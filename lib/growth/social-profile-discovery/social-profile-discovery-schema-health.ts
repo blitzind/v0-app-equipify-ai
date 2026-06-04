@@ -6,10 +6,17 @@ export { GROWTH_SOCIAL_PROFILE_DISCOVERY_MIGRATION }
 export async function isGrowthSocialProfileDiscoverySchemaReady(
   admin: SupabaseClient,
 ): Promise<boolean> {
-  const { error } = await admin
+  const { error: runsErr } = await admin
     .schema("growth")
     .from("social_profile_discovery_runs")
     .select("id")
     .limit(1)
-  return !error
+  if (runsErr) return false
+
+  const { error: jobsErr } = await admin
+    .schema("growth")
+    .from("social_profile_discovery_jobs")
+    .select("id")
+    .limit(1)
+  return !jobsErr
 }

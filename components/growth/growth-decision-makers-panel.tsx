@@ -9,6 +9,7 @@ import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/gr
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import { GrowthEmailDiscoveryOperatorCard } from "@/components/growth/growth-email-discovery-operator-card"
 import { GrowthPhoneDiscoveryOperatorCard } from "@/components/growth/growth-phone-discovery-operator-card"
+import { GrowthSocialProfileDiscoveryOperatorCard } from "@/components/growth/growth-social-profile-discovery-operator-card"
 import type { GrowthLeadDecisionMaker } from "@/lib/growth/decision-maker-types"
 import type { GrowthLead } from "@/lib/growth/types"
 import { cn } from "@/lib/utils"
@@ -254,6 +255,12 @@ export function GrowthDecisionMakersPanel({
                             personLabel={dm.fullName}
                           />
                           <GrowthPhoneDiscoveryOperatorCard
+                            compact
+                            companyId={canonicalCompanyId}
+                            personId={dm.canonicalPersonId}
+                            personLabel={dm.fullName}
+                          />
+                          <GrowthSocialProfileDiscoveryOperatorCard
                             compact
                             companyId={canonicalCompanyId}
                             personId={dm.canonicalPersonId}

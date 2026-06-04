@@ -7,6 +7,8 @@ import { GROWTH_EMAIL_DISCOVERY_PROSPECT_FILTERS } from "@/lib/growth/email-disc
 import type { GrowthEmailDiscoveryProspectFilter } from "@/lib/growth/email-discovery/email-discovery-runtime-types"
 import { GROWTH_PHONE_DISCOVERY_PROSPECT_FILTERS } from "@/lib/growth/phone-discovery/phone-discovery-runtime-types"
 import type { GrowthPhoneDiscoveryProspectFilter } from "@/lib/growth/phone-discovery/phone-discovery-runtime-types"
+import { GROWTH_SOCIAL_PROFILE_DISCOVERY_PROSPECT_FILTERS } from "@/lib/growth/social-profile-discovery/social-profile-discovery-runtime-types"
+import type { GrowthSocialProfileDiscoveryProspectFilter } from "@/lib/growth/social-profile-discovery/social-profile-discovery-runtime-types"
 
 export const runtime = "nodejs"
 
@@ -68,6 +70,22 @@ export async function GET(request: Request) {
     )
   }
 
+  const socialProfileDiscoveryParam = url.searchParams.get("social_profile_discovery_filter") ?? ""
+  const socialProfileDiscoveryFilterParsed = GROWTH_SOCIAL_PROFILE_DISCOVERY_PROSPECT_FILTERS.includes(
+    socialProfileDiscoveryParam as GrowthSocialProfileDiscoveryProspectFilter,
+  )
+    ? (socialProfileDiscoveryParam as GrowthSocialProfileDiscoveryProspectFilter)
+    : null
+  if (socialProfileDiscoveryParam && !socialProfileDiscoveryFilterParsed) {
+    return NextResponse.json(
+      {
+        error: "invalid_social_profile_discovery_filter",
+        message: `social_profile_discovery_filter must be one of: ${GROWTH_SOCIAL_PROFILE_DISCOVERY_PROSPECT_FILTERS.join(", ")}.`,
+      },
+      { status: 400 },
+    )
+  }
+
   if (!limitParsed.success || !offsetParsed.success) {
     return NextResponse.json({ error: "invalid_pagination", message: "Invalid limit or offset." }, { status: 400 })
   }
@@ -81,6 +99,7 @@ export async function GET(request: Request) {
       unassigned: unassignedParam || undefined,
       emailDiscoveryFilter: emailDiscoveryFilterParsed,
       phoneDiscoveryFilter: phoneDiscoveryFilterParsed,
+      socialProfileDiscoveryFilter: socialProfileDiscoveryFilterParsed,
     })
 
     logGrowthEngine("call_queue_list_success", {

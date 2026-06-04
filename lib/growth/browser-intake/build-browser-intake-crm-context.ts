@@ -13,6 +13,7 @@ import { buildLinkedInLookupQuery } from "@/lib/growth/browser-intake/linkedin-c
 import { resolveCanonicalCompanyIdForLead } from "@/lib/growth/canonical-persons/canonical-person-repository"
 import { loadEmailDiscoveryOperatorStatus } from "@/lib/growth/email-discovery/email-discovery-operator-status"
 import { loadPhoneDiscoveryOperatorStatus } from "@/lib/growth/phone-discovery/phone-discovery-operator-status"
+import { loadSocialProfileDiscoveryOperatorStatus } from "@/lib/growth/social-profile-discovery/social-profile-discovery-operator-status"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { normalizeCompanyName, normalizeWebsiteDomain } from "@/lib/growth/import/normalize"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
@@ -156,6 +157,7 @@ export async function buildBrowserIntakeCrmContext(
   const decisionMakersForDiscovery = await listGrowthLeadDecisionMakers(admin, lead.id)
   const email_discovery_contacts = []
   const phone_discovery_contacts = []
+  const social_profile_discovery_contacts = []
   if (canonical_company_id) {
     for (const dm of decisionMakersForDiscovery) {
       const person_id = dm.canonicalPersonId?.trim() ?? ""
@@ -188,6 +190,22 @@ export async function buildBrowserIntakeCrmContext(
           has_verified_phone: phoneStatus.has_verified_phone,
           discovery_status: phoneStatus.discovery_status,
           can_discover: phoneStatus.can_discover,
+        })
+      }
+      const socialStatus = await loadSocialProfileDiscoveryOperatorStatus(admin, {
+        company_id: canonical_company_id,
+        person_id,
+        discovery_scope: "person",
+      })
+      if (socialStatus) {
+        social_profile_discovery_contacts.push({
+          person_id,
+          name: dm.fullName,
+          title: dm.title,
+          verified_profile: socialStatus.verified_profile,
+          has_verified_profile: socialStatus.has_verified_profile,
+          discovery_status: socialStatus.discovery_status,
+          can_discover: socialStatus.can_discover,
         })
       }
     }
@@ -275,6 +293,7 @@ export async function buildBrowserIntakeCrmContext(
     canonical_company_id,
     email_discovery_contacts,
     phone_discovery_contacts,
+    social_profile_discovery_contacts,
     links: {
       lead: `${adminPrefix}${buildAdminLinks(lead.id, lead.companyName, opportunity?.id ?? null).lead}`,
       company: `${adminPrefix}${buildAdminLinks(lead.id, lead.companyName, opportunity?.id ?? null).company}`,

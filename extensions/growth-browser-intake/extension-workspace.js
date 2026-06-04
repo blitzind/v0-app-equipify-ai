@@ -1117,6 +1117,71 @@
     }
   }
 
+  async function enqueueBrowserSocialProfileDiscovery(companyId, personId, buttonEl) {
+    if (!companyId || !personId) return
+    if (buttonEl) {
+      buttonEl.disabled = true
+      buttonEl.textContent = "Queuing…"
+    }
+    try {
+      const res = await fetch("/api/platform/growth/browser-intake/social-profile-discovery", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_id: companyId,
+          person_id: personId,
+          promote_on_complete: true,
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || !body.ok) {
+        throw new Error(body.message ?? "Could not queue social profile discovery.")
+      }
+      if (buttonEl) {
+        buttonEl.textContent = body.enqueued ? "Queued" : body.reason ?? "Skipped"
+      }
+    } catch (error) {
+      if (buttonEl) buttonEl.textContent = "Discover social"
+      window.EquipifyGrowthPanelLoad?.setStatus?.(
+        error instanceof Error ? error.message : "Social profile discovery failed.",
+        "error",
+      )
+    } finally {
+      if (buttonEl && buttonEl.textContent === "Queuing…") buttonEl.textContent = "Discover social"
+    }
+  }
+
+  function renderSocialProfileDiscoveryContacts(context) {
+    const list = document.getElementById("es-ws-social-profile-discovery-list")
+    if (!list) return
+    const companyId = trimOrNull(context?.canonical_company_id)
+    const contacts = context?.social_profile_discovery_contacts ?? []
+    if (!companyId || !contacts.length) {
+      list.innerHTML =
+        '<p class="es-ws-empty">Canonical social profile discovery is available after decision makers are linked to canonical persons.</p>'
+      return
+    }
+    list.innerHTML = contacts
+      .slice(0, 6)
+      .map((contact) => {
+        const verified = contact.has_verified_profile
+          ? `<span class="es-ws-meta">${escapeHtml(contact.verified_profile ?? "verified")}</span>`
+          : `<button type="button" class="es-ws-inline-btn es-ws-social-profile-discovery-btn" data-company-id="${escapeHtml(companyId)}" data-person-id="${escapeHtml(contact.person_id)}">Discover social</button>`
+        return `<div class="es-ws-social-profile-discovery-row"><strong>${escapeHtml(contact.name)}</strong> ${verified}<span class="es-ws-meta">${escapeHtml(contact.discovery_status)}</span></div>`
+      })
+      .join("")
+    list.querySelectorAll(".es-ws-social-profile-discovery-btn[data-person-id][data-company-id]").forEach((button) => {
+      button.addEventListener("click", () => {
+        void enqueueBrowserSocialProfileDiscovery(
+          button.getAttribute("data-company-id"),
+          button.getAttribute("data-person-id"),
+          button,
+        )
+      })
+    })
+  }
+
   function renderPhoneDiscoveryContacts(context) {
     const list = document.getElementById("es-ws-phone-discovery-list")
     if (!list) return
@@ -1497,6 +1562,7 @@
     renderCrmContacts(context)
     renderEmailDiscoveryContacts(context)
     renderPhoneDiscoveryContacts(context)
+    renderSocialProfileDiscoveryContacts(context)
     renderTechnologies(detected, context)
     renderSignals(detected, context)
     renderCrmRelationship(context, relationship, contactsCount, oppCount, customerCount, hasMatch)

@@ -13,6 +13,11 @@ import {
   matchesPhoneDiscoveryProspectFilter,
   type GrowthPhoneDiscoveryProspectFilter,
 } from "@/lib/growth/phone-discovery/phone-discovery-runtime-types"
+import { loadSocialProfileDiscoveryLeadRollup } from "@/lib/growth/social-profile-discovery/social-profile-discovery-lead-rollup"
+import {
+  matchesSocialProfileDiscoveryProspectFilter,
+  type GrowthSocialProfileDiscoveryProspectFilter,
+} from "@/lib/growth/social-profile-discovery/social-profile-discovery-runtime-types"
 import { fetchGrowthLeadDecisionMakerById } from "@/lib/growth/decision-maker-repository"
 import { listGrowthLeads } from "@/lib/growth/lead-repository"
 import { resolveGrowthRepLabels } from "@/lib/growth/assignment/rep-roster-repository"
@@ -41,6 +46,7 @@ export async function listGrowthCallQueue(
     unassigned?: boolean
     emailDiscoveryFilter?: GrowthEmailDiscoveryProspectFilter | null
     phoneDiscoveryFilter?: GrowthPhoneDiscoveryProspectFilter | null
+    socialProfileDiscoveryFilter?: GrowthSocialProfileDiscoveryProspectFilter | null
   },
 ): Promise<GrowthCallQueueRow[]> {
   const leads = await listGrowthLeads(admin, {
@@ -114,6 +120,13 @@ export async function listGrowthCallQueue(
     if (input.phoneDiscoveryFilter) {
       const rollup = await loadPhoneDiscoveryLeadRollup(admin, lead.id)
       if (!matchesPhoneDiscoveryProspectFilter(input.phoneDiscoveryFilter, rollup)) {
+        continue
+      }
+    }
+
+    if (input.socialProfileDiscoveryFilter) {
+      const rollup = await loadSocialProfileDiscoveryLeadRollup(admin, lead.id)
+      if (!matchesSocialProfileDiscoveryProspectFilter(input.socialProfileDiscoveryFilter, rollup)) {
         continue
       }
     }

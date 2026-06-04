@@ -166,19 +166,4 @@ export type GrowthSocialProfileDiscoveryRunDetail = {
   >
 }
 
-/** Operator rollup for infrastructure (7.5A — run-based, no job queue). */
-export type GrowthSocialProfileDiscoveryOperatorStatus = {
-  company_id: string
-  person_id: string | null
-  discovery_scope: GrowthSocialProfileDiscoveryScope
-  has_verified_profile: boolean
-  verified_profile: string | null
-  verified_profile_type: GrowthSocialProfileDiscoveryProfileType | null
-  discovery_status: "none" | "completed" | "failed"
-  last_run_id: string | null
-  last_run_status: string | null
-  last_run_at: string | null
-  evidence_count: number
-  can_discover: boolean
-  can_view_evidence: boolean
-}
+export type { GrowthSocialProfileDiscoveryOperatorStatus } from "@/lib/growth/social-profile-discovery/social-profile-discovery-runtime-types"

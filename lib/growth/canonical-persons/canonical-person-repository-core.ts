@@ -551,5 +551,12 @@ export async function persistCanonicalPersonChannels(
       company_id: input.canonical_company_id,
       person_id: personId,
     })
+    const { triggerSocialProfileDiscoveryAfterPersonPersist } = await import(
+      "@/lib/growth/social-profile-discovery/social-profile-discovery-triggers"
+    )
+    await triggerSocialProfileDiscoveryAfterPersonPersist(admin, {
+      company_id: input.canonical_company_id,
+      person_id: personId,
+    })
   }
 }

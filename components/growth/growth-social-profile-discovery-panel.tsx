@@ -13,6 +13,7 @@ import {
   type EmailDiscoveryRolePairRow,
 } from "@/lib/growth/email-discovery/email-discovery-role-pairs"
 import { GROWTH_SOCIAL_PROFILE_DISCOVERY_QA_MARKER } from "@/lib/growth/social-profile-discovery/social-profile-discovery-types"
+import { GROWTH_SOCIAL_PROFILE_DISCOVERY_RUNTIME_QA_MARKER } from "@/lib/growth/social-profile-discovery/social-profile-discovery-runtime-types"
 import type { GrowthSocialProfileDiscoveryRunDetail } from "@/lib/growth/social-profile-discovery/social-profile-discovery-types"
 
 type DiscoveryResult = {
@@ -48,6 +49,7 @@ export function GrowthSocialProfileDiscoveryPanel() {
   const [running, setRunning] = useState(false)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [result, setResult] = useState<DiscoveryResult | null>(null)
   const [detail, setDetail] = useState<GrowthSocialProfileDiscoveryRunDetail | null>(null)
   const [promote, setPromote] = useState(true)
@@ -178,7 +180,7 @@ export function GrowthSocialProfileDiscoveryPanel() {
     }
   }
 
-  async function runDiscovery() {
+  async function runDiscovery(sync = false) {
     if (discoveryScope === "person" && !hasValidRole) {
       setError("Select a company/person role pair or enter IDs with an existing person_company_roles row.")
       return
@@ -190,19 +192,25 @@ export function GrowthSocialProfileDiscoveryPanel() {
 
     setRunning(true)
     setError(null)
+    setNotice(null)
     setResult(null)
     setDetail(null)
     try {
       const body: Record<string, unknown> = {
         company_id: companyId.trim(),
         discovery_scope: discoveryScope,
-        promote,
+        promote_on_complete: promote,
+        promote: sync ? promote : undefined,
+        trigger_source: "infrastructure_panel",
       }
       if (discoveryScope === "person") {
         body.person_id = personId.trim()
       }
 
-      const res = await fetch("/api/platform/growth/social-profile-discovery/run", {
+      const endpoint = sync
+        ? "/api/platform/growth/social-profile-discovery/run"
+        : "/api/platform/growth/social-profile-discovery/jobs"
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -210,14 +218,29 @@ export function GrowthSocialProfileDiscoveryPanel() {
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
         result?: DiscoveryResult
+        enqueued?: boolean
+        job_id?: string | null
+        reason?: string | null
         message?: string
         error?: unknown
       }
-      if (!res.ok || !data.ok || !data.result) {
+      if (!res.ok || !data.ok) {
         throw new Error(formatCanonicalPersonBackfillRequestError(data))
       }
-      setResult(data.result)
-      await loadRunDetail(data.result.run_id)
+      if (sync && data.result) {
+        setResult(data.result)
+        await loadRunDetail(data.result.run_id)
+      } else {
+        setNotice(
+          data.enqueued
+            ? `Queued job ${data.job_id ?? ""}. The growth-social-profile-discovery-worker cron processes pending jobs.`
+            : data.reason === "verified_profile_exists"
+              ? "Verified profile already on file — job not queued."
+              : data.reason === "active_job_exists"
+                ? "Discovery already queued or running."
+                : "Discovery was not queued.",
+        )
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Social profile discovery failed.")
     } finally {
@@ -234,15 +257,19 @@ export function GrowthSocialProfileDiscoveryPanel() {
     !running
 
   return (
-    <GrowthEngineCard title="Social profile discovery (7.5A)">
-      <div className="space-y-4" data-qa-marker={GROWTH_SOCIAL_PROFILE_DISCOVERY_QA_MARKER}>
+    <GrowthEngineCard title="Social profile discovery (7.5A + 7.5B)">
+      <div
+        className="space-y-4"
+        data-qa-marker={GROWTH_SOCIAL_PROFILE_DISCOVERY_QA_MARKER}
+        data-runtime-qa-marker={GROWTH_SOCIAL_PROFILE_DISCOVERY_RUNTIME_QA_MARKER}
+      >
         <p className="text-sm text-muted-foreground">
           Evidence-backed social profile URLs for canonical persons or companies. Supported types:
           LinkedIn person/company, X/Twitter, Facebook, Instagram. No AI URL generation, no username
           guessing, no authenticated scraping. Only <code className="text-xs">verified</code> candidates
           at confidence ≥ 0.85 promote to <code className="text-xs">person_profiles</code> or{" "}
-          <code className="text-xs">company_profiles</code>. Runtime queues and browser triggers ship in
-          7.5B.
+          <code className="text-xs">company_profiles</code>. Default action queues async jobs processed by{" "}
+          <code className="text-xs">growth-social-profile-discovery-worker</code>.
         </p>
 
         <div className="flex flex-wrap gap-4">
@@ -321,12 +348,16 @@ export function GrowthSocialProfileDiscoveryPanel() {
         </label>
 
         <div className="flex flex-wrap gap-2">
-          <Button type="button" disabled={!canRun} onClick={() => void runDiscovery()}>
+          <Button type="button" disabled={!canRun} onClick={() => void runDiscovery(false)}>
             {running ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Share2 className="mr-2 size-4" />}
-            Run discovery
+            Queue discovery (7.5B)
+          </Button>
+          <Button type="button" variant="outline" disabled={!canRun} onClick={() => void runDiscovery(true)}>
+            Run sync (debug)
           </Button>
         </div>
 
+        {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
         {result ? (

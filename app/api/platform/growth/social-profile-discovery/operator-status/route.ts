@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { loadSocialProfileDiscoveryOperatorStatus } from "@/lib/growth/social-profile-discovery/social-profile-discovery-operator-status"
 import { GROWTH_SOCIAL_PROFILE_DISCOVERY_QA_MARKER } from "@/lib/growth/social-profile-discovery/social-profile-discovery-types"
+import { GROWTH_SOCIAL_PROFILE_DISCOVERY_RUNTIME_QA_MARKER } from "@/lib/growth/social-profile-discovery/social-profile-discovery-runtime-types"
 
 export const runtime = "nodejs"
 
@@ -52,6 +53,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     ok: true,
     qa_marker: GROWTH_SOCIAL_PROFILE_DISCOVERY_QA_MARKER,
+    runtime_qa_marker: GROWTH_SOCIAL_PROFILE_DISCOVERY_RUNTIME_QA_MARKER,
     status,
   })
 }

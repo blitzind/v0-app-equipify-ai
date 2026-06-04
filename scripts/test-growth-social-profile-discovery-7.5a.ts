@@ -212,7 +212,6 @@ assert.match(panel, /social-profile-discovery\/runs\//)
 assert.match(panel, /person_company_roles/)
 assert.match(panel, /GROWTH_SOCIAL_PROFILE_DISCOVERY_QA_MARKER/)
 assert.match(panel, /social-profile-discovery\/run/)
-assert.doesNotMatch(panel, /social-profile-discovery\/jobs/)
 
 const infra = fs.readFileSync(
   path.join(process.cwd(), "app/(admin)/admin/growth/infrastructure/page.tsx"),

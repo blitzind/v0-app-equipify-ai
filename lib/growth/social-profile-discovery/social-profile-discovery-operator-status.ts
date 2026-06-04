@@ -1,12 +1,15 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { resolveSocialProfileDiscoveryDisplayStatus } from "@/lib/growth/social-profile-discovery/social-profile-discovery-discovery-status"
 import { companyHasVerifiedSocialProfile } from "@/lib/growth/social-profile-discovery/social-profile-discovery-company-profile-integrity"
 import { personHasVerifiedSocialProfile } from "@/lib/growth/social-profile-discovery/social-profile-discovery-person-profile-integrity"
+import { recoverStaleSocialProfileDiscoveryRunningJobs } from "@/lib/growth/social-profile-discovery/social-profile-discovery-stale-jobs"
 import type {
+  GrowthSocialProfileDiscoveryJobStatus,
   GrowthSocialProfileDiscoveryOperatorStatus,
-  GrowthSocialProfileDiscoveryScope,
-} from "@/lib/growth/social-profile-discovery/social-profile-discovery-types"
+} from "@/lib/growth/social-profile-discovery/social-profile-discovery-runtime-types"
+import type { GrowthSocialProfileDiscoveryScope } from "@/lib/growth/social-profile-discovery/social-profile-discovery-types"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -39,6 +42,12 @@ export async function loadSocialProfileDiscoveryOperatorStatus(
       .maybeSingle()
     if (!role) return null
   }
+
+  await recoverStaleSocialProfileDiscoveryRunningJobs(admin, {
+    company_id,
+    person_id,
+    discovery_scope,
+  })
 
   const has_verified_profile =
     discovery_scope === "person" && person_id
@@ -82,7 +91,42 @@ export async function loadSocialProfileDiscoveryOperatorStatus(
     }
   }
 
-  let runQuery = admin
+  let activeJobQuery = admin
+    .schema("growth")
+    .from("social_profile_discovery_jobs")
+    .select("id, status")
+    .eq("company_id", company_id)
+    .eq("discovery_scope", discovery_scope)
+    .in("status", ["pending", "running"])
+
+  if (discovery_scope === "person" && person_id) {
+    activeJobQuery = activeJobQuery.eq("person_id", person_id)
+  } else {
+    activeJobQuery = activeJobQuery.is("person_id", null)
+  }
+  const { data: activeJob } = await activeJobQuery.maybeSingle()
+
+  let latestJobQuery = admin
+    .schema("growth")
+    .from("social_profile_discovery_jobs")
+    .select("id, status, run_id, completed_at, created_at, last_error")
+    .eq("company_id", company_id)
+    .eq("discovery_scope", discovery_scope)
+    .order("created_at", { ascending: false })
+    .limit(1)
+
+  if (discovery_scope === "person" && person_id) {
+    latestJobQuery = latestJobQuery.eq("person_id", person_id)
+  } else {
+    latestJobQuery = latestJobQuery.is("person_id", null)
+  }
+  const { data: latestJob } = await latestJobQuery.maybeSingle()
+
+  const latest_job_status = latestJob?.status
+    ? (asString(latestJob.status) as GrowthSocialProfileDiscoveryJobStatus)
+    : null
+
+  let lastRunQuery = admin
     .schema("growth")
     .from("social_profile_discovery_runs")
     .select("id, status, completed_at, started_at, created_at")
@@ -92,15 +136,15 @@ export async function loadSocialProfileDiscoveryOperatorStatus(
     .limit(1)
 
   if (discovery_scope === "person" && person_id) {
-    runQuery = runQuery.eq("person_id", person_id)
+    lastRunQuery = lastRunQuery.eq("person_id", person_id)
   } else {
-    runQuery = runQuery.is("person_id", null)
+    lastRunQuery = lastRunQuery.is("person_id", null)
   }
+  const { data: lastRun } = await lastRunQuery.maybeSingle()
 
-  const { data: lastRun } = await runQuery.maybeSingle()
+  const evidence_run_id = asString(latestJob?.run_id) || (lastRun?.id ? asString(lastRun.id) : null)
 
   let evidence_count = 0
-  const evidence_run_id = lastRun?.id ? asString(lastRun.id) : null
   if (evidence_run_id) {
     const { data: candidateRows } = await admin
       .schema("growth")
@@ -118,16 +162,21 @@ export async function loadSocialProfileDiscoveryOperatorStatus(
     }
   }
 
+  const active_job_status = activeJob?.status
+    ? (asString(activeJob.status) as GrowthSocialProfileDiscoveryJobStatus)
+    : null
   const last_run_status = lastRun?.status ? asString(lastRun.status) : null
   const last_run_at =
     asString(lastRun?.completed_at) || asString(lastRun?.started_at) || asString(lastRun?.created_at) || null
 
-  let discovery_status: GrowthSocialProfileDiscoveryOperatorStatus["discovery_status"] = "none"
-  if (last_run_status === "completed" || last_run_status === "partial") discovery_status = "completed"
-  else if (last_run_status === "failed") discovery_status = "failed"
+  const discovery_status = resolveSocialProfileDiscoveryDisplayStatus({
+    active_job_status,
+    latest_job_status,
+    last_run_status,
+  })
 
-  const can_discover = !has_verified_profile
-  const can_view_evidence = evidence_count > 0
+  const active_job_blocked = Boolean(activeJob?.id)
+  const display_run_id = evidence_run_id || null
 
   return {
     company_id,
@@ -137,11 +186,21 @@ export async function loadSocialProfileDiscoveryOperatorStatus(
     verified_profile,
     verified_profile_type,
     discovery_status,
-    last_run_id: evidence_run_id,
+    job_status: active_job_status ?? latest_job_status,
+    job_id: activeJob?.id
+      ? asString(activeJob.id)
+      : latestJob?.id
+        ? asString(latestJob.id)
+        : null,
+    last_run_id: display_run_id,
     last_run_status,
-    last_run_at,
+    last_run_at:
+      discovery_status === "failed" && latestJob?.completed_at
+        ? asString(latestJob.completed_at) || last_run_at
+        : last_run_at,
     evidence_count,
-    can_discover,
-    can_view_evidence,
+    can_discover: !active_job_blocked && !has_verified_profile,
+    can_view_evidence: Boolean(display_run_id && evidence_count > 0),
+    active_job_blocked,
   }
 }

@@ -39,19 +39,14 @@ export function verifySocialProfileDiscoveryDraft(
       e.evidence_type === "website_structured" ||
       e.evidence_type === "social_link",
   )
-  const hasStagingEvidence = draft.evidence.some((e) => e.evidence_type === "staging_row")
   const stagingTrusted = draft.staging_trusted === true
 
   if (draft.source === "website" && hasDirectWebsiteEvidence && confidence >= 0.85) {
     verification_status = "verified"
     reasons.push("Website social link with explicit URL on crawled page.")
-  } else if (
-    draft.source === "staging_contact" &&
-    (stagingTrusted || hasStagingEvidence) &&
-    confidence >= 0.85
-  ) {
+  } else if (draft.source === "staging_contact" && stagingTrusted && confidence >= 0.85) {
     verification_status = "verified"
-    reasons.push("Staging row linked to canonical subject with trusted contact status.")
+    reasons.push("Trusted staging row linked to canonical subject at verified confidence threshold.")
   } else if (draft.source === "canonical_channel" && confidence >= 0.8) {
     verification_status = "probable"
     reasons.push("Existing canonical profile channel — not re-crawled.")

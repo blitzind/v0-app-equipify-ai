@@ -262,16 +262,17 @@ export async function collectStagingSocialProfileDiscoveryCandidates(
     const { data: contacts } = await admin
       .schema("growth")
       .from("company_contacts")
-      .select("id, linkedin_url, linkedin_company_url, metadata")
+      .select("id, linkedin_url, metadata")
       .eq("canonical_company_id", ctx.company_id)
 
     for (const row of contacts ?? []) {
+      const meta =
+        row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+          ? (row.metadata as Record<string, unknown>)
+          : {}
       const companyUrl =
-        (typeof row.linkedin_company_url === "string" && row.linkedin_company_url) ||
-        (typeof row.metadata === "object" &&
-          row.metadata &&
-          typeof (row.metadata as Record<string, unknown>).linkedin_company_url === "string" &&
-          ((row.metadata as Record<string, unknown>).linkedin_company_url as string)) ||
+        (typeof meta.linkedin_company_url === "string" && meta.linkedin_company_url.trim()) ||
+        (typeof meta.linkedin_company === "string" && meta.linkedin_company.trim()) ||
         null
       if (companyUrl) {
         const draft = draftFromUrl({
