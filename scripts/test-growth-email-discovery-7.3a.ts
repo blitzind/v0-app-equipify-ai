@@ -242,15 +242,19 @@ const pdlQuery = buildPdlPersonSearchQuery({
   domain: "acme.example",
   prefer_reachable: true,
 })
-const bool = (pdlQuery.query as { query: { bool: Record<string, unknown> } }).query.bool
+const pdlJson = JSON.stringify(pdlQuery.query)
+assert.doesNotMatch(pdlJson, /minimum_should_match/)
+const bool = (pdlQuery.query as { query: { bool: { must: unknown[] } } }).query.bool
 assert.ok(Array.isArray(bool.must))
-assert.ok(Array.isArray(bool.should))
-assert.equal(bool.minimum_should_match, 1)
-assert.equal(
-  JSON.stringify(bool.must),
-  JSON.stringify(bool.must).replace(/minimum_should_match/, ""),
-)
-assert.doesNotMatch(JSON.stringify(bool.must), /minimum_should_match/)
+const reachable = bool.must.find(
+  (c) =>
+    typeof c === "object" &&
+    c !== null &&
+    "bool" in c &&
+    Array.isArray((c as { bool: { should: unknown[] } }).bool.should),
+) as { bool: { should: unknown[] } } | undefined
+assert.ok(reachable?.bool.should.length)
+assert.doesNotMatch(JSON.stringify(reachable), /minimum_should_match/)
 
 const zbConfig = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/contact-verification/providers/zerobounce-config.ts"),
