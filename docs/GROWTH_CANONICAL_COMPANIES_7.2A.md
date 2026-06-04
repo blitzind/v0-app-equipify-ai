@@ -62,27 +62,40 @@ Preferred path: platform admin session against the deployed Growth Engine (uses 
 - Signed-in user email on `EQUIPIFY_PLATFORM_ADMIN_EMAILS`
 - `GROWTH_ENGINE_ENABLED=true` on the deployment
 
-**Dry run:**
+**Chunked execution (required on Vercel):** Each request processes at most **40** unlinked staging rows (`batch_size` default 40, max 100). Responses include `done`, `cursor`, and `progress`. Repeat until `done: true`. Resume-safe: linked rows and lineage are skipped on subsequent chunks.
+
+**Dry run (first chunk):**
 
 ```bash
 curl -X POST "$ORIGIN/api/platform/growth/canonical-companies/backfill" \
   -H "Content-Type: application/json" \
   -H "Cookie: <platform-admin-session>" \
-  -d '{"mode":"dry_run"}'
+  -d '{"mode":"dry_run","batch_size":40}'
 ```
 
-**Apply** (exact confirmation required):
+**Dry run (resume):**
 
 ```bash
 curl -X POST "$ORIGIN/api/platform/growth/canonical-companies/backfill" \
   -H "Content-Type: application/json" \
   -H "Cookie: <platform-admin-session>" \
-  -d '{"mode":"apply","confirm":"APPLY_GROWTH_CANONICAL_COMPANIES_7_2A"}'
+  -d '{"mode":"dry_run","batch_size":40,"cursor":<cursor from prior response>}'
 ```
 
-**UI:** `/admin/growth/infrastructure` — Canonical companies (7.2A) panel (dry run / apply).
+**Apply** (exact confirmation required; loop until `done: true`):
+
+```bash
+curl -X POST "$ORIGIN/api/platform/growth/canonical-companies/backfill" \
+  -H "Content-Type: application/json" \
+  -H "Cookie: <platform-admin-session>" \
+  -d '{"mode":"apply","confirm":"APPLY_GROWTH_CANONICAL_COMPANIES_7_2A","batch_size":40,"cursor":null}'
+```
+
+**UI:** `/admin/growth/infrastructure` — Canonical companies panel auto-loops chunks until complete.
 
 Schema pre-check returns `{ "ok": false, "reason": "schema_not_ready" }` with HTTP 503 when migration tables are missing.
+
+**Why chunked:** Full apply issues ~5 sequential DB round-trips per candidate (~2.5k+ rows). A single request exceeds Vercel `FUNCTION_INVOCATION_TIMEOUT`; dry-run at ~94s is near the same limit.
 
 ## Production credentials (CLI fallback)
 

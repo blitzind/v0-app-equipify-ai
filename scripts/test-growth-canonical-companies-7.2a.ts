@@ -22,9 +22,13 @@ import {
   canonicalCompanyBackfillResponseExcludesSecrets,
   GROWTH_CANONICAL_COMPANY_APPLY_CONFIRM,
   GROWTH_CANONICAL_COMPANY_BACKFILL_API_QA_MARKER,
+  mergeCanonicalCompanyBackfillStats,
   parseCanonicalCompanyBackfillRequest,
   resolveCanonicalCompanyRuntimeContext,
 } from "../lib/growth/canonical-companies/canonical-company-backfill-api"
+import {
+  GROWTH_CANONICAL_COMPANY_BACKFILL_DEFAULT_BATCH_SIZE,
+} from "../lib/growth/canonical-companies/canonical-company-types"
 import {
   GROWTH_CANONICAL_COMPANY_MIGRATION,
   GROWTH_CANONICAL_COMPANY_QA_MARKER,
@@ -198,7 +202,10 @@ async function main(): Promise<void> {
 
   const dryParsed = parseCanonicalCompanyBackfillRequest({ mode: "dry_run" })
   assert.equal(dryParsed.ok, true)
-  if (dryParsed.ok) assert.equal(dryParsed.mode, "dry_run")
+  if (dryParsed.ok) {
+    assert.equal(dryParsed.mode, "dry_run")
+    assert.equal(dryParsed.batchSize, GROWTH_CANONICAL_COMPANY_BACKFILL_DEFAULT_BATCH_SIZE)
+  }
 
   const applyBad = parseCanonicalCompanyBackfillRequest({ mode: "apply", confirm: "wrong" })
   assert.equal(applyBad.ok, false)
@@ -216,8 +223,10 @@ async function main(): Promise<void> {
   )
   assert.match(routeSource, /requireGrowthEnginePlatformAccess/)
   assert.match(routeSource, /runCanonicalCompanyBackfill/)
+  assert.match(routeSource, /batchSize: parsed\.batchSize/)
   assert.match(routeSource, /isGrowthCanonicalCompanySchemaReady/)
   assert.match(routeSource, /parseCanonicalCompanyBackfillRequest/)
+  assert.doesNotMatch(routeSource, /maxDuration = 120/)
   assert.doesNotMatch(routeSource, /SUPABASE_SERVICE_ROLE_KEY/)
   assert.doesNotMatch(routeSource, /serviceRoleKey/)
   assert.doesNotMatch(routeSource, /createServiceRoleClient/)
@@ -230,7 +239,13 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(panelSource, /canonical-companies\/backfill/)
+  assert.match(panelSource, /batch_size: 40/)
+  assert.match(panelSource, /mergeCanonicalCompanyBackfillStats/)
   assert.match(panelSource, /GROWTH_CANONICAL_COMPANY_APPLY_CONFIRM/)
+
+  assert.match(backfillSource, /fetchPendingChunk/)
+  assert.match(backfillSource, /GrowthCanonicalCompanyBackfillCursor/)
+  assert.doesNotMatch(backfillSource, /fetchAllRows/)
 
   const infraPage = fs.readFileSync(
     path.join(process.cwd(), "app/(admin)/admin/growth/infrastructure/page.tsx"),
@@ -285,11 +300,43 @@ async function main(): Promise<void> {
   assert.ok(warnings.some((w) => w.includes("review-tier")))
   assert.ok(warnings.some((w) => w.includes("domain group")))
 
+  const merged = mergeCanonicalCompanyBackfillStats(mockStats, {
+    ...mockStats,
+    sources: {
+      ...mockStats.sources,
+      real_world_company_candidates: {
+        ...mockStats.sources.real_world_company_candidates,
+        rows_processed: 2,
+      },
+    },
+  })
+  assert.equal(merged.sources.real_world_company_candidates.rows_processed, 2)
+
   const apiPayload = buildCanonicalCompanyBackfillApiResponse({
     mode: "dry_run",
-    stats: mockStats,
+    result: {
+      stats: mockStats,
+      done: false,
+      cursor: {
+        source_table: "real_world_company_candidates",
+        after_id: "00000000-0000-4000-8000-000000000001",
+        domain_counts: { "acme.com": 2 },
+      },
+      progress: {
+        batch_size: 40,
+        processed_in_chunk: 1,
+        current_source_table: "real_world_company_candidates",
+      },
+      pending_by_source: {
+        external_company_candidates: 0,
+        real_world_company_candidates: 100,
+        discovery_candidates: 0,
+      },
+    },
     duration_ms: 42,
   })
+  assert.equal(apiPayload.done, false)
+  assert.ok(apiPayload.cursor)
   assert.equal(apiPayload.api_qa_marker, GROWTH_CANONICAL_COMPANY_BACKFILL_API_QA_MARKER)
   assert.equal(apiPayload.target_schema, "growth")
   assert.equal(apiPayload.duration_ms, 42)

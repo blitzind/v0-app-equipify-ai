@@ -5,59 +5,114 @@ import { Loader2, Play, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
-import { GROWTH_CANONICAL_COMPANY_APPLY_CONFIRM } from "@/lib/growth/canonical-companies/canonical-company-backfill-api"
-import { GROWTH_CANONICAL_COMPANY_QA_MARKER } from "@/lib/growth/canonical-companies/canonical-company-types"
+import {
+  GROWTH_CANONICAL_COMPANY_APPLY_CONFIRM,
+  mergeCanonicalCompanyBackfillStats,
+} from "@/lib/growth/canonical-companies/canonical-company-backfill-api"
+import {
+  GROWTH_CANONICAL_COMPANY_QA_MARKER,
+  type GrowthCanonicalCompanyBackfillCursor,
+  type GrowthCanonicalCompanyBackfillStats,
+} from "@/lib/growth/canonical-companies/canonical-company-types"
 
 type BackfillApiResponse = {
   ok?: boolean
+  done?: boolean
+  cursor?: GrowthCanonicalCompanyBackfillCursor | null
   mode?: string
   reason?: string
   error?: string
   message?: string
   duration_ms?: number
   warnings?: string[]
+  progress?: { processed_in_chunk?: number; batch_size?: number; current_source_table?: string }
   summary?: {
     canonical_companies_existing?: number
     canonical_companies_after?: number
     merge_groups_by_domain?: number
     skipped_already_linked?: number
     would_create_new?: number
+    processed_in_chunk?: number
+    batch_size?: number
   }
-  stats?: Record<string, unknown>
+  stats?: GrowthCanonicalCompanyBackfillStats
 }
 
 export function GrowthCanonicalCompanyBackfillPanel() {
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<BackfillApiResponse | null>(null)
+  const [chunkLabel, setChunkLabel] = useState<string | null>(null)
   const [showApplyConfirm, setShowApplyConfirm] = useState(false)
   const [confirmText, setConfirmText] = useState("")
 
-  async function runBackfill(mode: "dry_run" | "apply") {
+  async function runBackfillChunks(mode: "dry_run" | "apply") {
     setRunning(true)
     setError(null)
-    try {
-      const body =
-        mode === "apply"
-          ? { mode, confirm: GROWTH_CANONICAL_COMPANY_APPLY_CONFIRM }
-          : { mode: "dry_run" }
+    setChunkLabel(null)
 
-      const res = await fetch("/api/platform/growth/canonical-companies/backfill", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      })
-      const data = (await res.json().catch(() => ({}))) as BackfillApiResponse
-      if (!res.ok || !data.ok) {
-        throw new Error(data.message ?? data.reason ?? data.error ?? "Backfill request failed.")
+    let cursor: GrowthCanonicalCompanyBackfillCursor | null = null
+    let cumulative: GrowthCanonicalCompanyBackfillStats | null = null
+    let chunks = 0
+
+    try {
+      for (;;) {
+        chunks++
+        const body: Record<string, unknown> = {
+          mode,
+          batch_size: 40,
+          cursor,
+        }
+        if (mode === "apply") {
+          body.confirm = GROWTH_CANONICAL_COMPANY_APPLY_CONFIRM
+        }
+
+        const res = await fetch("/api/platform/growth/canonical-companies/backfill", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+        const data = (await res.json().catch(() => ({}))) as BackfillApiResponse
+        if (!res.ok || !data.ok || !data.stats) {
+          throw new Error(data.message ?? data.reason ?? data.error ?? "Backfill request failed.")
+        }
+
+        cumulative = cumulative
+          ? mergeCanonicalCompanyBackfillStats(cumulative, data.stats)
+          : data.stats
+
+        setChunkLabel(
+          `Chunk ${chunks}: ${data.progress?.processed_in_chunk ?? 0} rows · ${data.progress?.current_source_table ?? ""}${data.done ? " · complete" : ""}`,
+        )
+
+        if (data.done) {
+          setResult({
+            ...data,
+            stats: cumulative,
+            done: true,
+          })
+          break
+        }
+
+        cursor = data.cursor ?? null
+        if (!cursor) {
+          throw new Error("Backfill incomplete but no cursor returned.")
+        }
       }
-      setResult(data)
+
       if (mode === "apply") {
         setShowApplyConfirm(false)
         setConfirmText("")
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Backfill request failed.")
+      setError(
+        e instanceof Error
+          ? `${e.message}${cumulative ? " (partial progress saved — re-run apply to resume)" : ""}`
+          : "Backfill request failed.",
+      )
+      if (cumulative) {
+        setResult({ ok: true, mode, stats: cumulative, done: false })
+      }
     } finally {
       setRunning(false)
     }
@@ -65,13 +120,11 @@ export function GrowthCanonicalCompanyBackfillPanel() {
 
   return (
     <GrowthEngineCard title="Canonical companies (7.2A)">
-      <div
-        className="space-y-4"
-        data-qa-marker={GROWTH_CANONICAL_COMPANY_QA_MARKER}
-      >
+      <div className="space-y-4" data-qa-marker={GROWTH_CANONICAL_COMPANY_QA_MARKER}>
         <p className="text-sm text-muted-foreground">
-          Link staging company candidates to <code className="text-xs">growth.companies</code> via the
-          production backfill engine. Dry run reports stats only; apply writes canonical rows and lineage.
+          Link staging company candidates to <code className="text-xs">growth.companies</code>. Runs in
+          batches of 40 per request (resume-safe). Re-run apply after a timeout to continue from lineage +
+          linked staging rows.
         </p>
 
         <div className="flex flex-wrap gap-2">
@@ -79,7 +132,7 @@ export function GrowthCanonicalCompanyBackfillPanel() {
             size="sm"
             variant="outline"
             disabled={running}
-            onClick={() => void runBackfill("dry_run")}
+            onClick={() => void runBackfillChunks("dry_run")}
           >
             {running ? <Loader2 className="mr-2 size-4 animate-spin" /> : <ShieldCheck className="mr-2 size-4" />}
             Run dry run
@@ -114,28 +167,29 @@ export function GrowthCanonicalCompanyBackfillPanel() {
               className="mt-3"
               size="sm"
               disabled={running || confirmText !== GROWTH_CANONICAL_COMPANY_APPLY_CONFIRM}
-              onClick={() => void runBackfill("apply")}
+              onClick={() => void runBackfillChunks("apply")}
             >
               Confirm apply
             </Button>
           </div>
         ) : null}
 
+        {chunkLabel ? <p className="text-sm text-muted-foreground">{chunkLabel}</p> : null}
+
         {result?.ok ? (
           <div className="space-y-2 text-sm text-muted-foreground">
             <div className="flex flex-wrap gap-2">
               <GrowthBadge label={result.mode ?? "unknown"} tone={result.mode === "apply" ? "attention" : "neutral"} />
-              {typeof result.duration_ms === "number" ? (
-                <GrowthBadge label={`${result.duration_ms} ms`} tone="neutral" />
-              ) : null}
+              {result.done ? <GrowthBadge label="done" tone="healthy" /> : <GrowthBadge label="partial" tone="attention" />}
             </div>
-            {result.summary ? (
+            {result.stats ? (
               <p>
-                Existing {result.summary.canonical_companies_existing ?? 0} → after{" "}
-                {result.summary.canonical_companies_after ?? 0} · merge groups{" "}
-                {result.summary.merge_groups_by_domain ?? 0} · skipped linked{" "}
-                {result.summary.skipped_already_linked ?? 0} · would create{" "}
-                {result.summary.would_create_new ?? 0}
+                Processed {result.stats.sources.real_world_company_candidates.rows_processed} RW ·{" "}
+                {result.stats.sources.external_company_candidates.rows_processed} external · after{" "}
+                {result.stats.canonical_companies_after} companies · would create{" "}
+                {result.stats.sources.real_world_company_candidates.would_create_new +
+                  result.stats.sources.external_company_candidates.would_create_new +
+                  result.stats.sources.discovery_candidates.would_create_new}
               </p>
             ) : null}
             {result.warnings?.length ? (

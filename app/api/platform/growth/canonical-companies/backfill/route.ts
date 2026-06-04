@@ -11,7 +11,7 @@ import {
 } from "@/lib/growth/canonical-companies/canonical-company-schema-health"
 
 export const runtime = "nodejs"
-export const maxDuration = 120
+export const maxDuration = 60
 
 export async function POST(request: Request) {
   const access = await requireGrowthEnginePlatformAccess()
@@ -39,21 +39,29 @@ export async function POST(request: Request) {
 
   const startedMs = Date.now()
   try {
-    const stats = await runCanonicalCompanyBackfill(access.admin, { mode: parsed.mode })
+    const result = await runCanonicalCompanyBackfill(access.admin, {
+      mode: parsed.mode,
+      batchSize: parsed.batchSize,
+      cursor: parsed.cursor,
+    })
     const duration_ms = Date.now() - startedMs
 
     logGrowthEngine("canonical_company_backfill", {
       mode: parsed.mode,
       duration_ms,
+      done: result.done,
+      batch_size: result.progress.batch_size,
+      processed_in_chunk: result.progress.processed_in_chunk,
+      current_source_table: result.progress.current_source_table,
       actor_user_id: access.userId,
-      merge_groups_by_domain: stats.merge_groups_by_domain,
-      canonical_companies_after: stats.canonical_companies_after,
+      merge_groups_by_domain: result.stats.merge_groups_by_domain,
+      canonical_companies_after: result.stats.canonical_companies_after,
     })
 
     return NextResponse.json(
       buildCanonicalCompanyBackfillApiResponse({
         mode: parsed.mode,
-        stats,
+        result,
         duration_ms,
       }),
     )

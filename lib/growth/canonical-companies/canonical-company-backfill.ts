@@ -26,10 +26,20 @@ import {
 export { simulateCanonicalCompanyBackfill } from "@/lib/growth/canonical-companies/canonical-company-simulate"
 import {
   GROWTH_CANONICAL_COMPANY_QA_MARKER,
+  GROWTH_CANONICAL_COMPANY_BACKFILL_DEFAULT_BATCH_SIZE,
+  GROWTH_CANONICAL_COMPANY_BACKFILL_MAX_BATCH_SIZE,
+  type GrowthCanonicalCompanyBackfillCursor,
+  type GrowthCanonicalCompanyBackfillResult,
   type GrowthCanonicalCompanyBackfillStats,
   type GrowthCanonicalCompanyCandidateInput,
   type GrowthCanonicalCompanySourceTable,
 } from "@/lib/growth/canonical-companies/canonical-company-types"
+
+const DEFAULT_SOURCES: GrowthCanonicalCompanySourceTable[] = [
+  "external_company_candidates",
+  "real_world_company_candidates",
+  "discovery_candidates",
+]
 
 function emptySourceStats() {
   return {
@@ -45,27 +55,26 @@ function emptySourceStats() {
   }
 }
 
-async function fetchAllRows(
-  admin: SupabaseClient,
-  table: GrowthCanonicalCompanySourceTable,
-  select: string,
-): Promise<Record<string, unknown>[]> {
-  const rows: Record<string, unknown>[] = []
-  let from = 0
-  const pageSize = 1000
-  while (true) {
-    const { data, error } = await admin
-      .schema("growth")
-      .from(table)
-      .select(select)
-      .range(from, from + pageSize - 1)
-    if (error) throw new Error(`${table}: ${error.message}`)
-    const batch = (data ?? []) as Record<string, unknown>[]
-    rows.push(...batch)
-    if (batch.length < pageSize) break
-    from += pageSize
+function emptyStats(mode: "dry_run" | "apply", existingCount: number): GrowthCanonicalCompanyBackfillStats {
+  return {
+    qa_marker: GROWTH_CANONICAL_COMPANY_QA_MARKER,
+    mode,
+    sources: {
+      external_company_candidates: emptySourceStats(),
+      real_world_company_candidates: emptySourceStats(),
+      discovery_candidates: emptySourceStats(),
+    },
+    canonical_companies_existing: existingCount,
+    canonical_companies_after: existingCount,
+    unique_normalized_domains: 0,
+    merge_groups_by_domain: 0,
   }
-  return rows
+}
+
+function selectForTable(table: GrowthCanonicalCompanySourceTable): string {
+  return table === "discovery_candidates"
+    ? "id, run_id, company_id, source_type, discovery_source_type, company_name, website, domain, industry, location, city, state, source_confidence, dedupe_hash, discovered_at, created_at, metadata, canonical_company_id"
+    : "id, run_id, provider_name, provider_type, company_name, website, domain, phone, address, city, state, country, industry, confidence, dedupe_hash, created_at, metadata, canonical_company_id, query"
 }
 
 function mapRow(
@@ -121,6 +130,55 @@ function bumpStats(
     default:
       break
   }
+}
+
+function mergeGroupsFromDomainCounts(domainCounts: Record<string, number>): number {
+  let mergeGroups = 0
+  for (const count of Object.values(domainCounts)) {
+    if (count > 1) mergeGroups++
+  }
+  return mergeGroups
+}
+
+function trackDomain(domainCounts: Record<string, number>, domain: string | null): void {
+  if (!domain) return
+  domainCounts[domain] = (domainCounts[domain] ?? 0) + 1
+}
+
+export async function countUnlinkedStagingCandidates(
+  admin: SupabaseClient,
+  table: GrowthCanonicalCompanySourceTable,
+): Promise<number> {
+  const { count, error } = await admin
+    .schema("growth")
+    .from(table)
+    .select("id", { count: "exact", head: true })
+    .is("canonical_company_id", null)
+  if (error) throw new Error(`${table} count: ${error.message}`)
+  return count ?? 0
+}
+
+async function fetchPendingChunk(
+  admin: SupabaseClient,
+  table: GrowthCanonicalCompanySourceTable,
+  afterId: string | null,
+  limit: number,
+): Promise<Record<string, unknown>[]> {
+  let query = admin
+    .schema("growth")
+    .from(table)
+    .select(selectForTable(table))
+    .is("canonical_company_id", null)
+    .order("id", { ascending: true })
+    .limit(limit)
+
+  if (afterId) {
+    query = query.gt("id", afterId)
+  }
+
+  const { data, error } = await query
+  if (error) throw new Error(`${table}: ${error.message}`)
+  return (data ?? []) as Record<string, unknown>[]
 }
 
 async function processCandidate(
@@ -185,68 +243,196 @@ async function processCandidate(
   }
 }
 
+function resolveBatchSize(batchSize?: number): number | null {
+  if (batchSize == null) return null
+  return Math.min(
+    GROWTH_CANONICAL_COMPANY_BACKFILL_MAX_BATCH_SIZE,
+    Math.max(1, Math.floor(batchSize)),
+  )
+}
+
+function resolveStartTable(
+  sources: GrowthCanonicalCompanySourceTable[],
+  cursor: GrowthCanonicalCompanyBackfillCursor | null | undefined,
+): GrowthCanonicalCompanySourceTable {
+  if (cursor?.source_table && sources.includes(cursor.source_table)) {
+    return cursor.source_table
+  }
+  return sources[0]
+}
+
+function nextSourceTable(
+  sources: GrowthCanonicalCompanySourceTable[],
+  current: GrowthCanonicalCompanySourceTable,
+): GrowthCanonicalCompanySourceTable | null {
+  const idx = sources.indexOf(current)
+  if (idx < 0 || idx >= sources.length - 1) return null
+  return sources[idx + 1]
+}
+
 export async function runCanonicalCompanyBackfill(
   admin: SupabaseClient,
-  options: { mode: "dry_run" | "apply"; sources?: GrowthCanonicalCompanySourceTable[] },
-): Promise<GrowthCanonicalCompanyBackfillStats> {
+  options: {
+    mode: "dry_run" | "apply"
+    sources?: GrowthCanonicalCompanySourceTable[]
+    batchSize?: number
+    cursor?: GrowthCanonicalCompanyBackfillCursor | null
+  },
+): Promise<GrowthCanonicalCompanyBackfillResult> {
   const mode = options.mode
-  const sources: GrowthCanonicalCompanySourceTable[] =
-    options.sources ?? [
-      "external_company_candidates",
-      "real_world_company_candidates",
-      "discovery_candidates",
-    ]
+  const sources = options.sources ?? DEFAULT_SOURCES
+  const batchSize = resolveBatchSize(
+    options.batchSize ?? (options.cursor != null ? GROWTH_CANONICAL_COMPANY_BACKFILL_DEFAULT_BATCH_SIZE : undefined),
+  )
 
   const existingCount = await countCanonicalCompanies(admin)
   const loaded = await loadCanonicalCompanyIndexesFromDb(admin)
   const indexes = buildIndexesFromDb(loaded)
 
-  const stats: GrowthCanonicalCompanyBackfillStats = {
-    qa_marker: GROWTH_CANONICAL_COMPANY_QA_MARKER,
-    mode,
-    sources: {
-      external_company_candidates: emptySourceStats(),
-      real_world_company_candidates: emptySourceStats(),
-      discovery_candidates: emptySourceStats(),
-    },
-    canonical_companies_existing: existingCount,
-    canonical_companies_after: existingCount,
-    unique_normalized_domains: indexes.by_normalized_domain.size,
-    merge_groups_by_domain: 0,
+  const stats = emptyStats(mode, existingCount)
+  stats.unique_normalized_domains = indexes.by_normalized_domain.size
+
+  const pending_by_source: Record<GrowthCanonicalCompanySourceTable, number> = {
+    external_company_candidates: await countUnlinkedStagingCandidates(admin, "external_company_candidates"),
+    real_world_company_candidates: await countUnlinkedStagingCandidates(admin, "real_world_company_candidates"),
+    discovery_candidates: await countUnlinkedStagingCandidates(admin, "discovery_candidates"),
   }
 
-  const domainGroups = new Map<string, number>()
+  const domainCounts: Record<string, number> = { ...(options.cursor?.domain_counts ?? {}) }
 
-  for (const table of sources) {
-    const select =
-      table === "discovery_candidates"
-        ? "id, run_id, company_id, source_type, discovery_source_type, company_name, website, domain, industry, location, city, state, source_confidence, dedupe_hash, discovered_at, created_at, metadata, canonical_company_id"
-        : "id, run_id, provider_name, provider_type, company_name, website, domain, phone, address, city, state, country, industry, confidence, dedupe_hash, created_at, metadata, canonical_company_id, query"
+  if (batchSize == null) {
+    return runCanonicalCompanyBackfillFull(admin, {
+      mode,
+      sources,
+      stats,
+      indexes,
+      domainCounts,
+      existingCount,
+      pending_by_source,
+    })
+  }
 
-    const rows = await fetchAllRows(admin, table, select)
+  let table = resolveStartTable(sources, options.cursor)
+  let afterId = options.cursor?.after_id ?? null
+  let processedInChunk = 0
+
+  while (processedInChunk < batchSize) {
+    const remaining = batchSize - processedInChunk
+    const rows = await fetchPendingChunk(admin, table, afterId, remaining)
+
     for (const row of rows) {
-      if (asString(row.canonical_company_id)) {
-        stats.sources[table].already_linked++
-        stats.sources[table].rows_processed++
-        continue
-      }
       const input = mapRow(table, row)
       const d = canonicalNormalizedDomain(input.domain, input.website)
-      if (d) domainGroups.set(d, (domainGroups.get(d) ?? 0) + 1)
+      trackDomain(domainCounts, d)
       await processCandidate(admin, input, indexes, mode, stats.sources[table])
+      processedInChunk++
+      afterId = asString(row.id)
+      if (processedInChunk >= batchSize) break
+    }
+
+    if (rows.length < remaining) {
+      const nextTable = nextSourceTable(sources, table)
+      if (!nextTable) {
+        stats.merge_groups_by_domain = mergeGroupsFromDomainCounts(domainCounts)
+        stats.unique_normalized_domains = indexes.by_normalized_domain.size
+        stats.canonical_companies_after =
+          mode === "apply" ? await countCanonicalCompanies(admin) : stats.canonical_companies_existing + totalWouldCreate(stats)
+
+        return {
+          stats,
+          done: true,
+          cursor: null,
+          progress: {
+            batch_size: batchSize,
+            processed_in_chunk: processedInChunk,
+            current_source_table: table,
+          },
+          pending_by_source,
+        }
+      }
+      table = nextTable
+      afterId = null
     }
   }
 
-  let mergeGroups = 0
-  for (const count of domainGroups.values()) {
-    if (count > 1) mergeGroups++
-  }
-  stats.merge_groups_by_domain = mergeGroups
+  stats.merge_groups_by_domain = mergeGroupsFromDomainCounts(domainCounts)
   stats.unique_normalized_domains = indexes.by_normalized_domain.size
   stats.canonical_companies_after =
-    mode === "apply" ? await countCanonicalCompanies(admin) : existingCount + stats.sources.external_company_candidates.would_create_new + stats.sources.real_world_company_candidates.would_create_new + stats.sources.discovery_candidates.would_create_new
+    stats.canonical_companies_existing + totalWouldCreate(stats)
 
-  return stats
+  return {
+    stats,
+    done: false,
+    cursor: {
+      source_table: table,
+      after_id: afterId,
+      domain_counts: domainCounts,
+    },
+    progress: {
+      batch_size: batchSize,
+      processed_in_chunk: processedInChunk,
+      current_source_table: table,
+    },
+    pending_by_source,
+  }
+}
+
+function totalWouldCreate(stats: GrowthCanonicalCompanyBackfillStats): number {
+  return (
+    stats.sources.external_company_candidates.would_create_new +
+    stats.sources.real_world_company_candidates.would_create_new +
+    stats.sources.discovery_candidates.would_create_new
+  )
+}
+
+async function runCanonicalCompanyBackfillFull(
+  admin: SupabaseClient,
+  input: {
+    mode: "dry_run" | "apply"
+    sources: GrowthCanonicalCompanySourceTable[]
+    stats: GrowthCanonicalCompanyBackfillStats
+    indexes: CanonicalCompanyResolverIndexes
+    domainCounts: Record<string, number>
+    existingCount: number
+    pending_by_source: Record<GrowthCanonicalCompanySourceTable, number>
+  },
+): Promise<GrowthCanonicalCompanyBackfillResult> {
+  const { mode, sources, stats, indexes, domainCounts, existingCount, pending_by_source } = input
+  let lastTable = sources[0]
+
+  for (const table of sources) {
+    lastTable = table
+    let afterId: string | null = null
+    while (true) {
+      const rows = await fetchPendingChunk(admin, table, afterId, 1000)
+      if (rows.length === 0) break
+      for (const row of rows) {
+        const inputRow = mapRow(table, row)
+        const d = canonicalNormalizedDomain(inputRow.domain, inputRow.website)
+        trackDomain(domainCounts, d)
+        await processCandidate(admin, inputRow, indexes, mode, stats.sources[table])
+        afterId = asString(row.id)
+      }
+      if (rows.length < 1000) break
+    }
+  }
+
+  stats.merge_groups_by_domain = mergeGroupsFromDomainCounts(domainCounts)
+  stats.unique_normalized_domains = indexes.by_normalized_domain.size
+  stats.canonical_companies_after =
+    mode === "apply" ? await countCanonicalCompanies(admin) : existingCount + totalWouldCreate(stats)
+
+  return {
+    stats,
+    done: true,
+    cursor: null,
+    progress: {
+      batch_size: 0,
+      processed_in_chunk: Object.values(stats.sources).reduce((n, s) => n + s.rows_processed, 0),
+      current_source_table: lastTable,
+    },
+    pending_by_source,
+  }
 }
 
 function asString(v: unknown): string {

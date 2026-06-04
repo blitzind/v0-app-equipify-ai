@@ -5,6 +5,11 @@
 import { z } from "zod"
 import {
   GROWTH_CANONICAL_COMPANY_QA_MARKER,
+  GROWTH_CANONICAL_COMPANY_BACKFILL_DEFAULT_BATCH_SIZE,
+  GROWTH_CANONICAL_COMPANY_BACKFILL_MAX_BATCH_SIZE,
+  GROWTH_CANONICAL_COMPANY_SOURCE_TABLES,
+  type GrowthCanonicalCompanyBackfillCursor,
+  type GrowthCanonicalCompanyBackfillResult,
   type GrowthCanonicalCompanyBackfillStats,
 } from "@/lib/growth/canonical-companies/canonical-company-types"
 
@@ -13,13 +18,26 @@ export const GROWTH_CANONICAL_COMPANY_APPLY_CONFIRM = "APPLY_GROWTH_CANONICAL_CO
 export const GROWTH_CANONICAL_COMPANY_BACKFILL_API_QA_MARKER =
   "growth-canonical-company-backfill-api-7.2a-v1" as const
 
+const CursorSchema = z.object({
+  source_table: z.enum(GROWTH_CANONICAL_COMPANY_SOURCE_TABLES),
+  after_id: z.string().uuid().nullable(),
+  domain_counts: z.record(z.string(), z.number()).optional().default({}),
+})
+
 const RequestSchema = z.object({
   mode: z.enum(["dry_run", "apply"]),
   confirm: z.string().optional(),
+  batch_size: z.number().int().min(1).max(GROWTH_CANONICAL_COMPANY_BACKFILL_MAX_BATCH_SIZE).optional(),
+  cursor: CursorSchema.nullable().optional(),
 })
 
 export type ParsedCanonicalCompanyBackfillRequest =
-  | { ok: true; mode: "dry_run" | "apply" }
+  | {
+      ok: true
+      mode: "dry_run" | "apply"
+      batchSize: number
+      cursor: GrowthCanonicalCompanyBackfillCursor | null
+    }
   | { ok: false; error: string; message: string }
 
 export function parseCanonicalCompanyBackfillRequest(
@@ -44,7 +62,42 @@ export function parseCanonicalCompanyBackfillRequest(
     }
   }
 
-  return { ok: true, mode: parsed.data.mode }
+  const batchSize = parsed.data.batch_size ?? GROWTH_CANONICAL_COMPANY_BACKFILL_DEFAULT_BATCH_SIZE
+  const cursor = parsed.data.cursor
+    ? {
+        source_table: parsed.data.cursor.source_table,
+        after_id: parsed.data.cursor.after_id,
+        domain_counts: parsed.data.cursor.domain_counts ?? {},
+      }
+    : null
+
+  return { ok: true, mode: parsed.data.mode, batchSize, cursor }
+}
+
+export function mergeCanonicalCompanyBackfillStats(
+  cumulative: GrowthCanonicalCompanyBackfillStats,
+  chunk: GrowthCanonicalCompanyBackfillStats,
+): GrowthCanonicalCompanyBackfillStats {
+  const merged = { ...cumulative, sources: { ...cumulative.sources } }
+  for (const table of GROWTH_CANONICAL_COMPANY_SOURCE_TABLES) {
+    const a = cumulative.sources[table]
+    const b = chunk.sources[table]
+    merged.sources[table] = {
+      rows_processed: a.rows_processed + b.rows_processed,
+      already_linked: a.already_linked + b.already_linked,
+      resolved_normalized_domain: a.resolved_normalized_domain + b.resolved_normalized_domain,
+      resolved_domain_alias: a.resolved_domain_alias + b.resolved_domain_alias,
+      resolved_name_city: a.resolved_name_city + b.resolved_name_city,
+      resolved_name_state: a.resolved_name_state + b.resolved_name_state,
+      would_create_new: a.would_create_new + b.would_create_new,
+      review_tier: a.review_tier + b.review_tier,
+      errors: a.errors + b.errors,
+    }
+  }
+  merged.merge_groups_by_domain = chunk.merge_groups_by_domain
+  merged.unique_normalized_domains = chunk.unique_normalized_domains
+  merged.canonical_companies_after = chunk.canonical_companies_after
+  return merged
 }
 
 export function resolveCanonicalCompanyRuntimeContext(): {
@@ -101,32 +154,42 @@ export function buildCanonicalCompanyBackfillWarnings(
 
 export function buildCanonicalCompanyBackfillApiResponse(input: {
   mode: "dry_run" | "apply"
-  stats: GrowthCanonicalCompanyBackfillStats
+  result: GrowthCanonicalCompanyBackfillResult
   duration_ms: number
 }): Record<string, unknown> {
-  const warnings = buildCanonicalCompanyBackfillWarnings(input.stats)
+  const { stats, done, cursor, progress, pending_by_source } = input.result
+  const warnings = buildCanonicalCompanyBackfillWarnings(stats)
+  const pendingTotal = Object.values(pending_by_source).reduce((n, v) => n + v, 0)
+
   return {
     ok: true,
     qa_marker: GROWTH_CANONICAL_COMPANY_QA_MARKER,
     api_qa_marker: GROWTH_CANONICAL_COMPANY_BACKFILL_API_QA_MARKER,
     mode: input.mode,
+    done,
+    cursor,
+    progress,
+    pending_by_source,
+    pending_total: pendingTotal,
     ...resolveCanonicalCompanyRuntimeContext(),
-    stats: input.stats,
+    stats,
     warnings,
     duration_ms: input.duration_ms,
     summary: {
-      canonical_companies_existing: input.stats.canonical_companies_existing,
-      canonical_companies_after: input.stats.canonical_companies_after,
-      merge_groups_by_domain: input.stats.merge_groups_by_domain,
-      unique_normalized_domains: input.stats.unique_normalized_domains,
-      skipped_already_linked: Object.values(input.stats.sources).reduce(
+      canonical_companies_existing: stats.canonical_companies_existing,
+      canonical_companies_after: stats.canonical_companies_after,
+      merge_groups_by_domain: stats.merge_groups_by_domain,
+      unique_normalized_domains: stats.unique_normalized_domains,
+      skipped_already_linked: Object.values(stats.sources).reduce(
         (sum, s) => sum + s.already_linked,
         0,
       ),
-      would_create_new: Object.values(input.stats.sources).reduce(
+      would_create_new: Object.values(stats.sources).reduce(
         (sum, s) => sum + s.would_create_new,
         0,
       ),
+      processed_in_chunk: progress.processed_in_chunk,
+      batch_size: progress.batch_size,
     },
   }
 }

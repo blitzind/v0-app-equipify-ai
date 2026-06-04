@@ -4,6 +4,8 @@
  *   pnpm tsx scripts/backfill-growth-canonical-companies-7.2a.ts
  *   GROWTH_CANONICAL_COMPANY_APPLY_CONFIRM=yes pnpm tsx scripts/backfill-growth-canonical-companies-7.2a.ts --apply
  *
+ *   --full  Process all rows in one run (no chunking; may be slow locally).
+ *
  * Requires production env in shell:
  *   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  *
@@ -16,11 +18,16 @@ import {
   resolveGrowthProductionSupabaseConfig,
 } from "../lib/growth/canonical-companies/load-growth-production-supabase-env"
 import { isGrowthCanonicalCompanySchemaReady } from "../lib/growth/canonical-companies/canonical-company-schema-health"
-import { GROWTH_CANONICAL_COMPANY_QA_MARKER } from "../lib/growth/canonical-companies/canonical-company-types"
+import {
+  GROWTH_CANONICAL_COMPANY_BACKFILL_DEFAULT_BATCH_SIZE,
+  GROWTH_CANONICAL_COMPANY_QA_MARKER,
+  type GrowthCanonicalCompanyBackfillCursor,
+} from "../lib/growth/canonical-companies/canonical-company-types"
 
 async function main(): Promise<void> {
   const apply = process.argv.includes("--apply")
   const allowLocal = process.argv.includes("--local")
+  const full = process.argv.includes("--full")
   const mode = apply ? "apply" : "dry_run"
 
   let config
@@ -59,13 +66,41 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
-  const report = await runCanonicalCompanyBackfill(admin, { mode })
+  let cursor: GrowthCanonicalCompanyBackfillCursor | null = null
+  let chunks = 0
+  let finalReport: Awaited<ReturnType<typeof runCanonicalCompanyBackfill>> | null = null
+
+  do {
+    chunks++
+    const chunk = await runCanonicalCompanyBackfill(admin, {
+      mode,
+      batchSize: full ? undefined : GROWTH_CANONICAL_COMPANY_BACKFILL_DEFAULT_BATCH_SIZE,
+      cursor: full ? null : cursor,
+    })
+    finalReport = chunk
+    cursor = chunk.cursor
+    console.error(
+      JSON.stringify({
+        chunk: chunks,
+        done: chunk.done,
+        processed_in_chunk: chunk.progress.processed_in_chunk,
+        source_table: chunk.progress.current_source_table,
+      }),
+    )
+  } while (!full && finalReport && !finalReport.done)
+
+  if (!finalReport) {
+    process.exit(1)
+  }
+
   console.log(
     JSON.stringify(
       {
         qa_marker: GROWTH_CANONICAL_COMPANY_QA_MARKER,
+        chunks,
         ...formatGrowthProductionTargetBanner(config, mode),
-        ...report,
+        ...finalReport.stats,
+        done: finalReport.done,
       },
       null,
       2,

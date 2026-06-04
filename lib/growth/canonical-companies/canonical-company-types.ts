@@ -95,6 +95,16 @@ export type GrowthCanonicalCompanyResolutionResult = {
   review_tier: boolean
 }
 
+export const GROWTH_CANONICAL_COMPANY_BACKFILL_DEFAULT_BATCH_SIZE = 40
+export const GROWTH_CANONICAL_COMPANY_BACKFILL_MAX_BATCH_SIZE = 100
+
+export type GrowthCanonicalCompanyBackfillCursor = {
+  source_table: GrowthCanonicalCompanySourceTable
+  after_id: string | null
+  /** Accumulated domain → candidate count for merge-group stats across chunks. */
+  domain_counts: Record<string, number>
+}
+
 export type GrowthCanonicalCompanyBackfillStats = {
   qa_marker: typeof GROWTH_CANONICAL_COMPANY_QA_MARKER
   mode: "dry_run" | "apply"
@@ -116,4 +126,16 @@ export type GrowthCanonicalCompanyBackfillStats = {
   canonical_companies_after: number
   unique_normalized_domains: number
   merge_groups_by_domain: number
+}
+
+export type GrowthCanonicalCompanyBackfillResult = {
+  stats: GrowthCanonicalCompanyBackfillStats
+  done: boolean
+  cursor: GrowthCanonicalCompanyBackfillCursor | null
+  progress: {
+    batch_size: number
+    processed_in_chunk: number
+    current_source_table: GrowthCanonicalCompanySourceTable
+  }
+  pending_by_source: Record<GrowthCanonicalCompanySourceTable, number>
 }
