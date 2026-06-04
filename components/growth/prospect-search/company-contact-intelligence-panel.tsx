@@ -19,12 +19,16 @@ import {
 
 export function CompanyContactIntelligencePanel({
   companyName,
+  company,
   intelligence,
   onResearchAction,
+  onResearchComplete,
 }: {
   companyName: string
+  company?: import("@/lib/growth/prospect-search/prospect-search-types").GrowthProspectSearchCompanyResult | null
   intelligence: GrowthProspectSearchContactIntelligence | null | undefined
   onResearchAction?: (actionId: string) => void
+  onResearchComplete?: (message: string, ok: boolean) => void
 }) {
   if (!intelligence) return null
 
@@ -52,6 +56,8 @@ export function CompanyContactIntelligencePanel({
       <ProspectSearchEngineIntelligencePanel
         companyName={companyName}
         intelligence={intelligence.engine_intelligence}
+        company={company ?? undefined}
+        onResearchComplete={onResearchComplete}
       />
 
       {intelligence.account_contact_strategy ? (

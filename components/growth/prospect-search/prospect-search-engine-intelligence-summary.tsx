@@ -3,6 +3,7 @@
 import { ShieldCheck } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { ProspectSearchEngineIntelligenceDiscoveryBadge } from "@/components/growth/prospect-search/prospect-search-engine-intelligence-discovery-badge"
+import { ProspectSearchEngineDiscoveryRollup } from "@/components/growth/prospect-search/prospect-search-engine-discovery-rollup"
 import { buildProspectSearchEngineIntelligenceSummary } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-filters"
 import { GROWTH_PROSPECT_SEARCH_INTELLIGENCE_UX_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-ux"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
@@ -60,6 +61,7 @@ export function ProspectSearchEngineIntelligenceSummary({
           </Badge>
         ) : null}
       </div>
+      <ProspectSearchEngineDiscoveryRollup row={row} className="mt-2" />
     </div>
   )
 }

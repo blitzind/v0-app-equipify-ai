@@ -44,6 +44,7 @@ import { SearchEmptyState } from "@/components/growth/prospect-search/search-emp
 import { SearchRecommendations } from "@/components/growth/prospect-search/search-recommendations"
 import { SearchViewToggle } from "@/components/growth/prospect-search/search-view-toggle"
 import { rotateHeroPlaceholder } from "@/components/growth/prospect-search/search-suggestion-engine"
+import { executeProspectSearchActionableResearch } from "@/lib/growth/prospect-search/prospect-search-actionable-research-execute"
 import {
   GROWTH_PROSPECT_SEARCH_UX_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_LAYOUT_V2_QA_MARKER,
@@ -1382,9 +1383,18 @@ function ProspectSearchShellInner() {
       }
       setContactDiscoveryBusy(true)
       try {
-        const params = new URLSearchParams({ company_candidate_id: companyId, run: "1" })
-        await fetch(`/api/platform/growth/contact-discovery?${params}`, { cache: "no-store" })
-        await refreshContactDiscoveryResults()
+        const result = await executeProspectSearchActionableResearch({
+          company,
+          actionKind: actionId,
+          companyCandidateId: companyId,
+        })
+        setActionMessage({
+          message: result.message,
+          tone: result.ok ? "success" : "error",
+        })
+        if (result.ok) {
+          await refreshContactDiscoveryResults()
+        }
       } finally {
         setContactDiscoveryBusy(false)
       }

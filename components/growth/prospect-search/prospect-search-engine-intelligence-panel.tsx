@@ -11,14 +11,21 @@ import {
   PROSPECT_SEARCH_ENGINE_INTELLIGENCE_PANEL_TITLE,
 } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-ux"
 import type { GrowthBuyingCommitteeIntelligenceRole } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-types"
+import { ProspectSearchActionableResearchActions } from "@/components/growth/prospect-search/prospect-search-actionable-research-actions"
+import { ProspectSearchEngineDiscoveryRollup } from "@/components/growth/prospect-search/prospect-search-engine-discovery-rollup"
 import { ProspectSearchSchemaHealthNotice } from "@/components/growth/prospect-search/prospect-search-schema-health-notice"
+import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 
 export function ProspectSearchEngineIntelligencePanel({
   companyName,
   intelligence,
+  company,
+  onResearchComplete,
 }: {
   companyName: string
   intelligence: GrowthProspectSearchEngineIntelligence | null | undefined
+  company?: GrowthProspectSearchCompanyResult | null
+  onResearchComplete?: (message: string, ok: boolean) => void
 }) {
   if (!intelligence?.has_canonical_company) return null
 
@@ -96,6 +103,16 @@ export function ProspectSearchEngineIntelligencePanel({
             </li>
           ))}
         </ul>
+      ) : null}
+
+      {company ? (
+        <>
+          <ProspectSearchEngineDiscoveryRollup row={company} className="mt-3" />
+          <ProspectSearchActionableResearchActions
+            company={company}
+            onComplete={onResearchComplete}
+          />
+        </>
       ) : null}
     </section>
   )

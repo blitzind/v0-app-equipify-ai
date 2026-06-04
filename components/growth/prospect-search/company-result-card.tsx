@@ -47,6 +47,7 @@ export function CompanyResultCard({
   searchQuery,
   savedSearchId,
   onResearchAction,
+  onResearchComplete,
 }: {
   row: GrowthProspectSearchCompanyResult
   selected: boolean
@@ -55,6 +56,7 @@ export function CompanyResultCard({
   onCheckedChange: (checked: boolean) => void
   onAction: (action: string, extra?: Record<string, unknown>) => void
   onResearchAction?: (actionId: string) => void
+  onResearchComplete?: (message: string, ok: boolean) => void
   onWorkflowLaunch?: (input: {
     actionId: string
     launchUrl?: string | null
@@ -231,8 +233,10 @@ export function CompanyResultCard({
         <>
           <CompanyContactIntelligencePanel
             companyName={row.company_name}
+            company={row}
             intelligence={row.contact_intelligence}
             onResearchAction={onResearchAction}
+            onResearchComplete={onResearchComplete}
           />
           {row.contact_intelligence?.company_contact_coverage?.ranking_summary ? (
             <p className="text-xs font-medium text-violet-900">
