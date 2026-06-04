@@ -21,7 +21,9 @@ Additive canonical company foundation in the `growth` schema. Staging tables rem
 | Repository (CLI/core) | `lib/growth/canonical-companies/canonical-company-repository-core.ts` |
 | Production env | `lib/growth/canonical-companies/load-growth-production-supabase-env.ts` |
 | Backfill | `lib/growth/canonical-companies/canonical-company-backfill.ts` |
-| Script | `scripts/backfill-growth-canonical-companies-7.2a.ts` |
+| Runtime API | `app/api/platform/growth/canonical-companies/backfill/route.ts` |
+| API helpers | `lib/growth/canonical-companies/canonical-company-backfill-api.ts` |
+| Script (CLI) | `scripts/backfill-growth-canonical-companies-7.2a.ts` |
 
 Migration: `supabase/migrations/20270708120000_growth_engine_canonical_companies_7_2a.sql`
 
@@ -49,7 +51,40 @@ Name-only keys never merge two companies that already have different domains.
 - Prospect Search refactor
 - Mandatory canonical ID on runtime discovery paths
 
-## Production credentials
+## Production Runtime Execution
+
+Preferred path: platform admin session against the deployed Growth Engine (uses deployment `SUPABASE_SERVICE_ROLE_KEY` — never returned in responses).
+
+**Endpoint:** `POST /api/platform/growth/canonical-companies/backfill`
+
+**Authorization:**
+
+- Signed-in user email on `EQUIPIFY_PLATFORM_ADMIN_EMAILS`
+- `GROWTH_ENGINE_ENABLED=true` on the deployment
+
+**Dry run:**
+
+```bash
+curl -X POST "$ORIGIN/api/platform/growth/canonical-companies/backfill" \
+  -H "Content-Type: application/json" \
+  -H "Cookie: <platform-admin-session>" \
+  -d '{"mode":"dry_run"}'
+```
+
+**Apply** (exact confirmation required):
+
+```bash
+curl -X POST "$ORIGIN/api/platform/growth/canonical-companies/backfill" \
+  -H "Content-Type: application/json" \
+  -H "Cookie: <platform-admin-session>" \
+  -d '{"mode":"apply","confirm":"APPLY_GROWTH_CANONICAL_COMPANIES_7_2A"}'
+```
+
+**UI:** `/admin/growth/infrastructure` — Canonical companies (7.2A) panel (dry run / apply).
+
+Schema pre-check returns `{ "ok": false, "reason": "schema_not_ready" }` with HTTP 503 when migration tables are missing.
+
+## Production credentials (CLI fallback)
 
 The backfill script does **not** read `.env.local`. Set in the shell:
 

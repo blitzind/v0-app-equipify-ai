@@ -17,8 +17,18 @@ import {
 } from "../lib/growth/canonical-companies/canonical-company-resolver"
 import { simulateCanonicalCompanyBackfill } from "../lib/growth/canonical-companies/canonical-company-simulate"
 import {
+  buildCanonicalCompanyBackfillApiResponse,
+  buildCanonicalCompanyBackfillWarnings,
+  canonicalCompanyBackfillResponseExcludesSecrets,
+  GROWTH_CANONICAL_COMPANY_APPLY_CONFIRM,
+  GROWTH_CANONICAL_COMPANY_BACKFILL_API_QA_MARKER,
+  parseCanonicalCompanyBackfillRequest,
+  resolveCanonicalCompanyRuntimeContext,
+} from "../lib/growth/canonical-companies/canonical-company-backfill-api"
+import {
   GROWTH_CANONICAL_COMPANY_MIGRATION,
   GROWTH_CANONICAL_COMPANY_QA_MARKER,
+  type GrowthCanonicalCompanyBackfillStats,
 } from "../lib/growth/canonical-companies/canonical-company-types"
 
 function candidate(
@@ -183,6 +193,111 @@ async function main(): Promise<void> {
   )
   assert.doesNotMatch(scriptSource, /\.env\.local/)
   assert.match(scriptSource, /resolveGrowthProductionSupabaseConfig/)
+
+  assert.equal(GROWTH_CANONICAL_COMPANY_APPLY_CONFIRM, "APPLY_GROWTH_CANONICAL_COMPANIES_7_2A")
+
+  const dryParsed = parseCanonicalCompanyBackfillRequest({ mode: "dry_run" })
+  assert.equal(dryParsed.ok, true)
+  if (dryParsed.ok) assert.equal(dryParsed.mode, "dry_run")
+
+  const applyBad = parseCanonicalCompanyBackfillRequest({ mode: "apply", confirm: "wrong" })
+  assert.equal(applyBad.ok, false)
+  if (!applyBad.ok) assert.equal(applyBad.error, "confirm_required")
+
+  const applyOk = parseCanonicalCompanyBackfillRequest({
+    mode: "apply",
+    confirm: GROWTH_CANONICAL_COMPANY_APPLY_CONFIRM,
+  })
+  assert.equal(applyOk.ok, true)
+
+  const routeSource = fs.readFileSync(
+    path.join(process.cwd(), "app/api/platform/growth/canonical-companies/backfill/route.ts"),
+    "utf8",
+  )
+  assert.match(routeSource, /requireGrowthEnginePlatformAccess/)
+  assert.match(routeSource, /runCanonicalCompanyBackfill/)
+  assert.match(routeSource, /isGrowthCanonicalCompanySchemaReady/)
+  assert.match(routeSource, /parseCanonicalCompanyBackfillRequest/)
+  assert.doesNotMatch(routeSource, /SUPABASE_SERVICE_ROLE_KEY/)
+  assert.doesNotMatch(routeSource, /serviceRoleKey/)
+  assert.doesNotMatch(routeSource, /createServiceRoleClient/)
+  if (!routeSource.includes("if (!access.ok) return access.response")) {
+    assert.fail("route must return access.response when unauthorized")
+  }
+
+  const panelSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/growth-canonical-company-backfill-panel.tsx"),
+    "utf8",
+  )
+  assert.match(panelSource, /canonical-companies\/backfill/)
+  assert.match(panelSource, /GROWTH_CANONICAL_COMPANY_APPLY_CONFIRM/)
+
+  const infraPage = fs.readFileSync(
+    path.join(process.cwd(), "app/(admin)/admin/growth/infrastructure/page.tsx"),
+    "utf8",
+  )
+  assert.match(infraPage, /GrowthCanonicalCompanyBackfillPanel/)
+
+  const mockStats: GrowthCanonicalCompanyBackfillStats = {
+    qa_marker: GROWTH_CANONICAL_COMPANY_QA_MARKER,
+    mode: "dry_run",
+    sources: {
+      external_company_candidates: {
+        rows_processed: 1,
+        already_linked: 0,
+        resolved_normalized_domain: 1,
+        resolved_domain_alias: 0,
+        resolved_name_city: 0,
+        resolved_name_state: 0,
+        would_create_new: 0,
+        review_tier: 1,
+        errors: 0,
+      },
+      real_world_company_candidates: {
+        rows_processed: 0,
+        already_linked: 0,
+        resolved_normalized_domain: 0,
+        resolved_domain_alias: 0,
+        resolved_name_city: 0,
+        resolved_name_state: 0,
+        would_create_new: 0,
+        review_tier: 0,
+        errors: 0,
+      },
+      discovery_candidates: {
+        rows_processed: 0,
+        already_linked: 0,
+        resolved_normalized_domain: 0,
+        resolved_domain_alias: 0,
+        resolved_name_city: 0,
+        resolved_name_state: 0,
+        would_create_new: 0,
+        review_tier: 0,
+        errors: 0,
+      },
+    },
+    canonical_companies_existing: 0,
+    canonical_companies_after: 1,
+    unique_normalized_domains: 1,
+    merge_groups_by_domain: 2,
+  }
+  const warnings = buildCanonicalCompanyBackfillWarnings(mockStats)
+  assert.ok(warnings.some((w) => w.includes("review-tier")))
+  assert.ok(warnings.some((w) => w.includes("domain group")))
+
+  const apiPayload = buildCanonicalCompanyBackfillApiResponse({
+    mode: "dry_run",
+    stats: mockStats,
+    duration_ms: 42,
+  })
+  assert.equal(apiPayload.api_qa_marker, GROWTH_CANONICAL_COMPANY_BACKFILL_API_QA_MARKER)
+  assert.equal(apiPayload.target_schema, "growth")
+  assert.equal(apiPayload.duration_ms, 42)
+  assert.ok(canonicalCompanyBackfillResponseExcludesSecrets(apiPayload))
+
+  const ctx = resolveCanonicalCompanyRuntimeContext()
+  assert.equal(ctx.target_schema, "growth")
+  assert.ok(typeof ctx.deployment_environment === "string")
 
   console.log("growth-canonical-companies-7.2a: ok")
 }
