@@ -97,6 +97,8 @@ Schema pre-check returns `{ "ok": false, "reason": "schema_not_ready" }` with HT
 
 **Why chunked:** Full apply issues ~5 sequential DB round-trips per candidate (~2.5k+ rows). A single request exceeds Vercel `FUNCTION_INVOCATION_TIMEOUT`; dry-run at ~94s is near the same limit.
 
+**Completion (7.2A fix):** `done: true` only when a fresh DB count shows `pending_total === 0` on all three staging tables. Failed rows stop the chunk without advancing `after_id` past the failure; errors are returned in `error_rows`. UI shows **DONE · certified** only when `certification === "pass"` and `verification.passed`.
+
 ## Production credentials (CLI fallback)
 
 The backfill script does **not** read `.env.local`. Set in the shell:

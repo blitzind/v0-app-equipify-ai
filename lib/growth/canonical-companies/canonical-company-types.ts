@@ -128,6 +128,18 @@ export type GrowthCanonicalCompanyBackfillStats = {
   merge_groups_by_domain: number
 }
 
+export type GrowthCanonicalCompanyBackfillErrorRow = {
+  source_table: GrowthCanonicalCompanySourceTable
+  source_id: string
+  message: string
+}
+
+export type GrowthCanonicalCompanyBackfillVerification = {
+  passed: boolean
+  pending_by_source: Record<GrowthCanonicalCompanySourceTable, number>
+  pending_total: number
+}
+
 export type GrowthCanonicalCompanyBackfillResult = {
   stats: GrowthCanonicalCompanyBackfillStats
   done: boolean
@@ -138,4 +150,8 @@ export type GrowthCanonicalCompanyBackfillResult = {
     current_source_table: GrowthCanonicalCompanySourceTable
   }
   pending_by_source: Record<GrowthCanonicalCompanySourceTable, number>
+  pending_total: number
+  error_rows: GrowthCanonicalCompanyBackfillErrorRow[]
+  verification: GrowthCanonicalCompanyBackfillVerification | null
+  certification: "pass" | "conditional_pass" | "fail" | null
 }

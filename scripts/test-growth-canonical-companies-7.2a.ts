@@ -332,10 +332,15 @@ async function main(): Promise<void> {
         real_world_company_candidates: 100,
         discovery_candidates: 0,
       },
+      pending_total: 100,
+      error_rows: [],
+      verification: null,
+      certification: null,
     },
     duration_ms: 42,
   })
   assert.equal(apiPayload.done, false)
+  assert.equal(apiPayload.pending_total, 100)
   assert.ok(apiPayload.cursor)
   assert.equal(apiPayload.api_qa_marker, GROWTH_CANONICAL_COMPANY_BACKFILL_API_QA_MARKER)
   assert.equal(apiPayload.target_schema, "growth")

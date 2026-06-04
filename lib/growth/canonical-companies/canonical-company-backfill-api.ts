@@ -9,6 +9,7 @@ import {
   GROWTH_CANONICAL_COMPANY_BACKFILL_MAX_BATCH_SIZE,
   GROWTH_CANONICAL_COMPANY_SOURCE_TABLES,
   type GrowthCanonicalCompanyBackfillCursor,
+  type GrowthCanonicalCompanyBackfillErrorRow,
   type GrowthCanonicalCompanyBackfillResult,
   type GrowthCanonicalCompanyBackfillStats,
 } from "@/lib/growth/canonical-companies/canonical-company-types"
@@ -72,6 +73,13 @@ export function parseCanonicalCompanyBackfillRequest(
     : null
 
   return { ok: true, mode: parsed.data.mode, batchSize, cursor }
+}
+
+export function mergeCanonicalCompanyBackfillErrorRows(
+  cumulative: GrowthCanonicalCompanyBackfillErrorRow[],
+  chunk: GrowthCanonicalCompanyBackfillErrorRow[],
+): GrowthCanonicalCompanyBackfillErrorRow[] {
+  return [...cumulative, ...chunk]
 }
 
 export function mergeCanonicalCompanyBackfillStats(
@@ -157,9 +165,19 @@ export function buildCanonicalCompanyBackfillApiResponse(input: {
   result: GrowthCanonicalCompanyBackfillResult
   duration_ms: number
 }): Record<string, unknown> {
-  const { stats, done, cursor, progress, pending_by_source } = input.result
+  const {
+    stats,
+    done,
+    cursor,
+    progress,
+    pending_by_source,
+    pending_total,
+    error_rows,
+    verification,
+    certification,
+  } = input.result
   const warnings = buildCanonicalCompanyBackfillWarnings(stats)
-  const pendingTotal = Object.values(pending_by_source).reduce((n, v) => n + v, 0)
+  const errors = totalErrorsFromStats(stats)
 
   return {
     ok: true,
@@ -170,7 +188,11 @@ export function buildCanonicalCompanyBackfillApiResponse(input: {
     cursor,
     progress,
     pending_by_source,
-    pending_total: pendingTotal,
+    pending_total,
+    error_rows,
+    errors,
+    verification,
+    certification,
     ...resolveCanonicalCompanyRuntimeContext(),
     stats,
     warnings,
@@ -190,8 +212,18 @@ export function buildCanonicalCompanyBackfillApiResponse(input: {
       ),
       processed_in_chunk: progress.processed_in_chunk,
       batch_size: progress.batch_size,
+      errors,
+      error_row_count: error_rows.length,
     },
   }
+}
+
+function totalErrorsFromStats(stats: GrowthCanonicalCompanyBackfillStats): number {
+  return (
+    stats.sources.external_company_candidates.errors +
+    stats.sources.real_world_company_candidates.errors +
+    stats.sources.discovery_candidates.errors
+  )
 }
 
 /** Returns true when serialized API payload must not include secrets. */

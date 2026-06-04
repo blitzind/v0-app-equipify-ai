@@ -208,6 +208,7 @@
     "test:growth-external-company-discovery": "tsx scripts/test-growth-external-company-discovery.ts",
     "test:growth-real-world-company-discovery": "tsx scripts/test-growth-real-world-company-discovery.ts",
     "test:growth-canonical-companies-7.2a": "tsx scripts/test-growth-canonical-companies-7.2a.ts",
+    "test:growth-canonical-companies-backfill-completion": "tsx scripts/test-growth-canonical-companies-backfill-completion.ts",
     "test:growth-serp-provider-audit": "tsx scripts/test-growth-serp-provider-audit.ts",
     "test:growth-provider-cache": "tsx scripts/test-growth-provider-cache.ts",
     "test:growth-company-signals": "tsx scripts/test-growth-company-signals.ts",

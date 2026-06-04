@@ -7,33 +7,36 @@ import { Input } from "@/components/ui/input"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import {
   GROWTH_CANONICAL_COMPANY_APPLY_CONFIRM,
+  mergeCanonicalCompanyBackfillErrorRows,
   mergeCanonicalCompanyBackfillStats,
 } from "@/lib/growth/canonical-companies/canonical-company-backfill-api"
 import {
   GROWTH_CANONICAL_COMPANY_QA_MARKER,
-  type GrowthCanonicalCompanyBackfillCursor,
+  type GrowthCanonicalCompanyBackfillErrorRow,
   type GrowthCanonicalCompanyBackfillStats,
 } from "@/lib/growth/canonical-companies/canonical-company-types"
 
 type BackfillApiResponse = {
   ok?: boolean
   done?: boolean
-  cursor?: GrowthCanonicalCompanyBackfillCursor | null
+  certification?: "pass" | "conditional_pass" | "fail" | null
+  cursor?: unknown
   mode?: string
   reason?: string
   error?: string
   message?: string
   duration_ms?: number
+  pending_total?: number
+  pending_by_source?: Record<string, number>
+  errors?: number
+  error_rows?: GrowthCanonicalCompanyBackfillErrorRow[]
   warnings?: string[]
+  verification?: { passed?: boolean; pending_total?: number }
   progress?: { processed_in_chunk?: number; batch_size?: number; current_source_table?: string }
   summary?: {
-    canonical_companies_existing?: number
     canonical_companies_after?: number
-    merge_groups_by_domain?: number
-    skipped_already_linked?: number
-    would_create_new?: number
-    processed_in_chunk?: number
-    batch_size?: number
+    errors?: number
+    error_row_count?: number
   }
   stats?: GrowthCanonicalCompanyBackfillStats
 }
@@ -43,17 +46,27 @@ export function GrowthCanonicalCompanyBackfillPanel() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<BackfillApiResponse | null>(null)
   const [chunkLabel, setChunkLabel] = useState<string | null>(null)
+  const [errorRows, setErrorRows] = useState<GrowthCanonicalCompanyBackfillErrorRow[]>([])
   const [showApplyConfirm, setShowApplyConfirm] = useState(false)
   const [confirmText, setConfirmText] = useState("")
+
+  const isCertifiedDone =
+    result?.done === true &&
+    result.certification === "pass" &&
+    (result.pending_total ?? 1) === 0 &&
+    (result.verification?.passed ?? false)
 
   async function runBackfillChunks(mode: "dry_run" | "apply") {
     setRunning(true)
     setError(null)
     setChunkLabel(null)
+    setErrorRows([])
 
-    let cursor: GrowthCanonicalCompanyBackfillCursor | null = null
+    let cursor: unknown = null
     let cumulative: GrowthCanonicalCompanyBackfillStats | null = null
+    let cumulativeErrors: GrowthCanonicalCompanyBackfillErrorRow[] = []
     let chunks = 0
+    let lastResponse: BackfillApiResponse | null = null
 
     try {
       for (;;) {
@@ -80,16 +93,22 @@ export function GrowthCanonicalCompanyBackfillPanel() {
         cumulative = cumulative
           ? mergeCanonicalCompanyBackfillStats(cumulative, data.stats)
           : data.stats
+        cumulativeErrors = mergeCanonicalCompanyBackfillErrorRows(
+          cumulativeErrors,
+          data.error_rows ?? [],
+        )
+        setErrorRows(cumulativeErrors)
+        lastResponse = data
 
         setChunkLabel(
-          `Chunk ${chunks}: ${data.progress?.processed_in_chunk ?? 0} rows · ${data.progress?.current_source_table ?? ""}${data.done ? " · complete" : ""}`,
+          `Chunk ${chunks}: ${data.progress?.processed_in_chunk ?? 0} processed · pending ${data.pending_total ?? "?"} · ${data.progress?.current_source_table ?? ""}`,
         )
 
         if (data.done) {
           setResult({
             ...data,
             stats: cumulative,
-            done: true,
+            error_rows: cumulativeErrors,
           })
           break
         }
@@ -98,6 +117,12 @@ export function GrowthCanonicalCompanyBackfillPanel() {
         if (!cursor) {
           throw new Error("Backfill incomplete but no cursor returned.")
         }
+      }
+
+      if (mode === "apply" && lastResponse && !lastResponse.done) {
+        setError(
+          `Apply stopped with ${lastResponse.pending_total ?? "?"} unlinked staging rows remaining. Re-run apply to continue.`,
+        )
       }
 
       if (mode === "apply") {
@@ -110,8 +135,15 @@ export function GrowthCanonicalCompanyBackfillPanel() {
           ? `${e.message}${cumulative ? " (partial progress saved — re-run apply to resume)" : ""}`
           : "Backfill request failed.",
       )
-      if (cumulative) {
-        setResult({ ok: true, mode, stats: cumulative, done: false })
+      if (cumulative && lastResponse) {
+        setResult({
+          ...lastResponse,
+          ok: true,
+          mode,
+          stats: cumulative,
+          error_rows: cumulativeErrors,
+          done: false,
+        })
       }
     } finally {
       setRunning(false)
@@ -122,9 +154,8 @@ export function GrowthCanonicalCompanyBackfillPanel() {
     <GrowthEngineCard title="Canonical companies (7.2A)">
       <div className="space-y-4" data-qa-marker={GROWTH_CANONICAL_COMPANY_QA_MARKER}>
         <p className="text-sm text-muted-foreground">
-          Link staging company candidates to <code className="text-xs">growth.companies</code>. Runs in
-          batches of 40 per request (resume-safe). Re-run apply after a timeout to continue from lineage +
-          linked staging rows.
+          Batched, resume-safe linkage into <code className="text-xs">growth.companies</code>. DONE only when
+          verification reports <code className="text-xs">pending_total = 0</code> across all staging tables.
         </p>
 
         <div className="flex flex-wrap gap-2">
@@ -180,24 +211,53 @@ export function GrowthCanonicalCompanyBackfillPanel() {
           <div className="space-y-2 text-sm text-muted-foreground">
             <div className="flex flex-wrap gap-2">
               <GrowthBadge label={result.mode ?? "unknown"} tone={result.mode === "apply" ? "attention" : "neutral"} />
-              {result.done ? <GrowthBadge label="done" tone="healthy" /> : <GrowthBadge label="partial" tone="attention" />}
+              {isCertifiedDone ? (
+                <GrowthBadge label="DONE · certified" tone="healthy" />
+              ) : result.done ? (
+                <GrowthBadge label={`done · ${result.certification ?? "unverified"}`} tone="attention" />
+              ) : (
+                <GrowthBadge label="in progress" tone="attention" />
+              )}
+              {typeof result.pending_total === "number" ? (
+                <GrowthBadge label={`pending ${result.pending_total}`} tone={result.pending_total === 0 ? "healthy" : "attention"} />
+              ) : null}
+              {(result.errors ?? 0) > 0 ? (
+                <GrowthBadge label={`errors ${result.errors}`} tone="attention" />
+              ) : null}
             </div>
-            {result.stats ? (
-              <p>
-                Processed {result.stats.sources.real_world_company_candidates.rows_processed} RW ·{" "}
-                {result.stats.sources.external_company_candidates.rows_processed} external · after{" "}
-                {result.stats.canonical_companies_after} companies · would create{" "}
-                {result.stats.sources.real_world_company_candidates.would_create_new +
-                  result.stats.sources.external_company_candidates.would_create_new +
-                  result.stats.sources.discovery_candidates.would_create_new}
-              </p>
-            ) : null}
+            <p>
+              Canonical companies in DB: {result.stats?.canonical_companies_after ?? result.summary?.canonical_companies_after ?? "—"}
+              {result.pending_by_source ? (
+                <>
+                  {" "}
+                  · RW pending {result.pending_by_source.real_world_company_candidates ?? 0} · external{" "}
+                  {result.pending_by_source.external_company_candidates ?? 0} · discovery{" "}
+                  {result.pending_by_source.discovery_candidates ?? 0}
+                </>
+              ) : null}
+            </p>
             {result.warnings?.length ? (
               <ul className="list-disc pl-5 text-amber-800 dark:text-amber-200">
                 {result.warnings.map((w) => (
                   <li key={w}>{w}</li>
                 ))}
               </ul>
+            ) : null}
+          </div>
+        ) : null}
+
+        {errorRows.length > 0 ? (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+            <p className="text-sm font-medium text-destructive">Failed rows ({errorRows.length})</p>
+            <ul className="mt-2 max-h-40 list-disc overflow-y-auto pl-5 text-xs text-destructive">
+              {errorRows.slice(0, 20).map((row) => (
+                <li key={`${row.source_table}:${row.source_id}`}>
+                  {row.source_table} {row.source_id}: {row.message}
+                </li>
+              ))}
+            </ul>
+            {errorRows.length > 20 ? (
+              <p className="mt-1 text-xs text-muted-foreground">Showing first 20 errors.</p>
             ) : null}
           </div>
         ) : null}
