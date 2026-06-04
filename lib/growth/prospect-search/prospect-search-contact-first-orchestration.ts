@@ -14,6 +14,10 @@ import { GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER } from "@/lib/growth/prosp
 import { augmentProspectSearchCompaniesWithPdl } from "@/lib/growth/prospect-search/prospect-search-pdl-augmentation"
 import { GROWTH_PDL_PROVIDER_QA_MARKER } from "@/lib/growth/providers/pdl/pdl-types"
 import { filterProspectSearchCompaniesByEngineIntelligence } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-filters"
+import {
+  filterProspectSearchCompaniesByEngineReadiness,
+  prioritizeProspectSearchCompaniesByEngineReadiness,
+} from "@/lib/growth/prospect-search/prospect-search-engine-readiness"
 import { applyProspectSearchSignalIntelligenceOverlay } from "@/lib/growth/signals/integrations/prospect-search-signal-intelligence-loader"
 import type {
   GrowthProspectSearchCompanyResult,
@@ -197,6 +201,10 @@ export async function applyProspectSearchContactFirstHydrationLayers(
 
   let merged = attachReachableHumanToCompanies([...companiesLightweight, ...enrichedDeep])
   merged = filterProspectSearchCompaniesByEngineIntelligence(merged, input.filters)
+  merged = filterProspectSearchCompaniesByEngineReadiness(merged, input.filters)
+  if (input.sort_by !== "signal_momentum") {
+    merged = prioritizeProspectSearchCompaniesByEngineReadiness(merged)
+  }
   const partial_intelligence = diagnostics.length > 0
   const summary = partial_intelligence
     ? diagnostics.map((row) => row.message).slice(0, 2).join(" · ")

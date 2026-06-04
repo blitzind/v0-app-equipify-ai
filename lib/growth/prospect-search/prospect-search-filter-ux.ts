@@ -15,6 +15,7 @@ export const PROSPECT_SEARCH_FILTER_ACCORDION_SECTIONS = [
   "confidence-fit",
   "account-safety",
   "engine-intelligence",
+  "engine-readiness",
 ] as const
 
 export type ProspectSearchFilterAccordionSection =

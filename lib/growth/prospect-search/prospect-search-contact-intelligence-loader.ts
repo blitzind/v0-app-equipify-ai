@@ -339,6 +339,10 @@ export async function loadProspectSearchContactIntelligenceBatch(
           intelligence,
           engine,
           personIdByContactId,
+          {
+            canonical_company_id: company.canonical_company_id,
+            is_suppressed: company.is_suppressed,
+          },
         )
 
         map.set(key, intelligence)

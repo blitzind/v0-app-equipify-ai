@@ -14,6 +14,12 @@ import {
   type GrowthProspectSearchRevenueBand,
   type GrowthProspectSearchSuppressionMode,
 } from "@/lib/growth/prospect-search/prospect-search-types"
+import {
+  GROWTH_PROSPECT_SEARCH_PRIORITIZATION_TIERS,
+  GROWTH_PROSPECT_SEARCH_RESEARCH_COMPLETENESS,
+  type GrowthProspectSearchPrioritizationTier,
+  type GrowthProspectSearchResearchCompleteness,
+} from "@/lib/growth/prospect-search/prospect-search-engine-readiness-types"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import type { GrowthProspectSearchIndexCompany } from "@/lib/growth/prospect-search/prospect-search-index"
 import {
@@ -364,6 +370,21 @@ export function normalizeProspectSearchFilters(
       ? raw.company_intelligence_categories.filter(
           (cat): cat is GrowthCompanyIntelligenceCategory =>
             GROWTH_COMPANY_INTELLIGENCE_CATEGORIES.includes(cat as GrowthCompanyIntelligenceCategory),
+        )
+      : undefined,
+    prioritization_tiers: Array.isArray(raw.prioritization_tiers)
+      ? raw.prioritization_tiers.filter((tier): tier is GrowthProspectSearchPrioritizationTier =>
+          GROWTH_PROSPECT_SEARCH_PRIORITIZATION_TIERS.includes(
+            tier as GrowthProspectSearchPrioritizationTier,
+          ),
+        )
+      : undefined,
+    research_completeness: Array.isArray(raw.research_completeness)
+      ? raw.research_completeness.filter(
+          (value): value is GrowthProspectSearchResearchCompleteness =>
+            GROWTH_PROSPECT_SEARCH_RESEARCH_COMPLETENESS.includes(
+              value as GrowthProspectSearchResearchCompleteness,
+            ),
         )
       : undefined,
   }

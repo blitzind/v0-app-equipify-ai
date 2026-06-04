@@ -10,6 +10,8 @@ import type {
   ProspectSearchCommitteeRoleMapping,
   ProspectSearchContactOverlay,
 } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
+import { mergeEngineReadinessIntoContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-engine-readiness"
+import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 
 function formatCommitteeRoleLabel(role: string): string {
   return role.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
@@ -113,9 +115,18 @@ export function mergeEngineIntelligenceIntoContactIntelligence(
   intelligence: GrowthProspectSearchContactIntelligence,
   engine: GrowthProspectSearchEngineIntelligence | null | undefined,
   personIdByContactId: Map<string, string | null>,
+  companyContext?: Pick<
+    GrowthProspectSearchCompanyResult,
+    "canonical_company_id" | "is_suppressed"
+  >,
 ): GrowthProspectSearchContactIntelligence {
   if (!engine?.has_canonical_company) {
-    return { ...intelligence, engine_intelligence: engine ?? undefined }
+    const baseline = { ...intelligence, engine_intelligence: engine ?? undefined }
+    return mergeEngineReadinessIntoContactIntelligence(baseline, {
+      contact_intelligence: baseline,
+      canonical_company_id: companyContext?.canonical_company_id ?? null,
+      is_suppressed: companyContext?.is_suppressed,
+    })
   }
 
   const source_labels = [
@@ -154,7 +165,7 @@ export function mergeEngineIntelligenceIntoContactIntelligence(
           canonical_person_id: personIdByContactId.get(contact.id) ?? contact.canonical_person_id ?? null,
         }))
 
-  return {
+  const merged: GrowthProspectSearchContactIntelligence = {
     ...intelligence,
     contacts,
     committee_roles,
@@ -164,4 +175,10 @@ export function mergeEngineIntelligenceIntoContactIntelligence(
     schema_health: engine.schema_health ?? intelligence.schema_health ?? null,
     schema_ready: intelligence.schema_ready && engine.schema_ready,
   }
+
+  return mergeEngineReadinessIntoContactIntelligence(merged, {
+    contact_intelligence: merged,
+    canonical_company_id: companyContext?.canonical_company_id ?? engine?.canonical_company_id ?? null,
+    is_suppressed: companyContext?.is_suppressed,
+  })
 }

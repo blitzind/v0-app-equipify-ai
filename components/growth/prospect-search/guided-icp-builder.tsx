@@ -39,6 +39,7 @@ import type {
   GrowthProspectSearchRevenueBand,
 } from "@/lib/growth/prospect-search/prospect-search-types"
 import { ProspectSearchEngineIntelligenceFiltersCard } from "@/components/growth/prospect-search/prospect-search-engine-intelligence-filters-card"
+import { ProspectSearchEngineReadinessFiltersCard } from "@/components/growth/prospect-search/prospect-search-engine-readiness-filters-card"
 import { cn } from "@/lib/utils"
 
 function FilterActions({
@@ -481,6 +482,15 @@ export function GuidedIcpBuilder({
           </AccordionTrigger>
           <AccordionContent className="pb-3">
             <ProspectSearchEngineIntelligenceFiltersCard filters={filters} onChange={onChange} />
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="engine-readiness" className="border-border/60 px-2">
+          <AccordionTrigger className="py-3 text-sm hover:no-underline">
+            Readiness & prioritization
+          </AccordionTrigger>
+          <AccordionContent className="pb-3">
+            <ProspectSearchEngineReadinessFiltersCard filters={filters} onChange={onChange} />
           </AccordionContent>
         </AccordionItem>
 

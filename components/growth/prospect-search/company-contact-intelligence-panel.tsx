@@ -56,7 +56,14 @@ export function CompanyContactIntelligencePanel({
       <ProspectSearchEngineIntelligencePanel
         companyName={companyName}
         intelligence={intelligence.engine_intelligence}
-        company={company ?? undefined}
+        company={
+          company
+            ? {
+                ...company,
+                contact_intelligence: intelligence,
+              }
+            : undefined
+        }
         onResearchComplete={onResearchComplete}
       />
 

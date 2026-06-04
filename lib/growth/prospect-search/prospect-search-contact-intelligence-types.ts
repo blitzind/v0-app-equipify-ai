@@ -120,6 +120,8 @@ export type GrowthProspectSearchContactIntelligence = {
   contact_identities?: import("@/lib/growth/prospect-search/prospect-search-contact-identity-types").ProspectSearchContactIdentityResolution[]
   /** Growth Engine 7.2–7.7 intelligence overlay (Phase 7.PS-A). */
   engine_intelligence?: import("@/lib/growth/prospect-search/prospect-search-engine-intelligence-types").GrowthProspectSearchEngineIntelligence | null
+  /** Growth Engine readiness & prioritization (Phase 7.PS-D). */
+  engine_readiness?: import("@/lib/growth/prospect-search/prospect-search-engine-readiness-types").GrowthProspectSearchEngineReadiness | null
 }
 
 export type ProspectSearchLeadEngineContactHandoffContext = {

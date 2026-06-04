@@ -7,6 +7,10 @@ import { applyProspectSearchIntelligenceOverlays } from "@/lib/growth/market-int
 import { applyProspectSearchContactIntelligenceOverlay } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-loader"
 import { GROWTH_DISCOVERY_RUNTIME_HARDENING_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-safe-fetch-json"
 import { filterProspectSearchCompaniesByEngineIntelligence } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-filters"
+import {
+  filterProspectSearchCompaniesByEngineReadiness,
+  prioritizeProspectSearchCompaniesByEngineReadiness,
+} from "@/lib/growth/prospect-search/prospect-search-engine-readiness"
 import { applyProspectSearchSignalIntelligenceOverlay } from "@/lib/growth/signals/integrations/prospect-search-signal-intelligence-loader"
 import type {
   GrowthProspectSearchCompanyResult,
@@ -118,6 +122,8 @@ export async function applyProspectSearchDiscoverHydrationLayers(
   }
 
   companies = filterProspectSearchCompaniesByEngineIntelligence(companies, input.filters)
+  companies = filterProspectSearchCompaniesByEngineReadiness(companies, input.filters)
+  companies = prioritizeProspectSearchCompaniesByEngineReadiness(companies)
 
   const partial_intelligence = diagnostics.length > 0
   const summary = partial_intelligence

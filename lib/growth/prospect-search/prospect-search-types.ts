@@ -193,6 +193,10 @@ export type GrowthProspectSearchFilters = {
   buying_committee_roles?: import("@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-types").GrowthBuyingCommitteeIntelligenceRole[]
   /** Growth Engine 7.6: at least one selected intelligence category present (7.PS-B). */
   company_intelligence_categories?: import("@/lib/growth/company-intelligence/company-intelligence-types").GrowthCompanyIntelligenceCategory[]
+  /** Phase 7.PS-D — readiness prioritization tier filter (post-hydration). */
+  prioritization_tiers?: import("@/lib/growth/prospect-search/prospect-search-engine-readiness-types").GrowthProspectSearchPrioritizationTier[]
+  /** Phase 7.PS-D — research completeness filter (post-hydration). */
+  research_completeness?: import("@/lib/growth/prospect-search/prospect-search-engine-readiness-types").GrowthProspectSearchResearchCompleteness[]
 }
 
 export type GrowthProspectSearchParsedQuery = {

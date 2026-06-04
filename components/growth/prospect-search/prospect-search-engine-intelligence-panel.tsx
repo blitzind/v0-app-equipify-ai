@@ -13,6 +13,8 @@ import {
 import type { GrowthBuyingCommitteeIntelligenceRole } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-types"
 import { ProspectSearchActionableResearchActions } from "@/components/growth/prospect-search/prospect-search-actionable-research-actions"
 import { ProspectSearchEngineDiscoveryRollup } from "@/components/growth/prospect-search/prospect-search-engine-discovery-rollup"
+import { ProspectSearchEngineReadinessSummaryCard } from "@/components/growth/prospect-search/prospect-search-engine-readiness-summary-card"
+import { ProspectSearchEngineReadinessBreakdownPanel } from "@/components/growth/prospect-search/prospect-search-engine-readiness-breakdown-panel"
 import { ProspectSearchSchemaHealthNotice } from "@/components/growth/prospect-search/prospect-search-schema-health-notice"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 
@@ -103,6 +105,16 @@ export function ProspectSearchEngineIntelligencePanel({
             </li>
           ))}
         </ul>
+      ) : null}
+
+      {company?.contact_intelligence?.engine_readiness ? (
+        <div className="mt-3">
+          <ProspectSearchEngineReadinessSummaryCard readiness={company.contact_intelligence.engine_readiness} />
+          <ProspectSearchEngineReadinessBreakdownPanel
+            readiness={company.contact_intelligence.engine_readiness}
+            companyName={companyName}
+          />
+        </div>
       ) : null}
 
       {company ? (

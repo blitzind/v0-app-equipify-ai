@@ -2,6 +2,13 @@
 
 import { parseTitleChips } from "@/lib/growth/prospect-search/title-suggestion-engine"
 import { hasActiveProspectSearchEngineIntelligenceFilters } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-filters"
+import { hasActiveProspectSearchEngineReadinessFilters } from "@/lib/growth/prospect-search/prospect-search-engine-readiness"
+import {
+  formatProspectSearchPrioritizationTier,
+  formatProspectSearchResearchCompleteness,
+} from "@/lib/growth/prospect-search/prospect-search-engine-readiness-ux"
+import type { GrowthProspectSearchPrioritizationTier } from "@/lib/growth/prospect-search/prospect-search-engine-readiness-types"
+import type { GrowthProspectSearchResearchCompleteness } from "@/lib/growth/prospect-search/prospect-search-engine-readiness-types"
 import {
   PROSPECT_SEARCH_BUYING_COMMITTEE_ROLE_LABELS,
   PROSPECT_SEARCH_COMPANY_INTELLIGENCE_CATEGORY_LABELS,
@@ -46,6 +53,11 @@ export function buildProspectSearchFilterHealthWarnings(input: {
   if (hasActiveProspectSearchEngineIntelligenceFilters(input.filters)) {
     warnings.push(
       "Verified intelligence filters apply after search hydration — counts may be lower than the index estimate.",
+    )
+  }
+  if (hasActiveProspectSearchEngineReadinessFilters(input.filters)) {
+    warnings.push(
+      "Readiness filters apply after intelligence hydration — prioritization uses Growth Engine evidence only.",
     )
   }
 
@@ -203,6 +215,30 @@ export function buildProspectSearchActiveFilterChips(
           )
           .join(", "),
         { company_intelligence_categories: undefined },
+      ),
+    )
+  }
+  if (filters.prioritization_tiers?.length) {
+    chips.push(
+      chip(
+        "readiness-tier",
+        "Readiness",
+        filters.prioritization_tiers
+          .map((t) => formatProspectSearchPrioritizationTier(t as GrowthProspectSearchPrioritizationTier))
+          .join(", "),
+        { prioritization_tiers: undefined },
+      ),
+    )
+  }
+  if (filters.research_completeness?.length) {
+    chips.push(
+      chip(
+        "readiness-research",
+        "Readiness",
+        filters.research_completeness
+          .map((v) => formatProspectSearchResearchCompleteness(v as GrowthProspectSearchResearchCompleteness))
+          .join(", "),
+        { research_completeness: undefined },
       ),
     )
   }
