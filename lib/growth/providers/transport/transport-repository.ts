@@ -152,7 +152,14 @@ export async function updateDeliveryAttempt(
 ): Promise<GrowthDeliveryAttempt> {
   const { data, error } = await attemptsTable(admin).update(updates).eq("id", attemptId).select("*").single()
   if (error) throw new Error(error.message)
-  return mapAttempt(data as Row)
+  const mapped = mapAttempt(data as Row)
+  if (updates.status === "sent") {
+    const { recordSendAttributionTouchForDeliveryAttempt } = await import(
+      "@/lib/growth/revenue-attribution/delivery-attempt-touch-hook"
+    )
+    await recordSendAttributionTouchForDeliveryAttempt(admin, attemptId).catch(() => undefined)
+  }
+  return mapped
 }
 
 export async function listProviderRateLimits(admin: SupabaseClient): Promise<GrowthProviderRateLimitRow[]> {

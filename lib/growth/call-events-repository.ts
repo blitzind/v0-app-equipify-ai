@@ -155,6 +155,16 @@ export async function recordGrowthLeadCallEvent(
     throw new Error("lead_update_failed")
   }
 
+  const { recordAttributionTouch } = await import("@/lib/growth/revenue-attribution/record-attribution-touch")
+  await recordAttributionTouch(admin, {
+    touchType: "call",
+    leadId: input.leadId,
+    repUserId: input.createdBy ?? lead.assignedTo ?? null,
+    attributionSource: "call_disposition",
+    attributionConfidence: 0.85,
+    metadata: { disposition: input.disposition, call_event_id: eventRow.id },
+  }).catch(() => undefined)
+
   logGrowthEngine("call_event_recorded", {
     leadId: input.leadId,
     disposition: input.disposition,

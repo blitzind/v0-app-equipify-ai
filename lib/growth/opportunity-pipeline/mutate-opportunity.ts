@@ -41,6 +41,8 @@ import {
   emitGrowthOpportunityCloseDatePassedNotification,
   emitGrowthOpportunityOwnerOverloadedNotification,
 } from "@/lib/growth/notifications/notification-integrations"
+import { recordRevenueAttributionEvent } from "@/lib/growth/revenue-intelligence/revenue-attribution"
+import { resolveAttributionContextForLead } from "@/lib/growth/revenue-attribution/resolve-attribution-context"
 
 type Actor = { userId?: string | null; email?: string | null }
 
@@ -113,6 +115,22 @@ export async function createGrowthOpportunity(
   })
 
   logGrowthEngine("opportunity_created", { opportunityId: opportunity.id, leadId: input.leadId, stageKey })
+
+  const ctx = await resolveAttributionContextForLead(admin, input.leadId, {
+    opportunityId: opportunity.id,
+    repUserId: ownerUserId,
+  })
+  await recordRevenueAttributionEvent(admin, {
+    leadId: input.leadId,
+    eventType: "opportunity_created",
+    opportunityId: opportunity.id,
+    sequenceId: ctx?.sequenceId ?? null,
+    sequenceEnrollmentId: ctx?.sequenceEnrollmentId ?? null,
+    senderAccountId: ctx?.senderAccountId ?? null,
+    weightedAmount: weightedAmount,
+    attributionWeight: 0.5,
+    metadata: { source: "opportunity_pipeline", stage_key: stageKey, rep_user_id: ownerUserId },
+  }).catch(() => undefined)
 
   return { ok: true, opportunity: enriched ?? opportunity }
 }
@@ -201,6 +219,27 @@ export async function updateGrowthOpportunityStage(
       amount,
       actor: input.actor,
     })
+
+    const ctx = await resolveAttributionContextForLead(admin, row.lead_id as string, {
+      opportunityId: input.opportunityId,
+      repUserId: updated.ownerUserId,
+    })
+    await recordRevenueAttributionEvent(admin, {
+      leadId: row.lead_id as string,
+      eventType: "opportunity_won",
+      opportunityId: input.opportunityId,
+      sequenceId: ctx?.sequenceId ?? null,
+      sequenceEnrollmentId: ctx?.sequenceEnrollmentId ?? null,
+      senderAccountId: ctx?.senderAccountId ?? null,
+      revenueAmount: amount,
+      weightedAmount: amount,
+      attributionWeight: 1,
+      metadata: {
+        source: "opportunity_pipeline",
+        from_stage: fromStage,
+        rep_user_id: updated.ownerUserId,
+      },
+    }).catch(() => undefined)
   }
   if (toStage === "closed_lost") {
     await emitGrowthOpportunityClosedLostTimeline(admin, {

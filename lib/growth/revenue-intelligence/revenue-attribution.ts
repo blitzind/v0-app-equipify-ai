@@ -10,6 +10,7 @@ import {
   insertPerformanceIntelligenceEvent,
   recordPerformancePlatformTimeline,
 } from "@/lib/growth/revenue-intelligence/performance-events"
+import { recordAttributionTouchFromRevenueEvent } from "@/lib/growth/revenue-attribution/attribution-revenue-event-bridge"
 import { upsertSequencePerformanceSnapshot } from "@/lib/growth/revenue-intelligence/performance-snapshots"
 
 type Row = Record<string, unknown>
@@ -119,7 +120,23 @@ export async function recordRevenueAttributionEvent(
     payload: { lead_id: input.leadId, event_type: input.eventType },
   }).catch(() => undefined)
 
-  return mapAttribution(data as Row)
+  const mapped = mapAttribution(data as Row)
+  await recordAttributionTouchFromRevenueEvent(admin, {
+    revenueEventId: mapped.id,
+    leadId: input.leadId,
+    eventType: input.eventType,
+    opportunityId: input.opportunityId,
+    sequenceId: input.sequenceId,
+    sequenceEnrollmentId: input.sequenceEnrollmentId,
+    senderAccountId: input.senderAccountId,
+    deliveryAttemptId: input.deliveryAttemptId,
+    attributionSource: input.metadata?.source ? String(input.metadata.source) : "revenue_attribution_events",
+    attributionConfidence: input.attributionWeight ?? 1,
+    metadata: input.metadata,
+    occurredAt: mapped.occurredAt,
+  })
+
+  return mapped
 }
 
 export async function listRevenueAttributionEvents(

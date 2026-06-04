@@ -166,6 +166,18 @@ export async function emitGrowthLeadResearchTimeline(
     actorUserId: input.actor?.userId,
     actorEmail: input.actor?.email,
   })
+
+  if (input.eventType === "research_completed") {
+    const { recordAttributionTouch } = await import("@/lib/growth/revenue-attribution/record-attribution-touch")
+    await recordAttributionTouch(admin, {
+      touchType: "research",
+      leadId: input.leadId,
+      repUserId: input.actor?.userId ?? null,
+      attributionSource: "research_pipeline",
+      attributionConfidence: 0.75,
+      metadata: { research_run_id: input.runId, ...(input.payload ?? {}) },
+    }).catch(() => undefined)
+  }
 }
 
 export async function emitGrowthLeadWebsiteFetchTimeline(

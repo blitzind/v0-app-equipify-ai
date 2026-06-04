@@ -382,6 +382,16 @@ export async function approvePersonalizationGeneration(
     actorEmail: input.actorEmail,
   })
 
+  const { recordAttributionTouch } = await import("@/lib/growth/revenue-attribution/record-attribution-touch")
+  await recordAttributionTouch(admin, {
+    touchType: "personalization",
+    leadId: existing.leadId,
+    repUserId: input.actorUserId ?? null,
+    attributionSource: "personalization_generation",
+    attributionConfidence: 0.8,
+    metadata: { generation_id: existing.id, generation_type: existing.generationType },
+  }).catch(() => undefined)
+
   await recordPersonalizationPerformanceSnapshot(admin, {
     generationId: input.generationId,
     leadId: existing.leadId,

@@ -430,6 +430,21 @@ export async function runGrowthImportCommit(
           companyName: lead.companyName,
           actor: input.actor,
         })
+        const { recordAttributionTouch } = await import("@/lib/growth/revenue-attribution/record-attribution-touch")
+        await recordAttributionTouch(admin, {
+          touchType: "lead_import",
+          leadId: lead.id,
+          repUserId: input.actor.userId,
+          attributionSource: "import_pipeline",
+          attributionConfidence: 1,
+          metadata: {
+            batch_id: batchId,
+            source_channel: existing.sourceChannel,
+            source_campaign: existing.sourceCampaign,
+            source_vendor: existing.sourceVendor,
+            row_index: rowIndex,
+          },
+        }).catch(() => undefined)
         await recomputeGrowthLeadWorkflowSignals(admin, lead.id)
         imported++
         if (isEstimatedCallReadyLead({ row: normalized, hasError: false, proposedAction: "create_new" })) {
