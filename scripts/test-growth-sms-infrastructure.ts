@@ -3,6 +3,8 @@
  * Run: pnpm test:growth-sms-infrastructure
  */
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import { mapSmsConversationToChannelThread } from "../lib/growth/inbox/inbox-channel-types"
 import { normalizeToE164, phoneLookupKeys } from "../lib/growth/sms/phone-normalization"
 import {
@@ -105,6 +107,13 @@ assert.equal(channelThread.channel, "sms")
 assert.equal(channelThread.messages.length, 2)
 assert.equal(channelThread.messages[1]?.bodyPreview, "Yes interested")
 console.log(`Channel thread: ${channelThread.channel} · ${channelThread.label} · ${channelThread.messages.length} messages`)
+
+console.log("\n=== SMS inbox thread linking (5.1G bridge) ===")
+const threadingSource = readFileSync(resolve("lib/growth/sms/sms-threading.ts"), "utf8")
+assert.match(threadingSource, /ensureSmsConversationInboxBridge/)
+assert.match(threadingSource, /findUnlinkedSmsInboxThreadForLead/)
+assert.doesNotMatch(threadingSource, /if \(existing\) return existing/)
+console.log("Existing conversations with null inbox_thread_id are repaired on reuse")
 
 console.log("\n=== End-to-end flow (simulated) ===")
 console.log("1. sendSms() → Twilio Messages API (when GROWTH_SMS_SEND_ENABLED=true)")

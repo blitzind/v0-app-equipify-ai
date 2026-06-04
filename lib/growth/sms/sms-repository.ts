@@ -235,6 +235,36 @@ export async function linkSmsConversationInboxThread(
   if (error) throw new Error(error.message)
 }
 
+export async function findUnlinkedSmsInboxThreadForLead(
+  admin: SupabaseClient,
+  input: { leadId: string; subject: string },
+): Promise<string | null> {
+  const { data, error } = await admin
+    .schema("growth")
+    .from("inbox_threads")
+    .select("id")
+    .eq("lead_id", input.leadId)
+    .eq("provider_family", "twilio_sms")
+    .eq("subject", input.subject)
+    .order("created_at", { ascending: true })
+
+  if (error) throw new Error(error.message)
+
+  for (const row of data ?? []) {
+    const threadId = asString((row as Row).id)
+    if (!threadId) continue
+
+    const { data: linked, error: linkedError } = await conversationsTable(admin)
+      .select("id")
+      .eq("inbox_thread_id", threadId)
+      .maybeSingle()
+    if (linkedError) throw new Error(linkedError.message)
+    if (!linked) return threadId
+  }
+
+  return null
+}
+
 export async function insertSmsMessage(
   admin: SupabaseClient,
   input: {

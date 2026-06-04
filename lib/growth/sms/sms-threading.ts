@@ -8,9 +8,40 @@ import {
   createSmsConversation,
   fetchGrowthSmsWorkspaceSettings,
   findSmsConversationByLeadAndParticipant,
+  findUnlinkedSmsInboxThreadForLead,
   linkSmsConversationInboxThread,
 } from "@/lib/growth/sms/sms-repository"
 import type { GrowthSmsConversation } from "@/lib/growth/sms/sms-types"
+
+function smsInboxThreadSubject(participantE164: string): string {
+  return `SMS · ${participantE164}`
+}
+
+async function ensureSmsConversationInboxBridge(
+  admin: SupabaseClient,
+  conversation: GrowthSmsConversation,
+  participantE164: string,
+): Promise<GrowthSmsConversation> {
+  if (conversation.inboxThreadId) return conversation
+
+  const subject = smsInboxThreadSubject(participantE164)
+  let inboxThreadId = await findUnlinkedSmsInboxThreadForLead(admin, {
+    leadId: conversation.leadId,
+    subject,
+  })
+
+  if (!inboxThreadId) {
+    const inboxThread = await createInboxThread(admin, {
+      lead_id: conversation.leadId,
+      subject,
+      provider_family: "twilio_sms",
+    })
+    inboxThreadId = inboxThread.id
+  }
+
+  await linkSmsConversationInboxThread(admin, conversation.id, inboxThreadId)
+  return { ...conversation, inboxThreadId }
+}
 
 export async function findOrCreateSmsConversation(
   admin: SupabaseClient,
@@ -30,7 +61,10 @@ export async function findOrCreateSmsConversation(
     leadId: input.leadId,
     participantE164: normalizedParticipant,
   })
-  if (existing) return existing
+  if (existing) {
+    if (input.bridgeInbox === false) return existing
+    return ensureSmsConversationInboxBridge(admin, existing, normalizedParticipant)
+  }
 
   const settings = await fetchGrowthSmsWorkspaceSettings(admin)
   const fromE164 = settings?.fromE164 ?? "+18333784743"
@@ -43,17 +77,8 @@ export async function findOrCreateSmsConversation(
     metadata: { created_by: "sms_threading" },
   })
 
-  if (input.bridgeInbox !== false) {
-    const inboxThread = await createInboxThread(admin, {
-      lead_id: input.leadId,
-      subject: `SMS · ${normalizedParticipant}`,
-      provider_family: "twilio_sms",
-    })
-    await linkSmsConversationInboxThread(admin, conversation.id, inboxThread.id)
-    return { ...conversation, inboxThreadId: inboxThread.id }
-  }
-
-  return conversation
+  if (input.bridgeInbox === false) return conversation
+  return ensureSmsConversationInboxBridge(admin, conversation, normalizedParticipant)
 }
 
 export async function appendSmsMessageToInboxBridge(
