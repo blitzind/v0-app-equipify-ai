@@ -1,10 +1,15 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import {
+  creditsFromPathSummaryOrCompute,
+  isGrowthAttributionModel,
+} from "@/lib/growth/revenue-attribution/attribution-credit-model"
 import type { GrowthAttributionTouch } from "@/lib/growth/revenue-attribution/attribution-touch-types"
 import { isGrowthAttributionTouchLedgerSchemaReady } from "@/lib/growth/revenue-attribution/attribution-touch-schema-health"
 import {
   listAttributionPathsForLeads,
+  listAttributionTouchesByIds,
   listAttributionTouchesInRange,
   listOpportunitiesForAttributionDashboard,
   loadLeadAttributionContexts,
@@ -40,7 +45,9 @@ function parseFilters(input?: Partial<GrowthRevenueAttributionDashboardFilters>)
     channel: input?.channel?.trim() || null,
     repUserId: input?.repUserId?.trim() || null,
     sequenceId: input?.sequenceId?.trim() || null,
-    attributionModel: input?.attributionModel === "last_touch" ? "last_touch" : "first_touch",
+    attributionModel: isGrowthAttributionModel(input?.attributionModel)
+      ? input.attributionModel
+      : "first_touch",
   }
 }
 
@@ -111,7 +118,8 @@ function campaignKeyForTouch(touch: GrowthAttributionTouch, lead: LeadAttributio
 function creditDimensionsFromTouch(
   touch: GrowthAttributionTouch,
   lead: LeadAttributionContext | undefined,
-  amount: number,
+  creditedRevenue: number,
+  winCredit: number,
   stores: {
     campaign: Map<string, DimensionBucket>
     sequence: Map<string, DimensionBucket>
@@ -124,7 +132,7 @@ function creditDimensionsFromTouch(
   },
 ): void {
   const leadId = touch.leadId
-  const patch = { leadId, wins: 1, attributedRevenue: amount }
+  const patch = { leadId, wins: winCredit, attributedRevenue: creditedRevenue }
 
   const campaignKey = campaignKeyForTouch(touch, lead)
   bumpBucket(stores.campaign, campaignKey, patch)
@@ -151,15 +159,36 @@ function creditDimensionsFromTouch(
   bumpBucket(stores.leadSource, sourceKey, patch)
 }
 
-function resolveCreditTouchId(
+function resolvePathForWonTouch(
+  pathByLeadOpp: Map<string, AttributionPathRow>,
+  wonTouch: GrowthAttributionTouch,
+): AttributionPathRow | undefined {
+  return (
+    pathByLeadOpp.get(`${wonTouch.leadId}:${wonTouch.opportunityId ?? "lead"}:opportunity`) ??
+    pathByLeadOpp.get(`${wonTouch.leadId}:${wonTouch.opportunityId ?? "lead"}:lead`) ??
+    pathByLeadOpp.get(`${wonTouch.leadId}:lead:lead`)
+  )
+}
+
+function orderedPathTouches(
   path: AttributionPathRow | undefined,
-  model: GrowthAttributionModel,
-  fallbackTouch: GrowthAttributionTouch,
-): string {
-  if (!path) return fallbackTouch.id
-  if (model === "first_touch" && path.firstTouchId) return path.firstTouchId
-  if (model === "last_touch" && path.lastTouchId) return path.lastTouchId
-  return fallbackTouch.id
+  wonTouch: GrowthAttributionTouch,
+  touchById: Map<string, GrowthAttributionTouch>,
+  pathTouchById: Map<string, GrowthAttributionTouch>,
+  leadTouches: GrowthAttributionTouch[],
+): GrowthAttributionTouch[] {
+  const ids = path?.touchIds ?? []
+  const fromPath = ids
+    .map((id) => pathTouchById.get(id) ?? touchById.get(id))
+    .filter((t): t is GrowthAttributionTouch => Boolean(t))
+    .sort((a, b) => a.touchedAt.localeCompare(b.touchedAt))
+
+  if (fromPath.length > 0) return fromPath
+
+  const anchorMs = Date.parse(wonTouch.touchedAt)
+  return leadTouches
+    .filter((t) => t.leadId === wonTouch.leadId && Date.parse(t.touchedAt) <= anchorMs)
+    .sort((a, b) => a.touchedAt.localeCompare(b.touchedAt))
 }
 
 function buildFunnel(
@@ -248,7 +277,17 @@ export async function fetchGrowthRevenueAttributionDashboard(
     listAttributionPathsForLeads(admin, leadIds),
   ])
 
-  const touchById = new Map(touches.map((t) => [t.id, t]))
+  const pathTouchIds = [...new Set(paths.flatMap((p) => p.touchIds))]
+  const pathTouchesLoaded = await listAttributionTouchesByIds(admin, pathTouchIds)
+  const pathTouchById = new Map(pathTouchesLoaded.map((t) => [t.id, t]))
+
+  const touchById = new Map([...touches, ...pathTouchesLoaded].map((t) => [t.id, t]))
+  const touchesByLead = new Map<string, GrowthAttributionTouch[]>()
+  for (const touch of touchById.values()) {
+    const list = touchesByLead.get(touch.leadId) ?? []
+    list.push(touch)
+    touchesByLead.set(touch.leadId, list)
+  }
   const pathByLeadOpp = new Map<string, AttributionPathRow>()
   for (const path of paths) {
     const key = `${path.leadId}:${path.opportunityId ?? "lead"}:${path.pathScope}`
@@ -295,16 +334,30 @@ export async function fetchGrowthRevenueAttributionDashboard(
     const amount = opp?.amount ?? 0
     attributedRevenue += amount
 
-    const path =
-      pathByLeadOpp.get(`${wonTouch.leadId}:${wonTouch.opportunityId ?? "lead"}:opportunity`) ??
-      pathByLeadOpp.get(`${wonTouch.leadId}:${wonTouch.opportunityId ?? "lead"}:lead`) ??
-      pathByLeadOpp.get(`${wonTouch.leadId}:lead:lead`)
+    const path = resolvePathForWonTouch(pathByLeadOpp, wonTouch)
+    const pathTouchList = orderedPathTouches(
+      path,
+      wonTouch,
+      touchById,
+      pathTouchById,
+      touchesByLead.get(wonTouch.leadId) ?? [],
+    )
 
-    const creditTouchId = resolveCreditTouchId(path, attributionModel, wonTouch)
-    const creditTouch = touchById.get(creditTouchId) ?? wonTouch
-    const lead = leadContexts.get(creditTouch.leadId)
+    const credits = creditsFromPathSummaryOrCompute(
+      attributionModel,
+      pathTouchList.length > 0 ? pathTouchList : [wonTouch],
+      wonTouch.touchedAt,
+      path?.pathSummary,
+    )
 
-    creditDimensionsFromTouch(creditTouch, lead, amount, stores)
+    for (const credit of credits) {
+      if (credit.attributionWeight <= 0) continue
+      const creditTouch = touchById.get(credit.touchId) ?? pathTouchById.get(credit.touchId)
+      if (!creditTouch) continue
+      const lead = leadContexts.get(creditTouch.leadId)
+      const weight = credit.attributionWeight * credit.attributionConfidence
+      creditDimensionsFromTouch(creditTouch, lead, amount * weight, credit.attributionWeight, stores)
+    }
   }
 
   const openOpps = opportunities.filter((o) => !o.closedWonAt && !o.closedLostAt)

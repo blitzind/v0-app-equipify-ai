@@ -140,7 +140,7 @@ export function GrowthRevenueAttributionDashboardView() {
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Model</label>
             <div className="flex gap-2">
-              {(["first_touch", "last_touch"] as const).map((model) => (
+              {(["first_touch", "last_touch", "linear", "time_decay"] as const).map((model) => (
                 <Button
                   key={model}
                   size="sm"

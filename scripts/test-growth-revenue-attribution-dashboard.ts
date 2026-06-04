@@ -40,9 +40,10 @@ function touch(partial: Partial<GrowthAttributionTouch> & Pick<GrowthAttribution
 }
 
 async function main(): Promise<void> {
-  assert.equal(GROWTH_REVENUE_ATTRIBUTION_DASHBOARD_QA_MARKER, "growth-revenue-attribution-dashboard-v1")
-  assert.equal(GROWTH_ATTRIBUTION_MODELS.length, 2)
-  assert.equal(attributionModelLabel("first_touch"), "First touch")
+  assert.equal(GROWTH_REVENUE_ATTRIBUTION_DASHBOARD_QA_MARKER, "growth-revenue-attribution-dashboard-v2")
+  assert.equal(GROWTH_ATTRIBUTION_MODELS.length, 4)
+  assert.equal(attributionModelLabel("linear"), "Linear")
+  assert.equal(attributionModelLabel("time_decay"), "Time decay")
 
   const path = buildAttributionPathFromTouches(
     [
@@ -60,8 +61,8 @@ async function main(): Promise<void> {
   assert.match(querySource, /attribution_paths/)
 
   const dashSource = readSource("lib/growth/revenue-attribution/revenue-attribution-dashboard.ts")
-  assert.match(dashSource, /first_touch/)
-  assert.match(dashSource, /last_touch/)
+  assert.match(dashSource, /creditsFromPathSummaryOrCompute/)
+  assert.match(readSource("lib/growth/revenue-attribution/attribution-credit-model.ts"), /time_decay/)
   assert.match(dashSource, /fetchGrowthRevenueAttributionDashboard/)
 
   const apiSource = readSource("app/api/platform/growth/revenue-attribution/dashboard/route.ts")
@@ -70,6 +71,7 @@ async function main(): Promise<void> {
 
   const uiSource = readSource("components/growth/growth-revenue-attribution-dashboard.tsx")
   assert.match(uiSource, /revenue-attribution\/dashboard/)
+  assert.match(uiSource, /time_decay/)
 
   const navSource = readSource("lib/growth/navigation/growth-navigation-destinations.ts")
   assert.match(navSource, /revenue-attribution/)

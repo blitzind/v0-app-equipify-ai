@@ -1,12 +1,16 @@
-/** Phase 6.32B-2 — Unified revenue attribution dashboard (client-safe). */
+/** Phase 6.32B-2 / 6.33A — Unified revenue attribution dashboard (client-safe). */
 
+import {
+  attributionModelLabel as creditModelLabel,
+  GROWTH_ATTRIBUTION_MODELS,
+  type GrowthAttributionModel,
+} from "@/lib/growth/revenue-attribution/attribution-credit-model"
 import type { GrowthAttributionTouchType } from "@/lib/growth/revenue-attribution/attribution-touch-types"
 
 export const GROWTH_REVENUE_ATTRIBUTION_DASHBOARD_QA_MARKER =
-  "growth-revenue-attribution-dashboard-v1" as const
+  "growth-revenue-attribution-dashboard-v2" as const
 
-export const GROWTH_ATTRIBUTION_MODELS = ["first_touch", "last_touch"] as const
-export type GrowthAttributionModel = (typeof GROWTH_ATTRIBUTION_MODELS)[number]
+export { GROWTH_ATTRIBUTION_MODELS, type GrowthAttributionModel }
 
 export type GrowthRevenueAttributionDashboardFilters = {
   dateFrom: string
@@ -74,5 +78,5 @@ export type GrowthRevenueAttributionDashboard = {
 }
 
 export function attributionModelLabel(model: GrowthAttributionModel): string {
-  return model === "first_touch" ? "First touch" : "Last touch"
+  return creditModelLabel(model)
 }

@@ -30,6 +30,7 @@ function emptyPayload(): GrowthRevenueAttributionRecommendationsPayload {
     underperformers: [],
     funnelBottlenecks: [],
     suggestedTests: [],
+    attributionModel: "first_touch",
     lastCalculatedAt: now,
   }
 }
@@ -55,6 +56,7 @@ export async function fetchGrowthRevenueAttributionRecommendations(
   ])
 
   return generateAttributionRecommendations({
+    attributionModel: dashboard.attributionModel,
     funnel: dashboard.funnel,
     byChannel: dashboard.byChannel,
     bySequence: dashboard.bySequence,

@@ -372,6 +372,7 @@ export function generateAttributionRecommendations(
 
   return {
     qa_marker: GROWTH_REVENUE_ATTRIBUTION_RECOMMENDATIONS_QA_MARKER,
+    attributionModel: input.attributionModel ?? "first_touch",
     recommendations: all,
     rollups,
     highConfidenceWins: all.filter((r) => r.category === "high_confidence_win"),

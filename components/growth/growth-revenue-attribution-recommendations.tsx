@@ -165,7 +165,8 @@ export function GrowthRevenueAttributionRecommendationsSection({
     <div className="space-y-4">
       <GrowthEngineCard title="Closed-loop recommendations (read-only)">
         <p className="text-xs text-muted-foreground mb-3">
-          {GROWTH_REVENUE_ATTRIBUTION_RECOMMENDATIONS_QA_MARKER} · {GROWTH_ATTRIBUTION_RECOMMENDATION_SAFETY_NOTES}
+          {GROWTH_REVENUE_ATTRIBUTION_RECOMMENDATIONS_QA_MARKER}
+          {payload ? ` · Model: ${payload.attributionModel}` : ""} · {GROWTH_ATTRIBUTION_RECOMMENDATION_SAFETY_NOTES}
         </p>
 
         {loading ? (

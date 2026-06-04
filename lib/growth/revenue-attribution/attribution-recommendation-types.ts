@@ -92,6 +92,7 @@ export type GrowthAttributionClosedLoopRollups = {
 
 export type GrowthRevenueAttributionRecommendationsPayload = {
   qa_marker: typeof GROWTH_REVENUE_ATTRIBUTION_RECOMMENDATIONS_QA_MARKER
+  attributionModel: import("@/lib/growth/revenue-attribution/attribution-credit-model").GrowthAttributionModel
   recommendations: GrowthAttributionRecommendation[]
   rollups: GrowthAttributionClosedLoopRollups
   highConfidenceWins: GrowthAttributionRecommendation[]
@@ -105,6 +106,7 @@ export const GROWTH_ATTRIBUTION_RECOMMENDATION_SAFETY_NOTES =
   "Advisory only. Operators must approve changes. No automatic sequence edits, personalization, sender routing, or sends."
 
 export type AttributionRecommendationEngineInput = {
+  attributionModel?: import("@/lib/growth/revenue-attribution/attribution-credit-model").GrowthAttributionModel
   funnel: GrowthAttributionFunnelStep[]
   byChannel: GrowthAttributionDimensionRow[]
   bySequence: GrowthAttributionDimensionRow[]

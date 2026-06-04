@@ -50,6 +50,7 @@ function main(): void {
     touchesAnalyzed: 80,
   })
 
+  assert.equal(result.attributionModel, "first_touch")
   assert.ok(result.recommendations.length > 0)
   assert.ok(result.highConfidenceWins.length > 0)
   assert.ok(result.rollups.channel.topChannels.length > 0)

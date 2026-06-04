@@ -1,5 +1,6 @@
-/** Client-safe attribution path helpers (Phase 6.32B-1). */
+/** Client-safe attribution path helpers (Phase 6.32B-1 / 6.33A). */
 
+import { buildStoredTouchCreditsByModel } from "@/lib/growth/revenue-attribution/attribution-credit-model"
 import type {
   GrowthAttributionPathScope,
   GrowthAttributionTouch,
@@ -15,13 +16,15 @@ function buildPathSummary(touches: GrowthAttributionTouch[]): Record<string, unk
   for (const touch of touches) {
     byType[touch.touchType] = (byType[touch.touchType] ?? 0) + 1
   }
+  const anchorAt = touches[touches.length - 1]?.touchedAt ?? new Date().toISOString()
   return {
     touch_types: byType,
     first_touched_at: touches[0]?.touchedAt ?? null,
-    last_touched_at: touches[touches.length - 1]?.touchedAt ?? null,
+    last_touched_at: anchorAt,
     sequence_ids: uniqueStrings(touches.map((t) => t.sequenceId)),
     sender_account_ids: uniqueStrings(touches.map((t) => t.senderAccountId)),
     rep_user_ids: uniqueStrings(touches.map((t) => t.repUserId)),
+    touch_credits_by_model: buildStoredTouchCreditsByModel(touches, anchorAt),
   }
 }
 

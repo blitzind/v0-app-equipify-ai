@@ -94,6 +94,7 @@ export type AttributionPathRow = {
   touchIds: string[]
   firstTouchId: string | null
   lastTouchId: string | null
+  pathSummary: Record<string, unknown>
 }
 
 export async function listAttributionPathsForLeads(
@@ -104,7 +105,7 @@ export async function listAttributionPathsForLeads(
   const { data, error } = await admin
     .schema("growth")
     .from("attribution_paths")
-    .select("id, lead_id, opportunity_id, path_scope, touch_ids, first_touch_id, last_touch_id")
+    .select("id, lead_id, opportunity_id, path_scope, touch_ids, first_touch_id, last_touch_id, path_summary")
     .in("lead_id", leadIds.slice(0, 200))
   if (error) throw new Error(error.message)
   return (data ?? []).map((row) => {
@@ -117,8 +118,23 @@ export async function listAttributionPathsForLeads(
       touchIds: Array.isArray(r.touch_ids) ? (r.touch_ids as string[]) : [],
       firstTouchId: r.first_touch_id ? String(r.first_touch_id) : null,
       lastTouchId: r.last_touch_id ? String(r.last_touch_id) : null,
+      pathSummary: (r.path_summary as Record<string, unknown>) ?? {},
     }
   })
+}
+
+export async function listAttributionTouchesByIds(
+  admin: SupabaseClient,
+  touchIds: string[],
+): Promise<GrowthAttributionTouch[]> {
+  if (touchIds.length === 0) return []
+  const { data, error } = await admin
+    .schema("growth")
+    .from("attribution_touches")
+    .select("*")
+    .in("id", touchIds.slice(0, 500))
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((row) => mapTouchRow(row as TouchRow))
 }
 
 export type LeadAttributionContext = {
