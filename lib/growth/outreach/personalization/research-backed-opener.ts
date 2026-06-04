@@ -49,10 +49,23 @@ const OPENER_TEMPLATES: Record<ResearchOpenerSource, string[]> = {
     "Hi {{contactName}} — {{companyName}} {{fact}}; worth a quick ops compare?",
     "{{contactName}}, {{companyName}} {{fact}} — quick ops note.",
   ],
+  website_summary: [
+    "{{contactName}}, {{companyName}} {{fact}} — had one dispatch workflow question.",
+    "Hi {{contactName}} — {{companyName}} {{fact}}; worth a quick ops compare?",
+    "{{contactName}}, {{companyName}} {{fact}} — quick ops note.",
+  ],
   outreach_angle: [
     "{{contactName}}, {{fact}} — one question for {{companyName}}.",
     "Hi {{contactName}} — {{fact}} at {{companyName}}; had a brief workflow question.",
     "{{contactName}}, {{fact}} for {{companyName}} — quick ops note.",
+  ],
+  lead_engine_angle: [
+    "{{contactName}}, {{fact}} — one question for {{companyName}}.",
+    "Hi {{contactName}} — {{fact}} at {{companyName}}; had a brief workflow question.",
+  ],
+  lead_engine_pain: [
+    "{{contactName}}, quick ops question for {{companyName}}: {{factLower}}.",
+    "Hi {{contactName}} — {{companyName}} and {{factLower}}; had one focused note.",
   ],
   research_pain_point: [
     "{{contactName}}, quick ops question for {{companyName}}: {{factLower}}.",
@@ -77,8 +90,10 @@ function buildOpenerText(input: {
   const rawFact = formatFactForEmbedding(input.candidate.evidence, input.tokens.companyName)
   const embeddedFact =
     input.candidate.source === "website_finding" ||
+    input.candidate.source === "website_summary" ||
     input.candidate.source === "company_summary" ||
-    input.candidate.source === "industry_context"
+    input.candidate.source === "industry_context" ||
+    input.candidate.source === "lead_engine_pain"
       ? lowercaseLeadIn(rawFact)
       : rawFact
   const embeddedFactLower = lowercaseLeadIn(rawFact)
@@ -122,15 +137,20 @@ export function buildResearchBackedOpener(input: {
   if (!shouldApplyResearchBackedOpener(input)) return null
 
   const confidenceTier = resolveResearchEvidenceConfidenceTier(input.packet.researchConfidence)
-  if (!confidenceTier) return null
+  const leadEngineTier =
+    input.packet.leadEngineGuidance && (input.packet.leadEngineGuidance.confidence ?? 0) >= 0.45
+      ? ("medium" as const)
+      : null
+  const effectiveTier = confidenceTier ?? leadEngineTier
+  if (!effectiveTier) return null
 
-  const candidate = selectResearchEvidenceCandidate(input.packet, confidenceTier)
+  const candidate = selectResearchEvidenceCandidate(input.packet, effectiveTier)
   if (!candidate) return null
 
   return {
     source: candidate.source,
     evidence: candidate.evidence,
-    confidenceTier,
+    confidenceTier: effectiveTier,
     text: buildOpenerText({
       candidate,
       tokens: input.tokens,

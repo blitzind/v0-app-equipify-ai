@@ -24,6 +24,13 @@ const memoryDefaults = {
   memoryRiskFlags: [] as string[],
 }
 
+const phase44Defaults = {
+  websiteSummary: null as string | null,
+  websiteTextExcerpt: null as string | null,
+  researchRecommendedNextAction: null as string | null,
+  leadEngineGuidance: null,
+}
+
 function ctaText(strategy: { blocks: { key: string; text: string }[] }) {
   return strategy.blocks.find((block) => block.key === "cta")?.text ?? ""
 }
@@ -91,6 +98,7 @@ const baseCold: OutreachContextPacket = {
   hasWebsiteResearch: true,
   hasDecisionMaker: true,
   ...memoryDefaults,
+  ...phase44Defaults,
 }
 
 const coldHigh = sample("Cold outreach — high research confidence", baseCold)

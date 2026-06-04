@@ -14,6 +14,7 @@ import { listGrowthOutreachQueueItems } from "@/lib/growth/outreach/outreach-que
 import { fetchLatestUsableGrowthLeadResearchRun } from "@/lib/growth/research-repository"
 import { normalizeGrowthResearchConfidence } from "@/lib/growth/research/research-confidence"
 import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
+import { resolveLeadEngineGuidanceFromLeadMetadata } from "@/lib/growth/outreach/personalization/lead-engine-guidance-bridge"
 import { buildLeadMemoryInfluenceContext, mergeMemoryObjectionSummaries } from "@/lib/growth/lead-memory/memory-influence-context"
 import { listGrowthLeadTimelineEvents } from "@/lib/growth/timeline-repository"
 import type { GrowthLead } from "@/lib/growth/types"
@@ -62,13 +63,26 @@ export async function buildOutreachContextPacket(
 
   const dm = primaryDecisionMaker(decisionMakers)
   const research = researchRun?.result
+  const leadEngineGuidance = resolveLeadEngineGuidanceFromLeadMetadata(lead.metadata)
+
+  const websiteSummaryRaw = research?.websiteSummary?.trim() ? truncate(research.websiteSummary, 200) : null
+  const websiteTextExcerpt = researchRun?.websiteTextExcerpt?.trim()
+    ? truncate(researchRun.websiteTextExcerpt, 200)
+    : null
 
   const websiteFindings = [
     prospectRun?.researchSummary ? truncate(prospectRun.researchSummary, 160) : null,
-    research?.websiteSummary ? truncate(research.websiteSummary, 160) : null,
+    websiteSummaryRaw,
     ...(research?.serviceAreaClues ?? []).map((entry) => truncate(entry, 80)),
     ...(research?.equipmentServiceIndicators ?? []).map((entry) => truncate(entry, 80)),
   ].filter(Boolean) as string[]
+
+  const researchOutreachAngles = (research?.outreachAngles ?? []).map((entry) => truncate(entry, 100))
+  const bridgedOutreachAngles = [
+    ...researchOutreachAngles,
+    ...(leadEngineGuidance?.prioritizedOutreachAngles ?? []),
+  ]
+  const outreachAngles = [...new Set(bridgedOutreachAngles.map((entry) => entry.trim()).filter(Boolean))]
 
   const hiringSignals = (research?.equipifyPainPoints ?? [])
     .filter((entry) => /hiring|technician|staff|headcount|recruit/i.test(entry))
@@ -165,9 +179,16 @@ export async function buildOutreachContextPacket(
     buyingIntent: buyingIntent ? String(buyingIntent) : null,
     competitorPressure,
     capacitySignals,
+    websiteSummary: websiteSummaryRaw,
+    websiteTextExcerpt,
     websiteFindings,
     hiringSignals,
     enrichmentFindings,
+    researchRecommendedNextAction: research?.recommendedNextAction?.trim()
+      ? truncate(research.recommendedNextAction, 120)
+      : prospectRun?.recommendedNextAction?.trim()
+        ? truncate(prospectRun.recommendedNextAction, 120)
+        : null,
     priorTouchSummaries,
     priorReplySummaries,
     objectionSummaries,
@@ -179,7 +200,7 @@ export async function buildOutreachContextPacket(
     researchPainPoints: (research?.equipifyPainPoints ?? []).map((entry) => truncate(entry, 100)),
     equipmentServiceIndicators: (research?.equipmentServiceIndicators ?? []).map((entry) => truncate(entry, 100)),
     companySummary: research?.companySummary ? truncate(research.companySummary, 160) : null,
-    outreachAngles: (research?.outreachAngles ?? []).map((entry) => truncate(entry, 100)),
+    outreachAngles,
     priorOutboundSubjects,
     priorTouchCount: priorTouchSummaries.length,
     hasWebsiteResearch: Boolean(research?.websiteSummary || websiteFindings.length > 0),
@@ -193,34 +214,8 @@ export async function buildOutreachContextPacket(
     memoryCommitmentSummaries: memory.commitmentSummaries.map((entry) => truncate(entry, 120)),
     memoryAvoidRepeating: memory.avoidRepeating.map((entry) => truncate(entry, 100)),
     memoryRiskFlags: memory.riskFlags.map((entry) => truncate(entry, 100)),
+    leadEngineGuidance,
   }
 }
 
-export function buildAllowedFactsFromContextPacket(packet: OutreachContextPacket): string[] {
-  return [
-    packet.companyName,
-    packet.industryLabel,
-    packet.website,
-    packet.employeeSize,
-    packet.location,
-    packet.decisionMakerName,
-    packet.decisionMakerTitle,
-    packet.opportunityReadinessTier,
-    packet.buyingIntent,
-    packet.competitorPressure,
-    ...packet.capacitySignals,
-    ...packet.websiteFindings,
-    ...packet.hiringSignals,
-    ...packet.enrichmentFindings,
-    ...packet.researchPainPoints,
-    ...packet.equipmentServiceIndicators,
-    ...(packet.companySummary ? [packet.companySummary] : []),
-    ...packet.outreachAngles,
-    ...packet.priorReplySummaries,
-    ...packet.objectionSummaries,
-    ...(packet.relationshipSummary ? [packet.relationshipSummary] : []),
-    ...packet.memoryPreferenceSummaries,
-    ...packet.memoryInteractionSummaries,
-    ...packet.memoryCommitmentSummaries,
-  ].filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
-}
+export { buildAllowedFactsFromContextPacket } from "@/lib/growth/outreach/personalization/allowed-facts-from-context-packet"

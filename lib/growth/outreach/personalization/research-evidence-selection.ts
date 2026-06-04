@@ -89,12 +89,28 @@ export function selectResearchEvidenceCandidate(
 ): ResearchEvidenceCandidate | null {
   const company = packet.companyName.trim()
 
+  if (packet.websiteSummary) {
+    const summary = truncateResearchSnippet(packet.websiteSummary)
+    if (isUsableResearchFact(summary, company)) {
+      return { source: "website_summary", evidence: summary }
+    }
+  }
+
   for (const fact of dedupeResearchFacts(packet.websiteFindings)) {
     if (isUsableResearchFact(fact, company)) return { source: "website_finding", evidence: fact }
   }
 
   for (const fact of dedupeResearchFacts(packet.outreachAngles)) {
     if (isUsableResearchFact(fact, company)) return { source: "outreach_angle", evidence: fact }
+  }
+
+  if (packet.leadEngineGuidance) {
+    for (const fact of dedupeResearchFacts(packet.leadEngineGuidance.prioritizedOutreachAngles)) {
+      if (isUsableResearchFact(fact, company)) return { source: "lead_engine_angle", evidence: fact }
+    }
+    for (const fact of dedupeResearchFacts(packet.leadEngineGuidance.prioritizedPainPoints)) {
+      if (isUsableResearchFact(fact, company)) return { source: "lead_engine_pain", evidence: fact }
+    }
   }
 
   for (const fact of dedupeResearchFacts(packet.researchPainPoints)) {

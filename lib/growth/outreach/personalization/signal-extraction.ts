@@ -17,10 +17,12 @@ function includesAny(values: string[], pattern: RegExp): boolean {
 export function extractPersonalizationSignals(packet: OutreachContextPacket): PersonalizationSignalKey[] {
   const signals: PersonalizationSignalKey[] = []
   const combinedFindings = [
+    ...(packet.websiteSummary ? [packet.websiteSummary] : []),
     ...packet.websiteFindings,
     ...packet.enrichmentFindings,
     ...packet.researchPainPoints,
     ...packet.equipmentServiceIndicators,
+    ...(packet.leadEngineGuidance?.prioritizedPainPoints ?? []),
   ]
 
   if (!packet.hasWebsiteResearch || includesAny(combinedFindings, SCHEDULER_GAP)) {

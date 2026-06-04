@@ -69,7 +69,10 @@ export type MessageAngleKey = (typeof MESSAGE_ANGLE_KEYS)[number]
 
 export type ResearchOpenerSource =
   | "website_finding"
+  | "website_summary"
   | "outreach_angle"
+  | "lead_engine_angle"
+  | "lead_engine_pain"
   | "research_pain_point"
   | "company_summary"
   | "industry_context"
@@ -137,8 +140,62 @@ export type CtaEvidenceSource =
   | "sequence_stage"
   | "engagement_signal"
   | "pain_signal"
+  | "lead_engine_guidance"
   | "legacy_template"
   | "breakup_context"
+
+export const OUTREACH_CONTEXT_SOURCE_KEYS = [
+  "company_name",
+  "industry_label",
+  "website",
+  "location",
+  "decision_maker",
+  "fit_score",
+  "engagement_score",
+  "website_summary",
+  "website_text_excerpt",
+  "website_findings",
+  "outreach_angles",
+  "company_summary",
+  "research_pain_points",
+  "hiring_signals",
+  "timeline_events",
+  "sequence_history",
+  "prior_touches",
+  "prior_replies",
+  "prior_subjects",
+  "memory",
+  "lead_engine_guidance",
+  "enrichment_findings",
+  "equipment_indicators",
+  "competitor_pressure",
+  "capacity_signals",
+  "research_confidence",
+  "research_recommended_next_action",
+] as const
+
+export type OutreachContextSourceKey = (typeof OUTREACH_CONTEXT_SOURCE_KEYS)[number]
+
+export type OutreachLeadEngineGuidance = {
+  personalizationSummary: string
+  companyContext: string | null
+  contactContext: string | null
+  prioritizedPainPoints: string[]
+  prioritizedOutreachAngles: string[]
+  communicationGuidance: string[]
+  buyingSignalGuidance: string[]
+  recommendedCtaStrategy: string | null
+  recommendedChannelPriority: string[]
+  recommendedSequencePriority: string | null
+  confidence: number | null
+  completeness: number | null
+}
+
+export type OutreachContextQualityMetadata = {
+  contextSourcesAvailable: OutreachContextSourceKey[]
+  contextSourcesUsed: OutreachContextSourceKey[]
+  utilizationPercentage: number
+}
 
 export type CtaQualityScore = {
   overall: number
@@ -173,9 +230,12 @@ export type OutreachContextPacket = {
   buyingIntent: string | null
   competitorPressure: string | null
   capacitySignals: string[]
+  websiteSummary: string | null
+  websiteTextExcerpt: string | null
   websiteFindings: string[]
   hiringSignals: string[]
   enrichmentFindings: string[]
+  researchRecommendedNextAction: string | null
   priorTouchSummaries: string[]
   priorReplySummaries: string[]
   objectionSummaries: string[]
@@ -200,6 +260,8 @@ export type OutreachContextPacket = {
   memoryCommitmentSummaries: string[]
   memoryAvoidRepeating: string[]
   memoryRiskFlags: string[]
+  /** Read-only Lead Engine advisory guidance (Phase 4.4D). */
+  leadEngineGuidance: OutreachLeadEngineGuidance | null
 }
 
 export type SelectedMessageBlock = {
@@ -243,6 +305,7 @@ export type OutreachPersonalizationAudit = {
   maxWords: number
   subjectIntelligence?: SubjectIntelligenceMetadata
   ctaIntelligence?: CtaIntelligenceMetadata
+  contextQuality?: OutreachContextQualityMetadata
 }
 
 export function isOutreachPersonalizationEmailType(

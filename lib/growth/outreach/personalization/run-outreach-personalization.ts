@@ -50,7 +50,7 @@ export async function runOutreachPersonalizationGeneration(
   const maxWords = input.maxWords ?? OUTREACH_PERSONALIZATION_DEFAULT_MAX_WORDS
   const contextPacket = await buildOutreachContextPacket(admin, input.lead)
   const signals = extractPersonalizationSignals(contextPacket)
-  const { strategy, draft } = buildPersonalizedOutreachDraft({
+  const { strategy, draft, contextQuality } = buildPersonalizedOutreachDraft({
     leadId: input.lead.id,
     packet: contextPacket,
     signals,
@@ -142,6 +142,7 @@ export async function runOutreachPersonalizationGeneration(
     maxWords,
     subjectIntelligence: strategy.subjectIntelligence,
     ctaIntelligence: strategy.ctaIntelligence,
+    contextQuality,
   }
 
   return {

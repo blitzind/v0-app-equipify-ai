@@ -165,6 +165,46 @@ function resolveMemoryCtaCandidate(packet: OutreachContextPacket): CtaCandidate 
   return null
 }
 
+function resolveLeadEngineCtaCandidate(input: {
+  packet: OutreachContextPacket
+  signals: PersonalizationSignalKey[]
+  painBlockId: string | undefined
+  meetingReady: boolean
+  generationType: GrowthAiCopilotGenerationType
+}): CtaCandidate | null {
+  const guidance = input.packet.leadEngineGuidance
+  if (!guidance?.recommendedCtaStrategy?.trim() || input.meetingReady) return null
+  if (input.generationType !== "cold_email") return null
+
+  const strategy = guidance.recommendedCtaStrategy.toUpperCase()
+  if (
+    strategy.includes("PAIN_VALIDATION") ||
+    strategy.includes("DISCOVERY") ||
+    strategy.includes("FIT_CONFIRMATION") ||
+    strategy.includes("TIMING_CHECK")
+  ) {
+    return {
+      category: "question_based",
+      blockId: resolveQuestionBlockId(input.signals, input.painBlockId),
+      evidenceSource: "lead_engine_guidance",
+      evidence: guidance.recommendedCtaStrategy,
+      selectionReason: "Lead Engine advisory CTA strategy favors validation question over meeting ask.",
+    }
+  }
+
+  if (strategy.includes("CHANNEL_TEST")) {
+    return {
+      category: "soft",
+      blockId: prefersConciseOutreach(input.packet) ? "soft_resource" : "soft_walkthrough",
+      evidenceSource: "lead_engine_guidance",
+      evidence: guidance.recommendedCtaStrategy,
+      selectionReason: "Lead Engine advisory CTA strategy favors soft channel test.",
+    }
+  }
+
+  return null
+}
+
 function resolveCtaCandidate(input: {
   packet: OutreachContextPacket
   strategy: SelectedMessageStrategy
@@ -306,6 +346,15 @@ function resolveCtaCandidate(input: {
       selectionReason: "Second sequence touch — soft CTA before asking for a meeting.",
     }
   }
+
+  const leadEngineCta = resolveLeadEngineCtaCandidate({
+    packet,
+    signals,
+    painBlockId,
+    meetingReady,
+    generationType,
+  })
+  if (leadEngineCta) return leadEngineCta
 
   if (researchTier && !meetingReady) {
     return {

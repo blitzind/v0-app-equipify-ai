@@ -10,6 +10,8 @@ import {
   type GrowthPersonalizationContext,
   type GrowthPersonalizationSource,
 } from "@/lib/growth/personalization/personalization-types"
+import { fetchLatestUsableGrowthLeadResearchRun } from "@/lib/growth/research-repository"
+import { normalizeGrowthResearchConfidence } from "@/lib/growth/research/research-confidence"
 import { listGrowthLeadTimelineEvents } from "@/lib/growth/timeline-repository"
 
 function asString(value: unknown): string {
@@ -30,7 +32,7 @@ export async function buildPersonalizationContext(
   const leadLabel = maskPersonalizationLeadLabel(input.leadId, lead.companyName)
   const sourcesUsed: GrowthPersonalizationSource[] = []
 
-  const [memoryView, oppSignals, bookingSignals, engagement, timeline, threads] = await Promise.all([
+  const [memoryView, oppSignals, bookingSignals, engagement, timeline, threads, researchRun] = await Promise.all([
     fetchLeadMemoryProfileView(admin, input.leadId).catch(() => null),
     admin
       .schema("growth")
@@ -55,7 +57,27 @@ export async function buildPersonalizationContext(
       .eq("lead_id", input.leadId)
       .order("updated_at", { ascending: false })
       .limit(5),
+    lead.latestResearchRunId
+      ? fetchLatestUsableGrowthLeadResearchRun(admin, input.leadId)
+      : Promise.resolve(null),
   ])
+
+  const research = researchRun?.result
+  const researchConfidence = normalizeGrowthResearchConfidence(
+    research?.researchConfidence ?? researchRun?.researchConfidence ?? null,
+  )
+  const companySummary = research?.companySummary?.trim()
+    ? sanitizePersonalizationEvidenceSnippet(research.companySummary)
+    : null
+  const outreachAngles = (research?.outreachAngles ?? [])
+    .map((entry) => sanitizePersonalizationEvidenceSnippet(entry))
+    .filter(Boolean)
+  const researchPainPoints = (research?.equipifyPainPoints ?? [])
+    .map((entry) => sanitizePersonalizationEvidenceSnippet(entry))
+    .filter(Boolean)
+  const hiringSignals = researchPainPoints
+    .filter((entry) => /hiring|technician|staff|headcount|recruit/i.test(entry))
+    .slice(0, 4)
 
   if (memoryView?.profile) sourcesUsed.push("relationship_memory")
 
@@ -107,10 +129,22 @@ export async function buildPersonalizationContext(
   const territoryLabel = [lead.city, lead.state, lead.country].filter(Boolean).join(", ") || null
   if (territoryLabel) sourcesUsed.push("territory_intelligence")
 
-  const websiteSignals = lead.websiteUrl
-    ? [sanitizePersonalizationEvidenceSnippet(`Website on file for ${lead.companyName}.`)]
-    : []
+  const websiteSignals = [
+    ...(research?.websiteSummary?.trim()
+      ? [sanitizePersonalizationEvidenceSnippet(research.websiteSummary)]
+      : []),
+    ...(research?.serviceAreaClues ?? [])
+      .map((entry) => sanitizePersonalizationEvidenceSnippet(entry))
+      .filter(Boolean),
+    ...(research?.equipmentServiceIndicators ?? [])
+      .map((entry) => sanitizePersonalizationEvidenceSnippet(entry))
+      .filter(Boolean),
+    ...(companySummary ? [companySummary] : []),
+    ...outreachAngles.slice(0, 3),
+  ].filter(Boolean)
   if (websiteSignals.length) sourcesUsed.push("website_intelligence")
+  if (companySummary) sourcesUsed.push("company_signals")
+  if (researchPainPoints.length) sourcesUsed.push("buying_signals")
 
   let templateOverlay: string | null = null
   if (input.contentTemplateVersionId) {
@@ -148,5 +182,10 @@ export async function buildPersonalizationContext(
     sequenceHistory,
     templateOverlay,
     sourcesUsed: [...new Set(sourcesUsed)],
+    companySummary,
+    outreachAngles,
+    researchPainPoints,
+    hiringSignals,
+    researchConfidence,
   }
 }

@@ -150,6 +150,12 @@ export type GrowthPersonalizationContext = {
   sequenceHistory: string[]
   templateOverlay: string | null
   sourcesUsed: GrowthPersonalizationSource[]
+  /** Research run fields aligned with outreach context packet (Phase 4.4E). */
+  companySummary: string | null
+  outreachAngles: string[]
+  researchPainPoints: string[]
+  hiringSignals: string[]
+  researchConfidence: number | null
 }
 
 export function sanitizePersonalizationEvidenceSnippet(text: string, maxLength = 280): string {

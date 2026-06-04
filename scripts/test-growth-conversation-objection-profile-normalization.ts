@@ -147,6 +147,10 @@ const harnessPacket: OutreachContextPacket = {
   memoryCommitmentSummaries: [],
   memoryAvoidRepeating: [],
   memoryRiskFlags: [],
+  websiteSummary: null,
+  websiteTextExcerpt: null,
+  researchRecommendedNextAction: null,
+  leadEngineGuidance: null,
 }
 
 const signals = extractPersonalizationSignals(harnessPacket)

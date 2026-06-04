@@ -4,6 +4,7 @@ import { countWords } from "@/lib/growth/outreach/personalization/message-variab
 import { applyCtaIntelligence, buildIntelligentCta } from "@/lib/growth/outreach/personalization/cta-intelligence"
 import { selectMessageStrategy } from "@/lib/growth/outreach/personalization/message-strategy"
 import { buildIntelligentSubject } from "@/lib/growth/outreach/personalization/subject-intelligence"
+import { computeContextUtilization } from "@/lib/growth/outreach/personalization/context-utilization"
 import { buildMemoryContextOpener } from "@/lib/growth/outreach/personalization/memory-strategy"
 import type {
   OutreachContextPacket,
@@ -46,7 +47,11 @@ export function buildPersonalizedOutreachDraft(input: {
   signals: PersonalizationSignalKey[]
   generationType: GrowthAiCopilotGenerationType
   maxWords: number
-}): { strategy: SelectedMessageStrategy; draft: OutreachPersonalizationDraft } {
+}): {
+  strategy: SelectedMessageStrategy
+  draft: OutreachPersonalizationDraft
+  contextQuality: ReturnType<typeof computeContextUtilization>
+} {
   const strategy = selectMessageStrategy({
     leadId: input.leadId,
     packet: input.packet,
@@ -85,5 +90,9 @@ export function buildPersonalizedOutreachDraft(input: {
     maxWords: input.maxWords,
     memoryOpener: buildMemoryContextOpener(input.packet),
   })
-  return { strategy: enrichedStrategy, draft }
+  const contextQuality = computeContextUtilization({
+    packet: input.packet,
+    strategy: enrichedStrategy,
+  })
+  return { strategy: enrichedStrategy, draft, contextQuality }
 }

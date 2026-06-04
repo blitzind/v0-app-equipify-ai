@@ -27,6 +27,13 @@ const memoryDefaults = {
   memoryRiskFlags: [] as string[],
 }
 
+const phase44Defaults = {
+  websiteSummary: null as string | null,
+  websiteTextExcerpt: null as string | null,
+  researchRecommendedNextAction: null as string | null,
+  leadEngineGuidance: null,
+}
+
 function sample(label: string, packet: OutreachContextPacket, generationType: OutreachContextPacket extends never ? never : "cold_email" | "follow_up_email" = "cold_email") {
   const signals = extractPersonalizationSignals(packet)
   const strategy = selectMessageStrategy({
@@ -89,6 +96,7 @@ const highPacket: OutreachContextPacket = {
   hasWebsiteResearch: true,
   hasDecisionMaker: true,
   ...memoryDefaults,
+  ...phase44Defaults,
 }
 
 const mediumPacket: OutreachContextPacket = {

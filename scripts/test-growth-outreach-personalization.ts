@@ -36,6 +36,13 @@ const emptyMemoryFields = {
   memoryRiskFlags: [] as string[],
 }
 
+const emptyPhase44Fields = {
+  websiteSummary: null as string | null,
+  websiteTextExcerpt: null as string | null,
+  researchRecommendedNextAction: null as string | null,
+  leadEngineGuidance: null,
+}
+
 const emptyResearchMetaFields = {
   companySummary: null as string | null,
   outreachAngles: [] as string[],
@@ -73,6 +80,7 @@ const basePacket: OutreachContextPacket = {
   companySummary: "Summit HVAC Services provides commercial HVAC maintenance across Colorado.",
   priorOutboundSubjects: [],
   ...emptyMemoryFields,
+  ...emptyPhase44Fields,
 }
 
 const signals = extractPersonalizationSignals(basePacket)
