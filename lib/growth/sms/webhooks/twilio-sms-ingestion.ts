@@ -151,37 +151,56 @@ export async function ingestTwilioSmsInboundWebhook(
     messageTimestamp: now,
   })
 
-  const replyResult = await processSmsInboundReply(admin, {
-    conversation,
-    body,
-    fromE164,
-    toE164: toE164 ?? settings?.fromE164 ?? "",
-    providerMessageId,
-    messageTimestamp: now,
-    rawPayloadRef: input.params,
-  })
+  try {
+    const replyResult = await processSmsInboundReply(admin, {
+      conversation,
+      body,
+      fromE164,
+      toE164: toE164 ?? settings?.fromE164 ?? "",
+      providerMessageId,
+      messageTimestamp: now,
+      rawPayloadRef: input.params,
+    })
 
-  await finalizeSmsProviderEvent(admin, event.id, {
-    processingStatus: "processed",
-    conversationId: conversation.id,
-    messageId: message.id,
-  })
+    await finalizeSmsProviderEvent(admin, event.id, {
+      processingStatus: "processed",
+      conversationId: conversation.id,
+      messageId: message.id,
+    })
 
-  logGrowthEngine("sms_inbound_received", {
-    leadId: lead.id,
-    conversationId: conversation.id,
-    messageId: message.id,
-    providerMessageId,
-    ingestionEventId: replyResult.ingestionEventId,
-    outboundReplyId: replyResult.outboundReplyId,
-  })
+    logGrowthEngine("sms_inbound_received", {
+      leadId: lead.id,
+      conversationId: conversation.id,
+      messageId: message.id,
+      providerMessageId,
+      ingestionEventId: replyResult.ingestionEventId,
+      outboundReplyId: replyResult.outboundReplyId,
+    })
 
-  return {
-    ok: true,
-    eventId: event.id,
-    eventType: "inbound_message",
-    messageId: message.id,
-    conversationId: conversation.id,
+    return {
+      ok: true,
+      eventId: event.id,
+      eventType: "inbound_message",
+      messageId: message.id,
+      conversationId: conversation.id,
+    }
+  } catch (processingError) {
+    await finalizeSmsProviderEvent(admin, event.id, {
+      processingStatus: "failed",
+      conversationId: conversation.id,
+      messageId: message.id,
+    }).catch(() => undefined)
+
+    const messageText =
+      processingError instanceof Error ? processingError.message : String(processingError)
+    logGrowthEngine("sms_inbound_post_ingestion_failed", {
+      leadId: lead.id,
+      conversationId: conversation.id,
+      messageId: message.id,
+      providerMessageId,
+      error: messageText,
+    })
+    throw processingError
   }
 }
 

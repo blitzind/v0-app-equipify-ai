@@ -127,4 +127,21 @@ assert.match(smsDraftEmbedSource, /GROWTH_SMS_OPERATOR_SEND_QA_MARKER/)
 console.log("\n=== Phase 5.5 operator send UI ===")
 console.log("Inbox SMS draft embed wired to POST /api/platform/growth/sms/send")
 
+const smsSourceMigration = readFileSync(
+  resolve("supabase/migrations/20270704120000_growth_sms_reply_ingestion_source.sql"),
+  "utf8",
+)
+assert.match(smsSourceMigration, /sms_provider_webhook/)
+
+const replaySource = readFileSync(resolve("lib/growth/sms/replay-sms-inbound-post-ingestion.ts"), "utf8")
+assert.match(replaySource, /replaySmsInboundPostIngestion/)
+assert.match(replaySource, /skipInboxBridge/)
+
+const ingestionSource = readFileSync(resolve("lib/growth/sms/webhooks/twilio-sms-ingestion.ts"), "utf8")
+assert.match(ingestionSource, /sms_inbound_post_ingestion_failed/)
+assert.match(ingestionSource, /processingStatus: "failed"/)
+
+console.log("\n=== SMS reply ingestion source constraint migration ===")
+console.log("sms_provider_webhook allowed in reply_ingestion_events migration")
+
 console.log("\n✓ Phase 5.2 validation passed — inbox integration, no sequences/AI.")

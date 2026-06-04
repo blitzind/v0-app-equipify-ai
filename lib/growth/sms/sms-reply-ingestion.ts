@@ -18,6 +18,9 @@ export type ProcessSmsInboundReplyInput = {
   providerMessageId: string
   messageTimestamp: string
   rawPayloadRef?: Record<string, unknown>
+  /** Skip inbox bridge when replaying post-ingestion for an existing inbound message. */
+  skipInboxBridge?: boolean
+  existingInboxMessageId?: string | null
 }
 
 export type ProcessSmsInboundReplyResult = {
@@ -66,7 +69,7 @@ export async function processSmsInboundReply(
 ): Promise<ProcessSmsInboundReplyResult> {
   let inboxMessage: GrowthInboxMessage | null = null
 
-  if (input.conversation.inboxThreadId) {
+  if (!input.skipInboxBridge && input.conversation.inboxThreadId) {
     const bridged = await appendSmsMessageToInboxBridge(admin, {
       conversation: input.conversation,
       direction: "inbound",
@@ -79,6 +82,8 @@ export async function processSmsInboundReply(
     inboxMessage = bridged?.message ?? null
   }
 
+  const inboxMessageId = input.existingInboxMessageId ?? inboxMessage?.id ?? null
+
   const sequenceEnrollmentId = await findActiveSequenceEnrollmentForLead(admin, input.conversation.leadId)
   const smsDeliveryAttemptId = await findLatestSmsDeliveryAttemptId(admin, input.conversation.leadId)
 
@@ -89,7 +94,7 @@ export async function processSmsInboundReply(
     subject: `SMS · ${input.conversation.participantE164}`,
     bodyExcerpt: input.body,
     receivedAt: input.messageTimestamp,
-    inboxMessageId: inboxMessage?.id ?? null,
+    inboxMessageId,
     providerFamily: "twilio_sms",
     providerMessageId: input.providerMessageId,
     providerReplyId: input.providerMessageId,
@@ -117,7 +122,7 @@ export async function processSmsInboundReply(
         summary: input.body.slice(0, 120) || "Inbound SMS reply received.",
         payload: {
           ingestion_event_id: ingestion.ingestionEventId,
-          inbox_message_id: inboxMessage?.id ?? null,
+          inbox_message_id: inboxMessageId,
           source: "sms_provider_webhook",
           provider_message_id: input.providerMessageId,
           channel: "sms",
@@ -162,7 +167,7 @@ export async function processSmsInboundReply(
   })
 
   return {
-    inboxMessageId: inboxMessage?.id ?? null,
+    inboxMessageId,
     ingestionEventId: ingestion.ingestionEventId,
     outboundReplyId: ingestion.outboundReplyId,
     sequenceEnrollmentId,

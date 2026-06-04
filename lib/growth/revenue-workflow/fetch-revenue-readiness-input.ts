@@ -32,6 +32,7 @@ export async function fetchGrowthLeadRevenueReadinessInput(
       .select("id, status")
       .eq("lead_id", lead.id)
       .gte("created_at", since30d)
+      .then((result) => result)
       .catch(() => ({ data: [], error: null })),
   ])
 
