@@ -18,11 +18,19 @@ import {
   filterInboxThreadsBySearch,
   sortInboxQueueThreads,
 } from "@/lib/growth/inbox/inbox-thread-queue-filters"
+import {
+  type GrowthInboxChannelFilter,
+  GROWTH_INBOX_CHANNEL_FILTER_OPTIONS,
+  GROWTH_INBOX_CHANNEL_FILTER_LABELS,
+  filterInboxThreadsByChannel,
+} from "@/lib/growth/inbox/inbox-channel-types"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
 
 type GrowthInboxQueueContextValue = {
   queueView: GrowthInboxQueueView
   setQueueView: (view: GrowthInboxQueueView) => void
+  channelFilter: GrowthInboxChannelFilter
+  setChannelFilter: (channel: GrowthInboxChannelFilter) => void
   searchQuery: string
   setSearchQuery: (query: string) => void
   visibleThreads: GrowthInboxThread[]
@@ -46,14 +54,16 @@ export function useGrowthInboxQueue(): GrowthInboxQueueContextValue {
 export function GrowthInboxQueueProvider({ children }: { children: ReactNode }) {
   const { threads, selectedThreadId, setSelectedThreadId, loadThreadDetail } = useGrowthInboxWorkspace()
   const [queueView, setQueueView] = useState<GrowthInboxQueueView>("needs_action")
+  const [channelFilter, setChannelFilter] = useState<GrowthInboxChannelFilter>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const searchInputRef = useRef<HTMLInputElement | null>(null)
 
   const visibleThreads = useMemo(() => {
-    const byView = filterInboxThreadsByQueueView(threads, queueView)
+    const byChannel = filterInboxThreadsByChannel(threads, channelFilter)
+    const byView = filterInboxThreadsByQueueView(byChannel, queueView)
     const bySearch = filterInboxThreadsBySearch(byView, searchQuery)
     return sortInboxQueueThreads(bySearch)
-  }, [threads, queueView, searchQuery])
+  }, [threads, channelFilter, queueView, searchQuery])
 
   const queueCounts = useMemo(() => countInboxThreadsByQueueView(threads), [threads])
 
@@ -96,6 +106,8 @@ export function GrowthInboxQueueProvider({ children }: { children: ReactNode }) 
     () => ({
       queueView,
       setQueueView,
+      channelFilter,
+      setChannelFilter,
       searchQuery,
       setSearchQuery,
       visibleThreads,
@@ -107,6 +119,7 @@ export function GrowthInboxQueueProvider({ children }: { children: ReactNode }) 
     }),
     [
       queueView,
+      channelFilter,
       searchQuery,
       visibleThreads,
       queueCounts,

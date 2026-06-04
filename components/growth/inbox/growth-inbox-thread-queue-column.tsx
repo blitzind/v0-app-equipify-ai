@@ -7,6 +7,12 @@ import {
   GROWTH_INBOX_QUEUE_VIEWS,
   GROWTH_INBOX_QUEUE_VIEW_LABELS,
 } from "@/lib/growth/inbox/inbox-thread-queue-filters"
+import {
+  GROWTH_INBOX_CHANNEL_FILTER_OPTIONS,
+  GROWTH_INBOX_CHANNEL_FILTER_LABELS,
+  GROWTH_INBOX_CHANNEL_LABELS,
+  inboxThreadNeedsAttention,
+} from "@/lib/growth/inbox/inbox-channel-types"
 import { useGrowthInboxQueue } from "@/components/growth/inbox/growth-inbox-queue-context"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
 import {
@@ -14,6 +20,7 @@ import {
   displayInboxLeadLabel,
   displayInboxSubject,
   formatInboxDate,
+  inboxChannelBadgeTone,
 } from "@/components/growth/inbox/growth-inbox-shared-ui"
 import { classificationLabel } from "@/lib/growth/inbox/reply-classifier"
 import { priorityTierLabel } from "@/lib/growth/inbox/thread-priority"
@@ -25,6 +32,8 @@ export function GrowthInboxThreadQueueColumn() {
   const {
     queueView,
     setQueueView,
+    channelFilter,
+    setChannelFilter,
     searchQuery,
     setSearchQuery,
     visibleThreads,
@@ -54,6 +63,23 @@ export function GrowthInboxThreadQueueColumn() {
             placeholder="Search threads… (/)"
             className="h-8 pl-8 text-xs"
           />
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {GROWTH_INBOX_CHANNEL_FILTER_OPTIONS.map((channel) => (
+            <button
+              key={channel}
+              type="button"
+              className={cn(
+                "rounded-md px-2 py-1 text-[10px] font-medium transition-colors",
+                channelFilter === channel
+                  ? "bg-muted text-foreground ring-1 ring-border"
+                  : "bg-muted/30 text-muted-foreground hover:bg-muted/50",
+              )}
+              onClick={() => setChannelFilter(channel)}
+            >
+              {GROWTH_INBOX_CHANNEL_FILTER_LABELS[channel]}
+            </button>
+          ))}
         </div>
         <div className="flex flex-wrap gap-1">
           {GROWTH_INBOX_QUEUE_VIEWS.map((view) => (
@@ -98,10 +124,19 @@ export function GrowthInboxThreadQueueColumn() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <p className="truncate text-xs font-semibold">{displayInboxLeadLabel(thread)}</p>
-                  <GrowthBadge
-                    label={priorityTierLabel(thread.priority_tier)}
-                    tone={INBOX_STATUS_TONE[thread.priority_tier] ?? "neutral"}
-                  />
+                  <div className="flex shrink-0 items-center gap-1">
+                    {inboxThreadNeedsAttention(thread) ? (
+                      <span className="size-1.5 rounded-full bg-rose-500" title="Needs attention" />
+                    ) : null}
+                    <GrowthBadge
+                      label={GROWTH_INBOX_CHANNEL_LABELS[thread.channel]}
+                      tone={inboxChannelBadgeTone(thread.channel)}
+                    />
+                    <GrowthBadge
+                      label={priorityTierLabel(thread.priority_tier)}
+                      tone={INBOX_STATUS_TONE[thread.priority_tier] ?? "neutral"}
+                    />
+                  </div>
                 </div>
                 <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{displayInboxSubject(thread.subject)}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-1">

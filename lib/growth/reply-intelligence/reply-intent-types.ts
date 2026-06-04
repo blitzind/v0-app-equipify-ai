@@ -37,6 +37,7 @@ export type GrowthReplyUncertaintyState = (typeof GROWTH_REPLY_UNCERTAINTY_STATE
 export const GROWTH_REPLY_INGESTION_SOURCES = [
   "provider_webhook",
   "google_mailbox_sync",
+  "sms_provider_webhook",
   "tracking_event",
   "manual_import",
 ] as const

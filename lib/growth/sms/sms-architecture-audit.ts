@@ -71,7 +71,7 @@ export function buildGrowthSmsArchitectureAudit(): GrowthSmsArchitectureAudit {
       inbound: "Twilio inbound webhook → sms_provider_events → sms_messages → sms_conversations",
       threading: "normalizeE164 + lead lookup → findOrCreateSmsConversation()",
       inbox: "sms-inbox-bridge maps sms_conversation → GrowthInboxChannelThread (channel=sms)",
-      futureReplyIntelligence: "ingestGrowthReply(source=sms_provider_webhook) — Phase 5.2+",
+      futureReplyIntelligence: "ingestGrowthReply(source=sms_provider_webhook) — Phase 5.2",
       futureMemory: "lead memory rebuild on SMS reply — Phase 5.2+",
       futureSequences: "multichannel sequence_channel_tasks channel=sms — Phase 5.3+",
     },

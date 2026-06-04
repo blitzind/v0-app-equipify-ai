@@ -1,5 +1,6 @@
 "use client"
 
+import { Mail, MessageSquare } from "lucide-react"
 import { GrowthInboxConversationThreadOps } from "@/components/growth/inbox/growth-inbox-conversation-thread-ops"
 import { GrowthInboxInlineRevenueContext } from "@/components/growth/inbox/growth-inbox-inline-revenue-context"
 import { GrowthInboxRelationshipMemoryStrip } from "@/components/growth/inbox/growth-inbox-relationship-memory-strip"
@@ -10,6 +11,7 @@ import {
   displayInboxLeadLabel,
   displayInboxSubject,
   formatInboxDate,
+  inboxChannelBadgeTone,
   inboxMessageSignalFlags,
   normalizeInboxDisplayText,
 } from "@/components/growth/inbox/growth-inbox-shared-ui"
@@ -18,6 +20,7 @@ import { classificationLabel } from "@/lib/growth/inbox/reply-classifier"
 import { priorityTierLabel } from "@/lib/growth/inbox/thread-priority"
 import { threadStatusLabel } from "@/lib/growth/inbox/thread-health"
 import { GROWTH_INBOX_WORKSPACE_PHASE3_QA_MARKER } from "@/lib/growth/inbox/inbox-workspace-types"
+import { GROWTH_SMS_INBOX_QA_MARKER } from "@/lib/growth/sms/sms-inbox-audit"
 
 export function GrowthInboxConversationColumn() {
   const { selectedThread, selectedMessages, syncDetail } = useGrowthInboxWorkspace()
@@ -33,13 +36,26 @@ export function GrowthInboxConversationColumn() {
   return (
     <div
       className="flex h-full min-h-0 flex-col bg-card"
-      data-equipify-qa-marker={GROWTH_INBOX_WORKSPACE_PHASE3_QA_MARKER}
+      data-equipify-qa-marker={`${GROWTH_INBOX_WORKSPACE_PHASE3_QA_MARKER}:${GROWTH_SMS_INBOX_QA_MARKER}`}
     >
       <header className="shrink-0 space-y-2 border-b border-border px-4 py-3">
-        <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Conversation</p>
+        <div className="flex items-center gap-2">
+          {selectedThread.channel === "sms" ? (
+            <MessageSquare className="size-3.5 text-muted-foreground" aria-hidden />
+          ) : (
+            <Mail className="size-3.5 text-muted-foreground" aria-hidden />
+          )}
+          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            {GROWTH_INBOX_CHANNEL_LABELS[selectedThread.channel]} conversation
+          </p>
+        </div>
         <h2 className="break-words text-base font-semibold leading-snug">{displayInboxSubject(selectedThread.subject)}</h2>
         <p className="text-xs font-medium text-foreground">{displayInboxLeadLabel(selectedThread)}</p>
         <div className="flex flex-wrap items-center gap-1.5">
+          <GrowthBadge
+            label={GROWTH_INBOX_CHANNEL_LABELS[selectedThread.channel]}
+            tone={inboxChannelBadgeTone(selectedThread.channel)}
+          />
           <GrowthBadge
             label={classificationLabel(selectedThread.classification)}
             tone={INBOX_STATUS_TONE[selectedThread.priority_tier] ?? "neutral"}

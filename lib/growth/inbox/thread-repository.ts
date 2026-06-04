@@ -23,7 +23,7 @@ import type {
   GrowthReplyIntelligenceSummary,
 } from "@/lib/growth/inbox/inbox-types"
 import { computeInboxThreadSlaDueAt } from "@/lib/growth/inbox-team-ownership/inbox-sla-tracker"
-import { formatLeadLabel } from "@/lib/growth/lead-label"
+import { resolveInboxThreadChannel } from "@/lib/growth/inbox/inbox-channel-types"
 
 type Row = Record<string, unknown>
 
@@ -111,6 +111,7 @@ async function mapThread(admin: SupabaseClient, row: Row, ownerLabels?: Map<stri
     id,
     lead_id: leadId,
     lead_label: leadLabel,
+    channel: resolveInboxThreadChannel(asString(row.provider_family) || "custom"),
     provider_family: asString(row.provider_family) || "custom",
     mailbox_connection_id: asString(row.mailbox_connection_id) || null,
     subject: asString(row.subject),

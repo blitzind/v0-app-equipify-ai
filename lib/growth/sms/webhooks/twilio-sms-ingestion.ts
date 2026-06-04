@@ -23,6 +23,7 @@ import {
   updateSmsDeliveryAttempt,
 } from "@/lib/growth/sms/sms-repository"
 import { appendSmsMessageToInboxBridge, findOrCreateSmsConversation } from "@/lib/growth/sms/sms-threading"
+import { processSmsInboundReply } from "@/lib/growth/sms/sms-reply-ingestion"
 
 export type IngestTwilioSmsWebhookInput = {
   rawBody: string
@@ -150,14 +151,14 @@ export async function ingestTwilioSmsInboundWebhook(
     messageTimestamp: now,
   })
 
-  await appendSmsMessageToInboxBridge(admin, {
+  const replyResult = await processSmsInboundReply(admin, {
     conversation,
-    direction: "inbound",
     body,
     fromE164,
     toE164: toE164 ?? settings?.fromE164 ?? "",
     providerMessageId,
     messageTimestamp: now,
+    rawPayloadRef: input.params,
   })
 
   await finalizeSmsProviderEvent(admin, event.id, {
@@ -171,6 +172,8 @@ export async function ingestTwilioSmsInboundWebhook(
     conversationId: conversation.id,
     messageId: message.id,
     providerMessageId,
+    ingestionEventId: replyResult.ingestionEventId,
+    outboundReplyId: replyResult.outboundReplyId,
   })
 
   return {

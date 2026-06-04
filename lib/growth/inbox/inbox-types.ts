@@ -65,6 +65,7 @@ export type GrowthInboxThread = {
   id: string
   lead_id: string
   lead_label: string
+  channel: "email" | "sms"
   provider_family: string
   mailbox_connection_id: string | null
   subject: string

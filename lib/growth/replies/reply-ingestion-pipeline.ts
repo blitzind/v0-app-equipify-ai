@@ -34,6 +34,8 @@ export type NormalizedReplyIngestInput = {
   providerFamily?: string | null
   providerMessageId?: string | null
   providerReplyId?: string | null
+  senderPhone?: string | null
+  recipientPhone?: string | null
   existingOutboundReplyId?: string | null
   existingMessageEventId?: string | null
   rawPayloadRef?: Record<string, unknown>
@@ -47,6 +49,9 @@ export type ReplyIngestionResult = {
 }
 
 function buildDedupeKey(input: NormalizedReplyIngestInput): string {
+  if (input.source === "sms_provider_webhook" && input.providerMessageId) {
+    return `sms:${input.providerFamily ?? "twilio"}:${input.providerMessageId}`
+  }
   if (input.connectionId && input.providerReplyId) {
     return `webhook:${input.connectionId}:${input.providerReplyId}`
   }
@@ -59,6 +64,8 @@ function buildDedupeKey(input: NormalizedReplyIngestInput): string {
         input.source,
         input.senderEmail ?? "",
         input.recipientEmail ?? "",
+        input.senderPhone ?? "",
+        input.recipientPhone ?? "",
         input.subject ?? "",
         input.bodyExcerpt ?? "",
         input.receivedAt,
@@ -168,7 +175,11 @@ export async function ingestGrowthReply(
     return { deduped: false, ingestionEventId: ingestionEvent.id, outboundReplyId: null, outboundReply: null }
   }
 
-  const connectionId = input.connectionId ?? (await resolveConnectionForLead(admin, input.leadId))
+  const connectionId =
+    input.connectionId ??
+    (input.source === "sms_provider_webhook"
+      ? await resolveSmsReplyConnectionId(admin)
+      : await resolveConnectionForLead(admin, input.leadId))
   if (!connectionId) {
     await markReplyIngestionProcessed(admin, ingestionEvent.id, { processingStatus: "processed" })
     return finalizeReplyIngestionResult(admin, input.leadId, {
@@ -262,4 +273,31 @@ export async function ingestGrowthReplyFromInboxSync(
   input: Omit<NormalizedReplyIngestInput, "source">,
 ): Promise<ReplyIngestionResult> {
   return ingestGrowthReply(admin, { ...input, source: "google_mailbox_sync" })
+}
+
+async function resolveSmsReplyConnectionId(admin: SupabaseClient): Promise<string | null> {
+  const { GROWTH_SMS_REPLY_CONNECTION_ID } = await import("@/lib/growth/sms/schema-health")
+  const { data, error } = await admin
+    .schema("growth")
+    .from("email_provider_connections")
+    .select("id")
+    .eq("id", GROWTH_SMS_REPLY_CONNECTION_ID)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return (data as { id?: string } | null)?.id ?? GROWTH_SMS_REPLY_CONNECTION_ID
+}
+
+export async function ingestGrowthReplyFromSmsWebhook(
+  admin: SupabaseClient,
+  input: Omit<NormalizedReplyIngestInput, "source" | "connectionId"> & {
+    connectionId?: string | null
+  },
+): Promise<ReplyIngestionResult> {
+  const connectionId = input.connectionId ?? (await resolveSmsReplyConnectionId(admin))
+  return ingestGrowthReply(admin, {
+    ...input,
+    source: "sms_provider_webhook",
+    connectionId: connectionId ?? undefined,
+    providerFamily: input.providerFamily ?? "twilio_sms",
+  })
 }

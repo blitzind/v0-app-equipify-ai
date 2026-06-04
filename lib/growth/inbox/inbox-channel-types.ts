@@ -35,7 +35,7 @@ export type GrowthInboxChannelMessage = {
 
 export function mapEmailInboxThreadToChannelThread(thread: GrowthInboxThread): GrowthInboxChannelThread {
   return {
-    channel: "email",
+    channel: thread.channel ?? "email",
     threadId: thread.id,
     leadId: thread.lead_id,
     label: thread.lead_label,
@@ -93,10 +93,48 @@ export function mapSmsMessageToChannelMessage(message: GrowthSmsMessage): Growth
   }
 }
 
-export function isSmsChannelThreadRef(ref: GrowthInboxChannelThreadRef): boolean {
-  return ref.channel === "sms"
+import type { GrowthInboxChannel } from "@/lib/growth/inbox/inbox-channel-types"
+
+export const GROWTH_SMS_INBOX_PROVIDER_FAMILIES = [
+  "twilio_sms",
+  "telnyx_sms",
+  "signalwire_sms",
+] as const
+
+export type GrowthSmsInboxProviderFamily = (typeof GROWTH_SMS_INBOX_PROVIDER_FAMILIES)[number]
+
+export function resolveInboxThreadChannel(providerFamily: string): GrowthInboxChannel {
+  if ((GROWTH_SMS_INBOX_PROVIDER_FAMILIES as readonly string[]).includes(providerFamily)) {
+    return "sms"
+  }
+  return "email"
 }
 
-export function isEmailChannelThreadRef(ref: GrowthInboxChannelThreadRef): boolean {
-  return ref.channel === "email"
+export const GROWTH_INBOX_CHANNEL_FILTER_OPTIONS = ["all", "email", "sms"] as const
+export type GrowthInboxChannelFilter = (typeof GROWTH_INBOX_CHANNEL_FILTER_OPTIONS)[number]
+
+export const GROWTH_INBOX_CHANNEL_LABELS: Record<GrowthInboxChannel, string> = {
+  email: "Email",
+  sms: "SMS",
+}
+
+export const GROWTH_INBOX_CHANNEL_FILTER_LABELS: Record<GrowthInboxChannelFilter, string> = {
+  all: "All channels",
+  email: "Email",
+  sms: "SMS",
+}
+
+export function filterInboxThreadsByChannel(
+  threads: GrowthInboxThread[],
+  channel: GrowthInboxChannelFilter,
+): GrowthInboxThread[] {
+  if (channel === "all") return threads
+  return threads.filter((thread) => thread.channel === channel)
+}
+
+export function inboxThreadNeedsAttention(thread: {
+  requires_human_review: boolean
+  thread_status: string
+}): boolean {
+  return thread.thread_status !== "archived" && thread.requires_human_review
 }

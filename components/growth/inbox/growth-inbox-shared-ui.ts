@@ -1,6 +1,7 @@
 "use client"
 
 import type { GrowthInboxMessage, GrowthInboxThread } from "@/lib/growth/inbox/inbox-types"
+import type { GrowthInboxChannel } from "@/lib/growth/inbox/inbox-channel-types"
 import { displayInboxSubject, normalizeInboxDisplayText } from "@/lib/growth/inbox/inbox-display-text"
 import { safeFormatLeadLabel } from "@/lib/growth/lead-label"
 
@@ -53,4 +54,8 @@ export function inboxMessageSignalFlags(message: GrowthInboxMessage): string[] {
   if (message.contains_positive_signal) flags.push("Positive")
   if (message.contains_competitor) flags.push("Competitor")
   return flags
+}
+
+export function inboxChannelBadgeTone(channel: GrowthInboxChannel): "healthy" | "attention" | "neutral" {
+  return channel === "sms" ? "attention" : "healthy"
 }

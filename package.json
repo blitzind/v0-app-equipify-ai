@@ -107,6 +107,7 @@
     "test:growth-outreach-memory-utilization": "tsx scripts/test-growth-outreach-memory-utilization.ts",
     "test:growth-outreach-performance-intelligence": "tsx scripts/test-growth-outreach-performance-intelligence.ts",
     "test:growth-sms-infrastructure": "tsx scripts/test-growth-sms-infrastructure.ts",
+    "test:growth-sms-inbox-reply-intelligence": "tsx scripts/test-growth-sms-inbox-reply-intelligence.ts",
     "test:growth-conversation-intelligence": "tsx scripts/test-growth-conversation-intelligence.ts",
     "test:growth-sequence-intelligence": "tsx scripts/test-growth-sequence-intelligence.ts",
     "test:growth-sequence-execution": "tsx scripts/test-growth-sequence-execution.ts",

@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { addInboxMessage, createInboxThread } from "@/lib/growth/inbox/thread-repository"
+import type { GrowthInboxMessage, GrowthInboxThread } from "@/lib/growth/inbox/inbox-types"
 import { normalizeToE164 } from "@/lib/growth/sms/phone-normalization"
 import {
   createSmsConversation,
@@ -66,10 +67,10 @@ export async function appendSmsMessageToInboxBridge(
     providerMessageId?: string | null
     messageTimestamp?: string
   },
-): Promise<void> {
-  if (!input.conversation.inboxThreadId) return
+): Promise<{ thread: GrowthInboxThread; message: GrowthInboxMessage } | null> {
+  if (!input.conversation.inboxThreadId) return null
 
-  await addInboxMessage(admin, {
+  return addInboxMessage(admin, {
     thread_id: input.conversation.inboxThreadId,
     direction: input.direction,
     sender: input.fromE164,

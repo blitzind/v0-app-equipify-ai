@@ -1,6 +1,11 @@
 /** Client-safe inbox thread queue views (Phase 3A). */
 
 import type { GrowthInboxThread } from "@/lib/growth/inbox/inbox-types"
+import {
+  type GrowthInboxChannelFilter,
+  GROWTH_INBOX_CHANNEL_FILTER_OPTIONS,
+  filterInboxThreadsByChannel,
+} from "@/lib/growth/inbox/inbox-channel-types"
 
 export const GROWTH_INBOX_QUEUE_VIEWS = [
   "needs_action",
@@ -23,6 +28,7 @@ export const GROWTH_INBOX_QUEUE_VIEW_LABELS: Record<GrowthInboxQueueView, string
   archived: "Archived",
   all: "All",
 }
+
 
 export function filterInboxThreadsByQueueView(
   threads: GrowthInboxThread[],
@@ -70,6 +76,8 @@ export function filterInboxThreadsBySearch(threads: GrowthInboxThread[], query: 
       thread.owner_label ?? "",
       thread.classification,
       thread.thread_status,
+      thread.channel,
+      thread.provider_family,
     ]
       .join(" ")
       .toLowerCase()

@@ -4,6 +4,8 @@ export const GROWTH_SMS_SCHEMA_MIGRATION = "20270703120000_growth_sms_infrastruc
 
 export const GROWTH_SMS_PLATFORM_SETTINGS_ID = "00000000-0000-4000-8000-000000005501" as const
 
+export const GROWTH_SMS_REPLY_CONNECTION_ID = "00000000-0000-4000-8000-000000005502" as const
+
 export async function isGrowthSmsSchemaReady(admin: SupabaseClient): Promise<boolean> {
   const checks = await Promise.all([
     admin.schema("growth").from("sms_workspace_settings").select("id").limit(1),
