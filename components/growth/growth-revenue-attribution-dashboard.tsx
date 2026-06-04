@@ -5,6 +5,7 @@ import { Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthRevenueAttributionRecommendationsSection } from "@/components/growth/growth-revenue-attribution-recommendations"
 import {
   attributionModelLabel,
   GROWTH_REVENUE_ATTRIBUTION_DASHBOARD_QA_MARKER,
@@ -212,6 +213,13 @@ export function GrowthRevenueAttributionDashboardView() {
           ))}
         </div>
       </GrowthEngineCard>
+
+      <GrowthRevenueAttributionRecommendationsSection
+        attributionModel={attributionModel}
+        channel={channel}
+        repUserId={repUserId}
+        sequenceId={sequenceId}
+      />
 
       <GrowthEngineCard title="Top performers">
         <div className="grid gap-4 lg:grid-cols-2">
