@@ -6,12 +6,22 @@ import {
   type GrowthCadenceTaskChannel,
 } from "@/lib/growth/cadence/cadence-types"
 import {
+  GROWTH_SEQUENCE_TRANSPORT_CHANNELS,
+  type GrowthSequenceTransportChannel,
+} from "@/lib/growth/sequences/execution/sequence-execution-types"
+import {
   GROWTH_SEQUENCE_STEP_CHANNELS,
   type GrowthSequenceStepChannel,
 } from "@/lib/growth/sequence-types"
 
 export function isCadenceEmailChannel(channel: GrowthSequenceStepChannel): boolean {
   return channel === GROWTH_CADENCE_EMAIL_CHANNEL
+}
+
+export function isSequenceTransportChannel(
+  channel: GrowthSequenceStepChannel,
+): channel is GrowthSequenceTransportChannel {
+  return (GROWTH_SEQUENCE_TRANSPORT_CHANNELS as readonly string[]).includes(channel)
 }
 
 export function isCadenceTaskChannel(channel: GrowthSequenceStepChannel): channel is GrowthCadenceTaskChannel {

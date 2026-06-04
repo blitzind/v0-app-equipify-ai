@@ -9,8 +9,11 @@ import {
   buildCadenceSuggestedSmsText,
   buildCadenceTaskInstructions,
   buildCadenceTaskTitle,
+  cadenceCallQueueHref,
   isCadenceTaskChannel,
 } from "@/lib/growth/cadence/cadence-channel-engine"
+import { normalizeSequenceStepChannel } from "@/lib/growth/sequence-orchestration/sequence-channel-routing"
+import { recordSequenceEnrollmentChannelEvent } from "@/lib/growth/sequence-orchestration/sequence-multi-channel-state-repository"
 import { emitCadenceTaskDueNotification } from "@/lib/growth/cadence/cadence-notifications"
 import {
   emitCadenceTaskCreatedTimeline,
@@ -44,8 +47,8 @@ export async function createCadenceTaskFromEnrollmentStep(
     dryRun?: boolean
   },
 ): Promise<{ task: GrowthCadenceTask | null; reason?: string }> {
-  if (!isCadenceTaskChannel(input.step.channel)) {
-    return { task: null, reason: "email_channel" }
+  if (!isCadenceTaskChannel(normalizeSequenceStepChannel(input.step.channel))) {
+    return { task: null, reason: "email_or_sms_transport_channel" }
   }
 
   const existing = await fetchGrowthCadenceTaskByEnrollmentStepId(admin, input.step.id)
@@ -56,9 +59,10 @@ export async function createCadenceTaskFromEnrollmentStep(
   const lead = await fetchGrowthLeadById(admin, input.step.leadId)
   if (!lead) return { task: null, reason: "lead_not_found" }
 
+  const normalizedChannel = normalizeSequenceStepChannel(input.step.channel)
   const preflight = await runGrowthOutreachPreflight(admin, {
     lead,
-    channel: input.step.channel === "manual_call" ? "manual_call" : "manual_follow_up",
+    channel: normalizedChannel === "manual_call" ? "manual_call" : "manual_follow_up",
     toEmail: lead.contactEmail,
     generationType: null,
     generationApproved: true,
@@ -66,12 +70,18 @@ export async function createCadenceTaskFromEnrollmentStep(
   if (!preflight.allowed) return { task: null, reason: preflight.code ?? "preflight_blocked" }
 
   const opportunity = await fetchGrowthOpportunityByLeadId(admin, lead.id)
-  const channel = input.step.channel
-  const instructions = buildCadenceTaskInstructions({
-    channel,
-    companyName: lead.companyName,
-    contactName: lead.contactName,
-  })
+  const channel = normalizedChannel
+  const callQueueHref = channel === "manual_call" ? cadenceCallQueueHref(lead.id) : null
+  const instructions = [
+    buildCadenceTaskInstructions({
+      channel,
+      companyName: lead.companyName,
+      contactName: lead.contactName,
+    }),
+    callQueueHref ? `Call queue: ${callQueueHref}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n\n")
   const title = buildCadenceTaskTitle({
     channel,
     companyName: lead.companyName,
@@ -167,6 +177,22 @@ export async function createCadenceTaskFromEnrollmentStep(
     enrollmentId: input.enrollmentId,
     stepOrder: input.step.stepOrder,
   })
+
+  if (channel === "manual_call") {
+    await recordSequenceEnrollmentChannelEvent(admin, {
+      enrollmentId: input.enrollmentId,
+      enrollmentStepId: input.step.id,
+      leadId: lead.id,
+      channel: input.step.channel === "call" ? "call" : "manual_call",
+      eventKind: "call_task_queued",
+      title: "Call Task Queued",
+      summary: title,
+      metadata: {
+        cadence_task_id: task.id,
+        call_queue_href: callQueueHref,
+      },
+    }).catch(() => undefined)
+  }
 
   if (dueAt && Date.parse(dueAt) <= Date.now()) {
     await emitCadenceTaskDueTimeline(admin, { task })

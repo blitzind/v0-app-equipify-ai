@@ -28,12 +28,13 @@ import {
   updateSequenceExecutionJob,
 } from "@/lib/growth/sequences/execution/sequence-job-repository"
 import { buildSequenceExecutionSendPayload } from "@/lib/growth/sequences/execution/sequence-send-builder"
+import { runSequenceSmsExecutionJob } from "@/lib/growth/sequences/execution/sequence-sms-runner"
 import { applyReputationSafeScheduleGate } from "@/lib/growth/outbound/reputation-safe-scheduler"
 import { shouldSuppressCampaignFollowUp } from "@/lib/growth/outbound/reply-intelligence"
-import {
-  evaluateGrowthQaDeliverabilityBypassForJobSend,
+import { evaluateGrowthQaDeliverabilityBypassForJobSend,
   fetchGrowthQaDeliverabilityBypassForJob,
 } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass"
+import { recordSequenceEnrollmentChannelEvent } from "@/lib/growth/sequence-orchestration/sequence-multi-channel-state-repository"
 
 export type SequenceExecutionRunInput = {
   jobId: string
@@ -370,6 +371,16 @@ export async function runSequenceExecutionJob(
     return { ok: false, jobId: locked.id, status: "blocked", message: "missing_step", blocked: true }
   }
 
+  if (locked.channel === "sms") {
+    const smsResult = await runSequenceSmsExecutionJob(admin, {
+      job: locked,
+      actingUserId: input.actingUserId,
+      actingUserEmail: input.actingUserEmail,
+      auditActorUserId: resolveSequenceExecutionAuditActorUserId(locked, input) ?? input.actingUserId,
+    })
+    return smsResult
+  }
+
   const followUp = await shouldSuppressCampaignFollowUp(admin, {
     sequenceEnrollmentId: locked.sequenceEnrollmentId,
   })
@@ -623,6 +634,20 @@ export async function runSequenceExecutionJob(
     stepId: locked.sequenceStepId,
     deliveryAttemptId: transport.attempt.id,
   })
+
+  await recordSequenceEnrollmentChannelEvent(admin, {
+    enrollmentId: locked.sequenceEnrollmentId,
+    enrollmentStepId: locked.sequenceStepId,
+    leadId: locked.leadId,
+    channel: "email",
+    eventKind: "email_sent",
+    title: "Email Sent",
+    summary: payload.subject,
+    metadata: {
+      job_id: locked.id,
+      delivery_attempt_id: transport.attempt.id,
+    },
+  }).catch(() => undefined)
 
   await advanceGrowthSequenceEnrollmentAfterStep(admin, {
     enrollmentStepId: locked.sequenceStepId,

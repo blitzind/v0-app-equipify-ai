@@ -20,8 +20,10 @@ import { computeStepExecutionConfidence } from "@/lib/growth/sequence-enrollment
 import { buildSequenceSchedulerIdempotencyKey } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
 import type { GrowthSequenceEnrollmentStep } from "@/lib/growth/sequence-enrollment-types"
 import { createCadenceTaskFromEnrollmentStep } from "@/lib/growth/cadence/materialize-cadence-step"
-import { isCadenceEmailChannel } from "@/lib/growth/cadence/cadence-channel-engine"
+import { isSequenceTransportChannel } from "@/lib/growth/cadence/cadence-channel-engine"
 import { fetchGrowthCadenceTaskByEnrollmentStepId } from "@/lib/growth/cadence/cadence-task-repository"
+import { normalizeSequenceStepChannel } from "@/lib/growth/sequence-orchestration/sequence-channel-routing"
+import { buildSequenceExecutionSmsPayload } from "@/lib/growth/sequences/execution/sequence-sms-send-builder"
 import {
   emitGrowthApprovalRequiredNotification,
 } from "@/lib/growth/notifications/notification-integrations"
@@ -129,15 +131,126 @@ export async function queueSequenceStepTransportJob(
 
   if (input.dryRun) return { queued: true }
 
-  if (!isCadenceEmailChannel(input.step.channel)) {
+  const stepChannel = input.step.channel
+  if (!isSequenceTransportChannel(stepChannel)) {
+    const cadenceStep = { ...input.step, channel: normalizeSequenceStepChannel(stepChannel) }
     const result = await createCadenceTaskFromEnrollmentStep(admin, {
-      step: input.step,
+      step: cadenceStep,
       enrollmentId: input.enrollmentId,
       actingUserId: input.actingUserId,
       idempotencyKey,
     })
     if (!result.task) return { queued: false, reason: result.reason ?? "cadence_task_failed" }
     return { queued: true }
+  }
+
+  if (stepChannel === "sms") {
+    const smsPayload = await buildSequenceExecutionSmsPayload(admin, {
+      sequenceStepId: input.step.id,
+      leadId: lead.id,
+      sequenceEnrollmentId: input.enrollmentId,
+    })
+    if ("error" in smsPayload) {
+      return {
+        queued: false,
+        reason: smsPayload.error,
+        failure: buildQueueStepFailure({
+          enrollmentId: input.enrollmentId,
+          step: input.step,
+          leadId: lead.id,
+          code: smsPayload.error,
+          message: `SMS draft could not be prepared: ${smsPayload.error}`,
+          phase: "queue_preflight",
+        }),
+      }
+    }
+
+    const preflight = await runGrowthOutreachPreflight(admin, {
+      lead,
+      channel: "sms",
+      toEmail: lead.contactEmail,
+      generationType: null,
+      generationApproved: true,
+      actingUserEmail: input.actingUserEmail,
+      actingUserId: input.actingUserId,
+      enrollmentId: input.enrollmentId,
+    })
+    if (!preflight.allowed) {
+      const code = preflight.code ?? "preflight_blocked"
+      return {
+        queued: false,
+        reason: code,
+        failure: buildQueueStepFailure({
+          enrollmentId: input.enrollmentId,
+          step: input.step,
+          leadId: lead.id,
+          code,
+          message: preflight.reason ?? "SMS preflight blocked queueing.",
+          phase: "queue_preflight",
+        }),
+      }
+    }
+
+    await updateGrowthSequenceEnrollmentStep(admin, input.step.id, {
+      status: "draft_created",
+      instructions: smsPayload.body,
+      stepExecutionConfidence: computeStepExecutionConfidence({ lead, channel: input.step.channel }),
+    })
+
+    const scheduledFor = input.step.scheduledFor ?? new Date().toISOString()
+    const job = await createSequenceExecutionJob(admin, {
+      sequenceEnrollmentId: input.enrollmentId,
+      sequenceStepId: input.step.id,
+      leadId: input.step.leadId,
+      scheduledFor,
+      status: "pending_approval",
+      channel: "sms",
+      smsDraftBody: smsPayload.body,
+      smsToE164: smsPayload.toE164,
+    })
+
+    await recordSequenceExecutionJobAuditEvent(admin, {
+      jobId: job.id,
+      eventType: "job_planned",
+      title: "SMS execution job planned",
+      description: "Due sequence SMS step queued for human approval — no auto-send.",
+      metadata: {
+        sequence_enrollment_id: input.enrollmentId,
+        sequence_step_id: input.step.id,
+        channel: "sms",
+        scheduler_idempotency_key: idempotencyKey,
+        sms_to_e164: smsPayload.toE164,
+        char_count: smsPayload.body.length,
+      },
+    })
+
+    await updateGrowthSequenceEnrollmentStep(admin, input.step.id, { status: "queued" })
+
+    await recordSequenceExecutionTimelineEvent(admin, {
+      leadId: lead.id,
+      eventType: "sequence_step_scheduled",
+      title: "Sequence SMS scheduled for approval",
+      summary: `Step ${input.step.stepOrder} SMS draft ready for human approval.`,
+      jobId: job.id,
+      enrollmentId: input.enrollmentId,
+      stepId: input.step.id,
+    })
+
+    await emitGrowthLeadSequenceStepQueuedTimeline(admin, {
+      leadId: lead.id,
+      enrollmentId: input.enrollmentId,
+      stepId: input.step.id,
+      queueId: job.id,
+    })
+
+    await emitGrowthApprovalRequiredNotification(admin, {
+      leadId: lead.id,
+      queueId: job.id,
+      companyName: lead.companyName,
+      ownerUserId: lead.assignedTo,
+    })
+
+    return { queued: true, jobId: job.id }
   }
 
   const transportReadiness = await evaluateGrowthOutboundTransportReadiness(admin)
@@ -273,6 +386,7 @@ export async function queueSequenceStepTransportJob(
     leadId: input.step.leadId,
     scheduledFor,
     status: "pending_approval",
+    channel: "email",
   })
 
   const qaDeliverabilityBypass = await evaluateGrowthQaDeliverabilityBypass(admin, {

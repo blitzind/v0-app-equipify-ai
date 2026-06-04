@@ -12,6 +12,7 @@ import {
   emitCadenceTaskCompletedTimeline,
   emitCadenceTaskSkippedTimeline,
 } from "@/lib/growth/cadence/cadence-timeline-emitter"
+import { recordSequenceEnrollmentChannelEvent } from "@/lib/growth/sequence-orchestration/sequence-multi-channel-state-repository"
 import {
   fetchGrowthCadenceTaskById,
   listGrowthCadenceTasksForScan,
@@ -19,7 +20,7 @@ import {
 } from "@/lib/growth/cadence/cadence-task-repository"
 import type { GrowthCadenceTask, GrowthCadenceTaskOutcome } from "@/lib/growth/cadence/cadence-types"
 import { advanceGrowthSequenceEnrollmentAfterStep } from "@/lib/growth/sequence-enrollment/sequence-enrollment-orchestrator"
-import { updateGrowthSequenceEnrollmentStep } from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
+import { fetchGrowthSequenceEnrollmentStepById, updateGrowthSequenceEnrollmentStep } from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
 import { recomputeGrowthLeadNextBestAction } from "@/lib/growth/recompute-lead-next-best-action"
 
 export async function completeGrowthCadenceTask(
@@ -63,6 +64,22 @@ export async function completeGrowthCadenceTask(
     companyName: lead.companyName,
     outcome: input.outcome,
   })
+
+  if (existing.sequenceEnrollmentStepId && (existing.channel === "manual_call" || existing.channel === "voicemail")) {
+    const enrollmentStep = await fetchGrowthSequenceEnrollmentStepById(admin, existing.sequenceEnrollmentStepId)
+    if (enrollmentStep) {
+      await recordSequenceEnrollmentChannelEvent(admin, {
+        enrollmentId: enrollmentStep.enrollmentId,
+        enrollmentStepId: existing.sequenceEnrollmentStepId,
+        leadId: existing.leadId,
+        channel: existing.channel,
+        eventKind: "call_completed",
+        title: "Call Completed",
+        summary: `Outcome: ${input.outcome}`,
+        metadata: { cadence_task_id: task.id, outcome: input.outcome },
+      }).catch(() => undefined)
+    }
+  }
 
   if (existing.channel === "manual_call" || existing.channel === "voicemail") {
     await recomputeGrowthLeadNextBestAction(admin, existing.leadId)

@@ -41,11 +41,15 @@ export const GROWTH_SEQUENCE_EXECUTION_TIMELINE_EVENT_TYPES = [
 export type GrowthSequenceExecutionTimelineEventType =
   (typeof GROWTH_SEQUENCE_EXECUTION_TIMELINE_EVENT_TYPES)[number]
 
+export const GROWTH_SEQUENCE_TRANSPORT_CHANNELS = ["email", "sms"] as const
+export type GrowthSequenceTransportChannel = (typeof GROWTH_SEQUENCE_TRANSPORT_CHANNELS)[number]
+
 export type GrowthSequenceExecutionJob = {
   id: string
   sequenceEnrollmentId: string
   sequenceStepId: string | null
   leadId: string
+  channel: GrowthSequenceTransportChannel
   senderAccountId: string | null
   providerId: string | null
   senderPoolId: string | null
@@ -59,6 +63,9 @@ export type GrowthSequenceExecutionJob = {
   attemptCount: number
   lastError: string | null
   deliveryAttemptId: string | null
+  smsDraftBody: string | null
+  smsToE164: string | null
+  smsDeliveryAttemptId: string | null
   requiresHumanApproval: boolean
   humanApprovedAt: string | null
   humanApprovedBy: string | null
@@ -154,6 +161,14 @@ export type GrowthSequenceSendPayload = {
   contentTemplateVersionId?: string | null
   contentTemplateId?: string | null
   personalizationGenerationId?: string | null
+}
+
+export type GrowthSequenceSmsSendPayload = {
+  leadId: string
+  toE164: string
+  body: string
+  sequenceEnrollmentId: string
+  sequenceStepId: string
 }
 
 export function maskSequenceExecutionLeadLabel(leadId: string, companyName?: string | null): string {

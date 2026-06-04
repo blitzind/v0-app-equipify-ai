@@ -1,6 +1,6 @@
 /** Shared enrollment step progression helpers (server + client safe). */
 
-import { isCadenceEmailChannel } from "@/lib/growth/cadence/cadence-channel-engine"
+import { isCadenceEmailChannel, isSequenceTransportChannel } from "@/lib/growth/cadence/cadence-channel-engine"
 import type { GrowthSequenceEnrollmentStep } from "@/lib/growth/sequence-enrollment-types"
 import type { GrowthSequenceStepChannel } from "@/lib/growth/sequence-types"
 
@@ -32,20 +32,27 @@ export function enrollmentHasPriorIncompleteSteps(
 }
 
 export function isManualSequenceStepChannel(channel: GrowthSequenceStepChannel): boolean {
-  return !isCadenceEmailChannel(channel)
+  return !isSequenceTransportChannel(channel)
 }
 
 export function isManualStepAwaitingCompletion(step: GrowthSequenceEnrollmentStep): boolean {
   return isManualSequenceStepChannel(step.channel) && ["queued", "draft_created"].includes(step.status)
 }
 
-/** Email step with AI draft materialized — ready for execution job planning. */
-export function isDraftReadyEmailSchedulerStep(step: GrowthSequenceEnrollmentStep): boolean {
+export function isDraftReadyTransportSchedulerStep(step: GrowthSequenceEnrollmentStep): boolean {
+  if (step.channel === "sms") {
+    return step.status === "draft_created" && Boolean(step.instructions?.trim())
+  }
   return (
     step.status === "draft_created" &&
     isCadenceEmailChannel(step.channel) &&
     Boolean(step.generationId)
   )
+}
+
+/** Email step with AI draft materialized — ready for execution job planning. */
+export function isDraftReadyEmailSchedulerStep(step: GrowthSequenceEnrollmentStep): boolean {
+  return isDraftReadyTransportSchedulerStep(step) && step.channel === "email"
 }
 
 export function isSequenceStepDueForScheduler(
@@ -54,7 +61,7 @@ export function isSequenceStepDueForScheduler(
 ): boolean {
   if (step.outreachQueueId) return false
   if (!["pending", "draft_created"].includes(step.status)) return false
-  if (isDraftReadyEmailSchedulerStep(step)) return true
+  if (isDraftReadyTransportSchedulerStep(step)) return true
   if (!step.scheduledFor) return false
   return Date.parse(step.scheduledFor) <= nowMs
 }

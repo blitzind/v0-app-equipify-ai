@@ -185,6 +185,42 @@ export async function fetchGrowthSequenceTouchTimeline(
     })
   }
 
+  const { data: smsAttempts } = await admin
+    .schema("growth")
+    .from("sms_delivery_attempts")
+    .select("id, queued_at, status")
+    .eq("lead_id", lead.id)
+    .gte("queued_at", since)
+    .order("queued_at", { ascending: true })
+
+  for (const row of smsAttempts ?? []) {
+    touches.push({
+      occurredAt: (row.queued_at as string) ?? (row as { created_at?: string }).created_at ?? since,
+      channel: "sms",
+      generationType: null,
+      messageId: row.id as string,
+      signalKind: row.status as string,
+    })
+  }
+
+  const { data: channelEvents } = await admin
+    .schema("growth")
+    .from("sequence_enrollment_channel_events")
+    .select("channel, event_kind, title, occurred_at, enrollment_step_id")
+    .eq("lead_id", lead.id)
+    .gte("occurred_at", since)
+    .order("occurred_at", { ascending: true })
+
+  for (const row of channelEvents ?? []) {
+    touches.push({
+      occurredAt: row.occurred_at as string,
+      channel: row.channel as GrowthSequenceTouch["channel"],
+      generationType: null,
+      signalKind: row.event_kind as string,
+      queueId: row.enrollment_step_id as string | null,
+    })
+  }
+
   return touches.sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt))
 }
 

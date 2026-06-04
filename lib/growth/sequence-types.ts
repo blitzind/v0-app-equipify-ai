@@ -8,6 +8,8 @@ export type GrowthSequencePatternKind = (typeof GROWTH_SEQUENCE_PATTERN_KINDS)[n
 
 export const GROWTH_SEQUENCE_STEP_CHANNELS = [
   "email",
+  "sms",
+  "call",
   "manual_call",
   "voicemail",
   "linkedin_view_profile",

@@ -6,6 +6,7 @@ import type {
   GrowthSequenceExecutionJobEvent,
   GrowthSequenceExecutionJobStatus,
   GrowthSequenceExecutionJobView,
+  GrowthSequenceTransportChannel,
 } from "@/lib/growth/sequences/execution/sequence-execution-types"
 import { maskSequenceExecutionLeadLabel } from "@/lib/growth/sequences/execution/sequence-execution-types"
 import { readQaDeliverabilityBypassFromJobEventMetadata } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass-types"
@@ -16,6 +17,7 @@ type JobRow = {
   sequence_enrollment_id: string
   sequence_step_id: string | null
   lead_id: string
+  channel?: string
   sender_account_id: string | null
   provider_id: string | null
   sender_pool_id?: string | null
@@ -29,6 +31,9 @@ type JobRow = {
   attempt_count: number
   last_error: string | null
   delivery_attempt_id: string | null
+  sms_draft_body?: string | null
+  sms_to_e164?: string | null
+  sms_delivery_attempt_id?: string | null
   requires_human_approval: boolean
   human_approved_at: string | null
   human_approved_by: string | null
@@ -61,6 +66,7 @@ function mapJob(row: JobRow): GrowthSequenceExecutionJob {
     sequenceEnrollmentId: row.sequence_enrollment_id,
     sequenceStepId: row.sequence_step_id,
     leadId: row.lead_id,
+    channel: (row.channel === "sms" ? "sms" : "email") as GrowthSequenceExecutionJob["channel"],
     senderAccountId: row.sender_account_id,
     providerId: row.provider_id,
     senderPoolId: row.sender_pool_id ?? null,
@@ -74,6 +80,9 @@ function mapJob(row: JobRow): GrowthSequenceExecutionJob {
     attemptCount: row.attempt_count,
     lastError: row.last_error,
     deliveryAttemptId: row.delivery_attempt_id,
+    smsDraftBody: row.sms_draft_body ?? null,
+    smsToE164: row.sms_to_e164 ?? null,
+    smsDeliveryAttemptId: row.sms_delivery_attempt_id ?? null,
     requiresHumanApproval: row.requires_human_approval,
     humanApprovedAt: row.human_approved_at,
     humanApprovedBy: row.human_approved_by,
@@ -126,6 +135,9 @@ export async function createSequenceExecutionJob(
     leadId: string
     scheduledFor: string
     status?: GrowthSequenceExecutionJobStatus
+    channel?: GrowthSequenceTransportChannel
+    smsDraftBody?: string | null
+    smsToE164?: string | null
   },
 ): Promise<GrowthSequenceExecutionJob> {
   const now = new Date().toISOString()
@@ -134,8 +146,11 @@ export async function createSequenceExecutionJob(
       sequence_enrollment_id: input.sequenceEnrollmentId,
       sequence_step_id: input.sequenceStepId,
       lead_id: input.leadId,
+      channel: input.channel ?? "email",
       status: input.status ?? "pending_approval",
       scheduled_for: input.scheduledFor,
+      sms_draft_body: input.smsDraftBody ?? null,
+      sms_to_e164: input.smsToE164 ?? null,
       requires_human_approval: true,
       created_at: now,
       updated_at: now,
@@ -159,6 +174,9 @@ export async function updateSequenceExecutionJob(
     attemptCount: number
     lastError: string | null
     deliveryAttemptId: string | null
+    smsDraftBody: string | null
+    smsToE164: string | null
+    smsDeliveryAttemptId: string | null
     humanApprovedAt: string | null
     humanApprovedBy: string | null
   }>,
@@ -173,6 +191,9 @@ export async function updateSequenceExecutionJob(
   if (patch.attemptCount !== undefined) row.attempt_count = patch.attemptCount
   if (patch.lastError !== undefined) row.last_error = patch.lastError?.slice(0, 500) ?? null
   if (patch.deliveryAttemptId !== undefined) row.delivery_attempt_id = patch.deliveryAttemptId
+  if (patch.smsDraftBody !== undefined) row.sms_draft_body = patch.smsDraftBody
+  if (patch.smsToE164 !== undefined) row.sms_to_e164 = patch.smsToE164
+  if (patch.smsDeliveryAttemptId !== undefined) row.sms_delivery_attempt_id = patch.smsDeliveryAttemptId
   if (patch.humanApprovedAt !== undefined) row.human_approved_at = patch.humanApprovedAt
   if (patch.humanApprovedBy !== undefined) row.human_approved_by = patch.humanApprovedBy
 

@@ -22,11 +22,13 @@ import { resolveScheduledFor } from "@/lib/growth/outreach/outreach-scheduling"
 import { runGrowthAiCopilotGeneration } from "@/lib/growth/run-ai-copilot-generation"
 import {
   enrollmentHasPriorIncompleteSteps,
+  isDraftReadyTransportSchedulerStep,
   isDraftReadyEmailSchedulerStep,
 } from "@/lib/growth/sequence-enrollment/enrollment-step-progress"
 import {
   fetchGrowthSequenceEnrollmentById,
   listGrowthSequenceEnrollmentSteps,
+  updateGrowthSequenceEnrollment,
   updateGrowthSequenceEnrollmentStep,
 } from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
 import {
@@ -54,7 +56,14 @@ import {
   emitGrowthLeadSequenceStepSkippedTimeline,
 } from "@/lib/growth/timeline-emitter"
 import { createCadenceTaskFromEnrollmentStep } from "@/lib/growth/cadence/materialize-cadence-step"
-import { isCadenceEmailChannel } from "@/lib/growth/cadence/cadence-channel-engine"
+import { isSequenceTransportChannel } from "@/lib/growth/cadence/cadence-channel-engine"
+import { normalizeSequenceStepChannel } from "@/lib/growth/sequence-orchestration/sequence-channel-routing"
+import {
+  evaluateSequenceChannelSelectionRules,
+  shouldPauseEnrollmentByChannelRules,
+} from "@/lib/growth/sequence-orchestration/sequence-channel-selection-rules"
+import { recordSequenceEnrollmentChannelEvent } from "@/lib/growth/sequence-orchestration/sequence-multi-channel-state-repository"
+import { fetchGrowthSequenceTouchTimeline } from "@/lib/growth/sequence-pattern-repository"
 import { fetchGrowthCadenceTaskByEnrollmentStepId } from "@/lib/growth/cadence/cadence-task-repository"
 import {
   emitGrowthApprovalRequiredNotification,
@@ -187,9 +196,20 @@ async function queueSequenceStepOutreach(
 
   if (input.dryRun) return { queued: true }
 
-  if (!isCadenceEmailChannel(input.step.channel)) {
-    const result = await createCadenceTaskFromEnrollmentStep(admin, {
+  if (input.step.channel === "sms") {
+    return queueSequenceStepTransportJob(admin, {
       step: input.step,
+      enrollmentId: input.enrollmentId,
+      actingUserId: input.actingUserId,
+      actingUserEmail: input.actingUserEmail,
+      dryRun: input.dryRun,
+    })
+  }
+
+  if (!isSequenceTransportChannel(input.step.channel)) {
+    const cadenceStep = { ...input.step, channel: normalizeSequenceStepChannel(input.step.channel) }
+    const result = await createCadenceTaskFromEnrollmentStep(admin, {
+      step: cadenceStep,
       enrollmentId: input.enrollmentId,
       actingUserId: input.actingUserId,
       idempotencyKey,
@@ -374,7 +394,7 @@ export async function runGrowthSequenceScheduler(
         typeof enrollment.metadata.qaAcceleration === "object" &&
         (enrollment.metadata.qaAcceleration as { bypassBusinessHoursStepId?: string }).bypassBusinessHoursStepId ===
           step.id
-      const draftReadyForExecutionJob = isDraftReadyEmailSchedulerStep(step)
+      const draftReadyForExecutionJob = isDraftReadyTransportSchedulerStep(step)
 
       const scheduled = resolveScheduledFor({
         sendNow: true,
@@ -408,6 +428,31 @@ export async function runGrowthSequenceScheduler(
             dryRun,
           })
         }
+        continue
+      }
+
+      const touches = await fetchGrowthSequenceTouchTimeline(admin, lead)
+      const channelDecision = evaluateSequenceChannelSelectionRules({
+        steps: enrollmentSteps,
+        currentStep: step,
+        touches,
+      })
+      if (shouldPauseEnrollmentByChannelRules(channelDecision) && !dryRun) {
+        await updateGrowthSequenceEnrollment(admin, enrollment.id, {
+          status: "paused",
+          pauseReason: channelDecision.reason,
+        })
+        await recordSequenceEnrollmentChannelEvent(admin, {
+          enrollmentId: enrollment.id,
+          enrollmentStepId: step.id,
+          leadId: lead.id,
+          channel: step.channel,
+          eventKind: "channel_rule_applied",
+          title: "Sequence paused by channel rule",
+          summary: channelDecision.reason,
+          metadata: { rule_code: channelDecision.ruleCode },
+        }).catch(() => undefined)
+        counts.skippedSuppressed += 1
         continue
       }
 

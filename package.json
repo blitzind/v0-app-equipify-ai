@@ -109,6 +109,7 @@
     "test:growth-sms-infrastructure": "tsx scripts/test-growth-sms-infrastructure.ts",
     "test:growth-sms-inbox-reply-intelligence": "tsx scripts/test-growth-sms-inbox-reply-intelligence.ts",
     "test:growth-sms-personalization": "tsx scripts/test-growth-sms-personalization.ts",
+    "test:growth-multi-channel-sequence-orchestration": "tsx scripts/test-growth-multi-channel-sequence-orchestration.ts",
     "test:growth-conversation-intelligence": "tsx scripts/test-growth-conversation-intelligence.ts",
     "test:growth-sequence-intelligence": "tsx scripts/test-growth-sequence-intelligence.ts",
     "test:growth-sequence-execution": "tsx scripts/test-growth-sequence-execution.ts",
