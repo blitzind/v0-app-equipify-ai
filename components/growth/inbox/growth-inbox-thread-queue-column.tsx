@@ -6,8 +6,8 @@ import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import {
   GROWTH_INBOX_QUEUE_VIEWS,
   GROWTH_INBOX_QUEUE_VIEW_LABELS,
-  useGrowthInboxQueue,
-} from "@/components/growth/inbox/growth-inbox-queue-context"
+} from "@/lib/growth/inbox/inbox-thread-queue-filters"
+import { useGrowthInboxQueue } from "@/components/growth/inbox/growth-inbox-queue-context"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
 import {
   INBOX_STATUS_TONE,
