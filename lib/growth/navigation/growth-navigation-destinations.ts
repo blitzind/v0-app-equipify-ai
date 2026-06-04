@@ -346,6 +346,20 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["revenue intelligence", "revenue", "sequence performance", "attribution", "analytics", "funnel"],
   },
   {
+    id: "revenue-attribution",
+    label: "Revenue Attribution",
+    href: "/admin/growth/revenue-attribution",
+    keywords: [
+      "revenue attribution",
+      "attribution dashboard",
+      "first touch",
+      "last touch",
+      "funnel",
+      "closed won",
+      "campaign attribution",
+    ],
+  },
+  {
     id: "opportunity-intelligence",
     label: "Opportunities",
     href: "/admin/growth/opportunity-intelligence",
@@ -655,6 +669,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         href: "/admin/growth/revenue-intelligence",
         label: "Revenue",
         match: prefixMatch("/admin/growth/revenue-intelligence"),
+      },
+      {
+        id: "revenue-attribution",
+        href: "/admin/growth/revenue-attribution",
+        label: "Revenue Attribution",
+        match: prefixMatch("/admin/growth/revenue-attribution"),
       },
       {
         id: "opportunity-intelligence",

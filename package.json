@@ -249,6 +249,7 @@
     "test:growth-sender-pools": "tsx scripts/test-growth-sender-pools.ts",
     "test:growth-health-aware-routing": "tsx scripts/test-growth-health-aware-routing.ts",
     "test:growth-attribution-touch-ledger": "tsx scripts/test-growth-attribution-touch-ledger.ts",
+    "test:growth-revenue-attribution-dashboard": "tsx scripts/test-growth-revenue-attribution-dashboard.ts",
     "test:growth-deliverability-ops": "tsx scripts/test-growth-deliverability-ops.ts",
     "test:growth-deliverability-reputation-protection": "tsx scripts/test-growth-deliverability-reputation-protection.ts",
     "test:growth-outbound-reliability-h2": "tsx scripts/test-growth-outbound-reliability-h2.ts",
