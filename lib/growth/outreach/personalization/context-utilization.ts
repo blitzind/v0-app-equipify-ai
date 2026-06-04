@@ -134,7 +134,9 @@ export function listUsedContextSources(
 ): OutreachContextSourceKey[] {
   const used = new Set<OutreachContextSourceKey>(["company_name"])
 
-  const openerKey = openerSourceToContextKey(strategy.researchOpener?.source)
+  const openerKey = strategy.memoryOpener
+    ? "memory"
+    : openerSourceToContextKey(strategy.researchOpener?.source)
   if (openerKey) used.add(openerKey)
 
   const subjectKey = subjectSourceToContextKey(strategy.subjectIntelligence?.evidenceSource)

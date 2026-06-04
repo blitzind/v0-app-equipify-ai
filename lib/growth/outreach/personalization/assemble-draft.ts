@@ -2,10 +2,14 @@
 
 import { countWords } from "@/lib/growth/outreach/personalization/message-variability"
 import { applyCtaIntelligence, buildIntelligentCta } from "@/lib/growth/outreach/personalization/cta-intelligence"
+import { computeContextUtilization } from "@/lib/growth/outreach/personalization/context-utilization"
+import {
+  applyMemoryCommunicationStyle,
+  resolveMemoryCommunicationStyle,
+} from "@/lib/growth/outreach/personalization/memory-communication-style"
+import { computeMemoryUtilization } from "@/lib/growth/outreach/personalization/memory-utilization"
 import { selectMessageStrategy } from "@/lib/growth/outreach/personalization/message-strategy"
 import { buildIntelligentSubject } from "@/lib/growth/outreach/personalization/subject-intelligence"
-import { computeContextUtilization } from "@/lib/growth/outreach/personalization/context-utilization"
-import { buildMemoryContextOpener } from "@/lib/growth/outreach/personalization/memory-strategy"
 import type {
   OutreachContextPacket,
   OutreachPersonalizationDraft,
@@ -24,16 +28,13 @@ export function assembleDeterministicOutreachDraft(input: {
   strategy: SelectedMessageStrategy
   subject: string
   maxWords: number
-  memoryOpener?: string | null
 }): OutreachPersonalizationDraft {
   const ordered = ["opening", "pain", "industry", "proof", "cta"] as const
   const blockText = ordered
     .map((key) => input.strategy.blocks.find((block) => block.key === key)?.text)
     .filter(Boolean)
     .join(" ")
-  const opener = input.memoryOpener?.trim()
-  const body = opener ? `${opener} ${blockText}` : blockText
-  const trimmed = trimToMaxWords(body, input.maxWords)
+  const trimmed = trimToMaxWords(blockText, input.maxWords)
   return {
     subject: input.subject,
     body: trimmed,
@@ -51,6 +52,7 @@ export function buildPersonalizedOutreachDraft(input: {
   strategy: SelectedMessageStrategy
   draft: OutreachPersonalizationDraft
   contextQuality: ReturnType<typeof computeContextUtilization>
+  memoryQuality: ReturnType<typeof computeMemoryUtilization>
 } {
   const strategy = selectMessageStrategy({
     leadId: input.leadId,
@@ -58,6 +60,9 @@ export function buildPersonalizedOutreachDraft(input: {
     signals: input.signals,
     generationType: input.generationType,
   })
+  const communicationStyle = resolveMemoryCommunicationStyle(input.packet)
+  const effectiveMaxWords = communicationStyle.maxWordsOverride ?? input.maxWords
+
   const subjectResult = buildIntelligentSubject({
     packet: input.packet,
     strategy,
@@ -71,9 +76,25 @@ export function buildPersonalizedOutreachDraft(input: {
     generationType: input.generationType,
     variationSeed: strategy.variationKey,
   })
-  const enrichedStrategy = applyCtaIntelligence(
+
+  let enrichedStrategy = applyCtaIntelligence(
     {
       ...strategy,
+      communicationStyle,
+      memoryInfluence: strategy.memoryInfluence
+        ? {
+            ...strategy.memoryInfluence,
+            styleApplied: communicationStyle.applied,
+          }
+        : communicationStyle.applied
+          ? {
+              painInfluenced: false,
+              objectionAware: false,
+              styleApplied: true,
+              avoidedTopics: input.packet.memoryAvoidRepeating.slice(0, 3),
+              committeeReferenced: input.packet.memoryCommitteeSummaries.length > 0,
+            }
+          : undefined,
       subjectIntelligence: {
         category: subjectResult.category,
         evidenceSource: subjectResult.evidenceSource,
@@ -84,15 +105,46 @@ export function buildPersonalizedOutreachDraft(input: {
     },
     ctaResult,
   )
+
+  const styled = applyMemoryCommunicationStyle({
+    body: enrichedStrategy.blocks.map((block) => block.text).join(" "),
+    blocks: enrichedStrategy.blocks,
+    style: communicationStyle,
+  })
+
+  if (styled.blocks !== enrichedStrategy.blocks || styled.body !== enrichedStrategy.blocks.map((b) => b.text).join(" ")) {
+    enrichedStrategy = {
+      ...enrichedStrategy,
+      blocks: styled.blocks,
+    }
+  }
+
   const draft = assembleDeterministicOutreachDraft({
     strategy: enrichedStrategy,
     subject: subjectResult.subject,
-    maxWords: input.maxWords,
-    memoryOpener: buildMemoryContextOpener(input.packet),
+    maxWords: effectiveMaxWords,
   })
+
+  const styledDraft = applyMemoryCommunicationStyle({
+    body: draft.body,
+    blocks: enrichedStrategy.blocks,
+    style: communicationStyle,
+  })
+
+  const finalDraft: OutreachPersonalizationDraft = {
+    subject: draft.subject,
+    body: trimToMaxWords(styledDraft.body, effectiveMaxWords),
+    wordCount: countWords(trimToMaxWords(styledDraft.body, effectiveMaxWords)),
+  }
+
   const contextQuality = computeContextUtilization({
     packet: input.packet,
     strategy: enrichedStrategy,
   })
-  return { strategy: enrichedStrategy, draft, contextQuality }
+  const memoryQuality = computeMemoryUtilization({
+    packet: input.packet,
+    strategy: enrichedStrategy,
+  })
+
+  return { strategy: enrichedStrategy, draft: finalDraft, contextQuality, memoryQuality }
 }

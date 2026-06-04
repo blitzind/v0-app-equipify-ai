@@ -104,6 +104,7 @@
     "test:growth-outreach-subject-intelligence": "tsx scripts/test-growth-outreach-subject-intelligence.ts",
     "test:growth-outreach-cta-intelligence": "tsx scripts/test-growth-outreach-cta-intelligence.ts",
     "test:growth-outreach-context-utilization": "tsx scripts/test-growth-outreach-context-utilization.ts",
+    "test:growth-outreach-memory-utilization": "tsx scripts/test-growth-outreach-memory-utilization.ts",
     "test:growth-conversation-intelligence": "tsx scripts/test-growth-conversation-intelligence.ts",
     "test:growth-sequence-intelligence": "tsx scripts/test-growth-sequence-intelligence.ts",
     "test:growth-sequence-execution": "tsx scripts/test-growth-sequence-execution.ts",

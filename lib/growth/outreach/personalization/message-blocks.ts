@@ -179,6 +179,24 @@ const CTA_BLOCKS: MessageBlockTemplate[] = [
     ],
   },
   {
+    id: "question_clarification",
+    label: "Question — clarification",
+    variants: [
+      "Did I capture your concern correctly?",
+      "Want me to clarify the one point you flagged?",
+      "Should I send a shorter answer on the concern you raised?",
+    ],
+  },
+  {
+    id: "customer_next_step",
+    label: "Customer — next step",
+    variants: [
+      "What would be most useful as a next step on your side?",
+      "Should we pick up from the last workflow discussion?",
+      "Want me to send the next piece we outlined?",
+    ],
+  },
+  {
     id: "soft_resource",
     label: "Soft — resource",
     variants: [

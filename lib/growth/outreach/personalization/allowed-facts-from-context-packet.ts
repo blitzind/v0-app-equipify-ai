@@ -54,6 +54,10 @@ export function buildAllowedFactsFromContextPacket(packet: OutreachContextPacket
     ...packet.memoryPreferenceSummaries,
     ...packet.memoryInteractionSummaries,
     ...packet.memoryCommitmentSummaries,
+    ...packet.memoryCommitteeSummaries,
+    ...packet.memoryOpenLoopSummaries,
+    ...(packet.memoryEngagementTrend ? [`Engagement trend: ${packet.memoryEngagementTrend}`] : []),
+    ...(packet.memoryProgressionScore != null ? [`Relationship progression: ${packet.memoryProgressionScore}`] : []),
     ...leadEngineFacts,
   ].filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
 }

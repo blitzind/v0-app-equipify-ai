@@ -25,6 +25,11 @@ const memoryDefaults = {
   memoryCommitmentSummaries: [] as string[],
   memoryAvoidRepeating: [] as string[],
   memoryRiskFlags: [] as string[],
+  memoryCommitteeSummaries: [] as string[],
+  memoryOpenLoopSummaries: [] as string[],
+  memoryEngagementTrend: null as string | null,
+  memoryProgressionScore: null as number | null,
+  memoryUnresolvedObjectionCount: 0,
 }
 
 const phase44Defaults = {
@@ -187,6 +192,6 @@ assert.equal(followUp.strategy.subjectIntelligence?.category, "follow_up")
 assert.ok(!isGenericSubjectPattern(followUp.draft.subject) || followUp.draft.subject.includes("follow"))
 
 assert.equal(memoryRich.strategy.subjectIntelligence?.category, "memory_aware")
-assert.equal(memoryRich.strategy.subjectIntelligence?.evidenceSource, "memory_commitment")
+assert.equal(memoryRich.strategy.subjectIntelligence?.evidenceSource, "memory_open_loop")
 
 console.log("\ngrowth-outreach-subject-intelligence: all checks passed")

@@ -24,6 +24,11 @@ const memoryDefaults = {
   memoryCommitmentSummaries: [] as string[],
   memoryAvoidRepeating: [] as string[],
   memoryRiskFlags: [] as string[],
+  memoryCommitteeSummaries: [] as string[],
+  memoryOpenLoopSummaries: [] as string[],
+  memoryEngagementTrend: null as string | null,
+  memoryProgressionScore: null as number | null,
+  memoryUnresolvedObjectionCount: 0,
 }
 
 const phase44Defaults = {

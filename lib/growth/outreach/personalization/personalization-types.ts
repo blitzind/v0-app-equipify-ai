@@ -83,6 +83,60 @@ export type ResearchOpenerMetadata = {
   confidenceTier: "high" | "medium"
 }
 
+export type MemoryOpenerSource =
+  | "memory_commitment"
+  | "memory_interaction"
+  | "memory_open_loop"
+  | "memory_objection"
+  | "memory_preference"
+  | "relationship_summary"
+  | "relationship_stage"
+
+export type MemoryOpenerMetadata = {
+  source: MemoryOpenerSource
+  evidence: string
+}
+
+export const OUTREACH_MEMORY_SIGNAL_KEYS = [
+  "relationship_stage",
+  "relationship_summary",
+  "memory_coverage",
+  "commitments",
+  "prior_interactions",
+  "preferences",
+  "objections",
+  "avoid_repeating",
+  "risk_flags",
+  "committee_context",
+  "engagement_trend",
+  "progression_score",
+  "open_loops",
+] as const
+
+export type MemorySignalKey = (typeof OUTREACH_MEMORY_SIGNAL_KEYS)[number]
+
+export type MemoryCommunicationStyle = {
+  maxWordsOverride?: number
+  preferShortSentences: boolean
+  formality: "standard" | "executive" | "relationship"
+  omitProofBlock: boolean
+  applied: boolean
+}
+
+export type MemoryInfluenceMetadata = {
+  painInfluenced: boolean
+  objectionAware: boolean
+  styleApplied: boolean
+  avoidedTopics: string[]
+  committeeReferenced: boolean
+}
+
+export type MemoryQualityMetadata = {
+  memorySignalsAvailable: MemorySignalKey[]
+  memorySignalsUsed: MemorySignalKey[]
+  memoryUtilizationPercentage: number
+}
+
 export type SubjectCategory =
   | "research_observation"
   | "pain_point"
@@ -96,7 +150,10 @@ export type SubjectEvidenceSource =
   | "memory_commitment"
   | "memory_interaction"
   | "memory_objection"
+  | "memory_open_loop"
+  | "memory_preference"
   | "relationship_stage"
+  | "relationship_summary"
   | "pain_signal"
   | "industry_signal"
   | "sequence_context"
@@ -134,6 +191,8 @@ export type CtaEvidenceSource =
   | "memory_commitment"
   | "memory_interaction"
   | "memory_preference"
+  | "memory_objection"
+  | "relationship_stage"
   | "prior_reply"
   | "booking_signal"
   | "opportunity_signal"
@@ -260,6 +319,11 @@ export type OutreachContextPacket = {
   memoryCommitmentSummaries: string[]
   memoryAvoidRepeating: string[]
   memoryRiskFlags: string[]
+  memoryCommitteeSummaries: string[]
+  memoryOpenLoopSummaries: string[]
+  memoryEngagementTrend: string | null
+  memoryProgressionScore: number | null
+  memoryUnresolvedObjectionCount: number
   /** Read-only Lead Engine advisory guidance (Phase 4.4D). */
   leadEngineGuidance: OutreachLeadEngineGuidance | null
 }
@@ -278,6 +342,9 @@ export type SelectedMessageStrategy = {
   sourceSignals: PersonalizationSignalKey[]
   variationKey: string
   researchOpener?: ResearchOpenerMetadata
+  memoryOpener?: MemoryOpenerMetadata
+  memoryInfluence?: MemoryInfluenceMetadata
+  communicationStyle?: MemoryCommunicationStyle
   subjectIntelligence?: SubjectIntelligenceMetadata
   ctaIntelligence?: CtaIntelligenceMetadata
 }
@@ -306,6 +373,7 @@ export type OutreachPersonalizationAudit = {
   subjectIntelligence?: SubjectIntelligenceMetadata
   ctaIntelligence?: CtaIntelligenceMetadata
   contextQuality?: OutreachContextQualityMetadata
+  memoryQuality?: MemoryQualityMetadata
 }
 
 export function isOutreachPersonalizationEmailType(

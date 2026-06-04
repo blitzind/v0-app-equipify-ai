@@ -2,7 +2,12 @@
 
 import type { GrowthAiCopilotGenerationType } from "@/lib/growth/ai-copilot-types"
 import { detectOutreachIndustry } from "@/lib/growth/outreach/personalization/industry-detection"
-import { hasMemoryRelationshipEngagement } from "@/lib/growth/outreach/personalization/memory-strategy"
+import {
+  extractMemoryOpenLoop,
+  hasMemoryRelationshipEngagement,
+  isExistingCustomerRelationship,
+  memoryMeetsOutreachThreshold,
+} from "@/lib/growth/outreach/personalization/memory-strategy"
 import { pickVariantIndex } from "@/lib/growth/outreach/personalization/message-variability"
 import {
   resolveResearchEvidenceConfidenceTier,
@@ -53,7 +58,7 @@ type SubjectCandidate = {
 
 function compactSubjectSnippet(text: string, max = 42): string {
   let snippet = truncateResearchSnippet(text, max)
-  snippet = snippet.replace(/^(covers|provides|offers|delivers|specializes in)\s+/i, "")
+  snippet = snippet.replace(/^(covers|provides|offers|delivers|specializes in|asked for|requested|mentioned|noted)\s+/i, "")
   return snippet.charAt(0).toUpperCase() + snippet.slice(1)
 }
 
@@ -138,17 +143,27 @@ function curiositySubjectTemplates(company: string, industryLabel: string | null
 }
 
 function memoryMeetsConfidenceThreshold(packet: OutreachContextPacket): boolean {
-  if (!packet.memoryAvailable) return false
-  if ((packet.memoryCoverageScore ?? 0) >= MEMORY_SUBJECT_CONFIDENCE_THRESHOLD) return true
-  return (
-    packet.memoryCommitmentSummaries.length > 0 ||
-    packet.memoryInteractionSummaries.length > 0 ||
-    packet.objectionSummaries.length > 0
-  )
+  return memoryMeetsOutreachThreshold(packet)
 }
 
 function resolveMemorySubjectCandidate(packet: OutreachContextPacket): SubjectCandidate | null {
   if (!memoryMeetsConfidenceThreshold(packet)) return null
+
+  const openLoop = extractMemoryOpenLoop(packet)
+  if (openLoop) {
+    const topic = compactSubjectSnippet(openLoop, 36)
+    return {
+      category: "memory_aware",
+      evidenceSource: "memory_open_loop",
+      evidence: openLoop,
+      templates: [
+        `Re: ${topic}`,
+        `Following up on ${topic}`,
+        `About ${topic}`,
+        `Quick follow-up on ${topic}`,
+      ],
+    }
+  }
 
   if (packet.memoryCommitmentSummaries[0]) {
     const topic = compactSubjectSnippet(packet.memoryCommitmentSummaries[0], 36)
@@ -159,6 +174,7 @@ function resolveMemorySubjectCandidate(packet: OutreachContextPacket): SubjectCa
       templates: [
         `Following up on ${topic}`,
         `Re: ${topic}`,
+        `About the ${topic}`,
         `About ${topic}`,
       ],
     }
@@ -192,11 +208,42 @@ function resolveMemorySubjectCandidate(packet: OutreachContextPacket): SubjectCa
     }
   }
 
+  if (isExistingCustomerRelationship(packet)) {
+    const topic = compactSubjectSnippet(
+      packet.memoryInteractionSummaries[0] ?? packet.relationshipSummary ?? packet.companyName,
+      36,
+    )
+    return {
+      category: "memory_aware",
+      evidenceSource: "relationship_stage",
+      evidence: packet.relationshipSummary ?? packet.memoryInteractionSummaries[0] ?? null,
+      templates: [
+        `Next step on ${topic}`,
+        `Following up on ${topic}`,
+        `Re: ${topic}`,
+      ],
+    }
+  }
+
+  if (packet.memoryPreferenceSummaries[0] && packet.relationshipSummary) {
+    const topic = compactSubjectSnippet(packet.relationshipSummary, 36)
+    return {
+      category: "memory_aware",
+      evidenceSource: "memory_preference",
+      evidence: packet.relationshipSummary,
+      templates: [
+        `Re: ${topic}`,
+        `Following up on ${topic}`,
+        `Quick follow-up — ${packet.companyName.trim()}`,
+      ],
+    }
+  }
+
   if (packet.relationshipSummary) {
     const topic = compactSubjectSnippet(packet.relationshipSummary, 36)
     return {
       category: "memory_aware",
-      evidenceSource: "relationship_stage",
+      evidenceSource: "relationship_summary",
       evidence: packet.relationshipSummary,
       templates: [
         `Following up on ${topic}`,
@@ -433,6 +480,10 @@ function resolveSubjectCandidate(input: {
     generationType === "next_message" ||
     strategy.angle === "engagement_follow_up"
 
+  if (memoryCandidate && (isFollowUpType || isExistingCustomerRelationship(packet))) {
+    return memoryCandidate
+  }
+
   if (isFollowUpType && memoryCandidate) {
     return memoryCandidate
   }
@@ -441,7 +492,12 @@ function resolveSubjectCandidate(input: {
     return resolveFollowUpSubjectCandidate(packet, strategy)
   }
 
-  if (memoryCandidate && hasMemoryRelationshipEngagement(packet)) {
+  if (
+    memoryCandidate &&
+    (hasMemoryRelationshipEngagement(packet) ||
+      isExistingCustomerRelationship(packet) ||
+      packet.objectionSummaries.length > 0)
+  ) {
     return memoryCandidate
   }
 

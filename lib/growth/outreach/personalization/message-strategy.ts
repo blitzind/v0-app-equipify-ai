@@ -3,15 +3,18 @@
 import type { GrowthAiCopilotGenerationType } from "@/lib/growth/ai-copilot-types"
 import { detectOutreachIndustry } from "@/lib/growth/outreach/personalization/industry-detection"
 import {
+  buildResearchBackedOpener,
+} from "@/lib/growth/outreach/personalization/research-backed-opener"
+import { buildMemoryBackedOpener } from "@/lib/growth/outreach/personalization/memory-backed-opener"
+import {
+  classifyMemoryObjection,
   hasCompetitiveMemoryRisk,
   hasMemoryRelationshipEngagement,
   prefersConciseOutreach,
   resolveMemoryInfluencedPainId,
   shouldAvoidPainBlock,
+  shouldPreferMemoryOpener,
 } from "@/lib/growth/outreach/personalization/memory-strategy"
-import {
-  buildResearchBackedOpener,
-} from "@/lib/growth/outreach/personalization/research-backed-opener"
 import {
   industryBlocksFor,
   interpolateBlockText,
@@ -243,7 +246,28 @@ export function selectMessageStrategy(input: {
     tokens,
   })
 
-  if (researchOpener) {
+  const memoryOpener = buildMemoryBackedOpener({
+    packet: input.packet,
+    generationType: input.generationType,
+    variationSeed: variationKey,
+    tokens,
+  })
+
+  const useMemoryOpener =
+    memoryOpener != null &&
+    (shouldPreferMemoryOpener(input.packet, input.generationType) || researchOpener == null)
+
+  if (useMemoryOpener && memoryOpener) {
+    const openingIndex = blocks.findIndex((block) => block.key === "opening")
+    if (openingIndex >= 0) {
+      blocks[openingIndex] = {
+        ...blocks[openingIndex],
+        blockId: "opening_memory_backed",
+        label: "Memory-backed opener",
+        text: memoryOpener.text,
+      }
+    }
+  } else if (researchOpener) {
     const openingIndex = blocks.findIndex((block) => block.key === "opening")
     if (openingIndex >= 0) {
       blocks[openingIndex] = {
@@ -255,17 +279,35 @@ export function selectMessageStrategy(input: {
     }
   }
 
+  const memoryPainUsed = Boolean(input.packet.memoryAvailable && resolveMemoryInfluencedPainId(input.packet))
+  const objectionCategory = classifyMemoryObjection(input.packet)
+
   return {
     industry,
     angle: pick.angle,
     blocks,
     sourceSignals: input.signals,
     variationKey,
-    researchOpener: researchOpener
+    researchOpener: !useMemoryOpener && researchOpener
       ? {
           source: researchOpener.source,
           evidence: researchOpener.evidence,
           confidenceTier: researchOpener.confidenceTier,
+        }
+      : undefined,
+    memoryOpener: useMemoryOpener && memoryOpener
+      ? {
+          source: memoryOpener.source,
+          evidence: memoryOpener.evidence,
+        }
+      : undefined,
+    memoryInfluence: input.packet.memoryAvailable
+      ? {
+          painInfluenced: memoryPainUsed,
+          objectionAware: objectionCategory != null,
+          styleApplied: false,
+          avoidedTopics: input.packet.memoryAvoidRepeating.slice(0, 3),
+          committeeReferenced: input.packet.memoryCommitteeSummaries.length > 0,
         }
       : undefined,
   }

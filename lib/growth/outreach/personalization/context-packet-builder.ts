@@ -214,6 +214,21 @@ export async function buildOutreachContextPacket(
     memoryCommitmentSummaries: memory.commitmentSummaries.map((entry) => truncate(entry, 120)),
     memoryAvoidRepeating: memory.avoidRepeating.map((entry) => truncate(entry, 100)),
     memoryRiskFlags: memory.riskFlags.map((entry) => truncate(entry, 100)),
+    memoryCommitteeSummaries: memory.committeeContext.map((entry) => truncate(entry, 120)),
+    memoryOpenLoopSummaries: [
+      ...memory.priorInteractionSummaries,
+      ...priorReplySummaries,
+    ]
+      .filter((entry) =>
+        /\b(asked|requested|pricing|breakdown|routing|proposal|send|share|wondering|question|follow up on)\b/i.test(
+          entry,
+        ),
+      )
+      .map((entry) => truncate(entry, 120))
+      .slice(0, 4),
+    memoryEngagementTrend: memory.engagementTrend,
+    memoryProgressionScore: memory.progressionScore,
+    memoryUnresolvedObjectionCount: memory.unresolvedObjectionCount,
     leadEngineGuidance,
   }
 }

@@ -2,8 +2,10 @@
 
 import type { GrowthAiCopilotGenerationType } from "@/lib/growth/ai-copilot-types"
 import {
+  classifyMemoryObjection,
   hasCompetitiveMemoryRisk,
   hasMemoryRelationshipEngagement,
+  isExistingCustomerRelationship,
   prefersConciseOutreach,
 } from "@/lib/growth/outreach/personalization/memory-strategy"
 import {
@@ -86,6 +88,7 @@ function warmEnoughForMeetingCta(
   }
 
   if (generationType === "cold_email") {
+    if (packet.objectionSummaries.length > 0 && packet.priorReplySummaries.length === 0) return false
     return packet.priorReplySummaries.length > 0 || hasMemoryRelationshipEngagement(packet)
   }
 
@@ -165,6 +168,61 @@ function resolveMemoryCtaCandidate(packet: OutreachContextPacket): CtaCandidate 
   return null
 }
 
+function resolveObjectionCtaCandidate(packet: OutreachContextPacket): CtaCandidate | null {
+  const category = classifyMemoryObjection(packet)
+  if (!category) return null
+
+  if (category === "pricing") {
+    return {
+      category: "question_based",
+      blockId: "question_clarification",
+      evidenceSource: "memory_objection",
+      evidence: packet.objectionSummaries[0] ?? null,
+      selectionReason: "Pricing objection on file — clarification CTA instead of another meeting ask.",
+    }
+  }
+
+  if (category === "timing") {
+    return {
+      category: "soft",
+      blockId: "follow_up_continue",
+      evidenceSource: "memory_objection",
+      evidence: packet.objectionSummaries[0] ?? null,
+      selectionReason: "Timing objection on file — low-pressure follow-up CTA.",
+    }
+  }
+
+  if (category === "implementation" || category === "staffing") {
+    return {
+      category: "question_based",
+      blockId: "question_clarification",
+      evidenceSource: "memory_objection",
+      evidence: packet.objectionSummaries[0] ?? null,
+      selectionReason: "Implementation or staffing concern on file — focused clarification CTA.",
+    }
+  }
+
+  return {
+    category: "question_based",
+    blockId: "question_clarification",
+    evidenceSource: "memory_objection",
+    evidence: packet.objectionSummaries[0] ?? null,
+    selectionReason: "Recorded objection — clarification CTA to stay context-aware.",
+  }
+}
+
+function resolveCustomerCtaCandidate(packet: OutreachContextPacket): CtaCandidate | null {
+  if (!isExistingCustomerRelationship(packet)) return null
+
+  return {
+    category: "memory_aware",
+    blockId: "customer_next_step",
+    evidenceSource: "relationship_stage",
+    evidence: packet.relationshipSummary ?? packet.memoryInteractionSummaries[0] ?? null,
+    selectionReason: "Existing customer relationship — next-step continuation CTA.",
+  }
+}
+
 function resolveLeadEngineCtaCandidate(input: {
   packet: OutreachContextPacket
   signals: PersonalizationSignalKey[]
@@ -241,6 +299,8 @@ function resolveCtaCandidate(input: {
   }
 
   const memoryCandidate = resolveMemoryCtaCandidate(packet)
+  const objectionCandidate = resolveObjectionCtaCandidate(packet)
+  const customerCandidate = resolveCustomerCtaCandidate(packet)
   const isFollowUpType =
     generationType === "follow_up_email" ||
     generationType === "reengagement_email" ||
@@ -249,6 +309,14 @@ function resolveCtaCandidate(input: {
 
   if (isFollowUpType && memoryCandidate) {
     return memoryCandidate
+  }
+
+  if (objectionCandidate && !meetingReady && generationType !== "breakup_email") {
+    return objectionCandidate
+  }
+
+  if (customerCandidate && (meetingReady || generationType === "follow_up_email")) {
+    return customerCandidate
   }
 
   if (isFollowUpType) {
@@ -305,6 +373,18 @@ function resolveCtaCandidate(input: {
       evidence: null,
       selectionReason: "Executive outreach — direct scheduling ask.",
     }
+  }
+
+  if (memoryCandidate && hasMemoryRelationshipEngagement(packet) && !meetingReady) {
+    return memoryCandidate
+  }
+
+  if (objectionCandidate && generationType === "cold_email" && !meetingReady) {
+    return objectionCandidate
+  }
+
+  if (objectionCandidate && !meetingReady && generationType !== "breakup_email" && !isFollowUpType) {
+    return objectionCandidate
   }
 
   if (meetingReady && booking) {
@@ -470,6 +550,11 @@ export function buildIntelligentCta(input: {
   if (candidate.category === "memory_aware" && candidate.evidence && candidate.blockId === "memory_commitment") {
     const topic = compactMemorySnippet(candidate.evidence)
     text = `Still good to follow through on ${topic.toLowerCase()}?`
+  }
+
+  if (candidate.blockId === "customer_next_step" && candidate.evidence) {
+    const topic = compactMemorySnippet(candidate.evidence, 56)
+    text = `What would be most useful as a next step on ${topic.toLowerCase()}?`
   }
 
   const qualityScore = scoreCtaQuality({
