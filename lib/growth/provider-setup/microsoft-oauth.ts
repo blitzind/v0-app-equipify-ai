@@ -5,6 +5,7 @@ const GRAPH_ME_URL = "https://graph.microsoft.com/v1.0/me"
 const DEFAULT_SCOPES = [
   "offline_access",
   "https://graph.microsoft.com/Mail.Send",
+  "https://graph.microsoft.com/Mail.Read",
   "https://graph.microsoft.com/User.Read",
 ]
 

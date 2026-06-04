@@ -1,6 +1,8 @@
 import "server-only"
 
+import { fetchGraphSentMessageMetadata, graphApiFetch } from "@/lib/growth/inbox-sync/graph-api-utils"
 import { hasCredential, truncateTransportError } from "@/lib/growth/providers/adapters/adapter-utils"
+import { GROWTH_MICROSOFT365_TRANSPORT_QA_MARKER } from "@/lib/growth/providers/adapters/provider-transport-capability-registry"
 import type {
   GrowthProviderAdapter,
   ProviderAdapterCredentials,
@@ -8,7 +10,7 @@ import type {
   ProviderSendResult,
 } from "@/lib/growth/providers/adapters/provider-adapter-types"
 
-const GRAPH_SEND_URL = "https://graph.microsoft.com/v1.0/me/sendMail"
+export { GROWTH_MICROSOFT365_TRANSPORT_QA_MARKER }
 
 export const microsoftProviderAdapter: GrowthProviderAdapter = {
   family: "microsoft",
@@ -41,49 +43,64 @@ export const microsoftProviderAdapter: GrowthProviderAdapter = {
       return { ok: true, provider_message_id: `sim-microsoft-${Date.now()}`, simulated: true }
     }
 
-    try {
-      const response = await fetch(GRAPH_SEND_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${credentials.access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: {
-            subject: message.subject,
-            body: {
-              contentType: message.html ? "HTML" : "Text",
-              content: message.html ?? message.text ?? "",
-            },
-            from: {
-              emailAddress: {
-                address: credentials.from_address ?? message.from,
-                name: message.fromName ?? undefined,
-              },
-            },
-            toRecipients: [{ emailAddress: { address: message.to } }],
-            ...(message.replyTo ? { replyTo: [{ emailAddress: { address: message.replyTo } }] } : {}),
-          },
-          saveToSentItems: true,
-        }),
-      })
-
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => ({}))) as { error?: { message?: string } }
-        return {
-          ok: false,
-          error: truncateTransportError(payload.error?.message ?? `Microsoft Graph ${response.status}`),
-        }
-      }
-
-      return { ok: true, provider_message_id: `graph-${Date.now()}` }
-    } catch (error) {
-      return {
-        ok: false,
-        error: truncateTransportError(error instanceof Error ? error.message : "Microsoft send failed."),
-      }
-    }
+    return sendMicrosoftGraphMessage(credentials, message)
   },
+}
+
+async function sendMicrosoftGraphMessage(
+  credentials: ProviderAdapterCredentials,
+  message: ProviderSendMessage,
+): Promise<ProviderSendResult> {
+  const accessToken = credentials.access_token
+  if (!accessToken) return { ok: false, error: "Microsoft access token missing." }
+
+  try {
+    const draftBody = {
+      subject: message.subject,
+      body: {
+        contentType: message.html ? "HTML" : "Text",
+        content: message.html ?? message.text ?? "",
+      },
+      toRecipients: [{ emailAddress: { address: message.to } }],
+      ...(message.replyTo
+        ? { replyTo: [{ emailAddress: { address: message.replyTo } }] }
+        : {}),
+    }
+
+    const created = await graphApiFetch<{ id?: string; conversationId?: string; internetMessageId?: string }>(
+      accessToken,
+      "/messages",
+      { method: "POST", body: JSON.stringify(draftBody) },
+    )
+    if (!created.ok) {
+      return { ok: false, error: truncateTransportError(created.message) }
+    }
+
+    const messageId = created.data.id?.trim()
+    if (!messageId) {
+      return { ok: false, error: "Microsoft Graph did not return a message id." }
+    }
+
+    const sent = await graphApiFetch(accessToken, `/messages/${encodeURIComponent(messageId)}/send`, {
+      method: "POST",
+    })
+    if (!sent.ok) {
+      return { ok: false, error: truncateTransportError(sent.message) }
+    }
+
+    const metadata = await fetchGraphSentMessageMetadata(accessToken, messageId)
+    return {
+      ok: true,
+      provider_message_id: messageId,
+      provider_thread_id: metadata.threadId ?? created.data.conversationId?.trim() ?? undefined,
+      rfc_message_id: metadata.rfcMessageId ?? undefined,
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      error: truncateTransportError(error instanceof Error ? error.message : "Microsoft send failed."),
+    }
+  }
 }
 
 export async function sendViaMicrosoft(

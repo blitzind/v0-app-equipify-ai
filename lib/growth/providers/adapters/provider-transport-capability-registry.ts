@@ -2,6 +2,8 @@
 
 import type { GrowthDeliveryProviderFamily } from "@/lib/growth/providers/provider-types"
 
+export const GROWTH_MICROSOFT365_TRANSPORT_QA_MARKER = "growth-microsoft365-transport-parity-v1" as const
+
 export const GROWTH_LIVE_TRANSPORT_FAMILIES = [
   "google",
   "microsoft",

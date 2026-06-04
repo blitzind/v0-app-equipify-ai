@@ -5,6 +5,7 @@ import type { GrowthInboxProviderRawMessage } from "@/lib/growth/inbox-sync/prov
 import { normalizeProviderMessage } from "@/lib/growth/inbox-sync/provider-message-normalizer"
 import type { GrowthInboxNormalizedMessage } from "@/lib/growth/inbox-sync/inbox-sync-types"
 import { createGoogleInboxSyncAdapter } from "@/lib/growth/inbox-sync/provider-sync-adapters/google-inbox-sync-adapter"
+import { createMicrosoftInboxSyncAdapter } from "@/lib/growth/inbox-sync/provider-sync-adapters/microsoft-inbox-sync-adapter"
 
 export type GrowthInboxSyncAdapter = {
   providerFamily: string
@@ -93,7 +94,7 @@ export function getInboxSyncAdapter(input: {
     case "google":
       return createGoogleInboxSyncAdapter(input.admin, input.mailboxConnectionId)
     case "microsoft":
-      return createUnsupportedAdapter("microsoft", input.mailboxConnectionId)
+      return createMicrosoftInboxSyncAdapter(input.admin, input.mailboxConnectionId)
     case "smtp":
       return createUnsupportedAdapter("smtp", input.mailboxConnectionId)
     case "custom":

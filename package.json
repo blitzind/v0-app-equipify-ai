@@ -252,6 +252,7 @@
     "test:growth-revenue-attribution-dashboard": "tsx scripts/test-growth-revenue-attribution-dashboard.ts",
     "test:growth-revenue-attribution-recommendations": "tsx scripts/test-growth-revenue-attribution-recommendations.ts",
     "test:growth-attribution-credit-model": "tsx scripts/test-growth-attribution-credit-model.ts",
+    "test:growth-microsoft365-transport-parity": "tsx scripts/test-growth-microsoft365-transport-parity.ts",
     "test:growth-deliverability-ops": "tsx scripts/test-growth-deliverability-ops.ts",
     "test:growth-deliverability-reputation-protection": "tsx scripts/test-growth-deliverability-reputation-protection.ts",
     "test:growth-outbound-reliability-h2": "tsx scripts/test-growth-outbound-reliability-h2.ts",

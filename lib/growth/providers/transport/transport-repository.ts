@@ -10,6 +10,8 @@ import type {
 import { decryptGrowthProviderCredentials } from "@/lib/growth/outbound/credentials-crypto"
 import { decryptMailboxToken, encryptMailboxToken } from "@/lib/growth/mailboxes/mailbox-token-manager"
 import { refreshGoogleMailboxTokensLive } from "@/lib/growth/mailboxes/google-mailbox-live-validation"
+import { refreshMicrosoftMailboxTokensLive } from "@/lib/growth/mailboxes/microsoft-mailbox-live-validation"
+import { microsoftProviderOAuthConfigured } from "@/lib/growth/provider-setup/microsoft-oauth"
 import { googleProviderOAuthConfigured } from "@/lib/growth/provider-setup/google-oauth"
 import { getDeliveryProvider, listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 import type { DeliveryRouteCandidate } from "@/lib/growth/providers/provider-router"
@@ -274,34 +276,35 @@ async function loadMailboxTokensForSender(
   const refreshToken = decryptMailboxToken(asString(row.encrypted_refresh_token) || null)
   const emailAddress = asString(row.email_address) || null
 
-  if (family === "google" && googleProviderOAuthConfigured() && asString(row.encrypted_refresh_token)) {
-    const expiresAtMs = Date.parse(asString(row.token_expires_at))
-    const accessExpired =
-      !Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now() + 60_000 || !accessToken
+  const encryptedRefresh = asString(row.encrypted_refresh_token) || null
+  const expiresAtMs = Date.parse(asString(row.token_expires_at))
+  const accessExpired =
+    !Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now() + 60_000 || !accessToken
 
-    if (accessExpired) {
-      const refreshed = await refreshGoogleMailboxTokensLive(asString(row.encrypted_refresh_token) || null)
-      if (refreshed.ok) {
-        accessToken = refreshed.accessToken
-        const now = new Date().toISOString()
-        const patch: Record<string, unknown> = {
-          encrypted_access_token: encryptMailboxToken(refreshed.accessToken),
-          token_expires_at: refreshed.expiresAt,
-          last_refresh_attempt: now,
-          last_successful_refresh: now,
-          updated_at: now,
-        }
-        if (refreshed.refreshToken) {
-          patch.encrypted_refresh_token = encryptMailboxToken(refreshed.refreshToken)
-        }
-        await admin
-          .schema("growth")
-          .from("mailbox_connections")
-          .update(patch)
-          .eq("id", asString(row.id))
-      } else if (accessToken) {
-        accessToken = null
+  if (accessExpired && encryptedRefresh) {
+    const refreshLive =
+      family === "google" && googleProviderOAuthConfigured()
+        ? await refreshGoogleMailboxTokensLive(encryptedRefresh)
+        : family === "microsoft" && microsoftProviderOAuthConfigured()
+          ? await refreshMicrosoftMailboxTokensLive(encryptedRefresh)
+          : null
+
+    if (refreshLive?.ok) {
+      accessToken = refreshLive.accessToken
+      const now = new Date().toISOString()
+      const patch: Record<string, unknown> = {
+        encrypted_access_token: encryptMailboxToken(refreshLive.accessToken),
+        token_expires_at: refreshLive.expiresAt,
+        last_refresh_attempt: now,
+        last_successful_refresh: now,
+        updated_at: now,
       }
+      if (refreshLive.refreshToken) {
+        patch.encrypted_refresh_token = encryptMailboxToken(refreshLive.refreshToken)
+      }
+      await admin.schema("growth").from("mailbox_connections").update(patch).eq("id", asString(row.id))
+    } else if (!refreshLive?.ok && accessToken) {
+      accessToken = null
     }
   }
 

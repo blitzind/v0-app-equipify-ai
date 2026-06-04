@@ -1,6 +1,7 @@
 import "server-only"
 
 import { googleProviderOAuthConfigured } from "@/lib/growth/provider-setup/google-oauth"
+import { microsoftProviderOAuthConfigured } from "@/lib/growth/provider-setup/microsoft-oauth"
 import { GROWTH_OUTBOUND_PROVIDER_CAPABILITIES } from "@/lib/growth/outbound/provider-capabilities"
 import { listDeliveryProviderRegistry } from "@/lib/growth/providers/provider-registry"
 import { supportsLiveTransport } from "@/lib/growth/providers/adapters/provider-transport-capability-registry"
@@ -50,7 +51,10 @@ export function resolveMailboxProviderReadiness(
     return descriptor("stub", "Google OAuth env incomplete — validation uses stub checks only.")
   }
   if (providerFamily === "microsoft") {
-    return descriptor("preview_only", "Microsoft 365 OAuth path not operationalized in this milestone.")
+    if (microsoftProviderOAuthConfigured()) {
+      return descriptor("live", "Microsoft 365 OAuth + Graph send/inbox sync path configured.")
+    }
+    return descriptor("stub", "Microsoft OAuth env incomplete — connect via provider setup.")
   }
   if (providerFamily === "smtp") {
     return descriptor("internal", "SMTP credentials supported for operator testing — not primary send plane.")

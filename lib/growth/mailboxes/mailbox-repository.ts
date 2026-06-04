@@ -20,6 +20,11 @@ import { getMailboxProviderCapabilities } from "@/lib/growth/mailboxes/mailbox-p
 import { validateMailboxConnectionStub } from "@/lib/growth/mailboxes/mailbox-validation"
 import { googleProviderOAuthConfigured } from "@/lib/growth/provider-setup/google-oauth"
 import { validateGoogleMailboxConnectionLive, refreshGoogleMailboxTokensLive } from "@/lib/growth/mailboxes/google-mailbox-live-validation"
+import {
+  refreshMicrosoftMailboxTokensLive,
+  validateMicrosoftMailboxConnectionLive,
+} from "@/lib/growth/mailboxes/microsoft-mailbox-live-validation"
+import { microsoftProviderOAuthConfigured } from "@/lib/growth/provider-setup/microsoft-oauth"
 import type {
   GrowthMailboxConnectionSummary,
   GrowthMailboxHealthDashboard,
@@ -359,7 +364,16 @@ export async function validateMailboxConnection(
           status: validationInput.status,
           validation_failure_count: validationInput.validation_failure_count,
         })
-      : validateMailboxConnectionStub(validationInput)
+      : providerFamily === "microsoft" && microsoftProviderOAuthConfigured()
+        ? await validateMicrosoftMailboxConnectionLive({
+            email_address: validationInput.email_address,
+            encrypted_refresh_token: asString(row.encrypted_refresh_token) || null,
+            encrypted_access_token: asString(row.encrypted_access_token) || null,
+            token_expires_at: validationInput.token_expires_at,
+            status: validationInput.status,
+            validation_failure_count: validationInput.validation_failure_count,
+          })
+        : validateMailboxConnectionStub(validationInput)
 
   let refreshResult = refreshProviderToken({
     provider_family: providerFamily,
@@ -369,8 +383,15 @@ export async function validateMailboxConnection(
   let tokenExpiresAt = asString(row.token_expires_at) || null
   let encryptedAccessToken = asString(row.encrypted_access_token) || null
 
-  if (providerFamily === "google" && googleProviderOAuthConfigured() && validation.valid) {
-    const liveRefresh = await refreshGoogleMailboxTokensLive(asString(row.encrypted_refresh_token) || null)
+  if (
+    validation.valid &&
+    ((providerFamily === "google" && googleProviderOAuthConfigured()) ||
+      (providerFamily === "microsoft" && microsoftProviderOAuthConfigured()))
+  ) {
+    const liveRefresh =
+      providerFamily === "google"
+        ? await refreshGoogleMailboxTokensLive(asString(row.encrypted_refresh_token) || null)
+        : await refreshMicrosoftMailboxTokensLive(asString(row.encrypted_refresh_token) || null)
     if (liveRefresh.ok) {
       refreshResult = "supported"
       encryptedAccessToken = encryptMailboxToken(liveRefresh.accessToken)
