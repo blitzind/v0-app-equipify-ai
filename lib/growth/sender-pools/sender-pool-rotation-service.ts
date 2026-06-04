@@ -49,9 +49,21 @@ export async function buildSenderPoolMemberContext(
   if (!sender || sender.deleted_at) return null
 
   const senderRoutes = routes.filter((route) => route.sender_account_id === sender.id && route.enabled)
+  let warmupProgress = sender.warmup_enabled ? 0 : 100
+  const { data: warmupRow } = await admin
+    .schema("growth")
+    .from("warmup_profiles")
+    .select("warmup_progress, status")
+    .eq("sender_account_id", sender.id)
+    .is("deleted_at", null)
+    .maybeSingle()
+  if (warmupRow && sender.warmup_enabled) {
+    warmupProgress = Number((warmupRow as { warmup_progress?: number }).warmup_progress ?? 0)
+    if ((warmupRow as { status?: string }).status === "throttled") warmupProgress = Math.min(warmupProgress, 40)
+  }
   const metrics = buildSenderPerformanceMetrics({
     sent: sender.daily_send_used,
-    warmupProgress: sender.warmup_enabled ? 50 : 100,
+    warmupProgress,
   })
   const health = senderHealthScore(metrics)
   const reputationTier = tierFromSenderReputationScore(metrics.reputation_score)
@@ -104,7 +116,7 @@ export async function buildSenderPoolMemberContext(
     complaintRisk: metrics.complaint_trend,
     providerHealthScore: senderRoutes.length > 0 ? 75 : 20,
     domainHealthScore,
-    warmupProgress: sender.warmup_enabled ? 50 : 100,
+    warmupProgress,
   }
 }
 

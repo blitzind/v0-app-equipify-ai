@@ -112,8 +112,17 @@ export function buildWarmupStatusChangeEvents(input: {
   if (input.nextStatus === "warming" && input.previousStatus === "paused") {
     events.push(buildWarmupResumeEvent(input.senderEmail))
   }
-  if (input.nextStatus === "completed" && input.previousStatus !== "completed") {
+  if (input.nextStatus === "active" && input.previousStatus !== "active") {
     events.push(buildWarmupCompletedEvent(input.senderEmail))
+  }
+  if (input.nextStatus === "throttled" && input.previousStatus !== "throttled") {
+    events.push({
+      event_type: "warmup_throttled",
+      severity: "high",
+      title: "Warmup throttled",
+      description: `Warmup throttled for ${input.senderEmail} — deliverability protection.`,
+      timeline_type: "warmup_throttled",
+    })
   }
   if (input.nextScore < input.previousScore) {
     events.push(buildWarmupHealthDeclinedEvent(input.senderEmail, input.previousScore, input.nextScore))

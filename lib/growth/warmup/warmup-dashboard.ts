@@ -9,9 +9,10 @@ import {
 export function buildWarmupDashboard(profiles: GrowthWarmupProfile[]): GrowthWarmupDashboard {
   const healthy_count = profiles.filter((profile) => profile.warmup_health === "healthy").length
   const paused_count = profiles.filter((profile) => profile.status === "paused").length
-  const completed_count = profiles.filter((profile) => profile.status === "completed").length
+  const active_count = profiles.filter((profile) => profile.status === "active").length
   const warming_count = profiles.filter((profile) => profile.status === "warming").length
-  const draft_count = profiles.filter((profile) => profile.status === "draft").length
+  const new_count = profiles.filter((profile) => profile.status === "new").length
+  const throttled_count = profiles.filter((profile) => profile.status === "throttled").length
 
   const average_warmup_score =
     profiles.length > 0
@@ -22,9 +23,12 @@ export function buildWarmupDashboard(profiles: GrowthWarmupProfile[]): GrowthWar
     qa_marker: GROWTH_WARMUP_FOUNDATION_QA_MARKER,
     healthy_count,
     paused_count,
-    completed_count,
+    active_count,
     average_warmup_score,
     warming_count,
-    draft_count,
+    new_count,
+    throttled_count,
+    draft_count: new_count,
+    completed_count: active_count,
   }
 }

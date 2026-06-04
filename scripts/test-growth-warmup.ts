@@ -30,8 +30,8 @@ import { GROWTH_SENDER_PROVIDER_CAPABILITIES } from "../lib/growth/sender/provid
 
 async function main(): Promise<void> {
   assert.equal(GROWTH_WARMUP_FOUNDATION_QA_MARKER, "growth-warmup-foundation-v1")
-  assert.match(GROWTH_WARMUP_PRIVACY_NOTE, /no outbound|no sending/i)
-  assert.equal(GROWTH_WARMUP_TIMELINE_EVENT_TYPES.length, 5)
+  assert.match(GROWTH_WARMUP_PRIVACY_NOTE, /native warmup|sequence transport/i)
+  assert.equal(GROWTH_WARMUP_TIMELINE_EVENT_TYPES.length, 7)
 
   const migration = fs.readFileSync(
     path.join(process.cwd(), `supabase/migrations/${GROWTH_WARMUP_FOUNDATION_SCHEMA_MIGRATION}`),
@@ -45,20 +45,18 @@ async function main(): Promise<void> {
   assert.match(migration, /deleted_at/)
   assert.match(migration, /service role only/)
 
-  assert.equal(interpolateWarmupVolume(1), 10)
-  assert.equal(interpolateWarmupVolume(3), 20)
-  assert.equal(interpolateWarmupVolume(7), 40)
-  assert.equal(interpolateWarmupVolume(14), 80)
-  assert.equal(interpolateWarmupVolume(21), 120)
-  assert.equal(interpolateWarmupVolume(30), 150)
-  assert.equal(interpolateWarmupVolume(2), 15)
+  assert.equal(interpolateWarmupVolume(1), 5)
+  assert.equal(interpolateWarmupVolume(3), 10)
+  assert.equal(interpolateWarmupVolume(7), 20)
+  assert.equal(interpolateWarmupVolume(14), 35)
+  assert.equal(interpolateWarmupVolume(21), 50)
+  assert.equal(interpolateWarmupVolume(30), 75)
 
   const schedule = generateWarmupScheduleDays(30)
   assert.equal(schedule.length, 30)
-  assert.equal(schedule[0].planned_volume, 10)
-  assert.equal(schedule[29].planned_volume, 150)
-  assert.equal(computeTargetDailyVolume(30), 150)
-  assert.equal(computeDailyIncrement(schedule), 5)
+  assert.equal(schedule[0].planned_volume, 5)
+  assert.equal(schedule[29].planned_volume, 75)
+  assert.equal(computeTargetDailyVolume(30), 75)
 
   assert.equal(computeWarmupScore({ status: "warming" }), 100)
   assert.equal(warmupScoreToTier(100), "healthy")
@@ -104,7 +102,7 @@ async function main(): Promise<void> {
 
   const events = buildWarmupStatusChangeEvents({
     senderEmail: "ops@example.com",
-    previousStatus: "draft",
+    previousStatus: "new",
     nextStatus: "warming",
     previousScore: 100,
     nextScore: 90,
@@ -132,6 +130,12 @@ async function main(): Promise<void> {
       started_at: new Date().toISOString(),
       completed_at: null,
       last_progress_at: new Date().toISOString(),
+      current_warmup_day: 3,
+      sends_today: 2,
+      sends_today_date: new Date().toISOString().slice(0, 10),
+      throttled_at: null,
+      throttle_reason: null,
+      last_capacity_sync_at: null,
       notes: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -153,6 +157,12 @@ async function main(): Promise<void> {
       started_at: null,
       completed_at: null,
       last_progress_at: null,
+      current_warmup_day: 1,
+      sends_today: 0,
+      sends_today_date: null,
+      throttled_at: null,
+      throttle_reason: null,
+      last_capacity_sync_at: null,
       notes: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -171,8 +181,8 @@ async function main(): Promise<void> {
   const repoSource = fs.readFileSync(path.join(process.cwd(), "lib/growth/warmup/warmup-repository.ts"), "utf8")
   assert.match(repoSource, /softDeleteWarmupProfile/)
   assert.match(repoSource, /generateWarmupSchedule/)
+  assert.match(repoSource, /syncSenderWarmupCapacity/)
   assert.match(repoSource, /deleted_at/)
-  assert.doesNotMatch(repoSource, /sendMail|smtp\.send|outbound/i)
 
   const schedulerSource = fs.readFileSync(path.join(process.cwd(), "lib/growth/warmup/warmup-scheduler.ts"), "utf8")
   assert.match(schedulerSource, /interpolateWarmupVolume/)

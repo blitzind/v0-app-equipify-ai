@@ -5,13 +5,14 @@ export type WarmupMilestone = {
   volume: number
 }
 
+/** Phase 6.31A native ramp: Day 1→5, 3→10, 7→20, 14→35, 21→50, 30→75. */
 export const DEFAULT_WARMUP_MILESTONES: WarmupMilestone[] = [
-  { day: 1, volume: 10 },
-  { day: 3, volume: 20 },
-  { day: 7, volume: 40 },
-  { day: 14, volume: 80 },
-  { day: 21, volume: 120 },
-  { day: 30, volume: 150 },
+  { day: 1, volume: 5 },
+  { day: 3, volume: 10 },
+  { day: 7, volume: 20 },
+  { day: 14, volume: 35 },
+  { day: 21, volume: 50 },
+  { day: 30, volume: 75 },
 ]
 
 export type WarmupScheduleDayDraft = {

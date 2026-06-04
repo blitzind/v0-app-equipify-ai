@@ -14,6 +14,8 @@ export const GROWTH_INTERNAL_OUTBOUND_AUDIT_EVENT_TYPES = [
   "outbound_queue_health_alert",
   "qa_deliverability_bypass_used",
   "qa_deliverability_bypass_denied",
+  "warmup_stage_changed",
+  "warmup_send_recorded",
 ] as const
 
 export type GrowthInternalOutboundAuditEventType = (typeof GROWTH_INTERNAL_OUTBOUND_AUDIT_EVENT_TYPES)[number]

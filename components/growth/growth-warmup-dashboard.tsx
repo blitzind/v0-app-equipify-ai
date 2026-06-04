@@ -33,11 +33,14 @@ import { GROWTH_WARMUP_FOUNDATION_QA_MARKER } from "@/lib/growth/warmup/warmup-t
 import type { GrowthSenderAccount } from "@/lib/growth/sender/sender-types"
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked"> = {
-  draft: "neutral",
+  new: "neutral",
   warming: "healthy",
+  active: "healthy",
+  throttled: "critical",
   paused: "attention",
-  completed: "healthy",
   disabled: "blocked",
+  draft: "neutral",
+  completed: "healthy",
   healthy: "healthy",
   warning: "attention",
   degraded: "attention",

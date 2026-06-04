@@ -43,7 +43,7 @@ export function computeWarmupProgress(input: {
   completed_days: number
   current_day_number: number
 }): number {
-  if (input.status === "completed") return 100
+  if (input.status === "active") return 100
   const totalDays = Math.max(1, input.warmup_days)
   const progressDay = Math.min(totalDays, Math.max(input.completed_days, input.current_day_number - 1))
   return Math.max(0, Math.min(100, Math.round((progressDay / totalDays) * 100)))

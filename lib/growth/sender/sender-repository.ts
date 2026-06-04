@@ -455,3 +455,16 @@ export async function updateSenderDomain(
 
   return updated
 }
+
+/** Increment daily send counter after a successful native transport send. */
+export async function incrementSenderDailySendUsed(
+  admin: SupabaseClient,
+  senderId: string,
+  delta = 1,
+): Promise<void> {
+  const sender = await getSenderAccount(admin, senderId)
+  if (!sender) return
+  await updateSenderAccount(admin, senderId, {
+    daily_send_used: sender.daily_send_used + Math.max(0, delta),
+  })
+}

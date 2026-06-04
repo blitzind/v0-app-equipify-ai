@@ -2,7 +2,15 @@
 
 export const GROWTH_WARMUP_FOUNDATION_QA_MARKER = "growth-warmup-foundation-v1" as const
 
-export const GROWTH_WARMUP_PROFILE_STATUSES = ["draft", "warming", "paused", "completed", "disabled"] as const
+/** Phase 6.31A native mailbox lifecycle (replaces draft/completed). */
+export const GROWTH_WARMUP_PROFILE_STATUSES = [
+  "new",
+  "warming",
+  "active",
+  "throttled",
+  "paused",
+  "disabled",
+] as const
 export type GrowthWarmupProfileStatus = (typeof GROWTH_WARMUP_PROFILE_STATUSES)[number]
 
 export const GROWTH_WARMUP_HEALTH_TIERS = ["healthy", "warning", "degraded", "critical"] as const
@@ -17,6 +25,8 @@ export const GROWTH_WARMUP_TIMELINE_EVENT_TYPES = [
   "warmup_completed",
   "warmup_health_declined",
   "warmup_progress_milestone",
+  "warmup_stage_changed",
+  "warmup_throttled",
 ] as const
 export type GrowthWarmupTimelineEventType = (typeof GROWTH_WARMUP_TIMELINE_EVENT_TYPES)[number]
 
@@ -27,6 +37,7 @@ export type GrowthWarmupScheduleDay = {
   warmup_profile_id: string
   day_number: number
   planned_volume: number
+  actual_volume: number
   completed: boolean
   completed_at: string | null
   created_at: string
@@ -48,6 +59,12 @@ export type GrowthWarmupProfile = {
   started_at: string | null
   completed_at: string | null
   last_progress_at: string | null
+  current_warmup_day: number
+  sends_today: number
+  sends_today_date: string | null
+  throttled_at: string | null
+  throttle_reason: string | null
+  last_capacity_sync_at: string | null
   notes: string | null
   created_at: string
   updated_at: string
@@ -73,11 +90,16 @@ export type GrowthWarmupDashboard = {
   qa_marker: typeof GROWTH_WARMUP_FOUNDATION_QA_MARKER
   healthy_count: number
   paused_count: number
-  completed_count: number
+  active_count: number
   average_warmup_score: number
   warming_count: number
+  new_count: number
+  throttled_count: number
+  /** @deprecated Use new_count */
   draft_count: number
+  /** @deprecated Use active_count */
+  completed_count: number
 }
 
 export const GROWTH_WARMUP_PRIVACY_NOTE =
-  "Warmup engine uses deterministic schedule planning only. No outbound sending, provider execution, or inbox interaction."
+  "Native warmup counts approved sequence transport sends toward daily ramp caps. No peer warmup bots or synthetic inbox placement."

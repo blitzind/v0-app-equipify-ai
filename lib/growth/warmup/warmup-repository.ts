@@ -65,6 +65,7 @@ function mapScheduleRow(row: WarmupRow): GrowthWarmupScheduleDay {
     warmup_profile_id: asString(row.warmup_profile_id),
     day_number: asNumber(row.day_number, 1),
     planned_volume: asNumber(row.planned_volume, 0),
+    actual_volume: asNumber(row.actual_volume, 0),
     completed: Boolean(row.completed),
     completed_at: asString(row.completed_at) || null,
     created_at: asString(row.created_at),
@@ -99,6 +100,12 @@ async function mapProfile(admin: SupabaseClient, row: WarmupRow, includeSchedule
     started_at: asString(row.started_at) || null,
     completed_at: asString(row.completed_at) || null,
     last_progress_at: asString(row.last_progress_at) || null,
+    current_warmup_day: asNumber(row.current_warmup_day, 1),
+    sends_today: asNumber(row.sends_today, 0),
+    sends_today_date: asString(row.sends_today_date) || null,
+    throttled_at: asString(row.throttled_at) || null,
+    throttle_reason: asString(row.throttle_reason) || null,
+    last_capacity_sync_at: asString(row.last_capacity_sync_at) || null,
     notes: asString(row.notes) || null,
     created_at: asString(row.created_at),
     updated_at: asString(row.updated_at),
@@ -112,7 +119,7 @@ async function mapProfile(admin: SupabaseClient, row: WarmupRow, includeSchedule
   return profile
 }
 
-async function recomputeWarmupProfile(
+export async function recomputeWarmupProfile(
   admin: SupabaseClient,
   profileId: string,
   input?: {
@@ -154,7 +161,7 @@ async function recomputeWarmupProfile(
 
   let nextStatus = input?.forceStatus ?? previous.status
   if (nextProgress >= 100 && nextStatus === "warming") {
-    nextStatus = "completed"
+    nextStatus = "active"
   }
 
   const plannedToday = getPlannedVolumeForDay(
@@ -171,7 +178,7 @@ async function recomputeWarmupProfile(
       warmup_health: health.warmup_health,
       current_daily_volume:
         nextStatus === "warming" ? Math.min(plannedToday, previous.current_daily_volume || plannedToday) : previous.current_daily_volume,
-      completed_at: nextStatus === "completed" ? previous.completed_at ?? now : previous.completed_at,
+      completed_at: nextStatus === "active" ? previous.completed_at ?? now : previous.completed_at,
       updated_at: now,
     })
     .is("deleted_at", null)
@@ -256,7 +263,7 @@ export async function createWarmupProfile(
   const { data, error } = await profilesTable(admin)
     .insert({
       sender_account_id: input.sender_account_id,
-      status: "draft",
+      status: "new",
       target_daily_volume: computeTargetDailyVolume(warmup_days),
       current_daily_volume: scheduleDraft[0]?.planned_volume ?? 0,
       daily_increment: computeDailyIncrement(scheduleDraft),
@@ -354,7 +361,7 @@ export async function generateWarmupSchedule(
   const firstDayVolume = scheduleDraft[0]?.planned_volume ?? 0
   const { error } = await profilesTable(admin)
     .update({
-      status: existing.status === "draft" || existing.status === "paused" ? "warming" : existing.status,
+      status: existing.status === "new" || existing.status === "paused" ? "warming" : existing.status,
       target_daily_volume: computeTargetDailyVolume(existing.warmup_days),
       daily_increment: computeDailyIncrement(scheduleDraft),
       current_daily_volume: firstDayVolume,
@@ -367,7 +374,10 @@ export async function generateWarmupSchedule(
 
   if (error) throw new Error(error.message)
 
-  return recomputeWarmupProfile(admin, profileId, input)
+  const updated = await recomputeWarmupProfile(admin, profileId, input)
+  const { syncSenderWarmupCapacity } = await import("@/lib/growth/warmup/warmup-execution")
+  await syncSenderWarmupCapacity(admin, updated).catch(() => undefined)
+  return updated
 }
 
 export async function pauseWarmupProfile(

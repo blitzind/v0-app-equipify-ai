@@ -12,6 +12,7 @@ import { buildSenderPoolMemberContext } from "@/lib/growth/sender-pools/sender-p
 import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 import { recordInternalOutboundAuditEvent } from "@/lib/growth/operations/internal-outbound-audit"
 import { evaluateReputationProtectionPreSend } from "@/lib/growth/deliverability/reputation-protection-pre-send"
+import { evaluateWarmupPreSendAllowed } from "@/lib/growth/warmup/warmup-pre-send-guard"
 
 export type GrowthPreSendInfrastructureResult = {
   allowed: boolean
@@ -25,6 +26,11 @@ export type GrowthPreSendInfrastructureResult = {
     | "daily_cap_exhausted"
     | "reputation_paused"
     | "reputation_throttled"
+    | "warmup_disabled"
+    | "warmup_not_started"
+    | "warmup_paused"
+    | "warmup_throttled"
+    | "warmup_cap_exhausted"
     | null
 }
 
@@ -62,6 +68,17 @@ export async function evaluatePreSendInfrastructureAllowed(
       allowed: false,
       reason: "Sender daily send cap exhausted.",
       blockCode: "daily_cap_exhausted",
+    }
+  }
+
+  const warmup = await evaluateWarmupPreSendAllowed(admin, {
+    senderAccountId: input.senderAccountId,
+  })
+  if (!warmup.allowed && warmup.blockCode) {
+    return {
+      allowed: false,
+      reason: warmup.reason ?? "Warmup policy blocked send.",
+      blockCode: warmup.blockCode,
     }
   }
 

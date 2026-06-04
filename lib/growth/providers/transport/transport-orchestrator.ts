@@ -29,6 +29,7 @@ import {
 } from "@/lib/growth/providers/transport/transport-repository"
 import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 import { resolveTransportSenderWithPool } from "@/lib/growth/sender-pools/sender-pool-rotation-service"
+import { recordNativeWarmupSend } from "@/lib/growth/warmup/warmup-execution"
 
 export class TransportHumanApprovalRequiredError extends Error {
   constructor() {
@@ -324,6 +325,12 @@ async function executeAttemptOnRoute(
       actorUserId: input.actorUserId,
       actorEmail: input.actorEmail,
     })
+    if (!input.is_test && input.sender_account_id) {
+      await recordNativeWarmupSend(admin, {
+        senderAccountId: input.sender_account_id,
+        deliveryAttemptId: attempt.id,
+      }).catch(() => undefined)
+    }
     return { ok: true, attempt: sent, provider_message_id: sendResult.provider_message_id }
   }
 
