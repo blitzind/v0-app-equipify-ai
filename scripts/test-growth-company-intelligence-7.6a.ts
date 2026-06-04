@@ -208,13 +208,11 @@ const runApi = fs.readFileSync(
 assert.match(runApi, /runCompanyIntelligenceForCanonicalCompany/)
 assert.doesNotMatch(runApi, /company-intelligence\/jobs/)
 
-const vercel = fs.readFileSync(path.join(process.cwd(), "vercel.json"), "utf8")
-assert.doesNotMatch(vercel, /company-intelligence-worker/)
-
 const panel = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-company-intelligence-panel.tsx"),
   "utf8",
 )
+assert.match(panel, /company-intelligence\/jobs/)
 assert.match(panel, /company-intelligence\/run/)
 assert.match(panel, /company-intelligence\/runs\//)
 assert.match(panel, /GROWTH_COMPANY_INTELLIGENCE_QA_MARKER/)

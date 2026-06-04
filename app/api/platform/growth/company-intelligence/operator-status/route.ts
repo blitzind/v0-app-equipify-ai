@@ -7,6 +7,7 @@ import {
   GROWTH_COMPANY_INTELLIGENCE_MIGRATION,
   GROWTH_COMPANY_INTELLIGENCE_QA_MARKER,
 } from "@/lib/growth/company-intelligence/company-intelligence-types"
+import { GROWTH_COMPANY_INTELLIGENCE_RUNTIME_QA_MARKER } from "@/lib/growth/company-intelligence/company-intelligence-runtime-types"
 
 export const runtime = "nodejs"
 
@@ -48,6 +49,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     ok: true,
     qa_marker: GROWTH_COMPANY_INTELLIGENCE_QA_MARKER,
+    runtime_qa_marker: GROWTH_COMPANY_INTELLIGENCE_RUNTIME_QA_MARKER,
     status,
   })
 }

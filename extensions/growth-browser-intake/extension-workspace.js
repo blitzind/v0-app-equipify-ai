@@ -1152,6 +1152,61 @@
     }
   }
 
+  async function enqueueBrowserCompanyIntelligence(companyId, buttonEl) {
+    if (!companyId) return
+    if (buttonEl) {
+      buttonEl.disabled = true
+      buttonEl.textContent = "Queuing…"
+    }
+    try {
+      const res = await fetch("/api/platform/growth/browser-intake/company-intelligence", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_id: companyId,
+          promote_on_complete: true,
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || !body.ok) {
+        throw new Error(body.message ?? "Could not queue company intelligence.")
+      }
+      if (buttonEl) {
+        buttonEl.textContent = body.enqueued ? "Queued" : body.reason ?? "Skipped"
+      }
+    } catch (error) {
+      if (buttonEl) buttonEl.textContent = "Collect intelligence"
+      window.EquipifyGrowthPanelLoad?.setStatus?.(
+        error instanceof Error ? error.message : "Company intelligence failed.",
+        "error",
+      )
+    } finally {
+      if (buttonEl && buttonEl.textContent === "Queuing…") buttonEl.textContent = "Collect intelligence"
+    }
+  }
+
+  function renderCompanyIntelligence(context) {
+    const panel = document.getElementById("es-ws-company-intelligence-panel")
+    if (!panel) return
+    const ci = context?.company_intelligence
+    const companyId = trimOrNull(context?.canonical_company_id)
+    if (!companyId || !ci) {
+      panel.innerHTML =
+        '<p class="es-ws-empty">Canonical company intelligence is available after the lead links to a canonical company.</p>'
+      return
+    }
+    const verified = ci.has_verified_intelligence
+      ? `<span class="es-ws-meta">${ci.snapshot_count} verified snapshot(s)</span>`
+      : `<button type="button" class="es-ws-inline-btn es-ws-company-intelligence-btn" data-company-id="${escapeHtml(companyId)}">Collect intelligence</button>`
+    panel.innerHTML = `<div class="es-ws-company-intelligence-row">${verified}<span class="es-ws-meta">${escapeHtml(ci.discovery_status)}</span></div>`
+    panel.querySelectorAll(".es-ws-company-intelligence-btn[data-company-id]").forEach((button) => {
+      button.addEventListener("click", () => {
+        void enqueueBrowserCompanyIntelligence(button.getAttribute("data-company-id"), button)
+      })
+    })
+  }
+
   function renderSocialProfileDiscoveryContacts(context) {
     const list = document.getElementById("es-ws-social-profile-discovery-list")
     if (!list) return
@@ -1563,6 +1618,7 @@
     renderEmailDiscoveryContacts(context)
     renderPhoneDiscoveryContacts(context)
     renderSocialProfileDiscoveryContacts(context)
+    renderCompanyIntelligence(context)
     renderTechnologies(detected, context)
     renderSignals(detected, context)
     renderCrmRelationship(context, relationship, contactsCount, oppCount, customerCount, hasMatch)

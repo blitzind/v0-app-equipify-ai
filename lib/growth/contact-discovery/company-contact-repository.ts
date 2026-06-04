@@ -397,6 +397,10 @@ export async function processCompanyContactRefreshQueue(
           "@/lib/growth/social-profile-discovery/social-profile-discovery-triggers"
         )
         void triggerSocialProfileDiscoveryAfterCompanyEnriched(admin, { company_id: refreshed.company_id })
+        const { triggerCompanyIntelligenceAfterCompanyEnriched } = await import(
+          "@/lib/growth/company-intelligence/company-intelligence-triggers"
+        )
+        void triggerCompanyIntelligenceAfterCompanyEnriched(admin, { company_id: refreshed.company_id })
       }
       processed += 1
     } catch (error) {

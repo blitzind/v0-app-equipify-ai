@@ -9,6 +9,8 @@ import { GROWTH_PHONE_DISCOVERY_PROSPECT_FILTERS } from "@/lib/growth/phone-disc
 import type { GrowthPhoneDiscoveryProspectFilter } from "@/lib/growth/phone-discovery/phone-discovery-runtime-types"
 import { GROWTH_SOCIAL_PROFILE_DISCOVERY_PROSPECT_FILTERS } from "@/lib/growth/social-profile-discovery/social-profile-discovery-runtime-types"
 import type { GrowthSocialProfileDiscoveryProspectFilter } from "@/lib/growth/social-profile-discovery/social-profile-discovery-runtime-types"
+import { GROWTH_COMPANY_INTELLIGENCE_PROSPECT_FILTERS } from "@/lib/growth/company-intelligence/company-intelligence-runtime-types"
+import type { GrowthCompanyIntelligenceProspectFilter } from "@/lib/growth/company-intelligence/company-intelligence-runtime-types"
 
 export const runtime = "nodejs"
 
@@ -86,6 +88,22 @@ export async function GET(request: Request) {
     )
   }
 
+  const companyIntelligenceParam = url.searchParams.get("company_intelligence_filter") ?? ""
+  const companyIntelligenceFilterParsed = GROWTH_COMPANY_INTELLIGENCE_PROSPECT_FILTERS.includes(
+    companyIntelligenceParam as GrowthCompanyIntelligenceProspectFilter,
+  )
+    ? (companyIntelligenceParam as GrowthCompanyIntelligenceProspectFilter)
+    : null
+  if (companyIntelligenceParam && !companyIntelligenceFilterParsed) {
+    return NextResponse.json(
+      {
+        error: "invalid_company_intelligence_filter",
+        message: `company_intelligence_filter must be one of: ${GROWTH_COMPANY_INTELLIGENCE_PROSPECT_FILTERS.join(", ")}.`,
+      },
+      { status: 400 },
+    )
+  }
+
   if (!limitParsed.success || !offsetParsed.success) {
     return NextResponse.json({ error: "invalid_pagination", message: "Invalid limit or offset." }, { status: 400 })
   }
@@ -100,6 +118,7 @@ export async function GET(request: Request) {
       emailDiscoveryFilter: emailDiscoveryFilterParsed,
       phoneDiscoveryFilter: phoneDiscoveryFilterParsed,
       socialProfileDiscoveryFilter: socialProfileDiscoveryFilterParsed,
+      companyIntelligenceFilter: companyIntelligenceFilterParsed,
     })
 
     logGrowthEngine("call_queue_list_success", {

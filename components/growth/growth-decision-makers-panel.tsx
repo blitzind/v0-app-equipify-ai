@@ -10,6 +10,7 @@ import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-
 import { GrowthEmailDiscoveryOperatorCard } from "@/components/growth/growth-email-discovery-operator-card"
 import { GrowthPhoneDiscoveryOperatorCard } from "@/components/growth/growth-phone-discovery-operator-card"
 import { GrowthSocialProfileDiscoveryOperatorCard } from "@/components/growth/growth-social-profile-discovery-operator-card"
+import { GrowthCompanyIntelligenceOperatorCard } from "@/components/growth/growth-company-intelligence-operator-card"
 import type { GrowthLeadDecisionMaker } from "@/lib/growth/decision-maker-types"
 import type { GrowthLead } from "@/lib/growth/types"
 import { cn } from "@/lib/utils"
@@ -193,6 +194,10 @@ export function GrowthDecisionMakersPanel({
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
             {error}
           </div>
+        ) : null}
+
+        {canonicalCompanyId ? (
+          <GrowthCompanyIntelligenceOperatorCard companyId={canonicalCompanyId} compact />
         ) : null}
 
         {loading ? (

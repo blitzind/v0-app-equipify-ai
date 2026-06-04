@@ -8,7 +8,9 @@ import { Label } from "@/components/ui/label"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import { GrowthEmailDiscoveryRolePicker } from "@/components/growth/growth-email-discovery-role-picker"
 import type { EmailDiscoveryRolePairRow } from "@/lib/growth/email-discovery/email-discovery-role-pairs"
+import { formatCanonicalPersonBackfillRequestError } from "@/lib/growth/canonical-persons/canonical-person-backfill-api"
 import { GROWTH_COMPANY_INTELLIGENCE_QA_MARKER } from "@/lib/growth/company-intelligence/company-intelligence-types"
+import { GROWTH_COMPANY_INTELLIGENCE_RUNTIME_QA_MARKER } from "@/lib/growth/company-intelligence/company-intelligence-runtime-types"
 import type { GrowthCompanyIntelligenceRunDetail } from "@/lib/growth/company-intelligence/company-intelligence-types"
 
 type DiscoveryResult = {
@@ -45,6 +47,7 @@ export function GrowthCompanyIntelligencePanel() {
   const [result, setResult] = useState<DiscoveryResult | null>(null)
   const [detail, setDetail] = useState<GrowthCompanyIntelligenceRunDetail | null>(null)
   const [promote, setPromote] = useState(true)
+  const [syncRun, setSyncRun] = useState(false)
   const [operatorStatus, setOperatorStatus] = useState<{
     snapshot_count: number
     categories_present: string[]
@@ -143,23 +146,46 @@ export function GrowthCompanyIntelligencePanel() {
     setResult(null)
     setDetail(null)
     try {
-      const res = await fetch("/api/platform/growth/company-intelligence/run", {
+      const endpoint = syncRun
+        ? "/api/platform/growth/company-intelligence/run"
+        : "/api/platform/growth/company-intelligence/jobs"
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company_id: companyId.trim(), promote }),
+        body: JSON.stringify({
+          company_id: companyId.trim(),
+          promote_on_complete: promote,
+          promote: syncRun ? promote : undefined,
+          trigger_source: "infrastructure_panel",
+        }),
       })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
         result?: DiscoveryResult
+        enqueued?: boolean
+        reason?: string | null
         message?: string
+        error?: unknown
       }
-      if (!res.ok || !data.ok || !data.result) {
-        throw new Error(data.message ?? "Company intelligence run failed.")
+      if (!res.ok || !data.ok) {
+        throw new Error(formatCanonicalPersonBackfillRequestError(data))
       }
-      setResult(data.result)
-      setNotice(
-        `Run ${data.result.run_id.slice(0, 8)}… — ${data.result.verified_count} verified, ${data.result.promoted_count} promoted.`,
-      )
+      if (syncRun && data.result) {
+        setResult(data.result)
+        setNotice(
+          `Run ${data.result.run_id.slice(0, 8)}… — ${data.result.verified_count} verified, ${data.result.promoted_count} promoted.`,
+        )
+      } else {
+        setNotice(
+          data.enqueued
+            ? "Company intelligence job queued."
+            : data.reason === "verified_intelligence_exists"
+              ? "Verified intelligence already on file."
+              : data.reason === "active_job_exists"
+                ? "Job already pending or running."
+                : "Job was not queued.",
+        )
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Company intelligence run failed.")
     } finally {
@@ -192,13 +218,14 @@ export function GrowthCompanyIntelligencePanel() {
 
   return (
     <GrowthEngineCard
-      title="Company intelligence (7.6A)"
+      title="Company intelligence (7.6A + 7.6B)"
       icon={<Building2 size={17} />}
       data-qa-marker={GROWTH_COMPANY_INTELLIGENCE_QA_MARKER}
+      data-runtime-qa-marker={GROWTH_COMPANY_INTELLIGENCE_RUNTIME_QA_MARKER}
     >
       <p className="mb-4 text-sm text-muted-foreground">
-        Evidence-backed firmographics from public website, staging, and canonical sources. Sync HTTP
-        run only — no jobs, cron, or browser automation in 7.6A.
+        Evidence-backed firmographics from public website, staging, and canonical sources. Default:
+        async job queue (cron worker). Enable sync run for debug only.
       </p>
       <div className="flex flex-col gap-4">
         <div className="grid gap-2">
@@ -244,6 +271,16 @@ export function GrowthCompanyIntelligencePanel() {
           Promote verified findings to canonical intelligence snapshots
         </label>
 
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={syncRun}
+            onChange={(e) => setSyncRun(e.target.checked)}
+            className="rounded border-border"
+          />
+          Sync debug run (HTTP, bypasses job queue)
+        </label>
+
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
@@ -251,7 +288,7 @@ export function GrowthCompanyIntelligencePanel() {
             onClick={() => void runDiscovery()}
           >
             {running ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-            Collect company intelligence
+            {syncRun ? "Run sync collection" : "Queue company intelligence"}
           </Button>
           {result?.run_id && (
             <Button

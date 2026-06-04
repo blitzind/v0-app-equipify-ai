@@ -14,6 +14,7 @@ import { resolveCanonicalCompanyIdForLead } from "@/lib/growth/canonical-persons
 import { loadEmailDiscoveryOperatorStatus } from "@/lib/growth/email-discovery/email-discovery-operator-status"
 import { loadPhoneDiscoveryOperatorStatus } from "@/lib/growth/phone-discovery/phone-discovery-operator-status"
 import { loadSocialProfileDiscoveryOperatorStatus } from "@/lib/growth/social-profile-discovery/social-profile-discovery-operator-status"
+import { loadCompanyIntelligenceOperatorStatus } from "@/lib/growth/company-intelligence/company-intelligence-operator-status"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { normalizeCompanyName, normalizeWebsiteDomain } from "@/lib/growth/import/normalize"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
@@ -211,6 +212,22 @@ export async function buildBrowserIntakeCrmContext(
     }
   }
 
+  let company_intelligence = null
+  if (canonical_company_id) {
+    const ciStatus = await loadCompanyIntelligenceOperatorStatus(admin, {
+      company_id: canonical_company_id,
+    })
+    if (ciStatus) {
+      company_intelligence = {
+        company_id: canonical_company_id,
+        snapshot_count: ciStatus.snapshot_count,
+        has_verified_intelligence: ciStatus.has_verified_intelligence,
+        discovery_status: ciStatus.discovery_status,
+        can_discover: ciStatus.can_discover,
+      }
+    }
+  }
+
   const [ownerRep, opportunity, timeline, enrichedMatch, companyCounts] = await Promise.all([
     lead.assignedTo ? fetchGrowthRepByUserId(admin, lead.assignedTo) : Promise.resolve(null),
     fetchGrowthOpportunityByLeadId(admin, lead.id),
@@ -294,6 +311,7 @@ export async function buildBrowserIntakeCrmContext(
     email_discovery_contacts,
     phone_discovery_contacts,
     social_profile_discovery_contacts,
+    company_intelligence,
     links: {
       lead: `${adminPrefix}${buildAdminLinks(lead.id, lead.companyName, opportunity?.id ?? null).lead}`,
       company: `${adminPrefix}${buildAdminLinks(lead.id, lead.companyName, opportunity?.id ?? null).company}`,
