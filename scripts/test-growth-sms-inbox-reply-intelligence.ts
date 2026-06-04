@@ -111,4 +111,20 @@ console.log("5. finalizeIngestedReplyIntelligence → processReplyIntelligence")
 console.log("6. recordSequenceExitCandidate when active enrollment exists")
 console.log("7. Thread visible in Inbox V2 queue with SMS badge + channel filter")
 
+const operatorSendSource = readFileSync(resolve("lib/growth/inbox/inbox-sms-operator-send.ts"), "utf8")
+assert.match(operatorSendSource, /resolveInboxSmsRecipientE164/)
+assert.match(operatorSendSource, /mapGrowthSmsSendApiError/)
+
+const smsDraftEmbedSource = readFileSync(
+  resolve("components/growth/inbox/growth-inbox-action-center-sms-draft-embed.tsx"),
+  "utf8",
+)
+assert.match(smsDraftEmbedSource, /\/api\/platform\/growth\/sms\/send/)
+assert.match(smsDraftEmbedSource, /Review before sending/)
+assert.match(smsDraftEmbedSource, /Send SMS/)
+assert.match(smsDraftEmbedSource, /GROWTH_SMS_OPERATOR_SEND_QA_MARKER/)
+
+console.log("\n=== Phase 5.5 operator send UI ===")
+console.log("Inbox SMS draft embed wired to POST /api/platform/growth/sms/send")
+
 console.log("\n✓ Phase 5.2 validation passed — inbox integration, no sequences/AI.")

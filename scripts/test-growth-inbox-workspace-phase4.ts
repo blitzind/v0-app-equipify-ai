@@ -30,6 +30,11 @@ function main() {
   const actionCenterSource = readSource("components/growth/inbox/growth-inbox-action-center-column.tsx")
   assert.match(actionCenterSource, /GrowthInboxActionCenterReplyDraftEmbed/)
 
+  const smsDraftEmbedSource = readSource("components/growth/inbox/growth-inbox-action-center-sms-draft-embed.tsx")
+  assert.match(smsDraftEmbedSource, /\/api\/platform\/growth\/sms\/send/)
+  assert.match(smsDraftEmbedSource, /loadThreadDetail/)
+  assert.match(smsDraftEmbedSource, /refreshThreads/)
+
   const supportingPanelsSource = readSource("components/growth/inbox/growth-inbox-v2-supporting-panels.tsx")
   assert.doesNotMatch(supportingPanelsSource, /GrowthReplyDraftingPanel/)
 

@@ -6,6 +6,11 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { mapSmsConversationToChannelThread } from "../lib/growth/inbox/inbox-channel-types"
+import {
+  GROWTH_SMS_OPERATOR_SEND_QA_MARKER,
+  mapGrowthSmsSendApiError,
+  resolveInboxSmsRecipientE164,
+} from "../lib/growth/inbox/inbox-sms-operator-send"
 import { normalizeToE164, phoneLookupKeys } from "../lib/growth/sms/phone-normalization"
 import {
   normalizeTwilioSmsStatus,
@@ -114,6 +119,25 @@ assert.match(threadingSource, /ensureSmsConversationInboxBridge/)
 assert.match(threadingSource, /findUnlinkedSmsInboxThreadForLead/)
 assert.doesNotMatch(threadingSource, /if \(existing\) return existing/)
 console.log("Existing conversations with null inbox_thread_id are repaired on reuse")
+
+console.log("\n=== Phase 5.5 operator send helpers ===")
+assert.equal(GROWTH_SMS_OPERATOR_SEND_QA_MARKER, "growth-sms-operator-send-v1")
+assert.equal(
+  resolveInboxSmsRecipientE164({ subject: "SMS · +13035550199", leadContactPhone: null }),
+  "+13035550199",
+)
+assert.equal(
+  resolveInboxSmsRecipientE164({
+    subject: "Other subject",
+    leadContactPhone: "+15623625489",
+  }),
+  "+15623625489",
+)
+assert.match(
+  mapGrowthSmsSendApiError(400, { error: "sms_inactive", message: "Growth SMS workspace is not active." }),
+  /not active/,
+)
+console.log("Recipient resolution + send error mapping verified")
 
 console.log("\n=== End-to-end flow (simulated) ===")
 console.log("1. sendSms() → Twilio Messages API (when GROWTH_SMS_SEND_ENABLED=true)")
