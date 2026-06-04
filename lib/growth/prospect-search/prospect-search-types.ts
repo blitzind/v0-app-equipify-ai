@@ -344,6 +344,8 @@ export type GrowthProspectSearchCompanyResult = GrowthSignalAiInsightClientField
   territory_match_reasons?: string[]
   /** Evidence-backed decision maker / committee overlay (Sprint 4C). */
   contact_intelligence?: GrowthProspectSearchContactIntelligence | null
+  /** Resolved growth.companies id when Prospect Search links to canonical company (7.PS-A). */
+  canonical_company_id?: string | null
   /** Multi-source growth signal score overlay. */
   growth_signal_score?: number | null
   growth_signal_tier?: GrowthSignalTier | null

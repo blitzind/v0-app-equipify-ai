@@ -25,6 +25,7 @@ export const MAX_CONTACT_CONFIDENCE_RANK_BOOST = 0.05
 
 export type ProspectSearchContactIntelligenceInputContact = {
   id: string
+  canonical_person_id?: string | null
   full_name: string
   title?: string | null
   email?: string | null
@@ -130,6 +131,7 @@ export function decisionMakerToContactInput(
 
   return {
     id: dm.id,
+    canonical_person_id: dm.canonicalPersonId,
     full_name,
     title: dm.title,
     email: dm.email,
@@ -266,6 +268,7 @@ function toOverlay(
     null
   const overlay: ProspectSearchContactOverlay = {
     id: contact.id,
+    canonical_person_id: contact.canonical_person_id ?? null,
     name: identity?.primary_name ?? contact.full_name,
     title: displayTitle,
     confidence: Number(Math.min(1, Math.max(0, displayConfidence)).toFixed(3)),

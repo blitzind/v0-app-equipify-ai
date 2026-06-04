@@ -6,7 +6,15 @@ import { listCompanyContacts } from "@/lib/growth/contact-discovery/company-cont
 import { computeCompanyContactCoverage } from "@/lib/growth/contact-discovery/company-contact-coverage"
 import { isGrowthCompanyContactsSchemaReady } from "@/lib/growth/contact-discovery/company-contact-schema-health"
 import { companyContactToContactInput } from "@/lib/growth/contact-discovery/integrations/company-contacts-bridge"
-import { probeProspectSearchContactIntelligenceSchema } from "@/lib/growth/prospect-search/prospect-search-intelligence-schema-health"
+import { probeProspectSearchIntelligenceSchema } from "@/lib/growth/prospect-search/prospect-search-intelligence-schema-health"
+import {
+  loadProspectSearchEngineIntelligenceBatch,
+} from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-loader"
+import { mergeEngineIntelligenceIntoContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-merge"
+import {
+  resolveProspectSearchCanonicalPersonIdsBatch,
+  type ProspectSearchCanonicalPersonRef,
+} from "@/lib/growth/prospect-search/prospect-search-canonical-resolution"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import type { GrowthLeadEngineDecisionMakerHypothesisOutput } from "@/lib/growth/lead-engine/decision-maker-hypothesis-types"
 import type { GrowthLeadEnginePipelineRun } from "@/lib/growth/lead-engine/orchestrator/lead-engine-run-types"
@@ -250,9 +258,9 @@ export async function loadProspectSearchContactIntelligenceBatch(
   const map = new Map<string, GrowthProspectSearchContactIntelligence>()
   if (companies.length === 0) return map
 
-  let schema_health: Awaited<ReturnType<typeof probeProspectSearchContactIntelligenceSchema>>
+  let schema_health: Awaited<ReturnType<typeof probeProspectSearchIntelligenceSchema>>
   try {
-    schema_health = await probeProspectSearchContactIntelligenceSchema(admin)
+    schema_health = await probeProspectSearchIntelligenceSchema(admin)
   } catch {
     schema_health = {
       ready: false,
@@ -285,8 +293,23 @@ export async function loadProspectSearchContactIntelligenceBatch(
     }),
   )
 
+  const engineByKey = await loadProspectSearchEngineIntelligenceBatch(
+    admin,
+    companies.map((company) => ({
+      key: `${company.source_type}:${company.id}`,
+      source_type: company.source_type,
+      id: company.id,
+      growth_lead_id: company.growth_lead_id,
+      website: company.website,
+      extra_person_ids: (decisionMakersByLead.get(company.growth_lead_id ?? "") ?? [])
+        .map((dm) => dm.canonicalPersonId)
+        .filter((id): id is string => Boolean(id)),
+    })),
+  )
+
   await Promise.allSettled(
     companies.map(async (company) => {
+      const key = `${company.source_type}:${company.id}`
       try {
         let intelligence = await buildContactIntelligenceForCompany(admin, company, {
           schema_ready,
@@ -300,10 +323,28 @@ export async function loadProspectSearchContactIntelligenceBatch(
             intelligence = { ...intelligence, lead_relationship_hydration: hydration }
           }
         }
-        map.set(`${company.source_type}:${company.id}`, intelligence)
+
+        const personRefs: ProspectSearchCanonicalPersonRef[] = intelligence.contacts.map(
+          (contact) => ({
+            contact_id: contact.id,
+            canonical_person_id_hint: contact.canonical_person_id ?? null,
+          }),
+        )
+        const personIdByContactId = await resolveProspectSearchCanonicalPersonIdsBatch(
+          admin,
+          personRefs,
+        )
+        const engine = engineByKey.get(key) ?? null
+        intelligence = mergeEngineIntelligenceIntoContactIntelligence(
+          intelligence,
+          engine,
+          personIdByContactId,
+        )
+
+        map.set(key, intelligence)
       } catch {
         map.set(
-          `${company.source_type}:${company.id}`,
+          key,
           emptyProspectSearchContactIntelligence(
             "Contact intelligence partially unavailable for this company.",
             { schema_ready, schema_health, source_labels: [] },
@@ -338,6 +379,8 @@ export function applyContactIntelligenceToCompanyResult(
     {
       ...company,
       contact_intelligence: intelligence,
+      canonical_company_id:
+        intelligence.engine_intelligence?.canonical_company_id ?? company.canonical_company_id ?? null,
       decision_maker_coverage,
     },
     context,

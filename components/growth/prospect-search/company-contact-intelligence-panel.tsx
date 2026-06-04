@@ -11,6 +11,7 @@ import { ProspectSearchAccountTimelinePanel } from "@/components/growth/prospect
 import { ProspectSearchOperationalIntelligencePanel } from "@/components/growth/prospect-search/prospect-search-operational-intelligence-panel"
 import { ProspectSearchOperatorAssistPanel } from "@/components/growth/prospect-search/prospect-search-operator-assist-panel"
 import { ProspectSearchSchemaHealthNotice } from "@/components/growth/prospect-search/prospect-search-schema-health-notice"
+import { ProspectSearchEngineIntelligencePanel } from "@/components/growth/prospect-search/prospect-search-engine-intelligence-panel"
 
 export function CompanyContactIntelligencePanel({
   companyName,
@@ -43,6 +44,11 @@ export function CompanyContactIntelligencePanel({
       </div>
 
       <ProspectSearchSchemaHealthNotice health={intelligence.schema_health} />
+
+      <ProspectSearchEngineIntelligencePanel
+        companyName={companyName}
+        intelligence={intelligence.engine_intelligence}
+      />
 
       {intelligence.account_contact_strategy ? (
         <div className="mt-3">

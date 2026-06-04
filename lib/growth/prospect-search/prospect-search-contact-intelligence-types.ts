@@ -14,6 +14,7 @@ export type ProspectSearchContactEvidence = {
 
 export type ProspectSearchContactOverlay = {
   id: string
+  canonical_person_id?: string | null
   name: string
   title: string | null
   confidence: number
@@ -117,6 +118,8 @@ export type GrowthProspectSearchContactIntelligence = {
   command_overlays?: import("@/lib/growth/prospect-search/prospect-search-command-overlays").ProspectSearchCommandOverlaysSnapshot | null
   website_extraction_diagnostics?: import("@/lib/growth/contact-discovery/website-extraction-acquisition-types").WebsiteExtractionDiagnosticsSnapshot | null
   contact_identities?: import("@/lib/growth/prospect-search/prospect-search-contact-identity-types").ProspectSearchContactIdentityResolution[]
+  /** Growth Engine 7.2–7.7 intelligence overlay (Phase 7.PS-A). */
+  engine_intelligence?: import("@/lib/growth/prospect-search/prospect-search-engine-intelligence-types").GrowthProspectSearchEngineIntelligence | null
 }
 
 export type ProspectSearchLeadEngineContactHandoffContext = {
