@@ -15,7 +15,7 @@ import {
   updateStagingCanonicalCompanyId,
   upsertCanonicalCompanyDomain,
   upsertCanonicalCompanyLineage,
-} from "@/lib/growth/canonical-companies/canonical-company-repository"
+} from "@/lib/growth/canonical-companies/canonical-company-repository-core"
 import {
   createEmptyCanonicalCompanyResolverIndexes,
   registerCanonicalCompanyInIndexes,

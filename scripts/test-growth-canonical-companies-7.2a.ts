@@ -166,7 +166,23 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(backfillSource, /source_metadata/)
+  assert.match(backfillSource, /canonical-company-repository-core/)
   assert.doesNotMatch(backfillSource, /delete from|truncate/i)
+  assert.doesNotMatch(backfillSource, /server-only/)
+
+  const repoServer = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/canonical-companies/canonical-company-repository.ts"),
+    "utf8",
+  )
+  assert.match(repoServer, /server-only/)
+  assert.match(repoServer, /canonical-company-repository-core/)
+
+  const scriptSource = fs.readFileSync(
+    path.join(process.cwd(), "scripts/backfill-growth-canonical-companies-7.2a.ts"),
+    "utf8",
+  )
+  assert.doesNotMatch(scriptSource, /\.env\.local/)
+  assert.match(scriptSource, /resolveGrowthProductionSupabaseConfig/)
 
   console.log("growth-canonical-companies-7.2a: ok")
 }

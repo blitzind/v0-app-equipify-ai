@@ -17,7 +17,9 @@ Additive canonical company foundation in the `growth` schema. Staging tables rem
 | Types | `lib/growth/canonical-companies/canonical-company-types.ts` |
 | Normalize | `lib/growth/canonical-companies/canonical-company-normalize.ts` |
 | Resolver | `lib/growth/canonical-companies/canonical-company-resolver.ts` |
-| Repository | `lib/growth/canonical-companies/canonical-company-repository.ts` |
+| Repository (Next.js) | `lib/growth/canonical-companies/canonical-company-repository.ts` (`server-only` re-export) |
+| Repository (CLI/core) | `lib/growth/canonical-companies/canonical-company-repository-core.ts` |
+| Production env | `lib/growth/canonical-companies/load-growth-production-supabase-env.ts` |
 | Backfill | `lib/growth/canonical-companies/canonical-company-backfill.ts` |
 | Script | `scripts/backfill-growth-canonical-companies-7.2a.ts` |
 
@@ -47,13 +49,24 @@ Name-only keys never merge two companies that already have different domains.
 - Prospect Search refactor
 - Mandatory canonical ID on runtime discovery paths
 
+## Production credentials
+
+The backfill script does **not** read `.env.local`. Set in the shell:
+
+```bash
+export NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+export SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+```
+
+Or use non-empty values in `.env.production.local`, `.env.vercel.production`, or `.vercel/.env.production.local`. When `supabase/.temp/project-ref` exists, the URL must match that linked project (unless `--local`).
+
 ## Dry-run (default)
 
 ```bash
 pnpm tsx scripts/backfill-growth-canonical-companies-7.2a.ts
 ```
 
-Prints JSON stats: resolution counts, merge groups by domain, errors. **No writes.**
+Prints a safety banner (host, project ref, schema `growth`, mode) to stderr, then JSON stats: resolution counts, merge groups by domain, errors. **No writes.**
 
 ## Apply mode
 
