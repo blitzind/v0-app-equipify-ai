@@ -15,6 +15,7 @@ export function buildPdlPersonSearchQuery(input: PdlPersonSearchInput): {
   const domain = normalizeDomain(input.domain)
   const companyName = input.company_name.trim()
   const must: Array<Record<string, unknown>> = []
+  const should: Array<Record<string, unknown>> = []
 
   if (domain) {
     must.push({ term: { job_company_website: domain } })
@@ -23,17 +24,18 @@ export function buildPdlPersonSearchQuery(input: PdlPersonSearchInput): {
   }
 
   if (input.prefer_reachable !== false) {
-    must.push({
-      bool: {
-        should: [
-          { exists: { field: "work_email" } },
-          { exists: { field: "emails" } },
-          { exists: { field: "phone_numbers" } },
-          { exists: { field: "mobile_phone" } },
-        ],
-        minimum_should_match: 1,
-      },
-    })
+    should.push(
+      { exists: { field: "work_email" } },
+      { exists: { field: "emails" } },
+      { exists: { field: "phone_numbers" } },
+      { exists: { field: "mobile_phone" } },
+    )
+  }
+
+  const bool: Record<string, unknown> = { must }
+  if (should.length > 0) {
+    bool.should = should
+    bool.minimum_should_match = 1
   }
 
   const summary = domain
@@ -45,9 +47,7 @@ export function buildPdlPersonSearchQuery(input: PdlPersonSearchInput): {
   return {
     query: {
       query: {
-        bool: {
-          must,
-        },
+        bool,
       },
     },
     summary,

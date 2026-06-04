@@ -9,6 +9,7 @@ import {
   mapZeroBounceStatusToEmailStatus,
   reasonsForZeroBounceResult,
 } from "../lib/growth/contact-verification/providers/zerobounce-mapper"
+import { resolveZeroBounceValidateUrl } from "../lib/growth/contact-verification/providers/zerobounce-config"
 import { isEmailReadyForLeadPromotion } from "../lib/growth/contact-verification/email-verification-types"
 
 assert.equal(mapZeroBounceStatusToEmailStatus({ status: "valid" }), "verified")
@@ -42,6 +43,17 @@ const serviceSource = fs.readFileSync(
 )
 assert.match(serviceSource, /verifyEmailWithZeroBounce/)
 assert.match(serviceSource, /assertEmailSendAllowed/)
+
+const zbUrl = resolveZeroBounceValidateUrl("test@example.com", "test-key")
+assert.match(zbUrl, /^https:\/\/api(-us|-eu)?\.zerobounce\.net\/v2\/validate/)
+assert.ok(zbUrl.includes("email=test%40example.com"))
+assert.ok(zbUrl.includes("api_key=test-key"))
+
+const zbClient = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/contact-verification/providers/zerobounce-client.ts"),
+  "utf8",
+)
+assert.match(zbClient, /AbortSignal\.timeout/)
 
 const acquisitionSource = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/acquisition/promote-verified-contact-to-lead.ts"),

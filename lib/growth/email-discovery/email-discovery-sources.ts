@@ -168,7 +168,7 @@ export async function collectStagingEmailDiscoveryCandidates(
   const { data: decisionMakers, error: dmErr } = await admin
     .schema("growth")
     .from("lead_decision_makers")
-    .select("id, email, name, source")
+    .select("id, email, full_name, source")
     .eq("canonical_person_id", ctx.person_id)
     .not("email", "is", null)
   if (dmErr) messages.push(`lead_decision_makers: ${dmErr.message}`)

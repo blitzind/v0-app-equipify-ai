@@ -25,6 +25,7 @@ import {
   GROWTH_EMAIL_DISCOVERY_QA_MARKER,
 } from "../lib/growth/email-discovery/email-discovery-types"
 import { canonicalNormalizedPersonEmail } from "../lib/growth/canonical-persons/canonical-person-normalize"
+import { buildPdlPersonSearchQuery } from "../lib/growth/providers/pdl/pdl-query-builder"
 
 const migration = fs.readFileSync(
   path.join(process.cwd(), `supabase/migrations/${GROWTH_EMAIL_DISCOVERY_MIGRATION}`),
@@ -202,12 +203,61 @@ assert.match(panel, /email-discovery\/runs\//)
 assert.match(panel, /person_company_roles/)
 assert.match(panel, /formatCanonicalPersonBackfillRequestError/)
 assert.match(panel, /evidence_count/)
+assert.match(panel, /GrowthEmailDiscoveryRolePicker/)
+assert.match(panel, /email-discovery\/role-pairs/)
+assert.match(panel, /hasValidRole/)
+
+const rolePairsApi = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/email-discovery/role-pairs/route.ts"),
+  "utf8",
+)
+assert.match(rolePairsApi, /loadEmailDiscoveryRolePairs/)
+
+const picker = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-email-discovery-role-picker.tsx"),
+  "utf8",
+)
+assert.match(picker, /company_name/)
+assert.match(picker, /person_name/)
+assert.match(picker, /domain/)
 
 const infra = fs.readFileSync(
   path.join(process.cwd(), "app/(admin)/admin/growth/infrastructure/page.tsx"),
   "utf8",
 )
 assert.match(infra, /GrowthEmailDiscoveryPanel/)
+assert.match(infra, /GrowthSectionLayout[\s\S]*GrowthEmailDiscoveryPanel/)
+assert.match(infra, /GrowthSectionLayout[\s\S]*GrowthCanonicalCompanyBackfillPanel/)
+
+const sources = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/email-discovery/email-discovery-sources.ts"),
+  "utf8",
+)
+assert.match(sources, /lead_decision_makers/)
+assert.match(sources, /full_name, source/)
+assert.doesNotMatch(sources, /email, name, source/)
+
+const pdlQuery = buildPdlPersonSearchQuery({
+  company_name: "Acme Corp",
+  domain: "acme.example",
+  prefer_reachable: true,
+})
+const bool = (pdlQuery.query as { query: { bool: Record<string, unknown> } }).query.bool
+assert.ok(Array.isArray(bool.must))
+assert.ok(Array.isArray(bool.should))
+assert.equal(bool.minimum_should_match, 1)
+assert.equal(
+  JSON.stringify(bool.must),
+  JSON.stringify(bool.must).replace(/minimum_should_match/, ""),
+)
+assert.doesNotMatch(JSON.stringify(bool.must), /minimum_should_match/)
+
+const zbConfig = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/contact-verification/providers/zerobounce-config.ts"),
+  "utf8",
+)
+assert.match(zbConfig, /api\.zerobounce\.net\/v2\/validate/)
+assert.doesNotMatch(zbConfig, /api\.zb\.io/)
 
 assert.equal(GROWTH_EMAIL_DISCOVERY_QA_MARKER, "growth-email-discovery-7.3a-v1")
 console.log("growth-email-discovery-7.3a: ok")

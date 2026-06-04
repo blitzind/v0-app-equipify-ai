@@ -28,7 +28,11 @@ export async function verifyEmailWithZeroBounce(
 
   const response = await safeFetchJson<ZeroBounceValidateResponse>(
     resolveZeroBounceValidateUrl(normalized, apiKey),
-    { method: "GET", headers: { Accept: "application/json" } },
+    {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(15_000),
+    },
   )
 
   if (!response.ok || !response.data) {

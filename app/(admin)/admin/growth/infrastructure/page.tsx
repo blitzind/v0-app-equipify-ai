@@ -58,15 +58,15 @@ export default function AdminGrowthInfrastructurePage() {
           </div>
         </section>
 
-        <GrowthInfrastructureReadinessStrip surfaceId="transport_send" title="Outbound transport" />
-
-        <GrowthCanonicalCompanyBackfillPanel />
-
-        <GrowthCanonicalPersonBackfillPanel />
-
-        <GrowthEmailDiscoveryPanel />
-
         <GrowthSectionLayout>
+          <GrowthInfrastructureReadinessStrip surfaceId="transport_send" title="Outbound transport" />
+
+          <GrowthCanonicalCompanyBackfillPanel />
+
+          <GrowthCanonicalPersonBackfillPanel />
+
+          <GrowthEmailDiscoveryPanel />
+
           <GrowthSenderInfrastructureDashboard />
         </GrowthSectionLayout>
       </div>

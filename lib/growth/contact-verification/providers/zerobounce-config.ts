@@ -23,8 +23,14 @@ export function isEmailVerificationFixtureEnabled(): boolean {
   return process.env.NODE_ENV !== "production" && !isZeroBounceConfigured()
 }
 
+/** ZeroBounce v2 validate — see https://www.zerobounce.net/docs/email-validation-api-quickstart/v2-validate-emails */
+const ZEROBOUNCE_VALIDATE_BASE_URL =
+  process.env.GROWTH_ZEROBOUNCE_VALIDATE_BASE_URL?.trim() ||
+  process.env.ZEROBOUNCE_VALIDATE_BASE_URL?.trim() ||
+  "https://api.zerobounce.net/v2/validate"
+
 export function resolveZeroBounceValidateUrl(email: string, apiKey: string): string {
-  const url = new URL("https://api.zb.io/v2/validate")
+  const url = new URL(ZEROBOUNCE_VALIDATE_BASE_URL)
   url.searchParams.set("api_key", apiKey)
   url.searchParams.set("email", email)
   return url.toString()

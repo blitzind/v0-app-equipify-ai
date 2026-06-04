@@ -1,12 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Loader2, MailSearch } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthEmailDiscoveryRolePicker } from "@/components/growth/growth-email-discovery-role-picker"
 import { formatCanonicalPersonBackfillRequestError } from "@/lib/growth/canonical-persons/canonical-person-backfill-api"
+import {
+  findEmailDiscoveryRolePair,
+  type EmailDiscoveryRolePairRow,
+} from "@/lib/growth/email-discovery/email-discovery-role-pairs"
 import { GROWTH_EMAIL_DISCOVERY_QA_MARKER } from "@/lib/growth/email-discovery/email-discovery-types"
 import type { GrowthEmailDiscoveryRunDetail } from "@/lib/growth/email-discovery/email-discovery-types"
 
@@ -41,6 +46,11 @@ type VerificationCertification = {
 export function GrowthEmailDiscoveryPanel() {
   const [companyId, setCompanyId] = useState("")
   const [personId, setPersonId] = useState("")
+  const [selectedRole, setSelectedRole] = useState<EmailDiscoveryRolePairRow | null>(null)
+  const [rolePairs, setRolePairs] = useState<EmailDiscoveryRolePairRow[]>([])
+  const [rolesLoading, setRolesLoading] = useState(true)
+  const [rolesLoadError, setRolesLoadError] = useState<string | null>(null)
+  const [manualRoleCheck, setManualRoleCheck] = useState<"idle" | "checking" | "valid" | "invalid">("idle")
   const [running, setRunning] = useState(false)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -48,6 +58,112 @@ export function GrowthEmailDiscoveryPanel() {
   const [detail, setDetail] = useState<GrowthEmailDiscoveryRunDetail | null>(null)
   const [verificationCert, setVerificationCert] = useState<VerificationCertification | null>(null)
   const [promote, setPromote] = useState(true)
+
+  const loadRolePairs = useCallback(async () => {
+    setRolesLoading(true)
+    setRolesLoadError(null)
+    try {
+      const res = await fetch("/api/platform/growth/email-discovery/role-pairs?limit=500", {
+        cache: "no-store",
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        pairs?: EmailDiscoveryRolePairRow[]
+        message?: string
+      }
+      if (!res.ok || !data.ok || !Array.isArray(data.pairs)) {
+        throw new Error(data.message ?? "Could not load company/person roles.")
+      }
+      setRolePairs(data.pairs)
+    } catch (e) {
+      setRolePairs([])
+      setRolesLoadError(e instanceof Error ? e.message : "Could not load company/person roles.")
+    } finally {
+      setRolesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadRolePairs()
+  }, [loadRolePairs])
+
+  const matchedRole = useMemo(
+    () => findEmailDiscoveryRolePair(rolePairs, companyId, personId),
+    [rolePairs, companyId, personId],
+  )
+
+  const hasValidRole =
+    Boolean(selectedRole && selectedRole.company_id === companyId.trim() && selectedRole.person_id === personId.trim()) ||
+    manualRoleCheck === "valid" ||
+    Boolean(matchedRole)
+
+  useEffect(() => {
+    if (!companyId.trim() || !personId.trim()) {
+      setManualRoleCheck("idle")
+      return
+    }
+    if (matchedRole) {
+      setManualRoleCheck("valid")
+      return
+    }
+    if (selectedRole?.company_id === companyId.trim() && selectedRole?.person_id === personId.trim()) {
+      setManualRoleCheck("valid")
+      return
+    }
+
+    let cancelled = false
+    setManualRoleCheck("checking")
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const params = new URLSearchParams({
+            company_id: companyId.trim(),
+            person_id: personId.trim(),
+            limit: "1",
+          })
+          const res = await fetch(`/api/platform/growth/email-discovery/role-pairs?${params}`, {
+            cache: "no-store",
+          })
+          const data = (await res.json().catch(() => ({}))) as {
+            ok?: boolean
+            pairs?: EmailDiscoveryRolePairRow[]
+          }
+          if (cancelled) return
+          const valid = res.ok && data.ok && (data.pairs?.length ?? 0) > 0
+          setManualRoleCheck(valid ? "valid" : "invalid")
+        } catch {
+          if (!cancelled) setManualRoleCheck("invalid")
+        }
+      })()
+    }, 350)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [companyId, personId, matchedRole, selectedRole])
+
+  function handleRoleSelect(row: EmailDiscoveryRolePairRow | null) {
+    setSelectedRole(row)
+    if (row) {
+      setCompanyId(row.company_id)
+      setPersonId(row.person_id)
+      setManualRoleCheck("valid")
+      setError(null)
+    }
+  }
+
+  function handleCompanyIdChange(value: string) {
+    setCompanyId(value)
+    setSelectedRole(null)
+    setError(null)
+  }
+
+  function handlePersonIdChange(value: string) {
+    setPersonId(value)
+    setSelectedRole(null)
+    setError(null)
+  }
 
   async function loadRunDetail(runId: string) {
     setLoadingDetail(true)
@@ -72,6 +188,11 @@ export function GrowthEmailDiscoveryPanel() {
   }
 
   async function runDiscovery() {
+    if (!hasValidRole) {
+      setError("Select a company/person role pair or enter IDs with an existing person_company_roles row.")
+      return
+    }
+
     setRunning(true)
     setError(null)
     setResult(null)
@@ -109,6 +230,11 @@ export function GrowthEmailDiscoveryPanel() {
   }
 
   const detailByCandidateId = new Map(detail?.candidates.map((c) => [c.id, c]) ?? [])
+  const canRun =
+    Boolean(companyId.trim() && personId.trim()) &&
+    hasValidRole &&
+    manualRoleCheck !== "checking" &&
+    !running
 
   return (
     <GrowthEngineCard title="Email discovery (7.3A)">
@@ -142,26 +268,54 @@ export function GrowthEmailDiscoveryPanel() {
           </div>
         ) : null}
 
+        <GrowthEmailDiscoveryRolePicker
+          pairs={rolePairs}
+          loading={rolesLoading}
+          loadError={rolesLoadError}
+          selected={selectedRole}
+          onSelect={handleRoleSelect}
+        />
+
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="email-discovery-company-id">Canonical company ID</Label>
+            <Label htmlFor="email-discovery-company-id">Canonical company ID (fallback)</Label>
             <Input
               id="email-discovery-company-id"
               value={companyId}
-              onChange={(e) => setCompanyId(e.target.value)}
+              onChange={(e) => handleCompanyIdChange(e.target.value)}
               placeholder="uuid"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="email-discovery-person-id">Canonical person ID</Label>
+            <Label htmlFor="email-discovery-person-id">Canonical person ID (fallback)</Label>
             <Input
               id="email-discovery-person-id"
               value={personId}
-              onChange={(e) => setPersonId(e.target.value)}
+              onChange={(e) => handlePersonIdChange(e.target.value)}
               placeholder="uuid"
             />
           </div>
         </div>
+
+        {companyId.trim() && personId.trim() ? (
+          <p
+            className={
+              manualRoleCheck === "invalid"
+                ? "text-xs text-destructive"
+                : manualRoleCheck === "valid"
+                  ? "text-xs text-green-700 dark:text-green-400"
+                  : "text-xs text-muted-foreground"
+            }
+          >
+            {manualRoleCheck === "checking"
+              ? "Checking person_company_roles…"
+              : manualRoleCheck === "valid"
+                ? "Valid company/person role — discovery allowed."
+                : manualRoleCheck === "invalid"
+                  ? "No person_company_roles row for these IDs. Discovery will be rejected."
+                  : null}
+          </p>
+        ) : null}
 
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -172,11 +326,7 @@ export function GrowthEmailDiscoveryPanel() {
           Promote verified candidates to person_emails
         </label>
 
-        <Button
-          type="button"
-          disabled={running || !companyId.trim() || !personId.trim()}
-          onClick={() => void runDiscovery()}
-        >
+        <Button type="button" disabled={!canRun} onClick={() => void runDiscovery()}>
           {running ? <Loader2 className="mr-2 size-4 animate-spin" /> : <MailSearch className="mr-2 size-4" />}
           Run email discovery
         </Button>
