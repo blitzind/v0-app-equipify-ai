@@ -8,16 +8,18 @@ import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-
 
 export function GrowthInboxWorkspaceKeyboardBridge() {
   const router = useRouter()
-  const { selectedThread, runAction, assignOwner, archiveThread } = useGrowthInboxWorkspace()
-  const { leadId, refresh } = useGrowthInboxLeadContext()
+  const { selectedThreadId, runAction, assignOwner, archiveThread } = useGrowthInboxWorkspace()
+  const { leadId, refreshWorkflow } = useGrowthInboxLeadContext()
 
   const onAssign = useCallback(() => {
+    if (!selectedThreadId) return
     void runAction("assign", assignOwner)
-  }, [runAction, assignOwner])
+  }, [runAction, assignOwner, selectedThreadId])
 
   const onArchive = useCallback(() => {
+    if (!selectedThreadId) return
     void runAction("archive", archiveThread)
-  }, [runAction, archiveThread])
+  }, [runAction, archiveThread, selectedThreadId])
 
   const onCall = useCallback(() => {
     if (!leadId) return
@@ -25,7 +27,10 @@ export function GrowthInboxWorkspaceKeyboardBridge() {
   }, [leadId, router])
 
   const onReply = useCallback(() => {
-    document.getElementById("inbox-reply-draft")?.scrollIntoView({ behavior: "smooth", block: "start" })
+    const draftSection = document.getElementById("inbox-reply-draft")
+    if (!draftSection) return
+    draftSection.scrollIntoView({ behavior: "smooth", block: "nearest" })
+    draftSection.querySelector<HTMLElement>("textarea, input, button")?.focus()
   }, [])
 
   const onCreateTask = useCallback(async () => {
@@ -35,8 +40,8 @@ export function GrowthInboxWorkspaceKeyboardBridge() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ leadId }),
     })
-    await refresh()
-  }, [leadId, refresh])
+    await refreshWorkflow()
+  }, [leadId, refreshWorkflow])
 
   const onCreateOpportunity = useCallback(async () => {
     if (!leadId) return
@@ -52,8 +57,6 @@ export function GrowthInboxWorkspaceKeyboardBridge() {
       }),
     )
   }, [leadId])
-
-  if (!selectedThread) return null
 
   return (
     <GrowthInboxKeyboardWorkflow

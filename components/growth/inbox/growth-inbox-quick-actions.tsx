@@ -20,7 +20,7 @@ import type { GrowthReplyOpportunityDraft } from "@/lib/growth/reply-intelligenc
 
 export function GrowthInboxQuickActions() {
   const { selectedThread, actionLoading, runAction, assignOwner, archiveThread } = useGrowthInboxWorkspace()
-  const { leadId, refresh } = useGrowthInboxLeadContext()
+  const { leadId, refreshRecommendations, refreshWorkflow } = useGrowthInboxLeadContext()
   const [taskLoading, setTaskLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [oppDraft, setOppDraft] = useState<GrowthReplyOpportunityDraft | null>(null)
@@ -83,7 +83,7 @@ export function GrowthInboxQuickActions() {
       })
       const payload = (await response.json().catch(() => ({}))) as { error?: string; message?: string }
       if (!response.ok) throw new Error(payload.error ?? payload.message ?? "Could not create task.")
-      await refresh()
+      await refreshWorkflow()
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "Task creation failed.")
     } finally {
@@ -111,7 +111,7 @@ export function GrowthInboxQuickActions() {
       const payload = (await response.json().catch(() => ({}))) as { error?: string; message?: string }
       if (!response.ok) throw new Error(payload.error ?? payload.message ?? "Could not create opportunity.")
       setOppOpen(false)
-      await refresh()
+      await refreshRecommendations()
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "Opportunity creation failed.")
     } finally {

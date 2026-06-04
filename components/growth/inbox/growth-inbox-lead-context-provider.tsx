@@ -16,7 +16,10 @@ import type {
   GrowthConversationTimelineEntry,
   GrowthReplyCopilotAssist,
 } from "@/lib/growth/reply-intelligence/reply-intent-types"
-import type { GrowthReplyWorkflowActionRecord } from "@/lib/growth/reply-intelligence/workflow-actions-types"
+import type {
+  GrowthReplyWorkflowActionRecord,
+  GrowthSequenceExitCandidateRecord,
+} from "@/lib/growth/reply-intelligence/workflow-actions-types"
 import type {
   GrowthRevenueCommandCenterLead,
   GrowthRevenueForecastEvidence,
@@ -31,6 +34,7 @@ import {
   readRevenueReadinessForLead,
   resolveInboxRevenuePlaybook,
 } from "@/lib/growth/inbox/inbox-revenue-context"
+import { useGrowthInboxSharedData } from "@/components/growth/inbox/growth-inbox-shared-data-provider"
 
 type GrowthInboxLeadContextValue = {
   leadId: string | null
@@ -43,6 +47,7 @@ type GrowthInboxLeadContextValue = {
   copilot: GrowthReplyCopilotAssist | null
   lead: GrowthLead | null
   workflowActions: GrowthReplyWorkflowActionRecord[]
+  sequenceExitCandidates: GrowthSequenceExitCandidateRecord[]
   opportunityRecommendations: GrowthOpportunityRecommendation[]
   bookingRecommendations: GrowthBookingRecommendation[]
   revenueReadiness: GrowthRevenueReadinessSnapshot | null
@@ -51,6 +56,8 @@ type GrowthInboxLeadContextValue = {
   playbook: GrowthRevenuePlaybook | null
   commandCenterLead: GrowthRevenueCommandCenterLead | null
   refresh: () => Promise<void>
+  refreshWorkflow: () => Promise<void>
+  refreshRecommendations: () => Promise<void>
 }
 
 const GrowthInboxLeadContext = createContext<GrowthInboxLeadContextValue | null>(null)
@@ -63,18 +70,11 @@ export function useGrowthInboxLeadContext(): GrowthInboxLeadContextValue {
   return value
 }
 
-function findCommandCenterLead(
-  dashboard: {
-    sections?: Record<string, GrowthRevenueCommandCenterLead[]>
-  } | null,
-  leadId: string,
-): GrowthRevenueCommandCenterLead | null {
-  if (!dashboard?.sections) return null
-  for (const leads of Object.values(dashboard.sections)) {
-    const match = leads.find((entry) => entry.leadId === leadId)
-    if (match) return match
-  }
-  return null
+function filterRecommendationsForThread<T extends { inboxThreadId?: string | null }>(
+  items: T[],
+  threadId: string | null,
+): T[] {
+  return items.filter((item) => !item.inboxThreadId || !threadId || item.inboxThreadId === threadId)
 }
 
 export function GrowthInboxLeadContextProvider({
@@ -88,6 +88,7 @@ export function GrowthInboxLeadContextProvider({
   thread: GrowthInboxThread | null
   children: ReactNode
 }) {
+  const { getCommandCenterLead } = useGrowthInboxSharedData()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [memoryProfile, setMemoryProfile] = useState<GrowthLeadMemoryProfileView | null>(null)
@@ -95,13 +96,18 @@ export function GrowthInboxLeadContextProvider({
   const [copilot, setCopilot] = useState<GrowthReplyCopilotAssist | null>(null)
   const [lead, setLead] = useState<GrowthLead | null>(null)
   const [workflowActions, setWorkflowActions] = useState<GrowthReplyWorkflowActionRecord[]>([])
+  const [sequenceExitCandidates, setSequenceExitCandidates] = useState<GrowthSequenceExitCandidateRecord[]>([])
   const [opportunityRecommendations, setOpportunityRecommendations] = useState<GrowthOpportunityRecommendation[]>([])
   const [bookingRecommendations, setBookingRecommendations] = useState<GrowthBookingRecommendation[]>([])
   const [forecastEvidence, setForecastEvidence] = useState<GrowthRevenueForecastEvidence | null>(null)
   const [executionPlan, setExecutionPlan] = useState<GrowthSalesExecutionPlan | null>(null)
-  const [commandCenterLead, setCommandCenterLead] = useState<GrowthRevenueCommandCenterLead | null>(null)
 
   const revenueReadiness = useMemo(() => readRevenueReadinessForLead(lead), [lead])
+
+  const commandCenterLead = useMemo(
+    () => (leadId ? getCommandCenterLead(leadId) : null),
+    [leadId, getCommandCenterLead],
+  )
 
   const playbook = useMemo(
     () =>
@@ -114,19 +120,80 @@ export function GrowthInboxLeadContextProvider({
     [lead, thread, memoryProfile, opportunityRecommendations],
   )
 
-  const refresh = useCallback(async () => {
+  const clearLeadState = useCallback(() => {
+    setMemoryProfile(null)
+    setTimeline([])
+    setCopilot(null)
+    setLead(null)
+    setWorkflowActions([])
+    setSequenceExitCandidates([])
+    setOpportunityRecommendations([])
+    setBookingRecommendations([])
+    setForecastEvidence(null)
+    setExecutionPlan(null)
+    setError(null)
+  }, [])
+
+  const refreshWorkflow = useCallback(async () => {
     if (!leadId) {
-      setMemoryProfile(null)
-      setTimeline([])
-      setCopilot(null)
-      setLead(null)
       setWorkflowActions([])
+      setSequenceExitCandidates([])
+      return
+    }
+
+    const workflowParams = new URLSearchParams({ status: "pending_review", limit: "20", leadId })
+    const exitParams = new URLSearchParams({ pendingOnly: "true", limit: "20", leadId })
+
+    const [workflowRes, exitRes] = await Promise.all([
+      fetch(`/api/platform/growth/replies/workflow-actions?${workflowParams.toString()}`, { cache: "no-store" }),
+      fetch(`/api/platform/growth/replies/sequence-exit-candidates?${exitParams.toString()}`, { cache: "no-store" }),
+    ])
+
+    const workflowPayload = (await workflowRes.json()) as { items?: GrowthReplyWorkflowActionRecord[] }
+    const exitPayload = (await exitRes.json()) as { items?: GrowthSequenceExitCandidateRecord[] }
+
+    if (workflowRes.ok) setWorkflowActions(workflowPayload.items ?? [])
+    else setWorkflowActions([])
+
+    if (exitRes.ok) setSequenceExitCandidates(exitPayload.items ?? [])
+    else setSequenceExitCandidates([])
+  }, [leadId])
+
+  const refreshRecommendations = useCallback(async () => {
+    if (!leadId) {
       setOpportunityRecommendations([])
       setBookingRecommendations([])
-      setForecastEvidence(null)
-      setExecutionPlan(null)
-      setCommandCenterLead(null)
-      setError(null)
+      return
+    }
+
+    const encodedLeadId = encodeURIComponent(leadId)
+    const bookingParams = new URLSearchParams({ leadId, status: "pending_review" })
+
+    const [opportunityDashboardRes, bookingRes] = await Promise.all([
+      fetch(`/api/platform/growth/opportunities/dashboard?leadId=${encodedLeadId}`, { cache: "no-store" }),
+      fetch(`/api/platform/growth/booking-intelligence/recommendations?${bookingParams.toString()}`, {
+        cache: "no-store",
+      }),
+    ])
+
+    const opportunityDashboardPayload = (await opportunityDashboardRes.json()) as {
+      intelligence?: { recommendedActions?: GrowthOpportunityRecommendation[] }
+    }
+    const bookingPayload = (await bookingRes.json()) as { recommendations?: GrowthBookingRecommendation[] }
+
+    const recommendations = filterRecommendationsForThread(
+      opportunityDashboardPayload.intelligence?.recommendedActions ?? [],
+      threadId,
+    )
+    setOpportunityRecommendations(recommendations)
+
+    const bookings = filterRecommendationsForThread(bookingPayload.recommendations ?? [], threadId)
+    setBookingRecommendations(bookings)
+  }, [leadId, threadId])
+
+  const refresh = useCallback(async () => {
+    if (!leadId) {
+      clearLeadState()
       return
     }
 
@@ -134,49 +201,22 @@ export function GrowthInboxLeadContextProvider({
     setError(null)
     try {
       const encodedLeadId = encodeURIComponent(leadId)
-      const workflowParams = new URLSearchParams({ status: "pending_review", limit: "20", leadId })
-      const bookingParams = new URLSearchParams({ leadId, status: "pending_review" })
 
-      const [
-        memoryRes,
-        timelineRes,
-        copilotRes,
-        leadRes,
-        workflowRes,
-        opportunityDashboardRes,
-        bookingRes,
-        forecastRes,
-        executionPlanRes,
-        commandCenterRes,
-      ] = await Promise.all([
+      const [memoryRes, timelineRes, copilotRes, leadRes, forecastRes, executionPlanRes] = await Promise.all([
         fetch(`/api/platform/growth/lead-memory/profile/${encodedLeadId}`, { cache: "no-store" }),
         fetch(`/api/platform/growth/replies/timeline?leadId=${encodedLeadId}`, { cache: "no-store" }),
         fetch(`/api/platform/growth/replies/copilot?leadId=${encodedLeadId}`, { cache: "no-store" }),
         fetch(`/api/platform/growth/leads/${encodedLeadId}`, { cache: "no-store" }),
-        fetch(`/api/platform/growth/replies/workflow-actions?${workflowParams.toString()}`, { cache: "no-store" }),
-        fetch(`/api/platform/growth/opportunities/dashboard?leadId=${encodedLeadId}`, { cache: "no-store" }),
-        fetch(`/api/platform/growth/booking-intelligence/recommendations?${bookingParams.toString()}`, {
-          cache: "no-store",
-        }),
         fetch(`/api/platform/growth/revenue-execution/forecast-evidence?leadId=${encodedLeadId}`, { cache: "no-store" }),
         fetch(`/api/platform/growth/revenue-execution/execution-plan?leadId=${encodedLeadId}`, { cache: "no-store" }),
-        fetch("/api/platform/growth/revenue-execution/command-center", { cache: "no-store" }),
       ])
 
       const memoryPayload = (await memoryRes.json()) as { profile?: GrowthLeadMemoryProfileView }
       const timelinePayload = (await timelineRes.json()) as { timeline?: { entries?: GrowthConversationTimelineEntry[] } }
       const copilotPayload = (await copilotRes.json()) as { assist?: GrowthReplyCopilotAssist }
       const leadPayload = (await leadRes.json()) as { lead?: GrowthLead }
-      const workflowPayload = (await workflowRes.json()) as { items?: GrowthReplyWorkflowActionRecord[] }
-      const opportunityDashboardPayload = (await opportunityDashboardRes.json()) as {
-        intelligence?: { recommendedActions?: GrowthOpportunityRecommendation[] }
-      }
-      const bookingPayload = (await bookingRes.json()) as { recommendations?: GrowthBookingRecommendation[] }
       const forecastPayload = (await forecastRes.json()) as { evidence?: GrowthRevenueForecastEvidence }
       const executionPlanPayload = (await executionPlanRes.json()) as { plan?: GrowthSalesExecutionPlan }
-      const commandCenterPayload = (await commandCenterRes.json()) as {
-        dashboard?: { sections?: Record<string, GrowthRevenueCommandCenterLead[]> }
-      }
 
       if (memoryRes.ok && memoryPayload.profile) setMemoryProfile(memoryPayload.profile)
       else setMemoryProfile(null)
@@ -190,19 +230,6 @@ export function GrowthInboxLeadContextProvider({
       if (leadRes.ok && leadPayload.lead) setLead(leadPayload.lead)
       else setLead(null)
 
-      if (workflowRes.ok) setWorkflowActions(workflowPayload.items ?? [])
-      else setWorkflowActions([])
-
-      const recommendations = (opportunityDashboardPayload.intelligence?.recommendedActions ?? []).filter(
-        (recommendation) => !recommendation.inboxThreadId || !threadId || recommendation.inboxThreadId === threadId,
-      )
-      setOpportunityRecommendations(recommendations)
-
-      const bookings = (bookingPayload.recommendations ?? []).filter(
-        (recommendation) => !recommendation.inboxThreadId || !threadId || recommendation.inboxThreadId === threadId,
-      )
-      setBookingRecommendations(bookings)
-
       if (forecastRes.ok && forecastPayload.evidence) setForecastEvidence(forecastPayload.evidence)
       else setForecastEvidence(null)
 
@@ -210,17 +237,13 @@ export function GrowthInboxLeadContextProvider({
       else if (leadPayload.lead) setExecutionPlan(readExecutionPlanFromLeadMetadata(leadPayload.lead.metadata))
       else setExecutionPlan(null)
 
-      if (commandCenterRes.ok) {
-        setCommandCenterLead(findCommandCenterLead(commandCenterPayload.dashboard ?? null, leadId))
-      } else {
-        setCommandCenterLead(null)
-      }
+      await Promise.all([refreshWorkflow(), refreshRecommendations()])
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Could not load lead context.")
     } finally {
       setLoading(false)
     }
-  }, [leadId, threadId])
+  }, [leadId, clearLeadState, refreshWorkflow, refreshRecommendations])
 
   useEffect(() => {
     void refresh()
@@ -238,6 +261,7 @@ export function GrowthInboxLeadContextProvider({
       copilot,
       lead,
       workflowActions,
+      sequenceExitCandidates,
       opportunityRecommendations,
       bookingRecommendations,
       revenueReadiness,
@@ -246,6 +270,8 @@ export function GrowthInboxLeadContextProvider({
       playbook,
       commandCenterLead,
       refresh,
+      refreshWorkflow,
+      refreshRecommendations,
     }),
     [
       leadId,
@@ -258,6 +284,7 @@ export function GrowthInboxLeadContextProvider({
       copilot,
       lead,
       workflowActions,
+      sequenceExitCandidates,
       opportunityRecommendations,
       bookingRecommendations,
       revenueReadiness,
@@ -266,6 +293,8 @@ export function GrowthInboxLeadContextProvider({
       playbook,
       commandCenterLead,
       refresh,
+      refreshWorkflow,
+      refreshRecommendations,
     ],
   )
 

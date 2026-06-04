@@ -7,7 +7,7 @@ import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
 
 export function GrowthInboxActionCenterBookingEmbed() {
-  const { bookingRecommendations, loading, refresh } = useGrowthInboxLeadContext()
+  const { bookingRecommendations, loading, refreshRecommendations } = useGrowthInboxLeadContext()
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   async function recommendationAction(recommendationId: string, action: "approve" | "dismiss") {
@@ -18,7 +18,7 @@ export function GrowthInboxActionCenterBookingEmbed() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ humanApprovalConfirmed: true }),
       })
-      await refresh()
+      await refreshRecommendations()
     } finally {
       setActionLoading(null)
     }

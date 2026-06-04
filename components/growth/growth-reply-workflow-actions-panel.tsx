@@ -272,18 +272,27 @@ export function GrowthReplyWorkflowActionsPanel({
   showSequenceExit = true,
   hideRevenuePanel = false,
   title = "Reply workflow actions",
+  useExternalData = false,
+  externalItems,
+  externalExitCandidates,
+  onExternalRefresh,
 }: {
   leadId?: string
   compact?: boolean
   showSequenceExit?: boolean
   hideRevenuePanel?: boolean
   title?: string
+  /** When true, skip internal fetch and consume preloaded inbox lead context data. */
+  useExternalData?: boolean
+  externalItems?: GrowthReplyWorkflowActionRecord[]
+  externalExitCandidates?: GrowthSequenceExitCandidateRecord[]
+  onExternalRefresh?: () => void | Promise<void>
 }) {
   const [dashboard, setDashboard] = useState<GrowthReplyWorkflowActionDashboard | null>(null)
   const [items, setItems] = useState<GrowthReplyWorkflowActionRecord[]>([])
   const [exitCandidates, setExitCandidates] = useState<GrowthSequenceExitCandidateRecord[]>([])
   const [filter, setFilter] = useState<FilterKey>("all")
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!useExternalData)
   const [acting, setActing] = useState<string | null>(null)
   const [exitActing, setExitActing] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -291,7 +300,7 @@ export function GrowthReplyWorkflowActionsPanel({
   const [oppOpen, setOppOpen] = useState(false)
   const [opportunityWorkflowActionId, setOpportunityWorkflowActionId] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
+  const loadInternal = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -326,9 +335,23 @@ export function GrowthReplyWorkflowActionsPanel({
     }
   }, [leadId, showSequenceExit])
 
+  const reloadData = useCallback(async () => {
+    if (useExternalData) {
+      await onExternalRefresh?.()
+      return
+    }
+    await loadInternal()
+  }, [useExternalData, onExternalRefresh, loadInternal])
+
   useEffect(() => {
-    void load()
-  }, [load])
+    if (useExternalData) {
+      setItems(externalItems ?? [])
+      setExitCandidates(externalExitCandidates ?? [])
+      setLoading(false)
+      return
+    }
+    void loadInternal()
+  }, [useExternalData, externalItems, externalExitCandidates, loadInternal])
 
   const filtered = items.filter((item) => {
     if (filter === "all") return true
@@ -384,7 +407,7 @@ export function GrowthReplyWorkflowActionsPanel({
         setActing(null)
         return
       }
-      await load()
+      await reloadData()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed.")
     } finally {
@@ -402,7 +425,7 @@ export function GrowthReplyWorkflowActionsPanel({
         body: JSON.stringify({ resolution }),
       })
       if (!res.ok) throw new Error("Could not resolve sequence exit candidate.")
-      await load()
+      await reloadData()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Resolve failed.")
     } finally {
@@ -410,7 +433,7 @@ export function GrowthReplyWorkflowActionsPanel({
     }
   }
 
-  if (loading && !dashboard) {
+  if (loading && !useExternalData && !dashboard) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" />
@@ -433,7 +456,7 @@ export function GrowthReplyWorkflowActionsPanel({
               </Button>
             ))}
           </div>
-          <Button type="button" size="sm" variant="outline" disabled={loading} onClick={() => void load()}>
+          <Button type="button" size="sm" variant="outline" disabled={loading} onClick={() => void reloadData()}>
             {loading ? <Loader2 className="mr-1 size-4 animate-spin" /> : <RefreshCw className="mr-1 size-4" />}
             Refresh
           </Button>
@@ -496,7 +519,7 @@ export function GrowthReplyWorkflowActionsPanel({
         workflowActionId={opportunityWorkflowActionId}
         onCreated={() => {
           setOpportunityWorkflowActionId(null)
-          void load()
+          void reloadData()
         }}
       />
     </div>

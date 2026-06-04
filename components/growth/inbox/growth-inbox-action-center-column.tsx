@@ -1,6 +1,7 @@
 "use client"
 
 import { GrowthInboxActionCenterWorkflowEmbeds } from "@/components/growth/inbox/growth-inbox-action-center-workflow-embeds"
+import { GrowthInboxActionCenterReplyDraftEmbed } from "@/components/growth/inbox/growth-inbox-action-center-reply-draft-embed"
 import { GrowthInboxQuickActions } from "@/components/growth/inbox/growth-inbox-quick-actions"
 import { GrowthInboxRecommendedActionCard } from "@/components/growth/inbox/growth-inbox-recommended-action-card"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
@@ -38,6 +39,7 @@ export function GrowthInboxActionCenterColumn() {
         <GrowthInboxRecommendedActionCard />
         <GrowthInboxQuickActions />
         <GrowthInboxActionCenterWorkflowEmbeds />
+        <GrowthInboxActionCenterReplyDraftEmbed />
       </div>
     </div>
   )

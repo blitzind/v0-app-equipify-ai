@@ -8,7 +8,7 @@ import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbo
 import { recommendationTypeLabel } from "@/lib/growth/opportunity-intelligence/opportunity-types"
 
 export function GrowthInboxActionCenterOpportunityEmbed() {
-  const { opportunityRecommendations, loading, refresh } = useGrowthInboxLeadContext()
+  const { opportunityRecommendations, loading, refreshRecommendations } = useGrowthInboxLeadContext()
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   async function resolveRecommendation(recommendationId: string, action: "accept" | "dismiss") {
@@ -19,7 +19,7 @@ export function GrowthInboxActionCenterOpportunityEmbed() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ humanApprovalConfirmed: true }),
       })
-      await refresh()
+      await refreshRecommendations()
     } finally {
       setActionLoading(null)
     }

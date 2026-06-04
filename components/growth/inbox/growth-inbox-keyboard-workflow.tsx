@@ -14,12 +14,12 @@ import {
 const SHORTCUTS = [
   { keys: "J / K", action: "Next / previous thread in queue" },
   { keys: "Enter", action: "Open selected thread" },
-  { keys: "A", action: "Assign owner" },
-  { keys: "C", action: "Open call workspace" },
-  { keys: "R", action: "Jump to reply drafting" },
-  { keys: "T", action: "Create follow-up task" },
-  { keys: "O", action: "Create opportunity" },
-  { keys: "E", action: "Archive thread" },
+  { keys: "A", action: "Assign owner (requires thread)" },
+  { keys: "C", action: "Open call workspace (requires thread)" },
+  { keys: "R", action: "Jump to reply drafting (requires thread)" },
+  { keys: "T", action: "Create follow-up task (requires thread)" },
+  { keys: "O", action: "Create opportunity (requires thread)" },
+  { keys: "E", action: "Archive thread (requires thread)" },
   { keys: "/", action: "Focus thread search" },
   { keys: "?", action: "Show keyboard shortcuts" },
 ] as const
@@ -47,7 +47,7 @@ export function GrowthInboxKeyboardWorkflow({
   onCreateTask,
   onCreateOpportunity,
 }: GrowthInboxKeyboardWorkflowProps) {
-  const { selectedThread } = useGrowthInboxWorkspace()
+  const { selectedThreadId } = useGrowthInboxWorkspace()
   const { selectAdjacentThread, focusSearch, visibleThreads, selectThreadByIndex } = useGrowthInboxQueue()
   const [helpOpen, setHelpOpen] = useState(false)
 
@@ -68,23 +68,33 @@ export function GrowthInboxKeyboardWorkflow({
       }
 
       if (isTypingTarget(event.target)) return
-      if (!selectedThread) return
 
-      switch (event.key.toLowerCase()) {
-        case "j":
+      const navigationKey = event.key.toLowerCase()
+      if (navigationKey === "j" || navigationKey === "k" || event.key === "Enter") {
+        if (visibleThreads.length === 0) return
+
+        if (navigationKey === "j") {
           event.preventDefault()
           selectAdjacentThread("next")
-          break
-        case "k":
+          return
+        }
+        if (navigationKey === "k") {
           event.preventDefault()
           selectAdjacentThread("prev")
-          break
-        case "enter": {
-          event.preventDefault()
-          const index = visibleThreads.findIndex((thread) => thread.id === selectedThread.id)
-          if (index >= 0) selectThreadByIndex(index)
-          break
+          return
         }
+        if (event.key === "Enter") {
+          event.preventDefault()
+          const index = visibleThreads.findIndex((thread) => thread.id === selectedThreadId)
+          if (index >= 0) selectThreadByIndex(index)
+          else selectThreadByIndex(0)
+          return
+        }
+      }
+
+      if (!selectedThreadId) return
+
+      switch (navigationKey) {
         case "a":
           event.preventDefault()
           onAssign()
@@ -117,7 +127,7 @@ export function GrowthInboxKeyboardWorkflow({
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [
-    selectedThread,
+    selectedThreadId,
     selectAdjacentThread,
     focusSearch,
     visibleThreads,

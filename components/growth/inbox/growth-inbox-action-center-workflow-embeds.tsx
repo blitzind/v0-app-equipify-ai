@@ -14,6 +14,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+import { GROWTH_INBOX_WORKSPACE_PHASE4_QA_MARKER } from "@/lib/growth/inbox/inbox-workspace-types"
 import { cn } from "@/lib/utils"
 
 function WorkflowGroup({
@@ -43,20 +44,28 @@ function WorkflowGroup({
 }
 
 export function GrowthInboxActionCenterWorkflowEmbeds() {
-  const { leadId, workflowActions, opportunityRecommendations, bookingRecommendations, copilot } =
-    useGrowthInboxLeadContext()
+  const {
+    leadId,
+    workflowActions,
+    sequenceExitCandidates,
+    opportunityRecommendations,
+    bookingRecommendations,
+    copilot,
+    refreshWorkflow,
+  } = useGrowthInboxLeadContext()
   const { actionLoading } = useGrowthInboxWorkspace()
 
   if (!leadId) return null
 
   const totalItems =
     workflowActions.length +
+    sequenceExitCandidates.length +
     opportunityRecommendations.length +
     bookingRecommendations.length +
     (copilot ? 1 : 0)
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-equipify-qa-marker={GROWTH_INBOX_WORKSPACE_PHASE4_QA_MARKER}>
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Workflow & Recommendations
@@ -70,9 +79,13 @@ export function GrowthInboxActionCenterWorkflowEmbeds() {
             <GrowthReplyWorkflowActionsPanel
               leadId={leadId}
               compact
-              showSequenceExit={false}
+              showSequenceExit
               hideRevenuePanel
               title="Pending workflow actions"
+              useExternalData
+              externalItems={workflowActions}
+              externalExitCandidates={sequenceExitCandidates}
+              onExternalRefresh={refreshWorkflow}
             />
           </div>
         </GrowthInboxWidgetErrorBoundary>

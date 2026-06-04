@@ -48,6 +48,8 @@ type ThreadDetailPayload = {
   message?: string
 }
 
+export type GrowthInboxActionRefreshMode = "full" | "threads" | "thread" | "none"
+
 export type GrowthInboxWorkspaceState = {
   loading: boolean
   error: string | null
@@ -76,8 +78,9 @@ export type GrowthInboxWorkspaceState = {
   setMessageBody: (value: string) => void
   setMessageDirection: (value: "inbound" | "outbound") => void
   load: () => Promise<void>
+  refreshThreads: () => Promise<void>
   loadThreadDetail: (threadId: string) => Promise<void>
-  runAction: (key: string, action: () => Promise<void>) => Promise<void>
+  runAction: (key: string, action: () => Promise<void>, refreshMode?: GrowthInboxActionRefreshMode) => Promise<void>
   createThread: () => Promise<void>
   addMessage: () => Promise<void>
   assignOwner: () => Promise<void>
@@ -145,6 +148,35 @@ export function GrowthInboxWorkspaceProvider({ children }: { children: ReactNode
     setSyncDetail(payload.syncDetail ?? null)
   }, [])
 
+  const refreshThreads = useCallback(async () => {
+    const [listResponse, dashboardResponse] = await Promise.all([
+      fetch("/api/platform/growth/inbox"),
+      fetch("/api/platform/growth/inbox/dashboard"),
+    ])
+    const listPayload = (await listResponse.json()) as ListPayload
+    const dashboardPayload = (await dashboardResponse.json()) as DashboardPayload
+    if (!listResponse.ok) {
+      throw new Error(sanitizeInboxUiErrorMessage(listPayload.message) ?? "Could not load inbox threads.")
+    }
+    if (!dashboardResponse.ok) {
+      throw new Error(sanitizeInboxUiErrorMessage(dashboardPayload.message) ?? "Could not load inbox dashboard.")
+    }
+
+    const mergedThreads = dashboardPayload.threads ?? listPayload.threads ?? []
+    setThreads(mergedThreads)
+    setLeads(listPayload.leads ?? [])
+    setDashboard(dashboardPayload.dashboard ?? null)
+    setIntelligence(dashboardPayload.intelligence ?? null)
+    setEvents(dashboardPayload.events ?? [])
+  }, [])
+
+  const refreshAfterThreadMutation = useCallback(
+    async (threadId: string) => {
+      await Promise.all([refreshThreads(), loadThreadDetail(threadId)])
+    },
+    [refreshThreads, loadThreadDetail],
+  )
+
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -196,12 +228,33 @@ export function GrowthInboxWorkspaceProvider({ children }: { children: ReactNode
     void load()
   }, [load])
 
-  async function runAction(key: string, action: () => Promise<void>) {
+  async function runAction(
+    key: string,
+    action: () => Promise<void>,
+    refreshMode: GrowthInboxActionRefreshMode = "thread",
+  ) {
     setActionLoading(key)
     setError(null)
+    const threadIdBeforeAction = selectedThreadId
     try {
       await action()
-      await load()
+      switch (refreshMode) {
+        case "full":
+          await load()
+          break
+        case "threads":
+          await refreshThreads()
+          if (threadIdBeforeAction) await loadThreadDetail(threadIdBeforeAction)
+          break
+        case "thread":
+          if (threadIdBeforeAction) await refreshAfterThreadMutation(threadIdBeforeAction)
+          else await refreshThreads()
+          break
+        case "none":
+          break
+        default:
+          break
+      }
     } catch (actionError) {
       setError(
         actionError instanceof Error
@@ -224,7 +277,11 @@ export function GrowthInboxWorkspaceProvider({ children }: { children: ReactNode
     })
     const payload = (await response.json()) as { message?: string; thread?: GrowthInboxThread }
     if (!response.ok) throw new Error(payload.message ?? "Could not create inbox thread.")
-    if (payload.thread) setSelectedThreadId(payload.thread.id)
+    if (payload.thread) {
+      setSelectedThreadId(payload.thread.id)
+      await refreshThreads()
+      await loadThreadDetail(payload.thread.id)
+    }
     setNewSubject("")
   }
 
@@ -305,6 +362,7 @@ export function GrowthInboxWorkspaceProvider({ children }: { children: ReactNode
     setMessageBody,
     setMessageDirection,
     load,
+    refreshThreads,
     loadThreadDetail,
     runAction,
     createThread,

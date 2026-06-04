@@ -3,6 +3,7 @@
 export const GROWTH_INBOX_WORKSPACE_V2_QA_MARKER = "growth-inbox-workspace-v2" as const
 export const GROWTH_INBOX_WORKSPACE_PHASE2_QA_MARKER = "growth-inbox-workspace-phase2" as const
 export const GROWTH_INBOX_WORKSPACE_PHASE3_QA_MARKER = "growth-inbox-workspace-phase3" as const
+export const GROWTH_INBOX_WORKSPACE_PHASE4_QA_MARKER = "growth-inbox-workspace-phase4" as const
 
 /**
  * Enable via `GROWTH_INBOX_WORKSPACE_V2=true` (server) or

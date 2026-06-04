@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { GrowthInboxLeadContextProvider } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
+import { GrowthInboxSharedDataProvider } from "@/components/growth/inbox/growth-inbox-shared-data-provider"
 import { GrowthInboxActionCenterColumn } from "@/components/growth/inbox/growth-inbox-action-center-column"
 import { GrowthInboxConversationColumn } from "@/components/growth/inbox/growth-inbox-conversation-column"
 import { GrowthInboxQueueProvider } from "@/components/growth/inbox/growth-inbox-queue-context"
@@ -26,6 +27,7 @@ import {
   GROWTH_INBOX_DIAGNOSTICS_HREF,
   GROWTH_INBOX_WORKSPACE_PHASE2_QA_MARKER,
   GROWTH_INBOX_WORKSPACE_PHASE3_QA_MARKER,
+  GROWTH_INBOX_WORKSPACE_PHASE4_QA_MARKER,
   GROWTH_INBOX_WORKSPACE_V2_QA_MARKER,
 } from "@/lib/growth/inbox/inbox-workspace-types"
 import { GROWTH_INBOX_RUNTIME_STABLE_QA_MARKER } from "@/lib/growth/inbox/inbox-runtime-types"
@@ -64,7 +66,7 @@ export function GrowthInboxWorkspaceV2Panel() {
         <p className="text-xs text-muted-foreground">
           {GROWTH_UNIFIED_INBOX_FOUNDATION_QA_MARKER} · {GROWTH_INBOX_RUNTIME_STABLE_QA_MARKER} ·{" "}
           {GROWTH_INBOX_WORKSPACE_V2_QA_MARKER} · {GROWTH_INBOX_WORKSPACE_PHASE2_QA_MARKER} ·{" "}
-          {GROWTH_INBOX_WORKSPACE_PHASE3_QA_MARKER} · Primary sales operating surface — human approval only.
+          {GROWTH_INBOX_WORKSPACE_PHASE3_QA_MARKER} · {GROWTH_INBOX_WORKSPACE_PHASE4_QA_MARKER} · Primary sales operating surface — human approval only.
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
@@ -119,7 +121,7 @@ export function GrowthInboxWorkspaceV2Panel() {
           <Button
             type="button"
             disabled={!newLeadId || Boolean(actionLoading)}
-            onClick={() => void runAction("create-thread", createThread)}
+            onClick={() => void runAction("create-thread", createThread, "none")}
           >
             <Plus className="mr-1.5 size-3.5" />
             Create Thread
@@ -127,20 +129,22 @@ export function GrowthInboxWorkspaceV2Panel() {
         </div>
       </div>
 
-      <GrowthInboxQueueProvider>
-        <GrowthInboxLeadContextProvider
-          leadId={selectedThread?.lead_id ?? null}
-          threadId={selectedThread?.id ?? null}
-          thread={selectedThread}
-        >
-          <GrowthInboxWorkspaceShell
-            threadQueue={<GrowthInboxThreadQueueColumn />}
-            conversation={<GrowthInboxConversationColumn />}
-            actionCenter={<GrowthInboxActionCenterColumn />}
-          />
-          <GrowthInboxWorkspaceKeyboardBridge />
-        </GrowthInboxLeadContextProvider>
-      </GrowthInboxQueueProvider>
+      <GrowthInboxSharedDataProvider>
+        <GrowthInboxQueueProvider>
+          <GrowthInboxLeadContextProvider
+            leadId={selectedThread?.lead_id ?? null}
+            threadId={selectedThread?.id ?? null}
+            thread={selectedThread}
+          >
+            <GrowthInboxWorkspaceShell
+              threadQueue={<GrowthInboxThreadQueueColumn />}
+              conversation={<GrowthInboxConversationColumn />}
+              actionCenter={<GrowthInboxActionCenterColumn />}
+            />
+            <GrowthInboxWorkspaceKeyboardBridge />
+          </GrowthInboxLeadContextProvider>
+        </GrowthInboxQueueProvider>
+      </GrowthInboxSharedDataProvider>
 
       <GrowthInboxV2SupportingPanels />
     </div>

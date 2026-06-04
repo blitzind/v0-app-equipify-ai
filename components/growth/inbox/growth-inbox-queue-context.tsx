@@ -44,7 +44,7 @@ export function useGrowthInboxQueue(): GrowthInboxQueueContextValue {
 }
 
 export function GrowthInboxQueueProvider({ children }: { children: ReactNode }) {
-  const { threads, selectedThread, setSelectedThreadId, loadThreadDetail } = useGrowthInboxWorkspace()
+  const { threads, selectedThreadId, setSelectedThreadId, loadThreadDetail } = useGrowthInboxWorkspace()
   const [queueView, setQueueView] = useState<GrowthInboxQueueView>("needs_action")
   const [searchQuery, setSearchQuery] = useState("")
   const searchInputRef = useRef<HTMLInputElement | null>(null)
@@ -70,15 +70,22 @@ export function GrowthInboxQueueProvider({ children }: { children: ReactNode }) 
   const selectAdjacentThread = useCallback(
     (direction: "next" | "prev") => {
       if (visibleThreads.length === 0) return
-      const currentIndex = visibleThreads.findIndex((thread) => thread.id === selectedThread?.id)
-      const startIndex = currentIndex >= 0 ? currentIndex : 0
-      const nextIndex =
-        direction === "next"
-          ? Math.min(startIndex + 1, visibleThreads.length - 1)
-          : Math.max(startIndex - 1, 0)
+      const currentIndex = selectedThreadId
+        ? visibleThreads.findIndex((thread) => thread.id === selectedThreadId)
+        : -1
+
+      let nextIndex: number
+      if (currentIndex < 0) {
+        nextIndex = direction === "next" ? 0 : visibleThreads.length - 1
+      } else if (direction === "next") {
+        nextIndex = Math.min(currentIndex + 1, visibleThreads.length - 1)
+      } else {
+        nextIndex = Math.max(currentIndex - 1, 0)
+      }
+
       selectThreadByIndex(nextIndex)
     },
-    [visibleThreads, selectedThread?.id, selectThreadByIndex],
+    [visibleThreads, selectedThreadId, selectThreadByIndex],
   )
 
   const focusSearch = useCallback(() => {

@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import { ChevronDown } from "lucide-react"
-import { GrowthReplyDraftingPanel } from "@/components/growth/growth-reply-drafting-panel"
 import { GrowthInboxTeamQueuePanel } from "@/components/growth/growth-inbox-team-queue-panel"
 import { GrowthInboxWidgetErrorBoundary } from "@/components/growth/growth-inbox-widget-error-boundary"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
@@ -33,7 +32,7 @@ export function GrowthInboxV2SupportingPanels() {
             <span>Competitor: {intelligence?.competitor ?? 0}</span>
           </div>
           <p className="mt-2">
-            Full workflow, opportunity, booking, and memory panels are consolidated in the Action Center.{" "}
+            Workflow, opportunity, booking, memory, and reply drafting are consolidated in the Action Center above.{" "}
             <Link href="/admin/growth/replies/workflow" className="font-medium text-indigo-600 hover:underline">
               Open full workflow center
             </Link>
@@ -41,22 +40,16 @@ export function GrowthInboxV2SupportingPanels() {
         </CollapsibleContent>
       </Collapsible>
 
-      <GrowthInboxWidgetErrorBoundary label="Team queue">
-        <GrowthInboxTeamQueuePanel
-          selectedThreadId={selectedThread?.id ?? null}
-          onSelectThread={(threadId) => {
-            setSelectedThreadId(threadId)
-            void loadThreadDetail(threadId)
-          }}
-          disabled={Boolean(actionLoading)}
-        />
-      </GrowthInboxWidgetErrorBoundary>
-
       {selectedThread ? (
-        <GrowthInboxWidgetErrorBoundary label="Reply drafting">
-          <div id="inbox-reply-draft">
-            <GrowthReplyDraftingPanel threadId={selectedThread.id} disabled={Boolean(actionLoading)} />
-          </div>
+        <GrowthInboxWidgetErrorBoundary label="Team queue">
+          <GrowthInboxTeamQueuePanel
+            selectedThreadId={selectedThread.id}
+            onSelectThread={(threadId) => {
+              setSelectedThreadId(threadId)
+              void loadThreadDetail(threadId)
+            }}
+            disabled={Boolean(actionLoading)}
+          />
         </GrowthInboxWidgetErrorBoundary>
       ) : null}
     </div>
