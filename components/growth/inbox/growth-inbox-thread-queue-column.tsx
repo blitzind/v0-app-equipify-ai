@@ -12,6 +12,7 @@ import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-
 import {
   INBOX_STATUS_TONE,
   displayInboxLeadLabel,
+  displayInboxSubject,
   formatInboxDate,
 } from "@/components/growth/inbox/growth-inbox-shared-ui"
 import { classificationLabel } from "@/lib/growth/inbox/reply-classifier"
@@ -102,7 +103,7 @@ export function GrowthInboxThreadQueueColumn() {
                     tone={INBOX_STATUS_TONE[thread.priority_tier] ?? "neutral"}
                   />
                 </div>
-                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{thread.subject || "Untitled thread"}</p>
+                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{displayInboxSubject(thread.subject)}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-1">
                   <GrowthBadge
                     label={classificationLabel(thread.classification)}

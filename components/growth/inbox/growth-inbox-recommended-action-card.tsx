@@ -82,26 +82,23 @@ export function GrowthInboxRecommendedActionCard() {
 
   return (
     <div className="space-y-2">
-      <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-3 dark:border-indigo-900/40 dark:bg-indigo-950/20">
-        <div className="flex items-start gap-2">
+      <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-3.5 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+        <div className="flex items-start gap-2.5">
           <Sparkles className="mt-0.5 size-4 shrink-0 text-indigo-700 dark:text-indigo-300" />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-900 dark:text-indigo-200">
-                Recommended Action
-              </p>
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               <GrowthBadge label={SOURCE_LABELS[recommendation.source]} tone="attention" />
               <GrowthBadge label={recommendation.confidence} tone="medium" />
             </div>
-            <p className="mt-1 text-sm font-semibold text-foreground">{recommendation.recommendation}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              <span className="font-medium">Why:</span> {recommendation.whyThisExists}
+            <p className="text-sm font-semibold leading-snug text-foreground">{recommendation.recommendation}</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              <span className="font-medium text-foreground">Why:</span> {recommendation.whyThisExists}
             </p>
-            <p className="mt-1 text-xs text-foreground">
+            <p className="text-xs leading-relaxed text-foreground">
               <span className="font-medium">Next step:</span> {recommendation.recommendedNextStep}
             </p>
             {recommendation.evidence.length > 0 ? (
-              <ul className="mt-2 space-y-1 text-[11px] text-muted-foreground">
+              <ul className="space-y-0.5 text-[11px] leading-relaxed text-muted-foreground">
                 {recommendation.evidence.slice(0, 3).map((entry) => (
                   <li key={entry} className="truncate">
                     • {entry}
@@ -109,7 +106,7 @@ export function GrowthInboxRecommendedActionCard() {
                 ))}
               </ul>
             ) : null}
-            <p className="mt-2 text-[10px] text-muted-foreground">Human approval required — no automation.</p>
+            <p className="text-[10px] text-muted-foreground">Human approval required — no automation.</p>
           </div>
         </div>
       </div>

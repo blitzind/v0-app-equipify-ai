@@ -25,6 +25,7 @@ import {
   inboxTeamQueueViewLabel,
 } from "@/lib/growth/inbox-team-ownership/inbox-team-ownership-types"
 import { formatInboxThreadAgeLabel } from "@/lib/growth/inbox-team-ownership/inbox-sla-tracker"
+import { displayInboxSubject } from "@/lib/growth/inbox/inbox-display-text"
 
 const SLA_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral"> = {
   ok: "healthy",
@@ -86,7 +87,7 @@ function QueueTable({
               onClick={() => onSelectThread(item.id)}
             >
               <td className="px-2 py-2">{item.leadLabel}</td>
-              <td className="max-w-[160px] truncate px-2 py-2">{item.subject || "—"}</td>
+              <td className="max-w-[160px] truncate px-2 py-2">{displayInboxSubject(item.subject)}</td>
               <td className="px-2 py-2">{item.ownerLabel ?? "Unassigned"}</td>
               <td className="px-2 py-2">
                 <GrowthBadge label={item.priorityTier} tone={item.priorityTier === "critical" ? "critical" : "neutral"} />

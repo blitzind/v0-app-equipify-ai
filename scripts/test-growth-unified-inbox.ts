@@ -7,6 +7,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { buildInboxDashboard, buildReplyIntelligenceSummary } from "../lib/growth/inbox/inbox-dashboard"
 import { classifyReply, classificationLabel } from "../lib/growth/inbox/reply-classifier"
+import { resolveGrowthInboxWorkspaceV2FromSearchParams } from "../lib/growth/inbox/inbox-workspace-types"
 import {
   buildClassificationEvent,
   buildReplyDetectedEvent,
@@ -213,13 +214,19 @@ async function main(): Promise<void> {
   assert.match(workspaceTypes, /GROWTH_INBOX_WORKSPACE_PHASE2_QA_MARKER/)
   assert.match(workspaceTypes, /isGrowthInboxWorkspaceV2Enabled/)
 
+  assert.equal(resolveGrowthInboxWorkspaceV2FromSearchParams(new URLSearchParams()), true)
+  assert.equal(resolveGrowthInboxWorkspaceV2FromSearchParams(new URLSearchParams("inboxWorkspaceV2=1")), true)
+  assert.equal(resolveGrowthInboxWorkspaceV2FromSearchParams(new URLSearchParams("inboxWorkspaceV2=true")), true)
+  assert.equal(resolveGrowthInboxWorkspaceV2FromSearchParams(new URLSearchParams("inboxWorkspaceV2=0")), false)
+  assert.equal(resolveGrowthInboxWorkspaceV2FromSearchParams(new URLSearchParams("inboxWorkspaceV2=false")), false)
+
   const memoryStrip = fs.readFileSync(
     path.join(process.cwd(), "components/growth/inbox/growth-inbox-relationship-memory-strip.tsx"),
     "utf8",
   )
-  assert.match(memoryStrip, /Relationship Memory/)
-  assert.match(memoryStrip, /Key Objections/)
-  assert.match(memoryStrip, /Risk Flags/)
+  assert.match(memoryStrip, /No relationship memory yet/)
+  assert.match(memoryStrip, /Objections/)
+  assert.match(memoryStrip, /Risk/)
 
   const timelinePanel = fs.readFileSync(
     path.join(process.cwd(), "components/growth/inbox/growth-inbox-relationship-timeline.tsx"),

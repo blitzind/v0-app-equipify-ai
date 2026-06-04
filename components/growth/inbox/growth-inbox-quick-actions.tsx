@@ -124,14 +124,13 @@ export function GrowthInboxQuickActions() {
   return (
     <>
       <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quick Actions</p>
         {error ? <p className="text-xs text-rose-600">{error}</p> : null}
         <div className="grid grid-cols-2 gap-2">
           <Button
             type="button"
             size="sm"
             variant="outline"
-            className="justify-start"
+            className="justify-start gap-1.5"
             disabled={Boolean(actionLoading)}
             onClick={() => void runAction("assign", assignOwner)}
           >
@@ -154,7 +153,7 @@ export function GrowthInboxQuickActions() {
             type="button"
             size="sm"
             variant="outline"
-            className="justify-start"
+            className="justify-start gap-1.5"
             disabled={Boolean(taskLoading)}
             onClick={() => void createTask("follow_up")}
           >
@@ -165,7 +164,7 @@ export function GrowthInboxQuickActions() {
             type="button"
             size="sm"
             variant="outline"
-            className="justify-start"
+            className="justify-start gap-1.5"
             disabled={Boolean(taskLoading)}
             onClick={() => void openOpportunityDialog()}
           >
@@ -176,7 +175,7 @@ export function GrowthInboxQuickActions() {
             type="button"
             size="sm"
             variant="outline"
-            className="justify-start"
+            className="justify-start gap-1.5"
             disabled={Boolean(actionLoading)}
             onClick={() => void runAction("archive", archiveThread)}
           >

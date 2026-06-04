@@ -1,7 +1,10 @@
 "use client"
 
 import type { GrowthInboxMessage, GrowthInboxThread } from "@/lib/growth/inbox/inbox-types"
+import { displayInboxSubject, normalizeInboxDisplayText } from "@/lib/growth/inbox/inbox-display-text"
 import { safeFormatLeadLabel } from "@/lib/growth/lead-label"
+
+export { displayInboxSubject, normalizeInboxDisplayText }
 
 export const INBOX_STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked"> = {
   open: "healthy",
