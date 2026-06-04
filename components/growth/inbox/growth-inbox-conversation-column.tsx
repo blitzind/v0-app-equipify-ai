@@ -24,8 +24,8 @@ export function GrowthInboxConversationColumn() {
 
   if (!selectedThread) {
     return (
-      <div className="flex h-full items-center justify-center p-6 text-sm text-muted-foreground">
-        Select a thread to view the conversation.
+      <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted-foreground">
+        Select a thread from the queue to read the conversation and take action.
       </div>
     )
   }
@@ -35,11 +35,11 @@ export function GrowthInboxConversationColumn() {
       className="flex h-full min-h-0 flex-col bg-card"
       data-equipify-qa-marker={GROWTH_INBOX_WORKSPACE_PHASE3_QA_MARKER}
     >
-      <header className="shrink-0 border-b border-border px-4 py-2">
+      <header className="shrink-0 space-y-2 border-b border-border px-4 py-3">
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Conversation</p>
-        <h2 className="mt-0.5 text-base font-semibold leading-snug">{displayInboxSubject(selectedThread.subject)}</h2>
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="font-medium">{displayInboxLeadLabel(selectedThread)}</span>
+        <h2 className="break-words text-base font-semibold leading-snug">{displayInboxSubject(selectedThread.subject)}</h2>
+        <p className="text-xs font-medium text-foreground">{displayInboxLeadLabel(selectedThread)}</p>
+        <div className="flex flex-wrap items-center gap-1.5">
           <GrowthBadge
             label={classificationLabel(selectedThread.classification)}
             tone={INBOX_STATUS_TONE[selectedThread.priority_tier] ?? "neutral"}
@@ -52,33 +52,33 @@ export function GrowthInboxConversationColumn() {
             label={threadStatusLabel(selectedThread.thread_status)}
             tone={INBOX_STATUS_TONE[selectedThread.thread_status] ?? "neutral"}
           />
-          <span className="text-[10px] text-muted-foreground">
-            {selectedThread.owner_label ?? "Unassigned"} · {formatInboxDate(selectedThread.last_message_at)}
-          </span>
         </div>
+        <p className="text-[10px] leading-relaxed text-muted-foreground">
+          {selectedThread.owner_label ?? "Unassigned"} · Last message {formatInboxDate(selectedThread.last_message_at)}
+        </p>
       </header>
 
       <GrowthInboxRelationshipMemoryStrip />
       <GrowthInboxInlineRevenueContext />
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="space-y-2.5 p-3">
+        <div className="space-y-3 p-4">
           {selectedMessages.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No messages on this thread yet.</p>
+            <p className="text-sm text-muted-foreground">No messages on this thread yet — sync or reply to start the thread.</p>
           ) : (
             selectedMessages.map((message) => (
               <div
                 key={message.id}
-                className="rounded-lg border border-border/70 bg-card px-3 py-2.5 shadow-sm"
+                className="rounded-lg border border-border/70 bg-card px-3.5 py-3 shadow-sm"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <GrowthBadge label={message.direction} tone={message.direction === "inbound" ? "healthy" : "neutral"} />
                   <span className="text-[10px] text-muted-foreground">{formatInboxDate(message.message_timestamp)}</span>
                 </div>
-                <p className="mt-1.5 text-sm leading-relaxed text-foreground">
+                <p className="mt-2 text-sm leading-relaxed text-foreground">
                   {normalizeInboxDisplayText(message.body_preview) || "—"}
                 </p>
-                <div className="mt-1.5 flex flex-wrap gap-1">
+                <div className="mt-2 flex flex-wrap gap-1">
                   {inboxMessageSignalFlags(message).map((flag) => (
                     <GrowthBadge key={flag} label={flag} tone="attention" />
                   ))}

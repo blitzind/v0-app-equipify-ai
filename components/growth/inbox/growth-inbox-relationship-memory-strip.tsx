@@ -3,17 +3,22 @@
 import { useMemo, useState } from "react"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { GrowthInboxContextEmptyHint } from "@/components/growth/inbox/growth-inbox-context-empty-hint"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
 import { projectLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-projection"
 import { relationshipStageLabel } from "@/lib/growth/lead-memory/memory-types"
 import { GROWTH_INBOX_WORKSPACE_PHASE2_QA_MARKER } from "@/lib/growth/inbox/inbox-workspace-types"
+import { cn } from "@/lib/utils"
 
 function MemoryChip({ label, value }: { label: string; value: string }) {
   return (
-    <div className="shrink-0 rounded border border-border/50 bg-muted/15 px-2 py-0.5">
-      <span className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{label}: </span>
-      <span className="text-[11px]">{value}</span>
+    <div
+      className="inline-flex max-w-full min-w-0 items-baseline gap-1 rounded border border-border/50 bg-muted/15 px-2 py-0.5"
+      title={`${label}: ${value}`}
+    >
+      <span className="shrink-0 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="min-w-0 truncate text-[11px] leading-snug">{value}</span>
     </div>
   )
 }
@@ -61,9 +66,10 @@ export function GrowthInboxRelationshipMemoryStrip() {
       : null,
     profile?.memoryCoverageScore != null && profile.memoryCoverageScore > 0
       ? { label: "Coverage", value: `${profile.memoryCoverageScore}%` }
-      : influence.memoryCoverageScore != null && influence.memoryCoverageScore > 0
-        ? { label: "Coverage", value: `${influence.memoryCoverageScore}%` }
-        : null,
+      : null,
+    influence.memoryCoverageScore != null && influence.memoryCoverageScore > 0 && !profile?.memoryCoverageScore
+      ? { label: "Coverage", value: `${influence.memoryCoverageScore}%` }
+      : null,
     objections.length ? { label: "Objections", value: objections.join(" · ") } : null,
     preferences.length ? { label: "Preferences", value: preferences.join(" · ") } : null,
     commitments.length ? { label: "Commitments", value: commitments.join(" · ") } : null,
@@ -71,43 +77,47 @@ export function GrowthInboxRelationshipMemoryStrip() {
   ].filter((chip): chip is { label: string; value: string } => chip != null && !isPlaceholderMemoryValue(chip.value))
 
   const hasMemory = chips.length > 0
+  const previewChips = expanded ? chips : chips.slice(0, 4)
 
   return (
     <div
-      className="shrink-0 border-b border-border/60 bg-card/90 px-3 py-1.5"
+      className="shrink-0 border-b border-border/60 bg-card/90 px-3 py-2"
       data-equipify-qa-marker={GROWTH_INBOX_WORKSPACE_PHASE2_QA_MARKER}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Memory</p>
-          {loading ? (
-            <span className="text-[11px] text-muted-foreground">Loading…</span>
-          ) : hasMemory ? (
-            <>
-              {profile ? (
-                <GrowthBadge label={relationshipStageLabel(profile.relationshipStage)} tone="healthy" />
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Memory</p>
+            {loading ? (
+              <span className="text-[11px] text-muted-foreground">Loading…</span>
+            ) : hasMemory && profile ? (
+              <GrowthBadge label={relationshipStageLabel(profile.relationshipStage)} tone="healthy" />
+            ) : null}
+            {!loading && !hasMemory ? (
+              <GrowthInboxContextEmptyHint label="No relationship memory yet — builds after engagement" />
+            ) : null}
+          </div>
+
+          {hasMemory && !loading ? (
+            <div className={cn("flex flex-wrap gap-1.5", expanded ? "max-h-40 overflow-y-auto pr-1" : undefined)}>
+              {previewChips.map((chip) => (
+                <MemoryChip key={chip.label} label={chip.label} value={chip.value} />
+              ))}
+              {!expanded && chips.length > previewChips.length ? (
+                <span className="self-center text-[10px] text-muted-foreground">
+                  +{chips.length - previewChips.length} more
+                </span>
               ) : null}
-              {!expanded ? (
-                <div className="hidden min-w-0 flex-1 flex-wrap gap-1 lg:flex">
-                  {chips.slice(0, 3).map((chip) => (
-                    <MemoryChip key={chip.label} label={chip.label} value={chip.value} />
-                  ))}
-                  {chips.length > 3 ? (
-                    <span className="text-[10px] text-muted-foreground">+{chips.length - 3} more</span>
-                  ) : null}
-                </div>
-              ) : null}
-            </>
-          ) : (
-            <span className="text-[11px] text-muted-foreground">No relationship memory yet for this lead.</span>
-          )}
+            </div>
+          ) : null}
         </div>
+
         {hasMemory ? (
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="h-6 shrink-0 px-1.5 text-[10px] text-muted-foreground"
+            className="mt-0.5 h-7 shrink-0 px-2 text-[10px] text-muted-foreground"
             onClick={() => setExpanded((value) => !value)}
           >
             {expanded ? (
@@ -118,20 +128,12 @@ export function GrowthInboxRelationshipMemoryStrip() {
             ) : (
               <>
                 <ChevronDown className="mr-0.5 size-3" />
-                Details
+                {chips.length > 4 ? "All" : "Details"}
               </>
             )}
           </Button>
         ) : null}
       </div>
-
-      {hasMemory && expanded ? (
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          {chips.map((chip) => (
-            <MemoryChip key={chip.label} label={chip.label} value={chip.value} />
-          ))}
-        </div>
-      ) : null}
     </div>
   )
 }

@@ -53,9 +53,11 @@ type DraftListPayload = {
 type Props = {
   threadId: string | null
   disabled?: boolean
+  /** When true, omits nested card chrome for Action Center embedding. */
+  embedded?: boolean
 }
 
-export function GrowthReplyDraftingPanel({ threadId, disabled }: Props) {
+export function GrowthReplyDraftingPanel({ threadId, disabled, embedded = false }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [draft, setDraft] = useState<GrowthReplyDraftView | null>(null)
@@ -184,34 +186,29 @@ export function GrowthReplyDraftingPanel({ threadId, disabled }: Props) {
   const canSend = draft?.status === "approved"
   const canDiscard = draft && ["draft", "approved"].includes(draft.status)
 
-  if (!threadId) {
-    return (
-      <GrowthEngineCard title="Reply Drafting">
-        <p className="text-sm text-muted-foreground">Select a thread to generate AI reply drafts.</p>
-      </GrowthEngineCard>
-    )
-  }
-
-  return (
-    <GrowthEngineCard title="Reply Drafting">
-      <div className="space-y-4">
+  const content = (
+    <div className="space-y-4">
+      {!embedded ? (
         <div className="flex flex-wrap items-center gap-2">
           <GrowthBadge label={GROWTH_AI_REPLY_DRAFTING_QA_MARKER} tone="neutral" />
           <p className="text-xs text-muted-foreground">{GROWTH_AI_REPLY_DRAFTING_PRIVACY_NOTE}</p>
         </div>
+      ) : (
+        <p className="text-[10px] leading-relaxed text-muted-foreground">{GROWTH_AI_REPLY_DRAFTING_PRIVACY_NOTE}</p>
+      )}
 
-        {loading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            Loading reply drafts…
-          </div>
-        ) : null}
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Loading reply drafts…
+        </div>
+      ) : null}
 
-        {error ? (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">{error}</div>
-        ) : null}
+      {error ? (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">{error}</div>
+      ) : null}
 
-        <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             size="sm"
@@ -343,11 +340,27 @@ export function GrowthReplyDraftingPanel({ threadId, disabled }: Props) {
             </div>
           </>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            No reply draft on this thread yet. Generate a draft for human review — approval does not send automatically.
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            No draft yet — generate one for human review. Approval does not send automatically.
           </p>
         )}
-      </div>
-    </GrowthEngineCard>
+    </div>
   )
+
+  if (!threadId) {
+    if (embedded) {
+      return <p className="text-xs text-muted-foreground">Select a thread to draft a reply.</p>
+    }
+    return (
+      <GrowthEngineCard title="Reply Drafting">
+        <p className="text-sm text-muted-foreground">Select a thread to generate AI reply drafts.</p>
+      </GrowthEngineCard>
+    )
+  }
+
+  if (embedded) {
+    return content
+  }
+
+  return <GrowthEngineCard title="Reply Drafting">{content}</GrowthEngineCard>
 }

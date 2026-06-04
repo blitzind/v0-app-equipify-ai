@@ -13,7 +13,7 @@ export function GrowthInboxActionCenterReplyDraftEmbed() {
   return (
     <div id="inbox-reply-draft" data-equipify-qa-marker={GROWTH_INBOX_WORKSPACE_PHASE4_QA_MARKER}>
       <GrowthInboxWidgetErrorBoundary label="Reply drafting">
-        <GrowthReplyDraftingPanel threadId={selectedThread.id} disabled={Boolean(actionLoading)} />
+        <GrowthReplyDraftingPanel threadId={selectedThread.id} disabled={Boolean(actionLoading)} embedded />
       </GrowthInboxWidgetErrorBoundary>
     </div>
   )

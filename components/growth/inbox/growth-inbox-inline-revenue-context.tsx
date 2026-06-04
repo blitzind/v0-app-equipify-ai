@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { TrendingUp } from "lucide-react"
+import { GrowthInboxContextEmptyHint } from "@/components/growth/inbox/growth-inbox-context-empty-hint"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
 import { executionPlanProgress } from "@/lib/growth/inbox/inbox-revenue-context"
 import { GROWTH_INBOX_WORKSPACE_PHASE3_QA_MARKER } from "@/lib/growth/inbox/inbox-workspace-types"
@@ -12,11 +13,11 @@ function CompactChip({ label, value }: { label: string; value: string }) {
   if (!value || value === "—" || value === "Not generated") return null
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border/50 bg-background/80 px-2 py-0.5 text-[10px]"
+      className="inline-flex max-w-full min-w-0 shrink-0 items-center gap-1 rounded-full border border-border/50 bg-background/80 px-2 py-0.5 text-[10px]"
       title={`${label}: ${value}`}
     >
-      <span className="font-medium text-muted-foreground">{label}</span>
-      <span className="max-w-[120px] truncate">{value}</span>
+      <span className="shrink-0 font-medium text-muted-foreground">{label}</span>
+      <span className="min-w-0 truncate">{value}</span>
     </span>
   )
 }
@@ -71,35 +72,38 @@ export function GrowthInboxInlineRevenueContext() {
       : null,
   ].filter((chip): chip is { label: string; value: string } => chip != null)
 
+  const hasRevenueContext = chips.length > 0
+
   return (
     <section
-      className="shrink-0 border-b border-border/60 bg-muted/10 px-3 py-1.5"
+      className="shrink-0 border-b border-border/60 bg-muted/5 px-3 py-1.5"
       data-equipify-qa-marker={GROWTH_INBOX_WORKSPACE_PHASE3_QA_MARKER}
     >
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
+      <div className="flex min-h-[1.75rem] flex-wrap items-center gap-x-2 gap-y-1">
+        <div className="flex shrink-0 items-center gap-1.5">
           <TrendingUp className="size-3 text-muted-foreground" />
           <h3 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Revenue</h3>
         </div>
+
+        {loading && !hasRevenueContext ? (
+          <span className="text-[10px] text-muted-foreground">Loading…</span>
+        ) : hasRevenueContext ? (
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+            {chips.map((chip) => (
+              <CompactChip key={chip.label} label={chip.label} value={chip.value} />
+            ))}
+          </div>
+        ) : (
+          <GrowthInboxContextEmptyHint label="Not scored yet" />
+        )}
+
         <Link
           href={`/admin/growth/revenue-execution/review${forecastEvidence ? `?leadId=${encodeURIComponent(leadId)}` : ""}`}
-          className="text-[9px] font-medium text-indigo-600 hover:underline"
+          className="ml-auto shrink-0 text-[9px] font-medium text-indigo-600 hover:underline"
         >
           Open review
         </Link>
       </div>
-
-      {loading && chips.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground">Loading revenue context…</p>
-      ) : chips.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground">No revenue context yet.</p>
-      ) : (
-        <div className="flex gap-1 overflow-x-auto pb-0.5">
-          {chips.map((chip) => (
-            <CompactChip key={chip.label} label={chip.label} value={chip.value} />
-          ))}
-        </div>
-      )}
     </section>
   )
 }

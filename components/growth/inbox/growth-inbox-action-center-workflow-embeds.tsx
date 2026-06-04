@@ -31,14 +31,14 @@ function WorkflowGroup({
   const [open, setOpen] = useState(defaultOpen)
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="rounded-md border border-border/70">
-      <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium hover:bg-muted/30">
+      <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2.5 text-left text-xs font-medium leading-snug hover:bg-muted/30">
         <span>
           {title}
           {count != null && count > 0 ? <span className="ml-1 text-muted-foreground">({count})</span> : null}
         </span>
         <ChevronDown className={cn("size-3.5 transition-transform", open ? "rotate-180" : "")} />
       </CollapsibleTrigger>
-      <CollapsibleContent className="border-t border-border/70 px-2 py-2">{children}</CollapsibleContent>
+      <CollapsibleContent className="space-y-2 border-t border-border/70 px-3 py-3">{children}</CollapsibleContent>
     </Collapsible>
   )
 }
@@ -65,12 +65,12 @@ export function GrowthInboxActionCenterWorkflowEmbeds() {
     (copilot ? 1 : 0)
 
   return (
-    <div className="space-y-2" data-equipify-qa-marker={GROWTH_INBOX_WORKSPACE_PHASE4_QA_MARKER}>
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+    <div className="space-y-3" data-equipify-qa-marker={GROWTH_INBOX_WORKSPACE_PHASE4_QA_MARKER}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           Workflow & Recommendations
         </p>
-        <span className="text-[10px] text-muted-foreground">{totalItems} item(s)</span>
+        <span className="shrink-0 text-[10px] text-muted-foreground">{totalItems} item(s)</span>
       </div>
 
       <WorkflowGroup title="Workflow Actions" count={workflowActions.length} defaultOpen={workflowActions.length > 0}>

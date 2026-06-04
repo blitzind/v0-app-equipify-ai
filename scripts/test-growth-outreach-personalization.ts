@@ -24,6 +24,23 @@ import { extractPersonalizationSignals } from "../lib/growth/outreach/personaliz
 import { selectMessageStrategy } from "../lib/growth/outreach/personalization/message-strategy"
 import { buildPersonalizationVariationKey, pickVariantIndex } from "../lib/growth/outreach/personalization/message-variability"
 
+const emptyMemoryFields = {
+  memoryAvailable: false,
+  memoryCoverageScore: null,
+  relationshipStage: null,
+  relationshipSummary: null,
+  memoryPreferenceSummaries: [] as string[],
+  memoryInteractionSummaries: [] as string[],
+  memoryCommitmentSummaries: [] as string[],
+  memoryAvoidRepeating: [] as string[],
+  memoryRiskFlags: [] as string[],
+}
+
+const emptyResearchMetaFields = {
+  companySummary: null as string | null,
+  outreachAngles: [] as string[],
+}
+
 const basePacket: OutreachContextPacket = {
   companyName: "Summit HVAC Services",
   industryLabel: "HVAC contractor",
@@ -52,6 +69,9 @@ const basePacket: OutreachContextPacket = {
   priorTouchCount: 0,
   hasWebsiteResearch: true,
   hasDecisionMaker: true,
+  outreachAngles: ["Growing commercial HVAC footprint across Denver metro"],
+  companySummary: "Summit HVAC Services provides commercial HVAC maintenance across Colorado.",
+  ...emptyMemoryFields,
 }
 
 const signals = extractPersonalizationSignals(basePacket)
@@ -71,6 +91,10 @@ const strategy = selectMessageStrategy({
 assert.equal(strategy.industry, "hvac")
 assert.equal(strategy.angle, "dispatch_pain_capacity")
 assert.equal(strategy.blocks.length, 5)
+assert.equal(strategy.blocks[0]?.blockId, "opening_research_backed")
+assert.equal(strategy.researchOpener?.source, "website_finding")
+assert.ok(strategy.researchOpener?.evidence.includes("Manual dispatch"))
+assert.ok(!strategy.blocks[0]?.text.includes("reaching out about"))
 
 const draftA = buildPersonalizedOutreachDraft({
   leadId: "00000000-0000-4000-8000-000000000001",
@@ -112,21 +136,26 @@ const sparsePacket: OutreachContextPacket = {
   researchPainPoints: [],
   hiringSignals: [],
   equipmentServiceIndicators: [],
+  outreachAngles: [],
+  companySummary: null,
   hasWebsiteResearch: false,
   hasDecisionMaker: false,
   decisionMakerName: null,
   researchConfidence: 20,
 }
 const sparseSignals = extractPersonalizationSignals(sparsePacket)
+const sparseStrategy = selectMessageStrategy({
+  leadId: "00000000-0000-4000-8000-000000000004",
+  packet: sparsePacket,
+  signals: sparseSignals,
+  generationType: "cold_email",
+})
+assert.notEqual(sparseStrategy.blocks[0]?.blockId, "opening_research_backed")
+assert.equal(sparseStrategy.researchOpener, undefined)
 const sparseConfidence = computePersonalizationConfidence({
   packet: sparsePacket,
   signals: sparseSignals,
-  strategy: selectMessageStrategy({
-    leadId: "00000000-0000-4000-8000-000000000004",
-    packet: sparsePacket,
-    signals: sparseSignals,
-    generationType: "cold_email",
-  }),
+  strategy: sparseStrategy,
 })
 const sparseWarnings = buildPersonalizationWarnings({
   packet: sparsePacket,
@@ -196,6 +225,7 @@ const clientSafeFiles = [
   "lib/growth/outreach/personalization/personalization-types.ts",
   "lib/growth/outreach/personalization/signal-extraction.ts",
   "lib/growth/outreach/personalization/message-strategy.ts",
+  "lib/growth/outreach/personalization/research-backed-opener.ts",
   "lib/growth/outreach/personalization/ai-refinement-guard.ts",
   "components/growth/growth-outreach-personalization-preview.tsx",
 ]
@@ -230,5 +260,24 @@ const contextBuilderSource = fs.readFileSync(
   "utf8",
 )
 assert.match(contextBuilderSource, /normalizeGrowthResearchConfidence/)
+assert.match(contextBuilderSource, /outreachAngles/)
+assert.match(contextBuilderSource, /companySummary/)
+
+const mediumPacket: OutreachContextPacket = {
+  ...basePacket,
+  researchConfidence: 50,
+  websiteFindings: [],
+  outreachAngles: [],
+  companySummary: null,
+  researchPainPoints: ["Dispatch still runs on spreadsheets and phone calls"],
+}
+const mediumStrategy = selectMessageStrategy({
+  leadId: "00000000-0000-4000-8000-000000000005",
+  packet: mediumPacket,
+  signals: extractPersonalizationSignals(mediumPacket),
+  generationType: "cold_email",
+})
+assert.equal(mediumStrategy.researchOpener?.source, "research_pain_point")
+assert.equal(mediumStrategy.researchOpener?.confidenceTier, "medium")
 
 console.log("growth outreach personalization tests passed")

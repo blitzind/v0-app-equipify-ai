@@ -275,8 +275,16 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(shellSource, /GrowthInboxWorkspaceShell/)
-  assert.match(shellSource, /24%/)
-  assert.match(shellSource, /52%/)
+  assert.match(shellSource, /22%/)
+  assert.match(shellSource, /50%/)
+  assert.match(shellSource, /28%/)
+
+  const v2Panel = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/inbox/growth-inbox-workspace-v2-panel.tsx"),
+    "utf8",
+  )
+  assert.match(v2Panel, /GrowthInboxWorkspaceActionsMenu/)
+  assert.doesNotMatch(v2Panel, /Create Thread<\/p>/)
 
   const diagnosticsPage = fs.readFileSync(
     path.join(process.cwd(), "app/(admin)/admin/growth/inbox/diagnostics/page.tsx"),

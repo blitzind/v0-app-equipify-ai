@@ -44,6 +44,8 @@ function main() {
 
   const v2PanelSource = readSource("components/growth/inbox/growth-inbox-workspace-v2-panel.tsx")
   assert.match(v2PanelSource, /GrowthInboxSharedDataProvider/)
+  assert.match(v2PanelSource, /GrowthInboxWorkspaceActionsMenu/)
+  assert.doesNotMatch(v2PanelSource, /Create Thread<\/p>/)
 
   console.log("growth-inbox-workspace-phase4: all checks passed")
 }

@@ -1,17 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { Loader2, Plus, RefreshCw } from "lucide-react"
+import { Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { GrowthInboxLeadContextProvider } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
 import { GrowthInboxSharedDataProvider } from "@/components/growth/inbox/growth-inbox-shared-data-provider"
 import { GrowthInboxActionCenterColumn } from "@/components/growth/inbox/growth-inbox-action-center-column"
@@ -20,6 +11,7 @@ import { GrowthInboxQueueProvider } from "@/components/growth/inbox/growth-inbox
 import { GrowthInboxThreadQueueColumn } from "@/components/growth/inbox/growth-inbox-thread-queue-column"
 import { GrowthInboxV2SupportingPanels } from "@/components/growth/inbox/growth-inbox-v2-supporting-panels"
 import { GrowthInboxWorkspaceKeyboardBridge } from "@/components/growth/inbox/growth-inbox-workspace-keyboard-bridge"
+import { GrowthInboxWorkspaceActionsMenu } from "@/components/growth/inbox/growth-inbox-workspace-actions-menu"
 import { GrowthInboxWorkspaceShell } from "@/components/growth/inbox/growth-inbox-workspace-shell"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
 import { GrowthInboxSetupEmptyState } from "@/components/growth/growth-inbox-setup-empty-state"
@@ -40,15 +32,8 @@ export function GrowthInboxWorkspaceV2Panel() {
     actionLoading,
     showHonestEmptyState,
     setupPhase,
-    leads,
-    newLeadId,
-    newSubject,
     selectedThread,
-    setNewLeadId,
-    setNewSubject,
     load,
-    runAction,
-    createThread,
   } = useGrowthInboxWorkspace()
 
   if (loading) {
@@ -78,6 +63,7 @@ export function GrowthInboxWorkspaceV2Panel() {
           <Button type="button" variant="outline" size="sm" asChild>
             <Link href="/admin/growth/sequences/execution">Sequence Execution</Link>
           </Button>
+          <GrowthInboxWorkspaceActionsMenu />
           <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={Boolean(actionLoading)}>
             <RefreshCw className="mr-1.5 size-3.5" />
             Refresh
@@ -90,44 +76,6 @@ export function GrowthInboxWorkspaceV2Panel() {
       ) : null}
 
       {showHonestEmptyState ? <GrowthInboxSetupEmptyState phase={setupPhase} /> : null}
-
-      <div className="rounded-xl border border-border bg-card p-4">
-        <p className="mb-3 text-sm font-medium">Create Thread</p>
-        <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
-          <div className="space-y-2">
-            <Label htmlFor="workspace-inbox-lead">Lead</Label>
-            <Select value={newLeadId} onValueChange={setNewLeadId}>
-              <SelectTrigger id="workspace-inbox-lead">
-                <SelectValue placeholder="Select lead" />
-              </SelectTrigger>
-              <SelectContent>
-                {leads.map((lead) => (
-                  <SelectItem key={lead.id} value={lead.id}>
-                    {lead.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="workspace-inbox-subject">Subject</Label>
-            <Input
-              id="workspace-inbox-subject"
-              value={newSubject}
-              onChange={(event) => setNewSubject(event.target.value)}
-              placeholder="Re: follow-up"
-            />
-          </div>
-          <Button
-            type="button"
-            disabled={!newLeadId || Boolean(actionLoading)}
-            onClick={() => void runAction("create-thread", createThread, "none")}
-          >
-            <Plus className="mr-1.5 size-3.5" />
-            Create Thread
-          </Button>
-        </div>
-      </div>
 
       <GrowthInboxSharedDataProvider>
         <GrowthInboxQueueProvider>

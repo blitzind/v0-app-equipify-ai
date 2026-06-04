@@ -10,6 +10,9 @@ import {
   shouldAvoidPainBlock,
 } from "@/lib/growth/outreach/personalization/memory-strategy"
 import {
+  buildResearchBackedOpener,
+} from "@/lib/growth/outreach/personalization/research-backed-opener"
+import {
   industryBlocksFor,
   interpolateBlockText,
   OUTREACH_MESSAGE_BLOCK_LIBRARY,
@@ -232,12 +235,39 @@ export function selectMessageStrategy(input: {
     pickBlock(OUTREACH_MESSAGE_BLOCK_LIBRARY.cta, pick.ctaId, "cta", variationKey, tokens),
   ]
 
+  const researchOpener = buildResearchBackedOpener({
+    packet: input.packet,
+    generationType: input.generationType,
+    openingBlockId: pick.openingId,
+    variationSeed: variationKey,
+    tokens,
+  })
+
+  if (researchOpener) {
+    const openingIndex = blocks.findIndex((block) => block.key === "opening")
+    if (openingIndex >= 0) {
+      blocks[openingIndex] = {
+        ...blocks[openingIndex],
+        blockId: "opening_research_backed",
+        label: "Research-backed opener",
+        text: researchOpener.text,
+      }
+    }
+  }
+
   return {
     industry,
     angle: pick.angle,
     blocks,
     sourceSignals: input.signals,
     variationKey,
+    researchOpener: researchOpener
+      ? {
+          source: researchOpener.source,
+          evidence: researchOpener.evidence,
+          confidenceTier: researchOpener.confidenceTier,
+        }
+      : undefined,
   }
 }
 

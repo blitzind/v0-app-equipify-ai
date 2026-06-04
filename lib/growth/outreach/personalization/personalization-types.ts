@@ -67,6 +67,19 @@ export const MESSAGE_ANGLE_KEYS = [
 
 export type MessageAngleKey = (typeof MESSAGE_ANGLE_KEYS)[number]
 
+export type ResearchOpenerSource =
+  | "website_finding"
+  | "outreach_angle"
+  | "research_pain_point"
+  | "company_summary"
+  | "industry_context"
+
+export type ResearchOpenerMetadata = {
+  source: ResearchOpenerSource
+  evidence: string
+  confidenceTier: "high" | "medium"
+}
+
 export type OutreachContextPacket = {
   companyName: string
   industryLabel: string | null
@@ -92,6 +105,8 @@ export type OutreachContextPacket = {
   researchConfidence: number | null
   researchPainPoints: string[]
   equipmentServiceIndicators: string[]
+  companySummary: string | null
+  outreachAngles: string[]
   priorTouchCount: number
   hasWebsiteResearch: boolean
   hasDecisionMaker: boolean
@@ -120,6 +135,7 @@ export type SelectedMessageStrategy = {
   blocks: SelectedMessageBlock[]
   sourceSignals: PersonalizationSignalKey[]
   variationKey: string
+  researchOpener?: ResearchOpenerMetadata
 }
 
 export type OutreachPersonalizationDraft = {

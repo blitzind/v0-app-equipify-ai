@@ -2,6 +2,7 @@
 
 import { useMemo } from "react"
 import { Loader2, Sparkles } from "lucide-react"
+import { GrowthInboxContextEmptyHint } from "@/components/growth/inbox/growth-inbox-context-empty-hint"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
 import { orchestrateGrowthInboxRecommendations } from "@/lib/growth/inbox/inbox-recommendation-orchestrator"
@@ -63,30 +64,26 @@ export function GrowthInboxRecommendedActionCard() {
 
   if (loading && !recommendation) {
     return (
-      <div className="rounded-lg border border-border bg-muted/10 p-3">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 className="size-3.5 animate-spin" />
-          Orchestrating recommended action…
-        </div>
+      <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
+        <Loader2 className="size-3.5 animate-spin" />
+        Loading recommendation…
       </div>
     )
   }
 
   if (!recommendation) {
     return (
-      <div className="rounded-lg border border-dashed border-border bg-muted/10 p-3 text-xs text-muted-foreground">
-        No prioritized recommendation yet. Monitoring workflow, revenue execution, playbook, and intelligence sources.
-      </div>
+      <GrowthInboxContextEmptyHint label="No prioritized action — monitoring workflow and revenue signals" />
     )
   }
 
   return (
-    <div className="space-y-2">
-      <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-3.5 dark:border-indigo-900/40 dark:bg-indigo-950/20">
-        <div className="flex items-start gap-2.5">
+    <div className="space-y-2.5">
+      <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+        <div className="flex items-start gap-3">
           <Sparkles className="mt-0.5 size-4 shrink-0 text-indigo-700 dark:text-indigo-300" />
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <div className="flex flex-wrap items-center gap-1.5">
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
               <GrowthBadge label={SOURCE_LABELS[recommendation.source]} tone="attention" />
               <GrowthBadge label={recommendation.confidence} tone="medium" />
             </div>
@@ -98,21 +95,21 @@ export function GrowthInboxRecommendedActionCard() {
               <span className="font-medium">Next step:</span> {recommendation.recommendedNextStep}
             </p>
             {recommendation.evidence.length > 0 ? (
-              <ul className="space-y-0.5 text-[11px] leading-relaxed text-muted-foreground">
+              <ul className="space-y-1 text-[11px] leading-relaxed text-muted-foreground">
                 {recommendation.evidence.slice(0, 3).map((entry) => (
-                  <li key={entry} className="truncate">
+                  <li key={entry} className="break-words">
                     • {entry}
                   </li>
                 ))}
               </ul>
             ) : null}
-            <p className="text-[10px] text-muted-foreground">Human approval required — no automation.</p>
+            <p className="text-[10px] leading-relaxed text-muted-foreground">Human approval required — no automation.</p>
           </div>
         </div>
       </div>
       {ranked.length > 1 ? (
-        <p className="text-[10px] text-muted-foreground">
-          {ranked.length - 1} alternate recommendation(s) available in workflow sections below.
+        <p className="text-[10px] leading-relaxed text-muted-foreground">
+          {ranked.length - 1} alternate recommendation(s) in workflow sections below.
         </p>
       ) : null}
     </div>
