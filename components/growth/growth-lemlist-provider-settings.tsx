@@ -12,8 +12,13 @@ import {
 } from "@/lib/growth/outbound/providers/lemlist/lemlist-config"
 import {
   LEMLIST_AUTO_LAUNCH_WARNING,
+  LEMLIST_ROLLBACK_ONLY_OPERATOR_NOTE,
   LEMLIST_WEBHOOK_VERIFICATION_NOTE,
 } from "@/lib/growth/outbound/providers/lemlist/lemlist-labels"
+import {
+  GROWTH_ADAPTER_ROLLBACK_SEQUENCE_EXECUTION_HREF,
+  GROWTH_LEMLIST_DECOMMISSION_QA_MARKER,
+} from "@/lib/growth/runtime/adapter-outbound-decommission-types"
 import type { GrowthProviderConnectionSummary } from "@/lib/growth/outbound/provider-types"
 
 type LemlistCampaignRow = {
@@ -44,13 +49,14 @@ type SyncedCampaign = {
 type Props = {
   connection: GrowthProviderConnectionSummary
   onUpdated: () => Promise<void>
+  readOnly?: boolean
 }
 
 function formatStat(value: number | undefined): string {
   return value != null ? String(value) : "—"
 }
 
-export function GrowthLemlistProviderSettings({ connection, onUpdated }: Props) {
+export function GrowthLemlistProviderSettings({ connection, onUpdated, readOnly = false }: Props) {
   const config = useMemo(() => parseLemlistConnectionConfig(connection.config), [connection.config])
   const [campaigns, setCampaigns] = useState<LemlistCampaignRow[]>([])
   const [syncedCampaigns, setSyncedCampaigns] = useState<SyncedCampaign[]>([])
@@ -62,6 +68,7 @@ export function GrowthLemlistProviderSettings({ connection, onUpdated }: Props) 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [adapterRollbackActive, setAdapterRollbackActive] = useState(false)
 
   const webhookPath = buildLemlistWebhookCallbackPath(connection.id)
   const webhookUrl = useMemo(() => {
@@ -104,6 +111,17 @@ export function GrowthLemlistProviderSettings({ connection, onUpdated }: Props) 
   useEffect(() => {
     void loadCampaigns()
   }, [loadCampaigns])
+
+  useEffect(() => {
+    void fetch("/api/platform/growth/outbound/cutover-status", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((body: { cutover?: { adapter_execution_enabled?: boolean } }) => {
+        setAdapterRollbackActive(Boolean(body.cutover?.adapter_execution_enabled))
+      })
+      .catch(() => setAdapterRollbackActive(false))
+  }, [])
+
+  const operatorReadOnly = readOnly || !adapterRollbackActive
 
   useEffect(() => {
     setDefaultCampaignId(config.defaultCampaignId ?? "")
@@ -175,7 +193,20 @@ export function GrowthLemlistProviderSettings({ connection, onUpdated }: Props) 
   }
 
   return (
-    <GrowthEngineCard title="Lemlist Campaign Settings">
+    <GrowthEngineCard title="Lemlist Campaign Settings (rollback-only)">
+      {operatorReadOnly ? (
+        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 space-y-2">
+          <p>{LEMLIST_ROLLBACK_ONLY_OPERATOR_NOTE}</p>
+          <p className="text-xs text-amber-900/80">
+            {GROWTH_LEMLIST_DECOMMISSION_QA_MARKER} · Historical campaigns and webhook config remain visible.
+            Approve sends at{" "}
+            <a className="underline font-medium" href={GROWTH_ADAPTER_ROLLBACK_SEQUENCE_EXECUTION_HREF}>
+              Sequence Execution
+            </a>
+            .
+          </p>
+        </div>
+      ) : null}
       {error ? (
         <div className="mb-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{error}</div>
       ) : null}
@@ -193,7 +224,7 @@ export function GrowthLemlistProviderSettings({ connection, onUpdated }: Props) 
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             value={defaultCampaignId}
             onChange={(e) => setDefaultCampaignId(e.target.value)}
-            disabled={loadingCampaigns}
+            disabled={loadingCampaigns || operatorReadOnly}
           >
             <option value="">Select a campaign…</option>
             {campaigns.map((campaign) => (
@@ -211,6 +242,7 @@ export function GrowthLemlistProviderSettings({ connection, onUpdated }: Props) 
             type="checkbox"
             checked={deduplicate}
             onChange={(e) => setDeduplicate(e.target.checked)}
+            disabled={operatorReadOnly}
           />
           <Label htmlFor="lemlist-deduplicate">Deduplicate leads across Lemlist campaigns</Label>
         </div>
@@ -228,11 +260,11 @@ export function GrowthLemlistProviderSettings({ connection, onUpdated }: Props) 
           {loadingCampaigns ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />}
           Refresh Campaigns
         </Button>
-        <Button onClick={() => void syncCampaigns()} disabled={syncing}>
+        <Button onClick={() => void syncCampaigns()} disabled={syncing || operatorReadOnly}>
           {syncing ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
           Sync Campaign Stats
         </Button>
-        <Button onClick={() => void saveSettings()} disabled={saving}>
+        <Button onClick={() => void saveSettings()} disabled={saving || operatorReadOnly}>
           {saving ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
           Save Lemlist Settings
         </Button>
@@ -285,6 +317,7 @@ export function GrowthLemlistProviderSettings({ connection, onUpdated }: Props) 
             value={webhookSecret}
             onChange={(e) => setWebhookSecret(e.target.value)}
             placeholder={connection.webhookSecretConfigured ? "Replace stored secret" : "Set webhook secret"}
+            disabled={operatorReadOnly}
           />
         </div>
         <div className="space-y-2">

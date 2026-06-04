@@ -61,6 +61,10 @@ const approvalPage = readSource("app/(admin)/admin/growth/outreach/approval/page
 assert.match(approvalPage, /redirect\(/)
 assert.match(approvalPage, /sequences\/execution/)
 
+const legacyQueuePage = readSource("app/(admin)/admin/growth/outreach/legacy-queue/page.tsx")
+assert.match(legacyQueuePage, /readOnly/)
+assert.match(legacyQueuePage, /GROWTH_LEMLIST_DECOMMISSION_QA_MARKER/)
+
 const envExample = readSource(".env.local.example")
 assert.match(envExample, /GROWTH_ALLOW_ADAPTER_OUTBOUND/)
 

@@ -298,7 +298,7 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     id: "outreach-approval",
     label: "Sequence Approvals",
     href: "/admin/growth/sequences/execution",
-    keywords: ["approval", "queue", "sequence execution"],
+    keywords: ["approval", "queue", "sequence execution", "native transport", "gmail", "microsoft"],
     consoleKey: "sequence_execution",
   },
   {
@@ -775,7 +775,8 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         consoleKey: "sequence_execution",
         match: (path) =>
           path.startsWith("/admin/growth/sequences/execution") ||
-          path.startsWith("/admin/growth/outreach/approval"),
+          path.startsWith("/admin/growth/outreach/approval") ||
+          path.startsWith("/admin/growth/outreach/legacy-queue"),
       },
       {
         id: "booking-intelligence",

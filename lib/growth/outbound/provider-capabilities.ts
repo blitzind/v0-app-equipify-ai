@@ -51,7 +51,8 @@ export const GROWTH_OUTBOUND_PROVIDER_CAPABILITIES: OutboundProviderCapabilities
   {
     providerFamily: "lemlist",
     displayName: "Lemlist",
-    summary: "Live sequence outbound via Lemlist campaign lead push and webhook events.",
+    summary:
+      "Rollback-only adapter — campaign lead push and webhooks when GROWTH_ALLOW_ADAPTER_OUTBOUND=true. Production uses native Gmail/Microsoft transport.",
     capabilities: {
       ...BASE_CAPABILITIES,
       multi_inbox_warmup: "partial",

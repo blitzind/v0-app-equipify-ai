@@ -8,13 +8,14 @@ This milestone operationalizes the existing Growth outbound stack without introd
 
 | Surface | Status | Notes |
 | --- | --- | --- |
-| Transport orchestrator (`executeTransportSend`) | **LIVE** when `GROWTH_TRANSPORT_SIMULATE` is unset | Human approval required; unified pre-send suppression |
-| Google mailbox OAuth + Gmail send | **LIVE** when Google OAuth env + encrypted credentials configured | Primary mailbox path for this milestone |
-| Outreach queue execution cron | **LIVE** | `POST /api/cron/growth-outreach-execute` |
-| Sequence scheduler + safe execute crons | **LIVE** | Creates `pending_approval` only; safe execute sends approved jobs |
+| Transport orchestrator (`executeTransportSend`) | **LIVE** when `GROWTH_TRANSPORT_SIMULATE` is unset | Human approval required; unified pre-send suppression; Gmail / Microsoft primary |
+| Google mailbox OAuth + Gmail send | **LIVE** when Google OAuth env + encrypted credentials configured | Primary production send path |
+| Microsoft 365 mailbox OAuth + Graph send | **LIVE** when Microsoft OAuth env configured | Production send + inbox sync when connected |
+| Sequence scheduler + safe execute crons | **LIVE** | Standalone mode: `sequence_execution_jobs`; human approval at Sequence Execution |
 | Inbox sync worker | **LIVE** when `GROWTH_INBOX_SYNC_SIMULATE` is unset | Polls connected mailboxes |
-| Lemlist cold outbound | **LIVE** | Only non-fixture outbound provider adapter |
-| Webhook ingestion | **LIVE** | Normalized provider delivery events |
+| Lemlist adapter (`outreach_queue`) | **ROLLBACK-ONLY** | Requires `GROWTH_OUTBOUND_MODE=adapter` + `GROWTH_ALLOW_ADAPTER_OUTBOUND=true`; see Phase 6.35D |
+| Outreach queue execution cron | **RETIRED from Vercel schedule** | Route retained; returns 410 unless rollback env |
+| Webhook ingestion | **LIVE** | Native transport + Lemlist historical webhooks when configured |
 | Compliance suppression (`delivery_suppressions`, `unsubscribe_registry`, bounces/complaints) | **LIVE** | Hashed identity layer |
 | Outbound suppression (`suppression_entries`) | **LIVE** | Plaintext operator suppressions — unified via `assertPreSendAllowed()` |
 
@@ -31,9 +32,8 @@ Simulation flags are **blocked in production** by runtime guards and the product
 
 | Surface | Status |
 | --- | --- |
-| Microsoft 365 mailbox OAuth | **PREVIEW ONLY** — not operationalized in v1 |
-| DNS validation probes | **STUB** — advisory records only |
-| Mailbox warmup execution | **DISABLED** — planning/registry UI only |
+| DNS validation probes | **STUB** unless `GROWTH_LIVE_DNS_VERIFICATION=true` |
+| Mailbox warmup execution | **LIVE** when transport simulate is off — ramp caps and pre-send guards (6.35B) |
 | Smartlead / Instantly / EmailBison outbound | **STUB** — fixture adapters |
 | SMTP / custom mailbox paths | **INTERNAL / STUB** — operator testing only |
 

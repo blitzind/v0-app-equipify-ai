@@ -107,7 +107,7 @@ function degradedCopy(failureReason: GrowthOutboundOperationsFailureReason): {
         message: "Live queue metrics could not be loaded right now.",
         actions: [
           "Retry load",
-          "Open outreach approvals",
+          "Open sequence approvals",
           "Check provider setup and deliverability protection",
         ],
       }

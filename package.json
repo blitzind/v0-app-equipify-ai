@@ -99,6 +99,7 @@
     "test:growth-call-copilot": "tsx scripts/test-growth-call-copilot.ts",
     "test:growth-outreach-execution": "tsx scripts/test-growth-outreach-execution.ts",
     "test:growth-lemlist-outbound": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-lemlist-outbound.ts",
+    "test:growth-lemlist-decommission": "tsx scripts/test-growth-lemlist-decommission.ts",
     "test:growth-outreach-personalization": "tsx scripts/test-growth-outreach-personalization.ts",
     "test:growth-outreach-research-opener": "tsx scripts/test-growth-outreach-research-opener.ts",
     "test:growth-outreach-subject-intelligence": "tsx scripts/test-growth-outreach-subject-intelligence.ts",

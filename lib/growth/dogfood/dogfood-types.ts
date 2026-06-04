@@ -51,7 +51,7 @@ export const GROWTH_DOGFOOD_SUBSYSTEM_CHECKS: Record<GrowthDogfoodSubsystem, str
   import: ["Seamless CSV import", "Dedupe", "Enrichment", "Assignment"],
   outbound: [
     "Personalization quality",
-    "Lemlist delivery",
+    "Native Gmail / Microsoft delivery",
     "Bounce handling",
     "Unsubscribe handling",
     "Suppression handling",

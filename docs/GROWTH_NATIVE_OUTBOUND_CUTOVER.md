@@ -37,6 +37,7 @@ Then restore `growth-outreach-execute` in `vercel.json` and redeploy.
 - POST `/api/platform/growth/outreach/queue` (+ approve/execute/replay) — HTTP 410 + cutover payload
 - Manual enrollment queue API — routes to `queueSequenceStepTransportJob` when adapter disabled
 - UI: `/admin/growth/outreach/approval` → redirects to `/admin/growth/sequences/execution`
+- Phase 6.35D: Lemlist operator UI archived read-only; legacy queue at `/admin/growth/outreach/legacy-queue` (see `docs/GROWTH_LEMLIST_DECOMMISSION_6.35D.md`)
 
 ## Webhooks (operator)
 

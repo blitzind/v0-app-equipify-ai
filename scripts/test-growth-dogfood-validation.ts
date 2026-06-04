@@ -19,6 +19,13 @@ import { GROWTH_NOTIFICATION_TYPES } from "../lib/growth/notifications/notificat
 assert.equal(GROWTH_DOGFOOD_VALIDATION_QA_MARKER, "dogfood-validation-v1")
 assert.equal(GROWTH_DOGFOOD_SUBSYSTEMS.length, 6)
 
+const dogfoodTypesSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/dogfood/dogfood-types.ts"),
+  "utf8",
+)
+assert.match(dogfoodTypesSource, /Native Gmail \/ Microsoft delivery/)
+assert.doesNotMatch(dogfoodTypesSource, /Lemlist delivery/)
+
 assert.equal(readinessPercentForStatus("validated"), 100)
 assert.equal(readinessPercentForStatus("warning"), 75)
 assert.equal(readinessPercentForStatus("testing"), 50)

@@ -33,8 +33,13 @@ import {
   type GrowthProviderLifecycleStatus,
   type GrowthProviderValidationResult,
 } from "@/lib/growth/outbound/provider-types"
+import Link from "next/link"
 import { GrowthLemlistProviderSettings } from "@/components/growth/growth-lemlist-provider-settings"
 import { GROWTH_OUTBOUND_PROVIDER_FAMILIES, type GrowthOutboundProviderFamily } from "@/lib/growth/outbound/types"
+import {
+  GROWTH_ADAPTER_LEGACY_QUEUE_ARCHIVE_HREF,
+  GROWTH_LEMLIST_ROLLBACK_ONLY_OPERATOR_NOTE,
+} from "@/lib/growth/runtime/adapter-outbound-decommission-types"
 
 const LIFECYCLE_TONE: Record<
   GrowthProviderLifecycleStatus,
@@ -86,7 +91,7 @@ export function GrowthProvidersDashboard() {
   const [timeline, setTimeline] = useState<GrowthPlatformTimelineEvent[]>([])
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
-  const [newFamily, setNewFamily] = useState<GrowthOutboundProviderFamily>("lemlist")
+  const [newFamily, setNewFamily] = useState<GrowthOutboundProviderFamily>("smartlead")
   const [newLabel, setNewLabel] = useState("")
   const [credentialApiKey, setCredentialApiKey] = useState("")
 
@@ -291,6 +296,12 @@ export function GrowthProvidersDashboard() {
       ) : null}
 
       <GrowthEngineCard title="Add Provider Connection" icon={<Plug size={16} />}>
+        <p className="mb-3 text-sm text-muted-foreground">
+          {GROWTH_LEMLIST_ROLLBACK_ONLY_OPERATOR_NOTE}{" "}
+          <Link className="underline" href={GROWTH_ADAPTER_LEGACY_QUEUE_ARCHIVE_HREF}>
+            View legacy outreach queue (read-only)
+          </Link>
+        </p>
         <div className="grid gap-4 md:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="provider-family">Provider family</Label>
@@ -302,7 +313,9 @@ export function GrowthProvidersDashboard() {
             >
               {GROWTH_OUTBOUND_PROVIDER_FAMILIES.map((family) => (
                 <option key={family} value={family}>
-                  {adapters?.find((a) => a.providerFamily === family)?.providerName ?? family}
+                  {family === "lemlist"
+                    ? "Lemlist (rollback-only)"
+                    : (adapters?.find((a) => a.providerFamily === family)?.providerName ?? family)}
                 </option>
               ))}
             </select>
@@ -498,7 +511,7 @@ export function GrowthProvidersDashboard() {
             </GrowthEngineCard>
 
             {selected.providerFamily === "lemlist" ? (
-              <GrowthLemlistProviderSettings connection={selected} onUpdated={load} />
+              <GrowthLemlistProviderSettings connection={selected} onUpdated={load} readOnly />
             ) : null}
 
             <GrowthEngineCard title="Credentials (write-only)">

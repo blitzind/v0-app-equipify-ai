@@ -1,9 +1,14 @@
 "use client"
 
+import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import { Loader2, Mail, RefreshCw, ShieldAlert, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import {
+  GROWTH_ADAPTER_ROLLBACK_SEQUENCE_EXECUTION_HREF,
+  GROWTH_LEMLIST_ROLLBACK_ONLY_OPERATOR_NOTE,
+} from "@/lib/growth/runtime/adapter-outbound-decommission-types"
 import type { GrowthOutreachQueueItemWithLead } from "@/lib/growth/outreach/outreach-queue-types"
 import {
   GROWTH_OUTREACH_QUEUE_CHANNEL_LABELS,
@@ -53,12 +58,14 @@ function QueueList({
   onAction,
   actingId,
   highlightQueueId,
+  readOnly = false,
 }: {
   title: string
   items: GrowthOutreachQueueItemWithLead[]
   onAction: (action: "approve" | "execute" | "cancel", queueId: string) => void
   actingId: string | null
   highlightQueueId?: string | null
+  readOnly?: boolean
 }) {
   return (
     <GrowthEngineCard title={title}>
@@ -91,7 +98,7 @@ function QueueList({
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <GrowthBadge label={item.status.replace(/_/g, " ")} tone="neutral" />
-                  {item.status === "pending_approval" ? (
+                  {readOnly ? null : item.status === "pending_approval" ? (
                     <Button
                       type="button"
                       size="sm"
@@ -102,7 +109,7 @@ function QueueList({
                       Approve
                     </Button>
                   ) : null}
-                  {item.status === "approved" ? (
+                  {!readOnly && item.status === "approved" ? (
                     <Button
                       type="button"
                       size="sm"
@@ -112,7 +119,7 @@ function QueueList({
                       Execute
                     </Button>
                   ) : null}
-                  {["pending_approval", "approved", "scheduled"].includes(item.status) ? (
+                  {!readOnly && ["pending_approval", "approved", "scheduled"].includes(item.status) ? (
                     <Button
                       type="button"
                       size="sm"
@@ -143,9 +150,12 @@ function formatDuration(ms: number | null): string {
 export function GrowthOutreachApprovalDashboard({
   highlightQueueId,
   filterLeadId,
+  readOnly = false,
 }: {
   highlightQueueId?: string | null
   filterLeadId?: string | null
+  /** Historical outreach_queue visibility — no approve/execute when adapter cutover is active. */
+  readOnly?: boolean
 }) {
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null)
   const [loading, setLoading] = useState(true)
@@ -179,6 +189,7 @@ export function GrowthOutreachApprovalDashboard({
   }, [highlightQueueId, dashboard])
 
   async function handleAction(action: "approve" | "execute" | "cancel", queueId: string) {
+    if (readOnly) return
     setActingId(queueId)
     try {
       const path =
@@ -234,6 +245,18 @@ export function GrowthOutreachApprovalDashboard({
 
   return (
     <div className="space-y-6">
+      {readOnly ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          <p>{GROWTH_LEMLIST_ROLLBACK_ONLY_OPERATOR_NOTE}</p>
+          <p className="mt-1 text-xs text-amber-900/80">
+            Approve new sends at{" "}
+            <Link className="underline font-medium" href={GROWTH_ADAPTER_ROLLBACK_SEQUENCE_EXECUTION_HREF}>
+              Sequence Execution
+            </Link>
+            . Queue mutations require adapter rollback env.
+          </p>
+        </div>
+      ) : null}
       {filterLeadId ? (
         <p className="text-sm text-muted-foreground">
           Filtered to lead <span className="font-mono">{filterLeadId.slice(0, 8)}…</span> — human approval required for
@@ -301,6 +324,7 @@ export function GrowthOutreachApprovalDashboard({
         onAction={handleAction}
         actingId={actingId}
         highlightQueueId={highlightQueueId}
+        readOnly={readOnly}
       />
       <QueueList
         title="Scheduled"
@@ -308,6 +332,7 @@ export function GrowthOutreachApprovalDashboard({
         onAction={handleAction}
         actingId={actingId}
         highlightQueueId={highlightQueueId}
+        readOnly={readOnly}
       />
       <QueueList
         title="Failed"
@@ -315,6 +340,7 @@ export function GrowthOutreachApprovalDashboard({
         onAction={handleAction}
         actingId={actingId}
         highlightQueueId={highlightQueueId}
+        readOnly={readOnly}
       />
       <QueueList
         title="Executed recently"
@@ -322,6 +348,7 @@ export function GrowthOutreachApprovalDashboard({
         onAction={handleAction}
         actingId={actingId}
         highlightQueueId={highlightQueueId}
+        readOnly={readOnly}
       />
 
       {filteredSections.followUpDraftsPendingApproval.length > 0 ? (

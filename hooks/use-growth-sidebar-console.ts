@@ -123,7 +123,9 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
         leadInboxRes,
         callQueueRes,
         copilotRes,
+        cutoverStatusRes,
         outreachApprovalRes,
+        sequenceExecutionRes,
         intentPixelRes,
         revenueRes,
         executiveRes,
@@ -153,8 +155,14 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
         fetchJson<{ ok?: boolean; dashboard?: { approvalQueue?: unknown[] } }>(
           "/api/platform/growth/copilot/dashboard",
         ),
+        fetchJson<{ ok?: boolean; cutover?: { adapter_execution_enabled?: boolean } }>(
+          "/api/platform/growth/outbound/cutover-status",
+        ),
         fetchJson<{ ok?: boolean; sections?: { pendingApproval?: unknown[] } }>(
           "/api/platform/growth/outreach/approval-dashboard",
+        ),
+        fetchJson<{ ok?: boolean; dashboard?: { pendingApproval?: number } }>(
+          "/api/platform/growth/sequences/execution/dashboard",
         ),
         fetchJson<{
           ok?: boolean
@@ -244,7 +252,12 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
       const commandCritical = commandRes?.dashboard?.missionControl?.criticalActions ?? 0
       const callQueueCount = safeLength(callQueueRes?.rows)
       const approvalQueueCount = safeLength(copilotRes?.dashboard?.approvalQueue)
-      const outreachPendingCount = safeLength(outreachApprovalRes?.sections?.pendingApproval)
+      const adapterRollbackActive = Boolean(cutoverStatusRes?.cutover?.adapter_execution_enabled)
+      const legacyOutreachPending = safeLength(outreachApprovalRes?.sections?.pendingApproval)
+      const sequencePendingCount = sequenceExecutionRes?.dashboard?.pendingApproval ?? 0
+      const outreachPendingCount = adapterRollbackActive
+        ? legacyOutreachPending + sequencePendingCount
+        : sequencePendingCount
       const intentHighIntentCount = safeLength(intentPixelRes?.snapshot?.high_intent_queue)
       const intentLiveCount = safeLength(intentPixelRes?.snapshot?.live_visitors)
       const intentPixelBadge =
@@ -292,6 +305,7 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
           callQueue: callQueueCount > 0 ? callQueueCount : undefined,
           copilot: approvalQueueCount > 0 ? approvalQueueCount : undefined,
           outreach_approval: outreachPendingCount > 0 ? outreachPendingCount : undefined,
+          sequence_execution: sequencePendingCount > 0 ? sequencePendingCount : undefined,
           revenue: revenueAttention > 0 ? revenueAttention : undefined,
           executive: executiveTier.executive_now ?? undefined,
           playbooks: playbooksDraftCount > 0 ? playbooksDraftCount : undefined,
@@ -334,7 +348,13 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
             { label: "High intent queue", value: intentHighIntentCount },
             { label: "Live visitors", value: intentLiveCount },
           ],
-          outreach_approval: [{ label: "Pending approval", value: outreachPendingCount }],
+          outreach_approval: [
+            {
+              label: adapterRollbackActive ? "Pending approval" : "Sequence pending",
+              value: outreachPendingCount,
+            },
+          ],
+          sequence_execution: [{ label: "Sequence pending", value: sequencePendingCount }],
           relationships: [
             { label: "Trusted", value: safeLength(relationships?.trustedRelationships) },
             { label: "Strategic", value: safeLength(relationships?.strategicRelationships) },

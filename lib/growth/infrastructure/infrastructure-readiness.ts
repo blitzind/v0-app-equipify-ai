@@ -16,6 +16,7 @@ import type {
   GrowthInfrastructureSurfaceId,
 } from "@/lib/growth/infrastructure/infrastructure-readiness-types"
 import { growthInfrastructureReadinessLabel } from "@/lib/growth/infrastructure/infrastructure-readiness-types"
+import { isAdapterOutboundExecutionEnabled } from "@/lib/growth/runtime/outbound-cutover"
 
 function descriptor(
   status: GrowthInfrastructureReadinessDescriptor["status"],
@@ -100,10 +101,23 @@ export function resolveDeliverabilityReadiness(): GrowthInfrastructureReadinessD
 }
 
 export function resolveOutboundProviderReadiness(providerFamily: string): GrowthInfrastructureReadinessDescriptor {
+  if (providerFamily === "lemlist") {
+    if (isAdapterOutboundExecutionEnabled()) {
+      return descriptor(
+        "live",
+        "Lemlist adapter execution enabled via rollback (GROWTH_OUTBOUND_MODE=adapter + GROWTH_ALLOW_ADAPTER_OUTBOUND=true).",
+      )
+    }
+    return descriptor(
+      "disabled",
+      "Lemlist is rollback-only — primary send plane is native Gmail / Microsoft 365 transport (Sequence Execution).",
+    )
+  }
+
   const entry = GROWTH_OUTBOUND_PROVIDER_CAPABILITIES.find((item) => item.providerFamily === providerFamily)
   if (!entry) return descriptor("stub", "Unknown outbound provider.")
   if (entry.fixtureOnly) return descriptor("stub", `${entry.displayName} remains fixture/stub-only.`)
-  return descriptor("live", `${entry.displayName} is the live cold outbound execution provider.`)
+  return descriptor("internal", `${entry.displayName} remains fixture/stub-only — not the production send plane.`)
 }
 
 export function buildGrowthInfrastructureReadinessCatalog(): GrowthInfrastructureReadinessCatalogEntry[] {
@@ -116,7 +130,11 @@ export function buildGrowthInfrastructureReadinessCatalog(): GrowthInfrastructur
     { surfaceId: "warmup", title: "Mailbox warmup", readiness: resolveWarmupReadiness() },
     { surfaceId: "webhook_ingestion", title: "Webhook ingestion", readiness: resolveWebhookIngestionReadiness() },
     { surfaceId: "deliverability", title: "Deliverability intelligence", readiness: resolveDeliverabilityReadiness() },
-    { surfaceId: "outbound_provider", title: "Lemlist cold outbound", readiness: resolveOutboundProviderReadiness("lemlist") },
+    {
+      surfaceId: "outbound_provider",
+      title: "Lemlist adapter (rollback-only)",
+      readiness: resolveOutboundProviderReadiness("lemlist"),
+    },
   ]
 
   for (const provider of listDeliveryProviderRegistry()) {

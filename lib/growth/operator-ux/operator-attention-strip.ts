@@ -9,6 +9,7 @@ import {
   type GrowthOperatorAttentionStrip,
 } from "@/lib/growth/operator-ux/operator-ux-h3-types"
 import { fetchGrowthAttentionDashboard } from "@/lib/growth/notifications/notification-repository"
+import { isAdapterOutboundExecutionEnabled } from "@/lib/growth/runtime/outbound-cutover"
 
 function pushItem(items: GrowthOperatorAttentionItem[], item: GrowthOperatorAttentionItem | null): void {
   if (!item || item.count <= 0) return
@@ -28,14 +29,19 @@ export async function buildGrowthOperatorAttentionStrip(
 
   const outreachPending = outbound?.approvals.outreach_pending_approval ?? 0
   const sequencePending = outbound?.approvals.sequence_pending_approval ?? 0
+  const adapterRollbackActive = isAdapterOutboundExecutionEnabled()
   const approvalTotal =
-    outreachPending + sequencePending + (attention?.needsApprovalCount ?? 0)
+    (adapterRollbackActive ? outreachPending : 0) +
+    sequencePending +
+    (attention?.needsApprovalCount ?? 0)
 
   pushItem(items, {
     id: "outreach_approval",
     category: "approval",
     label: "Pending approvals",
-    summary: `${outreachPending} outreach · ${sequencePending} sequence`,
+    summary: adapterRollbackActive
+      ? `${outreachPending} outreach · ${sequencePending} sequence`
+      : `${sequencePending} sequence (native transport)`,
     count: approvalTotal,
     href: "/admin/growth/sequences/execution",
     severity: approvalTotal >= 5 ? "high" : "medium",
