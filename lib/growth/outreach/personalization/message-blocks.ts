@@ -152,6 +152,96 @@ const PROOF_BLOCKS: MessageBlockTemplate[] = [
 
 const CTA_BLOCKS: MessageBlockTemplate[] = [
   {
+    id: "question_dispatch",
+    label: "Question — dispatch",
+    variants: [
+      "Is dispatch still mostly manual on your team?",
+      "How are you handling dispatch handoffs today?",
+      "Still coordinating technicians by phone or spreadsheet?",
+    ],
+  },
+  {
+    id: "question_scheduling",
+    label: "Question — scheduling",
+    variants: [
+      "How are you handling online scheduling today?",
+      "Is booking still mostly phone-based on your team?",
+      "Do customers book service online or call in?",
+    ],
+  },
+  {
+    id: "question_workflow",
+    label: "Question — workflow",
+    variants: [
+      "Do you have one place to track open service jobs?",
+      "Is service visibility a bottleneck right now?",
+      "Worth comparing notes on your dispatch workflow?",
+    ],
+  },
+  {
+    id: "soft_resource",
+    label: "Soft — resource",
+    variants: [
+      "Happy to send a one-pager if that is easier than a call.",
+      "I can share a short overview if useful — no meeting required.",
+      "Want a brief workflow summary instead of a live walkthrough?",
+    ],
+  },
+  {
+    id: "soft_walkthrough",
+    label: "Soft — walkthrough",
+    variants: [
+      "Happy to share a quick walkthrough if useful.",
+      "I can send a short walkthrough if that helps.",
+      "Open to a quick walkthrough of the workflow?",
+    ],
+  },
+  {
+    id: "follow_up_reply",
+    label: "Follow-up — reply",
+    variants: [
+      "Still worth picking this up?",
+      "Should I keep this on your radar?",
+      "Worth revisiting when timing is better?",
+    ],
+  },
+  {
+    id: "follow_up_continue",
+    label: "Follow-up — continue",
+    variants: [
+      "Should I send a quick summary of the workflow fit?",
+      "Want me to follow up with a shorter note next week?",
+      "Happy to circle back with one focused question.",
+    ],
+  },
+  {
+    id: "memory_commitment",
+    label: "Memory — commitment",
+    variants: [
+      "Still good to follow through on what we outlined?",
+      "Want me to pick up the thread we left open?",
+      "Should I send what we discussed before your next review?",
+    ],
+  },
+  {
+    id: "direct_reply",
+    label: "Direct — reply",
+    variants: [
+      "Reply with what works best and I will adjust.",
+      "Send a quick note back if you want the short version.",
+      "What is the best way to keep this moving on your side?",
+    ],
+  },
+  {
+    id: "direct_time",
+    label: "Direct — time",
+    variants: [
+      "What day works for a 15-minute fit check?",
+      "Send a couple times that work and I will adapt.",
+      "What does your calendar look like for a brief review?",
+    ],
+  },
+  {
     id: "fifteen_minute",
     label: "15-minute CTA",
     variants: [

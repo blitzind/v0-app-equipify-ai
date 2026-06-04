@@ -118,6 +118,47 @@ export type SubjectIntelligenceMetadata = {
   legacySubject: string
 }
 
+export type CtaCategory =
+  | "question_based"
+  | "soft"
+  | "meeting"
+  | "direct"
+  | "follow_up"
+  | "memory_aware"
+
+export type CtaEvidenceSource =
+  | "research_confidence"
+  | "memory_commitment"
+  | "memory_interaction"
+  | "memory_preference"
+  | "prior_reply"
+  | "booking_signal"
+  | "opportunity_signal"
+  | "sequence_stage"
+  | "engagement_signal"
+  | "pain_signal"
+  | "legacy_template"
+  | "breakup_context"
+
+export type CtaQualityScore = {
+  overall: number
+  replyFit: number
+  contextMatch: number
+  specificity: number
+  engagementAlignment: number
+  memoryAlignment: number
+  avoidsColdMeetingAsk: boolean
+}
+
+export type CtaIntelligenceMetadata = {
+  category: CtaCategory
+  evidenceSource: CtaEvidenceSource
+  evidence: string | null
+  selectionReason: string
+  qualityScore: CtaQualityScore
+  legacyCta: string
+}
+
 export type OutreachContextPacket = {
   companyName: string
   industryLabel: string | null
@@ -176,6 +217,7 @@ export type SelectedMessageStrategy = {
   variationKey: string
   researchOpener?: ResearchOpenerMetadata
   subjectIntelligence?: SubjectIntelligenceMetadata
+  ctaIntelligence?: CtaIntelligenceMetadata
 }
 
 export type OutreachPersonalizationDraft = {
@@ -200,6 +242,7 @@ export type OutreachPersonalizationAudit = {
   generationType: GrowthAiCopilotGenerationType
   maxWords: number
   subjectIntelligence?: SubjectIntelligenceMetadata
+  ctaIntelligence?: CtaIntelligenceMetadata
 }
 
 export function isOutreachPersonalizationEmailType(

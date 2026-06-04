@@ -141,6 +141,7 @@ export async function runOutreachPersonalizationGeneration(
     generationType: input.generationType,
     maxWords,
     subjectIntelligence: strategy.subjectIntelligence,
+    ctaIntelligence: strategy.ctaIntelligence,
   }
 
   return {

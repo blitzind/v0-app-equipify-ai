@@ -107,6 +107,10 @@ const draftA = buildPersonalizedOutreachDraft({
 assert.ok(draftA.strategy.subjectIntelligence)
 assert.ok((draftA.strategy.subjectIntelligence?.qualityScore.overall ?? 0) >= 55)
 assert.ok(!/quick ops note/i.test(draftA.draft.subject))
+assert.ok(draftA.strategy.ctaIntelligence)
+assert.equal(draftA.strategy.ctaIntelligence?.category, "question_based")
+assert.ok(draftA.strategy.ctaIntelligence?.qualityScore.avoidsColdMeetingAsk)
+assert.ok(!/15-minute walkthrough/i.test(draftA.draft.body))
 
 const draftB = buildPersonalizedOutreachDraft({
   leadId: "00000000-0000-4000-8000-000000000002",
@@ -232,6 +236,7 @@ const clientSafeFiles = [
   "lib/growth/outreach/personalization/message-strategy.ts",
   "lib/growth/outreach/personalization/research-backed-opener.ts",
   "lib/growth/outreach/personalization/subject-intelligence.ts",
+  "lib/growth/outreach/personalization/cta-intelligence.ts",
   "lib/growth/outreach/personalization/research-evidence-selection.ts",
   "lib/growth/outreach/personalization/ai-refinement-guard.ts",
   "components/growth/growth-outreach-personalization-preview.tsx",

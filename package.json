@@ -102,6 +102,7 @@
     "test:growth-outreach-personalization": "tsx scripts/test-growth-outreach-personalization.ts",
     "test:growth-outreach-research-opener": "tsx scripts/test-growth-outreach-research-opener.ts",
     "test:growth-outreach-subject-intelligence": "tsx scripts/test-growth-outreach-subject-intelligence.ts",
+    "test:growth-outreach-cta-intelligence": "tsx scripts/test-growth-outreach-cta-intelligence.ts",
     "test:growth-conversation-intelligence": "tsx scripts/test-growth-conversation-intelligence.ts",
     "test:growth-sequence-intelligence": "tsx scripts/test-growth-sequence-intelligence.ts",
     "test:growth-sequence-execution": "tsx scripts/test-growth-sequence-execution.ts",
