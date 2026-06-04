@@ -2,9 +2,19 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { tierFromSenderReputationScore } from "@/lib/growth/compliance/sender-reputation"
+import { buildMailboxHealthIntelRow } from "@/lib/growth/deliverability/mailbox-health-intelligence"
 import { buildSenderPerformanceMetrics, senderHealthScore } from "@/lib/growth/revenue-intelligence/sender-intelligence"
 import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
+import type { GrowthDeliveryRoute } from "@/lib/growth/providers/provider-types"
 import { getSenderAccount, listSenderAccounts } from "@/lib/growth/sender/sender-repository"
+import {
+  computeHealthAwareRoutingScore,
+  computeSenderCapacityMetrics,
+  isHealthAwareRoutingEligible,
+  pickBestRouteForSender,
+  reputationTrendFromPoints,
+} from "@/lib/growth/sender-pools/health-aware-routing"
+import type { HealthAwareRouteCandidate } from "@/lib/growth/sender-pools/health-aware-routing"
 import {
   detectSenderFatigueSignals,
   memberContextFromFatigue,
@@ -89,7 +99,23 @@ export async function buildSenderPoolMemberContext(
   const mailboxConnected = await mailboxConnectedForSender(admin, sender.id)
   const dailyCapRemaining = Math.max(0, sender.daily_send_limit - sender.daily_send_used)
 
-  return {
+  const routeCandidates: HealthAwareRouteCandidate[] = senderRoutes.map((route) => ({
+    route_id: route.id,
+    provider_id: route.provider_id,
+    priority: route.priority,
+    health_weight: route.health_weight,
+    provider_health_score: route.health_weight,
+    daily_cap: route.daily_cap,
+    current_volume: route.current_volume,
+  }))
+  const bestRoute = pickBestRouteForSender(routeCandidates)
+  const providerHealthScore = bestRoute
+    ? Math.round(bestRoute.provider_health_score * 0.6 + bestRoute.health_weight * 0.4)
+    : senderRoutes.length > 0
+      ? 75
+      : 20
+
+  const base: GrowthSenderPoolMemberContext = {
     memberId: member.id,
     senderAccountId: sender.id,
     senderLabel: maskSenderLabel(sender.email_address, sender.display_name),
@@ -114,10 +140,88 @@ export async function buildSenderPoolMemberContext(
     recentVolume: sender.daily_send_used,
     bounceRisk: metrics.bounce_trend,
     complaintRisk: metrics.complaint_trend,
-    providerHealthScore: senderRoutes.length > 0 ? 75 : 20,
+    providerHealthScore,
     domainHealthScore,
     warmupProgress,
   }
+
+  const intel = await buildMailboxHealthIntelRow(admin, sender.id).catch(() => null)
+  if (!intel) {
+    const capacity = computeSenderCapacityMetrics({
+      daily_capacity: sender.daily_send_limit,
+      sends_today: sender.daily_send_used,
+    })
+    return {
+      ...base,
+      remainingDailyCapacity: capacity.remaining_capacity,
+      utilizationPct: capacity.utilization_pct,
+      projectedExhaustionHours: capacity.projected_exhaustion_hours,
+      routingScore: computeHealthAwareRoutingScore(base),
+      routingEligible: isHealthAwareRoutingEligible(base),
+    }
+  }
+
+  const capacity = computeSenderCapacityMetrics({
+    daily_capacity: intel.daily_capacity,
+    sends_today: intel.sends_today,
+  })
+
+  const enriched: GrowthSenderPoolMemberContext = {
+    ...base,
+    healthScore: intel.health_score,
+    reputationScore: Math.max(base.reputationScore, intel.health_score),
+    bounceRisk: intel.bounce_rate,
+    complaintRisk: intel.complaint_rate,
+    mailboxHealthScore: intel.health_score,
+    mailboxHealthState: intel.health_state,
+    reputationTrendDirection:
+      intel.health_trend.length >= 2 ? reputationTrendFromPoints(intel.health_trend) : "unknown",
+    warmupStatus: intel.warmup_status,
+    remainingDailyCapacity: capacity.remaining_capacity,
+    utilizationPct: capacity.utilization_pct,
+    projectedExhaustionHours: capacity.projected_exhaustion_hours,
+    deliverySuccessRate: intel.delivery_success_rate,
+    throttleStatus: intel.throttle_status,
+    dailyCapRemaining: capacity.remaining_capacity,
+    routingRecommendedAction:
+      intel.throttle_recommendation ?? intel.capacity_recommendation ?? intel.primary_risk_reason,
+    warmupHealthCritical:
+      base.warmupHealthCritical || intel.health_state === "critical" || intel.health_state === "disabled",
+  }
+  enriched.routingScore = computeHealthAwareRoutingScore(enriched)
+  enriched.routingEligible = isHealthAwareRoutingEligible(enriched)
+  return enriched
+}
+
+function routeCandidateFromGrowthRoute(route: GrowthDeliveryRoute): HealthAwareRouteCandidate {
+  return {
+    route_id: route.id,
+    provider_id: route.provider_id,
+    priority: route.priority,
+    health_weight: route.health_weight,
+    provider_health_score: route.health_weight,
+    daily_cap: route.daily_cap,
+    current_volume: route.current_volume,
+  }
+}
+
+export function buildHealthAwareRouteBySender(
+  routes: GrowthDeliveryRoute[],
+): Record<string, { providerId: string | null; routeId: string | null }> {
+  const routeBySender: Record<string, { providerId: string | null; routeId: string | null }> = {}
+  const bySender = new Map<string, GrowthDeliveryRoute[]>()
+  for (const route of routes.filter((r) => r.enabled)) {
+    const list = bySender.get(route.sender_account_id) ?? []
+    list.push(route)
+    bySender.set(route.sender_account_id, list)
+  }
+  for (const [senderId, senderRoutes] of bySender) {
+    const best = pickBestRouteForSender(senderRoutes.map(routeCandidateFromGrowthRoute))
+    if (best) {
+      routeBySender[senderId] = { providerId: best.provider_id, routeId: best.route_id }
+    }
+  }
+  return routeBySender
 }
 
 export async function resolveSenderRotationForPool(
@@ -182,15 +286,7 @@ export async function resolveSenderRotationForPool(
     }
   }
 
-  const routeBySender: Record<string, { providerId: string | null; routeId: string | null }> = {}
-  for (const route of routes.filter((r) => r.enabled)) {
-    if (!routeBySender[route.sender_account_id]) {
-      routeBySender[route.sender_account_id] = {
-        providerId: route.provider_id,
-        routeId: route.id,
-      }
-    }
-  }
+  const routeBySender = buildHealthAwareRouteBySender(routes)
 
   const output = selectSenderFromPool({
     strategy: pool.rotationStrategy,
@@ -234,7 +330,13 @@ export async function resolveTransportSenderWithPool(
     manualSenderAccountId?: string | null
     sequenceExecutionJobId?: string | null
   },
-): Promise<{ senderAccountId: string; providerId: string | null; rotationDecisionId?: string | null } | null> {
+): Promise<{
+  senderAccountId: string
+  providerId: string | null
+  rotationDecisionId?: string | null
+  rotationReason?: GrowthSenderRotationOutput["reason"]
+  rotationRiskLevel?: GrowthSenderRotationOutput["riskLevel"]
+} | null> {
   if (input.senderPoolId && (input.allowAutoRotation ?? true)) {
     const rotation = await resolveSenderRotationForPool(admin, {
       senderPoolId: input.senderPoolId,
@@ -243,10 +345,15 @@ export async function resolveTransportSenderWithPool(
       sequenceExecutionJobId: input.sequenceExecutionJobId,
     })
     if (rotation.selectedSenderAccountId) {
+      const routes = await listDeliveryRoutes(admin)
+      const routeBySender = buildHealthAwareRouteBySender(routes)
+      const route = routeBySender[rotation.selectedSenderAccountId]
       return {
         senderAccountId: rotation.selectedSenderAccountId,
-        providerId: rotation.selectedProviderId,
+        providerId: route?.providerId ?? rotation.selectedProviderId,
         rotationDecisionId: rotation.decisionId ?? null,
+        rotationReason: rotation.reason,
+        rotationRiskLevel: rotation.riskLevel,
       }
     }
   }

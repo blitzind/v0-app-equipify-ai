@@ -11,10 +11,16 @@ import {
   recordSenderPoolPerformanceSnapshot,
 } from "@/lib/growth/sender-pools/sender-pool-repository"
 import { buildSenderPoolMemberContext } from "@/lib/growth/sender-pools/sender-pool-rotation-service"
+import {
+  buildRouteBalancingRecommendation,
+  memberContextToRoutingInsight,
+} from "@/lib/growth/sender-pools/health-aware-routing"
+import { GROWTH_HEALTH_AWARE_ROUTING_QA_MARKER } from "@/lib/growth/sender-pools/health-aware-routing-types"
 import { computeRotationHealthScore } from "@/lib/growth/sender-pools/sender-rotation"
 import {
   GROWTH_SENDER_POOL_INTELLIGENCE_QA_MARKER,
   type GrowthSenderPoolDashboard,
+  type GrowthSenderPoolMemberContext,
 } from "@/lib/growth/sender-pools/sender-pool-types"
 import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 
@@ -38,6 +44,8 @@ export async function fetchGrowthSenderPoolDashboard(
   let sendersInCooldown = 0
   let reputationSum = 0
   let reputationCount = 0
+  const allContexts: GrowthSenderPoolMemberContext[] = []
+  const routingInsights: GrowthSenderPoolDashboard["routingInsights"] = []
 
   for (const pool of scopedPools) {
     const poolMembers = members.filter((member) => member.senderPoolId === pool.id)
@@ -46,10 +54,15 @@ export async function fetchGrowthSenderPoolDashboard(
       const ctx = await buildSenderPoolMemberContext(admin, member, routes)
       if (ctx) {
         contexts.push(ctx)
+        allContexts.push(ctx)
         reputationSum += ctx.reputationScore
         reputationCount += 1
         if (member.memberStatus === "cooldown") sendersInCooldown += 1
       }
+    }
+    const poolBalancing = buildRouteBalancingRecommendation(contexts)
+    for (const ctx of contexts) {
+      routingInsights.push(memberContextToRoutingInsight(ctx, pool.id, poolBalancing))
     }
     eligibleSenders += filterEligibleSenderPoolMembers(
       contexts,
@@ -90,8 +103,11 @@ export async function fetchGrowthSenderPoolDashboard(
     averageReputation,
   })
 
+  const routeBalancingRecommendation = buildRouteBalancingRecommendation(allContexts)
+
   return {
     qa_marker: GROWTH_SENDER_POOL_INTELLIGENCE_QA_MARKER,
+    health_aware_routing_marker: GROWTH_HEALTH_AWARE_ROUTING_QA_MARKER,
     activePools,
     eligibleSenders,
     sendersInCooldown,
@@ -103,5 +119,7 @@ export async function fetchGrowthSenderPoolDashboard(
     rotationDecisions,
     fatigueEvents,
     performanceSnapshots,
+    routingInsights: routingInsights.sort((a, b) => b.routing_score - a.routing_score),
+    routeBalancingRecommendation,
   }
 }

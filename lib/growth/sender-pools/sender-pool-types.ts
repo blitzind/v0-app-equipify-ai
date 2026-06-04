@@ -1,4 +1,11 @@
-/** Client-safe Growth Engine sender pool intelligence types (Phase 2Q). */
+/** Client-safe Growth Engine sender pool intelligence types (Phase 2Q + 6.31C). */
+
+import type { GrowthMailboxHealthState } from "@/lib/growth/deliverability/mailbox-health-score-types"
+import {
+  GROWTH_HEALTH_AWARE_ROUTING_QA_MARKER,
+  type GrowthReputationTrendDirection,
+  type GrowthSenderRoutingInsight,
+} from "@/lib/growth/sender-pools/health-aware-routing-types"
 
 export const GROWTH_SENDER_POOL_INTELLIGENCE_QA_MARKER = "growth-sender-pool-intelligence-v1" as const
 
@@ -31,6 +38,7 @@ export type GrowthSenderPoolMemberStatus = (typeof GROWTH_SENDER_POOL_MEMBER_STA
 export const GROWTH_SENDER_ROTATION_DECISION_REASONS = [
   "daily_cap_remaining",
   "health_score",
+  "mailbox_health",
   "reputation_score",
   "warmup_status",
   "bounce_risk",
@@ -141,6 +149,7 @@ export type GrowthSenderPoolPerformanceSnapshot = {
 
 export type GrowthSenderPoolDashboard = {
   qa_marker: typeof GROWTH_SENDER_POOL_INTELLIGENCE_QA_MARKER
+  health_aware_routing_marker: typeof GROWTH_HEALTH_AWARE_ROUTING_QA_MARKER
   activePools: number
   eligibleSenders: number
   sendersInCooldown: number
@@ -152,6 +161,8 @@ export type GrowthSenderPoolDashboard = {
   rotationDecisions: GrowthSenderRotationDecision[]
   fatigueEvents: GrowthSenderFatigueEvent[]
   performanceSnapshots: GrowthSenderPoolPerformanceSnapshot[]
+  routingInsights: GrowthSenderRoutingInsight[]
+  routeBalancingRecommendation: string | null
 }
 
 export type GrowthSenderRotationOutput = {
@@ -191,7 +202,22 @@ export type GrowthSenderPoolMemberContext = {
   providerHealthScore: number
   domainHealthScore: number
   warmupProgress: number
+  /** Phase 6.31C — mailbox health intelligence signals */
+  mailboxHealthScore?: number
+  mailboxHealthState?: GrowthMailboxHealthState
+  reputationTrendDirection?: GrowthReputationTrendDirection
+  warmupStatus?: string | null
+  remainingDailyCapacity?: number
+  utilizationPct?: number
+  projectedExhaustionHours?: number | null
+  deliverySuccessRate?: number
+  throttleStatus?: "ok" | "throttled" | "paused"
+  routingScore?: number
+  routingEligible?: boolean
+  routingRecommendedAction?: string | null
 }
+
+export type { GrowthSenderRoutingInsight } from "@/lib/growth/sender-pools/health-aware-routing-types"
 
 export function poolStatusLabel(status: GrowthSenderPoolStatus): string {
   switch (status) {
@@ -252,6 +278,8 @@ export function rotationReasonLabel(reason: GrowthSenderRotationDecisionReason):
       return "Daily cap remaining"
     case "health_score":
       return "Health score"
+    case "mailbox_health":
+      return "Mailbox health"
     case "reputation_score":
       return "Reputation score"
     case "warmup_status":

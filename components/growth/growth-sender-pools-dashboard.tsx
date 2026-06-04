@@ -10,6 +10,7 @@ import {
   GROWTH_SENDER_POOL_INTELLIGENCE_PRIVACY_NOTE,
   GROWTH_SENDER_POOL_INTELLIGENCE_QA_MARKER,
   GROWTH_SENDER_POOL_ROTATION_STRATEGIES,
+  type GrowthSenderRoutingInsight,
   fatigueTypeLabel,
   memberStatusLabel,
   poolStatusLabel,
@@ -34,6 +35,17 @@ const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutra
   medium: "medium",
   high: "attention",
   critical: "critical",
+  healthy: "healthy",
+  warning: "attention",
+  at_risk: "attention",
+  disabled: "blocked",
+  ok: "healthy",
+  throttled: "attention",
+  paused: "blocked",
+  improving: "healthy",
+  declining: "critical",
+  stable: "neutral",
+  unknown: "neutral",
 }
 
 function formatWhen(value: string | null | undefined): string {
@@ -210,6 +222,60 @@ export function GrowthSenderPoolsDashboardView() {
           <pre className="text-xs overflow-auto rounded-md bg-muted/40 p-3">{JSON.stringify(simulation, null, 2)}</pre>
         </GrowthEngineCard>
       ) : null}
+
+      {dashboard?.routeBalancingRecommendation ? (
+        <GrowthEngineCard title="Route balancing">
+          <p className="text-sm text-muted-foreground">{dashboard.routeBalancingRecommendation}</p>
+        </GrowthEngineCard>
+      ) : null}
+
+      <GrowthEngineCard title="Health-aware routing">
+        <p className="text-xs text-muted-foreground mb-3">{dashboard?.health_aware_routing_marker}</p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-xs text-muted-foreground">
+                <th className="py-2 pr-3">Sender</th>
+                <th className="py-2 pr-3">Routing</th>
+                <th className="py-2 pr-3">Health</th>
+                <th className="py-2 pr-3">Remaining</th>
+                <th className="py-2 pr-3">Util %</th>
+                <th className="py-2 pr-3">Eligible</th>
+                <th className="py-2 pr-3">Trend</th>
+                <th className="py-2">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(dashboard?.routingInsights ?? []).slice(0, 40).map((row: GrowthSenderRoutingInsight) => (
+                <tr key={row.sender_account_id} className="border-b border-border/50">
+                  <td className="py-2 pr-3 font-medium">{row.sender_label}</td>
+                  <td className="py-2 pr-3">{row.routing_score}</td>
+                  <td className="py-2 pr-3">
+                    <GrowthBadge
+                      label={`${row.mailbox_health_score} · ${row.mailbox_health_state}`}
+                      tone={STATUS_TONE[row.mailbox_health_state] ?? "neutral"}
+                    />
+                  </td>
+                  <td className="py-2 pr-3">{row.remaining_capacity}</td>
+                  <td className="py-2 pr-3">{row.utilization_pct}%</td>
+                  <td className="py-2 pr-3">
+                    <GrowthBadge
+                      label={row.routing_eligible ? "Yes" : "No"}
+                      tone={row.routing_eligible ? "healthy" : "blocked"}
+                    />
+                  </td>
+                  <td className="py-2 pr-3">
+                    <GrowthBadge label={row.reputation_trend} tone={STATUS_TONE[row.reputation_trend] ?? "neutral"} />
+                  </td>
+                  <td className="py-2 text-xs text-muted-foreground max-w-xs">
+                    {row.recommended_action ?? "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </GrowthEngineCard>
 
       <GrowthEngineCard title="Pool Members">
         <div className="overflow-x-auto">

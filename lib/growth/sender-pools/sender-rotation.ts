@@ -1,3 +1,4 @@
+import { computeHealthAwareRoutingScore } from "@/lib/growth/sender-pools/health-aware-routing"
 import {
   filterEligibleSenderPoolMembers,
   evaluateSenderPoolMemberEligibility,
@@ -30,12 +31,18 @@ function riskFromMember(member: GrowthSenderPoolMemberContext): GrowthSenderRota
 
 function primaryReasonForMember(member: GrowthSenderPoolMemberContext): GrowthSenderRotationDecisionReason {
   if (member.dailyCapRemaining <= 10) return "daily_cap_remaining"
+  if ((member.mailboxHealthScore ?? member.healthScore) >= 85 && member.mailboxHealthState === "healthy")
+    return "mailbox_health"
   if (member.reputationScore >= 80) return "reputation_score"
   if (member.warmupProgress > 0 && member.warmupProgress < 100) return "warmup_status"
   if (member.recentVolume <= 50) return "recent_volume"
   if (member.providerHealthScore >= 70) return "provider_health"
   if (member.domainHealthScore >= 70) return "domain_health"
   return "health_score"
+}
+
+function healthAwareMemberScore(member: GrowthSenderPoolMemberContext): number {
+  return member.routingScore ?? computeHealthAwareRoutingScore(member)
 }
 
 function scoreMember(strategy: GrowthSenderPoolRotationStrategy, member: GrowthSenderPoolMemberContext): number {
@@ -49,22 +56,17 @@ function scoreMember(strategy: GrowthSenderPoolRotationStrategy, member: GrowthS
     case "best_reputation":
       return member.reputationScore
     case "warmup_safe":
-      return member.warmupProgress * 2 + member.healthScore - member.recentVolume * 0.1
+      return (
+        member.warmupProgress * 2 +
+        healthAwareMemberScore(member) -
+        member.recentVolume * 0.1 -
+        (member.utilizationPct ?? 0) * 0.15
+      )
     case "manual_priority":
-      return member.manualPriority * 1000 + member.healthScore
+      return member.manualPriority * 1000 + healthAwareMemberScore(member)
     case "weighted_health":
     default:
-      return (
-        member.healthScore * 0.35 +
-        member.reputationScore * 0.25 +
-        member.domainHealthScore * 0.15 +
-        member.providerHealthScore * 0.15 +
-        member.complianceScore * 0.1 -
-        member.bounceRisk * 0.2 -
-        member.complaintRisk * 0.3 -
-        member.recentVolume * 0.05 +
-        member.priorityWeight * 0.01
-      )
+      return healthAwareMemberScore(member)
   }
 }
 

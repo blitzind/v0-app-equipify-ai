@@ -411,8 +411,8 @@ export async function executeTransportSend(
     const sender = await getSenderAccount(admin, senderAccountId)
     rotationMeta = {
       selectedSenderLabel: sender?.display_name || sender?.email_address || null,
-      reason: "health_score",
-      riskLevel: "low",
+      reason: resolved.rotationReason ?? "health_score",
+      riskLevel: resolved.rotationRiskLevel ?? "low",
       fallbackCandidates: [],
     }
   }

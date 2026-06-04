@@ -1,3 +1,4 @@
+import { isHealthAwareRoutingEligible } from "@/lib/growth/sender-pools/health-aware-routing"
 import type {
   GrowthSenderPoolMemberContext,
   GrowthSenderRotationDecisionReason,
@@ -34,6 +35,14 @@ export function evaluateSenderPoolMemberEligibility(
   if (member.dailyCapRemaining <= 0) blockedReasons.push("Daily cap exhausted")
   if (!member.providerRouteAvailable) blockedReasons.push("No provider route available")
   if (member.complianceScore < minComplianceScore) blockedReasons.push("Compliance score below pool minimum")
+  if (member.mailboxHealthState === "critical") blockedReasons.push("Mailbox health critical")
+  if (member.mailboxHealthState === "disabled") blockedReasons.push("Mailbox disabled")
+  if (member.throttleStatus === "paused") blockedReasons.push("Mailbox deliverability paused")
+  if (member.throttleStatus === "throttled") blockedReasons.push("Mailbox throttled")
+  if (member.routingEligible === false) blockedReasons.push("Not eligible for health-aware routing")
+  else if (member.mailboxHealthState && !isHealthAwareRoutingEligible(member)) {
+    blockedReasons.push("Health-aware routing blocked")
+  }
 
   if (blockedReasons.length === 0) {
     return { eligible: true, blockedReasons: [], primaryReason: "health_score" }
@@ -41,6 +50,10 @@ export function evaluateSenderPoolMemberEligibility(
 
   let primaryReason: GrowthSenderRotationDecisionReason = "health_score"
   if (member.dailyCapRemaining <= 0) primaryReason = "daily_cap_remaining"
+  else if (member.mailboxHealthState === "critical" || member.mailboxHealthState === "disabled")
+    primaryReason = "mailbox_health"
+  else if (member.throttleStatus === "throttled" || member.throttleStatus === "paused")
+    primaryReason = "mailbox_health"
   else if (member.senderReputationCritical) primaryReason = "reputation_score"
   else if (member.warmupHealthCritical) primaryReason = "warmup_status"
   else if (member.bounceRisk >= 70) primaryReason = "bounce_risk"

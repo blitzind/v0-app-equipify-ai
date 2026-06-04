@@ -78,7 +78,8 @@ async function main(): Promise<void> {
   assert.equal(GROWTH_SENDER_POOL_STATUSES.length, 4)
   assert.equal(GROWTH_SENDER_POOL_ROTATION_STRATEGIES.length, 6)
   assert.equal(GROWTH_SENDER_POOL_MEMBER_STATUSES.length, 6)
-  assert.equal(GROWTH_SENDER_ROTATION_DECISION_REASONS.length, 10)
+  assert.equal(GROWTH_SENDER_ROTATION_DECISION_REASONS.length, 11)
+  assert.ok(GROWTH_SENDER_ROTATION_DECISION_REASONS.includes("mailbox_health"))
   assert.equal(GROWTH_SENDER_FATIGUE_TYPES.length, 7)
 
   const migration = readSource(`supabase/migrations/${GROWTH_SENDER_POOL_INTELLIGENCE_SCHEMA_MIGRATION}`)
@@ -175,6 +176,9 @@ async function main(): Promise<void> {
   const navSource = readSource("lib/growth/navigation/growth-navigation-destinations.ts")
   assert.match(navSource, /sender-pools/)
   assert.match(navSource, /Sender Pools/)
+
+  const healthRoutingSource = readSource("lib/growth/sender-pools/health-aware-routing.ts")
+  assert.match(healthRoutingSource, /computeHealthAwareRoutingScore/)
 
   console.log("growth sender pool intelligence checks passed")
 }

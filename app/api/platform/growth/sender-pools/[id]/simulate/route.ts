@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { memberContextToRoutingInsight } from "@/lib/growth/sender-pools/health-aware-routing"
+import { GROWTH_HEALTH_AWARE_ROUTING_QA_MARKER } from "@/lib/growth/sender-pools/health-aware-routing-types"
 import {
   buildSenderPoolMemberContext,
   resolveSenderRotationForPool,
@@ -69,10 +71,14 @@ export async function POST(
       metadata: { sender_pool_id: id, simulated: true },
     })
 
+    const routingInsights = contexts.map((ctx) => memberContextToRoutingInsight(ctx, id, null))
+
     return NextResponse.json({
       ok: true,
+      qa_marker: GROWTH_HEALTH_AWARE_ROUTING_QA_MARKER,
       rotation,
       ineligibleMembers: ineligible,
+      routingInsights,
       privacy_note: "Simulation only — no message sent.",
     })
   } catch (e) {
