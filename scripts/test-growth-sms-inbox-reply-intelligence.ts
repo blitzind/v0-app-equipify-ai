@@ -144,4 +144,34 @@ assert.match(ingestionSource, /processingStatus: "failed"/)
 console.log("\n=== SMS reply ingestion source constraint migration ===")
 console.log("sms_provider_webhook allowed in reply_ingestion_events migration")
 
+console.log("\n=== Phase 5.6 SMS response suggestions ===")
+const inboundSuggestionsSource = readFileSync(
+  resolve("lib/growth/sms/inbound-sms-response-suggestions.ts"),
+  "utf8",
+)
+assert.match(inboundSuggestionsSource, /buildInboundSmsResponseSuggestions/)
+assert.match(inboundSuggestionsSource, /buildCallPromptSuggestion/)
+assert.match(inboundSuggestionsSource, /buildEmailFollowUpSuggestion/)
+
+const safetySource = readFileSync(resolve("lib/growth/sms/sms-suggestion-safety.ts"), "utf8")
+assert.match(safetySource, /auditSmsSuggestionSafety/)
+assert.match(safetySource, /shouldSuppressSmsReplySuggestion/)
+
+const inboundApiRoute = readFileSync(
+  resolve("app/api/platform/growth/sms/inbound-suggestions/route.ts"),
+  "utf8",
+)
+assert.match(inboundApiRoute, /GROWTH_SMS_INBOUND_RESPONSE_SUGGESTIONS_QA_MARKER/)
+
+const smsSuggestionsEmbed = readFileSync(
+  resolve("components/growth/inbox/growth-inbox-action-center-sms-draft-embed.tsx"),
+  "utf8",
+)
+assert.match(smsSuggestionsEmbed, /SMS Response Suggestions/)
+assert.match(smsSuggestionsEmbed, /Lead replied/)
+assert.match(smsSuggestionsEmbed, /Human approval required/)
+assert.match(smsSuggestionsEmbed, /Send SMS/)
+
+console.log("Phase 5.6 inbound SMS response suggestions wired")
+
 console.log("\n✓ Phase 5.2 validation passed — inbox integration, no sequences/AI.")

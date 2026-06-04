@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CheckCircle2, Copy, Loader2, Send, Sparkles } from "lucide-react"
+import { CheckCircle2, Copy, Loader2, Phone, Send, Sparkles, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
@@ -18,14 +18,14 @@ import {
   type GrowthSmsSendApiSuccess,
 } from "@/lib/growth/inbox/inbox-sms-operator-send"
 import {
-  GROWTH_SMS_PERSONALIZATION_QA_MARKER,
-  type GrowthSmsInboxDraftSuggestion,
-} from "@/lib/growth/sms/personalization/sms-personalization-types"
+  GROWTH_SMS_INBOUND_RESPONSE_SUGGESTIONS_QA_MARKER,
+  type GrowthInboundSmsResponseSuggestions,
+} from "@/lib/growth/sms/inbound-sms-response-suggestion-types"
 import { cn } from "@/lib/utils"
 
-type DraftPayload = {
+type SuggestionsPayload = {
   ok?: boolean
-  suggestion?: GrowthSmsInboxDraftSuggestion
+  suggestions?: GrowthInboundSmsResponseSuggestions
   message?: string
 }
 
@@ -39,14 +39,23 @@ type SendResult = GrowthSmsSendApiSuccess & {
   sentAt: string
 }
 
+function latestInboundBody(
+  messages: { direction: string; body_preview: string; message_timestamp: string }[],
+): string | null {
+  const inbound = messages
+    .filter((message) => message.direction === "inbound" && message.body_preview.trim())
+    .sort((a, b) => b.message_timestamp.localeCompare(a.message_timestamp))
+  return inbound[0]?.body_preview.trim() ?? null
+}
+
 export function GrowthInboxActionCenterSmsDraftEmbed() {
   const { selectedThread, selectedMessages, actionLoading, loadThreadDetail, refreshThreads } =
     useGrowthInboxWorkspace()
-  const { lead, refresh: refreshLeadContext } = useGrowthInboxLeadContext()
+  const { lead, refresh: refreshLeadContext, refreshWorkflow } = useGrowthInboxLeadContext()
 
   const [loading, setLoading] = useState(false)
   const [draftError, setDraftError] = useState<string | null>(null)
-  const [suggestion, setSuggestion] = useState<GrowthSmsInboxDraftSuggestion | null>(null)
+  const [suggestions, setSuggestions] = useState<GrowthInboundSmsResponseSuggestions | null>(null)
   const [draftBody, setDraftBody] = useState("")
   const [copied, setCopied] = useState(false)
 
@@ -57,6 +66,10 @@ export function GrowthInboxActionCenterSmsDraftEmbed() {
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [sendResult, setSendResult] = useState<SendResult | null>(null)
+  const [workflowLoading, setWorkflowLoading] = useState<string | null>(null)
+  const [workflowError, setWorkflowError] = useState<string | null>(null)
+
+  const inboundBody = useMemo(() => latestInboundBody(selectedMessages), [selectedMessages])
 
   const recipientE164 = useMemo(() => {
     if (!selectedThread) return null
@@ -79,26 +92,29 @@ export function GrowthInboxActionCenterSmsDraftEmbed() {
     !Boolean(actionLoading) &&
     liveSendEnabled !== false
 
-  const loadSuggestion = useCallback(async (leadId: string, draftType: "outbound" | "reply") => {
-    setLoading(true)
-    setDraftError(null)
-    try {
-      const response = await fetch(
-        `/api/platform/growth/sms/personalization/draft?leadId=${leadId}&draftType=${draftType}`,
-      )
-      const payload = (await response.json()) as DraftPayload
-      if (!response.ok) throw new Error(payload.message ?? "Could not load SMS draft suggestion.")
+  const loadSuggestions = useCallback(
+    async (leadId: string, threadId: string, bodyPreview: string | null) => {
+      setLoading(true)
+      setDraftError(null)
+      try {
+        const params = new URLSearchParams({ leadId, threadId })
+        if (bodyPreview) params.set("inboundBody", bodyPreview)
+        const response = await fetch(`/api/platform/growth/sms/inbound-suggestions?${params.toString()}`)
+        const payload = (await response.json()) as SuggestionsPayload
+        if (!response.ok) throw new Error(payload.message ?? "Could not load SMS response suggestions.")
 
-      const next = payload.suggestion ?? null
-      setSuggestion(next)
-      setDraftBody(next?.suggestedBody ?? "")
-    } catch (loadError) {
-      setDraftError(loadError instanceof Error ? loadError.message : "Could not load SMS draft.")
-      setSuggestion(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+        const next = payload.suggestions ?? null
+        setSuggestions(next)
+        setDraftBody(next?.smsReply.suggestedBody ?? "")
+      } catch (loadError) {
+        setDraftError(loadError instanceof Error ? loadError.message : "Could not load SMS suggestions.")
+        setSuggestions(null)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [],
+  )
 
   const loadReadiness = useCallback(async () => {
     setReadinessError(null)
@@ -121,7 +137,7 @@ export function GrowthInboxActionCenterSmsDraftEmbed() {
 
   useEffect(() => {
     if (!selectedThread || selectedThread.channel !== "sms") {
-      setSuggestion(null)
+      setSuggestions(null)
       setDraftBody("")
       setDraftError(null)
       setSendError(null)
@@ -131,9 +147,9 @@ export function GrowthInboxActionCenterSmsDraftEmbed() {
 
     setSendError(null)
     setSendResult(null)
-    void loadSuggestion(selectedThread.lead_id, "reply")
+    void loadSuggestions(selectedThread.lead_id, selectedThread.id, inboundBody)
     void loadReadiness()
-  }, [selectedThread, loadSuggestion, loadReadiness])
+  }, [selectedThread, inboundBody, loadSuggestions, loadReadiness])
 
   const copyDraft = async () => {
     if (!draftBody.trim()) return
@@ -191,23 +207,102 @@ export function GrowthInboxActionCenterSmsDraftEmbed() {
     }
   }
 
+  async function runWorkflowAction(type: "call" | "mark_interested" | "opportunity") {
+    if (!selectedThread?.lead_id) return
+    setWorkflowLoading(type)
+    setWorkflowError(null)
+    try {
+      if (type === "opportunity") {
+        document.dispatchEvent(new CustomEvent("growth-inbox-open-opportunity-dialog"))
+        return
+      }
+
+      const endpoint =
+        type === "call"
+          ? "/api/platform/growth/replies/workflow-actions/create-call-task"
+          : "/api/platform/growth/replies/workflow-actions/mark-interested"
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId: selectedThread.lead_id }),
+      })
+      const payload = (await response.json().catch(() => ({}))) as { error?: string; message?: string }
+      if (!response.ok) throw new Error(payload.error ?? payload.message ?? "Workflow action failed.")
+      await refreshWorkflow()
+    } catch (actionError) {
+      setWorkflowError(actionError instanceof Error ? actionError.message : "Workflow action failed.")
+    } finally {
+      setWorkflowLoading(null)
+    }
+  }
+
   if (!selectedThread || selectedThread.channel !== "sms") return null
+
+  const replyContext = suggestions?.replyContext
 
   return (
     <div
       id="inbox-sms-draft"
-      data-equipify-qa-marker={`${GROWTH_SMS_PERSONALIZATION_QA_MARKER}:${GROWTH_SMS_OPERATOR_SEND_QA_MARKER}`}
+      data-equipify-qa-marker={`${GROWTH_SMS_INBOUND_RESPONSE_SUGGESTIONS_QA_MARKER}:${GROWTH_SMS_OPERATOR_SEND_QA_MARKER}`}
     >
-      <GrowthInboxWidgetErrorBoundary label="SMS drafting">
+      <GrowthInboxWidgetErrorBoundary label="SMS response suggestions">
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-medium text-foreground">Suggested SMS</p>
+            <p className="text-xs font-medium text-foreground">SMS Response Suggestions</p>
             <GrowthBadge label="Human approval required" tone="attention" />
           </div>
 
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            SMS-specific personalization — not a shortened email. Edit the draft, review recipient details, then send.
-          </p>
+          {inboundBody ? (
+            <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-xs space-y-1.5">
+              <p className="font-medium text-foreground">Lead replied</p>
+              <p className="text-muted-foreground italic">&ldquo;{inboundBody}&rdquo;</p>
+              {replyContext ? (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <GrowthBadge label={`Intent: ${replyContext.intent.replace(/_/g, " ")}`} tone="healthy" />
+                  <GrowthBadge label={`Sentiment: ${replyContext.sentiment}`} tone="neutral" />
+                  <GrowthBadge label={replyContext.engagementSignal} tone="attention" />
+                  {suggestions?.nextBestActionLabel ? (
+                    <GrowthBadge label={`NBA: ${suggestions.nextBestActionLabel}`} tone="neutral" />
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">No inbound SMS on this thread yet.</p>
+          )}
+
+          {suggestions?.callPrompt ? (
+            <div className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-950 space-y-1">
+              <p className="font-medium flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5" />
+                Suggested call prompt
+              </p>
+              <p>
+                <span className="font-medium">Why now:</span> {suggestions.callPrompt.whyCallNow}
+              </p>
+              <p>
+                <span className="font-medium">Open with:</span> {suggestions.callPrompt.openingLine}
+              </p>
+              <p>
+                <span className="font-medium">Ask:</span> {suggestions.callPrompt.keyQuestion}
+              </p>
+              <p>
+                <span className="font-medium">Aim for:</span> {suggestions.callPrompt.desiredOutcome}
+              </p>
+            </div>
+          ) : null}
+
+          {suggestions?.emailFollowUp ? (
+            <div className="rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-950 space-y-1">
+              <p className="font-medium">Suggested email follow-up</p>
+              <p className="font-medium">{suggestions.emailFollowUp.label}</p>
+              <p>{suggestions.emailFollowUp.summary}</p>
+              {suggestions.emailFollowUp.suggestedSubject ? (
+                <p className="text-[10px] text-violet-800">Subject idea: {suggestions.emailFollowUp.suggestedSubject}</p>
+              ) : null}
+              <p className="text-[10px] text-violet-800">Suggestion only — operator sends email manually.</p>
+            </div>
+          ) : null}
 
           <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 space-y-1">
             <p className="font-medium">Review before sending</p>
@@ -230,29 +325,42 @@ export function GrowthInboxActionCenterSmsDraftEmbed() {
             <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900">{draftError}</p>
           ) : null}
 
-          {suggestion ? (
+          {suggestions?.safetyWarnings.length ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] text-amber-900 space-y-0.5">
+              {suggestions.safetyWarnings.map((warning) => (
+                <p key={warning}>{warning}</p>
+              ))}
+            </div>
+          ) : null}
+
+          {suggestions?.smsReply ? (
             <div className="flex flex-wrap gap-1.5">
-              <GrowthBadge label={`Hook: ${suggestion.audit.openingHook.strategy.replace(/_/g, " ")}`} tone="neutral" />
-              <GrowthBadge label={`CTA: ${suggestion.audit.cta.category.replace(/_/g, " ")}`} tone="neutral" />
-              <GrowthBadge label={`Quality ${suggestion.audit.qualityScore.overall}`} tone="healthy" />
               <GrowthBadge
-                label={`${suggestion.charCount} chars · ${suggestion.segmentCount} seg`}
+                label={`Confidence: ${Math.round(suggestions.replyContext.confidence * 100)}% (${suggestions.replyContext.confidenceTier})`}
+                tone="neutral"
+              />
+              <GrowthBadge label={`Quality ${suggestions.smsReply.audit.qualityScore.overall}`} tone="healthy" />
+              <GrowthBadge
+                label={`${suggestions.smsReply.charCount} chars · ${suggestions.smsReply.segmentCount} seg`}
                 tone="neutral"
               />
             </div>
           ) : null}
 
-          <Textarea
-            value={draftBody}
-            onChange={(event) => {
-              setDraftBody(event.target.value)
-              setSendError(null)
-            }}
-            rows={4}
-            disabled={Boolean(actionLoading) || sending}
-            className="text-sm"
-            placeholder="Edit SMS draft or type your message…"
-          />
+          <div>
+            <p className="mb-1.5 text-[11px] font-medium text-foreground">Suggested SMS reply</p>
+            <Textarea
+              value={draftBody}
+              onChange={(event) => {
+                setDraftBody(event.target.value)
+                setSendError(null)
+              }}
+              rows={4}
+              disabled={Boolean(actionLoading) || sending}
+              className="text-sm"
+              placeholder="Edit SMS draft or type your message…"
+            />
+          </div>
 
           <p
             className={cn(
@@ -275,20 +383,13 @@ export function GrowthInboxActionCenterSmsDraftEmbed() {
               type="button"
               size="sm"
               variant="ghost"
-              disabled={loading || sending || Boolean(actionLoading)}
-              onClick={() => void loadSuggestion(selectedThread.lead_id, "reply")}
+              disabled={loading || sending || Boolean(actionLoading) || !inboundBody}
+              onClick={() =>
+                void loadSuggestions(selectedThread.lead_id, selectedThread.id, inboundBody)
+              }
             >
               <Sparkles className="mr-1.5 h-3.5 w-3.5" />
               Regenerate
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              disabled={loading || sending || Boolean(actionLoading)}
-              onClick={() => void loadSuggestion(selectedThread.lead_id, "outbound")}
-            >
-              Outbound variant
             </Button>
             <Button
               type="button"
@@ -300,6 +401,58 @@ export function GrowthInboxActionCenterSmsDraftEmbed() {
               {sending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Send className="mr-1.5 h-3.5 w-3.5" />}
               Send SMS
             </Button>
+          </div>
+
+          <div className="border-t border-border/60 pt-3">
+            <p className="mb-2 text-[11px] font-medium text-muted-foreground">Quick actions</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="justify-start"
+                disabled={Boolean(workflowLoading) || sending}
+                onClick={() => void runWorkflowAction("call")}
+              >
+                {workflowLoading === "call" ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Phone className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                Create call task
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="justify-start"
+                disabled={Boolean(workflowLoading) || sending}
+                onClick={() => void runWorkflowAction("mark_interested")}
+              >
+                {workflowLoading === "mark_interested" ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                Mark interested
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="justify-start col-span-2"
+                disabled={Boolean(workflowLoading) || sending}
+                onClick={() => void runWorkflowAction("opportunity")}
+              >
+                {workflowLoading === "opportunity" ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Target className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                Create opportunity
+              </Button>
+            </div>
+            {workflowError ? <p className="mt-2 text-xs text-rose-600">{workflowError}</p> : null}
           </div>
 
           {sendError ? (
@@ -318,11 +471,11 @@ export function GrowthInboxActionCenterSmsDraftEmbed() {
             </div>
           ) : null}
 
-          {suggestion?.contextUsed.length ? (
-            <p className="text-[10px] text-muted-foreground">Context: {suggestion.contextUsed.join(", ")}</p>
+          {suggestions?.contextUsed.length ? (
+            <p className="text-[10px] text-muted-foreground">Context: {suggestions.contextUsed.join(", ")}</p>
           ) : null}
-          {suggestion?.memoryUsed.length ? (
-            <p className="text-[10px] text-muted-foreground">Memory: {suggestion.memoryUsed.join(" · ")}</p>
+          {suggestions?.memoryUsed.length ? (
+            <p className="text-[10px] text-muted-foreground">Memory: {suggestions.memoryUsed.join(" · ")}</p>
           ) : null}
         </div>
       </GrowthInboxWidgetErrorBoundary>

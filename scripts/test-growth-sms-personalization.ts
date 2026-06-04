@@ -19,6 +19,12 @@ import {
   type SmsMessageType,
 } from "../lib/growth/sms/personalization/sms-personalization-types"
 import type { OutreachContextPacket } from "../lib/growth/outreach/personalization/personalization-types"
+import {
+  buildInboundSmsResponseSuggestions,
+  buildInboundSmsResponseSuggestionArchitectureAudit,
+} from "../lib/growth/sms/inbound-sms-response-suggestions"
+import { GROWTH_SMS_INBOUND_RESPONSE_SUGGESTIONS_QA_MARKER } from "../lib/growth/sms/inbound-sms-response-suggestion-types"
+import { auditSmsSuggestionSafety, sanitizeSmsSuggestionBody } from "../lib/growth/sms/sms-suggestion-safety"
 
 const LEAD_ID = "00000000-0000-4000-8000-00000000e533"
 
@@ -232,4 +238,76 @@ const apiRouteSource = readFileSync(
 )
 assert.match(apiRouteSource, /buildSmsInboxDraftSuggestion/)
 
-console.log("\nPhase 5.3 SMS personalization validation passed")
+console.log("\n=== Phase 5.6 Inbound SMS response suggestions ===")
+
+const christaSuggestions = buildInboundSmsResponseSuggestions({
+  leadId: LEAD_ID,
+  inboundBody: "Can you tell me more?",
+  contactName: "Christa",
+  companyName: "Summit HVAC Services",
+  packet: {
+    ...basePacket,
+    priorReplySummaries: ["Asked for more detail on technician routing (interested)"],
+    priorTouchCount: 2,
+    engagementScore: 80,
+    memoryAvailable: true,
+    memoryCoverageScore: 43,
+    relationshipStage: "engaged",
+    relationshipSummary: "Open to meeting — asked for more information via SMS.",
+    memoryInteractionSummaries: ["Replied Yes then asked for more detail"],
+    memoryOpenLoopSummaries: ["Asked for more detail on workflow"],
+    memoryPreferenceSummaries: ["communication preference: open to meeting"],
+  },
+  priorSmsPreviews: ["Yes", "Can you tell me more?"],
+  threadClassification: "positive_interest",
+  nextBestAction: "call_immediately",
+  nextBestActionReason: "Hot lead with positive SMS reply — call immediately.",
+})
+
+assert.equal(christaSuggestions.qa_marker, GROWTH_SMS_INBOUND_RESPONSE_SUGGESTIONS_QA_MARKER)
+assert.equal(christaSuggestions.replyContext.intent, "positive_interest")
+assert.equal(christaSuggestions.replyContext.sentiment, "positive")
+assert.equal(christaSuggestions.replyContext.engagementSignal, "positive engagement")
+assert.ok(christaSuggestions.smsReply.suggestedBody.length > 0)
+assert.ok(christaSuggestions.smsReply.suggestedBody.length <= 320)
+assert.ok(!christaSuggestions.smsReply.suggestedBody.toLowerCase().startsWith("hi christa"))
+assert.ok(christaSuggestions.emailFollowUp !== null)
+assert.equal(christaSuggestions.emailFollowUp?.kind, "send_short_overview")
+assert.ok(christaSuggestions.callPrompt !== null)
+assert.ok(
+  christaSuggestions.callPrompt?.whyCallNow.toLowerCase().includes("positive") ||
+    christaSuggestions.callPrompt?.openingLine.toLowerCase().includes("more"),
+)
+assert.equal(christaSuggestions.nextBestAction, "call_immediately")
+assert.equal(christaSuggestions.humanApprovalRequired, true)
+
+console.log(`Christa SMS suggestion: ${christaSuggestions.smsReply.suggestedBody}`)
+console.log(`Email follow-up: ${christaSuggestions.emailFollowUp?.label}`)
+console.log(`Call prompt opener: ${christaSuggestions.callPrompt?.openingLine}`)
+
+const unsafeBody = sanitizeSmsSuggestionBody("Hi Christa,\n\nBest regards — our engagement score is 80.")
+assert.ok(!unsafeBody.toLowerCase().includes("best regards"))
+const safetyWarnings = auditSmsSuggestionSafety({ body: "Guaranteed 100% results!", intent: "positive_interest" })
+assert.ok(safetyWarnings.some((warning) => warning.includes("Overpromise")))
+
+const phase56Audit = buildInboundSmsResponseSuggestionArchitectureAudit()
+assert.equal(phase56Audit.qa_marker, GROWTH_SMS_INBOUND_RESPONSE_SUGGESTIONS_QA_MARKER)
+assert.ok(phase56Audit.reuses.length >= 4)
+
+const inboundApiSource = readFileSync(
+  resolve(process.cwd(), "app/api/platform/growth/sms/inbound-suggestions/route.ts"),
+  "utf8",
+)
+assert.match(inboundApiSource, /fetchInboundSmsResponseSuggestions/)
+
+const smsEmbedSource = readFileSync(
+  resolve(process.cwd(), "components/growth/inbox/growth-inbox-action-center-sms-draft-embed.tsx"),
+  "utf8",
+)
+assert.match(smsEmbedSource, /inbound-suggestions/)
+assert.match(smsEmbedSource, /Suggested call prompt/)
+assert.match(smsEmbedSource, /Suggested email follow-up/)
+assert.match(smsEmbedSource, /Create call task/)
+assert.match(smsEmbedSource, /Mark interested/)
+
+console.log("\nPhase 5.3 + 5.6 SMS personalization validation passed")

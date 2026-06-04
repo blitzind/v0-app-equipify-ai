@@ -76,7 +76,7 @@ export function GrowthInboxActionCenterColumn() {
         </ActionSection>
 
         {selectedThread.channel === "sms" ? (
-          <ActionSection title="SMS Drafting">
+          <ActionSection title="SMS Response Suggestions">
             <GrowthInboxActionCenterSmsDraftEmbed />
           </ActionSection>
         ) : null}
