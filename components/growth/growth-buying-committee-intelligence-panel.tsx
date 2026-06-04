@@ -10,6 +10,7 @@ import { GrowthEmailDiscoveryRolePicker } from "@/components/growth/growth-email
 import type { EmailDiscoveryRolePairRow } from "@/lib/growth/email-discovery/email-discovery-role-pairs"
 import { formatCanonicalPersonBackfillRequestError } from "@/lib/growth/canonical-persons/canonical-person-backfill-api"
 import { GROWTH_BUYING_COMMITTEE_INTELLIGENCE_QA_MARKER } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-types"
+import { GROWTH_BUYING_COMMITTEE_INTELLIGENCE_RUNTIME_QA_MARKER } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-runtime-types"
 import type { GrowthBuyingCommitteeIntelligenceRunDetail } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-types"
 
 type DiscoveryResult = {
@@ -48,11 +49,14 @@ export function GrowthBuyingCommitteeIntelligencePanel() {
   const [result, setResult] = useState<DiscoveryResult | null>(null)
   const [detail, setDetail] = useState<GrowthBuyingCommitteeIntelligenceRunDetail | null>(null)
   const [promote, setPromote] = useState(true)
+  const [syncRun, setSyncRun] = useState(false)
   const [operatorStatus, setOperatorStatus] = useState<{
     verified_member_count: number
     coverage_score: number
     roles_present: string[]
     roles_missing: string[]
+    discovery_status: string
+    has_verified_committee: boolean
   } | null>(null)
 
   const loadRolePairs = useCallback(async () => {
@@ -119,6 +123,8 @@ export function GrowthBuyingCommitteeIntelligencePanel() {
               coverage_score: number
               roles_present: string[]
               roles_missing: string[]
+              discovery_status: string
+              has_verified_committee: boolean
             }
           }
           if (cancelled) return
@@ -129,6 +135,8 @@ export function GrowthBuyingCommitteeIntelligencePanel() {
               coverage_score: data.status.coverage_score,
               roles_present: data.status.roles_present,
               roles_missing: data.status.roles_missing,
+              discovery_status: data.status.discovery_status,
+              has_verified_committee: data.status.has_verified_committee,
             })
           } else {
             setCompanyCheck("invalid")
@@ -155,27 +163,46 @@ export function GrowthBuyingCommitteeIntelligencePanel() {
     setResult(null)
     setDetail(null)
     try {
-      const res = await fetch("/api/platform/growth/buying-committee-intelligence/run", {
+      const endpoint = syncRun
+        ? "/api/platform/growth/buying-committee-intelligence/run"
+        : "/api/platform/growth/buying-committee-intelligence/jobs"
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           company_id: companyId.trim(),
-          promote,
+          promote_on_complete: promote,
+          promote: syncRun ? promote : undefined,
+          trigger_source: "infrastructure_panel",
         }),
       })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
         result?: DiscoveryResult
+        enqueued?: boolean
+        reason?: string | null
         message?: string
         error?: unknown
       }
-      if (!res.ok || !data.ok || !data.result) {
+      if (!res.ok || !data.ok) {
         throw new Error(formatCanonicalPersonBackfillRequestError(data))
       }
-      setResult(data.result)
-      setNotice(
-        `Run ${data.result.run_id.slice(0, 8)}… — ${data.result.verified_count} verified, ${data.result.promoted_count} promoted · coverage ${(data.result.coverage.coverage_score * 100).toFixed(0)}%.`,
-      )
+      if (syncRun && data.result) {
+        setResult(data.result)
+        setNotice(
+          `Run ${data.result.run_id.slice(0, 8)}… — ${data.result.verified_count} verified, ${data.result.promoted_count} promoted · coverage ${(data.result.coverage.coverage_score * 100).toFixed(0)}%.`,
+        )
+      } else {
+        setNotice(
+          data.enqueued
+            ? "Buying committee intelligence job queued."
+            : data.reason === "verified_committee_exists"
+              ? "Verified committee members already on file."
+              : data.reason === "active_job_exists"
+                ? "Job already pending or running."
+                : "Job was not queued.",
+        )
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Buying committee intelligence run failed.")
     } finally {
@@ -208,13 +235,14 @@ export function GrowthBuyingCommitteeIntelligencePanel() {
 
   return (
     <GrowthEngineCard
-      title="Buying committee intelligence (7.7A)"
+      title="Buying committee intelligence (7.7A + 7.7B)"
       icon={<Users size={17} />}
       data-qa-marker={GROWTH_BUYING_COMMITTEE_INTELLIGENCE_QA_MARKER}
+      data-runtime-qa-marker={GROWTH_BUYING_COMMITTEE_INTELLIGENCE_RUNTIME_QA_MARKER}
     >
       <p className="mb-4 text-sm text-muted-foreground">
         Evidence-backed buying committee role assignments from canonical employment, staging contacts,
-        and confirmed decision makers. Roles from job titles use deterministic pattern evidence only; no AI people.
+        and confirmed decision makers. Default: async job queue (cron worker). Sync run for debug only.
       </p>
       <div className="flex flex-col gap-4">
         <div className="grid gap-2">
@@ -244,7 +272,8 @@ export function GrowthBuyingCommitteeIntelligencePanel() {
           )}
           {companyCheck === "valid" && operatorStatus && (
             <p className="text-xs text-muted-foreground">
-              Verified members: {operatorStatus.verified_member_count} · coverage{" "}
+              Status: {operatorStatus.discovery_status} · verified members:{" "}
+              {operatorStatus.verified_member_count} · coverage{" "}
               {(operatorStatus.coverage_score * 100).toFixed(0)}% · present:{" "}
               {operatorStatus.roles_present.join(", ") || "none"} · missing:{" "}
               {operatorStatus.roles_missing.join(", ") || "none"}
@@ -262,20 +291,37 @@ export function GrowthBuyingCommitteeIntelligencePanel() {
           Promote verified assignments to canonical committee intelligence
         </label>
 
-        <Button
-          type="button"
-          disabled={running || !hasValidCompany || !companyId.trim()}
-          onClick={() => void runDiscovery()}
-        >
-          {running ? (
-            <>
-              <Loader2 className="mr-2 size-4 animate-spin" />
-              Running…
-            </>
-          ) : (
-            "Run buying committee intelligence"
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={syncRun}
+            onChange={(e) => setSyncRun(e.target.checked)}
+            className="rounded border-border"
+          />
+          Sync debug run (HTTP, bypasses job queue)
+        </label>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            disabled={running || !hasValidCompany || !companyId.trim()}
+            onClick={() => void runDiscovery()}
+          >
+            {running ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+            {syncRun ? "Run sync collection" : "Queue buying committee intelligence"}
+          </Button>
+          {result?.run_id && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loadingDetail}
+              onClick={() => void loadRunDetail(result.run_id)}
+            >
+              {loadingDetail ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+              Load run detail
+            </Button>
           )}
-        </Button>
+        </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
         {notice && <p className="text-sm text-muted-foreground">{notice}</p>}

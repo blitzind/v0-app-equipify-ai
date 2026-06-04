@@ -15,6 +15,7 @@ import { loadEmailDiscoveryOperatorStatus } from "@/lib/growth/email-discovery/e
 import { loadPhoneDiscoveryOperatorStatus } from "@/lib/growth/phone-discovery/phone-discovery-operator-status"
 import { loadSocialProfileDiscoveryOperatorStatus } from "@/lib/growth/social-profile-discovery/social-profile-discovery-operator-status"
 import { loadCompanyIntelligenceOperatorStatus } from "@/lib/growth/company-intelligence/company-intelligence-operator-status"
+import { loadBuyingCommitteeIntelligenceOperatorStatus } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-operator-status"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { normalizeCompanyName, normalizeWebsiteDomain } from "@/lib/growth/import/normalize"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
@@ -213,6 +214,7 @@ export async function buildBrowserIntakeCrmContext(
   }
 
   let company_intelligence = null
+  let buying_committee_intelligence = null
   if (canonical_company_id) {
     const ciStatus = await loadCompanyIntelligenceOperatorStatus(admin, {
       company_id: canonical_company_id,
@@ -224,6 +226,20 @@ export async function buildBrowserIntakeCrmContext(
         has_verified_intelligence: ciStatus.has_verified_intelligence,
         discovery_status: ciStatus.discovery_status,
         can_discover: ciStatus.can_discover,
+      }
+    }
+
+    const bciStatus = await loadBuyingCommitteeIntelligenceOperatorStatus(admin, {
+      company_id: canonical_company_id,
+    })
+    if (bciStatus) {
+      buying_committee_intelligence = {
+        company_id: canonical_company_id,
+        verified_member_count: bciStatus.verified_member_count,
+        has_verified_committee: bciStatus.has_verified_committee,
+        discovery_status: bciStatus.discovery_status,
+        can_discover: bciStatus.can_discover,
+        coverage_score: bciStatus.coverage_score,
       }
     }
   }
@@ -312,6 +328,7 @@ export async function buildBrowserIntakeCrmContext(
     phone_discovery_contacts,
     social_profile_discovery_contacts,
     company_intelligence,
+    buying_committee_intelligence,
     links: {
       lead: `${adminPrefix}${buildAdminLinks(lead.id, lead.companyName, opportunity?.id ?? null).lead}`,
       company: `${adminPrefix}${buildAdminLinks(lead.id, lead.companyName, opportunity?.id ?? null).company}`,

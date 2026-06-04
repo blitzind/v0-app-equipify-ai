@@ -1207,6 +1207,61 @@
     })
   }
 
+  async function enqueueBrowserBuyingCommitteeIntelligence(companyId, buttonEl) {
+    if (!companyId) return
+    if (buttonEl) {
+      buttonEl.disabled = true
+      buttonEl.textContent = "Queuing…"
+    }
+    try {
+      const res = await fetch("/api/platform/growth/browser-intake/buying-committee-intelligence", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_id: companyId,
+          promote_on_complete: true,
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || !body.ok) {
+        throw new Error(body.message ?? "Could not queue buying committee intelligence.")
+      }
+      if (buttonEl) {
+        buttonEl.textContent = body.enqueued ? "Queued" : body.reason ?? "Skipped"
+      }
+    } catch (error) {
+      if (buttonEl) buttonEl.textContent = "Map committee"
+      window.EquipifyGrowthPanelLoad?.setStatus?.(
+        error instanceof Error ? error.message : "Buying committee intelligence failed.",
+        "error",
+      )
+    } finally {
+      if (buttonEl && buttonEl.textContent === "Queuing…") buttonEl.textContent = "Map committee"
+    }
+  }
+
+  function renderBuyingCommitteeIntelligence(context) {
+    const panel = document.getElementById("es-ws-buying-committee-intelligence-panel")
+    if (!panel) return
+    const bci = context?.buying_committee_intelligence
+    const companyId = trimOrNull(context?.canonical_company_id)
+    if (!companyId || !bci) {
+      panel.innerHTML =
+        '<p class="es-ws-empty">Canonical buying committee intelligence is available after the lead links to a canonical company.</p>'
+      return
+    }
+    const verified = bci.has_verified_committee
+      ? `<span class="es-ws-meta">${bci.verified_member_count} verified member(s) · ${Math.round(bci.coverage_score * 100)}% coverage</span>`
+      : `<button type="button" class="es-ws-inline-btn es-ws-buying-committee-intelligence-btn" data-company-id="${escapeHtml(companyId)}">Map committee</button>`
+    panel.innerHTML = `<div class="es-ws-company-intelligence-row">${verified}<span class="es-ws-meta">${escapeHtml(bci.discovery_status)}</span></div>`
+    panel.querySelectorAll(".es-ws-buying-committee-intelligence-btn[data-company-id]").forEach((button) => {
+      button.addEventListener("click", () => {
+        void enqueueBrowserBuyingCommitteeIntelligence(button.getAttribute("data-company-id"), button)
+      })
+    })
+  }
+
   function renderSocialProfileDiscoveryContacts(context) {
     const list = document.getElementById("es-ws-social-profile-discovery-list")
     if (!list) return
@@ -1619,6 +1674,7 @@
     renderPhoneDiscoveryContacts(context)
     renderSocialProfileDiscoveryContacts(context)
     renderCompanyIntelligence(context)
+    renderBuyingCommitteeIntelligence(context)
     renderTechnologies(detected, context)
     renderSignals(detected, context)
     renderCrmRelationship(context, relationship, contactsCount, oppCount, customerCount, hasMatch)

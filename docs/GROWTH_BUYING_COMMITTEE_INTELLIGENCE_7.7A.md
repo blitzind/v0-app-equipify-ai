@@ -34,9 +34,10 @@ Migration: `supabase/migrations/20270719120000_growth_engine_buying_committee_in
 
 `analyzeBuyingCommitteeCoverage` — role presence, coverage score, single-thread risk
 
-## APIs (sync only — no 7.7B runtime)
+## APIs
 
-- `POST /api/platform/growth/buying-committee-intelligence/run`
+- `POST /api/platform/growth/buying-committee-intelligence/run` — sync (debug / infrastructure)
+- `POST /api/platform/growth/buying-committee-intelligence/jobs` — async queue (**7.7B**)
 - `GET /api/platform/growth/buying-committee-intelligence/runs/[runId]`
 - `GET /api/platform/growth/buying-committee-intelligence/operator-status?company_id=`
 
@@ -51,4 +52,4 @@ Migration: `supabase/migrations/20270719120000_growth_engine_buying_committee_in
 
 ## Hard rules
 
-No AI-generated people, no blind title guessing (pattern evidence required), no role without evidence, no intent/engagement scoring, no paid enrichment. Runtime/jobs/cron/browser/lead drawer belong in **7.7B**.
+No AI-generated people, no blind title guessing (pattern evidence required), no role without evidence, no intent/engagement scoring, no paid enrichment. Async runtime: **7.7B** (`docs/GROWTH_BUYING_COMMITTEE_INTELLIGENCE_7.7B.md`).

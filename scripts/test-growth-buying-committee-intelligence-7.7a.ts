@@ -264,16 +264,12 @@ const runApi = fs.readFileSync(
 assert.match(runApi, /runBuyingCommitteeIntelligenceForCanonicalCompany/)
 assert.doesNotMatch(runApi, /buying-committee-intelligence\/jobs/)
 
-const vercel = fs.readFileSync(path.join(process.cwd(), "vercel.json"), "utf8")
-assert.doesNotMatch(vercel, /buying-committee-intelligence-worker/)
-
 const panel = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-buying-committee-intelligence-panel.tsx"),
   "utf8",
 )
 assert.match(panel, /buying-committee-intelligence\/run/)
 assert.match(panel, /buying-committee-intelligence\/runs\//)
-assert.doesNotMatch(panel, /buying-committee-intelligence\/jobs/)
 assert.match(panel, /GROWTH_BUYING_COMMITTEE_INTELLIGENCE_QA_MARKER/)
 
 const infra = fs.readFileSync(

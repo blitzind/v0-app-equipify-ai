@@ -11,6 +11,8 @@ import { GROWTH_SOCIAL_PROFILE_DISCOVERY_PROSPECT_FILTERS } from "@/lib/growth/s
 import type { GrowthSocialProfileDiscoveryProspectFilter } from "@/lib/growth/social-profile-discovery/social-profile-discovery-runtime-types"
 import { GROWTH_COMPANY_INTELLIGENCE_PROSPECT_FILTERS } from "@/lib/growth/company-intelligence/company-intelligence-runtime-types"
 import type { GrowthCompanyIntelligenceProspectFilter } from "@/lib/growth/company-intelligence/company-intelligence-runtime-types"
+import { GROWTH_BUYING_COMMITTEE_INTELLIGENCE_PROSPECT_FILTERS } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-runtime-types"
+import type { GrowthBuyingCommitteeIntelligenceProspectFilter } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-runtime-types"
 
 export const runtime = "nodejs"
 
@@ -104,6 +106,22 @@ export async function GET(request: Request) {
     )
   }
 
+  const buyingCommitteeParam = url.searchParams.get("buying_committee_intelligence_filter") ?? ""
+  const buyingCommitteeFilterParsed = GROWTH_BUYING_COMMITTEE_INTELLIGENCE_PROSPECT_FILTERS.includes(
+    buyingCommitteeParam as GrowthBuyingCommitteeIntelligenceProspectFilter,
+  )
+    ? (buyingCommitteeParam as GrowthBuyingCommitteeIntelligenceProspectFilter)
+    : null
+  if (buyingCommitteeParam && !buyingCommitteeFilterParsed) {
+    return NextResponse.json(
+      {
+        error: "invalid_buying_committee_intelligence_filter",
+        message: `buying_committee_intelligence_filter must be one of: ${GROWTH_BUYING_COMMITTEE_INTELLIGENCE_PROSPECT_FILTERS.join(", ")}.`,
+      },
+      { status: 400 },
+    )
+  }
+
   if (!limitParsed.success || !offsetParsed.success) {
     return NextResponse.json({ error: "invalid_pagination", message: "Invalid limit or offset." }, { status: 400 })
   }
@@ -119,6 +137,7 @@ export async function GET(request: Request) {
       phoneDiscoveryFilter: phoneDiscoveryFilterParsed,
       socialProfileDiscoveryFilter: socialProfileDiscoveryFilterParsed,
       companyIntelligenceFilter: companyIntelligenceFilterParsed,
+      buyingCommitteeIntelligenceFilter: buyingCommitteeFilterParsed,
     })
 
     logGrowthEngine("call_queue_list_success", {

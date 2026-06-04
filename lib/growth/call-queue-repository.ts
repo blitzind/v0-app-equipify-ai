@@ -23,6 +23,11 @@ import {
   matchesCompanyIntelligenceProspectFilter,
   type GrowthCompanyIntelligenceProspectFilter,
 } from "@/lib/growth/company-intelligence/company-intelligence-runtime-types"
+import { loadBuyingCommitteeIntelligenceLeadRollup } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-lead-rollup"
+import {
+  matchesBuyingCommitteeIntelligenceProspectFilter,
+  type GrowthBuyingCommitteeIntelligenceProspectFilter,
+} from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-runtime-types"
 import { fetchGrowthLeadDecisionMakerById } from "@/lib/growth/decision-maker-repository"
 import { listGrowthLeads } from "@/lib/growth/lead-repository"
 import { resolveGrowthRepLabels } from "@/lib/growth/assignment/rep-roster-repository"
@@ -53,6 +58,7 @@ export async function listGrowthCallQueue(
     phoneDiscoveryFilter?: GrowthPhoneDiscoveryProspectFilter | null
     socialProfileDiscoveryFilter?: GrowthSocialProfileDiscoveryProspectFilter | null
     companyIntelligenceFilter?: GrowthCompanyIntelligenceProspectFilter | null
+    buyingCommitteeIntelligenceFilter?: GrowthBuyingCommitteeIntelligenceProspectFilter | null
   },
 ): Promise<GrowthCallQueueRow[]> {
   const leads = await listGrowthLeads(admin, {
@@ -140,6 +146,18 @@ export async function listGrowthCallQueue(
     if (input.companyIntelligenceFilter) {
       const rollup = await loadCompanyIntelligenceLeadRollup(admin, lead.id)
       if (!matchesCompanyIntelligenceProspectFilter(input.companyIntelligenceFilter, rollup)) {
+        continue
+      }
+    }
+
+    if (input.buyingCommitteeIntelligenceFilter) {
+      const rollup = await loadBuyingCommitteeIntelligenceLeadRollup(admin, lead.id)
+      if (
+        !matchesBuyingCommitteeIntelligenceProspectFilter(
+          input.buyingCommitteeIntelligenceFilter,
+          rollup,
+        )
+      ) {
         continue
       }
     }

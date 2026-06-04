@@ -2,24 +2,23 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
-import { runCompanyIntelligenceForCanonicalCompany } from "@/lib/growth/company-intelligence/company-intelligence-orchestrator"
-import { companyHasVerifiedIntelligenceSnapshots } from "@/lib/growth/company-intelligence/company-intelligence-snapshot-integrity"
-import { recoverStaleCompanyIntelligenceRunningJobs } from "@/lib/growth/company-intelligence/company-intelligence-stale-jobs"
-import { triggerBuyingCommitteeIntelligenceAfterCompanyIntelligence } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-triggers"
+import { runBuyingCommitteeIntelligenceForCanonicalCompany } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-orchestrator"
+import { buyingCommitteeHasVerifiedIntelligenceMembers } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-committee-integrity"
+import { recoverStaleBuyingCommitteeIntelligenceRunningJobs } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-stale-jobs"
 import type {
-  GrowthCompanyIntelligenceJobTrigger,
-  GrowthCompanyIntelligenceJobStatus,
-} from "@/lib/growth/company-intelligence/company-intelligence-runtime-types"
+  GrowthBuyingCommitteeIntelligenceJobTrigger,
+  GrowthBuyingCommitteeIntelligenceJobStatus,
+} from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-runtime-types"
 
-export const GROWTH_COMPANY_INTELLIGENCE_MAX_JOBS_PER_CRON = 2 as const
+export const GROWTH_BUYING_COMMITTEE_INTELLIGENCE_MAX_JOBS_PER_CRON = 2 as const
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
 
-export type EnqueueCompanyIntelligenceJobInput = {
+export type EnqueueBuyingCommitteeIntelligenceJobInput = {
   company_id: string
-  trigger_source: GrowthCompanyIntelligenceJobTrigger
+  trigger_source: GrowthBuyingCommitteeIntelligenceJobTrigger
   created_by?: string | null
   promote_on_complete?: boolean
   scheduled_for?: string
@@ -27,31 +26,31 @@ export type EnqueueCompanyIntelligenceJobInput = {
   skip_if_active_job?: boolean
 }
 
-export type EnqueueCompanyIntelligenceJobResult =
+export type EnqueueBuyingCommitteeIntelligenceJobResult =
   | { ok: true; enqueued: true; job_id: string }
   | { ok: true; enqueued: false; reason: string; job_id?: string | null }
   | { ok: false; reason: string }
 
-export async function findActiveCompanyIntelligenceJob(
+export async function findActiveBuyingCommitteeIntelligenceJob(
   admin: SupabaseClient,
   company_id: string,
-): Promise<{ id: string; status: GrowthCompanyIntelligenceJobStatus } | null> {
+): Promise<{ id: string; status: GrowthBuyingCommitteeIntelligenceJobStatus } | null> {
   const { data } = await admin
     .schema("growth")
-    .from("company_intelligence_jobs")
+    .from("buying_committee_jobs")
     .select("id, status")
     .eq("company_id", company_id)
     .in("status", ["pending", "running"])
     .maybeSingle()
 
   if (!data?.id) return null
-  return { id: asString(data.id), status: data.status as GrowthCompanyIntelligenceJobStatus }
+  return { id: asString(data.id), status: data.status as GrowthBuyingCommitteeIntelligenceJobStatus }
 }
 
-export async function enqueueCompanyIntelligenceJob(
+export async function enqueueBuyingCommitteeIntelligenceJob(
   admin: SupabaseClient,
-  input: EnqueueCompanyIntelligenceJobInput,
-): Promise<EnqueueCompanyIntelligenceJobResult> {
+  input: EnqueueBuyingCommitteeIntelligenceJobInput,
+): Promise<EnqueueBuyingCommitteeIntelligenceJobResult> {
   const company_id = asString(input.company_id)
   if (!company_id) {
     return { ok: false, reason: "company_id is required." }
@@ -69,13 +68,13 @@ export async function enqueueCompanyIntelligenceJob(
   }
 
   if (input.skip_if_verified !== false) {
-    if (await companyHasVerifiedIntelligenceSnapshots(admin, company_id)) {
-      return { ok: true, enqueued: false, reason: "verified_intelligence_exists" }
+    if (await buyingCommitteeHasVerifiedIntelligenceMembers(admin, company_id)) {
+      return { ok: true, enqueued: false, reason: "verified_committee_exists" }
     }
   }
 
   if (input.skip_if_active_job !== false) {
-    const active = await findActiveCompanyIntelligenceJob(admin, company_id)
+    const active = await findActiveBuyingCommitteeIntelligenceJob(admin, company_id)
     if (active) {
       return { ok: true, enqueued: false, reason: "active_job_exists", job_id: active.id }
     }
@@ -84,7 +83,7 @@ export async function enqueueCompanyIntelligenceJob(
   const scheduled_for = input.scheduled_for ?? new Date().toISOString()
   const { data, error } = await admin
     .schema("growth")
-    .from("company_intelligence_jobs")
+    .from("buying_committee_jobs")
     .insert({
       company_id,
       created_by: input.created_by ?? null,
@@ -99,7 +98,7 @@ export async function enqueueCompanyIntelligenceJob(
 
   if (error) {
     if (error.code === "23505") {
-      const active = await findActiveCompanyIntelligenceJob(admin, company_id)
+      const active = await findActiveBuyingCommitteeIntelligenceJob(admin, company_id)
       return {
         ok: true,
         enqueued: false,
@@ -111,7 +110,7 @@ export async function enqueueCompanyIntelligenceJob(
   }
 
   const job_id = asString(data?.id)
-  logGrowthEngine("company_intelligence_job_enqueued", {
+  logGrowthEngine("buying_committee_intelligence_job_enqueued", {
     job_id,
     company_id,
     trigger_source: input.trigger_source,
@@ -122,15 +121,15 @@ export async function enqueueCompanyIntelligenceJob(
   return { ok: true, enqueued: true, job_id }
 }
 
-export async function processCompanyIntelligenceJobQueue(
+export async function processBuyingCommitteeIntelligenceJobQueue(
   admin: SupabaseClient,
-  limit = GROWTH_COMPANY_INTELLIGENCE_MAX_JOBS_PER_CRON,
+  limit = GROWTH_BUYING_COMMITTEE_INTELLIGENCE_MAX_JOBS_PER_CRON,
 ): Promise<{ processed: number; failed: number; skipped: number; stale_recovered: number }> {
-  const { recovered: stale_recovered } = await recoverStaleCompanyIntelligenceRunningJobs(admin)
+  const { recovered: stale_recovered } = await recoverStaleBuyingCommitteeIntelligenceRunningJobs(admin)
 
   const { data: jobs } = await admin
     .schema("growth")
-    .from("company_intelligence_jobs")
+    .from("buying_committee_jobs")
     .select("id, company_id, promote_on_complete, attempts")
     .eq("status", "pending")
     .lte("scheduled_for", new Date().toISOString())
@@ -151,7 +150,7 @@ export async function processCompanyIntelligenceJobQueue(
 
     const { error: runErr } = await admin
       .schema("growth")
-      .from("company_intelligence_jobs")
+      .from("buying_committee_jobs")
       .update({
         status: "running",
         started_at: new Date().toISOString(),
@@ -166,14 +165,14 @@ export async function processCompanyIntelligenceJobQueue(
     }
 
     try {
-      const result = await runCompanyIntelligenceForCanonicalCompany(admin, {
+      const result = await runBuyingCommitteeIntelligenceForCanonicalCompany(admin, {
         company_id,
         promote: Boolean(job.promote_on_complete),
       })
 
       await admin
         .schema("growth")
-        .from("company_intelligence_jobs")
+        .from("buying_committee_jobs")
         .update({
           status: "completed",
           completed_at: new Date().toISOString(),
@@ -182,23 +181,21 @@ export async function processCompanyIntelligenceJobQueue(
         })
         .eq("id", job_id)
 
-      logGrowthEngine("company_intelligence_job_completed", {
+      logGrowthEngine("buying_committee_intelligence_job_completed", {
         job_id,
         run_id: result.run_id,
         company_id,
-        finding_count: result.finding_count,
+        member_count: result.member_count,
         verified_count: result.verified_count,
         promoted_count: result.promoted_count,
       })
 
-      await triggerBuyingCommitteeIntelligenceAfterCompanyIntelligence(admin, { company_id })
-
       processed += 1
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Company intelligence failed."
+      const message = error instanceof Error ? error.message : "Buying committee intelligence failed."
       await admin
         .schema("growth")
-        .from("company_intelligence_jobs")
+        .from("buying_committee_jobs")
         .update({
           status: "failed",
           completed_at: new Date().toISOString(),
@@ -206,7 +203,7 @@ export async function processCompanyIntelligenceJobQueue(
         })
         .eq("id", job_id)
 
-      logGrowthEngine("company_intelligence_job_failed", {
+      logGrowthEngine("buying_committee_intelligence_job_failed", {
         job_id,
         company_id,
         message: message.slice(0, 500),

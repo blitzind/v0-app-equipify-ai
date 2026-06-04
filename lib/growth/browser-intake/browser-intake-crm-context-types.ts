@@ -93,6 +93,15 @@ export type GrowthBrowserIntakeCrmContextCompanyIntelligence = {
   can_discover: boolean
 }
 
+export type GrowthBrowserIntakeCrmContextBuyingCommitteeIntelligence = {
+  company_id: string
+  verified_member_count: number
+  has_verified_committee: boolean
+  discovery_status: string
+  can_discover: boolean
+  coverage_score: number
+}
+
 export type GrowthBrowserIntakeCrmContext = {
   lead_id: string
   company_name: string
@@ -117,6 +126,7 @@ export type GrowthBrowserIntakeCrmContext = {
   phone_discovery_contacts: GrowthBrowserIntakeCrmContextPhoneDiscoveryContact[]
   social_profile_discovery_contacts: GrowthBrowserIntakeCrmContextSocialProfileDiscoveryContact[]
   company_intelligence: GrowthBrowserIntakeCrmContextCompanyIntelligence | null
+  buying_committee_intelligence: GrowthBrowserIntakeCrmContextBuyingCommitteeIntelligence | null
   links: GrowthBrowserIntakeCrmContextLinks
 }
 
