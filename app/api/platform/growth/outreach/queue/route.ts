@@ -4,6 +4,10 @@ import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { GROWTH_OUTREACH_QUEUE_CHANNELS } from "@/lib/growth/outreach/outreach-queue-types"
 import { listGrowthOutreachQueueItems, listGrowthOutreachQueueItemsWithLead } from "@/lib/growth/outreach/outreach-queue-repository"
 import { createGrowthOutreachQueueItem } from "@/lib/growth/outreach/run-outreach-queue"
+import {
+  AdapterOutboundCutoverDisabledError,
+  growthAdapterOutboundCutoverHttpResponse,
+} from "@/lib/growth/runtime/outbound-cutover"
 
 export const runtime = "nodejs"
 
@@ -68,6 +72,9 @@ export async function POST(request: Request) {
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 
+  const cutover = growthAdapterOutboundCutoverHttpResponse("POST /outreach/queue")
+  if (cutover) return cutover
+
   const parsed = PostSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) {
     return NextResponse.json({ error: "invalid_body", message: "Invalid queue payload." }, { status: 400 })
@@ -88,6 +95,9 @@ export async function POST(request: Request) {
     })
     return NextResponse.json({ ok: true, item })
   } catch (e) {
+    if (e instanceof AdapterOutboundCutoverDisabledError) {
+      return growthAdapterOutboundCutoverHttpResponse(e.message) ?? NextResponse.json({ error: e.code }, { status: 410 })
+    }
     const code = e instanceof Error ? e.message : "queue_failed"
     const mapped = mapError(code)
     return NextResponse.json({ error: mapped.code, message: mapped.message }, { status: mapped.status })

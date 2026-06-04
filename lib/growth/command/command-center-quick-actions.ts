@@ -29,5 +29,5 @@ export const GROWTH_COMMAND_CENTER_QUICK_ACTIONS: readonly GrowthCommandCenterQu
   { href: GROWTH_CALLS_PRIMARY_HREF, label: "Open Calls", icon: Headphones },
   { href: "/admin/growth/meetings", label: "Join Meeting", icon: Video },
   { href: "/admin/growth/sequences", label: "Launch Sequence", icon: GitBranch },
-  { href: "/admin/growth/outreach/approval", label: "Open Approval Queue", icon: CheckCircle2 },
+  { href: "/admin/growth/sequences/execution", label: "Open Sequence Approvals", icon: CheckCircle2 },
 ] as const

@@ -1,5 +1,9 @@
-/** Phase 5.6F — SMS response suggestion quality and safety rules. Client-safe. */
+/** Phase 5.6F + 5.6.1 — SMS response suggestion quality and safety rules. Client-safe. */
 
+import {
+  auditCustomerFacingSuggestionCopy,
+  normalizeCustomerFacingCopy,
+} from "@/lib/growth/sms/sms-customer-facing-phrases"
 import { hasSmsBlastLanguage } from "@/lib/growth/sms/personalization/sms-memory-awareness"
 import { trimSmsToMaxChars } from "@/lib/growth/sms/personalization/sms-quality-scoring"
 import type { GrowthReplyIntent } from "@/lib/growth/reply-intelligence/reply-intent-types"
@@ -14,10 +18,9 @@ const UNAVAILABLE_CAPABILITY = /\b(auto.?book|instant demo|live chat|24\/7 suppo
 const PUSHY_SALES = /\b(limited time|act now|don't miss|last chance|exclusive offer)\b/i
 
 export function sanitizeSmsSuggestionBody(body: string, maxChars = SMS_PERSONALIZATION_DEFAULT_MAX_CHARS): string {
-  let result = body.trim().replace(/\s+/g, " ")
+  let result = normalizeCustomerFacingCopy(body)
   result = result.replace(EMAIL_GREETING, "")
   result = result.replace(EMAIL_CLOSING, "")
-  result = result.replace(/\n+/g, " ").trim()
   return trimSmsToMaxChars(result, maxChars)
 }
 
@@ -55,6 +58,8 @@ export function auditSmsSuggestionSafety(input: {
   if (intent === "objection" || intent === "timing_delay") {
     warnings.push("Objection or timing signal — avoid aggressive meeting push.")
   }
+
+  warnings.push(...auditCustomerFacingSuggestionCopy(body))
 
   return warnings
 }

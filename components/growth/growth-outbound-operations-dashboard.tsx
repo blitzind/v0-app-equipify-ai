@@ -147,7 +147,7 @@ function GrowthOutboundOperationsDegradedState({
               Retry
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/admin/growth/outreach/approval">Open outreach approvals</Link>
+              <Link href="/admin/growth/sequences/execution">Open sequence approvals</Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
               <Link href="/admin/growth/providers/setup">Provider setup</Link>
@@ -263,10 +263,9 @@ function GrowthOutboundOperationsDashboardContent() {
     >
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="outline" size="sm" asChild>
-          <Link href="/admin/growth/outreach/approval">Outreach approvals ({dashboard.approvals.outreach_pending_approval})</Link>
-        </Button>
-        <Button type="button" variant="outline" size="sm" asChild>
-          <Link href="/admin/growth/sequences/execution">Sequence approvals ({dashboard.approvals.sequence_pending_approval})</Link>
+          <Link href="/admin/growth/sequences/execution">
+            Sequence approvals ({dashboard.approvals.sequence_pending_approval})
+          </Link>
         </Button>
         <Button type="button" variant="outline" size="sm" asChild>
           <Link href="/admin/growth/copilot/personalization">AI personalization</Link>
@@ -515,7 +514,7 @@ function GrowthOutboundOperationsDashboardContent() {
                 <div className="mt-2 flex flex-wrap gap-2">
                   {item.retry_eligible ? (
                     <Button type="button" variant="outline" size="sm" asChild>
-                      <Link href={`/admin/growth/outreach/approval?replay=${item.queue_id}`}>Review replay</Link>
+                      <Link href={`/admin/growth/sequences/execution?replay=${item.queue_id}`}>Review in execution</Link>
                     </Button>
                   ) : null}
                   <Button type="button" variant="ghost" size="sm" asChild>

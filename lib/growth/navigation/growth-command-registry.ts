@@ -83,8 +83,8 @@ export const GROWTH_COMMAND_REGISTRY: GrowthCommandRegistryEntry[] = [
   {
     id: "review-outreach",
     label: "Review Outreach",
-    href: "/admin/growth/outreach/approval",
-    keywords: ["outreach", "approval", "review", "pending"],
+    href: "/admin/growth/sequences/execution",
+    keywords: ["outreach", "approval", "review", "pending", "sequence execution"],
     coreWorkflow: true,
     paletteEnabled: true,
   },

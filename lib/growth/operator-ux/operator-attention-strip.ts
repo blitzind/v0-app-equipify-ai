@@ -37,7 +37,7 @@ export async function buildGrowthOperatorAttentionStrip(
     label: "Pending approvals",
     summary: `${outreachPending} outreach · ${sequencePending} sequence`,
     count: approvalTotal,
-    href: "/admin/growth/outreach/approval",
+    href: "/admin/growth/sequences/execution",
     severity: approvalTotal >= 5 ? "high" : "medium",
   })
 

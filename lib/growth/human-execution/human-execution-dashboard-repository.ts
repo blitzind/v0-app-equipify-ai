@@ -384,7 +384,7 @@ export async function mapOutreachPendingToApprovalItems(
       replyRoutingLabel: null,
       createdAt: row.created_at as string,
       updatedAt: row.updated_at as string,
-      ctaHref: `/admin/growth/outreach/approval?queueId=${row.id as string}`,
+      ctaHref: `/admin/growth/sequences/execution?queueId=${row.id as string}`,
     } satisfies HumanExecutionApprovalItem
   })
 }

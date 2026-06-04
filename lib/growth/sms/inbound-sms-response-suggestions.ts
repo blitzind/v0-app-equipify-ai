@@ -30,8 +30,16 @@ import {
 import {
   auditSmsSuggestionSafety,
   sanitizeSmsSuggestionBody,
-  shouldSuppressSmsReplySuggestion,
 } from "@/lib/growth/sms/sms-suggestion-safety"
+import {
+  collectVerifiedResearchSnippets,
+  normalizeCustomerFacingCopy,
+  toCustomerFacingBenefitPhrase,
+  toCustomerFacingCallQuestion,
+  toCustomerFacingEmailFollowUpSummary,
+  toCustomerFacingObjectionLabel,
+  toOperatorFacingCallReason,
+} from "@/lib/growth/sms/sms-customer-facing-phrases"
 
 const CALL_NBA: GrowthNextBestAction[] = [
   "call_immediately",
@@ -42,25 +50,18 @@ const CALL_NBA: GrowthNextBestAction[] = [
   "immediate_sales_action",
 ]
 
-function compact(text: string, max: number): string {
-  const trimmed = text.trim().replace(/[.…]+$/, "")
-  if (trimmed.length <= max) return trimmed
-  const cut = trimmed.slice(0, max - 1)
-  const space = cut.lastIndexOf(" ")
-  return `${(space > 12 ? cut.slice(0, space) : cut).trim()}…`
-}
-
 function firstName(contactName: string | null | undefined, companyName: string): string | null {
   if (contactName?.trim()) return contactName.trim().split(/\s+/)[0] ?? null
   return null
 }
 
-function pickVerifiedFactSnippet(packet: OutreachContextPacket): string | null {
-  if (!packet.hasWebsiteResearch) return null
-  if (packet.researchPainPoints[0]?.trim()) return compact(packet.researchPainPoints[0], 72)
-  if (packet.websiteFindings[0]?.trim()) return compact(packet.websiteFindings[0], 72)
-  if (packet.companySummary?.trim()) return compact(packet.companySummary, 72)
-  return null
+function pickVerifiedResearchSnippets(packet: OutreachContextPacket): string[] {
+  return collectVerifiedResearchSnippets({
+    researchPainPoints: packet.researchPainPoints,
+    websiteFindings: packet.websiteFindings,
+    companySummary: packet.companySummary,
+    hasWebsiteResearch: packet.hasWebsiteResearch,
+  })
 }
 
 function resolveEngagementSignal(intent: GrowthReplyIntent, threadClassification: GrowthInboxClassification | null): string {
@@ -90,19 +91,18 @@ function buildIntentAwareSmsBody(input: {
   intent: GrowthReplyIntent
   contactFirstName: string | null
   companyName: string
-  verifiedFact: string | null
+  customerBenefitPhrase: string | null
   relationshipMemory?: ReplyCopilotRelationshipMemory
   priorSmsPreviews: string[]
 }): string {
-  const { intent, contactFirstName, companyName, verifiedFact, relationshipMemory } = input
+  const { intent, contactFirstName, companyName, customerBenefitPhrase, relationshipMemory } = input
   const namePrefix = contactFirstName ? `${contactFirstName}, ` : ""
-  const factClause = verifiedFact ? `${verifiedFact}. ` : ""
 
   switch (intent) {
     case "positive_interest":
     case "needs_more_information":
-      if (factClause) {
-        return `${namePrefix}happy to share more — ${factClause.trim()} Want a quick overview by text or email?`
+      if (customerBenefitPhrase) {
+        return `${namePrefix}happy to share more. ${customerBenefitPhrase} Would you prefer a quick overview by text or email?`
       }
       return `${namePrefix}happy to share more — want a quick text overview or should I email a short summary?`
     case "meeting_request":
@@ -115,7 +115,8 @@ function buildIntentAwareSmsBody(input: {
     case "objection": {
       const objection = relationshipMemory?.topObjections[0]
       if (objection?.trim()) {
-        return `${namePrefix}got it on ${compact(objection.split(":")[0] ?? objection, 40)} — want me to clarify one point by text?`
+        const label = toCustomerFacingObjectionLabel(objection)
+        return `${namePrefix}got it on ${label} — want me to clarify one point by text?`
       }
       return `${namePrefix}appreciate the note — want me to clarify one point without rehashing prior details?`
     }
@@ -162,25 +163,21 @@ function buildEmailFollowUpSuggestion(input: {
 
   if (!kind) return null
 
-  const labels: Record<GrowthSmsEmailFollowUpKind, { label: string; summary: string; subject: string }> = {
+  const labels: Record<GrowthSmsEmailFollowUpKind, { label: string; subject: string }> = {
     send_details_by_email: {
       label: "Send details by email",
-      summary: "Follow up with a concise email that answers their question — operator sends manually.",
       subject: `Re: ${companyName} — details you asked for`,
     },
     send_short_overview: {
       label: "Send short overview",
-      summary: "Email a brief overview with verified research points — no auto-send.",
       subject: `Quick overview for ${companyName}`,
     },
     send_scheduling_link: {
       label: "Send scheduling link",
-      summary: "Email a scheduling link or propose 2–3 times — human approval required.",
       subject: `Scheduling — ${companyName}`,
     },
     send_proposal_context: {
       label: "Send proposal/context",
-      summary: "Email pricing or scope context appropriate to their question — verify facts first.",
       subject: `Context for ${companyName}`,
     },
   }
@@ -190,7 +187,7 @@ function buildEmailFollowUpSuggestion(input: {
   return {
     kind,
     label: entry.label,
-    summary: entry.summary.replace("operator sends", `${greeting}: operator sends`),
+    summary: toCustomerFacingEmailFollowUpSummary(kind, greeting),
     suggestedSubject: entry.subject,
     humanApprovalRequired: true,
   }
@@ -203,22 +200,17 @@ function buildCallPromptSuggestion(input: {
   companyName: string
   nextBestAction: GrowthNextBestAction | null
   nextBestActionReason: string | null
-  verifiedFact: string | null
+  researchSnippets: string[]
   buyingSignals: string[]
 }): GrowthSmsCallPromptSuggestion | null {
-  const { intent, inboundBody, contactFirstName, companyName, nextBestAction, nextBestActionReason, verifiedFact, buyingSignals } =
+  const { intent, inboundBody, contactFirstName, companyName, nextBestAction, nextBestActionReason, researchSnippets, buyingSignals } =
     input
 
   if (!nextBestAction || !CALL_NBA.includes(nextBestAction)) return null
   if (intent === "unsubscribe" || intent === "not_interested" || intent === "angry_complaint") return null
 
   const name = contactFirstName ?? "there"
-  const excerpt = compact(inboundBody, 80)
-  const whyCallNow =
-    nextBestActionReason?.trim() ||
-    (intent === "positive_interest" || intent === "needs_more_information"
-      ? `Prospect asked for more info via SMS ("${excerpt}") — high-intent window.`
-      : `Next best action is ${GROWTH_NEXT_BEST_ACTION_LABELS[nextBestAction]}.`)
+  const whyCallNow = toOperatorFacingCallReason({ inboundBody, nextBestActionReason })
 
   const openingLine =
     intent === "positive_interest" || intent === "needs_more_information"
@@ -228,9 +220,9 @@ function buildCallPromptSuggestion(input: {
   const keyQuestion =
     buyingSignals.includes("timeline_urgency")
       ? "What's driving the timeline on your side?"
-      : verifiedFact
-        ? `Is ${verifiedFact.toLowerCase().replace(/\.$/, "")} still the main pain point?`
-        : "What part of the workflow is most urgent for you right now?"
+      : researchSnippets.length > 0
+        ? toCustomerFacingCallQuestion(researchSnippets)
+        : "What part of running the business still feels more manual than you'd like?"
 
   const desiredOutcome =
     intent === "meeting_request" || intent === "demo_request"
@@ -238,10 +230,10 @@ function buildCallPromptSuggestion(input: {
       : "Agree on one concrete next step — overview by email, quick call, or scheduling link."
 
   return {
-    whyCallNow,
-    openingLine,
-    keyQuestion,
-    desiredOutcome,
+    whyCallNow: normalizeCustomerFacingCopy(whyCallNow),
+    openingLine: normalizeCustomerFacingCopy(openingLine),
+    keyQuestion: normalizeCustomerFacingCopy(keyQuestion),
+    desiredOutcome: normalizeCustomerFacingCopy(desiredOutcome),
     humanApprovalRequired: true,
   }
 }
@@ -289,7 +281,12 @@ export function buildInboundSmsResponseSuggestions(input: {
   const inboundBody = input.inboundBody.trim()
   const classified = classifyReplyIntentV2(inboundBody)
   const buying = extractBuyingSignals(inboundBody)
-  const verifiedFact = pickVerifiedFactSnippet(input.packet)
+  const researchSnippets = pickVerifiedResearchSnippets(input.packet)
+  const customerBenefitPhrase = toCustomerFacingBenefitPhrase({
+    rawSnippets: researchSnippets,
+    industryLabel: input.packet.industryLabel,
+    hasVerifiedResearch: input.packet.hasWebsiteResearch,
+  })
   const contactFirstName = firstName(input.contactName, input.companyName)
   const threadClassification = input.threadClassification ?? null
 
@@ -304,28 +301,15 @@ export function buildInboundSmsResponseSuggestions(input: {
     maxChars: SMS_PERSONALIZATION_DEFAULT_MAX_CHARS,
   })
 
-  let smsBody: string
-  if (shouldSuppressSmsReplySuggestion(classified.intent)) {
-    smsBody = buildIntentAwareSmsBody({
-      inboundBody,
-      intent: classified.intent,
-      contactFirstName,
-      companyName: input.companyName,
-      verifiedFact,
-      relationshipMemory: input.relationshipMemory,
-      priorSmsPreviews: input.priorSmsPreviews,
-    })
-  } else {
-    smsBody = buildIntentAwareSmsBody({
-      inboundBody,
-      intent: classified.intent,
-      contactFirstName,
-      companyName: input.companyName,
-      verifiedFact,
-      relationshipMemory: input.relationshipMemory,
-      priorSmsPreviews: input.priorSmsPreviews,
-    })
-  }
+  const smsBody = buildIntentAwareSmsBody({
+    inboundBody,
+    intent: classified.intent,
+    contactFirstName,
+    companyName: input.companyName,
+    customerBenefitPhrase,
+    relationshipMemory: input.relationshipMemory,
+    priorSmsPreviews: input.priorSmsPreviews,
+  })
 
   const smsReply = wrapSmsDraftSuggestion({ body: smsBody, draftType: "reply", audit })
   const safetyWarnings = auditSmsSuggestionSafety({ body: smsReply.suggestedBody, intent: classified.intent })
@@ -345,7 +329,7 @@ export function buildInboundSmsResponseSuggestions(input: {
     companyName: input.companyName,
     nextBestAction: input.nextBestAction ?? null,
     nextBestActionReason: input.nextBestActionReason ?? null,
-    verifiedFact,
+    researchSnippets,
     buyingSignals: buying.map((signal) => signal.signal),
   })
 
@@ -354,7 +338,7 @@ export function buildInboundSmsResponseSuggestions(input: {
     "inbound_sms_body",
     `reply_intent:${classified.intent}`,
   ]
-  if (verifiedFact) contextUsed.push("verified_research")
+  if (researchSnippets.length > 0) contextUsed.push("verified_research")
   if (input.nextBestAction) contextUsed.push(`next_best_action:${input.nextBestAction}`)
 
   const memoryUsed = [...smsReply.memoryUsed]
@@ -398,6 +382,7 @@ export function buildInboundSmsResponseSuggestionArchitectureAudit() {
       "reply-copilot patterns — intent-driven tone",
       "next-best-action — call prompt gating",
       "sms-suggestion-safety — Phase 5.6F rules",
+      "sms-customer-facing-phrases — Phase 5.6.1 benefit-oriented copy",
     ],
     doesNot: [
       "Auto-send SMS or email",

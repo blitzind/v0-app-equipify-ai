@@ -523,7 +523,7 @@ export function buildSavedSearchWorkflowLaunchLinks(input?: {
     { id: "launch_workflow", label: "Launch workflow", href: `/admin/growth/search${suffix}` },
     { id: "review_opportunities", label: "Review opportunities", href: `/admin/growth/opportunities/workspace${suffix}` },
     { id: "run_qualification", label: "Run qualification", href: `/admin/growth/leads/lead-engine${suffix}` },
-    { id: "open_outreach_queue", label: "Open outreach queue", href: `/admin/growth/outreach/approval${suffix}` },
+    { id: "open_outreach_queue", label: "Open sequence approvals", href: `/admin/growth/sequences/execution${suffix}` },
     { id: "batch_outbound_preview", label: "Batch outbound preview", href: `/admin/growth/search${suffix}${suffix ? "&" : "?"}batchOutbound=1` },
     { id: "executive_review", label: "Executive review", href: `/admin/growth/executive${suffix}` },
   ]

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { fetchGrowthOutboundOperationsDashboard } from "@/lib/growth/operations/outbound-operations-dashboard"
+import { describeGrowthNativeOutboundCutoverStatus } from "@/lib/growth/runtime/outbound-cutover"
 
 export const runtime = "nodejs"
 
@@ -9,8 +10,11 @@ export async function GET() {
   if (!access.ok) return access.response
 
   try {
-    const dashboard = await fetchGrowthOutboundOperationsDashboard(access.admin)
-    return NextResponse.json({ ok: true, dashboard })
+    const [dashboard, native_cutover] = await Promise.all([
+      fetchGrowthOutboundOperationsDashboard(access.admin),
+      Promise.resolve(describeGrowthNativeOutboundCutoverStatus()),
+    ])
+    return NextResponse.json({ ok: true, dashboard, native_cutover })
   } catch (error) {
     const raw = error instanceof Error ? error.message : String(error)
     const message = sanitizeOutboundOperationsApiError(raw)

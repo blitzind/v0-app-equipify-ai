@@ -18,17 +18,17 @@ function readSource(relativePath: string): string {
 
 assert.deepEqual([...GROWTH_OUTBOUND_MODES], ["adapter", "standalone"])
 assert.equal(GROWTH_OUTBOUND_MODE_ENV, "GROWTH_OUTBOUND_MODE")
-assert.equal(parseGrowthOutboundMode(undefined), "adapter")
-assert.equal(parseGrowthOutboundMode(""), "adapter")
+assert.equal(parseGrowthOutboundMode(undefined), "standalone")
+assert.equal(parseGrowthOutboundMode(""), "standalone")
 assert.equal(parseGrowthOutboundMode("adapter"), "adapter")
 assert.equal(parseGrowthOutboundMode("standalone"), "standalone")
 assert.equal(parseGrowthOutboundMode("STANDALONE"), "standalone")
-assert.equal(parseGrowthOutboundMode("invalid"), "adapter")
+assert.equal(parseGrowthOutboundMode("invalid"), "standalone")
 assert.equal(growthOutboundModeLabel("standalone"), "standalone (transport)")
 assert.equal(growthOutboundModeLabel("adapter"), "adapter (outreach queue)")
 
 const schedulerSource = readSource("lib/growth/sequence-enrollment/run-sequence-scheduler.ts")
-assert.match(schedulerSource, /isGrowthOutboundStandaloneMode/)
+assert.match(schedulerSource, /isAdapterOutboundExecutionEnabled/)
 assert.match(schedulerSource, /queueSequenceStepTransportJob/)
 assert.match(schedulerSource, /queueSequenceStepOutreach/)
 assert.match(schedulerSource, /sequence_scheduler_outbound_mode/)
@@ -50,8 +50,8 @@ assert.doesNotMatch(transportQueueSource, /insertGrowthOutreachQueueItem/)
 assert.doesNotMatch(transportQueueSource, /executeGrowthOutreachQueueItem/)
 assert.doesNotMatch(transportQueueSource, /getOutboundProviderAdapter/)
 
-assert.match(schedulerSource, /standaloneMode\s*\?\s*await queueSequenceStepTransportJob/)
-assert.match(schedulerSource, /:\s*await queueSequenceStepOutreach/)
+assert.match(schedulerSource, /adapterSchedulingEnabled\s*\?\s*await queueSequenceStepOutreach/)
+assert.match(schedulerSource, /:\s*await queueSequenceStepTransportJob/)
 
 const plannerSource = readSource("lib/growth/sequences/execution/sequence-job-planner.ts")
 assert.match(plannerSource, /fetchGrowthOutreachQueueByEnrollmentStepId/)
@@ -65,6 +65,7 @@ assert.match(cronSafeSource, /runApprovedDueSequenceExecutionJobs/)
 
 const envExample = readSource(".env.local.example")
 assert.match(envExample, /GROWTH_OUTBOUND_MODE=standalone/)
+assert.match(envExample, /GROWTH_ALLOW_ADAPTER_OUTBOUND/)
 assert.match(envExample, /growth-sequence-scheduler cron/)
 
 const planningTestExists = fs.existsSync(

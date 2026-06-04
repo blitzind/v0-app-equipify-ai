@@ -136,6 +136,9 @@ export async function insertGrowthOutreachQueueItem(
     createdBy?: string | null
   },
 ): Promise<GrowthOutreachQueueItem> {
+  const { assertAdapterOutboundExecutionAllowed } = await import("@/lib/growth/runtime/outbound-cutover")
+  assertAdapterOutboundExecutionAllowed("insertGrowthOutreachQueueItem")
+
   const { data, error } = await queueTable(admin)
     .insert({
       lead_id: input.leadId,

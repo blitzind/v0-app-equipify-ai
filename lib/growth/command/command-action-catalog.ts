@@ -96,7 +96,7 @@ export function commandLeadFocusHref(leadId: string, focus: string, referenceId?
 }
 
 export function commandOutreachHref(queueId: string): string {
-  return `/admin/growth/outreach/approval?highlight=${encodeURIComponent(queueId)}`
+  return `/admin/growth/sequences/execution?highlight=${encodeURIComponent(queueId)}`
 }
 
 export function commandSequenceExecutionHref(enrollmentId: string): string {

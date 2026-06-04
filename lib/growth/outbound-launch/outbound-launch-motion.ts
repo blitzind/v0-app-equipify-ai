@@ -291,10 +291,10 @@ export function buildOutboundLaunchUrls(input: {
       ? withContext(`/admin/growth/copilot?leadId=${encodeURIComponent(growthLeadId)}&intent=generate_draft`)
       : null,
     queue_for_approval: growthLeadId
-      ? withContext(`/admin/growth/outreach/approval?leadId=${encodeURIComponent(growthLeadId)}`)
+      ? withContext(`/admin/growth/sequences/execution?leadId=${encodeURIComponent(growthLeadId)}`)
       : null,
     approval_queue: growthLeadId
-      ? withContext(`/admin/growth/outreach/approval?leadId=${encodeURIComponent(growthLeadId)}`)
+      ? withContext(`/admin/growth/sequences/execution?leadId=${encodeURIComponent(growthLeadId)}`)
       : null,
     guided_sequence: growthLeadId
       ? withContext(`/admin/growth/sequences/execution?leadId=${encodeURIComponent(growthLeadId)}`)

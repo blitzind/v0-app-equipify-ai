@@ -21,10 +21,6 @@
       "schedule": "*/5 * * * *"
     },
     {
-      "path": "/api/cron/growth-outreach-execute",
-      "schedule": "*/5 * * * *"
-    },
-    {
       "path": "/api/cron/growth-sequence-scheduler",
       "schedule": "*/10 * * * *"
     },

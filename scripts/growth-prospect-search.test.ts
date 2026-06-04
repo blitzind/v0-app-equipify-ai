@@ -3069,8 +3069,8 @@ async function testProspectOutboundLaunchMotion(): Promise<void> {
     path.join(process.cwd(), "app/(admin)/admin/growth/outreach/approval/page.tsx"),
     "utf8",
   )
-  assert.match(approvalPage, /filterLeadId/)
-  assert.match(approvalPage, /OutboundLaunchContextBanner/)
+  assert.match(approvalPage, /redirect\(/)
+  assert.match(approvalPage, /sequences\/execution/)
 }
 
 async function testProspectTerritoryOpportunityHeatmap(): Promise<void> {

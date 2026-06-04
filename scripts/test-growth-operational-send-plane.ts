@@ -8,6 +8,7 @@ import path from "node:path"
 import { GROWTH_CRON_EXECUTION_TELEMETRY_GRANTS_MIGRATION, GROWTH_CRON_EXECUTION_TELEMETRY_MIGRATION } from "../lib/growth/runtime/cron-telemetry-repository"
 import {
   GROWTH_CRON_ROUTE_IDS,
+  GROWTH_CRON_ROUTES_RETIRED_FROM_VERCEL,
   GROWTH_CRON_TELEMETRY_QA_MARKER,
   growthCronApiPath,
 } from "../lib/growth/runtime/cron-telemetry-types"
@@ -49,10 +50,13 @@ async function main(): Promise<void> {
   }
   for (const routeId of GROWTH_CRON_ROUTE_IDS) {
     const apiPath = growthCronApiPath(routeId)
-    assert.ok(
-      vercel.crons.some((cron) => cron.path === apiPath),
-      `missing vercel cron registration for ${apiPath}`,
-    )
+    const retiredFromVercel = (GROWTH_CRON_ROUTES_RETIRED_FROM_VERCEL as readonly string[]).includes(routeId)
+    if (!retiredFromVercel) {
+      assert.ok(
+        vercel.crons.some((cron) => cron.path === apiPath),
+        `missing vercel cron registration for ${apiPath}`,
+      )
+    }
     assert.ok(
       fs.existsSync(path.join(process.cwd(), `app/api/cron/${routeId}/route.ts`)),
       `missing cron route file for ${routeId}`,
@@ -63,8 +67,7 @@ async function main(): Promise<void> {
     path.join(process.cwd(), "app/api/cron/growth-outreach-execute/route.ts"),
     "utf8",
   )
-  assert.match(cronRoute, /runGrowthCronJob/)
-  assert.match(cronRoute, /growth-cron-runner/)
+  assert.match(cronRoute, /isGrowthOutreachExecuteCronEnabled/)
   assert.match(cronRoute, /export async function GET/)
 
   const transport = fs.readFileSync(

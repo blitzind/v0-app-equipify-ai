@@ -156,6 +156,10 @@ assert.match(inboundSuggestionsSource, /buildEmailFollowUpSuggestion/)
 const safetySource = readFileSync(resolve("lib/growth/sms/sms-suggestion-safety.ts"), "utf8")
 assert.match(safetySource, /auditSmsSuggestionSafety/)
 assert.match(safetySource, /shouldSuppressSmsReplySuggestion/)
+assert.match(safetySource, /auditCustomerFacingSuggestionCopy/)
+
+const customerFacingRoute = readFileSync(resolve("lib/growth/sms/sms-customer-facing-phrases.ts"), "utf8")
+assert.match(customerFacingRoute, /toCustomerFacingBenefitPhrase/)
 
 const inboundApiRoute = readFileSync(
   resolve("app/api/platform/growth/sms/inbound-suggestions/route.ts"),

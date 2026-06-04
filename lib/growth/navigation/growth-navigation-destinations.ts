@@ -296,10 +296,10 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
   },
   {
     id: "outreach-approval",
-    label: "Outreach Approval",
-    href: "/admin/growth/outreach/approval",
-    keywords: ["approval", "queue"],
-    consoleKey: "outreach_approval",
+    label: "Sequence Approvals",
+    href: "/admin/growth/sequences/execution",
+    keywords: ["approval", "queue", "sequence execution"],
+    consoleKey: "sequence_execution",
   },
   {
     id: "experiments",
@@ -749,18 +749,13 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
           path.startsWith("/admin/growth/sequences") && !path.startsWith("/admin/growth/sequences/execution"),
       },
       {
-        id: "outreach-approval",
-        href: "/admin/growth/outreach/approval",
-        label: "Outreach Approval",
-        consoleKey: "outreach_approval",
-        match: prefixMatch("/admin/growth/outreach/approval"),
-      },
-      {
         id: "sequence-execution",
         href: "/admin/growth/sequences/execution",
         label: "Sequence Execution",
         consoleKey: "sequence_execution",
-        match: prefixMatch("/admin/growth/sequences/execution"),
+        match: (path) =>
+          path.startsWith("/admin/growth/sequences/execution") ||
+          path.startsWith("/admin/growth/outreach/approval"),
       },
       {
         id: "booking-intelligence",

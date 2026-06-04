@@ -171,7 +171,19 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ leadId: lead.id, generationId, channel: "email" }),
       })
-      const created = (await createRes.json().catch(() => ({}))) as { ok?: boolean; item?: GrowthOutreachQueueItem }
+      const created = (await createRes.json().catch(() => ({}))) as {
+        ok?: boolean
+        item?: GrowthOutreachQueueItem
+        error?: string
+        sequence_execution_href?: string
+        message?: string
+      }
+      if (createRes.status === 410 || created.error === "adapter_outbound_cutover_disabled") {
+        throw new Error(
+          created.message ??
+            "Outreach queue is disabled. Approve sends from Sequence Execution (native Gmail transport).",
+        )
+      }
       if (!createRes.ok || !created.item) throw new Error("Queue failed.")
       if (sendNow) {
         await fetch(`/api/platform/growth/outreach/queue/${created.item.id}/approve`, {

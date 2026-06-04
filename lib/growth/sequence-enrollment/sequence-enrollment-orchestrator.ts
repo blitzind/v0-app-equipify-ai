@@ -27,7 +27,9 @@ import {
 import type { GrowthCadenceTaskOutcome } from "@/lib/growth/cadence/cadence-types"
 import { fetchGrowthAiCopilotGenerationById } from "@/lib/growth/ai-copilot-repository"
 import { runGrowthAiCopilotGeneration } from "@/lib/growth/run-ai-copilot-generation"
+import { isAdapterOutboundExecutionEnabled } from "@/lib/growth/runtime/outbound-cutover"
 import { isGrowthOutboundStandaloneMode } from "@/lib/growth/runtime/outbound-mode"
+import { queueSequenceStepTransportJob } from "@/lib/growth/sequences/execution/queue-sequence-step-transport-job"
 import { queueSequenceStepTransportJob } from "@/lib/growth/sequences/execution/queue-sequence-step-transport-job"
 import {
   computeEnrollmentHealthScore,
@@ -320,6 +322,18 @@ export async function queueGrowthSequenceEnrollmentStep(
     generationApproved: true,
   })
   if (!preflight.allowed) throw new Error(preflight.code ?? "preflight_blocked")
+
+  if (!isAdapterOutboundExecutionEnabled()) {
+    const result = await queueSequenceStepTransportJob(admin, {
+      step,
+      enrollmentId: enrollment.id,
+      actingUserId: input.actingUserId,
+      actingUserEmail: input.actingUserEmail,
+      dryRun: false,
+    })
+    if (!result.queued) throw new Error(result.reason ?? "queue_failed")
+    return
+  }
 
   const commSettings = await fetchGrowthPlatformCommunicationSettings(admin)
   const queueItem = await insertGrowthOutreachQueueItem(admin, {

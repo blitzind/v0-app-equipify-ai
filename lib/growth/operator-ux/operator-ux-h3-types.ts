@@ -69,7 +69,7 @@ export const GROWTH_OPERATOR_DAILY_WORKFLOW: GrowthOperatorDailyWorkflowStep[] =
     order: 4,
     label: "Approve pending sends",
     description: "Outreach, sequences, AI personalization, and reply drafts.",
-    href: "/admin/growth/outreach/approval",
+    href: "/admin/growth/sequences/execution",
     attention_id: "outreach_approval",
   },
   {

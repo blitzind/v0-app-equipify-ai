@@ -25,6 +25,13 @@ import {
 } from "../lib/growth/sms/inbound-sms-response-suggestions"
 import { GROWTH_SMS_INBOUND_RESPONSE_SUGGESTIONS_QA_MARKER } from "../lib/growth/sms/inbound-sms-response-suggestion-types"
 import { auditSmsSuggestionSafety, sanitizeSmsSuggestionBody } from "../lib/growth/sms/sms-suggestion-safety"
+import {
+  auditCustomerFacingSuggestionCopy,
+  containsBlockedCustomerFacingTerms,
+  normalizeCustomerFacingCopy,
+  toCustomerFacingBenefitPhrase,
+  toCustomerFacingCallQuestion,
+} from "../lib/growth/sms/sms-customer-facing-phrases"
 
 const LEAD_ID = "00000000-0000-4000-8000-00000000e533"
 
@@ -271,6 +278,10 @@ assert.equal(christaSuggestions.replyContext.engagementSignal, "positive engagem
 assert.ok(christaSuggestions.smsReply.suggestedBody.length > 0)
 assert.ok(christaSuggestions.smsReply.suggestedBody.length <= 320)
 assert.ok(!christaSuggestions.smsReply.suggestedBody.toLowerCase().startsWith("hi christa"))
+assert.ok(!christaSuggestions.smsReply.suggestedBody.toLowerCase().includes("manual dispatch process"))
+assert.ok(christaSuggestions.smsReply.suggestedBody.includes("Equipify helps service teams manage scheduling"))
+assert.ok(christaSuggestions.smsReply.suggestedBody.includes("Would you prefer a quick overview by text or email?"))
+assert.ok(!containsBlockedCustomerFacingTerms(christaSuggestions.smsReply.suggestedBody))
 assert.ok(christaSuggestions.emailFollowUp !== null)
 assert.equal(christaSuggestions.emailFollowUp?.kind, "send_short_overview")
 assert.ok(christaSuggestions.callPrompt !== null)
@@ -278,12 +289,49 @@ assert.ok(
   christaSuggestions.callPrompt?.whyCallNow.toLowerCase().includes("positive") ||
     christaSuggestions.callPrompt?.openingLine.toLowerCase().includes("more"),
 )
+assert.ok(christaSuggestions.callPrompt?.keyQuestion.includes("scheduling and dispatch"))
+assert.ok(!christaSuggestions.callPrompt?.keyQuestion.toLowerCase().includes("pain point"))
+assert.ok(!christaSuggestions.callPrompt?.keyQuestion.toLowerCase().includes("manual dispatch process"))
 assert.equal(christaSuggestions.nextBestAction, "call_immediately")
 assert.equal(christaSuggestions.humanApprovalRequired, true)
 
 console.log(`Christa SMS suggestion: ${christaSuggestions.smsReply.suggestedBody}`)
 console.log(`Email follow-up: ${christaSuggestions.emailFollowUp?.label}`)
 console.log(`Call prompt opener: ${christaSuggestions.callPrompt?.openingLine}`)
+console.log(`Call prompt question: ${christaSuggestions.callPrompt?.keyQuestion}`)
+
+console.log("\n=== Phase 5.6.1 Customer-facing phrase refinement ===")
+const internalLeak = "Manual dispatch process is the main pain point for this lead."
+const normalized = normalizeCustomerFacingCopy(internalLeak)
+assert.ok(!normalized.toLowerCase().includes("manual dispatch process"))
+assert.ok(!normalized.toLowerCase().includes("pain point"))
+const blockedWarnings = auditCustomerFacingSuggestionCopy("Their fit score shows operational inefficiency.")
+assert.ok(blockedWarnings.length >= 2)
+
+const benefitPhrase = toCustomerFacingBenefitPhrase({
+  rawSnippets: ["Manual dispatch process"],
+  industryLabel: "HVAC contractor",
+  hasVerifiedResearch: true,
+})
+assert.ok(benefitPhrase?.includes("Equipify helps service teams manage scheduling"))
+assert.ok(!benefitPhrase?.toLowerCase().includes("manual dispatch"))
+
+const callQuestion = toCustomerFacingCallQuestion(["Manual dispatch process"])
+assert.ok(callQuestion.includes("scheduling and dispatch"))
+assert.ok(!callQuestion.toLowerCase().includes("pain point"))
+
+const customerFacingSource = readFileSync(
+  resolve(process.cwd(), "lib/growth/sms/sms-customer-facing-phrases.ts"),
+  "utf8",
+)
+assert.match(customerFacingSource, /toCustomerFacingBenefitPhrase/)
+const inboundSuggestionsSource = readFileSync(
+  resolve(process.cwd(), "lib/growth/sms/inbound-sms-response-suggestions.ts"),
+  "utf8",
+)
+assert.match(inboundSuggestionsSource, /toCustomerFacingBenefitPhrase/)
+
+console.log("Phase 5.6.1 customer-facing refinement validated")
 
 const unsafeBody = sanitizeSmsSuggestionBody("Hi Christa,\n\nBest regards — our engagement score is 80.")
 assert.ok(!unsafeBody.toLowerCase().includes("best regards"))

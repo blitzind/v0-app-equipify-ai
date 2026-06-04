@@ -2,6 +2,9 @@
 
 export const GROWTH_CRON_TELEMETRY_QA_MARKER = "growth-operational-send-plane-v1" as const
 
+/** Crons removed from vercel.json but route handlers retained for rollback / telemetry history. */
+export const GROWTH_CRON_ROUTES_RETIRED_FROM_VERCEL = ["growth-outreach-execute"] as const
+
 export const GROWTH_CRON_ROUTE_IDS = [
   "growth-outreach-execute",
   "growth-sequence-scheduler",

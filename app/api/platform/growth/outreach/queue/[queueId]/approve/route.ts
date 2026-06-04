@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { approveGrowthOutreachQueueItem } from "@/lib/growth/outreach/run-outreach-queue"
+import { growthAdapterOutboundCutoverHttpResponse } from "@/lib/growth/runtime/outbound-cutover"
 
 export const runtime = "nodejs"
 
@@ -20,6 +21,9 @@ export async function POST(
 ) {
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
+
+  const cutover = growthAdapterOutboundCutoverHttpResponse("POST /outreach/queue/[queueId]/approve")
+  if (cutover) return cutover
 
   const { queueId } = await context.params
   if (!UUID_RE.test(queueId)) {

@@ -14,7 +14,7 @@ export {
   type GrowthOutboundMode,
 } from "@/lib/growth/runtime/outbound-mode-types"
 
-/** Default `adapter` preserves legacy outreach-queue / Lemlist path. Set `standalone` for native transport. */
+/** Default `standalone` (native transport). Rollback: `adapter` + `GROWTH_ALLOW_ADAPTER_OUTBOUND=true`. */
 export function getGrowthOutboundMode(): GrowthOutboundMode {
   return parseGrowthOutboundMode(process.env[GROWTH_OUTBOUND_MODE_ENV])
 }

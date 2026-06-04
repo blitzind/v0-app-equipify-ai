@@ -105,6 +105,8 @@ export async function executeGrowthOutreachQueueItem(
   },
 ): Promise<GrowthOutreachQueueItem> {
   assertGrowthProductionRuntimeSafe("outreach_queue_execute")
+  const { assertAdapterOutboundExecutionAllowed } = await import("@/lib/growth/runtime/outbound-cutover")
+  assertAdapterOutboundExecutionAllowed("executeGrowthOutreachQueueItem")
 
   const lead = await fetchGrowthLeadById(admin, input.queueItem.leadId)
   if (!lead) throw new Error("not_found")

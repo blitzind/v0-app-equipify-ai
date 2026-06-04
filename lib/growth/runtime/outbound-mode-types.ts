@@ -5,7 +5,8 @@ export type GrowthOutboundMode = (typeof GROWTH_OUTBOUND_MODES)[number]
 
 export const GROWTH_OUTBOUND_MODE_ENV = "GROWTH_OUTBOUND_MODE" as const
 
-const DEFAULT_OUTBOUND_MODE: GrowthOutboundMode = "adapter"
+/** Phase 6.30D: production cutover default — native transport scheduling. Rollback: GROWTH_OUTBOUND_MODE=adapter + GROWTH_ALLOW_ADAPTER_OUTBOUND=true */
+const DEFAULT_OUTBOUND_MODE: GrowthOutboundMode = "standalone"
 
 export function parseGrowthOutboundMode(raw: string | undefined | null): GrowthOutboundMode {
   const normalized = raw?.trim().toLowerCase()

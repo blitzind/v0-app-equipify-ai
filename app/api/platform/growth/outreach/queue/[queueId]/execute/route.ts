@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { fetchGrowthOutreachQueueItem } from "@/lib/growth/outreach/outreach-queue-repository"
 import { executeGrowthOutreachQueueItem } from "@/lib/growth/outreach/execute-outreach"
+import { growthAdapterOutboundCutoverHttpResponse } from "@/lib/growth/runtime/outbound-cutover"
 
 export const runtime = "nodejs"
 
@@ -14,6 +15,9 @@ export async function POST(
 ) {
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
+
+  const cutover = growthAdapterOutboundCutoverHttpResponse("POST /outreach/queue/[queueId]/execute")
+  if (cutover) return cutover
 
   const { queueId } = await context.params
   if (!UUID_RE.test(queueId)) {
