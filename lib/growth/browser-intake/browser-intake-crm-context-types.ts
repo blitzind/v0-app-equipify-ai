@@ -55,6 +55,16 @@ export type GrowthBrowserIntakeCrmContextRelationshipMap = {
   related_leads: GrowthBrowserIntakeCrmContextRelationshipContact[]
 }
 
+export type GrowthBrowserIntakeCrmContextEmailDiscoveryContact = {
+  person_id: string
+  name: string
+  title: string | null
+  verified_email: string | null
+  has_verified_email: boolean
+  discovery_status: string
+  can_discover: boolean
+}
+
 export type GrowthBrowserIntakeCrmContext = {
   lead_id: string
   company_name: string
@@ -74,6 +84,8 @@ export type GrowthBrowserIntakeCrmContext = {
   lead_notes: string | null
   timeline_preview: GrowthBrowserIntakeCrmContextTimelineEvent[]
   company_relationship_map: GrowthBrowserIntakeCrmContextRelationshipMap
+  canonical_company_id: string | null
+  email_discovery_contacts: GrowthBrowserIntakeCrmContextEmailDiscoveryContact[]
   links: GrowthBrowserIntakeCrmContextLinks
 }
 

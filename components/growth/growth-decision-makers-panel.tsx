@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
+import { GrowthEmailDiscoveryOperatorCard } from "@/components/growth/growth-email-discovery-operator-card"
 import type { GrowthLeadDecisionMaker } from "@/lib/growth/decision-maker-types"
 import type { GrowthLead } from "@/lib/growth/types"
 import { cn } from "@/lib/utils"
@@ -36,6 +37,7 @@ export function GrowthDecisionMakersPanel({
   const [title, setTitle] = useState("")
   const [phone, setPhone] = useState("")
   const [email, setEmail] = useState("")
+  const [canonicalCompanyId, setCanonicalCompanyId] = useState<string | null>(null)
 
   const showForm = openAddForm ?? showFormInternal
 
@@ -59,6 +61,17 @@ export function GrowthDecisionMakersPanel({
         throw new Error(data.message ?? data.error ?? "Could not load decision makers.")
       }
       setDecisionMakers(data.decisionMakers ?? [])
+      const discoveryRes = await fetch(`/api/platform/growth/leads/${lead.id}/email-discovery`, {
+        cache: "no-store",
+      })
+      const discoveryData = (await discoveryRes.json().catch(() => ({}))) as {
+        company_id?: string | null
+      }
+      setCanonicalCompanyId(
+        typeof discoveryData.company_id === "string" && discoveryData.company_id.trim()
+          ? discoveryData.company_id.trim()
+          : null,
+      )
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load decision makers.")
     } finally {
@@ -230,6 +243,16 @@ export function GrowthDecisionMakersPanel({
                       )}
                       {dm.evidenceExcerpt ? (
                         <p className="mt-2 text-xs text-muted-foreground line-clamp-2">{dm.evidenceExcerpt}</p>
+                      ) : null}
+                      {canonicalCompanyId && dm.canonicalPersonId ? (
+                        <div className="mt-3">
+                          <GrowthEmailDiscoveryOperatorCard
+                            compact
+                            companyId={canonicalCompanyId}
+                            personId={dm.canonicalPersonId}
+                            personLabel={dm.fullName}
+                          />
+                        </div>
                       ) : null}
                     </div>
                     <div className="flex shrink-0 flex-col gap-1">

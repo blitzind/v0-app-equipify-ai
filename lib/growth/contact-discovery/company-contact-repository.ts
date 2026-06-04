@@ -384,6 +384,12 @@ export async function processCompanyContactRefreshQueue(
         .from("company_contact_refresh_queue")
         .update({ status: "completed", updated_at: new Date().toISOString() })
         .eq("id", queueId)
+      if (refreshed.company_id) {
+        const { triggerEmailDiscoveryAfterCompanyEnriched } = await import(
+          "@/lib/growth/email-discovery/email-discovery-triggers"
+        )
+        void triggerEmailDiscoveryAfterCompanyEnriched(admin, { company_id: refreshed.company_id })
+      }
       processed += 1
     } catch (error) {
       failed += 1

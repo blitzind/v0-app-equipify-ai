@@ -3,6 +3,8 @@ import { z } from "zod"
 import { logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { listGrowthCallQueue } from "@/lib/growth/call-queue-repository"
 import { GROWTH_CALL_QUEUE_FILTERS } from "@/lib/growth/call-types"
+import { GROWTH_EMAIL_DISCOVERY_PROSPECT_FILTERS } from "@/lib/growth/email-discovery/email-discovery-runtime-types"
+import type { GrowthEmailDiscoveryProspectFilter } from "@/lib/growth/email-discovery/email-discovery-runtime-types"
 
 export const runtime = "nodejs"
 
@@ -32,6 +34,22 @@ export async function GET(request: Request) {
   const assignedToParsed =
     assignedToParam && z.string().uuid().safeParse(assignedToParam).success ? assignedToParam : undefined
 
+  const emailDiscoveryParam = url.searchParams.get("email_discovery_filter") ?? ""
+  const emailDiscoveryFilterParsed = GROWTH_EMAIL_DISCOVERY_PROSPECT_FILTERS.includes(
+    emailDiscoveryParam as GrowthEmailDiscoveryProspectFilter,
+  )
+    ? (emailDiscoveryParam as GrowthEmailDiscoveryProspectFilter)
+    : null
+  if (emailDiscoveryParam && !emailDiscoveryFilterParsed) {
+    return NextResponse.json(
+      {
+        error: "invalid_email_discovery_filter",
+        message: `email_discovery_filter must be one of: ${GROWTH_EMAIL_DISCOVERY_PROSPECT_FILTERS.join(", ")}.`,
+      },
+      { status: 400 },
+    )
+  }
+
   if (!limitParsed.success || !offsetParsed.success) {
     return NextResponse.json({ error: "invalid_pagination", message: "Invalid limit or offset." }, { status: 400 })
   }
@@ -43,6 +61,7 @@ export async function GET(request: Request) {
       offset: offsetParsed.data,
       assignedTo: assignedToParsed,
       unassigned: unassignedParam || undefined,
+      emailDiscoveryFilter: emailDiscoveryFilterParsed,
     })
 
     logGrowthEngine("call_queue_list_success", {

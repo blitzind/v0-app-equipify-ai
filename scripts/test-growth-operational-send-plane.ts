@@ -22,7 +22,7 @@ import { DEV_FALLBACK_CREDENTIAL_PEPPER, isUsingDevFallbackCredentialPepper } fr
 async function main(): Promise<void> {
   assert.equal(GROWTH_CRON_TELEMETRY_QA_MARKER, "growth-operational-send-plane-v1")
   assert.equal(GROWTH_INFRASTRUCTURE_READINESS_QA_MARKER, "growth-internal-outbound-ops-v1")
-  assert.equal(GROWTH_CRON_ROUTE_IDS.length, 16)
+  assert.equal(GROWTH_CRON_ROUTE_IDS.length, 17)
 
   const migration = fs.readFileSync(
     path.join(process.cwd(), `supabase/migrations/${GROWTH_CRON_EXECUTION_TELEMETRY_MIGRATION}`),

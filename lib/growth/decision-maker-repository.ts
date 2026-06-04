@@ -13,11 +13,12 @@ import type {
 import { emitGrowthLeadDecisionMakerTimeline } from "@/lib/growth/timeline-emitter"
 
 const DM_SELECT =
-  "id, lead_id, full_name, title, email, phone, linkedin_url, source, source_detail, confidence, evidence_excerpt, status, is_primary, created_by, created_at, updated_at"
+  "id, lead_id, canonical_person_id, full_name, title, email, phone, linkedin_url, source, source_detail, confidence, evidence_excerpt, status, is_primary, created_by, created_at, updated_at"
 
 type DecisionMakerDbRow = {
   id: string
   lead_id: string
+  canonical_person_id: string | null
   full_name: string
   title: string | null
   email: string | null
@@ -55,6 +56,7 @@ function mapDecisionMakerRow(row: DecisionMakerDbRow): GrowthLeadDecisionMaker {
   return {
     id: row.id,
     leadId: row.lead_id,
+    canonicalPersonId: row.canonical_person_id?.trim() || null,
     fullName: row.full_name,
     title: row.title,
     email: row.email,

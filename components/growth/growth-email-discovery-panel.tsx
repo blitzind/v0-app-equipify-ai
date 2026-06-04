@@ -54,6 +54,7 @@ export function GrowthEmailDiscoveryPanel() {
   const [running, setRunning] = useState(false)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [result, setResult] = useState<DiscoveryResult | null>(null)
   const [detail, setDetail] = useState<GrowthEmailDiscoveryRunDetail | null>(null)
   const [verificationCert, setVerificationCert] = useState<VerificationCertification | null>(null)
@@ -187,7 +188,7 @@ export function GrowthEmailDiscoveryPanel() {
     }
   }
 
-  async function runDiscovery() {
+  async function runDiscovery(sync = false) {
     if (!hasValidRole) {
       setError("Select a company/person role pair or enter IDs with an existing person_company_roles row.")
       return
@@ -195,33 +196,55 @@ export function GrowthEmailDiscoveryPanel() {
 
     setRunning(true)
     setError(null)
+    setNotice(null)
     setResult(null)
     setDetail(null)
     try {
-      const res = await fetch("/api/platform/growth/email-discovery/run", {
+      const endpoint = sync
+        ? "/api/platform/growth/email-discovery/run"
+        : "/api/platform/growth/email-discovery/jobs"
+      const body = sync
+        ? {
+            company_id: companyId.trim(),
+            person_id: personId.trim(),
+            promote,
+            require_production_safe_verification: true,
+          }
+        : {
+            company_id: companyId.trim(),
+            person_id: personId.trim(),
+            promote_on_complete: promote,
+            trigger_source: "infrastructure_panel",
+          }
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          company_id: companyId.trim(),
-          person_id: personId.trim(),
-          promote,
-          require_production_safe_verification: true,
-        }),
+        body: JSON.stringify(body),
       })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
         result?: DiscoveryResult
+        enqueued?: boolean
+        job_id?: string | null
+        reason?: string | null
         verification_certification?: VerificationCertification
         message?: string
-        reason?: string
         error?: unknown
       }
-      if (!res.ok || !data.ok || !data.result) {
+      if (!res.ok || !data.ok) {
         throw new Error(formatCanonicalPersonBackfillRequestError(data))
       }
-      setResult(data.result)
-      setVerificationCert(data.verification_certification ?? null)
-      await loadRunDetail(data.result.run_id)
+      if (sync && data.result) {
+        setResult(data.result)
+        setVerificationCert(data.verification_certification ?? null)
+        await loadRunDetail(data.result.run_id)
+      } else if (data.enqueued) {
+        setNotice(
+          `Queued job ${data.job_id ?? ""}. The growth-email-discovery-worker cron processes pending jobs.`,
+        )
+      } else {
+        setNotice(data.reason ?? data.message ?? "Discovery was not queued (verified email or active job).")
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Email discovery failed.")
     } finally {
@@ -326,10 +349,17 @@ export function GrowthEmailDiscoveryPanel() {
           Promote verified candidates to person_emails
         </label>
 
-        <Button type="button" disabled={!canRun} onClick={() => void runDiscovery()}>
-          {running ? <Loader2 className="mr-2 size-4 animate-spin" /> : <MailSearch className="mr-2 size-4" />}
-          Run email discovery
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" disabled={!canRun} onClick={() => void runDiscovery(false)}>
+            {running ? <Loader2 className="mr-2 size-4 animate-spin" /> : <MailSearch className="mr-2 size-4" />}
+            Queue discovery (7.3B)
+          </Button>
+          <Button type="button" variant="outline" disabled={!canRun} onClick={() => void runDiscovery(true)}>
+            Sync run (infra)
+          </Button>
+        </div>
+
+        {notice ? <p className="text-sm text-emerald-700">{notice}</p> : null}
 
         {result ? (
           <div className="space-y-2 text-sm">

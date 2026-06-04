@@ -533,4 +533,14 @@ export async function persistCanonicalPersonChannels(
       ...channelBase,
     })
   }
+
+  if (input.canonical_company_id) {
+    const { triggerEmailDiscoveryAfterPersonPersist } = await import(
+      "@/lib/growth/email-discovery/email-discovery-triggers"
+    )
+    await triggerEmailDiscoveryAfterPersonPersist(admin, {
+      company_id: input.canonical_company_id,
+      person_id: personId,
+    })
+  }
 }

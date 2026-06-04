@@ -20,6 +20,10 @@ import {
   type GrowthCallQueueRow,
   type GrowthLeadCallDisposition,
 } from "@/lib/growth/call-types"
+import {
+  GROWTH_EMAIL_DISCOVERY_PROSPECT_FILTERS,
+  type GrowthEmailDiscoveryProspectFilter,
+} from "@/lib/growth/email-discovery/email-discovery-runtime-types"
 import type { GrowthLead } from "@/lib/growth/types"
 
 const FILTER_LABELS: Record<GrowthCallQueueFilter, string> = {
@@ -54,6 +58,13 @@ const FILTER_LABELS: Record<GrowthCallQueueFilter, string> = {
   constraint_pressure: "Constraint Pressure",
 }
 
+const EMAIL_DISCOVERY_FILTER_LABELS: Record<GrowthEmailDiscoveryProspectFilter, string> = {
+  has_verified_email: "Has verified email",
+  missing_verified_email: "Missing verified email",
+  discovery_pending: "Discovery pending",
+  discovery_failed: "Discovery failed",
+}
+
 export default function AdminGrowthCallQueuePage() {
   const { sessionIdentity } = useAdmin()
   const header = usePlatformAdminHeaderIdentity({
@@ -63,6 +74,8 @@ export default function AdminGrowthCallQueuePage() {
   })
 
   const [filter, setFilter] = useState<GrowthCallQueueFilter>("call_ready")
+  const [emailDiscoveryFilter, setEmailDiscoveryFilter] =
+    useState<GrowthEmailDiscoveryProspectFilter | null>(null)
   const [rows, setRows] = useState<GrowthCallQueueRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -73,13 +86,15 @@ export default function AdminGrowthCallQueuePage() {
   const [openingLeadId, setOpeningLeadId] = useState<string | null>(null)
   const [ownerFilter, setOwnerFilter] = useState<"all" | "unassigned" | "mine">("all")
 
-  const load = useCallback(async (activeFilter: GrowthCallQueueFilter) => {
+  const load = useCallback(
+    async (activeFilter: GrowthCallQueueFilter, activeEmailFilter: GrowthEmailDiscoveryProspectFilter | null) => {
     setLoading(true)
     setError(null)
     setSuccessMessage(null)
     try {
       const params = new URLSearchParams({ filter: activeFilter })
       if (ownerFilter === "unassigned") params.set("unassigned", "true")
+      if (activeEmailFilter) params.set("email_discovery_filter", activeEmailFilter)
       const res = await fetch(`/api/platform/growth/call-queue?${params.toString()}`, { cache: "no-store" })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
@@ -99,8 +114,8 @@ export default function AdminGrowthCallQueuePage() {
   }, [ownerFilter])
 
   useEffect(() => {
-    void load(filter)
-  }, [filter, load, ownerFilter])
+    void load(filter, emailDiscoveryFilter)
+  }, [filter, emailDiscoveryFilter, load, ownerFilter])
 
   async function openLead(leadId: string) {
     setOpeningLeadId(leadId)
@@ -152,7 +167,7 @@ export default function AdminGrowthCallQueuePage() {
       if (selectedLead?.id === leadId && data.lead) {
         setSelectedLead(data.lead)
       }
-      await load(filter)
+      await load(filter, emailDiscoveryFilter)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not record call disposition.")
     } finally {
@@ -184,7 +199,12 @@ export default function AdminGrowthCallQueuePage() {
                 </div>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={() => void load(filter)} disabled={loading}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void load(filter, emailDiscoveryFilter)}
+              disabled={loading}
+            >
               {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />}
               Refresh
             </Button>
@@ -204,6 +224,39 @@ export default function AdminGrowthCallQueuePage() {
                 )}
               >
                 {item === "all" ? "All owners" : "Unassigned only"}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="w-full text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Email discovery
+            </span>
+            <button
+              type="button"
+              onClick={() => setEmailDiscoveryFilter(null)}
+              className={cn(
+                "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                emailDiscoveryFilter === null
+                  ? "border-indigo-200 bg-indigo-50 text-indigo-800"
+                  : "border-border bg-background text-muted-foreground hover:bg-muted/40",
+              )}
+            >
+              Any
+            </button>
+            {GROWTH_EMAIL_DISCOVERY_PROSPECT_FILTERS.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setEmailDiscoveryFilter(item)}
+                className={cn(
+                  "rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                  emailDiscoveryFilter === item
+                    ? "border-indigo-200 bg-indigo-50 text-indigo-800"
+                    : "border-border bg-background text-muted-foreground hover:bg-muted/40",
+                )}
+              >
+                {EMAIL_DISCOVERY_FILTER_LABELS[item]}
               </button>
             ))}
           </div>

@@ -3,6 +3,11 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { matchesCallQueueFilter } from "@/lib/growth/call-priority"
 import type { GrowthCallQueueFilter, GrowthCallQueueRow } from "@/lib/growth/call-types"
+import { loadEmailDiscoveryLeadRollup } from "@/lib/growth/email-discovery/email-discovery-lead-rollup"
+import {
+  matchesEmailDiscoveryProspectFilter,
+  type GrowthEmailDiscoveryProspectFilter,
+} from "@/lib/growth/email-discovery/email-discovery-runtime-types"
 import { fetchGrowthLeadDecisionMakerById } from "@/lib/growth/decision-maker-repository"
 import { listGrowthLeads } from "@/lib/growth/lead-repository"
 import { resolveGrowthRepLabels } from "@/lib/growth/assignment/rep-roster-repository"
@@ -29,6 +34,7 @@ export async function listGrowthCallQueue(
     offset?: number
     assignedTo?: string | null
     unassigned?: boolean
+    emailDiscoveryFilter?: GrowthEmailDiscoveryProspectFilter | null
   },
 ): Promise<GrowthCallQueueRow[]> {
   const leads = await listGrowthLeads(admin, {
@@ -90,6 +96,13 @@ export async function listGrowthCallQueue(
       }, now)
     ) {
       continue
+    }
+
+    if (input.emailDiscoveryFilter) {
+      const rollup = await loadEmailDiscoveryLeadRollup(admin, lead.id)
+      if (!matchesEmailDiscoveryProspectFilter(input.emailDiscoveryFilter, rollup)) {
+        continue
+      }
     }
 
     const hasPersistedPriority =

@@ -10,6 +10,8 @@ import {
   pickBestBrowserIntakeLeadMatch,
 } from "@/lib/growth/browser-intake/browser-intake-lead-lookup"
 import { buildLinkedInLookupQuery } from "@/lib/growth/browser-intake/linkedin-context-detect"
+import { resolveCanonicalCompanyIdForLead } from "@/lib/growth/canonical-persons/canonical-person-repository"
+import { loadEmailDiscoveryOperatorStatus } from "@/lib/growth/email-discovery/email-discovery-operator-status"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { normalizeCompanyName, normalizeWebsiteDomain } from "@/lib/growth/import/normalize"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
@@ -149,6 +151,30 @@ export async function buildBrowserIntakeCrmContext(
   const lead = await fetchGrowthLeadById(admin, leadId)
   if (!lead) return null
 
+  const canonical_company_id = await resolveCanonicalCompanyIdForLead(admin, lead.id)
+  const decisionMakersForDiscovery = await listGrowthLeadDecisionMakers(admin, lead.id)
+  const email_discovery_contacts = []
+  if (canonical_company_id) {
+    for (const dm of decisionMakersForDiscovery) {
+      const person_id = dm.canonicalPersonId?.trim() ?? ""
+      if (!person_id) continue
+      const status = await loadEmailDiscoveryOperatorStatus(admin, {
+        company_id: canonical_company_id,
+        person_id,
+      })
+      if (!status) continue
+      email_discovery_contacts.push({
+        person_id,
+        name: dm.fullName,
+        title: dm.title,
+        verified_email: status.verified_email,
+        has_verified_email: status.has_verified_email,
+        discovery_status: status.discovery_status,
+        can_discover: status.can_discover,
+      })
+    }
+  }
+
   const [ownerRep, opportunity, timeline, enrichedMatch, companyCounts] = await Promise.all([
     lead.assignedTo ? fetchGrowthRepByUserId(admin, lead.assignedTo) : Promise.resolve(null),
     fetchGrowthOpportunityByLeadId(admin, lead.id),
@@ -228,6 +254,8 @@ export async function buildBrowserIntakeCrmContext(
       summary: event.summary ?? null,
     })),
     company_relationship_map: companyCounts.relationshipMap,
+    canonical_company_id,
+    email_discovery_contacts,
     links: {
       lead: `${adminPrefix}${buildAdminLinks(lead.id, lead.companyName, opportunity?.id ?? null).lead}`,
       company: `${adminPrefix}${buildAdminLinks(lead.id, lead.companyName, opportunity?.id ?? null).company}`,

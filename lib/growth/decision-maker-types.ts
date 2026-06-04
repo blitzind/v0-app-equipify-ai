@@ -27,6 +27,7 @@ export type GrowthDecisionMakerPresenceStatus = (typeof GROWTH_DECISION_MAKER_PR
 export type GrowthLeadDecisionMaker = {
   id: string
   leadId: string
+  canonicalPersonId: string | null
   fullName: string
   title: string | null
   email: string | null

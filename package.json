@@ -213,6 +213,8 @@
     "test:growth-canonical-persons-backfill-completion": "tsx scripts/test-growth-canonical-persons-backfill-completion.ts",
     "cleanup:growth-canonical-person-orphans-7.2b": "tsx scripts/cleanup-growth-canonical-person-orphans-7.2b.ts",
     "test:growth-email-discovery-7.3a": "tsx scripts/test-growth-email-discovery-7.3a.ts",
+    "test:growth-email-discovery-7.3b": "tsx scripts/test-growth-email-discovery-7.3b.ts",
+    "test:growth-phone-discovery-7.4a": "tsx scripts/test-growth-phone-discovery-7.4a.ts",
     "test:growth-serp-provider-audit": "tsx scripts/test-growth-serp-provider-audit.ts",
     "test:growth-provider-cache": "tsx scripts/test-growth-provider-cache.ts",
     "test:growth-company-signals": "tsx scripts/test-growth-company-signals.ts",

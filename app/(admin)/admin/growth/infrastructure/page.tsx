@@ -7,6 +7,7 @@ import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import { GrowthCanonicalCompanyBackfillPanel } from "@/components/growth/growth-canonical-company-backfill-panel"
 import { GrowthCanonicalPersonBackfillPanel } from "@/components/growth/growth-canonical-person-backfill-panel"
 import { GrowthEmailDiscoveryPanel } from "@/components/growth/growth-email-discovery-panel"
+import { GrowthPhoneDiscoveryPanel } from "@/components/growth/growth-phone-discovery-panel"
 import { GrowthSenderInfrastructureDashboard } from "@/components/growth/growth-sender-infrastructure-dashboard"
 import { GrowthInfrastructureReadinessStrip } from "@/components/growth/growth-infrastructure-readiness-strip"
 import { GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER } from "@/lib/growth/operations/internal-outbound-ops-types"
@@ -66,6 +67,8 @@ export default function AdminGrowthInfrastructurePage() {
           <GrowthCanonicalPersonBackfillPanel />
 
           <GrowthEmailDiscoveryPanel />
+
+          <GrowthPhoneDiscoveryPanel />
 
           <GrowthSenderInfrastructureDashboard />
         </GrowthSectionLayout>

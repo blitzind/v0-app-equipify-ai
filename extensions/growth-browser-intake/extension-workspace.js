@@ -1017,6 +1017,71 @@
     }))
   }
 
+  async function enqueueBrowserEmailDiscovery(companyId, personId, buttonEl) {
+    if (!companyId || !personId) return
+    if (buttonEl) {
+      buttonEl.disabled = true
+      buttonEl.textContent = "Queuing…"
+    }
+    try {
+      const res = await fetch("/api/platform/growth/browser-intake/email-discovery", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_id: companyId,
+          person_id: personId,
+          promote_on_complete: true,
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || !body.ok) {
+        throw new Error(body.message ?? "Could not queue email discovery.")
+      }
+      if (buttonEl) {
+        buttonEl.textContent = body.enqueued ? "Queued" : body.reason ?? "Skipped"
+      }
+    } catch (error) {
+      if (buttonEl) buttonEl.textContent = "Discover email"
+      window.EquipifyGrowthPanelLoad?.setStatus?.(
+        error instanceof Error ? error.message : "Email discovery failed.",
+        "error",
+      )
+    } finally {
+      if (buttonEl && buttonEl.textContent === "Queuing…") buttonEl.textContent = "Discover email"
+    }
+  }
+
+  function renderEmailDiscoveryContacts(context) {
+    const list = document.getElementById("es-ws-email-discovery-list")
+    if (!list) return
+    const companyId = trimOrNull(context?.canonical_company_id)
+    const contacts = context?.email_discovery_contacts ?? []
+    if (!companyId || !contacts.length) {
+      list.innerHTML =
+        '<p class="es-ws-empty">Canonical email discovery is available after decision makers are linked to canonical persons.</p>'
+      return
+    }
+    list.innerHTML = contacts
+      .slice(0, 6)
+      .map((contact) => {
+        const verified = contact.has_verified_email
+          ? `<span class="es-ws-meta">${escapeHtml(contact.verified_email ?? "verified")}</span>`
+          : `<button type="button" class="es-ws-inline-btn" data-company-id="${escapeHtml(companyId)}" data-person-id="${escapeHtml(contact.person_id)}">Discover email</button>`
+        return `<div class="es-ws-email-discovery-row"><strong>${escapeHtml(contact.name)}</strong> ${verified}<span class="es-ws-meta">${escapeHtml(contact.discovery_status)}</span></div>`
+      })
+      .join("")
+    list.querySelectorAll("[data-person-id][data-company-id]").forEach((button) => {
+      button.addEventListener("click", () => {
+        void enqueueBrowserEmailDiscovery(
+          button.getAttribute("data-company-id"),
+          button.getAttribute("data-person-id"),
+          button,
+        )
+      })
+    })
+  }
+
   function renderCrmContacts(context) {
     const list = document.getElementById("es-ws-crm-contacts-list")
     if (!list) return
@@ -1365,6 +1430,7 @@
     renderQueueShortcuts(recentCaptures)
     renderEmployees(context, input?.visibleLinkedInPeople ?? [], detected, formValues)
     renderCrmContacts(context)
+    renderEmailDiscoveryContacts(context)
     renderTechnologies(detected, context)
     renderSignals(detected, context)
     renderCrmRelationship(context, relationship, contactsCount, oppCount, customerCount, hasMatch)
