@@ -2,9 +2,12 @@
 
 import { Mail } from "lucide-react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import { GrowthUnifiedInboxDashboardPanel } from "@/components/growth/growth-unified-inbox-dashboard"
+import { GrowthInboxWorkspaceProvider } from "@/components/growth/inbox/growth-inbox-workspace-provider"
+import { GrowthInboxWorkspaceV2Panel } from "@/components/growth/inbox/growth-inbox-workspace-v2-panel"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
@@ -12,9 +15,23 @@ import {
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 import { Button } from "@/components/ui/button"
+import {
+  GROWTH_INBOX_DIAGNOSTICS_HREF,
+  GROWTH_INBOX_WORKSPACE_V2_QA_MARKER,
+  resolveGrowthInboxWorkspaceV2FromSearchParams,
+} from "@/lib/growth/inbox/inbox-workspace-types"
+
+function InboxWorkspaceContent() {
+  const searchParams = useSearchParams()
+  const workspaceV2 = resolveGrowthInboxWorkspaceV2FromSearchParams(searchParams)
+
+  return workspaceV2 ? <GrowthInboxWorkspaceV2Panel /> : <GrowthUnifiedInboxDashboardPanel />
+}
 
 export default function AdminGrowthUnifiedInboxPage() {
   const { sessionIdentity } = useAdmin()
+  const searchParams = useSearchParams()
+  const workspaceV2 = resolveGrowthInboxWorkspaceV2FromSearchParams(searchParams)
   const header = usePlatformAdminHeaderIdentity({
     displayName: sessionIdentity?.displayName,
     email: sessionIdentity?.email,
@@ -33,20 +50,34 @@ export default function AdminGrowthUnifiedInboxPage() {
                 <Mail size={17} />
               </span>
               <div>
-                <h1 className={PAGE_STANDARD_PAGE_TITLE}>Inbox</h1>
+                <h1 className={PAGE_STANDARD_PAGE_TITLE}>{workspaceV2 ? "Inbox Workspace" : "Inbox"}</h1>
                 <p className="text-sm text-muted-foreground">
-                  Unified inbox ownership and reply intelligence — orchestration only, no mailbox sync or auto replies.
+                  {workspaceV2
+                    ? "Three-column inbox workspace — thread queue, conversation, and action center foundation."
+                    : "Unified inbox ownership and reply intelligence — orchestration only, no mailbox sync or auto replies."}
                 </p>
+                {workspaceV2 ? (
+                  <p className="mt-1 text-xs text-muted-foreground" data-equipify-qa-marker={GROWTH_INBOX_WORKSPACE_V2_QA_MARKER}>
+                    {GROWTH_INBOX_WORKSPACE_V2_QA_MARKER} enabled
+                  </p>
+                ) : null}
               </div>
             </div>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/admin/growth/queue">Revenue Queue</Link>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" asChild>
+                <Link href={GROWTH_INBOX_DIAGNOSTICS_HREF}>Inbox Diagnostics</Link>
+              </Button>
+              <Button type="button" variant="outline" size="sm" asChild>
+                <Link href="/admin/growth/queue">Revenue Queue</Link>
+              </Button>
+            </div>
           </div>
         </section>
 
         <GrowthSectionLayout>
-          <GrowthUnifiedInboxDashboardPanel />
+          <GrowthInboxWorkspaceProvider>
+            <InboxWorkspaceContent />
+          </GrowthInboxWorkspaceProvider>
         </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>

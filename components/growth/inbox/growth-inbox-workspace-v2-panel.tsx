@@ -1,0 +1,148 @@
+"use client"
+
+import Link from "next/link"
+import { Loader2, Plus, RefreshCw } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { GrowthInboxLeadContextProvider } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
+import { GrowthInboxActionCenterColumn } from "@/components/growth/inbox/growth-inbox-action-center-column"
+import { GrowthInboxConversationColumn } from "@/components/growth/inbox/growth-inbox-conversation-column"
+import { GrowthInboxQueueProvider } from "@/components/growth/inbox/growth-inbox-queue-context"
+import { GrowthInboxThreadQueueColumn } from "@/components/growth/inbox/growth-inbox-thread-queue-column"
+import { GrowthInboxV2SupportingPanels } from "@/components/growth/inbox/growth-inbox-v2-supporting-panels"
+import { GrowthInboxWorkspaceKeyboardBridge } from "@/components/growth/inbox/growth-inbox-workspace-keyboard-bridge"
+import { GrowthInboxWorkspaceShell } from "@/components/growth/inbox/growth-inbox-workspace-shell"
+import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
+import { GrowthInboxSetupEmptyState } from "@/components/growth/growth-inbox-setup-empty-state"
+import {
+  GROWTH_INBOX_DIAGNOSTICS_HREF,
+  GROWTH_INBOX_WORKSPACE_PHASE2_QA_MARKER,
+  GROWTH_INBOX_WORKSPACE_PHASE3_QA_MARKER,
+  GROWTH_INBOX_WORKSPACE_V2_QA_MARKER,
+} from "@/lib/growth/inbox/inbox-workspace-types"
+import { GROWTH_INBOX_RUNTIME_STABLE_QA_MARKER } from "@/lib/growth/inbox/inbox-runtime-types"
+import { GROWTH_UNIFIED_INBOX_FOUNDATION_QA_MARKER } from "@/lib/growth/inbox/inbox-types"
+
+export function GrowthInboxWorkspaceV2Panel() {
+  const {
+    loading,
+    error,
+    actionLoading,
+    showHonestEmptyState,
+    setupPhase,
+    leads,
+    newLeadId,
+    newSubject,
+    selectedThread,
+    setNewLeadId,
+    setNewSubject,
+    load,
+    runAction,
+    createThread,
+  } = useGrowthInboxWorkspace()
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" />
+        Loading inbox workspace…
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6" data-equipify-qa-marker={GROWTH_INBOX_WORKSPACE_V2_QA_MARKER}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">
+          {GROWTH_UNIFIED_INBOX_FOUNDATION_QA_MARKER} · {GROWTH_INBOX_RUNTIME_STABLE_QA_MARKER} ·{" "}
+          {GROWTH_INBOX_WORKSPACE_V2_QA_MARKER} · {GROWTH_INBOX_WORKSPACE_PHASE2_QA_MARKER} ·{" "}
+          {GROWTH_INBOX_WORKSPACE_PHASE3_QA_MARKER} · Primary sales operating surface — human approval only.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href={GROWTH_INBOX_DIAGNOSTICS_HREF}>Inbox Diagnostics</Link>
+          </Button>
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/revenue-execution">Revenue Execution</Link>
+          </Button>
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/sequences/execution">Sequence Execution</Link>
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={Boolean(actionLoading)}>
+            <RefreshCw className="mr-1.5 size-3.5" />
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      {error ? (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">{error}</div>
+      ) : null}
+
+      {showHonestEmptyState ? <GrowthInboxSetupEmptyState phase={setupPhase} /> : null}
+
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="mb-3 text-sm font-medium">Create Thread</p>
+        <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
+          <div className="space-y-2">
+            <Label htmlFor="workspace-inbox-lead">Lead</Label>
+            <Select value={newLeadId} onValueChange={setNewLeadId}>
+              <SelectTrigger id="workspace-inbox-lead">
+                <SelectValue placeholder="Select lead" />
+              </SelectTrigger>
+              <SelectContent>
+                {leads.map((lead) => (
+                  <SelectItem key={lead.id} value={lead.id}>
+                    {lead.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="workspace-inbox-subject">Subject</Label>
+            <Input
+              id="workspace-inbox-subject"
+              value={newSubject}
+              onChange={(event) => setNewSubject(event.target.value)}
+              placeholder="Re: follow-up"
+            />
+          </div>
+          <Button
+            type="button"
+            disabled={!newLeadId || Boolean(actionLoading)}
+            onClick={() => void runAction("create-thread", createThread)}
+          >
+            <Plus className="mr-1.5 size-3.5" />
+            Create Thread
+          </Button>
+        </div>
+      </div>
+
+      <GrowthInboxQueueProvider>
+        <GrowthInboxLeadContextProvider
+          leadId={selectedThread?.lead_id ?? null}
+          threadId={selectedThread?.id ?? null}
+          thread={selectedThread}
+        >
+          <GrowthInboxWorkspaceShell
+            threadQueue={<GrowthInboxThreadQueueColumn />}
+            conversation={<GrowthInboxConversationColumn />}
+            actionCenter={<GrowthInboxActionCenterColumn />}
+          />
+          <GrowthInboxWorkspaceKeyboardBridge />
+        </GrowthInboxLeadContextProvider>
+      </GrowthInboxQueueProvider>
+
+      <GrowthInboxV2SupportingPanels />
+    </div>
+  )
+}

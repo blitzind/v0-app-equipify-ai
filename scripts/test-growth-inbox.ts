@@ -65,9 +65,20 @@ const uiSource = fs.readFileSync(
 )
 assert.match(uiSource, /GROWTH_INBOX_RUNTIME_STABLE_QA_MARKER/)
 assert.match(uiSource, /GrowthInboxSetupEmptyState/)
-assert.match(uiSource, /GrowthInboxWidgetErrorBoundary/)
-assert.match(uiSource, /safeFormatLeadLabel/)
-assert.match(uiSource, /sanitizeInboxUiErrorMessage/)
+assert.match(uiSource, /GrowthInboxExtendedPanels/)
+
+const extendedPanels = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/inbox/growth-inbox-extended-panels.tsx"),
+  "utf8",
+)
+assert.match(extendedPanels, /GrowthInboxWidgetErrorBoundary/)
+
+const sharedUi = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/inbox/growth-inbox-shared-ui.ts"),
+  "utf8",
+)
+assert.match(sharedUi, /safeFormatLeadLabel/)
+assert.match(sharedUi, /sanitizeInboxUiErrorMessage/)
 
 const boundarySource = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-inbox-widget-error-boundary.tsx"),

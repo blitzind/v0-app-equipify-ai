@@ -270,11 +270,13 @@ export function GrowthReplyWorkflowActionsPanel({
   leadId,
   compact = false,
   showSequenceExit = true,
+  hideRevenuePanel = false,
   title = "Reply workflow actions",
 }: {
   leadId?: string
   compact?: boolean
   showSequenceExit?: boolean
+  hideRevenuePanel?: boolean
   title?: string
 }) {
   const [dashboard, setDashboard] = useState<GrowthReplyWorkflowActionDashboard | null>(null)
@@ -485,7 +487,7 @@ export function GrowthReplyWorkflowActionsPanel({
         </GrowthEngineCard>
       ) : null}
 
-      {leadId ? <GrowthRevenueWorkflowWorkspacePanel leadId={leadId} compact /> : null}
+      {leadId && !hideRevenuePanel ? <GrowthRevenueWorkflowWorkspacePanel leadId={leadId} compact /> : null}
 
       <OpportunityReviewDialog
         open={oppOpen}

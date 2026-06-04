@@ -169,18 +169,32 @@ async function main(): Promise<void> {
     path.join(process.cwd(), "components/growth/growth-unified-inbox-dashboard.tsx"),
     "utf8",
   )
-  assert.match(uiSource, /Inbox Health/)
+  assert.match(uiSource, /GrowthInboxDiagnosticsPanel/)
   assert.match(uiSource, /Threads/)
   assert.match(uiSource, /Message Viewer/)
-  assert.match(uiSource, /Reply Intelligence/)
+  assert.match(uiSource, /GrowthInboxExtendedPanels/)
   assert.match(uiSource, /Assign Owner/)
-  assert.match(uiSource, /Sync Health/)
-  assert.match(uiSource, /GROWTH_INBOX_SYNC_THREAD_CONTINUITY_QA_MARKER/)
-  assert.match(uiSource, /GROWTH_UNIFIED_INBOX_FOUNDATION_QA_MARKER/)
   assert.match(uiSource, /GROWTH_INBOX_RUNTIME_STABLE_QA_MARKER/)
+  assert.match(uiSource, /GROWTH_UNIFIED_INBOX_FOUNDATION_QA_MARKER/)
   assert.match(uiSource, /GrowthInboxSetupEmptyState/)
-  assert.match(uiSource, /GrowthInboxWidgetErrorBoundary/)
-  assert.match(uiSource, /GrowthInboxTeamQueuePanel/)
+
+  const extendedPanels = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/inbox/growth-inbox-extended-panels.tsx"),
+    "utf8",
+  )
+  assert.match(extendedPanels, /GrowthInboxWidgetErrorBoundary/)
+  assert.match(extendedPanels, /GrowthInboxTeamQueuePanel/)
+  assert.match(extendedPanels, /Reply Intelligence/)
+
+  const diagnosticsPanel = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/inbox/growth-inbox-diagnostics-panel.tsx"),
+    "utf8",
+  )
+  assert.match(diagnosticsPanel, /Inbox Health/)
+  assert.match(diagnosticsPanel, /Sync Health/)
+  assert.match(diagnosticsPanel, /Sync Runs/)
+  assert.match(diagnosticsPanel, /Provider Mailbox Controls/)
+  assert.match(diagnosticsPanel, /GROWTH_INBOX_SYNC_THREAD_CONTINUITY_QA_MARKER/)
 
   const navSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/navigation/growth-navigation-destinations.ts"),
@@ -188,6 +202,81 @@ async function main(): Promise<void> {
   )
   assert.match(navSource, /\/admin\/growth\/inbox/)
   assert.match(navSource, /unified-inbox/)
+  assert.match(navSource, /inbox-diagnostics/)
+  assert.match(navSource, /\/admin\/growth\/inbox\/diagnostics/)
+
+  const workspaceTypes = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/inbox/inbox-workspace-types.ts"),
+    "utf8",
+  )
+  assert.match(workspaceTypes, /GROWTH_INBOX_WORKSPACE_V2/)
+  assert.match(workspaceTypes, /GROWTH_INBOX_WORKSPACE_PHASE2_QA_MARKER/)
+  assert.match(workspaceTypes, /isGrowthInboxWorkspaceV2Enabled/)
+
+  const memoryStrip = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/inbox/growth-inbox-relationship-memory-strip.tsx"),
+    "utf8",
+  )
+  assert.match(memoryStrip, /Relationship Memory/)
+  assert.match(memoryStrip, /Key Objections/)
+  assert.match(memoryStrip, /Risk Flags/)
+
+  const timelinePanel = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/inbox/growth-inbox-relationship-timeline.tsx"),
+    "utf8",
+  )
+  assert.match(timelinePanel, /Relationship Timeline/)
+  assert.match(timelinePanel, /inboxTimelineEventTypeLabel/)
+
+  const leadContext = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/inbox/growth-inbox-lead-context-provider.tsx"),
+    "utf8",
+  )
+  assert.match(leadContext, /replies\/timeline/)
+
+  const actionCenter = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/inbox/growth-inbox-action-center-column.tsx"),
+    "utf8",
+  )
+  assert.match(actionCenter, /GrowthInboxRecommendedActionCard/)
+  assert.match(actionCenter, /GrowthInboxQuickActions/)
+  assert.match(actionCenter, /GrowthInboxActionCenterWorkflowEmbeds/)
+
+  assert.match(
+    fs.readFileSync(path.join(process.cwd(), "lib/growth/inbox/inbox-action-center-resolver.ts"), "utf8"),
+    /orchestrateGrowthInboxRecommendations/,
+  )
+  assert.match(workspaceTypes, /GROWTH_INBOX_WORKSPACE_PHASE3_QA_MARKER/)
+
+  const queueFilters = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/inbox/inbox-thread-queue-filters.ts"),
+    "utf8",
+  )
+  assert.match(queueFilters, /needs_action/)
+  assert.match(queueFilters, /meeting_intent/)
+
+  const orchestrator = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/inbox/inbox-recommendation-orchestrator.ts"),
+    "utf8",
+  )
+  assert.match(orchestrator, /orchestrateGrowthInboxRecommendations/)
+  assert.match(orchestrator, /revenue_execution/)
+  assert.match(orchestrator, /playbook/)
+
+  const shellSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/inbox/growth-inbox-workspace-shell.tsx"),
+    "utf8",
+  )
+  assert.match(shellSource, /GrowthInboxWorkspaceShell/)
+  assert.match(shellSource, /24%/)
+  assert.match(shellSource, /52%/)
+
+  const diagnosticsPage = fs.readFileSync(
+    path.join(process.cwd(), "app/(admin)/admin/growth/inbox/diagnostics/page.tsx"),
+    "utf8",
+  )
+  assert.match(diagnosticsPage, /Inbox Diagnostics/)
+  assert.match(diagnosticsPage, /GrowthInboxDiagnosticsPanel/)
 
   console.log("growth-unified-inbox: all checks passed")
 }

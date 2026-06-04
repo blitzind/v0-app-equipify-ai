@@ -198,11 +198,13 @@ async function main(): Promise<void> {
   assert.match(runRouteSource, /requireGrowthEnginePlatformAccess/)
 
   const uiSource = readSource("components/growth/growth-unified-inbox-dashboard.tsx")
-  assert.match(uiSource, /Sync Health/)
-  assert.match(uiSource, /Sync Runs/)
   assert.match(uiSource, /Thread continuity/)
-  assert.match(uiSource, /Coming Soon/)
   assert.doesNotMatch(uiSource, /api_key|secret|password/i)
+
+  const diagnosticsPanel = readSource("components/growth/inbox/growth-inbox-diagnostics-panel.tsx")
+  assert.match(diagnosticsPanel, /Sync Health/)
+  assert.match(diagnosticsPanel, /Sync Runs/)
+  assert.match(diagnosticsPanel, /Coming Soon/)
 
   assert.equal(classifyReply({ body: "What is pricing?" }).classification, "budget")
 

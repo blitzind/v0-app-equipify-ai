@@ -125,9 +125,15 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
   },
   {
     id: "unified-inbox",
-    label: "Inbox",
+    label: "Inbox Workspace",
     href: "/admin/growth/inbox",
-    keywords: ["inbox", "reply", "thread", "unified inbox", "reply intelligence"],
+    keywords: ["inbox", "reply", "thread", "unified inbox", "reply intelligence", "inbox workspace"],
+  },
+  {
+    id: "inbox-diagnostics",
+    label: "Inbox Diagnostics",
+    href: "/admin/growth/inbox/diagnostics",
+    keywords: ["inbox diagnostics", "sync", "inbox health", "provider controls", "sync runs"],
   },
   {
     id: "internal-outbound-operations",
@@ -469,8 +475,14 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
       {
         id: "unified-inbox",
         href: "/admin/growth/inbox",
-        label: "Inbox",
-        match: prefixMatch("/admin/growth/inbox"),
+        label: "Inbox Workspace",
+        match: (path) => path === "/admin/growth/inbox" || path.startsWith("/admin/growth/inbox?"),
+      },
+      {
+        id: "inbox-diagnostics",
+        href: "/admin/growth/inbox/diagnostics",
+        label: "Inbox Diagnostics",
+        match: prefixMatch("/admin/growth/inbox/diagnostics"),
       },
       {
         id: "queue",
