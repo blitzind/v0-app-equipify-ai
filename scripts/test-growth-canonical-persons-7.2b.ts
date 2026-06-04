@@ -22,6 +22,7 @@ import {
   buildCanonicalPersonBackfillApiResponse,
   buildCanonicalPersonBackfillWarnings,
   canonicalPersonBackfillResponseExcludesSecrets,
+  formatCanonicalPersonBackfillRequestError,
   GROWTH_CANONICAL_PERSON_APPLY_CONFIRM,
   GROWTH_CANONICAL_PERSON_BACKFILL_API_QA_MARKER,
   mergeCanonicalPersonBackfillStats,
@@ -29,12 +30,17 @@ import {
   resolveCanonicalPersonRuntimeContext,
 } from "../lib/growth/canonical-persons/canonical-person-backfill-api"
 import {
+  isDeletableOrphanCanonicalPerson,
+  type CanonicalPersonOrphanRecord,
+} from "../lib/growth/canonical-persons/canonical-person-orphan-cleanup"
+import {
   buildResumeCursor,
   resolveBackfillDoneState,
   sumPendingTotal,
 } from "../lib/growth/canonical-persons/canonical-person-backfill-completion"
 import {
   GROWTH_CANONICAL_PERSON_BACKFILL_DEFAULT_BATCH_SIZE,
+  GROWTH_CANONICAL_PERSON_CHANNEL_UNIQUENESS_MIGRATION,
   GROWTH_CANONICAL_PERSON_MIGRATION,
   GROWTH_CANONICAL_PERSON_QA_MARKER,
   GROWTH_CANONICAL_PERSON_SOURCE_TABLES,
@@ -71,6 +77,89 @@ async function main(): Promise<void> {
   assert.match(migration, /growth\.person_source_lineage/)
   assert.match(migration, /canonical_person_id/)
   assert.doesNotMatch(migration, /blitzpay|stripe|organization_subscriptions/i)
+
+  const channelUniquenessMigration = fs.readFileSync(
+    path.join(process.cwd(), `supabase/migrations/${GROWTH_CANONICAL_PERSON_CHANNEL_UNIQUENESS_MIGRATION}`),
+    "utf8",
+  )
+  assert.match(channelUniquenessMigration, /drop index if exists growth\.person_emails_normalized_email_unique/)
+  assert.match(channelUniquenessMigration, /person_emails_normalized_email_key unique \(normalized_email\)/)
+  assert.match(channelUniquenessMigration, /person_phones_normalized_phone_key unique \(normalized_phone\)/)
+  assert.match(
+    channelUniquenessMigration,
+    /person_profiles_normalized_profile_key_key unique \(normalized_profile_key\)/,
+  )
+  assert.doesNotMatch(
+    channelUniquenessMigration,
+    /create unique index.*person_emails_normalized_email_unique[\s\S]*where normalized_email/i,
+  )
+
+  const repositoryCore = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/canonical-persons/canonical-person-repository-core.ts"),
+    "utf8",
+  )
+  assert.match(repositoryCore, /onConflict: "normalized_email"/)
+  assert.match(repositoryCore, /onConflict: "normalized_phone"/)
+  assert.match(repositoryCore, /onConflict: "normalized_profile_key"/)
+
+  const persistChannels = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/canonical-persons/canonical-person-repository-core.ts"),
+    "utf8",
+  )
+  assert.match(persistChannels, /if \(email && input\.email\)/)
+  assert.match(persistChannels, /if \(phone && input\.phone\)/)
+  assert.match(persistChannels, /if \(linkedinKey && input\.linkedin_url\)/)
+
+  assert.equal(canonicalNormalizedPersonEmail(""), null)
+  assert.equal(canonicalNormalizedPersonEmail("   "), null)
+  assert.equal(canonicalNormalizedPersonPhone(""), null)
+  assert.equal(canonicalNormalizedPersonLinkedIn(""), null)
+
+  assert.equal(
+    formatCanonicalPersonBackfillRequestError({ error: { code: "23505", message: "duplicate key" } }),
+    "duplicate key",
+  )
+  assert.equal(
+    formatCanonicalPersonBackfillRequestError({ error: { code: "23505", details: "x" } }),
+    '{"code":"23505","details":"x"}',
+  )
+  assert.equal(formatCanonicalPersonBackfillRequestError({ message: "schema_not_ready" }), "schema_not_ready")
+  assert.equal(
+    formatCanonicalPersonBackfillRequestError({}),
+    "Backfill request failed.",
+  )
+
+  const orphanWithLineage: CanonicalPersonOrphanRecord = {
+    person_id: "p1",
+    has_lineage: true,
+    has_email: false,
+    has_phone: false,
+    has_profile: false,
+    has_company_role: false,
+    has_merge_event: false,
+  }
+  assert.equal(isDeletableOrphanCanonicalPerson(orphanWithLineage), false)
+
+  const orphanBare: CanonicalPersonOrphanRecord = {
+    person_id: "p2",
+    has_lineage: false,
+    has_email: false,
+    has_phone: false,
+    has_profile: false,
+    has_company_role: false,
+    has_merge_event: false,
+  }
+  assert.equal(isDeletableOrphanCanonicalPerson(orphanBare), true)
+
+  const orphanWithEmail: CanonicalPersonOrphanRecord = { ...orphanBare, has_email: true }
+  assert.equal(isDeletableOrphanCanonicalPerson(orphanWithEmail), false)
+
+  const cleanupScript = fs.readFileSync(
+    path.join(process.cwd(), "scripts/cleanup-growth-canonical-person-orphans-7.2b.ts"),
+    "utf8",
+  )
+  assert.match(cleanupScript, /runCanonicalPersonOrphanCleanup/)
+  assert.match(cleanupScript, /--apply/)
 
   const resolverSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/canonical-persons/canonical-person-resolver.ts"),
@@ -281,6 +370,7 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(panelSource, /canonical-persons\/backfill/)
+  assert.match(panelSource, /formatCanonicalPersonBackfillRequestError/)
   assert.match(panelSource, /isCertifiedDone/)
 
   const infraPage = fs.readFileSync(

@@ -5,6 +5,10 @@ export const GROWTH_CANONICAL_PERSON_QA_MARKER = "growth-canonical-person-7.2b-v
 export const GROWTH_CANONICAL_PERSON_MIGRATION =
   "20270709120000_growth_engine_canonical_persons_7_2b.sql" as const
 
+/** PostgREST upsert-compatible channel uniqueness (replaces partial unique indexes). */
+export const GROWTH_CANONICAL_PERSON_CHANNEL_UNIQUENESS_MIGRATION =
+  "20270710120000_growth_engine_canonical_persons_7_2b_channel_uniqueness.sql" as const
+
 export const GROWTH_CANONICAL_PERSON_STATUSES = ["active", "merged", "suppressed"] as const
 export type GrowthCanonicalPersonStatus = (typeof GROWTH_CANONICAL_PERSON_STATUSES)[number]
 

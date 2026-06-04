@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import {
+  formatCanonicalPersonBackfillRequestError,
   GROWTH_CANONICAL_PERSON_APPLY_CONFIRM,
   mergeCanonicalPersonBackfillErrorRows,
   mergeCanonicalPersonBackfillStats,
@@ -87,7 +88,7 @@ export function GrowthCanonicalPersonBackfillPanel() {
         })
         const data = (await res.json().catch(() => ({}))) as BackfillApiResponse
         if (!res.ok || !data.ok || !data.stats) {
-          throw new Error(data.message ?? data.reason ?? data.error ?? "Backfill request failed.")
+          throw new Error(formatCanonicalPersonBackfillRequestError(data))
         }
 
         cumulative = cumulative

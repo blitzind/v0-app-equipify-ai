@@ -19,6 +19,29 @@ export const GROWTH_CANONICAL_PERSON_APPLY_CONFIRM = "APPLY_GROWTH_CANONICAL_PER
 export const GROWTH_CANONICAL_PERSON_BACKFILL_API_QA_MARKER =
   "growth-canonical-person-backfill-api-7.2b-v1" as const
 
+/** Avoid `[object Object]` when API error fields are nested objects. */
+export function formatCanonicalPersonBackfillRequestError(data: {
+  message?: unknown
+  reason?: unknown
+  error?: unknown
+}): string {
+  for (const field of [data.message, data.reason, data.error]) {
+    if (typeof field === "string" && field.trim()) return field.trim()
+    if (field && typeof field === "object" && "message" in field) {
+      const nested = (field as { message?: unknown }).message
+      if (typeof nested === "string" && nested.trim()) return nested.trim()
+    }
+  }
+  if (data.error !== undefined && data.error !== null && typeof data.error !== "string") {
+    try {
+      return JSON.stringify(data.error)
+    } catch {
+      return "Backfill request failed."
+    }
+  }
+  return "Backfill request failed."
+}
+
 const CursorSchema = z.object({
   source_table: z.enum(GROWTH_CANONICAL_PERSON_SOURCE_TABLES),
   after_id: z.string().uuid().nullable(),
