@@ -6,6 +6,8 @@ import { createHash } from "node:crypto"
 import { fetchLeadWebsite } from "@/lib/growth/research-website-fetch"
 import { resolveReadyLeadWebsiteUrl } from "@/lib/growth/research-website-url"
 import { extractAboutPageContacts } from "@/lib/growth/contact-discovery/extract/extract-about-page"
+import { extractAuthorBylineContacts } from "@/lib/growth/contact-discovery/extract/extract-author-byline"
+import { extractContactCardContacts } from "@/lib/growth/contact-discovery/extract/extract-contact-card"
 import { extractContactPageContacts } from "@/lib/growth/contact-discovery/extract/extract-contact-page"
 import { extractFooterContacts } from "@/lib/growth/contact-discovery/extract/extract-footer"
 import { extractLeadershipPageContacts } from "@/lib/growth/contact-discovery/extract/extract-leadership-page"
@@ -43,10 +45,14 @@ function extractContactsFromPage(html: string, pageUrl: string, pageType: Return
   const contacts: ExtractedWebsiteContact[] = []
   contacts.push(...extractSchemaOrgPersonContacts(html, pageUrl))
   contacts.push(...extractFooterContacts(html, pageUrl))
-  if (pageType === "team" || pageType === "staff") contacts.push(...extractTeamPageContacts(html, pageUrl))
+  if (pageType === "team" || pageType === "staff") {
+    contacts.push(...extractTeamPageContacts(html, pageUrl))
+    contacts.push(...extractContactCardContacts(html, pageUrl))
+  }
   if (pageType === "contact") contacts.push(...extractContactPageContacts(html, pageUrl))
   if (pageType === "about" || pageType === "careers") contacts.push(...extractAboutPageContacts(html, pageUrl))
   if (pageType === "leadership") contacts.push(...extractLeadershipPageContacts(html, pageUrl))
+  if (pageType === "blog_author") contacts.push(...extractAuthorBylineContacts(html, pageUrl))
   if (pageType === "privacy" || pageType === "locations" || pageType === "branch") {
     contacts.push(...extractContactPageContacts(html, pageUrl))
   }

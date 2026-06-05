@@ -174,6 +174,135 @@ export async function fetchLeadWebsite(rawWebsite: string | null | undefined): P
   return failureResult("error", currentUrl, sourceUrls, started)
 }
 
+export type GrowthPublicHtmlFetchResult = {
+  status: GrowthLeadWebsiteFetchStatus
+  normalizedUrl: string | null
+  sourceUrls: string[]
+  body: string | null
+  durationMs: number
+  byteCount: number
+}
+
+/** Fetch public HTML document (full body, not plain-text excerpt) for external evidence extraction. */
+export async function fetchPublicHtmlDocument(
+  rawUrl: string | null | undefined,
+): Promise<GrowthPublicHtmlFetchResult> {
+  const config = getGrowthResearchWebsiteConfig()
+  const started = Date.now()
+
+  if (!config.enabled) {
+    return { status: "skipped", normalizedUrl: null, sourceUrls: [], body: null, durationMs: Date.now() - started, byteCount: 0 }
+  }
+
+  const normalized = normalizeLeadWebsite(rawUrl)
+  if (normalized.status === "skipped") {
+    return { status: "skipped", normalizedUrl: null, sourceUrls: [], body: null, durationMs: Date.now() - started, byteCount: 0 }
+  }
+  if (normalized.status === "invalid_url") {
+    return { status: "invalid_url", normalizedUrl: null, sourceUrls: [], body: null, durationMs: Date.now() - started, byteCount: 0 }
+  }
+
+  let currentUrl = normalized.url
+  const sourceUrls = [currentUrl]
+
+  for (let hop = 0; hop <= config.maxRedirects; hop++) {
+    const safety = await assertLeadWebsiteUrlSafe(currentUrl)
+    if (!safety.ok) {
+      return { status: "blocked", normalizedUrl: currentUrl, sourceUrls, body: null, durationMs: Date.now() - started, byteCount: 0 }
+    }
+
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), config.timeoutMs)
+
+    try {
+      const response = await fetch(currentUrl, {
+        method: "GET",
+        redirect: "manual",
+        signal: controller.signal,
+        headers: {
+          Accept: "text/html, text/plain;q=0.9, application/xhtml+xml;q=0.8, */*;q=0.1",
+          "User-Agent": USER_AGENT,
+        },
+      })
+
+      if (response.status >= 300 && response.status < 400) {
+        if (hop >= config.maxRedirects) {
+          return { status: "error", normalizedUrl: currentUrl, sourceUrls, body: null, durationMs: Date.now() - started, byteCount: 0 }
+        }
+        const location = response.headers.get("location")
+        if (!location) return { status: "error", normalizedUrl: currentUrl, sourceUrls, body: null, durationMs: Date.now() - started, byteCount: 0 }
+
+        let nextUrl: string
+        try {
+          nextUrl = new URL(location, currentUrl).href
+        } catch {
+          return { status: "error", normalizedUrl: currentUrl, sourceUrls, body: null, durationMs: Date.now() - started, byteCount: 0 }
+        }
+
+        const nextNormalized = normalizeLeadWebsite(nextUrl)
+        if (nextNormalized.status !== "ready") {
+          return { status: "blocked", normalizedUrl: currentUrl, sourceUrls, body: null, durationMs: Date.now() - started, byteCount: 0 }
+        }
+
+        currentUrl = nextNormalized.url
+        if (!sourceUrls.includes(currentUrl)) sourceUrls.push(currentUrl)
+        continue
+      }
+
+      if (!response.ok) {
+        return { status: "error", normalizedUrl: currentUrl, sourceUrls, body: null, durationMs: Date.now() - started, byteCount: 0 }
+      }
+
+      const bodyResult = await readResponseBodyLimited(response, config.maxBytes)
+      if (!bodyResult.ok) {
+        return {
+          status: bodyResult.status,
+          normalizedUrl: currentUrl,
+          sourceUrls,
+          body: null,
+          durationMs: Date.now() - started,
+          byteCount: 0,
+        }
+      }
+
+      const contentType = response.headers.get("content-type")
+      if (!isLikelyTextContent(contentType, bodyResult.body)) {
+        return {
+          status: "error",
+          normalizedUrl: currentUrl,
+          sourceUrls,
+          body: null,
+          durationMs: Date.now() - started,
+          byteCount: bodyResult.byteCount,
+        }
+      }
+
+      return {
+        status: "ok",
+        normalizedUrl: currentUrl,
+        sourceUrls: [currentUrl],
+        body: bodyResult.body,
+        durationMs: Date.now() - started,
+        byteCount: bodyResult.byteCount,
+      }
+    } catch (error) {
+      const isTimeout = error instanceof Error && error.name === "AbortError"
+      return {
+        status: isTimeout ? "timeout" : "error",
+        normalizedUrl: currentUrl,
+        sourceUrls,
+        body: null,
+        durationMs: Date.now() - started,
+        byteCount: 0,
+      }
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  return { status: "error", normalizedUrl: currentUrl, sourceUrls, body: null, durationMs: Date.now() - started, byteCount: 0 }
+}
+
 export function websiteFetchLogHost(result: GrowthLeadWebsiteFetchResult): string | null {
   return hostnameForLog(result.normalizedUrl ?? result.sourceUrls[0] ?? null)
 }
