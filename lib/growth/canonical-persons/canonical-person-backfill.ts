@@ -260,6 +260,54 @@ async function processCandidate(
   try {
     const enriched = await enrichCandidateInput(admin, input)
 
+    const { shouldMaterializeCanonicalPerson } = await import(
+      "@/lib/growth/human-identity-evidence/contact-identity-classification"
+    )
+    if (
+      !shouldMaterializeCanonicalPerson({
+        full_name: enriched.full_name,
+        title: enriched.title,
+        email: enriched.email,
+        phone: enriched.phone,
+        linkedin_url: enriched.linkedin_url,
+      })
+    ) {
+      stats.rows_processed++
+      stats.already_linked++
+      if (mode === "apply" && enriched.source_table === "company_contacts") {
+        const meta =
+          enriched.source_metadata && typeof enriched.source_metadata === "object"
+            ? (enriched.source_metadata as Record<string, unknown>)
+            : {}
+        const { preserveCompanyChannelsFromContactRow } = await import(
+          "@/lib/growth/human-identity-evidence/generic-contact-containment"
+        )
+        await preserveCompanyChannelsFromContactRow(admin, {
+          company_id: asString(meta.company_id),
+          company_contact_id: enriched.source_id,
+          full_name: enriched.full_name,
+          title: enriched.title,
+          email: enriched.email,
+          phone: enriched.phone,
+          linkedin_url: enriched.linkedin_url,
+          source_type: enriched.discovery_source,
+          source_evidence: Array.isArray(meta.source_evidence)
+            ? (meta.source_evidence as Array<{
+                claim?: string
+                evidence?: string
+                source?: string
+                page_url?: string | null
+              }>)
+            : [],
+          metadata:
+            meta.metadata && typeof meta.metadata === "object"
+              ? (meta.metadata as Record<string, unknown>)
+              : {},
+        }).catch(() => 0)
+      }
+      return { ok: true }
+    }
+
     const existingLineage = await fetchLineagePersonId(
       admin,
       enriched.source_table,

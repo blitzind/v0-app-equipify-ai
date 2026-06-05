@@ -10,6 +10,7 @@ import { isGrowthCompanyContactsSchemaReady } from "@/lib/growth/contact-discove
 import { scoreDecisionMakerTitle } from "@/lib/growth/contact-discovery/decision-maker-score"
 import type { GrowthContactCandidate } from "@/lib/growth/contact-discovery/contact-discovery-types"
 import { companyContactDedupeHash } from "@/lib/growth/contact-discovery/website-contact-discovery"
+import { classifyContactIdentity } from "@/lib/growth/human-identity-evidence/contact-identity-classification"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -77,6 +78,15 @@ function candidateToCompanyRow(input: {
     email: input.candidate.email,
   })
 
+  const identity = classifyContactIdentity({
+    full_name: input.candidate.full_name,
+    title: input.candidate.job_title,
+    email: input.candidate.email,
+    phone: input.candidate.phone,
+    linkedin_url: input.candidate.linkedin_url,
+    source_type: candidateSourceType(input.candidate.provider_type),
+  })
+
   return {
     company_id: input.company_id,
     contact_candidate_id: input.candidate.id,
@@ -107,6 +117,9 @@ function candidateToCompanyRow(input: {
       discovery_provider: input.candidate.provider_name,
       provider_type: input.candidate.provider_type,
       contact_candidate_id: input.candidate.id,
+      identity_classification: identity.classification,
+      identity_classification_reasons: identity.reasons,
+      eligible_for_canonical_person: identity.eligible_for_canonical_person,
     },
   }
 }

@@ -239,6 +239,8 @@
     "test:growth-evidence-gap-closure-cert-7-ps-hr": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-evidence-gap-closure-cert-7-ps-hr.ts",
     "test:growth-prospect-graph-expansion-cert-7-ps-hs": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-prospect-graph-expansion-cert-7-ps-hs.ts",
     "test:growth-canonical-graph-materialization-cert-7-ps-ht": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-canonical-graph-materialization-cert-7-ps-ht.ts",
+    "test:growth-person-committee-density-cert-7-ps-hu": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-person-committee-density-cert-7-ps-hu.ts",
+    "test:growth-generic-contact-containment-cert-7-ps-hv": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-generic-contact-containment-cert-7-ps-hv.ts",
     "test:growth-canonical-company-staging-linkage-cert-7-ps-hm-link": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-canonical-company-staging-linkage-cert-7-ps-hm-link.ts",
     "test:growth-human-identity-naming-channel-cert-7-ps-hn": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-human-identity-naming-channel-cert-7-ps-hn.ts",
     "test:growth-provider-activation-verified-email-cert-7-ps-ho": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-provider-activation-verified-email-cert-7-ps-ho.ts",

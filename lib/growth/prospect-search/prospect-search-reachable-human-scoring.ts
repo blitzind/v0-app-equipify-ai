@@ -48,7 +48,9 @@ function isNamedPerson(contact: ProspectSearchContactOverlay): boolean {
   const name = contact.name?.trim() ?? ""
   if (!name || name.length < 2) return false
   if (/^(info|contact|sales|support|admin|office|hello|team)@/i.test(contact.email ?? "")) return false
-  return !/^(info|contact|sales|support|admin|office|hello)$/i.test(name)
+  const emailClass = (contact.email_classification ?? "").toLowerCase()
+  if (emailClass.includes("generic") || emailClass.includes("role_email")) return false
+  return !/^(info|contact|sales|support|admin|office|hello|customer service)$/i.test(name)
 }
 
 function hasNamedVerifiedDirectChannel(contact: ProspectSearchContactOverlay): boolean {

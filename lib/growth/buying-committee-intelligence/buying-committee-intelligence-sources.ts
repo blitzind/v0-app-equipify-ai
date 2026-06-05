@@ -252,6 +252,10 @@ export async function collectStagingContactCommitteeAssignments(
     return { drafts: [], messages }
   }
 
+  const { classifyContactIdentity } = await import(
+    "@/lib/growth/human-identity-evidence/contact-identity-classification"
+  )
+
   const drafts: GrowthBuyingCommitteeIntelligenceDraftAssignment[] = []
   for (const row of contacts ?? []) {
     const person_id = asString(row.canonical_person_id)
@@ -264,6 +268,16 @@ export async function collectStagingContactCommitteeAssignments(
     const declared = asString(metadata.committee_role).toLowerCase()
     const title = asString(row.title) || null
     const full_name = asString(row.full_name) || "Unknown"
+
+    const identity = classifyContactIdentity({
+      full_name,
+      title,
+      email: asString(row.email),
+      phone: asString(row.phone),
+      linkedin_url: asString(row.linkedin_url),
+      source_type: asString(row.source_type),
+    })
+    if (!identity.eligible_for_committee) continue
 
     if (declared && declared !== "unknown") {
       const committee_role = mapCanonicalEmploymentRoleToCommitteeRole(declared)

@@ -58,6 +58,9 @@ export type GrowthProspectGraphExpansionMetrics = {
   verified_phones_total: number
   verified_profiles_total: number
   committee_members_verified: number
+  role_channel_contacts_total: number
+  company_channel_contacts_total: number
+  generic_placeholder_contacts_total: number
   named_person_density_pct: number
   committee_density_pct: number
   source_attribution: Partial<Record<GrowthProspectSourceType, number>>
