@@ -453,3 +453,18 @@ export async function runDeployedEmailDiscoveryCert(input: {
     provider_config_source: "deployed_runtime",
   }
 }
+
+/** Trigger deployed email-discovery cert cron (benchmark queue or default target). */
+export async function runDeployedBenchmarkVerifiedEmailQueue(input: {
+  admin: SupabaseClient
+}): Promise<{ ok: boolean; error: string | null }> {
+  try {
+    triggerVercelCron(EMAIL_DISCOVERY_CERT_CRON_ROUTE)
+    return { ok: true, error: null }
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    }
+  }
+}

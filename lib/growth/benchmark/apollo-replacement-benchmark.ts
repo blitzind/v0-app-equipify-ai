@@ -75,12 +75,7 @@ export async function runApolloReplacementBenchmark(input: {
     (snapshot_kind === "baseline" ? current_snapshot : null)
 
   let delta_report = null
-  if (baseline_snapshot && input.phase_version !== baseline_snapshot.phase_version) {
-    delta_report = buildApolloReplacementBenchmarkDeltaReport({
-      before_snapshot: baseline_snapshot,
-      after_snapshot: current_snapshot,
-    })
-  } else if (input.compare_phase_version) {
+  if (input.compare_phase_version) {
     const compare_snapshot = await loadApolloReplacementBenchmarkSnapshot(input.admin, {
       benchmark_id: APOLLO_REPLACEMENT_BENCHMARK_ID,
       phase_version: input.compare_phase_version,
@@ -91,6 +86,11 @@ export async function runApolloReplacementBenchmark(input: {
         after_snapshot: current_snapshot,
       })
     }
+  } else if (baseline_snapshot && input.phase_version !== baseline_snapshot.phase_version) {
+    delta_report = buildApolloReplacementBenchmarkDeltaReport({
+      before_snapshot: baseline_snapshot,
+      after_snapshot: current_snapshot,
+    })
   }
 
   const historical = await listApolloReplacementBenchmarkSnapshots(input.admin)
