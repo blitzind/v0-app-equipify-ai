@@ -72,18 +72,18 @@ function triggerVercelCron(cronPath: string): void {
   })
 }
 
-async function fetchCronTelemetryMetadata(input: {
+export async function fetchLatestCronTelemetryRun(input: {
   admin: SupabaseClient
   cron_route: string
   started_after: string
   poll_timeout_ms?: number
-}): Promise<Record<string, unknown> | null> {
+}): Promise<{ run_id: string | null; metadata: Record<string, unknown> | null }> {
   const deadline = Date.now() + (input.poll_timeout_ms ?? 90_000)
   while (Date.now() < deadline) {
     const { data, error } = await input.admin
       .schema("growth")
       .from("cron_execution_runs")
-      .select("metadata, started_at, ok")
+      .select("id, metadata, started_at, ok")
       .eq("cron_route", input.cron_route)
       .eq("ok", true)
       .gte("started_at", input.started_after)
@@ -92,11 +92,24 @@ async function fetchCronTelemetryMetadata(input: {
       .maybeSingle()
 
     if (!error && data?.metadata && typeof data.metadata === "object") {
-      return data.metadata as Record<string, unknown>
+      return {
+        run_id: typeof data.id === "string" ? data.id : null,
+        metadata: data.metadata as Record<string, unknown>,
+      }
     }
     await sleep(2_000)
   }
-  return null
+  return { run_id: null, metadata: null }
+}
+
+async function fetchCronTelemetryMetadata(input: {
+  admin: SupabaseClient
+  cron_route: string
+  started_after: string
+  poll_timeout_ms?: number
+}): Promise<Record<string, unknown> | null> {
+  const latest = await fetchLatestCronTelemetryRun(input)
+  return latest.metadata
 }
 
 function diagnosticsFromCronMetadata(
@@ -316,6 +329,8 @@ export async function runDeployedEmailDiscoveryCert(input: {
   error: string | null
   body: Record<string, unknown> | null
   channel: "http" | "vercel_cron_telemetry"
+  cron_telemetry_run_id: string | null
+  provider_config_source: "deployed_runtime"
 }> {
   const cron_secret = (input.cron_secret ?? resolveGrowthDeployedRuntimeCronSecret() ?? "").trim()
 
@@ -351,6 +366,8 @@ export async function runDeployedEmailDiscoveryCert(input: {
           error: null,
           body,
           channel: "http",
+          cron_telemetry_run_id: null,
+          provider_config_source: "deployed_runtime",
         }
       }
       if (!input.admin) {
@@ -360,6 +377,8 @@ export async function runDeployedEmailDiscoveryCert(input: {
           error: String(body?.error ?? "email_discovery_cert_run_failed"),
           body,
           channel: "http",
+          cron_telemetry_run_id: null,
+          provider_config_source: "deployed_runtime",
         }
       }
     } catch (e) {
@@ -370,6 +389,8 @@ export async function runDeployedEmailDiscoveryCert(input: {
           error: e instanceof Error ? e.message : String(e),
           body: null,
           channel: "http",
+          cron_telemetry_run_id: null,
+          provider_config_source: "deployed_runtime",
         }
       }
     }
@@ -382,6 +403,8 @@ export async function runDeployedEmailDiscoveryCert(input: {
       error: "cron_secret_unavailable_for_email_discovery_cert",
       body: null,
       channel: "http",
+      cron_telemetry_run_id: null,
+      provider_config_source: "deployed_runtime",
     }
   }
 
@@ -395,32 +418,38 @@ export async function runDeployedEmailDiscoveryCert(input: {
       error: "vercel_cron_email_discovery_trigger_failed",
       body: { detail: e instanceof Error ? e.message : String(e) },
       channel: "vercel_cron_telemetry",
+      cron_telemetry_run_id: null,
+      provider_config_source: "deployed_runtime",
     }
   }
 
-  const metadata = await fetchCronTelemetryMetadata({
+  const telemetry = await fetchLatestCronTelemetryRun({
     admin: input.admin,
     cron_route: EMAIL_DISCOVERY_CERT_CRON_ROUTE,
     started_after,
     poll_timeout_ms: 120_000,
   })
 
-  if (!metadata?.cert_result || typeof metadata.cert_result !== "object") {
+  if (!telemetry.metadata?.cert_result || typeof telemetry.metadata.cert_result !== "object") {
     return {
       ok: false,
       http_status: null,
       error: "vercel_cron_email_discovery_telemetry_timeout",
       body: null,
       channel: "vercel_cron_telemetry",
+      cron_telemetry_run_id: telemetry.run_id,
+      provider_config_source: "deployed_runtime",
     }
   }
 
-  const cert_result = metadata.cert_result as Record<string, unknown>
+  const cert_result = telemetry.metadata.cert_result as Record<string, unknown>
   return {
     ok: cert_result.ok === true,
     http_status: cert_result.ok === true ? 200 : 503,
     error: cert_result.ok === true ? null : String(cert_result.error ?? "email_discovery_cert_run_failed"),
     body: cert_result,
     channel: "vercel_cron_telemetry",
+    cron_telemetry_run_id: telemetry.run_id,
+    provider_config_source: "deployed_runtime",
   }
 }
