@@ -5,7 +5,7 @@ import { analyzeBuyingCommitteeCoverage } from "@/lib/growth/buying-committee-in
 import { loadCompanyIntelligenceOperatorStatus } from "@/lib/growth/company-intelligence/company-intelligence-operator-status"
 import {
   resolveProspectSearchCanonicalCompanyId,
-  resolveProspectSearchCanonicalCompanyIdsBatch,
+  resolveProspectSearchCompanyCoverageBatch,
 } from "@/lib/growth/prospect-search/prospect-search-canonical-resolution"
 import { probeProspectSearchEngineIntelligenceSchema } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-schema-health"
 import {
@@ -273,6 +273,8 @@ export async function loadProspectSearchEngineIntelligenceBatch(
     growth_lead_id: string | null
     website?: string | null
     extra_person_ids?: string[]
+    lead_metadata?: Record<string, unknown> | null
+    canonical_company_id?: string | null
   }>,
 ): Promise<Map<string, GrowthProspectSearchEngineIntelligence>> {
   const map = new Map<string, GrowthProspectSearchEngineIntelligence>()
@@ -292,7 +294,7 @@ export async function loadProspectSearchEngineIntelligenceBatch(
     }
   }
 
-  const canonicalByKey = await resolveProspectSearchCanonicalCompanyIdsBatch(
+  const coverageByKey = await resolveProspectSearchCompanyCoverageBatch(
     admin,
     companies.map((company) => ({
       key: company.key,
@@ -300,6 +302,7 @@ export async function loadProspectSearchEngineIntelligenceBatch(
       id: company.id,
       growth_lead_id: company.growth_lead_id,
       website: company.website,
+      lead_metadata: company.lead_metadata ?? null,
     })),
   )
 
@@ -308,7 +311,10 @@ export async function loadProspectSearchEngineIntelligenceBatch(
       try {
         const intelligence = await loadProspectSearchEngineIntelligence(admin, {
           ...company,
-          canonical_company_id: canonicalByKey.get(company.key) ?? null,
+          canonical_company_id:
+            company.canonical_company_id ??
+            coverageByKey.get(company.key)?.canonical_company_id ??
+            null,
           schema_health,
         })
         map.set(company.key, intelligence)

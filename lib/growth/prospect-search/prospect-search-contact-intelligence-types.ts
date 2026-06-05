@@ -122,6 +122,8 @@ export type GrowthProspectSearchContactIntelligence = {
   engine_intelligence?: import("@/lib/growth/prospect-search/prospect-search-engine-intelligence-types").GrowthProspectSearchEngineIntelligence | null
   /** Growth Engine readiness & prioritization (Phase 7.PS-D). */
   engine_readiness?: import("@/lib/growth/prospect-search/prospect-search-engine-readiness-types").GrowthProspectSearchEngineReadiness | null
+  /** Growth Engine coverage & resolution diagnostics (Phase 7.PS-E). */
+  engine_coverage?: import("@/lib/growth/prospect-search/prospect-search-coverage-types").ProspectSearchIntelligenceCoverage | null
 }
 
 export type ProspectSearchLeadEngineContactHandoffContext = {

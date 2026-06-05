@@ -17,6 +17,7 @@ import { BuyingCommitteePanel } from "@/components/growth/prospect-search/buying
 import { CompanyContactIntelligencePanel } from "@/components/growth/prospect-search/company-contact-intelligence-panel"
 import { ProspectSearchEngineIntelligenceSummary } from "@/components/growth/prospect-search/prospect-search-engine-intelligence-summary"
 import { ProspectSearchEngineReadinessBadges } from "@/components/growth/prospect-search/prospect-search-engine-readiness-badges"
+import { ProspectSearchCoverageBadges } from "@/components/growth/prospect-search/prospect-search-coverage-badges"
 import { ProspectSearchLegacyIntelligenceNotice } from "@/components/growth/prospect-search/prospect-search-legacy-intelligence-notice"
 import {
   PROSPECT_SEARCH_LEGACY_BUYING_COMMITTEE_PANEL_TITLE,
@@ -184,6 +185,11 @@ export function CompanyResultCard({
       <ProspectSearchEngineIntelligenceSummary row={row} className="mt-1" />
       <ProspectSearchEngineReadinessBadges
         readiness={row.contact_intelligence?.engine_readiness}
+        compact
+        className="mt-1"
+      />
+      <ProspectSearchCoverageBadges
+        coverage={row.contact_intelligence?.engine_coverage}
         compact
         className="mt-1"
       />

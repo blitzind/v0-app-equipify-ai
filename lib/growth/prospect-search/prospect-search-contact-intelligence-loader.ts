@@ -12,7 +12,12 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-loader"
 import { mergeEngineIntelligenceIntoContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-merge"
 import {
-  resolveProspectSearchCanonicalPersonIdsBatch,
+  applyPersonLinkageToContactOverlays,
+  mergeProspectSearchCoverageIntoContactIntelligence,
+} from "@/lib/growth/prospect-search/prospect-search-coverage-merge"
+import {
+  resolveProspectSearchCompanyCoverageBatch,
+  resolveProspectSearchPersonLinkageBatch,
   type ProspectSearchCanonicalPersonRef,
 } from "@/lib/growth/prospect-search/prospect-search-canonical-resolution"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
@@ -293,14 +298,37 @@ export async function loadProspectSearchContactIntelligenceBatch(
     }),
   )
 
-  const engineByKey = await loadProspectSearchEngineIntelligenceBatch(
+  const companyKeys = companies.map((company) => ({
+    key: `${company.source_type}:${company.id}`,
+    company,
+  }))
+
+  const companyCoverageByKey = await resolveProspectSearchCompanyCoverageBatch(
     admin,
-    companies.map((company) => ({
-      key: `${company.source_type}:${company.id}`,
+    companyKeys.map(({ key, company }) => ({
+      key,
       source_type: company.source_type,
       id: company.id,
       growth_lead_id: company.growth_lead_id,
       website: company.website,
+      lead_metadata: company.growth_lead_id
+        ? leadMetadataById.get(company.growth_lead_id) ?? null
+        : null,
+    })),
+  )
+
+  const engineByKey = await loadProspectSearchEngineIntelligenceBatch(
+    admin,
+    companyKeys.map(({ key, company }) => ({
+      key,
+      source_type: company.source_type,
+      id: company.id,
+      growth_lead_id: company.growth_lead_id,
+      website: company.website,
+      lead_metadata: company.growth_lead_id
+        ? leadMetadataById.get(company.growth_lead_id) ?? null
+        : null,
+      canonical_company_id: companyCoverageByKey.get(key)?.canonical_company_id ?? null,
       extra_person_ids: (decisionMakersByLead.get(company.growth_lead_id ?? "") ?? [])
         .map((dm) => dm.canonicalPersonId)
         .filter((id): id is string => Boolean(id)),
@@ -330,20 +358,38 @@ export async function loadProspectSearchContactIntelligenceBatch(
             canonical_person_id_hint: contact.canonical_person_id ?? null,
           }),
         )
-        const personIdByContactId = await resolveProspectSearchCanonicalPersonIdsBatch(
-          admin,
-          personRefs,
-        )
         const engine = engineByKey.get(key) ?? null
+        const committeePersonIds =
+          engine?.buying_committee?.members?.map((member) => member.person_id) ?? []
+        const linkageByContactId = await resolveProspectSearchPersonLinkageBatch(admin, personRefs, {
+          committee_person_ids: committeePersonIds,
+        })
+        intelligence = {
+          ...intelligence,
+          contacts: applyPersonLinkageToContactOverlays(intelligence.contacts, linkageByContactId),
+        }
+        const personIdByContactId = new Map<string, string | null>()
+        for (const [contactId, row] of linkageByContactId) {
+          personIdByContactId.set(contactId, row.canonical_person_id)
+        }
         intelligence = mergeEngineIntelligenceIntoContactIntelligence(
           intelligence,
           engine,
           personIdByContactId,
           {
-            canonical_company_id: company.canonical_company_id,
+            canonical_company_id:
+              companyCoverageByKey.get(key)?.canonical_company_id ??
+              company.canonical_company_id,
             is_suppressed: company.is_suppressed,
           },
         )
+        const companyCoverage = companyCoverageByKey.get(key)
+        if (companyCoverage) {
+          intelligence = mergeProspectSearchCoverageIntoContactIntelligence(intelligence, {
+            company: companyCoverage,
+            contacts: [...linkageByContactId.values()],
+          })
+        }
 
         map.set(key, intelligence)
       } catch {
@@ -384,7 +430,10 @@ export function applyContactIntelligenceToCompanyResult(
       ...company,
       contact_intelligence: intelligence,
       canonical_company_id:
-        intelligence.engine_intelligence?.canonical_company_id ?? company.canonical_company_id ?? null,
+        intelligence.engine_coverage?.company.canonical_company_id ??
+        intelligence.engine_intelligence?.canonical_company_id ??
+        company.canonical_company_id ??
+        null,
       decision_maker_coverage,
     },
     context,

@@ -15,6 +15,7 @@ import { ProspectSearchActionableResearchActions } from "@/components/growth/pro
 import { ProspectSearchEngineDiscoveryRollup } from "@/components/growth/prospect-search/prospect-search-engine-discovery-rollup"
 import { ProspectSearchEngineReadinessSummaryCard } from "@/components/growth/prospect-search/prospect-search-engine-readiness-summary-card"
 import { ProspectSearchEngineReadinessBreakdownPanel } from "@/components/growth/prospect-search/prospect-search-engine-readiness-breakdown-panel"
+import { ProspectSearchCoverageResolutionPanel } from "@/components/growth/prospect-search/prospect-search-coverage-resolution-panel"
 import { ProspectSearchSchemaHealthNotice } from "@/components/growth/prospect-search/prospect-search-schema-health-notice"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 
@@ -105,6 +106,13 @@ export function ProspectSearchEngineIntelligencePanel({
             </li>
           ))}
         </ul>
+      ) : null}
+
+      {company?.contact_intelligence?.engine_coverage ? (
+        <ProspectSearchCoverageResolutionPanel
+          coverage={company.contact_intelligence.engine_coverage}
+          companyName={companyName}
+        />
       ) : null}
 
       {company?.contact_intelligence?.engine_readiness ? (
