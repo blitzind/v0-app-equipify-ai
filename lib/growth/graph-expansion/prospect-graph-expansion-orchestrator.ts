@@ -11,6 +11,7 @@ import {
   diffProspectGraphExpansionMetrics,
   loadProspectGraphExpansionMetrics,
 } from "@/lib/growth/graph-expansion/prospect-graph-expansion-metrics"
+import { runCanonicalGraphMaterialization } from "@/lib/growth/graph-expansion/canonical-graph-materialization"
 import {
   type ProspectGraphAnchorCompany,
   processProspectGraphAcquisitionQueue,
@@ -42,11 +43,10 @@ export async function runProspectGraphExpansionCycle(
   },
 ): Promise<GrowthProspectGraphExpansionCycleResult> {
   const messages: string[] = []
-  const companyIds = input.anchor_companies.map((a) => a.canonical_company_id)
 
   const before = await loadProspectGraphExpansionMetrics(admin, {
-    company_ids: companyIds,
-    industry_contains: input.industry_contains,
+    industry_contains: input.industry_contains ?? "biomedical",
+    limit: 500,
   })
 
   let jobs_queued = 0
@@ -83,24 +83,42 @@ export async function runProspectGraphExpansionCycle(
   evidence_versions_created += queueResult.evidence_versions_created
   messages.push(...queueResult.messages.slice(0, 6))
 
+  const materialization = await runCanonicalGraphMaterialization(admin, {
+    mode: "apply",
+    industry_contains: input.industry_contains ?? "biomedical",
+    limit: 120,
+    run_person_backfill: true,
+  })
+  messages.push(...materialization.messages)
+
   const after = await loadProspectGraphExpansionMetrics(admin, {
-    company_ids: companyIds,
-    industry_contains: input.industry_contains,
+    industry_contains: input.industry_contains ?? "biomedical",
+    limit: 500,
   })
 
   const outreach_before = estimateOutreachReadyInventory(before.metrics)
   const outreach_after = estimateOutreachReadyInventory(after.metrics)
 
   const metrics_delta = diffProspectGraphExpansionMetrics(before.metrics, after.metrics)
+  const materializationSummary = {
+    qa_marker: materialization.qa_marker,
+    candidates_discovered: materialization.metrics.candidates_discovered,
+    candidates_promoted: materialization.metrics.candidates_promoted,
+    candidates_blocked: materialization.metrics.candidates_blocked,
+    companies_added: materialization.metrics.companies_added,
+    persons_promoted: materialization.metrics.persons_promoted,
+    promotion_rate_pct: materialization.metrics.promotion_rate_pct,
+    promotion_blockers: Object.entries(materialization.metrics.blockers_by_reason)
+      .filter(([, count]) => (count ?? 0) > 0)
+      .map(([reason, count]) => `${reason}:${count}`),
+  }
+
   const ok =
-    (after.metrics.companies_total > before.metrics.companies_total ||
+    (materialization.metrics.companies_added > 0 ||
+      materialization.metrics.candidates_promoted > 0 ||
+      after.metrics.companies_total > before.metrics.companies_total ||
       after.metrics.persons_total > before.metrics.persons_total ||
-      after.metrics.named_persons_total > before.metrics.named_persons_total ||
-      after.metrics.titles_total > before.metrics.titles_total ||
-      after.metrics.verified_emails_total > before.metrics.verified_emails_total ||
-      after.metrics.verified_phones_total > before.metrics.verified_phones_total ||
-      after.metrics.committee_members_verified > before.metrics.committee_members_verified ||
-      after.metrics.named_person_density_pct > before.metrics.named_person_density_pct) &&
+      after.metrics.named_persons_total > before.metrics.named_persons_total) &&
     after.metrics.named_person_density_pct >= before.metrics.named_person_density_pct
 
   return {
@@ -110,6 +128,7 @@ export async function runProspectGraphExpansionCycle(
     jobs_processed,
     jobs_failed,
     discovery_new_companies,
+    materialization: materializationSummary,
     metrics_before: before.metrics,
     metrics_after: after.metrics,
     metrics_delta,

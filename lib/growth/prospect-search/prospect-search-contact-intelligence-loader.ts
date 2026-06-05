@@ -407,9 +407,20 @@ export async function loadProspectSearchContactIntelligenceBatch(
           const { metrics: graphMetrics } = await loadProspectGraphExpansionMetrics(admin, {
             company_ids: [canonicalForGraph],
           })
+          const graphOverlay = buildProspectSearchGraphExpansionOverlay(graphMetrics)
+          const { count } = await admin
+            .schema("growth")
+            .from("discovery_candidates")
+            .select("id", { count: "exact", head: true })
+            .is("canonical_company_id", null)
+          if ((count ?? 0) > 0) {
+            graphOverlay.promotion_blockers.push(
+              `unmaterialized_discovery_candidates:${count}`,
+            )
+          }
           intelligence = mergeProspectSearchGraphExpansionIntoContactIntelligence(
             intelligence,
-            buildProspectSearchGraphExpansionOverlay(graphMetrics),
+            graphOverlay,
           )
         }
 

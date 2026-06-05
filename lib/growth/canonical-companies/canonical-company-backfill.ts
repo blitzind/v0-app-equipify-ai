@@ -39,6 +39,7 @@ import {
   type GrowthCanonicalCompanyBackfillResult,
   type GrowthCanonicalCompanyBackfillStats,
   type GrowthCanonicalCompanyCandidateInput,
+  type GrowthCanonicalCompanyResolutionMethod,
   type GrowthCanonicalCompanySourceTable,
 } from "@/lib/growth/canonical-companies/canonical-company-types"
 
@@ -48,7 +49,15 @@ const DEFAULT_SOURCES: GrowthCanonicalCompanySourceTable[] = [
   "discovery_candidates",
 ]
 
-type ProcessCandidateResult = { ok: true } | { ok: false; error: string }
+type ProcessCandidateResult =
+  | {
+      ok: true
+      company_id: string | null
+      linked_existing: boolean
+      would_create_new: boolean
+      resolution_method: GrowthCanonicalCompanyResolutionMethod
+    }
+  | { ok: false; error: string }
 
 function emptySourceStats() {
   return {
@@ -213,7 +222,13 @@ async function processCandidate(
       if (mode === "apply") {
         await updateStagingCanonicalCompanyId(admin, input.source_table, input.source_id, existingLineage)
       }
-      return { ok: true }
+      return {
+        ok: true,
+        company_id: existingLineage,
+        linked_existing: true,
+        would_create_new: false,
+        resolution_method: "normalized_domain",
+      }
     }
 
     const resolution = resolveCanonicalCompany(input, indexes)
@@ -226,7 +241,13 @@ async function processCandidate(
           : `dry-${input.source_table}-${input.source_id}`
         registerNewCanonicalCompanyFromCandidate(indexes, dryId, input)
       }
-      return { ok: true }
+      return {
+        ok: true,
+        company_id: resolution.company_id,
+        linked_existing: !resolution.would_create_new,
+        would_create_new: resolution.would_create_new,
+        resolution_method: resolution.resolution_method,
+      }
     }
 
     let companyId = resolution.company_id
@@ -255,7 +276,13 @@ async function processCandidate(
       source_metadata: input.source_metadata ?? {},
     })
     await updateStagingCanonicalCompanyId(admin, input.source_table, input.source_id, companyId)
-    return { ok: true }
+    return {
+      ok: true,
+      company_id: companyId,
+      linked_existing: !resolution.would_create_new,
+      would_create_new: resolution.would_create_new,
+      resolution_method: resolution.resolution_method,
+    }
   } catch (e) {
     stats.errors++
     const message = e instanceof Error ? e.message : String(e)
@@ -574,6 +601,56 @@ async function runCanonicalCompanyBackfillFull(
     },
     tableWalkComplete: true,
   })
+}
+
+export type PromoteCanonicalCompanyCandidateOutcome = ProcessCandidateResult
+
+export async function promoteCanonicalCompanyCandidates(
+  admin: SupabaseClient,
+  input: {
+    mode: "dry_run" | "apply"
+    candidates: GrowthCanonicalCompanyCandidateInput[]
+  },
+): Promise<{
+  outcomes: Array<
+    PromoteCanonicalCompanyCandidateOutcome & {
+      source_table: GrowthCanonicalCompanySourceTable
+      source_id: string
+    }
+  >
+  stats: GrowthCanonicalCompanyBackfillStats["sources"][GrowthCanonicalCompanySourceTable]
+}> {
+  const loaded = await loadCanonicalCompanyIndexesFromDb(admin)
+  const indexes = buildIndexesFromDb(loaded)
+  const statsBySource: GrowthCanonicalCompanyBackfillStats["sources"] = {
+    external_company_candidates: emptySourceStats(),
+    real_world_company_candidates: emptySourceStats(),
+    discovery_candidates: emptySourceStats(),
+  }
+
+  const outcomes: Array<
+    PromoteCanonicalCompanyCandidateOutcome & {
+      source_table: GrowthCanonicalCompanySourceTable
+      source_id: string
+    }
+  > = []
+
+  for (const candidate of input.candidates) {
+    const outcome = await processCandidate(
+      admin,
+      candidate,
+      indexes,
+      input.mode,
+      statsBySource[candidate.source_table],
+    )
+    outcomes.push({
+      ...outcome,
+      source_table: candidate.source_table,
+      source_id: candidate.source_id,
+    })
+  }
+
+  return { outcomes, stats: statsBySource.discovery_candidates }
 }
 
 function asString(v: unknown): string {

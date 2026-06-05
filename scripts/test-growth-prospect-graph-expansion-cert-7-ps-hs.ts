@@ -143,10 +143,15 @@ async function main() {
     })
   }
 
+  const materialization = cycle.materialization
+  const materialization_companies_added = materialization?.companies_added ?? 0
+  const materialization_promoted = materialization?.candidates_promoted ?? 0
+
   const graph_size_increased =
     industry_after.metrics.companies_total > industry_before.metrics.companies_total ||
     anchor_after.metrics.persons_total > anchor_before.metrics.persons_total ||
-    anchor_after.metrics.companies_total > anchor_before.metrics.companies_total
+    anchor_after.metrics.companies_total > anchor_before.metrics.companies_total ||
+    materialization_companies_added > 0
 
   const density_increased =
     anchor_after.metrics.named_person_density_pct > anchor_before.metrics.named_person_density_pct ||
@@ -159,6 +164,14 @@ async function main() {
   let certification: "PASS" | "PASS_PARTIAL" | "FAIL" = "FAIL"
 
   if (
+    materialization_promoted > 0 &&
+    materialization_companies_added > 0 &&
+    graph_growth_without_density_loss &&
+    compliance.evidence_backed_only &&
+    compliance.no_synthetic_contacts
+  ) {
+    certification = "PASS"
+  } else if (
     graph_size_increased &&
     density_increased &&
     graph_growth_without_density_loss &&
@@ -169,7 +182,10 @@ async function main() {
   } else if (
     cycle.jobs_processed > 0 &&
     graph_growth_without_density_loss &&
-    (graph_size_increased || cycle.evidence_versions_created > 0 || cycle.discovery_new_companies > 0)
+    (graph_size_increased ||
+      cycle.evidence_versions_created > 0 ||
+      cycle.discovery_new_companies > 0 ||
+      materialization_promoted > 0)
   ) {
     certification = "PASS_PARTIAL"
   } else if (cycle.jobs_failed > 0 && cycle.jobs_processed === 0) {
@@ -202,12 +218,15 @@ async function main() {
           jobs_failed: cycle.jobs_failed,
           discovery_new_companies: cycle.discovery_new_companies,
           evidence_versions_created: cycle.evidence_versions_created,
+          materialization,
           messages: cycle.messages.slice(0, 8),
         },
         companies_added: {
           industry: industry_after.metrics.companies_total - industry_before.metrics.companies_total,
           anchors: anchor_after.metrics.companies_total - anchor_before.metrics.companies_total,
           discovery_new_companies: cycle.discovery_new_companies,
+          materialization: materialization_companies_added,
+          candidates_promoted: materialization_promoted,
         },
         persons_added: anchor_after.metrics.persons_total - anchor_before.metrics.persons_total,
         named_person_density: {
@@ -244,12 +263,16 @@ async function main() {
         remaining_blockers: [
           ...(density_increased ? [] : ["named_person_density_not_increased"]),
           ...(graph_size_increased ? [] : ["graph_size_not_increased_on_anchors_or_industry"]),
+          ...(materialization_promoted === 0
+            ? ["discovery_candidates_not_materialized_to_canonical_graph"]
+            : []),
           ...(cycle.discovery_new_companies === 0
             ? ["discovery_segments_returned_zero_new_companies"]
             : []),
           ...(anchor_after.metrics.committee_members_verified === 0
             ? ["committee_density_still_zero"]
             : []),
+          ...(materialization?.promotion_blockers ?? []),
         ],
       },
       null,

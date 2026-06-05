@@ -80,6 +80,17 @@ export type GrowthProspectGraphAcquisitionJob = {
   evidence_version_after: string | null
 }
 
+export type GrowthProspectGraphMaterializationSummary = {
+  qa_marker: string
+  candidates_discovered: number
+  candidates_promoted: number
+  candidates_blocked: number
+  companies_added: number
+  persons_promoted: number
+  promotion_rate_pct: number
+  promotion_blockers: string[]
+}
+
 export type GrowthProspectGraphExpansionCycleResult = {
   qa_marker: typeof GROWTH_PROSPECT_GRAPH_EXPANSION_QA_MARKER
   ok: boolean
@@ -87,6 +98,7 @@ export type GrowthProspectGraphExpansionCycleResult = {
   jobs_processed: number
   jobs_failed: number
   discovery_new_companies: number
+  materialization: GrowthProspectGraphMaterializationSummary | null
   metrics_before: GrowthProspectGraphExpansionMetrics
   metrics_after: GrowthProspectGraphExpansionMetrics
   metrics_delta: Partial<GrowthProspectGraphExpansionMetrics>

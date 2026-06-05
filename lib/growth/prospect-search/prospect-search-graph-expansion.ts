@@ -15,6 +15,13 @@ export type ProspectSearchGraphExpansionOverlay = {
   qa_marker: typeof GROWTH_PROSPECT_SEARCH_GRAPH_EXPANSION_QA_MARKER
   graph_qa_marker: typeof GROWTH_PROSPECT_GRAPH_EXPANSION_QA_MARKER
   metrics: GrowthProspectGraphExpansionMetrics
+  materialization?: {
+    qa_marker: string
+    candidates_discovered: number
+    candidates_promoted: number
+    promotion_rate_pct: number
+    promotion_blockers: string[]
+  } | null
   source_registry: Array<{
     source_type: string
     label: string
@@ -24,6 +31,7 @@ export type ProspectSearchGraphExpansionOverlay = {
   source_attribution_summary: string[]
   evidence_freshness_label: string
   graph_growth_score: number
+  promotion_blockers: string[]
 }
 
 export function buildProspectSearchGraphExpansionOverlay(
@@ -59,14 +67,27 @@ export function buildProspectSearchGraphExpansionOverlay(
     ),
   )
 
+  const promotion_blockers: string[] = []
+  if (metrics.companies_total === 0) {
+    promotion_blockers.push("no_canonical_company_materialized")
+  }
+  if (metrics.named_person_density_pct === 0) {
+    promotion_blockers.push("no_named_person_density")
+  }
+  if (metrics.committee_members_verified === 0) {
+    promotion_blockers.push("no_committee_members_verified")
+  }
+
   return {
     qa_marker: GROWTH_PROSPECT_SEARCH_GRAPH_EXPANSION_QA_MARKER,
     graph_qa_marker: GROWTH_PROSPECT_GRAPH_EXPANSION_QA_MARKER,
     metrics,
+    materialization: null,
     source_registry: registry,
     source_attribution_summary,
     evidence_freshness_label,
     graph_growth_score,
+    promotion_blockers,
   }
 }
 

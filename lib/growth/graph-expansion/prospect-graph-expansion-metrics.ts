@@ -2,6 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { isGenericIdentityName } from "@/lib/growth/human-identity-evidence/human-identity-evidence-evidence"
+import { GROWTH_CANONICAL_GRAPH_MATERIALIZATION_ICP_INDUSTRY_PATTERNS } from "@/lib/growth/graph-expansion/canonical-graph-materialization-types"
 import {
   GROWTH_PROSPECT_GRAPH_EXPANSION_QA_MARKER,
   GROWTH_PROSPECT_SOURCE_TYPES,
@@ -103,24 +104,32 @@ export async function loadProspectGraphExpansionMetrics(
   const metrics = buildEmptyProspectGraphExpansionMetrics()
   const limit = input.limit ?? 500
   const industryFilter = (input.industry_contains ?? "").trim().toLowerCase()
+  const industryPatterns = industryFilter
+    ? [industryFilter, ...GROWTH_CANONICAL_GRAPH_MATERIALIZATION_ICP_INDUSTRY_PATTERNS]
+    : []
 
   let companyIds = [...(input.company_ids ?? [])]
 
   if (companyIds.length === 0) {
-    let query = admin
+    const { data: companies } = await admin
       .schema("growth")
       .from("companies")
       .select("id, website, primary_domain, industry")
-      .limit(limit)
+      .limit(Math.max(limit, 800))
 
-    if (industryFilter) {
-      query = query.ilike("industry", `%${industryFilter}%`)
-    }
+    const filteredCompanies = industryPatterns.length
+      ? (companies ?? []).filter((row) => {
+          const industry = asString((row as Record<string, unknown>).industry).toLowerCase()
+          return industryPatterns.some((pattern) => industry.includes(pattern.toLowerCase()))
+        })
+      : (companies ?? [])
 
-    const { data: companies } = await query
-    companyIds = (companies ?? []).map((row) => asString((row as Record<string, unknown>).id)).filter(Boolean)
+    companyIds = filteredCompanies
+      .slice(0, limit)
+      .map((row) => asString((row as Record<string, unknown>).id))
+      .filter(Boolean)
     metrics.companies_total = companyIds.length
-    metrics.companies_with_website = (companies ?? []).filter((row) => {
+    metrics.companies_with_website = filteredCompanies.slice(0, limit).filter((row) => {
       const website = asString((row as Record<string, unknown>).website)
       const domain = asString((row as Record<string, unknown>).primary_domain)
       return Boolean(website || domain)
