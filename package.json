@@ -248,6 +248,7 @@
     "test:growth-team-page-name-extraction-cert-7-ps-id": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-team-page-name-extraction-cert-7-ps-id.ts",
     "test:growth-batch-graph-expansion-cert-7-ps-ib": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-batch-graph-expansion-cert-7-ps-ib.ts",
     "test:growth-batch-wave-density-improvement-cert-7-ps-ie": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-batch-wave-density-improvement-cert-7-ps-ie.ts",
+    "test:growth-batch-icp-filtered-expansion-cert-7-ps-if": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-batch-icp-filtered-expansion-cert-7-ps-if.ts",
     "test:growth-canonical-company-staging-linkage-cert-7-ps-hm-link": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-canonical-company-staging-linkage-cert-7-ps-hm-link.ts",
     "test:growth-human-identity-naming-channel-cert-7-ps-hn": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-human-identity-naming-channel-cert-7-ps-hn.ts",
     "test:growth-provider-activation-verified-email-cert-7-ps-ho": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-provider-activation-verified-email-cert-7-ps-ho.ts",

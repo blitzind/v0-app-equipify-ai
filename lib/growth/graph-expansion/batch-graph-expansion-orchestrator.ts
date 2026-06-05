@@ -70,6 +70,7 @@ export async function runBatchGraphExpansion(
     max_companies?: number
     cohort_limit?: number
     include_anchors?: boolean
+    cohort_override?: BatchGraphExpansionCohortCompany[]
     dry_run?: boolean
     stop_after_wave?: boolean
   } = {},
@@ -92,11 +93,13 @@ export async function runBatchGraphExpansion(
     }
   }
 
-  const fullCohort = await loadBatchGraphExpansionCohort(admin, {
-    limit: input.cohort_limit ?? 250,
-    include_anchors: input.include_anchors,
-    only_unenriched: true,
-  })
+  const fullCohort =
+    input.cohort_override ??
+    (await loadBatchGraphExpansionCohort(admin, {
+      limit: input.cohort_limit ?? 250,
+      include_anchors: input.include_anchors,
+      only_unenriched: true,
+    }))
 
   let manifest =
     (batch_id ? await loadBatchGraphExpansionManifest(admin, batch_id) : null) ??
