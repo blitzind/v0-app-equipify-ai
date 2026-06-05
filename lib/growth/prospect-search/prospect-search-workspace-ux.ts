@@ -6,17 +6,54 @@ import type {
   ProspectSearchWorkspacePrioritizationAggregate,
   ProspectSearchWorkspaceResearchQueueId,
   ProspectSearchWorkspaceViewId,
+  ProspectSearchWorkspaceWorklistKind,
 } from "@/lib/growth/prospect-search/prospect-search-workspace-types"
 
 export const GROWTH_PROSPECT_SEARCH_WORKSPACE_UX_QA_MARKER =
   "growth-prospect-search-workspace-ux-7-ps-fa-v1" as const
+
+export const GROWTH_PROSPECT_SEARCH_WORKSPACE_FB_UX_QA_MARKER =
+  "growth-prospect-search-workspace-ux-7-ps-fb-v1" as const
 
 export const PROSPECT_SEARCH_WORKSPACE_SUMMARY_TITLE = "Operator workspace"
 export const PROSPECT_SEARCH_WORKSPACE_QUEUES_TITLE = "Research & coverage queues"
 export const PROSPECT_SEARCH_WORKSPACE_HEALTH_TITLE = "Workspace health"
 export const PROSPECT_SEARCH_WORKSPACE_VIEWS_TITLE = "Workspace views"
 export const PROSPECT_SEARCH_WORKSPACE_PLANNER_NOTE =
-  "Bulk action planner only — plans Growth Engine jobs from PS-C lanes. Does not enqueue or execute in 7.PS-FA."
+  "Execution preview only — plans Growth Engine jobs from PS-C lanes. Does not enqueue or execute in 7.PS-FB."
+
+export const PROSPECT_SEARCH_WORKSPACE_WORKLIST_TITLE = "Operator worklist"
+export const PROSPECT_SEARCH_WORKSPACE_EXECUTION_PREVIEW_TITLE = "Bulk execution preview"
+export const PROSPECT_SEARCH_WORKSPACE_SELECTION_TITLE = "Workspace selection"
+
+export const PROSPECT_SEARCH_WORKSPACE_WORKLIST_LABELS: Record<
+  ProspectSearchWorkspaceWorklistKind,
+  string
+> = {
+  outreach_ready: "Outreach ready",
+  research_first: "Research first",
+  missing_email: "Missing email",
+  missing_phone: "Missing phone",
+  committee_gaps: "Committee gaps",
+  coverage_gaps: "Coverage gaps",
+  unresolved_accounts: "Unresolved accounts",
+}
+
+export const PROSPECT_SEARCH_WORKSPACE_WORKLIST_FIELD_LABELS: Record<string, string> = {
+  readiness_summary: "Readiness",
+  committee_coverage: "Committee",
+  verified_channels: "Verified channels",
+  company_intelligence_coverage: "Company intelligence",
+  blocking_gaps: "Blocking gaps",
+  recommended_research_lanes: "Recommended lanes",
+  canonical_linkage: "Canonical linkage",
+  verified_phone: "Verified phone",
+  verified_email: "Verified email",
+  committee_status: "Committee status",
+  missing_roles: "Missing roles",
+  verified_members: "Verified members",
+  coverage_diagnostics: "Coverage diagnostics",
+}
 
 export const PROSPECT_SEARCH_PRIORITIZATION_AGGREGATE_LABELS: Record<
   ProspectSearchWorkspacePrioritizationAggregate,

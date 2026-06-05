@@ -23,7 +23,6 @@ import {
   type ProspectSearchWorkspaceQueueId,
   type ProspectSearchWorkspaceQueueRollup,
   type ProspectSearchWorkspaceResearchQueueId,
-  type ProspectSearchWorkspaceBulkActionPlan,
   type ProspectSearchWorkspaceViewMatch,
 } from "@/lib/growth/prospect-search/prospect-search-workspace-types"
 import {
@@ -38,7 +37,11 @@ import {
   PROSPECT_SEARCH_WORKSPACE_VIEW_DEFINITIONS,
   getProspectSearchWorkspaceViewDefinition,
 } from "@/lib/growth/prospect-search/prospect-search-workspace-views"
-import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
+import { prospectSearchSelectionKey } from "@/lib/growth/prospect-search/prospect-search-selection"
+import type {
+  GrowthProspectSearchCompanyResult,
+  GrowthProspectSearchDiscoverResult,
+} from "@/lib/growth/prospect-search/prospect-search-types"
 import type { ProspectSearchWorkspaceViewId } from "@/lib/growth/prospect-search/prospect-search-workspace-types"
 
 const LOW_PERSON_LINKAGE_PCT = 50
@@ -173,6 +176,13 @@ function coverageQueueMembership(
     default:
       return false
   }
+}
+
+export function prospectSearchWorkspaceCompanyInQueue(
+  ref: ProspectSearchWorkspaceCompanyRef,
+  queueId: ProspectSearchWorkspaceQueueId,
+): boolean {
+  return queueMembership(ref, queueId)
 }
 
 function queueMembership(ref: ProspectSearchWorkspaceCompanyRef, queueId: ProspectSearchWorkspaceQueueId): boolean {
@@ -464,7 +474,16 @@ export function filterProspectSearchCompaniesByWorkspaceView(
   const match = workspace.views.find((row) => row.view_id === viewId)
   if (!match?.company_keys.length) return []
   const keys = new Set(match.company_keys)
-  return companies.filter((company) => keys.has(`${company.source_type}:${company.id}`))
+  return companies.filter((company) => keys.has(prospectSearchSelectionKey(company)))
+}
+
+/** Filter discover rows to the shell-visible hydrated company set (7.PS-FB). Read-only. */
+export function filterProspectSearchDiscoverResultsToVisibleCompanies(
+  rows: GrowthProspectSearchDiscoverResult[],
+  visibleCompanies: GrowthProspectSearchCompanyResult[],
+): GrowthProspectSearchDiscoverResult[] {
+  const keys = new Set(visibleCompanies.map((company) => prospectSearchSelectionKey(company)))
+  return rows.filter((row) => keys.has(prospectSearchSelectionKey(row.company)))
 }
 
 /** Resolve primary canonical person for planner evidence (read-only). */

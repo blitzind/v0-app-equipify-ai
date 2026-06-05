@@ -14,11 +14,13 @@ export function ProspectSearchWorkspaceViewSelector({
   views,
   selectedViewId,
   onSelectView,
+  filteringActive,
   className,
 }: {
   views: ProspectSearchWorkspaceViewMatch[]
   selectedViewId?: ProspectSearchWorkspaceViewId | null
   onSelectView?: (viewId: ProspectSearchWorkspaceViewId) => void
+  filteringActive?: boolean
   className?: string
 }) {
   const countByView = new Map(views.map((row) => [row.view_id, row.count]))
@@ -32,7 +34,9 @@ export function ProspectSearchWorkspaceViewSelector({
     >
       <h4 className="text-sm font-semibold text-slate-950">{PROSPECT_SEARCH_WORKSPACE_VIEWS_TITLE}</h4>
       <p className="mt-1 text-[11px] text-muted-foreground">
-        Deterministic view definitions — configuration only, no saved persistence in 7.PS-FA.
+        {filteringActive
+          ? "Filtering hydrated company results — click again to clear."
+          : "Select a view to filter results and open the operator worklist (7.PS-FB)."}
       </p>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {PROSPECT_SEARCH_WORKSPACE_VIEW_DEFINITIONS.map((definition) => {

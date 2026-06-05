@@ -9,6 +9,67 @@ import type { GrowthProspectSearchGrowthEngineJobLane } from "@/lib/growth/prosp
 export const GROWTH_PROSPECT_SEARCH_WORKSPACE_QA_MARKER =
   "growth-prospect-search-workspace-7-ps-fa-v1" as const
 
+export const GROWTH_PROSPECT_SEARCH_WORKSPACE_FB_QA_MARKER =
+  "growth-prospect-search-workspace-7-ps-fb-v1" as const
+
+export const PROSPECT_SEARCH_WORKSPACE_WORKLIST_KINDS = [
+  "outreach_ready",
+  "research_first",
+  "missing_email",
+  "missing_phone",
+  "committee_gaps",
+  "coverage_gaps",
+  "unresolved_accounts",
+] as const
+
+export type ProspectSearchWorkspaceWorklistKind =
+  (typeof PROSPECT_SEARCH_WORKSPACE_WORKLIST_KINDS)[number]
+
+export type ProspectSearchWorkspaceWorklistRow = {
+  company_key: string
+  company_name: string
+  canonical_company_id: string | null
+  fields: Record<string, string | number | string[] | null>
+}
+
+export type ProspectSearchWorkspaceWorklist = {
+  qa_marker: typeof GROWTH_PROSPECT_SEARCH_WORKSPACE_FB_QA_MARKER
+  kind: ProspectSearchWorkspaceWorklistKind
+  label: string
+  account_count: number
+  rows: ProspectSearchWorkspaceWorklistRow[]
+}
+
+export type ProspectSearchWorkspaceWorklistMetrics = {
+  visible_accounts: number
+  selected_accounts: number
+  executable_accounts: number
+  blocked_accounts: number
+}
+
+export type ProspectSearchWorkspaceExecutionPreviewAccount = {
+  company_key: string
+  company_name: string
+  recommended_action_kinds: string[]
+  blocked_reasons: string[]
+  canonical_company_id: string | null
+  canonical_person_id: string | null
+  contact_count: number
+}
+
+export type ProspectSearchWorkspaceExecutionPreview = {
+  qa_marker: typeof GROWTH_PROSPECT_SEARCH_WORKSPACE_FB_QA_MARKER
+  queue_id: ProspectSearchWorkspaceQueueId | null
+  selected_account_count: number
+  affected_account_count: number
+  affected_contact_count: number
+  affected_canonical_company_count: number
+  affected_canonical_person_count: number
+  recommended_action_kinds: string[]
+  accounts: ProspectSearchWorkspaceExecutionPreviewAccount[]
+  planner_note: string
+}
+
 export const PROSPECT_SEARCH_WORKSPACE_PRIORITIZATION_AGGREGATES = [
   "accounts_ready_for_outreach",
   "accounts_with_gaps",

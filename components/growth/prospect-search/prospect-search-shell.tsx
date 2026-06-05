@@ -37,6 +37,11 @@ import { TerritoryOpportunityHeatmapPanel } from "@/components/growth/prospect-s
 import { ProspectSearchTerritoryPrioritizationPanel } from "@/components/growth/prospect-search/prospect-search-territory-prioritization-panel"
 import { ProspectSearchOperatorWorkspacePanel } from "@/components/growth/prospect-search/prospect-search-operator-workspace-panel"
 import {
+  filterProspectSearchCompaniesByWorkspaceView,
+  filterProspectSearchDiscoverResultsToVisibleCompanies,
+} from "@/lib/growth/prospect-search/prospect-search-workspace"
+import type { ProspectSearchWorkspaceViewId } from "@/lib/growth/prospect-search/prospect-search-workspace-types"
+import {
   aggregateProspectSearchTerritoryPrioritization,
   applyTerritoryOpportunityBoostToCompanies,
 } from "@/lib/growth/prospect-search/prospect-search-territory-prioritization"
@@ -331,6 +336,7 @@ function ProspectSearchShellInner() {
     Map<string, ProspectSearchBackgroundEnrichmentJob>
   >(new Map())
   const [commandWorkViewFilter, setCommandWorkViewFilter] = useState<string>("all")
+  const [workspaceViewId, setWorkspaceViewId] = useState<ProspectSearchWorkspaceViewId | null>(null)
 
   const queryRef = useRef(query)
   const filtersRef = useRef(filters)
@@ -408,6 +414,25 @@ function ProspectSearchShellInner() {
       companyMatchesCommandOverlayFilter(row, commandWorkViewFilter),
     )
   }, [companiesWithContactCoverage, commandWorkViewFilter])
+
+  const displayCompanies = useMemo(() => {
+    let rows = commandFilteredCompanies
+    if (workspaceViewId) {
+      rows = filterProspectSearchCompaniesByWorkspaceView(rows, workspaceViewId)
+    }
+    return rows
+  }, [commandFilteredCompanies, workspaceViewId])
+
+  const displayDiscoverResults = useMemo(
+    () =>
+      filterProspectSearchDiscoverResultsToVisibleCompanies(
+        discoverFilteredResults,
+        displayCompanies,
+      ),
+    [discoverFilteredResults, displayCompanies],
+  )
+
+  const workspaceViewFilteringActive = Boolean(workspaceViewId)
   const peopleRowsWithCompanies = useMemo(
     () =>
       peopleRows.map((row) => ({
@@ -449,7 +474,14 @@ function ProspectSearchShellInner() {
   const paginationTotalCount =
     resultMode === "people" || resultMode === "queue"
       ? (result?.total_people ?? displayPeopleRows.length)
-      : (result?.total_companies ?? companies.length)
+      : displayCompanies.length
+
+  const showWorkspaceViewEmpty =
+    workspaceViewFilteringActive &&
+    searchCompleted &&
+    resultMode === "companies" &&
+    displayCompanies.length === 0 &&
+    commandFilteredCompanies.length > 0
   const peopleRowsWithRelationshipRef = useRef(displayPeopleRows)
   peopleRowsWithRelationshipRef.current = displayPeopleRows
   const peopleRowsVisibilityKey = useMemo(
@@ -479,7 +511,7 @@ function ProspectSearchShellInner() {
     discoveryMode,
     isSearching: loading,
     searchCompleted,
-    filteredCount: companies.length,
+    filteredCount: displayCompanies.length,
     rawProviderCount,
   })
   const showCleanStart = shouldShowProspectSearchCleanStart({
@@ -507,9 +539,9 @@ function ProspectSearchShellInner() {
         hydration_summary: result?.discovery_hydration?.summary,
         expanded_search_exhausted: result?.expanded_search_exhausted,
         raw_provider_count: rawProviderCount,
-        filtered_count: companies.length,
+        filtered_count: displayCompanies.length,
       }),
-    [result, rawProviderCount, companies.length],
+    [result, rawProviderCount, displayCompanies.length],
   )
   const showInternalEmpty =
     discoveryMode === "internal" && hasSearched && !loading && companies.length === 0 && people.length === 0
@@ -1091,8 +1123,8 @@ function ProspectSearchShellInner() {
   }, [])
 
   const selectAllVisible = useCallback(() => {
-    setSelectedKeys(new Set(companies.map((row) => prospectSearchSelectionKey(row))))
-  }, [companies])
+    setSelectedKeys(new Set(displayCompanies.map((row) => prospectSearchSelectionKey(row))))
+  }, [displayCompanies])
 
   const clearSelection = useCallback(() => {
     setSelectedKeys(new Set())
@@ -1827,7 +1859,12 @@ function ProspectSearchShellInner() {
                   label="Operator workspace"
                   qaMarker={GROWTH_PROSPECT_SEARCH_RENDER_LOOP_FIX_QA_MARKER}
                 >
-                  <ProspectSearchOperatorWorkspacePanel companies={companies} />
+                  <ProspectSearchOperatorWorkspacePanel
+                    companies={companiesWithContactCoverage}
+                    visibleCompanies={displayCompanies}
+                    selectedViewId={workspaceViewId}
+                    onSelectView={setWorkspaceViewId}
+                  />
                 </GrowthAdminWidgetErrorBoundary>
               ) : null}
 
@@ -1840,13 +1877,14 @@ function ProspectSearchShellInner() {
               {(discoveryMode === "internal" && hasSearched) ||
               (discoveryMode === "discover_external" && (searchCompleted || loading)) ? (
                 <>
-              {companies.length > 0 && searchCompleted ? (
+              {displayCompanies.length > 0 && searchCompleted ? (
                 <div id="growth-outbound-launch-review">
                   <SavedSearchBatchLaunchPanel
                   savedSearchId={activeSavedSearchId}
-                  companies={companies}
+                  companies={displayCompanies}
                   onOpenCompany={(companyId) => {
-                    const match = companiesWithContactCoverage.find((row) => row.id === companyId)
+                    const match = displayCompanies.find((row) => row.id === companyId) ??
+                      companiesWithContactCoverage.find((row) => row.id === companyId)
                     if (match) setSelectedCompany(match)
                   }}
                 />
@@ -1872,8 +1910,18 @@ function ProspectSearchShellInner() {
                               {formatProspectSearchResultsCountLabel({
                                 discoveryMode,
                                 searchCompleted,
-                                totalCompanies: result.total_companies,
+                                totalCompanies: displayCompanies.length,
                               })}
+                              {workspaceViewFilteringActive ? (
+                                <>
+                                  <span className="font-normal text-muted-foreground" aria-hidden="true">
+                                    ·
+                                  </span>
+                                  <span className="font-normal text-muted-foreground">
+                                    workspace view filter active
+                                  </span>
+                                </>
+                              ) : null}
                             </span>
                             {result.discovery_mode === "internal" ? (
                               <>
@@ -1891,7 +1939,7 @@ function ProspectSearchShellInner() {
                     </h2>
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
-                    {companies.length > 0 ? (
+                    {displayCompanies.length > 0 ? (
                       <Button size="sm" variant="ghost" onClick={selectAllVisible}>
                         Select all visible
                       </Button>
@@ -1919,7 +1967,7 @@ function ProspectSearchShellInner() {
                           void fetchResults({ nextPage: 1, resetSelection: true })
                         }
                       }}
-                      companyCount={companies.length}
+                      companyCount={displayCompanies.length}
                       peopleCount={displayPeopleRows.length || peopleRows.length}
                     />
                     {discoveryMode === "internal" ? (
@@ -1940,12 +1988,19 @@ function ProspectSearchShellInner() {
 
                 {result ? <ProspectSearchDiagnosticsDisclosure result={result} /> : null}
 
+                {showWorkspaceViewEmpty ? (
+                  <p className="text-xs text-muted-foreground">
+                    No accounts match the active workspace view on this page. Clear the view
+                    filter or choose another workspace view.
+                  </p>
+                ) : null}
+
                 {(showInternalEmpty || showDiscoverNoResults || showDiscoverFiltersHiding) &&
                 !showDiscoverReady ? (
                   <ProspectSearchRelaxFilters
                     filters={filters}
                     discoveryMode={discoveryMode}
-                    resultCount={result?.total_companies ?? null}
+                    resultCount={displayCompanies.length}
                     onChange={replaceFilters}
                   />
                 ) : null}
@@ -1977,7 +2032,7 @@ function ProspectSearchShellInner() {
                 selectedCount={selectedKeys.size}
                 pushableCount={pushableSelectedCount}
                 selectedCompanies={selectedCompanies}
-                visibleCompanyCount={companies.length}
+                visibleCompanyCount={displayCompanies.length}
                 pushing={bulkPushing}
                 contactDiscoveryBusy={contactDiscoveryBusy}
                 onPush={() => void runBulkPush()}
@@ -2089,7 +2144,7 @@ function ProspectSearchShellInner() {
                 />
               ) : searchCompleted && view === "card" && resultMode === "companies" ? (
                 <div className="flex flex-col gap-4">
-                  {commandFilteredCompanies.map((row) =>
+                  {displayCompanies.map((row) =>
                     row.lightweight_mode ? (
                       <ProspectSearchLightweightCompanyRow
                         key={`${row.source_type}-${row.id}`}
@@ -2125,7 +2180,7 @@ function ProspectSearchShellInner() {
                 <>
                   <ProspectSearchDiscoverResultsTable
                     mode={resultMode}
-                    rows={discoverFilteredResults}
+                    rows={displayDiscoverResults}
                     peopleRows={peopleRowsWithRelationship}
                     selectedId={selectedCompany?.id ?? null}
                     selectedKeys={selectedKeys}
@@ -2177,7 +2232,7 @@ function ProspectSearchShellInner() {
               ) : searchCompleted ? (
                 <>
                 <CompanyResultsTable
-                  rows={companies}
+                  rows={displayCompanies}
                   selectedId={selectedCompany?.id ?? null}
                   selectedKeys={selectedKeys}
                   onSelect={setSelectedCompany}
