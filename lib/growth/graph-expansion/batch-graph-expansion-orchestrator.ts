@@ -71,6 +71,7 @@ export async function runBatchGraphExpansion(
     cohort_limit?: number
     include_anchors?: boolean
     cohort_override?: BatchGraphExpansionCohortCompany[]
+    expansion_profile?: "default" | "service_shop"
     dry_run?: boolean
     stop_after_wave?: boolean
   } = {},
@@ -198,6 +199,7 @@ export async function runBatchGraphExpansion(
       : await runBatchGraphExpansionForCompany(admin, {
           company,
           provider_counters: wave_metrics.provider_counters,
+          expansion_profile: input.expansion_profile,
         })
 
     company_results.push({

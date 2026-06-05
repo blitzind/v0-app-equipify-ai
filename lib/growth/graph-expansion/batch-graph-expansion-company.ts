@@ -12,6 +12,7 @@ import {
 } from "@/lib/growth/corroborated-contact-channel-completion/corroborated-contact-channel-completion-runtime"
 import { countVerifiedChannelsForPerson } from "@/lib/growth/corroborated-contact-channel-completion/corroborated-contact-channel-completion-metrics"
 import { acquireExternalEvidenceFromRegistry } from "@/lib/growth/external-evidence/external-evidence-acquisition"
+import { acquireServiceShopExternalEvidence } from "@/lib/growth/external-evidence/service-shop-external-evidence"
 import { reconcileExternalEvidenceRecords } from "@/lib/growth/external-evidence/external-evidence-reconciliation"
 import type { BatchGraphExpansionCohortCompany } from "@/lib/growth/graph-expansion/batch-graph-expansion-types"
 import {
@@ -45,6 +46,22 @@ async function loadCompanyWebsite(
   return website.startsWith("http") ? website : `https://${website}`
 }
 
+async function loadCompanyLocation(
+  admin: SupabaseClient,
+  company_id: string,
+): Promise<{ city: string | null; state: string | null }> {
+  const { data } = await admin
+    .schema("growth")
+    .from("companies")
+    .select("city, state")
+    .eq("id", company_id)
+    .maybeSingle()
+  return {
+    city: asString(data?.city) || null,
+    state: asString(data?.state) || null,
+  }
+}
+
 async function withCompanyTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
@@ -71,6 +88,7 @@ export async function runBatchGraphExpansionForCompany(
     company_timeout_ms?: number
     run_external_evidence?: boolean
     run_channel_completion?: boolean
+    expansion_profile?: "default" | "service_shop"
   },
 ): Promise<{
   ok: boolean
@@ -131,10 +149,19 @@ export async function runBatchGraphExpansionForCompany(
         })
 
         if (input.run_external_evidence !== false) {
-          const external = await acquireExternalEvidenceFromRegistry({
-            max_sources: 2,
-            cohort: [{ company_name: input.company.company_name }],
-          })
+          const location = await loadCompanyLocation(admin, input.company.canonical_company_id)
+          const external =
+            input.expansion_profile === "service_shop"
+              ? await acquireServiceShopExternalEvidence({
+                  company_name: input.company.company_name,
+                  city: location.city,
+                  state: location.state,
+                  max_sources: 8,
+                })
+              : await acquireExternalEvidenceFromRegistry({
+                  max_sources: 2,
+                  cohort: [{ company_name: input.company.company_name }],
+                })
           input.provider_counters.external_evidence_sources += external.sources_queried
           if (external.records.length > 0) {
             const reconciliation = await reconcileExternalEvidenceRecords(admin, {
@@ -144,8 +171,6 @@ export async function runBatchGraphExpansionForCompany(
                   company_candidate_id: input.company.company_candidate_id,
                   canonical_company_id: input.company.canonical_company_id,
                   company_name: input.company.company_name,
-                  search_query: input.company.search_query,
-                  cohort_kind: "ps_ht_new",
                 },
               ],
             })
