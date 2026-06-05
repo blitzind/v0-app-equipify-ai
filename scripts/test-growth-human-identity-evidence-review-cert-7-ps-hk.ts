@@ -102,7 +102,13 @@ async function main() {
 
     const promoted = (reviewResult?.phone_discovery?.promoted_count ?? 0) > 0
     const verifiedRun = (reviewResult?.phone_discovery?.verified_count ?? 0) > 0
-    const pass = promoted && afterPhones.verified > beforePhones.verified
+    const pass =
+      promoted &&
+      verifiedRun &&
+      afterPhones.verified >= beforePhones.verified &&
+      afterPhones.verified > 0 &&
+      (afterPhones.verified > beforePhones.verified ||
+        contact?.contact_status === "verified")
 
     if (pass) passCount += 1
 

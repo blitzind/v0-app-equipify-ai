@@ -237,6 +237,7 @@
     "test:growth-human-identity-evidence-review-cert-7-ps-hk": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-human-identity-evidence-review-cert-7-ps-hk.ts",
     "test:growth-prospect-search-outreach-readiness-cert-7-ps-hl": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-prospect-search-outreach-readiness-cert-7-ps-hl.ts",
     "test:growth-canonical-company-staging-linkage-cert-7-ps-hm-link": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-canonical-company-staging-linkage-cert-7-ps-hm-link.ts",
+    "test:growth-human-identity-naming-channel-cert-7-ps-hn": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-human-identity-naming-channel-cert-7-ps-hn.ts",
     "test:growth-serp-provider-audit": "tsx scripts/test-growth-serp-provider-audit.ts",
     "test:growth-provider-cache": "tsx scripts/test-growth-provider-cache.ts",
     "test:growth-company-signals": "tsx scripts/test-growth-company-signals.ts",
