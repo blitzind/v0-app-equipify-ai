@@ -20,6 +20,9 @@ import {
 import {
   classifyWebsitePageType,
   DEFAULT_WEBSITE_CRAWL_MAX_PAGES,
+  extractPersonPageLinksFromHtml,
+  parseRobotsTxtSitemapUrls,
+  parseSitemapIndexUrls,
   planWebsiteCrawlUrls,
 } from "@/lib/growth/contact-discovery/website-crawl-planner"
 import { enrichExtractedWebsiteContacts } from "@/lib/growth/contact-discovery/website-extraction-enrichment"
@@ -159,11 +162,52 @@ export async function discoverWebsiteContacts(rawWebsite: string | null | undefi
     messages.push(`${websiteUrl}: homepage fetch ${homepageFetch.status}`)
   }
 
+  const personPageLinks: string[] = []
+  if (homepageHtml) {
+    personPageLinks.push(...extractPersonPageLinksFromHtml(homepageHtml, new URL(websiteUrl).origin))
+  }
+
   try {
     const origin = new URL(websiteUrl).origin
+    const robotsFetch = await fetchLeadWebsite(`${origin}/robots.txt`)
+    if (robotsFetch.status === "ok" && robotsFetch.excerpt) {
+      for (const sitemapUrl of parseRobotsTxtSitemapUrls(robotsFetch.excerpt)) {
+        const childFetch = await fetchLeadWebsite(sitemapUrl)
+        if (childFetch.status === "ok" && childFetch.excerpt) {
+          if (!sitemapXml) sitemapXml = childFetch.excerpt
+          else {
+            personPageLinks.push(
+              ...parseSitemapIndexUrls(childFetch.excerpt, origin, 12).filter((url) =>
+                /team|staff|about|leadership|people|management/i.test(url),
+              ),
+            )
+          }
+        }
+      }
+    }
+
     const sitemapFetch = await fetchLeadWebsite(`${origin}/sitemap.xml`)
     if (sitemapFetch.status === "ok" && sitemapFetch.excerpt) {
       sitemapXml = sitemapFetch.excerpt
+      const indexUrls = parseSitemapIndexUrls(sitemapFetch.excerpt, origin, 4)
+      for (const childUrl of indexUrls) {
+        if (!childUrl.endsWith(".xml")) continue
+        const childFetch = await fetchLeadWebsite(childUrl)
+        if (childFetch.status === "ok" && childFetch.excerpt) {
+          personPageLinks.push(
+            ...parseSitemapIndexUrls(childFetch.excerpt, origin, 12).filter((url) =>
+              /team|staff|about|leadership|people|management/i.test(url),
+            ),
+          )
+        }
+      }
+    }
+
+    if (!sitemapXml) {
+      const indexFetch = await fetchLeadWebsite(`${origin}/sitemap_index.xml`)
+      if (indexFetch.status === "ok" && indexFetch.excerpt) {
+        sitemapXml = indexFetch.excerpt
+      }
     }
   } catch {
     // Sitemap optional
@@ -173,7 +217,9 @@ export async function discoverWebsiteContacts(rawWebsite: string | null | undefi
     websiteUrl,
     homepageHtml,
     sitemapXml,
+    personPageLinks: [...new Set(personPageLinks)],
     maxPages: DEFAULT_WEBSITE_CRAWL_MAX_PAGES,
+    prioritize_person_pages: true,
   })
 
   const websiteUrlNoTrailingSlash = websiteUrl.replace(/\/$/, "")
