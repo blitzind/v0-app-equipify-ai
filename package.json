@@ -235,6 +235,8 @@
     "test:growth-prospect-search-human-acquisition-cert-7-ps-hb": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-prospect-search-human-acquisition-cert-7-ps-hb.ts",
     "test:growth-prospect-search-verified-channels-cert-7-ps-hf": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-prospect-search-verified-channels-cert-7-ps-hf.ts",
     "test:growth-human-identity-evidence-review-cert-7-ps-hk": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-human-identity-evidence-review-cert-7-ps-hk.ts",
+    "test:growth-prospect-search-outreach-readiness-cert-7-ps-hl": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-prospect-search-outreach-readiness-cert-7-ps-hl.ts",
+    "test:growth-canonical-company-staging-linkage-cert-7-ps-hm-link": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-canonical-company-staging-linkage-cert-7-ps-hm-link.ts",
     "test:growth-serp-provider-audit": "tsx scripts/test-growth-serp-provider-audit.ts",
     "test:growth-provider-cache": "tsx scripts/test-growth-provider-cache.ts",
     "test:growth-company-signals": "tsx scripts/test-growth-company-signals.ts",

@@ -12,6 +12,7 @@ import {
   loadContactDiscoverySnapshot,
   runContactDiscoveryForCompany,
 } from "@/lib/growth/contact-discovery/contact-repository"
+import { ensureStagingCanonicalCompanyLinkage } from "@/lib/growth/canonical-companies/canonical-company-staging-linkage"
 import { fetchStagingCanonicalCompanyId } from "@/lib/growth/canonical-persons/canonical-person-repository-core"
 import { refreshProspectSearchCompanyAfterHumanAcquisition } from "@/lib/growth/prospect-search/prospect-search-human-acquisition-hydration"
 import { GROWTH_PROSPECT_SEARCH_HUMAN_ACQUISITION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-human-acquisition-types"
@@ -101,6 +102,13 @@ export async function runProspectSearchHumanAcquisitionPipeline(
     canonical_company_id,
     mode: "apply",
   })
+
+  const linkage = await ensureStagingCanonicalCompanyLinkage(admin, company_candidate_id, {
+    explicit_canonical_company_id: canonical_company_id || null,
+  })
+  if (linkage.canonical_company_id) {
+    canonical_company_id = linkage.canonical_company_id
+  }
 
   const ok =
     discovery_contacts > 0 ||

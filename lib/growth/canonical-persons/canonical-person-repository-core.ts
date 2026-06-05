@@ -309,17 +309,11 @@ export async function fetchStagingCanonicalCompanyId(
   admin: SupabaseClient,
   companyCandidateId: string,
 ): Promise<string | null> {
-  for (const table of ["external_company_candidates", "real_world_company_candidates"] as const) {
-    const { data } = await admin
-      .schema("growth")
-      .from(table)
-      .select("canonical_company_id")
-      .eq("id", companyCandidateId)
-      .maybeSingle()
-    const id = asString(data?.canonical_company_id)
-    if (id) return id
-  }
-  return null
+  const { resolveStagingCanonicalCompanyId } = await import(
+    "@/lib/growth/canonical-companies/canonical-company-staging-linkage"
+  )
+  const resolution = await resolveStagingCanonicalCompanyId(admin, companyCandidateId)
+  return resolution.canonical_company_id
 }
 
 export async function resolveCanonicalCompanyIdForLead(

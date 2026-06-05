@@ -182,6 +182,16 @@ export async function syncContactCandidatesToCompanyContacts(
     if (!error) synced += 1
   }
 
+  const companyCandidateId = asString(input.candidates[0]?.company_candidate_id)
+  if (companyCandidateId) {
+    const { ensureStagingCanonicalCompanyLinkage } = await import(
+      "@/lib/growth/canonical-companies/canonical-company-staging-linkage"
+    )
+    await ensureStagingCanonicalCompanyLinkage(admin, companyCandidateId, {
+      explicit_canonical_company_id: input.company_id,
+    })
+  }
+
   logAcquisitionStep("syncContactCandidatesToCompanyContacts_done", {
     companyId: input.company_id,
     synced,

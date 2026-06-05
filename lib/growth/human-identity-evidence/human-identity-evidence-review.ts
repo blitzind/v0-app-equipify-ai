@@ -11,6 +11,7 @@ import type {
   HumanIdentityEvidenceReviewInput,
   HumanIdentityEvidenceReviewResult,
 } from "@/lib/growth/human-identity-evidence/human-identity-evidence-types"
+import { ensureStagingCanonicalCompanyLinkage } from "@/lib/growth/canonical-companies/canonical-company-staging-linkage"
 import { runPhoneDiscoveryForCanonicalPerson } from "@/lib/growth/phone-discovery/phone-discovery-orchestrator"
 
 function asString(v: unknown): string {
@@ -309,6 +310,29 @@ export async function submitHumanIdentityEvidenceReview(
       new_values,
       phone_discovery,
       error: `Review applied but audit insert failed: ${auditErr.message}`,
+    }
+  }
+
+  const contactCandidateId =
+    asString(row.contact_candidate_id) ||
+    asString(metadata.contact_candidate_id) ||
+    asString(
+      metadata.metadata && typeof metadata.metadata === "object"
+        ? (metadata.metadata as Record<string, unknown>).contact_candidate_id
+        : null,
+    )
+  if (contactCandidateId) {
+    const { data: candidateRow } = await admin
+      .schema("growth")
+      .from("contact_candidates")
+      .select("company_candidate_id")
+      .eq("id", contactCandidateId)
+      .maybeSingle()
+    const companyCandidateId = asString(candidateRow?.company_candidate_id)
+    if (companyCandidateId) {
+      await ensureStagingCanonicalCompanyLinkage(admin, companyCandidateId, {
+        explicit_canonical_company_id: company_id || null,
+      })
     }
   }
 

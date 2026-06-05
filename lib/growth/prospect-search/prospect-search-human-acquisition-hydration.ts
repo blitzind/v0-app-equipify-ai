@@ -6,6 +6,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { ensureStagingCanonicalCompanyLinkage } from "@/lib/growth/canonical-companies/canonical-company-staging-linkage"
 import { attachReachableHumanToCompanies } from "@/lib/growth/prospect-search/prospect-search-contactability-ranking"
 import { applyProspectSearchContactIntelligenceOverlay } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-loader"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
@@ -27,6 +28,12 @@ export async function refreshProspectSearchCompanyAfterHumanAcquisition(
     input.company.canonical_company_id ||
     input.company.contact_intelligence?.engine_intelligence?.canonical_company_id ||
     null
+
+  if (input.company.source_type === "external_discovered") {
+    await ensureStagingCanonicalCompanyLinkage(admin, input.company.id, {
+      explicit_canonical_company_id: canonical,
+    })
+  }
 
   const base: GrowthProspectSearchCompanyResult = {
     ...input.company,
