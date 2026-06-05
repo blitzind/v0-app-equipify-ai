@@ -35,6 +35,7 @@ import {
 import { TerritoryIntelligencePanel } from "@/components/growth/prospect-search/territory-intelligence-panel"
 import { TerritoryOpportunityHeatmapPanel } from "@/components/growth/prospect-search/territory-opportunity-heatmap-panel"
 import { ProspectSearchTerritoryPrioritizationPanel } from "@/components/growth/prospect-search/prospect-search-territory-prioritization-panel"
+import { ProspectSearchOperatorWorkspacePanel } from "@/components/growth/prospect-search/prospect-search-operator-workspace-panel"
 import {
   aggregateProspectSearchTerritoryPrioritization,
   applyTerritoryOpportunityBoostToCompanies,
@@ -1818,6 +1819,15 @@ function ProspectSearchShellInner() {
                   qaMarker={GROWTH_PROSPECT_SEARCH_RENDER_LOOP_FIX_QA_MARKER}
                 >
                   <ProspectSearchTerritoryPrioritizationPanel territories={territoryPrioritization} />
+                </GrowthAdminWidgetErrorBoundary>
+              ) : null}
+
+              {companies.length > 0 && searchCompleted ? (
+                <GrowthAdminWidgetErrorBoundary
+                  label="Operator workspace"
+                  qaMarker={GROWTH_PROSPECT_SEARCH_RENDER_LOOP_FIX_QA_MARKER}
+                >
+                  <ProspectSearchOperatorWorkspacePanel companies={companies} />
                 </GrowthAdminWidgetErrorBoundary>
               ) : null}
 

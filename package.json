@@ -227,6 +227,7 @@
     "test:growth-prospect-search-actionable-research-7-ps-c": "tsx scripts/test-growth-prospect-search-actionable-research-7-ps-c.ts",
     "test:growth-prospect-search-readiness-7-ps-d": "tsx scripts/test-growth-prospect-search-readiness-7-ps-d.ts",
     "test:growth-prospect-search-coverage-7-ps-e": "tsx scripts/test-growth-prospect-search-coverage-7-ps-e.ts",
+    "test:growth-prospect-search-workspace-7-ps-fa": "tsx scripts/test-growth-prospect-search-workspace-7-ps-fa.ts",
     "test:growth-serp-provider-audit": "tsx scripts/test-growth-serp-provider-audit.ts",
     "test:growth-provider-cache": "tsx scripts/test-growth-provider-cache.ts",
     "test:growth-company-signals": "tsx scripts/test-growth-company-signals.ts",
