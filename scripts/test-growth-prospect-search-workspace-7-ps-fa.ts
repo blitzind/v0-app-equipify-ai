@@ -79,9 +79,10 @@ assert.match(operatorPanel, /data-qa-marker=\{workspace\.qa_marker\}/)
 
 assert.equal(PROSPECT_SEARCH_WORKSPACE_VIEW_DEFINITIONS.length, PROSPECT_SEARCH_WORKSPACE_VIEW_IDS.length)
 assert.equal(PROSPECT_SEARCH_WORKSPACE_PRIORITIZATION_AGGREGATES.length, 4)
-assert.equal(PROSPECT_SEARCH_WORKSPACE_RESEARCH_QUEUE_IDS.length, 7)
+assert.equal(PROSPECT_SEARCH_WORKSPACE_RESEARCH_QUEUE_IDS.length, 8)
+assert.equal(PROSPECT_SEARCH_WORKSPACE_RESEARCH_QUEUE_IDS[0], "acquire_humans")
 assert.equal(PROSPECT_SEARCH_WORKSPACE_COVERAGE_QUEUE_IDS.length, 5)
-assert.equal(PROSPECT_SEARCH_WORKSPACE_BULK_ACTION_KINDS.length, 5)
+assert.equal(PROSPECT_SEARCH_WORKSPACE_BULK_ACTION_KINDS.length, 6)
 
 function mockEngine(
   partial: Partial<GrowthProspectSearchEngineIntelligence>,
@@ -213,7 +214,7 @@ const workspace = buildProspectSearchOperatorWorkspace([ready, missingEmail, unr
 assert.equal(workspace.qa_marker, GROWTH_PROSPECT_SEARCH_WORKSPACE_QA_MARKER)
 assert.equal(workspace.account_count, 3)
 assert.equal(workspace.aggregates.prioritization.length, 4)
-assert.equal(workspace.aggregates.research_queues.length, 7)
+assert.equal(workspace.aggregates.research_queues.length, 8)
 assert.equal(workspace.aggregates.coverage_queues.length, 5)
 assert.equal(workspace.views.length, PROSPECT_SEARCH_WORKSPACE_VIEW_IDS.length)
 

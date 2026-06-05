@@ -19,6 +19,7 @@ export const GROWTH_COMPANY_CONTACT_PHONE_STATUSES = [
   "business",
   "mobile",
   "invalid",
+  "verified",
 ] as const
 export type GrowthCompanyContactPhoneStatus = (typeof GROWTH_COMPANY_CONTACT_PHONE_STATUSES)[number]
 

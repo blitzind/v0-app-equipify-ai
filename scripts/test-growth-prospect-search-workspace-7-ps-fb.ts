@@ -103,7 +103,7 @@ assert.match(operatorPanel, /visibleCompanies/)
 assert.doesNotMatch(operatorPanel, /filterProspectSearchCompaniesByWorkspaceView/)
 assert.doesNotMatch(operatorPanel, /executeProspectSearchActionableResearch|enqueueProspectSearch/i)
 
-assert.equal(PROSPECT_SEARCH_WORKSPACE_WORKLIST_KINDS.length, 7)
+assert.equal(PROSPECT_SEARCH_WORKSPACE_WORKLIST_KINDS.length, 8)
 
 function mockEngine(
   partial: Partial<GrowthProspectSearchEngineIntelligence>,

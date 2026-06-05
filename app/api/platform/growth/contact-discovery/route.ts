@@ -22,6 +22,26 @@ export async function GET(request: Request) {
   }
 
   const run = url.searchParams.get("run") === "1"
+  const completePipeline = url.searchParams.get("complete_pipeline") === "1"
+
+  if (run && completePipeline) {
+    const { runProspectSearchHumanAcquisitionPipeline } = await import(
+      "@/lib/growth/prospect-search/prospect-search-human-acquisition"
+    )
+    const pipeline = await runProspectSearchHumanAcquisitionPipeline(access.admin, {
+      company_candidate_id: companyCandidateId,
+      created_by: access.userId,
+      run_discovery: true,
+    })
+    const snapshot = await loadContactDiscoverySnapshot(access.admin, companyCandidateId)
+    return NextResponse.json({
+      ok: pipeline.ok,
+      qa_marker: GROWTH_CONTACT_DISCOVERY_QA_MARKER,
+      snapshot,
+      human_acquisition: pipeline,
+    })
+  }
+
   const snapshot = run
     ? await runContactDiscoveryForCompany(access.admin, {
         company_candidate_id: companyCandidateId,

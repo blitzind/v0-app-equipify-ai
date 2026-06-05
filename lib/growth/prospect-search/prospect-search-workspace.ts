@@ -57,12 +57,30 @@ const PRIORITIZATION_TIER_BY_AGGREGATE: Record<
   insufficient_data_accounts: "insufficient_data",
 }
 
-const BULK_ACTION_TO_PS_C_KIND: Record<ProspectSearchWorkspaceBulkActionKind, string> = {
+export const PROSPECT_SEARCH_WORKSPACE_BULK_ACTION_TO_PS_C_KIND: Record<
+  ProspectSearchWorkspaceBulkActionKind,
+  string
+> = {
+  human_acquisition: "refresh_stale_contacts",
   email_discovery: "verify_email",
   phone_discovery: "verify_phone_numbers",
   social_profile_discovery: "queue_social_profile_discovery",
   company_intelligence: "rerun_website_extraction",
   buying_committee_intelligence: "expand_relationship_coverage",
+}
+
+export function prospectSearchWorkspaceCompanyNeedsHumanAcquisition(
+  ref: ProspectSearchWorkspaceCompanyRef,
+): boolean {
+  if (!hasCanonicalCompany(ref)) return false
+  const contactCount = ref.coverage?.metrics?.contact_count ?? 0
+  const linkedPersons = ref.coverage?.metrics?.contacts_with_canonical_person ?? 0
+  if (contactCount === 0) return true
+  return linkedPersons === 0
+}
+
+function hasLinkedCanonicalPerson(ref: ProspectSearchWorkspaceCompanyRef): boolean {
+  return (ref.coverage?.metrics?.contacts_with_canonical_person ?? 0) > 0
 }
 
 function hasCriticalRoleGap(roles: string[], role: string): boolean {
@@ -118,12 +136,26 @@ function researchQueueMembership(
   const canonical = hasCanonicalCompany(ref)
 
   switch (queueId) {
+    case "acquire_humans":
+      return prospectSearchWorkspaceCompanyNeedsHumanAcquisition(ref)
     case "missing_verified_email":
-      return canonical && (channels?.persons_with_verified_email ?? 0) === 0
+      return (
+        canonical &&
+        hasLinkedCanonicalPerson(ref) &&
+        (channels?.persons_with_verified_email ?? 0) === 0
+      )
     case "missing_verified_phone":
-      return canonical && (channels?.persons_with_verified_phone ?? 0) === 0
+      return (
+        canonical &&
+        hasLinkedCanonicalPerson(ref) &&
+        (channels?.persons_with_verified_phone ?? 0) === 0
+      )
     case "missing_verified_social":
-      return canonical && (channels?.persons_with_verified_profile ?? 0) === 0
+      return (
+        canonical &&
+        hasLinkedCanonicalPerson(ref) &&
+        (channels?.persons_with_verified_profile ?? 0) === 0
+      )
     case "missing_committee":
       return canonical && (committee?.verified_member_count ?? 0) === 0
     case "missing_company_intelligence":
@@ -373,7 +405,7 @@ export function planProspectSearchWorkspaceBulkAction(input: {
   company_keys?: string[]
 }): ProspectSearchWorkspaceBulkActionPlan {
   const actionMeta = PROSPECT_SEARCH_WORKSPACE_BULK_ACTION_LABELS[input.action_kind]
-  const psKind = BULK_ACTION_TO_PS_C_KIND[input.action_kind]
+  const psKind = PROSPECT_SEARCH_WORKSPACE_BULK_ACTION_TO_PS_C_KIND[input.action_kind]
   const keyFilter = input.company_keys?.length ? new Set(input.company_keys) : null
 
   const targets = input.companies.filter((company) => {
@@ -387,6 +419,56 @@ export function planProspectSearchWorkspaceBulkAction(input: {
 
   const canonicalCompanyIds = new Set<string>()
   const personIds = new Set<string>()
+
+  if (input.action_kind === "human_acquisition") {
+    for (const company of targets) {
+      const ref = prospectSearchWorkspaceCompanyRef(company)
+      const company_key = ref.company_key
+      const ctx = resolveProspectSearchCanonicalResearchContext(company)
+      if (!ctx.canonical_company_id) {
+        blocked_accounts.push({
+          company_key,
+          company_name: company.company_name,
+          reason:
+            "No canonical company linked yet — resolve company lineage before contact acquisition.",
+        })
+        continue
+      }
+      if (!prospectSearchWorkspaceCompanyNeedsHumanAcquisition(ref)) {
+        blocked_accounts.push({
+          company_key,
+          company_name: company.company_name,
+          reason: "Account already has linked humans or evidence-backed contacts.",
+        })
+        continue
+      }
+      executable_accounts.push({
+        company_key,
+        company_name: company.company_name,
+        lane: "legacy_contact_discovery",
+        canonical_company_id: ctx.canonical_company_id,
+        canonical_person_id: null,
+      })
+      canonicalCompanyIds.add(ctx.canonical_company_id)
+    }
+
+    return {
+      qa_marker: GROWTH_PROSPECT_SEARCH_WORKSPACE_QA_MARKER,
+      action_kind: input.action_kind,
+      lane: "legacy_contact_discovery",
+      label: actionMeta.label,
+      description: actionMeta.description,
+      action_count: targets.length,
+      executable_count: executable_accounts.length,
+      blocked_count: blocked_accounts.length,
+      affected_account_count: targets.length,
+      affected_company_count: canonicalCompanyIds.size,
+      affected_person_count: 0,
+      executable_accounts,
+      blocked_accounts,
+      planner_note: PROSPECT_SEARCH_WORKSPACE_PLANNER_NOTE,
+    }
+  }
 
   for (const company of targets) {
     const plan = buildProspectSearchActionableResearchPlan({
@@ -437,6 +519,8 @@ function mapProspectSearchWorkspaceBulkActionToLane(
   kind: ProspectSearchWorkspaceBulkActionKind,
 ): GrowthProspectSearchGrowthEngineJobLane {
   switch (kind) {
+    case "human_acquisition":
+      return "legacy_contact_discovery"
     case "email_discovery":
       return "email_discovery"
     case "phone_discovery":

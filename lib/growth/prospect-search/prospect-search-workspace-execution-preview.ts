@@ -15,9 +15,10 @@ import {
 import { PROSPECT_SEARCH_WORKSPACE_PLANNER_NOTE } from "@/lib/growth/prospect-search/prospect-search-workspace-ux"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 
-const QUEUE_TO_BULK_ACTION: Partial<
+export const PROSPECT_SEARCH_WORKSPACE_QUEUE_TO_BULK_ACTION: Partial<
   Record<ProspectSearchWorkspaceQueueId, ProspectSearchWorkspaceBulkActionKind>
 > = {
+  acquire_humans: "human_acquisition",
   missing_verified_email: "email_discovery",
   missing_verified_phone: "phone_discovery",
   missing_verified_social: "social_profile_discovery",
@@ -48,7 +49,9 @@ export function buildProspectSearchWorkspaceExecutionPreview(input: {
     keySet.has(`${company.source_type}:${company.id}`),
   )
 
-  const bulkKind = input.queue_id ? QUEUE_TO_BULK_ACTION[input.queue_id] : null
+  const bulkKind = input.queue_id
+    ? PROSPECT_SEARCH_WORKSPACE_QUEUE_TO_BULK_ACTION[input.queue_id]
+    : null
   const bulkPlan = bulkKind
     ? planProspectSearchWorkspaceBulkAction({
         companies: targets,
@@ -161,6 +164,12 @@ export function countProspectSearchWorkspacePreviewExecutable(
   return preview.accounts.filter(
     (row) => row.recommended_action_kinds.length > 0 && row.blocked_reasons.length === 0,
   ).length
+}
+
+export function prospectSearchWorkspaceBulkActionKindForQueue(
+  queueId: ProspectSearchWorkspaceQueueId,
+): ProspectSearchWorkspaceBulkActionKind | null {
+  return PROSPECT_SEARCH_WORKSPACE_QUEUE_TO_BULK_ACTION[queueId] ?? null
 }
 
 export function countProspectSearchWorkspacePreviewBlocked(

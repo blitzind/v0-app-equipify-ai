@@ -4,6 +4,7 @@ import { buildProspectSearchSuggestedGrowthEngineActions } from "@/lib/growth/pr
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import {
   prospectSearchWorkspaceCompanyInQueue,
+  prospectSearchWorkspaceCompanyNeedsHumanAcquisition,
   prospectSearchWorkspaceCompanyRef,
 } from "@/lib/growth/prospect-search/prospect-search-workspace"
 import {
@@ -35,6 +36,8 @@ export function prospectSearchWorkspaceViewToWorklistKind(
   switch (viewId) {
     case "outreach_ready":
       return "outreach_ready"
+    case "acquire_humans":
+      return "acquire_humans"
     case "research_queue":
       return "research_first"
     case "missing_emails":
@@ -61,6 +64,8 @@ function refMatchesWorklistKind(
       return ref.readiness?.prioritization_tier === "ready_for_outreach"
     case "research_first":
       return ref.readiness?.prioritization_tier === "research_first"
+    case "acquire_humans":
+      return prospectSearchWorkspaceCompanyNeedsHumanAcquisition(ref)
     case "missing_email":
       return prospectSearchWorkspaceCompanyInQueue(ref, "missing_verified_email")
     case "missing_phone":
@@ -121,6 +126,15 @@ function buildWorklistRowFields(
         committee_coverage: formatCommitteeCoverage(ref),
         verified_channels: formatVerifiedChannels(ref),
         company_intelligence_coverage: formatCompanyIntelligenceCoverage(ref),
+      }
+    case "acquire_humans":
+      return {
+        canonical_linkage: ref.coverage?.company.resolved
+          ? `Linked (${ref.canonical_company_id ?? "canonical"})`
+          : "Unresolved canonical company",
+        contact_count: ref.coverage?.metrics?.contact_count ?? 0,
+        linked_persons: ref.coverage?.metrics?.contacts_with_canonical_person ?? 0,
+        recommended_action: "Run website contact discovery and canonical person promotion",
       }
     case "research_first": {
       const blocking: string[] = []

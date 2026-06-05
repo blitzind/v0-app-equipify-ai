@@ -15,6 +15,9 @@ export const GROWTH_PROSPECT_SEARCH_WORKSPACE_UX_QA_MARKER =
 export const GROWTH_PROSPECT_SEARCH_WORKSPACE_FB_UX_QA_MARKER =
   "growth-prospect-search-workspace-ux-7-ps-fb-v1" as const
 
+export const GROWTH_PROSPECT_SEARCH_WORKSPACE_FC_UX_QA_MARKER =
+  "growth-prospect-search-workspace-ux-7-ps-fc-v1" as const
+
 export const PROSPECT_SEARCH_WORKSPACE_SUMMARY_TITLE = "Operator workspace"
 export const PROSPECT_SEARCH_WORKSPACE_QUEUES_TITLE = "Research & coverage queues"
 export const PROSPECT_SEARCH_WORKSPACE_HEALTH_TITLE = "Workspace health"
@@ -25,12 +28,18 @@ export const PROSPECT_SEARCH_WORKSPACE_PLANNER_NOTE =
 export const PROSPECT_SEARCH_WORKSPACE_WORKLIST_TITLE = "Operator worklist"
 export const PROSPECT_SEARCH_WORKSPACE_EXECUTION_PREVIEW_TITLE = "Bulk execution preview"
 export const PROSPECT_SEARCH_WORKSPACE_SELECTION_TITLE = "Workspace selection"
+export const PROSPECT_SEARCH_WORKSPACE_BULK_EXECUTION_TITLE = "Bulk research enqueue"
+
+export const PROSPECT_SEARCH_WORKSPACE_BULK_QUEUE_RESEARCH_LABEL = "Queue selected research"
+export const PROSPECT_SEARCH_WORKSPACE_BULK_CONFIRM_LABEL = "Confirm queue"
+export const PROSPECT_SEARCH_WORKSPACE_BULK_CANCEL_LABEL = "Cancel"
 
 export const PROSPECT_SEARCH_WORKSPACE_WORKLIST_LABELS: Record<
   ProspectSearchWorkspaceWorklistKind,
   string
 > = {
   outreach_ready: "Outreach ready",
+  acquire_humans: "Acquire humans",
   research_first: "Research first",
   missing_email: "Missing email",
   missing_phone: "Missing phone",
@@ -69,6 +78,11 @@ export const PROSPECT_SEARCH_RESEARCH_QUEUE_LABELS: Record<
   ProspectSearchWorkspaceResearchQueueId,
   { label: string; description: string }
 > = {
+  acquire_humans: {
+    label: "Acquire humans",
+    description:
+      "Canonical company linked but no evidence-backed humans — run website contact discovery first (7.PS-HA-FIX).",
+  },
   missing_verified_email: {
     label: "Missing verified email",
     description: "Canonical company linked but no verified email (7.3).",
@@ -129,6 +143,11 @@ export const PROSPECT_SEARCH_WORKSPACE_BULK_ACTION_LABELS: Record<
   ProspectSearchWorkspaceBulkActionKind,
   { label: string; description: string }
 > = {
+  human_acquisition: {
+    label: "Acquire humans (execute)",
+    description:
+      "Runs legacy website contact discovery, syncs company_contacts, and promotes canonical persons (7.PS-HA-FIX).",
+  },
   email_discovery: {
     label: "Email discovery (plan)",
     description: "Would queue email discovery jobs (7.3B) per PS-C planner.",
@@ -154,6 +173,7 @@ export const PROSPECT_SEARCH_WORKSPACE_BULK_ACTION_LABELS: Record<
 export const PROSPECT_SEARCH_WORKSPACE_VIEW_LABELS: Record<ProspectSearchWorkspaceViewId, string> =
   {
     outreach_ready: "Outreach Ready",
+    acquire_humans: "Acquire Humans",
     research_queue: "Research Queue",
     committee_gaps: "Committee Gaps",
     missing_emails: "Missing Emails",

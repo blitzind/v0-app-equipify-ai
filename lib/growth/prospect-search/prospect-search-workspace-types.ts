@@ -12,8 +12,47 @@ export const GROWTH_PROSPECT_SEARCH_WORKSPACE_QA_MARKER =
 export const GROWTH_PROSPECT_SEARCH_WORKSPACE_FB_QA_MARKER =
   "growth-prospect-search-workspace-7-ps-fb-v1" as const
 
+export const GROWTH_PROSPECT_SEARCH_WORKSPACE_FC_QA_MARKER =
+  "growth-prospect-search-workspace-7-ps-fc-v1" as const
+
+export const GROWTH_PROSPECT_SEARCH_WORKSPACE_HA_FIX_QA_MARKER =
+  "growth-prospect-search-workspace-7-ps-ha-fix-v1" as const
+
+export const PROSPECT_SEARCH_WORKSPACE_BULK_EXECUTION_MAX_ACCOUNTS = 25
+
+export type ProspectSearchWorkspaceBulkAccountExecutionStatus =
+  | "enqueued"
+  | "already_satisfied"
+  | "skipped_blocked"
+  | "failed"
+
+export type ProspectSearchWorkspaceBulkAccountResult = {
+  company_key: string
+  company_name: string
+  status: ProspectSearchWorkspaceBulkAccountExecutionStatus
+  message: string
+  lane: GrowthProspectSearchGrowthEngineJobLane | null
+  job_id: string | null
+  reason: string | null
+}
+
+export type ProspectSearchWorkspaceBulkExecutionResult = {
+  qa_marker: typeof GROWTH_PROSPECT_SEARCH_WORKSPACE_FC_QA_MARKER
+  queue_id: ProspectSearchWorkspaceQueueId
+  action_kind: ProspectSearchWorkspaceBulkActionKind
+  requested_count: number
+  executable_count: number
+  skipped_count: number
+  enqueued_count: number
+  already_satisfied_count: number
+  failed_count: number
+  blocked_reasons: string[]
+  per_account_results: ProspectSearchWorkspaceBulkAccountResult[]
+}
+
 export const PROSPECT_SEARCH_WORKSPACE_WORKLIST_KINDS = [
   "outreach_ready",
+  "acquire_humans",
   "research_first",
   "missing_email",
   "missing_phone",
@@ -81,6 +120,7 @@ export type ProspectSearchWorkspacePrioritizationAggregate =
   (typeof PROSPECT_SEARCH_WORKSPACE_PRIORITIZATION_AGGREGATES)[number]
 
 export const PROSPECT_SEARCH_WORKSPACE_RESEARCH_QUEUE_IDS = [
+  "acquire_humans",
   "missing_verified_email",
   "missing_verified_phone",
   "missing_verified_social",
@@ -110,6 +150,7 @@ export type ProspectSearchWorkspaceQueueId =
 
 export const PROSPECT_SEARCH_WORKSPACE_VIEW_IDS = [
   "outreach_ready",
+  "acquire_humans",
   "research_queue",
   "committee_gaps",
   "missing_emails",
@@ -121,6 +162,7 @@ export const PROSPECT_SEARCH_WORKSPACE_VIEW_IDS = [
 export type ProspectSearchWorkspaceViewId = (typeof PROSPECT_SEARCH_WORKSPACE_VIEW_IDS)[number]
 
 export const PROSPECT_SEARCH_WORKSPACE_BULK_ACTION_KINDS = [
+  "human_acquisition",
   "email_discovery",
   "phone_discovery",
   "social_profile_discovery",

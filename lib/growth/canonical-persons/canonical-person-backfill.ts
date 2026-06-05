@@ -417,6 +417,89 @@ function nextSourceTable(
   return sources[idx + 1]
 }
 
+/** Promote staging contacts for one external company candidate (7.PS-HA-FIX). */
+export async function runCanonicalPersonBackfillForCompanyCandidate(
+  admin: SupabaseClient,
+  input: {
+    company_candidate_id: string
+    canonical_company_id?: string | null
+    mode: "dry_run" | "apply"
+  },
+): Promise<{ rows_processed: number; persons_linked: number; errors: number }> {
+  const company_candidate_id = input.company_candidate_id.trim()
+  if (!company_candidate_id) {
+    return { rows_processed: 0, persons_linked: 0, errors: 0 }
+  }
+
+  const loaded = await loadCanonicalPersonIndexesFromDb(admin)
+  const indexes = buildIndexesFromDb(loaded)
+  let rows_processed = 0
+  let persons_linked = 0
+  let errors = 0
+
+  const { data: candidateRows, error: candidateError } = await admin
+    .schema("growth")
+    .from("contact_candidates")
+    .select(selectForPersonSourceTable("contact_candidates"))
+    .eq("company_candidate_id", company_candidate_id)
+    .is("canonical_person_id", null)
+    .order("id", { ascending: true })
+    .limit(50)
+
+  if (candidateError) {
+    throw new Error(`contact_candidates: ${candidateError.message}`)
+  }
+
+  const stats = emptySourceStats()
+  for (const row of candidateRows ?? []) {
+    const mapped = mapContactCandidateRow(row as Record<string, unknown>)
+    if (input.canonical_company_id) {
+      mapped.canonical_company_id = input.canonical_company_id
+    }
+    const outcome = await processCandidate(admin, mapped, indexes, input.mode, stats)
+    rows_processed++
+    if (!outcome.ok) {
+      errors++
+      continue
+    }
+    persons_linked++
+  }
+
+  const canonical_company_id =
+    (input.canonical_company_id ?? "").trim() ||
+    (await fetchStagingCanonicalCompanyId(admin, company_candidate_id))
+
+  if (canonical_company_id) {
+    const { data: contactRows, error: contactError } = await admin
+      .schema("growth")
+      .from("company_contacts")
+      .select(selectForPersonSourceTable("company_contacts"))
+      .eq("company_id", canonical_company_id)
+      .is("canonical_person_id", null)
+      .order("id", { ascending: true })
+      .limit(50)
+
+    if (contactError) {
+      throw new Error(`company_contacts: ${contactError.message}`)
+    }
+
+    const contactStats = emptySourceStats()
+    for (const row of contactRows ?? []) {
+      const mapped = mapCompanyContactRow(row as Record<string, unknown>)
+      mapped.canonical_company_id = canonical_company_id
+      const outcome = await processCandidate(admin, mapped, indexes, input.mode, contactStats)
+      rows_processed++
+      if (!outcome.ok) {
+        errors++
+        continue
+      }
+      persons_linked++
+    }
+  }
+
+  return { rows_processed, persons_linked, errors }
+}
+
 export async function runCanonicalPersonBackfill(
   admin: SupabaseClient,
   options: {

@@ -16,13 +16,18 @@ import type {
   ProspectSearchWorkspaceQueueId,
   ProspectSearchWorkspaceViewId,
 } from "@/lib/growth/prospect-search/prospect-search-workspace-types"
-import { GROWTH_PROSPECT_SEARCH_WORKSPACE_FB_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-workspace-types"
+import {
+  GROWTH_PROSPECT_SEARCH_WORKSPACE_FB_QA_MARKER,
+  GROWTH_PROSPECT_SEARCH_WORKSPACE_FC_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-workspace-types"
+import type { ProspectSearchWorkspaceBulkExecutionResult } from "@/lib/growth/prospect-search/prospect-search-workspace-types"
 import { ProspectSearchWorkspaceSummaryCard } from "@/components/growth/prospect-search/prospect-search-workspace-summary-card"
 import { ProspectSearchWorkspaceHealthCard } from "@/components/growth/prospect-search/prospect-search-workspace-health-card"
 import { ProspectSearchWorkspaceQueuesCard } from "@/components/growth/prospect-search/prospect-search-workspace-queues-card"
 import { ProspectSearchWorkspaceViewSelector } from "@/components/growth/prospect-search/prospect-search-workspace-view-selector"
 import { ProspectSearchWorkspaceWorklistCard } from "@/components/growth/prospect-search/prospect-search-workspace-worklist-card"
 import { ProspectSearchWorkspaceExecutionPreviewCard } from "@/components/growth/prospect-search/prospect-search-workspace-execution-preview-card"
+import { ProspectSearchWorkspaceBulkExecutionCard } from "@/components/growth/prospect-search/prospect-search-workspace-bulk-execution-card"
 import { ProspectSearchWorkspaceSelectionBar } from "@/components/growth/prospect-search/prospect-search-workspace-selection-bar"
 import { PROSPECT_SEARCH_WORKSPACE_PLANNER_NOTE } from "@/lib/growth/prospect-search/prospect-search-workspace-ux"
 export function ProspectSearchOperatorWorkspacePanel({
@@ -30,12 +35,14 @@ export function ProspectSearchOperatorWorkspacePanel({
   visibleCompanies,
   selectedViewId,
   onSelectView,
+  onBulkExecutionComplete,
   className,
 }: {
   companies: GrowthProspectSearchCompanyResult[]
   visibleCompanies: GrowthProspectSearchCompanyResult[]
   selectedViewId: ProspectSearchWorkspaceViewId | null
   onSelectView: (viewId: ProspectSearchWorkspaceViewId | null) => void
+  onBulkExecutionComplete?: (result: ProspectSearchWorkspaceBulkExecutionResult) => void
   className?: string
 }) {
   const [selectedQueueId, setSelectedQueueId] = useState<ProspectSearchWorkspaceQueueId | null>(null)
@@ -55,6 +62,19 @@ export function ProspectSearchOperatorWorkspacePanel({
     setSelection(clearProspectSearchWorkspaceSelection())
     setSelectedQueueId(null)
   }, [selectedViewId])
+
+  useEffect(() => {
+    if (selectedViewId === "acquire_humans") {
+      setSelectedQueueId("acquire_humans")
+      return
+    }
+    const acquireCount =
+      workspace.aggregates.research_queues.find((q) => q.queue_id === "acquire_humans")?.count ??
+      0
+    if (acquireCount > 0 && !selectedQueueId) {
+      setSelectedQueueId("acquire_humans")
+    }
+  }, [selectedViewId, workspace.aggregates.research_queues, selectedQueueId])
 
   const worklist = useMemo(() => {
     if (!selectedViewId) return null
@@ -105,6 +125,7 @@ export function ProspectSearchOperatorWorkspacePanel({
       data-operator-workspace-panel="v1"
       data-qa-marker={workspace.qa_marker}
       data-workspace-fb-marker={GROWTH_PROSPECT_SEARCH_WORKSPACE_FB_QA_MARKER}
+      data-workspace-fc-marker={GROWTH_PROSPECT_SEARCH_WORKSPACE_FC_QA_MARKER}
     >
       <p className="mb-3 text-[11px] text-slate-700">{PROSPECT_SEARCH_WORKSPACE_PLANNER_NOTE}</p>
       <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
@@ -148,6 +169,14 @@ export function ProspectSearchOperatorWorkspacePanel({
               />
               <ProspectSearchWorkspaceExecutionPreviewCard preview={executionPreview} />
             </div>
+            <ProspectSearchWorkspaceBulkExecutionCard
+              companies={companies}
+              selectedCompanyKeys={selectedCompanyKeys}
+              selectedQueueId={selectedQueueId}
+              preview={executionPreview}
+              metrics={metrics}
+              onExecutionComplete={onBulkExecutionComplete}
+            />
           </>
         ) : (
           <p className="text-[11px] text-muted-foreground">

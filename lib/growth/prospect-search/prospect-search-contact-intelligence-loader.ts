@@ -106,6 +106,7 @@ async function buildContactIntelligenceForCompany(
     schema_health: import("@/lib/growth/schema-health/growth-schema-health-types").GrowthSchemaHealthSummary
     decisionMakersByLead: Map<string, Awaited<ReturnType<typeof listGrowthLeadDecisionMakers>>>
     leadMetadataById: Map<string, Record<string, unknown>>
+    canonical_company_id_for_contacts?: string | null
   },
 ): Promise<GrowthProspectSearchContactIntelligence> {
   const source_labels: string[] = []
@@ -183,7 +184,9 @@ async function buildContactIntelligenceForCompany(
 
   if (await isGrowthCompanyContactsSchemaReady(admin)) {
     try {
-      const companyContacts = await listCompanyContacts(admin, input.id)
+      const companyContactsLookupId =
+        context.canonical_company_id_for_contacts?.trim() || input.id
+      const companyContacts = await listCompanyContacts(admin, companyContactsLookupId)
       if (companyContacts.length > 0) source_labels.push("growth.company_contacts")
       if (companyContacts.some((c) => c.source_type !== "manual" && c.source_type !== "crm")) {
         source_labels.push("website_public_extract")
@@ -344,6 +347,8 @@ export async function loadProspectSearchContactIntelligenceBatch(
           schema_health,
           decisionMakersByLead,
           leadMetadataById,
+          canonical_company_id_for_contacts:
+            companyCoverageByKey.get(key)?.canonical_company_id ?? null,
         })
         if (company.growth_lead_id) {
           const hydration = leadRelationshipHydrationById.get(company.growth_lead_id)

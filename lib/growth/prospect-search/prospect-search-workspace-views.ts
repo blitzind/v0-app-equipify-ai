@@ -17,6 +17,14 @@ export const PROSPECT_SEARCH_WORKSPACE_VIEW_DEFINITIONS: ProspectSearchWorkspace
       match_mode: "tier_only",
     },
     {
+      id: "acquire_humans",
+      label: "Acquire Humans",
+      description:
+        "Canonical accounts without linked humans — acquisition-first queue (7.PS-HA-FIX).",
+      queue_ids: ["acquire_humans"],
+      match_mode: "any_queue",
+    },
+    {
       id: "research_queue",
       label: "Research Queue",
       description: "Accounts marked research_first — queue discovery before outreach.",

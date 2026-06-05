@@ -1864,6 +1864,7 @@ function ProspectSearchShellInner() {
                     visibleCompanies={displayCompanies}
                     selectedViewId={workspaceViewId}
                     onSelectView={setWorkspaceViewId}
+                    onBulkExecutionComplete={() => void refreshContactDiscoveryResults()}
                   />
                 </GrowthAdminWidgetErrorBoundary>
               ) : null}
