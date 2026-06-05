@@ -94,6 +94,9 @@ export function applyVerifiedChannelsToContactOverlays(
               ? "profile_verified"
               : contact.verification_status ?? null
 
+    const provider_verified_email = channels.has_verified_email && Boolean(emailMerge.value)
+    const provider_verified_phone = channels.has_verified_phone && Boolean(phoneMerge.value)
+
     return {
       ...contact,
       canonical_person_id: person_id,
@@ -101,12 +104,15 @@ export function applyVerifiedChannelsToContactOverlays(
       phone: phoneMerge.value,
       linkedin_url: linkedinMerge.value,
       verification_status,
+      email_verification_depth: provider_verified_email
+        ? "provider_verified"
+        : contact.email_verification_depth,
+      phone_verification_depth: provider_verified_phone
+        ? "provider_verified"
+        : contact.phone_verification_depth,
       outreach_ready:
         contact.outreach_ready ||
-        Boolean(
-          (channels.has_verified_email && emailMerge.value) ||
-            (channels.has_verified_phone && phoneMerge.value),
-        ),
+        Boolean(provider_verified_email || provider_verified_phone),
     }
   })
 }

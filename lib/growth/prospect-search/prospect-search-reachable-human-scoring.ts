@@ -51,7 +51,19 @@ function isNamedPerson(contact: ProspectSearchContactOverlay): boolean {
   return !/^(info|contact|sales|support|admin|office|hello)$/i.test(name)
 }
 
+function hasNamedVerifiedDirectChannel(contact: ProspectSearchContactOverlay): boolean {
+  return (
+    isNamedPerson(contact) &&
+    Boolean(
+      (contact.email?.trim() && isVerifiedEmail(contact)) ||
+        (contact.phone?.trim() && isVerifiedPhone(contact)),
+    )
+  )
+}
+
 function isGenericChannel(contact: ProspectSearchContactOverlay): boolean {
+  if (hasNamedVerifiedDirectChannel(contact)) return false
+
   const emailClass = (contact.email_classification ?? "").toLowerCase()
   const phoneClass = (contact.phone_classification ?? "").toLowerCase()
   return (
@@ -71,8 +83,10 @@ export function scoreProspectSearchReachableHumanFromContacts(
   const verifiedEmails = contacts.filter((c) => c.email && isVerifiedEmail(c))
   const verifiedPhones = contacts.filter((c) => c.phone && isVerifiedPhone(c))
   const namedPeople = contacts.filter(isNamedPerson)
+  const hasNamedVerifiedChannel = contacts.some(hasNamedVerifiedDirectChannel)
   const genericOnly =
     contacts.length > 0 &&
+    !hasNamedVerifiedChannel &&
     contacts.every((c) => isGenericChannel(c) || !isNamedPerson(c))
 
   const roleScores = contacts

@@ -5085,6 +5085,44 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   assert.equal(reachable.label, "outreach_ready")
   assert.ok(reachable.score >= 75)
 
+  const namedWithMainLinePhone = scoreProspectSearchReachableHumanFromContacts([
+    {
+      id: "c-biomed",
+      name: "Thanh",
+      title: "Owner",
+      confidence: 0.85,
+      email: "thanh@biomed-service.com",
+      phone: "+1 512 555 0199",
+      verification_status: "verified_channels",
+      email_classification: "owner_leadership_email",
+      phone_classification: "main_line",
+      outreach_ready: true,
+      source_evidence: [],
+      role_type: "owner",
+      recommended_priority: 1,
+    },
+  ])
+  assert.equal(namedWithMainLinePhone.label, "outreach_ready")
+  assert.ok(namedWithMainLinePhone.score >= 75)
+
+  const genericCompanyContact = scoreProspectSearchReachableHumanFromContacts([
+    {
+      id: "c-generic",
+      name: "",
+      title: null,
+      confidence: 0.6,
+      email: null,
+      phone: "+1 512 555 0101",
+      verification_status: "phone_verified",
+      phone_classification: "main_line",
+      outreach_ready: true,
+      source_evidence: [],
+      role_type: null,
+      recommended_priority: 2,
+    },
+  ])
+  assert.equal(genericCompanyContact.label, "generic_channel_only")
+
   const indexBoost = computeProspectSearchIndexContactabilityBoost({
     id: "co1",
     source_type: "growth_lead",
