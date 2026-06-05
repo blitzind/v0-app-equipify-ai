@@ -11,12 +11,26 @@ export async function isGrowthSocialProfileDiscoverySchemaReady(
     .from("social_profile_discovery_runs")
     .select("id")
     .limit(1)
-  if (runsErr) return false
+  return !runsErr
+}
 
+export async function isGrowthSocialProfileDiscoveryJobQueueSchemaReady(
+  admin: SupabaseClient,
+): Promise<boolean> {
   const { error: jobsErr } = await admin
     .schema("growth")
     .from("social_profile_discovery_jobs")
     .select("id")
     .limit(1)
   return !jobsErr
+}
+
+export async function isGrowthSocialProfileDiscoveryRuntimeSchemaReady(
+  admin: SupabaseClient,
+): Promise<boolean> {
+  const [runsReady, jobsReady] = await Promise.all([
+    isGrowthSocialProfileDiscoverySchemaReady(admin),
+    isGrowthSocialProfileDiscoveryJobQueueSchemaReady(admin),
+  ])
+  return runsReady && jobsReady
 }

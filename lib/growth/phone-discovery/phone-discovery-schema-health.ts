@@ -7,3 +7,20 @@ export async function isGrowthPhoneDiscoverySchemaReady(admin: SupabaseClient): 
   const { error } = await admin.schema("growth").from("phone_discovery_runs").select("id").limit(1)
   return !error
 }
+
+export async function isGrowthPhoneDiscoveryJobQueueSchemaReady(
+  admin: SupabaseClient,
+): Promise<boolean> {
+  const { error } = await admin.schema("growth").from("phone_discovery_jobs").select("id").limit(1)
+  return !error
+}
+
+export async function isGrowthPhoneDiscoveryRuntimeSchemaReady(
+  admin: SupabaseClient,
+): Promise<boolean> {
+  const [runsReady, jobsReady] = await Promise.all([
+    isGrowthPhoneDiscoverySchemaReady(admin),
+    isGrowthPhoneDiscoveryJobQueueSchemaReady(admin),
+  ])
+  return runsReady && jobsReady
+}

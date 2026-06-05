@@ -3,12 +3,13 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { isGrowthBuyingCommitteeIntelligenceSchemaReady } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-schema-health"
+import { isGrowthBuyingCommitteeIntelligenceRuntimeSchemaReady } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-schema-health"
 import { isGrowthCanonicalPersonSchemaReady } from "@/lib/growth/canonical-persons/canonical-person-schema-health"
-import { isGrowthCompanyIntelligenceSchemaReady } from "@/lib/growth/company-intelligence/company-intelligence-schema-health"
-import { isGrowthEmailDiscoverySchemaReady } from "@/lib/growth/email-discovery/email-discovery-schema-health"
-import { isGrowthPhoneDiscoverySchemaReady } from "@/lib/growth/phone-discovery/phone-discovery-schema-health"
-import { isGrowthSocialProfileDiscoverySchemaReady } from "@/lib/growth/social-profile-discovery/social-profile-discovery-schema-health"
+import { isGrowthCompanyIntelligenceRuntimeSchemaReady } from "@/lib/growth/company-intelligence/company-intelligence-schema-health"
+import { isGrowthEmailDiscoveryRuntimeSchemaReady } from "@/lib/growth/email-discovery/email-discovery-schema-health"
+import { isGrowthEngineJobQueueSchemaReady } from "@/lib/growth/growth-engine-job-queue-schema-health"
+import { isGrowthPhoneDiscoveryRuntimeSchemaReady } from "@/lib/growth/phone-discovery/phone-discovery-schema-health"
+import { isGrowthSocialProfileDiscoveryRuntimeSchemaReady } from "@/lib/growth/social-profile-discovery/social-profile-discovery-schema-health"
 import {
   mergeGrowthSchemaHealthSummaries,
   type GrowthSchemaHealthSummary,
@@ -41,25 +42,28 @@ export const GROWTH_PROSPECT_SEARCH_ENGINE_INTELLIGENCE_SCHEMA_OBJECTS: GrowthSc
 export async function probeProspectSearchEngineIntelligenceSchema(
   admin: SupabaseClient,
 ): Promise<GrowthSchemaHealthSummary> {
-  const [objectProbe, canonicalReady, companyIntelReady, committeeReady] = await Promise.all([
-    probeGrowthSchemaObjects(admin, {
-      cacheKey: "growth:prospect-search-engine-intelligence",
-      featureLabel: "Growth Engine intelligence (Prospect Search)",
-      objects: [...GROWTH_PROSPECT_SEARCH_ENGINE_INTELLIGENCE_SCHEMA_OBJECTS],
-    }),
-    isGrowthCanonicalPersonSchemaReady(admin).catch(() => false),
-    isGrowthCompanyIntelligenceSchemaReady(admin).catch(() => false),
-    isGrowthBuyingCommitteeIntelligenceSchemaReady(admin).catch(() => false),
-  ])
+  const [objectProbe, canonicalReady, companyIntelReady, committeeReady, jobQueuesReady] =
+    await Promise.all([
+      probeGrowthSchemaObjects(admin, {
+        cacheKey: "growth:prospect-search-engine-intelligence",
+        featureLabel: "Growth Engine intelligence (Prospect Search)",
+        objects: [...GROWTH_PROSPECT_SEARCH_ENGINE_INTELLIGENCE_SCHEMA_OBJECTS],
+      }),
+      isGrowthCanonicalPersonSchemaReady(admin).catch(() => false),
+      isGrowthCompanyIntelligenceRuntimeSchemaReady(admin).catch(() => false),
+      isGrowthBuyingCommitteeIntelligenceRuntimeSchemaReady(admin).catch(() => false),
+      isGrowthEngineJobQueueSchemaReady(admin).catch(() => false),
+    ])
 
   const channelReady = await Promise.all([
-    isGrowthEmailDiscoverySchemaReady(admin).catch(() => false),
-    isGrowthPhoneDiscoverySchemaReady(admin).catch(() => false),
-    isGrowthSocialProfileDiscoverySchemaReady(admin).catch(() => false),
+    isGrowthEmailDiscoveryRuntimeSchemaReady(admin).catch(() => false),
+    isGrowthPhoneDiscoveryRuntimeSchemaReady(admin).catch(() => false),
+    isGrowthSocialProfileDiscoveryRuntimeSchemaReady(admin).catch(() => false),
   ]).then((results) => results.some(Boolean))
 
   const subsystemReady =
-    canonicalReady && (companyIntelReady || committeeReady || channelReady || objectProbe.ready)
+    canonicalReady &&
+    (companyIntelReady || committeeReady || channelReady || jobQueuesReady || objectProbe.ready)
 
   const merged = mergeGrowthSchemaHealthSummaries([objectProbe])
   return {
