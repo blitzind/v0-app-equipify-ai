@@ -252,6 +252,7 @@
     "test:growth-batch-service-shop-expansion-cert-7-ps-ig": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-batch-service-shop-expansion-cert-7-ps-ig.ts",
     "test:growth-batch-service-shop-corroboration-channel-completion-cert-7-ps-ih": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-batch-service-shop-corroboration-channel-completion-cert-7-ps-ih.ts",
     "test:growth-apollo-replacement-benchmark-cert-7-ps-ij": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-apollo-replacement-benchmark-cert-7-ps-ij.ts",
+    "test:growth-apollo-replacement-benchmark-density-improvement-cert-7-ps-ik": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-apollo-replacement-benchmark-density-improvement-cert-7-ps-ik.ts",
     "test:growth-canonical-company-staging-linkage-cert-7-ps-hm-link": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-canonical-company-staging-linkage-cert-7-ps-hm-link.ts",
     "test:growth-human-identity-naming-channel-cert-7-ps-hn": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-human-identity-naming-channel-cert-7-ps-hn.ts",
     "test:growth-provider-activation-verified-email-cert-7-ps-ho": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-provider-activation-verified-email-cert-7-ps-ho.ts",

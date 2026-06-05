@@ -339,23 +339,36 @@ export async function upgradeGenericIdentitiesBatch(
     company_ids?: string[]
     limit?: number
     dry_run?: boolean
+    require_canonical_person_id?: boolean
   },
 ): Promise<HumanIdentityNamingUpgradeResult[]> {
   const limit = Math.min(Math.max(input?.limit ?? 50, 1), 200)
   let query = admin
     .schema("growth")
     .from("company_contacts")
-    .select("id, full_name, company_id")
-    .not("canonical_person_id", "is", null)
+    .select("id, full_name, company_id, email")
+    .neq("contact_status", "archived")
     .order("updated_at", { ascending: false })
-    .limit(limit * 3)
+    .limit(limit * 4)
+
+  if (input?.require_canonical_person_id !== false) {
+    query = query.not("canonical_person_id", "is", null)
+  }
 
   if (input?.company_ids?.length) {
     query = query.in("company_id", input.company_ids)
   }
 
   const { data } = await query
-  const targets = (data ?? []).filter((row) => isGenericIdentityName(asString(row.full_name))).slice(0, limit)
+  const targets = (data ?? [])
+    .filter((row) => isGenericIdentityName(asString(row.full_name)))
+    .sort((a, b) => {
+      const aEmail = asString(a.email)
+      const bEmail = asString(b.email)
+      if (Boolean(aEmail) !== Boolean(bEmail)) return aEmail ? -1 : 1
+      return 0
+    })
+    .slice(0, limit)
 
   const results: HumanIdentityNamingUpgradeResult[] = []
   for (const row of targets) {
