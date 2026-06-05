@@ -151,7 +151,7 @@ export async function enrichPersonCompanyRoleFromTitleEvidence(
     title,
     department: null,
     seniority: null,
-    role_type: "employment",
+    role_type: "unknown",
     is_primary: rows.length === 0,
     confidence: 0.82,
     source_table: "company_contacts",
