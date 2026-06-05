@@ -52,8 +52,15 @@ function rowToCompanyContact(row: Record<string, unknown>): GrowthCompanyContact
   }
 }
 
-function candidateSourceType(providerType: string): GrowthCompanyContact["source_type"] {
-  if (providerType.includes("website")) return "team_page"
+function candidateSourceType(
+  providerType: string,
+  metadata?: Record<string, unknown>,
+): GrowthCompanyContact["source_type"] {
+  const metaSource = asString(metadata?.source_type)
+  if (metaSource === "contact_page") return "contact_page"
+  if (metaSource === "team_page") return "team_page"
+  if (metaSource === "website") return "website"
+  if (providerType.includes("website")) return "website"
   if (providerType.includes("linkedin")) return "linkedin"
   if (providerType.includes("pdl") || providerType.includes("people_data")) return "public_record"
   return "manual"
@@ -63,9 +70,15 @@ function candidateToCompanyRow(input: {
   company_id: string
   candidate: GrowthContactCandidate
 }): Record<string, unknown> {
+  const candidateMetadata =
+    input.candidate.metadata && typeof input.candidate.metadata === "object"
+      ? (input.candidate.metadata as Record<string, unknown>)
+      : {}
+  const resolvedSourceType = candidateSourceType(input.candidate.provider_type, candidateMetadata)
+
   const score = scoreDecisionMakerTitle({
     title: input.candidate.job_title,
-    source_type: candidateSourceType(input.candidate.provider_type),
+    source_type: resolvedSourceType,
     evidence_count: input.candidate.evidence.length,
     has_website_evidence: input.candidate.provider_type.includes("website"),
     exact_title_match: Boolean(input.candidate.job_title),
@@ -84,7 +97,7 @@ function candidateToCompanyRow(input: {
     email: input.candidate.email,
     phone: input.candidate.phone,
     linkedin_url: input.candidate.linkedin_url,
-    source_type: candidateSourceType(input.candidate.provider_type),
+    source_type: resolvedSourceType,
   })
 
   return {
@@ -102,7 +115,7 @@ function candidateToCompanyRow(input: {
     linkedin_url: input.candidate.linkedin_url,
     confidence_score: Math.max(score.confidence_score, Math.round(input.candidate.confidence * 100)),
     decision_maker_score: score.decision_maker_score,
-    source_type: candidateSourceType(input.candidate.provider_type),
+    source_type: resolvedSourceType,
     source_evidence: input.candidate.evidence.map((item) => ({
       claim: item.claim,
       evidence: item.evidence,
@@ -117,6 +130,9 @@ function candidateToCompanyRow(input: {
       discovery_provider: input.candidate.provider_name,
       provider_type: input.candidate.provider_type,
       contact_candidate_id: input.candidate.id,
+      source_type: resolvedSourceType,
+      source_page_type: asString(candidateMetadata.source_page_type) || null,
+      source_page_url: asString(candidateMetadata.source_page_url) || null,
       identity_classification: identity.classification,
       identity_classification_reasons: identity.reasons,
       eligible_for_canonical_person: identity.eligible_for_canonical_person,

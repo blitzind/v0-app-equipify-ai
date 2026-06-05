@@ -58,14 +58,75 @@ export function splitName(fullName: string): { first_name: string | null; last_n
   return { first_name: parts[0] ?? null, last_name: parts.slice(1).join(" ") || null }
 }
 
+const JOB_TITLE_HINT_RE =
+  /\b(ceo|owner|president|founder|director|manager|vice president|vp|chief|technician|engineer|coordinator|specialist|supervisor|lead|head of|partner|principal|administrator|consultant)\b/i
+
+export function looksLikeJobTitle(value: string): boolean {
+  const text = value.trim()
+  if (!text || text.length > 120) return false
+  const words = text.split(/\s+/).filter(Boolean)
+
+  // "Jane Owner" — Owner is a surname, not a title label.
+  if (
+    words.length === 2 &&
+    /^[A-Z][A-Za-z.'-]*$/.test(words[0] ?? "") &&
+    words[1]?.toLowerCase() === "owner" &&
+    !JOB_TITLE_HINT_RE.test(words[0] ?? "")
+  ) {
+    return false
+  }
+
+  if (words.length === 2 && JOB_TITLE_HINT_RE.test(words[0] ?? "") && !JOB_TITLE_HINT_RE.test(words[1] ?? "")) {
+    return true
+  }
+
+  if (JOB_TITLE_HINT_RE.test(text)) return true
+  if (/\b(of|and|&|for|at)\b/i.test(text) && words.length <= 6) return true
+  return false
+}
+
+function escapeRegexToken(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function nameTokenLooksValid(token: string): boolean {
+  return token.length >= 2 && /^[A-Za-z][A-Za-z.'-]*$/.test(token)
+}
+
 export function isPlausiblePersonName(value: string): boolean {
   const name = value.trim()
   if (name.length < 4 || name.length > 80) return false
   if (/\d/.test(name)) return false
   if (/@|https?:\/\//i.test(name)) return false
+  if (SECTION_HEADING_RE.test(name)) return false
+  if (looksLikeJobTitle(name)) return false
   const words = name.split(/\s+/).filter(Boolean)
   if (words.length < 2 || words.length > 5) return false
-  return words.every((word) => /^[A-Za-z][A-Za-z.'-]*$/.test(word))
+  return words.every((word) => nameTokenLooksValid(word))
+}
+
+/** Single-token names allowed only with visible team-card evidence (not email inference alone). */
+export function isEvidenceBackedSingleTokenTeamName(name: string, block: string): boolean {
+  const token = name.trim()
+  if (token.length < 3 || token.length > 40) return false
+  if (!/^[A-Za-z][A-Za-z.'-]*$/.test(token)) return false
+  if (looksLikeJobTitle(token)) return false
+
+  const plain = stripHtmlTags(block)
+  if (!new RegExp(`\\b${escapeRegexToken(token)}\\b`, "i").test(plain)) return false
+
+  const mailtoLocal =
+    block.match(/mailto:([^"'>\s]+)/i)?.[1]?.split("@")[0]?.trim().toLowerCase() ?? ""
+  const mailtoCorroborates = mailtoLocal.length >= 3 && mailtoLocal === token.toLowerCase()
+  const hasLinkedIn = /linkedin\.com\/in\//i.test(block)
+  const hasTitleCue = looksLikeJobTitle(plain)
+
+  return mailtoCorroborates || hasLinkedIn || hasTitleCue
+}
+
+export function isPlausibleTeamPagePersonName(name: string, block: string): boolean {
+  if (isPlausiblePersonName(name)) return true
+  return isEvidenceBackedSingleTokenTeamName(name, block)
 }
 
 export function extractEmails(text: string): string[] {
@@ -111,21 +172,134 @@ export function dedupeExtractedContacts(contacts: ExtractedWebsiteContact[]): Ex
 }
 
 export function extractCardBlocks(html: string): string[] {
-  return [...html.matchAll(/<(?:article|li|div)[^>]*class="[^"]*(?:team|member|staff|person|leadership|employee)[^"]*"[^>]*>([\s\S]{0,2000}?)<\/(?:article|li|div)>/gi)]
+  const cardClassPattern =
+    /(?:team|member|staff|person|leadership|employee|profile|bio|people|elementor-team|staff-member|team-member|person-card|member-card)/i
+  const blocks = [
+    ...html.matchAll(
+      /<(?:article|li|div|section)[^>]*class="[^"]*(?:team|member|staff|person|leadership|employee|profile|bio|people|elementor-team|staff-member|team-member|person-card|member-card)[^"]*"[^>]*>([\s\S]{0,3000}?)<\/(?:article|li|div|section)>/gi,
+    ),
+    ...html.matchAll(/<div[^>]*class="[^"]*elementor-team-member[^"]*"[^>]*>([\s\S]{0,2000})/gi),
+  ]
     .map((match) => match[1] ?? "")
     .filter(Boolean)
+
+  const seen = new Set<string>()
+  const unique: string[] = []
+  for (const block of blocks) {
+    if (
+      !cardClassPattern.test(block) &&
+      !/<h[1-6][^>]*>/i.test(block) &&
+      !/elementor-heading-title/i.test(block)
+    ) {
+      continue
+    }
+    const key = block.slice(0, 180)
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(block)
+  }
+  return unique
+}
+
+function readNameCandidates(block: string): string[] {
+  const candidates: string[] = []
+  const patterns = [
+    /<h[1-6][^>]*>([^<]{2,80})<\/h[1-6]>/gi,
+    /class="[^"]*(?:member-name|team-name|person-name|staff-name|employee-name)[^"]*"[^>]*>([^<]{2,80})</gi,
+    /class="[^"]*\bname\b[^"]*"[^>]*>([^<]{2,80})</gi,
+    /<strong[^>]*>([^<]{2,60})<\/strong>/gi,
+    /<div[^>]*class="[^"]*elementor-heading-title[^"]*"[^>]*>([^<]{2,80})<\/div>/gi,
+  ]
+  for (const pattern of patterns) {
+    for (const match of block.matchAll(pattern)) {
+      const value = stripHtmlTags(match[1] ?? "")
+      if (value) candidates.push(value)
+    }
+  }
+  return candidates
+}
+
+function readTitleCandidates(block: string): string[] {
+  const candidates: string[] = []
+  const patterns = [
+    /<p[^>]*class="[^"]*(?:title|role|position|job)[^"]*"[^>]*>([^<]{3,120})<\/p>/gi,
+    /<(?:span|div|p)[^>]*class="[^"]*(?:title|role|position|job)[^"]*"[^>]*>([^<]{3,120})<\/(?:span|div|p)>/gi,
+    /<div[^>]*class="[^"]*elementor-heading-title[^"]*"[^>]*>([^<]{3,120})<\/div>/gi,
+  ]
+  for (const pattern of patterns) {
+    for (const match of block.matchAll(pattern)) {
+      const value = stripHtmlTags(match[1] ?? "")
+      if (value) candidates.push(value)
+    }
+  }
+  return candidates
+}
+
+function pickBestNameTitlePair(
+  names: string[],
+  titles: string[],
+): { name: string | null; title: string | null } {
+  let name: string | null = null
+  let title: string | null = null
+
+  for (const candidate of names) {
+    if (looksLikeJobTitle(candidate)) {
+      if (!title) title = candidate
+      continue
+    }
+    if (!name) name = candidate
+  }
+
+  for (const candidate of titles) {
+    if (looksLikeJobTitle(candidate)) {
+      if (!title) title = candidate
+      continue
+    }
+    if (!name && !looksLikeJobTitle(candidate)) name = candidate
+  }
+
+  if (name && looksLikeJobTitle(name) && title && !looksLikeJobTitle(title)) {
+    return { name: title, title: name }
+  }
+  if (name && looksLikeJobTitle(name) && !title) {
+    return { name: null, title: name }
+  }
+  return { name, title }
 }
 
 export function readHeadingAndSubheading(block: string): { name: string | null; title: string | null } {
-  const nameMatch =
-    block.match(/<h[2-6][^>]*>([^<]{3,80})<\/h[2-6]>/i) ??
-    block.match(/class="[^"]*name[^"]*"[^>]*>([^<]{3,80})</i)
-  const titleMatch =
-    block.match(/<p[^>]*class="[^"]*(?:title|role|position)[^"]*"[^>]*>([^<]{3,120})<\/p>/i) ??
-    block.match(/<(?:span|p)[^>]*>([^<]{4,120})<\/(?:span|p)>/i)
-  const name = nameMatch?.[1] ? stripHtmlTags(nameMatch[1]) : null
-  const title = titleMatch?.[1] ? stripHtmlTags(titleMatch[1]) : null
-  return { name, title }
+  const names = readNameCandidates(block)
+  const titles = readTitleCandidates(block)
+  const picked = pickBestNameTitlePair(names, titles)
+
+  const personTitleCandidate = titles.find(
+    (candidate) => isPlausiblePersonName(candidate) && !looksLikeJobTitle(candidate),
+  )
+  if (
+    personTitleCandidate &&
+    (!picked.name || (looksLikeJobTitle(picked.name) && !isPlausiblePersonName(picked.name)))
+  ) {
+    const resolvedTitle =
+      picked.name && looksLikeJobTitle(picked.name)
+        ? picked.name
+        : picked.title ?? titles.find((candidate) => looksLikeJobTitle(candidate)) ?? null
+    return { name: personTitleCandidate, title: resolvedTitle }
+  }
+
+  if (picked.name && !looksLikeJobTitle(picked.name)) return picked
+
+  const fallbackParagraph = block.match(/<p[^>]*>([^<]{4,120})<\/p>/i)?.[1]
+  const fallback = fallbackParagraph ? stripHtmlTags(fallbackParagraph) : null
+  if (fallback && !looksLikeJobTitle(fallback) && isPlausiblePersonName(fallback)) {
+    return {
+      name: fallback,
+      title:
+        picked.name && looksLikeJobTitle(picked.name)
+          ? picked.name
+          : picked.title ?? titles.find((candidate) => looksLikeJobTitle(candidate)) ?? null,
+    }
+  }
+  return picked
 }
 
 export function leadershipIndicatorFromTitle(title: string | null): boolean {
@@ -151,10 +325,12 @@ export function extractSectionBlocks(html: string): string[] {
   const blocks = extractCardBlocks(html)
   if (blocks.length > 0) return blocks
   const sections: string[] = []
-  for (const match of html.matchAll(/<(?:section|div)[^>]*>([\s\S]{0,4000}?)<\/(?:section|div)>/gi)) {
+  for (const match of html.matchAll(/<(?:section|div)[^>]*>([\s\S]{0,5000}?)<\/(?:section|div)>/gi)) {
     const block = match[1] ?? ""
     if (SECTION_HEADING_RE.test(block)) sections.push(block)
   }
+  if (sections.length > 0) return sections
+  if (SECTION_HEADING_RE.test(html)) return [html]
   return sections
 }
 

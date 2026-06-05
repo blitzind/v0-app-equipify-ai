@@ -6,7 +6,7 @@ import {
   extractEmails,
   extractLinkedInUrls,
   extractPhones,
-  isPlausiblePersonName,
+  isPlausibleTeamPagePersonName,
   leadershipIndicatorFromTitle,
   readHeadingAndSubheading,
   splitName,
@@ -20,7 +20,7 @@ export function extractContactCardContacts(html: string, pageUrl: string): Extra
 
   for (const block of extractCardBlocks(html)) {
     const { name, title } = readHeadingAndSubheading(block)
-    if (!name || !isPlausiblePersonName(name)) continue
+    if (!name || !isPlausibleTeamPagePersonName(name, block)) continue
     const plain = stripHtmlTags(block)
     const email = extractEmails(plain)[0] ?? null
     const phone = extractPhones(plain)[0] ?? null

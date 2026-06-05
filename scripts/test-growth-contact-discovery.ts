@@ -310,6 +310,32 @@ async function main(): Promise<void> {
   assert.ok(extracted.some((item) => item.full_name === "Jane Owner"))
   assert.ok(extracted.some((item) => item.email === "jane@acmehvac.com"))
 
+  const singleNameTeamHtml = `
+    <section><h2>Our Team</h2>
+      <div class="staff-member"><h4>Thanh</h4><p class="role">Biomedical Technician</p><a href="mailto:thanh@biomed-service.com">Email</a></div>
+    </section>
+  `
+  const singleNameExtracted = extractTeamPageContacts(singleNameTeamHtml, "https://biomed-service.com/team")
+  assert.ok(singleNameExtracted.some((item) => item.full_name === "Thanh"))
+  assert.ok(singleNameExtracted.some((item) => item.title === "Biomedical Technician"))
+
+  const elementorTeamHtml = `
+    <div class="elementor-team-member">
+      <div class="elementor-heading-title">Maria Lopez</div>
+      <div class="elementor-heading-title">Operations Director</div>
+    </div>
+  `
+  const elementorExtracted = extractTeamPageContacts(elementorTeamHtml, "https://example.com/team")
+  assert.ok(elementorExtracted.some((item) => item.full_name === "Maria Lopez"))
+  assert.ok(elementorExtracted.some((item) => item.title === "Operations Director"))
+
+  const swappedTitleHtml = `
+    <div class="team-member"><h3>Service Manager</h3><p class="title">Robert Chen</p></div>
+  `
+  const swappedExtracted = extractTeamPageContacts(swappedTitleHtml, "https://example.com/team")
+  assert.ok(swappedExtracted.some((item) => item.full_name === "Robert Chen"))
+  assert.ok(swappedExtracted.some((item) => item.title === "Service Manager"))
+
   const schemaHtml = `<script type="application/ld+json">{"@type":"Person","name":"Alex Director","jobTitle":"Operations Director","email":"alex@example.com"}</script>`
   const schemaContacts = extractSchemaOrgPersonContacts(schemaHtml, "https://example.com/about")
   assert.ok(schemaContacts.some((item) => item.full_name === "Alex Director"))
