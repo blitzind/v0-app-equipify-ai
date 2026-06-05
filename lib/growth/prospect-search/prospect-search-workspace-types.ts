@@ -157,6 +157,7 @@ export const PROSPECT_SEARCH_WORKSPACE_VIEW_IDS = [
   "missing_phones",
   "low_coverage",
   "unresolved_accounts",
+  "graph_expansion",
 ] as const
 
 export type ProspectSearchWorkspaceViewId = (typeof PROSPECT_SEARCH_WORKSPACE_VIEW_IDS)[number]

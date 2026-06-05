@@ -67,6 +67,8 @@ export type ProspectSearchIntelligenceCoverageMetrics = {
   company_intelligence_category_count: number
   has_verified_company_intelligence: boolean
   intelligence_coverage_pct: number
+  /** Phase 7.PS-HS — prospect graph expansion metrics overlay. */
+  graph_expansion?: import("@/lib/growth/graph-expansion/prospect-graph-expansion-types").GrowthProspectGraphExpansionMetrics | null
 }
 
 export type ProspectSearchIntelligenceCoverage = {

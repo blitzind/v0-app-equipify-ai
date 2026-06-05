@@ -66,6 +66,15 @@ export const PROSPECT_SEARCH_WORKSPACE_VIEW_DEFINITIONS: ProspectSearchWorkspace
       queue_ids: ["unresolved_company", "unresolved_contacts"],
       match_mode: "any_queue",
     },
+    {
+      id: "graph_expansion",
+      label: "Graph Expansion",
+      description:
+        "Accounts with graph growth opportunity — stale evidence, low named-person density, or expansion queue (7.PS-HS).",
+      queue_ids: ["low_person_linkage", "missing_company_intelligence"],
+      prioritization_tiers: ["research_first"],
+      match_mode: "any_queue",
+    },
   ]
 
 export function getProspectSearchWorkspaceViewDefinition(

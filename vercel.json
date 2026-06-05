@@ -73,6 +73,10 @@
       "schedule": "30 4 * * *"
     },
     {
+      "path": "/api/cron/growth-prospect-graph-expansion-worker",
+      "schedule": "45 3 * * *"
+    },
+    {
       "path": "/api/cron/growth-territory-refresh",
       "schedule": "0 2 * * *"
     },

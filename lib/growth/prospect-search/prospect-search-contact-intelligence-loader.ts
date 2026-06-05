@@ -11,10 +11,15 @@ import {
   loadProspectSearchEngineIntelligenceBatch,
 } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-loader"
 import { mergeEngineIntelligenceIntoContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-merge"
+import { loadProspectGraphExpansionMetrics } from "@/lib/growth/graph-expansion/prospect-graph-expansion-metrics"
 import {
   applyPersonLinkageToContactOverlays,
   mergeProspectSearchCoverageIntoContactIntelligence,
 } from "@/lib/growth/prospect-search/prospect-search-coverage-merge"
+import {
+  buildProspectSearchGraphExpansionOverlay,
+  mergeProspectSearchGraphExpansionIntoContactIntelligence,
+} from "@/lib/growth/prospect-search/prospect-search-graph-expansion"
 import {
   resolveProspectSearchCompanyCoverageBatch,
   resolveProspectSearchPersonLinkageBatch,
@@ -394,6 +399,18 @@ export async function loadProspectSearchContactIntelligenceBatch(
             company: companyCoverage,
             contacts: [...linkageByContactId.values()],
           })
+        }
+
+        const canonicalForGraph =
+          companyCoverage?.canonical_company_id ?? company.canonical_company_id ?? null
+        if (canonicalForGraph) {
+          const { metrics: graphMetrics } = await loadProspectGraphExpansionMetrics(admin, {
+            company_ids: [canonicalForGraph],
+          })
+          intelligence = mergeProspectSearchGraphExpansionIntoContactIntelligence(
+            intelligence,
+            buildProspectSearchGraphExpansionOverlay(graphMetrics),
+          )
         }
 
         map.set(key, intelligence)
