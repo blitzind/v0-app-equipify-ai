@@ -5,6 +5,10 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { isPlausiblePersonName } from "@/lib/growth/contact-discovery/extract/extract-shared"
 import { classifyContactIdentity } from "@/lib/growth/human-identity-evidence/contact-identity-classification"
+import {
+  isFalsePositiveEmailLocalPartIdentity,
+  ROLE_LOCAL_PART_IDENTITY_NAMES,
+} from "@/lib/growth/human-identity-evidence/email-local-part-identity-guards"
 import { isGenericIdentityName } from "@/lib/growth/human-identity-evidence/human-identity-evidence-evidence"
 import { loadApolloReplacementBenchmarkCohort } from "@/lib/growth/benchmark/apollo-replacement-benchmark-storage"
 import { APOLLO_REPLACEMENT_BENCHMARK_ID } from "@/lib/growth/benchmark/apollo-replacement-benchmark-types"
@@ -13,30 +17,6 @@ import type {
   BenchmarkVerifiedEmailRejectedRow,
 } from "@/lib/growth/benchmark/apollo-replacement-benchmark-verified-email-types"
 
-const ROLE_LOCAL_PARTS = new Set([
-  "info",
-  "contact",
-  "sales",
-  "support",
-  "hello",
-  "admin",
-  "office",
-  "service",
-  "dispatch",
-  "billing",
-  "hr",
-  "careers",
-  "help",
-  "team",
-  "noreply",
-  "no-reply",
-  "orders",
-  "custserv",
-  "cs",
-  "customerservice",
-  "asap",
-])
-
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
@@ -44,7 +24,7 @@ function asString(value: unknown): string {
 export function isRoleOrGenericInboxEmail(email: string): boolean {
   const local = email.split("@")[0]?.trim().toLowerCase() ?? ""
   if (!local) return true
-  if (ROLE_LOCAL_PARTS.has(local)) return true
+  if (ROLE_LOCAL_PART_IDENTITY_NAMES.has(local)) return true
   if (/^(info|contact|sales|support|service|admin|office|help|team|orders|custserv)/i.test(local)) {
     return true
   }
@@ -87,8 +67,9 @@ export function isBenchmarkEligiblePersonalName(full_name: string, email: string
   const name = full_name.trim()
   const local = email.split("@")[0]?.trim().toLowerCase() ?? ""
   if (!name || !local) return false
-  if (ROLE_LOCAL_PARTS.has(local)) return false
-  if (ROLE_LOCAL_PARTS.has(name.toLowerCase())) return false
+  if (ROLE_LOCAL_PART_IDENTITY_NAMES.has(local)) return false
+  if (ROLE_LOCAL_PART_IDENTITY_NAMES.has(name.toLowerCase())) return false
+  if (isFalsePositiveEmailLocalPartIdentity(name, email)) return false
   if (COMPANY_FRAGMENT_NAME_TOKENS.test(name) && !isPlausiblePersonName(name)) return false
   if (isPlausiblePersonName(name)) return true
   if (emailLocalPartSupportsPersonName(email, name) && /^[A-Z][a-z]{2,}$/.test(name)) return true
@@ -102,15 +83,15 @@ function isPsIkNamingUpgrade(metadata: Record<string, unknown>): boolean {
   )
 }
 
-export async function selectBenchmarkVerifiedEmailCandidates(
+export async function selectVerifiedEmailCandidatesForCompanyIds(
   admin: SupabaseClient,
+  company_ids: string[],
 ): Promise<{
   cohort_company_count: number
   selected: BenchmarkVerifiedEmailCandidateRow[]
   rejected: BenchmarkVerifiedEmailRejectedRow[]
 }> {
-  const cohort = await loadApolloReplacementBenchmarkCohort(admin, APOLLO_REPLACEMENT_BENCHMARK_ID)
-  if (!cohort || cohort.company_ids.length === 0) {
+  if (company_ids.length === 0) {
     return { cohort_company_count: 0, selected: [], rejected: [] }
   }
 
@@ -120,14 +101,14 @@ export async function selectBenchmarkVerifiedEmailCandidates(
     .select(
       "id, company_id, canonical_person_id, full_name, title, email, phone, linkedin_url, source_type, metadata, source_evidence",
     )
-    .in("company_id", cohort.company_ids)
+    .in("company_id", company_ids)
     .neq("contact_status", "archived")
 
   const { data: companies } = await admin
     .schema("growth")
     .from("companies")
     .select("id, display_name")
-    .in("id", cohort.company_ids)
+    .in("id", company_ids)
 
   const companyNameById = new Map(
     (companies ?? []).map((row) => [
@@ -313,8 +294,22 @@ export async function selectBenchmarkVerifiedEmailCandidates(
   })
 
   return {
-    cohort_company_count: cohort.company_ids.length,
+    cohort_company_count: company_ids.length,
     selected,
     rejected,
   }
+}
+
+export async function selectBenchmarkVerifiedEmailCandidates(
+  admin: SupabaseClient,
+): Promise<{
+  cohort_company_count: number
+  selected: BenchmarkVerifiedEmailCandidateRow[]
+  rejected: BenchmarkVerifiedEmailRejectedRow[]
+}> {
+  const cohort = await loadApolloReplacementBenchmarkCohort(admin, APOLLO_REPLACEMENT_BENCHMARK_ID)
+  if (!cohort || cohort.company_ids.length === 0) {
+    return { cohort_company_count: 0, selected: [], rejected: [] }
+  }
+  return selectVerifiedEmailCandidatesForCompanyIds(admin, cohort.company_ids)
 }

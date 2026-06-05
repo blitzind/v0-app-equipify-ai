@@ -1,5 +1,6 @@
 /** Phase 7.PS-HV — Contact/person identity classification. Client-safe. */
 
+import { isFalsePositiveEmailLocalPartIdentity } from "@/lib/growth/human-identity-evidence/email-local-part-identity-guards"
 import { isGenericIdentityName } from "@/lib/growth/human-identity-evidence/human-identity-evidence-evidence"
 
 export const GROWTH_CONTACT_IDENTITY_CLASSIFICATION_QA_MARKER =
@@ -72,6 +73,16 @@ export function classifyContactIdentity(input: {
 
   const hasChannel = Boolean(email || phone || linkedin_url)
   const hasTitle = Boolean(title)
+
+  if (isFalsePositiveEmailLocalPartIdentity(full_name, email)) {
+    reasons.push("false_positive_email_local_part_identity")
+    return {
+      classification: "company_channel",
+      eligible_for_canonical_person: false,
+      eligible_for_committee: false,
+      reasons,
+    }
+  }
 
   if (looksLikePersonalName(full_name)) {
     reasons.push("personal_name_shape")

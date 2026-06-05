@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
+import { processDensityScaleUpVerifiedEmailQueueIfScheduled } from "@/lib/growth/benchmark/apollo-replacement-benchmark-density-scale-up-execute"
 import { processBenchmarkVerifiedEmailQueueIfScheduled } from "@/lib/growth/benchmark/apollo-replacement-benchmark-verified-email-execute"
 import { runEmailDiscoveryForCanonicalPerson } from "@/lib/growth/email-discovery/email-discovery-orchestrator"
 import { evaluateEmailDiscoveryVerificationCertification } from "@/lib/growth/email-discovery/email-discovery-certification"
@@ -105,6 +106,28 @@ export async function POST(request: Request) {
           promoted_count:
             typeof benchmark_queue.cert_payload.emails_promoted === "number"
               ? benchmark_queue.cert_payload.emails_promoted
+              : 0,
+        }
+      }
+
+      const scale_up_queue = await processDensityScaleUpVerifiedEmailQueueIfScheduled(admin)
+      if (scale_up_queue.processed && scale_up_queue.cert_payload) {
+        return {
+          ...scale_up_queue.cert_payload,
+          qa_marker: GROWTH_EMAIL_DISCOVERY_QA_MARKER,
+          provider_snapshot,
+          verification_certification,
+          processed:
+            typeof scale_up_queue.cert_payload.processed === "number"
+              ? scale_up_queue.cert_payload.processed
+              : 0,
+          verified_count:
+            typeof scale_up_queue.cert_payload.emails_verified === "number"
+              ? scale_up_queue.cert_payload.emails_verified
+              : 0,
+          promoted_count:
+            typeof scale_up_queue.cert_payload.emails_promoted === "number"
+              ? scale_up_queue.cert_payload.emails_promoted
               : 0,
         }
       }

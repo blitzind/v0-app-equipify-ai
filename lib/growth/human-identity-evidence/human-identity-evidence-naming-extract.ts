@@ -2,28 +2,13 @@
 
 import { isPlausiblePersonName } from "@/lib/growth/contact-discovery/extract/extract-shared"
 import {
+  ROLE_LOCAL_PART_IDENTITY_NAMES,
+  shouldRejectEmailLocalPartNamingUpgrade,
+} from "@/lib/growth/human-identity-evidence/email-local-part-identity-guards"
+import {
   evidenceCorpus,
   isGenericIdentityName,
 } from "@/lib/growth/human-identity-evidence/human-identity-evidence-evidence"
-
-const ROLE_LOCAL_PARTS = new Set([
-  "info",
-  "contact",
-  "sales",
-  "support",
-  "hello",
-  "admin",
-  "office",
-  "service",
-  "dispatch",
-  "billing",
-  "hr",
-  "careers",
-  "help",
-  "team",
-  "noreply",
-  "no-reply",
-])
 
 export type EvidenceBackedIdentityCandidate = {
   full_name: string
@@ -46,10 +31,12 @@ function capitalizeToken(token: string): string {
 
 function nameFromEmailLocalPart(email: string): string | null {
   const local = email.split("@")[0]?.trim().toLowerCase() ?? ""
-  if (!local || local.length < 3 || ROLE_LOCAL_PARTS.has(local)) return null
+  if (!local || local.length < 3 || ROLE_LOCAL_PART_IDENTITY_NAMES.has(local)) return null
 
   if (local.includes(".")) {
-    const parts = local.split(".").filter((p) => p.length >= 2 && !ROLE_LOCAL_PARTS.has(p))
+    const parts = local
+      .split(".")
+      .filter((p) => p.length >= 2 && !ROLE_LOCAL_PART_IDENTITY_NAMES.has(p))
     if (parts.length >= 2) {
       const full = parts.map(capitalizeToken).join(" ")
       if (full.length >= 4) return full
@@ -122,7 +109,7 @@ export function extractEvidenceBackedIdentity(input: {
   const email = asString(input.email)
   if (email) {
     const derived = nameFromEmailLocalPart(email)
-    if (derived) {
+    if (derived && !shouldRejectEmailLocalPartNamingUpgrade(derived, email)) {
       const corpus = buildIdentityEvidenceCorpus({
         source_evidence: input.source_evidence,
         metadata: input.metadata,
