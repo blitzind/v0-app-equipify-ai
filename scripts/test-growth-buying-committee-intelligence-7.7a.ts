@@ -68,6 +68,7 @@ const sources = fs.readFileSync(
 assert.match(sources, /person_company_roles/)
 assert.match(sources, /company_contacts/)
 assert.match(sources, /lead_decision_makers/)
+assert.match(sources, /collectWebsiteAndTeamPageEvidenceAssignments/)
 assert.doesNotMatch(sources, /inferCommitteeRole|openai|guess|pdl|apollo/i)
 
 const roleClass = fs.readFileSync(
@@ -92,6 +93,12 @@ assert.equal(
 const cfoMatch = classifyCommitteeRoleFromJobTitle({ job_title: "Chief Financial Officer" })
 assert.equal(cfoMatch?.committee_role, "economic_buyer")
 assert.ok(cfoMatch?.evidence_text.includes("economic_buyer_title"))
+
+const biomedicalMatch = classifyCommitteeRoleFromJobTitle({
+  job_title: "Biomedical Equipment Manager",
+})
+assert.equal(biomedicalMatch?.committee_role, "end_user")
+assert.ok(biomedicalMatch?.evidence_text.includes("biomedical_manager_title"))
 
 const vague = classifyCommitteeRoleFromJobTitle({ job_title: "Team Member" })
 assert.equal(vague, null)

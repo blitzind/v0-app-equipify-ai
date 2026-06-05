@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { analyzeBuyingCommitteeCoverage } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-coverage"
+import { enrichBuyingCommitteeReadForProspectSearch } from "@/lib/growth/prospect-search/prospect-search-buying-committee-foundation"
 import { loadCompanyIntelligenceOperatorStatus } from "@/lib/growth/company-intelligence/company-intelligence-operator-status"
 import {
   resolveProspectSearchCanonicalCompanyId,
@@ -82,7 +83,7 @@ async function loadBuyingCommitteeRead(
   const verified_person_ids = [...new Set(members.map((m) => m.person_id).filter(Boolean))]
   const coverage = analyzeBuyingCommitteeCoverage({ verified_roles, verified_person_ids })
 
-  return {
+  return enrichBuyingCommitteeReadForProspectSearch({
     member_count: members.length,
     verified_member_count: members.length,
     coverage_score: coverage.coverage_score,
@@ -90,7 +91,7 @@ async function loadBuyingCommitteeRead(
     roles_present: verified_roles,
     roles_missing: coverage.roles_missing,
     members,
-  }
+  })
 }
 
 async function loadVerifiedChannelsRead(

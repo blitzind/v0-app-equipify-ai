@@ -5,6 +5,7 @@
 
 import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
+import { applyProcessEnvProviderKeyFallback } from "@/lib/growth/qa/provider-runtime-env-resolution"
 import {
   GROWTH_PRODUCTION_ENV_SOURCES,
   mergeGrowthProductionEnvLayers,
@@ -154,6 +155,7 @@ function applyVerifiedChannelsCertDefaults(env: Record<string, string>): {
 export function loadVerifiedChannelsCertEnvLayers(input?: {
   cwd?: string
   sources?: readonly string[]
+  inheritProcessEnvProviderKeys?: boolean
 }): {
   merged: Record<string, string>
   sources: Record<string, string>
@@ -161,6 +163,7 @@ export function loadVerifiedChannelsCertEnvLayers(input?: {
 } {
   const cwd = input?.cwd ?? process.cwd()
   const sourceFiles = input?.sources ?? GROWTH_PRODUCTION_ENV_SOURCES
+  const inheritProcessEnvProviderKeys = input?.inheritProcessEnvProviderKeys ?? true
   const layers: Array<{ source: string; values: Record<string, string> }> = []
   const loaded_files: string[] = []
 
@@ -175,7 +178,12 @@ export function loadVerifiedChannelsCertEnvLayers(input?: {
     }
   }
 
-  const { merged, sources } = mergeGrowthProductionEnvLayers(layers)
+  let { merged, sources } = mergeGrowthProductionEnvLayers(layers)
+  if (inheritProcessEnvProviderKeys) {
+    const fallback = applyProcessEnvProviderKeyFallback(merged, sources, process.env)
+    merged = fallback.merged
+    sources = fallback.sources
+  }
   return { merged, sources, loaded_files }
 }
 
@@ -203,24 +211,20 @@ function resolveRawKeyStatus(
 export function auditVerifiedChannelsCertEnv(input?: {
   cwd?: string
   sources?: readonly string[]
+  inheritProcessEnvProviderKeys?: boolean
 }): GrowthVerifiedChannelsCertEnvAudit {
-  const cwd = input?.cwd ?? process.cwd()
-  const sourceFiles = input?.sources ?? GROWTH_PRODUCTION_ENV_SOURCES
+  const { merged, sources, loaded_files } = loadVerifiedChannelsCertEnvLayers(input)
   const layers: Array<{ source: string; values: Record<string, string> }> = []
-  const loaded_files: string[] = []
-
+  const sourceFiles = input?.sources ?? GROWTH_PRODUCTION_ENV_SOURCES
   for (const relativePath of sourceFiles) {
-    const absolutePath = resolve(cwd, relativePath)
+    const absolutePath = resolve(input?.cwd ?? process.cwd(), relativePath)
     if (!existsSync(absolutePath)) continue
     try {
       layers.push({ source: relativePath, values: parseGrowthProductionEnvFile(absolutePath) })
-      loaded_files.push(relativePath)
     } catch {
       /* optional */
     }
   }
-
-  const { merged, sources } = mergeGrowthProductionEnvLayers(layers)
   const { env, applied_defaults } = applyVerifiedChannelsCertDefaults(merged)
   const production_like = isProductionLike(env)
 
@@ -256,9 +260,15 @@ export function auditVerifiedChannelsCertEnv(input?: {
 export function bootstrapVerifiedChannelsCertEnv(input?: {
   cwd?: string
   sources?: readonly string[]
+  /** When true (default), non-empty process.env provider keys fill gaps after file merge. */
+  inheritProcessEnvProviderKeys?: boolean
 }): { url: string; jwt: string; audit: GrowthVerifiedChannelsCertEnvAudit } | null {
   const cwd = input?.cwd ?? process.cwd()
-  const { merged, loaded_files } = loadVerifiedChannelsCertEnvLayers({ cwd, sources: input?.sources })
+  const { merged, loaded_files } = loadVerifiedChannelsCertEnvLayers({
+    cwd,
+    sources: input?.sources,
+    inheritProcessEnvProviderKeys: input?.inheritProcessEnvProviderKeys,
+  })
   const { env, applied_defaults } = applyVerifiedChannelsCertDefaults(merged)
 
   const jwt =
@@ -281,7 +291,11 @@ export function bootstrapVerifiedChannelsCertEnv(input?: {
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY =
     isPresentEnvValue(env.NEXT_PUBLIC_SUPABASE_ANON_KEY) ? env.NEXT_PUBLIC_SUPABASE_ANON_KEY.trim() : jwt
 
-  const audit = auditVerifiedChannelsCertEnv({ cwd, sources: input?.sources })
+  const audit = auditVerifiedChannelsCertEnv({
+    cwd,
+    sources: input?.sources,
+    inheritProcessEnvProviderKeys: input?.inheritProcessEnvProviderKeys,
+  })
   audit.loaded_files = loaded_files
   audit.applied_defaults = applied_defaults
 

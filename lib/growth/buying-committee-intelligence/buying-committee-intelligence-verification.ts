@@ -65,6 +65,20 @@ export function evidenceSupportsRole(draft: GrowthBuyingCommitteeIntelligenceDra
         const hay = e.evidence_text.toLowerCase()
         return hay.includes("title pattern") && (title ? hay.includes(title.slice(0, 32)) : true)
       })
+    case "website_evidence":
+    case "team_page_evidence":
+      return sourceEvidence.some((e) => {
+        if (e.evidence_type !== "website_evidence" && e.evidence_type !== "team_page_evidence") {
+          return false
+        }
+        const hay = e.evidence_text.toLowerCase()
+        const method = (e.extraction_method ?? "").toLowerCase()
+        return (
+          hay.includes("title pattern") &&
+          (hay.includes(role.replace(/_/g, " ")) || hay.includes(role)) &&
+          (method.endsWith("_title") || Boolean(e.source_url) || hay.includes("website evidence"))
+        )
+      })
     default:
       return sourceEvidence.some((e) => {
         const hay = `${e.evidence_text} ${JSON.stringify(e.metadata ?? {})}`.toLowerCase()
@@ -108,6 +122,11 @@ export function verifyBuyingCommitteeIntelligenceDraft(
   const hasCanonical = draft.evidence.some((e) => e.evidence_type === "canonical_role")
   const hasConfirmedDm = draft.evidence.some((e) => e.evidence_type === "confirmed_decision_maker")
   const hasTitlePattern = draft.evidence.some((e) => e.evidence_type === "title_pattern")
+  const hasWebsiteTitleEvidence = draft.evidence.some(
+    (e) =>
+      (e.evidence_type === "website_evidence" || e.evidence_type === "team_page_evidence") &&
+      e.evidence_text.toLowerCase().includes("title pattern"),
+  )
   const hasMetadataDeclared = draft.evidence.some(
     (e) =>
       e.evidence_type === "metadata_declared" &&
@@ -140,6 +159,22 @@ export function verifyBuyingCommitteeIntelligenceDraft(
   } else if (draft.source === "title_pattern" && hasTitlePattern && confidence >= 0.85) {
     verification_status = "verified"
     reasons.push("Job title matched a deterministic committee role pattern with cited span.")
+  } else if (
+    (draft.source === "website_evidence" || draft.source === "team_page_evidence") &&
+    hasWebsiteTitleEvidence &&
+    stagingTrusted &&
+    confidence >= 0.85
+  ) {
+    verification_status = "verified"
+    reasons.push(
+      "Website or team-page evidence cites a job title matching a deterministic committee role pattern.",
+    )
+  } else if (
+    (draft.source === "website_evidence" || draft.source === "team_page_evidence") &&
+    !stagingTrusted
+  ) {
+    verification_status = "unverified"
+    reasons.push("Website/team-page assignment requires source_evidence or verified contact status.")
   } else if (hasTitlePattern && confidence >= 0.7) {
     verification_status = "probable"
     reasons.push("Title pattern evidence present; below verified confidence threshold.")

@@ -180,6 +180,8 @@ const ROUTE_CATEGORIES: Record<GrowthCronRouteId, GrowthCronExecutionCategory> =
   "growth-lifecycle-maintenance": "outbound",
   "growth-reputation-snapshot": "outbound",
   "growth-warmup-progression": "outbound",
+  "growth-provider-runtime-diagnostics": "discovery",
+  "growth-email-discovery-cert-run": "discovery",
 }
 
 export async function summarizeGrowthCronRouteHealth(

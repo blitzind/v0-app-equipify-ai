@@ -7,6 +7,11 @@ import {
   auditVerifiedChannelsCertEnv,
   bootstrapVerifiedChannelsCertEnv,
 } from "../lib/growth/qa/verified-channels-cert-env-bootstrap"
+import {
+  probeDeployedGrowthProviderRuntime,
+  resolveGrowthDeployedRuntimeBaseUrl,
+  resolveGrowthDeployedRuntimeCronSecret,
+} from "../lib/growth/qa/growth-provider-deployed-runtime-probe"
 import type { GrowthProspectSearchCompanyResult } from "../lib/growth/prospect-search/prospect-search-types"
 
 export const GROWTH_PROSPECT_SEARCH_OUTREACH_READINESS_CERT_QA_MARKER =
@@ -221,8 +226,18 @@ async function main() {
   ])
 
   const admin = createClient(boot.url, boot.jwt, { auth: { persistSession: false } })
+  const deployed_probe = await probeDeployedGrowthProviderRuntime({
+    base_url: resolveGrowthDeployedRuntimeBaseUrl() ?? "https://app.equipify.ai",
+    cron_secret: resolveGrowthDeployedRuntimeCronSecret(),
+    admin,
+  })
   const envAudit = auditVerifiedChannelsCertEnv()
-  const provider_blockers = providerBlockers(envAudit)
+  const provider_blockers =
+    deployed_probe.ok &&
+    deployed_probe.diagnostics.loaders.isZeroBounceConfigured &&
+    deployed_probe.diagnostics.loaders.isPdlApiConfigured
+      ? []
+      : providerBlockers(envAudit)
 
   const person_ids = PS_HE_TARGETS.map((t) => t.person_id)
   const company_websites = await loadCompanyWebsites(

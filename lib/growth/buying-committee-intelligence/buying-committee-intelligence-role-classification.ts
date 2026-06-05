@@ -28,7 +28,52 @@ const ROLE_PATTERNS: RolePattern[] = [
       /\bowner\b/i,
       /\bfounder\b/i,
       /\bco-founder\b/i,
+      /\bcofounder\b/i,
       /\bmanaging partner\b/i,
+      /\bprincipal owner\b/i,
+    ],
+  },
+  {
+    committee_role: "end_user",
+    pattern_id: "operations_manager_title",
+    patterns: [
+      /\boperations manager\b/i,
+      /\bdirector of operations\b/i,
+      /\bhead of operations\b/i,
+      /\boperations director\b/i,
+      /\bvp operations\b/i,
+    ],
+  },
+  {
+    committee_role: "end_user",
+    pattern_id: "service_manager_title",
+    patterns: [
+      /\bservice manager\b/i,
+      /\bservices manager\b/i,
+      /\bfield service manager\b/i,
+      /\bservice director\b/i,
+    ],
+  },
+  {
+    committee_role: "end_user",
+    pattern_id: "biomedical_manager_title",
+    patterns: [
+      /\bbiomedical manager\b/i,
+      /\bbiomed manager\b/i,
+      /\bclinical engineering manager\b/i,
+      /\bbe manager\b/i,
+      /\bbiomedical equipment manager\b/i,
+      /\bbiomedical service manager\b/i,
+    ],
+  },
+  {
+    committee_role: "technical_buyer",
+    pattern_id: "biomedical_technical_buyer_title",
+    patterns: [
+      /\bbiomedical engineer\b/i,
+      /\bclinical engineer\b/i,
+      /\bhtm director\b/i,
+      /\bhealthcare technology manager\b/i,
     ],
   },
   {

@@ -30,6 +30,8 @@ export const GROWTH_BUYING_COMMITTEE_INTELLIGENCE_SOURCES = [
   "confirmed_decision_maker",
   "title_pattern",
   "metadata_declared",
+  "website_evidence",
+  "team_page_evidence",
   "manual",
   "unknown",
 ] as const
@@ -73,6 +75,8 @@ export const GROWTH_BUYING_COMMITTEE_INTELLIGENCE_EVIDENCE_TYPES = [
   "confirmed_decision_maker",
   "title_pattern",
   "metadata_declared",
+  "website_evidence",
+  "team_page_evidence",
   "verification",
   "operator_note",
 ] as const

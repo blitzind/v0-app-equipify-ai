@@ -38,6 +38,12 @@ export type GrowthProspectSearchBuyingCommitteeRead = {
   roles_present: string[]
   roles_missing: string[]
   members: GrowthProspectSearchBuyingCommitteeMember[]
+  /** Phase 7.PS-HP — evidence-backed committee completeness (0–1). */
+  committee_completeness?: number
+  missing_critical_roles?: string[]
+  detected_role_labels?: string[]
+  committee_readiness?: "ready" | "partial" | "gap" | "blocked"
+  outreach_prioritization_boost?: number
 }
 
 export type GrowthProspectSearchVerifiedChannelPerson = {

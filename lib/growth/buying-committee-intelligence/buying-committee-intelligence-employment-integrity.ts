@@ -7,6 +7,9 @@ const COMPANY_CONTACT_SOURCES: GrowthBuyingCommitteeIntelligenceSource[] = [
   "metadata_declared",
   "title_pattern",
   "confirmed_decision_maker",
+  "website_evidence",
+  "team_page_evidence",
+  "staging_contact",
 ]
 
 export function buyingCommitteeSourceRequiresEmploymentCheck(
@@ -38,7 +41,7 @@ export async function personHasVerifiedCompanyEmploymentLink(
     .schema("growth")
     .from("company_contacts")
     .select("id")
-    .eq("canonical_company_id", company_id)
+    .or(`canonical_company_id.eq.${company_id},company_id.eq.${company_id}`)
     .eq("canonical_person_id", person_id)
     .limit(1)
     .maybeSingle()

@@ -19,6 +19,10 @@ export function baseConfidenceForBuyingCommitteeSource(
       return 0.87
     case "title_pattern":
       return 0.84
+    case "website_evidence":
+      return 0.86
+    case "team_page_evidence":
+      return 0.88
     case "manual":
       return 0.8
     default:
