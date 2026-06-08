@@ -31,6 +31,7 @@ const ROLE_PATTERNS: RolePattern[] = [
       /\bcofounder\b/i,
       /\bmanaging partner\b/i,
       /\bprincipal owner\b/i,
+      /\bmanaging member\b/i,
     ],
   },
   {
