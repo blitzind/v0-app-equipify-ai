@@ -137,6 +137,7 @@ export async function insertGrowthSequenceEnrollmentStep(
     channel: GrowthSequenceEnrollmentStep["channel"]
     generationType?: string | null
     scheduledFor?: string | null
+    voiceDropCampaignId?: string | null
     stepExecutionConfidence?: number
   },
 ): Promise<GrowthSequenceEnrollmentStep> {
@@ -149,6 +150,7 @@ export async function insertGrowthSequenceEnrollmentStep(
       channel: input.channel,
       generation_type: input.generationType ?? null,
       scheduled_for: input.scheduledFor ?? null,
+      voice_drop_campaign_id: input.voiceDropCampaignId ?? null,
       step_execution_confidence: input.stepExecutionConfidence ?? 50,
     })
     .select(STEP_SELECT)
@@ -207,6 +209,7 @@ export async function updateGrowthSequenceEnrollmentStep(
     cadenceTaskId: string | null
     generationId: string | null
     instructions: string | null
+    voiceDropCampaignId: string | null
     stepOutcome: string | null
     skipReason: string | null
     opportunityId: string | null
@@ -224,6 +227,7 @@ export async function updateGrowthSequenceEnrollmentStep(
   if (patch.cadenceTaskId !== undefined) row.cadence_task_id = patch.cadenceTaskId
   if (patch.generationId !== undefined) row.generation_id = patch.generationId
   if (patch.instructions !== undefined) row.instructions = patch.instructions
+  if (patch.voiceDropCampaignId !== undefined) row.voice_drop_campaign_id = patch.voiceDropCampaignId
   if (patch.stepOutcome !== undefined) row.step_outcome = patch.stepOutcome
   if (patch.skipReason !== undefined) row.skip_reason = patch.skipReason
   if (patch.opportunityId !== undefined) row.opportunity_id = patch.opportunityId

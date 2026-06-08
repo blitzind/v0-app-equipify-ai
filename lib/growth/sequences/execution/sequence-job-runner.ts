@@ -29,6 +29,7 @@ import {
 } from "@/lib/growth/sequences/execution/sequence-job-repository"
 import { buildSequenceExecutionSendPayload } from "@/lib/growth/sequences/execution/sequence-send-builder"
 import { runSequenceSmsExecutionJob } from "@/lib/growth/sequences/execution/sequence-sms-runner"
+import { runSequenceVoiceDropExecutionJob } from "@/lib/growth/sequences/execution/sequence-voice-drop-runner"
 import { applyReputationSafeScheduleGate } from "@/lib/growth/outbound/reputation-safe-scheduler"
 import { shouldSuppressCampaignFollowUp } from "@/lib/growth/outbound/reply-intelligence"
 import { evaluateGrowthQaDeliverabilityBypassForJobSend,
@@ -379,6 +380,16 @@ export async function runSequenceExecutionJob(
       auditActorUserId: resolveSequenceExecutionAuditActorUserId(locked, input) ?? input.actingUserId,
     })
     return smsResult
+  }
+
+  if (locked.channel === "voice_drop") {
+    const voiceDropResult = await runSequenceVoiceDropExecutionJob(admin, {
+      job: locked,
+      actingUserId: input.actingUserId,
+      actingUserEmail: input.actingUserEmail,
+      auditActorUserId: resolveSequenceExecutionAuditActorUserId(locked, input) ?? input.actingUserId,
+    })
+    return voiceDropResult
   }
 
   const followUp = await shouldSuppressCampaignFollowUp(admin, {

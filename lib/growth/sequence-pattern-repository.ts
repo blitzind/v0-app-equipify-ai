@@ -44,6 +44,7 @@ type StepRow = {
   delay_days_max: number
   generation_type: string | null
   playbook_category: string | null
+  voice_drop_campaign_id: string | null
   required_human_approval: boolean
   expected_signal: string
 }
@@ -58,6 +59,7 @@ function mapStep(row: StepRow): GrowthSequencePatternStep {
     delayDaysMax: row.delay_days_max,
     generationType: row.generation_type,
     playbookCategory: row.playbook_category,
+    voiceDropCampaignId: row.voice_drop_campaign_id ?? null,
     requiredHumanApproval: row.required_human_approval,
     expectedSignal: row.expected_signal as GrowthSequencePatternStep["expectedSignal"],
   }

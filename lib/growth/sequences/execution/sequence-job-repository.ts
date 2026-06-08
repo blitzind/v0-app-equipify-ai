@@ -33,6 +33,9 @@ type JobRow = {
   delivery_attempt_id: string | null
   sms_draft_body?: string | null
   sms_to_e164?: string | null
+  voice_drop_campaign_id?: string | null
+  voice_drop_recipient_id?: string | null
+  voice_drop_delivery_attempt_id?: string | null
   sms_delivery_attempt_id?: string | null
   requires_human_approval: boolean
   human_approved_at: string | null
@@ -60,13 +63,19 @@ function eventsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("sequence_execution_job_events")
 }
 
+function mapTransportChannel(channel: string | undefined): GrowthSequenceTransportChannel {
+  if (channel === "sms") return "sms"
+  if (channel === "voice_drop") return "voice_drop"
+  return "email"
+}
+
 function mapJob(row: JobRow): GrowthSequenceExecutionJob {
   return {
     id: row.id,
     sequenceEnrollmentId: row.sequence_enrollment_id,
     sequenceStepId: row.sequence_step_id,
     leadId: row.lead_id,
-    channel: (row.channel === "sms" ? "sms" : "email") as GrowthSequenceExecutionJob["channel"],
+    channel: mapTransportChannel(row.channel),
     senderAccountId: row.sender_account_id,
     providerId: row.provider_id,
     senderPoolId: row.sender_pool_id ?? null,
@@ -83,6 +92,9 @@ function mapJob(row: JobRow): GrowthSequenceExecutionJob {
     smsDraftBody: row.sms_draft_body ?? null,
     smsToE164: row.sms_to_e164 ?? null,
     smsDeliveryAttemptId: row.sms_delivery_attempt_id ?? null,
+    voiceDropCampaignId: row.voice_drop_campaign_id ?? null,
+    voiceDropRecipientId: row.voice_drop_recipient_id ?? null,
+    voiceDropDeliveryAttemptId: row.voice_drop_delivery_attempt_id ?? null,
     requiresHumanApproval: row.requires_human_approval,
     humanApprovedAt: row.human_approved_at,
     humanApprovedBy: row.human_approved_by,
@@ -138,6 +150,7 @@ export async function createSequenceExecutionJob(
     channel?: GrowthSequenceTransportChannel
     smsDraftBody?: string | null
     smsToE164?: string | null
+    voiceDropCampaignId?: string | null
   },
 ): Promise<GrowthSequenceExecutionJob> {
   const now = new Date().toISOString()
@@ -151,6 +164,7 @@ export async function createSequenceExecutionJob(
       scheduled_for: input.scheduledFor,
       sms_draft_body: input.smsDraftBody ?? null,
       sms_to_e164: input.smsToE164 ?? null,
+      voice_drop_campaign_id: input.voiceDropCampaignId ?? null,
       requires_human_approval: true,
       created_at: now,
       updated_at: now,
@@ -177,6 +191,9 @@ export async function updateSequenceExecutionJob(
     smsDraftBody: string | null
     smsToE164: string | null
     smsDeliveryAttemptId: string | null
+    voiceDropCampaignId: string | null
+    voiceDropRecipientId: string | null
+    voiceDropDeliveryAttemptId: string | null
     humanApprovedAt: string | null
     humanApprovedBy: string | null
   }>,
@@ -194,6 +211,11 @@ export async function updateSequenceExecutionJob(
   if (patch.smsDraftBody !== undefined) row.sms_draft_body = patch.smsDraftBody
   if (patch.smsToE164 !== undefined) row.sms_to_e164 = patch.smsToE164
   if (patch.smsDeliveryAttemptId !== undefined) row.sms_delivery_attempt_id = patch.smsDeliveryAttemptId
+  if (patch.voiceDropCampaignId !== undefined) row.voice_drop_campaign_id = patch.voiceDropCampaignId
+  if (patch.voiceDropRecipientId !== undefined) row.voice_drop_recipient_id = patch.voiceDropRecipientId
+  if (patch.voiceDropDeliveryAttemptId !== undefined) {
+    row.voice_drop_delivery_attempt_id = patch.voiceDropDeliveryAttemptId
+  }
   if (patch.humanApprovedAt !== undefined) row.human_approved_at = patch.humanApprovedAt
   if (patch.humanApprovedBy !== undefined) row.human_approved_by = patch.humanApprovedBy
 

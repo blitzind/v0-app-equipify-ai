@@ -41,6 +41,7 @@ type StepRow = {
   cadence_task_id: string | null
   generation_id: string | null
   instructions: string | null
+  voice_drop_campaign_id: string | null
   step_outcome: string | null
   skip_reason: string | null
   opportunity_id: string | null
@@ -56,7 +57,7 @@ const ENROLLMENT_SELECT =
   "id, lead_id, sequence_pattern_id, sequence_version, status, current_step_order, enrollment_health_score, enrollment_stalled, owner_user_id, pause_reason, started_at, completed_at, cancelled_at, cancelled_reason, metadata, created_by, created_at, updated_at"
 
 const STEP_SELECT =
-  "id, enrollment_id, lead_id, sequence_pattern_step_id, step_order, channel, generation_type, scheduled_for, status, step_execution_confidence, outreach_queue_id, cadence_task_id, generation_id, instructions, step_outcome, skip_reason, opportunity_id, meeting_id, due_at, completed_at, failure_reason, created_at, updated_at"
+  "id, enrollment_id, lead_id, sequence_pattern_step_id, step_order, channel, generation_type, scheduled_for, status, step_execution_confidence, outreach_queue_id, cadence_task_id, generation_id, instructions, voice_drop_campaign_id, step_outcome, skip_reason, opportunity_id, meeting_id, due_at, completed_at, failure_reason, created_at, updated_at"
 
 export function mapGrowthSequenceEnrollmentRow(row: EnrollmentRow): GrowthSequenceEnrollment {
   return {
@@ -97,6 +98,7 @@ export function mapGrowthSequenceEnrollmentStepRow(row: StepRow): GrowthSequence
     cadenceTaskId: row.cadence_task_id,
     generationId: row.generation_id,
     instructions: row.instructions,
+    voiceDropCampaignId: row.voice_drop_campaign_id ?? null,
     stepOutcome: row.step_outcome,
     skipReason: row.skip_reason,
     opportunityId: row.opportunity_id,

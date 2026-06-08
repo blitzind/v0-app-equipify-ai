@@ -124,6 +124,7 @@ export async function createGrowthSequenceEnrollmentDraft(
       stepOrder: patternStep.stepOrder,
       channel: patternStep.channel,
       generationType: patternStep.generationType,
+      voiceDropCampaignId: patternStep.voiceDropCampaignId,
       scheduledFor: cursor,
       stepExecutionConfidence: computeStepExecutionConfidence({ lead, channel: patternStep.channel }),
     })

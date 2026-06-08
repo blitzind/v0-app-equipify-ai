@@ -43,6 +43,9 @@ export function isDraftReadyTransportSchedulerStep(step: GrowthSequenceEnrollmen
   if (step.channel === "sms") {
     return step.status === "draft_created" && Boolean(step.instructions?.trim())
   }
+  if (step.channel === "voice_drop") {
+    return step.status === "draft_created" && Boolean(step.voiceDropCampaignId)
+  }
   return (
     step.status === "draft_created" &&
     isCadenceEmailChannel(step.channel) &&

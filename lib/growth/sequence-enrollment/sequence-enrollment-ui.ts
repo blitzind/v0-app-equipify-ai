@@ -52,6 +52,10 @@ export function formatSequenceChannelLabel(channel: GrowthSequenceStepChannel): 
   switch (channel) {
     case "email":
       return "Email"
+    case "sms":
+      return "SMS"
+    case "voice_drop":
+      return "Voice Drop"
     case "manual_call":
       return "Manual Call"
     case "voicemail":
@@ -79,6 +83,10 @@ export function formatSequenceChannelShortLabel(channel: GrowthSequenceStepChann
   switch (channel) {
     case "email":
       return "Email"
+    case "sms":
+      return "SMS"
+    case "voice_drop":
+      return "VD"
     case "manual_call":
       return "Call"
     case "voicemail":

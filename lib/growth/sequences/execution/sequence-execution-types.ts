@@ -41,7 +41,7 @@ export const GROWTH_SEQUENCE_EXECUTION_TIMELINE_EVENT_TYPES = [
 export type GrowthSequenceExecutionTimelineEventType =
   (typeof GROWTH_SEQUENCE_EXECUTION_TIMELINE_EVENT_TYPES)[number]
 
-export const GROWTH_SEQUENCE_TRANSPORT_CHANNELS = ["email", "sms"] as const
+export const GROWTH_SEQUENCE_TRANSPORT_CHANNELS = ["email", "sms", "voice_drop"] as const
 export type GrowthSequenceTransportChannel = (typeof GROWTH_SEQUENCE_TRANSPORT_CHANNELS)[number]
 
 export type GrowthSequenceExecutionJob = {
@@ -66,6 +66,9 @@ export type GrowthSequenceExecutionJob = {
   smsDraftBody: string | null
   smsToE164: string | null
   smsDeliveryAttemptId: string | null
+  voiceDropCampaignId: string | null
+  voiceDropRecipientId: string | null
+  voiceDropDeliveryAttemptId: string | null
   requiresHumanApproval: boolean
   humanApprovedAt: string | null
   humanApprovedBy: string | null
@@ -105,6 +108,7 @@ export type GrowthSequenceSafeExecutionDashboard = {
   pendingApproval: number
   blocked: number
   sent24h: number
+  voiceDropMetrics?: GrowthSequenceVoiceDropExecutionMetrics
   jobs: GrowthSequenceExecutionJobView[]
   soloApprovalEnabled?: boolean
   outboundMode?: "adapter" | "standalone"
@@ -169,6 +173,23 @@ export type GrowthSequenceSmsSendPayload = {
   body: string
   sequenceEnrollmentId: string
   sequenceStepId: string
+}
+
+export type GrowthSequenceVoiceDropSendPayload = {
+  leadId: string
+  organizationId: string
+  toE164: string
+  voiceDropCampaignId: string
+  campaignName: string
+  renderedMessage: string
+  sequenceEnrollmentId: string
+  sequenceStepId: string
+}
+
+export type GrowthSequenceVoiceDropExecutionMetrics = {
+  voiceDropsQueued: number
+  voiceDropsDelivered: number
+  voiceDropsFailed: number
 }
 
 export function maskSequenceExecutionLeadLabel(leadId: string, companyName?: string | null): string {

@@ -60,6 +60,7 @@ export type GrowthSequenceEnrollmentStep = {
   cadenceTaskId: string | null
   generationId: string | null
   instructions: string | null
+  voiceDropCampaignId: string | null
   stepOutcome: string | null
   skipReason: string | null
   opportunityId: string | null

@@ -9,7 +9,7 @@ import {
   type GrowthSequenceStepChannel,
 } from "@/lib/growth/sequence-types"
 
-export const GROWTH_SEQUENCE_TRANSPORT_CHANNELS = ["email", "sms"] as const
+export const GROWTH_SEQUENCE_TRANSPORT_CHANNELS = ["email", "sms", "voice_drop"] as const
 export type GrowthSequenceTransportChannel = (typeof GROWTH_SEQUENCE_TRANSPORT_CHANNELS)[number]
 
 /** Normalize call alias to manual_call for cadence routing. */
@@ -35,6 +35,8 @@ export function sequenceChannelLabel(channel: GrowthSequenceStepChannel): string
       return "Email"
     case "sms":
       return "SMS"
+    case "voice_drop":
+      return "Voice Drop"
     case "call":
     case "manual_call":
       return "Call"

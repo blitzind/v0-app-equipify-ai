@@ -24,6 +24,8 @@ import { isSequenceTransportChannel } from "@/lib/growth/cadence/cadence-channel
 import { fetchGrowthCadenceTaskByEnrollmentStepId } from "@/lib/growth/cadence/cadence-task-repository"
 import { normalizeSequenceStepChannel } from "@/lib/growth/sequence-orchestration/sequence-channel-routing"
 import { buildSequenceExecutionSmsPayload } from "@/lib/growth/sequences/execution/sequence-sms-send-builder"
+import { buildSequenceExecutionVoiceDropPayload } from "@/lib/growth/sequences/execution/sequence-voice-drop-send-builder"
+import { emitSequenceVoiceDropTimelineEvent } from "@/lib/growth/sequences/execution/sequence-voice-drop-timeline"
 import {
   emitGrowthApprovalRequiredNotification,
 } from "@/lib/growth/notifications/notification-integrations"
@@ -234,6 +236,125 @@ export async function queueSequenceStepTransportJob(
       jobId: job.id,
       enrollmentId: input.enrollmentId,
       stepId: input.step.id,
+    })
+
+    await emitGrowthLeadSequenceStepQueuedTimeline(admin, {
+      leadId: lead.id,
+      enrollmentId: input.enrollmentId,
+      stepId: input.step.id,
+      queueId: job.id,
+    })
+
+    await emitGrowthApprovalRequiredNotification(admin, {
+      leadId: lead.id,
+      queueId: job.id,
+      companyName: lead.companyName,
+      ownerUserId: lead.assignedTo,
+    })
+
+    return { queued: true, jobId: job.id }
+  }
+
+  if (stepChannel === "voice_drop") {
+    const voiceDropPayload = await buildSequenceExecutionVoiceDropPayload(admin, {
+      sequenceStepId: input.step.id,
+      leadId: lead.id,
+      sequenceEnrollmentId: input.enrollmentId,
+      voiceDropCampaignId: input.step.voiceDropCampaignId,
+    })
+    if ("error" in voiceDropPayload) {
+      return {
+        queued: false,
+        reason: voiceDropPayload.error,
+        failure: buildQueueStepFailure({
+          enrollmentId: input.enrollmentId,
+          step: input.step,
+          leadId: lead.id,
+          code: voiceDropPayload.error,
+          message: voiceDropPayload.message ?? `Voice drop step could not be prepared: ${voiceDropPayload.error}`,
+          phase: "queue_preflight",
+        }),
+      }
+    }
+
+    const preflight = await runGrowthOutreachPreflight(admin, {
+      lead,
+      channel: "voice_drop",
+      toEmail: lead.contactEmail,
+      generationType: null,
+      generationApproved: true,
+      actingUserEmail: input.actingUserEmail,
+      actingUserId: input.actingUserId,
+      enrollmentId: input.enrollmentId,
+    })
+    if (!preflight.allowed) {
+      const code = preflight.code ?? "preflight_blocked"
+      return {
+        queued: false,
+        reason: code,
+        failure: buildQueueStepFailure({
+          enrollmentId: input.enrollmentId,
+          step: input.step,
+          leadId: lead.id,
+          code,
+          message: preflight.reason ?? "Voice drop preflight blocked queueing.",
+          phase: "queue_preflight",
+        }),
+      }
+    }
+
+    await updateGrowthSequenceEnrollmentStep(admin, input.step.id, {
+      status: "draft_created",
+      voiceDropCampaignId: voiceDropPayload.voiceDropCampaignId,
+      instructions: input.step.instructions ?? voiceDropPayload.campaignName,
+      stepExecutionConfidence: computeStepExecutionConfidence({ lead, channel: input.step.channel }),
+    })
+
+    const scheduledFor = input.step.scheduledFor ?? new Date().toISOString()
+    const job = await createSequenceExecutionJob(admin, {
+      sequenceEnrollmentId: input.enrollmentId,
+      sequenceStepId: input.step.id,
+      leadId: input.step.leadId,
+      scheduledFor,
+      status: "pending_approval",
+      channel: "voice_drop",
+      voiceDropCampaignId: voiceDropPayload.voiceDropCampaignId,
+    })
+
+    await recordSequenceExecutionJobAuditEvent(admin, {
+      jobId: job.id,
+      eventType: "job_planned",
+      title: "Voice drop execution job planned",
+      description: "Due sequence voice drop step queued for human approval — no auto-send.",
+      metadata: {
+        sequence_enrollment_id: input.enrollmentId,
+        sequence_step_id: input.step.id,
+        channel: "voice_drop",
+        scheduler_idempotency_key: idempotencyKey,
+        voice_drop_campaign_id: voiceDropPayload.voiceDropCampaignId,
+      },
+    })
+
+    await updateGrowthSequenceEnrollmentStep(admin, input.step.id, { status: "queued" })
+
+    await recordSequenceExecutionTimelineEvent(admin, {
+      leadId: lead.id,
+      eventType: "sequence_step_scheduled",
+      title: "Sequence voice drop scheduled for approval",
+      summary: `Step ${input.step.stepOrder} voice drop ready for human approval.`,
+      jobId: job.id,
+      enrollmentId: input.enrollmentId,
+      stepId: input.step.id,
+    })
+
+    await emitSequenceVoiceDropTimelineEvent(admin, {
+      eventType: "voice_drop_queued",
+      leadId: lead.id,
+      enrollmentId: input.enrollmentId,
+      stepId: input.step.id,
+      jobId: job.id,
+      campaignId: voiceDropPayload.voiceDropCampaignId,
+      summary: `Voice drop campaign ${voiceDropPayload.campaignName} queued for approval.`,
     })
 
     await emitGrowthLeadSequenceStepQueuedTimeline(admin, {

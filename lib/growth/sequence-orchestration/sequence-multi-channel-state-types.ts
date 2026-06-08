@@ -3,6 +3,8 @@
 export const GROWTH_SEQUENCE_CHANNEL_EVENT_KINDS = [
   "email_sent",
   "sms_sent",
+  "voice_drop_delivered",
+  "voice_drop_answered",
   "call_task_queued",
   "call_completed",
   "reply_received",

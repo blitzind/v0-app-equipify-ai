@@ -34,6 +34,16 @@ export async function fetchGrowthSequenceSafeExecutionDashboard(
   const sent24h = jobs.filter(
     (job) => job.status === "sent" && job.updatedAt >= sentSince,
   ).length
+  const voiceDropJobs = jobs.filter((job) => job.channel === "voice_drop")
+  const voiceDropMetrics = {
+    voiceDropsQueued: voiceDropJobs.filter((job) =>
+      ["pending_approval", "approved", "scheduled", "running"].includes(job.status),
+    ).length,
+    voiceDropsDelivered: voiceDropJobs.filter(
+      (job) => job.status === "sent" && Boolean(job.voiceDropDeliveryAttemptId),
+    ).length,
+    voiceDropsFailed: voiceDropJobs.filter((job) => job.status === "failed").length,
+  }
 
   return {
     qa_marker: GROWTH_SEQUENCE_SAFE_EXECUTION_QA_MARKER,
@@ -41,6 +51,7 @@ export async function fetchGrowthSequenceSafeExecutionDashboard(
     pendingApproval,
     blocked,
     sent24h,
+    voiceDropMetrics,
     jobs: views,
     soloApprovalEnabled: canUseGrowthOutboundSoloApproval({ platformAdmin: true }),
     outboundMode: getGrowthOutboundMode(),

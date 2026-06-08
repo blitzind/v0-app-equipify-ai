@@ -189,6 +189,17 @@ export async function ingestVoiceDropTwilioStatusWebhook(
       },
     )
 
+    if (plan.kind === "interim" || plan.kind === "finalized") {
+      const { maybeEmitSequenceVoiceDropWebhookTimeline } = await import(
+        "@/lib/growth/sequences/execution/sequence-voice-drop-webhook-timeline"
+      )
+      await maybeEmitSequenceVoiceDropWebhookTimeline(admin, {
+        attempt,
+        plan,
+        payload: input.payload,
+      }).catch(() => undefined)
+    }
+
     return { ok: true, updated: true, auditEvent: plan.auditEvent }
   } catch (error) {
     logVoiceInfrastructure("voice_drop_status_persist_failed", {

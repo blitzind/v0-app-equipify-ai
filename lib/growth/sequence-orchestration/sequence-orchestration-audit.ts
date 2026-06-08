@@ -15,11 +15,12 @@ export const SEQUENCE_EMAIL_ONLY_ASSUMPTIONS = [
 ] as const
 
 export const MULTI_CHANNEL_MIGRATION_PLAN = [
-  "Add sms + call to sequence step channel constraints",
-  "Add channel, sms_draft_body, sms_to_e164 on sequence_execution_jobs",
+  "Add sms + voice_drop + call to sequence step channel constraints",
+  "Add channel, sms_draft_body, sms_to_e164, voice_drop_campaign_id on sequence_execution_jobs",
   "Create sequence_enrollment_channel_events for unified timeline",
-  "Introduce isSequenceTransportChannel(email | sms) for scheduler/worker",
+  "Introduce isSequenceTransportChannel(email | sms | voice_drop) for scheduler/worker",
   "SMS steps: buildPersonalizedSmsDraft → pending_approval job → sendSms after approval",
+  "Voice drop steps: approved campaign → pending_approval job → certified Twilio provider after approval",
   "Call steps: cadence task + call queue href — no auto-dial",
   "Rule-based channel selection at step advance (no AI)",
 ] as const
@@ -45,9 +46,9 @@ export function buildGrowthMultiChannelSequenceArchitectureAudit(): GrowthMultiC
     migrationPlan: MULTI_CHANNEL_MIGRATION_PLAN,
     architectureMap: {
       scheduler:
-        "runGrowthSequenceScheduler → isSequenceTransportChannel(email|sms) → transport job | cadence task(call)",
+        "runGrowthSequenceScheduler → isSequenceTransportChannel(email|sms|voice_drop) → transport job | cadence task(call)",
       transport:
-        "queueSequenceStepTransportJob → email: AI draft + execution job | sms: SMS personalization + execution job",
+        "queueSequenceStepTransportJob → email: AI draft + execution job | sms: SMS personalization + execution job | voice_drop: campaign link + execution job",
       cadence: "createCadenceTaskFromEnrollmentStep → manual_call/call → call queue href, operator completes",
       state: "sequence_enrollment_channel_events + fetchGrowthSequenceTouchTimeline",
       rules: "evaluateSequenceChannelSelectionRules — deterministic skip/pause/advance hints",

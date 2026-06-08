@@ -9,6 +9,7 @@ export type GrowthSequencePatternKind = (typeof GROWTH_SEQUENCE_PATTERN_KINDS)[n
 export const GROWTH_SEQUENCE_STEP_CHANNELS = [
   "email",
   "sms",
+  "voice_drop",
   "call",
   "manual_call",
   "voicemail",
@@ -41,6 +42,7 @@ export type GrowthSequencePatternStep = {
   delayDaysMax: number
   generationType: string | null
   playbookCategory: string | null
+  voiceDropCampaignId: string | null
   requiredHumanApproval: boolean
   expectedSignal: GrowthSequenceExpectedSignal
 }
