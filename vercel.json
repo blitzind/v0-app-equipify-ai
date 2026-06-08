@@ -109,6 +109,10 @@
       "schedule": "0 0 1 1 *"
     },
     {
+      "path": "/api/cron/growth-pdl-test-lookup-run",
+      "schedule": "0 0 1 1 *"
+    },
+    {
       "path": "/api/cron/growth-email-discovery-cert-run",
       "schedule": "0 0 1 1 *"
     }

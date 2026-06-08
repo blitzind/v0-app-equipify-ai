@@ -11,6 +11,7 @@ export const GROWTH_PROVIDER_DEPLOYED_RUNTIME_PROBE_QA_MARKER =
   "growth-provider-deployed-runtime-probe-7-ps-ho-runtime-v1" as const
 
 const RUNTIME_DIAGNOSTICS_CRON_ROUTE = growthCronApiPath("growth-provider-runtime-diagnostics")
+const PDL_TEST_LOOKUP_CRON_ROUTE = growthCronApiPath("growth-pdl-test-lookup-run")
 const EMAIL_DISCOVERY_CERT_CRON_ROUTE = growthCronApiPath("growth-email-discovery-cert-run")
 
 export type GrowthProviderDeployedRuntimeProbeResult =
@@ -451,6 +452,243 @@ export async function runDeployedEmailDiscoveryCert(input: {
     channel: "vercel_cron_telemetry",
     cron_telemetry_run_id: telemetry.run_id,
     provider_config_source: "deployed_runtime",
+  }
+}
+
+function parseDeployedPdlTestLookupPayload(body: Record<string, unknown> | null): {
+  ok: boolean
+  search_executable: boolean
+  contacts_returned: number
+  query_summary: string | null
+  message: string | null
+  sandbox_mode: boolean
+  pdl_configured: boolean
+  production_ready: boolean
+} {
+  const lookup =
+    body?.lookup && typeof body.lookup === "object"
+      ? (body.lookup as Record<string, unknown>)
+      : null
+  const provider_config =
+    body?.provider_config && typeof body.provider_config === "object"
+      ? (body.provider_config as Record<string, unknown>)
+      : null
+  const diagnostics =
+    body?.diagnostics && typeof body.diagnostics === "object"
+      ? (body.diagnostics as { loaders?: { isPdlApiConfigured?: boolean; pdl_sandbox_enabled?: boolean } })
+      : null
+
+  const contacts_returned =
+    typeof lookup?.contacts_returned === "number" ? lookup.contacts_returned : 0
+  const query_summary =
+    typeof lookup?.query_summary === "string" ? lookup.query_summary : null
+  const message = typeof lookup?.message === "string" ? lookup.message : null
+  const pdl_configured =
+    provider_config?.pdl_configured === true ||
+    diagnostics?.loaders?.isPdlApiConfigured === true
+  const sandbox_mode =
+    provider_config?.sandbox_mode === true ||
+    diagnostics?.loaders?.pdl_sandbox_enabled === true ||
+    lookup?.sandbox === true
+  const blocked = new Set([
+    "missing_api_key",
+    "disabled",
+    "missing_input",
+    "not_configured",
+    "not_executed",
+  ])
+  const search_executable = Boolean(query_summary && !blocked.has(query_summary))
+
+  return {
+    ok: body?.ok === true || contacts_returned > 0,
+    search_executable,
+    contacts_returned,
+    query_summary,
+    message,
+    sandbox_mode,
+    pdl_configured,
+    production_ready:
+      provider_config?.production_ready === true ||
+      (pdl_configured && !sandbox_mode),
+  }
+}
+
+async function runDeployedPdlTestLookupViaVercelCron(input: {
+  base_url: string
+  admin: SupabaseClient
+}): Promise<{
+  ok: boolean
+  http_status: number | null
+  error: string | null
+  channel: "vercel_cron_telemetry"
+  search_executable: boolean
+  contacts_returned: number
+  query_summary: string | null
+  message: string | null
+  sandbox_mode: boolean
+  pdl_configured: boolean
+  production_ready: boolean
+  body: Record<string, unknown> | null
+}> {
+  const started_after = new Date().toISOString()
+  try {
+    triggerVercelCron(PDL_TEST_LOOKUP_CRON_ROUTE)
+  } catch (e) {
+    return {
+      ok: false,
+      http_status: null,
+      error: "vercel_cron_pdl_lookup_trigger_failed",
+      channel: "vercel_cron_telemetry",
+      search_executable: false,
+      contacts_returned: 0,
+      query_summary: null,
+      message: null,
+      sandbox_mode: false,
+      pdl_configured: false,
+      production_ready: false,
+      body: { detail: e instanceof Error ? e.message : String(e) },
+    }
+  }
+
+  const metadata = await fetchCronTelemetryMetadata({
+    admin: input.admin,
+    cron_route: PDL_TEST_LOOKUP_CRON_ROUTE,
+    started_after,
+    poll_timeout_ms: 120_000,
+  })
+
+  if (!metadata) {
+    return {
+      ok: false,
+      http_status: null,
+      error: "vercel_cron_pdl_lookup_telemetry_timeout",
+      channel: "vercel_cron_telemetry",
+      search_executable: false,
+      contacts_returned: 0,
+      query_summary: null,
+      message: null,
+      sandbox_mode: false,
+      pdl_configured: false,
+      production_ready: false,
+      body: null,
+    }
+  }
+
+  const parsed = parseDeployedPdlTestLookupPayload(metadata)
+  return {
+    ok: parsed.ok,
+    http_status: parsed.ok ? 200 : 503,
+    error: parsed.ok ? null : parsed.message,
+    channel: "vercel_cron_telemetry",
+    ...parsed,
+    body: metadata,
+  }
+}
+
+/** Phase 7.PS-IS — Single-company PDL test lookup on deployed runtime (no persistence). */
+export async function runDeployedPdlTestLookup(input: {
+  base_url: string
+  cron_secret?: string | null
+  company_name: string
+  domain?: string | null
+  limit?: number
+  sandbox?: boolean
+  fetch_impl?: typeof fetch
+  admin?: SupabaseClient | null
+}): Promise<{
+  ok: boolean
+  http_status: number | null
+  error: string | null
+  channel: "http" | "vercel_cron_telemetry"
+  search_executable: boolean
+  contacts_returned: number
+  query_summary: string | null
+  message: string | null
+  sandbox_mode: boolean
+  pdl_configured: boolean
+  production_ready: boolean
+  body: Record<string, unknown> | null
+}> {
+  const cron_secret = (input.cron_secret ?? resolveGrowthDeployedRuntimeCronSecret() ?? "").trim()
+
+  if (cron_secret) {
+    const url = `${input.base_url.replace(/\/$/, "")}/api/platform/growth/providers/pdl-test-lookup`
+    const fetchFn = input.fetch_impl ?? fetch
+
+    try {
+      const response = await fetchFn(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${cron_secret}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          company_name: input.company_name,
+          domain: input.domain ?? null,
+          limit: input.limit ?? 3,
+          sandbox: input.sandbox === true,
+        }),
+        signal: AbortSignal.timeout(60_000),
+      })
+
+      const raw = await response.text()
+      let body: Record<string, unknown> | null = null
+      try {
+        body = JSON.parse(raw) as Record<string, unknown>
+      } catch {
+        body = { raw: raw.slice(0, 500) }
+      }
+
+      const parsed = parseDeployedPdlTestLookupPayload(body)
+      return {
+        ok: response.ok && parsed.ok,
+        http_status: response.status,
+        error: response.ok ? null : String(body?.error ?? "pdl_test_lookup_failed"),
+        channel: "http",
+        ...parsed,
+        body,
+      }
+    } catch (e) {
+      if (!input.admin) {
+        return {
+          ok: false,
+          http_status: null,
+          error: e instanceof Error ? e.message : String(e),
+          channel: "http",
+          search_executable: false,
+          contacts_returned: 0,
+          query_summary: null,
+          message: null,
+          sandbox_mode: false,
+          pdl_configured: false,
+          production_ready: false,
+          body: null,
+        }
+      }
+    }
+  }
+
+  if (input.admin) {
+    return runDeployedPdlTestLookupViaVercelCron({
+      base_url: input.base_url,
+      admin: input.admin,
+    })
+  }
+
+  return {
+    ok: false,
+    http_status: null,
+    error: "cron_secret_unavailable_for_pdl_test_lookup",
+    channel: "http",
+    search_executable: false,
+    contacts_returned: 0,
+    query_summary: null,
+    message: null,
+    sandbox_mode: false,
+    pdl_configured: false,
+    production_ready: false,
+    body: null,
   }
 }
 

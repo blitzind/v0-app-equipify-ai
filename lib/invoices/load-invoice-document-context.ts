@@ -6,7 +6,10 @@ import {
   invoiceGrandTotalCents,
   type InvoicePaymentAllocationState,
 } from "@/lib/billing/invoice-payment-allocation"
-import { formatInvoiceBillingAddressLines } from "@/lib/billing/invoice-financial-display"
+import { formatBillingAddressPartsBlock, splitLineItemDescription } from "@/lib/documents/document-address"
+import { loadCustomerDocumentFields } from "@/lib/documents/load-customer-document-fields"
+import { profileLabelById } from "@/lib/documents/profile-label"
+import { getOrganizationDocumentBranding } from "@/lib/organization/document-branding"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { missingWorkOrderNumberColumn } from "@/lib/work-orders/postgrest-fallback"
 import { invoiceStatusDbToUi, parseLineItems } from "@/lib/org-quotes-invoices/map"
@@ -71,6 +74,7 @@ export async function loadInvoiceDocumentContext(
         "due_date",
         "issued_at",
         "paid_at",
+        "created_by",
         "archived_at",
         "line_items",
         "notes",
@@ -108,6 +112,7 @@ export async function loadInvoiceDocumentContext(
     due_date?: string | null
     issued_at?: string | null
     paid_at?: string | null
+    created_by?: string | null
     archived_at?: string | null
     line_items?: unknown
     notes?: string | null
@@ -130,18 +135,10 @@ export async function loadInvoiceDocumentContext(
     if (dbStatusLower === "void") return null
   }
 
-  const [{ data: org }, { data: cust }, equipRes, payRes, refundRes] = await Promise.all([
-    supabase
-      .from("organizations")
-      .select("name, logo_url, document_logo_url")
-      .eq("id", organizationId)
-      .maybeSingle(),
-    supabase
-      .from("customers")
-      .select("company_name")
-      .eq("organization_id", organizationId)
-      .eq("id", inv.customer_id)
-      .maybeSingle(),
+  const [branding, customerFields, authorName, equipRes, payRes, refundRes] = await Promise.all([
+    getOrganizationDocumentBranding(supabase, organizationId),
+    loadCustomerDocumentFields(supabase, organizationId, inv.customer_id),
+    profileLabelById(supabase, inv.created_by),
     inv.equipment_id ?
       supabase
         .from("equipment")
@@ -207,19 +204,6 @@ export async function loadInvoiceDocumentContext(
     }
   }
 
-  const organizationName = (org as { name?: string; logo_url?: string | null; document_logo_url?: string | null } | null)?.name?.trim() || "Your service team"
-  const documentLogoUrl =
-    typeof (org as { document_logo_url?: string | null } | null)?.document_logo_url === "string"
-      ? (org as { document_logo_url: string }).document_logo_url.trim() || null
-    : null
-  const logoUrl =
-    typeof (org as { logo_url?: string | null } | null)?.logo_url === "string"
-      ? (org as { logo_url: string }).logo_url.trim() || null
-    : null
-
-  const customerCompanyName =
-    (cust as { company_name?: string } | null)?.company_name?.trim() || "Customer"
-
   const equipmentName =
     equipRes.data && typeof equipRes.data === "object" && "name" in equipRes.data
       ? String((equipRes.data as { name: string }).name).trim() || null
@@ -256,26 +240,33 @@ export async function loadInvoiceDocumentContext(
     const qty = Number(li.qty) || 0
     const unit = Number(li.unit) || 0
     const lineTotalUsd = qty * unit
+    const description = li.description?.trim() ? li.description.trim() : "Line item"
+    const split = splitLineItemDescription(description)
     const row: InvoiceDocumentLineItem = {
-      description: li.description?.trim() ? li.description.trim() : "Line item",
+      description,
+      itemName: split.title,
+      detailNotes: split.detail,
       qty,
       unitUsd: unit,
       lineTotalUsd,
     }
     if (li.sku?.trim()) row.sku = li.sku.trim()
+    if (typeof li.taxable === "boolean") row.taxable = li.taxable
     return row
   })
 
-  const billToAddressBlock = formatInvoiceBillingAddressLines({
-    billing_address_line1: inv.billing_address_line1,
-    billing_address_line2: inv.billing_address_line2,
-    billing_city: inv.billing_city,
-    billing_state: inv.billing_state,
-    billing_postal_code: inv.billing_postal_code,
-    billing_country: inv.billing_country,
-  }).trim()
-
   const billToName = inv.billing_name?.trim() || null
+  const billToAddressBlock = formatBillingAddressPartsBlock(
+    {
+      billing_address_line1: inv.billing_address_line1,
+      billing_address_line2: inv.billing_address_line2,
+      billing_city: inv.billing_city,
+      billing_state: inv.billing_state,
+      billing_postal_code: inv.billing_postal_code,
+      billing_country: inv.billing_country,
+    },
+    billToName,
+  ).trim()
 
   const taxRateNum = inv.tax_rate_percent == null ? null : Number(inv.tax_rate_percent)
 
@@ -292,14 +283,21 @@ export async function loadInvoiceDocumentContext(
     organizationId,
     invoiceId: inv.id,
     customerId: inv.customer_id,
-    organizationName,
-    documentLogoUrl,
-    logoUrl,
+    organizationName: branding.organizationName,
+    documentLogoUrl: branding.documentLogoUrl,
+    logoUrl: branding.appLogoUrl,
+    companyAddress: branding.companyAddress,
+    companyPhone: branding.companyPhone,
+    companyWebsite: branding.companyWebsite,
+    companyEmail: branding.companyEmail,
     invoiceNumberLabel: String(inv.invoice_number ?? "").trim() || "Invoice",
     invoiceTitle: inv.title?.trim() ? inv.title.trim() : null,
-    customerCompanyName,
+    customerCompanyName: customerFields?.customerCompanyName ?? "Customer",
+    customerPhone: customerFields?.customerPhone ?? inv.billing_contact_phone?.trim() || null,
+    customerEmail: customerFields?.customerEmail ?? inv.billing_contact_email?.trim() || null,
     billToName,
     billToAddressBlock,
+    serviceAddressBlock: customerFields?.serviceAddressBlock ?? null,
     equipmentName,
     workOrderLabel,
     serviceDateLabel,
@@ -307,6 +305,7 @@ export async function loadInvoiceDocumentContext(
     dueDateLabel: inv.due_date ? formatDateLabel(inv.due_date + "T12:00:00", "—") : "—",
     statusDisplay,
     dbStatusLower,
+    authorName,
     lineItems,
     customerNotes: inv.notes?.trim() ? inv.notes.trim() : null,
     invoiceInstructions: inv.invoice_instructions?.trim() ? inv.invoice_instructions.trim() : null,

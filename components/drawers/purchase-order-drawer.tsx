@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { cn, looksLikeUuid } from "@/lib/utils"
 import { usePurchaseOrders, type PurchaseOrder, type POStatus, type POLineItem } from "@/lib/purchase-order-store"
 import { createBrowserSupabaseClient } from "@/lib/supabase/client"
@@ -32,11 +32,7 @@ import {
 import Link from "next/link"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
 import { AddVendorModal } from "@/components/vendors/add-vendor-modal"
-import { useTenant } from "@/lib/tenant-store"
-import { documentBrandingFromTenantWorkspace } from "@/lib/organization/document-branding"
-import { buildPurchaseOrderDocumentHtml } from "@/lib/documents/simple-document-html"
-import { downloadCertificateHtmlFile } from "@/lib/certificates/certificate-pdf-html"
-import { escapeHtml } from "@/lib/email/format"
+import { buildPurchaseOrderPdfFilename } from "@/lib/purchase-orders/purchase-order-pdf-filename"
 import { buildPurchaseOrderLineFromCatalog } from "@/lib/catalog/catalog-line-snapshots"
 import { AddFromCatalogDialog } from "@/components/catalog/add-from-catalog-dialog"
 
@@ -149,36 +145,43 @@ export function PurchaseOrderDrawer({
   const { orders, updateOrder, archiveOrder } = usePurchaseOrders()
   const order = orders.find((o) => o.id === orderId) ?? null
 
-  const { workspace } = useTenant()
-  const documentBranding = useMemo(() => documentBrandingFromTenantWorkspace(workspace), [workspace])
+  const [downloadPdfBusy, setDownloadPdfBusy] = useState(false)
 
-  function handleDownloadPoPdf() {
-    if (!order) return
-    const fmtMoney = (n: number) =>
-      new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n)
-    const totalCents = order.lineItems.reduce((s, li) => s + li.lineTotalCents, 0)
-    const rows = order.lineItems.map(
-      (li) =>
-        `<tr><td>${escapeHtml(li.description)}</td><td class="num">${li.quantity}</td><td class="num">${fmtMoney(li.unitCostCents / 100)}</td><td class="num">${fmtMoney(li.lineTotalCents / 100)}</td></tr>`,
-    ).join("")
-    const woLabel = order.workOrderId ? getWorkOrderDisplay({ id: order.workOrderId }) : null
-    const html = buildPurchaseOrderDocumentHtml({
-      branding: documentBranding,
-      poNumber: order.purchaseOrderNumber?.trim() || order.id.slice(0, 8),
-      vendor: order.vendor,
-      vendorEmail: order.vendorEmail,
-      vendorPhone: order.vendorPhone,
-      shipTo: order.shipTo,
-      billTo: order.billTo,
-      status: order.status,
-      orderedDate: fmtDate(order.orderedDate),
-      eta: fmtDate(order.eta),
-      totalCents,
-      lineRowsHtml: rows,
-      notes: order.notes?.trim() || null,
-      workOrderLabel: woLabel,
-    })
-    downloadCertificateHtmlFile(html, `PO-${order.purchaseOrderNumber?.trim() || "order"}`)
+  async function handleDownloadPoPdf() {
+    if (!order || downloadPdfBusy) return
+    const oid = organizationId?.trim()
+    if (!oid || orgStatus !== "ready") {
+      toast(orgStatus === "ready" && !oid ? "No organization selected." : "Loading organization…", "info")
+      return
+    }
+    setDownloadPdfBusy(true)
+    try {
+      const url = `/api/organizations/${encodeURIComponent(oid)}/purchase-orders/${encodeURIComponent(order.id)}/pdf`
+      const res = await fetch(url, { credentials: "include", cache: "no-store" })
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { message?: string }
+        toast(typeof j.message === "string" ? j.message : "Could not download PDF.", "info")
+        return
+      }
+      const blob = await res.blob()
+      const cd = res.headers.get("Content-Disposition")
+      let name = buildPurchaseOrderPdfFilename(order.purchaseOrderNumber?.trim() || "PO")
+      const m = cd?.match(/filename="([^"]+)"/i)
+      if (m?.[1]) name = m[1].trim()
+      const href = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = href
+      a.download = name
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(href)
+      toast("Purchase order PDF downloaded")
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not download PDF.", "info")
+    } finally {
+      setDownloadPdfBusy(false)
+    }
   }
 
   const [toasts, setToasts]               = useState<ToastItem[]>([])
@@ -412,9 +415,10 @@ export function PurchaseOrderDrawer({
                 size="sm"
                 className="gap-1.5 h-8 text-xs cursor-pointer"
                 type="button"
-                onClick={() => handleDownloadPoPdf()}
+                disabled={downloadPdfBusy}
+                onClick={() => void handleDownloadPoPdf()}
               >
-                <Download className="w-3.5 h-3.5" /> Download PDF
+                <Download className="w-3.5 h-3.5" /> {downloadPdfBusy ? "Preparing…" : "Download PDF"}
               </Button>
               <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs cursor-not-allowed opacity-60" disabled title="Duplicate is not available for this purchase order yet.">
                 <Copy className="w-3.5 h-3.5" /> Duplicate

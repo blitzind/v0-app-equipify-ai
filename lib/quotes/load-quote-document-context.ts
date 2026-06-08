@@ -1,6 +1,11 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { invoiceGrandTotalCents } from "@/lib/billing/invoice-payment-allocation"
+import { splitLineItemDescription } from "@/lib/documents/document-address"
+import { loadCustomerDocumentFields } from "@/lib/documents/load-customer-document-fields"
+import { profileLabelById } from "@/lib/documents/profile-label"
+import { getOrganizationDocumentBranding } from "@/lib/organization/document-branding"
 import { quoteStatusDbToUi, parseLineItems } from "@/lib/org-quotes-invoices/map"
 import type { QuoteDocumentContext, QuoteDocumentLineItem } from "@/lib/quotes/quote-document-context"
 
@@ -36,8 +41,11 @@ export async function loadQuoteDocumentContext(
         "quote_number",
         "title",
         "amount_cents",
+        "tax_amount_cents",
+        "tax_rate_percent",
         "status",
         "created_at",
+        "created_by",
         "expires_at",
         "line_items",
         "notes",
@@ -57,8 +65,11 @@ export async function loadQuoteDocumentContext(
     quote_number?: string | null
     title?: string | null
     amount_cents?: number | null
+    tax_amount_cents?: number | null
+    tax_rate_percent?: number | string | null
     status?: string | null
     created_at?: string | null
+    created_by?: string | null
     expires_at?: string | null
     line_items?: unknown
     notes?: string | null
@@ -67,18 +78,10 @@ export async function loadQuoteDocumentContext(
 
   if (!opts?.staffDocumentExport && quote.archived_at) return null
 
-  const [{ data: org }, { data: cust }, equipRes] = await Promise.all([
-    supabase
-      .from("organizations")
-      .select("name, logo_url, document_logo_url")
-      .eq("id", organizationId)
-      .maybeSingle(),
-    supabase
-      .from("customers")
-      .select("company_name")
-      .eq("organization_id", organizationId)
-      .eq("id", quote.customer_id)
-      .maybeSingle(),
+  const [branding, customerFields, authorName, equipRes] = await Promise.all([
+    getOrganizationDocumentBranding(supabase, organizationId),
+    loadCustomerDocumentFields(supabase, organizationId, quote.customer_id),
+    profileLabelById(supabase, quote.created_by),
     quote.equipment_id ?
       supabase
         .from("equipment")
@@ -88,21 +91,6 @@ export async function loadQuoteDocumentContext(
         .maybeSingle()
     : Promise.resolve({ data: null }),
   ])
-
-  const organizationName =
-    (org as { name?: string; logo_url?: string | null; document_logo_url?: string | null } | null)?.name?.trim() ||
-    "Your service team"
-  const documentLogoUrl =
-    typeof (org as { document_logo_url?: string | null } | null)?.document_logo_url === "string"
-      ? (org as { document_logo_url: string }).document_logo_url.trim() || null
-    : null
-  const logoUrl =
-    typeof (org as { logo_url?: string | null } | null)?.logo_url === "string"
-      ? (org as { logo_url: string }).logo_url.trim() || null
-    : null
-
-  const customerCompanyName =
-    (cust as { company_name?: string } | null)?.company_name?.trim() || "Customer"
 
   const equipmentName =
     equipRes.data && typeof equipRes.data === "object" && "name" in equipRes.data
@@ -114,33 +102,58 @@ export async function loadQuoteDocumentContext(
     const qty = Number(li.qty) || 0
     const unit = Number(li.unit) || 0
     const lineTotalUsd = qty * unit
-    return {
-      description: li.description?.trim() ? li.description.trim() : "Line item",
+    const description = li.description?.trim() ? li.description.trim() : "Line item"
+    const split = splitLineItemDescription(description)
+    const row: QuoteDocumentLineItem = {
+      description,
+      itemName: split.title,
+      detailNotes: split.detail,
       qty,
       unitUsd: unit,
       lineTotalUsd,
     }
+    if (typeof li.taxable === "boolean") row.taxable = li.taxable
+    if (li.sku?.trim()) row.sku = li.sku.trim()
+    return row
   })
 
-  const totalCents = Math.round(Number(quote.amount_cents ?? 0))
-  const statusDisplay = quoteStatusDbToUi(String(quote.status || ""))
+  const subtotalCents = Math.round(Number(quote.amount_cents ?? 0))
+  const taxCents = quote.tax_amount_cents == null ? 0 : Math.round(Number(quote.tax_amount_cents))
+  const totalCents = invoiceGrandTotalCents({
+    amount_cents: subtotalCents,
+    tax_amount_cents: quote.tax_amount_cents,
+  })
+  const taxRateNum = quote.tax_rate_percent == null ? null : Number(quote.tax_rate_percent)
 
   return {
     organizationId,
     quoteId: quote.id,
     customerId: quote.customer_id,
-    organizationName,
-    documentLogoUrl,
-    logoUrl,
+    organizationName: branding.organizationName,
+    documentLogoUrl: branding.documentLogoUrl,
+    logoUrl: branding.appLogoUrl,
+    companyAddress: branding.companyAddress,
+    companyPhone: branding.companyPhone,
+    companyWebsite: branding.companyWebsite,
+    companyEmail: branding.companyEmail,
     quoteNumberLabel: String(quote.quote_number ?? "").trim() || "Quote",
     quoteTitle: quote.title?.trim() ? quote.title.trim() : null,
-    customerCompanyName,
+    customerCompanyName: customerFields?.customerCompanyName ?? "Customer",
+    customerPhone: customerFields?.customerPhone ?? null,
+    customerEmail: customerFields?.customerEmail ?? null,
+    serviceAddressBlock: customerFields?.serviceAddressBlock ?? null,
+    billingAddressBlock: customerFields?.billingAddressBlock ?? null,
     equipmentName,
-    statusDisplay,
+    statusDisplay: quoteStatusDbToUi(String(quote.status || "")),
     createdDateLabel: formatDateLabel(quote.created_at, "—"),
     expiresDateLabel: formatDateLabel(quote.expires_at, "—"),
+    authorName: authorName,
+    poNumber: customerFields?.poNumber ?? null,
     lineItems,
     customerNotes: quote.notes?.trim() ? quote.notes.trim() : null,
+    subtotalCents,
+    taxCents,
+    taxRatePercent: taxRateNum != null && Number.isFinite(taxRateNum) ? taxRateNum : null,
     totalCents,
   }
 }

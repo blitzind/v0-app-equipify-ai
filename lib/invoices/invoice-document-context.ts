@@ -2,10 +2,13 @@ import type { InvoicePaymentAllocationState } from "@/lib/billing/invoice-paymen
 
 export type InvoiceDocumentLineItem = {
   description: string
+  itemName: string
+  detailNotes: string | null
   qty: number
   unitUsd: number
   lineTotalUsd: number
   sku?: string
+  taxable?: boolean
 }
 
 /** Shared invoice facts for PDF generation and customer invoice email. */
@@ -16,12 +19,19 @@ export type InvoiceDocumentContext = {
   organizationName: string
   documentLogoUrl: string | null
   logoUrl: string | null
+  companyAddress: string | null
+  companyPhone: string | null
+  companyWebsite: string | null
+  companyEmail: string | null
   invoiceNumberLabel: string
   invoiceTitle: string | null
   customerCompanyName: string
+  customerPhone: string | null
+  customerEmail: string | null
   billToName: string | null
-  /** Single formatted billing address (comma-separated lines flattened). */
+  /** Multi-line billing address block. */
   billToAddressBlock: string
+  serviceAddressBlock: string | null
   equipmentName: string | null
   workOrderLabel: string | null
   serviceDateLabel: string | null
@@ -29,6 +39,7 @@ export type InvoiceDocumentContext = {
   dueDateLabel: string
   statusDisplay: string
   dbStatusLower: string
+  authorName: string | null
   lineItems: InvoiceDocumentLineItem[]
   customerNotes: string | null
   invoiceInstructions: string | null

@@ -12,6 +12,7 @@ import {
   getPdlApiKey,
   isPdlApiConfigured,
   isPdlDiscoveryDisabled,
+  isPdlSandboxEnabled,
 } from "@/lib/growth/providers/pdl/pdl-config"
 import { maskProviderEnvValue, classifyProviderEnvValueShape } from "@/lib/growth/qa/provider-runtime-env-resolution"
 
@@ -47,6 +48,7 @@ export type GrowthProviderRuntimeDiagnosticsSnapshot = {
     email_verification_disabled: boolean
     fixture_enabled: boolean
     pdl_discovery_disabled: boolean
+    pdl_sandbox_enabled: boolean
   }
   production_safe: boolean
 }
@@ -110,6 +112,7 @@ export function buildGrowthProviderRuntimeDiagnosticsSnapshot(
       email_verification_disabled,
       fixture_enabled,
       pdl_discovery_disabled: isPdlDiscoveryDisabled(),
+      pdl_sandbox_enabled: isPdlSandboxEnabled(),
     },
     production_safe:
       isZeroBounce &&

@@ -1,8 +1,6 @@
 import "server-only"
 
 import { PDFDocument } from "pdf-lib"
-import { invoiceTaxRowLabel } from "@/lib/billing/invoice-financial-display"
-import { formatTaxedIndicator } from "@/lib/documents/document-address"
 import {
   PdfDocumentLayout,
   PDF_COLOR_BODY,
@@ -21,17 +19,19 @@ import {
   pdfMoneyFromCents,
   pickDocumentLogoUrl,
 } from "@/lib/documents/pdf-lib-shared"
-import type { QuoteDocumentContext } from "@/lib/quotes/quote-document-context"
+import type { PurchaseOrderDocumentContext } from "@/lib/purchase-orders/purchase-order-document-context"
 
-export async function generateQuotePdfBuffer(ctx: QuoteDocumentContext): Promise<Uint8Array> {
+export async function generatePurchaseOrderPdfBuffer(
+  ctx: PurchaseOrderDocumentContext,
+): Promise<Uint8Array> {
   const pdf = await PDFDocument.create()
   const fonts = await createPdfFonts(pdf)
   const layout = new PdfDocumentLayout(pdf, fonts)
 
   layout.setContinuationHeader({
     organizationName: ctx.organizationName,
-    documentTypeLabel: "Quote",
-    documentNumberLabel: ctx.quoteNumberLabel,
+    documentTypeLabel: "Purchase Order",
+    documentNumberLabel: ctx.purchaseOrderNumberLabel,
     statusDisplay: ctx.statusDisplay,
   })
 
@@ -56,7 +56,7 @@ export async function generateQuotePdfBuffer(ctx: QuoteDocumentContext): Promise
   }
   layout.y -= PDF_GAP_SM
 
-  layout.page.drawText("QUOTE", {
+  layout.page.drawText("PURCHASE ORDER", {
     x: PDF_MARGIN,
     y: layout.y,
     size: 10,
@@ -65,7 +65,7 @@ export async function generateQuotePdfBuffer(ctx: QuoteDocumentContext): Promise
   })
   layout.y -= PDF_LINE
 
-  layout.page.drawText(ctx.quoteNumberLabel, {
+  layout.page.drawText(ctx.purchaseOrderNumberLabel, {
     x: PDF_MARGIN,
     y: layout.y,
     size: 13,
@@ -74,38 +74,34 @@ export async function generateQuotePdfBuffer(ctx: QuoteDocumentContext): Promise
   })
   layout.y -= PDF_LINE + PDF_GAP_MD
 
-  layout.drawTextLine(`Issued: ${ctx.createdDateLabel}`)
-  layout.drawTextLine(`Valid through: ${ctx.expiresDateLabel}`)
+  layout.drawTextLine(`Order date: ${ctx.orderDateLabel}`)
+  layout.drawTextLine(`Expected: ${ctx.expectedDateLabel}`)
   layout.drawTextLine(`Status: ${ctx.statusDisplay}`)
-  layout.drawOptionalMetaLine("Author", ctx.authorName)
-  layout.drawOptionalMetaLine("PO Number", ctx.poNumber)
   layout.y -= PDF_GAP_SM
 
-  layout.drawSectionLabel("Customer")
-  layout.drawWrappedBlock(ctx.customerCompanyName, { size: 10, bold: true })
+  layout.drawSectionLabel("Vendor")
+  layout.drawWrappedBlock(ctx.vendorName, { size: 10, bold: true })
   layout.y -= PDF_GAP_SM
-  if (ctx.customerPhone?.trim()) {
-    layout.drawTextLine(ctx.customerPhone.trim())
-  }
-  if (ctx.customerEmail?.trim()) {
-    layout.drawTextLine(ctx.customerEmail.trim())
-  }
-  layout.drawOptionalAddressSection("Service address", ctx.serviceAddressBlock)
-  layout.drawOptionalAddressSection("Billing address", ctx.billingAddressBlock)
+  layout.drawOptionalMetaLine("Contact", ctx.vendorContactName)
+  layout.drawOptionalMetaLine("Email", ctx.vendorEmail)
+  layout.drawOptionalMetaLine("Phone", ctx.vendorPhone)
   layout.y -= PDF_GAP_MD
 
-  const refBits = [ctx.equipmentName ? `Equipment: ${ctx.equipmentName}` : null].filter(Boolean) as string[]
-  if (refBits.length) {
-    layout.drawSectionLabel("Reference")
-    for (const line of refBits) {
-      layout.drawWrappedBlock(line, { size: 9 })
-    }
+  if (ctx.customerCompanyName?.trim()) {
+    layout.drawSectionLabel("Customer")
+    layout.drawWrappedBlock(ctx.customerCompanyName.trim(), { size: 10, bold: true })
+    layout.y -= PDF_GAP_SM
+    if (ctx.customerPhone?.trim()) layout.drawTextLine(ctx.customerPhone.trim())
+    if (ctx.customerEmail?.trim()) layout.drawTextLine(ctx.customerEmail.trim())
     layout.y -= PDF_GAP_MD
   }
 
-  if (ctx.quoteTitle) {
-    layout.drawSectionLabel("Scope")
-    layout.drawWrappedBlock(ctx.quoteTitle, { size: 10 })
+  layout.drawOptionalAddressSection("Ship to", ctx.shipToBlock)
+  layout.drawOptionalAddressSection("Bill to", ctx.billToBlock)
+
+  if (ctx.workOrderLabel?.trim()) {
+    layout.drawSectionLabel("Work order")
+    layout.drawWrappedBlock(ctx.workOrderLabel.trim(), { size: 9 })
     layout.y -= PDF_GAP_MD
   }
 
@@ -114,8 +110,8 @@ export async function generateQuotePdfBuffer(ctx: QuoteDocumentContext): Promise
   layout.y -= PDF_GAP_SM
 
   const colDesc = PDF_MARGIN
-  const colQty = PDF_PAGE_W - PDF_MARGIN - 210
-  const colTaxed = PDF_PAGE_W - PDF_MARGIN - 150
+  const colQty = PDF_PAGE_W - PDF_MARGIN - 200
+  const colUnit = PDF_PAGE_W - PDF_MARGIN - 128
   const colAmt = PDF_PAGE_W - PDF_MARGIN - 62
 
   layout.page.drawText("Description", {
@@ -126,7 +122,7 @@ export async function generateQuotePdfBuffer(ctx: QuoteDocumentContext): Promise
     color: PDF_COLOR_LABEL,
   })
   layout.page.drawText("Qty", { x: colQty, y: layout.y, size: 8, font: fonts.bold, color: PDF_COLOR_LABEL })
-  layout.page.drawText("Taxed", { x: colTaxed, y: layout.y, size: 8, font: fonts.bold, color: PDF_COLOR_LABEL })
+  layout.page.drawText("Unit", { x: colUnit, y: layout.y, size: 8, font: fonts.bold, color: PDF_COLOR_LABEL })
   layout.page.drawText("Amount", { x: colAmt, y: layout.y, size: 8, font: fonts.bold, color: PDF_COLOR_LABEL })
   layout.y -= 16
 
@@ -135,8 +131,8 @@ export async function generateQuotePdfBuffer(ctx: QuoteDocumentContext): Promise
       ? ctx.lineItems
       : [
           {
-            description: ctx.quoteTitle?.trim() || "Quoted services",
-            itemName: ctx.quoteTitle?.trim() || "Quoted services",
+            description: "Purchase order total",
+            itemName: "Purchase order total",
             detailNotes: null,
             qty: 1,
             unitUsd: ctx.totalCents / 100,
@@ -147,10 +143,10 @@ export async function generateQuotePdfBuffer(ctx: QuoteDocumentContext): Promise
   const MIN_LINE_ROW = 16
 
   for (const li of lineItems) {
-    const qtyStr = String(Number.isInteger(li.qty) ? Math.round(li.qty) : li.qty)
-    const taxedStr = formatTaxedIndicator(li.taxable) ?? "—"
-    const amtStr = pdfMoneyFromCents(Math.round(li.lineTotalUsd * 100))
     const desc = li.sku ? `${li.itemName} (SKU ${li.sku})` : li.itemName
+    const qtyStr = String(Number.isInteger(li.qty) ? Math.round(li.qty) : li.qty)
+    const unitStr = pdfMoneyFromCents(Math.round(li.unitUsd * 100))
+    const amtStr = pdfMoneyFromCents(Math.round(li.lineTotalUsd * 100))
 
     layout.ensureSpace(MIN_LINE_ROW + (li.detailNotes ? 8 : 4))
     const yBefore = layout.y
@@ -165,7 +161,7 @@ export async function generateQuotePdfBuffer(ctx: QuoteDocumentContext): Promise
     )
 
     layout.page.drawText(qtyStr, { x: colQty, y: yBefore, size: 9, font: fonts.regular, color: PDF_COLOR_BODY })
-    layout.page.drawText(taxedStr, { x: colTaxed, y: yBefore, size: 9, font: fonts.regular, color: PDF_COLOR_BODY })
+    layout.page.drawText(unitStr, { x: colUnit, y: yBefore, size: 9, font: fonts.regular, color: PDF_COLOR_BODY })
     layout.page.drawText(amtStr, { x: colAmt, y: yBefore, size: 9, font: fonts.regular, color: PDF_COLOR_BODY })
 
     let rowBottom = Math.min(yAfterDesc, yBefore - MIN_LINE_ROW)
@@ -185,39 +181,21 @@ export async function generateQuotePdfBuffer(ctx: QuoteDocumentContext): Promise
   }
 
   layout.y -= PDF_GAP_LG
-  layout.ensureSpace(8)
-
-  layout.drawMoneyRow("Subtotal", pdfMoneyFromCents(ctx.subtotalCents))
-  if (ctx.taxCents > 0) {
-    layout.drawMoneyRow(
-      invoiceTaxRowLabel({ taxRatePercent: ctx.taxRatePercent }),
-      pdfMoneyFromCents(ctx.taxCents),
-    )
-  }
+  layout.ensureSpace(4)
   layout.drawMoneyRow("Total", pdfMoneyFromCents(ctx.totalCents), true)
   layout.y -= PDF_GAP_MD
 
-  if (ctx.customerNotes) {
+  if (ctx.notes) {
     layout.ensureSpace(6)
     layout.drawSectionLabel("Notes")
     layout.y -= PDF_GAP_SM
-    layout.drawWrappedBlock(ctx.customerNotes, { size: 9 })
+    layout.drawWrappedBlock(ctx.notes, { size: 9 })
     layout.y -= PDF_GAP_MD
   }
 
-  layout.ensureSpace(8)
-  layout.drawWrappedBlock("Thank you for your business!", { size: 9, bold: true })
-  layout.y -= PDF_GAP_SM
-
-  if (ctx.companyAddress?.trim()) {
-    layout.drawSectionLabel("Please remit payment to")
-    layout.drawWrappedBlock(ctx.companyAddress.trim(), { size: 8, color: PDF_COLOR_META })
-    layout.y -= PDF_GAP_MD
-  }
-
-  const preparedBy = ctx.authorName?.trim() || ctx.organizationName
+  layout.ensureSpace(4)
   layout.drawWrappedBlock(
-    `Quote prepared by ${preparedBy}. Values are estimates until approved in writing.`,
+    `Purchase order issued by ${ctx.organizationName}.`,
     { size: 8, color: PDF_COLOR_MUTED },
   )
 

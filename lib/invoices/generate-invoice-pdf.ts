@@ -1,211 +1,147 @@
 import "server-only"
 
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib"
+import { PDFDocument } from "pdf-lib"
 import type { InvoiceDocumentContext } from "@/lib/invoices/invoice-document-context"
-import { formatUsdFromCents, invoiceTaxRowLabel } from "@/lib/billing/invoice-financial-display"
-
-const PAGE_W = 595.28
-const PAGE_H = 841.89
-const MARGIN = 48
-const GAP_SM = 4
-const GAP_MD = 10
-const GAP_LG = 16
-const LINE = 14
-const MAX_LOGO_H = 44
-
-function moneyFromCents(cents: number): string {
-  return formatUsdFromCents(Math.max(0, Math.round(cents)))
-}
-
-function pickLogoUrl(ctx: InvoiceDocumentContext): string | null {
-  const d = ctx.documentLogoUrl?.trim()
-  if (d) return d
-  const l = ctx.logoUrl?.trim()
-  return l || null
-}
-
-async function tryFetchBytes(url: string): Promise<Uint8Array | null> {
-  try {
-    const u = new URL(url)
-    if (u.protocol !== "https:" && u.protocol !== "http:") return null
-    const res = await fetch(url, { signal: AbortSignal.timeout(12_000) })
-    if (!res.ok) return null
-    return new Uint8Array(await res.arrayBuffer())
-  } catch {
-    return null
-  }
-}
-
-/** `y` is pdf baseline (from bottom). Returns next baseline below wrapped text. */
-function drawWrappedDown(
-  page: PDFPage,
-  text: string,
-  x: number,
-  y: number,
-  maxWidth: number,
-  font: PDFFont,
-  size: number,
-  color = rgb(0.1, 0.12, 0.18),
-): number {
-  const paragraphs = text.split(/\r?\n/)
-  let curY = y
-  for (const para of paragraphs) {
-    const words = para.split(/\s+/).filter(Boolean)
-    if (words.length === 0) {
-      curY -= size + GAP_SM
-      continue
-    }
-    let line = ""
-    for (const w of words) {
-      const next = line ? `${line} ${w}` : w
-      if (font.widthOfTextAtSize(next, size) <= maxWidth) {
-        line = next
-      } else {
-        if (line) {
-          page.drawText(line, { x, y: curY, size, font, color })
-          curY -= size + GAP_SM
-        }
-        line = w
-      }
-    }
-    if (line) {
-      page.drawText(line, { x, y: curY, size, font, color })
-      curY -= size + GAP_SM
-    }
-  }
-  return curY
-}
+import { invoiceTaxRowLabel } from "@/lib/billing/invoice-financial-display"
+import { formatTaxedIndicator } from "@/lib/documents/document-address"
+import {
+  PdfDocumentLayout,
+  PDF_COLOR_BODY,
+  PDF_COLOR_LABEL,
+  PDF_COLOR_META,
+  PDF_COLOR_MUTED,
+  PDF_COLOR_TITLE,
+  PDF_GAP_LG,
+  PDF_GAP_MD,
+  PDF_GAP_SM,
+  PDF_LINE,
+  PDF_MARGIN,
+  PDF_PAGE_W,
+  createPdfFonts,
+  drawWrappedDown,
+  pdfMoneyFromCents,
+  pickDocumentLogoUrl,
+} from "@/lib/documents/pdf-lib-shared"
 
 export async function generateInvoicePdfBuffer(ctx: InvoiceDocumentContext): Promise<Uint8Array> {
   const pdf = await PDFDocument.create()
-  const font = await pdf.embedFont(StandardFonts.Helvetica)
-  const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold)
+  const fonts = await createPdfFonts(pdf)
+  const layout = new PdfDocumentLayout(pdf, fonts)
 
-  let page = pdf.addPage([PAGE_W, PAGE_H])
-  /** Baseline from bottom — start below top margin. */
-  let y = PAGE_H - MARGIN - 14
+  layout.setContinuationHeader({
+    organizationName: ctx.organizationName,
+    documentTypeLabel: "Invoice",
+    documentNumberLabel: ctx.invoiceNumberLabel,
+    statusDisplay: ctx.statusDisplay,
+  })
 
-  const logoUrl = pickLogoUrl(ctx)
-  if (logoUrl) {
-    const bytes = await tryFetchBytes(logoUrl)
-    if (bytes && bytes.byteLength > 16) {
-      try {
-        let img
-        try {
-          img = await pdf.embedPng(bytes)
-        } catch {
-          img = await pdf.embedJpg(bytes)
-        }
-        const iw = img.width
-        const ih = img.height
-        const scale = Math.min(150 / iw, MAX_LOGO_H / ih)
-        const dw = iw * scale
-        const dh = ih * scale
-        page.drawImage(img, {
-          x: PAGE_W - MARGIN - dw,
-          y: y - dh + 10,
-          width: dw,
-          height: dh,
-        })
-      } catch {
-        /* ignore */
-      }
-    }
-  }
+  await layout.drawLogo(pickDocumentLogoUrl(ctx.documentLogoUrl, ctx.logoUrl))
 
-  page.drawText(ctx.organizationName, {
-    x: MARGIN,
-    y,
+  layout.page.drawText(ctx.organizationName, {
+    x: PDF_MARGIN,
+    y: layout.y,
     size: 15,
-    font: fontBold,
-    color: rgb(0.06, 0.09, 0.16),
+    font: fonts.bold,
+    color: PDF_COLOR_TITLE,
   })
-  y -= LINE + 6
+  layout.y -= PDF_LINE + 6
 
-  page.drawText("INVOICE", { x: MARGIN, y, size: 10, font: fontBold, color: rgb(0.35, 0.42, 0.52) })
-  y -= LINE
+  if (ctx.companyAddress?.trim()) {
+    layout.drawWrappedBlock(ctx.companyAddress.trim(), { size: 8, color: PDF_COLOR_META })
+    layout.y -= PDF_GAP_SM
+  }
+  for (const line of [ctx.companyPhone, ctx.companyWebsite, ctx.companyEmail]) {
+    if (!line?.trim()) continue
+    layout.drawTextLine(line.trim(), { size: 8 })
+  }
+  layout.y -= PDF_GAP_SM
 
-  page.drawText(ctx.invoiceNumberLabel, {
-    x: MARGIN,
-    y,
+  layout.page.drawText("INVOICE", {
+    x: PDF_MARGIN,
+    y: layout.y,
+    size: 10,
+    font: fonts.bold,
+    color: PDF_COLOR_LABEL,
+  })
+  layout.y -= PDF_LINE
+
+  layout.page.drawText(ctx.invoiceNumberLabel, {
+    x: PDF_MARGIN,
+    y: layout.y,
     size: 13,
-    font: fontBold,
-    color: rgb(0.06, 0.09, 0.16),
+    font: fonts.bold,
+    color: PDF_COLOR_TITLE,
   })
-  y -= LINE + GAP_MD
+  layout.y -= PDF_LINE + PDF_GAP_MD
 
-  const meta = [
-    `Issue date: ${ctx.issuedDateLabel}`,
-    `Due date: ${ctx.dueDateLabel}`,
-    `Status: ${ctx.statusDisplay}`,
-  ]
-  for (const line of meta) {
-    page.drawText(line, { x: MARGIN, y, size: 9, font, color: rgb(0.25, 0.32, 0.42) })
-    y -= LINE - 2
+  layout.drawTextLine(`Issue date: ${ctx.issuedDateLabel}`)
+  layout.drawTextLine(`Due date: ${ctx.dueDateLabel}`)
+  layout.drawTextLine(`Status: ${ctx.statusDisplay}`)
+  if (ctx.paymentTermsLabel?.trim()) {
+    layout.drawTextLine(`Terms: ${ctx.paymentTermsLabel.trim()}`)
   }
-  y -= GAP_SM
+  layout.drawOptionalMetaLine("Author", ctx.authorName)
+  layout.drawOptionalMetaLine("PO Number", ctx.poNumber)
+  layout.y -= PDF_GAP_SM
 
-  page.drawText("Bill to", { x: MARGIN, y, size: 9, font: fontBold, color: rgb(0.35, 0.42, 0.52) })
-  y -= LINE
-
+  layout.drawSectionLabel("Bill to")
   const billName = ctx.billToName?.trim() || ctx.customerCompanyName
-  y = drawWrappedDown(page, billName, MARGIN, y, PAGE_W - MARGIN * 2, fontBold, 10)
-  y -= GAP_SM
+  layout.drawWrappedBlock(billName, { size: 10, bold: true })
+  layout.y -= PDF_GAP_SM
   if (ctx.billToAddressBlock) {
-    y = drawWrappedDown(page, ctx.billToAddressBlock, MARGIN, y, PAGE_W - MARGIN * 2, font, 9)
+    layout.drawWrappedBlock(ctx.billToAddressBlock, { size: 9 })
   }
-  y -= GAP_MD
+  if (ctx.customerPhone?.trim()) {
+    layout.drawTextLine(ctx.customerPhone.trim())
+  }
+  if (ctx.customerEmail?.trim()) {
+    layout.drawTextLine(ctx.customerEmail.trim())
+  }
+  layout.drawOptionalAddressSection("Service address", ctx.serviceAddressBlock)
+  layout.y -= PDF_GAP_MD
 
   const svcBits = [
     ctx.equipmentName ? `Equipment / service: ${ctx.equipmentName}` : null,
     ctx.workOrderLabel ? `Work order: ${ctx.workOrderLabel}` : null,
     ctx.serviceDateLabel ? `Service date: ${ctx.serviceDateLabel}` : null,
-    ctx.poNumber ? `PO: ${ctx.poNumber}` : null,
   ].filter(Boolean) as string[]
 
   if (svcBits.length) {
-    page.drawText("Job reference", { x: MARGIN, y, size: 9, font: fontBold, color: rgb(0.35, 0.42, 0.52) })
-    y -= LINE
+    layout.drawSectionLabel("Job reference")
     for (const line of svcBits) {
-      y = drawWrappedDown(page, line, MARGIN, y, PAGE_W - MARGIN * 2, font, 9)
+      layout.drawWrappedBlock(line, { size: 9 })
     }
-    y -= GAP_MD
+    layout.y -= PDF_GAP_MD
   }
 
   if (ctx.invoiceTitle) {
-    page.drawText("Subject", { x: MARGIN, y, size: 9, font: fontBold, color: rgb(0.35, 0.42, 0.52) })
-    y -= LINE
-    y = drawWrappedDown(page, ctx.invoiceTitle, MARGIN, y, PAGE_W - MARGIN * 2, font, 10)
-    y -= GAP_MD
+    layout.drawSectionLabel("Subject")
+    layout.drawWrappedBlock(ctx.invoiceTitle, { size: 10 })
+    layout.y -= PDF_GAP_MD
   }
 
-  const ensureSpace = (minLines: number) => {
-    if (y < MARGIN + minLines * LINE) {
-      page = pdf.addPage([PAGE_W, PAGE_H])
-      y = PAGE_H - MARGIN - 12
-    }
-  }
+  layout.ensureSpace(8)
+  layout.drawSectionLabel("Line items")
+  layout.y -= PDF_GAP_SM
 
-  ensureSpace(8)
-  page.drawText("Line items", { x: MARGIN, y, size: 9, font: fontBold, color: rgb(0.35, 0.42, 0.52) })
-  y -= LINE + GAP_SM
+  const colDesc = PDF_MARGIN
+  const colQty = PDF_PAGE_W - PDF_MARGIN - 230
+  const colTaxed = PDF_PAGE_W - PDF_MARGIN - 170
+  const colUnit = PDF_PAGE_W - PDF_MARGIN - 128
+  const colAmt = PDF_PAGE_W - PDF_MARGIN - 62
 
-  const colDesc = MARGIN
-  const colQty = PAGE_W - MARGIN - 200
-  const colUnit = PAGE_W - MARGIN - 128
-  const colAmt = PAGE_W - MARGIN - 62
-
-  page.drawText("Description", {
+  layout.page.drawText("Description", {
     x: colDesc,
-    y,
+    y: layout.y,
     size: 8,
-    font: fontBold,
-    color: rgb(0.35, 0.42, 0.52),
+    font: fonts.bold,
+    color: PDF_COLOR_LABEL,
   })
-  page.drawText("Qty", { x: colQty, y, size: 8, font: fontBold, color: rgb(0.35, 0.42, 0.52) })
-  page.drawText("Unit", { x: colUnit, y, size: 8, font: fontBold, color: rgb(0.35, 0.42, 0.52) })
-  page.drawText("Amount", { x: colAmt, y, size: 8, font: fontBold, color: rgb(0.35, 0.42, 0.52) })
-  y -= 16
+  layout.page.drawText("Qty", { x: colQty, y: layout.y, size: 8, font: fonts.bold, color: PDF_COLOR_LABEL })
+  layout.page.drawText("Taxed", { x: colTaxed, y: layout.y, size: 8, font: fonts.bold, color: PDF_COLOR_LABEL })
+  layout.page.drawText("Unit", { x: colUnit, y: layout.y, size: 8, font: fonts.bold, color: PDF_COLOR_LABEL })
+  layout.page.drawText("Amount", { x: colAmt, y: layout.y, size: 8, font: fonts.bold, color: PDF_COLOR_LABEL })
+  layout.y -= 16
 
   const lineItems =
     ctx.lineItems.length > 0
@@ -213,6 +149,8 @@ export async function generateInvoicePdfBuffer(ctx: InvoiceDocumentContext): Pro
       : [
           {
             description: "Invoice total (stored as a single amount)",
+            itemName: "Invoice total (stored as a single amount)",
+            detailNotes: null,
             qty: 1,
             unitUsd: ctx.subtotalCents / 100,
             lineTotalUsd: ctx.subtotalCents / 100,
@@ -222,58 +160,89 @@ export async function generateInvoicePdfBuffer(ctx: InvoiceDocumentContext): Pro
   const MIN_LINE_ROW = 16
 
   for (const li of lineItems) {
-    const desc = li.sku ? `${li.description} (SKU ${li.sku})` : li.description
+    const desc = li.sku ? `${li.itemName} (SKU ${li.sku})` : li.itemName
     const qtyStr = String(Number.isInteger(li.qty) ? Math.round(li.qty) : li.qty)
-    const unitStr = moneyFromCents(Math.round(li.unitUsd * 100))
-    const amtStr = moneyFromCents(Math.round(li.lineTotalUsd * 100))
+    const taxedStr = formatTaxedIndicator(li.taxable) ?? "—"
+    const unitStr = pdfMoneyFromCents(Math.round(li.unitUsd * 100))
+    const amtStr = pdfMoneyFromCents(Math.round(li.lineTotalUsd * 100))
 
-    ensureSpace(MIN_LINE_ROW + 4)
-    const yBefore = y
-    const yAfterDesc = drawWrappedDown(page, desc, colDesc, y, colQty - colDesc - 10, font, 9)
+    layout.ensureSpace(MIN_LINE_ROW + (li.detailNotes ? 8 : 4))
+    const yBefore = layout.y
+    const yAfterDesc = drawWrappedDown(
+      layout.page,
+      desc,
+      colDesc,
+      layout.y,
+      colQty - colDesc - 10,
+      fonts.regular,
+      9,
+    )
 
-    page.drawText(qtyStr, { x: colQty, y: yBefore, size: 9, font, color: rgb(0.12, 0.16, 0.22) })
-    page.drawText(unitStr, { x: colUnit, y: yBefore, size: 9, font, color: rgb(0.12, 0.16, 0.22) })
-    page.drawText(amtStr, { x: colAmt, y: yBefore, size: 9, font, color: rgb(0.12, 0.16, 0.22) })
+    layout.page.drawText(qtyStr, { x: colQty, y: yBefore, size: 9, font: fonts.regular, color: PDF_COLOR_BODY })
+    layout.page.drawText(taxedStr, { x: colTaxed, y: yBefore, size: 9, font: fonts.regular, color: PDF_COLOR_BODY })
+    layout.page.drawText(unitStr, { x: colUnit, y: yBefore, size: 9, font: fonts.regular, color: PDF_COLOR_BODY })
+    layout.page.drawText(amtStr, { x: colAmt, y: yBefore, size: 9, font: fonts.regular, color: PDF_COLOR_BODY })
 
-    y = Math.min(yAfterDesc, yBefore - MIN_LINE_ROW) - GAP_MD
+    let rowBottom = Math.min(yAfterDesc, yBefore - MIN_LINE_ROW)
+    if (li.detailNotes?.trim()) {
+      rowBottom = drawWrappedDown(
+        layout.page,
+        li.detailNotes.trim(),
+        colDesc + 8,
+        rowBottom - PDF_GAP_SM,
+        colQty - colDesc - 18,
+        fonts.regular,
+        8,
+        PDF_COLOR_META,
+      )
+    }
+    layout.y = rowBottom - PDF_GAP_MD
   }
 
-  y -= GAP_LG
-  ensureSpace(10)
+  layout.y -= PDF_GAP_LG
+  layout.ensureSpace(10)
 
-  const labelX = PAGE_W - MARGIN - 200
-  const drawMoneyRow = (label: string, value: string, bold = false) => {
-    const f = bold ? fontBold : font
-    page.drawText(label, { x: labelX, y, size: 10, font: f, color: rgb(0.12, 0.16, 0.22) })
-    const w = f.widthOfTextAtSize(value, 10)
-    page.drawText(value, { x: PAGE_W - MARGIN - w, y, size: 10, font: f, color: rgb(0.12, 0.16, 0.22) })
-    y -= LINE + 2
-  }
-
-  drawMoneyRow("Subtotal", moneyFromCents(ctx.subtotalCents))
+  layout.drawMoneyRow("Subtotal", pdfMoneyFromCents(ctx.subtotalCents))
   if (ctx.taxCents > 0) {
-    drawMoneyRow(`${invoiceTaxRowLabel({ taxRatePercent: ctx.taxRatePercent })}`, moneyFromCents(ctx.taxCents))
+    layout.drawMoneyRow(
+      invoiceTaxRowLabel({ taxRatePercent: ctx.taxRatePercent }),
+      pdfMoneyFromCents(ctx.taxCents),
+    )
   }
-  drawMoneyRow("Total", moneyFromCents(ctx.grandTotalCents), true)
-  drawMoneyRow("Amount paid", moneyFromCents(ctx.totalPaidCents))
-  drawMoneyRow("Balance due", moneyFromCents(Math.max(0, ctx.balanceDueCents)), true)
-
-  y -= GAP_MD
+  layout.drawMoneyRow("Total", pdfMoneyFromCents(ctx.grandTotalCents), true)
+  layout.drawMoneyRow("Amount paid", pdfMoneyFromCents(ctx.totalPaidCents))
+  layout.drawMoneyRow("Balance due", pdfMoneyFromCents(Math.max(0, ctx.balanceDueCents)), true)
+  layout.y -= PDF_GAP_MD
 
   const notesParts: string[] = []
   if (ctx.invoiceInstructions) notesParts.push(`Instructions\n${ctx.invoiceInstructions}`)
   if (ctx.customerNotes) notesParts.push(`Notes\n${ctx.customerNotes}`)
 
   if (notesParts.length) {
-    ensureSpace(6)
-    page.drawText("Terms & notes", { x: MARGIN, y, size: 9, font: fontBold, color: rgb(0.35, 0.42, 0.52) })
-    y -= LINE + GAP_SM
+    layout.ensureSpace(6)
+    layout.drawSectionLabel("Terms & notes")
+    layout.y -= PDF_GAP_SM
     for (const block of notesParts) {
-      ensureSpace(4)
-      y = drawWrappedDown(page, block, MARGIN, y, PAGE_W - MARGIN * 2, font, 9)
-      y -= GAP_MD
+      layout.ensureSpace(4)
+      layout.drawWrappedBlock(block, { size: 9 })
+      layout.y -= PDF_GAP_MD
     }
   }
 
+  layout.ensureSpace(8)
+  layout.drawWrappedBlock("Thank you for your business!", { size: 9, bold: true })
+  layout.y -= PDF_GAP_SM
+
+  if (ctx.companyAddress?.trim()) {
+    layout.drawSectionLabel("Please remit payment to")
+    layout.drawWrappedBlock(ctx.companyAddress.trim(), { size: 8, color: PDF_COLOR_META })
+    layout.y -= PDF_GAP_MD
+  }
+
+  if (ctx.invoiceInstructions?.trim()) {
+    layout.drawWrappedBlock(ctx.invoiceInstructions.trim(), { size: 8, color: PDF_COLOR_MUTED })
+  }
+
+  layout.stampPageNumbers()
   return pdf.save()
 }
