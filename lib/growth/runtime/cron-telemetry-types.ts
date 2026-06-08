@@ -29,6 +29,7 @@ export const GROWTH_CRON_ROUTE_IDS = [
   "growth-warmup-progression",
   "growth-provider-runtime-diagnostics",
   "growth-pdl-test-lookup-run",
+  "growth-pdl-coverage-audit-run",
   "growth-email-discovery-cert-run",
   "growth-prospect-graph-expansion-worker",
 ] as const

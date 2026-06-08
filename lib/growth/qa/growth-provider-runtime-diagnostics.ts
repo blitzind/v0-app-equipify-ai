@@ -13,6 +13,7 @@ import {
   isPdlApiConfigured,
   isPdlDiscoveryDisabled,
   isPdlSandboxEnabled,
+  resolvePdlSandboxEnvConfig,
 } from "@/lib/growth/providers/pdl/pdl-config"
 import { maskProviderEnvValue, classifyProviderEnvValueShape } from "@/lib/growth/qa/provider-runtime-env-resolution"
 
@@ -48,7 +49,10 @@ export type GrowthProviderRuntimeDiagnosticsSnapshot = {
     email_verification_disabled: boolean
     fixture_enabled: boolean
     pdl_discovery_disabled: boolean
+    /** Env default from PDL_USE_SANDBOX (not per-request override). */
     pdl_sandbox_enabled: boolean
+    pdl_sandbox_env_raw: string | null
+    pdl_sandbox_env_explicit: boolean
   }
   production_safe: boolean
 }
@@ -89,6 +93,7 @@ export function buildGrowthProviderRuntimeDiagnosticsSnapshot(
   const isPdl = isPdlApiConfigured()
   const fixture_enabled = isEmailVerificationFixtureEnabled()
   const email_verification_disabled = isEmailVerificationDisabled()
+  const pdlSandboxEnv = resolvePdlSandboxEnvConfig(env)
 
   return {
     qa_marker: GROWTH_PROVIDER_RUNTIME_DIAGNOSTICS_QA_MARKER,
@@ -112,7 +117,9 @@ export function buildGrowthProviderRuntimeDiagnosticsSnapshot(
       email_verification_disabled,
       fixture_enabled,
       pdl_discovery_disabled: isPdlDiscoveryDisabled(),
-      pdl_sandbox_enabled: isPdlSandboxEnabled(),
+      pdl_sandbox_enabled: pdlSandboxEnv.env_sandbox_enabled,
+      pdl_sandbox_env_raw: pdlSandboxEnv.env_raw,
+      pdl_sandbox_env_explicit: pdlSandboxEnv.env_explicit,
     },
     production_safe:
       isZeroBounce &&

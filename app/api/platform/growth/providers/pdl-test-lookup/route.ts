@@ -40,8 +40,11 @@ export async function POST(request: Request) {
     provider_config: {
       pdl_configured: isPdlApiConfigured(),
       pdl_discovery_disabled: isPdlDiscoveryDisabled(),
-      sandbox_mode: isPdlSandboxEnabled(),
-      production_ready: isPdlApiConfigured() && !isPdlDiscoveryDisabled() && !isPdlSandboxEnabled(),
+      env_sandbox_mode: isPdlSandboxEnabled(),
+      effective_sandbox_mode: lookup.sandbox,
+      sandbox_mode: lookup.sandbox,
+      production_ready:
+        isPdlApiConfigured() && !isPdlDiscoveryDisabled() && !lookup.sandbox,
       winning_key: diagnostics.loaders.pdl_winning_key,
     },
     lookup,
@@ -61,6 +64,8 @@ export async function GET(request: Request) {
     provider_config: {
       pdl_configured: isPdlApiConfigured(),
       pdl_discovery_disabled: isPdlDiscoveryDisabled(),
+      env_sandbox_mode: isPdlSandboxEnabled(),
+      effective_sandbox_mode: null,
       sandbox_mode: isPdlSandboxEnabled(),
       production_ready: isPdlApiConfigured() && !isPdlDiscoveryDisabled() && !isPdlSandboxEnabled(),
       winning_key: diagnostics.loaders.pdl_winning_key,

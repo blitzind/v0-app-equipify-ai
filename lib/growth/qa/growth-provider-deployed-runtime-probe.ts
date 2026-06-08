@@ -486,10 +486,14 @@ function parseDeployedPdlTestLookupPayload(body: Record<string, unknown> | null)
   const pdl_configured =
     provider_config?.pdl_configured === true ||
     diagnostics?.loaders?.isPdlApiConfigured === true
-  const sandbox_mode =
-    provider_config?.sandbox_mode === true ||
-    diagnostics?.loaders?.pdl_sandbox_enabled === true ||
-    lookup?.sandbox === true
+  const env_sandbox_mode =
+    provider_config?.env_sandbox_mode === true ||
+    diagnostics?.loaders?.pdl_sandbox_enabled === true
+  const effective_sandbox_mode =
+    typeof lookup?.sandbox === "boolean"
+      ? lookup.sandbox === true
+      : provider_config?.effective_sandbox_mode === true || env_sandbox_mode
+  const sandbox_mode = effective_sandbox_mode
   const blocked = new Set([
     "missing_api_key",
     "disabled",
@@ -509,7 +513,7 @@ function parseDeployedPdlTestLookupPayload(body: Record<string, unknown> | null)
     pdl_configured,
     production_ready:
       provider_config?.production_ready === true ||
-      (pdl_configured && !sandbox_mode),
+      (pdl_configured && !effective_sandbox_mode),
   }
 }
 
@@ -595,6 +599,8 @@ export async function runDeployedPdlTestLookup(input: {
   sandbox?: boolean
   fetch_impl?: typeof fetch
   admin?: SupabaseClient | null
+  /** When true, never fall back to the fixed single-company PDL cron probe. */
+  disallow_cron_fallback?: boolean
 }): Promise<{
   ok: boolean
   http_status: number | null
@@ -641,6 +647,22 @@ export async function runDeployedPdlTestLookup(input: {
       }
 
       const parsed = parseDeployedPdlTestLookupPayload(body)
+      if (response.status === 401 || response.status === 403) {
+        return {
+          ok: false,
+          http_status: response.status,
+          error: String(body?.error ?? "pdl_test_lookup_unauthorized"),
+          channel: "http",
+          search_executable: false,
+          contacts_returned: 0,
+          query_summary: null,
+          message: null,
+          sandbox_mode: false,
+          pdl_configured: false,
+          production_ready: false,
+          body,
+        }
+      }
       return {
         ok: response.ok && parsed.ok,
         http_status: response.status,
@@ -650,11 +672,12 @@ export async function runDeployedPdlTestLookup(input: {
         body,
       }
     } catch (e) {
-      if (!input.admin) {
+      const http_error = e instanceof Error ? e.message : String(e)
+      if (!input.admin || input.disallow_cron_fallback) {
         return {
           ok: false,
           http_status: null,
-          error: e instanceof Error ? e.message : String(e),
+          error: http_error,
           channel: "http",
           search_executable: false,
           contacts_returned: 0,
@@ -669,7 +692,7 @@ export async function runDeployedPdlTestLookup(input: {
     }
   }
 
-  if (input.admin) {
+  if (input.admin && !input.disallow_cron_fallback) {
     return runDeployedPdlTestLookupViaVercelCron({
       base_url: input.base_url,
       admin: input.admin,

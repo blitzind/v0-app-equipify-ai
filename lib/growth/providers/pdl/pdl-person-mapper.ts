@@ -3,24 +3,39 @@
 import type { GrowthContactDiscoveryProviderRawContact } from "@/lib/growth/contact-discovery/contact-discovery-provider-types"
 import type { PdlPersonRecord } from "@/lib/growth/providers/pdl/pdl-types"
 
+function asTrimmedString(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value)
+  }
+  return null
+}
+
 function pickEmail(person: PdlPersonRecord): string | null {
-  const work = person.work_email?.trim()
+  const work = asTrimmedString(person.work_email)
   if (work) return work
-  const recommended = person.recommended_personal_email?.trim()
+  const recommended = asTrimmedString(person.recommended_personal_email)
   if (recommended) return recommended
-  for (const entry of person.emails ?? []) {
-    const address = entry.address?.trim()
-    if (address) return address
+  if (Array.isArray(person.emails)) {
+    for (const entry of person.emails) {
+      const address = asTrimmedString(entry?.address)
+      if (address) return address
+    }
   }
   return null
 }
 
 function pickPhone(person: PdlPersonRecord): string | null {
-  const mobile = person.mobile_phone?.trim()
+  const mobile = asTrimmedString(person.mobile_phone)
   if (mobile) return mobile
-  for (const entry of person.phone_numbers ?? []) {
-    const number = entry.number?.trim()
-    if (number) return number
+  if (Array.isArray(person.phone_numbers)) {
+    for (const entry of person.phone_numbers) {
+      const number = asTrimmedString(entry?.number)
+      if (number) return number
+    }
   }
   return null
 }
@@ -40,22 +55,22 @@ function resolveConfidence(person: PdlPersonRecord): number {
 
 function locationLabel(person: PdlPersonRecord): string | null {
   const parts = [person.location_locality, person.location_region, person.location_country]
-    .map((value) => value?.trim())
+    .map((value) => asTrimmedString(value))
     .filter(Boolean)
   if (parts.length > 0) return parts.join(", ")
-  return person.location_name?.trim() || null
+  return asTrimmedString(person.location_name)
 }
 
 export function mapPdlPersonToContactDiscoveryRaw(
   person: PdlPersonRecord,
   input: { company_name: string; domain: string | null; sandbox: boolean },
 ): GrowthContactDiscoveryProviderRawContact | null {
-  const full_name = person.full_name?.trim()
+  const full_name = asTrimmedString(person.full_name)
   if (!full_name) return null
 
   const email = pickEmail(person)
   const phone = pickPhone(person)
-  const linkedin_url = person.linkedin_url?.trim() || null
+  const linkedin_url = asTrimmedString(person.linkedin_url)
   const hasPii = Boolean(email || phone || linkedin_url)
   const location = locationLabel(person)
   const providerLabel = input.sandbox ? "People Data Labs (sandbox)" : "People Data Labs"
@@ -68,21 +83,24 @@ export function mapPdlPersonToContactDiscoveryRaw(
     },
   ]
 
-  if (person.job_title?.trim()) {
+  const job_title = asTrimmedString(person.job_title)
+  if (job_title) {
     evidence.push({
       claim: "Role attribution",
-      evidence: person.job_title.trim(),
+      evidence: job_title,
       source: "people_data_labs",
     })
   }
 
   return {
     full_name,
-    first_name: person.first_name?.trim() || null,
-    last_name: person.last_name?.trim() || null,
-    job_title: person.job_title?.trim() || null,
-    department: person.job_title_sub_role?.trim() || null,
-    seniority: person.job_title_levels?.[0]?.trim() || null,
+    first_name: asTrimmedString(person.first_name),
+    last_name: asTrimmedString(person.last_name),
+    job_title,
+    department: asTrimmedString(person.job_title_sub_role),
+    seniority: Array.isArray(person.job_title_levels)
+      ? asTrimmedString(person.job_title_levels[0])
+      : null,
     linkedin_url,
     email,
     phone,
@@ -120,7 +138,8 @@ export function mapPdlPeopleToContactDiscoveryRaw(input: {
   const seen = new Set<string>()
   const contacts: GrowthContactDiscoveryProviderRawContact[] = []
 
-  for (const person of input.people) {
+  const people = Array.isArray(input.people) ? input.people : []
+  for (const person of people) {
     const mapped = mapPdlPersonToContactDiscoveryRaw(person, {
       company_name: input.company_name,
       domain: input.domain,
