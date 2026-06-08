@@ -42,9 +42,21 @@ export type GrowthContactDiscoveryProviderRawContact = {
   /** When set, PII fields may be retained if they pass normalizer rules. */
   pii_observed?: boolean
   confidence?: number | null
+  /** Vendor-stable person key when available (Phase 7.PCA-1 adapter contract). */
+  external_provider_contact_id?: string | null
   evidence: GrowthContactDiscoveryEvidence[]
   source_attribution: GrowthContactDiscoveryAttribution[]
   metadata?: Record<string, unknown>
+}
+
+/** Provider run metadata — diagnostics, rate limits, cost hints (Phase 7.PCA-1). */
+export type GrowthContactDiscoveryProviderRunMetadata = {
+  qa_marker?: string
+  duration_ms?: number
+  rate_limit_remaining?: number
+  estimated_cost_usd?: number
+  provider_run_id?: string
+  [key: string]: unknown
 }
 
 export type GrowthContactDiscoveryProviderResult = {
@@ -54,6 +66,7 @@ export type GrowthContactDiscoveryProviderResult = {
   message: string
   contacts: GrowthContactDiscoveryProviderRawContact[]
   error?: string | null
+  metadata?: GrowthContactDiscoveryProviderRunMetadata
 }
 
 export type GrowthContactDiscoveryProvider = {

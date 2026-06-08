@@ -89,10 +89,11 @@ export async function runProspectSearchHumanAcquisitionPipeline(
   }
 
   let company_contacts_synced = 0
-  if (canonical_company_id && discovery_contacts > 0) {
+  if (discovery_contacts > 0) {
     const snapshot = await loadContactDiscoverySnapshot(admin, company_candidate_id)
     company_contacts_synced = await syncContactCandidatesToCompanyContacts(admin, {
-      company_id: canonical_company_id,
+      company_candidate_id,
+      canonical_company_id: canonical_company_id || null,
       candidates: snapshot.contacts,
     })
   }

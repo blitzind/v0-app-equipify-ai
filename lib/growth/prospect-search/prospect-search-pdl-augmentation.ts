@@ -2,7 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createPeopleDataLabsContactDiscoveryProvider } from "@/lib/growth/contact-discovery/providers/people-data-labs-provider"
-import { persistPdlContactsToCandidates } from "@/lib/growth/providers/pdl/pdl-contact-persistence"
+import { persistProviderContactsAndSync } from "@/lib/growth/providers/pdl/pdl-contact-persistence"
 import { isPdlApiConfigured, isPdlDiscoveryDisabled } from "@/lib/growth/providers/pdl/pdl-config"
 import { GROWTH_PDL_PROVIDER_QA_MARKER } from "@/lib/growth/providers/pdl/pdl-types"
 import { applyProspectSearchContactIntelligenceOverlay } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-loader"
@@ -94,14 +94,15 @@ export async function augmentProspectSearchCompaniesWithPdl(
 
     if (company.source_type === "external_discovered") {
       try {
-        await persistPdlContactsToCandidates(admin, {
+        await persistProviderContactsAndSync(admin, {
           company_candidate_id: company.id,
+          canonical_company_id: company.canonical_company_id ?? null,
           provider_name: result.provider_name,
           provider_type: result.provider_type,
           contacts: result.contacts,
         })
       } catch {
-        // company_contacts persistence already attempted in provider — safe fallback.
+        // Non-blocking — hydration overlay may still surface in-memory provider contacts.
       }
     }
 

@@ -10,6 +10,10 @@ import { isGrowthCompanyContactsSchemaReady } from "@/lib/growth/contact-discove
 import { scoreDecisionMakerTitle } from "@/lib/growth/contact-discovery/decision-maker-score"
 import type { GrowthContactCandidate } from "@/lib/growth/contact-discovery/contact-discovery-types"
 import { companyContactDedupeHash } from "@/lib/growth/contact-discovery/website-contact-discovery"
+import {
+  resolveCompanyContactsCanonicalCompanyId,
+  type CompanyContactsPersistenceResolution,
+} from "@/lib/growth/contact-discovery/resolve-company-contacts-company-id"
 import { classifyContactIdentity } from "@/lib/growth/human-identity-evidence/contact-identity-classification"
 
 function asString(value: unknown): string {
@@ -91,14 +95,26 @@ function candidateToCompanyRow(input: {
     email: input.candidate.email,
   })
 
-  const identity = classifyContactIdentity({
-    full_name: input.candidate.full_name,
-    title: input.candidate.job_title,
-    email: input.candidate.email,
-    phone: input.candidate.phone,
-    linkedin_url: input.candidate.linkedin_url,
-    source_type: resolvedSourceType,
-  })
+  const metaClassification = asString(candidateMetadata.identity_classification)
+  const identity =
+    metaClassification &&
+    ["named_person", "role_contact", "company_channel", "generic_placeholder"].includes(metaClassification)
+      ? {
+          classification: metaClassification as ReturnType<typeof classifyContactIdentity>["classification"],
+          eligible_for_canonical_person: candidateMetadata.eligible_for_canonical_person === true,
+          eligible_for_committee: candidateMetadata.eligible_for_committee === true,
+          reasons: Array.isArray(candidateMetadata.identity_classification_reasons)
+            ? (candidateMetadata.identity_classification_reasons as string[])
+            : ["normalized_at_ingest"],
+        }
+      : classifyContactIdentity({
+          full_name: input.candidate.full_name,
+          title: input.candidate.job_title,
+          email: input.candidate.email,
+          phone: input.candidate.phone,
+          linkedin_url: input.candidate.linkedin_url,
+          source_type: resolvedSourceType,
+        })
 
   return {
     company_id: input.company_id,
@@ -140,19 +156,32 @@ function candidateToCompanyRow(input: {
   }
 }
 
-/** Bridge contact_candidates → company_contacts for acquisition promotion. */
-export async function syncContactCandidatesToCompanyContacts(
+export type SyncContactCandidatesToCompanyContactsInput = {
+  candidates: GrowthContactCandidate[]
+  /** Staging candidate id — used to resolve canonical company id when not explicit. */
+  company_candidate_id?: string
+  /** Canonical `growth.companies` id — preferred when already known. */
+  canonical_company_id?: string | null
+  /**
+   * @deprecated Legacy alias for `canonical_company_id`.
+   * Do not pass staging candidate ids here after Phase 7.PCA-1.
+   */
+  company_id?: string
+}
+
+export type SyncContactCandidatesToCompanyContactsResult = {
+  synced: number
+  resolution: CompanyContactsPersistenceResolution | null
+}
+
+async function syncContactCandidatesToCanonicalCompany(
   admin: SupabaseClient,
   input: {
-    company_id: string
+    canonical_company_id: string
     candidates: GrowthContactCandidate[]
   },
 ): Promise<number> {
-  logAcquisitionStep("syncContactCandidatesToCompanyContacts", {
-    companyId: input.company_id,
-    candidate_count: input.candidates.length,
-  })
-
+  const canonical_company_id = input.canonical_company_id
   if (!(await isGrowthCompanyContactsSchemaReady(admin))) return 0
   if (input.candidates.length === 0) return 0
 
@@ -163,7 +192,7 @@ export async function syncContactCandidatesToCompanyContacts(
     if (!candidate.full_name.trim()) continue
 
     const row = candidateToCompanyRow({
-      company_id: input.company_id,
+      company_id: canonical_company_id,
       candidate,
     })
     const dedupe_hash = asString(row.dedupe_hash)
@@ -172,7 +201,7 @@ export async function syncContactCandidatesToCompanyContacts(
       .schema("growth")
       .from("company_contacts")
       .select("*")
-      .eq("company_id", input.company_id)
+      .eq("company_id", canonical_company_id)
       .eq("dedupe_hash", dedupe_hash)
       .maybeSingle()
 
@@ -211,22 +240,82 @@ export async function syncContactCandidatesToCompanyContacts(
     if (!error) synced += 1
   }
 
-  const companyCandidateId = asString(input.candidates[0]?.company_candidate_id)
-  if (companyCandidateId) {
+  return synced
+}
+
+/** Bridge contact_candidates → company_contacts for acquisition promotion. */
+export async function syncContactCandidatesToCompanyContacts(
+  admin: SupabaseClient,
+  input: SyncContactCandidatesToCompanyContactsInput,
+): Promise<number> {
+  const result = await syncContactCandidatesToCompanyContactsWithResolution(admin, input)
+  return result.synced
+}
+
+/** Same as syncContactCandidatesToCompanyContacts but returns canonical resolution diagnostics. */
+export async function syncContactCandidatesToCompanyContactsWithResolution(
+  admin: SupabaseClient,
+  input: SyncContactCandidatesToCompanyContactsInput,
+): Promise<SyncContactCandidatesToCompanyContactsResult> {
+  const company_candidate_id =
+    asString(input.company_candidate_id) || asString(input.candidates[0]?.company_candidate_id)
+  const explicitCanonical =
+    asString(input.canonical_company_id) || asString(input.company_id) || null
+
+  logAcquisitionStep("syncContactCandidatesToCompanyContacts", {
+    company_candidate_id: company_candidate_id || null,
+    canonical_company_id: explicitCanonical,
+    candidate_count: input.candidates.length,
+  })
+
+  if (input.candidates.length === 0) {
+    return { synced: 0, resolution: null }
+  }
+
+  if (!company_candidate_id && !explicitCanonical) {
+    logAcquisitionStep("syncContactCandidatesToCompanyContacts_skipped", {
+      reason: "missing_company_candidate_and_canonical_id",
+    })
+    return { synced: 0, resolution: null }
+  }
+
+  const resolution = company_candidate_id
+    ? await resolveCompanyContactsCanonicalCompanyId(admin, {
+        company_candidate_id,
+        explicit_canonical_company_id: explicitCanonical,
+      })
+    : null
+
+  const canonical_company_id = resolution?.canonical_company_id ?? explicitCanonical
+  if (!canonical_company_id) {
+    logAcquisitionStep("syncContactCandidatesToCompanyContacts_skipped", {
+      company_candidate_id,
+      diagnostics: resolution?.diagnostics ?? ["canonical_company_id_unresolved"],
+    })
+    return { synced: 0, resolution }
+  }
+
+  const synced = await syncContactCandidatesToCanonicalCompany(admin, {
+    canonical_company_id,
+    candidates: input.candidates,
+  })
+
+  if (company_candidate_id) {
     const { ensureStagingCanonicalCompanyLinkage } = await import(
       "@/lib/growth/canonical-companies/canonical-company-staging-linkage"
     )
-    await ensureStagingCanonicalCompanyLinkage(admin, companyCandidateId, {
-      explicit_canonical_company_id: input.company_id,
+    await ensureStagingCanonicalCompanyLinkage(admin, company_candidate_id, {
+      explicit_canonical_company_id: canonical_company_id,
     })
   }
 
   logAcquisitionStep("syncContactCandidatesToCompanyContacts_done", {
-    companyId: input.company_id,
+    company_candidate_id: company_candidate_id || null,
+    canonical_company_id,
     synced,
   })
 
-  return synced
+  return { synced, resolution }
 }
 
 export async function listContactCandidatesForCompany(

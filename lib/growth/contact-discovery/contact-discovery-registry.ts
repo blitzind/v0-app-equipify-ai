@@ -11,9 +11,9 @@ import type {
 import { createInternalGrowthContactDiscoveryProvider } from "@/lib/growth/contact-discovery/providers/internal-growth-provider"
 import { createManualFixtureContactDiscoveryProvider } from "@/lib/growth/contact-discovery/providers/manual-fixture-provider"
 import { createWebsitePublicExtractContactDiscoveryProvider } from "@/lib/growth/contact-discovery/providers/website-public-extract-provider"
+import { createApolloContactDiscoveryProvider } from "@/lib/growth/contact-discovery/providers/apollo-contact-discovery-provider"
 import { createPeopleDataLabsContactDiscoveryProvider } from "@/lib/growth/contact-discovery/providers/people-data-labs-provider"
 import {
-  createFutureApolloContactProvider,
   createFutureClayContactProvider,
   createFutureProviderContactSlot,
   createFutureSeamlessContactProvider,
@@ -27,7 +27,7 @@ export function listContactDiscoveryProviders(
     createInternalGrowthContactDiscoveryProvider(admin),
     createWebsitePublicExtractContactDiscoveryProvider(admin),
     createPeopleDataLabsContactDiscoveryProvider(admin),
-    createFutureApolloContactProvider(),
+    createApolloContactDiscoveryProvider(),
     createFutureSeamlessContactProvider(),
     createFutureClayContactProvider(),
     createFutureProviderContactSlot(),

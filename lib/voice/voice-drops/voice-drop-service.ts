@@ -20,6 +20,8 @@ import {
   isVoiceDropEnabled,
   resolveVoiceDropProviderMode,
 } from "@/lib/voice/voice-drops/provider-types"
+import { isVoiceDropTwilioOutboundCertified } from "@/lib/voice/voice-drops/twilio-voice-drop-config"
+import { VOICE_DROP_TWILIO_VD_1B_QA_MARKER } from "@/lib/voice/voice-drops/twilio-voice-drop-gates"
 import { buildVoiceDropCampaignDashboardSnapshot } from "@/lib/voice/voice-drops/snapshot-builder"
 import type {
   VoiceDropCampaignDashboardSnapshot,
@@ -94,8 +96,9 @@ export async function fetchVoiceDropReadiness(
     optOutRegistryReady: optOutCount >= 0,
     callHourRulesReady: Boolean(callHourRule),
     autonomousOutboundDisabled: true,
+    twilioOutboundCertified: isVoiceDropTwilioOutboundCertified(),
     message: isVoiceDropEnabled()
-      ? `Voice drop infrastructure enabled — provider ${providerMode}, approval required, compliance orchestration ${isComplianceOrchestrationEnabled() ? "active" : "disabled"}.`
+      ? `Voice drop infrastructure enabled — provider ${providerMode}, approval required, Twilio certification ${isVoiceDropTwilioOutboundCertified() ? "active" : "pending (set VOICE_DROP_TWILIO_OUTBOUND_CERTIFIED=true after review)"}, compliance orchestration ${isComplianceOrchestrationEnabled() ? "active" : "disabled"}.`
       : "Set VOICE_DROP_ENABLED=true to activate voice drop infrastructure.",
   }
 }
@@ -256,6 +259,10 @@ export async function queueApprovedVoiceDropRecipients(
   admin: SupabaseClient,
   input: { organizationId: string; campaignId: string; userId?: string | null },
 ): Promise<{ queued: number; suppressed: number; failed: number }> {
+  if (!isVoiceDropEnabled()) {
+    throw new Error("Voice drop infrastructure is disabled. Set VOICE_DROP_ENABLED=true.")
+  }
+
   const campaign = await getVoiceDropCampaign(admin, input.organizationId, input.campaignId)
   if (!campaign) throw new Error("Campaign not found.")
   if (campaign.approvalStatus !== "approved") {
@@ -359,13 +366,29 @@ export async function queueApprovedVoiceDropRecipients(
       recipientId: recipient.id,
       provider: campaign.voiceProvider,
       providerDeliveryId: result.providerDeliveryId,
-      status: result.status === "delivered" ? "delivered" : result.status === "failed" ? "failed" : "queued",
+      status:
+        result.status === "delivered"
+          ? "delivered"
+          : result.status === "failed"
+            ? "failed"
+            : result.status === "in_progress"
+              ? "in_progress"
+              : "queued",
       failureReason: result.failureReason,
-      metadata: { evidenceText: result.evidenceText },
+      metadata: {
+        evidenceText: result.evidenceText,
+        providerStatus: result.status,
+        startedAt: new Date().toISOString(),
+        qaMarker: VOICE_DROP_TWILIO_VD_1B_QA_MARKER,
+      },
     })
 
     const recipientStatus =
-      result.status === "delivered" ? "delivered" : result.status === "failed" ? "failed" : "queued"
+      result.status === "delivered"
+        ? "delivered"
+        : result.status === "failed"
+          ? "failed"
+          : "queued"
 
     await updateVoiceDropRecipient(admin, {
       organizationId: input.organizationId,

@@ -4,7 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { logAcquisitionStep } from "@/lib/growth/acquisition/acquisition-diagnostics"
 import { buildBuyingCommitteeAssessment } from "@/lib/growth/contact-discovery/buying-committee-builder"
 import { runContactDiscoveryProviders } from "@/lib/growth/contact-discovery/contact-discovery-registry"
-import { OPERATOR_CONTACT_DISCOVERY_PROVIDER_TYPES } from "@/lib/growth/contact-discovery/contact-discovery-operator-providers"
+import { resolveOperatorContactDiscoveryProviderTypes } from "@/lib/growth/contact-discovery/contact-discovery-operator-providers"
+import type { GrowthContactDiscoveryProviderType } from "@/lib/growth/contact-discovery/contact-discovery-provider-types"
 import {
   GROWTH_CONTACT_DISCOVERY_PRIVACY_NOTE,
   GROWTH_CONTACT_DISCOVERY_QA_MARKER,
@@ -161,6 +162,7 @@ export async function runContactDiscoveryForCompany(
     company_candidate_id: string
     created_by?: string | null
     limit?: number
+    provider_types?: GrowthContactDiscoveryProviderType[]
   },
 ): Promise<GrowthContactDiscoverySnapshot> {
   logAcquisitionStep("runContactDiscoveryForCompany", {
@@ -194,9 +196,11 @@ export async function runContactDiscoveryForCompany(
     }
   }
 
+  const providerTypes = input.provider_types ?? resolveOperatorContactDiscoveryProviderTypes()
+
   logAcquisitionStep("runContactDiscoveryProviders", {
     companyId: ctx.company_candidate_id,
-    provider_types: OPERATOR_CONTACT_DISCOVERY_PROVIDER_TYPES,
+    provider_types: providerTypes,
   })
 
   const providerResults = await runContactDiscoveryProviders(
@@ -210,7 +214,7 @@ export async function runContactDiscoveryForCompany(
       industry: ctx.industry,
       limit: input.limit ?? 20,
     },
-    { provider_types: [...OPERATOR_CONTACT_DISCOVERY_PROVIDER_TYPES] },
+    { provider_types: providerTypes },
   )
 
   const provider_messages = providerResults.map(

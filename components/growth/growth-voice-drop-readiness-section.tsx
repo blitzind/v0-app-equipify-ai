@@ -54,6 +54,12 @@ export function GrowthVoiceDropReadinessSection() {
           <GrowthBadge label="Approval required" tone="neutral" />
           <GrowthBadge label="Compliance gating enabled" tone="neutral" />
           <GrowthBadge label="Autonomous outbound disabled" tone="neutral" />
+          {readiness.providerMode === "twilio" ? (
+            <GrowthBadge
+              label={readiness.twilioOutboundCertified ? "Twilio outbound certified" : "Twilio outbound pending certification"}
+              tone={readiness.twilioOutboundCertified ? "healthy" : "neutral"}
+            />
+          ) : null}
         </div>
         <p className="text-xs text-muted-foreground">{readiness.message}</p>
         <ul className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
@@ -62,6 +68,7 @@ export function GrowthVoiceDropReadinessSection() {
           <li>Approval workflow: {readiness.approvalWorkflowEnabled ? "enabled" : "off"}</li>
           <li>Opt-out/DNC: {readiness.optOutRegistryReady ? "registry ready" : "pending"}</li>
           <li>Call-hour rules: {readiness.callHourRulesReady ? "ready" : "pending"}</li>
+          <li>Twilio certification: {readiness.twilioOutboundCertified ? "certified" : "pending"}</li>
           <li>Schema: {readiness.schemaReady ? "ready" : "pending migration"}</li>
         </ul>
       </div>

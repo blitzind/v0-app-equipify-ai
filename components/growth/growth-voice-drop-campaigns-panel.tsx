@@ -8,6 +8,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import type { VoiceDropCampaignDashboardSnapshot, VoiceDropCampaignPublicView } from "@/lib/voice/voice-drops/types"
 import { VOICE_DROP_INFRASTRUCTURE_QA_MARKER } from "@/lib/voice/voice-drops/types"
+import type { VoiceDropCampaignDeliveryEvidenceSnapshot } from "@/lib/voice/voice-drops/voice-drop-delivery-evidence-types"
+import { GrowthVoiceDropDeliveryEvidencePanel } from "@/components/growth/growth-voice-drop-delivery-evidence-panel"
 
 export function GrowthVoiceDropCampaignsPanel() {
   const [dashboard, setDashboard] = useState<VoiceDropCampaignDashboardSnapshot | null>(null)
@@ -18,6 +20,9 @@ export function GrowthVoiceDropCampaignsPanel() {
     "Hi {{first_name}}, this is {{assigned_rep}} from our team. Please call us back at {{callback_number}} when convenient.",
   )
   const [error, setError] = useState<string | null>(null)
+  const [evidenceByCampaignId, setEvidenceByCampaignId] = useState<
+    Record<string, VoiceDropCampaignDeliveryEvidenceSnapshot | null>
+  >({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -55,6 +60,25 @@ export function GrowthVoiceDropCampaignsPanel() {
     }
   }, [draftMessage, draftName, load])
 
+  const loadCampaignEvidence = useCallback(async (campaignId: string) => {
+    setActing(`evidence:${campaignId}`)
+    setError(null)
+    try {
+      const res = await fetch(`/api/platform/growth/voice/voice-drops/campaigns/${campaignId}`, { cache: "no-store" })
+      const data = (await res.json().catch(() => ({}))) as {
+        deliveryEvidence?: VoiceDropCampaignDeliveryEvidenceSnapshot
+        message?: string
+      }
+      if (!res.ok) {
+        setError(data.message ?? "Failed to load delivery evidence.")
+        return
+      }
+      setEvidenceByCampaignId((prev) => ({ ...prev, [campaignId]: data.deliveryEvidence ?? null }))
+    } finally {
+      setActing(null)
+    }
+  }, [])
+
   const campaignAction = useCallback(
     async (campaignId: string, action: string) => {
       setActing(`${action}:${campaignId}`)
@@ -68,11 +92,14 @@ export function GrowthVoiceDropCampaignsPanel() {
         const data = (await res.json().catch(() => ({}))) as { message?: string }
         if (!res.ok) setError(data.message ?? "Action failed.")
         await load()
+        if (action === "queue") {
+          await loadCampaignEvidence(campaignId)
+        }
       } finally {
         setActing(null)
       }
     },
-    [load],
+    [load, loadCampaignEvidence],
   )
 
   if (loading) {
@@ -159,7 +186,25 @@ export function GrowthVoiceDropCampaignsPanel() {
                   Queue delivery (approved)
                 </Button>
               ) : null}
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={acting != null}
+                data-qa-action="voice-drop-delivery-evidence"
+                onClick={() => void loadCampaignEvidence(campaign.id)}
+              >
+                {acting === `evidence:${campaign.id}` ? (
+                  <Loader2 className="mr-2 size-3 animate-spin" />
+                ) : null}
+                Delivery evidence
+              </Button>
             </div>
+            {evidenceByCampaignId[campaign.id] ? (
+              <div className="mt-3">
+                <GrowthVoiceDropDeliveryEvidencePanel evidence={evidenceByCampaignId[campaign.id]} />
+              </div>
+            ) : null}
           </div>
         ))}
         {(dashboard?.campaigns ?? []).length === 0 ? (

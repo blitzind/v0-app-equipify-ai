@@ -337,7 +337,7 @@ async function tickDiscoverContacts(
       },
       () =>
         syncContactCandidatesToCompanyContacts(admin, {
-          company_id: company.id,
+          company_candidate_id: company.id,
           candidates,
         }),
     )

@@ -466,3 +466,126 @@ export async function recentDeliveryForPhone(
   if (error) return false
   return (data ?? []).some((r) => r.status === "delivered" || r.status === "queued")
 }
+
+export async function getVoiceDropRecipientForDelivery(
+  admin: SupabaseClient,
+  organizationId: string,
+  recipientId: string,
+): Promise<VoiceDropRecipientPublicView | null> {
+  const { data, error } = await admin
+    .schema("voice")
+    .from("voice_drop_recipients")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("id", recipientId)
+    .maybeSingle()
+
+  if (error) {
+    if (isMissingTableError(error)) return null
+    throw new Error(error.message)
+  }
+  return data ? mapRecipient(data as RecipientRow) : null
+}
+
+export async function getVoiceDropDeliveryAttemptByProviderDeliveryId(
+  admin: SupabaseClient,
+  providerDeliveryId: string,
+): Promise<VoiceDropDeliveryAttemptPublicView | null> {
+  const { data, error } = await admin
+    .schema("voice")
+    .from("voice_drop_delivery_attempts")
+    .select("*")
+    .eq("provider_delivery_id", providerDeliveryId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    if (isMissingTableError(error)) return null
+    throw new Error(error.message)
+  }
+  return data ? mapDelivery(data as DeliveryRow) : null
+}
+
+export async function updateVoiceDropDeliveryAttempt(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string
+    attemptId: string
+    patch: Partial<{
+      status: VoiceDropDeliveryStatus
+      failureReason: string | null
+      deliveredAt: string | null
+      durationSeconds: number | null
+      costAmount: number | null
+      metadata: Record<string, unknown>
+    }>
+  },
+): Promise<VoiceDropDeliveryAttemptPublicView | null> {
+  const dbPatch: Record<string, unknown> = {}
+  if (input.patch.status != null) dbPatch.status = input.patch.status
+  if (input.patch.failureReason !== undefined) dbPatch.failure_reason = input.patch.failureReason
+  if (input.patch.deliveredAt !== undefined) dbPatch.delivered_at = input.patch.deliveredAt
+  if (input.patch.durationSeconds !== undefined) dbPatch.duration_seconds = input.patch.durationSeconds
+  if (input.patch.costAmount !== undefined) dbPatch.cost_amount = input.patch.costAmount
+  if (input.patch.metadata !== undefined) dbPatch.metadata_json = input.patch.metadata
+
+  const { data, error } = await admin
+    .schema("voice")
+    .from("voice_drop_delivery_attempts")
+    .update(dbPatch)
+    .eq("organization_id", input.organizationId)
+    .eq("id", input.attemptId)
+    .select("*")
+    .maybeSingle()
+
+  if (error) {
+    if (isMissingTableError(error)) return null
+    throw new Error(error.message)
+  }
+  return data ? mapDelivery(data as DeliveryRow) : null
+}
+
+export async function listVoiceDropDeliveryAttemptsForCampaign(
+  admin: SupabaseClient,
+  organizationId: string,
+  campaignId: string,
+  limit = 500,
+): Promise<VoiceDropDeliveryAttemptPublicView[]> {
+  const { data, error } = await admin
+    .schema("voice")
+    .from("voice_drop_delivery_attempts")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("campaign_id", campaignId)
+    .order("created_at", { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    if (isMissingTableError(error)) return []
+    throw new Error(error.message)
+  }
+  return (data ?? []).map((row) => mapDelivery(row as DeliveryRow))
+}
+
+export async function listVoiceDropDeliveryAttemptsForRecipient(
+  admin: SupabaseClient,
+  organizationId: string,
+  recipientId: string,
+  limit = 20,
+): Promise<VoiceDropDeliveryAttemptPublicView[]> {
+  const { data, error } = await admin
+    .schema("voice")
+    .from("voice_drop_delivery_attempts")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("recipient_id", recipientId)
+    .order("created_at", { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    if (isMissingTableError(error)) return []
+    throw new Error(error.message)
+  }
+  return (data ?? []).map((row) => mapDelivery(row as DeliveryRow))
+}

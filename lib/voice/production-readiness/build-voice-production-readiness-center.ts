@@ -29,6 +29,11 @@ import {
 import { fetchVoiceOperationsReadiness } from "@/lib/voice/repository/voice-operations-repository"
 import { probeVoiceSchemaHealth } from "@/lib/voice/schema-health"
 import { fetchVoiceDropReadiness } from "@/lib/voice/voice-drops/voice-drop-service"
+import {
+  buildVoiceDropStatusWebhookUrl,
+  buildVoiceDropTwimlWebhookUrl,
+  resolveVoiceDropTwilioPublicOrigin,
+} from "@/lib/voice/voice-drops/twilio-voice-drop-config"
 import { fetchWorkflowOrchestrationReadiness } from "@/lib/voice/workflow-orchestration/workflow-orchestration-service"
 import {
   evaluateTwilioConnectionReadiness,
@@ -520,13 +525,17 @@ function buildVoiceDropSection(
   if (!voiceDrop.schemaReady) failingHealthChecks.push("Voice drop schema not ready.")
   if (!voiceDrop.complianceGatingReady) failingHealthChecks.push("Compliance orchestration required for voice drops.")
   if (!voiceDrop.callHourRulesReady) failingHealthChecks.push("Call hour rules not configured.")
+  if (voiceDrop.providerMode === "twilio" && voiceDrop.voiceDropEnabled && !voiceDrop.twilioOutboundCertified) {
+    failingHealthChecks.push("Twilio outbound pending certification (VOICE_DROP_TWILIO_OUTBOUND_CERTIFIED).")
+  }
 
   let status: VoiceProductionReadinessStatus = "blocked"
   if (
     voiceDrop.voiceDropEnabled &&
     voiceDrop.schemaReady &&
     voiceDrop.complianceGatingReady &&
-    voiceDrop.callHourRulesReady
+    voiceDrop.callHourRulesReady &&
+    (voiceDrop.providerMode !== "twilio" || voiceDrop.twilioOutboundCertified)
   ) {
     status = "ready"
   } else if (voiceDrop.voiceDropEnabled && voiceDrop.schemaReady) {
@@ -534,6 +543,10 @@ function buildVoiceDropSection(
   } else if (voiceDrop.schemaReady) {
     status = "partial"
   }
+
+  const webhookSampleOrg = "00000000-0000-4000-8000-000000000000"
+  const webhookSampleRecipient = "00000000-0000-4000-8000-000000000001"
+  const publicOrigin = resolveVoiceDropTwilioPublicOrigin()
 
   return {
     id: "voice_drops",
@@ -551,8 +564,21 @@ function buildVoiceDropSection(
       ? "Enable VOICE_DROP_ENABLED after compliance orchestration and approval workflows are verified."
       : !voiceDrop.complianceGatingReady
         ? "Enable VOICE_COMPLIANCE_ORCHESTRATION_ENABLED before running voice drop campaigns."
-        : "Configure call hour rules and operator approval workflow for outbound voice drops.",
-    webhookUrls: [],
+        : voiceDrop.providerMode === "twilio" && !voiceDrop.twilioOutboundCertified
+          ? "Set VOICE_DROP_TWILIO_OUTBOUND_CERTIFIED=true only after compliance certification review."
+          : "Configure call hour rules and operator approval workflow for outbound voice drops.",
+    webhookUrls: [
+      buildVoiceDropTwimlWebhookUrl({
+        origin: publicOrigin,
+        organizationId: webhookSampleOrg,
+        recipientId: webhookSampleRecipient,
+      }),
+      buildVoiceDropStatusWebhookUrl({
+        origin: publicOrigin,
+        organizationId: webhookSampleOrg,
+        recipientId: webhookSampleRecipient,
+      }),
+    ],
     settingsHref: "/admin/growth/calls/voice-drops",
     deploymentRequirementsHref: VOICE_PRODUCTION_READINESS_DEPLOYMENT_DOC,
   }

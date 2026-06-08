@@ -8,6 +8,10 @@ import {
 } from "@/lib/growth/contact-discovery/company-contact-types"
 import { isGrowthCompanyContactsSchemaReady } from "@/lib/growth/contact-discovery/company-contact-schema-health"
 import type { GrowthContactDiscoveryProviderRawContact } from "@/lib/growth/contact-discovery/contact-discovery-provider-types"
+import {
+  listContactCandidatesForCompany,
+  syncContactCandidatesToCompanyContactsWithResolution,
+} from "@/lib/growth/acquisition/sync-contact-candidates-to-company-contacts"
 import { filterNewContacts, findExistingContactDedupeHashes } from "@/lib/growth/contact-discovery/contact-dedupe"
 import {
   dedupeNormalizedContacts,
@@ -70,6 +74,49 @@ function providerContactToCompanyRow(input: {
   }
 }
 
+/**
+ * Standard post-provider path (Phase 7.PCA-1):
+ * raw contacts → contact_candidates → company_contacts (canonical company id).
+ */
+export async function persistProviderContactsAndSync(
+  admin: SupabaseClient,
+  input: {
+    company_candidate_id: string
+    canonical_company_id?: string | null
+    provider_name: string
+    provider_type: string
+    contacts: GrowthContactDiscoveryProviderRawContact[]
+  },
+): Promise<{
+  candidates_persisted: number
+  company_contacts_synced: number
+  canonical_company_id: string | null
+}> {
+  const candidates_persisted = await persistPdlContactsToCandidates(admin, {
+    company_candidate_id: input.company_candidate_id,
+    provider_name: input.provider_name,
+    provider_type: input.provider_type,
+    contacts: input.contacts,
+  })
+
+  const candidates = await listContactCandidatesForCompany(admin, input.company_candidate_id)
+  const sync = await syncContactCandidatesToCompanyContactsWithResolution(admin, {
+    company_candidate_id: input.company_candidate_id,
+    canonical_company_id: input.canonical_company_id,
+    candidates,
+  })
+
+  return {
+    candidates_persisted,
+    company_contacts_synced: sync.synced,
+    canonical_company_id: sync.resolution?.canonical_company_id ?? input.canonical_company_id ?? null,
+  }
+}
+
+/**
+ * @deprecated Phase 7.PCA-1 — use `persistProviderContactsAndSync` or orchestrator sync path.
+ * `company_id` MUST be a canonical `growth.companies` id, never a staging candidate id.
+ */
 export async function upsertProviderCompanyContacts(
   admin: SupabaseClient,
   input: {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { requireVoicePlatformRouteContext, UUID_RE, voiceInvalidIdResponse } from "@/lib/voice/api/voice-platform-route"
 import { getVoiceDropCampaign } from "@/lib/voice/repository/voice-drop-repository"
 import { listVoiceDropRecipients } from "@/lib/voice/repository/voice-drop-repository"
+import { fetchVoiceDropCampaignDeliveryEvidence } from "@/lib/voice/voice-drops/voice-drop-delivery-evidence-service"
 import {
   previewVoiceDropRecipientsCompliance,
   queueApprovedVoiceDropRecipients,
@@ -20,7 +21,11 @@ export async function GET(_request: Request, context: { params: Promise<{ campai
   try {
     const campaign = await getVoiceDropCampaign(ctx.admin, ctx.organizationId, campaignId)
     const recipients = await listVoiceDropRecipients(ctx.admin, ctx.organizationId, campaignId)
-    return NextResponse.json({ ok: true, campaign, recipients })
+    const deliveryEvidence = await fetchVoiceDropCampaignDeliveryEvidence(ctx.admin, {
+      organizationId: ctx.organizationId,
+      campaignId,
+    })
+    return NextResponse.json({ ok: true, campaign, recipients, deliveryEvidence })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ error: "fetch_failed", message }, { status: 500 })

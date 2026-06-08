@@ -19,6 +19,8 @@ export function formatContactDiscoveryProviderLabel(provider: string): string {
       return "Website"
     case "people_data_labs":
       return "PDL"
+    case "apollo":
+      return "Apollo"
     default:
       return provider.replace(/_/g, " ")
   }

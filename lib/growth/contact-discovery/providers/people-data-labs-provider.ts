@@ -5,7 +5,6 @@ import type {
   GrowthContactDiscoveryProvider,
   GrowthContactDiscoveryProviderQuery,
 } from "@/lib/growth/contact-discovery/contact-discovery-provider-types"
-import { upsertProviderCompanyContacts } from "@/lib/growth/providers/pdl/pdl-contact-persistence"
 import { mapPdlPeopleToContactDiscoveryRaw } from "@/lib/growth/providers/pdl/pdl-person-mapper"
 import {
   isPdlApiConfigured,
@@ -13,12 +12,11 @@ import {
   searchPdlPeopleByCompany,
 } from "@/lib/growth/providers/pdl/pdl-client"
 import { GROWTH_PDL_PROVIDER_QA_MARKER } from "@/lib/growth/providers/pdl/pdl-types"
-import { recordPdlProviderPersistedContacts } from "@/lib/growth/providers/pdl/pdl-provider-diagnostics"
 
 export { GROWTH_PDL_PROVIDER_QA_MARKER }
 
 export function createPeopleDataLabsContactDiscoveryProvider(
-  admin: SupabaseClient,
+  _admin: SupabaseClient,
 ): GrowthContactDiscoveryProvider {
   return {
     provider_name: "people_data_labs",
@@ -74,17 +72,6 @@ export function createPeopleDataLabsContactDiscoveryProvider(
         sandbox: search.sandbox,
       })
 
-      if (contacts.length > 0) {
-        const persisted = await upsertProviderCompanyContacts(admin, {
-          company_id: input.company_candidate_id,
-          growth_lead_id: input.growth_lead_id,
-          provider_type: "future_people_data_labs",
-          provider_name: "people_data_labs",
-          contacts,
-        })
-        recordPdlProviderPersistedContacts({ contacts_persisted: persisted })
-      }
-
       return {
         provider_name: "people_data_labs",
         provider_type: "future_people_data_labs",
@@ -97,7 +84,7 @@ export function createPeopleDataLabsContactDiscoveryProvider(
           query_summary: search.query_summary,
           pdl_total: search.total,
           equipify_merge_note:
-            "Provider results merged into Equipify contact graph — ranking uses Equipify contact-native scoring.",
+            "Provider results returned to orchestrator — normalized to contact_candidates then synced to company_contacts.",
         },
       }
     },

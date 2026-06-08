@@ -6,6 +6,10 @@ import type {
   GrowthContactVerificationState,
 } from "@/lib/growth/contact-discovery/contact-discovery-types"
 import type { GrowthContactDiscoveryProviderRawContact } from "@/lib/growth/contact-discovery/contact-discovery-provider-types"
+import {
+  classifyContactIdentity,
+  type ContactIdentityClassification,
+} from "@/lib/growth/human-identity-evidence/contact-identity-classification"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -53,6 +57,9 @@ export type NormalizedContactCandidate = {
   source_attribution: GrowthContactDiscoveryAttribution[]
   dedupe_hash: string
   metadata: Record<string, unknown>
+  identity_classification: ContactIdentityClassification
+  eligible_for_canonical_person: boolean
+  eligible_for_committee: boolean
 }
 
 function sanitizePii(
@@ -163,6 +170,17 @@ export function normalizeContactCandidate(
     title_role_match: Boolean(job_title),
   })
 
+  const sourceTypeFromProvider =
+    provider_type.includes("website") ? "website" : provider_type.includes("pdl") ? "public_record" : null
+  const identity = classifyContactIdentity({
+    full_name,
+    title: job_title,
+    email: pii.email,
+    phone: pii.phone,
+    linkedin_url: pii.linkedin_url,
+    source_type: sourceTypeFromProvider,
+  })
+
   return {
     full_name,
     first_name: asString(raw.first_name) || first,
@@ -181,7 +199,14 @@ export function normalizeContactCandidate(
     metadata: {
       ...(raw.metadata && typeof raw.metadata === "object" ? raw.metadata : {}),
       pii_observed: raw.pii_observed === true,
+      identity_classification: identity.classification,
+      identity_classification_reasons: identity.reasons,
+      eligible_for_canonical_person: identity.eligible_for_canonical_person,
+      eligible_for_committee: identity.eligible_for_committee,
     },
+    identity_classification: identity.classification,
+    eligible_for_canonical_person: identity.eligible_for_canonical_person,
+    eligible_for_committee: identity.eligible_for_committee,
   }
 }
 

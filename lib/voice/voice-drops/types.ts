@@ -151,6 +151,7 @@ export type VoiceDropReadinessSnapshot = {
   optOutRegistryReady: boolean
   callHourRulesReady: boolean
   autonomousOutboundDisabled: true
+  twilioOutboundCertified: boolean
   message: string
 }
 

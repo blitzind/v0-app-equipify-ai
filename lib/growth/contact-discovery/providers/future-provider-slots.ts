@@ -3,6 +3,10 @@ import type {
   GrowthContactDiscoveryProviderType,
 } from "@/lib/growth/contact-discovery/contact-discovery-provider-types"
 
+/**
+ * Reserved vendor slots — implement via `GrowthContactAcquisitionProviderAdapter`
+ * (see contact-acquisition-provider-adapter-types.ts) in Phase 7.PCA-2+.
+ */
 function skipped(
   provider_name: string,
   provider_type: GrowthContactDiscoveryProviderType,

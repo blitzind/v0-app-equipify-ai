@@ -90,6 +90,16 @@ export type VoiceTelemetryEvent =
   | "voice_answered_inbound_media_stream_create_requested"
   | "voice_answered_inbound_media_stream_started"
   | "voice_answered_inbound_media_stream_failed"
+  | "voice_drop_provider_blocked"
+  | "voice_drop_provider_call_create_attempted"
+  | "voice_drop_provider_call_created"
+  | "voice_drop_provider_call_create_failed"
+  | "voice_drop_twiml_served"
+  | "voice_drop_twiml_failed"
+  | "voice_drop_status_webhook_received"
+  | "voice_drop_status_persisted"
+  | "voice_drop_status_persist_failed"
+  | "voice_drop_delivery_finalized"
 
 export function logVoiceInfrastructure(
   event: VoiceTelemetryEvent,

@@ -1,0 +1,390 @@
+import "server-only"
+
+import { safeDiscoveryProviderResponse } from "@/lib/growth/prospect-search/prospect-search-safe-fetch-json"
+import { buildApolloMockPeople } from "@/lib/growth/providers/apollo/apollo-mock-fixtures"
+import {
+  APOLLO_BULK_MATCH_PATH,
+  APOLLO_DEFAULT_PEOPLE_SEARCH_PATH,
+  APOLLO_BULK_MATCH_BATCH_SIZE,
+  getApolloApiKey,
+  isApolloDiscoveryDisabled,
+  isApolloEmailEnrichmentEnabled,
+  isApolloMockEnabled,
+  resolveApolloApiBaseUrl,
+} from "@/lib/growth/providers/apollo/apollo-config"
+import {
+  buildApolloPeopleSearchParams,
+  GROWTH_APOLLO_PERSON_SENIORITIES,
+  GROWTH_APOLLO_PERSON_TITLES,
+} from "@/lib/growth/providers/apollo/apollo-query-builder"
+import {
+  assertApolloCompanySearchAllowed,
+  recordApolloBulkMatchBatch,
+  recordApolloSearchApiCall,
+  ApolloRunGuardrailError,
+} from "@/lib/growth/providers/apollo/apollo-run-guardrails"
+import {
+  classifyApolloHttpError,
+  isApolloRateLimitError,
+  recordApolloProviderCalled,
+  recordApolloProviderFailed,
+  recordApolloProviderReturnedContacts,
+  recordApolloProviderSkipped,
+} from "@/lib/growth/providers/apollo/apollo-provider-diagnostics"
+import {
+  GROWTH_APOLLO_PROVIDER_QA_MARKER,
+  type ApolloBulkMatchResponse,
+  type ApolloPeopleSearchResponse,
+  type ApolloPersonRecord,
+  type ApolloPersonSearchInput,
+  type ApolloPersonSearchResult,
+  type ApolloSearchDiagnostics,
+} from "@/lib/growth/providers/apollo/apollo-types"
+
+export {
+  getApolloApiKey,
+  isApolloMockEnabled,
+  isApolloDiscoveryDisabled,
+} from "@/lib/growth/providers/apollo/apollo-config"
+
+function emptyDiagnostics(
+  input: ApolloPersonSearchInput,
+  domain: string | null,
+  per_page: number,
+  partial?: Partial<ApolloSearchDiagnostics>,
+): ApolloSearchDiagnostics {
+  return {
+    qa_marker: GROWTH_APOLLO_PROVIDER_QA_MARKER,
+    endpoint: `${resolveApolloApiBaseUrl()}${APOLLO_DEFAULT_PEOPLE_SEARCH_PATH}`,
+    search_input: {
+      company_name: input.company_name.trim(),
+      domain,
+      person_titles: [...GROWTH_APOLLO_PERSON_TITLES],
+      person_seniorities: [...GROWTH_APOLLO_PERSON_SENIORITIES],
+      per_page,
+    },
+    result_count: 0,
+    contacts_mapped: 0,
+    contacts_skipped: 0,
+    skip_reasons: {},
+    api_error_category: "none",
+    rate_limit_remaining: null,
+    credits_consumed_estimate: null,
+    enrich_endpoint: null,
+    enrich_batch_count: 0,
+    mock: false,
+    latency_ms: null,
+    ...partial,
+  }
+}
+
+async function enrichApolloPeopleWithBulkMatch(input: {
+  people: ApolloPersonRecord[]
+  apiKey: string
+}): Promise<{ people: ApolloPersonRecord[]; batches: number; credits_estimate: number }> {
+  const ids = input.people.map((p) => (typeof p.id === "string" ? p.id.trim() : "")).filter(Boolean)
+  if (ids.length === 0) {
+    return { people: input.people, batches: 0, credits_estimate: 0 }
+  }
+
+  const merged = new Map<string, ApolloPersonRecord>()
+  for (const person of input.people) {
+    const id = typeof person.id === "string" ? person.id.trim() : ""
+    if (id) merged.set(id, person)
+  }
+
+  let batches = 0
+  for (let i = 0; i < ids.length; i += APOLLO_BULK_MATCH_BATCH_SIZE) {
+    const batchIds = ids.slice(i, i + APOLLO_BULK_MATCH_BATCH_SIZE)
+    batches += 1
+
+    const res = await fetch(`${resolveApolloApiBaseUrl()}${APOLLO_BULK_MATCH_PATH}`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
+        "x-api-key": input.apiKey,
+      },
+      body: JSON.stringify({
+        details: batchIds.map((id) => ({ id })),
+        reveal_personal_emails: false,
+      }),
+    })
+
+    const parsed = await safeDiscoveryProviderResponse<ApolloBulkMatchResponse>(res)
+    if (!parsed.ok) continue
+
+    const matches = parsed.data.matches ?? parsed.data.people ?? []
+    for (const match of matches) {
+      const id = typeof match.id === "string" ? match.id.trim() : ""
+      if (!id || !merged.has(id)) continue
+      merged.set(id, { ...merged.get(id)!, ...match })
+    }
+  }
+
+  return {
+    people: [...merged.values()],
+    batches,
+    credits_estimate: batches,
+  }
+}
+
+export async function searchApolloPeopleByCompany(
+  input: ApolloPersonSearchInput,
+  options?: { apiKey?: string; mock?: boolean },
+): Promise<ApolloPersonSearchResult> {
+  const started = performance.now()
+  const finishLatency = () => Math.round(performance.now() - started)
+  const mock = options?.mock ?? isApolloMockEnabled()
+  const { params, summary, domain, per_page } = buildApolloPeopleSearchParams(input)
+
+  if (isApolloDiscoveryDisabled()) {
+    const message = "Apollo discovery disabled via GROWTH_DISCOVERY_DISABLE_APOLLO."
+    recordApolloProviderSkipped({
+      reason: message,
+      query_summary: summary,
+      mock,
+      latency_ms: finishLatency(),
+      api_error_category: "disabled",
+    })
+    return {
+      qa_marker: GROWTH_APOLLO_PROVIDER_QA_MARKER,
+      status: "skipped",
+      message,
+      people: [],
+      total: 0,
+      mock,
+      diagnostics: emptyDiagnostics(input, domain, per_page, {
+        api_error_category: "disabled",
+        mock,
+        latency_ms: finishLatency(),
+      }),
+    }
+  }
+
+  const companyName = input.company_name.trim()
+  if (!domain && !companyName) {
+    const message = "Company domain or name required for Apollo people search."
+    recordApolloProviderSkipped({
+      reason: message,
+      query_summary: summary,
+      mock,
+      latency_ms: finishLatency(),
+      api_error_category: "missing_company_identity",
+    })
+    return {
+      qa_marker: GROWTH_APOLLO_PROVIDER_QA_MARKER,
+      status: "skipped",
+      message,
+      people: [],
+      total: 0,
+      mock,
+      diagnostics: emptyDiagnostics(input, domain, per_page, {
+        api_error_category: "missing_company_identity",
+        mock,
+        latency_ms: finishLatency(),
+      }),
+    }
+  }
+
+  if (mock) {
+    const people = buildApolloMockPeople({
+      company_name: companyName,
+      domain,
+      limit: input.limit,
+    })
+    const latency_ms = finishLatency()
+    recordApolloProviderCalled({ query_summary: summary, mock: true })
+    recordApolloProviderReturnedContacts({
+      contacts_returned: people.length,
+      query_summary: summary,
+      mock: true,
+      latency_ms,
+    })
+    return {
+      qa_marker: GROWTH_APOLLO_PROVIDER_QA_MARKER,
+      status: "success",
+      message: `Apollo mock returned ${people.length} people.`,
+      people,
+      total: people.length,
+      mock: true,
+      diagnostics: emptyDiagnostics(input, domain, per_page, {
+        result_count: people.length,
+        api_error_category: "mock",
+        mock: true,
+        latency_ms,
+      }),
+    }
+  }
+
+  const apiKey = options?.apiKey ?? getApolloApiKey()
+  if (!apiKey) {
+    const message = "APOLLO_API_KEY not configured."
+    recordApolloProviderSkipped({
+      reason: message,
+      query_summary: summary,
+      mock: false,
+      latency_ms: finishLatency(),
+      api_error_category: "missing_credentials",
+    })
+    return {
+      qa_marker: GROWTH_APOLLO_PROVIDER_QA_MARKER,
+      status: "skipped",
+      message,
+      people: [],
+      total: 0,
+      mock: false,
+      diagnostics: emptyDiagnostics(input, domain, per_page, {
+        api_error_category: "missing_credentials",
+        latency_ms: finishLatency(),
+      }),
+    }
+  }
+
+  recordApolloProviderCalled({ query_summary: summary, mock: false })
+
+  try {
+    assertApolloCompanySearchAllowed({ company_limit: input.limit })
+  } catch (err) {
+    const message =
+      err instanceof ApolloRunGuardrailError
+        ? err.message
+        : "Apollo run guardrail blocked people search."
+    const latency_ms = finishLatency()
+    recordApolloProviderSkipped({
+      reason: message,
+      query_summary: summary,
+      mock: false,
+      latency_ms,
+      api_error_category: "guardrail",
+    })
+    return {
+      qa_marker: GROWTH_APOLLO_PROVIDER_QA_MARKER,
+      status: "skipped",
+      message,
+      people: [],
+      total: 0,
+      mock: false,
+      diagnostics: emptyDiagnostics(input, domain, per_page, {
+        api_error_category: "guardrail",
+        latency_ms,
+      }),
+    }
+  }
+
+  try {
+    const searchUrl = `${resolveApolloApiBaseUrl()}${APOLLO_DEFAULT_PEOPLE_SEARCH_PATH}?${params.toString()}`
+    const res = await fetch(searchUrl, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
+        "x-api-key": apiKey,
+      },
+    })
+
+    const parsed = await safeDiscoveryProviderResponse<ApolloPeopleSearchResponse>(res)
+    const latency_ms = finishLatency()
+
+    if (!parsed.ok) {
+      const category = classifyApolloHttpError(parsed.status, parsed.error)
+      recordApolloProviderFailed({
+        reason: parsed.error,
+        query_summary: summary,
+        mock: false,
+        latency_ms,
+        api_error_category: category,
+        rate_limited: isApolloRateLimitError(parsed.error, parsed.status),
+      })
+      return {
+        qa_marker: GROWTH_APOLLO_PROVIDER_QA_MARKER,
+        status: "failed",
+        message: parsed.error,
+        people: [],
+        total: 0,
+        mock: false,
+        error: parsed.error,
+        diagnostics: emptyDiagnostics(input, domain, per_page, {
+          api_error_category: category,
+          latency_ms,
+          rate_limit_remaining:
+            parsed.status === 429 ? 0 : null,
+        }),
+      }
+    }
+
+    let people = Array.isArray(parsed.data.people) ? parsed.data.people : []
+    const total = parsed.data.pagination?.total_entries ?? people.length
+
+    recordApolloSearchApiCall()
+
+    let enrich_batches = 0
+    let credits_estimate = 0
+    let enrich_endpoint: string | null = null
+
+    if (isApolloEmailEnrichmentEnabled() && people.length > 0) {
+      enrich_endpoint = `${resolveApolloApiBaseUrl()}${APOLLO_BULK_MATCH_PATH}`
+      const enriched = await enrichApolloPeopleWithBulkMatch({ people, apiKey })
+      people = enriched.people
+      enrich_batches = enriched.batches
+      credits_estimate = enriched.credits_estimate
+      recordApolloBulkMatchBatch({ batches: enriched.batches })
+    }
+
+    recordApolloProviderReturnedContacts({
+      contacts_returned: people.length,
+      query_summary: summary,
+      mock: false,
+      latency_ms,
+    })
+
+    const rateHeader = res.headers.get("x-rate-limit-remaining") ?? res.headers.get("X-RateLimit-Remaining")
+    const rate_limit_remaining = rateHeader ? Number(rateHeader) : null
+
+    return {
+      qa_marker: GROWTH_APOLLO_PROVIDER_QA_MARKER,
+      status: "success",
+      message:
+        people.length === 0
+          ? "Apollo people search returned no results."
+          : `Apollo returned ${people.length} people (${total} total matches).`,
+      people,
+      total,
+      mock: false,
+      diagnostics: emptyDiagnostics(input, domain, per_page, {
+        result_count: people.length,
+        api_error_category: "none",
+        latency_ms,
+        rate_limit_remaining: Number.isFinite(rate_limit_remaining) ? rate_limit_remaining : null,
+        credits_consumed_estimate: isApolloEmailEnrichmentEnabled() ? credits_estimate : 0,
+        enrich_endpoint,
+        enrich_batch_count: enrich_batches,
+      }),
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Apollo people search failed."
+    const latency_ms = finishLatency()
+    recordApolloProviderFailed({
+      reason: message,
+      query_summary: summary,
+      mock: false,
+      latency_ms,
+      api_error_category: "network_error",
+    })
+    return {
+      qa_marker: GROWTH_APOLLO_PROVIDER_QA_MARKER,
+      status: "failed",
+      message,
+      people: [],
+      total: 0,
+      mock: false,
+      error: message,
+      diagnostics: emptyDiagnostics(input, domain, per_page, {
+        api_error_category: "network_error",
+        latency_ms,
+      }),
+    }
+  }
+}

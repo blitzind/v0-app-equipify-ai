@@ -11,7 +11,7 @@ import {
 } from "@/lib/growth/benchmark/apollo-replacement-benchmark-pdl-validation-types"
 import { classifyContactIdentity } from "@/lib/growth/human-identity-evidence/contact-identity-classification"
 import { isFalsePositiveEmailLocalPartIdentity } from "@/lib/growth/human-identity-evidence/email-local-part-identity-guards"
-import { upsertProviderCompanyContacts } from "@/lib/growth/providers/pdl/pdl-contact-persistence"
+import { persistProviderContactsAndSync } from "@/lib/growth/providers/pdl/pdl-contact-persistence"
 import { searchPdlPeopleByCompany } from "@/lib/growth/providers/pdl/pdl-client"
 import { mapPdlPeopleToContactDiscoveryRaw } from "@/lib/growth/providers/pdl/pdl-person-mapper"
 import { recordPdlProviderPersistedContacts } from "@/lib/growth/providers/pdl/pdl-provider-diagnostics"
@@ -204,12 +204,14 @@ export async function acquireBenchmarkPdlContacts(
 
     let persisted = 0
     if (accepted.length > 0) {
-      persisted = await upsertProviderCompanyContacts(admin, {
-        company_id: company.company_candidate_id,
+      const pipeline = await persistProviderContactsAndSync(admin, {
+        company_candidate_id: company.company_candidate_id,
+        canonical_company_id: company.canonical_company_id,
         provider_type: "future_people_data_labs",
         provider_name: "people_data_labs",
         contacts: accepted,
       })
+      persisted = pipeline.company_contacts_synced
       recordPdlProviderPersistedContacts({ contacts_persisted: persisted })
     }
 
