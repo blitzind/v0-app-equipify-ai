@@ -61,7 +61,9 @@ import { normalizeSequenceStepChannel } from "@/lib/growth/sequence-orchestratio
 import {
   evaluateSequenceChannelSelectionRules,
   shouldPauseEnrollmentByChannelRules,
+  shouldSkipStepByChannelRules,
 } from "@/lib/growth/sequence-orchestration/sequence-channel-selection-rules"
+import { evaluateSequenceVoiceDropFatigueGate } from "@/lib/growth/sequence-orchestration/sequence-voice-drop-fatigue"
 import { recordSequenceEnrollmentChannelEvent } from "@/lib/growth/sequence-orchestration/sequence-multi-channel-state-repository"
 import { fetchGrowthSequenceTouchTimeline } from "@/lib/growth/sequence-pattern-repository"
 import { fetchGrowthCadenceTaskByEnrollmentStepId } from "@/lib/growth/cadence/cadence-task-repository"
@@ -457,6 +459,49 @@ export async function runGrowthSequenceScheduler(
         }).catch(() => undefined)
         counts.skippedSuppressed += 1
         continue
+      }
+
+      if (shouldSkipStepByChannelRules(channelDecision) && !dryRun) {
+        await skipSequenceStep(admin, {
+          step,
+          enrollmentId: enrollment.id,
+          reason: channelDecision.reason,
+          actingUserId: input.actingUserId,
+          actingUserEmail: input.actingUserEmail,
+          dryRun,
+        })
+        await recordSequenceEnrollmentChannelEvent(admin, {
+          enrollmentId: enrollment.id,
+          enrollmentStepId: step.id,
+          leadId: lead.id,
+          channel: step.channel,
+          eventKind: "channel_rule_applied",
+          title: "Sequence step skipped by channel rule",
+          summary: channelDecision.reason,
+          metadata: { rule_code: channelDecision.ruleCode },
+        }).catch(() => undefined)
+        counts.skippedSuppressed += 1
+        continue
+      }
+
+      if (step.channel === "voice_drop" && lead.promotedOrganizationId && !dryRun) {
+        const fatigue = await evaluateSequenceVoiceDropFatigueGate(admin, {
+          organizationId: lead.promotedOrganizationId,
+          phoneNumber: lead.contactPhone,
+          touches,
+        })
+        if (!fatigue.allowed) {
+          await skipSequenceStep(admin, {
+            step,
+            enrollmentId: enrollment.id,
+            reason: fatigue.message,
+            actingUserId: input.actingUserId,
+            actingUserEmail: input.actingUserEmail,
+            dryRun,
+          })
+          counts.skippedSuppressed += 1
+          continue
+        }
       }
 
       const preflight = await runGrowthOutreachPreflight(admin, {

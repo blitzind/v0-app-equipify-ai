@@ -7,12 +7,18 @@ export const SEQUENCE_CHANNEL_RULE_DEFAULTS = {
   emailNoReplyDaysBeforeSms: 3,
   positiveSmsReplyStopsColdOutreach: true,
   callCompletedSkipsRedundantEmail: true,
+  voiceDropMinHoursAfterSms: 24,
+  voiceDropMinHoursAfterCall: 12,
+  voiceDropCooldownDays: 7,
 } as const
 
 export type SequenceChannelSelectionRuleCode =
   | "email_no_reply_escalate_sms"
   | "positive_sms_reply_pause_cold"
   | "call_completed_adjust_next"
+  | "voice_drop_cooldown_skip"
+  | "voice_drop_sms_fatigue_skip"
+  | "voice_drop_call_fatigue_skip"
   | "none"
 
 export type SequenceChannelSelectionDecision = {
@@ -76,6 +82,44 @@ export function evaluateSequenceChannelSelectionRules(input: {
         ruleCode: "email_no_reply_escalate_sms",
         action: "proceed",
         reason: `No email reply after ${SEQUENCE_CHANNEL_RULE_DEFAULTS.emailNoReplyDaysBeforeSms}+ days — SMS step proceeds.`,
+      }
+    }
+  }
+
+  if (currentStep.channel === "voice_drop") {
+    const lastVoiceDrop = lastTouchByChannel(touches, "voice_drop")
+    if (
+      lastVoiceDrop &&
+      daysSince(lastVoiceDrop.occurredAt, nowMs) < SEQUENCE_CHANNEL_RULE_DEFAULTS.voiceDropCooldownDays
+    ) {
+      return {
+        ruleCode: "voice_drop_cooldown_skip",
+        action: "skip_step",
+        reason: `Voice drop cooldown (${SEQUENCE_CHANNEL_RULE_DEFAULTS.voiceDropCooldownDays} days) — skip step.`,
+      }
+    }
+
+    const lastSms = lastTouchByChannel(touches, "sms")
+    if (
+      lastSms &&
+      daysSince(lastSms.occurredAt, nowMs) * 24 < SEQUENCE_CHANNEL_RULE_DEFAULTS.voiceDropMinHoursAfterSms
+    ) {
+      return {
+        ruleCode: "voice_drop_sms_fatigue_skip",
+        action: "skip_step",
+        reason: `SMS within ${SEQUENCE_CHANNEL_RULE_DEFAULTS.voiceDropMinHoursAfterSms}h — defer voice drop step.`,
+      }
+    }
+
+    const lastCall = lastTouchByChannel(touches, "manual_call") ?? lastTouchByChannel(touches, "call")
+    if (
+      lastCall &&
+      daysSince(lastCall.occurredAt, nowMs) * 24 < SEQUENCE_CHANNEL_RULE_DEFAULTS.voiceDropMinHoursAfterCall
+    ) {
+      return {
+        ruleCode: "voice_drop_call_fatigue_skip",
+        action: "skip_step",
+        reason: `Call within ${SEQUENCE_CHANNEL_RULE_DEFAULTS.voiceDropMinHoursAfterCall}h — defer voice drop step.`,
       }
     }
   }

@@ -133,5 +133,6 @@ export const GROWTH_SEQUENCE_CATALOG_KEYS = [
   "follow_up_after_reply",
   "executive_follow_up",
   "reengagement_sequence",
+  "multichannel_with_voice_drop",
 ] as const
 export type GrowthSequenceCatalogKey = (typeof GROWTH_SEQUENCE_CATALOG_KEYS)[number]

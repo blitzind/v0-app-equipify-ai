@@ -414,3 +414,15 @@ export async function queueApprovedVoiceDropRecipients(
 
   return { queued, suppressed, failed }
 }
+
+export async function listApprovedVoiceDropCampaigns(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<VoiceDropCampaignPublicView[]> {
+  const campaigns = await listVoiceDropCampaigns(admin, organizationId)
+  return campaigns.filter(
+    (campaign) =>
+      campaign.approvalStatus === "approved" &&
+      (campaign.status === "approved" || campaign.status === "scheduled" || campaign.status === "running"),
+  )
+}

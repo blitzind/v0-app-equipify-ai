@@ -242,6 +242,9 @@ export function GrowthSequenceSafeExecutionDashboard({
             <GrowthBadge label="Cron auto-plans jobs" tone="healthy" />
           ) : null}
           <Button variant="outline" size="sm" asChild>
+            <Link href="/admin/growth/sequences/builder">Sequence Builder</Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
             <Link href="/admin/growth/settings/governance">Governance</Link>
           </Button>
           <Button variant="outline" size="sm" asChild>
@@ -282,6 +285,17 @@ export function GrowthSequenceSafeExecutionDashboard({
           <StatTile label="Blocked" value={dashboard?.blocked ?? 0} />
           <StatTile label="Sent 24h" value={dashboard?.sent24h ?? 0} />
         </div>
+
+        {dashboard?.voiceDropMetrics ? (
+          <div className="mt-4 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Sequence Voice Drop execution metrics</p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <StatTile label="Voice Drops Queued" value={dashboard.voiceDropMetrics.voiceDropsQueued} />
+              <StatTile label="Voice Drops Delivered" value={dashboard.voiceDropMetrics.voiceDropsDelivered} />
+              <StatTile label="Voice Drops Failed" value={dashboard.voiceDropMetrics.voiceDropsFailed} />
+            </div>
+          </div>
+        ) : null}
 
         {(meetingIntentReviews > 0 || sequenceStopCandidates > 0) ? (
           <div className="mt-4 flex flex-wrap gap-2">

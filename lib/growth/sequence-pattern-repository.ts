@@ -226,6 +226,55 @@ export async function fetchGrowthSequenceTouchTimeline(
   return touches.sort((a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt))
 }
 
+export async function updateGrowthSequencePatternStepVoiceDropCampaign(
+  admin: SupabaseClient,
+  input: {
+    patternId: string
+    stepId: string
+    voiceDropCampaignId: string | null
+  },
+): Promise<GrowthSequencePatternStep> {
+  const { data, error } = await admin
+    .schema("growth")
+    .from("sequence_pattern_steps")
+    .update({
+      voice_drop_campaign_id: input.voiceDropCampaignId,
+    })
+    .eq("id", input.stepId)
+    .eq("pattern_id", input.patternId)
+    .select("*")
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error("step_not_found")
+
+  return {
+    id: data.id as string,
+    patternId: data.pattern_id as string,
+    stepOrder: data.step_order as number,
+    channel: data.channel as GrowthSequencePatternStep["channel"],
+    delayDaysMin: data.delay_days_min as number,
+    delayDaysMax: data.delay_days_max as number,
+    generationType: (data.generation_type as string | null) ?? null,
+    playbookCategory: (data.playbook_category as string | null) ?? null,
+    voiceDropCampaignId: (data.voice_drop_campaign_id as string | null) ?? null,
+    requiredHumanApproval: Boolean(data.required_human_approval),
+    expectedSignal: data.expected_signal as GrowthSequencePatternStep["expectedSignal"],
+  }
+}
+
+export async function setGrowthSequencePatternActive(
+  admin: SupabaseClient,
+  input: { patternId: string; isActive: boolean },
+): Promise<void> {
+  const { error } = await admin
+    .schema("growth")
+    .from("sequence_patterns")
+    .update({ is_active: input.isActive, updated_at: new Date().toISOString() })
+    .eq("id", input.patternId)
+  if (error) throw new Error(error.message)
+}
+
 export async function upsertGrowthSequencePatternMetrics(
   admin: SupabaseClient,
   patternId: string,

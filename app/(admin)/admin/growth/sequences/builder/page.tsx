@@ -2,8 +2,7 @@
 
 import { GitBranch } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
-import { Button } from "@/components/ui/button"
-import { GrowthSequencesDashboard } from "@/components/growth/growth-sequences-dashboard"
+import { GrowthSequencePatternBuilder } from "@/components/growth/growth-sequence-pattern-builder"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
@@ -12,7 +11,7 @@ import {
 } from "@/components/admin/platform-admin-shell"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
 
-export default function AdminGrowthSequencesPage() {
+export default function AdminGrowthSequenceBuilderPage() {
   const { sessionIdentity } = useAdmin()
   const header = usePlatformAdminHeaderIdentity({
     displayName: sessionIdentity?.displayName,
@@ -31,21 +30,16 @@ export default function AdminGrowthSequencesPage() {
               <GitBranch size={17} />
             </span>
             <div>
-              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Sequence Intelligence</h1>
+              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Sequence Builder</h1>
               <p className="text-sm text-muted-foreground">
-                Deterministic outreach pattern effectiveness, abandonment and fatigue risk, and lead-level sequence recommendations — read-only, no auto-enrollment.
+                Configure Voice Drop steps on sequence patterns using approved campaigns — no database edits required.
               </p>
             </div>
           </div>
         </section>
 
         <GrowthSectionLayout>
-          <div className="mb-4">
-            <Button variant="outline" size="sm" asChild>
-              <a href="/admin/growth/sequences/builder">Open Sequence Builder (Voice Drop)</a>
-            </Button>
-          </div>
-          <GrowthSequencesDashboard />
+          <GrowthSequencePatternBuilder />
         </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>

@@ -3,6 +3,9 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { buildSequenceSchedulerIdempotencyKey } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
 import { advanceGrowthSequenceEnrollmentAfterStep } from "@/lib/growth/sequence-enrollment/sequence-enrollment-orchestrator"
+import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { fetchGrowthSequenceTouchTimeline } from "@/lib/growth/sequence-pattern-repository"
+import { evaluateSequenceVoiceDropFatigueGate } from "@/lib/growth/sequence-orchestration/sequence-voice-drop-fatigue"
 import {
   recordSequenceExecutionJobAuditEvent,
   recordSequenceExecutionTimelineEvent,
@@ -99,6 +102,39 @@ export async function runSequenceVoiceDropExecutionJob(
       status: "blocked",
       message: payload.error,
       blocked: true,
+    }
+  }
+
+  const lead = await fetchGrowthLeadById(admin, job.leadId)
+  if (lead?.promotedOrganizationId) {
+    const touches = await fetchGrowthSequenceTouchTimeline(admin, lead)
+    const fatigue = await evaluateSequenceVoiceDropFatigueGate(admin, {
+      organizationId: lead.promotedOrganizationId,
+      phoneNumber: payload.toE164,
+      touches,
+    })
+    if (!fatigue.allowed) {
+      await updateSequenceExecutionJob(admin, job.id, {
+        status: "blocked",
+        lastError: fatigue.code,
+        lockedAt: null,
+        lockedBy: null,
+      })
+      await recordSequenceExecutionJobAuditEvent(admin, {
+        jobId: job.id,
+        eventType: "job_blocked",
+        title: "Voice drop fatigue blocked",
+        description: fatigue.message,
+        severity: "medium",
+        metadata: { code: fatigue.code, qa_marker: GROWTH_SEQUENCE_VOICE_DROP_VD_2_QA_MARKER },
+      })
+      return {
+        ok: false,
+        jobId: job.id,
+        status: "blocked",
+        message: fatigue.code,
+        blocked: true,
+      }
     }
   }
 

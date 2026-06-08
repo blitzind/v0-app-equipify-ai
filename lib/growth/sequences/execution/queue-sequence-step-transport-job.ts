@@ -5,6 +5,8 @@ import { logGrowthEngine } from "@/lib/growth/access"
 import { fetchGrowthAiCopilotGenerationById } from "@/lib/growth/ai-copilot-repository"
 import type { GrowthAiCopilotGenerationType } from "@/lib/growth/ai-copilot-types"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { fetchGrowthSequenceTouchTimeline } from "@/lib/growth/sequence-pattern-repository"
+import { evaluateSequenceVoiceDropFatigueGate } from "@/lib/growth/sequence-orchestration/sequence-voice-drop-fatigue"
 import { runGrowthOutreachPreflight } from "@/lib/growth/outreach/outreach-preflight"
 import { fetchGrowthOutreachQueueByEnrollmentStepId } from "@/lib/growth/outreach/outreach-queue-repository"
 import { runGrowthAiCopilotGeneration } from "@/lib/growth/run-ai-copilot-generation"
@@ -274,6 +276,29 @@ export async function queueSequenceStepTransportJob(
           message: voiceDropPayload.message ?? `Voice drop step could not be prepared: ${voiceDropPayload.error}`,
           phase: "queue_preflight",
         }),
+      }
+    }
+
+    if (lead.promotedOrganizationId) {
+      const touches = await fetchGrowthSequenceTouchTimeline(admin, lead)
+      const fatigue = await evaluateSequenceVoiceDropFatigueGate(admin, {
+        organizationId: lead.promotedOrganizationId,
+        phoneNumber: lead.contactPhone,
+        touches,
+      })
+      if (!fatigue.allowed) {
+        return {
+          queued: false,
+          reason: fatigue.code,
+          failure: buildQueueStepFailure({
+            enrollmentId: input.enrollmentId,
+            step: input.step,
+            leadId: lead.id,
+            code: fatigue.code,
+            message: fatigue.message,
+            phase: "queue_preflight",
+          }),
+        }
       }
     }
 

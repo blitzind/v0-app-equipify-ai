@@ -2,6 +2,8 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { listGrowthSequencePatterns } from "@/lib/growth/sequence-pattern-repository"
+import { validateGrowthSequencePatternVoiceDropActivation } from "@/lib/growth/sequences/sequence-voice-drop-pattern-readiness"
 import { runGrowthOutreachPreflight } from "@/lib/growth/outreach/outreach-preflight"
 import type { GrowthLead } from "@/lib/growth/types"
 
@@ -61,6 +63,29 @@ export async function runSequenceEnrollmentPreflight(
       allowed: false,
       code: "active_enrollment",
       reason: "Lead already has another sequence enrollment in progress.",
+    }
+  }
+
+  const patternId = explicitPattern ?? lead.recommendedSequencePatternId
+  if (patternId) {
+    const patterns = await listGrowthSequencePatterns(admin)
+    const pattern = patterns.find((entry) => entry.id === patternId)
+    if (pattern && !pattern.isActive) {
+      return {
+        allowed: false,
+        code: "pattern_not_active",
+        reason: "Sequence pattern is not active — configure Voice Drop campaigns in Sequence Builder first.",
+      }
+    }
+    if (pattern) {
+      const voiceDropReady = validateGrowthSequencePatternVoiceDropActivation(pattern)
+      if (!voiceDropReady.ok) {
+        return {
+          allowed: false,
+          code: voiceDropReady.code ?? "voice_drop_campaign_required",
+          reason: voiceDropReady.message ?? "Voice Drop campaign required.",
+        }
+      }
     }
   }
 
