@@ -90,17 +90,22 @@ export async function acquireBenchmarkPdlContacts(
     }>
     limit_per_company?: number
     require_production?: boolean
+    /** When true, always hit live PDL API regardless of PDL_USE_SANDBOX env. */
+    force_live?: boolean
   },
 ): Promise<{
   company_results: Array<{
     canonical_company_id: string
     company_name: string
     company_candidate_id: string
+    domain: string | null
+    query_mode: "domain" | "company_name"
     status: "success" | "skipped" | "failed" | "no_results"
     persons_discovered: number
     persons_accepted: number
     persons_persisted: number
     persons_rejected: number
+    emails_returned: number
     sandbox: boolean
     messages: string[]
   }>
@@ -118,15 +123,19 @@ export async function acquireBenchmarkPdlContacts(
     persons_accepted: number
     persons_persisted: number
     persons_rejected: number
+    emails_returned: number
     sandbox: boolean
     messages: string[]
   }> = []
 
   const limit = input.limit_per_company ?? 25
-  const sandbox = input.require_production === false
+  const sandbox = input.force_live ? false : input.require_production === false
+  const query_mode_for = (domain: string | null): "domain" | "company_name" =>
+    domain ? "domain" : "company_name"
 
   for (const company of input.companies) {
     const rowMessages: string[] = []
+    const query_mode = query_mode_for(company.domain)
     const search = await searchPdlPeopleByCompany(
       {
         company_name: company.company_name,
@@ -141,11 +150,13 @@ export async function acquireBenchmarkPdlContacts(
     if (search.status === "skipped") {
       company_results.push({
         ...company,
+        query_mode,
         status: "skipped",
         persons_discovered: 0,
         persons_accepted: 0,
         persons_persisted: 0,
         persons_rejected: 0,
+        emails_returned: 0,
         sandbox: search.sandbox,
         messages: [search.message ?? "pdl_skipped"],
       })
@@ -155,11 +166,13 @@ export async function acquireBenchmarkPdlContacts(
     if (search.status === "failed") {
       company_results.push({
         ...company,
+        query_mode,
         status: "failed",
         persons_discovered: 0,
         persons_accepted: 0,
         persons_persisted: 0,
         persons_rejected: 0,
+        emails_returned: 0,
         sandbox: search.sandbox,
         messages: [search.message ?? search.error ?? "pdl_failed"],
       })
@@ -172,6 +185,7 @@ export async function acquireBenchmarkPdlContacts(
       domain: company.domain,
       sandbox: search.sandbox,
     })
+    const emails_returned = mapped.filter((contact) => Boolean(asString(contact.email))).length
 
     const accepted: GrowthContactDiscoveryProviderRawContact[] = []
     for (const contact of mapped) {
@@ -206,11 +220,13 @@ export async function acquireBenchmarkPdlContacts(
 
     company_results.push({
       ...company,
+      query_mode,
       status,
       persons_discovered: mapped.length,
       persons_accepted: accepted.length,
       persons_persisted: persisted,
       persons_rejected: mapped.length - accepted.length,
+      emails_returned,
       sandbox: search.sandbox,
       messages: rowMessages,
     })

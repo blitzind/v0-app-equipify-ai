@@ -132,6 +132,7 @@ function emptyMetrics(): BenchmarkPdlValidationMetrics {
     titles_added: 0,
     committee_members_created: 0,
     verified_emails_added: 0,
+    emails_returned: 0,
     outreach_ready_companies_added: 0,
   }
 }
@@ -143,7 +144,8 @@ export async function runApolloReplacementBenchmarkPdlValidation(
   ok: boolean
   preflight: {
     pdl_configured: boolean
-    pdl_sandbox: boolean
+    pdl_sandbox_env: boolean
+    pdl_effective_live: boolean
     pdl_production_ready: boolean
     zerobounce_configured: boolean
     production_safe: boolean
@@ -164,13 +166,15 @@ export async function runApolloReplacementBenchmarkPdlValidation(
   const pdl_configured =
     runtime_diagnostics.loaders.isPdlApiConfigured &&
     !runtime_diagnostics.loaders.pdl_discovery_disabled
-  const pdl_sandbox = isPdlSandboxEnabled()
-  const pdl_production_ready = pdl_configured && !pdl_sandbox
+  const pdl_sandbox_env = isPdlSandboxEnabled()
+  const pdl_effective_live = true
+  const pdl_production_ready = pdl_configured && pdl_effective_live
   const zerobounce_configured = runtime_diagnostics.loaders.isZeroBounceConfigured
 
   const preflight = {
     pdl_configured,
-    pdl_sandbox,
+    pdl_sandbox_env,
+    pdl_effective_live,
     pdl_production_ready,
     zerobounce_configured,
     production_safe: runtime_diagnostics.production_safe,
@@ -191,8 +195,10 @@ export async function runApolloReplacementBenchmarkPdlValidation(
     }
   }
 
-  if (pdl_sandbox) {
-    messages.push("preflight_warning: pdl_sandbox_enabled — set PDL_USE_SANDBOX=false for production validation")
+  if (pdl_sandbox_env) {
+    messages.push(
+      "preflight_note: pdl_sandbox_env_enabled — benchmark validation forces live PDL (sandbox:false per company)",
+    )
   }
 
   const cohort =
@@ -224,7 +230,7 @@ export async function runApolloReplacementBenchmarkPdlValidation(
 
   const acquisition = await acquireBenchmarkPdlContacts(admin, {
     companies: cohortCompanies,
-    require_production: !pdl_sandbox,
+    force_live: true,
   })
 
   metrics.persons_discovered = acquisition.company_results.reduce(
@@ -243,6 +249,10 @@ export async function runApolloReplacementBenchmarkPdlValidation(
   metrics.companies_with_results = acquisition.company_results.filter(
     (r) => r.persons_discovered > 0,
   ).length
+  metrics.emails_returned = acquisition.company_results.reduce(
+    (sum, r) => sum + r.emails_returned,
+    0,
+  )
 
   messages.push(...acquisition.messages)
 

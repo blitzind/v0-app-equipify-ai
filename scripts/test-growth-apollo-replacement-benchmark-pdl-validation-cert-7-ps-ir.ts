@@ -26,6 +26,11 @@ async function main() {
     { summarizeApolloReplacementBenchmarkDeltas },
     { evaluateApolloReplacementBenchmarkPhaseOutcome },
     { GROWTH_APOLLO_REPLACEMENT_BENCHMARK_PDL_VALIDATION_QA_MARKER },
+    {
+      runDeployedPdlBenchmarkValidation,
+      shouldUseDeployedPdlBenchmarkValidationRuntime,
+    },
+    { isPdlApiConfigured },
   ] = await Promise.all([
     import("../lib/growth/benchmark/apollo-replacement-benchmark-pdl-validation-discovery"),
     import("../lib/growth/benchmark/apollo-replacement-benchmark"),
@@ -35,6 +40,8 @@ async function main() {
     import("../lib/growth/benchmark/apollo-replacement-benchmark-delta"),
     import("../lib/growth/benchmark/apollo-replacement-benchmark-integration"),
     import("../lib/growth/benchmark/apollo-replacement-benchmark-pdl-validation-types"),
+    import("../lib/growth/qa/pdl-benchmark-validation-deployed-runtime"),
+    import("../lib/growth/providers/pdl/pdl-config"),
   ])
 
   const compliance = evaluateApolloBenchmarkPdlValidationCertification()
@@ -55,7 +62,20 @@ async function main() {
       })
     ).current_snapshot.metrics
 
-  const validation = await runApolloReplacementBenchmarkPdlValidation(admin)
+  const use_deployed_runtime = shouldUseDeployedPdlBenchmarkValidationRuntime()
+  const deployed_run = use_deployed_runtime
+    ? await runDeployedPdlBenchmarkValidation({ admin, poll_timeout_ms: 600_000 })
+    : null
+
+  const validation =
+    deployed_run?.validation ??
+    (await runApolloReplacementBenchmarkPdlValidation(admin))
+
+  const execution_channel = deployed_run
+    ? deployed_run.channel
+    : isPdlApiConfigured()
+      ? "local_runtime"
+      : "unconfigured"
 
   const benchmark_after = await runApolloReplacementBenchmark({
     admin,
@@ -81,6 +101,17 @@ async function main() {
       pdl_configured: validation.preflight.pdl_configured,
     })
 
+  const PDL_COST_PER_VERIFIED_CONTACT_USD = 0.18
+  const cost_estimate_usd =
+    validation.metrics.verified_emails_added > 0
+      ? validation.metrics.verified_emails_added * PDL_COST_PER_VERIFIED_CONTACT_USD
+      : validation.metrics.persons_persisted * PDL_COST_PER_VERIFIED_CONTACT_USD * 0.25
+
+  const rejected_by_reason = validation.rejected.reduce<Record<string, number>>((acc, row) => {
+    acc[row.reason] = (acc[row.reason] ?? 0) + 1
+    return acc
+  }, {})
+
   console.log(
     JSON.stringify(
       {
@@ -88,6 +119,14 @@ async function main() {
         validation_qa_marker: GROWTH_APOLLO_REPLACEMENT_BENCHMARK_PDL_VALIDATION_QA_MARKER,
         certification,
         compliance,
+        execution_channel,
+        deployed_runtime: deployed_run
+          ? {
+              ok: deployed_run.ok,
+              error: deployed_run.error,
+              cron_telemetry_run_id: deployed_run.cron_telemetry_run_id,
+            }
+          : null,
         preflight: validation.preflight,
         runtime_diagnostics: {
           qa_marker: validation.runtime_diagnostics.qa_marker,
@@ -106,7 +145,9 @@ async function main() {
         titles_added: validation.metrics.titles_added,
         committee_members_created: validation.metrics.committee_members_created,
         verified_emails_added: validation.metrics.verified_emails_added,
+        emails_returned: validation.metrics.emails_returned,
         outreach_ready_companies_added: validation.metrics.outreach_ready_companies_added,
+        rejected_by_reason,
         rejected_sample: validation.rejected.slice(0, 12),
         company_results_sample: validation.company_results
           .filter((r) => r.persons_discovered > 0 || r.persons_persisted > 0)
@@ -149,6 +190,7 @@ async function main() {
             }
           : null,
         density_claim_allowed,
+        cost_estimate_usd,
         remaining_blockers,
         messages: validation.messages,
       },

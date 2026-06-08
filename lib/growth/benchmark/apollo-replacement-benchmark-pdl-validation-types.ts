@@ -41,5 +41,6 @@ export type BenchmarkPdlValidationMetrics = {
   titles_added: number
   committee_members_created: number
   verified_emails_added: number
+  emails_returned: number
   outreach_ready_companies_added: number
 }
