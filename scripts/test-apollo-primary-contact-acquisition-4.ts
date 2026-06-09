@@ -19,6 +19,11 @@ import {
   shouldShowApolloEnrollmentDraftWorkflowLink,
 } from "../lib/growth/apollo/apollo-primary-contact-enrollment-draft-evidence"
 import { mapApolloEnrollmentDraftStagingRow } from "../lib/growth/apollo/apollo-primary-contact-enrollment-draft-staging-evidence"
+import {
+  evaluateApolloEnrollmentDraftIdentityGate,
+  resolveApolloEnrollmentDraftExplicitPatternId,
+  shouldUseApolloEnrollmentDraftExplicitPattern,
+} from "../lib/growth/apollo/apollo-primary-contact-enrollment-draft-identity-evidence"
 import { mapEnrollmentQueueDbRow } from "../lib/growth/apollo/apollo-primary-contact-enrollment-bridge-evidence"
 import { buildEnrollmentBridgeContactSnapshot } from "../lib/growth/apollo/apollo-primary-contact-enrollment-bridge-evidence"
 import type { ApolloPrimaryContactOperatorReviewRow } from "../lib/growth/apollo/apollo-primary-contact-operator-review-types"
@@ -34,11 +39,13 @@ const MIGRATION_PATH =
 const EXECUTION_PAGE_PATH = "app/(admin)/admin/growth/sequences/execution/page.tsx"
 
 const STAGING_EVIDENCE_PATH = "lib/growth/apollo/apollo-primary-contact-enrollment-draft-staging-evidence.ts"
+const IDENTITY_EVIDENCE_PATH = "lib/growth/apollo/apollo-primary-contact-enrollment-draft-identity-evidence.ts"
 
 const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-primary-contact-enrollment-draft-types.ts",
   "lib/growth/apollo/apollo-primary-contact-enrollment-draft-evidence.ts",
   STAGING_EVIDENCE_PATH,
+  IDENTITY_EVIDENCE_PATH,
   SERVER_PATH,
   DRAFT_ROUTE_PATH,
   DRAFT_ACTIONS_ROUTE_PATH,
@@ -96,9 +103,12 @@ console.log("  ✓ routes — platform admin + structured logging with safety fl
 
 assert.match(serverSource, /loadStagingCompanyCandidateRow/)
 assert.match(serverSource, /mapApolloEnrollmentDraftStagingRow/)
-assert.match(serverSource, /staging_evidence/)
+assert.match(serverSource, /evaluateApolloEnrollmentDraftIdentityGate/)
+assert.match(serverSource, /resolveApolloEnrollmentDraftExplicitPatternId/)
+assert.match(serverSource, /lead_resolution_evidence/)
+assert.match(serverSource, /listGrowthSequencePatterns/)
 assert.doesNotMatch(serverSource, /async function loadCompanyCandidate/)
-console.log("  ✓ draft bridge — dual-key staging company candidate resolution")
+console.log("  ✓ draft bridge — dual-key staging + Apollo identity explicit pattern resolution")
 
 const HENRY_SCHEIN_LOOKUP_KEY = "d2e669d5-e912-4fb7-992a-b4f9a92ff56a"
 const HENRY_SCHEIN_STAGING_ROW_ID = "45863143-b63f-4880-8980-cbae40cb84e1"
@@ -132,6 +142,42 @@ assert.equal(henryScheinStaging.staging_evidence.queue_item_id, HENRY_SCHEIN_QUE
 assert.equal(henryScheinStaging.staging_evidence.canonical_company_id, HENRY_SCHEIN_CANONICAL_COMPANY_ID)
 assert.equal(henryScheinStaging.company.company_name, "Henry Schein")
 console.log("  ✓ staging evidence — discovery_candidates company_id lookup key resolves to staging row id")
+
+const HENRY_SCHEIN_COMPANY_CONTACT_ID = "eb8cd0e8-bd5b-4bea-afca-a458e896a959"
+const HENRY_SCHEIN_CONTACT_CANDIDATE_ID = "76c08c1e-abd1-44ac-a924-6b039f8198ba"
+const HENRY_SCHEIN_CANONICAL_PERSON_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+const dianaIdentityGate = evaluateApolloEnrollmentDraftIdentityGate({
+  queue_status: "enrollment_approved",
+  sequence_ready: true,
+  company_contact_id: HENRY_SCHEIN_COMPANY_CONTACT_ID,
+  contact_candidate_id: HENRY_SCHEIN_CONTACT_CANDIDATE_ID,
+  canonical_person_id: HENRY_SCHEIN_CANONICAL_PERSON_ID,
+  email: "diana.king@henryschein.com",
+  email_status: "discovered",
+  linkedin_url: "https://www.linkedin.com/in/diana-king",
+  full_name: "Diana K***",
+  metadata: { apollo_last_name_obfuscated_present: true },
+})
+
+assert.equal(dianaIdentityGate.allowed, true)
+assert.equal(dianaIdentityGate.obfuscated_name, true)
+assert.equal(dianaIdentityGate.email_present, true)
+assert.equal(dianaIdentityGate.linkedin_present, true)
+assert.match(dianaIdentityGate.identity_source ?? "", /company_contact_id\+canonical_person_id\+email/)
+
+assert.equal(
+  shouldUseApolloEnrollmentDraftExplicitPattern({ identity_gate: dianaIdentityGate }),
+  true,
+)
+assert.equal(
+  resolveApolloEnrollmentDraftExplicitPatternId({
+    patterns: [{ id: "pattern-cold-email", key: "cold_email_only", isActive: true }],
+    identity_gate: dianaIdentityGate,
+  }),
+  "pattern-cold-email",
+)
+console.log("  ✓ Henry Schein/Diana — obfuscated name with contact identity allows explicit draft pattern")
 
 assert.match(
   fs.readFileSync(path.join(process.cwd(), "lib/growth/canonical-companies/canonical-company-staging-linkage.ts"), "utf8"),

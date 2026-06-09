@@ -56,6 +56,21 @@ export type ApolloPrimaryContactEnrollmentDraftStagingEvidence = {
   queue_item_id: string | null
 }
 
+export type ApolloPrimaryContactEnrollmentDraftLeadResolutionEvidence = {
+  lead_resolution_step: string
+  confidence_score: number | null
+  confidence_reason: string | null
+  identity_source: string | null
+  company_contact_id: string | null
+  canonical_person_id: string | null
+  contact_candidate_id: string | null
+  email_present: boolean
+  linkedin_present: boolean
+  obfuscated_name: boolean
+  explicit_pattern_id: string | null
+  preflight_code: string | null
+}
+
 export type ApolloPrimaryContactEnrollmentDraftActionResult = {
   ok: boolean
   action: "create_enrollment_draft"
@@ -64,6 +79,7 @@ export type ApolloPrimaryContactEnrollmentDraftActionResult = {
   enrollment_draft_id: string | null
   source_attribution: ApolloPrimaryContactEnrollmentSourceAttribution[]
   staging_evidence?: ApolloPrimaryContactEnrollmentDraftStagingEvidence | null
+  lead_resolution_evidence?: ApolloPrimaryContactEnrollmentDraftLeadResolutionEvidence | null
   error?: string | null
   blockers?: string[]
   auto_enrollment: false

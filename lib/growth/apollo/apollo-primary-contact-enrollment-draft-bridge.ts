@@ -25,6 +25,13 @@ import {
   type ApolloPrimaryContactEnrollmentDraftStagingEvidence,
 } from "@/lib/growth/apollo/apollo-primary-contact-enrollment-draft-staging-evidence"
 import {
+  buildApolloEnrollmentDraftLeadResolutionEvidence,
+  evaluateApolloEnrollmentDraftIdentityGate,
+  resolveApolloEnrollmentDraftExplicitPatternId,
+  shouldUseApolloEnrollmentDraftExplicitPattern,
+  type ApolloPrimaryContactEnrollmentDraftLeadResolutionEvidence,
+} from "@/lib/growth/apollo/apollo-primary-contact-enrollment-draft-identity-evidence"
+import {
   APOLLO_PRIMARY_CONTACT_ENROLLMENT_DRAFT_QA_MARKER,
   type ApolloPrimaryContactEnrollmentDraftActionResult,
   type ApolloPrimaryContactEnrollmentDraftSnapshot,
@@ -33,6 +40,7 @@ import type { GrowthCompanyContact } from "@/lib/growth/contact-discovery/compan
 import { loadStagingCompanyCandidateRow } from "@/lib/growth/canonical-companies/canonical-company-staging-linkage"
 import { canonicalNormalizedDomain } from "@/lib/growth/canonical-companies/canonical-company-normalize"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
+import { listGrowthSequencePatterns } from "@/lib/growth/sequence-pattern-repository"
 import { createGrowthSequenceEnrollmentDraft } from "@/lib/growth/sequence-enrollment/sequence-enrollment-orchestrator"
 import { runSequenceEnrollmentPreflight } from "@/lib/growth/sequence-enrollment/sequence-enrollment-preflight"
 
@@ -62,6 +70,7 @@ function emptyDraftActionResult(
     queue_item_id?: string | null
     blockers?: string[]
     staging_evidence?: ApolloPrimaryContactEnrollmentDraftStagingEvidence | null
+    lead_resolution_evidence?: ApolloPrimaryContactEnrollmentDraftLeadResolutionEvidence | null
   },
 ): ApolloPrimaryContactEnrollmentDraftActionResult {
   return {
@@ -72,12 +81,32 @@ function emptyDraftActionResult(
     enrollment_draft_id: null,
     source_attribution: buildApolloEnrollmentSourceAttributionChain(),
     staging_evidence: input?.staging_evidence ?? null,
+    lead_resolution_evidence: input?.lead_resolution_evidence ?? null,
     error,
     blockers: input?.blockers,
     auto_enrollment: false,
     outreach_sent: false,
     enrolled_count: 0,
     outreach_count: 0,
+  }
+}
+
+async function loadCompanyContactIdentityForDraft(
+  admin: SupabaseClient,
+  companyContactId: string,
+): Promise<{ contact: GrowthCompanyContact; canonical_person_id: string | null } | null> {
+  const { data, error } = await admin
+    .schema("growth")
+    .from("company_contacts")
+    .select("*")
+    .eq("id", companyContactId)
+    .maybeSingle()
+
+  if (error || !data) return null
+  const row = data as Record<string, unknown>
+  return {
+    contact: rowToCompanyContact(row),
+    canonical_person_id: asString(row.canonical_person_id) || null,
   }
 }
 
@@ -419,6 +448,7 @@ async function recordDraftEvidence(
     status: "draft_created" | "blocked"
     blockers: string[]
     staging_evidence?: ApolloPrimaryContactEnrollmentDraftStagingEvidence | null
+    lead_resolution_evidence?: ApolloPrimaryContactEnrollmentDraftLeadResolutionEvidence | null
     created_by?: string | null
     created_by_email?: string | null
   },
@@ -439,6 +469,7 @@ async function recordDraftEvidence(
     metadata: {
       qa_marker: APOLLO_PRIMARY_CONTACT_ENROLLMENT_DRAFT_QA_MARKER,
       staging_evidence: input.staging_evidence ?? null,
+      lead_resolution_evidence: input.lead_resolution_evidence ?? null,
     },
   })
 }
@@ -613,8 +644,96 @@ export async function createApolloPrimaryContactEnrollmentDraft(
     })
   }
 
+  const companyContactIdentity = await loadCompanyContactIdentityForDraft(admin, queueRow.company_contact_id)
+  if (!companyContactIdentity) {
+    const leadResolutionEvidence = buildApolloEnrollmentDraftLeadResolutionEvidence({
+      lead_resolution_step: "company_contact_not_found",
+      identity_gate: evaluateApolloEnrollmentDraftIdentityGate({
+        queue_status: queueRow.status,
+        sequence_ready: queueRow.sequence_ready,
+        company_contact_id: queueRow.company_contact_id,
+        contact_candidate_id: queueRow.contact_candidate_id,
+        canonical_person_id: null,
+        email: null,
+        email_status: null,
+        linkedin_url: null,
+      }),
+      recommended_sequence_confidence: lead.recommendedSequenceConfidence,
+      recommended_sequence_reason: lead.recommendedSequenceReason,
+    })
+    return emptyDraftActionResult("company_contact_not_found", {
+      queue_item_id: input.queue_item_id,
+      staging_evidence: stagingEvidence,
+      lead_resolution_evidence: leadResolutionEvidence,
+    })
+  }
+
+  const companyContact = companyContactIdentity.contact
+  const identityGate = evaluateApolloEnrollmentDraftIdentityGate({
+    queue_status: queueRow.status,
+    sequence_ready: queueRow.sequence_ready,
+    company_contact_id: queueRow.company_contact_id,
+    contact_candidate_id: queueRow.contact_candidate_id ?? companyContact.contact_candidate_id,
+    canonical_person_id: companyContactIdentity.canonical_person_id,
+    email: companyContact.email,
+    email_status: companyContact.email_status,
+    linkedin_url: companyContact.linkedin_url,
+    full_name: companyContact.full_name,
+    metadata: companyContact.metadata,
+  })
+
+  if (!identityGate.allowed) {
+    const leadResolutionEvidence = buildApolloEnrollmentDraftLeadResolutionEvidence({
+      lead_resolution_step: "identity_gate_blocked",
+      identity_gate: identityGate,
+      recommended_sequence_confidence: lead.recommendedSequenceConfidence,
+      recommended_sequence_reason: lead.recommendedSequenceReason,
+    })
+    await recordDraftEvidence(admin, {
+      queue_item_id: input.queue_item_id,
+      company_candidate_id: queueRow.company_candidate_id,
+      company_contact_id: queueRow.company_contact_id,
+      growth_lead_id: lead.id,
+      enrollment_draft_id: null,
+      status: "blocked",
+      blockers: identityGate.blockers,
+      staging_evidence: stagingEvidence,
+      lead_resolution_evidence: leadResolutionEvidence,
+      created_by: input.acting_user_id ?? null,
+      created_by_email: input.acting_user_email ?? null,
+    })
+    return emptyDraftActionResult("identity_gate_blocked", {
+      queue_item_id: input.queue_item_id,
+      blockers: identityGate.blockers,
+      staging_evidence: stagingEvidence,
+      lead_resolution_evidence: leadResolutionEvidence,
+    })
+  }
+
+  const patterns = await listGrowthSequencePatterns(admin)
+  const explicitPatternId = shouldUseApolloEnrollmentDraftExplicitPattern({
+    identity_gate: identityGate,
+    requested_pattern_id: input.pattern_id ?? null,
+  })
+    ? resolveApolloEnrollmentDraftExplicitPatternId({
+        patterns,
+        requested_pattern_id: input.pattern_id ?? null,
+        identity_gate: identityGate,
+      })
+    : (input.pattern_id ?? null)
+
   const preflight = await runSequenceEnrollmentPreflight(admin, lead, {
-    patternId: input.pattern_id ?? null,
+    patternId: explicitPatternId,
+  })
+
+  const leadResolutionEvidence = buildApolloEnrollmentDraftLeadResolutionEvidence({
+    lead_resolution_step: preflight.allowed ? "preflight_passed" : "preflight_blocked",
+    identity_gate: identityGate,
+    recommended_sequence_confidence: lead.recommendedSequenceConfidence,
+    recommended_sequence_reason: lead.recommendedSequenceReason,
+    explicit_pattern_id: explicitPatternId,
+    preflight_code: preflight.code ?? null,
+    preflight_reason: preflight.reason ?? null,
   })
 
   if (!preflight.allowed) {
@@ -628,8 +747,26 @@ export async function createApolloPrimaryContactEnrollmentDraft(
       status: "blocked",
       blockers,
       staging_evidence: stagingEvidence,
+      lead_resolution_evidence: leadResolutionEvidence,
       created_by: input.acting_user_id ?? null,
       created_by_email: input.acting_user_email ?? null,
+    })
+
+    logGrowthEngine("apollo_primary_contact_enrollment_draft_preflight_blocked", {
+      queue_item_id: input.queue_item_id.slice(0, 8),
+      lead_id: lead.id.slice(0, 8),
+      preflight_code: preflight.code ?? null,
+      confidence_score: lead.recommendedSequenceConfidence,
+      identity_source: identityGate.identity_source,
+      company_contact_id: queueRow.company_contact_id?.slice(0, 8) ?? null,
+      canonical_person_id: identityGate.canonical_person_id?.slice(0, 8) ?? null,
+      contact_candidate_id: identityGate.contact_candidate_id?.slice(0, 8) ?? null,
+      email_present: identityGate.email_present,
+      linkedin_present: identityGate.linkedin_present,
+      obfuscated_name: identityGate.obfuscated_name,
+      explicit_pattern_id: explicitPatternId?.slice(0, 8) ?? null,
+      auto_enrollment: false,
+      outreach_sent: false,
     })
 
     await admin
@@ -643,6 +780,7 @@ export async function createApolloPrimaryContactEnrollmentDraft(
             growth_lead_id: lead.id,
             enrollment_draft_id: null,
             blockers,
+            lead_resolution_evidence: leadResolutionEvidence,
             source_attribution: buildApolloEnrollmentSourceAttributionChain(),
           },
         },
@@ -653,6 +791,7 @@ export async function createApolloPrimaryContactEnrollmentDraft(
       queue_item_id: input.queue_item_id,
       blockers,
       staging_evidence: stagingEvidence,
+      lead_resolution_evidence: leadResolutionEvidence,
     })
   }
 
@@ -660,7 +799,7 @@ export async function createApolloPrimaryContactEnrollmentDraft(
   try {
     enrollment = await createGrowthSequenceEnrollmentDraft(admin, {
       leadId: lead.id,
-      patternId: input.pattern_id ?? null,
+      patternId: explicitPatternId,
       actingUserId: input.acting_user_id ?? "system",
       actingUserEmail: input.acting_user_email ?? "system@equipify.internal",
     })
@@ -677,6 +816,7 @@ export async function createApolloPrimaryContactEnrollmentDraft(
       status: "blocked",
       blockers,
       staging_evidence: stagingEvidence,
+      lead_resolution_evidence: leadResolutionEvidence,
       created_by: input.acting_user_id ?? null,
       created_by_email: input.acting_user_email ?? null,
     })
@@ -685,6 +825,7 @@ export async function createApolloPrimaryContactEnrollmentDraft(
       queue_item_id: input.queue_item_id,
       blockers,
       staging_evidence: stagingEvidence,
+      lead_resolution_evidence: leadResolutionEvidence,
     })
   }
 
@@ -697,6 +838,7 @@ export async function createApolloPrimaryContactEnrollmentDraft(
     status: "draft_created",
     blockers: [],
     staging_evidence: stagingEvidence,
+    lead_resolution_evidence: leadResolutionEvidence,
     created_by: input.acting_user_id ?? null,
     created_by_email: input.acting_user_email ?? null,
   })
@@ -718,6 +860,14 @@ export async function createApolloPrimaryContactEnrollmentDraft(
     staging_row_id: stagingEvidence.staging_row_id?.slice(0, 8) ?? null,
     candidate_domain_normalized: stagingEvidence.candidate_domain_normalized,
     canonical_company_id: stagingEvidence.canonical_company_id?.slice(0, 8) ?? null,
+    identity_source: identityGate.identity_source,
+    company_contact_id: queueRow.company_contact_id?.slice(0, 8) ?? null,
+    canonical_person_id: identityGate.canonical_person_id?.slice(0, 8) ?? null,
+    contact_candidate_id: identityGate.contact_candidate_id?.slice(0, 8) ?? null,
+    email_present: identityGate.email_present,
+    linkedin_present: identityGate.linkedin_present,
+    obfuscated_name: identityGate.obfuscated_name,
+    explicit_pattern_id: explicitPatternId?.slice(0, 8) ?? null,
     auto_enrollment: false,
     outreach_sent: false,
     enrolled_count: 0,
@@ -732,6 +882,7 @@ export async function createApolloPrimaryContactEnrollmentDraft(
     enrollment_draft_id: enrollment.id,
     source_attribution: buildApolloEnrollmentSourceAttributionChain(),
     staging_evidence: stagingEvidence,
+    lead_resolution_evidence: leadResolutionEvidence,
     auto_enrollment: false,
     outreach_sent: false,
     enrolled_count: 0,
