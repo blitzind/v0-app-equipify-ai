@@ -133,6 +133,88 @@ export function mapApolloEnrollmentDraftQueueRow(input: {
   }
 }
 
+export function buildApolloEnrollmentDraftLookup(
+  draft_items: ApolloPrimaryContactEnrollmentDraftQueueRow[],
+): Map<string, ApolloPrimaryContactEnrollmentDraftQueueRow> {
+  return new Map(draft_items.map((item) => [item.queue_item_id, item]))
+}
+
+export function resolveApolloEnrollmentDraftRowState(input: {
+  queue_item_id: string
+  draft_snapshot: Pick<ApolloPrimaryContactEnrollmentDraftSnapshot, "items" | "summary"> | null
+  draft_lookup?: Map<string, ApolloPrimaryContactEnrollmentDraftQueueRow>
+}): ApolloPrimaryContactEnrollmentDraftQueueRow | null {
+  const lookup =
+    input.draft_lookup ?? buildApolloEnrollmentDraftLookup(input.draft_snapshot?.items ?? [])
+  return lookup.get(input.queue_item_id) ?? null
+}
+
+export function mergeApolloEnrollmentPanelRows(input: {
+  queue_items: ApolloPrimaryContactEnrollmentQueueRow[]
+  draft_items: ApolloPrimaryContactEnrollmentDraftQueueRow[]
+}): ApolloPrimaryContactEnrollmentDraftQueueRow[] {
+  const draftByQueueId = buildApolloEnrollmentDraftLookup(input.draft_items)
+
+  const merged = input.queue_items.map((queueRow) => {
+    const draftRow = draftByQueueId.get(queueRow.queue_item_id)
+    if (draftRow) return draftRow
+    return mapApolloEnrollmentDraftQueueRow({ queue_row: queueRow, metadata: null })
+  })
+
+  for (const draftRow of input.draft_items) {
+    if (!merged.some((row) => row.queue_item_id === draftRow.queue_item_id)) {
+      merged.push(draftRow)
+    }
+  }
+
+  return merged
+}
+
+export function shouldShowApolloEnrollmentCreateDraftAction(input: {
+  row: Pick<
+    ApolloPrimaryContactEnrollmentDraftQueueRow,
+    "queue_item_id" | "status" | "draftable" | "enrollment_draft_id"
+  >
+  draft_snapshot: Pick<ApolloPrimaryContactEnrollmentDraftSnapshot, "items" | "summary"> | null
+  draft_lookup?: Map<string, ApolloPrimaryContactEnrollmentDraftQueueRow>
+}): boolean {
+  if (input.row.status !== "enrollment_approved") return false
+  if (input.row.enrollment_draft_id) return false
+
+  if (input.row.draftable === true) return true
+
+  const draftRow = resolveApolloEnrollmentDraftRowState({
+    queue_item_id: input.row.queue_item_id,
+    draft_snapshot: input.draft_snapshot,
+    draft_lookup: input.draft_lookup,
+  })
+  return draftRow?.draftable === true
+}
+
+export function shouldShowApolloEnrollmentDraftWorkflowLink(input: {
+  row: Pick<
+    ApolloPrimaryContactEnrollmentDraftQueueRow,
+    "queue_item_id" | "enrollment_draft_id" | "growth_lead_id"
+  >
+  draft_snapshot: Pick<ApolloPrimaryContactEnrollmentDraftSnapshot, "items"> | null
+  draft_lookup?: Map<string, ApolloPrimaryContactEnrollmentDraftQueueRow>
+}): { show: boolean; growth_lead_id: string | null; enrollment_draft_id: string | null } {
+  const draftRow = resolveApolloEnrollmentDraftRowState({
+    queue_item_id: input.row.queue_item_id,
+    draft_snapshot: input.draft_snapshot,
+    draft_lookup: input.draft_lookup,
+  })
+
+  const enrollment_draft_id = draftRow?.enrollment_draft_id ?? input.row.enrollment_draft_id
+  const growth_lead_id = draftRow?.growth_lead_id ?? input.row.growth_lead_id
+
+  return {
+    show: Boolean(enrollment_draft_id && growth_lead_id),
+    growth_lead_id,
+    enrollment_draft_id,
+  }
+}
+
 export function buildApolloPrimaryContactEnrollmentDraftSnapshot(input: {
   items: ApolloPrimaryContactEnrollmentDraftQueueRow[]
 }): ApolloPrimaryContactEnrollmentDraftSnapshot {

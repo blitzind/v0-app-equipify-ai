@@ -16,11 +16,19 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import type { ApolloPrimaryContactEnrollmentApprovalQueueSnapshot } from "@/lib/growth/apollo/apollo-primary-contact-enrollment-bridge-types"
 import type {
   ApolloPrimaryContactEnrollmentDraftQueueRow,
   ApolloPrimaryContactEnrollmentDraftSnapshot,
 } from "@/lib/growth/apollo/apollo-primary-contact-enrollment-draft-types"
 import { APOLLO_PRIMARY_CONTACT_ENROLLMENT_DRAFT_QA_MARKER } from "@/lib/growth/apollo/apollo-primary-contact-enrollment-draft-types"
+import {
+  buildApolloEnrollmentDraftLookup,
+  mergeApolloEnrollmentPanelRows,
+  resolveApolloEnrollmentDraftRowState,
+  shouldShowApolloEnrollmentCreateDraftAction,
+  shouldShowApolloEnrollmentDraftWorkflowLink,
+} from "@/lib/growth/apollo/apollo-primary-contact-enrollment-draft-evidence"
 import type { ApolloPrimaryContactEnrollmentQueueStatus } from "@/lib/growth/apollo/apollo-primary-contact-enrollment-bridge-types"
 import { cn } from "@/lib/utils"
 
@@ -49,6 +57,18 @@ function enrichmentLabel(status: ApolloPrimaryContactEnrollmentDraftQueueRow["en
   return status.replace(/_/g, " ")
 }
 
+function resolveDefaultQueueFilter(input: {
+  items: ApolloPrimaryContactEnrollmentDraftQueueRow[]
+  summary: ApolloPrimaryContactEnrollmentDraftSnapshot["summary"] | undefined
+}): QueueFilter {
+  const pendingCount = input.items.filter((row) => row.status === "pending_enrollment_approval").length
+  if (pendingCount > 0) return "pending_enrollment_approval"
+  if ((input.summary?.draftable ?? 0) > 0) return "enrollment_approved"
+  if ((input.summary?.drafts_created ?? 0) > 0) return "draft_created"
+  if ((input.summary?.approved ?? 0) > 0) return "enrollment_approved"
+  return "all"
+}
+
 export function ApolloPrimaryContactEnrollmentApprovalQueuePanel({
   companyCandidateId,
   className,
@@ -56,12 +76,30 @@ export function ApolloPrimaryContactEnrollmentApprovalQueuePanel({
   companyCandidateId?: string | null
   className?: string
 }) {
-  const [snapshot, setSnapshot] = useState<ApolloPrimaryContactEnrollmentDraftSnapshot | null>(null)
+  const [queueSnapshot, setQueueSnapshot] =
+    useState<ApolloPrimaryContactEnrollmentApprovalQueueSnapshot | null>(null)
+  const [draftSnapshot, setDraftSnapshot] = useState<ApolloPrimaryContactEnrollmentDraftSnapshot | null>(
+    null,
+  )
   const [loading, setLoading] = useState(false)
   const [actionKey, setActionKey] = useState<string | null>(null)
   const [filter, setFilter] = useState<QueueFilter>("pending_enrollment_approval")
+  const [filterTouched, setFilterTouched] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const displayItems = useMemo(() => {
+    if (!queueSnapshot && !draftSnapshot) return []
+    return mergeApolloEnrollmentPanelRows({
+      queue_items: queueSnapshot?.items ?? draftSnapshot?.items ?? [],
+      draft_items: draftSnapshot?.items ?? [],
+    })
+  }, [queueSnapshot, draftSnapshot])
+
+  const draftLookup = useMemo(
+    () => buildApolloEnrollmentDraftLookup(draftSnapshot?.items ?? []),
+    [draftSnapshot?.items],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -69,55 +107,111 @@ export function ApolloPrimaryContactEnrollmentApprovalQueuePanel({
     try {
       const params = new URLSearchParams()
       if (companyCandidateId) params.set("companyCandidateId", companyCandidateId)
-      const res = await fetch(
-        `/api/platform/growth/apollo-primary-contact-acquisition/enrollment-draft?${params.toString()}`,
-        { cache: "no-store" },
-      )
-      const json = (await res.json()) as {
+      params.set("status", "all")
+      const query = params.toString()
+
+      const [queueRes, draftRes] = await Promise.all([
+        fetch(
+          `/api/platform/growth/apollo-primary-contact-acquisition/enrollment-approval-queue?${query}`,
+          { cache: "no-store" },
+        ),
+        fetch(`/api/platform/growth/apollo-primary-contact-acquisition/enrollment-draft?${query}`, {
+          cache: "no-store",
+        }),
+      ])
+
+      const queueJson = (await queueRes.json()) as {
+        ok?: boolean
+        snapshot?: ApolloPrimaryContactEnrollmentApprovalQueueSnapshot
+        message?: string
+      }
+      const draftJson = (await draftRes.json()) as {
         ok?: boolean
         snapshot?: ApolloPrimaryContactEnrollmentDraftSnapshot
         message?: string
       }
-      if (!res.ok || !json.ok || !json.snapshot) {
-        throw new Error(json.message ?? "Could not load Apollo enrollment draft queue.")
+
+      if (!queueRes.ok || !queueJson.ok || !queueJson.snapshot) {
+        throw new Error(queueJson.message ?? "Could not load Apollo enrollment approval queue.")
       }
-      setSnapshot(json.snapshot)
+      if (!draftRes.ok || !draftJson.ok || !draftJson.snapshot) {
+        throw new Error(draftJson.message ?? "Could not load Apollo enrollment draft snapshot.")
+      }
+
+      setQueueSnapshot(queueJson.snapshot)
+      setDraftSnapshot(draftJson.snapshot)
+
+      if (!filterTouched) {
+        const merged = mergeApolloEnrollmentPanelRows({
+          queue_items: queueJson.snapshot.items,
+          draft_items: draftJson.snapshot.items,
+        })
+        setFilter(
+          resolveDefaultQueueFilter({
+            items: merged,
+            summary: draftJson.snapshot.summary,
+          }),
+        )
+      }
     } catch (e) {
-      setSnapshot(null)
-      setError(e instanceof Error ? e.message : "Could not load Apollo enrollment draft queue.")
+      setQueueSnapshot(null)
+      setDraftSnapshot(null)
+      setError(e instanceof Error ? e.message : "Could not load Apollo enrollment queue.")
     } finally {
       setLoading(false)
     }
-  }, [companyCandidateId])
+  }, [companyCandidateId, filterTouched])
 
   useEffect(() => {
     void load()
   }, [load])
 
   const filteredItems = useMemo(() => {
-    const items = snapshot?.items ?? []
     switch (filter) {
       case "pending_enrollment_approval":
       case "enrollment_approved":
       case "enrollment_rejected":
-        return items.filter((row) => row.status === filter)
+        return displayItems.filter((row) => row.status === filter)
       case "sequence_ready":
-        return items.filter((row) => row.sequence_ready)
+        return displayItems.filter((row) => row.sequence_ready)
       case "contactable":
-        return items.filter((row) => row.contactable)
+        return displayItems.filter((row) => row.contactable)
       case "draftable":
-        return items.filter((row) => row.draftable)
+        return displayItems.filter((row) =>
+          shouldShowApolloEnrollmentCreateDraftAction({
+            row,
+            draft_snapshot: draftSnapshot,
+            draft_lookup: draftLookup,
+          }),
+        )
       case "draft_created":
-        return items.filter((row) => Boolean(row.enrollment_draft_id))
+        return displayItems.filter((row) => {
+          const link = shouldShowApolloEnrollmentDraftWorkflowLink({
+            row,
+            draft_snapshot: draftSnapshot,
+            draft_lookup: draftLookup,
+          })
+          return link.show
+        })
       case "blocked":
-        return items.filter(
+        return displayItems.filter(
           (row) =>
-            row.status === "enrollment_approved" && !row.enrollment_draft_id && !row.draftable,
+            row.status === "enrollment_approved" &&
+            !shouldShowApolloEnrollmentCreateDraftAction({
+              row,
+              draft_snapshot: draftSnapshot,
+              draft_lookup: draftLookup,
+            }) &&
+            !shouldShowApolloEnrollmentDraftWorkflowLink({
+              row,
+              draft_snapshot: draftSnapshot,
+              draft_lookup: draftLookup,
+            }).show,
         )
       default:
-        return items
+        return displayItems
     }
-  }, [snapshot?.items, filter])
+  }, [displayItems, draftLookup, draftSnapshot, filter])
 
   async function runApprovalAction(input: {
     action: "approve_enrollment" | "reject_enrollment"
@@ -147,6 +241,7 @@ export function ApolloPrimaryContactEnrollmentApprovalQueuePanel({
         setMessage(
           "Enrollment eligibility approved. Create an enrollment draft below — draft only, confirm separately in the lead workflow.",
         )
+        setFilterTouched(false)
       } else {
         setMessage("Enrollment eligibility rejected. No enrollment or outreach was triggered.")
       }
@@ -190,6 +285,7 @@ export function ApolloPrimaryContactEnrollmentApprovalQueuePanel({
       setMessage(
         "Enrollment draft created. Open the lead sequence panel to review and confirm — no auto-enrollment or outreach.",
       )
+      setFilter("draft_created")
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Draft creation failed.")
@@ -198,9 +294,9 @@ export function ApolloPrimaryContactEnrollmentApprovalQueuePanel({
     }
   }
 
-  const summary = snapshot?.summary
-  const evidence = snapshot?.evidence
-  const attributionChain = snapshot?.source_attribution_chain ?? []
+  const summary = draftSnapshot?.summary
+  const evidence = draftSnapshot?.evidence
+  const attributionChain = draftSnapshot?.source_attribution_chain ?? []
 
   return (
     <GrowthEngineCard
@@ -214,7 +310,7 @@ export function ApolloPrimaryContactEnrollmentApprovalQueuePanel({
             <Sparkles className="size-4 text-indigo-700" />
             <p className="text-sm text-muted-foreground">
               Apollo → Operator Approved → Enrollment Queue → Draft. Explicit draft creation only — no
-              auto-enrollment, sequences, or outreach.
+              auto-enrollment or outreach.
             </p>
             {summary ? (
               <GrowthBadge
@@ -241,7 +337,10 @@ export function ApolloPrimaryContactEnrollmentApprovalQueuePanel({
             <GrowthBadge label={`Draftable ${summary.draftable}`} tone="attention" />
             <GrowthBadge label={`Drafts ${summary.drafts_created}`} tone="healthy" />
             <GrowthBadge label={`Blocked ${summary.blocked}`} tone="medium" />
-            <GrowthBadge label={`Pending approval ${summary.total - summary.approved}`} tone="attention" />
+            <GrowthBadge
+              label={`Pending approval ${displayItems.filter((row) => row.status === "pending_enrollment_approval").length}`}
+              tone="attention"
+            />
           </div>
         ) : null}
 
@@ -263,7 +362,10 @@ export function ApolloPrimaryContactEnrollmentApprovalQueuePanel({
               size="sm"
               variant={filter === value ? "default" : "outline"}
               className="h-7 text-[10px]"
-              onClick={() => setFilter(value)}
+              onClick={() => {
+                setFilterTouched(true)
+                setFilter(value)
+              }}
             >
               {label}
             </Button>
@@ -273,16 +375,16 @@ export function ApolloPrimaryContactEnrollmentApprovalQueuePanel({
         {message ? <p className="mt-2 text-xs text-emerald-800">{message}</p> : null}
         {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
 
-        {loading && !snapshot ? (
+        {loading && !draftSnapshot ? (
           <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="size-3.5 animate-spin" />
             Loading enrollment approval queue…
           </p>
         ) : null}
 
-        {!loading && snapshot && filteredItems.length === 0 ? (
+        {!loading && draftSnapshot && filteredItems.length === 0 ? (
           <p className="mt-3 text-xs text-muted-foreground">
-            {snapshot.items.length === 0
+            {displayItems.length === 0
               ? "No approved Apollo contacts in the enrollment approval queue yet. Operator review approvals hand off here automatically when sequence-ready."
               : "No items match the selected filter."}
           </p>
@@ -290,113 +392,137 @@ export function ApolloPrimaryContactEnrollmentApprovalQueuePanel({
 
         {filteredItems.length ? (
           <ul className="mt-3 space-y-2">
-            {filteredItems.map((row) => (
-              <li key={row.queue_item_id} className="rounded-lg border border-border bg-card px-3 py-2 text-xs">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="flex items-center gap-1 font-medium">
-                      <UserRound className="size-3 text-muted-foreground" />
-                      {row.full_name}
-                    </p>
-                    <p className="text-muted-foreground">
-                      {row.title ?? "—"} · {row.company_name}
-                    </p>
+            {filteredItems.map((row) => {
+              const draftRow =
+                draftLookup.get(row.queue_item_id) ??
+                resolveApolloEnrollmentDraftRowState({
+                  queue_item_id: row.queue_item_id,
+                  draft_snapshot: draftSnapshot,
+                  draft_lookup: draftLookup,
+                }) ??
+                row
+              const showCreateDraft = shouldShowApolloEnrollmentCreateDraftAction({
+                row: draftRow,
+                draft_snapshot: draftSnapshot,
+                draft_lookup: draftLookup,
+              })
+              const draftWorkflowLink = shouldShowApolloEnrollmentDraftWorkflowLink({
+                row: draftRow,
+                draft_snapshot: draftSnapshot,
+                draft_lookup: draftLookup,
+              })
+
+              return (
+                <li
+                  key={row.queue_item_id}
+                  data-queue-item-id={row.queue_item_id}
+                  className="rounded-lg border border-border bg-card px-3 py-2 text-xs"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-1 font-medium">
+                        <UserRound className="size-3 text-muted-foreground" />
+                        {row.full_name}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {row.title ?? "—"} · {row.company_name}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      <GrowthBadge label={row.source} tone="neutral" />
+                      <GrowthBadge label={queueStatusLabel(row.status)} tone={queueStatusTone(row.status)} />
+                      {draftWorkflowLink.show ? (
+                        <GrowthBadge label="Draft created" tone="healthy" />
+                      ) : showCreateDraft ? (
+                        <GrowthBadge label="Draftable" tone="attention" />
+                      ) : row.status === "enrollment_approved" ? (
+                        <GrowthBadge label="Blocked" tone="medium" />
+                      ) : null}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    <GrowthBadge label={row.source} tone="neutral" />
-                    <GrowthBadge label={queueStatusLabel(row.status)} tone={queueStatusTone(row.status)} />
-                    {row.enrollment_draft_id ? (
-                      <GrowthBadge label="Draft created" tone="healthy" />
-                    ) : row.draftable ? (
-                      <GrowthBadge label="Draftable" tone="attention" />
-                    ) : row.status === "enrollment_approved" ? (
-                      <GrowthBadge label="Blocked" tone="medium" />
-                    ) : null}
-                  </div>
-                </div>
 
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  <GrowthBadge label={enrichmentLabel(row.enrichment_status)} tone="neutral" />
-                  <GrowthBadge
-                    label={row.contactable ? "Contactable" : "Not contactable"}
-                    tone={row.contactable ? "healthy" : "attention"}
-                  />
-                  <GrowthBadge
-                    label={row.sequence_ready ? "Sequence-ready" : "Not sequence-ready"}
-                    tone={row.sequence_ready ? "healthy" : "medium"}
-                  />
-                </div>
-
-                {row.blockers.length || row.draft_blockers.length ? (
-                  <p className="mt-1 text-[10px] text-amber-900">
-                    Blockers: {[...row.blockers, ...row.draft_blockers].join(", ").replace(/_/g, " ")}
-                  </p>
-                ) : null}
-
-                {row.status === "pending_enrollment_approval" ? (
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-[10px]"
-                      disabled={actionKey === `approve_enrollment:${row.queue_item_id}`}
-                      onClick={() => void runApprovalAction({ action: "approve_enrollment", row })}
-                    >
-                      {actionKey === `approve_enrollment:${row.queue_item_id}` ? (
-                        <Loader2 className="mr-1 size-3 animate-spin" />
-                      ) : (
-                        <BadgeCheck className="mr-1 size-3" />
-                      )}
-                      Approve enrollment eligibility
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 text-[10px]"
-                      disabled={actionKey === `reject_enrollment:${row.queue_item_id}`}
-                      onClick={() => void runApprovalAction({ action: "reject_enrollment", row })}
-                    >
-                      {actionKey === `reject_enrollment:${row.queue_item_id}` ? (
-                        <Loader2 className="mr-1 size-3 animate-spin" />
-                      ) : (
-                        <ShieldAlert className="mr-1 size-3" />
-                      )}
-                      Reject enrollment
-                    </Button>
+                    <GrowthBadge label={enrichmentLabel(row.enrichment_status)} tone="neutral" />
+                    <GrowthBadge
+                      label={row.contactable ? "Contactable" : "Not contactable"}
+                      tone={row.contactable ? "healthy" : "attention"}
+                    />
+                    <GrowthBadge
+                      label={row.sequence_ready ? "Sequence-ready" : "Not sequence-ready"}
+                      tone={row.sequence_ready ? "healthy" : "medium"}
+                    />
                   </div>
-                ) : null}
 
-                {row.status === "enrollment_approved" && row.draftable ? (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    <Button
-                      size="sm"
-                      variant="default"
-                      className="h-7 text-[10px]"
-                      disabled={actionKey === `create_draft:${row.queue_item_id}`}
-                      onClick={() => void runCreateDraftAction(row)}
-                    >
-                      {actionKey === `create_draft:${row.queue_item_id}` ? (
-                        <Loader2 className="mr-1 size-3 animate-spin" />
-                      ) : (
-                        <FilePlus2 className="mr-1 size-3" />
-                      )}
-                      Create enrollment draft
-                    </Button>
-                  </div>
-                ) : null}
+                  {row.blockers.length || draftRow.draft_blockers.length ? (
+                    <p className="mt-1 text-[10px] text-amber-900">
+                      Blockers: {[...row.blockers, ...draftRow.draft_blockers].join(", ").replace(/_/g, " ")}
+                    </p>
+                  ) : null}
 
-                {row.enrollment_draft_id && row.growth_lead_id ? (
-                  <div className="mt-2">
-                    <Button size="sm" variant="outline" className="h-7 text-[10px]" asChild>
-                      <Link href={`/admin/growth/leads/crm?open=${row.growth_lead_id}`}>
-                        <ExternalLink className="mr-1 size-3" />
-                        View draft in enrollment workflow
-                      </Link>
-                    </Button>
-                  </div>
-                ) : null}
-              </li>
-            ))}
+                  {row.status === "pending_enrollment_approval" ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[10px]"
+                        disabled={actionKey === `approve_enrollment:${row.queue_item_id}`}
+                        onClick={() => void runApprovalAction({ action: "approve_enrollment", row })}
+                      >
+                        {actionKey === `approve_enrollment:${row.queue_item_id}` ? (
+                          <Loader2 className="mr-1 size-3 animate-spin" />
+                        ) : (
+                          <BadgeCheck className="mr-1 size-3" />
+                        )}
+                        Approve enrollment eligibility
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-[10px]"
+                        disabled={actionKey === `reject_enrollment:${row.queue_item_id}`}
+                        onClick={() => void runApprovalAction({ action: "reject_enrollment", row })}
+                      >
+                        {actionKey === `reject_enrollment:${row.queue_item_id}` ? (
+                          <Loader2 className="mr-1 size-3 animate-spin" />
+                        ) : (
+                          <ShieldAlert className="mr-1 size-3" />
+                        )}
+                        Reject enrollment
+                      </Button>
+                    </div>
+                  ) : null}
+
+                  {row.status === "enrollment_approved" ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {showCreateDraft ? (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="h-7 text-[10px]"
+                          disabled={actionKey === `create_draft:${row.queue_item_id}`}
+                          onClick={() => void runCreateDraftAction(row)}
+                        >
+                          {actionKey === `create_draft:${row.queue_item_id}` ? (
+                            <Loader2 className="mr-1 size-3 animate-spin" />
+                          ) : (
+                            <FilePlus2 className="mr-1 size-3" />
+                          )}
+                          Create enrollment draft
+                        </Button>
+                      ) : null}
+                      {draftWorkflowLink.show && draftWorkflowLink.growth_lead_id ? (
+                        <Button size="sm" variant="outline" className="h-7 text-[10px]" asChild>
+                          <Link href={`/admin/growth/leads/crm?open=${draftWorkflowLink.growth_lead_id}`}>
+                            <ExternalLink className="mr-1 size-3" />
+                            View draft in enrollment workflow
+                          </Link>
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </li>
+              )
+            })}
           </ul>
         ) : null}
       </section>

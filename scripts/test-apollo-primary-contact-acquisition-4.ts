@@ -14,6 +14,9 @@ import {
   buildApolloPrimaryContactEnrollmentDraftSnapshot,
   evaluateApolloEnrollmentDraftGates,
   mapApolloEnrollmentDraftQueueRow,
+  mergeApolloEnrollmentPanelRows,
+  shouldShowApolloEnrollmentCreateDraftAction,
+  shouldShowApolloEnrollmentDraftWorkflowLink,
 } from "../lib/growth/apollo/apollo-primary-contact-enrollment-draft-evidence"
 import { mapEnrollmentQueueDbRow } from "../lib/growth/apollo/apollo-primary-contact-enrollment-bridge-evidence"
 import { buildEnrollmentBridgeContactSnapshot } from "../lib/growth/apollo/apollo-primary-contact-enrollment-bridge-evidence"
@@ -117,7 +120,9 @@ assert.match(executionPageSource, /ApolloPrimaryContactEnrollmentApprovalQueuePa
 console.log("  ✓ sequence execution page — enrollment approval queue panel")
 
 assert.match(panelSource, /APOLLO_PRIMARY_CONTACT_ENROLLMENT_DRAFT_QA_MARKER/)
-assert.match(panelSource, /Create enrollment draft/)
+assert.match(panelSource, /enrollment-approval-queue/)
+assert.match(panelSource, /enrollment-draft/)
+assert.match(panelSource, /shouldShowApolloEnrollmentCreateDraftAction/)
 assert.match(panelSource, /View draft in enrollment workflow/)
 assert.match(panelSource, /Apollo → Operator Approved → Enrollment Queue → Draft/)
 assert.match(panelSource, /no auto-enrollment/i)
@@ -214,6 +219,24 @@ assert.equal(draftSnapshot.evidence.blocked_contacts, 1)
 assert.equal(draftSnapshot.auto_enrollment, false)
 assert.equal(draftSnapshot.outreach_sent, false)
 console.log("  ✓ draft snapshot — evidence fields and safety flags")
+
+const mergedApprovedDraftable = mergeApolloEnrollmentPanelRows({
+  queue_items: [queueRow],
+  draft_items: [draftableRow],
+})
+assert.equal(mergedApprovedDraftable.length, 1)
+assert.equal(
+  shouldShowApolloEnrollmentCreateDraftAction({
+    row: mergedApprovedDraftable[0]!,
+    draft_snapshot: draftSnapshot,
+  }),
+  true,
+)
+assert.match(
+  fs.readFileSync(path.join(process.cwd(), PANEL_PATH), "utf8"),
+  /shouldShowApolloEnrollmentCreateDraftAction/,
+)
+console.log("  ✓ approved + draftable queue item renders create draft action")
 
 const manifestPath = path.join(process.cwd(), ".next/app-path-routes-manifest.json")
 if (fs.existsSync(manifestPath)) {
