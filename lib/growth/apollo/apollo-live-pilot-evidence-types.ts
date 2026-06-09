@@ -1,5 +1,7 @@
 /** Apollo AI-2 live pilot evidence schema — client-safe validation. */
 
+import type { ApolloLivePilotProviderEvidence } from "@/lib/growth/apollo/apollo-live-pilot-provider-evidence"
+
 export const APOLLO_LIVE_PILOT_EVIDENCE_QA_MARKER = "apollo-live-pilot-ai-2-v1" as const
 
 export type ApolloLivePilotCanonicalMatchCounts = {
@@ -69,6 +71,7 @@ export type ApolloLivePilotEvidence = {
   contact_quality: ApolloLivePilotContactQuality
   research_pipeline: ApolloLivePilotResearchPipeline
   readiness_funnel: ApolloLivePilotReadinessFunnel
+  provider?: ApolloLivePilotProviderEvidence
   contact_ids?: {
     candidate_ids?: string[]
     company_contact_ids?: string[]

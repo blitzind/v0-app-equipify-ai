@@ -29,13 +29,15 @@ export async function POST(request: Request) {
   })
 
   logGrowthEngine("apollo_live_pilot_production_execute", {
-    execution_id: "execution_id" in result ? result.execution_id : null,
+    execution_id: result.execution_id,
     company_candidate_id: result.company_candidate_id?.slice(0, 8) ?? null,
     ok: result.ok,
-    error: result.ok ? null : result.error,
+    error: result.ok ? null : result.error ?? null,
+    message: result.ok ? null : result.message ?? null,
     duration_ms: Date.now() - startedMs,
     actor_user_id: access.userId,
-    api_calls: result.ok ? result.evidence_bundle.runtime.api_calls : null,
+    api_calls: result.evidence_bundle?.runtime.api_calls ?? null,
+    failure_errors: result.evidence_bundle?.errors ?? null,
   })
 
   if (!result.ok && result.error === "gates_failed") {

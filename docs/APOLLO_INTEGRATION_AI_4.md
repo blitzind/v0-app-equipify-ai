@@ -32,28 +32,55 @@ vercel env run -e production -- pnpm check:apollo-live-pilot-env-ai-4
 
 ## 2. Select one test company
 
-**If none exist**, seed one safe test company first (LE-3):
+Two operator-seeded profiles are supported. **Precision Biomedical** remains valid for mapper/filter diagnostics; **Henry Schein** is recommended for stronger Apollo employee coverage.
+
+### Strong B2B pilot company (recommended)
+
+Seed + select Henry Schein (one company, no outreach):
+
+```bash
+APOLLO_TEST_COMPANY_SEED_ACK=1 \
+APOLLO_TEST_COMPANY_NAME="Henry Schein" \
+APOLLO_TEST_COMPANY_DOMAIN="henryschein.com" \
+APOLLO_TEST_COMPANY_WEBSITE="https://www.henryschein.com" \
+pnpm prepare:apollo-live-pilot-test-company:production
+```
+
+Preset shorthand:
+
+```bash
+APOLLO_TEST_COMPANY_SEED_ACK=1 APOLLO_TEST_COMPANY_PROFILE=henry_schein \
+pnpm prepare:apollo-live-pilot-test-company:production
+```
+
+Copy the returned `env_hint` into **Vercel Production** as `GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID`, redeploy, then execute the live pilot.
+
+### Weak/small company (mapper diagnostics)
+
+**If none exist**, seed Precision Biomedical first (LE-3):
 
 ```bash
 APOLLO_TEST_COMPANY_SEED_ACK=1 \
 APOLLO_TEST_COMPANY_NAME="Precision Biomedical Services" \
 APOLLO_TEST_COMPANY_DOMAIN="precisionbiomedicalservices.com" \
 APOLLO_TEST_COMPANY_WEBSITE="https://precisionbiomedicalservices.com" \
-pnpm seed:apollo-live-pilot-test-company
+pnpm seed:apollo-live-pilot-test-company:production
 ```
 
 Add the returned `GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID` to **Vercel Production**.
 
-Auto-select a suitable company (domain present, not suppressed, low existing Apollo contacts):
+Auto-select a suitable seeded company by domain:
 
 ```bash
-vercel env run -e production -- env APOLLO_TEST_COMPANY_PREFER_SEEDED=1 pnpm select:apollo-live-pilot-test-company-ai-4
+APOLLO_TEST_COMPANY_DOMAIN=henryschein.com \
+APOLLO_TEST_COMPANY_PREFER_SEEDED=1 \
+pnpm select:apollo-live-pilot-test-company-ai-4:production
 ```
 
 Or validate a specific candidate:
 
 ```bash
-APOLLO_AI_4_COMPANY_CANDIDATE_ID=<uuid> pnpm select:apollo-live-pilot-test-company-ai-4
+APOLLO_AI_4_COMPANY_CANDIDATE_ID=<uuid> pnpm select:apollo-live-pilot-test-company-ai-4:production
 ```
 
 Copy the returned `company_candidate_id` into `GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID`. **One company only** — no bulk selection.

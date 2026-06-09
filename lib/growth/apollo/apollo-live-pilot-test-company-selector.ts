@@ -4,7 +4,11 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { ApolloLivePilotDryRunTargetCompany } from "@/lib/growth/apollo/apollo-live-pilot-dry-run"
-import { APOLLO_LIVE_PILOT_TEST_COMPANY_SOURCE_MARKER } from "@/lib/growth/apollo/apollo-live-pilot-test-company-seed"
+import { mergeApolloLivePilotTestCompanySeedEnv } from "@/lib/growth/apollo/apollo-live-pilot-test-company-presets"
+import {
+  APOLLO_LIVE_PILOT_TEST_COMPANY_SOURCE_MARKER,
+  normalizeApolloTestCompanyDomain,
+} from "@/lib/growth/apollo/apollo-live-pilot-test-company-seed"
 
 export const APOLLO_LIVE_PILOT_TEST_COMPANY_SELECTOR_QA_MARKER =
   "apollo-live-pilot-test-company-selector-ai-4-v1" as const
@@ -86,7 +90,7 @@ async function loadSeededCandidateRow(
     .limit(5)
 
   if (domain?.trim()) {
-    query = query.eq("domain", domain.trim().toLowerCase().replace(/^www\./, ""))
+    query = query.eq("domain", normalizeApolloTestCompanyDomain(domain))
   }
 
   const { data: rows } = await query
@@ -224,5 +228,37 @@ export async function resolveApolloLivePilotTestCompany(
     message: nameSearch
       ? `No suitable company found matching "${nameSearch}".`
       : "No suitable discovery_candidates row found — run pnpm seed:apollo-live-pilot-test-company",
+  }
+}
+
+export function resolveApolloLivePilotTestCompanySelectionFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): {
+  company_candidate_id: string | null
+  company_name_search: string | null
+  prefer_seeded: boolean
+  seeded_domain: string | null
+} {
+  const merged = mergeApolloLivePilotTestCompanySeedEnv(env)
+  const explicitId =
+    env.APOLLO_AI_4_COMPANY_CANDIDATE_ID?.trim() ||
+    env.GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID?.trim() ||
+    null
+  const seededDomain =
+    env.APOLLO_TEST_COMPANY_DOMAIN?.trim() || merged.domain || null
+  const nameSearch =
+    env.APOLLO_AI_4_COMPANY_NAME_SEARCH?.trim() ||
+    env.APOLLO_TEST_COMPANY_NAME?.trim() ||
+    (seededDomain ? null : merged.company_name || null)
+  const preferSeeded =
+    env.APOLLO_TEST_COMPANY_PREFER_SEEDED === "1" ||
+    Boolean(seededDomain) ||
+    Boolean(env.APOLLO_TEST_COMPANY_PROFILE?.trim())
+
+  return {
+    company_candidate_id: explicitId,
+    company_name_search: nameSearch,
+    prefer_seeded: preferSeeded,
+    seeded_domain: seededDomain ? normalizeApolloTestCompanyDomain(seededDomain) : null,
   }
 }

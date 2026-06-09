@@ -7,10 +7,18 @@ import { syncContactCandidatesToCompanyContactsWithResolution } from "@/lib/grow
 import { runCanonicalPersonBackfillForCompanyCandidate } from "@/lib/growth/canonical-persons/canonical-person-backfill"
 import { ensureStagingCanonicalCompanyLinkage } from "@/lib/growth/canonical-companies/canonical-company-staging-linkage"
 import { fetchStagingCanonicalCompanyId } from "@/lib/growth/canonical-persons/canonical-person-repository-core"
-import { runContactDiscoveryForCompany } from "@/lib/growth/contact-discovery/contact-repository"
+import { runApolloLivePilotContactDiscovery } from "@/lib/growth/apollo/apollo-live-pilot-contact-discovery"
+import type { GrowthContactDiscoveryProviderOutcome } from "@/lib/growth/contact-discovery/contact-discovery-provider-outcomes"
+import type { GrowthContactDiscoverySnapshot } from "@/lib/growth/contact-discovery/contact-discovery-types"
 import { scoreDecisionMakerTitle } from "@/lib/growth/contact-discovery/decision-maker-score"
 import type { ApolloLivePilotEvidence } from "@/lib/growth/apollo/apollo-live-pilot-evidence-types"
 import { APOLLO_LIVE_PILOT_EVIDENCE_QA_MARKER } from "@/lib/growth/apollo/apollo-live-pilot-evidence-types"
+import {
+  buildApolloLivePilotProviderDiscoveryError,
+  buildApolloLivePilotProviderEvidence,
+  logApolloLivePilotProviderEvidence,
+  type ApolloLivePilotProviderEvidence,
+} from "@/lib/growth/apollo/apollo-live-pilot-provider-evidence"
 import { classifyApolloContactTitleBucket } from "@/lib/growth/providers/apollo/apollo-title-buckets"
 import {
   assertApolloLiveBenchmarkAllowed,
@@ -22,6 +30,13 @@ import {
   getApolloRunGuardrailSnapshot,
   resetApolloRunGuardrails,
 } from "@/lib/growth/providers/apollo/apollo-run-guardrails"
+import {
+  formatApolloLivePilotErrorForEvidence,
+  formatApolloLivePilotFailureForEvidence,
+  logApolloLivePilotError,
+  logApolloLivePilotFailure,
+} from "@/lib/growth/apollo/apollo-live-pilot-error-reporting"
+import type { SyncContactCandidatesToCompanyContactsResult } from "@/lib/growth/acquisition/sync-contact-candidates-to-company-contacts"
 
 export const APOLLO_LIVE_PILOT_RUNNER_QA_MARKER = "apollo-live-pilot-runner-ai-2-v1" as const
 
@@ -66,6 +81,7 @@ async function loadCompanyContext(
 ): Promise<{
   company_name: string
   domain: string | null
+  website_url: string | null
   canonical_company_id: string | null
 }> {
   const { data } = await admin
@@ -81,6 +97,7 @@ async function loadCompanyContext(
     asString(row?.domain) ||
     asString(row?.website)?.replace(/^https?:\/\//, "").split("/")[0] ||
     null
+  const website_url = asString(row?.website) || (domain ? `https://${domain}` : null)
 
   let canonical_company_id: string | null = null
   if (row) {
@@ -90,6 +107,7 @@ async function loadCompanyContext(
   return {
     company_name: asString(row?.company_name) || company_candidate_id,
     domain,
+    website_url,
     canonical_company_id,
   }
 }
@@ -223,6 +241,182 @@ async function collectReadinessFunnel(
   }
 }
 
+function providerClassificationErrorName(
+  classification: ApolloLivePilotProviderEvidence["classification"],
+): string {
+  switch (classification) {
+    case "apollo_zero_results":
+      return "ApolloZeroResults"
+    case "apollo_results_rejected_by_mapping":
+      return "ApolloResultsRejectedByMapping"
+    case "apollo_results_rejected_by_icp_title":
+      return "ApolloResultsRejectedByIcpTitle"
+    case "apollo_results_rejected_by_canonical_sync":
+      return "ApolloResultsRejectedByCanonicalSync"
+    case "apollo_results_rejected_non_person_rows":
+      return "ApolloResultsRejectedNonPersonRows"
+    case "apollo_success":
+      return "ApolloSuccess"
+  }
+}
+
+function providerClassificationPhase(
+  classification: ApolloLivePilotProviderEvidence["classification"],
+): string {
+  return `contact_discovery_${classification}`
+}
+
+function collectApolloDiscoveryErrors(
+  apolloOutcome: GrowthContactDiscoveryProviderOutcome | null,
+  providerEvidence: ApolloLivePilotProviderEvidence | null,
+  fallbackMessage: string | null,
+): string[] {
+  const errors: string[] = []
+
+  if (!apolloOutcome) {
+    const message = fallbackMessage ?? "Apollo provider outcome missing from contact discovery."
+    logApolloLivePilotFailure({
+      phase: "contact_discovery_apollo_outcome",
+      error_name: "ApolloOutcomeMissing",
+      error_message: message,
+    })
+    errors.push(formatApolloLivePilotFailureForEvidence("contact_discovery_apollo_outcome", "ApolloOutcomeMissing", message))
+    return errors
+  }
+
+  if (apolloOutcome.status === "skipped") {
+    const message = apolloOutcome.message ?? apolloOutcome.provider_error ?? "Apollo discovery skipped."
+    logApolloLivePilotFailure({
+      phase: "contact_discovery_apollo_skipped",
+      error_name: "ApolloSkipped",
+      error_message: message,
+    })
+    errors.push(formatApolloLivePilotFailureForEvidence("contact_discovery_apollo_skipped", "ApolloSkipped", message))
+    return errors
+  }
+
+  if (apolloOutcome.status === "failed") {
+    const message = apolloOutcome.provider_error ?? apolloOutcome.message ?? "Apollo discovery failed."
+    logApolloLivePilotFailure({
+      phase: "contact_discovery_apollo_failed",
+      error_name: "ApolloFailed",
+      error_message: message,
+    })
+    errors.push(formatApolloLivePilotFailureForEvidence("contact_discovery_apollo_failed", "ApolloFailed", message))
+    return errors
+  }
+
+  if (providerEvidence) {
+    const discoveryError = buildApolloLivePilotProviderDiscoveryError(providerEvidence)
+    if (discoveryError) {
+      logApolloLivePilotFailure({
+        phase: providerClassificationPhase(providerEvidence.classification),
+        error_name: providerClassificationErrorName(providerEvidence.classification),
+        error_message: discoveryError,
+      })
+      errors.push(discoveryError)
+    }
+    return errors
+  }
+
+  if ((apolloOutcome.contacts_returned ?? 0) === 0) {
+    const message = apolloOutcome.message ?? "Apollo returned zero contacts."
+    logApolloLivePilotFailure({
+      phase: "contact_discovery_apollo_zero_results",
+      error_name: "ApolloZeroResults",
+      error_message: message,
+    })
+    errors.push(
+      formatApolloLivePilotFailureForEvidence("contact_discovery_apollo_zero_results", "ApolloZeroResults", message),
+    )
+  }
+
+  return errors
+}
+
+function buildApolloLivePilotEvidence(input: {
+  started: number
+  env: NodeJS.ProcessEnv
+  company_candidate_id: string
+  companyContext: {
+    company_name: string
+    domain: string | null
+    canonical_company_id: string | null
+  }
+  canonical_company_id: string | null
+  errors: string[]
+  apolloContacts: GrowthContactDiscoverySnapshot["contacts"]
+  apolloOutcome: GrowthContactDiscoveryProviderOutcome | null
+  sync: SyncContactCandidatesToCompanyContactsResult
+  backfill: { persons_linked: number; rows_processed: number }
+  contactQuality: ApolloLivePilotEvidence["contact_quality"]
+  readinessFunnel: ApolloLivePilotEvidence["readiness_funnel"]
+  providerEvidence: ApolloLivePilotProviderEvidence | null
+}): ApolloLivePilotEvidence {
+  const guardrails = getApolloRunGuardrailSnapshot()
+  const config = diagnoseApolloContactDiscoveryConfig(input.env)
+  const provider = input.providerEvidence
+  const irrelevantTitleSkipped = provider?.rejection_reasons.irrelevant_title ?? 0
+
+  return {
+    qa_marker: APOLLO_LIVE_PILOT_EVIDENCE_QA_MARKER,
+    pilot_at: new Date().toISOString(),
+    mock: config.mock_mode,
+    company: {
+      canonical_company_id: input.canonical_company_id || null,
+      company_candidate_id: input.company_candidate_id,
+      company_name: input.companyContext.company_name,
+      domain: input.companyContext.domain,
+    },
+    runtime: {
+      duration_ms: Date.now() - input.started,
+      api_calls: guardrails?.search_api_calls ?? 0,
+      credits_consumed: guardrails?.credits_estimate ?? 0,
+      errors: input.errors,
+    },
+    discovery: {
+      raw_contacts_returned: provider?.apollo_people_returned ?? input.apolloContacts.length,
+      contacts_mapped: provider?.apollo_people_mapped ?? input.apolloContacts.length,
+      contacts_skipped: provider?.apollo_people_rejected ?? 0,
+      contacts_rejected: provider?.apollo_people_rejected ?? 0,
+      candidates_stored: input.apolloContacts.length,
+      company_contacts_synced: input.sync.synced,
+    },
+    provider: input.providerEvidence,
+    canonical_matching: {
+      company: {
+        matched:
+          input.canonical_company_id && input.sync.resolution?.ready !== false ? 1 : 0,
+        created: 0,
+        deduped: 0,
+        rejected: input.canonical_company_id ? 0 : 1,
+      },
+      person: {
+        matched: 0,
+        created: input.backfill.persons_linked,
+        deduped: Math.max(0, input.backfill.rows_processed - input.backfill.persons_linked),
+        rejected: Math.max(0, input.apolloContacts.length - input.sync.synced),
+      },
+    },
+    contact_quality: {
+      ...input.contactQuality,
+      irrelevant_title_skipped: irrelevantTitleSkipped,
+    },
+    research_pipeline: {
+      company_intelligence_present: input.readinessFunnel.research_complete > 0,
+      buying_committee_present: input.contactQuality.buying_committee_relevant > 0,
+      fit_score_present: input.readinessFunnel.score_available > 0,
+      relationship_intelligence_present: false,
+      next_best_action_present: false,
+      automated_flow_confirmed:
+        input.apolloContacts.length > 0 &&
+        input.sync.synced > 0 &&
+        input.backfill.persons_linked > 0,
+    },
+    readiness_funnel: input.readinessFunnel,
+  }
+}
+
 export async function runApolloLivePilotAi2(
   admin: SupabaseClient,
   input: {
@@ -271,25 +465,78 @@ export async function runApolloLivePilotAi2(
       companyContext.canonical_company_id ||
       (await fetchStagingCanonicalCompanyId(admin, company_candidate_id))
 
-    const discovery = await runContactDiscoveryForCompany(admin, {
-      company_candidate_id,
-      created_by: input.created_by ?? null,
-      limit: input.contact_limit ?? 10,
-      provider_types: ["future_apollo"],
-    })
-
-    const apolloOutcome = discovery.provider_outcomes.find((o) => o.provider === "apollo")
-    const apolloContacts = discovery.contacts.filter((c) => c.provider_type === "future_apollo")
-
-    if (apolloOutcome?.status === "failed") {
-      errors.push(apolloOutcome.message ?? "apollo_discovery_failed")
+    let discoveryResult: Awaited<ReturnType<typeof runApolloLivePilotContactDiscovery>>
+    try {
+      discoveryResult = await runApolloLivePilotContactDiscovery(admin, {
+        company_candidate_id,
+        company_name: companyContext.company_name,
+        domain: companyContext.domain,
+        website_url: companyContext.website_url,
+        created_by: input.created_by ?? null,
+        limit: input.contact_limit ?? 10,
+      })
+    } catch (error) {
+      logApolloLivePilotError("runContactDiscoveryForCompany", error)
+      errors.push(formatApolloLivePilotErrorForEvidence("runContactDiscoveryForCompany", error))
+      const contactQuality = await collectContactQuality(admin, company_candidate_id)
+      const evidence = buildApolloLivePilotEvidence({
+        started,
+        env,
+        company_candidate_id,
+        companyContext,
+        canonical_company_id,
+        errors,
+        apolloContacts: [],
+        apolloOutcome: null,
+        sync: { synced: 0, resolution: null },
+        backfill: { persons_linked: 0, rows_processed: 0 },
+        contactQuality,
+        readinessFunnel: {
+          imported: 0,
+          research_complete: 0,
+          score_available: 0,
+          contactable: 0,
+          sequence_ready: 0,
+        },
+        providerEvidence: null,
+      })
+      return {
+        ok: false,
+        evidence,
+        error: formatApolloLivePilotErrorForEvidence("runContactDiscoveryForCompany", error),
+      }
     }
 
-    const sync = await syncContactCandidatesToCompanyContactsWithResolution(admin, {
-      company_candidate_id,
-      canonical_company_id: canonical_company_id || null,
-      candidates: apolloContacts,
+    const apolloOutcome = discoveryResult.apollo_outcome
+    const apolloContacts = discoveryResult.apollo_contacts
+    const fallbackMessage =
+      discoveryResult.snapshot.provider_messages.find((message) =>
+        message.toLowerCase().startsWith("apollo:"),
+      ) ??
+      discoveryResult.snapshot.provider_messages[0] ??
+      null
+
+    let sync: SyncContactCandidatesToCompanyContactsResult
+    try {
+      sync = await syncContactCandidatesToCompanyContactsWithResolution(admin, {
+        company_candidate_id,
+        canonical_company_id: canonical_company_id || null,
+        candidates: apolloContacts,
+      })
+    } catch (error) {
+      logApolloLivePilotError("syncContactCandidatesToCompanyContacts", error)
+      errors.push(formatApolloLivePilotErrorForEvidence("syncContactCandidatesToCompanyContacts", error))
+      sync = { synced: 0, resolution: null }
+    }
+
+    const providerEvidence = buildApolloLivePilotProviderEvidence({
+      provider_result: discoveryResult.apollo_provider_result,
+      candidates_stored: apolloContacts.length,
+      company_contacts_synced: sync.synced,
+      canonical_sync_rejected: Math.max(0, apolloContacts.length - sync.synced),
     })
+    logApolloLivePilotProviderEvidence(providerEvidence)
+    errors.push(...collectApolloDiscoveryErrors(apolloOutcome, providerEvidence, fallbackMessage))
 
     const backfill = await runCanonicalPersonBackfillForCompanyCandidate(admin, {
       company_candidate_id,
@@ -302,8 +549,6 @@ export async function runApolloLivePilotAi2(
     })
     if (linkage.canonical_company_id) canonical_company_id = linkage.canonical_company_id
 
-    const guardrails = getApolloRunGuardrailSnapshot()
-    const config = diagnoseApolloContactDiscoveryConfig(env)
     const contactQuality = await collectContactQuality(admin, company_candidate_id)
     const readinessFunnel = await collectReadinessFunnel(
       admin,
@@ -311,70 +556,29 @@ export async function runApolloLivePilotAi2(
       sync.synced,
     )
 
-    const skippedFromMapper =
-      typeof apolloOutcome?.metadata === "object" && apolloOutcome.metadata
-        ? Number((apolloOutcome.metadata as Record<string, unknown>).contacts_skipped ?? 0)
-        : 0
-
-    const evidence: ApolloLivePilotEvidence = {
-      qa_marker: APOLLO_LIVE_PILOT_EVIDENCE_QA_MARKER,
-      pilot_at: new Date().toISOString(),
-      mock: config.mock_mode,
-      company: {
-        canonical_company_id: canonical_company_id || null,
-        company_candidate_id,
-        company_name: companyContext.company_name,
-        domain: companyContext.domain,
-      },
-      runtime: {
-        duration_ms: Date.now() - started,
-        api_calls: guardrails?.search_api_calls ?? 1,
-        credits_consumed: guardrails?.credits_estimate ?? 0,
-        errors,
-      },
-      discovery: {
-        raw_contacts_returned: apolloContacts.length + skippedFromMapper,
-        contacts_mapped: apolloContacts.length,
-        contacts_skipped: skippedFromMapper,
-        contacts_rejected: 0,
-        candidates_stored: apolloContacts.length,
-        company_contacts_synced: sync.synced,
-      },
-      canonical_matching: {
-        company: {
-          matched: canonical_company_id && sync.resolution?.ready !== false ? 1 : 0,
-          created: 0,
-          deduped: 0,
-          rejected: canonical_company_id ? 0 : 1,
-        },
-        person: {
-          matched: 0,
-          created: backfill.persons_linked,
-          deduped: Math.max(0, backfill.rows_processed - backfill.persons_linked),
-          rejected: Math.max(0, apolloContacts.length - sync.synced),
-        },
-      },
-      contact_quality: {
-        ...contactQuality,
-        irrelevant_title_skipped: skippedFromMapper,
-      },
-      research_pipeline: {
-        company_intelligence_present: readinessFunnel.research_complete > 0,
-        buying_committee_present: contactQuality.buying_committee_relevant > 0,
-        fit_score_present: readinessFunnel.score_available > 0,
-        relationship_intelligence_present: false,
-        next_best_action_present: false,
-        automated_flow_confirmed: apolloContacts.length > 0 && sync.synced > 0 && backfill.persons_linked > 0,
-      },
-      readiness_funnel: readinessFunnel,
-    }
+    const evidence = buildApolloLivePilotEvidence({
+      started,
+      env,
+      company_candidate_id,
+      companyContext,
+      canonical_company_id,
+      errors,
+      apolloContacts,
+      apolloOutcome,
+      sync,
+      backfill,
+      contactQuality,
+      readinessFunnel,
+      providerEvidence,
+    })
 
     return { ok: errors.length === 0 && apolloContacts.length > 0, evidence, error: null }
   } catch (error) {
+    logApolloLivePilotError("runApolloLivePilotAi2", error)
     return {
       ok: false,
       evidence: null,
-      error: error instanceof Error ? error.message : String(error),
+      error: formatApolloLivePilotErrorForEvidence("runApolloLivePilotAi2", error),
     }
   } finally {
     resetApolloRunGuardrails()

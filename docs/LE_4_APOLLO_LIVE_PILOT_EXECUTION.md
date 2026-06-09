@@ -20,13 +20,39 @@ Configure in **Vercel → Project → Settings → Environment Variables → Pro
 | `APOLLO_API_KEY` | *(secret — Vercel Production runtime only)* |
 | `GROWTH_APOLLO_LIVE_BENCHMARK_ACK` | `1` |
 | `GROWTH_APOLLO_AI_3_LIVE_PILOT_ENABLED` | `true` |
-| `GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID` | `ad4f77c7-e91a-494a-8cb8-44fa23533087` |
+| `GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID` | *(from seed/select — see Step 0 below)* |
 | `NEXT_PUBLIC_SUPABASE_URL` | production Supabase URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | production service role |
 
-Seeded company: **Precision Biomedical Services** (`precisionbiomedicalservices.com`).
+Seeded companies (operator-safe, one at a time):
+
+| Profile | Company | Domain | Use |
+|---------|---------|--------|-----|
+| `precision_biomedical` | Precision Biomedical Services | `precisionbiomedicalservices.com` | Mapper/filter diagnostics (often weak Apollo rows) |
+| `henry_schein` | Henry Schein | `henryschein.com` | Stronger B2B Apollo coverage (recommended) |
 
 Redeploy after changing Production env vars.
+
+---
+
+## Step 0 — Seed/select pilot company (Production DB, no Apollo HTTP)
+
+Recommended strong B2B test company:
+
+```bash
+# Requires production Supabase service role (Vercel Production secret — never commit).
+# vercel env pull does not include SUPABASE_SERVICE_ROLE_KEY; export it for this CLI step only.
+
+APOLLO_TEST_COMPANY_SEED_ACK=1 \
+APOLLO_TEST_COMPANY_NAME="Henry Schein" \
+APOLLO_TEST_COMPANY_DOMAIN="henryschein.com" \
+APOLLO_TEST_COMPANY_WEBSITE="https://www.henryschein.com" \
+pnpm prepare:apollo-live-pilot-test-company:production
+```
+
+Set the returned `env_hint` in **Vercel Production** as `GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID`, then redeploy.
+
+Precision Biomedical remains available via `APOLLO_TEST_COMPANY_PROFILE=precision_biomedical` or explicit name/domain env vars.
 
 ---
 

@@ -5,8 +5,26 @@ import { isPlausiblePersonName } from "@/lib/growth/contact-discovery/extract/ex
 import { GROWTH_CONTACT_ACQUISITION_PROVIDER_ADAPTER_QA_MARKER } from "@/lib/growth/contact-discovery/contact-acquisition-provider-adapter-types"
 import { classifyContactIdentity } from "@/lib/growth/human-identity-evidence/contact-identity-classification"
 import { isFalsePositiveEmailLocalPartIdentity } from "@/lib/growth/human-identity-evidence/email-local-part-identity-guards"
-import { isApolloIrrelevantTitleForIcp } from "@/lib/growth/providers/apollo/apollo-title-buckets"
+import {
+  classifyApolloContactTitleBucket,
+  isApolloIrrelevantTitleForIcp,
+} from "@/lib/growth/providers/apollo/apollo-title-buckets"
 import type { ApolloPersonRecord, ApolloSearchDiagnostics } from "@/lib/growth/providers/apollo/apollo-types"
+
+export type ApolloRedactedRejectionSample = {
+  raw_first_name_present: boolean
+  raw_last_name_present: boolean
+  raw_name_present: boolean
+  mapped_full_name_present: boolean
+  title: string | null
+  seniority: string | null
+  organization_domain: string | null
+  email_present: boolean
+  phone_present: boolean
+  rejection_reason: string
+  /** @deprecated Use raw_name_present / mapped_full_name_present */
+  name_present?: boolean
+}
 
 function asTrimmedString(value: unknown): string | null {
   if (typeof value === "string") {
@@ -92,6 +110,38 @@ export function evaluateApolloContactAcceptance(
   }
 
   return { accepted: true, reason: null }
+}
+
+function buildRedactedRejectionSample(input: {
+  person: ApolloPersonRecord
+  reason: string
+  domain: string | null
+  mapped: GrowthContactDiscoveryProviderRawContact | null
+}): ApolloRedactedRejectionSample {
+  const rawFirstName = asTrimmedString(input.person.first_name)
+  const rawLastName = asTrimmedString(input.person.last_name)
+  const rawName = asTrimmedString(input.person.name)
+  const mappedFullName = input.mapped?.full_name ?? resolveFullName(input.person)
+  const rawEmail = asTrimmedString(input.person.email)
+  const email = isObservedEmail(input.person, rawEmail) ? rawEmail : null
+  const phone = pickPhone(input.person)
+  const org = input.person.organization
+
+  return {
+    raw_first_name_present: Boolean(rawFirstName),
+    raw_last_name_present: Boolean(rawLastName),
+    raw_name_present: Boolean(rawName),
+    mapped_full_name_present: Boolean(mappedFullName && mappedFullName.length >= 2),
+    title: asTrimmedString(input.person.title) ?? asTrimmedString(input.person.headline),
+    seniority: asTrimmedString(input.person.seniority),
+    organization_domain:
+      asTrimmedString(org?.primary_domain) ??
+      asTrimmedString(input.domain) ??
+      null,
+    email_present: Boolean(email),
+    phone_present: Boolean(phone),
+    rejection_reason: input.reason,
+  }
 }
 
 export function mapApolloPersonToContactDiscoveryRaw(
@@ -187,15 +237,40 @@ export function mapApolloPeopleToContactDiscoveryRaw(input: {
 }): {
   contacts: GrowthContactDiscoveryProviderRawContact[]
   diagnostics: Pick<ApolloSearchDiagnostics, "contacts_mapped" | "contacts_skipped" | "skip_reasons">
+  apollo_people_returned: number
+  missing_email_count: number
+  missing_phone_count: number
+  title_bucket_rejections: Record<string, number>
+  rejected_sample: ApolloRedactedRejectionSample | null
 } {
   const skip_reasons: Record<string, number> = {}
+  const title_bucket_rejections: Record<string, number> = {}
   const seen = new Set<string>()
   const contacts: GrowthContactDiscoveryProviderRawContact[] = []
+  let missing_email_count = 0
+  let missing_phone_count = 0
+  let rejected_sample: ApolloRedactedRejectionSample | null = null
 
   for (const person of input.people) {
     const rawTitle = asTrimmedString(person.title) ?? asTrimmedString(person.headline)
+    const rawEmail = asTrimmedString(person.email)
+    const email = isObservedEmail(person, rawEmail) ? rawEmail : null
+    const phone = pickPhone(person)
+    if (!email) missing_email_count += 1
+    if (!phone) missing_phone_count += 1
+
     if (isApolloIrrelevantTitleForIcp(rawTitle)) {
       skip_reasons.irrelevant_title = (skip_reasons.irrelevant_title ?? 0) + 1
+      const bucket = classifyApolloContactTitleBucket(rawTitle)
+      title_bucket_rejections[bucket] = (title_bucket_rejections[bucket] ?? 0) + 1
+      if (!rejected_sample) {
+        rejected_sample = buildRedactedRejectionSample({
+          person,
+          reason: "irrelevant_title",
+          domain: input.domain,
+          mapped: null,
+        })
+      }
       continue
     }
 
@@ -208,6 +283,18 @@ export function mapApolloPeopleToContactDiscoveryRaw(input: {
     if (!gate.accepted || !mapped) {
       const reason = gate.reason ?? "rejected"
       skip_reasons[reason] = (skip_reasons[reason] ?? 0) + 1
+      if (rawTitle) {
+        const bucket = classifyApolloContactTitleBucket(rawTitle)
+        title_bucket_rejections[bucket] = (title_bucket_rejections[bucket] ?? 0) + 1
+      }
+      if (!rejected_sample) {
+        rejected_sample = buildRedactedRejectionSample({
+          person,
+          reason,
+          domain: input.domain,
+          mapped,
+        })
+      }
       continue
     }
 
@@ -218,6 +305,14 @@ export function mapApolloPeopleToContactDiscoveryRaw(input: {
     ].join("|")
     if (seen.has(key)) {
       skip_reasons.duplicate = (skip_reasons.duplicate ?? 0) + 1
+      if (!rejected_sample) {
+        rejected_sample = buildRedactedRejectionSample({
+          person,
+          reason: "duplicate",
+          domain: input.domain,
+          mapped,
+        })
+      }
       continue
     }
     seen.add(key)
@@ -231,5 +326,10 @@ export function mapApolloPeopleToContactDiscoveryRaw(input: {
       contacts_skipped: input.people.length - contacts.length,
       skip_reasons,
     },
+    apollo_people_returned: input.people.length,
+    missing_email_count,
+    missing_phone_count,
+    title_bucket_rejections,
+    rejected_sample,
   }
 }

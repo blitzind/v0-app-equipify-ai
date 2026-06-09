@@ -7,6 +7,12 @@ import fs from "node:fs"
 import path from "node:path"
 import { buildApolloLivePilotDryRunReport } from "../lib/growth/apollo/apollo-live-pilot-dry-run"
 import {
+  APOLLO_LIVE_PILOT_TEST_COMPANY_PRESETS,
+  mergeApolloLivePilotTestCompanySeedEnv,
+  resolveApolloLivePilotTestCompanyPreset,
+} from "../lib/growth/apollo/apollo-live-pilot-test-company-presets"
+import { resolveApolloLivePilotTestCompanySelectionFromEnv } from "../lib/growth/apollo/apollo-live-pilot-test-company-selector"
+import {
   APOLLO_LIVE_PILOT_TEST_COMPANY_SEED_QA_MARKER,
   APOLLO_LIVE_PILOT_TEST_COMPANY_SOURCE_MARKER,
   buildApolloTestCompanyDedupeHash,
@@ -72,6 +78,31 @@ assert.equal(
   "https://precisionbiomedicalservices.com",
 )
 record("seed.env_valid", "pass", "Valid seed env parses")
+
+console.log("\n=== LE-3 Henry Schein preset ===")
+const henryPreset = resolveApolloLivePilotTestCompanyPreset("henry_schein")
+assert.ok(henryPreset)
+assert.equal(henryPreset?.domain, "henryschein.com")
+assert.equal(henryPreset?.coverage_tier, "strong")
+assert.ok(APOLLO_LIVE_PILOT_TEST_COMPANY_PRESETS.precision_biomedical)
+const presetEnv = validateApolloLivePilotTestCompanySeedEnv({
+  APOLLO_TEST_COMPANY_SEED_ACK: "1",
+  APOLLO_TEST_COMPANY_PROFILE: "henry_schein",
+} as NodeJS.ProcessEnv)
+assert.equal(presetEnv.ok, true)
+assert.equal(presetEnv.input?.company_name, "Henry Schein")
+assert.equal(presetEnv.input?.domain, "henryschein.com")
+const mergedPreset = mergeApolloLivePilotTestCompanySeedEnv({
+  APOLLO_TEST_COMPANY_PROFILE: "henry_schein",
+} as NodeJS.ProcessEnv)
+assert.equal(mergedPreset.website, "https://www.henryschein.com")
+const selectionEnv = resolveApolloLivePilotTestCompanySelectionFromEnv({
+  APOLLO_TEST_COMPANY_DOMAIN: "henryschein.com",
+  APOLLO_TEST_COMPANY_PREFER_SEEDED: "1",
+} as NodeJS.ProcessEnv)
+assert.equal(selectionEnv.seeded_domain, "henryschein.com")
+assert.equal(selectionEnv.prefer_seeded, true)
+record("seed.henry_schein_preset", "pass", "Henry Schein preset resolves seed/select env")
 
 console.log("\n=== LE-3 Seed does not call Apollo ===")
 const seedSource = fs.readFileSync(

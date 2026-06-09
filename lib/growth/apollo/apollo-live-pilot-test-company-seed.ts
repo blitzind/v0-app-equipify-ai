@@ -4,6 +4,7 @@ import "server-only"
 
 import { createHash, randomUUID } from "node:crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { mergeApolloLivePilotTestCompanySeedEnv } from "@/lib/growth/apollo/apollo-live-pilot-test-company-presets"
 
 export const APOLLO_LIVE_PILOT_TEST_COMPANY_SEED_QA_MARKER =
   "apollo-live-pilot-test-company-seed-le-3-v1" as const
@@ -15,6 +16,9 @@ export type ApolloLivePilotTestCompanySeedInput = {
   company_name: string
   domain: string
   website: string
+  industry?: string | null
+  pilot_profile?: string | null
+  coverage_tier?: "strong" | "weak" | null
 }
 
 export type ApolloLivePilotTestCompanySeedResult = {
@@ -68,13 +72,21 @@ export function validateApolloLivePilotTestCompanySeedEnv(
     errors.push("Set APOLLO_TEST_COMPANY_SEED_ACK=1 to seed one Apollo live pilot test company")
   }
 
-  const company_name = env.APOLLO_TEST_COMPANY_NAME?.trim() ?? ""
-  const domainRaw = env.APOLLO_TEST_COMPANY_DOMAIN?.trim() ?? ""
-  const websiteRaw = env.APOLLO_TEST_COMPANY_WEBSITE?.trim() ?? ""
+  const merged = mergeApolloLivePilotTestCompanySeedEnv(env)
+  const company_name = merged.company_name
+  const domainRaw = merged.domain
+  const websiteRaw = merged.website
+  const industry = merged.industry
 
-  if (!company_name) errors.push("APOLLO_TEST_COMPANY_NAME is required")
-  if (!domainRaw) errors.push("APOLLO_TEST_COMPANY_DOMAIN is required")
-  if (!websiteRaw && !domainRaw) errors.push("APOLLO_TEST_COMPANY_WEBSITE or APOLLO_TEST_COMPANY_DOMAIN is required")
+  if (!company_name && !env.APOLLO_TEST_COMPANY_PROFILE?.trim()) {
+    errors.push("APOLLO_TEST_COMPANY_NAME or APOLLO_TEST_COMPANY_PROFILE is required")
+  }
+  if (!domainRaw && !env.APOLLO_TEST_COMPANY_PROFILE?.trim()) {
+    errors.push("APOLLO_TEST_COMPANY_DOMAIN or APOLLO_TEST_COMPANY_PROFILE is required")
+  }
+  if (!websiteRaw && !domainRaw && !env.APOLLO_TEST_COMPANY_PROFILE?.trim()) {
+    errors.push("APOLLO_TEST_COMPANY_WEBSITE, APOLLO_TEST_COMPANY_DOMAIN, or APOLLO_TEST_COMPANY_PROFILE is required")
+  }
 
   if (errors.length > 0) return { ok: false, errors, input: null }
 
@@ -88,7 +100,17 @@ export function validateApolloLivePilotTestCompanySeedEnv(
   return {
     ok: errors.length === 0,
     errors,
-    input: errors.length === 0 ? { company_name, domain, website } : null,
+    input:
+      errors.length === 0
+        ? {
+            company_name,
+            domain,
+            website,
+            industry,
+            pilot_profile: merged.pilot_profile,
+            coverage_tier: merged.coverage_tier,
+          }
+        : null,
   }
 }
 
@@ -158,6 +180,10 @@ export async function seedApolloLivePilotTestCompany(
   const company_id = randomUUID()
   const now = new Date().toISOString()
 
+  const industry = input.industry?.trim() || "b2b_services"
+  const pilotProfile = input.pilot_profile?.trim() || null
+  const coverageTier = input.coverage_tier ?? null
+
   const { data: run, error: runError } = await admin
     .schema("growth")
     .from("discovery_runs")
@@ -166,7 +192,7 @@ export async function seedApolloLivePilotTestCompany(
       segment_key: "apollo_live_pilot_test",
       discovery_source_type: "manual_seed",
       query_text: `Apollo live pilot test company seed: ${input.company_name}`,
-      industry: "biomedical_services",
+      industry,
       status: "completed",
       new_companies_found: 1,
       started_at: now,
@@ -175,6 +201,8 @@ export async function seedApolloLivePilotTestCompany(
         source_marker: APOLLO_LIVE_PILOT_TEST_COMPANY_SOURCE_MARKER,
         seed_phase: "LE-3",
         purpose: "apollo_live_pilot_only",
+        pilot_profile: pilotProfile,
+        coverage_tier: coverageTier,
       },
     })
     .select("id")
@@ -207,7 +235,7 @@ export async function seedApolloLivePilotTestCompany(
       company_name: input.company_name,
       website,
       domain,
-      industry: "biomedical_services",
+      industry,
       discovery_source_type: "manual_seed",
       source_confidence: 90,
       evidence: [
@@ -228,6 +256,9 @@ export async function seedApolloLivePilotTestCompany(
         no_outreach: true,
         no_enrollment: true,
         apollo_live_pilot_only: true,
+        pilot_profile: pilotProfile,
+        coverage_tier: coverageTier,
+        industry,
       },
       discovered_at: now,
     })

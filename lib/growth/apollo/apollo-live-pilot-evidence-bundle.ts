@@ -3,6 +3,7 @@
 import type { ApolloAi3ProductionCertification } from "@/lib/growth/apollo/apollo-integration-ai-3-production-certification"
 import type { ApolloLivePilotEvidence } from "@/lib/growth/apollo/apollo-live-pilot-evidence-types"
 import type { ApolloLivePilotEvidenceValidation } from "@/lib/growth/apollo/apollo-live-pilot-evidence-types"
+import type { ApolloLivePilotProviderEvidence } from "@/lib/growth/apollo/apollo-live-pilot-provider-evidence"
 
 export const APOLLO_LIVE_PILOT_EVIDENCE_BUNDLE_QA_MARKER = "apollo-live-pilot-evidence-bundle-ai-4-v1" as const
 
@@ -34,6 +35,7 @@ export type ApolloLivePilotEvidenceBundle = {
   go_no_go: ApolloAi3ProductionCertification["final_go_no_go"] | null
   errors: string[]
   validation: ApolloLivePilotEvidenceValidation
+  provider: ApolloLivePilotProviderEvidence | null
   evidence: ApolloLivePilotEvidence
   certification: ApolloAi3ProductionCertification | null
   operator_commands: ApolloLivePilotOperatorCommands
@@ -87,6 +89,7 @@ export function buildApolloLivePilotEvidenceBundle(input: {
     go_no_go: cert?.final_go_no_go ?? null,
     errors: input.evidence.runtime.errors,
     validation: input.validation,
+    provider: input.evidence.provider ?? null,
     evidence: input.evidence,
     certification: cert,
     operator_commands: buildApolloLivePilotOperatorCommands(input.output_path),

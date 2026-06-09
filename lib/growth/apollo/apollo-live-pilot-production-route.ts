@@ -7,6 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { certifyApolloProductionRollout } from "@/lib/growth/apollo/apollo-integration-ai-3-production-certification"
 import { buildApolloLivePilotEvidenceBundle } from "@/lib/growth/apollo/apollo-live-pilot-evidence-bundle"
 import type { ApolloLivePilotEvidenceBundle } from "@/lib/growth/apollo/apollo-live-pilot-evidence-bundle"
+import { redactApolloLivePilotErrorMessage } from "@/lib/growth/apollo/apollo-live-pilot-error-reporting"
 import { runApolloLivePilotAi2 } from "@/lib/growth/apollo/apollo-live-pilot-runner"
 import { validateApolloLivePilotEvidence } from "@/lib/growth/apollo/apollo-live-pilot-evidence-types"
 import {
@@ -17,22 +18,15 @@ import {
 export type { ApolloLivePilotProductionReadinessPayload } from "@/lib/growth/apollo/apollo-live-pilot-production-route-gates"
 export { buildApolloLivePilotProductionReadinessPayload } from "@/lib/growth/apollo/apollo-live-pilot-production-route-gates"
 
-export type ApolloLivePilotProductionExecuteResult =
-  | {
-      ok: true
-      execution_id: string
-      company_candidate_id: string
-      evidence_bundle: ApolloLivePilotEvidenceBundle
-    }
-  | {
-      ok: false
-      error: "gates_failed" | "pilot_failed" | "no_evidence"
-      message: string | null
-      execution_id?: string
-      company_candidate_id?: string | null
-      blockers?: string[]
-      evidence_bundle: null
-    }
+export type ApolloLivePilotProductionExecuteResult = {
+  ok: boolean
+  execution_id: string
+  company_candidate_id: string
+  error?: "gates_failed" | "pilot_failed" | "no_evidence"
+  message?: string | null
+  blockers?: string[]
+  evidence_bundle: ApolloLivePilotEvidenceBundle | null
+}
 
 export async function executeApolloLivePilotInProduction(
   admin: SupabaseClient,
@@ -49,7 +43,8 @@ export async function executeApolloLivePilotInProduction(
       error: "gates_failed",
       message: gates.error,
       blockers: gates.blockers,
-      company_candidate_id: gates.company_candidate_id,
+      company_candidate_id: gates.company_candidate_id ?? "",
+      execution_id: randomUUID(),
       evidence_bundle: null,
     }
   }
@@ -64,14 +59,14 @@ export async function executeApolloLivePilotInProduction(
   })
 
   if (!pilot.evidence) {
-    return {
+    return redactApolloLivePilotProductionSecrets({
       ok: false,
       error: pilot.error ? "pilot_failed" : "no_evidence",
-      message: pilot.error,
+      message: pilot.error ? redactApolloLivePilotErrorMessage(pilot.error) : "No evidence produced.",
       execution_id,
       company_candidate_id,
       evidence_bundle: null,
-    }
+    })
   }
 
   const validation = validateApolloLivePilotEvidence(pilot.evidence)
@@ -88,10 +83,22 @@ export async function executeApolloLivePilotInProduction(
     ok: pilot.ok && certification.ok && validation.ok,
   })
 
+  const ok = pilot.ok && certification.ok && validation.ok
+
   return redactApolloLivePilotProductionSecrets({
-    ok: pilot.ok && certification.ok && validation.ok,
+    ok,
     execution_id,
     company_candidate_id,
+    ...(ok
+      ? {}
+      : {
+          error: "pilot_failed" as const,
+          message:
+            pilot.error ??
+            (evidence_bundle.errors.length > 0
+              ? evidence_bundle.errors.join(" | ")
+              : "Apollo live pilot failed."),
+        }),
     evidence_bundle,
   })
 }
