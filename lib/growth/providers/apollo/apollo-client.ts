@@ -3,15 +3,13 @@ import "server-only"
 import { safeDiscoveryProviderResponse } from "@/lib/growth/prospect-search/prospect-search-safe-fetch-json"
 import { buildApolloMockPeople } from "@/lib/growth/providers/apollo/apollo-mock-fixtures"
 import {
-  APOLLO_BULK_MATCH_PATH,
   APOLLO_DEFAULT_PEOPLE_SEARCH_PATH,
-  APOLLO_BULK_MATCH_BATCH_SIZE,
   getApolloApiKey,
   isApolloDiscoveryDisabled,
   isApolloEmailEnrichmentEnabled,
   isApolloMockEnabled,
-  resolveApolloApiBaseUrl,
 } from "@/lib/growth/providers/apollo/apollo-config"
+import { enrichApolloPeopleWithBulkMatch } from "@/lib/growth/providers/apollo/apollo-enrich-people"
 import {
   buildApolloPeopleSearchParams,
   GROWTH_APOLLO_PERSON_SENIORITIES,
@@ -19,14 +17,10 @@ import {
 } from "@/lib/growth/providers/apollo/apollo-query-builder"
 import {
   assertApolloCompanySearchAllowed,
-  recordApolloBulkMatchBatch,
   recordApolloSearchApiCall,
   ApolloRunGuardrailError,
 } from "@/lib/growth/providers/apollo/apollo-run-guardrails"
-import {
-  normalizeApolloSearchPeople,
-  normalizeApolloSearchPersonRecord,
-} from "@/lib/growth/providers/apollo/apollo-search-person-normalize"
+import { normalizeApolloSearchPeople } from "@/lib/growth/providers/apollo/apollo-search-person-normalize"
 import {
   classifyApolloHttpError,
   isApolloRateLimitError,
@@ -38,7 +32,6 @@ import {
 import {
   GROWTH_APOLLO_PROVIDER_QA_MARKER,
   type ApolloApiErrorCategory,
-  type ApolloBulkMatchResponse,
   type ApolloPeopleSearchResponse,
   type ApolloPersonRecord,
   type ApolloPersonSearchInput,
@@ -135,58 +128,6 @@ function emptyDiagnostics(
     mock: false,
     latency_ms: null,
     ...partial,
-  }
-}
-
-async function enrichApolloPeopleWithBulkMatch(input: {
-  people: ApolloPersonRecord[]
-  apiKey: string
-}): Promise<{ people: ApolloPersonRecord[]; batches: number; credits_estimate: number }> {
-  const ids = input.people.map((p) => (typeof p.id === "string" ? p.id.trim() : "")).filter(Boolean)
-  if (ids.length === 0) {
-    return { people: input.people, batches: 0, credits_estimate: 0 }
-  }
-
-  const merged = new Map<string, ApolloPersonRecord>()
-  for (const person of input.people) {
-    const id = typeof person.id === "string" ? person.id.trim() : ""
-    if (id) merged.set(id, person)
-  }
-
-  let batches = 0
-  for (let i = 0; i < ids.length; i += APOLLO_BULK_MATCH_BATCH_SIZE) {
-    const batchIds = ids.slice(i, i + APOLLO_BULK_MATCH_BATCH_SIZE)
-    batches += 1
-
-    const res = await fetch(`${resolveApolloApiBaseUrl()}${APOLLO_BULK_MATCH_PATH}`, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache",
-        "x-api-key": input.apiKey,
-      },
-      body: JSON.stringify({
-        details: batchIds.map((id) => ({ id })),
-        reveal_personal_emails: false,
-      }),
-    })
-
-    const parsed = await safeDiscoveryProviderResponse<ApolloBulkMatchResponse>(res)
-    if (!parsed.ok) continue
-
-    const matches = parsed.data.matches ?? parsed.data.people ?? []
-    for (const match of matches) {
-      const id = typeof match.id === "string" ? match.id.trim() : ""
-      if (!id || !merged.has(id)) continue
-      merged.set(id, normalizeApolloSearchPersonRecord({ ...merged.get(id)!, ...match }))
-    }
-  }
-
-  return {
-    people: [...merged.values()],
-    batches,
-    credits_estimate: batches,
   }
 }
 
@@ -485,12 +426,16 @@ export async function searchApolloPeopleByCompany(
     let enrich_endpoint: string | null = null
 
     if (isApolloEmailEnrichmentEnabled() && people.length > 0) {
-      enrich_endpoint = `${resolveApolloApiBaseUrl()}${APOLLO_BULK_MATCH_PATH}`
-      const enriched = await enrichApolloPeopleWithBulkMatch({ people, apiKey })
+      const enriched = await enrichApolloPeopleWithBulkMatch({
+        people,
+        apiKey,
+        domain,
+        record_guardrails: true,
+      })
+      enrich_endpoint = enriched.enrich_endpoint
       people = enriched.people
       enrich_batches = enriched.batches
       credits_estimate = enriched.credits_estimate
-      recordApolloBulkMatchBatch({ batches: enriched.batches })
     }
 
     recordApolloProviderReturnedContacts({

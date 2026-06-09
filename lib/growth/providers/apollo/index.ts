@@ -15,6 +15,7 @@ export {
   isApolloProviderConfigured,
 } from "@/lib/growth/providers/apollo/apollo-config"
 export { searchApolloPeopleByCompany } from "@/lib/growth/providers/apollo/apollo-client"
+export { enrichApolloPeopleWithBulkMatch } from "@/lib/growth/providers/apollo/apollo-enrich-people"
 export {
   mapApolloPeopleToContactDiscoveryRaw,
   mapApolloPersonToContactDiscoveryRaw,
