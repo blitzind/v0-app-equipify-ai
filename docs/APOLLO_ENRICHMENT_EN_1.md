@@ -109,7 +109,24 @@ pnpm test:apollo-enrichment-cert-en-1
 | LinkedIn found | `channels.linkedin_found` |
 | Verified emails | `channels.verified_emails` |
 | Promoted company contacts | `promotion.company_contacts_synced` |
+| Enriched with email / LinkedIn | `promotion.enriched_candidates_with_email` / `enriched_candidates_with_linkedin` |
+| Promotion blockers | `promotion.promotion_blockers` |
+| Contactable after promotion | `promotion.contactable_after_promotion` |
+| Sequence-ready after promotion | `promotion.sequence_ready_after_promotion` |
 | Sequence-ready contacts | `readiness.sequence_ready` |
+
+### EN-3 — Post-enrichment promotion (Henry Schein)
+
+After EN-2 bulk_match enriches `contact_candidates`, EN-3 promotes channel-bearing rows to `company_contacts`, runs canonical person backfill, and reports readiness without outreach or enrollment.
+
+Tests: `pnpm test:apollo-enrichment-cert-en-3`
+
+Implementation: `lib/growth/apollo/apollo-enrichment-cert-promotion.ts`
+
+| EN-2 symptom | EN-3 fix |
+|--------------|----------|
+| `company_contacts_synced: 0` with channels in candidates | Resolve canonical company via staging linkage + domain fallback; reload enriched rows from DB before sync |
+| `sequence_ready: 0` after sync | Run `runCanonicalPersonBackfillForCompanyCandidate` after promotion; gate sequence-ready on contactable email/phone + canonical person + identity classification |
 
 ## Go / No-Go Criteria
 

@@ -3,7 +3,6 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { syncContactCandidatesToCompanyContactsWithResolution } from "@/lib/growth/acquisition/sync-contact-candidates-to-company-contacts"
 import { getRecommendedApolloEnrichmentPath } from "@/lib/growth/apollo/apollo-enrichment-cert-audit"
 import {
   assertApolloEnrichmentCertAllowed,
@@ -14,6 +13,7 @@ import {
   APOLLO_ENRICHMENT_CERT_EVIDENCE_QA_MARKER,
   type ApolloEnrichmentCertEvidence,
 } from "@/lib/growth/apollo/apollo-enrichment-cert-evidence-types"
+import { promoteEnrichedApolloCandidatesToCompanyContacts } from "@/lib/growth/apollo/apollo-enrichment-cert-promotion"
 import { candidateHasObservedContactChannel } from "@/lib/growth/apollo/apollo-live-pilot-canonical-sync-evidence"
 import { fetchStagingCanonicalCompanyId } from "@/lib/growth/canonical-persons/canonical-person-repository-core"
 import type { GrowthContactCandidate } from "@/lib/growth/contact-discovery/contact-discovery-types"
@@ -190,32 +190,6 @@ async function updateEnrichedCandidates(
   return updated
 }
 
-async function countSequenceReady(
-  admin: SupabaseClient,
-  canonical_company_id: string | null,
-): Promise<{ sequence_ready: number; contactable: number }> {
-  if (!canonical_company_id) return { sequence_ready: 0, contactable: 0 }
-
-  const { data: contacts } = await admin
-    .schema("growth")
-    .from("company_contacts")
-    .select("email, phone, email_status, phone_status, canonical_person_id, growth_lead_id")
-    .eq("company_id", canonical_company_id)
-
-  let sequence_ready = 0
-  let contactable = 0
-  for (const raw of contacts ?? []) {
-    const row = raw as Record<string, unknown>
-    const hasEmail = Boolean(asString(row.email)) && asString(row.email_status) !== "blocked"
-    const hasPhone = Boolean(asString(row.phone)) && asString(row.phone_status) !== "blocked"
-    if (hasEmail || hasPhone) contactable += 1
-    if ((hasEmail || hasPhone) && asString(row.canonical_person_id)) {
-      sequence_ready += 1
-    }
-  }
-  return { sequence_ready, contactable }
-}
-
 export async function runApolloEnrichmentCertEn1(
   admin: SupabaseClient,
   input?: {
@@ -298,20 +272,13 @@ export async function runApolloEnrichmentCertEn1(
 
     const afterChannels = countChannels(withPersonId)
 
-    let company_contacts_synced = 0
-    try {
-      const sync = await syncContactCandidatesToCompanyContactsWithResolution(admin, {
-        company_candidate_id,
-        canonical_company_id: companyContext.canonical_company_id,
-        candidates: withPersonId.filter((candidate) => candidateHasObservedContactChannel(candidate)),
-        require_contact_channel: true,
-      })
-      company_contacts_synced = sync.synced
-    } catch (error) {
-      errors.push(error instanceof Error ? error.message : "Canonical sync failed.")
-    }
+    const promotion = await promoteEnrichedApolloCandidatesToCompanyContacts(admin, {
+      company_candidate_id,
+      domain: companyContext.domain,
+      canonical_company_id: companyContext.canonical_company_id,
+      enriched_candidates: withPersonId,
+    })
 
-    const readiness = await countSequenceReady(admin, companyContext.canonical_company_id)
     const guardrails = getApolloRunGuardrailSnapshot()
     const recommended = getRecommendedApolloEnrichmentPath()
 
@@ -323,7 +290,7 @@ export async function runApolloEnrichmentCertEn1(
         company_candidate_id,
         company_name: companyContext.company_name,
         domain: companyContext.domain,
-        canonical_company_id: companyContext.canonical_company_id,
+        canonical_company_id: promotion.canonical_company_id ?? companyContext.canonical_company_id,
       },
       gates: {
         enrich_emails: isApolloEmailEnrichmentEnabled(env),
@@ -354,12 +321,25 @@ export async function runApolloEnrichmentCertEn1(
         after: afterChannels,
       },
       promotion: {
-        company_contacts_synced,
-        company_contacts_promoted: company_contacts_synced,
+        company_contacts_synced: promotion.company_contacts_synced,
+        company_contacts_promoted: promotion.company_contacts_synced,
+        enriched_candidates_with_email: promotion.enriched_candidates_with_email,
+        enriched_candidates_with_linkedin: promotion.enriched_candidates_with_linkedin,
+        promotion_attempted: promotion.promotion_attempted,
+        promotion_blockers: promotion.promotion_blockers,
+        company_contacts_created: promotion.company_contacts_created,
+        company_contacts_updated: promotion.company_contacts_updated,
+        contactable_after_promotion: promotion.contactable_after_promotion,
+        sequence_ready_after_promotion: promotion.sequence_ready_after_promotion,
+        canonical_person_backfill_rows_processed:
+          promotion.canonical_person_backfill.rows_processed,
+        canonical_person_backfill_persons_linked:
+          promotion.canonical_person_backfill.persons_linked,
+        rejection_reasons: promotion.rejection_reasons,
       },
       readiness: {
-        sequence_ready: readiness.sequence_ready,
-        contactable: readiness.contactable,
+        sequence_ready: promotion.sequence_ready_after_promotion,
+        contactable: promotion.contactable_after_promotion,
       },
       runtime: {
         duration_ms: Date.now() - started,
@@ -383,8 +363,21 @@ export async function runApolloEnrichmentCertEn1(
           after: afterChannels,
         },
         promotion: {
-          company_contacts_synced,
-          company_contacts_promoted: company_contacts_synced,
+          company_contacts_synced: promotion.company_contacts_synced,
+          company_contacts_promoted: promotion.company_contacts_synced,
+          enriched_candidates_with_email: promotion.enriched_candidates_with_email,
+          enriched_candidates_with_linkedin: promotion.enriched_candidates_with_linkedin,
+          promotion_attempted: promotion.promotion_attempted,
+          promotion_blockers: promotion.promotion_blockers,
+          company_contacts_created: promotion.company_contacts_created,
+          company_contacts_updated: promotion.company_contacts_updated,
+          contactable_after_promotion: promotion.contactable_after_promotion,
+          sequence_ready_after_promotion: promotion.sequence_ready_after_promotion,
+          canonical_person_backfill_rows_processed:
+            promotion.canonical_person_backfill.rows_processed,
+          canonical_person_backfill_persons_linked:
+            promotion.canonical_person_backfill.persons_linked,
+          rejection_reasons: promotion.rejection_reasons,
         },
         runtime: {
           duration_ms: Date.now() - started,

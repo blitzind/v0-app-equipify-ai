@@ -181,6 +181,17 @@ const sampleEvidence: ApolloEnrichmentCertEvidence = {
   promotion: {
     company_contacts_synced: 7,
     company_contacts_promoted: 7,
+    enriched_candidates_with_email: 5,
+    enriched_candidates_with_linkedin: 6,
+    promotion_attempted: true,
+    promotion_blockers: [],
+    company_contacts_created: 7,
+    company_contacts_updated: 0,
+    contactable_after_promotion: 7,
+    sequence_ready_after_promotion: 5,
+    canonical_person_backfill_rows_processed: 7,
+    canonical_person_backfill_persons_linked: 5,
+    rejection_reasons: {},
   },
   readiness: {
     sequence_ready: 5,

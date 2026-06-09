@@ -75,7 +75,7 @@ function main(): void {
       before: { email: 0, phone: 0, linkedin: 0 },
       after: { email: 5, phone: 2, linkedin: 3 },
     },
-    promotion: { company_contacts_synced: 5, company_contacts_promoted: 5 },
+    promotion: { company_contacts_synced: 5, company_contacts_promoted: 5, enriched_candidates_with_email: 5, enriched_candidates_with_linkedin: 3, promotion_attempted: true, promotion_blockers: [], company_contacts_created: 5, company_contacts_updated: 0, contactable_after_promotion: 5, sequence_ready_after_promotion: 4, canonical_person_backfill_rows_processed: 5, canonical_person_backfill_persons_linked: 4, rejection_reasons: {} },
     runtime: { duration_ms: 100, api_calls: 1, errors: [] },
     gates: {
       enrich_emails: true,
@@ -104,7 +104,7 @@ function main(): void {
       before: { email: 0, phone: 0, linkedin: 0 },
       after: { email: 0, phone: 0, linkedin: 0 },
     },
-    promotion: { company_contacts_synced: 0, company_contacts_promoted: 0 },
+    promotion: { company_contacts_synced: 0, company_contacts_promoted: 0, enriched_candidates_with_email: 0, enriched_candidates_with_linkedin: 0, promotion_attempted: false, promotion_blockers: ["no_enriched_candidates_with_contact_channel"], company_contacts_created: 0, company_contacts_updated: 0, contactable_after_promotion: 0, sequence_ready_after_promotion: 0, canonical_person_backfill_rows_processed: 0, canonical_person_backfill_persons_linked: 0, rejection_reasons: {} },
     runtime: { duration_ms: 100, api_calls: 1, errors: [] },
     gates: {
       enrich_emails: true,
@@ -133,7 +133,7 @@ function main(): void {
       before: { email: 0, phone: 0, linkedin: 0 },
       after: { email: 0, phone: 0, linkedin: 0 },
     },
-    promotion: { company_contacts_synced: 0, company_contacts_promoted: 0 },
+    promotion: { company_contacts_synced: 0, company_contacts_promoted: 0, enriched_candidates_with_email: 0, enriched_candidates_with_linkedin: 0, promotion_attempted: false, promotion_blockers: ["no_enriched_candidates_with_contact_channel"], company_contacts_created: 0, company_contacts_updated: 0, contactable_after_promotion: 0, sequence_ready_after_promotion: 0, canonical_person_backfill_rows_processed: 0, canonical_person_backfill_persons_linked: 0, rejection_reasons: {} },
     runtime: { duration_ms: 50, api_calls: 0, errors: [] },
     gates: {
       enrich_emails: true,

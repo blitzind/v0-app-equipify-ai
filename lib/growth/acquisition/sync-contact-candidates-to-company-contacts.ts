@@ -56,7 +56,7 @@ function rowToCompanyContact(row: Record<string, unknown>): GrowthCompanyContact
   }
 }
 
-function candidateSourceType(
+export function candidateSourceType(
   providerType: string,
   metadata?: Record<string, unknown>,
 ): GrowthCompanyContact["source_type"] {
@@ -67,6 +67,7 @@ function candidateSourceType(
   if (providerType.includes("website")) return "website"
   if (providerType.includes("linkedin")) return "linkedin"
   if (providerType.includes("pdl") || providerType.includes("people_data")) return "public_record"
+  if (providerType.includes("apollo")) return "public_record"
   return "manual"
 }
 
@@ -176,6 +177,8 @@ export type SyncContactCandidatesToCompanyContactsInput = {
 
 export type SyncContactCandidatesToCompanyContactsResult = {
   synced: number
+  created: number
+  updated: number
   resolution: CompanyContactsPersistenceResolution | null
   canonical_sync_attempted: boolean
   rejection_reasons: Record<string, number>
@@ -204,18 +207,20 @@ async function syncContactCandidatesToCanonicalCompany(
     candidates: GrowthContactCandidate[]
     require_contact_channel?: boolean
   },
-): Promise<{ synced: number; rejection_reasons: Record<string, number> }> {
+): Promise<{ synced: number; created: number; updated: number; rejection_reasons: Record<string, number> }> {
   const rejection_reasons: Record<string, number> = {}
   const canonical_company_id = input.canonical_company_id
   if (!(await isGrowthCompanyContactsSchemaReady(admin))) {
     bumpRejectionReason(rejection_reasons, "schema_not_ready")
-    return { synced: 0, rejection_reasons }
+    return { synced: 0, created: 0, updated: 0, rejection_reasons }
   }
   if (input.candidates.length === 0) {
-    return { synced: 0, rejection_reasons }
+    return { synced: 0, created: 0, updated: 0, rejection_reasons }
   }
 
   let synced = 0
+  let created = 0
+  let updated = 0
   const nowIso = new Date().toISOString()
 
   for (const candidate of input.candidates) {
@@ -264,8 +269,10 @@ async function syncContactCandidatesToCanonicalCompany(
           },
         })
         .eq("id", prior.id)
-      if (!error) synced += 1
-      else bumpRejectionReason(rejection_reasons, classifyInsertFailure(error))
+      if (!error) {
+        synced += 1
+        updated += 1
+      } else bumpRejectionReason(rejection_reasons, classifyInsertFailure(error))
       continue
     }
 
@@ -276,11 +283,13 @@ async function syncContactCandidatesToCanonicalCompany(
         last_checked_at: nowIso,
       },
     })
-    if (!error) synced += 1
-    else bumpRejectionReason(rejection_reasons, classifyInsertFailure(error))
+    if (!error) {
+      synced += 1
+      created += 1
+    } else bumpRejectionReason(rejection_reasons, classifyInsertFailure(error))
   }
 
-  return { synced, rejection_reasons }
+  return { synced, created, updated, rejection_reasons }
 }
 
 /** Bridge contact_candidates → company_contacts for acquisition promotion. */
@@ -311,6 +320,8 @@ export async function syncContactCandidatesToCompanyContactsWithResolution(
   if (input.candidates.length === 0) {
     return {
       synced: 0,
+      created: 0,
+      updated: 0,
       resolution: null,
       canonical_sync_attempted: false,
       rejection_reasons: {},
@@ -323,6 +334,8 @@ export async function syncContactCandidatesToCompanyContactsWithResolution(
     })
     return {
       synced: 0,
+      created: 0,
+      updated: 0,
       resolution: null,
       canonical_sync_attempted: false,
       rejection_reasons: { missing_company_candidate_and_canonical_id: input.candidates.length },
@@ -344,6 +357,8 @@ export async function syncContactCandidatesToCompanyContactsWithResolution(
     })
     return {
       synced: 0,
+      created: 0,
+      updated: 0,
       resolution,
       canonical_sync_attempted: true,
       rejection_reasons: {
@@ -376,6 +391,8 @@ export async function syncContactCandidatesToCompanyContactsWithResolution(
 
   return {
     synced: syncResult.synced,
+    created: syncResult.created,
+    updated: syncResult.updated,
     resolution,
     canonical_sync_attempted: true,
     rejection_reasons: syncResult.rejection_reasons,

@@ -45,6 +45,17 @@ export type ApolloEnrichmentCertEvidence = {
   promotion: {
     company_contacts_synced: number
     company_contacts_promoted: number
+    enriched_candidates_with_email: number
+    enriched_candidates_with_linkedin: number
+    promotion_attempted: boolean
+    promotion_blockers: string[]
+    company_contacts_created: number
+    company_contacts_updated: number
+    contactable_after_promotion: number
+    sequence_ready_after_promotion: number
+    canonical_person_backfill_rows_processed: number
+    canonical_person_backfill_persons_linked: number
+    rejection_reasons: Record<string, number>
   }
   readiness: {
     sequence_ready: number
@@ -99,6 +110,16 @@ export function certifyApolloEnrichmentGoNoGo(
     )
     if (evidence.promotion?.company_contacts_synced > 0) {
       reasons.push(`${evidence.promotion.company_contacts_synced} company contact(s) synced.`)
+    } else if (
+      evidence.channels.after.email - evidence.channels.before.email +
+        evidence.channels.after.phone - evidence.channels.before.phone +
+        evidence.channels.after.linkedin - evidence.channels.before.linkedin >
+        0 &&
+      (evidence.promotion?.promotion_blockers?.length ?? 0) > 0
+    ) {
+      reasons.push(
+        `Promotion blocked after enrichment: ${(evidence.promotion?.promotion_blockers ?? []).slice(0, 3).join("; ")}`,
+      )
     }
     return { go_no_go: "go", reasons }
   }

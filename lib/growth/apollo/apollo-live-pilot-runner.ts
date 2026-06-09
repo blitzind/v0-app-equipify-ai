@@ -493,7 +493,7 @@ export async function runApolloLivePilotAi2(
         errors,
         apolloContacts: [],
         apolloOutcome: null,
-        sync: { synced: 0, resolution: null, canonical_sync_attempted: false, rejection_reasons: {} },
+        sync: { synced: 0, created: 0, updated: 0, resolution: null, canonical_sync_attempted: false, rejection_reasons: {} },
         backfill: { persons_linked: 0, rows_processed: 0 },
         contactQuality,
         readinessFunnel: {
@@ -534,6 +534,8 @@ export async function runApolloLivePilotAi2(
       errors.push(formatApolloLivePilotErrorForEvidence("syncContactCandidatesToCompanyContacts", error))
       sync = {
         synced: 0,
+        created: 0,
+        updated: 0,
         resolution: null,
         canonical_sync_attempted: false,
         rejection_reasons: {},

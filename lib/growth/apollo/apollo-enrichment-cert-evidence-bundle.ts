@@ -24,6 +24,14 @@ export type ApolloEnrichmentCertEvidenceBundle = {
     company_contacts_synced: number
     canonical_person_matches: number
     canonical_company_matches: number
+    enriched_candidates_with_email: number
+    enriched_candidates_with_linkedin: number
+    promotion_attempted: boolean
+    promotion_blockers: string[]
+    company_contacts_created: number
+    company_contacts_updated: number
+    contactable_after_promotion: number
+    sequence_ready_after_promotion: number
   }
   readiness: {
     contactable: number
@@ -75,6 +83,14 @@ export function buildApolloEnrichmentCertEvidenceBundle(input: {
       canonical_person_matches: input.canonical_person_matches ?? sequenceReady,
       canonical_company_matches:
         input.canonical_company_matches ?? (input.evidence.company.canonical_company_id ? 1 : 0),
+      enriched_candidates_with_email: input.evidence.promotion.enriched_candidates_with_email,
+      enriched_candidates_with_linkedin: input.evidence.promotion.enriched_candidates_with_linkedin,
+      promotion_attempted: input.evidence.promotion.promotion_attempted,
+      promotion_blockers: input.evidence.promotion.promotion_blockers,
+      company_contacts_created: input.evidence.promotion.company_contacts_created,
+      company_contacts_updated: input.evidence.promotion.company_contacts_updated,
+      contactable_after_promotion: input.evidence.promotion.contactable_after_promotion,
+      sequence_ready_after_promotion: input.evidence.promotion.sequence_ready_after_promotion,
     },
     readiness: {
       contactable,
