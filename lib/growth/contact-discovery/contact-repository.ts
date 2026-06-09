@@ -6,6 +6,8 @@ import { buildBuyingCommitteeAssessment } from "@/lib/growth/contact-discovery/b
 import { runContactDiscoveryProviders } from "@/lib/growth/contact-discovery/contact-discovery-registry"
 import { resolveOperatorContactDiscoveryProviderTypes } from "@/lib/growth/contact-discovery/contact-discovery-operator-providers"
 import type { GrowthContactDiscoveryProviderType } from "@/lib/growth/contact-discovery/contact-discovery-provider-types"
+import { canonicalNormalizedDomain } from "@/lib/growth/canonical-companies/canonical-company-normalize"
+import { loadStagingCompanyCandidateRow } from "@/lib/growth/canonical-companies/canonical-company-staging-linkage"
 import {
   GROWTH_CONTACT_DISCOVERY_PRIVACY_NOTE,
   GROWTH_CONTACT_DISCOVERY_QA_MARKER,
@@ -87,6 +89,26 @@ export async function resolveCompanyCandidateContext(
   companyCandidateId: string,
 ): Promise<ResolveCompanyContextResult | null> {
   try {
+    const staging = await loadStagingCompanyCandidateRow(admin, companyCandidateId)
+    if (staging) {
+      const row = staging.row
+      const meta =
+        row.metadata && typeof row.metadata === "object"
+          ? (row.metadata as Record<string, unknown>)
+          : {}
+      const domain = canonicalNormalizedDomain(asString(row.domain), asString(row.website))
+      const website = asString(row.website) || (domain ? `https://${domain}` : null)
+      return {
+        company_candidate_id: asString(row.company_id) || staging.lookup_key,
+        company_name: asString(row.company_name) || staging.lookup_key,
+        domain,
+        website_url: website,
+        growth_lead_id:
+          typeof meta.matched_growth_lead_id === "string" ? meta.matched_growth_lead_id : null,
+        industry: asString(row.industry) || null,
+      }
+    }
+
     const data =
       (await loadCompanyCandidateRow(admin, companyCandidateId, "real_world_company_candidates")) ??
       (await loadCompanyCandidateRow(admin, companyCandidateId, "external_company_candidates"))

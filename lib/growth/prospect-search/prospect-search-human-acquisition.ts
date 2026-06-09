@@ -14,6 +14,12 @@ import {
 } from "@/lib/growth/contact-discovery/contact-repository"
 import { ensureStagingCanonicalCompanyLinkage } from "@/lib/growth/canonical-companies/canonical-company-staging-linkage"
 import { fetchStagingCanonicalCompanyId } from "@/lib/growth/canonical-persons/canonical-person-repository-core"
+import { isApolloPrimaryContactAcquisitionEnabled } from "@/lib/growth/apollo/apollo-primary-contact-acquisition-gates"
+import { runApolloPrimaryContactAcquisitionForCompany } from "@/lib/growth/apollo/apollo-primary-contact-acquisition"
+import {
+  beginApolloRunGuardrails,
+  resetApolloRunGuardrails,
+} from "@/lib/growth/providers/apollo/apollo-run-guardrails"
 import { refreshProspectSearchCompanyAfterHumanAcquisition } from "@/lib/growth/prospect-search/prospect-search-human-acquisition-hydration"
 import { GROWTH_PROSPECT_SEARCH_HUMAN_ACQUISITION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-human-acquisition-types"
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
@@ -62,6 +68,48 @@ export async function runProspectSearchHumanAcquisitionPipeline(
       backfill_persons_linked: 0,
       message: "company_candidate_id is required.",
       provider_messages: [],
+    }
+  }
+
+  if (isApolloPrimaryContactAcquisitionEnabled()) {
+    beginApolloRunGuardrails()
+    try {
+      const primary = await runApolloPrimaryContactAcquisitionForCompany(admin, {
+        company_candidate_id,
+        created_by: input.created_by ?? null,
+      })
+
+      let refreshed_company: GrowthProspectSearchCompanyResult | null = null
+      if (input.company_snapshot) {
+        refreshed_company = await refreshProspectSearchCompanyAfterHumanAcquisition(admin, {
+          company: input.company_snapshot,
+          canonical_company_id: primary.canonical_company_id,
+          query: input.search_query ?? null,
+        })
+      }
+
+      const ok =
+        primary.promoted_contacts > 0 ||
+        primary.existing_contactable_before > 0 ||
+        primary.apollo_people_found > 0
+
+      return {
+        qa_marker: GROWTH_PROSPECT_SEARCH_HUMAN_ACQUISITION_QA_MARKER,
+        ok,
+        company_candidate_id: primary.company_candidate_id,
+        canonical_company_id: primary.canonical_company_id,
+        discovery_contacts: primary.apollo_people_found,
+        company_contacts_synced: primary.promoted_contacts,
+        backfill_rows_processed: primary.promoted_contacts,
+        backfill_persons_linked: primary.sequence_ready_contacts,
+        message: ok
+          ? `Apollo-Primary contact acquisition — ${primary.apollo_people_found} Apollo people, ${primary.promoted_contacts} promoted, ${primary.sequence_ready_contacts} sequence-ready (no auto-enrollment).`
+          : primary.blockers[0] ?? "Apollo-Primary contact acquisition finished without promoted contacts.",
+        provider_messages: primary.blockers,
+        refreshed_company,
+      }
+    } finally {
+      resetApolloRunGuardrails()
     }
   }
 
