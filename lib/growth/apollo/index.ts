@@ -50,3 +50,31 @@ export {
   unwrapApolloLivePilotEvidenceBundle,
   type ApolloLivePilotEvidenceBundle,
 } from "@/lib/growth/apollo/apollo-live-pilot-evidence-bundle"
+export {
+  APOLLO_INTEGRATION_AI_5_QA_MARKER,
+  certifyApolloProductionActivation,
+  formatApolloProductionActivationMarkdown,
+  loadApolloPilotEvidenceFromJson,
+  type ApolloProductionActivationCertification,
+  type ApolloProductionActivationDecision,
+} from "@/lib/growth/apollo/apollo-integration-ai-5-production-activation"
+export {
+  APOLLO_PIPELINE_E2E_VALIDATION_QA_MARKER,
+  validateApolloPipelineE2E,
+} from "@/lib/growth/apollo/apollo-pipeline-e2e-validation"
+export {
+  APOLLO_SEQUENCE_ELIGIBILITY_QA_MARKER,
+  certifyApolloSequenceEligibility,
+} from "@/lib/growth/apollo/apollo-sequence-eligibility-certification"
+export {
+  APOLLO_OUTREACH_CHANNEL_READINESS_QA_MARKER,
+  assessApolloOutreachChannelReadiness,
+} from "@/lib/growth/apollo/apollo-outreach-channel-readiness"
+export {
+  APOLLO_QUALITY_BENCHMARK_QA_MARKER,
+  buildApolloQualityBenchmarkReport,
+} from "@/lib/growth/apollo/apollo-quality-benchmark-report"
+export {
+  APOLLO_PRODUCTION_ACTIVATION_LIMITS_QA_MARKER,
+  buildApolloProductionActivationLimits,
+} from "@/lib/growth/apollo/apollo-production-activation-limits"
