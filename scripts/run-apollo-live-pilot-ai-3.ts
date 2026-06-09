@@ -23,6 +23,7 @@ import {
   certifyApolloProductionRollout,
   formatApolloAi3CertificationMarkdown,
 } from "../lib/growth/apollo/apollo-integration-ai-3-production-certification"
+import { buildApolloLivePilotEvidenceBundle } from "../lib/growth/apollo/apollo-live-pilot-evidence-bundle"
 import { validateApolloLivePilotEvidence } from "../lib/growth/apollo/apollo-live-pilot-evidence-types"
 import { runApolloLivePilotAi2 } from "../lib/growth/apollo/apollo-live-pilot-runner"
 import { bootstrapVerifiedChannelsCertEnv } from "../lib/growth/qa/verified-channels-cert-env-bootstrap"
@@ -85,16 +86,17 @@ async function main(): Promise<void> {
     compliance_orchestration_enabled: process.env.VOICE_COMPLIANCE_ORCHESTRATION_ENABLED === "true",
   })
 
-  const payload = {
-    ok: pilot.ok && certification.ok,
-    validation,
-    certification: certification.certification,
-    evidence: pilot.evidence,
-  }
-
   const outputPath =
     process.env.GROWTH_APOLLO_AI_3_OUTPUT_PATH?.trim() ||
     process.env.GROWTH_APOLLO_AI_2_OUTPUT_PATH?.trim()
+
+  const payload = buildApolloLivePilotEvidenceBundle({
+    evidence: pilot.evidence,
+    validation,
+    certification: certification.certification,
+    ok: pilot.ok && certification.ok && validation.ok,
+    output_path: outputPath,
+  })
   const json = `${JSON.stringify(payload, null, 2)}\n`
 
   if (outputPath) {

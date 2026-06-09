@@ -27,6 +27,7 @@ import {
   analyzeApolloReadinessFunnel,
 } from "../lib/growth/apollo/apollo-readiness-funnel-analysis"
 import { APOLLO_ROLLOUT_PLAN_QA_MARKER, buildApolloControlledRolloutPlan } from "../lib/growth/apollo/apollo-rollout-plan"
+import { unwrapApolloLivePilotEvidenceBundle } from "../lib/growth/apollo/apollo-live-pilot-evidence-bundle"
 import { analyzeApolloLivePilotEvidence } from "../lib/growth/apollo/apollo-live-pilot-analysis"
 
 type CertResult = { id: string; section: string; status: "pass" | "fail" | "skip" | "manual"; detail: string }
@@ -132,7 +133,7 @@ console.log("\n=== AI-3 Live Evidence (optional) ===")
 const evidencePath = process.env.APOLLO_AI_3_PILOT_EVIDENCE_JSON?.trim()
 if (evidencePath && fs.existsSync(evidencePath)) {
   const parsed = JSON.parse(fs.readFileSync(evidencePath, "utf8"))
-  const evidence = parsed.evidence ?? parsed
+  const { evidence } = unwrapApolloLivePilotEvidenceBundle(parsed)
   const realCert = certifyApolloProductionRollout({
     evidence,
     voice_drop_vd4_live_certified: process.env.APOLLO_VD4_LIVE_CERTIFIED === "true",

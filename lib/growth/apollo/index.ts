@@ -23,3 +23,30 @@ export { scoreApolloContactQuality } from "@/lib/growth/apollo/apollo-contact-qu
 export { analyzeApolloReadinessFunnel } from "@/lib/growth/apollo/apollo-readiness-funnel-analysis"
 export { assessApolloMultichannelProductionReadiness } from "@/lib/growth/apollo/apollo-multichannel-production-readiness"
 export { buildApolloControlledRolloutPlan } from "@/lib/growth/apollo/apollo-rollout-plan"
+export {
+  APOLLO_LIVE_PILOT_ENV_READINESS_QA_MARKER,
+  buildApolloLivePilotEnvReadinessReport,
+  formatApolloLivePilotEnvReadinessMarkdown,
+} from "@/lib/growth/apollo/apollo-live-pilot-env-readiness"
+export {
+  APOLLO_LIVE_PILOT_SAFETY_QA_MARKER,
+  buildApolloLivePilotSafetyReport,
+} from "@/lib/growth/apollo/apollo-live-pilot-safety"
+export {
+  APOLLO_LIVE_PILOT_DRY_RUN_QA_MARKER,
+  buildApolloLivePilotDryRunReport,
+  formatApolloLivePilotDryRunMarkdown,
+  type ApolloLivePilotDryRunTargetCompany,
+} from "@/lib/growth/apollo/apollo-live-pilot-dry-run"
+export {
+  APOLLO_LIVE_PILOT_TEST_COMPANY_SELECTOR_QA_MARKER,
+  resolveApolloLivePilotTestCompany,
+} from "@/lib/growth/apollo/apollo-live-pilot-test-company-selector"
+export {
+  APOLLO_LIVE_PILOT_EVIDENCE_BUNDLE_QA_MARKER,
+  buildApolloLivePilotEvidenceBundle,
+  buildApolloLivePilotOperatorCommands,
+  isApolloLivePilotEvidenceBundle,
+  unwrapApolloLivePilotEvidenceBundle,
+  type ApolloLivePilotEvidenceBundle,
+} from "@/lib/growth/apollo/apollo-live-pilot-evidence-bundle"
