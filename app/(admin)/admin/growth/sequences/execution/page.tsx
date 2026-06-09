@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation"
 import { useCallback, useState } from "react"
 import { PlayCircle } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
+import { ApolloPrimaryContactEnrollmentApprovalQueuePanel } from "@/components/growth/apollo-primary-contact-enrollment-approval-queue-panel"
 import { GrowthEnrollmentExecutionContext } from "@/components/growth/growth-enrollment-execution-context"
 import { GrowthSequenceExecutionFoundationDashboard } from "@/components/growth/growth-sequence-execution-foundation-dashboard"
 import { GrowthSequenceSafeExecutionDashboard } from "@/components/growth/growth-sequence-safe-execution-dashboard"
@@ -63,6 +64,7 @@ export default function AdminGrowthSequenceExecutionPage() {
             sequencePatternId={sequencePatternId}
             onSchedulerComplete={onSchedulerComplete}
           />
+          <ApolloPrimaryContactEnrollmentApprovalQueuePanel className="mb-6" />
           <GrowthSequenceSafeExecutionDashboard
             key={safeExecutionRefreshKey}
             highlightJobId={highlightJobId}

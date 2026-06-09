@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess, logGrowthEngine } from "@/lib/growth/access"
 import {
+  bulkHandoffApprovedApolloContactsToEnrollmentQueue,
+  handoffApprovedApolloContactToEnrollmentQueue,
+} from "@/lib/growth/apollo/apollo-primary-contact-enrollment-bridge"
+import {
   approveApolloPrimaryContactForOutreach,
   bulkApproveSequenceReadyApolloContacts,
   rejectApolloPrimaryContact,
@@ -62,7 +66,27 @@ export async function POST(request: Request) {
     if (!result.ok) {
       return NextResponse.json(result, { status: result.error === "contact_not_found" ? 404 : 400 })
     }
-    return NextResponse.json(result)
+
+    const handoff = await handoffApprovedApolloContactToEnrollmentQueue(access.admin, {
+      company_candidate_id: companyCandidateId,
+      company_contact_id: body.companyContactId ?? null,
+      contact_candidate_id: body.contactCandidateId ?? null,
+      operator_review_id: result.review_id,
+    })
+
+    logGrowthEngine("apollo_primary_contact_enrollment_handoff", {
+      company_candidate_id: companyCandidateId.slice(0, 8),
+      contact_id: result.contact_id?.slice(0, 8) ?? null,
+      queue_item_id: handoff.queue_item_id?.slice(0, 8) ?? null,
+      handoff_id: handoff.handoff?.handoff_id?.slice(0, 8) ?? null,
+      ok: handoff.ok,
+      auto_enrollment: false,
+      outreach_sent: false,
+      enrolled_count: 0,
+      outreach_count: 0,
+    })
+
+    return NextResponse.json({ ...result, enrollment_handoff: handoff })
   }
 
   if (action === "reject") {
@@ -113,7 +137,21 @@ export async function POST(request: Request) {
     if (!result.ok) {
       return NextResponse.json(result, { status: 400 })
     }
-    return NextResponse.json(result)
+
+    const handoff = await bulkHandoffApprovedApolloContactsToEnrollmentQueue(access.admin, {
+      company_candidate_id: companyCandidateId,
+    })
+
+    logGrowthEngine("apollo_primary_contact_enrollment_bulk_handoff", {
+      company_candidate_id: companyCandidateId.slice(0, 8),
+      handoff_count: handoff.queue_item_ids.length,
+      auto_enrollment: false,
+      outreach_sent: false,
+      enrolled_count: 0,
+      outreach_count: 0,
+    })
+
+    return NextResponse.json({ ...result, enrollment_handoff: handoff })
   }
 
   return NextResponse.json(

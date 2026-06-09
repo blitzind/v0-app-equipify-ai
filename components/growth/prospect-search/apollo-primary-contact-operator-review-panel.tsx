@@ -139,9 +139,9 @@ export function ApolloPrimaryContactOperatorReviewPanel({
         throw new Error(json.message ?? json.error ?? "Review action failed.")
       }
       if (input.action === "bulk_approve") {
-        setMessage(`Approved ${json.contact_ids?.length ?? 0} sequence-ready contact(s) for outreach readiness.`)
-      } else if (input.action === "approve") {
-        setMessage("Contact approved for outreach readiness. No enrollment or outreach was triggered.")
+        setMessage(`Approved ${json.contact_ids?.length ?? 0} sequence-ready contact(s) for outreach readiness and enrollment approval queue.`)
+      } else       if (input.action === "approve") {
+        setMessage("Contact approved for outreach readiness and queued for enrollment approval. No enrollment or outreach was triggered.")
       } else {
         setMessage("Contact rejected and suppressed. No enrollment or outreach was triggered.")
       }
