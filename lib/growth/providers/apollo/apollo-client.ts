@@ -33,6 +33,7 @@ import {
 } from "@/lib/growth/providers/apollo/apollo-provider-diagnostics"
 import {
   GROWTH_APOLLO_PROVIDER_QA_MARKER,
+  type ApolloApiErrorCategory,
   type ApolloBulkMatchResponse,
   type ApolloPeopleSearchResponse,
   type ApolloPersonRecord,
@@ -46,6 +47,61 @@ export {
   isApolloMockEnabled,
   isApolloDiscoveryDisabled,
 } from "@/lib/growth/providers/apollo/apollo-config"
+
+const APOLLO_PEOPLE_SEARCH_ENDPOINT = `${resolveApolloApiBaseUrl()}${APOLLO_DEFAULT_PEOPLE_SEARCH_PATH}`
+
+export type ApolloPeopleSearchBlockerClass =
+  | "apollo_plan_api_access"
+  | "missing_company_domain"
+  | "zero_results"
+  | "other"
+
+function logApolloPeopleSearchTrace(details: Record<string, unknown>): void {
+  console.info(
+    JSON.stringify({
+      source: "growth-engine",
+      event: "apollo_people_search_trace",
+      ts: new Date().toISOString(),
+      ...details,
+    }),
+  )
+}
+
+function redactApolloHttpPayload(input: {
+  status: number
+  error: string | null
+  error_kind?: string | null
+}): string {
+  return JSON.stringify({
+    http_status: input.status,
+    error: input.error,
+    error_kind: input.error_kind ?? null,
+  })
+}
+
+function classifyApolloSearchBlocker(input: {
+  api_call_attempted: boolean
+  http_status: number | null
+  api_error_category: ApolloApiErrorCategory
+  result_count: number
+  skipped_reason: string | null
+}): ApolloPeopleSearchBlockerClass | null {
+  if (!input.api_call_attempted) {
+    if (input.api_error_category === "missing_company_identity") return "missing_company_domain"
+    return "other"
+  }
+  if (
+    input.http_status === 401 ||
+    input.http_status === 403 ||
+    input.api_error_category === "auth"
+  ) {
+    return "apollo_plan_api_access"
+  }
+  if (input.api_call_attempted && input.result_count === 0 && input.http_status === 200) {
+    return "zero_results"
+  }
+  return null
+}
 
 function emptyDiagnostics(
   input: ApolloPersonSearchInput,
@@ -141,6 +197,25 @@ export async function searchApolloPeopleByCompany(
 
   if (isApolloDiscoveryDisabled()) {
     const message = "Apollo discovery disabled via GROWTH_DISCOVERY_DISABLE_APOLLO."
+    const api_error_category = "disabled" as const
+    logApolloPeopleSearchTrace({
+      endpoint: APOLLO_PEOPLE_SEARCH_ENDPOINT,
+      endpoint_name: APOLLO_DEFAULT_PEOPLE_SEARCH_PATH,
+      api_call_attempted: false,
+      http_status: null,
+      apollo_response_redacted: null,
+      search_skipped_reason: message,
+      company_domain: domain,
+      company_name: input.company_name.trim() || null,
+      api_error_category,
+      likely_blocker: classifyApolloSearchBlocker({
+        api_call_attempted: false,
+        http_status: null,
+        api_error_category,
+        result_count: 0,
+        skipped_reason: message,
+      }),
+    })
     recordApolloProviderSkipped({
       reason: message,
       query_summary: summary,
@@ -166,6 +241,25 @@ export async function searchApolloPeopleByCompany(
   const companyName = input.company_name.trim()
   if (!domain && !companyName) {
     const message = "Company domain or name required for Apollo people search."
+    const api_error_category = "missing_company_identity" as const
+    logApolloPeopleSearchTrace({
+      endpoint: APOLLO_PEOPLE_SEARCH_ENDPOINT,
+      endpoint_name: APOLLO_DEFAULT_PEOPLE_SEARCH_PATH,
+      api_call_attempted: false,
+      http_status: null,
+      apollo_response_redacted: null,
+      search_skipped_reason: message,
+      company_domain: domain,
+      company_name: null,
+      api_error_category,
+      likely_blocker: classifyApolloSearchBlocker({
+        api_call_attempted: false,
+        http_status: null,
+        api_error_category,
+        result_count: 0,
+        skipped_reason: message,
+      }),
+    })
     recordApolloProviderSkipped({
       reason: message,
       query_summary: summary,
@@ -221,6 +315,19 @@ export async function searchApolloPeopleByCompany(
   const apiKey = options?.apiKey ?? getApolloApiKey()
   if (!apiKey) {
     const message = "APOLLO_API_KEY not configured."
+    const api_error_category = "missing_credentials" as const
+    logApolloPeopleSearchTrace({
+      endpoint: APOLLO_PEOPLE_SEARCH_ENDPOINT,
+      endpoint_name: APOLLO_DEFAULT_PEOPLE_SEARCH_PATH,
+      api_call_attempted: false,
+      http_status: null,
+      apollo_response_redacted: null,
+      search_skipped_reason: message,
+      company_domain: domain,
+      company_name: companyName || null,
+      api_error_category,
+      likely_blocker: "other",
+    })
     recordApolloProviderSkipped({
       reason: message,
       query_summary: summary,
@@ -252,6 +359,19 @@ export async function searchApolloPeopleByCompany(
         ? err.message
         : "Apollo run guardrail blocked people search."
     const latency_ms = finishLatency()
+    const api_error_category = "guardrail" as const
+    logApolloPeopleSearchTrace({
+      endpoint: APOLLO_PEOPLE_SEARCH_ENDPOINT,
+      endpoint_name: APOLLO_DEFAULT_PEOPLE_SEARCH_PATH,
+      api_call_attempted: false,
+      http_status: null,
+      apollo_response_redacted: null,
+      search_skipped_reason: message,
+      company_domain: domain,
+      company_name: companyName || null,
+      api_error_category,
+      likely_blocker: "other",
+    })
     recordApolloProviderSkipped({
       reason: message,
       query_summary: summary,
@@ -274,7 +394,19 @@ export async function searchApolloPeopleByCompany(
   }
 
   try {
-    const searchUrl = `${resolveApolloApiBaseUrl()}${APOLLO_DEFAULT_PEOPLE_SEARCH_PATH}?${params.toString()}`
+    const searchUrl = `${APOLLO_PEOPLE_SEARCH_ENDPOINT}?${params.toString()}`
+    logApolloPeopleSearchTrace({
+      endpoint: APOLLO_PEOPLE_SEARCH_ENDPOINT,
+      endpoint_name: APOLLO_DEFAULT_PEOPLE_SEARCH_PATH,
+      api_call_attempted: true,
+      http_status: null,
+      apollo_response_redacted: null,
+      search_skipped_reason: null,
+      company_domain: domain,
+      company_name: companyName || null,
+      query_summary: summary,
+      org_domain_filter_applied: Boolean(domain),
+    })
     const res = await fetch(searchUrl, {
       method: "POST",
       headers: {
@@ -290,6 +422,28 @@ export async function searchApolloPeopleByCompany(
 
     if (!parsed.ok) {
       const category = classifyApolloHttpError(parsed.status, parsed.error)
+      logApolloPeopleSearchTrace({
+        endpoint: APOLLO_PEOPLE_SEARCH_ENDPOINT,
+        endpoint_name: APOLLO_DEFAULT_PEOPLE_SEARCH_PATH,
+        api_call_attempted: true,
+        http_status: parsed.status,
+        apollo_response_redacted: redactApolloHttpPayload({
+          status: parsed.status,
+          error: parsed.error,
+          error_kind: parsed.error_kind,
+        }),
+        search_skipped_reason: null,
+        company_domain: domain,
+        company_name: companyName || null,
+        api_error_category: category,
+        likely_blocker: classifyApolloSearchBlocker({
+          api_call_attempted: true,
+          http_status: parsed.status,
+          api_error_category: category,
+          result_count: 0,
+          skipped_reason: null,
+        }),
+      })
       recordApolloProviderFailed({
         reason: parsed.error,
         query_summary: summary,
@@ -343,6 +497,31 @@ export async function searchApolloPeopleByCompany(
     const rateHeader = res.headers.get("x-rate-limit-remaining") ?? res.headers.get("X-RateLimit-Remaining")
     const rate_limit_remaining = rateHeader ? Number(rateHeader) : null
 
+    logApolloPeopleSearchTrace({
+      endpoint: APOLLO_PEOPLE_SEARCH_ENDPOINT,
+      endpoint_name: APOLLO_DEFAULT_PEOPLE_SEARCH_PATH,
+      api_call_attempted: true,
+      http_status: parsed.status,
+      apollo_response_redacted: JSON.stringify({
+        http_status: parsed.status,
+        people_count: people.length,
+        total_entries: total,
+      }),
+      search_skipped_reason: people.length === 0 ? "Apollo people search returned no results." : null,
+      company_domain: domain,
+      company_name: companyName || null,
+      result_count: people.length,
+      org_domain_filter_applied: Boolean(domain),
+      api_error_category: "none",
+      likely_blocker: classifyApolloSearchBlocker({
+        api_call_attempted: true,
+        http_status: parsed.status,
+        api_error_category: "none",
+        result_count: people.length,
+        skipped_reason: null,
+      }),
+    })
+
     return {
       qa_marker: GROWTH_APOLLO_PROVIDER_QA_MARKER,
       status: "success",
@@ -366,6 +545,22 @@ export async function searchApolloPeopleByCompany(
   } catch (err) {
     const message = err instanceof Error ? err.message : "Apollo people search failed."
     const latency_ms = finishLatency()
+    logApolloPeopleSearchTrace({
+      endpoint: APOLLO_PEOPLE_SEARCH_ENDPOINT,
+      endpoint_name: APOLLO_DEFAULT_PEOPLE_SEARCH_PATH,
+      api_call_attempted: true,
+      http_status: null,
+      apollo_response_redacted: redactApolloHttpPayload({
+        status: 0,
+        error: message,
+        error_kind: "network_error",
+      }),
+      search_skipped_reason: null,
+      company_domain: domain,
+      company_name: companyName || null,
+      api_error_category: "network_error",
+      likely_blocker: "other",
+    })
     recordApolloProviderFailed({
       reason: message,
       query_summary: summary,

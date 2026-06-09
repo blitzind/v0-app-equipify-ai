@@ -249,6 +249,24 @@ export async function runApolloLivePilotAi2(
 
   try {
     const companyContext = await loadCompanyContext(admin, company_candidate_id)
+    console.info(
+      JSON.stringify({
+        source: "growth-engine",
+        event: "apollo_live_pilot_runner_trace",
+        ts: new Date().toISOString(),
+        phase: "before_contact_discovery",
+        company_candidate_id,
+        company_domain: companyContext.domain,
+        company_name: companyContext.company_name,
+        exited_before_apollo_request: false,
+        search_skip_note:
+          !companyContext.domain && !companyContext.company_name.trim()
+            ? "Both company_domain and company_name empty — Apollo search will skip before HTTP."
+            : !companyContext.domain
+              ? "company_domain is null — Apollo HTTP may still run but q_organization_domains_list is not sent."
+              : null,
+      }),
+    )
     let canonical_company_id =
       companyContext.canonical_company_id ||
       (await fetchStagingCanonicalCompanyId(admin, company_candidate_id))
