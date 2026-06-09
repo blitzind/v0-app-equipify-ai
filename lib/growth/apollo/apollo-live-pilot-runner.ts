@@ -586,7 +586,12 @@ export async function runApolloLivePilotAi2(
       providerEvidence,
     })
 
-    return { ok: errors.length === 0 && apolloContacts.length > 0, evidence, error: null }
+    const apolloPeopleMapped = providerEvidence?.apollo_people_mapped ?? 0
+    return {
+      ok: errors.length === 0 && (apolloContacts.length > 0 || apolloPeopleMapped > 0),
+      evidence,
+      error: null,
+    }
   } catch (error) {
     logApolloLivePilotError("runApolloLivePilotAi2", error)
     return {

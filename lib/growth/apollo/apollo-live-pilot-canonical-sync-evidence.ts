@@ -84,6 +84,46 @@ export function isApolloSearchOnlyMissingContactChannels(input: {
   return missingChannelRejections > 0
 }
 
+/** Mapped Apollo rows with no email/phone/linkedin — includes deduped runs with empty candidates_stored. */
+export function isApolloMappedResultsMissingContactChannels(input: {
+  apollo_people_mapped: number
+  candidates_stored: number
+  missing_email_count: number
+  missing_phone_count: number
+  channel_counts: ApolloCandidateChannelCounts
+  rejection_reasons: Record<string, number>
+}): boolean {
+  if (input.apollo_people_mapped <= 0) return false
+  if (hasStructuralCanonicalSyncReason(input.rejection_reasons)) return false
+
+  if (
+    isApolloSearchOnlyMissingContactChannels({
+      candidates_stored: input.candidates_stored,
+      channel_counts: input.channel_counts,
+      rejection_reasons: input.rejection_reasons,
+    })
+  ) {
+    return true
+  }
+
+  if (input.candidates_stored > 0) return false
+
+  const missingChannelRejections = input.rejection_reasons.missing_contact_channel ?? 0
+  if (missingChannelRejections > 0) return true
+
+  const mapped = input.apollo_people_mapped
+  const noneHaveObservedChannels =
+    input.channel_counts.candidate_has_email_count === 0 &&
+    input.channel_counts.candidate_has_phone_count === 0 &&
+    input.channel_counts.candidate_has_linkedin_count === 0
+
+  return (
+    noneHaveObservedChannels &&
+    input.missing_email_count >= mapped &&
+    input.missing_phone_count >= mapped
+  )
+}
+
 export function hasStructuralCanonicalSyncReason(
   rejection_reasons: Record<string, number>,
 ): boolean {

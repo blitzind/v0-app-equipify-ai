@@ -4,7 +4,7 @@ import type { GrowthContactCandidate } from "@/lib/growth/contact-discovery/cont
 import type { GrowthContactDiscoveryProviderResult } from "@/lib/growth/contact-discovery/contact-discovery-provider-types"
 import {
   hasStructuralCanonicalSyncReason,
-  isApolloSearchOnlyMissingContactChannels,
+  isApolloMappedResultsMissingContactChannels,
   summarizeApolloCandidateChannelCounts,
 } from "@/lib/growth/apollo/apollo-live-pilot-canonical-sync-evidence"
 import type { ApolloRedactedRejectionSample } from "@/lib/growth/providers/apollo/map-apollo-contact"
@@ -163,7 +163,7 @@ export function buildApolloLivePilotProviderEvidence(input: {
   const apollo_total_matches = asNumber(metadata.apollo_total_matches, asNumber(metadata.apollo_total))
   const apollo_people_mapped = asNumber(
     metadata.apollo_people_mapped,
-    input.provider_result?.contacts.length ?? 0,
+    input.provider_result?.contacts.length ?? input.candidates_stored,
   )
   const apollo_people_rejected = asNumber(
     metadata.apollo_people_rejected,
@@ -221,8 +221,11 @@ export function classifyApolloLivePilotProviderEvidence(
   }
 
   if (
-    isApolloSearchOnlyMissingContactChannels({
+    isApolloMappedResultsMissingContactChannels({
+      apollo_people_mapped: evidence.apollo_people_mapped,
       candidates_stored: evidence.candidates_stored,
+      missing_email_count: evidence.missing_email_count,
+      missing_phone_count: evidence.missing_phone_count,
       channel_counts: {
         candidate_has_name_count: evidence.candidate_has_name_count,
         candidate_has_title_count: evidence.candidate_has_title_count,
@@ -243,13 +246,6 @@ export function classifyApolloLivePilotProviderEvidence(
     hasStructuralCanonicalSyncReason(evidence.canonical_sync_rejection_reasons)
   ) {
     return "apollo_results_rejected_by_canonical_sync"
-  }
-
-  if (
-    evidence.apollo_people_mapped > 0 &&
-    evidence.candidates_stored === 0
-  ) {
-    return "apollo_results_rejected_by_mapping"
   }
 
   if (
