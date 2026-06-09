@@ -13,7 +13,16 @@ import {
   isSequenceReadyCompanyContact,
   selectApolloCandidatesForPromotion,
 } from "@/lib/growth/apollo/apollo-enrichment-cert-promotion-evidence"
-import { ensureStagingCanonicalCompanyLinkage } from "@/lib/growth/canonical-companies/canonical-company-staging-linkage"
+import { promoteCanonicalCompanyCandidates } from "@/lib/growth/canonical-companies/canonical-company-backfill"
+import {
+  mapDiscoveryCandidateRow,
+  mapExternalCompanyCandidateRow,
+  mapRealWorldCompanyCandidateRow,
+} from "@/lib/growth/canonical-companies/canonical-company-candidate-mappers"
+import {
+  ensureStagingCanonicalCompanyLinkage,
+  type GrowthStagingCompanyCandidateTable,
+} from "@/lib/growth/canonical-companies/canonical-company-staging-linkage"
 import { canonicalNormalizedDomain } from "@/lib/growth/canonical-companies/canonical-company-normalize"
 import { runCanonicalPersonBackfillForCompanyCandidate } from "@/lib/growth/canonical-persons/canonical-person-backfill"
 import { candidateHasObservedContactChannel } from "@/lib/growth/apollo/apollo-live-pilot-canonical-sync-evidence"
@@ -82,6 +91,64 @@ async function resolveCanonicalCompanyIdFromDomain(
   return asString(alias?.company_id) || null
 }
 
+function mapStagingRowToCanonicalInput(
+  source_table: GrowthStagingCompanyCandidateTable,
+  row: Record<string, unknown>,
+) {
+  if (source_table === "external_company_candidates") return mapExternalCompanyCandidateRow(row)
+  if (source_table === "real_world_company_candidates") return mapRealWorldCompanyCandidateRow(row)
+  return mapDiscoveryCandidateRow(row)
+}
+
+async function loadStagingRowForPromotion(
+  admin: SupabaseClient,
+  company_candidate_id: string,
+): Promise<{ source_table: GrowthStagingCompanyCandidateTable; row: Record<string, unknown> } | null> {
+  const tables: GrowthStagingCompanyCandidateTable[] = [
+    "real_world_company_candidates",
+    "external_company_candidates",
+    "discovery_candidates",
+  ]
+  for (const table of tables) {
+    const select =
+      table === "discovery_candidates"
+        ? "id, run_id, company_id, source_type, discovery_source_type, company_name, website, domain, industry, location, city, state, source_confidence, dedupe_hash, discovered_at, created_at, metadata, canonical_company_id"
+        : "id, run_id, provider_name, provider_type, company_name, website, domain, phone, address, city, state, country, industry, confidence, dedupe_hash, created_at, metadata, canonical_company_id, query"
+    const { data } = await admin.schema("growth").from(table).select(select).eq("id", company_candidate_id).maybeSingle()
+    if (data) return { source_table: table, row: data as Record<string, unknown> }
+  }
+  return null
+}
+
+async function ensureCanonicalCompanyViaBackfill(
+  admin: SupabaseClient,
+  company_candidate_id: string,
+): Promise<string | null> {
+  const staging = await loadStagingRowForPromotion(admin, company_candidate_id)
+  if (!staging) return null
+
+  const mapped = mapStagingRowToCanonicalInput(staging.source_table, staging.row)
+  const { outcomes } = await promoteCanonicalCompanyCandidates(admin, {
+    mode: "apply",
+    candidates: [mapped],
+  })
+  const outcome = outcomes[0]
+  if (!outcome?.ok || !outcome.company_id) return null
+  return outcome.company_id
+}
+
+export async function loadPersistedApolloCandidatesForPromotion(
+  admin: SupabaseClient,
+  company_candidate_id: string,
+  limit = 200,
+): Promise<GrowthContactCandidate[]> {
+  const all = await listContactCandidatesForCompany(admin, company_candidate_id, limit)
+  return all.filter(
+    (candidate) =>
+      candidate.provider_type === "future_apollo" && candidateHasObservedContactChannel(candidate),
+  )
+}
+
 export async function resolveApolloEnrichmentCanonicalCompanyId(
   admin: SupabaseClient,
   input: {
@@ -113,6 +180,14 @@ export async function resolveApolloEnrichmentCanonicalCompanyId(
     return { canonical_company_id: fromDomain, resolution_blockers: [] }
   }
 
+  const fromBackfill = await ensureCanonicalCompanyViaBackfill(admin, input.company_candidate_id)
+  if (fromBackfill) {
+    await ensureStagingCanonicalCompanyLinkage(admin, input.company_candidate_id, {
+      explicit_canonical_company_id: fromBackfill,
+    }).catch(() => null)
+    return { canonical_company_id: fromBackfill, resolution_blockers: [] }
+  }
+
   const blockers: string[] = []
   if (!linkage.source_table) {
     blockers.push("staging_company_candidate_not_found")
@@ -135,15 +210,15 @@ export async function reloadEnrichedApolloCandidates(
     candidate_ids: string[]
   },
 ): Promise<GrowthContactCandidate[]> {
-  if (input.candidate_ids.length === 0) return []
   const all = await listContactCandidatesForCompany(admin, input.company_candidate_id, 200)
-  const idSet = new Set(input.candidate_ids)
-  return all.filter(
+  const channelReady = all.filter(
     (candidate) =>
-      idSet.has(candidate.id) &&
-      candidate.provider_type === "future_apollo" &&
-      candidateHasObservedContactChannel(candidate),
+      candidate.provider_type === "future_apollo" && candidateHasObservedContactChannel(candidate),
   )
+  if (input.candidate_ids.length === 0) return channelReady
+
+  const idSet = new Set(input.candidate_ids)
+  return channelReady.filter((candidate) => idSet.has(candidate.id))
 }
 
 function isContactableCompanyContact(row: Record<string, unknown>): boolean {
@@ -180,7 +255,12 @@ export async function promoteEnrichedApolloCandidatesToCompanyContacts(
   admin: SupabaseClient,
   input: ApolloEnrichmentPromotionInput,
 ): Promise<ApolloEnrichmentPromotionResult> {
-  const channelCounts = countEnrichedCandidateChannels(input.enriched_candidates)
+  const persisted = await loadPersistedApolloCandidatesForPromotion(admin, input.company_candidate_id)
+  const seedCandidates =
+    input.enriched_candidates.length > 0 ? input.enriched_candidates : persisted
+  const channelCounts = countEnrichedCandidateChannels(
+    seedCandidates.length > 0 ? seedCandidates : persisted,
+  )
   const resolution = await resolveApolloEnrichmentCanonicalCompanyId(admin, {
     company_candidate_id: input.company_candidate_id,
     domain: input.domain,
@@ -189,10 +269,12 @@ export async function promoteEnrichedApolloCandidatesToCompanyContacts(
 
   const reloaded = await reloadEnrichedApolloCandidates(admin, {
     company_candidate_id: input.company_candidate_id,
-    candidate_ids: input.enriched_candidates.map((candidate) => candidate.id),
+    candidate_ids: seedCandidates.map((candidate) => candidate.id),
   })
   const promotionCandidates =
-    reloaded.length > 0 ? reloaded : selectApolloCandidatesForPromotion(input.enriched_candidates)
+    reloaded.length > 0
+      ? reloaded
+      : selectApolloCandidatesForPromotion(seedCandidates.length > 0 ? seedCandidates : persisted)
 
   const promotion_attempted = promotionCandidates.length > 0
   let company_contacts_synced = 0

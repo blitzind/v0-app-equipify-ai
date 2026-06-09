@@ -243,6 +243,7 @@
     "test:apollo-enrichment-cert-en-3": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-enrichment-cert-en-3.ts",
     "test:apollo-enrichment-cert-production-route": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-enrichment-cert-production-route.ts",
     "run:apollo-enrichment-cert-en-1": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/run-apollo-enrichment-cert-en-1.ts",
+    "run:apollo-enrichment-cert-en-3": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/run-apollo-enrichment-cert-en-3.ts",
     "run:apollo-henry-schein-search-map-pilot": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/run-apollo-henry-schein-search-map-pilot.ts",
     "test:growth-contact-acquisition-apollo-7-pca-3": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-contact-acquisition-apollo-7-pca-3.ts",
     "benchmark:growth-contact-acquisition-apollo-7-pca-2": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/benchmark-growth-contact-acquisition-apollo-7-pca-2.ts",

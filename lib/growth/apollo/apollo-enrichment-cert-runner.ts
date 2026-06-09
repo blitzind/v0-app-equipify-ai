@@ -13,7 +13,7 @@ import {
   APOLLO_ENRICHMENT_CERT_EVIDENCE_QA_MARKER,
   type ApolloEnrichmentCertEvidence,
 } from "@/lib/growth/apollo/apollo-enrichment-cert-evidence-types"
-import { promoteEnrichedApolloCandidatesToCompanyContacts } from "@/lib/growth/apollo/apollo-enrichment-cert-promotion"
+import { promoteEnrichedApolloCandidatesToCompanyContacts, loadPersistedApolloCandidatesForPromotion } from "@/lib/growth/apollo/apollo-enrichment-cert-promotion"
 import { candidateHasObservedContactChannel } from "@/lib/growth/apollo/apollo-live-pilot-canonical-sync-evidence"
 import { fetchStagingCanonicalCompanyId } from "@/lib/growth/canonical-persons/canonical-person-repository-core"
 import type { GrowthContactCandidate } from "@/lib/growth/contact-discovery/contact-discovery-types"
@@ -190,6 +190,157 @@ async function updateEnrichedCandidates(
   return updated
 }
 
+export async function runApolloEnrichmentCertEn3(
+  admin: SupabaseClient,
+  input: {
+    company_candidate_id: string
+    env?: NodeJS.ProcessEnv
+  },
+): Promise<{ ok: boolean; evidence: ApolloEnrichmentCertEvidence | null; error: string | null }> {
+  const company_candidate_id = input.company_candidate_id.trim()
+  if (!company_candidate_id) {
+    return { ok: false, evidence: null, error: "company_candidate_id is required for EN-3 promotion." }
+  }
+
+  const started = Date.now()
+  const companyContext = await loadCompanyContext(admin, company_candidate_id)
+  const enriched_candidates = await loadPersistedApolloCandidatesForPromotion(
+    admin,
+    company_candidate_id,
+  )
+  const recommended = getRecommendedApolloEnrichmentPath()
+
+  const promotion = await promoteEnrichedApolloCandidatesToCompanyContacts(admin, {
+    company_candidate_id,
+    domain: companyContext.domain,
+    canonical_company_id: companyContext.canonical_company_id,
+    enriched_candidates,
+  })
+
+  const channelCounts = {
+    email: enriched_candidates.filter((c) => asString(c.email)).length,
+    linkedin: enriched_candidates.filter((c) => asString(c.linkedin_url)).length,
+    phone: enriched_candidates.filter((c) => asString(c.phone)).length,
+  }
+
+  const evidence: ApolloEnrichmentCertEvidence = {
+    qa_marker: APOLLO_ENRICHMENT_CERT_EVIDENCE_QA_MARKER,
+    cert_at: new Date().toISOString(),
+    mock: isApolloMockEnabled(input.env ?? process.env),
+    company: {
+      company_candidate_id,
+      company_name: companyContext.company_name,
+      domain: companyContext.domain,
+      canonical_company_id: promotion.canonical_company_id ?? companyContext.canonical_company_id,
+    },
+    gates: {
+      enrich_emails: false,
+      enrich_emails_ack: false,
+      en_1_cert_enabled: false,
+      en_1_cert_ack: false,
+      max_people: enriched_candidates.length,
+    },
+    recommended_path: {
+      path_id: recommended.path_id,
+      name: recommended.name,
+      credit_cost: recommended.credit_cost,
+      env_gates: recommended.env_gates,
+    },
+    enrichment: {
+      candidates_eligible: enriched_candidates.length,
+      candidates_with_apollo_person_id: enriched_candidates.length,
+      bulk_match_batches: 0,
+      credits_consumed: 0,
+      candidates_updated: 0,
+    },
+    channels: {
+      emails_found: 0,
+      phones_found: 0,
+      linkedin_found: 0,
+      verified_emails: 0,
+      before: channelCounts,
+      after: channelCounts,
+    },
+    promotion: {
+      company_contacts_synced: promotion.company_contacts_synced,
+      company_contacts_promoted: promotion.company_contacts_synced,
+      enriched_candidates_with_email: promotion.enriched_candidates_with_email,
+      enriched_candidates_with_linkedin: promotion.enriched_candidates_with_linkedin,
+      promotion_attempted: promotion.promotion_attempted,
+      promotion_blockers: promotion.promotion_blockers,
+      company_contacts_created: promotion.company_contacts_created,
+      company_contacts_updated: promotion.company_contacts_updated,
+      contactable_after_promotion: promotion.contactable_after_promotion,
+      sequence_ready_after_promotion: promotion.sequence_ready_after_promotion,
+      canonical_person_backfill_rows_processed: promotion.canonical_person_backfill.rows_processed,
+      canonical_person_backfill_persons_linked: promotion.canonical_person_backfill.persons_linked,
+      rejection_reasons: promotion.rejection_reasons,
+    },
+    readiness: {
+      sequence_ready: promotion.sequence_ready_after_promotion,
+      contactable: promotion.contactable_after_promotion,
+    },
+    runtime: {
+      duration_ms: Date.now() - started,
+      api_calls: 0,
+      errors: [],
+    },
+    certification: certifyApolloEnrichmentGoNoGo({
+      enrichment: {
+        candidates_eligible: enriched_candidates.length,
+        candidates_with_apollo_person_id: enriched_candidates.length,
+        bulk_match_batches: 0,
+        credits_consumed: 0,
+        candidates_updated: 0,
+      },
+      channels: {
+        emails_found: 0,
+        phones_found: 0,
+        linkedin_found: 0,
+        verified_emails: 0,
+        before: channelCounts,
+        after: channelCounts,
+      },
+      promotion: {
+        company_contacts_synced: promotion.company_contacts_synced,
+        company_contacts_promoted: promotion.company_contacts_synced,
+        enriched_candidates_with_email: promotion.enriched_candidates_with_email,
+        enriched_candidates_with_linkedin: promotion.enriched_candidates_with_linkedin,
+        promotion_attempted: promotion.promotion_attempted,
+        promotion_blockers: promotion.promotion_blockers,
+        company_contacts_created: promotion.company_contacts_created,
+        company_contacts_updated: promotion.company_contacts_updated,
+        contactable_after_promotion: promotion.contactable_after_promotion,
+        sequence_ready_after_promotion: promotion.sequence_ready_after_promotion,
+        canonical_person_backfill_rows_processed: promotion.canonical_person_backfill.rows_processed,
+        canonical_person_backfill_persons_linked: promotion.canonical_person_backfill.persons_linked,
+        rejection_reasons: promotion.rejection_reasons,
+      },
+      runtime: {
+        duration_ms: Date.now() - started,
+        api_calls: 0,
+        errors: [],
+      },
+      gates: {
+        enrich_emails: false,
+        enrich_emails_ack: false,
+        en_1_cert_enabled: false,
+        en_1_cert_ack: false,
+        max_people: enriched_candidates.length,
+      },
+    }),
+  }
+
+  const ok =
+    promotion.promotion_attempted &&
+    promotion.enriched_candidates_with_email > 0 &&
+    Boolean(promotion.canonical_company_id) &&
+    promotion.company_contacts_synced > 0 &&
+    promotion.contactable_after_promotion > 0
+
+  return { ok, evidence, error: ok ? null : promotion.promotion_blockers[0] ?? "EN-3 promotion incomplete." }
+}
+
 export async function runApolloEnrichmentCertEn1(
   admin: SupabaseClient,
   input?: {
@@ -215,10 +366,14 @@ export async function runApolloEnrichmentCertEn1(
   try {
     const companyContext = await loadCompanyContext(admin, company_candidate_id)
     const candidates = await loadChannelLessApolloCandidates(admin, company_candidate_id, max_people)
+    const persistedForPromotion = await loadPersistedApolloCandidatesForPromotion(
+      admin,
+      company_candidate_id,
+    )
     const beforeChannels = countChannels(candidates)
     const withPersonId = candidates.filter((candidate) => Boolean(readApolloPersonId(candidate)))
 
-    if (withPersonId.length === 0) {
+    if (withPersonId.length === 0 && persistedForPromotion.length === 0) {
       errors.push(
         "No channel-less Apollo candidates with apollo_person_id — run search-only live pilot first.",
       )
@@ -272,11 +427,14 @@ export async function runApolloEnrichmentCertEn1(
 
     const afterChannels = countChannels(withPersonId)
 
+    const promotionCandidates =
+      withPersonId.length > 0 ? withPersonId : persistedForPromotion
+
     const promotion = await promoteEnrichedApolloCandidatesToCompanyContacts(admin, {
       company_candidate_id,
       domain: companyContext.domain,
       canonical_company_id: companyContext.canonical_company_id,
-      enriched_candidates: withPersonId,
+      enriched_candidates: promotionCandidates,
     })
 
     const guardrails = getApolloRunGuardrailSnapshot()

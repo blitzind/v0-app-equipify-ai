@@ -12,7 +12,11 @@ import type { GrowthCanonicalCompanySourceTable } from "@/lib/growth/canonical-c
 export const GROWTH_CANONICAL_COMPANY_STAGING_LINKAGE_QA_MARKER =
   "growth-canonical-company-staging-linkage-7-ps-hm-link-v1" as const
 
-const STAGING_TABLES = ["real_world_company_candidates", "external_company_candidates"] as const
+const STAGING_TABLES = [
+  "real_world_company_candidates",
+  "external_company_candidates",
+  "discovery_candidates",
+] as const satisfies readonly GrowthCanonicalCompanySourceTable[]
 export type GrowthStagingCompanyCandidateTable = (typeof STAGING_TABLES)[number]
 
 export type StagingCanonicalCompanyResolutionMethod =
@@ -21,6 +25,7 @@ export type StagingCanonicalCompanyResolutionMethod =
   | "company_contacts"
   | "companies_primary_domain"
   | "company_domains_alias"
+  | "canonical_backfill"
   | "explicit"
   | "unresolved"
 
@@ -38,6 +43,29 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
 
+function stagingProviderFields(
+  row: Record<string, unknown>,
+  source_table: GrowthStagingCompanyCandidateTable,
+): { provider_name: string; provider_type: string } {
+  if (source_table === "discovery_candidates") {
+    return {
+      provider_name: "discovery_candidates",
+      provider_type: asString(row.discovery_source_type) || asString(row.source_type) || "discovery",
+    }
+  }
+  return {
+    provider_name: asString(row.provider_name) || "prospect_search",
+    provider_type: asString(row.provider_type) || "manual_import",
+  }
+}
+
+function selectForStagingTable(table: GrowthStagingCompanyCandidateTable): string {
+  if (table === "discovery_candidates") {
+    return "id, canonical_company_id, domain, website, company_name, run_id, source_type, discovery_source_type, source_confidence, metadata"
+  }
+  return "id, canonical_company_id, domain, website, company_name, provider_name, provider_type, run_id, confidence, metadata"
+}
+
 async function loadStagingRow(
   admin: SupabaseClient,
   companyCandidateId: string,
@@ -51,9 +79,7 @@ async function loadStagingRow(
     const { data } = await admin
       .schema("growth")
       .from(table)
-      .select(
-        "id, canonical_company_id, domain, website, company_name, provider_name, provider_type, run_id, confidence, metadata",
-      )
+      .select(selectForStagingTable(table))
       .eq("id", companyCandidateId)
       .maybeSingle()
     if (data) {
@@ -250,14 +276,20 @@ export async function ensureStagingCanonicalCompanyLinkage(
       companyCandidateId,
     )
     if (!existingLineage) {
+      const provider = stagingProviderFields(staging.row, resolution.source_table)
       await upsertCanonicalCompanyLineage(admin, {
         company_id: resolution.canonical_company_id,
         source_table: resolution.source_table,
         source_id: companyCandidateId,
-        provider_name: asString(staging.row.provider_name) || "prospect_search",
-        provider_type: asString(staging.row.provider_type) || "manual_import",
+        provider_name: provider.provider_name,
+        provider_type: provider.provider_type,
         run_id: asString(staging.row.run_id) || null,
-        confidence: typeof staging.row.confidence === "number" ? staging.row.confidence : 0,
+        confidence:
+          typeof staging.row.confidence === "number"
+            ? staging.row.confidence
+            : typeof staging.row.source_confidence === "number"
+              ? staging.row.source_confidence
+              : 0,
         observed_at: new Date().toISOString(),
         source_metadata: {
           qa_marker: GROWTH_CANONICAL_COMPANY_STAGING_LINKAGE_QA_MARKER,
