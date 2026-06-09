@@ -591,12 +591,95 @@ const canonicalRejectedEvidence = buildApolloLivePilotProviderEvidence({
   candidates_stored: 1,
   company_contacts_synced: 0,
   canonical_sync_rejected: 1,
+  canonical_sync_attempted: true,
+  canonical_sync_rejection_reasons: { insert_failed: 1 },
+  candidates: [
+    {
+      id: "c1",
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+      company_candidate_id: "co-1",
+      provider_name: "apollo",
+      provider_type: "future_apollo",
+      full_name: "Jane Doe",
+      first_name: "Jane",
+      last_name: "Doe",
+      job_title: "CEO",
+      department: null,
+      seniority: null,
+      linkedin_url: null,
+      email: "jane@example.com",
+      phone: null,
+      verification_state: "unverified",
+      confidence: 0.8,
+      source_attribution: [],
+      evidence: [],
+      dedupe_hash: "abc",
+      metadata: {},
+    },
+  ],
 })
 assert.equal(
   classifyApolloLivePilotProviderEvidence(canonicalRejectedEvidence),
   "apollo_results_rejected_by_canonical_sync",
 )
 record("provider.canonical_sync_rejection", "pass", "Canonical sync rejection classified separately")
+
+const missingChannelsEvidence = buildApolloLivePilotProviderEvidence({
+  provider_result: {
+    provider_name: "apollo",
+    provider_type: "future_apollo",
+    status: "success",
+    message: "Mapped 10 contact(s)",
+    contacts: [],
+    metadata: {
+      apollo_people_returned: 10,
+      apollo_total_matches: 10,
+      apollo_people_mapped: 10,
+      apollo_people_rejected: 0,
+      missing_email_count: 10,
+      missing_phone_count: 10,
+    },
+  },
+  candidates_stored: 10,
+  company_contacts_synced: 0,
+  canonical_sync_rejected: 10,
+  canonical_sync_attempted: true,
+  canonical_sync_rejection_reasons: { missing_contact_channel: 10 },
+  candidates: Array.from({ length: 10 }, (_, index) => ({
+    id: `c-${index}`,
+    created_at: "2026-01-01T00:00:00.000Z",
+    updated_at: "2026-01-01T00:00:00.000Z",
+    company_candidate_id: "co-1",
+    provider_name: "apollo",
+    provider_type: "future_apollo",
+    full_name: "Carrie Ki***g",
+    first_name: "Carrie",
+    last_name: "Ki***g",
+    job_title: "Executive Vice President, Chief Operating Officer",
+    department: null,
+    seniority: null,
+    linkedin_url: null,
+    email: null,
+    phone: null,
+    verification_state: "unverified",
+    confidence: 0.58,
+    source_attribution: [],
+    evidence: [],
+    dedupe_hash: `hash-${index}`,
+    metadata: {},
+  })),
+})
+assert.equal(
+  classifyApolloLivePilotProviderEvidence(missingChannelsEvidence),
+  "apollo_results_missing_contact_channels",
+)
+assert.equal(buildApolloLivePilotProviderDiscoveryError(missingChannelsEvidence), null)
+record(
+  "provider.missing_contact_channels",
+  "pass",
+  "Search-only named/title matches without channels classify as missing_contact_channels",
+)
 
 const nonPersonEvidence = buildApolloLivePilotProviderEvidence({
   provider_result: {

@@ -253,6 +253,8 @@ function providerClassificationErrorName(
       return "ApolloResultsRejectedByIcpTitle"
     case "apollo_results_rejected_by_canonical_sync":
       return "ApolloResultsRejectedByCanonicalSync"
+    case "apollo_results_missing_contact_channels":
+      return "ApolloResultsMissingContactChannels"
     case "apollo_results_rejected_non_person_rows":
       return "ApolloResultsRejectedNonPersonRows"
     case "apollo_success":
@@ -395,7 +397,10 @@ function buildApolloLivePilotEvidence(input: {
         matched: 0,
         created: input.backfill.persons_linked,
         deduped: Math.max(0, input.backfill.rows_processed - input.backfill.persons_linked),
-        rejected: Math.max(0, input.apolloContacts.length - input.sync.synced),
+        rejected:
+          input.providerEvidence?.classification === "apollo_results_missing_contact_channels"
+            ? 0
+            : Math.max(0, input.apolloContacts.length - input.sync.synced),
       },
     },
     contact_quality: {
@@ -488,7 +493,7 @@ export async function runApolloLivePilotAi2(
         errors,
         apolloContacts: [],
         apolloOutcome: null,
-        sync: { synced: 0, resolution: null },
+        sync: { synced: 0, resolution: null, canonical_sync_attempted: false, rejection_reasons: {} },
         backfill: { persons_linked: 0, rows_processed: 0 },
         contactQuality,
         readinessFunnel: {
@@ -522,11 +527,17 @@ export async function runApolloLivePilotAi2(
         company_candidate_id,
         canonical_company_id: canonical_company_id || null,
         candidates: apolloContacts,
+        require_contact_channel: true,
       })
     } catch (error) {
       logApolloLivePilotError("syncContactCandidatesToCompanyContacts", error)
       errors.push(formatApolloLivePilotErrorForEvidence("syncContactCandidatesToCompanyContacts", error))
-      sync = { synced: 0, resolution: null }
+      sync = {
+        synced: 0,
+        resolution: null,
+        canonical_sync_attempted: false,
+        rejection_reasons: {},
+      }
     }
 
     const providerEvidence = buildApolloLivePilotProviderEvidence({
@@ -534,6 +545,9 @@ export async function runApolloLivePilotAi2(
       candidates_stored: apolloContacts.length,
       company_contacts_synced: sync.synced,
       canonical_sync_rejected: Math.max(0, apolloContacts.length - sync.synced),
+      canonical_sync_attempted: sync.canonical_sync_attempted,
+      canonical_sync_rejection_reasons: sync.rejection_reasons,
+      candidates: apolloContacts,
     })
     logApolloLivePilotProviderEvidence(providerEvidence)
     errors.push(...collectApolloDiscoveryErrors(apolloOutcome, providerEvidence, fallbackMessage))

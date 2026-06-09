@@ -1,6 +1,12 @@
 /** Apollo live pilot provider evidence — client-safe diagnostics. */
 
+import type { GrowthContactCandidate } from "@/lib/growth/contact-discovery/contact-discovery-types"
 import type { GrowthContactDiscoveryProviderResult } from "@/lib/growth/contact-discovery/contact-discovery-provider-types"
+import {
+  hasStructuralCanonicalSyncReason,
+  isApolloSearchOnlyMissingContactChannels,
+  summarizeApolloCandidateChannelCounts,
+} from "@/lib/growth/apollo/apollo-live-pilot-canonical-sync-evidence"
 import type { ApolloRedactedRejectionSample } from "@/lib/growth/providers/apollo/map-apollo-contact"
 
 export const APOLLO_LIVE_PILOT_PROVIDER_EVIDENCE_QA_MARKER =
@@ -11,6 +17,7 @@ export type ApolloLivePilotProviderClassification =
   | "apollo_results_rejected_by_mapping"
   | "apollo_results_rejected_by_icp_title"
   | "apollo_results_rejected_by_canonical_sync"
+  | "apollo_results_missing_contact_channels"
   | "apollo_results_rejected_non_person_rows"
   | "apollo_success"
 
@@ -30,6 +37,13 @@ export type ApolloLivePilotProviderEvidence = {
   candidates_stored: number
   company_contacts_synced: number
   canonical_sync_rejected: number
+  canonical_sync_attempted: boolean
+  canonical_sync_rejection_reasons: Record<string, number>
+  candidate_has_name_count: number
+  candidate_has_title_count: number
+  candidate_has_email_count: number
+  candidate_has_phone_count: number
+  candidate_has_linkedin_count: number
   rejection_reasons: Record<string, number>
   title_bucket_rejections: Record<string, number>
   missing_email_count: number
@@ -129,6 +143,9 @@ export function buildApolloLivePilotProviderEvidence(input: {
   candidates_stored: number
   company_contacts_synced: number
   canonical_sync_rejected: number
+  canonical_sync_attempted?: boolean
+  canonical_sync_rejection_reasons?: Record<string, number>
+  candidates?: GrowthContactCandidate[]
 }): ApolloLivePilotProviderEvidence {
   const metadata =
     input.provider_result?.metadata && typeof input.provider_result.metadata === "object"
@@ -155,6 +172,8 @@ export function buildApolloLivePilotProviderEvidence(input: {
 
   const rejection_reasons = asRecord(metadata.rejection_reasons ?? diagnostics.skip_reasons)
   const title_bucket_rejections = asRecord(metadata.title_bucket_rejections)
+  const channel_counts = summarizeApolloCandidateChannelCounts(input.candidates ?? [])
+  const canonical_sync_rejection_reasons = asRecord(input.canonical_sync_rejection_reasons)
 
   const evidence: ApolloLivePilotProviderEvidence = {
     qa_marker: APOLLO_LIVE_PILOT_PROVIDER_EVIDENCE_QA_MARKER,
@@ -165,6 +184,13 @@ export function buildApolloLivePilotProviderEvidence(input: {
     candidates_stored: input.candidates_stored,
     company_contacts_synced: input.company_contacts_synced,
     canonical_sync_rejected: input.canonical_sync_rejected,
+    canonical_sync_attempted: input.canonical_sync_attempted === true,
+    canonical_sync_rejection_reasons,
+    candidate_has_name_count: channel_counts.candidate_has_name_count,
+    candidate_has_title_count: channel_counts.candidate_has_title_count,
+    candidate_has_email_count: channel_counts.candidate_has_email_count,
+    candidate_has_phone_count: channel_counts.candidate_has_phone_count,
+    candidate_has_linkedin_count: channel_counts.candidate_has_linkedin_count,
     rejection_reasons,
     title_bucket_rejections,
     missing_email_count: asNumber(metadata.missing_email_count),
@@ -195,9 +221,26 @@ export function classifyApolloLivePilotProviderEvidence(
   }
 
   if (
+    isApolloSearchOnlyMissingContactChannels({
+      candidates_stored: evidence.candidates_stored,
+      channel_counts: {
+        candidate_has_name_count: evidence.candidate_has_name_count,
+        candidate_has_title_count: evidence.candidate_has_title_count,
+        candidate_has_email_count: evidence.candidate_has_email_count,
+        candidate_has_phone_count: evidence.candidate_has_phone_count,
+        candidate_has_linkedin_count: evidence.candidate_has_linkedin_count,
+      },
+      rejection_reasons: evidence.canonical_sync_rejection_reasons,
+    })
+  ) {
+    return "apollo_results_missing_contact_channels"
+  }
+
+  if (
     evidence.candidates_stored > 0 &&
     evidence.company_contacts_synced === 0 &&
-    evidence.canonical_sync_rejected > 0
+    evidence.canonical_sync_rejected > 0 &&
+    hasStructuralCanonicalSyncReason(evidence.canonical_sync_rejection_reasons)
   ) {
     return "apollo_results_rejected_by_canonical_sync"
   }
@@ -212,7 +255,8 @@ export function classifyApolloLivePilotProviderEvidence(
   if (
     evidence.candidates_stored > 0 &&
     evidence.company_contacts_synced < evidence.candidates_stored &&
-    evidence.canonical_sync_rejected > 0
+    evidence.canonical_sync_rejected > 0 &&
+    hasStructuralCanonicalSyncReason(evidence.canonical_sync_rejection_reasons)
   ) {
     return "apollo_results_rejected_by_canonical_sync"
   }
@@ -231,7 +275,9 @@ export function buildApolloLivePilotProviderDiscoveryError(
     case "apollo_results_rejected_by_icp_title":
       return `[contact_discovery_apollo_results_rejected_by_icp_title] ApolloResultsRejectedByIcpTitle: Apollo returned ${evidence.apollo_people_returned} people but ICP/title filters rejected all; title_bucket_rejections=${JSON.stringify(evidence.title_bucket_rejections)}`
     case "apollo_results_rejected_by_canonical_sync":
-      return `[contact_discovery_apollo_results_rejected_by_canonical_sync] ApolloResultsRejectedByCanonicalSync: Mapped ${evidence.apollo_people_mapped} but synced ${evidence.company_contacts_synced}; canonical_sync_rejected=${evidence.canonical_sync_rejected}`
+      return `[contact_discovery_apollo_results_rejected_by_canonical_sync] ApolloResultsRejectedByCanonicalSync: Mapped ${evidence.apollo_people_mapped} but synced ${evidence.company_contacts_synced}; canonical_sync_rejection_reasons=${JSON.stringify(evidence.canonical_sync_rejection_reasons)}`
+    case "apollo_results_missing_contact_channels":
+      return null
     case "apollo_results_rejected_non_person_rows":
       return `[contact_discovery_apollo_results_rejected_non_person_rows] ApolloResultsRejectedNonPersonRows: Apollo returned ${evidence.apollo_people_returned} row(s) but all appear to be non-person/company/account records; rejection_reasons=${JSON.stringify(evidence.rejection_reasons)}`
     case "apollo_success":
@@ -254,6 +300,13 @@ export function logApolloLivePilotProviderEvidence(
       apollo_people_rejected: evidence.apollo_people_rejected,
       candidates_stored: evidence.candidates_stored,
       company_contacts_synced: evidence.company_contacts_synced,
+      canonical_sync_attempted: evidence.canonical_sync_attempted,
+      canonical_sync_rejection_reasons: evidence.canonical_sync_rejection_reasons,
+      candidate_has_name_count: evidence.candidate_has_name_count,
+      candidate_has_title_count: evidence.candidate_has_title_count,
+      candidate_has_email_count: evidence.candidate_has_email_count,
+      candidate_has_phone_count: evidence.candidate_has_phone_count,
+      candidate_has_linkedin_count: evidence.candidate_has_linkedin_count,
       rejection_reasons: evidence.rejection_reasons,
       title_bucket_rejections: evidence.title_bucket_rejections,
       missing_email_count: evidence.missing_email_count,

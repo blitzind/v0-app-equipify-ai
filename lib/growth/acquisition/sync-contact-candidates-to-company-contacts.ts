@@ -167,11 +167,34 @@ export type SyncContactCandidatesToCompanyContactsInput = {
    * Do not pass staging candidate ids here after Phase 7.PCA-1.
    */
   company_id?: string
+  /**
+   * When true, candidates without email/phone/linkedin are not promoted to company_contacts.
+   * Used by Apollo search-only pilots — identity remains in contact_candidates for research.
+   */
+  require_contact_channel?: boolean
 }
 
 export type SyncContactCandidatesToCompanyContactsResult = {
   synced: number
   resolution: CompanyContactsPersistenceResolution | null
+  canonical_sync_attempted: boolean
+  rejection_reasons: Record<string, number>
+}
+
+function hasObservedContactChannel(candidate: GrowthContactCandidate): boolean {
+  return Boolean(
+    asString(candidate.email) || asString(candidate.phone) || asString(candidate.linkedin_url),
+  )
+}
+
+function bumpRejectionReason(reasons: Record<string, number>, reason: string): void {
+  reasons[reason] = (reasons[reason] ?? 0) + 1
+}
+
+function classifyInsertFailure(error: { code?: string | null; message?: string | null }): string {
+  const code = asString(error.code)
+  if (code) return `insert_failed_${code.toLowerCase()}`
+  return "insert_failed"
 }
 
 async function syncContactCandidatesToCanonicalCompany(
@@ -179,17 +202,32 @@ async function syncContactCandidatesToCanonicalCompany(
   input: {
     canonical_company_id: string
     candidates: GrowthContactCandidate[]
+    require_contact_channel?: boolean
   },
-): Promise<number> {
+): Promise<{ synced: number; rejection_reasons: Record<string, number> }> {
+  const rejection_reasons: Record<string, number> = {}
   const canonical_company_id = input.canonical_company_id
-  if (!(await isGrowthCompanyContactsSchemaReady(admin))) return 0
-  if (input.candidates.length === 0) return 0
+  if (!(await isGrowthCompanyContactsSchemaReady(admin))) {
+    bumpRejectionReason(rejection_reasons, "schema_not_ready")
+    return { synced: 0, rejection_reasons }
+  }
+  if (input.candidates.length === 0) {
+    return { synced: 0, rejection_reasons }
+  }
 
   let synced = 0
   const nowIso = new Date().toISOString()
 
   for (const candidate of input.candidates) {
-    if (!candidate.full_name.trim()) continue
+    if (!candidate.full_name.trim()) {
+      bumpRejectionReason(rejection_reasons, "missing_full_name")
+      continue
+    }
+
+    if (input.require_contact_channel && !hasObservedContactChannel(candidate)) {
+      bumpRejectionReason(rejection_reasons, "missing_contact_channel")
+      continue
+    }
 
     const row = candidateToCompanyRow({
       company_id: canonical_company_id,
@@ -227,6 +265,7 @@ async function syncContactCandidatesToCanonicalCompany(
         })
         .eq("id", prior.id)
       if (!error) synced += 1
+      else bumpRejectionReason(rejection_reasons, classifyInsertFailure(error))
       continue
     }
 
@@ -238,9 +277,10 @@ async function syncContactCandidatesToCanonicalCompany(
       },
     })
     if (!error) synced += 1
+    else bumpRejectionReason(rejection_reasons, classifyInsertFailure(error))
   }
 
-  return synced
+  return { synced, rejection_reasons }
 }
 
 /** Bridge contact_candidates → company_contacts for acquisition promotion. */
@@ -269,14 +309,24 @@ export async function syncContactCandidatesToCompanyContactsWithResolution(
   })
 
   if (input.candidates.length === 0) {
-    return { synced: 0, resolution: null }
+    return {
+      synced: 0,
+      resolution: null,
+      canonical_sync_attempted: false,
+      rejection_reasons: {},
+    }
   }
 
   if (!company_candidate_id && !explicitCanonical) {
     logAcquisitionStep("syncContactCandidatesToCompanyContacts_skipped", {
       reason: "missing_company_candidate_and_canonical_id",
     })
-    return { synced: 0, resolution: null }
+    return {
+      synced: 0,
+      resolution: null,
+      canonical_sync_attempted: false,
+      rejection_reasons: { missing_company_candidate_and_canonical_id: input.candidates.length },
+    }
   }
 
   const resolution = company_candidate_id
@@ -292,12 +342,20 @@ export async function syncContactCandidatesToCompanyContactsWithResolution(
       company_candidate_id,
       diagnostics: resolution?.diagnostics ?? ["canonical_company_id_unresolved"],
     })
-    return { synced: 0, resolution }
+    return {
+      synced: 0,
+      resolution,
+      canonical_sync_attempted: true,
+      rejection_reasons: {
+        canonical_company_id_unresolved: input.candidates.length,
+      },
+    }
   }
 
-  const synced = await syncContactCandidatesToCanonicalCompany(admin, {
+  const syncResult = await syncContactCandidatesToCanonicalCompany(admin, {
     canonical_company_id,
     candidates: input.candidates,
+    require_contact_channel: input.require_contact_channel === true,
   })
 
   if (company_candidate_id) {
@@ -312,10 +370,16 @@ export async function syncContactCandidatesToCompanyContactsWithResolution(
   logAcquisitionStep("syncContactCandidatesToCompanyContacts_done", {
     company_candidate_id: company_candidate_id || null,
     canonical_company_id,
-    synced,
+    synced: syncResult.synced,
+    rejection_reasons: syncResult.rejection_reasons,
   })
 
-  return { synced, resolution }
+  return {
+    synced: syncResult.synced,
+    resolution,
+    canonical_sync_attempted: true,
+    rejection_reasons: syncResult.rejection_reasons,
+  }
 }
 
 export async function listContactCandidatesForCompany(
