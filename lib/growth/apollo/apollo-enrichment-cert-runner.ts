@@ -16,6 +16,8 @@ import {
 import { promoteEnrichedApolloCandidatesToCompanyContacts, loadPersistedApolloCandidatesForPromotion } from "@/lib/growth/apollo/apollo-enrichment-cert-promotion"
 import { candidateHasObservedContactChannel } from "@/lib/growth/apollo/apollo-live-pilot-canonical-sync-evidence"
 import { fetchStagingCanonicalCompanyId } from "@/lib/growth/canonical-persons/canonical-person-repository-core"
+import { canonicalNormalizedDomain } from "@/lib/growth/canonical-companies/canonical-company-normalize"
+import { loadStagingCompanyCandidateRow } from "@/lib/growth/canonical-companies/canonical-company-staging-linkage"
 import type { GrowthContactCandidate } from "@/lib/growth/contact-discovery/contact-discovery-types"
 import { verifyEmailWithZeroBounce } from "@/lib/growth/contact-verification/providers/zerobounce-client"
 import { isApolloEmailEnrichmentEnabled, isApolloMockEnabled } from "@/lib/growth/providers/apollo/apollo-config"
@@ -85,19 +87,12 @@ async function loadCompanyContext(
   domain: string | null
   canonical_company_id: string | null
 }> {
-  const { data } = await admin
-    .schema("growth")
-    .from("discovery_candidates")
-    .select("company_name, domain, website, id, company_id")
-    .or(`id.eq.${company_candidate_id},company_id.eq.${company_candidate_id}`)
-    .limit(1)
-    .maybeSingle()
+  const staging = await loadStagingCompanyCandidateRow(admin, company_candidate_id)
+  const row = staging?.row ?? null
 
-  const row = data as Record<string, unknown> | null
-  const domain =
-    asString(row?.domain) ||
-    asString(row?.website)?.replace(/^https?:\/\//, "").split("/")[0] ||
-    null
+  const domain = row
+    ? canonicalNormalizedDomain(asString(row.domain), asString(row.website))
+    : null
 
   const canonical_company_id = row
     ? await fetchStagingCanonicalCompanyId(admin, company_candidate_id)
@@ -272,6 +267,7 @@ export async function runApolloEnrichmentCertEn3(
       company_contacts_updated: promotion.company_contacts_updated,
       contactable_after_promotion: promotion.contactable_after_promotion,
       sequence_ready_after_promotion: promotion.sequence_ready_after_promotion,
+      canonical_company_resolution: promotion.canonical_company_resolution,
       canonical_person_backfill_rows_processed: promotion.canonical_person_backfill.rows_processed,
       canonical_person_backfill_persons_linked: promotion.canonical_person_backfill.persons_linked,
       rejection_reasons: promotion.rejection_reasons,
@@ -312,6 +308,7 @@ export async function runApolloEnrichmentCertEn3(
         company_contacts_updated: promotion.company_contacts_updated,
         contactable_after_promotion: promotion.contactable_after_promotion,
         sequence_ready_after_promotion: promotion.sequence_ready_after_promotion,
+        canonical_company_resolution: promotion.canonical_company_resolution,
         canonical_person_backfill_rows_processed: promotion.canonical_person_backfill.rows_processed,
         canonical_person_backfill_persons_linked: promotion.canonical_person_backfill.persons_linked,
         rejection_reasons: promotion.rejection_reasons,
@@ -338,7 +335,7 @@ export async function runApolloEnrichmentCertEn3(
     promotion.company_contacts_synced > 0 &&
     promotion.contactable_after_promotion > 0
 
-  return { ok, evidence, error: ok ? null : promotion.promotion_blockers[0] ?? "EN-3 promotion incomplete." }
+  return { ok, evidence, error: ok ? null : promotion.canonical_company_resolution.blocker_reason ?? promotion.promotion_blockers[0] ?? "EN-3 promotion incomplete." }
 }
 
 export async function runApolloEnrichmentCertEn1(
@@ -489,6 +486,7 @@ export async function runApolloEnrichmentCertEn1(
         company_contacts_updated: promotion.company_contacts_updated,
         contactable_after_promotion: promotion.contactable_after_promotion,
         sequence_ready_after_promotion: promotion.sequence_ready_after_promotion,
+        canonical_company_resolution: promotion.canonical_company_resolution,
         canonical_person_backfill_rows_processed:
           promotion.canonical_person_backfill.rows_processed,
         canonical_person_backfill_persons_linked:

@@ -20,6 +20,8 @@ import { assertApolloEnrichmentCertProductionResponseHasNoSecrets } from "../lib
 const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-enrichment-cert-en-3-production-route-gates.ts",
   "lib/growth/apollo/apollo-enrichment-cert-en-3-production-route.ts",
+  "lib/growth/apollo/apollo-enrichment-cert-canonical-company-resolution-evidence.ts",
+  "lib/growth/apollo/apollo-enrichment-cert-canonical-company-resolution.ts",
   "app/api/platform/growth/apollo-enrichment-cert-en-3/readiness/route.ts",
   "app/api/platform/growth/apollo-enrichment-cert-en-3/execute/route.ts",
 ]
@@ -98,6 +100,8 @@ const productionRoute = fs.readFileSync(
 assert.match(executeRoute, /requireGrowthEnginePlatformAccess/)
 assert.match(executeRoute, /executeApolloEnrichmentCertEn3InProduction/)
 assert.match(productionRoute, /runApolloEnrichmentCertEn3/)
+assert.match(productionRoute, /canonical_company_resolution/)
+assert.match(productionRoute, /buildEn3PromotionFailureMessage/)
 assert.doesNotMatch(productionRoute, /enrichApolloPeopleWithBulkMatch/)
 assert.doesNotMatch(executeRoute, /APOLLO_API_KEY/)
 console.log("  ✓ execute route — platform admin, EN-3 only, no Apollo HTTP")

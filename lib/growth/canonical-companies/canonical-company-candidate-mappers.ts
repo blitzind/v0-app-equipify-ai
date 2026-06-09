@@ -85,7 +85,7 @@ export function mapDiscoveryCandidateRow(
     source_table: "discovery_candidates",
     source_id: asString(row.id),
     run_id: asString(row.run_id) || null,
-    provider_name: "",
+    provider_name: "discovery_candidates",
     provider_type: asString(row.discovery_source_type) || asString(row.source_type),
     company_name: asString(row.company_name) || "Unknown",
     website: asString(row.website) || null,

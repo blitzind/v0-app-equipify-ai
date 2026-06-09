@@ -1,6 +1,7 @@
 /** Apollo EN-1 enrichment certification evidence — client-safe. */
 
 import type { ApolloEnrichmentPathAuditEntry } from "@/lib/growth/apollo/apollo-enrichment-cert-audit"
+import type { ApolloEnrichmentCertCanonicalCompanyResolutionEvidence } from "@/lib/growth/apollo/apollo-enrichment-cert-canonical-company-resolution-evidence"
 
 export const APOLLO_ENRICHMENT_CERT_EVIDENCE_QA_MARKER = "apollo-enrichment-cert-evidence-en-1-v1" as const
 
@@ -53,6 +54,7 @@ export type ApolloEnrichmentCertEvidence = {
     company_contacts_updated: number
     contactable_after_promotion: number
     sequence_ready_after_promotion: number
+    canonical_company_resolution?: ApolloEnrichmentCertCanonicalCompanyResolutionEvidence | null
     canonical_person_backfill_rows_processed: number
     canonical_person_backfill_persons_linked: number
     rejection_reasons: Record<string, number>

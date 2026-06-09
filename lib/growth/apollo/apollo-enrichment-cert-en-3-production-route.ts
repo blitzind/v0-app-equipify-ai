@@ -12,9 +12,11 @@ import {
   redactApolloEnrichmentCertProductionSecrets,
 } from "@/lib/growth/apollo/apollo-enrichment-cert-en-3-production-route-gates"
 import { countEnrichedCandidateChannels } from "@/lib/growth/apollo/apollo-enrichment-cert-promotion-evidence"
+import { summarizeApolloEnrichmentCertCanonicalCompanyResolutionFailure } from "@/lib/growth/apollo/apollo-enrichment-cert-canonical-company-resolution-evidence"
 import { loadPersistedApolloCandidatesForPromotion } from "@/lib/growth/apollo/apollo-enrichment-cert-promotion"
 import { runApolloEnrichmentCertEn3 } from "@/lib/growth/apollo/apollo-enrichment-cert-runner"
 import type { ApolloEnrichmentCertEvidence } from "@/lib/growth/apollo/apollo-enrichment-cert-evidence-types"
+import type { ApolloEnrichmentCertCanonicalCompanyResolutionEvidence } from "@/lib/growth/apollo/apollo-enrichment-cert-canonical-company-resolution-evidence"
 
 export type { ApolloEnrichmentCertEn3ProductionReadinessPayload } from "@/lib/growth/apollo/apollo-enrichment-cert-en-3-production-route-gates"
 export { buildApolloEnrichmentCertEn3ProductionReadinessPayload } from "@/lib/growth/apollo/apollo-enrichment-cert-en-3-production-route-gates"
@@ -26,8 +28,22 @@ export type ApolloEnrichmentCertEn3ProductionExecuteResult = {
   error?: "gates_failed" | "promotion_failed" | "no_evidence"
   message?: string | null
   blockers?: string[]
+  canonical_company_resolution?: ApolloEnrichmentCertCanonicalCompanyResolutionEvidence | null
   evidence: ApolloEnrichmentCertEvidence | null
   evidence_bundle: ApolloEnrichmentCertEvidenceBundle | null
+}
+
+function buildEn3PromotionFailureMessage(
+  result: Awaited<ReturnType<typeof runApolloEnrichmentCertEn3>>,
+): string {
+  const resolution = result.evidence?.promotion.canonical_company_resolution
+  if (resolution) {
+    return (
+      resolution.blocker_reason ??
+      summarizeApolloEnrichmentCertCanonicalCompanyResolutionFailure(resolution)
+    )
+  }
+  return result.error ?? "Apollo EN-3 promotion certification failed."
 }
 
 function asString(value: unknown): string {
@@ -138,15 +154,13 @@ export async function executeApolloEnrichmentCertEn3InProduction(
     company_candidate_id,
     evidence: result.evidence,
     evidence_bundle,
+    canonical_company_resolution: result.evidence?.promotion.canonical_company_resolution ?? null,
     ...(result.ok
       ? {}
       : {
           error: "promotion_failed" as const,
-          message:
-            result.error ??
-            (evidence_bundle.errors.length > 0
-              ? evidence_bundle.errors.join(" | ")
-              : "Apollo EN-3 promotion certification failed."),
+          message: buildEn3PromotionFailureMessage(result),
+          blockers: result.evidence?.promotion.promotion_blockers,
         }),
   })
 }

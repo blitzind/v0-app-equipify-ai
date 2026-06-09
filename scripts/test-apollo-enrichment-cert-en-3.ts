@@ -11,6 +11,11 @@ import {
   apolloContactDiscoverySourceType,
   APOLLO_ENRICHMENT_CERT_PROMOTION_EVIDENCE_QA_MARKER,
 } from "../lib/growth/apollo/apollo-enrichment-cert-promotion-evidence"
+import {
+  APOLLO_ENRICHMENT_CERT_CANONICAL_COMPANY_RESOLUTION_EVIDENCE_QA_MARKER,
+  emptyApolloEnrichmentCertCanonicalCompanyResolutionEvidence,
+  summarizeApolloEnrichmentCertCanonicalCompanyResolutionFailure,
+} from "../lib/growth/apollo/apollo-enrichment-cert-canonical-company-resolution-evidence"
 import { candidateHasObservedContactChannel } from "../lib/growth/apollo/apollo-live-pilot-canonical-sync-evidence"
 import { mapApolloPeopleToContactDiscoveryRaw } from "../lib/growth/providers/apollo/map-apollo-contact"
 import { normalizeApolloSearchPersonRecord } from "../lib/growth/providers/apollo/apollo-search-person-normalize"
@@ -149,6 +154,23 @@ function main(): void {
   assert.ok(blockers.includes("canonical_company_id_unresolved"))
   assert.ok(blockers.some((item) => item.includes("staging_company_candidate_not_found")))
   console.log("  ✓ promotion blockers surfaced when canonical sync fails")
+
+  assert.equal(
+    APOLLO_ENRICHMENT_CERT_CANONICAL_COMPANY_RESOLUTION_EVIDENCE_QA_MARKER,
+    "apollo-enrichment-cert-canonical-company-resolution-en-3-v1",
+  )
+  const unresolvedEvidence = emptyApolloEnrichmentCertCanonicalCompanyResolutionEvidence(
+    "d2e669d5-e912-4fb7-992a-b4f9a92ff56a",
+  )
+  unresolvedEvidence.staging_table_detected = null
+  unresolvedEvidence.candidate_domain_normalized = "henryschein.com"
+  unresolvedEvidence.domain_lookup_attempted = true
+  unresolvedEvidence.promote_backfill_ran = false
+  const summary = summarizeApolloEnrichmentCertCanonicalCompanyResolutionFailure(unresolvedEvidence)
+  assert.ok(summary.includes("canonical_company_id_unresolved"))
+  assert.ok(summary.includes("staging_company_candidate_not_found"))
+  assert.ok(summary.includes("henryschein.com"))
+  console.log("  ✓ canonical resolution evidence summarizes failure steps")
 
   console.log("\nAll Apollo EN-3 enrichment promotion checks passed.")
 }

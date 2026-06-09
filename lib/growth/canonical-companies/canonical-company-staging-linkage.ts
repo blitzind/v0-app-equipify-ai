@@ -13,9 +13,9 @@ export const GROWTH_CANONICAL_COMPANY_STAGING_LINKAGE_QA_MARKER =
   "growth-canonical-company-staging-linkage-7-ps-hm-link-v1" as const
 
 const STAGING_TABLES = [
+  "discovery_candidates",
   "real_world_company_candidates",
   "external_company_candidates",
-  "discovery_candidates",
 ] as const satisfies readonly GrowthCanonicalCompanySourceTable[]
 export type GrowthStagingCompanyCandidateTable = (typeof STAGING_TABLES)[number]
 
@@ -61,9 +61,78 @@ function stagingProviderFields(
 
 function selectForStagingTable(table: GrowthStagingCompanyCandidateTable): string {
   if (table === "discovery_candidates") {
-    return "id, canonical_company_id, domain, website, company_name, run_id, source_type, discovery_source_type, source_confidence, metadata"
+    return "id, company_id, canonical_company_id, domain, website, company_name, run_id, source_type, discovery_source_type, source_confidence, metadata"
   }
   return "id, canonical_company_id, domain, website, company_name, provider_name, provider_type, run_id, confidence, metadata"
+}
+
+function stagingRowId(row: Record<string, unknown>): string {
+  return asString(row.id)
+}
+
+async function loadDiscoveryCandidateStagingRow(
+  admin: SupabaseClient,
+  lookupKey: string,
+): Promise<Record<string, unknown> | null> {
+  const select = selectForStagingTable("discovery_candidates")
+  const { data: byId } = await admin
+    .schema("growth")
+    .from("discovery_candidates")
+    .select(select)
+    .eq("id", lookupKey)
+    .maybeSingle()
+  if (byId) return byId as Record<string, unknown>
+
+  const { data: byCompanyId } = await admin
+    .schema("growth")
+    .from("discovery_candidates")
+    .select(select)
+    .eq("company_id", lookupKey)
+    .maybeSingle()
+  return (byCompanyId as Record<string, unknown> | null) ?? null
+}
+
+export type LoadedStagingCompanyCandidateRow = {
+  source_table: GrowthStagingCompanyCandidateTable
+  row: Record<string, unknown>
+  staging_row_id: string
+  lookup_key: string
+}
+
+export async function loadStagingCompanyCandidateRow(
+  admin: SupabaseClient,
+  lookupKey: string,
+  preferredTable?: GrowthStagingCompanyCandidateTable,
+): Promise<LoadedStagingCompanyCandidateRow | null> {
+  const key = asString(lookupKey)
+  if (!key) return null
+
+  const tables = preferredTable ? [preferredTable] : STAGING_TABLES
+  for (const table of tables) {
+    if (table === "discovery_candidates") {
+      const row = await loadDiscoveryCandidateStagingRow(admin, key)
+      if (row) {
+        const id = stagingRowId(row)
+        if (!id) continue
+        return { source_table: table, row, staging_row_id: id, lookup_key: key }
+      }
+      continue
+    }
+
+    const { data } = await admin
+      .schema("growth")
+      .from(table)
+      .select(selectForStagingTable(table))
+      .eq("id", key)
+      .maybeSingle()
+    if (data) {
+      const row = data as Record<string, unknown>
+      const id = stagingRowId(row)
+      if (!id) continue
+      return { source_table: table, row, staging_row_id: id, lookup_key: key }
+    }
+  }
+  return null
 }
 
 async function loadStagingRow(
@@ -73,20 +142,15 @@ async function loadStagingRow(
 ): Promise<{
   source_table: GrowthStagingCompanyCandidateTable
   row: Record<string, unknown>
+  staging_row_id: string
 } | null> {
-  const tables = preferredTable ? [preferredTable] : STAGING_TABLES
-  for (const table of tables) {
-    const { data } = await admin
-      .schema("growth")
-      .from(table)
-      .select(selectForStagingTable(table))
-      .eq("id", companyCandidateId)
-      .maybeSingle()
-    if (data) {
-      return { source_table: table, row: data as Record<string, unknown> }
-    }
+  const loaded = await loadStagingCompanyCandidateRow(admin, companyCandidateId, preferredTable)
+  if (!loaded) return null
+  return {
+    source_table: loaded.source_table,
+    row: loaded.row,
+    staging_row_id: loaded.staging_row_id,
   }
-  return null
 }
 
 async function resolveFromCompanyContacts(
@@ -205,7 +269,11 @@ export async function resolveStagingCanonicalCompanyId(
     }
   }
 
-  const lineageId = await fetchLineageCompanyId(admin, staging.source_table, company_candidate_id)
+  const lineageId = await fetchLineageCompanyId(
+    admin,
+    staging.source_table,
+    staging.staging_row_id,
+  )
   if (lineageId) {
     return {
       ...base,
@@ -258,12 +326,13 @@ export async function ensureStagingCanonicalCompanyLinkage(
   const staging = await loadStagingRow(admin, companyCandidateId, resolution.source_table)
   if (!staging) return resolution
 
+  const stagingRowId = staging.staging_row_id
   const columnId = asString(staging.row.canonical_company_id)
   if (columnId !== resolution.canonical_company_id) {
     await updateStagingCanonicalCompanyId(
       admin,
       resolution.source_table,
-      companyCandidateId,
+      stagingRowId,
       resolution.canonical_company_id,
     )
     resolution.persisted = true
@@ -273,14 +342,14 @@ export async function ensureStagingCanonicalCompanyLinkage(
     const existingLineage = await fetchLineageCompanyId(
       admin,
       resolution.source_table,
-      companyCandidateId,
+      stagingRowId,
     )
     if (!existingLineage) {
       const provider = stagingProviderFields(staging.row, resolution.source_table)
       await upsertCanonicalCompanyLineage(admin, {
         company_id: resolution.canonical_company_id,
         source_table: resolution.source_table,
-        source_id: companyCandidateId,
+        source_id: stagingRowId,
         provider_name: provider.provider_name,
         provider_type: provider.provider_type,
         run_id: asString(staging.row.run_id) || null,
@@ -294,6 +363,7 @@ export async function ensureStagingCanonicalCompanyLinkage(
         source_metadata: {
           qa_marker: GROWTH_CANONICAL_COMPANY_STAGING_LINKAGE_QA_MARKER,
           linkage_method: resolution.method,
+          lookup_key: companyCandidateId,
         },
       })
       resolution.lineage_upserted = true

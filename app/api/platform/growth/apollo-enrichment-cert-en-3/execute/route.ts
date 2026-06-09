@@ -40,6 +40,7 @@ export async function POST(request: Request) {
     promotion_attempted: result.evidence?.promotion.promotion_attempted ?? false,
     company_contacts_synced: result.evidence?.promotion.company_contacts_synced ?? 0,
     contactable_after_promotion: result.evidence?.promotion.contactable_after_promotion ?? 0,
+    canonical_company_resolution: result.canonical_company_resolution ?? null,
     verdict: result.evidence_bundle?.verdict ?? null,
     failure_errors: result.evidence_bundle?.errors ?? null,
   })
