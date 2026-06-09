@@ -904,6 +904,7 @@ export async function certifyApolloScale1ProductionAudit(
       contactable_contacts: 0,
       sequence_ready_contacts: 0,
       blockers: resolution.canonical_company_id ? [] : ["canonical_company_id_unresolved"],
+      search_strategy: null,
     }
 
     const { data: apolloCandidates } = await admin

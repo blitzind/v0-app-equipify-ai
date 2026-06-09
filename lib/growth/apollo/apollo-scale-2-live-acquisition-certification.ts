@@ -93,6 +93,7 @@ export type ApolloScale2LiveAcquisitionCertification = {
   }
   company_results: ApolloScale1CompanyResult[]
   companies: ApolloScale2CompanyEvidenceRow[]
+  acquisition_companies: ApolloPrimaryContactAcquisitionCompanyEvidence[]
   failure_analysis: ApolloScale2FailureAnalysis
   aggregate: {
     companies_processed: number
@@ -536,6 +537,7 @@ export function buildApolloScale2LiveAcquisitionCertification(input: {
   cohort: Awaited<ReturnType<typeof resolveApolloScale2LiveCohort>>
   company_results: ApolloScale1CompanyResult[]
   companies: ApolloScale2CompanyEvidenceRow[]
+  acquisition_companies: ApolloPrimaryContactAcquisitionCompanyEvidence[]
   companies_requested: number
   acquisition: Awaited<ReturnType<typeof runApolloPrimaryContactAcquisition>>
   certified_at?: string
@@ -666,6 +668,7 @@ export function buildApolloScale2LiveAcquisitionCertification(input: {
     },
     company_results: input.company_results,
     companies,
+    acquisition_companies: input.acquisition_companies,
     failure_analysis,
     aggregate,
     credit_efficiency,
@@ -830,6 +833,7 @@ export async function certifyApolloScale2LiveAcquisition(
     cohort,
     company_results,
     companies,
+    acquisition_companies: acquisition.companies,
     companies_requested: company_limit,
     acquisition,
   })

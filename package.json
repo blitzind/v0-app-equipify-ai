@@ -254,6 +254,8 @@
     "certify:apollo-scale-2:production": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/certify-apollo-scale-2-production.ts",
     "test:apollo-scale-2": "tsx scripts/test-apollo-scale-2.ts",
     "test:apollo-scale-2-production-route": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-scale-2-production-route.ts",
+    "test:apollo-scale-2-evidence-generation": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-scale-2-evidence-generation.ts",
+    "test:apollo-tiered-search": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-tiered-search.ts",
     "certify:execution-1-approval-job:production": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/certify-execution-1-approval-job-production.ts",
     "test:execution-1-approval-job": "tsx scripts/test-execution-1-approval-job.ts",
     "certify:execution-2-approval-readiness:production": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/certify-execution-2-approval-readiness-production.ts",

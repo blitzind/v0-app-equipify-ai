@@ -1,5 +1,7 @@
 /** Apollo-Primary-1 contact acquisition evidence — client-safe. */
 
+import type { ApolloTieredPeopleSearchEvidence } from "@/lib/growth/providers/apollo/apollo-tiered-people-search-types"
+
 export const APOLLO_PRIMARY_CONTACT_ACQUISITION_EVIDENCE_QA_MARKER =
   "apollo-primary-contact-acquisition-evidence-v1" as const
 
@@ -21,6 +23,7 @@ export type ApolloPrimaryContactAcquisitionCompanyEvidence = {
   contactable_contacts: number
   sequence_ready_contacts: number
   blockers: string[]
+  search_strategy: ApolloTieredPeopleSearchEvidence | null
 }
 
 export type ApolloPrimaryContactAcquisitionEvidence = {

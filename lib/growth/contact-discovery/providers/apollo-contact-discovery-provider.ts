@@ -4,15 +4,14 @@ import type {
   GrowthContactDiscoveryProvider,
   GrowthContactDiscoveryProviderQuery,
 } from "@/lib/growth/contact-discovery/contact-discovery-provider-types"
-import { searchApolloPeopleByCompany } from "@/lib/growth/providers/apollo/apollo-client"
 import {
   isApolloContactDiscoveryEnabled,
   isApolloDiscoveryDisabled,
   isApolloMockEnabled,
   isApolloProviderConfigured,
 } from "@/lib/growth/providers/apollo/apollo-config"
-import { mapApolloPeopleToContactDiscoveryRaw } from "@/lib/growth/providers/apollo/map-apollo-contact"
 import { GROWTH_APOLLO_PROVIDER_QA_MARKER } from "@/lib/growth/providers/apollo/apollo-types"
+import { searchApolloPeopleWithTierStrategy } from "@/lib/growth/providers/apollo/apollo-tiered-people-search"
 
 export { GROWTH_APOLLO_PROVIDER_QA_MARKER }
 
@@ -45,7 +44,7 @@ export function createApolloContactDiscoveryProvider(): GrowthContactDiscoveryPr
       }
 
       const domain = input.domain?.trim() || null
-      const search = await searchApolloPeopleByCompany(
+      const search = await searchApolloPeopleWithTierStrategy(
         {
           company_name: input.company_name,
           domain,
@@ -66,6 +65,7 @@ export function createApolloContactDiscoveryProvider(): GrowthContactDiscoveryPr
           metadata: {
             qa_marker: GROWTH_APOLLO_PROVIDER_QA_MARKER,
             apollo_diagnostics: search.diagnostics,
+            apollo_search_strategy: search.search_strategy,
           },
         }
       }
@@ -81,22 +81,17 @@ export function createApolloContactDiscoveryProvider(): GrowthContactDiscoveryPr
           metadata: {
             qa_marker: GROWTH_APOLLO_PROVIDER_QA_MARKER,
             apollo_diagnostics: search.diagnostics,
+            apollo_search_strategy: search.search_strategy,
           },
         }
       }
 
-      const mapped = mapApolloPeopleToContactDiscoveryRaw({
-        people: search.people,
-        company_name: input.company_name,
-        domain,
-        mock: search.mock,
-      })
-
+      const contacts = search.mapped_contacts
       const diagnostics = {
         ...search.diagnostics,
-        contacts_mapped: mapped.diagnostics.contacts_mapped,
-        contacts_skipped: mapped.diagnostics.contacts_skipped,
-        skip_reasons: mapped.diagnostics.skip_reasons,
+        contacts_mapped: contacts.length,
+        contacts_skipped: search.search_strategy.mapping_rejections,
+        skip_reasons: search.search_strategy.rejection_reasons,
       }
 
       return {
@@ -104,24 +99,23 @@ export function createApolloContactDiscoveryProvider(): GrowthContactDiscoveryPr
         provider_type: "future_apollo",
         status: "success",
         message:
-          mapped.contacts.length === 0
+          contacts.length === 0
             ? search.message
-            : `${search.message} Mapped ${mapped.contacts.length} contact(s); skipped ${mapped.diagnostics.contacts_skipped}.`,
-        contacts: mapped.contacts,
+            : `${search.message} Mapped ${contacts.length} contact(s) via tier ${search.search_strategy.tier_used}.`,
+        contacts,
         metadata: {
           qa_marker: GROWTH_APOLLO_PROVIDER_QA_MARKER,
           apollo_diagnostics: diagnostics,
           apollo_mock: search.mock,
           apollo_total: search.total,
-          apollo_people_returned: mapped.apollo_people_returned,
+          apollo_people_returned: search.search_strategy.raw_contacts_returned,
           apollo_total_matches: search.total,
-          apollo_people_mapped: mapped.diagnostics.contacts_mapped,
-          apollo_people_rejected: mapped.diagnostics.contacts_skipped,
-          rejection_reasons: mapped.diagnostics.skip_reasons,
-          title_bucket_rejections: mapped.title_bucket_rejections,
-          missing_email_count: mapped.missing_email_count,
-          missing_phone_count: mapped.missing_phone_count,
-          apollo_rejected_sample: mapped.rejected_sample,
+          apollo_people_mapped: contacts.length,
+          apollo_people_rejected: search.search_strategy.mapping_rejections,
+          rejection_reasons: search.search_strategy.rejection_reasons,
+          apollo_search_strategy: search.search_strategy,
+          apollo_tier_used: search.search_strategy.tier_used,
+          apollo_tier_attempts: search.search_strategy.tier_attempts,
         },
       }
     },

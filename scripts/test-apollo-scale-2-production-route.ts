@@ -135,6 +135,18 @@ const bundle = buildApolloScale2EvidenceBundle({
       skipped_due_to_missing_domain: 0,
     },
     company_results: [],
+    companies: [],
+    failure_analysis: {
+      no_email: [],
+      no_phone: [],
+      missing_person: [],
+      canonical_failure: [],
+      enrichment_failure: [],
+      promotion_failure: [],
+      suppression: [],
+      low_confidence: [],
+      other: [],
+    },
     aggregate: {
       companies_processed: 15,
       apollo_contacts_found: 20,
@@ -190,6 +202,7 @@ const bundle = buildApolloScale2EvidenceBundle({
   },
 })
 assert.equal(bundle.verdict, "PASS_PARTIAL")
+assert.equal(bundle.companies.length, 0)
 assert.equal(bundle.safety.auto_enrollment, false)
 assert.equal(bundle.safety.outreach_sent, false)
 assert.equal(bundle.safety.scheduler_run, false)

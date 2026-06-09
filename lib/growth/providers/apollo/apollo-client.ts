@@ -13,8 +13,8 @@ import {
 import { enrichApolloPeopleWithBulkMatch } from "@/lib/growth/providers/apollo/apollo-enrich-people"
 import {
   buildApolloPeopleSearchParams,
-  GROWTH_APOLLO_PERSON_SENIORITIES,
-  GROWTH_APOLLO_PERSON_TITLES,
+  buildApolloPeopleSearchParamsForTier,
+  type ApolloSearchTier,
 } from "@/lib/growth/providers/apollo/apollo-query-builder"
 import {
   assertApolloCompanySearchAllowed,
@@ -105,6 +105,8 @@ function emptyDiagnostics(
   input: ApolloPersonSearchInput,
   domain: string | null,
   per_page: number,
+  person_titles: string[],
+  person_seniorities: string[],
   partial?: Partial<ApolloSearchDiagnostics>,
 ): ApolloSearchDiagnostics {
   return {
@@ -113,8 +115,8 @@ function emptyDiagnostics(
     search_input: {
       company_name: input.company_name.trim(),
       domain,
-      person_titles: [...GROWTH_APOLLO_PERSON_TITLES],
-      person_seniorities: [...GROWTH_APOLLO_PERSON_SENIORITIES],
+      person_titles,
+      person_seniorities,
       per_page,
     },
     result_count: 0,
@@ -134,12 +136,16 @@ function emptyDiagnostics(
 
 export async function searchApolloPeopleByCompany(
   input: ApolloPersonSearchInput,
-  options?: { apiKey?: string; mock?: boolean },
+  options?: { apiKey?: string; mock?: boolean; tier?: ApolloSearchTier },
 ): Promise<ApolloPersonSearchResult> {
   const started = performance.now()
   const finishLatency = () => Math.round(performance.now() - started)
   const mock = options?.mock ?? isApolloMockEnabled()
-  const { params, summary, domain, per_page } = buildApolloPeopleSearchParams(input)
+  const tier = options?.tier ?? 1
+  const built = buildApolloPeopleSearchParamsForTier(input, tier)
+  const { params, summary, domain, per_page } = built
+  const personTitles = [...built.person_titles]
+  const personSeniorities = [...built.person_seniorities]
 
   if (isApolloDiscoveryDisabled()) {
     const message = "Apollo discovery disabled via GROWTH_DISCOVERY_DISABLE_APOLLO."
@@ -176,7 +182,7 @@ export async function searchApolloPeopleByCompany(
       people: [],
       total: 0,
       mock,
-      diagnostics: emptyDiagnostics(input, domain, per_page, {
+      diagnostics: emptyDiagnostics(input, domain, per_page, personTitles, personSeniorities, {
         api_error_category: "disabled",
         mock,
         latency_ms: finishLatency(),
@@ -220,7 +226,7 @@ export async function searchApolloPeopleByCompany(
       people: [],
       total: 0,
       mock,
-      diagnostics: emptyDiagnostics(input, domain, per_page, {
+      diagnostics: emptyDiagnostics(input, domain, per_page, personTitles, personSeniorities, {
         api_error_category: "missing_company_identity",
         mock,
         latency_ms: finishLatency(),
@@ -249,7 +255,7 @@ export async function searchApolloPeopleByCompany(
       people,
       total: people.length,
       mock: true,
-      diagnostics: emptyDiagnostics(input, domain, per_page, {
+      diagnostics: emptyDiagnostics(input, domain, per_page, personTitles, personSeniorities, {
         result_count: people.length,
         api_error_category: "mock",
         mock: true,
@@ -288,7 +294,7 @@ export async function searchApolloPeopleByCompany(
       people: [],
       total: 0,
       mock: false,
-      diagnostics: emptyDiagnostics(input, domain, per_page, {
+      diagnostics: emptyDiagnostics(input, domain, per_page, personTitles, personSeniorities, {
         api_error_category: "missing_credentials",
         latency_ms: finishLatency(),
       }),
@@ -332,7 +338,7 @@ export async function searchApolloPeopleByCompany(
       people: [],
       total: 0,
       mock: false,
-      diagnostics: emptyDiagnostics(input, domain, per_page, {
+      diagnostics: emptyDiagnostics(input, domain, per_page, personTitles, personSeniorities, {
         api_error_category: "guardrail",
         latency_ms,
       }),
@@ -406,7 +412,7 @@ export async function searchApolloPeopleByCompany(
         total: 0,
         mock: false,
         error: parsed.error,
-        diagnostics: emptyDiagnostics(input, domain, per_page, {
+        diagnostics: emptyDiagnostics(input, domain, per_page, personTitles, personSeniorities, {
           api_error_category: category,
           latency_ms,
           rate_limit_remaining:
@@ -484,7 +490,7 @@ export async function searchApolloPeopleByCompany(
       people,
       total,
       mock: false,
-      diagnostics: emptyDiagnostics(input, domain, per_page, {
+      diagnostics: emptyDiagnostics(input, domain, per_page, personTitles, personSeniorities, {
         result_count: people.length,
         api_error_category: "none",
         latency_ms,
@@ -528,7 +534,7 @@ export async function searchApolloPeopleByCompany(
       total: 0,
       mock: false,
       error: message,
-      diagnostics: emptyDiagnostics(input, domain, per_page, {
+      diagnostics: emptyDiagnostics(input, domain, per_page, personTitles, personSeniorities, {
         api_error_category: "network_error",
         latency_ms,
       }),

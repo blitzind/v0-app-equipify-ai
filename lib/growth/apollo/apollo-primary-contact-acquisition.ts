@@ -14,6 +14,8 @@ import {
   type ApolloPrimaryContactAcquisitionCompanyEvidence,
   type ApolloPrimaryContactAcquisitionEvidence,
 } from "@/lib/growth/apollo/apollo-primary-contact-acquisition-evidence"
+import { emptyApolloTieredPeopleSearchEvidence } from "@/lib/growth/providers/apollo/apollo-tiered-people-search-types"
+import type { ApolloTieredPeopleSearchEvidence } from "@/lib/growth/providers/apollo/apollo-tiered-people-search-types"
 import { isApolloPrimaryContactAcquisitionEnabled } from "@/lib/growth/apollo/apollo-primary-contact-acquisition-gates"
 import { canonicalNormalizedDomain } from "@/lib/growth/canonical-companies/canonical-company-normalize"
 import { loadStagingCompanyCandidateRow } from "@/lib/growth/canonical-companies/canonical-company-staging-linkage"
@@ -280,6 +282,21 @@ async function enrichChannelLessApolloCandidates(
   }
 }
 
+function readSearchStrategyFromDiscovery(
+  discovery: Awaited<ReturnType<typeof runApolloLivePilotContactDiscovery>>,
+): ApolloTieredPeopleSearchEvidence {
+  const metadata = discovery.apollo_provider_result?.metadata
+  if (
+    metadata &&
+    typeof metadata === "object" &&
+    (metadata as Record<string, unknown>).apollo_search_strategy &&
+    typeof (metadata as Record<string, unknown>).apollo_search_strategy === "object"
+  ) {
+    return (metadata as Record<string, unknown>).apollo_search_strategy as ApolloTieredPeopleSearchEvidence
+  }
+  return emptyApolloTieredPeopleSearchEvidence()
+}
+
 export async function runApolloPrimaryContactAcquisitionForCompany(
   admin: SupabaseClient,
   input: {
@@ -315,6 +332,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
       contactable_contacts: 0,
       sequence_ready_contacts: 0,
       blockers: ["staging_company_candidate_not_found"],
+      search_strategy: null,
     }
   }
 
@@ -342,6 +360,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
   let apollo_search_attempted = false
   let apollo_search_skipped_reason: string | null = null
   let apollo_people_found = existing.existing_apollo_with_channel
+  let search_strategy: ApolloTieredPeopleSearchEvidence | null = null
 
   if (skipSearch) {
     apollo_search_skipped_reason =
@@ -371,8 +390,19 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     }
 
     apollo_people_found = discovery.apollo_contacts.length
+    search_strategy = readSearchStrategyFromDiscovery(discovery)
+
     if (apollo_people_found === 0 && apollo_search_attempted) {
-      blockers.push("apollo_zero_contacts_mapped")
+      if (existing.existing_contactable_before > 0) {
+        search_strategy = {
+          ...(search_strategy ?? emptyApolloTieredPeopleSearchEvidence()),
+          tier_used: 4,
+          legacy_fallback_used: true,
+          legacy_contactable_count: existing.existing_contactable_before,
+        }
+      } else {
+        blockers.push("apollo_zero_contacts_mapped")
+      }
     }
   }
 
@@ -450,6 +480,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     contactable_contacts: readiness.contactable,
     sequence_ready_contacts: readiness.sequence_ready,
     blockers,
+    search_strategy,
   }
 }
 
