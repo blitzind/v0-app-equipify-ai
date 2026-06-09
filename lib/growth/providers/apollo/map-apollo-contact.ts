@@ -272,6 +272,34 @@ export function mapApolloPersonToContactDiscoveryRaw(
   }
 }
 
+export type ApolloPersonMappingOutcome = {
+  mapped: GrowthContactDiscoveryProviderRawContact | null
+  accepted: boolean
+  rejection_reason: string | null
+}
+
+export function resolveApolloPersonMappingOutcome(
+  person: ApolloPersonRecord,
+  input: { company_name: string; domain: string | null; mock: boolean },
+): ApolloPersonMappingOutcome {
+  const rawTitle = asTrimmedString(person.title) ?? asTrimmedString(person.headline)
+  if (isApolloIrrelevantTitleForIcp(rawTitle)) {
+    return { mapped: null, accepted: false, rejection_reason: "irrelevant_title" }
+  }
+
+  const mapped = mapApolloPersonToContactDiscoveryRaw(person, input)
+  if (!mapped) {
+    return { mapped: null, accepted: false, rejection_reason: "map_failed" }
+  }
+
+  const gate = evaluateApolloContactAcceptance(person, mapped)
+  return {
+    mapped,
+    accepted: gate.accepted,
+    rejection_reason: gate.accepted ? null : (gate.reason ?? "rejected"),
+  }
+}
+
 export function mapApolloPeopleToContactDiscoveryRaw(input: {
   people: ApolloPersonRecord[]
   company_name: string
@@ -317,14 +345,14 @@ export function mapApolloPeopleToContactDiscoveryRaw(input: {
       continue
     }
 
-    const mapped = mapApolloPersonToContactDiscoveryRaw(person, {
+    const outcome = resolveApolloPersonMappingOutcome(person, {
       company_name: input.company_name,
       domain: input.domain,
       mock: input.mock,
     })
-    const gate = evaluateApolloContactAcceptance(person, mapped)
-    if (!gate.accepted || !mapped) {
-      const reason = gate.reason ?? "rejected"
+    const mapped = outcome.mapped
+    if (!outcome.accepted || !mapped) {
+      const reason = outcome.rejection_reason ?? "rejected"
       skip_reasons[reason] = (skip_reasons[reason] ?? 0) + 1
       if (rawTitle) {
         const bucket = classifyApolloContactTitleBucket(rawTitle)
