@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import {
   buildApolloOperatorReviewMetadataPatch,
   buildApolloPrimaryContactOperatorReviewSnapshot,
-  isApolloSourcedCompanyContactRow,
+  isApolloBackedCompanyContactRow,
   mergeApolloOperatorReviewRows,
 } from "@/lib/growth/apollo/apollo-primary-contact-operator-review-evidence"
 import {
@@ -74,18 +74,6 @@ async function loadApolloReviewSourceRows(
   company_contacts: Record<string, unknown>[]
   contact_candidates: Record<string, unknown>[]
 }> {
-  let company_contacts: Record<string, unknown>[] = []
-  if (input.canonical_company_id) {
-    const { data } = await admin
-      .schema("growth")
-      .from("company_contacts")
-      .select("*")
-      .eq("company_id", input.canonical_company_id)
-      .neq("contact_status", "archived")
-      .limit(100)
-    company_contacts = ((data ?? []) as Record<string, unknown>[]).filter(isApolloSourcedCompanyContactRow)
-  }
-
   const { data: candidates } = await admin
     .schema("growth")
     .from("contact_candidates")
@@ -94,10 +82,73 @@ async function loadApolloReviewSourceRows(
     .eq("provider_type", "future_apollo")
     .limit(100)
 
-  return {
-    company_contacts,
-    contact_candidates: (candidates ?? []) as Record<string, unknown>[],
+  const contact_candidates = (candidates ?? []) as Record<string, unknown>[]
+  const apolloCandidateIds = new Set(
+    contact_candidates.map((row) => asString(row.id)).filter(Boolean),
+  )
+
+  const companyContactById = new Map<string, Record<string, unknown>>()
+  const addCompanyContacts = (rows: Record<string, unknown>[] | null | undefined) => {
+    for (const row of rows ?? []) {
+      const id = asString(row.id)
+      if (!id || companyContactById.has(id)) continue
+      if (!isApolloBackedCompanyContactRow(row, apolloCandidateIds)) continue
+      companyContactById.set(id, row)
+    }
   }
+
+  if (input.canonical_company_id) {
+    const { data } = await admin
+      .schema("growth")
+      .from("company_contacts")
+      .select("*")
+      .eq("company_id", input.canonical_company_id)
+      .neq("contact_status", "archived")
+      .limit(100)
+    addCompanyContacts((data ?? []) as Record<string, unknown>[])
+  }
+
+  if (apolloCandidateIds.size > 0) {
+    const { data } = await admin
+      .schema("growth")
+      .from("company_contacts")
+      .select("*")
+      .in("contact_candidate_id", [...apolloCandidateIds])
+      .neq("contact_status", "archived")
+      .limit(100)
+    addCompanyContacts((data ?? []) as Record<string, unknown>[])
+  }
+
+  return {
+    company_contacts: [...companyContactById.values()],
+    contact_candidates,
+  }
+}
+
+async function resolvePromotedCompanyContactId(
+  admin: SupabaseClient,
+  input: {
+    company_contact_id?: string | null
+    contact_candidate_id?: string | null
+  },
+): Promise<string | null> {
+  const companyContactId = asString(input.company_contact_id)
+  if (companyContactId) return companyContactId
+
+  const candidateId = asString(input.contact_candidate_id)
+  if (!candidateId) return null
+
+  const { data } = await admin
+    .schema("growth")
+    .from("company_contacts")
+    .select("id")
+    .eq("contact_candidate_id", candidateId)
+    .neq("contact_status", "archived")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  return asString(data?.id) || null
 }
 
 export async function loadApolloPrimaryContactOperatorReviewSnapshot(
@@ -359,6 +410,7 @@ export async function approveApolloPrimaryContactForOutreach(
   }
 
   const target = resolveReviewTarget(input)
+  target.company_contact_id = await resolvePromotedCompanyContactId(admin, target)
   const reviewed_at = new Date().toISOString()
   const snapshot = await loadApolloPrimaryContactOperatorReviewSnapshot(admin, input.company_candidate_id)
   const reviewRow = snapshot?.contacts.find((row) => {
@@ -384,30 +436,36 @@ export async function approveApolloPrimaryContactForOutreach(
     }
   }
 
-  if (target.company_contact_id) {
-    await applyOperatorReviewToContact(admin, {
-      company_contact_id: target.company_contact_id,
-      status: "approved",
-      reviewed_at,
-      reviewed_by: input.reviewer_user_id ?? null,
-      note: input.note,
-      outreach_ready: true,
-    })
-  } else if (target.contact_candidate_id) {
-    await applyOperatorReviewToCandidate(admin, {
-      contact_candidate_id: target.contact_candidate_id,
-      status: "approved",
-      reviewed_at,
-      reviewed_by: input.reviewer_user_id ?? null,
-      note: input.note,
-      outreach_ready: true,
-    })
+  if (!target.company_contact_id) {
+    return {
+      ok: false,
+      action: "approve",
+      review_id: null,
+      contact_id: target.contact_candidate_id,
+      contact_ids: [],
+      operator_review_status: null,
+      error: "promoted_company_contact_required",
+      auto_enrollment: false,
+      outreach_sent: false,
+      enrolled_count: 0,
+      outreach_count: 0,
+      evidence: null,
+    }
   }
+
+  await applyOperatorReviewToContact(admin, {
+    company_contact_id: target.company_contact_id,
+    status: "approved",
+    reviewed_at,
+    reviewed_by: input.reviewer_user_id ?? null,
+    note: input.note,
+    outreach_ready: true,
+  })
 
   const evidence = await insertReviewEvidence(admin, {
     company_candidate_id: context.company_candidate_id,
     company_contact_id: target.company_contact_id,
-    contact_candidate_id: target.contact_candidate_id,
+    contact_candidate_id: reviewRow.contact_candidate_id ?? target.contact_candidate_id,
     action: "approve",
     operator_review_status: "approved",
     reviewer_user_id: input.reviewer_user_id ?? null,

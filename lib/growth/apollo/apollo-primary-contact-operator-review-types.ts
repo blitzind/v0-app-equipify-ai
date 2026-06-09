@@ -32,6 +32,7 @@ export type ApolloPrimaryContactOperatorReviewRow = {
   row_id: string
   company_contact_id: string | null
   contact_candidate_id: string | null
+  canonical_person_id: string | null
   full_name: string
   title: string | null
   company_name: string
@@ -46,6 +47,14 @@ export type ApolloPrimaryContactOperatorReviewRow = {
   contact_status: string | null
   email_status: string | null
   phone_status: string | null
+}
+
+export type ApolloPrimaryContactOperatorReviewSnapshotEvidence = {
+  promoted_company_contacts_loaded: number
+  unpromoted_candidates_loaded: number
+  sequence_ready_contacts: number
+  contactable_contacts: number
+  missing_company_contact_id_count: number
 }
 
 export type ApolloPrimaryContactOperatorReviewSnapshot = {
@@ -63,6 +72,7 @@ export type ApolloPrimaryContactOperatorReviewSnapshot = {
     sequence_ready: number
     sequence_ready_pending_approval: number
   }
+  evidence: ApolloPrimaryContactOperatorReviewSnapshotEvidence
   auto_enrollment: false
   outreach_sent: false
 }

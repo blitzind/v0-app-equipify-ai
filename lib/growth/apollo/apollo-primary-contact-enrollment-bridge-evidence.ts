@@ -70,6 +70,15 @@ export function evaluateApolloEnrollmentBridgeHandoffGates(input: {
     }
   }
 
+  if (!row.company_contact_id) {
+    return {
+      allowed: false,
+      code: "missing_company_contact_id",
+      reason: "Promoted company_contact_id is required for enrollment handoff.",
+      contact_row: row,
+    }
+  }
+
   if (!row.sequence_ready) {
     return {
       allowed: false,

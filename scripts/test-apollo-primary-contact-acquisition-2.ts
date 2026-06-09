@@ -12,6 +12,7 @@ import {
 import {
   buildApolloPrimaryContactOperatorReviewSnapshot,
   buildApolloOperatorReviewMetadataPatch,
+  isApolloBackedCompanyContactRow,
   isApolloSourcedCompanyContactRow,
   mergeApolloOperatorReviewRows,
   readApolloOperatorReviewStatus,
@@ -142,10 +143,99 @@ const snapshot = buildApolloPrimaryContactOperatorReviewSnapshot({
 assert.equal(snapshot.qa_marker, APOLLO_PRIMARY_CONTACT_OPERATOR_REVIEW_QA_MARKER)
 assert.equal(snapshot.contacts.length, 1)
 assert.equal(snapshot.contacts[0]?.source, "Apollo")
+assert.equal(snapshot.contacts[0]?.company_contact_id, "contact-1")
+assert.equal(snapshot.contacts[0]?.sequence_ready, true)
 assert.equal(snapshot.contacts[0]?.contactable, true)
+assert.equal(snapshot.evidence.promoted_company_contacts_loaded, 1)
+assert.equal(snapshot.evidence.unpromoted_candidates_loaded, 0)
+assert.equal(snapshot.evidence.missing_company_contact_id_count, 0)
 assert.equal(snapshot.auto_enrollment, false)
 assert.equal(snapshot.outreach_sent, false)
 console.log("  ✓ snapshot builder — Apollo contact fields and safety flags")
+
+const promotedAcquisitionSyncContact = {
+  id: "promoted-1",
+  contact_candidate_id: "candidate-1",
+  full_name: "Carrie King",
+  title: "Chief Operating Officer",
+  email: "carrie.king@example.com",
+  email_status: "discovered",
+  phone: null,
+  phone_status: "unknown",
+  linkedin_url: "https://www.linkedin.com/in/carrie-king",
+  canonical_person_id: "person-1",
+  contact_status: "candidate",
+  source_type: "public_record",
+  metadata: {
+    acquisition_sync: true,
+    provider_type: "future_apollo",
+    discovery_provider: "apollo",
+    identity_classification: "named_individual",
+    eligible_for_canonical_person: true,
+  },
+}
+
+assert.equal(
+  isApolloBackedCompanyContactRow(promotedAcquisitionSyncContact, new Set(["candidate-1"])),
+  true,
+)
+assert.equal(isApolloSourcedCompanyContactRow(promotedAcquisitionSyncContact), true)
+
+const henryScheinCandidates = Array.from({ length: 10 }, (_, index) => ({
+  id: `candidate-${index + 1}`,
+  full_name: `Henry Contact ${index + 1}`,
+  job_title: "Director",
+  provider_type: "future_apollo",
+  email: index < 5 ? `contact${index + 1}@henryschein.com` : null,
+  linkedin_url: index >= 5 ? `https://www.linkedin.com/in/henry-${index + 1}` : null,
+  metadata: { apollo_person_id: `apollo-${index + 1}` },
+}))
+
+const henryScheinPromotedContacts = henryScheinCandidates.slice(0, 5).map((candidate, index) => ({
+  id: `promoted-${index + 1}`,
+  contact_candidate_id: candidate.id,
+  full_name: candidate.full_name,
+  title: candidate.job_title,
+  email: candidate.email,
+  email_status: candidate.email ? "discovered" : "unknown",
+  phone: null,
+  phone_status: "unknown",
+  linkedin_url: candidate.linkedin_url,
+  canonical_person_id: `person-${index + 1}`,
+  contact_status: "candidate",
+  source_type: "public_record",
+  metadata: {
+    acquisition_sync: true,
+    provider_type: "future_apollo",
+    identity_classification: "named_individual",
+    eligible_for_canonical_person: true,
+  },
+}))
+
+const henrySnapshot = buildApolloPrimaryContactOperatorReviewSnapshot({
+  company_candidate_id: "d2e669d5-e912-4fb7-992a-b4f9a92ff56a",
+  company_name: "Henry Schein",
+  canonical_company_id: "dd2b44c6-8383-4737-951a-6054200f45b5",
+  company_contacts: henryScheinPromotedContacts,
+  contact_candidates: henryScheinCandidates,
+})
+
+assert.equal(henrySnapshot.evidence.promoted_company_contacts_loaded, 5)
+assert.equal(henrySnapshot.evidence.unpromoted_candidates_loaded, 5)
+assert.equal(henrySnapshot.evidence.sequence_ready_contacts, 5)
+assert.equal(henrySnapshot.evidence.contactable_contacts, 5)
+assert.equal(henrySnapshot.evidence.missing_company_contact_id_count, 5)
+assert.ok(
+  henrySnapshot.contacts.some(
+    (row) => row.company_contact_id != null && row.sequence_ready && row.contactable,
+  ),
+  "Expected at least one promoted sequence-ready contactable row",
+)
+assert.equal(
+  henrySnapshot.contacts.filter((row) => row.company_contact_id != null && row.sequence_ready).length,
+  5,
+)
+console.log("  ✓ Henry Schein regression — promoted contacts preferred with sequence readiness")
 
 const merged = mergeApolloOperatorReviewRows({
   company_contacts: [apolloContact],
@@ -161,7 +251,9 @@ const merged = mergeApolloOperatorReviewRows({
   ],
   company_name: "Henry Schein",
 })
-assert.equal(merged.length, 2)
+assert.equal(merged.contacts.length, 2)
+assert.equal(merged.promoted_company_contacts_loaded, 1)
+assert.equal(merged.unpromoted_candidates_loaded, 1)
 console.log("  ✓ merge — company contacts + unpromoted Apollo candidates")
 
 const approvedPatch = buildApolloOperatorReviewMetadataPatch({

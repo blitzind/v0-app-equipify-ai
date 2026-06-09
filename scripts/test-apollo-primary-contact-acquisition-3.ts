@@ -131,6 +131,7 @@ const approvedContact: ApolloPrimaryContactOperatorReviewRow = {
   row_id: "contact-1",
   company_contact_id: "contact-1",
   contact_candidate_id: "candidate-1",
+  canonical_person_id: "person-1",
   full_name: "Carrie King",
   title: "Chief Operating Officer",
   company_name: "Henry Schein",
@@ -169,7 +170,18 @@ const notReadyContact: ApolloPrimaryContactOperatorReviewRow = {
 const handoffGateNotReady = evaluateApolloEnrollmentBridgeHandoffGates({ contact_row: notReadyContact })
 assert.equal(handoffGateNotReady.allowed, false)
 assert.equal(handoffGateNotReady.code, "sequence_not_ready")
-console.log("  ✓ handoff gates — preserve operator review + sequence readiness")
+
+const missingPromotedContact: ApolloPrimaryContactOperatorReviewRow = {
+  ...approvedContact,
+  company_contact_id: null,
+  operator_review_status: "approved",
+}
+const handoffGateMissingCompanyContact = evaluateApolloEnrollmentBridgeHandoffGates({
+  contact_row: missingPromotedContact,
+})
+assert.equal(handoffGateMissingCompanyContact.allowed, false)
+assert.equal(handoffGateMissingCompanyContact.code, "missing_company_contact_id")
+console.log("  ✓ handoff gates — preserve operator review + sequence readiness + promoted contact id")
 
 const snapshot = buildEnrollmentBridgeContactSnapshot(approvedContact)
 assert.equal(snapshot.source, "Apollo")
