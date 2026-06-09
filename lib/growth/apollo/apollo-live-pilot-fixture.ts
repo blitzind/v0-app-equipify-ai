@@ -76,11 +76,54 @@ export function buildApolloLivePilotLiveEvidenceTemplate(): ApolloLivePilotEvide
     ...buildApolloLivePilotMockEvidence(),
     mock: false,
     pilot_at: new Date().toISOString(),
-    runtime: {
-      duration_ms: 0,
-      api_calls: 1,
-      credits_consumed: 0,
-      errors: [],
+    runtime: { duration_ms: 3200, api_calls: 1, credits_consumed: 0, errors: [] },
+  }
+}
+
+/** Representative successful live pilot for AI-3 certification unit tests (not real API data). */
+export function buildApolloLivePilotAi3ApprovedEvidence(): ApolloLivePilotEvidence {
+  return {
+    ...buildApolloLivePilotMockEvidence(),
+    mock: false,
+    pilot_at: "2026-06-08T22:00:00.000Z",
+    runtime: { duration_ms: 3200, api_calls: 1, credits_consumed: 0, errors: [] },
+    discovery: {
+      raw_contacts_returned: 4,
+      contacts_mapped: 3,
+      contacts_skipped: 1,
+      contacts_rejected: 0,
+      candidates_stored: 3,
+      company_contacts_synced: 3,
+    },
+    contact_quality: {
+      decision_maker_count: 3,
+      with_email: 3,
+      with_phone: 2,
+      with_verified_email: 2,
+      with_linkedin: 3,
+      irrelevant_title_skipped: 1,
+      buying_committee_relevant: 3,
+      average_decision_maker_score: 88,
+      title_buckets: {
+        owner_founder_president_ceo: 1,
+        operations_coo_general_manager: 1,
+        biomedical_equipment_facilities_maintenance: 1,
+      },
+    },
+    research_pipeline: {
+      company_intelligence_present: true,
+      buying_committee_present: true,
+      fit_score_present: true,
+      relationship_intelligence_present: true,
+      next_best_action_present: true,
+      automated_flow_confirmed: true,
+    },
+    readiness_funnel: {
+      imported: 3,
+      research_complete: 3,
+      score_available: 3,
+      contactable: 3,
+      sequence_ready: 1,
     },
   }
 }
