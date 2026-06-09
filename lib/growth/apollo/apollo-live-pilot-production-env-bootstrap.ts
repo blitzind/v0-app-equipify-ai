@@ -1,6 +1,6 @@
 /**
  * Apollo live pilot production env bootstrap — no .env.local.
- * Prefer: vercel env run -e production -- pnpm …
+ * Prefer: node scripts/vercel-production-env-run.ts -- pnpm …
  */
 
 import { existsSync } from "node:fs"
@@ -20,36 +20,77 @@ export const APOLLO_LIVE_PILOT_PRODUCTION_ENV_FILE_SOURCES = [
   ".vercel/.env.production.local",
 ] as const
 
-export const APOLLO_LIVE_PILOT_VERCEL_PRODUCTION_COMMAND =
-  "vercel env run -e production -- pnpm run:le-2-apollo-live-pilot" as const
+export const APOLLO_LIVE_PILOT_PROTECTED_ENV_KEYS = [
+  "APOLLO_API_KEY",
+  "GROWTH_APOLLO_API_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  "GROWTH_CONTACT_DISCOVERY_APOLLO_ENABLED",
+  "GROWTH_APOLLO_USE_MOCK",
+  "GROWTH_APOLLO_LIVE_BENCHMARK_ACK",
+  "GROWTH_APOLLO_AI_3_LIVE_PILOT_ENABLED",
+  "GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID",
+  "GROWTH_APOLLO_AI_3_OUTPUT_PATH",
+] as const
 
-export const APOLLO_LIVE_PILOT_VERCEL_PREFLIGHT_COMMAND =
-  "vercel env run -e production -- pnpm check:apollo-live-pilot-env-ai-4" as const
+export const APOLLO_LIVE_PILOT_VERCEL_PRODUCTION_COMMAND =
+  "pnpm check:apollo-live-pilot-env-ai-4:production" as const
+
+export const APOLLO_LIVE_PILOT_VERCEL_LIVE_PILOT_COMMAND =
+  "pnpm run:le-2-apollo-live-pilot:production" as const
 
 function isPresent(value: string | undefined): value is string {
-  return typeof value === "string" && value.trim().length > 0
+  if (typeof value !== "string") return false
+  const trimmed = value.trim()
+  return trimmed.length > 0 && trimmed !== '""' && trimmed !== "''"
+}
+
+export type ApolloLivePilotProtectedEnvSnapshot = Partial<
+  Record<(typeof APOLLO_LIVE_PILOT_PROTECTED_ENV_KEYS)[number], string>
+>
+
+export function snapshotApolloLivePilotProtectedEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): ApolloLivePilotProtectedEnvSnapshot {
+  const snapshot: ApolloLivePilotProtectedEnvSnapshot = {}
+  for (const key of APOLLO_LIVE_PILOT_PROTECTED_ENV_KEYS) {
+    const value = env[key]
+    if (isPresent(value)) snapshot[key] = value.trim()
+  }
+  return snapshot
+}
+
+export function restoreApolloLivePilotProtectedEnv(
+  snapshot: ApolloLivePilotProtectedEnvSnapshot,
+  env: NodeJS.ProcessEnv = process.env,
+): void {
+  for (const [key, value] of Object.entries(snapshot)) {
+    if (!isPresent(value)) continue
+    if (!isPresent(env[key])) {
+      env[key] = value
+    }
+  }
 }
 
 export type ApolloLivePilotProductionEnvBootstrapResult = {
   qa_marker: typeof APOLLO_LIVE_PILOT_PRODUCTION_ENV_QA_MARKER
   loaded_files: string[]
   skipped_files: string[]
-  /** True when Apollo/Supabase keys were already in process.env (typical with vercel env run). */
-  vercel_env_run_detected: boolean
+  vercel_production_env_run: boolean
   recommended_command: typeof APOLLO_LIVE_PILOT_VERCEL_PRODUCTION_COMMAND
 }
 
 export function bootstrapApolloLivePilotProductionEnv(input?: {
   cwd?: string
+  protectedSnapshot?: ApolloLivePilotProtectedEnvSnapshot
 }): ApolloLivePilotProductionEnvBootstrapResult {
   const cwd = input?.cwd ?? process.cwd()
+  const protectedSnapshot = input?.protectedSnapshot ?? snapshotApolloLivePilotProtectedEnv()
   const layers: Array<{ source: string; values: Record<string, string> }> = []
   const loaded_files: string[] = []
   const skipped_files: string[] = []
-
-  const hadApolloKeyBefore =
-    isPresent(process.env.APOLLO_API_KEY) || isPresent(process.env.GROWTH_APOLLO_API_KEY)
-  const hadSupabaseBefore = isPresent(process.env.SUPABASE_SERVICE_ROLE_KEY)
 
   for (const relativePath of APOLLO_LIVE_PILOT_PRODUCTION_ENV_FILE_SOURCES) {
     const absolutePath = resolve(cwd, relativePath)
@@ -67,24 +108,21 @@ export function bootstrapApolloLivePilotProductionEnv(input?: {
 
   const { merged } = mergeGrowthProductionEnvLayers(layers)
 
-  // File values fill gaps only — vercel env run / exported process.env wins.
+  // File values fill gaps only — Vercel production pull / process.env wins.
   for (const [key, value] of Object.entries(merged)) {
-    if (isPresent(value) && !isPresent(process.env[key])) {
+    if (!isPresent(value)) continue
+    if (!isPresent(process.env[key])) {
       process.env[key] = value.trim()
     }
   }
 
-  const vercel_env_run_detected =
-    hadApolloKeyBefore ||
-    hadSupabaseBefore ||
-    (isPresent(process.env.APOLLO_API_KEY) && loaded_files.length === 0) ||
-    (isPresent(process.env.GROWTH_APOLLO_API_KEY) && loaded_files.length === 0)
+  restoreApolloLivePilotProtectedEnv(protectedSnapshot)
 
   return {
     qa_marker: APOLLO_LIVE_PILOT_PRODUCTION_ENV_QA_MARKER,
     loaded_files,
     skipped_files,
-    vercel_env_run_detected,
+    vercel_production_env_run: process.env.EQUIPIFY_VERCEL_PRODUCTION_ENV_RUN === "1",
     recommended_command: APOLLO_LIVE_PILOT_VERCEL_PRODUCTION_COMMAND,
   }
 }

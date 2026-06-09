@@ -12,10 +12,9 @@ import {
 } from "../lib/growth/apollo/apollo-live-pilot-dry-run"
 import { resolveApolloLivePilotTestCompany } from "../lib/growth/apollo/apollo-live-pilot-test-company-selector"
 import { bootstrapApolloLivePilotCliEnv } from "./apollo-live-pilot-cli-env-bootstrap"
-import { bootstrapVerifiedChannelsCertEnv } from "../lib/growth/qa/verified-channels-cert-env-bootstrap"
 
 async function main(): Promise<void> {
-  bootstrapApolloLivePilotCliEnv()
+  const boot = bootstrapApolloLivePilotCliEnv()
 
   let targetCompany = null
   const companyId =
@@ -23,7 +22,7 @@ async function main(): Promise<void> {
     process.env.GROWTH_APOLLO_AI_4_COMPANY_CANDIDATE_ID?.trim() ||
     null
 
-  const boot = bootstrapVerifiedChannelsCertEnv()
+  const boot = bootstrapApolloLivePilotCliEnv()
   if (boot) {
     const admin = createClient(boot.url, boot.jwt, { auth: { persistSession: false } })
     const resolved = await resolveApolloLivePilotTestCompany(admin, {

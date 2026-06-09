@@ -2,8 +2,8 @@
  * Apollo AI-4 — environment readiness check (no secrets, no API calls).
  * Run: pnpm check:apollo-live-pilot-env-ai-4
  *
- * Production (Vercel env — preferred):
- *   vercel env run -e production -- pnpm check:apollo-live-pilot-env-ai-4
+ * Production (Vercel Production env — no .env.local):
+ *   pnpm check:apollo-live-pilot-env-ai-4:production
  */
 import {
   buildApolloLivePilotEnvReadinessReport,

@@ -17,7 +17,7 @@
  *   APOLLO_VD4_LIVE_CERTIFIED=true  (if VD-4 Voice Drop live cert complete)
  *
  * Production:
- *   vercel env run -e production -- pnpm run:apollo-live-pilot-ai-3
+ *   pnpm run:apollo-live-pilot-ai-3:production
  */
 import fs from "node:fs"
 import path from "node:path"
@@ -30,7 +30,6 @@ import { buildApolloLivePilotEvidenceBundle } from "../lib/growth/apollo/apollo-
 import { validateApolloLivePilotEvidence } from "../lib/growth/apollo/apollo-live-pilot-evidence-types"
 import { runApolloLivePilotAi2 } from "../lib/growth/apollo/apollo-live-pilot-runner"
 import { bootstrapApolloLivePilotCliEnv } from "./apollo-live-pilot-cli-env-bootstrap"
-import { bootstrapVerifiedChannelsCertEnv } from "../lib/growth/qa/verified-channels-cert-env-bootstrap"
 
 function pilotEnabled(): boolean {
   return (
@@ -48,8 +47,6 @@ function companyCandidateId(): string | null {
 }
 
 async function main(): Promise<void> {
-  bootstrapApolloLivePilotCliEnv()
-
   if (!pilotEnabled()) {
     console.error(
       JSON.stringify({
@@ -71,7 +68,7 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
-  const boot = bootstrapVerifiedChannelsCertEnv()
+  const boot = bootstrapApolloLivePilotCliEnv()
   if (!boot) {
     console.error(JSON.stringify({ ok: false, error: "Supabase credentials unavailable." }))
     process.exit(1)

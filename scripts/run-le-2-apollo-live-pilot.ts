@@ -1,15 +1,13 @@
 /**
  * LE-2 — execute Apollo live pilot workflow (steps 1–2). Manual steps 3–6 follow in docs.
  *
- * Production (Vercel env — preferred):
- *   vercel env run -e production -- pnpm run:le-2-apollo-live-pilot
- *
- * Do not use .env.local for this workflow.
+ * Production (Vercel Production env — no .env.local):
+ *   pnpm run:le-2-apollo-live-pilot:production
  */
 import { execSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
-import { APOLLO_LIVE_PILOT_VERCEL_PRODUCTION_COMMAND } from "../lib/growth/apollo/apollo-live-pilot-production-env-bootstrap"
+import { APOLLO_LIVE_PILOT_VERCEL_LIVE_PILOT_COMMAND } from "../lib/growth/apollo/apollo-live-pilot-production-env-bootstrap"
 import { buildApolloLivePilotEnvReadinessReport } from "../lib/growth/apollo/apollo-live-pilot-env-readiness"
 import { bootstrapApolloLivePilotCliEnv } from "./apollo-live-pilot-cli-env-bootstrap"
 
@@ -29,7 +27,7 @@ async function main(): Promise<void> {
     console.error("\nBlockers (configure Vercel Production env, then re-run):")
     for (const b of readiness.blockers) console.error(`  - ${b}`)
     console.error("\nPreferred command:")
-    console.error(`  ${APOLLO_LIVE_PILOT_VERCEL_PRODUCTION_COMMAND}`)
+    console.error(`  ${APOLLO_LIVE_PILOT_VERCEL_LIVE_PILOT_COMMAND}`)
     console.error("\nSee docs/LE_4_APOLLO_LIVE_PILOT_EXECUTION.md")
     process.exit(1)
   }

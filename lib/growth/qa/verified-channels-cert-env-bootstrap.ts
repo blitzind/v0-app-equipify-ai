@@ -92,9 +92,12 @@ function isSupabaseServiceRoleJwt(jwt: string): boolean {
   }
 }
 
-function extractServiceRoleJwtFromFiles(cwd: string): string | null {
+function extractServiceRoleJwtFromFiles(
+  cwd: string,
+  sources: readonly string[] = GROWTH_PRODUCTION_ENV_SOURCES,
+): string | null {
   const candidates: string[] = []
-  for (const relativePath of GROWTH_PRODUCTION_ENV_SOURCES) {
+  for (const relativePath of sources) {
     const absolutePath = resolve(cwd, relativePath)
     if (!existsSync(absolutePath)) continue
     try {
@@ -262,20 +265,38 @@ export function bootstrapVerifiedChannelsCertEnv(input?: {
   sources?: readonly string[]
   /** When true (default), non-empty process.env provider keys fill gaps after file merge. */
   inheritProcessEnvProviderKeys?: boolean
+  /** Preserve Vercel-injected values — never overwrite with empty file layers. */
+  protectedSnapshot?: Partial<Record<string, string>>
 }): { url: string; jwt: string; audit: GrowthVerifiedChannelsCertEnvAudit } | null {
   const cwd = input?.cwd ?? process.cwd()
+  const sourceFiles = input?.sources ?? GROWTH_PRODUCTION_ENV_SOURCES
+  const protectedSnapshot = input?.protectedSnapshot ?? {}
   const { merged, loaded_files } = loadVerifiedChannelsCertEnvLayers({
     cwd,
-    sources: input?.sources,
+    sources: sourceFiles,
     inheritProcessEnvProviderKeys: input?.inheritProcessEnvProviderKeys,
   })
   const { env, applied_defaults } = applyVerifiedChannelsCertDefaults(merged)
 
+  for (const [key, value] of Object.entries(protectedSnapshot)) {
+    if (typeof value === "string" && value.trim().length > 0) {
+      env[key] = value.trim()
+    }
+  }
+
   const jwt =
-    extractServiceRoleJwtFromFiles(cwd) ??
+    extractServiceRoleJwtFromFiles(cwd, sourceFiles) ??
+    (isPresentEnvValue(protectedSnapshot.SUPABASE_SERVICE_ROLE_KEY) &&
+    isSupabaseServiceRoleJwt(protectedSnapshot.SUPABASE_SERVICE_ROLE_KEY)
+      ? protectedSnapshot.SUPABASE_SERVICE_ROLE_KEY.trim()
+      : null) ??
     (isPresentEnvValue(env.SUPABASE_SERVICE_ROLE_KEY) &&
     isSupabaseServiceRoleJwt(env.SUPABASE_SERVICE_ROLE_KEY)
       ? env.SUPABASE_SERVICE_ROLE_KEY.trim()
+      : null) ??
+    (isPresentEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY) &&
+    isSupabaseServiceRoleJwt(process.env.SUPABASE_SERVICE_ROLE_KEY)
+      ? process.env.SUPABASE_SERVICE_ROLE_KEY.trim()
       : null)
 
   const url = resolveSupabaseUrl(env, jwt) ?? "https://byyfylkklbxcdofaspye.supabase.co"
@@ -293,7 +314,7 @@ export function bootstrapVerifiedChannelsCertEnv(input?: {
 
   const audit = auditVerifiedChannelsCertEnv({
     cwd,
-    sources: input?.sources,
+    sources: sourceFiles,
     inheritProcessEnvProviderKeys: input?.inheritProcessEnvProviderKeys,
   })
   audit.loaded_files = loaded_files

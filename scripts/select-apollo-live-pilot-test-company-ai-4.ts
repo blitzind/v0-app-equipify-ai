@@ -13,12 +13,9 @@
 import { createClient } from "@supabase/supabase-js"
 import { resolveApolloLivePilotTestCompany } from "../lib/growth/apollo/apollo-live-pilot-test-company-selector"
 import { bootstrapApolloLivePilotCliEnv } from "./apollo-live-pilot-cli-env-bootstrap"
-import { bootstrapVerifiedChannelsCertEnv } from "../lib/growth/qa/verified-channels-cert-env-bootstrap"
 
 async function main(): Promise<void> {
-  bootstrapApolloLivePilotCliEnv()
-
-  const boot = bootstrapVerifiedChannelsCertEnv()
+  const boot = bootstrapApolloLivePilotCliEnv()
   if (!boot) {
     console.error(JSON.stringify({ ok: false, error: "Supabase credentials unavailable." }))
     process.exit(1)
