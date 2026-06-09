@@ -6,9 +6,9 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { loadApolloReplacementBenchmarkCohort } from "@/lib/growth/benchmark/apollo-replacement-benchmark-storage"
 import { APOLLO_REPLACEMENT_BENCHMARK_ID } from "@/lib/growth/benchmark/apollo-replacement-benchmark-types"
 import { canonicalNormalizedDomain } from "@/lib/growth/canonical-companies/canonical-company-normalize"
-import { emptyApolloPrimaryContactAcquisitionEvidence } from "@/lib/growth/apollo/apollo-primary-contact-acquisition-evidence"
 import { runApolloPrimaryContactAcquisition } from "@/lib/growth/apollo/apollo-primary-contact-acquisition"
 import { resolveApolloPrimaryContactAcquisitionContactLimit } from "@/lib/growth/apollo/apollo-primary-contact-acquisition-gates"
+import type { ApolloPrimaryContactAcquisitionCompanyEvidence } from "@/lib/growth/apollo/apollo-primary-contact-acquisition-evidence"
 import {
   buildApolloScale1CompanyResult,
   type ApolloScale1BlockerCategory,
@@ -44,6 +44,28 @@ export type ApolloScale2LiveCohortCompany = {
   prior_apollo_candidates: number
 }
 
+export type ApolloScale2CompanyEvidenceRow = {
+  company_candidate_id: string
+  company_name: string
+  domain: string
+  search_attempted: boolean
+  contacts_found: number
+  contacts_enriched: number
+  contacts_promoted: number
+  contactable_contacts: number
+  sequence_ready_contacts: number
+  blockers: string[]
+  error: string | null
+  error_metadata: {
+    name: string | null
+    stack: string | null
+  } | null
+  apollo_response_status: string
+  failed: boolean
+}
+
+export type ApolloScale2FailureAnalysis = Record<ApolloScale2FailureCategory, string[]>
+
 export type ApolloScale2LiveAcquisitionCertification = {
   qa_marker: typeof APOLLO_SCALE_2_QA_MARKER
   result: ApolloScale2CertResult
@@ -70,6 +92,8 @@ export type ApolloScale2LiveAcquisitionCertification = {
     skipped_due_to_missing_domain: number
   }
   company_results: ApolloScale1CompanyResult[]
+  companies: ApolloScale2CompanyEvidenceRow[]
+  failure_analysis: ApolloScale2FailureAnalysis
   aggregate: {
     companies_processed: number
     apollo_contacts_found: number
@@ -131,6 +155,200 @@ function pct(n: number, d: number): number | null {
 function safeRatio(numerator: number, denominator: number): number | null {
   if (denominator <= 0) return null
   return Math.round((numerator / denominator) * 1000) / 1000
+}
+
+function emptyScale2FailureAnalysis(): ApolloScale2FailureAnalysis {
+  return {
+    no_email: [],
+    no_phone: [],
+    missing_person: [],
+    canonical_failure: [],
+    enrichment_failure: [],
+    promotion_failure: [],
+    suppression: [],
+    low_confidence: [],
+    other: [],
+  }
+}
+
+function parseAcquisitionRuntimeErrors(
+  errors: string[],
+): Map<string, { message: string; name: string | null; stack: string | null }> {
+  const byCompany = new Map<string, { message: string; name: string | null; stack: string | null }>()
+  for (const entry of errors) {
+    const separator = entry.indexOf(": ")
+    if (separator <= 0) continue
+    const company_candidate_id = entry.slice(0, separator).trim()
+    const message = entry.slice(separator + 2).trim()
+    if (!company_candidate_id) continue
+    byCompany.set(company_candidate_id, { message, name: null, stack: null })
+  }
+  return byCompany
+}
+
+function serializeAcquisitionError(error: unknown): {
+  message: string
+  name: string | null
+  stack: string | null
+} {
+  if (error instanceof Error) {
+    return {
+      message: error.message || "company_acquisition_failed",
+      name: error.name ?? "Error",
+      stack: error.stack ?? null,
+    }
+  }
+  return {
+    message: typeof error === "string" ? error : "company_acquisition_failed",
+    name: null,
+    stack: null,
+  }
+}
+
+export function resolveApolloScale2ApolloResponseStatus(input: {
+  acquisition?: ApolloPrimaryContactAcquisitionCompanyEvidence | null
+  exception_error?: string | null
+}): string {
+  if (input.exception_error) return "exception"
+  const company = input.acquisition
+  if (!company) return "missing"
+  if (company.apollo_search_skipped_reason) return "skipped"
+  if (company.blockers.some((blocker) => blocker.includes("apollo_search_failed"))) return "failed"
+  if (company.blockers.includes("apollo_zero_contacts_mapped")) return "empty"
+  if (company.apollo_search_attempted && company.apollo_people_found > 0) return "success"
+  if (company.apollo_search_attempted) return "empty"
+  return "not_attempted"
+}
+
+function buildFailedScale1CompanyResult(input: {
+  cohort: ApolloScale2LiveCohortCompany
+  acquisition?: ApolloPrimaryContactAcquisitionCompanyEvidence | null
+  error: string
+}): ApolloScale1CompanyResult {
+  const acquisition = input.acquisition
+  const blockers = [...(acquisition?.blockers ?? []), input.error]
+
+  return {
+    company_name: input.cohort.company_name,
+    company_candidate_id: input.cohort.company_candidate_id,
+    canonical_company_id: acquisition?.canonical_company_id ?? input.cohort.canonical_company_id,
+    industry: input.cohort.industry,
+    acquisition: {
+      apollo_contacts_found: acquisition?.apollo_people_found ?? 0,
+      apollo_contacts_enriched: acquisition?.enrichment_candidates_updated ?? 0,
+      emails_discovered: 0,
+      phones_discovered: 0,
+      linkedin_profiles_discovered: 0,
+      credits_consumed: acquisition?.credits_consumed ?? 0,
+      apollo_search_attempted: acquisition?.apollo_search_attempted ?? false,
+      apollo_search_skipped_reason: acquisition?.apollo_search_skipped_reason ?? null,
+      enrichment_attempted: acquisition?.enrichment_attempted ?? false,
+      enrichment_skipped_reason: acquisition?.enrichment_skipped_reason ?? null,
+      enrichment_candidates_updated: acquisition?.enrichment_candidates_updated ?? 0,
+    },
+    promotion: {
+      contacts_promoted: acquisition?.promoted_contacts ?? 0,
+      canonical_persons_created: 0,
+      canonical_persons_matched: 0,
+      canonical_company_matched: Boolean(acquisition?.canonical_company_id ?? input.cohort.canonical_company_id),
+      company_contacts_created: acquisition?.promoted_contacts ?? 0,
+    },
+    readiness: {
+      contactable_contacts: acquisition?.contactable_contacts ?? 0,
+      sequence_ready_contacts: acquisition?.sequence_ready_contacts ?? 0,
+      blocked_contacts: 0,
+      blockers_by_category: {
+        no_email: 0,
+        no_phone: 0,
+        low_confidence: 0,
+        missing_company: 0,
+        missing_person: 0,
+        suppression: 0,
+        fatigue: 0,
+        duplicate: 0,
+        other: 0,
+      },
+    },
+    company_blockers: blockers,
+    failed: true,
+    failure_reason: input.error,
+  }
+}
+
+export function mapApolloScale2CompanyEvidenceRow(input: {
+  cohort: ApolloScale2LiveCohortCompany
+  result: ApolloScale1CompanyResult
+  acquisition?: ApolloPrimaryContactAcquisitionCompanyEvidence | null
+  error?: string | null
+  error_metadata?: ApolloScale2CompanyEvidenceRow["error_metadata"]
+}): ApolloScale2CompanyEvidenceRow {
+  return {
+    company_candidate_id: input.result.company_candidate_id,
+    company_name: input.result.company_name,
+    domain: input.cohort.domain,
+    search_attempted: input.result.acquisition.apollo_search_attempted,
+    contacts_found: input.result.acquisition.apollo_contacts_found,
+    contacts_enriched: input.result.acquisition.apollo_contacts_enriched,
+    contacts_promoted: input.result.promotion.contacts_promoted,
+    contactable_contacts: input.result.readiness.contactable_contacts,
+    sequence_ready_contacts: input.result.readiness.sequence_ready_contacts,
+    blockers: [...input.result.company_blockers],
+    error: input.error ?? input.result.failure_reason,
+    error_metadata: input.error_metadata ?? null,
+    apollo_response_status: resolveApolloScale2ApolloResponseStatus({
+      acquisition: input.acquisition ?? null,
+      exception_error: input.error_metadata ? input.error : null,
+    }),
+    failed: input.result.failed || Boolean(input.error ?? input.result.failure_reason),
+  }
+}
+
+export function buildApolloScale2FailureAnalysis(input: {
+  company_results: ApolloScale1CompanyResult[]
+}): ApolloScale2FailureAnalysis {
+  const analysis = emptyScale2FailureAnalysis()
+  const seen = new Map<ApolloScale2FailureCategory, Set<string>>()
+
+  function add(category: ApolloScale2FailureCategory, company_name: string): void {
+    const names = seen.get(category) ?? new Set<string>()
+    if (names.has(company_name)) return
+    names.add(company_name)
+    seen.set(category, names)
+    analysis[category].push(company_name)
+  }
+
+  for (const company of input.company_results) {
+    for (const blocker of company.company_blockers) {
+      const mapped = mapCompanyBlockerToScale2(blocker)
+      if (mapped) add(mapped, company.company_name)
+    }
+    for (const [category, count] of Object.entries(company.readiness.blockers_by_category)) {
+      if (count <= 0) continue
+      add(
+        mapContactBlockerToScale2(category as ApolloScale1BlockerCategory),
+        company.company_name,
+      )
+    }
+    if (!company.canonical_company_id) add("canonical_failure", company.company_name)
+    if (
+      company.acquisition.enrichment_attempted &&
+      company.acquisition.enrichment_candidates_updated === 0
+    ) {
+      add("enrichment_failure", company.company_name)
+    }
+    if (
+      company.acquisition.apollo_search_attempted &&
+      company.promotion.contacts_promoted === 0 &&
+      company.acquisition.apollo_contacts_found > 0
+    ) {
+      add("promotion_failure", company.company_name)
+    }
+    if (company.failed && company.failure_reason) {
+      add("other", company.company_name)
+    }
+  }
+
+  return analysis
 }
 
 function emptyScale2FailureCounts(): Record<ApolloScale2FailureCategory, number> {
@@ -317,6 +535,7 @@ function assessScale2Result(input: {
 export function buildApolloScale2LiveAcquisitionCertification(input: {
   cohort: Awaited<ReturnType<typeof resolveApolloScale2LiveCohort>>
   company_results: ApolloScale1CompanyResult[]
+  companies: ApolloScale2CompanyEvidenceRow[]
   companies_requested: number
   acquisition: Awaited<ReturnType<typeof runApolloPrimaryContactAcquisition>>
   certified_at?: string
@@ -417,6 +636,8 @@ export function buildApolloScale2LiveAcquisitionCertification(input: {
 
   const biggest_blockers = failures_ranked.slice(0, 5).map((row) => `${row.category} (${row.count})`)
   const yieldPct = aggregate.search_to_sequence_ready_pct
+  const failure_analysis = buildApolloScale2FailureAnalysis({ company_results: input.company_results })
+  const companies = input.companies
 
   return {
     qa_marker: APOLLO_SCALE_2_QA_MARKER,
@@ -444,6 +665,8 @@ export function buildApolloScale2LiveAcquisitionCertification(input: {
       skipped_due_to_missing_domain: input.cohort.skipped_due_to_missing_domain,
     },
     company_results: input.company_results,
+    companies,
+    failure_analysis,
     aggregate,
     credit_efficiency,
     failures_by_category,
@@ -516,24 +739,97 @@ export async function certifyApolloScale2LiveAcquisition(
   })
 
   const metaById = new Map(
-    cohort.selected.map((row) => [
-      row.company_candidate_id,
-      { industry: row.industry, company_name: row.company_name },
-    ]),
+    cohort.selected.map((row) => [row.company_candidate_id, row] as const),
   )
+  const acquisitionById = new Map(
+    acquisition.companies.map((company) => [company.company_candidate_id, company] as const),
+  )
+  const runtimeErrors = parseAcquisitionRuntimeErrors(acquisition.runtime.errors)
 
   const company_results: ApolloScale1CompanyResult[] = []
-  for (const company of acquisition.companies) {
-    const meta = metaById.get(company.company_candidate_id) ?? {
-      industry: null,
-      company_name: company.company_name,
+  const companies: ApolloScale2CompanyEvidenceRow[] = []
+
+  for (const cohortCompany of cohort.selected) {
+    const acquisitionCompany = acquisitionById.get(cohortCompany.company_candidate_id) ?? null
+    const runtimeError = runtimeErrors.get(cohortCompany.company_candidate_id) ?? null
+
+    if (!acquisitionCompany && runtimeError) {
+      const failed = buildFailedScale1CompanyResult({
+        cohort: cohortCompany,
+        error: runtimeError.message,
+      })
+      company_results.push(failed)
+      companies.push(
+        mapApolloScale2CompanyEvidenceRow({
+          cohort: cohortCompany,
+          result: failed,
+          error: runtimeError.message,
+          error_metadata: runtimeError,
+        }),
+      )
+      continue
     }
-    company_results.push(await buildApolloScale1CompanyResult(admin, company, meta))
+
+    if (!acquisitionCompany) {
+      const failed = buildFailedScale1CompanyResult({
+        cohort: cohortCompany,
+        error: "acquisition_company_evidence_missing",
+      })
+      company_results.push(failed)
+      companies.push(
+        mapApolloScale2CompanyEvidenceRow({
+          cohort: cohortCompany,
+          result: failed,
+          error: failed.failure_reason,
+        }),
+      )
+      continue
+    }
+
+    try {
+      const result = await buildApolloScale1CompanyResult(admin, acquisitionCompany, {
+        industry: cohortCompany.industry,
+        company_name: cohortCompany.company_name,
+      })
+      if (runtimeError) {
+        result.failed = true
+        result.failure_reason = runtimeError.message
+        result.company_blockers.push(runtimeError.message)
+      }
+      company_results.push(result)
+      companies.push(
+        mapApolloScale2CompanyEvidenceRow({
+          cohort: cohortCompany,
+          result,
+          acquisition: acquisitionCompany,
+          error: result.failure_reason,
+          error_metadata: runtimeError,
+        }),
+      )
+    } catch (error) {
+      const serialized = serializeAcquisitionError(error)
+      const failed = buildFailedScale1CompanyResult({
+        cohort: cohortCompany,
+        acquisition: acquisitionCompany,
+        error: serialized.message,
+      })
+      company_results.push(failed)
+      companies.push(
+        mapApolloScale2CompanyEvidenceRow({
+          cohort: cohortCompany,
+          result: failed,
+          acquisition: acquisitionCompany,
+          error: serialized.message,
+          error_metadata: serialized,
+        }),
+      )
+    }
   }
 
   return buildApolloScale2LiveAcquisitionCertification({
     cohort,
     company_results,
+    companies,
     companies_requested: company_limit,
     acquisition,
   })

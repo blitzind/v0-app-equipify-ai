@@ -8,6 +8,11 @@ import {
   buildApolloScale2EvidenceBundle,
   type ApolloScale2EvidenceBundle,
 } from "@/lib/growth/apollo/apollo-scale-2-evidence-bundle"
+import type {
+  ApolloScale2CertResult,
+  ApolloScale2CompanyEvidenceRow,
+  ApolloScale2FailureAnalysis,
+} from "@/lib/growth/apollo/apollo-scale-2-live-acquisition-certification"
 import {
   assertApolloScale2ProductionExecuteAllowed,
   buildApolloScale2ProductionReadinessPayload,
@@ -24,9 +29,12 @@ export { buildApolloScale2ProductionReadinessPayload } from "@/lib/growth/apollo
 export type ApolloScale2ProductionExecuteResult = {
   ok: boolean
   execution_id: string
+  verdict: ApolloScale2CertResult | null
+  companies: ApolloScale2CompanyEvidenceRow[]
+  failure_analysis: ApolloScale2FailureAnalysis | null
+  blockers: string[]
   error?: "gates_failed" | "cohort_failed" | "certification_failed"
   message?: string | null
-  blockers?: string[]
   evidence_bundle: ApolloScale2EvidenceBundle | null
 }
 
@@ -90,6 +98,9 @@ export async function executeApolloScale2InProduction(
       message: gates.error,
       blockers: gates.blockers,
       execution_id,
+      verdict: null,
+      companies: [],
+      failure_analysis: null,
       evidence_bundle: null,
     })
   }
@@ -107,6 +118,9 @@ export async function executeApolloScale2InProduction(
       message,
       blockers: [message],
       execution_id,
+      verdict: null,
+      companies: [],
+      failure_analysis: null,
       evidence_bundle: null,
     })
   }
@@ -114,6 +128,7 @@ export async function executeApolloScale2InProduction(
   const certification = await certifyApolloScale2LiveAcquisition(admin, {
     company_limit: input?.company_limit ?? gates.company_limit,
     contact_limit: input?.contact_limit,
+    created_by: input?.created_by ?? null,
     env,
   })
 
@@ -123,15 +138,16 @@ export async function executeApolloScale2InProduction(
   return redactApolloScale2ProductionSecrets({
     ok,
     execution_id,
+    verdict: evidence_bundle.verdict,
+    companies: evidence_bundle.companies,
+    failure_analysis: evidence_bundle.failure_analysis,
+    blockers: evidence_bundle.blockers,
     evidence_bundle,
     ...(ok
       ? {}
       : {
           error: "certification_failed" as const,
           message: `Apollo-Scale-2 certification result: ${certification.result}`,
-          blockers: certification.failures_ranked.slice(0, 5).map(
-            (row) => `${row.category} (${row.count})`,
-          ),
         }),
   })
 }

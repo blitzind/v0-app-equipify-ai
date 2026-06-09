@@ -46,6 +46,7 @@ export type ApolloScale1CompanyResult = {
     apollo_search_skipped_reason: string | null
     enrichment_attempted: boolean
     enrichment_skipped_reason: string | null
+    enrichment_candidates_updated: number
   }
   promotion: {
     contacts_promoted: number
@@ -331,6 +332,7 @@ export async function buildApolloScale1CompanyResult(
       apollo_search_skipped_reason: company.apollo_search_skipped_reason,
       enrichment_attempted: company.enrichment_attempted,
       enrichment_skipped_reason: company.enrichment_skipped_reason,
+      enrichment_candidates_updated: company.enrichment_candidates_updated,
     },
     promotion: {
       contacts_promoted: company.promoted_contacts,
