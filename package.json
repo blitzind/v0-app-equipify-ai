@@ -376,6 +376,7 @@
     "test:voice-drop-twilio-vd-1b": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-drop-twilio-vd-1b.ts",
     "test:voice-drop-sequence-vd-2": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-drop-sequence-vd-2.ts",
     "test:voice-drop-sequence-vd-3": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-drop-sequence-vd-3.ts",
+    "test:voice-drop-sequence-vd-4": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-drop-sequence-vd-4.ts",
     "test:voice-compliance-orchestration-phase-4c": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-compliance-orchestration-phase-4c.ts",
     "test:voice-ai-outbound-phase-5a": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-ai-outbound-phase-5a.ts",
     "test:voice-observability-phase-5b": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-voice-observability-phase-5b.ts",
