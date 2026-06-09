@@ -25,6 +25,7 @@ import {
   shouldGateLegacyProspectSearchBuyingCommitteePanel,
   shouldGateLegacyProspectSearchCompanySignals,
 } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-ux"
+import { ApolloPrimaryContactOperatorReviewPanel } from "@/components/growth/prospect-search/apollo-primary-contact-operator-review-panel"
 import { CompanyContactsPanel } from "@/components/growth/prospect-search/company-contacts-panel"
 import { CompanyGrowthSignalsPanel } from "@/components/growth/prospect-search/company-growth-signals-panel"
 import { RelatedCompaniesPanel } from "@/components/growth/prospect-search/related-companies-panel"
@@ -285,6 +286,10 @@ export function CompanyResultCard({
               suppressSchemaNotice={Boolean(row.contact_intelligence?.schema_health?.warning_message)}
             />
           )}
+          <ApolloPrimaryContactOperatorReviewPanel
+            companyCandidateId={row.id}
+            companyName={row.company_name}
+          />
           <CompanyContactsPanel
             companyId={row.id}
             companyName={row.company_name}
