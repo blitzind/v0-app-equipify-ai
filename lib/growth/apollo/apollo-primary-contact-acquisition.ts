@@ -460,6 +460,7 @@ export async function runApolloPrimaryContactAcquisition(
     contact_limit?: number
     created_by?: string | null
     env?: NodeJS.ProcessEnv
+    skip_apollo_search_if_existing_contactable?: boolean
   },
 ): Promise<ApolloPrimaryContactAcquisitionEvidence> {
   const env = input.env ?? process.env
@@ -481,6 +482,8 @@ export async function runApolloPrimaryContactAcquisition(
           contact_limit: input.contact_limit,
           created_by: input.created_by,
           env,
+          skip_apollo_search_if_existing_contactable:
+            input.skip_apollo_search_if_existing_contactable,
         })
         evidence.companies.push(company)
 
