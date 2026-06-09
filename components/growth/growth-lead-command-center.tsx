@@ -13,6 +13,7 @@ import {
   UserPlus,
 } from "lucide-react"
 import { GrowthLeadEditContactDialog } from "@/components/growth/growth-lead-edit-contact-dialog"
+import { GrowthNextBestActionBanner } from "@/components/growth/growth-next-best-action-banner"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
