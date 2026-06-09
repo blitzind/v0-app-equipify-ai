@@ -84,6 +84,28 @@ async function main() {
   assert.ok(mapped.diagnostics.contacts_skipped >= 1, "generic Customer Service fixture should be skipped")
   assert.ok(mapped.contacts.length >= 1)
 
+  const { buildApolloApiSearchNormalizedFixtures } = await import(
+    "../lib/growth/providers/apollo/apollo-api-search-fixtures"
+  )
+  const apiSearchMapped = mapApolloPeopleToContactDiscoveryRaw({
+    people: buildApolloApiSearchNormalizedFixtures(),
+    company_name: "Henry Schein",
+    domain: "henryschein.com",
+    mock: false,
+  })
+  assert.equal(apiSearchMapped.apollo_people_returned, 3)
+  assert.equal(apiSearchMapped.diagnostics.skip_reasons.name_not_plausible, 1)
+  assert.ok(apiSearchMapped.contacts.length >= 2)
+  const obfuscatedMapped = apiSearchMapped.contacts.find((contact) =>
+    contact.full_name.includes("*"),
+  )
+  assert.ok(obfuscatedMapped)
+  assert.equal(obfuscatedMapped?.metadata?.apollo_last_name_source, "last_name_obfuscated")
+  assert.ok(apiSearchMapped.rejected_sample)
+  assert.equal(apiSearchMapped.rejected_sample?.rejection_reason, "name_not_plausible")
+  assert.equal(apiSearchMapped.rejected_sample?.raw_first_name_present, true)
+  assert.equal(apiSearchMapped.rejected_sample?.raw_last_name_present, false)
+
   const normalized = normalizeContactCandidate(
     mapped.contacts[0]!,
     "apollo",

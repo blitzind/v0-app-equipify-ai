@@ -9,16 +9,19 @@ import {
   classifyApolloContactTitleBucket,
   isApolloIrrelevantTitleForIcp,
 } from "@/lib/growth/providers/apollo/apollo-title-buckets"
-import type { ApolloPersonRecord, ApolloSearchDiagnostics } from "@/lib/growth/providers/apollo/apollo-types"
+import { isApolloObfuscatedLastNameToken } from "@/lib/growth/providers/apollo/apollo-search-person-normalize"
+import type {
+  ApolloPersonRecord,
+  ApolloRedactedRawFieldDiagnostics,
+  ApolloSearchDiagnostics,
+} from "@/lib/growth/providers/apollo/apollo-types"
 
-export type ApolloRedactedRejectionSample = {
+export type ApolloRedactedRejectionSample = ApolloRedactedRawFieldDiagnostics & {
   raw_first_name_present: boolean
   raw_last_name_present: boolean
   raw_name_present: boolean
   mapped_full_name_present: boolean
-  title: string | null
   seniority: string | null
-  organization_domain: string | null
   email_present: boolean
   phone_present: boolean
   rejection_reason: string
@@ -41,6 +44,21 @@ function resolveFullName(person: ApolloPersonRecord): string | null {
   const last = asTrimmedString(person.last_name)
   if (first && last) return `${first} ${last}`
   return first ?? last
+}
+
+function isPlausibleApolloMappedFullName(full_name: string, person: ApolloPersonRecord): boolean {
+  if (isPlausiblePersonName(full_name)) return true
+
+  const words = full_name.trim().split(/\s+/).filter(Boolean)
+  if (words.length !== 2) return false
+
+  const first = words[0]!
+  const last = words[1]!
+  if (!/^[A-Za-z][A-Za-z.'-]*$/.test(first) || first.length < 2) return false
+  if (!isApolloObfuscatedLastNameToken(last)) return false
+  if (person.apollo_name_fields?.last_name_source !== "last_name_obfuscated") return false
+
+  return true
 }
 
 function pickPhone(person: ApolloPersonRecord): string | null {
@@ -88,7 +106,9 @@ export function evaluateApolloContactAcceptance(
 
   const full_name = mapped.full_name
   if (!full_name || full_name.length < 2) return { accepted: false, reason: "missing_full_name" }
-  if (!isPlausiblePersonName(full_name)) return { accepted: false, reason: "name_not_plausible" }
+  if (!isPlausibleApolloMappedFullName(full_name, person)) {
+    return { accepted: false, reason: "name_not_plausible" }
+  }
   if (isFalsePositiveEmailLocalPartIdentity(full_name, mapped.email)) {
     return { accepted: false, reason: "false_positive_email_local_part_identity" }
   }
@@ -119,25 +139,46 @@ function buildRedactedRejectionSample(input: {
   mapped: GrowthContactDiscoveryProviderRawContact | null
 }): ApolloRedactedRejectionSample {
   const rawFirstName = asTrimmedString(input.person.first_name)
-  const rawLastName = asTrimmedString(input.person.last_name)
+  const rawLastNameObfuscated = asTrimmedString(input.person.last_name_obfuscated)
+  const rawLastNamePlain = asTrimmedString(input.person.last_name)
   const rawName = asTrimmedString(input.person.name)
   const mappedFullName = input.mapped?.full_name ?? resolveFullName(input.person)
   const rawEmail = asTrimmedString(input.person.email)
   const email = isObservedEmail(input.person, rawEmail) ? rawEmail : null
   const phone = pickPhone(input.person)
   const org = input.person.organization
+  const fieldDiagnostics = input.person.apollo_search_field_diagnostics
+  const rawLastNamePresent =
+    fieldDiagnostics?.last_name_present === true ||
+    fieldDiagnostics?.last_name_obfuscated_present === true ||
+    Boolean(rawLastNameObfuscated) ||
+    Boolean(rawLastNamePlain)
 
   return {
-    raw_first_name_present: Boolean(rawFirstName),
-    raw_last_name_present: Boolean(rawLastName),
-    raw_name_present: Boolean(rawName),
-    mapped_full_name_present: Boolean(mappedFullName && mappedFullName.length >= 2),
-    title: asTrimmedString(input.person.title) ?? asTrimmedString(input.person.headline),
-    seniority: asTrimmedString(input.person.seniority),
+    available_name_keys: fieldDiagnostics?.available_name_keys ?? [],
+    available_person_keys: fieldDiagnostics?.available_person_keys ?? [],
+    first_name_present: fieldDiagnostics?.first_name_present ?? Boolean(rawFirstName),
+    last_name_present: fieldDiagnostics?.last_name_present ?? Boolean(rawLastNamePlain),
+    name_present: fieldDiagnostics?.name_present ?? Boolean(rawName),
+    full_name_present:
+      fieldDiagnostics?.full_name_present ?? Boolean(mappedFullName && mappedFullName.length >= 2),
+    person_id_present: fieldDiagnostics?.person_id_present ?? Boolean(asTrimmedString(input.person.id)),
+    last_name_obfuscated_present:
+      fieldDiagnostics?.last_name_obfuscated_present ?? Boolean(rawLastNameObfuscated),
+    title:
+      fieldDiagnostics?.title ??
+      asTrimmedString(input.person.title) ??
+      asTrimmedString(input.person.headline),
     organization_domain:
+      fieldDiagnostics?.organization_domain ??
       asTrimmedString(org?.primary_domain) ??
       asTrimmedString(input.domain) ??
       null,
+    raw_first_name_present: Boolean(rawFirstName),
+    raw_last_name_present: rawLastNamePresent,
+    raw_name_present: Boolean(rawName),
+    mapped_full_name_present: Boolean(mappedFullName && mappedFullName.length >= 2),
+    seniority: asTrimmedString(input.person.seniority),
     email_present: Boolean(email),
     phone_present: Boolean(phone),
     rejection_reason: input.reason,
@@ -223,6 +264,8 @@ export function mapApolloPersonToContactDiscoveryRaw(
       apollo_source_url: sourceUrl,
       apollo_has_email_flag: person.has_email === true,
       apollo_has_direct_phone_flag: person.has_direct_phone === true,
+      apollo_last_name_source: person.apollo_name_fields?.last_name_source ?? null,
+      apollo_last_name_obfuscated_present: Boolean(asTrimmedString(person.last_name_obfuscated)),
       equipify_ranking_note:
         "Raw Apollo ordering ignored — Equipify contact-native ranking applies after merge.",
     },

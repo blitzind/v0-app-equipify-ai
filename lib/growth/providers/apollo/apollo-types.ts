@@ -20,10 +20,24 @@ export type ApolloOrganizationRecord = {
   linkedin_url?: string | null
 }
 
+export type ApolloRedactedRawFieldDiagnostics = {
+  available_name_keys: string[]
+  available_person_keys: string[]
+  first_name_present: boolean
+  last_name_present: boolean
+  name_present: boolean
+  full_name_present: boolean
+  person_id_present: boolean
+  last_name_obfuscated_present: boolean
+  title: string | null
+  organization_domain: string | null
+}
+
 export type ApolloPersonRecord = {
   id?: string | null
   first_name?: string | null
   last_name?: string | null
+  last_name_obfuscated?: string | null
   name?: string | null
   title?: string | null
   headline?: string | null
@@ -44,6 +58,11 @@ export type ApolloPersonRecord = {
   /** Apollo search may expose availability flags without PII */
   has_email?: boolean | null
   has_direct_phone?: boolean | null
+  apollo_name_fields?: {
+    last_name_source?: "last_name" | "last_name_obfuscated" | null
+    available_name_keys?: string[]
+  } | null
+  apollo_search_field_diagnostics?: ApolloRedactedRawFieldDiagnostics | null
 }
 
 export type ApolloApiErrorCategory =

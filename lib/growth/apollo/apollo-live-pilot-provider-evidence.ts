@@ -64,6 +64,18 @@ function readRejectedSample(value: unknown): ApolloRedactedRejectionSample | nul
     record.mapped_full_name_present === true ||
     (record.name_present === true && (rawFirstNamePresent || rawLastNamePresent))
   return {
+    available_name_keys: Array.isArray(record.available_name_keys)
+      ? record.available_name_keys.filter((key): key is string => typeof key === "string")
+      : [],
+    available_person_keys: Array.isArray(record.available_person_keys)
+      ? record.available_person_keys.filter((key): key is string => typeof key === "string")
+      : [],
+    first_name_present: record.first_name_present === true,
+    last_name_present: record.last_name_present === true,
+    name_present: record.name_present === true || rawNamePresent,
+    full_name_present: record.full_name_present === true || mappedFullNamePresent,
+    person_id_present: record.person_id_present === true,
+    last_name_obfuscated_present: record.last_name_obfuscated_present === true,
     raw_first_name_present: rawFirstNamePresent,
     raw_last_name_present: rawLastNamePresent,
     raw_name_present: rawNamePresent,

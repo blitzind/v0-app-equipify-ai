@@ -236,6 +236,8 @@
     "test:growth-prospect-search-human-acquisition-7-ps-ha-fix": "tsx scripts/test-growth-prospect-search-human-acquisition-7-ps-ha-fix.ts",
     "test:growth-contact-acquisition-alignment-7-pca-1": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-contact-acquisition-alignment-7-pca-1.ts",
     "test:growth-contact-acquisition-apollo-7-pca-2": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-contact-acquisition-apollo-7-pca-2.ts",
+    "test:apollo-search-person-normalize": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-search-person-normalize.ts",
+    "run:apollo-henry-schein-search-map-pilot": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/run-apollo-henry-schein-search-map-pilot.ts",
     "test:growth-contact-acquisition-apollo-7-pca-3": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-contact-acquisition-apollo-7-pca-3.ts",
     "benchmark:growth-contact-acquisition-apollo-7-pca-2": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/benchmark-growth-contact-acquisition-apollo-7-pca-2.ts",
     "cleanup:apollo-benchmark-candidates-7-pca-3": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/cleanup-apollo-benchmark-candidates-7-pca-3.ts",

@@ -24,6 +24,10 @@ import {
   ApolloRunGuardrailError,
 } from "@/lib/growth/providers/apollo/apollo-run-guardrails"
 import {
+  normalizeApolloSearchPeople,
+  normalizeApolloSearchPersonRecord,
+} from "@/lib/growth/providers/apollo/apollo-search-person-normalize"
+import {
   classifyApolloHttpError,
   isApolloRateLimitError,
   recordApolloProviderCalled,
@@ -175,7 +179,7 @@ async function enrichApolloPeopleWithBulkMatch(input: {
     for (const match of matches) {
       const id = typeof match.id === "string" ? match.id.trim() : ""
       if (!id || !merged.has(id)) continue
-      merged.set(id, { ...merged.get(id)!, ...match })
+      merged.set(id, normalizeApolloSearchPersonRecord({ ...merged.get(id)!, ...match }))
     }
   }
 
@@ -469,7 +473,9 @@ export async function searchApolloPeopleByCompany(
       }
     }
 
-    let people = Array.isArray(parsed.data.people) ? parsed.data.people : []
+    let people = normalizeApolloSearchPeople(
+      Array.isArray(parsed.data.people) ? parsed.data.people : [],
+    )
     const total = parsed.data.pagination?.total_entries ?? people.length
 
     recordApolloSearchApiCall()
