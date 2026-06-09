@@ -28,6 +28,9 @@ export const GROWTH_VERIFIED_CHANNELS_CERT_ENV_KEYS = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "SUPABASE_URL",
   "SUPABASE_SERVICE_ROLE_KEY",
+  "GROWTH_ENGINE_AI_ORG_ID",
+  "GROWTH_ENGINE_ENABLED",
+  "OPENAI_API_KEY",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
 ] as const
 
@@ -129,6 +132,9 @@ function resolveSupabaseUrl(env: Record<string, string>, jwt: string | null): st
   return null
 }
 
+/** Blitz internal org — scopes Growth Engine AI usage logs in production. */
+export const GROWTH_CERT_DEFAULT_AI_ORG_ID = "00757488-1026-44a5-aac4-269533ac21be" as const
+
 function applyVerifiedChannelsCertDefaults(env: Record<string, string>): {
   env: Record<string, string>
   applied_defaults: string[]
@@ -150,6 +156,13 @@ function applyVerifiedChannelsCertDefaults(env: Record<string, string>): {
   if (productionLike && !isPresentEnvValue(next.GROWTH_EMAIL_VERIFICATION_USE_FIXTURE)) {
     next.GROWTH_EMAIL_VERIFICATION_USE_FIXTURE = "false"
     applied_defaults.push("GROWTH_EMAIL_VERIFICATION_USE_FIXTURE=false")
+  }
+
+  if (!isPresentEnvValue(next.GROWTH_ENGINE_AI_ORG_ID)) {
+    next.GROWTH_ENGINE_AI_ORG_ID = GROWTH_CERT_DEFAULT_AI_ORG_ID
+    applied_defaults.push(
+      `GROWTH_ENGINE_AI_ORG_ID=${GROWTH_CERT_DEFAULT_AI_ORG_ID.slice(0, 8)}… (cert bootstrap fallback — set on Vercel Production for runtime materialization)`,
+    )
   }
 
   return { env: next, applied_defaults }
@@ -309,6 +322,9 @@ export function bootstrapVerifiedChannelsCertEnv(input?: {
   process.env.NEXT_PUBLIC_SUPABASE_URL = url
   process.env.SUPABASE_URL = url
   process.env.SUPABASE_SERVICE_ROLE_KEY = jwt
+  if (isPresentEnvValue(env.GROWTH_ENGINE_AI_ORG_ID)) {
+    process.env.GROWTH_ENGINE_AI_ORG_ID = env.GROWTH_ENGINE_AI_ORG_ID.trim()
+  }
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY =
     isPresentEnvValue(env.NEXT_PUBLIC_SUPABASE_ANON_KEY) ? env.NEXT_PUBLIC_SUPABASE_ANON_KEY.trim() : jwt
 
