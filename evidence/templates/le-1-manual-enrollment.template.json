@@ -1,0 +1,13 @@
+{
+  "qa_marker": "le-1-manual-enrollment-v1",
+  "enrolled_at": "REPLACE_ISO_TIMESTAMP",
+  "lead_id": "REPLACE_LEAD_UUID",
+  "enrollment_id": "REPLACE_ENROLLMENT_UUID",
+  "pattern_id": "REPLACE_PATTERN_UUID",
+  "company_candidate_id": "REPLACE_COMPANY_CANDIDATE_UUID",
+  "canonical_person_id": "REPLACE_CANONICAL_PERSON_UUID",
+  "operator_approved": true,
+  "bulk_enrollment": false,
+  "contacts_enrolled": 1,
+  "notes": "LE-2 manual enrollment — one contact only"
+}

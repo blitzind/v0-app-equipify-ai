@@ -1,0 +1,16 @@
+{
+  "qa_marker": "le-1-non-voice-channel-v1",
+  "validated_at": "REPLACE_ISO_TIMESTAMP",
+  "lead_id": "REPLACE_LEAD_UUID",
+  "enrollment_id": "REPLACE_ENROLLMENT_UUID",
+  "email_job_created": true,
+  "email_execution_job_id": "REPLACE_JOB_UUID",
+  "sms_eligibility_evaluated": true,
+  "sms_eligible": false,
+  "approval_workflow_verified": true,
+  "timeline_event_emitted": true,
+  "timeline_event_ids": ["REPLACE_TIMELINE_EVENT_UUID"],
+  "channel_event_ids": [],
+  "send_executed": false,
+  "notes": "Pre-send validation — job created and approved workflow verified, no send yet"
+}

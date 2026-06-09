@@ -1,0 +1,32 @@
+{
+  "qa_marker": "le-2-live-evidence-validation-v1",
+  "validated_at": "2026-06-09T00:34:28.911Z",
+  "evidence_paths": {
+    "apollo": "./evidence/apollo-ai-3-pilot.json",
+    "manual_enrollment": "./evidence/le-1-manual-enrollment.json",
+    "non_voice_channels": "./evidence/le-1-non-voice-channels.json",
+    "email_execution": "./evidence/le-2-email-execution.json",
+    "voice_drop": "./evidence/vd-4-live-evidence.json"
+  },
+  "apollo_evidence": null,
+  "apollo_mock": true,
+  "ai3": null,
+  "ai5": null,
+  "le1": null,
+  "email_execution": {
+    "present": false,
+    "valid": false,
+    "evidence": null,
+    "errors": [
+      "Missing LE-2 email execution evidence"
+    ],
+    "summary": "Missing LE-2 email execution evidence"
+  },
+  "observed_launch_limits": null,
+  "blockers": [
+    "Missing apollo-ai-3-pilot.json — run pnpm run:apollo-live-pilot-ai-3",
+    "Missing LE-2 email execution evidence"
+  ],
+  "final_verdict": "rejected",
+  "final_justification": "Rejected — missing or invalid live evidence. Complete LE-2 execution checklist."
+}

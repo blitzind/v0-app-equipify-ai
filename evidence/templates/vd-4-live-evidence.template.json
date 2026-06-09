@@ -1,0 +1,16 @@
+{
+  "qa_marker": "le-1-voice-drop-live-v1",
+  "validated_at": "REPLACE_ISO_TIMESTAMP",
+  "callSid": "CA_REPLACE",
+  "recipientId": "REPLACE_RECIPIENT_UUID",
+  "deliveryAttemptId": "REPLACE_ATTEMPT_UUID",
+  "enrollmentId": "REPLACE_ENROLLMENT_UUID",
+  "campaignId": "REPLACE_CAMPAIGN_UUID",
+  "leadId": "REPLACE_LEAD_UUID",
+  "timelineEventIds": ["REPLACE_TIMELINE_EVENT_UUID"],
+  "channelEventIds": ["REPLACE_CHANNEL_EVENT_UUID"],
+  "amd_detected": true,
+  "twiml_playback_confirmed": true,
+  "status_callback_received": true,
+  "delivery_status": "delivered"
+}

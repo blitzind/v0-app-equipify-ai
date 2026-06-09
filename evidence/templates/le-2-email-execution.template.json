@@ -1,0 +1,16 @@
+{
+  "qa_marker": "le-2-email-execution-v1",
+  "validated_at": "REPLACE_ISO_TIMESTAMP",
+  "lead_id": "REPLACE_LEAD_UUID",
+  "enrollment_id": "REPLACE_ENROLLMENT_UUID",
+  "execution_job_id": "REPLACE_JOB_UUID",
+  "approved_by": "REPLACE_OPERATOR_USER_ID",
+  "approved_at": "REPLACE_ISO_TIMESTAMP",
+  "send_executed": true,
+  "transport_message_id": "REPLACE_PROVIDER_MESSAGE_ID",
+  "timeline_event_ids": ["REPLACE_TIMELINE_EVENT_UUID"],
+  "engagement_event_ids": [],
+  "channel_event_ids": ["REPLACE_CHANNEL_EVENT_UUID"],
+  "delivery_status": "sent",
+  "notes": "LE-2 — single operator-approved email send"
+}
