@@ -1,7 +1,18 @@
 /** Prospect Search runtime initialization — client-safe mode parsing + diagnostics. */
 
 import { GROWTH_BASE64URL_RUNTIME_FIX_QA_MARKER } from "@/lib/encoding/base64url-runtime"
+import {
+  GROWTH_PROSPECT_SEARCH_CANONICAL_COMPANY_QUERY_PARAM,
+  GROWTH_PROSPECT_SEARCH_COMPANY_CANDIDATE_DEEP_LINK_QA_MARKER,
+  GROWTH_PROSPECT_SEARCH_COMPANY_CANDIDATE_QUERY_PARAM,
+} from "@/lib/growth/prospect-search/prospect-search-company-candidate-deep-link-types"
 import type { GrowthProspectSearchDiscoveryMode } from "@/lib/growth/prospect-search/prospect-search-types"
+
+export {
+  GROWTH_PROSPECT_SEARCH_COMPANY_CANDIDATE_DEEP_LINK_QA_MARKER,
+  GROWTH_PROSPECT_SEARCH_COMPANY_CANDIDATE_QUERY_PARAM,
+  GROWTH_PROSPECT_SEARCH_CANONICAL_COMPANY_QUERY_PARAM,
+}
 
 export { GROWTH_BASE64URL_RUNTIME_FIX_QA_MARKER }
 
@@ -39,6 +50,36 @@ export function resolveProspectSearchDiscoveryMode(
     logProspectSearchRuntimeIssue("invalid_mode_param", { mode })
   }
   return GROWTH_PROSPECT_SEARCH_DEFAULT_DISCOVERY_MODE
+}
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/** Resolve operator deep-link company candidate id from URL — invalid values return null. */
+export function resolveProspectSearchCompanyCandidateIdParam(
+  value: string | null | undefined,
+): string | null {
+  const trimmed = value?.trim() ?? ""
+  if (!trimmed || !UUID_RE.test(trimmed)) {
+    if (trimmed) {
+      logProspectSearchRuntimeIssue("invalid_company_candidate_id_param", { value: trimmed })
+    }
+    return null
+  }
+  return trimmed
+}
+
+/** Resolve optional canonical company id from URL — invalid values return null. */
+export function resolveProspectSearchCanonicalCompanyIdParam(
+  value: string | null | undefined,
+): string | null {
+  const trimmed = value?.trim() ?? ""
+  if (!trimmed) return null
+  if (!UUID_RE.test(trimmed)) {
+    logProspectSearchRuntimeIssue("invalid_canonical_company_id_param", { value: trimmed })
+    return null
+  }
+  return trimmed
 }
 
 /** Client-safe diagnostic logging — no secrets, no stack traces in UI. */

@@ -119,8 +119,11 @@ import {
   type GrowthTerritoryOpportunityRecommendedAction,
 } from "@/lib/growth/prospect-search/territory-opportunity-heatmap"
 import {
+  GROWTH_PROSPECT_SEARCH_COMPANY_CANDIDATE_DEEP_LINK_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_RUNTIME_FIX_QA_MARKER,
   GROWTH_PROSPECT_SEARCH_RENDER_LOOP_FIX_QA_MARKER,
+  resolveProspectSearchCanonicalCompanyIdParam,
+  resolveProspectSearchCompanyCandidateIdParam,
   resolveProspectSearchDiscoveryMode,
 } from "@/lib/growth/prospect-search/prospect-search-runtime"
 import {
@@ -337,6 +340,17 @@ function ProspectSearchShellInner() {
   >(new Map())
   const [commandWorkViewFilter, setCommandWorkViewFilter] = useState<string>("all")
   const [workspaceViewId, setWorkspaceViewId] = useState<ProspectSearchWorkspaceViewId | null>(null)
+  const [operatorDeepLinkActive, setOperatorDeepLinkActive] = useState(false)
+  const [operatorDeepLinkMessage, setOperatorDeepLinkMessage] = useState<string | null>(null)
+
+  const deepLinkCompanyCandidateId = useMemo(
+    () => resolveProspectSearchCompanyCandidateIdParam(searchParams.get("companyCandidateId")),
+    [searchParams],
+  )
+  const deepLinkCanonicalCompanyId = useMemo(
+    () => resolveProspectSearchCanonicalCompanyIdParam(searchParams.get("canonicalCompanyId")),
+    [searchParams],
+  )
 
   const queryRef = useRef(query)
   const filtersRef = useRef(filters)
@@ -614,6 +628,81 @@ function ProspectSearchShellInner() {
   }, [searchParams])
 
   useEffect(() => {
+    if (!deepLinkCompanyCandidateId) {
+      setOperatorDeepLinkActive(false)
+      setOperatorDeepLinkMessage(null)
+      return
+    }
+
+    let cancelled = false
+    const controller = new AbortController()
+
+    async function loadOperatorDeepLinkCompany() {
+      setLoading(true)
+      setError(null)
+      setActionMessage(null)
+      setDiscoveryMode("discover_external")
+      setView("card")
+      setResultMode("companies")
+      setHasSearched(true)
+      setOperatorDeepLinkActive(true)
+
+      try {
+        const params = new URLSearchParams({ companyCandidateId: deepLinkCompanyCandidateId })
+        if (deepLinkCanonicalCompanyId) {
+          params.set("canonicalCompanyId", deepLinkCanonicalCompanyId)
+        }
+
+        const res = await fetch(
+          `/api/platform/growth/prospect-search/company-candidate?${params.toString()}`,
+          { cache: "no-store", signal: controller.signal },
+        )
+        const json = (await res.json()) as {
+          ok?: boolean
+          company?: GrowthProspectSearchCompanyResult
+          result?: GrowthProspectSearchResult
+          message?: string
+        }
+
+        if (cancelled) return
+        if (!res.ok || !json.ok || !json.company || !json.result) {
+          setOperatorDeepLinkActive(false)
+          setError(json.message ?? "Could not load company for Apollo operator review.")
+          return
+        }
+
+        const company = json.company
+        const criteriaKey = buildProspectSearchCriteriaKey(company.company_name, EMPTY_FILTERS)
+
+        setResult(json.result)
+        setQuery(company.company_name)
+        replaceFilters(EMPTY_FILTERS)
+        setSelectedCompany(company)
+        setSelectedKeys(new Set())
+        setSearchCompleted(true)
+        setLastSearchedCriteriaKey(criteriaKey)
+        setOperatorDeepLinkMessage(
+          json.message ??
+            `Operator deep link — ${company.company_name} loaded for Apollo acquisition review.`,
+        )
+      } catch (e) {
+        if (cancelled || (e instanceof DOMException && e.name === "AbortError")) return
+        setOperatorDeepLinkActive(false)
+        setError(e instanceof Error ? e.message : "Could not load company for Apollo operator review.")
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    void loadOperatorDeepLinkCompany()
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [deepLinkCompanyCandidateId, deepLinkCanonicalCompanyId, replaceFilters])
+
+  useEffect(() => {
+    if (operatorDeepLinkActive) return
     if (!searchCompleted || companies.length === 0) return
     const lightweight = companies.filter((company) => company.lightweight_mode)
     if (lightweight.length === 0) return
@@ -629,6 +718,7 @@ function ProspectSearchShellInner() {
   }, [searchCompleted, companies])
 
   useEffect(() => {
+    if (operatorDeepLinkActive) return
     if (!searchCompleted || companies.length === 0) return
     const nextMode = resolveDefaultProspectSearchResultMode({
       companies,
@@ -636,7 +726,7 @@ function ProspectSearchShellInner() {
       serverPeopleCount: people.length,
     })
     setResultMode((prev) => (prev === nextMode ? prev : nextMode))
-  }, [searchCompleted, lastSearchedCriteriaKey, companies, filters, people.length])
+  }, [operatorDeepLinkActive, searchCompleted, lastSearchedCriteriaKey, companies, filters, people.length])
 
   useEffect(() => {
     setSelectedPeopleStore((prev) =>
@@ -649,6 +739,7 @@ function ProspectSearchShellInner() {
   }, [peopleRowsVisibilityKey, selectedPeopleKeys])
 
   useEffect(() => {
+    if (deepLinkCompanyCandidateId || operatorDeepLinkActive) return
     if (lastSearchedCriteriaKey === null) return
     if (currentCriteriaKey === lastSearchedCriteriaKey) return
     setResult(null)
@@ -658,7 +749,13 @@ function ProspectSearchShellInner() {
     setSelectedPeopleStore(new Map())
     setSearchCompleted(false)
     setPendingProviderSearchHint(resolveProspectSearchStagedSearchPendingMessage(discoveryMode))
-  }, [currentCriteriaKey, lastSearchedCriteriaKey, discoveryMode])
+  }, [
+    currentCriteriaKey,
+    lastSearchedCriteriaKey,
+    discoveryMode,
+    deepLinkCompanyCandidateId,
+    operatorDeepLinkActive,
+  ])
 
   const fetchResults = useCallback(
     async (input: {
@@ -1612,6 +1709,9 @@ function ProspectSearchShellInner() {
       data-no-presearch-counts-marker={GROWTH_PROSPECT_SEARCH_NO_PRESEARCH_COUNTS_QA_MARKER}
       data-staged-search-marker={GROWTH_PROSPECT_SEARCH_STAGED_SEARCH_QA_MARKER}
       data-runtime-stable-marker={GROWTH_PROSPECT_SEARCH_RUNTIME_STABLE_QA_MARKER}
+      data-company-candidate-deep-link-marker={GROWTH_PROSPECT_SEARCH_COMPANY_CANDIDATE_DEEP_LINK_QA_MARKER}
+      data-operator-deep-link-active={operatorDeepLinkActive ? "true" : "false"}
+      data-operator-deep-link-company-id={deepLinkCompanyCandidateId ?? ""}
       data-people-workflows-marker={GROWTH_PEOPLE_WORKFLOWS_QA_MARKER}
       data-contact-eligibility-marker={GROWTH_CONTACT_ELIGIBILITY_ENGINE_QA_MARKER}
       data-contact-freshness-marker={GROWTH_CONTACT_FRESHNESS_QA_MARKER}
@@ -1779,6 +1879,17 @@ function ProspectSearchShellInner() {
         >
           {!showCleanStart ? (
             <>
+              {operatorDeepLinkActive && operatorDeepLinkMessage ? (
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 px-4 py-3 text-sm text-indigo-950">
+                  <p className="font-medium">Apollo operator review deep link</p>
+                  <p className="mt-1 text-xs text-indigo-900/90">{operatorDeepLinkMessage}</p>
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    Staging company loaded for review only — no provider search, Apollo acquisition,
+                    enrollment, or outreach was triggered.
+                  </p>
+                </div>
+              ) : null}
+
               {(discoveryMode === "internal" && hasSearched) ||
               (discoveryMode === "discover_external" && searchCompleted) ? (
                 <GrowthAdminWidgetErrorBoundary
