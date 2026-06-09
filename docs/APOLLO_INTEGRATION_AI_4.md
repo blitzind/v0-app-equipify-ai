@@ -4,19 +4,19 @@ Phase **AI-4** prepares operators to execute the **first real Apollo live pilot*
 
 ## Prerequisites
 
-Complete AI-1 through AI-3 certification (`pnpm test:apollo-integration-ai-1` … `ai-3`). Configure Apollo env in `.env.local` (see below).
+Complete AI-1 through AI-3 certification (`pnpm test:apollo-integration-ai-1` … `ai-3`). Configure Apollo env in **Vercel Production** (see [LE_4_APOLLO_LIVE_PILOT_EXECUTION.md](./LE_4_APOLLO_LIVE_PILOT_EXECUTION.md)).
 
 ## 1. Environment setup
 
-Add to `.env.local`:
+Configure in **Vercel → Production** (not `.env.local`):
 
 ```bash
 GROWTH_CONTACT_DISCOVERY_APOLLO_ENABLED=true
 GROWTH_APOLLO_USE_MOCK=false
-APOLLO_API_KEY=...                          # or GROWTH_APOLLO_API_KEY
+# APOLLO_API_KEY — Vercel secret only
 GROWTH_APOLLO_LIVE_BENCHMARK_ACK=1
 GROWTH_APOLLO_AI_3_LIVE_PILOT_ENABLED=true
-GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID=   # set after company selection
+GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID=ad4f77c7-e91a-494a-8cb8-44fa23533087
 GROWTH_APOLLO_AI_3_OUTPUT_PATH=./evidence/apollo-ai-3-pilot.json
 
 # Keep disabled for first pilot:
@@ -27,7 +27,7 @@ GROWTH_APOLLO_AI_3_OUTPUT_PATH=./evidence/apollo-ai-3-pilot.json
 Validate readiness (no secrets printed):
 
 ```bash
-pnpm check:apollo-live-pilot-env-ai-4
+vercel env run -e production -- pnpm check:apollo-live-pilot-env-ai-4
 ```
 
 ## 2. Select one test company
@@ -42,12 +42,12 @@ APOLLO_TEST_COMPANY_WEBSITE="https://precisionbiomedicalservices.com" \
 pnpm seed:apollo-live-pilot-test-company
 ```
 
-Add the returned `GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID` to `.env.local`.
+Add the returned `GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID` to **Vercel Production**.
 
 Auto-select a suitable company (domain present, not suppressed, low existing Apollo contacts):
 
 ```bash
-APOLLO_TEST_COMPANY_PREFER_SEEDED=1 pnpm select:apollo-live-pilot-test-company-ai-4
+vercel env run -e production -- env APOLLO_TEST_COMPANY_PREFER_SEEDED=1 pnpm select:apollo-live-pilot-test-company-ai-4
 ```
 
 Or validate a specific candidate:

@@ -176,7 +176,7 @@ export function buildApolloLivePilotEnvReadinessReport(
 
   if (!companyId) {
     warnings.push(
-      "No company candidate — seed one: APOLLO_TEST_COMPANY_SEED_ACK=1 pnpm seed:apollo-live-pilot-test-company",
+      "No company candidate — set GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID in Vercel Production, or seed: APOLLO_TEST_COMPANY_SEED_ACK=1 pnpm seed:apollo-live-pilot-test-company",
     )
   }
 

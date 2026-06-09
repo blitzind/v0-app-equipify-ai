@@ -2,42 +2,21 @@
  * Apollo AI-4 — select one test company candidate (no Apollo API calls).
  * Run: pnpm select:apollo-live-pilot-test-company-ai-4
  *
+ * Production:
+ *   vercel env run -e production -- env APOLLO_TEST_COMPANY_PREFER_SEEDED=1 pnpm select:apollo-live-pilot-test-company-ai-4
+ *
  * Optional:
  *   APOLLO_AI_4_COMPANY_CANDIDATE_ID=<uuid>  — validate explicit company
  *   APOLLO_AI_4_COMPANY_NAME_SEARCH=<name>   — filter by company name
  *   APOLLO_TEST_COMPANY_PREFER_SEEDED=1      — prefer LE-3 seeded candidate
  */
-import { readFileSync } from "node:fs"
 import { createClient } from "@supabase/supabase-js"
 import { resolveApolloLivePilotTestCompany } from "../lib/growth/apollo/apollo-live-pilot-test-company-selector"
+import { bootstrapApolloLivePilotCliEnv } from "./apollo-live-pilot-cli-env-bootstrap"
 import { bootstrapVerifiedChannelsCertEnv } from "../lib/growth/qa/verified-channels-cert-env-bootstrap"
 
-function loadEnvFile(path: string): void {
-  try {
-    const raw = readFileSync(path, "utf8")
-    for (const line of raw.split("\n")) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith("#")) continue
-      const eq = trimmed.indexOf("=")
-      if (eq <= 0) continue
-      const key = trimmed.slice(0, eq)
-      let value = trimmed.slice(eq + 1)
-      if (
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
-      ) {
-        value = value.slice(1, -1)
-      }
-      if (!process.env[key]) process.env[key] = value
-    }
-  } catch {
-    /* optional */
-  }
-}
-
 async function main(): Promise<void> {
-  loadEnvFile(".env.local")
-  loadEnvFile(".env.local.active")
+  bootstrapApolloLivePilotCliEnv()
 
   const boot = bootstrapVerifiedChannelsCertEnv()
   if (!boot) {

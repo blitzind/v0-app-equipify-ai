@@ -8,9 +8,9 @@ No new product features — only operator execution of existing workflows and ev
 
 ## Prerequisites
 
-Configure `.env.local` per [LE_3_LIVE_PILOT_UNBLOCK.md](./LE_3_LIVE_PILOT_UNBLOCK.md) (Apollo API key + seed test company).
+Configure **Vercel Production** env per [LE_4_APOLLO_LIVE_PILOT_EXECUTION.md](./LE_4_APOLLO_LIVE_PILOT_EXECUTION.md) and [LE_3_LIVE_PILOT_UNBLOCK.md](./LE_3_LIVE_PILOT_UNBLOCK.md) (Apollo pilot flags + seeded test company).
 
-Previously:
+Previously (Vercel Production — do not use `.env.local`):
 
 ```bash
 # Apollo (required for steps 1–2)
@@ -48,7 +48,7 @@ Ensure at least one suitable `growth.discovery_candidates` row exists (domain, n
 ## Step 1–2 — Apollo live pilot + certification
 
 ```bash
-pnpm run:le-2-apollo-live-pilot
+vercel env run -e production -- pnpm run:le-2-apollo-live-pilot
 ```
 
 Or manually:

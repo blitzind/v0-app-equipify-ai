@@ -43,6 +43,13 @@ export {
   resolveApolloLivePilotTestCompany,
 } from "@/lib/growth/apollo/apollo-live-pilot-test-company-selector"
 export {
+  APOLLO_LIVE_PILOT_PRODUCTION_ENV_FILE_SOURCES,
+  APOLLO_LIVE_PILOT_PRODUCTION_ENV_QA_MARKER,
+  APOLLO_LIVE_PILOT_VERCEL_PREFLIGHT_COMMAND,
+  APOLLO_LIVE_PILOT_VERCEL_PRODUCTION_COMMAND,
+  bootstrapApolloLivePilotProductionEnv,
+} from "@/lib/growth/apollo/apollo-live-pilot-production-env-bootstrap"
+export {
   APOLLO_LIVE_PILOT_TEST_COMPANY_SEED_QA_MARKER,
   APOLLO_LIVE_PILOT_TEST_COMPANY_SOURCE_MARKER,
   seedApolloLivePilotTestCompany,

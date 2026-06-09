@@ -15,6 +15,9 @@
  *   GROWTH_APOLLO_AI_3_OUTPUT_PATH=./evidence/apollo-ai-3-pilot.json
  *   GROWTH_APOLLO_AI_3_REPORT_PATH=./evidence/apollo-ai-3-certification.md
  *   APOLLO_VD4_LIVE_CERTIFIED=true  (if VD-4 Voice Drop live cert complete)
+ *
+ * Production:
+ *   vercel env run -e production -- pnpm run:apollo-live-pilot-ai-3
  */
 import fs from "node:fs"
 import path from "node:path"
@@ -26,6 +29,7 @@ import {
 import { buildApolloLivePilotEvidenceBundle } from "../lib/growth/apollo/apollo-live-pilot-evidence-bundle"
 import { validateApolloLivePilotEvidence } from "../lib/growth/apollo/apollo-live-pilot-evidence-types"
 import { runApolloLivePilotAi2 } from "../lib/growth/apollo/apollo-live-pilot-runner"
+import { bootstrapApolloLivePilotCliEnv } from "./apollo-live-pilot-cli-env-bootstrap"
 import { bootstrapVerifiedChannelsCertEnv } from "../lib/growth/qa/verified-channels-cert-env-bootstrap"
 
 function pilotEnabled(): boolean {
@@ -44,6 +48,8 @@ function companyCandidateId(): string | null {
 }
 
 async function main(): Promise<void> {
+  bootstrapApolloLivePilotCliEnv()
+
   if (!pilotEnabled()) {
     console.error(
       JSON.stringify({

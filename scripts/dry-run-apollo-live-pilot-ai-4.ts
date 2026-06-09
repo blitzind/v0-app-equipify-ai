@@ -1,42 +1,21 @@
 /**
  * Apollo AI-4 — dry-run report before live pilot (no Apollo API calls).
  * Run: pnpm dry-run:apollo-live-pilot-ai-4
+ *
+ * Production:
+ *   vercel env run -e production -- pnpm dry-run:apollo-live-pilot-ai-4
  */
-import { readFileSync } from "node:fs"
 import { createClient } from "@supabase/supabase-js"
 import {
   buildApolloLivePilotDryRunReport,
   formatApolloLivePilotDryRunMarkdown,
 } from "../lib/growth/apollo/apollo-live-pilot-dry-run"
 import { resolveApolloLivePilotTestCompany } from "../lib/growth/apollo/apollo-live-pilot-test-company-selector"
+import { bootstrapApolloLivePilotCliEnv } from "./apollo-live-pilot-cli-env-bootstrap"
 import { bootstrapVerifiedChannelsCertEnv } from "../lib/growth/qa/verified-channels-cert-env-bootstrap"
 
-function loadEnvFile(path: string): void {
-  try {
-    const raw = readFileSync(path, "utf8")
-    for (const line of raw.split("\n")) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith("#")) continue
-      const eq = trimmed.indexOf("=")
-      if (eq <= 0) continue
-      const key = trimmed.slice(0, eq)
-      let value = trimmed.slice(eq + 1)
-      if (
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
-      ) {
-        value = value.slice(1, -1)
-      }
-      if (!process.env[key]) process.env[key] = value
-    }
-  } catch {
-    /* optional */
-  }
-}
-
 async function main(): Promise<void> {
-  loadEnvFile(".env.local")
-  loadEnvFile(".env.local.active")
+  bootstrapApolloLivePilotCliEnv()
 
   let targetCompany = null
   const companyId =

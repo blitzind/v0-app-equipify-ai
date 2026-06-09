@@ -9,16 +9,14 @@ No Apollo HTTP during seed. No outreach. No enrollment.
 
 ---
 
-## Step 1 — Apollo API key (local only)
+## Step 1 — Apollo env (Vercel Production)
 
-Add to `.env.local` (never commit):
+Configure in **Vercel → Production** (not `.env.local`):
 
 ```bash
 GROWTH_CONTACT_DISCOVERY_APOLLO_ENABLED=true
 GROWTH_APOLLO_USE_MOCK=false
-APOLLO_API_KEY=your_apollo_key_here
-# or GROWTH_APOLLO_API_KEY=...
-
+# APOLLO_API_KEY — Vercel secret only
 GROWTH_APOLLO_LIVE_BENCHMARK_ACK=1
 GROWTH_APOLLO_AI_3_LIVE_PILOT_ENABLED=true
 GROWTH_APOLLO_AI_3_OUTPUT_PATH=./evidence/apollo-ai-3-pilot.json
@@ -27,7 +25,7 @@ GROWTH_APOLLO_AI_3_OUTPUT_PATH=./evidence/apollo-ai-3-pilot.json
 Verify (no secrets printed):
 
 ```bash
-pnpm check:apollo-live-pilot-env-ai-4
+vercel env run -e production -- pnpm check:apollo-live-pilot-env-ai-4
 ```
 
 ---
@@ -57,14 +55,14 @@ Or add to `.env.local` and run `pnpm seed:apollo-live-pilot-test-company`.
 }
 ```
 
-Copy `env_hint` into `.env.local`. Re-running seed is idempotent (no duplicate).
+Copy `env_hint` into **Vercel Production** as `GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID`. Re-running seed is idempotent (no duplicate).
 
 ---
 
 ## Step 3 — Select seeded candidate
 
 ```bash
-APOLLO_TEST_COMPANY_PREFER_SEEDED=1 pnpm select:apollo-live-pilot-test-company-ai-4
+vercel env run -e production -- env APOLLO_TEST_COMPANY_PREFER_SEEDED=1 pnpm select:apollo-live-pilot-test-company-ai-4
 ```
 
 ---
@@ -72,7 +70,7 @@ APOLLO_TEST_COMPANY_PREFER_SEEDED=1 pnpm select:apollo-live-pilot-test-company-a
 ## Step 4 — Dry-run (no Apollo API)
 
 ```bash
-pnpm dry-run:apollo-live-pilot-ai-4
+vercel env run -e production -- pnpm dry-run:apollo-live-pilot-ai-4
 ```
 
 When env + company are set, `ready_to_execute_live: true` (assuming API key configured).
@@ -82,7 +80,7 @@ When env + company are set, `ready_to_execute_live: true` (assuming API key conf
 ## Step 5 — Live pilot (operator)
 
 ```bash
-pnpm run:le-2-apollo-live-pilot
+vercel env run -e production -- pnpm run:le-2-apollo-live-pilot
 ```
 
 Produces `./evidence/apollo-ai-3-pilot.json`.
