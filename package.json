@@ -246,6 +246,7 @@
     "test:apollo-primary-contact-acquisition-2": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-primary-contact-acquisition-2.ts",
     "test:apollo-primary-contact-acquisition-2-deep-link": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-primary-contact-acquisition-2-deep-link.ts",
     "test:apollo-primary-contact-acquisition-3": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-primary-contact-acquisition-3.ts",
+    "test:apollo-primary-contact-acquisition-4": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-primary-contact-acquisition-4.ts",
     "test:apollo-enrichment-cert-production-route": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-enrichment-cert-production-route.ts",
     "run:apollo-enrichment-cert-en-1": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/run-apollo-enrichment-cert-en-1.ts",
     "run:apollo-enrichment-cert-en-3": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/run-apollo-enrichment-cert-en-3.ts",

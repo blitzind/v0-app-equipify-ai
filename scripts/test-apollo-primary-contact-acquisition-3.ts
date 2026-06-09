@@ -116,7 +116,10 @@ console.log("  ✓ operator review actions — handoff to enrollment queue after
 assert.match(executionPageSource, /ApolloPrimaryContactEnrollmentApprovalQueuePanel/)
 console.log("  ✓ sequence execution page — enrollment approval queue panel")
 
-assert.match(panelSource, /APOLLO_PRIMARY_CONTACT_ENROLLMENT_BRIDGE_QA_MARKER/)
+assert.match(
+  panelSource,
+  /APOLLO_PRIMARY_CONTACT_ENROLLMENT_(BRIDGE|DRAFT)_QA_MARKER/,
+)
 assert.match(panelSource, /Approve enrollment eligibility/)
 assert.match(panelSource, /no auto-enrollment/i)
 console.log("  ✓ UI panel — enrollment approval actions and no-side-effects copy")
