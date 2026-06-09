@@ -47,6 +47,15 @@ export type ApolloPrimaryContactEnrollmentDraftSnapshot = {
   outreach_sent: false
 }
 
+export type ApolloPrimaryContactEnrollmentDraftStagingEvidence = {
+  lookup_key: string
+  staging_table_detected: string | null
+  staging_row_id: string | null
+  candidate_domain_normalized: string | null
+  canonical_company_id: string | null
+  queue_item_id: string | null
+}
+
 export type ApolloPrimaryContactEnrollmentDraftActionResult = {
   ok: boolean
   action: "create_enrollment_draft"
@@ -54,6 +63,7 @@ export type ApolloPrimaryContactEnrollmentDraftActionResult = {
   growth_lead_id: string | null
   enrollment_draft_id: string | null
   source_attribution: ApolloPrimaryContactEnrollmentSourceAttribution[]
+  staging_evidence?: ApolloPrimaryContactEnrollmentDraftStagingEvidence | null
   error?: string | null
   blockers?: string[]
   auto_enrollment: false

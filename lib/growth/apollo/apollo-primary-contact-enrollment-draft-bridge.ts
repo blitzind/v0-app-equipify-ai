@@ -17,12 +17,21 @@ import {
   mapApolloEnrollmentDraftQueueRow,
   readApolloEnrollmentDraftFromQueueMetadata,
 } from "@/lib/growth/apollo/apollo-primary-contact-enrollment-draft-evidence"
+import { resolveApolloEnrichmentCanonicalCompanyId } from "@/lib/growth/apollo/apollo-enrichment-cert-canonical-company-resolution"
+import {
+  buildApolloEnrollmentDraftStagingEvidence,
+  mapApolloEnrollmentDraftStagingRow,
+  type ApolloEnrollmentDraftStagingCompanyCandidate,
+  type ApolloPrimaryContactEnrollmentDraftStagingEvidence,
+} from "@/lib/growth/apollo/apollo-primary-contact-enrollment-draft-staging-evidence"
 import {
   APOLLO_PRIMARY_CONTACT_ENROLLMENT_DRAFT_QA_MARKER,
   type ApolloPrimaryContactEnrollmentDraftActionResult,
   type ApolloPrimaryContactEnrollmentDraftSnapshot,
 } from "@/lib/growth/apollo/apollo-primary-contact-enrollment-draft-types"
 import type { GrowthCompanyContact } from "@/lib/growth/contact-discovery/company-contact-types"
+import { loadStagingCompanyCandidateRow } from "@/lib/growth/canonical-companies/canonical-company-staging-linkage"
+import { canonicalNormalizedDomain } from "@/lib/growth/canonical-companies/canonical-company-normalize"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import { createGrowthSequenceEnrollmentDraft } from "@/lib/growth/sequence-enrollment/sequence-enrollment-orchestrator"
 import { runSequenceEnrollmentPreflight } from "@/lib/growth/sequence-enrollment/sequence-enrollment-preflight"
@@ -47,21 +56,13 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
 
-type CompanyCandidateRow = {
-  id: string
-  company_name: string
-  website: string | null
-  domain: string | null
-  address: string | null
-  city: string | null
-  state: string | null
-  country: string | null
-  phone: string | null
-}
-
 function emptyDraftActionResult(
   error: string,
-  input?: { queue_item_id?: string | null; blockers?: string[] },
+  input?: {
+    queue_item_id?: string | null
+    blockers?: string[]
+    staging_evidence?: ApolloPrimaryContactEnrollmentDraftStagingEvidence | null
+  },
 ): ApolloPrimaryContactEnrollmentDraftActionResult {
   return {
     ok: false,
@@ -70,6 +71,7 @@ function emptyDraftActionResult(
     growth_lead_id: null,
     enrollment_draft_id: null,
     source_attribution: buildApolloEnrollmentSourceAttributionChain(),
+    staging_evidence: input?.staging_evidence ?? null,
     error,
     blockers: input?.blockers,
     auto_enrollment: false,
@@ -79,53 +81,67 @@ function emptyDraftActionResult(
   }
 }
 
-async function loadCompanyCandidate(
+async function loadStagingCompanyCandidateForDraft(
   admin: SupabaseClient,
-  companyCandidateId: string,
-): Promise<CompanyCandidateRow | null> {
-  const select =
-    "id, company_name, website, domain, address, city, state, country, phone"
-
-  const { data: realWorld } = await admin
-    .schema("growth")
-    .from("real_world_company_candidates")
-    .select(select)
-    .eq("id", companyCandidateId)
-    .maybeSingle()
-  if (realWorld) {
-    const row = realWorld as Record<string, unknown>
+  input: {
+    lookup_key: string
+    queue_item_id?: string | null
+  },
+): Promise<
+  | {
+      ok: true
+      company: ApolloEnrollmentDraftStagingCompanyCandidate
+      staging_evidence: ApolloPrimaryContactEnrollmentDraftStagingEvidence
+    }
+  | {
+      ok: false
+      code: "company_candidate_not_found"
+      staging_evidence: ApolloPrimaryContactEnrollmentDraftStagingEvidence
+    }
+> {
+  const lookupKey = asString(input.lookup_key)
+  const staging = await loadStagingCompanyCandidateRow(admin, lookupKey)
+  if (!staging) {
     return {
-      id: asString(row.id),
-      company_name: asString(row.company_name),
-      website: asString(row.website) || null,
-      domain: asString(row.domain) || null,
-      address: asString(row.address) || null,
-      city: asString(row.city) || null,
-      state: asString(row.state) || null,
-      country: asString(row.country) || null,
-      phone: asString(row.phone) || null,
+      ok: false,
+      code: "company_candidate_not_found",
+      staging_evidence: buildApolloEnrollmentDraftStagingEvidence({
+        lookup_key: lookupKey,
+        queue_item_id: input.queue_item_id ?? null,
+      }),
     }
   }
 
-  const { data: external } = await admin
-    .schema("growth")
-    .from("external_company_candidates")
-    .select(select)
-    .eq("id", companyCandidateId)
-    .maybeSingle()
-  if (!external) return null
+  const domain = canonicalNormalizedDomain(
+    asString(staging.row.domain),
+    asString(staging.row.website),
+  )
+  const resolution = await resolveApolloEnrichmentCanonicalCompanyId(admin, {
+    company_candidate_id: lookupKey,
+    domain,
+  })
 
-  const row = external as Record<string, unknown>
+  const mapped = mapApolloEnrollmentDraftStagingRow({
+    lookup_key: staging.lookup_key,
+    source_table: staging.source_table,
+    staging_row_id: staging.staging_row_id,
+    row: staging.row,
+    canonical_company_id: resolution.canonical_company_id,
+    queue_item_id: input.queue_item_id ?? null,
+  })
+
+  if (!mapped.company.company_name.trim()) {
+    return {
+      ok: false,
+      code: "company_candidate_not_found",
+      staging_evidence: mapped.staging_evidence,
+    }
+  }
+
   return {
-    id: asString(row.id),
-    company_name: asString(row.company_name),
-    website: asString(row.website) || null,
-    domain: asString(row.domain) || null,
-    address: asString(row.address) || null,
-    city: asString(row.city) || null,
-    state: asString(row.state) || null,
-    country: asString(row.country) || null,
-    phone: asString(row.phone) || null,
+    ok: true,
+    company: mapped.company,
+    staging_evidence: mapped.staging_evidence,
   }
 }
 
@@ -168,8 +184,7 @@ function rowToCompanyContact(row: Record<string, unknown>): GrowthCompanyContact
 
 function companyContactToImportRow(
   contact: GrowthCompanyContact,
-  company: CompanyCandidateRow,
-  companyCandidateId: string,
+  company: ApolloEnrollmentDraftStagingCompanyCandidate,
 ): NormalizedImportRow {
   const website =
     company.website ??
@@ -240,7 +255,14 @@ async function resolveOrCreateGrowthLeadForApolloQueueItem(
     company_contact_id: string
     created_by?: string | null
   },
-): Promise<{ ok: true; lead_id: string } | { ok: false; code: string }> {
+): Promise<
+  | { ok: true; lead_id: string; staging_evidence: ApolloPrimaryContactEnrollmentDraftStagingEvidence }
+  | {
+      ok: false
+      code: string
+      staging_evidence: ApolloPrimaryContactEnrollmentDraftStagingEvidence | null
+    }
+> {
   const { data: contactRow, error: contactError } = await admin
     .schema("growth")
     .from("company_contacts")
@@ -248,26 +270,69 @@ async function resolveOrCreateGrowthLeadForApolloQueueItem(
     .eq("id", input.company_contact_id)
     .maybeSingle()
 
-  if (contactError) return { ok: false, code: contactError.message }
-  if (!contactRow) return { ok: false, code: "company_contact_not_found" }
+  if (contactError) {
+    return {
+      ok: false,
+      code: contactError.message,
+      staging_evidence: buildApolloEnrollmentDraftStagingEvidence({
+        lookup_key: input.company_candidate_id,
+        queue_item_id: input.queue_item_id,
+      }),
+    }
+  }
+  if (!contactRow) {
+    return {
+      ok: false,
+      code: "company_contact_not_found",
+      staging_evidence: buildApolloEnrollmentDraftStagingEvidence({
+        lookup_key: input.company_candidate_id,
+        queue_item_id: input.queue_item_id,
+      }),
+    }
+  }
 
   const contact = rowToCompanyContact(contactRow as Record<string, unknown>)
 
   if (contact.contact_status === "suppressed" || contact.contact_status === "archived") {
-    return { ok: false, code: "contact_suppressed" }
+    return {
+      ok: false,
+      code: "contact_suppressed",
+      staging_evidence: buildApolloEnrollmentDraftStagingEvidence({
+        lookup_key: input.company_candidate_id,
+        queue_item_id: input.queue_item_id,
+      }),
+    }
   }
 
   if (contact.growth_lead_id) {
     const lead = await fetchGrowthLeadById(admin, contact.growth_lead_id)
-    if (lead) return { ok: true, lead_id: lead.id }
+    if (lead) {
+      const existingStaging = await loadStagingCompanyCandidateForDraft(admin, {
+        lookup_key: input.company_candidate_id,
+        queue_item_id: input.queue_item_id,
+      })
+      return {
+        ok: true,
+        lead_id: lead.id,
+        staging_evidence: existingStaging.staging_evidence,
+      }
+    }
   }
 
-  const company = await loadCompanyCandidate(admin, input.company_candidate_id)
-  if (!company?.company_name.trim()) {
-    return { ok: false, code: "company_candidate_not_found" }
+  const staging = await loadStagingCompanyCandidateForDraft(admin, {
+    lookup_key: input.company_candidate_id,
+    queue_item_id: input.queue_item_id,
+  })
+  if (!staging.ok) {
+    return {
+      ok: false,
+      code: staging.code,
+      staging_evidence: staging.staging_evidence,
+    }
   }
 
-  const normalized = companyContactToImportRow(contact, company, input.company_candidate_id)
+  const company = staging.company
+  const normalized = companyContactToImportRow(contact, company)
   const dedupe = await findImportDedupeMatch(admin, {
     vendorKey: "apollo_primary_contact",
     row: normalized,
@@ -281,11 +346,11 @@ async function resolveOrCreateGrowthLeadForApolloQueueItem(
       leadId: dedupe.leadId,
       queueItemId: input.queue_item_id,
     })
-    return { ok: true, lead_id: dedupe.leadId }
+    return { ok: true, lead_id: dedupe.leadId, staging_evidence: staging.staging_evidence }
   }
 
   if (action === "skip") {
-    return { ok: false, code: "dedupe_skip" }
+    return { ok: false, code: "dedupe_skip", staging_evidence: staging.staging_evidence }
   }
 
   const lead = await createGrowthLead(admin, {
@@ -307,8 +372,10 @@ async function resolveOrCreateGrowthLeadForApolloQueueItem(
       apollo_primary_contact: {
         company_contact_id: contact.id,
         company_candidate_id: input.company_candidate_id,
+        staging_row_id: company.staging_row_id,
         contact_candidate_id: contact.contact_candidate_id,
         queue_item_id: input.queue_item_id,
+        staging_evidence: staging.staging_evidence,
         source_attribution: buildApolloEnrollmentSourceAttributionChain(),
         promoted_at: new Date().toISOString(),
       },
@@ -338,7 +405,7 @@ async function resolveOrCreateGrowthLeadForApolloQueueItem(
     queueItemId: input.queue_item_id,
   })
 
-  return { ok: true, lead_id: lead.id }
+  return { ok: true, lead_id: lead.id, staging_evidence: staging.staging_evidence }
 }
 
 async function recordDraftEvidence(
@@ -351,6 +418,7 @@ async function recordDraftEvidence(
     enrollment_draft_id: string | null
     status: "draft_created" | "blocked"
     blockers: string[]
+    staging_evidence?: ApolloPrimaryContactEnrollmentDraftStagingEvidence | null
     created_by?: string | null
     created_by_email?: string | null
   },
@@ -368,7 +436,10 @@ async function recordDraftEvidence(
     outreach_sent: false,
     created_by: input.created_by ?? null,
     created_by_email: input.created_by_email ?? null,
-    metadata: { qa_marker: APOLLO_PRIMARY_CONTACT_ENROLLMENT_DRAFT_QA_MARKER },
+    metadata: {
+      qa_marker: APOLLO_PRIMARY_CONTACT_ENROLLMENT_DRAFT_QA_MARKER,
+      staging_evidence: input.staging_evidence ?? null,
+    },
   })
 }
 
@@ -508,19 +579,38 @@ export async function createApolloPrimaryContactEnrollmentDraft(
       enrollment_draft_id: null,
       status: "blocked",
       blockers: [leadResolution.code],
+      staging_evidence: leadResolution.staging_evidence,
       created_by: input.acting_user_id ?? null,
       created_by_email: input.acting_user_email ?? null,
+    })
+
+    logGrowthEngine("apollo_primary_contact_enrollment_draft_staging_blocked", {
+      queue_item_id: input.queue_item_id.slice(0, 8),
+      code: leadResolution.code,
+      lookup_key: leadResolution.staging_evidence?.lookup_key?.slice(0, 8) ?? null,
+      staging_table_detected: leadResolution.staging_evidence?.staging_table_detected ?? null,
+      staging_row_id: leadResolution.staging_evidence?.staging_row_id?.slice(0, 8) ?? null,
+      candidate_domain_normalized: leadResolution.staging_evidence?.candidate_domain_normalized ?? null,
+      canonical_company_id: leadResolution.staging_evidence?.canonical_company_id?.slice(0, 8) ?? null,
+      auto_enrollment: false,
+      outreach_sent: false,
     })
 
     return emptyDraftActionResult(leadResolution.code, {
       queue_item_id: input.queue_item_id,
       blockers: [leadResolution.code],
+      staging_evidence: leadResolution.staging_evidence,
     })
   }
 
+  const stagingEvidence = leadResolution.staging_evidence
+
   const lead = await fetchGrowthLeadById(admin, leadResolution.lead_id)
   if (!lead) {
-    return emptyDraftActionResult("lead_not_found", { queue_item_id: input.queue_item_id })
+    return emptyDraftActionResult("lead_not_found", {
+      queue_item_id: input.queue_item_id,
+      staging_evidence: stagingEvidence,
+    })
   }
 
   const preflight = await runSequenceEnrollmentPreflight(admin, lead, {
@@ -537,6 +627,7 @@ export async function createApolloPrimaryContactEnrollmentDraft(
       enrollment_draft_id: null,
       status: "blocked",
       blockers,
+      staging_evidence: stagingEvidence,
       created_by: input.acting_user_id ?? null,
       created_by_email: input.acting_user_email ?? null,
     })
@@ -561,6 +652,7 @@ export async function createApolloPrimaryContactEnrollmentDraft(
     return emptyDraftActionResult(preflight.code ?? "preflight_blocked", {
       queue_item_id: input.queue_item_id,
       blockers,
+      staging_evidence: stagingEvidence,
     })
   }
 
@@ -584,6 +676,7 @@ export async function createApolloPrimaryContactEnrollmentDraft(
       enrollment_draft_id: null,
       status: "blocked",
       blockers,
+      staging_evidence: stagingEvidence,
       created_by: input.acting_user_id ?? null,
       created_by_email: input.acting_user_email ?? null,
     })
@@ -591,6 +684,7 @@ export async function createApolloPrimaryContactEnrollmentDraft(
     return emptyDraftActionResult(code, {
       queue_item_id: input.queue_item_id,
       blockers,
+      staging_evidence: stagingEvidence,
     })
   }
 
@@ -602,6 +696,7 @@ export async function createApolloPrimaryContactEnrollmentDraft(
     enrollment_draft_id: enrollment.id,
     status: "draft_created",
     blockers: [],
+    staging_evidence: stagingEvidence,
     created_by: input.acting_user_id ?? null,
     created_by_email: input.acting_user_email ?? null,
   })
@@ -618,6 +713,11 @@ export async function createApolloPrimaryContactEnrollmentDraft(
     queue_item_id: input.queue_item_id.slice(0, 8),
     lead_id: lead.id.slice(0, 8),
     enrollment_id: enrollment.id.slice(0, 8),
+    lookup_key: stagingEvidence.lookup_key.slice(0, 8),
+    staging_table_detected: stagingEvidence.staging_table_detected,
+    staging_row_id: stagingEvidence.staging_row_id?.slice(0, 8) ?? null,
+    candidate_domain_normalized: stagingEvidence.candidate_domain_normalized,
+    canonical_company_id: stagingEvidence.canonical_company_id?.slice(0, 8) ?? null,
     auto_enrollment: false,
     outreach_sent: false,
     enrolled_count: 0,
@@ -631,6 +731,7 @@ export async function createApolloPrimaryContactEnrollmentDraft(
     growth_lead_id: lead.id,
     enrollment_draft_id: enrollment.id,
     source_attribution: buildApolloEnrollmentSourceAttributionChain(),
+    staging_evidence: stagingEvidence,
     auto_enrollment: false,
     outreach_sent: false,
     enrolled_count: 0,

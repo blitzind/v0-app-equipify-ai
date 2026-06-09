@@ -18,6 +18,7 @@ import {
   shouldShowApolloEnrollmentCreateDraftAction,
   shouldShowApolloEnrollmentDraftWorkflowLink,
 } from "../lib/growth/apollo/apollo-primary-contact-enrollment-draft-evidence"
+import { mapApolloEnrollmentDraftStagingRow } from "../lib/growth/apollo/apollo-primary-contact-enrollment-draft-staging-evidence"
 import { mapEnrollmentQueueDbRow } from "../lib/growth/apollo/apollo-primary-contact-enrollment-bridge-evidence"
 import { buildEnrollmentBridgeContactSnapshot } from "../lib/growth/apollo/apollo-primary-contact-enrollment-bridge-evidence"
 import type { ApolloPrimaryContactOperatorReviewRow } from "../lib/growth/apollo/apollo-primary-contact-operator-review-types"
@@ -32,9 +33,12 @@ const MIGRATION_PATH =
   "supabase/migrations/20270812120000_growth_engine_apollo_primary_contact_enrollment_drafts.sql"
 const EXECUTION_PAGE_PATH = "app/(admin)/admin/growth/sequences/execution/page.tsx"
 
+const STAGING_EVIDENCE_PATH = "lib/growth/apollo/apollo-primary-contact-enrollment-draft-staging-evidence.ts"
+
 const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-primary-contact-enrollment-draft-types.ts",
   "lib/growth/apollo/apollo-primary-contact-enrollment-draft-evidence.ts",
+  STAGING_EVIDENCE_PATH,
   SERVER_PATH,
   DRAFT_ROUTE_PATH,
   DRAFT_ACTIONS_ROUTE_PATH,
@@ -89,6 +93,55 @@ assert.match(draftActionsRoute, /auto_enrollment:\s*false/)
 assert.match(draftActionsRoute, /outreach_sent:\s*false/)
 assert.match(draftActionsRoute, /enrolled_count:\s*0/)
 console.log("  ✓ routes — platform admin + structured logging with safety flags")
+
+assert.match(serverSource, /loadStagingCompanyCandidateRow/)
+assert.match(serverSource, /mapApolloEnrollmentDraftStagingRow/)
+assert.match(serverSource, /staging_evidence/)
+assert.doesNotMatch(serverSource, /async function loadCompanyCandidate/)
+console.log("  ✓ draft bridge — dual-key staging company candidate resolution")
+
+const HENRY_SCHEIN_LOOKUP_KEY = "d2e669d5-e912-4fb7-992a-b4f9a92ff56a"
+const HENRY_SCHEIN_STAGING_ROW_ID = "45863143-b63f-4880-8980-cbae40cb84e1"
+const HENRY_SCHEIN_QUEUE_ITEM_ID = "7f5a5d69-4df0-4501-959a-5e74a1b0471e"
+const HENRY_SCHEIN_CANONICAL_COMPANY_ID = "dd2b44c6-8383-4737-951a-6054200f45b5"
+
+const henryScheinStaging = mapApolloEnrollmentDraftStagingRow({
+  lookup_key: HENRY_SCHEIN_LOOKUP_KEY,
+  source_table: "discovery_candidates",
+  staging_row_id: HENRY_SCHEIN_STAGING_ROW_ID,
+  row: {
+    id: HENRY_SCHEIN_STAGING_ROW_ID,
+    company_id: HENRY_SCHEIN_LOOKUP_KEY,
+    company_name: "Henry Schein",
+    domain: "henryschein.com",
+    website: "https://www.henryschein.com",
+    canonical_company_id: HENRY_SCHEIN_CANONICAL_COMPANY_ID,
+  },
+  queue_item_id: HENRY_SCHEIN_QUEUE_ITEM_ID,
+  canonical_company_id: HENRY_SCHEIN_CANONICAL_COMPANY_ID,
+})
+
+assert.equal(henryScheinStaging.staging_evidence.lookup_key, HENRY_SCHEIN_LOOKUP_KEY)
+assert.equal(henryScheinStaging.staging_evidence.staging_row_id, HENRY_SCHEIN_STAGING_ROW_ID)
+assert.notEqual(
+  henryScheinStaging.staging_evidence.lookup_key,
+  henryScheinStaging.staging_evidence.staging_row_id,
+)
+assert.equal(henryScheinStaging.staging_evidence.staging_table_detected, "discovery_candidates")
+assert.equal(henryScheinStaging.staging_evidence.queue_item_id, HENRY_SCHEIN_QUEUE_ITEM_ID)
+assert.equal(henryScheinStaging.staging_evidence.canonical_company_id, HENRY_SCHEIN_CANONICAL_COMPANY_ID)
+assert.equal(henryScheinStaging.company.company_name, "Henry Schein")
+console.log("  ✓ staging evidence — discovery_candidates company_id lookup key resolves to staging row id")
+
+assert.match(
+  fs.readFileSync(path.join(process.cwd(), "lib/growth/canonical-companies/canonical-company-staging-linkage.ts"), "utf8"),
+  /loadDiscoveryCandidateStagingRow/,
+)
+assert.match(
+  fs.readFileSync(path.join(process.cwd(), "lib/growth/canonical-companies/canonical-company-staging-linkage.ts"), "utf8"),
+  /\.eq\("company_id", lookupKey\)/,
+)
+console.log("  ✓ staging loader — discovery_candidates id OR company_id dual-key lookup")
 
 assert.match(serverSource, /createGrowthSequenceEnrollmentDraft/)
 assert.match(serverSource, /runSequenceEnrollmentPreflight/)
