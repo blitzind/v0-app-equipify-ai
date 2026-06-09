@@ -8,10 +8,12 @@ import path from "node:path"
 import {
   APOLLO_LIVE_PILOT_PRODUCTION_EXECUTE_CONFIRM,
   APOLLO_LIVE_PILOT_PRODUCTION_ROUTE_QA_MARKER,
+  APOLLO_LIVE_PILOT_TEST_COMPANY_PREPARE_CONFIRM,
   assertApolloLivePilotProductionExecuteAllowed,
   assertApolloLivePilotProductionResponseHasNoSecrets,
   redactApolloLivePilotProductionSecrets,
   validateApolloLivePilotProductionExecuteConfirmation,
+  validateApolloLivePilotTestCompanyPrepareConfirmation,
   buildApolloLivePilotProductionReadinessPayload,
 } from "../lib/growth/apollo/apollo-live-pilot-production-route-gates"
 import {
@@ -55,8 +57,10 @@ const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-live-pilot-provider-evidence.ts",
   "lib/growth/apollo/apollo-live-pilot-production-route-gates.ts",
   "lib/growth/apollo/apollo-live-pilot-production-route.ts",
+  "lib/growth/apollo/apollo-live-pilot-test-company-prepare-route.ts",
   "app/api/platform/growth/apollo-live-pilot/readiness/route.ts",
   "app/api/platform/growth/apollo-live-pilot/execute/route.ts",
+  "app/api/platform/growth/apollo-live-pilot/test-company/prepare/route.ts",
 ]
 
 for (const relativePath of REQUIRED_FILES) {
@@ -66,6 +70,7 @@ for (const relativePath of REQUIRED_FILES) {
 
 assert.equal(APOLLO_LIVE_PILOT_PRODUCTION_ROUTE_QA_MARKER, "apollo-live-pilot-production-route-v1")
 assert.equal(APOLLO_LIVE_PILOT_PRODUCTION_EXECUTE_CONFIRM, "RUN_APOLLO_LIVE_PILOT")
+assert.equal(APOLLO_LIVE_PILOT_TEST_COMPANY_PREPARE_CONFIRM, "PREPARE_APOLLO_TEST_COMPANY")
 
 console.log("\n=== Route protection (static) ===")
 const readinessRoute = fs.readFileSync(
@@ -76,11 +81,27 @@ const executeRoute = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/apollo-live-pilot/execute/route.ts"),
   "utf8",
 )
+const prepareRoute = fs.readFileSync(
+  path.join(process.cwd(), "app/api/platform/growth/apollo-live-pilot/test-company/prepare/route.ts"),
+  "utf8",
+)
+const prepareOrchestration = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/apollo/apollo-live-pilot-test-company-prepare-route.ts"),
+  "utf8",
+)
 assert.match(readinessRoute, /requireGrowthEnginePlatformAccess/)
 assert.match(executeRoute, /requireGrowthEnginePlatformAccess/)
+assert.match(prepareRoute, /requireGrowthEnginePlatformAccess/)
 assert.match(executeRoute, /validateApolloLivePilotProductionExecuteConfirmation/)
 assert.match(executeRoute, /executeApolloLivePilotInProduction/)
-record("route.platform_admin", "pass", "Both routes require platform admin access")
+assert.match(prepareRoute, /validateApolloLivePilotTestCompanyPrepareConfirmation/)
+assert.match(prepareRoute, /prepareApolloLivePilotTestCompanyInProduction/)
+assert.doesNotMatch(prepareRoute, /APOLLO_API_KEY/)
+assert.doesNotMatch(prepareRoute, /SUPABASE_SERVICE_ROLE_KEY/)
+assert.doesNotMatch(prepareOrchestration, /apollo-client|searchApolloPeople/)
+assert.match(prepareOrchestration, /seedApolloLivePilotTestCompany/)
+assert.match(prepareOrchestration, /resolveApolloLivePilotTestCompany/)
+record("route.platform_admin", "pass", "Live pilot routes require platform admin access")
 
 console.log("\n=== Confirmation gate ===")
 const noBody = validateApolloLivePilotProductionExecuteConfirmation(null)
@@ -96,6 +117,56 @@ const okConfirm = validateApolloLivePilotProductionExecuteConfirmation({
 })
 assert.equal(okConfirm.ok, true)
 record("confirm.accepts_token", "pass", "RUN_APOLLO_LIVE_PILOT accepted")
+
+console.log("\n=== Test company prepare confirmation ===")
+const prepareNoBody = validateApolloLivePilotTestCompanyPrepareConfirmation(null)
+assert.equal(prepareNoBody.ok, false)
+record("prepare_confirm.body_required", "pass", "Missing body rejected")
+
+const prepareWrongConfirm = validateApolloLivePilotTestCompanyPrepareConfirmation({
+  confirm: "yes",
+  profile: "henry_schein",
+})
+assert.equal(prepareWrongConfirm.ok, false)
+record("prepare_confirm.exact_token", "pass", "Wrong confirm token rejected")
+
+const prepareMissingProfile = validateApolloLivePilotTestCompanyPrepareConfirmation({
+  confirm: APOLLO_LIVE_PILOT_TEST_COMPANY_PREPARE_CONFIRM,
+})
+assert.equal(prepareMissingProfile.ok, false)
+record("prepare_confirm.profile_required", "pass", "Profile required")
+
+const prepareUnknownProfile = validateApolloLivePilotTestCompanyPrepareConfirmation({
+  confirm: APOLLO_LIVE_PILOT_TEST_COMPANY_PREPARE_CONFIRM,
+  profile: "unknown_co",
+})
+assert.equal(prepareUnknownProfile.ok, false)
+record("prepare_confirm.known_profile", "pass", "Unknown profile rejected")
+
+const prepareOk = validateApolloLivePilotTestCompanyPrepareConfirmation({
+  confirm: APOLLO_LIVE_PILOT_TEST_COMPANY_PREPARE_CONFIRM,
+  profile: "henry_schein",
+})
+assert.equal(prepareOk.ok, true)
+assert.equal(prepareOk.profile, "henry_schein")
+record("prepare_confirm.accepts_henry_schein", "pass", "PREPARE_APOLLO_TEST_COMPANY + henry_schein accepted")
+
+const prepareResponseSample = redactApolloLivePilotProductionSecrets({
+  ok: true,
+  created: true,
+  company_candidate_id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+  company_name: "Henry Schein",
+  domain: "henryschein.com",
+  env_hint: "GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+  SUPABASE_SERVICE_ROLE_KEY: "eyJhbGciOiJIUzI1NiJ9.secret",
+})
+assert.equal(
+  (prepareResponseSample as Record<string, unknown>).SUPABASE_SERVICE_ROLE_KEY,
+  "[REDACTED]",
+)
+const prepareJson = JSON.stringify(prepareResponseSample)
+assertApolloLivePilotProductionResponseHasNoSecrets(prepareJson)
+record("prepare_confirm.no_secrets", "pass", "Prepare response redacts secrets")
 
 console.log("\n=== Execute gates (mock / missing env) ===")
 const emptyEnv = {} as NodeJS.ProcessEnv

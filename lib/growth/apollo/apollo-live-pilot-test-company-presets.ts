@@ -51,6 +51,10 @@ export function resolveApolloLivePilotTestCompanyPreset(
   return APOLLO_LIVE_PILOT_TEST_COMPANY_PRESETS[key] ?? null
 }
 
+export function listApolloLivePilotTestCompanyPresetProfiles(): string[] {
+  return Object.keys(APOLLO_LIVE_PILOT_TEST_COMPANY_PRESETS)
+}
+
 export function mergeApolloLivePilotTestCompanySeedEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): {

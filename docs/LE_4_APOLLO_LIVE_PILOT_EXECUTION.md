@@ -35,24 +35,24 @@ Redeploy after changing Production env vars.
 
 ---
 
-## Step 0 — Seed/select pilot company (Production DB, no Apollo HTTP)
+## Step 0 — Seed/select pilot company (Production runtime, no Apollo HTTP)
 
-Recommended strong B2B test company:
+Use the platform-admin **prepare** route (uses Production Supabase credentials — no local CLI secrets):
 
-```bash
-# Requires production Supabase service role (Vercel Production secret — never commit).
-# vercel env pull does not include SUPABASE_SERVICE_ROLE_KEY; export it for this CLI step only.
-
-APOLLO_TEST_COMPANY_SEED_ACK=1 \
-APOLLO_TEST_COMPANY_NAME="Henry Schein" \
-APOLLO_TEST_COMPANY_DOMAIN="henryschein.com" \
-APOLLO_TEST_COMPANY_WEBSITE="https://www.henryschein.com" \
-pnpm prepare:apollo-live-pilot-test-company:production
+```javascript
+fetch("/api/platform/growth/apollo-live-pilot/test-company/prepare", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    confirm: "PREPARE_APOLLO_TEST_COMPANY",
+    profile: "henry_schein",
+  }),
+}).then(r => r.json()).then(console.log)
 ```
 
-Set the returned `env_hint` in **Vercel Production** as `GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID`, then redeploy.
+Copy `env_hint` → set **`GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID`** in Vercel Production, then redeploy.
 
-Precision Biomedical remains available via `APOLLO_TEST_COMPANY_PROFILE=precision_biomedical` or explicit name/domain env vars.
+Profiles: `henry_schein` (strong B2B coverage), `precision_biomedical` (weak/mapper diagnostics).
 
 ---
 

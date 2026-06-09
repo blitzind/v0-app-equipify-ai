@@ -8,6 +8,10 @@ import {
   buildApolloLivePilotSafetyReport,
   type ApolloLivePilotSafetyReport,
 } from "@/lib/growth/apollo/apollo-live-pilot-safety"
+import {
+  listApolloLivePilotTestCompanyPresetProfiles,
+  resolveApolloLivePilotTestCompanyPreset,
+} from "@/lib/growth/apollo/apollo-live-pilot-test-company-presets"
 import { getApolloApiKey } from "@/lib/growth/providers/apollo/apollo-config"
 import {
   isApolloContactDiscoveryEnabled,
@@ -19,6 +23,9 @@ export const APOLLO_LIVE_PILOT_PRODUCTION_ROUTE_QA_MARKER =
   "apollo-live-pilot-production-route-v1" as const
 
 export const APOLLO_LIVE_PILOT_PRODUCTION_EXECUTE_CONFIRM = "RUN_APOLLO_LIVE_PILOT" as const
+
+export const APOLLO_LIVE_PILOT_TEST_COMPANY_PREPARE_CONFIRM =
+  "PREPARE_APOLLO_TEST_COMPANY" as const
 
 export type ApolloLivePilotProductionExecuteGateResult = {
   ok: boolean
@@ -57,6 +64,50 @@ export function validateApolloLivePilotProductionExecuteConfirmation(body: unkno
   }
 
   return { ok: true, error: null }
+}
+
+export function validateApolloLivePilotTestCompanyPrepareConfirmation(body: unknown): {
+  ok: boolean
+  error: string | null
+  profile: string | null
+} {
+  if (!body || typeof body !== "object") {
+    return {
+      ok: false,
+      error: `Request body must be JSON with confirm: "${APOLLO_LIVE_PILOT_TEST_COMPANY_PREPARE_CONFIRM}" and profile.`,
+      profile: null,
+    }
+  }
+
+  const record = body as Record<string, unknown>
+  const confirm = record.confirm
+  if (confirm !== APOLLO_LIVE_PILOT_TEST_COMPANY_PREPARE_CONFIRM) {
+    return {
+      ok: false,
+      error: `Set confirm to "${APOLLO_LIVE_PILOT_TEST_COMPANY_PREPARE_CONFIRM}".`,
+      profile: null,
+    }
+  }
+
+  const profileRaw = typeof record.profile === "string" ? record.profile.trim() : ""
+  if (!profileRaw) {
+    return {
+      ok: false,
+      error: `profile is required (${listApolloLivePilotTestCompanyPresetProfiles().join(", ")}).`,
+      profile: null,
+    }
+  }
+
+  const preset = resolveApolloLivePilotTestCompanyPreset(profileRaw)
+  if (!preset) {
+    return {
+      ok: false,
+      error: `Unknown profile "${profileRaw}". Allowed: ${listApolloLivePilotTestCompanyPresetProfiles().join(", ")}.`,
+      profile: null,
+    }
+  }
+
+  return { ok: true, error: null, profile: preset.profile }
 }
 
 export function assertApolloLivePilotProductionExecuteAllowed(
@@ -123,6 +174,9 @@ export function assertApolloLivePilotProductionResponseHasNoSecrets(json: string
   }
   if (/GROWTH_APOLLO_API_KEY\s*[:=]\s*["']?[a-zA-Z0-9_-]{8,}/.test(json)) {
     throw new Error("Response appears to include GROWTH_APOLLO_API_KEY value")
+  }
+  if (/SUPABASE_SERVICE_ROLE_KEY\s*[:=]\s*["']?[a-zA-Z0-9_-]{8,}/.test(json)) {
+    throw new Error("Response appears to include SUPABASE_SERVICE_ROLE_KEY value")
   }
 }
 
