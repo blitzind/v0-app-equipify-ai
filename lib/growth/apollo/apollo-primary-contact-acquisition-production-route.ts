@@ -29,10 +29,16 @@ export type ApolloPrimaryContactAcquisitionExecuteResult = {
 
 export async function buildApolloPrimaryContactAcquisitionProductionReadiness(
   admin: SupabaseClient,
-  env: NodeJS.ProcessEnv = process.env,
+  input?: {
+    company_candidate_id?: string
+    env?: NodeJS.ProcessEnv
+  },
 ): Promise<ReturnType<typeof buildApolloPrimaryContactAcquisitionReadinessPayload>> {
   void admin
-  return buildApolloPrimaryContactAcquisitionReadinessPayload({ env })
+  return buildApolloPrimaryContactAcquisitionReadinessPayload({
+    env: input?.env ?? process.env,
+    company_candidate_id: input?.company_candidate_id,
+  })
 }
 
 export async function executeApolloPrimaryContactAcquisitionInProduction(

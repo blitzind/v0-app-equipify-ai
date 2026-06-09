@@ -183,10 +183,14 @@ export type ApolloPrimaryContactAcquisitionReadinessPayload = {
 export function buildApolloPrimaryContactAcquisitionReadinessPayload(input?: {
   env?: NodeJS.ProcessEnv
   nowIso?: string
+  company_candidate_id?: string | null
 }): ApolloPrimaryContactAcquisitionReadinessPayload {
   const env = input?.env ?? process.env
   const gates = assertApolloPrimaryContactAcquisitionAllowed(env)
   const config_diagnostics = diagnoseApolloContactDiscoveryConfig(env)
+  const company_candidate_id =
+    input?.company_candidate_id?.trim() ||
+    resolveApolloPrimaryContactAcquisitionCompanyCandidateId({ env })
 
   return redactApolloEnrichmentCertProductionSecrets({
     qa_marker: APOLLO_PRIMARY_CONTACT_ACQUISITION_GATES_QA_MARKER,
@@ -196,7 +200,7 @@ export function buildApolloPrimaryContactAcquisitionReadinessPayload(input?: {
     production_runtime: isApolloPrimaryContactAcquisitionProductionRuntime(env),
     apollo_configured: isApolloApiConfigured(env) || isApolloMockEnabled(env),
     enrich_emails: isApolloEmailEnrichmentEnabled(env),
-    company_candidate_id: gates.company_candidate_id,
+    company_candidate_id,
     contact_limit: gates.contact_limit,
     blockers: [...gates.blockers, ...config_diagnostics.issues.map((issue) => issue.message)],
     config_diagnostics,
