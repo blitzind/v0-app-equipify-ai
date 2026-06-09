@@ -8,7 +8,9 @@ No new product features — only operator execution of existing workflows and ev
 
 ## Prerequisites
 
-Configure `.env.local`:
+Configure `.env.local` per [LE_3_LIVE_PILOT_UNBLOCK.md](./LE_3_LIVE_PILOT_UNBLOCK.md) (Apollo API key + seed test company).
+
+Previously:
 
 ```bash
 # Apollo (required for steps 1–2)

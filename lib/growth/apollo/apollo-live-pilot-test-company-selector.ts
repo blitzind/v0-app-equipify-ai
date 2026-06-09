@@ -4,6 +4,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { ApolloLivePilotDryRunTargetCompany } from "@/lib/growth/apollo/apollo-live-pilot-dry-run"
+import { APOLLO_LIVE_PILOT_TEST_COMPANY_SOURCE_MARKER } from "@/lib/growth/apollo/apollo-live-pilot-test-company-seed"
 
 export const APOLLO_LIVE_PILOT_TEST_COMPANY_SELECTOR_QA_MARKER =
   "apollo-live-pilot-test-company-selector-ai-4-v1" as const
@@ -61,13 +62,35 @@ async function loadCandidateRow(
   const { data } = await admin
     .schema("growth")
     .from("discovery_candidates")
-    .select(
-      "id, company_id, company_name, domain, website, primary_domain, canonical_company_id, is_suppressed, is_duplicate",
-    )
+    .select("id, company_id, company_name, domain, website, is_suppressed, is_duplicate")
     .or(`id.eq.${company_candidate_id},company_id.eq.${company_candidate_id}`)
     .limit(1)
     .maybeSingle()
   return (data as Record<string, unknown> | null) ?? null
+}
+
+async function loadSeededCandidateRow(
+  admin: SupabaseClient,
+  domain?: string | null,
+): Promise<Record<string, unknown> | null> {
+  let query = admin
+    .schema("growth")
+    .from("discovery_candidates")
+    .select(
+      "id, company_id, company_name, domain, website, is_suppressed, is_duplicate, metadata",
+    )
+    .eq("is_suppressed", false)
+    .eq("is_duplicate", false)
+    .contains("metadata", { source_marker: APOLLO_LIVE_PILOT_TEST_COMPANY_SOURCE_MARKER })
+    .order("discovered_at", { ascending: false })
+    .limit(5)
+
+  if (domain?.trim()) {
+    query = query.eq("domain", domain.trim().toLowerCase().replace(/^www\./, ""))
+  }
+
+  const { data: rows } = await query
+  return (rows?.[0] as Record<string, unknown> | undefined) ?? null
 }
 
 export async function resolveApolloLivePilotTestCompany(
@@ -75,6 +98,8 @@ export async function resolveApolloLivePilotTestCompany(
   input?: {
     company_candidate_id?: string | null
     company_name_search?: string | null
+    prefer_seeded?: boolean
+    seeded_domain?: string | null
   },
 ): Promise<{
   ok: boolean
@@ -103,7 +128,7 @@ export async function resolveApolloLivePilotTestCompany(
         company_candidate_id: companyId,
         company_name: asString(row.company_name) || companyId,
         domain,
-        canonical_company_id: asString(row.canonical_company_id) || null,
+        canonical_company_id: null,
         existing_apollo_contacts: existing,
         suitable: suitability.suitable,
         suitability_notes: suitability.notes,
@@ -114,12 +139,41 @@ export async function resolveApolloLivePilotTestCompany(
     }
   }
 
+  if (input?.prefer_seeded) {
+    const seeded = await loadSeededCandidateRow(admin, input.seeded_domain)
+    if (seeded) {
+      const companyId = asString(seeded.company_id) || asString(seeded.id)
+      const domain = resolveDomain(seeded)
+      const existing = await countApolloContacts(admin, companyId)
+      const suitability = assessSuitability({
+        company_name: asString(seeded.company_name),
+        domain,
+        is_suppressed: seeded.is_suppressed === true,
+        is_duplicate: seeded.is_duplicate === true,
+        existing_contacts: existing,
+      })
+      if (suitability.suitable) {
+        return {
+          ok: true,
+          company: {
+            company_candidate_id: companyId,
+            company_name: asString(seeded.company_name) || companyId,
+            domain,
+            canonical_company_id: null,
+            existing_apollo_contacts: existing,
+            suitable: true,
+            suitability_notes: ["Selected LE-3 seeded Apollo live pilot test company"],
+          },
+          message: "Selected seeded test company (APOLLO_TEST_COMPANY_PREFER_SEEDED=1).",
+        }
+      }
+    }
+  }
+
   let query = admin
     .schema("growth")
     .from("discovery_candidates")
-    .select(
-      "id, company_id, company_name, domain, website, primary_domain, canonical_company_id, is_suppressed, is_duplicate",
-    )
+    .select("id, company_id, company_name, domain, website, is_suppressed, is_duplicate")
     .eq("is_suppressed", false)
     .eq("is_duplicate", false)
     .order("discovered_at", { ascending: false })
@@ -155,7 +209,7 @@ export async function resolveApolloLivePilotTestCompany(
         company_candidate_id: companyId,
         company_name: asString(row.company_name) || companyId,
         domain,
-        canonical_company_id: asString(row.canonical_company_id) || null,
+        canonical_company_id: null,
         existing_apollo_contacts: existing,
         suitable: true,
         suitability_notes: ["Selected: low existing Apollo contacts, valid domain, not suppressed"],
@@ -169,6 +223,6 @@ export async function resolveApolloLivePilotTestCompany(
     company: null,
     message: nameSearch
       ? `No suitable company found matching "${nameSearch}".`
-      : "No suitable discovery_candidates row found — add domain + non-suppressed company.",
+      : "No suitable discovery_candidates row found — run pnpm seed:apollo-live-pilot-test-company",
   }
 }

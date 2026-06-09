@@ -174,6 +174,12 @@ export function buildApolloLivePilotEnvReadinessReport(
     blockers.push("GROWTH_APOLLO_USE_MOCK is enabled — live pilot will not call Apollo.")
   }
 
+  if (!companyId) {
+    warnings.push(
+      "No company candidate — seed one: APOLLO_TEST_COMPANY_SEED_ACK=1 pnpm seed:apollo-live-pilot-test-company",
+    )
+  }
+
   const ready_for_live_pilot =
     blockers.length === 0 &&
     activation.ready_for_live_benchmark &&

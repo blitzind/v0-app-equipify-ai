@@ -32,10 +32,22 @@ pnpm check:apollo-live-pilot-env-ai-4
 
 ## 2. Select one test company
 
+**If none exist**, seed one safe test company first (LE-3):
+
+```bash
+APOLLO_TEST_COMPANY_SEED_ACK=1 \
+APOLLO_TEST_COMPANY_NAME="Precision Biomedical Services" \
+APOLLO_TEST_COMPANY_DOMAIN="precisionbiomedicalservices.com" \
+APOLLO_TEST_COMPANY_WEBSITE="https://precisionbiomedicalservices.com" \
+pnpm seed:apollo-live-pilot-test-company
+```
+
+Add the returned `GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID` to `.env.local`.
+
 Auto-select a suitable company (domain present, not suppressed, low existing Apollo contacts):
 
 ```bash
-pnpm select:apollo-live-pilot-test-company-ai-4
+APOLLO_TEST_COMPANY_PREFER_SEEDED=1 pnpm select:apollo-live-pilot-test-company-ai-4
 ```
 
 Or validate a specific candidate:

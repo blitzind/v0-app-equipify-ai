@@ -43,6 +43,12 @@ export {
   resolveApolloLivePilotTestCompany,
 } from "@/lib/growth/apollo/apollo-live-pilot-test-company-selector"
 export {
+  APOLLO_LIVE_PILOT_TEST_COMPANY_SEED_QA_MARKER,
+  APOLLO_LIVE_PILOT_TEST_COMPANY_SOURCE_MARKER,
+  seedApolloLivePilotTestCompany,
+  validateApolloLivePilotTestCompanySeedEnv,
+} from "@/lib/growth/apollo/apollo-live-pilot-test-company-seed"
+export {
   APOLLO_LIVE_PILOT_EVIDENCE_BUNDLE_QA_MARKER,
   buildApolloLivePilotEvidenceBundle,
   buildApolloLivePilotOperatorCommands,

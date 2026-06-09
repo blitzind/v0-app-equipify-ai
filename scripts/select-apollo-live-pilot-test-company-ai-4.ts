@@ -5,6 +5,7 @@
  * Optional:
  *   APOLLO_AI_4_COMPANY_CANDIDATE_ID=<uuid>  — validate explicit company
  *   APOLLO_AI_4_COMPANY_NAME_SEARCH=<name>   — filter by company name
+ *   APOLLO_TEST_COMPANY_PREFER_SEEDED=1      — prefer LE-3 seeded candidate
  */
 import { readFileSync } from "node:fs"
 import { createClient } from "@supabase/supabase-js"
@@ -50,10 +51,14 @@ async function main(): Promise<void> {
     process.env.GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID?.trim() ||
     null
   const nameSearch = process.env.APOLLO_AI_4_COMPANY_NAME_SEARCH?.trim() || null
+  const preferSeeded = process.env.APOLLO_TEST_COMPANY_PREFER_SEEDED === "1"
+  const seededDomain = process.env.APOLLO_TEST_COMPANY_DOMAIN?.trim() || null
 
   const result = await resolveApolloLivePilotTestCompany(admin, {
     company_candidate_id: explicitId,
     company_name_search: nameSearch,
+    prefer_seeded: preferSeeded || Boolean(seededDomain),
+    seeded_domain: seededDomain,
   })
 
   console.log(
