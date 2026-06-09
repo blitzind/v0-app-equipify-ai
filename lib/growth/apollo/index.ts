@@ -66,6 +66,21 @@ export {
   type ApolloLivePilotEvidenceBundle,
 } from "@/lib/growth/apollo/apollo-live-pilot-evidence-bundle"
 export {
+  APOLLO_LIVE_PILOT_PRODUCTION_ROUTE_QA_MARKER,
+  APOLLO_LIVE_PILOT_PRODUCTION_EXECUTE_CONFIRM,
+  assertApolloLivePilotProductionExecuteAllowed,
+  redactApolloLivePilotProductionSecrets,
+  validateApolloLivePilotProductionExecuteConfirmation,
+  buildApolloLivePilotProductionReadinessPayload,
+} from "@/lib/growth/apollo/apollo-live-pilot-production-route-gates"
+export {
+  buildApolloLivePilotProductionReadinessPayload,
+  type ApolloLivePilotProductionReadinessPayload,
+} from "@/lib/growth/apollo/apollo-live-pilot-production-route-gates"
+export {
+  executeApolloLivePilotInProduction,
+} from "@/lib/growth/apollo/apollo-live-pilot-production-route"
+export {
   APOLLO_INTEGRATION_AI_5_QA_MARKER,
   certifyApolloProductionActivation,
   formatApolloProductionActivationMarkdown,

@@ -113,7 +113,8 @@ assert.ok(bundle.discovery.raw_contacts_returned >= 0)
 assert.ok(bundle.canonical_matching.person.created >= 0)
 assert.ok(bundle.readiness_funnel.sequence_ready >= 0)
 assert.ok(bundle.go_no_go)
-assert.ok(bundle.operator_commands.live_pilot.includes("pnpm run:apollo-live-pilot-ai-3"))
+assert.ok(bundle.operator_commands.live_pilot.includes("apollo-live-pilot/execute"))
+assert.ok(bundle.operator_commands.live_pilot.includes("RUN_APOLLO_LIVE_PILOT"))
 record("bundle.fields", "evidence", "pass", "Bundle includes target, runtime, discovery, go/no-go")
 record("bundle.commands", "operator", "pass", "Operator command blocks present")
 
@@ -127,7 +128,7 @@ record("bundle.type_guard", "evidence", "pass", "Distinguishes bundle from raw e
 console.log("\n=== AI-4 Operator Commands ===")
 const commands = buildApolloLivePilotOperatorCommands("./evidence/apollo-ai-3-pilot.json")
 assert.match(commands.validate, /test:apollo-integration-ai-3/)
-assert.match(commands.env_check, /check:apollo-live-pilot-env-ai-4/)
+assert.match(commands.env_check, /apollo-live-pilot\/readiness/)
 record("commands.validate", "operator", "pass", "Validation command references AI-3 harness")
 
 function writeReport(): void {

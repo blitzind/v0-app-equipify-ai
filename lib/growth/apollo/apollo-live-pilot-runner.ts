@@ -29,18 +29,22 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
 
-function isAi2LivePilotEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.GROWTH_APOLLO_AI_2_LIVE_PILOT_ENABLED === "true"
+function isLivePilotEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return (
+    env.GROWTH_APOLLO_AI_3_LIVE_PILOT_ENABLED === "true" ||
+    env.GROWTH_APOLLO_AI_2_LIVE_PILOT_ENABLED === "true"
+  )
 }
 
 export function assertApolloAi2LivePilotAllowed(env: NodeJS.ProcessEnv = process.env): {
   ok: boolean
   error: string | null
 } {
-  if (!isAi2LivePilotEnabled(env)) {
+  if (!isLivePilotEnabled(env)) {
     return {
       ok: false,
-      error: "Set GROWTH_APOLLO_AI_2_LIVE_PILOT_ENABLED=true to run live pilot.",
+      error:
+        "Set GROWTH_APOLLO_AI_3_LIVE_PILOT_ENABLED=true (or AI-2 equivalent) to run live pilot.",
     }
   }
   if (isApolloMockEnabled(env)) {
@@ -67,21 +71,26 @@ async function loadCompanyContext(
   const { data } = await admin
     .schema("growth")
     .from("discovery_candidates")
-    .select("company_name, primary_domain, canonical_company_id, website, id, company_id")
+    .select("company_name, domain, website, id, company_id")
     .or(`id.eq.${company_candidate_id},company_id.eq.${company_candidate_id}`)
     .limit(1)
     .maybeSingle()
 
   const row = data as Record<string, unknown> | null
   const domain =
-    asString(row?.primary_domain) ||
+    asString(row?.domain) ||
     asString(row?.website)?.replace(/^https?:\/\//, "").split("/")[0] ||
     null
+
+  let canonical_company_id: string | null = null
+  if (row) {
+    canonical_company_id = await fetchStagingCanonicalCompanyId(admin, company_candidate_id)
+  }
 
   return {
     company_name: asString(row?.company_name) || company_candidate_id,
     domain,
-    canonical_company_id: asString(row?.canonical_company_id) || null,
+    canonical_company_id,
   }
 }
 

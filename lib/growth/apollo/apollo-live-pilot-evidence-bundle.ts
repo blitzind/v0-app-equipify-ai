@@ -42,15 +42,14 @@ export type ApolloLivePilotEvidenceBundle = {
 export function buildApolloLivePilotOperatorCommands(outputPath?: string | null): ApolloLivePilotOperatorCommands {
   const evidencePath = outputPath?.trim() || "./evidence/apollo-ai-3-pilot.json"
   return {
-    env_check: "pnpm check:apollo-live-pilot-env-ai-4",
-    dry_run: "pnpm dry-run:apollo-live-pilot-ai-4",
+    env_check:
+      "GET /api/platform/growth/apollo-live-pilot/readiness (platform admin session, Vercel Production runtime)",
+    dry_run: "pnpm dry-run:apollo-live-pilot-ai-4 (local planning only — no Production secrets)",
     live_pilot: [
-      "GROWTH_APOLLO_AI_3_LIVE_PILOT_ENABLED=true \\",
-      "GROWTH_APOLLO_USE_MOCK=false \\",
-      "GROWTH_APOLLO_LIVE_BENCHMARK_ACK=1 \\",
-      "GROWTH_APOLLO_AI_3_COMPANY_CANDIDATE_ID=<company-uuid> \\",
-      `GROWTH_APOLLO_AI_3_OUTPUT_PATH=${evidencePath} \\`,
-      "pnpm run:apollo-live-pilot-ai-3",
+      "POST /api/platform/growth/apollo-live-pilot/execute",
+      'Body: { "confirm": "RUN_APOLLO_LIVE_PILOT" }',
+      "Auth: platform admin session on deployed Production",
+      `Save response evidence_bundle to ${evidencePath}`,
     ].join("\n"),
     validate: `APOLLO_AI_3_PILOT_EVIDENCE_JSON=${evidencePath} pnpm test:apollo-integration-ai-3`,
     rollback:

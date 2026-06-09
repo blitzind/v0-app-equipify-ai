@@ -180,17 +180,6 @@ export function buildApolloLivePilotEnvReadinessReport(
     )
   }
 
-  if (env.EQUIPIFY_VERCEL_PRODUCTION_ENV_RUN === "1" && !keyConfigured) {
-    const idx = blockers.findIndex((b) => b.startsWith("APOLLO_API_KEY"))
-    const detail =
-      "Vercel Production pull returned an empty value — re-save APOLLO_API_KEY in Vercel dashboard and redeploy"
-    if (idx >= 0) {
-      blockers[idx] = `APOLLO_API_KEY: ${detail}`
-    } else {
-      blockers.push(`APOLLO_API_KEY: ${detail}`)
-    }
-  }
-
   const ready_for_live_pilot =
     blockers.length === 0 &&
     activation.ready_for_live_benchmark &&
