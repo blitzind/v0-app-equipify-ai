@@ -8,8 +8,12 @@ import {
   type ApolloMapperRejectionEvidence,
   type ApolloTierAttemptCompactSummary,
 } from "@/lib/growth/apollo/apollo-search-diagnostic-evidence"
-import type { ApolloPartialIdentityEvidence } from "@/lib/growth/apollo/apollo-partial-identity-evidence"
-import { emptyApolloPartialIdentityEvidence } from "@/lib/growth/apollo/apollo-partial-identity-evidence"
+import type { ApolloCohortCompanySearchDebug } from "@/lib/growth/apollo/apollo-cohort-company-search-debug"
+import { buildApolloCohortCompanySearchDebug } from "@/lib/growth/apollo/apollo-cohort-company-search-debug"
+import {
+  emptyApolloPartialIdentityEvidence,
+  type ApolloPartialIdentityEvidence,
+} from "@/lib/growth/apollo/apollo-partial-identity-evidence"
 import type { ApolloSearchTierAttemptEvidence } from "@/lib/growth/providers/apollo/apollo-tiered-people-search-types"
 
 export const APOLLO_SCALE_3_COMPANY_PROMOTION_EVIDENCE_QA_MARKER =
@@ -42,6 +46,7 @@ export type ApolloScale3MappedCompanyEvidenceRow = ApolloScale3CompanyEvidenceBa
   contactable: number
   sequence_ready: number
   partial_identity_evidence: ApolloPartialIdentityEvidence
+  cohort_search_debug: ApolloCohortCompanySearchDebug | null
   legacy_fallback_used: boolean
   promotion_evidence: ApolloScale3CompanyPromotionEvidence
   acquisition_evidence: ApolloAcquisitionSearchEvidence | null
@@ -194,6 +199,16 @@ export function mapApolloScale3CompanyEvidenceRow(input: {
     tier_attempts_compact: buildApolloTierAttemptsCompactSummaries(tier_attempts),
     partial_identity_evidence:
       input.acquisition?.partial_identity_evidence ?? emptyApolloPartialIdentityEvidence(),
+    cohort_search_debug:
+      input.acquisition?.search_debug ??
+      buildApolloCohortCompanySearchDebug({
+        company_candidate_id: input.base.company_candidate_id,
+        company_name: input.base.company_name,
+        domain: input.base.domain,
+        search_path: "scale3_evidence_only",
+        search_strategy: strategy,
+        acquisition: input.acquisition,
+      }),
     contacts_enriched: promotion_evidence.email_enrichment_candidates_updated,
     contacts_promoted: promotion_evidence.current_run_apollo_promoted_contacts,
     contactable: apollo_contactable,

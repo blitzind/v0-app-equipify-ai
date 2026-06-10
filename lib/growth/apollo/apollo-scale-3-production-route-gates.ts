@@ -4,6 +4,7 @@ import { redactApolloEnrichmentCertProductionSecrets } from "@/lib/growth/apollo
 import {
   APOLLO_SCALE_3_RECOMMENDED_MAX_API_CALLS_PER_RUN,
 } from "@/lib/growth/apollo/apollo-single-company-search-diagnostic-gates"
+import { buildApolloSearchApiBudgetEvidence } from "@/lib/growth/apollo/apollo-search-api-budget-evidence"
 import {
   assertApolloScale2ProductionExecuteAllowed,
   buildApolloScale2ProductionReadinessPayload,
@@ -141,8 +142,6 @@ export function buildApolloScale3ProductionReadinessPayload(input: {
   const env = input.env ?? process.env
   const gates = assertApolloScale3ProductionExecuteAllowed(env)
   const company_limit = resolveApolloScale2CompanyLimit()
-  const limits = resolveApolloCreditLimits(env)
-  const minimum_search_api_calls = company_limit * 5
   const base = buildApolloScale2ProductionReadinessPayload({
     ...input,
     env: {
@@ -160,13 +159,7 @@ export function buildApolloScale3ProductionReadinessPayload(input: {
     production_runtime: isApolloScale2ProductionRuntime(env),
     blockers: gates.blockers.length > 0 ? gates.blockers : base.blockers,
     browser_console_execute_snippet: APOLLO_SCALE_3_BROWSER_CONSOLE_EXECUTE_SNIPPET,
-    search_api_budget: {
-      current_max_api_calls_per_run: limits.max_api_calls_per_run,
-      minimum_for_full_cohort_tiers: minimum_search_api_calls,
-      recommended_for_cert: APOLLO_SCALE_3_RECOMMENDED_MAX_API_CALLS_PER_RUN,
-      sufficient_for_full_cohort: limits.max_api_calls_per_run >= minimum_search_api_calls,
-      recommended_env: `GROWTH_APOLLO_MAX_API_CALLS_PER_RUN=${APOLLO_SCALE_3_RECOMMENDED_MAX_API_CALLS_PER_RUN}`,
-    },
+    search_api_budget: buildApolloSearchApiBudgetEvidence({ env, company_limit }),
   })
 }
 

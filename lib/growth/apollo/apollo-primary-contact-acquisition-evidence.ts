@@ -5,6 +5,7 @@ import type { ApolloVerifiedEmailPromotionEvidence } from "@/lib/growth/apollo/a
 import type { ApolloAcquisitionSearchEvidence } from "@/lib/growth/apollo/apollo-acquisition-search-evidence"
 import type { ApolloCurrentRunAttribution } from "@/lib/growth/apollo/apollo-current-run-attribution"
 import type { ApolloPartialIdentityEvidence } from "@/lib/growth/apollo/apollo-partial-identity-evidence"
+import type { ApolloCohortCompanySearchDebug } from "@/lib/growth/apollo/apollo-cohort-company-search-debug"
 
 export const APOLLO_PRIMARY_CONTACT_ACQUISITION_EVIDENCE_QA_MARKER =
   "apollo-primary-contact-acquisition-evidence-v1" as const
@@ -48,6 +49,7 @@ export type ApolloPrimaryContactAcquisitionCompanyEvidence = {
   apollo_persisted_this_run: number
   current_run_attribution: ApolloCurrentRunAttribution | null
   partial_identity_evidence: ApolloPartialIdentityEvidence | null
+  search_debug: ApolloCohortCompanySearchDebug | null
 }
 
 export type ApolloPrimaryContactAcquisitionEvidence = {

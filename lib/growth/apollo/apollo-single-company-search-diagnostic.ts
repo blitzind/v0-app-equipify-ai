@@ -13,8 +13,9 @@ import {
   buildApolloSingleCompanySearchDiagnosticReadinessPayload,
   redactApolloSingleCompanySearchDiagnosticSecrets,
 } from "@/lib/growth/apollo/apollo-single-company-search-diagnostic-gates"
+import { runApolloSharedTieredPeopleSearch } from "@/lib/growth/apollo/apollo-shared-tiered-search"
+import { emptyApolloPartialIdentityEvidence } from "@/lib/growth/apollo/apollo-partial-identity-evidence"
 import { isApolloMockEnabled } from "@/lib/growth/providers/apollo/apollo-config"
-import { searchApolloPeopleWithTierStrategy } from "@/lib/growth/providers/apollo/apollo-tiered-people-search"
 import {
   beginApolloRunGuardrails,
   resetApolloRunGuardrails,
@@ -121,6 +122,7 @@ export async function executeApolloSingleCompanySearchDiagnostic(
       tier_attempts: [],
       tier_attempts_compact: [],
       mapper_rejection_evidence: null,
+      partial_identity_evidence: emptyApolloPartialIdentityEvidence(),
       search_strategy: null,
       safety: {
         enrollment: false,
@@ -142,6 +144,7 @@ export async function executeApolloSingleCompanySearchDiagnostic(
       tier_attempts: [],
       tier_attempts_compact: [],
       mapper_rejection_evidence: null,
+      partial_identity_evidence: emptyApolloPartialIdentityEvidence(),
       search_strategy: null,
       safety: {
         enrollment: false,
@@ -154,9 +157,9 @@ export async function executeApolloSingleCompanySearchDiagnostic(
 
   const mock = isApolloMockEnabled(env)
   beginApolloRunGuardrails()
-  let searchOutcome: Awaited<ReturnType<typeof searchApolloPeopleWithTierStrategy>> | null = null
+  let searchOutcome: Awaited<ReturnType<typeof runApolloSharedTieredPeopleSearch>> | null = null
   try {
-    searchOutcome = await searchApolloPeopleWithTierStrategy(
+    searchOutcome = await runApolloSharedTieredPeopleSearch(
       {
         company_name: company.company_name,
         domain: company.domain,
@@ -165,7 +168,7 @@ export async function executeApolloSingleCompanySearchDiagnostic(
         state: company.state ?? undefined,
         limit: 25,
       },
-      { mock, legacy_contactable_count: 0 },
+      { mock },
     )
   } finally {
     resetApolloRunGuardrails()
@@ -191,6 +194,13 @@ export async function executeApolloSingleCompanySearchDiagnostic(
     tier_attempts,
     tier_attempts_compact,
     mapper_rejection_evidence,
+    partial_identity_evidence: {
+      ...emptyApolloPartialIdentityEvidence(),
+      mapped_partial_identity_contacts:
+        searchOutcome.search_strategy.mapped_partial_identity_contacts ?? 0,
+      partial_identity_candidates_staged:
+        searchOutcome.search_strategy.mapped_partial_identity_contacts ?? 0,
+    },
     search_strategy: searchOutcome.search_strategy,
     search_summary: {
       raw_contacts_returned: searchOutcome.search_strategy.raw_contacts_returned,

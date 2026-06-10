@@ -27,11 +27,16 @@ import {
   resolveApolloProviderOutcomeFromDiscoverySnapshot,
 } from "@/lib/growth/apollo/apollo-live-pilot-discovery-result"
 
+export const APOLLO_LIVE_PILOT_FRESH_SEARCH_PATH = "fresh_single_provider_run" as const
+export const APOLLO_LIVE_PILOT_LEGACY_SNAPSHOT_PATH = "legacy_snapshot_short_circuit" as const
+export const APOLLO_LIVE_PILOT_LEGACY_DOUBLE_RUN_PATH = "legacy_snapshot_then_provider_run" as const
+
 export type ApolloLivePilotContactDiscoveryResult = {
   snapshot: GrowthContactDiscoverySnapshot
   apollo_outcome: GrowthContactDiscoveryProviderOutcome | null
   apollo_contacts: GrowthContactCandidate[]
   apollo_provider_result: GrowthContactDiscoveryProviderResult | null
+  search_path: string
 }
 
 function asString(value: unknown): string {
@@ -179,7 +184,93 @@ export async function runApolloLivePilotContactDiscovery(
     created_by?: string | null
     limit?: number
   },
+  options?: {
+    /** Cert/acquisition: one live tier search, no snapshot short-circuit or double provider runs. */
+    fresh_apollo_search?: boolean
+  },
 ): Promise<ApolloLivePilotContactDiscoveryResult> {
+  if (options?.fresh_apollo_search !== false) {
+    const providerResults = await runContactDiscoveryProviders(
+      admin,
+      {
+        company_candidate_id: input.company_candidate_id,
+        company_name: input.company_name,
+        domain: input.domain,
+        website_url: input.website_url,
+        growth_lead_id: null,
+        industry: null,
+        city: input.city,
+        state: input.state,
+        limit: input.limit ?? 10,
+      },
+      { provider_types: ["future_apollo"] },
+    )
+
+    const apolloProviderResult = providerResults.find(
+      (result) => result.provider_name === "apollo" || result.provider_type === "future_apollo",
+    )
+
+    const persisted = await persistApolloProviderContacts(admin, {
+      company_candidate_id: input.company_candidate_id,
+      created_by: input.created_by,
+      providerResults,
+    })
+
+    const provider_outcomes = buildContactDiscoveryProviderOutcomes({
+      provider_results: providerResults,
+      persisted_by_provider: { apollo: persisted.length },
+    })
+
+    const apollo_outcome =
+      provider_outcomes.find(
+        (outcome) => outcome.provider === "apollo" || outcome.provider === "future_apollo",
+      ) ??
+      (apolloProviderResult
+        ? {
+            provider: apolloProviderResult.provider_name,
+            contacts_returned: apolloProviderResult.contacts.length,
+            contacts_persisted: persisted.length,
+            status: apolloProviderResult.status,
+            message:
+              apolloProviderResult.status === "skipped" || apolloProviderResult.status === "failed"
+                ? apolloProviderResult.message
+                : persisted.length === 0
+                  ? apolloProviderResult.message
+                  : null,
+            provider_error:
+              apolloProviderResult.status === "failed"
+                ? apolloProviderResult.error ?? apolloProviderResult.message
+                : null,
+          }
+        : null)
+
+    const provider_messages = providerResults.map(
+      (result) => `${result.provider_name}: ${result.status} — ${result.message}`,
+    )
+
+    const snapshot: GrowthContactDiscoverySnapshot = {
+      qa_marker: "growth-contact-discovery-v1",
+      schema_ready: true,
+      company_candidate_id: input.company_candidate_id,
+      run: null,
+      contacts: persisted,
+      buying_committee: null,
+      provider_messages,
+      provider_outcomes,
+      persistence_error: null,
+      privacy_note:
+        "Contact discovery stores role candidates only; PII is gated by verification and operator review.",
+    }
+
+    return {
+      snapshot,
+      apollo_outcome,
+      apollo_contacts: persisted,
+      apollo_provider_result: apolloProviderResult ?? null,
+      search_path: APOLLO_LIVE_PILOT_FRESH_SEARCH_PATH,
+    }
+  }
+
   const snapshot = await runContactDiscoveryForCompany(admin, {
     company_candidate_id: input.company_candidate_id,
     created_by: input.created_by ?? null,
@@ -191,7 +282,13 @@ export async function runApolloLivePilotContactDiscovery(
   const apollo_contacts = resolveApolloContactsFromDiscoverySnapshot(snapshot)
 
   if (apollo_outcome && apollo_contacts.length > 0) {
-    return { snapshot, apollo_outcome, apollo_contacts, apollo_provider_result: null }
+    return {
+      snapshot,
+      apollo_outcome,
+      apollo_contacts,
+      apollo_provider_result: null,
+      search_path: APOLLO_LIVE_PILOT_LEGACY_SNAPSHOT_PATH,
+    }
   }
 
   const providerResults = await runContactDiscoveryProviders(
@@ -268,5 +365,6 @@ export async function runApolloLivePilotContactDiscovery(
     apollo_outcome,
     apollo_contacts: mergedContacts,
     apollo_provider_result: apolloProviderResult ?? null,
+    search_path: APOLLO_LIVE_PILOT_LEGACY_DOUBLE_RUN_PATH,
   }
 }

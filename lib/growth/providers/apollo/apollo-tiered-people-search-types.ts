@@ -42,6 +42,7 @@ export type ApolloSearchTierAttemptEvidence = {
   title_filter_applied: boolean
   raw_contacts_returned: number
   mapped_contacts: number
+  mapped_partial_identity_contacts?: number
   mapping_rejections: number
   rejection_reasons: Record<string, number>
   mapper_rejection_samples: ApolloMapperRejectionPersonSample[]

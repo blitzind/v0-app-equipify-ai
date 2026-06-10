@@ -3,6 +3,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { buildApolloCohortCompanySearchDebug } from "@/lib/growth/apollo/apollo-cohort-company-search-debug"
 import { runApolloLivePilotContactDiscovery } from "@/lib/growth/apollo/apollo-live-pilot-contact-discovery"
 import { enrichApolloCandidatesNeedingEmail } from "@/lib/growth/apollo/apollo-candidate-email-enrichment"
 import { enrichApolloPartialIdentityCandidates } from "@/lib/growth/apollo/apollo-partial-identity-enrichment"
@@ -195,7 +196,19 @@ function readSearchStrategyFromDiscovery(
   ) {
     return (metadata as Record<string, unknown>).apollo_search_strategy as ApolloTieredPeopleSearchEvidence
   }
+
   return emptyApolloTieredPeopleSearchEvidence()
+}
+
+function snapshotGuardrails(): Record<string, number> | null {
+  const guardrails = getApolloRunGuardrailSnapshot()
+  if (!guardrails) return null
+  return {
+    search_api_calls: guardrails.search_api_calls,
+    api_calls: guardrails.api_calls,
+    companies_acquired: guardrails.companies_acquired,
+    bulk_match_batches: guardrails.bulk_match_batches,
+  }
 }
 
 async function loadApolloCandidateIds(
@@ -274,6 +287,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
       apollo_persisted_this_run: 0,
       current_run_attribution: null,
       partial_identity_evidence: emptyApolloPartialIdentityEvidence(),
+      search_debug: null,
     }
   }
 
@@ -306,6 +320,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
       apollo_persisted_this_run: 0,
       current_run_attribution: null,
       partial_identity_evidence: emptyApolloPartialIdentityEvidence(),
+      search_debug: null,
     }
   }
   recordApolloCompanyAcquisitionStarted()
@@ -339,6 +354,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
   let apollo_people_found = 0
   let apollo_persisted_this_run = 0
   let search_strategy: ApolloTieredPeopleSearchEvidence | null = null
+  let search_debug: ReturnType<typeof buildApolloCohortCompanySearchDebug> = null
 
   if (skipSearch) {
     apollo_search_skipped_reason =
@@ -347,16 +363,22 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
         : "existing_apollo_candidates_with_channels"
   } else {
     apollo_search_attempted = true
-    const discovery = await runApolloLivePilotContactDiscovery(admin, {
-      company_candidate_id: context.company_candidate_id,
-      company_name: context.company_name,
-      domain: context.domain,
-      website_url: context.website_url,
-      city: context.city,
-      state: context.state,
-      created_by: input.created_by ?? null,
-      limit: contact_limit,
-    })
+    const guardrails_before_search = snapshotGuardrails()
+    const discovery = await runApolloLivePilotContactDiscovery(
+      admin,
+      {
+        company_candidate_id: context.company_candidate_id,
+        company_name: context.company_name,
+        domain: context.domain,
+        website_url: context.website_url,
+        city: context.city,
+        state: context.state,
+        created_by: input.created_by ?? null,
+        limit: contact_limit,
+      },
+      { fresh_apollo_search: true },
+    )
+    const guardrails_after_search = snapshotGuardrails()
 
     if (discovery.apollo_outcome?.status === "failed") {
       blockers.push(
@@ -388,6 +410,20 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
           ? discovery.apollo_provider_result.contacts.length
           : 0
     apollo_people_found = search_strategy?.mapped_contacts ?? apollo_persisted_this_run
+
+    search_debug = buildApolloCohortCompanySearchDebug({
+      company_candidate_id: context.company_candidate_id,
+      company_name: context.company_name,
+      domain: context.domain,
+      city: context.city,
+      state: context.state,
+      website_url: context.website_url,
+      contact_limit,
+      search_path: discovery.search_path,
+      guardrails_before_search,
+      guardrails_after_search,
+      search_strategy,
+    })
 
     if (apollo_people_found === 0 && apollo_search_attempted) {
       if (
@@ -556,6 +592,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     apollo_persisted_this_run,
     current_run_attribution,
     partial_identity_evidence,
+    search_debug,
   }
 }
 

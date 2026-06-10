@@ -191,6 +191,7 @@ export async function searchApolloPeopleWithTierStrategy(
       title_filter_applied: built.title_filter_applied,
       raw_contacts_returned: search.people.length,
       mapped_contacts: mapped.diagnostics.contacts_mapped,
+      mapped_partial_identity_contacts: mapped.mapped_partial_identity_contacts,
       mapping_rejections: mapped.diagnostics.contacts_skipped,
       rejection_reasons: mapped.diagnostics.skip_reasons,
       mapper_rejection_samples: mappingAudit.samples,

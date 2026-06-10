@@ -29,12 +29,14 @@ export type ApolloTierAttemptCompactSummary = {
   tier: number
   tier_name: string
   query_type: string
+  request_payload_summary: string | null
   domain: string | null
   company_name: string | null
   location: string | null
   titles_count: number
   raw_count: number
   mapped_count: number
+  partial_identity_count: number
   skipped_reason: string | null
   rejection_reasons: Record<string, number>
 }
@@ -166,12 +168,14 @@ export function buildApolloTierAttemptCompactSummary(
     tier: attempt.tier,
     tier_name: attempt.tier_name,
     query_type: inferQueryType(attempt),
+    request_payload_summary: attempt.request_payload_summary || null,
     domain: attempt.company_domain,
     company_name: attempt.company_name || null,
     location: attempt.organization_location,
     titles_count: attempt.person_titles.length,
     raw_count: attempt.raw_contacts_returned,
     mapped_count: attempt.mapped_contacts,
+    partial_identity_count: attempt.mapped_partial_identity_contacts ?? 0,
     skipped_reason: attempt.skipped_reason,
     rejection_reasons: attempt.rejection_reasons,
   }

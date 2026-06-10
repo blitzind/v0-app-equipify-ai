@@ -11,7 +11,7 @@ import {
   isApolloProviderConfigured,
 } from "@/lib/growth/providers/apollo/apollo-config"
 import { GROWTH_APOLLO_PROVIDER_QA_MARKER } from "@/lib/growth/providers/apollo/apollo-types"
-import { searchApolloPeopleWithTierStrategy } from "@/lib/growth/providers/apollo/apollo-tiered-people-search"
+import { runApolloSharedTieredPeopleSearch } from "@/lib/growth/apollo/apollo-shared-tiered-search"
 
 export { GROWTH_APOLLO_PROVIDER_QA_MARKER }
 
@@ -44,7 +44,7 @@ export function createApolloContactDiscoveryProvider(): GrowthContactDiscoveryPr
       }
 
       const domain = input.domain?.trim() || null
-      const search = await searchApolloPeopleWithTierStrategy(
+      const search = await runApolloSharedTieredPeopleSearch(
         {
           company_name: input.company_name,
           domain,
