@@ -15,6 +15,10 @@ import {
   type CompanyContactsPersistenceResolution,
 } from "@/lib/growth/contact-discovery/resolve-company-contacts-company-id"
 import { classifyContactIdentity } from "@/lib/growth/human-identity-evidence/contact-identity-classification"
+import {
+  readApolloTierUsedFromCandidate,
+  resolveApolloCandidateCompanyContactEmailStatus,
+} from "@/lib/growth/apollo/apollo-verified-email-promotion-evidence"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -126,7 +130,7 @@ function candidateToCompanyRow(input: {
     title: input.candidate.job_title,
     department: input.candidate.department,
     email: input.candidate.email,
-    email_status: input.candidate.email ? "discovered" : "unknown",
+    email_status: resolveApolloCandidateCompanyContactEmailStatus(input.candidate),
     phone: input.candidate.phone,
     phone_status: input.candidate.phone ? "unknown" : "unknown",
     linkedin_url: input.candidate.linkedin_url,
@@ -153,6 +157,10 @@ function candidateToCompanyRow(input: {
       identity_classification: identity.classification,
       identity_classification_reasons: identity.reasons,
       eligible_for_canonical_person: identity.eligible_for_canonical_person,
+      eligible_for_committee: identity.eligible_for_committee,
+      apollo_tier_used: readApolloTierUsedFromCandidate(input.candidate),
+      apollo_email_status: asString(candidateMetadata.apollo_email_status) || null,
+      apollo_person_id: asString(candidateMetadata.apollo_person_id) || null,
     },
   }
 }

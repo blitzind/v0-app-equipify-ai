@@ -1,5 +1,10 @@
 /** Apollo EN-3 promotion evidence helpers — client-safe. */
 
+import {
+  apolloCandidateHasVerifiedPromotableChannel,
+  countApolloVerifiedEmailCandidates,
+  selectApolloVerifiedEmailCandidatesForPromotion,
+} from "@/lib/growth/apollo/apollo-verified-email-promotion-evidence"
 import { candidateHasObservedContactChannel } from "@/lib/growth/apollo/apollo-live-pilot-canonical-sync-evidence"
 import type { GrowthContactCandidate } from "@/lib/growth/contact-discovery/contact-discovery-types"
 import { classifyContactIdentity } from "@/lib/growth/human-identity-evidence/contact-identity-classification"
@@ -28,7 +33,27 @@ export function countEnrichedCandidateChannels(
 export function selectApolloCandidatesForPromotion(
   candidates: GrowthContactCandidate[],
 ): GrowthContactCandidate[] {
+  const apollo = candidates.filter((candidate) => candidate.provider_type === "future_apollo")
+  if (apollo.length > 0) {
+    return selectApolloVerifiedEmailCandidatesForPromotion(candidates)
+  }
   return candidates.filter((candidate) => candidateHasObservedContactChannel(candidate))
+}
+
+export function countVerifiedApolloCandidateChannels(
+  candidates: GrowthContactCandidate[],
+): { with_verified_email: number; with_linkedin: number; with_channel: number } {
+  let with_linkedin = 0
+  let with_channel = 0
+  for (const candidate of candidates) {
+    if (asString(candidate.linkedin_url)) with_linkedin += 1
+    if (apolloCandidateHasVerifiedPromotableChannel(candidate)) with_channel += 1
+  }
+  return {
+    with_verified_email: countApolloVerifiedEmailCandidates(candidates),
+    with_linkedin,
+    with_channel,
+  }
 }
 
 export function buildApolloEnrichmentPromotionBlockers(input: {

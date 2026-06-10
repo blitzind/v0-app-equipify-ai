@@ -86,7 +86,16 @@ export function createApolloContactDiscoveryProvider(): GrowthContactDiscoveryPr
         }
       }
 
-      const contacts = search.mapped_contacts
+      const contacts = search.mapped_contacts.map((contact) => ({
+        ...contact,
+        metadata: {
+          ...(contact.metadata && typeof contact.metadata === "object"
+            ? (contact.metadata as Record<string, unknown>)
+            : {}),
+          apollo_tier_used: search.search_strategy.tier_used,
+          apollo_search_strategy: search.search_strategy,
+        },
+      }))
       const diagnostics = {
         ...search.diagnostics,
         contacts_mapped: contacts.length,

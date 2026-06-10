@@ -333,6 +333,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
       sequence_ready_contacts: 0,
       blockers: ["staging_company_candidate_not_found"],
       search_strategy: null,
+      verified_email_promotion: null,
     }
   }
 
@@ -481,6 +482,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     sequence_ready_contacts: readiness.sequence_ready,
     blockers,
     search_strategy,
+    verified_email_promotion: promotion.verified_email_promotion,
   }
 }
 

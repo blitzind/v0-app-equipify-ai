@@ -10,6 +10,7 @@ import {
 import {
   buildApolloEnrichmentPromotionBlockers,
   countEnrichedCandidateChannels,
+  countVerifiedApolloCandidateChannels,
   isSequenceReadyCompanyContact,
   selectApolloCandidatesForPromotion,
 } from "@/lib/growth/apollo/apollo-enrichment-cert-promotion-evidence"
@@ -18,7 +19,11 @@ import {
   type ApolloEnrichmentCertCanonicalCompanyResolutionEvidence,
 } from "@/lib/growth/apollo/apollo-enrichment-cert-canonical-company-resolution"
 import { runCanonicalPersonBackfillForCompanyCandidate } from "@/lib/growth/canonical-persons/canonical-person-backfill"
-import { candidateHasObservedContactChannel } from "@/lib/growth/apollo/apollo-live-pilot-canonical-sync-evidence"
+import {
+  apolloCandidateHasVerifiedPromotableChannel,
+  buildApolloVerifiedEmailPromotionContactRow,
+  type ApolloVerifiedEmailPromotionEvidence,
+} from "@/lib/growth/apollo/apollo-verified-email-promotion-evidence"
 import type { GrowthContactCandidate } from "@/lib/growth/contact-discovery/contact-discovery-types"
 
 export {
@@ -53,6 +58,7 @@ export type ApolloEnrichmentPromotionResult = {
   canonical_company_resolution: ApolloEnrichmentCertCanonicalCompanyResolutionEvidence
   canonical_person_backfill: { rows_processed: number; persons_linked: number }
   rejection_reasons: Record<string, number>
+  verified_email_promotion: ApolloVerifiedEmailPromotionEvidence
 }
 
 export async function loadPersistedApolloCandidatesForPromotion(
@@ -63,7 +69,8 @@ export async function loadPersistedApolloCandidatesForPromotion(
   const all = await listContactCandidatesForCompany(admin, company_candidate_id, limit)
   return all.filter(
     (candidate) =>
-      candidate.provider_type === "future_apollo" && candidateHasObservedContactChannel(candidate),
+      candidate.provider_type === "future_apollo" &&
+      apolloCandidateHasVerifiedPromotableChannel(candidate),
   )
 }
 
@@ -77,7 +84,8 @@ export async function reloadEnrichedApolloCandidates(
   const all = await listContactCandidatesForCompany(admin, input.company_candidate_id, 200)
   const channelReady = all.filter(
     (candidate) =>
-      candidate.provider_type === "future_apollo" && candidateHasObservedContactChannel(candidate),
+      candidate.provider_type === "future_apollo" &&
+      apolloCandidateHasVerifiedPromotableChannel(candidate),
   )
   if (input.candidate_ids.length === 0) return channelReady
 
@@ -122,7 +130,7 @@ export async function promoteEnrichedApolloCandidatesToCompanyContacts(
   const persisted = await loadPersistedApolloCandidatesForPromotion(admin, input.company_candidate_id)
   const seedCandidates =
     input.enriched_candidates.length > 0 ? input.enriched_candidates : persisted
-  const channelCounts = countEnrichedCandidateChannels(
+  const channelCounts = countVerifiedApolloCandidateChannels(
     seedCandidates.length > 0 ? seedCandidates : persisted,
   )
   const resolution = await resolveApolloEnrichmentCanonicalCompanyId(admin, {
@@ -186,9 +194,52 @@ export async function promoteEnrichedApolloCandidatesToCompanyContacts(
     rejection_reasons,
   })
 
+  const { data: promotedContacts } = canonical_company_id
+    ? await admin
+        .schema("growth")
+        .from("company_contacts")
+        .select("*")
+        .eq("company_id", canonical_company_id)
+        .limit(200)
+    : { data: [] as unknown[] }
+
+  const contactsByCandidateId = new Map<string, Record<string, unknown>>()
+  for (const raw of promotedContacts ?? []) {
+    const row = raw as Record<string, unknown>
+    const candidateId = asString(row.contact_candidate_id)
+    if (candidateId) contactsByCandidateId.set(candidateId, row)
+  }
+
+  const promotionPool = selectApolloCandidatesForPromotion(
+    seedCandidates.length > 0 ? seedCandidates : persisted,
+  )
+  const blockers_by_contact = promotionPool.map((candidate) =>
+    buildApolloVerifiedEmailPromotionContactRow({
+      candidate,
+      company_contact: contactsByCandidateId.get(candidate.id) ?? null,
+    }),
+  )
+
+  let canonical_person_matched = 0
+  for (const row of blockers_by_contact) {
+    if (row.canonical_person_id) canonical_person_matched += 1
+  }
+  const canonical_person_created = Math.max(0, backfill.persons_linked - canonical_person_matched)
+
+  const verified_email_promotion: ApolloVerifiedEmailPromotionEvidence = {
+    qa_marker: "apollo-verified-email-promotion-evidence-v1",
+    verified_email_contacts: channelCounts.with_verified_email,
+    canonical_person_created,
+    canonical_person_matched,
+    company_contacts_promoted: company_contacts_synced,
+    contactable_after_promotion: readiness.contactable,
+    sequence_ready_after_promotion: readiness.sequence_ready,
+    blockers_by_contact,
+  }
+
   return {
     qa_marker: "apollo-enrichment-cert-promotion-evidence-en-3-v1",
-    enriched_candidates_with_email: channelCounts.with_email,
+    enriched_candidates_with_email: channelCounts.with_verified_email,
     enriched_candidates_with_linkedin: channelCounts.with_linkedin,
     promotion_attempted,
     promotion_blockers,
@@ -204,5 +255,6 @@ export async function promoteEnrichedApolloCandidatesToCompanyContacts(
       persons_linked: backfill.persons_linked,
     },
     rejection_reasons,
+    verified_email_promotion,
   }
 }

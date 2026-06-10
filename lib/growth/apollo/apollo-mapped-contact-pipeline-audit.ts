@@ -3,6 +3,7 @@
 import { candidateHasObservedContactChannel } from "@/lib/growth/apollo/apollo-live-pilot-canonical-sync-evidence"
 import { isSequenceReadyCompanyContact } from "@/lib/growth/apollo/apollo-enrichment-cert-promotion-evidence"
 import { personOrganizationMatchesTarget } from "@/lib/growth/apollo/apollo-search-query-audit"
+import { isApolloVerifiedEmailStatus } from "@/lib/growth/apollo/apollo-verified-email-promotion-evidence"
 import type { GrowthContactDiscoveryProviderRawContact } from "@/lib/growth/contact-discovery/contact-discovery-provider-types"
 import type { GrowthContactCandidate } from "@/lib/growth/contact-discovery/contact-discovery-types"
 import { classifyContactIdentity } from "@/lib/growth/human-identity-evidence/contact-identity-classification"
@@ -154,9 +155,17 @@ export function evaluateApolloMappedContactPipelineStages(input: {
   })
 
   const apollo_person_id = readApolloPersonIdFromMapped(input.contact)
+  const metadata =
+    input.contact.metadata && typeof input.contact.metadata === "object"
+      ? (input.contact.metadata as Record<string, unknown>)
+      : {}
+  const apolloEmailStatus = asString(metadata.apollo_email_status) || asString(input.person.email_status)
+  const hasVerifiedEmail =
+    Boolean(asString(input.contact.email)) && isApolloVerifiedEmailStatus(apolloEmailStatus)
   const hasChannel =
     input.persisted_has_channel === true ||
-    Boolean(asString(input.contact.email) || asString(input.contact.phone) || asString(input.contact.linkedin_url))
+    hasVerifiedEmail ||
+    Boolean(asString(input.contact.phone) || asString(input.contact.linkedin_url))
 
   const stages: ApolloPipelineStageResult[] = []
 
@@ -201,7 +210,7 @@ export function evaluateApolloMappedContactPipelineStages(input: {
     ),
   )
 
-  if (asString(input.contact.email)) {
+  if (hasVerifiedEmail) {
     stages.push(stageResult("enrichment_eligibility", true, null))
   } else if (!apollo_person_id) {
     stages.push(stageResult("enrichment_eligibility", false, "no_apollo_person_id"))

@@ -74,6 +74,7 @@ function buildEnrichedHenryScheinCandidate(
     metadata: {
       ...normalized.metadata,
       apollo_enriched_at: "2026-06-01T00:00:00.000Z",
+      apollo_email_status: "verified",
     },
   }
 }
