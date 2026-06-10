@@ -15,6 +15,7 @@ import {
   mapApolloScale3CompanyEvidenceRow,
   type ApolloScale3CompanyPromotionEvidence,
 } from "@/lib/growth/apollo/apollo-scale-3-company-promotion-evidence"
+import { assessApolloScale3SearchStrategyResult } from "@/lib/growth/apollo/apollo-scale-3-certification-assessment"
 import type { ApolloPrimaryContactAcquisitionCompanyEvidence } from "@/lib/growth/apollo/apollo-primary-contact-acquisition-evidence"
 import type { ApolloSearchTierAttemptEvidence } from "@/lib/growth/providers/apollo/apollo-tiered-people-search-types"
 
@@ -51,31 +52,18 @@ export type ApolloScale3SearchStrategyCertification = {
     contactable_after_promotion: number
     legacy_contactable_contacts: number
     sequence_ready_after_promotion: number
+    current_run_apollo_verified_email_contacts: number
+    current_run_apollo_promoted_contacts: number
+    current_run_apollo_contactable_contacts: number
+    current_run_apollo_sequence_ready_contacts: number
+    historical_apollo_verified_email_contacts: number
   }
   failure_analysis: ApolloScale2LiveAcquisitionCertification["failure_analysis"]
   certification: ApolloScale2LiveAcquisitionCertification
 }
 
 export { mapApolloScale3CompanyEvidenceRow }
-
-export function assessApolloScale3SearchStrategyResult(input: {
-  companies: ApolloScale3CompanyEvidenceRow[]
-  mock: boolean
-}): ApolloScale2CertResult {
-  if (input.mock) return "FAIL"
-
-  const apolloReady = input.companies.filter(
-    (row) =>
-      row.mapped_contacts > 0 &&
-      row.promotion_evidence.verified_email_contacts > 0 &&
-      row.promotion_evidence.company_contacts_promoted > 0 &&
-      row.contactable > 0 &&
-      row.sequence_ready > 0,
-  )
-
-  if (apolloReady.length >= 1) return "PASS"
-  return "FAIL"
-}
+export { assessApolloScale3SearchStrategyResult } from "@/lib/growth/apollo/apollo-scale-3-certification-assessment"
 
 export async function certifyApolloScale3SearchStrategy(
   admin: SupabaseClient,
@@ -114,6 +102,11 @@ export async function certifyApolloScale3SearchStrategy(
   let contactable_after_promotion = 0
   let legacy_contactable_contacts = 0
   let sequence_ready_after_promotion = 0
+  let current_run_apollo_verified_email_contacts = 0
+  let current_run_apollo_promoted_contacts = 0
+  let current_run_apollo_contactable_contacts = 0
+  let current_run_apollo_sequence_ready_contacts = 0
+  let historical_apollo_verified_email_contacts = 0
 
   for (const row of companies) {
     if (row.tier_used === 1) tierCounts.tier_1 += 1
@@ -126,9 +119,18 @@ export async function certifyApolloScale3SearchStrategy(
     verified_email_contacts += row.promotion_evidence.verified_email_contacts
     email_enrichment_candidates_updated += row.promotion_evidence.email_enrichment_candidates_updated
     company_contacts_promoted += row.promotion_evidence.company_contacts_promoted
-    contactable_after_promotion += row.contactable
-    legacy_contactable_contacts += row.acquisition_evidence?.legacy_contactable_count ?? 0
-    sequence_ready_after_promotion += row.sequence_ready
+    contactable_after_promotion += row.promotion_evidence.current_run_apollo_contactable_contacts
+    legacy_contactable_contacts += row.promotion_evidence.legacy_contactable_contacts
+    sequence_ready_after_promotion += row.promotion_evidence.current_run_apollo_sequence_ready_contacts
+    current_run_apollo_verified_email_contacts +=
+      row.promotion_evidence.current_run_apollo_verified_email_contacts
+    current_run_apollo_promoted_contacts += row.promotion_evidence.current_run_apollo_promoted_contacts
+    current_run_apollo_contactable_contacts +=
+      row.promotion_evidence.current_run_apollo_contactable_contacts
+    current_run_apollo_sequence_ready_contacts +=
+      row.promotion_evidence.current_run_apollo_sequence_ready_contacts
+    historical_apollo_verified_email_contacts +=
+      row.promotion_evidence.historical_apollo_verified_email_contacts
   }
 
   const scale3Result = assessApolloScale3SearchStrategyResult({
@@ -164,6 +166,11 @@ export async function certifyApolloScale3SearchStrategy(
       contactable_after_promotion,
       legacy_contactable_contacts,
       sequence_ready_after_promotion,
+      current_run_apollo_verified_email_contacts,
+      current_run_apollo_promoted_contacts,
+      current_run_apollo_contactable_contacts,
+      current_run_apollo_sequence_ready_contacts,
+      historical_apollo_verified_email_contacts,
     },
     certification: scale2,
   }

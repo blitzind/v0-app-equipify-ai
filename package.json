@@ -259,6 +259,7 @@
     "test:apollo-acquisition-search-evidence": "tsx scripts/test-apollo-acquisition-search-evidence.ts",
     "test:apollo-tiered-search": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-tiered-search.ts",
     "test:apollo-scale-3-query-coverage": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-scale-3-query-coverage.ts",
+    "test:apollo-scale-3-guardrail-attribution": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-scale-3-guardrail-attribution.ts",
     "test:apollo-search-query-audit": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-search-query-audit.ts",
     "audit:apollo-scale-4-search-queries": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/audit-apollo-scale-4-search-queries.ts",
     "audit:apollo-mapping-pipeline:medical-equipment-solutions": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/audit-apollo-mapping-pipeline-medical-equipment-solutions.ts",

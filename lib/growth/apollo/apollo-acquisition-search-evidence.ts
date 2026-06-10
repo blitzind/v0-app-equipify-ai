@@ -47,6 +47,8 @@ export type ApolloAcquisitionSearchEvidence = {
   tier_used: number | null
   chosen_tier?: number | null
   chosen_tier_name?: string | null
+  last_attempted_tier?: number | null
+  last_attempted_tier_name?: string | null
   stop_reason?: string | null
   legacy_fallback_used: boolean
   legacy_contactable_count: number
@@ -136,8 +138,12 @@ export function buildApolloAcquisitionSearchEvidence(input: {
   const strategy = input.search_strategy
   const apollo_raw_people_count = strategy?.raw_contacts_returned ?? 0
   const apollo_mapped_people_count = strategy?.mapped_contacts ?? input.apollo_persisted_this_run ?? 0
-  const tier_used = strategy?.tier_used ?? null
-  const queryAttempt = pickQueryAttempt(strategy?.tier_attempts ?? [], tier_used)
+  const tier_used = strategy?.chosen_tier ?? strategy?.tier_used ?? null
+  const chosen_tier_name =
+    strategy?.chosen_tier_name ??
+    strategy?.last_attempted_tier_name ??
+    null
+  const queryAttempt = pickQueryAttempt(strategy?.tier_attempts ?? [], tier_used ?? strategy?.last_attempted_tier ?? null)
   const provider_mode = diagnostics.apollo_disabled_flag || !diagnostics.apollo_enabled
     ? "disabled"
     : diagnostics.mock_mode
@@ -210,7 +216,9 @@ export function buildApolloAcquisitionSearchEvidence(input: {
       search_outcome,
       tier_used,
       chosen_tier: strategy?.chosen_tier ?? tier_used,
-      chosen_tier_name: strategy?.chosen_tier_name ?? null,
+      chosen_tier_name,
+      last_attempted_tier: strategy?.last_attempted_tier ?? null,
+      last_attempted_tier_name: strategy?.last_attempted_tier_name ?? null,
       stop_reason: strategy?.stop_reason ?? null,
       legacy_fallback_used: strategy?.legacy_fallback_used ?? false,
       legacy_contactable_count:

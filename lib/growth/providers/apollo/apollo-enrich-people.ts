@@ -9,7 +9,7 @@ import {
   isApolloMockEnabled,
   resolveApolloApiBaseUrl,
 } from "@/lib/growth/providers/apollo/apollo-config"
-import { recordApolloBulkMatchBatch } from "@/lib/growth/providers/apollo/apollo-run-guardrails"
+import { recordApolloBulkMatchBatch, assertApolloEnrichmentCallAllowed } from "@/lib/growth/providers/apollo/apollo-run-guardrails"
 import { normalizeApolloSearchPersonRecord } from "@/lib/growth/providers/apollo/apollo-search-person-normalize"
 import type {
   ApolloBulkMatchResponse,
@@ -72,6 +72,7 @@ export async function enrichApolloPeopleWithBulkMatch(input: {
     )
     const batches = Math.ceil(ids.length / APOLLO_BULK_MATCH_BATCH_SIZE)
     if (input.record_guardrails !== false && isApolloEmailEnrichmentEnabled(env)) {
+      assertApolloEnrichmentCallAllowed({ env })
       recordApolloBulkMatchBatch({ batches, env })
     }
     return {
@@ -107,6 +108,9 @@ export async function enrichApolloPeopleWithBulkMatch(input: {
   for (let i = 0; i < ids.length; i += APOLLO_BULK_MATCH_BATCH_SIZE) {
     const batchIds = ids.slice(i, i + APOLLO_BULK_MATCH_BATCH_SIZE)
     batches += 1
+    if (input.record_guardrails !== false) {
+      assertApolloEnrichmentCallAllowed({ env })
+    }
 
     const res = await fetch(enrich_endpoint, {
       method: "POST",

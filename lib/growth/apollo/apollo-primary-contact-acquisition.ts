@@ -28,8 +28,15 @@ import { isApolloMockEnabled } from "@/lib/growth/providers/apollo/apollo-config
 import {
   beginApolloRunGuardrails,
   getApolloRunGuardrailSnapshot,
+  recordApolloCompanyAcquisitionStarted,
   resetApolloRunGuardrails,
+  assertApolloCompanyAcquisitionAllowed,
 } from "@/lib/growth/providers/apollo/apollo-run-guardrails"
+import {
+  resolveApolloCurrentRunAttribution,
+  assertApolloCurrentRunMetricsConsistent,
+  type ApolloCurrentRunAttribution,
+} from "@/lib/growth/apollo/apollo-current-run-attribution"
 import { isSequenceReadyCompanyContact } from "@/lib/growth/apollo/apollo-enrichment-cert-promotion-evidence"
 
 export {
@@ -185,6 +192,40 @@ function readSearchStrategyFromDiscovery(
   return emptyApolloTieredPeopleSearchEvidence()
 }
 
+async function loadApolloCandidateIds(
+  admin: SupabaseClient,
+  company_candidate_id: string,
+): Promise<Set<string>> {
+  const { data } = await admin
+    .schema("growth")
+    .from("contact_candidates")
+    .select("id")
+    .eq("company_candidate_id", company_candidate_id)
+    .eq("provider_type", "future_apollo")
+
+  const ids = new Set<string>()
+  for (const raw of data ?? []) {
+    const id = asString((raw as Record<string, unknown>).id)
+    if (id) ids.add(id)
+  }
+  return ids
+}
+
+async function loadCompanyContactsForAttribution(
+  admin: SupabaseClient,
+  canonical_company_id: string | null,
+): Promise<Record<string, unknown>[]> {
+  if (!canonical_company_id) return []
+  const { data } = await admin
+    .schema("growth")
+    .from("company_contacts")
+    .select(
+      "id, full_name, title, email, phone, email_status, phone_status, linkedin_url, canonical_person_id, contact_candidate_id, metadata",
+    )
+    .eq("company_id", canonical_company_id)
+  return (data ?? []) as Record<string, unknown>[]
+}
+
 export async function runApolloPrimaryContactAcquisitionForCompany(
   admin: SupabaseClient,
   input: {
@@ -224,8 +265,44 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
       search_strategy: null,
       apollo_search_evidence: null,
       verified_email_promotion: null,
+      apollo_persisted_this_run: 0,
+      current_run_attribution: null,
     }
   }
+
+  try {
+    assertApolloCompanyAcquisitionAllowed({ env })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "company_acquisition_guardrail_blocked"
+    return {
+      company_candidate_id: context.company_candidate_id,
+      company_name: context.company_name,
+      domain: context.domain,
+      canonical_company_id: null,
+      apollo_search_attempted: false,
+      apollo_search_skipped_reason: message,
+      apollo_people_found: 0,
+      existing_contacts_reused: 0,
+      existing_contactable_before: 0,
+      enrichment_attempted: false,
+      enrichment_skipped_reason: "company_acquisition_guardrail_blocked",
+      enrichment_candidates_updated: 0,
+      email_enrichment: emptyEmailEnrichmentEvidence("company_acquisition_guardrail_blocked"),
+      credits_consumed: 0,
+      promoted_contacts: 0,
+      contactable_contacts: 0,
+      sequence_ready_contacts: 0,
+      blockers: [message],
+      search_strategy: null,
+      apollo_search_evidence: null,
+      verified_email_promotion: null,
+      apollo_persisted_this_run: 0,
+      current_run_attribution: null,
+    }
+  }
+  recordApolloCompanyAcquisitionStarted()
+
+  const apollo_candidate_ids_before = await loadApolloCandidateIds(admin, context.company_candidate_id)
 
   const resolution = await resolveApolloEnrichmentCanonicalCompanyId(admin, {
     company_candidate_id: context.company_candidate_id,
@@ -285,6 +362,17 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     }
 
     search_strategy = readSearchStrategyFromDiscovery(discovery)
+    if (
+      apollo_search_skipped_reason &&
+      (!search_strategy || search_strategy.tier_attempts.length === 0)
+    ) {
+      search_strategy = {
+        ...emptyApolloTieredPeopleSearchEvidence(),
+        stop_reason: apollo_search_skipped_reason.includes("search API calls")
+          ? "search_api_budget_exhausted"
+          : "tier_skipped",
+      }
+    }
     apollo_persisted_this_run =
       typeof discovery.apollo_outcome?.contacts_persisted === "number"
         ? discovery.apollo_outcome.contacts_persisted
@@ -372,10 +460,31 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     }
   }
 
-  const readiness = await countReadinessAfterPromotion(
+  const companyContacts = await loadCompanyContactsForAttribution(
     admin,
     promotion.canonical_company_id ?? canonical_company_id,
   )
+  const current_run_attribution = resolveApolloCurrentRunAttribution({
+    apollo_mapped_this_run: search_strategy?.mapped_contacts ?? apollo_people_found,
+    apollo_persisted_this_run,
+    apollo_candidate_ids_before,
+    apollo_candidates_after: enrichedCandidates,
+    verified_email_promotion: promotion.verified_email_promotion,
+    existing_contactable_before: existing.existing_contactable_before,
+    company_contacts: companyContacts,
+  })
+  for (const leakBlocker of assertApolloCurrentRunMetricsConsistent({
+    apollo_mapped_this_run: current_run_attribution.current_run_apollo_mapped_contacts,
+    apollo_persisted_this_run: current_run_attribution.current_run_apollo_persisted_contacts,
+    current_run_apollo_verified_email_contacts:
+      current_run_attribution.current_run_apollo_verified_email_contacts,
+    current_run_apollo_promoted_contacts:
+      current_run_attribution.current_run_apollo_promoted_contacts,
+    current_run_apollo_sequence_ready_contacts:
+      current_run_attribution.current_run_apollo_sequence_ready_contacts,
+  })) {
+    if (!blockers.includes(leakBlocker)) blockers.push(leakBlocker)
+  }
 
   const searchEvidence = buildApolloAcquisitionSearchEvidence({
     company_name: context.company_name,
@@ -404,13 +513,15 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     enrichment_candidates_updated,
     email_enrichment,
     credits_consumed,
-    promoted_contacts: promotion.company_contacts_synced,
-    contactable_contacts: readiness.contactable,
-    sequence_ready_contacts: readiness.sequence_ready,
+    promoted_contacts: current_run_attribution.current_run_apollo_promoted_contacts,
+    contactable_contacts: current_run_attribution.current_run_apollo_contactable_contacts,
+    sequence_ready_contacts: current_run_attribution.current_run_apollo_sequence_ready_contacts,
     blockers: searchEvidence.apollo_search_blockers,
     search_strategy,
     apollo_search_evidence: searchEvidence.apollo_search_evidence,
     verified_email_promotion: promotion.verified_email_promotion,
+    apollo_persisted_this_run,
+    current_run_attribution,
   }
 }
 

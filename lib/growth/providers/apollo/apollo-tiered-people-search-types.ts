@@ -8,6 +8,7 @@ export const APOLLO_TIERED_PEOPLE_SEARCH_QA_MARKER = "apollo-tiered-people-searc
 export type ApolloSearchTierStopReason =
   | "mapped_contacts_found"
   | "exhausted_all_tiers"
+  | "search_api_budget_exhausted"
   | "mock_single_tier"
   | "tier_skipped"
 
@@ -40,6 +41,8 @@ export type ApolloTieredPeopleSearchEvidence = {
   tier_used: ApolloSearchTierUsed
   chosen_tier: ApolloSearchTier | null
   chosen_tier_name: string | null
+  last_attempted_tier: ApolloSearchTier | null
+  last_attempted_tier_name: string | null
   stop_reason: ApolloSearchTierStopReason | null
   tier_attempts: ApolloSearchTierAttemptEvidence[]
   raw_contacts_returned: number
@@ -56,6 +59,8 @@ export function emptyApolloTieredPeopleSearchEvidence(): ApolloTieredPeopleSearc
     tier_used: null,
     chosen_tier: null,
     chosen_tier_name: null,
+    last_attempted_tier: null,
+    last_attempted_tier_name: null,
     stop_reason: null,
     tier_attempts: [],
     raw_contacts_returned: 0,

@@ -17,7 +17,7 @@ import {
   type ApolloSearchTier,
 } from "@/lib/growth/providers/apollo/apollo-query-builder"
 import {
-  assertApolloCompanySearchAllowed,
+  assertApolloSearchApiCallAllowed,
   recordApolloSearchApiCall,
   ApolloRunGuardrailError,
 } from "@/lib/growth/providers/apollo/apollo-run-guardrails"
@@ -304,7 +304,7 @@ export async function searchApolloPeopleByCompany(
   recordApolloProviderCalled({ query_summary: summary, mock: false })
 
   try {
-    assertApolloCompanySearchAllowed({ company_limit: input.limit })
+    assertApolloSearchApiCallAllowed({ env: process.env })
   } catch (err) {
     const message =
       err instanceof ApolloRunGuardrailError

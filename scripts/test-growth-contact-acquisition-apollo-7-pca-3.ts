@@ -15,6 +15,7 @@ import {
   getApolloRunGuardrailSnapshot,
   ApolloRunGuardrailError,
   assertApolloCompanySearchAllowed,
+  assertApolloSearchApiCallAllowed,
 } from "../lib/growth/providers/apollo/apollo-run-guardrails"
 import {
   classifyApolloContactTitleBucket,
@@ -81,12 +82,13 @@ async function main() {
   recordApolloSearchApiCall()
   const snap = getApolloRunGuardrailSnapshot()
   assert.equal(snap?.search_api_calls, 1)
+  assert.equal(snap?.companies_acquired, 0)
   assert.equal(snap?.credits_estimate, 0)
   resetApolloRunGuardrails()
 
   beginApolloRunGuardrails()
   for (let i = 0; i < 60; i += 1) recordApolloSearchApiCall()
-  assert.throws(() => assertApolloCompanySearchAllowed(), ApolloRunGuardrailError)
+  assert.throws(() => assertApolloSearchApiCallAllowed(), ApolloRunGuardrailError)
   resetApolloRunGuardrails()
 
   const skippedIrrelevant = mapApolloPeopleToContactDiscoveryRaw({

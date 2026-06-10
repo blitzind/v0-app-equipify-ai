@@ -50,6 +50,12 @@ export type ApolloScale3CompanyPromotionEvidence = {
   company_contacts_promoted: number
   contactable_after_promotion: number
   sequence_ready_after_promotion: number
+  current_run_apollo_verified_email_contacts: number
+  current_run_apollo_promoted_contacts: number
+  current_run_apollo_contactable_contacts: number
+  current_run_apollo_sequence_ready_contacts: number
+  historical_apollo_verified_email_contacts: number
+  legacy_contactable_contacts: number
 }
 
 export function buildApolloScale3CompanyPromotionEvidence(
@@ -57,6 +63,7 @@ export function buildApolloScale3CompanyPromotionEvidence(
 ): ApolloScale3CompanyPromotionEvidence {
   const emailEnrichment = acquisition?.email_enrichment
   const verifiedPromotion = acquisition?.verified_email_promotion
+  const currentRun = acquisition?.current_run_attribution
 
   return {
     apollo_search_attempted: acquisition?.apollo_search_attempted ?? false,
@@ -77,6 +84,17 @@ export function buildApolloScale3CompanyPromotionEvidence(
       verifiedPromotion?.contactable_after_promotion ?? acquisition?.contactable_contacts ?? 0,
     sequence_ready_after_promotion:
       verifiedPromotion?.sequence_ready_after_promotion ?? acquisition?.sequence_ready_contacts ?? 0,
+    current_run_apollo_verified_email_contacts:
+      currentRun?.current_run_apollo_verified_email_contacts ?? 0,
+    current_run_apollo_promoted_contacts: currentRun?.current_run_apollo_promoted_contacts ?? 0,
+    current_run_apollo_contactable_contacts:
+      currentRun?.current_run_apollo_contactable_contacts ?? 0,
+    current_run_apollo_sequence_ready_contacts:
+      currentRun?.current_run_apollo_sequence_ready_contacts ?? 0,
+    historical_apollo_verified_email_contacts:
+      currentRun?.historical_apollo_verified_email_contacts ?? 0,
+    legacy_contactable_contacts:
+      currentRun?.legacy_contactable_contacts ?? acquisition?.existing_contactable_before ?? 0,
   }
 }
 
@@ -125,19 +143,26 @@ export function mapApolloScale3CompanyEvidenceRow(input: {
 }): ApolloScale3MappedCompanyEvidenceRow {
   const strategy = input.acquisition?.search_strategy
   const promotion_evidence = buildApolloScale3CompanyPromotionEvidence(input.acquisition)
-  const apollo_contactable = input.base.contactable_contacts
-  const apollo_sequence_ready = input.base.sequence_ready_contacts
+  const apollo_contactable = promotion_evidence.current_run_apollo_contactable_contacts
+  const apollo_sequence_ready = promotion_evidence.current_run_apollo_sequence_ready_contacts
   const mergedBlockers = [
     ...new Set([
       ...input.base.blockers,
       ...(input.acquisition?.apollo_search_evidence?.apollo_search_blockers ?? []),
+      ...(input.acquisition?.blockers ?? []),
     ]),
   ]
 
   return {
     ...input.base,
     blockers: mergedBlockers,
-    tier_used: strategy?.tier_used ?? input.acquisition?.apollo_search_evidence?.tier_used ?? null,
+    tier_used:
+      strategy?.chosen_tier ??
+      strategy?.last_attempted_tier ??
+      input.acquisition?.apollo_search_evidence?.chosen_tier ??
+      input.acquisition?.apollo_search_evidence?.last_attempted_tier ??
+      strategy?.tier_used ??
+      null,
     raw_contacts_returned:
       strategy?.raw_contacts_returned ??
       input.acquisition?.apollo_search_evidence?.apollo_raw_people_count ??
@@ -153,7 +178,7 @@ export function mapApolloScale3CompanyEvidenceRow(input: {
       {},
     tier_attempts: strategy?.tier_attempts ?? [],
     contacts_enriched: promotion_evidence.email_enrichment_candidates_updated,
-    contacts_promoted: promotion_evidence.company_contacts_promoted,
+    contacts_promoted: promotion_evidence.current_run_apollo_promoted_contacts,
     contactable: apollo_contactable,
     sequence_ready: apollo_sequence_ready,
     contactable_contacts: apollo_contactable,

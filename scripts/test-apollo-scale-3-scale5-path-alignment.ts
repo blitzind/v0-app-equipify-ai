@@ -41,8 +41,13 @@ function mesScale5PassAcquisition(): ApolloPrimaryContactAcquisitionCompanyEvide
     sequence_ready_contacts: 4,
     blockers: [],
     search_strategy: {
-      qa_marker: "apollo-tiered-people-search-v1",
+      qa_marker: "apollo-tiered-people-search-v2",
       tier_used: 2,
+      chosen_tier: 2,
+      chosen_tier_name: "B_company_location_titles",
+      last_attempted_tier: 2,
+      last_attempted_tier_name: "B_company_location_titles",
+      stop_reason: "mapped_contacts_found",
       raw_contacts_returned: 9,
       mapped_contacts: 9,
       mapping_rejections: 0,
@@ -60,6 +65,20 @@ function mesScale5PassAcquisition(): ApolloPrimaryContactAcquisitionCompanyEvide
       contactable_after_promotion: 5,
       sequence_ready_after_promotion: 4,
       blockers_by_contact: [],
+    },
+    apollo_persisted_this_run: 9,
+    current_run_attribution: {
+      qa_marker: "apollo-current-run-attribution-v1",
+      current_run_apollo_mapped_contacts: 9,
+      current_run_apollo_persisted_contacts: 9,
+      current_run_apollo_verified_email_contacts: 4,
+      current_run_apollo_promoted_contacts: 9,
+      current_run_apollo_contactable_contacts: 5,
+      current_run_apollo_sequence_ready_contacts: 4,
+      historical_apollo_verified_email_contacts: 0,
+      legacy_contactable_contacts: 0,
+      apollo_candidate_ids_this_run: ["mes-candidate-1"],
+      has_current_run_search_yield: true,
     },
   }
 }
@@ -96,6 +115,10 @@ function testMedicalEquipmentSolutionsScale5PassMapsToScale3Evidence(): void {
   assert.equal(row.promotion_evidence.company_contacts_promoted, 9)
   assert.equal(row.promotion_evidence.contactable_after_promotion, 5)
   assert.equal(row.promotion_evidence.sequence_ready_after_promotion, 4)
+  assert.equal(row.promotion_evidence.current_run_apollo_contactable_contacts, 5)
+  assert.equal(row.promotion_evidence.current_run_apollo_sequence_ready_contacts, 4)
+  assert.equal(row.contactable, 5)
+  assert.equal(row.sequence_ready, 4)
   assert.equal(row.promotion_evidence.verified_status_without_email_selected, 4)
   assert.equal(row.promotion_evidence.email_enrichment_candidates_updated, 4)
 

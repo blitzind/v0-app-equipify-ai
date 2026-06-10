@@ -60,6 +60,7 @@ export const APOLLO_DEFAULT_MAX_CONTACTS_PER_COMPANY = 25 as const
 export type ApolloCreditLimits = {
   max_companies_per_run: number
   max_api_calls_per_run: number
+  max_enrichment_batches_per_run: number
   max_contacts_per_company: number
 }
 
@@ -70,14 +71,19 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
 }
 
 export function resolveApolloCreditLimits(env: NodeJS.ProcessEnv = process.env): ApolloCreditLimits {
+  const max_api_calls_per_run = parsePositiveInt(
+    env.GROWTH_APOLLO_MAX_API_CALLS_PER_RUN,
+    APOLLO_DEFAULT_MAX_API_CALLS_PER_RUN,
+  )
   return {
     max_companies_per_run: parsePositiveInt(
       env.GROWTH_APOLLO_MAX_COMPANIES_PER_RUN,
       APOLLO_DEFAULT_MAX_COMPANIES_PER_RUN,
     ),
-    max_api_calls_per_run: parsePositiveInt(
-      env.GROWTH_APOLLO_MAX_API_CALLS_PER_RUN,
-      APOLLO_DEFAULT_MAX_API_CALLS_PER_RUN,
+    max_api_calls_per_run,
+    max_enrichment_batches_per_run: parsePositiveInt(
+      env.GROWTH_APOLLO_MAX_ENRICHMENT_BATCHES_PER_RUN,
+      max_api_calls_per_run,
     ),
     max_contacts_per_company: parsePositiveInt(
       env.GROWTH_APOLLO_MAX_CONTACTS_PER_COMPANY,
