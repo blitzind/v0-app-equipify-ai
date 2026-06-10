@@ -323,7 +323,9 @@ export async function buildApolloScale1CompanyResult(
     industry: meta.industry,
     acquisition: {
       apollo_contacts_found: company.apollo_people_found,
-      apollo_contacts_enriched: apollo_contacts_enriched || company.enrichment_candidates_updated,
+      apollo_contacts_enriched:
+        company.email_enrichment?.candidates_updated ??
+        (apollo_contacts_enriched || company.enrichment_candidates_updated),
       emails_discovered,
       phones_discovered,
       linkedin_profiles_discovered,
@@ -332,18 +334,23 @@ export async function buildApolloScale1CompanyResult(
       apollo_search_skipped_reason: company.apollo_search_skipped_reason,
       enrichment_attempted: company.enrichment_attempted,
       enrichment_skipped_reason: company.enrichment_skipped_reason,
-      enrichment_candidates_updated: company.enrichment_candidates_updated,
+      enrichment_candidates_updated:
+        company.email_enrichment?.candidates_updated ?? company.enrichment_candidates_updated,
     },
     promotion: {
-      contacts_promoted: company.promoted_contacts,
+      contacts_promoted:
+        company.verified_email_promotion?.company_contacts_promoted ?? company.promoted_contacts,
       canonical_persons_created,
       canonical_persons_matched,
       canonical_company_matched: Boolean(company.canonical_company_id),
-      company_contacts_created: company.promoted_contacts,
+      company_contacts_created:
+        company.verified_email_promotion?.company_contacts_promoted ?? company.promoted_contacts,
     },
     readiness: {
-      contactable_contacts,
-      sequence_ready_contacts,
+      contactable_contacts:
+        company.verified_email_promotion?.contactable_after_promotion ?? contactable_contacts,
+      sequence_ready_contacts:
+        company.verified_email_promotion?.sequence_ready_after_promotion ?? sequence_ready_contacts,
       blocked_contacts,
       blockers_by_category,
     },

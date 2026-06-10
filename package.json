@@ -255,6 +255,7 @@
     "test:apollo-scale-2": "tsx scripts/test-apollo-scale-2.ts",
     "test:apollo-scale-2-production-route": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-scale-2-production-route.ts",
     "test:apollo-scale-2-evidence-generation": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-scale-2-evidence-generation.ts",
+    "test:apollo-scale-3-scale5-path-alignment": "tsx scripts/test-apollo-scale-3-scale5-path-alignment.ts",
     "test:apollo-tiered-search": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-tiered-search.ts",
     "test:apollo-search-query-audit": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-search-query-audit.ts",
     "audit:apollo-scale-4-search-queries": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/audit-apollo-scale-4-search-queries.ts",

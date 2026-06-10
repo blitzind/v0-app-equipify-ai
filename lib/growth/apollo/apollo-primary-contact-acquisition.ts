@@ -97,6 +97,7 @@ async function countExistingContactReuse(
 ): Promise<{
   existing_contacts_reused: number
   existing_contactable_before: number
+  existing_apollo_candidates: number
   existing_apollo_with_channel: number
 }> {
   let existing_contacts_reused = 0
@@ -116,6 +117,16 @@ async function countExistingContactReuse(
     }
   }
 
+  const { data: apolloRows } = await admin
+    .schema("growth")
+    .from("contact_candidates")
+    .select("id")
+    .eq("company_candidate_id", input.company_candidate_id)
+    .eq("provider_type", "future_apollo")
+    .limit(500)
+
+  const existing_apollo_candidates = (apolloRows ?? []).length
+
   const persisted = await loadPersistedApolloCandidatesForPromotion(
     admin,
     input.company_candidate_id,
@@ -125,6 +136,7 @@ async function countExistingContactReuse(
   return {
     existing_contacts_reused,
     existing_contactable_before,
+    existing_apollo_candidates,
     existing_apollo_with_channel,
   }
 }
@@ -228,7 +240,8 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
 
   const skipSearch =
     input.skip_apollo_search_if_existing_contactable !== false &&
-    (existing.existing_contactable_before > 0 || existing.existing_apollo_with_channel >= contact_limit)
+    ((existing.existing_contactable_before > 0 && existing.existing_apollo_with_channel > 0) ||
+      existing.existing_apollo_with_channel >= contact_limit)
 
   let apollo_search_attempted = false
   let apollo_search_skipped_reason: string | null = null
@@ -266,14 +279,18 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     search_strategy = readSearchStrategyFromDiscovery(discovery)
 
     if (apollo_people_found === 0 && apollo_search_attempted) {
-      if (existing.existing_contactable_before > 0) {
+      if (
+        existing.existing_contactable_before > 0 &&
+        existing.existing_apollo_candidates === 0
+      ) {
         search_strategy = {
           ...(search_strategy ?? emptyApolloTieredPeopleSearchEvidence()),
           tier_used: 4,
           legacy_fallback_used: true,
           legacy_contactable_count: existing.existing_contactable_before,
         }
-      } else {
+      }
+      if (!blockers.includes("apollo_zero_contacts_mapped")) {
         blockers.push("apollo_zero_contacts_mapped")
       }
     }
