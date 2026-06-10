@@ -59,6 +59,48 @@ export function isApolloVerifiedEmailStatus(status: string | null | undefined): 
   return asString(status).toLowerCase() === "verified"
 }
 
+/** Verified Apollo email for company_contacts.email — rejects unavailable/extrapolated. */
+export function resolveApolloCandidatePromotedEmail(
+  candidate: GrowthContactCandidate,
+): string | null {
+  const email = asString(candidate.email)
+  if (!email) return null
+  if (candidate.provider_type !== "future_apollo") return email
+
+  const status = readApolloEmailStatusFromCandidate(candidate)
+  if (isApolloVerifiedEmailStatus(status)) return email
+  if (status && NON_CONTACTABLE_APOLLO_EMAIL_STATUSES.has(status.toLowerCase())) return null
+  return null
+}
+
+export function resolveApolloCandidateCompanyContactEmailStatus(
+  candidate: GrowthContactCandidate,
+): GrowthCompanyContact["email_status"] {
+  const email = resolveApolloCandidatePromotedEmail(candidate)
+  if (!email) return "unknown"
+
+  const status = readApolloEmailStatusFromCandidate(candidate)
+  if (isApolloVerifiedEmailStatus(status)) return "verified"
+  if (status && NON_CONTACTABLE_APOLLO_EMAIL_STATUSES.has(status.toLowerCase())) return "unknown"
+  return "discovered"
+}
+
+export function buildApolloCompanyContactPromotionFields(input: {
+  candidate: GrowthContactCandidate
+  prior_email?: string | null
+  prior_email_status?: GrowthCompanyContact["email_status"] | null
+}): {
+  email: string | null
+  email_status: GrowthCompanyContact["email_status"]
+} {
+  const promotedEmail = resolveApolloCandidatePromotedEmail(input.candidate)
+  const email = promotedEmail || asString(input.prior_email) || null
+  const email_status = email
+    ? resolveApolloCandidateCompanyContactEmailStatus({ ...input.candidate, email })
+    : input.prior_email_status ?? "unknown"
+  return { email, email_status }
+}
+
 export function apolloCandidateHasVerifiedPromotableChannel(
   candidate: GrowthContactCandidate,
 ): boolean {
@@ -76,18 +118,6 @@ export function apolloCandidateHasVerifiedPromotableChannel(
   }
 
   return Boolean(asString(candidate.phone) || asString(candidate.linkedin_url))
-}
-
-export function resolveApolloCandidateCompanyContactEmailStatus(
-  candidate: GrowthContactCandidate,
-): GrowthCompanyContact["email_status"] {
-  const email = asString(candidate.email)
-  if (!email) return "unknown"
-
-  const status = readApolloEmailStatusFromCandidate(candidate)
-  if (isApolloVerifiedEmailStatus(status)) return "verified"
-  if (status && NON_CONTACTABLE_APOLLO_EMAIL_STATUSES.has(status.toLowerCase())) return "unknown"
-  return "discovered"
 }
 
 export type ApolloVerifiedEmailPromotionContactBlocker = {

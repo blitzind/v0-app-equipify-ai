@@ -17,7 +17,8 @@ import {
 import { classifyContactIdentity } from "@/lib/growth/human-identity-evidence/contact-identity-classification"
 import {
   readApolloTierUsedFromCandidate,
-  resolveApolloCandidateCompanyContactEmailStatus,
+  buildApolloCompanyContactPromotionFields,
+  resolveApolloCandidatePromotedEmail,
 } from "@/lib/growth/apollo/apollo-verified-email-promotion-evidence"
 
 function asString(value: unknown): string {
@@ -75,6 +76,12 @@ export function candidateSourceType(
   return "manual"
 }
 
+function preferNonEmptyString(next: unknown, prior: unknown): string | null {
+  const normalized = asString(next)
+  if (normalized) return normalized
+  return asString(prior) || null
+}
+
 function candidateToCompanyRow(input: {
   company_id: string
   candidate: GrowthContactCandidate
@@ -93,11 +100,15 @@ function candidateToCompanyRow(input: {
     exact_title_match: Boolean(input.candidate.job_title),
   })
 
+  const promotedEmail = resolveApolloCandidatePromotedEmail(input.candidate)
+  const promotionFields = buildApolloCompanyContactPromotionFields({
+    candidate: input.candidate,
+  })
   const dedupe_hash = companyContactDedupeHash({
     company_id: input.company_id,
     full_name: input.candidate.full_name,
     title: input.candidate.job_title,
-    email: input.candidate.email,
+    email: promotedEmail,
   })
 
   const metaClassification = asString(candidateMetadata.identity_classification)
@@ -129,11 +140,11 @@ function candidateToCompanyRow(input: {
     last_name: input.candidate.last_name,
     title: input.candidate.job_title,
     department: input.candidate.department,
-    email: input.candidate.email,
-    email_status: resolveApolloCandidateCompanyContactEmailStatus(input.candidate),
-    phone: input.candidate.phone,
+    email: promotionFields.email,
+    email_status: promotionFields.email_status,
+    phone: asString(input.candidate.phone) || null,
     phone_status: input.candidate.phone ? "unknown" : "unknown",
-    linkedin_url: input.candidate.linkedin_url,
+    linkedin_url: asString(input.candidate.linkedin_url) || null,
     confidence_score: Math.max(score.confidence_score, Math.round(input.candidate.confidence * 100)),
     decision_maker_score: score.decision_maker_score,
     source_type: resolvedSourceType,
@@ -208,6 +219,87 @@ function classifyInsertFailure(error: { code?: string | null; message?: string |
   return "insert_failed"
 }
 
+async function findExistingCompanyContactForCandidate(
+  admin: SupabaseClient,
+  input: {
+    canonical_company_id: string
+    candidate: GrowthContactCandidate
+    dedupe_hash: string
+  },
+): Promise<Record<string, unknown> | null> {
+  if (input.candidate.id) {
+    const { data: byCandidate } = await admin
+      .schema("growth")
+      .from("company_contacts")
+      .select("*")
+      .eq("company_id", input.canonical_company_id)
+      .eq("contact_candidate_id", input.candidate.id)
+      .maybeSingle()
+    if (byCandidate) return byCandidate as Record<string, unknown>
+  }
+
+  const { data: byHash } = await admin
+    .schema("growth")
+    .from("company_contacts")
+    .select("*")
+    .eq("company_id", input.canonical_company_id)
+    .eq("dedupe_hash", input.dedupe_hash)
+    .maybeSingle()
+
+  return (byHash as Record<string, unknown> | undefined) ?? null
+}
+
+function buildCompanyContactUpdateFromCandidate(input: {
+  candidate: GrowthContactCandidate
+  row: Record<string, unknown>
+  prior: GrowthCompanyContact
+  nowIso: string
+}): Record<string, unknown> {
+  const promotionFields = buildApolloCompanyContactPromotionFields({
+    candidate: input.candidate,
+    prior_email: input.prior.email,
+    prior_email_status: input.prior.email_status,
+  })
+  const resolvedPhone = preferNonEmptyString(input.row.phone, input.prior.phone)
+  const resolvedLinkedin = preferNonEmptyString(input.row.linkedin_url, input.prior.linkedin_url)
+  const resolvedTitle = preferNonEmptyString(input.row.title, input.prior.title)
+  const nextDedupeHash =
+    asString(input.row.dedupe_hash) ||
+    companyContactDedupeHash({
+      company_id: input.prior.company_id,
+      full_name: input.prior.full_name,
+      title: resolvedTitle,
+      email: promotionFields.email,
+    })
+
+  return {
+    contact_candidate_id: input.prior.contact_candidate_id ?? input.candidate.id,
+    full_name: preferNonEmptyString(input.row.full_name, input.prior.full_name) ?? input.prior.full_name,
+    first_name: preferNonEmptyString(input.row.first_name, input.prior.first_name),
+    last_name: preferNonEmptyString(input.row.last_name, input.prior.last_name),
+    title: resolvedTitle,
+    department: preferNonEmptyString(input.row.department, input.prior.department),
+    email: promotionFields.email,
+    email_status: promotionFields.email_status,
+    phone: resolvedPhone,
+    phone_status: resolvedPhone ? input.prior.phone_status || "unknown" : input.prior.phone_status,
+    linkedin_url: resolvedLinkedin,
+    confidence_score: Math.max(input.prior.confidence_score, Number(input.row.confidence_score ?? 0)),
+    decision_maker_score: Math.max(
+      input.prior.decision_maker_score,
+      Number(input.row.decision_maker_score ?? 0),
+    ),
+    dedupe_hash: nextDedupeHash,
+    updated_at: input.nowIso,
+    metadata: {
+      ...input.prior.metadata,
+      ...(input.row.metadata as Record<string, unknown>),
+      acquisition_sync: true,
+      contact_candidate_id: input.prior.contact_candidate_id ?? input.candidate.id,
+    },
+  }
+}
+
 async function syncContactCandidatesToCanonicalCompany(
   admin: SupabaseClient,
   input: {
@@ -248,34 +340,25 @@ async function syncContactCandidatesToCanonicalCompany(
     })
     const dedupe_hash = asString(row.dedupe_hash)
 
-    const { data: existing } = await admin
-      .schema("growth")
-      .from("company_contacts")
-      .select("*")
-      .eq("company_id", canonical_company_id)
-      .eq("dedupe_hash", dedupe_hash)
-      .maybeSingle()
+    const existing = await findExistingCompanyContactForCandidate(admin, {
+      canonical_company_id,
+      candidate,
+      dedupe_hash,
+    })
 
     if (existing) {
       const prior = rowToCompanyContact(existing as Record<string, unknown>)
       const { error } = await admin
         .schema("growth")
         .from("company_contacts")
-        .update({
-          contact_candidate_id: prior.contact_candidate_id ?? candidate.id,
-          email: row.email ?? prior.email,
-          phone: row.phone ?? prior.phone,
-          title: row.title ?? prior.title,
-          linkedin_url: row.linkedin_url ?? prior.linkedin_url,
-          confidence_score: Math.max(prior.confidence_score, Number(row.confidence_score ?? 0)),
-          decision_maker_score: Math.max(prior.decision_maker_score, Number(row.decision_maker_score ?? 0)),
-          updated_at: nowIso,
-          metadata: {
-            ...prior.metadata,
-            acquisition_sync: true,
-            contact_candidate_id: prior.contact_candidate_id ?? candidate.id,
-          },
-        })
+        .update(
+          buildCompanyContactUpdateFromCandidate({
+            candidate,
+            row,
+            prior,
+            nowIso,
+          }),
+        )
         .eq("id", prior.id)
       if (!error) {
         synced += 1
