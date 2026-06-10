@@ -262,6 +262,7 @@
     "test:apollo-mapped-contact-pipeline-audit": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-mapped-contact-pipeline-audit.ts",
     "test:apollo-mapping-pipeline-audit-route": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-mapping-pipeline-audit-route.ts",
     "test:apollo-scale-5-verified-email-promotion": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-scale-5-verified-email-promotion.ts",
+    "test:apollo-scale-5-production-route": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-scale-5-production-route.ts",
     "test:apollo-search-query-audit-route": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-search-query-audit-route.ts",
     "certify:execution-1-approval-job:production": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/certify-execution-1-approval-job-production.ts",
     "test:execution-1-approval-job": "tsx scripts/test-execution-1-approval-job.ts",

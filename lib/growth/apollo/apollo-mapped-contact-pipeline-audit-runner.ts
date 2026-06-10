@@ -34,7 +34,7 @@ function readApolloPersonId(candidate: GrowthContactCandidate): string | null {
   return asString(metadata.apollo_person_id) || null
 }
 
-async function resolveMedicalEquipmentSolutionsCompany(admin: SupabaseClient): Promise<{
+export async function resolveMedicalEquipmentSolutionsCompany(admin: SupabaseClient): Promise<{
   company_candidate_id: string
   company_name: string
   domain: string
