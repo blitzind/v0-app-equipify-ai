@@ -12,6 +12,12 @@ export type ApolloPrimaryContactEmailEnrichmentEvidence = {
   verified_status_without_email_selected: number
   channel_less_selected: number
   skipped_reason: string | null
+  error: string | null
+  error_stage:
+    | "email_enrichment_selection"
+    | "apollo_bulk_match_enrichment"
+    | "candidate_persistence"
+    | null
 }
 
 export type ApolloPrimaryContactAcquisitionCompanyEvidence = {

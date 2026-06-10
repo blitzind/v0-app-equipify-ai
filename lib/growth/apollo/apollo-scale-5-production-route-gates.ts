@@ -39,9 +39,23 @@ await fetch("/api/platform/growth/apollo-scale-5/execute", {
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ confirm: "${APOLLO_SCALE_5_EXECUTE_CONFIRM}" }),
 })
-  .then((r) => r.json())
+  .then(async (r) => {
+    const text = await r.text()
+    try {
+      return JSON.parse(text)
+    } catch (error) {
+      console.error("apollo-scale-5 execute returned non-JSON", r.status, text.slice(0, 500))
+      throw error
+    }
+  })
   .then((payload) => {
+    console.log("ok", payload.ok)
+    console.log("stage", payload.stage)
+    console.log("error", payload.error ?? null, payload.message ?? null)
+    console.log("execution_id", payload.execution_id)
     console.log("verdict", payload.verdict)
+    console.log("email_enrichment", payload.certification?.email_enrichment ?? null)
+    console.log("email_channel_evidence", payload.certification?.email_channel_evidence ?? null)
     console.log("search", payload.certification?.search)
     console.log("promotion", payload.certification?.promotion)
     console.log("readiness", payload.certification?.readiness)

@@ -21,7 +21,13 @@ import {
   buildApolloEmailChannelEvidenceRow,
   type ApolloEmailChannelEvidenceRow,
 } from "@/lib/growth/apollo/apollo-email-channel-evidence"
+import {
+  ApolloScale5StageError,
+  runApolloScale5ExecutionStage,
+} from "@/lib/growth/apollo/apollo-scale-5-execution-errors"
 import type { GrowthContactCandidate } from "@/lib/growth/contact-discovery/contact-discovery-types"
+
+export const APOLLO_SCALE_5_PRODUCTION_CERT_QA_MARKER =
   "apollo-scale-5-verified-email-production-cert-v1" as const
 
 export type ApolloScale5ContactEvidenceRow = {
@@ -339,24 +345,54 @@ export async function certifyApolloScale5VerifiedEmailPromotion(
   const env = input.env ?? process.env
   const contact_limit = input.contact_limit ?? 25
 
-  const acquisition = await runApolloPrimaryContactAcquisitionForCompany(admin, {
-    company_candidate_id: input.company_candidate_id,
-    contact_limit,
-    created_by: input.created_by ?? null,
-    env,
-    skip_apollo_search_if_existing_contactable: false,
+  const acquisitionStage = await runApolloScale5ExecutionStage({
+    stage: "apollo_search",
+    run: () =>
+      runApolloPrimaryContactAcquisitionForCompany(admin, {
+        company_candidate_id: input.company_candidate_id,
+        contact_limit,
+        created_by: input.created_by ?? null,
+        env,
+        skip_apollo_search_if_existing_contactable: false,
+      }),
   })
+  if (!acquisitionStage.ok) {
+    throw new ApolloScale5StageError(acquisitionStage.stage, acquisitionStage.message, {
+      cause: acquisitionStage.cause,
+    })
+  }
+  const acquisition = acquisitionStage.value
 
-  const contactEvidence = await loadApolloContactEvidence(admin, {
-    company_candidate_id: input.company_candidate_id,
-    canonical_company_id: acquisition.canonical_company_id,
+  const contactEvidenceStage = await runApolloScale5ExecutionStage({
+    stage: "readiness_evaluation",
+    run: () =>
+      loadApolloContactEvidence(admin, {
+        company_candidate_id: input.company_candidate_id,
+        canonical_company_id: acquisition.canonical_company_id,
+      }),
   })
+  if (!contactEvidenceStage.ok) {
+    throw new ApolloScale5StageError(contactEvidenceStage.stage, contactEvidenceStage.message, {
+      cause: contactEvidenceStage.cause,
+    })
+  }
+  const contactEvidence = contactEvidenceStage.value
 
-  const email_channel_evidence = await loadApolloEmailChannelEvidence(admin, {
-    company_candidate_id: input.company_candidate_id,
-    canonical_company_id: acquisition.canonical_company_id,
-    verified_names: APOLLO_SCALE_5_VERIFIED_CONTACT_NAMES,
+  const emailChannelStage = await runApolloScale5ExecutionStage({
+    stage: "evidence_build",
+    run: () =>
+      loadApolloEmailChannelEvidence(admin, {
+        company_candidate_id: input.company_candidate_id,
+        canonical_company_id: acquisition.canonical_company_id,
+        verified_names: APOLLO_SCALE_5_VERIFIED_CONTACT_NAMES,
+      }),
   })
+  if (!emailChannelStage.ok) {
+    throw new ApolloScale5StageError(emailChannelStage.stage, emailChannelStage.message, {
+      cause: emailChannelStage.cause,
+    })
+  }
+  const email_channel_evidence = emailChannelStage.value
 
   const verified_email_promotion = acquisition.verified_email_promotion
   const verified_contact_checks = buildVerifiedContactChecks(contactEvidence.contacts)

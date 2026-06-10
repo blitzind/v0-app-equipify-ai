@@ -14,6 +14,7 @@ import {
   emptyApolloPrimaryContactAcquisitionEvidence,
   type ApolloPrimaryContactAcquisitionCompanyEvidence,
   type ApolloPrimaryContactAcquisitionEvidence,
+  type ApolloPrimaryContactEmailEnrichmentEvidence,
 } from "@/lib/growth/apollo/apollo-primary-contact-acquisition-evidence"
 import { emptyApolloTieredPeopleSearchEvidence } from "@/lib/growth/providers/apollo/apollo-tiered-people-search-types"
 import type { ApolloTieredPeopleSearchEvidence } from "@/lib/growth/providers/apollo/apollo-tiered-people-search-types"
@@ -40,13 +41,19 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
 
-function emptyEmailEnrichmentEvidence(skipped_reason: string | null = null) {
+function emptyEmailEnrichmentEvidence(
+  skipped_reason: string | null = null,
+  overrides?: Partial<ApolloPrimaryContactEmailEnrichmentEvidence>,
+) {
   return {
     candidates_selected: 0,
     candidates_updated: 0,
     verified_status_without_email_selected: 0,
     channel_less_selected: 0,
     skipped_reason,
+    error: null,
+    error_stage: null,
+    ...overrides,
   }
 }
 
@@ -311,6 +318,11 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
       verified_status_without_email_selected: enrichment.verified_status_without_email_selected,
       channel_less_selected: enrichment.channel_less_selected,
       skipped_reason: enrichment.skipped_reason,
+      error: enrichment.error,
+      error_stage: enrichment.error_stage,
+    }
+    if (enrichment.error) {
+      blockers.push(`apollo_email_enrichment:${enrichment.error_stage ?? "unknown"}:${enrichment.error}`)
     }
   }
 

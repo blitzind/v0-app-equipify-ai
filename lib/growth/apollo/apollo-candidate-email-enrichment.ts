@@ -45,6 +45,29 @@ export type ApolloCandidateEmailEnrichmentResult = {
   channel_less_selected: number
   credits_consumed: number
   skipped_reason: string | null
+  error: string | null
+  error_stage:
+    | "email_enrichment_selection"
+    | "apollo_bulk_match_enrichment"
+    | "candidate_persistence"
+    | null
+}
+
+function emptyEnrichmentResult(
+  skipped_reason: string | null,
+  overrides?: Partial<ApolloCandidateEmailEnrichmentResult>,
+): ApolloCandidateEmailEnrichmentResult {
+  return {
+    candidates_selected: 0,
+    candidates_updated: 0,
+    verified_status_without_email_selected: 0,
+    channel_less_selected: 0,
+    credits_consumed: 0,
+    skipped_reason,
+    error: null,
+    error_stage: null,
+    ...overrides,
+  }
 }
 
 export async function enrichApolloCandidatesNeedingEmail(
@@ -57,17 +80,10 @@ export async function enrichApolloCandidatesNeedingEmail(
   },
 ): Promise<ApolloCandidateEmailEnrichmentResult> {
   if (!isApolloEmailEnrichmentEnabled(input.env)) {
-    return {
-      candidates_selected: 0,
-      candidates_updated: 0,
-      verified_status_without_email_selected: 0,
-      channel_less_selected: 0,
-      credits_consumed: 0,
-      skipped_reason: "enrichment_gates_blocked",
-    }
+    return emptyEnrichmentResult("enrichment_gates_blocked")
   }
 
-  const { data } = await admin
+  const { data, error: loadError } = await admin
     .schema("growth")
     .from("contact_candidates")
     .select(
@@ -77,18 +93,18 @@ export async function enrichApolloCandidatesNeedingEmail(
     .eq("provider_type", "future_apollo")
     .limit(Math.max(input.max_people * 3, input.max_people))
 
+  if (loadError) {
+    return emptyEnrichmentResult("candidate_load_failed", {
+      error: loadError.message,
+      error_stage: "email_enrichment_selection" as ApolloCandidateEmailEnrichmentResult["error_stage"],
+    })
+  }
+
   const candidates = (data ?? []) as GrowthContactCandidate[]
   const selected = candidates.filter((candidate) => apolloCandidateNeedsEmailEnrichment(candidate))
 
   if (selected.length === 0) {
-    return {
-      candidates_selected: 0,
-      candidates_updated: 0,
-      verified_status_without_email_selected: 0,
-      channel_less_selected: 0,
-      credits_consumed: 0,
-      skipped_reason: "no_candidates_need_email_enrichment",
-    }
+    return emptyEnrichmentResult("no_candidates_need_email_enrichment")
   }
 
   let verified_status_without_email_selected = 0
@@ -102,25 +118,65 @@ export async function enrichApolloCandidatesNeedingEmail(
     }
   }
 
-  const mock = isApolloMockEnabled(input.env)
-  const people = selected.slice(0, input.max_people).map(candidateToApolloPersonRecord)
-  const enriched = await enrichApolloPeopleWithBulkMatch({
-    people,
-    mock,
-    domain: input.domain,
-    env: input.env,
-    record_guardrails: true,
-  })
+  let enriched: Awaited<ReturnType<typeof enrichApolloPeopleWithBulkMatch>>
+  try {
+    const mock = isApolloMockEnabled(input.env)
+    const people = selected
+      .slice(0, input.max_people)
+      .map(candidateToApolloPersonRecord)
+      .filter((person) => asString(person.id))
 
-  const mapped = mapApolloPeopleToContactDiscoveryRaw({
-    people: enriched.people,
-    company_name: input.company_candidate_id,
-    domain: input.domain,
-    mock,
-  })
+    if (people.length === 0) {
+      return emptyEnrichmentResult("no_apollo_person_ids_for_enrichment", {
+        candidates_selected: selected.length,
+        verified_status_without_email_selected,
+        channel_less_selected,
+        error: "missing_apollo_person_id",
+        error_stage: "apollo_bulk_match_enrichment",
+      })
+    }
+
+    enriched = await enrichApolloPeopleWithBulkMatch({
+      people,
+      mock,
+      domain: input.domain,
+      env: input.env,
+      record_guardrails: true,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return emptyEnrichmentResult("apollo_bulk_match_failed", {
+      candidates_selected: selected.length,
+      verified_status_without_email_selected,
+      channel_less_selected,
+      error: message,
+      error_stage: "apollo_bulk_match_enrichment",
+    })
+  }
+
+  let mapped: ReturnType<typeof mapApolloPeopleToContactDiscoveryRaw>
+  try {
+    const mock = isApolloMockEnabled(input.env)
+    mapped = mapApolloPeopleToContactDiscoveryRaw({
+      people: enriched.people ?? [],
+      company_name: input.company_candidate_id,
+      domain: input.domain,
+      mock,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return emptyEnrichmentResult("candidate_mapping_failed", {
+      candidates_selected: selected.length,
+      verified_status_without_email_selected,
+      channel_less_selected,
+      credits_consumed: enriched.credits_estimate ?? 0,
+      error: message,
+      error_stage: "apollo_bulk_match_enrichment",
+    })
+  }
 
   const enrichedByPersonId = new Map<string, (typeof mapped.contacts)[number]>()
-  for (const contact of mapped.contacts) {
+  for (const contact of mapped.contacts ?? []) {
     const personId =
       contact.metadata && typeof contact.metadata === "object"
         ? asString((contact.metadata as Record<string, unknown>).apollo_person_id)
@@ -129,9 +185,11 @@ export async function enrichApolloCandidatesNeedingEmail(
   }
 
   let candidates_updated = 0
+  let persistence_error: string | null = null
   for (const candidate of selected.slice(0, input.max_people)) {
+    const candidateId = asString(candidate.id)
     const personId = readApolloPersonIdFromCandidate(candidate)
-    if (!personId) continue
+    if (!candidateId || !personId) continue
     const enrichedContact = enrichedByPersonId.get(personId)
     if (!enrichedContact) continue
 
@@ -160,7 +218,7 @@ export async function enrichApolloCandidatesNeedingEmail(
       continue
     }
 
-    const { error } = await admin
+    const { error: updateError } = await admin
       .schema("growth")
       .from("contact_candidates")
       .update({
@@ -170,9 +228,13 @@ export async function enrichApolloCandidatesNeedingEmail(
         metadata,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", candidate.id)
+      .eq("id", candidateId)
 
-    if (!error) candidates_updated += 1
+    if (updateError) {
+      persistence_error = updateError.message
+      continue
+    }
+    candidates_updated += 1
   }
 
   const guardrails = getApolloRunGuardrailSnapshot()
@@ -181,7 +243,9 @@ export async function enrichApolloCandidatesNeedingEmail(
     candidates_updated,
     verified_status_without_email_selected,
     channel_less_selected,
-    credits_consumed: guardrails?.credits_estimate ?? enriched.credits_estimate,
-    skipped_reason: null,
+    credits_consumed: guardrails?.credits_estimate ?? enriched.credits_estimate ?? 0,
+    skipped_reason: persistence_error ? "candidate_persistence_partial_failure" : null,
+    error: persistence_error,
+    error_stage: persistence_error ? "candidate_persistence" : null,
   }
 }
