@@ -8,6 +8,11 @@ import {
 import { candidateHasObservedContactChannel } from "@/lib/growth/apollo/apollo-live-pilot-canonical-sync-evidence"
 import type { GrowthContactCandidate } from "@/lib/growth/contact-discovery/contact-discovery-types"
 import { classifyContactIdentity } from "@/lib/growth/human-identity-evidence/contact-identity-classification"
+import {
+  APOLLO_IDENTITY_STATUS_NEEDS_ENRICHMENT,
+  APOLLO_MATCH_STRENGTH_STRONG_ORG_PARTIAL_PERSON,
+  isApolloPartialIdentityNameResolved,
+} from "@/lib/growth/apollo/apollo-partial-identity"
 
 export const APOLLO_ENRICHMENT_CERT_PROMOTION_EVIDENCE_QA_MARKER =
   "apollo-enrichment-cert-promotion-evidence-en-3-v1" as const
@@ -104,6 +109,17 @@ export function isSequenceReadyCompanyContact(row: Record<string, unknown>): boo
     const verifiedEmail =
       emailStatus === "verified" || metadata.apollo_email_enriched === true
     if (!verifiedEmail) return false
+  }
+
+  if (asString(metadata.apollo_match_strength) === APOLLO_MATCH_STRENGTH_STRONG_ORG_PARTIAL_PERSON) {
+    const emailStatus = asString(row.email_status)?.toLowerCase() ?? ""
+    const verifiedEmail = emailStatus === "verified" || metadata.apollo_email_enriched === true
+    if (!verifiedEmail) return false
+    if (!isApolloPartialIdentityNameResolved(asString(row.full_name))) return false
+  }
+
+  if (asString(metadata.identity_status) === APOLLO_IDENTITY_STATUS_NEEDS_ENRICHMENT) {
+    return false
   }
 
   const identity = classifyContactIdentity({

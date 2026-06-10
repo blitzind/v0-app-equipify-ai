@@ -8,6 +8,8 @@ import {
   type ApolloMapperRejectionEvidence,
   type ApolloTierAttemptCompactSummary,
 } from "@/lib/growth/apollo/apollo-search-diagnostic-evidence"
+import type { ApolloPartialIdentityEvidence } from "@/lib/growth/apollo/apollo-partial-identity-evidence"
+import { emptyApolloPartialIdentityEvidence } from "@/lib/growth/apollo/apollo-partial-identity-evidence"
 import type { ApolloSearchTierAttemptEvidence } from "@/lib/growth/providers/apollo/apollo-tiered-people-search-types"
 
 export const APOLLO_SCALE_3_COMPANY_PROMOTION_EVIDENCE_QA_MARKER =
@@ -39,6 +41,7 @@ export type ApolloScale3MappedCompanyEvidenceRow = ApolloScale3CompanyEvidenceBa
   tier_attempts_compact: ApolloTierAttemptCompactSummary[]
   contactable: number
   sequence_ready: number
+  partial_identity_evidence: ApolloPartialIdentityEvidence
   legacy_fallback_used: boolean
   promotion_evidence: ApolloScale3CompanyPromotionEvidence
   acquisition_evidence: ApolloAcquisitionSearchEvidence | null
@@ -189,6 +192,8 @@ export function mapApolloScale3CompanyEvidenceRow(input: {
     mapper_rejection_evidence,
     tier_attempts,
     tier_attempts_compact: buildApolloTierAttemptsCompactSummaries(tier_attempts),
+    partial_identity_evidence:
+      input.acquisition?.partial_identity_evidence ?? emptyApolloPartialIdentityEvidence(),
     contacts_enriched: promotion_evidence.email_enrichment_candidates_updated,
     contacts_promoted: promotion_evidence.current_run_apollo_promoted_contacts,
     contactable: apollo_contactable,

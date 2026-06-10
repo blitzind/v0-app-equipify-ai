@@ -5,6 +5,12 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { runApolloLivePilotContactDiscovery } from "@/lib/growth/apollo/apollo-live-pilot-contact-discovery"
 import { enrichApolloCandidatesNeedingEmail } from "@/lib/growth/apollo/apollo-candidate-email-enrichment"
+import { enrichApolloPartialIdentityCandidates } from "@/lib/growth/apollo/apollo-partial-identity-enrichment"
+import {
+  buildApolloPartialIdentityEvidence,
+  emptyApolloPartialIdentityEvidence,
+} from "@/lib/growth/apollo/apollo-partial-identity-evidence"
+import { listContactCandidatesForCompany } from "@/lib/growth/acquisition/sync-contact-candidates-to-company-contacts"
 import { buildApolloAcquisitionSearchEvidence } from "@/lib/growth/apollo/apollo-acquisition-search-evidence"
 import { apolloCandidateNeedsEmailEnrichment } from "@/lib/growth/apollo/apollo-email-channel-evidence"
 import {
@@ -267,6 +273,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
       verified_email_promotion: null,
       apollo_persisted_this_run: 0,
       current_run_attribution: null,
+      partial_identity_evidence: emptyApolloPartialIdentityEvidence(),
     }
   }
 
@@ -298,6 +305,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
       verified_email_promotion: null,
       apollo_persisted_this_run: 0,
       current_run_attribution: null,
+      partial_identity_evidence: emptyApolloPartialIdentityEvidence(),
     }
   }
   recordApolloCompanyAcquisitionStarted()
@@ -399,6 +407,21 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
   let enrichment_skipped_reason: string | null = null
   let enrichment_candidates_updated = 0
   let credits_consumed = 0
+  let partial_identity_enrichment_attempted = false
+  let partial_identity_enrichment_resolved = 0
+
+  const partialIdentityEnrichment = await enrichApolloPartialIdentityCandidates(admin, {
+    company_candidate_id: context.company_candidate_id,
+    company_name: context.company_name,
+    domain: context.domain,
+    env,
+    max_people: contact_limit,
+  })
+  if (partialIdentityEnrichment.candidates_selected > 0) {
+    partial_identity_enrichment_attempted = true
+    partial_identity_enrichment_resolved = partialIdentityEnrichment.enrichment_resolved
+    credits_consumed += partialIdentityEnrichment.candidates_updated > 0 ? 0 : 0
+  }
 
   const channelLessBefore = await admin
     .schema("growth")
@@ -446,6 +469,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     admin,
     context.company_candidate_id,
   )
+  const allCandidates = await listContactCandidatesForCompany(admin, context.company_candidate_id, 200)
 
   const promotion = await promoteEnrichedApolloCandidatesToCompanyContacts(admin, {
     company_candidate_id: context.company_candidate_id,
@@ -498,6 +522,15 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     env,
   })
 
+  const partial_identity_evidence = buildApolloPartialIdentityEvidence({
+    search_strategy,
+    candidates: allCandidates,
+    apollo_candidate_ids_this_run: current_run_attribution.apollo_candidate_ids_this_run,
+    partial_identity_enrichment_attempted,
+    partial_identity_enrichment_resolved,
+    verified_email_promotion: promotion.verified_email_promotion,
+  })
+
   return {
     company_candidate_id: context.company_candidate_id,
     company_name: context.company_name,
@@ -522,6 +555,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     verified_email_promotion: promotion.verified_email_promotion,
     apollo_persisted_this_run,
     current_run_attribution,
+    partial_identity_evidence,
   }
 }
 

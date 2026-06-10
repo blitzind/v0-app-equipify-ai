@@ -12,6 +12,11 @@ import {
 import { isApolloObfuscatedLastNameToken } from "@/lib/growth/providers/apollo/apollo-search-person-normalize"
 import { evaluateApolloOrganizationMatch } from "@/lib/growth/providers/apollo/apollo-org-match"
 import type { ApolloTierMappingPolicy } from "@/lib/growth/providers/apollo/apollo-tier-mapping-policy"
+import {
+  applyApolloPartialIdentityToMappedContact,
+  evaluateApolloPartialIdentityStaging,
+  isApolloPartialIdentityMappedContact,
+} from "@/lib/growth/apollo/apollo-partial-identity"
 import type {
   ApolloPersonRecord,
   ApolloRedactedRawFieldDiagnostics,
@@ -329,10 +334,32 @@ export function resolveApolloPersonMappingOutcome(
   }
 
   const gate = evaluateApolloContactAcceptance(person, mapped)
+  if (gate.accepted) {
+    return {
+      mapped,
+      accepted: true,
+      rejection_reason: null,
+    }
+  }
+
+  const partial = evaluateApolloPartialIdentityStaging({
+    person,
+    mapped,
+    context: input,
+    rejection_reason: gate.reason,
+  })
+  if (partial.eligible) {
+    return {
+      mapped: applyApolloPartialIdentityToMappedContact(mapped),
+      accepted: true,
+      rejection_reason: null,
+    }
+  }
+
   return {
     mapped,
-    accepted: gate.accepted,
-    rejection_reason: gate.accepted ? null : (gate.reason ?? "rejected"),
+    accepted: false,
+    rejection_reason: gate.reason ?? "rejected",
   }
 }
 
@@ -353,6 +380,8 @@ export function mapApolloPeopleToContactDiscoveryRaw(input: {
   missing_phone_count: number
   title_bucket_rejections: Record<string, number>
   rejected_sample: ApolloRedactedRejectionSample | null
+  mapped_partial_identity_contacts: number
+  mapped_full_identity_contacts: number
 } {
   const skip_reasons: Record<string, number> = {}
   const title_bucket_rejections: Record<string, number> = {}
@@ -361,6 +390,8 @@ export function mapApolloPeopleToContactDiscoveryRaw(input: {
   let missing_email_count = 0
   let missing_phone_count = 0
   let rejected_sample: ApolloRedactedRejectionSample | null = null
+  let mapped_partial_identity_contacts = 0
+  let mapped_full_identity_contacts = 0
 
   const mappingContext: ApolloPeopleMappingContext = {
     company_name: input.company_name,
@@ -435,6 +466,11 @@ export function mapApolloPeopleToContactDiscoveryRaw(input: {
     }
     seen.add(key)
     contacts.push(mapped)
+    if (isApolloPartialIdentityMappedContact(mapped)) {
+      mapped_partial_identity_contacts += 1
+    } else {
+      mapped_full_identity_contacts += 1
+    }
     if (maxMapped != null && contacts.length >= maxMapped) break
   }
 
@@ -450,5 +486,7 @@ export function mapApolloPeopleToContactDiscoveryRaw(input: {
     missing_phone_count,
     title_bucket_rejections,
     rejected_sample,
+    mapped_partial_identity_contacts,
+    mapped_full_identity_contacts,
   }
 }

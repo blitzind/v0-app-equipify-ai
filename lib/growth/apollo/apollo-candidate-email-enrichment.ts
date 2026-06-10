@@ -196,6 +196,10 @@ export async function enrichApolloCandidatesNeedingEmail(
     const nextEmail = asString(enrichedContact.email) || asString(candidate.email) || null
     const nextPhone = asString(enrichedContact.phone) || asString(candidate.phone) || null
     const nextLinkedin = asString(enrichedContact.linkedin_url) || asString(candidate.linkedin_url) || null
+    const nextFullName =
+      asString(enrichedContact.full_name) && asString(enrichedContact.full_name) !== asString(candidate.full_name)
+        ? asString(enrichedContact.full_name)
+        : null
     const enrichedEmailStatus =
       enrichedContact.metadata && typeof enrichedContact.metadata === "object"
         ? asString((enrichedContact.metadata as Record<string, unknown>).apollo_email_status)
@@ -213,7 +217,8 @@ export async function enrichApolloCandidatesNeedingEmail(
     if (
       nextEmail === asString(candidate.email) &&
       nextPhone === asString(candidate.phone) &&
-      nextLinkedin === asString(candidate.linkedin_url)
+      nextLinkedin === asString(candidate.linkedin_url) &&
+      !nextFullName
     ) {
       continue
     }
@@ -222,6 +227,7 @@ export async function enrichApolloCandidatesNeedingEmail(
       .schema("growth")
       .from("contact_candidates")
       .update({
+        ...(nextFullName ? { full_name: nextFullName } : {}),
         email: nextEmail,
         phone: nextPhone,
         linkedin_url: nextLinkedin,

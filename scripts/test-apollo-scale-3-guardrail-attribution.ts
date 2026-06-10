@@ -126,6 +126,15 @@ function testZeroRawHistoricalContactsDoNotCurrentRunPass(): void {
           contactable: 0,
           sequence_ready: 0,
           legacy_fallback_used: false,
+          partial_identity_evidence: {
+            qa_marker: "apollo-partial-identity-v1",
+            mapped_partial_identity_contacts: 0,
+            partial_identity_candidates_staged: 0,
+            partial_identity_enrichment_attempted: false,
+            partial_identity_enrichment_resolved: 0,
+            partial_identity_promoted_after_resolution: 0,
+            partial_identity_blockers: [],
+          },
           promotion_evidence: {
             apollo_search_attempted: true,
             apollo_search_skipped_reason: null,
@@ -213,6 +222,8 @@ function testZeroRawPreservesLastAttemptedTierEvidence(): void {
       rejection_reasons: {},
       legacy_fallback_used: false,
       legacy_contactable_count: 0,
+      mapped_partial_identity_contacts: 0,
+      mapped_full_identity_contacts: 0,
     },
     env: {
       GROWTH_CONTACT_DISCOVERY_APOLLO_ENABLED: "true",

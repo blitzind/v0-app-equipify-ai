@@ -84,6 +84,8 @@ export async function searchApolloPeopleWithTierStrategy(
   let raw_contacts_returned = 0
   let winningPeople = bestSearch?.people ?? []
   let stop_reason: ApolloSearchTierStopReason | null = null
+  let mapped_partial_identity_contacts = 0
+  let mapped_full_identity_contacts = 0
 
   for (const tier of APOLLO_SEARCH_TIERS) {
     const skipReason = shouldSkipApolloSearchTier(tier, input)
@@ -207,6 +209,8 @@ export async function searchApolloPeopleWithTierStrategy(
       bestMapped = mapped
       tier_used = tier
       winningPeople = search.people
+      mapped_partial_identity_contacts = mapped.mapped_partial_identity_contacts
+      mapped_full_identity_contacts = mapped.mapped_full_identity_contacts
     }
 
     if (mapped.diagnostics.contacts_mapped > 0) {
@@ -286,6 +290,8 @@ export async function searchApolloPeopleWithTierStrategy(
     rejection_reasons,
     legacy_fallback_used,
     legacy_contactable_count,
+    mapped_partial_identity_contacts,
+    mapped_full_identity_contacts,
   }
 
   return {

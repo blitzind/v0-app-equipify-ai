@@ -55,6 +55,8 @@ function mesScale5PassAcquisition(): ApolloPrimaryContactAcquisitionCompanyEvide
       tier_attempts: [],
       legacy_fallback_used: false,
       legacy_contactable_count: 0,
+      mapped_partial_identity_contacts: 0,
+      mapped_full_identity_contacts: 0,
     },
     verified_email_promotion: {
       qa_marker: "apollo-verified-email-promotion-evidence-v1",

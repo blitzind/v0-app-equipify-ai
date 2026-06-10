@@ -95,6 +95,8 @@ function testBuildSearchEvidenceQuerySummary(): void {
       rejection_reasons: {},
       legacy_fallback_used: false,
       legacy_contactable_count: 0,
+      mapped_partial_identity_contacts: 0,
+      mapped_full_identity_contacts: 0,
     },
     env: {
       GROWTH_CONTACT_DISCOVERY_APOLLO_ENABLED: "true",

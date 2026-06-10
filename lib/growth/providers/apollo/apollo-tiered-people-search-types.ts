@@ -65,6 +65,8 @@ export type ApolloTieredPeopleSearchEvidence = {
   rejection_reasons: Record<string, number>
   legacy_fallback_used: boolean
   legacy_contactable_count: number
+  mapped_partial_identity_contacts: number
+  mapped_full_identity_contacts: number
 }
 
 export function emptyApolloTieredPeopleSearchEvidence(): ApolloTieredPeopleSearchEvidence {
@@ -83,5 +85,7 @@ export function emptyApolloTieredPeopleSearchEvidence(): ApolloTieredPeopleSearc
     rejection_reasons: {},
     legacy_fallback_used: false,
     legacy_contactable_count: 0,
+    mapped_partial_identity_contacts: 0,
+    mapped_full_identity_contacts: 0,
   }
 }

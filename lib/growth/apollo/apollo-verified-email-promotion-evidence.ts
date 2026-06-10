@@ -1,6 +1,12 @@
 /** Apollo verified-email promotion evidence — client-safe. */
 
 import { candidateHasObservedContactChannel } from "@/lib/growth/apollo/apollo-live-pilot-canonical-sync-evidence"
+import {
+  canPromoteApolloPartialIdentityCandidate,
+  isApolloPartialIdentityMappedContact,
+  readApolloPartialIdentityStatus,
+  APOLLO_IDENTITY_STATUS_NEEDS_ENRICHMENT,
+} from "@/lib/growth/apollo/apollo-partial-identity"
 import { isSequenceReadyCompanyContact } from "@/lib/growth/apollo/apollo-enrichment-cert-promotion-evidence"
 import type { GrowthContactCandidate } from "@/lib/growth/contact-discovery/contact-discovery-types"
 import type { GrowthCompanyContact } from "@/lib/growth/contact-discovery/company-contact-types"
@@ -108,6 +114,17 @@ export function apolloCandidateHasVerifiedPromotableChannel(
     return candidateHasObservedContactChannel(candidate)
   }
 
+  if (isApolloPartialIdentityMappedContact(candidate)) {
+    if (!canPromoteApolloPartialIdentityCandidate(candidate)) return false
+    const email = asString(candidate.email)
+    const status = readApolloEmailStatusFromCandidate(candidate)
+    if (email && isApolloVerifiedEmailStatus(status)) return true
+    return (
+      isApolloPartialIdentityCandidateResolved(candidate) &&
+      candidateHasObservedContactChannel(candidate)
+    )
+  }
+
   const email = asString(candidate.email)
   if (email) {
     const status = readApolloEmailStatusFromCandidate(candidate)
@@ -148,6 +165,13 @@ export function evaluateApolloVerifiedEmailPromotionBlocker(
   candidate: GrowthContactCandidate,
 ): string | null {
   if (!asString(candidate.full_name)) return "missing_full_name"
+  if (
+    isApolloPartialIdentityMappedContact(candidate) &&
+    readApolloPartialIdentityStatus(candidate) === APOLLO_IDENTITY_STATUS_NEEDS_ENRICHMENT &&
+    !canPromoteApolloPartialIdentityCandidate(candidate)
+  ) {
+    return "partial_identity_unresolved"
+  }
   const apolloEmailStatus = readApolloEmailStatusFromCandidate(candidate)
   if (isApolloVerifiedEmailStatus(apolloEmailStatus) && !asString(candidate.email)) {
     return "apollo_verified_status_without_email"
@@ -158,6 +182,15 @@ export function evaluateApolloVerifiedEmailPromotionBlocker(
       return status ? `apollo_email_${status}` : "no_verified_email_available"
     }
     return "missing_contact_channel"
+  }
+
+  if (
+    isApolloPartialIdentityMappedContact(candidate) &&
+    canPromoteApolloPartialIdentityCandidate(candidate) &&
+    isApolloVerifiedEmailStatus(readApolloEmailStatusFromCandidate(candidate)) &&
+    asString(candidate.email)
+  ) {
+    return null
   }
 
   const identity = classifyContactIdentity({
