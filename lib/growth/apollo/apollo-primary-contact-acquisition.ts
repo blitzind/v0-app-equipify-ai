@@ -4,7 +4,8 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { runApolloLivePilotContactDiscovery } from "@/lib/growth/apollo/apollo-live-pilot-contact-discovery"
-import { candidateHasObservedContactChannel } from "@/lib/growth/apollo/apollo-live-pilot-canonical-sync-evidence"
+import { enrichApolloCandidatesNeedingEmail } from "@/lib/growth/apollo/apollo-candidate-email-enrichment"
+import { apolloCandidateNeedsEmailEnrichment } from "@/lib/growth/apollo/apollo-email-channel-evidence"
 import {
   loadPersistedApolloCandidatesForPromotion,
   promoteEnrichedApolloCandidatesToCompanyContacts,
@@ -21,10 +22,7 @@ import { canonicalNormalizedDomain } from "@/lib/growth/canonical-companies/cano
 import { loadStagingCompanyCandidateRow } from "@/lib/growth/canonical-companies/canonical-company-staging-linkage"
 import { resolveApolloEnrichmentCanonicalCompanyId } from "@/lib/growth/apollo/apollo-enrichment-cert-canonical-company-resolution"
 import type { GrowthContactCandidate } from "@/lib/growth/contact-discovery/contact-discovery-types"
-import { isApolloEmailEnrichmentEnabled, isApolloMockEnabled } from "@/lib/growth/providers/apollo/apollo-config"
-import { enrichApolloPeopleWithBulkMatch } from "@/lib/growth/providers/apollo/apollo-enrich-people"
-import { mapApolloPeopleToContactDiscoveryRaw } from "@/lib/growth/providers/apollo/map-apollo-contact"
-import type { ApolloPersonRecord } from "@/lib/growth/providers/apollo/apollo-types"
+import { isApolloMockEnabled } from "@/lib/growth/providers/apollo/apollo-config"
 import {
   beginApolloRunGuardrails,
   getApolloRunGuardrailSnapshot,
@@ -42,30 +40,13 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
 
-function readApolloPersonId(candidate: GrowthContactCandidate): string | null {
-  const metadata =
-    candidate.metadata && typeof candidate.metadata === "object"
-      ? (candidate.metadata as Record<string, unknown>)
-      : {}
-  return asString(metadata.apollo_person_id) || null
-}
-
-function candidateToApolloPersonRecord(candidate: GrowthContactCandidate): ApolloPersonRecord {
-  const metadata =
-    candidate.metadata && typeof candidate.metadata === "object"
-      ? (candidate.metadata as Record<string, unknown>)
-      : {}
+function emptyEmailEnrichmentEvidence(skipped_reason: string | null = null) {
   return {
-    id: readApolloPersonId(candidate),
-    first_name: candidate.first_name,
-    last_name: candidate.last_name,
-    title: candidate.job_title,
-    linkedin_url: candidate.linkedin_url,
-    email: candidate.email,
-    email_status: asString(metadata.apollo_email_status) || null,
-    organization: {
-      name: asString(metadata.company_name) || null,
-    },
+    candidates_selected: 0,
+    candidates_updated: 0,
+    verified_status_without_email_selected: 0,
+    channel_less_selected: 0,
+    skipped_reason,
   }
 }
 
@@ -165,123 +146,6 @@ async function countReadinessAfterPromotion(
   return { contactable, sequence_ready }
 }
 
-async function enrichChannelLessApolloCandidates(
-  admin: SupabaseClient,
-  input: {
-    company_candidate_id: string
-    domain: string | null
-    max_people: number
-    env: NodeJS.ProcessEnv
-  },
-): Promise<{ candidates_updated: number; credits_consumed: number; skipped_reason: string | null }> {
-  if (!isApolloEmailEnrichmentEnabled(input.env)) {
-    return {
-      candidates_updated: 0,
-      credits_consumed: 0,
-      skipped_reason: "enrichment_gates_blocked",
-    }
-  }
-
-  const { data } = await admin
-    .schema("growth")
-    .from("contact_candidates")
-    .select(
-      "id, email, phone, linkedin_url, first_name, last_name, job_title, metadata, provider_type",
-    )
-    .eq("company_candidate_id", input.company_candidate_id)
-    .eq("provider_type", "future_apollo")
-    .limit(Math.max(input.max_people * 3, input.max_people))
-
-  const channelLess = ((data ?? []) as GrowthContactCandidate[]).filter(
-    (candidate) =>
-      !candidateHasObservedContactChannel(candidate) && Boolean(readApolloPersonId(candidate)),
-  )
-  if (channelLess.length === 0) {
-    return {
-      candidates_updated: 0,
-      credits_consumed: 0,
-      skipped_reason: "no_channel_less_apollo_candidates",
-    }
-  }
-
-  const mock = isApolloMockEnabled(input.env)
-  const people = channelLess.slice(0, input.max_people).map(candidateToApolloPersonRecord)
-  const enriched = await enrichApolloPeopleWithBulkMatch({
-    people,
-    mock,
-    domain: input.domain,
-    env: input.env,
-    record_guardrails: true,
-  })
-
-  const mapped = mapApolloPeopleToContactDiscoveryRaw({
-    people: enriched.people,
-    company_name: input.company_candidate_id,
-    domain: input.domain,
-    mock,
-  })
-
-  const enrichedByPersonId = new Map<string, (typeof mapped.contacts)[number]>()
-  for (const contact of mapped.contacts) {
-    const personId =
-      contact.metadata && typeof contact.metadata === "object"
-        ? asString((contact.metadata as Record<string, unknown>).apollo_person_id)
-        : asString(contact.external_provider_contact_id)
-    if (personId) enrichedByPersonId.set(personId, contact)
-  }
-
-  let candidates_updated = 0
-  for (const candidate of channelLess.slice(0, input.max_people)) {
-    const personId = readApolloPersonId(candidate)
-    if (!personId) continue
-    const enrichedContact = enrichedByPersonId.get(personId)
-    if (!enrichedContact) continue
-
-    const nextEmail = asString(enrichedContact.email) || candidate.email
-    const nextPhone = asString(enrichedContact.phone) || candidate.phone
-    const nextLinkedin = asString(enrichedContact.linkedin_url) || candidate.linkedin_url
-    if (
-      nextEmail === candidate.email &&
-      nextPhone === candidate.phone &&
-      nextLinkedin === candidate.linkedin_url
-    ) {
-      continue
-    }
-
-    const metadata = {
-      ...(candidate.metadata && typeof candidate.metadata === "object"
-        ? (candidate.metadata as Record<string, unknown>)
-        : {}),
-      apollo_enriched_at: new Date().toISOString(),
-      apollo_email_status:
-        enrichedContact.metadata && typeof enrichedContact.metadata === "object"
-          ? asString((enrichedContact.metadata as Record<string, unknown>).apollo_email_status)
-          : null,
-    }
-
-    const { error } = await admin
-      .schema("growth")
-      .from("contact_candidates")
-      .update({
-        email: nextEmail || null,
-        phone: nextPhone || null,
-        linkedin_url: nextLinkedin || null,
-        metadata,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", candidate.id)
-
-    if (!error) candidates_updated += 1
-  }
-
-  const guardrails = getApolloRunGuardrailSnapshot()
-  return {
-    candidates_updated,
-    credits_consumed: guardrails?.credits_estimate ?? enriched.credits_estimate,
-    skipped_reason: null,
-  }
-}
-
 function readSearchStrategyFromDiscovery(
   discovery: Awaited<ReturnType<typeof runApolloLivePilotContactDiscovery>>,
 ): ApolloTieredPeopleSearchEvidence {
@@ -327,6 +191,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
       enrichment_attempted: false,
       enrichment_skipped_reason: "company_context_missing",
       enrichment_candidates_updated: 0,
+      email_enrichment: emptyEmailEnrichmentEvidence("company_context_missing"),
       credits_consumed: 0,
       promoted_contacts: 0,
       contactable_contacts: 0,
@@ -419,16 +284,18 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     .eq("company_candidate_id", context.company_candidate_id)
     .eq("provider_type", "future_apollo")
 
-  const needsEnrichment = ((channelLessBefore.data ?? []) as GrowthContactCandidate[]).some(
-    (candidate) =>
-      !candidateHasObservedContactChannel(candidate) && Boolean(readApolloPersonId(candidate)),
+  const needsEnrichment = ((channelLessBefore.data ?? []) as GrowthContactCandidate[]).some((candidate) =>
+    apolloCandidateNeedsEmailEnrichment(candidate),
   )
 
+  let email_enrichment = emptyEmailEnrichmentEvidence()
+
   if (!needsEnrichment) {
-    enrichment_skipped_reason = "all_candidates_have_contact_channels_or_no_apollo_rows"
+    enrichment_skipped_reason = "no_candidates_need_email_enrichment"
+    email_enrichment = emptyEmailEnrichmentEvidence(enrichment_skipped_reason)
   } else {
     enrichment_attempted = true
-    const enrichment = await enrichChannelLessApolloCandidates(admin, {
+    const enrichment = await enrichApolloCandidatesNeedingEmail(admin, {
       company_candidate_id: context.company_candidate_id,
       domain: context.domain,
       max_people: contact_limit,
@@ -438,6 +305,13 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     credits_consumed += enrichment.credits_consumed
     enrichment_skipped_reason = enrichment.skipped_reason
     if (enrichment.skipped_reason) enrichment_attempted = false
+    email_enrichment = {
+      candidates_selected: enrichment.candidates_selected,
+      candidates_updated: enrichment.candidates_updated,
+      verified_status_without_email_selected: enrichment.verified_status_without_email_selected,
+      channel_less_selected: enrichment.channel_less_selected,
+      skipped_reason: enrichment.skipped_reason,
+    }
   }
 
   const enrichedCandidates = await loadPersistedApolloCandidatesForPromotion(
@@ -476,6 +350,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     enrichment_attempted,
     enrichment_skipped_reason,
     enrichment_candidates_updated,
+    email_enrichment,
     credits_consumed,
     promoted_contacts: promotion.company_contacts_synced,
     contactable_contacts: readiness.contactable,

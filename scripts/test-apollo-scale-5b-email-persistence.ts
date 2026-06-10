@@ -15,7 +15,7 @@ function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(message)
 }
 
-function verifiedCandidate(full_name: string, email: string): GrowthContactCandidate {
+function verifiedCandidate(full_name: string, email: string | null): GrowthContactCandidate {
   return {
     id: `candidate-${full_name}`,
     created_at: new Date().toISOString(),
@@ -92,11 +92,25 @@ function testMedicalEquipmentSolutionsBeforeAfterEvidence(): void {
   }
 }
 
+function testVerifiedStatusWithoutEmailDoesNotPreserveVerifiedCompanyContactStatus(): void {
+  const verifiedStatusOnly = verifiedCandidate("Status Only", null)
+  verifiedStatusOnly.linkedin_url = "https://linkedin.com/in/status-only"
+  const fields = buildApolloCompanyContactPromotionFields({
+    candidate: verifiedStatusOnly,
+    prior_email: null,
+    prior_email_status: "verified",
+  })
+  assert(fields.email === null, "no email value should persist")
+  assert(fields.email_status === "unknown", "email_status must not stay verified without email")
+}
+
 function main(): void {
   testResolvePromotedEmailRequiresVerifiedStatus()
   console.log("  ✓ verified-only email persistence policy preserved")
   testPromotionFieldsBackfillNullCompanyContactEmail()
   console.log("  ✓ promotion fields backfill null company_contact.email")
+  testVerifiedStatusWithoutEmailDoesNotPreserveVerifiedCompanyContactStatus()
+  console.log("  ✓ verified email_status without address does not preserve verified company_contact email_status")
   testMedicalEquipmentSolutionsBeforeAfterEvidence()
   console.log("  ✓ MES before/after evidence + blocker deltas for four verified contacts")
   console.log("\nApollo-Scale-5B email persistence checks passed.")

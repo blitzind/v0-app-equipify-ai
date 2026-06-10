@@ -6,6 +6,14 @@ import type { ApolloVerifiedEmailPromotionEvidence } from "@/lib/growth/apollo/a
 export const APOLLO_PRIMARY_CONTACT_ACQUISITION_EVIDENCE_QA_MARKER =
   "apollo-primary-contact-acquisition-evidence-v1" as const
 
+export type ApolloPrimaryContactEmailEnrichmentEvidence = {
+  candidates_selected: number
+  candidates_updated: number
+  verified_status_without_email_selected: number
+  channel_less_selected: number
+  skipped_reason: string | null
+}
+
 export type ApolloPrimaryContactAcquisitionCompanyEvidence = {
   company_candidate_id: string
   company_name: string
@@ -19,6 +27,7 @@ export type ApolloPrimaryContactAcquisitionCompanyEvidence = {
   enrichment_attempted: boolean
   enrichment_skipped_reason: string | null
   enrichment_candidates_updated: number
+  email_enrichment: ApolloPrimaryContactEmailEnrichmentEvidence
   credits_consumed: number
   promoted_contacts: number
   contactable_contacts: number

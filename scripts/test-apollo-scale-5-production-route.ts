@@ -130,6 +130,13 @@ assert.match(executeRoute, /executeApolloScale5InProduction/)
 assert.match(executeRoute, /maxDuration = 300/)
 assert.match(productionRoute, /certifyApolloScale5VerifiedEmailPromotion/)
 assert.match(productionRoute, /resolveMedicalEquipmentSolutionsCompany/)
+const certModule = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/apollo/apollo-scale-5-verified-email-production-certification.ts"),
+  "utf8",
+)
+assert.match(certModule, /email_channel_evidence/)
+assert.match(certModule, /email_enrichment/)
+console.log("  ✓ certification — email channel evidence + enrichment metrics")
 assert.doesNotMatch(executeRoute, /confirmGrowthSequenceEnrollment/)
 assert.doesNotMatch(executeRoute, /runSequenceExecutionJob/)
 assert.doesNotMatch(productionRoute, /APOLLO_API_KEY/)

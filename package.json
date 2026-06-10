@@ -266,6 +266,7 @@
     "test:apollo-scale-5a-contactable-eligibility-audit": "tsx scripts/test-apollo-scale-5a-contactable-eligibility-audit.ts",
     "test:apollo-scale-5a-production-route": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-scale-5a-production-route.ts",
     "test:apollo-scale-5b-email-persistence": "tsx scripts/test-apollo-scale-5b-email-persistence.ts",
+    "test:apollo-scale-5b-email-channel": "tsx scripts/test-apollo-scale-5b-email-channel.ts",
     "test:apollo-search-query-audit-route": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-search-query-audit-route.ts",
     "certify:execution-1-approval-job:production": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/certify-execution-1-approval-job-production.ts",
     "test:execution-1-approval-job": "tsx scripts/test-execution-1-approval-job.ts",

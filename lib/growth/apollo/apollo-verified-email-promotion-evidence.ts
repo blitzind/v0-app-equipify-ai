@@ -97,7 +97,7 @@ export function buildApolloCompanyContactPromotionFields(input: {
   const email = promotedEmail || asString(input.prior_email) || null
   const email_status = email
     ? resolveApolloCandidateCompanyContactEmailStatus({ ...input.candidate, email })
-    : input.prior_email_status ?? "unknown"
+    : "unknown"
   return { email, email_status }
 }
 
@@ -148,6 +148,10 @@ export function evaluateApolloVerifiedEmailPromotionBlocker(
   candidate: GrowthContactCandidate,
 ): string | null {
   if (!asString(candidate.full_name)) return "missing_full_name"
+  const apolloEmailStatus = readApolloEmailStatusFromCandidate(candidate)
+  if (isApolloVerifiedEmailStatus(apolloEmailStatus) && !asString(candidate.email)) {
+    return "apollo_verified_status_without_email"
+  }
   if (!apolloCandidateHasVerifiedPromotableChannel(candidate)) {
     const status = readApolloEmailStatusFromCandidate(candidate)
     if (asString(candidate.email) && !isApolloVerifiedEmailStatus(status)) {

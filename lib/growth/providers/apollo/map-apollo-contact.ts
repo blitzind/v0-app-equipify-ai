@@ -256,6 +256,8 @@ export function mapApolloPersonToContactDiscoveryRaw(
       apollo_organization_id:
         asTrimmedString(person.organization_id) ?? asTrimmedString(org?.id),
       apollo_email_status: asTrimmedString(person.email_status),
+      apollo_search_raw_email: rawEmail,
+      apollo_search_mapped_email: email,
       apollo_seniority: asTrimmedString(person.seniority),
       apollo_departments: person.departments ?? [],
       apollo_functions: person.functions ?? [],

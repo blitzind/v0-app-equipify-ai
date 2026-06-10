@@ -17,9 +17,11 @@ import {
   isApolloVerifiedEmailStatus,
   readApolloEmailStatusFromCandidate,
 } from "@/lib/growth/apollo/apollo-verified-email-promotion-evidence"
+import {
+  buildApolloEmailChannelEvidenceRow,
+  type ApolloEmailChannelEvidenceRow,
+} from "@/lib/growth/apollo/apollo-email-channel-evidence"
 import type { GrowthContactCandidate } from "@/lib/growth/contact-discovery/contact-discovery-types"
-
-export const APOLLO_SCALE_5_PRODUCTION_CERT_QA_MARKER =
   "apollo-scale-5-verified-email-production-cert-v1" as const
 
 export type ApolloScale5ContactEvidenceRow = {
@@ -84,6 +86,14 @@ export type ApolloScale5VerifiedEmailProductionCertification = {
     sequence_ready_contacts: number
     promoted_contacts: number
   }
+  email_enrichment: {
+    candidates_selected: number
+    candidates_updated: number
+    verified_status_without_email_selected: number
+    channel_less_selected: number
+    skipped_reason: string | null
+  }
+  email_channel_evidence: ApolloEmailChannelEvidenceRow[]
   contacts: ApolloScale5ContactEvidenceRow[]
   verified_contact_checks: ApolloScale5VerifiedContactCheck[]
   blockers: string[]
@@ -105,6 +115,89 @@ function isContactableCompanyContact(row: Record<string, unknown>): boolean {
 
 function normalizeName(value: string): string {
   return value.trim().toLowerCase()
+}
+
+async function loadPrimaryPersonEmail(
+  admin: SupabaseClient,
+  person_id: string,
+): Promise<string | null> {
+  const { data } = await admin
+    .schema("growth")
+    .from("person_emails")
+    .select("email")
+    .eq("person_id", person_id)
+    .order("is_primary", { ascending: false })
+    .limit(1)
+
+  const row = data?.[0] as Record<string, unknown> | undefined
+  return asString(row?.email) || null
+}
+
+async function loadApolloEmailChannelEvidence(
+  admin: SupabaseClient,
+  input: {
+    company_candidate_id: string
+    canonical_company_id: string | null
+    verified_names?: readonly string[]
+  },
+): Promise<ApolloEmailChannelEvidenceRow[]> {
+  const { data: candidateRows } = await admin
+    .schema("growth")
+    .from("contact_candidates")
+    .select("*")
+    .eq("company_candidate_id", input.company_candidate_id)
+    .eq("provider_type", "future_apollo")
+    .limit(200)
+
+  const candidates = (candidateRows ?? []) as GrowthContactCandidate[]
+  const companyContactsByCandidateId = new Map<string, Record<string, unknown>>()
+
+  if (input.canonical_company_id) {
+    const { data: companyContacts } = await admin
+      .schema("growth")
+      .from("company_contacts")
+      .select("*")
+      .eq("company_id", input.canonical_company_id)
+      .limit(200)
+
+    for (const raw of companyContacts ?? []) {
+      const row = raw as Record<string, unknown>
+      const candidateId = asString(row.contact_candidate_id)
+      if (candidateId) companyContactsByCandidateId.set(candidateId, row)
+    }
+  }
+
+  const nameFilter = input.verified_names?.map(normalizeName) ?? null
+  const rows: ApolloEmailChannelEvidenceRow[] = []
+
+  for (const candidate of candidates) {
+    if (nameFilter && !nameFilter.includes(normalizeName(candidate.full_name))) continue
+
+    const companyContact = companyContactsByCandidateId.get(candidate.id) ?? null
+    const canonicalPersonId = asString(companyContact?.canonical_person_id)
+    const canonicalPersonEmail = canonicalPersonId
+      ? await loadPrimaryPersonEmail(admin, canonicalPersonId)
+      : null
+
+    const metadata =
+      candidate.metadata && typeof candidate.metadata === "object"
+        ? (candidate.metadata as Record<string, unknown>)
+        : {}
+    const rawEmail = asString(metadata.apollo_search_raw_email) || null
+    const mappedEmail = asString(metadata.apollo_search_mapped_email) || asString(candidate.email) || null
+
+    rows.push(
+      buildApolloEmailChannelEvidenceRow({
+        candidate,
+        raw_email: rawEmail,
+        mapped_email: mappedEmail,
+        company_contact: companyContact,
+        canonical_person_email: canonicalPersonEmail,
+      }),
+    )
+  }
+
+  return rows
 }
 
 function resolveVerifiedContactBlocker(row: ApolloScale5ContactEvidenceRow): string | null {
@@ -259,6 +352,12 @@ export async function certifyApolloScale5VerifiedEmailPromotion(
     canonical_company_id: acquisition.canonical_company_id,
   })
 
+  const email_channel_evidence = await loadApolloEmailChannelEvidence(admin, {
+    company_candidate_id: input.company_candidate_id,
+    canonical_company_id: acquisition.canonical_company_id,
+    verified_names: APOLLO_SCALE_5_VERIFIED_CONTACT_NAMES,
+  })
+
   const verified_email_promotion = acquisition.verified_email_promotion
   const verified_contact_checks = buildVerifiedContactChecks(contactEvidence.contacts)
 
@@ -316,6 +415,8 @@ export async function certifyApolloScale5VerifiedEmailPromotion(
         verified_email_promotion?.company_contacts_promoted ?? acquisition.promoted_contacts,
     },
     readiness,
+    email_enrichment: acquisition.email_enrichment,
+    email_channel_evidence,
     contacts: contactEvidence.contacts,
     verified_contact_checks,
     blockers,

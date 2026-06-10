@@ -183,7 +183,8 @@ const orchestrator = fs.readFileSync(
   "utf8",
 )
 assert.match(orchestrator, /existing_contactable_before/)
-assert.match(orchestrator, /enrichChannelLessApolloCandidates/)
+assert.match(orchestrator, /enrichApolloCandidatesNeedingEmail/)
+assert.match(orchestrator, /apolloCandidateNeedsEmailEnrichment/)
 assert.match(orchestrator, /promoteEnrichedApolloCandidatesToCompanyContacts/)
 assert.match(orchestrator, /sequence_ready_contacts/)
 assert.doesNotMatch(orchestrator, /auto_enroll|enrollLead|sequence_enroll/)
