@@ -101,6 +101,7 @@ export type ApolloScale2LiveAcquisitionCertification = {
     apollo_contacts_enriched: number
     company_contacts_created: number
     contactable_contacts: number
+    legacy_contactable_contacts: number
     sequence_ready_contacts: number
     search_to_enriched_pct: number | null
     search_to_contactable_pct: number | null
@@ -257,6 +258,8 @@ function buildFailedScale1CompanyResult(input: {
     readiness: {
       contactable_contacts: acquisition?.contactable_contacts ?? 0,
       sequence_ready_contacts: acquisition?.sequence_ready_contacts ?? 0,
+      apollo_contactable_contacts: 0,
+      legacy_contactable_contacts: acquisition?.existing_contactable_before ?? 0,
       blocked_contacts: 0,
       blockers_by_category: {
         no_email: 0,
@@ -595,7 +598,11 @@ export function buildApolloScale2LiveAcquisitionCertification(input: {
     0,
   )
   const contactable_contacts = input.company_results.reduce(
-    (sum, row) => sum + row.readiness.contactable_contacts,
+    (sum, row) => sum + row.readiness.apollo_contactable_contacts,
+    0,
+  )
+  const legacy_contactable_contacts = input.company_results.reduce(
+    (sum, row) => sum + row.readiness.legacy_contactable_contacts,
     0,
   )
   const sequence_ready_contacts = input.company_results.reduce(
@@ -611,6 +618,7 @@ export function buildApolloScale2LiveAcquisitionCertification(input: {
     apollo_contacts_enriched,
     company_contacts_created,
     contactable_contacts,
+    legacy_contactable_contacts,
     sequence_ready_contacts,
     search_to_enriched_pct: pct(apollo_contacts_enriched, apollo_contacts_found),
     search_to_contactable_pct: pct(contactable_contacts, apollo_contacts_found),

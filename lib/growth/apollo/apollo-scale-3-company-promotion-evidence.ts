@@ -1,6 +1,7 @@
 /** Apollo Scale-3 company promotion evidence — client-safe mapping from acquisition evidence. */
 
 import type { ApolloPrimaryContactAcquisitionCompanyEvidence } from "@/lib/growth/apollo/apollo-primary-contact-acquisition-evidence"
+import type { ApolloAcquisitionSearchEvidence } from "@/lib/growth/apollo/apollo-acquisition-search-evidence"
 import type { ApolloSearchTierAttemptEvidence } from "@/lib/growth/providers/apollo/apollo-tiered-people-search-types"
 
 export const APOLLO_SCALE_3_COMPANY_PROMOTION_EVIDENCE_QA_MARKER =
@@ -22,7 +23,7 @@ export type ApolloScale3CompanyEvidenceBaseRow = {
 }
 
 export type ApolloScale3MappedCompanyEvidenceRow = ApolloScale3CompanyEvidenceBaseRow & {
-  tier_used: number
+  tier_used: number | null
   raw_contacts_returned: number
   mapped_contacts: number
   mapping_rejections: number
@@ -32,6 +33,7 @@ export type ApolloScale3MappedCompanyEvidenceRow = ApolloScale3CompanyEvidenceBa
   sequence_ready: number
   legacy_fallback_used: boolean
   promotion_evidence: ApolloScale3CompanyPromotionEvidence
+  acquisition_evidence: ApolloAcquisitionSearchEvidence | null
 }
 
 export type ApolloScale3CompanyPromotionEvidence = {
@@ -79,14 +81,13 @@ export function buildApolloScale3CompanyPromotionEvidence(
 }
 
 export function isApolloScale3LegacyTier4OnlyFallback(input: {
-  tier_used: number
+  tier_used: number | null
   legacy_fallback_used: boolean
   mapped_contacts: number
   promotion: ApolloScale3CompanyPromotionEvidence
 }): boolean {
   return (
     input.legacy_fallback_used &&
-    input.tier_used === 4 &&
     input.mapped_contacts === 0 &&
     input.promotion.verified_email_contacts === 0 &&
     input.promotion.company_contacts_promoted === 0
@@ -96,7 +97,7 @@ export function isApolloScale3LegacyTier4OnlyFallback(input: {
 /** Scale-5 PASS-shaped acquisition should not collapse to tier-4/no-channel in Scale-3 evidence. */
 export function assertApolloScale3CompanyMatchesScale5PromotionPath(input: {
   company_name: string
-  tier_used: number
+  tier_used: number | null
   legacy_fallback_used: boolean
   mapped_contacts: number
   promotion: ApolloScale3CompanyPromotionEvidence
@@ -106,8 +107,8 @@ export function assertApolloScale3CompanyMatchesScale5PromotionPath(input: {
   if (input.promotion.company_contacts_promoted <= 0) {
     return `${input.company_name}: verified_email_contacts>0 but company_contacts_promoted=0`
   }
-  if (input.promotion.verified_email_contacts > 0 && input.tier_used === 4 && input.legacy_fallback_used) {
-    return `${input.company_name}: Scale-5 promotion path regressed to tier-4 fallback`
+  if (input.promotion.verified_email_contacts > 0 && input.legacy_fallback_used && input.mapped_contacts === 0) {
+    return `${input.company_name}: Scale-5 promotion path regressed to legacy-only fallback`
   }
   if (isApolloScale3LegacyTier4OnlyFallback({ ...input, promotion: input.promotion })) {
     return `${input.company_name}: Scale-5 promotion path regressed to tier-4-only fallback`
@@ -124,22 +125,45 @@ export function mapApolloScale3CompanyEvidenceRow(input: {
 }): ApolloScale3MappedCompanyEvidenceRow {
   const strategy = input.acquisition?.search_strategy
   const promotion_evidence = buildApolloScale3CompanyPromotionEvidence(input.acquisition)
+  const apollo_contactable = input.base.contactable_contacts
+  const apollo_sequence_ready = input.base.sequence_ready_contacts
+  const mergedBlockers = [
+    ...new Set([
+      ...input.base.blockers,
+      ...(input.acquisition?.apollo_search_evidence?.apollo_search_blockers ?? []),
+    ]),
+  ]
 
   return {
     ...input.base,
-    tier_used: strategy?.tier_used ?? 0,
-    raw_contacts_returned: strategy?.raw_contacts_returned ?? 0,
-    mapped_contacts: strategy?.mapped_contacts ?? input.base.contacts_found,
+    blockers: mergedBlockers,
+    tier_used: strategy?.tier_used ?? input.acquisition?.apollo_search_evidence?.tier_used ?? null,
+    raw_contacts_returned:
+      strategy?.raw_contacts_returned ??
+      input.acquisition?.apollo_search_evidence?.apollo_raw_people_count ??
+      0,
+    mapped_contacts:
+      strategy?.mapped_contacts ??
+      input.acquisition?.apollo_search_evidence?.apollo_mapped_people_count ??
+      input.base.contacts_found,
     mapping_rejections: strategy?.mapping_rejections ?? 0,
-    rejection_reasons: strategy?.rejection_reasons ?? {},
+    rejection_reasons:
+      strategy?.rejection_reasons ??
+      input.acquisition?.apollo_search_evidence?.mapper_rejection_reasons ??
+      {},
     tier_attempts: strategy?.tier_attempts ?? [],
     contacts_enriched: promotion_evidence.email_enrichment_candidates_updated,
     contacts_promoted: promotion_evidence.company_contacts_promoted,
-    contactable: promotion_evidence.contactable_after_promotion,
-    sequence_ready: promotion_evidence.sequence_ready_after_promotion,
-    contactable_contacts: promotion_evidence.contactable_after_promotion,
-    sequence_ready_contacts: promotion_evidence.sequence_ready_after_promotion,
+    contactable: apollo_contactable,
+    sequence_ready: apollo_sequence_ready,
+    contactable_contacts: apollo_contactable,
+    sequence_ready_contacts: apollo_sequence_ready,
     legacy_fallback_used: strategy?.legacy_fallback_used ?? false,
-    promotion_evidence,
+    promotion_evidence: {
+      ...promotion_evidence,
+      contactable_after_promotion: apollo_contactable,
+      sequence_ready_after_promotion: apollo_sequence_ready,
+    },
+    acquisition_evidence: input.acquisition?.apollo_search_evidence ?? null,
   }
 }

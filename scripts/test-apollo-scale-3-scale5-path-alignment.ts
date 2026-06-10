@@ -115,7 +115,7 @@ function testLegacyTier4OnlyFallbackDetected(): void {
   assert.equal(
     assertApolloScale3CompanyMatchesScale5PromotionPath({
       company_name: "Legacy Only Co",
-      tier_used: 4,
+      tier_used: null,
       legacy_fallback_used: true,
       mapped_contacts: 0,
       promotion,
@@ -126,13 +126,13 @@ function testLegacyTier4OnlyFallbackDetected(): void {
 
   const bad = assertApolloScale3CompanyMatchesScale5PromotionPath({
     company_name: "Medical Equipment Solutions",
-    tier_used: 4,
+    tier_used: null,
     legacy_fallback_used: true,
     mapped_contacts: 0,
     promotion: buildApolloScale3CompanyPromotionEvidence(mesScale5PassAcquisition()),
     blockers: ["no_enriched_candidates_with_contact_channel"],
   })
-  assert.match(bad ?? "", /regressed to tier-4 fallback/)
+  assert.match(bad ?? "", /regressed to legacy-only fallback/)
 }
 
 function testAcquisitionSkipRequiresApolloCandidatesWhenLegacyContactable(): void {
@@ -164,10 +164,17 @@ function testScale3ExecuteReturnsStructuredFailure(): void {
     path.join(process.cwd(), "lib/growth/apollo/apollo-scale-3-production-route.ts"),
     "utf8",
   )
+  const certification = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/apollo/apollo-scale-3-search-strategy-certification.ts"),
+    "utf8",
+  )
   assert.match(route, /jsonResponse/)
   assert.match(route, /formatApolloScale5ExecutionFailure/)
   assert.match(productionRoute, /failure_analysis/)
-  assert.match(productionRoute, /aggregate/)
+  assert.match(certification, /legacy_contactable_contacts/)
+  assert.match(route, /legacy_contactable_contacts/)
+  assert.match(route, /jsonResponse\(result, 200\)/)
+  assert.doesNotMatch(route, /certification_failed[\s\S]*500/)
 }
 
 function main(): void {

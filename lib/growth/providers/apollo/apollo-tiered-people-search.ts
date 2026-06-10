@@ -5,14 +5,18 @@ import "server-only"
 import { searchApolloPeopleByCompany } from "@/lib/growth/providers/apollo/apollo-client"
 import { isApolloMockEnabled } from "@/lib/growth/providers/apollo/apollo-config"
 import {
+  APOLLO_SEARCH_TIER_NAMES,
   buildApolloPeopleSearchParamsForTier,
+  shouldSkipApolloSearchTier,
   type ApolloSearchTier,
 } from "@/lib/growth/providers/apollo/apollo-query-builder"
+import { resolveApolloTierMappingPolicy } from "@/lib/growth/providers/apollo/apollo-tier-mapping-policy"
 import { mapApolloPeopleToContactDiscoveryRaw } from "@/lib/growth/providers/apollo/map-apollo-contact"
 import type { ApolloPersonSearchInput, ApolloPersonSearchResult } from "@/lib/growth/providers/apollo/apollo-types"
 import {
   emptyApolloTieredPeopleSearchEvidence,
   type ApolloSearchTierAttemptEvidence,
+  type ApolloSearchTierStopReason,
   type ApolloTieredPeopleSearchEvidence,
 } from "@/lib/growth/providers/apollo/apollo-tiered-people-search-types"
 
@@ -26,6 +30,8 @@ export type ApolloTieredPeopleSearchOutcome = ApolloPersonSearchResult & {
   mapped_contacts: ReturnType<typeof mapApolloPeopleToContactDiscoveryRaw>["contacts"]
   search_strategy: ApolloTieredPeopleSearchEvidence
 }
+
+const APOLLO_SEARCH_TIERS: ApolloSearchTier[] = [1, 2, 3, 4, 5]
 
 function mergeRejectionReasons(
   target: Record<string, number>,
@@ -53,14 +59,45 @@ export async function searchApolloPeopleWithTierStrategy(
     company_name: input.company_name,
     domain: input.domain,
     mock,
+    city: input.city,
+    state: input.state,
   })
-  let tier_used: ApolloTieredPeopleSearchEvidence["tier_used"] = 1
+  let tier_used: ApolloTieredPeopleSearchEvidence["tier_used"] = null
   let raw_contacts_returned = 0
-  let winningPeople = bestMapped.contacts.length > 0 ? [] : bestSearch?.people ?? []
+  let winningPeople = bestSearch?.people ?? []
+  let stop_reason: ApolloSearchTierStopReason | null = null
 
-  for (const tier of [1, 2, 3] as ApolloSearchTier[]) {
+  for (const tier of APOLLO_SEARCH_TIERS) {
+    const skipReason = shouldSkipApolloSearchTier(tier, input)
+    if (skipReason) {
+      tier_attempts.push({
+        tier,
+        tier_name: APOLLO_SEARCH_TIER_NAMES[tier],
+        request_payload: {},
+        request_payload_summary: `skipped:${skipReason}`,
+        company_domain: input.domain,
+        company_name: input.company_name.trim(),
+        organization_location: null,
+        person_titles: [],
+        person_seniorities: [],
+        domain_exact_only: false,
+        title_filter_applied: false,
+        raw_contacts_returned: 0,
+        mapped_contacts: 0,
+        mapping_rejections: 0,
+        rejection_reasons: {},
+        apollo_status: "skipped",
+        apollo_message: skipReason,
+        skipped_reason: skipReason,
+      })
+      continue
+    }
+
     const built = buildApolloPeopleSearchParamsForTier(input, tier)
-    if (tier === 2 && !built.company_name) continue
+    const mappingPolicy = resolveApolloTierMappingPolicy(tier, {
+      domain: built.domain,
+      state: input.state ?? null,
+    })
 
     const search = await searchApolloPeopleByCompany(input, {
       apiKey: options?.apiKey,
@@ -73,22 +110,31 @@ export async function searchApolloPeopleWithTierStrategy(
       company_name: input.company_name,
       domain: built.domain,
       mock: search.mock,
+      city: input.city,
+      state: input.state,
+      search_tier: tier,
+      mapping_policy: mappingPolicy,
     })
 
     tier_attempts.push({
       tier,
+      tier_name: built.tier_name,
       request_payload: built.request_payload,
+      request_payload_summary: built.summary,
       company_domain: built.domain,
       company_name: built.company_name,
+      organization_location: built.organization_location,
       person_titles: built.person_titles,
       person_seniorities: built.person_seniorities,
       domain_exact_only: built.domain_exact_only,
+      title_filter_applied: built.title_filter_applied,
       raw_contacts_returned: search.people.length,
       mapped_contacts: mapped.diagnostics.contacts_mapped,
       mapping_rejections: mapped.diagnostics.contacts_skipped,
       rejection_reasons: mapped.diagnostics.skip_reasons,
       apollo_status: search.status,
       apollo_message: search.message,
+      skipped_reason: null,
     })
     mergeRejectionReasons(rejection_reasons, mapped.diagnostics.skip_reasons)
 
@@ -105,16 +151,23 @@ export async function searchApolloPeopleWithTierStrategy(
 
     if (mapped.diagnostics.contacts_mapped > 0) {
       tier_used = tier
+      stop_reason = "mapped_contacts_found"
       break
     }
 
-    if (mock) break
+    if (mock) {
+      stop_reason = "mock_single_tier"
+      break
+    }
+  }
+
+  if (!stop_reason) {
+    stop_reason = "exhausted_all_tiers"
   }
 
   const legacy_contactable_count = options?.legacy_contactable_count ?? 0
   let legacy_fallback_used = false
   if (bestMapped.diagnostics.contacts_mapped === 0 && legacy_contactable_count > 0) {
-    tier_used = 4
     legacy_fallback_used = true
   }
 
@@ -154,6 +207,9 @@ export async function searchApolloPeopleWithTierStrategy(
   const search_strategy: ApolloTieredPeopleSearchEvidence = {
     ...emptyApolloTieredPeopleSearchEvidence(),
     tier_used,
+    chosen_tier: tier_used,
+    chosen_tier_name: tier_used ? APOLLO_SEARCH_TIER_NAMES[tier_used] : null,
+    stop_reason,
     tier_attempts,
     raw_contacts_returned,
     mapped_contacts: bestMapped.diagnostics.contacts_mapped,

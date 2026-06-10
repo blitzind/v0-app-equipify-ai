@@ -26,6 +26,8 @@ export type GrowthContactDiscoveryProviderQuery = {
   website_url: string | null
   growth_lead_id: string | null
   industry: string | null
+  city?: string | null
+  state?: string | null
   limit?: number
 }
 

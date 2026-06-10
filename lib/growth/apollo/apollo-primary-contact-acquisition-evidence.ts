@@ -2,6 +2,7 @@
 
 import type { ApolloTieredPeopleSearchEvidence } from "@/lib/growth/providers/apollo/apollo-tiered-people-search-types"
 import type { ApolloVerifiedEmailPromotionEvidence } from "@/lib/growth/apollo/apollo-verified-email-promotion-evidence"
+import type { ApolloAcquisitionSearchEvidence } from "@/lib/growth/apollo/apollo-acquisition-search-evidence"
 
 export const APOLLO_PRIMARY_CONTACT_ACQUISITION_EVIDENCE_QA_MARKER =
   "apollo-primary-contact-acquisition-evidence-v1" as const
@@ -40,6 +41,7 @@ export type ApolloPrimaryContactAcquisitionCompanyEvidence = {
   sequence_ready_contacts: number
   blockers: string[]
   search_strategy: ApolloTieredPeopleSearchEvidence | null
+  apollo_search_evidence: ApolloAcquisitionSearchEvidence | null
   verified_email_promotion: ApolloVerifiedEmailPromotionEvidence | null
 }
 

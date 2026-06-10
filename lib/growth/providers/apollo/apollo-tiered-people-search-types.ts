@@ -3,29 +3,44 @@
 import type { ApolloSearchTier } from "@/lib/growth/providers/apollo/apollo-query-builder"
 import type { ApolloPersonSearchResult } from "@/lib/growth/providers/apollo/apollo-types"
 
-export const APOLLO_TIERED_PEOPLE_SEARCH_QA_MARKER = "apollo-tiered-people-search-v1" as const
+export const APOLLO_TIERED_PEOPLE_SEARCH_QA_MARKER = "apollo-tiered-people-search-v2" as const
 
-export type ApolloSearchTierUsed = ApolloSearchTier | 4
+export type ApolloSearchTierStopReason =
+  | "mapped_contacts_found"
+  | "exhausted_all_tiers"
+  | "mock_single_tier"
+  | "tier_skipped"
+
+/** Winning search tier (1–5). Legacy fallback is tracked separately. */
+export type ApolloSearchTierUsed = ApolloSearchTier | null
 
 export type ApolloSearchTierAttemptEvidence = {
   tier: ApolloSearchTier
+  tier_name: string
   request_payload: Record<string, unknown>
+  request_payload_summary: string
   company_domain: string | null
   company_name: string
+  organization_location: string | null
   person_titles: readonly string[]
   person_seniorities: readonly string[]
   domain_exact_only: boolean
+  title_filter_applied: boolean
   raw_contacts_returned: number
   mapped_contacts: number
   mapping_rejections: number
   rejection_reasons: Record<string, number>
   apollo_status: ApolloPersonSearchResult["status"]
   apollo_message: string | null
+  skipped_reason: string | null
 }
 
 export type ApolloTieredPeopleSearchEvidence = {
   qa_marker: typeof APOLLO_TIERED_PEOPLE_SEARCH_QA_MARKER
   tier_used: ApolloSearchTierUsed
+  chosen_tier: ApolloSearchTier | null
+  chosen_tier_name: string | null
+  stop_reason: ApolloSearchTierStopReason | null
   tier_attempts: ApolloSearchTierAttemptEvidence[]
   raw_contacts_returned: number
   mapped_contacts: number
@@ -38,7 +53,10 @@ export type ApolloTieredPeopleSearchEvidence = {
 export function emptyApolloTieredPeopleSearchEvidence(): ApolloTieredPeopleSearchEvidence {
   return {
     qa_marker: APOLLO_TIERED_PEOPLE_SEARCH_QA_MARKER,
-    tier_used: 1,
+    tier_used: null,
+    chosen_tier: null,
+    chosen_tier_name: null,
+    stop_reason: null,
     tier_attempts: [],
     raw_contacts_returned: 0,
     mapped_contacts: 0,

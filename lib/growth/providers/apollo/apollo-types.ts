@@ -9,6 +9,8 @@ export type ApolloPersonSearchInput = {
   domain: string | null
   website_url?: string | null
   industry?: string | null
+  city?: string | null
+  state?: string | null
   limit?: number
 }
 

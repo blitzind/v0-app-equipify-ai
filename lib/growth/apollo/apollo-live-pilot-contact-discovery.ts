@@ -174,6 +174,8 @@ export async function runApolloLivePilotContactDiscovery(
     company_name: string
     domain: string | null
     website_url: string | null
+    city?: string | null
+    state?: string | null
     created_by?: string | null
     limit?: number
   },
@@ -201,6 +203,8 @@ export async function runApolloLivePilotContactDiscovery(
       website_url: input.website_url,
       growth_lead_id: null,
       industry: null,
+      city: input.city,
+      state: input.state,
       limit: input.limit ?? 10,
     },
     { provider_types: ["future_apollo"] },

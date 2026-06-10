@@ -50,6 +50,8 @@ export function createApolloContactDiscoveryProvider(): GrowthContactDiscoveryPr
           domain,
           website_url: input.website_url,
           industry: input.industry,
+          city: input.city,
+          state: input.state,
           limit: input.limit ?? 20,
         },
         { mock: isApolloMockEnabled() },

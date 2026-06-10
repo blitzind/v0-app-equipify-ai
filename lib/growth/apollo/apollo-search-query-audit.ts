@@ -1,6 +1,7 @@
 /** Apollo search query audit — evidence-only tier inspection and classification. Client-safe. */
 
 import { buildApolloPeopleSearchParamsForTier, type ApolloSearchTier } from "@/lib/growth/providers/apollo/apollo-query-builder"
+import { personOrganizationMatchesTarget } from "@/lib/growth/providers/apollo/apollo-org-match"
 import {
   resolveApolloPersonMappingOutcome,
   type ApolloPersonMappingOutcome,
@@ -16,6 +17,8 @@ export const APOLLO_SEARCH_QUERY_AUDIT_COMPANY_NAMES = [
   "OMI MedTech",
   "MedTech AZ",
 ] as const
+
+export { personOrganizationMatchesTarget } from "@/lib/growth/providers/apollo/apollo-org-match"
 
 export type ApolloSearchQueryAuditClassification =
   | "NO_APOLLO_COVERAGE"
@@ -85,10 +88,6 @@ function asTrimmedString(value: unknown): string | null {
   return null
 }
 
-function normalizeOrgToken(value: string | null | undefined): string {
-  return (value ?? "").trim().toLowerCase().replace(/^www\./i, "")
-}
-
 function resolvePersonDisplayName(person: ApolloPersonRecord): string | null {
   const fromParts = [asTrimmedString(person.first_name), asTrimmedString(person.last_name)]
     .filter(Boolean)
@@ -118,40 +117,6 @@ export function redactApolloPersonForAuditSample(person: ApolloPersonRecord): Ap
     city: asTrimmedString(person.city),
     state: asTrimmedString(person.state),
   }
-}
-
-export function personOrganizationMatchesTarget(
-  person: ApolloPersonRecord,
-  targetDomain: string | null,
-  targetCompanyName: string,
-): boolean | null {
-  const orgDomain = normalizeOrgToken(person.organization?.primary_domain)
-  const orgName = normalizeOrgToken(person.organization?.name)
-  if (!orgDomain && !orgName) return null
-
-  const targetDomainNorm = normalizeOrgToken(targetDomain)
-  if (targetDomainNorm && orgDomain) {
-    if (
-      orgDomain === targetDomainNorm ||
-      orgDomain.endsWith(`.${targetDomainNorm}`) ||
-      targetDomainNorm.endsWith(`.${orgDomain}`)
-    ) {
-      return true
-    }
-  }
-
-  const targetNameNorm = targetCompanyName.trim().toLowerCase()
-  if (targetNameNorm && orgName) {
-    const simplify = (value: string) => value.replace(/[^a-z0-9]/g, "")
-    const targetToken = simplify(targetNameNorm).slice(0, 12)
-    const orgToken = simplify(orgName)
-    if (targetToken.length >= 6 && orgToken.includes(targetToken)) return true
-    if (orgName.includes(targetNameNorm.slice(0, Math.min(14, targetNameNorm.length)))) return true
-  }
-
-  if (targetDomainNorm && orgDomain && orgDomain !== targetDomainNorm) return false
-  if (targetNameNorm && orgName && !orgName.includes(targetNameNorm.slice(0, 8))) return false
-  return null
 }
 
 export function buildApolloPersonMappingAuditRow(

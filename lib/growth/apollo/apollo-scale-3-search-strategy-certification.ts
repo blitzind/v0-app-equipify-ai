@@ -18,7 +18,7 @@ import {
 import type { ApolloPrimaryContactAcquisitionCompanyEvidence } from "@/lib/growth/apollo/apollo-primary-contact-acquisition-evidence"
 import type { ApolloSearchTierAttemptEvidence } from "@/lib/growth/providers/apollo/apollo-tiered-people-search-types"
 
-export const APOLLO_SCALE_3_QA_MARKER = "apollo-scale-3-search-strategy-cert-v2" as const
+export const APOLLO_SCALE_3_QA_MARKER = "apollo-scale-3-search-strategy-cert-v3" as const
 
 export type ApolloScale3CompanyEvidenceRow = import("@/lib/growth/apollo/apollo-scale-3-company-promotion-evidence").ApolloScale3MappedCompanyEvidenceRow & {
   error_metadata: ApolloScale2CompanyEvidenceRow["error_metadata"]
@@ -42,11 +42,14 @@ export type ApolloScale3SearchStrategyCertification = {
     tier_2_companies: number
     tier_3_companies: number
     tier_4_companies: number
+    tier_5_companies: number
+    legacy_fallback_companies: number
     companies_with_apollo_mapped_contacts: number
     verified_email_contacts: number
     email_enrichment_candidates_updated: number
     company_contacts_promoted: number
     contactable_after_promotion: number
+    legacy_contactable_contacts: number
     sequence_ready_after_promotion: number
   }
   failure_analysis: ApolloScale2LiveAcquisitionCertification["failure_analysis"]
@@ -54,6 +57,25 @@ export type ApolloScale3SearchStrategyCertification = {
 }
 
 export { mapApolloScale3CompanyEvidenceRow }
+
+export function assessApolloScale3SearchStrategyResult(input: {
+  companies: ApolloScale3CompanyEvidenceRow[]
+  mock: boolean
+}): ApolloScale2CertResult {
+  if (input.mock) return "FAIL"
+
+  const apolloReady = input.companies.filter(
+    (row) =>
+      row.mapped_contacts > 0 &&
+      row.promotion_evidence.verified_email_contacts > 0 &&
+      row.promotion_evidence.company_contacts_promoted > 0 &&
+      row.contactable > 0 &&
+      row.sequence_ready > 0,
+  )
+
+  if (apolloReady.length >= 1) return "PASS"
+  return "FAIL"
+}
 
 export async function certifyApolloScale3SearchStrategy(
   admin: SupabaseClient,
@@ -77,11 +99,20 @@ export async function certifyApolloScale3SearchStrategy(
     }),
   )
 
-  const tierCounts = { tier_1: 0, tier_2: 0, tier_3: 0, tier_4: 0, mapped: 0 }
+  const tierCounts = {
+    tier_1: 0,
+    tier_2: 0,
+    tier_3: 0,
+    tier_4: 0,
+    tier_5: 0,
+    legacy_fallback: 0,
+    mapped: 0,
+  }
   let verified_email_contacts = 0
   let email_enrichment_candidates_updated = 0
   let company_contacts_promoted = 0
   let contactable_after_promotion = 0
+  let legacy_contactable_contacts = 0
   let sequence_ready_after_promotion = 0
 
   for (const row of companies) {
@@ -89,17 +120,25 @@ export async function certifyApolloScale3SearchStrategy(
     if (row.tier_used === 2) tierCounts.tier_2 += 1
     if (row.tier_used === 3) tierCounts.tier_3 += 1
     if (row.tier_used === 4) tierCounts.tier_4 += 1
+    if (row.tier_used === 5) tierCounts.tier_5 += 1
+    if (row.legacy_fallback_used) tierCounts.legacy_fallback += 1
     if (row.mapped_contacts > 0) tierCounts.mapped += 1
     verified_email_contacts += row.promotion_evidence.verified_email_contacts
     email_enrichment_candidates_updated += row.promotion_evidence.email_enrichment_candidates_updated
     company_contacts_promoted += row.promotion_evidence.company_contacts_promoted
-    contactable_after_promotion += row.promotion_evidence.contactable_after_promotion
-    sequence_ready_after_promotion += row.promotion_evidence.sequence_ready_after_promotion
+    contactable_after_promotion += row.contactable
+    legacy_contactable_contacts += row.acquisition_evidence?.legacy_contactable_count ?? 0
+    sequence_ready_after_promotion += row.sequence_ready
   }
+
+  const scale3Result = assessApolloScale3SearchStrategyResult({
+    companies,
+    mock: scale2.runtime.mock,
+  })
 
   return {
     qa_marker: APOLLO_SCALE_3_QA_MARKER,
-    result: scale2.result,
+    result: scale3Result,
     certified_at: scale2.certified_at,
     mode: "live_apollo_tiered_search",
     safety: {
@@ -116,11 +155,14 @@ export async function certifyApolloScale3SearchStrategy(
       tier_2_companies: tierCounts.tier_2,
       tier_3_companies: tierCounts.tier_3,
       tier_4_companies: tierCounts.tier_4,
+      tier_5_companies: tierCounts.tier_5,
+      legacy_fallback_companies: tierCounts.legacy_fallback,
       companies_with_apollo_mapped_contacts: tierCounts.mapped,
       verified_email_contacts,
       email_enrichment_candidates_updated,
       company_contacts_promoted,
       contactable_after_promotion,
+      legacy_contactable_contacts,
       sequence_ready_after_promotion,
     },
     certification: scale2,

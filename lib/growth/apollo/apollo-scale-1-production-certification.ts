@@ -13,6 +13,7 @@ import {
   resolveApolloPrimaryContactAcquisitionContactLimit,
 } from "@/lib/growth/apollo/apollo-primary-contact-acquisition-gates"
 import { isSequenceReadyCompanyContact as isSequenceReadyContact } from "@/lib/growth/apollo/apollo-enrichment-cert-promotion-evidence"
+import { resolveApolloAttributedContactableCounts } from "@/lib/growth/apollo/apollo-acquisition-search-evidence"
 import { classifyContactIdentity } from "@/lib/growth/human-identity-evidence/contact-identity-classification"
 
 export const APOLLO_SCALE_1_QA_MARKER = "apollo-scale-1-production-cert-v1" as const
@@ -58,6 +59,8 @@ export type ApolloScale1CompanyResult = {
   readiness: {
     contactable_contacts: number
     sequence_ready_contacts: number
+    apollo_contactable_contacts: number
+    legacy_contactable_contacts: number
     blocked_contacts: number
     blockers_by_category: Record<ApolloScale1BlockerCategory, number>
   }
@@ -258,6 +261,7 @@ export async function buildApolloScale1CompanyResult(
     .eq("company_candidate_id", company.company_candidate_id)
     .eq("provider_type", "future_apollo")
 
+  const apolloCandidateIds = new Set<string>()
   let emails_discovered = 0
   let phones_discovered = 0
   let linkedin_profiles_discovered = 0
@@ -265,6 +269,8 @@ export async function buildApolloScale1CompanyResult(
 
   for (const raw of candidates ?? []) {
     const row = raw as Record<string, unknown>
+    const candidateId = asString(row.id)
+    if (candidateId) apolloCandidateIds.add(candidateId)
     const metadata =
       row.metadata && typeof row.metadata === "object"
         ? (row.metadata as Record<string, unknown>)
@@ -316,13 +322,19 @@ export async function buildApolloScale1CompanyResult(
     blockers_by_category[category] += 1
   }
 
+  const attributed = resolveApolloAttributedContactableCounts({
+    company_contacts,
+    apollo_candidate_ids: apolloCandidateIds,
+  })
+
   return {
     company_name: company.company_name || meta.company_name,
     company_candidate_id: company.company_candidate_id,
     canonical_company_id: company.canonical_company_id,
     industry: meta.industry,
     acquisition: {
-      apollo_contacts_found: company.apollo_people_found,
+      apollo_contacts_found:
+        company.apollo_search_evidence?.apollo_mapped_people_count ?? company.apollo_people_found,
       apollo_contacts_enriched:
         company.email_enrichment?.candidates_updated ??
         (apollo_contacts_enriched || company.enrichment_candidates_updated),
@@ -347,10 +359,10 @@ export async function buildApolloScale1CompanyResult(
         company.verified_email_promotion?.company_contacts_promoted ?? company.promoted_contacts,
     },
     readiness: {
-      contactable_contacts:
-        company.verified_email_promotion?.contactable_after_promotion ?? contactable_contacts,
-      sequence_ready_contacts:
-        company.verified_email_promotion?.sequence_ready_after_promotion ?? sequence_ready_contacts,
+      contactable_contacts: attributed.apollo_contactable,
+      sequence_ready_contacts,
+      apollo_contactable_contacts: attributed.apollo_contactable,
+      legacy_contactable_contacts: attributed.legacy_contactable,
       blocked_contacts,
       blockers_by_category,
     },
@@ -836,6 +848,8 @@ export async function certifyApolloScale1Production(
       readiness: {
         contactable_contacts: 0,
         sequence_ready_contacts: 0,
+        apollo_contactable_contacts: 0,
+        legacy_contactable_contacts: 0,
         blocked_contacts: 0,
         blockers_by_category: emptyBlockerCounts(),
       },

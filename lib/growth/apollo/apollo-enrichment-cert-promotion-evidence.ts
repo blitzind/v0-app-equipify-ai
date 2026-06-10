@@ -99,6 +99,13 @@ export function isSequenceReadyCompanyContact(row: Record<string, unknown>): boo
   }
   if (metadata.eligible_for_canonical_person === false) return false
 
+  if (asString(metadata.apollo_match_strength) === "weak") {
+    const emailStatus = asString(row.email_status)?.toLowerCase() ?? ""
+    const verifiedEmail =
+      emailStatus === "verified" || metadata.apollo_email_enriched === true
+    if (!verifiedEmail) return false
+  }
+
   const identity = classifyContactIdentity({
     full_name: asString(row.full_name),
     title: asString(row.title) || null,

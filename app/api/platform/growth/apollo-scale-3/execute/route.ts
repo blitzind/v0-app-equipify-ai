@@ -55,8 +55,18 @@ export async function POST(request: Request) {
       duration_ms: Date.now() - startedMs,
       companies_processed: result.companies.length,
       tier_4_companies: result.companies.filter((row) => row.tier_used === 4).length,
+      tier_5_companies: result.companies.filter((row) => row.tier_used === 5).length,
+      legacy_fallback_companies: result.companies.filter((row) => row.legacy_fallback_used).length,
       mapped_companies: result.companies.filter((row) => row.mapped_contacts > 0).length,
       verified_email_contacts: result.aggregate?.verified_email_contacts ?? 0,
+      apollo_contacts_found: result.aggregate?.apollo_contacts_found ?? 0,
+      apollo_contactable_contacts: result.aggregate?.contactable_after_promotion ?? 0,
+      legacy_contactable_contacts: result.aggregate?.legacy_contactable_contacts ?? 0,
+      search_outcomes: result.companies.reduce<Record<string, number>>((acc, row) => {
+        const outcome = row.acquisition_evidence?.search_outcome ?? "unknown"
+        acc[outcome] = (acc[outcome] ?? 0) + 1
+        return acc
+      }, {}),
       auto_enrollment: false,
       outreach_sent: false,
     })
@@ -66,9 +76,6 @@ export async function POST(request: Request) {
     }
     if (!result.ok && result.error === "cohort_failed") {
       return jsonResponse(result, 422)
-    }
-    if (!result.ok) {
-      return jsonResponse(result, 500)
     }
     return jsonResponse(result, 200)
   } catch (error) {

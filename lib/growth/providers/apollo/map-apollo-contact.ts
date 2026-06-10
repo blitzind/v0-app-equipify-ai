@@ -10,6 +10,8 @@ import {
   isApolloIrrelevantTitleForIcp,
 } from "@/lib/growth/providers/apollo/apollo-title-buckets"
 import { isApolloObfuscatedLastNameToken } from "@/lib/growth/providers/apollo/apollo-search-person-normalize"
+import { evaluateApolloOrganizationMatch } from "@/lib/growth/providers/apollo/apollo-org-match"
+import type { ApolloTierMappingPolicy } from "@/lib/growth/providers/apollo/apollo-tier-mapping-policy"
 import type {
   ApolloPersonRecord,
   ApolloRedactedRawFieldDiagnostics,
@@ -27,6 +29,16 @@ export type ApolloRedactedRejectionSample = ApolloRedactedRawFieldDiagnostics & 
   rejection_reason: string
   /** @deprecated Use raw_name_present / mapped_full_name_present */
   name_present?: boolean
+}
+
+export type ApolloPeopleMappingContext = {
+  company_name: string
+  domain: string | null
+  mock: boolean
+  city?: string | null
+  state?: string | null
+  search_tier?: number | null
+  mapping_policy?: ApolloTierMappingPolicy | null
 }
 
 function asTrimmedString(value: unknown): string | null {
@@ -187,7 +199,7 @@ function buildRedactedRejectionSample(input: {
 
 export function mapApolloPersonToContactDiscoveryRaw(
   person: ApolloPersonRecord,
-  input: { company_name: string; domain: string | null; mock: boolean },
+  input: ApolloPeopleMappingContext,
 ): GrowthContactDiscoveryProviderRawContact | null {
   const full_name = resolveFullName(person)
   if (!full_name) return null
@@ -264,6 +276,8 @@ export function mapApolloPersonToContactDiscoveryRaw(
       apollo_raw_title: asTrimmedString(person.title),
       apollo_mock: input.mock,
       apollo_source_url: sourceUrl,
+      apollo_search_tier: input.search_tier ?? null,
+      apollo_match_strength: input.mapping_policy?.match_strength ?? "strong",
       apollo_has_email_flag: person.has_email === true,
       apollo_has_direct_phone_flag: person.has_direct_phone === true,
       apollo_last_name_source: person.apollo_name_fields?.last_name_source ?? null,
@@ -282,11 +296,31 @@ export type ApolloPersonMappingOutcome = {
 
 export function resolveApolloPersonMappingOutcome(
   person: ApolloPersonRecord,
-  input: { company_name: string; domain: string | null; mock: boolean },
+  input: ApolloPeopleMappingContext,
 ): ApolloPersonMappingOutcome {
   const rawTitle = asTrimmedString(person.title) ?? asTrimmedString(person.headline)
   if (isApolloIrrelevantTitleForIcp(rawTitle)) {
     return { mapped: null, accepted: false, rejection_reason: "irrelevant_title" }
+  }
+
+  const policy = input.mapping_policy
+  if (policy?.require_organization_match || policy?.require_location_match) {
+    const orgGate = evaluateApolloOrganizationMatch({
+      person,
+      target_domain: input.domain,
+      target_company_name: input.company_name,
+      target_city: input.city ?? null,
+      target_state: input.state ?? null,
+      require_organization_match: policy.require_organization_match,
+      require_location_match: policy.require_location_match,
+    })
+    if (!orgGate.accepted) {
+      return {
+        mapped: null,
+        accepted: false,
+        rejection_reason: orgGate.reason ?? "organization_mismatch",
+      }
+    }
   }
 
   const mapped = mapApolloPersonToContactDiscoveryRaw(person, input)
@@ -307,6 +341,10 @@ export function mapApolloPeopleToContactDiscoveryRaw(input: {
   company_name: string
   domain: string | null
   mock: boolean
+  city?: string | null
+  state?: string | null
+  search_tier?: number | null
+  mapping_policy?: ApolloTierMappingPolicy | null
 }): {
   contacts: GrowthContactDiscoveryProviderRawContact[]
   diagnostics: Pick<ApolloSearchDiagnostics, "contacts_mapped" | "contacts_skipped" | "skip_reasons">
@@ -323,6 +361,17 @@ export function mapApolloPeopleToContactDiscoveryRaw(input: {
   let missing_email_count = 0
   let missing_phone_count = 0
   let rejected_sample: ApolloRedactedRejectionSample | null = null
+
+  const mappingContext: ApolloPeopleMappingContext = {
+    company_name: input.company_name,
+    domain: input.domain,
+    mock: input.mock,
+    city: input.city,
+    state: input.state,
+    search_tier: input.search_tier ?? null,
+    mapping_policy: input.mapping_policy ?? null,
+  }
+  const maxMapped = input.mapping_policy?.max_mapped_contacts ?? null
 
   for (const person of input.people) {
     const rawTitle = asTrimmedString(person.title) ?? asTrimmedString(person.headline)
@@ -347,11 +396,7 @@ export function mapApolloPeopleToContactDiscoveryRaw(input: {
       continue
     }
 
-    const outcome = resolveApolloPersonMappingOutcome(person, {
-      company_name: input.company_name,
-      domain: input.domain,
-      mock: input.mock,
-    })
+    const outcome = resolveApolloPersonMappingOutcome(person, mappingContext)
     const mapped = outcome.mapped
     if (!outcome.accepted || !mapped) {
       const reason = outcome.rejection_reason ?? "rejected"
@@ -390,6 +435,7 @@ export function mapApolloPeopleToContactDiscoveryRaw(input: {
     }
     seen.add(key)
     contacts.push(mapped)
+    if (maxMapped != null && contacts.length >= maxMapped) break
   }
 
   return {
