@@ -15,6 +15,19 @@ export type ApolloSearchTierStopReason =
 /** Winning search tier (1–5). Legacy fallback is tracked separately. */
 export type ApolloSearchTierUsed = ApolloSearchTier | null
 
+export type ApolloMapperRejectionPersonSample = {
+  name: string | null
+  title: string | null
+  organization_name: string | null
+  organization_domain: string | null
+  city: string | null
+  state: string | null
+  linkedin_url: string | null
+  email_status: string | null
+  accepted: boolean
+  rejection_reason: string | null
+}
+
 export type ApolloSearchTierAttemptEvidence = {
   tier: ApolloSearchTier
   tier_name: string
@@ -31,6 +44,7 @@ export type ApolloSearchTierAttemptEvidence = {
   mapped_contacts: number
   mapping_rejections: number
   rejection_reasons: Record<string, number>
+  mapper_rejection_samples: ApolloMapperRejectionPersonSample[]
   apollo_status: ApolloPersonSearchResult["status"]
   apollo_message: string | null
   skipped_reason: string | null

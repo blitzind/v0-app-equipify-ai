@@ -2,6 +2,12 @@
 
 import type { ApolloPrimaryContactAcquisitionCompanyEvidence } from "@/lib/growth/apollo/apollo-primary-contact-acquisition-evidence"
 import type { ApolloAcquisitionSearchEvidence } from "@/lib/growth/apollo/apollo-acquisition-search-evidence"
+import {
+  buildApolloMapperRejectionEvidenceFromTierAttempts,
+  buildApolloTierAttemptsCompactSummaries,
+  type ApolloMapperRejectionEvidence,
+  type ApolloTierAttemptCompactSummary,
+} from "@/lib/growth/apollo/apollo-search-diagnostic-evidence"
 import type { ApolloSearchTierAttemptEvidence } from "@/lib/growth/providers/apollo/apollo-tiered-people-search-types"
 
 export const APOLLO_SCALE_3_COMPANY_PROMOTION_EVIDENCE_QA_MARKER =
@@ -28,7 +34,9 @@ export type ApolloScale3MappedCompanyEvidenceRow = ApolloScale3CompanyEvidenceBa
   mapped_contacts: number
   mapping_rejections: number
   rejection_reasons: Record<string, number>
+  mapper_rejection_evidence: ApolloMapperRejectionEvidence | null
   tier_attempts: ApolloSearchTierAttemptEvidence[]
+  tier_attempts_compact: ApolloTierAttemptCompactSummary[]
   contactable: number
   sequence_ready: number
   legacy_fallback_used: boolean
@@ -145,6 +153,8 @@ export function mapApolloScale3CompanyEvidenceRow(input: {
   const promotion_evidence = buildApolloScale3CompanyPromotionEvidence(input.acquisition)
   const apollo_contactable = promotion_evidence.current_run_apollo_contactable_contacts
   const apollo_sequence_ready = promotion_evidence.current_run_apollo_sequence_ready_contacts
+  const tier_attempts = strategy?.tier_attempts ?? []
+  const mapper_rejection_evidence = buildApolloMapperRejectionEvidenceFromTierAttempts(tier_attempts)
   const mergedBlockers = [
     ...new Set([
       ...input.base.blockers,
@@ -176,7 +186,9 @@ export function mapApolloScale3CompanyEvidenceRow(input: {
       strategy?.rejection_reasons ??
       input.acquisition?.apollo_search_evidence?.mapper_rejection_reasons ??
       {},
-    tier_attempts: strategy?.tier_attempts ?? [],
+    mapper_rejection_evidence,
+    tier_attempts,
+    tier_attempts_compact: buildApolloTierAttemptsCompactSummaries(tier_attempts),
     contacts_enriched: promotion_evidence.email_enrichment_candidates_updated,
     contacts_promoted: promotion_evidence.current_run_apollo_promoted_contacts,
     contactable: apollo_contactable,

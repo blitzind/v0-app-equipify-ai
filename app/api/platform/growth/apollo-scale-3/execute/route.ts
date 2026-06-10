@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess, logGrowthEngine } from "@/lib/growth/access"
+import { buildApolloTierAttemptsCompactSummaries } from "@/lib/growth/apollo/apollo-search-diagnostic-evidence"
 import { executeApolloScale3InProduction } from "@/lib/growth/apollo/apollo-scale-3-production-route"
 import { formatApolloScale5ExecutionFailure } from "@/lib/growth/apollo/apollo-scale-5-execution-errors"
 import { validateApolloScale3Confirmation } from "@/lib/growth/apollo/apollo-scale-3-production-route-gates"
@@ -67,6 +68,16 @@ export async function POST(request: Request) {
         acc[outcome] = (acc[outcome] ?? 0) + 1
         return acc
       }, {}),
+      tier_attempts_by_company: result.companies.map((row) => ({
+        company_name: row.company_name,
+        search_outcome: row.acquisition_evidence?.search_outcome ?? "unknown",
+        raw_contacts_returned: row.raw_contacts_returned,
+        mapped_contacts: row.mapped_contacts,
+        tier_attempts_compact:
+          row.tier_attempts_compact ??
+          buildApolloTierAttemptsCompactSummaries(row.tier_attempts ?? []),
+        mapper_rejection_evidence: row.mapper_rejection_evidence ?? null,
+      })),
       auto_enrollment: false,
       outreach_sent: false,
     })

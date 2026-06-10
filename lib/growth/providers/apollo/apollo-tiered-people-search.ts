@@ -12,6 +12,7 @@ import {
 } from "@/lib/growth/providers/apollo/apollo-query-builder"
 import { classifyApolloRunGuardrailMessage } from "@/lib/growth/providers/apollo/apollo-run-guardrails"
 import { resolveApolloTierMappingPolicy } from "@/lib/growth/providers/apollo/apollo-tier-mapping-policy"
+import { auditApolloPeopleMappingDetailed } from "@/lib/growth/apollo/apollo-search-diagnostic-evidence"
 import { mapApolloPeopleToContactDiscoveryRaw } from "@/lib/growth/providers/apollo/map-apollo-contact"
 import type { ApolloPersonSearchInput, ApolloPersonSearchResult } from "@/lib/growth/providers/apollo/apollo-types"
 import {
@@ -103,6 +104,7 @@ export async function searchApolloPeopleWithTierStrategy(
         mapped_contacts: 0,
         mapping_rejections: 0,
         rejection_reasons: {},
+        mapper_rejection_samples: [],
         apollo_status: "skipped",
         apollo_message: skipReason,
         skipped_reason: `skipped:${skipReason}`,
@@ -139,6 +141,7 @@ export async function searchApolloPeopleWithTierStrategy(
         mapped_contacts: 0,
         mapping_rejections: 0,
         rejection_reasons: {},
+        mapper_rejection_samples: [],
         apollo_status: search.status,
         apollo_message: search.message,
         skipped_reason: search.message,
@@ -146,6 +149,20 @@ export async function searchApolloPeopleWithTierStrategy(
       stop_reason = "search_api_budget_exhausted"
       break
     }
+
+    const mappingAudit =
+      search.people.length > 0
+        ? auditApolloPeopleMappingDetailed({
+            people: search.people,
+            company_name: input.company_name,
+            domain: built.domain,
+            mock: search.mock,
+            city: input.city,
+            state: input.state,
+            search_tier: tier,
+            mapping_policy: mappingPolicy,
+          })
+        : { samples: [], rejection_reasons: {}, mapped_count: 0 }
 
     const mapped = mapApolloPeopleToContactDiscoveryRaw({
       people: search.people,
@@ -174,6 +191,7 @@ export async function searchApolloPeopleWithTierStrategy(
       mapped_contacts: mapped.diagnostics.contacts_mapped,
       mapping_rejections: mapped.diagnostics.contacts_skipped,
       rejection_reasons: mapped.diagnostics.skip_reasons,
+      mapper_rejection_samples: mappingAudit.samples,
       apollo_status: search.status,
       apollo_message: search.message,
       skipped_reason: null,

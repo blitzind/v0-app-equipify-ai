@@ -2,12 +2,16 @@
 
 import { redactApolloEnrichmentCertProductionSecrets } from "@/lib/growth/apollo/apollo-enrichment-cert-production-route-gates"
 import {
+  APOLLO_SCALE_3_RECOMMENDED_MAX_API_CALLS_PER_RUN,
+} from "@/lib/growth/apollo/apollo-single-company-search-diagnostic-gates"
+import {
   assertApolloScale2ProductionExecuteAllowed,
   buildApolloScale2ProductionReadinessPayload,
   isApolloScale2Enabled,
   isApolloScale2ProductionRuntime,
   resolveApolloScale2CompanyLimit,
 } from "@/lib/growth/apollo/apollo-scale-2-production-route-gates"
+import { resolveApolloCreditLimits } from "@/lib/growth/providers/apollo/apollo-config"
 
 export const APOLLO_SCALE_3_PRODUCTION_ROUTE_QA_MARKER =
   "apollo-scale-3-production-route-v1" as const
@@ -41,7 +45,21 @@ await fetch("/api/platform/growth/apollo-scale-3/execute", {
     console.log("verdict", payload.verdict)
     console.log("aggregate", payload.aggregate)
     console.log("failure_analysis", payload.failure_analysis)
-    console.log("companies", payload.companies)
+    console.log("search_outcomes", (payload.companies ?? []).reduce((acc, row) => {
+      const outcome = row.acquisition_evidence?.search_outcome ?? "unknown"
+      acc[outcome] = (acc[outcome] ?? 0) + 1
+      return acc
+    }, {}))
+    for (const row of payload.companies ?? []) {
+      console.log("company", row.company_name, {
+        search_outcome: row.acquisition_evidence?.search_outcome,
+        raw: row.raw_contacts_returned,
+        mapped: row.mapped_contacts,
+        tier_attempts_compact: row.tier_attempts_compact,
+        mapper_rejection_evidence: row.mapper_rejection_evidence,
+        rejection_reasons: row.rejection_reasons,
+      })
+    }
     return payload
   })`
 
@@ -122,6 +140,9 @@ export function buildApolloScale3ProductionReadinessPayload(input: {
 }) {
   const env = input.env ?? process.env
   const gates = assertApolloScale3ProductionExecuteAllowed(env)
+  const company_limit = resolveApolloScale2CompanyLimit()
+  const limits = resolveApolloCreditLimits(env)
+  const minimum_search_api_calls = company_limit * 5
   const base = buildApolloScale2ProductionReadinessPayload({
     ...input,
     env: {
@@ -139,6 +160,13 @@ export function buildApolloScale3ProductionReadinessPayload(input: {
     production_runtime: isApolloScale2ProductionRuntime(env),
     blockers: gates.blockers.length > 0 ? gates.blockers : base.blockers,
     browser_console_execute_snippet: APOLLO_SCALE_3_BROWSER_CONSOLE_EXECUTE_SNIPPET,
+    search_api_budget: {
+      current_max_api_calls_per_run: limits.max_api_calls_per_run,
+      minimum_for_full_cohort_tiers: minimum_search_api_calls,
+      recommended_for_cert: APOLLO_SCALE_3_RECOMMENDED_MAX_API_CALLS_PER_RUN,
+      sufficient_for_full_cohort: limits.max_api_calls_per_run >= minimum_search_api_calls,
+      recommended_env: `GROWTH_APOLLO_MAX_API_CALLS_PER_RUN=${APOLLO_SCALE_3_RECOMMENDED_MAX_API_CALLS_PER_RUN}`,
+    },
   })
 }
 

@@ -83,6 +83,7 @@ function testBuildSearchEvidenceQuerySummary(): void {
           mapped_contacts: 0,
           mapping_rejections: 0,
           rejection_reasons: {},
+          mapper_rejection_samples: [],
           apollo_status: "success",
           apollo_message: null,
           skipped_reason: null,
