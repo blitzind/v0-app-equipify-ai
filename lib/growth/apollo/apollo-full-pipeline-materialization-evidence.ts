@@ -61,6 +61,11 @@ export type ApolloFullPipelineMaterializationEvidence = {
   templates_considered: string[]
   template_rejection_reasons: string[]
   fallback_template_used: boolean
+  sequence_pattern_lookup_key: string | null
+  sequence_pattern_id: string | null
+  sequence_pattern_lookup_error: string | null
+  certification_fallback_pattern_used: boolean
+  pattern_source: string | null
 }
 
 const UNSAFE_JOB_STATUSES = new Set([
@@ -264,5 +269,13 @@ export function buildApolloFullPipelineMaterializationEvidence(input: {
     templates_considered: input.template_override?.templates_considered ?? [],
     template_rejection_reasons: input.template_override?.template_rejection_reasons ?? [],
     fallback_template_used: input.template_override?.fallback_template_used ?? false,
+    sequence_pattern_lookup_key: input.handoff?.sequence_pattern_lookup_key ?? null,
+    sequence_pattern_id: input.handoff?.sequence_pattern_id ?? null,
+    sequence_pattern_lookup_error: input.handoff?.sequence_pattern_lookup_error ?? null,
+    certification_fallback_pattern_used:
+      input.handoff?.certification_fallback_pattern_used ??
+      input.template_override?.fallback_template_used ??
+      false,
+    pattern_source: input.handoff?.pattern_source ?? null,
   }
 }

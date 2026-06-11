@@ -67,6 +67,7 @@ import {
   selectApolloCertificationMaterializableSequenceTemplate,
 } from "../lib/growth/apollo/apollo-certification-multichannel-template-override"
 import { buildApolloMultichannelSchedulingPlan } from "../lib/growth/apollo/apollo-multichannel-scheduling-layer"
+import { resolveApolloSequenceExecutionPatternLookup } from "../lib/growth/apollo/apollo-sequence-execution-pattern-resolution"
 
 const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-full-pipeline-production-certification-types.ts",
@@ -81,7 +82,9 @@ const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-enrollment-growth-lead-resolution.ts",
   "lib/growth/apollo/apollo-certification-multichannel-template-override.ts",
   "lib/growth/apollo/apollo-certification-multichannel-template-override-bridge.ts",
+  "lib/growth/apollo/apollo-sequence-execution-pattern-resolution.ts",
   "lib/growth/apollo/apollo-sequence-execution-handoff-input.ts",
+  "supabase/migrations/20270823120000_growth_apollo_certification_sequence_patterns.sql",
   "lib/growth/apollo/apollo-full-pipeline-production-route-gates.ts",
   "lib/growth/apollo/apollo-full-pipeline-production-route.ts",
   "app/api/platform/growth/apollo-full-pipeline-certification/readiness/route.ts",
@@ -499,6 +502,8 @@ console.log("  ✓ multichannel approval captures sequence execution handoff evi
 
 assert.match(bridgeSource, /normalizeGrowthActorUserIdForDb/)
 assert.doesNotMatch(bridgeSource, /createdBy:\s*"apollo-sequence-execution-automation"/)
+assert.match(bridgeSource, /fetchGrowthSequencePatternByKeyForApolloMaterialization/)
+assert.match(bridgeSource, /sequence_pattern_lookup_key/)
 assert.match(bridgeSource, /resolveAndBackfillApolloPipelineGrowthLeadForSequenceExecution/)
 assert.match(bridgeSource, /unsupported_template:custom_future|resolveUnsupportedSequenceMaterializationBlockers/)
 assert.match(bridgeSource, /status:\s*"pending_approval"/)
@@ -682,6 +687,52 @@ assert.ok(templateOverrideEvidence.templates_considered.length > 0)
 assert.ok(templateOverrideEvidence.template_rejection_reasons.length > 0)
 console.log("  ✓ certification overrides Custom Future Sequence to materializable template")
 
+const certificationPatternResolution = resolveApolloSequenceExecutionPatternLookup({
+  sequence_key: CERTIFICATION_MINIMAL_EMAIL_TEMPLATE.sequence_key,
+})
+assert.equal(certificationPatternResolution.sequence_pattern_lookup_key, "certification_minimal_email")
+assert.equal(certificationPatternResolution.certification_fallback_pattern_used, true)
+assert.equal(certificationPatternResolution.pattern_source, "persisted_pattern")
+
+const productionPatternResolution = resolveApolloSequenceExecutionPatternLookup({
+  sequence_key: "custom_future",
+})
+assert.equal(productionPatternResolution.sequence_pattern_lookup_key, "multichannel_with_voice_drop")
+assert.equal(productionPatternResolution.certification_fallback_pattern_used, false)
+
+const migrationSql = fs.readFileSync(
+  path.join(process.cwd(), "supabase/migrations/20270823120000_growth_apollo_certification_sequence_patterns.sql"),
+  "utf8",
+)
+assert.match(migrationSql, /certification_minimal_email/)
+assert.match(migrationSql, /certification_only.*true/)
+assert.match(migrationSql, /operator_selection_disabled.*true/)
+console.log("  ✓ certification patterns seeded; production still uses multichannel_with_voice_drop lookup")
+
+const certificationEmailPipeline = buildSequenceExecutionPipelineFromMultichannelHandoff({
+  multichannel_sequence_candidate_id: "mc-cert",
+  voice_drop_candidate_id: "vd-cert",
+  enrollment_candidate_id: "en-cert",
+  company_candidate_id: "co-cert",
+  company_contact_id: "cc-cert",
+  growth_lead_id: "lead-cert",
+  company_name: "Summit Medical",
+  full_name: "Bryan Ginther",
+  title: "Director",
+  email: "bryan@example.com",
+  phone: null,
+  qualification_score: 75,
+  sequence_key: CERTIFICATION_MINIMAL_EMAIL_TEMPLATE.sequence_key,
+  sequence_label: CERTIFICATION_MINIMAL_EMAIL_TEMPLATE.sequence_label,
+  channel_order: ["email"],
+  scheduling_plan: buildApolloMultichannelSchedulingPlan({ channel_order: ["email"] }),
+  source_attribution: { attribution_chain: ["Apollo", "Qualification", "Enrollment", "Voice Drop", "Multi-Channel"] },
+})
+assert.equal(certificationEmailPipeline.materialization.pattern_key, "certification_minimal_email")
+assert.equal(certificationEmailPipeline.materialization.total_steps, 1)
+assert.equal(certificationEmailPipeline.materialization.drafts.length, 1)
+console.log("  ✓ certification_minimal_email resolves persisted pattern key and materializes 1 email step")
+
 const supportedPipeline = buildSequenceExecutionPipelineFromMultichannelHandoff({
   multichannel_sequence_candidate_id: "mc-1",
   voice_drop_candidate_id: "vd-1",
@@ -761,6 +812,11 @@ const materializationEvidence = buildApolloFullPipelineMaterializationEvidence({
     draft_placeholders_created: 2,
     pending_approval_jobs_created: 2,
     materialization_reused: true,
+    sequence_pattern_lookup_key: "certification_minimal_email_voice_drop",
+    sequence_pattern_id: "pattern-cert-1",
+    sequence_pattern_lookup_error: null,
+    certification_fallback_pattern_used: true,
+    pattern_source: "persisted_pattern",
     outreach_sent: false,
     voice_drop_sent: false,
     email_sent: false,
@@ -830,6 +886,9 @@ assert.equal(
 )
 assert.equal(materializationEvidence.certification_sequence_template_override_used, true)
 assert.equal(materializationEvidence.original_sequence_key, "custom_future")
+assert.equal(materializationEvidence.sequence_pattern_lookup_key, "certification_minimal_email_voice_drop")
+assert.equal(materializationEvidence.sequence_pattern_id, "pattern-cert-1")
+assert.equal(materializationEvidence.certification_fallback_pattern_used, true)
 console.log("  ✓ existing materialization reuse evidence")
 
 const multichannelFixture = {

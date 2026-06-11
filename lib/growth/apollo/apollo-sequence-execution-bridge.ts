@@ -19,7 +19,8 @@ import type {
 } from "@/lib/growth/apollo/apollo-sequence-execution-automation-types"
 import { APOLLO_SEQUENCE_EXECUTION_AUTOMATION_QA_MARKER } from "@/lib/growth/apollo/apollo-sequence-execution-automation-types"
 import { buildSequenceExecutionPipelineFromMultichannelHandoff } from "@/lib/growth/apollo/apollo-sequence-execution-pipeline-builder"
-import { listGrowthSequencePatterns } from "@/lib/growth/sequence-pattern-repository"
+import { resolveApolloSequenceExecutionPatternLookup } from "@/lib/growth/apollo/apollo-sequence-execution-pattern-resolution"
+import { fetchGrowthSequencePatternByKeyForApolloMaterialization } from "@/lib/growth/sequence-pattern-repository"
 import {
   insertGrowthSequenceEnrollment,
   insertGrowthSequenceEnrollmentStep,
@@ -37,6 +38,16 @@ const TABLE = "apollo_sequence_execution_candidates"
 function emptyResult(
   action: ApolloSequenceExecutionAutomationActionResult["action"],
   error: string,
+  patternEvidence?: Partial<
+    Pick<
+      ApolloSequenceExecutionAutomationActionResult,
+      | "sequence_pattern_lookup_key"
+      | "sequence_pattern_id"
+      | "sequence_pattern_lookup_error"
+      | "certification_fallback_pattern_used"
+      | "pattern_source"
+    >
+  >,
 ): ApolloSequenceExecutionAutomationActionResult {
   return {
     ok: false,
@@ -45,6 +56,12 @@ function emptyResult(
     candidate_ids: [],
     status: null,
     error,
+    sequence_pattern_lookup_key: patternEvidence?.sequence_pattern_lookup_key ?? null,
+    sequence_pattern_id: patternEvidence?.sequence_pattern_id ?? null,
+    sequence_pattern_lookup_error: patternEvidence?.sequence_pattern_lookup_error ?? error,
+    certification_fallback_pattern_used:
+      patternEvidence?.certification_fallback_pattern_used ?? false,
+    pattern_source: patternEvidence?.pattern_source ?? null,
     outreach_sent: false,
     voice_drop_sent: false,
     email_sent: false,
@@ -174,13 +191,29 @@ export async function handoffMultichannelApprovedToSequenceExecution(
     )
   }
 
-  const patterns = await listGrowthSequencePatterns(admin)
-  const pattern =
-    patterns.find((entry) => entry.key === pipeline.materialization.pattern_key) ??
-    patterns.find((entry) => entry.key === "multichannel_with_voice_drop") ??
-    null
+  const patternResolution = resolveApolloSequenceExecutionPatternLookup({
+    sequence_key: resolvedInput.sequence_key,
+  })
+  const lookupKey = pipeline.materialization.pattern_key || patternResolution.sequence_pattern_lookup_key
+
+  let pattern = await fetchGrowthSequencePatternByKeyForApolloMaterialization(admin, lookupKey)
+  if (!pattern && lookupKey !== "multichannel_with_voice_drop") {
+    pattern = await fetchGrowthSequencePatternByKeyForApolloMaterialization(
+      admin,
+      "multichannel_with_voice_drop",
+    )
+  }
+
+  const patternEvidence = {
+    sequence_pattern_lookup_key: lookupKey,
+    sequence_pattern_id: pattern?.id ?? null,
+    sequence_pattern_lookup_error: pattern ? null : "sequence_pattern_not_found",
+    certification_fallback_pattern_used: patternResolution.certification_fallback_pattern_used,
+    pattern_source: patternResolution.pattern_source,
+  }
+
   if (!pattern) {
-    return emptyResult("create_from_multichannel", "sequence_pattern_not_found")
+    return emptyResult("create_from_multichannel", "sequence_pattern_not_found", patternEvidence)
   }
 
   const patternSteps = [...pattern.steps].sort((a, b) => a.stepOrder - b.stepOrder)
@@ -331,6 +364,11 @@ export async function handoffMultichannelApprovedToSequenceExecution(
     draft_placeholders_created: pipeline.materialization.drafts.length,
     pending_approval_jobs_created: pendingApprovalJobs,
     materialization_reused: false,
+    sequence_pattern_lookup_key: lookupKey,
+    sequence_pattern_id: pattern.id,
+    sequence_pattern_lookup_error: null,
+    certification_fallback_pattern_used: patternResolution.certification_fallback_pattern_used,
+    pattern_source: patternResolution.pattern_source,
     outreach_sent: false,
     voice_drop_sent: false,
     email_sent: false,

@@ -16,6 +16,7 @@ type PatternRow = {
   pattern_kind: string
   sequence_version: number
   is_active: boolean
+  metadata?: Record<string, unknown> | null
   min_touches: number
   max_observation_days: number
   attempt_count: number
@@ -93,6 +94,49 @@ function mapPattern(row: PatternRow, steps: GrowthSequencePatternStep[]): Growth
     computedAt: row.computed_at,
     steps,
   }
+}
+
+function metadataAllowsApolloMaterialization(metadata: unknown): boolean {
+  if (!metadata || typeof metadata !== "object") return false
+  const record = metadata as Record<string, unknown>
+  return record.apollo_materialization_allowed === true || record.certification_only === true
+}
+
+async function fetchGrowthSequencePatternRowByKey(
+  admin: SupabaseClient,
+  key: string,
+): Promise<PatternRow | null> {
+  const { data, error } = await admin
+    .schema("growth")
+    .from("sequence_patterns")
+    .select("*")
+    .eq("key", key)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  return data ? (data as PatternRow) : null
+}
+
+export async function fetchGrowthSequencePatternByKeyForApolloMaterialization(
+  admin: SupabaseClient,
+  key: string,
+): Promise<GrowthSequencePattern | null> {
+  const row = await fetchGrowthSequencePatternRowByKey(admin, key)
+  if (!row) return null
+
+  const apolloAllowed = row.is_active || metadataAllowsApolloMaterialization(row.metadata)
+  if (!apolloAllowed) return null
+
+  const { data: steps, error: stepsError } = await admin
+    .schema("growth")
+    .from("sequence_pattern_steps")
+    .select("*")
+    .eq("pattern_id", row.id)
+    .order("step_order", { ascending: true })
+
+  if (stepsError) throw new Error(stepsError.message)
+
+  return mapPattern(row, ((steps ?? []) as StepRow[]).map(mapStep))
 }
 
 export async function listGrowthSequencePatterns(admin: SupabaseClient): Promise<GrowthSequencePattern[]> {

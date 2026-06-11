@@ -8,6 +8,7 @@ import {
   buildApolloSequenceExecutionDraftRecords,
   summarizeApolloSequenceExecutionDrafts,
 } from "@/lib/growth/apollo/apollo-sequence-draft-generation"
+import { resolveApolloSequenceExecutionPatternLookup } from "@/lib/growth/apollo/apollo-sequence-execution-pattern-resolution"
 import {
   buildApolloSequenceExecutionStepPlans,
   summarizeApolloSequenceExecutionSteps,
@@ -21,12 +22,15 @@ export function buildApolloSequenceExecutionMaterializationPlan(
 ): ApolloSequenceExecutionMaterializationPlan {
   const steps = buildApolloSequenceExecutionStepPlans(input)
   const drafts = buildApolloSequenceExecutionDraftRecords({ handoff: input, steps })
+  const patternResolution = resolveApolloSequenceExecutionPatternLookup({
+    sequence_key: input.sequence_key,
+  })
 
   return {
     plan_version: "v1",
     sequence_key: input.sequence_key,
     sequence_label: input.sequence_label,
-    pattern_key: "multichannel_with_voice_drop",
+    pattern_key: patternResolution.sequence_pattern_lookup_key,
     total_steps: steps.length,
     total_days: input.scheduling_plan.total_days,
     steps,

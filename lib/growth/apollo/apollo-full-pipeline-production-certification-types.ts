@@ -77,6 +77,11 @@ export type ApolloFullPipelineMaterializationEvidence = {
   templates_considered: string[]
   template_rejection_reasons: string[]
   fallback_template_used: boolean
+  sequence_pattern_lookup_key: string | null
+  sequence_pattern_id: string | null
+  sequence_pattern_lookup_error: string | null
+  certification_fallback_pattern_used: boolean
+  pattern_source: string | null
 }
 
 export type ApolloFullPipelineSafetyViolation = {

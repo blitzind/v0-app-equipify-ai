@@ -174,6 +174,11 @@ export type ApolloSequenceExecutionAutomationActionResult = {
   draft_placeholders_created?: number
   pending_approval_jobs_created?: number
   materialization_reused?: boolean
+  sequence_pattern_lookup_key?: string | null
+  sequence_pattern_id?: string | null
+  sequence_pattern_lookup_error?: string | null
+  certification_fallback_pattern_used?: boolean
+  pattern_source?: "persisted_pattern" | "certification_inline_pattern" | null
   outreach_sent: false
   voice_drop_sent: false
   email_sent: false
