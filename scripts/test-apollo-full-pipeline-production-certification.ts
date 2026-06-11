@@ -55,6 +55,15 @@ import {
   resolveApolloPipelineGrowthLeadIdFromChain,
   buildApolloPipelineGrowthLeadResolutionEvidence,
 } from "../lib/growth/apollo/apollo-pipeline-growth-lead-resolution-evidence"
+import {
+  APOLLO_CERTIFICATION_PREFERRED_MATERIALIZABLE_SEQUENCE_KEYS,
+  buildApolloCertificationMultichannelTemplateOverrideEvidence,
+  countMaterializableSequenceStepsFromChannelOrder,
+  inferApolloCertificationChannelAvailability,
+  needsApolloCertificationMultichannelTemplateOverride,
+  selectApolloCertificationMaterializableSequenceTemplate,
+} from "../lib/growth/apollo/apollo-certification-multichannel-template-override"
+import { buildApolloMultichannelSchedulingPlan } from "../lib/growth/apollo/apollo-multichannel-scheduling-layer"
 
 const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-full-pipeline-production-certification-types.ts",
@@ -67,6 +76,8 @@ const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-pipeline-growth-lead-resolution-evidence.ts",
   "lib/growth/apollo/apollo-pipeline-growth-lead-resolution.ts",
   "lib/growth/apollo/apollo-enrollment-growth-lead-resolution.ts",
+  "lib/growth/apollo/apollo-certification-multichannel-template-override.ts",
+  "lib/growth/apollo/apollo-certification-multichannel-template-override-bridge.ts",
   "lib/growth/apollo/apollo-sequence-execution-handoff-input.ts",
   "lib/growth/apollo/apollo-full-pipeline-production-route-gates.ts",
   "lib/growth/apollo/apollo-full-pipeline-production-route.ts",
@@ -493,6 +504,8 @@ console.log("  ✓ sequence execution bridge uses valid actor UUID and pending_a
 assert.match(certSource, /handoffMultichannelApprovedToSequenceExecution/)
 assert.match(certSource, /materialization_evidence/)
 assert.match(certSource, /resolveAndBackfillApolloPipelineGrowthLeadForSequenceExecution/)
+assert.match(certSource, /applyApolloCertificationMultichannelTemplateOverride/)
+assert.match(certSource, /certification_sequence_template_override_used|template_override/)
 assert.match(certSource, /growth_lead_resolution/)
 assert.match(certSource, /multichannel_sequence_candidate_id/)
 assert.match(certSource, /materialization_reused/)
@@ -557,6 +570,55 @@ const customFutureBlockers = resolveUnsupportedSequenceMaterializationBlockers({
 })
 assert.ok(customFutureBlockers.includes("unsupported_template:custom_future"))
 console.log("  ✓ Custom Future Sequence returns explicit unsupported_template blocker")
+
+assert.equal(
+  needsApolloCertificationMultichannelTemplateOverride({
+    sequence_key: "custom_future",
+    scheduling_plan: buildApolloMultichannelSchedulingPlan({
+      channel_order: ["future_channel"],
+    }),
+  }),
+  true,
+)
+
+const certAvailability = inferApolloCertificationChannelAvailability({
+  stored: {
+    verified_email: false,
+    phone: false,
+    mobile_phone: false,
+    voice_drop_capable: false,
+    sms_capable: false,
+    linkedin: false,
+  },
+  email: "bryan@example.com",
+  phone: "+15551234567",
+})
+const overrideTemplate = selectApolloCertificationMaterializableSequenceTemplate({
+  availability: certAvailability,
+  preferred_keys: APOLLO_CERTIFICATION_PREFERRED_MATERIALIZABLE_SEQUENCE_KEYS,
+})
+assert.ok(overrideTemplate)
+assert.notEqual(overrideTemplate?.sequence_key, "custom_future")
+assert.ok(countMaterializableSequenceStepsFromChannelOrder(overrideTemplate!.channel_order) > 0)
+
+const overrideScheduling = buildApolloMultichannelSchedulingPlan({
+  channel_order: overrideTemplate!.channel_order,
+})
+const templateOverrideEvidence = buildApolloCertificationMultichannelTemplateOverrideEvidence({
+  override_used: true,
+  original_sequence_key: "custom_future",
+  materialized_sequence_key: overrideTemplate!.sequence_key,
+  original_sequence_label: "Custom Future Sequence",
+  materialized_sequence_label: overrideTemplate!.sequence_label,
+  materializable_steps_before: 0,
+  materializable_steps_after: overrideScheduling.touches.filter(
+    (touch) => touch.channel !== "future_channel",
+  ).length,
+})
+assert.equal(templateOverrideEvidence.certification_sequence_template_override_used, true)
+assert.equal(templateOverrideEvidence.original_sequence_key, "custom_future")
+assert.ok(templateOverrideEvidence.materializable_steps_after > 0)
+console.log("  ✓ certification overrides Custom Future Sequence to materializable template")
 
 const supportedPipeline = buildSequenceExecutionPipelineFromMultichannelHandoff({
   multichannel_sequence_candidate_id: "mc-1",
@@ -646,6 +708,7 @@ const materializationEvidence = buildApolloFullPipelineMaterializationEvidence({
     jobs_scheduled: false,
   },
   growth_lead_resolution: growthLeadEvidence,
+  template_override: templateOverrideEvidence,
   multichannel: {
     candidate_id: "mc-1",
     voice_drop_candidate_id: "vd-1",
@@ -703,6 +766,8 @@ assert.equal(
   materializationEvidence.growth_lead_resolution_source,
   growthLeadEvidence.growth_lead_resolution_source,
 )
+assert.equal(materializationEvidence.certification_sequence_template_override_used, true)
+assert.equal(materializationEvidence.original_sequence_key, "custom_future")
 console.log("  ✓ existing materialization reuse evidence")
 
 const multichannelFixture = {

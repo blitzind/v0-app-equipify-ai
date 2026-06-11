@@ -2,6 +2,7 @@
 
 import type { ApolloSequenceExecutionAutomationActionResult } from "@/lib/growth/apollo/apollo-sequence-execution-automation-types"
 import type { ApolloMultichannelSequenceCandidateRow } from "@/lib/growth/apollo/apollo-multichannel-orchestration-types"
+import type { ApolloCertificationMultichannelTemplateOverrideEvidence } from "@/lib/growth/apollo/apollo-certification-multichannel-template-override"
 import type { ApolloPipelineGrowthLeadResolutionEvidence } from "@/lib/growth/apollo/apollo-pipeline-growth-lead-resolution-evidence"
 
 export const APOLLO_FULL_PIPELINE_MATERIALIZATION_EVIDENCE_QA_MARKER =
@@ -46,6 +47,12 @@ export type ApolloFullPipelineMaterializationEvidence = {
   growth_lead_id_after: string | null
   growth_lead_backfilled_rows: string[]
   growth_lead_resolution_blockers: string[]
+  certification_sequence_template_override_used: boolean
+  original_sequence_key: string | null
+  materialized_sequence_key: string | null
+  materializable_steps_before: number
+  materializable_steps_after: number
+  template_override_blockers: string[]
 }
 
 const UNSAFE_JOB_STATUSES = new Set([
@@ -190,6 +197,7 @@ export function buildApolloFullPipelineMaterializationEvidence(input: {
     "sequence_template" | "scheduling_plan"
   > | null
   growth_lead_resolution?: ApolloPipelineGrowthLeadResolutionEvidence | null
+  template_override?: ApolloCertificationMultichannelTemplateOverrideEvidence | null
 }): ApolloFullPipelineMaterializationEvidence {
   const error = input.handoff?.ok === false ? input.handoff.error ?? "materialization_failed" : null
   const parsed = parseMaterializationErrorEvidence(error)
@@ -233,5 +241,12 @@ export function buildApolloFullPipelineMaterializationEvidence(input: {
     growth_lead_backfilled_rows: input.growth_lead_resolution?.growth_lead_backfilled_rows ?? [],
     growth_lead_resolution_blockers:
       input.growth_lead_resolution?.growth_lead_resolution_blockers ?? [],
+    certification_sequence_template_override_used:
+      input.template_override?.certification_sequence_template_override_used ?? false,
+    original_sequence_key: input.template_override?.original_sequence_key ?? null,
+    materialized_sequence_key: input.template_override?.materialized_sequence_key ?? null,
+    materializable_steps_before: input.template_override?.materializable_steps_before ?? 0,
+    materializable_steps_after: input.template_override?.materializable_steps_after ?? 0,
+    template_override_blockers: input.template_override?.template_override_blockers ?? [],
   }
 }

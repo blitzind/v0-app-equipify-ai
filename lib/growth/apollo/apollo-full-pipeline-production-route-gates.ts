@@ -59,6 +59,11 @@ await fetch("/api/platform/growth/apollo-full-pipeline-certification/execute", {
     console.log("certified", payload.certification?.certified)
     console.log("stage_ids", payload.certification?.stage_ids)
     console.log("materialization_evidence", payload.certification?.materialization_evidence)
+    console.log("template_override", {
+      used: payload.certification?.materialization_evidence?.certification_sequence_template_override_used,
+      original: payload.certification?.materialization_evidence?.original_sequence_key,
+      materialized: payload.certification?.materialization_evidence?.materialized_sequence_key,
+    })
     console.log("attribution_chain", payload.certification?.attribution_chain)
     console.log("safety", payload.certification?.safety)
     console.log("safety_violations", payload.certification?.safety_violations)

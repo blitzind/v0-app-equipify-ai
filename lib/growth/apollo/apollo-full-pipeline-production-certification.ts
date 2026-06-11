@@ -57,6 +57,7 @@ import { approveApolloMultichannelSequenceCandidate } from "@/lib/growth/apollo/
 import { mapApolloMultichannelSequenceCandidateDbRow } from "@/lib/growth/apollo/apollo-multichannel-orchestration-evidence"
 import { handoffMultichannelApprovedToSequenceExecution } from "@/lib/growth/apollo/apollo-sequence-execution-bridge"
 import { buildApolloSequenceExecutionHandoffInput } from "@/lib/growth/apollo/apollo-sequence-execution-handoff-input"
+import { applyApolloCertificationMultichannelTemplateOverride } from "@/lib/growth/apollo/apollo-certification-multichannel-template-override-bridge"
 import { resolveAndBackfillApolloPipelineGrowthLeadForSequenceExecution } from "@/lib/growth/apollo/apollo-pipeline-growth-lead-resolution"
 import { loadApolloPrimaryContactOperatorReviewSnapshot } from "@/lib/growth/apollo/apollo-primary-contact-operator-review"
 import { approveApolloVoiceDropCandidate } from "@/lib/growth/apollo/apollo-voice-drop-candidate-queue"
@@ -463,10 +464,41 @@ export async function certifyApolloFullPipelineProduction(
         .maybeSingle()
     : { data: null }
 
-  const multichannel = multichannelRow
+  let multichannel = multichannelRow
     ? mapApolloMultichannelSequenceCandidateDbRow(multichannelRow as Record<string, unknown>)
     : null
   stageIds.multichannel_sequence_candidate_id = multichannel?.candidate_id ?? null
+
+  let templateOverrideEvidence = null
+  if (multichannel) {
+    const templateOverride = await applyApolloCertificationMultichannelTemplateOverride(admin, {
+      candidate_id: multichannel.candidate_id,
+      email: multichannel.email,
+      phone: multichannel.phone,
+    })
+    templateOverrideEvidence = templateOverride.evidence
+
+    if (templateOverride.ok && templateOverride.evidence.certification_sequence_template_override_used) {
+      const { data: refreshedMultichannelRow } = await admin
+        .schema("growth")
+        .from("apollo_multichannel_sequence_candidates")
+        .select("*")
+        .eq("id", multichannel.candidate_id)
+        .maybeSingle()
+      if (refreshedMultichannelRow) {
+        multichannel = mapApolloMultichannelSequenceCandidateDbRow(
+          refreshedMultichannelRow as Record<string, unknown>,
+        )
+      }
+    }
+
+    if (
+      !templateOverride.ok ||
+      templateOverride.evidence.materializable_steps_after === 0
+    ) {
+      blockers.push("multichannel_template_not_materializable")
+    }
+  }
 
   checks.push({
     id: "multichannel_candidate_created",
@@ -476,6 +508,22 @@ export async function certifyApolloFullPipelineProduction(
       : "Multi-channel sequence candidate not created.",
   })
   if (!multichannel) blockers.push("multichannel_candidate_missing")
+
+  if (templateOverrideEvidence?.certification_sequence_template_override_used) {
+    checks.push({
+      id: "multichannel_template_materializable",
+      satisfied: templateOverrideEvidence.materializable_steps_after > 0,
+      detail: `Certification template override: ${templateOverrideEvidence.original_sequence_key} → ${templateOverrideEvidence.materialized_sequence_key} (${templateOverrideEvidence.materializable_steps_after} materializable step(s)).`,
+    })
+  } else if (multichannel) {
+    checks.push({
+      id: "multichannel_template_materializable",
+      satisfied: (templateOverrideEvidence?.materializable_steps_after ?? 0) > 0,
+      detail: templateOverrideEvidence?.template_override_blockers.length
+        ? `Multichannel template not materializable: ${templateOverrideEvidence.template_override_blockers.join(" | ")}`
+        : `Multichannel sequence ${multichannel.sequence_template.sequence_key} is materializable.`,
+    })
+  }
 
   if (multichannel && multichannel.status === "pending_sequence_approval") {
     const approveMultichannel = await approveApolloMultichannelSequenceCandidate(admin, {
@@ -594,6 +642,7 @@ export async function certifyApolloFullPipelineProduction(
       pending_approval_jobs_created: handoffResult?.pending_approval_jobs_created ?? 0,
       multichannel,
       growth_lead_resolution: growthLeadResolution,
+      template_override: templateOverrideEvidence,
     })
   }
 
