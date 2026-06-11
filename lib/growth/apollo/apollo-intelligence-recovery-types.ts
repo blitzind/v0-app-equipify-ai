@@ -134,6 +134,15 @@ export type ApolloIntelligenceRecoveryCompanyEvidence = {
   no_op_reason: string
 }
 
+export type ApolloIntelligenceRecoveryChunkMeta = {
+  offset: number
+  limit: number
+  total_discovered_companies: number
+  processed_count: number
+  has_more: boolean
+  next_offset: number | null
+}
+
 export type ApolloIntelligenceRecoveryWriteEvidence = {
   canonical_resolution_attempted_count: number
   canonical_resolved_count: number
@@ -155,6 +164,7 @@ export type ApolloIntelligenceRecoveryReport = {
   qa_marker: typeof APOLLO_INTELLIGENCE_RECOVERY_QA_MARKER
   mode: ApolloIntelligenceRecoveryMode
   computed_at: string
+  chunk: ApolloIntelligenceRecoveryChunkMeta
   writes_performed: boolean
   before: ApolloIntelligenceRecoveryFunnelSnapshot
   after: ApolloIntelligenceRecoveryFunnelSnapshot

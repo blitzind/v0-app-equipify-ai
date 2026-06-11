@@ -226,6 +226,7 @@ export function evaluateApolloIntelligenceRecoveryNoOp(input: {
   mode: ApolloIntelligenceRecoveryMode
   writes_performed: boolean
   write_evidence: ApolloIntelligenceRecoveryWriteEvidence
+  processed_count?: number
 }): {
   recovery_ok: boolean
   severity: "ok" | "critical"
@@ -233,11 +234,15 @@ export function evaluateApolloIntelligenceRecoveryNoOp(input: {
   top_no_op_reasons: string[]
 } {
   const isRecover = input.mode === "recover_missing_intelligence"
+  const processedCount = input.processed_count ?? 0
+  if (isRecover && processedCount === 0) {
+    return { recovery_ok: true, severity: "ok", no_op_root_cause: null, top_no_op_reasons: [] }
+  }
   const noOp =
     isRecover &&
     (!input.writes_performed ||
-      input.write_evidence.companies_with_score_increase === 0 &&
-        input.write_evidence.companies_crossed_threshold === 0)
+      (input.write_evidence.companies_with_score_increase === 0 &&
+        input.write_evidence.companies_crossed_threshold === 0))
 
   if (!noOp) {
     return { recovery_ok: true, severity: "ok", no_op_root_cause: null, top_no_op_reasons: [] }

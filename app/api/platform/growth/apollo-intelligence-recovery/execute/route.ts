@@ -4,6 +4,7 @@ import {
   APOLLO_INTELLIGENCE_RECOVERY_MODES,
   type ApolloIntelligenceRecoveryMode,
 } from "@/lib/growth/apollo/apollo-intelligence-recovery-types"
+import { parseApolloIntelligenceRecoveryChunk } from "@/lib/growth/apollo/apollo-intelligence-recovery-chunking"
 import { validateApolloIntelligenceRecoveryConfirmation } from "@/lib/growth/apollo/apollo-intelligence-recovery-gates"
 import { executeApolloIntelligenceRecovery } from "@/lib/growth/apollo/apollo-intelligence-recovery-route"
 
@@ -33,16 +34,23 @@ export async function POST(request: Request) {
 
   const record = body && typeof body === "object" ? (body as Record<string, unknown>) : {}
   const mode = parseMode(record.mode)
+  const { offset, limit } = parseApolloIntelligenceRecoveryChunk(record, mode)
 
   try {
     const startedMs = Date.now()
     const report = await executeApolloIntelligenceRecovery(access.admin, {
       mode,
       created_by: access.userId,
+      offset,
+      limit,
     })
 
     logGrowthEngine("apollo_intelligence_recovery_execute", {
       mode,
+      offset: report.chunk.offset,
+      limit: report.chunk.limit,
+      processed_count: report.chunk.processed_count,
+      has_more: report.chunk.has_more,
       writes_performed: report.writes_performed,
       recovery_ok: report.recovery_ok,
       severity: report.severity,
@@ -59,6 +67,7 @@ export async function POST(request: Request) {
       severity: report.severity,
       no_op_root_cause: report.no_op_root_cause,
       top_no_op_reasons: report.top_no_op_reasons,
+      chunk: report.chunk,
       report,
     })
   } catch (e) {

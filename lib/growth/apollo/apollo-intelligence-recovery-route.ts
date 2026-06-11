@@ -17,6 +17,10 @@ import {
   enrichApollo25CompanyPilotSelectionInputWithIntelligence,
   loadLatestProspectResearchRunIdForCompanyCandidate,
 } from "@/lib/growth/apollo/apollo-intelligence-recovery-enrichment"
+import {
+  buildApolloIntelligenceRecoveryChunkMeta,
+  resolveApolloIntelligenceRecoveryChunkLimit,
+} from "@/lib/growth/apollo/apollo-intelligence-recovery-chunking"
 import { buildApolloIntelligenceRecoveryFunnelFromSelectionInputs } from "@/lib/growth/apollo/apollo-intelligence-recovery-funnel"
 import {
   APOLLO_INTELLIGENCE_RECOVERY_EXECUTE_CONFIRM,
@@ -48,11 +52,15 @@ import { loadApolloPrimaryContactOperatorReviewSnapshot } from "@/lib/growth/apo
 
 export { loadApolloDiscoveredCompanyIds } from "@/lib/growth/apollo/apollo-25-company-pilot-route"
 
-async function buildEnrichedSelectionInputs(admin: SupabaseClient): Promise<
-  Awaited<ReturnType<typeof buildApollo25CompanyPilotSelectionInputs>>
-> {
-  const baseInputs = await buildApollo25CompanyPilotSelectionInputs(admin)
-  const enriched: typeof baseInputs = []
+type ApolloIntelligenceRecoverySelectionInputs = Awaited<
+  ReturnType<typeof buildApollo25CompanyPilotSelectionInputs>
+>
+
+async function buildEnrichedSelectionInputs(
+  admin: SupabaseClient,
+  baseInputs: ApolloIntelligenceRecoverySelectionInputs,
+): Promise<ApolloIntelligenceRecoverySelectionInputs> {
+  const enriched: ApolloIntelligenceRecoverySelectionInputs = []
 
   for (const input of baseInputs) {
     const resolution = await resolveApolloEnrichmentCanonicalCompanyId(admin, {
@@ -105,16 +113,37 @@ export async function executeApolloIntelligenceRecovery(
   input: {
     mode: ApolloIntelligenceRecoveryMode
     created_by?: string | null
+    offset?: number
+    limit?: number
   },
 ): Promise<ApolloIntelligenceRecoveryReport> {
   const production_threshold = resolveApolloEnrollmentQualificationThreshold()
   const schema = await probeProspectSearchEngineIntelligenceSchema(admin).catch(() => null)
 
-  const beforeInputs = await buildEnrichedSelectionInputs(admin)
+  const offset = Math.max(0, input.offset ?? 0)
+  const baseInputs = await buildApollo25CompanyPilotSelectionInputs(admin)
+  const total_discovered_companies = baseInputs.length
+  const chunkLimit = resolveApolloIntelligenceRecoveryChunkLimit(
+    input.mode,
+    input.limit,
+    total_discovered_companies,
+  )
+  const chunkEnd = Math.min(offset + chunkLimit, total_discovered_companies)
+  const processed_count = Math.max(0, chunkEnd - offset)
+
+  const allEnrichedInputs = await buildEnrichedSelectionInputs(admin, baseInputs)
   const before = buildApolloIntelligenceRecoveryFunnelFromSelectionInputs(
-    beforeInputs,
+    allEnrichedInputs,
     production_threshold,
   )
+
+  const chunkInputs = allEnrichedInputs.slice(offset, chunkEnd)
+  const chunk = buildApolloIntelligenceRecoveryChunkMeta({
+    offset,
+    limit: chunkLimit,
+    total_discovered_companies,
+    processed_count,
+  })
 
   const writes_performed = input.mode === "recover_missing_intelligence"
   const company_results: ApolloIntelligenceRecoveryReport["company_results"] = []
@@ -129,7 +158,7 @@ export async function executeApolloIntelligenceRecovery(
   let fit_score_count = 0
   let research_score_count = 0
 
-  for (const baseInput of beforeInputs) {
+  for (const baseInput of chunkInputs) {
     const snapshot = await loadApolloPrimaryContactOperatorReviewSnapshot(
       admin,
       baseInput.company_candidate_id,
@@ -370,7 +399,21 @@ export async function executeApolloIntelligenceRecovery(
     )
   }
 
-  const afterInputs = await buildEnrichedSelectionInputs(admin)
+  const afterInputs = [...allEnrichedInputs]
+  for (const baseInput of chunkInputs) {
+    const resolution = await resolveApolloEnrichmentCanonicalCompanyId(admin, {
+      company_candidate_id: baseInput.company_candidate_id,
+    })
+    const idx = afterInputs.findIndex(
+      (row) => row.company_candidate_id === baseInput.company_candidate_id,
+    )
+    if (idx < 0) continue
+    afterInputs[idx] = await enrichApollo25CompanyPilotSelectionInputWithIntelligence(
+      admin,
+      afterInputs[idx],
+      resolution.canonical_company_id,
+    )
+  }
   const after = buildApolloIntelligenceRecoveryFunnelFromSelectionInputs(
     afterInputs,
     production_threshold,
@@ -382,12 +425,14 @@ export async function executeApolloIntelligenceRecovery(
     mode: input.mode,
     writes_performed,
     write_evidence,
+    processed_count,
   })
 
   return {
     qa_marker: APOLLO_INTELLIGENCE_RECOVERY_QA_MARKER,
     mode: input.mode,
     computed_at: new Date().toISOString(),
+    chunk,
     writes_performed,
     before,
     after,

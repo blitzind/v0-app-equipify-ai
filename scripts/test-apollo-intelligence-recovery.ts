@@ -11,6 +11,13 @@ import {
   type Apollo25CompanyPilotSelectionInput,
 } from "../lib/growth/apollo/apollo-25-company-pilot-selection"
 import { buildApollo25CompanyPilotEligibilityDiagnostic } from "../lib/growth/apollo/apollo-25-company-pilot-eligibility-diagnostic"
+import {
+  APOLLO_INTELLIGENCE_RECOVERY_DEFAULT_CHUNK_LIMIT,
+  APOLLO_INTELLIGENCE_RECOVERY_MAX_CHUNK_LIMIT,
+  buildApolloIntelligenceRecoveryChunkMeta,
+  parseApolloIntelligenceRecoveryChunk,
+  resolveApolloIntelligenceRecoveryChunkLimit,
+} from "../lib/growth/apollo/apollo-intelligence-recovery-chunking"
 import { buildApolloIntelligenceRecoveryCanonicalAuditRow } from "../lib/growth/apollo/apollo-intelligence-recovery-audit"
 import {
   buildApolloIntelligenceRecoveryCompanyEvidence,
@@ -45,6 +52,7 @@ const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-intelligence-recovery-funnel.ts",
   "lib/growth/apollo/apollo-intelligence-recovery-enrichment.ts",
   "lib/growth/apollo/apollo-intelligence-recovery-evidence.ts",
+  "lib/growth/apollo/apollo-intelligence-recovery-chunking.ts",
   "lib/growth/apollo/apollo-intelligence-recovery-route.ts",
   "app/api/platform/growth/apollo-intelligence-recovery/readiness/route.ts",
   "app/api/platform/growth/apollo-intelligence-recovery/execute/route.ts",
@@ -327,6 +335,54 @@ console.log("  ✓ greenfield eligible with intelligence context")
 assert.equal(routeSource.includes("writes_performed = input.mode === \"recover_missing_intelligence\""), true)
 console.log("  ✓ recover mode is sole write path")
 
+const recoverChunkDefault = parseApolloIntelligenceRecoveryChunk({}, "recover_missing_intelligence")
+assert.equal(recoverChunkDefault.offset, 0)
+assert.equal(recoverChunkDefault.limit, APOLLO_INTELLIGENCE_RECOVERY_DEFAULT_CHUNK_LIMIT)
+const recoverChunkExplicit = parseApolloIntelligenceRecoveryChunk(
+  { offset: 10, limit: 5 },
+  "recover_missing_intelligence",
+)
+assert.equal(recoverChunkExplicit.offset, 10)
+assert.equal(recoverChunkExplicit.limit, 5)
+const diagnosticChunk = parseApolloIntelligenceRecoveryChunk({}, "diagnostic_only")
+assert.equal(diagnosticChunk.offset, 0)
+assert.equal(diagnosticChunk.limit, undefined)
+assert.equal(
+  resolveApolloIntelligenceRecoveryChunkLimit("diagnostic_only", undefined, 48),
+  48,
+)
+assert.equal(
+  resolveApolloIntelligenceRecoveryChunkLimit("recover_missing_intelligence", undefined, 48),
+  APOLLO_INTELLIGENCE_RECOVERY_DEFAULT_CHUNK_LIMIT,
+)
+assert.equal(
+  resolveApolloIntelligenceRecoveryChunkLimit(
+    "recover_missing_intelligence",
+    APOLLO_INTELLIGENCE_RECOVERY_MAX_CHUNK_LIMIT + 10,
+    48,
+  ),
+  APOLLO_INTELLIGENCE_RECOVERY_MAX_CHUNK_LIMIT,
+)
+const chunkMeta = buildApolloIntelligenceRecoveryChunkMeta({
+  offset: 0,
+  limit: 5,
+  total_discovered_companies: 48,
+  processed_count: 5,
+})
+assert.equal(chunkMeta.has_more, true)
+assert.equal(chunkMeta.next_offset, 5)
+const chunkMetaLast = buildApolloIntelligenceRecoveryChunkMeta({
+  offset: 45,
+  limit: 5,
+  total_discovered_companies: 48,
+  processed_count: 3,
+})
+assert.equal(chunkMetaLast.has_more, false)
+assert.equal(chunkMetaLast.next_offset, null)
+assert.equal(routeSource.includes("chunkInputs"), true)
+assert.equal(routeSource.includes("buildEnrichedSelectionInputs(admin, afterInputs[idx]"), false)
+console.log("  ✓ production-safe chunking defaults and partial re-enrich")
+
 const unresolvedEvidence = buildApolloIntelligenceRecoveryCompanyEvidence({
   company_candidate_id: "co-unresolved",
   company_name: "Unresolved Co",
@@ -464,6 +520,7 @@ console.log("  ✓ aggregate write evidence")
 const noOpEval = evaluateApolloIntelligenceRecoveryNoOp({
   mode: "recover_missing_intelligence",
   writes_performed: true,
+  processed_count: 4,
   write_evidence: {
     canonical_resolution_attempted_count: 4,
     canonical_resolved_count: 3,
