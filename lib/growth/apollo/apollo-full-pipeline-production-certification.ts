@@ -471,10 +471,18 @@ export async function certifyApolloFullPipelineProduction(
 
   let templateOverrideEvidence = null
   if (multichannel) {
+    const resolvedCertificationEmail =
+      multichannel.email ?? enrollment?.email ?? voiceDrop?.email ?? null
+    const resolvedCertificationPhone =
+      multichannel.phone ?? enrollment?.phone ?? voiceDrop?.phone ?? null
+
     const templateOverride = await applyApolloCertificationMultichannelTemplateOverride(admin, {
       candidate_id: multichannel.candidate_id,
-      email: multichannel.email,
-      phone: multichannel.phone,
+      email: resolvedCertificationEmail,
+      phone: resolvedCertificationPhone,
+      sequence_ready_contact: Boolean(enrollmentEvidence?.sequence_ready_contact_id),
+      verified_email_contact: Boolean(resolvedCertificationEmail),
+      channel_availability_overlay: voiceDrop?.channel_availability ?? null,
     })
     templateOverrideEvidence = templateOverride.evidence
 
@@ -516,12 +524,20 @@ export async function certifyApolloFullPipelineProduction(
       detail: `Certification template override: ${templateOverrideEvidence.original_sequence_key} → ${templateOverrideEvidence.materialized_sequence_key} (${templateOverrideEvidence.materializable_steps_after} materializable step(s)).`,
     })
   } else if (multichannel) {
+    const templateDetail = templateOverrideEvidence?.template_override_blockers.length
+      ? `Multichannel template not materializable: ${templateOverrideEvidence.template_override_blockers.join(" | ")}`
+      : `Multichannel sequence ${multichannel.sequence_template.sequence_key} is materializable.`
+    const channelDetail = templateOverrideEvidence
+      ? ` Channels=[${templateOverrideEvidence.available_channels.join(", ")}], email=${templateOverrideEvidence.contact_email_present}, phone=${templateOverrideEvidence.contact_phone_present}.`
+      : ""
+    const rejectionDetail = templateOverrideEvidence?.template_rejection_reasons.length
+      ? ` Rejections: ${templateOverrideEvidence.template_rejection_reasons.slice(0, 4).join(" | ")}.`
+      : ""
+
     checks.push({
       id: "multichannel_template_materializable",
       satisfied: (templateOverrideEvidence?.materializable_steps_after ?? 0) > 0,
-      detail: templateOverrideEvidence?.template_override_blockers.length
-        ? `Multichannel template not materializable: ${templateOverrideEvidence.template_override_blockers.join(" | ")}`
-        : `Multichannel sequence ${multichannel.sequence_template.sequence_key} is materializable.`,
+      detail: `${templateDetail}${channelDetail}${rejectionDetail}`,
     })
   }
 

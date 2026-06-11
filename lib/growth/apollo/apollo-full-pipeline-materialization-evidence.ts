@@ -53,6 +53,14 @@ export type ApolloFullPipelineMaterializationEvidence = {
   materializable_steps_before: number
   materializable_steps_after: number
   template_override_blockers: string[]
+  contact_email_present: boolean
+  contact_phone_present: boolean
+  voice_drop_capable: boolean
+  sms_capable: boolean
+  available_channels: string[]
+  templates_considered: string[]
+  template_rejection_reasons: string[]
+  fallback_template_used: boolean
 }
 
 const UNSAFE_JOB_STATUSES = new Set([
@@ -248,5 +256,13 @@ export function buildApolloFullPipelineMaterializationEvidence(input: {
     materializable_steps_before: input.template_override?.materializable_steps_before ?? 0,
     materializable_steps_after: input.template_override?.materializable_steps_after ?? 0,
     template_override_blockers: input.template_override?.template_override_blockers ?? [],
+    contact_email_present: input.template_override?.contact_email_present ?? false,
+    contact_phone_present: input.template_override?.contact_phone_present ?? false,
+    voice_drop_capable: input.template_override?.voice_drop_capable ?? false,
+    sms_capable: input.template_override?.sms_capable ?? false,
+    available_channels: input.template_override?.available_channels ?? [],
+    templates_considered: input.template_override?.templates_considered ?? [],
+    template_rejection_reasons: input.template_override?.template_rejection_reasons ?? [],
+    fallback_template_used: input.template_override?.fallback_template_used ?? false,
   }
 }

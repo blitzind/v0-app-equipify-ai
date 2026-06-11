@@ -3,13 +3,14 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import type { ApolloChannelAvailability } from "@/lib/growth/apollo/apollo-voice-drop-automation-types"
 import {
   buildApolloCertificationMultichannelTemplateOverrideEvidence,
   countMaterializableSequenceStepsFromChannelOrder,
   countMaterializableSequenceStepsFromSchedulingPlan,
+  evaluateApolloCertificationTemplateSelection,
   inferApolloCertificationChannelAvailability,
   needsApolloCertificationMultichannelTemplateOverride,
-  selectApolloCertificationMaterializableSequenceTemplate,
   type ApolloCertificationMultichannelTemplateOverrideEvidence,
 } from "@/lib/growth/apollo/apollo-certification-multichannel-template-override"
 import { mapApolloMultichannelSequenceCandidateDbRow } from "@/lib/growth/apollo/apollo-multichannel-orchestration-evidence"
@@ -21,12 +22,34 @@ import {
 
 const TABLE = "apollo_multichannel_sequence_candidates"
 
+function asString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : ""
+}
+
+function mergeChannelAvailability(
+  base: ApolloChannelAvailability,
+  overlay?: ApolloChannelAvailability | null,
+): ApolloChannelAvailability {
+  if (!overlay) return base
+  return {
+    verified_email: base.verified_email || overlay.verified_email,
+    phone: base.phone || overlay.phone,
+    mobile_phone: base.mobile_phone || overlay.mobile_phone,
+    sms_capable: base.sms_capable || overlay.sms_capable,
+    voice_drop_capable: base.voice_drop_capable || overlay.voice_drop_capable,
+    linkedin: base.linkedin || overlay.linkedin,
+  }
+}
+
 export async function applyApolloCertificationMultichannelTemplateOverride(
   admin: SupabaseClient,
   input: {
     candidate_id: string
     email?: string | null
     phone?: string | null
+    sequence_ready_contact?: boolean
+    verified_email_contact?: boolean
+    channel_availability_overlay?: ApolloChannelAvailability | null
     prior_outreach_count?: number
   },
 ): Promise<{
@@ -61,6 +84,27 @@ export async function applyApolloCertificationMultichannelTemplateOverride(
   const originalLabel = row.sequence_template.sequence_label
   const stepsBefore = countMaterializableSequenceStepsFromSchedulingPlan(row.scheduling_plan)
 
+  const resolvedEmail =
+    asString(input.email) || asString(row.email) || null
+  const resolvedPhone =
+    asString(input.phone) || asString(row.phone) || null
+
+  const storedAvailability = mergeChannelAvailability(
+    row.channel_availability,
+    input.channel_availability_overlay,
+  )
+
+  const availability = inferApolloCertificationChannelAvailability({
+    stored: storedAvailability,
+    email: resolvedEmail,
+    phone: resolvedPhone,
+    sequence_ready_contact: input.sequence_ready_contact,
+    verified_email_contact: input.verified_email_contact,
+  })
+
+  const selection = evaluateApolloCertificationTemplateSelection({ availability })
+  const overrideTemplate = selection.template
+
   if (
     !needsApolloCertificationMultichannelTemplateOverride({
       sequence_key: originalKey,
@@ -78,19 +122,10 @@ export async function applyApolloCertificationMultichannelTemplateOverride(
         materialized_sequence_label: originalLabel,
         materializable_steps_before: stepsBefore,
         materializable_steps_after: stepsBefore,
+        selection,
       }),
     }
   }
-
-  const availability = inferApolloCertificationChannelAvailability({
-    stored: row.channel_availability,
-    email: input.email ?? row.email,
-    phone: input.phone ?? row.phone,
-  })
-
-  const overrideTemplate = selectApolloCertificationMaterializableSequenceTemplate({
-    availability,
-  })
 
   if (
     !overrideTemplate ||
@@ -107,6 +142,7 @@ export async function applyApolloCertificationMultichannelTemplateOverride(
         materializable_steps_before: stepsBefore,
         materializable_steps_after: 0,
         blockers: ["no_materializable_sequence_template"],
+        selection,
       }),
     }
   }
@@ -130,6 +166,7 @@ export async function applyApolloCertificationMultichannelTemplateOverride(
     materialized_sequence_label: overrideTemplate.sequence_label,
     materializable_steps_before: stepsBefore,
     materializable_steps_after: stepsAfter,
+    selection,
   })
 
   const { error: updateError } = await admin
@@ -177,6 +214,7 @@ export async function applyApolloCertificationMultichannelTemplateOverride(
         materializable_steps_before: stepsBefore,
         materializable_steps_after: stepsAfter,
         blockers: [updateError.message],
+        selection,
       }),
     }
   }

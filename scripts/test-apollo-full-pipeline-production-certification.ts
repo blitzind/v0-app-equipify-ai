@@ -57,8 +57,11 @@ import {
 } from "../lib/growth/apollo/apollo-pipeline-growth-lead-resolution-evidence"
 import {
   APOLLO_CERTIFICATION_PREFERRED_MATERIALIZABLE_SEQUENCE_KEYS,
+  CERTIFICATION_MINIMAL_EMAIL_TEMPLATE,
+  CERTIFICATION_MINIMAL_EMAIL_VOICE_DROP_TEMPLATE,
   buildApolloCertificationMultichannelTemplateOverrideEvidence,
   countMaterializableSequenceStepsFromChannelOrder,
+  evaluateApolloCertificationTemplateSelection,
   inferApolloCertificationChannelAvailability,
   needsApolloCertificationMultichannelTemplateOverride,
   selectApolloCertificationMaterializableSequenceTemplate,
@@ -505,6 +508,8 @@ assert.match(certSource, /handoffMultichannelApprovedToSequenceExecution/)
 assert.match(certSource, /materialization_evidence/)
 assert.match(certSource, /resolveAndBackfillApolloPipelineGrowthLeadForSequenceExecution/)
 assert.match(certSource, /applyApolloCertificationMultichannelTemplateOverride/)
+assert.match(certSource, /sequence_ready_contact/)
+assert.match(certSource, /enrollment\?\.email/)
 assert.match(certSource, /certification_sequence_template_override_used|template_override/)
 assert.match(certSource, /growth_lead_resolution/)
 assert.match(certSource, /multichannel_sequence_candidate_id/)
@@ -581,18 +586,72 @@ assert.equal(
   true,
 )
 
-const certAvailability = inferApolloCertificationChannelAvailability({
-  stored: {
-    verified_email: false,
-    phone: false,
-    mobile_phone: false,
-    voice_drop_capable: false,
-    sms_capable: false,
-    linkedin: false,
-  },
+const emptyStoredAvailability = {
+  verified_email: false,
+  phone: false,
+  mobile_phone: false,
+  voice_drop_capable: false,
+  sms_capable: false,
+  linkedin: false,
+}
+
+const sequenceReadyOnlyAvailability = inferApolloCertificationChannelAvailability({
+  stored: emptyStoredAvailability,
+  sequence_ready_contact: true,
+})
+const sequenceReadySelection = evaluateApolloCertificationTemplateSelection({
+  availability: sequenceReadyOnlyAvailability,
+})
+assert.equal(sequenceReadySelection.template?.sequence_key, CERTIFICATION_MINIMAL_EMAIL_TEMPLATE.sequence_key)
+assert.equal(sequenceReadySelection.contact_email_present, true)
+assert.ok(sequenceReadySelection.templates_considered.includes("email_voice_drop"))
+assert.ok(sequenceReadySelection.template_rejection_reasons.length > 0)
+console.log("  ✓ custom_future + sequence-ready contact => certification_minimal_email")
+
+const emailOnlyAvailability = inferApolloCertificationChannelAvailability({
+  stored: emptyStoredAvailability,
+  email: "bryan@example.com",
+})
+const emailOnlySelection = evaluateApolloCertificationTemplateSelection({
+  availability: emailOnlyAvailability,
+})
+assert.equal(emailOnlySelection.template?.sequence_key, CERTIFICATION_MINIMAL_EMAIL_TEMPLATE.sequence_key)
+assert.equal(emailOnlySelection.fallback_template_used, true)
+assert.ok(emailOnlySelection.available_channels.includes("email"))
+console.log("  ✓ custom_future + verified email => certification_minimal_email")
+
+const emailVoiceAvailability = inferApolloCertificationChannelAvailability({
+  stored: emptyStoredAvailability,
   email: "bryan@example.com",
   phone: "+15551234567",
 })
+const emailVoiceSelection = evaluateApolloCertificationTemplateSelection({
+  availability: emailVoiceAvailability,
+})
+assert.ok(
+  emailVoiceSelection.template?.sequence_key === "email_voice_drop" ||
+    emailVoiceSelection.template?.sequence_key ===
+      CERTIFICATION_MINIMAL_EMAIL_VOICE_DROP_TEMPLATE.sequence_key,
+)
+assert.ok(countMaterializableSequenceStepsFromChannelOrder(emailVoiceSelection.template!.channel_order) > 0)
+console.log("  ✓ custom_future + email + phone => email_voice_drop or certification_minimal_email_voice_drop")
+
+const emailNoVoiceAvailability = inferApolloCertificationChannelAvailability({
+  stored: {
+    ...emptyStoredAvailability,
+    voice_drop_capable: false,
+  },
+  email: "bryan@example.com",
+  verified_email_contact: true,
+})
+const emailNoVoiceSelection = evaluateApolloCertificationTemplateSelection({
+  availability: emailNoVoiceAvailability,
+})
+assert.equal(emailNoVoiceSelection.template?.sequence_key, CERTIFICATION_MINIMAL_EMAIL_TEMPLATE.sequence_key)
+assert.equal(emailNoVoiceSelection.voice_drop_capable, false)
+console.log("  ✓ no voice capability does not block email materialization")
+
+const certAvailability = emailVoiceAvailability
 const overrideTemplate = selectApolloCertificationMaterializableSequenceTemplate({
   availability: certAvailability,
   preferred_keys: APOLLO_CERTIFICATION_PREFERRED_MATERIALIZABLE_SEQUENCE_KEYS,
@@ -614,10 +673,13 @@ const templateOverrideEvidence = buildApolloCertificationMultichannelTemplateOve
   materializable_steps_after: overrideScheduling.touches.filter(
     (touch) => touch.channel !== "future_channel",
   ).length,
+  selection: emailVoiceSelection,
 })
 assert.equal(templateOverrideEvidence.certification_sequence_template_override_used, true)
 assert.equal(templateOverrideEvidence.original_sequence_key, "custom_future")
 assert.ok(templateOverrideEvidence.materializable_steps_after > 0)
+assert.ok(templateOverrideEvidence.templates_considered.length > 0)
+assert.ok(templateOverrideEvidence.template_rejection_reasons.length > 0)
 console.log("  ✓ certification overrides Custom Future Sequence to materializable template")
 
 const supportedPipeline = buildSequenceExecutionPipelineFromMultichannelHandoff({

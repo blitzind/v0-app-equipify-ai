@@ -69,6 +69,14 @@ export type ApolloFullPipelineMaterializationEvidence = {
   materializable_steps_before: number
   materializable_steps_after: number
   template_override_blockers: string[]
+  contact_email_present: boolean
+  contact_phone_present: boolean
+  voice_drop_capable: boolean
+  sms_capable: boolean
+  available_channels: string[]
+  templates_considered: string[]
+  template_rejection_reasons: string[]
+  fallback_template_used: boolean
 }
 
 export type ApolloFullPipelineSafetyViolation = {
