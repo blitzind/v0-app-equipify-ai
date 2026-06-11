@@ -4,7 +4,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
-import { appendGrowthLeadTimelineEvent } from "@/lib/growth/timeline-emitter"
+import { appendGrowthLeadTimelineEvent } from "@/lib/growth/timeline-repository"
 import { recomputeDealIntelligenceScore } from "@/lib/growth/deal-intelligence/deal-intelligence-service"
 import {
   buildOpportunityApprovalAttributionRecord,
