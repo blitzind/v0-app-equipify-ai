@@ -88,6 +88,9 @@ export function evaluateOpportunityDraftDuplicateBlock(input: {
   if (input.existing_status === "draft" || input.existing_status === "approved") {
     return { blocked: true, code: "duplicate_opportunity_draft_pending_or_approved" }
   }
+  if (input.existing_status === "converted") {
+    return { blocked: true, code: "duplicate_opportunity_draft_already_converted" }
+  }
   return { blocked: false, code: null }
 }
 
@@ -143,6 +146,9 @@ export function mapOpportunityDraftDbRow(row: Record<string, unknown>): Opportun
     approved_at: asString(row.approved_at) || null,
     approved_email: asString(row.approved_email) || null,
     rejection_note: asString(row.rejection_note) || null,
+    opportunity_id: asString(row.opportunity_id) || null,
+    converted_at: asString(row.converted_at) || null,
+    converted_email: asString(row.converted_email) || null,
   }
 }
 
@@ -159,6 +165,7 @@ export function buildOpportunityDraftQueueSnapshot(input: {
       approved: input.items.filter((item) => item.status === "approved").length,
       rejected: input.items.filter((item) => item.status === "rejected").length,
       stale: input.items.filter((item) => item.status === "stale").length,
+      converted: input.items.filter((item) => item.status === "converted").length,
     },
     ...OPPORTUNITY_DRAFT_SAFETY_FLAGS,
   }

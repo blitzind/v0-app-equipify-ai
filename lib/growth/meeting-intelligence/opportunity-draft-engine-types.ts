@@ -16,7 +16,7 @@ export const OPPORTUNITY_DRAFT_ENGINE_ID = "growth-opportunity-draft-engine-m1d-
 export const OPPORTUNITY_DRAFT_ENGINE_MIGRATION =
   "20270821120000_growth_engine_opportunity_drafts_m1d.sql" as const
 
-export const OPPORTUNITY_DRAFT_STATUSES = ["draft", "approved", "rejected", "stale"] as const
+export const OPPORTUNITY_DRAFT_STATUSES = ["draft", "approved", "rejected", "stale", "converted"] as const
 
 export type OpportunityDraftStatus = (typeof OPPORTUNITY_DRAFT_STATUSES)[number]
 
@@ -137,6 +137,9 @@ export type OpportunityDraftRow = {
   approved_at: string | null
   approved_email: string | null
   rejection_note: string | null
+  opportunity_id: string | null
+  converted_at: string | null
+  converted_email: string | null
 }
 
 export type OpportunityDraftQueueSnapshot = {
@@ -149,6 +152,7 @@ export type OpportunityDraftQueueSnapshot = {
     approved: number
     rejected: number
     stale: number
+    converted: number
   }
 } & OpportunityDraftSafetyFlags
 
@@ -159,9 +163,12 @@ export type OpportunityDraftActionResult = {
     | "approve_opportunity_draft"
     | "reject_opportunity_draft"
     | "regenerate_opportunity_draft"
+    | "create_opportunity"
   draft_id: string | null
   status: OpportunityDraftStatus | null
   artifacts: OpportunityDraftGeneratedArtifacts | null
+  opportunity_id?: string | null
+  attribution_chain?: string[]
   error?: string | null
 } & OpportunityDraftSafetyFlags
 
@@ -171,6 +178,7 @@ export type OpportunityDraftFunnelMetrics = {
   drafts_generated: number
   drafts_approved: number
   drafts_rejected: number
+  drafts_converted: number
   average_readiness_score: number
   average_confidence_score: number
   average_estimated_value: number

@@ -132,7 +132,7 @@ async function buildOpportunityDraftGeneratorInput(
   return {
     meeting,
     input,
-    companyName: lead?.companyName ?? meeting.title.replace(/^Meeting with /i, "") || "Account",
+    companyName: lead?.companyName ?? (meeting.title.replace(/^Meeting with /i, "") || "Account"),
   }
 }
 

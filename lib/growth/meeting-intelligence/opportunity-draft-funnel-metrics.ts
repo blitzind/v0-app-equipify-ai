@@ -44,6 +44,7 @@ export async function buildOpportunityDraftFunnelMetrics(
     drafts_generated: draftRows.length,
     drafts_approved: draftRows.filter((row) => row.status === "approved").length,
     drafts_rejected: draftRows.filter((row) => row.status === "rejected").length,
+    drafts_converted: draftRows.filter((row) => row.status === "converted").length,
     average_readiness_score: average(readinessScores),
     average_confidence_score: average(confidenceScores),
     average_estimated_value: average(estimatedValues),

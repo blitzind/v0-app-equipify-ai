@@ -12,6 +12,10 @@ import {
   OPPORTUNITY_DRAFT_SAFETY_FLAGS,
 } from "@/lib/growth/meeting-intelligence/opportunity-draft-evidence"
 import { generateAndPersistOpportunityDraft } from "@/lib/growth/meeting-intelligence/opportunity-draft-service"
+import { confirmCreateOpportunityFromDraft } from "@/lib/growth/meeting-intelligence/opportunity-approval-service"
+import type {
+  OpportunityApprovalDraftEdits,
+} from "@/lib/growth/meeting-intelligence/opportunity-approval-engine-types"
 import type {
   OpportunityDraftActionResult,
   OpportunityDraftQueueSnapshot,
@@ -232,6 +236,48 @@ export async function regenerateOpportunityDraft(
     draft_id: generated.draft.draft_id,
     status: generated.draft.status,
     artifacts: generated.artifacts,
+    ...OPPORTUNITY_DRAFT_SAFETY_FLAGS,
+  }
+}
+
+export async function createOpportunityFromApprovedDraft(
+  admin: SupabaseClient,
+  input: {
+    draft_id: string
+    operator_id?: string | null
+    operator_email?: string | null
+    edits?: OpportunityApprovalDraftEdits
+  },
+): Promise<OpportunityDraftActionResult> {
+  const result = await confirmCreateOpportunityFromDraft(admin, {
+    opportunity_draft_id: input.draft_id,
+    operator_id: input.operator_id,
+    operator_email: input.operator_email,
+    edits: input.edits,
+  })
+
+  if (!result.ok) {
+    return {
+      ok: false,
+      action: "create_opportunity",
+      draft_id: input.draft_id,
+      status: result.draft_status,
+      artifacts: null,
+      opportunity_id: null,
+      attribution_chain: result.attribution_chain,
+      error: result.error ?? "create_opportunity_failed",
+      ...OPPORTUNITY_DRAFT_SAFETY_FLAGS,
+    }
+  }
+
+  return {
+    ok: true,
+    action: "create_opportunity",
+    draft_id: result.draft_id,
+    status: result.draft_status,
+    artifacts: null,
+    opportunity_id: result.opportunity_id,
+    attribution_chain: result.attribution_chain,
     ...OPPORTUNITY_DRAFT_SAFETY_FLAGS,
   }
 }

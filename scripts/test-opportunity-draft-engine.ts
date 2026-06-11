@@ -61,7 +61,7 @@ for (const relativePath of REQUIRED_FILES) {
 }
 
 assert.equal(OPPORTUNITY_DRAFT_ENGINE_QA_MARKER, "growth-opportunity-draft-engine-m1d-v1")
-assert.deepEqual([...OPPORTUNITY_DRAFT_STATUSES], ["draft", "approved", "rejected", "stale"])
+assert.deepEqual([...OPPORTUNITY_DRAFT_STATUSES], ["draft", "approved", "rejected", "stale", "converted"])
 console.log("  ✓ opportunity draft QA markers")
 
 const accountPlaybookContext = buildMeetingPrepAccountPlaybookContext({

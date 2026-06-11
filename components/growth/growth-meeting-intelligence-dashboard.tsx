@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import { GrowthMeetingCalendarIntelligenceInline } from "@/components/growth/growth-meeting-calendar-intelligence-inline"
 import { GrowthMeetingPrepPanel } from "@/components/growth/growth-meeting-prep-panel"
+import { GrowthOpportunityDraftPanel } from "@/components/growth/growth-opportunity-draft-panel"
 import {
   GROWTH_MEETING_INBOX_VIEWS,
   GROWTH_MEETING_PROVIDER_LABELS,
@@ -284,6 +285,7 @@ export function GrowthMeetingIntelligenceDashboard() {
             <GrowthMeetingCalendarIntelligenceInline intelligence={intelligenceByMeetingId[selectedMeeting.id]} />
           ) : null}
           <GrowthMeetingPrepPanel meetingId={selectedMeeting.id} meetingStatus={selectedMeeting.status} />
+          <GrowthOpportunityDraftPanel meetingId={selectedMeeting.id} meetingStatus={selectedMeeting.status} />
         </div>
       ) : null}
 
