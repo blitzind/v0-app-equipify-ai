@@ -57,6 +57,7 @@ import { approveApolloMultichannelSequenceCandidate } from "@/lib/growth/apollo/
 import { mapApolloMultichannelSequenceCandidateDbRow } from "@/lib/growth/apollo/apollo-multichannel-orchestration-evidence"
 import { handoffMultichannelApprovedToSequenceExecution } from "@/lib/growth/apollo/apollo-sequence-execution-bridge"
 import { buildApolloSequenceExecutionHandoffInput } from "@/lib/growth/apollo/apollo-sequence-execution-handoff-input"
+import { resolveAndBackfillApolloPipelineGrowthLeadForSequenceExecution } from "@/lib/growth/apollo/apollo-pipeline-growth-lead-resolution"
 import { loadApolloPrimaryContactOperatorReviewSnapshot } from "@/lib/growth/apollo/apollo-primary-contact-operator-review"
 import { approveApolloVoiceDropCandidate } from "@/lib/growth/apollo/apollo-voice-drop-candidate-queue"
 import { mapApolloVoiceDropCandidateDbRow } from "@/lib/growth/apollo/apollo-voice-drop-automation-evidence"
@@ -502,8 +503,33 @@ export async function certifyApolloFullPipelineProduction(
   let materializationEvidence: ApolloFullPipelineMaterializationEvidence | null = null
   let executionRow: Record<string, unknown> | null = null
   let handoffResult = null
+  let growthLeadResolution = null
 
   if (multichannel && multichannel.status === "sequence_approved") {
+    if (enrollmentCandidateId) {
+      growthLeadResolution = await resolveAndBackfillApolloPipelineGrowthLeadForSequenceExecution(admin, {
+        enrollment_candidate_id: enrollmentCandidateId,
+        company_candidate_id: stageIds.company_candidate_id,
+        company_contact_id:
+          multichannel.company_contact_id ??
+          enrollment?.company_contact_id ??
+          accountPlaybook?.company_contact_id ??
+          voiceDrop?.company_contact_id ??
+          null,
+        voice_drop_candidate_id: multichannel.voice_drop_candidate_id,
+        multichannel_sequence_candidate_id: multichannel.candidate_id,
+        created_by_user_id: actor.actorUserId,
+        enrollment_row: (enrollmentRow as Record<string, unknown> | null) ?? null,
+        account_playbook_row: (accountPlaybookRow as Record<string, unknown> | null) ?? null,
+        voice_drop_row: (voiceDropRow as Record<string, unknown> | null) ?? null,
+        multichannel_row: (multichannelRow as Record<string, unknown> | null) ?? null,
+      })
+      stageIds.growth_lead_id = growthLeadResolution.growth_lead_id
+      if (enrollmentEvidence) {
+        enrollmentEvidence.growth_lead_id = growthLeadResolution.growth_lead_id
+      }
+    }
+
     const { data: existingExecutionRow } = await admin
       .schema("growth")
       .from("apollo_sequence_execution_candidates")
@@ -518,7 +544,7 @@ export async function certifyApolloFullPipelineProduction(
     if (!executionRow?.sequence_enrollment_id) {
       const handoffInput = buildApolloSequenceExecutionHandoffInput({
         multichannel,
-        growth_lead_id: stageIds.growth_lead_id ?? enrollment?.growth_lead_id ?? null,
+        growth_lead_id: growthLeadResolution?.growth_lead_id ?? stageIds.growth_lead_id ?? null,
         voice_drop_script_reference: voiceDrop?.voice_drop_script.full_script ?? null,
         created_by_user_id: actor.actorUserId,
       })
@@ -567,6 +593,7 @@ export async function certifyApolloFullPipelineProduction(
         0,
       pending_approval_jobs_created: handoffResult?.pending_approval_jobs_created ?? 0,
       multichannel,
+      growth_lead_resolution: growthLeadResolution,
     })
   }
 

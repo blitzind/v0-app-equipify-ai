@@ -2,6 +2,7 @@
 
 import type { ApolloSequenceExecutionAutomationActionResult } from "@/lib/growth/apollo/apollo-sequence-execution-automation-types"
 import type { ApolloMultichannelSequenceCandidateRow } from "@/lib/growth/apollo/apollo-multichannel-orchestration-types"
+import type { ApolloPipelineGrowthLeadResolutionEvidence } from "@/lib/growth/apollo/apollo-pipeline-growth-lead-resolution-evidence"
 
 export const APOLLO_FULL_PIPELINE_MATERIALIZATION_EVIDENCE_QA_MARKER =
   "apollo-full-pipeline-materialization-evidence-v1" as const
@@ -38,6 +39,13 @@ export type ApolloFullPipelineMaterializationEvidence = {
   selected_sequence_template: string | null
   unsupported_channel_or_template_blockers: string[]
   materialization_reused: boolean
+  growth_lead_resolution_attempted: boolean
+  growth_lead_resolution_source: string | null
+  growth_lead_id: string | null
+  growth_lead_id_before: string | null
+  growth_lead_id_after: string | null
+  growth_lead_backfilled_rows: string[]
+  growth_lead_resolution_blockers: string[]
 }
 
 const UNSAFE_JOB_STATUSES = new Set([
@@ -181,6 +189,7 @@ export function buildApolloFullPipelineMaterializationEvidence(input: {
     ApolloMultichannelSequenceCandidateRow,
     "sequence_template" | "scheduling_plan"
   > | null
+  growth_lead_resolution?: ApolloPipelineGrowthLeadResolutionEvidence | null
 }): ApolloFullPipelineMaterializationEvidence {
   const error = input.handoff?.ok === false ? input.handoff.error ?? "materialization_failed" : null
   const parsed = parseMaterializationErrorEvidence(error)
@@ -214,5 +223,15 @@ export function buildApolloFullPipelineMaterializationEvidence(input: {
     selected_sequence_template: input.multichannel?.sequence_template.sequence_label ?? null,
     unsupported_channel_or_template_blockers: blockers,
     materialization_reused: input.reused,
+    growth_lead_resolution_attempted:
+      input.growth_lead_resolution?.growth_lead_resolution_attempted ?? false,
+    growth_lead_resolution_source:
+      input.growth_lead_resolution?.growth_lead_resolution_source ?? null,
+    growth_lead_id: input.growth_lead_resolution?.growth_lead_id ?? null,
+    growth_lead_id_before: input.growth_lead_resolution?.growth_lead_id_before ?? null,
+    growth_lead_id_after: input.growth_lead_resolution?.growth_lead_id_after ?? null,
+    growth_lead_backfilled_rows: input.growth_lead_resolution?.growth_lead_backfilled_rows ?? [],
+    growth_lead_resolution_blockers:
+      input.growth_lead_resolution?.growth_lead_resolution_blockers ?? [],
   }
 }

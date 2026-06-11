@@ -51,6 +51,10 @@ import {
 } from "../lib/growth/apollo/apollo-full-pipeline-materialization-evidence"
 import { buildApolloSequenceExecutionHandoffInput } from "../lib/growth/apollo/apollo-sequence-execution-handoff-input"
 import { buildSequenceExecutionPipelineFromMultichannelHandoff } from "../lib/growth/apollo/apollo-sequence-execution-pipeline-builder"
+import {
+  resolveApolloPipelineGrowthLeadIdFromChain,
+  buildApolloPipelineGrowthLeadResolutionEvidence,
+} from "../lib/growth/apollo/apollo-pipeline-growth-lead-resolution-evidence"
 
 const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-full-pipeline-production-certification-types.ts",
@@ -60,6 +64,9 @@ const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-full-pipeline-certification-actor.ts",
   "lib/growth/apollo/apollo-full-pipeline-db-error-evidence.ts",
   "lib/growth/apollo/apollo-full-pipeline-materialization-evidence.ts",
+  "lib/growth/apollo/apollo-pipeline-growth-lead-resolution-evidence.ts",
+  "lib/growth/apollo/apollo-pipeline-growth-lead-resolution.ts",
+  "lib/growth/apollo/apollo-enrollment-growth-lead-resolution.ts",
   "lib/growth/apollo/apollo-sequence-execution-handoff-input.ts",
   "lib/growth/apollo/apollo-full-pipeline-production-route-gates.ts",
   "lib/growth/apollo/apollo-full-pipeline-production-route.ts",
@@ -478,17 +485,69 @@ console.log("  ✓ multichannel approval captures sequence execution handoff evi
 
 assert.match(bridgeSource, /normalizeGrowthActorUserIdForDb/)
 assert.doesNotMatch(bridgeSource, /createdBy:\s*"apollo-sequence-execution-automation"/)
+assert.match(bridgeSource, /resolveAndBackfillApolloPipelineGrowthLeadForSequenceExecution/)
 assert.match(bridgeSource, /unsupported_template:custom_future|resolveUnsupportedSequenceMaterializationBlockers/)
 assert.match(bridgeSource, /status:\s*"pending_approval"/)
 console.log("  ✓ sequence execution bridge uses valid actor UUID and pending_approval jobs")
 
 assert.match(certSource, /handoffMultichannelApprovedToSequenceExecution/)
 assert.match(certSource, /materialization_evidence/)
+assert.match(certSource, /resolveAndBackfillApolloPipelineGrowthLeadForSequenceExecution/)
+assert.match(certSource, /growth_lead_resolution/)
 assert.match(certSource, /multichannel_sequence_candidate_id/)
 assert.match(certSource, /materialization_reused/)
 assert.match(certSource, /safety_violations/)
 assert.match(certSource, /evaluateApolloFullPipelineStageSafety/)
 console.log("  ✓ certification retries materialization and reports safety violations")
+
+const fromEnrollment = resolveApolloPipelineGrowthLeadIdFromChain({
+  enrollment_growth_lead_id: "lead-enrollment",
+})
+assert.equal(fromEnrollment.growth_lead_id, "lead-enrollment")
+assert.equal(fromEnrollment.source, "enrollment_candidate")
+
+const fromPlaybook = resolveApolloPipelineGrowthLeadIdFromChain({
+  account_playbook_growth_lead_id: "lead-playbook",
+})
+assert.equal(fromPlaybook.source, "account_playbook")
+
+const fromVoiceDrop = resolveApolloPipelineGrowthLeadIdFromChain({
+  voice_drop_growth_lead_id: "lead-voice-drop",
+})
+assert.equal(fromVoiceDrop.source, "voice_drop_candidate")
+
+const fromMultichannel = resolveApolloPipelineGrowthLeadIdFromChain({
+  multichannel_growth_lead_id: "lead-multichannel",
+})
+assert.equal(fromMultichannel.source, "multichannel_candidate")
+
+const fromMetadata = resolveApolloPipelineGrowthLeadIdFromChain({
+  multichannel_metadata: { growth_lead_id: "lead-metadata" },
+})
+assert.equal(fromMetadata.source, "multichannel_metadata")
+
+const fromCompanyContact = resolveApolloPipelineGrowthLeadIdFromChain({
+  company_contact_growth_lead_id: "lead-company-contact",
+})
+assert.equal(fromCompanyContact.source, "company_contact")
+console.log("  ✓ growth_lead_id chain resolver prefers enrollment then downstream fallbacks")
+
+const growthLeadEvidence = buildApolloPipelineGrowthLeadResolutionEvidence({
+  attempted: true,
+  source: "created_for_sequence_execution",
+  growth_lead_id_before: null,
+  growth_lead_id_after: "lead-new",
+  backfilled_rows: [
+    "apollo_enrollment_candidates",
+    "apollo_account_playbooks",
+    "apollo_voice_drop_candidates",
+    "apollo_multichannel_sequence_candidates",
+  ],
+  blockers: [],
+})
+assert.equal(growthLeadEvidence.growth_lead_id_after, "lead-new")
+assert.equal(growthLeadEvidence.growth_lead_backfilled_rows.length, 4)
+console.log("  ✓ growth lead backfill evidence includes source and backfilled rows")
 
 const customFutureBlockers = resolveUnsupportedSequenceMaterializationBlockers({
   sequence_key: "custom_future",
@@ -586,6 +645,7 @@ const materializationEvidence = buildApolloFullPipelineMaterializationEvidence({
     draft_created: true,
     jobs_scheduled: false,
   },
+  growth_lead_resolution: growthLeadEvidence,
   multichannel: {
     candidate_id: "mc-1",
     voice_drop_candidate_id: "vd-1",
@@ -639,6 +699,10 @@ assert.equal(materializationEvidence.materialization_reused, true)
 assert.equal(materializationEvidence.sequence_execution_candidate_id, "exec-1")
 assert.equal(materializationEvidence.sequence_enrollment_id, "enroll-1")
 assert.equal(materializationEvidence.steps_created, 2)
+assert.equal(
+  materializationEvidence.growth_lead_resolution_source,
+  growthLeadEvidence.growth_lead_resolution_source,
+)
 console.log("  ✓ existing materialization reuse evidence")
 
 const multichannelFixture = {

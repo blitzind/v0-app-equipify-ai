@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { normalizeGrowthActorUserIdForDb } from "@/lib/growth/actor-user-id"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { resolveUnsupportedSequenceMaterializationBlockers } from "@/lib/growth/apollo/apollo-full-pipeline-materialization-evidence"
+import { resolveAndBackfillApolloPipelineGrowthLeadForSequenceExecution } from "@/lib/growth/apollo/apollo-pipeline-growth-lead-resolution"
 import {
   evaluateApolloSequenceExecutionDuplicateBlock,
   mapApolloSequenceExecutionCandidateDbRow,
@@ -79,15 +80,30 @@ export async function handoffMultichannelApprovedToSequenceExecution(
   admin: SupabaseClient,
   input: ApolloSequenceExecutionMultichannelHandoffInput,
 ): Promise<ApolloSequenceExecutionAutomationActionResult> {
-  if (!input.growth_lead_id?.trim()) {
-    return emptyResult("create_from_multichannel", "growth_lead_id_required")
+  const leadResolution = await resolveAndBackfillApolloPipelineGrowthLeadForSequenceExecution(admin, {
+    enrollment_candidate_id: input.enrollment_candidate_id,
+    company_candidate_id: input.company_candidate_id,
+    company_contact_id: input.company_contact_id,
+    voice_drop_candidate_id: input.voice_drop_candidate_id,
+    multichannel_sequence_candidate_id: input.multichannel_sequence_candidate_id,
+    created_by_user_id: input.created_by_user_id ?? null,
+  })
+
+  const growthLeadId = leadResolution.growth_lead_id?.trim() || input.growth_lead_id?.trim() || null
+  if (!growthLeadId) {
+    return emptyResult(
+      "create_from_multichannel",
+      leadResolution.growth_lead_resolution_blockers[0] ?? "growth_lead_id_required",
+    )
   }
+
+  const resolvedInput = { ...input, growth_lead_id: growthLeadId }
 
   const { data: existing } = await admin
     .schema("growth")
     .from(TABLE)
     .select("id, status")
-    .eq("multichannel_sequence_candidate_id", input.multichannel_sequence_candidate_id)
+    .eq("multichannel_sequence_candidate_id", resolvedInput.multichannel_sequence_candidate_id)
     .in("status", ["pending_draft_approval", "execution_ready"])
     .limit(1)
     .maybeSingle()
@@ -144,11 +160,11 @@ export async function handoffMultichannelApprovedToSequenceExecution(
     }
   }
 
-  const pipeline = buildSequenceExecutionPipelineFromMultichannelHandoff(input)
+  const pipeline = buildSequenceExecutionPipelineFromMultichannelHandoff(resolvedInput)
   const unsupportedBlockers = resolveUnsupportedSequenceMaterializationBlockers({
-    sequence_key: input.sequence_key,
-    sequence_label: input.sequence_label,
-    scheduling_touches: input.scheduling_plan.touches,
+    sequence_key: resolvedInput.sequence_key,
+    sequence_label: resolvedInput.sequence_label,
+    scheduling_touches: resolvedInput.scheduling_plan.touches,
     materialized_step_count: pipeline.materialization.steps.length,
   })
   if (!pipeline.materialization.steps.length) {
@@ -170,12 +186,12 @@ export async function handoffMultichannelApprovedToSequenceExecution(
   const patternSteps = [...pattern.steps].sort((a, b) => a.stepOrder - b.stepOrder)
   const baseTime = new Date().toISOString()
 
-  const createdBy = normalizeGrowthActorUserIdForDb(input.created_by_user_id)
+  const createdBy = normalizeGrowthActorUserIdForDb(resolvedInput.created_by_user_id)
 
   let enrollment
   try {
     enrollment = await insertGrowthSequenceEnrollment(admin, {
-      leadId: input.growth_lead_id,
+      leadId: resolvedInput.growth_lead_id!,
       sequencePatternId: pattern.id,
       sequenceVersion: pattern.sequenceVersion,
       status: "draft",
@@ -194,7 +210,7 @@ export async function handoffMultichannelApprovedToSequenceExecution(
 
     const step = await insertGrowthSequenceEnrollmentStep(admin, {
       enrollmentId: enrollment.id,
-      leadId: input.growth_lead_id,
+      leadId: resolvedInput.growth_lead_id!,
       sequencePatternStepId: patternStepId,
       stepOrder: stepPlan.step_number,
       channel: stepPlan.channel,
@@ -212,12 +228,12 @@ export async function handoffMultichannelApprovedToSequenceExecution(
       const job = await createSequenceExecutionJob(admin, {
         sequenceEnrollmentId: enrollment.id,
         sequenceStepId: step.id,
-        leadId: input.growth_lead_id,
+        leadId: resolvedInput.growth_lead_id!,
         scheduledFor,
         status: "pending_approval",
         channel: transportChannel,
         smsDraftBody: transportChannel === "sms" ? draft?.body_placeholder ?? null : null,
-        smsToE164: transportChannel === "sms" ? input.phone : null,
+        smsToE164: transportChannel === "sms" ? resolvedInput.phone : null,
       })
       executionJobId = job.id
       jobStatus = job.status
@@ -229,7 +245,7 @@ export async function handoffMultichannelApprovedToSequenceExecution(
         description: "Multichannel-approved sequence materialized — pending human approval, no send.",
         metadata: {
           qa_marker: APOLLO_SEQUENCE_EXECUTION_AUTOMATION_QA_MARKER,
-          multichannel_sequence_candidate_id: input.multichannel_sequence_candidate_id,
+          multichannel_sequence_candidate_id: resolvedInput.multichannel_sequence_candidate_id,
           draft_id: draft?.draft_id ?? null,
         },
       })
@@ -250,12 +266,12 @@ export async function handoffMultichannelApprovedToSequenceExecution(
     .schema("growth")
     .from(TABLE)
     .insert({
-      multichannel_sequence_candidate_id: input.multichannel_sequence_candidate_id,
-      voice_drop_candidate_id: input.voice_drop_candidate_id,
-      enrollment_candidate_id: input.enrollment_candidate_id,
-      company_candidate_id: input.company_candidate_id,
-      company_contact_id: input.company_contact_id,
-      growth_lead_id: input.growth_lead_id,
+      multichannel_sequence_candidate_id: resolvedInput.multichannel_sequence_candidate_id,
+      voice_drop_candidate_id: resolvedInput.voice_drop_candidate_id,
+      enrollment_candidate_id: resolvedInput.enrollment_candidate_id,
+      company_candidate_id: resolvedInput.company_candidate_id,
+      company_contact_id: resolvedInput.company_contact_id,
+      growth_lead_id: resolvedInput.growth_lead_id,
       sequence_enrollment_id: enrollment.id,
       status: "pending_draft_approval",
       sequence_materialization: pipeline.materialization,

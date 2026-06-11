@@ -56,6 +56,13 @@ export type ApolloFullPipelineMaterializationEvidence = {
   selected_sequence_template: string | null
   unsupported_channel_or_template_blockers: string[]
   materialization_reused: boolean
+  growth_lead_resolution_attempted: boolean
+  growth_lead_resolution_source: string | null
+  growth_lead_id: string | null
+  growth_lead_id_before: string | null
+  growth_lead_id_after: string | null
+  growth_lead_backfilled_rows: string[]
+  growth_lead_resolution_blockers: string[]
 }
 
 export type ApolloFullPipelineSafetyViolation = {
