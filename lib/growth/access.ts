@@ -6,7 +6,15 @@ import { z } from "zod"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { getPlatformAdminAllowlistMeta, isPlatformAdminEmail } from "@/lib/platform-admin"
 import { isGrowthQaAccelerationEnabled } from "@/lib/growth/sequence-enrollment/qa-acceleration-config"
-import { createServerSupabaseClient, getBearerAccessToken } from "@/lib/supabase/server"
+import {
+  classifyGrowthEngineBearerAuthError,
+  getGrowthEngineBearerTokenMetadata,
+} from "@/lib/growth/growth-engine-platform-user-resolution"
+import {
+  createServerSupabaseClient,
+  createSupabaseClientWithAccessToken,
+  getBearerAccessToken,
+} from "@/lib/supabase/server"
 
 /** Global kill switch for Growth Engine platform routes. Default off. */
 export function isGrowthEngineEnabledEnv(): boolean {
@@ -43,9 +51,76 @@ export type GrowthEnginePlatformAccess =
 
 export type GrowthEnginePlatformUserResolution = {
   bearer_token_present: boolean
+  bearer_resolution_attempted: boolean
+  bearer_resolution_error_code: string | null
+  bearer_resolution_error_message_safe: string | null
+  bearer_token_length: number
+  bearer_token_segment_count: number
   bearer_user_resolved: boolean
   cookie_user_resolved: boolean
   resolved_user: { userId: string; userEmail: string } | null
+}
+
+function mapSupabaseUser(user: { id: string; email?: string | null } | null | undefined): {
+  userId: string
+  userEmail: string
+} | null {
+  if (!user?.id) return null
+  const email = typeof user.email === "string" ? user.email.trim() : ""
+  if (!email) return null
+  return { userId: user.id, userEmail: email }
+}
+
+async function resolveGrowthEngineBearerUser(
+  bearer: string,
+  cookieClient: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+): Promise<{
+  bearer_user_resolved: boolean
+  bearer_user: { userId: string; userEmail: string } | null
+  bearer_resolution_error_code: string | null
+  bearer_resolution_error_message_safe: string | null
+}> {
+  const bearerClient = createSupabaseClientWithAccessToken(bearer)
+  const bearerClientResult = await bearerClient.auth.getUser()
+  const bearerUser = mapSupabaseUser(bearerClientResult.data.user)
+  if (bearerUser) {
+    return {
+      bearer_user_resolved: true,
+      bearer_user: bearerUser,
+      bearer_resolution_error_code: null,
+      bearer_resolution_error_message_safe: null,
+    }
+  }
+
+  let errorInfo = classifyGrowthEngineBearerAuthError(bearerClientResult.error)
+  if (!bearerClientResult.error && bearerClientResult.data.user?.id && !bearerUser) {
+    errorInfo = {
+      code: "email_missing",
+      message_safe: "Supabase user resolved without email",
+    }
+  }
+
+  const cookieBearerResult = await cookieClient.auth.getUser(bearer)
+  const cookieBearerUser = mapSupabaseUser(cookieBearerResult.data.user)
+  if (cookieBearerUser) {
+    return {
+      bearer_user_resolved: true,
+      bearer_user: cookieBearerUser,
+      bearer_resolution_error_code: null,
+      bearer_resolution_error_message_safe: null,
+    }
+  }
+
+  if (cookieBearerResult.error) {
+    errorInfo = classifyGrowthEngineBearerAuthError(cookieBearerResult.error)
+  }
+
+  return {
+    bearer_user_resolved: false,
+    bearer_user: null,
+    bearer_resolution_error_code: errorInfo.code,
+    bearer_resolution_error_message_safe: errorInfo.message_safe,
+  }
 }
 
 export async function resolveGrowthEnginePlatformUserResolution(
@@ -53,31 +128,39 @@ export async function resolveGrowthEnginePlatformUserResolution(
 ): Promise<GrowthEnginePlatformUserResolution> {
   const cookieClient = await createServerSupabaseClient()
   const bearer = request ? getBearerAccessToken(request) : null
-  let bearer_user_resolved = false
-  let bearerUser: { userId: string; userEmail: string } | null = null
-
-  if (bearer) {
-    const { data, error } = await cookieClient.auth.getUser(bearer)
-    if (!error && data.user?.id && data.user.email) {
-      bearer_user_resolved = true
-      bearerUser = { userId: data.user.id, userEmail: data.user.email }
-    }
-  }
+  const tokenMeta = getGrowthEngineBearerTokenMetadata(bearer)
 
   const {
-    data: { user },
+    data: { user: cookieSessionUser },
   } = await cookieClient.auth.getUser()
-  const cookie_user_resolved = Boolean(user?.id && user.email)
-  const cookieUser =
-    cookie_user_resolved && user?.id && user.email
-      ? { userId: user.id, userEmail: user.email }
-      : null
+  const cookieUser = mapSupabaseUser(cookieSessionUser)
+  const cookie_user_resolved = Boolean(cookieUser)
+
+  let bearer_user_resolved = false
+  let bearerUser: { userId: string; userEmail: string } | null = null
+  let bearer_resolution_attempted = false
+  let bearer_resolution_error_code: string | null = null
+  let bearer_resolution_error_message_safe: string | null = null
+
+  if (bearer && !cookieUser) {
+    bearer_resolution_attempted = true
+    const bearerResolution = await resolveGrowthEngineBearerUser(bearer, cookieClient)
+    bearer_user_resolved = bearerResolution.bearer_user_resolved
+    bearerUser = bearerResolution.bearer_user
+    bearer_resolution_error_code = bearerResolution.bearer_resolution_error_code
+    bearer_resolution_error_message_safe = bearerResolution.bearer_resolution_error_message_safe
+  }
 
   return {
     bearer_token_present: Boolean(bearer),
+    bearer_resolution_attempted,
+    bearer_resolution_error_code,
+    bearer_resolution_error_message_safe,
+    bearer_token_length: tokenMeta.bearer_token_length,
+    bearer_token_segment_count: tokenMeta.bearer_token_segment_count,
     bearer_user_resolved,
     cookie_user_resolved,
-    resolved_user: bearerUser ?? cookieUser,
+    resolved_user: cookieUser ?? bearerUser,
   }
 }
 

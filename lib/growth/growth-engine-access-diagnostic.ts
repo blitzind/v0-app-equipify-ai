@@ -19,6 +19,11 @@ export type GrowthEngineAccessDiagnostic = {
   growth_engine_enabled: boolean
   request_has_authorization_header: boolean
   bearer_token_present: boolean
+  bearer_resolution_attempted: boolean
+  bearer_resolution_error_code: string | null
+  bearer_resolution_error_message_safe: string | null
+  bearer_token_length: number
+  bearer_token_segment_count: number
   bearer_user_resolved: boolean
   cookie_user_resolved: boolean
   resolved_email: string | null
@@ -40,6 +45,11 @@ export function buildGrowthEngineAccessDiagnostic(input: {
   diagnostic_enabled: boolean
   request_has_authorization_header: boolean
   bearer_token_present: boolean
+  bearer_resolution_attempted: boolean
+  bearer_resolution_error_code: string | null
+  bearer_resolution_error_message_safe: string | null
+  bearer_token_length: number
+  bearer_token_segment_count: number
   bearer_user_resolved: boolean
   cookie_user_resolved: boolean
   resolved_email: string | null
@@ -67,6 +77,11 @@ export function buildGrowthEngineAccessDiagnostic(input: {
     growth_engine_enabled: input.growth_engine_enabled,
     request_has_authorization_header: input.request_has_authorization_header,
     bearer_token_present: input.bearer_token_present,
+    bearer_resolution_attempted: input.bearer_resolution_attempted,
+    bearer_resolution_error_code: input.bearer_resolution_error_code,
+    bearer_resolution_error_message_safe: input.bearer_resolution_error_message_safe,
+    bearer_token_length: input.bearer_token_length,
+    bearer_token_segment_count: input.bearer_token_segment_count,
     bearer_user_resolved: input.bearer_user_resolved,
     cookie_user_resolved: input.cookie_user_resolved,
     resolved_email: input.resolved_email,

@@ -10,8 +10,12 @@ import {
   buildGrowthEngineAccessDiagnostic,
   isGrowthEngineAccessDiagnosticEnabledEnv,
 } from "../lib/growth/growth-engine-access-diagnostic"
-import { isPlatformAdminEmail } from "../lib/platform-admin-policy"
-import { getPlatformAdminAllowlistMeta } from "../lib/platform-admin-policy"
+import {
+  classifyGrowthEngineBearerAuthError,
+  getGrowthEngineBearerTokenMetadata,
+  sanitizeGrowthEngineAuthErrorMessage,
+} from "../lib/growth/growth-engine-platform-user-resolution"
+import { isPlatformAdminEmail, getPlatformAdminAllowlistMeta } from "../lib/platform-admin-policy"
 
 const ROOT = process.cwd()
 
@@ -26,18 +30,50 @@ assert.ok(
 
 const accessSource = fs.readFileSync(path.join(ROOT, "lib/growth/access.ts"), "utf8")
 assert.match(accessSource, /resolveGrowthEnginePlatformUserResolution/)
+assert.match(accessSource, /createSupabaseClientWithAccessToken/)
 console.log("  ✓ shared bearer/cookie resolution exported from access.ts")
+
+const tokenMeta = getGrowthEngineBearerTokenMetadata("eyJheader.payload.signature")
+assert.equal(tokenMeta.bearer_token_length, 27)
+assert.equal(tokenMeta.bearer_token_segment_count, 3)
+assert.deepEqual(getGrowthEngineBearerTokenMetadata(null), {
+  bearer_token_length: 0,
+  bearer_token_segment_count: 0,
+})
+console.log("  ✓ bearer token metadata reports length and segment count")
+
+assert.equal(
+  sanitizeGrowthEngineAuthErrorMessage("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.bad"),
+  "supabase_auth_error",
+)
+assert.equal(sanitizeGrowthEngineAuthErrorMessage("Invalid JWT"), "Invalid JWT")
+const classified = classifyGrowthEngineBearerAuthError({ code: "invalid_jwt", message: "JWT expired" })
+assert.equal(classified.code, "invalid_jwt")
+assert.equal(classified.message_safe, "JWT expired")
+console.log("  ✓ auth error messages are sanitized for diagnostics")
 
 process.env.EQUIPIFY_PLATFORM_ADMIN_EMAILS = "mike@blitzind.com,ops@equipify.ai"
 const allowlistMeta = getPlatformAdminAllowlistMeta()
 assert.equal(allowlistMeta.admin_allowlist_env_present, true)
 assert.equal(allowlistMeta.admin_allowlist_entry_count, 2)
 
+const bearerDefaults = {
+  bearer_resolution_attempted: false,
+  bearer_resolution_error_code: null,
+  bearer_resolution_error_message_safe: null,
+  bearer_token_length: 0,
+  bearer_token_segment_count: 0,
+}
+
 const bearerOnly = buildGrowthEngineAccessDiagnostic({
   growth_engine_enabled: true,
   diagnostic_enabled: true,
   request_has_authorization_header: true,
   bearer_token_present: true,
+  ...bearerDefaults,
+  bearer_resolution_attempted: true,
+  bearer_token_length: 795,
+  bearer_token_segment_count: 3,
   bearer_user_resolved: true,
   cookie_user_resolved: false,
   resolved_email: "mike@blitzind.com",
@@ -55,6 +91,7 @@ const cookieFallback = buildGrowthEngineAccessDiagnostic({
   diagnostic_enabled: true,
   request_has_authorization_header: false,
   bearer_token_present: false,
+  ...bearerDefaults,
   bearer_user_resolved: false,
   cookie_user_resolved: true,
   resolved_email: "mike@blitzind.com",
@@ -72,6 +109,8 @@ const allowlistPresentNotIncluded = buildGrowthEngineAccessDiagnostic({
   diagnostic_enabled: true,
   request_has_authorization_header: true,
   bearer_token_present: true,
+  ...bearerDefaults,
+  bearer_resolution_attempted: true,
   bearer_user_resolved: true,
   cookie_user_resolved: false,
   resolved_email: "stranger@example.com",
@@ -89,6 +128,8 @@ const emptyAllowlist = buildGrowthEngineAccessDiagnostic({
   diagnostic_enabled: true,
   request_has_authorization_header: true,
   bearer_token_present: true,
+  ...bearerDefaults,
+  bearer_resolution_attempted: true,
   bearer_user_resolved: true,
   cookie_user_resolved: false,
   resolved_email: "mike@blitzind.com",
@@ -105,6 +146,11 @@ const bearerNotResolved = buildGrowthEngineAccessDiagnostic({
   diagnostic_enabled: true,
   request_has_authorization_header: true,
   bearer_token_present: true,
+  bearer_resolution_attempted: true,
+  bearer_resolution_error_code: "invalid_jwt",
+  bearer_resolution_error_message_safe: "JWT expired",
+  bearer_token_length: 795,
+  bearer_token_segment_count: 3,
   bearer_user_resolved: false,
   cookie_user_resolved: false,
   resolved_email: null,
@@ -114,7 +160,25 @@ const bearerNotResolved = buildGrowthEngineAccessDiagnostic({
   resolved_email_in_admin_allowlist: false,
 })
 assert.equal(bearerNotResolved.access_decision, "unauthenticated")
-console.log("  ✓ bearer present but user not resolved → unauthenticated")
+assert.equal(bearerNotResolved.bearer_resolution_error_code, "invalid_jwt")
+console.log("  ✓ expired/invalid bearer fails safely → unauthenticated")
+
+const malformedBearerHeader = buildGrowthEngineAccessDiagnostic({
+  growth_engine_enabled: true,
+  diagnostic_enabled: true,
+  request_has_authorization_header: true,
+  bearer_token_present: false,
+  ...bearerDefaults,
+  bearer_user_resolved: false,
+  cookie_user_resolved: false,
+  resolved_email: null,
+  admin_allowlist_env_present: true,
+  admin_allowlist_entry_count: 1,
+  admin_allowlist_env_source: "EQUIPIFY_PLATFORM_ADMIN_EMAILS",
+  resolved_email_in_admin_allowlist: false,
+})
+assert.equal(malformedBearerHeader.access_decision, "unauthenticated")
+console.log("  ✓ malformed Bearer header fails safely → unauthenticated")
 
 process.env.GROWTH_ENGINE_ACCESS_DIAGNOSTIC_ENABLED = "true"
 assert.equal(isGrowthEngineAccessDiagnosticEnabledEnv(), true)

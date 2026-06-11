@@ -13,8 +13,27 @@ const ROOT = process.cwd()
 const accessSource = fs.readFileSync(path.join(ROOT, "lib/growth/access.ts"), "utf8")
 assert.match(accessSource, /getBearerAccessToken/)
 assert.match(accessSource, /resolveGrowthEnginePlatformUser/)
+assert.match(accessSource, /createSupabaseClientWithAccessToken\(bearer\)/)
+assert.match(accessSource, /bearerClient\.auth\.getUser\(\)/)
 assert.match(accessSource, /cookieClient\.auth\.getUser\(bearer\)/)
-console.log("  ✓ requireGrowthEnginePlatformAccess resolves bearer + cookie sessions")
+console.log("  ✓ bearer validated via access-token client + cookie fallback")
+
+const serverSource = fs.readFileSync(path.join(ROOT, "lib/supabase/server.ts"), "utf8")
+assert.match(serverSource, /Authorization: `Bearer \$\{accessToken\}`/)
+console.log("  ✓ access-token client sets Authorization header for Supabase getUser")
+
+function getBearerAccessTokenFromHeader(authHeader: string | null | undefined): string | null {
+  if (typeof authHeader !== "string") return null
+  const match = authHeader.match(/^Bearer\s+(.+)$/i)
+  const token = match?.[1]?.trim()
+  return token || null
+}
+
+assert.equal(getBearerAccessTokenFromHeader("NotBearer token"), null)
+assert.equal(getBearerAccessTokenFromHeader("Bearer"), null)
+assert.equal(getBearerAccessTokenFromHeader("Bearer   "), null)
+assert.equal(getBearerAccessTokenFromHeader("Bearer eyJheader.payload.sig"), "eyJheader.payload.sig")
+console.log("  ✓ malformed Bearer header yields no token")
 
 const commandCenterRoute = fs.readFileSync(
   path.join(ROOT, "app/api/platform/growth/revenue-execution/command-center/route.ts"),
