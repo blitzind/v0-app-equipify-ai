@@ -5,6 +5,7 @@ import "server-only"
  * Middleware must import `@/lib/platform-admin-policy` directly (Edge-safe).
  */
 export {
+  getPlatformAdminAllowlistMeta,
   getPlatformAdminEmails,
   isPlatformAdminEmail,
   logPlatformAdminDevDiagnostics,

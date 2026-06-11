@@ -42,6 +42,30 @@ export function getPlatformAdminEmails(): string[] {
     .filter(Boolean)
 }
 
+export function getPlatformAdminAllowlistMeta(): {
+  admin_allowlist_env_present: boolean
+  admin_allowlist_entry_count: number
+  admin_allowlist_env_source: string | null
+} {
+  const resolved = resolvePlatformAdminEnv()
+  if (!resolved) {
+    return {
+      admin_allowlist_env_present: false,
+      admin_allowlist_entry_count: 0,
+      admin_allowlist_env_source: null,
+    }
+  }
+  const entries = resolved.raw
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean)
+  return {
+    admin_allowlist_env_present: entries.length > 0,
+    admin_allowlist_entry_count: entries.length,
+    admin_allowlist_env_source: resolved.source,
+  }
+}
+
 export function isPlatformAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false
   const normalized = email.trim().toLowerCase()

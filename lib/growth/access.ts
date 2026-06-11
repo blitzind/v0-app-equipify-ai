@@ -4,7 +4,7 @@ import { NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
-import { isPlatformAdminEmail } from "@/lib/platform-admin"
+import { getPlatformAdminAllowlistMeta, isPlatformAdminEmail } from "@/lib/platform-admin"
 import { isGrowthQaAccelerationEnabled } from "@/lib/growth/sequence-enrollment/qa-acceleration-config"
 import { createServerSupabaseClient, getBearerAccessToken } from "@/lib/supabase/server"
 
@@ -41,25 +41,52 @@ export type GrowthEnginePlatformAccess =
     }
   | { ok: false; response: NextResponse }
 
-async function resolveGrowthEnginePlatformUser(request?: Request): Promise<{
-  userId: string
-  userEmail: string
-} | null> {
+export type GrowthEnginePlatformUserResolution = {
+  bearer_token_present: boolean
+  bearer_user_resolved: boolean
+  cookie_user_resolved: boolean
+  resolved_user: { userId: string; userEmail: string } | null
+}
+
+export async function resolveGrowthEnginePlatformUserResolution(
+  request?: Request,
+): Promise<GrowthEnginePlatformUserResolution> {
   const cookieClient = await createServerSupabaseClient()
   const bearer = request ? getBearerAccessToken(request) : null
+  let bearer_user_resolved = false
+  let bearerUser: { userId: string; userEmail: string } | null = null
 
   if (bearer) {
     const { data, error } = await cookieClient.auth.getUser(bearer)
     if (!error && data.user?.id && data.user.email) {
-      return { userId: data.user.id, userEmail: data.user.email }
+      bearer_user_resolved = true
+      bearerUser = { userId: data.user.id, userEmail: data.user.email }
     }
   }
 
   const {
     data: { user },
   } = await cookieClient.auth.getUser()
-  if (!user?.id || !user.email) return null
-  return { userId: user.id, userEmail: user.email }
+  const cookie_user_resolved = Boolean(user?.id && user.email)
+  const cookieUser =
+    cookie_user_resolved && user?.id && user.email
+      ? { userId: user.id, userEmail: user.email }
+      : null
+
+  return {
+    bearer_token_present: Boolean(bearer),
+    bearer_user_resolved,
+    cookie_user_resolved,
+    resolved_user: bearerUser ?? cookieUser,
+  }
+}
+
+async function resolveGrowthEnginePlatformUser(request?: Request): Promise<{
+  userId: string
+  userEmail: string
+} | null> {
+  const resolution = await resolveGrowthEnginePlatformUserResolution(request)
+  return resolution.resolved_user
 }
 
 export async function requireGrowthEnginePlatformAccess(
