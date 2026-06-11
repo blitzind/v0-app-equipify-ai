@@ -10,12 +10,17 @@ import {
 import type { ApolloEnrollmentAutomationReport } from "@/lib/growth/apollo/apollo-enrollment-automation-types"
 import type { ApolloFullPipelineEnrollmentEvidence } from "@/lib/growth/apollo/apollo-full-pipeline-production-certification-types"
 import type { ApolloPrimaryContactOperatorReviewRow } from "@/lib/growth/apollo/apollo-primary-contact-operator-review-types"
+import { runApolloEnrollmentAutomation } from "@/lib/growth/apollo/apollo-enrollment-auto-enrollment"
 import {
   describeEnrollmentDuplicatePreventionDecision,
+  isCertificationEligibleSequenceReadyContact,
+  selectSequenceReadyContactForCertification,
+  type ApolloFullPipelineCertificationScoredContact,
 } from "@/lib/growth/apollo/apollo-full-pipeline-enrollment-resolution-evidence"
 import {
   evaluateApolloEnrollmentQualification,
   resolveApolloEnrollmentQualificationThreshold,
+  resolveApolloFullPipelineCertificationQualificationThreshold,
 } from "@/lib/growth/apollo/apollo-enrollment-qualification-engine"
 import { loadApolloPrimaryContactOperatorReviewSnapshot } from "@/lib/growth/apollo/apollo-primary-contact-operator-review"
 import { loadProspectSearchEngineIntelligence } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-loader"
@@ -153,6 +158,82 @@ function buildQualificationInput(input: {
   }
 }
 
+export async function scoreSequenceReadyContactsForCertification(
+  admin: SupabaseClient,
+  input: {
+    company_candidate_id: string
+    contacts: ApolloPrimaryContactOperatorReviewRow[]
+    env?: NodeJS.ProcessEnv
+  },
+): Promise<ApolloFullPipelineCertificationScoredContact[]> {
+  const snapshot = await loadApolloPrimaryContactOperatorReviewSnapshot(admin, input.company_candidate_id)
+  if (!snapshot) return []
+
+  const summary = summarizeApolloOperatorReviewForQualification(snapshot)
+  const engineIntelligence = await loadProspectSearchEngineIntelligence(admin, {
+    source_type: "external_discovered",
+    id: input.company_candidate_id,
+    growth_lead_id: null,
+    canonical_company_id: snapshot.canonical_company_id,
+  })
+
+  const fitScore =
+    asNumber(engineIntelligence.company_intelligence?.snapshots?.[0]?.confidence) != null
+      ? (engineIntelligence.company_intelligence?.snapshots?.[0]?.confidence ?? 0) * 100
+      : null
+
+  const scored: ApolloFullPipelineCertificationScoredContact[] = []
+  for (const contact of input.contacts.filter((row) => isCertificationEligibleSequenceReadyContact(row))) {
+    const qualification = evaluateApolloEnrollmentQualification(
+      buildQualificationInput({
+        snapshotSummary: summary,
+        contact,
+        companyIntelligencePresent:
+          engineIntelligence.company_intelligence?.has_verified_intelligence === true,
+        buyingCommitteePresent: (engineIntelligence.buying_committee?.member_count ?? 0) > 0,
+        buyingCommitteeCoverage: engineIntelligence.buying_committee?.committee_completeness ?? null,
+        fitScore,
+        researchScore: fitScore,
+      }),
+      { threshold: resolveApolloEnrollmentQualificationThreshold(input.env) },
+    )
+    scored.push({
+      contact,
+      qualification_score: qualification.qualification_score,
+    })
+  }
+
+  return scored
+}
+
+export async function executeApolloFullPipelineCertificationEnrollment(
+  admin: SupabaseClient,
+  input: {
+    execution_id: string
+    company_candidate_id: string
+    selected_contact: ApolloPrimaryContactOperatorReviewRow
+    threshold_used: number
+    threshold_source: "production" | "certification_override"
+    production_threshold: number
+    certification_threshold: number
+    created_by?: string | null
+    env?: NodeJS.ProcessEnv
+  },
+): Promise<ApolloEnrollmentAutomationReport> {
+  return runApolloEnrollmentAutomation(admin, {
+    execution_id: input.execution_id,
+    company_candidate_id: input.company_candidate_id,
+    created_by: input.created_by ?? null,
+    env: input.env,
+    qualification_threshold_override: input.threshold_used,
+    production_qualification_threshold: input.production_threshold,
+    certification_qualification_threshold: input.certification_threshold,
+    qualification_threshold_source: input.threshold_source,
+    target_company_contact_id: input.selected_contact.company_contact_id,
+    target_contact_candidate_id: input.selected_contact.contact_candidate_id,
+  })
+}
+
 export async function buildApolloFullPipelineEnrollmentEvidence(
   admin: SupabaseClient,
   input: {
@@ -164,56 +245,84 @@ export async function buildApolloFullPipelineEnrollmentEvidence(
     existing_enrollment_candidate_status?: string | null
     duplicate_prevention_decision?: string | null
     insert_error?: string | null
+    qualification_score?: number | null
+    qualification_threshold?: number | null
+    qualification_threshold_source?: ApolloFullPipelineEnrollmentEvidence["qualification_threshold_source"]
+    production_threshold?: number | null
+    certification_threshold?: number | null
+    qualification_override_used?: boolean
     env?: NodeJS.ProcessEnv
   },
 ): Promise<ApolloFullPipelineEnrollmentEvidence> {
   const contact = input.sequence_ready_contact
-  const threshold = resolveApolloEnrollmentQualificationThreshold(input.env)
+  const production_threshold =
+    input.production_threshold ?? resolveApolloEnrollmentQualificationThreshold(input.env)
+  const certification_threshold =
+    input.certification_threshold ??
+    resolveApolloFullPipelineCertificationQualificationThreshold(input.env)
+  const threshold = input.qualification_threshold ?? production_threshold
   const qualification_blockers: string[] = []
 
-  let qualification_score: number | null = null
+  let qualification_score: number | null = input.qualification_score ?? null
 
   if (contact) {
-    const snapshot = await loadApolloPrimaryContactOperatorReviewSnapshot(admin, input.company_candidate_id)
-    if (snapshot) {
-      const summary = summarizeApolloOperatorReviewForQualification(snapshot)
-      const engineIntelligence = await loadProspectSearchEngineIntelligence(admin, {
-        source_type: "external_discovered",
-        id: input.company_candidate_id,
-        growth_lead_id: null,
-        canonical_company_id: snapshot.canonical_company_id,
-      })
+    if (qualification_score == null) {
+      const snapshot = await loadApolloPrimaryContactOperatorReviewSnapshot(admin, input.company_candidate_id)
+      if (snapshot) {
+        const summary = summarizeApolloOperatorReviewForQualification(snapshot)
+        const engineIntelligence = await loadProspectSearchEngineIntelligence(admin, {
+          source_type: "external_discovered",
+          id: input.company_candidate_id,
+          growth_lead_id: null,
+          canonical_company_id: snapshot.canonical_company_id,
+        })
 
-      const fitScore =
-        asNumber(engineIntelligence.company_intelligence?.snapshots?.[0]?.confidence) != null
-          ? (engineIntelligence.company_intelligence?.snapshots?.[0]?.confidence ?? 0) * 100
-          : null
+        const fitScore =
+          asNumber(engineIntelligence.company_intelligence?.snapshots?.[0]?.confidence) != null
+            ? (engineIntelligence.company_intelligence?.snapshots?.[0]?.confidence ?? 0) * 100
+            : null
 
-      const qualification = evaluateApolloEnrollmentQualification(
-        buildQualificationInput({
-          snapshotSummary: summary,
-          contact,
-          companyIntelligencePresent:
-            engineIntelligence.company_intelligence?.has_verified_intelligence === true,
-          buyingCommitteePresent: (engineIntelligence.buying_committee?.member_count ?? 0) > 0,
-          buyingCommitteeCoverage:
-            engineIntelligence.buying_committee?.committee_completeness ?? null,
-          fitScore,
-          researchScore: fitScore,
-        }),
-        { threshold },
+        const qualification = evaluateApolloEnrollmentQualification(
+          buildQualificationInput({
+            snapshotSummary: summary,
+            contact,
+            companyIntelligencePresent:
+              engineIntelligence.company_intelligence?.has_verified_intelligence === true,
+            buyingCommitteePresent: (engineIntelligence.buying_committee?.member_count ?? 0) > 0,
+            buyingCommitteeCoverage:
+              engineIntelligence.buying_committee?.committee_completeness ?? null,
+            fitScore,
+            researchScore: fitScore,
+          }),
+          { threshold: production_threshold },
+        )
+
+        qualification_score = qualification.qualification_score
+        if (
+          qualification_score < production_threshold &&
+          (input.qualification_override_used ||
+            (qualification_score >= certification_threshold &&
+              input.qualification_threshold_source === "certification_override"))
+        ) {
+          // Certification override path — production threshold miss is expected.
+        } else if (!qualification.qualified_for_enrollment) {
+          qualification_blockers.push(qualification.qualification_reason)
+        }
+      }
+    } else if (
+      qualification_score < production_threshold &&
+      !(input.qualification_override_used || qualification_score >= certification_threshold)
+    ) {
+      qualification_blockers.push(
+        `Qualification score ${qualification_score} below production threshold ${production_threshold}.`,
       )
+    }
 
-      qualification_score = qualification.qualification_score
-      if (!qualification.qualified_for_enrollment) {
-        qualification_blockers.push(qualification.qualification_reason)
-      }
-      if (!contact.contactable) {
-        qualification_blockers.push("Contact is not contactable (missing email/phone or blocked).")
-      }
-      if (contact.blockers.length > 0) {
-        qualification_blockers.push(`Contact blockers: ${contact.blockers.join(", ")}.`)
-      }
+    if (!contact.contactable) {
+      qualification_blockers.push("Contact is not contactable (missing email/phone or blocked).")
+    }
+    if (contact.blockers.length > 0) {
+      qualification_blockers.push(`Contact blockers: ${contact.blockers.join(", ")}.`)
     }
   } else {
     qualification_blockers.push("No sequence-ready contact available for enrollment.")
@@ -232,15 +341,22 @@ export async function buildApolloFullPipelineEnrollmentEvidence(
     ) ??
     null
 
+  const qualification_override_used = input.qualification_override_used === true
+
   return {
     sequence_ready_contact_id:
       contact?.company_contact_id ?? contact?.contact_candidate_id ?? null,
     sequence_ready_contact_name: contact?.full_name ?? null,
+    selected_contact_name: contact?.full_name ?? null,
     growth_lead_id: null,
     company_contact_id: contact?.company_contact_id ?? null,
     contact_candidate_id: contact?.contact_candidate_id ?? null,
     qualification_score,
     qualification_threshold: threshold,
+    qualification_threshold_source: input.qualification_threshold_source ?? null,
+    production_threshold,
+    certification_threshold,
+    qualification_override_used,
     qualification_blockers,
     existing_enrollment_candidate_id: input.existing_enrollment_candidate_id ?? null,
     existing_enrollment_candidate_status: input.existing_enrollment_candidate_status ?? null,

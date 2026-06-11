@@ -3,20 +3,26 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { executeApolloEnrollmentAutomationInProduction } from "@/lib/growth/apollo/apollo-enrollment-automation-route"
 import {
   mapApolloEnrollmentCandidateDbRow,
 } from "@/lib/growth/apollo/apollo-enrollment-automation-evidence"
+import type { ApolloEnrollmentAutomationReport } from "@/lib/growth/apollo/apollo-enrollment-automation-types"
 import type { ApolloFullPipelineEnrollmentEvidence } from "@/lib/growth/apollo/apollo-full-pipeline-production-certification-types"
 import {
   pickEnrollmentCandidateIdFromAutomationReport,
-  selectSequenceReadyContactForEnrollment,
+  selectSequenceReadyContactForCertification,
 } from "@/lib/growth/apollo/apollo-full-pipeline-enrollment-resolution-evidence"
 import {
   buildApolloFullPipelineEnrollmentEvidence,
+  executeApolloFullPipelineCertificationEnrollment,
   findReusableApolloEnrollmentCandidate,
   mapReusableEnrollmentCandidateId,
+  scoreSequenceReadyContactsForCertification,
 } from "@/lib/growth/apollo/apollo-full-pipeline-enrollment-resolution"
+import {
+  resolveApolloEnrollmentQualificationThreshold,
+  resolveApolloFullPipelineCertificationQualificationThreshold,
+} from "@/lib/growth/apollo/apollo-enrollment-qualification-engine"
 import { approveApolloEnrollmentCandidate } from "@/lib/growth/apollo/apollo-enrollment-candidate-queue"
 import { mapApolloAccountPlaybookDbRow } from "@/lib/growth/apollo/apollo-account-playbooks-evidence"
 import { approveApolloAccountPlaybook } from "@/lib/growth/apollo/apollo-account-playbooks-queue"
@@ -85,23 +91,81 @@ export async function certifyApolloFullPipelineProduction(
   }
 
   const snapshot = await loadApolloPrimaryContactOperatorReviewSnapshot(admin, input.company_candidate_id)
-  const sequenceReadyContact = selectSequenceReadyContactForEnrollment(snapshot?.contacts ?? [])
+  const productionThreshold = resolveApolloEnrollmentQualificationThreshold(input.env)
+  const certificationThreshold = resolveApolloFullPipelineCertificationQualificationThreshold(input.env)
+  const scoredContacts = await scoreSequenceReadyContactsForCertification(admin, {
+    company_candidate_id: input.company_candidate_id,
+    contacts: snapshot?.contacts ?? [],
+    env: input.env,
+  })
+  const certificationSelection = selectSequenceReadyContactForCertification(scoredContacts, {
+    production_threshold: productionThreshold,
+    certification_threshold: certificationThreshold,
+  })
+  const sequenceReadyContact = certificationSelection?.contact ?? null
+
   checks.push({
     id: "sequence_ready_contact",
     satisfied: Boolean(sequenceReadyContact),
     detail: sequenceReadyContact
-      ? sequenceReadyContact.contactable
-        ? `Sequence-ready contact ${sequenceReadyContact.full_name} loaded for company candidate.`
-        : `Sequence-ready contact ${sequenceReadyContact.full_name} loaded but not contactable — enrollment may be blocked.`
-      : "No sequence-ready Apollo contact found for company candidate.",
+      ? `Sequence-ready contact ${sequenceReadyContact.full_name} selected for certification enrollment.`
+      : "No sequence-ready contactable Apollo contact qualifies for certification enrollment.",
   })
-  if (!sequenceReadyContact) blockers.push("sequence_ready_contact_missing")
+  if (!sequenceReadyContact) {
+    blockers.push("sequence_ready_contact_missing")
+    if (scoredContacts.length > 0) {
+      const best = [...scoredContacts].sort(
+        (left, right) => right.qualification_score - left.qualification_score,
+      )[0]
+      blockers.push(
+        `best_contact_below_certification_threshold:${best.contact.full_name}:${best.qualification_score}`,
+      )
+    }
+  }
+
+  if (sequenceReadyContact) {
+    checks.push({
+      id: "selected_contact_name",
+      satisfied: true,
+      detail: sequenceReadyContact.full_name,
+    })
+    checks.push({
+      id: "qualification_score",
+      satisfied: certificationSelection != null,
+      detail:
+        certificationSelection != null
+          ? `Qualification score ${certificationSelection.qualification_score} (production threshold ${productionThreshold}, certification threshold ${certificationThreshold}).`
+          : "Qualification score unavailable for selected contact.",
+    })
+    checks.push({
+      id: "certification_override_used",
+      satisfied: true,
+      detail:
+        certificationSelection?.threshold_source === "certification_override"
+          ? `Certification override applied — threshold ${certificationThreshold} used instead of production ${productionThreshold}.`
+          : `Production threshold ${productionThreshold} satisfied — no override required.`,
+    })
+  } else {
+    checks.push({
+      id: "selected_contact_name",
+      satisfied: false,
+      detail: "No contact selected.",
+    })
+    checks.push({
+      id: "qualification_score",
+      satisfied: false,
+      detail: "Qualification score unavailable.",
+    })
+    checks.push({
+      id: "certification_override_used",
+      satisfied: false,
+      detail: "Certification override not applied.",
+    })
+  }
 
   let enrollmentCandidateId = input.enrollment_candidate_id?.trim() || null
   let enrollmentReuseReason: string | null = null
-  let enrollmentAutomationReport = null as Awaited<
-    ReturnType<typeof executeApolloEnrollmentAutomationInProduction>
-  >["report"]
+  let enrollmentAutomationReport = null as ApolloEnrollmentAutomationReport | null
   let enrollmentAutomationMessage: string | null = null
 
   const reusableEnrollment = await findReusableApolloEnrollmentCandidate(admin, {
@@ -116,32 +180,40 @@ export async function certifyApolloFullPipelineProduction(
     enrollmentReuseReason = reusableEnrollment.reuse_reason
   }
 
-  if (!enrollmentCandidateId) {
-    const automation = await executeApolloEnrollmentAutomationInProduction(admin, {
-      company_candidate_id: input.company_candidate_id,
-      certification_mode: false,
-      created_by: CERT_ACTOR_ID,
-      env: input.env,
-    })
-    enrollmentAutomationReport = automation.report
-    enrollmentAutomationMessage = automation.message ?? null
-
-    enrollmentCandidateId =
-      pickEnrollmentCandidateIdFromAutomationReport(automation.report, {
-        company_contact_id: sequenceReadyContact?.company_contact_id ?? null,
-        contact_candidate_id: sequenceReadyContact?.contact_candidate_id ?? null,
-      }) ?? null
-
-    if (!enrollmentCandidateId) {
-      const postAutomationReuse = await findReusableApolloEnrollmentCandidate(admin, {
+  if (!enrollmentCandidateId && sequenceReadyContact && certificationSelection) {
+    try {
+      enrollmentAutomationReport = await executeApolloFullPipelineCertificationEnrollment(admin, {
+        execution_id: input.execution_id,
         company_candidate_id: input.company_candidate_id,
-        company_contact_id: sequenceReadyContact?.company_contact_id ?? null,
-        contact_candidate_id: sequenceReadyContact?.contact_candidate_id ?? null,
+        selected_contact: sequenceReadyContact,
+        threshold_used: certificationSelection.threshold_used,
+        threshold_source: certificationSelection.threshold_source,
+        production_threshold: productionThreshold,
+        certification_threshold: certificationThreshold,
+        created_by: CERT_ACTOR_ID,
+        env: input.env,
       })
-      if (postAutomationReuse) {
-        enrollmentCandidateId = mapReusableEnrollmentCandidateId(postAutomationReuse.row)
-        enrollmentReuseReason = postAutomationReuse.reuse_reason
+      enrollmentCandidateId =
+        pickEnrollmentCandidateIdFromAutomationReport(enrollmentAutomationReport, {
+          company_contact_id: sequenceReadyContact.company_contact_id,
+          contact_candidate_id: sequenceReadyContact.contact_candidate_id,
+        }) ?? null
+
+      if (!enrollmentCandidateId) {
+        const postAutomationReuse = await findReusableApolloEnrollmentCandidate(admin, {
+          company_candidate_id: input.company_candidate_id,
+          company_contact_id: sequenceReadyContact.company_contact_id,
+          contact_candidate_id: sequenceReadyContact.contact_candidate_id,
+        })
+        if (postAutomationReuse) {
+          enrollmentCandidateId = mapReusableEnrollmentCandidateId(postAutomationReuse.row)
+          enrollmentReuseReason = postAutomationReuse.reuse_reason
+        } else if (enrollmentAutomationReport.blockers.length > 0) {
+          enrollmentAutomationMessage = enrollmentAutomationReport.blockers.join(" | ")
+        }
       }
+    } catch (error) {
+      enrollmentAutomationMessage = error instanceof Error ? error.message : String(error)
     }
   }
 
@@ -158,8 +230,24 @@ export async function certifyApolloFullPipelineProduction(
       duplicate_prevention_decision: enrollmentReuseReason
         ? `reused_before_automation:${enrollmentReuseReason}`
         : undefined,
+      qualification_score: certificationSelection?.qualification_score ?? null,
+      qualification_threshold: certificationSelection?.threshold_used ?? productionThreshold,
+      qualification_threshold_source: certificationSelection?.threshold_source ?? null,
+      production_threshold: productionThreshold,
+      certification_threshold: certificationThreshold,
+      qualification_override_used:
+        certificationSelection?.threshold_source === "certification_override",
       env: input.env,
     })
+
+  checks.push({
+    id: "qualification_blockers",
+    satisfied: enrollmentEvidence.qualification_blockers.length === 0 || Boolean(enrollmentCandidateId),
+    detail:
+      enrollmentEvidence.qualification_blockers.length > 0
+        ? enrollmentEvidence.qualification_blockers.join(" | ")
+        : "No qualification blockers for selected contact.",
+  })
 
   if (enrollmentCandidateId) {
     checks.push({
@@ -167,7 +255,9 @@ export async function certifyApolloFullPipelineProduction(
       satisfied: true,
       detail: enrollmentReuseReason
         ? `Reusing enrollment candidate ${enrollmentCandidateId} (${enrollmentReuseReason}).`
-        : `Enrollment candidate ${enrollmentCandidateId} materialized via automation.`,
+        : certificationSelection?.threshold_source === "certification_override"
+          ? `Enrollment candidate ${enrollmentCandidateId} created with certification threshold ${certificationThreshold} (score ${certificationSelection.qualification_score}).`
+          : `Enrollment candidate ${enrollmentCandidateId} materialized at production threshold ${productionThreshold}.`,
     })
   } else {
     const evidenceSummary = [

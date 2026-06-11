@@ -10,6 +10,8 @@ export const APOLLO_ENROLLMENT_QUALIFICATION_ENGINE_QA_MARKER =
 
 export const APOLLO_ENROLLMENT_DEFAULT_QUALIFICATION_THRESHOLD = 70
 
+export const APOLLO_FULL_PIPELINE_CERTIFICATION_DEFAULT_QUALIFICATION_THRESHOLD = 50
+
 export function resolveApolloEnrollmentQualificationThreshold(
   env: NodeJS.ProcessEnv = process.env,
 ): number {
@@ -17,6 +19,18 @@ export function resolveApolloEnrollmentQualificationThreshold(
   const parsed = raw ? Number.parseInt(raw, 10) : NaN
   if (!Number.isFinite(parsed) || parsed < 1 || parsed > 100) {
     return APOLLO_ENROLLMENT_DEFAULT_QUALIFICATION_THRESHOLD
+  }
+  return parsed
+}
+
+/** Full pipeline certification only — never used by normal enrollment automation. */
+export function resolveApolloFullPipelineCertificationQualificationThreshold(
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  const raw = env.GROWTH_APOLLO_FULL_PIPELINE_CERTIFICATION_QUALIFICATION_THRESHOLD?.trim()
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN
+  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 100) {
+    return APOLLO_FULL_PIPELINE_CERTIFICATION_DEFAULT_QUALIFICATION_THRESHOLD
   }
   return parsed
 }

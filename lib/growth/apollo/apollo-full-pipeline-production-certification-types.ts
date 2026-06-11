@@ -40,14 +40,21 @@ export type ApolloFullPipelineStageIds = {
   growth_lead_id: string | null
 }
 
+export type ApolloFullPipelineQualificationThresholdSource = "production" | "certification_override"
+
 export type ApolloFullPipelineEnrollmentEvidence = {
   sequence_ready_contact_id: string | null
   sequence_ready_contact_name: string | null
+  selected_contact_name: string | null
   growth_lead_id: string | null
   company_contact_id: string | null
   contact_candidate_id: string | null
   qualification_score: number | null
   qualification_threshold: number | null
+  qualification_threshold_source: ApolloFullPipelineQualificationThresholdSource | null
+  production_threshold: number | null
+  certification_threshold: number | null
+  qualification_override_used: boolean
   qualification_blockers: string[]
   existing_enrollment_candidate_id: string | null
   existing_enrollment_candidate_status: string | null

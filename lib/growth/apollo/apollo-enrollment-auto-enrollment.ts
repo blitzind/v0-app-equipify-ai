@@ -384,6 +384,13 @@ export async function runApolloEnrollmentAutoEnrollmentForCompany(
     company_candidate_id: string
     created_by?: string | null
     env?: NodeJS.ProcessEnv
+    /** Full pipeline certification only — must not be passed from normal enrollment routes. */
+    qualification_threshold_override?: number | null
+    production_qualification_threshold?: number | null
+    certification_qualification_threshold?: number | null
+    qualification_threshold_source?: "production" | "certification_override" | null
+    target_company_contact_id?: string | null
+    target_contact_candidate_id?: string | null
   },
 ): Promise<{
   contacts_evaluated: number
@@ -404,7 +411,9 @@ export async function runApolloEnrollmentAutoEnrollmentForCompany(
     qualified_contacts: number
   }
 }> {
-  const threshold = resolveApolloEnrollmentQualificationThreshold(input.env)
+  const productionThreshold =
+    input.production_qualification_threshold ?? resolveApolloEnrollmentQualificationThreshold(input.env)
+  const threshold = input.qualification_threshold_override ?? productionThreshold
   const snapshot = await loadApolloPrimaryContactOperatorReviewSnapshot(admin, input.company_candidate_id)
   if (!snapshot) {
     return {
@@ -459,7 +468,12 @@ export async function runApolloEnrollmentAutoEnrollmentForCompany(
     ? `${engineIntelligence.buying_committee?.member_count ?? 0} committee members; roles: ${(engineIntelligence.buying_committee?.roles_present ?? []).join(", ") || "unknown"}`
     : null
 
-  const targets = snapshot.contacts.filter((row) => row.sequence_ready && row.contactable)
+  let targets = snapshot.contacts.filter((row) => row.sequence_ready && row.contactable)
+  if (input.target_company_contact_id) {
+    targets = targets.filter((row) => row.company_contact_id === input.target_company_contact_id)
+  } else if (input.target_contact_candidate_id) {
+    targets = targets.filter((row) => row.contact_candidate_id === input.target_contact_candidate_id)
+  }
   const candidates: ApolloEnrollmentCandidateRow[] = []
   const blockers: string[] = []
   let contacts_qualified = 0
@@ -568,6 +582,11 @@ export async function runApolloEnrollmentAutoEnrollmentForCompany(
         contact_snapshot: contactSnapshot,
         qualification_snapshot: {
           threshold,
+          production_threshold: productionThreshold,
+          certification_threshold: input.certification_qualification_threshold ?? null,
+          qualification_threshold_source: input.qualification_threshold_source ?? "production",
+          qualification_override_used:
+            input.qualification_threshold_source === "certification_override",
           score_breakdown: qualification.score_breakdown,
           qualification_input: qualificationInput,
         },
@@ -670,6 +689,12 @@ export async function runApolloEnrollmentAutomation(
     company_candidate_id: string
     created_by?: string | null
     env?: NodeJS.ProcessEnv
+    qualification_threshold_override?: number | null
+    production_qualification_threshold?: number | null
+    certification_qualification_threshold?: number | null
+    qualification_threshold_source?: "production" | "certification_override" | null
+    target_company_contact_id?: string | null
+    target_contact_candidate_id?: string | null
   },
 ): Promise<ApolloEnrollmentAutomationReport> {
   const result = await runApolloEnrollmentAutoEnrollmentForCompany(admin, input)

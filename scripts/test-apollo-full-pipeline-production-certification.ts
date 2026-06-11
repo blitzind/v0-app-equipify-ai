@@ -24,9 +24,13 @@ import { assertApolloEnrichmentCertProductionResponseHasNoSecrets } from "../lib
 import {
   describeEnrollmentDuplicatePreventionDecision,
   pickEnrollmentCandidateIdFromAutomationReport,
+  selectSequenceReadyContactForCertification,
   selectSequenceReadyContactForEnrollment,
 } from "../lib/growth/apollo/apollo-full-pipeline-enrollment-resolution-evidence"
-import { evaluateApolloEnrollmentQualification } from "../lib/growth/apollo/apollo-enrollment-qualification-engine"
+import {
+  evaluateApolloEnrollmentQualification,
+  resolveApolloEnrollmentQualificationThreshold,
+} from "../lib/growth/apollo/apollo-enrollment-qualification-engine"
 import type { ApolloEnrollmentAutomationReport } from "../lib/growth/apollo/apollo-enrollment-automation-types"
 import { APOLLO_ENROLLMENT_AUTOMATION_QA_MARKER } from "../lib/growth/apollo/apollo-enrollment-automation-types"
 
@@ -318,10 +322,77 @@ console.log("  ✓ DB insert failure evidence shape")
 
 assert.match(certSource, /findReusableApolloEnrollmentCandidate/)
 assert.match(certSource, /enrollment_evidence/)
-assert.match(certSource, /selectSequenceReadyContactForEnrollment/)
+assert.match(certSource, /selectSequenceReadyContactForCertification/)
+assert.match(certSource, /executeApolloFullPipelineCertificationEnrollment/)
+assert.match(certSource, /qualification_override_used/)
+assert.match(certSource, /selected_contact_name/)
 assert.match(executeRoute, /status: 200/)
 assert.doesNotMatch(executeRoute, /certification_failed[\s\S]*status: 500/)
 console.log("  ✓ structured certification failure returns HTTP 200")
+
+const productionThreshold = resolveApolloEnrollmentQualificationThreshold({})
+const certificationThreshold = 50
+const lowScoreContact = { ...contactFixture, full_name: "Bryan Ginther", company_contact_id: "cc-low" }
+const highScoreContact = {
+  ...contactFixture,
+  full_name: "High Scorer",
+  company_contact_id: "cc-high",
+}
+
+const productionBlocked = evaluateApolloEnrollmentQualification(
+  {
+    mapped_contacts: 1,
+    verified_email_contacts: 1,
+    contactable_contacts: 1,
+    sequence_ready_contacts: 1,
+    company_intelligence_present: false,
+    buying_committee_present: false,
+    buying_committee_coverage: null,
+    fit_score: null,
+    research_score: null,
+    contact_sequence_ready: true,
+    contact_contactable: true,
+    contact_blockers: [],
+    apollo_search_tier: null,
+    verified_email_source: "apollo_search_verified_email",
+    enrichment_source: "apollo_enrichment_cert",
+  },
+  { threshold: productionThreshold },
+)
+assert.equal(productionBlocked.qualification_score, 55)
+assert.equal(productionBlocked.qualified_for_enrollment, false)
+console.log("  ✓ production automation blocks score 55 when threshold=70")
+
+const certSelectionLow = selectSequenceReadyContactForCertification(
+  [{ contact: lowScoreContact, qualification_score: 55 }],
+  { production_threshold: 70, certification_threshold: 50 },
+)
+assert.equal(certSelectionLow?.contact.full_name, "Bryan Ginther")
+assert.equal(certSelectionLow?.threshold_source, "certification_override")
+assert.equal(certSelectionLow?.threshold_used, 50)
+console.log("  ✓ full pipeline certification proceeds with score 55 using certification threshold=50")
+
+const certSelectionPreferHigh = selectSequenceReadyContactForCertification(
+  [
+    { contact: lowScoreContact, qualification_score: 55 },
+    { contact: highScoreContact, qualification_score: 75 },
+  ],
+  { production_threshold: 70, certification_threshold: 50 },
+)
+assert.equal(certSelectionPreferHigh?.contact.full_name, "High Scorer")
+assert.equal(certSelectionPreferHigh?.threshold_source, "production")
+assert.equal(certSelectionPreferHigh?.threshold_used, 70)
+console.log("  ✓ full pipeline certification prefers score ≥70 if available")
+
+assert.match(certSource, /outreach_sent: false/)
+assert.match(certSource, /executeApolloFullPipelineCertificationEnrollment/)
+assert.doesNotMatch(certSource, /executeApolloEnrollmentAutomationInProduction/)
+console.log("  ✓ certification override cannot send outreach")
+
+assert.match(certSource, /qualification_threshold_source/)
+assert.match(certSource, /production_threshold/)
+assert.match(certSource, /certification_threshold/)
+console.log("  ✓ override evidence is present")
 
 const autoEnrollmentSource = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/apollo/apollo-enrollment-auto-enrollment.ts"),

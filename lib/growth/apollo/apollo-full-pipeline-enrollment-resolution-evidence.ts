@@ -1,7 +1,13 @@
 /** Apollo Full Pipeline enrollment resolution helpers — client-safe pure functions. */
 
 import type { ApolloEnrollmentAutomationReport } from "@/lib/growth/apollo/apollo-enrollment-automation-types"
+import type { ApolloFullPipelineQualificationThresholdSource } from "@/lib/growth/apollo/apollo-full-pipeline-production-certification-types"
 import type { ApolloPrimaryContactOperatorReviewRow } from "@/lib/growth/apollo/apollo-primary-contact-operator-review-types"
+
+export type ApolloFullPipelineCertificationScoredContact = {
+  contact: ApolloPrimaryContactOperatorReviewRow
+  qualification_score: number
+}
 
 export function selectSequenceReadyContactForEnrollment(
   contacts: ApolloPrimaryContactOperatorReviewRow[],
@@ -11,6 +17,55 @@ export function selectSequenceReadyContactForEnrollment(
     contacts.find((contact) => contact.sequence_ready) ??
     null
   )
+}
+
+export function isCertificationEligibleSequenceReadyContact(
+  contact: ApolloPrimaryContactOperatorReviewRow,
+): boolean {
+  return contact.sequence_ready && contact.contactable && contact.blockers.length === 0
+}
+
+export function selectSequenceReadyContactForCertification(
+  scoredContacts: ApolloFullPipelineCertificationScoredContact[],
+  input: {
+    production_threshold: number
+    certification_threshold: number
+  },
+): {
+  contact: ApolloPrimaryContactOperatorReviewRow
+  qualification_score: number
+  threshold_used: number
+  threshold_source: ApolloFullPipelineQualificationThresholdSource
+} | null {
+  const eligible = scoredContacts
+    .filter((row) => isCertificationEligibleSequenceReadyContact(row.contact))
+    .sort((left, right) => right.qualification_score - left.qualification_score)
+
+  const productionQualified = eligible.filter(
+    (row) => row.qualification_score >= input.production_threshold,
+  )
+  if (productionQualified[0]) {
+    return {
+      contact: productionQualified[0].contact,
+      qualification_score: productionQualified[0].qualification_score,
+      threshold_used: input.production_threshold,
+      threshold_source: "production",
+    }
+  }
+
+  const certificationQualified = eligible.filter(
+    (row) => row.qualification_score >= input.certification_threshold,
+  )
+  if (certificationQualified[0]) {
+    return {
+      contact: certificationQualified[0].contact,
+      qualification_score: certificationQualified[0].qualification_score,
+      threshold_used: input.certification_threshold,
+      threshold_source: "certification_override",
+    }
+  }
+
+  return null
 }
 
 export function pickEnrollmentCandidateIdFromAutomationReport(
