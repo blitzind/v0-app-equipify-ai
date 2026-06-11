@@ -49,5 +49,5 @@ export async function POST(request: Request) {
   if (!result.ok && result.error === "gates_failed") {
     return NextResponse.json(result, { status: 403 })
   }
-  return NextResponse.json(result, { status: result.ok ? 200 : 500 })
+  return NextResponse.json(result, { status: 200 })
 }

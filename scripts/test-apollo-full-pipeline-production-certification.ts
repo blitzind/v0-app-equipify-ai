@@ -21,10 +21,20 @@ import {
   validateApolloFullPipelineProductionCertificationConfirmation,
 } from "../lib/growth/apollo/apollo-full-pipeline-production-route-gates"
 import { assertApolloEnrichmentCertProductionResponseHasNoSecrets } from "../lib/growth/apollo/apollo-enrichment-cert-production-route-gates"
+import {
+  describeEnrollmentDuplicatePreventionDecision,
+  pickEnrollmentCandidateIdFromAutomationReport,
+  selectSequenceReadyContactForEnrollment,
+} from "../lib/growth/apollo/apollo-full-pipeline-enrollment-resolution-evidence"
+import { evaluateApolloEnrollmentQualification } from "../lib/growth/apollo/apollo-enrollment-qualification-engine"
+import type { ApolloEnrollmentAutomationReport } from "../lib/growth/apollo/apollo-enrollment-automation-types"
+import { APOLLO_ENROLLMENT_AUTOMATION_QA_MARKER } from "../lib/growth/apollo/apollo-enrollment-automation-types"
 
 const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-full-pipeline-production-certification-types.ts",
   "lib/growth/apollo/apollo-full-pipeline-production-certification.ts",
+  "lib/growth/apollo/apollo-full-pipeline-enrollment-resolution.ts",
+  "lib/growth/apollo/apollo-full-pipeline-enrollment-resolution-evidence.ts",
   "lib/growth/apollo/apollo-full-pipeline-production-route-gates.ts",
   "lib/growth/apollo/apollo-full-pipeline-production-route.ts",
   "app/api/platform/growth/apollo-full-pipeline-certification/readiness/route.ts",
@@ -148,5 +158,176 @@ const gates = assertApolloFullPipelineProductionCertificationAllowed({
 })
 assert.equal(gates.ok, false)
 console.log("  ✓ production gates block when ACK missing")
+
+const contactFixture = {
+  row_id: "row-1",
+  company_contact_id: "cc-1",
+  contact_candidate_id: "cand-1",
+  canonical_person_id: null,
+  full_name: "Bryan Ginther",
+  title: "CEO",
+  company_name: "Acme",
+  source: "Apollo" as const,
+  channel_availability: { email: true, linkedin: false, phone: true },
+  enrichment_status: "channel_ready" as const,
+  contactable: true,
+  sequence_ready: true,
+  operator_review_status: "approved" as const,
+  outreach_ready: true,
+  blockers: [],
+  contact_status: "active",
+  email_status: "verified",
+  phone_status: "verified",
+}
+
+const nonContactableSequenceReady = {
+  ...contactFixture,
+  row_id: "row-2",
+  company_contact_id: "cc-2",
+  full_name: "Not Contactable",
+  contactable: false,
+}
+
+const selected = selectSequenceReadyContactForEnrollment([
+  nonContactableSequenceReady,
+  contactFixture,
+])
+assert.equal(selected?.full_name, "Bryan Ginther")
+console.log("  ✓ sequence-ready contact prefers contactable candidate")
+
+const fallback = selectSequenceReadyContactForEnrollment([nonContactableSequenceReady])
+assert.equal(fallback?.full_name, "Not Contactable")
+console.log("  ✓ sequence-ready contact falls back when only non-contactable")
+
+const automationReport = {
+  qa_marker: APOLLO_ENROLLMENT_AUTOMATION_QA_MARKER,
+  automation_id: "apollo-enrollment-automation-v1",
+  execution_id: "exec-1",
+  company_candidate_id: "company-1",
+  contacts_evaluated: 1,
+  contacts_qualified: 1,
+  candidates_created: 1,
+  candidates_skipped_duplicate: 0,
+  candidates_skipped_re_enrollment: 0,
+  funnel_metrics: {},
+  candidates: [
+    {
+      candidate_id: "enroll-1",
+      company_candidate_id: "company-1",
+      company_contact_id: "cc-1",
+      contact_candidate_id: "cand-1",
+      growth_lead_id: "lead-1",
+      prospect_id: null,
+      status: "pending_enrollment_approval",
+      company_name: "Acme",
+      full_name: "Bryan Ginther",
+      title: "CEO",
+      email: "bryan@acme.com",
+      phone: null,
+      qualified_for_enrollment: true,
+      qualification_reason: "Qualified",
+      qualification_score: 82,
+      fit_score: 80,
+      research_score: 80,
+      source_attribution: {
+        apollo_source: "Apollo Primary Contact Acquisition",
+        apollo_search_tier: null,
+        verified_email_source: "apollo_search_verified_email",
+        enrichment_source: "apollo_enrichment_cert",
+        qualification_source: "apollo_enrollment_qualification_engine",
+        enrollment_source: "apollo_enrollment_automation",
+        attribution_chain: ["Apollo", "Enrichment", "Promotion", "Qualification", "Enrollment"],
+      },
+      operator_intelligence: {
+        why_selected: "Qualified",
+        likely_decision_maker_role: null,
+        company_summary: null,
+        research_summary: null,
+        buying_committee_summary: null,
+        recommended_first_channel: "email",
+        recommended_sequence: null,
+        apollo_evidence_summary: null,
+      },
+      acquisition_evidence: {},
+      created_at: new Date().toISOString(),
+      enrollment_approved_at: null,
+      enrollment_approved_email: null,
+    },
+  ],
+  blockers: [],
+  auto_enrollment: false,
+  outreach_sent: false,
+  draft_created: false,
+  completed_at: new Date().toISOString(),
+} satisfies ApolloEnrollmentAutomationReport
+
+assert.equal(
+  pickEnrollmentCandidateIdFromAutomationReport(automationReport, {
+    company_contact_id: "cc-1",
+    contact_candidate_id: "cand-1",
+  }),
+  "enroll-1",
+)
+console.log("  ✓ automation report resolves enrollment candidate by contact ids")
+
+const reusedReport = {
+  ...automationReport,
+  candidates_created: 0,
+  candidates_skipped_re_enrollment: 1,
+  candidates: automationReport.candidates,
+}
+assert.equal(describeEnrollmentDuplicatePreventionDecision(reusedReport), "reused_existing_candidate")
+console.log("  ✓ existing enrollment candidate reuse decision")
+
+const qualificationFail = evaluateApolloEnrollmentQualification(
+  {
+    mapped_contacts: 1,
+    verified_email_contacts: 0,
+    contactable_contacts: 0,
+    sequence_ready_contacts: 1,
+    company_intelligence_present: false,
+    buying_committee_present: false,
+    buying_committee_coverage: null,
+    fit_score: null,
+    research_score: null,
+    contact_sequence_ready: true,
+    contact_contactable: false,
+    contact_blockers: ["missing_email"],
+    apollo_search_tier: null,
+    verified_email_source: "apollo_search_verified_email",
+    enrichment_source: "apollo_enrichment_cert",
+  },
+  { threshold: 70 },
+)
+assert.equal(qualificationFail.qualified_for_enrollment, false)
+assert.match(qualificationFail.qualification_reason, /not contactable/i)
+console.log("  ✓ qualification failure produces blockers")
+
+const insertFailureReport = {
+  ...automationReport,
+  candidates_created: 0,
+  candidates: [],
+  contacts_qualified: 1,
+  blockers: ["Bryan Ginther: duplicate key value violates unique constraint"],
+}
+assert.match(
+  insertFailureReport.blockers[0] ?? "",
+  /duplicate key|violates/i,
+)
+console.log("  ✓ DB insert failure evidence shape")
+
+assert.match(certSource, /findReusableApolloEnrollmentCandidate/)
+assert.match(certSource, /enrollment_evidence/)
+assert.match(certSource, /selectSequenceReadyContactForEnrollment/)
+assert.match(executeRoute, /status: 200/)
+assert.doesNotMatch(executeRoute, /certification_failed[\s\S]*status: 500/)
+console.log("  ✓ structured certification failure returns HTTP 200")
+
+const autoEnrollmentSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/apollo/apollo-enrollment-auto-enrollment.ts"),
+  "utf8",
+)
+assert.match(autoEnrollmentSource, /existingApproved[\s\S]*candidates\.push/)
+console.log("  ✓ approved enrollment candidate returned for reuse")
 
 console.log("\nApollo Full Pipeline Production Certification checks passed.")

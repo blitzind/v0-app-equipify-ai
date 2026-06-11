@@ -504,6 +504,7 @@ export async function runApolloEnrollmentAutoEnrollmentForCompany(
     })
     if (existingApproved) {
       candidates_skipped_re_enrollment += 1
+      candidates.push(mapApolloEnrollmentCandidateDbRow(existingApproved))
       continue
     }
 
@@ -519,6 +520,13 @@ export async function runApolloEnrollmentAutoEnrollmentForCompany(
       })
       if (reEnrollmentBlock.blocked) {
         candidates_skipped_re_enrollment += 1
+        const reuseApproved = await findApprovedCandidateForContact(admin, {
+          company_contact_id: contact.company_contact_id,
+          contact_candidate_id: contact.contact_candidate_id,
+        })
+        if (reuseApproved) {
+          candidates.push(mapApolloEnrollmentCandidateDbRow(reuseApproved))
+        }
         continue
       }
     }

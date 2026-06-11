@@ -7,6 +7,16 @@ import { executeApolloEnrollmentAutomationInProduction } from "@/lib/growth/apol
 import {
   mapApolloEnrollmentCandidateDbRow,
 } from "@/lib/growth/apollo/apollo-enrollment-automation-evidence"
+import type { ApolloFullPipelineEnrollmentEvidence } from "@/lib/growth/apollo/apollo-full-pipeline-production-certification-types"
+import {
+  pickEnrollmentCandidateIdFromAutomationReport,
+  selectSequenceReadyContactForEnrollment,
+} from "@/lib/growth/apollo/apollo-full-pipeline-enrollment-resolution-evidence"
+import {
+  buildApolloFullPipelineEnrollmentEvidence,
+  findReusableApolloEnrollmentCandidate,
+  mapReusableEnrollmentCandidateId,
+} from "@/lib/growth/apollo/apollo-full-pipeline-enrollment-resolution"
 import { approveApolloEnrollmentCandidate } from "@/lib/growth/apollo/apollo-enrollment-candidate-queue"
 import { mapApolloAccountPlaybookDbRow } from "@/lib/growth/apollo/apollo-account-playbooks-evidence"
 import { approveApolloAccountPlaybook } from "@/lib/growth/apollo/apollo-account-playbooks-queue"
@@ -75,32 +85,35 @@ export async function certifyApolloFullPipelineProduction(
   }
 
   const snapshot = await loadApolloPrimaryContactOperatorReviewSnapshot(admin, input.company_candidate_id)
-  const sequenceReadyContact = snapshot?.contacts.find((c) => c.sequence_ready) ?? null
+  const sequenceReadyContact = selectSequenceReadyContactForEnrollment(snapshot?.contacts ?? [])
   checks.push({
     id: "sequence_ready_contact",
     satisfied: Boolean(sequenceReadyContact),
     detail: sequenceReadyContact
-      ? `Sequence-ready contact ${sequenceReadyContact.full_name} loaded for company candidate.`
+      ? sequenceReadyContact.contactable
+        ? `Sequence-ready contact ${sequenceReadyContact.full_name} loaded for company candidate.`
+        : `Sequence-ready contact ${sequenceReadyContact.full_name} loaded but not contactable — enrollment may be blocked.`
       : "No sequence-ready Apollo contact found for company candidate.",
   })
   if (!sequenceReadyContact) blockers.push("sequence_ready_contact_missing")
 
   let enrollmentCandidateId = input.enrollment_candidate_id?.trim() || null
+  let enrollmentReuseReason: string | null = null
+  let enrollmentAutomationReport = null as Awaited<
+    ReturnType<typeof executeApolloEnrollmentAutomationInProduction>
+  >["report"]
+  let enrollmentAutomationMessage: string | null = null
 
-  if (!enrollmentCandidateId) {
-    const { data: existingEnrollment } = await admin
-      .schema("growth")
-      .from("apollo_enrollment_candidates")
-      .select("*")
-      .eq("company_candidate_id", input.company_candidate_id)
-      .eq("status", "pending_enrollment_approval")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
+  const reusableEnrollment = await findReusableApolloEnrollmentCandidate(admin, {
+    enrollment_candidate_id: enrollmentCandidateId,
+    company_candidate_id: input.company_candidate_id,
+    company_contact_id: sequenceReadyContact?.company_contact_id ?? null,
+    contact_candidate_id: sequenceReadyContact?.contact_candidate_id ?? null,
+  })
 
-    if (existingEnrollment) {
-      enrollmentCandidateId = asString(existingEnrollment.id)
-    }
+  if (reusableEnrollment) {
+    enrollmentCandidateId = mapReusableEnrollmentCandidateId(reusableEnrollment.row)
+    enrollmentReuseReason = reusableEnrollment.reuse_reason
   }
 
   if (!enrollmentCandidateId) {
@@ -110,21 +123,75 @@ export async function certifyApolloFullPipelineProduction(
       created_by: CERT_ACTOR_ID,
       env: input.env,
     })
-    enrollmentCandidateId = automation.report?.candidates[0]?.candidate_id ?? null
-    checks.push({
-      id: "enrollment_candidate_created",
-      satisfied: Boolean(enrollmentCandidateId),
-      detail: enrollmentCandidateId
-        ? `Enrollment candidate ${enrollmentCandidateId} created via automation.`
-        : automation.message ?? "Enrollment automation did not create a candidate.",
+    enrollmentAutomationReport = automation.report
+    enrollmentAutomationMessage = automation.message ?? null
+
+    enrollmentCandidateId =
+      pickEnrollmentCandidateIdFromAutomationReport(automation.report, {
+        company_contact_id: sequenceReadyContact?.company_contact_id ?? null,
+        contact_candidate_id: sequenceReadyContact?.contact_candidate_id ?? null,
+      }) ?? null
+
+    if (!enrollmentCandidateId) {
+      const postAutomationReuse = await findReusableApolloEnrollmentCandidate(admin, {
+        company_candidate_id: input.company_candidate_id,
+        company_contact_id: sequenceReadyContact?.company_contact_id ?? null,
+        contact_candidate_id: sequenceReadyContact?.contact_candidate_id ?? null,
+      })
+      if (postAutomationReuse) {
+        enrollmentCandidateId = mapReusableEnrollmentCandidateId(postAutomationReuse.row)
+        enrollmentReuseReason = postAutomationReuse.reuse_reason
+      }
+    }
+  }
+
+  const enrollmentEvidence: ApolloFullPipelineEnrollmentEvidence =
+    await buildApolloFullPipelineEnrollmentEvidence(admin, {
+      company_candidate_id: input.company_candidate_id,
+      sequence_ready_contact: sequenceReadyContact,
+      automation_report: enrollmentAutomationReport,
+      automation_message: enrollmentAutomationMessage,
+      existing_enrollment_candidate_id: enrollmentCandidateId,
+      existing_enrollment_candidate_status: reusableEnrollment
+        ? asString(reusableEnrollment.row.status)
+        : null,
+      duplicate_prevention_decision: enrollmentReuseReason
+        ? `reused_before_automation:${enrollmentReuseReason}`
+        : undefined,
+      env: input.env,
     })
-    if (!enrollmentCandidateId) blockers.push("enrollment_candidate_not_created")
-  } else {
+
+  if (enrollmentCandidateId) {
     checks.push({
       id: "enrollment_candidate_created",
       satisfied: true,
-      detail: `Reusing enrollment candidate ${enrollmentCandidateId}.`,
+      detail: enrollmentReuseReason
+        ? `Reusing enrollment candidate ${enrollmentCandidateId} (${enrollmentReuseReason}).`
+        : `Enrollment candidate ${enrollmentCandidateId} materialized via automation.`,
     })
+  } else {
+    const evidenceSummary = [
+      enrollmentEvidence.qualification_blockers.length > 0
+        ? `Qualification blockers: ${enrollmentEvidence.qualification_blockers.join(" | ")}`
+        : null,
+      enrollmentEvidence.duplicate_prevention_decision
+        ? `Duplicate prevention: ${enrollmentEvidence.duplicate_prevention_decision}`
+        : null,
+      enrollmentEvidence.insert_error ? `Insert error: ${enrollmentEvidence.insert_error}` : null,
+      enrollmentEvidence.automation_message,
+    ]
+      .filter(Boolean)
+      .join(" — ")
+
+    checks.push({
+      id: "enrollment_candidate_created",
+      satisfied: false,
+      detail:
+        evidenceSummary ||
+        enrollmentAutomationMessage ||
+        "Enrollment automation did not create or reuse a candidate.",
+    })
+    blockers.push("enrollment_candidate_not_created")
   }
 
   stageIds.enrollment_candidate_id = enrollmentCandidateId
@@ -142,6 +209,7 @@ export async function certifyApolloFullPipelineProduction(
     ? mapApolloEnrollmentCandidateDbRow(enrollmentRow as Record<string, unknown>)
     : null
   stageIds.growth_lead_id = enrollment?.growth_lead_id ?? null
+  enrollmentEvidence.growth_lead_id = enrollment?.growth_lead_id ?? null
 
   if (enrollment && enrollment.status === "pending_enrollment_approval") {
     const approveEnrollment = await approveApolloEnrollmentCandidate(admin, {
@@ -431,6 +499,7 @@ export async function certifyApolloFullPipelineProduction(
     certified,
     blockers,
     checks,
+    enrollment_evidence: enrollmentEvidence,
     stage_ids: stageIds,
     attribution_chain: [...APOLLO_FULL_PIPELINE_ATTRIBUTION_CHAIN],
     attribution_preserved,

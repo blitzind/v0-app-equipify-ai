@@ -40,6 +40,22 @@ export type ApolloFullPipelineStageIds = {
   growth_lead_id: string | null
 }
 
+export type ApolloFullPipelineEnrollmentEvidence = {
+  sequence_ready_contact_id: string | null
+  sequence_ready_contact_name: string | null
+  growth_lead_id: string | null
+  company_contact_id: string | null
+  contact_candidate_id: string | null
+  qualification_score: number | null
+  qualification_threshold: number | null
+  qualification_blockers: string[]
+  existing_enrollment_candidate_id: string | null
+  existing_enrollment_candidate_status: string | null
+  duplicate_prevention_decision: string | null
+  insert_error: string | null
+  automation_message: string | null
+}
+
 export type ApolloFullPipelineProductionCertificationReport = {
   qa_marker: typeof APOLLO_FULL_PIPELINE_PRODUCTION_CERTIFICATION_QA_MARKER
   certification_id: typeof APOLLO_FULL_PIPELINE_PRODUCTION_CERTIFICATION_ID
@@ -47,6 +63,7 @@ export type ApolloFullPipelineProductionCertificationReport = {
   certified: boolean
   blockers: string[]
   checks: Array<{ id: string; satisfied: boolean; detail: string }>
+  enrollment_evidence: ApolloFullPipelineEnrollmentEvidence | null
   stage_ids: ApolloFullPipelineStageIds
   attribution_chain: ApolloFullPipelineAttributionStage[]
   attribution_preserved: boolean

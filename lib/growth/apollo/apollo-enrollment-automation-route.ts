@@ -81,7 +81,9 @@ export async function executeApolloEnrollmentAutomationInProduction(
 
     const ok = input.certification_mode
       ? Boolean(certification?.certified)
-      : report.candidates_created > 0 || report.contacts_qualified > 0
+      : report.candidates_created > 0 ||
+        report.candidates.length > 0 ||
+        report.contacts_qualified > 0
 
     return redactApolloEnrollmentAutomationSecrets({
       ok,
