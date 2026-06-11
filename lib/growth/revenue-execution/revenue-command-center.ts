@@ -169,12 +169,12 @@ export async function fetchRevenueCommandCenterDashboard(
       ? await admin
           .schema("growth")
           .from("leads")
-          .select("id, company_name, metadata, call_priority_score, next_best_action, workflow_health, relationship_stage")
+          .select("id, company_name, metadata, call_priority_score, next_best_action, workflow_health")
           .in("id", candidateLeadIds)
       : await admin
           .schema("growth")
           .from("leads")
-          .select("id, company_name, metadata, call_priority_score, next_best_action, workflow_health, relationship_stage")
+          .select("id, company_name, metadata, call_priority_score, next_best_action, workflow_health")
           .not("status", "in", ACTIVE_LEAD_STATUS_FILTER)
           .order("call_priority_score", { ascending: false, nullsFirst: false })
           .limit(100)

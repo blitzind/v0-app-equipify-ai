@@ -50,21 +50,44 @@ export async function listSequenceExitCandidates(
       ? admin
           .schema("growth")
           .from("sequence_enrollments")
-          .select("id, status, sequence_name")
+          .select("id, status, sequence_pattern_id")
           .in("id", enrollmentIds)
       : Promise.resolve({ data: [], error: null }),
   ])
   if (leadsRes.error) throw new Error(leadsRes.error.message)
   if (enrollmentsRes.error) throw new Error(enrollmentsRes.error.message)
 
+  const patternIds = [
+    ...new Set(
+      (enrollmentsRes.data ?? [])
+        .map((row) => asString((row as Record<string, unknown>).sequence_pattern_id))
+        .filter(Boolean),
+    ),
+  ]
+  const { data: patternRows, error: patternError } = patternIds.length
+    ? await admin.schema("growth").from("sequence_patterns").select("id, label").in("id", patternIds)
+    : { data: [], error: null }
+  if (patternError) throw new Error(patternError.message)
+
+  const patternLabelById = new Map(
+    (patternRows ?? []).map((row) => [asString(row.id), asString(row.label)]),
+  )
+
   const companyByLead = new Map(
     (leadsRes.data ?? []).map((row) => [asString(row.id), asString(row.company_name)]),
   )
   const enrollmentById = new Map(
-    (enrollmentsRes.data ?? []).map((row) => [
-      asString(row.id),
-      { status: asString(row.status), sequenceName: asString(row.sequence_name) },
-    ]),
+    (enrollmentsRes.data ?? []).map((row) => {
+      const record = row as Record<string, unknown>
+      const patternId = asString(record.sequence_pattern_id)
+      return [
+        asString(record.id),
+        {
+          status: asString(record.status),
+          sequenceName: patternLabelById.get(patternId) || null,
+        },
+      ]
+    }),
   )
 
   const results: GrowthSequenceExitCandidateRecord[] = []
