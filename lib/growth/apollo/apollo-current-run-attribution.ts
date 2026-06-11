@@ -11,7 +11,10 @@ import type { GrowthContactDiscoveryProviderRawContact } from "@/lib/growth/cont
 import type { GrowthContactCandidate } from "@/lib/growth/contact-discovery/contact-discovery-types"
 import { isSequenceReadyCompanyContact } from "@/lib/growth/apollo/apollo-enrichment-cert-promotion-evidence"
 
-export const APOLLO_CURRENT_RUN_ATTRIBUTION_QA_MARKER = "apollo-current-run-attribution-v2" as const
+import type { ApolloSearchDomainAliasEvidence } from "@/lib/growth/apollo/apollo-search-domain-aliases"
+import type { ApolloCurrentRunAttributionSource } from "@/lib/growth/apollo/apollo-search-domain-aliases"
+
+export const APOLLO_CURRENT_RUN_ATTRIBUTION_QA_MARKER = "apollo-current-run-attribution-v3" as const
 
 export type ApolloVerifiedEmailSource = "search" | "enrichment" | null
 
@@ -44,7 +47,13 @@ export type ApolloCurrentRunAttribution = {
   apollo_candidate_ids_this_run: string[]
   apollo_candidate_ids_attributed_this_run: string[]
   apollo_person_ids_mapped_this_run: string[]
+  apollo_person_ids_historical_revalidated_this_run: string[]
   has_current_run_search_yield: boolean
+  fresh_search_contacts_found: number
+  historical_revalidated_contacts_found: number
+  current_run_attribution_source: ApolloCurrentRunAttributionSource | null
+  domain_aliases_used: string[]
+  domain_alias_evidence: ApolloSearchDomainAliasEvidence | null
   promotion_attempted: boolean
   promotion_blockers_by_candidate: ApolloCurrentRunCandidateAttributionRow[]
   contactability_blockers_by_candidate: ApolloCurrentRunCandidateAttributionRow[]
@@ -110,14 +119,20 @@ export function resolveApolloCandidateIdsThisRun(input: {
   return ids
 }
 
-/** Current-run yield includes newly inserted rows and existing rows mapped again this search. */
+/** Current-run yield includes newly inserted rows, search-mapped rows, and optional historical revalidation. */
 export function resolveApolloCandidateIdsAttributedThisRun(input: {
   before: Set<string>
   apollo_candidates: GrowthContactCandidate[]
   apollo_person_ids_mapped_this_run: string[]
+  apollo_person_ids_historical_revalidated_this_run?: string[]
 }): string[] {
   const attributed = new Set<string>()
-  const personIds = new Set(input.apollo_person_ids_mapped_this_run.map((id) => id.trim()).filter(Boolean))
+  const personIds = new Set([
+    ...input.apollo_person_ids_mapped_this_run.map((id) => id.trim()).filter(Boolean),
+    ...(input.apollo_person_ids_historical_revalidated_this_run ?? [])
+      .map((id) => id.trim())
+      .filter(Boolean),
+  ])
   const afterIds = new Set(
     input.apollo_candidates.map((candidate) => asString(candidate.id)).filter(Boolean),
   )
@@ -198,12 +213,29 @@ export function resolveApolloCurrentRunAttribution(input: {
   apollo_candidate_ids_before: Set<string>
   apollo_candidates_after: GrowthContactCandidate[]
   apollo_person_ids_mapped_this_run?: string[]
+  apollo_person_ids_historical_revalidated_this_run?: string[]
+  domain_alias_evidence?: ApolloSearchDomainAliasEvidence | null
   verified_email_promotion: ApolloVerifiedEmailPromotionEvidence | null
   existing_contactable_before: number
   company_contacts: Record<string, unknown>[]
   promotion_attempted?: boolean
 }): ApolloCurrentRunAttribution {
   const apollo_person_ids_mapped_this_run = input.apollo_person_ids_mapped_this_run ?? []
+  const apollo_person_ids_historical_revalidated_this_run =
+    input.apollo_person_ids_historical_revalidated_this_run ?? []
+  const fresh_search_contacts_found = apollo_person_ids_mapped_this_run.length
+  const historical_revalidated_contacts_found =
+    apollo_person_ids_historical_revalidated_this_run.length
+  const domain_alias_evidence = input.domain_alias_evidence ?? null
+  const domain_aliases_used = domain_alias_evidence?.alias_domains ?? []
+  const current_run_attribution_source = (() => {
+    const fresh = fresh_search_contacts_found > 0
+    const historical = historical_revalidated_contacts_found > 0
+    if (fresh && historical) return "mixed" as const
+    if (fresh) return "fresh_search" as const
+    if (historical) return "historical_revalidated" as const
+    return null
+  })()
   const apollo_candidate_ids_this_run = resolveApolloCandidateIdsThisRun({
     before: input.apollo_candidate_ids_before,
     after: new Set(
@@ -214,6 +246,7 @@ export function resolveApolloCurrentRunAttribution(input: {
     before: input.apollo_candidate_ids_before,
     apollo_candidates: input.apollo_candidates_after,
     apollo_person_ids_mapped_this_run,
+    apollo_person_ids_historical_revalidated_this_run,
   })
   const thisRunIdSet = new Set(apollo_candidate_ids_attributed_this_run)
 
@@ -221,7 +254,8 @@ export function resolveApolloCurrentRunAttribution(input: {
     input.apollo_mapped_this_run > 0 ||
     input.apollo_persisted_this_run > 0 ||
     apollo_candidate_ids_attributed_this_run.length > 0 ||
-    apollo_person_ids_mapped_this_run.length > 0
+    apollo_person_ids_mapped_this_run.length > 0 ||
+    apollo_person_ids_historical_revalidated_this_run.length > 0
 
   let current_run_apollo_verified_email_contacts = 0
   let search_verified_email_contacts = 0
@@ -279,7 +313,10 @@ export function resolveApolloCurrentRunAttribution(input: {
   return {
     qa_marker: APOLLO_CURRENT_RUN_ATTRIBUTION_QA_MARKER,
     current_run_apollo_mapped_contacts: has_current_run_search_yield
-      ? input.apollo_mapped_this_run
+      ? Math.max(
+          input.apollo_mapped_this_run,
+          fresh_search_contacts_found + historical_revalidated_contacts_found,
+        )
       : 0,
     current_run_apollo_persisted_contacts: has_current_run_search_yield
       ? input.apollo_persisted_this_run
@@ -295,7 +332,13 @@ export function resolveApolloCurrentRunAttribution(input: {
     apollo_candidate_ids_this_run,
     apollo_candidate_ids_attributed_this_run,
     apollo_person_ids_mapped_this_run,
+    apollo_person_ids_historical_revalidated_this_run,
     has_current_run_search_yield,
+    fresh_search_contacts_found,
+    historical_revalidated_contacts_found,
+    current_run_attribution_source,
+    domain_aliases_used,
+    domain_alias_evidence,
     promotion_attempted: input.promotion_attempted ?? false,
     promotion_blockers_by_candidate: promotion_blockers_by_candidate.filter(
       (row) => row.attributed_this_run && row.promotion_blocker,
@@ -312,13 +355,16 @@ export function resolveApolloCurrentRunAttribution(input: {
 export function assertApolloCurrentRunMetricsConsistent(input: {
   apollo_mapped_this_run: number
   apollo_persisted_this_run: number
+  historical_revalidated_contacts_found?: number
   current_run_apollo_verified_email_contacts: number
   current_run_apollo_promoted_contacts: number
   current_run_apollo_sequence_ready_contacts: number
 }): string[] {
   const blockers: string[] = []
   const noSearchYield =
-    input.apollo_mapped_this_run === 0 && input.apollo_persisted_this_run === 0
+    input.apollo_mapped_this_run === 0 &&
+    input.apollo_persisted_this_run === 0 &&
+    (input.historical_revalidated_contacts_found ?? 0) === 0
 
   if (noSearchYield) {
     if (input.current_run_apollo_verified_email_contacts > 0) {

@@ -1,7 +1,7 @@
 /** Apollo Scale-3 certification assessment — client-safe current-run PASS gate. */
 
 import type { ApolloScale2CertResult } from "@/lib/growth/apollo/apollo-scale-2-live-acquisition-certification"
-import type { ApolloScale3MappedCompanyEvidenceRow } from "@/lib/growth/apollo/apollo-scale-3-company-promotion-evidence"
+import type { ApolloScale3CertificationMode } from "@/lib/growth/apollo/apollo-certification-historical-revalidation-evidence"
 
 export const APOLLO_SCALE_3_CERT_VERDICT_FAIL_REASONS = [
   "mock_mode",
@@ -31,6 +31,8 @@ export type ApolloScale3CompanyCertificationFailReason = ApolloScale3CompanyCert
 
 export type ApolloScale3CompanyCurrentRunMetrics = {
   mapped_contacts: number
+  fresh_search_contacts_found: number
+  historical_revalidated_contacts_found: number
   current_run_apollo_verified_email_contacts: number
   current_run_apollo_promoted_contacts: number
   current_run_apollo_contactable_contacts: number
@@ -56,8 +58,16 @@ export function resolveApolloScale3CompanyCurrentRunMetrics(
   row: ApolloScale3MappedCompanyEvidenceRow,
 ): ApolloScale3CompanyCurrentRunMetrics {
   const promo = row.promotion_evidence
+  const fresh_search_contacts_found = normalizeApolloCurrentRunMetric(
+    row.fresh_search_contacts_found ?? row.mapped_contacts,
+  )
+  const historical_revalidated_contacts_found = normalizeApolloCurrentRunMetric(
+    row.historical_revalidated_contacts_found,
+  )
   return {
     mapped_contacts: normalizeApolloCurrentRunMetric(row.mapped_contacts),
+    fresh_search_contacts_found,
+    historical_revalidated_contacts_found,
     current_run_apollo_verified_email_contacts: normalizeApolloCurrentRunMetric(
       row.current_run_apollo_verified_email_contacts ??
         promo?.current_run_apollo_verified_email_contacts,
@@ -73,6 +83,20 @@ export function resolveApolloScale3CompanyCurrentRunMetrics(
         promo?.current_run_apollo_sequence_ready_contacts,
     ),
   }
+}
+
+export function resolveApolloScale3CompanyEffectiveMappedContacts(
+  row: ApolloScale3MappedCompanyEvidenceRow,
+  mode: ApolloScale3CertificationMode,
+): number {
+  const metrics = resolveApolloScale3CompanyCurrentRunMetrics(row)
+  if (mode === "certification_winners_revalidation") {
+    if (metrics.fresh_search_contacts_found > 0) return metrics.fresh_search_contacts_found
+    if (metrics.historical_revalidated_contacts_found > 0) {
+      return metrics.historical_revalidated_contacts_found
+    }
+  }
+  return metrics.fresh_search_contacts_found
 }
 
 export function resolveApolloScale3CompanyCertificationFailReasons(
@@ -100,8 +124,10 @@ export function resolveApolloScale3CompanyCertificationFailReasons(
 
 export function isApolloScale3CurrentRunSequenceReadyCompany(
   row: ApolloScale3MappedCompanyEvidenceRow,
+  mode: ApolloScale3CertificationMode = "greenfield",
 ): boolean {
   const metrics = resolveApolloScale3CompanyCurrentRunMetrics(row)
+  const effectiveMapped = resolveApolloScale3CompanyEffectiveMappedContacts(row, mode)
   const partialStaged =
     normalizeApolloCurrentRunMetric(row.partial_identity_evidence?.partial_identity_candidates_staged) >
       0 ||
@@ -111,8 +137,12 @@ export function isApolloScale3CurrentRunSequenceReadyCompany(
     return false
   }
 
+  if (mode === "greenfield" && metrics.fresh_search_contacts_found === 0) {
+    return false
+  }
+
   return (
-    metrics.mapped_contacts > 0 &&
+    effectiveMapped > 0 &&
     metrics.current_run_apollo_verified_email_contacts > 0 &&
     metrics.current_run_apollo_promoted_contacts > 0 &&
     metrics.current_run_apollo_contactable_contacts > 0 &&
@@ -128,6 +158,11 @@ function sumAggregateCurrentRunMetrics(
       const metrics = resolveApolloScale3CompanyCurrentRunMetrics(row)
       return {
         mapped_contacts: totals.mapped_contacts + metrics.mapped_contacts,
+        fresh_search_contacts_found:
+          totals.fresh_search_contacts_found + metrics.fresh_search_contacts_found,
+        historical_revalidated_contacts_found:
+          totals.historical_revalidated_contacts_found +
+          metrics.historical_revalidated_contacts_found,
         current_run_apollo_verified_email_contacts:
           totals.current_run_apollo_verified_email_contacts +
           metrics.current_run_apollo_verified_email_contacts,
@@ -143,6 +178,8 @@ function sumAggregateCurrentRunMetrics(
     },
     {
       mapped_contacts: 0,
+      fresh_search_contacts_found: 0,
+      historical_revalidated_contacts_found: 0,
       current_run_apollo_verified_email_contacts: 0,
       current_run_apollo_promoted_contacts: 0,
       current_run_apollo_contactable_contacts: 0,
@@ -154,7 +191,9 @@ function sumAggregateCurrentRunMetrics(
 export function buildApolloScale3CertificationAssessment(input: {
   companies: ApolloScale3MappedCompanyEvidenceRow[]
   mock: boolean
+  certification_mode?: ApolloScale3CertificationMode
 }): ApolloScale3CertificationAssessment {
+  const certification_mode = input.certification_mode ?? "greenfield"
   const partial_company_fail_reasons: Record<string, ApolloScale3CompanyCertificationFailReason[]> =
     {}
   for (const row of input.companies) {
@@ -165,7 +204,9 @@ export function buildApolloScale3CertificationAssessment(input: {
   }
 
   const aggregate_current_run = sumAggregateCurrentRunMetrics(input.companies)
-  const apolloReady = input.companies.filter(isApolloScale3CurrentRunSequenceReadyCompany)
+  const apolloReady = input.companies.filter((row) =>
+    isApolloScale3CurrentRunSequenceReadyCompany(row, certification_mode),
+  )
   const verdict_fail_reasons: ApolloScale3CertVerdictFailReason[] = []
 
   if (input.mock) {
@@ -217,6 +258,7 @@ export function buildApolloScale3CertificationAssessment(input: {
 export function assessApolloScale3SearchStrategyResult(input: {
   companies: ApolloScale3MappedCompanyEvidenceRow[]
   mock: boolean
+  certification_mode?: ApolloScale3CertificationMode
 }): ApolloScale2CertResult {
   return buildApolloScale3CertificationAssessment(input).result
 }

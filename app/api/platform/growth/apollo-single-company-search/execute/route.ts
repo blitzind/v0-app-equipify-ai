@@ -23,6 +23,7 @@ export async function POST(request: Request) {
   const result = await executeApolloSingleCompanySearchDiagnostic(access.admin, {
     company_candidate_id: confirmation.company_candidate_id,
     company_name: confirmation.company_name,
+    include_domain_aliases: confirmation.include_domain_aliases,
     env: process.env,
   })
 

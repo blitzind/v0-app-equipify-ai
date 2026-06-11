@@ -18,7 +18,14 @@ import {
   type ApolloScale3CohortPreset,
 } from "@/lib/growth/apollo/apollo-scale-3-search-strategy-certification"
 import type { ApolloScale2CertResult } from "@/lib/growth/apollo/apollo-scale-2-live-acquisition-certification"
-import type { ApolloScale3CertFailReason, ApolloScale3CompanyCertWarningReason } from "@/lib/growth/apollo/apollo-scale-3-certification-assessment"
+import type {
+  ApolloScale3CertFailReason,
+  ApolloScale3CompanyCertWarningReason,
+} from "@/lib/growth/apollo/apollo-scale-3-certification-assessment"
+import {
+  resolveApolloScale3CertificationMode,
+  type ApolloScale3CertificationMode,
+} from "@/lib/growth/apollo/apollo-certification-historical-revalidation-evidence"
 import { buildApolloSearchApiBudgetEvidence } from "@/lib/growth/apollo/apollo-search-api-budget-evidence"
 import type { ApolloSearchApiBudgetEvidence } from "@/lib/growth/apollo/apollo-search-api-budget-evidence"
 import { resolveApolloScale2CompanyLimit } from "@/lib/growth/apollo/apollo-scale-2-production-route-gates"
@@ -32,6 +39,7 @@ const EMPTY_SCALE3_CERT_DIAGNOSTICS = {
   fail_reasons: [] as ApolloScale3CertFailReason[],
   warnings: [] as ApolloScale3CompanyCertWarningReason[],
   partial_company_fail_reasons: {} as Record<string, ApolloScale3CompanyCertWarningReason[]>,
+  certification_mode: "greenfield" as ApolloScale3CertificationMode,
 }
 
 export type ApolloScale3ProductionExecuteResult = {
@@ -52,6 +60,7 @@ export type ApolloScale3ProductionExecuteResult = {
   fail_reasons: ApolloScale3CertFailReason[]
   warnings: ApolloScale3CompanyCertWarningReason[]
   partial_company_fail_reasons: Record<string, ApolloScale3CompanyCertWarningReason[]>
+  certification_mode: ApolloScale3CertificationMode
   cohort_selection: ApolloScale3CertificationCohortResolution | null
 }
 
@@ -226,6 +235,10 @@ export async function executeApolloScale3InProduction(
       )
     }
 
+    const certification_mode = resolveApolloScale3CertificationMode({
+      cohort_preset: input?.cohort_preset,
+    })
+
     stage = "apollo_search"
     const certificationStage = await runApolloScale5ExecutionStage({
       stage: "evidence_build",
@@ -239,6 +252,7 @@ export async function executeApolloScale3InProduction(
           company_candidate_ids: input?.company_candidate_ids,
           cohort_preset: input?.cohort_preset,
           cohort_resolution,
+          certification_mode,
         }),
     })
     if (!certificationStage.ok) {
@@ -286,6 +300,7 @@ export async function executeApolloScale3InProduction(
         warnings: certification.certification_assessment.warnings,
         partial_company_fail_reasons:
           certification.certification_assessment.partial_company_fail_reasons,
+        certification_mode: certification.certification_mode,
         search_api_budget: buildApolloSearchApiBudgetEvidence({
           env,
           company_limit,

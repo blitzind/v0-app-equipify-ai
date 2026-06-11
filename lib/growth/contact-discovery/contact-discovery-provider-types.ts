@@ -29,6 +29,7 @@ export type GrowthContactDiscoveryProviderQuery = {
   city?: string | null
   state?: string | null
   limit?: number
+  organization_domains?: string[]
 }
 
 export type GrowthContactDiscoveryProviderRawContact = {

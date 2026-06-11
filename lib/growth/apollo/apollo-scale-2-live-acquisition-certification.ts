@@ -726,6 +726,7 @@ export async function certifyApolloScale2LiveAcquisition(
     created_by?: string | null
     env?: NodeJS.ProcessEnv
     cohort?: Awaited<ReturnType<typeof resolveApolloScale2LiveCohort>>
+    certification_mode?: import("@/lib/growth/apollo/apollo-certification-historical-revalidation").ApolloScale3CertificationMode
   },
 ): Promise<ApolloScale2LiveAcquisitionCertification> {
   const env = input?.env ?? process.env
@@ -750,6 +751,7 @@ export async function certifyApolloScale2LiveAcquisition(
     created_by: input?.created_by ?? null,
     env,
     skip_apollo_search_if_existing_contactable: false,
+    certification_mode: input?.certification_mode,
   })
 
   const metaById = new Map(

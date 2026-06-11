@@ -183,6 +183,7 @@ export async function runApolloLivePilotContactDiscovery(
     state?: string | null
     created_by?: string | null
     limit?: number
+    organization_domains?: string[]
   },
   options?: {
     /** Cert/acquisition: one live tier search, no snapshot short-circuit or double provider runs. */
@@ -202,6 +203,7 @@ export async function runApolloLivePilotContactDiscovery(
         city: input.city,
         state: input.state,
         limit: input.limit ?? 10,
+        organization_domains: input.organization_domains,
       },
       { provider_types: ["future_apollo"] },
     )

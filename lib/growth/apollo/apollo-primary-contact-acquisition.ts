@@ -49,6 +49,13 @@ import {
   assertApolloCurrentRunMetricsConsistent,
   type ApolloCurrentRunAttribution,
 } from "@/lib/growth/apollo/apollo-current-run-attribution"
+import {
+  readApolloHistoricalRevalidationPersonIds,
+  type ApolloScale3CertificationMode,
+} from "@/lib/growth/apollo/apollo-certification-historical-revalidation-evidence"
+import { loadApolloHistoricalRevalidationCandidates } from "@/lib/growth/apollo/apollo-certification-historical-revalidation-loader"
+import { loadApolloSearchDomainAliasesForCompany } from "@/lib/growth/apollo/apollo-search-domain-aliases-loader"
+import { resolveApolloOrganizationDomainsForSearch } from "@/lib/growth/apollo/apollo-search-domain-aliases"
 import { isSequenceReadyCompanyContact } from "@/lib/growth/apollo/apollo-enrichment-cert-promotion-evidence"
 
 export {
@@ -258,6 +265,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     created_by?: string | null
     env?: NodeJS.ProcessEnv
     skip_apollo_search_if_existing_contactable?: boolean
+    certification_mode?: ApolloScale3CertificationMode
   },
 ): Promise<ApolloPrimaryContactAcquisitionCompanyEvidence> {
   const env = input.env ?? process.env
@@ -363,6 +371,13 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
   let apollo_person_ids_mapped_this_run: string[] = []
   let search_strategy: ApolloTieredPeopleSearchEvidence | null = null
   let search_debug: ReturnType<typeof buildApolloCohortCompanySearchDebug> = null
+  let apollo_person_ids_historical_revalidated_this_run: string[] = []
+  const domain_alias_evidence = await loadApolloSearchDomainAliasesForCompany(admin, {
+    company_candidate_id: context.company_candidate_id,
+    primary_domain: context.domain,
+    canonical_company_id,
+  })
+  const organization_domains = resolveApolloOrganizationDomainsForSearch(domain_alias_evidence)
 
   if (skipSearch) {
     apollo_search_skipped_reason =
@@ -383,6 +398,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
         state: context.state,
         created_by: input.created_by ?? null,
         limit: contact_limit,
+        organization_domains,
       },
       { fresh_apollo_search: true },
     )
@@ -448,6 +464,20 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
         }
       }
     }
+  }
+
+  const fresh_search_mapped_contacts = search_strategy?.mapped_contacts ?? apollo_people_found
+  if (
+    input.certification_mode === "certification_winners_revalidation" &&
+    fresh_search_mapped_contacts === 0 &&
+    apollo_person_ids_mapped_this_run.length === 0
+  ) {
+    const historicalCandidates = await loadApolloHistoricalRevalidationCandidates(
+      admin,
+      context.company_candidate_id,
+    )
+    apollo_person_ids_historical_revalidated_this_run =
+      readApolloHistoricalRevalidationPersonIds(historicalCandidates)
   }
 
   let enrichment_attempted = false
@@ -556,6 +586,8 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     apollo_candidate_ids_before,
     apollo_candidates_after: apolloCandidatesAfter,
     apollo_person_ids_mapped_this_run,
+    apollo_person_ids_historical_revalidated_this_run,
+    domain_alias_evidence,
     verified_email_promotion: promotion.verified_email_promotion,
     existing_contactable_before: existing.existing_contactable_before,
     company_contacts: companyContacts,
@@ -564,6 +596,8 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
   for (const leakBlocker of assertApolloCurrentRunMetricsConsistent({
     apollo_mapped_this_run: current_run_attribution.current_run_apollo_mapped_contacts,
     apollo_persisted_this_run: current_run_attribution.current_run_apollo_persisted_contacts,
+    historical_revalidated_contacts_found:
+      current_run_attribution.historical_revalidated_contacts_found,
     current_run_apollo_verified_email_contacts:
       current_run_attribution.current_run_apollo_verified_email_contacts,
     current_run_apollo_promoted_contacts:
@@ -633,6 +667,7 @@ export async function runApolloPrimaryContactAcquisition(
     created_by?: string | null
     env?: NodeJS.ProcessEnv
     skip_apollo_search_if_existing_contactable?: boolean
+    certification_mode?: ApolloScale3CertificationMode
   },
 ): Promise<ApolloPrimaryContactAcquisitionEvidence> {
   const env = input.env ?? process.env
@@ -656,6 +691,7 @@ export async function runApolloPrimaryContactAcquisition(
           env,
           skip_apollo_search_if_existing_contactable:
             input.skip_apollo_search_if_existing_contactable,
+          certification_mode: input.certification_mode,
         })
         evidence.companies.push(company)
 

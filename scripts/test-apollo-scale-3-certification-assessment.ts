@@ -78,6 +78,12 @@ function scale3Row(
       partial.current_run_apollo_sequence_ready_contacts ??
       promotion_evidence.current_run_apollo_sequence_ready_contacts,
     certification_fail_reasons: partial.certification_fail_reasons ?? [],
+    fresh_search_contacts_found:
+      partial.fresh_search_contacts_found ?? partial.mapped_contacts ?? 0,
+    historical_revalidated_contacts_found: partial.historical_revalidated_contacts_found ?? 0,
+    current_run_attribution_source: partial.current_run_attribution_source ?? null,
+    domain_aliases_used: partial.domain_aliases_used ?? [],
+    domain_alias_evidence: partial.domain_alias_evidence ?? null,
     partial_identity_evidence: partial.partial_identity_evidence ?? emptyApolloPartialIdentityEvidence(),
     cohort_search_debug: partial.cohort_search_debug ?? null,
     legacy_fallback_used: partial.legacy_fallback_used ?? false,

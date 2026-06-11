@@ -16,6 +16,10 @@ import {
   type ApolloScale3CohortPreset,
 } from "@/lib/growth/apollo/apollo-scale-3-certification-cohort"
 import {
+  resolveApolloScale3CertificationMode,
+  type ApolloScale3CertificationMode,
+} from "@/lib/growth/apollo/apollo-certification-historical-revalidation"
+import {
   buildApolloScale3CompanyPromotionEvidence,
   mapApolloScale3CompanyEvidenceRow,
   type ApolloScale3CompanyPromotionEvidence,
@@ -71,6 +75,7 @@ export type ApolloScale3SearchStrategyCertification = {
   certification_assessment: ApolloScale3CertificationAssessment
   certification: ApolloScale2LiveAcquisitionCertification
   cohort_selection: ApolloScale3CertificationCohortResolution
+  certification_mode: ApolloScale3CertificationMode
 }
 
 export { mapApolloScale3CompanyEvidenceRow }
@@ -91,9 +96,14 @@ export async function certifyApolloScale3SearchStrategy(
     company_candidate_ids?: string[]
     cohort_preset?: ApolloScale3CohortPreset
     cohort_resolution?: ApolloScale3CertificationCohortResolution
+    certification_mode?: ApolloScale3CertificationMode
   },
 ): Promise<ApolloScale3SearchStrategyCertification> {
   const env = input?.env ?? process.env
+  const certification_mode = resolveApolloScale3CertificationMode({
+    cohort_preset: input?.cohort_preset,
+    certification_mode: input?.certification_mode,
+  })
   const company_limit = Math.max(
     15,
     Math.min(
@@ -118,6 +128,7 @@ export async function certifyApolloScale3SearchStrategy(
     created_by: input?.created_by,
     env,
     cohort: toApolloScale2LiveCohortShape(cohort_resolution),
+    certification_mode,
   })
 
   const acquisitionById = new Map(
@@ -183,6 +194,7 @@ export async function certifyApolloScale3SearchStrategy(
   const certification_assessment = buildApolloScale3CertificationAssessment({
     companies,
     mock: scale2.runtime.mock,
+    certification_mode,
   })
 
   return {
@@ -224,6 +236,7 @@ export async function certifyApolloScale3SearchStrategy(
     },
     certification: scale2,
     cohort_selection: cohort_resolution,
+    certification_mode,
   }
 }
 

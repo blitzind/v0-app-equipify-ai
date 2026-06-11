@@ -12,6 +12,8 @@ export type ApolloPersonSearchInput = {
   city?: string | null
   state?: string | null
   limit?: number
+  /** Additional organization domains (e.g. email-domain aliases) for q_organization_domains_list. */
+  organization_domains?: string[]
 }
 
 export type ApolloOrganizationRecord = {

@@ -21,10 +21,12 @@ function testConfirmationRequiresCompany(): void {
 
   const byName = validateApolloSingleCompanySearchDiagnosticConfirmation({
     confirm: APOLLO_SINGLE_COMPANY_SEARCH_DIAGNOSTIC_EXECUTE_CONFIRM,
-    company_name: "Pulse Biomedical Service",
+    company_name: "Stat Biomedical Technicians, Inc.",
+    include_domain_aliases: true,
   })
   assert.equal(byName.ok, true)
-  assert.equal(byName.company_name, "Pulse Biomedical Service")
+  assert.equal(byName.company_name, "Stat Biomedical Technicians, Inc.")
+  assert.equal(byName.include_domain_aliases, true)
 }
 
 function testReadinessIncludesBudgetRecommendation(): void {

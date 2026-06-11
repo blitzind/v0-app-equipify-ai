@@ -29,12 +29,15 @@ await fetch("/api/platform/growth/apollo-single-company-search/execute", {
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
     confirm: "${APOLLO_SINGLE_COMPANY_SEARCH_DIAGNOSTIC_EXECUTE_CONFIRM}",
-    company_name: "Pulse Biomedical Service",
+    company_name: "Stat Biomedical Technicians, Inc.",
+    include_domain_aliases: true,
   }),
 })
   .then((r) => r.json())
   .then((payload) => {
     console.log("company", payload.company)
+    console.log("domain_alias_evidence", payload.domain_alias_evidence)
+    console.log("per_domain_tier_attempts", payload.per_domain_tier_attempts)
     console.log("tier_attempts_compact", payload.tier_attempts_compact)
     console.log("mapper_rejection_evidence", payload.mapper_rejection_evidence)
     console.log("tier_attempts", payload.tier_attempts)
@@ -93,6 +96,7 @@ export function validateApolloSingleCompanySearchDiagnosticConfirmation(body: un
   error: string | null
   company_candidate_id: string | null
   company_name: string | null
+  include_domain_aliases: boolean
 } {
   if (!body || typeof body !== "object") {
     return {
@@ -100,6 +104,7 @@ export function validateApolloSingleCompanySearchDiagnosticConfirmation(body: un
       error: `Request body must be JSON with confirm: "${APOLLO_SINGLE_COMPANY_SEARCH_DIAGNOSTIC_EXECUTE_CONFIRM}" and company_candidate_id or company_name.`,
       company_candidate_id: null,
       company_name: null,
+      include_domain_aliases: false,
     }
   }
   const record = body as Record<string, unknown>
@@ -109,12 +114,14 @@ export function validateApolloSingleCompanySearchDiagnosticConfirmation(body: un
       error: `Set confirm to "${APOLLO_SINGLE_COMPANY_SEARCH_DIAGNOSTIC_EXECUTE_CONFIRM}".`,
       company_candidate_id: null,
       company_name: null,
+      include_domain_aliases: false,
     }
   }
 
   const company_candidate_id =
     typeof record.company_candidate_id === "string" ? record.company_candidate_id.trim() : ""
   const company_name = typeof record.company_name === "string" ? record.company_name.trim() : ""
+  const include_domain_aliases = record.include_domain_aliases === true
 
   if (!company_candidate_id && !company_name) {
     return {
@@ -122,6 +129,7 @@ export function validateApolloSingleCompanySearchDiagnosticConfirmation(body: un
       error: "Provide company_candidate_id or company_name.",
       company_candidate_id: null,
       company_name: null,
+      include_domain_aliases: false,
     }
   }
 
@@ -130,6 +138,7 @@ export function validateApolloSingleCompanySearchDiagnosticConfirmation(body: un
     error: null,
     company_candidate_id: company_candidate_id || null,
     company_name: company_name || null,
+    include_domain_aliases,
   }
 }
 

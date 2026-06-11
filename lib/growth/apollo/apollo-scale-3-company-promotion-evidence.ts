@@ -18,6 +18,8 @@ import {
 import type { ApolloSearchTierAttemptEvidence } from "@/lib/growth/providers/apollo/apollo-tiered-people-search-types"
 import type { ApolloCurrentRunCandidateAttributionRow } from "@/lib/growth/apollo/apollo-current-run-attribution"
 import type { ApolloScale3CompanyCertificationFailReason } from "@/lib/growth/apollo/apollo-scale-3-certification-assessment"
+import type { ApolloCurrentRunAttributionSource } from "@/lib/growth/apollo/apollo-search-domain-aliases"
+import type { ApolloSearchDomainAliasEvidence } from "@/lib/growth/apollo/apollo-search-domain-aliases"
 
 export const APOLLO_SCALE_3_COMPANY_PROMOTION_EVIDENCE_QA_MARKER =
   "apollo-scale-3-company-promotion-evidence-v1" as const
@@ -53,6 +55,11 @@ export type ApolloScale3MappedCompanyEvidenceRow = ApolloScale3CompanyEvidenceBa
   current_run_apollo_contactable_contacts: number
   current_run_apollo_sequence_ready_contacts: number
   certification_fail_reasons: ApolloScale3CompanyCertificationFailReason[]
+  fresh_search_contacts_found: number
+  historical_revalidated_contacts_found: number
+  current_run_attribution_source: ApolloCurrentRunAttributionSource | null
+  domain_aliases_used: string[]
+  domain_alias_evidence: ApolloSearchDomainAliasEvidence | null
   partial_identity_evidence: ApolloPartialIdentityEvidence
   cohort_search_debug: ApolloCohortCompanySearchDebug | null
   enrichment_evidence: ApolloCompanyEnrichmentEvidence
@@ -183,6 +190,7 @@ export function mapApolloScale3CompanyEvidenceRow(input: {
   const promotion_evidence = buildApolloScale3CompanyPromotionEvidence(input.acquisition)
   const apollo_contactable = promotion_evidence.current_run_apollo_contactable_contacts
   const apollo_sequence_ready = promotion_evidence.current_run_apollo_sequence_ready_contacts
+  const currentRunAttribution = input.acquisition?.current_run_attribution
   const tier_attempts = strategy?.tier_attempts ?? []
   const mapper_rejection_evidence = buildApolloMapperRejectionEvidenceFromTierAttempts(tier_attempts)
   const mergedBlockers = [
@@ -243,6 +251,12 @@ export function mapApolloScale3CompanyEvidenceRow(input: {
     current_run_apollo_sequence_ready_contacts:
       promotion_evidence.current_run_apollo_sequence_ready_contacts,
     certification_fail_reasons: [] as ApolloScale3CompanyCertificationFailReason[],
+    fresh_search_contacts_found: currentRunAttribution?.fresh_search_contacts_found ?? 0,
+    historical_revalidated_contacts_found:
+      currentRunAttribution?.historical_revalidated_contacts_found ?? 0,
+    current_run_attribution_source: currentRunAttribution?.current_run_attribution_source ?? null,
+    domain_aliases_used: currentRunAttribution?.domain_aliases_used ?? [],
+    domain_alias_evidence: currentRunAttribution?.domain_alias_evidence ?? null,
     contactable_contacts: apollo_contactable,
     sequence_ready_contacts: apollo_sequence_ready,
     legacy_fallback_used: strategy?.legacy_fallback_used ?? false,

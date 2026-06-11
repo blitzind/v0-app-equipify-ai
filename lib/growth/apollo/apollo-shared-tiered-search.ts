@@ -10,6 +10,7 @@ export const APOLLO_SHARED_TIERED_SEARCH_QA_MARKER = "apollo-shared-tiered-searc
 
 export type ApolloSharedTieredSearchInput = ApolloPersonSearchInput & {
   legacy_contactable_count?: number
+  organization_domains?: string[]
 }
 
 export async function runApolloSharedTieredPeopleSearch(
@@ -28,6 +29,7 @@ export async function runApolloSharedTieredPeopleSearch(
       city: input.city,
       state: input.state,
       limit: input.limit,
+      organization_domains: input.organization_domains,
     },
     {
       apiKey: options?.apiKey,

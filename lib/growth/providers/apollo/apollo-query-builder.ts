@@ -6,6 +6,23 @@ import { resolveApolloCreditLimits } from "@/lib/growth/providers/apollo/apollo-
 
 export type ApolloSearchTier = 1 | 2 | 3 | 4 | 5
 
+function resolveOrganizationDomainsForTier(input: ApolloPersonSearchInput): string[] {
+  const primary = normalizeApolloDomain(input.domain, input.website_url)
+  const domains = new Set<string>()
+  if (primary) domains.add(primary)
+  for (const alias of input.organization_domains ?? []) {
+    const normalized = normalizeApolloDomain(alias, null)
+    if (normalized) domains.add(normalized)
+  }
+  return [...domains]
+}
+
+function appendOrganizationDomains(params: URLSearchParams, domains: string[]): void {
+  for (const domain of domains) {
+    params.append("q_organization_domains_list[]", domain)
+  }
+}
+
 /** Tier A–E labels for evidence and logging. */
 export const APOLLO_SEARCH_TIER_NAMES: Record<ApolloSearchTier, string> = {
   1: "A_strict_domain_titles",
@@ -175,6 +192,7 @@ export function buildApolloPeopleSearchParamsForTier(
   tier: ApolloSearchTier,
 ): ApolloPeopleSearchParamsBuilt {
   const domain = normalizeApolloDomain(input.domain, input.website_url)
+  const organization_domains = resolveOrganizationDomainsForTier(input)
   const company_name = input.company_name.trim()
   const organization_location = resolveApolloOrganizationLocation({
     city: input.city,
@@ -202,8 +220,8 @@ export function buildApolloPeopleSearchParamsForTier(
     person_seniorities = GROWTH_APOLLO_PERSON_SENIORITIES
     title_filter_applied = true
     appendTitlesAndSeniorities(params, person_titles, person_seniorities)
-    if (domain) {
-      params.append("q_organization_domains_list[]", domain)
+    if (organization_domains.length > 0) {
+      appendOrganizationDomains(params, organization_domains)
       domain_exact_only = true
     } else if (company_name) {
       params.set("q_organization_name", company_name)
@@ -224,8 +242,8 @@ export function buildApolloPeopleSearchParamsForTier(
     person_seniorities = GROWTH_APOLLO_PERSON_SENIORITIES_TIER_3
     title_filter_applied = true
     appendTitlesAndSeniorities(params, person_titles, person_seniorities)
-    if (domain) {
-      params.append("q_organization_domains_list[]", domain)
+    if (organization_domains.length > 0) {
+      appendOrganizationDomains(params, organization_domains)
       domain_exact_only = true
     } else if (company_name) {
       params.set("q_organization_name", company_name)
@@ -235,8 +253,8 @@ export function buildApolloPeopleSearchParamsForTier(
     }
   } else if (tier === 4) {
     title_filter_applied = false
-    if (domain) {
-      params.append("q_organization_domains_list[]", domain)
+    if (organization_domains.length > 0) {
+      appendOrganizationDomains(params, organization_domains)
       domain_exact_only = true
     } else if (company_name) {
       params.set("q_organization_name", company_name)
@@ -246,8 +264,8 @@ export function buildApolloPeopleSearchParamsForTier(
     }
   } else {
     title_filter_applied = false
-    if (domain) {
-      params.append("q_organization_domains_list[]", domain)
+    if (organization_domains.length > 0) {
+      appendOrganizationDomains(params, organization_domains)
       domain_exact_only = true
     } else if (company_name) {
       params.set("q_organization_name", company_name)
@@ -258,9 +276,15 @@ export function buildApolloPeopleSearchParamsForTier(
   }
 
   const tier_name = APOLLO_SEARCH_TIER_NAMES[tier]
+  const domainSummary =
+    organization_domains.length > 0 ? organization_domains.join("+") : null
   const summary = [
     tier_name,
-    domain ? `domain=${domain}` : company_name ? `company=${company_name}` : "no_anchor",
+    domainSummary
+      ? `domains=${domainSummary}`
+      : company_name
+        ? `company=${company_name}`
+        : "no_anchor",
     organization_location ? `location=${organization_location}` : null,
     title_filter_applied ? `titles=${person_titles.length}` : "titles=0",
     person_seniorities.length > 0 ? `seniorities=${person_seniorities.length}` : "seniorities=0",
@@ -290,7 +314,7 @@ export function shouldSkipApolloSearchTier(
   tier: ApolloSearchTier,
   input: ApolloPersonSearchInput,
 ): string | null {
-  const domain = normalizeApolloDomain(input.domain, input.website_url)
+  const organization_domains = resolveOrganizationDomainsForTier(input)
   const company_name = input.company_name.trim()
   const organization_location = resolveApolloOrganizationLocation({
     city: input.city,
@@ -298,17 +322,21 @@ export function shouldSkipApolloSearchTier(
   })
 
   if (tier === 1) {
-    if (!domain && !company_name) return "missing_domain_and_company_name"
+    if (organization_domains.length === 0 && !company_name) return "missing_domain_and_company_name"
     return null
   }
   if (tier === 2) {
     if (!company_name) return "missing_company_name"
-    if (!domain && !organization_location) return "missing_location_for_name_search"
+    if (organization_domains.length === 0 && !organization_location) {
+      return "missing_location_for_name_search"
+    }
     return null
   }
   if (tier === 3 || tier === 4 || tier === 5) {
-    if (!domain && !company_name) return "missing_domain_and_company_name"
-    if (!domain && !organization_location) return "missing_location_for_name_search"
+    if (organization_domains.length === 0 && !company_name) return "missing_domain_and_company_name"
+    if (organization_domains.length === 0 && !organization_location) {
+      return "missing_location_for_name_search"
+    }
     return null
   }
   return null

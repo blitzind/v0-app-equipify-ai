@@ -53,6 +53,7 @@ export function createApolloContactDiscoveryProvider(): GrowthContactDiscoveryPr
           city: input.city,
           state: input.state,
           limit: input.limit ?? 20,
+          organization_domains: input.organization_domains,
         },
         { mock: isApolloMockEnabled() },
       )
