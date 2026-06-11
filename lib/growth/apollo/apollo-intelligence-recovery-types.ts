@@ -95,6 +95,62 @@ export type ApolloIntelligenceRecoveryCompanyResult = {
   errors: string[]
 }
 
+export type ApolloIntelligenceRecoveryIntelligenceOutcome =
+  | "skipped"
+  | "reused"
+  | "created"
+  | "failed"
+
+export type ApolloIntelligenceRecoveryCompanyEvidence = {
+  company_candidate_id: string
+  company_name: string
+  canonical_company_id_before: string | null
+  canonical_company_id_after: string | null
+  canonical_resolution_attempted: boolean
+  canonical_resolution_result: "resolved" | "unresolved" | "not_attempted"
+  canonical_resolution_blocker: string | null
+  company_intelligence_before: boolean
+  company_intelligence_after: boolean
+  company_intelligence_attempted: boolean
+  company_intelligence_created_or_reused: boolean
+  company_intelligence_outcome: ApolloIntelligenceRecoveryIntelligenceOutcome
+  company_intelligence_error: string | null
+  buying_committee_before: boolean
+  buying_committee_after: boolean
+  buying_committee_attempted: boolean
+  buying_committee_created_or_reused: boolean
+  buying_committee_outcome: ApolloIntelligenceRecoveryIntelligenceOutcome
+  buying_committee_error: string | null
+  fit_score_before: number | null
+  fit_score_after: number | null
+  research_score_before: number | null
+  research_score_after: number | null
+  qualification_score_before: number
+  qualification_score_after: number
+  score_delta: number
+  crossed_threshold: boolean
+  remaining_blockers: string[]
+  intelligence_added: string[]
+  no_op_reason: string
+}
+
+export type ApolloIntelligenceRecoveryWriteEvidence = {
+  canonical_resolution_attempted_count: number
+  canonical_resolved_count: number
+  canonical_unresolved_count: number
+  company_intelligence_attempted_count: number
+  company_intelligence_created_count: number
+  company_intelligence_reused_count: number
+  company_intelligence_failed_count: number
+  buying_committee_attempted_count: number
+  buying_committee_created_count: number
+  buying_committee_reused_count: number
+  buying_committee_failed_count: number
+  companies_with_score_increase: number
+  companies_crossed_threshold: number
+  no_op_reason_counts: Record<string, number>
+}
+
 export type ApolloIntelligenceRecoveryReport = {
   qa_marker: typeof APOLLO_INTELLIGENCE_RECOVERY_QA_MARKER
   mode: ApolloIntelligenceRecoveryMode
@@ -118,6 +174,12 @@ export type ApolloIntelligenceRecoveryReport = {
   canonical_audit: ApolloIntelligenceRecoveryCanonicalAuditRow[]
   intelligence_audit: ApolloIntelligenceRecoveryIntelligenceAuditRow[]
   company_results: ApolloIntelligenceRecoveryCompanyResult[]
+  company_evidence: ApolloIntelligenceRecoveryCompanyEvidence[]
+  write_evidence: ApolloIntelligenceRecoveryWriteEvidence
+  recovery_ok: boolean
+  severity: "ok" | "critical"
+  no_op_root_cause: string | null
+  top_no_op_reasons: string[]
   root_cause_summary: string
   no_outreach_side_effects: true
   no_enrollment_candidates_created: true

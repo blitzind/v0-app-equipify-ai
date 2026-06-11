@@ -23,6 +23,12 @@ import {
   assertApolloIntelligenceRecoveryEnvAllowed,
 } from "@/lib/growth/apollo/apollo-intelligence-recovery-gates"
 import {
+  buildApolloIntelligenceRecoveryCompanyEvidence,
+  aggregateApolloIntelligenceRecoveryWriteEvidence,
+  evaluateApolloIntelligenceRecoveryNoOp,
+} from "@/lib/growth/apollo/apollo-intelligence-recovery-evidence"
+import type { ApolloIntelligenceRecoveryIntelligenceOutcome } from "@/lib/growth/apollo/apollo-intelligence-recovery-types"
+import {
   buildApolloIntelligenceRecoveryQualificationContext,
   buildApolloIntelligenceRecoveryRootCauseSummary,
   buildApolloIntelligenceRecoveryScoreDecompositionRow,
@@ -112,6 +118,7 @@ export async function executeApolloIntelligenceRecovery(
 
   const writes_performed = input.mode === "recover_missing_intelligence"
   const company_results: ApolloIntelligenceRecoveryReport["company_results"] = []
+  const company_evidence: ApolloIntelligenceRecoveryReport["company_evidence"] = []
   const scoreRows: ReturnType<typeof buildApolloIntelligenceRecoveryScoreDecompositionRow>[] = []
   const canonical_audit: ApolloIntelligenceRecoveryReport["canonical_audit"] = []
   const intelligence_audit: ApolloIntelligenceRecoveryReport["intelligence_audit"] = []
@@ -148,9 +155,20 @@ export async function executeApolloIntelligenceRecovery(
       company_candidate_id: baseInput.company_candidate_id,
     })
 
-    let canonicalId = resolution.canonical_company_id
+    const canonical_company_id_before = resolution.canonical_company_id
+    let canonicalId = canonical_company_id_before
     const recovery_actions: string[] = []
     const errors: string[] = []
+
+    const canonical_resolution_attempted = writes_performed
+    const canonical_resolution_result: "resolved" | "unresolved" | "not_attempted" =
+      !canonical_resolution_attempted
+        ? "not_attempted"
+        : canonicalId
+          ? "resolved"
+          : "unresolved"
+    const canonical_resolution_blocker =
+      canonicalId ? null : resolution.resolution_blockers[0] ?? resolution.evidence.blocker_reason
 
     canonical_audit.push(
       buildApolloIntelligenceRecoveryCanonicalAuditRow({
@@ -176,28 +194,57 @@ export async function executeApolloIntelligenceRecovery(
       canonical_company_id: canonicalId,
     })
 
+    let company_intelligence_attempted = false
+    let company_intelligence_outcome: ApolloIntelligenceRecoveryIntelligenceOutcome = "skipped"
+    let company_intelligence_error: string | null = null
+
+    let buying_committee_attempted = false
+    let buying_committee_outcome: ApolloIntelligenceRecoveryIntelligenceOutcome = "skipped"
+    let buying_committee_error: string | null = null
+
+    const hadVerifiedCompanyIntelligence =
+      engine.company_intelligence?.has_verified_intelligence === true
+    const hadBuyingCommitteeMembers = (engine.buying_committee?.member_count ?? 0) > 0
+
     if (
       writes_performed &&
       input.mode === "recover_missing_intelligence" &&
       canonicalId &&
-      !engine.company_intelligence?.has_verified_intelligence
+      !hadVerifiedCompanyIntelligence
     ) {
+      company_intelligence_attempted = true
       recovery_actions.push("run_company_intelligence")
       try {
-        await runCompanyIntelligenceForCanonicalCompany(admin, {
+        const runResult = await runCompanyIntelligenceForCanonicalCompany(admin, {
           company_id: canonicalId,
           created_by: input.created_by,
           promote: true,
         })
+        engine = await loadProspectSearchEngineIntelligence(admin, {
+          source_type: "external_discovered",
+          id: baseInput.company_candidate_id,
+          growth_lead_id: baseInput.growth_lead_id ?? null,
+          canonical_company_id: canonicalId,
+        })
+        const verifiedAfter = engine.company_intelligence?.has_verified_intelligence === true
+        if (verifiedAfter && !hadVerifiedCompanyIntelligence) {
+          company_intelligence_outcome = "created"
+        } else if (verifiedAfter) {
+          company_intelligence_outcome = "reused"
+        } else if (runResult.promoted_count > 0) {
+          company_intelligence_outcome = "created"
+        } else {
+          company_intelligence_outcome = "failed"
+          company_intelligence_error = "company_intelligence_run_completed_without_verified_promotion"
+          errors.push(company_intelligence_error)
+        }
       } catch (e) {
-        errors.push(e instanceof Error ? e.message : "company_intelligence_failed")
+        company_intelligence_outcome = "failed"
+        company_intelligence_error = e instanceof Error ? e.message : "company_intelligence_failed"
+        errors.push(company_intelligence_error)
       }
-      engine = await loadProspectSearchEngineIntelligence(admin, {
-        source_type: "external_discovered",
-        id: baseInput.company_candidate_id,
-        growth_lead_id: baseInput.growth_lead_id ?? null,
-        canonical_company_id: canonicalId,
-      })
+    } else if (hadVerifiedCompanyIntelligence) {
+      company_intelligence_outcome = "reused"
     }
 
     if (
@@ -206,22 +253,39 @@ export async function executeApolloIntelligenceRecovery(
       canonicalId &&
       (engine.buying_committee?.member_count ?? 0) === 0
     ) {
+      buying_committee_attempted = true
       recovery_actions.push("run_buying_committee_intelligence")
       try {
-        await runBuyingCommitteeIntelligenceForCanonicalCompany(admin, {
+        const runResult = await runBuyingCommitteeIntelligenceForCanonicalCompany(admin, {
           company_id: canonicalId,
           created_by: input.created_by,
           promote: true,
         })
+        engine = await loadProspectSearchEngineIntelligence(admin, {
+          source_type: "external_discovered",
+          id: baseInput.company_candidate_id,
+          growth_lead_id: baseInput.growth_lead_id ?? null,
+          canonical_company_id: canonicalId,
+        })
+        const membersAfter = engine.buying_committee?.member_count ?? 0
+        if (membersAfter > 0 && !hadBuyingCommitteeMembers) {
+          buying_committee_outcome = "created"
+        } else if (membersAfter > 0) {
+          buying_committee_outcome = "reused"
+        } else if (runResult.promoted_count > 0 || runResult.member_count > 0) {
+          buying_committee_outcome = "created"
+        } else {
+          buying_committee_outcome = "failed"
+          buying_committee_error = "buying_committee_run_completed_without_members"
+          errors.push(buying_committee_error)
+        }
       } catch (e) {
-        errors.push(e instanceof Error ? e.message : "buying_committee_intelligence_failed")
+        buying_committee_outcome = "failed"
+        buying_committee_error = e instanceof Error ? e.message : "buying_committee_intelligence_failed"
+        errors.push(buying_committee_error)
       }
-      engine = await loadProspectSearchEngineIntelligence(admin, {
-        source_type: "external_discovered",
-        id: baseInput.company_candidate_id,
-        growth_lead_id: baseInput.growth_lead_id ?? null,
-        canonical_company_id: canonicalId,
-      })
+    } else if (hadBuyingCommitteeMembers) {
+      buying_committee_outcome = "reused"
     }
 
     const intelligenceRow = buildApolloIntelligenceRecoveryIntelligenceAuditRow({
@@ -274,6 +338,36 @@ export async function executeApolloIntelligenceRecovery(
       recovery_actions,
       errors,
     })
+
+    company_evidence.push(
+      buildApolloIntelligenceRecoveryCompanyEvidence({
+        company_candidate_id: baseInput.company_candidate_id,
+        company_name: baseInput.company_name,
+        canonical_company_id_before,
+        canonical_company_id_after: canonicalId,
+        canonical_resolution_attempted,
+        canonical_resolution_result,
+        canonical_resolution_blocker,
+        company_intelligence_before: baseInput.company_intelligence_present ?? false,
+        company_intelligence_after: afterContext.company_intelligence_present,
+        company_intelligence_attempted,
+        company_intelligence_outcome,
+        company_intelligence_error,
+        buying_committee_before: baseInput.buying_committee_present ?? false,
+        buying_committee_after: afterContext.buying_committee_present,
+        buying_committee_attempted,
+        buying_committee_outcome,
+        buying_committee_error,
+        fit_score_before: baseInput.fit_score ?? null,
+        fit_score_after: afterContext.fit_score,
+        research_score_before: baseInput.research_score ?? null,
+        research_score_after: afterContext.research_score,
+        qualification_score_before: beforeRow.current_score,
+        qualification_score_after: afterRow.current_score,
+        remaining_blockers: afterRow.blockers,
+        production_threshold,
+      }),
+    )
   }
 
   const afterInputs = await buildEnrichedSelectionInputs(admin)
@@ -283,6 +377,12 @@ export async function executeApolloIntelligenceRecovery(
   )
 
   const decomposition_summary = summarizeApolloIntelligenceRecoveryScoreDecomposition(scoreRows)
+  const write_evidence = aggregateApolloIntelligenceRecoveryWriteEvidence(company_evidence)
+  const noOpEvaluation = evaluateApolloIntelligenceRecoveryNoOp({
+    mode: input.mode,
+    writes_performed,
+    write_evidence,
+  })
 
   return {
     qa_marker: APOLLO_INTELLIGENCE_RECOVERY_QA_MARKER,
@@ -307,6 +407,12 @@ export async function executeApolloIntelligenceRecovery(
     canonical_audit,
     intelligence_audit,
     company_results,
+    company_evidence,
+    write_evidence,
+    recovery_ok: noOpEvaluation.recovery_ok,
+    severity: noOpEvaluation.severity,
+    no_op_root_cause: noOpEvaluation.no_op_root_cause,
+    top_no_op_reasons: noOpEvaluation.top_no_op_reasons,
     root_cause_summary: buildApolloIntelligenceRecoveryRootCauseSummary({
       before: {
         score_gte_threshold_companies: before.score_gte_threshold_companies,

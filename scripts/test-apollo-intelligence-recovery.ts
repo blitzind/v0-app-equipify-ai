@@ -10,7 +10,13 @@ import {
   selectApollo25CompanyPilotCandidates,
   type Apollo25CompanyPilotSelectionInput,
 } from "../lib/growth/apollo/apollo-25-company-pilot-selection"
+import { buildApollo25CompanyPilotEligibilityDiagnostic } from "../lib/growth/apollo/apollo-25-company-pilot-eligibility-diagnostic"
 import { buildApolloIntelligenceRecoveryCanonicalAuditRow } from "../lib/growth/apollo/apollo-intelligence-recovery-audit"
+import {
+  buildApolloIntelligenceRecoveryCompanyEvidence,
+  aggregateApolloIntelligenceRecoveryWriteEvidence,
+  evaluateApolloIntelligenceRecoveryNoOp,
+} from "../lib/growth/apollo/apollo-intelligence-recovery-evidence"
 import { buildApolloIntelligenceRecoveryFunnelFromSelectionInputs } from "../lib/growth/apollo/apollo-intelligence-recovery-funnel"
 import {
   APOLLO_INTELLIGENCE_RECOVERY_EXECUTE_CONFIRM,
@@ -38,6 +44,7 @@ const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-intelligence-recovery-audit.ts",
   "lib/growth/apollo/apollo-intelligence-recovery-funnel.ts",
   "lib/growth/apollo/apollo-intelligence-recovery-enrichment.ts",
+  "lib/growth/apollo/apollo-intelligence-recovery-evidence.ts",
   "lib/growth/apollo/apollo-intelligence-recovery-route.ts",
   "app/api/platform/growth/apollo-intelligence-recovery/readiness/route.ts",
   "app/api/platform/growth/apollo-intelligence-recovery/execute/route.ts",
@@ -134,7 +141,29 @@ const cappedRow = buildApolloIntelligenceRecoveryScoreDecompositionRow({
 })
 assert.equal(cappedRow.current_score, 65)
 assert.equal(cappedRow.missing_points_to_threshold, 5)
-console.log("  ✓ score decomposition shows 65 cap without intelligence")
+console.log("  ✓ score decomposition shows 65 cap with company intelligence")
+
+const noIntelRow = buildApolloIntelligenceRecoveryScoreDecompositionRow({
+  company_candidate_id: "co-0",
+  company_name: "No Intel Co",
+  contacts: [buildContact(0, "No Intel Co")],
+  snapshot_summary: {
+    mapped_contacts: 1,
+    verified_email_contacts: 1,
+    contactable_contacts: 1,
+    sequence_ready_contacts: 1,
+  },
+  qualificationContext: {
+    company_intelligence_present: false,
+    buying_committee_present: false,
+    buying_committee_coverage: null,
+    fit_score: null,
+    research_score: null,
+  },
+  production_threshold: threshold,
+})
+assert.equal(noIntelRow.current_score, 55)
+console.log("  ✓ scorer default without company intelligence is 55 not inflated")
 
 const engineWithCommittee: GrowthProspectSearchEngineIntelligence = {
   qa_marker: "growth-prospect-search-engine-intelligence-7-ps-a-v1",
@@ -297,5 +326,194 @@ console.log("  ✓ greenfield eligible with intelligence context")
 
 assert.equal(routeSource.includes("writes_performed = input.mode === \"recover_missing_intelligence\""), true)
 console.log("  ✓ recover mode is sole write path")
+
+const unresolvedEvidence = buildApolloIntelligenceRecoveryCompanyEvidence({
+  company_candidate_id: "co-unresolved",
+  company_name: "Unresolved Co",
+  canonical_company_id_before: null,
+  canonical_company_id_after: null,
+  canonical_resolution_attempted: true,
+  canonical_resolution_result: "unresolved",
+  canonical_resolution_blocker: "no_active_canonical_company_for_domain",
+  company_intelligence_before: false,
+  company_intelligence_after: false,
+  company_intelligence_attempted: false,
+  company_intelligence_outcome: "skipped",
+  company_intelligence_error: null,
+  buying_committee_before: false,
+  buying_committee_after: false,
+  buying_committee_attempted: false,
+  buying_committee_outcome: "skipped",
+  buying_committee_error: null,
+  fit_score_before: null,
+  fit_score_after: null,
+  research_score_before: null,
+  research_score_after: null,
+  qualification_score_before: 55,
+  qualification_score_after: 55,
+  remaining_blockers: ["qualification_below_threshold"],
+  production_threshold: threshold,
+})
+assert.equal(unresolvedEvidence.no_op_reason, "canonical_unresolved")
+console.log("  ✓ canonical unresolved evidence")
+
+const ciFailedEvidence = buildApolloIntelligenceRecoveryCompanyEvidence({
+  company_candidate_id: "co-ci-fail",
+  company_name: "CI Fail Co",
+  canonical_company_id_before: "canonical-ci",
+  canonical_company_id_after: "canonical-ci",
+  canonical_resolution_attempted: true,
+  canonical_resolution_result: "resolved",
+  canonical_resolution_blocker: null,
+  company_intelligence_before: false,
+  company_intelligence_after: false,
+  company_intelligence_attempted: true,
+  company_intelligence_outcome: "failed",
+  company_intelligence_error: "preflight_failed",
+  buying_committee_before: false,
+  buying_committee_after: false,
+  buying_committee_attempted: false,
+  buying_committee_outcome: "skipped",
+  buying_committee_error: null,
+  fit_score_before: null,
+  fit_score_after: null,
+  research_score_before: null,
+  research_score_after: null,
+  qualification_score_before: 55,
+  qualification_score_after: 55,
+  remaining_blockers: ["qualification_below_threshold"],
+  production_threshold: threshold,
+})
+assert.equal(ciFailedEvidence.no_op_reason, "company_intelligence_write_failed")
+console.log("  ✓ company intelligence write failure evidence")
+
+const bcFailedEvidence = buildApolloIntelligenceRecoveryCompanyEvidence({
+  company_candidate_id: "co-bc-fail",
+  company_name: "BC Fail Co",
+  canonical_company_id_before: "canonical-bc",
+  canonical_company_id_after: "canonical-bc",
+  canonical_resolution_attempted: true,
+  canonical_resolution_result: "resolved",
+  canonical_resolution_blocker: null,
+  company_intelligence_before: true,
+  company_intelligence_after: true,
+  company_intelligence_attempted: false,
+  company_intelligence_outcome: "reused",
+  company_intelligence_error: null,
+  buying_committee_before: false,
+  buying_committee_after: false,
+  buying_committee_attempted: true,
+  buying_committee_outcome: "failed",
+  buying_committee_error: "buying_committee_run_completed_without_members",
+  fit_score_before: 80,
+  fit_score_after: 80,
+  research_score_before: 80,
+  research_score_after: 80,
+  qualification_score_before: 65,
+  qualification_score_after: 65,
+  remaining_blockers: ["qualification_below_threshold"],
+  production_threshold: threshold,
+})
+assert.equal(bcFailedEvidence.no_op_reason, "buying_committee_write_failed")
+console.log("  ✓ buying committee write failure evidence")
+
+const recoveredEvidence = buildApolloIntelligenceRecoveryCompanyEvidence({
+  company_candidate_id: "co-recovered",
+  company_name: "Recovered Co",
+  canonical_company_id_before: "canonical-recovered",
+  canonical_company_id_after: "canonical-recovered",
+  canonical_resolution_attempted: true,
+  canonical_resolution_result: "resolved",
+  canonical_resolution_blocker: null,
+  company_intelligence_before: true,
+  company_intelligence_after: true,
+  company_intelligence_attempted: false,
+  company_intelligence_outcome: "reused",
+  company_intelligence_error: null,
+  buying_committee_before: false,
+  buying_committee_after: true,
+  buying_committee_attempted: true,
+  buying_committee_outcome: "created",
+  buying_committee_error: null,
+  fit_score_before: 80,
+  fit_score_after: 80,
+  research_score_before: 80,
+  research_score_after: 80,
+  qualification_score_before: 65,
+  qualification_score_after: qualifiedRow.current_score,
+  remaining_blockers: [],
+  production_threshold: threshold,
+})
+assert.ok(recoveredEvidence.score_delta > 0)
+assert.equal(recoveredEvidence.crossed_threshold, true)
+console.log("  ✓ successful recovery increases score and crosses threshold")
+
+const writeEvidence = aggregateApolloIntelligenceRecoveryWriteEvidence([
+  unresolvedEvidence,
+  ciFailedEvidence,
+  bcFailedEvidence,
+  recoveredEvidence,
+])
+assert.equal(writeEvidence.canonical_unresolved_count, 1)
+assert.equal(writeEvidence.company_intelligence_failed_count, 1)
+assert.equal(writeEvidence.buying_committee_failed_count, 1)
+assert.equal(writeEvidence.companies_with_score_increase, 1)
+assert.equal(writeEvidence.companies_crossed_threshold, 1)
+console.log("  ✓ aggregate write evidence")
+
+const noOpEval = evaluateApolloIntelligenceRecoveryNoOp({
+  mode: "recover_missing_intelligence",
+  writes_performed: true,
+  write_evidence: {
+    canonical_resolution_attempted_count: 4,
+    canonical_resolved_count: 3,
+    canonical_unresolved_count: 1,
+    company_intelligence_attempted_count: 1,
+    company_intelligence_created_count: 0,
+    company_intelligence_reused_count: 0,
+    company_intelligence_failed_count: 1,
+    buying_committee_attempted_count: 2,
+    buying_committee_created_count: 1,
+    buying_committee_reused_count: 0,
+    buying_committee_failed_count: 1,
+    companies_with_score_increase: 0,
+    companies_crossed_threshold: 0,
+    no_op_reason_counts: { canonical_unresolved: 2, no_score_change: 1 },
+  },
+})
+assert.equal(noOpEval.recovery_ok, false)
+assert.equal(noOpEval.severity, "critical")
+assert.ok(noOpEval.no_op_root_cause)
+console.log("  ✓ recovery no-op reports blocker")
+
+const recoveredPilotInput = buildFixtureCompany(3, {
+  company_intelligence_present: true,
+  buying_committee_present: true,
+  buying_committee_coverage: 0.6,
+  fit_score: 80,
+  research_score: 80,
+})
+const pilotDiagnostic = buildApollo25CompanyPilotEligibilityDiagnostic(
+  [recoveredPilotInput],
+  { production_threshold: threshold, pilot_selection_mode: "greenfield" },
+)
+assert.equal(pilotDiagnostic.funnel_counts.companies_with_qualification_score_gte_threshold, 1)
+assert.equal(pilotDiagnostic.funnel_counts.companies_eligible_greenfield, 1)
+console.log("  ✓ pilot diagnostic reflects recovered intelligence")
+
+const scorerConsumesEngine = buildApolloIntelligenceRecoveryQualificationContext(engineWithCommittee)
+const pilotFromEngine = buildFixtureCompany(4, {
+  company_intelligence_present: scorerConsumesEngine.company_intelligence_present,
+  buying_committee_present: scorerConsumesEngine.buying_committee_present,
+  buying_committee_coverage: scorerConsumesEngine.buying_committee_coverage,
+  fit_score: scorerConsumesEngine.fit_score,
+  research_score: scorerConsumesEngine.research_score,
+})
+const funnelFromEngine = buildApolloIntelligenceRecoveryFunnelFromSelectionInputs(
+  [pilotFromEngine],
+  threshold,
+)
+assert.equal(funnelFromEngine.score_gte_threshold_companies, 1)
+console.log("  ✓ scorer consumes recovered engine artifacts in funnel")
 
 console.log("\nApollo Intelligence Recovery Certification PASSED")

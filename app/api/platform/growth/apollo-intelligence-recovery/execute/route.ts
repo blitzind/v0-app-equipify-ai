@@ -44,13 +44,23 @@ export async function POST(request: Request) {
     logGrowthEngine("apollo_intelligence_recovery_execute", {
       mode,
       writes_performed: report.writes_performed,
+      recovery_ok: report.recovery_ok,
+      severity: report.severity,
+      no_op_root_cause: report.no_op_root_cause,
       before_eligible: report.before.eligible_greenfield_companies,
       after_eligible: report.after.eligible_greenfield_companies,
       score_gte_threshold_after: report.after.score_gte_threshold_companies,
+      companies_with_score_increase: report.write_evidence.companies_with_score_increase,
       duration_ms: Date.now() - startedMs,
     })
 
-    return NextResponse.json({ ok: true, report })
+    return NextResponse.json({
+      ok: report.recovery_ok,
+      severity: report.severity,
+      no_op_root_cause: report.no_op_root_cause,
+      top_no_op_reasons: report.top_no_op_reasons,
+      report,
+    })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, message }, { status: 500 })

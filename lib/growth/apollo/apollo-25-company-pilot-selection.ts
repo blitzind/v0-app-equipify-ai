@@ -148,7 +148,7 @@ function scoreContacts(
         verified_email_contacts: input.snapshot_summary.verified_email_contacts,
         contactable_contacts: input.snapshot_summary.contactable_contacts,
         sequence_ready_contacts: input.snapshot_summary.sequence_ready_contacts,
-        company_intelligence_present: input.company_intelligence_present ?? true,
+        company_intelligence_present: input.company_intelligence_present ?? false,
         buying_committee_present: input.buying_committee_present ?? false,
         buying_committee_coverage: input.buying_committee_coverage ?? null,
         fit_score: input.fit_score ?? null,
