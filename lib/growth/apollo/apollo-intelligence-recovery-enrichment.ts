@@ -4,9 +4,9 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Apollo25CompanyPilotSelectionInput } from "@/lib/growth/apollo/apollo-25-company-pilot-selection"
-import {
-  buildApolloIntelligenceRecoveryQualificationContext,
-} from "@/lib/growth/apollo/apollo-intelligence-recovery-qualification"
+import { mergeApolloIntelligenceRecoveryQualificationContext } from "@/lib/growth/apollo/apollo-intelligence-recovery-artifact-contract"
+import type { GrowthBuyingCommitteeIntelligenceRunResult } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-types"
+import type { GrowthCompanyIntelligenceRunResult } from "@/lib/growth/company-intelligence/company-intelligence-types"
 import { loadProspectSearchEngineIntelligence } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-loader"
 
 function asString(value: unknown): string {
@@ -17,6 +17,10 @@ export async function enrichApollo25CompanyPilotSelectionInputWithIntelligence(
   admin: SupabaseClient,
   input: Apollo25CompanyPilotSelectionInput,
   canonical_company_id?: string | null,
+  artifact_overlay?: {
+    company_intelligence_run?: GrowthCompanyIntelligenceRunResult | null
+    buying_committee_run?: GrowthBuyingCommitteeIntelligenceRunResult | null
+  },
 ): Promise<Apollo25CompanyPilotSelectionInput> {
   const engine = await loadProspectSearchEngineIntelligence(admin, {
     source_type: "external_discovered",
@@ -25,7 +29,11 @@ export async function enrichApollo25CompanyPilotSelectionInputWithIntelligence(
     canonical_company_id: canonical_company_id ?? null,
   })
 
-  const context = buildApolloIntelligenceRecoveryQualificationContext(engine)
+  const context = mergeApolloIntelligenceRecoveryQualificationContext({
+    engine,
+    company_intelligence_run: artifact_overlay?.company_intelligence_run,
+    buying_committee_run: artifact_overlay?.buying_committee_run,
+  })
 
   return {
     ...input,

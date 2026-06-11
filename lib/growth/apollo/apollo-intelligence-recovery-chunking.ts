@@ -3,6 +3,7 @@
 import type {
   ApolloIntelligenceRecoveryChunkMeta,
   ApolloIntelligenceRecoveryMode,
+  ApolloIntelligenceRecoveryTarget,
 } from "@/lib/growth/apollo/apollo-intelligence-recovery-types"
 
 export const APOLLO_INTELLIGENCE_RECOVERY_CHUNKING_QA_MARKER =
@@ -71,15 +72,19 @@ export function parseApolloIntelligenceRecoveryChunk(
 export function buildApolloIntelligenceRecoveryChunkMeta(input: {
   offset: number
   limit: number
+  target: ApolloIntelligenceRecoveryTarget
   total_discovered_companies: number
+  target_pool_count: number
   processed_count: number
 }): ApolloIntelligenceRecoveryChunkMeta {
   const chunkEnd = input.offset + input.processed_count
-  const has_more = chunkEnd < input.total_discovered_companies
+  const has_more = chunkEnd < input.target_pool_count
   return {
     offset: input.offset,
     limit: input.limit,
+    target: input.target,
     total_discovered_companies: input.total_discovered_companies,
+    target_pool_count: input.target_pool_count,
     processed_count: input.processed_count,
     has_more,
     next_offset: has_more ? chunkEnd : null,

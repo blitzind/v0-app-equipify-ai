@@ -12,12 +12,22 @@ import {
 } from "../lib/growth/apollo/apollo-25-company-pilot-selection"
 import { buildApollo25CompanyPilotEligibilityDiagnostic } from "../lib/growth/apollo/apollo-25-company-pilot-eligibility-diagnostic"
 import {
+  classifyBuyingCommitteeRecoveryOutcome,
+  classifyCompanyIntelligenceRecoveryOutcome,
+  mergeApolloIntelligenceRecoveryQualificationContext,
+} from "../lib/growth/apollo/apollo-intelligence-recovery-artifact-contract"
+import {
   APOLLO_INTELLIGENCE_RECOVERY_DEFAULT_CHUNK_LIMIT,
   APOLLO_INTELLIGENCE_RECOVERY_MAX_CHUNK_LIMIT,
   buildApolloIntelligenceRecoveryChunkMeta,
   parseApolloIntelligenceRecoveryChunk,
   resolveApolloIntelligenceRecoveryChunkLimit,
 } from "../lib/growth/apollo/apollo-intelligence-recovery-chunking"
+import {
+  filterApolloIntelligenceRecoveryTargetPool,
+  isApolloIntelligenceRecoveryQualificationTarget,
+  parseApolloIntelligenceRecoveryTarget,
+} from "../lib/growth/apollo/apollo-intelligence-recovery-targeting"
 import { buildApolloIntelligenceRecoveryCanonicalAuditRow } from "../lib/growth/apollo/apollo-intelligence-recovery-audit"
 import {
   buildApolloIntelligenceRecoveryCompanyEvidence,
@@ -53,6 +63,8 @@ const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-intelligence-recovery-enrichment.ts",
   "lib/growth/apollo/apollo-intelligence-recovery-evidence.ts",
   "lib/growth/apollo/apollo-intelligence-recovery-chunking.ts",
+  "lib/growth/apollo/apollo-intelligence-recovery-targeting.ts",
+  "lib/growth/apollo/apollo-intelligence-recovery-artifact-contract.ts",
   "lib/growth/apollo/apollo-intelligence-recovery-route.ts",
   "app/api/platform/growth/apollo-intelligence-recovery/readiness/route.ts",
   "app/api/platform/growth/apollo-intelligence-recovery/execute/route.ts",
@@ -366,22 +378,159 @@ assert.equal(
 const chunkMeta = buildApolloIntelligenceRecoveryChunkMeta({
   offset: 0,
   limit: 5,
+  target: "qualification_recovery",
   total_discovered_companies: 48,
+  target_pool_count: 14,
   processed_count: 5,
 })
 assert.equal(chunkMeta.has_more, true)
 assert.equal(chunkMeta.next_offset, 5)
+assert.equal(chunkMeta.target_pool_count, 14)
 const chunkMetaLast = buildApolloIntelligenceRecoveryChunkMeta({
-  offset: 45,
+  offset: 12,
   limit: 5,
+  target: "qualification_recovery",
   total_discovered_companies: 48,
-  processed_count: 3,
+  target_pool_count: 14,
+  processed_count: 2,
 })
 assert.equal(chunkMetaLast.has_more, false)
 assert.equal(chunkMetaLast.next_offset, null)
 assert.equal(routeSource.includes("chunkInputs"), true)
 assert.equal(routeSource.includes("buildEnrichedSelectionInputs(admin, afterInputs[idx]"), false)
 console.log("  ✓ production-safe chunking defaults and partial re-enrich")
+
+assert.equal(parseApolloIntelligenceRecoveryTarget(undefined, "recover_missing_intelligence"), "qualification_recovery")
+assert.equal(parseApolloIntelligenceRecoveryTarget("all_discovered", "recover_missing_intelligence"), "all_discovered")
+const scoreZeroCompany = buildFixtureCompany(10, {
+  company_intelligence_present: false,
+  contacts: [(() => {
+    const c = buildContact(10, "Score Zero Co")
+    c.sequence_ready = false
+    c.contactable = false
+    return c
+  })()],
+  snapshot_summary: {
+    mapped_contacts: 1,
+    verified_email_contacts: 1,
+    contactable_contacts: 0,
+    sequence_ready_contacts: 0,
+  },
+})
+const nearThresholdCompany = buildFixtureCompany(11, {
+  company_intelligence_present: false,
+  buying_committee_present: false,
+})
+const targetPool = filterApolloIntelligenceRecoveryTargetPool(
+  [scoreZeroCompany, nearThresholdCompany],
+  "qualification_recovery",
+  threshold,
+)
+assert.equal(targetPool.length, 1)
+assert.equal(
+  isApolloIntelligenceRecoveryQualificationTarget({
+    snapshot_summary: nearThresholdCompany.snapshot_summary,
+    qualification_score: 55,
+    production_threshold: threshold,
+  }),
+  true,
+)
+console.log("  ✓ qualification_recovery target excludes score-zero companies")
+
+const bcFalseCreated = classifyBuyingCommitteeRecoveryOutcome({
+  had_members_before: false,
+  engine_member_count_after: 0,
+  run_result: {
+    run_id: "run-1",
+    company_id: "co-1",
+    qa_marker: "growth-buying-committee-intelligence-7.6b-v1",
+    member_count: 3,
+    verified_count: 0,
+    promoted_count: 0,
+    coverage: {
+      roles_present: [],
+      roles_missing: [],
+      coverage_score: 0,
+      single_thread_risk: true,
+      verified_member_count: 0,
+    },
+    assignments: [],
+    messages: [],
+  },
+})
+assert.equal(bcFalseCreated.outcome, "failed")
+assert.equal(bcFalseCreated.error, "buying_committee_run_completed_without_members")
+console.log("  ✓ buying committee created outcome requires engine members not draft count")
+
+const mergedFromRun = mergeApolloIntelligenceRecoveryQualificationContext({
+  engine: null,
+  buying_committee_run: {
+    run_id: "run-bc",
+    company_id: "co-bc",
+    qa_marker: "growth-buying-committee-intelligence-7.6b-v1",
+    member_count: 2,
+    verified_count: 2,
+    promoted_count: 2,
+    coverage: {
+      roles_present: ["decision_maker"],
+      roles_missing: [],
+      coverage_score: 0.6,
+      single_thread_risk: false,
+      verified_member_count: 2,
+    },
+    assignments: [
+      {
+        assignment_ref: "a1",
+        person_id: "p1",
+        full_name: "Buyer",
+        job_title: "CEO",
+        committee_role: "economic_buyer",
+        source: "staging_contact",
+        confidence: 0.9,
+        verification_status: "verified",
+        promotion_status: "promoted",
+        evidence_count: 1,
+      },
+    ],
+    messages: [],
+  },
+})
+assert.equal(mergedFromRun.buying_committee_present, true)
+assert.equal(mergedFromRun.buying_committee_coverage, 0.6)
+console.log("  ✓ artifact contract merges verified run assignments into qualification context")
+
+const ciVerifiedNotPromoted = classifyCompanyIntelligenceRecoveryOutcome({
+  had_verified_before: false,
+  engine_has_verified_after: false,
+  run_result: {
+    qa_marker: "growth-company-intelligence-7.6a-v1",
+    run_id: "run-ci",
+    company_id: "co-ci",
+    status: "completed",
+    finding_count: 1,
+    verified_count: 1,
+    promoted_count: 0,
+    findings: [
+      {
+        finding_ref: "f1",
+        intelligence_category: "operations",
+        intelligence_key: "fleet",
+        value_text: "x",
+        source: "canonical_company",
+        confidence: 0.9,
+        confidence_tier: "direct_evidence",
+        verification_status: "verified",
+        promotion_status: "rejected",
+        verification_provider: "rules",
+        verification_reasons: [],
+        evidence_count: 1,
+      },
+    ],
+    messages: [],
+  },
+})
+assert.equal(ciVerifiedNotPromoted.error, "company_intelligence_verified_findings_not_promoted_to_snapshots")
+console.log("  ✓ company intelligence failure distinguishes verified-not-promoted")
 
 const unresolvedEvidence = buildApolloIntelligenceRecoveryCompanyEvidence({
   company_candidate_id: "co-unresolved",

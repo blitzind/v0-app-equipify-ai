@@ -134,10 +134,19 @@ export type ApolloIntelligenceRecoveryCompanyEvidence = {
   no_op_reason: string
 }
 
+export const APOLLO_INTELLIGENCE_RECOVERY_TARGETS = [
+  "qualification_recovery",
+  "all_discovered",
+] as const
+
+export type ApolloIntelligenceRecoveryTarget = (typeof APOLLO_INTELLIGENCE_RECOVERY_TARGETS)[number]
+
 export type ApolloIntelligenceRecoveryChunkMeta = {
   offset: number
   limit: number
+  target: ApolloIntelligenceRecoveryTarget
   total_discovered_companies: number
+  target_pool_count: number
   processed_count: number
   has_more: boolean
   next_offset: number | null
@@ -163,6 +172,7 @@ export type ApolloIntelligenceRecoveryWriteEvidence = {
 export type ApolloIntelligenceRecoveryReport = {
   qa_marker: typeof APOLLO_INTELLIGENCE_RECOVERY_QA_MARKER
   mode: ApolloIntelligenceRecoveryMode
+  target: ApolloIntelligenceRecoveryTarget
   computed_at: string
   chunk: ApolloIntelligenceRecoveryChunkMeta
   writes_performed: boolean
@@ -202,5 +212,7 @@ export type ApolloIntelligenceRecoveryReadiness = {
   intelligence_schema_ready: boolean
   production_qualification_threshold: number
   apollo_discovered_company_count: number
+  qualification_recovery_target_count: number
+  default_recover_target: ApolloIntelligenceRecoveryTarget
   confirm_token: string
 }

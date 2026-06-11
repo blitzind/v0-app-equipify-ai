@@ -5,6 +5,7 @@ import {
   type ApolloIntelligenceRecoveryMode,
 } from "@/lib/growth/apollo/apollo-intelligence-recovery-types"
 import { parseApolloIntelligenceRecoveryChunk } from "@/lib/growth/apollo/apollo-intelligence-recovery-chunking"
+import { parseApolloIntelligenceRecoveryTarget } from "@/lib/growth/apollo/apollo-intelligence-recovery-targeting"
 import { validateApolloIntelligenceRecoveryConfirmation } from "@/lib/growth/apollo/apollo-intelligence-recovery-gates"
 import { executeApolloIntelligenceRecovery } from "@/lib/growth/apollo/apollo-intelligence-recovery-route"
 
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
   const record = body && typeof body === "object" ? (body as Record<string, unknown>) : {}
   const mode = parseMode(record.mode)
   const { offset, limit } = parseApolloIntelligenceRecoveryChunk(record, mode)
+  const target = parseApolloIntelligenceRecoveryTarget(record.target, mode)
 
   try {
     const startedMs = Date.now()
@@ -43,12 +45,15 @@ export async function POST(request: Request) {
       created_by: access.userId,
       offset,
       limit,
+      target,
     })
 
     logGrowthEngine("apollo_intelligence_recovery_execute", {
       mode,
+      target: report.target,
       offset: report.chunk.offset,
       limit: report.chunk.limit,
+      target_pool_count: report.chunk.target_pool_count,
       processed_count: report.chunk.processed_count,
       has_more: report.chunk.has_more,
       writes_performed: report.writes_performed,

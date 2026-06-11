@@ -14,9 +14,18 @@ import {
   buildApolloIntelligenceRecoveryIntelligenceAuditRow,
 } from "@/lib/growth/apollo/apollo-intelligence-recovery-audit"
 import {
+  classifyBuyingCommitteeRecoveryOutcome,
+  classifyCompanyIntelligenceRecoveryOutcome,
+  mergeApolloIntelligenceRecoveryQualificationContext,
+} from "@/lib/growth/apollo/apollo-intelligence-recovery-artifact-contract"
+import {
   enrichApollo25CompanyPilotSelectionInputWithIntelligence,
   loadLatestProspectResearchRunIdForCompanyCandidate,
 } from "@/lib/growth/apollo/apollo-intelligence-recovery-enrichment"
+import {
+  filterApolloIntelligenceRecoveryTargetPool,
+  parseApolloIntelligenceRecoveryTarget,
+} from "@/lib/growth/apollo/apollo-intelligence-recovery-targeting"
 import {
   buildApolloIntelligenceRecoveryChunkMeta,
   resolveApolloIntelligenceRecoveryChunkLimit,
@@ -31,7 +40,12 @@ import {
   aggregateApolloIntelligenceRecoveryWriteEvidence,
   evaluateApolloIntelligenceRecoveryNoOp,
 } from "@/lib/growth/apollo/apollo-intelligence-recovery-evidence"
-import type { ApolloIntelligenceRecoveryIntelligenceOutcome } from "@/lib/growth/apollo/apollo-intelligence-recovery-types"
+import type { GrowthBuyingCommitteeIntelligenceRunResult } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-types"
+import type { GrowthCompanyIntelligenceRunResult } from "@/lib/growth/company-intelligence/company-intelligence-types"
+import type {
+  ApolloIntelligenceRecoveryIntelligenceOutcome,
+  ApolloIntelligenceRecoveryTarget,
+} from "@/lib/growth/apollo/apollo-intelligence-recovery-types"
 import {
   buildApolloIntelligenceRecoveryQualificationContext,
   buildApolloIntelligenceRecoveryRootCauseSummary,
@@ -92,6 +106,15 @@ export async function loadApolloIntelligenceRecoveryReadiness(
   }))
 
   const companyIds = await loadApolloDiscoveredCompanyIds(admin)
+  const production_threshold = resolveApolloEnrollmentQualificationThreshold()
+  const baseInputs = await buildApollo25CompanyPilotSelectionInputs(admin)
+  const allEnriched = await buildEnrichedSelectionInputs(admin, baseInputs)
+  const qualification_recovery_target_count = filterApolloIntelligenceRecoveryTargetPool(
+    allEnriched,
+    "qualification_recovery",
+    production_threshold,
+  ).length
+
   const blockers = [...envGate.blockers]
   if (!schema.ready) {
     blockers.push("prospect_search_engine_intelligence_schema_not_ready")
@@ -102,8 +125,10 @@ export async function loadApolloIntelligenceRecoveryReadiness(
     ready: blockers.length === 0,
     blockers,
     intelligence_schema_ready: schema.ready,
-    production_qualification_threshold: resolveApolloEnrollmentQualificationThreshold(),
+    production_qualification_threshold: production_threshold,
     apollo_discovered_company_count: companyIds.length,
+    qualification_recovery_target_count,
+    default_recover_target: "qualification_recovery",
     confirm_token: APOLLO_INTELLIGENCE_RECOVERY_EXECUTE_CONFIRM,
   }
 }
@@ -115,35 +140,55 @@ export async function executeApolloIntelligenceRecovery(
     created_by?: string | null
     offset?: number
     limit?: number
+    target?: ApolloIntelligenceRecoveryTarget
   },
 ): Promise<ApolloIntelligenceRecoveryReport> {
   const production_threshold = resolveApolloEnrollmentQualificationThreshold()
   const schema = await probeProspectSearchEngineIntelligenceSchema(admin).catch(() => null)
+  const target = input.target ?? parseApolloIntelligenceRecoveryTarget(undefined, input.mode)
 
   const offset = Math.max(0, input.offset ?? 0)
   const baseInputs = await buildApollo25CompanyPilotSelectionInputs(admin)
   const total_discovered_companies = baseInputs.length
+
+  const allEnrichedInputs = await buildEnrichedSelectionInputs(admin, baseInputs)
+  const targetPool = filterApolloIntelligenceRecoveryTargetPool(
+    allEnrichedInputs,
+    target,
+    production_threshold,
+  )
+  const target_pool_count = targetPool.length
+
   const chunkLimit = resolveApolloIntelligenceRecoveryChunkLimit(
     input.mode,
     input.limit,
-    total_discovered_companies,
+    target_pool_count,
   )
-  const chunkEnd = Math.min(offset + chunkLimit, total_discovered_companies)
+  const chunkEnd = Math.min(offset + chunkLimit, target_pool_count)
   const processed_count = Math.max(0, chunkEnd - offset)
 
-  const allEnrichedInputs = await buildEnrichedSelectionInputs(admin, baseInputs)
   const before = buildApolloIntelligenceRecoveryFunnelFromSelectionInputs(
     allEnrichedInputs,
     production_threshold,
   )
 
-  const chunkInputs = allEnrichedInputs.slice(offset, chunkEnd)
+  const chunkInputs = targetPool.slice(offset, chunkEnd)
   const chunk = buildApolloIntelligenceRecoveryChunkMeta({
     offset,
     limit: chunkLimit,
+    target,
     total_discovered_companies,
+    target_pool_count,
     processed_count,
   })
+
+  const artifactOverlayByCompany = new Map<
+    string,
+    {
+      company_intelligence_run?: GrowthCompanyIntelligenceRunResult | null
+      buying_committee_run?: GrowthBuyingCommitteeIntelligenceRunResult | null
+    }
+  >()
 
   const writes_performed = input.mode === "recover_missing_intelligence"
   const company_results: ApolloIntelligenceRecoveryReport["company_results"] = []
@@ -235,6 +280,9 @@ export async function executeApolloIntelligenceRecovery(
       engine.company_intelligence?.has_verified_intelligence === true
     const hadBuyingCommitteeMembers = (engine.buying_committee?.member_count ?? 0) > 0
 
+    let companyIntelligenceRun: GrowthCompanyIntelligenceRunResult | null = null
+    let buyingCommitteeRun: GrowthBuyingCommitteeIntelligenceRunResult | null = null
+
     if (
       writes_performed &&
       input.mode === "recover_missing_intelligence" &&
@@ -244,7 +292,7 @@ export async function executeApolloIntelligenceRecovery(
       company_intelligence_attempted = true
       recovery_actions.push("run_company_intelligence")
       try {
-        const runResult = await runCompanyIntelligenceForCanonicalCompany(admin, {
+        companyIntelligenceRun = await runCompanyIntelligenceForCanonicalCompany(admin, {
           company_id: canonicalId,
           created_by: input.created_by,
           promote: true,
@@ -255,18 +303,14 @@ export async function executeApolloIntelligenceRecovery(
           growth_lead_id: baseInput.growth_lead_id ?? null,
           canonical_company_id: canonicalId,
         })
-        const verifiedAfter = engine.company_intelligence?.has_verified_intelligence === true
-        if (verifiedAfter && !hadVerifiedCompanyIntelligence) {
-          company_intelligence_outcome = "created"
-        } else if (verifiedAfter) {
-          company_intelligence_outcome = "reused"
-        } else if (runResult.promoted_count > 0) {
-          company_intelligence_outcome = "created"
-        } else {
-          company_intelligence_outcome = "failed"
-          company_intelligence_error = "company_intelligence_run_completed_without_verified_promotion"
-          errors.push(company_intelligence_error)
-        }
+        const ciOutcome = classifyCompanyIntelligenceRecoveryOutcome({
+          had_verified_before: hadVerifiedCompanyIntelligence,
+          engine_has_verified_after: engine.company_intelligence?.has_verified_intelligence === true,
+          run_result: companyIntelligenceRun,
+        })
+        company_intelligence_outcome = ciOutcome.outcome
+        company_intelligence_error = ciOutcome.error
+        if (company_intelligence_error) errors.push(company_intelligence_error)
       } catch (e) {
         company_intelligence_outcome = "failed"
         company_intelligence_error = e instanceof Error ? e.message : "company_intelligence_failed"
@@ -285,7 +329,7 @@ export async function executeApolloIntelligenceRecovery(
       buying_committee_attempted = true
       recovery_actions.push("run_buying_committee_intelligence")
       try {
-        const runResult = await runBuyingCommitteeIntelligenceForCanonicalCompany(admin, {
+        buyingCommitteeRun = await runBuyingCommitteeIntelligenceForCanonicalCompany(admin, {
           company_id: canonicalId,
           created_by: input.created_by,
           promote: true,
@@ -296,18 +340,14 @@ export async function executeApolloIntelligenceRecovery(
           growth_lead_id: baseInput.growth_lead_id ?? null,
           canonical_company_id: canonicalId,
         })
-        const membersAfter = engine.buying_committee?.member_count ?? 0
-        if (membersAfter > 0 && !hadBuyingCommitteeMembers) {
-          buying_committee_outcome = "created"
-        } else if (membersAfter > 0) {
-          buying_committee_outcome = "reused"
-        } else if (runResult.promoted_count > 0 || runResult.member_count > 0) {
-          buying_committee_outcome = "created"
-        } else {
-          buying_committee_outcome = "failed"
-          buying_committee_error = "buying_committee_run_completed_without_members"
-          errors.push(buying_committee_error)
-        }
+        const bcOutcome = classifyBuyingCommitteeRecoveryOutcome({
+          had_members_before: hadBuyingCommitteeMembers,
+          engine_member_count_after: engine.buying_committee?.member_count ?? 0,
+          run_result: buyingCommitteeRun,
+        })
+        buying_committee_outcome = bcOutcome.outcome
+        buying_committee_error = bcOutcome.error
+        if (buying_committee_error) errors.push(buying_committee_error)
       } catch (e) {
         buying_committee_outcome = "failed"
         buying_committee_error = e instanceof Error ? e.message : "buying_committee_intelligence_failed"
@@ -316,6 +356,11 @@ export async function executeApolloIntelligenceRecovery(
     } else if (hadBuyingCommitteeMembers) {
       buying_committee_outcome = "reused"
     }
+
+    artifactOverlayByCompany.set(baseInput.company_candidate_id, {
+      company_intelligence_run: companyIntelligenceRun,
+      buying_committee_run: buyingCommitteeRun,
+    })
 
     const intelligenceRow = buildApolloIntelligenceRecoveryIntelligenceAuditRow({
       company_candidate_id: baseInput.company_candidate_id,
@@ -332,7 +377,11 @@ export async function executeApolloIntelligenceRecovery(
     if (intelligenceRow.fit_score_exists) fit_score_count += 1
     if (intelligenceRow.research_score_exists) research_score_count += 1
 
-    const afterContext = buildApolloIntelligenceRecoveryQualificationContext(engine)
+    const afterContext = mergeApolloIntelligenceRecoveryQualificationContext({
+      engine,
+      company_intelligence_run: companyIntelligenceRun,
+      buying_committee_run: buyingCommitteeRun,
+    })
     const afterRow = buildApolloIntelligenceRecoveryScoreDecompositionRow({
       company_candidate_id: baseInput.company_candidate_id,
       company_name: baseInput.company_name,
@@ -408,10 +457,12 @@ export async function executeApolloIntelligenceRecovery(
       (row) => row.company_candidate_id === baseInput.company_candidate_id,
     )
     if (idx < 0) continue
+    const overlay = artifactOverlayByCompany.get(baseInput.company_candidate_id)
     afterInputs[idx] = await enrichApollo25CompanyPilotSelectionInputWithIntelligence(
       admin,
       afterInputs[idx],
       resolution.canonical_company_id,
+      overlay,
     )
   }
   const after = buildApolloIntelligenceRecoveryFunnelFromSelectionInputs(
@@ -431,6 +482,7 @@ export async function executeApolloIntelligenceRecovery(
   return {
     qa_marker: APOLLO_INTELLIGENCE_RECOVERY_QA_MARKER,
     mode: input.mode,
+    target,
     computed_at: new Date().toISOString(),
     chunk,
     writes_performed,
