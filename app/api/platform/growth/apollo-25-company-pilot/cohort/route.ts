@@ -8,7 +8,7 @@ import {
 export const runtime = "nodejs"
 
 export async function POST(request: Request) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const access = await requireGrowthEnginePlatformAccess(request)
   if (!access.ok) return access.response
 
   try {

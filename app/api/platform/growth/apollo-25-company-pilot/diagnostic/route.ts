@@ -8,7 +8,7 @@ import {
 export const runtime = "nodejs"
 
 export async function GET(request: Request) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const access = await requireGrowthEnginePlatformAccess(request)
   if (!access.ok) return access.response
 
   const url = new URL(request.url)

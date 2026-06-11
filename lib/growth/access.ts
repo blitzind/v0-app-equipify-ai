@@ -6,7 +6,7 @@ import { z } from "zod"
 import { createServiceRoleSupabaseClient } from "@/lib/billing/service-role-client"
 import { isPlatformAdminEmail } from "@/lib/platform-admin"
 import { isGrowthQaAccelerationEnabled } from "@/lib/growth/sequence-enrollment/qa-acceleration-config"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { createServerSupabaseClient, getBearerAccessToken } from "@/lib/supabase/server"
 
 /** Global kill switch for Growth Engine platform routes. Default off. */
 export function isGrowthEngineEnabledEnv(): boolean {
@@ -41,7 +41,30 @@ export type GrowthEnginePlatformAccess =
     }
   | { ok: false; response: NextResponse }
 
-export async function requireGrowthEnginePlatformAccess(): Promise<GrowthEnginePlatformAccess> {
+async function resolveGrowthEnginePlatformUser(request?: Request): Promise<{
+  userId: string
+  userEmail: string
+} | null> {
+  const cookieClient = await createServerSupabaseClient()
+  const bearer = request ? getBearerAccessToken(request) : null
+
+  if (bearer) {
+    const { data, error } = await cookieClient.auth.getUser(bearer)
+    if (!error && data.user?.id && data.user.email) {
+      return { userId: data.user.id, userEmail: data.user.email }
+    }
+  }
+
+  const {
+    data: { user },
+  } = await cookieClient.auth.getUser()
+  if (!user?.id || !user.email) return null
+  return { userId: user.id, userEmail: user.email }
+}
+
+export async function requireGrowthEnginePlatformAccess(
+  request?: Request,
+): Promise<GrowthEnginePlatformAccess> {
   if (!isGrowthEngineEnabledEnv()) {
     logGrowthEngine("access_denied", { reason: "feature_disabled" })
     return {
@@ -53,13 +76,14 @@ export async function requireGrowthEnginePlatformAccess(): Promise<GrowthEngineP
     }
   }
 
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const resolvedUser = await resolveGrowthEnginePlatformUser(request)
 
-  if (!user?.email || !isPlatformAdminEmail(user.email)) {
-    logGrowthEngine("access_denied", { reason: "forbidden" })
+  if (!resolvedUser || !isPlatformAdminEmail(resolvedUser.userEmail)) {
+    logGrowthEngine("access_denied", {
+      reason: "forbidden",
+      auth_mode: request && getBearerAccessToken(request) ? "bearer" : "cookie",
+      email: resolvedUser?.userEmail ?? null,
+    })
     return {
       ok: false,
       response: NextResponse.json(
@@ -73,8 +97,8 @@ export async function requireGrowthEnginePlatformAccess(): Promise<GrowthEngineP
     return {
       ok: true,
       admin: createServiceRoleSupabaseClient(),
-      userId: user.id,
-      userEmail: user.email,
+      userId: resolvedUser.userId,
+      userEmail: resolvedUser.userEmail,
     }
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e)

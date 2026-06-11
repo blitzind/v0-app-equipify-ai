@@ -4,8 +4,8 @@ import { fetchRevenueCommandCenterDashboard } from "@/lib/growth/revenue-executi
 
 export const runtime = "nodejs"
 
-export async function GET() {
-  const access = await requireGrowthEnginePlatformAccess()
+export async function GET(request: Request) {
+  const access = await requireGrowthEnginePlatformAccess(request)
   if (!access.ok) return access.response
 
   try {

@@ -284,6 +284,7 @@
     "test:apollo-pilot-operations": "tsx scripts/test-apollo-pilot-operations.ts",
     "test:apollo-operator-scale-optimization": "tsx scripts/test-apollo-operator-scale-optimization.ts",
     "test:apollo-25-company-pilot-launch": "tsx scripts/test-apollo-25-company-pilot-launch.ts",
+    "test:growth-engine-platform-access": "tsx scripts/test-growth-engine-platform-access.ts",
     "test:apollo-intelligence-recovery": "tsx scripts/test-apollo-intelligence-recovery.ts",
     "test:apollo-search-diagnostic-evidence": "tsx scripts/test-apollo-search-diagnostic-evidence.ts",
     "test:apollo-partial-identity": "tsx scripts/test-apollo-partial-identity.ts",
