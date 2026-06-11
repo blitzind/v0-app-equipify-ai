@@ -5,11 +5,16 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import {
   certifyApolloScale2LiveAcquisition,
-  resolveApolloScale2LiveCohort,
   type ApolloScale2CertResult,
   type ApolloScale2CompanyEvidenceRow,
   type ApolloScale2LiveAcquisitionCertification,
 } from "@/lib/growth/apollo/apollo-scale-2-live-acquisition-certification"
+import {
+  resolveApolloScale3CertificationCohort,
+  toApolloScale2LiveCohortShape,
+  type ApolloScale3CertificationCohortResolution,
+  type ApolloScale3CohortPreset,
+} from "@/lib/growth/apollo/apollo-scale-3-certification-cohort"
 import {
   buildApolloScale3CompanyPromotionEvidence,
   mapApolloScale3CompanyEvidenceRow,
@@ -65,6 +70,7 @@ export type ApolloScale3SearchStrategyCertification = {
   failure_analysis: ApolloScale2LiveAcquisitionCertification["failure_analysis"]
   certification_assessment: ApolloScale3CertificationAssessment
   certification: ApolloScale2LiveAcquisitionCertification
+  cohort_selection: ApolloScale3CertificationCohortResolution
 }
 
 export { mapApolloScale3CompanyEvidenceRow }
@@ -81,9 +87,38 @@ export async function certifyApolloScale3SearchStrategy(
     contact_limit?: number
     created_by?: string | null
     env?: NodeJS.ProcessEnv
+    company_names?: string[]
+    company_candidate_ids?: string[]
+    cohort_preset?: ApolloScale3CohortPreset
+    cohort_resolution?: ApolloScale3CertificationCohortResolution
   },
 ): Promise<ApolloScale3SearchStrategyCertification> {
-  const scale2 = await certifyApolloScale2LiveAcquisition(admin, input)
+  const env = input?.env ?? process.env
+  const company_limit = Math.max(
+    15,
+    Math.min(
+      20,
+      input?.company_limit ??
+        (Number.parseInt(env.GROWTH_APOLLO_SCALE_2_COMPANY_LIMIT ?? "15", 10) || 15),
+    ),
+  )
+  const cohort_resolution =
+    input?.cohort_resolution ??
+    (await resolveApolloScale3CertificationCohort(admin, {
+      company_limit,
+      company_names: input?.company_names,
+      company_candidate_ids: input?.company_candidate_ids,
+      cohort_preset: input?.cohort_preset,
+      env,
+    }))
+
+  const scale2 = await certifyApolloScale2LiveAcquisition(admin, {
+    company_limit,
+    contact_limit: input?.contact_limit,
+    created_by: input?.created_by,
+    env,
+    cohort: toApolloScale2LiveCohortShape(cohort_resolution),
+  })
 
   const acquisitionById = new Map(
     scale2.acquisition_companies.map((company) => [company.company_candidate_id, company] as const),
@@ -188,7 +223,16 @@ export async function certifyApolloScale3SearchStrategy(
       historical_apollo_verified_email_contacts,
     },
     certification: scale2,
+    cohort_selection: cohort_resolution,
   }
 }
 
-export { resolveApolloScale2LiveCohort }
+export {
+  resolveApolloScale3CertificationCohort,
+  APOLLO_SCALE_3_CERTIFICATION_WINNER_COMPANY_NAMES,
+} from "@/lib/growth/apollo/apollo-scale-3-certification-cohort"
+export type {
+  ApolloScale3CertificationCohortResolution,
+  ApolloScale3CohortPreset,
+  ApolloScale3CohortSelectionEvidenceRow,
+} from "@/lib/growth/apollo/apollo-scale-3-certification-cohort"

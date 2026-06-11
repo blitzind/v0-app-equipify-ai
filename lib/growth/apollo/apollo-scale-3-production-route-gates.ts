@@ -1,9 +1,7 @@
 /** Apollo-Scale-3 production route gates — client-safe, no secrets. */
 
 import { redactApolloEnrichmentCertProductionSecrets } from "@/lib/growth/apollo/apollo-enrichment-cert-production-route-gates"
-import {
-  APOLLO_SCALE_3_RECOMMENDED_MAX_API_CALLS_PER_RUN,
-} from "@/lib/growth/apollo/apollo-single-company-search-diagnostic-gates"
+import { APOLLO_SCALE_3_CERTIFICATION_WINNER_COMPANY_NAMES } from "@/lib/growth/apollo/apollo-scale-3-certification-cohort-selection"
 import { buildApolloSearchApiBudgetEvidence } from "@/lib/growth/apollo/apollo-search-api-budget-evidence"
 import {
   assertApolloScale2ProductionExecuteAllowed,
@@ -12,12 +10,23 @@ import {
   isApolloScale2ProductionRuntime,
   resolveApolloScale2CompanyLimit,
 } from "@/lib/growth/apollo/apollo-scale-2-production-route-gates"
-import { resolveApolloCreditLimits } from "@/lib/growth/providers/apollo/apollo-config"
 
 export const APOLLO_SCALE_3_PRODUCTION_ROUTE_QA_MARKER =
   "apollo-scale-3-production-route-v1" as const
 
 export const APOLLO_SCALE_3_EXECUTE_CONFIRM = "RUN_APOLLO_SCALE_3" as const
+
+export { APOLLO_SCALE_3_CERTIFICATION_WINNER_COMPANY_NAMES }
+
+export const APOLLO_SCALE_3_FORCED_COHORT_EXECUTE_SNIPPET = `await fetch("/api/platform/growth/apollo-scale-3/execute", {
+  method: "POST",
+  credentials: "include",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    confirm: "${APOLLO_SCALE_3_EXECUTE_CONFIRM}",
+    cohort_preset: "certification_winners",
+  }),
+})`
 
 export const APOLLO_SCALE_3_BROWSER_CONSOLE_EXECUTE_SNIPPET = `// Apollo-Scale-3 — tiered search strategy cert on Vercel Production
 await fetch("/api/platform/growth/apollo-scale-3/readiness", { credentials: "include" })
@@ -44,6 +53,7 @@ await fetch("/api/platform/growth/apollo-scale-3/execute", {
     console.log("stage", payload.stage)
     console.log("error", payload.error ?? null, payload.message ?? null)
     console.log("verdict", payload.verdict)
+    console.log("cohort_selection", payload.cohort_selection)
     console.log("fail_reasons", payload.fail_reasons)
     console.log("aggregate", payload.aggregate)
     console.log("failure_analysis", payload.failure_analysis)
@@ -105,6 +115,9 @@ export function validateApolloScale3Confirmation(body: unknown): {
   error: string | null
   company_limit: number
   contact_limit?: number
+  company_names?: string[]
+  company_candidate_ids?: string[]
+  cohort_preset?: "certification_winners"
 } {
   const company_limit = resolveApolloScale2CompanyLimit()
   if (!body || typeof body !== "object") {
@@ -122,6 +135,32 @@ export function validateApolloScale3Confirmation(body: unknown): {
       company_limit,
     }
   }
+
+  const company_names = parseStringArray(record.company_names ?? record.companyNames)
+  const company_candidate_ids = parseStringArray(
+    record.company_candidate_ids ?? record.companyCandidateIds,
+  )
+  const cohort_preset =
+    record.cohort_preset === "certification_winners" ||
+    record.cohortPreset === "certification_winners"
+      ? ("certification_winners" as const)
+      : undefined
+
+  if (company_names && company_candidate_ids) {
+    return {
+      ok: false,
+      error: "Provide either company_names or company_candidate_ids, not both.",
+      company_limit,
+    }
+  }
+  if (cohort_preset && (company_names || company_candidate_ids)) {
+    return {
+      ok: false,
+      error: "cohort_preset cannot be combined with company_names or company_candidate_ids.",
+      company_limit,
+    }
+  }
+
   const limitRaw =
     typeof record.contactLimit === "number"
       ? record.contactLimit
@@ -132,10 +171,21 @@ export function validateApolloScale3Confirmation(body: unknown): {
     ok: true,
     error: null,
     company_limit,
+    ...(company_names ? { company_names } : {}),
+    ...(company_candidate_ids ? { company_candidate_ids } : {}),
+    ...(cohort_preset ? { cohort_preset } : {}),
     ...(limitRaw && Number.isFinite(limitRaw) && limitRaw > 0
       ? { contact_limit: Math.min(limitRaw, 25) }
       : {}),
   }
+}
+
+function parseStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const items = value
+    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+    .filter(Boolean)
+  return items.length > 0 ? items : undefined
 }
 
 export function buildApolloScale3ProductionReadinessPayload(input: {
@@ -165,6 +215,14 @@ export function buildApolloScale3ProductionReadinessPayload(input: {
     production_runtime: isApolloScale2ProductionRuntime(env),
     blockers: gates.blockers.length > 0 ? gates.blockers : base.blockers,
     browser_console_execute_snippet: APOLLO_SCALE_3_BROWSER_CONSOLE_EXECUTE_SNIPPET,
+    forced_cohort_execute_snippet: APOLLO_SCALE_3_FORCED_COHORT_EXECUTE_SNIPPET,
+    certification_winner_company_names: [...APOLLO_SCALE_3_CERTIFICATION_WINNER_COMPANY_NAMES],
+    cohort_selection_options: {
+      default: "deterministic_default_no_prior_apollo",
+      cohort_preset: "certification_winners",
+      company_names: "forced_company_names",
+      company_candidate_ids: "forced_company_candidate_ids",
+    },
     search_api_budget: buildApolloSearchApiBudgetEvidence({ env, company_limit }),
   })
 }

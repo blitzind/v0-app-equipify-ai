@@ -725,6 +725,7 @@ export async function certifyApolloScale2LiveAcquisition(
     contact_limit?: number
     created_by?: string | null
     env?: NodeJS.ProcessEnv
+    cohort?: Awaited<ReturnType<typeof resolveApolloScale2LiveCohort>>
   },
 ): Promise<ApolloScale2LiveAcquisitionCertification> {
   const env = input?.env ?? process.env
@@ -739,7 +740,9 @@ export async function certifyApolloScale2LiveAcquisition(
   const contact_limit =
     input?.contact_limit ?? resolveApolloPrimaryContactAcquisitionContactLimit(env)
 
-  const cohort = await resolveApolloScale2LiveCohort(admin, { limit: company_limit, env })
+  const cohort =
+    input?.cohort ??
+    (await resolveApolloScale2LiveCohort(admin, { limit: company_limit, env }))
 
   const acquisition = await runApolloPrimaryContactAcquisition(admin, {
     company_candidate_ids: cohort.selected.map((row) => row.company_candidate_id),

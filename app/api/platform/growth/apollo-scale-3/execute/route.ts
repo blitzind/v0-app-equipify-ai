@@ -44,6 +44,9 @@ export async function POST(request: Request) {
     const result = await executeApolloScale3InProduction(access.admin, {
       company_limit: confirmation.company_limit,
       contact_limit: confirmation.contact_limit,
+      company_names: confirmation.company_names,
+      company_candidate_ids: confirmation.company_candidate_ids,
+      cohort_preset: confirmation.cohort_preset,
       created_by: access.userId,
       env: process.env,
     })

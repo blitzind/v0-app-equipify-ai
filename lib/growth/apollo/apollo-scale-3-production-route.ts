@@ -11,9 +11,11 @@ import {
 } from "@/lib/growth/apollo/apollo-scale-3-production-route-gates"
 import {
   certifyApolloScale3SearchStrategy,
-  resolveApolloScale2LiveCohort,
+  resolveApolloScale3CertificationCohort,
   type ApolloScale3CompanyEvidenceRow,
   type ApolloScale3SearchStrategyCertification,
+  type ApolloScale3CertificationCohortResolution,
+  type ApolloScale3CohortPreset,
 } from "@/lib/growth/apollo/apollo-scale-3-search-strategy-certification"
 import type { ApolloScale2CertResult } from "@/lib/growth/apollo/apollo-scale-2-live-acquisition-certification"
 import type { ApolloScale3CertFailReason } from "@/lib/growth/apollo/apollo-scale-3-certification-assessment"
@@ -42,6 +44,7 @@ export type ApolloScale3ProductionExecuteResult = {
   certification: ApolloScale3SearchStrategyCertification | null
   search_api_budget: ApolloSearchApiBudgetEvidence | null
   fail_reasons: ApolloScale3CertFailReason[]
+  cohort_selection: ApolloScale3CertificationCohortResolution | null
 }
 
 function serializeApolloScale3ExecuteResult(
@@ -77,6 +80,7 @@ function serializeApolloScale3ExecuteResult(
       certification: payload.certification,
       search_api_budget: payload.search_api_budget ?? buildApolloSearchApiBudgetEvidence({ env }),
       fail_reasons: payload.fail_reasons ?? [],
+      cohort_selection: payload.cohort_selection ?? null,
     })
   }
 }
@@ -91,7 +95,10 @@ export async function buildApolloScale3ProductionReadiness(
   let cohort_companies: Array<{ company_candidate_id: string; company_name: string; domain: string }> = []
   let cohort_error: string | null = null
   try {
-    const cohort = await resolveApolloScale2LiveCohort(admin, { limit: gates.company_limit, env })
+    const cohort = await resolveApolloScale3CertificationCohort(admin, {
+      company_limit: gates.company_limit,
+      env,
+    })
     cohort_companies_selected = cohort.selected.length
     cohort_companies = cohort.selected.map((row) => ({
       company_candidate_id: row.company_candidate_id,
@@ -116,6 +123,9 @@ export async function executeApolloScale3InProduction(
     contact_limit?: number
     created_by?: string | null
     env?: NodeJS.ProcessEnv
+    company_names?: string[]
+    company_candidate_ids?: string[]
+    cohort_preset?: ApolloScale3CohortPreset
   },
 ): Promise<ApolloScale3ProductionExecuteResult> {
   const env = input?.env ?? process.env
@@ -140,17 +150,22 @@ export async function executeApolloScale3InProduction(
           certification: null,
           search_api_budget: buildApolloSearchApiBudgetEvidence({ env }),
           fail_reasons: [],
+          cohort_selection: null,
         },
         env,
       )
     }
 
+    const company_limit = input?.company_limit ?? gates.company_limit
     stage = "target_company_resolution"
     const cohortStage = await runApolloScale5ExecutionStage({
       stage: "target_company_resolution",
       run: () =>
-        resolveApolloScale2LiveCohort(admin, {
-          limit: input?.company_limit ?? gates.company_limit,
+        resolveApolloScale3CertificationCohort(admin, {
+          company_limit,
+          company_names: input?.company_names,
+          company_candidate_ids: input?.company_candidate_ids,
+          cohort_preset: input?.cohort_preset,
           env,
         }),
     })
@@ -171,6 +186,31 @@ export async function executeApolloScale3InProduction(
           certification: null,
           search_api_budget: buildApolloSearchApiBudgetEvidence({ env }),
           fail_reasons: [],
+          cohort_selection: null,
+        },
+        env,
+      )
+    }
+
+    const cohort_resolution = cohortStage.value
+    if (cohort_resolution.selected.length < 15) {
+      const message = `Apollo-Scale-3 requires at least 15 companies; resolved ${cohort_resolution.selected.length}.`
+      return serializeApolloScale3ExecuteResult(
+        {
+          ok: false,
+          stage: "target_company_resolution",
+          error: "cohort_failed",
+          message,
+          blockers: [message],
+          execution_id,
+          verdict: null,
+          companies: [],
+          failure_analysis: null,
+          aggregate: null,
+          certification: null,
+          search_api_budget: buildApolloSearchApiBudgetEvidence({ env }),
+          fail_reasons: [],
+          cohort_selection: cohort_resolution,
         },
         env,
       )
@@ -181,10 +221,14 @@ export async function executeApolloScale3InProduction(
       stage: "evidence_build",
       run: () =>
         certifyApolloScale3SearchStrategy(admin, {
-          company_limit: input?.company_limit ?? gates.company_limit,
+          company_limit,
           contact_limit: input?.contact_limit,
           created_by: input?.created_by ?? null,
           env,
+          company_names: input?.company_names,
+          company_candidate_ids: input?.company_candidate_ids,
+          cohort_preset: input?.cohort_preset,
+          cohort_resolution,
         }),
     })
     if (!certificationStage.ok) {
@@ -203,6 +247,7 @@ export async function executeApolloScale3InProduction(
           certification: null,
           search_api_budget: buildApolloSearchApiBudgetEvidence({ env }),
           fail_reasons: [],
+          cohort_selection: cohort_resolution,
         },
         env,
       )
@@ -226,10 +271,11 @@ export async function executeApolloScale3InProduction(
         failure_analysis: certification.failure_analysis,
         aggregate: certification.aggregate,
         certification,
+        cohort_selection: certification.cohort_selection,
         fail_reasons: certification.certification_assessment.fail_reasons,
         search_api_budget: buildApolloSearchApiBudgetEvidence({
           env,
-          company_limit: input?.company_limit ?? gates.company_limit,
+          company_limit,
           guardrails: {
             search_api_calls: certification.certification.runtime.api_calls,
             api_calls: certification.certification.runtime.api_calls,
@@ -262,6 +308,7 @@ export async function executeApolloScale3InProduction(
         certification: null,
         search_api_budget: buildApolloSearchApiBudgetEvidence({ env }),
         fail_reasons: [],
+        cohort_selection: null,
       },
       env,
     )
