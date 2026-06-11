@@ -283,6 +283,7 @@
     "test:apollo-content-quality-optimization": "tsx scripts/test-apollo-content-quality-optimization.ts",
     "test:apollo-pilot-operations": "tsx scripts/test-apollo-pilot-operations.ts",
     "test:apollo-operator-scale-optimization": "tsx scripts/test-apollo-operator-scale-optimization.ts",
+    "test:apollo-25-company-pilot-launch": "tsx scripts/test-apollo-25-company-pilot-launch.ts",
     "test:apollo-search-diagnostic-evidence": "tsx scripts/test-apollo-search-diagnostic-evidence.ts",
     "test:apollo-partial-identity": "tsx scripts/test-apollo-partial-identity.ts",
     "test:apollo-single-company-search-diagnostic-route": "tsx scripts/test-apollo-single-company-search-diagnostic-route.ts",
