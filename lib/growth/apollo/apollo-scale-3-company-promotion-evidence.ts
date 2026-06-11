@@ -16,6 +16,7 @@ import {
   type ApolloPartialIdentityEvidence,
 } from "@/lib/growth/apollo/apollo-partial-identity-evidence"
 import type { ApolloSearchTierAttemptEvidence } from "@/lib/growth/providers/apollo/apollo-tiered-people-search-types"
+import type { ApolloCurrentRunCandidateAttributionRow } from "@/lib/growth/apollo/apollo-current-run-attribution"
 import type { ApolloScale3CertFailReason } from "@/lib/growth/apollo/apollo-scale-3-certification-assessment"
 
 export const APOLLO_SCALE_3_COMPANY_PROMOTION_EVIDENCE_QA_MARKER =
@@ -80,6 +81,12 @@ export type ApolloScale3CompanyPromotionEvidence = {
   current_run_apollo_sequence_ready_contacts: number
   historical_apollo_verified_email_contacts: number
   legacy_contactable_contacts: number
+  search_verified_email_contacts: number
+  enrichment_verified_email_contacts: number
+  promotion_attempted: boolean
+  promotion_blockers_by_candidate: ApolloCurrentRunCandidateAttributionRow[]
+  contactability_blockers_by_candidate: ApolloCurrentRunCandidateAttributionRow[]
+  sequence_readiness_blockers_by_candidate: ApolloCurrentRunCandidateAttributionRow[]
 }
 
 export function buildApolloScale3CompanyPromotionEvidence(
@@ -119,6 +126,13 @@ export function buildApolloScale3CompanyPromotionEvidence(
       currentRun?.historical_apollo_verified_email_contacts ?? 0,
     legacy_contactable_contacts:
       currentRun?.legacy_contactable_contacts ?? acquisition?.existing_contactable_before ?? 0,
+    search_verified_email_contacts: currentRun?.search_verified_email_contacts ?? 0,
+    enrichment_verified_email_contacts: currentRun?.enrichment_verified_email_contacts ?? 0,
+    promotion_attempted: currentRun?.promotion_attempted ?? false,
+    promotion_blockers_by_candidate: currentRun?.promotion_blockers_by_candidate ?? [],
+    contactability_blockers_by_candidate: currentRun?.contactability_blockers_by_candidate ?? [],
+    sequence_readiness_blockers_by_candidate:
+      currentRun?.sequence_readiness_blockers_by_candidate ?? [],
   }
 }
 

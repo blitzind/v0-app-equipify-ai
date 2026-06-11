@@ -44,6 +44,7 @@ import {
   assertApolloCompanyAcquisitionAllowed,
 } from "@/lib/growth/providers/apollo/apollo-run-guardrails"
 import {
+  readApolloPersonIdsFromProviderContacts,
   resolveApolloCurrentRunAttribution,
   assertApolloCurrentRunMetricsConsistent,
   type ApolloCurrentRunAttribution,
@@ -359,6 +360,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
   let apollo_search_skipped_reason: string | null = null
   let apollo_people_found = 0
   let apollo_persisted_this_run = 0
+  let apollo_person_ids_mapped_this_run: string[] = []
   let search_strategy: ApolloTieredPeopleSearchEvidence | null = null
   let search_debug: ReturnType<typeof buildApolloCohortCompanySearchDebug> = null
 
@@ -416,6 +418,9 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
           ? discovery.apollo_provider_result.contacts.length
           : 0
     apollo_people_found = search_strategy?.mapped_contacts ?? apollo_persisted_this_run
+    apollo_person_ids_mapped_this_run = readApolloPersonIdsFromProviderContacts(
+      discovery.apollo_provider_result?.contacts,
+    )
 
     search_debug = buildApolloCohortCompanySearchDebug({
       company_candidate_id: context.company_candidate_id,
@@ -542,14 +547,19 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     admin,
     promotion.canonical_company_id ?? canonical_company_id,
   )
+  const apolloCandidatesAfter = allCandidates.filter(
+    (candidate) => candidate.provider_type === "future_apollo",
+  )
   const current_run_attribution = resolveApolloCurrentRunAttribution({
     apollo_mapped_this_run: search_strategy?.mapped_contacts ?? apollo_people_found,
     apollo_persisted_this_run,
     apollo_candidate_ids_before,
-    apollo_candidates_after: enrichedCandidates,
+    apollo_candidates_after: apolloCandidatesAfter,
+    apollo_person_ids_mapped_this_run,
     verified_email_promotion: promotion.verified_email_promotion,
     existing_contactable_before: existing.existing_contactable_before,
     company_contacts: companyContacts,
+    promotion_attempted: promotion.promotion_attempted,
   })
   for (const leakBlocker of assertApolloCurrentRunMetricsConsistent({
     apollo_mapped_this_run: current_run_attribution.current_run_apollo_mapped_contacts,

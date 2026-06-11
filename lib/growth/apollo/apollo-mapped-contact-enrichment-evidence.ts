@@ -8,6 +8,7 @@ import {
 } from "@/lib/growth/apollo/apollo-email-channel-evidence"
 import { candidateHasObservedContactChannel } from "@/lib/growth/apollo/apollo-live-pilot-canonical-sync-evidence"
 import type { ApolloCandidateEmailEnrichmentResult } from "@/lib/growth/apollo/apollo-candidate-email-enrichment"
+import { resolveApolloVerifiedEmailSource } from "@/lib/growth/apollo/apollo-current-run-attribution"
 import {
   evaluateApolloVerifiedEmailPromotionBlocker,
   isApolloVerifiedEmailStatus,
@@ -53,6 +54,7 @@ export type ApolloMappedContactEnrichmentRow = {
   needs_email_enrichment: boolean
   enrichment_eligibility_blocker: string | null
   verified_promotion_blocker: string | null
+  verified_email_source: "search" | "enrichment" | null
 }
 
 export type ApolloCompanyEnrichmentEvidence = {
@@ -63,6 +65,7 @@ export type ApolloCompanyEnrichmentEvidence = {
   enrichment_provider: "apollo_bulk_match" | null
   enrichment_candidates_selected: number
   enrichment_candidates_updated: number
+  search_verified_email_contacts: number
   enrichment_verified_email_contacts: number
   enrichment_no_email_count: number
   enrichment_unverified_email_count: number
@@ -140,33 +143,43 @@ export function buildApolloMappedContactEnrichmentRow(
     needs_email_enrichment: apolloCandidateNeedsEmailEnrichment(candidate),
     enrichment_eligibility_blocker: resolveApolloMappedContactEnrichmentEligibilityBlocker(candidate),
     verified_promotion_blocker: evaluateApolloVerifiedEmailPromotionBlocker(candidate),
+    verified_email_source: resolveApolloVerifiedEmailSource(candidate),
   }
 }
 
-function countEnrichmentEmailOutcomes(candidates: GrowthContactCandidate[]): {
+function countVerifiedEmailOutcomesBySource(candidates: GrowthContactCandidate[]): {
+  search_verified_email_contacts: number
   enrichment_verified_email_contacts: number
   enrichment_no_email_count: number
   enrichment_unverified_email_count: number
 } {
+  let search_verified_email_contacts = 0
   let enrichment_verified_email_contacts = 0
   let enrichment_no_email_count = 0
   let enrichment_unverified_email_count = 0
 
   for (const candidate of candidates) {
+    const source = resolveApolloVerifiedEmailSource(candidate)
+    if (source === "search") {
+      search_verified_email_contacts += 1
+      continue
+    }
+    if (source === "enrichment") {
+      enrichment_verified_email_contacts += 1
+      continue
+    }
+
     const email = asString(candidate.email)
     const status = readApolloEmailStatusFromCandidate(candidate)
     if (!email) {
       enrichment_no_email_count += 1
-      continue
-    }
-    if (isApolloVerifiedEmailStatus(status)) {
-      enrichment_verified_email_contacts += 1
-    } else {
+    } else if (!isApolloVerifiedEmailStatus(status)) {
       enrichment_unverified_email_count += 1
     }
   }
 
   return {
+    search_verified_email_contacts,
     enrichment_verified_email_contacts,
     enrichment_no_email_count,
     enrichment_unverified_email_count,
@@ -179,13 +192,14 @@ function mapSkippedReasonToBlockers(input: {
   enrichment_attempted: boolean
   enrich_emails_enabled: boolean
   candidates_requiring_enrichment: number
+  search_verified_email_contacts: number
 }): ApolloEnrichmentBlocker[] {
   const blockers: ApolloEnrichmentBlocker[] = []
   if (!input.enrich_emails_enabled) {
     blockers.push("enrichment_provider_disabled")
     blockers.push("enrichment_gates_blocked")
   }
-  if (!input.enrichment_attempted) {
+  if (!input.enrichment_attempted && input.search_verified_email_contacts === 0) {
     blockers.push("enrichment_not_attempted")
   }
   if (input.skipped_reason === "no_candidates_need_email_enrichment") {
@@ -234,7 +248,7 @@ export function buildApolloCompanyEnrichmentEvidence(input: {
 
   const enrichment_attempted = input.enrichment_attempted ?? false
   const enrichment_result = input.enrichment_result
-  const emailOutcomes = countEnrichmentEmailOutcomes(input.candidates)
+  const emailOutcomes = countVerifiedEmailOutcomesBySource(input.candidates)
 
   const blockers = mapSkippedReasonToBlockers({
     skipped_reason: enrichment_result?.skipped_reason ?? null,
@@ -242,6 +256,7 @@ export function buildApolloCompanyEnrichmentEvidence(input: {
     enrichment_attempted,
     enrich_emails_enabled,
     candidates_requiring_enrichment: linkedinOnlyCount,
+    search_verified_email_contacts: emailOutcomes.search_verified_email_contacts,
   })
 
   if (
@@ -270,6 +285,7 @@ export function buildApolloCompanyEnrichmentEvidence(input: {
       enrichment_attempted && enrich_emails_enabled ? "apollo_bulk_match" : null,
     enrichment_candidates_selected: enrichment_result?.candidates_selected ?? 0,
     enrichment_candidates_updated: enrichment_result?.candidates_updated ?? 0,
+    search_verified_email_contacts: emailOutcomes.search_verified_email_contacts,
     enrichment_verified_email_contacts: emailOutcomes.enrichment_verified_email_contacts,
     enrichment_no_email_count: emailOutcomes.enrichment_no_email_count,
     enrichment_unverified_email_count: emailOutcomes.enrichment_unverified_email_count,

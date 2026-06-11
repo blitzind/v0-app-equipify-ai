@@ -263,6 +263,7 @@
     "test:apollo-tiered-search": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-tiered-search.ts",
     "test:apollo-scale-3-query-coverage": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-scale-3-query-coverage.ts",
     "test:apollo-scale-3-guardrail-attribution": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-apollo-scale-3-guardrail-attribution.ts",
+    "test:apollo-current-run-search-verified-attribution": "tsx scripts/test-apollo-current-run-search-verified-attribution.ts",
     "test:apollo-search-diagnostic-evidence": "tsx scripts/test-apollo-search-diagnostic-evidence.ts",
     "test:apollo-partial-identity": "tsx scripts/test-apollo-partial-identity.ts",
     "test:apollo-single-company-search-diagnostic-route": "tsx scripts/test-apollo-single-company-search-diagnostic-route.ts",
