@@ -28,6 +28,15 @@ import {
   selectSequenceReadyContactForEnrollment,
 } from "../lib/growth/apollo/apollo-full-pipeline-enrollment-resolution-evidence"
 import {
+  normalizeGrowthActorUserIdForDb,
+  isGrowthActorUserIdUuid,
+} from "../lib/growth/actor-user-id"
+import {
+  APOLLO_FULL_PIPELINE_CERTIFICATION_SOURCE,
+  resolveApolloFullPipelineCertificationActor,
+} from "../lib/growth/apollo/apollo-full-pipeline-certification-actor"
+import { buildApolloFullPipelineDbErrorEvidence } from "../lib/growth/apollo/apollo-full-pipeline-db-error-evidence"
+import {
   evaluateApolloEnrollmentQualification,
   resolveApolloEnrollmentQualificationThreshold,
 } from "../lib/growth/apollo/apollo-enrollment-qualification-engine"
@@ -39,6 +48,8 @@ const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-full-pipeline-production-certification.ts",
   "lib/growth/apollo/apollo-full-pipeline-enrollment-resolution.ts",
   "lib/growth/apollo/apollo-full-pipeline-enrollment-resolution-evidence.ts",
+  "lib/growth/apollo/apollo-full-pipeline-certification-actor.ts",
+  "lib/growth/apollo/apollo-full-pipeline-db-error-evidence.ts",
   "lib/growth/apollo/apollo-full-pipeline-production-route-gates.ts",
   "lib/growth/apollo/apollo-full-pipeline-production-route.ts",
   "app/api/platform/growth/apollo-full-pipeline-certification/readiness/route.ts",
@@ -400,5 +411,43 @@ const autoEnrollmentSource = fs.readFileSync(
 )
 assert.match(autoEnrollmentSource, /existingApproved[\s\S]*candidates\.push/)
 console.log("  ✓ approved enrollment candidate returned for reuse")
+
+assert.equal(
+  normalizeGrowthActorUserIdForDb(APOLLO_FULL_PIPELINE_CERTIFICATION_SOURCE),
+  null,
+)
+assert.equal(
+  normalizeGrowthActorUserIdForDb("apollo-full-pipeline-certification"),
+  null,
+)
+console.log("  ✓ certification source string does not write into UUID columns")
+
+const actor = resolveApolloFullPipelineCertificationActor({
+  actor_user_id: "fbef0db5-a5f3-483f-a490-429a9decb05f",
+  actor_email: "admin@equipify.ai",
+})
+assert.equal(actor.actorUserId, "fbef0db5-a5f3-483f-a490-429a9decb05f")
+assert.equal(actor.certificationSource, APOLLO_FULL_PIPELINE_CERTIFICATION_SOURCE)
+assert.equal(isGrowthActorUserIdUuid(actor.actorUserId), true)
+console.log("  ✓ enrollment candidate uses valid/null actor UUID")
+
+assert.match(autoEnrollmentSource, /certification_source/)
+assert.match(autoEnrollmentSource, /normalizeGrowthActorUserIdForDb/)
+console.log("  ✓ source string preserved in metadata")
+
+assert.match(certSource, /normalizeGrowthActorUserIdForDb|actor\.actorUserId/)
+assert.match(executeRoute, /actor_user_id: access\.userId/)
+console.log("  ✓ approval path uses valid/null actor UUID")
+
+const dbEvidence = buildApolloFullPipelineDbErrorEvidence({
+  message: 'invalid input syntax for type uuid: "apollo-full-pipeline-certification"',
+  company_contact_id: "cc-1",
+  contact_candidate_id: "cand-1",
+})
+assert.equal(dbEvidence.db_error_table, "growth.leads")
+assert.equal(dbEvidence.db_error_operation, "insert")
+assert.match(dbEvidence.insert_error ?? "", /table=growth\.leads/)
+assert.match(dbEvidence.insert_error ?? "", /company_contact_id=cc-1/)
+console.log("  ✓ DB insert failure evidence includes table/operation")
 
 console.log("\nApollo Full Pipeline Production Certification checks passed.")

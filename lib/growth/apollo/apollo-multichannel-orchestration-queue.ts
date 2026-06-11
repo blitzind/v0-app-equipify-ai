@@ -3,6 +3,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { normalizeGrowthActorUserIdForDb } from "@/lib/growth/actor-user-id"
 import {
   buildApolloMultichannelSequenceQueueSnapshot,
   evaluateApolloMultichannelSequenceApprovalGate,
@@ -107,13 +108,14 @@ export async function approveApolloMultichannelSequenceCandidate(
   }
 
   const now = new Date().toISOString()
+  const approverUserId = normalizeGrowthActorUserIdForDb(input.approver_user_id)
   const { error: updateError } = await admin
     .schema("growth")
     .from(TABLE)
     .update({
       status: "sequence_approved",
       sequence_approved_at: now,
-      sequence_approved_by: input.approver_user_id ?? null,
+      sequence_approved_by: approverUserId,
       sequence_approved_email: input.approver_email ?? null,
       outreach_sent: false,
       voice_drop_sent: false,

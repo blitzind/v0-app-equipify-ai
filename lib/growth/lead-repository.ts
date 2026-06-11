@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { normalizeGrowthActorUserIdForDb } from "@/lib/growth/actor-user-id"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { GrowthLeadArchiveSchemaIncompleteError } from "@/lib/growth/lead-archive-api-errors"
 import { probeGrowthLeadArchiveSchema } from "@/lib/growth/lead-archive-schema-health"
@@ -525,13 +526,13 @@ export async function createGrowthLead(
     source_vendor: trimOrNull(input.sourceVendor),
     assigned_to: trimOrNull(input.assignedTo),
     assigned_at: input.assignedTo ? new Date().toISOString() : null,
-    assigned_by: input.assignedTo ? trimOrNull(input.createdBy) : null,
+    assigned_by: input.assignedTo ? normalizeGrowthActorUserIdForDb(input.createdBy) : null,
     assignment_source: input.assignedTo
       ? input.sourceKind === "import"
         ? "import"
         : "manual"
       : null,
-    created_by: trimOrNull(input.createdBy),
+    created_by: normalizeGrowthActorUserIdForDb(input.createdBy),
   }
 
   const { data, error } = await growthLeadsTable(admin).insert(row).select(leadSelectFor(await isGrowthLeadArchiveSchemaReady(admin))).single()

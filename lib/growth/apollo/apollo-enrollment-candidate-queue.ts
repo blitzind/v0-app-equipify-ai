@@ -3,6 +3,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { normalizeGrowthActorUserIdForDb } from "@/lib/growth/actor-user-id"
 import {
   buildApolloEnrollmentCandidateQueueSnapshot,
   evaluateApolloEnrollmentApprovalGate,
@@ -100,13 +101,14 @@ export async function approveApolloEnrollmentCandidate(
   }
 
   const now = new Date().toISOString()
+  const approverUserId = normalizeGrowthActorUserIdForDb(input.approver_user_id)
   const { error: updateError } = await admin
     .schema("growth")
     .from(CANDIDATES_TABLE)
     .update({
       status: "enrollment_approved",
       enrollment_approved_at: now,
-      enrollment_approved_by: input.approver_user_id ?? null,
+      enrollment_approved_by: approverUserId,
       enrollment_approved_email: input.approver_email ?? null,
       auto_enrollment_attempted: false,
       outreach_sent: false,
@@ -180,12 +182,13 @@ export async function rejectApolloEnrollmentCandidate(
   }
 
   const now = new Date().toISOString()
+  const approverUserId = normalizeGrowthActorUserIdForDb(input.approver_user_id)
   const { error: updateError } = await admin
     .schema("growth")
     .from(CANDIDATES_TABLE)
     .update({
       status: "enrollment_rejected",
-      enrollment_approved_by: input.approver_user_id ?? null,
+      enrollment_approved_by: approverUserId,
       enrollment_approved_email: input.approver_email ?? null,
       enrollment_rejection_note: input.note?.trim() || null,
       auto_enrollment_attempted: false,

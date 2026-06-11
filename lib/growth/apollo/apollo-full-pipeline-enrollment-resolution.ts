@@ -11,6 +11,7 @@ import type { ApolloEnrollmentAutomationReport } from "@/lib/growth/apollo/apoll
 import type { ApolloFullPipelineEnrollmentEvidence } from "@/lib/growth/apollo/apollo-full-pipeline-production-certification-types"
 import type { ApolloPrimaryContactOperatorReviewRow } from "@/lib/growth/apollo/apollo-primary-contact-operator-review-types"
 import { runApolloEnrollmentAutomation } from "@/lib/growth/apollo/apollo-enrollment-auto-enrollment"
+import { buildApolloFullPipelineDbErrorEvidence } from "@/lib/growth/apollo/apollo-full-pipeline-db-error-evidence"
 import {
   describeEnrollmentDuplicatePreventionDecision,
   isCertificationEligibleSequenceReadyContact,
@@ -216,19 +217,26 @@ export async function executeApolloFullPipelineCertificationEnrollment(
     threshold_source: "production" | "certification_override"
     production_threshold: number
     certification_threshold: number
-    created_by?: string | null
+    actor_user_id?: string | null
+    actor_email?: string | null
+    certification_source?: string | null
+    audit_reason?: string | null
     env?: NodeJS.ProcessEnv
   },
 ): Promise<ApolloEnrollmentAutomationReport> {
   return runApolloEnrollmentAutomation(admin, {
     execution_id: input.execution_id,
     company_candidate_id: input.company_candidate_id,
-    created_by: input.created_by ?? null,
+    created_by: input.actor_user_id ?? null,
     env: input.env,
     qualification_threshold_override: input.threshold_used,
     production_qualification_threshold: input.production_threshold,
     certification_qualification_threshold: input.certification_threshold,
     qualification_threshold_source: input.threshold_source,
+    certification_source: input.certification_source ?? null,
+    created_by_source: input.certification_source ?? null,
+    execution_source: input.certification_source ?? null,
+    audit_reason: input.audit_reason ?? null,
     target_company_contact_id: input.selected_contact.company_contact_id,
     target_contact_candidate_id: input.selected_contact.contact_candidate_id,
   })
@@ -251,6 +259,10 @@ export async function buildApolloFullPipelineEnrollmentEvidence(
     production_threshold?: number | null
     certification_threshold?: number | null
     qualification_override_used?: boolean
+    certification_source?: string | null
+    db_error_table?: string | null
+    db_error_operation?: string | null
+    db_error_message?: string | null
     env?: NodeJS.ProcessEnv
   },
 ): Promise<ApolloFullPipelineEnrollmentEvidence> {
@@ -334,12 +346,26 @@ export async function buildApolloFullPipelineEnrollmentEvidence(
     }
   }
 
-  const insert_error =
+  const rawInsertError =
     input.insert_error ??
     input.automation_report?.blockers.find((blocker) =>
-      /insert|duplicate key|violates|candidate_insert_failed/i.test(blocker),
+      /insert|duplicate key|violates|candidate_insert_failed|invalid input syntax for type uuid/i.test(
+        blocker,
+      ),
     ) ??
+    input.db_error_message ??
     null
+
+  const dbEvidence = rawInsertError
+    ? buildApolloFullPipelineDbErrorEvidence({
+        message: rawInsertError,
+        table: input.db_error_table,
+        operation: input.db_error_operation,
+        company_contact_id: contact?.company_contact_id ?? null,
+        contact_candidate_id: contact?.contact_candidate_id ?? null,
+        candidate_id: input.existing_enrollment_candidate_id ?? null,
+      })
+    : null
 
   const qualification_override_used = input.qualification_override_used === true
 
@@ -363,7 +389,11 @@ export async function buildApolloFullPipelineEnrollmentEvidence(
     duplicate_prevention_decision:
       input.duplicate_prevention_decision ??
       describeEnrollmentDuplicatePreventionDecision(input.automation_report),
-    insert_error,
+    insert_error: dbEvidence?.insert_error ?? rawInsertError,
+    db_error_table: dbEvidence?.db_error_table ?? input.db_error_table ?? null,
+    db_error_operation: dbEvidence?.db_error_operation ?? input.db_error_operation ?? null,
+    db_error_message: dbEvidence?.db_error_message ?? input.db_error_message ?? null,
+    certification_source: input.certification_source ?? null,
     automation_message: input.automation_message ?? null,
   }
 }

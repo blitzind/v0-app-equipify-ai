@@ -27,6 +27,8 @@ export async function executeApolloFullPipelineProductionCertification(
   input: {
     company_candidate_id: string
     enrollment_candidate_id?: string | null
+    actor_user_id?: string | null
+    actor_email?: string | null
     env?: NodeJS.ProcessEnv
   },
 ): Promise<ApolloFullPipelineProductionCertificationExecuteResult> {
@@ -50,6 +52,8 @@ export async function executeApolloFullPipelineProductionCertification(
       execution_id,
       company_candidate_id: input.company_candidate_id,
       enrollment_candidate_id: input.enrollment_candidate_id ?? null,
+      actor_user_id: input.actor_user_id ?? null,
+      actor_email: input.actor_email ?? null,
       env,
     })
 

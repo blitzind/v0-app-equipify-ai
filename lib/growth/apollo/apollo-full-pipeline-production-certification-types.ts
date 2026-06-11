@@ -60,6 +60,10 @@ export type ApolloFullPipelineEnrollmentEvidence = {
   existing_enrollment_candidate_status: string | null
   duplicate_prevention_decision: string | null
   insert_error: string | null
+  db_error_table: string | null
+  db_error_operation: string | null
+  db_error_message: string | null
+  certification_source: string | null
   automation_message: string | null
 }
 

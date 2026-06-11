@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { normalizeGrowthActorUserIdForDb } from "@/lib/growth/actor-user-id"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { decisionMakerCandidateScore } from "@/lib/growth/decision-maker-source-weight"
 import type {
@@ -146,7 +147,7 @@ export async function createGrowthLeadDecisionMaker(
       evidence_excerpt: trimOrNull(input.evidenceExcerpt),
       status: input.status ?? "suspected",
       is_primary: input.isPrimary ?? false,
-      created_by: trimOrNull(input.createdBy),
+      created_by: normalizeGrowthActorUserIdForDb(input.createdBy),
     })
     .select(DM_SELECT)
     .single()

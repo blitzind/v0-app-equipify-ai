@@ -27,6 +27,8 @@ export async function POST(request: Request) {
   const result = await executeApolloFullPipelineProductionCertification(access.admin, {
     company_candidate_id: confirmation.company_candidate_id,
     enrollment_candidate_id: confirmation.enrollment_candidate_id,
+    actor_user_id: access.userId,
+    actor_email: access.userEmail,
     env: process.env,
   })
 

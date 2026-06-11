@@ -3,6 +3,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { normalizeGrowthActorUserIdForDb } from "@/lib/growth/actor-user-id"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { findImportDedupeMatch, proposeImportRowAction } from "@/lib/growth/import/dedupe"
 import type { NormalizedImportRow } from "@/lib/growth/import/types"
@@ -389,6 +390,10 @@ export async function runApolloEnrollmentAutoEnrollmentForCompany(
     production_qualification_threshold?: number | null
     certification_qualification_threshold?: number | null
     qualification_threshold_source?: "production" | "certification_override" | null
+    certification_source?: string | null
+    created_by_source?: string | null
+    execution_source?: string | null
+    audit_reason?: string | null
     target_company_contact_id?: string | null
     target_contact_candidate_id?: string | null
   },
@@ -602,13 +607,21 @@ export async function runApolloEnrollmentAutoEnrollmentForCompany(
         auto_enrollment_attempted: true,
         outreach_sent: false,
         updated_at: now,
-        metadata: { qa_marker: APOLLO_ENROLLMENT_AUTOMATION_QA_MARKER },
+        metadata: {
+          qa_marker: APOLLO_ENROLLMENT_AUTOMATION_QA_MARKER,
+          certification_source: input.certification_source ?? null,
+          created_by_source: input.created_by_source ?? null,
+          execution_source: input.execution_source ?? null,
+          audit_reason: input.audit_reason ?? null,
+        },
       })
       .select("*")
       .single()
 
     if (insertError || !inserted) {
-      blockers.push(`${contact.full_name}: ${insertError?.message ?? "candidate_insert_failed"}`)
+      blockers.push(
+        `${contact.full_name}: table=growth.apollo_enrollment_candidates operation=insert | ${insertError?.message ?? "candidate_insert_failed"}`,
+      )
       continue
     }
 
@@ -618,7 +631,7 @@ export async function runApolloEnrollmentAutoEnrollmentForCompany(
         company_candidate_id: input.company_candidate_id,
         company_contact_id: contact.company_contact_id,
         candidate_id: candidateId,
-        created_by: input.created_by,
+        created_by: normalizeGrowthActorUserIdForDb(input.created_by),
       })
 
       if (leadResolution.ok) {
@@ -643,7 +656,9 @@ export async function runApolloEnrollmentAutoEnrollmentForCompany(
           mapApolloEnrollmentCandidateDbRow((refreshed ?? inserted) as Record<string, unknown>),
         )
       } else {
-        blockers.push(`${contact.full_name}: ${leadResolution.code}`)
+        blockers.push(
+          `${contact.full_name}: table=growth.leads operation=insert | ${leadResolution.code}`,
+        )
         candidates.push(mapApolloEnrollmentCandidateDbRow(inserted as Record<string, unknown>))
       }
     } else {
@@ -693,6 +708,10 @@ export async function runApolloEnrollmentAutomation(
     production_qualification_threshold?: number | null
     certification_qualification_threshold?: number | null
     qualification_threshold_source?: "production" | "certification_override" | null
+    certification_source?: string | null
+    created_by_source?: string | null
+    execution_source?: string | null
+    audit_reason?: string | null
     target_company_contact_id?: string | null
     target_contact_candidate_id?: string | null
   },

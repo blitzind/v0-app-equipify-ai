@@ -20,6 +20,11 @@ import {
   scoreSequenceReadyContactsForCertification,
 } from "@/lib/growth/apollo/apollo-full-pipeline-enrollment-resolution"
 import {
+  resolveApolloFullPipelineCertificationActor,
+  APOLLO_FULL_PIPELINE_CERTIFICATION_SOURCE,
+} from "@/lib/growth/apollo/apollo-full-pipeline-certification-actor"
+import { buildApolloFullPipelineDbErrorEvidence } from "@/lib/growth/apollo/apollo-full-pipeline-db-error-evidence"
+import {
   resolveApolloEnrollmentQualificationThreshold,
   resolveApolloFullPipelineCertificationQualificationThreshold,
 } from "@/lib/growth/apollo/apollo-enrollment-qualification-engine"
@@ -49,9 +54,6 @@ import {
 } from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
 import { listSequenceExecutionJobs } from "@/lib/growth/sequences/execution/sequence-job-repository"
 
-const CERT_ACTOR_EMAIL = "apollo-full-pipeline-cert@equipify.internal"
-const CERT_ACTOR_ID = "apollo-full-pipeline-certification"
-
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
@@ -74,9 +76,15 @@ export async function certifyApolloFullPipelineProduction(
     execution_id: string
     company_candidate_id: string
     enrollment_candidate_id?: string | null
+    actor_user_id?: string | null
+    actor_email?: string | null
     env?: NodeJS.ProcessEnv
   },
 ): Promise<ApolloFullPipelineProductionCertificationReport> {
+  const actor = resolveApolloFullPipelineCertificationActor({
+    actor_user_id: input.actor_user_id,
+    actor_email: input.actor_email,
+  })
   const blockers: string[] = []
   const checks: ApolloFullPipelineProductionCertificationReport["checks"] = []
   const stageIds: ApolloFullPipelineStageIds = {
@@ -190,7 +198,10 @@ export async function certifyApolloFullPipelineProduction(
         threshold_source: certificationSelection.threshold_source,
         production_threshold: productionThreshold,
         certification_threshold: certificationThreshold,
-        created_by: CERT_ACTOR_ID,
+        actor_user_id: actor.actorUserId,
+        actor_email: actor.actorEmail,
+        certification_source: actor.certificationSource,
+        audit_reason: actor.auditReason,
         env: input.env,
       })
       enrollmentCandidateId =
@@ -217,6 +228,15 @@ export async function certifyApolloFullPipelineProduction(
     }
   }
 
+  const dbErrorEvidence = enrollmentAutomationMessage
+    ? buildApolloFullPipelineDbErrorEvidence({
+        message: enrollmentAutomationMessage,
+        company_contact_id: sequenceReadyContact?.company_contact_id ?? null,
+        contact_candidate_id: sequenceReadyContact?.contact_candidate_id ?? null,
+        candidate_id: enrollmentCandidateId,
+      })
+    : null
+
   const enrollmentEvidence: ApolloFullPipelineEnrollmentEvidence =
     await buildApolloFullPipelineEnrollmentEvidence(admin, {
       company_candidate_id: input.company_candidate_id,
@@ -237,6 +257,11 @@ export async function certifyApolloFullPipelineProduction(
       certification_threshold: certificationThreshold,
       qualification_override_used:
         certificationSelection?.threshold_source === "certification_override",
+      certification_source: APOLLO_FULL_PIPELINE_CERTIFICATION_SOURCE,
+      db_error_table: dbErrorEvidence?.db_error_table ?? null,
+      db_error_operation: dbErrorEvidence?.db_error_operation ?? null,
+      db_error_message: dbErrorEvidence?.db_error_message ?? null,
+      insert_error: dbErrorEvidence?.insert_error ?? undefined,
       env: input.env,
     })
 
@@ -304,8 +329,8 @@ export async function certifyApolloFullPipelineProduction(
   if (enrollment && enrollment.status === "pending_enrollment_approval") {
     const approveEnrollment = await approveApolloEnrollmentCandidate(admin, {
       candidate_id: enrollment.candidate_id,
-      approver_user_id: CERT_ACTOR_ID,
-      approver_email: CERT_ACTOR_EMAIL,
+      approver_user_id: actor.actorUserId,
+      approver_email: actor.actorEmail,
       note: `full-pipeline-cert:${input.execution_id}`,
     })
     checks.push({
@@ -359,8 +384,8 @@ export async function certifyApolloFullPipelineProduction(
   if (accountPlaybook && accountPlaybook.status === "pending_playbook_approval") {
     const approvePlaybook = await approveApolloAccountPlaybook(admin, {
       playbook_id: accountPlaybook.playbook_id,
-      approver_user_id: CERT_ACTOR_ID,
-      approver_email: CERT_ACTOR_EMAIL,
+      approver_user_id: actor.actorUserId,
+      approver_email: actor.actorEmail,
       note: `full-pipeline-cert:${input.execution_id}`,
     })
     checks.push({
@@ -407,8 +432,8 @@ export async function certifyApolloFullPipelineProduction(
   if (voiceDrop && voiceDrop.status === "pending_voice_drop_approval") {
     const approveVoiceDrop = await approveApolloVoiceDropCandidate(admin, {
       candidate_id: voiceDrop.candidate_id,
-      approver_user_id: CERT_ACTOR_ID,
-      approver_email: CERT_ACTOR_EMAIL,
+      approver_user_id: actor.actorUserId,
+      approver_email: actor.actorEmail,
       note: `full-pipeline-cert:${input.execution_id}`,
     })
     checks.push({
@@ -455,8 +480,8 @@ export async function certifyApolloFullPipelineProduction(
   if (multichannel && multichannel.status === "pending_sequence_approval") {
     const approveMultichannel = await approveApolloMultichannelSequenceCandidate(admin, {
       candidate_id: multichannel.candidate_id,
-      approver_user_id: CERT_ACTOR_ID,
-      approver_email: CERT_ACTOR_EMAIL,
+      approver_user_id: actor.actorUserId,
+      approver_email: actor.actorEmail,
       note: `full-pipeline-cert:${input.execution_id}`,
     })
     checks.push({

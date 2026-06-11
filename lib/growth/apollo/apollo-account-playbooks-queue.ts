@@ -3,6 +3,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { normalizeGrowthActorUserIdForDb } from "@/lib/growth/actor-user-id"
 import {
   buildApolloAccountPlaybookQueueSnapshot,
   evaluateApolloAccountPlaybookApprovalGate,
@@ -109,13 +110,14 @@ export async function approveApolloAccountPlaybook(
     .maybeSingle()
 
   const now = new Date().toISOString()
+  const approverUserId = normalizeGrowthActorUserIdForDb(input.approver_user_id)
   const { error: updateError } = await admin
     .schema("growth")
     .from(TABLE)
     .update({
       status: "playbook_approved",
       playbook_approved_at: now,
-      playbook_approved_by: input.approver_user_id ?? null,
+      playbook_approved_by: approverUserId,
       playbook_approved_email: input.approver_email ?? null,
       outreach_sent: false,
       updated_at: now,

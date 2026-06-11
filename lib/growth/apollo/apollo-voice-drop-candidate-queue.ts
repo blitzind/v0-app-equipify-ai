@@ -3,6 +3,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { normalizeGrowthActorUserIdForDb } from "@/lib/growth/actor-user-id"
 import {
   buildApolloVoiceDropCandidateQueueSnapshot,
   evaluateApolloVoiceDropApprovalGate,
@@ -103,13 +104,14 @@ export async function approveApolloVoiceDropCandidate(
   }
 
   const now = new Date().toISOString()
+  const approverUserId = normalizeGrowthActorUserIdForDb(input.approver_user_id)
   const { error: updateError } = await admin
     .schema("growth")
     .from(TABLE)
     .update({
       status: "voice_drop_approved",
       voice_drop_approved_at: now,
-      voice_drop_approved_by: input.approver_user_id ?? null,
+      voice_drop_approved_by: approverUserId,
       voice_drop_approved_email: input.approver_email ?? null,
       voice_drop_sent: false,
       outreach_sent: false,
