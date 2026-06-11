@@ -275,6 +275,7 @@
     "test:apollo-meeting-bridge": "tsx scripts/test-apollo-meeting-bridge.ts",
     "test:account-aware-meeting-prep": "tsx scripts/test-account-aware-meeting-prep.ts",
     "test:ai-meeting-prep": "tsx scripts/test-ai-meeting-prep.ts",
+    "test:opportunity-draft-engine": "tsx scripts/test-opportunity-draft-engine.ts",
     "test:apollo-full-pipeline-production-certification": "tsx scripts/test-apollo-full-pipeline-production-certification.ts",
     "test:apollo-search-diagnostic-evidence": "tsx scripts/test-apollo-search-diagnostic-evidence.ts",
     "test:apollo-partial-identity": "tsx scripts/test-apollo-partial-identity.ts",

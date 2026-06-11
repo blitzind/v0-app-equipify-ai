@@ -30,6 +30,7 @@ import type {
 } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 import { recomputeGrowthLeadNextBestAction } from "@/lib/growth/recompute-lead-next-best-action"
 import { recomputeMeetingOutcomeForMeeting } from "@/lib/growth/meeting-outcome-intelligence/meeting-outcome-intelligence-service"
+import { maybeGenerateOpportunityDraftForMeeting } from "@/lib/growth/meeting-intelligence/opportunity-draft-service"
 import { fetchGrowthMeetingLocationPlatformContext } from "@/lib/growth/meeting-location/meeting-location-settings-server"
 import {
   applyResolvedMeetingLocationPatch,
@@ -285,8 +286,30 @@ export async function updateGrowthMeeting(
     (input.status === "completed" && existing.status !== "completed") ||
     (input.status === "no_show" && existing.status !== "no_show")
 
+  const meetingJustCompleted = input.status === "completed" && existing.status !== "completed"
+  const outcomeJustSubmitted = Boolean(input.outcome?.trim()) && !existing.outcomeRecordedAt
+
   if (shouldRecomputeMeetingOutcome) {
-    void recomputeMeetingOutcomeForMeeting(admin, meetingId).catch(() => undefined)
+    void recomputeMeetingOutcomeForMeeting(admin, meetingId)
+      .then(() => {
+        if (nextStatus === "completed") {
+          return maybeGenerateOpportunityDraftForMeeting(admin, meetingId, {
+            regenerate: outcomeJustSubmitted && !meetingJustCompleted,
+            trigger: outcomeJustSubmitted ? "meeting_outcome" : "meeting_completed",
+            actor_user_id: input.actor?.userId ?? null,
+            actor_email: input.actor?.email ?? null,
+          })
+        }
+        return undefined
+      })
+      .catch(() => undefined)
+  } else if (nextStatus === "completed" && (meetingJustCompleted || outcomeJustSubmitted)) {
+    void maybeGenerateOpportunityDraftForMeeting(admin, meetingId, {
+      regenerate: outcomeJustSubmitted && !meetingJustCompleted,
+      trigger: outcomeJustSubmitted ? "meeting_outcome" : "meeting_completed",
+      actor_user_id: input.actor?.userId ?? null,
+      actor_email: input.actor?.email ?? null,
+    }).catch(() => undefined)
   }
 
   if (
