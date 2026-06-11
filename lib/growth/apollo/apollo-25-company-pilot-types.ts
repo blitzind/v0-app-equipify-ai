@@ -1,5 +1,10 @@
 /** Apollo 25-company pilot launch — client-safe types (Phase 14). */
 
+import type {
+  Apollo25CompanyPilotSelectionMode,
+  Apollo25CompanyPilotSkipReason,
+} from "@/lib/growth/apollo/apollo-25-company-pilot-skip-reasons"
+
 export const APOLLO_25_COMPANY_PILOT_QA_MARKER = "apollo-25-company-pilot-launch-v14" as const
 
 export const APOLLO_25_COMPANY_PILOT_TARGET_COUNT = 25 as const
@@ -33,8 +38,45 @@ export type Apollo25CompanyPilotSelectionReport = {
   selected_count: number
   eligible_pool_count: number
   production_qualification_threshold: number
+  pilot_selection_mode: Apollo25CompanyPilotSelectionMode
   selected: Apollo25CompanyPilotSelectionRow[]
-  skipped: Array<{ company_candidate_id: string; company_name: string; reason: string }>
+  skipped: Array<{
+    company_candidate_id: string
+    company_name: string
+    reason: string
+    skip_reason: Apollo25CompanyPilotSkipReason
+  }>
+}
+
+export type Apollo25CompanyPilotEligibilityFunnelCounts = {
+  total_apollo_discovered_companies: number
+  companies_with_verified_email: number
+  companies_with_sequence_ready_contacts: number
+  companies_with_qualification_score_gte_threshold: number
+  companies_blocked_by_re_enrollment: number
+  companies_blocked_by_suppression: number
+  companies_blocked_by_active_pilot: number
+  companies_blocked_by_missing_lead_contact_linkage: number
+  companies_blocked_by_materialization_readiness: number
+  companies_eligible_greenfield: number
+  companies_eligible_revalidation: number
+}
+
+export type Apollo25CompanyPilotEligibilityDiagnostic = {
+  qa_marker: typeof APOLLO_25_COMPANY_PILOT_QA_MARKER
+  target_count: number
+  production_qualification_threshold: number
+  pilot_selection_mode: Apollo25CompanyPilotSelectionMode
+  funnel_counts: Apollo25CompanyPilotEligibilityFunnelCounts
+  skipped_reason_counts: Record<Apollo25CompanyPilotSkipReason, number>
+  sample_blocked_companies: Array<{
+    company_candidate_id: string
+    company_name: string
+    primary_skip_reason: Apollo25CompanyPilotSkipReason
+    qualification_score: number
+    enrollment_status: string | null
+  }>
+  remediation: string[]
 }
 
 export type Apollo25CompanyPilotPreflightCheck = {
@@ -89,6 +131,8 @@ export type Apollo25CompanyPilotLaunchVerdict = "READY TO LAUNCH 25-COMPANY PILO
 export type Apollo25CompanyPilotLaunchReport = {
   qa_marker: typeof APOLLO_25_COMPANY_PILOT_QA_MARKER
   computed_at: string
+  root_cause_summary: string
+  eligibility_diagnostic: Apollo25CompanyPilotEligibilityDiagnostic
   selection: Apollo25CompanyPilotSelectionReport
   preflight: Apollo25CompanyPilotPreflightReport
   cohort_creation: {

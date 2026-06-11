@@ -6,8 +6,13 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { summarizeApolloOperatorReviewForQualification } from "@/lib/growth/apollo/apollo-enrollment-automation-evidence"
 import type { ApolloEnrollmentCandidateStatus } from "@/lib/growth/apollo/apollo-enrollment-automation-types"
 import { resolveApolloEnrollmentQualificationThreshold } from "@/lib/growth/apollo/apollo-enrollment-qualification-engine"
-import { buildApollo25CompanyPilotLaunchReport, resolveApollo25CompanyPilotEnvGatesOk } from "@/lib/growth/apollo/apollo-25-company-pilot-launch-report"
+import { buildApollo25CompanyPilotEligibilityDiagnostic } from "@/lib/growth/apollo/apollo-25-company-pilot-eligibility-diagnostic"
+import {
+  buildApollo25CompanyPilotLaunchReport,
+  resolveApollo25CompanyPilotEnvGatesOk,
+} from "@/lib/growth/apollo/apollo-25-company-pilot-launch-report"
 import type { Apollo25CompanyPilotSelectionInput } from "@/lib/growth/apollo/apollo-25-company-pilot-selection"
+import type { Apollo25CompanyPilotSelectionMode } from "@/lib/growth/apollo/apollo-25-company-pilot-skip-reasons"
 import { createApolloPilotCohort } from "@/lib/growth/apollo/apollo-pilot-route"
 import { loadApolloPrimaryContactOperatorReviewSnapshot } from "@/lib/growth/apollo/apollo-primary-contact-operator-review"
 import { APOLLO_25_COMPANY_PILOT_TARGET_COUNT } from "@/lib/growth/apollo/apollo-25-company-pilot-types"
@@ -15,9 +20,16 @@ import { APOLLO_25_COMPANY_PILOT_TARGET_COUNT } from "@/lib/growth/apollo/apollo
 const COHORTS_TABLE = "apollo_pilot_cohorts"
 const COMPANIES_TABLE = "apollo_pilot_cohort_companies"
 const ENROLLMENT_TABLE = "apollo_enrollment_candidates"
+const CONTACT_CANDIDATES_TABLE = "contact_candidates"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
+}
+
+function parsePilotSelectionMode(value: unknown): Apollo25CompanyPilotSelectionMode {
+  const raw = asString(value)
+  if (raw === "existing_pipeline_revalidation") return "existing_pipeline_revalidation"
+  return "greenfield"
 }
 
 async function loadActivePilotCompanyIds(admin: SupabaseClient): Promise<Set<string>> {
@@ -48,20 +60,32 @@ async function loadActivePilotCompanyIds(admin: SupabaseClient): Promise<Set<str
   return ids
 }
 
-async function loadEnrollmentCompanyPool(admin: SupabaseClient): Promise<string[]> {
-  const { data, error } = await admin
-    .schema("growth")
-    .from(ENROLLMENT_TABLE)
-    .select("company_candidate_id")
-
-  if (error) throw new Error(error.message)
-
+async function loadApolloDiscoveredCompanyIds(admin: SupabaseClient): Promise<string[]> {
   const ids = new Set<string>()
-  for (const row of data ?? []) {
+
+  const [enrollmentRes, contactCandidateRes] = await Promise.all([
+    admin.schema("growth").from(ENROLLMENT_TABLE).select("company_candidate_id"),
+    admin
+      .schema("growth")
+      .from(CONTACT_CANDIDATES_TABLE)
+      .select("company_candidate_id")
+      .eq("provider_type", "future_apollo")
+      .not("company_candidate_id", "is", null),
+  ])
+
+  if (enrollmentRes.error) throw new Error(enrollmentRes.error.message)
+  if (contactCandidateRes.error) throw new Error(contactCandidateRes.error.message)
+
+  for (const row of enrollmentRes.data ?? []) {
     const id = asString((row as Record<string, unknown>).company_candidate_id)
     if (id) ids.add(id)
   }
-  return [...ids]
+  for (const row of contactCandidateRes.data ?? []) {
+    const id = asString((row as Record<string, unknown>).company_candidate_id)
+    if (id) ids.add(id)
+  }
+
+  return [...ids].sort()
 }
 
 async function loadEnrollmentStateByCompany(
@@ -104,6 +128,60 @@ async function loadEnrollmentStateByCompany(
   return map
 }
 
+async function loadPipelineStateByCompany(
+  admin: SupabaseClient,
+  companyIds: string[],
+): Promise<
+  Record<
+    string,
+    {
+      has_execution_ready_candidate: boolean
+      has_account_playbook: boolean
+    }
+  >
+> {
+  if (companyIds.length === 0) return {}
+
+  const [executionRes, playbookRes] = await Promise.all([
+    admin
+      .schema("growth")
+      .from("apollo_sequence_execution_candidates")
+      .select("company_candidate_id, status")
+      .in("company_candidate_id", companyIds),
+    admin
+      .schema("growth")
+      .from("account_playbooks")
+      .select("company_candidate_id")
+      .in("company_candidate_id", companyIds),
+  ])
+
+  if (executionRes.error) throw new Error(executionRes.error.message)
+  if (playbookRes.error) throw new Error(playbookRes.error.message)
+
+  const map: Record<string, { has_execution_ready_candidate: boolean; has_account_playbook: boolean }> = {}
+
+  for (const companyId of companyIds) {
+    map[companyId] = { has_execution_ready_candidate: false, has_account_playbook: false }
+  }
+
+  for (const row of executionRes.data ?? []) {
+    const record = row as Record<string, unknown>
+    const companyId = asString(record.company_candidate_id)
+    if (!companyId || !map[companyId]) continue
+    if (asString(record.status) === "execution_ready") {
+      map[companyId].has_execution_ready_candidate = true
+    }
+  }
+
+  for (const row of playbookRes.data ?? []) {
+    const companyId = asString((row as Record<string, unknown>).company_candidate_id)
+    if (!companyId || !map[companyId]) continue
+    map[companyId].has_account_playbook = true
+  }
+
+  return map
+}
+
 async function loadActiveEnrollmentLeadIds(admin: SupabaseClient, leadIds: string[]): Promise<Set<string>> {
   if (leadIds.length === 0) return new Set()
 
@@ -128,10 +206,13 @@ export async function buildApollo25CompanyPilotSelectionInputs(
   admin: SupabaseClient,
   options?: { company_ids?: string[] },
 ): Promise<Apollo25CompanyPilotSelectionInput[]> {
-  const pool = options?.company_ids ?? await loadEnrollmentCompanyPool(admin)
+  const pool = options?.company_ids ?? await loadApolloDiscoveredCompanyIds(admin)
   const activePilotIds = await loadActivePilotCompanyIds(admin)
   const enrollmentState = await loadEnrollmentStateByCompany(admin, pool)
-  const leadIds = [...new Set(Object.values(enrollmentState).map((row) => row.growth_lead_id).filter(Boolean) as string[])]
+  const pipelineState = await loadPipelineStateByCompany(admin, pool)
+  const leadIds = [
+    ...new Set(Object.values(enrollmentState).map((row) => row.growth_lead_id).filter(Boolean) as string[]),
+  ]
   const activeLeadIds = await loadActiveEnrollmentLeadIds(admin, leadIds)
 
   const inputs: Apollo25CompanyPilotSelectionInput[] = []
@@ -141,8 +222,8 @@ export async function buildApollo25CompanyPilotSelectionInputs(
     if (!snapshot) continue
 
     const enrollment = enrollmentState[companyId]
-    const hasActive =
-      enrollment?.growth_lead_id ? activeLeadIds.has(enrollment.growth_lead_id) : false
+    const pipeline = pipelineState[companyId]
+    const hasActive = enrollment?.growth_lead_id ? activeLeadIds.has(enrollment.growth_lead_id) : false
 
     inputs.push({
       company_candidate_id: companyId,
@@ -151,14 +232,32 @@ export async function buildApollo25CompanyPilotSelectionInputs(
       contacts: snapshot.contacts,
       snapshot_summary: summarizeApolloOperatorReviewForQualification(snapshot),
       enrollment_status: enrollment?.status ?? null,
+      growth_lead_id: enrollment?.growth_lead_id ?? null,
       has_active_sequence_enrollment: hasActive,
       in_active_pilot_cohort: activePilotIds.has(companyId),
+      has_execution_ready_candidate: pipeline?.has_execution_ready_candidate ?? false,
+      has_account_playbook: pipeline?.has_account_playbook ?? false,
       company_intelligence_present: true,
       buying_committee_present: false,
     })
   }
 
   return inputs
+}
+
+export async function loadApollo25CompanyPilotEligibilityDiagnosticReport(
+  admin: SupabaseClient,
+  input?: { pilot_selection_mode?: Apollo25CompanyPilotSelectionMode },
+) {
+  const production_threshold = resolveApolloEnrollmentQualificationThreshold()
+  const pilot_selection_mode = input?.pilot_selection_mode ?? "greenfield"
+  const selection_inputs = await buildApollo25CompanyPilotSelectionInputs(admin)
+
+  return buildApollo25CompanyPilotEligibilityDiagnostic(selection_inputs, {
+    production_threshold,
+    pilot_selection_mode,
+    target_count: APOLLO_25_COMPANY_PILOT_TARGET_COUNT,
+  })
 }
 
 export async function loadApollo25CompanyPilotLaunchReport(
@@ -168,12 +267,14 @@ export async function loadApollo25CompanyPilotLaunchReport(
     cohort_name?: string
     created_by?: string
     created_by_email?: string
+    pilot_selection_mode?: Apollo25CompanyPilotSelectionMode
   },
 ) {
   const migrationProbe = await admin.schema("growth").from(COHORTS_TABLE).select("id").limit(1)
   const migration_present = !migrationProbe.error
 
   const production_threshold = resolveApolloEnrollmentQualificationThreshold()
+  const pilot_selection_mode = input?.pilot_selection_mode ?? "greenfield"
   const selection_inputs = await buildApollo25CompanyPilotSelectionInputs(admin)
 
   let cohort_creation: {
@@ -195,6 +296,7 @@ export async function loadApollo25CompanyPilotLaunchReport(
   const preview = buildApollo25CompanyPilotLaunchReport({
     selection_inputs,
     production_threshold,
+    pilot_selection_mode,
     migration_present,
     cohort_status: null,
     env_gates_ok: resolveApollo25CompanyPilotEnvGatesOk(),
@@ -218,7 +320,9 @@ export async function loadApollo25CompanyPilotLaunchReport(
       metadata: {
         qa_marker: preview.qa_marker,
         pilot_launch_certification: true,
+        pilot_selection_mode,
         no_auto_outreach: true,
+        no_duplicate_enrollment: true,
       },
     })
 
@@ -235,6 +339,7 @@ export async function loadApollo25CompanyPilotLaunchReport(
   const report = buildApollo25CompanyPilotLaunchReport({
     selection_inputs,
     production_threshold,
+    pilot_selection_mode,
     migration_present,
     cohort_status,
     cohort_creation,
@@ -244,3 +349,5 @@ export async function loadApollo25CompanyPilotLaunchReport(
 
   return report
 }
+
+export { parsePilotSelectionMode }

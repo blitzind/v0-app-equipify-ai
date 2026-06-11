@@ -1,10 +1,17 @@
 /** Assemble full 25-company pilot launch certification report — client-safe. */
 
-import { buildApollo25CompanyPilotLaunchChecklist, resolveApollo25CompanyPilotVerdict, validateApollo25CompanyPilotLifecycleControls } from "@/lib/growth/apollo/apollo-25-company-pilot-launch-checklist"
+import { buildApollo25CompanyPilotEligibilityDiagnostic } from "@/lib/growth/apollo/apollo-25-company-pilot-eligibility-diagnostic"
+import {
+  buildApollo25CompanyPilotLaunchChecklist,
+  resolveApollo25CompanyPilotVerdict,
+  validateApollo25CompanyPilotLifecycleControls,
+} from "@/lib/growth/apollo/apollo-25-company-pilot-launch-checklist"
 import { runApollo25CompanyPilotPreflight } from "@/lib/growth/apollo/apollo-25-company-pilot-preflight"
 import { selectApollo25CompanyPilotCandidates } from "@/lib/growth/apollo/apollo-25-company-pilot-selection"
+import type { Apollo25CompanyPilotSelectionMode } from "@/lib/growth/apollo/apollo-25-company-pilot-skip-reasons"
 import {
   APOLLO_25_COMPANY_PILOT_QA_MARKER,
+  type Apollo25CompanyPilotEligibilityDiagnostic,
   type Apollo25CompanyPilotLaunchReport,
 } from "@/lib/growth/apollo/apollo-25-company-pilot-types"
 import { estimateApollo25CompanyPilotWorkload } from "@/lib/growth/apollo/apollo-25-company-pilot-workload"
@@ -21,10 +28,46 @@ export function resolveApollo25CompanyPilotEnvGatesOk(env: NodeJS.ProcessEnv = p
   return env.GROWTH_APOLLO_LIVE_BENCHMARK_ACK === "1"
 }
 
+export function buildApollo25CompanyPilotRootCauseSummary(
+  diagnostic: Apollo25CompanyPilotEligibilityDiagnostic,
+): string {
+  const { funnel_counts, skipped_reason_counts, pilot_selection_mode } = diagnostic
+
+  if (funnel_counts.companies_eligible_greenfield >= diagnostic.target_count && pilot_selection_mode === "greenfield") {
+    return "Eligible greenfield pool meets target under production rules."
+  }
+
+  if (
+    pilot_selection_mode === "existing_pipeline_revalidation" &&
+    funnel_counts.companies_eligible_revalidation >= diagnostic.target_count
+  ) {
+    return "Eligible revalidation pool meets target for existing pipeline companies."
+  }
+
+  const topReason = Object.entries(skipped_reason_counts)
+    .filter(([, count]) => count > 0)
+    .sort((left, right) => right[1] - left[1])[0]
+
+  const parts: string[] = [
+    `Apollo discovered ${funnel_counts.total_apollo_discovered_companies} companies; greenfield eligible ${funnel_counts.companies_eligible_greenfield}, revalidation eligible ${funnel_counts.companies_eligible_revalidation}.`,
+  ]
+
+  if (topReason) {
+    parts.push(`Primary blocker: ${topReason[0]} (${topReason[1]} companies).`)
+  }
+
+  if (funnel_counts.total_apollo_discovered_companies < diagnostic.target_count) {
+    parts.push("Insufficient Apollo discovery footprint for a 25-company pilot.")
+  }
+
+  return parts.join(" ")
+}
+
 export function buildApollo25CompanyPilotLaunchReport(input: {
   selection_inputs: Apollo25CompanyPilotSelectionInput[]
   contacts_by_company?: Record<string, ApolloPrimaryContactOperatorReviewRow>
   production_threshold?: number
+  pilot_selection_mode?: Apollo25CompanyPilotSelectionMode
   migration_present: boolean
   cohort_status: ApolloPilotCohortStatus | null
   cohort_creation?: Apollo25CompanyPilotLaunchReport["cohort_creation"]
@@ -33,9 +76,21 @@ export function buildApollo25CompanyPilotLaunchReport(input: {
   env_gates_ok?: boolean
   computed_at?: string
 }): Apollo25CompanyPilotLaunchReport {
+  const production_threshold = input.production_threshold ?? 70
+  const pilot_selection_mode = input.pilot_selection_mode ?? "greenfield"
+
   const selection = selectApollo25CompanyPilotCandidates(input.selection_inputs, {
     production_threshold: input.production_threshold,
+    pilot_selection_mode,
   })
+
+  const eligibility_diagnostic = buildApollo25CompanyPilotEligibilityDiagnostic(input.selection_inputs, {
+    production_threshold,
+    pilot_selection_mode,
+    target_count: selection.target_count,
+  })
+
+  const root_cause_summary = buildApollo25CompanyPilotRootCauseSummary(eligibility_diagnostic)
 
   const contacts_by_company = input.contacts_by_company ?? {}
   for (const row of selection.selected) {
@@ -76,6 +131,8 @@ export function buildApollo25CompanyPilotLaunchReport(input: {
   const partial: Omit<Apollo25CompanyPilotLaunchReport, "verdict" | "recommendations"> = {
     qa_marker: APOLLO_25_COMPANY_PILOT_QA_MARKER,
     computed_at: input.computed_at ?? new Date().toISOString(),
+    root_cause_summary,
+    eligibility_diagnostic,
     selection,
     preflight,
     cohort_creation: input.cohort_creation ?? {
@@ -92,11 +149,11 @@ export function buildApollo25CompanyPilotLaunchReport(input: {
   }
 
   const verdict = resolveApollo25CompanyPilotVerdict(partial)
-  const recommendations: string[] = []
+  const recommendations: string[] = [...eligibility_diagnostic.remediation]
 
   if (selection.selected_count < selection.target_count) {
     recommendations.push(
-      `Expand eligible pool: only ${selection.selected_count}/${selection.target_count} companies pass production rules.`,
+      `Expand eligible pool: only ${selection.selected_count}/${selection.target_count} companies pass production rules in ${pilot_selection_mode} mode.`,
     )
   }
   if (preflight.pilot_readiness_pct < 100) {

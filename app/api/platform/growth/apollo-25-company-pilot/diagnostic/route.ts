@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import {
-  loadApollo25CompanyPilotLaunchReport,
+  loadApollo25CompanyPilotEligibilityDiagnosticReport,
   parsePilotSelectionMode,
 } from "@/lib/growth/apollo/apollo-25-company-pilot-route"
 
@@ -20,10 +20,10 @@ export async function GET(request: Request) {
   )
 
   try {
-    const report = await loadApollo25CompanyPilotLaunchReport(access.admin, {
+    const diagnostic = await loadApollo25CompanyPilotEligibilityDiagnosticReport(access.admin, {
       pilot_selection_mode,
     })
-    return NextResponse.json({ ok: true, report })
+    return NextResponse.json({ ok: true, diagnostic })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, message }, { status: 500 })

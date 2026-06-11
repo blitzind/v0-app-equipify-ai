@@ -11,6 +11,7 @@ import {
   isApolloPilotCohortProcessingAllowed,
   resolveApolloPilotCohortStatusAfterAction,
 } from "../lib/growth/apollo/apollo-pilot-cohort-state"
+import { buildApollo25CompanyPilotEligibilityDiagnostic } from "../lib/growth/apollo/apollo-25-company-pilot-eligibility-diagnostic"
 import {
   buildApollo25CompanyPilotLaunchChecklist,
   resolveApollo25CompanyPilotVerdict,
@@ -18,6 +19,7 @@ import {
 } from "../lib/growth/apollo/apollo-25-company-pilot-launch-checklist"
 import {
   buildApollo25CompanyPilotLaunchReport,
+  buildApollo25CompanyPilotRootCauseSummary,
   resolveApollo25CompanyPilotEnvGatesOk,
 } from "../lib/growth/apollo/apollo-25-company-pilot-launch-report"
 import { runApollo25CompanyPilotPreflight } from "../lib/growth/apollo/apollo-25-company-pilot-preflight"
@@ -36,13 +38,16 @@ const ROOT = process.cwd()
 
 const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-25-company-pilot-types.ts",
+  "lib/growth/apollo/apollo-25-company-pilot-skip-reasons.ts",
   "lib/growth/apollo/apollo-25-company-pilot-selection.ts",
+  "lib/growth/apollo/apollo-25-company-pilot-eligibility-diagnostic.ts",
   "lib/growth/apollo/apollo-25-company-pilot-preflight.ts",
   "lib/growth/apollo/apollo-25-company-pilot-workload.ts",
   "lib/growth/apollo/apollo-25-company-pilot-launch-checklist.ts",
   "lib/growth/apollo/apollo-25-company-pilot-launch-report.ts",
   "lib/growth/apollo/apollo-25-company-pilot-route.ts",
   "app/api/platform/growth/apollo-25-company-pilot/report/route.ts",
+  "app/api/platform/growth/apollo-25-company-pilot/diagnostic/route.ts",
   "app/api/platform/growth/apollo-25-company-pilot/cohort/route.ts",
 ]
 
@@ -160,6 +165,61 @@ assert.equal(suppressedEligibility.eligible, false)
 assert.match(suppressedEligibility.reason, /suppression/)
 console.log("  ✓ suppression check")
 
+const approvedCompany = buildFixtureCompany(900)
+approvedCompany.enrollment_status = "enrollment_approved"
+approvedCompany.growth_lead_id = "lead-900"
+const approvedGreenfield = selectApollo25CompanyPilotCandidates([approvedCompany], {
+  production_threshold: 70,
+  pilot_selection_mode: "greenfield",
+})
+assert.equal(approvedGreenfield.selected_count, 0)
+assert.equal(approvedGreenfield.skipped[0]?.skip_reason, "already_enrollment_approved")
+console.log("  ✓ already-approved excluded in greenfield mode")
+
+const approvedRevalidation = selectApollo25CompanyPilotCandidates(
+  [
+    {
+      ...approvedCompany,
+      has_execution_ready_candidate: true,
+      has_account_playbook: true,
+    },
+  ],
+  {
+    production_threshold: 70,
+    pilot_selection_mode: "existing_pipeline_revalidation",
+  },
+)
+assert.equal(approvedRevalidation.selected_count, 1)
+console.log("  ✓ existing_pipeline_revalidation includes approved pipeline company")
+
+const approvedNoMaterialization = selectApollo25CompanyPilotCandidates([approvedCompany], {
+  production_threshold: 70,
+  pilot_selection_mode: "existing_pipeline_revalidation",
+})
+assert.equal(approvedNoMaterialization.selected_count, 0)
+assert.equal(approvedNoMaterialization.skipped[0]?.skip_reason, "materialization_not_ready")
+console.log("  ✓ revalidation requires execution-ready or playbook materialization")
+
+const emptyPoolDiagnostic = buildApollo25CompanyPilotEligibilityDiagnostic(
+  [
+    {
+      ...approvedCompany,
+      company_candidate_id: "stat-biomedical",
+      company_name: "Stat Biomedical Technicians, Inc.",
+    },
+  ],
+  { production_threshold: 70, pilot_selection_mode: "greenfield" },
+)
+assert.equal(emptyPoolDiagnostic.funnel_counts.companies_eligible_greenfield, 0)
+assert.equal(emptyPoolDiagnostic.skipped_reason_counts.already_enrollment_approved, 1)
+assert.ok(emptyPoolDiagnostic.remediation.length > 0)
+assert.ok(
+  emptyPoolDiagnostic.remediation.some((line) => line.includes("existing_pipeline_revalidation")),
+)
+const emptyRootCause = buildApollo25CompanyPilotRootCauseSummary(emptyPoolDiagnostic)
+assert.match(emptyRootCause, /already_enrollment_approved|greenfield eligible 0/)
+console.log("  ✓ empty eligible pool diagnostic counts and remediation")
+
 const contactsByCompany: Record<string, ApolloPrimaryContactOperatorReviewRow> = {}
 for (const company of fixtureCompanies.slice(0, 25)) {
   contactsByCompany[company.company_candidate_id] = company.contacts[0]
@@ -233,6 +293,8 @@ const report = buildApollo25CompanyPilotLaunchReport({
 assert.equal(report.verdict, "READY TO LAUNCH 25-COMPANY PILOT")
 assert.equal(report.no_outreach_side_effects, true)
 assert.equal(report.lifecycle_controls_validated, true)
+assert.ok(report.eligibility_diagnostic.funnel_counts.companies_eligible_greenfield >= 25)
+assert.ok(report.root_cause_summary.length > 0)
 assert.equal(resolveApollo25CompanyPilotVerdict(report), "READY TO LAUNCH 25-COMPANY PILOT")
 console.log("  ✓ certification verdict READY TO LAUNCH 25-COMPANY PILOT")
 
