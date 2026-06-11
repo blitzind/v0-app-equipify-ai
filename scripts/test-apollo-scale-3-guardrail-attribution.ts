@@ -125,6 +125,11 @@ function testZeroRawHistoricalContactsDoNotCurrentRunPass(): void {
           tier_attempts_compact: [],
           contactable: 0,
           sequence_ready: 0,
+          current_run_apollo_verified_email_contacts: 0,
+          current_run_apollo_promoted_contacts: 0,
+          current_run_apollo_contactable_contacts: 0,
+          current_run_apollo_sequence_ready_contacts: 0,
+          certification_fail_reasons: [],
           legacy_fallback_used: false,
           partial_identity_evidence: {
             qa_marker: "apollo-partial-identity-v1",

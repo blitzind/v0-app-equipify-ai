@@ -16,6 +16,7 @@ import {
   type ApolloScale3SearchStrategyCertification,
 } from "@/lib/growth/apollo/apollo-scale-3-search-strategy-certification"
 import type { ApolloScale2CertResult } from "@/lib/growth/apollo/apollo-scale-2-live-acquisition-certification"
+import type { ApolloScale3CertFailReason } from "@/lib/growth/apollo/apollo-scale-3-certification-assessment"
 import { buildApolloSearchApiBudgetEvidence } from "@/lib/growth/apollo/apollo-search-api-budget-evidence"
 import type { ApolloSearchApiBudgetEvidence } from "@/lib/growth/apollo/apollo-search-api-budget-evidence"
 import { resolveApolloScale2CompanyLimit } from "@/lib/growth/apollo/apollo-scale-2-production-route-gates"
@@ -40,6 +41,7 @@ export type ApolloScale3ProductionExecuteResult = {
   stack?: string
   certification: ApolloScale3SearchStrategyCertification | null
   search_api_budget: ApolloSearchApiBudgetEvidence | null
+  fail_reasons: ApolloScale3CertFailReason[]
 }
 
 function serializeApolloScale3ExecuteResult(
@@ -74,6 +76,7 @@ function serializeApolloScale3ExecuteResult(
       error_metadata: failure.error_metadata,
       certification: payload.certification,
       search_api_budget: payload.search_api_budget ?? buildApolloSearchApiBudgetEvidence({ env }),
+      fail_reasons: payload.fail_reasons ?? [],
     })
   }
 }
@@ -136,6 +139,7 @@ export async function executeApolloScale3InProduction(
           aggregate: null,
           certification: null,
           search_api_budget: buildApolloSearchApiBudgetEvidence({ env }),
+          fail_reasons: [],
         },
         env,
       )
@@ -166,6 +170,7 @@ export async function executeApolloScale3InProduction(
           aggregate: null,
           certification: null,
           search_api_budget: buildApolloSearchApiBudgetEvidence({ env }),
+          fail_reasons: [],
         },
         env,
       )
@@ -197,6 +202,7 @@ export async function executeApolloScale3InProduction(
           aggregate: null,
           certification: null,
           search_api_budget: buildApolloSearchApiBudgetEvidence({ env }),
+          fail_reasons: [],
         },
         env,
       )
@@ -207,7 +213,7 @@ export async function executeApolloScale3InProduction(
     const blockers = certification.certification.failures_ranked.map(
       (row) => `${row.category} (${row.count})`,
     )
-    const ok = certification.result !== "FAIL"
+    const ok = certification.result === "PASS"
 
     return serializeApolloScale3ExecuteResult(
       {
@@ -220,6 +226,7 @@ export async function executeApolloScale3InProduction(
         failure_analysis: certification.failure_analysis,
         aggregate: certification.aggregate,
         certification,
+        fail_reasons: certification.certification_assessment.fail_reasons,
         search_api_budget: buildApolloSearchApiBudgetEvidence({
           env,
           company_limit: input?.company_limit ?? gates.company_limit,
@@ -254,6 +261,7 @@ export async function executeApolloScale3InProduction(
         aggregate: null,
         certification: null,
         search_api_budget: buildApolloSearchApiBudgetEvidence({ env }),
+        fail_reasons: [],
       },
       env,
     )

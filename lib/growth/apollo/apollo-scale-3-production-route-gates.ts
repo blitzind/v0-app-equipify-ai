@@ -44,6 +44,7 @@ await fetch("/api/platform/growth/apollo-scale-3/execute", {
     console.log("stage", payload.stage)
     console.log("error", payload.error ?? null, payload.message ?? null)
     console.log("verdict", payload.verdict)
+    console.log("fail_reasons", payload.fail_reasons)
     console.log("aggregate", payload.aggregate)
     console.log("failure_analysis", payload.failure_analysis)
     console.log("search_outcomes", (payload.companies ?? []).reduce((acc, row) => {
@@ -56,6 +57,11 @@ await fetch("/api/platform/growth/apollo-scale-3/execute", {
         search_outcome: row.acquisition_evidence?.search_outcome,
         raw: row.raw_contacts_returned,
         mapped: row.mapped_contacts,
+        current_run_apollo_verified_email_contacts: row.current_run_apollo_verified_email_contacts,
+        current_run_apollo_promoted_contacts: row.current_run_apollo_promoted_contacts,
+        current_run_apollo_contactable_contacts: row.current_run_apollo_contactable_contacts,
+        current_run_apollo_sequence_ready_contacts: row.current_run_apollo_sequence_ready_contacts,
+        certification_fail_reasons: row.certification_fail_reasons,
         tier_attempts_compact: row.tier_attempts_compact,
         mapper_rejection_evidence: row.mapper_rejection_evidence,
         rejection_reasons: row.rejection_reasons,

@@ -15,7 +15,11 @@ import {
   mapApolloScale3CompanyEvidenceRow,
   type ApolloScale3CompanyPromotionEvidence,
 } from "@/lib/growth/apollo/apollo-scale-3-company-promotion-evidence"
-import { assessApolloScale3SearchStrategyResult } from "@/lib/growth/apollo/apollo-scale-3-certification-assessment"
+import {
+  buildApolloScale3CertificationAssessment,
+  resolveApolloScale3CompanyCertificationFailReasons,
+  type ApolloScale3CertificationAssessment,
+} from "@/lib/growth/apollo/apollo-scale-3-certification-assessment"
 import type { ApolloPrimaryContactAcquisitionCompanyEvidence } from "@/lib/growth/apollo/apollo-primary-contact-acquisition-evidence"
 import type { ApolloSearchTierAttemptEvidence } from "@/lib/growth/providers/apollo/apollo-tiered-people-search-types"
 
@@ -59,11 +63,16 @@ export type ApolloScale3SearchStrategyCertification = {
     historical_apollo_verified_email_contacts: number
   }
   failure_analysis: ApolloScale2LiveAcquisitionCertification["failure_analysis"]
+  certification_assessment: ApolloScale3CertificationAssessment
   certification: ApolloScale2LiveAcquisitionCertification
 }
 
 export { mapApolloScale3CompanyEvidenceRow }
 export { assessApolloScale3SearchStrategyResult } from "@/lib/growth/apollo/apollo-scale-3-certification-assessment"
+export {
+  buildApolloScale3CertificationAssessment,
+  type ApolloScale3CertFailReason,
+} from "@/lib/growth/apollo/apollo-scale-3-certification-assessment"
 
 export async function certifyApolloScale3SearchStrategy(
   admin: SupabaseClient,
@@ -85,7 +94,10 @@ export async function certifyApolloScale3SearchStrategy(
       base,
       acquisition: acquisitionById.get(base.company_candidate_id) ?? null,
     }),
-  )
+  ).map((row) => ({
+    ...row,
+    certification_fail_reasons: resolveApolloScale3CompanyCertificationFailReasons(row),
+  }))
 
   const tierCounts = {
     tier_1: 0,
@@ -133,14 +145,14 @@ export async function certifyApolloScale3SearchStrategy(
       row.promotion_evidence.historical_apollo_verified_email_contacts
   }
 
-  const scale3Result = assessApolloScale3SearchStrategyResult({
+  const certification_assessment = buildApolloScale3CertificationAssessment({
     companies,
     mock: scale2.runtime.mock,
   })
 
   return {
     qa_marker: APOLLO_SCALE_3_QA_MARKER,
-    result: scale3Result,
+    result: certification_assessment.result,
     certified_at: scale2.certified_at,
     mode: "live_apollo_tiered_search",
     safety: {
@@ -151,8 +163,11 @@ export async function certifyApolloScale3SearchStrategy(
     },
     companies,
     failure_analysis: scale2.failure_analysis,
+    certification_assessment,
     aggregate: {
       ...scale2.aggregate,
+      contactable_contacts: current_run_apollo_contactable_contacts,
+      sequence_ready_contacts: current_run_apollo_sequence_ready_contacts,
       tier_1_companies: tierCounts.tier_1,
       tier_2_companies: tierCounts.tier_2,
       tier_3_companies: tierCounts.tier_3,

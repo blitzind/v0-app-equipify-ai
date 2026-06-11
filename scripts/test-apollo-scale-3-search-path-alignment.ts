@@ -284,6 +284,8 @@ function testCurrentRunApolloFieldsDefaultToZero(): void {
     },
     acquisition: null,
   })
+  assert.equal(row.current_run_apollo_contactable_contacts, 0)
+  assert.equal(row.current_run_apollo_sequence_ready_contacts, 0)
   assert.equal(row.promotion_evidence.current_run_apollo_verified_email_contacts, 0)
   assert.equal(row.promotion_evidence.current_run_apollo_promoted_contacts, 0)
   assert.equal(row.promotion_evidence.current_run_apollo_contactable_contacts, 0)
