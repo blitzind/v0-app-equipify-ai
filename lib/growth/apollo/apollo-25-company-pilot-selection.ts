@@ -40,6 +40,9 @@ export type Apollo25CompanyPilotSelectionInput = {
   has_account_playbook?: boolean
   company_intelligence_present?: boolean
   buying_committee_present?: boolean
+  buying_committee_coverage?: number | null
+  fit_score?: number | null
+  research_score?: number | null
 }
 
 export type Apollo25CompanyPilotCompanyEligibilitySignals = {
@@ -147,9 +150,9 @@ function scoreContacts(
         sequence_ready_contacts: input.snapshot_summary.sequence_ready_contacts,
         company_intelligence_present: input.company_intelligence_present ?? true,
         buying_committee_present: input.buying_committee_present ?? false,
-        buying_committee_coverage: null,
-        fit_score: null,
-        research_score: null,
+        buying_committee_coverage: input.buying_committee_coverage ?? null,
+        fit_score: input.fit_score ?? null,
+        research_score: input.research_score ?? null,
         contact_sequence_ready: contact.sequence_ready,
         contact_contactable: contact.contactable,
         contact_blockers: contact.blockers,

@@ -14,6 +14,8 @@ import {
 import type { Apollo25CompanyPilotSelectionInput } from "@/lib/growth/apollo/apollo-25-company-pilot-selection"
 import type { Apollo25CompanyPilotSelectionMode } from "@/lib/growth/apollo/apollo-25-company-pilot-skip-reasons"
 import { createApolloPilotCohort } from "@/lib/growth/apollo/apollo-pilot-route"
+import { enrichApollo25CompanyPilotSelectionInputWithIntelligence } from "@/lib/growth/apollo/apollo-intelligence-recovery-enrichment"
+import { resolveApolloEnrichmentCanonicalCompanyId } from "@/lib/growth/apollo/apollo-enrichment-cert-canonical-company-resolution"
 import { loadApolloPrimaryContactOperatorReviewSnapshot } from "@/lib/growth/apollo/apollo-primary-contact-operator-review"
 import { APOLLO_25_COMPANY_PILOT_TARGET_COUNT } from "@/lib/growth/apollo/apollo-25-company-pilot-types"
 
@@ -60,7 +62,7 @@ async function loadActivePilotCompanyIds(admin: SupabaseClient): Promise<Set<str
   return ids
 }
 
-async function loadApolloDiscoveredCompanyIds(admin: SupabaseClient): Promise<string[]> {
+export async function loadApolloDiscoveredCompanyIds(admin: SupabaseClient): Promise<string[]> {
   const ids = new Set<string>()
 
   const [enrollmentRes, contactCandidateRes] = await Promise.all([
@@ -225,7 +227,7 @@ export async function buildApollo25CompanyPilotSelectionInputs(
     const pipeline = pipelineState[companyId]
     const hasActive = enrollment?.growth_lead_id ? activeLeadIds.has(enrollment.growth_lead_id) : false
 
-    inputs.push({
+    const baseInput: Apollo25CompanyPilotSelectionInput = {
       company_candidate_id: companyId,
       company_name: snapshot.company_name,
       domain: null,
@@ -237,9 +239,19 @@ export async function buildApollo25CompanyPilotSelectionInputs(
       in_active_pilot_cohort: activePilotIds.has(companyId),
       has_execution_ready_candidate: pipeline?.has_execution_ready_candidate ?? false,
       has_account_playbook: pipeline?.has_account_playbook ?? false,
-      company_intelligence_present: true,
-      buying_committee_present: false,
+    }
+
+    const resolution = await resolveApolloEnrichmentCanonicalCompanyId(admin, {
+      company_candidate_id: companyId,
     })
+
+    inputs.push(
+      await enrichApollo25CompanyPilotSelectionInputWithIntelligence(
+        admin,
+        baseInput,
+        resolution.canonical_company_id,
+      ),
+    )
   }
 
   return inputs
