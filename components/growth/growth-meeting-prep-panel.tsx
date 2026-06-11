@@ -71,12 +71,17 @@ export function GrowthMeetingPrepPanel({
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
         prep?: GrowthMeetingPrepBundle
+        account_playbook_context?: GrowthMeetingPrepBundle["accountPlaybookContext"]
         message?: string
       }
       if (!res.ok || !data.ok || !data.prep) {
         throw new Error(data.message ?? "Could not load meeting prep.")
       }
-      setPrep(data.prep)
+      setPrep({
+        ...data.prep,
+        accountPlaybookContext:
+          data.account_playbook_context ?? data.prep.accountPlaybookContext ?? null,
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : "Meeting prep failed.")
       setPrep(null)
@@ -164,6 +169,103 @@ export function GrowthMeetingPrepPanel({
               </ol>
             )}
           </PrepSection>
+
+          {prep.accountPlaybookContext?.available ? (
+            <PrepSection title="Account Playbook Context">
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  {prep.accountPlaybookContext.playbookKey ? (
+                    <GrowthBadge label={prep.accountPlaybookContext.playbookKey} tone="healthy" />
+                  ) : null}
+                  <GrowthBadge
+                    label={`Coverage ${prep.accountPlaybookContext.coverageStatus}`}
+                    tone={
+                      prep.accountPlaybookContext.coverageStatus === "Strong"
+                        ? "healthy"
+                        : prep.accountPlaybookContext.coverageStatus === "Partial"
+                          ? "medium"
+                          : "attention"
+                    }
+                  />
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {prep.accountPlaybookContext.committeeCoverageScore}/100
+                  </span>
+                </div>
+
+                {prep.accountPlaybookContext.committeeStrategy ? (
+                  <p className="text-xs text-muted-foreground">
+                    {prep.accountPlaybookContext.committeeStrategy}
+                  </p>
+                ) : null}
+
+                {prep.accountPlaybookContext.accountLevelObjective ? (
+                  <div className="rounded-md border border-violet-200/70 bg-violet-50/50 px-2.5 py-2 dark:border-violet-500/30 dark:bg-violet-500/10">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-200">
+                      Account-level meeting objective
+                    </p>
+                    <p className="mt-1 text-sm font-medium">
+                      {prep.accountPlaybookContext.accountLevelObjective.objective}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {prep.accountPlaybookContext.accountLevelObjective.reasons.join(" · ")}
+                    </p>
+                  </div>
+                ) : null}
+
+                {prep.accountPlaybookContext.stakeholderFocus.length > 0 ? (
+                  <div>
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Stakeholder focus
+                    </p>
+                    <ul className="space-y-2">
+                      {prep.accountPlaybookContext.stakeholderFocus.map((focus) => (
+                        <li
+                          key={focus.roleCategory}
+                          className="rounded-md border border-border/60 bg-card px-2.5 py-2 text-xs"
+                        >
+                          <p className="font-medium">{focus.roleCategory}</p>
+                          <p className="mt-0.5 text-muted-foreground">
+                            Focus: {focus.focusAreas.join(" · ")}
+                          </p>
+                          {focus.messagingThemes.length > 0 ? (
+                            <p className="mt-0.5 text-muted-foreground">
+                              Themes: {focus.messagingThemes.join(" · ")}
+                            </p>
+                          ) : null}
+                          {focus.members.length > 0 ? (
+                            <p className="mt-0.5 text-muted-foreground">
+                              Contacts:{" "}
+                              {focus.members
+                                .map((member) =>
+                                  member.title ? `${member.fullName} (${member.title})` : member.fullName,
+                                )
+                                .join("; ")}
+                            </p>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {prep.accountPlaybookContext.committeeCoverageRisks.length > 0 ? (
+                  <div>
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Prep risks
+                    </p>
+                    <ul className="space-y-1">
+                      {prep.accountPlaybookContext.committeeCoverageRisks.map((risk) => (
+                        <li key={risk.id} className="flex flex-wrap items-start justify-between gap-2 text-xs">
+                          <p className="text-muted-foreground">{risk.reason}</p>
+                          <GrowthBadge label={risk.priority} tone={riskTone(risk.priority)} />
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            </PrepSection>
+          ) : null}
 
           <PrepSection title="Open risks">
             {topRisks.length === 0 ? (

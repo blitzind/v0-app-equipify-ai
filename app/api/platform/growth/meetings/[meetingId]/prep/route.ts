@@ -36,6 +36,7 @@ export async function GET(_request: Request, context: { params: Promise<{ meetin
       ok: true,
       qa_marker: GROWTH_MEETING_PREP_QA_MARKER,
       prep,
+      account_playbook_context: prep.accountPlaybookContext,
     })
   } catch {
     return NextResponse.json({ error: "prep_failed", message: "Could not load meeting prep." }, { status: 500 })

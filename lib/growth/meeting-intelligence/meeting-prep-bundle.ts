@@ -6,6 +6,7 @@ import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prosp
 import {
   GROWTH_MEETING_PREP_QA_MARKER,
   type GrowthMeetingPrepBundle,
+  type MeetingPrepAccountPlaybookContext,
   type MeetingPrepBuyingStage,
   type MeetingPrepCompanySnapshot,
   type MeetingPrepDecisionMaker,
@@ -120,6 +121,7 @@ export function buildMeetingPrepOpenRisks(input: {
   research: GrowthResearchRunPublicView | null
   memoryObjections?: string[]
   memoryRiskFlags?: string[]
+  accountPlaybookContext?: MeetingPrepAccountPlaybookContext | null
 }): MeetingPrepOpenRisk[] {
   const risks: MeetingPrepOpenRisk[] = []
   const { lead } = input
@@ -257,6 +259,10 @@ export function buildMeetingPrepOpenRisks(input: {
     })
   }
 
+  if (input.accountPlaybookContext?.committeeCoverageRisks.length) {
+    risks.push(...input.accountPlaybookContext.committeeCoverageRisks)
+  }
+
   return rankMeetingPrepRisks(risks)
 }
 
@@ -267,6 +273,7 @@ export function buildMeetingPrepObjectives(input: {
   contactIntelligence: GrowthProspectSearchContactIntelligence | null
   research: GrowthResearchRunPublicView | null
   openRisks: MeetingPrepOpenRisk[]
+  accountPlaybookContext?: MeetingPrepAccountPlaybookContext | null
 }): MeetingPrepObjective[] {
   const objectives: MeetingPrepObjective[] = []
   const stage = (input.buyingStage.stage ?? "").toLowerCase()
@@ -347,6 +354,10 @@ export function buildMeetingPrepObjectives(input: {
       evidence: input.contactIntelligence.first_contact.reasons,
       priority: 78,
     })
+  }
+
+  if (input.accountPlaybookContext?.accountLevelObjective) {
+    objectives.unshift(input.accountPlaybookContext.accountLevelObjective)
   }
 
   return objectives
@@ -443,6 +454,7 @@ export function assembleMeetingPrepBundle(input: {
   decisionMakers: GrowthLeadDecisionMaker[]
   contactIntelligence: GrowthProspectSearchContactIntelligence | null
   research: GrowthResearchRunPublicView | null
+  accountPlaybookContext?: MeetingPrepAccountPlaybookContext | null
   relationshipMemory?: {
     summary: string | null
     topObjections: string[]
@@ -471,6 +483,7 @@ export function assembleMeetingPrepBundle(input: {
     research: input.research,
     memoryObjections: input.relationshipMemory?.topObjections,
     memoryRiskFlags: input.relationshipMemory?.riskFlags,
+    accountPlaybookContext: input.accountPlaybookContext,
   })
   const recommendedObjectives = buildMeetingPrepObjectives({
     lead: input.lead,
@@ -479,6 +492,7 @@ export function assembleMeetingPrepBundle(input: {
     contactIntelligence: input.contactIntelligence,
     research: input.research,
     openRisks,
+    accountPlaybookContext: input.accountPlaybookContext,
   })
   const readiness = computeMeetingPrepReadiness({
     lead: input.lead,
@@ -515,5 +529,6 @@ export function assembleMeetingPrepBundle(input: {
     researchSummary,
     recommendedObjectives,
     readiness,
+    accountPlaybookContext: input.accountPlaybookContext ?? null,
   }
 }

@@ -1,9 +1,14 @@
-/** Meeting prep bundle types (Sprint 3.1). Client-safe. */
+/** Meeting prep bundle types (Sprint 3.1 + M1-B account playbook). Client-safe. */
 
+import type { ApolloAccountPlaybookCommitteeRoleCategory } from "@/lib/growth/apollo/apollo-account-playbooks-types"
+import type { ApolloMeetingBridgeAttributionRecord } from "@/lib/growth/apollo/apollo-meeting-bridge-types"
 import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
 import type { GrowthMeeting } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 
 export const GROWTH_MEETING_PREP_QA_MARKER = "growth-meeting-prep-v1" as const
+
+export const MEETING_PREP_ACCOUNT_PLAYBOOK_QA_MARKER =
+  "growth-meeting-prep-account-playbook-m1b-v1" as const
 
 export const MEETING_PREP_RISK_PRIORITIES = ["Critical", "High", "Medium", "Low"] as const
 export type MeetingPrepRiskPriority = (typeof MEETING_PREP_RISK_PRIORITIES)[number]
@@ -74,6 +79,44 @@ export type MeetingPrepResearchSummary = {
   recommendedNextAction: string | null
 }
 
+export type MeetingPrepCommitteeRoleSummaryItem = {
+  fullName: string
+  title: string | null
+  roleCategory: ApolloAccountPlaybookCommitteeRoleCategory
+  recommendedMessagingTheme: string[]
+  recommendedChannelMix: string[]
+  contactable: boolean
+}
+
+export type MeetingPrepStakeholderFocus = {
+  roleCategory: ApolloAccountPlaybookCommitteeRoleCategory
+  focusAreas: string[]
+  messagingThemes: string[]
+  recommendedChannels: string[]
+  members: Array<{ fullName: string; title: string | null }>
+}
+
+export type MeetingPrepAccountPlaybookContext = {
+  qa_marker: typeof MEETING_PREP_ACCOUNT_PLAYBOOK_QA_MARKER
+  available: boolean
+  meetingCandidateId: string | null
+  accountPlaybookId: string | null
+  playbookKey: string | null
+  committeeRoleSummary: MeetingPrepCommitteeRoleSummaryItem[]
+  committeeCoverageScore: number
+  committeeStrategy: string
+  coverageStatus: "Weak" | "Partial" | "Strong"
+  recommendedMessagingTheme: Record<string, string[]>
+  recommendedChannelMix: Record<string, string[]>
+  roleCategoryMix: Record<string, number>
+  confidenceScore: number | null
+  reasoning: string | null
+  sourceAttribution: ApolloMeetingBridgeAttributionRecord | null
+  stakeholderFocus: MeetingPrepStakeholderFocus[]
+  accountLevelObjective: MeetingPrepObjective | null
+  committeeCoverageRisks: MeetingPrepOpenRisk[]
+}
+
 export type GrowthMeetingPrepBundle = {
   qa_marker: typeof GROWTH_MEETING_PREP_QA_MARKER
   meeting: Pick<
@@ -100,4 +143,5 @@ export type GrowthMeetingPrepBundle = {
   researchSummary: MeetingPrepResearchSummary
   recommendedObjectives: MeetingPrepObjective[]
   readiness: MeetingPrepReadiness
+  accountPlaybookContext: MeetingPrepAccountPlaybookContext | null
 }

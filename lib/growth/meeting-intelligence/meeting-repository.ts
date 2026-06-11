@@ -10,7 +10,7 @@ import type {
 } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 
 const MEETING_SELECT =
-  "id, lead_id, owner_user_id, opportunity_id, outbound_reply_id, realtime_call_session_id, title, status, start_at, end_at, source, provider, calendar_event_id, calendar_sync_status, calendar_sync_error, calendar_synced_at, calendar_last_sync_at, meeting_url, manual_meeting_url, meeting_location_type, meeting_location_label, auto_create_meeting_link, provider_connection_required, notes, attendee_emails, timezone, outcome, next_action, follow_up_due_at, no_show_reason, scheduled_at, completed_at, canceled_at, no_show_at, outcome_recorded_at, booking_page_id, created_by, created_at, updated_at"
+  "id, lead_id, owner_user_id, opportunity_id, outbound_reply_id, realtime_call_session_id, title, status, start_at, end_at, source, provider, calendar_event_id, calendar_sync_status, calendar_sync_error, calendar_synced_at, calendar_last_sync_at, meeting_url, manual_meeting_url, meeting_location_type, meeting_location_label, auto_create_meeting_link, provider_connection_required, notes, attendee_emails, timezone, outcome, next_action, follow_up_due_at, no_show_reason, scheduled_at, completed_at, canceled_at, no_show_at, outcome_recorded_at, booking_page_id, meeting_candidate_id, account_playbook_id, source_attribution, created_by, created_at, updated_at"
 
 type MeetingDbRow = {
   id: string
@@ -49,6 +49,9 @@ type MeetingDbRow = {
   no_show_at: string | null
   outcome_recorded_at: string | null
   booking_page_id: string | null
+  meeting_candidate_id: string | null
+  account_playbook_id: string | null
+  source_attribution: Record<string, unknown> | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -96,6 +99,9 @@ export function mapGrowthMeetingRow(row: MeetingDbRow): GrowthMeeting {
     noShowAt: row.no_show_at,
     outcomeRecordedAt: row.outcome_recorded_at,
     bookingPageId: row.booking_page_id,
+    meetingCandidateId: row.meeting_candidate_id,
+    accountPlaybookId: row.account_playbook_id,
+    sourceAttribution: row.source_attribution,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

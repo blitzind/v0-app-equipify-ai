@@ -105,6 +105,9 @@ export type GrowthMeeting = {
   updatedAt: string
   bookingPageId?: string | null
   companyName?: string | null
+  meetingCandidateId?: string | null
+  accountPlaybookId?: string | null
+  sourceAttribution?: Record<string, unknown> | null
 }
 
 export type GrowthMeetingIntelligenceDashboard = {

@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { assembleMeetingPrepBundle } from "@/lib/growth/meeting-intelligence/meeting-prep-bundle"
+import { loadMeetingPrepAccountPlaybookContext } from "@/lib/growth/meeting-intelligence/meeting-prep-account-playbook-loader"
 import type {
   GrowthMeetingPrepBundle,
   MeetingPrepBuyingStage,
@@ -93,6 +94,7 @@ export async function gatherMeetingPrepBundleForMeeting(
   ])
 
   const contactIntelligence = contactIntelMap.get(`growth_lead:${lead.id}`) ?? null
+  const accountPlaybookContext = await loadMeetingPrepAccountPlaybookContext(admin, meeting)
 
   return assembleMeetingPrepBundle({
     meeting,
@@ -102,6 +104,7 @@ export async function gatherMeetingPrepBundleForMeeting(
     decisionMakers,
     contactIntelligence,
     research,
+    accountPlaybookContext,
     relationshipMemory: memory.available
       ? {
           summary: memory.relationshipSummary,

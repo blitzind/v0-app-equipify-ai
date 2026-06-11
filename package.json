@@ -273,6 +273,7 @@
     "test:apollo-multichannel-orchestration": "tsx scripts/test-apollo-multichannel-orchestration.ts",
     "test:apollo-sequence-execution-automation": "tsx scripts/test-apollo-sequence-execution-automation.ts",
     "test:apollo-meeting-bridge": "tsx scripts/test-apollo-meeting-bridge.ts",
+    "test:account-aware-meeting-prep": "tsx scripts/test-account-aware-meeting-prep.ts",
     "test:apollo-full-pipeline-production-certification": "tsx scripts/test-apollo-full-pipeline-production-certification.ts",
     "test:apollo-search-diagnostic-evidence": "tsx scripts/test-apollo-search-diagnostic-evidence.ts",
     "test:apollo-partial-identity": "tsx scripts/test-apollo-partial-identity.ts",

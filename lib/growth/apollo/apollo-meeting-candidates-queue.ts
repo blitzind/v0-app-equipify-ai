@@ -5,6 +5,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { proposeGrowthMeetingFromReply } from "@/lib/growth/meeting-intelligence/mutate-meeting"
+import { linkMeetingToAccountPlaybookContext } from "@/lib/growth/meeting-intelligence/meeting-prep-account-playbook-loader"
 import {
   buildApolloMeetingCandidateQueueSnapshot,
   evaluateApolloMeetingCandidateApprovalGate,
@@ -121,6 +122,19 @@ export async function approveApolloMeetingCandidate(
           : input.approver_user_id ?? null,
     })
     growthMeetingId = meeting?.id ?? null
+  }
+
+  if (growthMeetingId) {
+    try {
+      await linkMeetingToAccountPlaybookContext(admin, {
+        meeting_id: growthMeetingId,
+        meeting_candidate_id: candidate.candidate_id,
+        account_playbook_id: candidate.account_playbook_id,
+        source_attribution: candidate.source_attribution,
+      })
+    } catch {
+      return emptyResult("approve_meeting_candidate", "meeting_linkage_failed")
+    }
   }
 
   const now = new Date().toISOString()
