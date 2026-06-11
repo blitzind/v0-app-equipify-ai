@@ -119,8 +119,13 @@ function testMappedEnrichedCreatedButContactableZeroFails(): void {
   const assessment = buildApolloScale3CertificationAssessment({ mock: false, companies })
   assert.equal(assessment.result, "FAIL")
   assert.ok(assessment.fail_reasons.includes("aggregate_contactable_zero"))
-  assert.ok(assessment.fail_reasons.includes("mapped_contacts_found_but_not_contactable"))
-  assert.ok(assessment.fail_reasons.includes("mapped_contacts_found_but_no_sequence_ready"))
+  assert.ok(assessment.fail_reasons.includes("no_current_run_sequence_ready_contact"))
+  assert.ok(assessment.fail_reasons.includes("insufficient_current_run_pipeline_yield"))
+  assert.ok(!assessment.fail_reasons.includes("mapped_contacts_found_but_not_contactable"))
+  assert.ok(!assessment.fail_reasons.includes("mapped_contacts_found_but_no_sequence_ready"))
+  assert.ok(assessment.warnings.includes("mapped_contacts_found_but_not_contactable"))
+  assert.ok(assessment.warnings.includes("mapped_contacts_found_but_no_sequence_ready"))
+  assert.ok(assessment.partial_company_fail_reasons.pulse?.includes("mapped_contacts_found_but_not_contactable"))
   assert.equal(assessApolloScale3SearchStrategyResult({ mock: false, companies }), "FAIL")
 }
 
@@ -182,6 +187,55 @@ function testPassRequiresCurrentRunSequenceReady(): void {
   assert.equal(buildApolloScale3CertificationAssessment({ mock: false, companies: [ready] }).result, "PASS")
 }
 
+function testPassWithNonWinningMappedCompaniesHasEmptyTopLevelFailReasons(): void {
+  const winner = scale3Row({
+    company_candidate_id: "stat",
+    company_name: "Stat Biomedical Technicians, Inc.",
+    domain: "stat-biomed.com",
+    mapped_contacts: 4,
+    promotion_evidence: basePromotion({
+      current_run_apollo_verified_email_contacts: 2,
+      current_run_apollo_promoted_contacts: 4,
+      current_run_apollo_contactable_contacts: 2,
+      current_run_apollo_sequence_ready_contacts: 1,
+    }),
+    current_run_apollo_verified_email_contacts: 2,
+    current_run_apollo_promoted_contacts: 4,
+    current_run_apollo_contactable_contacts: 2,
+    current_run_apollo_sequence_ready_contacts: 1,
+  })
+  const laggard = scale3Row({
+    company_candidate_id: "sterling",
+    company_name: "Sterling Biomedical",
+    domain: "sterlingbiomedical.com",
+    mapped_contacts: 1,
+    promotion_evidence: basePromotion({
+      current_run_apollo_verified_email_contacts: 1,
+      current_run_apollo_promoted_contacts: 1,
+      current_run_apollo_contactable_contacts: 0,
+      current_run_apollo_sequence_ready_contacts: 0,
+    }),
+    current_run_apollo_verified_email_contacts: 1,
+    current_run_apollo_promoted_contacts: 1,
+    current_run_apollo_contactable_contacts: 0,
+    current_run_apollo_sequence_ready_contacts: 0,
+  })
+
+  const assessment = buildApolloScale3CertificationAssessment({
+    mock: false,
+    companies: [winner, laggard],
+  })
+  assert.equal(assessment.result, "PASS")
+  assert.deepEqual(assessment.fail_reasons, [])
+  assert.ok(assessment.warnings.includes("mapped_contacts_found_but_not_contactable"))
+  assert.ok(assessment.warnings.includes("mapped_contacts_found_but_no_sequence_ready"))
+  assert.ok(
+    assessment.partial_company_fail_reasons.sterling?.includes(
+      "mapped_contacts_found_but_not_contactable",
+    ),
+  )
+}
+
 function testPartialIdentityAloneCannotPass(): void {
   const companies = [
     scale3Row({
@@ -213,6 +267,8 @@ function main(): void {
   console.log("  ✓ contactable=0 => FAIL; undefined current_run fields default to 0")
   testPassRequiresCurrentRunSequenceReady()
   console.log("  ✓ PASS requires current_run sequence_ready > 0")
+  testPassWithNonWinningMappedCompaniesHasEmptyTopLevelFailReasons()
+  console.log("  ✓ PASS with non-winning mapped companies keeps top-level fail_reasons empty")
   testPartialIdentityAloneCannotPass()
   console.log("  ✓ partial identity alone cannot PASS")
   console.log("\nApollo Scale-3 certification assessment checks passed.")

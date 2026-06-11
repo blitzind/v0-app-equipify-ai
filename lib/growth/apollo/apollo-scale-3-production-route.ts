@@ -18,7 +18,7 @@ import {
   type ApolloScale3CohortPreset,
 } from "@/lib/growth/apollo/apollo-scale-3-search-strategy-certification"
 import type { ApolloScale2CertResult } from "@/lib/growth/apollo/apollo-scale-2-live-acquisition-certification"
-import type { ApolloScale3CertFailReason } from "@/lib/growth/apollo/apollo-scale-3-certification-assessment"
+import type { ApolloScale3CertFailReason, ApolloScale3CompanyCertWarningReason } from "@/lib/growth/apollo/apollo-scale-3-certification-assessment"
 import { buildApolloSearchApiBudgetEvidence } from "@/lib/growth/apollo/apollo-search-api-budget-evidence"
 import type { ApolloSearchApiBudgetEvidence } from "@/lib/growth/apollo/apollo-search-api-budget-evidence"
 import { resolveApolloScale2CompanyLimit } from "@/lib/growth/apollo/apollo-scale-2-production-route-gates"
@@ -27,6 +27,12 @@ import {
   formatApolloScale5ExecutionMessage,
   runApolloScale5ExecutionStage,
 } from "@/lib/growth/apollo/apollo-scale-5-execution-errors"
+
+const EMPTY_SCALE3_CERT_DIAGNOSTICS = {
+  fail_reasons: [] as ApolloScale3CertFailReason[],
+  warnings: [] as ApolloScale3CompanyCertWarningReason[],
+  partial_company_fail_reasons: {} as Record<string, ApolloScale3CompanyCertWarningReason[]>,
+}
 
 export type ApolloScale3ProductionExecuteResult = {
   ok: boolean
@@ -44,6 +50,8 @@ export type ApolloScale3ProductionExecuteResult = {
   certification: ApolloScale3SearchStrategyCertification | null
   search_api_budget: ApolloSearchApiBudgetEvidence | null
   fail_reasons: ApolloScale3CertFailReason[]
+  warnings: ApolloScale3CompanyCertWarningReason[]
+  partial_company_fail_reasons: Record<string, ApolloScale3CompanyCertWarningReason[]>
   cohort_selection: ApolloScale3CertificationCohortResolution | null
 }
 
@@ -80,6 +88,8 @@ function serializeApolloScale3ExecuteResult(
       certification: payload.certification,
       search_api_budget: payload.search_api_budget ?? buildApolloSearchApiBudgetEvidence({ env }),
       fail_reasons: payload.fail_reasons ?? [],
+      warnings: payload.warnings ?? [],
+      partial_company_fail_reasons: payload.partial_company_fail_reasons ?? {},
       cohort_selection: payload.cohort_selection ?? null,
     })
   }
@@ -149,7 +159,7 @@ export async function executeApolloScale3InProduction(
           aggregate: null,
           certification: null,
           search_api_budget: buildApolloSearchApiBudgetEvidence({ env }),
-          fail_reasons: [],
+          ...EMPTY_SCALE3_CERT_DIAGNOSTICS,
           cohort_selection: null,
         },
         env,
@@ -185,7 +195,7 @@ export async function executeApolloScale3InProduction(
           aggregate: null,
           certification: null,
           search_api_budget: buildApolloSearchApiBudgetEvidence({ env }),
-          fail_reasons: [],
+          ...EMPTY_SCALE3_CERT_DIAGNOSTICS,
           cohort_selection: null,
         },
         env,
@@ -209,7 +219,7 @@ export async function executeApolloScale3InProduction(
           aggregate: null,
           certification: null,
           search_api_budget: buildApolloSearchApiBudgetEvidence({ env }),
-          fail_reasons: [],
+          ...EMPTY_SCALE3_CERT_DIAGNOSTICS,
           cohort_selection: cohort_resolution,
         },
         env,
@@ -246,7 +256,7 @@ export async function executeApolloScale3InProduction(
           aggregate: null,
           certification: null,
           search_api_budget: buildApolloSearchApiBudgetEvidence({ env }),
-          fail_reasons: [],
+          ...EMPTY_SCALE3_CERT_DIAGNOSTICS,
           cohort_selection: cohort_resolution,
         },
         env,
@@ -273,6 +283,9 @@ export async function executeApolloScale3InProduction(
         certification,
         cohort_selection: certification.cohort_selection,
         fail_reasons: certification.certification_assessment.fail_reasons,
+        warnings: certification.certification_assessment.warnings,
+        partial_company_fail_reasons:
+          certification.certification_assessment.partial_company_fail_reasons,
         search_api_budget: buildApolloSearchApiBudgetEvidence({
           env,
           company_limit,
@@ -307,7 +320,7 @@ export async function executeApolloScale3InProduction(
         aggregate: null,
         certification: null,
         search_api_budget: buildApolloSearchApiBudgetEvidence({ env }),
-        fail_reasons: [],
+        ...EMPTY_SCALE3_CERT_DIAGNOSTICS,
         cohort_selection: null,
       },
       env,

@@ -17,7 +17,7 @@ import {
 } from "@/lib/growth/apollo/apollo-partial-identity-evidence"
 import type { ApolloSearchTierAttemptEvidence } from "@/lib/growth/providers/apollo/apollo-tiered-people-search-types"
 import type { ApolloCurrentRunCandidateAttributionRow } from "@/lib/growth/apollo/apollo-current-run-attribution"
-import type { ApolloScale3CertFailReason } from "@/lib/growth/apollo/apollo-scale-3-certification-assessment"
+import type { ApolloScale3CompanyCertificationFailReason } from "@/lib/growth/apollo/apollo-scale-3-certification-assessment"
 
 export const APOLLO_SCALE_3_COMPANY_PROMOTION_EVIDENCE_QA_MARKER =
   "apollo-scale-3-company-promotion-evidence-v1" as const
@@ -52,7 +52,7 @@ export type ApolloScale3MappedCompanyEvidenceRow = ApolloScale3CompanyEvidenceBa
   current_run_apollo_promoted_contacts: number
   current_run_apollo_contactable_contacts: number
   current_run_apollo_sequence_ready_contacts: number
-  certification_fail_reasons: ApolloScale3CertFailReason[]
+  certification_fail_reasons: ApolloScale3CompanyCertificationFailReason[]
   partial_identity_evidence: ApolloPartialIdentityEvidence
   cohort_search_debug: ApolloCohortCompanySearchDebug | null
   enrichment_evidence: ApolloCompanyEnrichmentEvidence
@@ -242,7 +242,7 @@ export function mapApolloScale3CompanyEvidenceRow(input: {
       promotion_evidence.current_run_apollo_contactable_contacts,
     current_run_apollo_sequence_ready_contacts:
       promotion_evidence.current_run_apollo_sequence_ready_contacts,
-    certification_fail_reasons: [] as ApolloScale3CertFailReason[],
+    certification_fail_reasons: [] as ApolloScale3CompanyCertificationFailReason[],
     contactable_contacts: apollo_contactable,
     sequence_ready_contacts: apollo_sequence_ready,
     legacy_fallback_used: strategy?.legacy_fallback_used ?? false,

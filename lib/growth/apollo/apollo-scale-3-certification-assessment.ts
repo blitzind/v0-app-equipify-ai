@@ -3,17 +3,31 @@
 import type { ApolloScale2CertResult } from "@/lib/growth/apollo/apollo-scale-2-live-acquisition-certification"
 import type { ApolloScale3MappedCompanyEvidenceRow } from "@/lib/growth/apollo/apollo-scale-3-company-promotion-evidence"
 
-export const APOLLO_SCALE_3_CERT_FAIL_REASONS = [
+export const APOLLO_SCALE_3_CERT_VERDICT_FAIL_REASONS = [
   "mock_mode",
   "aggregate_contactable_zero",
   "no_current_run_sequence_ready_contact",
   "insufficient_current_run_pipeline_yield",
+  "partial_identity_unresolved",
+] as const
+
+export const APOLLO_SCALE_3_COMPANY_CERT_WARNING_REASONS = [
   "mapped_contacts_found_but_not_contactable",
   "mapped_contacts_found_but_no_sequence_ready",
   "partial_identity_unresolved",
 ] as const
 
-export type ApolloScale3CertFailReason = (typeof APOLLO_SCALE_3_CERT_FAIL_REASONS)[number]
+/** @deprecated Use ApolloScale3CertVerdictFailReason for top-level fail_reasons. */
+export const APOLLO_SCALE_3_CERT_FAIL_REASONS = [
+  ...APOLLO_SCALE_3_CERT_VERDICT_FAIL_REASONS,
+  ...APOLLO_SCALE_3_COMPANY_CERT_WARNING_REASONS,
+] as const
+
+export type ApolloScale3CertVerdictFailReason = (typeof APOLLO_SCALE_3_CERT_VERDICT_FAIL_REASONS)[number]
+export type ApolloScale3CompanyCertWarningReason =
+  (typeof APOLLO_SCALE_3_COMPANY_CERT_WARNING_REASONS)[number]
+export type ApolloScale3CertFailReason = ApolloScale3CertVerdictFailReason
+export type ApolloScale3CompanyCertificationFailReason = ApolloScale3CompanyCertWarningReason
 
 export type ApolloScale3CompanyCurrentRunMetrics = {
   mapped_contacts: number
@@ -25,8 +39,10 @@ export type ApolloScale3CompanyCurrentRunMetrics = {
 
 export type ApolloScale3CertificationAssessment = {
   result: ApolloScale2CertResult
-  fail_reasons: ApolloScale3CertFailReason[]
-  company_fail_reasons: Record<string, ApolloScale3CertFailReason[]>
+  fail_reasons: ApolloScale3CertVerdictFailReason[]
+  warnings: ApolloScale3CompanyCertWarningReason[]
+  partial_company_fail_reasons: Record<string, ApolloScale3CompanyCertificationFailReason[]>
+  company_fail_reasons: Record<string, ApolloScale3CompanyCertificationFailReason[]>
   apollo_ready_company_count: number
   aggregate_current_run: ApolloScale3CompanyCurrentRunMetrics
 }
@@ -61,9 +77,9 @@ export function resolveApolloScale3CompanyCurrentRunMetrics(
 
 export function resolveApolloScale3CompanyCertificationFailReasons(
   row: ApolloScale3MappedCompanyEvidenceRow,
-): ApolloScale3CertFailReason[] {
+): ApolloScale3CompanyCertificationFailReason[] {
   const metrics = resolveApolloScale3CompanyCurrentRunMetrics(row)
-  const reasons: ApolloScale3CertFailReason[] = []
+  const reasons: ApolloScale3CompanyCertificationFailReason[] = []
   const partialStaged =
     normalizeApolloCurrentRunMetric(row.partial_identity_evidence?.partial_identity_candidates_staged) >
       0 ||
@@ -139,56 +155,48 @@ export function buildApolloScale3CertificationAssessment(input: {
   companies: ApolloScale3MappedCompanyEvidenceRow[]
   mock: boolean
 }): ApolloScale3CertificationAssessment {
-  const company_fail_reasons: Record<string, ApolloScale3CertFailReason[]> = {}
+  const partial_company_fail_reasons: Record<string, ApolloScale3CompanyCertificationFailReason[]> =
+    {}
   for (const row of input.companies) {
     const reasons = resolveApolloScale3CompanyCertificationFailReasons(row)
     if (reasons.length > 0) {
-      company_fail_reasons[row.company_candidate_id] = reasons
+      partial_company_fail_reasons[row.company_candidate_id] = reasons
     }
   }
 
   const aggregate_current_run = sumAggregateCurrentRunMetrics(input.companies)
   const apolloReady = input.companies.filter(isApolloScale3CurrentRunSequenceReadyCompany)
-  const fail_reasons: ApolloScale3CertFailReason[] = []
+  const verdict_fail_reasons: ApolloScale3CertVerdictFailReason[] = []
 
   if (input.mock) {
-    fail_reasons.push("mock_mode")
+    verdict_fail_reasons.push("mock_mode")
   }
 
   if (aggregate_current_run.current_run_apollo_contactable_contacts === 0) {
-    fail_reasons.push("aggregate_contactable_zero")
+    verdict_fail_reasons.push("aggregate_contactable_zero")
   }
   if (aggregate_current_run.current_run_apollo_sequence_ready_contacts === 0) {
-    fail_reasons.push("no_current_run_sequence_ready_contact")
+    verdict_fail_reasons.push("no_current_run_sequence_ready_contact")
   }
   if (apolloReady.length === 0) {
-    fail_reasons.push("insufficient_current_run_pipeline_yield")
-  }
-
-  const hasMappedNotContactable = input.companies.some((row) => {
-    const metrics = resolveApolloScale3CompanyCurrentRunMetrics(row)
-    return metrics.mapped_contacts > 0 && metrics.current_run_apollo_contactable_contacts === 0
-  })
-  if (hasMappedNotContactable) {
-    fail_reasons.push("mapped_contacts_found_but_not_contactable")
-  }
-
-  const hasMappedNotSequenceReady = input.companies.some((row) => {
-    const metrics = resolveApolloScale3CompanyCurrentRunMetrics(row)
-    return metrics.mapped_contacts > 0 && metrics.current_run_apollo_sequence_ready_contacts === 0
-  })
-  if (hasMappedNotSequenceReady) {
-    fail_reasons.push("mapped_contacts_found_but_no_sequence_ready")
+    verdict_fail_reasons.push("insufficient_current_run_pipeline_yield")
   }
 
   const hasUnresolvedPartial = input.companies.some((row) =>
-    (company_fail_reasons[row.company_candidate_id] ?? []).includes("partial_identity_unresolved"),
+    (partial_company_fail_reasons[row.company_candidate_id] ?? []).includes(
+      "partial_identity_unresolved",
+    ),
   )
   if (hasUnresolvedPartial && aggregate_current_run.current_run_apollo_sequence_ready_contacts === 0) {
-    fail_reasons.push("partial_identity_unresolved")
+    verdict_fail_reasons.push("partial_identity_unresolved")
   }
 
-  const uniqueFailReasons = [...new Set(fail_reasons)]
+  const uniqueVerdictFailReasons = [...new Set(verdict_fail_reasons)]
+  const warnings = [
+    ...new Set(
+      Object.values(partial_company_fail_reasons).flatMap((reasons) => reasons),
+    ),
+  ]
   const passesCurrentRunGate =
     !input.mock &&
     apolloReady.length >= 1 &&
@@ -197,8 +205,10 @@ export function buildApolloScale3CertificationAssessment(input: {
 
   return {
     result: passesCurrentRunGate ? "PASS" : "FAIL",
-    fail_reasons: uniqueFailReasons,
-    company_fail_reasons,
+    fail_reasons: passesCurrentRunGate ? [] : uniqueVerdictFailReasons,
+    warnings,
+    partial_company_fail_reasons,
+    company_fail_reasons: partial_company_fail_reasons,
     apollo_ready_company_count: apolloReady.length,
     aggregate_current_run,
   }

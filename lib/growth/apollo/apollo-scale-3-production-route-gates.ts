@@ -55,6 +55,8 @@ await fetch("/api/platform/growth/apollo-scale-3/execute", {
     console.log("verdict", payload.verdict)
     console.log("cohort_selection", payload.cohort_selection)
     console.log("fail_reasons", payload.fail_reasons)
+    console.log("warnings", payload.warnings)
+    console.log("partial_company_fail_reasons", payload.partial_company_fail_reasons)
     console.log("aggregate", payload.aggregate)
     console.log("failure_analysis", payload.failure_analysis)
     console.log("search_outcomes", (payload.companies ?? []).reduce((acc, row) => {
