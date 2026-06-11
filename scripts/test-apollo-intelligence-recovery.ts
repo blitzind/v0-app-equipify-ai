@@ -17,6 +17,10 @@ import {
   mergeApolloIntelligenceRecoveryQualificationContext,
 } from "../lib/growth/apollo/apollo-intelligence-recovery-artifact-contract"
 import {
+  applyApolloQualificationScoringContextToSelectionInput,
+  shouldLoadApolloQualificationScoringRunArtifacts,
+} from "../lib/growth/apollo/apollo-qualification-scoring-context-helpers"
+import {
   APOLLO_INTELLIGENCE_RECOVERY_DEFAULT_CHUNK_LIMIT,
   APOLLO_INTELLIGENCE_RECOVERY_MAX_CHUNK_LIMIT,
   buildApolloIntelligenceRecoveryChunkMeta,
@@ -65,6 +69,8 @@ const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-intelligence-recovery-chunking.ts",
   "lib/growth/apollo/apollo-intelligence-recovery-targeting.ts",
   "lib/growth/apollo/apollo-intelligence-recovery-artifact-contract.ts",
+  "lib/growth/apollo/apollo-qualification-scoring-context.ts",
+  "lib/growth/apollo/apollo-qualification-scoring-context-helpers.ts",
   "lib/growth/apollo/apollo-intelligence-recovery-route.ts",
   "app/api/platform/growth/apollo-intelligence-recovery/readiness/route.ts",
   "app/api/platform/growth/apollo-intelligence-recovery/execute/route.ts",
@@ -498,6 +504,35 @@ const mergedFromRun = mergeApolloIntelligenceRecoveryQualificationContext({
 assert.equal(mergedFromRun.buying_committee_present, true)
 assert.equal(mergedFromRun.buying_committee_coverage, 0.6)
 console.log("  ✓ artifact contract merges verified run assignments into qualification context")
+
+const needsRuns = shouldLoadApolloQualificationScoringRunArtifacts(null)
+assert.equal(needsRuns.company_intelligence, true)
+assert.equal(needsRuns.buying_committee, true)
+const needsRunsAfterEngine = shouldLoadApolloQualificationScoringRunArtifacts(engineWithCommittee)
+assert.equal(needsRunsAfterEngine.company_intelligence, false)
+assert.equal(needsRunsAfterEngine.buying_committee, false)
+
+const appliedInput = applyApolloQualificationScoringContextToSelectionInput(
+  buildFixtureCompany(20),
+  mergedFromRun,
+)
+assert.equal(appliedInput.buying_committee_present, true)
+assert.equal(appliedInput.buying_committee_coverage, 0.6)
+console.log("  ✓ shared scoring context applies to pilot selection input")
+
+assert.equal(
+  fs.readFileSync(path.join(ROOT, "lib/growth/apollo/apollo-25-company-pilot-route.ts"), "utf8").includes(
+    "loadApolloQualificationScoringContextForCompany",
+  ),
+  false,
+)
+assert.equal(
+  fs.readFileSync(path.join(ROOT, "lib/growth/apollo/apollo-intelligence-recovery-enrichment.ts"), "utf8").includes(
+    "loadApolloQualificationScoringContextForCompany",
+  ),
+  true,
+)
+console.log("  ✓ pilot enrichment uses shared qualification scoring loader")
 
 const ciVerifiedNotPromoted = classifyCompanyIntelligenceRecoveryOutcome({
   had_verified_before: false,

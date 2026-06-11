@@ -16,8 +16,8 @@ import {
 import {
   classifyBuyingCommitteeRecoveryOutcome,
   classifyCompanyIntelligenceRecoveryOutcome,
-  mergeApolloIntelligenceRecoveryQualificationContext,
 } from "@/lib/growth/apollo/apollo-intelligence-recovery-artifact-contract"
+import { loadApolloQualificationScoringContextForCompany } from "@/lib/growth/apollo/apollo-qualification-scoring-context"
 import {
   enrichApollo25CompanyPilotSelectionInputWithIntelligence,
   loadLatestProspectResearchRunIdForCompanyCandidate,
@@ -377,11 +377,16 @@ export async function executeApolloIntelligenceRecovery(
     if (intelligenceRow.fit_score_exists) fit_score_count += 1
     if (intelligenceRow.research_score_exists) research_score_count += 1
 
-    const afterContext = mergeApolloIntelligenceRecoveryQualificationContext({
-      engine,
-      company_intelligence_run: companyIntelligenceRun,
-      buying_committee_run: buyingCommitteeRun,
+    const scoringContext = await loadApolloQualificationScoringContextForCompany(admin, {
+      company_candidate_id: baseInput.company_candidate_id,
+      growth_lead_id: baseInput.growth_lead_id ?? null,
+      canonical_company_id: canonicalId,
+      artifact_overlay: {
+        company_intelligence_run: companyIntelligenceRun,
+        buying_committee_run: buyingCommitteeRun,
+      },
     })
+    const afterContext = scoringContext
     const afterRow = buildApolloIntelligenceRecoveryScoreDecompositionRow({
       company_candidate_id: baseInput.company_candidate_id,
       company_name: baseInput.company_name,
