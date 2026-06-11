@@ -15,6 +15,7 @@ export const GROWTH_AI_COPILOT_GENERATION_TYPES = [
   "call_summary",
   "next_message",
   "call_risk_brief",
+  "meeting_prep",
 ] as const
 export type GrowthAiCopilotGenerationType = (typeof GROWTH_AI_COPILOT_GENERATION_TYPES)[number]
 

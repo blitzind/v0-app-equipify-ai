@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { gatherMeetingPrepBundle } from "@/lib/growth/meeting-intelligence/meeting-prep-context"
+import { fetchLatestAiMeetingPrepForMeeting } from "@/lib/growth/meeting-intelligence/ai-meeting-prep-service"
 import { GROWTH_MEETING_PREP_QA_MARKER } from "@/lib/growth/meeting-intelligence/meeting-prep-types"
 import {
   GROWTH_MEETING_SCHEMA_SETUP_MESSAGE,
@@ -32,11 +33,13 @@ export async function GET(_request: Request, context: { params: Promise<{ meetin
     if (!prep) {
       return NextResponse.json({ error: "not_found", message: "Meeting or lead not found." }, { status: 404 })
     }
+    const aiMeetingPrep = await fetchLatestAiMeetingPrepForMeeting(access.admin, meetingId)
     return NextResponse.json({
       ok: true,
       qa_marker: GROWTH_MEETING_PREP_QA_MARKER,
       prep,
       account_playbook_context: prep.accountPlaybookContext,
+      ai_meeting_prep: aiMeetingPrep,
     })
   } catch {
     return NextResponse.json({ error: "prep_failed", message: "Could not load meeting prep." }, { status: 500 })

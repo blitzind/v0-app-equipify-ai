@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { ChevronDown, ChevronUp, Loader2, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
+import type { AiMeetingPrepRow } from "@/lib/growth/meeting-intelligence/ai-meeting-prep-types"
 import type { GrowthMeetingPrepBundle, MeetingPrepRiskPriority } from "@/lib/growth/meeting-intelligence/meeting-prep-types"
 
 function riskTone(priority: MeetingPrepRiskPriority): "attention" | "healthy" | "medium" | "neutral" {
@@ -52,7 +53,10 @@ export function GrowthMeetingPrepPanel({
   meetingStatus: string
 }) {
   const [prep, setPrep] = useState<GrowthMeetingPrepBundle | null>(null)
+  const [aiMeetingPrep, setAiMeetingPrep] = useState<AiMeetingPrepRow | null>(null)
   const [loading, setLoading] = useState(true)
+  const [generatingAiPrep, setGeneratingAiPrep] = useState(false)
+  const [queueActionLoading, setQueueActionLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showMoreRisks, setShowMoreRisks] = useState(false)
 
@@ -72,6 +76,7 @@ export function GrowthMeetingPrepPanel({
         ok?: boolean
         prep?: GrowthMeetingPrepBundle
         account_playbook_context?: GrowthMeetingPrepBundle["accountPlaybookContext"]
+        ai_meeting_prep?: AiMeetingPrepRow | null
         message?: string
       }
       if (!res.ok || !data.ok || !data.prep) {
@@ -82,6 +87,7 @@ export function GrowthMeetingPrepPanel({
         accountPlaybookContext:
           data.account_playbook_context ?? data.prep.accountPlaybookContext ?? null,
       })
+      setAiMeetingPrep(data.ai_meeting_prep ?? null)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Meeting prep failed.")
       setPrep(null)
@@ -93,6 +99,52 @@ export function GrowthMeetingPrepPanel({
   useEffect(() => {
     void load()
   }, [load])
+
+  const runAiPrepAction = useCallback(
+    async (action: "generate" | "approve_ai_meeting_prep" | "reject_ai_meeting_prep" | "regenerate_ai_meeting_prep") => {
+      setQueueActionLoading(true)
+      setGeneratingAiPrep(action === "generate")
+      try {
+        if (action === "generate") {
+          const res = await fetch("/api/platform/growth/ai-meeting-prep/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ meetingId, regenerate: Boolean(aiMeetingPrep) }),
+          })
+          const data = (await res.json().catch(() => ({}))) as { prep?: AiMeetingPrepRow | null }
+          if (!res.ok) throw new Error("Could not generate AI meeting prep.")
+          setAiMeetingPrep(data.prep ?? null)
+          return
+        }
+
+        if (!aiMeetingPrep?.prep_id) return
+        const res = await fetch("/api/platform/growth/ai-meeting-prep/queue/actions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action, prepId: aiMeetingPrep.prep_id }),
+        })
+        const data = (await res.json().catch(() => ({}))) as {
+          ok?: boolean
+          result?: { prep_id?: string | null; status?: AiMeetingPrepRow["status"] | null }
+        }
+        if (!res.ok || !data.ok) throw new Error("AI meeting prep action failed.")
+        if (action === "regenerate_ai_meeting_prep") {
+          await load()
+        } else if (aiMeetingPrep) {
+          setAiMeetingPrep({
+            ...aiMeetingPrep,
+            status: data.result?.status ?? aiMeetingPrep.status,
+          })
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "AI meeting prep action failed.")
+      } finally {
+        setQueueActionLoading(false)
+        setGeneratingAiPrep(false)
+      }
+    },
+    [aiMeetingPrep, load, meetingId],
+  )
 
   const topRisks = useMemo(() => prep?.openRisks.slice(0, 3) ?? [], [prep])
   const moreRisks = useMemo(() => prep?.openRisks.slice(3) ?? [], [prep])
@@ -266,6 +318,141 @@ export function GrowthMeetingPrepPanel({
               </div>
             </PrepSection>
           ) : null}
+
+          <PrepSection title="AI Meeting Prep">
+            <div className="space-y-3" data-qa-marker="growth-ai-meeting-prep-m1c-v1">
+              <div className="flex flex-wrap items-center gap-2">
+                {aiMeetingPrep ? (
+                  <GrowthBadge
+                    label={aiMeetingPrep.status}
+                    tone={
+                      aiMeetingPrep.status === "approved"
+                        ? "healthy"
+                        : aiMeetingPrep.status === "rejected"
+                          ? "attention"
+                          : aiMeetingPrep.status === "stale"
+                            ? "neutral"
+                            : "medium"
+                    }
+                  />
+                ) : (
+                  <GrowthBadge label="Not generated" tone="neutral" />
+                )}
+                {aiMeetingPrep ? (
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    Confidence {(aiMeetingPrep.confidence_score * 100).toFixed(0)}%
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={generatingAiPrep || queueActionLoading}
+                  onClick={() => void runAiPrepAction("generate")}
+                >
+                  {generatingAiPrep ? "Generating…" : aiMeetingPrep ? "Regenerate prep" : "Generate AI prep"}
+                </Button>
+                {aiMeetingPrep?.status === "draft" ? (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={queueActionLoading}
+                      onClick={() => void runAiPrepAction("approve_ai_meeting_prep")}
+                    >
+                      Approve prep
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={queueActionLoading}
+                      onClick={() => void runAiPrepAction("reject_ai_meeting_prep")}
+                    >
+                      Reject prep
+                    </Button>
+                  </>
+                ) : null}
+              </div>
+
+              {aiMeetingPrep ? (
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <p className="font-semibold uppercase tracking-wide text-muted-foreground">Executive brief</p>
+                    <p className="mt-1 leading-relaxed">{aiMeetingPrep.executive_brief}</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold uppercase tracking-wide text-muted-foreground">Suggested agenda</p>
+                    <ul className="mt-1 space-y-1">
+                      {aiMeetingPrep.suggested_agenda.map((item) => (
+                        <li key={item.segment}>
+                          {item.duration_minutes}m · {item.segment} — {item.objective}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  {aiMeetingPrep.stakeholder_analysis.length > 0 ? (
+                    <div>
+                      <p className="font-semibold uppercase tracking-wide text-muted-foreground">Stakeholder analysis</p>
+                      <ul className="mt-1 space-y-1">
+                        {aiMeetingPrep.stakeholder_analysis.map((item) => (
+                          <li key={`${item.role_category}-${item.contact_name ?? "unknown"}`}>
+                            <span className="font-medium">{item.role_category}</span>
+                            {item.contact_name ? ` · ${item.contact_name}` : ""}
+                            {item.talking_points.length ? ` — ${item.talking_points[0]}` : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {aiMeetingPrep.likely_objections.length > 0 ? (
+                    <div>
+                      <p className="font-semibold uppercase tracking-wide text-muted-foreground">Likely objections</p>
+                      <ul className="mt-1 space-y-1">
+                        {aiMeetingPrep.likely_objections.slice(0, 4).map((item) => (
+                          <li key={item.objection}>
+                            {item.objection}: {item.response_angle}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {aiMeetingPrep.discovery_questions.length > 0 ? (
+                    <div>
+                      <p className="font-semibold uppercase tracking-wide text-muted-foreground">Discovery questions</p>
+                      <ul className="mt-1 list-disc pl-4 space-y-0.5">
+                        {aiMeetingPrep.discovery_questions.slice(0, 5).map((question) => (
+                          <li key={question}>{question}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {aiMeetingPrep.competitive_risks.length > 0 ? (
+                    <div>
+                      <p className="font-semibold uppercase tracking-wide text-muted-foreground">Competitive risks</p>
+                      <ul className="mt-1 list-disc pl-4 space-y-0.5">
+                        {aiMeetingPrep.competitive_risks.map((risk) => (
+                          <li key={risk}>{risk}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  <div>
+                    <p className="font-semibold uppercase tracking-wide text-muted-foreground">Recommended outcome</p>
+                    <p className="mt-1">{aiMeetingPrep.recommended_outcome}</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Generate reviewable AI prep artifacts from the deterministic prep bundle. No outreach, booking, or
+                  calendar actions occur.
+                </p>
+              )}
+            </div>
+          </PrepSection>
 
           <PrepSection title="Open risks">
             {topRisks.length === 0 ? (
