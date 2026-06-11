@@ -8,7 +8,8 @@ import {
   type ApolloMapperRejectionEvidence,
   type ApolloTierAttemptCompactSummary,
 } from "@/lib/growth/apollo/apollo-search-diagnostic-evidence"
-import type { ApolloCohortCompanySearchDebug } from "@/lib/growth/apollo/apollo-cohort-company-search-debug"
+import type { ApolloCompanyEnrichmentEvidence } from "@/lib/growth/apollo/apollo-mapped-contact-enrichment-evidence"
+import { emptyApolloCompanyEnrichmentEvidence } from "@/lib/growth/apollo/apollo-mapped-contact-enrichment-evidence"
 import { buildApolloCohortCompanySearchDebug } from "@/lib/growth/apollo/apollo-cohort-company-search-debug"
 import {
   emptyApolloPartialIdentityEvidence,
@@ -53,6 +54,7 @@ export type ApolloScale3MappedCompanyEvidenceRow = ApolloScale3CompanyEvidenceBa
   certification_fail_reasons: ApolloScale3CertFailReason[]
   partial_identity_evidence: ApolloPartialIdentityEvidence
   cohort_search_debug: ApolloCohortCompanySearchDebug | null
+  enrichment_evidence: ApolloCompanyEnrichmentEvidence
   legacy_fallback_used: boolean
   promotion_evidence: ApolloScale3CompanyPromotionEvidence
   acquisition_evidence: ApolloAcquisitionSearchEvidence | null
@@ -236,5 +238,7 @@ export function mapApolloScale3CompanyEvidenceRow(input: {
       sequence_ready_after_promotion: apollo_sequence_ready,
     },
     acquisition_evidence: input.acquisition?.apollo_search_evidence ?? null,
+    enrichment_evidence:
+      input.acquisition?.enrichment_evidence ?? emptyApolloCompanyEnrichmentEvidence(),
   }
 }

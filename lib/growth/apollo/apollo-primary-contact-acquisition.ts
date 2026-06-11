@@ -4,6 +4,10 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { buildApolloCohortCompanySearchDebug } from "@/lib/growth/apollo/apollo-cohort-company-search-debug"
+import {
+  buildApolloCompanyEnrichmentEvidence,
+  emptyApolloCompanyEnrichmentEvidence,
+} from "@/lib/growth/apollo/apollo-mapped-contact-enrichment-evidence"
 import { runApolloLivePilotContactDiscovery } from "@/lib/growth/apollo/apollo-live-pilot-contact-discovery"
 import { enrichApolloCandidatesNeedingEmail } from "@/lib/growth/apollo/apollo-candidate-email-enrichment"
 import { enrichApolloPartialIdentityCandidates } from "@/lib/growth/apollo/apollo-partial-identity-enrichment"
@@ -288,6 +292,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
       current_run_attribution: null,
       partial_identity_evidence: emptyApolloPartialIdentityEvidence(),
       search_debug: null,
+      enrichment_evidence: emptyApolloCompanyEnrichmentEvidence(env),
     }
   }
 
@@ -321,6 +326,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
       current_run_attribution: null,
       partial_identity_evidence: emptyApolloPartialIdentityEvidence(),
       search_debug: null,
+      enrichment_evidence: emptyApolloCompanyEnrichmentEvidence(env),
     }
   }
   recordApolloCompanyAcquisitionStarted()
@@ -471,33 +477,34 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
   )
 
   let email_enrichment = emptyEmailEnrichmentEvidence()
+  let enrichment_result: Awaited<ReturnType<typeof enrichApolloCandidatesNeedingEmail>> | null = null
 
   if (!needsEnrichment) {
     enrichment_skipped_reason = "no_candidates_need_email_enrichment"
     email_enrichment = emptyEmailEnrichmentEvidence(enrichment_skipped_reason)
   } else {
     enrichment_attempted = true
-    const enrichment = await enrichApolloCandidatesNeedingEmail(admin, {
+    enrichment_result = await enrichApolloCandidatesNeedingEmail(admin, {
       company_candidate_id: context.company_candidate_id,
       domain: context.domain,
       max_people: contact_limit,
       env,
     })
-    enrichment_candidates_updated = enrichment.candidates_updated
-    credits_consumed += enrichment.credits_consumed
-    enrichment_skipped_reason = enrichment.skipped_reason
-    if (enrichment.skipped_reason) enrichment_attempted = false
+    enrichment_candidates_updated = enrichment_result.candidates_updated
+    credits_consumed += enrichment_result.credits_consumed
+    enrichment_skipped_reason = enrichment_result.skipped_reason
+    if (enrichment_result.skipped_reason) enrichment_attempted = false
     email_enrichment = {
-      candidates_selected: enrichment.candidates_selected,
-      candidates_updated: enrichment.candidates_updated,
-      verified_status_without_email_selected: enrichment.verified_status_without_email_selected,
-      channel_less_selected: enrichment.channel_less_selected,
-      skipped_reason: enrichment.skipped_reason,
-      error: enrichment.error,
-      error_stage: enrichment.error_stage,
+      candidates_selected: enrichment_result.candidates_selected,
+      candidates_updated: enrichment_result.candidates_updated,
+      verified_status_without_email_selected: enrichment_result.verified_status_without_email_selected,
+      channel_less_selected: enrichment_result.channel_less_selected,
+      skipped_reason: enrichment_result.skipped_reason,
+      error: enrichment_result.error,
+      error_stage: enrichment_result.error_stage,
     }
-    if (enrichment.error) {
-      blockers.push(`apollo_email_enrichment:${enrichment.error_stage ?? "unknown"}:${enrichment.error}`)
+    if (enrichment_result.error) {
+      blockers.push(`apollo_email_enrichment:${enrichment_result.error_stage ?? "unknown"}:${enrichment_result.error}`)
     }
   }
 
@@ -506,6 +513,17 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     context.company_candidate_id,
   )
   const allCandidates = await listContactCandidatesForCompany(admin, context.company_candidate_id, 200)
+  const enrichment_evidence = buildApolloCompanyEnrichmentEvidence({
+    candidates: allCandidates.filter((candidate) => candidate.provider_type === "future_apollo"),
+    env,
+    enrichment_attempted,
+    enrichment_result,
+    guardrails: getApolloRunGuardrailSnapshot(),
+  })
+  for (const enrichmentBlocker of enrichment_evidence.enrichment_blockers) {
+    const tagged = `apollo_enrichment:${enrichmentBlocker}`
+    if (!blockers.includes(tagged)) blockers.push(tagged)
+  }
 
   const promotion = await promoteEnrichedApolloCandidatesToCompanyContacts(admin, {
     company_candidate_id: context.company_candidate_id,
@@ -593,6 +611,7 @@ export async function runApolloPrimaryContactAcquisitionForCompany(
     current_run_attribution,
     partial_identity_evidence,
     search_debug,
+    enrichment_evidence,
   }
 }
 

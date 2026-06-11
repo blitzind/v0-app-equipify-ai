@@ -51,6 +51,13 @@ export type ApolloCandidateEmailEnrichmentResult = {
     | "apollo_bulk_match_enrichment"
     | "candidate_persistence"
     | null
+  enrichment_provider: "apollo_bulk_match" | null
+  enrichment_request_summary: string | null
+  enrichment_response_summary: string | null
+  enrichment_verified_email_contacts: number
+  enrichment_no_email_count: number
+  enrichment_unverified_email_count: number
+  bulk_match_batches: number
 }
 
 function emptyEnrichmentResult(
@@ -66,7 +73,39 @@ function emptyEnrichmentResult(
     skipped_reason,
     error: null,
     error_stage: null,
+    enrichment_provider: null,
+    enrichment_request_summary: null,
+    enrichment_response_summary: null,
+    enrichment_verified_email_contacts: 0,
+    enrichment_no_email_count: 0,
+    enrichment_unverified_email_count: 0,
+    bulk_match_batches: 0,
     ...overrides,
+  }
+}
+
+function countEnrichmentEmailOutcomes(candidates: GrowthContactCandidate[]): {
+  enrichment_verified_email_contacts: number
+  enrichment_no_email_count: number
+  enrichment_unverified_email_count: number
+} {
+  let enrichment_verified_email_contacts = 0
+  let enrichment_no_email_count = 0
+  let enrichment_unverified_email_count = 0
+  for (const candidate of candidates) {
+    const email = asString(candidate.email)
+    const status = readApolloEmailStatusFromCandidate(candidate)
+    if (!email) {
+      enrichment_no_email_count += 1
+      continue
+    }
+    if (isApolloVerifiedEmailStatus(status)) enrichment_verified_email_contacts += 1
+    else enrichment_unverified_email_count += 1
+  }
+  return {
+    enrichment_verified_email_contacts,
+    enrichment_no_email_count,
+    enrichment_unverified_email_count,
   }
 }
 
@@ -80,7 +119,9 @@ export async function enrichApolloCandidatesNeedingEmail(
   },
 ): Promise<ApolloCandidateEmailEnrichmentResult> {
   if (!isApolloEmailEnrichmentEnabled(input.env)) {
-    return emptyEnrichmentResult("enrichment_gates_blocked")
+    return emptyEnrichmentResult("enrichment_gates_blocked", {
+      enrichment_provider: null,
+    })
   }
 
   const { data, error: loadError } = await admin
@@ -119,6 +160,8 @@ export async function enrichApolloCandidatesNeedingEmail(
   }
 
   let enriched: Awaited<ReturnType<typeof enrichApolloPeopleWithBulkMatch>>
+  let enrichment_request_summary: string | null = null
+  let enrichment_response_summary: string | null = null
   try {
     const mock = isApolloMockEnabled(input.env)
     const people = selected
@@ -136,6 +179,9 @@ export async function enrichApolloCandidatesNeedingEmail(
       })
     }
 
+    const personIds = people.map((person) => asString(person.id)).filter(Boolean)
+    enrichment_request_summary = `apollo_bulk_match;people=${personIds.length};sample_ids=${personIds.slice(0, 3).join(",")}`
+
     enriched = await enrichApolloPeopleWithBulkMatch({
       people,
       mock,
@@ -143,6 +189,14 @@ export async function enrichApolloCandidatesNeedingEmail(
       env: input.env,
       record_guardrails: true,
     })
+
+    let emailsReturned = 0
+    let verifiedReturned = 0
+    for (const person of enriched.people ?? []) {
+      if (asString(person.email)) emailsReturned += 1
+      if (isApolloVerifiedEmailStatus(person.email_status)) verifiedReturned += 1
+    }
+    enrichment_response_summary = `apollo_bulk_match;batches=${enriched.batches};emails_returned=${emailsReturned};verified_returned=${verifiedReturned}`
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return emptyEnrichmentResult("apollo_bulk_match_failed", {
@@ -244,6 +298,14 @@ export async function enrichApolloCandidatesNeedingEmail(
   }
 
   const guardrails = getApolloRunGuardrailSnapshot()
+  const { data: reloaded } = await admin
+    .schema("growth")
+    .from("contact_candidates")
+    .select("id, email, metadata, provider_type, full_name")
+    .eq("company_candidate_id", input.company_candidate_id)
+    .eq("provider_type", "future_apollo")
+  const emailOutcomes = countEnrichmentEmailOutcomes((reloaded ?? []) as GrowthContactCandidate[])
+
   return {
     candidates_selected: selected.length,
     candidates_updated,
@@ -253,5 +315,12 @@ export async function enrichApolloCandidatesNeedingEmail(
     skipped_reason: persistence_error ? "candidate_persistence_partial_failure" : null,
     error: persistence_error,
     error_stage: persistence_error ? "candidate_persistence" : null,
+    enrichment_provider: "apollo_bulk_match",
+    enrichment_request_summary,
+    enrichment_response_summary,
+    enrichment_verified_email_contacts: emailOutcomes.enrichment_verified_email_contacts,
+    enrichment_no_email_count: emailOutcomes.enrichment_no_email_count,
+    enrichment_unverified_email_count: emailOutcomes.enrichment_unverified_email_count,
+    bulk_match_batches: enriched.batches ?? guardrails?.bulk_match_batches ?? 0,
   }
 }
