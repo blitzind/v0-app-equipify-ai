@@ -5,6 +5,22 @@ import { useCallback, useState } from "react"
 import { PlayCircle } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
 import { ApolloPrimaryContactEnrollmentApprovalQueuePanel } from "@/components/growth/apollo-primary-contact-enrollment-approval-queue-panel"
+import {
+  ApolloEnrollmentAutomationQueuePanel,
+  ApolloEnrollmentFunnelDashboard,
+} from "@/components/growth/apollo-enrollment-automation-panel"
+import {
+  ApolloVoiceDropAutomationQueuePanel,
+  ApolloVoiceDropFunnelDashboard,
+} from "@/components/growth/apollo-voice-drop-automation-panel"
+import {
+  ApolloMultichannelOrchestrationQueuePanel,
+  ApolloMultichannelOrchestrationFunnelDashboard,
+} from "@/components/growth/apollo-multichannel-orchestration-panel"
+import {
+  ApolloSequenceExecutionAutomationQueuePanel,
+  ApolloSequenceExecutionFunnelDashboard,
+} from "@/components/growth/apollo-sequence-execution-automation-panel"
 import { GrowthEnrollmentExecutionContext } from "@/components/growth/growth-enrollment-execution-context"
 import { GrowthSequenceExecutionFoundationDashboard } from "@/components/growth/growth-sequence-execution-foundation-dashboard"
 import { GrowthSequenceSafeExecutionDashboard } from "@/components/growth/growth-sequence-safe-execution-dashboard"
@@ -64,6 +80,14 @@ export default function AdminGrowthSequenceExecutionPage() {
             sequencePatternId={sequencePatternId}
             onSchedulerComplete={onSchedulerComplete}
           />
+          <ApolloEnrollmentFunnelDashboard className="mb-6" />
+          <ApolloEnrollmentAutomationQueuePanel className="mb-6" />
+          <ApolloVoiceDropFunnelDashboard className="mb-6" />
+          <ApolloVoiceDropAutomationQueuePanel className="mb-6" />
+          <ApolloMultichannelOrchestrationFunnelDashboard className="mb-6" />
+          <ApolloMultichannelOrchestrationQueuePanel className="mb-6" />
+          <ApolloSequenceExecutionFunnelDashboard className="mb-6" />
+          <ApolloSequenceExecutionAutomationQueuePanel className="mb-6" />
           <ApolloPrimaryContactEnrollmentApprovalQueuePanel className="mb-6" />
           <GrowthSequenceSafeExecutionDashboard
             key={safeExecutionRefreshKey}

@@ -108,3 +108,60 @@ export {
   APOLLO_PRODUCTION_ACTIVATION_LIMITS_QA_MARKER,
   buildApolloProductionActivationLimits,
 } from "@/lib/growth/apollo/apollo-production-activation-limits"
+export {
+  APOLLO_ENROLLMENT_AUTOMATION_QA_MARKER,
+  APOLLO_ENROLLMENT_AUTOMATION_ID,
+  type ApolloEnrollmentAutomationReport,
+  type ApolloEnrollmentCertificationReport,
+  type ApolloEnrollmentFunnelMetrics,
+} from "@/lib/growth/apollo/apollo-enrollment-automation-types"
+export {
+  APOLLO_ENROLLMENT_QUALIFICATION_ENGINE_QA_MARKER,
+  evaluateApolloEnrollmentQualification,
+  resolveApolloEnrollmentQualificationThreshold,
+} from "@/lib/growth/apollo/apollo-enrollment-qualification-engine"
+export {
+  APOLLO_ENROLLMENT_AUTOMATION_ROUTE_QA_MARKER,
+  APOLLO_ENROLLMENT_AUTOMATION_EXECUTE_CONFIRM,
+  APOLLO_ENROLLMENT_CERTIFICATION_EXECUTE_CONFIRM,
+  APOLLO_ENROLLMENT_AUTOMATION_BROWSER_CONSOLE_EXECUTE_SNIPPET,
+} from "@/lib/growth/apollo/apollo-enrollment-automation-route-gates"
+export {
+  APOLLO_VOICE_DROP_AUTOMATION_QA_MARKER,
+  APOLLO_VOICE_DROP_AUTOMATION_ID,
+  type ApolloVoiceDropAutomationReport,
+  type ApolloVoiceDropCertificationReport,
+  type ApolloVoiceDropFunnelMetrics,
+} from "@/lib/growth/apollo/apollo-voice-drop-automation-types"
+export {
+  APOLLO_VOICE_DROP_AUTOMATION_ROUTE_QA_MARKER,
+  APOLLO_VOICE_DROP_AUTOMATION_EXECUTE_CONFIRM,
+  APOLLO_VOICE_DROP_CERTIFICATION_EXECUTE_CONFIRM,
+  APOLLO_VOICE_DROP_AUTOMATION_BROWSER_CONSOLE_EXECUTE_SNIPPET,
+} from "@/lib/growth/apollo/apollo-voice-drop-automation-route-gates"
+export {
+  APOLLO_MULTICHANNEL_ORCHESTRATION_QA_MARKER,
+  APOLLO_MULTICHANNEL_ORCHESTRATION_ID,
+  type ApolloMultichannelOrchestrationReport,
+  type ApolloMultichannelOrchestrationCertificationReport,
+  type ApolloMultichannelOrchestrationFunnelMetrics,
+} from "@/lib/growth/apollo/apollo-multichannel-orchestration-types"
+export {
+  APOLLO_MULTICHANNEL_ORCHESTRATION_ROUTE_QA_MARKER,
+  APOLLO_MULTICHANNEL_ORCHESTRATION_EXECUTE_CONFIRM,
+  APOLLO_MULTICHANNEL_CERTIFICATION_EXECUTE_CONFIRM,
+  APOLLO_MULTICHANNEL_ORCHESTRATION_BROWSER_CONSOLE_EXECUTE_SNIPPET,
+} from "@/lib/growth/apollo/apollo-multichannel-orchestration-route-gates"
+export {
+  APOLLO_SEQUENCE_EXECUTION_AUTOMATION_QA_MARKER,
+  APOLLO_SEQUENCE_EXECUTION_AUTOMATION_ID,
+  type ApolloSequenceExecutionAutomationReport,
+  type ApolloSequenceExecutionCertificationReport,
+  type ApolloSequenceExecutionFunnelMetrics,
+} from "@/lib/growth/apollo/apollo-sequence-execution-automation-types"
+export {
+  APOLLO_SEQUENCE_EXECUTION_AUTOMATION_ROUTE_QA_MARKER,
+  APOLLO_SEQUENCE_EXECUTION_AUTOMATION_EXECUTE_CONFIRM,
+  APOLLO_SEQUENCE_EXECUTION_CERTIFICATION_EXECUTE_CONFIRM,
+  APOLLO_SEQUENCE_EXECUTION_AUTOMATION_BROWSER_CONSOLE_EXECUTE_SNIPPET,
+} from "@/lib/growth/apollo/apollo-sequence-execution-automation-route-gates"
