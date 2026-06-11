@@ -18,6 +18,7 @@ export const APOLLO_FULL_PIPELINE_PRODUCTION_CERTIFICATION_EXECUTE_CONFIRM =
 
 export const APOLLO_FULL_PIPELINE_PRODUCTION_READINESS_CHECKLIST = [
   "Platform admin session on Vercel Production (not preview).",
+  "GROWTH_APOLLO_ACCOUNT_PLAYBOOKS_ENABLED=true and GROWTH_APOLLO_ACCOUNT_PLAYBOOKS_ACK=1",
   "GROWTH_APOLLO_ENROLLMENT_AUTOMATION_ENABLED=true and GROWTH_APOLLO_ENROLLMENT_AUTOMATION_ACK=1",
   "GROWTH_APOLLO_VOICE_DROP_AUTOMATION_ENABLED=true and GROWTH_APOLLO_VOICE_DROP_AUTOMATION_ACK=1",
   "GROWTH_APOLLO_MULTICHANNEL_ORCHESTRATION_ENABLED=true and GROWTH_APOLLO_MULTICHANNEL_ORCHESTRATION_ACK=1",
@@ -29,7 +30,7 @@ export const APOLLO_FULL_PIPELINE_PRODUCTION_READINESS_CHECKLIST = [
 
 export const APOLLO_FULL_PIPELINE_PRODUCTION_ROLLBACK_NOTES = [
   "Certification creates real queue rows and a draft sequence_enrollment — it does not send outreach.",
-  "To rollback: cancel draft sequence_enrollment, then delete or reject apollo_sequence_execution_candidates, apollo_multichannel_sequence_candidates, apollo_voice_drop_candidates, and apollo_enrollment_candidates for the test company.",
+  "To rollback: cancel draft sequence_enrollment, then delete or reject apollo_sequence_execution_candidates, apollo_multichannel_sequence_candidates, apollo_voice_drop_candidates, account_playbooks, and apollo_enrollment_candidates for the test company.",
   "Pending-approval sequence_execution_jobs can be skipped or deleted; none should reach sent status during certification.",
   "Re-run is idempotent when prior candidates are rejected or removed — duplicate prevention may return existing pending rows.",
 ] as const

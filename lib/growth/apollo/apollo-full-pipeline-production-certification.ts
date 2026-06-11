@@ -8,6 +8,8 @@ import {
   mapApolloEnrollmentCandidateDbRow,
 } from "@/lib/growth/apollo/apollo-enrollment-automation-evidence"
 import { approveApolloEnrollmentCandidate } from "@/lib/growth/apollo/apollo-enrollment-candidate-queue"
+import { mapApolloAccountPlaybookDbRow } from "@/lib/growth/apollo/apollo-account-playbooks-evidence"
+import { approveApolloAccountPlaybook } from "@/lib/growth/apollo/apollo-account-playbooks-queue"
 import {
   APOLLO_FULL_PIPELINE_ATTRIBUTION_CHAIN,
   APOLLO_FULL_PIPELINE_PRODUCTION_CERTIFICATION_ID,
@@ -64,6 +66,7 @@ export async function certifyApolloFullPipelineProduction(
   const stageIds: ApolloFullPipelineStageIds = {
     company_candidate_id: input.company_candidate_id,
     enrollment_candidate_id: input.enrollment_candidate_id ?? null,
+    account_playbook_id: null,
     voice_drop_candidate_id: null,
     multichannel_sequence_candidate_id: null,
     sequence_execution_candidate_id: null,
@@ -151,7 +154,7 @@ export async function certifyApolloFullPipelineProduction(
       id: "enrollment_approved",
       satisfied: approveEnrollment.ok,
       detail: approveEnrollment.ok
-        ? "Enrollment approved; voice drop handoff triggered."
+        ? "Enrollment approved; account playbook handoff triggered."
         : approveEnrollment.error ?? "Enrollment approval failed.",
     })
     if (!approveEnrollment.ok) blockers.push("enrollment_approval_failed")
@@ -168,6 +171,54 @@ export async function certifyApolloFullPipelineProduction(
       detail: "Enrollment candidate missing or in unexpected status.",
     })
     blockers.push("enrollment_not_approvable")
+  }
+
+  const { data: accountPlaybookRow } = enrollmentCandidateId
+    ? await admin
+        .schema("growth")
+        .from("account_playbooks")
+        .select("*")
+        .eq("enrollment_candidate_id", enrollmentCandidateId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null }
+
+  const accountPlaybook = accountPlaybookRow
+    ? mapApolloAccountPlaybookDbRow(accountPlaybookRow as Record<string, unknown>)
+    : null
+  stageIds.account_playbook_id = accountPlaybook?.playbook_id ?? null
+
+  checks.push({
+    id: "account_playbook_created",
+    satisfied: Boolean(accountPlaybook),
+    detail: accountPlaybook
+      ? `Account playbook ${accountPlaybook.playbook_id} present (${accountPlaybook.playbook_key}).`
+      : "Account playbook not created after enrollment approval.",
+  })
+  if (!accountPlaybook) blockers.push("account_playbook_missing")
+
+  if (accountPlaybook && accountPlaybook.status === "pending_playbook_approval") {
+    const approvePlaybook = await approveApolloAccountPlaybook(admin, {
+      playbook_id: accountPlaybook.playbook_id,
+      approver_user_id: CERT_ACTOR_ID,
+      approver_email: CERT_ACTOR_EMAIL,
+      note: `full-pipeline-cert:${input.execution_id}`,
+    })
+    checks.push({
+      id: "account_playbook_approved",
+      satisfied: approvePlaybook.ok,
+      detail: approvePlaybook.ok
+        ? "Account playbook approved; voice drop handoff triggered."
+        : approvePlaybook.error ?? "Account playbook approval failed.",
+    })
+    if (!approvePlaybook.ok) blockers.push("account_playbook_approval_failed")
+  } else if (accountPlaybook?.status === "playbook_approved") {
+    checks.push({
+      id: "account_playbook_approved",
+      satisfied: true,
+      detail: "Account playbook already approved.",
+    })
   }
 
   const { data: voiceDropRow } = enrollmentCandidateId
@@ -336,10 +387,9 @@ export async function certifyApolloFullPipelineProduction(
   })
   if (!attribution_preserved) blockers.push("attribution_not_preserved")
 
-  const safetyRows = [enrollmentRow, voiceDropRow, multichannelRow, executionRow].filter(Boolean) as Record<
-    string,
-    unknown
-  >[]
+  const safetyRows = [enrollmentRow, accountPlaybookRow, voiceDropRow, multichannelRow, executionRow].filter(
+    Boolean,
+  ) as Record<string, unknown>[]
   const safetyVerified = safetyRows.every((row) => recordSafetyFromRow(row))
   checks.push({
     id: "safety_flags",
@@ -358,6 +408,8 @@ export async function certifyApolloFullPipelineProduction(
           "sequence_ready_contact",
           "enrollment_candidate_created",
           "enrollment_approved",
+          "account_playbook_created",
+          "account_playbook_approved",
           "voice_drop_candidate_created",
           "voice_drop_approved",
           "multichannel_candidate_created",

@@ -10,6 +10,7 @@ export const APOLLO_FULL_PIPELINE_ATTRIBUTION_CHAIN = [
   "Apollo",
   "Qualification",
   "Enrollment",
+  "Account Playbook",
   "Voice Drop",
   "Multi-Channel",
   "Sequence Execution",
@@ -31,6 +32,7 @@ export type ApolloFullPipelineSafetyFlags = {
 export type ApolloFullPipelineStageIds = {
   company_candidate_id: string
   enrollment_candidate_id: string | null
+  account_playbook_id: string | null
   voice_drop_candidate_id: string | null
   multichannel_sequence_candidate_id: string | null
   sequence_execution_candidate_id: string | null

@@ -62,6 +62,7 @@ assert.deepEqual([...APOLLO_FULL_PIPELINE_ATTRIBUTION_CHAIN], [
   "Apollo",
   "Qualification",
   "Enrollment",
+  "Account Playbook",
   "Voice Drop",
   "Multi-Channel",
   "Sequence Execution",
@@ -136,6 +137,7 @@ for (const forbidden of FORBIDDEN_SIDE_EFFECT_IMPORTS) {
 console.log("  ✓ no live outreach side-effect imports")
 
 assert.match(certSource, /approveApolloEnrollmentCandidate/)
+assert.match(certSource, /approveApolloAccountPlaybook/)
 assert.match(certSource, /approveApolloVoiceDropCandidate/)
 assert.match(certSource, /approveApolloMultichannelSequenceCandidate/)
 assert.match(certSource, /pending_approval/)

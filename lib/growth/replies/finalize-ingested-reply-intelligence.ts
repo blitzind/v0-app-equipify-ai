@@ -12,6 +12,7 @@ import {
 } from "@/lib/growth/reply-intelligence/process-reply-intelligence"
 import { emitGrowthLeadStatusChangedTimeline } from "@/lib/growth/timeline-emitter"
 import type { GrowthLeadStatus } from "@/lib/growth/types"
+import { maybeBridgeApolloPipelineToMeetingIntelligenceForLead } from "@/lib/growth/apollo/apollo-meeting-bridge"
 
 async function resolveDmPhone(
   admin: SupabaseClient,
@@ -132,4 +133,9 @@ export async function finalizeIngestedReplyIntelligence(
   })
 
   await recomputeGrowthLeadWorkflowSignals(admin, input.leadId)
+
+  await maybeBridgeApolloPipelineToMeetingIntelligenceForLead(admin, {
+    lead_id: input.leadId,
+    outbound_reply_id: input.outboundReply.id,
+  })
 }

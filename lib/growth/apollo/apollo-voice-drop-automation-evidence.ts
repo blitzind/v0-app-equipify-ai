@@ -45,6 +45,8 @@ export function buildApolloVoiceDropAttributionRecord(
       asString(enrollmentAttribution?.qualification_source) || "apollo_enrollment_qualification_engine",
     enrollment_source:
       asString(enrollmentAttribution?.enrollment_source) || "apollo_enrollment_automation",
+    account_playbook_source:
+      asString(enrollmentAttribution?.account_playbook_source) || "apollo_account_playbooks_abp_1",
     voice_drop_source: "apollo_voice_drop_automation",
     attribution_chain: buildApolloVoiceDropAttributionChain(),
   }

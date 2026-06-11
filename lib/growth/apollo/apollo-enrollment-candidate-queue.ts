@@ -14,7 +14,7 @@ import {
   type ApolloEnrollmentCandidateQueueSnapshot,
   type ApolloEnrollmentCandidateStatus,
 } from "@/lib/growth/apollo/apollo-enrollment-automation-types"
-import { handoffEnrollmentApprovedToVoiceDropPipeline } from "@/lib/growth/apollo/apollo-voice-drop-bridge"
+import { handoffEnrollmentApprovedToAccountPlaybook } from "@/lib/growth/apollo/apollo-account-playbooks-bridge"
 
 export {
   APOLLO_ENROLLMENT_AUTOMATION_QA_MARKER,
@@ -122,9 +122,10 @@ export async function approveApolloEnrollmentCandidate(
     return emptyActionResult("approve_enrollment", updateError.message)
   }
 
-  await handoffEnrollmentApprovedToVoiceDropPipeline(admin, {
+  await handoffEnrollmentApprovedToAccountPlaybook(admin, {
     enrollment_candidate_id: candidate.candidate_id,
     company_candidate_id: candidate.company_candidate_id,
+    canonical_company_id: null,
     company_contact_id: candidate.company_contact_id,
     contact_candidate_id: candidate.contact_candidate_id,
     growth_lead_id: candidate.growth_lead_id,

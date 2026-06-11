@@ -23,6 +23,7 @@ export const APOLLO_SEQUENCE_EXECUTION_SOURCE_ATTRIBUTION = [
   "Apollo",
   "Qualification",
   "Enrollment",
+  "Account Playbook",
   "Voice Drop",
   "Multi-Channel",
   "Sequence Execution",
@@ -85,6 +86,7 @@ export type ApolloSequenceExecutionAttributionRecord = {
   apollo_source: string
   qualification_source: string
   enrollment_source: string
+  account_playbook_source: string
   voice_drop_source: string
   multichannel_source: string
   sequence_execution_source: string

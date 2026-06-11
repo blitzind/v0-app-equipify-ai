@@ -178,3 +178,37 @@ export {
   APOLLO_FULL_PIPELINE_PRODUCTION_ROLLBACK_NOTES,
   APOLLO_FULL_PIPELINE_PRODUCTION_CERTIFICATION_BROWSER_CONSOLE_SNIPPET,
 } from "@/lib/growth/apollo/apollo-full-pipeline-production-route-gates"
+export {
+  APOLLO_ACCOUNT_PLAYBOOKS_QA_MARKER,
+  APOLLO_ACCOUNT_PLAYBOOKS_ID,
+  type ApolloAccountPlaybookAutomationReport,
+  type ApolloAccountPlaybookCertificationReport,
+  type ApolloAccountPlaybookFunnelMetrics,
+} from "@/lib/growth/apollo/apollo-account-playbooks-types"
+export {
+  APOLLO_ACCOUNT_PLAYBOOKS_ROUTE_QA_MARKER,
+  APOLLO_ACCOUNT_PLAYBOOKS_EXECUTE_CONFIRM,
+  APOLLO_ACCOUNT_PLAYBOOKS_CERTIFICATION_EXECUTE_CONFIRM,
+  APOLLO_ACCOUNT_PLAYBOOKS_BROWSER_CONSOLE_EXECUTE_SNIPPET,
+} from "@/lib/growth/apollo/apollo-account-playbooks-route-gates"
+export {
+  runAccountPlaybookEngine,
+  classifyCommitteeRoleFromTitle,
+  APOLLO_ACCOUNT_PLAYBOOK_ENGINE_QA_MARKER,
+} from "@/lib/growth/apollo/apollo-account-playbook-engine"
+export {
+  APOLLO_MEETING_BRIDGE_QA_MARKER,
+  APOLLO_MEETING_BRIDGE_ID,
+  APOLLO_MEETING_BRIDGE_MIGRATION,
+  APOLLO_MEETING_BRIDGE_SOURCE_ATTRIBUTION,
+  type ApolloMeetingBridgeAutomationReport,
+  type ApolloMeetingBridgeCertificationReport,
+  type ApolloMeetingCandidateFunnelMetrics,
+  type ApolloMeetingCandidateQueueSnapshot,
+} from "@/lib/growth/apollo/apollo-meeting-bridge-types"
+export {
+  APOLLO_MEETING_BRIDGE_ROUTE_QA_MARKER,
+  APOLLO_MEETING_BRIDGE_EXECUTE_CONFIRM,
+  APOLLO_MEETING_BRIDGE_CERTIFICATION_EXECUTE_CONFIRM,
+  APOLLO_MEETING_BRIDGE_BROWSER_CONSOLE_EXECUTE_SNIPPET,
+} from "@/lib/growth/apollo/apollo-meeting-bridge-route-gates"

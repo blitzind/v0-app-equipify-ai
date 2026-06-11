@@ -94,7 +94,14 @@ const SAMPLE_HANDOFF = {
   },
   voice_drop_script_reference: "Hi Alex, this is a voice drop placeholder.",
   source_attribution: {
-    attribution_chain: ["Apollo", "Qualification", "Enrollment", "Voice Drop", "Multi-Channel Sequence"],
+    attribution_chain: [
+      "Apollo",
+      "Qualification",
+      "Enrollment",
+      "Account Playbook",
+      "Voice Drop",
+      "Multi-Channel Sequence",
+    ],
   },
 }
 
@@ -159,6 +166,7 @@ assert.deepEqual(attribution.attribution_chain, [
   "Apollo",
   "Qualification",
   "Enrollment",
+  "Account Playbook",
   "Voice Drop",
   "Multi-Channel",
   "Sequence Execution",

@@ -21,6 +21,7 @@ export const APOLLO_MULTICHANNEL_SOURCE_ATTRIBUTION = [
   "Apollo",
   "Qualification",
   "Enrollment",
+  "Account Playbook",
   "Voice Drop",
   "Multi-Channel Sequence",
 ] as const
@@ -102,6 +103,7 @@ export type ApolloMultichannelAttributionRecord = {
   apollo_source: string
   qualification_source: string
   enrollment_source: string
+  account_playbook_source: string
   voice_drop_source: string
   multichannel_source: string
   attribution_chain: ApolloMultichannelSourceAttribution[]

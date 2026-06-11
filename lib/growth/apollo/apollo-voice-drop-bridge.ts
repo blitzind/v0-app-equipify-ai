@@ -1,10 +1,12 @@
-/** Apollo Voice Drop bridge — enrollment approval → voice drop candidate (no send). */
+/** Apollo Voice Drop bridge — account playbook approval → voice drop candidate (no send). */
 
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
+import type { ApolloAccountPlaybookVoiceDropHandoffInput } from "@/lib/growth/apollo/apollo-account-playbooks-types"
 import {
+  buildApolloVoiceDropAttributionRecord,
   evaluateApolloVoiceDropDuplicateBlock,
   mapApolloVoiceDropCandidateDbRow,
 } from "@/lib/growth/apollo/apollo-voice-drop-automation-evidence"
@@ -37,9 +39,37 @@ function emptyResult(
   }
 }
 
-export async function handoffEnrollmentApprovedToVoiceDropPipeline(
+function enrichOperatorIntelligenceFromPlaybook(
+  input: ApolloAccountPlaybookVoiceDropHandoffInput,
+): Record<string, unknown> {
+  const base = { ...input.operator_intelligence }
+  const playbook = input.playbook_result
+  return {
+    ...base,
+    account_playbook_key: playbook.playbook_key,
+    committee_strategy: playbook.committee_strategy,
+    committee_coverage_score: playbook.committee_coverage_score,
+    coverage_status: playbook.coverage_status,
+    buying_committee_summary: `${playbook.committee_role_summary.length} committee member(s); coverage ${playbook.coverage_status} (${playbook.committee_coverage_score}/100).`,
+    recommended_messaging_theme: playbook.recommended_messaging_theme,
+    recommended_channel_mix: playbook.recommended_channel_mix,
+  }
+}
+
+async function insertVoiceDropCandidate(
   admin: SupabaseClient,
-  input: ApolloVoiceDropEnrollmentHandoffInput & { env?: NodeJS.ProcessEnv },
+  input: {
+    enrollment_candidate_id: string
+    account_playbook_id?: string | null
+    company_candidate_id: string
+    company_contact_id: string | null
+    contact_candidate_id: string | null
+    growth_lead_id: string | null
+    qualification_score: number
+    handoff: ApolloVoiceDropEnrollmentHandoffInput
+    env?: NodeJS.ProcessEnv
+    handoff_source: "enrollment" | "account_playbook"
+  },
 ): Promise<ApolloVoiceDropAutomationActionResult> {
   const { data: existing } = await admin
     .schema("growth")
@@ -68,7 +98,7 @@ export async function handoffEnrollmentApprovedToVoiceDropPipeline(
     }
   }
 
-  const pipeline = buildVoiceDropPipelineFromEnrollmentHandoff(input, input.env)
+  const pipeline = buildVoiceDropPipelineFromEnrollmentHandoff(input.handoff, input.env)
   const now = new Date().toISOString()
 
   const { data, error } = await admin
@@ -76,6 +106,7 @@ export async function handoffEnrollmentApprovedToVoiceDropPipeline(
     .from(TABLE)
     .insert({
       enrollment_candidate_id: input.enrollment_candidate_id,
+      account_playbook_id: input.account_playbook_id ?? null,
       company_candidate_id: input.company_candidate_id,
       company_contact_id: input.company_contact_id,
       contact_candidate_id: input.contact_candidate_id,
@@ -85,11 +116,11 @@ export async function handoffEnrollmentApprovedToVoiceDropPipeline(
       voice_drop_score: pipeline.voiceDropScore,
       recommendation_confidence: pipeline.channelRecommendations.confidence_score,
       contact_snapshot: {
-        full_name: input.full_name,
-        title: input.title,
-        company_name: input.company_name,
-        email: input.email,
-        phone: input.phone,
+        full_name: input.handoff.full_name,
+        title: input.handoff.title,
+        company_name: input.handoff.company_name,
+        email: input.handoff.email,
+        phone: input.handoff.phone,
       },
       channel_evaluation: pipeline.availability,
       channel_recommendations: pipeline.channelRecommendations,
@@ -103,7 +134,8 @@ export async function handoffEnrollmentApprovedToVoiceDropPipeline(
       updated_at: now,
       metadata: {
         qa_marker: APOLLO_VOICE_DROP_AUTOMATION_QA_MARKER,
-        enrollment_handoff_at: now,
+        handoff_source: input.handoff_source,
+        handoff_at: now,
       },
     })
     .select("*")
@@ -117,6 +149,7 @@ export async function handoffEnrollmentApprovedToVoiceDropPipeline(
   logGrowthEngine("apollo_voice_drop_candidate_created", {
     candidate_id: candidateId,
     enrollment_candidate_id: input.enrollment_candidate_id,
+    account_playbook_id: input.account_playbook_id ?? null,
     voice_drop_score: pipeline.voiceDropScore,
     voice_drop_sent: false,
     outreach_sent: false,
@@ -133,6 +166,64 @@ export async function handoffEnrollmentApprovedToVoiceDropPipeline(
     outreach_sent: false,
     draft_created: false,
   }
+}
+
+/** @deprecated Use handoffAccountPlaybookApprovedToVoiceDropPipeline after ABP-1 enrollment handoff. */
+export async function handoffEnrollmentApprovedToVoiceDropPipeline(
+  admin: SupabaseClient,
+  input: ApolloVoiceDropEnrollmentHandoffInput & { env?: NodeJS.ProcessEnv },
+): Promise<ApolloVoiceDropAutomationActionResult> {
+  return insertVoiceDropCandidate(admin, {
+    enrollment_candidate_id: input.enrollment_candidate_id,
+    company_candidate_id: input.company_candidate_id,
+    company_contact_id: input.company_contact_id,
+    contact_candidate_id: input.contact_candidate_id,
+    growth_lead_id: input.growth_lead_id,
+    qualification_score: input.qualification_score,
+    handoff: input,
+    env: input.env,
+    handoff_source: "enrollment",
+  })
+}
+
+export async function handoffAccountPlaybookApprovedToVoiceDropPipeline(
+  admin: SupabaseClient,
+  input: ApolloAccountPlaybookVoiceDropHandoffInput & { env?: NodeJS.ProcessEnv },
+): Promise<ApolloVoiceDropAutomationActionResult> {
+  const enrichedOperatorIntelligence = enrichOperatorIntelligenceFromPlaybook(input)
+  const voiceDropAttribution = buildApolloVoiceDropAttributionRecord(
+    input.source_attribution as unknown as Record<string, unknown>,
+  )
+
+  return insertVoiceDropCandidate(admin, {
+    enrollment_candidate_id: input.enrollment_candidate_id,
+    account_playbook_id: input.account_playbook_id,
+    company_candidate_id: input.company_candidate_id,
+    company_contact_id: input.company_contact_id,
+    contact_candidate_id: input.contact_candidate_id,
+    growth_lead_id: input.growth_lead_id,
+    qualification_score: input.qualification_score,
+    handoff: {
+      enrollment_candidate_id: input.enrollment_candidate_id,
+      company_candidate_id: input.company_candidate_id,
+      company_contact_id: input.company_contact_id,
+      contact_candidate_id: input.contact_candidate_id,
+      growth_lead_id: input.growth_lead_id,
+      company_name: input.company_name,
+      full_name: input.full_name,
+      title: input.title,
+      email: input.email,
+      phone: input.phone,
+      qualification_score: input.qualification_score,
+      fit_score: input.fit_score,
+      research_score: input.research_score,
+      operator_intelligence: enrichedOperatorIntelligence,
+      source_attribution: voiceDropAttribution as unknown as Record<string, unknown>,
+      acquisition_evidence: input.acquisition_evidence,
+    },
+    env: input.env,
+    handoff_source: "account_playbook",
+  })
 }
 
 export async function regenerateApolloVoiceDropCandidateIntelligence(

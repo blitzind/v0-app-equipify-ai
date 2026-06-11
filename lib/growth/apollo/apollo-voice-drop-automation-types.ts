@@ -19,6 +19,7 @@ export const APOLLO_VOICE_DROP_SOURCE_ATTRIBUTION = [
   "Apollo",
   "Qualification",
   "Enrollment",
+  "Account Playbook",
   "Voice Drop",
 ] as const
 
@@ -97,6 +98,7 @@ export type ApolloVoiceDropAttributionRecord = {
   apollo_source: string
   qualification_source: string
   enrollment_source: string
+  account_playbook_source: string
   voice_drop_source: string
   attribution_chain: ApolloVoiceDropSourceAttribution[]
 }

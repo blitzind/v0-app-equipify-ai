@@ -130,6 +130,7 @@ assert.deepEqual(attribution.attribution_chain, [
   "Apollo",
   "Qualification",
   "Enrollment",
+  "Account Playbook",
   "Voice Drop",
   "Multi-Channel Sequence",
 ])

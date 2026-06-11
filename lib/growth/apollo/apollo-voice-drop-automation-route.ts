@@ -5,7 +5,9 @@ import "server-only"
 import { randomUUID } from "node:crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { mapApolloEnrollmentCandidateDbRow } from "@/lib/growth/apollo/apollo-enrollment-automation-evidence"
-import { handoffEnrollmentApprovedToVoiceDropPipeline } from "@/lib/growth/apollo/apollo-voice-drop-bridge"
+import type { ApolloAccountPlaybookEngineResult } from "@/lib/growth/apollo/apollo-account-playbooks-types"
+import { mapApolloAccountPlaybookDbRow } from "@/lib/growth/apollo/apollo-account-playbooks-evidence"
+import { handoffAccountPlaybookApprovedToVoiceDropPipeline } from "@/lib/growth/apollo/apollo-voice-drop-bridge"
 import { certifyApolloVoiceDropAutomation } from "@/lib/growth/apollo/apollo-voice-drop-certification"
 import { mapApolloVoiceDropCandidateDbRow } from "@/lib/growth/apollo/apollo-voice-drop-automation-evidence"
 import type {
@@ -111,9 +113,35 @@ export async function executeApolloVoiceDropAutomationInProduction(
     })
   }
 
-  const handoff = await handoffEnrollmentApprovedToVoiceDropPipeline(admin, {
+  const { data: playbookRow, error: playbookError } = await admin
+    .schema("growth")
+    .from("account_playbooks")
+    .select("*")
+    .eq("enrollment_candidate_id", input.enrollment_candidate_id)
+    .eq("status", "playbook_approved")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (playbookError || !playbookRow) {
+    return redactApolloVoiceDropAutomationSecrets({
+      ok: false,
+      execution_id,
+      report: null,
+      certification: null,
+      blockers: ["account_playbook_not_approved"],
+      error: "enrollment_not_approved",
+      message: "Account playbook must be approved before voice drop automation.",
+    })
+  }
+
+  const playbook = mapApolloAccountPlaybookDbRow(playbookRow as Record<string, unknown>)
+
+  const handoff = await handoffAccountPlaybookApprovedToVoiceDropPipeline(admin, {
+    account_playbook_id: playbook.playbook_id,
     enrollment_candidate_id: enrollment.candidate_id,
     company_candidate_id: enrollment.company_candidate_id,
+    canonical_company_id: playbook.canonical_company_id,
     company_contact_id: enrollment.company_contact_id,
     contact_candidate_id: enrollment.contact_candidate_id,
     growth_lead_id: enrollment.growth_lead_id,
@@ -126,8 +154,23 @@ export async function executeApolloVoiceDropAutomationInProduction(
     fit_score: enrollment.fit_score,
     research_score: enrollment.research_score,
     operator_intelligence: enrollment.operator_intelligence as unknown as Record<string, unknown>,
-    source_attribution: enrollment.source_attribution as unknown as Record<string, unknown>,
+    source_attribution: playbook.source_attribution,
     acquisition_evidence: enrollment.acquisition_evidence,
+    playbook_result: {
+      playbook_key: playbook.playbook_key,
+      committee_strategy: playbook.committee_strategy,
+      recommended_roles: playbook.recommended_roles,
+      recommended_channels: playbook.recommended_channels,
+      committee_role_summary: playbook.committee_role_summary,
+      committee_coverage_score: playbook.committee_coverage_score,
+      coverage_status: playbook.coverage_status,
+      recommended_messaging_theme:
+        playbook.recommended_messaging_theme as ApolloAccountPlaybookEngineResult["recommended_messaging_theme"],
+      recommended_channel_mix:
+        playbook.recommended_channel_mix as ApolloAccountPlaybookEngineResult["recommended_channel_mix"],
+      confidence_score: playbook.confidence_score,
+      reasoning: playbook.reasoning,
+    },
     env,
   })
 

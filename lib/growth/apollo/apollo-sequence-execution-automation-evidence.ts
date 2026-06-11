@@ -52,6 +52,8 @@ export function buildApolloSequenceExecutionAttributionRecord(
     qualification_source:
       asString(prior?.qualification_source) || "apollo_enrollment_qualification_engine",
     enrollment_source: asString(prior?.enrollment_source) || "apollo_enrollment_automation",
+    account_playbook_source:
+      asString(prior?.account_playbook_source) || "apollo_account_playbooks_abp_1",
     voice_drop_source: asString(prior?.voice_drop_source) || "apollo_voice_drop_automation",
     multichannel_source:
       asString(prior?.multichannel_source) || "apollo_multichannel_orchestration_engine",

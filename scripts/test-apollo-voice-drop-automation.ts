@@ -122,6 +122,7 @@ assert.deepEqual(attribution.attribution_chain, [
   "Apollo",
   "Qualification",
   "Enrollment",
+  "Account Playbook",
   "Voice Drop",
 ])
 console.log("  ✓ attribution chain preserved")
@@ -249,8 +250,8 @@ const enrollmentQueue = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/apollo/apollo-enrollment-candidate-queue.ts"),
   "utf8",
 )
-assert.match(enrollmentQueue, /handoffEnrollmentApprovedToVoiceDropPipeline/)
-console.log("  ✓ enrollment approval triggers voice drop handoff")
+assert.match(enrollmentQueue, /handoffEnrollmentApprovedToAccountPlaybook/)
+console.log("  ✓ enrollment approval triggers account playbook handoff")
 
 const bridgeSource = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/apollo/apollo-voice-drop-bridge.ts"),
