@@ -169,6 +169,11 @@ export type ApolloSequenceExecutionAutomationActionResult = {
   candidate_ids: string[]
   status: ApolloSequenceExecutionCandidateStatus | null
   error?: string | null
+  sequence_enrollment_id?: string | null
+  steps_created?: number
+  draft_placeholders_created?: number
+  pending_approval_jobs_created?: number
+  materialization_reused?: boolean
   outreach_sent: false
   voice_drop_sent: false
   email_sent: false
@@ -251,4 +256,5 @@ export type ApolloSequenceExecutionMultichannelHandoffInput = {
   voice_drop_script_reference?: string | null
   source_attribution: Record<string, unknown>
   operator_intelligence?: Record<string, unknown>
+  created_by_user_id?: string | null
 }

@@ -3,7 +3,9 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { normalizeGrowthActorUserIdForDb } from "@/lib/growth/actor-user-id"
 import { logGrowthEngine } from "@/lib/growth/access"
+import { resolveUnsupportedSequenceMaterializationBlockers } from "@/lib/growth/apollo/apollo-full-pipeline-materialization-evidence"
 import {
   evaluateApolloSequenceExecutionDuplicateBlock,
   mapApolloSequenceExecutionCandidateDbRow,
@@ -95,12 +97,42 @@ export async function handoffMultichannelApprovedToSequenceExecution(
       existing_status: existing.status as ApolloSequenceExecutionCandidateStatus,
     })
     if (duplicate.blocked) {
+      const { data: existingRow } = await admin
+        .schema("growth")
+        .from(TABLE)
+        .select("sequence_enrollment_id, sequence_materialization, execution_jobs")
+        .eq("id", existing.id)
+        .maybeSingle()
+
+      const materialization =
+        existingRow?.sequence_materialization &&
+        typeof existingRow.sequence_materialization === "object"
+          ? (existingRow.sequence_materialization as {
+              steps?: unknown[]
+              drafts?: unknown[]
+            })
+          : null
+      const executionJobs = Array.isArray(existingRow?.execution_jobs) ? existingRow.execution_jobs : []
+
       return {
         ok: true,
         action: "create_from_multichannel",
         candidate_id: typeof existing.id === "string" ? existing.id : null,
         candidate_ids: typeof existing.id === "string" ? [existing.id] : [],
         status: existing.status as ApolloSequenceExecutionCandidateStatus,
+        sequence_enrollment_id:
+          typeof existingRow?.sequence_enrollment_id === "string"
+            ? existingRow.sequence_enrollment_id
+            : null,
+        steps_created: materialization?.steps?.length ?? 0,
+        draft_placeholders_created: materialization?.drafts?.length ?? 0,
+        pending_approval_jobs_created: executionJobs.filter(
+          (job) =>
+            job &&
+            typeof job === "object" &&
+            (job as { job_status?: string }).job_status === "pending_approval",
+        ).length,
+        materialization_reused: true,
         outreach_sent: false,
         voice_drop_sent: false,
         email_sent: false,
@@ -113,8 +145,17 @@ export async function handoffMultichannelApprovedToSequenceExecution(
   }
 
   const pipeline = buildSequenceExecutionPipelineFromMultichannelHandoff(input)
+  const unsupportedBlockers = resolveUnsupportedSequenceMaterializationBlockers({
+    sequence_key: input.sequence_key,
+    sequence_label: input.sequence_label,
+    scheduling_touches: input.scheduling_plan.touches,
+    materialized_step_count: pipeline.materialization.steps.length,
+  })
   if (!pipeline.materialization.steps.length) {
-    return emptyResult("create_from_multichannel", "sequence_steps_empty")
+    return emptyResult(
+      "create_from_multichannel",
+      unsupportedBlockers[0] ?? "sequence_steps_empty",
+    )
   }
 
   const patterns = await listGrowthSequencePatterns(admin)
@@ -129,13 +170,21 @@ export async function handoffMultichannelApprovedToSequenceExecution(
   const patternSteps = [...pattern.steps].sort((a, b) => a.stepOrder - b.stepOrder)
   const baseTime = new Date().toISOString()
 
-  const enrollment = await insertGrowthSequenceEnrollment(admin, {
-    leadId: input.growth_lead_id,
-    sequencePatternId: pattern.id,
-    sequenceVersion: pattern.sequenceVersion,
-    status: "draft",
-    createdBy: "apollo-sequence-execution-automation",
-  })
+  const createdBy = normalizeGrowthActorUserIdForDb(input.created_by_user_id)
+
+  let enrollment
+  try {
+    enrollment = await insertGrowthSequenceEnrollment(admin, {
+      leadId: input.growth_lead_id,
+      sequencePatternId: pattern.id,
+      sequenceVersion: pattern.sequenceVersion,
+      status: "draft",
+      createdBy,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "sequence_enrollment_insert_failed"
+    return emptyResult("create_from_multichannel", message)
+  }
 
   const executionJobLinks: ApolloSequenceExecutionJobLink[] = []
 
@@ -251,12 +300,21 @@ export async function handoffMultichannelApprovedToSequenceExecution(
     jobs_scheduled: false,
   })
 
+  const pendingApprovalJobs = executionJobLinks.filter(
+    (job) => job.job_status === "pending_approval",
+  ).length
+
   return {
     ok: true,
     action: "create_from_multichannel",
     candidate_id: candidateId,
     candidate_ids: candidateId ? [candidateId] : [],
     status: "pending_draft_approval",
+    sequence_enrollment_id: enrollment.id,
+    steps_created: pipeline.materialization.steps.length,
+    draft_placeholders_created: pipeline.materialization.drafts.length,
+    pending_approval_jobs_created: pendingApprovalJobs,
+    materialization_reused: false,
     outreach_sent: false,
     voice_drop_sent: false,
     email_sent: false,

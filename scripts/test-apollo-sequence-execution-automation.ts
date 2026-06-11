@@ -234,6 +234,8 @@ const multichannelQueue = fs.readFileSync(
   "utf8",
 )
 assert.match(multichannelQueue, /handoffMultichannelApprovedToSequenceExecution/)
+assert.match(multichannelQueue, /materialization_error/)
+assert.match(multichannelQueue, /buildApolloSequenceExecutionHandoffInput/)
 console.log("  ✓ multichannel approval triggers sequence execution handoff")
 
 const bridgeSource = fs.readFileSync(
@@ -257,6 +259,8 @@ console.log("  ✓ no live outreach side-effect imports")
 assert.match(bridgeSource, /outreach_sent:\s*false/)
 assert.match(bridgeSource, /jobs_scheduled:\s*false/)
 assert.match(bridgeSource, /status:\s*"pending_approval"/)
+assert.match(bridgeSource, /normalizeGrowthActorUserIdForDb/)
+assert.doesNotMatch(bridgeSource, /createdBy:\s*"apollo-sequence-execution-automation"/)
 console.log("  ✓ bridge safety flags")
 
 const panelSource = fs.readFileSync(

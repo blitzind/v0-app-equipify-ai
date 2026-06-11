@@ -42,6 +42,28 @@ export type ApolloFullPipelineStageIds = {
 
 export type ApolloFullPipelineQualificationThresholdSource = "production" | "certification_override"
 
+export type ApolloFullPipelineMaterializationEvidence = {
+  materialization_attempted: boolean
+  materialization_error: string | null
+  materialization_error_table: string | null
+  materialization_error_operation: string | null
+  sequence_execution_candidate_id: string | null
+  sequence_enrollment_id: string | null
+  steps_created: number
+  draft_placeholders_created: number
+  pending_approval_jobs_created: number
+  selected_sequence_key: string | null
+  selected_sequence_template: string | null
+  unsupported_channel_or_template_blockers: string[]
+  materialization_reused: boolean
+}
+
+export type ApolloFullPipelineSafetyViolation = {
+  stage: string
+  field: string
+  value: unknown
+}
+
 export type ApolloFullPipelineEnrollmentEvidence = {
   sequence_ready_contact_id: string | null
   sequence_ready_contact_name: string | null
@@ -75,10 +97,12 @@ export type ApolloFullPipelineProductionCertificationReport = {
   blockers: string[]
   checks: Array<{ id: string; satisfied: boolean; detail: string }>
   enrollment_evidence: ApolloFullPipelineEnrollmentEvidence | null
+  materialization_evidence: ApolloFullPipelineMaterializationEvidence | null
   stage_ids: ApolloFullPipelineStageIds
   attribution_chain: ApolloFullPipelineAttributionStage[]
   attribution_preserved: boolean
   safety: ApolloFullPipelineSafetyFlags
+  safety_violations: ApolloFullPipelineSafetyViolation[]
   readiness_checklist: string[]
   rollback_notes: string[]
   summary: string

@@ -58,8 +58,10 @@ await fetch("/api/platform/growth/apollo-full-pipeline-certification/execute", {
   .then((payload) => {
     console.log("certified", payload.certification?.certified)
     console.log("stage_ids", payload.certification?.stage_ids)
+    console.log("materialization_evidence", payload.certification?.materialization_evidence)
     console.log("attribution_chain", payload.certification?.attribution_chain)
     console.log("safety", payload.certification?.safety)
+    console.log("safety_violations", payload.certification?.safety_violations)
     console.log("checks", payload.certification?.checks)
     console.log("blockers", payload.certification?.blockers)
     return payload

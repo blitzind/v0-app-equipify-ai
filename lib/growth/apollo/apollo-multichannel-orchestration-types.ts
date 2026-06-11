@@ -178,6 +178,10 @@ export type ApolloMultichannelOrchestrationActionResult = {
   candidate_ids: string[]
   status: ApolloMultichannelSequenceCandidateStatus | null
   error?: string | null
+  materialization_attempted?: boolean
+  materialization_error?: string | null
+  sequence_execution_candidate_id?: string | null
+  sequence_enrollment_id?: string | null
   outreach_sent: false
   voice_drop_sent: false
   draft_created: false

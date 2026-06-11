@@ -42,6 +42,15 @@ import {
 } from "../lib/growth/apollo/apollo-enrollment-qualification-engine"
 import type { ApolloEnrollmentAutomationReport } from "../lib/growth/apollo/apollo-enrollment-automation-types"
 import { APOLLO_ENROLLMENT_AUTOMATION_QA_MARKER } from "../lib/growth/apollo/apollo-enrollment-automation-types"
+import {
+  buildApolloFullPipelineMaterializationEvidence,
+  evaluateApolloFullPipelineExecutionJobSafety,
+  evaluateApolloFullPipelineStageSafety,
+  resolveUnsupportedSequenceMaterializationBlockers,
+  summarizeApolloFullPipelineSafetyViolations,
+} from "../lib/growth/apollo/apollo-full-pipeline-materialization-evidence"
+import { buildApolloSequenceExecutionHandoffInput } from "../lib/growth/apollo/apollo-sequence-execution-handoff-input"
+import { buildSequenceExecutionPipelineFromMultichannelHandoff } from "../lib/growth/apollo/apollo-sequence-execution-pipeline-builder"
 
 const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-full-pipeline-production-certification-types.ts",
@@ -50,6 +59,8 @@ const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-full-pipeline-enrollment-resolution-evidence.ts",
   "lib/growth/apollo/apollo-full-pipeline-certification-actor.ts",
   "lib/growth/apollo/apollo-full-pipeline-db-error-evidence.ts",
+  "lib/growth/apollo/apollo-full-pipeline-materialization-evidence.ts",
+  "lib/growth/apollo/apollo-sequence-execution-handoff-input.ts",
   "lib/growth/apollo/apollo-full-pipeline-production-route-gates.ts",
   "lib/growth/apollo/apollo-full-pipeline-production-route.ts",
   "app/api/platform/growth/apollo-full-pipeline-certification/readiness/route.ts",
@@ -449,5 +460,235 @@ assert.equal(dbEvidence.db_error_operation, "insert")
 assert.match(dbEvidence.insert_error ?? "", /table=growth\.leads/)
 assert.match(dbEvidence.insert_error ?? "", /company_contact_id=cc-1/)
 console.log("  ✓ DB insert failure evidence includes table/operation")
+
+const multichannelQueueSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/apollo/apollo-multichannel-orchestration-queue.ts"),
+  "utf8",
+)
+const bridgeSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/apollo/apollo-sequence-execution-bridge.ts"),
+  "utf8",
+)
+
+assert.match(multichannelQueueSource, /handoffMultichannelApprovedToSequenceExecution/)
+assert.match(multichannelQueueSource, /materializationEvidence/)
+assert.match(multichannelQueueSource, /materialization_error/)
+assert.match(multichannelQueueSource, /buildApolloSequenceExecutionHandoffInput/)
+console.log("  ✓ multichannel approval captures sequence execution handoff evidence")
+
+assert.match(bridgeSource, /normalizeGrowthActorUserIdForDb/)
+assert.doesNotMatch(bridgeSource, /createdBy:\s*"apollo-sequence-execution-automation"/)
+assert.match(bridgeSource, /unsupported_template:custom_future|resolveUnsupportedSequenceMaterializationBlockers/)
+assert.match(bridgeSource, /status:\s*"pending_approval"/)
+console.log("  ✓ sequence execution bridge uses valid actor UUID and pending_approval jobs")
+
+assert.match(certSource, /handoffMultichannelApprovedToSequenceExecution/)
+assert.match(certSource, /materialization_evidence/)
+assert.match(certSource, /multichannel_sequence_candidate_id/)
+assert.match(certSource, /materialization_reused/)
+assert.match(certSource, /safety_violations/)
+assert.match(certSource, /evaluateApolloFullPipelineStageSafety/)
+console.log("  ✓ certification retries materialization and reports safety violations")
+
+const customFutureBlockers = resolveUnsupportedSequenceMaterializationBlockers({
+  sequence_key: "custom_future",
+  sequence_label: "Custom Future Sequence",
+  scheduling_touches: [{ channel: "future_channel" }],
+  materialized_step_count: 0,
+})
+assert.ok(customFutureBlockers.includes("unsupported_template:custom_future"))
+console.log("  ✓ Custom Future Sequence returns explicit unsupported_template blocker")
+
+const supportedPipeline = buildSequenceExecutionPipelineFromMultichannelHandoff({
+  multichannel_sequence_candidate_id: "mc-1",
+  voice_drop_candidate_id: "vd-1",
+  enrollment_candidate_id: "en-1",
+  company_candidate_id: "co-1",
+  company_contact_id: "cc-1",
+  growth_lead_id: "lead-1",
+  company_name: "Summit Medical",
+  full_name: "Bryan Ginther",
+  title: "Director",
+  email: "bryan@example.com",
+  phone: "+15551234567",
+  qualification_score: 75,
+  sequence_key: "email_voice_drop",
+  sequence_label: "Email → Voice Drop",
+  channel_order: ["email", "voice_drop"],
+  scheduling_plan: {
+    total_days: 3,
+    touches: [
+      { day_offset: 1, channel: "email", spacing_days_from_prior: 0, cadence_label: "async_inbox", reason: "Day 1" },
+      { day_offset: 3, channel: "voice_drop", spacing_days_from_prior: 2, cadence_label: "mobile_voicemail", reason: "Day 3" },
+    ],
+  },
+  source_attribution: { attribution_chain: ["Apollo", "Qualification", "Enrollment", "Voice Drop", "Multi-Channel"] },
+})
+assert.equal(supportedPipeline.materialization.total_steps, 2)
+assert.equal(supportedPipeline.materialization.drafts.length, 2)
+console.log("  ✓ supported multichannel sequence materializes steps and draft placeholders")
+
+const draftCreatedRow = {
+  outreach_sent: false,
+  jobs_scheduled: false,
+  voice_drop_sent: false,
+  email_sent: false,
+  sms_sent: false,
+  call_placed: false,
+  draft_created: true,
+}
+assert.deepEqual(evaluateApolloFullPipelineStageSafety(draftCreatedRow, "apollo_sequence_execution_candidates"), [])
+console.log("  ✓ safety check allows draft_created=true on execution candidate")
+
+const pendingApprovalJobs = evaluateApolloFullPipelineExecutionJobSafety({
+  jobs: [{ status: "pending_approval" }, { status: "pending_approval" }],
+})
+assert.deepEqual(pendingApprovalJobs, [])
+const scheduledJobViolation = evaluateApolloFullPipelineExecutionJobSafety({
+  jobs: [{ status: "scheduled" }],
+})
+assert.equal(scheduledJobViolation.length, 1)
+assert.equal(scheduledJobViolation[0]?.field, "jobs_scheduled")
+console.log("  ✓ safety check allows pending_approval jobs and flags scheduled jobs")
+
+const outreachViolation = evaluateApolloFullPipelineStageSafety(
+  { outreach_sent: true, jobs_scheduled: false },
+  "apollo_voice_drop_candidates",
+)
+assert.equal(outreachViolation.length, 1)
+assert.equal(outreachViolation[0]?.stage, "apollo_voice_drop_candidates")
+assert.equal(outreachViolation[0]?.field, "outreach_sent")
+assert.match(
+  summarizeApolloFullPipelineSafetyViolations(outreachViolation),
+  /apollo_voice_drop_candidates\.outreach_sent=true/,
+)
+console.log("  ✓ safety check reports exact violating stage and field")
+
+const materializationEvidence = buildApolloFullPipelineMaterializationEvidence({
+  attempted: true,
+  reused: true,
+  handoff: {
+    ok: true,
+    action: "create_from_multichannel",
+    candidate_id: "exec-1",
+    candidate_ids: ["exec-1"],
+    status: "pending_draft_approval",
+    sequence_enrollment_id: "enroll-1",
+    steps_created: 2,
+    draft_placeholders_created: 2,
+    pending_approval_jobs_created: 2,
+    materialization_reused: true,
+    outreach_sent: false,
+    voice_drop_sent: false,
+    email_sent: false,
+    sms_sent: false,
+    call_placed: false,
+    draft_created: true,
+    jobs_scheduled: false,
+  },
+  multichannel: {
+    candidate_id: "mc-1",
+    voice_drop_candidate_id: "vd-1",
+    enrollment_candidate_id: "en-1",
+    company_candidate_id: "co-1",
+    company_contact_id: "cc-1",
+    growth_lead_id: "lead-1",
+    status: "sequence_approved",
+    company_name: "Summit Medical",
+    full_name: "Bryan Ginther",
+    title: "Director",
+    email: "bryan@example.com",
+    phone: "+15551234567",
+    qualification_score: 75,
+    fit_score: null,
+    sequence_template: {
+      sequence_key: "email_voice_drop",
+      sequence_version: "v1",
+      sequence_label: "Email → Voice Drop",
+      channel_order: ["email", "voice_drop"],
+      recommendation_reason: "test",
+    },
+    channel_availability: {
+      verified_email: true,
+      phone: true,
+      sms_capable: false,
+      voice_drop_capable: true,
+    },
+    orchestration_result: {
+      channel_order: ["email", "voice_drop"],
+      orchestration_confidence: 80,
+      rationale: "test",
+    },
+    orchestration_confidence: 80,
+    scheduling_plan: {
+      total_days: 3,
+      touches: [
+        { day_offset: 1, channel: "email", spacing_days_from_prior: 0, cadence_label: "async_inbox", reason: "Day 1" },
+        { day_offset: 3, channel: "voice_drop", spacing_days_from_prior: 2, cadence_label: "mobile_voicemail", reason: "Day 3" },
+      ],
+    },
+    operator_summary: { headline: "test", detail: "test" },
+    source_attribution: { attribution_chain: [] },
+    created_at: new Date().toISOString(),
+    sequence_approved_at: null,
+    sequence_approved_by: null,
+    sequence_approved_email: null,
+  },
+})
+assert.equal(materializationEvidence.materialization_reused, true)
+assert.equal(materializationEvidence.sequence_execution_candidate_id, "exec-1")
+assert.equal(materializationEvidence.sequence_enrollment_id, "enroll-1")
+assert.equal(materializationEvidence.steps_created, 2)
+console.log("  ✓ existing materialization reuse evidence")
+
+const multichannelFixture = {
+  candidate_id: "mc-1",
+  voice_drop_candidate_id: "vd-1",
+  enrollment_candidate_id: "en-1",
+  company_candidate_id: "co-1",
+  company_contact_id: "cc-1",
+  growth_lead_id: null,
+  status: "sequence_approved" as const,
+  company_name: "Summit Medical",
+  full_name: "Bryan Ginther",
+  title: "Director",
+  email: "bryan@example.com",
+  phone: "+15551234567",
+  qualification_score: 75,
+  fit_score: null,
+  sequence_template: {
+    sequence_key: "email_voice_drop",
+    sequence_version: "v1",
+    sequence_label: "Email → Voice Drop",
+    channel_order: ["email", "voice_drop"] as const,
+    recommendation_reason: "test",
+  },
+  channel_availability: {
+    verified_email: true,
+    phone: true,
+    sms_capable: false,
+    voice_drop_capable: true,
+  },
+  orchestration_result: {
+    channel_order: ["email", "voice_drop"] as const,
+    orchestration_confidence: 80,
+    rationale: "test",
+  },
+  orchestration_confidence: 80,
+  scheduling_plan: { total_days: 3, touches: [] },
+  operator_summary: { headline: "test", detail: "test" },
+  source_attribution: { attribution_chain: [] },
+  created_at: new Date().toISOString(),
+  sequence_approved_at: null,
+  sequence_approved_by: null,
+  sequence_approved_email: null,
+}
+
+const handoffInput = buildApolloSequenceExecutionHandoffInput({
+  multichannel: multichannelFixture,
+  growth_lead_id: "lead-from-enrollment",
+})
+assert.equal(handoffInput.growth_lead_id, "lead-from-enrollment")
+console.log("  ✓ handoff input backfills growth_lead_id from enrollment")
 
 console.log("\nApollo Full Pipeline Production Certification checks passed.")

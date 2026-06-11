@@ -7,7 +7,16 @@ import {
   mapApolloEnrollmentCandidateDbRow,
 } from "@/lib/growth/apollo/apollo-enrollment-automation-evidence"
 import type { ApolloEnrollmentAutomationReport } from "@/lib/growth/apollo/apollo-enrollment-automation-types"
-import type { ApolloFullPipelineEnrollmentEvidence } from "@/lib/growth/apollo/apollo-full-pipeline-production-certification-types"
+import type {
+  ApolloFullPipelineEnrollmentEvidence,
+  ApolloFullPipelineMaterializationEvidence,
+} from "@/lib/growth/apollo/apollo-full-pipeline-production-certification-types"
+import {
+  buildApolloFullPipelineMaterializationEvidence,
+  evaluateApolloFullPipelineExecutionJobSafety,
+  evaluateApolloFullPipelineStageSafety,
+  summarizeApolloFullPipelineSafetyViolations,
+} from "@/lib/growth/apollo/apollo-full-pipeline-materialization-evidence"
 import {
   pickEnrollmentCandidateIdFromAutomationReport,
   selectSequenceReadyContactForCertification,
@@ -46,6 +55,8 @@ import { assertApolloSequenceExecutionAttributionPreserved } from "@/lib/growth/
 import { mapApolloSequenceExecutionCandidateDbRow } from "@/lib/growth/apollo/apollo-sequence-execution-automation-evidence"
 import { approveApolloMultichannelSequenceCandidate } from "@/lib/growth/apollo/apollo-multichannel-orchestration-queue"
 import { mapApolloMultichannelSequenceCandidateDbRow } from "@/lib/growth/apollo/apollo-multichannel-orchestration-evidence"
+import { handoffMultichannelApprovedToSequenceExecution } from "@/lib/growth/apollo/apollo-sequence-execution-bridge"
+import { buildApolloSequenceExecutionHandoffInput } from "@/lib/growth/apollo/apollo-sequence-execution-handoff-input"
 import { loadApolloPrimaryContactOperatorReviewSnapshot } from "@/lib/growth/apollo/apollo-primary-contact-operator-review"
 import { approveApolloVoiceDropCandidate } from "@/lib/growth/apollo/apollo-voice-drop-candidate-queue"
 import { mapApolloVoiceDropCandidateDbRow } from "@/lib/growth/apollo/apollo-voice-drop-automation-evidence"
@@ -56,18 +67,6 @@ import { listSequenceExecutionJobs } from "@/lib/growth/sequences/execution/sequ
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
-}
-
-function recordSafetyFromRow(row: Record<string, unknown> | null | undefined): boolean {
-  if (!row) return true
-  return (
-    row.outreach_sent === false &&
-    row.jobs_scheduled === false &&
-    row.voice_drop_sent === false &&
-    (row.email_sent === false || row.email_sent == null) &&
-    (row.sms_sent === false || row.sms_sent == null) &&
-    (row.call_placed === false || row.call_placed == null)
-  )
 }
 
 export async function certifyApolloFullPipelineProduction(
@@ -500,16 +499,76 @@ export async function certifyApolloFullPipelineProduction(
     })
   }
 
-  const { data: executionRow } = stageIds.multichannel_sequence_candidate_id
-    ? await admin
-        .schema("growth")
-        .from("apollo_sequence_execution_candidates")
-        .select("*")
-        .eq("multichannel_sequence_candidate_id", stageIds.multichannel_sequence_candidate_id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-    : { data: null }
+  let materializationEvidence: ApolloFullPipelineMaterializationEvidence | null = null
+  let executionRow: Record<string, unknown> | null = null
+  let handoffResult = null
+
+  if (multichannel && multichannel.status === "sequence_approved") {
+    const { data: existingExecutionRow } = await admin
+      .schema("growth")
+      .from("apollo_sequence_execution_candidates")
+      .select("*")
+      .eq("multichannel_sequence_candidate_id", multichannel.candidate_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    executionRow = (existingExecutionRow as Record<string, unknown> | null) ?? null
+
+    if (!executionRow?.sequence_enrollment_id) {
+      const handoffInput = buildApolloSequenceExecutionHandoffInput({
+        multichannel,
+        growth_lead_id: stageIds.growth_lead_id ?? enrollment?.growth_lead_id ?? null,
+        voice_drop_script_reference: voiceDrop?.voice_drop_script.full_script ?? null,
+        created_by_user_id: actor.actorUserId,
+      })
+      handoffResult = await handoffMultichannelApprovedToSequenceExecution(admin, handoffInput)
+
+      if (handoffResult.ok && handoffResult.candidate_id) {
+        const { data: refreshedExecutionRow } = await admin
+          .schema("growth")
+          .from("apollo_sequence_execution_candidates")
+          .select("*")
+          .eq("id", handoffResult.candidate_id)
+          .maybeSingle()
+        executionRow = (refreshedExecutionRow as Record<string, unknown> | null) ?? executionRow
+      } else if (!handoffResult.ok) {
+        const { data: retryExecutionRow } = await admin
+          .schema("growth")
+          .from("apollo_sequence_execution_candidates")
+          .select("*")
+          .eq("multichannel_sequence_candidate_id", multichannel.candidate_id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        executionRow = (retryExecutionRow as Record<string, unknown> | null) ?? executionRow
+      }
+    }
+
+    const mappedExecution = executionRow
+      ? mapApolloSequenceExecutionCandidateDbRow(executionRow)
+      : null
+
+    materializationEvidence = buildApolloFullPipelineMaterializationEvidence({
+      attempted: true,
+      reused: Boolean(
+        handoffResult?.materialization_reused ||
+          (mappedExecution && !handoffResult && Boolean(executionRow?.sequence_enrollment_id)),
+      ),
+      handoff: handoffResult,
+      sequence_execution_candidate_id: mappedExecution?.candidate_id ?? handoffResult?.candidate_id ?? null,
+      sequence_enrollment_id:
+        mappedExecution?.sequence_enrollment_id ?? handoffResult?.sequence_enrollment_id ?? null,
+      steps_created:
+        mappedExecution?.materialization.total_steps ?? handoffResult?.steps_created ?? 0,
+      draft_placeholders_created:
+        mappedExecution?.materialization.drafts.length ??
+        handoffResult?.draft_placeholders_created ??
+        0,
+      pending_approval_jobs_created: handoffResult?.pending_approval_jobs_created ?? 0,
+      multichannel,
+    })
+  }
 
   const execution = executionRow
     ? mapApolloSequenceExecutionCandidateDbRow(executionRow as Record<string, unknown>)
@@ -517,12 +576,20 @@ export async function certifyApolloFullPipelineProduction(
   stageIds.sequence_execution_candidate_id = execution?.candidate_id ?? null
   stageIds.sequence_enrollment_id = execution?.sequence_enrollment_id ?? null
 
+  const materializationDetail = execution?.sequence_enrollment_id
+    ? `Sequence enrollment ${execution.sequence_enrollment_id} materialized with ${execution.materialization.total_steps} step(s).`
+    : materializationEvidence?.materialization_error
+      ? `Materialization failed: ${materializationEvidence.materialization_error}${
+          materializationEvidence.materialization_error_table
+            ? ` (table=${materializationEvidence.materialization_error_table}, operation=${materializationEvidence.materialization_error_operation})`
+            : ""
+        }`
+      : "Sequence execution candidate or enrollment missing."
+
   checks.push({
     id: "sequence_execution_materialized",
     satisfied: Boolean(execution?.sequence_enrollment_id),
-    detail: execution?.sequence_enrollment_id
-      ? `Sequence enrollment ${execution.sequence_enrollment_id} materialized with ${execution.materialization.total_steps} step(s).`
-      : "Sequence execution candidate or enrollment missing.",
+    detail: materializationDetail,
   })
   if (!execution?.sequence_enrollment_id) blockers.push("sequence_execution_not_materialized")
 
@@ -570,16 +637,45 @@ export async function certifyApolloFullPipelineProduction(
   })
   if (!attribution_preserved) blockers.push("attribution_not_preserved")
 
-  const safetyRows = [enrollmentRow, accountPlaybookRow, voiceDropRow, multichannelRow, executionRow].filter(
-    Boolean,
-  ) as Record<string, unknown>[]
-  const safetyVerified = safetyRows.every((row) => recordSafetyFromRow(row))
+  const safetyViolations = [
+    ...evaluateApolloFullPipelineStageSafety(
+      enrollmentRow as Record<string, unknown> | null,
+      "apollo_enrollment_candidates",
+    ),
+    ...evaluateApolloFullPipelineStageSafety(
+      accountPlaybookRow as Record<string, unknown> | null,
+      "apollo_account_playbooks",
+    ),
+    ...evaluateApolloFullPipelineStageSafety(
+      voiceDropRow as Record<string, unknown> | null,
+      "apollo_voice_drop_candidates",
+    ),
+    ...evaluateApolloFullPipelineStageSafety(
+      multichannelRow as Record<string, unknown> | null,
+      "apollo_multichannel_sequence_candidates",
+    ),
+    ...evaluateApolloFullPipelineStageSafety(
+      executionRow as Record<string, unknown> | null,
+      "apollo_sequence_execution_candidates",
+    ),
+  ]
+
+  if (execution?.sequence_enrollment_id) {
+    const executionJobs = (await listSequenceExecutionJobs(admin, { limit: 200 })).filter(
+      (job) => job.sequenceEnrollmentId === execution.sequence_enrollment_id,
+    )
+    safetyViolations.push(
+      ...evaluateApolloFullPipelineExecutionJobSafety({
+        jobs: executionJobs.map((job) => ({ status: job.status })),
+      }),
+    )
+  }
+
+  const safetyVerified = safetyViolations.length === 0
   checks.push({
     id: "safety_flags",
     satisfied: safetyVerified,
-    detail: safetyVerified
-      ? "All stage records report outreach_sent=false, jobs_scheduled=false, and no channel sends."
-      : "One or more stage records have unexpected safety flags.",
+    detail: summarizeApolloFullPipelineSafetyViolations(safetyViolations),
   })
   if (!safetyVerified) blockers.push("safety_flags_violated")
 
@@ -615,9 +711,11 @@ export async function certifyApolloFullPipelineProduction(
     blockers,
     checks,
     enrollment_evidence: enrollmentEvidence,
+    materialization_evidence: materializationEvidence,
     stage_ids: stageIds,
     attribution_chain: [...APOLLO_FULL_PIPELINE_ATTRIBUTION_CHAIN],
     attribution_preserved,
+    safety_violations: safetyViolations,
     safety: {
       outreach_sent: false,
       jobs_scheduled: false,
