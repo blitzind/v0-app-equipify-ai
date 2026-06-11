@@ -43,11 +43,35 @@ function lowercaseLeadIn(fact: string): string {
   return fact.charAt(0).toLowerCase() + fact.slice(1)
 }
 
+const OPENING_STYLE_OPENER_PREFIX: Record<string, string[]> = {
+  opening_pain_first: [
+    "{{contactName}}, capacity pressure often shows up as {{factLower}} at {{companyName}}.",
+    "Hi {{contactName}} — {{factLower}} is a common trigger for workflow reviews at {{companyName}}.",
+  ],
+  opening_benchmark: [
+    "{{contactName}}, operators like {{companyName}} benchmark {{factLower}} before scaling volume.",
+    "Hi {{contactName}} — teams compare {{factLower}} when evaluating dispatch at {{companyName}}.",
+  ],
+  opening_operational_issue: [
+    "{{contactName}}, operational handoffs at {{companyName}} often surface as {{factLower}}.",
+    "Hi {{contactName}} — {{factLower}} usually points to a coordination gap at {{companyName}}.",
+  ],
+  opening_workflow: [
+    "{{contactName}}, one workflow question for {{companyName}} around {{factLower}}.",
+    "Hi {{contactName}} — how {{companyName}} tracks {{factLower}} stood out in research.",
+  ],
+  opening_observation: [
+    "{{contactName}}, noticed {{companyName}} {{fact}} — had one operational observation.",
+    "Hi {{contactName}} — {{companyName}} {{fact}} caught my eye on the workflow side.",
+  ],
+}
+
 const OPENER_TEMPLATES: Record<ResearchOpenerSource, string[]> = {
   website_finding: [
     "{{contactName}}, {{companyName}} {{fact}} — had one dispatch workflow question.",
     "Hi {{contactName}} — {{companyName}} {{fact}}; worth a quick ops compare?",
-    "{{contactName}}, {{companyName}} {{fact}} — quick ops note.",
+    "{{contactName}}, {{companyName}} {{fact}} — quick workflow review?",
+    "Saw that {{companyName}} {{fact}} — {{contactName}}, had one ops question.",
   ],
   website_summary: [
     "{{contactName}}, {{companyName}} {{fact}} — had one dispatch workflow question.",
@@ -86,6 +110,7 @@ function buildOpenerText(input: {
   candidate: ResearchEvidenceCandidate
   tokens: { companyName: string; contactName: string | null }
   variationSeed: string
+  openingBlockId?: string
 }): string {
   const rawFact = formatFactForEmbedding(input.candidate.evidence, input.tokens.companyName)
   const embeddedFact =
@@ -98,9 +123,11 @@ function buildOpenerText(input: {
       : rawFact
   const embeddedFactLower = lowercaseLeadIn(rawFact)
 
-  const templates = OPENER_TEMPLATES[input.candidate.source]
+  const stylePrefix = input.openingBlockId ? OPENING_STYLE_OPENER_PREFIX[input.openingBlockId] : undefined
+  const baseTemplates = OPENER_TEMPLATES[input.candidate.source]
+  const templates = stylePrefix ? [...stylePrefix, ...baseTemplates] : baseTemplates
   const templateIndex = pickVariantIndex(
-    `${input.variationSeed}:research_opener:${input.candidate.source}`,
+    `${input.variationSeed}:research_opener:${input.candidate.source}:${input.openingBlockId ?? "default"}`,
     templates.length,
   )
   const template = templates[templateIndex] ?? templates[0]!
@@ -155,6 +182,7 @@ export function buildResearchBackedOpener(input: {
       candidate,
       tokens: input.tokens,
       variationSeed: input.variationSeed,
+      openingBlockId: input.openingBlockId,
     }),
   }
 }

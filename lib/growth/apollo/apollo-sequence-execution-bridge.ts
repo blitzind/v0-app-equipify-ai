@@ -20,6 +20,7 @@ import type {
 import { APOLLO_SEQUENCE_EXECUTION_AUTOMATION_QA_MARKER } from "@/lib/growth/apollo/apollo-sequence-execution-automation-types"
 import { buildSequenceExecutionPipelineFromMultichannelHandoff } from "@/lib/growth/apollo/apollo-sequence-execution-pipeline-builder"
 import { resolveApolloSequenceExecutionPatternLookup } from "@/lib/growth/apollo/apollo-sequence-execution-pattern-resolution"
+import { restoreApolloSequenceExecutionJobsAfterDraftRegenerate } from "@/lib/growth/apollo/apollo-sequence-execution-job-gate-server"
 import { fetchGrowthSequencePatternByKeyForApolloMaterialization } from "@/lib/growth/sequence-pattern-repository"
 import {
   insertGrowthSequenceEnrollment,
@@ -265,7 +266,7 @@ export async function handoffMultichannelApprovedToSequenceExecution(
         scheduledFor,
         status: "pending_approval",
         channel: transportChannel,
-        smsDraftBody: transportChannel === "sms" ? draft?.body_placeholder ?? null : null,
+        smsDraftBody: null,
         smsToE164: transportChannel === "sms" ? resolvedInput.phone : null,
       })
       executionJobId = job.id
@@ -428,6 +429,15 @@ export async function regenerateApolloSequenceExecutionDrafts(
   const pipeline = buildSequenceExecutionPipelineFromMultichannelHandoff(handoff)
   const now = new Date().toISOString()
 
+  const restoredExecutionJobs = await restoreApolloSequenceExecutionJobsAfterDraftRegenerate(admin, {
+    execution_jobs: row.execution_jobs,
+    candidate_id: input.candidate_id,
+    acting_user_id:
+      typeof metadata.drafts_approved_by === "string" ? metadata.drafts_approved_by : "system",
+    acting_user_email:
+      typeof metadata.drafts_approved_email === "string" ? metadata.drafts_approved_email : "system",
+  })
+
   const { error: updateError } = await admin
     .schema("growth")
     .from(TABLE)
@@ -436,6 +446,7 @@ export async function regenerateApolloSequenceExecutionDrafts(
       sequence_materialization: pipeline.materialization,
       sequence_steps: pipeline.materialization.steps,
       draft_records: pipeline.materialization.drafts,
+      execution_jobs: restoredExecutionJobs,
       operator_summary: pipeline.operator_summary,
       updated_at: now,
       metadata: { ...metadata, draft_regenerated_at: now },

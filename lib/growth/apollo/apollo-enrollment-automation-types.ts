@@ -1,5 +1,8 @@
 /** Apollo Enrollment Automation types — client-safe. */
 
+import type { ApolloPipelineAttributionDisplay } from "@/lib/growth/apollo/apollo-pipeline-attribution-display"
+import type { ApolloQueuePaginationMeta } from "@/lib/growth/apollo/apollo-queue-pagination"
+
 export const APOLLO_ENROLLMENT_AUTOMATION_QA_MARKER =
   "apollo-enrollment-automation-v1" as const
 
@@ -97,6 +100,7 @@ export type ApolloEnrollmentCandidateRow = {
   created_at: string
   enrollment_approved_at: string | null
   enrollment_approved_email: string | null
+  attribution_display: ApolloPipelineAttributionDisplay
 }
 
 export type ApolloEnrollmentCandidateQueueSnapshot = {
@@ -113,10 +117,12 @@ export type ApolloEnrollmentCandidateQueueSnapshot = {
   }
   auto_enrollment: false
   outreach_sent: false
+  pagination?: ApolloQueuePaginationMeta
 }
 
 export type ApolloEnrollmentFunnelMetrics = {
   qa_marker: typeof APOLLO_ENROLLMENT_AUTOMATION_QA_MARKER
+  funnel_view?: "historical" | "current_run"
   companies_searched: number
   contacts_found: number
   contacts_mapped: number

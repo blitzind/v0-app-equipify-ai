@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { loadApolloMultichannelSequenceQueue } from "@/lib/growth/apollo/apollo-multichannel-orchestration-queue"
 import type { ApolloMultichannelSequenceCandidateStatus } from "@/lib/growth/apollo/apollo-multichannel-orchestration-types"
+import { parseApolloQueueRequestSearchParams } from "@/lib/growth/apollo/apollo-queue-pagination"
 
 export const runtime = "nodejs"
 
@@ -26,6 +27,7 @@ export async function GET(request: Request) {
       company_candidate_id: companyCandidateId,
       voice_drop_candidate_id: voiceDropCandidateId,
       status,
+      pagination: parseApolloQueueRequestSearchParams(url.searchParams),
     })
     return NextResponse.json({ ok: true, snapshot })
   } catch (e) {

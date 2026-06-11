@@ -16,6 +16,8 @@ import {
   type ApolloEnrollmentCandidateStatus,
 } from "@/lib/growth/apollo/apollo-enrollment-automation-types"
 import { handoffEnrollmentApprovedToAccountPlaybook } from "@/lib/growth/apollo/apollo-account-playbooks-bridge"
+import { loadApolloQueueRows, paginateMappedApolloQueueRows } from "@/lib/growth/apollo/apollo-queue-loader"
+import type { ApolloQueuePaginationInput } from "@/lib/growth/apollo/apollo-queue-pagination"
 
 export {
   APOLLO_ENROLLMENT_AUTOMATION_QA_MARKER,
@@ -49,30 +51,22 @@ export async function loadApolloEnrollmentCandidateQueue(
     company_candidate_id?: string | null
     status?: ApolloEnrollmentCandidateStatus | "all"
     limit?: number
+    pagination?: ApolloQueuePaginationInput
   },
 ): Promise<ApolloEnrollmentCandidateQueueSnapshot> {
-  let query = admin
-    .schema("growth")
-    .from(CANDIDATES_TABLE)
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(input?.limit ?? 100)
+  const rows = await loadApolloQueueRows(admin, {
+    table: CANDIDATES_TABLE,
+    company_candidate_id: input?.company_candidate_id ?? null,
+    status: input?.status ?? "all",
+    scanLimit: input?.limit ?? undefined,
+  })
 
-  const companyCandidateId = input?.company_candidate_id?.trim()
-  if (companyCandidateId) {
-    query = query.eq("company_candidate_id", companyCandidateId)
-  }
-
-  const status = input?.status ?? "all"
-  if (status !== "all") {
-    query = query.eq("status", status)
-  }
-
-  const { data, error } = await query
-  if (error) throw new Error(error.message)
-
-  const items = ((data ?? []) as Record<string, unknown>[]).map(mapApolloEnrollmentCandidateDbRow)
-  return buildApolloEnrollmentCandidateQueueSnapshot({ items })
+  const mapped = rows.map(mapApolloEnrollmentCandidateDbRow)
+  const paged = paginateMappedApolloQueueRows(mapped, input?.pagination)
+  return buildApolloEnrollmentCandidateQueueSnapshot({
+    items: paged.items,
+    pagination: paged.pagination,
+  })
 }
 
 export async function approveApolloEnrollmentCandidate(

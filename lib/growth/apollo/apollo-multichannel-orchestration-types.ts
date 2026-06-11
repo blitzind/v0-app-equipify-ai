@@ -1,5 +1,7 @@
 /** Apollo Multi-Channel Orchestration types — client-safe. */
 
+import type { ApolloPipelineAttributionDisplay } from "@/lib/growth/apollo/apollo-pipeline-attribution-display"
+import type { ApolloQueuePaginationMeta } from "@/lib/growth/apollo/apollo-queue-pagination"
 import type { ApolloChannelAvailability } from "@/lib/growth/apollo/apollo-voice-drop-automation-types"
 
 export const APOLLO_MULTICHANNEL_ORCHESTRATION_QA_MARKER =
@@ -135,6 +137,7 @@ export type ApolloMultichannelSequenceCandidateRow = {
   created_at: string
   sequence_approved_at: string | null
   sequence_approved_email: string | null
+  attribution_display: ApolloPipelineAttributionDisplay
 }
 
 export type ApolloMultichannelSequenceQueueSnapshot = {
@@ -152,6 +155,7 @@ export type ApolloMultichannelSequenceQueueSnapshot = {
   voice_drop_sent: false
   draft_created: false
   jobs_scheduled: false
+  pagination?: ApolloQueuePaginationMeta
 }
 
 export type ApolloMultichannelOrchestrationFunnelMetrics = {

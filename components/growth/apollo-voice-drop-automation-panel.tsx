@@ -20,6 +20,9 @@ import type {
   ApolloVoiceDropFunnelMetrics,
 } from "@/lib/growth/apollo/apollo-voice-drop-automation-types"
 import { APOLLO_VOICE_DROP_AUTOMATION_QA_MARKER } from "@/lib/growth/apollo/apollo-voice-drop-automation-types"
+import type { ApolloQueueSortKey } from "@/lib/growth/apollo/apollo-queue-pagination"
+import { ApolloPipelineAttributionPanel } from "@/components/growth/apollo-pipeline-attribution-panel"
+import { ApolloQueueControls } from "@/components/growth/apollo-queue-controls"
 import { cn } from "@/lib/utils"
 
 type QueueFilter = "all" | ApolloVoiceDropCandidateStatus | "voice_ready"
@@ -117,6 +120,9 @@ export function ApolloVoiceDropAutomationQueuePanel({
   const [loading, setLoading] = useState(false)
   const [actionKey, setActionKey] = useState<string | null>(null)
   const [filter, setFilter] = useState<QueueFilter>("pending_voice_drop_approval")
+  const [search, setSearch] = useState("")
+  const [sort, setSort] = useState<ApolloQueueSortKey>("created_at_desc")
+  const [page, setPage] = useState(1)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -127,6 +133,10 @@ export function ApolloVoiceDropAutomationQueuePanel({
       const params = new URLSearchParams()
       if (companyCandidateId) params.set("companyCandidateId", companyCandidateId)
       params.set("status", "all")
+      params.set("page", String(page))
+      params.set("pageSize", "25")
+      if (search.trim()) params.set("search", search.trim())
+      params.set("sort", sort)
       const res = await fetch(
         `/api/platform/growth/apollo-voice-drop-automation/voice-drop-queue?${params.toString()}`,
         { cache: "no-store" },
@@ -145,7 +155,7 @@ export function ApolloVoiceDropAutomationQueuePanel({
     } finally {
       setLoading(false)
     }
-  }, [companyCandidateId])
+  }, [companyCandidateId, page, search, sort])
 
   useEffect(() => {
     void load()
@@ -221,6 +231,22 @@ export function ApolloVoiceDropAutomationQueuePanel({
           <StatTile label="Voice-ready" value={String(snapshot.summary.voice_ready)} />
         </div>
       ) : null}
+
+      <ApolloQueueControls
+        pagination={snapshot?.pagination ?? null}
+        search={search}
+        sort={sort}
+        loading={loading}
+        onSearchChange={(value) => {
+          setSearch(value)
+          setPage(1)
+        }}
+        onSortChange={(value) => {
+          setSort(value)
+          setPage(1)
+        }}
+        onPageChange={setPage}
+      />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Filter className="size-4 text-muted-foreground" />
@@ -298,6 +324,11 @@ export function ApolloVoiceDropAutomationQueuePanel({
                 <p className="font-medium text-foreground">Recommended script</p>
                 <p className="mt-1 text-muted-foreground">{row.voice_drop_script.full_script}</p>
               </div>
+
+              <ApolloPipelineAttributionPanel
+                attribution={row.attribution_display}
+                className="mt-3"
+              />
 
               {row.status === "pending_voice_drop_approval" ? (
                 <div className="mt-4 flex flex-wrap gap-2">

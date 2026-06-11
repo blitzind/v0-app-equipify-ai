@@ -14,6 +14,9 @@ import {
   APOLLO_SEQUENCE_EXECUTION_AUTOMATION_QA_MARKER,
   APOLLO_SEQUENCE_EXECUTION_SOURCE_ATTRIBUTION,
 } from "@/lib/growth/apollo/apollo-sequence-execution-automation-types"
+import { buildApolloPipelineAttributionDisplay } from "@/lib/growth/apollo/apollo-pipeline-attribution-display"
+import type { ApolloQueuePaginationMeta } from "@/lib/growth/apollo/apollo-queue-pagination"
+import { summarizeApolloSequenceCandidateDraftReadiness } from "@/lib/growth/apollo/apollo-sequence-draft-readiness"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -134,11 +137,22 @@ export function mapApolloSequenceExecutionCandidateDbRow(
     created_at: asString(row.created_at),
     drafts_approved_at: asString(row.drafts_approved_at) || null,
     drafts_approved_email: asString(row.drafts_approved_email) || null,
+    draft_rejection_note: asString(row.draft_rejection_note) || null,
+    draft_readiness_label: summarizeApolloSequenceCandidateDraftReadiness(materialization.drafts)
+      .readiness_label,
+    attribution_display: buildApolloPipelineAttributionDisplay({
+      source_attribution: row.source_attribution as Record<string, unknown>,
+      approved_at: asString(row.drafts_approved_at) || null,
+      approved_email: asString(row.drafts_approved_email) || null,
+      approved_by: asString(row.drafts_approved_by) || null,
+      rejection_note: asString(row.draft_rejection_note) || null,
+    }),
   }
 }
 
 export function buildApolloSequenceExecutionQueueSnapshot(input: {
   items: ApolloSequenceExecutionCandidateRow[]
+  pagination?: ApolloQueuePaginationMeta
 }): ApolloSequenceExecutionQueueSnapshot {
   const items = input.items
   return {
@@ -159,6 +173,7 @@ export function buildApolloSequenceExecutionQueueSnapshot(input: {
     call_placed: false,
     draft_created: true,
     jobs_scheduled: false,
+    pagination: input.pagination,
   }
 }
 

@@ -20,6 +20,8 @@ import { buildApolloFullPipelineMaterializationEvidence } from "@/lib/growth/apo
 import { handoffMultichannelApprovedToSequenceExecution } from "@/lib/growth/apollo/apollo-sequence-execution-bridge"
 import { buildApolloSequenceExecutionHandoffInput } from "@/lib/growth/apollo/apollo-sequence-execution-handoff-input"
 import { mapApolloVoiceDropCandidateDbRow } from "@/lib/growth/apollo/apollo-voice-drop-automation-evidence"
+import { loadApolloQueueRows, paginateMappedApolloQueueRows } from "@/lib/growth/apollo/apollo-queue-loader"
+import type { ApolloQueuePaginationInput } from "@/lib/growth/apollo/apollo-queue-pagination"
 
 export {
   APOLLO_MULTICHANNEL_ORCHESTRATION_QA_MARKER,
@@ -54,34 +56,25 @@ export async function loadApolloMultichannelSequenceQueue(
     voice_drop_candidate_id?: string | null
     status?: ApolloMultichannelSequenceCandidateStatus | "all"
     limit?: number
+    pagination?: ApolloQueuePaginationInput
   },
 ): Promise<ApolloMultichannelSequenceQueueSnapshot> {
-  let query = admin
-    .schema("growth")
-    .from(TABLE)
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(input?.limit ?? 100)
+  const rows = await loadApolloQueueRows(admin, {
+    table: TABLE,
+    company_candidate_id: input?.company_candidate_id ?? null,
+    status: input?.status ?? "all",
+    scanLimit: input?.limit ?? undefined,
+    extraFilters: input?.voice_drop_candidate_id?.trim()
+      ? [{ column: "voice_drop_candidate_id", value: input.voice_drop_candidate_id.trim() }]
+      : [],
+  })
 
-  if (input?.company_candidate_id?.trim()) {
-    query = query.eq("company_candidate_id", input.company_candidate_id.trim())
-  }
-  if (input?.voice_drop_candidate_id?.trim()) {
-    query = query.eq("voice_drop_candidate_id", input.voice_drop_candidate_id.trim())
-  }
-
-  const status = input?.status ?? "all"
-  if (status !== "all") {
-    query = query.eq("status", status)
-  }
-
-  const { data, error } = await query
-  if (error) throw new Error(error.message)
-
-  const items = ((data ?? []) as Record<string, unknown>[]).map(
-    mapApolloMultichannelSequenceCandidateDbRow,
-  )
-  return buildApolloMultichannelSequenceQueueSnapshot({ items })
+  const mapped = rows.map(mapApolloMultichannelSequenceCandidateDbRow)
+  const paged = paginateMappedApolloQueueRows(mapped, input?.pagination)
+  return buildApolloMultichannelSequenceQueueSnapshot({
+    items: paged.items,
+    pagination: paged.pagination,
+  })
 }
 
 export async function approveApolloMultichannelSequenceCandidate(

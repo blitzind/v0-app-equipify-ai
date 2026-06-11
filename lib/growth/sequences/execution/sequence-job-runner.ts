@@ -31,6 +31,7 @@ import { buildSequenceExecutionSendPayload } from "@/lib/growth/sequences/execut
 import { runSequenceSmsExecutionJob } from "@/lib/growth/sequences/execution/sequence-sms-runner"
 import { runSequenceVoiceDropExecutionJob } from "@/lib/growth/sequences/execution/sequence-voice-drop-runner"
 import { applyReputationSafeScheduleGate } from "@/lib/growth/outbound/reputation-safe-scheduler"
+import { evaluateApolloSequenceExecutionJobApprovalGateForJob } from "@/lib/growth/apollo/apollo-sequence-execution-job-gate-server"
 import { shouldSuppressCampaignFollowUp } from "@/lib/growth/outbound/reply-intelligence"
 import { evaluateGrowthQaDeliverabilityBypassForJobSend,
   fetchGrowthQaDeliverabilityBypassForJob,
@@ -86,6 +87,18 @@ export async function approveSequenceExecutionJob(
   }
   if (!["draft", "pending_approval", "blocked", "failed"].includes(job.status)) {
     return { ok: false, jobId: job.id, status: job.status, message: "invalid_status_for_approval" }
+  }
+
+  const apolloDraftGate = await evaluateApolloSequenceExecutionJobApprovalGateForJob(admin, {
+    sequenceEnrollmentId: job.sequenceEnrollmentId,
+  })
+  if (!apolloDraftGate.allowed) {
+    return {
+      ok: false,
+      jobId: job.id,
+      status: job.status,
+      message: apolloDraftGate.code ?? "apollo_draft_approval_required",
+    }
   }
 
   await enforceGovernanceIfReady(admin, {

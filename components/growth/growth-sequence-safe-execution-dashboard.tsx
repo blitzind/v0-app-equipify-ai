@@ -20,6 +20,7 @@ import {
   sequenceExecutionJobRowId,
 } from "@/lib/growth/sequence-enrollment/sequence-execution-job-focus"
 import { channelTypeLabel, taskStatusLabel, type GrowthSequenceChannelTask } from "@/lib/growth/multichannel/multichannel-types"
+import { ApolloDraftReadinessBadges } from "@/components/growth/apollo-pipeline-attribution-panel"
 import { cn } from "@/lib/utils"
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked" | "medium"> = {
@@ -429,7 +430,9 @@ function JobRow({
   onSkip: () => void
   onRestore: () => void
 }) {
-  const canApprove = ["draft", "pending_approval", "blocked", "failed"].includes(job.status)
+  const canApprove =
+    ["draft", "pending_approval", "blocked", "failed"].includes(job.status) &&
+    !job.apolloDraftApprovalBlocked
   const canRun = !soloApprovalEnabled && job.status === "approved" && Boolean(job.humanApprovedAt)
   const canSkip = !["sent", "skipped"].includes(job.status)
   const canRestore = job.status === "skipped" && !job.deliveryAttemptId
@@ -448,10 +451,16 @@ function JobRow({
       <td className="px-2 py-3">
         <div className="flex flex-wrap items-center gap-1">
           <GrowthBadge label={sequenceExecutionStatusLabel(job.status)} tone={STATUS_TONE[job.status] ?? "neutral"} />
+          {job.draftReadinessLabel ? (
+            <ApolloDraftReadinessBadges labels={[job.draftReadinessLabel]} />
+          ) : null}
           {job.qaDeliverabilityBypassUsed ? (
             <GrowthBadge label="QA deliverability bypass" tone="attention" />
           ) : null}
         </div>
+        {job.apolloDraftApprovalBlocked && job.apolloDraftApprovalMessage ? (
+          <p className="mt-1 text-[11px] text-amber-700">{job.apolloDraftApprovalMessage}</p>
+        ) : null}
       </td>
       <td className="px-2 py-3 tabular-nums text-muted-foreground">{formatWhen(job.scheduledFor)}</td>
       <td className="px-2 py-3">

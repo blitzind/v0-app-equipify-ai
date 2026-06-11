@@ -21,6 +21,7 @@ import {
   OUTREACH_MESSAGE_BLOCK_LIBRARY,
   type MessageBlockTemplate,
 } from "@/lib/growth/outreach/personalization/message-blocks"
+import { selectEmailOpeningStyleId } from "@/lib/growth/outreach/personalization/email-variation-engine"
 import {
   buildPersonalizationVariationKey,
   pickVariantIndex,
@@ -228,10 +229,17 @@ export function selectMessageStrategy(input: {
     strategyVersion: OUTREACH_PERSONALIZATION_STRATEGY_VERSION,
     angle: pick.angle,
   })
+  const openingId = selectEmailOpeningStyleId({
+    variationSeed: variationKey,
+    packet: input.packet,
+    signals: input.signals,
+    generationType: input.generationType,
+    fallbackOpeningId: pick.openingId,
+  })
   const tokens = { companyName: input.packet.companyName, contactName: input.packet.decisionMakerName }
 
   const blocks: SelectedMessageBlock[] = [
-    pickBlock(OUTREACH_MESSAGE_BLOCK_LIBRARY.opening, pick.openingId, "opening", variationKey, tokens),
+    pickBlock(OUTREACH_MESSAGE_BLOCK_LIBRARY.opening, openingId, "opening", variationKey, tokens),
     pickBlock(OUTREACH_MESSAGE_BLOCK_LIBRARY.pain, pick.painId, "pain", variationKey, tokens),
     pickBlock(industryBlocksFor(industry), pick.industryId, "industry", variationKey, tokens),
     pickBlock(OUTREACH_MESSAGE_BLOCK_LIBRARY.proof, pick.proofId, "proof", variationKey, tokens),
@@ -241,7 +249,7 @@ export function selectMessageStrategy(input: {
   const researchOpener = buildResearchBackedOpener({
     packet: input.packet,
     generationType: input.generationType,
-    openingBlockId: pick.openingId,
+    openingBlockId: openingId,
     variationSeed: variationKey,
     tokens,
   })
@@ -275,6 +283,30 @@ export function selectMessageStrategy(input: {
         blockId: "opening_research_backed",
         label: "Research-backed opener",
         text: researchOpener.text,
+      }
+    }
+  }
+
+  const industryIndex = blocks.findIndex((block) => block.key === "industry")
+  if (industryIndex >= 0) {
+    let industryText = blocks[industryIndex].text
+    if (input.packet.outreachAngles.length > 0) {
+      industryText = `${industryText} ${input.packet.outreachAngles[0]!.trim()}.`
+    }
+    if (input.packet.memoryCommitteeSummaries.length > 0) {
+      industryText = `${industryText} Committee context: ${input.packet.memoryCommitteeSummaries[0]!.trim()}.`
+    }
+    if (industryText !== blocks[industryIndex].text) {
+      blocks[industryIndex] = { ...blocks[industryIndex], text: industryText }
+    }
+  }
+
+  if (input.packet.researchRecommendedNextAction?.trim()) {
+    const proofIndex = blocks.findIndex((block) => block.key === "proof")
+    if (proofIndex >= 0) {
+      blocks[proofIndex] = {
+        ...blocks[proofIndex],
+        text: `${blocks[proofIndex].text} Recommended next step from research: ${input.packet.researchRecommendedNextAction.trim()}.`,
       }
     }
   }

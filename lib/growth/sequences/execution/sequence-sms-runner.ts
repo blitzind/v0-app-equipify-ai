@@ -12,6 +12,11 @@ import { updateSequenceExecutionJob } from "@/lib/growth/sequences/execution/seq
 import { buildSequenceExecutionSmsPayload } from "@/lib/growth/sequences/execution/sequence-sms-send-builder"
 import { advanceGrowthSequenceEnrollmentAfterStep } from "@/lib/growth/sequence-enrollment/sequence-enrollment-orchestrator"
 import { sendSms } from "@/lib/growth/sms/send-sms"
+import {
+  APOLLO_SMS_PLACEHOLDER_BLOCK_CODE,
+  evaluateApolloSmsSendReadiness,
+  isApolloSmsPlaceholderBody,
+} from "@/lib/growth/apollo/apollo-sequence-placeholder-guard"
 import type { GrowthSequenceExecutionJob } from "@/lib/growth/sequences/execution/sequence-execution-types"
 
 export async function runSequenceSmsExecutionJob(
@@ -28,20 +33,43 @@ export async function runSequenceSmsExecutionJob(
     return { ok: false, jobId: job.id, status: "blocked", message: "missing_step", blocked: true }
   }
 
-  const payload =
-    job.smsDraftBody && job.smsToE164
-      ? {
-          leadId: job.leadId,
-          toE164: job.smsToE164,
-          body: job.smsDraftBody,
-          sequenceEnrollmentId: job.sequenceEnrollmentId,
-          sequenceStepId: job.sequenceStepId,
-        }
-      : await buildSequenceExecutionSmsPayload(admin, {
-          sequenceStepId: job.sequenceStepId,
-          leadId: job.leadId,
-          sequenceEnrollmentId: job.sequenceEnrollmentId,
-        })
+  const useStoredDraft =
+    job.smsDraftBody &&
+    job.smsToE164 &&
+    !isApolloSmsPlaceholderBody(job.smsDraftBody)
+
+  let payload = useStoredDraft
+    ? {
+        leadId: job.leadId,
+        toE164: job.smsToE164!,
+        body: job.smsDraftBody!,
+        sequenceEnrollmentId: job.sequenceEnrollmentId,
+        sequenceStepId: job.sequenceStepId,
+      }
+    : await buildSequenceExecutionSmsPayload(admin, {
+        sequenceStepId: job.sequenceStepId,
+        leadId: job.leadId,
+        sequenceEnrollmentId: job.sequenceEnrollmentId,
+      })
+
+  if (!("error" in payload)) {
+    const smsReadiness = evaluateApolloSmsSendReadiness(payload.body)
+    if (!smsReadiness.allowed) {
+      await updateSequenceExecutionJob(admin, job.id, {
+        status: "blocked",
+        lastError: smsReadiness.code ?? APOLLO_SMS_PLACEHOLDER_BLOCK_CODE,
+        lockedAt: null,
+        lockedBy: null,
+      })
+      return {
+        ok: false,
+        jobId: job.id,
+        status: "blocked",
+        message: smsReadiness.code ?? APOLLO_SMS_PLACEHOLDER_BLOCK_CODE,
+        blocked: true,
+      }
+    }
+  }
 
   if ("error" in payload) {
     await updateSequenceExecutionJob(admin, job.id, {

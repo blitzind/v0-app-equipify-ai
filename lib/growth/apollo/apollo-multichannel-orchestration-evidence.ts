@@ -16,6 +16,8 @@ import {
   APOLLO_MULTICHANNEL_ORCHESTRATION_QA_MARKER,
   APOLLO_MULTICHANNEL_SOURCE_ATTRIBUTION,
 } from "@/lib/growth/apollo/apollo-multichannel-orchestration-types"
+import { buildApolloPipelineAttributionDisplay } from "@/lib/growth/apollo/apollo-pipeline-attribution-display"
+import type { ApolloQueuePaginationMeta } from "@/lib/growth/apollo/apollo-queue-pagination"
 import type { ApolloChannelAvailability } from "@/lib/growth/apollo/apollo-voice-drop-automation-types"
 
 function asString(value: unknown): string {
@@ -144,11 +146,19 @@ export function mapApolloMultichannelSequenceCandidateDbRow(
     created_at: asString(row.created_at),
     sequence_approved_at: asString(row.sequence_approved_at) || null,
     sequence_approved_email: asString(row.sequence_approved_email) || null,
+    attribution_display: buildApolloPipelineAttributionDisplay({
+      source_attribution: readJson(row.source_attribution, buildApolloMultichannelAttributionRecord()) as unknown as Record<string, unknown>,
+      approved_at: asString(row.sequence_approved_at) || null,
+      approved_email: asString(row.sequence_approved_email) || null,
+      approved_by: asString(row.sequence_approved_by) || null,
+      rejection_note: asString(row.sequence_rejection_note) || null,
+    }),
   }
 }
 
 export function buildApolloMultichannelSequenceQueueSnapshot(input: {
   items: ApolloMultichannelSequenceCandidateRow[]
+  pagination?: ApolloQueuePaginationMeta
 }): ApolloMultichannelSequenceQueueSnapshot {
   const items = input.items
   return {
@@ -166,6 +176,7 @@ export function buildApolloMultichannelSequenceQueueSnapshot(input: {
     voice_drop_sent: false,
     draft_created: false,
     jobs_scheduled: false,
+    pagination: input.pagination,
   }
 }
 

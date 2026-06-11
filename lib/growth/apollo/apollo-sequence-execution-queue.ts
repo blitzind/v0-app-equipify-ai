@@ -16,6 +16,10 @@ import {
   type ApolloSequenceExecutionQueueSnapshot,
 } from "@/lib/growth/apollo/apollo-sequence-execution-automation-types"
 import { regenerateApolloSequenceExecutionDrafts } from "@/lib/growth/apollo/apollo-sequence-execution-bridge"
+import { loadApolloQueueRows, paginateMappedApolloQueueRows } from "@/lib/growth/apollo/apollo-queue-loader"
+import type { ApolloQueuePaginationInput } from "@/lib/growth/apollo/apollo-queue-pagination"
+import { skipApolloSequenceExecutionJobsForDraftReject } from "@/lib/growth/apollo/apollo-sequence-execution-job-gate-server"
+import { personalizeApolloSequenceCandidateContent } from "@/lib/growth/apollo/apollo-sequence-personalization-service"
 
 export {
   APOLLO_SEQUENCE_EXECUTION_AUTOMATION_QA_MARKER,
@@ -46,6 +50,16 @@ function emptyResult(
   }
 }
 
+function mergeCandidateMetadata(
+  existing: Record<string, unknown> | null | undefined,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...(existing && typeof existing === "object" ? existing : {}),
+    ...patch,
+  }
+}
+
 export async function loadApolloSequenceExecutionQueue(
   admin: SupabaseClient,
   input?: {
@@ -53,37 +67,30 @@ export async function loadApolloSequenceExecutionQueue(
     multichannel_sequence_candidate_id?: string | null
     status?: ApolloSequenceExecutionCandidateStatus | "all"
     limit?: number
+    pagination?: ApolloQueuePaginationInput
   },
 ): Promise<ApolloSequenceExecutionQueueSnapshot> {
-  let query = admin
-    .schema("growth")
-    .from(TABLE)
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(input?.limit ?? 100)
+  const rows = await loadApolloQueueRows(admin, {
+    table: TABLE,
+    company_candidate_id: input?.company_candidate_id ?? null,
+    status: input?.status ?? "all",
+    scanLimit: input?.limit ?? undefined,
+    extraFilters: input?.multichannel_sequence_candidate_id?.trim()
+      ? [
+          {
+            column: "multichannel_sequence_candidate_id",
+            value: input.multichannel_sequence_candidate_id.trim(),
+          },
+        ]
+      : [],
+  })
 
-  if (input?.company_candidate_id?.trim()) {
-    query = query.eq("company_candidate_id", input.company_candidate_id.trim())
-  }
-  if (input?.multichannel_sequence_candidate_id?.trim()) {
-    query = query.eq(
-      "multichannel_sequence_candidate_id",
-      input.multichannel_sequence_candidate_id.trim(),
-    )
-  }
-
-  const status = input?.status ?? "all"
-  if (status !== "all") {
-    query = query.eq("status", status)
-  }
-
-  const { data, error } = await query
-  if (error) throw new Error(error.message)
-
-  const items = ((data ?? []) as Record<string, unknown>[]).map(
-    mapApolloSequenceExecutionCandidateDbRow,
-  )
-  return buildApolloSequenceExecutionQueueSnapshot({ items })
+  const mapped = rows.map(mapApolloSequenceExecutionCandidateDbRow)
+  const paged = paginateMappedApolloQueueRows(mapped, input?.pagination)
+  return buildApolloSequenceExecutionQueueSnapshot({
+    items: paged.items,
+    pagination: paged.pagination,
+  })
 }
 
 export async function approveApolloSequenceExecutionDrafts(
@@ -111,17 +118,39 @@ export async function approveApolloSequenceExecutionDrafts(
     return emptyResult("approve_draft", gate.code ?? "approval_blocked")
   }
 
-  const approvedDrafts = approveAllApolloSequenceExecutionDrafts(candidate.materialization.drafts)
-  const approvedSteps = candidate.materialization.steps.map((step) => ({
+  const personalization = await personalizeApolloSequenceCandidateContent(admin, {
+    candidate,
+    acting_user_id: input.approver_user_id?.trim() || "system",
+    acting_user_email: input.approver_email?.trim() || "system",
+  })
+  if (!personalization.ok) {
+    return emptyResult(
+      "approve_draft",
+      `${personalization.code ?? "content_not_ready"}: ${personalization.detail ?? "Personalization incomplete."}`,
+    )
+  }
+
+  const personalizedCandidate = {
+    ...candidate,
+    materialization: personalization.materialization,
+    execution_jobs: personalization.execution_jobs,
+  }
+
+  const approvedDrafts = approveAllApolloSequenceExecutionDrafts(personalizedCandidate.materialization.drafts)
+  const approvedSteps = personalizedCandidate.materialization.steps.map((step) => ({
     ...step,
     approval_status: "draft_approved" as const,
   }))
   const materialization = {
-    ...candidate.materialization,
+    ...personalizedCandidate.materialization,
     steps: approvedSteps,
     drafts: approvedDrafts,
   }
   const now = new Date().toISOString()
+  const existingMetadata =
+    data.metadata && typeof data.metadata === "object"
+      ? (data.metadata as Record<string, unknown>)
+      : {}
 
   const { error: updateError } = await admin
     .schema("growth")
@@ -142,10 +171,14 @@ export async function approveApolloSequenceExecutionDrafts(
       draft_created: true,
       jobs_scheduled: false,
       updated_at: now,
-      metadata: {
+      execution_jobs: personalizedCandidate.execution_jobs,
+      metadata: mergeCandidateMetadata(existingMetadata, {
         qa_marker: APOLLO_SEQUENCE_EXECUTION_AUTOMATION_QA_MARKER,
         draft_approval_note: input.note?.trim() || null,
-      },
+        draft_approved_at: now,
+        personalization_packet_marker: personalization.unified_context?.qa_marker ?? null,
+        content_readiness_detail: personalization.readiness.detail,
+      }),
     })
     .eq("id", input.candidate_id)
 
@@ -179,7 +212,7 @@ export async function rejectApolloSequenceExecutionDrafts(
   const { data, error } = await admin
     .schema("growth")
     .from(TABLE)
-    .select("id, status")
+    .select("*")
     .eq("id", input.candidate_id)
     .maybeSingle()
 
@@ -189,12 +222,29 @@ export async function rejectApolloSequenceExecutionDrafts(
     return emptyResult("reject_draft", "invalid_candidate_status")
   }
 
+  const candidate = mapApolloSequenceExecutionCandidateDbRow(data as Record<string, unknown>)
+  const actingUserId = input.approver_user_id?.trim() || "system"
+  const actingUserEmail = input.approver_email?.trim() || "system"
+
+  const skippedExecutionJobs = await skipApolloSequenceExecutionJobsForDraftReject(admin, {
+    execution_jobs: candidate.execution_jobs,
+    acting_user_id: actingUserId,
+    acting_user_email: actingUserEmail,
+    candidate_id: input.candidate_id,
+  })
+
   const now = new Date().toISOString()
+  const existingMetadata =
+    data.metadata && typeof data.metadata === "object"
+      ? (data.metadata as Record<string, unknown>)
+      : {}
+
   const { error: updateError } = await admin
     .schema("growth")
     .from(TABLE)
     .update({
       status: "draft_rejected",
+      execution_jobs: skippedExecutionJobs,
       drafts_approved_by: input.approver_user_id ?? null,
       drafts_approved_email: input.approver_email ?? null,
       draft_rejection_note: input.note?.trim() || null,
@@ -206,7 +256,13 @@ export async function rejectApolloSequenceExecutionDrafts(
       draft_created: true,
       jobs_scheduled: false,
       updated_at: now,
-      metadata: { qa_marker: APOLLO_SEQUENCE_EXECUTION_AUTOMATION_QA_MARKER },
+      metadata: mergeCandidateMetadata(existingMetadata, {
+        qa_marker: APOLLO_SEQUENCE_EXECUTION_AUTOMATION_QA_MARKER,
+        draft_rejected_at: now,
+        draft_rejection_jobs_skipped: skippedExecutionJobs.filter(
+          (job) => job.job_status === "skipped",
+        ).length,
+      }),
     })
     .eq("id", input.candidate_id)
 

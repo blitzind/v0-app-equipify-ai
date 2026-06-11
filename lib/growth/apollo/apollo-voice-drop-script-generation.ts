@@ -1,5 +1,12 @@
 /** Apollo Voice Drop script generation — client-safe, no send. */
 
+import type { ApolloUnifiedPersonalizationContext } from "@/lib/growth/apollo/apollo-unified-personalization-context"
+import {
+  resolveApolloUnifiedBusinessProblem,
+  resolveApolloUnifiedCompanyInsight,
+  resolveApolloUnifiedResearchInsight,
+  resolveApolloUnifiedRoleInsight,
+} from "@/lib/growth/apollo/apollo-unified-personalization-context"
 import type {
   ApolloVoiceDropScript,
   ApolloVoiceDropScriptType,
@@ -112,4 +119,49 @@ export function generateApolloVoiceDropScript(input: {
     full_script,
     personalization_data,
   }
+}
+
+/** Generate voice drop script from unified personalization context — evidence only. */
+export function generateApolloVoiceDropScriptFromUnifiedContext(input: {
+  script_type: ApolloVoiceDropScriptType
+  unified_context: ApolloUnifiedPersonalizationContext
+  assigned_rep?: string | null
+  callback_number?: string | null
+}): ApolloVoiceDropScript {
+  const ctx = input.unified_context
+  const companyInsight = resolveApolloUnifiedCompanyInsight(ctx)
+  const roleInsight = resolveApolloUnifiedRoleInsight(ctx)
+  const researchInsight = resolveApolloUnifiedResearchInsight(ctx)
+  const businessProblem = resolveApolloUnifiedBusinessProblem(ctx)
+
+  const researchLine = [
+    companyInsight,
+    roleInsight,
+    researchInsight,
+    businessProblem ? `Focus area: ${businessProblem}` : null,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 200)
+
+  const script = generateApolloVoiceDropScript({
+    script_type: input.script_type,
+    full_name: ctx.contact_full_name,
+    company_name: ctx.contact_company_name,
+    title: ctx.contact_title,
+    assigned_rep: input.assigned_rep,
+    callback_number: input.callback_number,
+    research_line: researchLine || null,
+  })
+
+  const ctaRationale = ctx.outreach_packet.researchRecommendedNextAction?.trim()
+  if (ctaRationale && !script.call_to_action.includes(ctaRationale.slice(0, 40))) {
+    const call_to_action = `${script.call_to_action} ${ctaRationale}`.trim()
+    const full_script = [script.intro, script.value_proposition, script.personalization_line, call_to_action].join(
+      " ",
+    )
+    return { ...script, call_to_action, full_script }
+  }
+
+  return script
 }

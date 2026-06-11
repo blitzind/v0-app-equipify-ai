@@ -1,5 +1,7 @@
 /** Apollo Sequence Execution Automation types — client-safe. */
 
+import type { ApolloPipelineAttributionDisplay } from "@/lib/growth/apollo/apollo-pipeline-attribution-display"
+import type { ApolloQueuePaginationMeta } from "@/lib/growth/apollo/apollo-queue-pagination"
 import type { GrowthSequenceStepChannel } from "@/lib/growth/sequence-types"
 import type { ApolloOrchestrationChannelId } from "@/lib/growth/apollo/apollo-multichannel-orchestration-types"
 
@@ -60,6 +62,12 @@ export type ApolloSequenceExecutionDraftRecord = {
   voice_drop_script_reference: string | null
   approval_status: ApolloSequenceExecutionDraftApprovalStatus
   content_summary: string
+  /** AI copilot generation id for email steps (Outreach Personalization engine). */
+  generation_id?: string | null
+  /** Marker proving unified personalization packet was consumed. */
+  personalization_packet_marker?: string | null
+  /** Evidence-backed call plan for call steps. */
+  call_intelligence?: Record<string, unknown> | null
 }
 
 export type ApolloSequenceExecutionMaterializationPlan = {
@@ -124,6 +132,9 @@ export type ApolloSequenceExecutionCandidateRow = {
   created_at: string
   drafts_approved_at: string | null
   drafts_approved_email: string | null
+  draft_rejection_note?: string | null
+  draft_readiness_label?: string | null
+  attribution_display: ApolloPipelineAttributionDisplay
 }
 
 export type ApolloSequenceExecutionQueueSnapshot = {
@@ -144,6 +155,7 @@ export type ApolloSequenceExecutionQueueSnapshot = {
   call_placed: false
   draft_created: true
   jobs_scheduled: false
+  pagination?: ApolloQueuePaginationMeta
 }
 
 export type ApolloSequenceExecutionFunnelMetrics = {

@@ -11,6 +11,8 @@ import {
   APOLLO_VOICE_DROP_AUTOMATION_QA_MARKER,
   APOLLO_VOICE_DROP_SOURCE_ATTRIBUTION,
 } from "@/lib/growth/apollo/apollo-voice-drop-automation-types"
+import { buildApolloPipelineAttributionDisplay } from "@/lib/growth/apollo/apollo-pipeline-attribution-display"
+import type { ApolloQueuePaginationMeta } from "@/lib/growth/apollo/apollo-queue-pagination"
 import type {
   ApolloChannelAvailability,
   ApolloChannelRecommendation,
@@ -152,11 +154,19 @@ export function mapApolloVoiceDropCandidateDbRow(
     created_at: asString(row.created_at),
     voice_drop_approved_at: asString(row.voice_drop_approved_at) || null,
     voice_drop_approved_email: asString(row.voice_drop_approved_email) || null,
+    attribution_display: buildApolloPipelineAttributionDisplay({
+      source_attribution: sourceAttribution as unknown as Record<string, unknown>,
+      approved_at: asString(row.voice_drop_approved_at) || null,
+      approved_email: asString(row.voice_drop_approved_email) || null,
+      approved_by: asString(row.voice_drop_approved_by) || null,
+      rejection_note: asString(row.voice_drop_rejection_note) || null,
+    }),
   }
 }
 
 export function buildApolloVoiceDropCandidateQueueSnapshot(input: {
   items: ApolloVoiceDropCandidateRow[]
+  pagination?: ApolloQueuePaginationMeta
 }): ApolloVoiceDropCandidateQueueSnapshot {
   const items = input.items
   return {
@@ -174,6 +184,7 @@ export function buildApolloVoiceDropCandidateQueueSnapshot(input: {
     voice_drop_sent: false,
     outreach_sent: false,
     draft_created: false,
+    pagination: input.pagination,
   }
 }
 

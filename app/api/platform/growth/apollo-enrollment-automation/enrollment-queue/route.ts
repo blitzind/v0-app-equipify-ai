@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { loadApolloEnrollmentCandidateQueue } from "@/lib/growth/apollo/apollo-enrollment-candidate-queue"
 import type { ApolloEnrollmentCandidateStatus } from "@/lib/growth/apollo/apollo-enrollment-automation-types"
+import { parseApolloQueueRequestSearchParams } from "@/lib/growth/apollo/apollo-queue-pagination"
 
 export const runtime = "nodejs"
 
@@ -24,6 +25,7 @@ export async function GET(request: Request) {
     const snapshot = await loadApolloEnrollmentCandidateQueue(access.admin, {
       company_candidate_id: companyCandidateId,
       status,
+      pagination: parseApolloQueueRequestSearchParams(url.searchParams),
     })
     return NextResponse.json({ ok: true, snapshot })
   } catch (e) {

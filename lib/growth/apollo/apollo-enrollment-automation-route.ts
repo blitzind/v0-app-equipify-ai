@@ -117,6 +117,12 @@ export async function executeApolloEnrollmentAutomationInProduction(
   }
 }
 
-export async function loadApolloEnrollmentFunnelMetrics(admin: SupabaseClient) {
-  return buildApolloEnrollmentFunnelMetrics(admin)
+export async function loadApolloEnrollmentFunnelMetrics(
+  admin: SupabaseClient,
+  input?: {
+    view?: "historical" | "current_run"
+    company_candidate_id?: string | null
+  },
+) {
+  return buildApolloEnrollmentFunnelMetrics(admin, input)
 }

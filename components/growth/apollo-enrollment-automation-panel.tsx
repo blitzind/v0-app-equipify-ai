@@ -20,6 +20,9 @@ import type {
   ApolloEnrollmentFunnelMetrics,
 } from "@/lib/growth/apollo/apollo-enrollment-automation-types"
 import { APOLLO_ENROLLMENT_AUTOMATION_QA_MARKER } from "@/lib/growth/apollo/apollo-enrollment-automation-types"
+import type { ApolloQueueSortKey } from "@/lib/growth/apollo/apollo-queue-pagination"
+import { ApolloPipelineAttributionPanel } from "@/components/growth/apollo-pipeline-attribution-panel"
+import { ApolloQueueControls } from "@/components/growth/apollo-queue-controls"
 import { cn } from "@/lib/utils"
 
 type QueueFilter = "all" | ApolloEnrollmentCandidateStatus | "qualified"
@@ -41,14 +44,16 @@ export function ApolloEnrollmentFunnelDashboard({ className }: { className?: str
   const [metrics, setMetrics] = useState<ApolloEnrollmentFunnelMetrics | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [view, setView] = useState<"historical" | "current_run">("historical")
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/platform/growth/apollo-enrollment-automation/funnel-metrics", {
-        cache: "no-store",
-      })
+      const res = await fetch(
+        `/api/platform/growth/apollo-enrollment-automation/funnel-metrics?view=${view}`,
+        { cache: "no-store" },
+      )
       const json = (await res.json()) as {
         ok?: boolean
         metrics?: ApolloEnrollmentFunnelMetrics
@@ -63,7 +68,7 @@ export function ApolloEnrollmentFunnelDashboard({ className }: { className?: str
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [view])
 
   useEffect(() => {
     void load()
@@ -97,12 +102,23 @@ export function ApolloEnrollmentFunnelDashboard({ className }: { className?: str
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
-          End-to-end Apollo acquisition → qualification → enrollment candidate funnel.
+          End-to-end Apollo acquisition → qualification → enrollment candidate funnel
+          {metrics?.funnel_view ? ` (${metrics.funnel_view.replace(/_/g, " ")})` : ""}.
         </p>
-        <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
-          {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <select
+            value={view}
+            onChange={(event) => setView(event.target.value as "historical" | "current_run")}
+            className="h-8 rounded-md border bg-background px-2 text-xs"
+          >
+            <option value="historical">Historical view</option>
+            <option value="current_run">Current-run view</option>
+          </select>
+          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            Refresh
+          </Button>
+        </div>
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -125,6 +141,9 @@ export function ApolloEnrollmentAutomationQueuePanel({
   const [loading, setLoading] = useState(false)
   const [actionKey, setActionKey] = useState<string | null>(null)
   const [filter, setFilter] = useState<QueueFilter>("pending_enrollment_approval")
+  const [search, setSearch] = useState("")
+  const [sort, setSort] = useState<ApolloQueueSortKey>("created_at_desc")
+  const [page, setPage] = useState(1)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -135,6 +154,10 @@ export function ApolloEnrollmentAutomationQueuePanel({
       const params = new URLSearchParams()
       if (companyCandidateId) params.set("companyCandidateId", companyCandidateId)
       params.set("status", "all")
+      params.set("page", String(page))
+      params.set("pageSize", "25")
+      if (search.trim()) params.set("search", search.trim())
+      params.set("sort", sort)
       const res = await fetch(
         `/api/platform/growth/apollo-enrollment-automation/enrollment-queue?${params.toString()}`,
         { cache: "no-store" },
@@ -153,7 +176,7 @@ export function ApolloEnrollmentAutomationQueuePanel({
     } finally {
       setLoading(false)
     }
-  }, [companyCandidateId])
+  }, [companyCandidateId, page, search, sort])
 
   useEffect(() => {
     void load()
@@ -224,6 +247,22 @@ export function ApolloEnrollmentAutomationQueuePanel({
           <StatTile label="Qualified" value={String(snapshot.summary.qualified)} />
         </div>
       ) : null}
+
+      <ApolloQueueControls
+        pagination={snapshot?.pagination ?? null}
+        search={search}
+        sort={sort}
+        loading={loading}
+        onSearchChange={(value) => {
+          setSearch(value)
+          setPage(1)
+        }}
+        onSortChange={(value) => {
+          setSort(value)
+          setPage(1)
+        }}
+        onPageChange={setPage}
+      />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Filter className="size-4 text-muted-foreground" />
@@ -300,6 +339,11 @@ export function ApolloEnrollmentAutomationQueuePanel({
                     : ""}
                 </p>
               </div>
+
+              <ApolloPipelineAttributionPanel
+                attribution={row.attribution_display}
+                className="mt-3"
+              />
 
               {row.status === "pending_enrollment_approval" ? (
                 <div className="mt-4 flex flex-wrap gap-2">

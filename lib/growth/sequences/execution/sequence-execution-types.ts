@@ -100,6 +100,10 @@ export type GrowthSequenceExecutionJobView = GrowthSequenceExecutionJob & {
   experimentVariantId?: string | null
   experimentVariantLabel?: string | null
   qaDeliverabilityBypassUsed?: boolean
+  apolloDraftApprovalBlocked?: boolean
+  apolloDraftApprovalMessage?: string | null
+  draftReadinessLabel?: string | null
+  isPlaceholderDraft?: boolean
 }
 
 export type GrowthSequenceSafeExecutionDashboard = {

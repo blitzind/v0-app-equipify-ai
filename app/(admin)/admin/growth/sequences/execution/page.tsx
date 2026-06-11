@@ -21,6 +21,7 @@ import {
   ApolloSequenceExecutionAutomationQueuePanel,
   ApolloSequenceExecutionFunnelDashboard,
 } from "@/components/growth/apollo-sequence-execution-automation-panel"
+import { ApolloPilotOperationsPanel } from "@/components/growth/apollo-pilot-operations-panel"
 import { GrowthEnrollmentExecutionContext } from "@/components/growth/growth-enrollment-execution-context"
 import { GrowthSequenceExecutionFoundationDashboard } from "@/components/growth/growth-sequence-execution-foundation-dashboard"
 import { GrowthSequenceSafeExecutionDashboard } from "@/components/growth/growth-sequence-safe-execution-dashboard"
@@ -73,6 +74,7 @@ export default function AdminGrowthSequenceExecutionPage() {
         </section>
 
         <GrowthSectionLayout>
+          <ApolloPilotOperationsPanel className="mb-6" />
           <OutboundLaunchContextBanner className="mb-4" />
           <GrowthEnrollmentExecutionContext
             enrollmentId={contextEnrollmentId}

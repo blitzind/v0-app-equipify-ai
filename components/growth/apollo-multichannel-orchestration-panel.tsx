@@ -20,6 +20,9 @@ import type {
   ApolloMultichannelSequenceQueueSnapshot,
 } from "@/lib/growth/apollo/apollo-multichannel-orchestration-types"
 import { APOLLO_MULTICHANNEL_ORCHESTRATION_QA_MARKER } from "@/lib/growth/apollo/apollo-multichannel-orchestration-types"
+import type { ApolloQueueSortKey } from "@/lib/growth/apollo/apollo-queue-pagination"
+import { ApolloPipelineAttributionPanel } from "@/components/growth/apollo-pipeline-attribution-panel"
+import { ApolloQueueControls } from "@/components/growth/apollo-queue-controls"
 import { cn } from "@/lib/utils"
 
 type QueueFilter = "all" | ApolloMultichannelSequenceCandidateStatus
@@ -134,6 +137,9 @@ export function ApolloMultichannelOrchestrationQueuePanel({
   const [loading, setLoading] = useState(false)
   const [actionKey, setActionKey] = useState<string | null>(null)
   const [filter, setFilter] = useState<QueueFilter>("pending_sequence_approval")
+  const [search, setSearch] = useState("")
+  const [sort, setSort] = useState<ApolloQueueSortKey>("created_at_desc")
+  const [page, setPage] = useState(1)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -144,6 +150,10 @@ export function ApolloMultichannelOrchestrationQueuePanel({
       const params = new URLSearchParams()
       if (companyCandidateId) params.set("companyCandidateId", companyCandidateId)
       params.set("status", "all")
+      params.set("page", String(page))
+      params.set("pageSize", "25")
+      if (search.trim()) params.set("search", search.trim())
+      params.set("sort", sort)
       const res = await fetch(
         `/api/platform/growth/apollo-multichannel-orchestration/multichannel-queue?${params.toString()}`,
         { cache: "no-store" },
@@ -162,7 +172,7 @@ export function ApolloMultichannelOrchestrationQueuePanel({
     } finally {
       setLoading(false)
     }
-  }, [companyCandidateId])
+  }, [companyCandidateId, page, search, sort])
 
   useEffect(() => {
     void load()
@@ -235,6 +245,22 @@ export function ApolloMultichannelOrchestrationQueuePanel({
           <StatTile label="Regenerated" value={String(snapshot.summary.regenerated)} />
         </div>
       ) : null}
+
+      <ApolloQueueControls
+        pagination={snapshot?.pagination ?? null}
+        search={search}
+        sort={sort}
+        loading={loading}
+        onSearchChange={(value) => {
+          setSearch(value)
+          setPage(1)
+        }}
+        onSortChange={(value) => {
+          setSort(value)
+          setPage(1)
+        }}
+        onPageChange={setPage}
+      />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Filter className="size-4 text-muted-foreground" />
@@ -317,6 +343,11 @@ export function ApolloMultichannelOrchestrationQueuePanel({
                 <p className="mt-2 font-medium text-foreground">Scheduling plan</p>
                 <p className="mt-1 text-muted-foreground">{row.operator_summary.scheduling_summary}</p>
               </div>
+
+              <ApolloPipelineAttributionPanel
+                attribution={row.attribution_display}
+                className="mt-3"
+              />
 
               {row.status === "pending_sequence_approval" ? (
                 <div className="mt-4 flex flex-wrap gap-2">

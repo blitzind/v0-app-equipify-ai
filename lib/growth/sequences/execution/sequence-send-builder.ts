@@ -10,6 +10,7 @@ import { resolveSenderRotationForPool } from "@/lib/growth/sender-pools/sender-p
 import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 import { listSenderAccounts } from "@/lib/growth/sender/sender-repository"
 import { resolveApprovedTemplateContent } from "@/lib/growth/content/dashboard"
+import { isApolloEmailPlaceholderContent } from "@/lib/growth/apollo/apollo-sequence-placeholder-guard"
 import { getApprovedPersonalizationForJob } from "@/lib/growth/personalization/dashboard"
 import type { GrowthSequenceSendPayload } from "@/lib/growth/sequences/execution/sequence-execution-types"
 
@@ -89,6 +90,7 @@ export async function buildSequenceExecutionSendPayload(
     manualSenderAccountId?: string | null
     sequenceExecutionJobId?: string | null
     contentTemplateVersionId?: string | null
+    personalizationGenerationId?: string | null
   },
 ): Promise<GrowthSequenceSendPayload | { error: string }> {
   const [step, lead] = await Promise.all([
@@ -135,6 +137,10 @@ export async function buildSequenceExecutionSendPayload(
     if (generation.status !== "approved") return { error: "generation_not_approved" }
     subject = generation.generatedSubject?.trim() || subject
     body = generation.generatedContent?.trim() || body
+  }
+
+  if (step.channel === "email" && isApolloEmailPlaceholderContent({ subject, body })) {
+    return { error: step.generationId ? "apollo_email_placeholder_blocked" : "missing_generation" }
   }
 
   const personalizationGenerationId = input.personalizationGenerationId ?? null

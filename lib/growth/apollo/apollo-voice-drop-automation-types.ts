@@ -1,5 +1,8 @@
 /** Apollo Voice Drop Automation types — client-safe. */
 
+import type { ApolloPipelineAttributionDisplay } from "@/lib/growth/apollo/apollo-pipeline-attribution-display"
+import type { ApolloQueuePaginationMeta } from "@/lib/growth/apollo/apollo-queue-pagination"
+
 export const APOLLO_VOICE_DROP_AUTOMATION_QA_MARKER =
   "apollo-voice-drop-automation-v1" as const
 
@@ -128,6 +131,7 @@ export type ApolloVoiceDropCandidateRow = {
   created_at: string
   voice_drop_approved_at: string | null
   voice_drop_approved_email: string | null
+  attribution_display: ApolloPipelineAttributionDisplay
 }
 
 export type ApolloVoiceDropCandidateQueueSnapshot = {
@@ -145,6 +149,7 @@ export type ApolloVoiceDropCandidateQueueSnapshot = {
   voice_drop_sent: false
   outreach_sent: false
   draft_created: false
+  pagination?: ApolloQueuePaginationMeta
 }
 
 export type ApolloVoiceDropFunnelMetrics = {

@@ -11,6 +11,8 @@ import {
   APOLLO_ENROLLMENT_AUTOMATION_QA_MARKER,
   APOLLO_ENROLLMENT_AUTOMATION_SOURCE_ATTRIBUTION,
 } from "@/lib/growth/apollo/apollo-enrollment-automation-types"
+import { buildApolloPipelineAttributionDisplay } from "@/lib/growth/apollo/apollo-pipeline-attribution-display"
+import type { ApolloQueuePaginationMeta } from "@/lib/growth/apollo/apollo-queue-pagination"
 import type { ApolloPrimaryContactOperatorReviewRow } from "@/lib/growth/apollo/apollo-primary-contact-operator-review-types"
 import type { ApolloPrimaryContactOperatorReviewSnapshot } from "@/lib/growth/apollo/apollo-primary-contact-operator-review-types"
 
@@ -130,11 +132,19 @@ export function mapApolloEnrollmentCandidateDbRow(
     created_at: asString(row.created_at),
     enrollment_approved_at: asString(row.enrollment_approved_at) || null,
     enrollment_approved_email: asString(row.enrollment_approved_email) || null,
+    attribution_display: buildApolloPipelineAttributionDisplay({
+      source_attribution: sourceAttribution as unknown as Record<string, unknown>,
+      approved_at: asString(row.enrollment_approved_at) || null,
+      approved_email: asString(row.enrollment_approved_email) || null,
+      approved_by: asString(row.enrollment_approved_by) || null,
+      rejection_note: asString(row.enrollment_rejection_note) || null,
+    }),
   }
 }
 
 export function buildApolloEnrollmentCandidateQueueSnapshot(input: {
   items: ApolloEnrollmentCandidateRow[]
+  pagination?: ApolloQueuePaginationMeta
 }): ApolloEnrollmentCandidateQueueSnapshot {
   const items = input.items
   return {
@@ -151,6 +161,7 @@ export function buildApolloEnrollmentCandidateQueueSnapshot(input: {
     },
     auto_enrollment: false,
     outreach_sent: false,
+    pagination: input.pagination,
   }
 }
 

@@ -7,6 +7,7 @@ import { buildPersonalizedSmsDraft } from "@/lib/growth/sms/personalization/asse
 import { projectSmsPersonalizationContext } from "@/lib/growth/sms/personalization/sms-context-projection"
 import { buildOutreachContextPacket } from "@/lib/growth/outreach/personalization/context-packet-builder"
 import { fetchGrowthSequenceEnrollmentStepById } from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
+import { evaluateApolloSmsSendReadiness } from "@/lib/growth/apollo/apollo-sequence-placeholder-guard"
 import type { GrowthSequenceSmsSendPayload } from "@/lib/growth/sequences/execution/sequence-execution-types"
 
 export async function buildSequenceExecutionSmsPayload(
@@ -42,6 +43,11 @@ export async function buildSequenceExecutionSmsPayload(
   }
 
   if (!body.trim()) return { error: "missing_sms_body" }
+
+  const smsReadiness = evaluateApolloSmsSendReadiness(body)
+  if (!smsReadiness.allowed) {
+    return { error: smsReadiness.code ?? "apollo_sms_placeholder_blocked" }
+  }
 
   return {
     leadId: lead.id,

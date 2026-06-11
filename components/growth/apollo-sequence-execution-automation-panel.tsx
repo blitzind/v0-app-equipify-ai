@@ -19,6 +19,13 @@ import type {
   ApolloSequenceExecutionQueueSnapshot,
 } from "@/lib/growth/apollo/apollo-sequence-execution-automation-types"
 import { APOLLO_SEQUENCE_EXECUTION_AUTOMATION_QA_MARKER } from "@/lib/growth/apollo/apollo-sequence-execution-automation-types"
+import { classifyApolloSequenceDraftReadiness } from "@/lib/growth/apollo/apollo-sequence-draft-readiness"
+import type { ApolloQueueSortKey } from "@/lib/growth/apollo/apollo-queue-pagination"
+import {
+  ApolloDraftReadinessBadges,
+  ApolloPipelineAttributionPanel,
+} from "@/components/growth/apollo-pipeline-attribution-panel"
+import { ApolloQueueControls } from "@/components/growth/apollo-queue-controls"
 import { cn } from "@/lib/utils"
 
 type QueueFilter = "all" | ApolloSequenceExecutionCandidateStatus
@@ -116,6 +123,9 @@ export function ApolloSequenceExecutionAutomationQueuePanel({
   const [loading, setLoading] = useState(false)
   const [actionKey, setActionKey] = useState<string | null>(null)
   const [filter, setFilter] = useState<QueueFilter>("pending_draft_approval")
+  const [search, setSearch] = useState("")
+  const [sort, setSort] = useState<ApolloQueueSortKey>("created_at_desc")
+  const [page, setPage] = useState(1)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -126,6 +136,10 @@ export function ApolloSequenceExecutionAutomationQueuePanel({
       const params = new URLSearchParams()
       if (companyCandidateId) params.set("companyCandidateId", companyCandidateId)
       params.set("status", "all")
+      params.set("page", String(page))
+      params.set("pageSize", "25")
+      if (search.trim()) params.set("search", search.trim())
+      params.set("sort", sort)
       const res = await fetch(
         `/api/platform/growth/apollo-sequence-execution-automation/execution-queue?${params.toString()}`,
         { cache: "no-store" },
@@ -144,7 +158,7 @@ export function ApolloSequenceExecutionAutomationQueuePanel({
     } finally {
       setLoading(false)
     }
-  }, [companyCandidateId])
+  }, [companyCandidateId, page, search, sort])
 
   useEffect(() => {
     void load()
@@ -218,6 +232,22 @@ export function ApolloSequenceExecutionAutomationQueuePanel({
         </div>
       ) : null}
 
+      <ApolloQueueControls
+        pagination={snapshot?.pagination ?? null}
+        search={search}
+        sort={sort}
+        loading={loading}
+        onSearchChange={(value) => {
+          setSearch(value)
+          setPage(1)
+        }}
+        onSortChange={(value) => {
+          setSort(value)
+          setPage(1)
+        }}
+        onPageChange={setPage}
+      />
+
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Filter className="size-4 text-muted-foreground" />
         {(
@@ -257,6 +287,13 @@ export function ApolloSequenceExecutionAutomationQueuePanel({
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">{row.full_name}</p>
                     <GrowthBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</GrowthBadge>
+                    <ApolloDraftReadinessBadges
+                      labels={
+                        row.draft_readiness_label
+                          ? [row.draft_readiness_label]
+                          : ["Draft Placeholder"]
+                      }
+                    />
                   </div>
                   <p className="text-sm text-muted-foreground">
                     {row.company_name}
@@ -273,6 +310,17 @@ export function ApolloSequenceExecutionAutomationQueuePanel({
                 </div>
               </div>
 
+              <ApolloPipelineAttributionPanel
+                attribution={row.attribution_display}
+                className="mt-3"
+              />
+
+              <p className="mt-2 text-xs text-amber-700">
+                {row.status === "execution_ready"
+                  ? "Drafts approved — execution jobs may now be approved in Safe Execution below."
+                  : "Approve drafts here first — execution jobs remain blocked until draft status is execution-ready."}
+              </p>
+
               <div className="mt-3 grid gap-2 text-xs text-muted-foreground md:grid-cols-2">
                 <p>
                   <span className="font-medium text-foreground">Steps:</span> {row.operator_summary.step_summary}
@@ -283,14 +331,26 @@ export function ApolloSequenceExecutionAutomationQueuePanel({
               </div>
 
               <div className="mt-3 space-y-2">
-                {row.materialization.drafts.map((draft) => (
+                {row.materialization.drafts.map((draft) => {
+                  const readiness = classifyApolloSequenceDraftReadiness(draft)
+                  return (
                   <div key={draft.draft_id} className="rounded-lg border bg-background/60 p-3 text-xs">
-                    <p className="font-medium text-foreground">
-                      Step {draft.step_number} · {draft.draft_type} · {draft.approval_status.replace(/_/g, " ")}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-foreground">
+                        Step {draft.step_number} · {draft.draft_type} · {draft.approval_status.replace(/_/g, " ")}
+                      </p>
+                      <ApolloDraftReadinessBadges labels={[readiness.readiness_label]} />
+                    </div>
                     <p className="mt-1 text-muted-foreground">{draft.content_summary}</p>
+                    <p className="mt-1 text-muted-foreground">{readiness.readiness_detail}</p>
+                    {draft.body_placeholder ? (
+                      <p className="mt-2 whitespace-pre-wrap rounded border border-dashed p-2 text-[11px]">
+                        {draft.body_placeholder}
+                      </p>
+                    ) : null}
                   </div>
-                ))}
+                  )
+                })}
               </div>
 
               {row.status === "pending_draft_approval" ? (

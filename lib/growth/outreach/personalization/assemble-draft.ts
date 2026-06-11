@@ -1,7 +1,11 @@
 /** Assemble deterministic outreach draft from selected blocks (slice 6.15B). */
 
 import { countWords } from "@/lib/growth/outreach/personalization/message-variability"
-import { applyCtaIntelligence, buildIntelligentCta } from "@/lib/growth/outreach/personalization/cta-intelligence"
+import {
+  applyCtaIntelligence,
+  buildIntelligentCta,
+  ensureActionableCtaClosing,
+} from "@/lib/growth/outreach/personalization/cta-intelligence"
 import { computeContextUtilization } from "@/lib/growth/outreach/personalization/context-utilization"
 import {
   applyMemoryCommunicationStyle,
@@ -131,10 +135,13 @@ export function buildPersonalizedOutreachDraft(input: {
     style: communicationStyle,
   })
 
+  const bodyWithActionableCta = ensureActionableCtaClosing(styledDraft.body, ctaResult.text)
+  const trimmedBody = trimToMaxWords(bodyWithActionableCta, effectiveMaxWords)
+
   const finalDraft: OutreachPersonalizationDraft = {
     subject: draft.subject,
-    body: trimToMaxWords(styledDraft.body, effectiveMaxWords),
-    wordCount: countWords(trimToMaxWords(styledDraft.body, effectiveMaxWords)),
+    body: trimmedBody,
+    wordCount: countWords(trimmedBody),
   }
 
   const contextQuality = computeContextUtilization({

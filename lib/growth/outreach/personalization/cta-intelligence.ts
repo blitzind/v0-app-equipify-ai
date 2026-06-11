@@ -12,6 +12,7 @@ import {
   interpolateBlockText,
   OUTREACH_MESSAGE_BLOCK_LIBRARY,
 } from "@/lib/growth/outreach/personalization/message-blocks"
+import { selectResearchAwareCtaStyleId } from "@/lib/growth/outreach/personalization/email-variation-engine"
 import { pickVariantIndex } from "@/lib/growth/outreach/personalization/message-variability"
 import { resolveResearchEvidenceConfidenceTier } from "@/lib/growth/outreach/personalization/research-evidence-selection"
 import type {
@@ -437,32 +438,87 @@ function resolveCtaCandidate(input: {
   if (leadEngineCta) return leadEngineCta
 
   if (researchTier && !meetingReady) {
+    const blockId = selectResearchAwareCtaStyleId({
+      variationSeed: strategy.variationKey,
+      packet,
+      signals,
+      meetingReady: false,
+    })
     return {
-      category: "question_based",
-      blockId: resolveQuestionBlockId(signals, painBlockId),
+      category: blockId.startsWith("cta_") || blockId.includes("review") || blockId.includes("minute")
+        ? "soft"
+        : "question_based",
+      blockId,
       evidenceSource: "research_confidence",
       evidence: strategy.researchOpener?.evidence ?? packet.researchPainPoints[0] ?? null,
-      selectionReason: "Cold outreach with usable research — question-based CTA to earn a reply.",
+      selectionReason: "Cold outreach with usable research — action-oriented review CTA.",
     }
   }
 
   if (signals.includes("dispatch_appears_manual") || signals.includes("website_has_no_scheduler")) {
+    const blockId = selectResearchAwareCtaStyleId({
+      variationSeed: strategy.variationKey,
+      packet,
+      signals,
+      meetingReady: false,
+    })
     return {
       category: "question_based",
-      blockId: resolveQuestionBlockId(signals, painBlockId),
+      blockId,
       evidenceSource: "pain_signal",
       evidence: packet.researchPainPoints[0] ?? null,
-      selectionReason: "Pain signal detected on cold outreach — specific workflow question CTA.",
+      selectionReason: "Pain signal detected — specific workflow or gap review CTA.",
     }
   }
 
+  const blockId = selectResearchAwareCtaStyleId({
+    variationSeed: strategy.variationKey,
+    packet,
+    signals,
+    meetingReady: false,
+  })
   return {
-    category: "question_based",
-    blockId: "question_workflow",
+    category: "soft",
+    blockId,
     evidenceSource: "legacy_template",
-    evidence: null,
-    selectionReason: "Cold outreach with limited context — generic workflow question instead of meeting CTA.",
+    evidence: packet.researchRecommendedNextAction ?? null,
+    selectionReason: "Cold outreach — actionable review CTA instead of generic question.",
   }
+}
+
+const WEAK_CTA_PATTERNS = [
+  /^worth comparing notes/i,
+  /^happy to circle back/i,
+  /^should i keep this on your radar/i,
+  /^let me know if/i,
+  /^thoughts\?$/i,
+]
+
+const ACTIONABLE_CTA_PATTERNS = [
+  /\b(review|call|walkthrough|assessment|audit|diagnostic|meeting|schedule|compare|benchmark)\b/i,
+  /\?\s*$/,
+]
+
+export function isWeakGenericCta(text: string): boolean {
+  const trimmed = text.trim()
+  if (!trimmed) return true
+  if (WEAK_CTA_PATTERNS.some((p) => p.test(trimmed))) return true
+  return !ACTIONABLE_CTA_PATTERNS.some((p) => p.test(trimmed))
+}
+
+export function ensureActionableCtaClosing(body: string, ctaText: string): string {
+  const trimmedBody = body.trim()
+  const trimmedCta = ctaText.trim()
+  if (!trimmedCta) return trimmedBody
+
+  const lastSentence = trimmedBody.split(/[.!?]/).filter(Boolean).pop()?.trim() ?? ""
+  if (isWeakGenericCta(lastSentence) || !ACTIONABLE_CTA_PATTERNS.some((p) => p.test(lastSentence))) {
+    const withoutWeakEnd = trimmedBody.replace(/\s*(Worth comparing notes[^.?!]*[.?!]?)\s*$/i, "").trim()
+    const base = withoutWeakEnd.length > 0 ? withoutWeakEnd : trimmedBody
+    if (base.toLowerCase().includes(trimmedCta.toLowerCase().slice(0, 24))) return trimmedBody
+    return `${base.replace(/[.!?]\s*$/, "")}. ${trimmedCta}`
+  }
+  return trimmedBody
 }
 
 export function scoreCtaQuality(input: {
@@ -555,6 +611,20 @@ export function buildIntelligentCta(input: {
   if (candidate.blockId === "customer_next_step" && candidate.evidence) {
     const topic = compactMemorySnippet(candidate.evidence, 56)
     text = `What would be most useful as a next step on ${topic.toLowerCase()}?`
+  }
+
+  if (isWeakGenericCta(text)) {
+    const upgradedId = selectResearchAwareCtaStyleId({
+      variationSeed: input.variationSeed,
+      packet: input.packet,
+      signals: input.signals,
+      meetingReady,
+    })
+    text = pickCtaText(upgradedId, `${input.variationSeed}:cta-upgrade`, tokens)
+    candidate.blockId = upgradedId
+    if (candidate.category === "question_based" && upgradedId.startsWith("cta_")) {
+      candidate.category = "soft"
+    }
   }
 
   const qualityScore = scoreCtaQuality({

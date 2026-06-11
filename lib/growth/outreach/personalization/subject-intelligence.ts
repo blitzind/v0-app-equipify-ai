@@ -28,12 +28,16 @@ export type { SubjectCategory, SubjectEvidenceSource, SubjectQualityScore } from
 export const GENERIC_SUBJECT_PATTERNS = [
   /quick ops note/i,
   /quick note for/i,
+  /quick ops question/i,
+  /quick follow-up/i,
   /reaching out/i,
   /touching base/i,
   /checking in/i,
   /^following up$/i,
   /^follow-up$/i,
   /^follow up$/i,
+  /^following up —/i,
+  /following up on/i,
   /just following up/i,
   /wanted to reach out/i,
   /wanted to connect/i,
@@ -136,9 +140,10 @@ function curiositySubjectTemplates(company: string, industryLabel: string | null
   const industry = industryLabel?.trim()
   return [
     "One workflow question",
-    `Quick ops question — ${company}`,
-    industry ? `Your ${industry} workflow` : "Curious about your dispatch process",
-    `Field service workflow — ${company}`,
+    `Dispatch workflow — ${company}`,
+    industry ? `${industry} service workflow` : "Field service workflow question",
+    `Service visibility — ${company}`,
+    `Ops workflow review — ${company}`,
   ]
 }
 
@@ -276,8 +281,8 @@ function resolveFollowUpSubjectCandidate(
       evidence: packet.priorReplySummaries[0] ?? null,
       templates: [
         `Re: ${replyTopic}`,
-        `Following up on ${replyTopic}`,
-        `Quick follow-up — ${company}`,
+        `${replyTopic} — next step`,
+        `Workflow note — ${company}`,
       ],
     }
   }
@@ -444,7 +449,7 @@ export function buildLegacyDeterministicSubject(input: {
   if (input.strategy.angle === "executive_outcome") return `${company} — ops workflow review`
   if (input.strategy.industry === "hvac") return `${company} dispatch workflow`
   if (input.strategy.industry === "medical_equipment") return `${company} service visibility`
-  return `${company} — quick ops note`
+  return `Workflow question — ${company}`
 }
 
 function resolveSubjectCandidate(input: {
@@ -610,16 +615,31 @@ function pickDiverseSubject(input: {
   variationSeed: string
   priorSubjects: string[]
 }): string {
-  const templateCount = input.candidate.templates.length
+  const nonGenericTemplates = input.candidate.templates.filter(
+    (template) => !isGenericSubjectPattern(trimSubject(template)),
+  )
+  const templates =
+    nonGenericTemplates.length > 0 ? nonGenericTemplates : input.candidate.templates
+  const templateCount = templates.length
   const startIndex = pickVariantIndex(`${input.variationSeed}:subject:${input.candidate.category}`, templateCount)
 
   for (let offset = 0; offset < templateCount; offset += 1) {
-    const template = input.candidate.templates[(startIndex + offset) % templateCount]!
+    const template = templates[(startIndex + offset) % templateCount]!
     const subject = trimSubject(template)
+    if (isGenericSubjectPattern(subject)) continue
     if (!isTooSimilarToPrior(subject, input.priorSubjects)) return subject
   }
 
-  return trimSubject(input.candidate.templates[startIndex] ?? input.candidate.templates[0]!)
+  return trimSubject(templates[startIndex] ?? templates[0]!)
+}
+
+function buildResearchAwareSubjectFallback(packet: OutreachContextPacket): string {
+  const company = packet.companyName.trim()
+  const pain = packet.researchPainPoints[0]
+  if (pain) return trimSubject(`${compactSubjectSnippet(pain, 42)} — ${company}`)
+  const finding = packet.websiteFindings[0]
+  if (finding) return trimSubject(`${compactSubjectSnippet(finding, 42)} — ${company}`)
+  return trimSubject(`Workflow question — ${company}`)
 }
 
 export function buildIntelligentSubject(input: {
@@ -634,11 +654,14 @@ export function buildIntelligentSubject(input: {
   })
   const priorSubjects = input.packet.priorOutboundSubjects
   const candidate = resolveSubjectCandidate(input)
-  const subject = pickDiverseSubject({
+  let subject = pickDiverseSubject({
     candidate,
     variationSeed: input.variationSeed,
     priorSubjects,
   })
+  if (isGenericSubjectPattern(subject)) {
+    subject = buildResearchAwareSubjectFallback(input.packet)
+  }
   const qualityScore = scoreSubjectQuality({
     subject,
     category: candidate.category,

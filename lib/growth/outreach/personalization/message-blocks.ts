@@ -43,6 +43,96 @@ const OPENINGS: MessageBlockTemplate[] = [
       "Hi {{contactName}} — circling back with a clearer next step for {{companyName}}.",
     ],
   },
+  {
+    id: "opening_pain_first",
+    label: "Pain-first",
+    variants: [
+      "{{contactName}}, dispatch friction and missed visibility often show up before teams add headcount — had a focused note for {{companyName}}.",
+      "Hi {{contactName}} — when service queues get opaque, response time slips first at {{companyName}}.",
+      "{{contactName}}, capacity pressure usually surfaces in dispatch before anywhere else — quick note for {{companyName}}.",
+    ],
+  },
+  {
+    id: "opening_benchmark",
+    label: "Benchmark-first",
+    variants: [
+      "{{contactName}}, operators similar to {{companyName}} often benchmark dispatch handoffs before scaling volume.",
+      "Hi {{contactName}} — teams at your scale usually compare workflow benchmarks before the next hiring push.",
+      "{{contactName}}, worth a quick benchmark on how {{companyName}} coordinates field service today?",
+    ],
+  },
+  {
+    id: "opening_operational_issue",
+    label: "Operational issue",
+    variants: [
+      "{{contactName}}, manual coordination between scheduling and dispatch still creates gaps for teams like {{companyName}}.",
+      "Hi {{contactName}} — operational handoffs are where most service teams lose visibility first.",
+      "{{contactName}}, one operational pattern stood out for {{companyName}} around service coordination.",
+    ],
+  },
+  {
+    id: "opening_staffing",
+    label: "Staffing",
+    variants: [
+      "{{contactName}}, hiring signals at {{companyName}} often mean workflow strain is already visible in dispatch.",
+      "Hi {{contactName}} — growing field teams usually expose scheduling gaps before capacity catches up.",
+      "{{contactName}}, staffing growth at {{companyName}} often pairs with dispatch coordination pressure.",
+    ],
+  },
+  {
+    id: "opening_compliance",
+    label: "Compliance",
+    variants: [
+      "{{contactName}}, biomedical operators like {{companyName}} balance uptime with documentation-heavy service workflows.",
+      "Hi {{contactName}} — compliance-ready service teams still need cleaner dispatch visibility at {{companyName}}.",
+      "{{contactName}}, clinical equipment uptime and audit-ready workflows often compete at organizations like {{companyName}}.",
+    ],
+  },
+  {
+    id: "opening_workflow",
+    label: "Workflow",
+    variants: [
+      "{{contactName}}, one workflow question for {{companyName}} around how open jobs get tracked.",
+      "Hi {{contactName}} — service workflow clarity is usually the first fix operators want at {{companyName}}.",
+      "{{contactName}}, had a specific workflow observation for {{companyName}}'s field ops.",
+    ],
+  },
+  {
+    id: "opening_peer_comparison",
+    label: "Peer comparison",
+    variants: [
+      "{{contactName}}, peers in your segment often tighten dispatch before the next growth phase — thought of {{companyName}}.",
+      "Hi {{contactName}} — similar operators are comparing dispatch workflows; had a note for {{companyName}}.",
+      "{{contactName}}, operators comparable to {{companyName}} are reworking service handoffs this quarter.",
+    ],
+  },
+  {
+    id: "opening_observation",
+    label: "Observation",
+    variants: [
+      "{{contactName}}, noticed {{companyName}} runs multi-site service — had one operational observation.",
+      "Hi {{contactName}} — {{companyName}} looks like an operator where dispatch visibility would matter quickly.",
+      "{{contactName}}, one observation about how {{companyName}} coordinates field work.",
+    ],
+  },
+  {
+    id: "opening_trigger_event",
+    label: "Trigger event",
+    variants: [
+      "{{contactName}}, recent growth at {{companyName}} often triggers a dispatch workflow review.",
+      "Hi {{contactName}} — expansion phases usually surface service coordination gaps at {{companyName}}.",
+      "{{contactName}}, timing at {{companyName}} may make a short workflow review worthwhile.",
+    ],
+  },
+  {
+    id: "opening_industry_specific",
+    label: "Industry-specific",
+    variants: [
+      "{{contactName}}, equipment-intensive operators in your space often standardize dispatch before scaling technicians.",
+      "Hi {{contactName}} — field service leaders in your industry usually prioritize job visibility first.",
+      "{{contactName}}, had an industry-specific ops note for {{companyName}}.",
+    ],
+  },
 ]
 
 const PAIN_BLOCKS: MessageBlockTemplate[] = [
@@ -284,6 +374,105 @@ const CTA_BLOCKS: MessageBlockTemplate[] = [
       "Happy to share a quick walkthrough if useful.",
       "I can send a short walkthrough if that helps.",
       "Open to a quick walkthrough of the workflow?",
+    ],
+  },
+  {
+    id: "cta_workflow_review",
+    label: "Workflow review",
+    variants: [
+      "Open to a brief workflow review next week?",
+      "Would a short workflow review be useful for your team?",
+      "Worth a 15-minute workflow review to compare approaches?",
+    ],
+  },
+  {
+    id: "cta_benchmark_review",
+    label: "Benchmark review",
+    variants: [
+      "Happy to share how similar operators benchmark dispatch — worth a quick review?",
+      "Open to a brief benchmark review against peer workflows?",
+      "Would a short benchmark comparison be helpful?",
+    ],
+  },
+  {
+    id: "cta_ops_audit",
+    label: "Operations audit",
+    variants: [
+      "Worth a light ops audit of how jobs flow from intake to closeout?",
+      "Open to a quick operational audit of your dispatch handoffs?",
+      "Would a brief ops audit help clarify next steps?",
+    ],
+  },
+  {
+    id: "cta_ops_assessment",
+    label: "Operations assessment",
+    variants: [
+      "Open to a short operations assessment of your service queue?",
+      "Would a focused ops assessment be useful this quarter?",
+      "Happy to run a quick assessment of dispatch friction if helpful.",
+    ],
+  },
+  {
+    id: "cta_quick_call",
+    label: "Quick call",
+    variants: [
+      "Open to a 10-minute call to compare notes?",
+      "Would a quick call this week help clarify fit?",
+      "Happy to schedule a brief call if timing works.",
+    ],
+  },
+  {
+    id: "cta_process_review",
+    label: "Process review",
+    variants: [
+      "Worth a short process review on how work gets assigned today?",
+      "Open to a focused process review of your field service flow?",
+      "Would a brief process review help identify quick wins?",
+    ],
+  },
+  {
+    id: "cta_operational_gap_review",
+    label: "Operational gap review",
+    variants: [
+      "Open to reviewing where operational gaps show up in dispatch?",
+      "Would a quick gap review on service handoffs be useful?",
+      "Happy to outline common gaps operators fix first — worth a review?",
+    ],
+  },
+  {
+    id: "cta_service_review",
+    label: "Service review",
+    variants: [
+      "Worth a short service workflow review for your team?",
+      "Open to a brief review of how service jobs are tracked today?",
+      "Would a focused service review help prioritize next steps?",
+    ],
+  },
+  {
+    id: "cta_diagnostic_offer",
+    label: "Diagnostic offer",
+    variants: [
+      "I can share a short diagnostic on dispatch friction — interested?",
+      "Happy to send a quick diagnostic checklist if that helps.",
+      "Open to a lightweight diagnostic on your service workflow?",
+    ],
+  },
+  {
+    id: "cta_peer_comparison_review",
+    label: "Peer comparison review",
+    variants: [
+      "Worth comparing how peer operators handle similar dispatch volume?",
+      "Open to a peer comparison review of field service workflows?",
+      "Would a brief peer benchmark be useful for your planning?",
+    ],
+  },
+  {
+    id: "cta_workflow_diagnostic",
+    label: "Workflow diagnostic",
+    variants: [
+      "Open to a workflow diagnostic to spot manual handoffs?",
+      "Would a short workflow diagnostic help clarify priorities?",
+      "Happy to walk through a diagnostic on service coordination.",
     ],
   },
 ]

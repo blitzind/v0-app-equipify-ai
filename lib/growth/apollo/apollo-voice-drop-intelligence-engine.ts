@@ -1,5 +1,12 @@
 /** Apollo Voice Drop Intelligence Engine — client-safe. */
 
+import type { ApolloUnifiedPersonalizationContext } from "@/lib/growth/apollo/apollo-unified-personalization-context"
+import {
+  resolveApolloUnifiedBusinessProblem,
+  resolveApolloUnifiedCompanyInsight,
+  resolveApolloUnifiedResearchInsight,
+  resolveApolloUnifiedRoleInsight,
+} from "@/lib/growth/apollo/apollo-unified-personalization-context"
 import type {
   ApolloVoiceDropIntelligence,
   ApolloVoiceDropScriptType,
@@ -94,5 +101,54 @@ export function buildApolloVoiceDropIntelligence(input: {
       .filter(Boolean)
       .join(" ")
       .trim() || `Voice drop intelligence for ${input.full_name} at ${input.company_name}.`,
+  }
+}
+
+/** Upgrade voice drop intelligence using unified Apollo personalization context. */
+export function buildApolloVoiceDropIntelligenceFromUnifiedContext(input: {
+  unified_context: ApolloUnifiedPersonalizationContext
+  fit_score?: number | null
+  is_follow_up?: boolean
+}): ApolloVoiceDropIntelligence {
+  const ctx = input.unified_context
+  const base = buildApolloVoiceDropIntelligence({
+    company_name: ctx.contact_company_name,
+    full_name: ctx.contact_full_name,
+    title: ctx.contact_title,
+    fit_score: input.fit_score ?? ctx.qualification_score,
+    research_summary: resolveApolloUnifiedResearchInsight(ctx),
+    company_summary: resolveApolloUnifiedCompanyInsight(ctx),
+    buying_committee_summary: ctx.buying_committee_summary,
+    apollo_evidence_summary: ctx.apollo_evidence_summary,
+    is_follow_up: input.is_follow_up,
+  })
+
+  const enrichedOpportunities = [
+    ...base.personalization_opportunities,
+    resolveApolloUnifiedRoleInsight(ctx) ? `Role insight: ${resolveApolloUnifiedRoleInsight(ctx)}` : "",
+    resolveApolloUnifiedBusinessProblem(ctx)
+      ? `Business problem: ${resolveApolloUnifiedBusinessProblem(ctx)}`
+      : "",
+    ctx.account_playbook_summary ? `Playbook: ${ctx.account_playbook_summary}` : "",
+  ].filter(Boolean)
+
+  const ctaRationale = ctx.outreach_packet.researchRecommendedNextAction?.trim()
+    ? `CTA rationale: ${ctx.outreach_packet.researchRecommendedNextAction}`
+    : base.call_to_action_recommendation
+
+  return {
+    ...base,
+    personalization_opportunities: enrichedOpportunities.length
+      ? enrichedOpportunities
+      : base.personalization_opportunities,
+    call_to_action_recommendation: ctaRationale,
+    intelligence_summary: [
+      base.intelligence_summary,
+      resolveApolloUnifiedResearchInsight(ctx),
+      resolveApolloUnifiedBusinessProblem(ctx),
+    ]
+      .filter(Boolean)
+      .join(" — ")
+      .trim(),
   }
 }
