@@ -22,6 +22,17 @@ export const APOLLO_CERTIFICATION_PREFERRED_MATERIALIZABLE_SEQUENCE_KEYS = [
   "voice_sms_email",
 ] as const
 
+/** Pilot cohort materialization — prefer full async email + voice + SMS when channels allow. */
+export const APOLLO_PILOT_COHORT_MATERIALIZATION_PREFERRED_SEQUENCE_KEYS = [
+  "email_voice_sms",
+  "voice_sms_email",
+  "email_voice_drop",
+  "email_sms",
+  "voice_drop_email",
+  "call_email",
+  "call_sms",
+] as const
+
 export const APOLLO_CERTIFICATION_FALLBACK_TEMPLATE_KEYS = [
   "certification_minimal_email",
   "certification_minimal_email_voice_drop",

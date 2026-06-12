@@ -48,7 +48,17 @@ import {
   evaluateApollo25CompanyPilotCohortPersonalization,
   evaluateApolloExecutionMaterializationChannelDrafts,
 } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation"
+import {
+  APOLLO_PILOT_COHORT_MATERIALIZATION_PREFERRED_SEQUENCE_KEYS,
+  countMaterializableSequenceStepsFromSchedulingPlan,
+  evaluateApolloCertificationTemplateSelection,
+  inferApolloCertificationChannelAvailability,
+  needsApolloCertificationMultichannelTemplateOverride,
+} from "../lib/growth/apollo/apollo-certification-multichannel-template-override"
+import { buildApolloMultichannelSchedulingPlan } from "../lib/growth/apollo/apollo-multichannel-scheduling-layer"
 import { buildApolloSequenceExecutionDraftRecords } from "../lib/growth/apollo/apollo-sequence-draft-generation"
+import { buildApolloSequenceExecutionStepPlans } from "../lib/growth/apollo/apollo-sequence-step-generation"
+import { resolveUnsupportedSequenceMaterializationBlockers } from "../lib/growth/apollo/apollo-full-pipeline-materialization-evidence"
 import { buildApollo25CompanyPilotCohortReview } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-review"
 import {
   describeEnrollmentDuplicatePreventionDecision,
@@ -664,6 +674,110 @@ assert.equal(materializedChannelDrafts.sms_assets, true)
 assert.equal(materializedChannelDrafts.voice_drop_assets, true)
 assert.equal(materializedChannelDrafts.content_quality_optimization, true)
 console.log("  ✓ materialize channel draft readiness distinguishes placeholder vs personalized drafts")
+
+assert.match(materializeSource, /applyApolloCertificationMultichannelTemplateOverride/)
+assert.match(materializeSource, /APOLLO_PILOT_COHORT_MATERIALIZATION_PREFERRED_SEQUENCE_KEYS/)
+assert.doesNotMatch(materializeSource, /runSequenceExecutionJob/)
+console.log("  ✓ pilot materialize applies multichannel template override before sequence handoff")
+
+const customFuturePlan = buildApolloMultichannelSchedulingPlan({ channel_order: ["future_channel"] })
+assert.equal(
+  needsApolloCertificationMultichannelTemplateOverride({
+    sequence_key: "custom_future",
+    scheduling_plan: customFuturePlan,
+  }),
+  true,
+)
+assert.ok(
+  resolveUnsupportedSequenceMaterializationBlockers({
+    sequence_key: "custom_future",
+    sequence_label: "Custom Future Sequence",
+    scheduling_touches: customFuturePlan.touches,
+    materialized_step_count: 0,
+  }).includes("unsupported_template:custom_future"),
+)
+
+const pilotChannelAvailability = inferApolloCertificationChannelAvailability({
+  stored: {
+    verified_email: false,
+    phone: false,
+    mobile_phone: false,
+    voice_drop_capable: false,
+    sms_capable: false,
+    linkedin: false,
+  },
+  email: "contact@example.com",
+  phone: "+15551234567",
+  sequence_ready_contact: true,
+})
+const pilotTemplateSelection = evaluateApolloCertificationTemplateSelection({
+  availability: pilotChannelAvailability,
+  preferred_keys: APOLLO_PILOT_COHORT_MATERIALIZATION_PREFERRED_SEQUENCE_KEYS,
+})
+assert.equal(pilotTemplateSelection.template?.sequence_key, "email_voice_sms")
+const pilotSchedulingPlan = buildApolloMultichannelSchedulingPlan({
+  channel_order: pilotTemplateSelection.template!.channel_order,
+})
+assert.equal(countMaterializableSequenceStepsFromSchedulingPlan(pilotSchedulingPlan), 3)
+const pilotHandoffInput = {
+  company_name: "Summit Medical",
+  full_name: "Alex Rivera",
+  title: "VP Operations",
+  voice_drop_script_reference: "Hi Alex, Equipify follow-up.",
+  sequence_key: pilotTemplateSelection.template!.sequence_key,
+  sequence_label: pilotTemplateSelection.template!.sequence_label,
+  scheduling_plan: pilotSchedulingPlan,
+  enrollment_candidate_id: "enroll-1",
+  company_candidate_id: "company-1",
+  company_contact_id: "contact-1",
+  growth_lead_id: "lead-1",
+  voice_drop_candidate_id: "voice-1",
+  multichannel_sequence_candidate_id: "multi-1",
+  email: "alex@example.com",
+  phone: "+15551234567",
+  qualification_score: 88,
+  channel_order: pilotTemplateSelection.template!.channel_order,
+  source_attribution: {},
+}
+const pilotExecutionSteps = buildApolloSequenceExecutionStepPlans(pilotHandoffInput)
+assert.equal(pilotExecutionSteps.length, 3)
+assert.deepEqual(
+  pilotExecutionSteps.map((step) => step.channel),
+  ["email", "voice_drop", "sms"],
+)
+const pilotPlaceholderDrafts = buildApolloSequenceExecutionDraftRecords({
+  handoff: pilotHandoffInput,
+  steps: pilotExecutionSteps,
+})
+assert.equal(pilotPlaceholderDrafts.filter((draft) => draft.draft_type === "email").length, 1)
+assert.equal(pilotPlaceholderDrafts.filter((draft) => draft.draft_type === "sms").length, 1)
+assert.equal(pilotPlaceholderDrafts.filter((draft) => draft.draft_type === "voice_drop").length, 1)
+assert.equal(
+  resolveUnsupportedSequenceMaterializationBlockers({
+    sequence_key: pilotTemplateSelection.template!.sequence_key,
+    sequence_label: pilotTemplateSelection.template!.sequence_label,
+    scheduling_touches: pilotSchedulingPlan.touches,
+    materialized_step_count: pilotExecutionSteps.length,
+  }).length,
+  0,
+)
+
+const unknownTemplateSelection = evaluateApolloCertificationTemplateSelection({
+  availability: {
+    ...pilotChannelAvailability,
+    verified_email: false,
+    phone: false,
+    mobile_phone: false,
+    voice_drop_capable: false,
+    sms_capable: false,
+    linkedin: false,
+    contact_email_present: false,
+    contact_phone_present: false,
+  },
+  preferred_keys: APOLLO_PILOT_COHORT_MATERIALIZATION_PREFERRED_SEQUENCE_KEYS,
+})
+assert.equal(unknownTemplateSelection.template, null)
+console.log("  ✓ custom_future maps to materializable pilot template; unknown channels still fail safely")
 
 const enrollBridgeSource = fs.readFileSync(
   path.join(ROOT, "lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge.ts"),

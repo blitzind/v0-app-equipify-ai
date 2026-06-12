@@ -51,6 +51,7 @@ export async function applyApolloCertificationMultichannelTemplateOverride(
     verified_email_contact?: boolean
     channel_availability_overlay?: ApolloChannelAvailability | null
     prior_outreach_count?: number
+    preferred_keys?: readonly string[]
   },
 ): Promise<{
   ok: boolean
@@ -102,7 +103,10 @@ export async function applyApolloCertificationMultichannelTemplateOverride(
     verified_email_contact: input.verified_email_contact,
   })
 
-  const selection = evaluateApolloCertificationTemplateSelection({ availability })
+  const selection = evaluateApolloCertificationTemplateSelection({
+    availability,
+    preferred_keys: input.preferred_keys,
+  })
   const overrideTemplate = selection.template
 
   if (

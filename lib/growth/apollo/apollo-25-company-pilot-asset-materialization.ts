@@ -34,6 +34,8 @@ import {
   APOLLO_25_COMPANY_PILOT_COHORT_SNAPSHOT_QA_MARKER,
   type Apollo25CompanyPilotCohortSnapshotCompany,
 } from "@/lib/growth/apollo/apollo-25-company-pilot-types"
+import { applyApolloCertificationMultichannelTemplateOverride } from "@/lib/growth/apollo/apollo-certification-multichannel-template-override-bridge"
+import { APOLLO_PILOT_COHORT_MATERIALIZATION_PREFERRED_SEQUENCE_KEYS } from "@/lib/growth/apollo/apollo-certification-multichannel-template-override"
 import { resolveAndBackfillApolloPipelineGrowthLeadForSequenceExecution } from "@/lib/growth/apollo/apollo-pipeline-growth-lead-resolution"
 import { loadApolloPilotCohort } from "@/lib/growth/apollo/apollo-pilot-route"
 import {
@@ -399,10 +401,38 @@ export async function materializeApollo25CompanyPilotCompanyAssets(
     multichannelRow = data as Record<string, unknown> | null
   }
 
-  const multichannelFresh = multichannelRow
+  let multichannelFresh = multichannelRow
     ? mapApolloMultichannelSequenceCandidateDbRow(multichannelRow as Record<string, unknown>)
     : null
   stage_ids.multichannel_sequence_candidate_id = multichannelFresh?.candidate_id ?? null
+
+  if (multichannelFresh) {
+    const templateOverride = await applyApolloCertificationMultichannelTemplateOverride(admin, {
+      candidate_id: multichannelFresh.candidate_id,
+      email: enrollment.email,
+      phone: enrollment.phone,
+      sequence_ready_contact: true,
+      verified_email_contact: Boolean(enrollment.email?.trim()),
+      channel_availability_overlay: multichannelFresh.channel_availability,
+      preferred_keys: APOLLO_PILOT_COHORT_MATERIALIZATION_PREFERRED_SEQUENCE_KEYS,
+    })
+    if (!templateOverride.ok) {
+      blockers.push(
+        `multichannel_template_override:${templateOverride.evidence.template_override_blockers.join(" | ") || "failed"}`,
+      )
+    } else {
+      const { data: reloadedMultichannel } = await admin
+        .schema("growth")
+        .from("apollo_multichannel_sequence_candidates")
+        .select("*")
+        .eq("id", multichannelFresh.candidate_id)
+        .maybeSingle()
+      if (reloadedMultichannel) {
+        multichannelRow = reloadedMultichannel as Record<string, unknown>
+        multichannelFresh = mapApolloMultichannelSequenceCandidateDbRow(multichannelRow)
+      }
+    }
+  }
 
   let { data: executionRow } = multichannelFresh
     ? await admin
