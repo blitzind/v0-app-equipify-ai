@@ -532,7 +532,15 @@ assert.equal(
   ),
   true,
 )
-console.log("  ✓ pilot enrichment uses shared qualification scoring loader")
+assert.match(
+  fs.readFileSync(path.join(ROOT, "lib/growth/apollo/apollo-enrollment-auto-enrollment.ts"), "utf8"),
+  /loadApolloQualificationScoringContextForCompany/,
+)
+assert.match(
+  fs.readFileSync(path.join(ROOT, "lib/growth/apollo/apollo-enrollment-auto-enrollment.ts"), "utf8"),
+  /buildApolloEnrollmentQualificationInputFromScoringContext/,
+)
+console.log("  ✓ pilot enrichment and enrollment automation use shared qualification scoring loader")
 
 const ciVerifiedNotPromoted = classifyCompanyIntelligenceRecoveryOutcome({
   had_verified_before: false,

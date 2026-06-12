@@ -24,18 +24,14 @@ import {
   resolveApolloFullPipelineCertificationQualificationThreshold,
 } from "@/lib/growth/apollo/apollo-enrollment-qualification-engine"
 import { loadApolloPrimaryContactOperatorReviewSnapshot } from "@/lib/growth/apollo/apollo-primary-contact-operator-review"
-import { loadProspectSearchEngineIntelligence } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-loader"
+import { buildApolloEnrollmentQualificationInputFromScoringContext } from "@/lib/growth/apollo/apollo-qualification-scoring-context-helpers"
+import { loadApolloQualificationScoringContextForCompany } from "@/lib/growth/apollo/apollo-qualification-scoring-context"
 
 const CANDIDATES_TABLE = "apollo_enrollment_candidates"
 const REUSABLE_STATUSES = ["pending_enrollment_approval", "enrollment_approved"] as const
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
-}
-
-function asNumber(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value
-  return null
 }
 
 async function findEnrollmentCandidateByContactIds(
@@ -131,34 +127,6 @@ export async function findReusableApolloEnrollmentCandidate(
   return null
 }
 
-function buildQualificationInput(input: {
-  snapshotSummary: ReturnType<typeof summarizeApolloOperatorReviewForQualification>
-  contact: ApolloPrimaryContactOperatorReviewRow
-  companyIntelligencePresent: boolean
-  buyingCommitteePresent: boolean
-  buyingCommitteeCoverage: number | null
-  fitScore: number | null
-  researchScore: number | null
-}) {
-  return {
-    mapped_contacts: input.snapshotSummary.mapped_contacts,
-    verified_email_contacts: input.snapshotSummary.verified_email_contacts,
-    contactable_contacts: input.snapshotSummary.contactable_contacts,
-    sequence_ready_contacts: input.snapshotSummary.sequence_ready_contacts,
-    company_intelligence_present: input.companyIntelligencePresent,
-    buying_committee_present: input.buyingCommitteePresent,
-    buying_committee_coverage: input.buyingCommitteeCoverage,
-    fit_score: input.fitScore,
-    research_score: input.researchScore,
-    contact_sequence_ready: input.contact.sequence_ready,
-    contact_contactable: input.contact.contactable,
-    contact_blockers: input.contact.blockers,
-    apollo_search_tier: null,
-    verified_email_source: "apollo_search_verified_email",
-    enrichment_source: "apollo_enrichment_cert",
-  }
-}
-
 export async function scoreSequenceReadyContactsForCertification(
   admin: SupabaseClient,
   input: {
@@ -171,30 +139,20 @@ export async function scoreSequenceReadyContactsForCertification(
   if (!snapshot) return []
 
   const summary = summarizeApolloOperatorReviewForQualification(snapshot)
-  const engineIntelligence = await loadProspectSearchEngineIntelligence(admin, {
-    source_type: "external_discovered",
-    id: input.company_candidate_id,
-    growth_lead_id: null,
+  const scoringContext = await loadApolloQualificationScoringContextForCompany(admin, {
+    company_candidate_id: input.company_candidate_id,
     canonical_company_id: snapshot.canonical_company_id,
   })
-
-  const fitScore =
-    asNumber(engineIntelligence.company_intelligence?.snapshots?.[0]?.confidence) != null
-      ? (engineIntelligence.company_intelligence?.snapshots?.[0]?.confidence ?? 0) * 100
-      : null
 
   const scored: ApolloFullPipelineCertificationScoredContact[] = []
   for (const contact of input.contacts.filter((row) => isCertificationEligibleSequenceReadyContact(row))) {
     const qualification = evaluateApolloEnrollmentQualification(
-      buildQualificationInput({
-        snapshotSummary: summary,
+      buildApolloEnrollmentQualificationInputFromScoringContext({
+        snapshot_summary: summary,
         contact,
-        companyIntelligencePresent:
-          engineIntelligence.company_intelligence?.has_verified_intelligence === true,
-        buyingCommitteePresent: (engineIntelligence.buying_committee?.member_count ?? 0) > 0,
-        buyingCommitteeCoverage: engineIntelligence.buying_committee?.committee_completeness ?? null,
-        fitScore,
-        researchScore: fitScore,
+        context: scoringContext,
+        verified_email_source: "apollo_search_verified_email",
+        enrichment_source: "apollo_enrollment_cert",
       }),
       { threshold: resolveApolloEnrollmentQualificationThreshold(input.env) },
     )
@@ -282,29 +240,18 @@ export async function buildApolloFullPipelineEnrollmentEvidence(
       const snapshot = await loadApolloPrimaryContactOperatorReviewSnapshot(admin, input.company_candidate_id)
       if (snapshot) {
         const summary = summarizeApolloOperatorReviewForQualification(snapshot)
-        const engineIntelligence = await loadProspectSearchEngineIntelligence(admin, {
-          source_type: "external_discovered",
-          id: input.company_candidate_id,
-          growth_lead_id: null,
+        const scoringContext = await loadApolloQualificationScoringContextForCompany(admin, {
+          company_candidate_id: input.company_candidate_id,
           canonical_company_id: snapshot.canonical_company_id,
         })
 
-        const fitScore =
-          asNumber(engineIntelligence.company_intelligence?.snapshots?.[0]?.confidence) != null
-            ? (engineIntelligence.company_intelligence?.snapshots?.[0]?.confidence ?? 0) * 100
-            : null
-
         const qualification = evaluateApolloEnrollmentQualification(
-          buildQualificationInput({
-            snapshotSummary: summary,
+          buildApolloEnrollmentQualificationInputFromScoringContext({
+            snapshot_summary: summary,
             contact,
-            companyIntelligencePresent:
-              engineIntelligence.company_intelligence?.has_verified_intelligence === true,
-            buyingCommitteePresent: (engineIntelligence.buying_committee?.member_count ?? 0) > 0,
-            buyingCommitteeCoverage:
-              engineIntelligence.buying_committee?.committee_completeness ?? null,
-            fitScore,
-            researchScore: fitScore,
+            context: scoringContext,
+            verified_email_source: "apollo_search_verified_email",
+            enrichment_source: "apollo_enrollment_cert",
           }),
           { threshold: production_threshold },
         )

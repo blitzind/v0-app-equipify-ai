@@ -26,10 +26,14 @@ import { runApollo25CompanyPilotPreflight } from "../lib/growth/apollo/apollo-25
 import { applyApollo25CompanyPilotCanonicalCohortDedupe } from "../lib/growth/apollo/apollo-25-company-pilot-canonical-cohort-dedupe"
 import { buildApollo25CompanyPilotCanonicalDedupeAudit } from "../lib/growth/apollo/apollo-25-company-pilot-canonical-dedupe-audit"
 import { buildApollo25CompanyPilotGreenfieldCohortSnapshot } from "../lib/growth/apollo/apollo-25-company-pilot-draft-cohort"
+import { mergeApolloIntelligenceRecoveryQualificationContext } from "../lib/growth/apollo/apollo-intelligence-recovery-artifact-contract"
+import { buildApolloIntelligenceRecoveryScoreDecompositionRow } from "../lib/growth/apollo/apollo-intelligence-recovery-qualification"
+import { buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput, evaluateApollo25CompanyPilotCohortEnrollmentReadiness } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-readiness"
 import {
-  buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput,
-  evaluateApollo25CompanyPilotCohortEnrollmentReadiness,
-} from "../lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-readiness"
+  applyApolloQualificationScoringContextToSelectionInput,
+  buildApolloEnrollmentQualificationInputFromScoringContext,
+} from "../lib/growth/apollo/apollo-qualification-scoring-context-helpers"
+import { evaluateApolloEnrollmentQualification } from "../lib/growth/apollo/apollo-enrollment-qualification-engine"
 import {
   evaluateApollo25CompanyPilotCohortEnrollmentBridgeSuccess,
   snapshotCompanyQualificationPassesThreshold,
@@ -596,6 +600,14 @@ const enrollBridgeSource = fs.readFileSync(
 )
 assert.match(enrollBridgeSource, /buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput/)
 assert.match(enrollBridgeSource, /loadCompanyIdsInOtherActivePilotCohorts/)
+assert.match(
+  fs.readFileSync(path.join(ROOT, "lib/growth/apollo/apollo-enrollment-auto-enrollment.ts"), "utf8"),
+  /loadApolloQualificationScoringContextForCompany/,
+)
+assert.match(
+  fs.readFileSync(path.join(ROOT, "lib/growth/apollo/apollo-enrollment-auto-enrollment.ts"), "utf8"),
+  /buildApolloEnrollmentQualificationInputFromScoringContext/,
+)
 assert.match(enrollBridgeSource, /buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput/)
 assert.match(enrollBridgeSource, /snapshotCompanyQualificationPassesThreshold/)
 assert.match(enrollBridgeSource, /executeApolloFullPipelineCertificationEnrollment/)
@@ -723,6 +735,92 @@ assert.equal(
   true,
 )
 console.log("  ✓ enrollment bridge all-fail result is not successful")
+
+const recoveredQualificationContext = mergeApolloIntelligenceRecoveryQualificationContext({
+  engine: {
+    qa_marker: "growth-prospect-search-engine-intelligence-v1",
+    source_type: "external_discovered",
+    source_id: "company-recovered",
+    growth_lead_id: null,
+    company_name: "Recovered Co",
+    canonical_company_id: "canonical-recovered",
+    has_canonical_company: true,
+    company_intelligence: {
+      has_verified_intelligence: true,
+      snapshot_count: 2,
+      categories_present: ["operations"],
+      discovery_status: "verified",
+      snapshots: [
+        {
+          intelligence_category: "operations",
+          intelligence_key: "fleet",
+          value_text: "verified ops",
+          confidence: 0.9,
+          verification_status: "verified",
+        },
+      ],
+    },
+    buying_committee: {
+      member_count: 2,
+      verified_member_count: 2,
+      coverage_score: 0.6,
+      single_thread_risk: false,
+      roles_present: ["decision_maker"],
+      roles_missing: [],
+      members: [],
+    },
+    verified_channels: null,
+    source_labels: [],
+  },
+})
+const recoveredContact = buildFixtureContact(88, "Recovered Co")
+const recoveredSnapshotSummary = {
+  mapped_contacts: 3,
+  verified_email_contacts: 3,
+  contactable_contacts: 3,
+  sequence_ready_contacts: 3,
+}
+const recoveryScoreRow = buildApolloIntelligenceRecoveryScoreDecompositionRow({
+  company_candidate_id: "company-recovered",
+  company_name: "Recovered Co",
+  contacts: [recoveredContact],
+  snapshot_summary: recoveredSnapshotSummary,
+  qualificationContext: recoveredQualificationContext,
+  production_threshold: 70,
+})
+const pilotRecoveredInput = applyApolloQualificationScoringContextToSelectionInput(
+  {
+    company_candidate_id: "company-recovered",
+    company_name: "Recovered Co",
+    domain: "recovered.example.com",
+    contacts: [recoveredContact],
+    snapshot_summary: recoveredSnapshotSummary,
+    enrollment_status: null,
+    has_active_sequence_enrollment: false,
+    in_active_pilot_cohort: false,
+    canonical_company_id: "canonical-recovered",
+  },
+  recoveredQualificationContext,
+)
+const pilotRecoveredAnalysis = analyzeApollo25CompanyPilotCompanyEligibility(
+  pilotRecoveredInput,
+  70,
+  "greenfield",
+)
+const enrollmentRecoveredQualification = evaluateApolloEnrollmentQualification(
+  buildApolloEnrollmentQualificationInputFromScoringContext({
+    snapshot_summary: recoveredSnapshotSummary,
+    contact: recoveredContact,
+    context: recoveredQualificationContext,
+    verified_email_source: "apollo_search_verified_email",
+    enrichment_source: "apollo_enrollment_cert",
+  }),
+  { threshold: 70 },
+)
+assert.equal(recoveryScoreRow.current_score, 100)
+assert.equal(pilotRecoveredAnalysis.score, 100)
+assert.equal(enrollmentRecoveredQualification.qualification_score, 100)
+console.log("  ✓ recovery, pilot, and enrollment qualification scores align for recovered companies")
 
 assert.equal(describeEnrollmentDuplicatePreventionDecision({ candidates_created: 1, candidates: [{ candidate_id: "c1" }] }), "created_new_candidate")
 assert.equal(
