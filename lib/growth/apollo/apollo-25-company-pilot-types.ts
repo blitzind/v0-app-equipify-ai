@@ -10,6 +10,21 @@ export const APOLLO_25_COMPANY_PILOT_QA_MARKER = "apollo-25-company-pilot-launch
 export const APOLLO_25_COMPANY_PILOT_COHORT_SNAPSHOT_QA_MARKER =
   "apollo-25-company-pilot-cohort-v14-2f" as const
 
+export type Apollo25CompanyPilotCohortCanonicalDedupeAuditEntry = {
+  canonical_company_id: string
+  kept_company_candidate_id: string
+  removed_company_candidate_ids: string[]
+}
+
+export type Apollo25CompanyPilotCohortCanonicalDedupeSummary = {
+  qa_marker: string
+  canonical_company_count: number
+  duplicate_canonical_companies: number
+  canonical_duplicates_removed: number
+  dedupe_audit: Apollo25CompanyPilotCohortCanonicalDedupeAuditEntry[]
+  excluded_companies: Apollo25CompanyPilotCohortSnapshotCompany[]
+}
+
 export const APOLLO_25_COMPANY_PILOT_TARGET_COUNT = 25 as const
 
 export type Apollo25CompanyPilotSelectedContact = {
@@ -154,6 +169,14 @@ export type Apollo25CompanyPilotCohortSnapshot = {
   production_qualification_threshold: number
   immutable: true
   companies: Apollo25CompanyPilotCohortSnapshotCompany[]
+  canonical_dedupe?: Apollo25CompanyPilotCohortCanonicalDedupeSummary
+}
+
+export type Apollo25CompanyPilotCohortLaunchCertification = {
+  certified: boolean
+  enrollment_ready_pct: number
+  personalization_ready_pct: number
+  blocking_issues: string[]
 }
 
 export type Apollo25CompanyPilotCohortEnrollmentReadinessCompany = {
@@ -217,10 +240,14 @@ export type Apollo25CompanyPilotCohortReview = {
   snapshot: Apollo25CompanyPilotCohortSnapshot
   cohort_size: number
   target_size: number
+  canonical_company_count: number
+  duplicate_canonical_companies: number
+  dedupe_audit: Apollo25CompanyPilotCohortCanonicalDedupeAuditEntry[]
   companies: Apollo25CompanyPilotCohortSnapshotCompany[]
   enrollment_readiness: Apollo25CompanyPilotCohortEnrollmentReadinessSummary
   personalization: Apollo25CompanyPilotCohortPersonalizationReport
   launch_recommendation: Apollo25CompanyPilotLaunchRecommendation
+  launch_certification: Apollo25CompanyPilotCohortLaunchCertification
   no_outreach_side_effects: true
 }
 

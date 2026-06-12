@@ -11,9 +11,16 @@ export function buildApollo25CompanyPilotLaunchRecommendation(input: {
   snapshot: Apollo25CompanyPilotCohortSnapshot
   enrollment_readiness: Apollo25CompanyPilotCohortEnrollmentReadinessSummary
   personalization: Apollo25CompanyPilotCohortPersonalizationReport
+  duplicate_canonical_companies?: number
 }): Apollo25CompanyPilotLaunchRecommendation {
   const blocking_issues: string[] = []
   const recommended_launch_size = input.snapshot.cohort_size
+
+  if ((input.duplicate_canonical_companies ?? 0) > 0) {
+    blocking_issues.push(
+      `canonical_duplicates_present:${input.duplicate_canonical_companies}`,
+    )
+  }
 
   if (input.snapshot.cohort_size === 0) {
     blocking_issues.push("no_greenfield_eligible_companies")
@@ -49,7 +56,11 @@ export function buildApollo25CompanyPilotLaunchRecommendation(input: {
     input.personalization.companies_evaluated > 0 &&
     input.personalization.companies_ready === input.personalization.companies_evaluated
 
-  const ready_for_launch = recommended_launch_size > 0 && enrollmentReady && personalizationReady
+  const ready_for_launch =
+    recommended_launch_size > 0 &&
+    enrollmentReady &&
+    personalizationReady &&
+    (input.duplicate_canonical_companies ?? 0) === 0
 
   return {
     ready_for_launch,

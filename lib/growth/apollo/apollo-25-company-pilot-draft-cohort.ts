@@ -4,6 +4,7 @@ import {
   analyzeApollo25CompanyPilotCompanyEligibility,
   type Apollo25CompanyPilotSelectionInput,
 } from "@/lib/growth/apollo/apollo-25-company-pilot-selection"
+import { applyApollo25CompanyPilotCanonicalCohortDedupe } from "@/lib/growth/apollo/apollo-25-company-pilot-canonical-cohort-dedupe"
 import {
   APOLLO_25_COMPANY_PILOT_COHORT_SNAPSHOT_QA_MARKER,
   APOLLO_25_COMPANY_PILOT_TARGET_COUNT,
@@ -75,23 +76,53 @@ export function buildApollo25CompanyPilotGreenfieldCohortSnapshot(input: {
     return left.company_name.localeCompare(right.company_name)
   })
 
-  const cohort_size = eligible.length
+  const preDedupeSize = eligible.length
   for (let index = 0; index < eligible.length; index += 1) {
     const company = eligible[index]!
     company.cohort_rank = index + 1
-    company.ranking_explanation = buildRankingExplanation(company, cohort_size)
+    company.ranking_explanation = buildRankingExplanation(company, preDedupeSize)
+  }
+
+  const deduped = applyApollo25CompanyPilotCanonicalCohortDedupe(eligible)
+  for (const company of deduped.kept) {
+    company.ranking_explanation = buildRankingExplanation(company, deduped.kept.length)
   }
 
   return {
     qa_marker: APOLLO_25_COMPANY_PILOT_COHORT_SNAPSHOT_QA_MARKER,
-    snapshot_id: buildDeterministicSnapshotId(eligible),
+    snapshot_id: buildDeterministicSnapshotId(deduped.kept),
     generated_at,
     pilot_selection_mode: "greenfield",
     target_size,
-    cohort_size,
+    cohort_size: deduped.kept.length,
     production_qualification_threshold: production_threshold,
     immutable: true,
-    companies: eligible,
+    companies: deduped.kept,
+    canonical_dedupe: deduped.summary,
+  }
+}
+
+export function ensureApollo25CompanyPilotCanonicalUniqueSnapshot(
+  snapshot: Apollo25CompanyPilotCohortSnapshot,
+): Apollo25CompanyPilotCohortSnapshot {
+  if (
+    snapshot.canonical_dedupe &&
+    snapshot.canonical_dedupe.duplicate_canonical_companies === 0
+  ) {
+    return snapshot
+  }
+
+  const deduped = applyApollo25CompanyPilotCanonicalCohortDedupe(snapshot.companies)
+  for (const company of deduped.kept) {
+    company.ranking_explanation = buildRankingExplanation(company, deduped.kept.length)
+  }
+
+  return {
+    ...snapshot,
+    snapshot_id: buildDeterministicSnapshotId(deduped.kept),
+    cohort_size: deduped.kept.length,
+    companies: deduped.kept,
+    canonical_dedupe: deduped.summary,
   }
 }
 

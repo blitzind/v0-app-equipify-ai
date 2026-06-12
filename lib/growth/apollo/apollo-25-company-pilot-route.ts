@@ -15,6 +15,7 @@ import type { Apollo25CompanyPilotSelectionInput } from "@/lib/growth/apollo/apo
 import type { Apollo25CompanyPilotSelectionMode } from "@/lib/growth/apollo/apollo-25-company-pilot-skip-reasons"
 import {
   buildApollo25CompanyPilotGreenfieldCohortSnapshot,
+  ensureApollo25CompanyPilotCanonicalUniqueSnapshot,
   parseApollo25CompanyPilotCohortSnapshotFromMetadata,
   snapshotCompaniesFromCohortCompanyRows,
 } from "@/lib/growth/apollo/apollo-25-company-pilot-draft-cohort"
@@ -363,6 +364,9 @@ export async function loadApollo25CompanyPilotLaunchReport(
         pilot_launch_certification: true,
         pilot_selection_mode: "greenfield",
         draft_cohort_snapshot_v14_2f: snapshot,
+        canonical_cohort_dedupe_v14_2g_1: snapshot.canonical_dedupe ?? null,
+        excluded_canonical_duplicate_companies:
+          snapshot.canonical_dedupe?.excluded_companies ?? [],
         snapshot_id: snapshot.snapshot_id,
         snapshot_immutable: true,
         no_auto_outreach: true,
@@ -537,7 +541,7 @@ export async function loadApollo25CompanyPilotCohortReview(
     cohort_status = loaded.cohort.status
     const parsedSnapshot = parseApollo25CompanyPilotCohortSnapshotFromMetadata(loaded.cohort.metadata)
     if (parsedSnapshot) {
-      snapshot = parsedSnapshot
+      snapshot = ensureApollo25CompanyPilotCanonicalUniqueSnapshot(parsedSnapshot)
     } else {
       const companies = snapshotCompaniesFromCohortCompanyRows(loaded.companies)
       if (companies.length === 0) {

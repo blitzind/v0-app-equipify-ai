@@ -23,6 +23,7 @@ import {
   resolveApollo25CompanyPilotEnvGatesOk,
 } from "../lib/growth/apollo/apollo-25-company-pilot-launch-report"
 import { runApollo25CompanyPilotPreflight } from "../lib/growth/apollo/apollo-25-company-pilot-preflight"
+import { applyApollo25CompanyPilotCanonicalCohortDedupe } from "../lib/growth/apollo/apollo-25-company-pilot-canonical-cohort-dedupe"
 import { buildApollo25CompanyPilotCanonicalDedupeAudit } from "../lib/growth/apollo/apollo-25-company-pilot-canonical-dedupe-audit"
 import { buildApollo25CompanyPilotGreenfieldCohortSnapshot } from "../lib/growth/apollo/apollo-25-company-pilot-draft-cohort"
 import { evaluateApollo25CompanyPilotCohortEnrollmentReadiness } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-readiness"
@@ -55,7 +56,9 @@ const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation.ts",
   "lib/growth/apollo/apollo-25-company-pilot-cohort-review.ts",
   "lib/growth/apollo/apollo-25-company-pilot-launch-recommendation.ts",
+  "lib/growth/apollo/apollo-25-company-pilot-canonical-cohort-dedupe.ts",
   "lib/growth/apollo/apollo-25-company-pilot-canonical-dedupe-audit.ts",
+  "lib/growth/apollo/apollo-25-company-pilot-launch-certification.ts",
   "lib/growth/apollo/apollo-25-company-pilot-asset-materialization.ts",
   "lib/growth/apollo/apollo-25-company-pilot-route.ts",
   "app/api/platform/growth/apollo-25-company-pilot/report/route.ts",
@@ -430,42 +433,137 @@ assert.match(cohortRouteSource, /export async function GET/)
 assert.match(cohortRouteSource, /cohort_size/)
 console.log("  ✓ cohort review GET endpoint exposes cohort_size and companies")
 
-const canonicalDedupe = buildApollo25CompanyPilotCanonicalDedupeAudit({
-  snapshot_companies: [
+const canonicalCohort = applyApollo25CompanyPilotCanonicalCohortDedupe([
+  {
+    company_candidate_id: "company-a",
+    company_name: "Medical Equipment Solutions",
+    qualification_score: 88,
+    verified_email_count: 1,
+    sequence_ready_count: 1,
+    canonical_company_id: "de0b580a-c1d8-4dff-ae85-6adad57e7eff",
+    enrollment_status: null,
+    cohort_rank: 2,
+    cohort_reason: "production_rules_passed",
+    ranking_explanation: "rank 2",
+  },
+  {
+    company_candidate_id: "company-b",
+    company_name: "Medical Equipment Solutions LLC",
+    qualification_score: 82,
+    verified_email_count: 1,
+    sequence_ready_count: 1,
+    canonical_company_id: "de0b580a-c1d8-4dff-ae85-6adad57e7eff",
+    enrollment_status: null,
+    cohort_rank: 1,
+    cohort_reason: "production_rules_passed",
+    ranking_explanation: "rank 1",
+  },
+])
+assert.equal(canonicalCohort.kept.length, 1)
+assert.equal(canonicalCohort.kept[0]?.company_candidate_id, "company-a")
+assert.equal(canonicalCohort.summary.duplicate_canonical_companies, 0)
+assert.equal(canonicalCohort.summary.canonical_duplicates_removed, 1)
+assert.equal(canonicalCohort.summary.dedupe_audit[0]?.kept_company_candidate_id, "company-a")
+assert.deepEqual(canonicalCohort.summary.dedupe_audit[0]?.removed_company_candidate_ids, ["company-b"])
+assert.equal(canonicalCohort.summary.excluded_companies[0]?.company_candidate_id, "company-b")
+console.log("  ✓ duplicate canonical companies collapse — highest-ranked candidate retained")
+
+const dedupeSnapshot = buildApollo25CompanyPilotGreenfieldCohortSnapshot({
+  selection_inputs: [
     {
-      company_candidate_id: "company-a",
+      ...buildFixtureCompany(901),
+      company_candidate_id: "dup-a",
       company_name: "Medical Equipment Solutions",
-      qualification_score: 88,
-      verified_email_count: 1,
-      sequence_ready_count: 1,
       canonical_company_id: "de0b580a-c1d8-4dff-ae85-6adad57e7eff",
-      enrollment_status: null,
-      cohort_rank: 1,
-      cohort_reason: "production_rules_passed",
-      ranking_explanation: "rank 1",
     },
     {
-      company_candidate_id: "company-b",
-      company_name: "Medical Equipment Solutions LLC",
-      qualification_score: 82,
-      verified_email_count: 1,
-      sequence_ready_count: 1,
+      ...buildFixtureCompany(902),
+      company_candidate_id: "dup-b",
+      company_name: "Medical Equipment Solutions Alt",
       canonical_company_id: "de0b580a-c1d8-4dff-ae85-6adad57e7eff",
-      enrollment_status: null,
-      cohort_rank: 2,
-      cohort_reason: "production_rules_passed",
-      ranking_explanation: "rank 2",
     },
-  ],
+  ].map((row, index) => ({
+    ...row,
+    contacts: [buildFixtureContact(900 + index, row.company_name)],
+    snapshot_summary: {
+      mapped_contacts: 1,
+      verified_email_contacts: 1,
+      contactable_contacts: 1,
+      sequence_ready_contacts: 1,
+    },
+    company_intelligence_present: true,
+    buying_committee_present: true,
+  })),
+  production_threshold: 70,
+  generated_at: "2026-06-11T12:00:00.000Z",
 })
-assert.equal(canonicalDedupe.duplicate_canonical_groups.length, 1)
-assert.equal(canonicalDedupe.duplicate_canonical_groups[0]?.duplicate_outreach_risk, "elevated")
-assert.ok(canonicalDedupe.medical_equipment_solutions_audit)
-assert.equal(
-  canonicalDedupe.medical_equipment_solutions_audit?.canonical_company_id,
-  "de0b580a-c1d8-4dff-ae85-6adad57e7eff",
-)
-console.log("  ✓ canonical dedupe audit flags shared canonical company groups")
+assert.equal(dedupeSnapshot.canonical_dedupe?.duplicate_canonical_companies, 0)
+assert.equal(dedupeSnapshot.cohort_size, 1)
+console.log("  ✓ greenfield snapshot generation applies canonical dedupe")
+
+const certifiedReview = buildApollo25CompanyPilotCohortReview({
+  selection_inputs: readinessFixtureCompanies.slice(0, 11),
+  production_threshold: 70,
+  target_size: 11,
+  computed_at: "2026-06-11T12:00:00.000Z",
+  materialization_by_company: Object.fromEntries(
+    readinessFixtureCompanies.slice(0, 11).map((company) => [
+      company.company_candidate_id,
+      {
+        has_account_playbook: true,
+        has_personalization_generation: true,
+        execution_drafts: [
+          {
+            draft_type: "email",
+            channel: "email",
+            body_placeholder: "Personalized email body for outreach.",
+            step_number: 1,
+            draft_id: "d1",
+            approval_status: "draft_pending",
+            subject_placeholder: "Subject",
+            content_summary: "email",
+            voice_drop_script_reference: null,
+          },
+          {
+            draft_type: "sms",
+            channel: "sms",
+            body_placeholder: "Personalized SMS body.",
+            step_number: 2,
+            draft_id: "d2",
+            approval_status: "draft_pending",
+            subject_placeholder: null,
+            content_summary: "sms",
+            voice_drop_script_reference: null,
+          },
+          {
+            draft_type: "voice_drop",
+            channel: "voice_drop",
+            body_placeholder: "Personalized voice script.",
+            step_number: 3,
+            draft_id: "d3",
+            approval_status: "draft_pending",
+            subject_placeholder: null,
+            content_summary: "voice",
+            voice_drop_script_reference: "script",
+          },
+        ],
+        has_voice_drop_candidate: true,
+      },
+    ]),
+  ),
+})
+assert.equal(certifiedReview.duplicate_canonical_companies, 0)
+assert.equal(certifiedReview.enrollment_readiness.readiness_pct, 100)
+assert.equal(certifiedReview.personalization.readiness_pct, 100)
+assert.equal(certifiedReview.launch_recommendation.ready_for_launch, true)
+assert.equal(certifiedReview.launch_certification.certified, true)
+console.log("  ✓ launch certification passes on deduped cohort with full readiness")
+
+const canonicalDedupe = buildApollo25CompanyPilotCanonicalDedupeAudit({
+  snapshot_companies: canonicalCohort.kept,
+})
+assert.equal(canonicalDedupe.duplicate_canonical_groups.length, 0)
+console.log("  ✓ outreach audit clean after canonical cohort dedupe")
 
 const materializeRouteSource = fs.readFileSync(
   path.join(ROOT, "app/api/platform/growth/apollo-25-company-pilot/cohort/materialize/route.ts"),

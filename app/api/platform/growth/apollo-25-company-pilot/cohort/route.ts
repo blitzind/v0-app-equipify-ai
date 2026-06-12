@@ -26,6 +26,12 @@ export async function GET(request: Request) {
       ok: true,
       cohort_size: review.cohort_size,
       target_size: review.target_size,
+      canonical_company_count: review.canonical_company_count,
+      duplicate_canonical_companies: review.duplicate_canonical_companies,
+      dedupe_audit: review.dedupe_audit,
+      companies_ready: review.personalization.companies_ready,
+      readiness_pct: review.personalization.readiness_pct,
+      ready_for_launch: review.launch_recommendation.ready_for_launch,
       companies: review.companies,
       review,
     })
@@ -74,6 +80,9 @@ export async function POST(request: Request) {
       cohort: report.cohort_creation,
       cohort_size: review.cohort_size,
       target_size: review.target_size,
+      canonical_company_count: review.canonical_company_count,
+      duplicate_canonical_companies: review.duplicate_canonical_companies,
+      dedupe_audit: review.dedupe_audit,
       companies: review.companies,
       review,
     })

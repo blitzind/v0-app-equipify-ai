@@ -20,9 +20,13 @@ import { buildApollo25CompanyPilotCanonicalDedupeAudit } from "@/lib/growth/apol
 import { evaluateApollo25CompanyPilotCohortPersonalization } from "@/lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation"
 import { buildApollo25CompanyPilotCohortReview } from "@/lib/growth/apollo/apollo-25-company-pilot-cohort-review"
 import {
+  ensureApollo25CompanyPilotCanonicalUniqueSnapshot,
   parseApollo25CompanyPilotCohortSnapshotFromMetadata,
   snapshotCompaniesFromCohortCompanyRows,
 } from "@/lib/growth/apollo/apollo-25-company-pilot-draft-cohort"
+import {
+  isApollo25CompanyPilotCanonicalDuplicateExcluded,
+} from "@/lib/growth/apollo/apollo-25-company-pilot-canonical-cohort-dedupe"
 import {
   APOLLO_25_COMPANY_PILOT_COHORT_SNAPSHOT_QA_MARKER,
   type Apollo25CompanyPilotCohortSnapshotCompany,
@@ -175,10 +179,63 @@ export async function materializeApollo25CompanyPilotCompanyAssets(
     acting_user_id: string
     acting_user_email: string
     execution_id: string
+    canonical_dedupe?: import("@/lib/growth/apollo/apollo-25-company-pilot-types").Apollo25CompanyPilotCohortCanonicalDedupeSummary | null
+    materialized_canonical_company_ids?: Set<string>
   },
 ): Promise<Apollo25CompanyPilotAssetMaterializationCompanyResult> {
   const blockers: string[] = []
   const company_candidate_id = input.snapshot_company.company_candidate_id
+
+  if (isApollo25CompanyPilotCanonicalDuplicateExcluded(company_candidate_id, input.canonical_dedupe)) {
+    return {
+      company_candidate_id,
+      company_name: input.snapshot_company.company_name,
+      ready: false,
+      blockers: ["canonical_duplicate_excluded_from_cohort"],
+      artifacts: {
+        account_playbook: false,
+        personalization: false,
+        content_quality_optimization: false,
+        voice_drop_assets: false,
+        email_assets: false,
+        sms_assets: false,
+      },
+      stage_ids: {
+        enrollment_candidate_id: null,
+        account_playbook_id: null,
+        voice_drop_candidate_id: null,
+        multichannel_sequence_candidate_id: null,
+        sequence_execution_candidate_id: null,
+        growth_lead_id: null,
+      },
+    }
+  }
+
+  const canonicalId = input.snapshot_company.canonical_company_id?.trim()
+  if (canonicalId && input.materialized_canonical_company_ids?.has(canonicalId)) {
+    return {
+      company_candidate_id,
+      company_name: input.snapshot_company.company_name,
+      ready: false,
+      blockers: ["canonical_company_already_materialized_in_cohort"],
+      artifacts: {
+        account_playbook: false,
+        personalization: false,
+        content_quality_optimization: false,
+        voice_drop_assets: false,
+        email_assets: false,
+        sms_assets: false,
+      },
+      stage_ids: {
+        enrollment_candidate_id: null,
+        account_playbook_id: null,
+        voice_drop_candidate_id: null,
+        multichannel_sequence_candidate_id: null,
+        sequence_execution_candidate_id: null,
+        growth_lead_id: null,
+      },
+    }
+  }
   const stage_ids = {
     enrollment_candidate_id: null as string | null,
     account_playbook_id: null as string | null,
@@ -441,6 +498,10 @@ export async function materializeApollo25CompanyPilotCompanyAssets(
 
   const ready = Boolean(personalizationCompany?.ready)
 
+  if (canonicalId && input.materialized_canonical_company_ids) {
+    input.materialized_canonical_company_ids.add(canonicalId)
+  }
+
   return {
     company_candidate_id,
     company_name: input.snapshot_company.company_name,
@@ -557,7 +618,7 @@ export async function materializeApollo25CompanyPilotCohortAssets(
   const loaded = await loadApolloPilotCohort(admin, input.cohort_id)
   if (!loaded) throw new Error("cohort_not_found")
 
-  const snapshot =
+  const rawSnapshot =
     parseApollo25CompanyPilotCohortSnapshotFromMetadata(loaded.cohort.metadata) ??
     (() => {
       const companies = snapshotCompaniesFromCohortCompanyRows(loaded.companies)
@@ -574,6 +635,9 @@ export async function materializeApollo25CompanyPilotCohortAssets(
         companies,
       }
     })()
+  const snapshot = ensureApollo25CompanyPilotCanonicalUniqueSnapshot(rawSnapshot)
+  const canonical_dedupe = snapshot.canonical_dedupe
+  const materializedCanonicalIds = new Set<string>()
 
   const execution_id = randomUUID()
   logGrowthEngine("apollo_25_pilot_asset_materialization_started", {
@@ -590,6 +654,8 @@ export async function materializeApollo25CompanyPilotCohortAssets(
         acting_user_id: input.acting_user_id,
         acting_user_email: input.acting_user_email,
         execution_id,
+        canonical_dedupe,
+        materialized_canonical_company_ids: materializedCanonicalIds,
       }),
     )
   }
@@ -627,6 +693,7 @@ export async function materializeApollo25CompanyPilotCohortAssets(
       updated_at: now,
       metadata: {
         ...loaded.cohort.metadata,
+        canonical_cohort_dedupe_v14_2g_1: snapshot.canonical_dedupe ?? null,
         pilot_asset_materialization_v14_2g: {
           execution_id,
           materialized_at: now,
@@ -634,6 +701,8 @@ export async function materializeApollo25CompanyPilotCohortAssets(
           companies_ready,
           readiness_pct: review.personalization.readiness_pct,
           ready_for_launch: review.launch_recommendation.ready_for_launch,
+          canonical_company_count: review.canonical_company_count,
+          duplicate_canonical_companies: review.duplicate_canonical_companies,
         },
       },
     })
