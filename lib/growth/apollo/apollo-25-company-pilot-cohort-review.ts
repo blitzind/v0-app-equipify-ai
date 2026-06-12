@@ -27,6 +27,7 @@ export function buildApollo25CompanyPilotCohortReview(input: {
   cohort_name?: string | null
   cohort_status?: string | null
   materialization_by_company?: Record<string, Apollo25CompanyPilotPersonalizationMaterializationState>
+  company_ids_in_other_active_pilot_cohorts?: ReadonlySet<string> | readonly string[]
   computed_at?: string
 }): Apollo25CompanyPilotCohortReview {
   const rawSnapshot =
@@ -44,6 +45,8 @@ export function buildApollo25CompanyPilotCohortReview(input: {
     snapshot_companies: snapshot.companies,
     selection_inputs: input.selection_inputs,
     production_threshold: input.production_threshold ?? snapshot.production_qualification_threshold,
+    cohort_id: input.cohort_id,
+    company_ids_in_other_active_pilot_cohorts: input.company_ids_in_other_active_pilot_cohorts,
   })
 
   const personalization = evaluateApollo25CompanyPilotCohortPersonalization({

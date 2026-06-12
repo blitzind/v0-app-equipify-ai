@@ -195,10 +195,14 @@ export type Apollo25CompanyPilotCohortEnrollmentReadinessCompany = {
   }
 }
 
+export type Apollo25CompanyPilotCohortEnrollmentReadinessMode =
+  "preview_selection" | "persisted_cohort_review"
+
 export type Apollo25CompanyPilotCohortEnrollmentReadinessSummary = {
   companies_evaluated: number
   companies_ready: number
   readiness_pct: number
+  readiness_mode: Apollo25CompanyPilotCohortEnrollmentReadinessMode
   companies: Apollo25CompanyPilotCohortEnrollmentReadinessCompany[]
 }
 

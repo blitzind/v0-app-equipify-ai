@@ -398,7 +398,9 @@ const enrollmentReadiness = evaluateApollo25CompanyPilotCohortEnrollmentReadines
   snapshot_companies: readinessSnapshot.companies.slice(0, 5),
   selection_inputs: readinessFixtureCompanies,
   production_threshold: 70,
+  readiness_mode: "preview_selection",
 })
+assert.equal(enrollmentReadiness.readiness_mode, "preview_selection")
 assert.equal(enrollmentReadiness.companies_evaluated, 5)
 assert.equal(enrollmentReadiness.companies_ready, 5)
 console.log("  ✓ enrollment readiness validation accurate for eligible companies")
@@ -631,7 +633,7 @@ const enrolledEnrollmentReadiness = evaluateApollo25CompanyPilotCohortEnrollment
     qualification_score: 80,
     verified_email_count: 1,
     sequence_ready_count: 1,
-    canonical_company_id: null,
+    canonical_company_id: company.canonical_company_id,
     enrollment_status: "enrollment_approved",
     cohort_rank: index + 1,
     cohort_reason: "production_rules_passed",
@@ -639,10 +641,75 @@ const enrolledEnrollmentReadiness = evaluateApollo25CompanyPilotCohortEnrollment
   })),
   selection_inputs: enrolledFixtureCompanies,
   production_threshold: 70,
+  cohort_id: "fixture-cohort-id",
+  readiness_mode: "persisted_cohort_review",
 })
+assert.equal(enrolledEnrollmentReadiness.readiness_mode, "persisted_cohort_review")
 assert.equal(enrolledEnrollmentReadiness.readiness_pct, 100)
 assert.equal(enrolledEnrollmentReadiness.companies_ready, 11)
 console.log("  ✓ enrollment readiness passes after approved enrollments (materialization prerequisite)")
+
+const persistedCohortFixtureCompanies = readinessFixtureCompanies.slice(0, 11).map((company) => ({
+  ...company,
+  in_active_pilot_cohort: true,
+}))
+const persistedCohortSnapshotCompanies = persistedCohortFixtureCompanies.map((company, index) => ({
+  company_candidate_id: company.company_candidate_id,
+  company_name: company.company_name,
+  qualification_score: 100,
+  verified_email_count: company.snapshot_summary.verified_email_contacts,
+  sequence_ready_count: company.snapshot_summary.sequence_ready_contacts,
+  canonical_company_id: company.canonical_company_id,
+  enrollment_status: null,
+  cohort_rank: index + 1,
+  cohort_reason: "production_rules_passed",
+  ranking_explanation: "immutable snapshot fixture",
+}))
+const persistedCohortEnrollmentReadiness = evaluateApollo25CompanyPilotCohortEnrollmentReadiness({
+  snapshot_companies: persistedCohortSnapshotCompanies,
+  selection_inputs: persistedCohortFixtureCompanies,
+  production_threshold: 70,
+  cohort_id: "persisted-draft-cohort",
+  readiness_mode: "persisted_cohort_review",
+})
+assert.equal(persistedCohortEnrollmentReadiness.readiness_mode, "persisted_cohort_review")
+assert.equal(persistedCohortEnrollmentReadiness.companies_evaluated, 11)
+assert.ok(
+  persistedCohortEnrollmentReadiness.companies.every(
+    (row) => row.checks.qualification_gte_threshold && row.checks.no_active_enrollment_conflict,
+  ),
+)
+console.log("  ✓ persisted cohort members pass snapshot-anchored qualification with self-cohort exemption")
+
+const otherCohortConflictReadiness = evaluateApollo25CompanyPilotCohortEnrollmentReadiness({
+  snapshot_companies: persistedCohortSnapshotCompanies.slice(0, 1),
+  selection_inputs: persistedCohortFixtureCompanies.slice(0, 1).map((company) => ({
+    ...company,
+    in_active_pilot_cohort: true,
+  })),
+  production_threshold: 70,
+  cohort_id: "persisted-draft-cohort",
+  readiness_mode: "persisted_cohort_review",
+  company_ids_in_other_active_pilot_cohorts: [persistedCohortFixtureCompanies[0]!.company_candidate_id],
+})
+assert.equal(otherCohortConflictReadiness.companies[0]?.checks.no_active_enrollment_conflict, false)
+assert.ok(
+  otherCohortConflictReadiness.companies[0]?.blockers.includes("no_active_enrollment_conflict"),
+)
+console.log("  ✓ membership in another active pilot cohort still blocks readiness")
+
+const previewActivePilotReadiness = evaluateApollo25CompanyPilotCohortEnrollmentReadiness({
+  snapshot_companies: persistedCohortSnapshotCompanies.slice(0, 1),
+  selection_inputs: persistedCohortFixtureCompanies.slice(0, 1).map((company) => ({
+    ...company,
+    in_active_pilot_cohort: true,
+  })),
+  production_threshold: 70,
+  readiness_mode: "preview_selection",
+})
+assert.equal(previewActivePilotReadiness.readiness_mode, "preview_selection")
+assert.equal(previewActivePilotReadiness.companies[0]?.checks.no_active_enrollment_conflict, false)
+console.log("  ✓ preview selection still blocks active pilot conflicts")
 
 const enrollRouteSource = fs.readFileSync(
   path.join(ROOT, "app/api/platform/growth/apollo-25-company-pilot/cohort/enroll/route.ts"),

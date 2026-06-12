@@ -75,6 +75,43 @@ async function loadActivePilotCompanyIds(admin: SupabaseClient): Promise<Set<str
   return ids
 }
 
+async function loadCompanyIdsInOtherActivePilotCohorts(
+  admin: SupabaseClient,
+  excluding_cohort_id: string,
+): Promise<Set<string>> {
+  const excludingId = excluding_cohort_id.trim()
+  if (!excludingId) return new Set()
+
+  const { data: cohorts, error } = await admin
+    .schema("growth")
+    .from(COHORTS_TABLE)
+    .select("id, status")
+    .in("status", ["draft", "active", "paused"])
+
+  if (error) throw new Error(error.message)
+
+  const otherCohortIds = (cohorts ?? [])
+    .map((row) => asString((row as Record<string, unknown>).id))
+    .filter((id) => id && id !== excludingId)
+
+  if (otherCohortIds.length === 0) return new Set()
+
+  const { data: companies, error: companiesError } = await admin
+    .schema("growth")
+    .from(COMPANIES_TABLE)
+    .select("company_candidate_id")
+    .in("cohort_id", otherCohortIds)
+
+  if (companiesError) throw new Error(companiesError.message)
+
+  const ids = new Set<string>()
+  for (const row of companies ?? []) {
+    const id = asString((row as Record<string, unknown>).company_candidate_id)
+    if (id) ids.add(id)
+  }
+  return ids
+}
+
 export async function loadApolloDiscoveredCompanyIds(admin: SupabaseClient): Promise<string[]> {
   const ids = new Set<string>()
 
@@ -533,9 +570,15 @@ export async function loadApollo25CompanyPilotCohortReview(
     cohort_id = await loadLatestDraftApollo25CompanyPilotCohortId(admin)
   }
 
+  let company_ids_in_other_active_pilot_cohorts: Set<string> | undefined
+
   if (cohort_id) {
     const loaded = await loadApolloPilotCohort(admin, cohort_id)
     if (!loaded) throw new Error("cohort_not_found")
+    company_ids_in_other_active_pilot_cohorts = await loadCompanyIdsInOtherActivePilotCohorts(
+      admin,
+      cohort_id,
+    )
 
     cohort_name = loaded.cohort.cohort_name
     cohort_status = loaded.cohort.status
@@ -570,6 +613,7 @@ export async function loadApollo25CompanyPilotCohortReview(
     cohort_name,
     cohort_status,
     materialization_by_company,
+    company_ids_in_other_active_pilot_cohorts,
   })
 }
 
