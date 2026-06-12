@@ -17,6 +17,7 @@ import { resolveApolloEnrichmentCanonicalCompanyId } from "@/lib/growth/apollo/a
 import { approveApolloMultichannelSequenceCandidate } from "@/lib/growth/apollo/apollo-multichannel-orchestration-queue"
 import { mapApolloMultichannelSequenceCandidateDbRow } from "@/lib/growth/apollo/apollo-multichannel-orchestration-evidence"
 import { buildApollo25CompanyPilotCanonicalDedupeAudit } from "@/lib/growth/apollo/apollo-25-company-pilot-canonical-dedupe-audit"
+import { isApolloSmsPersonalizationRequired } from "@/lib/growth/apollo/apollo-25-company-pilot-personalization-asset-requirements"
 import {
   evaluateApollo25CompanyPilotCohortPersonalization,
   evaluateApolloExecutionMaterializationChannelDrafts,
@@ -513,7 +514,12 @@ export async function materializeApollo25CompanyPilotCompanyAssets(
       })
     }
 
-    if (missingPhone) {
+    if (missingPhone && isApolloSmsPersonalizationRequired({
+      sequence_key: execution.materialization.sequence_key,
+      selected_channels: execution.materialization.steps.map((step) => step.orchestration_channel),
+      materialization_steps: execution.materialization.steps,
+      expected_draft_types: execution.materialization.drafts.map((draft) => draft.draft_type),
+    })) {
       blockers.push(APOLLO_SMS_PERSONALIZATION_MISSING_PHONE_BLOCKER)
     }
 
@@ -605,6 +611,9 @@ async function loadPilotPersonalizationMaterializationByCompany(
       has_personalization_generation: false,
       execution_drafts: [],
       has_voice_drop_candidate: false,
+      sequence_key: null,
+      selected_channels: [],
+      materialization_steps: [],
     }
   }
   if (companyIds.length === 0) return map
@@ -679,6 +688,11 @@ async function loadPilotPersonalizationMaterializationByCompany(
     const companyId = candidate.company_candidate_id?.trim()
     if (!companyId || !map[companyId]) continue
     map[companyId].execution_drafts = candidate.materialization.drafts
+    map[companyId].sequence_key = candidate.materialization.sequence_key
+    map[companyId].selected_channels = candidate.materialization.steps.map(
+      (step) => step.orchestration_channel,
+    )
+    map[companyId].materialization_steps = candidate.materialization.steps
   }
 
   return map

@@ -219,6 +219,10 @@ export type Apollo25CompanyPilotCohortPersonalizationCompany = {
   company_name: string
   ready: boolean
   missing_assets: Apollo25CompanyPilotCohortPersonalizationAssetKey[]
+  required_assets: Apollo25CompanyPilotCohortPersonalizationAssetKey[]
+  optional_assets: Apollo25CompanyPilotCohortPersonalizationAssetKey[]
+  selected_template: string | null
+  selected_channels: string[]
   assets: Record<Apollo25CompanyPilotCohortPersonalizationAssetKey, boolean>
 }
 

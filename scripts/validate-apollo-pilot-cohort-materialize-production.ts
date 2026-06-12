@@ -6,11 +6,10 @@
  */
 import { createClient } from "@supabase/supabase-js"
 import { materializeApollo25CompanyPilotCohortAssetReadiness } from "../lib/growth/apollo/apollo-25-company-pilot-route"
+import { resolveApolloPilotMaterializationValidationActor } from "../lib/growth/apollo/apollo-pilot-materialization-validation-actor"
 import { bootstrapVerifiedChannelsCertEnv } from "../lib/growth/qa/verified-channels-cert-env-bootstrap"
 
 const COHORT_ID = "c04a1a26-9e22-4aa7-b1b3-025ffdfc591a"
-const VALIDATION_ACTOR_ID = "00000000-0000-4000-8000-000000000001"
-const VALIDATION_ACTOR_EMAIL = "apollo-pilot-materialize-validation@equipify.internal"
 
 /** Vercel production credential layers — intentionally excludes `.env.local`. */
 const PRODUCTION_VALIDATION_ENV_SOURCES = [
@@ -44,21 +43,30 @@ async function main(): Promise<void> {
 
   const admin = createClient(boot.url, boot.jwt, { auth: { persistSession: false } })
 
+  const actor = await resolveApolloPilotMaterializationValidationActor(admin, {
+    acting_user_id: process.env.GROWTH_APOLLO_PILOT_MATERIALIZE_ACTING_USER_ID ?? null,
+    acting_user_email: process.env.GROWTH_APOLLO_PILOT_MATERIALIZE_ACTING_USER_EMAIL ?? null,
+  })
+
   const report = await materializeApollo25CompanyPilotCohortAssetReadiness(admin, {
     cohort_id: COHORT_ID,
-    acting_user_id: VALIDATION_ACTOR_ID,
-    acting_user_email: VALIDATION_ACTOR_EMAIL,
+    acting_user_id: actor.acting_user_id,
+    acting_user_email: actor.acting_user_email,
   })
 
   const trimErrorCompanies = report.companies.filter((company) =>
     company.blockers.some((blocker) => blocker.includes("trim")),
   )
+  const fkErrorCompanies = report.companies.filter((company) =>
+    company.blockers.some((blocker) => blocker.includes("ai_copilot_generations_created_by_fkey")),
+  )
 
   const payload = {
-    ok: trimErrorCompanies.length === 0,
+    ok: trimErrorCompanies.length === 0 && fkErrorCompanies.length === 0,
     cohort_id: COHORT_ID,
     supabase_url: boot.url,
     env_loaded_files: boot.audit.loaded_files,
+    validation_actor: actor,
     companies_processed: report.companies_processed,
     companies_ready: report.companies_ready,
     readiness_pct: report.readiness_pct,
@@ -69,20 +77,34 @@ async function main(): Promise<void> {
       company_name: company.company_name,
       blockers: company.blockers,
     })),
-    first_two_companies: report.companies.slice(0, 2).map((company) => ({
+    fk_error_companies: fkErrorCompanies.map((company) => ({
       company_candidate_id: company.company_candidate_id,
       company_name: company.company_name,
-      ready: company.ready,
       blockers: company.blockers,
-      stage_ids: company.stage_ids,
-      artifacts: company.artifacts,
     })),
+    first_two_companies: report.companies.slice(0, 2).map((company) => {
+      const personalizationCompany = report.review.personalization.companies.find(
+        (row) => row.company_candidate_id === company.company_candidate_id,
+      )
+      return {
+        company_candidate_id: company.company_candidate_id,
+        company_name: company.company_name,
+        ready: company.ready,
+        blockers: company.blockers,
+        stage_ids: company.stage_ids,
+        artifacts: company.artifacts,
+        required_assets: personalizationCompany?.required_assets ?? [],
+        optional_assets: personalizationCompany?.optional_assets ?? [],
+        selected_template: personalizationCompany?.selected_template ?? null,
+        selected_channels: personalizationCompany?.selected_channels ?? [],
+      }
+    }),
     personalization: report.review.personalization,
     launch_recommendation: report.review.launch_recommendation,
   }
 
   console.log(JSON.stringify(payload, null, 2))
-  process.exit(trimErrorCompanies.length === 0 ? 0 : 1)
+  process.exit(trimErrorCompanies.length === 0 && fkErrorCompanies.length === 0 ? 0 : 1)
 }
 
 main().catch((error) => {

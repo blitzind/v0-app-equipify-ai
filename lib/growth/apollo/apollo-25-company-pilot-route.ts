@@ -448,6 +448,9 @@ async function loadApollo25CompanyPilotPersonalizationMaterializationByCompany(
       has_personalization_generation: false,
       execution_drafts: [],
       has_voice_drop_candidate: false,
+      sequence_key: null,
+      selected_channels: [],
+      materialization_steps: [],
     }
   }
   if (companyIds.length === 0) return map
@@ -518,6 +521,11 @@ async function loadApollo25CompanyPilotPersonalizationMaterializationByCompany(
     const companyId = candidate.company_candidate_id?.trim()
     if (!companyId || !map[companyId]) continue
     map[companyId].execution_drafts = candidate.materialization.drafts
+    map[companyId].sequence_key = candidate.materialization.sequence_key
+    map[companyId].selected_channels = candidate.materialization.steps.map(
+      (step) => step.orchestration_channel,
+    )
+    map[companyId].materialization_steps = candidate.materialization.steps
   }
 
   return map

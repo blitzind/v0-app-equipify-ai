@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { normalizeGrowthActorUserIdForDb } from "@/lib/growth/actor-user-id"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { buildGrowthAiCopilotInput } from "@/lib/growth/ai-copilot-input"
 import {
@@ -73,6 +74,14 @@ export type RunGrowthAiCopilotGenerationResult =
 export async function runGrowthAiCopilotGeneration(
   input: RunGrowthAiCopilotGenerationInput,
 ): Promise<RunGrowthAiCopilotGenerationResult> {
+  const actingUserId = normalizeGrowthActorUserIdForDb(input.actingUserId)
+  if (input.actingUserId && !actingUserId) {
+    logGrowthEngine("ai_copilot_generation_actor_invalid_uuid_normalized", {
+      actingUserEmail: input.actingUserEmail,
+      rawActingUserId: input.actingUserId,
+    })
+  }
+
   const settings = await fetchGrowthCopilotSettings(input.admin)
   if (!settings.aiCopilotEnabled) {
     return { ok: false, code: "copilot_disabled", message: "AI Copilot is disabled in platform settings." }
@@ -187,27 +196,27 @@ export async function runGrowthAiCopilotGeneration(
         approvedAt: null,
         approvedBy: null,
         sentAt: null,
-        createdBy: input.actingUserId,
+        createdBy: actingUserId,
         createdAt: new Date().toISOString(),
       }
-      return { ok: true, generation: ephemeral }
-    }
+    return { ok: true, generation: ephemeral }
+  }
 
-    const generation = await insertGrowthAiCopilotGeneration(input.admin, {
-      leadId: lead.id,
-      generationType: input.generationType,
-      promptVersion,
-      promptVariant,
-      inputSnapshot: snapshot,
-      generatedContent: mapped.generatedContent,
-      generatedSubject: mapped.generatedSubject,
-      classification: mapped.classification,
-      sourceReplyId: input.sourceReplyId ?? null,
-      inputHash: personalizedInputHash,
-      playbookInfluenceScore,
-      playbookAttribution,
-      createdBy: input.actingUserId,
-    })
+  const generation = await insertGrowthAiCopilotGeneration(input.admin, {
+    leadId: lead.id,
+    generationType: input.generationType,
+    promptVersion,
+    promptVariant,
+    inputSnapshot: snapshot,
+    generatedContent: mapped.generatedContent,
+    generatedSubject: mapped.generatedSubject,
+    classification: mapped.classification,
+    sourceReplyId: input.sourceReplyId ?? null,
+    inputHash: personalizedInputHash,
+    playbookInfluenceScore,
+    playbookAttribution,
+    createdBy: actingUserId,
+  })
 
     const performanceAttribution = await persistOutreachPerformanceAttribution(input.admin, {
       generationId: generation.id,
@@ -245,7 +254,7 @@ export async function runGrowthAiCopilotGeneration(
       generationId: generation.id,
       generationType: generation.generationType,
       summary: generation.generatedSubject ?? generation.generationType.replace(/_/g, " "),
-      actor: { userId: input.actingUserId, email: input.actingUserEmail },
+      actor: { userId: actingUserId ?? input.actingUserId, email: input.actingUserEmail },
     })
 
     logGrowthEngine("ai_copilot_personalized_generation_created", {
@@ -296,7 +305,7 @@ export async function runGrowthAiCopilotGeneration(
       approvedAt: null,
       approvedBy: null,
       sentAt: null,
-      createdBy: input.actingUserId,
+      createdBy: actingUserId,
       createdAt: new Date().toISOString(),
     }
     return { ok: true, generation: ephemeral }
@@ -315,7 +324,7 @@ export async function runGrowthAiCopilotGeneration(
     inputHash,
     playbookInfluenceScore,
     playbookAttribution,
-    createdBy: input.actingUserId,
+    createdBy: actingUserId,
   })
 
   if (playbookResolution.rules.length > 0) {

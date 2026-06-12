@@ -26,7 +26,11 @@ import {
   APOLLO_SMS_PERSONALIZATION_MISSING_PHONE_BLOCKER,
 } from "../lib/growth/apollo/apollo-sequence-personalization-constants"
 import { evaluateApolloSequenceCandidateContentReadiness } from "../lib/growth/apollo/apollo-sequence-draft-readiness"
-import { evaluateApolloExecutionMaterializationChannelDrafts } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation"
+import { evaluateApolloExecutionMaterializationChannelDrafts, evaluateApollo25CompanyPilotCohortPersonalization } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation"
+import {
+  isApolloSmsPersonalizationRequired,
+  resolveRequiredApolloPersonalizationAssets,
+} from "../lib/growth/apollo/apollo-25-company-pilot-personalization-asset-requirements"
 import { buildApolloSequenceExecutionDraftRecords } from "../lib/growth/apollo/apollo-sequence-draft-generation"
 import {
   isApolloSequenceDraftPlaceholderContent,
@@ -292,12 +296,19 @@ const personalizationServiceSource = fs.readFileSync(
 assert.match(personalizationServiceSource, /buildApolloEmailPersonalizationFallback/)
 assert.match(personalizationServiceSource, /smsPhoneUnavailable/)
 assert.doesNotMatch(personalizationServiceSource, /Email personalization blocked:/)
+const validationActorSource = fs.readFileSync(
+  path.join(ROOT, "lib/growth/apollo/apollo-pilot-materialization-validation-actor.ts"),
+  "utf8",
+)
+assert.match(validationActorSource, /listGrowthRepRoster/)
+assert.match(validationActorSource, /normalizeGrowthActorUserIdForDb/)
 const materializeSource = fs.readFileSync(
   path.join(ROOT, "lib/growth/apollo/apollo-25-company-pilot-asset-materialization.ts"),
   "utf8",
 )
 assert.match(materializeSource, /shouldPersistPersonalizedDrafts/)
 assert.match(materializeSource, /APOLLO_SMS_PERSONALIZATION_MISSING_PHONE_BLOCKER/)
+assert.match(materializeSource, /isApolloSmsPersonalizationRequired/)
 assert.doesNotMatch(materializeSource, /runSequenceExecutionJob/)
 const channelBefore = evaluateApolloExecutionMaterializationChannelDrafts(placeholderDrafts)
 assert.equal(channelBefore.email_assets, false)
@@ -351,5 +362,97 @@ assert.equal(nullPhoneChannelState.voice_drop_assets, true)
 assert.equal(nullPhoneChannelState.sms_assets, false)
 assert.equal(APOLLO_SMS_PERSONALIZATION_MISSING_PHONE_BLOCKER, "sms_personalization:missing_phone")
 console.log("  ✓ null phone fixture — email/voice personalization path without SMS throw")
+
+const readinessSnapshotCompany = {
+  company_candidate_id: "readiness-co-1",
+  company_name: "Readiness Co",
+  qualification_score: 80,
+  verified_email_count: 1,
+  sequence_ready_count: 1,
+  canonical_company_id: "canonical-readiness-co-1",
+  enrollment_status: null,
+  cohort_rank: 1,
+  cohort_reason: "production_rules_passed",
+  ranking_explanation: "rank 1",
+}
+
+const personalizedEmailDraftRecord = {
+  draft_id: "draft-email-1",
+  draft_type: "email" as const,
+  step_number: 1,
+  channel: "email" as const,
+  subject_placeholder: "Quick idea",
+  body_placeholder: "Hi Alex, personalized outreach for your team.",
+  voice_drop_script_reference: null,
+  approval_status: "pending_draft_approval" as const,
+  content_summary: "email",
+}
+
+function evaluateChannelAwarePersonalizationFixture(input: {
+  selected_template?: string
+  selected_channels?: string[]
+  sms_capable?: boolean
+  execution_drafts?: typeof personalizedEmailDraftRecord[]
+  has_voice_drop_candidate?: boolean
+}) {
+  return evaluateApollo25CompanyPilotCohortPersonalization({
+    snapshot_companies: [readinessSnapshotCompany],
+    materialization_by_company: {
+      [readinessSnapshotCompany.company_candidate_id]: {
+        has_account_playbook: true,
+        has_personalization_generation: true,
+        execution_drafts: input.execution_drafts ?? [personalizedEmailDraftRecord],
+        has_voice_drop_candidate: input.has_voice_drop_candidate ?? true,
+        sequence_key: input.selected_template ?? null,
+        selected_channels: input.selected_channels,
+        sms_capable: input.sms_capable,
+      },
+    },
+  }).companies[0]
+}
+
+const emailOnlyReady = evaluateChannelAwarePersonalizationFixture({
+  selected_template: "certification_minimal_email",
+  selected_channels: ["email"],
+  sms_capable: false,
+})
+assert.equal(emailOnlyReady.ready, true)
+assert.deepEqual(emailOnlyReady.missing_assets, [])
+assert.ok(emailOnlyReady.required_assets.includes("email_assets"))
+assert.ok(!emailOnlyReady.required_assets.includes("sms_assets"))
+console.log("  ✓ channel-aware readiness — email-only template ready without SMS assets")
+
+const smsSelectedMissing = evaluateChannelAwarePersonalizationFixture({
+  selected_channels: ["email", "sms"],
+  sms_capable: true,
+})
+assert.equal(smsSelectedMissing.ready, false)
+assert.deepEqual(smsSelectedMissing.missing_assets, ["sms_assets"])
+console.log("  ✓ channel-aware readiness — SMS-selected template requires sms_assets")
+
+const voiceSelectedMissing = evaluateChannelAwarePersonalizationFixture({
+  selected_channels: ["email", "voice_drop"],
+  has_voice_drop_candidate: false,
+})
+assert.equal(voiceSelectedMissing.ready, false)
+assert.deepEqual(voiceSelectedMissing.missing_assets, ["voice_drop_assets"])
+console.log("  ✓ channel-aware readiness — voice-selected template requires voice_drop_assets")
+
+const emailOnlySmsBlocker = isApolloSmsPersonalizationRequired({
+  sequence_key: "certification_minimal_email",
+  selected_channels: ["email"],
+})
+assert.equal(emailOnlySmsBlocker, false)
+const smsTemplateBlocker = isApolloSmsPersonalizationRequired({
+  selected_channels: ["email", "sms"],
+})
+assert.equal(smsTemplateBlocker, true)
+const emailOnlyRequirements = resolveRequiredApolloPersonalizationAssets({
+  sequence_key: "certification_minimal_email",
+  selected_channels: ["email"],
+})
+assert.equal(emailOnlyRequirements.channel_availability.sms, "not_applicable")
+assert.equal(emailOnlyRequirements.channel_availability.voice_drop, "optional")
+console.log("  ✓ channel-aware readiness — SMS blocker not applicable for email-only templates")
 
 console.log("\nApollo Personalization Integration checks passed.")

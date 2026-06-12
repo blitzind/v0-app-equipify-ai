@@ -1,10 +1,14 @@
 /** Apollo 25-company pilot cohort — personalization asset validation (Phase 14.2F). */
 
+import { resolveRequiredApolloPersonalizationAssets } from "@/lib/growth/apollo/apollo-25-company-pilot-personalization-asset-requirements"
 import {
   evaluateApolloSequenceCandidateContentReadiness,
   isApolloSequenceDraftPlaceholderContent,
 } from "@/lib/growth/apollo/apollo-sequence-draft-readiness"
-import type { ApolloSequenceExecutionDraftRecord } from "@/lib/growth/apollo/apollo-sequence-execution-automation-types"
+import type {
+  ApolloSequenceExecutionDraftRecord,
+  ApolloSequenceExecutionStepPlan,
+} from "@/lib/growth/apollo/apollo-sequence-execution-automation-types"
 import type {
   Apollo25CompanyPilotCohortPersonalizationAssetKey,
   Apollo25CompanyPilotCohortPersonalizationCompany,
@@ -17,16 +21,11 @@ export type Apollo25CompanyPilotPersonalizationMaterializationState = {
   has_personalization_generation: boolean
   execution_drafts: ApolloSequenceExecutionDraftRecord[]
   has_voice_drop_candidate: boolean
+  sequence_key?: string | null
+  selected_channels?: string[]
+  materialization_steps?: ApolloSequenceExecutionStepPlan[]
+  sms_capable?: boolean
 }
-
-const ASSET_KEYS: Apollo25CompanyPilotCohortPersonalizationAssetKey[] = [
-  "account_playbook",
-  "personalization",
-  "content_quality_optimization",
-  "voice_drop_assets",
-  "email_assets",
-  "sms_assets",
-]
 
 function hasNonPlaceholderDraft(
   drafts: ApolloSequenceExecutionDraftRecord[],
@@ -96,13 +95,24 @@ export function evaluateApollo25CompanyPilotCohortPersonalization(input: {
       }
 
       const assets = evaluatePersonalizationAssets(state)
-      const missing_assets = ASSET_KEYS.filter((key) => !assets[key])
+      const assetRequirements = resolveRequiredApolloPersonalizationAssets({
+        sequence_key: state.sequence_key,
+        selected_channels: state.selected_channels,
+        materialization_steps: state.materialization_steps,
+        expected_draft_types: state.execution_drafts.map((draft) => draft.draft_type),
+        sms_capable: state.sms_capable,
+      })
+      const missing_assets = assetRequirements.required_assets.filter((key) => !assets[key])
 
       return {
         company_candidate_id: snapshotCompany.company_candidate_id,
         company_name: snapshotCompany.company_name,
         ready: missing_assets.length === 0,
         missing_assets,
+        required_assets: assetRequirements.required_assets,
+        optional_assets: assetRequirements.optional_assets,
+        selected_template: assetRequirements.selected_template,
+        selected_channels: assetRequirements.selected_channels,
         assets,
       }
     },
