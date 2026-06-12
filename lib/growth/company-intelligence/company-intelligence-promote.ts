@@ -48,34 +48,43 @@ export async function promoteVerifiedCompanyIntelligenceFinding(
   }
 
   const observed_at = new Date().toISOString()
-  const { data, error } = await admin
-    .schema("growth")
-    .from("company_intelligence_snapshots")
-    .upsert(
-      {
-        company_id: input.company_id,
-        intelligence_category: input.draft.intelligence_category,
-        intelligence_key: input.draft.intelligence_key,
-        normalized_intelligence_key: input.draft.normalized_intelligence_key,
-        value_text: input.draft.value_text,
-        value_json: input.draft.value_json,
-        confidence: input.confidence,
-        verification_status: "verified",
-        source_table: "company_intelligence_runs",
-        source_run_id: input.run_id,
-        source_evidence_ids: input.source_evidence_ids,
-        provider_name: input.draft.provider_name,
-        discovery_source: input.draft.discovery_source,
-        observed_at,
-        metadata: {
-          qa_marker: "growth-company-intelligence-7.6a-v1",
-          source: input.draft.source,
-        },
-      },
-      { onConflict: "company_id,normalized_intelligence_key", ignoreDuplicates: false },
-    )
-    .select("id")
-    .single()
+  const snapshotRow = {
+    company_id: input.company_id,
+    intelligence_category: input.draft.intelligence_category,
+    intelligence_key: input.draft.intelligence_key,
+    normalized_intelligence_key: input.draft.normalized_intelligence_key,
+    value_text: input.draft.value_text,
+    value_json: input.draft.value_json,
+    confidence: input.confidence,
+    verification_status: "verified" as const,
+    source_table: "company_intelligence_runs",
+    source_run_id: input.run_id,
+    source_evidence_ids: input.source_evidence_ids,
+    provider_name: input.draft.provider_name,
+    discovery_source: input.draft.discovery_source,
+    observed_at,
+    metadata: {
+      qa_marker: "growth-company-intelligence-7.6a-v1",
+      source: input.draft.source,
+    },
+  }
+
+  const writeResult = existing
+    ? await admin
+        .schema("growth")
+        .from("company_intelligence_snapshots")
+        .update(snapshotRow)
+        .eq("id", existing.id)
+        .select("id")
+        .single()
+    : await admin
+        .schema("growth")
+        .from("company_intelligence_snapshots")
+        .insert(snapshotRow)
+        .select("id")
+        .single()
+
+  const { data, error } = writeResult
 
   if (error) {
     return { promoted: false, promotion_status: "failed", reason: error.message }

@@ -79,16 +79,27 @@ export async function loadLatestCompletedCompanyIntelligenceRunResult(
   const { data, error } = await admin
     .schema("growth")
     .from("company_intelligence_runs")
-    .select("id")
+    .select("id, verified_count, promoted_count, completed_at")
     .eq("company_id", canonical_company_id)
     .eq("status", "completed")
     .order("completed_at", { ascending: false, nullsFirst: false })
-    .limit(1)
-    .maybeSingle()
+    .limit(20)
+
   if (error) throw new Error(error.message)
-  if (!data?.id) return null
-  const detail = await loadCompanyIntelligenceRunDetail(admin, data.id as string)
+  const rows = data ?? []
+  if (rows.length === 0) return null
+
+  const bestRow =
+    rows.find((row) => Number(row.verified_count) > 0 || Number(row.promoted_count) > 0) ?? rows[0]
+  const runId = asString(bestRow.id)
+  if (!runId) return null
+
+  const detail = await loadCompanyIntelligenceRunDetail(admin, runId)
   return detail ? mapCompanyIntelligenceRunDetailToResult(detail) : null
+}
+
+function asString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : ""
 }
 
 export async function loadLatestCompletedBuyingCommitteeIntelligenceRunResult(

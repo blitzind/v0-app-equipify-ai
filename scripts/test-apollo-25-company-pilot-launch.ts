@@ -72,6 +72,7 @@ import {
 } from "../lib/growth/apollo/apollo-unified-personalization-context"
 import { resolveUnsupportedSequenceMaterializationBlockers } from "../lib/growth/apollo/apollo-full-pipeline-materialization-evidence"
 import { buildApollo25CompanyPilotCohortReview } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-review"
+import { buildApollo25CompanyPilotCohortLaunchCertification } from "../lib/growth/apollo/apollo-25-company-pilot-launch-certification"
 import {
   describeEnrollmentDuplicatePreventionDecision,
 } from "../lib/growth/apollo/apollo-full-pipeline-enrollment-resolution-evidence"
@@ -105,6 +106,7 @@ const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-25-company-pilot-canonical-cohort-dedupe.ts",
   "lib/growth/apollo/apollo-25-company-pilot-canonical-dedupe-audit.ts",
   "lib/growth/apollo/apollo-25-company-pilot-launch-certification.ts",
+  "lib/growth/apollo/apollo-25-company-pilot-launch-certification-policy.ts",
   "lib/growth/apollo/apollo-25-company-pilot-asset-materialization.ts",
   "lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge-types.ts",
   "lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge-evidence.ts",
@@ -610,6 +612,117 @@ assert.equal(certifiedReview.personalization.readiness_pct, 100)
 assert.equal(certifiedReview.launch_recommendation.ready_for_launch, true)
 assert.equal(certifiedReview.launch_certification.certified, true)
 console.log("  ✓ launch certification passes on deduped cohort with full readiness")
+
+function buildCertificationMaterializationMap(
+  companies: typeof readinessFixtureCompanies,
+): Record<string, import("../lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation").Apollo25CompanyPilotPersonalizationMaterializationState> {
+  return Object.fromEntries(
+    companies.map((company) => [
+      company.company_candidate_id,
+      {
+        has_account_playbook: true,
+        has_personalization_generation: true,
+        execution_drafts: [
+          {
+            draft_type: "email" as const,
+            channel: "email" as const,
+            body_placeholder: "Personalized email body for outreach.",
+            step_number: 1,
+            draft_id: "d1",
+            approval_status: "pending_draft_approval" as const,
+            subject_placeholder: "Subject",
+            content_summary: "email",
+            voice_drop_script_reference: null,
+          },
+        ],
+        has_voice_drop_candidate: true,
+        sequence_key: "certification_minimal_email",
+        selected_channels: ["email"],
+      },
+    ]),
+  )
+}
+
+const poolBelowTargetReview = buildApollo25CompanyPilotCohortReview({
+  selection_inputs: readinessFixtureCompanies.slice(0, 11),
+  production_threshold: 70,
+  target_size: 25,
+  computed_at: "2026-06-11T12:00:00.000Z",
+  materialization_by_company: buildCertificationMaterializationMap(
+    readinessFixtureCompanies.slice(0, 11),
+  ),
+})
+assert.equal(poolBelowTargetReview.launch_recommendation.ready_for_launch, true)
+assert.equal(poolBelowTargetReview.launch_certification.certified, true)
+assert.equal(poolBelowTargetReview.launch_certification.fatal_blockers.length, 0)
+assert.ok(
+  poolBelowTargetReview.launch_certification.warnings.some((issue) =>
+    issue.includes("eligible_pool_below_target"),
+  ),
+)
+console.log("  ✓ launch certification — pool below target is warning-only when ready_for_launch")
+
+const enrollmentIncompleteCert = buildApollo25CompanyPilotCohortLaunchCertification({
+  ...certifiedReview,
+  enrollment_readiness: {
+    ...certifiedReview.enrollment_readiness,
+    readiness_pct: 90,
+    companies_ready: 9,
+    companies_evaluated: 10,
+  },
+  launch_recommendation: {
+    ...certifiedReview.launch_recommendation,
+    ready_for_launch: false,
+  },
+})
+assert.equal(enrollmentIncompleteCert.certified, false)
+assert.ok(
+  enrollmentIncompleteCert.fatal_blockers.some((issue) =>
+    issue.includes("enrollment_readiness_incomplete"),
+  ),
+)
+console.log("  ✓ launch certification — enrollment incomplete remains fatal")
+
+const personalizationIncompleteCert = buildApollo25CompanyPilotCohortLaunchCertification({
+  ...certifiedReview,
+  personalization: {
+    ...certifiedReview.personalization,
+    readiness_pct: 90,
+    companies_ready: 9,
+    companies_evaluated: 10,
+  },
+  launch_recommendation: {
+    ...certifiedReview.launch_recommendation,
+    ready_for_launch: false,
+  },
+})
+assert.equal(personalizationIncompleteCert.certified, false)
+assert.ok(
+  personalizationIncompleteCert.fatal_blockers.some((issue) =>
+    issue.includes("personalization_readiness_incomplete"),
+  ),
+)
+console.log("  ✓ launch certification — personalization incomplete remains fatal")
+
+const duplicateCanonicalCert = buildApollo25CompanyPilotCohortLaunchCertification({
+  ...certifiedReview,
+  duplicate_canonical_companies: 1,
+  launch_recommendation: {
+    ...certifiedReview.launch_recommendation,
+    blocking_issues: [
+      ...certifiedReview.launch_recommendation.blocking_issues,
+      "canonical_duplicates_present:1",
+    ],
+    ready_for_launch: false,
+  },
+})
+assert.equal(duplicateCanonicalCert.certified, false)
+assert.ok(
+  duplicateCanonicalCert.fatal_blockers.some((issue) =>
+    issue.includes("canonical_duplicates_present"),
+  ),
+)
+console.log("  ✓ launch certification — canonical duplicates remain fatal")
 
 const canonicalDedupe = buildApollo25CompanyPilotCanonicalDedupeAudit({
   snapshot_companies: canonicalCohort.kept,

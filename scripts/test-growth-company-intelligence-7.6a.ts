@@ -170,7 +170,9 @@ const promoteSrc = fs.readFileSync(
   "utf8",
 )
 assert.match(promoteSrc, /fetchCompanyIntelligenceSnapshotByKey\(admin, \{/)
-assert.match(promoteSrc, /onConflict: "company_id,normalized_intelligence_key"/)
+assert.doesNotMatch(promoteSrc, /onConflict:\s*"company_id,normalized_intelligence_key"/)
+assert.match(promoteSrc, /\.insert\(snapshotRow\)/)
+assert.match(promoteSrc, /\.update\(snapshotRow\)/)
 
 const block = evaluateCompanyIntelligenceSnapshotPromotion({
   existing: {
@@ -222,6 +224,18 @@ const infra = fs.readFileSync(
   "utf8",
 )
 assert.match(infra, /GrowthCompanyIntelligencePanel/)
+
+const repromoteSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/company-intelligence/company-intelligence-repromote.ts"),
+  "utf8",
+)
+assert.match(repromoteSource, /repromoteVerifiedCompanyIntelligenceRunFindings/)
+
+const scoringContextSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/apollo/apollo-qualification-scoring-context.ts"),
+  "utf8",
+)
+assert.match(scoringContextSource, /verified_count\) > 0 \|\| Number\(row\.promoted_count\) > 0/)
 
 assert.equal(GROWTH_COMPANY_INTELLIGENCE_QA_MARKER, "growth-company-intelligence-7.6a-v1")
 

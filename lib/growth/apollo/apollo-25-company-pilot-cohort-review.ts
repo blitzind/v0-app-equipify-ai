@@ -81,6 +81,8 @@ export function buildApollo25CompanyPilotCohortReview(input: {
       certified: false,
       enrollment_ready_pct: enrollment_readiness.readiness_pct,
       personalization_ready_pct: personalization.readiness_pct,
+      fatal_blockers: [],
+      warnings: [],
       blocking_issues: [],
     },
     no_outreach_side_effects: true,

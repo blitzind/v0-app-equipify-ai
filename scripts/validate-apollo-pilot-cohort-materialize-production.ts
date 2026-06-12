@@ -100,7 +100,15 @@ async function main(): Promise<void> {
       }
     }),
     personalization: report.review.personalization,
+    enrollment_readiness: {
+      companies_evaluated: report.review.enrollment_readiness.companies_evaluated,
+      companies_ready: report.review.enrollment_readiness.companies_ready,
+      readiness_pct: report.review.enrollment_readiness.readiness_pct,
+    },
     launch_recommendation: report.review.launch_recommendation,
+    launch_certification: report.review.launch_certification,
+    fatal_blockers: report.review.launch_certification.fatal_blockers,
+    warnings: report.review.launch_certification.warnings,
   }
 
   console.log(JSON.stringify(payload, null, 2))

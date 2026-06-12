@@ -176,6 +176,11 @@ export type Apollo25CompanyPilotCohortLaunchCertification = {
   certified: boolean
   enrollment_ready_pct: number
   personalization_ready_pct: number
+  /** Operational/certification blockers that prevent certified=true. */
+  fatal_blockers: string[]
+  /** Discovery-scale or advisory issues preserved for operators; non-fatal when ready_for_launch. */
+  warnings: string[]
+  /** Full issue list (fatal_blockers + warnings) for backward-compatible visibility. */
   blocking_issues: string[]
 }
 
