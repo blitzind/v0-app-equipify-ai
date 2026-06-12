@@ -32,6 +32,7 @@ import { buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput, evaluate
 import {
   applyApolloQualificationScoringContextToSelectionInput,
   buildApolloEnrollmentQualificationInputFromScoringContext,
+  resolveApolloEnrollmentFitResearchFromScoringContext,
 } from "../lib/growth/apollo/apollo-qualification-scoring-context-helpers"
 import { evaluateApolloEnrollmentQualification } from "../lib/growth/apollo/apollo-enrollment-qualification-engine"
 import {
@@ -608,6 +609,29 @@ assert.match(
   fs.readFileSync(path.join(ROOT, "lib/growth/apollo/apollo-enrollment-auto-enrollment.ts"), "utf8"),
   /buildApolloEnrollmentQualificationInputFromScoringContext/,
 )
+assert.match(
+  fs.readFileSync(path.join(ROOT, "lib/growth/apollo/apollo-enrollment-auto-enrollment.ts"), "utf8"),
+  /resolveApolloEnrollmentFitResearchFromScoringContext/,
+)
+const enrollmentFitResearch = resolveApolloEnrollmentFitResearchFromScoringContext({
+  company_intelligence_present: true,
+  buying_committee_present: true,
+  buying_committee_coverage: 0.6,
+  fit_score: 90,
+  research_score: 90,
+})
+assert.equal(enrollmentFitResearch.fit_score, 90)
+assert.equal(enrollmentFitResearch.research_score, 90)
+assert.equal(enrollmentFitResearch.research_summary, "Research confidence 90/100.")
+const enrollmentFitResearchMissing = resolveApolloEnrollmentFitResearchFromScoringContext({
+  company_intelligence_present: true,
+  buying_committee_present: false,
+  buying_committee_coverage: null,
+  fit_score: null,
+  research_score: null,
+})
+assert.equal(enrollmentFitResearchMissing.research_summary, null)
+console.log("  ✓ enrollment fit/research scores derived from shared scoring context")
 assert.match(enrollBridgeSource, /buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput/)
 assert.match(enrollBridgeSource, /snapshotCompanyQualificationPassesThreshold/)
 assert.match(enrollBridgeSource, /executeApolloFullPipelineCertificationEnrollment/)

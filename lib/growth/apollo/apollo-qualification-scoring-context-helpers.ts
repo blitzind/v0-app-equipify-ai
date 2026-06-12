@@ -29,6 +29,22 @@ export function applyApolloQualificationScoringContextToSelectionInput(
   }
 }
 
+export function resolveApolloEnrollmentFitResearchFromScoringContext(
+  context: ApolloIntelligenceRecoveryQualificationContext,
+): {
+  fit_score: number | null
+  research_score: number | null
+  research_summary: string | null
+} {
+  const fit_score = context.fit_score
+  const research_score = context.research_score
+  return {
+    fit_score,
+    research_score,
+    research_summary: research_score != null ? `Research confidence ${research_score}/100.` : null,
+  }
+}
+
 export function buildApolloEnrollmentQualificationInputFromScoringContext(input: {
   snapshot_summary: {
     mapped_contacts: number

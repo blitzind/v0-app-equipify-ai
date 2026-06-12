@@ -31,7 +31,10 @@ import {
 } from "@/lib/growth/apollo/apollo-enrollment-qualification-engine"
 import { loadApolloPrimaryContactOperatorReviewSnapshot } from "@/lib/growth/apollo/apollo-primary-contact-operator-review"
 import type { ApolloPrimaryContactOperatorReviewRow } from "@/lib/growth/apollo/apollo-primary-contact-operator-review-types"
-import { buildApolloEnrollmentQualificationInputFromScoringContext } from "@/lib/growth/apollo/apollo-qualification-scoring-context-helpers"
+import {
+  buildApolloEnrollmentQualificationInputFromScoringContext,
+  resolveApolloEnrollmentFitResearchFromScoringContext,
+} from "@/lib/growth/apollo/apollo-qualification-scoring-context-helpers"
 import { loadApolloQualificationScoringContextForCompany } from "@/lib/growth/apollo/apollo-qualification-scoring-context"
 
 const CANDIDATES_TABLE = "apollo_enrollment_candidates"
@@ -190,6 +193,8 @@ export async function runApolloEnrollmentAutoEnrollmentForCompany(
   const companyIntelligencePresent = scoringContext.company_intelligence_present
   const buyingCommitteePresent = scoringContext.buying_committee_present
   const buyingCommitteeCoverage = scoringContext.buying_committee_coverage
+  const { fit_score: fitScore, research_score: researchScore, research_summary } =
+    resolveApolloEnrollmentFitResearchFromScoringContext(scoringContext)
 
   const engineIntelligence = scoringContext.engine
   const companySummary =
@@ -282,7 +287,7 @@ export async function runApolloEnrollmentAutoEnrollmentForCompany(
       qualification,
       qualification_input: qualificationInput,
       company_summary: companySummary,
-      research_summary: researchScore != null ? `Research confidence ${researchScore}/100.` : null,
+      research_summary,
       buying_committee_summary: buyingCommitteeSummary,
     })
 
