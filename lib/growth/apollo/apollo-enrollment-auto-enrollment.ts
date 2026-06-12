@@ -13,7 +13,6 @@ import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import {
   buildApolloEnrollmentAttributionRecord,
   buildApolloEnrollmentContactSnapshot,
-  evaluateApolloEnrollmentReEnrollmentBlock,
   mapApolloEnrollmentCandidateDbRow,
   summarizeApolloOperatorReviewForQualification,
 } from "@/lib/growth/apollo/apollo-enrollment-automation-evidence"
@@ -264,12 +263,8 @@ export async function runApolloEnrollmentAutoEnrollmentForCompany(
       : null
 
     if (companyContact?.growth_lead_id) {
-      const reEnrollmentBlock = evaluateApolloEnrollmentReEnrollmentBlock({
-        existing_status: "enrollment_approved",
-        growth_lead_id: companyContact.growth_lead_id,
-        has_active_enrollment: await hasActiveSequenceEnrollment(admin, companyContact.growth_lead_id),
-      })
-      if (reEnrollmentBlock.blocked) {
+      const hasActiveEnrollment = await hasActiveSequenceEnrollment(admin, companyContact.growth_lead_id)
+      if (hasActiveEnrollment) {
         candidates_skipped_re_enrollment += 1
         const reuseApproved = await findApprovedCandidateForContact(admin, {
           company_contact_id: contact.company_contact_id,
@@ -277,6 +272,10 @@ export async function runApolloEnrollmentAutoEnrollmentForCompany(
         })
         if (reuseApproved) {
           candidates.push(mapApolloEnrollmentCandidateDbRow(reuseApproved))
+        } else {
+          blockers.push(
+            `active_enrollment_exists:growth_lead_id=${companyContact.growth_lead_id}`,
+          )
         }
         continue
       }

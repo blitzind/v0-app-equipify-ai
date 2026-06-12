@@ -44,6 +44,20 @@ export function buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput(
   }
 }
 
+/** Cohort enroll bridge — exempt self-cohort + do not treat prior approved enrollment as greenfield skip. */
+export function buildApollo25CompanyPilotCohortEnrollmentBridgeSelectionInput(
+  selectionInput: Apollo25CompanyPilotSelectionInput,
+  input: {
+    company_candidate_id: string
+    company_ids_in_other_active_pilot_cohorts: Set<string>
+  },
+): Apollo25CompanyPilotSelectionInput {
+  return {
+    ...buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput(selectionInput, input),
+    enrollment_status: null,
+  }
+}
+
 function buildSelectionInputForReadinessAnalysis(
   selectionInput: Apollo25CompanyPilotSelectionInput,
   input: {

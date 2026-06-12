@@ -13,6 +13,9 @@ export type Apollo25CompanyPilotCohortEnrollmentBridgeFailure = {
   company_name: string
   code: string
   message: string
+  contact_company_contact_id?: string | null
+  contact_candidate_id?: string | null
+  automation_blockers?: string[]
 }
 
 export type Apollo25CompanyPilotCohortEnrollmentBridgeCompanyResult = {
@@ -23,6 +26,7 @@ export type Apollo25CompanyPilotCohortEnrollmentBridgeCompanyResult = {
   created: boolean
   reused: boolean
   approved: boolean
+  treated_as?: "created_approved" | "reused_approved"
 }
 
 export type Apollo25CompanyPilotCohortEnrollmentBridgeReport = {
@@ -37,6 +41,7 @@ export type Apollo25CompanyPilotCohortEnrollmentBridgeReport = {
   companies: Apollo25CompanyPilotCohortEnrollmentBridgeCompanyResult[]
   review: Apollo25CompanyPilotCohortReview
   ok: boolean
+  partial_success: boolean
   no_outbound_sends: true
   no_sequence_execution: true
 }

@@ -110,7 +110,7 @@ export async function findReusableApolloEnrollmentCandidate(
     return { row: byContact, reuse_reason: "contact_pending_or_approved" }
   }
 
-  const { data: byCompany } = await admin
+  const { data: byCompanyPending } = await admin
     .schema("growth")
     .from(CANDIDATES_TABLE)
     .select("*")
@@ -120,8 +120,28 @@ export async function findReusableApolloEnrollmentCandidate(
     .limit(1)
     .maybeSingle()
 
-  if (byCompany) {
-    return { row: byCompany as Record<string, unknown>, reuse_reason: "company_candidate_pending" }
+  if (byCompanyPending) {
+    return {
+      row: byCompanyPending as Record<string, unknown>,
+      reuse_reason: "company_candidate_pending",
+    }
+  }
+
+  const { data: byCompanyApproved } = await admin
+    .schema("growth")
+    .from(CANDIDATES_TABLE)
+    .select("*")
+    .eq("company_candidate_id", input.company_candidate_id)
+    .eq("status", "enrollment_approved")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (byCompanyApproved) {
+    return {
+      row: byCompanyApproved as Record<string, unknown>,
+      reuse_reason: "contact_pending_or_approved",
+    }
   }
 
   return null

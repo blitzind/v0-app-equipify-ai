@@ -28,7 +28,11 @@ import { buildApollo25CompanyPilotCanonicalDedupeAudit } from "../lib/growth/apo
 import { buildApollo25CompanyPilotGreenfieldCohortSnapshot } from "../lib/growth/apollo/apollo-25-company-pilot-draft-cohort"
 import { mergeApolloIntelligenceRecoveryQualificationContext } from "../lib/growth/apollo/apollo-intelligence-recovery-artifact-contract"
 import { buildApolloIntelligenceRecoveryScoreDecompositionRow } from "../lib/growth/apollo/apollo-intelligence-recovery-qualification"
-import { buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput, evaluateApollo25CompanyPilotCohortEnrollmentReadiness } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-readiness"
+import {
+  buildApollo25CompanyPilotCohortEnrollmentBridgeSelectionInput,
+  buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput,
+  evaluateApollo25CompanyPilotCohortEnrollmentReadiness,
+} from "../lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-readiness"
 import {
   applyApolloQualificationScoringContextToSelectionInput,
   buildApolloEnrollmentQualificationInputFromScoringContext,
@@ -36,7 +40,7 @@ import {
 } from "../lib/growth/apollo/apollo-qualification-scoring-context-helpers"
 import { evaluateApolloEnrollmentQualification } from "../lib/growth/apollo/apollo-enrollment-qualification-engine"
 import {
-  evaluateApollo25CompanyPilotCohortEnrollmentBridgeSuccess,
+  evaluateApollo25CompanyPilotCohortEnrollmentBridgeOutcome,
   snapshotCompanyQualificationPassesThreshold,
 } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge-evidence"
 import { analyzeApollo25CompanyPilotCompanyEligibility } from "../lib/growth/apollo/apollo-25-company-pilot-selection"
@@ -599,7 +603,8 @@ const enrollBridgeSource = fs.readFileSync(
   path.join(ROOT, "lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge.ts"),
   "utf8",
 )
-assert.match(enrollBridgeSource, /buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput/)
+assert.match(enrollBridgeSource, /buildApollo25CompanyPilotCohortEnrollmentBridgeSelectionInput/)
+assert.match(enrollBridgeSource, /findApprovedEnrollmentCandidateForCompany/)
 assert.match(enrollBridgeSource, /loadCompanyIdsInOtherActivePilotCohorts/)
 assert.match(
   fs.readFileSync(path.join(ROOT, "lib/growth/apollo/apollo-enrollment-auto-enrollment.ts"), "utf8"),
@@ -632,7 +637,6 @@ const enrollmentFitResearchMissing = resolveApolloEnrollmentFitResearchFromScori
 })
 assert.equal(enrollmentFitResearchMissing.research_summary, null)
 console.log("  ✓ enrollment fit/research scores derived from shared scoring context")
-assert.match(enrollBridgeSource, /buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput/)
 assert.match(enrollBridgeSource, /snapshotCompanyQualificationPassesThreshold/)
 assert.match(enrollBridgeSource, /executeApolloFullPipelineCertificationEnrollment/)
 assert.match(enrollBridgeSource, /findReusableApolloEnrollmentCandidate/)
@@ -740,25 +744,126 @@ const noContactEligibility = analyzeApollo25CompanyPilotCompanyEligibility(
 assert.equal(noContactEligibility.eligible, false)
 console.log("  ✓ enrollment bridge blocks when contact resolution fails")
 
-assert.equal(
-  evaluateApollo25CompanyPilotCohortEnrollmentBridgeSuccess({
+const bridgeCompanyResult = (
+  company_candidate_id: string,
+  reused = false,
+): {
+  company_candidate_id: string
+  company_name: string
+  enrollment_candidate_id: string
+  growth_lead_id: string
+  created: boolean
+  reused: boolean
+  approved: boolean
+  treated_as?: "created_approved" | "reused_approved"
+} => ({
+  company_candidate_id,
+  company_name: `Co ${company_candidate_id}`,
+  enrollment_candidate_id: `e-${company_candidate_id}`,
+  growth_lead_id: `l-${company_candidate_id}`,
+  created: !reused,
+  reused,
+  approved: true,
+  treated_as: reused ? "reused_approved" : "created_approved",
+})
+
+const elevenApprovedCompanies = Array.from({ length: 11 }, (_, index) =>
+  bridgeCompanyResult(`company-${index + 1}`, true),
+)
+
+assert.deepEqual(
+  evaluateApollo25CompanyPilotCohortEnrollmentBridgeOutcome({
+    companies_processed: 11,
+    companies: elevenApprovedCompanies,
+    failures: [],
+    enrollment_candidates_approved: 11,
+  }),
+  { ok: true, partial_success: false },
+)
+
+const partialBridgeOutcome = evaluateApollo25CompanyPilotCohortEnrollmentBridgeOutcome({
+  companies_processed: 11,
+  companies: elevenApprovedCompanies.slice(0, 10),
+  failures: [
+    {
+      company_candidate_id: "henry",
+      company_name: "Henry Schein",
+      code: "enrollment_candidate_not_created",
+      message: "active_enrollment_exists:growth_lead_id=lead-henry",
+    },
+  ],
+  enrollment_candidates_approved: 10,
+})
+assert.equal(partialBridgeOutcome.ok, false)
+assert.equal(partialBridgeOutcome.partial_success, true)
+
+assert.deepEqual(
+  evaluateApollo25CompanyPilotCohortEnrollmentBridgeOutcome({
+    companies_processed: 11,
     companies: [],
-    enrollment_candidates_created: 0,
-    enrollment_candidates_reused: 0,
+    failures: Array.from({ length: 11 }, (_, index) => ({
+      company_candidate_id: `company-${index}`,
+      company_name: `Co ${index}`,
+      code: "already_enrollment_approved",
+      message: "already_enrollment_approved",
+    })),
     enrollment_candidates_approved: 0,
   }),
-  false,
+  { ok: false, partial_success: false },
 )
-assert.equal(
-  evaluateApollo25CompanyPilotCohortEnrollmentBridgeSuccess({
-    companies: [{ company_candidate_id: "c1", company_name: "Co", enrollment_candidate_id: "e1", growth_lead_id: "l1", created: true, reused: false, approved: true }],
-    enrollment_candidates_created: 1,
-    enrollment_candidates_reused: 0,
-    enrollment_candidates_approved: 1,
-  }),
-  true,
+console.log("  ✓ enrollment bridge partial success is not plain ok")
+
+const approvedRerunInput = buildApollo25CompanyPilotCohortEnrollmentBridgeSelectionInput(
+  {
+    ...readinessFixtureCompanies[0]!,
+    enrollment_status: "enrollment_approved",
+    growth_lead_id: "lead-approved",
+    in_active_pilot_cohort: true,
+  },
+  {
+    company_candidate_id: readinessFixtureCompanies[0]!.company_candidate_id,
+    company_ids_in_other_active_pilot_cohorts: new Set(),
+  },
 )
-console.log("  ✓ enrollment bridge all-fail result is not successful")
+assert.equal(approvedRerunInput.enrollment_status, null)
+assert.equal(approvedRerunInput.in_active_pilot_cohort, false)
+const approvedRerunEligibility = analyzeApollo25CompanyPilotCompanyEligibility(
+  approvedRerunInput,
+  70,
+  "greenfield",
+)
+assert.equal(approvedRerunEligibility.eligible, true)
+assert.notEqual(approvedRerunEligibility.skip_reason, "already_enrollment_approved")
+console.log("  ✓ enrollment bridge selection input allows approved cohort rerun without skip")
+
+const activeEnrollmentOtherCohortInput = buildApollo25CompanyPilotCohortEnrollmentBridgeSelectionInput(
+  {
+    ...readinessFixtureCompanies[0]!,
+    enrollment_status: null,
+    has_active_sequence_enrollment: true,
+    in_active_pilot_cohort: true,
+  },
+  {
+    company_candidate_id: readinessFixtureCompanies[0]!.company_candidate_id,
+    company_ids_in_other_active_pilot_cohorts: new Set([readinessFixtureCompanies[0]!.company_candidate_id]),
+  },
+)
+const activeEnrollmentOtherCohortEligibility = analyzeApollo25CompanyPilotCompanyEligibility(
+  activeEnrollmentOtherCohortInput,
+  70,
+  "greenfield",
+)
+assert.equal(activeEnrollmentOtherCohortEligibility.eligible, false)
+assert.equal(activeEnrollmentOtherCohortEligibility.skip_reason, "active_pilot_conflict")
+console.log("  ✓ unrelated active pilot cohort membership still blocks enrollment bridge")
+
+const autoEnrollmentSource = fs.readFileSync(
+  path.join(ROOT, "lib/growth/apollo/apollo-enrollment-auto-enrollment.ts"),
+  "utf8",
+)
+assert.doesNotMatch(autoEnrollmentSource, /existing_status:\s*"enrollment_approved"/)
+assert.match(autoEnrollmentSource, /active_enrollment_exists:growth_lead_id=/)
+console.log("  ✓ enrollment automation only blocks growth_lead re-enrollment on active sequence enrollment")
 
 const recoveredQualificationContext = mergeApolloIntelligenceRecoveryQualificationContext({
   engine: {

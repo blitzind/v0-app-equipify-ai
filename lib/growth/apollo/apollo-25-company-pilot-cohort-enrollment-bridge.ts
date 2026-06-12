@@ -16,7 +16,7 @@ import {
   snapshotCompaniesFromCohortCompanyRows,
 } from "@/lib/growth/apollo/apollo-25-company-pilot-draft-cohort"
 import {
-  buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput,
+  buildApollo25CompanyPilotCohortEnrollmentBridgeSelectionInput,
 } from "@/lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-readiness"
 import { buildApollo25CompanyPilotCohortReview } from "@/lib/growth/apollo/apollo-25-company-pilot-cohort-review"
 import {
@@ -24,7 +24,7 @@ import {
   type Apollo25CompanyPilotSelectionInput,
 } from "@/lib/growth/apollo/apollo-25-company-pilot-selection"
 import {
-  evaluateApollo25CompanyPilotCohortEnrollmentBridgeSuccess,
+  evaluateApollo25CompanyPilotCohortEnrollmentBridgeOutcome,
   snapshotCompanyQualificationPassesThreshold,
 } from "@/lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge-evidence"
 import {
@@ -59,6 +59,7 @@ export {
   APOLLO_25_COMPANY_PILOT_COHORT_ENROLLMENT_BRIDGE_SOURCE,
 } from "@/lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge-types"
 export {
+  evaluateApollo25CompanyPilotCohortEnrollmentBridgeOutcome,
   evaluateApollo25CompanyPilotCohortEnrollmentBridgeSuccess,
   snapshotCompanyQualificationPassesThreshold,
 } from "@/lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge-evidence"
@@ -185,52 +186,66 @@ async function enrollApollo25CompanyPilotCohortCompany(
     }
   }
 
-  const selectionInputForEnrollment = buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput(
-    input.selection_input,
-    {
-      company_candidate_id,
-      company_ids_in_other_active_pilot_cohorts: input.company_ids_in_other_active_pilot_cohorts,
-    },
-  )
-
-  const analysis = analyzeApollo25CompanyPilotCompanyEligibility(
-    selectionInputForEnrollment,
-    input.production_threshold,
-    "greenfield",
-  )
-
-  if (!analysis.eligible || !analysis.contact) {
-    return {
-      company_candidate_id,
-      company_name,
-      code: analysis.skip_reason ?? "contact_resolution_failed",
-      message: analysis.raw_reason ?? "No eligible sequence-ready contact for enrollment.",
-    }
-  }
-
-  const contact = analysis.contact
   let created = false
   let reused = false
   let enrollmentCandidateId: string | null = null
+  let contact: Apollo25CompanyPilotSelectionInput["contacts"][number] | null = null
 
-  const reusableBeforeAutomation = await findReusableApolloEnrollmentCandidate(admin, {
-    company_candidate_id,
-    company_contact_id: contact.company_contact_id,
-    contact_candidate_id: contact.contact_candidate_id,
-  })
-
-  if (reusableBeforeAutomation) {
-    enrollmentCandidateId = mapReusableEnrollmentCandidateId(reusableBeforeAutomation.row)
+  const approvedRowEarly = await findApprovedEnrollmentCandidateForCompany(admin, company_candidate_id)
+  if (approvedRowEarly) {
+    enrollmentCandidateId = mapReusableEnrollmentCandidateId(approvedRowEarly)
     reused = true
-  } else {
-    const approvedRow = await findApprovedEnrollmentCandidateForCompany(admin, company_candidate_id)
-    if (approvedRow) {
-      enrollmentCandidateId = mapReusableEnrollmentCandidateId(approvedRow)
-      reused = true
-    }
   }
 
   if (!enrollmentCandidateId) {
+    const selectionInputForEnrollment = buildApollo25CompanyPilotCohortEnrollmentBridgeSelectionInput(
+      input.selection_input,
+      {
+        company_candidate_id,
+        company_ids_in_other_active_pilot_cohorts: input.company_ids_in_other_active_pilot_cohorts,
+      },
+    )
+
+    const analysis = analyzeApollo25CompanyPilotCompanyEligibility(
+      selectionInputForEnrollment,
+      input.production_threshold,
+      "greenfield",
+    )
+
+    if (!analysis.eligible || !analysis.contact) {
+      if (analysis.skip_reason === "already_enrollment_approved") {
+        const approvedRow = await findApprovedEnrollmentCandidateForCompany(admin, company_candidate_id)
+        if (approvedRow) {
+          enrollmentCandidateId = mapReusableEnrollmentCandidateId(approvedRow)
+          reused = true
+        }
+      }
+
+      if (!enrollmentCandidateId) {
+        return {
+          company_candidate_id,
+          company_name,
+          code: analysis.skip_reason ?? "contact_resolution_failed",
+          message: analysis.raw_reason ?? "No eligible sequence-ready contact for enrollment.",
+        }
+      }
+    } else {
+      contact = analysis.contact
+
+      const reusableBeforeAutomation = await findReusableApolloEnrollmentCandidate(admin, {
+        company_candidate_id,
+        company_contact_id: contact.company_contact_id,
+        contact_candidate_id: contact.contact_candidate_id,
+      })
+
+      if (reusableBeforeAutomation) {
+        enrollmentCandidateId = mapReusableEnrollmentCandidateId(reusableBeforeAutomation.row)
+        reused = true
+      }
+    }
+  }
+
+  if (!enrollmentCandidateId && contact) {
     try {
       const automationReport = await executeApolloFullPipelineCertificationEnrollment(admin, {
         execution_id: input.execution_id,
@@ -262,15 +277,27 @@ async function enrollApollo25CompanyPilotCohortCompany(
           enrollmentCandidateId = mapReusableEnrollmentCandidateId(postAutomationReuse.row)
           reused = true
         } else {
-          const message =
-            automationReport.blockers.length > 0
-              ? automationReport.blockers.join(" | ")
-              : "Enrollment automation did not create or reuse a candidate."
-          return {
+          const approvedAfterAutomation = await findApprovedEnrollmentCandidateForCompany(
+            admin,
             company_candidate_id,
-            company_name,
-            code: "enrollment_candidate_not_created",
-            message,
+          )
+          if (approvedAfterAutomation) {
+            enrollmentCandidateId = mapReusableEnrollmentCandidateId(approvedAfterAutomation)
+            reused = true
+          } else {
+            const message =
+              automationReport.blockers.length > 0
+                ? automationReport.blockers.join(" | ")
+                : "Enrollment automation did not create or reuse a candidate."
+            return {
+              company_candidate_id,
+              company_name,
+              code: "enrollment_candidate_not_created",
+              message,
+              contact_company_contact_id: contact.company_contact_id ?? null,
+              contact_candidate_id: contact.contact_candidate_id ?? null,
+              automation_blockers: automationReport.blockers,
+            }
           }
         }
       } else if (automationReport.candidates_created > 0) {
@@ -285,6 +312,15 @@ async function enrollApollo25CompanyPilotCohortCompany(
         code: "enrollment_automation_failed",
         message: error instanceof Error ? error.message : String(error),
       }
+    }
+  }
+
+  if (!enrollmentCandidateId) {
+    return {
+      company_candidate_id,
+      company_name,
+      code: "enrollment_candidate_not_created",
+      message: "No enrollment candidate resolved for cohort company.",
     }
   }
 
@@ -374,6 +410,7 @@ async function enrollApollo25CompanyPilotCohortCompany(
     created,
     reused,
     approved,
+    treated_as: created ? "created_approved" : reused ? "reused_approved" : undefined,
   }
 }
 
@@ -485,7 +522,12 @@ export async function enrollApollo25CompanyPilotCohortCompanies(
     no_sequence_execution: true as const,
   }
 
-  const ok = evaluateApollo25CompanyPilotCohortEnrollmentBridgeSuccess(reportBody)
+  const { ok, partial_success } = evaluateApollo25CompanyPilotCohortEnrollmentBridgeOutcome({
+    companies_processed,
+    companies,
+    failures,
+    enrollment_candidates_approved,
+  })
 
   const { error: metadataError } = await admin
     .schema("growth")
@@ -506,6 +548,7 @@ export async function enrollApollo25CompanyPilotCohortCompanies(
           failure_count: failures.length,
           failures,
           ok,
+          partial_success,
         },
       },
     })
@@ -525,10 +568,12 @@ export async function enrollApollo25CompanyPilotCohortCompanies(
     failure_count: failures.length,
     enrollment_readiness_pct: review.enrollment_readiness.readiness_pct,
     ok,
+    partial_success,
   })
 
   return {
     ...reportBody,
     ok,
+    partial_success,
   }
 }

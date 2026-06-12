@@ -23,6 +23,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: report.ok,
+      partial_success: report.partial_success,
       report,
       companies_processed: report.companies_processed,
       enrollment_candidates_created: report.enrollment_candidates_created,
