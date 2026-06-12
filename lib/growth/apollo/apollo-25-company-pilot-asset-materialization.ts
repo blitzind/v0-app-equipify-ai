@@ -17,7 +17,10 @@ import { resolveApolloEnrichmentCanonicalCompanyId } from "@/lib/growth/apollo/a
 import { approveApolloMultichannelSequenceCandidate } from "@/lib/growth/apollo/apollo-multichannel-orchestration-queue"
 import { mapApolloMultichannelSequenceCandidateDbRow } from "@/lib/growth/apollo/apollo-multichannel-orchestration-evidence"
 import { buildApollo25CompanyPilotCanonicalDedupeAudit } from "@/lib/growth/apollo/apollo-25-company-pilot-canonical-dedupe-audit"
-import { evaluateApollo25CompanyPilotCohortPersonalization } from "@/lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation"
+import {
+  evaluateApollo25CompanyPilotCohortPersonalization,
+  evaluateApolloExecutionMaterializationChannelDrafts,
+} from "@/lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation"
 import { buildApollo25CompanyPilotCohortReview } from "@/lib/growth/apollo/apollo-25-company-pilot-cohort-review"
 import {
   ensureApollo25CompanyPilotCanonicalUniqueSnapshot,
@@ -448,9 +451,14 @@ export async function materializeApollo25CompanyPilotCompanyAssets(
       acting_user_id: input.acting_user_id,
       acting_user_email: input.acting_user_email,
     })
-    if (!personalization.ok) {
-      blockers.push(`personalization:${personalization.code ?? "failed"}`)
-    } else {
+    const channelDrafts = evaluateApolloExecutionMaterializationChannelDrafts(
+      personalization.materialization.drafts,
+    )
+    const shouldPersistPersonalizedDrafts =
+      personalization.ok ||
+      (channelDrafts.email_assets && channelDrafts.sms_assets && channelDrafts.voice_drop_assets)
+
+    if (shouldPersistPersonalizedDrafts) {
       await persistPersonalizedExecutionCandidate(admin, {
         candidate_id: execution.candidate_id,
         materialization: personalization.materialization,
@@ -459,6 +467,10 @@ export async function materializeApollo25CompanyPilotCompanyAssets(
         acting_user_id: input.acting_user_id,
         acting_user_email: input.acting_user_email,
       })
+    }
+
+    if (!personalization.ok) {
+      blockers.push(`personalization:${personalization.code ?? "failed"}`)
     }
   }
 

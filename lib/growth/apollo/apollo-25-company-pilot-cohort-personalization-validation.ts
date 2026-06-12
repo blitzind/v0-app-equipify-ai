@@ -39,6 +39,26 @@ function hasNonPlaceholderDraft(
   )
 }
 
+export function evaluateApolloExecutionMaterializationChannelDrafts(
+  drafts: ApolloSequenceExecutionDraftRecord[],
+): {
+  email_assets: boolean
+  sms_assets: boolean
+  voice_drop_assets: boolean
+  content_quality_optimization: boolean
+} {
+  const placeholderCount = drafts.filter((draft) =>
+    isApolloSequenceDraftPlaceholderContent(draft.body_placeholder),
+  ).length
+
+  return {
+    email_assets: hasNonPlaceholderDraft(drafts, "email"),
+    sms_assets: hasNonPlaceholderDraft(drafts, "sms"),
+    voice_drop_assets: hasNonPlaceholderDraft(drafts, "voice_drop"),
+    content_quality_optimization: drafts.length > 0 && placeholderCount === 0,
+  }
+}
+
 function evaluatePersonalizationAssets(
   state: Apollo25CompanyPilotPersonalizationMaterializationState,
 ): Record<Apollo25CompanyPilotCohortPersonalizationAssetKey, boolean> {

@@ -22,6 +22,7 @@ import {
 } from "../lib/growth/apollo/apollo-sequence-placeholder-guard"
 import { APOLLO_SEQUENCE_PERSONALIZATION_SERVICE_QA_MARKER } from "../lib/growth/apollo/apollo-sequence-personalization-constants"
 import { evaluateApolloSequenceCandidateContentReadiness } from "../lib/growth/apollo/apollo-sequence-draft-readiness"
+import { evaluateApolloExecutionMaterializationChannelDrafts } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation"
 import { buildApolloSequenceExecutionDraftRecords } from "../lib/growth/apollo/apollo-sequence-draft-generation"
 import {
   isApolloSequenceDraftPlaceholderContent,
@@ -272,5 +273,22 @@ assert.equal(APOLLO_SEQUENCE_PERSONALIZATION_SERVICE_QA_MARKER, "apollo-sequence
 console.log("  ✓ draft approval requires content readiness (placeholders blocked)")
 
 assert.equal(APOLLO_SEQUENCE_PLACEHOLDER_GUARD_QA_MARKER, "apollo-sequence-placeholder-guard-v1")
+
+const personalizationServiceSource = fs.readFileSync(
+  path.join(ROOT, "lib/growth/apollo/apollo-sequence-personalization-service.ts"),
+  "utf8",
+)
+assert.match(personalizationServiceSource, /buildApolloEmailPersonalizationFallback/)
+assert.doesNotMatch(personalizationServiceSource, /Email personalization blocked:/)
+const materializeSource = fs.readFileSync(
+  path.join(ROOT, "lib/growth/apollo/apollo-25-company-pilot-asset-materialization.ts"),
+  "utf8",
+)
+assert.match(materializeSource, /shouldPersistPersonalizedDrafts/)
+assert.doesNotMatch(materializeSource, /runSequenceExecutionJob/)
+const channelBefore = evaluateApolloExecutionMaterializationChannelDrafts(placeholderDrafts)
+assert.equal(channelBefore.email_assets, false)
+assert.equal(channelBefore.sms_assets, false)
+console.log("  ✓ pilot materialize persists channel drafts without sequence execution sends")
 
 console.log("\nApollo Personalization Integration checks passed.")

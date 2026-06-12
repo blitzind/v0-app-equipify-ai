@@ -44,7 +44,11 @@ import {
   snapshotCompanyQualificationPassesThreshold,
 } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge-evidence"
 import { analyzeApollo25CompanyPilotCompanyEligibility } from "../lib/growth/apollo/apollo-25-company-pilot-selection"
-import { evaluateApollo25CompanyPilotCohortPersonalization } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation"
+import {
+  evaluateApollo25CompanyPilotCohortPersonalization,
+  evaluateApolloExecutionMaterializationChannelDrafts,
+} from "../lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation"
+import { buildApolloSequenceExecutionDraftRecords } from "../lib/growth/apollo/apollo-sequence-draft-generation"
 import { buildApollo25CompanyPilotCohortReview } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-review"
 import {
   describeEnrollmentDuplicatePreventionDecision,
@@ -597,7 +601,69 @@ const materializeRouteSource = fs.readFileSync(
 )
 assert.match(materializeRouteSource, /materializeApollo25CompanyPilotCohortAssetReadiness/)
 assert.doesNotMatch(materializeRouteSource, /runSequenceExecutionJob/)
+const materializeSource = fs.readFileSync(
+  path.join(ROOT, "lib/growth/apollo/apollo-25-company-pilot-asset-materialization.ts"),
+  "utf8",
+)
+assert.match(materializeSource, /evaluateApolloExecutionMaterializationChannelDrafts/)
+assert.match(materializeSource, /shouldPersistPersonalizedDrafts/)
+assert.doesNotMatch(materializeSource, /runSequenceExecutionJob/)
+assert.doesNotMatch(materializeSource, /queueSequenceStepTransportJob/)
 console.log("  ✓ cohort materialize route present without sequence execution sends")
+
+const placeholderHandoffDrafts = buildApolloSequenceExecutionDraftRecords({
+  handoff: {
+    company_name: "Summit Medical",
+    full_name: "Alex Rivera",
+    title: "VP Operations",
+    voice_drop_script_reference: "Hi Alex, this is Equipify.",
+    sequence_key: "multichannel_with_voice_drop",
+    sequence_label: "Multichannel",
+    scheduling_plan: { total_days: 7, touches: 4 },
+    enrollment_candidate_id: "enroll-1",
+    company_candidate_id: "company-1",
+    company_contact_id: "contact-1",
+    growth_lead_id: "lead-1",
+    voice_drop_candidate_id: "voice-1",
+    multichannel_sequence_candidate_id: "multi-1",
+    email: "alex@example.com",
+    phone: "+15551234567",
+    qualification_score: 88,
+    source_attribution: {},
+    created_by_user_id: "user-1",
+  },
+  steps: [
+    { step_number: 1, channel: "email", scheduled_offset_days: 1, generation_type: "follow_up_email" },
+    { step_number: 2, channel: "sms", scheduled_offset_days: 2, generation_type: null },
+    { step_number: 3, channel: "voice_drop", scheduled_offset_days: 3, generation_type: null },
+  ],
+})
+const placeholderChannelDrafts = evaluateApolloExecutionMaterializationChannelDrafts(placeholderHandoffDrafts)
+assert.equal(placeholderChannelDrafts.email_assets, false)
+assert.equal(placeholderChannelDrafts.sms_assets, false)
+const materializedChannelDrafts = evaluateApolloExecutionMaterializationChannelDrafts(
+  placeholderHandoffDrafts.map((draft) => {
+    if (draft.draft_type === "email") {
+      return {
+        ...draft,
+        subject_placeholder: "Equipify idea for Summit Medical",
+        body_placeholder: "Hi Alex, Equipify supports VP Operations leaders at Summit Medical.",
+      }
+    }
+    if (draft.draft_type === "sms") {
+      return { ...draft, body_placeholder: "Alex, quick Equipify follow-up re: Summit Medical. Reply STOP to opt out." }
+    }
+    if (draft.draft_type === "voice_drop") {
+      return { ...draft, body_placeholder: "Hi Alex, this is Equipify calling about Summit Medical workflows." }
+    }
+    return draft
+  }),
+)
+assert.equal(materializedChannelDrafts.email_assets, true)
+assert.equal(materializedChannelDrafts.sms_assets, true)
+assert.equal(materializedChannelDrafts.voice_drop_assets, true)
+assert.equal(materializedChannelDrafts.content_quality_optimization, true)
+console.log("  ✓ materialize channel draft readiness distinguishes placeholder vs personalized drafts")
 
 const enrollBridgeSource = fs.readFileSync(
   path.join(ROOT, "lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge.ts"),

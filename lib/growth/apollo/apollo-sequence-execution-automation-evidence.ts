@@ -77,7 +77,7 @@ export function assertApolloSequenceExecutionAttributionPreserved(
 export function mapApolloSequenceExecutionCandidateDbRow(
   row: Record<string, unknown>,
 ): ApolloSequenceExecutionCandidateRow {
-  const materialization =
+  let materialization =
     row.sequence_materialization && typeof row.sequence_materialization === "object"
       ? (row.sequence_materialization as ApolloSequenceExecutionMaterializationPlan)
       : {
@@ -90,6 +90,17 @@ export function mapApolloSequenceExecutionCandidateDbRow(
           steps: [],
           drafts: [],
         }
+
+  if (
+    materialization.drafts.length === 0 &&
+    Array.isArray(row.draft_records) &&
+    row.draft_records.length > 0
+  ) {
+    materialization = {
+      ...materialization,
+      drafts: row.draft_records as ApolloSequenceExecutionDraftRecord[],
+    }
+  }
 
   const executionJobs =
     row.execution_jobs && Array.isArray(row.execution_jobs)

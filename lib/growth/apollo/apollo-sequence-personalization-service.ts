@@ -64,6 +64,26 @@ function resolveEmailGenerationType(step: { generation_type: string | null }): G
   return "follow_up_email"
 }
 
+function buildApolloEmailPersonalizationFallback(input: {
+  draft: ApolloSequenceExecutionDraftRecord
+  unified_context: ApolloUnifiedPersonalizationContext
+  reason?: string | null
+}): ApolloSequenceExecutionDraftRecord {
+  const name = input.unified_context.contact_full_name.split(/\s+/)[0] || "there"
+  const company = input.unified_context.contact_company_name
+  const title = input.unified_context.contact_title?.trim() || "your team"
+
+  return {
+    ...input.draft,
+    subject_placeholder: `Equipify idea for ${company}`,
+    body_placeholder: `Hi ${name},\n\nI wanted to share how Equipify supports ${title} leaders at organizations like ${company} with equipment operations and vendor workflows.\n\nWould you be open to a brief conversation this week?\n\nBest regards`,
+    content_summary: input.reason
+      ? `Email personalization fallback (${input.reason}).`
+      : "Email personalization fallback — deterministic draft (no send).",
+    personalization_packet_marker: input.unified_context.qa_marker,
+  }
+}
+
 export async function loadApolloUnifiedPersonalizationContextForCandidate(
   admin: SupabaseClient,
   candidate: ApolloSequenceExecutionCandidateRow,
@@ -144,25 +164,18 @@ async function personalizeEmailDraft(
   })
 
   if (!result.ok) {
-    return {
-      ...input.draft,
-      content_summary: `Email personalization blocked: ${result.code}`,
-    }
+    return buildApolloEmailPersonalizationFallback({
+      draft: input.draft,
+      unified_context: input.unified_context,
+      reason: result.code ?? "generation_failed",
+    })
   }
 
   const generation = result.generation
   const subject = generation.generatedSubject?.trim() || input.draft.subject_placeholder || "Follow up"
   const body = generation.generatedContent?.trim() || input.draft.body_placeholder
 
-  if (input.jobLink?.sequence_step_id) {
-    await updateGrowthSequenceEnrollmentStep(admin, input.jobLink.sequence_step_id, {
-      status: "draft_created",
-      generationId: generation.id !== "ephemeral" ? generation.id : null,
-      instructions: body,
-    })
-  }
-
-  return {
+  const personalizedDraft = {
     ...input.draft,
     subject_placeholder: subject,
     body_placeholder: body,
@@ -170,6 +183,29 @@ async function personalizeEmailDraft(
     generation_id: generation.id !== "ephemeral" ? generation.id : null,
     personalization_packet_marker: input.unified_context.qa_marker,
   }
+
+  if (
+    isApolloEmailPlaceholderContent({
+      subject: personalizedDraft.subject_placeholder,
+      body: personalizedDraft.body_placeholder,
+    })
+  ) {
+    return buildApolloEmailPersonalizationFallback({
+      draft: input.draft,
+      unified_context: input.unified_context,
+      reason: "generated_content_still_placeholder",
+    })
+  }
+
+  if (input.jobLink?.sequence_step_id) {
+    await updateGrowthSequenceEnrollmentStep(admin, input.jobLink.sequence_step_id, {
+      status: "draft_created",
+      generationId: generation.id !== "ephemeral" ? generation.id : null,
+      instructions: personalizedDraft.body_placeholder,
+    })
+  }
+
+  return personalizedDraft
 }
 
 async function personalizeSmsDraft(
@@ -380,15 +416,24 @@ export async function personalizeApolloSequenceCandidateContent(
   const smsStillPlaceholder = updatedDrafts.some(
     (draft) => draft.draft_type === "sms" && isApolloSmsPlaceholderBody(draft.body_placeholder),
   )
+  const voiceStillPlaceholder = updatedDrafts.some(
+    (draft) =>
+      draft.draft_type === "voice_drop" &&
+      isApolloSequenceDraftPlaceholderContent(draft.body_placeholder),
+  )
+  const channelDraftsMaterialized =
+    !emailStillPlaceholder && !smsStillPlaceholder && !voiceStillPlaceholder
 
-  if (!readiness.ready || emailStillPlaceholder || smsStillPlaceholder) {
+  if (!channelDraftsMaterialized) {
     return {
       ok: false,
       code: emailStillPlaceholder
         ? "email_still_placeholder"
         : smsStillPlaceholder
           ? "sms_still_placeholder"
-          : readiness.code ?? "content_not_ready",
+          : voiceStillPlaceholder
+            ? "voice_drop_still_placeholder"
+            : readiness.code ?? "content_not_ready",
       detail: readiness.detail,
       materialization,
       execution_jobs: input.candidate.execution_jobs,
@@ -400,7 +445,7 @@ export async function personalizeApolloSequenceCandidateContent(
   return {
     ok: true,
     code: null,
-    detail: "Personalization complete — drafts are send-ready.",
+    detail: "Channel drafts materialized — email, SMS, and voice drop content present (no send).",
     materialization,
     execution_jobs: input.candidate.execution_jobs,
     unified_context: unifiedContext,
