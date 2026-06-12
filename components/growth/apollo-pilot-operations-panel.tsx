@@ -26,9 +26,10 @@ import {
   type ApolloPilotOperatorAnalytics,
   type ApolloPilotRoiMetrics,
 } from "@/lib/growth/apollo/apollo-pilot-types"
+import { ApolloOperationsDashboardSections } from "@/components/growth/apollo-operations-dashboard-sections"
 import { cn } from "@/lib/utils"
 
-type PilotTab = "overview" | "funnel" | "channels" | "content" | "operators" | "roi"
+type PilotTab = "operations" | "overview" | "funnel" | "channels" | "content" | "operators" | "roi"
 
 type CohortAnalytics = {
   cohort: ApolloPilotCohortRow
@@ -166,6 +167,7 @@ export function ApolloPilotOperationsPanel({ className }: { className?: string }
   }
 
   const tabs: { id: PilotTab; label: string }[] = [
+    { id: "operations", label: "Operations" },
     { id: "overview", label: "Overview" },
     { id: "funnel", label: "Funnel" },
     { id: "channels", label: "Channels" },
@@ -271,6 +273,10 @@ export function ApolloPilotOperationsPanel({ className }: { className?: string }
       </div>
 
       {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
+
+      {tab === "operations" && (
+        <ApolloOperationsDashboardSections cohortId={selectedId || undefined} />
+      )}
 
       {tab === "overview" && dashboardTiles.length > 0 && (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-5">

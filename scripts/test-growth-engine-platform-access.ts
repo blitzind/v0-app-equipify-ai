@@ -56,6 +56,13 @@ const reportRoute = fs.readFileSync(
 assert.match(reportRoute, /requireGrowthEnginePlatformAccess\(request\)/)
 console.log("  ✓ apollo-25-company-pilot report passes request into platform access")
 
+const operationsDashboardRoute = fs.readFileSync(
+  path.join(ROOT, "app/api/platform/growth/apollo-operations-dashboard/route.ts"),
+  "utf8",
+)
+assert.match(operationsDashboardRoute, /requireGrowthEnginePlatformAccess\(request\)/)
+console.log("  ✓ apollo-operations-dashboard passes request into platform access")
+
 process.env.EQUIPIFY_PLATFORM_ADMIN_EMAILS = "mike@blitzind.com"
 assert.equal(isPlatformAdminEmail("mike@blitzind.com"), true)
 assert.equal(isPlatformAdminEmail("other@example.com"), false)
