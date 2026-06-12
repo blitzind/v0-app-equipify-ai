@@ -75,7 +75,7 @@ async function loadActivePilotCompanyIds(admin: SupabaseClient): Promise<Set<str
   return ids
 }
 
-async function loadCompanyIdsInOtherActivePilotCohorts(
+export async function loadCompanyIdsInOtherActivePilotCohorts(
   admin: SupabaseClient,
   excluding_cohort_id: string,
 ): Promise<Set<string>> {

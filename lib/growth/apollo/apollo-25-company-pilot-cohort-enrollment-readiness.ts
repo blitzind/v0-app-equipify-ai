@@ -19,12 +19,29 @@ export function resolveApollo25CompanyPilotCohortEnrollmentReadinessMode(input: 
   return "preview_selection"
 }
 
-function toOtherActivePilotCompanyIds(
+export function toOtherActivePilotCompanyIds(
   value: ReadonlySet<string> | readonly string[] | undefined,
 ): Set<string> {
   if (!value) return new Set()
   if (value instanceof Set) return new Set(value)
   return new Set(value.map((id) => id.trim()).filter(Boolean))
+}
+
+export function buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput(
+  selectionInput: Apollo25CompanyPilotSelectionInput,
+  input: {
+    company_candidate_id: string
+    company_ids_in_other_active_pilot_cohorts: Set<string>
+  },
+): Apollo25CompanyPilotSelectionInput {
+  const inOtherActivePilotCohort = input.company_ids_in_other_active_pilot_cohorts.has(
+    input.company_candidate_id.trim(),
+  )
+
+  return {
+    ...selectionInput,
+    in_active_pilot_cohort: inOtherActivePilotCohort,
+  }
 }
 
 function buildSelectionInputForReadinessAnalysis(
@@ -39,14 +56,10 @@ function buildSelectionInputForReadinessAnalysis(
     return selectionInput
   }
 
-  const inOtherActivePilotCohort = input.company_ids_in_other_active_pilot_cohorts.has(
-    input.company_candidate_id.trim(),
-  )
-
-  return {
-    ...selectionInput,
-    in_active_pilot_cohort: inOtherActivePilotCohort,
-  }
+  return buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput(selectionInput, {
+    company_candidate_id: input.company_candidate_id,
+    company_ids_in_other_active_pilot_cohorts: input.company_ids_in_other_active_pilot_cohorts,
+  })
 }
 
 export function evaluateApollo25CompanyPilotCohortEnrollmentReadiness(input: {

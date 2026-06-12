@@ -26,7 +26,15 @@ import { runApollo25CompanyPilotPreflight } from "../lib/growth/apollo/apollo-25
 import { applyApollo25CompanyPilotCanonicalCohortDedupe } from "../lib/growth/apollo/apollo-25-company-pilot-canonical-cohort-dedupe"
 import { buildApollo25CompanyPilotCanonicalDedupeAudit } from "../lib/growth/apollo/apollo-25-company-pilot-canonical-dedupe-audit"
 import { buildApollo25CompanyPilotGreenfieldCohortSnapshot } from "../lib/growth/apollo/apollo-25-company-pilot-draft-cohort"
-import { evaluateApollo25CompanyPilotCohortEnrollmentReadiness } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-readiness"
+import {
+  buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput,
+  evaluateApollo25CompanyPilotCohortEnrollmentReadiness,
+} from "../lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-readiness"
+import {
+  evaluateApollo25CompanyPilotCohortEnrollmentBridgeSuccess,
+  snapshotCompanyQualificationPassesThreshold,
+} from "../lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge-evidence"
+import { analyzeApollo25CompanyPilotCompanyEligibility } from "../lib/growth/apollo/apollo-25-company-pilot-selection"
 import { evaluateApollo25CompanyPilotCohortPersonalization } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation"
 import { buildApollo25CompanyPilotCohortReview } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-review"
 import {
@@ -63,6 +71,8 @@ const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-25-company-pilot-canonical-dedupe-audit.ts",
   "lib/growth/apollo/apollo-25-company-pilot-launch-certification.ts",
   "lib/growth/apollo/apollo-25-company-pilot-asset-materialization.ts",
+  "lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge-types.ts",
+  "lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge-evidence.ts",
   "lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge.ts",
   "lib/growth/apollo/apollo-25-company-pilot-route.ts",
   "app/api/platform/growth/apollo-25-company-pilot/report/route.ts",
@@ -584,21 +594,135 @@ const enrollBridgeSource = fs.readFileSync(
   path.join(ROOT, "lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge.ts"),
   "utf8",
 )
-assert.match(
-  enrollBridgeSource,
-  /apollo-25-company-pilot-cohort-enrollment-bridge-v14-2j/,
-)
-assert.match(
-  enrollBridgeSource,
-  /apollo-25-company-pilot-cohort-enroll-v14-2j/,
-)
+assert.match(enrollBridgeSource, /buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput/)
+assert.match(enrollBridgeSource, /loadCompanyIdsInOtherActivePilotCohorts/)
+assert.match(enrollBridgeSource, /buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput/)
+assert.match(enrollBridgeSource, /snapshotCompanyQualificationPassesThreshold/)
 assert.match(enrollBridgeSource, /executeApolloFullPipelineCertificationEnrollment/)
 assert.match(enrollBridgeSource, /findReusableApolloEnrollmentCandidate/)
 assert.match(enrollBridgeSource, /approveApolloEnrollmentCandidate/)
 assert.match(enrollBridgeSource, /handoffEnrollmentApprovedToAccountPlaybook/)
+assert.match(enrollBridgeSource, /executed_at/)
+assert.match(enrollBridgeSource, /failures,/)
 assert.doesNotMatch(enrollBridgeSource, /runSequenceExecutionJob/)
 assert.doesNotMatch(enrollBridgeSource, /queueSequenceStepTransportJob/)
 console.log("  ✓ cohort enrollment bridge reuses enrollment automation + approval handoff")
+
+const selfCohortExemptInput = buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput(
+  { ...readinessFixtureCompanies[0]!, in_active_pilot_cohort: true },
+  {
+    company_candidate_id: readinessFixtureCompanies[0]!.company_candidate_id,
+    company_ids_in_other_active_pilot_cohorts: new Set(),
+  },
+)
+assert.equal(selfCohortExemptInput.in_active_pilot_cohort, false)
+const otherCohortExemptInput = buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput(
+  { ...readinessFixtureCompanies[0]!, in_active_pilot_cohort: true },
+  {
+    company_candidate_id: readinessFixtureCompanies[0]!.company_candidate_id,
+    company_ids_in_other_active_pilot_cohorts: new Set([readinessFixtureCompanies[0]!.company_candidate_id]),
+  },
+)
+assert.equal(otherCohortExemptInput.in_active_pilot_cohort, true)
+const selfCohortEligibility = analyzeApollo25CompanyPilotCompanyEligibility(
+  selfCohortExemptInput,
+  70,
+  "greenfield",
+)
+assert.equal(selfCohortEligibility.eligible, true)
+assert.ok(selfCohortEligibility.contact)
+console.log("  ✓ enrollment bridge self-cohort exemption allows draft cohort membership")
+
+const otherCohortEligibility = analyzeApollo25CompanyPilotCompanyEligibility(
+  otherCohortExemptInput,
+  70,
+  "greenfield",
+)
+assert.equal(otherCohortEligibility.eligible, false)
+assert.equal(otherCohortEligibility.skip_reason, "active_pilot_conflict")
+console.log("  ✓ enrollment bridge still blocks other active pilot cohort membership")
+
+assert.equal(
+  snapshotCompanyQualificationPassesThreshold(
+    {
+      company_candidate_id: readinessFixtureCompanies[0]!.company_candidate_id,
+      company_name: readinessFixtureCompanies[0]!.company_name,
+      qualification_score: 100,
+      verified_email_count: 1,
+      sequence_ready_count: 1,
+      canonical_company_id: null,
+      enrollment_status: null,
+      cohort_rank: 1,
+      cohort_reason: "production_rules_passed",
+      ranking_explanation: "fixture",
+    },
+    70,
+  ),
+  true,
+)
+assert.equal(
+  snapshotCompanyQualificationPassesThreshold(
+    {
+      company_candidate_id: readinessFixtureCompanies[0]!.company_candidate_id,
+      company_name: readinessFixtureCompanies[0]!.company_name,
+      qualification_score: 50,
+      verified_email_count: 1,
+      sequence_ready_count: 1,
+      canonical_company_id: null,
+      enrollment_status: null,
+      cohort_rank: 1,
+      cohort_reason: "production_rules_passed",
+      ranking_explanation: "fixture",
+    },
+    70,
+  ),
+  false,
+)
+console.log("  ✓ enrollment bridge uses snapshot-anchored qualification threshold")
+
+const noContactEligibility = analyzeApollo25CompanyPilotCompanyEligibility(
+  buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput(
+    {
+      ...readinessFixtureCompanies[0]!,
+      in_active_pilot_cohort: true,
+      contacts: [],
+      snapshot_summary: {
+        mapped_contacts: 0,
+        verified_email_contacts: 0,
+        contactable_contacts: 0,
+        sequence_ready_contacts: 0,
+      },
+    },
+    {
+      company_candidate_id: readinessFixtureCompanies[0]!.company_candidate_id,
+      company_ids_in_other_active_pilot_cohorts: new Set(),
+    },
+  ),
+  70,
+  "greenfield",
+)
+assert.equal(noContactEligibility.eligible, false)
+console.log("  ✓ enrollment bridge blocks when contact resolution fails")
+
+assert.equal(
+  evaluateApollo25CompanyPilotCohortEnrollmentBridgeSuccess({
+    companies: [],
+    enrollment_candidates_created: 0,
+    enrollment_candidates_reused: 0,
+    enrollment_candidates_approved: 0,
+  }),
+  false,
+)
+assert.equal(
+  evaluateApollo25CompanyPilotCohortEnrollmentBridgeSuccess({
+    companies: [{ company_candidate_id: "c1", company_name: "Co", enrollment_candidate_id: "e1", growth_lead_id: "l1", created: true, reused: false, approved: true }],
+    enrollment_candidates_created: 1,
+    enrollment_candidates_reused: 0,
+    enrollment_candidates_approved: 1,
+  }),
+  true,
+)
+console.log("  ✓ enrollment bridge all-fail result is not successful")
 
 assert.equal(describeEnrollmentDuplicatePreventionDecision({ candidates_created: 1, candidates: [{ candidate_id: "c1" }] }), "created_new_candidate")
 assert.equal(
@@ -716,7 +840,9 @@ const enrollRouteSource = fs.readFileSync(
   "utf8",
 )
 assert.match(enrollRouteSource, /enrollApollo25CompanyPilotCohortEnrollmentBridge/)
+assert.match(enrollRouteSource, /ok: report\.ok/)
+assert.match(enrollRouteSource, /status: report\.ok \? 200 : 422/)
 assert.doesNotMatch(enrollRouteSource, /runSequenceExecutionJob/)
-console.log("  ✓ cohort enroll route present without sequence execution sends")
+console.log("  ✓ cohort enroll route returns strict ok status without sequence execution sends")
 
 console.log("\nApollo 25-Company Pilot Launch Certification PASSED")

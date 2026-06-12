@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json({
-      ok: true,
+      ok: report.ok,
       report,
       companies_processed: report.companies_processed,
       enrollment_candidates_created: report.enrollment_candidates_created,
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       enrollment_readiness: report.review.enrollment_readiness,
       ready_for_launch: report.review.launch_recommendation.ready_for_launch,
       certified: report.review.launch_certification.certified,
-    })
+    }, { status: report.ok ? 200 : 422 })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     const status = message === "cohort_not_found" || message === "cohort_snapshot_missing" ? 404 : 500

@@ -15,13 +15,27 @@ import {
   parseApollo25CompanyPilotCohortSnapshotFromMetadata,
   snapshotCompaniesFromCohortCompanyRows,
 } from "@/lib/growth/apollo/apollo-25-company-pilot-draft-cohort"
+import {
+  buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput,
+} from "@/lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-readiness"
 import { buildApollo25CompanyPilotCohortReview } from "@/lib/growth/apollo/apollo-25-company-pilot-cohort-review"
 import {
   analyzeApollo25CompanyPilotCompanyEligibility,
+  type Apollo25CompanyPilotSelectionInput,
 } from "@/lib/growth/apollo/apollo-25-company-pilot-selection"
 import {
+  evaluateApollo25CompanyPilotCohortEnrollmentBridgeSuccess,
+  snapshotCompanyQualificationPassesThreshold,
+} from "@/lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge-evidence"
+import {
+  APOLLO_25_COMPANY_PILOT_COHORT_ENROLLMENT_BRIDGE_QA_MARKER,
+  APOLLO_25_COMPANY_PILOT_COHORT_ENROLLMENT_BRIDGE_SOURCE,
+  type Apollo25CompanyPilotCohortEnrollmentBridgeCompanyResult,
+  type Apollo25CompanyPilotCohortEnrollmentBridgeFailure,
+  type Apollo25CompanyPilotCohortEnrollmentBridgeReport,
+} from "@/lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge-types"
+import {
   APOLLO_25_COMPANY_PILOT_COHORT_SNAPSHOT_QA_MARKER,
-  type Apollo25CompanyPilotCohortReview,
   type Apollo25CompanyPilotCohortSnapshotCompany,
 } from "@/lib/growth/apollo/apollo-25-company-pilot-types"
 import {
@@ -40,49 +54,20 @@ import {
 import { resolveApolloEnrichmentCanonicalCompanyId } from "@/lib/growth/apollo/apollo-enrichment-cert-canonical-company-resolution"
 import { loadApolloPilotCohort } from "@/lib/growth/apollo/apollo-pilot-route"
 
-export const APOLLO_25_COMPANY_PILOT_COHORT_ENROLLMENT_BRIDGE_QA_MARKER =
-  "apollo-25-company-pilot-cohort-enrollment-bridge-v14-2j" as const
-
-export const APOLLO_25_COMPANY_PILOT_COHORT_ENROLLMENT_BRIDGE_SOURCE =
-  "apollo-25-company-pilot-cohort-enroll-v14-2j" as const
+export {
+  APOLLO_25_COMPANY_PILOT_COHORT_ENROLLMENT_BRIDGE_QA_MARKER,
+  APOLLO_25_COMPANY_PILOT_COHORT_ENROLLMENT_BRIDGE_SOURCE,
+} from "@/lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge-types"
+export {
+  evaluateApollo25CompanyPilotCohortEnrollmentBridgeSuccess,
+  snapshotCompanyQualificationPassesThreshold,
+} from "@/lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge-evidence"
 
 const ENROLLMENT_TABLE = "apollo_enrollment_candidates"
 const PLAYBOOKS_TABLE = "account_playbooks"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
-}
-
-export type Apollo25CompanyPilotCohortEnrollmentBridgeFailure = {
-  company_candidate_id: string
-  company_name: string
-  code: string
-  message: string
-}
-
-export type Apollo25CompanyPilotCohortEnrollmentBridgeCompanyResult = {
-  company_candidate_id: string
-  company_name: string
-  enrollment_candidate_id: string | null
-  growth_lead_id: string | null
-  created: boolean
-  reused: boolean
-  approved: boolean
-}
-
-export type Apollo25CompanyPilotCohortEnrollmentBridgeReport = {
-  qa_marker: typeof APOLLO_25_COMPANY_PILOT_COHORT_ENROLLMENT_BRIDGE_QA_MARKER
-  cohort_id: string
-  execution_id: string
-  companies_processed: number
-  enrollment_candidates_created: number
-  enrollment_candidates_reused: number
-  enrollment_candidates_approved: number
-  failures: Apollo25CompanyPilotCohortEnrollmentBridgeFailure[]
-  companies: Apollo25CompanyPilotCohortEnrollmentBridgeCompanyResult[]
-  review: Apollo25CompanyPilotCohortReview
-  no_outbound_sends: true
-  no_sequence_execution: true
 }
 
 function buildPlaybookHandoffInput(
@@ -169,13 +154,14 @@ async function enrollApollo25CompanyPilotCohortCompany(
   admin: SupabaseClient,
   input: {
     snapshot_company: Apollo25CompanyPilotCohortSnapshotCompany
-    selection_input: import("@/lib/growth/apollo/apollo-25-company-pilot-selection").Apollo25CompanyPilotSelectionInput | null
+    selection_input: Apollo25CompanyPilotSelectionInput | null
     production_threshold: number
     certification_threshold: number
     cohort_id: string
     execution_id: string
     acting_user_id: string
     acting_user_email: string
+    company_ids_in_other_active_pilot_cohorts: Set<string>
   },
 ): Promise<Apollo25CompanyPilotCohortEnrollmentBridgeCompanyResult | Apollo25CompanyPilotCohortEnrollmentBridgeFailure> {
   const company_candidate_id = input.snapshot_company.company_candidate_id
@@ -190,8 +176,25 @@ async function enrollApollo25CompanyPilotCohortCompany(
     }
   }
 
-  const analysis = analyzeApollo25CompanyPilotCompanyEligibility(
+  if (!snapshotCompanyQualificationPassesThreshold(input.snapshot_company, input.production_threshold)) {
+    return {
+      company_candidate_id,
+      company_name,
+      code: "qualification_below_threshold",
+      message: `Snapshot qualification score ${input.snapshot_company.qualification_score} is below production threshold ${input.production_threshold}.`,
+    }
+  }
+
+  const selectionInputForEnrollment = buildApollo25CompanyPilotCohortSelfCohortExemptSelectionInput(
     input.selection_input,
+    {
+      company_candidate_id,
+      company_ids_in_other_active_pilot_cohorts: input.company_ids_in_other_active_pilot_cohorts,
+    },
+  )
+
+  const analysis = analyzeApollo25CompanyPilotCompanyEligibility(
+    selectionInputForEnrollment,
     input.production_threshold,
     "greenfield",
   )
@@ -415,10 +418,13 @@ export async function enrollApollo25CompanyPilotCohortCompanies(
     cohort_size: snapshot.cohort_size,
   })
 
-  const { buildApollo25CompanyPilotSelectionInputs } = await import(
-    "@/lib/growth/apollo/apollo-25-company-pilot-route"
-  )
+  const { buildApollo25CompanyPilotSelectionInputs, loadCompanyIdsInOtherActivePilotCohorts } =
+    await import("@/lib/growth/apollo/apollo-25-company-pilot-route")
   const selection_inputs = await buildApollo25CompanyPilotSelectionInputs(admin)
+  const company_ids_in_other_active_pilot_cohorts = await loadCompanyIdsInOtherActivePilotCohorts(
+    admin,
+    input.cohort_id,
+  )
   const selectionByCompany = new Map(
     selection_inputs.map((row) => [row.company_candidate_id, row]),
   )
@@ -439,6 +445,7 @@ export async function enrollApollo25CompanyPilotCohortCompanies(
       execution_id,
       acting_user_id: input.acting_user_id,
       acting_user_email: input.acting_user_email,
+      company_ids_in_other_active_pilot_cohorts,
     })
 
     if ("code" in result) {
@@ -463,40 +470,7 @@ export async function enrollApollo25CompanyPilotCohortCompanies(
   const companies_processed = snapshot.companies.length
   const now = new Date().toISOString()
 
-  await admin
-    .schema("growth")
-    .from("apollo_pilot_cohorts")
-    .update({
-      updated_at: now,
-      metadata: {
-        ...loaded.cohort.metadata,
-        canonical_cohort_dedupe_v14_2g_1: snapshot.canonical_dedupe ?? null,
-        pilot_cohort_enrollment_v14_2j: {
-          execution_id,
-          enrolled_at: now,
-          companies_processed,
-          enrollment_candidates_created,
-          enrollment_candidates_reused,
-          enrollment_candidates_approved,
-          enrollment_readiness_pct: review.enrollment_readiness.readiness_pct,
-          failure_count: failures.length,
-        },
-      },
-    })
-    .eq("id", input.cohort_id)
-
-  logGrowthEngine("apollo_25_pilot_cohort_enrollment_bridge_completed", {
-    cohort_id: input.cohort_id,
-    execution_id,
-    companies_processed,
-    enrollment_candidates_created,
-    enrollment_candidates_reused,
-    enrollment_candidates_approved,
-    failure_count: failures.length,
-    enrollment_readiness_pct: review.enrollment_readiness.readiness_pct,
-  })
-
-  return {
+  const reportBody = {
     qa_marker: APOLLO_25_COMPANY_PILOT_COHORT_ENROLLMENT_BRIDGE_QA_MARKER,
     cohort_id: input.cohort_id,
     execution_id,
@@ -507,7 +481,54 @@ export async function enrollApollo25CompanyPilotCohortCompanies(
     failures,
     companies,
     review,
-    no_outbound_sends: true,
-    no_sequence_execution: true,
+    no_outbound_sends: true as const,
+    no_sequence_execution: true as const,
+  }
+
+  const ok = evaluateApollo25CompanyPilotCohortEnrollmentBridgeSuccess(reportBody)
+
+  const { error: metadataError } = await admin
+    .schema("growth")
+    .from("apollo_pilot_cohorts")
+    .update({
+      updated_at: now,
+      metadata: {
+        ...loaded.cohort.metadata,
+        canonical_cohort_dedupe_v14_2g_1: snapshot.canonical_dedupe ?? null,
+        pilot_cohort_enrollment_v14_2j: {
+          execution_id,
+          executed_at: now,
+          companies_processed,
+          enrollment_candidates_created,
+          enrollment_candidates_reused,
+          enrollment_candidates_approved,
+          enrollment_readiness_pct: review.enrollment_readiness.readiness_pct,
+          failure_count: failures.length,
+          failures,
+          ok,
+        },
+      },
+    })
+    .eq("id", input.cohort_id)
+
+  if (metadataError) {
+    throw new Error(`cohort_enrollment_metadata_update_failed:${metadataError.message}`)
+  }
+
+  logGrowthEngine("apollo_25_pilot_cohort_enrollment_bridge_completed", {
+    cohort_id: input.cohort_id,
+    execution_id,
+    companies_processed,
+    enrollment_candidates_created,
+    enrollment_candidates_reused,
+    enrollment_candidates_approved,
+    failure_count: failures.length,
+    enrollment_readiness_pct: review.enrollment_readiness.readiness_pct,
+    ok,
+  })
+
+  return {
+    ...reportBody,
+    ok,
   }
 }
