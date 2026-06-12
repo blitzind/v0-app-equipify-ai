@@ -43,6 +43,7 @@ export type Apollo25CompanyPilotSelectionInput = {
   buying_committee_coverage?: number | null
   fit_score?: number | null
   research_score?: number | null
+  canonical_company_id?: string | null
 }
 
 export type Apollo25CompanyPilotCompanyEligibilitySignals = {

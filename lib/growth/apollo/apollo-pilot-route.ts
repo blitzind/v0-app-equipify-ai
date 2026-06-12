@@ -138,6 +138,10 @@ export async function createApolloPilotCohort(
       company_candidate_id: string
       company_name?: string
       domain?: string | null
+      qualification_status?: string
+      sequence_ready_count?: number
+      enrollment_candidate_count?: number
+      metadata?: Record<string, unknown>
     }>
     metadata?: Record<string, unknown>
   },
@@ -190,7 +194,14 @@ export async function createApolloPilotCohort(
           company_candidate_id: company.company_candidate_id.trim(),
           company_name: company.company_name?.trim() || "Unknown company",
           domain: company.domain?.trim() || null,
+          qualification_status: company.qualification_status?.trim() || "unknown",
+          sequence_ready_count: company.sequence_ready_count ?? 0,
+          enrollment_candidate_count: company.enrollment_candidate_count ?? 0,
           status: "active",
+          metadata: {
+            ...(company.metadata ?? {}),
+            snapshot_locked: true,
+          },
         })),
       )
       .select("*")

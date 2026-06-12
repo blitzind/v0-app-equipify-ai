@@ -13,11 +13,23 @@ import {
 } from "@/lib/growth/apollo/apollo-25-company-pilot-launch-report"
 import type { Apollo25CompanyPilotSelectionInput } from "@/lib/growth/apollo/apollo-25-company-pilot-selection"
 import type { Apollo25CompanyPilotSelectionMode } from "@/lib/growth/apollo/apollo-25-company-pilot-skip-reasons"
+import {
+  buildApollo25CompanyPilotGreenfieldCohortSnapshot,
+  parseApollo25CompanyPilotCohortSnapshotFromMetadata,
+  snapshotCompaniesFromCohortCompanyRows,
+} from "@/lib/growth/apollo/apollo-25-company-pilot-draft-cohort"
+import { buildApollo25CompanyPilotCohortReview } from "@/lib/growth/apollo/apollo-25-company-pilot-cohort-review"
+import type { Apollo25CompanyPilotPersonalizationMaterializationState } from "@/lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation"
 import { createApolloPilotCohort } from "@/lib/growth/apollo/apollo-pilot-route"
+import { loadApolloPilotCohort } from "@/lib/growth/apollo/apollo-pilot-route"
+import { mapApolloSequenceExecutionCandidateDbRow } from "@/lib/growth/apollo/apollo-sequence-execution-automation-evidence"
 import { enrichApollo25CompanyPilotSelectionInputWithIntelligence } from "@/lib/growth/apollo/apollo-intelligence-recovery-enrichment"
 import { resolveApolloEnrichmentCanonicalCompanyId } from "@/lib/growth/apollo/apollo-enrichment-cert-canonical-company-resolution"
 import { loadApolloPrimaryContactOperatorReviewSnapshot } from "@/lib/growth/apollo/apollo-primary-contact-operator-review"
-import { APOLLO_25_COMPANY_PILOT_TARGET_COUNT } from "@/lib/growth/apollo/apollo-25-company-pilot-types"
+import {
+  APOLLO_25_COMPANY_PILOT_COHORT_SNAPSHOT_QA_MARKER,
+  APOLLO_25_COMPANY_PILOT_TARGET_COUNT,
+} from "@/lib/growth/apollo/apollo-25-company-pilot-types"
 
 const COHORTS_TABLE = "apollo_pilot_cohorts"
 const COMPANIES_TABLE = "apollo_pilot_cohort_companies"
@@ -245,13 +257,15 @@ export async function buildApollo25CompanyPilotSelectionInputs(
       company_candidate_id: companyId,
     })
 
-    inputs.push(
-      await enrichApollo25CompanyPilotSelectionInputWithIntelligence(
-        admin,
-        baseInput,
-        resolution.canonical_company_id,
-      ),
+    const enriched = await enrichApollo25CompanyPilotSelectionInputWithIntelligence(
+      admin,
+      baseInput,
+      resolution.canonical_company_id,
     )
+    inputs.push({
+      ...enriched,
+      canonical_company_id: resolution.canonical_company_id?.trim() || null,
+    })
   }
 
   return inputs
@@ -314,7 +328,14 @@ export async function loadApollo25CompanyPilotLaunchReport(
     env_gates_ok: resolveApollo25CompanyPilotEnvGatesOk(),
   })
 
-  if (input?.create_cohort && migration_present && preview.selection.selected_count > 0) {
+  if (input?.create_cohort && migration_present) {
+    const snapshot = buildApollo25CompanyPilotGreenfieldCohortSnapshot({
+      selection_inputs,
+      production_threshold,
+      target_size: APOLLO_25_COMPANY_PILOT_TARGET_COUNT,
+    })
+
+    if (snapshot.cohort_size > 0) {
     const cohortName =
       input.cohort_name?.trim() ||
       `Apollo 25-Company Pilot ${new Date().toISOString().slice(0, 10)}`
@@ -324,15 +345,26 @@ export async function loadApollo25CompanyPilotLaunchReport(
       target_company_count: APOLLO_25_COMPANY_PILOT_TARGET_COUNT,
       created_by: input.created_by ?? "system",
       created_by_email: input.created_by_email ?? "system@equipify.internal",
-      companies: preview.selection.selected.map((row) => ({
+      companies: snapshot.companies.map((row) => ({
         company_candidate_id: row.company_candidate_id,
         company_name: row.company_name,
-        domain: row.domain,
+        qualification_status: `score_${row.qualification_score}`,
+        sequence_ready_count: row.sequence_ready_count,
+        enrollment_candidate_count: row.verified_email_count,
+        metadata: {
+          snapshot_v14_2f: row,
+          cohort_rank: row.cohort_rank,
+          cohort_reason: row.cohort_reason,
+          snapshot_id: snapshot.snapshot_id,
+        },
       })),
       metadata: {
         qa_marker: preview.qa_marker,
         pilot_launch_certification: true,
-        pilot_selection_mode,
+        pilot_selection_mode: "greenfield",
+        draft_cohort_snapshot_v14_2f: snapshot,
+        snapshot_id: snapshot.snapshot_id,
+        snapshot_immutable: true,
         no_auto_outreach: true,
         no_duplicate_enrollment: true,
       },
@@ -346,6 +378,7 @@ export async function loadApollo25CompanyPilotLaunchReport(
       created: true,
     }
     cohort_status = created.cohort.status
+    }
   }
 
   const report = buildApollo25CompanyPilotLaunchReport({
@@ -360,6 +393,206 @@ export async function loadApollo25CompanyPilotLaunchReport(
   })
 
   return report
+}
+
+async function loadApollo25CompanyPilotPersonalizationMaterializationByCompany(
+  admin: SupabaseClient,
+  companyIds: string[],
+  enrollmentState: Record<string, { growth_lead_id: string | null }>,
+): Promise<Record<string, Apollo25CompanyPilotPersonalizationMaterializationState>> {
+  const map: Record<string, Apollo25CompanyPilotPersonalizationMaterializationState> = {}
+  for (const companyId of companyIds) {
+    map[companyId] = {
+      has_account_playbook: false,
+      has_personalization_generation: false,
+      execution_drafts: [],
+      has_voice_drop_candidate: false,
+    }
+  }
+  if (companyIds.length === 0) return map
+
+  const leadIds = [
+    ...new Set(
+      companyIds
+        .map((companyId) => enrollmentState[companyId]?.growth_lead_id)
+        .filter((leadId): leadId is string => Boolean(leadId)),
+    ),
+  ]
+
+  const [playbookRes, executionRes, voiceDropRes, personalizationRes] = await Promise.all([
+    admin
+      .schema("growth")
+      .from("account_playbooks")
+      .select("company_candidate_id")
+      .in("company_candidate_id", companyIds),
+    admin
+      .schema("growth")
+      .from("apollo_sequence_execution_candidates")
+      .select("*")
+      .in("company_candidate_id", companyIds),
+    admin
+      .schema("growth")
+      .from("apollo_voice_drop_candidates")
+      .select("company_candidate_id")
+      .in("company_candidate_id", companyIds),
+    leadIds.length > 0
+      ? admin
+          .schema("growth")
+          .from("personalization_generations")
+          .select("lead_id")
+          .in("lead_id", leadIds)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+
+  if (playbookRes.error) throw new Error(playbookRes.error.message)
+  if (executionRes.error) throw new Error(executionRes.error.message)
+  if (voiceDropRes.error) throw new Error(voiceDropRes.error.message)
+  if (personalizationRes.error) throw new Error(personalizationRes.error.message)
+
+  for (const row of playbookRes.data ?? []) {
+    const companyId = asString((row as Record<string, unknown>).company_candidate_id)
+    if (companyId && map[companyId]) map[companyId].has_account_playbook = true
+  }
+
+  for (const row of voiceDropRes.data ?? []) {
+    const companyId = asString((row as Record<string, unknown>).company_candidate_id)
+    if (companyId && map[companyId]) map[companyId].has_voice_drop_candidate = true
+  }
+
+  const leadsWithPersonalization = new Set<string>()
+  for (const row of personalizationRes.data ?? []) {
+    const leadId = asString((row as Record<string, unknown>).lead_id)
+    if (leadId) leadsWithPersonalization.add(leadId)
+  }
+
+  for (const companyId of companyIds) {
+    const leadId = enrollmentState[companyId]?.growth_lead_id
+    if (leadId && leadsWithPersonalization.has(leadId)) {
+      map[companyId].has_personalization_generation = true
+    }
+  }
+
+  for (const row of executionRes.data ?? []) {
+    const candidate = mapApolloSequenceExecutionCandidateDbRow(row as Record<string, unknown>)
+    const companyId = candidate.company_candidate_id?.trim()
+    if (!companyId || !map[companyId]) continue
+    map[companyId].execution_drafts = candidate.materialization.drafts
+  }
+
+  return map
+}
+
+async function loadLatestDraftApollo25CompanyPilotCohortId(admin: SupabaseClient): Promise<string | null> {
+  const { data, error } = await admin
+    .schema("growth")
+    .from(COHORTS_TABLE)
+    .select("id, metadata")
+    .eq("status", "draft")
+    .order("created_at", { ascending: false })
+    .limit(5)
+
+  if (error) throw new Error(error.message)
+
+  for (const row of data ?? []) {
+    const metadata = (row as Record<string, unknown>).metadata as Record<string, unknown> | undefined
+    if (parseApollo25CompanyPilotCohortSnapshotFromMetadata(metadata)) {
+      return asString((row as Record<string, unknown>).id) || null
+    }
+  }
+
+  return null
+}
+
+export async function loadApollo25CompanyPilotCohortReview(
+  admin: SupabaseClient,
+  input?: { cohort_id?: string; preview?: boolean },
+) {
+  const production_threshold = resolveApolloEnrollmentQualificationThreshold()
+  const selection_inputs = await buildApollo25CompanyPilotSelectionInputs(admin)
+  const companyIds = selection_inputs.map((row) => row.company_candidate_id)
+  const enrollmentState = await loadEnrollmentStateByCompany(admin, companyIds)
+  const materialization_by_company = await loadApollo25CompanyPilotPersonalizationMaterializationByCompany(
+    admin,
+    companyIds,
+    enrollmentState,
+  )
+
+  let cohort_id: string | null = null
+  let cohort_name: string | null = null
+  let cohort_status: string | null = null
+  let snapshot: ReturnType<typeof buildApollo25CompanyPilotGreenfieldCohortSnapshot> | null = null
+
+  const requestedCohortId = input?.cohort_id?.trim()
+  if (requestedCohortId) {
+    cohort_id = requestedCohortId
+  } else if (!input?.preview) {
+    cohort_id = await loadLatestDraftApollo25CompanyPilotCohortId(admin)
+  }
+
+  if (cohort_id) {
+    const loaded = await loadApolloPilotCohort(admin, cohort_id)
+    if (!loaded) throw new Error("cohort_not_found")
+
+    cohort_name = loaded.cohort.cohort_name
+    cohort_status = loaded.cohort.status
+    const parsedSnapshot = parseApollo25CompanyPilotCohortSnapshotFromMetadata(loaded.cohort.metadata)
+    if (parsedSnapshot) {
+      snapshot = parsedSnapshot
+    } else {
+      const companies = snapshotCompaniesFromCohortCompanyRows(loaded.companies)
+      if (companies.length === 0) {
+        throw new Error("cohort_snapshot_missing")
+      }
+      snapshot = {
+        qa_marker: APOLLO_25_COMPANY_PILOT_COHORT_SNAPSHOT_QA_MARKER,
+        snapshot_id: asString(loaded.cohort.metadata.snapshot_id) || "restored-from-company-rows",
+        generated_at: loaded.cohort.created_at,
+        pilot_selection_mode: "greenfield",
+        target_size: APOLLO_25_COMPANY_PILOT_TARGET_COUNT,
+        cohort_size: companies.length,
+        production_qualification_threshold: production_threshold,
+        immutable: true,
+        companies,
+      }
+    }
+  }
+
+  return buildApollo25CompanyPilotCohortReview({
+    selection_inputs,
+    production_threshold,
+    target_size: APOLLO_25_COMPANY_PILOT_TARGET_COUNT,
+    snapshot,
+    cohort_id,
+    cohort_name,
+    cohort_status,
+    materialization_by_company,
+  })
+}
+
+export async function createApollo25CompanyPilotDraftCohort(
+  admin: SupabaseClient,
+  input: {
+    cohort_name?: string
+    created_by: string
+    created_by_email: string
+  },
+) {
+  const migrationProbe = await admin.schema("growth").from(COHORTS_TABLE).select("id").limit(1)
+  if (migrationProbe.error) throw new Error("apollo_pilot_cohorts_table_unavailable")
+
+  const report = await loadApollo25CompanyPilotLaunchReport(admin, {
+    create_cohort: true,
+    cohort_name: input.cohort_name,
+    created_by: input.created_by,
+    created_by_email: input.created_by_email,
+    pilot_selection_mode: "greenfield",
+  })
+
+  const review = await loadApollo25CompanyPilotCohortReview(admin, {
+    cohort_id: report.cohort_creation.cohort_id ?? undefined,
+  })
+
+  return { report, review }
 }
 
 export { parsePilotSelectionMode }

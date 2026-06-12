@@ -7,6 +7,9 @@ import type {
 
 export const APOLLO_25_COMPANY_PILOT_QA_MARKER = "apollo-25-company-pilot-launch-v14" as const
 
+export const APOLLO_25_COMPANY_PILOT_COHORT_SNAPSHOT_QA_MARKER =
+  "apollo-25-company-pilot-cohort-v14-2f" as const
+
 export const APOLLO_25_COMPANY_PILOT_TARGET_COUNT = 25 as const
 
 export type Apollo25CompanyPilotSelectedContact = {
@@ -127,6 +130,99 @@ export type Apollo25CompanyPilotLaunchChecklist = {
 }
 
 export type Apollo25CompanyPilotLaunchVerdict = "READY TO LAUNCH 25-COMPANY PILOT" | "NOT READY"
+
+export type Apollo25CompanyPilotCohortSnapshotCompany = {
+  company_candidate_id: string
+  company_name: string
+  qualification_score: number
+  verified_email_count: number
+  sequence_ready_count: number
+  canonical_company_id: string | null
+  enrollment_status: string | null
+  cohort_rank: number
+  cohort_reason: string
+  ranking_explanation: string
+}
+
+export type Apollo25CompanyPilotCohortSnapshot = {
+  qa_marker: typeof APOLLO_25_COMPANY_PILOT_COHORT_SNAPSHOT_QA_MARKER
+  snapshot_id: string
+  generated_at: string
+  pilot_selection_mode: "greenfield"
+  target_size: number
+  cohort_size: number
+  production_qualification_threshold: number
+  immutable: true
+  companies: Apollo25CompanyPilotCohortSnapshotCompany[]
+}
+
+export type Apollo25CompanyPilotCohortEnrollmentReadinessCompany = {
+  company_candidate_id: string
+  company_name: string
+  ready: boolean
+  blockers: string[]
+  checks: {
+    verified_email: boolean
+    sequence_ready_contact: boolean
+    canonical_company_linkage: boolean
+    company_intelligence: boolean
+    qualification_gte_threshold: boolean
+    no_suppression_conflict: boolean
+    no_active_enrollment_conflict: boolean
+  }
+}
+
+export type Apollo25CompanyPilotCohortEnrollmentReadinessSummary = {
+  companies_evaluated: number
+  companies_ready: number
+  readiness_pct: number
+  companies: Apollo25CompanyPilotCohortEnrollmentReadinessCompany[]
+}
+
+export type Apollo25CompanyPilotCohortPersonalizationAssetKey =
+  | "account_playbook"
+  | "personalization"
+  | "content_quality_optimization"
+  | "voice_drop_assets"
+  | "email_assets"
+  | "sms_assets"
+
+export type Apollo25CompanyPilotCohortPersonalizationCompany = {
+  company_candidate_id: string
+  company_name: string
+  ready: boolean
+  missing_assets: Apollo25CompanyPilotCohortPersonalizationAssetKey[]
+  assets: Record<Apollo25CompanyPilotCohortPersonalizationAssetKey, boolean>
+}
+
+export type Apollo25CompanyPilotCohortPersonalizationReport = {
+  companies_evaluated: number
+  companies_ready: number
+  readiness_pct: number
+  companies: Apollo25CompanyPilotCohortPersonalizationCompany[]
+}
+
+export type Apollo25CompanyPilotLaunchRecommendation = {
+  ready_for_launch: boolean
+  blocking_issues: string[]
+  recommended_launch_size: number
+}
+
+export type Apollo25CompanyPilotCohortReview = {
+  qa_marker: typeof APOLLO_25_COMPANY_PILOT_COHORT_SNAPSHOT_QA_MARKER
+  computed_at: string
+  cohort_id: string | null
+  cohort_name: string | null
+  cohort_status: string | null
+  snapshot: Apollo25CompanyPilotCohortSnapshot
+  cohort_size: number
+  target_size: number
+  companies: Apollo25CompanyPilotCohortSnapshotCompany[]
+  enrollment_readiness: Apollo25CompanyPilotCohortEnrollmentReadinessSummary
+  personalization: Apollo25CompanyPilotCohortPersonalizationReport
+  launch_recommendation: Apollo25CompanyPilotLaunchRecommendation
+  no_outreach_side_effects: true
+}
 
 export type Apollo25CompanyPilotLaunchReport = {
   qa_marker: typeof APOLLO_25_COMPANY_PILOT_QA_MARKER

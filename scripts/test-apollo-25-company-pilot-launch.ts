@@ -23,6 +23,10 @@ import {
   resolveApollo25CompanyPilotEnvGatesOk,
 } from "../lib/growth/apollo/apollo-25-company-pilot-launch-report"
 import { runApollo25CompanyPilotPreflight } from "../lib/growth/apollo/apollo-25-company-pilot-preflight"
+import { buildApollo25CompanyPilotGreenfieldCohortSnapshot } from "../lib/growth/apollo/apollo-25-company-pilot-draft-cohort"
+import { evaluateApollo25CompanyPilotCohortEnrollmentReadiness } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-readiness"
+import { evaluateApollo25CompanyPilotCohortPersonalization } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation"
+import { buildApollo25CompanyPilotCohortReview } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-review"
 import {
   evaluateApollo25CompanyPilotEligibility,
   selectApollo25CompanyPilotCandidates,
@@ -45,6 +49,11 @@ const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-25-company-pilot-workload.ts",
   "lib/growth/apollo/apollo-25-company-pilot-launch-checklist.ts",
   "lib/growth/apollo/apollo-25-company-pilot-launch-report.ts",
+  "lib/growth/apollo/apollo-25-company-pilot-draft-cohort.ts",
+  "lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-readiness.ts",
+  "lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation.ts",
+  "lib/growth/apollo/apollo-25-company-pilot-cohort-review.ts",
+  "lib/growth/apollo/apollo-25-company-pilot-launch-recommendation.ts",
   "lib/growth/apollo/apollo-25-company-pilot-route.ts",
   "app/api/platform/growth/apollo-25-company-pilot/report/route.ts",
   "app/api/platform/growth/apollo-25-company-pilot/diagnostic/route.ts",
@@ -325,5 +334,96 @@ for (const item of report.checklist.items) {
 
 console.log("\n--- Final Verdict ---")
 console.log(report.verdict)
+
+const snapshotOnce = buildApollo25CompanyPilotGreenfieldCohortSnapshot({
+  selection_inputs: fixtureCompanies,
+  production_threshold: 70,
+  generated_at: "2026-06-11T12:00:00.000Z",
+})
+const snapshotTwice = buildApollo25CompanyPilotGreenfieldCohortSnapshot({
+  selection_inputs: fixtureCompanies,
+  production_threshold: 70,
+  generated_at: "2026-06-11T12:00:00.000Z",
+})
+assert.equal(snapshotOnce.snapshot_id, snapshotTwice.snapshot_id)
+assert.equal(snapshotOnce.cohort_size, 30)
+assert.equal(snapshotOnce.companies.length, 30)
+assert.equal(snapshotOnce.immutable, true)
+console.log("  ✓ greenfield cohort snapshot deterministic")
+
+for (let i = 1; i < snapshotOnce.companies.length; i += 1) {
+  const prev = snapshotOnce.companies[i - 1]!
+  const next = snapshotOnce.companies[i]!
+  assert.ok(prev.qualification_score >= next.qualification_score)
+  assert.equal(next.cohort_rank, prev.cohort_rank + 1)
+}
+assert.ok(snapshotOnce.companies.every((row) => row.ranking_explanation.includes("Rank")))
+console.log("  ✓ cohort ranking stable by qualification score")
+
+const snapshotCompanyIds = snapshotOnce.companies.map((row) => row.company_candidate_id)
+assert.equal(new Set(snapshotCompanyIds).size, snapshotCompanyIds.length)
+console.log("  ✓ no duplicate companies in cohort snapshot")
+
+const approvedSnapshot = buildApollo25CompanyPilotGreenfieldCohortSnapshot({
+  selection_inputs: [approvedCompany],
+  production_threshold: 70,
+  generated_at: "2026-06-11T12:00:00.000Z",
+})
+assert.equal(approvedSnapshot.cohort_size, 0)
+console.log("  ✓ greenfield exclusions respected in cohort snapshot")
+
+const readinessFixtureCompanies = fixtureCompanies.map((company) => ({
+  ...company,
+  canonical_company_id: `canonical-${company.company_candidate_id}`,
+  company_intelligence_present: true,
+}))
+const readinessSnapshot = buildApollo25CompanyPilotGreenfieldCohortSnapshot({
+  selection_inputs: readinessFixtureCompanies,
+  production_threshold: 70,
+  generated_at: "2026-06-11T12:00:00.000Z",
+})
+const enrollmentReadiness = evaluateApollo25CompanyPilotCohortEnrollmentReadiness({
+  snapshot_companies: readinessSnapshot.companies.slice(0, 5),
+  selection_inputs: readinessFixtureCompanies,
+  production_threshold: 70,
+})
+assert.equal(enrollmentReadiness.companies_evaluated, 5)
+assert.equal(enrollmentReadiness.companies_ready, 5)
+console.log("  ✓ enrollment readiness validation accurate for eligible companies")
+
+const personalization = evaluateApollo25CompanyPilotCohortPersonalization({
+  snapshot_companies: snapshotOnce.companies.slice(0, 2),
+  materialization_by_company: {},
+})
+assert.equal(personalization.companies_ready, 0)
+assert.ok(
+  personalization.companies.every((row) => row.missing_assets.includes("account_playbook")),
+)
+console.log("  ✓ personalization validation reports missing assets")
+
+const smallPoolReview = buildApollo25CompanyPilotCohortReview({
+  selection_inputs: fixtureCompanies.slice(0, 12),
+  production_threshold: 70,
+  target_size: 25,
+  computed_at: "2026-06-11T12:00:00.000Z",
+})
+assert.equal(smallPoolReview.cohort_size, 12)
+assert.equal(smallPoolReview.target_size, 25)
+assert.equal(smallPoolReview.launch_recommendation.recommended_launch_size, 12)
+assert.equal(smallPoolReview.launch_recommendation.ready_for_launch, false)
+assert.ok(
+  smallPoolReview.launch_recommendation.blocking_issues.some((issue) =>
+    issue.includes("eligible_pool_below_target"),
+  ),
+)
+console.log("  ✓ launch recommendation recommends actual launch size below target")
+
+const cohortRouteSource = fs.readFileSync(
+  path.join(ROOT, "app/api/platform/growth/apollo-25-company-pilot/cohort/route.ts"),
+  "utf8",
+)
+assert.match(cohortRouteSource, /export async function GET/)
+assert.match(cohortRouteSource, /cohort_size/)
+console.log("  ✓ cohort review GET endpoint exposes cohort_size and companies")
 
 console.log("\nApollo 25-Company Pilot Launch Certification PASSED")
