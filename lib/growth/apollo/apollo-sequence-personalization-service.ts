@@ -225,7 +225,7 @@ async function personalizeSmsDraft(
     draftType: "outbound",
   })
 
-  let body = smsDraft.body.trim()
+  let body = asString(smsDraft.body)
   if (!body || isApolloSmsPlaceholderBody(body)) {
     const name = input.unified_context.contact_full_name.split(/\s+/)[0] || "there"
     const company = input.unified_context.contact_company_name

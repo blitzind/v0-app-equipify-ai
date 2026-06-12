@@ -109,13 +109,23 @@ export function mapApolloMultichannelSequenceCandidateDbRow(
       confidence_score: 0,
       reasoning: "Pending",
     } as ApolloMultichannelOrchestrationResult),
-    sequence_template: readJson(row.sequence_template, {
-      sequence_key: "pending",
-      sequence_version: "v1",
-      sequence_label: "Pending",
-      channel_order: [],
-      recommendation_reason: "Pending",
-    } as ApolloMultichannelSequenceTemplate),
+    sequence_template: (() => {
+      const template = readJson(row.sequence_template, {
+        sequence_key: "pending",
+        sequence_version: "v1",
+        sequence_label: "Pending",
+        channel_order: [],
+        recommendation_reason: "Pending",
+      } as ApolloMultichannelSequenceTemplate)
+      return {
+        ...template,
+        sequence_key: asString(template.sequence_key) || "pending",
+        sequence_version: asString(template.sequence_version) || "v1",
+        sequence_label: asString(template.sequence_label) || "Pending",
+        recommendation_reason: asString(template.recommendation_reason) || "Pending",
+        channel_order: Array.isArray(template.channel_order) ? template.channel_order : [],
+      }
+    })(),
     scheduling_plan: readJson(row.scheduling_plan, {
       plan_version: "v1",
       total_days: 0,

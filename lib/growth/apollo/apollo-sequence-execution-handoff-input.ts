@@ -3,6 +3,10 @@
 import type { ApolloMultichannelSequenceCandidateRow } from "@/lib/growth/apollo/apollo-multichannel-orchestration-types"
 import type { ApolloSequenceExecutionMultichannelHandoffInput } from "@/lib/growth/apollo/apollo-sequence-execution-automation-types"
 
+function asString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : ""
+}
+
 export function buildApolloSequenceExecutionHandoffInput(input: {
   multichannel: ApolloMultichannelSequenceCandidateRow
   growth_lead_id?: string | null
@@ -18,14 +22,14 @@ export function buildApolloSequenceExecutionHandoffInput(input: {
     company_candidate_id: input.multichannel.company_candidate_id,
     company_contact_id: input.multichannel.company_contact_id,
     growth_lead_id: growthLeadId,
-    company_name: input.multichannel.company_name,
-    full_name: input.multichannel.full_name,
-    title: input.multichannel.title,
-    email: input.multichannel.email,
-    phone: input.multichannel.phone,
+    company_name: asString(input.multichannel.company_name) || "Unknown",
+    full_name: asString(input.multichannel.full_name) || "Unknown",
+    title: asString(input.multichannel.title) || null,
+    email: asString(input.multichannel.email) || null,
+    phone: asString(input.multichannel.phone) || null,
     qualification_score: input.multichannel.qualification_score,
-    sequence_key: input.multichannel.sequence_template.sequence_key,
-    sequence_label: input.multichannel.sequence_template.sequence_label,
+    sequence_key: asString(input.multichannel.sequence_template.sequence_key) || "pending",
+    sequence_label: asString(input.multichannel.sequence_template.sequence_label) || "Pending",
     channel_order: input.multichannel.orchestration_result.channel_order,
     scheduling_plan: input.multichannel.scheduling_plan,
     voice_drop_script_reference: input.voice_drop_script_reference ?? null,

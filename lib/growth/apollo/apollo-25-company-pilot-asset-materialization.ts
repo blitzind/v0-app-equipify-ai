@@ -690,16 +690,48 @@ export async function materializeApollo25CompanyPilotCohortAssets(
 
   const companies: Apollo25CompanyPilotAssetMaterializationCompanyResult[] = []
   for (const snapshotCompany of snapshot.companies) {
-    companies.push(
-      await materializeApollo25CompanyPilotCompanyAssets(admin, {
-        snapshot_company: snapshotCompany,
-        acting_user_id: input.acting_user_id,
-        acting_user_email: input.acting_user_email,
+    try {
+      companies.push(
+        await materializeApollo25CompanyPilotCompanyAssets(admin, {
+          snapshot_company: snapshotCompany,
+          acting_user_id: input.acting_user_id,
+          acting_user_email: input.acting_user_email,
+          execution_id,
+          canonical_dedupe,
+          materialized_canonical_company_ids: materializedCanonicalIds,
+        }),
+      )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      logGrowthEngine("apollo_25_pilot_asset_materialization_company_failed", {
+        cohort_id: input.cohort_id,
         execution_id,
-        canonical_dedupe,
-        materialized_canonical_company_ids: materializedCanonicalIds,
-      }),
-    )
+        company_candidate_id: snapshotCompany.company_candidate_id,
+        error: message,
+      })
+      companies.push({
+        company_candidate_id: snapshotCompany.company_candidate_id,
+        company_name: snapshotCompany.company_name,
+        ready: false,
+        blockers: [`materialization_error:${message}`],
+        artifacts: {
+          account_playbook: false,
+          personalization: false,
+          content_quality_optimization: false,
+          voice_drop_assets: false,
+          email_assets: false,
+          sms_assets: false,
+        },
+        stage_ids: {
+          enrollment_candidate_id: null,
+          account_playbook_id: null,
+          voice_drop_candidate_id: null,
+          multichannel_sequence_candidate_id: null,
+          sequence_execution_candidate_id: null,
+          growth_lead_id: null,
+        },
+      })
+    }
   }
 
   const { buildApollo25CompanyPilotSelectionInputs } = await import(

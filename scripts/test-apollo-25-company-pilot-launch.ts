@@ -53,11 +53,19 @@ import {
   countMaterializableSequenceStepsFromSchedulingPlan,
   evaluateApolloCertificationTemplateSelection,
   inferApolloCertificationChannelAvailability,
+  isApolloSequenceMaterializableSequenceKey,
   needsApolloCertificationMultichannelTemplateOverride,
 } from "../lib/growth/apollo/apollo-certification-multichannel-template-override"
 import { buildApolloMultichannelSchedulingPlan } from "../lib/growth/apollo/apollo-multichannel-scheduling-layer"
+import { mapApolloMultichannelSequenceCandidateDbRow } from "../lib/growth/apollo/apollo-multichannel-orchestration-evidence"
 import { buildApolloSequenceExecutionDraftRecords } from "../lib/growth/apollo/apollo-sequence-draft-generation"
+import { buildApolloSequenceExecutionHandoffInput } from "../lib/growth/apollo/apollo-sequence-execution-handoff-input"
+import { buildApolloSequenceExecutionMaterializationPlan } from "../lib/growth/apollo/apollo-sequence-materialization-engine"
 import { buildApolloSequenceExecutionStepPlans } from "../lib/growth/apollo/apollo-sequence-step-generation"
+import {
+  buildApolloUnifiedPersonalizationContextFromPacket,
+  APOLLO_UNIFIED_PERSONALIZATION_CONTEXT_QA_MARKER,
+} from "../lib/growth/apollo/apollo-unified-personalization-context"
 import { resolveUnsupportedSequenceMaterializationBlockers } from "../lib/growth/apollo/apollo-full-pipeline-materialization-evidence"
 import { buildApollo25CompanyPilotCohortReview } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-review"
 import {
@@ -778,6 +786,130 @@ const unknownTemplateSelection = evaluateApolloCertificationTemplateSelection({
 })
 assert.equal(unknownTemplateSelection.template, null)
 console.log("  ✓ custom_future maps to materializable pilot template; unknown channels still fail safely")
+
+assert.equal(isApolloSequenceMaterializableSequenceKey(null), false)
+assert.equal(
+  needsApolloCertificationMultichannelTemplateOverride({
+    sequence_key: null,
+    scheduling_plan: customFuturePlan,
+  }),
+  true,
+)
+const nullTemplateRow = mapApolloMultichannelSequenceCandidateDbRow({
+  id: "multi-null-template",
+  voice_drop_candidate_id: "voice-1",
+  enrollment_candidate_id: "enroll-1",
+  company_candidate_id: "company-1",
+  status: "sequence_approved",
+  contact_snapshot: {
+    company_name: null,
+    full_name: null,
+    title: null,
+    email: "contact@example.com",
+    phone: "+15551234567",
+  },
+  sequence_template: {
+    sequence_key: null,
+    sequence_version: null,
+    sequence_label: null,
+    channel_order: ["future_channel"],
+    recommendation_reason: null,
+  },
+  scheduling_plan: customFuturePlan,
+  orchestration_result: {
+    recommended_sequence: null,
+    channel_order: ["future_channel"],
+    confidence_score: 0,
+    reasoning: null,
+  },
+  channel_availability: {
+    verified_email: true,
+    phone: true,
+    mobile_phone: true,
+    sms_capable: true,
+    voice_drop_capable: true,
+    linkedin: false,
+  },
+})
+assert.equal(nullTemplateRow.sequence_template.sequence_key, "pending")
+const nullTemplateHandoff = buildApolloSequenceExecutionHandoffInput({
+  multichannel: nullTemplateRow,
+  growth_lead_id: "lead-1",
+})
+assert.equal(nullTemplateHandoff.sequence_key, "pending")
+assert.equal(nullTemplateHandoff.company_name, "Unknown")
+assert.equal(nullTemplateHandoff.full_name, "Unknown")
+const nullTemplateMaterialization = buildApolloSequenceExecutionMaterializationPlan(nullTemplateHandoff)
+assert.ok(nullTemplateMaterialization.pattern_key)
+const nullNameDrafts = buildApolloSequenceExecutionDraftRecords({
+  handoff: {
+    ...nullTemplateHandoff,
+    company_name: null as unknown as string,
+    full_name: null as unknown as string,
+    title: null,
+  },
+  steps: pilotExecutionSteps.slice(0, 1),
+})
+assert.match(nullNameDrafts[0].body_placeholder, /Hi there/)
+const nullContactUnifiedContext = buildApolloUnifiedPersonalizationContextFromPacket({
+  packet: {
+    companyName: "Summit Medical",
+    industryLabel: null,
+    website: null,
+    employeeSize: null,
+    location: null,
+    decisionMakerName: null,
+    decisionMakerTitle: null,
+    fitScore: 70,
+    engagementScore: 0,
+    opportunityReadinessTier: "warm",
+    buyingIntent: null,
+    competitorPressure: null,
+    capacitySignals: [],
+    websiteSummary: null,
+    websiteTextExcerpt: null,
+    websiteFindings: [],
+    hiringSignals: [],
+    enrichmentFindings: [],
+    researchRecommendedNextAction: null,
+    priorTouchSummaries: [],
+    priorReplySummaries: [],
+    objectionSummaries: [],
+    sequenceHistorySummaries: [],
+    timelineEventSummaries: [],
+    researchConfidence: 0.5,
+    researchPainPoints: [],
+    equipmentServiceIndicators: [],
+    companySummary: null,
+    outreachAngles: [],
+    priorOutboundSubjects: [],
+    priorTouchCount: 0,
+    hasWebsiteResearch: false,
+    hasDecisionMaker: false,
+    memoryAvailable: false,
+    memoryCoverageScore: null,
+    relationshipStage: null,
+    relationshipSummary: null,
+    memoryPreferenceSummaries: [],
+    memoryInteractionSummaries: [],
+    memoryCommitmentSummaries: [],
+    memoryAvoidRepeating: [],
+    memoryRiskFlags: [],
+    memoryCommitteeSummaries: [],
+    memoryOpenLoopSummaries: [],
+    memoryEngagementTrend: null,
+    memoryProgressionScore: null,
+    memoryUnresolvedObjectionCount: 0,
+    leadEngineGuidance: null,
+  },
+  contact_full_name: null,
+  contact_title: null,
+  contact_company_name: null,
+})
+assert.equal(nullContactUnifiedContext.qa_marker, APOLLO_UNIFIED_PERSONALIZATION_CONTEXT_QA_MARKER)
+assert.equal(nullContactUnifiedContext.contact_full_name, "there")
+assert.equal(nullContactUnifiedContext.contact_company_name, "Summit Medical")
+console.log("  ✓ null template/contact fields materialize without trim throws")
 
 const enrollBridgeSource = fs.readFileSync(
   path.join(ROOT, "lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge.ts"),

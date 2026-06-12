@@ -26,8 +26,12 @@ export type ApolloUnifiedPersonalizationContext = {
   attribution_chain: string[]
 }
 
+function asString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : ""
+}
+
 function truncate(value: string | null | undefined, max = 200): string | null {
-  const trimmed = (value ?? "").trim()
+  const trimmed = asString(value)
   if (!trimmed) return null
   if (trimmed.length <= max) return trimmed
   return `${trimmed.slice(0, max - 1)}…`
@@ -35,9 +39,9 @@ function truncate(value: string | null | undefined, max = 200): string | null {
 
 export function buildApolloUnifiedPersonalizationContextFromPacket(input: {
   packet: OutreachContextPacket
-  contact_full_name: string
+  contact_full_name?: string | null
   contact_title?: string | null
-  contact_company_name: string
+  contact_company_name?: string | null
   qualification_score?: number | null
   apollo_evidence_summary?: string | null
   apollo_source_label?: string | null
@@ -75,9 +79,9 @@ export function buildApolloUnifiedPersonalizationContextFromPacket(input: {
     account_playbook_summary: truncate(input.account_playbook_summary),
     buying_committee_summary: buyingCommittee,
     company_intelligence_summary: truncate(companyIntel) ?? truncate(packet.companyName),
-    contact_full_name: input.contact_full_name.trim() || "there",
+    contact_full_name: asString(input.contact_full_name) || "there",
     contact_title: truncate(input.contact_title, 120),
-    contact_company_name: input.contact_company_name.trim() || packet.companyName,
+    contact_company_name: asString(input.contact_company_name) || packet.companyName,
     qualification_score: input.qualification_score ?? packet.fitScore,
     attribution_chain: input.attribution_chain ?? [],
   }

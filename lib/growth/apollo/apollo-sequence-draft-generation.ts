@@ -10,6 +10,10 @@ import type {
 export const APOLLO_SEQUENCE_DRAFT_GENERATION_QA_MARKER =
   "apollo-sequence-draft-generation-v1" as const
 
+function asString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : ""
+}
+
 function draftTypeForStep(step: ApolloSequenceExecutionStepPlan) {
   if (step.channel === "email") return "email" as const
   if (step.channel === "sms") return "sms" as const
@@ -22,9 +26,9 @@ export function buildApolloSequenceExecutionDraftRecords(input: {
   steps: ApolloSequenceExecutionStepPlan[]
 }): ApolloSequenceExecutionDraftRecord[] {
   const { handoff, steps } = input
-  const company = handoff.company_name.trim() || "your organization"
-  const name = handoff.full_name.trim() || "there"
-  const title = handoff.title?.trim() || "your role"
+  const company = asString(handoff.company_name) || "your organization"
+  const name = asString(handoff.full_name) || "there"
+  const title = asString(handoff.title) || "your role"
 
   return steps.map((step) => {
     const draftType = draftTypeForStep(step)

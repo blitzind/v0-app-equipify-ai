@@ -9,6 +9,10 @@ export const APOLLO_CERTIFICATION_SEQUENCE_PATTERN_KEYS = [
   ...APOLLO_CERTIFICATION_FALLBACK_TEMPLATE_KEYS,
 ] as const
 
+function asString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : ""
+}
+
 export type ApolloSequencePatternSource = "persisted_pattern" | "certification_inline_pattern"
 
 export type ApolloSequencePatternResolution = {
@@ -17,16 +21,21 @@ export type ApolloSequencePatternResolution = {
   pattern_source: ApolloSequencePatternSource
 }
 
-export function isApolloCertificationSequencePatternKey(sequenceKey: string): boolean {
-  return (APOLLO_CERTIFICATION_SEQUENCE_PATTERN_KEYS as readonly string[]).includes(sequenceKey.trim())
+export function isApolloCertificationSequencePatternKey(
+  sequenceKey: string | null | undefined,
+): boolean {
+  const normalized = asString(sequenceKey)
+  return normalized
+    ? (APOLLO_CERTIFICATION_SEQUENCE_PATTERN_KEYS as readonly string[]).includes(normalized)
+    : false
 }
 
 export function resolveApolloSequenceExecutionPatternLookup(
   input: {
-    sequence_key: string
+    sequence_key: string | null | undefined
   },
 ): ApolloSequencePatternResolution {
-  const sequenceKey = input.sequence_key.trim()
+  const sequenceKey = asString(input.sequence_key)
 
   if (isApolloCertificationSequencePatternKey(sequenceKey)) {
     return {

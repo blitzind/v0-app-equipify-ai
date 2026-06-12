@@ -108,8 +108,10 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
 
-export function isApolloSequenceMaterializableSequenceKey(sequenceKey: string): boolean {
-  const normalized = sequenceKey.trim()
+export function isApolloSequenceMaterializableSequenceKey(
+  sequenceKey: string | null | undefined,
+): boolean {
+  const normalized = asString(sequenceKey)
   return Boolean(normalized) && normalized !== "custom_future" && normalized !== "pending"
 }
 
@@ -355,7 +357,7 @@ export function selectApolloCertificationMaterializableSequenceTemplate(input: {
 }
 
 export function needsApolloCertificationMultichannelTemplateOverride(input: {
-  sequence_key: string
+  sequence_key: string | null | undefined
   scheduling_plan: ApolloMultichannelSchedulingPlan
 }): boolean {
   if (!isApolloSequenceMaterializableSequenceKey(input.sequence_key)) return true
