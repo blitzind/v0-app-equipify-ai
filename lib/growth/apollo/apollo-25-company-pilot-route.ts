@@ -613,4 +613,18 @@ export async function materializeApollo25CompanyPilotCohortAssetReadiness(
   return materializeApollo25CompanyPilotCohortAssets(admin, input)
 }
 
+export async function enrollApollo25CompanyPilotCohortEnrollmentBridge(
+  admin: SupabaseClient,
+  input: {
+    cohort_id: string
+    acting_user_id: string
+    acting_user_email: string
+  },
+) {
+  const { enrollApollo25CompanyPilotCohortCompanies } = await import(
+    "@/lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge"
+  )
+  return enrollApollo25CompanyPilotCohortCompanies(admin, input)
+}
+
 export { parsePilotSelectionMode }

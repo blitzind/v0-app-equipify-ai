@@ -39,6 +39,30 @@ export function evaluateApollo25CompanyPilotCohortEnrollmentReadiness(input: {
       }
     }
 
+    if (selectionInput.enrollment_status === "enrollment_approved") {
+      const checks = {
+        verified_email: true,
+        sequence_ready_contact: true,
+        canonical_company_linkage: Boolean(selectionInput.canonical_company_id?.trim()),
+        company_intelligence: Boolean(selectionInput.company_intelligence_present),
+        qualification_gte_threshold: true,
+        no_suppression_conflict: true,
+        no_active_enrollment_conflict: true,
+      }
+      const blockers: string[] = []
+      if (!checks.canonical_company_linkage) blockers.push("canonical_company_linkage")
+      if (!checks.company_intelligence) blockers.push("company_intelligence")
+      if (!selectionInput.growth_lead_id?.trim()) blockers.push("missing_growth_lead")
+
+      return {
+        company_candidate_id: snapshotCompany.company_candidate_id,
+        company_name: snapshotCompany.company_name,
+        ready: blockers.length === 0,
+        blockers,
+        checks,
+      }
+    }
+
     const analysis = analyzeApollo25CompanyPilotCompanyEligibility(
       selectionInput,
       production_threshold,
@@ -54,9 +78,7 @@ export function evaluateApollo25CompanyPilotCohortEnrollmentReadiness(input: {
         analysis.score >= production_threshold && !analysis.signals.qualification_below_threshold,
       no_suppression_conflict: !analysis.signals.suppression_conflict,
       no_active_enrollment_conflict:
-        !analysis.signals.active_pilot_conflict &&
-        !selectionInput.has_active_sequence_enrollment &&
-        selectionInput.enrollment_status !== "enrollment_approved",
+        !analysis.signals.active_pilot_conflict && !selectionInput.has_active_sequence_enrollment,
     }
 
     const blockers = Object.entries(checks)

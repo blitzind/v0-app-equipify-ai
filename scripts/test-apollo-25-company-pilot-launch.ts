@@ -30,6 +30,9 @@ import { evaluateApollo25CompanyPilotCohortEnrollmentReadiness } from "../lib/gr
 import { evaluateApollo25CompanyPilotCohortPersonalization } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation"
 import { buildApollo25CompanyPilotCohortReview } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-review"
 import {
+  describeEnrollmentDuplicatePreventionDecision,
+} from "../lib/growth/apollo/apollo-full-pipeline-enrollment-resolution-evidence"
+import {
   evaluateApollo25CompanyPilotEligibility,
   selectApollo25CompanyPilotCandidates,
 } from "../lib/growth/apollo/apollo-25-company-pilot-selection"
@@ -60,11 +63,13 @@ const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-25-company-pilot-canonical-dedupe-audit.ts",
   "lib/growth/apollo/apollo-25-company-pilot-launch-certification.ts",
   "lib/growth/apollo/apollo-25-company-pilot-asset-materialization.ts",
+  "lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge.ts",
   "lib/growth/apollo/apollo-25-company-pilot-route.ts",
   "app/api/platform/growth/apollo-25-company-pilot/report/route.ts",
   "app/api/platform/growth/apollo-25-company-pilot/diagnostic/route.ts",
   "app/api/platform/growth/apollo-25-company-pilot/cohort/route.ts",
   "app/api/platform/growth/apollo-25-company-pilot/cohort/materialize/route.ts",
+  "app/api/platform/growth/apollo-25-company-pilot/cohort/enroll/route.ts",
 ]
 
 const FORBIDDEN = [
@@ -572,5 +577,79 @@ const materializeRouteSource = fs.readFileSync(
 assert.match(materializeRouteSource, /materializeApollo25CompanyPilotCohortAssetReadiness/)
 assert.doesNotMatch(materializeRouteSource, /runSequenceExecutionJob/)
 console.log("  ✓ cohort materialize route present without sequence execution sends")
+
+const enrollBridgeSource = fs.readFileSync(
+  path.join(ROOT, "lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge.ts"),
+  "utf8",
+)
+assert.match(
+  enrollBridgeSource,
+  /apollo-25-company-pilot-cohort-enrollment-bridge-v14-2j/,
+)
+assert.match(
+  enrollBridgeSource,
+  /apollo-25-company-pilot-cohort-enroll-v14-2j/,
+)
+assert.match(enrollBridgeSource, /executeApolloFullPipelineCertificationEnrollment/)
+assert.match(enrollBridgeSource, /findReusableApolloEnrollmentCandidate/)
+assert.match(enrollBridgeSource, /approveApolloEnrollmentCandidate/)
+assert.match(enrollBridgeSource, /handoffEnrollmentApprovedToAccountPlaybook/)
+assert.doesNotMatch(enrollBridgeSource, /runSequenceExecutionJob/)
+assert.doesNotMatch(enrollBridgeSource, /queueSequenceStepTransportJob/)
+console.log("  ✓ cohort enrollment bridge reuses enrollment automation + approval handoff")
+
+assert.equal(describeEnrollmentDuplicatePreventionDecision({ candidates_created: 1, candidates: [{ candidate_id: "c1" }] }), "created_new_candidate")
+assert.equal(
+  describeEnrollmentDuplicatePreventionDecision({
+    candidates_created: 0,
+    candidates: [{ candidate_id: "c1" }],
+    candidates_skipped_duplicate: 0,
+  }),
+  "reused_existing_candidate",
+)
+assert.equal(
+  describeEnrollmentDuplicatePreventionDecision({
+    candidates_created: 0,
+    candidates: [],
+    candidates_skipped_duplicate: 1,
+  }),
+  "reused_pending_duplicate",
+)
+console.log("  ✓ enrollment duplicate prevention decisions classify reuse vs create")
+
+const enrolledFixtureCompanies = fixtureCompanies.slice(0, 11).map((company, index) => ({
+  ...company,
+  enrollment_status: "enrollment_approved" as const,
+  growth_lead_id: `lead-${index + 1}`,
+  company_candidate_id: `enrolled-company-${index + 1}`,
+  canonical_company_id: `canonical-${index + 1}`,
+}))
+const enrolledEnrollmentReadiness = evaluateApollo25CompanyPilotCohortEnrollmentReadiness({
+  snapshot_companies: enrolledFixtureCompanies.map((company, index) => ({
+    company_candidate_id: company.company_candidate_id,
+    company_name: company.company_name,
+    qualification_score: 80,
+    verified_email_count: 1,
+    sequence_ready_count: 1,
+    canonical_company_id: null,
+    enrollment_status: "enrollment_approved",
+    cohort_rank: index + 1,
+    cohort_reason: "production_rules_passed",
+    ranking_explanation: "fixture",
+  })),
+  selection_inputs: enrolledFixtureCompanies,
+  production_threshold: 70,
+})
+assert.equal(enrolledEnrollmentReadiness.readiness_pct, 100)
+assert.equal(enrolledEnrollmentReadiness.companies_ready, 11)
+console.log("  ✓ enrollment readiness passes after approved enrollments (materialization prerequisite)")
+
+const enrollRouteSource = fs.readFileSync(
+  path.join(ROOT, "app/api/platform/growth/apollo-25-company-pilot/cohort/enroll/route.ts"),
+  "utf8",
+)
+assert.match(enrollRouteSource, /enrollApollo25CompanyPilotCohortEnrollmentBridge/)
+assert.doesNotMatch(enrollRouteSource, /runSequenceExecutionJob/)
+console.log("  ✓ cohort enroll route present without sequence execution sends")
 
 console.log("\nApollo 25-Company Pilot Launch Certification PASSED")
