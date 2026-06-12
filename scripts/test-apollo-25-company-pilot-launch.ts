@@ -63,6 +63,10 @@ import { buildApolloSequenceExecutionHandoffInput } from "../lib/growth/apollo/a
 import { buildApolloSequenceExecutionMaterializationPlan } from "../lib/growth/apollo/apollo-sequence-materialization-engine"
 import { buildApolloSequenceExecutionStepPlans } from "../lib/growth/apollo/apollo-sequence-step-generation"
 import {
+  evaluateApolloVoiceDropApprovalGate,
+  mapApolloVoiceDropCandidateDbRow,
+} from "../lib/growth/apollo/apollo-voice-drop-automation-evidence"
+import {
   buildApolloUnifiedPersonalizationContextFromPacket,
   APOLLO_UNIFIED_PERSONALIZATION_CONTEXT_QA_MARKER,
 } from "../lib/growth/apollo/apollo-unified-personalization-context"
@@ -910,6 +914,46 @@ assert.equal(nullContactUnifiedContext.qa_marker, APOLLO_UNIFIED_PERSONALIZATION
 assert.equal(nullContactUnifiedContext.contact_full_name, "there")
 assert.equal(nullContactUnifiedContext.contact_company_name, "Summit Medical")
 console.log("  ✓ null template/contact fields materialize without trim throws")
+
+const nullVoiceDropScriptRow = mapApolloVoiceDropCandidateDbRow({
+  id: "voice-null-script",
+  enrollment_candidate_id: "enroll-1",
+  company_candidate_id: "df1d98f7-a60b-443e-bd5c-c9f8097ccf5c",
+  status: "pending_voice_drop_approval",
+  qualification_score: 88,
+  contact_snapshot: {
+    company_name: "Absolute Electric LLC",
+    full_name: null,
+    title: null,
+    email: "contact@example.com",
+    phone: "+15551234567",
+  },
+  voice_drop_script: {
+    script_type: "cold_introduction",
+    intro: null,
+    value_proposition: null,
+    personalization_line: null,
+    call_to_action: null,
+    full_script: null,
+    personalization_data: null,
+  },
+  channel_availability: {
+    verified_email: true,
+    phone: true,
+    mobile_phone: true,
+    sms_capable: true,
+    voice_drop_capable: true,
+    linkedin: false,
+  },
+})
+assert.equal(nullVoiceDropScriptRow.voice_drop_script.full_script, "")
+assert.equal(nullVoiceDropScriptRow.full_name, "Unknown")
+const nullVoiceDropApprovalGate = evaluateApolloVoiceDropApprovalGate({
+  candidate: nullVoiceDropScriptRow,
+})
+assert.equal(nullVoiceDropApprovalGate.allowed, false)
+assert.equal(nullVoiceDropApprovalGate.code, "script_not_generated")
+console.log("  ✓ null voice_drop_script.full_script blocks approval without trim throws")
 
 const enrollBridgeSource = fs.readFileSync(
   path.join(ROOT, "lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-bridge.ts"),

@@ -2,12 +2,16 @@
 
 const E164_RE = /^\+[1-9]\d{6,14}$/
 
-export function isValidE164(value: string): boolean {
-  return E164_RE.test(value.trim())
+export function isValidE164(value: string | null | undefined): boolean {
+  const trimmed = typeof value === "string" ? value.trim() : ""
+  return trimmed ? E164_RE.test(trimmed) : false
 }
 
-export function normalizeToE164(input: string, defaultCountryCode = "1"): string | null {
-  const trimmed = input.trim()
+export function normalizeToE164(
+  input: string | null | undefined,
+  defaultCountryCode = "1",
+): string | null {
+  const trimmed = typeof input === "string" ? input.trim() : ""
   if (!trimmed) return null
 
   if (trimmed.startsWith("+")) {
@@ -29,7 +33,7 @@ export function normalizeToE164(input: string, defaultCountryCode = "1"): string
   return null
 }
 
-export function phoneLookupKeys(e164: string): string[] {
+export function phoneLookupKeys(e164: string | null | undefined): string[] {
   const normalized = normalizeToE164(e164)
   if (!normalized) return []
 

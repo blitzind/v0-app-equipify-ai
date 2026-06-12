@@ -21,6 +21,10 @@ import { APOLLO_ACCOUNT_PLAYBOOKS_QA_MARKER } from "@/lib/growth/apollo/apollo-a
 const PLAYBOOKS_TABLE = "account_playbooks"
 const MEMBERS_TABLE = "account_playbook_members"
 
+function asString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : ""
+}
+
 function emptyResult(
   action: ApolloAccountPlaybookAutomationActionResult["action"],
   error: string,
@@ -74,10 +78,11 @@ function extractBuyingCommitteeMembers(
       .filter((entry): entry is ApolloAccountPlaybookCommitteeMemberInput => entry !== null)
   }
 
-  if (input.full_name.trim()) {
+  const primaryContactName = asString(input.full_name)
+  if (primaryContactName) {
     return [
       {
-        full_name: input.full_name,
+        full_name: primaryContactName,
         title: input.title,
         email: input.email,
         phone: input.phone,

@@ -17,6 +17,10 @@ import { buildVoiceDropPipelineFromEnrollmentHandoff } from "@/lib/growth/apollo
 
 const TABLE = "apollo_voice_drop_candidates"
 
+function asString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : ""
+}
+
 export async function certifyApolloVoiceDropAutomation(
   admin: SupabaseClient,
   input: {
@@ -52,7 +56,7 @@ export async function certifyApolloVoiceDropAutomation(
   })
   if (!intelligenceGenerated) blockers.push("intelligence_not_generated")
 
-  const scriptGenerated = Boolean(first?.voice_drop_script.full_script.trim())
+  const scriptGenerated = Boolean(asString(first?.voice_drop_script.full_script))
   checks.push({
     id: "script_generated",
     satisfied: scriptGenerated,
@@ -157,7 +161,7 @@ export async function certifyApolloVoiceDropAutomation(
 
   checks.push({
     id: "script_generation_engine",
-    satisfied: Boolean(pipelineSelfTest.voiceDropScript.full_script.trim()),
+    satisfied: Boolean(asString(pipelineSelfTest.voiceDropScript.full_script)),
     detail: "Offline script generation engine produces full script.",
   })
 

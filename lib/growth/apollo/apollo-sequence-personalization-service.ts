@@ -38,9 +38,15 @@ import {
 import { buildApolloVoiceDropIntelligenceFromUnifiedContext } from "@/lib/growth/apollo/apollo-voice-drop-intelligence-engine"
 import { generateApolloVoiceDropScriptFromUnifiedContext } from "@/lib/growth/apollo/apollo-voice-drop-script-generation"
 
-import { APOLLO_SEQUENCE_PERSONALIZATION_SERVICE_QA_MARKER } from "@/lib/growth/apollo/apollo-sequence-personalization-constants"
+import {
+  APOLLO_SEQUENCE_PERSONALIZATION_SERVICE_QA_MARKER,
+  APOLLO_SMS_PERSONALIZATION_MISSING_PHONE_BLOCKER,
+} from "@/lib/growth/apollo/apollo-sequence-personalization-constants"
 
-export { APOLLO_SEQUENCE_PERSONALIZATION_SERVICE_QA_MARKER } from "@/lib/growth/apollo/apollo-sequence-personalization-constants"
+export {
+  APOLLO_SEQUENCE_PERSONALIZATION_SERVICE_QA_MARKER,
+  APOLLO_SMS_PERSONALIZATION_MISSING_PHONE_BLOCKER,
+} from "@/lib/growth/apollo/apollo-sequence-personalization-constants"
 
 export type ApolloSequencePersonalizationResult = {
   ok: boolean
@@ -333,6 +339,7 @@ export async function personalizeApolloSequenceCandidateContent(
   }
 
   const phoneE164 = normalizeToE164(input.candidate.phone)
+  const smsPhoneUnavailable = !phoneE164
   const materialization = { ...input.candidate.materialization }
   const updatedDrafts: ApolloSequenceExecutionDraftRecord[] = []
   const jobByStep = new Map(
@@ -371,6 +378,10 @@ export async function personalizeApolloSequenceCandidateContent(
     }
 
     if (draft.draft_type === "sms") {
+      if (smsPhoneUnavailable) {
+        updatedDrafts.push(draft)
+        continue
+      }
       const smsResult = await personalizeSmsDraft(admin, {
         draft,
         jobLink,
@@ -422,14 +433,16 @@ export async function personalizeApolloSequenceCandidateContent(
       isApolloSequenceDraftPlaceholderContent(draft.body_placeholder),
   )
   const channelDraftsMaterialized =
-    !emailStillPlaceholder && !smsStillPlaceholder && !voiceStillPlaceholder
+    !emailStillPlaceholder &&
+    !voiceStillPlaceholder &&
+    (smsPhoneUnavailable || !smsStillPlaceholder)
 
   if (!channelDraftsMaterialized) {
     return {
       ok: false,
       code: emailStillPlaceholder
         ? "email_still_placeholder"
-        : smsStillPlaceholder
+        : smsStillPlaceholder && !smsPhoneUnavailable
           ? "sms_still_placeholder"
           : voiceStillPlaceholder
             ? "voice_drop_still_placeholder"
@@ -444,8 +457,10 @@ export async function personalizeApolloSequenceCandidateContent(
 
   return {
     ok: true,
-    code: null,
-    detail: "Channel drafts materialized — email, SMS, and voice drop content present (no send).",
+    code: smsPhoneUnavailable ? APOLLO_SMS_PERSONALIZATION_MISSING_PHONE_BLOCKER : null,
+    detail: smsPhoneUnavailable
+      ? "Email and voice drop drafts materialized — SMS blocked (missing phone, no send)."
+      : "Channel drafts materialized — email, SMS, and voice drop content present (no send).",
     materialization,
     execution_jobs: input.candidate.execution_jobs,
     unified_context: unifiedContext,

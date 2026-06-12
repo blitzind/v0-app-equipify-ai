@@ -45,6 +45,8 @@ import { APOLLO_SEQUENCE_EXECUTION_AUTOMATION_QA_MARKER } from "@/lib/growth/apo
 import { handoffMultichannelApprovedToSequenceExecution } from "@/lib/growth/apollo/apollo-sequence-execution-bridge"
 import { buildApolloSequenceExecutionHandoffInput } from "@/lib/growth/apollo/apollo-sequence-execution-handoff-input"
 import { personalizeApolloSequenceCandidateContent } from "@/lib/growth/apollo/apollo-sequence-personalization-service"
+import { APOLLO_SMS_PERSONALIZATION_MISSING_PHONE_BLOCKER } from "@/lib/growth/apollo/apollo-sequence-personalization-constants"
+import { normalizeToE164 } from "@/lib/growth/sms/phone-normalization"
 import { approveApolloVoiceDropCandidate } from "@/lib/growth/apollo/apollo-voice-drop-candidate-queue"
 import { mapApolloVoiceDropCandidateDbRow } from "@/lib/growth/apollo/apollo-voice-drop-automation-evidence"
 import { generatePersonalizationDraft } from "@/lib/growth/personalization/dashboard"
@@ -271,6 +273,16 @@ export async function materializeApollo25CompanyPilotCompanyAssets(
 
   stage_ids.enrollment_candidate_id = enrollment.candidate_id
 
+  const emptyArtifacts = {
+    account_playbook: false,
+    personalization: false,
+    content_quality_optimization: false,
+    voice_drop_assets: false,
+    email_assets: false,
+    sms_assets: false,
+  }
+
+  try {
   const canonicalResolution = await resolveApolloEnrichmentCanonicalCompanyId(admin, {
     company_candidate_id,
   })
@@ -476,6 +488,7 @@ export async function materializeApollo25CompanyPilotCompanyAssets(
   if (!execution) {
     blockers.push("sequence_execution_candidate_missing")
   } else {
+    const missingPhone = !normalizeToE164(execution.phone)
     const personalization = await personalizeApolloSequenceCandidateContent(admin, {
       candidate: execution,
       acting_user_id: input.acting_user_id,
@@ -486,6 +499,7 @@ export async function materializeApollo25CompanyPilotCompanyAssets(
     )
     const shouldPersistPersonalizedDrafts =
       personalization.ok ||
+      (channelDrafts.email_assets && channelDrafts.voice_drop_assets) ||
       (channelDrafts.email_assets && channelDrafts.sms_assets && channelDrafts.voice_drop_assets)
 
     if (shouldPersistPersonalizedDrafts) {
@@ -497,6 +511,10 @@ export async function materializeApollo25CompanyPilotCompanyAssets(
         acting_user_id: input.acting_user_id,
         acting_user_email: input.acting_user_email,
       })
+    }
+
+    if (missingPhone) {
+      blockers.push(APOLLO_SMS_PERSONALIZATION_MISSING_PHONE_BLOCKER)
     }
 
     if (!personalization.ok) {
@@ -551,6 +569,23 @@ export async function materializeApollo25CompanyPilotCompanyAssets(
     blockers,
     artifacts,
     stage_ids,
+  }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    logGrowthEngine("apollo_25_pilot_asset_materialization_company_failed", {
+      cohort_company_candidate_id: company_candidate_id,
+      execution_id: input.execution_id,
+      enrollment_candidate_id: stage_ids.enrollment_candidate_id,
+      error: message,
+    })
+    return {
+      company_candidate_id,
+      company_name: input.snapshot_company.company_name,
+      ready: false,
+      blockers: [`materialization_error:${message}`],
+      artifacts: emptyArtifacts,
+      stage_ids,
+    }
   }
 }
 

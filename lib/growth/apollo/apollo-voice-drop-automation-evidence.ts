@@ -34,6 +34,21 @@ function asNumber(value: unknown): number {
   return 0
 }
 
+function normalizeVoiceDropScript(raw: ApolloVoiceDropScript): ApolloVoiceDropScript {
+  return {
+    script_type: raw.script_type ?? "cold_introduction",
+    intro: asString(raw.intro),
+    value_proposition: asString(raw.value_proposition),
+    personalization_line: asString(raw.personalization_line),
+    call_to_action: asString(raw.call_to_action),
+    full_script: asString(raw.full_script),
+    personalization_data:
+      raw.personalization_data && typeof raw.personalization_data === "object"
+        ? raw.personalization_data
+        : {},
+  }
+}
+
 export function buildApolloVoiceDropAttributionChain(): ApolloVoiceDropSourceAttribution[] {
   return [...APOLLO_VOICE_DROP_SOURCE_ATTRIBUTION]
 }
@@ -112,7 +127,7 @@ export function mapApolloVoiceDropCandidateDbRow(
           call_to_action_recommendation: "Pending.",
           intelligence_summary: "Pending.",
         }
-  const voiceDropScript =
+  const voiceDropScript = normalizeVoiceDropScript(
     row.voice_drop_script && typeof row.voice_drop_script === "object"
       ? (row.voice_drop_script as ApolloVoiceDropScript)
       : {
@@ -123,7 +138,8 @@ export function mapApolloVoiceDropCandidateDbRow(
           call_to_action: "",
           full_script: "",
           personalization_data: {},
-        }
+        },
+  )
   const sourceAttribution =
     row.source_attribution && typeof row.source_attribution === "object"
       ? (row.source_attribution as ApolloVoiceDropAttributionRecord)
@@ -194,7 +210,7 @@ export function evaluateApolloVoiceDropApprovalGate(input: {
   if (input.candidate.status !== "pending_voice_drop_approval") {
     return { allowed: false, code: "invalid_candidate_status" }
   }
-  if (!input.candidate.voice_drop_script.full_script.trim()) {
+  if (!asString(input.candidate.voice_drop_script.full_script)) {
     return { allowed: false, code: "script_not_generated" }
   }
   return { allowed: true, code: null }

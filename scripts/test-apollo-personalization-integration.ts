@@ -13,6 +13,7 @@ import {
   buildApolloUnifiedPersonalizationContextFromPacket,
   APOLLO_UNIFIED_PERSONALIZATION_CONTEXT_QA_MARKER,
 } from "../lib/growth/apollo/apollo-unified-personalization-context"
+import { normalizeToE164, isValidE164 } from "../lib/growth/sms/phone-normalization"
 import {
   evaluateApolloSmsSendReadiness,
   isApolloEmailPlaceholderContent,
@@ -20,7 +21,10 @@ import {
   APOLLO_SMS_PLACEHOLDER_BLOCK_CODE,
   APOLLO_SEQUENCE_PLACEHOLDER_GUARD_QA_MARKER,
 } from "../lib/growth/apollo/apollo-sequence-placeholder-guard"
-import { APOLLO_SEQUENCE_PERSONALIZATION_SERVICE_QA_MARKER } from "../lib/growth/apollo/apollo-sequence-personalization-constants"
+import {
+  APOLLO_SEQUENCE_PERSONALIZATION_SERVICE_QA_MARKER,
+  APOLLO_SMS_PERSONALIZATION_MISSING_PHONE_BLOCKER,
+} from "../lib/growth/apollo/apollo-sequence-personalization-constants"
 import { evaluateApolloSequenceCandidateContentReadiness } from "../lib/growth/apollo/apollo-sequence-draft-readiness"
 import { evaluateApolloExecutionMaterializationChannelDrafts } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation"
 import { buildApolloSequenceExecutionDraftRecords } from "../lib/growth/apollo/apollo-sequence-draft-generation"
@@ -162,7 +166,14 @@ const unifiedContext = buildApolloUnifiedPersonalizationContextFromPacket({
 
 assert.equal(unifiedContext.qa_marker, APOLLO_UNIFIED_PERSONALIZATION_CONTEXT_QA_MARKER)
 assert.ok(unifiedContext.buying_committee_summary)
+assert.equal(normalizeToE164(null), null)
+assert.equal(normalizeToE164(undefined), null)
+assert.equal(normalizeToE164(""), null)
+assert.equal(isValidE164(null), false)
+assert.equal(isValidE164(undefined), false)
+assert.equal(isValidE164(""), false)
 console.log("  ✓ unified personalization context packet")
+console.log("  ✓ null phone E.164 normalization does not trim throw")
 
 const callIntel = buildApolloCallIntelligence(unifiedContext)
 assert.equal(callIntel.qa_marker, APOLLO_CALL_INTELLIGENCE_QA_MARKER)
@@ -279,16 +290,66 @@ const personalizationServiceSource = fs.readFileSync(
   "utf8",
 )
 assert.match(personalizationServiceSource, /buildApolloEmailPersonalizationFallback/)
+assert.match(personalizationServiceSource, /smsPhoneUnavailable/)
 assert.doesNotMatch(personalizationServiceSource, /Email personalization blocked:/)
 const materializeSource = fs.readFileSync(
   path.join(ROOT, "lib/growth/apollo/apollo-25-company-pilot-asset-materialization.ts"),
   "utf8",
 )
 assert.match(materializeSource, /shouldPersistPersonalizedDrafts/)
+assert.match(materializeSource, /APOLLO_SMS_PERSONALIZATION_MISSING_PHONE_BLOCKER/)
 assert.doesNotMatch(materializeSource, /runSequenceExecutionJob/)
 const channelBefore = evaluateApolloExecutionMaterializationChannelDrafts(placeholderDrafts)
 assert.equal(channelBefore.email_assets, false)
 assert.equal(channelBefore.sms_assets, false)
 console.log("  ✓ pilot materialize persists channel drafts without sequence execution sends")
+
+const nullPhoneHandoff = { ...handoff, phone: null }
+const nullPhoneDrafts = buildApolloSequenceExecutionDraftRecords({
+  handoff: nullPhoneHandoff,
+  steps,
+})
+assert.ok(
+  nullPhoneDrafts.some(
+    (draft) => draft.draft_type === "email" && isApolloSequenceDraftPlaceholderContent(draft.body_placeholder),
+  ),
+)
+assert.ok(
+  nullPhoneDrafts.some(
+    (draft) => draft.draft_type === "sms" && isApolloSequenceDraftPlaceholderContent(draft.body_placeholder),
+  ),
+)
+assert.ok(
+  nullPhoneDrafts.some(
+    (draft) =>
+      draft.draft_type === "voice_drop" && isApolloSequenceDraftPlaceholderContent(draft.body_placeholder),
+  ),
+)
+
+const nullPhoneVoiceScript = generateApolloVoiceDropScriptFromUnifiedContext({
+  script_type: voiceIntel.recommended_script_type,
+  unified_context: unifiedContext,
+})
+assert.ok(nullPhoneVoiceScript.full_script.trim())
+assert.ok(!nullPhoneVoiceScript.full_script.includes("[Draft placeholder"))
+
+const personalizedEmailDraft = {
+  ...nullPhoneDrafts.find((draft) => draft.draft_type === "email")!,
+  subject_placeholder: "Quick idea for Summit Medical",
+  body_placeholder: "Hi Alex, noticed your team at Summit Medical...",
+}
+const personalizedVoiceDraft = {
+  ...nullPhoneDrafts.find((draft) => draft.draft_type === "voice_drop")!,
+  body_placeholder: nullPhoneVoiceScript.full_script,
+  voice_drop_script_reference: nullPhoneVoiceScript.full_script,
+}
+const smsPlaceholderDraft = nullPhoneDrafts.find((draft) => draft.draft_type === "sms")!
+const nullPhoneChannelDrafts = [personalizedEmailDraft, smsPlaceholderDraft, personalizedVoiceDraft]
+const nullPhoneChannelState = evaluateApolloExecutionMaterializationChannelDrafts(nullPhoneChannelDrafts)
+assert.equal(nullPhoneChannelState.email_assets, true)
+assert.equal(nullPhoneChannelState.voice_drop_assets, true)
+assert.equal(nullPhoneChannelState.sms_assets, false)
+assert.equal(APOLLO_SMS_PERSONALIZATION_MISSING_PHONE_BLOCKER, "sms_personalization:missing_phone")
+console.log("  ✓ null phone fixture — email/voice personalization path without SMS throw")
 
 console.log("\nApollo Personalization Integration checks passed.")
