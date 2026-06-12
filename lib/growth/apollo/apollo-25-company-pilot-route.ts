@@ -595,4 +595,18 @@ export async function createApollo25CompanyPilotDraftCohort(
   return { report, review }
 }
 
+export async function materializeApollo25CompanyPilotCohortAssetReadiness(
+  admin: SupabaseClient,
+  input: {
+    cohort_id: string
+    acting_user_id: string
+    acting_user_email: string
+  },
+) {
+  const { materializeApollo25CompanyPilotCohortAssets } = await import(
+    "@/lib/growth/apollo/apollo-25-company-pilot-asset-materialization"
+  )
+  return materializeApollo25CompanyPilotCohortAssets(admin, input)
+}
+
 export { parsePilotSelectionMode }

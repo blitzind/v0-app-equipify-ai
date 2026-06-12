@@ -45,11 +45,16 @@ function evaluatePersonalizationAssets(
   const contentReadiness = evaluateApolloSequenceCandidateContentReadiness({
     drafts: state.execution_drafts,
   })
+  const placeholderCount = state.execution_drafts.filter((draft) =>
+    isApolloSequenceDraftPlaceholderContent(draft.body_placeholder),
+  ).length
+  const personalizedDraftsPresent =
+    state.execution_drafts.length > 0 && placeholderCount === 0
 
   return {
     account_playbook: state.has_account_playbook,
     personalization: state.has_personalization_generation,
-    content_quality_optimization: contentReadiness.ready,
+    content_quality_optimization: contentReadiness.ready || personalizedDraftsPresent,
     voice_drop_assets:
       hasNonPlaceholderDraft(state.execution_drafts, "voice_drop") || state.has_voice_drop_candidate,
     email_assets: hasNonPlaceholderDraft(state.execution_drafts, "email"),

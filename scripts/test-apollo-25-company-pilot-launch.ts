@@ -23,6 +23,7 @@ import {
   resolveApollo25CompanyPilotEnvGatesOk,
 } from "../lib/growth/apollo/apollo-25-company-pilot-launch-report"
 import { runApollo25CompanyPilotPreflight } from "../lib/growth/apollo/apollo-25-company-pilot-preflight"
+import { buildApollo25CompanyPilotCanonicalDedupeAudit } from "../lib/growth/apollo/apollo-25-company-pilot-canonical-dedupe-audit"
 import { buildApollo25CompanyPilotGreenfieldCohortSnapshot } from "../lib/growth/apollo/apollo-25-company-pilot-draft-cohort"
 import { evaluateApollo25CompanyPilotCohortEnrollmentReadiness } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-enrollment-readiness"
 import { evaluateApollo25CompanyPilotCohortPersonalization } from "../lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation"
@@ -54,10 +55,13 @@ const REQUIRED_FILES = [
   "lib/growth/apollo/apollo-25-company-pilot-cohort-personalization-validation.ts",
   "lib/growth/apollo/apollo-25-company-pilot-cohort-review.ts",
   "lib/growth/apollo/apollo-25-company-pilot-launch-recommendation.ts",
+  "lib/growth/apollo/apollo-25-company-pilot-canonical-dedupe-audit.ts",
+  "lib/growth/apollo/apollo-25-company-pilot-asset-materialization.ts",
   "lib/growth/apollo/apollo-25-company-pilot-route.ts",
   "app/api/platform/growth/apollo-25-company-pilot/report/route.ts",
   "app/api/platform/growth/apollo-25-company-pilot/diagnostic/route.ts",
   "app/api/platform/growth/apollo-25-company-pilot/cohort/route.ts",
+  "app/api/platform/growth/apollo-25-company-pilot/cohort/materialize/route.ts",
 ]
 
 const FORBIDDEN = [
@@ -425,5 +429,50 @@ const cohortRouteSource = fs.readFileSync(
 assert.match(cohortRouteSource, /export async function GET/)
 assert.match(cohortRouteSource, /cohort_size/)
 console.log("  ✓ cohort review GET endpoint exposes cohort_size and companies")
+
+const canonicalDedupe = buildApollo25CompanyPilotCanonicalDedupeAudit({
+  snapshot_companies: [
+    {
+      company_candidate_id: "company-a",
+      company_name: "Medical Equipment Solutions",
+      qualification_score: 88,
+      verified_email_count: 1,
+      sequence_ready_count: 1,
+      canonical_company_id: "de0b580a-c1d8-4dff-ae85-6adad57e7eff",
+      enrollment_status: null,
+      cohort_rank: 1,
+      cohort_reason: "production_rules_passed",
+      ranking_explanation: "rank 1",
+    },
+    {
+      company_candidate_id: "company-b",
+      company_name: "Medical Equipment Solutions LLC",
+      qualification_score: 82,
+      verified_email_count: 1,
+      sequence_ready_count: 1,
+      canonical_company_id: "de0b580a-c1d8-4dff-ae85-6adad57e7eff",
+      enrollment_status: null,
+      cohort_rank: 2,
+      cohort_reason: "production_rules_passed",
+      ranking_explanation: "rank 2",
+    },
+  ],
+})
+assert.equal(canonicalDedupe.duplicate_canonical_groups.length, 1)
+assert.equal(canonicalDedupe.duplicate_canonical_groups[0]?.duplicate_outreach_risk, "elevated")
+assert.ok(canonicalDedupe.medical_equipment_solutions_audit)
+assert.equal(
+  canonicalDedupe.medical_equipment_solutions_audit?.canonical_company_id,
+  "de0b580a-c1d8-4dff-ae85-6adad57e7eff",
+)
+console.log("  ✓ canonical dedupe audit flags shared canonical company groups")
+
+const materializeRouteSource = fs.readFileSync(
+  path.join(ROOT, "app/api/platform/growth/apollo-25-company-pilot/cohort/materialize/route.ts"),
+  "utf8",
+)
+assert.match(materializeRouteSource, /materializeApollo25CompanyPilotCohortAssetReadiness/)
+assert.doesNotMatch(materializeRouteSource, /runSequenceExecutionJob/)
+console.log("  ✓ cohort materialize route present without sequence execution sends")
 
 console.log("\nApollo 25-Company Pilot Launch Certification PASSED")
