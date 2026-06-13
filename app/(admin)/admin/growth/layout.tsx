@@ -1,6 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
+import { AidenAskLauncher } from "@/components/growth/aiden-ask-launcher"
 import { GrowthCommandNavigationPalette } from "@/components/growth/growth-command-navigation-palette"
 import { GrowthNavigationProvider } from "@/components/growth/growth-navigation-provider"
 
@@ -10,6 +11,7 @@ export default function AdminGrowthLayout({ children }: { children: ReactNode })
     <GrowthNavigationProvider>
       {children}
       <GrowthCommandNavigationPalette />
+      <AidenAskLauncher />
     </GrowthNavigationProvider>
   )
 }

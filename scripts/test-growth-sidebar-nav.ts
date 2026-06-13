@@ -129,6 +129,8 @@ assert.ok(!coreGroup?.items.some((i) => i.label === "Outreach Approval"))
 assert.ok(!coreGroup?.items.some((i) => i.label === "Lead Intelligence Inspector"))
 assert.ok(!coreGroup?.items.some((i) => i.label === "Lead Pipeline"))
 assert.ok(!coreGroup?.items.some((i) => i.label === "Imports"))
+assert.ok(coreGroup?.items.some((i) => i.id === "aiden-guide" && i.label === "Aiden"))
+assert.equal(coreGroup?.items[1]?.id, "aiden-guide")
 
 const leadEngineGroup = GROWTH_NAV_GROUP_DEFS.find((g) => g.id === "lead-engine")
 assert.equal(leadEngineGroup?.label, "Lead Engine")

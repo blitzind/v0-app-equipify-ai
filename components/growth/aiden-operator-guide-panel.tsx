@@ -3,13 +3,15 @@
 import Link from "next/link"
 import { Bot, ChevronRight, ExternalLink } from "lucide-react"
 import { AidenDailyBriefingPanel } from "@/components/growth/aiden-daily-briefing-panel"
+import { AidenGuidedWorkflowsPanel } from "@/components/growth/aiden-guided-workflows-panel"
+import { useAidenBriefing } from "@/components/growth/use-aiden-briefing"
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
-import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthBadge, GrowthCollapsibleEngineCard, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import {
   AIDEN_APOLLO_PILOT_CHECKLIST,
   AIDEN_COMMON_PROBLEMS,
@@ -58,16 +60,32 @@ type AidenOperatorGuidePanelProps = {
   className?: string
   /** When true, render without outer collapsible card (for dedicated page). */
   embedded?: boolean
+  /** When true, always expanded on Sequence Execution — no localStorage collapse. */
+  pinned?: boolean
 }
 
-export function AidenOperatorGuidePanel({ className, embedded = false }: AidenOperatorGuidePanelProps) {
+export function AidenOperatorGuidePanel({
+  className,
+  embedded = false,
+  pinned = false,
+}: AidenOperatorGuidePanelProps) {
+  const { briefing, loading, error, reload } = useAidenBriefing()
+
   const body = (
     <div
       className="space-y-4"
       data-aiden-operator-guide={AIDEN_OPERATOR_GUIDE_QA_MARKER}
       id="aiden-guide"
     >
-      <AidenDailyBriefingPanel />
+      <AidenDailyBriefingPanel
+        headerVariant="compact"
+        briefing={briefing}
+        loading={loading}
+        error={error}
+        onReload={reload}
+      />
+
+      <AidenGuidedWorkflowsPanel briefing={briefing} />
 
       <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 px-4 py-3 dark:border-indigo-900/40 dark:bg-indigo-950/30">
         <p className="text-sm font-medium text-foreground">Aiden — your Growth Engine operator coach</p>
@@ -350,6 +368,19 @@ export function AidenOperatorGuidePanel({ className, embedded = false }: AidenOp
 
   if (embedded) {
     return <div className={cn("rounded-2xl border border-border bg-card p-5 shadow-sm", className)}>{body}</div>
+  }
+
+  if (pinned) {
+    return (
+      <GrowthEngineCard
+        title="Aiden Guide"
+        icon={<Bot className="size-4 text-indigo-600" />}
+        className={className}
+        id="aiden-guide-card"
+      >
+        {body}
+      </GrowthEngineCard>
+    )
   }
 
   return (

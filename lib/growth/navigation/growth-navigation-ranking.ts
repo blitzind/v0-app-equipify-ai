@@ -42,8 +42,24 @@ export const GROWTH_COMMAND_QUERY_BOOSTS: Record<string, Record<string, number>>
     "lead-engine-inspector": 75,
   },
   coach: {
+    "aiden-guide": 150,
     calls: 110,
     "calls-live": 100,
+  },
+  aiden: {
+    "aiden-guide": 160,
+  },
+  help: {
+    "aiden-guide": 160,
+  },
+  next: {
+    "aiden-guide": 155,
+  },
+  blocker: {
+    "aiden-guide": 150,
+  },
+  workflow: {
+    "aiden-guide": 140,
   },
   provider: {
     providers: 120,
@@ -67,6 +83,7 @@ const CORE_WORKFLOW_IDS = new Set([
   "start-live-call",
   "open-inbox",
   "unified-inbox",
+  "aiden-guide",
 ])
 
 function searchableTerms(entry: GrowthCommandPaletteEntry): string[] {

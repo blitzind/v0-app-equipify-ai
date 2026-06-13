@@ -76,7 +76,7 @@ export default function AdminGrowthSequenceExecutionPage() {
         </section>
 
         <GrowthSectionLayout>
-          <AidenOperatorGuidePanel className="mb-6" />
+          <AidenOperatorGuidePanel className="mb-6" pinned />
           <ApolloPilotOperationsPanel className="mb-6" />
           <ApolloOperatorScalePanel className="mb-6" />
           <OutboundLaunchContextBanner className="mb-4" />

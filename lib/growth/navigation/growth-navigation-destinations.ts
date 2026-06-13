@@ -487,6 +487,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: prefixMatch("/admin/growth/command"),
       },
       {
+        id: "aiden-guide",
+        href: "/admin/growth/aiden",
+        label: "Aiden",
+        match: prefixMatch("/admin/growth/aiden"),
+      },
+      {
         id: "unified-inbox",
         href: "/admin/growth/inbox",
         label: "Inbox",
@@ -777,12 +783,6 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
           path.startsWith("/admin/growth/sequences/execution") ||
           path.startsWith("/admin/growth/outreach/approval") ||
           path.startsWith("/admin/growth/outreach/legacy-queue"),
-      },
-      {
-        id: "aiden-guide",
-        href: "/admin/growth/aiden",
-        label: "Aiden Guide",
-        match: prefixMatch("/admin/growth/aiden"),
       },
       {
         id: "booking-intelligence",

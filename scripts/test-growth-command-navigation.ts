@@ -89,7 +89,9 @@ assert.ok(
   ),
 )
 assert.ok(GROWTH_COMMAND_REGISTRY.some((a) => a.label === "Open Inbox"))
-assert.equal(GROWTH_COMMAND_REGISTRY.length, 7)
+assert.ok(GROWTH_COMMAND_REGISTRY.some((a) => a.id === "aiden-guide" && a.coreWorkflow === true))
+assert.ok(GROWTH_COMMAND_REGISTRY.some((a) => a.id === "aiden-guide" && a.keywords?.includes("next step")))
+assert.equal(GROWTH_COMMAND_REGISTRY.length, 8)
 
 const guardSource = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/navigation/growth-navigation-input-guard.ts"),
