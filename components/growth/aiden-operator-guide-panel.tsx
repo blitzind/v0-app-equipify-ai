@@ -16,10 +16,12 @@ import {
   AIDEN_COACH_TIPS,
   AIDEN_DAILY_SALES_WORKFLOW,
   AIDEN_GUIDE_SECTIONS,
+  AIDEN_FIRST_REPLY_OPERATOR_STEPS,
   AIDEN_LIVE_REPLY_VALIDATION,
   AIDEN_METRICS_GUIDE,
   AIDEN_OPERATOR_GUIDE_QA_MARKER,
   AIDEN_REPLY_HANDLING,
+  AIDEN_REPLY_SCENARIO_GUIDANCE,
   AIDEN_STATUS_DICTIONARY,
   AIDEN_TODAY_POST_LAUNCH,
   type AidenBlockerEntry,
@@ -223,6 +225,44 @@ export function AidenOperatorGuidePanel({ className, embedded = false }: AidenOp
               ))}
             </ul>
             <p className="mt-3 text-xs text-amber-800 dark:text-amber-200">{AIDEN_LIVE_REPLY_VALIDATION.operatorNote}</p>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="reply-scenarios" className="rounded-lg border border-border px-3">
+          <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
+            {AIDEN_REPLY_SCENARIO_GUIDANCE.title}
+          </AccordionTrigger>
+          <AccordionContent className="pb-4">
+            <p className="text-sm text-muted-foreground">{AIDEN_REPLY_SCENARIO_GUIDANCE.intro}</p>
+            <ul className="mt-3 space-y-2">
+              {AIDEN_REPLY_SCENARIO_GUIDANCE.scenarios.map((scenario) => (
+                <li key={scenario.id} className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-3 text-sm dark:border-indigo-900/40 dark:bg-indigo-950/20">
+                  <p className="font-medium text-indigo-900 dark:text-indigo-100">&ldquo;{scenario.message}&rdquo;</p>
+                  <p className="mt-1 font-mono text-[10px] text-muted-foreground">When: {scenario.signal}</p>
+                  <p className="mt-2">{scenario.action}</p>
+                  <GuideLinks links={scenario.links} />
+                </li>
+              ))}
+            </ul>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="first-reply-steps" className="rounded-lg border border-border px-3">
+          <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
+            {AIDEN_GUIDE_SECTIONS.find((s) => s.id === "first-reply-steps")?.title}
+          </AccordionTrigger>
+          <AccordionContent className="pb-4">
+            <ol className="space-y-3">
+              {AIDEN_FIRST_REPLY_OPERATOR_STEPS.map((step) => (
+                <li key={step.order} className="rounded-lg border border-border/60 p-3 text-sm">
+                  <p className="font-medium">
+                    {step.order}. {step.title}
+                  </p>
+                  <p className="mt-1 text-muted-foreground">{step.detail}</p>
+                  <GuideLinks links={step.links} />
+                </li>
+              ))}
+            </ol>
           </AccordionContent>
         </AccordionItem>
 

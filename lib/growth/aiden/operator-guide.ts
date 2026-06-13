@@ -1,6 +1,6 @@
 /** Static Aiden operator guide — edit here to update in-app coaching copy. */
 
-export const AIDEN_OPERATOR_GUIDE_QA_MARKER = "aiden-operator-guide-v2" as const
+export const AIDEN_OPERATOR_GUIDE_QA_MARKER = "aiden-operator-guide-v3" as const
 
 export type AidenGuideLink = {
   label: string
@@ -79,9 +79,24 @@ export const AIDEN_COACH_TIPS: AidenCoachTip[] = [
     when: "Before triggering safe execute.",
   },
   {
-    id: "monitor-replies",
-    message: "12 emails are live. Check inbox daily — zero replies in the first 48 hours is normal.",
-    when: "Post-launch monitoring phase.",
+    id: "first-reply",
+    message: "When the first pilot reply arrives, run the Live Reply Validation checklist before approving more sends.",
+    when: "First inbound reply on a live pilot send.",
+  },
+  {
+    id: "reply-meeting",
+    message: "A prospect requested a meeting — respond within 24 hours.",
+    when: "When meeting_requests count is greater than zero in Aiden briefing.",
+  },
+  {
+    id: "reply-positive",
+    message: "A positive-interest reply needs a response today.",
+    when: "When positive_interest count is greater than zero.",
+  },
+  {
+    id: "reply-objection",
+    message: "An objection requires follow-up — acknowledge and offer one next step.",
+    when: "When objections count is greater than zero.",
   },
   {
     id: "no-auto-send",
@@ -156,18 +171,111 @@ export const AIDEN_TODAY_POST_LAUNCH: AidenGuideStep[] = [
 export const AIDEN_LIVE_REPLY_VALIDATION = {
   title: "Live Reply Validation",
   intro:
-    "When the first real reply arrives, confirm each signal below. Re-run validation after each reply until all pass.",
+    "When the first real reply arrives on a pilot send, confirm each signal below. Re-run validation after each reply until all pass.",
   checklist: [
-    { key: "reply_received", label: "Reply ingested into Growth Engine", how: "Appears in inbox or outbound_replies for pilot lead." },
-    { key: "thread_associated", label: "Thread linked to lead", how: "Inbox thread shows correct company and contact." },
-    { key: "classification_generated", label: "Intent classification recorded", how: "positive_interest, objection, meeting_request, etc." },
-    { key: "timeline_updated", label: "Lead timeline event created", how: "reply_ingested or reply_received on lead timeline." },
-    { key: "next_best_action_generated", label: "Next best action suggested", how: "Workflow action or reply draft recommendation visible." },
+    { key: "reply_received", label: "Reply ingested into Growth Engine", how: "Appears in outbound_replies or reply_ingestion_events for pilot lead." },
+    { key: "thread_associated", label: "Thread linked to lead", how: "inbox_threads row exists; unified inbox shows correct company." },
+    { key: "classification_generated", label: "Intent classification recorded", how: "positive_interest, objection, meeting_request, etc. on outbound_replies." },
+    { key: "timeline_updated", label: "Lead timeline event created", how: "reply_ingested, reply_received, or reply_classified on lead timeline." },
+    { key: "next_best_action_generated", label: "Next best action suggested", how: "reply_workflow_actions row or next_best_action_computed_at on lead." },
     { key: "meeting_created", label: "Meeting logged (if applicable)", how: "Only for meeting_request — not required for every reply." },
     { key: "opportunity_created", label: "Opportunity created (if applicable)", how: "Manual operator step — not automatic." },
+    { key: "revenue_touch_created", label: "Reply attribution touch recorded", how: "attribution_touches with touch_type reply for pilot lead." },
   ],
-  operatorNote: "Zero replies after launch is expected for 24–72 hours. Monitor inbox; do not send follow-up blasts.",
+  operatorNote:
+    "Zero replies after launch is expected for 24–72 hours. When the first reply lands, respond within the same business day.",
 } as const
+
+/** Static guidance shown when replies exist — not tied to live counts (briefing panel handles that). */
+export const AIDEN_REPLY_SCENARIO_GUIDANCE = {
+  title: "When Replies Arrive",
+  intro: "Use these prompts when Aiden briefing or inbox shows inbound activity. Guidance only — you respond manually.",
+  scenarios: [
+    {
+      id: "new-reply",
+      signal: "new_replies > 0",
+      message: "You have 1 new reply.",
+      action: "Open unified inbox, read the thread, confirm classification before drafting a response.",
+      links: [
+        { label: "Unified inbox", href: "/admin/growth/inbox" },
+        { label: "Reply workflow", href: "/admin/growth/replies/workflow" },
+      ],
+    },
+    {
+      id: "meeting-request",
+      signal: "meeting_requests > 0",
+      message: "A prospect requested a meeting.",
+      action: "Respond within 24 hours. Propose times or send calendar link; log meeting on timeline.",
+      links: [
+        { label: "Meetings", href: "/admin/growth/meetings" },
+        { label: "Booking intelligence", href: "/admin/growth/booking-intelligence" },
+      ],
+    },
+    {
+      id: "objection",
+      signal: "objections > 0",
+      message: "An objection requires follow-up.",
+      action: "Acknowledge concern, use objection playbook, offer one clear next step. Do not argue or multi-blast.",
+      links: [{ label: "Reply handling", href: "/admin/growth/replies" }],
+    },
+    {
+      id: "positive-interest",
+      signal: "positive_interest > 0",
+      message: "A positive-interest reply needs a response today.",
+      action: "Use reply draft, propose next step or meeting. Mark lead engaged before approving more outbound.",
+      links: [
+        { label: "Reply drafts", href: "/admin/growth/copilot/reply-drafts" },
+        { label: "Opportunities", href: "/admin/growth/opportunities" },
+      ],
+    },
+    {
+      id: "unsubscribe",
+      signal: "unsubscribes > 0",
+      message: "An unsubscribe requires compliance review.",
+      action: "Confirm suppression applied. Never send again to that address.",
+      links: [{ label: "Compliance", href: "/admin/growth/compliance" }],
+    },
+  ],
+} as const
+
+export const AIDEN_FIRST_REPLY_OPERATOR_STEPS: AidenGuideStep[] = [
+  {
+    order: 1,
+    title: "Confirm ingestion",
+    detail: "Check Aiden briefing and unified inbox — reply should appear within one inbox sync cycle (~15 min).",
+    links: [
+      { label: "Aiden briefing", href: "/admin/growth/aiden" },
+      { label: "Inbox diagnostics", href: "/admin/growth/inbox/diagnostics" },
+    ],
+  },
+  {
+    order: 2,
+    title: "Verify pipeline artifacts",
+    detail: "Confirm thread, classification, timeline event, and next best action on the lead record.",
+    links: [{ label: "Lead timeline", href: "/admin/growth/inbox" }],
+  },
+  {
+    order: 3,
+    title: "Respond manually",
+    detail: "Use reply draft as a starting point only. You send — nothing auto-sends.",
+    links: [{ label: "Reply drafts", href: "/admin/growth/copilot/reply-drafts" }],
+  },
+  {
+    order: 4,
+    title: "Log downstream objects",
+    detail: "Book meetings or create opportunities only when intent warrants it — both are manual.",
+    links: [
+      { label: "Meetings", href: "/admin/growth/meetings" },
+      { label: "Opportunities", href: "/admin/growth/opportunities" },
+    ],
+  },
+  {
+    order: 5,
+    title: "Re-validate attribution",
+    detail: "Confirm reply attribution touch exists alongside existing send touches on revenue dashboard.",
+    links: [{ label: "Revenue attribution", href: "/admin/growth/revenue-attribution" }],
+  },
+]
 
 export const AIDEN_COMMON_PROBLEMS: AidenBlockerEntry[] = [
   {
@@ -584,6 +692,8 @@ export const AIDEN_GUIDE_SECTIONS = [
   { id: "status-dictionary", title: "Status Dictionary" },
   { id: "common-problems", title: "Common Problems" },
   { id: "live-reply-validation", title: "Live Reply Validation" },
+  { id: "reply-scenarios", title: "When Replies Arrive" },
+  { id: "first-reply-steps", title: "First Reply Playbook" },
   { id: "pilot-checklist", title: "Apollo Pilot Launch Checklist" },
   { id: "daily-sales", title: "Daily Sales Workflow" },
   { id: "metrics", title: "Metrics Guide" },
