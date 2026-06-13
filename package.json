@@ -8,7 +8,7 @@
     "check:tracked-imports": "tsx scripts/check-tracked-imports.ts",
     "test:growth-supabase-builder-catch": "tsx scripts/check-growth-supabase-builder-catch.ts",
     "aggregate:industry-benchmarks": "tsx scripts/aggregate-industry-operational-benchmarks.ts",
-    "prebuild": "pnpm check:tracked-imports && pnpm package:growth-extension",
+    "prebuild": "pnpm check:tracked-imports && pnpm test:growth-supabase-builder-catch && pnpm package:growth-extension",
     "build": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/verify-growth-production-runtime.ts && next build",
     "start": "next start",
     "lint": "eslint .",

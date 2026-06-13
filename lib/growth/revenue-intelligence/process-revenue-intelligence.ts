@@ -60,7 +60,9 @@ async function persistOpportunitySignals(
       source: signal.source,
       occurred_at: input.occurredAt,
       payload: signal.attribution,
-    }).catch(() => undefined)
+    })
+      .then(() => undefined)
+      .catch(() => undefined)
   }
   return signalIds
 }

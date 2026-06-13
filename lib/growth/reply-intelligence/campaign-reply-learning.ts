@@ -93,7 +93,9 @@ export async function recordCampaignReplyLearning(
       updated_at: new Date().toISOString(),
     },
     { onConflict: "snapshot_date,sequence_enrollment_id,sender_account_id" },
-  ).catch(() => undefined)
+  )
+    .then(() => undefined)
+    .catch(() => undefined)
 }
 
 export async function fetchAggregateCampaignReplyLearning(
