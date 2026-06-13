@@ -43,7 +43,9 @@ assert.match(checkScript, /verifyGrowthExtensionPackage/)
 assert.match(checkScript, /GROWTH_EXTENSION_STALE_ZIP_MESSAGE/)
 
 const packageJson = fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8")
-assert.match(packageJson, /"prebuild": "pnpm check:tracked-imports && pnpm package:growth-extension"/)
+assert.match(packageJson, /"prebuild": "pnpm check:tracked-imports && pnpm test:growth-supabase-builder-catch-fixtures && pnpm test:growth-supabase-builder-catch && pnpm package:growth-extension"/)
+assert.match(packageJson, /"test:growth-supabase-builder-catch-fixtures"/)
+assert.match(packageJson, /"test:growth-supabase-builder-catch"/)
 assert.match(packageJson, /"check:growth-extension-package"/)
 
 const cardSource = fs.readFileSync(
