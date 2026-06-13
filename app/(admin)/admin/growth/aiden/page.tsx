@@ -32,7 +32,7 @@ export default function AdminGrowthAidenGuidePage() {
             <div>
               <h1 className={PAGE_STANDARD_PAGE_TITLE}>Aiden — Operator Guide</h1>
               <p className="text-sm text-muted-foreground">
-                Step-by-step Growth Engine coaching. Guidance only — no sends, no auto-approval.
+                Live operational briefing plus step-by-step Growth Engine coaching. Read-only — no sends, no auto-approval.
               </p>
             </div>
           </div>

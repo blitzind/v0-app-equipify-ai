@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { Bot, ChevronRight, ExternalLink } from "lucide-react"
+import { AidenDailyBriefingPanel } from "@/components/growth/aiden-daily-briefing-panel"
 import {
   Accordion,
   AccordionContent,
@@ -64,6 +65,8 @@ export function AidenOperatorGuidePanel({ className, embedded = false }: AidenOp
       data-aiden-operator-guide={AIDEN_OPERATOR_GUIDE_QA_MARKER}
       id="aiden-guide"
     >
+      <AidenDailyBriefingPanel />
+
       <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 px-4 py-3 dark:border-indigo-900/40 dark:bg-indigo-950/30">
         <p className="text-sm font-medium text-foreground">Aiden — your Growth Engine operator coach</p>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
