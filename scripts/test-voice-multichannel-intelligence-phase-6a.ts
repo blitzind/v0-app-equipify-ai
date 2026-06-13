@@ -296,7 +296,12 @@ const commandCenter = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-command-center-dashboard.tsx"),
   "utf8",
 )
-assert.ok(commandCenter.includes("GrowthCommandMultichannelIntelligenceSection"))
+assert.doesNotMatch(commandCenter, /GrowthCommandMultichannelIntelligenceSection/)
+assert.ok(
+  fs.existsSync(
+    path.join(process.cwd(), "components/growth/growth-command-multichannel-intelligence-section.tsx"),
+  ),
+)
 
 const schemaHealth = fs.readFileSync(path.join(process.cwd(), "lib/voice/schema-health.ts"), "utf8")
 assert.match(schemaHealth, /"v20"/)

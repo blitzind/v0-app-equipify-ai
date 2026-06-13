@@ -33,7 +33,7 @@ export default function AdminGrowthCommandPage() {
               <div>
                 <h1 className={PAGE_STANDARD_PAGE_TITLE}>Growth Command Center</h1>
                 <p className="text-sm text-muted-foreground">
-                  Daily operating console — prioritized actions, pipeline health, and focus sprints.
+                  Daily sales workspace — briefing, replies, approvals, calls, and opportunities.
                 </p>
               </div>
             </div>

@@ -83,10 +83,12 @@ const commandCenterSource = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-command-center-dashboard.tsx"),
   "utf8",
 )
-assert.match(commandCenterSource, /GrowthOperatorAttentionStrip/)
-assert.doesNotMatch(commandCenterSource, /Queue is clear — no ranked actions right now/)
-assert.match(commandCenterSource, /GrowthOperatorDailyWorkflow/)
+assert.match(commandCenterSource, /AidenDailyBriefingPanel/)
+assert.match(commandCenterSource, /GrowthCommandDailyActionQueue/)
+assert.match(commandCenterSource, /GROWTH_COMMAND_CENTER_DAILY_WORKSPACE_QA_MARKER/)
 assert.match(commandCenterSource, /GROWTH_OPERATOR_UX_H3_QA_MARKER/)
+assert.doesNotMatch(commandCenterSource, /GrowthOperatorAttentionStrip/)
+assert.doesNotMatch(commandCenterSource, /GrowthOperatorDailyWorkflow/)
 assert.doesNotMatch(commandCenterSource, /Today's Pipeline Operations/)
 
 const outboundPageSource = fs.readFileSync(

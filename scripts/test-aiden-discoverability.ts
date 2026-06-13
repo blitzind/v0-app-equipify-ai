@@ -72,6 +72,9 @@ assert.match(growthLayout, /AidenAskLauncher/)
 
 const askLauncher = fs.readFileSync(path.join(process.cwd(), "components/growth/aiden-ask-launcher.tsx"), "utf8")
 assert.match(askLauncher, /rule-based/i)
+assert.match(askLauncher, /Your Growth Operations Coach/)
+assert.match(askLauncher, /AidenWordmark/)
+assert.match(askLauncher, /from-sky-500 via-\[color:var\(--primary\)\] to-blue-700/)
 assert.doesNotMatch(askLauncher, /\/api\/organizations\/.*\/aiden\/chat/)
 
 const signals = {

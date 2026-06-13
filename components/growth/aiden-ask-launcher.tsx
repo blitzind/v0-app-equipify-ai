@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 import { useCallback, useMemo, useState } from "react"
-import { Bot, Loader2, Send } from "lucide-react"
+import { Loader2, Send, Sparkles } from "lucide-react"
+import { AidenWordmark } from "@/components/aiden/aiden-wordmark"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -44,37 +45,58 @@ export function AidenAskLauncher() {
       <div
         data-aiden-ask-launcher="growth-v1"
         data-screenshot-chrome="hide"
-        className="pointer-events-auto fixed bottom-6 right-4 z-[94] sm:right-5"
+        className="pointer-events-auto fixed bottom-24 right-4 z-[95] sm:right-5 lg:bottom-6 lg:right-6"
       >
         <button
           type="button"
           onClick={() => setOpen(true)}
           className={cn(
-            "inline-flex h-12 items-center gap-2 rounded-full border border-indigo-200 bg-indigo-600 px-4 text-sm font-medium text-white shadow-lg",
-            "transition hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2",
+            "group relative inline-flex h-12 shrink-0 items-center gap-2 rounded-full pl-3 pr-4",
+            "bg-gradient-to-br from-sky-500 via-[color:var(--primary)] to-blue-700",
+            "text-white shadow-lg",
+            "border border-white/25",
+            "ring-2 ring-sky-400/55 ring-offset-2 ring-offset-background",
+            "shadow-[0_4px_22px_-4px_rgba(14,165,233,0.65),0_2px_12px_-2px_rgba(37,99,235,0.45),0_0_36px_-8px_rgba(56,189,248,0.55)]",
+            "transition-all duration-200 hover:brightness-[1.06] hover:shadow-[0_6px_28px_-4px_rgba(14,165,233,0.72),0_4px_16px_-2px_rgba(37,99,235,0.5),0_0_44px_-6px_rgba(56,189,248,0.6)]",
+            "active:scale-[0.97] active:brightness-[0.98]",
+            "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--primary)]",
           )}
           aria-haspopup="dialog"
           aria-expanded={open}
-          aria-label="Ask Aiden — Growth operator guide"
+          aria-label="Aiden — Your Growth Operations Coach"
         >
-          <Bot className="size-4" aria-hidden />
-          Ask Aiden
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/35 backdrop-blur-[2px] transition-colors group-hover:bg-white/22">
+            <Sparkles className="size-[18px] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]" aria-hidden strokeWidth={2} />
+          </span>
+          <span className="flex flex-col items-start pr-0.5 text-left leading-tight text-white drop-shadow-sm">
+            <AidenWordmark size="sm" tone="inverse" className="text-[15px]" />
+            <span className="text-[10px] font-normal text-white/90">Your Growth Operations Coach</span>
+          </span>
         </button>
       </div>
 
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="right" className="flex w-full flex-col sm:max-w-md" data-aiden-ask-engine={AIDEN_ASK_ENGINE_QA_MARKER}>
-          <SheetHeader>
+        <SheetContent
+          side="right"
+          className="flex h-full w-full flex-col overflow-hidden p-0 sm:max-w-[30rem]"
+          data-aiden-ask-engine={AIDEN_ASK_ENGINE_QA_MARKER}
+        >
+          <SheetHeader className="border-b border-border bg-card px-4 py-4">
             <SheetTitle className="flex items-center gap-2">
-              <Bot className="size-5 text-indigo-600" />
-              Ask Aiden
+              <span className="flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-blue-700 text-white">
+                <Sparkles className="size-4" aria-hidden />
+              </span>
+              <span className="flex flex-col items-start gap-0.5">
+                <AidenWordmark size="sm" />
+                <span className="text-xs font-normal text-muted-foreground">Your Growth Operations Coach</span>
+              </span>
             </SheetTitle>
             <SheetDescription>
               Rule-based Growth operator coach. Read-only guidance — no LLM, no sends, no approvals.
             </SheetDescription>
           </SheetHeader>
 
-          <div className="mt-4 flex flex-1 flex-col gap-4 overflow-hidden">
+          <div className="flex flex-1 flex-col gap-4 overflow-hidden px-4 py-4">
             {loading && !briefing ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" />

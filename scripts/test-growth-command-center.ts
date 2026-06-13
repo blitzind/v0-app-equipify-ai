@@ -22,6 +22,7 @@ import type { GrowthCommandAction } from "../lib/growth/command/command-action-t
 import {
   commandActionImpactTone,
   displayCommandActionImpact,
+  GROWTH_COMMAND_CENTER_DAILY_WORKSPACE_QA_MARKER,
   GROWTH_COMMAND_CENTER_QA_MARKER,
 } from "../lib/growth/command/command-action-types"
 import {
@@ -33,6 +34,9 @@ import {
   GROWTH_COMMAND_CENTER_ACTIONS_QA_MARKER,
   GROWTH_COMMAND_CENTER_QUICK_ACTIONS,
 } from "../lib/growth/command/command-center-quick-actions"
+import { GROWTH_COMMAND_CENTER_DAILY_ACTION_QUEUE_QA_MARKER } from "../lib/growth/command/command-center-daily-action-queue"
+import { GROWTH_COMMAND_OPEN_OPPORTUNITIES_QA_MARKER } from "../lib/growth/command/command-center-open-opportunities"
+import { GROWTH_COMMAND_SEQUENCE_QUEUE_QA_MARKER } from "../lib/growth/command/command-center-sequence-queue"
 import { PLATFORM_ADMIN_GROWTH_LEADS_TAB } from "../components/admin/platform-admin-shell"
 import { buildBossBattles, buildCoachTips, buildHeatMap, detectComboChains } from "../lib/growth/command/command-dashboard-helpers"
 import { describeSequenceStartUnavailable } from "../lib/growth/sequence-enrollment/sequence-enrollment-ui"
@@ -181,6 +185,26 @@ assert.match(commandLeadFocusHref("lead-1", "call-copilot"), /focus=call-copilot
 assert.match(commandOutreachHref("queue-1"), /highlight=queue-1/)
 
 assert.equal(GROWTH_COMMAND_CENTER_QA_MARKER, "command-center-v2")
+assert.equal(GROWTH_COMMAND_CENTER_DAILY_WORKSPACE_QA_MARKER, "command-center-daily-workspace-v1")
+assert.equal(GROWTH_COMMAND_CENTER_DAILY_ACTION_QUEUE_QA_MARKER, "growth-command-center-daily-action-queue-v1")
+assert.equal(GROWTH_COMMAND_SEQUENCE_QUEUE_QA_MARKER, "growth-command-sequence-queue-v1")
+assert.equal(GROWTH_COMMAND_OPEN_OPPORTUNITIES_QA_MARKER, "growth-command-open-opportunities-v1")
+
+const commandCenterDashboard = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/growth-command-center-dashboard.tsx"),
+  "utf8",
+)
+assert.match(commandCenterDashboard, /AidenDailyBriefingPanel/)
+assert.match(commandCenterDashboard, /GrowthCommandDailyActionQueue/)
+assert.match(commandCenterDashboard, /GrowthReplyWorkflowActionsPanel/)
+assert.match(commandCenterDashboard, /GrowthCommandSequenceQueueSection/)
+assert.match(commandCenterDashboard, /GrowthCommandOpenOpportunitiesSection/)
+assert.match(commandCenterDashboard, /GrowthCommandQuickActionsRail/)
+assert.match(commandCenterDashboard, /GROWTH_COMMAND_CENTER_DAILY_WORKSPACE_QA_MARKER/)
+assert.doesNotMatch(commandCenterDashboard, /GrowthCommandPipelineRevenueSection/)
+assert.doesNotMatch(commandCenterDashboard, /GrowthCommandSignalIntelligenceSection/)
+assert.doesNotMatch(commandCenterDashboard, /GrowthOperatorAttentionStrip/)
+assert.doesNotMatch(commandCenterDashboard, /GrowthOperatorDailyWorkflow/)
 
 assert.equal(displayCommandActionImpact(95), 10)
 assert.equal(displayCommandActionImpact(92), 9)
@@ -201,25 +225,23 @@ assert.equal(GROWTH_COMMAND_SECTION_TABS.length, 7)
 assert.equal(GROWTH_COMMAND_SECTION_TABS[0]?.anchor, "cc-today")
 assert.equal(GROWTH_COMMAND_COMM_SECTION_LINKS.length, 5)
 
-assert.equal(GROWTH_COMMAND_CENTER_ACTIONS_QA_MARKER, "growth-command-center-actions-v3")
-assert.equal(GROWTH_COMMAND_CENTER_QUICK_ACTIONS.length, 8)
+assert.equal(GROWTH_COMMAND_CENTER_ACTIONS_QA_MARKER, "growth-command-center-actions-v4")
+assert.equal(GROWTH_COMMAND_CENTER_QUICK_ACTIONS.length, 6)
 assert.deepEqual(
   GROWTH_COMMAND_CENTER_QUICK_ACTIONS.map((action) => action.label),
   [
     "Prospect Search",
-    "View Intent Activity",
-    "Run Research",
-    "Generate Copilot Draft",
-    "Start Live Call",
-    "Join Meeting",
-    "Launch Sequence",
-    "Open Approval Queue",
+    "Inbox",
+    "Meetings",
+    "Opportunities",
+    "Launch Campaign",
+    "Open Aiden",
   ],
 )
 assert.equal(GROWTH_COMMAND_CENTER_QUICK_ACTIONS[0]?.href, "/admin/growth/search")
-assert.equal(GROWTH_COMMAND_CENTER_QUICK_ACTIONS[1]?.href, "/admin/growth/intent-pixel")
+assert.equal(GROWTH_COMMAND_CENTER_QUICK_ACTIONS[1]?.href, "/admin/growth/inbox")
 assert.ok(!GROWTH_COMMAND_CENTER_QUICK_ACTIONS.some((action) => action.label === "Import Leads"))
-assert.ok(!GROWTH_COMMAND_CENTER_QUICK_ACTIONS.some((action) => action.label === "Open Sequences"))
+assert.ok(!GROWTH_COMMAND_CENTER_QUICK_ACTIONS.some((action) => action.label === "View Intent Activity"))
 
 const quickActionsRail = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-command-quick-actions-rail.tsx"),

@@ -269,6 +269,9 @@ const commandCenter = fs.readFileSync(
   path.join(process.cwd(), "components/growth/growth-command-center-dashboard.tsx"),
   "utf8",
 )
-assert.ok(commandCenter.includes("GrowthCommandWorkflowOrchestrationSection"))
+assert.doesNotMatch(commandCenter, /GrowthCommandWorkflowOrchestrationSection/)
+assert.ok(
+  fs.existsSync(path.join(process.cwd(), "components/growth/growth-command-workflow-orchestration-section.tsx")),
+)
 
 console.log("voice-workflow-orchestration-phase-5c: all checks passed")
