@@ -143,6 +143,7 @@ export async function fetchGrowthNativeDialerLeadContext(
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle()
+      .then((result) => result)
       .catch(() => ({ data: null, error: null })),
     admin
       .schema("growth")
@@ -152,6 +153,7 @@ export async function fetchGrowthNativeDialerLeadContext(
       .order("computed_at", { ascending: false })
       .limit(1)
       .maybeSingle()
+      .then((result) => result)
       .catch(() => ({ data: null, error: null })),
     admin
       .schema("growth")

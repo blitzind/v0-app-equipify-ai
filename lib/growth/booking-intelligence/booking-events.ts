@@ -206,6 +206,7 @@ export async function recordBookingPlatformTimeline(
       lead_id: input.leadId,
       metadata: { source: "booking_intelligence" },
     })
+    .then(() => undefined)
     .catch(() => undefined)
 }
 

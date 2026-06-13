@@ -171,6 +171,7 @@ async function persistBuyingCommitteeMap(
         evidence_snippet: member.evidence.slice(0, 500),
         source: "revenue_intelligence_v1",
       })
+      .then(() => undefined)
       .catch(() => undefined)
   }
 

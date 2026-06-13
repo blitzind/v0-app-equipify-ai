@@ -106,6 +106,7 @@ export async function completeAdapterDeliveryAttempt(
     .from("delivery_attempts")
     .update({ latency_ms: latencyMs, failure_class: null })
     .eq("id", input.attemptId)
+    .then(() => undefined)
     .catch(() => undefined)
 }
 
@@ -147,6 +148,7 @@ export async function failAdapterDeliveryAttempt(
       latency_ms: latencyMs,
     })
     .eq("id", input.attemptId)
+    .then(() => undefined)
     .catch(() => undefined)
 
   return classification.failure_class

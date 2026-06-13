@@ -218,6 +218,7 @@ export async function ingestOpportunityIntelligenceFromInbox(
         evidence_snippet: committee.evidenceSnippet,
         source: committee.source,
       })
+      .then(() => undefined)
       .catch(() => undefined)
     await recordOpportunityIntelligencePlatformTimeline(admin, {
       eventType: "committee_signal_detected",
@@ -307,6 +308,7 @@ export async function ingestOpportunityIntelligenceFromInbox(
         status: "pending",
         evidence_snippet: candidate.evidenceSnippet,
       })
+      .then(() => undefined)
       .catch(() => undefined)
     await recordOpportunityIntelligencePlatformTimeline(admin, {
       eventType: "sequence_pause_candidate_detected",
@@ -338,6 +340,7 @@ export async function ingestOpportunityIntelligenceFromInbox(
         requires_human_approval: true,
         metadata: recommendationMetadata(stopRecommendation, "inbox_classifier"),
       })
+      .then(() => undefined)
       .catch(() => undefined)
   }
 

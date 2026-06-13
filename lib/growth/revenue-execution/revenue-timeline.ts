@@ -86,6 +86,7 @@ export async function fetchRevenueExecutionTimeline(
       .eq("lead_id", leadId)
       .order("created_at", { ascending: false })
       .limit(30)
+      .then((result) => result)
       .catch(() => ({ data: [], error: null })),
   ])
 

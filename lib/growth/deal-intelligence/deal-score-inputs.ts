@@ -49,6 +49,7 @@ export async function gatherDealScoreContext(
         .order("computed_at", { ascending: false })
         .limit(1)
         .maybeSingle()
+        .then((result) => result)
         .catch(() => ({ data: null, error: null })),
     ])
 

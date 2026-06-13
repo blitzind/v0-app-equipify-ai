@@ -111,6 +111,7 @@ export async function recordChannelPlatformTimeline(
       lead_id: input.leadId,
       metadata: { source: "multichannel_sequences" },
     })
+    .then(() => undefined)
     .catch(() => undefined)
 }
 
