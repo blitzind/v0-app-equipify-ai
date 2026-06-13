@@ -1,6 +1,6 @@
 /** Static Aiden operator guide — edit here to update in-app coaching copy. */
 
-export const AIDEN_OPERATOR_GUIDE_QA_MARKER = "aiden-operator-guide-v1" as const
+export const AIDEN_OPERATOR_GUIDE_QA_MARKER = "aiden-operator-guide-v2" as const
 
 export type AidenGuideLink = {
   label: string
@@ -41,6 +41,7 @@ export type AidenReplyTypeEntry = {
   type: string
   where: string
   action: string
+  doNot: string
   opportunityHint?: string
 }
 
@@ -78,9 +79,138 @@ export const AIDEN_COACH_TIPS: AidenCoachTip[] = [
     when: "Before triggering safe execute.",
   },
   {
+    id: "monitor-replies",
+    message: "12 emails are live. Check inbox daily — zero replies in the first 48 hours is normal.",
+    when: "Post-launch monitoring phase.",
+  },
+  {
     id: "no-auto-send",
     message: "Nothing sends automatically. You approve every job; transport only runs on approved jobs.",
     when: "Always.",
+  },
+]
+
+export const AIDEN_TODAY_POST_LAUNCH: AidenGuideStep[] = [
+  {
+    order: 1,
+    title: "Check mailbox health",
+    detail: "Confirm outbound mailbox stays connected. Expired tokens block future sends even if today's sends completed.",
+    links: [
+      { label: "Mailboxes", href: "/admin/growth/infrastructure/mailboxes" },
+      { label: "Provider setup", href: "/admin/growth/providers/setup" },
+    ],
+  },
+  {
+    order: 2,
+    title: "Check inbox",
+    detail: "Open unified inbox for new threads after live sends. Run inbox diagnostics if sync looks stale.",
+    links: [
+      { label: "Unified inbox", href: "/admin/growth/inbox" },
+      { label: "Inbox diagnostics", href: "/admin/growth/inbox/diagnostics" },
+    ],
+  },
+  {
+    order: 3,
+    title: "Review replies",
+    detail: "Read each inbound message. Confirm classification and timeline update before responding.",
+    links: [
+      { label: "Replies", href: "/admin/growth/replies" },
+      { label: "Reply workflow", href: "/admin/growth/replies/workflow" },
+    ],
+  },
+  {
+    order: 4,
+    title: "Book meetings",
+    detail: "When classification is meeting_request or positive_interest with calendar intent, book and log on timeline.",
+    links: [
+      { label: "Meetings", href: "/admin/growth/meetings" },
+      { label: "Booking intelligence", href: "/admin/growth/booking-intelligence" },
+    ],
+  },
+  {
+    order: 5,
+    title: "Approve opportunities",
+    detail: "Promote qualified conversations manually. No auto-opportunity creation.",
+    links: [
+      { label: "Opportunities", href: "/admin/growth/opportunities" },
+      { label: "Opportunity pipeline", href: "/admin/growth/opportunities/pipeline" },
+    ],
+  },
+  {
+    order: 6,
+    title: "Review attribution",
+    detail: "Verify send attribution touches exist for each sent job. Reply attribution follows after ingestion.",
+    links: [{ label: "Revenue attribution", href: "/admin/growth/revenue-attribution" }],
+  },
+  {
+    order: 7,
+    title: "Review dashboard",
+    detail: "Compare emails sent, replies, meetings, and opportunities on pilot dashboard. Zero replies early is normal.",
+    links: [
+      { label: "Sequence execution", href: "/admin/growth/sequences/execution" },
+      { label: "Command", href: "/admin/growth/command" },
+    ],
+  },
+]
+
+export const AIDEN_LIVE_REPLY_VALIDATION = {
+  title: "Live Reply Validation",
+  intro:
+    "When the first real reply arrives, confirm each signal below. Re-run validation after each reply until all pass.",
+  checklist: [
+    { key: "reply_received", label: "Reply ingested into Growth Engine", how: "Appears in inbox or outbound_replies for pilot lead." },
+    { key: "thread_associated", label: "Thread linked to lead", how: "Inbox thread shows correct company and contact." },
+    { key: "classification_generated", label: "Intent classification recorded", how: "positive_interest, objection, meeting_request, etc." },
+    { key: "timeline_updated", label: "Lead timeline event created", how: "reply_ingested or reply_received on lead timeline." },
+    { key: "next_best_action_generated", label: "Next best action suggested", how: "Workflow action or reply draft recommendation visible." },
+    { key: "meeting_created", label: "Meeting logged (if applicable)", how: "Only for meeting_request — not required for every reply." },
+    { key: "opportunity_created", label: "Opportunity created (if applicable)", how: "Manual operator step — not automatic." },
+  ],
+  operatorNote: "Zero replies after launch is expected for 24–72 hours. Monitor inbox; do not send follow-up blasts.",
+} as const
+
+export const AIDEN_COMMON_PROBLEMS: AidenBlockerEntry[] = [
+  {
+    code: "mailbox unhealthy",
+    meaning: "OAuth access token expired or mailbox status is not connected.",
+    severity: "critical",
+    operatorAction: "Provider setup → reconnect Google → validate mailbox.",
+    engineeringNeeded: false,
+  },
+  {
+    code: "generation_not_approved",
+    meaning: "AI draft for sequence step not approved before send.",
+    severity: "high",
+    operatorAction: "Approve AI generation, then re-approve job.",
+    engineeringNeeded: false,
+  },
+  {
+    code: "job stuck running",
+    meaning: "Transport lock not released after attempt.",
+    severity: "medium",
+    operatorAction: "Wait for recovery cron (~30 min). Do not double-approve.",
+    engineeringNeeded: false,
+  },
+  {
+    code: "no verified email",
+    meaning: "Lead missing verified contact email.",
+    severity: "high",
+    operatorAction: "Enrich or fix contact before approving send.",
+    engineeringNeeded: false,
+  },
+  {
+    code: "sms missing phone",
+    meaning: "SMS required by template but no phone on contact.",
+    severity: "low",
+    operatorAction: "Ignore for email-only pilot templates.",
+    engineeringNeeded: false,
+  },
+  {
+    code: "eligible_pool_below_target",
+    meaning: "Certification pool smaller than target size.",
+    severity: "medium",
+    operatorAction: "Accept smaller pilot or add companies — not a reply blocker.",
+    engineeringNeeded: false,
   },
 ]
 
@@ -350,41 +480,48 @@ export const AIDEN_DAILY_SALES_WORKFLOW = {
 
 export const AIDEN_REPLY_HANDLING: AidenReplyTypeEntry[] = [
   {
-    type: "positive interest",
+    type: "positive_interest",
     where: "Unified inbox → thread → Action Center",
-    action: "Use reply draft; propose next step or meeting. Update lead to engaged.",
-    opportunityHint: "Create opportunity when budget and timeline are clear.",
+    action: "Use reply draft; propose next step or meeting. Mark lead engaged.",
+    doNot: "Do not auto-send without reading. Do not pitch unrelated products.",
+    opportunityHint: "Create opportunity when budget and timeline are confirmed.",
   },
   {
     type: "objection",
     where: "Replies workflow → classify as objection",
-    action: "Acknowledge concern; use playbook objection handler; do not argue.",
+    action: "Acknowledge concern; use objection playbook; offer one clear next step.",
+    doNot: "Do not argue or send multiple follow-ups same day.",
   },
   {
-    type: "not interested",
-    where: "Inbox → mark disposition",
-    action: "Respect opt-out tone; pause sequence; do not re-pitch immediately.",
+    type: "meeting_request",
+    where: "Meetings + booking intelligence",
+    action: "Send calendar link or propose times; log meeting on timeline.",
+    doNot: "Do not let meeting intent sit unresponded >24 hours.",
+    opportunityHint: "Strong signal — create or advance opportunity after meeting set.",
   },
   {
-    type: "out of office",
-    where: "Inbox thread",
-    action: "Snooze follow-up until return date; no immediate reply needed.",
+    type: "not_interested",
+    where: "Inbox → disposition",
+    action: "Pause sequence; note reason on lead.",
+    doNot: "Do not re-pitch immediately or CC others without permission.",
+  },
+  {
+    type: "wrong_person",
+    where: "Lead record + inbox",
+    action: "Ask for correct contact; update lead or create new contact.",
+    doNot: "Do not keep emailing the wrong address.",
   },
   {
     type: "unsubscribe",
     where: "Compliance / suppression",
-    action: "Confirm suppression applied; never send again to this address.",
+    action: "Confirm suppression applied.",
+    doNot: "Never send again to this address. Do not override suppression.",
   },
   {
-    type: "wrong person",
-    where: "Lead record + inbox",
-    action: "Ask for correct contact; update lead or create new contact.",
-  },
-  {
-    type: "meeting request",
-    where: "Meetings + booking intelligence",
-    action: "Send calendar link or propose times; log meeting on timeline.",
-    opportunityHint: "Strong signal — create or advance opportunity.",
+    type: "out_of_office",
+    where: "Inbox thread",
+    action: "Snooze follow-up until return date noted in message.",
+    doNot: "Do not treat OOO as positive interest or send immediate follow-up.",
   },
 ]
 
@@ -442,11 +579,12 @@ export const AIDEN_METRICS_GUIDE: AidenMetricEntry[] = [
 ]
 
 export const AIDEN_GUIDE_SECTIONS = [
-  { id: "today", title: "What do I do today?" },
-  { id: "pilot-checklist", title: "Apollo Pilot Launch Checklist" },
+  { id: "today", title: "Today" },
+  { id: "reply-handling", title: "Reply Handling" },
   { id: "status-dictionary", title: "Status Dictionary" },
-  { id: "blocker-playbook", title: "Blocker Playbook" },
+  { id: "common-problems", title: "Common Problems" },
+  { id: "live-reply-validation", title: "Live Reply Validation" },
+  { id: "pilot-checklist", title: "Apollo Pilot Launch Checklist" },
   { id: "daily-sales", title: "Daily Sales Workflow" },
-  { id: "reply-handling", title: "Reply Handling Guide" },
   { id: "metrics", title: "Metrics Guide" },
 ] as const

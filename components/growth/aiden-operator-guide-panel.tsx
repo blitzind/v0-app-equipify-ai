@@ -11,15 +11,16 @@ import {
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import {
   AIDEN_APOLLO_PILOT_CHECKLIST,
-  AIDEN_BLOCKER_PLAYBOOK,
+  AIDEN_COMMON_PROBLEMS,
   AIDEN_COACH_TIPS,
-  AIDEN_DAILY_ROUTINE,
   AIDEN_DAILY_SALES_WORKFLOW,
   AIDEN_GUIDE_SECTIONS,
+  AIDEN_LIVE_REPLY_VALIDATION,
   AIDEN_METRICS_GUIDE,
   AIDEN_OPERATOR_GUIDE_QA_MARKER,
   AIDEN_REPLY_HANDLING,
   AIDEN_STATUS_DICTIONARY,
+  AIDEN_TODAY_POST_LAUNCH,
   type AidenBlockerEntry,
   type AidenGuideLink,
 } from "@/lib/growth/aiden/operator-guide"
@@ -88,14 +89,14 @@ export function AidenOperatorGuidePanel({ className, embedded = false }: AidenOp
         </ul>
       </div>
 
-      <Accordion type="multiple" defaultValue={["today", "pilot-checklist"]} className="w-full space-y-1">
+      <Accordion type="multiple" defaultValue={["today", "reply-handling", "live-reply-validation"]} className="w-full space-y-1">
         <AccordionItem value="today" className="rounded-lg border border-border px-3">
           <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
             {AIDEN_GUIDE_SECTIONS.find((s) => s.id === "today")?.title}
           </AccordionTrigger>
           <AccordionContent className="pb-4">
             <ol className="space-y-3">
-              {AIDEN_DAILY_ROUTINE.map((step) => (
+              {AIDEN_TODAY_POST_LAUNCH.map((step) => (
                 <li key={step.order} className="flex gap-3 text-sm">
                   <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
                     {step.order}
@@ -108,6 +109,117 @@ export function AidenOperatorGuidePanel({ className, embedded = false }: AidenOp
                 </li>
               ))}
             </ol>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="reply-handling" className="rounded-lg border border-border px-3">
+          <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
+            {AIDEN_GUIDE_SECTIONS.find((s) => s.id === "reply-handling")?.title}
+          </AccordionTrigger>
+          <AccordionContent className="pb-4">
+            <ul className="space-y-3">
+              {AIDEN_REPLY_HANDLING.map((reply) => (
+                <li key={reply.type} className="rounded-lg border border-border/60 p-3 text-sm">
+                  <p className="font-mono text-xs font-semibold">{reply.type}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    <span className="font-semibold">Where: </span>
+                    {reply.where}
+                  </p>
+                  <p className="mt-1">
+                    <span className="font-semibold">Action: </span>
+                    {reply.action}
+                  </p>
+                  <p className="mt-1 text-xs text-rose-700 dark:text-rose-400">
+                    <span className="font-semibold">Do not: </span>
+                    {reply.doNot}
+                  </p>
+                  {reply.opportunityHint ? (
+                    <p className="mt-1 text-xs text-indigo-600 dark:text-indigo-400">{reply.opportunityHint}</p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+            <GuideLinks
+              links={[
+                { label: "Unified inbox", href: "/admin/growth/inbox" },
+                { label: "Reply drafts", href: "/admin/growth/copilot/reply-drafts" },
+              ]}
+            />
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="status-dictionary" className="rounded-lg border border-border px-3">
+          <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
+            {AIDEN_GUIDE_SECTIONS.find((s) => s.id === "status-dictionary")?.title}
+          </AccordionTrigger>
+          <AccordionContent className="pb-4">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[480px] text-left text-xs">
+                <thead>
+                  <tr className="border-b border-border text-muted-foreground">
+                    <th className="py-2 pr-3 font-semibold">Status</th>
+                    <th className="py-2 pr-3 font-semibold">Meaning</th>
+                    <th className="py-2 font-semibold">What to do</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {AIDEN_STATUS_DICTIONARY.map((row) => (
+                    <tr key={row.status} className="border-b border-border/50 align-top">
+                      <td className="py-2 pr-3 font-mono text-[11px]">{row.status}</td>
+                      <td className="py-2 pr-3 text-muted-foreground">{row.meaning}</td>
+                      <td className="py-2">{row.operatorAction}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="common-problems" className="rounded-lg border border-border px-3">
+          <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
+            {AIDEN_GUIDE_SECTIONS.find((s) => s.id === "common-problems")?.title}
+          </AccordionTrigger>
+          <AccordionContent className="pb-4">
+            <ul className="space-y-3">
+              {AIDEN_COMMON_PROBLEMS.map((blocker) => (
+                <li key={blocker.code} className="rounded-lg border border-border/60 p-3 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{blocker.code}</span>
+                    <GrowthBadge label={blocker.severity} tone={severityTone(blocker.severity)} />
+                    {blocker.engineeringNeeded ? (
+                      <GrowthBadge label="Engineering may be needed" tone="attention" />
+                    ) : (
+                      <GrowthBadge label="Operator fix" tone="healthy" />
+                    )}
+                  </div>
+                  <p className="mt-2 text-muted-foreground">{blocker.meaning}</p>
+                  <p className="mt-2">
+                    <span className="font-semibold">Action: </span>
+                    {blocker.operatorAction}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="live-reply-validation" className="rounded-lg border border-border px-3">
+          <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
+            {AIDEN_LIVE_REPLY_VALIDATION.title}
+          </AccordionTrigger>
+          <AccordionContent className="pb-4">
+            <p className="text-sm text-muted-foreground">{AIDEN_LIVE_REPLY_VALIDATION.intro}</p>
+            <ul className="mt-3 space-y-2">
+              {AIDEN_LIVE_REPLY_VALIDATION.checklist.map((item) => (
+                <li key={item.key} className="rounded-lg border border-border/60 bg-muted/10 p-3 text-sm">
+                  <p className="font-medium">{item.label}</p>
+                  <p className="mt-1 font-mono text-[11px] text-muted-foreground">{item.key}</p>
+                  <p className="mt-1 text-xs">{item.how}</p>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-xs text-amber-800 dark:text-amber-200">{AIDEN_LIVE_REPLY_VALIDATION.operatorNote}</p>
           </AccordionContent>
         </AccordionItem>
 
@@ -141,62 +253,6 @@ export function AidenOperatorGuidePanel({ className, embedded = false }: AidenOp
           </AccordionContent>
         </AccordionItem>
 
-        <AccordionItem value="status-dictionary" className="rounded-lg border border-border px-3">
-          <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
-            {AIDEN_GUIDE_SECTIONS.find((s) => s.id === "status-dictionary")?.title}
-          </AccordionTrigger>
-          <AccordionContent className="pb-4">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[480px] text-left text-xs">
-                <thead>
-                  <tr className="border-b border-border text-muted-foreground">
-                    <th className="py-2 pr-3 font-semibold">Status</th>
-                    <th className="py-2 pr-3 font-semibold">Meaning</th>
-                    <th className="py-2 font-semibold">What to do</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {AIDEN_STATUS_DICTIONARY.map((row) => (
-                    <tr key={row.status} className="border-b border-border/50 align-top">
-                      <td className="py-2 pr-3 font-mono text-[11px]">{row.status}</td>
-                      <td className="py-2 pr-3 text-muted-foreground">{row.meaning}</td>
-                      <td className="py-2">{row.operatorAction}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-
-        <AccordionItem value="blocker-playbook" className="rounded-lg border border-border px-3">
-          <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
-            {AIDEN_GUIDE_SECTIONS.find((s) => s.id === "blocker-playbook")?.title}
-          </AccordionTrigger>
-          <AccordionContent className="pb-4">
-            <ul className="space-y-3">
-              {AIDEN_BLOCKER_PLAYBOOK.map((blocker) => (
-                <li key={blocker.code} className="rounded-lg border border-border/60 p-3 text-sm">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{blocker.code}</span>
-                    <GrowthBadge label={blocker.severity} tone={severityTone(blocker.severity)} />
-                    {blocker.engineeringNeeded ? (
-                      <GrowthBadge label="Engineering may be needed" tone="attention" />
-                    ) : (
-                      <GrowthBadge label="Operator fix" tone="healthy" />
-                    )}
-                  </div>
-                  <p className="mt-2 text-muted-foreground">{blocker.meaning}</p>
-                  <p className="mt-2">
-                    <span className="font-semibold">Action: </span>
-                    {blocker.operatorAction}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </AccordionContent>
-        </AccordionItem>
-
         <AccordionItem value="daily-sales" className="rounded-lg border border-border px-3">
           <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
             {AIDEN_GUIDE_SECTIONS.find((s) => s.id === "daily-sales")?.title}
@@ -223,38 +279,6 @@ export function AidenOperatorGuidePanel({ className, embedded = false }: AidenOp
                 </div>
               ))}
             </div>
-          </AccordionContent>
-        </AccordionItem>
-
-        <AccordionItem value="reply-handling" className="rounded-lg border border-border px-3">
-          <AccordionTrigger className="py-3 text-sm font-semibold hover:no-underline">
-            {AIDEN_GUIDE_SECTIONS.find((s) => s.id === "reply-handling")?.title}
-          </AccordionTrigger>
-          <AccordionContent className="pb-4">
-            <ul className="space-y-3">
-              {AIDEN_REPLY_HANDLING.map((reply) => (
-                <li key={reply.type} className="rounded-lg border border-border/60 p-3 text-sm">
-                  <p className="font-medium capitalize">{reply.type}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    <span className="font-semibold">Where: </span>
-                    {reply.where}
-                  </p>
-                  <p className="mt-1">
-                    <span className="font-semibold">Action: </span>
-                    {reply.action}
-                  </p>
-                  {reply.opportunityHint ? (
-                    <p className="mt-1 text-xs text-indigo-600 dark:text-indigo-400">{reply.opportunityHint}</p>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-            <GuideLinks
-              links={[
-                { label: "Unified inbox", href: "/admin/growth/inbox" },
-                { label: "Reply drafts", href: "/admin/growth/copilot/reply-drafts" },
-              ]}
-            />
           </AccordionContent>
         </AccordionItem>
 
