@@ -20,6 +20,7 @@ export async function isGrowthGoogleCalendarConnectedForUser(
   admin: SupabaseClient,
   userId: string,
 ): Promise<boolean> {
+  if (!userId.trim()) return false
   const connection = await fetchGrowthCalendarConnectionForUser(admin, userId)
   return Boolean(connection)
 }

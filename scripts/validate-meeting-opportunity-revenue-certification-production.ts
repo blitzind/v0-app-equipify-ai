@@ -1,5 +1,5 @@
 /**
- * Phase 15.3A — Meeting, opportunity, and revenue attribution certification (read-only).
+ * Phase 15.3B — Meeting, opportunity, and revenue attribution certification (read-only).
  *
  * Run:
  *   node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- \
@@ -7,6 +7,7 @@
  */
 import { createClient } from "@supabase/supabase-js"
 import { bootstrapVerifiedChannelsCertEnv } from "../lib/growth/qa/verified-channels-cert-env-bootstrap"
+import { GROWTH_ATTRIBUTION_TOUCH_TYPES } from "../lib/growth/revenue-attribution/attribution-touch-types"
 
 const COHORT_ID = "c04a1a26-9e22-4aa7-b1b3-025ffdfc591a"
 const HENRY_LEAD = "7bf7a767-ef0f-4441-af6e-d0f3ffa81d56"
@@ -42,11 +43,9 @@ async function main(): Promise<void> {
   const evidence: Record<string, unknown> = {}
 
   const tableNames = [
-    "growth_meetings",
     "meeting_candidates",
     "meetings",
     "opportunity_drafts",
-    "growth_opportunities",
     "opportunities",
     "attribution_touches",
     "revenue_attribution_events",
@@ -64,22 +63,14 @@ async function main(): Promise<void> {
   }
   evidence.table_counts = tableCounts
 
-  const { data: cohortCompanies } = await admin
-    .schema("growth")
-    .from("apollo_pilot_cohort_companies")
-    .select("company_candidate_id")
-    .eq("cohort_id", COHORT_ID)
-
-  const companyIds =
-    cohortCompanies?.map((row) => asString((row as { company_candidate_id: string }).company_candidate_id)).filter(Boolean) ??
-    []
-
-  const { data: cohortLeads } = companyIds.length
-    ? await admin.schema("growth").from("leads").select("id").in("company_candidate_id", companyIds).limit(500)
-    : { data: [] }
-
-  const cohortLeadIds = cohortLeads?.map((row) => asString((row as { id: string }).id)).filter(Boolean) ?? []
-  evidence.cohort = { company_count: companyIds.length, lead_count: cohortLeadIds.length }
+  const { resolveApolloCohortLeadIds } = await import("../lib/growth/apollo/resolve-apollo-cohort-lead-ids")
+  const cohortResolution = await resolveApolloCohortLeadIds(admin, COHORT_ID)
+  const cohortLeadIds = cohortResolution?.lead_ids ?? []
+  evidence.cohort = {
+    company_count: cohortResolution?.company_candidate_ids.length ?? 0,
+    lead_count: cohortLeadIds.length,
+    resolution: "execution_queue",
+  }
 
   const meetingChecks: Check[] = []
 
@@ -87,7 +78,7 @@ async function main(): Promise<void> {
     .schema("growth")
     .from("outbound_replies")
     .select("id", { count: "exact", head: true })
-    .or("classification.eq.meeting_request,intent.eq.meeting_request")
+    .or("classification.eq.meeting_request,intent.eq.meeting_request,classification_v2.eq.meeting_request")
 
   meetingChecks.push({
     id: "meeting_request_reply",
@@ -102,7 +93,7 @@ async function main(): Promise<void> {
 
   meetingChecks.push({
     id: "meeting_candidate_queue",
-    pass: typeof meetingCandidates === "number",
+    pass: (meetingCandidates ?? 0) > 0,
     detail: { count: meetingCandidates ?? 0 },
   })
 
@@ -117,7 +108,7 @@ async function main(): Promise<void> {
     detail: { booking_pages: bookingPages ?? 0 },
   })
 
-  const { data: meetingStatusRows } = await admin.schema("growth").from("growth_meetings").select("status").limit(500)
+  const { data: meetingStatusRows } = await admin.schema("growth").from("meetings").select("status").limit(500)
   const meetingStatusCounts: Record<string, number> = {}
   for (const row of meetingStatusRows ?? []) {
     const status = asString((row as { status: string }).status)
@@ -125,7 +116,7 @@ async function main(): Promise<void> {
   }
   meetingChecks.push({
     id: "meeting_status_data",
-    pass: true,
+    pass: (meetingStatusRows?.length ?? 0) > 0,
     detail: { total: meetingStatusRows?.length ?? 0, by_status: meetingStatusCounts },
   })
 
@@ -144,7 +135,7 @@ async function main(): Promise<void> {
 
   meetingChecks.push({
     id: "meeting_timeline_events",
-    pass: true,
+    pass: (meetingTimelineEvents ?? 0) > 0,
     detail: { count: meetingTimelineEvents ?? 0 },
   })
 
@@ -152,11 +143,11 @@ async function main(): Promise<void> {
     .schema("growth")
     .from("attribution_touches")
     .select("id", { count: "exact", head: true })
-    .eq("touch_type", "meeting_booked")
+    .eq("touch_type", "meeting")
 
   meetingChecks.push({
     id: "meeting_attribution_touches",
-    pass: true,
+    pass: (meetingAttributionTouches ?? 0) > 0,
     detail: { count: meetingAttributionTouches ?? 0 },
   })
 
@@ -168,7 +159,7 @@ async function main(): Promise<void> {
 
   meetingChecks.push({
     id: "meeting_revenue_events",
-    pass: true,
+    pass: (meetingRevenueEvents ?? 0) > 0,
     detail: { count: meetingRevenueEvents ?? 0 },
   })
 
@@ -185,7 +176,7 @@ async function main(): Promise<void> {
     detail: { pages_with_reminder_template: pagesWithReminders?.length ?? 0 },
   })
 
-  const { count: legacyMeetingsForCohort } = cohortLeadIds.length
+  const { count: cohortMeetings } = cohortLeadIds.length
     ? await admin
         .schema("growth")
         .from("meetings")
@@ -195,8 +186,8 @@ async function main(): Promise<void> {
 
   meetingChecks.push({
     id: "cohort_meeting_records",
-    pass: true,
-    detail: { legacy_meetings_table: legacyMeetingsForCohort ?? 0, growth_meetings: tableCounts.growth_meetings },
+    pass: (cohortMeetings ?? 0) > 0 || (meetingCandidates ?? 0) > 0,
+    detail: { meetings_for_cohort: cohortMeetings ?? 0, meeting_candidates: meetingCandidates ?? 0 },
   })
 
   evidence.meeting_lifecycle = meetingChecks
@@ -216,7 +207,7 @@ async function main(): Promise<void> {
 
   oppChecks.push({
     id: "opportunity_draft_creation",
-    pass: true,
+    pass: (draftStatusRows?.length ?? 0) > 0,
     detail: { total: draftStatusRows?.length ?? 0, by_status: draftStatusCounts },
   })
 
@@ -238,15 +229,15 @@ async function main(): Promise<void> {
     .select("id", { count: "exact", head: true })
     .eq("status", "converted")
 
-  const { count: growthOpps } = await admin
+  const { count: opportunities } = await admin
     .schema("growth")
-    .from("growth_opportunities")
+    .from("opportunities")
     .select("id", { count: "exact", head: true })
 
   oppChecks.push({
     id: "opportunity_promotion",
-    pass: true,
-    detail: { converted_drafts: convertedDrafts ?? 0, growth_opportunities: growthOpps ?? 0 },
+    pass: (convertedDrafts ?? 0) > 0 || (opportunities ?? 0) > 0,
+    detail: { converted_drafts: convertedDrafts ?? 0, opportunities: opportunities ?? 0 },
   })
 
   const { count: oppAttributionTouches } = await admin
@@ -257,7 +248,7 @@ async function main(): Promise<void> {
 
   oppChecks.push({
     id: "opportunity_attribution_touches",
-    pass: true,
+    pass: (oppAttributionTouches ?? 0) > 0,
     detail: { count: oppAttributionTouches ?? 0 },
   })
 
@@ -274,7 +265,7 @@ async function main(): Promise<void> {
 
   oppChecks.push({
     id: "opportunity_timeline_events",
-    pass: true,
+    pass: (oppTimelineEvents ?? 0) > 0,
     detail: { count: oppTimelineEvents ?? 0 },
   })
 
@@ -329,17 +320,15 @@ async function main(): Promise<void> {
     blockers.push("revenue_attribution_dashboard_load_failed")
   }
 
-  const { count: sendTouches } = await admin
-    .schema("growth")
-    .from("attribution_touches")
-    .select("id", { count: "exact", head: true })
-    .eq("touch_type", "email_sent")
-
-  const { count: replyTouches } = await admin
-    .schema("growth")
-    .from("attribution_touches")
-    .select("id", { count: "exact", head: true })
-    .eq("touch_type", "reply_received")
+  const touchTypeCounts: Record<string, number> = {}
+  for (const touchType of GROWTH_ATTRIBUTION_TOUCH_TYPES) {
+    const { count } = await admin
+      .schema("growth")
+      .from("attribution_touches")
+      .select("id", { count: "exact", head: true })
+      .eq("touch_type", touchType)
+    touchTypeCounts[touchType] = count ?? 0
+  }
 
   const { count: allTouches } = await admin
     .schema("growth")
@@ -354,13 +343,7 @@ async function main(): Promise<void> {
   revChecks.push({
     id: "attribution_touches_integrity",
     pass: (allTouches ?? 0) > 0,
-    detail: {
-      total: allTouches ?? 0,
-      email_sent: sendTouches ?? 0,
-      reply_received: replyTouches ?? 0,
-      meeting_booked: meetingAttributionTouches ?? 0,
-      opportunity_created: oppAttributionTouches ?? 0,
-    },
+    detail: { total: allTouches ?? 0, by_type: touchTypeCounts },
   })
 
   if ((allTouches ?? 0) === 0) warnings.push("no_attribution_touches_in_production")
@@ -375,27 +358,27 @@ async function main(): Promise<void> {
   const { data: chainTouches } = await admin
     .schema("growth")
     .from("attribution_touches")
-    .select("lead_id,touch_type,occurred_at")
+    .select("lead_id,touch_type,touched_at")
     .in("lead_id", chainLeadIds)
-    .order("occurred_at", { ascending: true })
+    .order("touched_at", { ascending: true })
 
   const chainByLead: Record<string, string[]> = {}
   for (const touch of chainTouches ?? []) {
-    const leadId = asString((touch as { lead_id: string }).lead_id)
-    if (!chainByLead[leadId]) chainByLead[leadId] = []
-    chainByLead[leadId].push(asString((touch as { touch_type: string }).touch_type))
+    const lead = asString((touch as { lead_id: string }).lead_id)
+    if (!chainByLead[lead]) chainByLead[lead] = []
+    chainByLead[lead].push(asString((touch as { touch_type: string }).touch_type))
   }
 
   const chains = Object.values(chainByLead)
-  const leadsWithSend = chains.filter((types) => types.includes("email_sent")).length
-  const leadsWithReply = chains.filter((types) => types.includes("reply_received")).length
-  const leadsWithMeeting = chains.filter((types) => types.includes("meeting_booked")).length
+  const leadsWithSend = chains.filter((types) => types.includes("email_send")).length
+  const leadsWithReply = chains.filter((types) => types.includes("reply")).length
+  const leadsWithMeeting = chains.filter((types) => types.includes("meeting")).length
   const leadsWithOpp = chains.filter((types) => types.includes("opportunity_created")).length
-  const leadsWithWon = chains.filter((types) => types.includes("closed_won")).length
+  const leadsWithWon = chains.filter((types) => types.includes("opportunity_won")).length
 
   revChecks.push({
     id: "send_reply_meeting_opp_chain",
-    pass: leadsWithSend > 0,
+    pass: leadsWithSend > 0 && leadsWithReply > 0,
     detail: {
       leads_with_send: leadsWithSend,
       leads_with_reply: leadsWithReply,
@@ -416,16 +399,23 @@ async function main(): Promise<void> {
     analytics = null
   }
 
+  const dashboardReplyCount =
+    revenueDashboard?.funnel.find((step) => step.stage === "reply")?.count ?? 0
+  const analyticsReplyCount = analytics?.dashboard?.replies_received ?? 0
+  const replyCountsAligned =
+    analyticsReplyCount === 0 || dashboardReplyCount >= analyticsReplyCount || dashboardReplyCount === analyticsReplyCount
+
   if (analytics && revenueDashboard) {
     revChecks.push({
       id: "dashboard_cohort_analytics_alignment",
-      pass: true,
+      pass: replyCountsAligned,
       detail: {
         analytics_emails_sent: analytics.dashboard?.emails_sent ?? 0,
-        analytics_replies: analytics.dashboard?.replies_received ?? 0,
+        analytics_replies: analyticsReplyCount,
         analytics_meetings: analytics.dashboard?.meetings_booked ?? 0,
         analytics_opportunities: analytics.dashboard?.opportunities_created ?? 0,
         dashboard_funnel: revenueDashboard.funnel,
+        reply_counts_aligned: replyCountsAligned,
       },
     })
   } else {
@@ -437,6 +427,23 @@ async function main(): Promise<void> {
     warnings.push("dashboard_analytics_cross_check_incomplete")
   }
 
+  const { fetchAidenRevenueJourneyTracker } = await import("../lib/growth/aiden/aiden-revenue-journey-tracker")
+  const journeyTracker = await fetchAidenRevenueJourneyTracker(admin, { cohortId: COHORT_ID, limit: 50 })
+  revChecks.push({
+    id: "aiden_revenue_journey_tracker",
+    pass: journeyTracker.journeys.length > 0,
+    detail: {
+      qa_marker: journeyTracker.qa_marker,
+      summary: journeyTracker.summary,
+      sample_leads: journeyTracker.journeys.slice(0, 3).map((j) => ({
+        lead_id: j.lead_id,
+        company_name: j.company_name,
+        current_stage: j.current_stage,
+        complete_stages: j.stages.filter((s) => s.complete).length,
+      })),
+    },
+  })
+
   evidence.revenue_attribution = revChecks
   const revenuePct = pct(
     revChecks.filter((check) => check.pass).length,
@@ -445,30 +452,38 @@ async function main(): Promise<void> {
 
   if ((meetingIntentReplies ?? 0) === 0) warnings.push("no_meeting_intent_replies_in_db")
   if ((meetingCandidates ?? 0) === 0) warnings.push("no_meeting_candidates_materialized")
-  if ((meetingTimelineEvents ?? 0) === 0) warnings.push("no_meeting_timeline_events_yet")
-  if ((convertedDrafts ?? 0) === 0 && (growthOpps ?? 0) === 0) {
-    warnings.push("no_opportunity_promotions_in_production_yet")
-  }
   if (leadsWithReply === 0 && leadsWithSend > 0) {
     warnings.push("send_touches_exist_reply_touches_missing_on_sample_leads")
+  }
+  if (!replyCountsAligned) warnings.push("dashboard_reply_count_below_cohort_analytics")
+  if ((convertedDrafts ?? 0) === 0 && (opportunities ?? 0) === 0) {
+    warnings.push("no_opportunity_promotions_in_production_yet")
   }
   if ((pagesWithReminders?.length ?? 0) === 0) warnings.push("meeting_reminder_templates_not_configured")
 
   const recommended_next_steps: string[] = []
-  if ((meetingCandidates ?? 0) === 0 && (meetingIntentReplies ?? 0) > 0) {
-    recommended_next_steps.push("Bridge meeting-intent reply to meeting candidate (operator approve — no auto-schedule)")
-  }
   if (leadsWithReply === 0) {
-    recommended_next_steps.push("Verify reply_received attribution touch on next live reply (extend Henry reconcile pattern)")
+    recommended_next_steps.push("Backfill reply attribution touch on pilot replies (record-reply-attribution-touch)")
+  }
+  if ((meetingCandidates ?? 0) === 0) {
+    recommended_next_steps.push("Run scripts/certify-revenue-journey-production.ts -- --certify on pilot lead")
   }
   if ((convertedDrafts ?? 0) === 0) {
-    recommended_next_steps.push("Run one meeting → opportunity draft → approve → convert operator path")
+    recommended_next_steps.push("Complete meeting → opportunity draft → approve → convert on Henry Schein lead")
   }
-  if ((pagesWithReminders?.length ?? 0) === 0) {
-    recommended_next_steps.push("Configure booking page reminder email templates")
-  }
-  recommended_next_steps.push(
-    "Certify full chain on next pilot reply: send → reply → meeting candidate → meeting → opportunity → attribution dashboard",
+  recommended_next_steps.push("Use Aiden Revenue Journey Tracker to monitor per-lead stage gaps")
+
+  const scaleReadinessPct = pct(
+    [
+      meetingPct >= 90,
+      opportunityPct >= 90,
+      revenuePct >= 90,
+      leadsWithMeeting > 0,
+      (convertedDrafts ?? 0) > 0,
+      replyCountsAligned,
+      (pagesWithReminders?.length ?? 0) > 0,
+    ].filter(Boolean).length,
+    7,
   )
 
   const readiness = {
@@ -481,8 +496,8 @@ async function main(): Promise<void> {
     READY_FOR_PILOT:
       revenuePct >= 85 &&
       meetingPct >= 75 &&
-      (meetingIntentReplies ?? 0) > 0 &&
       leadsWithSend > 0 &&
+      leadsWithReply > 0 &&
       (meetingCandidates ?? 0) > 0,
     READY_FOR_SCALE:
       revenuePct >= 95 &&
@@ -491,41 +506,23 @@ async function main(): Promise<void> {
       leadsWithReply > 0 &&
       leadsWithMeeting > 0 &&
       (convertedDrafts ?? 0) > 0,
+    SCALE_READINESS_PCT: scaleReadinessPct,
   }
 
   console.log(
     JSON.stringify(
       {
         ok: true,
-        phase: "15.3A",
+        phase: "15.3B",
         observe_only: true,
         meeting_automation_pct: meetingPct,
         opportunity_pipeline_pct: opportunityPct,
         revenue_attribution_pct: revenuePct,
+        scale_readiness_pct: scaleReadinessPct,
         blockers,
         warnings,
         recommended_next_steps,
         readiness,
-        readiness_requirements: {
-          READY_FOR_OPERATOR_USE: [
-            "Revenue attribution dashboard loads",
-            "attribution_touches populated for sends",
-            "Booking pages + meeting UI/API paths exist",
-            "Operator can access meetings, opportunities, revenue attribution surfaces",
-          ],
-          READY_FOR_PILOT: [
-            "Meeting-intent replies detected",
-            "Meeting candidate bridge queue operational",
-            "Send attribution on cohort leads",
-            "Reply attribution touch on live replies",
-          ],
-          READY_FOR_SCALE: [
-            "Full send→reply→meeting→opportunity chain with timeline events",
-            "Opportunity draft approve+convert validated in production",
-            "Meeting reminders configured",
-            "Dashboard metrics align with cohort analytics",
-          ],
-        },
         evidence,
       },
       null,

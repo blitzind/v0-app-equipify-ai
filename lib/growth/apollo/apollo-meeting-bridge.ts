@@ -240,7 +240,7 @@ export async function loadApolloMeetingBridgePipelineInputForLead(
   const { data: leadRow } = await admin
     .schema("growth")
     .from("leads")
-    .select("id, company_name, status, assigned_to, opportunity_readiness_tier, canonical_company_id")
+    .select("id, company_name, status, assigned_to, opportunity_readiness_tier")
     .eq("id", input.lead_id)
     .maybeSingle()
 
@@ -331,10 +331,13 @@ export async function loadApolloMeetingBridgePipelineInputForLead(
     },
     company: {
       company_id:
-        typeof leadRow.canonical_company_id === "string" ? leadRow.canonical_company_id : null,
+        typeof sequenceRow?.company_candidate_id === "string"
+          ? sequenceRow.company_candidate_id
+          : typeof playbookRow?.company_candidate_id === "string"
+            ? playbookRow.company_candidate_id
+            : null,
       company_name: String(leadRow.company_name ?? ""),
-      canonical_company_id:
-        typeof leadRow.canonical_company_id === "string" ? leadRow.canonical_company_id : null,
+      canonical_company_id: null,
       company_candidate_id:
         typeof sequenceRow?.company_candidate_id === "string"
           ? sequenceRow.company_candidate_id

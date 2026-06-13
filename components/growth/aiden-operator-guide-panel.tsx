@@ -4,6 +4,7 @@ import Link from "next/link"
 import { Bot, ChevronRight, ExternalLink } from "lucide-react"
 import { AidenDailyBriefingPanel } from "@/components/growth/aiden-daily-briefing-panel"
 import { AidenGuidedWorkflowsPanel } from "@/components/growth/aiden-guided-workflows-panel"
+import { AidenRevenueJourneyTrackerPanel } from "@/components/growth/aiden-revenue-journey-tracker-panel"
 import { useAidenBriefing } from "@/components/growth/use-aiden-briefing"
 import {
   Accordion,
@@ -86,6 +87,8 @@ export function AidenOperatorGuidePanel({
       />
 
       <AidenGuidedWorkflowsPanel briefing={briefing} />
+
+      <AidenRevenueJourneyTrackerPanel embedded />
 
       <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 px-4 py-3 dark:border-indigo-900/40 dark:bg-indigo-950/30">
         <p className="text-sm font-medium text-foreground">Aiden — your Growth Engine operator coach</p>

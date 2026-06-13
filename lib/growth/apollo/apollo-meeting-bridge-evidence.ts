@@ -119,8 +119,11 @@ export function evaluateApolloMeetingBridgeTriggerRules(
   const matchedQualificationSignals: ApolloMeetingBridgeQualificationStatusTrigger[] = []
   const evidenceSnippets: string[] = []
 
-  const replyIntent =
-    input.reply_intelligence.classification_v2 ?? input.reply_intelligence.intent ?? null
+  const classificationV2 =
+    typeof input.reply_intelligence.classification_v2 === "string"
+      ? input.reply_intelligence.classification_v2
+      : null
+  const replyIntent = classificationV2 ?? input.reply_intelligence.intent ?? null
 
   if (
     replyIntent &&

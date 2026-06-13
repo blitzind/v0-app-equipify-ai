@@ -11,6 +11,7 @@ import {
   listAttributionPathsForLeads,
   listAttributionTouchesByIds,
   listAttributionTouchesInRange,
+  listReplyLeadIdsInRange,
   listOpportunitiesForAttributionDashboard,
   loadLeadAttributionContexts,
   loadSenderLabels,
@@ -195,9 +196,14 @@ function buildFunnel(
   touches: GrowthAttributionTouch[],
   opportunities: OpportunityRow[],
   filters: GrowthRevenueAttributionDashboardFilters,
+  supplementaryReplyLeadIds: string[] = [],
 ): GrowthAttributionFunnelStep[] {
   const leadIds = new Set(touches.map((t) => t.leadId))
   const replyLeads = new Set(touches.filter((t) => t.touchType === "reply").map((t) => t.leadId))
+  for (const leadId of supplementaryReplyLeadIds) {
+    replyLeads.add(leadId)
+    leadIds.add(leadId)
+  }
   const meetingLeads = new Set(touches.filter((t) => t.touchType === "meeting").map((t) => t.leadId))
   const oppLeads = new Set(
     touches.filter((t) => t.touchType === "opportunity_created").map((t) => t.leadId),
@@ -263,9 +269,10 @@ export async function fetchGrowthRevenueAttributionDashboard(
     return emptyDashboard(filters, attributionModel)
   }
 
-  const [touches, opportunities, sequenceLabels, stepLabels, senderLabels] = await Promise.all([
+  const [touches, opportunities, replyLeadIds, sequenceLabels, stepLabels, senderLabels] = await Promise.all([
     listAttributionTouchesInRange(admin, filters),
     listOpportunitiesForAttributionDashboard(admin),
+    listReplyLeadIdsInRange(admin, filters),
     loadSequenceLabels(admin),
     loadSequenceStepLabels(admin),
     loadSenderLabels(admin),
@@ -370,7 +377,7 @@ export async function fetchGrowthRevenueAttributionDashboard(
     inRange(o.createdAt, filters.dateFrom, filters.dateTo),
   ).length
 
-  const funnel = buildFunnel(touches, opportunities, filters)
+  const funnel = buildFunnel(touches, opportunities, filters, replyLeadIds)
 
   const touchVolumeByType = [...new Set(touches.map((t) => t.touchType))].map((touchType) => ({
     touchType,

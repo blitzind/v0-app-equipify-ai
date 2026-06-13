@@ -20,6 +20,16 @@ export async function emitReplyReceivedTimeline(
     outboundReplyId: input.replyId,
     payload: { intent: input.intent, priority: input.priority },
   })
+
+  const { recordReplyAttributionTouchForLead } = await import(
+    "@/lib/growth/revenue-attribution/record-reply-attribution-touch"
+  )
+  await recordReplyAttributionTouchForLead(admin, {
+    leadId: input.leadId,
+    replyId: input.replyId,
+    attributionSource: "reply_received_timeline",
+    metadata: { intent: input.intent, priority: input.priority },
+  }).catch(() => undefined)
 }
 
 export async function emitReplyClassifiedTimeline(

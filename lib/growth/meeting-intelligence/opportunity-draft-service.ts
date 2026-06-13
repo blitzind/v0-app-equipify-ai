@@ -41,7 +41,7 @@ async function fetchLatestMeetingOutcomeScoreForMeeting(
     .limit(1)
     .maybeSingle()
 
-  if (error) throw new Error(error.message)
+  if (error) return null
   return data ? mapMeetingOutcomeScoreRow(data as never) : null
 }
 

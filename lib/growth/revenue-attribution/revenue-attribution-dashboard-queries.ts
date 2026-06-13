@@ -31,6 +31,43 @@ function mapTouchRow(row: TouchRow): GrowthAttributionTouch {
   }
 }
 
+/** Leads with reply evidence in range — aligns funnel with cohort analytics. */
+export async function listReplyLeadIdsInRange(
+  admin: SupabaseClient,
+  filters: GrowthRevenueAttributionDashboardFilters,
+): Promise<string[]> {
+  const leadIds = new Set<string>()
+
+  const { data: timelineRows } = await admin
+    .schema("growth")
+    .from("lead_timeline_events")
+    .select("lead_id")
+    .in("event_type", ["reply_received", "reply_ingested", "reply_classified"])
+    .gte("occurred_at", filters.dateFrom)
+    .lte("occurred_at", filters.dateTo)
+    .limit(5000)
+
+  for (const row of timelineRows ?? []) {
+    const leadId = String((row as { lead_id: string }).lead_id ?? "")
+    if (leadId) leadIds.add(leadId)
+  }
+
+  const { data: replyRows } = await admin
+    .schema("growth")
+    .from("outbound_replies")
+    .select("lead_id")
+    .gte("received_at", filters.dateFrom)
+    .lte("received_at", filters.dateTo)
+    .limit(5000)
+
+  for (const row of replyRows ?? []) {
+    const leadId = String((row as { lead_id: string }).lead_id ?? "")
+    if (leadId) leadIds.add(leadId)
+  }
+
+  return [...leadIds]
+}
+
 export async function listAttributionTouchesInRange(
   admin: SupabaseClient,
   filters: GrowthRevenueAttributionDashboardFilters,
