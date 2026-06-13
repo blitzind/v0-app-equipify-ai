@@ -13,6 +13,7 @@ import {
   insertReplyIngestionEvent,
   markReplyIngestionProcessed,
 } from "@/lib/growth/reply-intelligence/reply-ingestion-repository"
+import { resolveReplyIngestionConnectionId } from "@/lib/growth/replies/reply-connection-resolver"
 import { appendGrowthLeadTimelineEvent } from "@/lib/growth/timeline-repository"
 
 export type NormalizedReplyIngestInput = {
@@ -75,18 +76,6 @@ function buildDedupeKey(input: NormalizedReplyIngestInput): string {
   return `hash:${hash}`
 }
 
-async function resolveConnectionForLead(admin: SupabaseClient, leadId: string): Promise<string | null> {
-  const { data, error } = await admin
-    .schema("growth")
-    .from("outbound_messages")
-    .select("connection_id")
-    .eq("lead_id", leadId)
-    .order("sent_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (error) throw new Error(error.message)
-  return (data as { connection_id?: string } | null)?.connection_id ?? null
-}
 
 async function finalizeReplyIngestionResult(
   admin: SupabaseClient,
@@ -105,7 +94,7 @@ export async function ingestGrowthReply(
 ): Promise<ReplyIngestionResult> {
   const dedupeKey = buildDedupeKey(input)
   const existing = await findReplyIngestionByDedupeKey(admin, dedupeKey)
-  if (existing) {
+  if (existing?.outboundReplyId) {
     return {
       deduped: true,
       ingestionEventId: existing.id,
@@ -114,40 +103,44 @@ export async function ingestGrowthReply(
     }
   }
 
-  const ingestionEvent = await insertReplyIngestionEvent(admin, {
-    source: input.source,
-    dedupeKey,
-    senderEmail: input.senderEmail,
-    recipientEmail: input.recipientEmail,
-    subject: input.subject,
-    bodyExcerpt: input.bodyExcerpt,
-    receivedAt: input.receivedAt,
-    leadId: input.leadId,
-    outboundReplyId: input.existingOutboundReplyId,
-    inboxMessageId: input.inboxMessageId,
-    mailboxConnectionId: input.mailboxConnectionId,
-    campaignId: input.campaignId,
-    sequenceEnrollmentId: input.sequenceEnrollmentId,
-    deliveryAttemptId: input.deliveryAttemptId,
-    providerFamily: input.providerFamily,
-    providerMessageId: input.providerMessageId,
-    rawPayloadRef: input.rawPayloadRef ?? {},
-    normalizedPayload: {
-      sender: input.senderEmail ?? null,
-      recipient: input.recipientEmail ?? null,
-      subject: input.subject ?? null,
-      body_excerpt: input.bodyExcerpt ?? null,
-      attribution: {
-        lead_id: input.leadId ?? null,
-        campaign_id: input.campaignId ?? null,
-        sequence_enrollment_id: input.sequenceEnrollmentId ?? null,
-        mailbox_connection_id: input.mailboxConnectionId ?? null,
-      },
-    },
-    processingStatus: input.existingOutboundReplyId ? "processed" : "pending",
-  })
+  const resumingIncomplete = Boolean(existing && !existing.outboundReplyId)
 
-  if (input.leadId) {
+  const ingestionEvent = resumingIncomplete
+    ? existing!
+    : await insertReplyIngestionEvent(admin, {
+        source: input.source,
+        dedupeKey,
+        senderEmail: input.senderEmail,
+        recipientEmail: input.recipientEmail,
+        subject: input.subject,
+        bodyExcerpt: input.bodyExcerpt,
+        receivedAt: input.receivedAt,
+        leadId: input.leadId,
+        outboundReplyId: input.existingOutboundReplyId,
+        inboxMessageId: input.inboxMessageId,
+        mailboxConnectionId: input.mailboxConnectionId,
+        campaignId: input.campaignId,
+        sequenceEnrollmentId: input.sequenceEnrollmentId,
+        deliveryAttemptId: input.deliveryAttemptId,
+        providerFamily: input.providerFamily,
+        providerMessageId: input.providerMessageId,
+        rawPayloadRef: input.rawPayloadRef ?? {},
+        normalizedPayload: {
+          sender: input.senderEmail ?? null,
+          recipient: input.recipientEmail ?? null,
+          subject: input.subject ?? null,
+          body_excerpt: input.bodyExcerpt ?? null,
+          attribution: {
+            lead_id: input.leadId ?? null,
+            campaign_id: input.campaignId ?? null,
+            sequence_enrollment_id: input.sequenceEnrollmentId ?? null,
+            mailbox_connection_id: input.mailboxConnectionId ?? null,
+          },
+        },
+        processingStatus: input.existingOutboundReplyId ? "processed" : "pending",
+      })
+
+  if (input.leadId && !resumingIncomplete) {
     await appendGrowthLeadTimelineEvent(admin, {
       leadId: input.leadId,
       eventType: "reply_ingested",
@@ -176,10 +169,14 @@ export async function ingestGrowthReply(
   }
 
   const connectionId =
-    input.connectionId ??
-    (input.source === "sms_provider_webhook"
-      ? await resolveSmsReplyConnectionId(admin)
-      : await resolveConnectionForLead(admin, input.leadId))
+    input.source === "sms_provider_webhook"
+      ? (input.connectionId ?? (await resolveSmsReplyConnectionId(admin)))
+      : await resolveReplyIngestionConnectionId(admin, {
+          leadId: input.leadId,
+          connectionId: input.connectionId,
+          mailboxConnectionId: input.mailboxConnectionId,
+          source: input.source,
+        })
   if (!connectionId) {
     await markReplyIngestionProcessed(admin, ingestionEvent.id, { processingStatus: "processed" })
     return finalizeReplyIngestionResult(admin, input.leadId, {
@@ -251,7 +248,7 @@ export async function ingestGrowthReply(
   })
 
   return finalizeReplyIngestionResult(admin, input.leadId, {
-    deduped: false,
+    deduped: resumingIncomplete,
     ingestionEventId: ingestionEvent.id,
     outboundReplyId: outboundReply.id,
     outboundReply,

@@ -32,6 +32,7 @@ import {
 } from "@/lib/growth/inbox-sync/thread-matcher"
 import type { GrowthInboxSyncRunSummary } from "@/lib/growth/inbox-sync/inbox-sync-types"
 import { ingestGrowthReplyFromInboxSync } from "@/lib/growth/replies/reply-ingestion-pipeline"
+import { resolveReplyIngestionConnectionId } from "@/lib/growth/replies/reply-connection-resolver"
 import { finalizeIngestedReplyIntelligence } from "@/lib/growth/replies/finalize-ingested-reply-intelligence"
 import { appendGrowthLeadTimelineEvent } from "@/lib/growth/timeline-repository"
 
@@ -217,8 +218,15 @@ export async function runInboxSyncForMailbox(
           payload: { thread_id: threadId, matched_by: match.matchedBy },
         })
 
+        const syncConnectionId = await resolveReplyIngestionConnectionId(admin, {
+          leadId,
+          mailboxConnectionId: mailbox.id,
+          source: "google_mailbox_sync",
+        })
+
         const ingestion = await ingestGrowthReplyFromInboxSync(admin, {
           leadId,
+          connectionId: syncConnectionId,
           mailboxConnectionId: mailbox.id,
           inboxMessageId: imported.message.id,
           senderEmail: message.fromEmail,

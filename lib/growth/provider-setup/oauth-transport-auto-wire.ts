@@ -12,6 +12,7 @@ import {
 } from "@/lib/growth/providers/provider-repository"
 import { getDeliveryProviderRegistryEntry } from "@/lib/growth/providers/provider-registry"
 import { getSenderAccount, updateSenderAccount } from "@/lib/growth/sender/sender-repository"
+import { ensureOAuthReplyIngestionConnection } from "@/lib/growth/replies/oauth-reply-ingestion-connection"
 import {
   evaluateGrowthOutboundTransportReadiness,
   type GrowthOutboundTransportReadiness,
@@ -125,6 +126,13 @@ export async function wireOAuthProviderTransportAfterConnection(
     sender_account_id: input.senderAccountId,
     mailbox_connection_id: input.mailboxConnectionId,
     status: "connected",
+    actorUserId: input.actorUserId,
+  })
+
+  await ensureOAuthReplyIngestionConnection(admin, {
+    providerFamily: input.providerFamily,
+    senderAccountId: input.senderAccountId,
+    mailboxEmail: mailbox.email_address,
     actorUserId: input.actorUserId,
   })
 

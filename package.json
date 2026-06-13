@@ -382,6 +382,7 @@
     "test:growth-inbox-workspace-phase4": "tsx scripts/test-growth-inbox-workspace-phase4.ts",
     "test:growth-inbox": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-inbox.ts && tsx scripts/test-growth-unified-inbox.ts",
     "test:growth-inbox-sync": "tsx scripts/test-growth-inbox-sync.ts",
+    "test:growth-reply-bridge-hardening": "tsx scripts/test-growth-reply-bridge-hardening.ts",
     "test:growth-ai-reply-drafting": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-ai-reply-drafting.ts",
     "test:growth-inbox-team-ownership": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-inbox-team-ownership.ts",
     "test:growth-sequence-ab-testing": "tsx scripts/test-growth-sequence-ab-testing.ts",
