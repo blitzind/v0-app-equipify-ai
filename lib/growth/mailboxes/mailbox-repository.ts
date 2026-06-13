@@ -88,9 +88,12 @@ async function recomputeMailboxHealth(
   const status = asString(row.status) as GrowthMailboxConnectionSummary["status"]
   let nextStatus = status
   const tokenExpiresAt = asString(row.token_expires_at) || null
+  const tokenExpired = isMailboxTokenExpired(tokenExpiresAt)
 
-  if (isMailboxTokenExpired(tokenExpiresAt) && status !== "disabled") {
+  if (tokenExpired && status !== "disabled") {
     nextStatus = "expired"
+  } else if (status === "expired" && !tokenExpired) {
+    nextStatus = "connected"
   }
 
   const score = computeMailboxConnectionHealth({

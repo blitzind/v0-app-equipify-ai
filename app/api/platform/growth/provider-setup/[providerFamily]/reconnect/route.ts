@@ -24,7 +24,7 @@ export const runtime = "nodejs"
 type RouteContext = { params: Promise<{ providerFamily: string }> }
 
 export async function POST(request: Request, context: RouteContext) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const access = await requireGrowthEnginePlatformAccess(request)
   if (!access.ok) return access.response
 
   const { providerFamily } = await context.params

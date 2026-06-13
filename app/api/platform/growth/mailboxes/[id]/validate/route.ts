@@ -6,10 +6,10 @@ import { isGrowthMailboxConnectionSchemaReady } from "@/lib/growth/mailboxes/mai
 export const runtime = "nodejs"
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const access = await requireGrowthEnginePlatformAccess(request)
   if (!access.ok) return access.response
 
   if (!(await isGrowthMailboxConnectionSchemaReady(access.admin))) {

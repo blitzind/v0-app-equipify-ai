@@ -7,8 +7,8 @@ import { GROWTH_MAILBOX_CONNECTION_PRIVACY_NOTE } from "@/lib/growth/mailboxes/m
 
 export const runtime = "nodejs"
 
-export async function GET() {
-  const access = await requireGrowthEnginePlatformAccess()
+export async function GET(request: Request) {
+  const access = await requireGrowthEnginePlatformAccess(request)
   if (!access.ok) return access.response
 
   if (!(await isGrowthMailboxConnectionSchemaReady(access.admin))) {
