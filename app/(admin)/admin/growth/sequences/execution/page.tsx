@@ -26,6 +26,7 @@ import { ApolloPilotOperationsPanel } from "@/components/growth/apollo-pilot-ope
 import { GrowthEnrollmentExecutionContext } from "@/components/growth/growth-enrollment-execution-context"
 import { GrowthSequenceExecutionFoundationDashboard } from "@/components/growth/growth-sequence-execution-foundation-dashboard"
 import { GrowthSequenceSafeExecutionDashboard } from "@/components/growth/growth-sequence-safe-execution-dashboard"
+import { AidenOperatorGuidePanel } from "@/components/growth/aiden-operator-guide-panel"
 import { OutboundLaunchContextBanner } from "@/components/growth/outbound-launch/outbound-launch-context-banner"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
@@ -75,6 +76,7 @@ export default function AdminGrowthSequenceExecutionPage() {
         </section>
 
         <GrowthSectionLayout>
+          <AidenOperatorGuidePanel className="mb-6" />
           <ApolloPilotOperationsPanel className="mb-6" />
           <ApolloOperatorScalePanel className="mb-6" />
           <OutboundLaunchContextBanner className="mb-4" />

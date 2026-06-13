@@ -89,6 +89,14 @@ export const GROWTH_COMMAND_REGISTRY: GrowthCommandRegistryEntry[] = [
     paletteEnabled: true,
   },
   {
+    id: "aiden-guide",
+    label: "Aiden Operator Guide",
+    href: "/admin/growth/aiden",
+    keywords: ["aiden", "operator guide", "coach", "help", "workflow", "blocker"],
+    aliases: ["operator guide", "growth guide"],
+    paletteEnabled: true,
+  },
+  {
     id: "open-provider-delivery",
     label: "Open Provider Delivery",
     href: "/admin/growth/providers/delivery",

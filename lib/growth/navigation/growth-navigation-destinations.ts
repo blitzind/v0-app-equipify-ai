@@ -779,6 +779,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
           path.startsWith("/admin/growth/outreach/legacy-queue"),
       },
       {
+        id: "aiden-guide",
+        href: "/admin/growth/aiden",
+        label: "Aiden Guide",
+        match: prefixMatch("/admin/growth/aiden"),
+      },
+      {
         id: "booking-intelligence",
         href: "/admin/growth/booking-intelligence",
         label: "Booking Intelligence",
