@@ -5,8 +5,8 @@ import { buildApolloSingleCompanyEnrichmentDiagnosticReadiness } from "@/lib/gro
 export const runtime = "nodejs"
 export const maxDuration = 120
 
-export async function GET() {
-  const access = await requireGrowthEnginePlatformAccess()
+export async function GET(request: Request) {
+  const access = await requireGrowthEnginePlatformAccess(request)
   if (!access.ok) return access.response
 
   const payload = await buildApolloSingleCompanyEnrichmentDiagnosticReadiness(access.admin, {

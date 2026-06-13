@@ -114,6 +114,7 @@ export function buildPersonalizedOutreachDraft(input: {
     body: enrichedStrategy.blocks.map((block) => block.text).join(" "),
     blocks: enrichedStrategy.blocks,
     style: communicationStyle,
+    companyName: input.packet.companyName,
   })
 
   if (styled.blocks !== enrichedStrategy.blocks || styled.body !== enrichedStrategy.blocks.map((b) => b.text).join(" ")) {
@@ -133,6 +134,7 @@ export function buildPersonalizedOutreachDraft(input: {
     body: draft.body,
     blocks: enrichedStrategy.blocks,
     style: communicationStyle,
+    companyName: input.packet.companyName,
   })
 
   const bodyWithActionableCta = ensureActionableCtaClosing(styledDraft.body, ctaResult.text)

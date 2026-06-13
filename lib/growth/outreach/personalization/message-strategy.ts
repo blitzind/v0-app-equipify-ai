@@ -293,9 +293,6 @@ export function selectMessageStrategy(input: {
     if (input.packet.outreachAngles.length > 0) {
       industryText = `${industryText} ${input.packet.outreachAngles[0]!.trim()}.`
     }
-    if (input.packet.memoryCommitteeSummaries.length > 0) {
-      industryText = `${industryText} Committee context: ${input.packet.memoryCommitteeSummaries[0]!.trim()}.`
-    }
     if (industryText !== blocks[industryIndex].text) {
       blocks[industryIndex] = { ...blocks[industryIndex], text: industryText }
     }

@@ -52,17 +52,14 @@ function testMappedContactsWithNoEmailTriggerEnrichment(): void {
   assert.equal(resolveApolloMappedContactEnrichmentEligibilityBlocker(row), null)
 }
 
-function testLinkedinOnlySkipsBulkMatch(): void {
+function testLinkedinOnlyNeedsEmailEnrichment(): void {
   const row = candidate({
     email: null,
     linkedin_url: "https://www.linkedin.com/in/jane-owner",
     metadata: { apollo_person_id: "apollo-person-1", apollo_email_status: "unavailable" },
   })
-  assert.equal(apolloCandidateNeedsEmailEnrichment(row), false)
-  assert.equal(
-    resolveApolloMappedContactEnrichmentEligibilityBlocker(row),
-    "linkedin_only_skips_bulk_match",
-  )
+  assert.equal(apolloCandidateNeedsEmailEnrichment(row), true)
+  assert.equal(resolveApolloMappedContactEnrichmentEligibilityBlocker(row), null)
 }
 
 function testEnrichmentDisabledProducesExplicitBlocker(): void {
@@ -122,13 +119,11 @@ function testVerifiedStatusWithoutEmailNotContactable(): void {
     email: null,
     metadata: { apollo_person_id: "apollo-person-1", apollo_email_status: "verified" },
   })
-  assert.equal(
-    resolveApolloMappedContactEnrichmentEligibilityBlocker(row),
-    "email_status_verified_without_email",
-  )
+  assert.equal(resolveApolloMappedContactEnrichmentEligibilityBlocker(row), null)
   assert.equal(evaluateApolloVerifiedEmailPromotionBlocker(row), "apollo_verified_status_without_email")
   const channel = buildApolloEmailChannelEvidenceRow({ candidate: row })
   assert.equal(channel.verified_status_without_email, true)
+  assert.equal(channel.needs_email_enrichment, true)
 }
 
 function testEnrichmentEmailPresentButNotPersistedBlocker(): void {
@@ -173,8 +168,8 @@ function testDiagnosticRoutesExist(): void {
 function main(): void {
   testMappedContactsWithNoEmailTriggerEnrichment()
   console.log("  ✓ mapped contacts with no email trigger enrichment")
-  testLinkedinOnlySkipsBulkMatch()
-  console.log("  ✓ linkedin-only skips bulk_match eligibility")
+  testLinkedinOnlyNeedsEmailEnrichment()
+  console.log("  ✓ linkedin-only requires bulk_match email enrichment")
   testEnrichmentDisabledProducesExplicitBlocker()
   console.log("  ✓ enrichment disabled produces explicit blocker")
   testVerifiedEmailPersistsCandidateEmail()

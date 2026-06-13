@@ -1,4 +1,8 @@
 import {
+  isAutoReplyEvidence,
+  isInternalMemoryPipelineTitle,
+} from "@/lib/growth/lead-memory/outreach-memory-evidence-guard"
+import {
   confidenceRank,
   sanitizeMemoryEvidenceSnippet,
   type GrowthLeadMemoryCategory,
@@ -46,6 +50,11 @@ export function ingestMemoryCandidatesFromSource(input: MemoryIngestionInput): I
   const candidates: IngestedMemoryCandidate[] = []
   const evidence = evidenceFromInput(input)
   if (evidence.length < 8) return candidates
+
+  const rawCombined = `${input.subject ?? ""} ${input.body ?? ""}`.trim()
+  if (isAutoReplyEvidence(rawCombined) || isAutoReplyEvidence(evidence)) {
+    return candidates
+  }
 
   if (input.meetingIntent) {
     candidates.push({

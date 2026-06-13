@@ -1,6 +1,7 @@
 /** Memory-backed opener selection (Phase 4.5C). */
 
 import type { GrowthAiCopilotGenerationType } from "@/lib/growth/ai-copilot-types"
+import { isUnusableOutreachMemoryEvidence } from "@/lib/growth/lead-memory/outreach-memory-evidence-guard"
 import { interpolateBlockText } from "@/lib/growth/outreach/personalization/message-blocks"
 import { pickVariantIndex } from "@/lib/growth/outreach/personalization/message-variability"
 import {
@@ -77,17 +78,26 @@ const MEMORY_OPENER_TEMPLATES: Record<MemoryOpenerSource, string[]> = {
 export function selectMemoryEvidenceCandidate(packet: OutreachContextPacket): MemoryEvidenceCandidate | null {
   if (!memoryMeetsOutreachThreshold(packet)) return null
 
-  if (packet.memoryCommitmentSummaries[0]?.trim()) {
-    const evidence = packet.memoryCommitmentSummaries[0].trim()
+  const tryEvidence = (
+    source: MemoryOpenerSource,
+    evidence: string | null | undefined,
+    topicTransform?: (value: string) => string,
+  ): MemoryEvidenceCandidate | null => {
+    const trimmed = evidence?.trim()
+    if (!trimmed || isUnusableOutreachMemoryEvidence({ evidence: trimmed })) return null
+    const topicSource = topicTransform ? topicTransform(trimmed) : trimmed
     return {
-      source: "memory_commitment",
-      evidence,
-      topic: compactMemoryTopic(evidence),
+      source,
+      evidence: trimmed,
+      topic: compactMemoryTopic(topicSource),
     }
   }
 
+  const commitment = tryEvidence("memory_commitment", packet.memoryCommitmentSummaries[0])
+  if (commitment) return commitment
+
   const openLoop = extractMemoryOpenLoop(packet)
-  if (openLoop) {
+  if (openLoop && !isUnusableOutreachMemoryEvidence({ evidence: openLoop })) {
     return {
       source: "memory_open_loop",
       evidence: openLoop,
@@ -95,48 +105,30 @@ export function selectMemoryEvidenceCandidate(packet: OutreachContextPacket): Me
     }
   }
 
-  if (packet.memoryInteractionSummaries[0]?.trim()) {
-    const evidence = packet.memoryInteractionSummaries[0].trim()
-    return {
-      source: "memory_interaction",
-      evidence,
-      topic: compactMemoryTopic(evidence),
-    }
-  }
+  const interaction = tryEvidence("memory_interaction", packet.memoryInteractionSummaries[0])
+  if (interaction) return interaction
 
-  if (packet.objectionSummaries[0]?.trim()) {
-    const evidence = packet.objectionSummaries[0].trim()
-    return {
-      source: "memory_objection",
-      evidence,
-      topic: compactMemoryTopic(evidence.replace(/^[^:]+:\s*/i, "")),
-    }
-  }
+  const objection = tryEvidence("memory_objection", packet.objectionSummaries[0], (value) =>
+    value.replace(/^[^:]+:\s*/i, ""),
+  )
+  if (objection) return objection
 
   if (packet.memoryPreferenceSummaries[0]?.trim() && packet.relationshipSummary?.trim()) {
-    return {
-      source: "memory_preference",
-      evidence: packet.memoryPreferenceSummaries[0],
-      topic: compactMemoryTopic(packet.relationshipSummary),
+    const preference = tryEvidence("memory_preference", packet.memoryPreferenceSummaries[0])
+    if (preference) {
+      return {
+        ...preference,
+        topic: compactMemoryTopic(packet.relationshipSummary.trim()),
+      }
     }
   }
 
-  if (packet.relationshipSummary?.trim()) {
-    const evidence = packet.relationshipSummary.trim()
-    return {
-      source: "relationship_summary",
-      evidence,
-      topic: compactMemoryTopic(evidence),
-    }
-  }
+  const relationship = tryEvidence("relationship_summary", packet.relationshipSummary)
+  if (relationship) return relationship
 
-  if (isExistingCustomerRelationship(packet) && packet.memoryInteractionSummaries[0]?.trim()) {
-    const evidence = packet.memoryInteractionSummaries[0].trim()
-    return {
-      source: "relationship_stage",
-      evidence,
-      topic: compactMemoryTopic(evidence),
-    }
+  if (isExistingCustomerRelationship(packet)) {
+    const stage = tryEvidence("relationship_stage", packet.memoryInteractionSummaries[0])
+    if (stage) return stage
   }
 
   return null

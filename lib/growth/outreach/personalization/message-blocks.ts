@@ -101,7 +101,7 @@ const OPENINGS: MessageBlockTemplate[] = [
     id: "opening_peer_comparison",
     label: "Peer comparison",
     variants: [
-      "{{contactName}}, peers in your segment often tighten dispatch before the next growth phase — thought of {{companyName}}.",
+      "{{contactName}}, had a dispatch note for {{companyName}} — peers in your segment often tighten workflow before the next growth phase.",
       "Hi {{contactName}} — similar operators are comparing dispatch workflows; had a note for {{companyName}}.",
       "{{contactName}}, operators comparable to {{companyName}} are reworking service handoffs this quarter.",
     ],

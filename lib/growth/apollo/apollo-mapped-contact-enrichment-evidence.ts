@@ -13,6 +13,7 @@ import {
   evaluateApolloVerifiedEmailPromotionBlocker,
   isApolloVerifiedEmailStatus,
   readApolloEmailStatusFromCandidate,
+  resolveApolloCandidatePromotedEmail,
 } from "@/lib/growth/apollo/apollo-verified-email-promotion-evidence"
 import type { GrowthContactCandidate } from "@/lib/growth/contact-discovery/contact-discovery-types"
 import {
@@ -102,20 +103,14 @@ export function resolveApolloMappedContactEnrichmentEligibilityBlocker(
 ): string | null {
   if (candidate.provider_type !== "future_apollo") return "not_apollo_candidate"
   if (!readApolloPersonIdFromCandidate(candidate)) return "missing_apollo_person_id"
+  if (apolloCandidateNeedsEmailEnrichment(candidate)) return null
+  if (resolveApolloCandidatePromotedEmail(candidate)) return "verified_email_already_present"
   if (apolloCandidateHasVerifiedStatusWithoutEmail(candidate)) {
     return "email_status_verified_without_email"
   }
-  if (apolloCandidateNeedsEmailEnrichment(candidate)) return null
   if (asString(candidate.email)) {
     const status = readApolloEmailStatusFromCandidate(candidate)
     if (status && !isApolloVerifiedEmailStatus(status)) return "enrichment_returned_unverified_email"
-    if (isApolloVerifiedEmailStatus(status)) return "verified_email_already_present"
-  }
-  if (asString(candidate.linkedin_url) && !asString(candidate.email)) {
-    return "linkedin_only_skips_bulk_match"
-  }
-  if (asString(candidate.phone) && !asString(candidate.email)) {
-    return "phone_only_skips_bulk_match"
   }
   return "no_candidates_need_email_enrichment"
 }

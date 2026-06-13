@@ -15,16 +15,48 @@ import type {
 
 const SHORT_SENTENCE_MAX_WORDS = 18
 
-function shortenSentence(sentence: string): string {
+function normalizeWordToken(value: string): string {
+  return value.replace(/[.!?,;:…]+$/g, "").trim()
+}
+
+function companyNameWordSpan(sentence: string, companyName: string | null | undefined): number | null {
+  const normalizedCompany = companyName?.trim()
+  if (!normalizedCompany) return null
+  const words = sentence.trim().split(/\s+/).filter(Boolean)
+  const companyWords = normalizedCompany.split(/\s+/).filter(Boolean)
+  if (companyWords.length === 0) return null
+  for (let index = 0; index <= words.length - companyWords.length; index += 1) {
+    const slice = words
+      .slice(index, index + companyWords.length)
+      .map(normalizeWordToken)
+      .join(" ")
+    if (slice.toLowerCase() === normalizedCompany.toLowerCase()) {
+      return index + companyWords.length
+    }
+  }
+  return null
+}
+
+function shortenSentence(sentence: string, companyName?: string | null): string {
   const words = sentence.trim().split(/\s+/).filter(Boolean)
   if (words.length <= SHORT_SENTENCE_MAX_WORDS) return sentence.trim()
+
+  if (companyName?.trim() && companyNameWordSpan(sentence, companyName) != null) {
+    return sentence.trim()
+  }
+
+  const companyEndIndex = companyNameWordSpan(sentence, companyName)
+  if (companyEndIndex != null && companyEndIndex > SHORT_SENTENCE_MAX_WORDS) {
+    return words.slice(0, companyEndIndex).join(" ")
+  }
+
   return `${words.slice(0, SHORT_SENTENCE_MAX_WORDS).join(" ")}…`
 }
 
-function applyShortSentences(text: string): string {
+function applyShortSentences(text: string, companyName?: string | null): string {
   return text
     .split(/(?<=[.!?])\s+/)
-    .map((sentence) => shortenSentence(sentence))
+    .map((sentence) => shortenSentence(sentence, companyName))
     .join(" ")
 }
 
@@ -67,6 +99,7 @@ export function applyMemoryCommunicationStyle(input: {
   body: string
   blocks: SelectedMessageBlock[]
   style: MemoryCommunicationStyle
+  companyName?: string | null
 }): { body: string; blocks: SelectedMessageBlock[] } {
   if (!input.style.applied) {
     return { body: input.body, blocks: input.blocks }
@@ -74,7 +107,7 @@ export function applyMemoryCommunicationStyle(input: {
 
   let body = input.body
   if (input.style.preferShortSentences) {
-    body = applyShortSentences(body)
+    body = applyShortSentences(body, input.companyName)
   }
   if (input.style.formality === "executive") {
     body = tightenExecutiveTone(body)

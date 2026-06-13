@@ -83,6 +83,14 @@ export function validateOutreachRefinement(input: {
     reasons.push("max_words_exceeded")
   }
 
+  if (/\*{2,}/.test(input.refinedBody) || /\*{2,}/.test(input.refinedSubject ?? "")) {
+    reasons.push("redacted_contact_or_content")
+  }
+
+  if (/\S+…\s/.test(input.refinedBody)) {
+    reasons.push("mid_body_truncation")
+  }
+
   if (/!{2,}/.test(input.refinedBody) || /!{2,}/.test(input.refinedSubject ?? "")) {
     reasons.push("excessive_punctuation")
   }

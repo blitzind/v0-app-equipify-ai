@@ -1,6 +1,7 @@
 /** Subject line intelligence — research-aware subjects with quality scoring (Phase 4.1). */
 
 import type { GrowthAiCopilotGenerationType } from "@/lib/growth/ai-copilot-types"
+import { isUnusableOutreachMemoryEvidence } from "@/lib/growth/lead-memory/outreach-memory-evidence-guard"
 import { detectOutreachIndustry } from "@/lib/growth/outreach/personalization/industry-detection"
 import {
   extractMemoryOpenLoop,
@@ -61,6 +62,7 @@ type SubjectCandidate = {
 }
 
 function compactSubjectSnippet(text: string, max = 42): string {
+  if (isUnusableOutreachMemoryEvidence({ evidence: text })) return ""
   let snippet = truncateResearchSnippet(text, max)
   snippet = snippet.replace(/^(covers|provides|offers|delivers|specializes in|asked for|requested|mentioned|noted)\s+/i, "")
   return snippet.charAt(0).toUpperCase() + snippet.slice(1)
@@ -155,106 +157,133 @@ function resolveMemorySubjectCandidate(packet: OutreachContextPacket): SubjectCa
   if (!memoryMeetsConfidenceThreshold(packet)) return null
 
   const openLoop = extractMemoryOpenLoop(packet)
-  if (openLoop) {
+  if (openLoop && !isUnusableOutreachMemoryEvidence({ evidence: openLoop })) {
     const topic = compactSubjectSnippet(openLoop, 36)
-    return {
-      category: "memory_aware",
-      evidenceSource: "memory_open_loop",
-      evidence: openLoop,
-      templates: [
-        `Re: ${topic}`,
-        `Following up on ${topic}`,
-        `About ${topic}`,
-        `Quick follow-up on ${topic}`,
-      ],
+    if (topic) {
+      return {
+        category: "memory_aware",
+        evidenceSource: "memory_open_loop",
+        evidence: openLoop,
+        templates: [
+          `Re: ${topic}`,
+          `Following up on ${topic}`,
+          `About ${topic}`,
+          `Quick follow-up on ${topic}`,
+        ],
+      }
     }
   }
 
   if (packet.memoryCommitmentSummaries[0]) {
-    const topic = compactSubjectSnippet(packet.memoryCommitmentSummaries[0], 36)
-    return {
-      category: "memory_aware",
-      evidenceSource: "memory_commitment",
-      evidence: packet.memoryCommitmentSummaries[0],
-      templates: [
-        `Following up on ${topic}`,
-        `Re: ${topic}`,
-        `About the ${topic}`,
-        `About ${topic}`,
-      ],
+    const evidence = packet.memoryCommitmentSummaries[0]
+    if (!isUnusableOutreachMemoryEvidence({ evidence })) {
+      const topic = compactSubjectSnippet(evidence, 36)
+      if (topic) {
+        return {
+          category: "memory_aware",
+          evidenceSource: "memory_commitment",
+          evidence,
+          templates: [
+            `Following up on ${topic}`,
+            `Re: ${topic}`,
+            `About the ${topic}`,
+            `About ${topic}`,
+          ],
+        }
+      }
     }
   }
 
   if (packet.memoryInteractionSummaries[0]) {
-    const topic = compactSubjectSnippet(packet.memoryInteractionSummaries[0], 36)
-    return {
-      category: "memory_aware",
-      evidenceSource: "memory_interaction",
-      evidence: packet.memoryInteractionSummaries[0],
-      templates: [
-        `Following up on ${topic}`,
-        `Re: ${topic}`,
-        `About our last note — ${topic}`,
-      ],
+    const evidence = packet.memoryInteractionSummaries[0]
+    if (!isUnusableOutreachMemoryEvidence({ evidence })) {
+      const topic = compactSubjectSnippet(evidence, 36)
+      if (topic) {
+        return {
+          category: "memory_aware",
+          evidenceSource: "memory_interaction",
+          evidence,
+          templates: [
+            `Following up on ${topic}`,
+            `Re: ${topic}`,
+            `About our last note — ${topic}`,
+          ],
+        }
+      }
     }
   }
 
   if (packet.objectionSummaries[0]) {
-    const topic = compactSubjectSnippet(packet.objectionSummaries[0], 36)
-    return {
-      category: "memory_aware",
-      evidenceSource: "memory_objection",
-      evidence: packet.objectionSummaries[0],
-      templates: [
-        `Re: ${topic}`,
-        `About ${topic}`,
-        `Following up on ${topic}`,
-      ],
+    const evidence = packet.objectionSummaries[0]
+    if (!isUnusableOutreachMemoryEvidence({ evidence })) {
+      const topic = compactSubjectSnippet(evidence, 36)
+      if (topic) {
+        return {
+          category: "memory_aware",
+          evidenceSource: "memory_objection",
+          evidence,
+          templates: [
+            `Re: ${topic}`,
+            `About ${topic}`,
+            `Following up on ${topic}`,
+          ],
+        }
+      }
     }
   }
 
   if (isExistingCustomerRelationship(packet)) {
-    const topic = compactSubjectSnippet(
-      packet.memoryInteractionSummaries[0] ?? packet.relationshipSummary ?? packet.companyName,
-      36,
-    )
-    return {
-      category: "memory_aware",
-      evidenceSource: "relationship_stage",
-      evidence: packet.relationshipSummary ?? packet.memoryInteractionSummaries[0] ?? null,
-      templates: [
-        `Next step on ${topic}`,
-        `Following up on ${topic}`,
-        `Re: ${topic}`,
-      ],
+    const rawEvidence = packet.memoryInteractionSummaries[0] ?? packet.relationshipSummary ?? packet.companyName
+    if (!isUnusableOutreachMemoryEvidence({ evidence: rawEvidence })) {
+      const topic = compactSubjectSnippet(rawEvidence, 36)
+      if (topic) {
+        return {
+          category: "memory_aware",
+          evidenceSource: "relationship_stage",
+          evidence: packet.relationshipSummary ?? packet.memoryInteractionSummaries[0] ?? null,
+          templates: [
+            `Next step on ${topic}`,
+            `Following up on ${topic}`,
+            `Re: ${topic}`,
+          ],
+        }
+      }
     }
   }
 
   if (packet.memoryPreferenceSummaries[0] && packet.relationshipSummary) {
-    const topic = compactSubjectSnippet(packet.relationshipSummary, 36)
-    return {
-      category: "memory_aware",
-      evidenceSource: "memory_preference",
-      evidence: packet.relationshipSummary,
-      templates: [
-        `Re: ${topic}`,
-        `Following up on ${topic}`,
-        `Quick follow-up — ${packet.companyName.trim()}`,
-      ],
+    if (!isUnusableOutreachMemoryEvidence({ evidence: packet.relationshipSummary })) {
+      const topic = compactSubjectSnippet(packet.relationshipSummary, 36)
+      if (topic) {
+        return {
+          category: "memory_aware",
+          evidenceSource: "memory_preference",
+          evidence: packet.relationshipSummary,
+          templates: [
+            `Re: ${topic}`,
+            `Following up on ${topic}`,
+            `Quick follow-up — ${packet.companyName.trim()}`,
+          ],
+        }
+      }
     }
   }
 
   if (packet.relationshipSummary) {
-    const topic = compactSubjectSnippet(packet.relationshipSummary, 36)
-    return {
-      category: "memory_aware",
-      evidenceSource: "relationship_summary",
-      evidence: packet.relationshipSummary,
-      templates: [
-        `Following up on ${topic}`,
-        `Re: ${topic}`,
-        `Quick follow-up — ${packet.companyName.trim()}`,
-      ],
+    if (!isUnusableOutreachMemoryEvidence({ evidence: packet.relationshipSummary })) {
+      const topic = compactSubjectSnippet(packet.relationshipSummary, 36)
+      if (topic) {
+        return {
+          category: "memory_aware",
+          evidenceSource: "relationship_summary",
+          evidence: packet.relationshipSummary,
+          templates: [
+            `Following up on ${topic}`,
+            `Re: ${topic}`,
+            `Quick follow-up — ${packet.companyName.trim()}`,
+          ],
+        }
+      }
     }
   }
 

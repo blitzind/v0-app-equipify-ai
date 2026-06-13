@@ -7,7 +7,7 @@ export const runtime = "nodejs"
 export const maxDuration = 120
 
 export async function POST(request: Request) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const access = await requireGrowthEnginePlatformAccess(request)
   if (!access.ok) return access.response
 
   const body = await request.json().catch(() => null)

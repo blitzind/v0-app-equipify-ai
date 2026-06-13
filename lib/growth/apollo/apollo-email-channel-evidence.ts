@@ -1,6 +1,5 @@
 /** Apollo email channel evidence — trace email presence through the live promotion path. Client-safe. */
 
-import { candidateHasObservedContactChannel } from "@/lib/growth/apollo/apollo-live-pilot-canonical-sync-evidence"
 import {
   buildApolloCompanyContactPromotionFields,
   isApolloVerifiedEmailStatus,
@@ -80,13 +79,18 @@ export function apolloCandidateHasVerifiedStatusWithoutEmail(
   return isApolloVerifiedEmailStatus(readApolloEmailStatusFromCandidate(candidate))
 }
 
-/** Candidates that should receive Apollo bulk_match before verified-email promotion. */
-export function apolloCandidateNeedsEmailEnrichment(candidate: GrowthContactCandidate): boolean {
+/** True when Apollo pilot still lacks a promotable verified email (LinkedIn/phone alone do not count). */
+export function apolloCandidateMissingPromotableEmail(
+  candidate: GrowthContactCandidate,
+): boolean {
   if (candidate.provider_type !== "future_apollo") return false
   if (!readApolloPersonIdFromCandidate(candidate)) return false
-  if (resolveApolloCandidatePromotedEmail(candidate)) return false
-  if (apolloCandidateHasVerifiedStatusWithoutEmail(candidate)) return true
-  return !candidateHasObservedContactChannel(candidate)
+  return !resolveApolloCandidatePromotedEmail(candidate)
+}
+
+/** Candidates that should receive Apollo bulk_match before verified-email promotion. */
+export function apolloCandidateNeedsEmailEnrichment(candidate: GrowthContactCandidate): boolean {
+  return apolloCandidateMissingPromotableEmail(candidate)
 }
 
 export function resolveApolloEmailSource(input: {

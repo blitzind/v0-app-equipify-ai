@@ -16,6 +16,11 @@ import { normalizeGrowthResearchConfidence } from "@/lib/growth/research/researc
 import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
 import { resolveLeadEngineGuidanceFromLeadMetadata } from "@/lib/growth/outreach/personalization/lead-engine-guidance-bridge"
 import { buildLeadMemoryInfluenceContext, mergeMemoryObjectionSummaries } from "@/lib/growth/lead-memory/memory-influence-context"
+import {
+  filterUsableOutreachMemorySnippet,
+  isRedactedContactName,
+  isUnusableOutreachMemoryEvidence,
+} from "@/lib/growth/lead-memory/outreach-memory-evidence-guard"
 import { listGrowthLeadTimelineEvents } from "@/lib/growth/timeline-repository"
 import type { GrowthLead } from "@/lib/growth/types"
 
@@ -41,6 +46,74 @@ function primaryDecisionMaker(
   }
 }
 
+function resolveOutreachContactName(
+  lead: GrowthLead,
+  decisionMakers: Awaited<ReturnType<typeof listGrowthLeadDecisionMakers>>,
+): string | null {
+  const dm = primaryDecisionMaker(decisionMakers)
+  if (dm.name && !isRedactedContactName(dm.name)) return dm.name
+  if (lead.contactName && !isRedactedContactName(lead.contactName)) return lead.contactName
+  return dm.name ?? lead.contactName ?? null
+}
+
+function resolveApolloCompanyContactId(lead: GrowthLead): string | null {
+  const metadata = lead.metadata && typeof lead.metadata === "object" ? lead.metadata : null
+  if (!metadata) return null
+  const primary = metadata.apollo_primary_contact
+  if (primary && typeof primary === "object") {
+    const id = (primary as { company_contact_id?: unknown }).company_contact_id
+    if (typeof id === "string" && id.trim()) return id.trim()
+  }
+  const enrollment = metadata.apollo_enrollment_automation
+  if (enrollment && typeof enrollment === "object") {
+    const id = (enrollment as { company_contact_id?: unknown }).company_contact_id
+    if (typeof id === "string" && id.trim()) return id.trim()
+  }
+  return null
+}
+
+function deriveContactNameFromEmail(email: string | null | undefined): string | null {
+  const local = email?.split("@")[0]?.trim()
+  if (!local) return null
+  const parts = local.replace(/[._+-]+/g, " ").split(/\s+/).filter(Boolean)
+  if (!parts.length) return null
+  return parts
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ")
+}
+
+async function resolveOutreachContactNameFromLead(
+  admin: SupabaseClient,
+  lead: GrowthLead,
+  decisionMakers: Awaited<ReturnType<typeof listGrowthLeadDecisionMakers>>,
+): Promise<string | null> {
+  const resolved = resolveOutreachContactName(lead, decisionMakers)
+  if (resolved && !isRedactedContactName(resolved)) return resolved
+
+  const companyContactId = resolveApolloCompanyContactId(lead)
+  if (companyContactId) {
+    const { data } = await admin
+      .schema("growth")
+      .from("company_contacts")
+      .select("full_name, email")
+      .eq("id", companyContactId)
+      .maybeSingle()
+    const fullName = typeof data?.full_name === "string" ? data.full_name.trim() : ""
+    if (fullName && !isRedactedContactName(fullName)) return fullName
+    const fromEmail = deriveContactNameFromEmail(typeof data?.email === "string" ? data.email : null)
+    if (fromEmail && !isRedactedContactName(fromEmail)) return fromEmail
+  }
+
+  return resolved
+}
+
+function usableReplySummary(reply: { bodyPreview: string; classification?: string | null }): string | null {
+  const classification = reply.classification ? ` (${reply.classification})` : ""
+  const raw = `${reply.bodyPreview}${classification}`.trim()
+  if (isUnusableOutreachMemoryEvidence({ evidence: raw })) return null
+  return truncate(raw)
+}
+
 export async function buildOutreachContextPacket(
   admin: SupabaseClient,
   lead: GrowthLead,
@@ -62,6 +135,7 @@ export async function buildOutreachContextPacket(
   ])
 
   const dm = primaryDecisionMaker(decisionMakers)
+  const contactName = await resolveOutreachContactNameFromLead(admin, lead, decisionMakers)
   const research = researchRun?.result
   const leadEngineGuidance = resolveLeadEngineGuidanceFromLeadMetadata(lead.metadata)
 
@@ -118,10 +192,10 @@ export async function buildOutreachContextPacket(
       .map((item) => truncate(item.payloadSnapshot.subject ?? item.payloadSnapshot.body ?? "Queued outreach")),
   ]
 
-  const priorReplySummaries = replies.slice(0, 4).map((reply) => {
-    const classification = reply.classification ? ` (${reply.classification})` : ""
-    return truncate(`${reply.bodyPreview}${classification}`)
-  })
+  const priorReplySummaries = replies
+    .slice(0, 4)
+    .map((reply) => usableReplySummary(reply))
+    .filter((entry): entry is string => Boolean(entry))
 
   const objectionSummaries = mergeMemoryObjectionSummaries(
     buildOutreachObjectionSummaries({
@@ -142,7 +216,11 @@ export async function buildOutreachContextPacket(
 
   const timelineEventSummaries = timelineEvents
     .slice(0, 6)
-    .map((event) => truncate(`${event.title}${event.summary ? ` — ${event.summary}` : ""}`, 120))
+    .map((event) => {
+      if (isUnusableOutreachMemoryEvidence({ title: event.title, evidence: event.summary ?? "" })) return null
+      return truncate(`${event.title}${event.summary ? ` — ${event.summary}` : ""}`, 120)
+    })
+    .filter((entry): entry is string => Boolean(entry))
 
   const capacityConstraints = resolveOperationalCapacityConstraintLabels(lead.operationalCapacityTopConstraints)
   const capacitySignals = [
@@ -171,7 +249,7 @@ export async function buildOutreachContextPacket(
     website: lead.website,
     employeeSize: lead.estimatedEmployeeCount ?? research?.estimatedEmployeeCount ?? null,
     location: locationLabel(lead),
-    decisionMakerName: dm.name ?? lead.contactName,
+    decisionMakerName: contactName,
     decisionMakerTitle: dm.title,
     fitScore: lead.score,
     engagementScore: lead.engagementScore,
@@ -214,7 +292,9 @@ export async function buildOutreachContextPacket(
     memoryCommitmentSummaries: memory.commitmentSummaries.map((entry) => truncate(entry, 120)),
     memoryAvoidRepeating: memory.avoidRepeating.map((entry) => truncate(entry, 100)),
     memoryRiskFlags: memory.riskFlags.map((entry) => truncate(entry, 100)),
-    memoryCommitteeSummaries: memory.committeeContext.map((entry) => truncate(entry, 120)),
+    memoryCommitteeSummaries: memory.committeeContext
+      .map((entry) => filterUsableOutreachMemorySnippet(entry, 120))
+      .filter((entry): entry is string => Boolean(entry)),
     memoryOpenLoopSummaries: [
       ...memory.priorInteractionSummaries,
       ...priorReplySummaries,

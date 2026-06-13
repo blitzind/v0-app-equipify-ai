@@ -1,6 +1,10 @@
 /** Client-safe projection of lead memory profile views into decision context (Sprint 3). */
 
 import {
+  filterUsableOutreachMemorySnippet,
+  isUnusableOutreachMemoryEvidence,
+} from "@/lib/growth/lead-memory/outreach-memory-evidence-guard"
+import {
   sanitizeMemoryEvidenceSnippet,
   type GrowthLeadMemoryInfluenceContext,
   type GrowthLeadMemoryProfileView,
@@ -22,7 +26,13 @@ const AVOID_REPEAT_CATEGORIES = new Set([
 
 function snippet(value: string | null | undefined, max = 200): string {
   if (!value?.trim()) return ""
-  return sanitizeMemoryEvidenceSnippet(value, max)
+  const sanitized = sanitizeMemoryEvidenceSnippet(value, max)
+  return filterUsableOutreachMemorySnippet(sanitized, max) ?? ""
+}
+
+function eventSnippet(title: string, evidence: string, max = 140): string {
+  if (isUnusableOutreachMemoryEvidence({ title, evidence })) return ""
+  return snippet(`${title}: ${evidence}`, max)
 }
 
 export function projectLeadMemoryInfluenceContext(
@@ -65,13 +75,13 @@ export function projectLeadMemoryInfluenceContext(
 
   const priorInteractionSummaries = (view?.events ?? [])
     .slice(0, 8)
-    .map((event) => snippet(`${event.title}: ${event.evidenceSnippet}`, 140))
+    .map((event) => eventSnippet(event.title, event.evidenceSnippet, 140))
     .filter(Boolean)
 
   const commitmentSummaries = (view?.events ?? [])
     .filter((event) => COMMITMENT_CATEGORIES.has(event.memoryCategory))
     .slice(0, 5)
-    .map((event) => snippet(`${event.title}: ${event.evidenceSnippet}`, 140))
+    .map((event) => eventSnippet(event.title, event.evidenceSnippet, 140))
     .filter(Boolean)
 
   const avoidRepeating = [
@@ -84,7 +94,16 @@ export function projectLeadMemoryInfluenceContext(
 
   const committeeContext = (view?.committeeMembers ?? [])
     .slice(0, 4)
-    .map((entry) => snippet(`${entry.memberLabel} (${entry.roleHint}): ${entry.evidenceSnippet}`, 140))
+    .map((entry) => {
+      if (isUnusableOutreachMemoryEvidence({ title: entry.roleHint, evidence: entry.evidenceSnippet })) {
+        return ""
+      }
+      const roleHint = entry.roleHint?.trim()
+      const label = entry.memberLabel?.trim()
+      if (roleHint && label) return snippet(`${label} (${roleHint})`, 80)
+      if (label) return snippet(label, 80)
+      return snippet(entry.evidenceSnippet, 100)
+    })
     .filter(Boolean)
 
   const riskFlags = (view?.relationshipContext?.riskFlags ?? []).map((entry) => snippet(entry, 120)).filter(Boolean)
