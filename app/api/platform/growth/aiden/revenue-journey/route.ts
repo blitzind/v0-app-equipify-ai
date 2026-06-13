@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server"
-import { requireGrowthPlatformAccess } from "@/lib/growth/access"
+import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { fetchAidenRevenueJourneyTracker } from "@/lib/growth/aiden/aiden-revenue-journey-tracker"
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const access = await requireGrowthPlatformAccess()
-  if (!access.ok) {
-    return NextResponse.json({ ok: false, message: access.message }, { status: access.status })
-  }
+  const access = await requireGrowthEnginePlatformAccess()
+  if (!access.ok) return access.response
 
   const url = new URL(request.url)
   const cohortId = url.searchParams.get("cohort_id")
