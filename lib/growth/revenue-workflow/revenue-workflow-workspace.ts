@@ -64,6 +64,7 @@ export async function fetchRevenueWorkflowWorkspaceDashboard(
       .select("id, status")
       .eq("status", "pending")
       .limit(200)
+      .then((result) => result)
       .catch(() => ({ data: [], error: null })),
     admin
       .schema("growth")
