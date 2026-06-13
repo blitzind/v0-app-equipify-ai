@@ -168,7 +168,6 @@ async function runCertification(certify: boolean, leadId: string): Promise<void>
       .from("outbound_replies")
       .update({
         intent: "meeting_request",
-        classification: "meeting_request",
         updated_at: new Date().toISOString(),
       })
       .eq("id", replyId)

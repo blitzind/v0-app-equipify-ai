@@ -125,7 +125,10 @@ export async function bridgeApolloPipelineToMeetingIntelligence(
   }
 
   const replyIntent =
-    input.reply_intelligence.classification_v2 ?? input.reply_intelligence.intent ?? null
+    input.reply_intelligence.intent ??
+    (typeof input.reply_intelligence.classification_v2 === "string"
+      ? input.reply_intelligence.classification_v2
+      : null)
   const bookingIntents = detectBookingIntentFromReplyIntelligence({
     intent: replyIntent,
     subject: input.reply_intelligence.subject,

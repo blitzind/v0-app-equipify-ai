@@ -123,7 +123,8 @@ export function evaluateApolloMeetingBridgeTriggerRules(
     typeof input.reply_intelligence.classification_v2 === "string"
       ? input.reply_intelligence.classification_v2
       : null
-  const replyIntent = classificationV2 ?? input.reply_intelligence.intent ?? null
+  // Prefer structured intent column; legacy classification is a separate enum (interested/unclassified/…).
+  const replyIntent = input.reply_intelligence.intent ?? classificationV2 ?? null
 
   if (
     replyIntent &&
@@ -193,10 +194,11 @@ export function buildApolloMeetingReadinessSnapshot(input: {
     100,
     Math.max(0, input.pipeline.account_playbook.committee_coverage_score),
   )
-  const replyIntent =
-    input.pipeline.reply_intelligence.classification_v2 ??
-    input.pipeline.reply_intelligence.intent ??
-    null
+  const classificationV2 =
+    typeof input.pipeline.reply_intelligence.classification_v2 === "string"
+      ? input.pipeline.reply_intelligence.classification_v2
+      : null
+  const replyIntent = input.pipeline.reply_intelligence.intent ?? classificationV2 ?? null
   const replyConfidence = input.reply_confidence ?? input.pipeline.reply_intelligence.confidence ?? null
 
   let meetingReadinessScore = qualificationScore * 0.35 + committeeCoverageScore * 0.25

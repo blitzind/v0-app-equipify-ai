@@ -74,11 +74,12 @@ async function main(): Promise<void> {
 
   const meetingChecks: Check[] = []
 
+  // Intent column only — legacy classification enum excludes meeting_request; classification_v2 is jsonb.
   const { count: meetingIntentReplies } = await admin
     .schema("growth")
     .from("outbound_replies")
     .select("id", { count: "exact", head: true })
-    .or("classification.eq.meeting_request,intent.eq.meeting_request,classification_v2.eq.meeting_request")
+    .eq("intent", "meeting_request")
 
   meetingChecks.push({
     id: "meeting_request_reply",
@@ -176,6 +177,18 @@ async function main(): Promise<void> {
     detail: { pages_with_reminder_template: pagesWithReminders?.length ?? 0 },
   })
 
+  const { count: meetingReminderTimelineEvents } = await admin
+    .schema("growth")
+    .from("lead_timeline_events")
+    .select("id", { count: "exact", head: true })
+    .eq("event_type", "meeting_reminder_configured")
+
+  meetingChecks.push({
+    id: "meeting_reminder_timeline",
+    pass: (meetingReminderTimelineEvents ?? 0) > 0,
+    detail: { count: meetingReminderTimelineEvents ?? 0 },
+  })
+
   const { count: cohortMeetings } = cohortLeadIds.length
     ? await admin
         .schema("growth")
@@ -258,6 +271,7 @@ async function main(): Promise<void> {
     .select("id", { count: "exact", head: true })
     .in("event_type", [
       "opportunity_created",
+      "opportunity_created_from_draft",
       "opportunity_draft_created",
       "opportunity_draft_approved",
       "opportunity_stage_changed",
@@ -513,7 +527,7 @@ async function main(): Promise<void> {
     JSON.stringify(
       {
         ok: true,
-        phase: "15.3B",
+        phase: "15.3C",
         observe_only: true,
         meeting_automation_pct: meetingPct,
         opportunity_pipeline_pct: opportunityPct,
