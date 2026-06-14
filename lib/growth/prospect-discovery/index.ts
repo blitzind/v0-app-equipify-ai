@@ -29,3 +29,42 @@ export {
   executeProspectDiscoveryFoundationCertification,
   validateProspectDiscoveryCertificationConfirmation,
 } from "@/lib/growth/prospect-discovery/prospect-search-certification"
+
+export {
+  PROSPECT_EXECUTION_EXECUTE_CONFIRM,
+  PROSPECT_EXECUTION_QA_MARKER,
+  PROSPECT_EXECUTION_STAGES,
+  PROSPECT_EXECUTION_READINESS_STATUSES,
+  type ProspectBudgetGuardRailLevel,
+  type ProspectExecutionCostBreakdown,
+  type ProspectExecutionPlan,
+  type ProspectExecutionPlanApproval,
+  type ProspectExecutionPlanInput,
+  type ProspectExecutionReadiness,
+  type ProspectExecutionReadinessReason,
+  type ProspectExecutionReadinessStatus,
+  type ProspectExecutionStage,
+  type ProspectExecutionStageId,
+  type ProspectProviderEnvSnapshot,
+} from "@/lib/growth/prospect-discovery/prospect-execution-plan-types"
+
+export { deriveSearchPlanId, deriveExecutionPlanId } from "@/lib/growth/prospect-discovery/prospect-execution-plan-ids"
+export { buildProspectExecutionPlan } from "@/lib/growth/prospect-discovery/prospect-execution-plan-builder"
+export {
+  buildProspectExecutionStages,
+  deriveProviderOrderFromStages,
+  orderProspectExecutionProviders,
+  selectProspectExecutionProviders,
+} from "@/lib/growth/prospect-discovery/prospect-provider-selection"
+export {
+  buildProspectExecutionCostWarnings,
+  buildProspectExecutionRisks,
+  classifyProspectBudgetGuardrail,
+  estimateProspectExecutionCost,
+  estimateProspectExecutionRuntimeSeconds,
+  estimateProspectExecutionVolume,
+} from "@/lib/growth/prospect-discovery/prospect-cost-estimator"
+export {
+  buildProspectExecutionReadiness,
+  resolveProspectProviderEnvSnapshot,
+} from "@/lib/growth/prospect-discovery/prospect-execution-readiness"

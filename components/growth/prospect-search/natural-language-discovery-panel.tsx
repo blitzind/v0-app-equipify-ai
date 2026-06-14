@@ -5,6 +5,11 @@ import { Sparkles } from "lucide-react"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import type { GrowthProspectSearchFilters } from "@/lib/growth/prospect-search/prospect-search-types"
 import type {
+  ProspectExecutionPlan,
+  ProspectExecutionReadiness,
+} from "@/lib/growth/prospect-discovery/prospect-execution-plan-types"
+import { PROSPECT_EXECUTION_QA_MARKER } from "@/lib/growth/prospect-discovery/prospect-execution-plan-types"
+import type {
   ProspectSearchIntent,
   ProspectSearchPlan,
   ProspectSearchSuggestion,
@@ -56,8 +61,12 @@ export function NaturalLanguageDiscoveryPanel({
   const [loading, setLoading] = useState(false)
   const [intent, setIntent] = useState<ProspectSearchIntent | null>(null)
   const [plan, setPlan] = useState<ProspectSearchPlan | null>(null)
+  const [executionPlan, setExecutionPlan] = useState<ProspectExecutionPlan | null>(null)
+  const [readiness, setReadiness] = useState<ProspectExecutionReadiness | null>(null)
   const [suggestions, setSuggestions] = useState<ProspectSearchSuggestion[]>([])
   const [approved, setApproved] = useState(false)
+  const [executionApproved, setExecutionApproved] = useState(false)
+  const [searchPlanId, setSearchPlanId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const loadSuggestions = useCallback(async (value: string) => {
@@ -93,6 +102,10 @@ export function NaturalLanguageDiscoveryPanel({
     setLoading(true)
     setError(null)
     setApproved(false)
+    setExecutionApproved(false)
+    setExecutionPlan(null)
+    setReadiness(null)
+    setSearchPlanId(null)
     try {
       const parseRes = await fetch("/api/platform/growth/prospect-discovery/parse", {
         method: "POST",
@@ -128,6 +141,22 @@ export function NaturalLanguageDiscoveryPanel({
         return
       }
       setPlan(planData.plan)
+
+      const execRes = await fetch("/api/platform/growth/prospect-discovery/execution-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ search_plan: planData.plan }),
+      })
+      const execData = (await execRes.json().catch(() => ({}))) as {
+        ok?: boolean
+        execution_plan?: ProspectExecutionPlan
+        readiness?: ProspectExecutionReadiness
+      }
+      if (execRes.ok && execData.execution_plan) {
+        setExecutionPlan(execData.execution_plan)
+        setReadiness(execData.readiness ?? null)
+        setSearchPlanId(execData.execution_plan.search_plan_id)
+      }
     } catch {
       setError("Planning request failed.")
       setIntent(null)
@@ -148,6 +177,28 @@ export function NaturalLanguageDiscoveryPanel({
     onApprovePlan?.(plan)
   }, [onApprovePlan, plan])
 
+  const handleApproveExecutionPlan = useCallback(async () => {
+    if (!plan || !executionPlan || !searchPlanId) return
+    const res = await fetch("/api/platform/growth/prospect-discovery/approve-plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        search_plan: plan,
+        search_plan_id: searchPlanId,
+      }),
+    })
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean }
+    if (res.ok && data.ok) setExecutionApproved(true)
+  }, [executionPlan, plan, searchPlanId])
+
+  const handleEditSearchPlan = useCallback(() => {
+    setApproved(false)
+    setExecutionApproved(false)
+    setExecutionPlan(null)
+    setReadiness(null)
+    void runPlanning()
+  }, [runPlanning])
+
   return (
     <GrowthEngineCard
       title="Natural Language Discovery"
@@ -155,8 +206,8 @@ export function NaturalLanguageDiscoveryPanel({
       className={cn(compact ? "text-sm" : undefined)}
     >
       <p className="mb-3 text-xs text-muted-foreground">
-        Describe your ideal prospect in plain English. GS-2A produces a search plan only — no search execution,
-        enrollment, or outreach until you approve in a future phase.
+        Describe your ideal prospect in plain English. GS-2A/2B produce search and execution plans only — no search
+        execution, enrollment, or outreach until a future human-gated phase.
       </p>
 
       <textarea
@@ -223,7 +274,8 @@ export function NaturalLanguageDiscoveryPanel({
               Quality: {plan.estimated_result_quality}
             </GrowthBadge>
             <GrowthBadge tone="neutral">Confidence: {Math.round(intent.confidence * 100)}%</GrowthBadge>
-            {approved ? <GrowthBadge tone="high">Plan approved</GrowthBadge> : null}
+            {approved ? <GrowthBadge tone="high">Search plan approved</GrowthBadge> : null}
+            {executionApproved ? <GrowthBadge tone="high">Execution plan approved</GrowthBadge> : null}
           </div>
 
           <div className="space-y-3 rounded-lg bg-muted/30 p-3">
@@ -292,6 +344,83 @@ export function NaturalLanguageDiscoveryPanel({
             </div>
           ) : null}
 
+          {executionPlan ? (
+            <div
+              className="space-y-3 rounded-lg border border-violet-200 bg-violet-50/40 p-3 dark:border-violet-900 dark:bg-violet-950/20"
+              data-qa-marker={PROSPECT_EXECUTION_QA_MARKER}
+            >
+              <p className="text-xs font-semibold">Execution Strategy</p>
+              <div className="flex flex-wrap gap-2">
+                <GrowthBadge tone={qualityTone(executionPlan.budget_guardrail)}>
+                  Budget: {executionPlan.budget_guardrail}
+                </GrowthBadge>
+                <GrowthBadge tone="neutral">~{executionPlan.estimated_companies} companies</GrowthBadge>
+                <GrowthBadge tone="neutral">~{executionPlan.estimated_contacts} contacts</GrowthBadge>
+                <GrowthBadge tone="neutral">~{executionPlan.estimated_credits} Apollo credits</GrowthBadge>
+                <GrowthBadge tone="neutral">
+                  ~{Math.round(executionPlan.estimated_runtime_seconds / 60)} min runtime
+                </GrowthBadge>
+                {readiness ? (
+                  <GrowthBadge
+                    tone={
+                      readiness.status === "ready"
+                        ? "high"
+                        : readiness.status === "partially_ready"
+                          ? "attention"
+                          : "critical"
+                    }
+                  >
+                    Readiness: {readiness.status.replace(/_/g, " ")}
+                  </GrowthBadge>
+                ) : null}
+              </div>
+
+              <div>
+                <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Execution stages
+                </p>
+                <ol className="space-y-2">
+                  {executionPlan.execution_stages.map((stage) => (
+                    <li key={stage.stage_id} className="rounded border border-border bg-background/70 px-2 py-1.5 text-[11px]">
+                      <span className="font-medium">
+                        Stage {stage.order}: {stage.label}
+                      </span>
+                      {stage.providers.length ? (
+                        <span className="text-muted-foreground"> — {stage.providers.join(", ").replace(/_/g, " ")}</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              {executionPlan.risks.length ? (
+                <div>
+                  <p className="mb-1 text-xs font-semibold">Risks</p>
+                  <ul className="list-disc space-y-1 pl-4 text-[11px] text-muted-foreground">
+                    {executionPlan.risks.map((risk) => (
+                      <li key={risk}>{risk}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {readiness?.reasons.length ? (
+                <div>
+                  <p className="mb-1 text-xs font-semibold">Readiness notes</p>
+                  <ul className="list-disc space-y-1 pl-4 text-[11px] text-muted-foreground">
+                    {readiness.reasons.slice(0, 5).map((reason) => (
+                      <li key={`${reason.code}-${reason.message}`}>{reason.message}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              <p className="text-[11px] text-muted-foreground">
+                Human approval required — approving stores plan state only; no provider execution.
+              </p>
+            </div>
+          ) : null}
+
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -302,11 +431,26 @@ export function NaturalLanguageDiscoveryPanel({
             </button>
             <button
               type="button"
+              onClick={handleEditSearchPlan}
+              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted"
+            >
+              Edit Search Plan
+            </button>
+            <button
+              type="button"
               onClick={handleApprovePlan}
               disabled={approved}
+              className="rounded-md border border-violet-300 px-3 py-1.5 text-xs font-medium hover:bg-violet-50 disabled:opacity-50 dark:border-violet-800 dark:hover:bg-violet-950/30"
+            >
+              {approved ? "Search Plan Approved" : "Approve Search Plan"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleApproveExecutionPlan()}
+              disabled={!executionPlan || executionApproved}
               className="rounded-md bg-violet-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
             >
-              {approved ? "Plan Approved" : "Approve Plan"}
+              {executionApproved ? "Execution Plan Approved" : "Approve Execution Plan"}
             </button>
           </div>
         </div>
