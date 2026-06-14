@@ -287,6 +287,8 @@
     "test:signal-event-router:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-signal-event-router.ts --production",
     "test:signal-external-bridge": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-signal-external-bridge.ts",
     "test:signal-external-bridge:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-signal-external-bridge.ts --production",
+    "test:signal-feed": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-signal-feed.ts",
+    "test:signal-feed:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-signal-feed.ts --production",
     "test:revenue-persistence-integrity": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-revenue-persistence-integrity.ts",
     "test:revenue-persistence-integrity:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-revenue-persistence-integrity.ts --production",
     "test:revenue-persistence-integrity:repair:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-revenue-persistence-integrity.ts --production --repair",

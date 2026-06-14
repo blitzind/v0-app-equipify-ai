@@ -76,6 +76,26 @@ export {
   isExternalSignalBridgeEnabled,
 } from "@/lib/growth/signal-intelligence/external-signal-producers"
 
+export {
+  SIGNAL_FEED_QA_MARKER,
+  SIGNAL_FEED_EXECUTE_CONFIRM,
+  SIGNAL_FEED_STATUSES,
+  SIGNAL_FEED_FILTERS,
+  type GrowthSignalFeedItem,
+  type GrowthSignalFeedResponse,
+  type SignalFeedStatus,
+  type SignalFeedFilter,
+  type SignalFeedRecommendation,
+} from "@/lib/growth/signal-intelligence/signal-feed-types"
+
+export { buildSignalRecommendations } from "@/lib/growth/signal-intelligence/signal-recommendation-engine"
+export { estimateSignalExpectedImpact } from "@/lib/growth/signal-intelligence/signal-revenue-impact-estimators"
+export {
+  buildSignalFeedReadinessPayload,
+  assertSignalFeedExecuteAllowed,
+  ALLOWED_SIGNAL_FEED_ACTIONS,
+} from "@/lib/growth/signal-intelligence/signal-feed-route-gates"
+
 export { matchSignalToLead, type SignalLeadMatch, type SignalLeadMatchInput } from "@/lib/growth/signal-intelligence/signal-lead-matcher"
 
 export { routeLeadSignalEvent, routeLeadSignalEvents } from "@/lib/growth/signal-intelligence/route-lead-signal-event"

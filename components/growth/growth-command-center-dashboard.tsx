@@ -5,6 +5,7 @@ import { GrowthCommandDailyActionQueue } from "@/components/growth/growth-comman
 import { GrowthCommandOpenOpportunitiesSection } from "@/components/growth/growth-command-open-opportunities-section"
 import { GrowthCommandQuickActionsRail } from "@/components/growth/growth-command-quick-actions-rail"
 import { GrowthCommandSequenceQueueSection } from "@/components/growth/growth-command-sequence-queue-section"
+import { GrowthSignalFeedPanel } from "@/components/growth/growth-signal-feed-panel"
 import { GrowthReplyWorkflowActionsPanel } from "@/components/growth/growth-reply-workflow-actions-panel"
 import { useAidenBriefing } from "@/components/growth/use-aiden-briefing"
 import { GROWTH_OPERATOR_UX_H3_QA_MARKER } from "@/lib/growth/operator-ux/operator-ux-h3-types"
@@ -32,6 +33,8 @@ export function GrowthCommandCenterDashboard() {
       />
 
       <GrowthCommandDailyActionQueue briefing={briefing} loading={loading} />
+
+      <GrowthSignalFeedPanel compact title="Signal Feed" />
 
       <GrowthReplyWorkflowActionsPanel compact showSequenceExit title="Reply workflow queue" />
 
