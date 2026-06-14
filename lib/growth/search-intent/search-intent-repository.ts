@@ -282,9 +282,19 @@ export async function persistSearchIntentSignals(
     return { ok: false, rows: [], reason: error.message }
   }
 
+  const rows = ((data ?? []) as Record<string, unknown>[]).map(mapRow)
+  if (process.env.GROWTH_SIGNAL_INTELLIGENCE_ENABLED?.trim().toLowerCase() === "true") {
+    const { bridgeSearchIntentSignalRow } = await import(
+      "@/lib/growth/signal-intelligence/external-signal-producers"
+    )
+    for (const row of rows) {
+      void bridgeSearchIntentSignalRow(admin, row).catch(() => undefined)
+    }
+  }
+
   return {
     ok: true,
-    rows: ((data ?? []) as Record<string, unknown>[]).map(mapRow),
+    rows,
     reason: null,
   }
 }

@@ -218,9 +218,24 @@ export async function captureIntentPixelEvent(
   let piiReason = ""
 
   if (payload.event_type === "pageview") {
-    await recordPageview(admin, site, session, payload, {
+    const pageview = await recordPageview(admin, site, session, payload, {
       allowMarketingAttribution: allowsMarketingAttribution(consentStatus, consentCategories),
     })
+    if (process.env.GROWTH_SIGNAL_INTELLIGENCE_ENABLED?.trim().toLowerCase() === "true") {
+      const { bridgeIntentPageviewEvent } = await import(
+        "@/lib/growth/signal-intelligence/external-signal-producers"
+      )
+      void bridgeIntentPageviewEvent(admin, {
+        pageview_id: pageview.id,
+        page_path: pageview.page_path,
+        company_domain:
+          typeof session.metadata?.identified_company_domain === "string"
+            ? session.metadata.identified_company_domain
+            : null,
+        visit_count: session.pageview_count + 1,
+        captured_at: pageview.captured_at,
+      }).catch(() => undefined)
+    }
   } else if (payload.event_type === "page_exit" || payload.event_type === "heartbeat") {
     const durationMs = payload.duration_ms ?? 0
     if (durationMs > 0) {

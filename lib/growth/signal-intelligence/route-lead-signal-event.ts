@@ -26,6 +26,7 @@ import {
   isDuplicateLeadSignalEvent,
 } from "@/lib/growth/signal-intelligence/signal-event-dedupe"
 import { applyLeadSignalScoringDefaults } from "@/lib/growth/signal-intelligence/signal-event-scoring"
+import { resolveSignalQueueHint } from "@/lib/growth/signal-intelligence/signal-queue-hints"
 
 async function runLeadSignalRecompute(
   admin: SupabaseClient,
@@ -72,6 +73,7 @@ export async function routeLeadSignalEvent(
       attribution_touch_recorded: false,
       recompute_succeeded: false,
       attention_evaluated: false,
+      queue_hint: null,
       dedupe_hash: dedupeHash,
     }
   }
@@ -81,10 +83,17 @@ export async function routeLeadSignalEvent(
   const timeline_emitted = await emitLeadSignalTimelineEvent(admin, scoredEvent)
   const attribution_touch_recorded = await recordLeadSignalAttributionTouch(admin, scoredEvent)
   const recompute_succeeded = await runLeadSignalRecompute(admin, scoredEvent)
+  const queue_hint = resolveSignalQueueHint(scoredEvent)
 
   let attention_evaluated = false
   if (scoredEvent.routeActions.includes("attention")) {
-    await evaluateGrowthAttentionSignals(admin).catch(() => undefined)
+    await evaluateGrowthAttentionSignals(admin, {
+      external_signal: {
+        lead_id: scoredEvent.leadId,
+        signal_type: scoredEvent.signalType,
+        urgency: scoredEvent.urgency,
+      },
+    }).catch(() => undefined)
     attention_evaluated = true
   }
 
@@ -97,6 +106,7 @@ export async function routeLeadSignalEvent(
     attribution_touch_recorded,
     recompute_succeeded,
     attention_evaluated,
+    queue_hint,
     dedupe_hash: dedupeHash,
   }
 }

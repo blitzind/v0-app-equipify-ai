@@ -9,7 +9,10 @@ import { recordAttributionTouch } from "@/lib/growth/revenue-attribution/record-
 import type { GrowthAttributionTouchType } from "@/lib/growth/revenue-attribution/attribution-touch-types"
 import { isGrowthSignalFoundationSchemaReady } from "@/lib/growth/signals/signal-schema-health"
 import type { LeadSignalEvent } from "@/lib/growth/signal-intelligence/lead-signal-event-types"
-import { LEAD_SIGNAL_EVENT_ROUTER_QA_MARKER } from "@/lib/growth/signal-intelligence/lead-signal-event-types"
+import {
+  LEAD_SIGNAL_EVENT_ROUTER_QA_MARKER,
+  SIGNAL_EXTERNAL_BRIDGE_QA_MARKER,
+} from "@/lib/growth/signal-intelligence/lead-signal-event-types"
 import { scoreLeadSignalEvent } from "@/lib/growth/signal-intelligence/signal-event-scoring"
 
 type SignalEventAuditRow = {
@@ -43,6 +46,22 @@ function timelineEventTypeForSignal(event: LeadSignalEvent): GrowthLeadTimelineE
       return "opportunity_closed_won"
     case "deal_lost":
       return "opportunity_closed_lost"
+    case "company_hiring":
+    case "leadership_change":
+    case "funding_event":
+    case "technology_change":
+    case "expansion_event":
+    case "high_intent_search":
+    case "category_interest":
+    case "pricing_page_visit":
+    case "demo_page_visit":
+    case "contact_page_visit":
+      return "buying_intent_detected"
+    case "competitor_search":
+      return "competitor_detected"
+    case "repeat_visit":
+    case "high_engagement_visit":
+      return "high_engagement_detected"
     default:
       return "reply_workflow_routed"
   }
@@ -169,6 +188,35 @@ export async function emitLeadSignalTimelineEvent(
   }).catch(() => undefined)
 
   return true
+}
+
+export async function persistUnmatchedExternalSignalAudit(
+  admin: SupabaseClient,
+  input: {
+    source_system: string
+    signal_type: string
+    evidence_ref: { table: string; id: string }
+    match: Record<string, unknown>
+    metadata: Record<string, unknown>
+    occurred_at?: string
+    organization_id?: string | null
+  },
+): Promise<string | null> {
+  return persistLeadSignalAuditEvent(admin, {
+    event_type: "routed",
+    organization_id: input.organization_id ?? null,
+    occurred_at: input.occurred_at ?? new Date().toISOString(),
+    event_payload: {
+      qa_marker: SIGNAL_EXTERNAL_BRIDGE_QA_MARKER,
+      router_outcome: "unmatched_external_signal",
+      source_system: input.source_system,
+      signal_type: input.signal_type,
+      evidence_ref: input.evidence_ref,
+      match: input.match,
+      metadata: input.metadata,
+      lead_id: null,
+    },
+  })
 }
 
 export async function recordLeadSignalAttributionTouch(

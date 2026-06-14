@@ -11,6 +11,10 @@ import {
   emitGrowthWorkloadImbalanceNotification,
 } from "@/lib/growth/notifications/notification-integrations"
 import { syncGrowthProviderAttentionNotifications } from "@/lib/growth/notifications/sync-provider-attention"
+import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { emitGrowthBuyingSignalDetectedNotification } from "@/lib/growth/notifications/notification-integrations"
+import type { LeadSignalType, LeadSignalUrgency } from "@/lib/growth/signal-intelligence/lead-signal-event-types"
+import { externalSignalAttentionTier } from "@/lib/growth/signal-intelligence/external-signal-scoring"
 
 function isHighPriorityUnassigned(row: {
   executive_priority_tier?: string | null
@@ -26,13 +30,23 @@ function isHighFitUnassigned(row: { score?: number | null }): boolean {
   return (row.score ?? 0) >= 80
 }
 
-export async function evaluateGrowthAttentionSignals(admin: SupabaseClient): Promise<{
+export async function evaluateGrowthAttentionSignals(
+  admin: SupabaseClient,
+  options?: {
+    external_signal?: {
+      lead_id: string
+      signal_type: LeadSignalType
+      urgency: LeadSignalUrgency
+    } | null
+  },
+): Promise<{
   providerNotifications: number
   highPriorityUnassigned: number
   highFitWaiting: number
   capacityWarnings: number
   followUpsDue: number
   workloadImbalance: number
+  externalSignalAlerts: number
 }> {
   const [providerNotifications, unassigned, reps] = await Promise.all([
     syncGrowthProviderAttentionNotifications(admin),
@@ -115,6 +129,24 @@ export async function evaluateGrowthAttentionSignals(admin: SupabaseClient): Pro
     }
   }
 
+  let externalSignalAlerts = 0
+  const external = options?.external_signal
+  if (external && (external.urgency === "urgent" || external.urgency === "high")) {
+    const tier = externalSignalAttentionTier(external.signal_type)
+    if (tier === "hot" || tier === "expansion") {
+      const lead = await fetchGrowthLeadById(admin, external.lead_id)
+      if (lead) {
+        await emitGrowthBuyingSignalDetectedNotification(admin, {
+          leadId: lead.id,
+          companyName: lead.companyName,
+          signalKey: external.signal_type,
+          ownerUserId: lead.assignedTo,
+        }).catch(() => undefined)
+        externalSignalAlerts += 1
+      }
+    }
+  }
+
   return {
     providerNotifications,
     highPriorityUnassigned,
@@ -122,5 +154,6 @@ export async function evaluateGrowthAttentionSignals(admin: SupabaseClient): Pro
     capacityWarnings,
     followUpsDue,
     workloadImbalance,
+    externalSignalAlerts,
   }
 }

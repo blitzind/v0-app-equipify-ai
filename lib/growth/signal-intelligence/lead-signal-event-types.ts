@@ -1,6 +1,7 @@
-/** Phase GS-1B — Lead signal event types (client-safe). */
+/** Phase GS-1B/GS-1C — Lead signal event types (client-safe). */
 
 export const LEAD_SIGNAL_EVENT_ROUTER_QA_MARKER = "growth-signal-event-router-gs1b-v1" as const
+export const SIGNAL_EXTERNAL_BRIDGE_QA_MARKER = "growth-signal-external-bridge-gs1c-v1" as const
 
 export const LEAD_SIGNAL_SOURCE_DOMAINS = [
   "reply",
@@ -26,6 +27,19 @@ export const LEAD_SIGNAL_TYPES = [
   "stage_advanced",
   "deal_won",
   "deal_lost",
+  "company_hiring",
+  "leadership_change",
+  "funding_event",
+  "technology_change",
+  "expansion_event",
+  "high_intent_search",
+  "category_interest",
+  "competitor_search",
+  "pricing_page_visit",
+  "repeat_visit",
+  "high_engagement_visit",
+  "demo_page_visit",
+  "contact_page_visit",
 ] as const
 
 export type LeadSignalType = (typeof LEAD_SIGNAL_TYPES)[number]
@@ -67,6 +81,13 @@ export type LeadSignalEvent = {
   occurredAt?: string
 }
 
+export type SignalQueueHint = {
+  hint_type: "recommend_sequence" | "recommend_meeting_outreach" | "review_company" | "hot_signal_alert"
+  label: string
+  reason: string
+  requires_human_approval: true
+}
+
 export type RouteLeadSignalEventResult = {
   qa_marker: typeof LEAD_SIGNAL_EVENT_ROUTER_QA_MARKER
   ok: boolean
@@ -76,8 +97,19 @@ export type RouteLeadSignalEventResult = {
   attribution_touch_recorded: boolean
   recompute_succeeded: boolean
   attention_evaluated: boolean
+  queue_hint: SignalQueueHint | null
   dedupe_hash: string
   error?: string
+}
+
+export type RouteExternalSignalBatchResult = {
+  qa_marker: typeof SIGNAL_EXTERNAL_BRIDGE_QA_MARKER
+  ok: boolean
+  matched_lead_count: number
+  routed_count: number
+  unmatched_audit_event_id: string | null
+  results: RouteLeadSignalEventResult[]
+  queue_hints: SignalQueueHint[]
 }
 
 export const LEAD_SIGNAL_TYPE_SOURCE_DOMAIN: Record<LeadSignalType, LeadSignalSourceDomain> = {
@@ -92,6 +124,19 @@ export const LEAD_SIGNAL_TYPE_SOURCE_DOMAIN: Record<LeadSignalType, LeadSignalSo
   stage_advanced: "opportunity",
   deal_won: "opportunity",
   deal_lost: "opportunity",
+  company_hiring: "company",
+  leadership_change: "company",
+  funding_event: "company",
+  technology_change: "company",
+  expansion_event: "company",
+  high_intent_search: "external",
+  category_interest: "external",
+  competitor_search: "external",
+  pricing_page_visit: "external",
+  repeat_visit: "external",
+  high_engagement_visit: "external",
+  demo_page_visit: "external",
+  contact_page_visit: "external",
 }
 
 export function assertLeadSignalEventShape(event: LeadSignalEvent): void {

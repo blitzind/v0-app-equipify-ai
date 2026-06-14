@@ -335,9 +335,18 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
   }
 
   const growthSignalByLead = new Map<string, { score: number; tier: GrowthSignalTier | null }>()
+  const externalSignalByLead = new Map<string, number>()
   try {
     const leadIds = leads.map((lead) => lead.id as string).filter(Boolean)
     if (leadIds.length > 0) {
+      const { loadRecentExternalSignalBoostsByLead } = await import(
+        "@/lib/growth/signal-intelligence/external-signal-producers"
+      )
+      const externalBoosts = await loadRecentExternalSignalBoostsByLead(admin, leadIds)
+      for (const [leadId, boost] of externalBoosts) {
+        externalSignalByLead.set(leadId, boost)
+      }
+
       const { data } = await admin
         .schema("growth")
         .from("company_growth_signal_scores")
@@ -361,6 +370,7 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
     const dealScore = dealScoreByLead.get(leadId)
     const callScore = callScoreByLead.get(leadId)
     const growthSignal = growthSignalByLead.get(leadId)
+    const externalSignalBoost = externalSignalByLead.get(leadId) ?? 0
     const baseImpact = {
       executivePriorityTier: lead.executive_priority_tier as string | null,
       revenueTrajectory: lead.revenue_trajectory as string | null,
@@ -390,6 +400,7 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
             signalTier: growthSignal.tier,
           })
         : 0,
+      externalSignalBoost,
     }
     const revenueInput = {
       revenueProbabilityScore: lead.revenue_probability_score as number | null,

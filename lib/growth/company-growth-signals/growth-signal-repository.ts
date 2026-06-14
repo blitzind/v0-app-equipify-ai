@@ -176,6 +176,22 @@ export async function runCompanyGrowthSignalDiscovery(
   await upsertSignals(admin, input.company_id, discovery.signals)
 
   const signals = await loadActiveSignals(admin, input.company_id)
+
+  if (process.env.GROWTH_SIGNAL_INTELLIGENCE_ENABLED?.trim().toLowerCase() === "true") {
+    const { bridgeCompanyGrowthSignalRow } = await import(
+      "@/lib/growth/signal-intelligence/external-signal-producers"
+    )
+    for (const signal of signals) {
+      void bridgeCompanyGrowthSignalRow(admin, {
+        id: signal.id,
+        company_id: input.company_id,
+        signal_type: signal.signal_type,
+        confidence_score: signal.confidence_score,
+        detected_at: signal.detected_at,
+      }).catch(() => undefined)
+    }
+  }
+
   const contacts = await listCompanyContacts(admin, input.company_id).catch(() => [])
   const coverage = computeCompanyContactCoverage(contacts)
 
