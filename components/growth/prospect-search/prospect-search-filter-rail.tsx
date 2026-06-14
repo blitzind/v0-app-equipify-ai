@@ -3,6 +3,7 @@
 import type { Dispatch, ReactNode, SetStateAction } from "react"
 import { Filter } from "lucide-react"
 import { GuidedIcpBuilder } from "@/components/growth/prospect-search/guided-icp-builder"
+import { NaturalLanguageDiscoveryPanel } from "@/components/growth/prospect-search/natural-language-discovery-panel"
 import { SavedSearchWorkflowSidebar } from "@/components/growth/prospect-search/saved-search-workflow-sidebar"
 import type { GrowthProspectSearchFilters } from "@/lib/growth/prospect-search/prospect-search-types"
 import type { GrowthProspectSearchSavedSearchWithWorkflow } from "@/lib/growth/prospect-search/saved-search-workflows"
@@ -61,6 +62,11 @@ export function ProspectSearchFilterRail({
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
         {filterHealthSlot}
         {relaxFiltersSlot}
+        <NaturalLanguageDiscoveryPanel
+          compact
+          onApplyFilters={(next) => onChange((prev) => ({ ...prev, ...next }))}
+        />
+        <div className="my-4 border-t border-border" />
         <GuidedIcpBuilder
           filters={filters}
           onChange={onChange}
