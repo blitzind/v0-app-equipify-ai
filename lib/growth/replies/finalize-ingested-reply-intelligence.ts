@@ -3,7 +3,6 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { fetchGrowthLeadById, updateGrowthLead } from "@/lib/growth/lead-repository"
 import { fetchGrowthLeadDecisionMakerById } from "@/lib/growth/decision-maker-repository"
-import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import type { GrowthOutboundReply } from "@/lib/growth/outbound/types"
 import { classifyReplyIntent } from "@/lib/growth/reply-intelligence/reply-intent-classifier"
 import {
@@ -120,7 +119,7 @@ export async function finalizeIngestedReplyIntelligence(
     messageId: input.outboundReply.messageId,
   })
 
-  await processReplyIntelligence(admin, {
+  const intelligence = await processReplyIntelligence(admin, {
     reply: input.outboundReply,
     lead: refreshedLead,
     bodyPreview: input.bodyPreview,
@@ -132,7 +131,22 @@ export async function finalizeIngestedReplyIntelligence(
     ingestionEventId: input.ingestionEventId,
   })
 
-  await recomputeGrowthLeadWorkflowSignals(admin, input.leadId)
+  const { buildReplyLeadSignalEvents } = await import(
+    "@/lib/growth/signal-intelligence/lead-signal-producers"
+  )
+  const { routeLeadSignalEvents } = await import(
+    "@/lib/growth/signal-intelligence/route-lead-signal-event"
+  )
+  await routeLeadSignalEvents(
+    admin,
+    buildReplyLeadSignalEvents({
+      leadId: input.leadId,
+      replyId: input.outboundReply.id,
+      intent: intelligence.intent,
+      confidence: intelligence.confidence ?? 0.7,
+      occurredAt: input.outboundReply.receivedAt,
+    }),
+  )
 
   await maybeBridgeApolloPipelineToMeetingIntelligenceForLead(admin, {
     lead_id: input.leadId,

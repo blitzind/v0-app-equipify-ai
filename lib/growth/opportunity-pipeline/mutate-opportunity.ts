@@ -132,6 +132,21 @@ export async function createGrowthOpportunity(
     metadata: { source: "opportunity_pipeline", stage_key: stageKey, rep_user_id: ownerUserId },
   }).catch(() => undefined)
 
+  const { buildOpportunityCreatedLeadSignalEvent } = await import(
+    "@/lib/growth/signal-intelligence/lead-signal-producers"
+  )
+  const { routeLeadSignalEvent } = await import(
+    "@/lib/growth/signal-intelligence/route-lead-signal-event"
+  )
+  await routeLeadSignalEvent(
+    admin,
+    buildOpportunityCreatedLeadSignalEvent({
+      leadId: input.leadId,
+      opportunityId: opportunity.id,
+      occurredAt: now,
+    }),
+  )
+
   return { ok: true, opportunity: enriched ?? opportunity }
 }
 
@@ -250,7 +265,53 @@ export async function updateGrowthOpportunityStage(
     })
   }
 
-  const lead = await fetchGrowthLeadById(admin, row.lead_id as string)
+  const leadId = row.lead_id as string
+  const { routeLeadSignalEvent } = await import(
+    "@/lib/growth/signal-intelligence/route-lead-signal-event"
+  )
+  if (toStage === "closed_won") {
+    const { buildDealWonLeadSignalEvent } = await import(
+      "@/lib/growth/signal-intelligence/lead-signal-producers"
+    )
+    await routeLeadSignalEvent(
+      admin,
+      buildDealWonLeadSignalEvent({
+        leadId,
+        opportunityId: input.opportunityId,
+        amount,
+        occurredAt: now,
+      }),
+    )
+  } else if (toStage === "closed_lost") {
+    const { buildDealLostLeadSignalEvent } = await import(
+      "@/lib/growth/signal-intelligence/lead-signal-producers"
+    )
+    await routeLeadSignalEvent(
+      admin,
+      buildDealLostLeadSignalEvent({
+        leadId,
+        opportunityId: input.opportunityId,
+        lossReason: input.patch.lossReason ?? null,
+        occurredAt: now,
+      }),
+    )
+  } else {
+    const { buildOpportunityStageAdvancedLeadSignalEvent } = await import(
+      "@/lib/growth/signal-intelligence/lead-signal-producers"
+    )
+    await routeLeadSignalEvent(
+      admin,
+      buildOpportunityStageAdvancedLeadSignalEvent({
+        leadId,
+        opportunityId: input.opportunityId,
+        fromStage,
+        toStage,
+        occurredAt: now,
+      }),
+    )
+  }
+
+  const lead = await fetchGrowthLeadById(admin, leadId)
   const enriched = await recomputeGrowthOpportunityDerivedFields(admin, input.opportunityId, {
     followUpAt: lead?.followUpAt ?? null,
     engagementTrend: lead?.opportunityReadinessTrend ?? null,

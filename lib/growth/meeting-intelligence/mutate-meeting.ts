@@ -28,7 +28,6 @@ import type {
   GrowthMeetingProvider,
   UpdateGrowthMeetingInput,
 } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
-import { recomputeGrowthLeadNextBestAction } from "@/lib/growth/recompute-lead-next-best-action"
 import { recomputeMeetingOutcomeForMeeting } from "@/lib/growth/meeting-outcome-intelligence/meeting-outcome-intelligence-service"
 import { maybeGenerateOpportunityDraftForMeeting } from "@/lib/growth/meeting-intelligence/opportunity-draft-service"
 import { fetchGrowthMeetingLocationPlatformContext } from "@/lib/growth/meeting-location/meeting-location-settings-server"
@@ -150,7 +149,20 @@ export async function createGrowthMeeting(
       companyName: lead.companyName,
       startAt: meeting.startAt,
     })
-    await recomputeGrowthLeadNextBestAction(admin, input.leadId)
+    const { buildMeetingBookedLeadSignalEvent } = await import(
+      "@/lib/growth/signal-intelligence/lead-signal-producers"
+    )
+    const { routeLeadSignalEvent } = await import(
+      "@/lib/growth/signal-intelligence/route-lead-signal-event"
+    )
+    await routeLeadSignalEvent(
+      admin,
+      buildMeetingBookedLeadSignalEvent({
+        leadId: input.leadId,
+        meetingId: meeting.id,
+        occurredAt: now,
+      }),
+    )
   }
 
   return { ok: true, meeting }
@@ -233,7 +245,20 @@ export async function updateGrowthMeeting(
       companyName: lead.companyName,
       startAt: meeting.startAt,
     })
-    await recomputeGrowthLeadNextBestAction(admin, meeting.leadId)
+    const { buildMeetingBookedLeadSignalEvent } = await import(
+      "@/lib/growth/signal-intelligence/lead-signal-producers"
+    )
+    const { routeLeadSignalEvent } = await import(
+      "@/lib/growth/signal-intelligence/route-lead-signal-event"
+    )
+    await routeLeadSignalEvent(
+      admin,
+      buildMeetingBookedLeadSignalEvent({
+        leadId: meeting.leadId,
+        meetingId: meeting.id,
+        occurredAt: now,
+      }),
+    )
   }
 
   if (input.status === "completed" && existing.status !== "completed") {
@@ -242,6 +267,20 @@ export async function updateGrowthMeeting(
       actorUserId: input.actor?.userId ?? null,
       sessionId: meeting.realtimeCallSessionId,
     })
+    const { buildMeetingCompletedLeadSignalEvent } = await import(
+      "@/lib/growth/signal-intelligence/lead-signal-producers"
+    )
+    const { routeLeadSignalEvent } = await import(
+      "@/lib/growth/signal-intelligence/route-lead-signal-event"
+    )
+    await routeLeadSignalEvent(
+      admin,
+      buildMeetingCompletedLeadSignalEvent({
+        leadId: meeting.leadId,
+        meetingId: meeting.id,
+        occurredAt: now,
+      }),
+    )
   }
 
   if (input.status === "no_show" && existing.status !== "no_show") {
@@ -257,6 +296,20 @@ export async function updateGrowthMeeting(
       companyName: lead.companyName,
       reason: meeting.noShowReason,
     })
+    const { buildMeetingNoShowLeadSignalEvent } = await import(
+      "@/lib/growth/signal-intelligence/lead-signal-producers"
+    )
+    const { routeLeadSignalEvent } = await import(
+      "@/lib/growth/signal-intelligence/route-lead-signal-event"
+    )
+    await routeLeadSignalEvent(
+      admin,
+      buildMeetingNoShowLeadSignalEvent({
+        leadId: meeting.leadId,
+        meetingId: meeting.id,
+        occurredAt: now,
+      }),
+    )
   }
 
   if (input.status === "canceled" && existing.status !== "canceled") {

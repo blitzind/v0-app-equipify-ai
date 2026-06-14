@@ -303,6 +303,15 @@ export async function insertGrowthOpportunityRow(
   return mapOpportunity(mapped, resolveStageLabel(settings, mapped.stage_key as GrowthOpportunityStageKey))
 }
 
+/** Compensating rollback when draft conversion fails after opportunity insert. */
+export async function deleteGrowthOpportunityRow(
+  admin: SupabaseClient,
+  opportunityId: string,
+): Promise<boolean> {
+  const { error } = await opportunitiesTable(admin).delete().eq("id", opportunityId)
+  return !error
+}
+
 export async function updateGrowthOpportunityRow(
   admin: SupabaseClient,
   opportunityId: string,

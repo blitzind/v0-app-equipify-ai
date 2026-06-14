@@ -25,7 +25,10 @@ import {
 import { mapOpportunityDraftDbRow } from "@/lib/growth/meeting-intelligence/opportunity-draft-evidence"
 import { updateGrowthMeetingRow } from "@/lib/growth/meeting-intelligence/meeting-repository"
 import { createGrowthOpportunity } from "@/lib/growth/opportunity-pipeline/mutate-opportunity"
-import { fetchGrowthOpportunityByLeadId } from "@/lib/growth/opportunity-pipeline/pipeline-repository"
+import {
+  deleteGrowthOpportunityRow,
+  fetchGrowthOpportunityByLeadId,
+} from "@/lib/growth/opportunity-pipeline/pipeline-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import { recomputeGrowthRevenueOperatingDashboard } from "@/lib/growth/revenue-operating/revenue-operating-dashboard-repository"
 
@@ -161,6 +164,7 @@ export async function confirmCreateOpportunityFromDraft(
     .eq("id", draftId)
 
   if (updateError) {
+    await deleteGrowthOpportunityRow(admin, opportunityId).catch(() => undefined)
     return failureResult(updateError.message, draftId)
   }
 
