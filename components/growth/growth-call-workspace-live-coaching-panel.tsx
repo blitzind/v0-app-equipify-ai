@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Loader2, Mic, Radio, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
+import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowledge-context-section"
 import {
   LiveCoachingExecutionScorePanel,
   LiveCoachingGuidancePanel,
@@ -292,6 +293,15 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
           </div>
 
           <p className="text-xs leading-relaxed text-muted-foreground">{GROWTH_CALL_DIALER_SAFETY_COPY}</p>
+
+          {sessionLeadId ? (
+            <GrowthKnowledgeContextSection
+              consumer="call_coaching"
+              title="Talk Track References"
+              leadId={sessionLeadId}
+              compact
+            />
+          ) : null}
         </div>
       )}
     </>

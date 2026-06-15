@@ -23,6 +23,7 @@ import type {
   GrowthSequenceExitCandidateRecord,
 } from "@/lib/growth/reply-intelligence/workflow-actions-types"
 import { GrowthRevenueWorkflowWorkspacePanel } from "@/components/growth/growth-revenue-workflow-workspace-panel"
+import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowledge-context-section"
 import { GROWTH_REPLY_WORKFLOW_CENTER_QA_MARKER } from "@/lib/growth/reply-intelligence/workflow-actions-types"
 
 type FilterKey = "all" | "interested" | "call_task" | "follow_up" | "opportunity"
@@ -499,6 +500,13 @@ export function GrowthReplyWorkflowActionsPanel({
           </p>
         ) : null}
       </GrowthEngineCard>
+
+      <GrowthKnowledgeContextSection
+        consumer="reply_intelligence"
+        title="Knowledge Context"
+        leadId={leadId}
+        compact={compact}
+      />
 
       {showSequenceExit && exitCandidates.length > 0 ? (
         <GrowthEngineCard title="Sequence exit review" subtitle="Inbound reply on active sequence — operator decides next step.">

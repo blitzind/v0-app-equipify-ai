@@ -301,6 +301,8 @@
     "test:knowledge-center-foundation:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-knowledge-center-foundation.ts --production",
     "test:knowledge-retrieval-layer": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-knowledge-retrieval-layer.ts",
     "test:knowledge-retrieval-layer:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-knowledge-retrieval-layer.ts --production",
+    "test:knowledge-context-injection": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-knowledge-context-injection.ts",
+    "test:knowledge-context-injection:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-knowledge-context-injection.ts --production",
     "test:revenue-persistence-integrity": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-revenue-persistence-integrity.ts",
     "test:revenue-persistence-integrity:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-revenue-persistence-integrity.ts --production",
     "test:revenue-persistence-integrity:repair:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-revenue-persistence-integrity.ts --production --repair",

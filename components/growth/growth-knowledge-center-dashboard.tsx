@@ -248,8 +248,6 @@ export function GrowthKnowledgeCenterDashboard() {
         </div>
       </GrowthEngineCard>
 
-      </GrowthEngineCard>
-
       <GrowthEngineCard title="Retrieval Preview" icon={<Search className="h-4 w-4" />}>
         <p className="mb-3 text-xs text-muted-foreground" data-qa-marker={KNOWLEDGE_RETRIEVAL_QA_MARKER}>
           Preview deterministic retrieval for active documents only. Display only — no generation or autonomous actions.

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { ChevronDown, ChevronUp, Loader2, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
+import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowledge-context-section"
 import type { AiMeetingPrepRow } from "@/lib/growth/meeting-intelligence/ai-meeting-prep-types"
 import type { GrowthMeetingPrepBundle, MeetingPrepRiskPriority } from "@/lib/growth/meeting-intelligence/meeting-prep-types"
 
@@ -588,6 +589,15 @@ export function GrowthMeetingPrepPanel({
               ) : null}
             </PrepSection>
           ) : null}
+
+          <div className="pt-2">
+            <GrowthKnowledgeContextSection
+              consumer="meeting_prep"
+              title="Supporting Documents"
+              leadId={prep.meeting.leadId}
+              compact
+            />
+          </div>
         </div>
       ) : null}
     </div>

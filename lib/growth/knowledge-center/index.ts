@@ -53,3 +53,30 @@ export {
   resolveConsumerRetrievalScope,
   retrieveKnowledgeForConsumer,
 } from "@/lib/growth/knowledge-center/knowledge-consumer-adapters"
+
+export {
+  KNOWLEDGE_CONTEXT_CONFIRM,
+  KNOWLEDGE_CONTEXT_QA_MARKER,
+  KNOWLEDGE_CONTEXT_RETRIEVED_EVENT,
+  type KnowledgeConsumerContext,
+  type KnowledgeConsumerContextCounts,
+  type KnowledgeContextInjectionRequest,
+  type KnowledgeContextInjectionResult,
+} from "@/lib/growth/knowledge-center/knowledge-context-types"
+
+export {
+  buildKnowledgeConsumerContext,
+  buildKnowledgeConsumerContextFromDocuments,
+} from "@/lib/growth/knowledge-center/knowledge-context-injection"
+
+export {
+  bucketCaseStudies,
+  bucketCompetitors,
+  bucketFaqs,
+  bucketObjections,
+  bucketPlaybooks,
+  bucketPricingNotes,
+  buildConsumerSpecificContextMetadata,
+  buildContextCounts,
+  consumerBucketDocuments,
+} from "@/lib/growth/knowledge-center/knowledge-consumer-wiring"

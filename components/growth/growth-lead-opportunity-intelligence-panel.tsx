@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Lightbulb, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowledge-context-section"
 import { GrowthOpportunityRecommendationScoringDetails } from "@/components/growth/growth-opportunity-recommendation-scoring-details"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import {
@@ -153,6 +154,13 @@ export function GrowthLeadOpportunityIntelligencePanel({ lead }: GrowthLeadOppor
           </div>
         </div>
       )}
+
+      <GrowthKnowledgeContextSection
+        consumer="opportunity_intelligence"
+        title="Supporting Knowledge"
+        leadId={lead.id}
+        compact
+      />
     </GrowthCollapsibleEngineCard>
   )
 }
