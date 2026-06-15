@@ -109,6 +109,8 @@ export async function createDeliveryAttempt(
     sender_account_id?: string | null
     lead_id?: string | null
     sequence_enrollment_id?: string | null
+    sequence_enrollment_step_id?: string | null
+    sequence_execution_job_id?: string | null
     metadata?: Record<string, unknown>
   },
 ): Promise<GrowthDeliveryAttempt> {
@@ -117,6 +119,8 @@ export async function createDeliveryAttempt(
   const row: Record<string, unknown> = {
     lead_id: input.lead_id ?? null,
     sequence_enrollment_id: input.sequence_enrollment_id ?? null,
+    sequence_enrollment_step_id: input.sequence_enrollment_step_id ?? null,
+    sequence_execution_job_id: input.sequence_execution_job_id ?? null,
     channel: "email",
     status: "queued",
     queued_at: now,

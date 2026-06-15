@@ -47,6 +47,7 @@ export type TransportSendInput = {
   text?: string
   lead_id?: string | null
   sequence_enrollment_id?: string | null
+  sequence_enrollment_step_id?: string | null
   sequence_execution_job_id?: string | null
   sender_pool_id?: string | null
   allow_auto_rotation?: boolean
@@ -121,6 +122,8 @@ async function executeAttemptOnRoute(
     message: { to: string; subject: string; html?: string; text?: string }
     lead_id?: string | null
     sequence_enrollment_id?: string | null
+    sequence_enrollment_step_id?: string | null
+    sequence_execution_job_id?: string | null
     sender_pool_id?: string | null
     actorUserId: string
     actorEmail: string
@@ -185,6 +188,8 @@ async function executeAttemptOnRoute(
     sender_account_id: input.sender_account_id,
     lead_id: input.lead_id,
     sequence_enrollment_id: input.sequence_enrollment_id,
+    sequence_enrollment_step_id: input.sequence_enrollment_step_id,
+    sequence_execution_job_id: input.sequence_execution_job_id,
     metadata: {
       route_id: input.route_id,
       is_test: input.is_test ?? false,
@@ -196,6 +201,9 @@ async function executeAttemptOnRoute(
       subject: input.message.subject,
       html: input.message.html ?? null,
       text: input.message.text ?? null,
+      sequence_enrollment_id: input.sequence_enrollment_id ?? null,
+      sequence_enrollment_step_id: input.sequence_enrollment_step_id ?? null,
+      sequence_execution_job_id: input.sequence_execution_job_id ?? null,
       ...(input.extra_metadata ?? {}),
     },
   })
@@ -507,6 +515,8 @@ export async function executeTransportSend(
     message: { to: input.to, subject: input.subject, html: input.html, text: input.text },
     lead_id: input.lead_id,
     sequence_enrollment_id: input.sequence_enrollment_id,
+    sequence_enrollment_step_id: input.sequence_enrollment_step_id,
+    sequence_execution_job_id: input.sequence_execution_job_id,
     sender_pool_id: input.sender_pool_id,
     actorUserId: input.actorUserId,
     actorEmail: input.actorEmail,
@@ -629,6 +639,8 @@ async function executeTransportOnSenderRoute(
     },
     lead_id: input.transportInput.lead_id,
     sequence_enrollment_id: input.transportInput.sequence_enrollment_id,
+    sequence_enrollment_step_id: input.transportInput.sequence_enrollment_step_id,
+    sequence_execution_job_id: input.transportInput.sequence_execution_job_id,
     sender_pool_id: input.transportInput.sender_pool_id,
     actorUserId: input.transportInput.actorUserId,
     actorEmail: input.transportInput.actorEmail,

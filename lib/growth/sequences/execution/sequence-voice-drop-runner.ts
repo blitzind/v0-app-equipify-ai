@@ -203,6 +203,7 @@ export async function runSequenceVoiceDropExecutionJob(
 
   const sequenceMetadata = {
     sequence_enrollment_id: job.sequenceEnrollmentId,
+    sequence_enrollment_step_id: job.sequenceStepId,
     sequence_step_id: job.sequenceStepId,
     sequence_execution_job_id: job.id,
     lead_id: job.leadId,

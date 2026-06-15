@@ -20,6 +20,8 @@ import type {
 import { GROWTH_ENGAGEMENT_ATTRIBUTION_QA_MARKER } from "@/lib/growth/tracking/tracking-types"
 import { buildTrackingHealthSnapshot } from "@/lib/growth/tracking/tracking-health"
 import { getDeliveryAttempt } from "@/lib/growth/providers/transport/transport-repository"
+import { resolveSequenceAttributionFromDeliveryAttemptId } from "@/lib/growth/sequences/attribution/sequence-attribution-resolver"
+import { sequenceAttributionToDbRow } from "@/lib/growth/sequences/attribution/sequence-attribution"
 
 type OpenRow = {
   id: string
@@ -152,6 +154,8 @@ export async function recordEmailOpen(
 
   const openedAt = input.openedAt ?? new Date().toISOString()
   const deviceType = inferDeviceType(input.userAgent)
+  const attribution = await resolveSequenceAttributionFromDeliveryAttemptId(admin, attempt.id)
+  const attributionRow = sequenceAttributionToDbRow(attribution)
 
   const { data, error } = await opensTable(admin)
     .insert({
@@ -165,6 +169,7 @@ export async function recordEmailOpen(
       country: input.country ?? null,
       city: input.city ?? null,
       device_type: deviceType,
+      ...attributionRow,
     })
     .select("*")
     .single()
@@ -226,6 +231,8 @@ export async function recordEmailClick(
 
   const clickedAt = input.clickedAt ?? new Date().toISOString()
   const deviceType = inferDeviceType(input.userAgent)
+  const attribution = await resolveSequenceAttributionFromDeliveryAttemptId(admin, attempt.id)
+  const attributionRow = sequenceAttributionToDbRow(attribution)
 
   const { data, error } = await clicksTable(admin)
     .insert({
@@ -240,6 +247,7 @@ export async function recordEmailClick(
       ip_hash: input.ipHash ?? null,
       country: input.country ?? null,
       device_type: deviceType,
+      ...attributionRow,
     })
     .select("*")
     .single()

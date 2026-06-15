@@ -10,6 +10,9 @@ import {
   verifySharePageToken,
 } from "@/lib/growth/share-pages/share-page-token"
 import {
+  sharePageAttributionToDbRow,
+} from "@/lib/growth/sequences/attribution/sequence-attribution"
+import {
   DEFAULT_GROWTH_SHARE_PAGE_THEME,
   EMPTY_GROWTH_SHARE_PAGE_ENGAGEMENT_SUMMARY,
   GROWTH_SHARE_PAGES_QA_MARKER,
@@ -32,13 +35,13 @@ import {
 } from "@/lib/growth/share-pages/share-page-types"
 
 const PAGE_SELECT =
-  "id, organization_id, lead_id, company_id, campaign_id, enrollment_id, sequence_step_id, sequence_execution_job_id, source_channel, status, token_prefix, published_at, expires_at, revoked_at, archived_at, first_viewed_at, last_viewed_at, max_views, engagement_summary, personalization_snapshot, personalization_context_version, sources_used, evidence_coverage_score, theme, headline, subheadline, hero_message, why_reaching_out, company_observations, cta_config, resources, booking_page_id, hero_media_type, hero_media_url, hero_media_thumbnail_url, voice_asset_id, video_asset_id, created_by, approved_by, approved_at, requires_human_review, created_at, updated_at"
+  "id, organization_id, lead_id, company_id, campaign_id, enrollment_id, sequence_step_id, sequence_enrollment_step_id, sequence_execution_job_id, source_channel, status, token_prefix, published_at, expires_at, revoked_at, archived_at, first_viewed_at, last_viewed_at, max_views, engagement_summary, personalization_snapshot, personalization_context_version, sources_used, evidence_coverage_score, theme, headline, subheadline, hero_message, why_reaching_out, company_observations, cta_config, resources, booking_page_id, hero_media_type, hero_media_url, hero_media_thumbnail_url, voice_asset_id, video_asset_id, created_by, approved_by, approved_at, requires_human_review, created_at, updated_at"
 
 const VIEW_SELECT =
-  "id, share_page_id, lead_id, session_key, visitor_fingerprint_hash, started_at, last_activity_at, ended_at, duration_ms, max_scroll_depth_pct, page_url, referrer, utm, device_metadata, created_at, updated_at"
+  "id, share_page_id, lead_id, session_key, visitor_fingerprint_hash, started_at, last_activity_at, ended_at, duration_ms, max_scroll_depth_pct, page_url, referrer, utm, device_metadata, enrollment_id, sequence_enrollment_step_id, sequence_step_id, sequence_execution_job_id, created_at, updated_at"
 
 const EVENT_SELECT =
-  "id, share_page_id, share_page_view_id, lead_id, event_type, event_label, metadata, occurred_at, created_at"
+  "id, share_page_id, share_page_view_id, lead_id, event_type, event_label, metadata, occurred_at, enrollment_id, sequence_enrollment_step_id, sequence_step_id, sequence_execution_job_id, created_at"
 
 type SharePageRow = {
   id: string
@@ -48,6 +51,7 @@ type SharePageRow = {
   campaign_id: string | null
   enrollment_id: string | null
   sequence_step_id: string | null
+  sequence_enrollment_step_id: string | null
   sequence_execution_job_id: string | null
   source_channel: string
   status: string
@@ -182,6 +186,7 @@ function mapPage(row: SharePageRow): GrowthSharePage {
     campaignId: row.campaign_id,
     enrollmentId: row.enrollment_id,
     sequenceStepId: row.sequence_step_id,
+    sequenceEnrollmentStepId: row.sequence_enrollment_step_id,
     sequenceExecutionJobId: row.sequence_execution_job_id,
     sourceChannel: row.source_channel as GrowthSharePageSourceChannel,
     status: row.status as GrowthSharePageStatus,
@@ -307,6 +312,7 @@ export async function createSharePage(
       campaign_id: input.campaignId ?? null,
       enrollment_id: input.enrollmentId ?? null,
       sequence_step_id: input.sequenceStepId ?? null,
+      sequence_enrollment_step_id: input.sequenceEnrollmentStepId ?? null,
       sequence_execution_job_id: input.sequenceExecutionJobId ?? null,
       source_channel: input.sourceChannel ?? "manual",
       status: input.status ?? "draft",
@@ -545,9 +551,19 @@ export async function createSharePageViewSession(
     utm?: Record<string, string>
     deviceMetadata?: Record<string, unknown>
     startedAt?: string
+    enrollmentId?: string | null
+    sequenceEnrollmentStepId?: string | null
+    sequenceStepId?: string | null
+    sequenceExecutionJobId?: string | null
   },
 ): Promise<GrowthSharePageView> {
   const startedAt = input.startedAt ?? new Date().toISOString()
+  const attributionRow = sharePageAttributionToDbRow({
+    enrollmentId: input.enrollmentId,
+    sequenceEnrollmentStepId: input.sequenceEnrollmentStepId,
+    sequenceStepId: input.sequenceStepId,
+    sequenceExecutionJobId: input.sequenceExecutionJobId,
+  })
   const { data, error } = await viewsTable(admin)
     .insert({
       share_page_id: input.sharePageId,
@@ -559,6 +575,7 @@ export async function createSharePageViewSession(
       page_url: input.pageUrl ?? "",
       referrer: input.referrer ?? null,
       utm: input.utm ?? {},
+      ...attributionRow,
       device_metadata: input.deviceMetadata ?? {},
     })
     .select(VIEW_SELECT)
@@ -617,8 +634,18 @@ export async function appendSharePageEvent(
     eventLabel?: string
     metadata?: Record<string, unknown>
     occurredAt?: string
+    enrollmentId?: string | null
+    sequenceEnrollmentStepId?: string | null
+    sequenceStepId?: string | null
+    sequenceExecutionJobId?: string | null
   },
 ): Promise<GrowthSharePageEvent> {
+  const attributionRow = sharePageAttributionToDbRow({
+    enrollmentId: input.enrollmentId,
+    sequenceEnrollmentStepId: input.sequenceEnrollmentStepId,
+    sequenceStepId: input.sequenceStepId,
+    sequenceExecutionJobId: input.sequenceExecutionJobId,
+  })
   const { data, error } = await eventsTable(admin)
     .insert({
       share_page_id: input.sharePageId,
@@ -628,6 +655,7 @@ export async function appendSharePageEvent(
       event_label: input.eventLabel ?? "",
       metadata: input.metadata ?? {},
       occurred_at: input.occurredAt ?? new Date().toISOString(),
+      ...attributionRow,
     })
     .select(EVENT_SELECT)
     .single()

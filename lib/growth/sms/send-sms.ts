@@ -82,8 +82,14 @@ export async function sendSms(
     toE164,
     body,
     idempotencyKey,
+    sequenceEnrollmentId: input.sequenceEnrollmentId ?? null,
+    sequenceEnrollmentStepId: input.sequenceEnrollmentStepId ?? null,
+    sequenceExecutionJobId: input.sequenceExecutionJobId ?? null,
     metadata: {
       acting_user_id: input.actingUserId ?? null,
+      sequence_enrollment_id: input.sequenceEnrollmentId ?? null,
+      sequence_enrollment_step_id: input.sequenceEnrollmentStepId ?? null,
+      sequence_execution_job_id: input.sequenceExecutionJobId ?? null,
       ...(input.metadata ?? {}),
     },
   })

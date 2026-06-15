@@ -139,6 +139,7 @@ export type GrowthSharePage = {
   campaignId: string | null
   enrollmentId: string | null
   sequenceStepId: string | null
+  sequenceEnrollmentStepId: string | null
   sequenceExecutionJobId: string | null
   sourceChannel: GrowthSharePageSourceChannel
   status: GrowthSharePageStatus
@@ -215,6 +216,7 @@ export type GrowthSharePageCreateInput = {
   campaignId?: string | null
   enrollmentId?: string | null
   sequenceStepId?: string | null
+  sequenceEnrollmentStepId?: string | null
   sequenceExecutionJobId?: string | null
   sourceChannel?: GrowthSharePageSourceChannel
   status?: Extract<GrowthSharePageStatus, "draft" | "pending_review">

@@ -40,6 +40,7 @@ export const growthSharePageCreateSchema = z.object({
   campaign_id: z.string().uuid().nullable().optional(),
   enrollment_id: z.string().uuid().nullable().optional(),
   sequence_step_id: z.string().uuid().nullable().optional(),
+  sequence_enrollment_step_id: z.string().uuid().nullable().optional(),
   sequence_execution_job_id: z.string().uuid().nullable().optional(),
   source_channel: z.enum(GROWTH_SHARE_PAGE_SOURCE_CHANNELS).optional(),
   booking_page_id: z.string().uuid().nullable().optional(),

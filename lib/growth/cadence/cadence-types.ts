@@ -66,7 +66,9 @@ export type GrowthCadenceTask = {
   leadId: string
   opportunityId: string | null
   meetingId: string | null
+  sequenceEnrollmentId: string | null
   sequenceEnrollmentStepId: string | null
+  sequenceExecutionJobId: string | null
   channel: GrowthCadenceTaskChannel
   title: string
   instructions: string

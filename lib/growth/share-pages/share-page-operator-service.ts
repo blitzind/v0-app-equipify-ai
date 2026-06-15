@@ -210,6 +210,7 @@ export async function createSharePageForOperator(
     campaignId: input.body.campaign_id ?? null,
     enrollmentId: input.body.enrollment_id ?? null,
     sequenceStepId: input.body.sequence_step_id ?? null,
+    sequenceEnrollmentStepId: input.body.sequence_enrollment_step_id ?? null,
     sequenceExecutionJobId: input.body.sequence_execution_job_id ?? null,
     sourceChannel: input.body.source_channel ?? "manual",
     status: "pending_review",

@@ -16,6 +16,7 @@ export type GrowthSharePageBookingAttribution = {
   sourceChannel: string
   campaignId?: string | null
   enrollmentId?: string | null
+  sequenceEnrollmentStepId?: string | null
   sequenceExecutionJobId?: string | null
 }
 
@@ -38,6 +39,7 @@ export function buildSharePageBookingAttribution(input: {
   sourceChannel: string
   campaignId?: string | null
   enrollmentId?: string | null
+  sequenceEnrollmentStepId?: string | null
   sequenceExecutionJobId?: string | null
 }): GrowthSharePageBookingAttribution {
   return {
@@ -47,6 +49,7 @@ export function buildSharePageBookingAttribution(input: {
     sourceChannel: input.sourceChannel,
     campaignId: input.campaignId ?? null,
     enrollmentId: input.enrollmentId ?? null,
+    sequenceEnrollmentStepId: input.sequenceEnrollmentStepId ?? null,
     sequenceExecutionJobId: input.sequenceExecutionJobId ?? null,
   }
 }
@@ -63,6 +66,9 @@ export function buildSharePageBookingUrl(
   params.set("source_channel", attribution.sourceChannel)
   if (attribution.campaignId) params.set("campaign_id", attribution.campaignId)
   if (attribution.enrollmentId) params.set("enrollment_id", attribution.enrollmentId)
+  if (attribution.sequenceEnrollmentStepId) {
+    params.set("sequence_enrollment_step_id", attribution.sequenceEnrollmentStepId)
+  }
   if (attribution.sequenceExecutionJobId) {
     params.set("sequence_execution_job_id", attribution.sequenceExecutionJobId)
   }
@@ -86,6 +92,7 @@ export function parseSharePageBookingAttributionFromSearchParams(
     sourceChannel,
     campaignId: readString(params.get("campaign_id")),
     enrollmentId: readString(params.get("enrollment_id")),
+    sequenceEnrollmentStepId: readString(params.get("sequence_enrollment_step_id")),
     sequenceExecutionJobId: readString(params.get("sequence_execution_job_id")),
   })
 }
@@ -108,6 +115,7 @@ export function parseSharePageBookingAttributionFromRecord(
     sourceChannel,
     campaignId: readString(record.campaign_id ?? record.campaignId),
     enrollmentId: readString(record.enrollment_id ?? record.enrollmentId),
+    sequenceEnrollmentStepId: readString(record.sequence_enrollment_step_id ?? record.sequenceEnrollmentStepId),
     sequenceExecutionJobId: readString(record.sequence_execution_job_id ?? record.sequenceExecutionJobId),
   })
 }
@@ -123,6 +131,7 @@ export function sharePageBookingAttributionToMetadata(
     source_channel: attribution.sourceChannel,
     campaign_id: attribution.campaignId ?? null,
     enrollment_id: attribution.enrollmentId ?? null,
+    sequence_enrollment_step_id: attribution.sequenceEnrollmentStepId ?? null,
     sequence_execution_job_id: attribution.sequenceExecutionJobId ?? null,
     requires_human_review: true,
     autonomous_execution_enabled: false,

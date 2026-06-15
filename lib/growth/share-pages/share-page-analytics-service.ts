@@ -144,6 +144,10 @@ async function resolveViewSession(
     utm: input.utm,
     deviceMetadata: input.deviceMetadata,
     startedAt: input.occurredAt,
+    enrollmentId: page.enrollmentId,
+    sequenceEnrollmentStepId: page.sequenceEnrollmentStepId,
+    sequenceStepId: page.sequenceStepId,
+    sequenceExecutionJobId: page.sequenceExecutionJobId,
   })
 
   return { viewId: created.id, created: true }
@@ -432,6 +436,10 @@ export async function ingestSharePageAnalyticsForPage(
       sharePageViewId: viewId,
       eventType,
       eventLabel: input.eventLabel ?? "",
+      enrollmentId: page.enrollmentId,
+      sequenceEnrollmentStepId: page.sequenceEnrollmentStepId,
+      sequenceStepId: page.sequenceStepId,
+      sequenceExecutionJobId: page.sequenceExecutionJobId,
       metadata: {
         qa_marker: GROWTH_SHARE_PAGES_ANALYTICS_QA_MARKER,
         ...(input.metadata ?? {}),

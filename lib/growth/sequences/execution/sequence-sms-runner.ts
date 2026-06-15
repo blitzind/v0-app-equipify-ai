@@ -88,6 +88,9 @@ export async function runSequenceSmsExecutionJob(
     body: payload.body,
     idempotencyKey: `sequence-job:${job.id}:${idempotencyKey}`,
     actingUserId: input.auditActorUserId,
+    sequenceEnrollmentId: job.sequenceEnrollmentId,
+    sequenceEnrollmentStepId: job.sequenceStepId,
+    sequenceExecutionJobId: job.id,
   })
 
   if (!smsResult.ok) {

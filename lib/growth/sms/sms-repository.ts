@@ -339,6 +339,9 @@ export async function createSmsDeliveryAttempt(
     toE164: string
     body: string
     idempotencyKey: string
+    sequenceEnrollmentId?: string | null
+    sequenceEnrollmentStepId?: string | null
+    sequenceExecutionJobId?: string | null
     metadata?: Record<string, unknown>
   },
 ): Promise<GrowthSmsDeliveryAttempt> {
@@ -355,6 +358,9 @@ export async function createSmsDeliveryAttempt(
       status: "queued",
       idempotency_key: input.idempotencyKey,
       queued_at: now,
+      sequence_enrollment_id: input.sequenceEnrollmentId ?? null,
+      sequence_enrollment_step_id: input.sequenceEnrollmentStepId ?? null,
+      sequence_execution_job_id: input.sequenceExecutionJobId ?? null,
       metadata: input.metadata ?? {},
       created_at: now,
     })

@@ -76,7 +76,13 @@ export async function completeGrowthCadenceTask(
         eventKind: "call_completed",
         title: "Call Completed",
         summary: `Outcome: ${input.outcome}`,
-        metadata: { cadence_task_id: task.id, outcome: input.outcome },
+        metadata: {
+          cadence_task_id: task.id,
+          outcome: input.outcome,
+          sequence_enrollment_id: enrollmentStep.enrollmentId,
+          sequence_enrollment_step_id: existing.sequenceEnrollmentStepId,
+          sequence_execution_job_id: existing.sequenceExecutionJobId ?? task.sequenceExecutionJobId ?? null,
+        },
       }).catch(() => undefined)
     }
   }

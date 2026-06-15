@@ -26,6 +26,7 @@ export async function resolveSharePageBookingRenderModel(
     sourceChannel: page.sourceChannel,
     campaignId: page.campaignId,
     enrollmentId: page.enrollmentId,
+    sequenceEnrollmentStepId: page.sequenceEnrollmentStepId,
     sequenceExecutionJobId: page.sequenceExecutionJobId,
   })
 

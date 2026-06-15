@@ -128,6 +128,9 @@ export type GrowthSmsSendInput = {
   body: string
   idempotencyKey?: string
   actingUserId?: string | null
+  sequenceEnrollmentId?: string | null
+  sequenceEnrollmentStepId?: string | null
+  sequenceExecutionJobId?: string | null
   metadata?: Record<string, unknown>
 }
 

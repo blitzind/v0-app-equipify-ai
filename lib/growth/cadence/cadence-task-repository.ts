@@ -10,7 +10,7 @@ import type {
 } from "@/lib/growth/cadence/cadence-types"
 
 const TASK_SELECT =
-  "id, owner_user_id, lead_id, opportunity_id, meeting_id, sequence_enrollment_step_id, channel, title, instructions, template_draft, suggested_sms_text, due_at, status, priority, outcome, skipped_reason, completed_at, completed_by, created_at, updated_at"
+  "id, owner_user_id, lead_id, opportunity_id, meeting_id, sequence_enrollment_id, sequence_enrollment_step_id, sequence_execution_job_id, channel, title, instructions, template_draft, suggested_sms_text, due_at, status, priority, outcome, skipped_reason, completed_at, completed_by, created_at, updated_at"
 
 type TaskDbRow = {
   id: string
@@ -18,7 +18,9 @@ type TaskDbRow = {
   lead_id: string
   opportunity_id: string | null
   meeting_id: string | null
+  sequence_enrollment_id: string | null
   sequence_enrollment_step_id: string | null
+  sequence_execution_job_id: string | null
   channel: string
   title: string
   instructions: string
@@ -46,7 +48,9 @@ export function mapGrowthCadenceTaskRow(row: TaskDbRow): GrowthCadenceTask {
     leadId: row.lead_id,
     opportunityId: row.opportunity_id,
     meetingId: row.meeting_id,
+    sequenceEnrollmentId: row.sequence_enrollment_id,
     sequenceEnrollmentStepId: row.sequence_enrollment_step_id,
+    sequenceExecutionJobId: row.sequence_execution_job_id,
     channel: row.channel as GrowthCadenceTaskChannel,
     title: row.title,
     instructions: row.instructions,

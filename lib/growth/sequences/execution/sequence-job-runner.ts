@@ -37,6 +37,7 @@ import { evaluateGrowthQaDeliverabilityBypassForJobSend,
   fetchGrowthQaDeliverabilityBypassForJob,
 } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass"
 import { recordSequenceEnrollmentChannelEvent } from "@/lib/growth/sequence-orchestration/sequence-multi-channel-state-repository"
+import { assertSequenceExecutionPauseGate } from "@/lib/growth/sequences/execution/sequence-pause-gate"
 
 export type SequenceExecutionRunInput = {
   jobId: string
@@ -375,6 +376,17 @@ export async function runSequenceExecutionJob(
     return { ok: false, jobId: job.id, status: "blocked", message: code, blocked: true }
   }
 
+  const pauseGate = await assertSequenceExecutionPauseGate(admin, job)
+  if (pauseGate.blocked) {
+    return {
+      ok: false,
+      jobId: job.id,
+      status: "blocked",
+      message: pauseGate.code ?? "enrollment_pause_gate",
+      blocked: true,
+    }
+  }
+
   const locked = await tryLockSequenceExecutionJob(admin, job.id, input.lockedBy ?? input.actingUserId)
   if (!locked) {
     return { ok: false, jobId: job.id, status: job.status, message: "job_locked" }
@@ -518,6 +530,7 @@ export async function runSequenceExecutionJob(
     allow_auto_rotation: payload.allowAutoRotation ?? locked.allowAutoRotation,
     manual_sender_account_id: payload.manualSenderAccountId ?? locked.manualSenderAccountId,
     sequence_execution_job_id: locked.id,
+    sequence_enrollment_step_id: locked.sequenceStepId,
     to: payload.to,
     subject: payload.subject,
     html: payload.html,
