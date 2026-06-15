@@ -20,6 +20,8 @@ export const GROWTH_SEQUENCE_ENROLLMENT_STEP_STATUSES = [
   "skipped",
   "failed",
   "cancelled",
+  "waiting",
+  "branch_skipped",
 ] as const
 export type GrowthSequenceEnrollmentStepStatus =
   (typeof GROWTH_SEQUENCE_ENROLLMENT_STEP_STATUSES)[number]

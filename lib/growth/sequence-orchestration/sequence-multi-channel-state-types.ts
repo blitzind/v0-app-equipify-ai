@@ -11,6 +11,10 @@ export const GROWTH_SEQUENCE_CHANNEL_EVENT_KINDS = [
   "step_approved",
   "step_skipped",
   "channel_rule_applied",
+  "branch_evaluated",
+  "wait_started",
+  "wait_resolved",
+  "condition_timeout",
 ] as const
 
 export type GrowthSequenceChannelEventKind = (typeof GROWTH_SEQUENCE_CHANNEL_EVENT_KINDS)[number]
