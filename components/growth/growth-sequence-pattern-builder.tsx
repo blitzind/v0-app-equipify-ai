@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowledge-context-section"
+import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growth-knowledge-recommendations-section"
 import { formatSequenceChannelLabel } from "@/lib/growth/sequence-enrollment/sequence-enrollment-ui"
 import type { GrowthSequencePattern, GrowthSequencePatternStep } from "@/lib/growth/sequence-types"
 import {
@@ -221,8 +222,10 @@ export function GrowthSequencePatternBuilder() {
       </GrowthEngineCard>
 
       <GrowthKnowledgeContextSection consumer="sequence_builder" title="Messaging References" compact />
+      <GrowthKnowledgeRecommendationsSection consumer="sequence_builder" title="Recommended Messaging" compact />
 
       <GrowthKnowledgeContextSection consumer="voice_drop" title="Script References" compact />
+      <GrowthKnowledgeRecommendationsSection consumer="voice_drop" title="Recommended Script Angles" compact />
     </div>
   )
 }

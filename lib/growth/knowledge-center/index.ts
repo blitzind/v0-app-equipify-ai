@@ -80,3 +80,26 @@ export {
   buildContextCounts,
   consumerBucketDocuments,
 } from "@/lib/growth/knowledge-center/knowledge-consumer-wiring"
+
+export {
+  KNOWLEDGE_RECOMMENDATION_CONFIRM,
+  KNOWLEDGE_RECOMMENDATION_GENERATED_EVENT,
+  KNOWLEDGE_RECOMMENDATION_QA_MARKER,
+  KNOWLEDGE_RECOMMENDATION_TYPE_LABELS,
+  KNOWLEDGE_CONSUMER_RECOMMENDATION_TYPES,
+  type KnowledgeCitation,
+  type KnowledgeRecommendation,
+  type KnowledgeRecommendationGenerateRequest,
+  type KnowledgeRecommendationGenerateResult,
+  type KnowledgeRecommendationPriority,
+} from "@/lib/growth/knowledge-center/knowledge-recommendation-types"
+
+export {
+  assertAllRecommendationsCited,
+  buildKnowledgeCitations,
+} from "@/lib/growth/knowledge-center/knowledge-citation-builder"
+
+export {
+  generateKnowledgeRecommendations,
+  generateKnowledgeRecommendationsFromDocuments,
+} from "@/lib/growth/knowledge-center/knowledge-recommendation-engine"

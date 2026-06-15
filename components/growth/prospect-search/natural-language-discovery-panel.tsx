@@ -17,6 +17,7 @@ import type {
 import { PROSPECT_DISCOVERY_QA_MARKER } from "@/lib/growth/prospect-discovery/prospect-search-intent-types"
 import { ProspectDiscoveryExecutionPanel } from "@/components/growth/prospect-search/prospect-discovery-execution-panel"
 import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowledge-context-section"
+import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growth-knowledge-recommendations-section"
 import { cn } from "@/lib/utils"
 
 const EXAMPLE_QUERIES = [
@@ -468,6 +469,12 @@ export function NaturalLanguageDiscoveryPanel({
     <GrowthKnowledgeContextSection
       consumer="prospect_discovery"
       title="Industry Playbooks & ICP Notes"
+      industry={plan?.prospect_search_filters?.industry ?? undefined}
+      compact
+    />
+    <GrowthKnowledgeRecommendationsSection
+      consumer="prospect_discovery"
+      title="Recommended Playbooks"
       industry={plan?.prospect_search_filters?.industry ?? undefined}
       compact
     />
