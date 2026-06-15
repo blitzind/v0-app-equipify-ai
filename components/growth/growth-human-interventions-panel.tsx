@@ -13,6 +13,7 @@ import {
   type HumanInterventionFilter,
   type HumanInterventionsResponse,
 } from "@/lib/growth/human-interventions/human-intervention-types"
+import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
 
 function priorityTone(priority: HumanIntervention["priority"]) {
   switch (priority) {
@@ -79,6 +80,7 @@ export function GrowthHumanInterventionsPanel({
   }
 
   return (
+    <>
     <GrowthEngineCard
       title={title}
       icon={<AlertTriangle className="h-4 w-4" />}
@@ -197,5 +199,9 @@ export function GrowthHumanInterventionsPanel({
         ))}
       </div>
     </GrowthEngineCard>
+    {leadId ? (
+      <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" leadId={leadId} compact={compact} />
+    ) : null}
+    </>
   )
 }

@@ -315,6 +315,8 @@
     "test:human-interventions:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-human-interventions.ts --production",
     "test:follow-up-policies": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-follow-up-policies.ts",
     "test:follow-up-policies:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-follow-up-policies.ts --production",
+    "test:sequence-preview": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-sequence-preview.ts",
+    "test:sequence-preview:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-sequence-preview.ts --production",
     "test:revenue-persistence-integrity": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-revenue-persistence-integrity.ts",
     "test:revenue-persistence-integrity:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-revenue-persistence-integrity.ts --production",
     "test:revenue-persistence-integrity:repair:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-revenue-persistence-integrity.ts --production --repair",

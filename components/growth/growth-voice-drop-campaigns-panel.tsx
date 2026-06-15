@@ -13,6 +13,7 @@ import { GrowthVoiceDropDeliveryEvidencePanel } from "@/components/growth/growth
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
+import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
 
 export function GrowthVoiceDropCampaignsPanel() {
   const [dashboard, setDashboard] = useState<VoiceDropCampaignDashboardSnapshot | null>(null)
@@ -220,6 +221,7 @@ export function GrowthVoiceDropCampaignsPanel() {
       <GrowthConversationalPlaybooksPanel consumer="voice_drop" title="Voice Drop Conversational Playbook" compact />
       <GrowthHumanInterventionsPanel title="Human Interventions" compact />
       <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" compact />
+      <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" compact />
     </div>
   )
 }

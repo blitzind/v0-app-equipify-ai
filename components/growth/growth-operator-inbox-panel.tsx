@@ -8,6 +8,7 @@ import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-uti
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
+import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
 import {
   OPERATOR_INBOX_FILTERS,
   OPERATOR_INBOX_QA_MARKER,
@@ -195,6 +196,7 @@ export function GrowthOperatorInboxPanel({
     <GrowthConversationalPlaybooksPanel consumer="operator_inbox" title="Conversational Playbook" leadId={leadId} compact />
     <GrowthHumanInterventionsPanel title="Human Interventions" leadId={leadId} compact />
     <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" leadId={leadId} compact />
+    <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" leadId={leadId} compact />
     </>
   )
 }
