@@ -1,5 +1,5 @@
 /**
- * SR-3 Phase 1/2/3/4/5 — Conditional schema, evaluator, branch/wait registry, event wake, timeout processor certification.
+ * SR-3 Phase 1–6 — Conditional schema, evaluator, branch/wait registry, event wake, timeout processor, branch simulation.
  *
  * Local: pnpm test:growth-sequence-conditions
  * Integration: pnpm test:growth-sequence-conditions:integration
@@ -32,6 +32,15 @@ import { GROWTH_SEQUENCE_WAIT_REGISTRY_QA_MARKER } from "../lib/growth/sequences
 import { GROWTH_SEQUENCE_EVENT_WAKE_QA_MARKER } from "../lib/growth/sequences/conditions/sequence-event-wake-types"
 import { GROWTH_SEQUENCE_WAIT_RESOLVER_QA_MARKER } from "../lib/growth/sequences/conditions/sequence-wait-registry-types"
 import { GROWTH_SEQUENCE_WAIT_TIMEOUT_QA_MARKER } from "../lib/growth/sequences/conditions/sequence-wait-timeout-types"
+import {
+  GROWTH_SEQUENCE_BRANCH_GRAPH_QA_MARKER,
+  GROWTH_SEQUENCE_BRANCH_SIMULATION_QA_MARKER,
+  simulateSequenceBranchStepPure,
+} from "../lib/growth/sequences/conditions/sequence-branch-simulation-types"
+import type { SequenceBranchEdge } from "../lib/growth/sequences/conditions/sequence-branch-types"
+import type { SequencePatternStepCondition } from "../lib/growth/sequences/conditions/sequence-condition-types"
+import type { SequenceConditionEvaluationResult } from "../lib/growth/sequences/conditions/sequence-condition-evaluator-types"
+import type { GrowthSequencePatternStep } from "../lib/growth/sequence-types"
 import {
   SEQUENCE_ENROLLMENT_WAIT_STATUSES,
   validateSequenceEnrollmentWaitStatus,
@@ -80,8 +89,318 @@ const EVALUATOR_WRITE_FORBIDDEN_PATTERNS = [
   /\.upsert\(/,
 ] as const
 
+const SIMULATION_WRITE_FORBIDDEN_PATTERNS = [
+  /\.insert\(/,
+  /\.update\(/,
+  /\.delete\(/,
+  /\.upsert\(/,
+  /createWait\(/,
+  /appendBranchDecision\(/,
+  /updateGrowthSequenceEnrollment/,
+  /scheduleBranchTargetEnrollmentStep/,
+] as const
+
+function runBranchSimulationPureRegression(): void {
+  const fromStep = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+  const trueTarget = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+  const falseTarget = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+  const defaultTarget = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+  const timeoutTarget = "ffffffff-ffff-4fff-8fff-ffffffffffff"
+  const conditionTrue = "11111111-1111-4111-8111-111111111111"
+  const conditionFalse = "22222222-2222-4222-8222-222222222222"
+  const conditionWait = "33333333-3333-4333-8333-333333333333"
+
+  const patternSteps: GrowthSequencePatternStep[] = [
+    {
+      id: fromStep,
+      patternId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      stepOrder: 1,
+      channel: "email",
+      delayDaysMin: 0,
+      delayDaysMax: 0,
+      generationType: null,
+      playbookCategory: null,
+      voiceDropCampaignId: null,
+      requiredHumanApproval: true,
+      expectedSignal: "reply",
+    },
+    {
+      id: trueTarget,
+      patternId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      stepOrder: 2,
+      channel: "email",
+      delayDaysMin: 2,
+      delayDaysMax: 2,
+      generationType: null,
+      playbookCategory: null,
+      voiceDropCampaignId: null,
+      requiredHumanApproval: true,
+      expectedSignal: "reply",
+    },
+    {
+      id: falseTarget,
+      patternId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      stepOrder: 3,
+      channel: "sms",
+      delayDaysMin: 2,
+      delayDaysMax: 2,
+      generationType: null,
+      playbookCategory: null,
+      voiceDropCampaignId: null,
+      requiredHumanApproval: true,
+      expectedSignal: "reply",
+    },
+    {
+      id: defaultTarget,
+      patternId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      stepOrder: 4,
+      channel: "call",
+      delayDaysMin: 3,
+      delayDaysMax: 3,
+      generationType: null,
+      playbookCategory: null,
+      voiceDropCampaignId: null,
+      requiredHumanApproval: true,
+      expectedSignal: "reply",
+    },
+    {
+      id: timeoutTarget,
+      patternId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      stepOrder: 5,
+      channel: "voice_drop",
+      delayDaysMin: 5,
+      delayDaysMax: 5,
+      generationType: null,
+      playbookCategory: null,
+      voiceDropCampaignId: null,
+      requiredHumanApproval: true,
+      expectedSignal: "reply",
+    },
+  ]
+
+  const edge = (
+    id: string,
+    type: SequenceBranchEdge["edgeType"],
+    conditionId: string | null,
+    to: string,
+  ): SequenceBranchEdge => ({
+    id,
+    patternId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    fromPatternStepId: fromStep,
+    toPatternStepId: to,
+    conditionId,
+    edgeType: type,
+    priority: 10,
+    label: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  })
+
+  const edges = [
+    edge("e-true", "conditional_true", conditionTrue, trueTarget),
+    edge("e-false", "conditional_false", conditionFalse, falseTarget),
+    edge("e-default", "default", null, defaultTarget),
+    edge("e-timeout", "timeout", null, timeoutTarget),
+  ]
+
+  const conditions: SequencePatternStepCondition[] = [
+    {
+      id: conditionTrue,
+      patternStepId: fromStep,
+      conditionKey: "email-opened",
+      spec: { dslVersion: 1, source: "email", event: "email.opened" },
+      label: "Email opened",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: conditionFalse,
+      patternStepId: fromStep,
+      conditionKey: "lead-qualified",
+      spec: { dslVersion: 1, source: "lead", event: "lead.status", statusValue: "qualified" },
+      label: "Lead qualified",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: conditionWait,
+      patternStepId: fromStep,
+      conditionKey: "email-opened-wait",
+      spec: { dslVersion: 1, source: "email", event: "email.opened" },
+      label: "Wait probe",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ]
+
+  const resultFor = (
+    matchedByCondition: Record<string, boolean>,
+    scenario: "immediate" | "wait_timeout" | "wait_matched" = "immediate",
+  ) => {
+    const evaluations = Object.entries(matchedByCondition).map(([conditionId, matched]) => ({
+      conditionId,
+      matched,
+    }))
+    const conditionResults = evaluations.map(({ conditionId, matched }) => ({
+      conditionId,
+      result: {
+        matched,
+        reason: matched ? "Matched." : "Not matched.",
+        evidence: [],
+        evaluatedAt: "2026-06-01T00:00:00.000Z",
+        readOnly: true as const,
+        event: conditions.find((entry) => entry.id === conditionId)!.spec.event,
+        source: conditions.find((entry) => entry.id === conditionId)!.spec.source,
+      } satisfies SequenceConditionEvaluationResult,
+    }))
+    return simulateSequenceBranchStepPure({
+      fromPatternStepId: fromStep,
+      patternSteps,
+      edges,
+      conditions,
+      evaluations,
+      conditionResults,
+      scenario,
+      now: "2026-06-01T00:00:00.000Z",
+    })
+  }
+
+  const trueBranch = resultFor({ [conditionTrue]: true, [conditionFalse]: false })
+  assert.equal(trueBranch.pathKind, "branched")
+  assert.equal(trueBranch.targetPatternStepId, trueTarget)
+  assert.equal(trueBranch.resolution, "conditional_true")
+  assert.ok(trueBranch.skippedSteps.some((entry) => entry.patternStepId === falseTarget))
+
+  const falseBranch = resultFor({ [conditionTrue]: false, [conditionFalse]: false })
+  assert.equal(falseBranch.pathKind, "waiting")
+  assert.ok(falseBranch.wait)
+  assert.equal(falseBranch.wait?.waitedForEvent, "email.opened")
+
+  const instantFalseEdges = [
+    edge("e-false-only", "conditional_false", conditionFalse, falseTarget),
+    edge("e-default-only", "default", null, defaultTarget),
+  ]
+  const instantFalse = simulateSequenceBranchStepPure({
+    fromPatternStepId: fromStep,
+    patternSteps,
+    edges: instantFalseEdges,
+    conditions: [conditions[1]!],
+    evaluations: [{ conditionId: conditionFalse, matched: false }],
+    conditionResults: [
+      {
+        conditionId: conditionFalse,
+        result: {
+          matched: false,
+          reason: "Not matched.",
+          evidence: [],
+          evaluatedAt: "2026-06-01T00:00:00.000Z",
+          readOnly: true,
+          event: "lead.status",
+          source: "lead",
+        },
+      },
+    ],
+    now: "2026-06-01T00:00:00.000Z",
+  })
+  assert.equal(instantFalse.pathKind, "branched")
+  assert.equal(instantFalse.targetPatternStepId, falseTarget)
+  assert.equal(instantFalse.resolution, "conditional_false")
+
+  const instantDefaultEdges = [
+    edge("e-lead-true", "conditional_true", conditionFalse, falseTarget),
+    edge("e-default-only", "default", null, defaultTarget),
+  ]
+  const instantDefault = simulateSequenceBranchStepPure({
+    fromPatternStepId: fromStep,
+    patternSteps,
+    edges: instantDefaultEdges,
+    conditions: [conditions[1]!],
+    evaluations: [{ conditionId: conditionFalse, matched: false }],
+    conditionResults: [
+      {
+        conditionId: conditionFalse,
+        result: {
+          matched: false,
+          reason: "Not matched.",
+          evidence: [],
+          evaluatedAt: "2026-06-01T00:00:00.000Z",
+          readOnly: true,
+          event: "lead.status",
+          source: "lead",
+        },
+      },
+    ],
+    now: "2026-06-01T00:00:00.000Z",
+  })
+  assert.equal(instantDefault.pathKind, "branched")
+  assert.equal(instantDefault.targetPatternStepId, defaultTarget)
+  assert.equal(instantDefault.resolution, "default")
+
+  const defaultBranch = instantDefault
+
+  const timeoutBranch = resultFor({ [conditionTrue]: false, [conditionFalse]: false }, "wait_timeout")
+  assert.equal(timeoutBranch.pathKind, "timeout")
+  assert.equal(timeoutBranch.targetPatternStepId, timeoutTarget)
+  assert.equal(timeoutBranch.branchDecision?.decision, "timeout")
+
+  const waitOnlyEdges = [
+    edge("e-wait", "conditional_true", conditionWait, trueTarget),
+    edge("e-wait-timeout", "timeout", null, timeoutTarget),
+  ]
+  const waitEvaluations = [{ conditionId: conditionWait, matched: false }]
+  const waitResults = [
+    {
+      conditionId: conditionWait,
+      result: {
+        matched: false,
+        reason: "Not matched.",
+        evidence: [],
+        evaluatedAt: "2026-06-01T00:00:00.000Z",
+        readOnly: true as const,
+        event: "email.opened" as const,
+        source: "email" as const,
+      },
+    },
+  ]
+  const waitPreview = simulateSequenceBranchStepPure({
+    fromPatternStepId: fromStep,
+    patternSteps,
+    edges: waitOnlyEdges,
+    conditions: [conditions[2]!],
+    evaluations: waitEvaluations,
+    conditionResults: waitResults,
+    scenario: "immediate",
+    now: "2026-06-01T00:00:00.000Z",
+  })
+  assert.equal(waitPreview.pathKind, "waiting")
+  assert.ok(waitPreview.wait)
+  assert.ok(waitPreview.timeout)
+
+  const resolverParity = resolveSequenceBranchEdges({
+    fromPatternStepId: fromStep,
+    edges,
+    evaluations: [{ conditionId: conditionTrue, matched: true }],
+  })
+  assert.equal(trueBranch.targetPatternStepId, resolverParity.targetPatternStepId)
+
+  const first = resultFor({ [conditionTrue]: true, [conditionFalse]: false })
+  const second = resultFor({ [conditionTrue]: true, [conditionFalse]: false })
+  assert.deepEqual(
+    {
+      pathKind: first.pathKind,
+      target: first.targetPatternStepId,
+      skipped: first.skippedPatternStepIds.sort(),
+    },
+    {
+      pathKind: second.pathKind,
+      target: second.targetPatternStepId,
+      skipped: second.skippedPatternStepIds.sort(),
+    },
+  )
+}
+
 function runLocalRegression(): void {
-  console.log(`\n=== SR-3 Phase 1/2/3/4/5 local regression (${GROWTH_SEQUENCE_CONDITIONS_QA_MARKER}) ===\n`)
+  console.log(`\n=== SR-3 Phase 1–6 local regression (${GROWTH_SEQUENCE_CONDITIONS_QA_MARKER}) ===\n`)
 
   assert.equal(GROWTH_SEQUENCE_CONDITIONS_QA_MARKER, "growth-sequence-conditions-sr3-phase1-v1")
   assert.equal(GROWTH_SEQUENCE_CONDITIONS_CONFIRM, "RUN_GROWTH_SEQUENCE_CONDITIONS_CERTIFICATION")
@@ -92,6 +411,8 @@ function runLocalRegression(): void {
   assert.equal(GROWTH_SEQUENCE_EVENT_WAKE_QA_MARKER, "growth-sequence-event-wake-sr3-phase4-v1")
   assert.equal(GROWTH_SEQUENCE_WAIT_RESOLVER_QA_MARKER, "growth-sequence-wait-resolver-sr3-phase4-v1")
   assert.equal(GROWTH_SEQUENCE_WAIT_TIMEOUT_QA_MARKER, "growth-sequence-wait-timeout-sr3-phase5-v1")
+  assert.equal(GROWTH_SEQUENCE_BRANCH_SIMULATION_QA_MARKER, "growth-sequence-branch-simulation-sr3-phase6-v1")
+  assert.equal(GROWTH_SEQUENCE_BRANCH_GRAPH_QA_MARKER, "growth-sequence-branch-graph-read-model-sr3-phase6-v1")
   assert.equal(
     GROWTH_SEQUENCE_CONDITION_EVALUATOR_CONFIRM,
     "RUN_GROWTH_SEQUENCE_CONDITION_EVALUATOR_CERTIFICATION",
@@ -121,6 +442,10 @@ function runLocalRegression(): void {
     "lib/growth/sequences/conditions/sequence-wait-timeout-processor.ts",
     "lib/growth/sequences/conditions/sequence-wait-recovery-diagnostics.ts",
     "app/api/cron/growth-sequence-wait-timeouts/route.ts",
+    "lib/growth/sequences/conditions/sequence-branch-simulation-types.ts",
+    "lib/growth/sequences/conditions/sequence-branch-graph-read-model.ts",
+    "lib/growth/sequences/conditions/sequence-branch-simulation-engine.ts",
+    "app/api/platform/growth/sequences/conditions/simulate/route.ts",
     "app/api/platform/growth/sequences/conditions/evaluate/route.ts",
     "supabase/migrations/20270827120000_growth_sequence_conditions_sr3_phase1.sql",
   ]
@@ -420,6 +745,46 @@ function runLocalRegression(): void {
   assert.match(recoveryCronSource, /diagnoseSequenceWaitRecovery/)
   console.log("  ✓ sequence recovery cron includes wait diagnostics")
 
+  runBranchSimulationPureRegression()
+  console.log("  ✓ branch simulation pure regression (true/false/default/timeout/wait/skipped)")
+
+  const simulationEngineSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/sequences/conditions/sequence-branch-simulation-engine.ts"),
+    "utf8",
+  )
+  assert.match(simulationEngineSource, /simulateSequenceBranchPreview/)
+  assert.match(simulationEngineSource, /simulateSequenceBranchStepPure/)
+  assert.match(simulationEngineSource, /evaluateSequenceConditionSpecReadOnly/)
+  for (const pattern of SIMULATION_WRITE_FORBIDDEN_PATTERNS) {
+    assert.doesNotMatch(simulationEngineSource, pattern, "simulation engine must not write")
+  }
+  for (const pattern of BRANCH_PATH_FORBIDDEN_PATTERNS) {
+    assert.doesNotMatch(simulationEngineSource, pattern, "simulation engine must not execute transport")
+  }
+  console.log("  ✓ branch simulation engine read-only surface")
+
+  const graphReadModelSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/sequences/conditions/sequence-branch-graph-read-model.ts"),
+    "utf8",
+  )
+  assert.match(graphReadModelSource, /buildSequenceBranchGraphReadModel/)
+  assert.match(graphReadModelSource, /listEdgesForPattern/)
+  for (const pattern of SIMULATION_WRITE_FORBIDDEN_PATTERNS) {
+    assert.doesNotMatch(graphReadModelSource, pattern, "graph read model must not write")
+  }
+  console.log("  ✓ branch graph read model without writes")
+
+  const simulateApiSource = fs.readFileSync(
+    path.join(process.cwd(), "app/api/platform/growth/sequences/conditions/simulate/route.ts"),
+    "utf8",
+  )
+  assert.match(simulateApiSource, /requireGrowthEnginePlatformAccess/)
+  assert.match(simulateApiSource, /simulateSequenceBranchPreview/)
+  assert.match(simulateApiSource, /read_only: true/)
+  assert.match(simulateApiSource, /branch_execution_enabled: false/)
+  assert.doesNotMatch(simulateApiSource, /\.insert\(/)
+  console.log("  ✓ platform simulate API is read-only")
+
   const hookTargets = [
     "lib/growth/tracking/tracking-repository.ts",
     "lib/growth/replies/reply-ingestion-pipeline.ts",
@@ -442,6 +807,8 @@ function runLocalRegression(): void {
     "lib/growth/sequences/conditions/sequence-event-wake-engine.ts",
     "lib/growth/sequences/conditions/sequence-wait-timeout-processor.ts",
     "lib/growth/sequences/conditions/sequence-wait-recovery-diagnostics.ts",
+    "lib/growth/sequences/conditions/sequence-branch-simulation-engine.ts",
+    "lib/growth/sequences/conditions/sequence-branch-graph-read-model.ts",
   ]
   for (const relativePath of forbiddenScanTargets) {
     const source = fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
@@ -458,7 +825,7 @@ function runLocalRegression(): void {
   assert.equal(typeof appendBranchDecision, "function")
   console.log("  ✓ repository imports resolve")
 
-  console.log("\nSR-3 Phase 1/2/3/4/5 local regression PASS\n")
+  console.log("\nSR-3 Phase 1–6 local regression PASS\n")
 }
 
 async function runIntegrationDiagnostics(): Promise<Record<string, unknown>> {
@@ -495,7 +862,7 @@ async function main(): Promise<void> {
     return
   }
 
-  console.log(`\n=== SR-3 Phase 1/2/3/4/5 ${mode} diagnostics ===\n`)
+  console.log(`\n=== SR-3 Phase 1–6 ${mode} diagnostics ===\n`)
   const report = await runIntegrationDiagnostics()
   console.log(JSON.stringify(report, null, 2))
 

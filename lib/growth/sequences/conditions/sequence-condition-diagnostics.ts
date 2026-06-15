@@ -41,6 +41,8 @@ import { resolveWaitMatched } from "@/lib/growth/sequences/conditions/sequence-w
 import { processExpiredSequenceWaits } from "@/lib/growth/sequences/conditions/sequence-wait-timeout-processor"
 import { GROWTH_SEQUENCE_WAIT_TIMEOUT_QA_MARKER } from "@/lib/growth/sequences/conditions/sequence-wait-timeout-types"
 import { diagnoseSequenceWaitRecovery } from "@/lib/growth/sequences/conditions/sequence-wait-recovery-diagnostics"
+import { simulateSequenceBranchPreview } from "@/lib/growth/sequences/conditions/sequence-branch-simulation-engine"
+import { GROWTH_SEQUENCE_BRANCH_SIMULATION_QA_MARKER } from "@/lib/growth/sequences/conditions/sequence-branch-simulation-types"
 import { listSequenceEnrollmentChannelEvents } from "@/lib/growth/sequence-orchestration/sequence-multi-channel-state-repository"
 import {
   fetchGrowthSequenceEnrollmentById,
@@ -79,6 +81,7 @@ export type SequenceConditionsDiagnosticsReport = {
   event_wake_ready: boolean
   wait_timeout_ready: boolean
   wait_timeout_no_transport: boolean
+  branch_simulation_ready: boolean
 }
 
 const SCHEMA_TABLES = [
@@ -170,6 +173,7 @@ export async function executeGrowthSequenceConditionsDiagnostics(
   let eventWakeReady = false
   let waitTimeoutReady = false
   let waitTimeoutNoTransport = true
+  let branchSimulationReady = false
   const crudMarker = `sr3-phase1-crud-${Date.now()}`
   const phase3Marker = `sr3-phase3-${Date.now()}`
   try {
@@ -873,6 +877,59 @@ export async function executeGrowthSequenceConditionsDiagnostics(
       })
 
       eventWakeReady = blockedWakeOk && wakeScan.scannedWaits >= 0 && (jobsAfterWake ?? 0) === 0
+
+      if (secondPatternStepId) {
+        const { count: jobsBeforeSimulation } = await admin
+          .schema("growth")
+          .from("sequence_execution_jobs")
+          .select("id", { count: "exact", head: true })
+          .eq("sequence_enrollment_id", enrollment.id)
+
+        const simulation = await simulateSequenceBranchPreview(admin, {
+          enrollmentId: enrollment.id,
+          enrollmentStepId: enrollmentStep.id,
+          now: fixedNow,
+          scenario: "immediate",
+          conditionOverrides: { [wakeCondition.id]: true },
+        })
+
+        const { count: jobsAfterSimulation } = await admin
+          .schema("growth")
+          .from("sequence_execution_jobs")
+          .select("id", { count: "exact", head: true })
+          .eq("sequence_enrollment_id", enrollment.id)
+
+        branchSimulationReady =
+          simulation.read_only === true &&
+          simulation.qa_marker === GROWTH_SEQUENCE_BRANCH_SIMULATION_QA_MARKER &&
+          (jobsBeforeSimulation ?? 0) === (jobsAfterSimulation ?? 0)
+
+        checks.push({
+          id: "simulation.read_only_preview",
+          ok: simulation.read_only === true,
+          detail: `Branch simulation returned path kind ${simulation.path.kind}.`,
+        })
+        checks.push({
+          id: "simulation.no_execution_jobs_created",
+          ok: (jobsBeforeSimulation ?? 0) === (jobsAfterSimulation ?? 0),
+          detail:
+            (jobsBeforeSimulation ?? 0) === (jobsAfterSimulation ?? 0)
+              ? "Simulation did not create sequence_execution_jobs rows."
+              : "Simulation created execution jobs — forbidden.",
+        })
+        checks.push({
+          id: "simulation.graph_read_model_attached",
+          ok: simulation.graph.steps.length > 0 && simulation.graph.edges.length >= 0,
+          detail: `Graph read model returned ${simulation.graph.steps.length} step node(s).`,
+        })
+      } else {
+        checks.push({
+          id: "simulation.read_only_preview",
+          ok: false,
+          detail: "Skipped simulation probes — second pattern step unavailable.",
+        })
+      }
+
       await deleteCondition(admin, wakeCondition.id)
     } else {
       checks.push({
@@ -915,7 +972,8 @@ export async function executeGrowthSequenceConditionsDiagnostics(
     advancementGateSafe &&
     eventWakeReady &&
     waitTimeoutReady &&
-    waitTimeoutNoTransport
+    waitTimeoutNoTransport &&
+    branchSimulationReady
 
   return {
     qa_marker: GROWTH_SEQUENCE_CONDITIONS_QA_MARKER,
@@ -937,5 +995,6 @@ export async function executeGrowthSequenceConditionsDiagnostics(
     event_wake_ready: eventWakeReady,
     wait_timeout_ready: waitTimeoutReady,
     wait_timeout_no_transport: waitTimeoutNoTransport,
+    branch_simulation_ready: branchSimulationReady,
   }
 }
