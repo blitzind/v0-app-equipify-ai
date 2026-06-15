@@ -24,6 +24,7 @@ import {
 } from "@/lib/growth/signal-intelligence/signal-feed-types"
 import { buildSignalRecommendations } from "@/lib/growth/signal-intelligence/signal-recommendation-engine"
 import { commandCenterLabelForSignalType } from "@/lib/growth/signal-intelligence/signal-queue-hints"
+import { loadTopProspectOpportunityFeedItems } from "@/lib/growth/prospect-discovery/prospect-recommendation-repository"
 
 type RawAuditRow = {
   id: string
@@ -310,16 +311,26 @@ export async function loadGrowthSignalFeed(
 
   const { items: collapsed, collapsed_from } = collapseByDedupeHash(mapped)
   const sorted = sortItems(collapsed, input?.sort ?? "occurred_at").slice(0, limit)
-  const hot_signals = sorted.filter(
-    (item) => item.priority === "urgent" || item.priority === "high" || item.status === "new",
-  ).slice(0, 12)
+
+  let prospectOpportunities: GrowthSignalFeedItem[] = []
+  if (!input?.lead_id) {
+    prospectOpportunities = await loadTopProspectOpportunityFeedItems(admin, 6)
+  }
+
+  const mergedItems = [...prospectOpportunities, ...sorted].slice(0, limit)
+  const hot_signals = [
+    ...prospectOpportunities,
+    ...sorted.filter(
+      (item) => item.priority === "urgent" || item.priority === "high" || item.status === "new",
+    ),
+  ].slice(0, 12)
 
   return {
     qa_marker: SIGNAL_FEED_QA_MARKER,
     generated_at: new Date().toISOString(),
-    total: sorted.length,
+    total: mergedItems.length,
     collapsed_from,
-    items: sorted,
+    items: mergedItems,
     hot_signals,
   }
 }

@@ -56,6 +56,7 @@ import { loadWatchlistMetricsSnapshot } from "@/lib/growth/signals/signal-watchl
 import type { GrowthCommandSignalIntelligenceSummary } from "@/lib/growth/command/command-action-types"
 import type { GrowthSignalTier } from "@/lib/growth/company-growth-signals/company-growth-signal-types"
 import { loadCommandCenterHotSignals } from "@/lib/growth/signal-intelligence/signal-feed-repository"
+import { loadTopProspectOpportunitiesForCommandCenter } from "@/lib/growth/prospect-discovery/prospect-recommendation-repository"
 
 const LEAD_SCAN_SELECT =
   "id, company_name, status, follow_up_at, next_best_action, next_best_action_reason, executive_priority_tier, revenue_probability_score, revenue_probability_tier, revenue_trajectory, revenue_probability_previous_score, forecast_contribution_weight, forecast_attention_level, conversation_urgency_level, conversation_health_tier, relationship_trend, engagement_tier, opportunity_readiness_tier, decision_maker_status, last_researched_at, operational_capacity_tier, workflow_health, contact_temperature, assigned_to, call_priority_tier, score"
@@ -757,6 +758,7 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
   const ownershipGaps = leads.filter((lead) => !lead.assigned_to).length
 
   const hotSignalFeed = await loadCommandCenterHotSignals(admin, 10)
+  const topProspectOpportunities = await loadTopProspectOpportunitiesForCommandCenter(admin, 8)
 
   return {
     generatedAt: now,
@@ -802,5 +804,6 @@ export async function fetchGrowthCommandDashboard(admin: SupabaseClient): Promis
     marketHealth,
     signalIntelligence,
     hotSignalFeed,
+    topProspectOpportunities,
   }
 }

@@ -157,6 +157,7 @@ import type {
 } from "@/lib/growth/signals/integrations/command-center-bridge"
 import type { GrowthSignalCopilotCommandBriefingClient } from "@/lib/growth/signals/ai/signal-copilot-client-types"
 import type { GrowthSignalFeedItem } from "@/lib/growth/signal-intelligence/signal-feed-types"
+import type { TopProspectOpportunityCard } from "@/lib/growth/prospect-discovery/prospect-recommendation-types"
 
 export type GrowthCommandSignalIntelligenceSummary = CommandCenterSignalMomentumSummary & {
   hiring: CommandCenterHiringMetrics
@@ -194,4 +195,5 @@ export type GrowthCommandDashboard = {
   marketHealth: GrowthCommandMarketHealth
   signalIntelligence: GrowthCommandSignalIntelligenceSummary
   hotSignalFeed: GrowthSignalFeedItem[]
+  topProspectOpportunities: TopProspectOpportunityCard[]
 }

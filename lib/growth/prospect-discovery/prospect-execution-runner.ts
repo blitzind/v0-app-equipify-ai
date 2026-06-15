@@ -208,6 +208,12 @@ export async function runProspectDiscoveryExecution(
       results_companies: context.companies,
       results_qualified_companies: context.qualified_companies,
     })
+    if (run.status === "completed") {
+      const { ensureProspectRecommendationsForExecutionRun } = await import(
+        "@/lib/growth/prospect-discovery/prospect-recommendation-repository"
+      )
+      await ensureProspectRecommendationsForExecutionRun(admin, run.execution_run_id).catch(() => undefined)
+    }
     clearProspectExecutionRunControl(run.execution_run_id)
   }
 
