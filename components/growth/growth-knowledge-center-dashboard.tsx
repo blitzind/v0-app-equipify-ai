@@ -23,6 +23,13 @@ import {
   type KnowledgeSourceType,
   type KnowledgeVisibility,
 } from "@/lib/growth/knowledge-center/knowledge-document-types"
+import {
+  KNOWLEDGE_CONSUMER_LABELS,
+  KNOWLEDGE_CONSUMERS,
+  KNOWLEDGE_RETRIEVAL_QA_MARKER,
+  type KnowledgeConsumer,
+  type KnowledgeRetrievalResult,
+} from "@/lib/growth/knowledge-center/knowledge-retrieval-types"
 
 type SectionKey = "documents" | "faqs" | "notes" | "urls" | "categories" | "tags"
 
@@ -63,6 +70,35 @@ export function GrowthKnowledgeCenterDashboard() {
   const [createFilename, setCreateFilename] = useState("")
   const [createFaqQuestion, setCreateFaqQuestion] = useState("")
   const [createFaqAnswer, setCreateFaqAnswer] = useState("")
+  const [previewConsumer, setPreviewConsumer] = useState<KnowledgeConsumer>("reply_intelligence")
+  const [previewQuery, setPreviewQuery] = useState("")
+  const [previewCategory, setPreviewCategory] = useState<KnowledgeCategory | "">("")
+  const [previewTag, setPreviewTag] = useState("")
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewResult, setPreviewResult] = useState<KnowledgeRetrievalResult | null>(null)
+
+  async function runRetrievalPreview() {
+    setPreviewLoading(true)
+    try {
+      const res = await fetch("/api/platform/growth/knowledge/retrieve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          consumer: previewConsumer,
+          query: previewQuery.trim() || undefined,
+          categories: previewCategory ? [previewCategory] : undefined,
+          tags: previewTag.trim() ? [previewTag.trim()] : undefined,
+          limit: 12,
+        }),
+      })
+      const data = (await res.json()) as KnowledgeRetrievalResult & { ok?: boolean }
+      setPreviewResult(res.ok ? data : null)
+    } catch {
+      setPreviewResult(null)
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
 
   const loadDocuments = useCallback(async () => {
     setLoading(true)
@@ -210,6 +246,89 @@ export function GrowthKnowledgeCenterDashboard() {
             </GrowthBadge>
           ))}
         </div>
+      </GrowthEngineCard>
+
+      </GrowthEngineCard>
+
+      <GrowthEngineCard title="Retrieval Preview" icon={<Search className="h-4 w-4" />}>
+        <p className="mb-3 text-xs text-muted-foreground" data-qa-marker={KNOWLEDGE_RETRIEVAL_QA_MARKER}>
+          Preview deterministic retrieval for active documents only. Display only — no generation or autonomous actions.
+        </p>
+        <div className="mb-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <select
+            value={previewConsumer}
+            onChange={(event) => setPreviewConsumer(event.target.value as KnowledgeConsumer)}
+            className="rounded-md border border-border bg-background px-2 py-2 text-sm"
+          >
+            {KNOWLEDGE_CONSUMERS.map((consumer) => (
+              <option key={consumer} value={consumer}>
+                {KNOWLEDGE_CONSUMER_LABELS[consumer]}
+              </option>
+            ))}
+          </select>
+          <select
+            value={previewCategory}
+            onChange={(event) => setPreviewCategory(event.target.value as KnowledgeCategory | "")}
+            className="rounded-md border border-border bg-background px-2 py-2 text-sm"
+          >
+            <option value="">All categories</option>
+            {KNOWLEDGE_CATEGORIES.map((category) => (
+              <option key={category} value={category}>
+                {KNOWLEDGE_CATEGORY_LABELS[category]}
+              </option>
+            ))}
+          </select>
+          <Input
+            value={previewTag}
+            onChange={(event) => setPreviewTag(event.target.value)}
+            placeholder="Tag filter"
+          />
+          <Input
+            value={previewQuery}
+            onChange={(event) => setPreviewQuery(event.target.value)}
+            placeholder="Query keywords"
+          />
+        </div>
+        <Button size="sm" disabled={previewLoading} onClick={() => void runRetrievalPreview()}>
+          {previewLoading ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Search className="mr-1 h-4 w-4" />}
+          Preview retrieval
+        </Button>
+
+        {previewResult ? (
+          <div className="mt-4 space-y-3 rounded-xl border border-border bg-muted/20 p-4">
+            <div className="flex flex-wrap gap-2">
+              <GrowthBadge tone="healthy">Relevance {previewResult.relevance_score}</GrowthBadge>
+              {previewResult.matched_categories.map((category) => (
+                <GrowthBadge key={category} tone="attention">
+                  {category}
+                </GrowthBadge>
+              ))}
+              {previewResult.matched_tags.map((tag) => (
+                <GrowthBadge key={tag} tone="neutral">
+                  #{tag}
+                </GrowthBadge>
+              ))}
+            </div>
+            {previewResult.warnings.length > 0 ? (
+              <p className="text-xs text-amber-700">{previewResult.warnings.join(" ")}</p>
+            ) : null}
+            <pre className="overflow-x-auto rounded-md bg-background p-3 text-[11px] text-muted-foreground">
+              {JSON.stringify(previewResult.consumer_context, null, 2)}
+            </pre>
+            <div className="space-y-2">
+              {previewResult.documents.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No active documents matched this retrieval scope.</p>
+              ) : (
+                previewResult.documents.map((doc) => (
+                  <div key={doc.knowledge_document_id} className="rounded-lg border border-border bg-background p-3">
+                    <p className="font-medium text-sm">{doc.title}</p>
+                    <p className="text-xs text-muted-foreground">{doc.summary}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        ) : null}
       </GrowthEngineCard>
 
       <GrowthEngineCard title="Knowledge Center">

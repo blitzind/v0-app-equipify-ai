@@ -17,6 +17,8 @@ import {
   type KnowledgeSearchResult,
   type KnowledgeVisibility,
 } from "@/lib/growth/knowledge-center/knowledge-document-types"
+import { retrieveKnowledgeForConsumer } from "@/lib/growth/knowledge-center/knowledge-consumer-adapters"
+import type { KnowledgeRetrievalRequest, KnowledgeRetrievalResult } from "@/lib/growth/knowledge-center/knowledge-retrieval-types"
 import { isGrowthSignalFoundationSchemaReady } from "@/lib/growth/signals/signal-schema-health"
 
 type RawKnowledgeRow = {
@@ -208,4 +210,15 @@ export async function runKnowledgeSearch(
     limit: 500,
   })
   return searchKnowledge(documents, input)
+}
+
+export async function runKnowledgeRetrieval(
+  admin: SupabaseClient,
+  request: KnowledgeRetrievalRequest,
+): Promise<KnowledgeRetrievalResult> {
+  const documents = await listKnowledgeDocuments(admin, {
+    organization_id: request.organization_id,
+    limit: 500,
+  })
+  return retrieveKnowledgeForConsumer(documents, request)
 }
