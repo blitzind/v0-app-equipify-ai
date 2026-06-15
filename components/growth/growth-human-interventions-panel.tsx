@@ -14,6 +14,7 @@ import {
   type HumanInterventionsResponse,
 } from "@/lib/growth/human-interventions/human-intervention-types"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
+import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
 
 function priorityTone(priority: HumanIntervention["priority"]) {
   switch (priority) {
@@ -201,6 +202,9 @@ export function GrowthHumanInterventionsPanel({
     </GrowthEngineCard>
     {leadId ? (
       <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" leadId={leadId} compact={compact} />
+    ) : null}
+    {leadId ? (
+      <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" leadId={leadId} compact={compact} />
     ) : null}
     </>
   )

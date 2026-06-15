@@ -11,6 +11,7 @@ import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-c
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
+import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
 import {
   GROWTH_OPPORTUNITY_INTELLIGENCE_PRIVACY_NOTE,
   GROWTH_OPPORTUNITY_INTELLIGENCE_QA_MARKER,
@@ -146,6 +147,8 @@ export function GrowthOpportunityIntelligenceDashboardView() {
       <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" compact />
 
       <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" compact />
+
+      <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" compact />
 
       <div className="grid gap-6 xl:grid-cols-2">
         <GrowthEngineCard title="High Intent Accounts">

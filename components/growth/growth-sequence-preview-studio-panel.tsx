@@ -13,6 +13,7 @@ import {
   type SequencePreviewFilter,
   type SequencePreviewStudioResponse,
 } from "@/lib/growth/sequence-preview/sequence-preview-types"
+import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
 
 function statusTone(status: SequencePreview["sequence_status"]) {
   switch (status) {
@@ -102,6 +103,7 @@ export function GrowthSequencePreviewStudioPanel({
   }
 
   return (
+    <>
     <GrowthEngineCard
       title={title}
       icon={<GitBranch className="h-4 w-4" />}
@@ -280,5 +282,12 @@ export function GrowthSequencePreviewStudioPanel({
         ))}
       </div>
     </GrowthEngineCard>
+    <GrowthCampaignBuilderWizardPanel
+      title="Campaign Builder Wizard"
+      leadId={leadId}
+      patternId={patternId}
+      compact={compact}
+    />
+    </>
   )
 }

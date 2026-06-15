@@ -17,6 +17,7 @@ import type {
 import { PROSPECT_DISCOVERY_QA_MARKER } from "@/lib/growth/prospect-discovery/prospect-search-intent-types"
 import { ProspectDiscoveryExecutionPanel } from "@/components/growth/prospect-search/prospect-discovery-execution-panel"
 import { GrowthCampaignReadinessPanel } from "@/components/growth/growth-campaign-readiness-panel"
+import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
 import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowledge-context-section"
 import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growth-knowledge-recommendations-section"
 import { cn } from "@/lib/utils"
@@ -472,6 +473,7 @@ export function NaturalLanguageDiscoveryPanel({
       searchPlanId={searchPlanId}
       compact
     />
+    <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" compact />
     <GrowthKnowledgeContextSection
       consumer="prospect_discovery"
       title="Industry Playbooks & ICP Notes"

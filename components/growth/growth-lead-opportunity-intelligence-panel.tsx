@@ -11,6 +11,7 @@ import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-c
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
+import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
 import { GrowthOpportunityRecommendationScoringDetails } from "@/components/growth/growth-opportunity-recommendation-scoring-details"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import {
@@ -189,6 +190,8 @@ export function GrowthLeadOpportunityIntelligencePanel({ lead }: GrowthLeadOppor
       <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" leadId={lead.id} compact />
 
       <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" leadId={lead.id} compact />
+
+      <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" leadId={lead.id} compact />
     </GrowthCollapsibleEngineCard>
   )
 }

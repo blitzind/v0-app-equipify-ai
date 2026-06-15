@@ -15,6 +15,7 @@ import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-c
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
+import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
 import { GrowthInboxWorkspaceKeyboardBridge } from "@/components/growth/inbox/growth-inbox-workspace-keyboard-bridge"
 import { GrowthInboxWorkspaceActionsMenu } from "@/components/growth/inbox/growth-inbox-workspace-actions-menu"
 import { GrowthInboxWorkspaceShell } from "@/components/growth/inbox/growth-inbox-workspace-shell"
@@ -109,6 +110,8 @@ export function GrowthInboxWorkspaceV2Panel() {
       <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" compact />
 
       <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" compact />
+
+      <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" compact />
 
       <GrowthInboxV2SupportingPanels />
     </div>

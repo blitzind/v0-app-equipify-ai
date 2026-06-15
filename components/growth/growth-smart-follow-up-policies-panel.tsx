@@ -13,6 +13,7 @@ import {
   type SmartFollowUpPoliciesResponse,
   type SmartFollowUpPolicy,
 } from "@/lib/growth/follow-up-policies/follow-up-policy-types"
+import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
 
 function priorityTone(priority: SmartFollowUpPolicy["priority"]) {
   switch (priority) {
@@ -99,6 +100,7 @@ export function GrowthSmartFollowUpPoliciesPanel({
   }
 
   return (
+    <>
     <GrowthEngineCard
       title={title}
       icon={<CalendarClock className="h-4 w-4" />}
@@ -259,5 +261,9 @@ export function GrowthSmartFollowUpPoliciesPanel({
         ))}
       </div>
     </GrowthEngineCard>
+    {leadId ? (
+      <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" leadId={leadId} compact={compact} />
+    ) : null}
+    </>
   )
 }

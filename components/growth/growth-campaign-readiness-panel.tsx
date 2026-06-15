@@ -8,6 +8,7 @@ import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-uti
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
+import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
 import {
   CAMPAIGN_READINESS_QA_MARKER,
   type CampaignReadinessAssessment,
@@ -331,6 +332,9 @@ export function GrowthCampaignReadinessPanel({
     ) : null}
     {leadId ? (
       <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" leadId={leadId} compact={compact} />
+    ) : null}
+    {leadId ? (
+      <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" leadId={leadId} compact={compact} />
     ) : null}
     </>
   )

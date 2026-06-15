@@ -17,6 +17,7 @@ import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growt
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
+import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
 import { GrowthCampaignReadinessPanel } from "@/components/growth/growth-campaign-readiness-panel"
 import { formatSequenceChannelLabel } from "@/lib/growth/sequence-enrollment/sequence-enrollment-ui"
 import type { GrowthSequencePattern, GrowthSequencePatternStep } from "@/lib/growth/sequence-types"
@@ -235,6 +236,7 @@ export function GrowthSequencePatternBuilder() {
       <GrowthConversationalPlaybooksPanel consumer="voice_drop" title="Voice Drop Playbook" compact />
       <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" compact />
       <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" patternId={selectedPatternId} compact />
+      <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" patternId={selectedPatternId} compact />
     </div>
   )
 }
