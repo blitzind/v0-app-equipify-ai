@@ -12,6 +12,7 @@ import { GrowthInboxThreadQueueColumn } from "@/components/growth/inbox/growth-i
 import { GrowthInboxV2SupportingPanels } from "@/components/growth/inbox/growth-inbox-v2-supporting-panels"
 import { GrowthOperatorInboxPanel } from "@/components/growth/growth-operator-inbox-panel"
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
+import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import { GrowthInboxWorkspaceKeyboardBridge } from "@/components/growth/inbox/growth-inbox-workspace-keyboard-bridge"
 import { GrowthInboxWorkspaceActionsMenu } from "@/components/growth/inbox/growth-inbox-workspace-actions-menu"
 import { GrowthInboxWorkspaceShell } from "@/components/growth/inbox/growth-inbox-workspace-shell"
@@ -100,6 +101,8 @@ export function GrowthInboxWorkspaceV2Panel() {
       <GrowthOperatorInboxPanel title="Unified Operator Inbox" compact />
 
       <GrowthConversationalPlaybooksPanel consumer="operator_inbox" title="Conversational Playbook" compact />
+
+      <GrowthHumanInterventionsPanel title="Human Interventions" compact />
 
       <GrowthInboxV2SupportingPanels />
     </div>

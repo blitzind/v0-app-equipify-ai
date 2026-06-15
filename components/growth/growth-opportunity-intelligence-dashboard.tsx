@@ -8,6 +8,7 @@ import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/gro
 import { GrowthOpportunityRecommendationScoringDetails } from "@/components/growth/growth-opportunity-recommendation-scoring-details"
 import { GrowthCampaignReadinessPanel } from "@/components/growth/growth-campaign-readiness-panel"
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
+import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import {
   GROWTH_OPPORTUNITY_INTELLIGENCE_PRIVACY_NOTE,
   GROWTH_OPPORTUNITY_INTELLIGENCE_QA_MARKER,
@@ -137,6 +138,8 @@ export function GrowthOpportunityIntelligenceDashboardView() {
       <GrowthCampaignReadinessPanel title="Campaign Readiness" compact />
 
       <GrowthConversationalPlaybooksPanel consumer="opportunity_intelligence" title="Conversational Playbook" compact />
+
+      <GrowthHumanInterventionsPanel title="Human Interventions" compact />
 
       <div className="grid gap-6 xl:grid-cols-2">
         <GrowthEngineCard title="High Intent Accounts">

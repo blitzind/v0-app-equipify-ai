@@ -8,6 +8,7 @@ import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowle
 import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growth-knowledge-recommendations-section"
 import { GrowthCampaignReadinessPanel } from "@/components/growth/growth-campaign-readiness-panel"
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
+import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import type { AiMeetingPrepRow } from "@/lib/growth/meeting-intelligence/ai-meeting-prep-types"
 import type { GrowthMeetingPrepBundle, MeetingPrepRiskPriority } from "@/lib/growth/meeting-intelligence/meeting-prep-types"
 
@@ -618,6 +619,7 @@ export function GrowthMeetingPrepPanel({
               leadId={prep.meeting.leadId}
               compact
             />
+            <GrowthHumanInterventionsPanel title="Human Interventions" leadId={prep.meeting.leadId} compact />
           </div>
         </div>
       ) : null}

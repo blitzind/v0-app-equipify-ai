@@ -2,21 +2,19 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { ExternalLink, Inbox, Loader2 } from "lucide-react"
+import { AlertTriangle, ExternalLink, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
-import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
-import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import {
-  OPERATOR_INBOX_FILTERS,
-  OPERATOR_INBOX_QA_MARKER,
-  OPERATOR_INBOX_SOURCE_LABELS,
-  type OperatorInboxFilter,
-  type OperatorInboxItem,
-  type OperatorInboxQueueResponse,
-} from "@/lib/growth/operator-inbox/operator-inbox-types"
+  HUMAN_INTERVENTION_FILTERS,
+  HUMAN_INTERVENTION_QA_MARKER,
+  HUMAN_INTERVENTION_TYPE_LABELS,
+  type HumanIntervention,
+  type HumanInterventionFilter,
+  type HumanInterventionsResponse,
+} from "@/lib/growth/human-interventions/human-intervention-types"
 
-function priorityTone(priority: OperatorInboxItem["priority"]) {
+function priorityTone(priority: HumanIntervention["priority"]) {
   switch (priority) {
     case "urgent":
       return "critical" as const
@@ -29,8 +27,8 @@ function priorityTone(priority: OperatorInboxItem["priority"]) {
   }
 }
 
-export function GrowthOperatorInboxPanel({
-  title = "Unified Operator Inbox",
+export function GrowthHumanInterventionsPanel({
+  title = "Human Interventions",
   leadId,
   compact = false,
 }: {
@@ -38,10 +36,11 @@ export function GrowthOperatorInboxPanel({
   leadId?: string | null
   compact?: boolean
 }) {
-  const [filter, setFilter] = useState<OperatorInboxFilter>("all")
+  const [filter, setFilter] = useState<HumanInterventionFilter>("all")
   const [loading, setLoading] = useState(false)
-  const [queue, setQueue] = useState<OperatorInboxQueueResponse | null>(null)
   const [actingId, setActingId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [queue, setQueue] = useState<HumanInterventionsResponse | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -49,10 +48,10 @@ export function GrowthOperatorInboxPanel({
       const params = new URLSearchParams()
       if (leadId) params.set("lead_id", leadId)
       params.set("filter", filter)
-      params.set("limit", compact ? "8" : "20")
+      params.set("limit", compact ? "8" : "25")
 
-      const res = await fetch(`/api/platform/growth/operator-inbox?${params.toString()}`)
-      const data = (await res.json()) as OperatorInboxQueueResponse & { ok?: boolean }
+      const res = await fetch(`/api/platform/growth/human-interventions?${params.toString()}`)
+      const data = (await res.json()) as HumanInterventionsResponse & { ok?: boolean }
       setQueue(res.ok ? data : null)
     } catch {
       setQueue(null)
@@ -65,18 +64,13 @@ export function GrowthOperatorInboxPanel({
     void load()
   }, [load])
 
-  async function runAction(item: OperatorInboxItem, action: "mark_viewed" | "mark_reviewed" | "dismiss") {
-    setActingId(item.item_id)
+  async function runAction(intervention: HumanIntervention, action: "mark_reviewed" | "dismiss") {
+    setActingId(intervention.intervention_id)
     try {
-      await fetch("/api/platform/growth/operator-inbox/actions", {
+      await fetch("/api/platform/growth/human-interventions/actions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action,
-          item_id: item.item_id,
-          source: item.source,
-          source_ref: item.source_ref,
-        }),
+        body: JSON.stringify({ action, intervention }),
       })
       await load()
     } finally {
@@ -85,19 +79,18 @@ export function GrowthOperatorInboxPanel({
   }
 
   return (
-    <>
     <GrowthEngineCard
       title={title}
-      icon={<Inbox className="h-4 w-4" />}
-      data-qa-marker={OPERATOR_INBOX_QA_MARKER}
+      icon={<AlertTriangle className="h-4 w-4" />}
+      data-qa-marker={HUMAN_INTERVENTION_QA_MARKER}
     >
       <p className="mb-3 text-xs text-muted-foreground">
-        Human-reviewed operator queue — signals, replies, approvals, attention, and threads. No autonomous outreach
-        execution.
+        Operator intervention queue — prioritizes replies, approvals, risks, and opportunities. Routing and
+        recommendations only. No autonomous execution.
       </p>
 
       <div className="mb-3 flex flex-wrap gap-2">
-        {OPERATOR_INBOX_FILTERS.map((value) => (
+        {HUMAN_INTERVENTION_FILTERS.map((value) => (
           <button
             key={value}
             type="button"
@@ -113,67 +106,80 @@ export function GrowthOperatorInboxPanel({
 
       <Button size="sm" variant="outline" disabled={loading} onClick={() => void load()}>
         {loading ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
-        Refresh queue
+        Refresh interventions
       </Button>
 
       {queue ? (
         <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-          <GrowthBadge tone="neutral">{queue.total} items</GrowthBadge>
+          <GrowthBadge tone="neutral">{queue.total} interventions</GrowthBadge>
           <GrowthBadge tone="attention">{queue.urgent_count} urgent/high</GrowthBadge>
-          <span>Signals: {queue.source_counts.signal}</span>
-          <span>Replies: {queue.source_counts.reply_workflow}</span>
-          <span>Approvals: {queue.source_counts.human_approval}</span>
         </div>
       ) : null}
 
       <div className="mt-4 space-y-3">
         {loading && !queue ? (
-          <p className="text-sm text-muted-foreground">Loading operator queue…</p>
+          <p className="text-sm text-muted-foreground">Loading human interventions…</p>
         ) : null}
 
-        {!loading && (queue?.items.length ?? 0) === 0 ? (
-          <p className="text-sm text-muted-foreground">No operator items matched this filter.</p>
+        {!loading && (queue?.interventions.length ?? 0) === 0 ? (
+          <p className="text-sm text-muted-foreground">No human interventions matched this filter.</p>
         ) : null}
 
-        {queue?.items.map((item) => (
-          <div key={item.item_id} className="rounded-xl border border-border bg-muted/20 p-3">
+        {queue?.interventions.map((item) => (
+          <div key={item.intervention_id} className="rounded-xl border border-border bg-muted/20 p-3">
             <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
               <div>
                 <p className="text-sm font-medium">{item.title}</p>
                 <p className="text-xs text-muted-foreground">
-                  {OPERATOR_INBOX_SOURCE_LABELS[item.source]}
+                  {HUMAN_INTERVENTION_TYPE_LABELS[item.intervention_type]}
                   {item.company_name ? ` · ${item.company_name}` : ""}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <GrowthBadge tone={priorityTone(item.priority)}>{item.priority}</GrowthBadge>
-                <GrowthBadge tone="neutral">Confidence {item.confidence}</GrowthBadge>
+                <GrowthBadge tone="neutral">{item.resolution.resolution_status}</GrowthBadge>
               </div>
             </div>
 
             <p className="mb-2 text-sm text-muted-foreground">{item.description}</p>
+            <p className="mb-2 text-xs text-muted-foreground">
+              <span className="font-medium">Trigger:</span> {item.trigger.reason}
+            </p>
 
-            {item.reasoning.length > 0 && !compact ? (
-              <ul className="mb-2 list-disc pl-4 text-xs text-muted-foreground">
-                {item.reasoning.map((reason) => (
-                  <li key={reason}>{reason}</li>
+            {expandedId === item.intervention_id && !compact ? (
+              <div className="mb-3 space-y-2">
+                {item.supporting_context.length > 0 ? (
+                  <ul className="list-disc pl-4 text-xs text-muted-foreground">
+                    {item.supporting_context.map((ctx) => (
+                      <li key={ctx}>{ctx}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                {item.recommendations.map((rec) => (
+                  <div key={rec.recommendation_id} className="rounded border border-border p-2 text-xs">
+                    <p className="font-medium">{rec.title}</p>
+                    <p className="text-muted-foreground">{rec.description}</p>
+                  </div>
                 ))}
-              </ul>
+              </div>
             ) : null}
 
             <div className="flex flex-wrap gap-2">
-              {item.cta_href ? (
+              <Button size="sm" variant="outline" onClick={() => setExpandedId(item.intervention_id)}>
+                View Details
+              </Button>
+              {item.related_href ? (
                 <Button size="sm" variant="outline" asChild>
-                  <Link href={item.cta_href}>
+                  <Link href={item.related_href}>
                     <ExternalLink className="mr-1 h-3 w-3" />
-                    Open
+                    Open Related Item
                   </Link>
                 </Button>
               ) : null}
               <Button
                 size="sm"
                 variant="secondary"
-                disabled={actingId === item.item_id}
+                disabled={actingId === item.intervention_id}
                 onClick={() => void runAction(item, "mark_reviewed")}
               >
                 Mark Reviewed
@@ -181,7 +187,7 @@ export function GrowthOperatorInboxPanel({
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={actingId === item.item_id}
+                disabled={actingId === item.intervention_id}
                 onClick={() => void runAction(item, "dismiss")}
               >
                 Dismiss
@@ -191,8 +197,5 @@ export function GrowthOperatorInboxPanel({
         ))}
       </div>
     </GrowthEngineCard>
-    <GrowthConversationalPlaybooksPanel consumer="operator_inbox" title="Conversational Playbook" leadId={leadId} compact />
-    <GrowthHumanInterventionsPanel title="Human Interventions" leadId={leadId} compact />
-    </>
   )
 }

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ClipboardCheck, ExternalLink, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import {
   CAMPAIGN_READINESS_QA_MARKER,
   type CampaignReadinessAssessment,
@@ -128,6 +129,7 @@ export function GrowthCampaignReadinessPanel({
   }
 
   return (
+    <>
     <GrowthEngineCard
       title={title}
       icon={<ClipboardCheck className="h-4 w-4" />}
@@ -321,5 +323,7 @@ export function GrowthCampaignReadinessPanel({
         <p className="text-sm text-muted-foreground">No campaign readiness assessment available.</p>
       ) : null}
     </GrowthEngineCard>
+    {leadId ? <GrowthHumanInterventionsPanel title="Human Interventions" leadId={leadId} compact={compact} /> : null}
+    </>
   )
 }

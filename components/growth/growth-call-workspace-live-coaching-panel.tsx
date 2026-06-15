@@ -7,6 +7,7 @@ import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowledge-context-section"
 import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growth-knowledge-recommendations-section"
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
+import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import {
   LiveCoachingExecutionScorePanel,
   LiveCoachingGuidancePanel,
@@ -316,6 +317,7 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
                 leadId={sessionLeadId}
                 compact
               />
+              <GrowthHumanInterventionsPanel title="Human Interventions" leadId={sessionLeadId} compact />
             </>
           ) : null}
         </div>

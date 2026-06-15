@@ -5,6 +5,7 @@ import { GrowthCommandDailyActionQueue } from "@/components/growth/growth-comman
 import { GrowthOperatorInboxPanel } from "@/components/growth/growth-operator-inbox-panel"
 import { GrowthCampaignReadinessPanel } from "@/components/growth/growth-campaign-readiness-panel"
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
+import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import { GrowthCommandOpenOpportunitiesSection } from "@/components/growth/growth-command-open-opportunities-section"
 import { GrowthCommandQuickActionsRail } from "@/components/growth/growth-command-quick-actions-rail"
 import { GrowthCommandSequenceQueueSection } from "@/components/growth/growth-command-sequence-queue-section"
@@ -43,6 +44,8 @@ export function GrowthCommandCenterDashboard() {
       <GrowthCampaignReadinessPanel compact title="Campaign Readiness" />
 
       <GrowthConversationalPlaybooksPanel consumer="operator_inbox" title="Conversational Playbook" compact />
+
+      <GrowthHumanInterventionsPanel compact title="Human Interventions" />
 
       <TopProspectOpportunitiesPanel compact title="Top Prospect Opportunities" />
 

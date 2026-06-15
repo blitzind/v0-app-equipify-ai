@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
+import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import { GrowthInboxWidgetErrorBoundary } from "@/components/growth/growth-inbox-widget-error-boundary"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
@@ -482,6 +483,11 @@ export function GrowthInboxActionCenterSmsDraftEmbed() {
           <GrowthConversationalPlaybooksPanel
             consumer="sms"
             title="SMS Conversational Playbook"
+            leadId={selectedThread.lead_id}
+            compact
+          />
+          <GrowthHumanInterventionsPanel
+            title="Human Interventions"
             leadId={selectedThread.lead_id}
             compact
           />

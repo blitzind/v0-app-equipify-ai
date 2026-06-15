@@ -5,6 +5,7 @@ import { BookOpen, CheckCircle2, ExternalLink, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import {
   CONVERSATIONAL_PLAYBOOK_CONSUMER_LABELS,
   CONVERSATIONAL_PLAYBOOK_QA_MARKER,
@@ -130,6 +131,7 @@ export function GrowthConversationalPlaybooksPanel({
   }
 
   return (
+    <>
     <GrowthEngineCard
       title={title}
       icon={<BookOpen className="h-4 w-4" />}
@@ -247,5 +249,7 @@ export function GrowthConversationalPlaybooksPanel({
         </p>
       ) : null}
     </GrowthEngineCard>
+    {leadId ? <GrowthHumanInterventionsPanel title="Human Interventions" leadId={leadId} compact={compact} /> : null}
+    </>
   )
 }

@@ -8,6 +8,7 @@ import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowle
 import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growth-knowledge-recommendations-section"
 import { GrowthCampaignReadinessPanel } from "@/components/growth/growth-campaign-readiness-panel"
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
+import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import { GrowthOpportunityRecommendationScoringDetails } from "@/components/growth/growth-opportunity-recommendation-scoring-details"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import {
@@ -180,6 +181,8 @@ export function GrowthLeadOpportunityIntelligencePanel({ lead }: GrowthLeadOppor
         leadId={lead.id}
         compact
       />
+
+      <GrowthHumanInterventionsPanel title="Human Interventions" leadId={lead.id} compact />
     </GrowthCollapsibleEngineCard>
   )
 }
