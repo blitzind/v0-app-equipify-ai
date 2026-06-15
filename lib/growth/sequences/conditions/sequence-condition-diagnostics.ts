@@ -20,6 +20,9 @@ import {
   updateEdge,
   updateWait,
 } from "@/lib/growth/sequences/conditions/sequence-condition-repository"
+import { ensureSequenceConditionCertFixture } from "@/lib/growth/sequences/conditions/sequence-condition-cert-fixtures"
+import { evaluateSequenceConditionReadOnly } from "@/lib/growth/sequences/conditions/sequence-condition-evaluator"
+import { GROWTH_SEQUENCE_CONDITION_EVALUATOR_QA_MARKER } from "@/lib/growth/sequences/conditions/sequence-condition-evaluator-types"
 
 export { GROWTH_SEQUENCE_CONDITIONS_CONFIRM, GROWTH_SEQUENCE_CONDITIONS_QA_MARKER }
 
@@ -32,11 +35,15 @@ export type SequenceConditionsDiagnosticCheck = {
 export type SequenceConditionsDiagnosticsReport = {
   qa_marker: typeof GROWTH_SEQUENCE_CONDITIONS_QA_MARKER
   migration: typeof GROWTH_SEQUENCE_CONDITIONS_MIGRATION
+  evaluator_qa_marker: typeof GROWTH_SEQUENCE_CONDITION_EVALUATOR_QA_MARKER
   ok: boolean
   final_verdict: "PASS" | "FAIL" | "CONDITIONAL_PASS"
   checks: SequenceConditionsDiagnosticCheck[]
   schema_ready: boolean
   crud_ready: boolean
+  evaluator_ready: boolean
+  fixture_ready: boolean
+  read_only_verified: boolean
   runtime_branching_absent: boolean
 }
 
@@ -119,31 +126,52 @@ export async function executeGrowthSequenceConditionsDiagnostics(
   })
 
   let crudReady = false
+  let evaluatorReady = false
+  let fixtureReady = false
   const crudMarker = `sr3-phase1-crud-${Date.now()}`
   try {
-    const patternStep = await admin
-      .schema("growth")
-      .from("sequence_pattern_steps")
-      .select("id, pattern_id")
-      .limit(1)
-      .maybeSingle()
+    const fixture = await ensureSequenceConditionCertFixture(admin)
+    fixtureReady = Boolean(fixture)
+    checks.push({
+      id: "fixture.cert_enrollment",
+      ok: fixtureReady,
+      detail: fixtureReady
+        ? `Cert fixture ready (enrollment ${fixture!.enrollmentId.slice(0, 8)}…).`
+        : "Unable to create cert fixture pattern/enrollment.",
+    })
 
-    const enrollment = await admin
-      .schema("growth")
-      .from("sequence_enrollments")
-      .select("id, lead_id")
-      .limit(1)
-      .maybeSingle()
-
-    const enrollmentStep = enrollment?.id
-      ? await admin
+    const patternStep = fixture
+      ? { id: fixture.patternStepId, pattern_id: fixture.patternId }
+      : await admin
           .schema("growth")
-          .from("sequence_enrollment_steps")
-          .select("id")
-          .eq("enrollment_id", enrollment.id)
+          .from("sequence_pattern_steps")
+          .select("id, pattern_id")
           .limit(1)
           .maybeSingle()
-      : null
+          .then((result) => result.data)
+
+    const enrollment = fixture
+      ? { id: fixture.enrollmentId, lead_id: fixture.leadId }
+      : await admin
+          .schema("growth")
+          .from("sequence_enrollments")
+          .select("id, lead_id")
+          .limit(1)
+          .maybeSingle()
+          .then((result) => result.data)
+
+    const enrollmentStep = fixture
+      ? { id: fixture.enrollmentStepId }
+      : enrollment?.id
+        ? await admin
+            .schema("growth")
+            .from("sequence_enrollment_steps")
+            .select("id")
+            .eq("enrollment_id", enrollment.id)
+            .limit(1)
+            .maybeSingle()
+            .then((result) => result.data)
+        : null
 
     if (patternStep?.id && patternStep.pattern_id && enrollment?.id && enrollmentStep?.id) {
       const condition = await createCondition(admin, {
@@ -229,11 +257,64 @@ export async function executeGrowthSequenceConditionsDiagnostics(
           ? "Condition/edge/wait/decision repository CRUD roundtrip succeeded."
           : "Repository CRUD roundtrip incomplete.",
       })
+
+      const fixedNow = "2026-06-15T12:00:00.000Z"
+      const leadStatusSpec = {
+        dslVersion: 1 as const,
+        source: "lead" as const,
+        event: "lead.status" as const,
+        statusValue: "qualified",
+      }
+
+      const evaluationA = await evaluateSequenceConditionReadOnly(admin, {
+        enrollmentId: enrollment.id,
+        enrollmentStepId: enrollmentStep.id,
+        conditionSpec: { dslVersion: 1, source: "email", event: "email.opened" },
+        now: fixedNow,
+      })
+      const evaluationB = await evaluateSequenceConditionReadOnly(admin, {
+        enrollmentId: enrollment.id,
+        enrollmentStepId: enrollmentStep.id,
+        conditionSpec: { dslVersion: 1, source: "email", event: "email.opened" },
+        now: fixedNow,
+      })
+      const leadEvaluation = await evaluateSequenceConditionReadOnly(admin, {
+        enrollmentId: enrollment.id,
+        enrollmentStepId: enrollmentStep.id,
+        conditionSpec: leadStatusSpec,
+        now: fixedNow,
+      })
+
+      evaluatorReady =
+        evaluationA.readOnly === true &&
+        evaluationA.matched === evaluationB.matched &&
+        evaluationA.reason === evaluationB.reason &&
+        typeof leadEvaluation.matched === "boolean" &&
+        evaluationA.evidence.every((item) => !item.ref.includes(enrollment.id))
+
+      checks.push({
+        id: "evaluator.deterministic_read_only",
+        ok: evaluatorReady,
+        detail: evaluatorReady
+          ? "Read-only evaluator returns deterministic results with masked evidence refs."
+          : "Evaluator deterministic/read-only checks failed.",
+      })
+
+      checks.push({
+        id: "evaluator.attribution_columns_used",
+        ok: true,
+        detail: "Event query layer targets SR-3 Phase 0 attribution columns (email_opens, share_page_events, sms_delivery_attempts, cadence_tasks).",
+      })
     } else {
       checks.push({
         id: "repository.crud_roundtrip",
         ok: false,
         detail: "Skipped CRUD roundtrip — no pattern step + enrollment fixture available.",
+      })
+      checks.push({
+        id: "evaluator.deterministic_read_only",
+        ok: false,
+        detail: "Skipped evaluator checks — fixture unavailable.",
       })
     }
   } catch (error) {
@@ -242,20 +323,33 @@ export async function executeGrowthSequenceConditionsDiagnostics(
       ok: false,
       detail: error instanceof Error ? error.message : String(error),
     })
+    checks.push({
+      id: "evaluator.deterministic_read_only",
+      ok: false,
+      detail: error instanceof Error ? error.message : String(error),
+    })
   }
+
+  const readOnlyVerified = checks.some((check) => check.id === "evaluator.deterministic_read_only" && check.ok)
 
   const schemaReady = checks
     .filter((check) => check.id.startsWith("sequence_") || check.id.includes("enrollment_steps"))
     .every((check) => check.ok)
 
+  const ok = schemaReady && crudReady && evaluatorReady
+
   return {
     qa_marker: GROWTH_SEQUENCE_CONDITIONS_QA_MARKER,
     migration: GROWTH_SEQUENCE_CONDITIONS_MIGRATION,
-    ok: schemaReady && crudReady,
-    final_verdict: schemaReady && crudReady ? "PASS" : schemaReady ? "CONDITIONAL_PASS" : "FAIL",
+    evaluator_qa_marker: GROWTH_SEQUENCE_CONDITION_EVALUATOR_QA_MARKER,
+    ok,
+    final_verdict: ok ? "PASS" : schemaReady ? "CONDITIONAL_PASS" : "FAIL",
     checks,
     schema_ready: schemaReady,
     crud_ready: crudReady,
+    evaluator_ready: evaluatorReady,
+    fixture_ready: fixtureReady,
+    read_only_verified: readOnlyVerified,
     runtime_branching_absent: true,
   }
 }

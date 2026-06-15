@@ -1,5 +1,5 @@
 /**
- * SR-3 Phase 1 — Conditional sequence schema + DSL foundation certification.
+ * SR-3 Phase 1/2 — Conditional sequence schema + read-only evaluator certification.
  *
  * Local: pnpm test:growth-sequence-conditions
  * Integration: pnpm test:growth-sequence-conditions:integration
@@ -17,6 +17,13 @@ import {
   parseSequenceConditionSpec,
   sequenceConditionSpecSchema,
 } from "../lib/growth/sequences/conditions/sequence-condition-types"
+import {
+  compareSequenceConditionNumeric,
+  GROWTH_SEQUENCE_CONDITION_EVALUATOR_CONFIRM,
+  GROWTH_SEQUENCE_CONDITION_EVALUATOR_QA_MARKER,
+  maskSequenceConditionEvidenceRef,
+  normalizeSequenceConditionTier,
+} from "../lib/growth/sequences/conditions/sequence-condition-evaluator-types"
 import {
   SEQUENCE_BRANCH_EDGE_TYPES,
   validateSequenceBranchEdgeType,
@@ -47,20 +54,30 @@ const PRODUCTION_ENV_SOURCES = [
 ] as const
 
 const RUNTIME_FORBIDDEN_PATTERNS = [
-  /evaluateSequenceCondition/i,
   /resolveSequenceWait/i,
   /executeSequenceBranch/i,
   /runBranchExecution/i,
-  /conditionEvaluator/i,
   /waitResolver/i,
 ] as const
 
+const EVALUATOR_WRITE_FORBIDDEN_PATTERNS = [
+  /\.insert\(/,
+  /\.update\(/,
+  /\.delete\(/,
+  /\.upsert\(/,
+] as const
+
 function runLocalRegression(): void {
-  console.log(`\n=== SR-3 Phase 1 local regression (${GROWTH_SEQUENCE_CONDITIONS_QA_MARKER}) ===\n`)
+  console.log(`\n=== SR-3 Phase 1/2 local regression (${GROWTH_SEQUENCE_CONDITIONS_QA_MARKER}) ===\n`)
 
   assert.equal(GROWTH_SEQUENCE_CONDITIONS_QA_MARKER, "growth-sequence-conditions-sr3-phase1-v1")
   assert.equal(GROWTH_SEQUENCE_CONDITIONS_CONFIRM, "RUN_GROWTH_SEQUENCE_CONDITIONS_CERTIFICATION")
   assert.equal(GROWTH_SEQUENCE_CONDITIONS_MIGRATION, "20270827120000_growth_sequence_conditions_sr3_phase1.sql")
+  assert.equal(GROWTH_SEQUENCE_CONDITION_EVALUATOR_QA_MARKER, "growth-sequence-condition-evaluator-sr3-phase2-v1")
+  assert.equal(
+    GROWTH_SEQUENCE_CONDITION_EVALUATOR_CONFIRM,
+    "RUN_GROWTH_SEQUENCE_CONDITION_EVALUATOR_CERTIFICATION",
+  )
   console.log("  ✓ QA markers")
 
   const requiredFiles = [
@@ -69,6 +86,11 @@ function runLocalRegression(): void {
     "lib/growth/sequences/conditions/sequence-wait-types.ts",
     "lib/growth/sequences/conditions/sequence-condition-repository.ts",
     "lib/growth/sequences/conditions/sequence-condition-diagnostics.ts",
+    "lib/growth/sequences/conditions/sequence-condition-evaluator-types.ts",
+    "lib/growth/sequences/conditions/sequence-condition-event-query.ts",
+    "lib/growth/sequences/conditions/sequence-condition-evaluator.ts",
+    "lib/growth/sequences/conditions/sequence-condition-cert-fixtures.ts",
+    "app/api/platform/growth/sequences/conditions/evaluate/route.ts",
     "supabase/migrations/20270827120000_growth_sequence_conditions_sr3_phase1.sql",
   ]
   for (const relativePath of requiredFiles) {
@@ -150,6 +172,44 @@ function runLocalRegression(): void {
   ])
   console.log("  ✓ wait status validation")
 
+  assert.equal(compareSequenceConditionNumeric("gte", 80, 75), true)
+  assert.equal(compareSequenceConditionNumeric("lt", 10, 75), true)
+  assert.equal(normalizeSequenceConditionTier("warming"), "warm")
+  assert.match(
+    maskSequenceConditionEvidenceRef("email_opens", "11111111-1111-4111-8111-111111111111"),
+    /^email_opens:11111111…$/,
+  )
+  console.log("  ✓ deterministic evaluator helper functions")
+
+  const evaluatorSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/sequences/conditions/sequence-condition-evaluator.ts"),
+    "utf8",
+  )
+  const eventQuerySource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/sequences/conditions/sequence-condition-event-query.ts"),
+    "utf8",
+  )
+  assert.match(evaluatorSource, /evaluateSequenceConditionReadOnly/)
+  assert.match(evaluatorSource, /readOnly: true/)
+  for (const pattern of EVALUATOR_WRITE_FORBIDDEN_PATTERNS) {
+    assert.doesNotMatch(evaluatorSource, pattern, "evaluator must not write")
+  }
+  assert.match(eventQuerySource, /sequence_enrollment_id/)
+  assert.match(eventQuerySource, /sequence_enrollment_step_id/)
+  assert.match(eventQuerySource, /enrollment_id/)
+  console.log("  ✓ read-only evaluator + attribution-aware event query wiring")
+
+  const apiRouteSource = fs.readFileSync(
+    path.join(process.cwd(), "app/api/platform/growth/sequences/conditions/evaluate/route.ts"),
+    "utf8",
+  )
+  assert.match(apiRouteSource, /requireGrowthEnginePlatformAccess/)
+  assert.match(apiRouteSource, /evaluateSequenceConditionReadOnly/)
+  assert.match(apiRouteSource, /read_only: true/)
+  assert.match(apiRouteSource, /branch_execution_enabled: false/)
+  assert.doesNotMatch(apiRouteSource, /\.insert\(/)
+  console.log("  ✓ platform evaluate API is read-only")
+
   const repositorySource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/sequences/conditions/sequence-condition-repository.ts"),
     "utf8",
@@ -194,21 +254,24 @@ function runLocalRegression(): void {
     "lib/growth/sequences/execution/sequence-job-runner.ts",
     "lib/growth/sequences/execution/sequence-job-planner.ts",
     "lib/growth/sequence-enrollment/sequence-enrollment-repository.ts",
+    "lib/growth/sequences/conditions/sequence-condition-evaluator.ts",
   ]
   for (const relativePath of forbiddenScanTargets) {
     const source = fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
     for (const pattern of RUNTIME_FORBIDDEN_PATTERNS) {
       assert.doesNotMatch(source, pattern, `${relativePath} must not contain runtime branching logic`)
     }
-    assert.doesNotMatch(source, /sequence-condition-repository/)
+    if (!relativePath.includes("evaluator")) {
+      assert.doesNotMatch(source, /sequence-condition-repository/)
+    }
   }
-  console.log("  ✓ no runtime branching behavior wired into execution paths")
+  console.log("  ✓ no branch execution / wait resolution wired into execution paths")
 
   assert.equal(typeof createCondition, "function")
   assert.equal(typeof appendBranchDecision, "function")
   console.log("  ✓ repository imports resolve")
 
-  console.log("\nSR-3 Phase 1 local regression PASS\n")
+  console.log("\nSR-3 Phase 1/2 local regression PASS\n")
 }
 
 async function runIntegrationDiagnostics(): Promise<Record<string, unknown>> {
@@ -245,7 +308,7 @@ async function main(): Promise<void> {
     return
   }
 
-  console.log(`\n=== SR-3 Phase 1 ${mode} diagnostics ===\n`)
+  console.log(`\n=== SR-3 Phase 1/2 ${mode} diagnostics ===\n`)
   const report = await runIntegrationDiagnostics()
   console.log(JSON.stringify(report, null, 2))
 
