@@ -1,7 +1,13 @@
-import type { GrowthSharePageRenderModel } from "@/lib/growth/share-pages/share-page-types"
+import type { GrowthSharePageCTA, GrowthSharePageRenderModel } from "@/lib/growth/share-pages/share-page-types"
 import { cn } from "@/lib/utils"
 
-export function GrowthSharePageCtaSection({ model }: { model: GrowthSharePageRenderModel }) {
+export function GrowthSharePageCtaSection({
+  model,
+  onCtaClick,
+}: {
+  model: GrowthSharePageRenderModel
+  onCtaClick?: (cta: GrowthSharePageCTA) => void
+}) {
   if (model.ctaConfig.length === 0) return null
 
   return (
@@ -11,9 +17,11 @@ export function GrowthSharePageCtaSection({ model }: { model: GrowthSharePageRen
       </h2>
       <div className="mt-4 flex flex-wrap gap-3">
         {model.ctaConfig.map((cta) => (
-          <div
+          <button
             key={cta.id}
+            type="button"
             aria-label={cta.label}
+            onClick={() => onCtaClick?.(cta)}
             className={cn(
               "inline-flex items-center rounded-full px-5 py-2.5 text-sm font-medium",
               cta.kind === "primary"
@@ -24,7 +32,7 @@ export function GrowthSharePageCtaSection({ model }: { model: GrowthSharePageRen
             )}
           >
             {cta.label}
-          </div>
+          </button>
         ))}
       </div>
       <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">

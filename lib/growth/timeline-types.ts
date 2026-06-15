@@ -179,6 +179,12 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "reply_draft_discarded",
   "reply_draft_sent",
   "reply_draft_blocked",
+  "share_page_viewed",
+  "share_page_engaged",
+  "share_page_cta_clicked",
+  "share_page_booking_started",
+  "share_page_booking_completed",
+  "share_page_resource_opened",
 ] as const
 
 export type GrowthLeadTimelineEventType = (typeof GROWTH_LEAD_TIMELINE_EVENT_TYPES)[number]

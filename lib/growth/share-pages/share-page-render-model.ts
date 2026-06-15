@@ -15,11 +15,13 @@ export function readSharePagePersonalizationSnapshot(
 
 export function mapSharePageToRenderModel(
   page: GrowthSharePage,
-  input: { prospectName: string; companyName: string; previewMode: boolean },
+  input: { prospectName: string; companyName: string; previewMode: boolean; publicToken?: string | null },
 ): GrowthSharePageRenderModel {
   const snapshot = readSharePagePersonalizationSnapshot(page.personalizationSnapshot)
 
   return {
+    sharePageId: page.id,
+    publicToken: input.previewMode ? null : input.publicToken ?? null,
     prospectName: input.prospectName,
     companyName: input.companyName,
     headline: page.headline || snapshot?.headline || `A note for ${input.companyName}`,

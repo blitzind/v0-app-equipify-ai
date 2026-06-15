@@ -11,6 +11,11 @@ export const GROWTH_SIGNAL_TYPES = [
   "funding_event",
   "search_intent",
   "manual_signal",
+  "share_page_viewed",
+  "share_page_engaged",
+  "share_page_cta_clicked",
+  "share_page_booking_started",
+  "share_page_booking_completed",
 ] as const
 
 export type GrowthSignalType = (typeof GROWTH_SIGNAL_TYPES)[number]

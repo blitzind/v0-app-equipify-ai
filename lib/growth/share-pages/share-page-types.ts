@@ -5,7 +5,12 @@ export const GROWTH_SHARE_PAGES_QA_MARKER = "share-pages-sr2-v1" as const
 export const GROWTH_SHARE_PAGES_MIGRATION =
   "20270826120000_growth_engine_share_pages_foundation.sql" as const
 
-export const GROWTH_SHARE_PAGES_CONFIRM = "RUN_GROWTH_SHARE_PAGES_CERTIFICATION" as const
+export const GROWTH_SHARE_PAGES_ANALYTICS_QA_MARKER = "share-pages-analytics-sr2b3-v1" as const
+
+export const GROWTH_SHARE_PAGES_ANALYTICS_MIGRATION =
+  "20270826120100_growth_engine_share_pages_analytics.sql" as const
+
+export const GROWTH_SHARE_PAGES_ANALYTICS_CONFIRM = "RUN_GROWTH_SHARE_PAGES_ANALYTICS_CERTIFICATION" as const
 
 export const GROWTH_SHARE_PAGE_STATUSES = [
   "draft",
@@ -314,6 +319,8 @@ export type GrowthSharePagePublicAccessResult = {
 }
 
 export type GrowthSharePageRenderModel = {
+  sharePageId: string
+  publicToken: string | null
   prospectName: string
   companyName: string
   headline: string

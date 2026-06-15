@@ -19,6 +19,10 @@ export const GROWTH_ENGAGEMENT_SIGNAL_KINDS = [
   "not_interested",
   "bounce",
   "suppression",
+  "share_page_view",
+  "share_page_engaged",
+  "share_page_cta_click",
+  "share_page_booking_completed",
 ] as const
 export type GrowthEngagementSignalKind = (typeof GROWTH_ENGAGEMENT_SIGNAL_KINDS)[number]
 

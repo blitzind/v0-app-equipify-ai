@@ -52,6 +52,10 @@ export type GrowthEngagementScoreRecord = {
   clicks: number
   meetings: number
   replies: number
+  pageViews: number
+  pageEngaged: number
+  pageCtaClicks: number
+  pageBookingsCompleted: number
   lastActivityAt: string | null
   updatedAt: string
 }

@@ -16,7 +16,7 @@ export { mapSharePageToRenderModel } from "@/lib/growth/share-pages/share-page-r
 export async function buildSharePageRenderModel(
   admin: SupabaseClient,
   page: Parameters<typeof mapSharePageToRenderModel>[0],
-  input: { previewMode: boolean },
+  input: { previewMode: boolean; publicToken?: string | null },
 ): Promise<GrowthSharePageRenderModel> {
   const lead = await fetchGrowthLeadById(admin, page.leadId)
   const snapshot = readSharePagePersonalizationSnapshot(page.personalizationSnapshot)
@@ -25,6 +25,7 @@ export async function buildSharePageRenderModel(
     prospectName: lead?.contactName?.trim() || snapshot?.prospectName || "there",
     companyName: lead?.companyName?.trim() || snapshot?.companyName || "your company",
     previewMode: input.previewMode,
+    publicToken: input.publicToken ?? null,
   })
 }
 

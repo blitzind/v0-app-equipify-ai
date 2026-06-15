@@ -23,6 +23,10 @@ const POSITIVE_KINDS = new Set<GrowthEngagementSignalKind>([
   "follow_up_completed",
   "decision_maker_confirmed",
   "research_completed",
+  "share_page_view",
+  "share_page_engaged",
+  "share_page_cta_click",
+  "share_page_booking_completed",
 ])
 
 function clampScore(value: number): number {

@@ -14,6 +14,10 @@ export const ENGAGEMENT_SIGNAL_BASE_POINTS: Record<GrowthEngagementSignalKind, n
   not_interested: -30,
   bounce: -25,
   suppression: -50,
+  share_page_view: 5,
+  share_page_engaged: 8,
+  share_page_cta_click: 15,
+  share_page_booking_completed: 35,
 }
 
 export const ENGAGEMENT_SIGNAL_HALF_LIFE_DAYS: Partial<Record<GrowthEngagementSignalKind, number>> = {
@@ -26,6 +30,10 @@ export const ENGAGEMENT_SIGNAL_HALF_LIFE_DAYS: Partial<Record<GrowthEngagementSi
   follow_up_completed: 21,
   decision_maker_confirmed: 60,
   research_completed: 45,
+  share_page_view: 14,
+  share_page_engaged: 21,
+  share_page_cta_click: 21,
+  share_page_booking_completed: 45,
   not_interested: 90,
 }
 

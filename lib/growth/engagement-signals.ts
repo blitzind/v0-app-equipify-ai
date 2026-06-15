@@ -87,6 +87,12 @@ export async function fetchGrowthLeadEngagementInput(
       "call_started",
       "decision_maker_confirmed",
       "research_completed",
+      "share_page_viewed",
+      "share_page_engaged",
+      "share_page_cta_clicked",
+      "share_page_booking_started",
+      "share_page_booking_completed",
+      "share_page_resource_opened",
     ])
     .order("occurred_at", { ascending: false })
 
@@ -110,6 +116,22 @@ export async function fetchGrowthLeadEngagementInput(
         break
       case "research_completed":
         signals.push({ kind: "research_completed", occurredAt, label: "Research completed" })
+        break
+      case "share_page_viewed":
+        signals.push({ kind: "share_page_view", occurredAt, label: row.title ?? "Share page viewed" })
+        break
+      case "share_page_engaged":
+        signals.push({ kind: "share_page_engaged", occurredAt, label: row.title ?? "Share page engaged" })
+        break
+      case "share_page_cta_clicked":
+        signals.push({ kind: "share_page_cta_click", occurredAt, label: row.title ?? "Share page CTA clicked" })
+        break
+      case "share_page_booking_completed":
+        signals.push({
+          kind: "share_page_booking_completed",
+          occurredAt,
+          label: row.title ?? "Share page booking completed",
+        })
         break
       default:
         break

@@ -61,6 +61,10 @@ type ScoreRow = {
   clicks: number
   meetings: number
   replies: number
+  page_views?: number
+  page_engaged?: number
+  page_cta_clicks?: number
+  page_bookings_completed?: number
   last_activity_at: string | null
   updated_at: string
 }
@@ -121,6 +125,10 @@ function mapScore(row: ScoreRow): GrowthEngagementScoreRecord {
     clicks: row.clicks,
     meetings: row.meetings,
     replies: row.replies,
+    pageViews: row.page_views ?? 0,
+    pageEngaged: row.page_engaged ?? 0,
+    pageCtaClicks: row.page_cta_clicks ?? 0,
+    pageBookingsCompleted: row.page_bookings_completed ?? 0,
     lastActivityAt: row.last_activity_at,
     updatedAt: row.updated_at,
   }
@@ -279,6 +287,10 @@ async function refreshLeadEngagementScore(
     incrementClicks?: number
     incrementReplies?: number
     incrementMeetings?: number
+    incrementPageViews?: number
+    incrementPageEngaged?: number
+    incrementPageCtaClicks?: number
+    incrementPageBookingsCompleted?: number
     activityAt?: string
   },
 ): Promise<GrowthEngagementScoreRecord> {
@@ -289,6 +301,11 @@ async function refreshLeadEngagementScore(
   const clicks = (existing?.clicks ?? 0) + (input.incrementClicks ?? 0)
   const replies = (existing?.replies ?? 0) + (input.incrementReplies ?? 0)
   const meetings = (existing?.meetings ?? 0) + (input.incrementMeetings ?? 0)
+  const pageViews = (existing?.page_views ?? 0) + (input.incrementPageViews ?? 0)
+  const pageEngaged = (existing?.page_engaged ?? 0) + (input.incrementPageEngaged ?? 0)
+  const pageCtaClicks = (existing?.page_cta_clicks ?? 0) + (input.incrementPageCtaClicks ?? 0)
+  const pageBookingsCompleted =
+    (existing?.page_bookings_completed ?? 0) + (input.incrementPageBookingsCompleted ?? 0)
   const lastActivityAt = input.activityAt ?? existing?.last_activity_at ?? null
 
   const computed = computeAttributionEngagementScore({
@@ -296,6 +313,10 @@ async function refreshLeadEngagementScore(
     clicks,
     replies,
     meetings,
+    pageViews,
+    pageEngaged,
+    pageCtaClicks,
+    pageBookingsCompleted,
     lastActivityAt,
   })
 
@@ -310,6 +331,10 @@ async function refreshLeadEngagementScore(
     clicks,
     meetings,
     replies,
+    page_views: pageViews,
+    page_engaged: pageEngaged,
+    page_cta_clicks: pageCtaClicks,
+    page_bookings_completed: pageBookingsCompleted,
     last_activity_at: lastActivityAt,
     updated_at: new Date().toISOString(),
   }
@@ -330,6 +355,20 @@ async function refreshLeadEngagementScore(
   })
 
   return mapScore(data as ScoreRow)
+}
+
+export async function recordSharePageAttributionEngagement(
+  admin: SupabaseClient,
+  leadId: string,
+  input: {
+    incrementPageViews?: number
+    incrementPageEngaged?: number
+    incrementPageCtaClicks?: number
+    incrementPageBookingsCompleted?: number
+    activityAt?: string
+  },
+): Promise<GrowthEngagementScoreRecord> {
+  return refreshLeadEngagementScore(admin, leadId, input)
 }
 
 export async function fetchAttributionRates(admin: SupabaseClient): Promise<GrowthAttributionRates> {

@@ -5,6 +5,10 @@ export const GROWTH_ATTRIBUTION_SCORE_POINTS = {
   click: 15,
   reply: 40,
   meeting: 50,
+  pageView: 5,
+  pageEngaged: 5,
+  pageCtaClick: 15,
+  pageBookingCompleted: 50,
 } as const
 
 export const GROWTH_ATTRIBUTION_INACTIVITY_DECAY = [
@@ -18,6 +22,10 @@ export type GrowthAttributionScoreInput = {
   clicks: number
   replies: number
   meetings: number
+  pageViews?: number
+  pageEngaged?: number
+  pageCtaClicks?: number
+  pageBookingsCompleted?: number
   lastActivityAt: string | null
   now?: Date
 }
@@ -56,7 +64,11 @@ export function computeAttributionEngagementScore(input: GrowthAttributionScoreI
     input.opens * GROWTH_ATTRIBUTION_SCORE_POINTS.open +
     input.clicks * GROWTH_ATTRIBUTION_SCORE_POINTS.click +
     input.replies * GROWTH_ATTRIBUTION_SCORE_POINTS.reply +
-    input.meetings * GROWTH_ATTRIBUTION_SCORE_POINTS.meeting
+    input.meetings * GROWTH_ATTRIBUTION_SCORE_POINTS.meeting +
+    (input.pageViews ?? 0) * GROWTH_ATTRIBUTION_SCORE_POINTS.pageView +
+    (input.pageEngaged ?? 0) * GROWTH_ATTRIBUTION_SCORE_POINTS.pageEngaged +
+    (input.pageCtaClicks ?? 0) * GROWTH_ATTRIBUTION_SCORE_POINTS.pageCtaClick +
+    (input.pageBookingsCompleted ?? 0) * GROWTH_ATTRIBUTION_SCORE_POINTS.pageBookingCompleted
 
   const idleDays = input.lastActivityAt ? daysSince(input.lastActivityAt, now) : Number.POSITIVE_INFINITY
   const decayPenalty = Number.isFinite(idleDays) ? computeInactivityDecayPenalty(idleDays) : 0

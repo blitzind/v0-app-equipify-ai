@@ -1,7 +1,13 @@
-import type { GrowthSharePageRenderModel } from "@/lib/growth/share-pages/share-page-types"
+import type { GrowthSharePageRenderModel, GrowthSharePageResource } from "@/lib/growth/share-pages/share-page-types"
 import { FileText } from "lucide-react"
 
-export function GrowthSharePageResources({ model }: { model: GrowthSharePageRenderModel }) {
+export function GrowthSharePageResources({
+  model,
+  onResourceOpen,
+}: {
+  model: GrowthSharePageRenderModel
+  onResourceOpen?: (resource: GrowthSharePageResource) => void
+}) {
   if (model.resources.length === 0) return null
 
   return (
@@ -11,9 +17,11 @@ export function GrowthSharePageResources({ model }: { model: GrowthSharePageRend
       </h2>
       <div className="mt-4 space-y-3">
         {model.resources.map((resource) => (
-          <div
+          <button
             key={resource.id}
-            className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+            type="button"
+            onClick={() => onResourceOpen?.(resource)}
+            className="flex w-full items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-[var(--share-brand-color)]/40 dark:border-slate-800 dark:bg-slate-900"
           >
             <FileText className="mt-0.5 size-4 shrink-0 text-[var(--share-brand-color)]" aria-hidden />
             <div>
@@ -22,7 +30,7 @@ export function GrowthSharePageResources({ model }: { model: GrowthSharePageRend
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{resource.description}</p>
               ) : null}
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </section>

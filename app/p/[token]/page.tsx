@@ -46,6 +46,9 @@ export default async function SharePagePublicRoute({ params }: PageProps) {
     return <GrowthSharePageUnavailable title={copy.title} message={copy.message} />
   }
 
-  const model = await buildSharePageRenderModel(admin, access.page, { previewMode: false })
+  const model = await buildSharePageRenderModel(admin, access.page, {
+    previewMode: false,
+    publicToken: token,
+  })
   return <GrowthSharePageView model={model} />
 }
