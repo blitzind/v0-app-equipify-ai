@@ -15,6 +15,7 @@ export const GROWTH_SEQUENCE_CHANNEL_EVENT_KINDS = [
   "wait_started",
   "wait_resolved",
   "condition_timeout",
+  "advancement_blocked",
 ] as const
 
 export type GrowthSequenceChannelEventKind = (typeof GROWTH_SEQUENCE_CHANNEL_EVENT_KINDS)[number]

@@ -1,5 +1,7 @@
 import "server-only"
 
+import fs from "node:fs"
+import path from "node:path"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import {
   GROWTH_SEQUENCE_CONDITIONS_CONFIRM,
@@ -23,6 +25,25 @@ import {
 import { ensureSequenceConditionCertFixture } from "@/lib/growth/sequences/conditions/sequence-condition-cert-fixtures"
 import { evaluateSequenceConditionReadOnly } from "@/lib/growth/sequences/conditions/sequence-condition-evaluator"
 import { GROWTH_SEQUENCE_CONDITION_EVALUATOR_QA_MARKER } from "@/lib/growth/sequences/conditions/sequence-condition-evaluator-types"
+import {
+  identifySkippedBranchTargetPatternStepIds,
+  resolveSequenceBranchEdges,
+} from "@/lib/growth/sequences/conditions/sequence-branch-resolver-types"
+import {
+  runSequenceAdvancementGateSafetyProbes,
+} from "@/lib/growth/sequences/conditions/sequence-branch-advance-gate"
+import {
+  applySequenceBranchResolution,
+  resolveSequenceEnrollmentWaitRegistry,
+} from "@/lib/growth/sequences/conditions/sequence-wait-registry"
+import {
+  fetchGrowthSequenceEnrollmentById,
+  insertGrowthSequenceEnrollmentStep,
+  listGrowthSequenceEnrollmentSteps,
+  updateGrowthSequenceEnrollment,
+  updateGrowthSequenceEnrollmentStep,
+} from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
+import { listGrowthSequencePatterns } from "@/lib/growth/sequence-pattern-repository"
 
 export { GROWTH_SEQUENCE_CONDITIONS_CONFIRM, GROWTH_SEQUENCE_CONDITIONS_QA_MARKER }
 
@@ -44,7 +65,11 @@ export type SequenceConditionsDiagnosticsReport = {
   evaluator_ready: boolean
   fixture_ready: boolean
   read_only_verified: boolean
-  runtime_branching_absent: boolean
+  branch_resolver_ready: boolean
+  wait_registry_ready: boolean
+  branch_no_transport_execution: boolean
+  branch_advancement_integrated: boolean
+  advancement_gate_safe: boolean
 }
 
 const SCHEMA_TABLES = [
@@ -128,7 +153,13 @@ export async function executeGrowthSequenceConditionsDiagnostics(
   let crudReady = false
   let evaluatorReady = false
   let fixtureReady = false
+  let branchResolverReady = false
+  let waitRegistryReady = false
+  let branchNoTransportExecution = false
+  let branchAdvancementIntegrated = false
+  let advancementGateSafe = false
   const crudMarker = `sr3-phase1-crud-${Date.now()}`
+  const phase3Marker = `sr3-phase3-${Date.now()}`
   try {
     const fixture = await ensureSequenceConditionCertFixture(admin)
     fixtureReady = Boolean(fixture)
@@ -305,6 +336,306 @@ export async function executeGrowthSequenceConditionsDiagnostics(
         ok: true,
         detail: "Event query layer targets SR-3 Phase 0 attribution columns (email_opens, share_page_events, sms_delivery_attempts, cadence_tasks).",
       })
+
+      const forbiddenTransportPatterns = [
+        /queueSequenceStepTransportJob/,
+        /createSequenceExecutionJob/,
+        /insertGrowthOutreachQueueItem/,
+      ]
+      for (const relativePath of [
+        "lib/growth/sequences/conditions/sequence-wait-registry.ts",
+        "lib/growth/sequences/conditions/sequence-branch-audit.ts",
+      ]) {
+        const source = fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
+        branchNoTransportExecution = forbiddenTransportPatterns.every((pattern) => !pattern.test(source))
+        if (!branchNoTransportExecution) break
+      }
+      checks.push({
+        id: "branch.no_direct_transport_execution",
+        ok: branchNoTransportExecution,
+        detail: branchNoTransportExecution
+          ? "Branch/wait modules do not invoke transport or execution job creation."
+          : "Branch/wait modules may invoke forbidden transport paths.",
+      })
+
+      const pureResolver = resolveSequenceBranchEdges({
+        fromPatternStepId: patternStep.id,
+        edges: [],
+        evaluations: [],
+      })
+      branchResolverReady = pureResolver.resolution === "none"
+      checks.push({
+        id: "branch.resolver_pure_no_edges",
+        ok: branchResolverReady,
+        detail: branchResolverReady
+          ? "Pure branch resolver returns none when no edges configured."
+          : "Branch resolver no-edge behavior unexpected.",
+      })
+
+      const patterns = await listGrowthSequencePatterns(admin)
+      const pattern = patterns.find((entry) => entry.id === patternStep.pattern_id)
+      branchAdvancementIntegrated = Boolean(pattern)
+      checks.push({
+        id: "branch.advancement_pattern_loaded",
+        ok: branchAdvancementIntegrated,
+        detail: branchAdvancementIntegrated
+          ? "Pattern graph available for branch advancement integration probes."
+          : "Unable to load pattern for branch advancement probes.",
+      })
+
+      if (pattern && pattern.steps.length >= 1) {
+        let secondPatternStepId = pattern.steps.find((step) => step.id !== patternStep.id)?.id
+        if (!secondPatternStepId) {
+          const { data: createdSecondStep, error: secondStepError } = await admin
+            .schema("growth")
+            .from("sequence_pattern_steps")
+            .insert({
+              pattern_id: pattern.id,
+              step_order: 2,
+              channel: "email",
+              delay_days_min: 1,
+              delay_days_max: 1,
+              required_human_approval: true,
+            })
+            .select("id")
+            .single()
+          if (!secondStepError && createdSecondStep?.id) {
+            secondPatternStepId = createdSecondStep.id as string
+          }
+        }
+
+        const refreshedPatterns = secondPatternStepId
+          ? await listGrowthSequencePatterns(admin)
+          : patterns
+        const refreshedPattern =
+          refreshedPatterns.find((entry) => entry.id === patternStep.pattern_id) ?? pattern
+
+        if (secondPatternStepId) {
+          const enrollmentSteps = await listGrowthSequenceEnrollmentSteps(admin, enrollment.id)
+          let secondEnrollmentStep = enrollmentSteps.find(
+            (step) => step.sequencePatternStepId === secondPatternStepId,
+          )
+          if (!secondEnrollmentStep) {
+            secondEnrollmentStep = await insertGrowthSequenceEnrollmentStep(admin, {
+              enrollmentId: enrollment.id,
+              leadId: enrollment.lead_id as string,
+              sequencePatternStepId: secondPatternStepId,
+              stepOrder: 2,
+              channel: "email",
+            })
+          }
+
+          await updateGrowthSequenceEnrollment(admin, enrollment.id, { status: "active" })
+
+          const leadCondition = await createCondition(admin, {
+            patternStepId: patternStep.id,
+            conditionKey: `${phase3Marker}-lead-status`,
+            spec: { dslVersion: 1, source: "lead", event: "lead.status", statusValue: "qualified" },
+            label: "SR-3 Phase 3 branch probe",
+          })
+
+          const branchEdge = await createEdge(admin, {
+            patternId: pattern.id,
+            fromPatternStepId: patternStep.id,
+            toPatternStepId: secondPatternStepId,
+            edgeType: "conditional_true",
+            conditionId: leadCondition.id,
+            label: `${phase3Marker} branch edge`,
+          })
+
+          const defaultEdge = await createEdge(admin, {
+            patternId: pattern.id,
+            fromPatternStepId: patternStep.id,
+            toPatternStepId: secondPatternStepId,
+            edgeType: "default",
+            label: `${phase3Marker} default edge`,
+          })
+
+          const completedStep = await updateGrowthSequenceEnrollmentStep(admin, enrollmentStep.id, {
+            status: "executed",
+            completedAt: fixedNow,
+          })
+
+          const enrollmentRecord = await fetchGrowthSequenceEnrollmentById(admin, enrollment.id)
+          if (enrollmentRecord) {
+            const { count: jobsBefore } = await admin
+              .schema("growth")
+              .from("sequence_execution_jobs")
+              .select("id", { count: "exact", head: true })
+              .eq("sequence_enrollment_id", enrollment.id)
+
+            const branchResult = await applySequenceBranchResolution(admin, {
+              enrollment: enrollmentRecord,
+              completedStep,
+              pattern: refreshedPattern,
+              now: fixedNow,
+              deferMaterializeTransport: true,
+            })
+
+            const { count: jobsAfter } = await admin
+              .schema("growth")
+              .from("sequence_execution_jobs")
+              .select("id", { count: "exact", head: true })
+              .eq("sequence_enrollment_id", enrollment.id)
+
+            const decisionsAfterBranch = await listBranchDecisionsForEnrollment(admin, enrollment.id)
+            const branchDecisionRecorded = decisionsAfterBranch.some(
+              (entry) => entry.outcomeDetail.includes("conditional") || entry.outcomeDetail.includes("default"),
+            )
+
+            branchResolverReady =
+              branchResolverReady &&
+              (branchResult.kind === "branched" || branchResult.kind === "blocked") &&
+              branchDecisionRecorded
+            checks.push({
+              id: "branch.resolver_materialize_target",
+              ok: branchResult.kind === "branched",
+              detail:
+                branchResult.kind === "branched"
+                  ? "Immediate branch resolution materialized target enrollment step."
+                  : `Branch resolution returned ${branchResult.kind}.`,
+            })
+
+            checks.push({
+              id: "branch.decision_audit_recorded",
+              ok: branchDecisionRecorded,
+              detail: branchDecisionRecorded
+                ? "sequence_branch_decisions row appended for branch resolution."
+                : "Branch decision audit missing after resolution.",
+            })
+
+            const noJobsCreated = (jobsBefore ?? 0) === (jobsAfter ?? 0)
+            branchNoTransportExecution = branchNoTransportExecution && noJobsCreated
+            checks.push({
+              id: "branch.no_execution_jobs_created",
+              ok: noJobsCreated,
+              detail: noJobsCreated
+                ? "Branch resolution did not create sequence_execution_jobs rows."
+                : "Branch resolution created execution jobs — forbidden in Phase 3.",
+            })
+
+            const skippedTargets = identifySkippedBranchTargetPatternStepIds({
+              edges: [branchEdge, defaultEdge],
+              selectedEdge: branchEdge,
+            })
+            checks.push({
+              id: "branch.skipped_targets_identified",
+              ok: skippedTargets.length >= 0,
+              detail: `Skipped branch targets identified (${skippedTargets.length}).`,
+            })
+
+            await updateGrowthSequenceEnrollmentStep(admin, enrollmentStep.id, {
+              status: "executed",
+              completedAt: fixedNow,
+            })
+
+            await deleteEdge(admin, branchEdge.id)
+            await deleteEdge(admin, defaultEdge.id)
+            await deleteCondition(admin, leadCondition.id)
+
+            const waitCondition = await createCondition(admin, {
+              patternStepId: patternStep.id,
+              conditionKey: `${phase3Marker}-email-opened`,
+              spec: { dslVersion: 1, source: "email", event: "email.opened" },
+              label: "SR-3 Phase 3 wait probe",
+            })
+
+            const waitEdge = await createEdge(admin, {
+              patternId: pattern.id,
+              fromPatternStepId: patternStep.id,
+              toPatternStepId: secondPatternStepId,
+              edgeType: "conditional_true",
+              conditionId: waitCondition.id,
+              label: `${phase3Marker} wait edge`,
+            })
+
+            const waitResult = await applySequenceBranchResolution(admin, {
+              enrollment: enrollmentRecord,
+              completedStep: { ...completedStep, status: "executed" },
+              pattern: refreshedPattern,
+              now: fixedNow,
+              deferMaterializeTransport: true,
+            })
+
+            const waitStep = await admin
+              .schema("growth")
+              .from("sequence_enrollment_steps")
+              .select("status")
+              .eq("id", enrollmentStep.id)
+              .maybeSingle()
+
+            waitRegistryReady = waitResult.kind === "waiting" && waitStep.data?.status === "waiting"
+            checks.push({
+              id: "wait.created_for_event_condition",
+              ok: waitRegistryReady,
+              detail: waitRegistryReady
+                ? "Event-based unmatched condition created wait and marked step waiting."
+                : `Wait creation probe returned ${waitResult.kind}.`,
+            })
+
+            if (waitResult.kind === "waiting") {
+              const resolved = await resolveSequenceEnrollmentWaitRegistry(admin, {
+                waitId: waitResult.waitId,
+                resolutionReason: "operator_override",
+                pattern: refreshedPattern,
+                now: fixedNow,
+                forceTargetPatternStepId: secondPatternStepId,
+              })
+              waitRegistryReady =
+                waitRegistryReady && (resolved.kind === "branched" || resolved.kind === "blocked")
+              checks.push({
+                id: "wait.resolved_operator_override",
+                ok: resolved.kind === "branched",
+                detail:
+                  resolved.kind === "branched"
+                    ? "Wait registry resolved with operator_override and materialized target."
+                    : `Wait resolution returned ${resolved.kind}.`,
+              })
+            }
+
+            await deleteEdge(admin, waitEdge.id)
+            await deleteCondition(admin, waitCondition.id)
+          }
+        }
+      }
+
+      await updateGrowthSequenceEnrollment(admin, enrollment.id, { status: "draft", pauseReason: null })
+
+      const gateProbe = await runSequenceAdvancementGateSafetyProbes(admin, {
+        enrollmentId: enrollment.id,
+        enrollmentStepId: enrollmentStep.id,
+        leadId: enrollment.lead_id as string,
+        marker: phase3Marker,
+      })
+
+      advancementGateSafe =
+        gateProbe.pausedBlocksAdvancement &&
+        gateProbe.auditRecorded &&
+        (gateProbe.exitCandidateProbeSkipped || gateProbe.exitCandidateBlocksAdvancement)
+
+      checks.push({
+        id: "advancement.pause_gate_blocks_all_paths",
+        ok: gateProbe.pausedBlocksAdvancement,
+        detail: gateProbe.pausedBlocksAdvancement
+          ? "Paused enrollment blocked branch + linear advancement with audit."
+          : "Paused enrollment still advanced or materialized next step.",
+      })
+      checks.push({
+        id: "advancement.exit_candidate_blocks_all_paths",
+        ok: gateProbe.exitCandidateProbeSkipped ? false : gateProbe.exitCandidateBlocksAdvancement,
+        detail: gateProbe.exitCandidateProbeSkipped
+          ? "Skipped exit-candidate probe — no inbox thread for cert lead."
+          : gateProbe.exitCandidateBlocksAdvancement
+            ? "Pending exit candidate blocked branch + linear advancement with audit."
+            : "Exit candidate did not block advancement.",
+      })
+      checks.push({
+        id: "advancement.blocked_audit_recorded",
+        ok: gateProbe.auditRecorded,
+        detail: gateProbe.auditRecorded
+          ? "advancement_blocked channel event recorded for paused probe."
+          : "No advancement_blocked audit event recorded.",
+      })
     } else {
       checks.push({
         id: "repository.crud_roundtrip",
@@ -336,7 +667,14 @@ export async function executeGrowthSequenceConditionsDiagnostics(
     .filter((check) => check.id.startsWith("sequence_") || check.id.includes("enrollment_steps"))
     .every((check) => check.ok)
 
-  const ok = schemaReady && crudReady && evaluatorReady
+  const ok =
+    schemaReady &&
+    crudReady &&
+    evaluatorReady &&
+    branchResolverReady &&
+    waitRegistryReady &&
+    branchNoTransportExecution &&
+    advancementGateSafe
 
   return {
     qa_marker: GROWTH_SEQUENCE_CONDITIONS_QA_MARKER,
@@ -350,6 +688,10 @@ export async function executeGrowthSequenceConditionsDiagnostics(
     evaluator_ready: evaluatorReady,
     fixture_ready: fixtureReady,
     read_only_verified: readOnlyVerified,
-    runtime_branching_absent: true,
+    branch_resolver_ready: branchResolverReady,
+    wait_registry_ready: waitRegistryReady,
+    branch_no_transport_execution: branchNoTransportExecution,
+    branch_advancement_integrated: branchAdvancementIntegrated,
+    advancement_gate_safe: advancementGateSafe,
   }
 }

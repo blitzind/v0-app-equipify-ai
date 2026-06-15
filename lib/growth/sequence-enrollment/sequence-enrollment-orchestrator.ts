@@ -57,6 +57,12 @@ import {
   emitGrowthLeadSequenceStepExecutedTimeline,
   emitGrowthLeadSequenceStepQueuedTimeline,
 } from "@/lib/growth/timeline-emitter"
+import {
+  evaluateSequenceBranchAdvanceGate,
+  recordSequenceAdvancementBlockedAudit,
+} from "@/lib/growth/sequences/conditions/sequence-branch-advance-gate"
+import { listEdgesFromPatternStep } from "@/lib/growth/sequences/conditions/sequence-condition-repository"
+import { applySequenceBranchResolution } from "@/lib/growth/sequences/conditions/sequence-wait-registry"
 
 function addDays(iso: string, days: number): string {
   return new Date(Date.parse(iso) + days * 24 * 60 * 60 * 1000).toISOString()
@@ -390,11 +396,76 @@ export async function advanceGrowthSequenceEnrollmentAfterStep(
   const enrollment = await fetchGrowthSequenceEnrollmentById(admin, step.enrollmentId)
   if (!enrollment || !["active", "paused"].includes(enrollment.status)) return
 
+  const advanceGate = await evaluateSequenceBranchAdvanceGate(admin, {
+    sequenceEnrollmentId: enrollment.id,
+  })
+  if (advanceGate.blocked) {
+    await recordSequenceAdvancementBlockedAudit(admin, {
+      enrollmentId: enrollment.id,
+      enrollmentStepId: step.id,
+      leadId: step.leadId,
+      stepOrder: step.stepOrder,
+      gate: advanceGate,
+    })
+    return
+  }
+
   const patterns = await listGrowthSequencePatterns(admin)
   const pattern = patterns.find((entry) => entry.id === enrollment.sequencePatternId)
   const totalSteps = pattern?.steps.length ?? 0
-
   const now = new Date().toISOString()
+
+  const branchEdges =
+    pattern && enrollment.status === "active"
+      ? await listEdgesFromPatternStep(admin, pattern.id, step.sequencePatternStepId)
+      : []
+
+  if (branchEdges.length > 0 && pattern) {
+    await updateGrowthSequenceEnrollmentStep(admin, step.id, {
+      status: "executed",
+      completedAt: now,
+    })
+
+    await emitGrowthLeadSequenceStepExecutedTimeline(admin, {
+      leadId: step.leadId,
+      enrollmentId: enrollment.id,
+      stepId: step.id,
+      stepOrder: step.stepOrder,
+    })
+
+    const branchResult = await applySequenceBranchResolution(admin, {
+      enrollment,
+      completedStep: { ...step, status: "executed", completedAt: now },
+      pattern,
+      now,
+      deferMaterializeTransport: true,
+    })
+
+    if (branchResult.kind === "waiting") {
+      await syncEnrollmentHealth(admin, enrollment.id, totalSteps)
+      return
+    }
+
+    if (branchResult.kind === "branched" || branchResult.kind === "blocked") {
+      await syncEnrollmentHealth(admin, enrollment.id, totalSteps)
+      return
+    }
+
+    if (branchResult.kind === "completed") {
+      await updateGrowthSequenceEnrollment(admin, enrollment.id, {
+        status: "completed",
+        completedAt: now,
+        enrollmentStalled: false,
+      })
+      await setLeadActiveSequenceEnrollment(admin, step.leadId, null)
+      await emitGrowthLeadSequenceEnrollmentCompletedTimeline(admin, {
+        leadId: step.leadId,
+        enrollmentId: enrollment.id,
+      })
+      return
+    }
+  }
+
   await updateGrowthSequenceEnrollmentStep(admin, step.id, {
     status: "executed",
     completedAt: now,

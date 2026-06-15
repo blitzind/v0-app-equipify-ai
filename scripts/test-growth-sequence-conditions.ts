@@ -1,5 +1,5 @@
 /**
- * SR-3 Phase 1/2 — Conditional sequence schema + read-only evaluator certification.
+ * SR-3 Phase 1/2/3 — Conditional sequence schema, read-only evaluator, branch resolver + wait registry certification.
  *
  * Local: pnpm test:growth-sequence-conditions
  * Integration: pnpm test:growth-sequence-conditions:integration
@@ -25,13 +25,18 @@ import {
   normalizeSequenceConditionTier,
 } from "../lib/growth/sequences/conditions/sequence-condition-evaluator-types"
 import {
-  SEQUENCE_BRANCH_EDGE_TYPES,
-  validateSequenceBranchEdgeType,
-} from "../lib/growth/sequences/conditions/sequence-branch-types"
+  GROWTH_SEQUENCE_BRANCH_RESOLVER_QA_MARKER,
+  resolveSequenceBranchEdges,
+} from "../lib/growth/sequences/conditions/sequence-branch-resolver-types"
+import { GROWTH_SEQUENCE_WAIT_REGISTRY_QA_MARKER } from "../lib/growth/sequences/conditions/sequence-wait-registry-types"
 import {
   SEQUENCE_ENROLLMENT_WAIT_STATUSES,
   validateSequenceEnrollmentWaitStatus,
 } from "../lib/growth/sequences/conditions/sequence-wait-types"
+import {
+  SEQUENCE_BRANCH_EDGE_TYPES,
+  validateSequenceBranchEdgeType,
+} from "../lib/growth/sequences/conditions/sequence-branch-types"
 import {
   appendBranchDecision,
   createCondition,
@@ -54,10 +59,15 @@ const PRODUCTION_ENV_SOURCES = [
 ] as const
 
 const RUNTIME_FORBIDDEN_PATTERNS = [
-  /resolveSequenceWait/i,
   /executeSequenceBranch/i,
   /runBranchExecution/i,
-  /waitResolver/i,
+] as const
+
+const BRANCH_PATH_FORBIDDEN_PATTERNS = [
+  /queueSequenceStepTransportJob/,
+  /createSequenceExecutionJob/,
+  /runGrowthAiCopilotGeneration/,
+  /insertGrowthOutreachQueueItem/,
 ] as const
 
 const EVALUATOR_WRITE_FORBIDDEN_PATTERNS = [
@@ -68,12 +78,14 @@ const EVALUATOR_WRITE_FORBIDDEN_PATTERNS = [
 ] as const
 
 function runLocalRegression(): void {
-  console.log(`\n=== SR-3 Phase 1/2 local regression (${GROWTH_SEQUENCE_CONDITIONS_QA_MARKER}) ===\n`)
+  console.log(`\n=== SR-3 Phase 1/2/3 local regression (${GROWTH_SEQUENCE_CONDITIONS_QA_MARKER}) ===\n`)
 
   assert.equal(GROWTH_SEQUENCE_CONDITIONS_QA_MARKER, "growth-sequence-conditions-sr3-phase1-v1")
   assert.equal(GROWTH_SEQUENCE_CONDITIONS_CONFIRM, "RUN_GROWTH_SEQUENCE_CONDITIONS_CERTIFICATION")
   assert.equal(GROWTH_SEQUENCE_CONDITIONS_MIGRATION, "20270827120000_growth_sequence_conditions_sr3_phase1.sql")
   assert.equal(GROWTH_SEQUENCE_CONDITION_EVALUATOR_QA_MARKER, "growth-sequence-condition-evaluator-sr3-phase2-v1")
+  assert.equal(GROWTH_SEQUENCE_BRANCH_RESOLVER_QA_MARKER, "growth-sequence-branch-resolver-sr3-phase3-v1")
+  assert.equal(GROWTH_SEQUENCE_WAIT_REGISTRY_QA_MARKER, "growth-sequence-wait-registry-sr3-phase3-v1")
   assert.equal(
     GROWTH_SEQUENCE_CONDITION_EVALUATOR_CONFIRM,
     "RUN_GROWTH_SEQUENCE_CONDITION_EVALUATOR_CERTIFICATION",
@@ -90,6 +102,12 @@ function runLocalRegression(): void {
     "lib/growth/sequences/conditions/sequence-condition-event-query.ts",
     "lib/growth/sequences/conditions/sequence-condition-evaluator.ts",
     "lib/growth/sequences/conditions/sequence-condition-cert-fixtures.ts",
+    "lib/growth/sequences/conditions/sequence-branch-resolver-types.ts",
+    "lib/growth/sequences/conditions/sequence-branch-resolver.ts",
+    "lib/growth/sequences/conditions/sequence-wait-registry-types.ts",
+    "lib/growth/sequences/conditions/sequence-wait-registry.ts",
+    "lib/growth/sequences/conditions/sequence-branch-audit.ts",
+    "lib/growth/sequences/conditions/sequence-branch-advance-gate.ts",
     "app/api/platform/growth/sequences/conditions/evaluate/route.ts",
     "supabase/migrations/20270827120000_growth_sequence_conditions_sr3_phase1.sql",
   ]
@@ -172,6 +190,43 @@ function runLocalRegression(): void {
   ])
   console.log("  ✓ wait status validation")
 
+  const edge = (id: string, type: SequenceBranchEdge["edgeType"], conditionId: string | null, to: string): SequenceBranchEdge => ({
+    id,
+    patternId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    fromPatternStepId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    toPatternStepId: to,
+    conditionId,
+    edgeType: type,
+    priority: 10,
+    label: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  })
+
+  const matched = resolveSequenceBranchEdges({
+    fromPatternStepId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    edges: [
+      edge("e1", "conditional_true", "c1", "cccccccc-cccc-4ccc-8ccc-cccccccccccc"),
+      edge("e2", "default", null, "dddddddd-dddd-4ddd-8ddd-dddddddddddd"),
+    ],
+    evaluations: [{ conditionId: "c1", matched: true }],
+  })
+  assert.equal(matched.selectedEdge?.id, "e1")
+  assert.equal(matched.skippedEdges.length, 1)
+  console.log("  ✓ branch resolver conditional_true selection")
+
+  const fallback = resolveSequenceBranchEdges({
+    fromPatternStepId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    edges: [
+      edge("e1", "conditional_true", "c1", "cccccccc-cccc-4ccc-8ccc-cccccccccccc"),
+      edge("e2", "default", null, "dddddddd-dddd-4ddd-8ddd-dddddddddddd"),
+    ],
+    evaluations: [{ conditionId: "c1", matched: false }],
+  })
+  assert.equal(fallback.selectedEdge?.id, "e2")
+  assert.equal(fallback.resolution, "default")
+  console.log("  ✓ branch resolver default edge fallback")
+
   assert.equal(compareSequenceConditionNumeric("gte", 80, 75), true)
   assert.equal(compareSequenceConditionNumeric("lt", 10, 75), true)
   assert.equal(normalizeSequenceConditionTier("warming"), "warm")
@@ -248,13 +303,43 @@ function runLocalRegression(): void {
   assert.match(channelEventTypes, /wait_started/)
   assert.match(channelEventTypes, /wait_resolved/)
   assert.match(channelEventTypes, /condition_timeout/)
+  assert.match(channelEventTypes, /advancement_blocked/)
   console.log("  ✓ reserved channel event kinds documented")
+
+  const waitRegistrySource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/sequences/conditions/sequence-wait-registry.ts"),
+    "utf8",
+  )
+  assert.match(waitRegistrySource, /resolveSequenceEnrollmentWaitRegistry/)
+  assert.match(waitRegistrySource, /scheduleBranchTargetEnrollmentStep/)
+  for (const pattern of BRANCH_PATH_FORBIDDEN_PATTERNS) {
+    assert.doesNotMatch(waitRegistrySource, pattern, "wait registry must not execute transport")
+  }
+  console.log("  ✓ wait registry surface without direct transport execution")
+
+  const orchestratorSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/sequence-enrollment/sequence-enrollment-orchestrator.ts"),
+    "utf8",
+  )
+  assert.match(orchestratorSource, /applySequenceBranchResolution/)
+  assert.match(orchestratorSource, /evaluateSequenceBranchAdvanceGate/)
+  assert.match(orchestratorSource, /advanceGate\.blocked/)
+  assert.match(orchestratorSource, /recordSequenceAdvancementBlockedAudit/)
+  console.log("  ✓ advancement integration hooks + pause gate blocks all paths")
+
+  const advanceGateSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/sequences/conditions/sequence-branch-advance-gate.ts"),
+    "utf8",
+  )
+  assert.match(advanceGateSource, /recordSequenceAdvancementBlockedAudit/)
+  assert.match(advanceGateSource, /runSequenceAdvancementGateSafetyProbes/)
+  assert.match(advanceGateSource, /advancement_blocked/)
+  console.log("  ✓ advancement gate audit + safety probes")
 
   const forbiddenScanTargets = [
     "lib/growth/sequences/execution/sequence-job-runner.ts",
     "lib/growth/sequences/execution/sequence-job-planner.ts",
-    "lib/growth/sequence-enrollment/sequence-enrollment-repository.ts",
-    "lib/growth/sequences/conditions/sequence-condition-evaluator.ts",
+    "lib/growth/sequences/conditions/sequence-wait-registry.ts",
   ]
   for (const relativePath of forbiddenScanTargets) {
     const source = fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
@@ -262,16 +347,16 @@ function runLocalRegression(): void {
       assert.doesNotMatch(source, pattern, `${relativePath} must not contain runtime branching logic`)
     }
     if (!relativePath.includes("evaluator")) {
-      assert.doesNotMatch(source, /sequence-condition-repository/)
+      assert.doesNotMatch(source, /executeSequenceBranch/)
     }
   }
-  console.log("  ✓ no branch execution / wait resolution wired into execution paths")
+  console.log("  ✓ no autonomous branch execution in job runner / wait registry")
 
   assert.equal(typeof createCondition, "function")
   assert.equal(typeof appendBranchDecision, "function")
   console.log("  ✓ repository imports resolve")
 
-  console.log("\nSR-3 Phase 1/2 local regression PASS\n")
+  console.log("\nSR-3 Phase 1/2/3 local regression PASS\n")
 }
 
 async function runIntegrationDiagnostics(): Promise<Record<string, unknown>> {
@@ -308,7 +393,7 @@ async function main(): Promise<void> {
     return
   }
 
-  console.log(`\n=== SR-3 Phase 1/2 ${mode} diagnostics ===\n`)
+  console.log(`\n=== SR-3 Phase 1/2/3 ${mode} diagnostics ===\n`)
   const report = await runIntegrationDiagnostics()
   console.log(JSON.stringify(report, null, 2))
 

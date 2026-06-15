@@ -104,6 +104,7 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "sequence_step_blocked",
   "sequence_step_sent",
   "sequence_step_failed",
+  "sequence_branch_evaluated",
   "sequence_scheduler_run",
   "qa_schedule_step_now",
   "qa_force_due_now",

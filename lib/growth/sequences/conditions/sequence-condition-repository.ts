@@ -334,6 +334,36 @@ export async function listEdgesForPattern(
   return ((data ?? []) as EdgeRow[]).map(mapEdgeRow)
 }
 
+export async function listEdgesFromPatternStep(
+  admin: SupabaseClient,
+  patternId: string,
+  fromPatternStepId: string,
+): Promise<SequenceBranchEdge[]> {
+  const { data, error } = await edgesTable(admin)
+    .select(EDGE_SELECT)
+    .eq("pattern_id", patternId)
+    .eq("from_pattern_step_id", fromPatternStepId)
+    .order("priority", { ascending: false })
+    .order("created_at", { ascending: true })
+
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as EdgeRow[]).map(mapEdgeRow)
+}
+
+export async function listActiveWaitsForEnrollmentStep(
+  admin: SupabaseClient,
+  enrollmentStepId: string,
+): Promise<SequenceEnrollmentWait[]> {
+  const { data, error } = await waitsTable(admin)
+    .select(WAIT_SELECT)
+    .eq("enrollment_step_id", enrollmentStepId)
+    .in("status", ["pending", "active"])
+    .order("created_at", { ascending: false })
+
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as WaitRow[]).map(mapWaitRow)
+}
+
 export async function createWait(
   admin: SupabaseClient,
   input: CreateSequenceEnrollmentWaitInput,

@@ -7,6 +7,8 @@ import {
   GROWTH_SEQUENCE_ATTRIBUTION_QA_MARKER,
 } from "@/lib/growth/sequences/attribution/sequence-attribution-types"
 import { evaluateEnrollmentStatusForExecutionGate } from "@/lib/growth/sequences/execution/sequence-pause-gate-types"
+import { ensureSequenceConditionCertFixture } from "@/lib/growth/sequences/conditions/sequence-condition-cert-fixtures"
+import { runSequenceAdvancementGateSafetyProbes } from "@/lib/growth/sequences/conditions/sequence-branch-advance-gate"
 
 export { GROWTH_SEQUENCE_ATTRIBUTION_CONFIRM, GROWTH_SEQUENCE_ATTRIBUTION_QA_MARKER }
 
@@ -25,6 +27,7 @@ export type SequenceAttributionDiagnosticsReport = {
   schema_ready: boolean
   pause_gate_ready: boolean
   attribution_columns_ready: boolean
+  advancement_gate_safe: boolean
 }
 
 const ATTRIBUTION_TABLES = [
@@ -130,20 +133,74 @@ export async function executeGrowthSequenceAttributionDiagnostics(
     detail: "sequence-pause-gate-types module loaded (safe-execute wiring verified in local regression).",
   })
 
+  let advancementGateSafe = false
+  try {
+    const fixture = await ensureSequenceConditionCertFixture(admin)
+    if (fixture) {
+      const gateProbe = await runSequenceAdvancementGateSafetyProbes(admin, {
+        enrollmentId: fixture.enrollmentId,
+        enrollmentStepId: fixture.enrollmentStepId,
+        leadId: fixture.leadId,
+        marker: `sr3-advancement-gate-${Date.now()}`,
+      })
+      advancementGateSafe =
+        gateProbe.pausedBlocksAdvancement &&
+        gateProbe.auditRecorded &&
+        (gateProbe.exitCandidateProbeSkipped || gateProbe.exitCandidateBlocksAdvancement)
+
+      checks.push({
+        id: "advancement.pause_gate_blocks_all_paths",
+        ok: gateProbe.pausedBlocksAdvancement,
+        detail: gateProbe.pausedBlocksAdvancement
+          ? "Paused enrollment blocked branch + linear advancement."
+          : "Paused enrollment still advanced.",
+      })
+      checks.push({
+        id: "advancement.exit_candidate_blocks_all_paths",
+        ok: gateProbe.exitCandidateProbeSkipped ? false : gateProbe.exitCandidateBlocksAdvancement,
+        detail: gateProbe.exitCandidateProbeSkipped
+          ? "Skipped exit-candidate probe — no inbox thread for cert lead."
+          : gateProbe.exitCandidateBlocksAdvancement
+            ? "Pending exit candidate blocked branch + linear advancement."
+            : "Exit candidate did not block advancement.",
+      })
+      checks.push({
+        id: "advancement.blocked_audit_recorded",
+        ok: gateProbe.auditRecorded,
+        detail: gateProbe.auditRecorded
+          ? "advancement_blocked audit event recorded."
+          : "No advancement_blocked audit event recorded.",
+      })
+    } else {
+      checks.push({
+        id: "advancement.pause_gate_blocks_all_paths",
+        ok: false,
+        detail: "Skipped — cert fixture unavailable.",
+      })
+    }
+  } catch (error) {
+    checks.push({
+      id: "advancement.pause_gate_blocks_all_paths",
+      ok: false,
+      detail: error instanceof Error ? error.message : String(error),
+    })
+  }
+
   const schemaReady = checks.filter((check) => check.id.includes(".")).every((check) => check.ok)
   const pauseGateReady = checks
     .filter((check) => check.id.startsWith("pause_gate."))
     .every((check) => check.ok)
-  const ok = schemaReady && pauseGateReady
+  const ok = schemaReady && pauseGateReady && advancementGateSafe
 
   return {
     qa_marker: GROWTH_SEQUENCE_ATTRIBUTION_QA_MARKER,
     migration: GROWTH_SEQUENCE_ATTRIBUTION_MIGRATION,
     ok,
-    final_verdict: ok ? "PASS" : schemaReady ? "CONDITIONAL_PASS" : "FAIL",
+    final_verdict: ok ? "PASS" : schemaReady && pauseGateReady ? "CONDITIONAL_PASS" : "FAIL",
     checks,
     schema_ready: schemaReady,
     pause_gate_ready: pauseGateReady,
     attribution_columns_ready: schemaReady,
+    advancement_gate_safe: advancementGateSafe,
   }
 }

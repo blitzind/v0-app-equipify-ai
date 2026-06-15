@@ -49,6 +49,7 @@ function runLocalRegression(): void {
     "lib/growth/sequences/attribution/sequence-attribution-resolver.ts",
     "lib/growth/sequences/attribution/sequence-attribution-diagnostics.ts",
     "lib/growth/sequences/execution/sequence-pause-gate.ts",
+    "lib/growth/sequences/conditions/sequence-branch-advance-gate.ts",
     "supabase/migrations/20270616120100_growth_sequence_attribution_sr3_phase0.sql",
   ]
   for (const relativePath of requiredFiles) {
@@ -111,6 +112,22 @@ function runLocalRegression(): void {
   assert.match(jobRunner, /assertSequenceExecutionPauseGate/)
   assert.match(jobRunner, /sequence_enrollment_step_id: locked\.sequenceStepId/)
   console.log("  ✓ safe execute pause gate + email step attribution wiring")
+
+  const orchestrator = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/sequence-enrollment/sequence-enrollment-orchestrator.ts"),
+    "utf8",
+  )
+  assert.match(orchestrator, /advanceGate\.blocked/)
+  assert.match(orchestrator, /recordSequenceAdvancementBlockedAudit/)
+  console.log("  ✓ advancement pause gate blocks branch and linear paths")
+
+  const advanceGate = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/sequences/conditions/sequence-branch-advance-gate.ts"),
+    "utf8",
+  )
+  assert.match(advanceGate, /runSequenceAdvancementGateSafetyProbes/)
+  assert.match(advanceGate, /advancement_blocked/)
+  console.log("  ✓ advancement gate audit + integration safety probes")
 
   const trackingRepo = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/tracking/tracking-repository.ts"),
