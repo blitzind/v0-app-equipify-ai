@@ -27,6 +27,7 @@ import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowle
 import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growth-knowledge-recommendations-section"
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
+import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GROWTH_REPLY_WORKFLOW_CENTER_QA_MARKER } from "@/lib/growth/reply-intelligence/workflow-actions-types"
 
 type FilterKey = "all" | "interested" | "call_task" | "follow_up" | "opportunity"
@@ -526,6 +527,8 @@ export function GrowthReplyWorkflowActionsPanel({
       />
 
       <GrowthHumanInterventionsPanel title="Human Interventions" leadId={leadId} compact={compact} />
+
+      <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" leadId={leadId} compact={compact} />
 
       {showSequenceExit && exitCandidates.length > 0 ? (
         <GrowthEngineCard title="Sequence exit review" subtitle="Inbound reply on active sequence — operator decides next step.">

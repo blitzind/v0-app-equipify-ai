@@ -9,6 +9,7 @@ import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growt
 import { GrowthCampaignReadinessPanel } from "@/components/growth/growth-campaign-readiness-panel"
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
+import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GrowthOpportunityRecommendationScoringDetails } from "@/components/growth/growth-opportunity-recommendation-scoring-details"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import {
@@ -183,6 +184,8 @@ export function GrowthLeadOpportunityIntelligencePanel({ lead }: GrowthLeadOppor
       />
 
       <GrowthHumanInterventionsPanel title="Human Interventions" leadId={lead.id} compact />
+
+      <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" leadId={lead.id} compact />
     </GrowthCollapsibleEngineCard>
   )
 }

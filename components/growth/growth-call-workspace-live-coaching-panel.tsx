@@ -8,6 +8,7 @@ import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowle
 import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growth-knowledge-recommendations-section"
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
+import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import {
   LiveCoachingExecutionScorePanel,
   LiveCoachingGuidancePanel,
@@ -318,6 +319,7 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
                 compact
               />
               <GrowthHumanInterventionsPanel title="Human Interventions" leadId={sessionLeadId} compact />
+              <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" leadId={sessionLeadId} compact />
             </>
           ) : null}
         </div>

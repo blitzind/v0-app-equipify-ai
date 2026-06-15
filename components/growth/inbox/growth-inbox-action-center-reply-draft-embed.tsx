@@ -4,6 +4,7 @@ import { GrowthInboxWidgetErrorBoundary } from "@/components/growth/growth-inbox
 import { GrowthReplyDraftingPanel } from "@/components/growth/growth-reply-drafting-panel"
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
+import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
 import { GROWTH_INBOX_WORKSPACE_PHASE4_QA_MARKER } from "@/lib/growth/inbox/inbox-workspace-types"
 
@@ -26,6 +27,11 @@ export function GrowthInboxActionCenterReplyDraftEmbed() {
         />
         <GrowthHumanInterventionsPanel
           title="Human Interventions"
+          leadId={selectedThread.lead_id}
+          compact
+        />
+        <GrowthSmartFollowUpPoliciesPanel
+          title="Smart Follow-Up Policies"
           leadId={selectedThread.lead_id}
           compact
         />

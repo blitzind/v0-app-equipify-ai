@@ -13,6 +13,7 @@ import { GrowthInboxV2SupportingPanels } from "@/components/growth/inbox/growth-
 import { GrowthOperatorInboxPanel } from "@/components/growth/growth-operator-inbox-panel"
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
+import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GrowthInboxWorkspaceKeyboardBridge } from "@/components/growth/inbox/growth-inbox-workspace-keyboard-bridge"
 import { GrowthInboxWorkspaceActionsMenu } from "@/components/growth/inbox/growth-inbox-workspace-actions-menu"
 import { GrowthInboxWorkspaceShell } from "@/components/growth/inbox/growth-inbox-workspace-shell"
@@ -103,6 +104,8 @@ export function GrowthInboxWorkspaceV2Panel() {
       <GrowthConversationalPlaybooksPanel consumer="operator_inbox" title="Conversational Playbook" compact />
 
       <GrowthHumanInterventionsPanel title="Human Interventions" compact />
+
+      <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" compact />
 
       <GrowthInboxV2SupportingPanels />
     </div>

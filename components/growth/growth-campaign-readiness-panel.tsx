@@ -6,6 +6,7 @@ import { ClipboardCheck, ExternalLink, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
+import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import {
   CAMPAIGN_READINESS_QA_MARKER,
   type CampaignReadinessAssessment,
@@ -324,6 +325,9 @@ export function GrowthCampaignReadinessPanel({
       ) : null}
     </GrowthEngineCard>
     {leadId ? <GrowthHumanInterventionsPanel title="Human Interventions" leadId={leadId} compact={compact} /> : null}
+    {leadId ? (
+      <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" leadId={leadId} compact={compact} />
+    ) : null}
     </>
   )
 }

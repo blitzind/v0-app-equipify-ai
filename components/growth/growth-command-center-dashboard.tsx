@@ -6,6 +6,7 @@ import { GrowthOperatorInboxPanel } from "@/components/growth/growth-operator-in
 import { GrowthCampaignReadinessPanel } from "@/components/growth/growth-campaign-readiness-panel"
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
+import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GrowthCommandOpenOpportunitiesSection } from "@/components/growth/growth-command-open-opportunities-section"
 import { GrowthCommandQuickActionsRail } from "@/components/growth/growth-command-quick-actions-rail"
 import { GrowthCommandSequenceQueueSection } from "@/components/growth/growth-command-sequence-queue-section"
@@ -46,6 +47,8 @@ export function GrowthCommandCenterDashboard() {
       <GrowthConversationalPlaybooksPanel consumer="operator_inbox" title="Conversational Playbook" compact />
 
       <GrowthHumanInterventionsPanel compact title="Human Interventions" />
+
+      <GrowthSmartFollowUpPoliciesPanel compact title="Smart Follow-Up Policies" />
 
       <TopProspectOpportunitiesPanel compact title="Top Prospect Opportunities" />
 

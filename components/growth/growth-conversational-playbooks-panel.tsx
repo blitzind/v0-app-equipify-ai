@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
+import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import {
   CONVERSATIONAL_PLAYBOOK_CONSUMER_LABELS,
   CONVERSATIONAL_PLAYBOOK_QA_MARKER,
@@ -250,6 +251,9 @@ export function GrowthConversationalPlaybooksPanel({
       ) : null}
     </GrowthEngineCard>
     {leadId ? <GrowthHumanInterventionsPanel title="Human Interventions" leadId={leadId} compact={compact} /> : null}
+    {leadId ? (
+      <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" leadId={leadId} compact={compact} />
+    ) : null}
     </>
   )
 }
