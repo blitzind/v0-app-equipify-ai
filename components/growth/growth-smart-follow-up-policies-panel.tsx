@@ -13,6 +13,7 @@ import {
   type SmartFollowUpPoliciesResponse,
   type SmartFollowUpPolicy,
 } from "@/lib/growth/follow-up-policies/follow-up-policy-types"
+import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
 import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
 
 function priorityTone(priority: SmartFollowUpPolicy["priority"]) {
@@ -75,6 +76,8 @@ export function GrowthSmartFollowUpPoliciesPanel({
   useEffect(() => {
     void load()
   }, [load])
+
+  useGrowthRealtimeRefresh({ subscriber: "follow_up_policies", onRefresh: () => void load() })
 
   async function runAction(policy: SmartFollowUpPolicy, action: "mark_reviewed" | "dismiss") {
     setActingId(policy.policy_id)

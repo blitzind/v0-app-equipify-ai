@@ -13,6 +13,7 @@ import {
   type SequencePreviewFilter,
   type SequencePreviewStudioResponse,
 } from "@/lib/growth/sequence-preview/sequence-preview-types"
+import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
 import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
 
 function statusTone(status: SequencePreview["sequence_status"]) {
@@ -78,6 +79,8 @@ export function GrowthSequencePreviewStudioPanel({
   useEffect(() => {
     void load()
   }, [load])
+
+  useGrowthRealtimeRefresh({ subscriber: "sequence_preview", onRefresh: () => void load() })
 
   async function runAction(preview: SequencePreview, action: "mark_reviewed" | "dismiss") {
     setActingId(preview.preview_id)

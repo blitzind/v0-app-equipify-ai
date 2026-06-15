@@ -15,6 +15,7 @@ import {
   type ConversationalPlaybookConsumer,
   type ConversationalPlaybookSection,
 } from "@/lib/growth/conversational-playbooks/conversational-playbook-types"
+import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
 
 function confidenceTone(score: number): "healthy" | "attention" | "critical" | "neutral" {
   if (score >= 70) return "healthy"
@@ -82,6 +83,8 @@ export function GrowthConversationalPlaybooksPanel({
   useEffect(() => {
     void load()
   }, [load])
+
+  useGrowthRealtimeRefresh({ subscriber: "conversational_playbooks", onRefresh: () => void load() })
 
   async function markReviewed() {
     if (!playbook) return

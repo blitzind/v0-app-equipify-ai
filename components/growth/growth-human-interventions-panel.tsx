@@ -13,6 +13,7 @@ import {
   type HumanInterventionFilter,
   type HumanInterventionsResponse,
 } from "@/lib/growth/human-interventions/human-intervention-types"
+import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
 import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
 
@@ -65,6 +66,8 @@ export function GrowthHumanInterventionsPanel({
   useEffect(() => {
     void load()
   }, [load])
+
+  useGrowthRealtimeRefresh({ subscriber: "human_interventions", onRefresh: () => void load() })
 
   async function runAction(intervention: HumanIntervention, action: "mark_reviewed" | "dismiss") {
     setActingId(intervention.intervention_id)

@@ -14,6 +14,7 @@ import {
   type CampaignReadinessAssessment,
   type CampaignReadinessStatus,
 } from "@/lib/growth/campaign-readiness/campaign-readiness-types"
+import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
 
 function statusTone(status: CampaignReadinessStatus): "healthy" | "attention" | "critical" | "neutral" {
   switch (status) {
@@ -89,6 +90,8 @@ export function GrowthCampaignReadinessPanel({
   useEffect(() => {
     void load()
   }, [load])
+
+  useGrowthRealtimeRefresh({ subscriber: "campaign_readiness", onRefresh: () => void load() })
 
   async function generateAssessment() {
     setGenerating(true)

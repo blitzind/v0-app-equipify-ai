@@ -9,6 +9,7 @@ import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
 import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
+import { GrowthRealtimeEventBusPanel } from "@/components/growth/growth-realtime-event-bus-panel"
 import { GrowthCommandOpenOpportunitiesSection } from "@/components/growth/growth-command-open-opportunities-section"
 import { GrowthCommandQuickActionsRail } from "@/components/growth/growth-command-quick-actions-rail"
 import { GrowthCommandSequenceQueueSection } from "@/components/growth/growth-command-sequence-queue-section"
@@ -41,6 +42,8 @@ export function GrowthCommandCenterDashboard() {
       />
 
       <GrowthCommandDailyActionQueue briefing={briefing} loading={loading} />
+
+      <GrowthRealtimeEventBusPanel compact title="Real-Time Event Bus" />
 
       <GrowthOperatorInboxPanel compact title="Unified Operator Inbox" />
 

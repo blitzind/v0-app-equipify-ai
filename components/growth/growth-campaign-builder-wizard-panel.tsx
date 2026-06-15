@@ -13,6 +13,7 @@ import {
   type CampaignBuilderWizard,
   type CampaignBuilderWizardResponse,
 } from "@/lib/growth/campaign-builder/campaign-builder-types"
+import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
 
 function statusTone(status: CampaignBuilderWizard["wizard_status"]) {
   switch (status) {
@@ -79,6 +80,8 @@ export function GrowthCampaignBuilderWizardPanel({
   useEffect(() => {
     void load()
   }, [load])
+
+  useGrowthRealtimeRefresh({ subscriber: "campaign_builder", onRefresh: () => void load() })
 
   async function runAction(wizard: CampaignBuilderWizard, action: "mark_reviewed" | "dismiss") {
     setActingId(wizard.wizard_id)

@@ -18,6 +18,7 @@ import {
   type OperatorInboxItem,
   type OperatorInboxQueueResponse,
 } from "@/lib/growth/operator-inbox/operator-inbox-types"
+import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
 
 function priorityTone(priority: OperatorInboxItem["priority"]) {
   switch (priority) {
@@ -67,6 +68,8 @@ export function GrowthOperatorInboxPanel({
   useEffect(() => {
     void load()
   }, [load])
+
+  useGrowthRealtimeRefresh({ subscriber: "operator_inbox", onRefresh: () => void load() })
 
   async function runAction(item: OperatorInboxItem, action: "mark_viewed" | "mark_reviewed" | "dismiss") {
     setActingId(item.item_id)
