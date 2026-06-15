@@ -16,6 +16,7 @@ import {
 import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
 import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
+import { GrowthAgentOrchestrationPanel } from "@/components/growth/growth-agent-orchestration-panel"
 
 function priorityTone(priority: HumanIntervention["priority"]) {
   switch (priority) {
@@ -208,6 +209,9 @@ export function GrowthHumanInterventionsPanel({
     ) : null}
     {leadId ? (
       <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" leadId={leadId} compact={compact} />
+    ) : null}
+    {leadId ? (
+      <GrowthAgentOrchestrationPanel title="Agent Orchestration" leadId={leadId} compact={compact} />
     ) : null}
     </>
   )

@@ -16,6 +16,7 @@ import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
 import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
+import { GrowthAgentOrchestrationPanel } from "@/components/growth/growth-agent-orchestration-panel"
 import { GrowthRealtimeEventBusPanel } from "@/components/growth/growth-realtime-event-bus-panel"
 import { GrowthInboxWorkspaceKeyboardBridge } from "@/components/growth/inbox/growth-inbox-workspace-keyboard-bridge"
 import { GrowthInboxWorkspaceActionsMenu } from "@/components/growth/inbox/growth-inbox-workspace-actions-menu"
@@ -113,6 +114,8 @@ export function GrowthInboxWorkspaceV2Panel() {
       <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" compact />
 
       <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" compact />
+
+      <GrowthAgentOrchestrationPanel title="Agent Orchestration" compact />
 
       <GrowthRealtimeEventBusPanel title="Real-Time Event Bus" compact />
 

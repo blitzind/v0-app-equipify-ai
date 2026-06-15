@@ -9,6 +9,7 @@ import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
 import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
+import { GrowthAgentOrchestrationPanel } from "@/components/growth/growth-agent-orchestration-panel"
 import {
   CAMPAIGN_READINESS_QA_MARKER,
   type CampaignReadinessAssessment,
@@ -338,6 +339,9 @@ export function GrowthCampaignReadinessPanel({
     ) : null}
     {leadId ? (
       <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" leadId={leadId} compact={compact} />
+    ) : null}
+    {leadId ? (
+      <GrowthAgentOrchestrationPanel title="Agent Orchestration" leadId={leadId} compact={compact} />
     ) : null}
     </>
   )

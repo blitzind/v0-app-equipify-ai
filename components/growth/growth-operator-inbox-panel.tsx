@@ -10,6 +10,7 @@ import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
 import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
+import { GrowthAgentOrchestrationPanel } from "@/components/growth/growth-agent-orchestration-panel"
 import {
   OPERATOR_INBOX_FILTERS,
   OPERATOR_INBOX_QA_MARKER,
@@ -202,6 +203,7 @@ export function GrowthOperatorInboxPanel({
     <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" leadId={leadId} compact />
     <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" leadId={leadId} compact />
     <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" leadId={leadId} compact />
+    <GrowthAgentOrchestrationPanel title="Agent Orchestration" leadId={leadId} compact />
     </>
   )
 }

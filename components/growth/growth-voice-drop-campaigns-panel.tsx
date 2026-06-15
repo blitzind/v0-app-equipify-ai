@@ -15,6 +15,7 @@ import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
 import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
+import { GrowthAgentOrchestrationPanel } from "@/components/growth/growth-agent-orchestration-panel"
 
 export function GrowthVoiceDropCampaignsPanel() {
   const [dashboard, setDashboard] = useState<VoiceDropCampaignDashboardSnapshot | null>(null)
@@ -224,6 +225,7 @@ export function GrowthVoiceDropCampaignsPanel() {
       <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" compact />
       <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" compact />
       <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" compact />
+      <GrowthAgentOrchestrationPanel title="Agent Orchestration" compact />
     </div>
   )
 }

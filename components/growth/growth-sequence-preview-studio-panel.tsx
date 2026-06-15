@@ -15,6 +15,7 @@ import {
 } from "@/lib/growth/sequence-preview/sequence-preview-types"
 import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
 import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
+import { GrowthAgentOrchestrationPanel } from "@/components/growth/growth-agent-orchestration-panel"
 
 function statusTone(status: SequencePreview["sequence_status"]) {
   switch (status) {
@@ -287,6 +288,12 @@ export function GrowthSequencePreviewStudioPanel({
     </GrowthEngineCard>
     <GrowthCampaignBuilderWizardPanel
       title="Campaign Builder Wizard"
+      leadId={leadId}
+      patternId={patternId}
+      compact={compact}
+    />
+    <GrowthAgentOrchestrationPanel
+      title="Agent Orchestration"
       leadId={leadId}
       patternId={patternId}
       compact={compact}

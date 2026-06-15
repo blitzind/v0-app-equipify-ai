@@ -12,6 +12,7 @@ import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
 import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
+import { GrowthAgentOrchestrationPanel } from "@/components/growth/growth-agent-orchestration-panel"
 import { GrowthRealtimeEventBusPanel } from "@/components/growth/growth-realtime-event-bus-panel"
 import {
   GROWTH_OPPORTUNITY_INTELLIGENCE_PRIVACY_NOTE,
@@ -150,6 +151,8 @@ export function GrowthOpportunityIntelligenceDashboardView() {
       <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" compact />
 
       <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" compact />
+
+      <GrowthAgentOrchestrationPanel title="Agent Orchestration" compact />
 
       <GrowthRealtimeEventBusPanel title="Real-Time Event Bus" compact />
 

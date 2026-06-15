@@ -25,6 +25,7 @@ export const REALTIME_EVENT_SUBSCRIBERS = [
   "follow_up_policies",
   "sequence_preview",
   "campaign_builder",
+  "agent_orchestration",
   "opportunity_intelligence",
   "signal_feed",
 ] as const

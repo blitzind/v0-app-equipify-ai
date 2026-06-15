@@ -8,29 +8,30 @@ import {
 } from "@/lib/growth/realtime-events/realtime-events-types"
 
 const QA_MARKER_ROUTES: Record<string, GrowthRealtimeEventSubscriber[]> = {
-  "growth-signal-feed-gs1d-v1": ["command_center", "signal_feed", "operator_inbox", "opportunity_intelligence"],
-  "growth-operator-inbox-gs1e-v1": ["operator_inbox", "command_center", "inbox_v2"],
-  "growth-campaign-readiness-gs2e-v1": ["campaign_readiness", "command_center", "campaign_builder"],
+  "growth-signal-feed-gs1d-v1": ["command_center", "signal_feed", "operator_inbox", "opportunity_intelligence", "agent_orchestration"],
+  "growth-operator-inbox-gs1e-v1": ["operator_inbox", "command_center", "inbox_v2", "agent_orchestration"],
+  "growth-campaign-readiness-gs2e-v1": ["campaign_readiness", "command_center", "campaign_builder", "agent_orchestration"],
   "growth-conversational-playbooks-gs3d-v1": ["conversational_playbooks", "inbox_v2", "command_center"],
-  "growth-human-interventions-gs3e-v1": ["human_interventions", "operator_inbox", "command_center"],
-  "growth-follow-up-policies-gs5c-v1": ["follow_up_policies", "operator_inbox", "command_center"],
-  "growth-sequence-preview-gs5b-v1": ["sequence_preview", "campaign_builder", "command_center"],
-  "growth-campaign-builder-gs5d-v1": ["campaign_builder", "campaign_readiness", "command_center"],
-  "growth-realtime-events-gs4c-v1": ["command_center", "operator_inbox"],
+  "growth-human-interventions-gs3e-v1": ["human_interventions", "operator_inbox", "command_center", "agent_orchestration"],
+  "growth-follow-up-policies-gs5c-v1": ["follow_up_policies", "operator_inbox", "command_center", "agent_orchestration"],
+  "growth-sequence-preview-gs5b-v1": ["sequence_preview", "campaign_builder", "command_center", "agent_orchestration"],
+  "growth-campaign-builder-gs5d-v1": ["campaign_builder", "campaign_readiness", "command_center", "agent_orchestration"],
+  "growth-agent-orchestration-gs4d-v1": ["agent_orchestration", "command_center", "operator_inbox"],
+  "growth-realtime-events-gs4c-v1": ["command_center", "operator_inbox", "agent_orchestration"],
 }
 
 const SOURCE_ROUTES: Record<GrowthRealtimeEventSource, GrowthRealtimeEventSubscriber[]> = {
-  signal_feed: ["signal_feed", "command_center", "operator_inbox"],
-  operator_inbox: ["operator_inbox", "inbox_v2", "command_center"],
-  campaign_readiness: ["campaign_readiness", "campaign_builder", "command_center"],
-  human_interventions: ["human_interventions", "operator_inbox", "command_center"],
-  follow_up_policies: ["follow_up_policies", "operator_inbox", "command_center"],
-  sequence_preview: ["sequence_preview", "campaign_builder", "command_center"],
-  campaign_builder: ["campaign_builder", "campaign_readiness", "command_center"],
+  signal_feed: ["signal_feed", "command_center", "operator_inbox", "agent_orchestration"],
+  operator_inbox: ["operator_inbox", "inbox_v2", "command_center", "agent_orchestration"],
+  campaign_readiness: ["campaign_readiness", "campaign_builder", "command_center", "agent_orchestration"],
+  human_interventions: ["human_interventions", "operator_inbox", "command_center", "agent_orchestration"],
+  follow_up_policies: ["follow_up_policies", "operator_inbox", "command_center", "agent_orchestration"],
+  sequence_preview: ["sequence_preview", "campaign_builder", "command_center", "agent_orchestration"],
+  campaign_builder: ["campaign_builder", "campaign_readiness", "command_center", "agent_orchestration"],
   conversational_playbooks: ["conversational_playbooks", "inbox_v2", "command_center"],
-  realtime_event_bus: ["command_center", "operator_inbox"],
-  attention_feed: ["operator_inbox", "inbox_v2", "command_center"],
-  unknown: ["command_center"],
+  realtime_event_bus: ["command_center", "operator_inbox", "agent_orchestration"],
+  attention_feed: ["operator_inbox", "inbox_v2", "command_center", "agent_orchestration"],
+  unknown: ["command_center", "agent_orchestration"],
 }
 
 function buildRouteHref(subscriber: GrowthRealtimeEventSubscriber, leadId: string | null): string | null {
@@ -53,6 +54,8 @@ function buildRouteHref(subscriber: GrowthRealtimeEventSubscriber, leadId: strin
     case "opportunity_intelligence":
       return `/admin/growth/opportunities${q}`
     case "signal_feed":
+      return `/admin/growth/command${q}`
+    case "agent_orchestration":
       return `/admin/growth/command${q}`
     default:
       return null
@@ -99,6 +102,7 @@ export function resolveSourceFromPayload(payload: Record<string, unknown>): Grow
   if (qa.includes("campaign-builder")) return "campaign_builder"
   if (qa.includes("conversational-playbooks")) return "conversational_playbooks"
   if (qa.includes("realtime-events")) return "realtime_event_bus"
+  if (qa.includes("agent-orchestration")) return "realtime_event_bus"
 
   const source = typeof payload.source === "string" ? payload.source : ""
   if (SOURCE_ROUTES[source as GrowthRealtimeEventSource]) return source as GrowthRealtimeEventSource

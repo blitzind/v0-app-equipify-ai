@@ -9,6 +9,7 @@ import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
 import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
+import { GrowthAgentOrchestrationPanel } from "@/components/growth/growth-agent-orchestration-panel"
 import { GrowthRealtimeEventBusPanel } from "@/components/growth/growth-realtime-event-bus-panel"
 import { GrowthCommandOpenOpportunitiesSection } from "@/components/growth/growth-command-open-opportunities-section"
 import { GrowthCommandQuickActionsRail } from "@/components/growth/growth-command-quick-actions-rail"
@@ -58,6 +59,8 @@ export function GrowthCommandCenterDashboard() {
       <GrowthSequencePreviewStudioPanel compact title="Sequence Preview Studio" />
 
       <GrowthCampaignBuilderWizardPanel compact title="Campaign Builder Wizard" />
+
+      <GrowthAgentOrchestrationPanel compact title="Agent Orchestration" />
 
       <TopProspectOpportunitiesPanel compact title="Top Prospect Opportunities" />
 
