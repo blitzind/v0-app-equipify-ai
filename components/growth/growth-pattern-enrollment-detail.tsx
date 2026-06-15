@@ -7,6 +7,7 @@ import { ArrowRight, Clock, FastForward, GitBranch, Loader2, Play, RefreshCw, Za
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import { GrowthSequenceOptimizationRecommendationsSection } from "@/components/growth/growth-sequence-optimization-recommendations"
+import { GrowthSequenceBranchAuditPanel } from "@/components/growth/growth-sequence-branch-audit-panel"
 import type { PatternEnrollmentDetailView } from "@/lib/growth/sequence-enrollment/enrollment-detail-types"
 import {
   formatEnrollmentStepStatusLabel,
@@ -260,6 +261,8 @@ export function GrowthPatternEnrollmentDetail({ enrollmentId }: { enrollmentId: 
           </p>
         ) : null}
       </GrowthEngineCard>
+
+      <GrowthSequenceBranchAuditPanel branchVisibility={detail.branchVisibility} />
 
       {detail.qaAccelerationEnabled ? (
         <GrowthEngineCard title="QA Tools" icon={<Zap className="size-4" />}>

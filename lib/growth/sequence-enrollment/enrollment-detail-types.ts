@@ -4,6 +4,8 @@ import type { GrowthSequenceEnrollmentStep, GrowthSequenceEnrollmentWithSteps } 
 import type { GrowthSequenceSchedulerStatus } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
 import type { PatternEnrollmentHistoryEventView } from "@/lib/growth/sequence-enrollment/qa-acceleration-types"
 import type { GrowthQaDeliverabilityBypassView } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass-types"
+import type { GrowthOutboundTransportReadiness } from "@/lib/growth/runtime/outbound-transport-readiness-types"
+import type { SequenceEnrollmentBranchVisibilityView } from "@/lib/growth/sequences/conditions/sequence-enrollment-branch-visibility-types"
 import type {
   GrowthSequenceExecutionJob,
   GrowthSequenceExecutionJobStatus,
@@ -65,6 +67,7 @@ export type PatternEnrollmentDetailView = {
   qaDeliverabilityBypass: GrowthQaDeliverabilityBypassView | null
   historyEvents: PatternEnrollmentHistoryEventView[]
   transportReadiness: GrowthOutboundTransportReadiness
+  branchVisibility: SequenceEnrollmentBranchVisibilityView | null
 }
 
 export type PatternEnrollmentStats = {

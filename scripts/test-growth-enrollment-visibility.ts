@@ -51,6 +51,15 @@ assert.match(detailApi, /fetchPatternEnrollmentDetail/)
 const detailRepo = readSource("lib/growth/sequence-enrollment/enrollment-detail.ts")
 assert.match(detailRepo, /fetchPatternEnrollmentWithSteps/)
 assert.match(detailRepo, /listSequenceExecutionJobsForEnrollment/)
+assert.match(detailRepo, /fetchSequenceEnrollmentBranchVisibility/)
+
+const branchPanel = readSource("components/growth/growth-sequence-branch-audit-panel.tsx")
+assert.match(branchPanel, /GrowthSequenceBranchAuditPanel/)
+assert.match(branchPanel, /branchDecisions/)
+assert.match(branchPanel, /activeWaits/)
+
+const detailComponent = readSource("components/growth/growth-pattern-enrollment-detail.tsx")
+assert.match(detailComponent, /GrowthSequenceBranchAuditPanel/)
 
 const patternStatsRepo = readSource("lib/growth/sequence-enrollment/pattern-enrollment-stats.ts")
 assert.match(patternStatsRepo, /sequence_enrollments/)

@@ -416,6 +416,19 @@ export async function listActiveWaitsForEnrollmentStep(
   return ((data ?? []) as WaitRow[]).map(mapWaitRow)
 }
 
+export async function listWaitsForEnrollment(
+  admin: SupabaseClient,
+  enrollmentId: string,
+): Promise<SequenceEnrollmentWait[]> {
+  const { data, error } = await waitsTable(admin)
+    .select(WAIT_SELECT)
+    .eq("enrollment_id", enrollmentId)
+    .order("created_at", { ascending: false })
+
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as WaitRow[]).map(mapWaitRow)
+}
+
 export async function createWait(
   admin: SupabaseClient,
   input: CreateSequenceEnrollmentWaitInput,

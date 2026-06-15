@@ -27,6 +27,7 @@ import { listPatternEnrollmentHistoryEvents } from "@/lib/growth/sequence-enroll
 import { evaluateGrowthOutboundTransportReadiness } from "@/lib/growth/runtime/outbound-transport-readiness"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { fetchGrowthQaDeliverabilityBypassView } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass"
+import { fetchSequenceEnrollmentBranchVisibility } from "@/lib/growth/sequences/conditions/sequence-enrollment-branch-visibility"
 
 function pickCurrentStep(steps: GrowthSequenceEnrollmentStep[], currentStepOrder: number) {
   return pickInProgressEnrollmentStep(steps, currentStepOrder)
@@ -150,7 +151,7 @@ export async function fetchPatternEnrollmentDetail(
   const bundle = await fetchPatternEnrollmentWithSteps(admin, enrollmentId)
   if (!bundle) return null
 
-  const [jobs, schedulerStatus, historyEvents, transportReadiness] = await Promise.all([
+  const [jobs, schedulerStatus, historyEvents, transportReadiness, branchVisibility] = await Promise.all([
     listSequenceExecutionJobsForEnrollment(admin, enrollmentId),
     fetchGrowthSequenceSchedulerStatus(admin).catch(() => null),
     listPatternEnrollmentHistoryEvents(admin, {
@@ -167,6 +168,11 @@ export async function fetchPatternEnrollmentDetail(
       deliveryRouteId: null,
       providerFamily: null,
     })),
+    fetchSequenceEnrollmentBranchVisibility(admin, {
+      enrollmentId: bundle.id,
+      sequencePatternId: bundle.sequencePatternId,
+      enrollmentSteps: bundle.steps,
+    }).catch(() => null),
   ])
   const jobViews = await enrichSequenceExecutionJobViews(admin, jobs)
   const stepOrderById = new Map(bundle.steps.map((step) => [step.id, step.stepOrder]))
@@ -249,5 +255,6 @@ export async function fetchPatternEnrollmentDetail(
     qaDeliverabilityBypass,
     historyEvents,
     transportReadiness,
+    branchVisibility,
   }
 }
