@@ -3,6 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { resolveSharePageBookingRenderModel } from "@/lib/growth/share-pages/share-page-booking-service"
+import { validateSharePagePublicRouteToken } from "@/lib/growth/share-pages/share-page-public-access"
 import { lookupSharePageByPreviewToken, lookupSharePageByPublicToken } from "@/lib/growth/share-pages/share-page-repository"
 import { mapSharePageToRenderModel, readSharePagePersonalizationSnapshot } from "@/lib/growth/share-pages/share-page-render-model"
 import type {
@@ -10,7 +11,6 @@ import type {
   GrowthSharePagePublicAccessResult,
   GrowthSharePageRenderModel,
 } from "@/lib/growth/share-pages/share-page-types"
-import { isSharePageTokenFormatValid } from "@/lib/growth/share-pages/share-page-token"
 
 export { mapSharePageToRenderModel } from "@/lib/growth/share-pages/share-page-render-model"
 
@@ -35,10 +35,7 @@ export async function buildSharePageRenderModel(
 }
 
 export function validateSharePageRouteToken(rawToken: string | undefined): GrowthSharePagePublicAccessReason | "invalid_format" {
-  const token = typeof rawToken === "string" ? rawToken.trim() : ""
-  if (!token) return "not_found"
-  if (!isSharePageTokenFormatValid(token)) return "invalid_format"
-  return "granted"
+  return validateSharePagePublicRouteToken(rawToken)
 }
 
 export async function resolveSharePagePublicRoute(

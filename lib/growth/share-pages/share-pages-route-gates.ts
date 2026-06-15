@@ -1,4 +1,6 @@
-/** Growth Engine SR-2B-1 — Share Pages route gates (client-safe). */
+/** Growth Engine SR-2B-1 — Share Pages platform admin route gates (server-only). */
+
+import "server-only"
 
 import {
   GROWTH_SHARE_PAGES_CONFIRM,
@@ -6,7 +8,6 @@ import {
   GROWTH_SHARE_PAGES_QA_MARKER,
   GROWTH_SHARE_PAGE_STATUSES,
 } from "@/lib/growth/share-pages/share-page-types"
-import { isSharePageTokenFormatValid } from "@/lib/growth/share-pages/share-page-token"
 
 export { GROWTH_SHARE_PAGES_CONFIRM }
 
@@ -27,33 +28,6 @@ export function assertSharePagesExecuteAllowed(env: Record<string, string | unde
     blockers.push("production_environment_required")
   }
   return { ok: blockers.length === 0, blockers }
-}
-
-export function validateSharePageOrganizationScope(input: {
-  organizationId: string | null | undefined
-  expectedOrganizationId: string | null | undefined
-}): { ok: boolean; error: string | null } {
-  const organizationId = input.organizationId?.trim() ?? ""
-  const expectedOrganizationId = input.expectedOrganizationId?.trim() ?? ""
-  if (!organizationId) return { ok: false, error: "organization_id_required" }
-  if (!expectedOrganizationId) return { ok: true, error: null }
-  if (organizationId !== expectedOrganizationId) {
-    return { ok: false, error: "organization_scope_mismatch" }
-  }
-  return { ok: true, error: null }
-}
-
-export function validateSharePageRouteToken(rawToken: string | null | undefined): {
-  ok: boolean
-  token: string | null
-  error: string | null
-} {
-  const token = typeof rawToken === "string" ? rawToken.trim() : ""
-  if (!token) return { ok: false, token: null, error: "token_required" }
-  if (!isSharePageTokenFormatValid(token)) {
-    return { ok: false, token: null, error: "token_format_invalid" }
-  }
-  return { ok: true, token, error: null }
 }
 
 export function validateSharePagesCertificationConfirmation(body: unknown): {

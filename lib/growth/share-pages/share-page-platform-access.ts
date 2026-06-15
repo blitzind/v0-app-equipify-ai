@@ -3,7 +3,7 @@ import "server-only"
 import { NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getGrowthEngineAiOrgId, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
-import { validateSharePageOrganizationScope } from "@/lib/growth/share-pages/share-pages-route-gates"
+import { validateSharePageOrganizationScope } from "@/lib/growth/share-pages/share-page-org-scope"
 import { isGrowthSharePagesSchemaReady } from "@/lib/growth/share-pages/share-pages-schema-health"
 import type { GrowthSharePage } from "@/lib/growth/share-pages/share-page-types"
 

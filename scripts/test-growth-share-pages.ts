@@ -11,9 +11,9 @@ import { createClient } from "@supabase/supabase-js"
 import { bootstrapVerifiedChannelsCertEnv } from "../lib/growth/qa/verified-channels-cert-env-bootstrap"
 import {
   buildSharePagesReadinessPayload,
-  validateSharePageOrganizationScope,
-  validateSharePageRouteToken,
 } from "../lib/growth/share-pages/share-pages-route-gates"
+import { validateSharePageOrganizationScope } from "../lib/growth/share-pages/share-page-org-scope"
+import { validateSharePageRouteToken } from "../lib/growth/share-pages/share-page-token-validation"
 import {
   GROWTH_SHARE_PAGE_EVENT_TYPES,
   GROWTH_SHARE_PAGE_STATUSES,
@@ -52,6 +52,9 @@ function runLocalRegression(): void {
     "lib/growth/share-pages/share-page-types.ts",
     "lib/growth/share-pages/share-page-token.ts",
     "lib/growth/share-pages/share-page-repository.ts",
+    "lib/growth/share-pages/share-page-token-validation.ts",
+    "lib/growth/share-pages/share-page-org-scope.ts",
+    "lib/growth/share-pages/share-page-public-access.ts",
     "lib/growth/share-pages/share-pages-route-gates.ts",
     "lib/growth/share-pages/share-pages-schema-health.ts",
     "lib/growth/share-pages/share-pages-diagnostics.ts",
