@@ -10,6 +10,7 @@ import { GrowthInboxConversationColumn } from "@/components/growth/inbox/growth-
 import { GrowthInboxQueueProvider } from "@/components/growth/inbox/growth-inbox-queue-context"
 import { GrowthInboxThreadQueueColumn } from "@/components/growth/inbox/growth-inbox-thread-queue-column"
 import { GrowthInboxV2SupportingPanels } from "@/components/growth/inbox/growth-inbox-v2-supporting-panels"
+import { GrowthOperatorInboxPanel } from "@/components/growth/growth-operator-inbox-panel"
 import { GrowthInboxWorkspaceKeyboardBridge } from "@/components/growth/inbox/growth-inbox-workspace-keyboard-bridge"
 import { GrowthInboxWorkspaceActionsMenu } from "@/components/growth/inbox/growth-inbox-workspace-actions-menu"
 import { GrowthInboxWorkspaceShell } from "@/components/growth/inbox/growth-inbox-workspace-shell"
@@ -24,6 +25,7 @@ import {
 } from "@/lib/growth/inbox/inbox-workspace-types"
 import { GROWTH_INBOX_RUNTIME_STABLE_QA_MARKER } from "@/lib/growth/inbox/inbox-runtime-types"
 import { GROWTH_UNIFIED_INBOX_FOUNDATION_QA_MARKER } from "@/lib/growth/inbox/inbox-types"
+import { OPERATOR_INBOX_QA_MARKER } from "@/lib/growth/operator-inbox/operator-inbox-types"
 
 export function GrowthInboxWorkspaceV2Panel() {
   const {
@@ -50,7 +52,7 @@ export function GrowthInboxWorkspaceV2Panel() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
           {GROWTH_UNIFIED_INBOX_FOUNDATION_QA_MARKER} · {GROWTH_INBOX_RUNTIME_STABLE_QA_MARKER} ·{" "}
-          {GROWTH_INBOX_WORKSPACE_V2_QA_MARKER} · {GROWTH_INBOX_WORKSPACE_PHASE2_QA_MARKER} ·{" "}
+          {GROWTH_INBOX_WORKSPACE_V2_QA_MARKER} · {OPERATOR_INBOX_QA_MARKER} · {GROWTH_INBOX_WORKSPACE_PHASE2_QA_MARKER} ·{" "}
           {GROWTH_INBOX_WORKSPACE_PHASE3_QA_MARKER} · {GROWTH_INBOX_WORKSPACE_PHASE4_QA_MARKER} · Primary sales operating surface — human approval only.
         </p>
         <div className="flex flex-wrap gap-2">
@@ -93,6 +95,8 @@ export function GrowthInboxWorkspaceV2Panel() {
           </GrowthInboxLeadContextProvider>
         </GrowthInboxQueueProvider>
       </GrowthInboxSharedDataProvider>
+
+      <GrowthOperatorInboxPanel title="Unified Operator Inbox" compact />
 
       <GrowthInboxV2SupportingPanels />
     </div>
