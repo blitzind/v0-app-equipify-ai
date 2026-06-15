@@ -5,6 +5,7 @@ import Link from "next/link"
 import { CalendarClock, ExternalLink, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
 import {
   SMART_FOLLOW_UP_FILTERS,
   SMART_FOLLOW_UP_POLICY_QA_MARKER,
@@ -51,12 +52,14 @@ export function GrowthSmartFollowUpPoliciesPanel({
 }) {
   const [filter, setFilter] = useState<SmartFollowUpFilter>("all")
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [actingId, setActingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [queue, setQueue] = useState<SmartFollowUpPoliciesResponse | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const params = new URLSearchParams()
       if (leadId) params.set("lead_id", leadId)
@@ -65,8 +68,14 @@ export function GrowthSmartFollowUpPoliciesPanel({
 
       const res = await fetch(`/api/platform/growth/follow-up-policies?${params.toString()}`)
       const data = (await res.json()) as SmartFollowUpPoliciesResponse & { ok?: boolean }
-      setQueue(res.ok ? data : null)
+      if (!res.ok) {
+        setError("Follow-up policies request failed")
+        setQueue(null)
+        return
+      }
+      setQueue(data)
     } catch {
+      setError("Follow-up policies unavailable")
       setQueue(null)
     } finally {
       setLoading(false)
@@ -142,15 +151,14 @@ export function GrowthSmartFollowUpPoliciesPanel({
         </div>
       ) : null}
 
-      <div className="mt-4 space-y-3">
-        {loading && !queue ? (
-          <p className="text-sm text-muted-foreground">Loading follow-up policies…</p>
-        ) : null}
-
-        {!loading && (queue?.policies.length ?? 0) === 0 ? (
-          <p className="text-sm text-muted-foreground">No follow-up policies matched this filter.</p>
-        ) : null}
-
+      <GrowthEnginePanelResilience
+        loading={loading && !queue}
+        error={error}
+        isEmpty={!loading && (queue?.policies.length ?? 0) === 0}
+        emptyKind="no_follow_up_policies"
+        onRetry={() => void load()}
+        partialData={Boolean(queue)}
+      >
         {queue?.policies.map((policy) => (
           <div key={policy.policy_id} className="rounded-xl border border-border bg-muted/20 p-3">
             <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
@@ -262,7 +270,7 @@ export function GrowthSmartFollowUpPoliciesPanel({
             </div>
           </div>
         ))}
-      </div>
+      </GrowthEnginePanelResilience>
     </GrowthEngineCard>
     {leadId ? (
       <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" leadId={leadId} compact={compact} />

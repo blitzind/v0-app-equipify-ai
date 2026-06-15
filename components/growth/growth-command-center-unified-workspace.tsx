@@ -5,6 +5,8 @@ import Link from "next/link"
 import { ExternalLink, LayoutDashboard, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthEngineHonestEmptyState } from "@/components/growth/growth-engine-honest-empty-state"
+import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
 import { GrowthCommandCenterMetricsPanel } from "@/components/growth/growth-command-center-metrics-panel"
 import { GrowthCommandCenterTimelinePanel } from "@/components/growth/growth-command-center-timeline-panel"
 import { GrowthLeadWorkspacePanel } from "@/components/growth/growth-lead-workspace-panel"
@@ -45,11 +47,13 @@ export function GrowthCommandCenterUnifiedWorkspace({
   const [filter, setFilter] = useState<CommandCenterUnificationFilter>("all")
   const [activeView, setActiveView] = useState<GrowthCommandCenterViewId>("needs_attention")
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [acting, setActing] = useState(false)
   const [workspace, setWorkspace] = useState<GrowthCommandCenterUnificationResponse | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const params = new URLSearchParams()
       if (leadId) params.set("lead_id", leadId)
@@ -58,8 +62,14 @@ export function GrowthCommandCenterUnifiedWorkspace({
 
       const res = await fetch(`/api/platform/growth/command-center-unification?${params.toString()}`)
       const data = (await res.json()) as GrowthCommandCenterUnificationResponse & { ok?: boolean }
-      setWorkspace(res.ok ? data : null)
+      if (!res.ok) {
+        setError("Command Center request failed")
+        setWorkspace(null)
+        return
+      }
+      setWorkspace(data)
     } catch {
+      setError("Command Center unavailable")
       setWorkspace(null)
     } finally {
       setLoading(false)
@@ -158,7 +168,7 @@ export function GrowthCommandCenterUnifiedWorkspace({
 
             <div className="space-y-2">
               {(selectedView?.items.length ?? 0) === 0 ? (
-                <p className="text-sm text-muted-foreground">No items in this view.</p>
+                <GrowthEngineHonestEmptyState kind="no_command_center_items" />
               ) : (
                 selectedView?.items.map((item) => (
                   <div key={item.item_id} className="rounded-lg border border-border bg-muted/20 p-2">
@@ -208,10 +218,16 @@ export function GrowthCommandCenterUnifiedWorkspace({
             </Button>
           </div>
         </>
-      ) : loading ? (
-        <p className="text-sm text-muted-foreground">Loading unified workspace…</p>
       ) : (
-        <p className="text-sm text-muted-foreground">Unified workspace unavailable.</p>
+        <GrowthEnginePanelResilience
+          loading={loading}
+          error={error}
+          isEmpty={!workspace}
+          emptyKind="no_command_center_items"
+          onRetry={() => void load()}
+        >
+          {null}
+        </GrowthEnginePanelResilience>
       )}
 
       {leadId ? <GrowthLeadWorkspacePanel leadId={leadId} compact={compact} /> : null}

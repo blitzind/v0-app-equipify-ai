@@ -5,6 +5,8 @@ import Link from "next/link"
 import { ClipboardCheck, ExternalLink, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthEngineHonestEmptyState } from "@/components/growth/growth-engine-honest-empty-state"
+import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
@@ -63,6 +65,7 @@ export function GrowthCampaignReadinessPanel({
   compact?: boolean
 }) {
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
   const [acting, setActing] = useState(false)
   const [assessment, setAssessment] = useState<CampaignReadinessAssessment | null>(null)
@@ -70,6 +73,7 @@ export function GrowthCampaignReadinessPanel({
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const params = new URLSearchParams()
       if (leadId) params.set("lead_id", leadId)
@@ -80,8 +84,14 @@ export function GrowthCampaignReadinessPanel({
 
       const res = await fetch(`/api/platform/growth/campaign-readiness?${params.toString()}`)
       const data = (await res.json()) as { ok?: boolean; assessment?: CampaignReadinessAssessment }
-      setAssessment(res.ok && data.assessment ? data.assessment : null)
+      if (!res.ok) {
+        setError("Campaign readiness request failed")
+        setAssessment(null)
+        return
+      }
+      setAssessment(data.assessment ?? null)
     } catch {
+      setError("Campaign readiness unavailable")
       setAssessment(null)
     } finally {
       setLoading(false)
@@ -326,9 +336,28 @@ export function GrowthCampaignReadinessPanel({
             ) : null}
           </div>
         </>
-      ) : !loading ? (
-        <p className="text-sm text-muted-foreground">No campaign readiness assessment available.</p>
-      ) : null}
+      ) : loading ? (
+        <GrowthEnginePanelResilience
+          loading
+          isEmpty={false}
+          emptyKind="no_campaign_readiness"
+          onRetry={() => void load()}
+        >
+          {null}
+        </GrowthEnginePanelResilience>
+      ) : error ? (
+        <GrowthEnginePanelResilience
+          loading={false}
+          error={error}
+          isEmpty={false}
+          emptyKind="no_campaign_readiness"
+          onRetry={() => void load()}
+        >
+          {null}
+        </GrowthEnginePanelResilience>
+      ) : (
+        <GrowthEngineHonestEmptyState kind="no_campaign_readiness" />
+      )}
     </GrowthEngineCard>
     {leadId ? <GrowthHumanInterventionsPanel title="Human Interventions" leadId={leadId} compact={compact} /> : null}
     {leadId ? (

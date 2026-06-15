@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Bot, ExternalLink, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
 import {
   AGENT_ORCHESTRATION_FILTERS,
   AGENT_ORCHESTRATION_QA_MARKER,
@@ -56,12 +57,14 @@ export function GrowthAgentOrchestrationPanel({
 }) {
   const [filter, setFilter] = useState<AgentOrchestrationFilter>("all")
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [actingId, setActingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [orchestration, setOrchestration] = useState<GrowthAgentOrchestrationResponse | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const params = new URLSearchParams()
       if (leadId) params.set("lead_id", leadId)
@@ -71,8 +74,14 @@ export function GrowthAgentOrchestrationPanel({
 
       const res = await fetch(`/api/platform/growth/agent-orchestration?${params.toString()}`)
       const data = (await res.json()) as GrowthAgentOrchestrationResponse & { ok?: boolean }
-      setOrchestration(res.ok ? data : null)
+      if (!res.ok) {
+        setError("Agent orchestration request failed")
+        setOrchestration(null)
+        return
+      }
+      setOrchestration(data)
     } catch {
+      setError("Agent orchestration unavailable")
       setOrchestration(null)
     } finally {
       setLoading(false)
@@ -148,15 +157,14 @@ export function GrowthAgentOrchestrationPanel({
         </div>
       ) : null}
 
-      <div className="mt-4 space-y-3">
-        {loading && !orchestration ? (
-          <p className="text-sm text-muted-foreground">Loading agent orchestration plan…</p>
-        ) : null}
-
-        {!loading && (orchestration?.plans.length ?? 0) === 0 ? (
-          <p className="text-sm text-muted-foreground">No orchestration plans matched this filter.</p>
-        ) : null}
-
+      <GrowthEnginePanelResilience
+        loading={loading && !orchestration}
+        error={error}
+        isEmpty={!loading && (orchestration?.plans.length ?? 0) === 0}
+        emptyKind="no_agent_plans"
+        onRetry={() => void load()}
+        partialData={Boolean(orchestration)}
+      >
         {orchestration?.plans.map((plan) => (
           <div key={plan.plan_id} className="rounded-xl border border-border bg-muted/20 p-3">
             <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
@@ -282,7 +290,7 @@ export function GrowthAgentOrchestrationPanel({
             </div>
           </div>
         ))}
-      </div>
+      </GrowthEnginePanelResilience>
     </GrowthEngineCard>
   )
 }

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ExternalLink, GitBranch, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
 import {
   SEQUENCE_PREVIEW_FILTERS,
   SEQUENCE_PREVIEW_QA_MARKER,
@@ -54,12 +55,14 @@ export function GrowthSequencePreviewStudioPanel({
 }) {
   const [filter, setFilter] = useState<SequencePreviewFilter>("all")
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [actingId, setActingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [studio, setStudio] = useState<SequencePreviewStudioResponse | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const params = new URLSearchParams()
       if (patternId) params.set("pattern_id", patternId)
@@ -69,8 +72,14 @@ export function GrowthSequencePreviewStudioPanel({
 
       const res = await fetch(`/api/platform/growth/sequence-preview?${params.toString()}`)
       const data = (await res.json()) as SequencePreviewStudioResponse & { ok?: boolean }
-      setStudio(res.ok ? data : null)
+      if (!res.ok) {
+        setError("Sequence preview request failed")
+        setStudio(null)
+        return
+      }
+      setStudio(data)
     } catch {
+      setError("Sequence preview unavailable")
       setStudio(null)
     } finally {
       setLoading(false)
@@ -147,15 +156,14 @@ export function GrowthSequencePreviewStudioPanel({
         </div>
       ) : null}
 
-      <div className="mt-4 space-y-3">
-        {loading && !studio ? (
-          <p className="text-sm text-muted-foreground">Loading sequence previews…</p>
-        ) : null}
-
-        {!loading && (studio?.previews.length ?? 0) === 0 ? (
-          <p className="text-sm text-muted-foreground">No sequence previews matched this filter.</p>
-        ) : null}
-
+      <GrowthEnginePanelResilience
+        loading={loading && !studio}
+        error={error}
+        isEmpty={!loading && (studio?.previews.length ?? 0) === 0}
+        emptyKind="no_sequence_previews"
+        onRetry={() => void load()}
+        partialData={Boolean(studio)}
+      >
         {studio?.previews.map((preview) => (
           <div key={preview.preview_id} className="rounded-xl border border-border bg-muted/20 p-3">
             <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
@@ -284,7 +292,7 @@ export function GrowthSequencePreviewStudioPanel({
             </div>
           </div>
         ))}
-      </div>
+      </GrowthEnginePanelResilience>
     </GrowthEngineCard>
     <GrowthCampaignBuilderWizardPanel
       title="Campaign Builder Wizard"

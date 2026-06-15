@@ -329,6 +329,8 @@
     "test:growth-engine-e2e:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-engine-e2e.ts --production",
     "test:growth-engine-performance": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-engine-performance.ts",
     "test:growth-engine-performance:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-engine-performance.ts --production",
+    "test:growth-engine-hardening": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-engine-hardening.ts",
+    "test:growth-engine-hardening:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-engine-hardening.ts --production",
     "test:revenue-persistence-integrity": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-revenue-persistence-integrity.ts",
     "test:revenue-persistence-integrity:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-revenue-persistence-integrity.ts --production",
     "test:revenue-persistence-integrity:repair:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-revenue-persistence-integrity.ts --production --repair",

@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Sparkles } from "lucide-react"
+import { Sparkles, Loader2, RefreshCw } from "lucide-react"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthEngineHonestEmptyState } from "@/components/growth/growth-engine-honest-empty-state"
 import type { GrowthProspectSearchFilters } from "@/lib/growth/prospect-search/prospect-search-types"
 import { PROSPECT_EXECUTION_QA_MARKER } from "@/lib/growth/prospect-discovery/prospect-execution-plan-types"
 import type {
@@ -245,11 +246,33 @@ export function NaturalLanguageDiscoveryPanel({
           className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
         >
           <Sparkles className="size-3.5" />
-          {loading ? "Planning…" : "Build Search Plan"}
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 size-4 animate-spin" />
+              Planning…
+            </>
+          ) : (
+            "Build Search Plan"
+          )}
+        </button>
+        <button
+          type="button"
+          className="rounded-md border px-3 py-2 text-sm"
+          disabled={loading}
+          onClick={() => void runPlanning()}
+        >
+          <RefreshCw className="mr-1 inline size-3.5" />
+          Retry
         </button>
       </div>
 
       {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
+
+      {!loading && !plan && !error && query.trim().length >= 3 ? (
+        <div className="mt-3">
+          <GrowthEngineHonestEmptyState kind="no_leads" />
+        </div>
+      ) : null}
 
       {suggestions.length > 0 && !plan ? (
         <div className="mt-4 rounded-lg border border-dashed border-border p-3">

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ExternalLink, Layers, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
 import {
   CAMPAIGN_BUILDER_FILTERS,
   CAMPAIGN_BUILDER_QA_MARKER,
@@ -54,12 +55,14 @@ export function GrowthCampaignBuilderWizardPanel({
 }) {
   const [filter, setFilter] = useState<CampaignBuilderFilter>("all")
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [actingId, setActingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [studio, setStudio] = useState<CampaignBuilderWizardResponse | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const params = new URLSearchParams()
       if (leadId) params.set("lead_id", leadId)
@@ -69,8 +72,14 @@ export function GrowthCampaignBuilderWizardPanel({
 
       const res = await fetch(`/api/platform/growth/campaign-builder?${params.toString()}`)
       const data = (await res.json()) as CampaignBuilderWizardResponse & { ok?: boolean }
-      setStudio(res.ok ? data : null)
+      if (!res.ok) {
+        setError("Campaign builder request failed")
+        setStudio(null)
+        return
+      }
+      setStudio(data)
     } catch {
+      setError("Campaign builder unavailable")
       setStudio(null)
     } finally {
       setLoading(false)
@@ -146,15 +155,14 @@ export function GrowthCampaignBuilderWizardPanel({
         </div>
       ) : null}
 
-      <div className="mt-4 space-y-3">
-        {loading && !studio ? (
-          <p className="text-sm text-muted-foreground">Loading campaign builder wizard…</p>
-        ) : null}
-
-        {!loading && (studio?.wizards.length ?? 0) === 0 ? (
-          <p className="text-sm text-muted-foreground">No campaign wizard sessions matched this filter.</p>
-        ) : null}
-
+      <GrowthEnginePanelResilience
+        loading={loading && !studio}
+        error={error}
+        isEmpty={!loading && (studio?.wizards.length ?? 0) === 0}
+        emptyKind="no_campaign_builders"
+        onRetry={() => void load()}
+        partialData={Boolean(studio)}
+      >
         {studio?.wizards.map((wizard) => (
           <div key={wizard.wizard_id} className="rounded-xl border border-border bg-muted/20 p-3">
             <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
@@ -279,7 +287,7 @@ export function GrowthCampaignBuilderWizardPanel({
             </div>
           </div>
         ))}
-      </div>
+      </GrowthEnginePanelResilience>
     </GrowthEngineCard>
   )
 }

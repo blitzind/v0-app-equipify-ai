@@ -5,6 +5,8 @@ import { BookOpen, CheckCircle2, ExternalLink, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthEngineHonestEmptyState } from "@/components/growth/growth-engine-honest-empty-state"
+import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import {
@@ -42,12 +44,14 @@ export function GrowthConversationalPlaybooksPanel({
 }) {
   const [query, setQuery] = useState(defaultQuery ?? "")
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [acting, setActing] = useState(false)
   const [playbook, setPlaybook] = useState<ConversationalPlaybook | null>(null)
   const [expanded, setExpanded] = useState(!compact)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const res = await fetch("/api/platform/growth/conversational-playbooks/generate", {
         method: "POST",
@@ -71,9 +75,11 @@ export function GrowthConversationalPlaybooksPanel({
           body: JSON.stringify({ action: "view_playbook", playbook: data.playbook }),
         })
       } else {
+        setError("Playbook generation returned no results")
         setPlaybook(null)
       }
     } catch {
+      setError("Conversational playbooks unavailable")
       setPlaybook(null)
     } finally {
       setLoading(false)
@@ -247,11 +253,28 @@ export function GrowthConversationalPlaybooksPanel({
             ) : null}
           </div>
         </>
-      ) : !loading ? (
-        <p className="text-sm text-muted-foreground">
-          No citation-backed playbook available — ingest knowledge documents for this consumer scope.
-        </p>
-      ) : null}
+      ) : loading ? (
+        <GrowthEnginePanelResilience
+          loading
+          isEmpty={false}
+          emptyKind="no_playbooks"
+          onRetry={() => void load()}
+        >
+          {null}
+        </GrowthEnginePanelResilience>
+      ) : error ? (
+        <GrowthEnginePanelResilience
+          loading={false}
+          error={error}
+          isEmpty={false}
+          emptyKind="no_playbooks"
+          onRetry={() => void load()}
+        >
+          {null}
+        </GrowthEnginePanelResilience>
+      ) : (
+        <GrowthEngineHonestEmptyState kind="no_playbooks" />
+      )}
     </GrowthEngineCard>
     {leadId ? <GrowthHumanInterventionsPanel title="Human Interventions" leadId={leadId} compact={compact} /> : null}
     {leadId ? (

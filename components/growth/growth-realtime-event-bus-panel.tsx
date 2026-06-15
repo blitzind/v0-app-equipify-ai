@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Activity, ExternalLink, Loader2, Radio } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
 import { subscribeToGrowthRealtimeEvents, type GrowthRealtimeSubscriptionMode } from "@/lib/growth/realtime-events/realtime-events-subscriber"
 import {
   REALTIME_EVENT_FILTERS,
@@ -37,6 +38,7 @@ export function GrowthRealtimeEventBusPanel({
 }) {
   const [filter, setFilter] = useState<RealtimeEventFilter>("all")
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [actingId, setActingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [feed, setFeed] = useState<GrowthRealtimeEventsResponse | null>(null)
@@ -45,14 +47,21 @@ export function GrowthRealtimeEventBusPanel({
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const params = new URLSearchParams()
       params.set("filter", filter)
       params.set("limit", compact ? "8" : "25")
       const res = await fetch(`/api/platform/growth/realtime-events?${params.toString()}`)
       const data = (await res.json()) as GrowthRealtimeEventsResponse & { ok?: boolean }
-      setFeed(res.ok ? data : null)
+      if (!res.ok) {
+        setError("Realtime events request failed")
+        setFeed(null)
+        return
+      }
+      setFeed(data)
     } catch {
+      setError("Realtime events unavailable")
       setFeed(null)
     } finally {
       setLoading(false)
@@ -159,15 +168,14 @@ export function GrowthRealtimeEventBusPanel({
         </div>
       ) : null}
 
-      <div className="mt-4 space-y-3">
-        {loading && !feed ? (
-          <p className="text-sm text-muted-foreground">Loading realtime events…</p>
-        ) : null}
-
-        {!loading && (feed?.events.length ?? 0) === 0 ? (
-          <p className="text-sm text-muted-foreground">No events matched this filter.</p>
-        ) : null}
-
+      <GrowthEnginePanelResilience
+        loading={loading && !feed}
+        error={error}
+        isEmpty={!loading && (feed?.events.length ?? 0) === 0}
+        emptyKind="no_events"
+        onRetry={() => void load()}
+        partialData={Boolean(feed)}
+      >
         {feed?.events.map((event) => (
           <div key={event.event_id} className="rounded-xl border border-border bg-muted/20 p-3">
             <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
@@ -246,7 +254,7 @@ export function GrowthRealtimeEventBusPanel({
             </div>
           </div>
         ))}
-      </div>
+      </GrowthEnginePanelResilience>
     </GrowthEngineCard>
   )
 }

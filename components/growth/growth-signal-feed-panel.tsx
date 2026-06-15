@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import { ArrowRight, Flame, X } from "lucide-react"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
 import type { GrowthSignalFeedItem } from "@/lib/growth/signal-intelligence/signal-feed-types"
 import {
   SIGNAL_FEED_FILTERS,
@@ -49,11 +50,13 @@ export function GrowthSignalFeedPanel({
 }) {
   const [items, setItems] = useState<GrowthSignalFeedItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<SignalFeedFilter | null>(null)
   const [sort, setSort] = useState<SignalFeedSortField>("occurred_at")
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const params = new URLSearchParams()
       if (filter) params.set("filter", filter)
@@ -68,8 +71,14 @@ export function GrowthSignalFeedPanel({
         ok?: boolean
         feed?: { items: GrowthSignalFeedItem[] }
       }
-      setItems(res.ok && data.feed ? data.feed.items : [])
+      if (!res.ok) {
+        setError("Signal feed request failed")
+        setItems([])
+        return
+      }
+      setItems(data.feed ? data.feed.items : [])
     } catch {
+      setError("Signal feed unavailable")
       setItems([])
     } finally {
       setLoading(false)
@@ -136,11 +145,23 @@ export function GrowthSignalFeedPanel({
       </div>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading signal feed…</p>
-      ) : items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No routed signals in feed window.</p>
+        <GrowthEnginePanelResilience
+          loading
+          isEmpty={false}
+          emptyKind="no_signals"
+          onRetry={() => void load()}
+        >
+          {null}
+        </GrowthEnginePanelResilience>
       ) : (
-        <ul className={cn("space-y-3", compact && "max-h-96 overflow-y-auto pr-1")}>
+        <GrowthEnginePanelResilience
+          loading={false}
+          error={error}
+          isEmpty={items.length === 0}
+          emptyKind="no_signals"
+          onRetry={() => void load()}
+        >
+          <ul className={cn("space-y-3", compact && "max-h-96 overflow-y-auto pr-1")}>
           {items.map((item) => (
             <li
               key={item.id}
@@ -227,6 +248,7 @@ export function GrowthSignalFeedPanel({
             </li>
           ))}
         </ul>
+        </GrowthEnginePanelResilience>
       )}
     </GrowthEngineCard>
   )
