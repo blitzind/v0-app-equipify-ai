@@ -16,6 +16,7 @@ import type {
 } from "@/lib/growth/prospect-discovery/prospect-search-intent-types"
 import { PROSPECT_DISCOVERY_QA_MARKER } from "@/lib/growth/prospect-discovery/prospect-search-intent-types"
 import { ProspectDiscoveryExecutionPanel } from "@/components/growth/prospect-search/prospect-discovery-execution-panel"
+import { GrowthCampaignReadinessPanel } from "@/components/growth/growth-campaign-readiness-panel"
 import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowledge-context-section"
 import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growth-knowledge-recommendations-section"
 import { cn } from "@/lib/utils"
@@ -465,6 +466,11 @@ export function NaturalLanguageDiscoveryPanel({
       executionPlan={executionPlan}
       searchPlanId={searchPlanId}
       executionApproved={executionApproved}
+    />
+    <GrowthCampaignReadinessPanel
+      title="Campaign Readiness"
+      searchPlanId={searchPlanId}
+      compact
     />
     <GrowthKnowledgeContextSection
       consumer="prospect_discovery"

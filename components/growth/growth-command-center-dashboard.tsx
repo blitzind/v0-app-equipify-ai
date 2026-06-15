@@ -3,6 +3,7 @@
 import { AidenDailyBriefingPanel } from "@/components/growth/aiden-daily-briefing-panel"
 import { GrowthCommandDailyActionQueue } from "@/components/growth/growth-command-daily-action-queue"
 import { GrowthOperatorInboxPanel } from "@/components/growth/growth-operator-inbox-panel"
+import { GrowthCampaignReadinessPanel } from "@/components/growth/growth-campaign-readiness-panel"
 import { GrowthCommandOpenOpportunitiesSection } from "@/components/growth/growth-command-open-opportunities-section"
 import { GrowthCommandQuickActionsRail } from "@/components/growth/growth-command-quick-actions-rail"
 import { GrowthCommandSequenceQueueSection } from "@/components/growth/growth-command-sequence-queue-section"
@@ -37,6 +38,8 @@ export function GrowthCommandCenterDashboard() {
       <GrowthCommandDailyActionQueue briefing={briefing} loading={loading} />
 
       <GrowthOperatorInboxPanel compact title="Unified Operator Inbox" />
+
+      <GrowthCampaignReadinessPanel compact title="Campaign Readiness" />
 
       <TopProspectOpportunitiesPanel compact title="Top Prospect Opportunities" />
 

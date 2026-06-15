@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowledge-context-section"
 import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growth-knowledge-recommendations-section"
+import { GrowthCampaignReadinessPanel } from "@/components/growth/growth-campaign-readiness-panel"
 import type { AiMeetingPrepRow } from "@/lib/growth/meeting-intelligence/ai-meeting-prep-types"
 import type { GrowthMeetingPrepBundle, MeetingPrepRiskPriority } from "@/lib/growth/meeting-intelligence/meeting-prep-types"
 
@@ -320,6 +321,12 @@ export function GrowthMeetingPrepPanel({
               </div>
             </PrepSection>
           ) : null}
+
+          <GrowthCampaignReadinessPanel
+            title="Campaign Readiness"
+            leadId={prep.meeting.leadId}
+            compact
+          />
 
           <PrepSection title="AI Meeting Prep">
             <div className="space-y-3" data-qa-marker="growth-ai-meeting-prep-m1c-v1">

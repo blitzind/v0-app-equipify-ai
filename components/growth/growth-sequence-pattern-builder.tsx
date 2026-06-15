@@ -14,6 +14,7 @@ import {
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowledge-context-section"
 import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growth-knowledge-recommendations-section"
+import { GrowthCampaignReadinessPanel } from "@/components/growth/growth-campaign-readiness-panel"
 import { formatSequenceChannelLabel } from "@/lib/growth/sequence-enrollment/sequence-enrollment-ui"
 import type { GrowthSequencePattern, GrowthSequencePatternStep } from "@/lib/growth/sequence-types"
 import {
@@ -220,6 +221,8 @@ export function GrowthSequencePatternBuilder() {
           </div>
         )}
       </GrowthEngineCard>
+
+      <GrowthCampaignReadinessPanel title="Campaign Readiness" compact />
 
       <GrowthKnowledgeContextSection consumer="sequence_builder" title="Messaging References" compact />
       <GrowthKnowledgeRecommendationsSection consumer="sequence_builder" title="Recommended Messaging" compact />

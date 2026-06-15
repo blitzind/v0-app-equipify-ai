@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowledge-context-section"
 import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growth-knowledge-recommendations-section"
+import { GrowthCampaignReadinessPanel } from "@/components/growth/growth-campaign-readiness-panel"
 import { GrowthOpportunityRecommendationScoringDetails } from "@/components/growth/growth-opportunity-recommendation-scoring-details"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import {
@@ -155,6 +156,8 @@ export function GrowthLeadOpportunityIntelligencePanel({ lead }: GrowthLeadOppor
           </div>
         </div>
       )}
+
+      <GrowthCampaignReadinessPanel title="Campaign Readiness" leadId={lead.id} compact />
 
       <GrowthKnowledgeContextSection
         consumer="opportunity_intelligence"
