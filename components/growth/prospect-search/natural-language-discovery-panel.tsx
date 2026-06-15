@@ -4,17 +4,18 @@ import { useCallback, useEffect, useState } from "react"
 import { Sparkles } from "lucide-react"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import type { GrowthProspectSearchFilters } from "@/lib/growth/prospect-search/prospect-search-types"
+import { PROSPECT_EXECUTION_QA_MARKER } from "@/lib/growth/prospect-discovery/prospect-execution-plan-types"
 import type {
   ProspectExecutionPlan,
   ProspectExecutionReadiness,
 } from "@/lib/growth/prospect-discovery/prospect-execution-plan-types"
-import { PROSPECT_EXECUTION_QA_MARKER } from "@/lib/growth/prospect-discovery/prospect-execution-plan-types"
 import type {
   ProspectSearchIntent,
   ProspectSearchPlan,
   ProspectSearchSuggestion,
 } from "@/lib/growth/prospect-discovery/prospect-search-intent-types"
 import { PROSPECT_DISCOVERY_QA_MARKER } from "@/lib/growth/prospect-discovery/prospect-search-intent-types"
+import { ProspectDiscoveryExecutionPanel } from "@/components/growth/prospect-search/prospect-discovery-execution-panel"
 import { cn } from "@/lib/utils"
 
 const EXAMPLE_QUERIES = [
@@ -200,6 +201,7 @@ export function NaturalLanguageDiscoveryPanel({
   }, [runPlanning])
 
   return (
+    <>
     <GrowthEngineCard
       title="Natural Language Discovery"
       data-qa-marker={PROSPECT_DISCOVERY_QA_MARKER}
@@ -456,5 +458,12 @@ export function NaturalLanguageDiscoveryPanel({
         </div>
       ) : null}
     </GrowthEngineCard>
+    <ProspectDiscoveryExecutionPanel
+      searchPlan={plan}
+      executionPlan={executionPlan}
+      searchPlanId={searchPlanId}
+      executionApproved={executionApproved}
+    />
+    </>
   )
 }
