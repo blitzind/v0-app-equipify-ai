@@ -785,6 +785,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
           path.startsWith("/admin/growth/outreach/legacy-queue"),
       },
       {
+        id: "share-pages",
+        href: "/admin/growth/share-pages",
+        label: "Share Pages",
+        match: prefixMatch("/admin/growth/share-pages"),
+      },
+      {
         id: "booking-intelligence",
         href: "/admin/growth/booking-intelligence",
         label: "Booking Intelligence",

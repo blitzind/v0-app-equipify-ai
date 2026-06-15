@@ -89,6 +89,15 @@ export const GROWTH_COMMAND_REGISTRY: GrowthCommandRegistryEntry[] = [
     paletteEnabled: true,
   },
   {
+    id: "share-pages",
+    label: "Share Pages",
+    href: "/admin/growth/share-pages",
+    keywords: ["share page", "personalized page", "landing page", "preview", "publish"],
+    aliases: ["share pages admin", "personalized share page"],
+    coreWorkflow: true,
+    paletteEnabled: true,
+  },
+  {
     id: "aiden-guide",
     label: "Aiden Operator Guide",
     href: "/admin/growth/aiden",

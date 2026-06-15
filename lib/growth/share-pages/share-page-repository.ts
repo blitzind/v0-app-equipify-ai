@@ -699,3 +699,98 @@ export async function getSharePageAnalyticsSummary(
     lastEventAt,
   }
 }
+
+export type GrowthSharePageListFilters = {
+  organizationId: string
+  status?: GrowthSharePageStatus
+  sourceChannel?: GrowthSharePageSourceChannel
+  leadIds?: string[] | null
+  limit?: number
+  offset?: number
+}
+
+export async function listGrowthSharePagesForOrganization(
+  admin: SupabaseClient,
+  filters: GrowthSharePageListFilters,
+): Promise<{ pages: GrowthSharePage[]; total: number }> {
+  const limit = filters.limit ?? 50
+  const offset = filters.offset ?? 0
+
+  let query = pagesTable(admin)
+    .select(PAGE_SELECT, { count: "exact" })
+    .eq("organization_id", filters.organizationId)
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1)
+
+  if (filters.status) query = query.eq("status", filters.status)
+  if (filters.sourceChannel) query = query.eq("source_channel", filters.sourceChannel)
+  if (filters.leadIds?.length) query = query.in("lead_id", filters.leadIds)
+
+  const { data, error, count } = await query
+  if (error) throw new Error(error.message)
+
+  return {
+    pages: (data ?? []).map((row) => mapPage(row as SharePageRow)),
+    total: count ?? (data ?? []).length,
+  }
+}
+
+export async function searchSharePageLeadIds(
+  admin: SupabaseClient,
+  search: string,
+  limit = 200,
+): Promise<string[]> {
+  const term = search.trim()
+  if (!term) return []
+
+  const pattern = `%${term.replace(/[%_]/g, "")}%`
+  const { data, error } = await admin
+    .schema("growth")
+    .from("leads")
+    .select("id")
+    .or(`company_name.ilike.${pattern},contact_name.ilike.${pattern},contact_email.ilike.${pattern}`)
+    .limit(limit)
+
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((row) => asString(row.id)).filter(Boolean)
+}
+
+export async function regenerateSharePagePreviewToken(
+  admin: SupabaseClient,
+  sharePageId: string,
+): Promise<{ page: GrowthSharePage; previewToken: string }> {
+  const existing = await fetchGrowthSharePageById(admin, sharePageId)
+  if (!existing) throw new Error("share_page_not_found")
+  if (existing.archivedAt || existing.status === "archived") {
+    throw new Error("share_page_archived")
+  }
+
+  const previewTokenBundle = generateSharePagePreviewTokenBundle()
+  const { data, error } = await pagesTable(admin)
+    .update({ preview_token_hash: previewTokenBundle.tokenHash })
+    .eq("id", sharePageId)
+    .select(PAGE_SELECT)
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  return {
+    page: mapPage(data as SharePageRow),
+    previewToken: previewTokenBundle.rawToken,
+  }
+}
+
+export async function listSharePageEventsForPage(
+  admin: SupabaseClient,
+  sharePageId: string,
+  limit = 50,
+): Promise<GrowthSharePageEvent[]> {
+  const { data, error } = await eventsTable(admin)
+    .select(EVENT_SELECT)
+    .eq("share_page_id", sharePageId)
+    .order("occurred_at", { ascending: false })
+    .limit(limit)
+
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((row) => mapEvent(row as SharePageEventRow))
+}

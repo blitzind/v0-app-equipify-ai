@@ -90,12 +90,20 @@ export function buildDefaultSharePageExpirationIso(
   return expires.toISOString()
 }
 
-export function buildSharePagePublicUrl(rawToken: string, baseUrl?: string): string {
-  const configured =
+function sharePageBaseUrl(baseUrl?: string): string {
+  return (
     baseUrl?.trim() ||
     process.env.GROWTH_TRACKING_BASE_URL?.trim() ||
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
     process.env.APP_URL?.trim() ||
     "https://app.equipify.ai"
-  return `${configured.replace(/\/+$/, "")}/p/${encodeURIComponent(rawToken.trim())}`
+  ).replace(/\/+$/, "")
+}
+
+export function buildSharePagePublicUrl(rawToken: string, baseUrl?: string): string {
+  return `${sharePageBaseUrl(baseUrl)}/p/${encodeURIComponent(rawToken.trim())}`
+}
+
+export function buildSharePagePreviewUrl(rawToken: string, baseUrl?: string): string {
+  return `${sharePageBaseUrl(baseUrl)}/p-preview/${encodeURIComponent(rawToken.trim())}`
 }
