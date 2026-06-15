@@ -178,6 +178,15 @@ async function executeWaitResolution(
   })
 
   if (input.resolutionReason === "timeout") {
+    await recordSequenceConditionTimeoutAudit(admin, {
+      enrollmentId,
+      enrollmentStepId,
+      leadId: completedStep.leadId,
+      waitId: input.waitId,
+      conditionId: String(waitRow.condition_id ?? ""),
+      occurredAt: now,
+    })
+
     const timeoutEdge = edges.find((edge) => edge.edgeType === "timeout")
     if (timeoutEdge) {
       resolver = {
@@ -187,14 +196,6 @@ async function executeWaitResolution(
         reason: "Wait timed out — timeout edge selected.",
         resolution: "conditional_false",
       }
-      await recordSequenceConditionTimeoutAudit(admin, {
-        enrollmentId,
-        enrollmentStepId,
-        leadId: completedStep.leadId,
-        waitId: input.waitId,
-        conditionId: String(waitRow.condition_id ?? ""),
-        occurredAt: now,
-      })
     }
   }
 

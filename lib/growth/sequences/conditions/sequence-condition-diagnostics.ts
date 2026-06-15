@@ -37,7 +37,11 @@ import {
   resolveSequenceEnrollmentWaitRegistry,
 } from "@/lib/growth/sequences/conditions/sequence-wait-registry"
 import { processSequenceAttributedWakeEvent } from "@/lib/growth/sequences/conditions/sequence-event-wake-engine"
-import { resolveWaitMatched, resolveWaitTimeout } from "@/lib/growth/sequences/conditions/sequence-wait-resolver"
+import { resolveWaitMatched } from "@/lib/growth/sequences/conditions/sequence-wait-resolver"
+import { processExpiredSequenceWaits } from "@/lib/growth/sequences/conditions/sequence-wait-timeout-processor"
+import { GROWTH_SEQUENCE_WAIT_TIMEOUT_QA_MARKER } from "@/lib/growth/sequences/conditions/sequence-wait-timeout-types"
+import { diagnoseSequenceWaitRecovery } from "@/lib/growth/sequences/conditions/sequence-wait-recovery-diagnostics"
+import { listSequenceEnrollmentChannelEvents } from "@/lib/growth/sequence-orchestration/sequence-multi-channel-state-repository"
 import {
   fetchGrowthSequenceEnrollmentById,
   insertGrowthSequenceEnrollmentStep,
@@ -73,6 +77,8 @@ export type SequenceConditionsDiagnosticsReport = {
   branch_advancement_integrated: boolean
   advancement_gate_safe: boolean
   event_wake_ready: boolean
+  wait_timeout_ready: boolean
+  wait_timeout_no_transport: boolean
 }
 
 const SCHEMA_TABLES = [
@@ -162,6 +168,8 @@ export async function executeGrowthSequenceConditionsDiagnostics(
   let branchAdvancementIntegrated = false
   let advancementGateSafe = false
   let eventWakeReady = false
+  let waitTimeoutReady = false
+  let waitTimeoutNoTransport = true
   const crudMarker = `sr3-phase1-crud-${Date.now()}`
   const phase3Marker = `sr3-phase3-${Date.now()}`
   try {
@@ -665,7 +673,7 @@ export async function executeGrowthSequenceConditionsDiagnostics(
         enrollmentId: enrollment.id,
         enrollmentStepId: enrollmentStep.id,
         patternStepId: patternStep.id,
-        conditionId: waitCondition.id,
+        conditionId: wakeCondition.id,
         waitKind: "until_event",
         status: "active",
         waitedForSource: "email",
@@ -686,11 +694,168 @@ export async function executeGrowthSequenceConditionsDiagnostics(
       })
 
       await updateGrowthSequenceEnrollment(admin, enrollment.id, { status: "active", pauseReason: null })
-      const timeoutResult = await resolveWaitTimeout(admin, { waitId: wait.id, now: fixedNow })
+
+      const phase5Marker = `${phase3Marker}-timeout`
+      const expiredAt = new Date(Date.parse(fixedNow) - 60_000).toISOString()
+
+      if (secondPatternStepId) {
+        const timeoutEdge = await createEdge(admin, {
+          patternId: pattern.id,
+          fromPatternStepId: patternStep.id,
+          toPatternStepId: secondPatternStepId,
+          edgeType: "timeout",
+          label: `${phase5Marker} timeout edge`,
+        })
+
+        await updateWait(admin, wait.id, { timeoutAt: expiredAt, status: "active" })
+
+        const { count: jobsBeforeTimeout } = await admin
+          .schema("growth")
+          .from("sequence_execution_jobs")
+          .select("id", { count: "exact", head: true })
+          .eq("sequence_enrollment_id", enrollment.id)
+
+        const timeoutBatch1 = await processExpiredSequenceWaits(admin, { now: fixedNow, limit: 50 })
+        const channelEventsAfterTimeout = await listSequenceEnrollmentChannelEvents(admin, {
+          enrollmentId: enrollment.id,
+          limit: 200,
+        })
+        const timeoutAudits = {
+          conditionTimeout: channelEventsAfterTimeout.some((entry) => entry.eventKind === "condition_timeout"),
+          waitResolved: channelEventsAfterTimeout.some((entry) => entry.eventKind === "wait_resolved"),
+          branchEvaluated: channelEventsAfterTimeout.some((entry) => entry.eventKind === "branch_evaluated"),
+        }
+
+        checks.push({
+          id: "timeout.expired_wait_resolves_timeout_edge",
+          ok: timeoutBatch1.resolved >= 1,
+          detail:
+            timeoutBatch1.resolved >= 1
+              ? `Expired wait resolved via timeout processor (resolved=${timeoutBatch1.resolved}).`
+              : `Timeout processor did not resolve expired wait (resolved=${timeoutBatch1.resolved}, failed=${timeoutBatch1.failed}).`,
+        })
+        checks.push({
+          id: "timeout.audits_recorded",
+          ok: timeoutAudits.conditionTimeout && timeoutAudits.waitResolved && timeoutAudits.branchEvaluated,
+          detail: `Audits: condition_timeout=${timeoutAudits.conditionTimeout}, wait_resolved=${timeoutAudits.waitResolved}, branch_evaluated=${timeoutAudits.branchEvaluated}.`,
+        })
+
+        const timeoutBatch2 = await processExpiredSequenceWaits(admin, { now: fixedNow, limit: 50 })
+        const idempotentOk = timeoutBatch2.resolved === 0 && !timeoutBatch2.processedWaitIds.includes(wait.id)
+        checks.push({
+          id: "timeout.idempotent_rerun",
+          ok: idempotentOk,
+          detail: idempotentOk
+            ? "Second timeout processor run did not re-resolve the same wait."
+            : `Idempotency probe failed (resolved=${timeoutBatch2.resolved}).`,
+        })
+
+        const waitNoEdge = await createWait(admin, {
+          enrollmentId: enrollment.id,
+          enrollmentStepId: enrollmentStep.id,
+          patternStepId: patternStep.id,
+          conditionId: wakeCondition.id,
+          waitKind: "until_event",
+          status: "active",
+          waitedForSource: "email",
+          waitedForEvent: "email.opened",
+          timeoutAt: expiredAt,
+          startedAt: fixedNow,
+        })
+        await deleteEdge(admin, timeoutEdge.id)
+        const noEdgeBatch = await processExpiredSequenceWaits(admin, { now: fixedNow, limit: 50 })
+        checks.push({
+          id: "timeout.missing_timeout_edge_records_failure",
+          ok: noEdgeBatch.failed >= 1,
+          detail:
+            noEdgeBatch.failed >= 1
+              ? `Wait without timeout edge counted as failed (failed=${noEdgeBatch.failed}).`
+              : "Missing timeout edge did not record failure.",
+        })
+
+        const waitPaused = await createWait(admin, {
+          enrollmentId: enrollment.id,
+          enrollmentStepId: enrollmentStep.id,
+          patternStepId: patternStep.id,
+          conditionId: wakeCondition.id,
+          waitKind: "until_event",
+          status: "active",
+          waitedForSource: "email",
+          waitedForEvent: "email.opened",
+          timeoutAt: expiredAt,
+          startedAt: fixedNow,
+        })
+        await createEdge(admin, {
+          patternId: pattern.id,
+          fromPatternStepId: patternStep.id,
+          toPatternStepId: secondPatternStepId,
+          edgeType: "timeout",
+          label: `${phase5Marker} paused timeout edge`,
+        })
+        await updateGrowthSequenceEnrollment(admin, enrollment.id, {
+          status: "paused",
+          pauseReason: phase5Marker,
+        })
+        const pausedBatch = await processExpiredSequenceWaits(admin, { now: fixedNow, limit: 50 })
+        const pausedBlockedOk = pausedBatch.blocked >= 1
+        checks.push({
+          id: "timeout.paused_enrollment_blocks_resolution",
+          ok: pausedBlockedOk,
+          detail: pausedBlockedOk
+            ? `Paused enrollment blocked timeout resolution (blocked=${pausedBatch.blocked}).`
+            : "Paused enrollment did not block timeout processor.",
+        })
+
+        await updateGrowthSequenceEnrollment(admin, enrollment.id, { status: "active", pauseReason: null })
+
+        const { count: jobsAfterTimeout } = await admin
+          .schema("growth")
+          .from("sequence_execution_jobs")
+          .select("id", { count: "exact", head: true })
+          .eq("sequence_enrollment_id", enrollment.id)
+        const noJobsFromTimeout = (jobsBeforeTimeout ?? 0) === (jobsAfterTimeout ?? 0)
+        waitTimeoutNoTransport = waitTimeoutNoTransport && noJobsFromTimeout
+        checks.push({
+          id: "timeout.no_execution_jobs_created",
+          ok: noJobsFromTimeout,
+          detail: noJobsFromTimeout
+            ? "Timeout processor did not create sequence_execution_jobs rows."
+            : "Timeout processor created execution jobs — forbidden.",
+        })
+
+        const recovery = await diagnoseSequenceWaitRecovery(admin, { limit: 50 })
+        checks.push({
+          id: "timeout.recovery_diagnostics_available",
+          ok: recovery.qa_marker === GROWTH_SEQUENCE_WAIT_TIMEOUT_QA_MARKER,
+          detail: `Wait recovery diagnostics returned ${recovery.totalIssues} issue(s).`,
+        })
+
+        waitTimeoutReady =
+          timeoutBatch1.resolved >= 1 &&
+          timeoutAudits.conditionTimeout &&
+          timeoutAudits.waitResolved &&
+          timeoutAudits.branchEvaluated &&
+          idempotentOk &&
+          noEdgeBatch.failed >= 1 &&
+          pausedBlockedOk &&
+          noJobsFromTimeout
+
+        void waitNoEdge
+        void waitPaused
+      } else {
+        checks.push({
+          id: "timeout.expired_wait_resolves_timeout_edge",
+          ok: false,
+          detail: "Skipped timeout processor probes — second pattern step unavailable.",
+        })
+      }
+
       checks.push({
         id: "wake.timeout_resolution_available",
-        ok: timeoutResult.kind === "blocked" || timeoutResult.kind === "branched",
-        detail: `Wait timeout resolution returned ${timeoutResult.kind}.`,
+        ok: waitTimeoutReady || secondPatternStepId === null,
+        detail: waitTimeoutReady
+          ? "Wait timeout resolution exercised via Phase 5 timeout processor."
+          : "Timeout resolution probe skipped — second pattern step unavailable.",
       })
 
       const { count: jobsAfterWake } = await admin
@@ -708,7 +873,7 @@ export async function executeGrowthSequenceConditionsDiagnostics(
       })
 
       eventWakeReady = blockedWakeOk && wakeScan.scannedWaits >= 0 && (jobsAfterWake ?? 0) === 0
-      await deleteCondition(admin, waitCondition.id)
+      await deleteCondition(admin, wakeCondition.id)
     } else {
       checks.push({
         id: "repository.crud_roundtrip",
@@ -748,7 +913,9 @@ export async function executeGrowthSequenceConditionsDiagnostics(
     waitRegistryReady &&
     branchNoTransportExecution &&
     advancementGateSafe &&
-    eventWakeReady
+    eventWakeReady &&
+    waitTimeoutReady &&
+    waitTimeoutNoTransport
 
   return {
     qa_marker: GROWTH_SEQUENCE_CONDITIONS_QA_MARKER,
@@ -768,5 +935,7 @@ export async function executeGrowthSequenceConditionsDiagnostics(
     branch_advancement_integrated: branchAdvancementIntegrated,
     advancement_gate_safe: advancementGateSafe,
     event_wake_ready: eventWakeReady,
+    wait_timeout_ready: waitTimeoutReady,
+    wait_timeout_no_transport: waitTimeoutNoTransport,
   }
 }

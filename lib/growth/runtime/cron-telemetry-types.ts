@@ -24,6 +24,7 @@ export const GROWTH_CRON_ROUTE_IDS = [
   "growth-market-health-refresh",
   "growth-dns-verify",
   "growth-sequence-recovery",
+  "growth-sequence-wait-timeouts",
   "growth-lifecycle-maintenance",
   "growth-reputation-snapshot",
   "growth-warmup-progression",

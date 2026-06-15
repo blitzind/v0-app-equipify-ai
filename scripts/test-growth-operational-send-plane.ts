@@ -11,6 +11,7 @@ import {
   GROWTH_CRON_ROUTES_RETIRED_FROM_VERCEL,
   GROWTH_CRON_TELEMETRY_QA_MARKER,
   growthCronApiPath,
+  type GrowthCronRouteId,
 } from "../lib/growth/runtime/cron-telemetry-types"
 import { GROWTH_INFRASTRUCTURE_READINESS_QA_MARKER } from "../lib/growth/infrastructure/infrastructure-readiness-types"
 import {
@@ -19,10 +20,60 @@ import {
 } from "../lib/growth/runtime/runtime-guards"
 import { DEV_FALLBACK_CREDENTIAL_PEPPER, isUsingDevFallbackCredentialPepper } from "../lib/growth/outbound/credentials-crypto"
 
+/** Handlers registered in telemetry; Vercel schedule is added at deploy time. */
+const CRON_ROUTES_PENDING_VERCEL_SCHEDULE = ["growth-sequence-wait-timeouts"] as const satisfies readonly GrowthCronRouteId[]
+
 async function main(): Promise<void> {
   assert.equal(GROWTH_CRON_TELEMETRY_QA_MARKER, "growth-operational-send-plane-v1")
   assert.equal(GROWTH_INFRASTRUCTURE_READINESS_QA_MARKER, "growth-internal-outbound-ops-v1")
-  assert.equal(GROWTH_CRON_ROUTE_IDS.length, 24)
+
+  assert.ok(GROWTH_CRON_ROUTE_IDS.length > 0, "growth cron registry must not be empty")
+  assert.equal(
+    new Set(GROWTH_CRON_ROUTE_IDS).size,
+    GROWTH_CRON_ROUTE_IDS.length,
+    "growth cron registry ids must be unique",
+  )
+
+  const vercel = JSON.parse(fs.readFileSync(path.join(process.cwd(), "vercel.json"), "utf8")) as {
+    crons: Array<{ path: string }>
+  }
+  const vercelCronPaths = new Set(vercel.crons.map((cron) => cron.path))
+  const exemptFromVercelSchedule = new Set<string>([
+    ...(GROWTH_CRON_ROUTES_RETIRED_FROM_VERCEL as readonly string[]),
+    ...CRON_ROUTES_PENDING_VERCEL_SCHEDULE,
+  ])
+
+  for (const routeId of GROWTH_CRON_ROUTE_IDS) {
+    const apiPath = growthCronApiPath(routeId)
+    assert.ok(
+      fs.existsSync(path.join(process.cwd(), `app/api/cron/${routeId}/route.ts`)),
+      `missing cron route file for ${routeId}`,
+    )
+    if (!exemptFromVercelSchedule.has(routeId)) {
+      assert.ok(
+        vercelCronPaths.has(apiPath),
+        `missing vercel cron registration for ${apiPath}`,
+      )
+    }
+  }
+
+  const expectedVercelScheduledCount = GROWTH_CRON_ROUTE_IDS.length - exemptFromVercelSchedule.size
+  const registeredInVercelCount = GROWTH_CRON_ROUTE_IDS.filter(
+    (routeId) => !exemptFromVercelSchedule.has(routeId) && vercelCronPaths.has(growthCronApiPath(routeId)),
+  ).length
+  assert.equal(
+    registeredInVercelCount,
+    expectedVercelScheduledCount,
+    "every non-exempt growth cron registry route must be scheduled in vercel.json",
+  )
+
+  for (const apiPath of vercelCronPaths) {
+    if (!apiPath.startsWith("/api/cron/growth-")) continue
+    assert.ok(
+      GROWTH_CRON_ROUTE_IDS.some((routeId) => growthCronApiPath(routeId) === apiPath),
+      `vercel cron ${apiPath} must be registered in GROWTH_CRON_ROUTE_IDS`,
+    )
+  }
 
   const migration = fs.readFileSync(
     path.join(process.cwd(), `supabase/migrations/${GROWTH_CRON_EXECUTION_TELEMETRY_MIGRATION}`),
@@ -44,24 +95,6 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(cronRunner, /telemetry persist skipped/)
-
-  const vercel = JSON.parse(fs.readFileSync(path.join(process.cwd(), "vercel.json"), "utf8")) as {
-    crons: Array<{ path: string }>
-  }
-  for (const routeId of GROWTH_CRON_ROUTE_IDS) {
-    const apiPath = growthCronApiPath(routeId)
-    const retiredFromVercel = (GROWTH_CRON_ROUTES_RETIRED_FROM_VERCEL as readonly string[]).includes(routeId)
-    if (!retiredFromVercel) {
-      assert.ok(
-        vercel.crons.some((cron) => cron.path === apiPath),
-        `missing vercel cron registration for ${apiPath}`,
-      )
-    }
-    assert.ok(
-      fs.existsSync(path.join(process.cwd(), `app/api/cron/${routeId}/route.ts`)),
-      `missing cron route file for ${routeId}`,
-    )
-  }
 
   const cronRoute = fs.readFileSync(
     path.join(process.cwd(), "app/api/cron/growth-outreach-execute/route.ts"),

@@ -177,6 +177,7 @@ const ROUTE_CATEGORIES: Record<GrowthCronRouteId, GrowthCronExecutionCategory> =
   "growth-market-health-refresh": "intelligence",
   "growth-dns-verify": "intelligence",
   "growth-sequence-recovery": "outbound",
+  "growth-sequence-wait-timeouts": "outbound",
   "growth-lifecycle-maintenance": "outbound",
   "growth-reputation-snapshot": "outbound",
   "growth-warmup-progression": "outbound",

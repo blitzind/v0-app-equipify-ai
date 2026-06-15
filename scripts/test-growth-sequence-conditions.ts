@@ -1,5 +1,5 @@
 /**
- * SR-3 Phase 1/2/3/4 — Conditional schema, evaluator, branch/wait registry, event wake engine certification.
+ * SR-3 Phase 1/2/3/4/5 — Conditional schema, evaluator, branch/wait registry, event wake, timeout processor certification.
  *
  * Local: pnpm test:growth-sequence-conditions
  * Integration: pnpm test:growth-sequence-conditions:integration
@@ -31,6 +31,7 @@ import {
 import { GROWTH_SEQUENCE_WAIT_REGISTRY_QA_MARKER } from "../lib/growth/sequences/conditions/sequence-wait-registry-types"
 import { GROWTH_SEQUENCE_EVENT_WAKE_QA_MARKER } from "../lib/growth/sequences/conditions/sequence-event-wake-types"
 import { GROWTH_SEQUENCE_WAIT_RESOLVER_QA_MARKER } from "../lib/growth/sequences/conditions/sequence-wait-registry-types"
+import { GROWTH_SEQUENCE_WAIT_TIMEOUT_QA_MARKER } from "../lib/growth/sequences/conditions/sequence-wait-timeout-types"
 import {
   SEQUENCE_ENROLLMENT_WAIT_STATUSES,
   validateSequenceEnrollmentWaitStatus,
@@ -80,7 +81,7 @@ const EVALUATOR_WRITE_FORBIDDEN_PATTERNS = [
 ] as const
 
 function runLocalRegression(): void {
-  console.log(`\n=== SR-3 Phase 1/2/3/4 local regression (${GROWTH_SEQUENCE_CONDITIONS_QA_MARKER}) ===\n`)
+  console.log(`\n=== SR-3 Phase 1/2/3/4/5 local regression (${GROWTH_SEQUENCE_CONDITIONS_QA_MARKER}) ===\n`)
 
   assert.equal(GROWTH_SEQUENCE_CONDITIONS_QA_MARKER, "growth-sequence-conditions-sr3-phase1-v1")
   assert.equal(GROWTH_SEQUENCE_CONDITIONS_CONFIRM, "RUN_GROWTH_SEQUENCE_CONDITIONS_CERTIFICATION")
@@ -90,6 +91,7 @@ function runLocalRegression(): void {
   assert.equal(GROWTH_SEQUENCE_WAIT_REGISTRY_QA_MARKER, "growth-sequence-wait-registry-sr3-phase3-v1")
   assert.equal(GROWTH_SEQUENCE_EVENT_WAKE_QA_MARKER, "growth-sequence-event-wake-sr3-phase4-v1")
   assert.equal(GROWTH_SEQUENCE_WAIT_RESOLVER_QA_MARKER, "growth-sequence-wait-resolver-sr3-phase4-v1")
+  assert.equal(GROWTH_SEQUENCE_WAIT_TIMEOUT_QA_MARKER, "growth-sequence-wait-timeout-sr3-phase5-v1")
   assert.equal(
     GROWTH_SEQUENCE_CONDITION_EVALUATOR_CONFIRM,
     "RUN_GROWTH_SEQUENCE_CONDITION_EVALUATOR_CERTIFICATION",
@@ -115,6 +117,10 @@ function runLocalRegression(): void {
     "lib/growth/sequences/conditions/sequence-event-wake-types.ts",
     "lib/growth/sequences/conditions/sequence-event-wake-engine.ts",
     "lib/growth/sequences/conditions/sequence-wait-resolver.ts",
+    "lib/growth/sequences/conditions/sequence-wait-timeout-types.ts",
+    "lib/growth/sequences/conditions/sequence-wait-timeout-processor.ts",
+    "lib/growth/sequences/conditions/sequence-wait-recovery-diagnostics.ts",
+    "app/api/cron/growth-sequence-wait-timeouts/route.ts",
     "app/api/platform/growth/sequences/conditions/evaluate/route.ts",
     "supabase/migrations/20270827120000_growth_sequence_conditions_sr3_phase1.sql",
   ]
@@ -369,6 +375,51 @@ function runLocalRegression(): void {
   }
   console.log("  ✓ wait resolver service with pause gate enforcement")
 
+  const timeoutProcessorSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/sequences/conditions/sequence-wait-timeout-processor.ts"),
+    "utf8",
+  )
+  assert.match(timeoutProcessorSource, /processExpiredSequenceWaits/)
+  assert.match(timeoutProcessorSource, /listExpiredActiveSequenceWaits/)
+  assert.match(timeoutProcessorSource, /resolveWaitTimeout/)
+  assert.match(timeoutProcessorSource, /recordSequenceAdvancementBlockedAudit/)
+  assert.match(timeoutProcessorSource, /timeout_at/)
+  for (const pattern of BRANCH_PATH_FORBIDDEN_PATTERNS) {
+    assert.doesNotMatch(timeoutProcessorSource, pattern, "timeout processor must not execute transport")
+  }
+  console.log("  ✓ wait timeout processor without transport execution")
+
+  const recoveryDiagnosticsSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/sequences/conditions/sequence-wait-recovery-diagnostics.ts"),
+    "utf8",
+  )
+  assert.match(recoveryDiagnosticsSource, /diagnoseSequenceWaitRecovery/)
+  assert.match(recoveryDiagnosticsSource, /stuck_active/)
+  assert.match(recoveryDiagnosticsSource, /missing_timeout/)
+  assert.match(recoveryDiagnosticsSource, /invalid_timeout_target/)
+  assert.doesNotMatch(recoveryDiagnosticsSource, /createEdge/)
+  assert.doesNotMatch(recoveryDiagnosticsSource, /updateWait/)
+  console.log("  ✓ wait recovery diagnostics (report-only)")
+
+  const timeoutCronSource = fs.readFileSync(
+    path.join(process.cwd(), "app/api/cron/growth-sequence-wait-timeouts/route.ts"),
+    "utf8",
+  )
+  assert.match(timeoutCronSource, /runGrowthCronJob/)
+  assert.match(timeoutCronSource, /processExpiredSequenceWaits/)
+  assert.match(timeoutCronSource, /growth-sequence-wait-timeouts/)
+  assert.match(timeoutCronSource, /export async function GET/)
+  assert.doesNotMatch(timeoutCronSource, /queueSequenceStepTransportJob/)
+  assert.doesNotMatch(timeoutCronSource, /safe-execute/)
+  console.log("  ✓ wait timeout cron route smoke")
+
+  const recoveryCronSource = fs.readFileSync(
+    path.join(process.cwd(), "app/api/cron/growth-sequence-recovery/route.ts"),
+    "utf8",
+  )
+  assert.match(recoveryCronSource, /diagnoseSequenceWaitRecovery/)
+  console.log("  ✓ sequence recovery cron includes wait diagnostics")
+
   const hookTargets = [
     "lib/growth/tracking/tracking-repository.ts",
     "lib/growth/replies/reply-ingestion-pipeline.ts",
@@ -389,6 +440,8 @@ function runLocalRegression(): void {
     "lib/growth/sequences/conditions/sequence-wait-registry.ts",
     "lib/growth/sequences/conditions/sequence-wait-resolver.ts",
     "lib/growth/sequences/conditions/sequence-event-wake-engine.ts",
+    "lib/growth/sequences/conditions/sequence-wait-timeout-processor.ts",
+    "lib/growth/sequences/conditions/sequence-wait-recovery-diagnostics.ts",
   ]
   for (const relativePath of forbiddenScanTargets) {
     const source = fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
@@ -405,7 +458,7 @@ function runLocalRegression(): void {
   assert.equal(typeof appendBranchDecision, "function")
   console.log("  ✓ repository imports resolve")
 
-  console.log("\nSR-3 Phase 1/2/3/4 local regression PASS\n")
+  console.log("\nSR-3 Phase 1/2/3/4/5 local regression PASS\n")
 }
 
 async function runIntegrationDiagnostics(): Promise<Record<string, unknown>> {
@@ -442,7 +495,7 @@ async function main(): Promise<void> {
     return
   }
 
-  console.log(`\n=== SR-3 Phase 1/2/3/4 ${mode} diagnostics ===\n`)
+  console.log(`\n=== SR-3 Phase 1/2/3/4/5 ${mode} diagnostics ===\n`)
   const report = await runIntegrationDiagnostics()
   console.log(JSON.stringify(report, null, 2))
 
