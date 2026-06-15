@@ -1,5 +1,5 @@
 /**
- * SR-3 Phase 1/2/3 — Conditional sequence schema, read-only evaluator, branch resolver + wait registry certification.
+ * SR-3 Phase 1/2/3/4 — Conditional schema, evaluator, branch/wait registry, event wake engine certification.
  *
  * Local: pnpm test:growth-sequence-conditions
  * Integration: pnpm test:growth-sequence-conditions:integration
@@ -29,6 +29,8 @@ import {
   resolveSequenceBranchEdges,
 } from "../lib/growth/sequences/conditions/sequence-branch-resolver-types"
 import { GROWTH_SEQUENCE_WAIT_REGISTRY_QA_MARKER } from "../lib/growth/sequences/conditions/sequence-wait-registry-types"
+import { GROWTH_SEQUENCE_EVENT_WAKE_QA_MARKER } from "../lib/growth/sequences/conditions/sequence-event-wake-types"
+import { GROWTH_SEQUENCE_WAIT_RESOLVER_QA_MARKER } from "../lib/growth/sequences/conditions/sequence-wait-registry-types"
 import {
   SEQUENCE_ENROLLMENT_WAIT_STATUSES,
   validateSequenceEnrollmentWaitStatus,
@@ -78,7 +80,7 @@ const EVALUATOR_WRITE_FORBIDDEN_PATTERNS = [
 ] as const
 
 function runLocalRegression(): void {
-  console.log(`\n=== SR-3 Phase 1/2/3 local regression (${GROWTH_SEQUENCE_CONDITIONS_QA_MARKER}) ===\n`)
+  console.log(`\n=== SR-3 Phase 1/2/3/4 local regression (${GROWTH_SEQUENCE_CONDITIONS_QA_MARKER}) ===\n`)
 
   assert.equal(GROWTH_SEQUENCE_CONDITIONS_QA_MARKER, "growth-sequence-conditions-sr3-phase1-v1")
   assert.equal(GROWTH_SEQUENCE_CONDITIONS_CONFIRM, "RUN_GROWTH_SEQUENCE_CONDITIONS_CERTIFICATION")
@@ -86,6 +88,8 @@ function runLocalRegression(): void {
   assert.equal(GROWTH_SEQUENCE_CONDITION_EVALUATOR_QA_MARKER, "growth-sequence-condition-evaluator-sr3-phase2-v1")
   assert.equal(GROWTH_SEQUENCE_BRANCH_RESOLVER_QA_MARKER, "growth-sequence-branch-resolver-sr3-phase3-v1")
   assert.equal(GROWTH_SEQUENCE_WAIT_REGISTRY_QA_MARKER, "growth-sequence-wait-registry-sr3-phase3-v1")
+  assert.equal(GROWTH_SEQUENCE_EVENT_WAKE_QA_MARKER, "growth-sequence-event-wake-sr3-phase4-v1")
+  assert.equal(GROWTH_SEQUENCE_WAIT_RESOLVER_QA_MARKER, "growth-sequence-wait-resolver-sr3-phase4-v1")
   assert.equal(
     GROWTH_SEQUENCE_CONDITION_EVALUATOR_CONFIRM,
     "RUN_GROWTH_SEQUENCE_CONDITION_EVALUATOR_CERTIFICATION",
@@ -108,6 +112,9 @@ function runLocalRegression(): void {
     "lib/growth/sequences/conditions/sequence-wait-registry.ts",
     "lib/growth/sequences/conditions/sequence-branch-audit.ts",
     "lib/growth/sequences/conditions/sequence-branch-advance-gate.ts",
+    "lib/growth/sequences/conditions/sequence-event-wake-types.ts",
+    "lib/growth/sequences/conditions/sequence-event-wake-engine.ts",
+    "lib/growth/sequences/conditions/sequence-wait-resolver.ts",
     "app/api/platform/growth/sequences/conditions/evaluate/route.ts",
     "supabase/migrations/20270827120000_growth_sequence_conditions_sr3_phase1.sql",
   ]
@@ -336,10 +343,52 @@ function runLocalRegression(): void {
   assert.match(advanceGateSource, /advancement_blocked/)
   console.log("  ✓ advancement gate audit + safety probes")
 
+  const wakeEngineSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/sequences/conditions/sequence-event-wake-engine.ts"),
+    "utf8",
+  )
+  assert.match(wakeEngineSource, /processSequenceAttributedWakeEvent/)
+  assert.match(wakeEngineSource, /dispatchSequenceEventWakeSafely/)
+  assert.match(wakeEngineSource, /resolveWaitMatched/)
+  for (const pattern of BRANCH_PATH_FORBIDDEN_PATTERNS) {
+    assert.doesNotMatch(wakeEngineSource, pattern, "wake engine must not execute transport")
+  }
+  console.log("  ✓ event wake engine surface without transport execution")
+
+  const waitResolverSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/sequences/conditions/sequence-wait-resolver.ts"),
+    "utf8",
+  )
+  assert.match(waitResolverSource, /resolveWaitMatched/)
+  assert.match(waitResolverSource, /resolveWaitTimeout/)
+  assert.match(waitResolverSource, /resolveWaitCancelled/)
+  assert.match(waitResolverSource, /resolveWaitOperatorOverride/)
+  assert.match(waitResolverSource, /evaluateSequenceBranchAdvanceGate/)
+  for (const pattern of BRANCH_PATH_FORBIDDEN_PATTERNS) {
+    assert.doesNotMatch(waitResolverSource, pattern, "wait resolver must not execute transport")
+  }
+  console.log("  ✓ wait resolver service with pause gate enforcement")
+
+  const hookTargets = [
+    "lib/growth/tracking/tracking-repository.ts",
+    "lib/growth/replies/reply-ingestion-pipeline.ts",
+    "lib/growth/share-pages/share-page-analytics-service.ts",
+    "lib/growth/sms/webhooks/twilio-sms-ingestion.ts",
+    "lib/growth/sequences/execution/sequence-voice-drop-runner.ts",
+    "lib/growth/cadence/mutate-cadence-task.ts",
+  ]
+  for (const relativePath of hookTargets) {
+    const source = fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
+    assert.match(source, /dispatchSequence/)
+  }
+  console.log("  ✓ event wake hooks wired into persistence paths")
+
   const forbiddenScanTargets = [
     "lib/growth/sequences/execution/sequence-job-runner.ts",
     "lib/growth/sequences/execution/sequence-job-planner.ts",
     "lib/growth/sequences/conditions/sequence-wait-registry.ts",
+    "lib/growth/sequences/conditions/sequence-wait-resolver.ts",
+    "lib/growth/sequences/conditions/sequence-event-wake-engine.ts",
   ]
   for (const relativePath of forbiddenScanTargets) {
     const source = fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
@@ -356,7 +405,7 @@ function runLocalRegression(): void {
   assert.equal(typeof appendBranchDecision, "function")
   console.log("  ✓ repository imports resolve")
 
-  console.log("\nSR-3 Phase 1/2/3 local regression PASS\n")
+  console.log("\nSR-3 Phase 1/2/3/4 local regression PASS\n")
 }
 
 async function runIntegrationDiagnostics(): Promise<Record<string, unknown>> {
@@ -393,7 +442,7 @@ async function main(): Promise<void> {
     return
   }
 
-  console.log(`\n=== SR-3 Phase 1/2/3 ${mode} diagnostics ===\n`)
+  console.log(`\n=== SR-3 Phase 1/2/3/4 ${mode} diagnostics ===\n`)
   const report = await runIntegrationDiagnostics()
   console.log(JSON.stringify(report, null, 2))
 

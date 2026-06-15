@@ -5,6 +5,9 @@ import type { SequenceConditionEvent } from "@/lib/growth/sequences/conditions/s
 export const GROWTH_SEQUENCE_WAIT_REGISTRY_QA_MARKER =
   "growth-sequence-wait-registry-sr3-phase3-v1" as const
 
+export const GROWTH_SEQUENCE_WAIT_RESOLVER_QA_MARKER =
+  "growth-sequence-wait-resolver-sr3-phase4-v1" as const
+
 export const SEQUENCE_WAIT_RESOLUTION_REASONS = [
   "matched",
   "timeout",
@@ -13,6 +16,13 @@ export const SEQUENCE_WAIT_RESOLUTION_REASONS = [
 ] as const
 
 export type SequenceWaitResolutionReason = (typeof SEQUENCE_WAIT_RESOLUTION_REASONS)[number]
+
+export type SequenceBranchAdvancementResult =
+  | { kind: "linear" }
+  | { kind: "waiting"; waitId: string }
+  | { kind: "branched"; targetEnrollmentStepId: string }
+  | { kind: "blocked"; reason: string }
+  | { kind: "completed" }
 
 const INSTANT_CONDITION_PREFIXES = ["lead.", "engagement."] as const
 

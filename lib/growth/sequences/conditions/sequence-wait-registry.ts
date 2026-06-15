@@ -13,12 +13,9 @@ import {
   createWait,
   listConditionsForStep,
   listEdgesFromPatternStep,
-  updateWait,
 } from "@/lib/growth/sequences/conditions/sequence-condition-repository"
 import {
   recordSequenceBranchEvaluatedAudit,
-  recordSequenceConditionTimeoutAudit,
-  recordSequenceWaitResolvedAudit,
   recordSequenceWaitStartedAudit,
 } from "@/lib/growth/sequences/conditions/sequence-branch-audit"
 import {
@@ -31,15 +28,10 @@ import type { SequenceConditionEvaluationResult } from "@/lib/growth/sequences/c
 import {
   isWaitUntilEventConditionEvent,
   mapWaitResolutionToBranchDecision,
-  type SequenceWaitResolutionReason,
+  type SequenceBranchAdvancementResult,
 } from "@/lib/growth/sequences/conditions/sequence-wait-registry-types"
 
-export type SequenceBranchAdvancementResult =
-  | { kind: "linear" }
-  | { kind: "waiting"; waitId: string }
-  | { kind: "branched"; targetEnrollmentStepId: string }
-  | { kind: "blocked"; reason: string }
-  | { kind: "completed" }
+export type { SequenceBranchAdvancementResult } from "@/lib/growth/sequences/conditions/sequence-wait-registry-types"
 
 function addDays(iso: string, days: number): string {
   return new Date(Date.parse(iso) + days * 24 * 60 * 60 * 1000).toISOString()
@@ -326,147 +318,4 @@ async function materializeBranchResolution(
     : { kind: "blocked", reason: input.resolver.reason }
 }
 
-export async function resolveSequenceEnrollmentWaitRegistry(
-  admin: SupabaseClient,
-  input: {
-    waitId: string
-    resolutionReason: SequenceWaitResolutionReason
-    pattern: GrowthSequencePattern
-    now?: string
-    forceTargetPatternStepId?: string | null
-  },
-): Promise<SequenceBranchAdvancementResult> {
-  const now = input.now ?? new Date().toISOString()
-  const { data: waitRow, error } = await admin
-    .schema("growth")
-    .from("sequence_enrollment_step_waits")
-    .select("*")
-    .eq("id", input.waitId)
-    .maybeSingle()
-  if (error) throw new Error(error.message)
-  if (!waitRow) throw new Error("wait_not_found")
-
-  const enrollmentId = String(waitRow.enrollment_id)
-  const enrollmentStepId = String(waitRow.enrollment_step_id)
-  const patternStepId = waitRow.pattern_step_id ? String(waitRow.pattern_step_id) : null
-  if (!patternStepId) throw new Error("wait_missing_pattern_step")
-
-  const steps = await listGrowthSequenceEnrollmentSteps(admin, enrollmentId)
-  const completedStep = steps.find((step) => step.id === enrollmentStepId)
-  if (!completedStep) throw new Error("enrollment_step_not_found")
-
-  const edges = await listEdgesFromPatternStep(admin, input.pattern.id, patternStepId)
-  const { evaluations, results: conditionResults } = await evaluateStepConditions(admin, {
-    enrollmentId,
-    enrollmentStepId,
-    patternStepId,
-    now,
-  })
-
-  let resolver = resolveSequenceBranchEdges({
-    fromPatternStepId: patternStepId,
-    edges,
-    evaluations,
-  })
-
-  if (input.resolutionReason === "timeout") {
-    const timeoutEdge = edges.find((edge) => edge.edgeType === "timeout")
-    if (timeoutEdge) {
-      resolver = {
-        selectedEdge: timeoutEdge,
-        targetPatternStepId: timeoutEdge.toPatternStepId,
-        skippedEdges: edges.filter((edge) => edge.id !== timeoutEdge.id),
-        reason: "Wait timed out — timeout edge selected.",
-        resolution: "conditional_false",
-      }
-      await recordSequenceConditionTimeoutAudit(admin, {
-        enrollmentId,
-        enrollmentStepId,
-        leadId: completedStep.leadId,
-        waitId: input.waitId,
-        conditionId: String(waitRow.condition_id ?? ""),
-        occurredAt: now,
-      })
-    }
-  }
-
-  if (input.forceTargetPatternStepId) {
-    const forcedEdge =
-      edges.find((edge) => edge.toPatternStepId === input.forceTargetPatternStepId) ?? resolver.selectedEdge
-    resolver = {
-      selectedEdge: forcedEdge,
-      targetPatternStepId: input.forceTargetPatternStepId,
-      skippedEdges: edges.filter((edge) => edge.id !== forcedEdge?.id),
-      reason: "Operator override — forced branch target selected.",
-      resolution: forcedEdge?.edgeType === "default" ? "default" : "conditional_true",
-    }
-  }
-
-  if (!resolver.targetPatternStepId) {
-    await updateWait(admin, input.waitId, {
-      status: input.resolutionReason === "cancelled" ? "cancelled" : "timed_out",
-      resolvedAt: now,
-      resolutionReason: input.resolutionReason,
-    })
-    return { kind: "blocked", reason: resolver.reason }
-  }
-
-  await updateWait(admin, input.waitId, {
-    status: input.resolutionReason === "timeout" ? "timed_out" : "resolved",
-    resolvedAt: now,
-    resolutionReason: input.resolutionReason,
-  })
-
-  await updateGrowthSequenceEnrollmentStep(admin, completedStep.id, {
-    status: "executed",
-    completedAt: now,
-  })
-
-  const skippedPatternStepIds = identifySkippedBranchTargetPatternStepIds({
-    edges,
-    selectedEdge: resolver.selectedEdge,
-  })
-
-  await recordSequenceWaitResolvedAudit(admin, {
-    enrollmentId,
-    enrollmentStepId,
-    leadId: completedStep.leadId,
-    waitId: input.waitId,
-    resolutionReason: input.resolutionReason,
-    selectedEdge: resolver.selectedEdge,
-    occurredAt: now,
-  })
-
-  const primaryResult = conditionResults[0]?.result
-  await appendBranchDecisionAudit(admin, {
-    enrollmentId,
-    enrollmentStepId,
-    patternStepId,
-    conditionId: resolver.selectedEdge?.conditionId ?? null,
-    edgeId: resolver.selectedEdge?.id ?? null,
-    decision: mapWaitResolutionToBranchDecision(input.resolutionReason),
-    source: primaryResult?.source ?? "email",
-    event: primaryResult?.event ?? "email.opened",
-    outcomeDetail: resolver.reason,
-    evaluatedAt: now,
-  })
-
-  const targetPatternStep = input.pattern.steps.find((step) => step.id === resolver.targetPatternStepId)
-  const scheduledAt = targetPatternStep ? addDays(now, targetPatternStep.delayDaysMin) : now
-  const targetStep = await scheduleBranchTargetEnrollmentStep(admin, {
-    enrollmentId,
-    pattern: input.pattern,
-    targetPatternStepId: resolver.targetPatternStepId,
-    skippedPatternStepIds,
-    scheduledAt,
-    skipReason: "Non-selected branch path skipped after wait resolution.",
-  })
-
-  if (targetStep) {
-    await updateGrowthSequenceEnrollment(admin, enrollmentId, { currentStepOrder: targetStep.stepOrder })
-  }
-
-  return targetStep
-    ? { kind: "branched", targetEnrollmentStepId: targetStep.id }
-    : { kind: "blocked", reason: resolver.reason }
-}
+export { resolveSequenceEnrollmentWaitRegistry } from "@/lib/growth/sequences/conditions/sequence-wait-resolver"

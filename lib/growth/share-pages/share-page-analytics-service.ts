@@ -27,6 +27,8 @@ import {
   type GrowthSharePageEventType,
 } from "@/lib/growth/share-pages/share-page-types"
 import { recordSharePageAttributionEngagement } from "@/lib/growth/tracking/tracking-repository"
+import { dispatchSequenceEventWakeSafely } from "@/lib/growth/sequences/conditions/sequence-event-wake-engine"
+import { mapSharePageEventToSequenceWakeEvent } from "@/lib/growth/sequences/conditions/sequence-event-wake-types"
 
 export const SHARE_PAGE_ENGAGEMENT_DURATION_MS = 30_000
 export const SHARE_PAGE_ENGAGEMENT_SCROLL_PCT = 50
@@ -459,6 +461,28 @@ export async function ingestSharePageAnalyticsForPage(
     pageUrl: input.pageUrl,
     deduplicated,
   })
+
+  const wakeEvent = mapSharePageEventToSequenceWakeEvent(eventType)
+  if (wakeEvent && !deduplicated) {
+    dispatchSequenceEventWakeSafely(admin, {
+      leadId: page.leadId,
+      sequenceEnrollmentId: page.enrollmentId,
+      sequenceEnrollmentStepId: page.sequenceEnrollmentStepId,
+      source: "share_page",
+      event: wakeEvent,
+      occurredAt,
+    })
+  }
+  if (sideEffects.engagementThresholdCrossed) {
+    dispatchSequenceEventWakeSafely(admin, {
+      leadId: page.leadId,
+      sequenceEnrollmentId: page.enrollmentId,
+      sequenceEnrollmentStepId: page.sequenceEnrollmentStepId,
+      source: "share_page",
+      event: "share_page.engaged",
+      occurredAt,
+    })
+  }
 
   return {
     ok: true,

@@ -18,6 +18,7 @@ import {
   evaluateSequenceVoiceDropExecutionPreflight,
 } from "@/lib/growth/sequences/execution/sequence-voice-drop-send-builder"
 import { emitSequenceVoiceDropTimelineEvent } from "@/lib/growth/sequences/execution/sequence-voice-drop-timeline"
+import { dispatchSequenceEventWakeSafely } from "@/lib/growth/sequences/conditions/sequence-event-wake-engine"
 import { GROWTH_SEQUENCE_VOICE_DROP_VD_2_QA_MARKER } from "@/lib/growth/sequences/sequence-voice-drop-step-types"
 import { evaluateAndAuditCompliance } from "@/lib/voice/compliance-orchestration/compliance-orchestration-service"
 import { mapComplianceResultToRecipientPatch } from "@/lib/voice/compliance-orchestration/compliance-decision-engine"
@@ -325,6 +326,14 @@ export async function runSequenceVoiceDropExecutionJob(
       deliveryAttemptId: attempt.id,
       summary: result.failureReason ?? result.evidenceText ?? "Voice drop delivery failed.",
     })
+    dispatchSequenceEventWakeSafely(admin, {
+      leadId: job.leadId,
+      sequenceEnrollmentId: job.sequenceEnrollmentId,
+      sequenceEnrollmentStepId: job.sequenceStepId,
+      source: "voice_drop",
+      event: "voice_drop.failed",
+      evidenceRef: attempt.id,
+    })
     await updateSequenceExecutionJob(admin, job.id, {
       status: "failed",
       lastError: result.failureReason ?? "voice_drop_failed",
@@ -366,6 +375,14 @@ export async function runSequenceVoiceDropExecutionJob(
       recipientId: recipient.id,
       deliveryAttemptId: attempt.id,
       summary: result.evidenceText ?? "Voice drop delivered to voicemail.",
+    })
+    dispatchSequenceEventWakeSafely(admin, {
+      leadId: job.leadId,
+      sequenceEnrollmentId: job.sequenceEnrollmentId,
+      sequenceEnrollmentStepId: job.sequenceStepId,
+      source: "voice_drop",
+      event: "voice_drop.delivered",
+      evidenceRef: attempt.id,
     })
   }
 

@@ -8,6 +8,7 @@ import { computeGrowthLeadNextBestAction } from "@/lib/growth/next-best-action"
 import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { recomputeGrowthLeadEngagementIntelligence } from "@/lib/growth/recompute-engagement-intelligence"
+import { dispatchSequenceWakeForLeadEvent } from "@/lib/growth/sequences/conditions/sequence-event-wake-engine"
 import { recomputeGrowthLeadRelationshipIntelligence } from "@/lib/growth/recompute-relationship-intelligence"
 import { recomputeGrowthLeadOpportunityReadiness } from "@/lib/growth/recompute-opportunity-readiness"
 import { recomputeGrowthLeadRevenueForecast } from "@/lib/growth/recompute-revenue-forecast"
@@ -126,6 +127,11 @@ export async function recomputeGrowthLeadNextBestAction(
       from: lead.nextBestAction,
       to: nba.action,
       reason: nba.reason,
+    })
+    dispatchSequenceWakeForLeadEvent(admin, {
+      leadId,
+      source: "lead",
+      event: "lead.next_best_action",
     })
   }
 

@@ -36,6 +36,8 @@ import {
   applySequenceBranchResolution,
   resolveSequenceEnrollmentWaitRegistry,
 } from "@/lib/growth/sequences/conditions/sequence-wait-registry"
+import { processSequenceAttributedWakeEvent } from "@/lib/growth/sequences/conditions/sequence-event-wake-engine"
+import { resolveWaitMatched, resolveWaitTimeout } from "@/lib/growth/sequences/conditions/sequence-wait-resolver"
 import {
   fetchGrowthSequenceEnrollmentById,
   insertGrowthSequenceEnrollmentStep,
@@ -70,6 +72,7 @@ export type SequenceConditionsDiagnosticsReport = {
   branch_no_transport_execution: boolean
   branch_advancement_integrated: boolean
   advancement_gate_safe: boolean
+  event_wake_ready: boolean
 }
 
 const SCHEMA_TABLES = [
@@ -158,6 +161,7 @@ export async function executeGrowthSequenceConditionsDiagnostics(
   let branchNoTransportExecution = false
   let branchAdvancementIntegrated = false
   let advancementGateSafe = false
+  let eventWakeReady = false
   const crudMarker = `sr3-phase1-crud-${Date.now()}`
   const phase3Marker = `sr3-phase3-${Date.now()}`
   try {
@@ -636,6 +640,75 @@ export async function executeGrowthSequenceConditionsDiagnostics(
           ? "advancement_blocked channel event recorded for paused probe."
           : "No advancement_blocked audit event recorded.",
       })
+
+      const wakeScan = await processSequenceAttributedWakeEvent(admin, {
+        leadId: enrollment.lead_id as string,
+        sequenceEnrollmentId: enrollment.id,
+        source: "email",
+        event: "email.opened",
+        occurredAt: fixedNow,
+      })
+      checks.push({
+        id: "wake.engine_scans_without_error",
+        ok: wakeScan.scannedWaits >= 0,
+        detail: `Event wake engine scanned ${wakeScan.scannedWaits} active wait(s).`,
+      })
+
+      await updateGrowthSequenceEnrollment(admin, enrollment.id, { status: "active", pauseReason: null })
+      const wakeCondition = await createCondition(admin, {
+        patternStepId: patternStep.id,
+        conditionKey: `${phase3Marker}-wake-open`,
+        spec: { dslVersion: 1, source: "email", event: "email.opened" },
+        label: "SR-3 Phase 4 wake probe",
+      })
+      const wait = await createWait(admin, {
+        enrollmentId: enrollment.id,
+        enrollmentStepId: enrollmentStep.id,
+        patternStepId: patternStep.id,
+        conditionId: waitCondition.id,
+        waitKind: "until_event",
+        status: "active",
+        waitedForSource: "email",
+        waitedForEvent: "email.opened",
+        startedAt: fixedNow,
+      })
+      await updateGrowthSequenceEnrollmentStep(admin, enrollmentStep.id, { status: "waiting" })
+
+      await updateGrowthSequenceEnrollment(admin, enrollment.id, { status: "paused", pauseReason: phase3Marker })
+      const blockedWake = await resolveWaitMatched(admin, { waitId: wait.id, now: fixedNow })
+      const blockedWakeOk = blockedWake.kind === "blocked"
+      checks.push({
+        id: "wake.pause_gate_blocks_resolution",
+        ok: blockedWakeOk,
+        detail: blockedWakeOk
+          ? "Paused enrollment blocked wait resolution during event wake path."
+          : `Wait resolution returned ${blockedWake.kind} while paused.`,
+      })
+
+      await updateGrowthSequenceEnrollment(admin, enrollment.id, { status: "active", pauseReason: null })
+      const timeoutResult = await resolveWaitTimeout(admin, { waitId: wait.id, now: fixedNow })
+      checks.push({
+        id: "wake.timeout_resolution_available",
+        ok: timeoutResult.kind === "blocked" || timeoutResult.kind === "branched",
+        detail: `Wait timeout resolution returned ${timeoutResult.kind}.`,
+      })
+
+      const { count: jobsAfterWake } = await admin
+        .schema("growth")
+        .from("sequence_execution_jobs")
+        .select("id", { count: "exact", head: true })
+        .eq("sequence_enrollment_id", enrollment.id)
+      checks.push({
+        id: "wake.no_execution_jobs_created",
+        ok: (jobsAfterWake ?? 0) === 0,
+        detail:
+          (jobsAfterWake ?? 0) === 0
+            ? "Event wake / wait resolution did not create sequence_execution_jobs."
+            : "Event wake path created execution jobs — forbidden.",
+      })
+
+      eventWakeReady = blockedWakeOk && wakeScan.scannedWaits >= 0 && (jobsAfterWake ?? 0) === 0
+      await deleteCondition(admin, waitCondition.id)
     } else {
       checks.push({
         id: "repository.crud_roundtrip",
@@ -674,7 +747,8 @@ export async function executeGrowthSequenceConditionsDiagnostics(
     branchResolverReady &&
     waitRegistryReady &&
     branchNoTransportExecution &&
-    advancementGateSafe
+    advancementGateSafe &&
+    eventWakeReady
 
   return {
     qa_marker: GROWTH_SEQUENCE_CONDITIONS_QA_MARKER,
@@ -693,5 +767,6 @@ export async function executeGrowthSequenceConditionsDiagnostics(
     branch_no_transport_execution: branchNoTransportExecution,
     branch_advancement_integrated: branchAdvancementIntegrated,
     advancement_gate_safe: advancementGateSafe,
+    event_wake_ready: eventWakeReady,
   }
 }

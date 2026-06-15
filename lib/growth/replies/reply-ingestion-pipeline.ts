@@ -15,6 +15,8 @@ import {
 } from "@/lib/growth/reply-intelligence/reply-ingestion-repository"
 import { resolveReplyIngestionConnectionId } from "@/lib/growth/replies/reply-connection-resolver"
 import { appendGrowthLeadTimelineEvent } from "@/lib/growth/timeline-repository"
+import { dispatchSequenceEventWakeSafely } from "@/lib/growth/sequences/conditions/sequence-event-wake-engine"
+import { resolveSequenceAttributionFromDeliveryAttemptId } from "@/lib/growth/sequences/attribution/sequence-attribution-resolver"
 
 export type NormalizedReplyIngestInput = {
   source: GrowthReplyIngestionSource
@@ -246,6 +248,22 @@ export async function ingestGrowthReply(
     outboundReplyId: outboundReply.id,
     processingStatus: "processed",
   })
+
+  if (input.leadId) {
+    const attribution = input.deliveryAttemptId
+      ? await resolveSequenceAttributionFromDeliveryAttemptId(admin, input.deliveryAttemptId)
+      : { sequenceEnrollmentId: input.sequenceEnrollmentId ?? null, sequenceEnrollmentStepId: null, sequenceExecutionJobId: null }
+    const isSms = input.source === "sms_provider_webhook"
+    dispatchSequenceEventWakeSafely(admin, {
+      leadId: input.leadId,
+      sequenceEnrollmentId: input.sequenceEnrollmentId ?? attribution.sequenceEnrollmentId,
+      sequenceEnrollmentStepId: attribution.sequenceEnrollmentStepId,
+      source: isSms ? "sms" : "email",
+      event: isSms ? "sms.replied" : "email.replied",
+      evidenceRef: outboundReply.id,
+      occurredAt: input.receivedAt,
+    })
+  }
 
   return finalizeReplyIngestionResult(admin, input.leadId, {
     deduped: resumingIncomplete,

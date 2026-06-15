@@ -13,6 +13,7 @@ import {
   emitGrowthLeadEngagementScoreChangedTimeline,
   emitGrowthLeadEngagementTierChangedTimeline,
 } from "@/lib/growth/timeline-emitter"
+import { dispatchSequenceWakeForLeadEvent } from "@/lib/growth/sequences/conditions/sequence-event-wake-engine"
 import type { GrowthLead } from "@/lib/growth/types"
 
 function growthLeadsTable(admin: SupabaseClient) {
@@ -73,6 +74,24 @@ export async function recomputeGrowthLeadEngagementIntelligence(
       leadId,
       from: prevTier,
       to: result.tier,
+    })
+    dispatchSequenceWakeForLeadEvent(admin, {
+      leadId,
+      source: "lead",
+      event: "lead.hot_tier",
+    })
+    dispatchSequenceWakeForLeadEvent(admin, {
+      leadId,
+      source: "engagement",
+      event: "engagement.tier",
+    })
+  }
+
+  if (prevScore != null && prevScore !== result.score) {
+    dispatchSequenceWakeForLeadEvent(admin, {
+      leadId,
+      source: "engagement",
+      event: "engagement.score_threshold",
     })
   }
 

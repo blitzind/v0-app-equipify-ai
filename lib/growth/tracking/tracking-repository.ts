@@ -22,6 +22,7 @@ import { buildTrackingHealthSnapshot } from "@/lib/growth/tracking/tracking-heal
 import { getDeliveryAttempt } from "@/lib/growth/providers/transport/transport-repository"
 import { resolveSequenceAttributionFromDeliveryAttemptId } from "@/lib/growth/sequences/attribution/sequence-attribution-resolver"
 import { sequenceAttributionToDbRow } from "@/lib/growth/sequences/attribution/sequence-attribution"
+import { dispatchSequenceWakeForDeliveryAttempt, dispatchSequenceWakeForLeadEvent } from "@/lib/growth/sequences/conditions/sequence-event-wake-engine"
 
 type OpenRow = {
   id: string
@@ -199,6 +200,16 @@ export async function recordEmailOpen(
     metric: "opens",
   }).catch(() => undefined)
 
+  if (attempt.lead_id) {
+    dispatchSequenceWakeForDeliveryAttempt(admin, {
+      leadId: attempt.lead_id,
+      deliveryAttemptId: attempt.id,
+      source: "email",
+      event: "email.opened",
+      occurredAt: openedAt,
+    })
+  }
+
   return { recorded: true, open: mapOpen(data as OpenRow) }
 }
 
@@ -284,6 +295,16 @@ export async function recordEmailClick(
     metric: "clicks",
   }).catch(() => undefined)
 
+  if (attempt.lead_id) {
+    dispatchSequenceWakeForDeliveryAttempt(admin, {
+      leadId: attempt.lead_id,
+      deliveryAttemptId: attempt.id,
+      source: "email",
+      event: "email.clicked",
+      occurredAt: clickedAt,
+    })
+  }
+
   return { recorded: true, click: mapClick(data as ClickRow), redirectUrl: input.destinationUrl }
 }
 
@@ -361,6 +382,23 @@ async function refreshLeadEngagementScore(
     nextTier: computed.tier,
     occurredAt: lastActivityAt ?? undefined,
   })
+
+  if (previousTier !== computed.tier) {
+    dispatchSequenceWakeForLeadEvent(admin, {
+      leadId,
+      source: "engagement",
+      event: "engagement.tier",
+      occurredAt: lastActivityAt ?? undefined,
+    })
+  }
+  if (previousScore !== computed.score) {
+    dispatchSequenceWakeForLeadEvent(admin, {
+      leadId,
+      source: "engagement",
+      event: "engagement.score_threshold",
+      occurredAt: lastActivityAt ?? undefined,
+    })
+  }
 
   return mapScore(data as ScoreRow)
 }

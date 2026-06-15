@@ -18,6 +18,7 @@ import type {
 import { GROWTH_COMPLIANCE_SUPPRESSION_QA_MARKER } from "@/lib/growth/compliance/compliance-types"
 import { buildSenderReputationSnapshot } from "@/lib/growth/compliance/sender-reputation"
 import { applyDeliverySuppression } from "@/lib/growth/compliance/suppression-engine"
+import { dispatchSequenceWakeForDeliveryAttempt } from "@/lib/growth/sequences/conditions/sequence-event-wake-engine"
 import { getDeliveryAttempt } from "@/lib/growth/providers/transport/transport-repository"
 
 type BounceRow = {
@@ -187,6 +188,13 @@ export async function recordEmailBounce(
       bounceType: classification.bounceType,
       deliveryAttemptId: attempt.id,
       summary: classification.summary,
+      occurredAt,
+    })
+    dispatchSequenceWakeForDeliveryAttempt(admin, {
+      leadId: attempt.lead_id,
+      deliveryAttemptId: attempt.id,
+      source: "email",
+      event: "email.bounced",
       occurredAt,
     })
   }

@@ -3,6 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { normalizeGrowthActorUserIdForDb } from "@/lib/growth/actor-user-id"
 import { logGrowthEngine } from "@/lib/growth/access"
+import { dispatchSequenceWakeForLeadEvent } from "@/lib/growth/sequences/conditions/sequence-event-wake-engine"
 import { GrowthLeadArchiveSchemaIncompleteError } from "@/lib/growth/lead-archive-api-errors"
 import { probeGrowthLeadArchiveSchema } from "@/lib/growth/lead-archive-schema-health"
 import { normalizeGrowthConversationObjectionProfile } from "@/lib/growth/conversation-objection-profile"
@@ -636,6 +637,15 @@ export async function updateGrowthLead(
     status: lead.status,
     patchedFields: Object.keys(patch),
   })
+
+  if (input.status !== undefined) {
+    dispatchSequenceWakeForLeadEvent(admin, {
+      leadId: lead.id,
+      source: "lead",
+      event: "lead.status",
+    })
+  }
+
   return lead
 }
 

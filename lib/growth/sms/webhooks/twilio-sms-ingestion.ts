@@ -24,6 +24,7 @@ import {
 } from "@/lib/growth/sms/sms-repository"
 import { appendSmsMessageToInboxBridge, findOrCreateSmsConversation } from "@/lib/growth/sms/sms-threading"
 import { processSmsInboundReply } from "@/lib/growth/sms/sms-reply-ingestion"
+import { dispatchSequenceWakeForSmsAttempt } from "@/lib/growth/sequences/conditions/sequence-event-wake-engine"
 
 export type IngestTwilioSmsWebhookInput = {
   rawBody: string
@@ -291,6 +292,24 @@ export async function ingestTwilioSmsStatusWebhook(
     normalizedStatus,
     deliveryAttemptId: attempt?.id ?? null,
   })
+
+  if (attempt?.leadId && attempt.id) {
+    if (normalizedStatus === "delivered") {
+      dispatchSequenceWakeForSmsAttempt(admin, {
+        leadId: attempt.leadId,
+        smsDeliveryAttemptId: attempt.id,
+        event: "sms.delivered",
+        occurredAt: now,
+      })
+    } else if (normalizedStatus === "undelivered" || normalizedStatus === "failed") {
+      dispatchSequenceWakeForSmsAttempt(admin, {
+        leadId: attempt.leadId,
+        smsDeliveryAttemptId: attempt.id,
+        event: "sms.failed",
+        occurredAt: now,
+      })
+    }
+  }
 
   return {
     ok: true,

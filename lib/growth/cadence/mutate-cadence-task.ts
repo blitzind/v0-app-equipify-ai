@@ -20,6 +20,7 @@ import {
 } from "@/lib/growth/cadence/cadence-task-repository"
 import type { GrowthCadenceTask, GrowthCadenceTaskOutcome } from "@/lib/growth/cadence/cadence-types"
 import { advanceGrowthSequenceEnrollmentAfterStep } from "@/lib/growth/sequence-enrollment/sequence-enrollment-orchestrator"
+import { dispatchSequenceEventWakeSafely } from "@/lib/growth/sequences/conditions/sequence-event-wake-engine"
 import { fetchGrowthSequenceEnrollmentStepById, updateGrowthSequenceEnrollmentStep } from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
 import { recomputeGrowthLeadNextBestAction } from "@/lib/growth/recompute-lead-next-best-action"
 
@@ -84,6 +85,15 @@ export async function completeGrowthCadenceTask(
           sequence_execution_job_id: existing.sequenceExecutionJobId ?? task.sequenceExecutionJobId ?? null,
         },
       }).catch(() => undefined)
+      dispatchSequenceEventWakeSafely(admin, {
+        leadId: existing.leadId,
+        sequenceEnrollmentId: enrollmentStep.enrollmentId,
+        sequenceEnrollmentStepId: existing.sequenceEnrollmentStepId,
+        source: "cadence",
+        event: "call_task.completed",
+        evidenceRef: task.id,
+        occurredAt: now,
+      })
     }
   }
 

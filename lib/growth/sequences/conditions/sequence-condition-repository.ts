@@ -15,6 +15,8 @@ import {
 } from "@/lib/growth/sequences/conditions/sequence-branch-types"
 import type {
   CreateSequenceConditionInput,
+  SequenceConditionEvent,
+  SequenceConditionSource,
   SequencePatternStepCondition,
   UpdateSequenceConditionInput,
 } from "@/lib/growth/sequences/conditions/sequence-condition-types"
@@ -258,6 +260,56 @@ export async function listConditionsForStep(
 
   if (error) throw new Error(error.message)
   return ((data ?? []) as ConditionRow[]).map(mapConditionRow)
+}
+
+export async function fetchConditionById(
+  admin: SupabaseClient,
+  conditionId: string,
+): Promise<SequencePatternStepCondition | null> {
+  const { data, error } = await conditionsTable(admin)
+    .select(CONDITION_SELECT)
+    .eq("id", conditionId)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  return data ? mapConditionRow(data as ConditionRow) : null
+}
+
+export async function listActiveWaitsForWakeEvent(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    sequenceEnrollmentId?: string | null
+    waitedForSource: SequenceConditionSource
+    waitedForEvent: SequenceConditionEvent
+  },
+): Promise<SequenceEnrollmentWait[]> {
+  let enrollmentIds: string[] | null = null
+
+  if (input.sequenceEnrollmentId) {
+    enrollmentIds = [input.sequenceEnrollmentId]
+  } else {
+    const { data: enrollments, error: enrollmentError } = await admin
+      .schema("growth")
+      .from("sequence_enrollments")
+      .select("id")
+      .eq("lead_id", input.leadId)
+      .in("status", ["active", "paused"])
+    if (enrollmentError) throw new Error(enrollmentError.message)
+    enrollmentIds = (enrollments ?? []).map((row) => String((row as { id: string }).id))
+    if (enrollmentIds.length === 0) return []
+  }
+
+  const { data, error } = await waitsTable(admin)
+    .select(WAIT_SELECT)
+    .in("enrollment_id", enrollmentIds)
+    .in("status", ["pending", "active"])
+    .eq("waited_for_source", input.waitedForSource)
+    .eq("waited_for_event", input.waitedForEvent)
+    .order("created_at", { ascending: true })
+
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as WaitRow[]).map(mapWaitRow)
 }
 
 export async function createEdge(
