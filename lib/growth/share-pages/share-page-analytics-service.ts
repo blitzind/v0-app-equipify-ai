@@ -378,9 +378,9 @@ async function handleSideEffects(
   return { engaged, engagementThresholdCrossed }
 }
 
-export async function ingestSharePageAnalyticsEvent(
+export async function ingestSharePageAnalyticsForPage(
   admin: SupabaseClient,
-  input: SharePageAnalyticsIngestInput,
+  input: Omit<SharePageAnalyticsIngestInput, "rawToken"> & { page: GrowthSharePage; skipRateLimit?: boolean },
 ): Promise<SharePageAnalyticsIngestResult> {
   const eventType = typeof input.eventType === "string" ? input.eventType.trim() : ""
   if (!isValidEventType(eventType)) {
@@ -392,24 +392,12 @@ export async function ingestSharePageAnalyticsEvent(
     return { ok: false, status: 400, error: "invalid_session_key" }
   }
 
-  const lookup = await lookupSharePageByPublicToken(admin, input.rawToken.trim())
-  if (lookup.access === "not_found") {
-    return { ok: false, status: 404, error: "not_found" }
-  }
-  if (lookup.access === "expired") {
-    return { ok: false, status: 410, error: "expired" }
-  }
-  if (lookup.access === "revoked" || lookup.access === "archived") {
-    return { ok: false, status: 403, error: lookup.access }
-  }
-  if (lookup.access !== "granted" || !lookup.page) {
-    return { ok: false, status: 403, error: lookup.access }
-  }
-
-  const page = lookup.page
-  const rateLimit = checkSharePageAnalyticsRateLimit(input.rateLimitKey ?? `${page.id}:${sessionKey}`)
-  if (!rateLimit.allowed) {
-    return { ok: false, status: 429, error: "rate_limited" }
+  const page = input.page
+  if (!input.skipRateLimit) {
+    const rateLimit = checkSharePageAnalyticsRateLimit(input.rateLimitKey ?? `${page.id}:${sessionKey}`)
+    if (!rateLimit.allowed) {
+      return { ok: false, status: 429, error: "rate_limited" }
+    }
   }
 
   const occurredAt = input.occurredAt ?? new Date().toISOString()
@@ -429,7 +417,11 @@ export async function ingestSharePageAnalyticsEvent(
   let deduplicated = false
   if (SCROLL_MILESTONE_EVENTS.has(eventType)) {
     deduplicated = await hasExistingMilestoneEvent(admin, viewId, eventType)
-  } else if (eventType === "SHARE_PAGE_VIEWED") {
+  } else if (
+    eventType === "SHARE_PAGE_VIEWED" ||
+    eventType === "SHARE_PAGE_BOOKING_STARTED" ||
+    eventType === "SHARE_PAGE_BOOKING_COMPLETED"
+  ) {
     deduplicated = await hasExistingMilestoneEvent(admin, viewId, eventType)
   }
 
@@ -468,6 +460,40 @@ export async function ingestSharePageAnalyticsEvent(
     engaged: sideEffects.engaged,
     engagementThresholdCrossed: sideEffects.engagementThresholdCrossed,
   }
+}
+
+export async function ingestSharePageAnalyticsEvent(
+  admin: SupabaseClient,
+  input: SharePageAnalyticsIngestInput,
+): Promise<SharePageAnalyticsIngestResult> {
+  const eventType = typeof input.eventType === "string" ? input.eventType.trim() : ""
+  if (!isValidEventType(eventType)) {
+    return { ok: false, status: 400, error: "invalid_event_type" }
+  }
+
+  const sessionKey = typeof input.sessionKey === "string" ? input.sessionKey.trim() : ""
+  if (!sessionKey || sessionKey.length < 8) {
+    return { ok: false, status: 400, error: "invalid_session_key" }
+  }
+
+  const lookup = await lookupSharePageByPublicToken(admin, input.rawToken.trim())
+  if (lookup.access === "not_found") {
+    return { ok: false, status: 404, error: "not_found" }
+  }
+  if (lookup.access === "expired") {
+    return { ok: false, status: 410, error: "expired" }
+  }
+  if (lookup.access === "revoked" || lookup.access === "archived") {
+    return { ok: false, status: 403, error: lookup.access }
+  }
+  if (lookup.access !== "granted" || !lookup.page) {
+    return { ok: false, status: 403, error: lookup.access }
+  }
+
+  return ingestSharePageAnalyticsForPage(admin, {
+    ...input,
+    page: lookup.page,
+  })
 }
 
 export async function assertSharePageAnalyticsSchemaReady(admin: SupabaseClient): Promise<boolean> {

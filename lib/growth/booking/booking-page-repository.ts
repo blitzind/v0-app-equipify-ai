@@ -367,6 +367,7 @@ export async function insertGrowthBookingPageBooking(
     calendarEventId?: string | null
     meetingUrl?: string | null
     errorMessage?: string | null
+    metadata?: Record<string, unknown>
   },
 ): Promise<{ id: string }> {
   const { data, error } = await bookingsTable(admin)
@@ -385,6 +386,7 @@ export async function insertGrowthBookingPageBooking(
       calendar_event_id: input.calendarEventId ?? null,
       meeting_url: input.meetingUrl ?? null,
       error_message: input.errorMessage ?? null,
+      metadata: input.metadata ?? {},
     })
     .select("id")
     .single()

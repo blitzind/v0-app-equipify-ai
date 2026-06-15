@@ -37,6 +37,10 @@ import {
   resolveVisitorTimezone,
 } from "@/lib/growth/booking/booking-public-timezone"
 import type { GrowthBookingPagePublicView, GrowthBookingSlot } from "@/lib/growth/booking/booking-page-types"
+import {
+  parseSharePageBookingAttributionFromSearchParams,
+  type GrowthSharePageBookingAttribution,
+} from "@/lib/growth/share-pages/share-page-booking-attribution"
 import { cn } from "@/lib/utils"
 
 type BookingPageProps = {
@@ -114,6 +118,8 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
   const [success, setSuccess] = useState<BookingSuccessState | null>(null)
   const [form, setForm] = useState({ name: "", email: "", company: "", phone: "", notes: "" })
   const [previewThemeMode, setPreviewThemeMode] = useState<GrowthBookingPublicThemeMode | null>(null)
+  const [sharePageAttribution, setSharePageAttribution] = useState<GrowthSharePageBookingAttribution | null>(null)
+  const startedSharePageBookingRef = useRef(false)
   const loadedMonthsRef = useRef<Set<string>>(new Set())
   const pendingMonthsRef = useRef<Set<string>>(new Set())
 
@@ -207,8 +213,22 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
   }, [load])
 
   useEffect(() => {
-    setPreviewThemeMode(parsePublicThemePreviewParam(new URLSearchParams(window.location.search).get("previewTheme")))
+    const params = new URLSearchParams(window.location.search)
+    setPreviewThemeMode(parsePublicThemePreviewParam(params.get("previewTheme")))
+    setSharePageAttribution(parseSharePageBookingAttributionFromSearchParams(params))
   }, [])
+
+  useEffect(() => {
+    if (!sharePageAttribution || startedSharePageBookingRef.current) return
+    if (new URLSearchParams(window.location.search).get("preview") === "1") return
+
+    startedSharePageBookingRef.current = true
+    void fetch("/api/growth/share-pages/booking/started", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ attribution: sharePageAttribution }),
+    }).catch(() => undefined)
+  }, [sharePageAttribution])
 
   const publicThemeMode: GrowthBookingPublicThemeMode = previewThemeMode ?? page?.publicThemeMode ?? "system"
 
@@ -312,6 +332,7 @@ export default function PublicBookingPage({ slug }: BookingPageProps) {
           ...form,
           slotStartAt: selectedSlot.startAt,
           slotEndAt: selectedSlot.endAt,
+          ...(sharePageAttribution ? { attribution: sharePageAttribution } : {}),
         }),
       })
       const data = (await res.json().catch(() => ({}))) as {

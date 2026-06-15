@@ -3,6 +3,9 @@
 export const GROWTH_BOOKING_SUBMIT_API_QA_MARKER = "booking-submit-api-v1" as const
 export const PUBLIC_BOOKING_SUBMIT_ROUTE_META = "public-booking-submit-v1" as const
 
+import type { GrowthSharePageBookingAttribution } from "@/lib/growth/share-pages/share-page-booking-attribution"
+import { parseSharePageBookingAttributionFromRecord } from "@/lib/growth/share-pages/share-page-booking-attribution"
+
 export type PublicBookingSubmitPayload = {
   name: string
   email: string
@@ -11,6 +14,7 @@ export type PublicBookingSubmitPayload = {
   notes?: string
   slotStartAt: string
   slotEndAt: string
+  attribution?: GrowthSharePageBookingAttribution
 }
 
 function readString(value: unknown): string | null {
@@ -86,6 +90,8 @@ export function parsePublicBookingSubmitPayload(
   if (!slotStartAt || !slotEndAt) return { ok: false, code: "invalid_form" }
   if (Date.parse(slotEndAt) <= Date.parse(slotStartAt)) return { ok: false, code: "invalid_form" }
 
+  const attribution = parseSharePageBookingAttributionFromRecord(body.attribution ?? body.sharePageAttribution)
+
   return {
     ok: true,
     data: {
@@ -96,6 +102,7 @@ export function parsePublicBookingSubmitPayload(
       notes: readOptionalString(body.notes)?.slice(0, 2000),
       slotStartAt,
       slotEndAt,
+      attribution: attribution ?? undefined,
     },
   }
 }

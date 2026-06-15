@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { resolveSharePageBookingRenderModel } from "@/lib/growth/share-pages/share-page-booking-service"
 import { lookupSharePageByPreviewToken, lookupSharePageByPublicToken } from "@/lib/growth/share-pages/share-page-repository"
 import { mapSharePageToRenderModel, readSharePagePersonalizationSnapshot } from "@/lib/growth/share-pages/share-page-render-model"
 import type {
@@ -20,12 +21,16 @@ export async function buildSharePageRenderModel(
 ): Promise<GrowthSharePageRenderModel> {
   const lead = await fetchGrowthLeadById(admin, page.leadId)
   const snapshot = readSharePagePersonalizationSnapshot(page.personalizationSnapshot)
+  const booking = await resolveSharePageBookingRenderModel(admin, page, {
+    previewMode: input.previewMode,
+  })
 
   return mapSharePageToRenderModel(page, {
     prospectName: lead?.contactName?.trim() || snapshot?.prospectName || "there",
     companyName: lead?.companyName?.trim() || snapshot?.companyName || "your company",
     previewMode: input.previewMode,
     publicToken: input.publicToken ?? null,
+    booking,
   })
 }
 

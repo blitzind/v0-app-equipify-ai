@@ -1,5 +1,9 @@
 /** Growth Engine SR-2B-1 — Personalized Share Pages types (client-safe). */
 
+import type { GrowthSharePageBookingRenderModel } from "@/lib/growth/share-pages/share-page-booking-attribution"
+
+export type { GrowthSharePageBookingRenderModel }
+
 export const GROWTH_SHARE_PAGES_QA_MARKER = "share-pages-sr2-v1" as const
 
 export const GROWTH_SHARE_PAGES_MIGRATION =
@@ -11,6 +15,13 @@ export const GROWTH_SHARE_PAGES_ANALYTICS_MIGRATION =
   "20270826120100_growth_engine_share_pages_analytics.sql" as const
 
 export const GROWTH_SHARE_PAGES_ANALYTICS_CONFIRM = "RUN_GROWTH_SHARE_PAGES_ANALYTICS_CERTIFICATION" as const
+
+export const GROWTH_SHARE_PAGES_BOOKING_QA_MARKER = "share-pages-booking-sr2b4-v1" as const
+
+export const GROWTH_SHARE_PAGES_BOOKING_MIGRATION =
+  "20270826120200_growth_engine_share_pages_booking_attribution.sql" as const
+
+export const GROWTH_SHARE_PAGES_BOOKING_CONFIRM = "RUN_GROWTH_SHARE_PAGES_BOOKING_CERTIFICATION" as const
 
 export const GROWTH_SHARE_PAGE_STATUSES = [
   "draft",
@@ -337,6 +348,7 @@ export type GrowthSharePageRenderModel = {
   voiceAssetId: string | null
   videoAssetId: string | null
   previewMode: boolean
+  booking: GrowthSharePageBookingRenderModel | null
 }
 
 export const GROWTH_SHARE_PAGES_SSR_QA_MARKER = "share-pages-ssr-sr2b2-v1" as const

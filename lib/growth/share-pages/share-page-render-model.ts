@@ -15,7 +15,13 @@ export function readSharePagePersonalizationSnapshot(
 
 export function mapSharePageToRenderModel(
   page: GrowthSharePage,
-  input: { prospectName: string; companyName: string; previewMode: boolean; publicToken?: string | null },
+  input: {
+    prospectName: string
+    companyName: string
+    previewMode: boolean
+    publicToken?: string | null
+    booking?: GrowthSharePageRenderModel["booking"]
+  },
 ): GrowthSharePageRenderModel {
   const snapshot = readSharePagePersonalizationSnapshot(page.personalizationSnapshot)
 
@@ -41,5 +47,6 @@ export function mapSharePageToRenderModel(
     voiceAssetId: page.voiceAssetId,
     videoAssetId: page.videoAssetId,
     previewMode: input.previewMode,
+    booking: input.booking ?? null,
   }
 }

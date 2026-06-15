@@ -24,6 +24,13 @@ import { resolveOutboundLeadByEmail } from "@/lib/growth/outbound/resolve-lead-b
 import { normalizeEmail } from "@/lib/growth/import/normalize"
 import { fetchGrowthMeetingLocationPlatformContext } from "@/lib/growth/meeting-location/meeting-location-settings-server"
 import { resolveMeetingLocation } from "@/lib/growth/meeting-location/resolve-meeting-location"
+import type { GrowthSharePageBookingAttribution } from "@/lib/growth/share-pages/share-page-booking-attribution"
+import {
+  sharePageBookingAttributionToMeetingSourceAttribution,
+  sharePageBookingAttributionToMetadata,
+} from "@/lib/growth/share-pages/share-page-booking-attribution"
+import { bridgeSharePageBookingCompleted } from "@/lib/growth/share-pages/share-page-booking-bridge"
+import { fetchSharePageForBookingAttribution } from "@/lib/growth/share-pages/share-page-booking-service"
 import {
   fetchPublicBookingSlots,
   type PublicBookingSlotsResult,
@@ -138,6 +145,7 @@ export async function submitPublicBooking(
     slotStartAt: string
     slotEndAt: string
     appOrigin: string
+    attribution?: GrowthSharePageBookingAttribution
   },
 ): Promise<PublicBookingSubmitResult> {
   const page = await fetchGrowthBookingPageBySlug(admin, input.slug, true)
@@ -192,7 +200,18 @@ export async function submitPublicBooking(
   try {
     const platformContext = await fetchGrowthMeetingLocationPlatformContext(admin, page.ownerUserId)
     const resolvedLocation = resolveBookingMeetingLocation(page, platformContext)
-    const leadId = await resolveLeadForBooking(admin, page, input)
+
+    const attributedSharePage = input.attribution
+      ? await fetchSharePageForBookingAttribution(admin, input.attribution)
+      : null
+    const leadId =
+      attributedSharePage?.leadId ??
+      (await resolveLeadForBooking(admin, page, input))
+
+    const meetingSourceAttribution = input.attribution
+      ? sharePageBookingAttributionToMeetingSourceAttribution(input.attribution)
+      : null
+
     const title = page.meetingType?.trim() || `${page.name} — ${name}`
     const meetingResult = await createGrowthMeeting(admin, {
       leadId,
@@ -219,6 +238,7 @@ export async function submitPublicBooking(
     await updateGrowthMeetingRow(admin, meetingResult.meeting.id, {
       booking_page_id: page.id,
       calendar_sync_status: "pending",
+      ...(meetingSourceAttribution ? { source_attribution: meetingSourceAttribution } : {}),
     })
 
     const meetingForSync = await fetchGrowthMeetingById(admin, meetingResult.meeting.id)
@@ -264,6 +284,10 @@ export async function submitPublicBooking(
       })
     }
 
+    const bookingMetadata = input.attribution
+      ? sharePageBookingAttributionToMetadata(input.attribution)
+      : {}
+
     const booking = await insertGrowthBookingPageBooking(admin, {
       bookingPageId: page.id,
       meetingId: syncedMeeting.id,
@@ -279,7 +303,16 @@ export async function submitPublicBooking(
       calendarEventId,
       meetingUrl: syncedMeeting.meetingUrl,
       errorMessage: calendarInvitePending ? "calendar_invite_pending" : null,
+      metadata: bookingMetadata,
     })
+
+    if (input.attribution && attributedSharePage) {
+      await bridgeSharePageBookingCompleted(admin, {
+        attribution: input.attribution,
+        bookingId: booking.id,
+        meetingId: syncedMeeting.id,
+      }).catch(() => undefined)
+    }
 
     const confirmationMessage = calendarInvitePending
       ? page.confirmationMessage?.trim()

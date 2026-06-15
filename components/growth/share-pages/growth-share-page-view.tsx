@@ -4,6 +4,7 @@ import { GrowthSharePageHero } from "@/components/growth/share-pages/growth-shar
 import { GrowthSharePageMessage } from "@/components/growth/share-pages/growth-share-page-message"
 import { GrowthSharePageObservations } from "@/components/growth/share-pages/growth-share-page-observations"
 import { GrowthSharePageCtaSection } from "@/components/growth/share-pages/growth-share-page-cta-section"
+import { GrowthSharePageBookingSection } from "@/components/growth/share-pages/growth-share-page-booking-section"
 import { GrowthSharePageResources } from "@/components/growth/share-pages/growth-share-page-resources"
 import { GrowthSharePageFooter } from "@/components/growth/share-pages/growth-share-page-footer"
 import { SharePageTracker, useSharePageTracker } from "@/components/growth/share-pages/share-page-tracker"
@@ -28,6 +29,7 @@ function GrowthSharePageStaticLayout({ model }: { model: GrowthSharePageRenderMo
         <div className="mt-8 space-y-8">
           <GrowthSharePageMessage model={model} />
           <GrowthSharePageObservations model={model} />
+          <GrowthSharePageBookingSection model={model} />
           <GrowthSharePageCtaSection model={model} />
           <GrowthSharePageResources model={model} />
         </div>
@@ -40,6 +42,23 @@ function GrowthSharePageStaticLayout({ model }: { model: GrowthSharePageRenderMo
 function GrowthSharePageTrackedLayout({ model }: { model: GrowthSharePageRenderModel }) {
   const { trackEvent } = useSharePageTracker()
 
+  const trackBookingStarted = () => {
+    void trackEvent("SHARE_PAGE_BOOKING_STARTED", { metadata: { source: "share_page_booking_section" } })
+  }
+
+  const handleCtaClick: Parameters<typeof GrowthSharePageCtaSection>[0]["onCtaClick"] = (cta, input) => {
+    void trackEvent("SHARE_PAGE_CTA_CLICKED", {
+      eventLabel: cta.label,
+      metadata: { tracking_key: cta.trackingKey, cta_id: cta.id, action: cta.action },
+    })
+    if (input?.bookingStarted) {
+      void trackEvent("SHARE_PAGE_BOOKING_STARTED", {
+        eventLabel: cta.label,
+        metadata: { tracking_key: cta.trackingKey, cta_id: cta.id, source: "share_page_cta" },
+      })
+    }
+  }
+
   return (
     <div
       className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
@@ -51,15 +70,8 @@ function GrowthSharePageTrackedLayout({ model }: { model: GrowthSharePageRenderM
         <div className="mt-8 space-y-8">
           <GrowthSharePageMessage model={model} />
           <GrowthSharePageObservations model={model} />
-          <GrowthSharePageCtaSection
-            model={model}
-            onCtaClick={(cta) => {
-              void trackEvent("SHARE_PAGE_CTA_CLICKED", {
-                eventLabel: cta.label,
-                metadata: { tracking_key: cta.trackingKey, cta_id: cta.id, action: cta.action },
-              })
-            }}
-          />
+          <GrowthSharePageBookingSection model={model} onBookingStart={trackBookingStarted} />
+          <GrowthSharePageCtaSection model={model} onCtaClick={handleCtaClick} />
           <GrowthSharePageResources
             model={model}
             onResourceOpen={(resource) => {
