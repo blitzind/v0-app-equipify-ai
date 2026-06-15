@@ -28,6 +28,7 @@ import {
   type GrowthSharePageTheme,
   type GrowthSharePageUpdateInput,
   type GrowthSharePageView,
+  type GrowthSharePagePublicAccessResult,
 } from "@/lib/growth/share-pages/share-page-types"
 
 const PAGE_SELECT =
@@ -481,28 +482,55 @@ export async function resolveSharePageByToken(
   admin: SupabaseClient,
   rawToken: string,
 ): Promise<GrowthSharePage | null> {
-  const tokenHash = hashSharePageToken(rawToken)
-  const row = await fetchSharePageRowByTokenHash(admin, tokenHash, "token_hash")
-  if (!row) return null
-  if (!verifySharePageToken(rawToken, tokenHash)) return null
-
-  const page = mapPage(row)
-  if (!resolvePublicResolvableStatus(page)) return null
-  return page
+  const lookup = await lookupSharePageByPublicToken(admin, rawToken)
+  return lookup.access === "granted" ? lookup.page : null
 }
 
 export async function resolveSharePageByPreviewToken(
   admin: SupabaseClient,
   rawToken: string,
 ): Promise<GrowthSharePage | null> {
-  const tokenHash = hashSharePageToken(rawToken)
-  const row = await fetchSharePageRowByTokenHash(admin, tokenHash, "preview_token_hash")
-  if (!row) return null
-  if (!verifySharePageToken(rawToken, tokenHash)) return null
+  const lookup = await lookupSharePageByPreviewToken(admin, rawToken)
+  return lookup.access === "granted" ? lookup.page : null
+}
+
+export async function lookupSharePageByPublicToken(
+  admin: SupabaseClient,
+  rawToken: string,
+): Promise<GrowthSharePagePublicAccessResult> {
+  const normalized = rawToken.trim()
+  if (!normalized) return { access: "not_found", page: null }
+
+  const tokenHash = hashSharePageToken(normalized)
+  const row = await fetchSharePageRowByTokenHash(admin, tokenHash, "token_hash")
+  if (!row) return { access: "not_found", page: null }
+  if (!verifySharePageToken(normalized, tokenHash)) return { access: "not_found", page: null }
 
   const page = mapPage(row)
-  if (!resolvePreviewResolvableStatus(page)) return null
-  return page
+  if (page.archivedAt || page.status === "archived") return { access: "archived", page }
+  if (page.revokedAt || page.status === "revoked") return { access: "revoked", page }
+  if (resolveSharePageExpirationIso(page.expiresAt)) return { access: "expired", page }
+  if (page.status !== "published") return { access: "unpublished", page }
+  return { access: "granted", page }
+}
+
+export async function lookupSharePageByPreviewToken(
+  admin: SupabaseClient,
+  rawToken: string,
+): Promise<GrowthSharePagePublicAccessResult> {
+  const normalized = rawToken.trim()
+  if (!normalized) return { access: "not_found", page: null }
+
+  const tokenHash = hashSharePageToken(normalized)
+  const row = await fetchSharePageRowByTokenHash(admin, tokenHash, "preview_token_hash")
+  if (!row) return { access: "not_found", page: null }
+  if (!verifySharePageToken(normalized, tokenHash)) return { access: "not_found", page: null }
+
+  const page = mapPage(row)
+  if (page.archivedAt || page.status === "archived") return { access: "archived", page }
+  if (page.revokedAt || page.status === "revoked") return { access: "revoked", page }
+  if (!resolvePreviewResolvableStatus(page)) return { access: "unpublished", page }
+  return { access: "granted", page }
 }
 
 export async function createSharePageViewSession(

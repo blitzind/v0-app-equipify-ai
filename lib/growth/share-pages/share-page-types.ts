@@ -295,3 +295,41 @@ export const EMPTY_GROWTH_SHARE_PAGE_ENGAGEMENT_SUMMARY: GrowthSharePageEngageme
   avgDurationMs: 0,
   lastActivityAt: null,
 }
+
+export const GROWTH_SHARE_PAGE_PUBLIC_ACCESS_REASONS = [
+  "granted",
+  "not_found",
+  "invalid_token",
+  "unpublished",
+  "expired",
+  "revoked",
+  "archived",
+] as const
+
+export type GrowthSharePagePublicAccessReason = (typeof GROWTH_SHARE_PAGE_PUBLIC_ACCESS_REASONS)[number]
+
+export type GrowthSharePagePublicAccessResult = {
+  access: GrowthSharePagePublicAccessReason
+  page: GrowthSharePage | null
+}
+
+export type GrowthSharePageRenderModel = {
+  prospectName: string
+  companyName: string
+  headline: string
+  subheadline: string | null
+  heroMessage: string
+  whyReachingOut: string | null
+  companyObservations: string[]
+  ctaConfig: GrowthSharePageCTA[]
+  resources: GrowthSharePageResource[]
+  theme: GrowthSharePageTheme
+  heroMediaType: GrowthSharePageHeroMediaType
+  heroMediaUrl: string | null
+  heroMediaThumbnailUrl: string | null
+  voiceAssetId: string | null
+  videoAssetId: string | null
+  previewMode: boolean
+}
+
+export const GROWTH_SHARE_PAGES_SSR_QA_MARKER = "share-pages-ssr-sr2b2-v1" as const
