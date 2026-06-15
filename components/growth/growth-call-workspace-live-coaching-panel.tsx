@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowledge-context-section"
 import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growth-knowledge-recommendations-section"
+import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 import {
   LiveCoachingExecutionScorePanel,
   LiveCoachingGuidancePanel,
@@ -306,6 +307,12 @@ export function GrowthCallWorkspaceLiveCoachingPanel({
               <GrowthKnowledgeRecommendationsSection
                 consumer="call_coaching"
                 title="Recommended Coaching Actions"
+                leadId={sessionLeadId}
+                compact
+              />
+              <GrowthConversationalPlaybooksPanel
+                consumer="call_coaching"
+                title="Call Coaching Playbook"
                 leadId={sessionLeadId}
                 compact
               />

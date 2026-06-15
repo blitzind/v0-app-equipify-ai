@@ -25,6 +25,7 @@ import type {
 import { GrowthRevenueWorkflowWorkspacePanel } from "@/components/growth/growth-revenue-workflow-workspace-panel"
 import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowledge-context-section"
 import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growth-knowledge-recommendations-section"
+import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 import { GROWTH_REPLY_WORKFLOW_CENTER_QA_MARKER } from "@/lib/growth/reply-intelligence/workflow-actions-types"
 
 type FilterKey = "all" | "interested" | "call_task" | "follow_up" | "opportunity"
@@ -512,6 +513,13 @@ export function GrowthReplyWorkflowActionsPanel({
       <GrowthKnowledgeRecommendationsSection
         consumer="reply_intelligence"
         title="Recommended Knowledge Actions"
+        leadId={leadId}
+        compact={compact}
+      />
+
+      <GrowthConversationalPlaybooksPanel
+        consumer="reply_intelligence"
+        title="Conversational Playbook"
         leadId={leadId}
         compact={compact}
       />

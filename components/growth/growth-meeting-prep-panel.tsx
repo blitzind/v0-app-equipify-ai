@@ -7,6 +7,7 @@ import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowledge-context-section"
 import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growth-knowledge-recommendations-section"
 import { GrowthCampaignReadinessPanel } from "@/components/growth/growth-campaign-readiness-panel"
+import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 import type { AiMeetingPrepRow } from "@/lib/growth/meeting-intelligence/ai-meeting-prep-types"
 import type { GrowthMeetingPrepBundle, MeetingPrepRiskPriority } from "@/lib/growth/meeting-intelligence/meeting-prep-types"
 
@@ -608,6 +609,12 @@ export function GrowthMeetingPrepPanel({
             <GrowthKnowledgeRecommendationsSection
               consumer="meeting_prep"
               title="Recommended Talking Points"
+              leadId={prep.meeting.leadId}
+              compact
+            />
+            <GrowthConversationalPlaybooksPanel
+              consumer="meeting_prep"
+              title="Meeting Conversational Playbook"
               leadId={prep.meeting.leadId}
               compact
             />

@@ -10,6 +10,7 @@ import type { VoiceDropCampaignDashboardSnapshot, VoiceDropCampaignPublicView } 
 import { VOICE_DROP_INFRASTRUCTURE_QA_MARKER } from "@/lib/voice/voice-drops/types"
 import type { VoiceDropCampaignDeliveryEvidenceSnapshot } from "@/lib/voice/voice-drops/voice-drop-delivery-evidence-types"
 import { GrowthVoiceDropDeliveryEvidencePanel } from "@/components/growth/growth-voice-drop-delivery-evidence-panel"
+import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 
 export function GrowthVoiceDropCampaignsPanel() {
   const [dashboard, setDashboard] = useState<VoiceDropCampaignDashboardSnapshot | null>(null)
@@ -213,6 +214,8 @@ export function GrowthVoiceDropCampaignsPanel() {
       </div>
 
       <p className="text-xs text-muted-foreground">{dashboard?.message}</p>
+
+      <GrowthConversationalPlaybooksPanel consumer="voice_drop" title="Voice Drop Conversational Playbook" compact />
     </div>
   )
 }

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ExternalLink, Inbox, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 import {
   OPERATOR_INBOX_FILTERS,
   OPERATOR_INBOX_QA_MARKER,
@@ -83,6 +84,7 @@ export function GrowthOperatorInboxPanel({
   }
 
   return (
+    <>
     <GrowthEngineCard
       title={title}
       icon={<Inbox className="h-4 w-4" />}
@@ -188,5 +190,7 @@ export function GrowthOperatorInboxPanel({
         ))}
       </div>
     </GrowthEngineCard>
+    <GrowthConversationalPlaybooksPanel consumer="operator_inbox" title="Conversational Playbook" leadId={leadId} compact />
+    </>
   )
 }

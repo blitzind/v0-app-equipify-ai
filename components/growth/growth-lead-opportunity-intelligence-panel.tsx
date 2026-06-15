@@ -7,6 +7,7 @@ import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/gr
 import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowledge-context-section"
 import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growth-knowledge-recommendations-section"
 import { GrowthCampaignReadinessPanel } from "@/components/growth/growth-campaign-readiness-panel"
+import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 import { GrowthOpportunityRecommendationScoringDetails } from "@/components/growth/growth-opportunity-recommendation-scoring-details"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import {
@@ -169,6 +170,13 @@ export function GrowthLeadOpportunityIntelligencePanel({ lead }: GrowthLeadOppor
       <GrowthKnowledgeRecommendationsSection
         consumer="opportunity_intelligence"
         title="Recommended Materials"
+        leadId={lead.id}
+        compact
+      />
+
+      <GrowthConversationalPlaybooksPanel
+        consumer="opportunity_intelligence"
+        title="Opportunity Conversational Playbook"
         leadId={lead.id}
         compact
       />

@@ -14,6 +14,7 @@ import {
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowledge-context-section"
 import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growth-knowledge-recommendations-section"
+import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 import { GrowthCampaignReadinessPanel } from "@/components/growth/growth-campaign-readiness-panel"
 import { formatSequenceChannelLabel } from "@/lib/growth/sequence-enrollment/sequence-enrollment-ui"
 import type { GrowthSequencePattern, GrowthSequencePatternStep } from "@/lib/growth/sequence-types"
@@ -229,6 +230,7 @@ export function GrowthSequencePatternBuilder() {
 
       <GrowthKnowledgeContextSection consumer="voice_drop" title="Script References" compact />
       <GrowthKnowledgeRecommendationsSection consumer="voice_drop" title="Recommended Script Angles" compact />
+      <GrowthConversationalPlaybooksPanel consumer="voice_drop" title="Voice Drop Playbook" compact />
     </div>
   )
 }
