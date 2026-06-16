@@ -799,6 +799,13 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
           path.startsWith("/admin/growth/outreach/legacy-queue"),
       },
       {
+        id: "automation-flows",
+        href: "/admin/growth/automation",
+        label: "Automation Flows",
+        consoleKey: "sequences",
+        match: prefixMatch("/admin/growth/automation"),
+      },
+      {
         id: "share-pages",
         href: "/admin/growth/share-pages",
         label: "Share Pages",
