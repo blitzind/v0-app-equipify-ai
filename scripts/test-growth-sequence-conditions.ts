@@ -8,8 +8,10 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
-import { createClient } from "@supabase/supabase-js"
-import { bootstrapVerifiedChannelsCertEnv } from "../lib/growth/qa/verified-channels-cert-env-bootstrap"
+import {
+  bootstrapGrowthSequenceConditionsCertEnv,
+  describeSequenceConditionsCertBootstrapFailure,
+} from "../lib/growth/sequences/conditions/sequence-condition-cert-bootstrap"
 import {
   GROWTH_SEQUENCE_CONDITIONS_CONFIRM,
   GROWTH_SEQUENCE_CONDITIONS_MIGRATION,
@@ -63,12 +65,6 @@ import {
   updateEdge,
   updateWait,
 } from "../lib/growth/sequences/conditions/sequence-condition-repository"
-
-const PRODUCTION_ENV_SOURCES = [
-  ".env.vercel.production",
-  ".vercel/.env.production.local",
-  ".env.production.local",
-] as const
 
 const RUNTIME_FORBIDDEN_PATTERNS = [
   /executeSequenceBranch/i,
@@ -832,22 +828,46 @@ async function runIntegrationDiagnostics(): Promise<Record<string, unknown>> {
   process.env.GROWTH_SEQUENCE_CONDITIONS_CERT_ALLOW_LOCAL =
     process.env.GROWTH_SEQUENCE_CONDITIONS_CERT_ALLOW_LOCAL ?? "1"
 
-  const boot = bootstrapVerifiedChannelsCertEnv({
-    sources: PRODUCTION_ENV_SOURCES,
-    inheritProcessEnvProviderKeys: true,
-    protectedSnapshot: {
-      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
-      SUPABASE_URL: process.env.SUPABASE_URL ?? "",
-      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
-    },
-  })
-  if (!boot) return { ok: false, final_verdict: "FAIL", error: "supabase_unavailable" }
+  const boot = bootstrapGrowthSequenceConditionsCertEnv()
+  if (!boot) {
+    return {
+      qa_marker: GROWTH_SEQUENCE_CONDITIONS_QA_MARKER,
+      ...describeSequenceConditionsCertBootstrapFailure(),
+    }
+  }
 
-  const admin = createClient(boot.url, boot.jwt, { auth: { persistSession: false } })
   const { executeGrowthSequenceConditionsDiagnostics } = await import(
     "../lib/growth/sequences/conditions/sequence-condition-diagnostics"
   )
-  return (await executeGrowthSequenceConditionsDiagnostics(admin)) as unknown as Record<string, unknown>
+  const report = (await executeGrowthSequenceConditionsDiagnostics(boot.admin)) as unknown as Record<
+    string,
+    unknown
+  >
+  return {
+    ...report,
+    env_source: boot.env_source,
+    vercel_production_env_run: boot.vercel_production_env_run,
+  }
+}
+
+async function runProductionDiagnostics(): Promise<Record<string, unknown>> {
+  const boot = bootstrapGrowthSequenceConditionsCertEnv({ requireVercelProductionEnvRun: true })
+  if (!boot) {
+    return {
+      qa_marker: GROWTH_SEQUENCE_CONDITIONS_QA_MARKER,
+      ...describeSequenceConditionsCertBootstrapFailure({ requireVercelProductionEnvRun: true }),
+    }
+  }
+
+  const { executeGrowthSequenceConditionsProductionDiagnostics } = await import(
+    "../lib/growth/sequences/conditions/sequence-condition-production-diagnostics"
+  )
+  const report = await executeGrowthSequenceConditionsProductionDiagnostics(boot.admin)
+  return {
+    ...report,
+    env_source: boot.env_source,
+    vercel_production_env_run: boot.vercel_production_env_run,
+  }
 }
 
 async function main(): Promise<void> {
@@ -863,7 +883,7 @@ async function main(): Promise<void> {
   }
 
   console.log(`\n=== SR-3 Phase 1–6 ${mode} diagnostics ===\n`)
-  const report = await runIntegrationDiagnostics()
+  const report = mode === "production" ? await runProductionDiagnostics() : await runIntegrationDiagnostics()
   console.log(JSON.stringify(report, null, 2))
 
   const verdict = String(report.final_verdict ?? "FAIL")

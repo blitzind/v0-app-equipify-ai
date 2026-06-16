@@ -3,6 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { persistGrowthSignalDraft } from "@/lib/growth/signals/signal-repository"
 import type { GrowthNormalizedSignalDraft, GrowthSignalType } from "@/lib/growth/signals/signal-types"
+import { dispatchHighIntentSequenceWakeSafely } from "@/lib/growth/sequences/runtime/sequence-trigger-runtime-dispatchers"
 import { GROWTH_SHARE_PAGES_ANALYTICS_QA_MARKER } from "@/lib/growth/share-pages/share-page-types"
 
 export const GROWTH_SHARE_PAGE_SIGNAL_PROVIDER_KEY = "share_page_analytics" as const
@@ -71,6 +72,23 @@ export async function emitSharePageHighIntentSignal(
   }
 
   const result = await persistGrowthSignalDraft(admin, draft)
+
+  if (result.ok && result.signal_id && !result.duplicate) {
+    dispatchHighIntentSequenceWakeSafely(admin, {
+      leadId: input.leadId,
+      signalId: result.signal_id,
+      score: typeof input.metadata?.signal_score === "number" ? input.metadata.signal_score : null,
+      signalType: input.signalType,
+      metadata: {
+        share_page_id: input.sharePageId,
+        share_page_view_id: input.sharePageViewId ?? null,
+        ...(input.metadata ?? {}),
+      },
+      occurredAt: input.occurredAt,
+      evidenceRef: result.signal_id,
+    })
+  }
+
   return {
     ok: result.ok,
     signalId: result.signal_id,

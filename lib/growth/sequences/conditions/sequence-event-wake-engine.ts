@@ -11,7 +11,6 @@ import {
   type SequenceAttributedWakeEvent,
   type SequenceEventWakeResult,
 } from "@/lib/growth/sequences/conditions/sequence-event-wake-types"
-import { resolveWaitMatched } from "@/lib/growth/sequences/conditions/sequence-wait-resolver"
 import { isTerminalEnrollmentWaitStatus } from "@/lib/growth/sequences/conditions/sequence-wait-types"
 
 export { GROWTH_SEQUENCE_EVENT_WAKE_QA_MARKER }
@@ -34,6 +33,10 @@ export async function processSequenceAttributedWakeEvent(
     blockedWaits: 0,
     skippedWaits: 0,
   }
+
+  const { resolveWaitMatched } = await import(
+    "@/lib/growth/sequences/conditions/sequence-wait-resolver"
+  )
 
   for (const wait of waits) {
     if (isTerminalEnrollmentWaitStatus(wait.status)) {

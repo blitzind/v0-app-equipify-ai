@@ -18,6 +18,27 @@ export type SequenceConditionCertFixture = {
   created: boolean
 }
 
+async function ensureCertInboxThreadForLead(
+  admin: SupabaseClient,
+  leadId: string,
+): Promise<void> {
+  const { data: existing } = await admin
+    .schema("growth")
+    .from("inbox_threads")
+    .select("id")
+    .eq("lead_id", leadId)
+    .limit(1)
+    .maybeSingle()
+
+  if (existing?.id) return
+
+  await admin.schema("growth").from("inbox_threads").insert({
+    lead_id: leadId,
+    subject: SR3_PHASE2_CONDITION_CERT_MARKER,
+    provider_family: "custom",
+  })
+}
+
 export async function ensureSequenceConditionCertFixture(
   admin: SupabaseClient,
 ): Promise<SequenceConditionCertFixture | null> {
@@ -95,12 +116,14 @@ export async function ensureSequenceConditionCertFixture(
       .maybeSingle()
 
     if (enrollmentStep.data?.id) {
+      const leadId = existingEnrollment.data.lead_id as string
+      await ensureCertInboxThreadForLead(admin, leadId)
       return {
         patternId,
         patternStepId,
         enrollmentId: existingEnrollment.data.id as string,
         enrollmentStepId: enrollmentStep.data.id as string,
-        leadId: existingEnrollment.data.lead_id as string,
+        leadId,
         created: false,
       }
     }
@@ -135,6 +158,8 @@ export async function ensureSequenceConditionCertFixture(
     stepOrder: 1,
     channel: "email",
   })
+
+  await ensureCertInboxThreadForLead(admin, lead.id as string)
 
   return {
     patternId,

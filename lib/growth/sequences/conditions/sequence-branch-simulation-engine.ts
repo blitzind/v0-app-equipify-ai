@@ -15,6 +15,8 @@ import {
   type SequenceBranchSimulationResult,
   type SequenceBranchSimulationScenario,
 } from "@/lib/growth/sequences/conditions/sequence-branch-simulation-types"
+import type { SequenceTriggerRuntimeSimulationFixture } from "@/lib/growth/sequences/runtime/sequence-trigger-runtime-types"
+import { resolveSequenceTriggerSimulationConditionOverrides } from "@/lib/growth/sequences/runtime/sequence-trigger-runtime-utils"
 
 export { GROWTH_SEQUENCE_BRANCH_SIMULATION_QA_MARKER }
 
@@ -24,6 +26,7 @@ export type SimulateSequenceBranchPreviewInput = {
   now?: string
   scenario?: SequenceBranchSimulationScenario
   conditionOverrides?: Record<string, boolean>
+  triggerFixtures?: SequenceTriggerRuntimeSimulationFixture[]
 }
 
 async function evaluateStepConditionsForSimulation(
@@ -101,12 +104,18 @@ export async function simulateSequenceBranchPreview(
   const edges = await listEdgesFromPatternStep(admin, pattern.id, fromPatternStepId)
   const graph = await buildSequenceBranchGraphReadModel(admin, { patternId: pattern.id })
 
+  const conditionOverrides = resolveSequenceTriggerSimulationConditionOverrides({
+    fixtures: input.triggerFixtures,
+    scenario,
+    conditionOverrides: input.conditionOverrides,
+  })
+
   const { evaluations, conditionEvaluations } = await evaluateStepConditionsForSimulation(admin, {
     enrollmentId: enrollment.id,
     enrollmentStepId: enrollmentStep.id,
     patternStepId: fromPatternStepId,
     now,
-    conditionOverrides: input.conditionOverrides,
+    conditionOverrides,
   })
 
   const conditionResults = conditionEvaluations.map((entry) => ({

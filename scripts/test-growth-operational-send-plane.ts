@@ -21,7 +21,7 @@ import {
 import { DEV_FALLBACK_CREDENTIAL_PEPPER, isUsingDevFallbackCredentialPepper } from "../lib/growth/outbound/credentials-crypto"
 
 /** Handlers registered in telemetry; Vercel schedule is added at deploy time. */
-const CRON_ROUTES_PENDING_VERCEL_SCHEDULE = ["growth-sequence-wait-timeouts"] as const satisfies readonly GrowthCronRouteId[]
+const CRON_ROUTES_PENDING_VERCEL_SCHEDULE = [] as const satisfies readonly GrowthCronRouteId[]
 
 async function main(): Promise<void> {
   assert.equal(GROWTH_CRON_TELEMETRY_QA_MARKER, "growth-operational-send-plane-v1")

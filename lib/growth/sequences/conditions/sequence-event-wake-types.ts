@@ -1,6 +1,7 @@
 /** SR-3 Phase 4 — attributed sequence wake event types (client-safe). */
 
 import type { GrowthSharePageEventType } from "@/lib/growth/share-pages/share-page-types"
+import type { GrowthMediaPlaybackAnalyticsEventType } from "@/lib/growth/media/media-asset-analytics-types"
 import type {
   SequenceConditionEvent,
   SequenceConditionSource,
@@ -33,11 +34,29 @@ const SHARE_PAGE_WAKE_MAP: Partial<Record<GrowthSharePageEventType, SequenceCond
   SHARE_PAGE_BOOKING_COMPLETED: "share_page.booking_completed",
 }
 
+const MEDIA_PLAYBACK_WAKE_MAP: Partial<
+  Record<GrowthMediaPlaybackAnalyticsEventType, SequenceConditionEvent>
+> = {
+  video_viewed: "media.viewed",
+  video_play_started: "media.play_started",
+  video_completed: "media.completed",
+  video_cta_clicked: "media.cta_clicked",
+}
+
 export function mapSharePageEventToSequenceWakeEvent(
   eventType: GrowthSharePageEventType,
 ): SequenceConditionEvent | null {
   if (eventType in SHARE_PAGE_WAKE_MAP) {
     return SHARE_PAGE_WAKE_MAP[eventType] ?? null
+  }
+  return null
+}
+
+export function mapMediaPlaybackEventToSequenceWakeEvent(
+  eventType: GrowthMediaPlaybackAnalyticsEventType,
+): SequenceConditionEvent | null {
+  if (eventType in MEDIA_PLAYBACK_WAKE_MAP) {
+    return MEDIA_PLAYBACK_WAKE_MAP[eventType] ?? null
   }
   return null
 }

@@ -399,8 +399,9 @@ export async function executeGrowthSequenceConditionsDiagnostics(
           : "Unable to load pattern for branch advancement probes.",
       })
 
+      let secondPatternStepId: string | undefined
       if (pattern && pattern.steps.length >= 1) {
-        let secondPatternStepId = pattern.steps.find((step) => step.id !== patternStep.id)?.id
+        secondPatternStepId = pattern.steps.find((step) => step.id !== patternStep.id)?.id
         if (!secondPatternStepId) {
           const { data: createdSecondStep, error: secondStepError } = await admin
             .schema("growth")
@@ -467,6 +468,11 @@ export async function executeGrowthSequenceConditionsDiagnostics(
             label: `${phase3Marker} default edge`,
           })
 
+          const patternWithBranchEdges =
+            (await listGrowthSequencePatterns(admin)).find(
+              (entry) => entry.id === patternStep.pattern_id,
+            ) ?? refreshedPattern
+
           const completedStep = await updateGrowthSequenceEnrollmentStep(admin, enrollmentStep.id, {
             status: "executed",
             completedAt: fixedNow,
@@ -483,7 +489,7 @@ export async function executeGrowthSequenceConditionsDiagnostics(
             const branchResult = await applySequenceBranchResolution(admin, {
               enrollment: enrollmentRecord,
               completedStep,
-              pattern: refreshedPattern,
+              pattern: patternWithBranchEdges,
               now: fixedNow,
               deferMaterializeTransport: true,
             })
@@ -565,10 +571,15 @@ export async function executeGrowthSequenceConditionsDiagnostics(
               label: `${phase3Marker} wait edge`,
             })
 
+            const patternWithWaitEdge =
+              (await listGrowthSequencePatterns(admin)).find(
+                (entry) => entry.id === patternStep.pattern_id,
+              ) ?? patternWithBranchEdges
+
             const waitResult = await applySequenceBranchResolution(admin, {
               enrollment: enrollmentRecord,
               completedStep: { ...completedStep, status: "executed" },
-              pattern: refreshedPattern,
+              pattern: patternWithWaitEdge,
               now: fixedNow,
               deferMaterializeTransport: true,
             })
@@ -593,7 +604,7 @@ export async function executeGrowthSequenceConditionsDiagnostics(
               const resolved = await resolveSequenceEnrollmentWaitRegistry(admin, {
                 waitId: waitResult.waitId,
                 resolutionReason: "operator_override",
-                pattern: refreshedPattern,
+                pattern: patternWithWaitEdge,
                 now: fixedNow,
                 forceTargetPatternStepId: secondPatternStepId,
               })
@@ -673,7 +684,7 @@ export async function executeGrowthSequenceConditionsDiagnostics(
         spec: { dslVersion: 1, source: "email", event: "email.opened" },
         label: "SR-3 Phase 4 wake probe",
       })
-      const wait = await createWait(admin, {
+      const wakeWait = await createWait(admin, {
         enrollmentId: enrollment.id,
         enrollmentStepId: enrollmentStep.id,
         patternStepId: patternStep.id,
@@ -687,7 +698,7 @@ export async function executeGrowthSequenceConditionsDiagnostics(
       await updateGrowthSequenceEnrollmentStep(admin, enrollmentStep.id, { status: "waiting" })
 
       await updateGrowthSequenceEnrollment(admin, enrollment.id, { status: "paused", pauseReason: phase3Marker })
-      const blockedWake = await resolveWaitMatched(admin, { waitId: wait.id, now: fixedNow })
+      const blockedWake = await resolveWaitMatched(admin, { waitId: wakeWait.id, now: fixedNow })
       const blockedWakeOk = blockedWake.kind === "blocked"
       checks.push({
         id: "wake.pause_gate_blocks_resolution",
@@ -711,7 +722,7 @@ export async function executeGrowthSequenceConditionsDiagnostics(
           label: `${phase5Marker} timeout edge`,
         })
 
-        await updateWait(admin, wait.id, { timeoutAt: expiredAt, status: "active" })
+        await updateWait(admin, wakeWait.id, { timeoutAt: expiredAt, status: "active" })
 
         const { count: jobsBeforeTimeout } = await admin
           .schema("growth")
@@ -745,7 +756,7 @@ export async function executeGrowthSequenceConditionsDiagnostics(
         })
 
         const timeoutBatch2 = await processExpiredSequenceWaits(admin, { now: fixedNow, limit: 50 })
-        const idempotentOk = timeoutBatch2.resolved === 0 && !timeoutBatch2.processedWaitIds.includes(wait.id)
+        const idempotentOk = timeoutBatch2.resolved === 0 && !timeoutBatch2.processedWaitIds.includes(wakeWait.id)
         checks.push({
           id: "timeout.idempotent_rerun",
           ok: idempotentOk,
@@ -766,7 +777,10 @@ export async function executeGrowthSequenceConditionsDiagnostics(
           timeoutAt: expiredAt,
           startedAt: fixedNow,
         })
-        await deleteEdge(admin, timeoutEdge.id)
+        const staleEdges = await listEdgesForPattern(admin, pattern.id)
+        for (const edge of staleEdges.filter((entry) => entry.fromPatternStepId === patternStep.id)) {
+          await deleteEdge(admin, edge.id)
+        }
         const noEdgeBatch = await processExpiredSequenceWaits(admin, { now: fixedNow, limit: 50 })
         checks.push({
           id: "timeout.missing_timeout_edge_records_failure",
@@ -856,7 +870,7 @@ export async function executeGrowthSequenceConditionsDiagnostics(
 
       checks.push({
         id: "wake.timeout_resolution_available",
-        ok: waitTimeoutReady || secondPatternStepId === null,
+        ok: waitTimeoutReady || !secondPatternStepId,
         detail: waitTimeoutReady
           ? "Wait timeout resolution exercised via Phase 5 timeout processor."
           : "Timeout resolution probe skipped — second pattern step unavailable.",

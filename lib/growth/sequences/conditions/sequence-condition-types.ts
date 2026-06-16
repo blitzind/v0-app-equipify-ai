@@ -8,6 +8,12 @@ export const GROWTH_SEQUENCE_CONDITIONS_QA_MARKER =
 export const GROWTH_SEQUENCE_CONDITIONS_MIGRATION =
   "20270827120000_growth_sequence_conditions_sr3_phase1.sql" as const
 
+export const GROWTH_SEQUENCE_BRANCH_EVALUATED_TIMELINE_MIGRATION =
+  "20270827120100_growth_sequence_branch_evaluated_timeline_sr3.sql" as const
+
+export const GROWTH_SEQUENCE_TRIGGER_RUNTIME_MIGRATION =
+  "20270827120900_growth_sequence_trigger_runtime_s3a.sql" as const
+
 export const GROWTH_SEQUENCE_CONDITIONS_CONFIRM =
   "RUN_GROWTH_SEQUENCE_CONDITIONS_CERTIFICATION" as const
 
@@ -21,6 +27,9 @@ export const SEQUENCE_CONDITION_SOURCES = [
   "cadence",
   "lead",
   "engagement",
+  "media",
+  "booking_handoff",
+  "high_intent",
 ] as const
 
 export type SequenceConditionSource = (typeof SEQUENCE_CONDITION_SOURCES)[number]
@@ -58,6 +67,12 @@ export const SEQUENCE_CONDITION_EVENTS = [
   "lead.next_best_action",
   "engagement.score_threshold",
   "engagement.tier",
+  "media.viewed",
+  "media.play_started",
+  "media.completed",
+  "media.cta_clicked",
+  "booking_handoff.ready",
+  "high_intent.detected",
 ] as const
 
 export type SequenceConditionEvent = (typeof SEQUENCE_CONDITION_EVENTS)[number]
@@ -86,6 +101,12 @@ export const SEQUENCE_CONDITION_EVENT_TO_SOURCE: Record<
   "lead.next_best_action": "lead",
   "engagement.score_threshold": "engagement",
   "engagement.tier": "engagement",
+  "media.viewed": "media",
+  "media.play_started": "media",
+  "media.completed": "media",
+  "media.cta_clicked": "media",
+  "booking_handoff.ready": "booking_handoff",
+  "high_intent.detected": "high_intent",
 }
 
 const dslVersionSchema = z.literal(SEQUENCE_CONDITION_DSL_VERSION)
@@ -160,6 +181,12 @@ export const sequenceConditionSpecSchema = z
       "voice_drop.delivered",
       "voice_drop.failed",
       "call_task.completed",
+      "media.viewed",
+      "media.play_started",
+      "media.completed",
+      "media.cta_clicked",
+      "booking_handoff.ready",
+      "high_intent.detected",
     ] as const).map((event) =>
       z
         .object({

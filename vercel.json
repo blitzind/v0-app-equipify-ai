@@ -93,6 +93,10 @@
       "schedule": "*/30 * * * *"
     },
     {
+      "path": "/api/cron/growth-sequence-wait-timeouts",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/cron/growth-lifecycle-maintenance",
       "schedule": "0 */4 * * *"
     },

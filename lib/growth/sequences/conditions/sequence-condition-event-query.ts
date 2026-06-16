@@ -322,8 +322,122 @@ export async function querySequenceConditionEventEvidence(
         extraFilter: (query) => query.eq("status", "completed"),
       }, now)
 
+    case "media.viewed":
+      return queryLeadScopedMediaAssetEvents(admin, scope, now, ["video_viewed"], "Media view recorded.")
+
+    case "media.play_started":
+      return queryLeadScopedMediaAssetEvents(admin, scope, now, ["video_play_started"], "Media play started.")
+
+    case "media.completed":
+      return queryLeadScopedMediaAssetEvents(admin, scope, now, ["video_completed"], "Media playback completed.")
+
+    case "media.cta_clicked":
+      return queryLeadScopedMediaAssetEvents(admin, scope, now, ["video_cta_clicked"], "Media CTA clicked.")
+
+    case "booking_handoff.ready": {
+      const { data, error } = await admin
+        .schema("growth")
+        .from("signals")
+        .select("id, occurred_at, signal_type, metadata")
+        .eq("provider_key", "media_booking_handoff")
+        .contains("metadata", { lead_id: scope.leadId, booking_handoff_ready: true })
+        .lte("occurred_at", now)
+        .order("occurred_at", { ascending: false })
+        .limit(5)
+
+      if (error) throw new Error(error.message)
+
+      const evidence = ((data ?? []) as Array<Record<string, unknown>>).map((row) =>
+        buildEvidence("signals", {
+          id: String(row.id),
+          occurredAt: (row.occurred_at as string | null) ?? null,
+          detail: "Booking handoff readiness recorded.",
+        }),
+      )
+
+      return {
+        found: evidence.length > 0,
+        evidence,
+        attributionScoped: false,
+      }
+    }
+
+    case "high_intent.detected": {
+      const { data, error } = await admin
+        .schema("growth")
+        .from("signals")
+        .select("id, occurred_at, signal_type, signal_score, metadata")
+        .in("signal_type", [
+          "share_page_viewed",
+          "share_page_engaged",
+          "share_page_cta_clicked",
+          "share_page_booking_started",
+          "share_page_booking_completed",
+        ])
+        .lte("occurred_at", now)
+        .order("occurred_at", { ascending: false })
+        .limit(20)
+
+      if (error) throw new Error(error.message)
+
+      const evidence = ((data ?? []) as Array<Record<string, unknown>>)
+        .filter((row) => {
+          const metadata = row.metadata
+          if (!metadata || typeof metadata !== "object") return false
+          return String((metadata as Record<string, unknown>).lead_id ?? "") === scope.leadId
+        })
+        .slice(0, 5)
+        .map((row) =>
+          buildEvidence("signals", {
+            id: String(row.id),
+            occurredAt: (row.occurred_at as string | null) ?? null,
+            detail: `High-intent signal ${String(row.signal_type)} recorded.`,
+          }),
+        )
+
+      return {
+        found: evidence.length > 0,
+        evidence,
+        attributionScoped: false,
+      }
+    }
+
     default:
       return { found: false, evidence: [], attributionScoped: false }
+  }
+}
+
+async function queryLeadScopedMediaAssetEvents(
+  admin: SupabaseClient,
+  scope: SequenceConditionAttributionScope,
+  now: string,
+  eventTypes: string[],
+  detail: string,
+): Promise<SequenceConditionEventQueryResult> {
+  const { data, error } = await admin
+    .schema("growth")
+    .from("media_asset_events")
+    .select("id, event_timestamp, event_type, session_id, progress_seconds, progress_percent, cta_key")
+    .eq("lead_id", scope.leadId)
+    .in("event_type", eventTypes)
+    .lte("event_timestamp", now)
+    .order("event_timestamp", { ascending: false })
+    .limit(5)
+
+  if (error) throw new Error(error.message)
+
+  const evidence = ((data ?? []) as Array<Record<string, unknown>>).map((row) =>
+    buildEvidence("media_asset_events", {
+      id: String(row.id),
+      occurredAt: (row.event_timestamp as string | null) ?? null,
+      detail,
+    }),
+  )
+
+  return {
+    found: evidence.length > 0,
+    evidence,
+    attributionScoped: false,
   }
 }
 
