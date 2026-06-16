@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Loader2, PlayCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,13 +32,17 @@ export function GrowthAutomationSimulationPanel({ flowId, simulation, loading, o
 
   const parsedFixture = useMemo(() => {
     try {
-      const parsed = JSON.parse(fixtureText) as Record<string, unknown>
-      setFixtureError(null)
-      return parsed
+      return JSON.parse(fixtureText) as Record<string, unknown>
     } catch {
       return null
     }
   }, [fixtureText])
+
+  useEffect(() => {
+    if (parsedFixture !== null) {
+      setFixtureError(null)
+    }
+  }, [parsedFixture])
 
   const handleRun = () => {
     if (!parsedFixture) {
@@ -97,7 +101,16 @@ export function GrowthAutomationSimulationPanel({ flowId, simulation, loading, o
         <label className="text-xs font-medium">Fixture editor</label>
         <Textarea
           value={fixtureText}
-          onChange={(event) => setFixtureText(event.target.value)}
+          onChange={(event) => {
+            const next = event.target.value
+            setFixtureText(next)
+            try {
+              JSON.parse(next)
+              setFixtureError(null)
+            } catch {
+              // Keep existing error until the fixture parses successfully.
+            }
+          }}
           rows={6}
           className="font-mono text-xs"
         />

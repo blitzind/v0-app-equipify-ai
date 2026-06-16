@@ -916,6 +916,20 @@ function runS5ELocalRegression(): void {
   assert.equal(GROWTH_AUTOMATION_SIMULATION_SAFETY_FLAGS.no_background_jobs, true)
   console.log("  ✓ simulation QA marker + preview safety flags")
 
+  const simulationPanelSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/automation/growth-automation-simulation-panel.tsx"),
+    "utf8",
+  )
+  const parsedFixtureUseMemoMatch = simulationPanelSource.match(
+    /const parsedFixture = useMemo\(\(\) => \{([\s\S]*?)\}, \[fixtureText\]\)/,
+  )
+  assert.ok(parsedFixtureUseMemoMatch, "Simulation panel parsedFixture useMemo block missing")
+  assert.ok(
+    !parsedFixtureUseMemoMatch[1].includes("setFixtureError"),
+    "Simulation panel useMemo must not call setFixtureError during render",
+  )
+  console.log("  ✓ simulation panel useMemo stays pure (no render-phase setState)")
+
   const { flow, version } = certFlow()
   const triggerId = "11111111-1111-4111-8111-111111111111"
   const approvalId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
