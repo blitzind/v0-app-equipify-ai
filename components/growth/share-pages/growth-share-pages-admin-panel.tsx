@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Copy, ExternalLink, Loader2, Plus, RefreshCw } from "lucide-react"
+import { Copy, ExternalLink, LayoutTemplate, Loader2, Plus, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -184,7 +184,11 @@ export function GrowthSharePagesDashboard() {
     <GrowthEngineCard title="Share Pages" data-qa-marker={GROWTH_SHARE_PAGES_OPERATOR_QA_MARKER}>
       <p className="mb-4 text-xs text-muted-foreground">
         Human-approved personalized pages — passive delivery only. No outreach sends, enrollments, or autonomous
-        scheduling.
+        scheduling.{" "}
+        <Link href="/admin/growth/share-pages/templates" className="font-medium text-primary underline-offset-4 hover:underline">
+          <LayoutTemplate className="mr-1 inline size-3.5" />
+          Manage reusable templates
+        </Link>
       </p>
 
       <div className="mb-4 flex flex-wrap items-end gap-3">

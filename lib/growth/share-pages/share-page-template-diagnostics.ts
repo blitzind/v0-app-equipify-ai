@@ -8,9 +8,12 @@ import {
   archiveTemplate,
   createTemplate,
   duplicateTemplate,
+  duplicateVersion,
   getTemplate,
   listTemplates,
   publishVersion,
+  restoreVersion,
+  unpublishTemplate,
   updateTemplate,
 } from "@/lib/growth/share-pages/share-page-template-repository"
 import { probeGrowthSharePageTemplatesSchema } from "@/lib/growth/share-pages/share-page-template-schema-health"
@@ -169,6 +172,41 @@ async function runRepositoryDiagnostics(
     "republish_version",
     republished.status === "published" && republished.publishedVersionId === edited.currentVersion?.id,
     "Draft version republished successfully.",
+  )
+
+  const unpublished = await unpublishTemplate(admin, created.id)
+  pushCheck(
+    checks,
+    "unpublish_template",
+    unpublished.status === "draft" && unpublished.publishedVersion?.isImmutable === true,
+    "Published template moved back to draft while preserving published version history.",
+  )
+
+  const restored = await restoreVersion(admin, {
+    templateId: created.id,
+    versionId: republished.publishedVersion?.id ?? "",
+    actorUserId: null,
+  })
+  pushCheck(
+    checks,
+    "restore_version",
+    restored.status === "draft" &&
+      restored.currentVersion?.status === "draft" &&
+      restored.currentVersion.id !== republished.publishedVersion?.id,
+    "Historical version restored into a new draft.",
+  )
+
+  const versionDuplicate = await duplicateVersion(admin, {
+    templateId: created.id,
+    versionId: republished.publishedVersion?.id ?? "",
+    actorUserId: null,
+  })
+  pushCheck(
+    checks,
+    "duplicate_version",
+    versionDuplicate.status === "draft" &&
+      versionDuplicate.versionNumber > (republished.publishedVersion?.versionNumber ?? 0),
+    "Historical version duplicated into a new draft.",
   )
 
   const duplicate = await duplicateTemplate(admin, {

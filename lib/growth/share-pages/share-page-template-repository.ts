@@ -8,6 +8,7 @@ import {
   canArchiveSharePageTemplate,
   canEditSharePageTemplateVersion,
   canPublishSharePageTemplate,
+  canUnpublishSharePageTemplate,
   nextSharePageTemplateVersionNumber,
   type GrowthSharePageTemplate,
   type GrowthSharePageTemplateStatus,
@@ -131,6 +132,7 @@ function mapTemplate(
   row: Record<string, unknown>,
   currentVersion: GrowthSharePageTemplateVersion | null = null,
   publishedVersion: GrowthSharePageTemplateVersion | null = null,
+  versionCount = 0,
 ): GrowthSharePageTemplate {
   return {
     id: asString(row.id),
@@ -150,15 +152,35 @@ function mapTemplate(
     qaMarker: GROWTH_SHARE_PAGE_TEMPLATES_QA_MARKER,
     currentVersion,
     publishedVersion,
+    versionCount,
     createdAt: asString(row.created_at),
     updatedAt: asString(row.updated_at),
   }
 }
 
+async function loadVersionCounts(
+  admin: SupabaseClient,
+  templateIds: string[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>()
+  if (templateIds.length === 0) return counts
+
+  const { data, error } = await versionsTable(admin).select("template_id").in("template_id", templateIds)
+  if (error) throw new Error(error.message)
+
+  for (const row of (data ?? []) as Record<string, unknown>[]) {
+    const templateId = asString(row.template_id)
+    counts.set(templateId, (counts.get(templateId) ?? 0) + 1)
+  }
+  return counts
+}
+
 async function loadVersionsForTemplate(
   admin: SupabaseClient,
   template: Record<string, unknown>,
+  versionCount?: number,
 ): Promise<GrowthSharePageTemplate> {
+  const templateId = asString(template.id)
   const currentId = asString(template.current_version_id)
   const publishedId = asString(template.published_version_id)
   let currentVersion: GrowthSharePageTemplateVersion | null = null
@@ -173,7 +195,13 @@ async function loadVersionsForTemplate(
     if (data) publishedVersion = mapVersion(data as Record<string, unknown>)
   }
 
-  return mapTemplate(template, currentVersion, publishedVersion)
+  let resolvedCount = versionCount
+  if (resolvedCount == null) {
+    const counts = await loadVersionCounts(admin, [templateId])
+    resolvedCount = counts.get(templateId) ?? 0
+  }
+
+  return mapTemplate(template, currentVersion, publishedVersion, resolvedCount)
 }
 
 async function listTemplateVersions(
@@ -221,7 +249,15 @@ export async function listTemplates(
   if (error) throw new Error(error.message)
 
   const rows = (data ?? []) as Record<string, unknown>[]
-  const items = await Promise.all(rows.map((row) => loadVersionsForTemplate(admin, row)))
+  const versionCounts = await loadVersionCounts(
+    admin,
+    rows.map((row) => asString(row.id)),
+  )
+  const items = await Promise.all(
+    rows.map((row) =>
+      loadVersionsForTemplate(admin, row, versionCounts.get(asString(row.id)) ?? 0),
+    ),
+  )
   return { items, total: count ?? items.length }
 }
 
@@ -306,9 +342,10 @@ export async function createTemplate(
   return getTemplate(admin, templateId) as Promise<GrowthSharePageTemplate>
 }
 
-async function createDraftVersionFromPublished(
+async function createDraftFromVersion(
   admin: SupabaseClient,
   templateId: string,
+  source: GrowthSharePageTemplateVersion,
   input: {
     blocks?: GrowthSharePageTemplateBlock[]
     theme?: GrowthSharePageTheme
@@ -323,13 +360,12 @@ async function createDraftVersionFromPublished(
   },
 ): Promise<GrowthSharePageTemplateVersion> {
   const existing = await getTemplate(admin, templateId)
-  if (!existing?.publishedVersion) throw new Error("published_version_not_found")
+  if (!existing) throw new Error("template_not_found")
 
   const versions = await listTemplateVersions(admin, templateId)
   const maxVersion = versions.reduce((max, version) => Math.max(max, version.versionNumber), 0)
-  const base = existing.publishedVersion
-  const blocks = input.blocks ?? base.blocks
-  const theme = input.theme ?? base.theme
+  const blocks = input.blocks ?? source.blocks
+  const theme = input.theme ?? source.theme
   const mergeFieldsUsed = extractSharePageTemplateMergeFields(blocks)
   const now = new Date().toISOString()
 
@@ -340,9 +376,9 @@ async function createDraftVersionFromPublished(
       status: "draft",
       blocks_json: blocks,
       theme_json: theme,
-      default_booking_page_id: input.defaultBookingPageId ?? base.defaultBookingPageId,
+      default_booking_page_id: input.defaultBookingPageId ?? source.defaultBookingPageId,
       merge_fields_used: mergeFieldsUsed,
-      change_summary: input.changeSummary?.trim() ?? "Draft created from published version",
+      change_summary: input.changeSummary?.trim() ?? `Draft created from version ${source.versionNumber}`,
       created_by: input.actorUserId ?? null,
     })
     .select("*")
@@ -364,6 +400,37 @@ async function createDraftVersionFromPublished(
     .eq("id", templateId)
 
   return version
+}
+
+async function createDraftVersionFromPublished(
+  admin: SupabaseClient,
+  templateId: string,
+  input: {
+    blocks?: GrowthSharePageTemplateBlock[]
+    theme?: GrowthSharePageTheme
+    defaultBookingPageId?: string | null
+    changeSummary?: string
+    actorUserId?: string | null
+    name?: string
+    description?: string
+    category?: string
+    tags?: string[]
+    previewImageUrl?: string | null
+  },
+): Promise<GrowthSharePageTemplateVersion> {
+  const existing = await getTemplate(admin, templateId)
+  if (!existing) throw new Error("template_not_found")
+
+  const base =
+    existing.currentVersion?.isImmutable === true
+      ? existing.currentVersion
+      : existing.publishedVersion
+  if (!base) throw new Error("published_version_not_found")
+
+  return createDraftFromVersion(admin, templateId, base, {
+    ...input,
+    changeSummary: input.changeSummary?.trim() ?? "Draft created from published version",
+  })
 }
 
 export async function updateTemplate(
@@ -603,6 +670,83 @@ export async function publishVersion(
     .eq("id", input.templateId)
 
   return getTemplate(admin, input.templateId) as Promise<GrowthSharePageTemplate>
+}
+
+export async function unpublishTemplate(
+  admin: SupabaseClient,
+  templateId: string,
+): Promise<GrowthSharePageTemplate> {
+  const existing = await getTemplate(admin, templateId)
+  if (!existing) throw new Error("template_not_found")
+  if (!canUnpublishSharePageTemplate(existing.status)) throw new Error("invalid_status")
+
+  const now = new Date().toISOString()
+  await templatesTable(admin)
+    .update({
+      status: "draft",
+      updated_at: now,
+    })
+    .eq("id", templateId)
+
+  return getTemplate(admin, templateId) as Promise<GrowthSharePageTemplate>
+}
+
+export async function restoreVersion(
+  admin: SupabaseClient,
+  input: {
+    templateId: string
+    versionId: string
+    actorUserId?: string | null
+    changeSummary?: string
+  },
+): Promise<GrowthSharePageTemplate> {
+  const existing = await getTemplate(admin, input.templateId)
+  if (!existing) throw new Error("template_not_found")
+  if (existing.status === "archived") throw new Error("template_archived")
+
+  const { data: versionRow, error: versionLoadError } = await versionsTable(admin)
+    .select("*")
+    .eq("id", input.versionId)
+    .eq("template_id", input.templateId)
+    .maybeSingle()
+  if (versionLoadError) throw new Error(versionLoadError.message)
+  if (!versionRow) throw new Error("version_not_found")
+
+  const source = mapVersion(versionRow as Record<string, unknown>)
+  await createDraftFromVersion(admin, input.templateId, source, {
+    changeSummary: input.changeSummary?.trim() ?? `Restored from version ${source.versionNumber}`,
+    actorUserId: input.actorUserId,
+  })
+
+  return getTemplate(admin, input.templateId) as Promise<GrowthSharePageTemplate>
+}
+
+export async function duplicateVersion(
+  admin: SupabaseClient,
+  input: {
+    templateId: string
+    versionId: string
+    actorUserId?: string | null
+    changeSummary?: string
+  },
+): Promise<GrowthSharePageTemplateVersion> {
+  const existing = await getTemplate(admin, input.templateId)
+  if (!existing) throw new Error("template_not_found")
+  if (existing.status === "archived") throw new Error("template_archived")
+
+  const { data: versionRow, error: versionLoadError } = await versionsTable(admin)
+    .select("*")
+    .eq("id", input.versionId)
+    .eq("template_id", input.templateId)
+    .maybeSingle()
+  if (versionLoadError) throw new Error(versionLoadError.message)
+  if (!versionRow) throw new Error("version_not_found")
+
+  const source = mapVersion(versionRow as Record<string, unknown>)
+  return createDraftFromVersion(admin, input.templateId, source, {
+    changeSummary: input.changeSummary?.trim() ?? `Duplicated from version ${source.versionNumber}`,
+    actorUserId: input.actorUserId,
+  })
 }
 
 export async function getPublishedTemplateVersionForInstantiation(

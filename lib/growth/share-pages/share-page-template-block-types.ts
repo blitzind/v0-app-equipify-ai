@@ -20,6 +20,7 @@ export type GrowthSharePageTemplateBlockBase = {
   type: GrowthSharePageTemplateBlockType
   order: number
   label?: string
+  enabled?: boolean
 }
 
 export type GrowthSharePageTemplateHeroBlock = GrowthSharePageTemplateBlockBase & {
@@ -27,6 +28,7 @@ export type GrowthSharePageTemplateHeroBlock = GrowthSharePageTemplateBlockBase 
   headline: string
   subheadline: string | null
   heroMessage: string
+  showLogo?: boolean
   heroMediaType?: "none" | "image" | "video"
   heroMediaUrl?: string | null
   heroMediaThumbnailUrl?: string | null
@@ -58,6 +60,7 @@ export type GrowthSharePageTemplateCalendarBlock = GrowthSharePageTemplateBlockB
   type: "calendar"
   heading: string | null
   bookingPageId: string | null
+  embedMode?: "inline" | "button"
 }
 
 export type GrowthSharePageTemplateTestimonialEntry = {
@@ -84,6 +87,7 @@ export type GrowthSharePageTemplateVideoPlaceholderBlock = GrowthSharePageTempla
   heading: string | null
   placeholderLabel: string
   mediaAssetRef: string | null
+  layout?: "wide" | "compact"
 }
 
 export type GrowthSharePageTemplateVoicePlaceholderBlock = GrowthSharePageTemplateBlockBase & {
@@ -91,6 +95,7 @@ export type GrowthSharePageTemplateVoicePlaceholderBlock = GrowthSharePageTempla
   heading: string | null
   placeholderLabel: string
   mediaAssetRef: string | null
+  showTranscript?: boolean
 }
 
 export type GrowthSharePageTemplateMediaCtaPlaceholderBlock = GrowthSharePageTemplateBlockBase & {
@@ -99,6 +104,7 @@ export type GrowthSharePageTemplateMediaCtaPlaceholderBlock = GrowthSharePageTem
   placeholderLabel: string
   ctaLabel: string
   mediaAssetRef: string | null
+  linkedBlockId?: string | null
 }
 
 export type GrowthSharePageTemplateBlock =

@@ -805,6 +805,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         match: prefixMatch("/admin/growth/share-pages"),
       },
       {
+        id: "share-page-templates",
+        href: "/admin/growth/share-pages/templates",
+        label: "Share Page Templates",
+        match: prefixMatch("/admin/growth/share-pages/templates"),
+      },
+      {
         id: "booking-intelligence",
         href: "/admin/growth/booking-intelligence",
         label: "Booking Intelligence",

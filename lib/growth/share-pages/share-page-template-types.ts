@@ -13,6 +13,9 @@ export type {
 
 export const GROWTH_SHARE_PAGE_TEMPLATES_QA_MARKER = "growth-share-page-templates-s1-v1" as const
 
+export const GROWTH_SHARE_PAGE_TEMPLATE_VERSIONING_QA_MARKER =
+  "growth-share-page-template-versioning-s1d-v1" as const
+
 export const GROWTH_SHARE_PAGE_TEMPLATES_CONFIRM = "RUN_GROWTH_SHARE_PAGE_TEMPLATES_CERTIFICATION" as const
 
 export const GROWTH_SHARE_PAGE_TEMPLATES_MIGRATION =
@@ -73,6 +76,7 @@ export type GrowthSharePageTemplate = {
   qaMarker: typeof GROWTH_SHARE_PAGE_TEMPLATES_QA_MARKER
   currentVersion: GrowthSharePageTemplateVersion | null
   publishedVersion: GrowthSharePageTemplateVersion | null
+  versionCount: number
   createdAt: string
   updatedAt: string
 }
@@ -87,6 +91,15 @@ export function canPublishSharePageTemplate(status: GrowthSharePageTemplateStatu
 
 export function canArchiveSharePageTemplate(status: GrowthSharePageTemplateStatus): boolean {
   return status !== "archived"
+}
+
+export function canUnpublishSharePageTemplate(status: GrowthSharePageTemplateStatus): boolean {
+  return status === "published"
+}
+
+export function hasUnpublishedSharePageTemplateDraft(template: GrowthSharePageTemplate): boolean {
+  if (!template.publishedVersion || !template.currentVersion) return false
+  return template.currentVersion.id !== template.publishedVersion.id
 }
 
 export function nextSharePageTemplateVersionNumber(maxVersion: number): number {
