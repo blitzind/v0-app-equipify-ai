@@ -184,12 +184,26 @@ const EMPTY_STATES: Record<GrowthEngineEmptyStateKind, GrowthEngineHonestEmptySt
     outreach_execution: false,
     enrollment_execution: false,
   },
+  no_data: {
+    kind: "no_data",
+    title: "No records yet",
+    message: "Nothing matched this view. Adjust filters or create the first record when ready.",
+    guidance: [
+      "Empty results are normal for new scopes — no autonomous execution is triggered.",
+      "Use refresh after creating data elsewhere in Growth Engine.",
+    ],
+    read_only: true,
+    requires_human_review: true,
+    autonomous_execution_enabled: false,
+    outreach_execution: false,
+    enrollment_execution: false,
+  },
 }
 
 export function buildGrowthEngineHonestEmptyState(
   kind: GrowthEngineEmptyStateKind,
 ): GrowthEngineHonestEmptyStateConfig {
-  return EMPTY_STATES[kind]
+  return EMPTY_STATES[kind] ?? EMPTY_STATES.no_data
 }
 
 export const GROWTH_ENGINE_EMPTY_STATE_KINDS = Object.keys(EMPTY_STATES) as GrowthEngineEmptyStateKind[]

@@ -18,6 +18,7 @@ export type GrowthEngineEmptyStateKind =
   | "no_follow_up_policies"
   | "no_playbooks"
   | "no_command_center_items"
+  | "no_data"
 
 export type HardeningFindingSeverity = "info" | "warning" | "critical"
 

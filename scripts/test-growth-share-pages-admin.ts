@@ -14,6 +14,8 @@ import {
   GROWTH_SHARE_PAGES_OPERATOR_CONFIRM,
   GROWTH_SHARE_PAGES_OPERATOR_QA_MARKER,
 } from "../lib/growth/share-pages/share-page-operator-types"
+import { buildGrowthEngineHonestEmptyState } from "../lib/growth/e2e/growth-engine-hardening-empty-states"
+import type { GrowthEngineEmptyStateKind } from "../lib/growth/e2e/growth-engine-hardening-types"
 import { buildSharePagePreviewUrl, buildSharePagePublicUrl } from "../lib/growth/share-pages/share-page-token"
 
 const PRODUCTION_ENV_SOURCES = [
@@ -89,6 +91,11 @@ function runLocalRegression(): void {
   assert.ok(panel.includes("pending review"))
   assert.ok(panel.includes("buildGrowthSharePageContext"))
   assert.ok(panel.includes("Approve / publish"))
+  const emptyKindMatch = panel.match(/emptyKind="([^"]+)"/)
+  assert.ok(emptyKindMatch, "Admin panel must declare GrowthEnginePanelResilience emptyKind")
+  const emptyConfig = buildGrowthEngineHonestEmptyState(emptyKindMatch[1] as GrowthEngineEmptyStateKind)
+  assert.ok(emptyConfig.title.trim().length > 0, "emptyKind must resolve to honest empty-state title")
+  console.log("  ✓ Admin panel empty-state kind registered")
   console.log("  ✓ Admin panel API wiring and safety copy")
 
   const listRoute = fs.readFileSync(
