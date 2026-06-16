@@ -2,7 +2,9 @@
 
 import { Activity } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
-import { GrowthEngagementDashboard } from "@/components/growth/growth-engagement-dashboard"
+import { GrowthEngagementCommandCenter } from "@/components/growth/engagement/growth-engagement-command-center"
+import { GrowthEngagementDashboardPanel } from "@/components/growth/engagement/growth-engagement-dashboard"
+import { GrowthEngagementDashboard as GrowthLeadEngagementDashboard } from "@/components/growth/growth-engagement-dashboard"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
@@ -30,16 +32,39 @@ export default function AdminGrowthEngagementPage() {
               <Activity size={17} />
             </span>
             <div>
-              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Engagement Intelligence</h1>
+              <h1 className={PAGE_STANDARD_PAGE_TITLE}>Engagement Dashboard</h1>
               <p className="text-sm text-muted-foreground">
-                Cross-channel engagement scoring, activity visibility, and queue prioritization — read-only intelligence, no send.
+                Share page, media, CTA, Q&A, conversational, and booking handoff engagement — read-only rollup, no
+                outreach execution.
               </p>
             </div>
           </div>
         </section>
 
         <GrowthSectionLayout>
-          <GrowthEngagementDashboard />
+          <div className="space-y-8">
+            <GrowthEngagementCommandCenter />
+
+            <section className="space-y-3 border-t border-border pt-8">
+              <div>
+                <h2 className="text-lg font-semibold">Engagement dashboard panels</h2>
+                <p className="text-sm text-muted-foreground">
+                  S4-A through S4-D detailed panels preserved alongside the unified command center workspace.
+                </p>
+              </div>
+              <GrowthEngagementDashboardPanel />
+            </section>
+
+            <section className="space-y-3 border-t border-border pt-8">
+              <div>
+                <h2 className="text-lg font-semibold">Lead engagement intelligence</h2>
+                <p className="text-sm text-muted-foreground">
+                  Cross-channel lead scoring and queue prioritization (Slice 5.4A) — preserved alongside S4-A rollups.
+                </p>
+              </div>
+              <GrowthLeadEngagementDashboard />
+            </section>
+          </div>
         </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>

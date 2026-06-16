@@ -182,6 +182,8 @@
     "test:growth-media-assets": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-media-assets.ts",
     "test:growth-media-assets:integration": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-media-assets.ts --integration",
     "test:growth-media-assets:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-media-assets.ts --production",
+    "test:growth-engagement-dashboard": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-engagement-dashboard.ts",
+    "test:growth-engagement-dashboard:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-engagement-dashboard.ts --production",
     "test:growth-reply-booking-notifications": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-reply-booking-notifications.ts",
     "test:growth-reply-booking-notifications:integration": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-reply-booking-notifications.ts --integration",
     "test:growth-reply-booking-notifications:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-reply-booking-notifications.ts --production",
