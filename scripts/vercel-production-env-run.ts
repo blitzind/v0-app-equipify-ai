@@ -1,21 +1,20 @@
 /**
  * Run a command with Vercel Production env — never reads or writes .env.local.
  *
+ * Uses `vercel env run -e production` so non-sensitive Production vars are injected
+ * into the child process. Sensitive secrets (Supabase service role, CRON_SECRET)
+ * are not materialized locally by Vercel CLI; production certs may fall back to
+ * Supabase CLI linked-project keys for live schema verification.
+ *
  * Usage: node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- pnpm check:apollo-live-pilot-env-ai-4
  */
 import { execSync, spawnSync } from "node:child_process"
-import { existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { existsSync, unlinkSync } from "node:fs"
 import { join } from "node:path"
-import { parseGrowthProductionEnvFile } from "../lib/growth/qa/reply-flow-env-bootstrap"
 
 export const VERCEL_PRODUCTION_ENV_RUN_QA_MARKER = "vercel-production-env-run-le-4-v1" as const
 
 const BLOCKED_LOCAL_ENV_FILES = [".env.local", ".env.local.active"] as const
-
-function isPresent(value: string | undefined): value is string {
-  return typeof value === "string" && value.trim().length > 0 && value.trim() !== '""' && value.trim() !== "''"
-}
 
 function parseArgs(argv: string[]): string[] {
   const dash = argv.indexOf("--")
@@ -29,28 +28,6 @@ function parseArgs(argv: string[]): string[] {
     process.exit(1)
   }
   return command
-}
-
-function pullVercelProductionEnv(tempEnvPath: string, cwd: string): void {
-  execSync(
-    `vercel env pull ${JSON.stringify(tempEnvPath)} --environment=production --yes`,
-    {
-      cwd,
-      stdio: ["ignore", "pipe", "inherit"],
-      env: process.env,
-    },
-  )
-}
-
-function applyPulledEnvToProcess(envPath: string): number {
-  const pulled = parseGrowthProductionEnvFile(envPath)
-  let applied = 0
-  for (const [key, value] of Object.entries(pulled)) {
-    if (!isPresent(value)) continue
-    process.env[key] = value.trim()
-    applied++
-  }
-  return applied
 }
 
 function hideLocalEnvFiles(cwd: string): Array<{ path: string; backup: string }> {
@@ -75,23 +52,20 @@ function restoreLocalEnvFiles(hidden: Array<{ path: string; backup: string }>): 
 }
 
 export function runWithVercelProductionEnv(command: string[], cwd = process.cwd()): number {
-  process.env.EQUIPIFY_VERCEL_PRODUCTION_ENV_RUN = "1"
-
-  const tempDir = mkdtempSync(join(tmpdir(), "equipify-vercel-prod-env-"))
-  const tempEnvPath = join(tempDir, "production.env")
   const hidden = hideLocalEnvFiles(cwd)
 
   try {
-    pullVercelProductionEnv(tempEnvPath, cwd)
-    const applied = applyPulledEnvToProcess(tempEnvPath)
     process.stderr.write(
-      `Vercel Production env loaded from temporary pull (${applied} keys applied; .env.local not used)\n`,
+      "Running with Vercel Production env via `vercel env run -e production` (.env.local not used)\n",
     )
 
-    const result = spawnSync(command[0]!, command.slice(1), {
+    const result = spawnSync("vercel", ["env", "run", "-e", "production", "--", ...command], {
       cwd,
       stdio: "inherit",
-      env: process.env,
+      env: {
+        ...process.env,
+        EQUIPIFY_VERCEL_PRODUCTION_ENV_RUN: "1",
+      },
       shell: false,
     })
 
@@ -102,11 +76,6 @@ export function runWithVercelProductionEnv(command: string[], cwd = process.cwd(
     return result.status ?? 1
   } finally {
     restoreLocalEnvFiles(hidden)
-    try {
-      rmSync(tempDir, { recursive: true, force: true })
-    } catch {
-      /* optional */
-    }
   }
 }
 

@@ -8,6 +8,7 @@ import {
   evaluateSequenceExecutionPauseGate,
 } from "@/lib/growth/sequences/execution/sequence-pause-gate"
 import { appendGrowthLeadTimelineEvent } from "@/lib/growth/timeline-repository"
+import { emitSequenceOperatorNotificationSafely } from "@/lib/growth/sequences/conditions/sequence-operator-notifications"
 
 export const GROWTH_SEQUENCE_ADVANCEMENT_GATE_QA_MARKER =
   "growth-sequence-advancement-gate-sr3-phase3-safety-v1" as const
@@ -61,6 +62,15 @@ export async function recordSequenceAdvancementBlockedAudit(
       sequence_enrollment_step_id: input.enrollmentStepId,
       source: "growth_sequence_advancement_gate",
     },
+    occurredAt: input.occurredAt,
+  })
+
+  await emitSequenceOperatorNotificationSafely(admin, {
+    event: "sequence_advancement_blocked",
+    enrollmentId: input.enrollmentId,
+    enrollmentStepId: input.enrollmentStepId,
+    leadId: input.leadId,
+    blockReason: input.gate.reason ?? input.gate.code ?? "Advancement blocked by pause gate.",
     occurredAt: input.occurredAt,
   })
 }

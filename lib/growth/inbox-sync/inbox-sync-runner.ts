@@ -369,5 +369,10 @@ export async function runInboxSyncForEnabledMailboxes(
     }
   }
 
+  const { evaluateInboxThreadSlaOperatorAlertsSafely } = await import(
+    "@/lib/growth/inbox-team-ownership/inbox-sla-evaluator"
+  )
+  await evaluateInboxThreadSlaOperatorAlertsSafely(admin)
+
   return { scanned: batch.length, completed, failed, summaries }
 }

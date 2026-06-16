@@ -29,6 +29,7 @@ import {
 import { recordSharePageAttributionEngagement } from "@/lib/growth/tracking/tracking-repository"
 import { dispatchSequenceEventWakeSafely } from "@/lib/growth/sequences/conditions/sequence-event-wake-engine"
 import { mapSharePageEventToSequenceWakeEvent } from "@/lib/growth/sequences/conditions/sequence-event-wake-types"
+import { emitSharePageOperatorNotification } from "@/lib/growth/share-pages/share-page-operator-notifications"
 
 export const SHARE_PAGE_ENGAGEMENT_DURATION_MS = 30_000
 export const SHARE_PAGE_ENGAGEMENT_SCROLL_PCT = 50
@@ -172,6 +173,26 @@ function resolveEngagementThreshold(input: {
   return false
 }
 
+async function emitSharePageOperatorNotificationSafely(
+  admin: SupabaseClient,
+  input: {
+    event:
+      | "share_page_viewed"
+      | "share_page_engaged"
+      | "share_page_cta_clicked"
+      | "share_page_booking_started"
+      | "share_page_booking_completed"
+    page: GrowthSharePage
+    sharePageViewId: string
+    companyLabel: string
+    leadOwnerUserId?: string | null
+    occurredAt: string
+    ctaLabel?: string | null
+  },
+): Promise<void> {
+  await emitSharePageOperatorNotification(admin, input).catch(() => undefined)
+}
+
 async function publishSharePageRealtime(
   admin: SupabaseClient,
   input: {
@@ -216,6 +237,7 @@ async function handleSideEffects(
 ): Promise<{ engaged: boolean; engagementThresholdCrossed: boolean }> {
   const lead = await fetchGrowthLeadById(admin, page.leadId)
   const companyName = lead?.companyName?.trim() || "Unknown company"
+  const leadOwnerUserId = lead?.assignedTo ?? null
   const domain = lead?.website?.trim() || null
   const context = {
     leadId: page.leadId,
@@ -250,6 +272,14 @@ async function handleSideEffects(
       page,
       sharePageViewId: input.sharePageViewId,
     })
+    await emitSharePageOperatorNotificationSafely(admin, {
+      event: "share_page_viewed",
+      page,
+      sharePageViewId: input.sharePageViewId,
+      companyLabel: companyName,
+      leadOwnerUserId,
+      occurredAt: input.occurredAt,
+    })
   }
 
   if (input.eventType === "SHARE_PAGE_CTA_CLICKED" && !input.deduplicated) {
@@ -274,6 +304,15 @@ async function handleSideEffects(
       providerEventId: `${page.id}:${input.sharePageViewId}:cta:${input.metadata?.tracking_key ?? input.eventLabel ?? "cta"}`,
       excerpt: input.eventLabel ? `Lead clicked CTA "${input.eventLabel}" on share page.` : "Lead clicked CTA on share page.",
     })
+    await emitSharePageOperatorNotificationSafely(admin, {
+      event: "share_page_cta_clicked",
+      page,
+      sharePageViewId: input.sharePageViewId,
+      companyLabel: companyName,
+      leadOwnerUserId,
+      occurredAt: input.occurredAt,
+      ctaLabel: input.eventLabel ?? null,
+    })
   }
 
   if (input.eventType === "SHARE_PAGE_BOOKING_STARTED" && !input.deduplicated) {
@@ -289,6 +328,14 @@ async function handleSideEffects(
       occurredAt: input.occurredAt,
       providerEventId: `${page.id}:${input.sharePageViewId}:booking_started`,
       excerpt: "Lead started booking flow from share page.",
+    })
+    await emitSharePageOperatorNotificationSafely(admin, {
+      event: "share_page_booking_started",
+      page,
+      sharePageViewId: input.sharePageViewId,
+      companyLabel: companyName,
+      leadOwnerUserId,
+      occurredAt: input.occurredAt,
     })
   }
 
@@ -314,6 +361,14 @@ async function handleSideEffects(
       eventType: "share_page_booking_completed",
       page,
       sharePageViewId: input.sharePageViewId,
+    })
+    await emitSharePageOperatorNotificationSafely(admin, {
+      event: "share_page_booking_completed",
+      page,
+      sharePageViewId: input.sharePageViewId,
+      companyLabel: companyName,
+      leadOwnerUserId,
+      occurredAt: input.occurredAt,
     })
   }
 
@@ -368,6 +423,14 @@ async function handleSideEffects(
           duration_ms: input.durationMs ?? null,
           scroll_depth_pct: input.scrollDepthPct ?? null,
         },
+      })
+      await emitSharePageOperatorNotificationSafely(admin, {
+        event: "share_page_engaged",
+        page,
+        sharePageViewId: input.sharePageViewId,
+        companyLabel: companyName,
+        leadOwnerUserId,
+        occurredAt: input.occurredAt,
       })
     }
   }

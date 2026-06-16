@@ -20,6 +20,7 @@ import { createPortal } from "react-dom"
 import type { LucideIcon } from "lucide-react"
 import {
   Activity,
+  Bell,
   Bolt,
   BookOpen,
   Bot,
@@ -116,6 +117,7 @@ type GrowthNavGroup = {
 
 const GROWTH_NAV_ICONS: Record<string, LucideIcon> = {
   command: LayoutDashboard,
+  "operator-notifications": Bell,
   "aiden-guide": Bot,
   queue: ListOrdered,
   search: Search,

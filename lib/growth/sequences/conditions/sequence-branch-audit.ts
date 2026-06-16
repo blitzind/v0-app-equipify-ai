@@ -9,6 +9,7 @@ import { GROWTH_SEQUENCE_BRANCH_RESOLVER_QA_MARKER } from "@/lib/growth/sequence
 import { GROWTH_SEQUENCE_WAIT_REGISTRY_QA_MARKER } from "@/lib/growth/sequences/conditions/sequence-wait-registry-types"
 import type { SequenceConditionMaskedEvidence } from "@/lib/growth/sequences/conditions/sequence-condition-evaluator-types"
 import { appendGrowthLeadTimelineEvent } from "@/lib/growth/timeline-repository"
+import { emitSequenceOperatorNotificationSafely } from "@/lib/growth/sequences/conditions/sequence-operator-notifications"
 
 export async function recordSequenceBranchEvaluatedAudit(
   admin: SupabaseClient,
@@ -55,6 +56,15 @@ export async function recordSequenceBranchEvaluatedAudit(
     payload: metadata,
     occurredAt: input.occurredAt,
   })
+
+  await emitSequenceOperatorNotificationSafely(admin, {
+    event: "sequence_branch_evaluated",
+    enrollmentId: input.enrollmentId,
+    enrollmentStepId: input.enrollmentStepId,
+    leadId: input.leadId,
+    branchDecisionId: input.resolver.selectedEdge?.id ?? null,
+    occurredAt: input.occurredAt,
+  })
 }
 
 export async function recordSequenceWaitStartedAudit(
@@ -85,6 +95,17 @@ export async function recordSequenceWaitStartedAudit(
     title: "Sequence wait started",
     summary: `Waiting for ${input.waitedForEvent}.`,
     metadata,
+    occurredAt: input.occurredAt,
+  })
+
+  await emitSequenceOperatorNotificationSafely(admin, {
+    event: "sequence_wait_started",
+    enrollmentId: input.enrollmentId,
+    enrollmentStepId: input.enrollmentStepId,
+    leadId: input.leadId,
+    waitId: input.waitId,
+    branchDecisionId: input.conditionId,
+    waitedForEvent: input.waitedForEvent,
     occurredAt: input.occurredAt,
   })
 }
@@ -120,6 +141,17 @@ export async function recordSequenceWaitResolvedAudit(
     metadata,
     occurredAt: input.occurredAt,
   })
+
+  await emitSequenceOperatorNotificationSafely(admin, {
+    event: "sequence_wait_resolved",
+    enrollmentId: input.enrollmentId,
+    enrollmentStepId: input.enrollmentStepId,
+    leadId: input.leadId,
+    waitId: input.waitId,
+    branchDecisionId: input.selectedEdge?.id ?? null,
+    resolutionReason: input.resolutionReason,
+    occurredAt: input.occurredAt,
+  })
 }
 
 export async function recordSequenceConditionTimeoutAudit(
@@ -146,6 +178,16 @@ export async function recordSequenceConditionTimeoutAudit(
       wait_id: input.waitId,
       condition_id: input.conditionId,
     },
+    occurredAt: input.occurredAt,
+  })
+
+  await emitSequenceOperatorNotificationSafely(admin, {
+    event: "sequence_wait_timeout",
+    enrollmentId: input.enrollmentId,
+    enrollmentStepId: input.enrollmentStepId,
+    leadId: input.leadId,
+    waitId: input.waitId,
+    branchDecisionId: input.conditionId,
     occurredAt: input.occurredAt,
   })
 }

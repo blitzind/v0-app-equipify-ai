@@ -98,6 +98,13 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     consoleKey: "command",
   },
   {
+    id: "operator-notifications",
+    label: "Notifications",
+    href: "/admin/growth/notifications",
+    keywords: ["notifications", "operator notifications", "alerts", "unread"],
+    consoleKey: "operator_notifications",
+  },
+  {
     id: "queue",
     label: "Queue",
     href: GROWTH_REVENUE_QUEUE_HREF,
@@ -485,6 +492,13 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         consoleKey: "command",
         shortcutKey: "m",
         match: prefixMatch("/admin/growth/command"),
+      },
+      {
+        id: "operator-notifications",
+        href: "/admin/growth/notifications",
+        label: "Notifications",
+        consoleKey: "operator_notifications",
+        match: prefixMatch("/admin/growth/notifications"),
       },
       {
         id: "aiden-guide",

@@ -49,6 +49,7 @@ export type GrowthSidebarConsoleKey =
   | "conversations"
   | "sequences"
   | "sequence_execution"
+  | "operator_notifications"
 
 const DEFAULT_HEALTH: GrowthSidebarConsoleHealth = {
   openInbox: 0,
@@ -140,6 +141,7 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
         unifiedInboxRes,
         sequencesRes,
         patternEnrollmentStatsRes,
+        operatorNotificationsRes,
       ] = await Promise.all([
         fetchJson<{ ok?: boolean; dashboard?: { missionControl?: { criticalActions?: number } } }>(
           "/api/platform/growth/command/dashboard",
@@ -244,6 +246,10 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
           ok?: boolean
           stats?: { activeCount?: number }
         }>("/api/platform/growth/sequences/enrollments/stats"),
+        fetchJson<{
+          ok?: boolean
+          counts?: { unreadTotal?: number }
+        }>("/api/platform/growth/notifications/unread"),
       ])
 
       const inboxTotal = leadInboxRes?.total ?? 0
@@ -293,12 +299,15 @@ export function useGrowthSidebarConsole(): GrowthSidebarConsoleState {
         0
       const activeSequencesCount = patternActiveCount > 0 ? patternActiveCount : templateActiveCount
       const criticalSignalsCount = commandCritical + intentHighIntentCount + inboxCriticalCount
+      const operatorNotificationUnread = operatorNotificationsRes?.counts?.unreadTotal ?? 0
 
       setState({
         loading: false,
         degraded: false,
         badges: {
           command: commandCritical > 0 ? commandCritical : undefined,
+          operator_notifications:
+            operatorNotificationUnread > 0 ? operatorNotificationUnread : undefined,
           inbox: inboxTotal > 0 ? inboxTotal : undefined,
           inbox_high_priority: highPriorityCount > 0 ? highPriorityCount : undefined,
           intent_pixel: intentPixelBadge,

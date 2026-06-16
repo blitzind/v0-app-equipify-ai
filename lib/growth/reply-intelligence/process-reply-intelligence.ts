@@ -33,6 +33,7 @@ import { routeReplyWorkflows } from "@/lib/growth/reply-intelligence/reply-routi
 import { computeReplySlaDueAt, computeOwnerResponseGapMs } from "@/lib/growth/reply-intelligence/reply-sla-tracker"
 import { computeReplyThreadIntelligence } from "@/lib/growth/reply-intelligence/reply-thread-intelligence"
 import { processReplyMeetingIntelligence } from "@/lib/growth/meeting-intelligence/process-meeting-intelligence"
+import { emitReplyOperatorNotificationsFromIntelligence } from "@/lib/growth/reply-intelligence/reply-operator-notifications"
 import type { GrowthReplyIntelligenceRecord } from "@/lib/growth/reply-intelligence/reply-intent-types"
 import {
   listGrowthOutboundRepliesForLead,
@@ -313,6 +314,18 @@ export async function processReplyIntelligence(
       priority,
     })
   }
+
+  await emitReplyOperatorNotificationsFromIntelligence(admin, {
+    replyId: input.reply.id,
+    leadId: input.lead.id,
+    organizationId: input.lead.promotedOrganizationId,
+    companyLabel: input.lead.companyName,
+    intent: classified.intent,
+    priority,
+    leadOwnerUserId: ownerUserId,
+    receivedAt: input.reply.receivedAt,
+    buyingSignalCount: buyingSignalsDetailed.length,
+  }).catch(() => undefined)
 
   return {
     replyId: updated.id,
