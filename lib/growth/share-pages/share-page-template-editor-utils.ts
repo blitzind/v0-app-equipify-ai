@@ -5,9 +5,12 @@ import type {
   GrowthSharePageTemplateBlockType,
   GrowthSharePageTemplateTestimonialEntry,
 } from "@/lib/growth/share-pages/share-page-template-block-types"
+import { createDefaultVideoOverlaySpec } from "@/lib/growth/media/media-video-overlay-utils"
 import { DEFAULT_GROWTH_SHARE_PAGE_THEME } from "@/lib/growth/share-pages/share-page-types"
 
 export const GROWTH_SHARE_PAGE_TEMPLATE_EDITOR_QA_MARKER = "growth-share-page-template-editor-s1c-v1" as const
+
+export { GROWTH_SHARE_PAGE_TEMPLATE_SAMPLE_CONTEXT } from "@/lib/growth/share-pages/share-page-template-preview-context"
 
 export const GROWTH_SHARE_PAGE_TEMPLATE_BLOCK_LABELS: Record<GrowthSharePageTemplateBlockType, string> = {
   hero: "Hero",
@@ -21,11 +24,6 @@ export const GROWTH_SHARE_PAGE_TEMPLATE_BLOCK_LABELS: Record<GrowthSharePageTemp
   voice_placeholder: "Voice Placeholder",
   media_cta_placeholder: "Media CTA Placeholder",
 }
-
-export const GROWTH_SHARE_PAGE_TEMPLATE_SAMPLE_CONTEXT = {
-  prospectName: "Alex Rivera",
-  companyName: "Summit Field Services",
-} as const
 
 function newBlockId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -115,8 +113,56 @@ export function createTemplateBlock(type: GrowthSharePageTemplateBlockType, orde
         type: "video_placeholder",
         heading: "Personalized video",
         placeholderLabel: "Video personalization placeholder",
+        videoAssetId: null,
         mediaAssetRef: null,
         layout: "wide",
+        settings: {
+          overlaySpec: createDefaultVideoOverlaySpec(),
+          aiVideo: {
+            enabled: false,
+            avatarId: null,
+            scriptTemplate: "Hi {{prospect.name}}, this is {{sender.name}} from {{sender.company}}.",
+            mergeFieldsUsed: ["prospect.name", "sender.name", "sender.company"],
+            voiceClone: {
+              enabled: false,
+              voiceId: null,
+              scriptTemplate: "Hi {{prospect.name}}, this is {{sender.name}} from {{sender.company}}.",
+              mergeFieldsUsed: ["prospect.name", "sender.name", "sender.company"],
+            },
+            conversationalAgent: {
+              enabled: false,
+              agentId: null,
+              qualificationGoal: "meeting_readiness",
+              systemPromptTemplate:
+                "You are speaking with {{prospect.name}} at {{company.name}} on behalf of {{sender.company}}.",
+              mergeFieldsUsed: ["prospect.name", "company.name", "sender.company"],
+              aiQa: {
+                enabled: false,
+                policyId: "qa-policy-safe-default",
+                questionPromptTemplate: "What would {{prospect.name}} like to know about {{sender.company}}?",
+                fallbackResponse:
+                  "Thanks for your question. A member of our team will follow up with a precise answer shortly.",
+                knowledgeSourceRefs: [
+                  { sourceType: "share_page_template", sourceId: null, label: "Template content", enabled: true },
+                ],
+                mergeFieldsUsed: ["prospect.name", "sender.company"],
+                bookingHandoffEnabled: true,
+              },
+              bookingHandoff: {
+                enabled: false,
+                readinessTier: "not_ready",
+                readinessScore: 0,
+                recommendedMeetingType: null,
+                recommendedDurationMinutes: null,
+                recommendedAttendees: [],
+                bookingRecommendation: null,
+                agendaTemplate:
+                  "Intro for {{prospect.name}} at {{company.name}} · goals · fit · next steps",
+                nextSteps: [],
+              },
+            },
+          },
+        },
       }
     case "voice_placeholder":
       return {

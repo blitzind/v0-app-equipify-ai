@@ -1,4 +1,7 @@
-/** Growth Engine S1-B — Share Page Template block model (client-safe). */
+/** Growth Engine S1-B/S2-E — Share Page Template block model (client-safe). */
+
+import type { GrowthMediaAiQaKnowledgeSourceRef } from "@/lib/growth/media/media-ai-qa-knowledge-types"
+import type { GrowthMediaVideoOverlaySpec } from "@/lib/growth/media/media-video-overlay-types"
 
 export const GROWTH_SHARE_PAGE_TEMPLATE_BLOCK_TYPES = [
   "hero",
@@ -82,12 +85,69 @@ export type GrowthSharePageTemplateCustomBlock = GrowthSharePageTemplateBlockBas
   htmlSafeText: string
 }
 
+export type GrowthSharePageTemplateVideoVoiceCloneSettings = {
+  enabled: boolean
+  voiceId?: string | null
+  scriptTemplate?: string | null
+  mergeFieldsUsed?: string[]
+}
+
+export type GrowthSharePageTemplateVideoAiQaSettings = {
+  enabled: boolean
+  policyId?: string | null
+  questionPromptTemplate?: string | null
+  fallbackResponse?: string | null
+  knowledgeSourceRefs?: GrowthMediaAiQaKnowledgeSourceRef[]
+  mergeFieldsUsed?: string[]
+  bookingHandoffEnabled?: boolean
+}
+
+export type GrowthSharePageTemplateVideoBookingHandoffSettings = {
+  enabled: boolean
+  readinessTier?: string | null
+  readinessScore?: number | null
+  recommendedMeetingType?: string | null
+  recommendedDurationMinutes?: number | null
+  recommendedAttendees?: string[]
+  bookingRecommendation?: string | null
+  agendaTemplate?: string | null
+  nextSteps?: string[]
+}
+
+export type GrowthSharePageTemplateVideoConversationalAgentSettings = {
+  enabled: boolean
+  agentId?: string | null
+  qualificationGoal?: string | null
+  systemPromptTemplate?: string | null
+  mergeFieldsUsed?: string[]
+  aiQa?: GrowthSharePageTemplateVideoAiQaSettings | null
+  bookingHandoff?: GrowthSharePageTemplateVideoBookingHandoffSettings | null
+}
+
+export type GrowthSharePageTemplateVideoAiVideoSettings = {
+  enabled: boolean
+  avatarId?: string | null
+  scriptTemplate?: string | null
+  mergeFieldsUsed?: string[]
+  voiceClone?: GrowthSharePageTemplateVideoVoiceCloneSettings | null
+  conversationalAgent?: GrowthSharePageTemplateVideoConversationalAgentSettings | null
+}
+
+export type GrowthSharePageTemplateVideoPlaceholderSettings = {
+  overlaySpec?: GrowthMediaVideoOverlaySpec | null
+  aiVideo?: GrowthSharePageTemplateVideoAiVideoSettings | null
+}
+
 export type GrowthSharePageTemplateVideoPlaceholderBlock = GrowthSharePageTemplateBlockBase & {
   type: "video_placeholder"
   heading: string | null
   placeholderLabel: string
+  /** S2-A persisted media asset reference (preferred). */
+  videoAssetId?: string | null
   mediaAssetRef: string | null
   layout?: "wide" | "compact"
+  /** S2-E overlay specifications — merge templates preserved until preview/instantiation render. */
+  settings?: GrowthSharePageTemplateVideoPlaceholderSettings | null
 }
 
 export type GrowthSharePageTemplateVoicePlaceholderBlock = GrowthSharePageTemplateBlockBase & {
