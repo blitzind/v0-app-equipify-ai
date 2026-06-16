@@ -170,6 +170,9 @@ export type GrowthSharePage = {
   heroMediaThumbnailUrl: string | null
   voiceAssetId: string | null
   videoAssetId: string | null
+  sharePageTemplateId: string | null
+  sharePageTemplateVersionId: string | null
+  templateBlocksSnapshot: unknown[] | Record<string, unknown> | null
   createdBy: string | null
   approvedBy: string | null
   approvedAt: string | null
@@ -240,6 +243,9 @@ export type GrowthSharePageCreateInput = {
   heroMediaThumbnailUrl?: string | null
   voiceAssetId?: string | null
   videoAssetId?: string | null
+  sharePageTemplateId?: string | null
+  sharePageTemplateVersionId?: string | null
+  templateBlocksSnapshot?: unknown[] | Record<string, unknown> | null
   createdBy?: string | null
 }
 

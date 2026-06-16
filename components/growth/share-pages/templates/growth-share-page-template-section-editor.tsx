@@ -13,6 +13,7 @@ import { createTestimonialEntry } from "@/lib/growth/share-pages/share-page-temp
 import type { GrowthSharePageTemplateBlock } from "@/lib/growth/share-pages/share-page-template-block-types"
 import type { GrowthBookingPageListItem } from "@/lib/growth/booking/booking-page-types"
 import { GROWTH_SHARE_PAGE_PUBLIC_THEME_MODES } from "@/lib/growth/share-pages/share-page-types"
+import { GrowthSharePageTemplateVideoAssetPanel } from "@/components/growth/share-pages/templates/growth-share-page-template-video-asset-panel"
 
 function Field({
   label,
@@ -362,6 +363,7 @@ export function GrowthSharePageTemplateSectionEditor({
               <option value="compact">Compact</option>
             </select>
           </Field>
+          <GrowthSharePageTemplateVideoAssetPanel block={block} disabled={disabled} onChange={onChange} />
         </>
       ) : null}
 

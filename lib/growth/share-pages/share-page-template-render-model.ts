@@ -1,12 +1,24 @@
-/** Growth Engine S1-C — map template editor state to share page render model (client-safe). */
+/** Growth Engine S1-C/S1-F — map template editor state to share page render model (client-safe). */
 
+import {
+  applySharePageTemplateMergeFields,
+} from "@/lib/growth/share-pages/share-page-template-instantiation-compile"
+import type {
+  GrowthSharePageTemplatePreviewContext,
+} from "@/lib/growth/share-pages/share-page-template-preview-context"
+import {
+  buildSharePageTemplatePreviewMergeValues,
+  DEFAULT_GROWTH_SHARE_PAGE_TEMPLATE_PREVIEW_CONTEXT,
+} from "@/lib/growth/share-pages/share-page-template-preview-context"
+import type { GrowthSharePageTemplateBlock } from "@/lib/growth/share-pages/share-page-template-block-types"
+import type { GrowthMediaVideoOverlaySpec } from "@/lib/growth/media/media-video-overlay-types"
+import type { GrowthSharePageTemplateVideoAiVideoSettings } from "@/lib/growth/share-pages/share-page-template-block-types"
+import { isTemplateBlockEnabled } from "@/lib/growth/share-pages/share-page-template-editor-utils"
 import type {
   GrowthSharePageCTA,
   GrowthSharePageRenderModel,
   GrowthSharePageTheme,
 } from "@/lib/growth/share-pages/share-page-types"
-import type { GrowthSharePageTemplateBlock } from "@/lib/growth/share-pages/share-page-template-block-types"
-import { isTemplateBlockEnabled } from "@/lib/growth/share-pages/share-page-template-editor-utils"
 import { DEFAULT_GROWTH_SHARE_PAGE_THEME } from "@/lib/growth/share-pages/share-page-types"
 
 export type GrowthSharePageTemplatePreviewBlock = {
@@ -14,6 +26,14 @@ export type GrowthSharePageTemplatePreviewBlock = {
   type: GrowthSharePageTemplateBlock["type"]
   label: string
   detail?: string
+  heading?: string | null
+  layout?: "wide" | "compact"
+  showTranscript?: boolean
+  videoAssetId?: string | null
+  thumbnailPreviewUrl?: string | null
+  overlaySpec?: GrowthMediaVideoOverlaySpec | null
+  aiVideo?: GrowthSharePageTemplateVideoAiVideoSettings | null
+  ctaLabel?: string
 }
 
 export type GrowthSharePageTemplatePreviewModel = {
@@ -21,21 +41,54 @@ export type GrowthSharePageTemplatePreviewModel = {
   extraBlocks: GrowthSharePageTemplatePreviewBlock[]
 }
 
+function applyPreviewMergeToBlock(
+  block: GrowthSharePageTemplateBlock,
+  mergeValues: Record<string, string>,
+): GrowthSharePageTemplateBlock {
+  const clone = structuredClone(block) as GrowthSharePageTemplateBlock & Record<string, unknown>
+
+  function walk(value: unknown): unknown {
+    if (typeof value === "string") return applySharePageTemplateMergeFields(value, mergeValues)
+    if (Array.isArray(value)) return value.map(walk)
+    if (value && typeof value === "object") {
+      const next: Record<string, unknown> = {}
+      for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+        next[key] = walk(nested)
+      }
+      return next
+    }
+    return value
+  }
+
+  return walk(clone) as GrowthSharePageTemplateBlock
+}
+
 export function mapTemplateEditorToRenderModel(input: {
   blocks: GrowthSharePageTemplateBlock[]
   theme: GrowthSharePageTheme
-  prospectName: string
-  companyName: string
+  previewContext?: GrowthSharePageTemplatePreviewContext
+  prospectName?: string
+  companyName?: string
   defaultBookingPageId?: string | null
   bookingSlug?: string | null
 }): GrowthSharePageTemplatePreviewModel {
-  const activeBlocks = input.blocks.filter(isTemplateBlockEnabled)
+  const previewContext: GrowthSharePageTemplatePreviewContext = input.previewContext ?? {
+    ...DEFAULT_GROWTH_SHARE_PAGE_TEMPLATE_PREVIEW_CONTEXT,
+    prospectName: input.prospectName ?? DEFAULT_GROWTH_SHARE_PAGE_TEMPLATE_PREVIEW_CONTEXT.prospectName,
+    companyName: input.companyName ?? DEFAULT_GROWTH_SHARE_PAGE_TEMPLATE_PREVIEW_CONTEXT.companyName,
+  }
+  const mergeValues = buildSharePageTemplatePreviewMergeValues(previewContext)
+  const activeBlocks = input.blocks
+    .filter(isTemplateBlockEnabled)
+    .map((block) => applyPreviewMergeToBlock(block, mergeValues))
+    .sort((a, b) => a.order - b.order)
+
   const theme = { ...DEFAULT_GROWTH_SHARE_PAGE_THEME, ...input.theme }
   if (theme.logoUrl && activeBlocks.some((block) => block.type === "hero" && block.showLogo === false)) {
     theme.logoUrl = null
   }
 
-  let headline = `A note for ${input.companyName}`
+  let headline = `A note for ${previewContext.companyName}`
   let subheadline: string | null = null
   let heroMessage = ""
   let whyReachingOut: string | null = null
@@ -108,29 +161,52 @@ export function mapTemplateEditorToRenderModel(input: {
         })
         break
       case "video_placeholder":
+        extraBlocks.push({
+          id: block.id,
+          type: block.type,
+          label: block.placeholderLabel,
+          heading: block.heading,
+          layout: block.layout ?? "wide",
+          videoAssetId: block.videoAssetId ?? block.mediaAssetRef ?? null,
+          overlaySpec: block.settings?.overlaySpec ?? null,
+          aiVideo: block.settings?.aiVideo ?? null,
+        })
+        break
       case "voice_placeholder":
+        extraBlocks.push({
+          id: block.id,
+          type: block.type,
+          label: block.placeholderLabel,
+          heading: block.heading,
+          showTranscript: block.showTranscript,
+        })
+        break
       case "media_cta_placeholder":
         extraBlocks.push({
           id: block.id,
           type: block.type,
-          label:
-            block.type === "media_cta_placeholder"
-              ? block.ctaLabel || block.placeholderLabel
-              : block.placeholderLabel,
-          detail: block.heading ?? undefined,
+          label: block.placeholderLabel,
+          heading: block.heading,
+          ctaLabel: block.ctaLabel,
         })
         break
     }
   }
 
+  const bookingSlug = input.bookingSlug ?? null
+  const bookingLinkOverride = previewContext.bookingLinkOverride.trim()
   const booking =
-    bookingPageId || input.bookingSlug
+    bookingPageId || bookingSlug || bookingLinkOverride
       ? {
           bookingPageId: bookingPageId ?? "preview-booking-page",
-          slug: input.bookingSlug ?? "preview-booking",
+          slug: bookingSlug ?? "preview-booking",
           name: "Book a meeting",
-          bookingUrl: input.bookingSlug ? `/book/${input.bookingSlug}` : "/book/preview-booking",
-          embedUrl: input.bookingSlug ? `/book/${input.bookingSlug}?embed=1` : "/book/preview-booking?embed=1",
+          bookingUrl: bookingLinkOverride || (bookingSlug ? `/book/${bookingSlug}` : "/book/preview-booking"),
+          embedUrl: bookingLinkOverride
+            ? `${bookingLinkOverride}${bookingLinkOverride.includes("?") ? "&" : "?"}embed=1`
+            : bookingSlug
+              ? `/book/${bookingSlug}?embed=1`
+              : "/book/preview-booking?embed=1",
           disabled: true,
         }
       : null
@@ -139,8 +215,8 @@ export function mapTemplateEditorToRenderModel(input: {
     renderModel: {
       sharePageId: "template-preview",
       publicToken: null,
-      prospectName: input.prospectName,
-      companyName: input.companyName,
+      prospectName: previewContext.prospectName,
+      companyName: previewContext.companyName,
       headline,
       subheadline,
       heroMessage,

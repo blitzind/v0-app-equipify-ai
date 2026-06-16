@@ -5,6 +5,9 @@ import "server-only"
 import { randomUUID } from "node:crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import {
+  instantiateSharePageFromTemplate,
+} from "@/lib/growth/share-pages/share-page-template-instantiation"
+import {
   archiveTemplate,
   createTemplate,
   duplicateTemplate,
@@ -68,6 +71,90 @@ async function resolveCertOrganizationId(admin: SupabaseClient): Promise<string 
 
 async function cleanupCertTemplate(admin: SupabaseClient, templateId: string): Promise<void> {
   await admin.schema("growth").from("share_page_templates").delete().eq("id", templateId)
+}
+
+async function cleanupCertSharePage(admin: SupabaseClient, sharePageId: string): Promise<void> {
+  await admin.schema("growth").from("share_pages").delete().eq("id", sharePageId)
+}
+
+async function resolveCertLeadId(admin: SupabaseClient): Promise<string | null> {
+  const { data, error } = await admin
+    .schema("growth")
+    .from("leads")
+    .select("id")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (error || !data?.id) return null
+  return data.id
+}
+
+async function runInstantiationDiagnostics(
+  admin: SupabaseClient,
+  organizationId: string,
+  checks: GrowthSharePageTemplatesDiagnosticsCheck[],
+): Promise<void> {
+  const leadId = await resolveCertLeadId(admin)
+  if (!leadId) {
+    pushCheck(checks, "instantiate_lead_scope", false, "Could not resolve certification lead id.")
+    return
+  }
+  pushCheck(checks, "instantiate_lead_scope", true, "Certification lead resolved.")
+
+  const instantiateName = `${CERT_PREFIX}-instantiate-${randomUUID()}`
+  const template = await createTemplate(admin, {
+    organizationId,
+    name: instantiateName,
+    tags: [CERT_PREFIX, `${CERT_PREFIX}-instantiate`],
+    changeSummary: "S1-E negative instantiate cert",
+  })
+  await publishVersion(admin, { templateId: template.id, actorUserId: null })
+
+  const draftOnly = await createTemplate(admin, {
+    organizationId,
+    name: `${instantiateName}-draft-only`,
+    tags: [CERT_PREFIX],
+    changeSummary: "Draft-only negative cert",
+  })
+  let rejectedUnpublished = false
+  try {
+    await instantiateSharePageFromTemplate(admin, {
+      templateId: draftOnly.id,
+      organizationId,
+      leadId,
+      buildContext: false,
+    })
+  } catch (error) {
+    rejectedUnpublished = error instanceof Error && error.message === "template_not_published"
+  }
+  pushCheck(
+    checks,
+    "instantiate_reject_unpublished",
+    rejectedUnpublished,
+    "Unpublished templates are rejected for instantiation.",
+  )
+
+  let rejectedMissingLead = false
+  try {
+    await instantiateSharePageFromTemplate(admin, {
+      templateId: template.id,
+      organizationId,
+      leadId: randomUUID(),
+      buildContext: false,
+    })
+  } catch (error) {
+    rejectedMissingLead = error instanceof Error && error.message === "lead_not_found"
+  }
+  pushCheck(
+    checks,
+    "instantiate_reject_missing_lead",
+    rejectedMissingLead,
+    "Missing lead id is rejected cleanly.",
+  )
+
+  await cleanupCertTemplate(admin, template.id)
+  await cleanupCertTemplate(admin, draftOnly.id)
+  pushCheck(checks, "instantiate_cleanup", true, "Instantiation negative cert fixtures deleted.")
 }
 
 async function runRepositoryDiagnostics(
@@ -174,6 +261,42 @@ async function runRepositoryDiagnostics(
     "Draft version republished successfully.",
   )
 
+  const leadId = await resolveCertLeadId(admin)
+  let lifecycleSharePageId: string | null = null
+  if (!leadId) {
+    pushCheck(checks, "lifecycle_instantiate_lead", false, "Could not resolve lead for lifecycle instantiation.")
+  } else {
+    pushCheck(checks, "lifecycle_instantiate_lead", true, "Lifecycle lead resolved.")
+    const instantiated = await instantiateSharePageFromTemplate(admin, {
+      templateId: created.id,
+      organizationId,
+      leadId,
+      buildContext: false,
+    })
+    lifecycleSharePageId = instantiated.sharePage.id
+    pushCheck(
+      checks,
+      "lifecycle_instantiate_draft",
+      instantiated.sharePage.status === "draft" && instantiated.sharePage.publishedAt == null,
+      "Lifecycle instantiation created draft share page only.",
+    )
+    pushCheck(
+      checks,
+      "lifecycle_lineage",
+      instantiated.sharePage.sharePageTemplateId === created.id &&
+        instantiated.sharePage.sharePageTemplateVersionId === republished.publishedVersionId &&
+        Array.isArray(instantiated.sharePage.templateBlocksSnapshot) &&
+        (instantiated.sharePage.templateBlocksSnapshot as unknown[]).length > 0,
+      "Lifecycle preserves template lineage and block snapshot.",
+    )
+    pushCheck(
+      checks,
+      "lifecycle_no_live_publish",
+      instantiated.noLivePagePublish === true,
+      "Lifecycle instantiation preserves no-live-page guard.",
+    )
+  }
+
   const unpublished = await unpublishTemplate(admin, created.id)
   pushCheck(
     checks,
@@ -231,7 +354,19 @@ async function runRepositoryDiagnostics(
 
   await cleanupCertTemplate(admin, created.id)
   await cleanupCertTemplate(admin, duplicate.id)
+  if (lifecycleSharePageId) {
+    await cleanupCertSharePage(admin, lifecycleSharePageId)
+  }
   pushCheck(checks, "cleanup", true, "Cert fixtures deleted.")
+
+  pushCheck(
+    checks,
+    "lifecycle_end_to_end",
+    checks.some((check) => check.id === "lifecycle_instantiate_draft" && check.ok),
+    "Create → edit → version → publish → instantiate → archive lifecycle certified.",
+  )
+
+  await runInstantiationDiagnostics(admin, organizationId, checks)
 
   return { templateId: created.id }
 }

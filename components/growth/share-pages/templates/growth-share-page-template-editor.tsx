@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Archive, Copy, Eye, FilePlus2, Loader2, Save, Send, Undo2 } from "lucide-react"
+import { Archive, Copy, Eye, FilePlus2, Loader2, Save, Send, Sparkles, Undo2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import { GrowthSharePageTemplateCanvas } from "@/components/growth/share-pages/templates/growth-share-page-template-canvas"
 import { GrowthSharePageTemplatePublishDialog } from "@/components/growth/share-pages/templates/growth-share-page-template-publish-dialog"
+import { GrowthSharePageTemplateInstantiateDialog } from "@/components/growth/share-pages/templates/growth-share-page-template-instantiate-dialog"
 import { GrowthSharePageTemplateSectionPalette } from "@/components/growth/share-pages/templates/growth-share-page-template-section-palette"
 import { GrowthSharePageTemplateSettingsPanel } from "@/components/growth/share-pages/templates/growth-share-page-template-settings-panel"
 import { GrowthSharePageTemplateVersionTimeline } from "@/components/growth/share-pages/templates/growth-share-page-template-version-timeline"
@@ -94,6 +95,7 @@ export function GrowthSharePageTemplateEditor({
   const [message, setMessage] = useState<string | null>(null)
   const [publishSummary, setPublishSummary] = useState("")
   const [showPublishDialog, setShowPublishDialog] = useState(false)
+  const [showInstantiateDialog, setShowInstantiateDialog] = useState(false)
   const savedSnapshotRef = useRef(serializeDraft(draft))
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -507,6 +509,12 @@ export function GrowthSharePageTemplateEditor({
             Publish template
           </Button>
           {template?.status === "published" ? (
+            <Button variant="secondary" size="sm" disabled={workflowBusy} onClick={() => setShowInstantiateDialog(true)}>
+              <Sparkles className="mr-1.5 size-3.5" />
+              Use template
+            </Button>
+          ) : null}
+          {template?.status === "published" ? (
             <Button variant="outline" size="sm" disabled={workflowBusy} onClick={() => void unpublishTemplate()}>
               <Undo2 className="mr-1.5 size-3.5" />
               Unpublish
@@ -582,6 +590,14 @@ export function GrowthSharePageTemplateEditor({
         publishing={publishing}
         onConfirm={() => void publishTemplate()}
       />
+
+      {template ? (
+        <GrowthSharePageTemplateInstantiateDialog
+          open={showInstantiateDialog}
+          onOpenChange={setShowInstantiateDialog}
+          template={template}
+        />
+      ) : null}
     </div>
   )
 }

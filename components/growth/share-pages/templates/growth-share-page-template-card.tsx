@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Archive, Copy, Eye, Pencil } from "lucide-react"
+import { Archive, Copy, Eye, Pencil, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import type { GrowthSharePageTemplate } from "@/lib/growth/share-pages/share-page-template-types"
@@ -41,11 +41,13 @@ export function GrowthSharePageTemplateCard({
   template,
   onDuplicate,
   onArchive,
+  onUseTemplate,
   busy,
 }: {
   template: GrowthSharePageTemplate
   onDuplicate: (template: GrowthSharePageTemplate) => void
   onArchive: (template: GrowthSharePageTemplate) => void
+  onUseTemplate?: (template: GrowthSharePageTemplate) => void
   busy?: boolean
 }) {
   const hasPublishedPointer = Boolean(template.publishedVersion)
@@ -112,6 +114,12 @@ export function GrowthSharePageTemplateCard({
             Preview
           </Link>
         </Button>
+        {template.status === "published" && onUseTemplate ? (
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => onUseTemplate(template)}>
+            <Sparkles className="mr-1.5 size-3.5" />
+            Use template
+          </Button>
+        ) : null}
         <Button size="sm" variant="outline" disabled={busy} onClick={() => onDuplicate(template)}>
           <Copy className="mr-1.5 size-3.5" />
           Duplicate

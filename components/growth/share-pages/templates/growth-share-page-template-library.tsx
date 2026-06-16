@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
 import { GrowthSharePageTemplateCard } from "@/components/growth/share-pages/templates/growth-share-page-template-card"
+import { GrowthSharePageTemplateInstantiateDialog } from "@/components/growth/share-pages/templates/growth-share-page-template-instantiate-dialog"
 import {
   sortTemplates,
   type GrowthSharePageTemplateSortKey,
@@ -36,6 +37,7 @@ export function GrowthSharePageTemplateLibrary() {
   const [categoryFilter, setCategoryFilter] = useState<string>("")
   const [tagFilter, setTagFilter] = useState("")
   const [sortKey, setSortKey] = useState<GrowthSharePageTemplateSortKey>("updated_at")
+  const [instantiateTemplate, setInstantiateTemplate] = useState<GrowthSharePageTemplate | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -200,6 +202,7 @@ export function GrowthSharePageTemplateLibrary() {
                 busy={busyId === template.id}
                 onDuplicate={(entry) => void duplicateTemplate(entry)}
                 onArchive={(entry) => void archiveTemplate(entry)}
+                onUseTemplate={setInstantiateTemplate}
               />
             ))}
           </div>
@@ -211,6 +214,16 @@ export function GrowthSharePageTemplateLibrary() {
           <LayoutTemplate className="mx-auto size-8 text-muted-foreground" />
           <p className="mt-3 text-sm text-muted-foreground">Templates you publish here stay in the library until instantiated.</p>
         </div>
+      ) : null}
+
+      {instantiateTemplate ? (
+        <GrowthSharePageTemplateInstantiateDialog
+          open={Boolean(instantiateTemplate)}
+          onOpenChange={(open) => {
+            if (!open) setInstantiateTemplate(null)
+          }}
+          template={instantiateTemplate}
+        />
       ) : null}
     </div>
   )

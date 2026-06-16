@@ -16,6 +16,14 @@ export const GROWTH_SHARE_PAGE_TEMPLATES_QA_MARKER = "growth-share-page-template
 export const GROWTH_SHARE_PAGE_TEMPLATE_VERSIONING_QA_MARKER =
   "growth-share-page-template-versioning-s1d-v1" as const
 
+export const GROWTH_SHARE_PAGE_TEMPLATE_INSTANTIATION_QA_MARKER =
+  "growth-share-page-template-instantiation-s1e-v1" as const
+
+export { GROWTH_SHARE_PAGE_TEMPLATE_PREVIEW_QA_MARKER } from "@/lib/growth/share-pages/share-page-template-preview-context"
+
+export const GROWTH_SHARE_PAGE_TEMPLATE_INSTANTIATION_MIGRATION =
+  "20270827120600_growth_share_page_template_lineage_s1e.sql" as const
+
 export const GROWTH_SHARE_PAGE_TEMPLATES_CONFIRM = "RUN_GROWTH_SHARE_PAGE_TEMPLATES_CERTIFICATION" as const
 
 export const GROWTH_SHARE_PAGE_TEMPLATES_MIGRATION =

@@ -35,7 +35,7 @@ import {
 } from "@/lib/growth/share-pages/share-page-types"
 
 const PAGE_SELECT =
-  "id, organization_id, lead_id, company_id, campaign_id, enrollment_id, sequence_step_id, sequence_enrollment_step_id, sequence_execution_job_id, source_channel, status, token_prefix, published_at, expires_at, revoked_at, archived_at, first_viewed_at, last_viewed_at, max_views, engagement_summary, personalization_snapshot, personalization_context_version, sources_used, evidence_coverage_score, theme, headline, subheadline, hero_message, why_reaching_out, company_observations, cta_config, resources, booking_page_id, hero_media_type, hero_media_url, hero_media_thumbnail_url, voice_asset_id, video_asset_id, created_by, approved_by, approved_at, requires_human_review, created_at, updated_at"
+  "id, organization_id, lead_id, company_id, campaign_id, enrollment_id, sequence_step_id, sequence_enrollment_step_id, sequence_execution_job_id, source_channel, status, token_prefix, published_at, expires_at, revoked_at, archived_at, first_viewed_at, last_viewed_at, max_views, engagement_summary, personalization_snapshot, personalization_context_version, sources_used, evidence_coverage_score, theme, headline, subheadline, hero_message, why_reaching_out, company_observations, cta_config, resources, booking_page_id, hero_media_type, hero_media_url, hero_media_thumbnail_url, voice_asset_id, video_asset_id, share_page_template_id, share_page_template_version_id, template_blocks_snapshot, created_by, approved_by, approved_at, requires_human_review, created_at, updated_at"
 
 const VIEW_SELECT =
   "id, share_page_id, lead_id, session_key, visitor_fingerprint_hash, started_at, last_activity_at, ended_at, duration_ms, max_scroll_depth_pct, page_url, referrer, utm, device_metadata, enrollment_id, sequence_enrollment_step_id, sequence_step_id, sequence_execution_job_id, created_at, updated_at"
@@ -82,6 +82,9 @@ type SharePageRow = {
   hero_media_thumbnail_url: string | null
   voice_asset_id: string | null
   video_asset_id: string | null
+  share_page_template_id: string | null
+  share_page_template_version_id: string | null
+  template_blocks_snapshot: unknown
   created_by: string | null
   approved_by: string | null
   approved_at: string | null
@@ -217,6 +220,13 @@ function mapPage(row: SharePageRow): GrowthSharePage {
     heroMediaThumbnailUrl: row.hero_media_thumbnail_url,
     voiceAssetId: row.voice_asset_id,
     videoAssetId: row.video_asset_id,
+    sharePageTemplateId: row.share_page_template_id ?? null,
+    sharePageTemplateVersionId: row.share_page_template_version_id ?? null,
+    templateBlocksSnapshot: Array.isArray(row.template_blocks_snapshot)
+      ? row.template_blocks_snapshot
+      : row.template_blocks_snapshot && typeof row.template_blocks_snapshot === "object"
+        ? (row.template_blocks_snapshot as Record<string, unknown>)
+        : null,
     createdBy: row.created_by,
     approvedBy: row.approved_by,
     approvedAt: row.approved_at,
@@ -340,6 +350,9 @@ export async function createSharePage(
       hero_media_thumbnail_url: input.heroMediaThumbnailUrl ?? null,
       voice_asset_id: input.voiceAssetId ?? null,
       video_asset_id: input.videoAssetId ?? null,
+      share_page_template_id: input.sharePageTemplateId ?? null,
+      share_page_template_version_id: input.sharePageTemplateVersionId ?? null,
+      template_blocks_snapshot: input.templateBlocksSnapshot ?? null,
       created_by: input.createdBy ?? null,
       requires_human_review: true,
       qa_marker: GROWTH_SHARE_PAGES_QA_MARKER,

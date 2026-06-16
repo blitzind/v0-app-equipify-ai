@@ -1,59 +1,79 @@
 "use client"
 
 import { GrowthSharePageView } from "@/components/growth/share-pages/growth-share-page-view"
-import { mapTemplateEditorToRenderModel } from "@/lib/growth/share-pages/share-page-template-render-model"
+import { GrowthSharePageTemplatePlaceholderPanel } from "@/components/growth/share-pages/templates/growth-share-page-template-placeholder-panel"
+import { shouldEmitGrowthMediaPlaybackAnalytics } from "@/hooks/growth/use-growth-media-playback-analytics"
+import type { GrowthSharePageTemplatePreviewContext } from "@/lib/growth/share-pages/share-page-template-preview-context"
+import {
+  buildSharePageTemplatePreviewMergeValues,
+  DEFAULT_GROWTH_SHARE_PAGE_TEMPLATE_PREVIEW_CONTEXT,
+  GROWTH_SHARE_PAGE_TEMPLATE_PREVIEW_VIEWPORT_WIDTH,
+  type GrowthSharePageTemplatePreviewViewport,
+} from "@/lib/growth/share-pages/share-page-template-preview-context"
 import type { GrowthSharePageTemplateEditorDraft } from "@/lib/growth/share-pages/share-page-template-editor-utils"
+import { mapTemplateEditorToRenderModel } from "@/lib/growth/share-pages/share-page-template-render-model"
 import { cn } from "@/lib/utils"
 
-export type GrowthSharePageTemplatePreviewViewport = "desktop" | "tablet" | "mobile"
-
-const VIEWPORT_WIDTH: Record<GrowthSharePageTemplatePreviewViewport, string> = {
-  desktop: "max-w-5xl",
-  tablet: "max-w-3xl",
-  mobile: "max-w-sm",
-}
+export type { GrowthSharePageTemplatePreviewViewport } from "@/lib/growth/share-pages/share-page-template-preview-context"
+export { GROWTH_SHARE_PAGE_TEMPLATE_PREVIEW_VIEWPORT_WIDTH } from "@/lib/growth/share-pages/share-page-template-preview-context"
 
 export function GrowthSharePageTemplatePreviewRenderer({
   draft,
   viewport,
+  previewContext,
   prospectName,
   companyName,
   bookingSlug,
 }: {
   draft: GrowthSharePageTemplateEditorDraft
   viewport: GrowthSharePageTemplatePreviewViewport
-  prospectName: string
-  companyName: string
+  previewContext?: GrowthSharePageTemplatePreviewContext
+  prospectName?: string
+  companyName?: string
   bookingSlug?: string | null
 }) {
   const preview = mapTemplateEditorToRenderModel({
     blocks: draft.blocks,
     theme: draft.theme,
+    previewContext,
     prospectName,
     companyName,
     defaultBookingPageId: draft.defaultBookingPageId,
     bookingSlug: bookingSlug ?? null,
   })
 
+  const analyticsPreviewMode = previewContext?.analyticsPreviewMode ?? true
+  const resolvedPreviewContext = previewContext ?? {
+    ...DEFAULT_GROWTH_SHARE_PAGE_TEMPLATE_PREVIEW_CONTEXT,
+    prospectName: prospectName ?? DEFAULT_GROWTH_SHARE_PAGE_TEMPLATE_PREVIEW_CONTEXT.prospectName,
+    companyName: companyName ?? DEFAULT_GROWTH_SHARE_PAGE_TEMPLATE_PREVIEW_CONTEXT.companyName,
+  }
+  const mergeValues = buildSharePageTemplatePreviewMergeValues(resolvedPreviewContext)
+  const analyticsEmitBlocked = !shouldEmitGrowthMediaPlaybackAnalytics({
+    assetId: preview.extraBlocks.find((block) => block.videoAssetId)?.videoAssetId ?? "",
+    analyticsPreviewMode,
+    trackingToken: null,
+    enabled: true,
+  })
+
   return (
     <div className="space-y-4">
-      <div className={cn("mx-auto w-full transition-all", VIEWPORT_WIDTH[viewport])}>
+      <p className="text-xs text-muted-foreground">
+        Template preview analytics: {analyticsPreviewMode ? "disabled (analyticsPreviewMode)" : "enabled"} —{" "}
+        {analyticsEmitBlocked ? "no playback analytics events emitted" : "hook-ready only"}
+      </p>
+      <div className={cn("mx-auto w-full transition-all", GROWTH_SHARE_PAGE_TEMPLATE_PREVIEW_VIEWPORT_WIDTH[viewport])}>
         <GrowthSharePageView model={preview.renderModel} />
       </div>
 
       {preview.extraBlocks.length > 0 ? (
-        <div className={cn("mx-auto w-full space-y-3", VIEWPORT_WIDTH[viewport])}>
+        <div className={cn("mx-auto w-full space-y-3", GROWTH_SHARE_PAGE_TEMPLATE_PREVIEW_VIEWPORT_WIDTH[viewport])}>
           {preview.extraBlocks.map((block) => (
-            <div
+            <GrowthSharePageTemplatePlaceholderPanel
               key={block.id}
-              className="rounded-xl border border-dashed border-amber-300 bg-amber-50/80 p-4 text-sm dark:border-amber-700 dark:bg-amber-950/40"
-            >
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-800 dark:text-amber-200">
-                {block.type.replace(/_/g, " ")}
-              </p>
-              <p className="mt-1 font-medium text-amber-950 dark:text-amber-100">{block.label}</p>
-              {block.detail ? <p className="mt-2 text-amber-900/80 dark:text-amber-100/80">{block.detail}</p> : null}
-            </div>
+              block={block}
+              mergeValues={mergeValues}
+            />
           ))}
         </div>
       ) : null}

@@ -4,12 +4,21 @@ import { useMemo, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { GrowthSharePageTemplatePreviewRenderer, type GrowthSharePageTemplatePreviewViewport } from "@/components/growth/share-pages/templates/growth-share-page-template-preview-renderer"
+import {
+  GrowthSharePageTemplatePreviewContextPanel,
+} from "@/components/growth/share-pages/templates/growth-share-page-template-preview-context-panel"
+import {
+  GrowthSharePageTemplatePreviewRenderer,
+} from "@/components/growth/share-pages/templates/growth-share-page-template-preview-renderer"
+import type { GrowthSharePageTemplatePreviewViewport } from "@/lib/growth/share-pages/share-page-template-preview-context"
 import {
   createDefaultTemplateEditorDraft,
-  GROWTH_SHARE_PAGE_TEMPLATE_SAMPLE_CONTEXT,
   type GrowthSharePageTemplateEditorDraft,
 } from "@/lib/growth/share-pages/share-page-template-editor-utils"
+import {
+  DEFAULT_GROWTH_SHARE_PAGE_TEMPLATE_PREVIEW_CONTEXT,
+  type GrowthSharePageTemplatePreviewContext,
+} from "@/lib/growth/share-pages/share-page-template-preview-context"
 import type { GrowthSharePageTemplate } from "@/lib/growth/share-pages/share-page-template-types"
 
 function draftFromTemplate(template: GrowthSharePageTemplate): GrowthSharePageTemplateEditorDraft {
@@ -35,8 +44,9 @@ export function GrowthSharePageTemplatePreviewPage({
 }) {
   const draft = useMemo(() => draftFromTemplate(template), [template])
   const [viewport, setViewport] = useState<GrowthSharePageTemplatePreviewViewport>("desktop")
-  const [prospectName, setProspectName] = useState<string>(GROWTH_SHARE_PAGE_TEMPLATE_SAMPLE_CONTEXT.prospectName)
-  const [companyName, setCompanyName] = useState<string>(GROWTH_SHARE_PAGE_TEMPLATE_SAMPLE_CONTEXT.companyName)
+  const [previewContext, setPreviewContext] = useState<GrowthSharePageTemplatePreviewContext>(
+    DEFAULT_GROWTH_SHARE_PAGE_TEMPLATE_PREVIEW_CONTEXT,
+  )
 
   return (
     <div className="space-y-6">
@@ -61,26 +71,12 @@ export function GrowthSharePageTemplatePreviewPage({
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <input
-          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-          value={prospectName}
-          onChange={(e) => setProspectName(e.target.value)}
-          placeholder="Sample prospect name"
-        />
-        <input
-          className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-          value={companyName}
-          onChange={(e) => setCompanyName(e.target.value)}
-          placeholder="Sample company name"
-        />
-      </div>
+      <GrowthSharePageTemplatePreviewContextPanel context={previewContext} onChange={setPreviewContext} />
 
       <GrowthSharePageTemplatePreviewRenderer
         draft={draft}
         viewport={viewport}
-        prospectName={prospectName}
-        companyName={companyName}
+        previewContext={previewContext}
       />
     </div>
   )
