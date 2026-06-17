@@ -24,7 +24,7 @@ export function GrowthInboxCallActionLinks() {
   const callWorkspaceHref = growthWorkspaceCallWorkspaceHref({ leadId })
   const callbackHref = growthWorkspaceCallWorkspaceHref({ leadId, dialMode: "callback" })
   const voicemailHref = growthWorkspaceCallWorkspaceHref({ leadId, dialMode: "missed_callback" })
-  const coachingHref = growthWorkspaceCallsCoachingHref(leadId)
+  const coachingHref = growthWorkspaceCallsCoachingHref({ leadId })
   const callsHubHref = growthFeaturePath(pathname, "calls")
 
   return (

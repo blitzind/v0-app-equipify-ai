@@ -2,8 +2,13 @@
 
 import type { NativeCallWorkspaceSessionPublicView, NativeDialerQueueItemPublicView } from "@/lib/growth/native-dialer/native-dialer-types"
 import type { OperatorInboxItem } from "@/lib/growth/operator-inbox/operator-inbox-types"
-import { GROWTH_CALLS_HUB_WORKSPACE_HREF } from "@/lib/growth/hubs/growth-workspace-hub-paths"
+import {
+  growthWorkspaceCallWorkspaceHref,
+  growthWorkspaceCallsCoachingHref,
+} from "@/lib/growth/navigation/growth-call-notification-links"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
+
+export { growthWorkspaceCallWorkspaceHref, growthWorkspaceCallsCoachingHref }
 
 export const GROWTH_INBOX_CALL_COMMUNICATION_READ_MODEL_QA_MARKER =
   "growth-inbox-call-communication-read-model-v1" as const
@@ -55,26 +60,6 @@ export type GrowthInboxCallCommunicationItem = {
 
 export function isGrowthInboxCallQueueView(view: string): view is GrowthInboxCallQueueView {
   return (GROWTH_INBOX_CALL_QUEUE_VIEWS as readonly string[]).includes(view)
-}
-
-export function growthWorkspaceCallWorkspaceHref(input?: {
-  leadId?: string | null
-  phone?: string | null
-  queueItemId?: string | null
-  dialMode?: string | null
-}): string {
-  const params = new URLSearchParams()
-  if (input?.leadId) params.set("leadId", input.leadId)
-  if (input?.phone) params.set("phone", input.phone)
-  if (input?.queueItemId) params.set("queueItemId", input.queueItemId)
-  if (input?.dialMode) params.set("dialMode", input.dialMode)
-  const query = params.toString()
-  return query ? `${GROWTH_CALLS_HUB_WORKSPACE_HREF}?${query}` : GROWTH_CALLS_HUB_WORKSPACE_HREF
-}
-
-export function growthWorkspaceCallsCoachingHref(leadId?: string | null): string {
-  if (!leadId) return `${GROWTH_WORKSPACE_BASE_PATH}/calls/coaching`
-  return `${GROWTH_WORKSPACE_BASE_PATH}/calls/coaching?leadId=${encodeURIComponent(leadId)}`
 }
 
 function mapDialerQueueKind(item: NativeDialerQueueItemPublicView): GrowthInboxCallCommunicationKind {
@@ -150,7 +135,7 @@ export function adaptOperatorInboxCallItem(item: OperatorInboxItem): GrowthInbox
     priorityScore: item.confidence,
     occurredAt: item.occurred_at,
     ctaHref:
-      item.cta_href?.replace("/admin/growth/calls/workspace", GROWTH_CALLS_HUB_WORKSPACE_HREF) ??
+      item.cta_href?.replace("/admin/growth/calls/workspace", growthWorkspaceCallWorkspaceHref()) ??
       growthWorkspaceCallWorkspaceHref({ leadId: item.lead_id }),
     source: "operator_inbox",
     sourceRef: item.source_ref,

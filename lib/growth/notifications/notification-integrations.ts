@@ -3,6 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { emitGrowthNotification } from "@/lib/growth/notifications/emit-growth-notification"
 import { commandLeadFocusHref, commandOutreachHref } from "@/lib/growth/command/command-action-catalog"
+import { growthWorkspaceCallsCoachingHref } from "@/lib/growth/navigation/growth-call-notification-links"
 
 export async function emitGrowthLeadAssignedNotification(
   admin: SupabaseClient,
@@ -291,7 +292,10 @@ export async function emitGrowthCoachingSignalNotification(
     body: `${input.companyName}: ${input.signalKey.replace(/_/g, " ")} during live call.`,
     sourceSystem: "coaching",
     sourceId: `${input.sessionId}:${input.signalKey}`,
-    actionUrl: commandLeadFocusHref(input.leadId, "calls"),
+    actionUrl: growthWorkspaceCallsCoachingHref({
+      leadId: input.leadId,
+      callSessionId: input.sessionId,
+    }),
     metadata: { signalKey: input.signalKey, sessionId: input.sessionId },
   })
 }
@@ -314,7 +318,10 @@ export async function emitGrowthProviderRetryWarningNotification(
     body: `Live coaching provider retry attempt ${input.attempt} for this call.`,
     sourceSystem: "coaching",
     sourceId: input.sessionId,
-    actionUrl: commandLeadFocusHref(input.leadId, "calls"),
+    actionUrl: growthWorkspaceCallsCoachingHref({
+      leadId: input.leadId,
+      callSessionId: input.sessionId,
+    }),
     metadata: { providerId: input.providerId, attempt: input.attempt, sessionId: input.sessionId },
   })
 }

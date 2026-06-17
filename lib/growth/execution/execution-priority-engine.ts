@@ -1,4 +1,5 @@
 import { commandLeadFocusHref, commandOutreachHref, commandSequenceExecutionHref } from "@/lib/growth/command/command-action-catalog"
+import { growthWorkspaceCallsCoachingHref } from "@/lib/growth/navigation/growth-call-notification-links"
 import { growthWorkspaceInboxHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import type {
   ExecutionPrioritySignalsInput,
@@ -123,10 +124,10 @@ function resolveCta(ctx: ExecutionLeadContext): { label: string; href: string } 
     return { label: "Open meetings", href: "/admin/growth/meetings?view=followups_due" }
   }
   if (ctx.callOverallScore !== null && ctx.callOverallScore < 55) {
-    return { label: "Review call score", href: commandLeadFocusHref(ctx.id, "call-copilot") }
+    return { label: "Review call score", href: growthWorkspaceCallsCoachingHref({ leadId: ctx.id }) }
   }
   if (ctx.nextBestAction === "call_prospect" || ctx.nextBestAction === "start_call_copilot") {
-    return { label: "Start call copilot", href: commandLeadFocusHref(ctx.id, "call-copilot") }
+    return { label: "Start call copilot", href: growthWorkspaceCallsCoachingHref({ leadId: ctx.id }) }
   }
   if (ctx.nextBestAction === "run_research" || ctx.nextBestAction === "review_research") {
     return { label: "Run research", href: commandLeadFocusHref(ctx.id, "research") }

@@ -2,7 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { emitGrowthNotification } from "@/lib/growth/notifications/emit-growth-notification"
-import { nativeCallWorkspaceHref } from "@/lib/growth/native-dialer/native-dialer-navigation"
+import { growthCallNotificationActionHref, growthWorkspaceCallWorkspaceHref } from "@/lib/growth/navigation/growth-call-notification-links"
 import type { NativeCallWrapupPublicView, NativeDialerQueueItemPublicView } from "@/lib/growth/native-dialer/native-dialer-types"
 
 export async function emitNativeDialerNotifications(
@@ -22,7 +22,9 @@ export async function emitNativeDialerNotifications(
         body: `${companyName}: operator confirmed meeting booked — review follow-up plan.`,
         sourceSystem: "intelligence",
         sourceId: wrapup.id,
-        actionUrl: wrapup.leadId ? nativeCallWorkspaceHref({ leadId: wrapup.leadId }) : "/admin/growth/calls/workspace",
+        actionUrl: wrapup.leadId
+          ? growthWorkspaceCallWorkspaceHref({ leadId: wrapup.leadId })
+          : growthWorkspaceCallWorkspaceHref(),
         metadata: { sessionId: wrapup.sessionId },
       })
     }
@@ -39,7 +41,12 @@ export async function emitNativeDialerNotifications(
       body: `${item.companyName ?? "Lead"}: ${item.reason}`,
       sourceSystem: "intelligence",
       sourceId: item.id,
-      actionUrl: item.ctaHref,
+      actionUrl: growthCallNotificationActionHref({
+        notificationType: item.queueMode === "missed_callback" ? "missed_callback" : "callback_due",
+        leadId: item.leadId,
+        queueItemId: item.id,
+        phone: item.phoneNumber,
+      }),
       metadata: { queueMode: item.queueMode },
     })
     return
@@ -54,7 +61,12 @@ export async function emitNativeDialerNotifications(
       body: `${item.companyName ?? "Lead"}: ${item.reason}`,
       sourceSystem: "intelligence",
       sourceId: item.id,
-      actionUrl: item.ctaHref,
+      actionUrl: growthCallNotificationActionHref({
+        notificationType: "priority_call_ready",
+        leadId: item.leadId,
+        queueItemId: item.id,
+        phone: item.phoneNumber,
+      }),
       metadata: { priorityScore: item.priorityScore },
     })
   }

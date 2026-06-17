@@ -13,6 +13,7 @@ import {
   GROWTH_SEQUENCE_STEP_CHANNELS,
   type GrowthSequenceStepChannel,
 } from "@/lib/growth/sequence-types"
+import { growthWorkspaceLeadQueueHref } from "@/lib/growth/navigation/growth-call-notification-links"
 
 export function isCadenceEmailChannel(channel: GrowthSequenceStepChannel): boolean {
   return channel === GROWTH_CADENCE_EMAIL_CHANNEL
@@ -108,7 +109,7 @@ export function buildCadenceLinkedInDraft(input: {
 }
 
 export function cadenceCallQueueHref(leadId: string): string {
-  return `/admin/growth/leads/queue?highlight=${leadId}`
+  return growthWorkspaceLeadQueueHref(leadId)
 }
 
 export function cadenceLeadDrawerHref(leadId: string, focus?: string): string {

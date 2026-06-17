@@ -3,11 +3,19 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { emitGrowthNotification } from "@/lib/growth/notifications/emit-growth-notification"
 import type { GrowthCadenceTask, GrowthCadenceTaskChannel } from "@/lib/growth/cadence/cadence-types"
-import { cadenceCallQueueHref, cadenceLeadDrawerHref } from "@/lib/growth/cadence/cadence-channel-engine"
+import { cadenceLeadDrawerHref } from "@/lib/growth/cadence/cadence-channel-engine"
+import { growthCallNotificationActionHref } from "@/lib/growth/navigation/growth-call-notification-links"
 
 function cadenceTaskHref(task: Pick<GrowthCadenceTask, "leadId" | "channel">): string {
-  if (task.channel === "manual_call" || task.channel === "voicemail") {
-    return cadenceCallQueueHref(task.leadId)
+  if (task.channel === "manual_call") {
+    return growthCallNotificationActionHref({ notificationType: "manual_call_due", leadId: task.leadId })
+  }
+  if (task.channel === "voicemail") {
+    return growthCallNotificationActionHref({
+      notificationType: "voicemail",
+      leadId: task.leadId,
+      channel: "voicemail",
+    })
   }
   if (task.channel === "meeting_followup") {
     return cadenceLeadDrawerHref(task.leadId, "meetings")

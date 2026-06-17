@@ -1,8 +1,11 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { commandLeadFocusHref } from "@/lib/growth/command/command-action-catalog"
 import type { CallIntelligenceScorecardPublicView } from "@/lib/growth/call-intelligence/call-intelligence-types"
+import {
+  growthCallNotificationActionHref,
+  growthWorkspaceCallsCoachingHref,
+} from "@/lib/growth/navigation/growth-call-notification-links"
 import { emitGrowthNotification } from "@/lib/growth/notifications/emit-growth-notification"
 
 export type CallIntelligenceNotificationContext = {
@@ -22,7 +25,14 @@ export async function emitCallIntelligenceNotifications(
 ): Promise<void> {
   if (input.scorecard.metrics.incomplete) return
 
-  const actionUrl = commandLeadFocusHref(input.leadId, "call-copilot")
+  const coachingUrl = growthWorkspaceCallsCoachingHref({
+    leadId: input.leadId,
+    callSessionId: input.realtimeSessionId,
+  })
+  const followUpUrl = growthCallNotificationActionHref({
+    notificationType: "call_followup_due",
+    leadId: input.leadId,
+  })
 
   if (input.scorecard.overallScore < 45 || input.scorecard.riskLevel === "critical") {
     await emitGrowthNotification(admin, {
@@ -34,7 +44,7 @@ export async function emitCallIntelligenceNotifications(
       body: `${input.companyName} call scored ${input.scorecard.overallScore}/100. Review coaching opportunities.`,
       sourceSystem: "coaching",
       sourceId: input.scorecard.id,
-      actionUrl,
+      actionUrl: coachingUrl,
       metadata: { overallScore: input.scorecard.overallScore, riskLevel: input.scorecard.riskLevel },
     })
   }
@@ -49,7 +59,7 @@ export async function emitCallIntelligenceNotifications(
       body: `${input.companyName}: no clear next step commitment detected on the call.`,
       sourceSystem: "coaching",
       sourceId: input.scorecard.id,
-      actionUrl,
+      actionUrl: coachingUrl,
       metadata: { nextStepScore: input.scorecard.nextStepScore },
     })
   }
@@ -64,7 +74,7 @@ export async function emitCallIntelligenceNotifications(
       body: `${input.companyName}: competitor pressure detected during the conversation.`,
       sourceSystem: "coaching",
       sourceId: input.scorecard.id,
-      actionUrl,
+      actionUrl: coachingUrl,
       metadata: { competitorRiskScore: input.scorecard.competitorRiskScore },
     })
   }
@@ -79,7 +89,7 @@ export async function emitCallIntelligenceNotifications(
       body: `${input.companyName}: multiple objections need operator follow-up.`,
       sourceSystem: "coaching",
       sourceId: input.scorecard.id,
-      actionUrl,
+      actionUrl: coachingUrl,
       metadata: { objectionCount: input.scorecard.detectedObjections.length },
     })
   }
@@ -94,7 +104,7 @@ export async function emitCallIntelligenceNotifications(
       body: `${input.companyName} showed strong buying signals. Human review recommended.`,
       sourceSystem: "coaching",
       sourceId: input.scorecard.id,
-      actionUrl,
+      actionUrl: coachingUrl,
       metadata: { buyingSignalScore: input.scorecard.buyingSignalScore },
     })
   }
@@ -109,7 +119,7 @@ export async function emitCallIntelligenceNotifications(
       body: `${input.companyName}: ${input.scorecard.recommendedNextAction}.`,
       sourceSystem: "coaching",
       sourceId: input.scorecard.id,
-      actionUrl,
+      actionUrl: followUpUrl,
       metadata: { recommendedNextAction: input.scorecard.recommendedNextAction },
     })
   }
