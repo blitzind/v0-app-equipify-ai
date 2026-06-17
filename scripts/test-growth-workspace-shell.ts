@@ -199,9 +199,8 @@ function runAudit(): void {
     "opportunities-pipeline",
     "conversations",
     "relationships",
-    "reports",
-    "signals",
   ])
+  assert.ok(!GROWTH_SHELL_NAV_GROUPS.some((group) => group.id === "settings"), "settings group must not appear in workspace sidebar")
   assert.equal(
     intelligenceNav.items.find((item) => item.id === "opportunities")?.href,
     "/growth/opportunities",
@@ -210,7 +209,7 @@ function runAudit(): void {
     intelligenceNav.items.find((item) => item.id === "conversations")?.href,
     "/growth/conversations",
   )
-  console.log("  ✓ sidebar workspace nav coverage; intelligence Phase 4 routes surfaced")
+  console.log("  ✓ sidebar workspace nav coverage; operator-only IA (Phase 5A)")
 
   const inboxDiagnostics = GROWTH_ROUTE_METADATA.find((entry) => entry.id === "admin-inbox-diagnostics")
   assert.ok(inboxDiagnostics?.hidden)

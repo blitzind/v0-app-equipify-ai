@@ -49,14 +49,13 @@ import {
   validateGrowthWorkspaceShellNavRegistryParity,
 } from "../lib/growth/navigation/growth-workspace-shell-navigation"
 
-const CANONICAL_WORKSPACE_SHELL_GROUP_ORDER = ["workspace", "content", "automation", "intelligence", "settings"] as const
+const CANONICAL_WORKSPACE_SHELL_GROUP_ORDER = ["workspace", "content", "automation", "intelligence"] as const
 
 const CANONICAL_WORKSPACE_SHELL_GROUP_LABELS: Record<(typeof CANONICAL_WORKSPACE_SHELL_GROUP_ORDER)[number], string> = {
   workspace: "Workspace",
   content: "Content",
   automation: "Automation",
   intelligence: "Intelligence",
-  settings: "Settings",
 }
 
 const CANONICAL_WORKSPACE_SHELL_NAV_IDS = [
@@ -70,20 +69,11 @@ const CANONICAL_WORKSPACE_SHELL_NAV_IDS = [
   "media-assets",
   "templates",
   "automation-flows",
-  "approvals",
-  "runtime",
-  "analytics",
   "engagement",
   "opportunities",
   "opportunities-pipeline",
   "conversations",
   "relationships",
-  "reports",
-  "signals",
-  "providers",
-  "team",
-  "compliance",
-  "settings-home",
 ] as const
 
 /** Orphan IA audit routes that must stay out of workspace shell primary nav. */

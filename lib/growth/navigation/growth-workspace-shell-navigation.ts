@@ -1,14 +1,13 @@
 /**
- * Registry-backed Growth workspace shell navigation (Phase 2C).
+ * Registry-backed Growth workspace shell navigation (Phase 2C, IA cleanup Phase 5A).
  *
  * Visible sidebar items are defined by an explicit manifest — not all registry
- * candidates — to preserve current IA while resolving hrefs from route metadata.
+ * candidates — to prioritize daily operator routes while resolving hrefs from route metadata.
  */
 
 import type { LucideIcon } from "lucide-react"
 import {
   Activity,
-  BarChart3,
   FileText,
   GitBranch,
   Handshake,
@@ -19,14 +18,11 @@ import {
   Layers,
   MessageSquare,
   Phone,
-  Radio,
-  Settings,
-  Shield,
   Target,
-  TrendingUp,
   Users,
   Workflow,
 } from "lucide-react"
+import { GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS } from "@/lib/growth/navigation/growth-workspace-sidebar-ia"
 import {
   findGrowthRouteMetadataForHref,
   getGrowthRouteMetadataById,
@@ -36,7 +32,7 @@ import {
   GROWTH_WORKSPACE_BASE_PATH,
 } from "@/lib/growth/navigation/growth-route-metadata-types"
 
-export const GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER = "growth-workspace-shell-nav-v3" as const
+export const GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER = "growth-workspace-shell-nav-v4" as const
 
 /** Back-compat QA marker used by shell components. */
 export const GROWTH_SHELL_NAV_QA_MARKER = GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER
@@ -102,9 +98,6 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
     label: "Automation",
     items: [
       { id: "automation-flows", label: "Automation Flows", registryRouteId: "workspace-automation", icon: GitBranch, workspaceRoute: true },
-      { id: "approvals", label: "Approvals", registryRouteId: "admin-outreach-legacy-queue", icon: Shield },
-      { id: "runtime", label: "Runtime", registryRouteId: "workspace-automation", icon: Radio, workspaceRoute: true },
-      { id: "analytics", label: "Analytics", registryRouteId: "workspace-automation", icon: BarChart3, workspaceRoute: true },
     ],
   },
   {
@@ -122,21 +115,12 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
       },
       { id: "conversations", label: "Conversations", registryRouteId: "workspace-conversations", icon: MessageSquare, workspaceRoute: true },
       { id: "relationships", label: "Relationships", registryRouteId: "workspace-relationships", icon: Handshake, workspaceRoute: true },
-      { id: "reports", label: "Reports", registryRouteId: "admin-revenue-intelligence", icon: TrendingUp },
-      { id: "signals", label: "Signals", registryRouteId: "admin-intent-pixel", icon: Radio },
-    ],
-  },
-  {
-    id: "settings",
-    label: "Settings",
-    items: [
-      { id: "providers", label: "Providers", registryRouteId: "admin-providers", icon: Settings },
-      { id: "team", label: "Team", registryRouteId: "admin-ownership", icon: Users },
-      { id: "compliance", label: "Compliance", registryRouteId: "admin-providers-compliance", icon: Shield },
-      { id: "settings-home", label: "Settings", registryRouteId: "workspace-settings", icon: Settings, workspaceRoute: true },
     ],
   },
 ]
+
+/** Phase 5A operator sidebar ids — must match manifest item ids exactly. */
+export const GROWTH_WORKSPACE_SHELL_OPERATOR_NAV_IDS = GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS
 
 function resolveManifestHref(entry: GrowthWorkspaceShellNavManifestEntry): string {
   if (entry.hrefOverride) return entry.hrefOverride
@@ -175,8 +159,8 @@ export function buildGrowthWorkspaceShellNavGroups(): GrowthShellNavGroup[] {
 /** Canonical visible workspace shell navigation — registry-derived from manifest. */
 export const GROWTH_SHELL_NAV_GROUPS: GrowthShellNavGroup[] = buildGrowthWorkspaceShellNavGroups()
 
-/** Nav items that share another route's href until dedicated pages exist. */
-export const GROWTH_SHELL_NAV_SECONDARY_IDS = new Set(["runtime", "analytics"])
+/** Reserved for duplicate href targets; empty after Phase 5A sidebar IA cleanup. */
+export const GROWTH_SHELL_NAV_SECONDARY_IDS = new Set<string>()
 
 export function isGrowthShellNavItemActive(pathname: string, item: GrowthShellNavItem): boolean {
   if (GROWTH_SHELL_NAV_SECONDARY_IDS.has(item.id)) return false

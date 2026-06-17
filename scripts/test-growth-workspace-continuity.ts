@@ -25,10 +25,14 @@ import {
   isGrowthShellNavItemActive,
   GROWTH_SHELL_NAV_GROUPS,
 } from "../lib/growth/navigation/growth-workspace-shell-navigation"
+import {
+  GROWTH_WORKSPACE_SIDEBAR_HIDDEN_NAV_IDS,
+  GROWTH_WORKSPACE_SIDEBAR_IA_QA_MARKER,
+} from "../lib/growth/navigation/growth-workspace-sidebar-ia"
 import { growthFeaturePath } from "../lib/growth/navigation/growth-workspace-base-path"
 import { resolveGrowthBreadcrumbs } from "../lib/growth/navigation/growth-route-registry"
 
-export const GROWTH_WORKSPACE_CONTINUITY_QA_MARKER = "growth-workspace-continuity-v5" as const
+export const GROWTH_WORKSPACE_CONTINUITY_QA_MARKER = "growth-workspace-continuity-v6" as const
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, "..")
@@ -147,6 +151,14 @@ function readSource(relativePath: string): string {
 function runAudit(): void {
   console.log(`\n=== Growth workspace continuity audit (${GROWTH_WORKSPACE_CONTINUITY_QA_MARKER}) ===\n`)
   console.log(`  registry qa marker: ${GROWTH_ROUTE_METADATA_QA_MARKER}`)
+
+  console.log(`  sidebar ia qa marker: ${GROWTH_WORKSPACE_SIDEBAR_IA_QA_MARKER}`)
+
+  const workspaceNavIds = GROWTH_SHELL_NAV_GROUPS.flatMap((group) => group.items.map((item) => item.id))
+  for (const hiddenId of GROWTH_WORKSPACE_SIDEBAR_HIDDEN_NAV_IDS) {
+    assert.ok(!workspaceNavIds.includes(hiddenId), `workspace sidebar still exposes hidden nav id: ${hiddenId}`)
+  }
+  console.log("  ✓ workspace sidebar excludes config/admin/control-plane items (Phase 5A)")
 
   for (const { file, forbidden } of OPERATOR_CONTINUITY_SOURCES) {
     const source = readSource(file)
