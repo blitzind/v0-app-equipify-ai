@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { Loader2, PlayCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -37,12 +37,6 @@ export function GrowthAutomationSimulationPanel({ flowId, simulation, loading, o
       return null
     }
   }, [fixtureText])
-
-  useEffect(() => {
-    if (parsedFixture !== null) {
-      setFixtureError(null)
-    }
-  }, [parsedFixture])
 
   const handleRun = () => {
     if (!parsedFixture) {

@@ -11,6 +11,7 @@ import {
   type GrowthAutomationCanvasHistorySnapshot,
   type GrowthAutomationCanvasHistoryState,
 } from "@/lib/growth/automation/growth-automation-canvas-history"
+import { canvasSnapshotsEqual, cloneCanvasState } from "@/lib/growth/automation/growth-automation-canvas-utils"
 
 type HistoryContextValue = {
   snapshot: GrowthAutomationCanvasHistorySnapshot
@@ -35,7 +36,12 @@ export function GrowthAutomationHistoryProvider({
   )
 
   const setSnapshot = useCallback((next: GrowthAutomationCanvasHistorySnapshot, recordHistory = true) => {
-    setHistory((current) => (recordHistory ? pushHistoryState(current, next) : { ...current, present: next }))
+    setHistory((current) => {
+      if (canvasSnapshotsEqual(current.present, next)) return current
+      return recordHistory
+        ? pushHistoryState(current, next)
+        : { ...current, present: cloneCanvasState(next) }
+    })
   }, [])
 
   const undo = useCallback(() => {

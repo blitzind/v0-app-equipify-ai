@@ -42,7 +42,13 @@ import {
   importCanvasState,
   reactFlowToPersistence,
 } from "@/lib/growth/automation/growth-automation-canvas-serialization"
-import { cloneCanvasState, createCanvasNode, filterCanvasNodesBySearch } from "@/lib/growth/automation/growth-automation-canvas-utils"
+import {
+  canvasSnapshotsEqual,
+  cloneCanvasState,
+  createCanvasNode,
+  filterCanvasNodesBySearch,
+  sameSelectedNodeIds,
+} from "@/lib/growth/automation/growth-automation-canvas-utils"
 import {
   GROWTH_AUTOMATION_API_SAFETY_FLAGS,
   type GrowthAutomationEdge,
@@ -125,10 +131,33 @@ function CanvasEditorInner({
 
   const updateCanvas = useCallback(
     (nextNodes: AutomationCanvasNode[], nextEdges: AutomationCanvasEdge[], recordHistory = true) => {
+      if (canvasSnapshotsEqual({ nodes, edges }, { nodes: nextNodes, edges: nextEdges })) return
       setSnapshot({ nodes: nextNodes, edges: nextEdges }, recordHistory)
     },
-    [setSnapshot],
+    [edges, nodes, setSnapshot],
   )
+
+  const handleNodesChange = useCallback(
+    (nextNodes: AutomationCanvasNode[], options?: { recordHistory?: boolean }) => {
+      updateCanvas(nextNodes, edges, options?.recordHistory ?? true)
+    },
+    [edges, updateCanvas],
+  )
+
+  const handleEdgesChange = useCallback(
+    (nextEdges: AutomationCanvasEdge[], options?: { recordHistory?: boolean }) => {
+      updateCanvas(nodes, nextEdges, options?.recordHistory ?? true)
+    },
+    [nodes, updateCanvas],
+  )
+
+  const handleSelectionChange = useCallback(({ nodeIds }: { nodeIds: string[]; edgeIds: string[] }) => {
+    setSelectedNodeIds((current) => (sameSelectedNodeIds(current, nodeIds) ? current : nodeIds))
+  }, [])
+
+  const handleReactFlowInit = useCallback((instance: ReactFlowInstance) => {
+    reactFlowRef.current = instance
+  }, [])
 
   const addNode = useCallback(
     (nodeType: GrowthAutomationCanvasNodeType) => {
@@ -413,12 +442,10 @@ function CanvasEditorInner({
           edges={edges}
           readOnly={readOnly}
           defaultEdgeType={selectedEdgeType}
-          onNodesChange={(next) => updateCanvas(next, edges)}
-          onEdgesChange={(next) => updateCanvas(nodes, next)}
-          onSelectionChange={({ nodeIds }) => setSelectedNodeIds(nodeIds)}
-          onInit={(instance) => {
-            reactFlowRef.current = instance
-          }}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
+          onSelectionChange={handleSelectionChange}
+          onInit={handleReactFlowInit}
         />
 
         <div className="flex flex-col gap-4">

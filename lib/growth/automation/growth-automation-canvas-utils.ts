@@ -110,6 +110,57 @@ export function filterCanvasNodesBySearch(nodes: AutomationCanvasNode[], query: 
   })
 }
 
+function canvasNodeCompareKey(node: AutomationCanvasNode): string {
+  return JSON.stringify({
+    id: node.id,
+    type: node.type,
+    position: node.position,
+    width: node.width,
+    height: node.height,
+    data: node.data,
+  })
+}
+
+function canvasEdgeCompareKey(edge: AutomationCanvasEdge): string {
+  return JSON.stringify({
+    id: edge.id,
+    source: edge.source,
+    target: edge.target,
+    type: edge.type,
+    label: edge.label,
+    animated: edge.animated,
+    data: edge.data,
+  })
+}
+
+export function canvasSnapshotsEqual(
+  left: { nodes: AutomationCanvasNode[]; edges: AutomationCanvasEdge[] },
+  right: { nodes: AutomationCanvasNode[]; edges: AutomationCanvasEdge[] },
+): boolean {
+  if (left.nodes.length !== right.nodes.length || left.edges.length !== right.edges.length) return false
+
+  const leftNodes = [...left.nodes].sort((a, b) => a.id.localeCompare(b.id))
+  const rightNodes = [...right.nodes].sort((a, b) => a.id.localeCompare(b.id))
+  for (let index = 0; index < leftNodes.length; index += 1) {
+    if (canvasNodeCompareKey(leftNodes[index]!) !== canvasNodeCompareKey(rightNodes[index]!)) return false
+  }
+
+  const leftEdges = [...left.edges].sort((a, b) => a.id.localeCompare(b.id))
+  const rightEdges = [...right.edges].sort((a, b) => a.id.localeCompare(b.id))
+  for (let index = 0; index < leftEdges.length; index += 1) {
+    if (canvasEdgeCompareKey(leftEdges[index]!) !== canvasEdgeCompareKey(rightEdges[index]!)) return false
+  }
+
+  return true
+}
+
+export function sameSelectedNodeIds(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false
+  const sortedLeft = [...left].sort()
+  const sortedRight = [...right].sort()
+  return sortedLeft.every((id, index) => id === sortedRight[index])
+}
+
 export function cloneCanvasState<T extends { nodes: AutomationCanvasNode[]; edges: AutomationCanvasEdge[] }>(
   state: T,
 ): T {

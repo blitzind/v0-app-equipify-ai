@@ -29,13 +29,20 @@ import { createCanvasEdge } from "@/lib/growth/automation/growth-automation-canv
 const nodeTypes = { automation: GrowthAutomationNode }
 const edgeTypes = { automation: GrowthAutomationEdge }
 
+const INTERNAL_NODE_CHANGE_TYPES = new Set<NodeChange["type"]>(["dimensions", "select", "reset"])
+const INTERNAL_EDGE_CHANGE_TYPES = new Set<EdgeChange["type"]>(["select", "reset"])
+
+type CanvasChangeOptions = {
+  recordHistory?: boolean
+}
+
 type Props = {
   nodes: AutomationCanvasNode[]
   edges: AutomationCanvasEdge[]
   readOnly?: boolean
   defaultEdgeType?: GrowthAutomationCanvasEdgeType
-  onNodesChange?: (nodes: AutomationCanvasNode[]) => void
-  onEdgesChange?: (edges: AutomationCanvasEdge[]) => void
+  onNodesChange?: (nodes: AutomationCanvasNode[], options?: CanvasChangeOptions) => void
+  onEdgesChange?: (edges: AutomationCanvasEdge[], options?: CanvasChangeOptions) => void
   onSelectionChange?: (selection: { nodeIds: string[]; edgeIds: string[] }) => void
   onInit?: (instance: ReactFlowInstance) => void
 }
@@ -54,16 +61,30 @@ export function GrowthAutomationReactFlow({
 
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      if (readOnly) return
-      onNodesChange?.(applyNodeChanges(changes, nodes) as AutomationCanvasNode[])
+      if (readOnly || changes.length === 0) return
+
+      const semanticChanges = changes.filter((change) => !INTERNAL_NODE_CHANGE_TYPES.has(change.type))
+      if (semanticChanges.length === 0 && changes.every((change) => change.type === "select")) {
+        return
+      }
+
+      const nextNodes = applyNodeChanges(changes, nodes) as AutomationCanvasNode[]
+      onNodesChange?.(nextNodes, { recordHistory: semanticChanges.length > 0 })
     },
     [nodes, onNodesChange, readOnly],
   )
 
   const handleEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
-      if (readOnly) return
-      onEdgesChange?.(applyEdgeChanges(changes, edges) as AutomationCanvasEdge[])
+      if (readOnly || changes.length === 0) return
+
+      const semanticChanges = changes.filter((change) => !INTERNAL_EDGE_CHANGE_TYPES.has(change.type))
+      if (semanticChanges.length === 0 && changes.every((change) => change.type === "select")) {
+        return
+      }
+
+      const nextEdges = applyEdgeChanges(changes, edges) as AutomationCanvasEdge[]
+      onEdgesChange?.(nextEdges, { recordHistory: semanticChanges.length > 0 })
     },
     [edges, onEdgesChange, readOnly],
   )
@@ -94,6 +115,14 @@ export function GrowthAutomationReactFlow({
     [onSelectionChange],
   )
 
+  const handleInit = useCallback(
+    (instance: ReactFlowInstance) => {
+      void instance.fitView({ padding: 0.2 })
+      onInit?.(instance)
+    },
+    [onInit],
+  )
+
   return (
     <div className="h-[560px] w-full rounded-xl border border-border bg-muted/10">
       {nodes.length === 0 ? (
@@ -108,9 +137,7 @@ export function GrowthAutomationReactFlow({
           onEdgesChange={handleEdgesChange}
           onConnect={handleConnect}
           onSelectionChange={handleSelectionChange}
-          onInit={onInit}
-          fitView
-          fitViewOptions={{ padding: 0.2 }}
+          onInit={handleInit}
           deleteKeyCode={readOnly ? null : ["Backspace", "Delete"]}
           multiSelectionKeyCode={["Shift", "Meta", "Control"]}
           proOptions={proOptions}
