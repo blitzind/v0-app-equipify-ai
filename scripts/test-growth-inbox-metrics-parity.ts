@@ -156,6 +156,7 @@ function runAudit(): void {
   assert.match(aggregator, /GROWTH_WORKSPACE_BASE_PATH\}\/inbox\/workflow/)
   assert.match(aggregator, /GROWTH_WORKSPACE_BASE_PATH\}\/inbox\?threadId=/)
   assert.doesNotMatch(aggregator, /\/admin\/growth\/inbox\?threadId=/)
+  assert.doesNotMatch(aggregator, /\/admin\/growth\/command\?leadId=/)
   console.log("  ✓ operator inbox CTAs use workspace inbox paths")
 
   console.log("\n=== Growth inbox metrics parity audit passed ===\n")

@@ -8,6 +8,9 @@ import type { GrowthReplyWorkflowActionRecord } from "@/lib/growth/reply-intelli
 import type { GrowthSignalFeedItem } from "@/lib/growth/signal-intelligence/signal-feed-types"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
 import {
+  growthOperatorInboxFallbackHref,
+} from "@/lib/growth/navigation/growth-operator-inbox-fallback-links"
+import {
   OPERATOR_INBOX_QA_MARKER,
   type OperatorInboxItem,
   type OperatorInboxItemSource,
@@ -62,7 +65,10 @@ export function normalizeSignalFeedItem(item: GrowthSignalFeedItem): OperatorInb
     lead_id: item.lead_id,
     company_name: item.company_name,
     occurred_at: item.occurred_at,
-    cta_href: item.cta.view_lead ?? item.cta.open_timeline,
+    cta_href:
+      item.cta.view_lead ??
+      item.cta.open_timeline ??
+      growthOperatorInboxFallbackHref({ leadId: item.lead_id }),
     status: mapSignalStatus(item.status),
   })
 }
@@ -87,6 +93,13 @@ export function normalizeReplyWorkflowAction(action: GrowthReplyWorkflowActionRe
 }
 
 export function normalizeAttentionNotification(notification: GrowthNotification): OperatorInboxItem {
+  const callSessionId =
+    typeof notification.metadata.sessionId === "string"
+      ? notification.metadata.sessionId
+      : typeof notification.metadata.callSessionId === "string"
+        ? notification.metadata.callSessionId
+        : null
+
   return baseItem("attention", notification.id, {
     title: notification.title,
     description: notification.body,
@@ -99,7 +112,16 @@ export function normalizeAttentionNotification(notification: GrowthNotification)
     lead_id: notification.leadId,
     company_name: null,
     occurred_at: notification.createdAt,
-    cta_href: notification.actionUrl ?? (notification.leadId ? `/admin/growth/command?leadId=${encodeURIComponent(notification.leadId)}` : null),
+    cta_href:
+      notification.actionUrl ??
+      growthOperatorInboxFallbackHref({
+        notificationType: notification.notificationType,
+        sourceSystem: notification.sourceSystem,
+        leadId: notification.leadId,
+        opportunityId: notification.opportunityId,
+        callSessionId,
+        channel: typeof notification.metadata.channel === "string" ? notification.metadata.channel : null,
+      }),
     status: notification.acknowledgedAt ? "viewed" : "new",
   })
 }
@@ -164,7 +186,7 @@ export function normalizeRecommendedAction(
     lead_id: leadId,
     company_name: null,
     occurred_at: new Date().toISOString(),
-    cta_href: leadId ? `/admin/growth/command?leadId=${encodeURIComponent(leadId)}` : null,
+    cta_href: growthOperatorInboxFallbackHref({ leadId }),
     status: "new",
   })
 }
