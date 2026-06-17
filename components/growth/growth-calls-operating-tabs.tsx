@@ -12,24 +12,19 @@ import {
   GROWTH_CALLS_PAGE_TITLE,
   GROWTH_CALLS_RUNTIME_HARDENING_QA_MARKER,
   GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER,
+  growthCallsOperatingHref,
   type GrowthCallsOperatingView,
   resolveGrowthCallsOperatingView,
 } from "@/lib/growth/navigation/growth-workspace-consolidation"
 
-const VIEW_TABS: Array<{
+const VIEW_TAB_DEFS: Array<{
   id: GrowthCallsOperatingView
   label: string
   icon: typeof Headphones
-  href: string
 }> = [
-  { id: "operate", label: "Operate", icon: Headphones, href: "/admin/growth/calls/workspace" },
-  {
-    id: "overview",
-    label: "Overview",
-    icon: LayoutDashboard,
-    href: "/admin/growth/calls/workspace?view=overview",
-  },
-  { id: "live", label: "Live monitor", icon: Radio, href: "/admin/growth/calls/live" },
+  { id: "operate", label: "Operate", icon: Headphones },
+  { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "live", label: "Live monitor", icon: Radio },
 ]
 
 function GrowthCallsOperatingTabsInner({ className }: { className?: string }) {
@@ -39,10 +34,14 @@ function GrowthCallsOperatingTabsInner({ className }: { className?: string }) {
     pathname,
     viewParam: searchParams.get("view"),
   })
+  const viewTabs = VIEW_TAB_DEFS.map((tab) => ({
+    ...tab,
+    href: growthCallsOperatingHref(tab.id, pathname),
+  }))
 
   return (
     <nav className={cn("flex flex-wrap gap-2", className)} aria-label="Calls operating views">
-      {VIEW_TABS.map((tab) => {
+      {viewTabs.map((tab) => {
         const Icon = tab.icon
         const isActive = activeView === tab.id
         return (

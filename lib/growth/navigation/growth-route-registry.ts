@@ -99,6 +99,26 @@ export function resolveGrowthBreadcrumbs(
     return crumbs
   }
 
+  if (segment.startsWith("calls/")) {
+    crumbs.push({ label: "Calls", href: `${GROWTH_WORKSPACE_BASE_PATH}/calls` })
+    crumbs.push({
+      label: options?.detailLabel ?? entry.breadcrumbLabel ?? entry.title,
+      href: metadataHref(entry),
+      loading: options?.detailLoading && !options.detailLabel,
+    })
+    return crumbs
+  }
+
+  if (segment.startsWith("leads/")) {
+    crumbs.push({ label: "Leads", href: `${GROWTH_WORKSPACE_BASE_PATH}/leads` })
+    crumbs.push({
+      label: options?.detailLabel ?? entry.breadcrumbLabel ?? entry.title,
+      href: metadataHref(entry),
+      loading: options?.detailLoading && !options.detailLabel,
+    })
+    return crumbs
+  }
+
   crumbs.push({ label: entry.breadcrumbLabel ?? entry.title, href: metadataHref(entry) })
   return crumbs
 }

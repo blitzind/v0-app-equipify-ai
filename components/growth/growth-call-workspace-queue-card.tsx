@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Loader2, Phone } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -12,6 +13,7 @@ import {
 } from "@/lib/growth/native-dialer/native-dialer-workspace-ui"
 import type { NativeDialerQueueItemPublicView, NativeDialerQueueMode } from "@/lib/growth/native-dialer/native-dialer-types"
 import { cn } from "@/lib/utils"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 
 const QUEUE_TAB_MODES: { id: NativeDialerQueueMode | "all"; label: string }[] = [
   { id: "power", label: "Power Dial" },
@@ -87,11 +89,13 @@ export function GrowthCallWorkspaceQueueCard({
   dialingId?: string | null
   onDialItem: (item: NativeDialerQueueItemPublicView) => void
 }) {
+  const pathname = usePathname()
+
   return (
     <section className={cn(GROWTH_CALL_WORKSPACE_PANEL, "p-4")}>
       <div className="mb-3 flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Call Queue</h3>
-        <Link href="/admin/growth/leads/queue" className="text-xs font-medium text-primary hover:underline">
+        <Link href={growthFeaturePath(pathname, "leads/queue")} className="text-xs font-medium text-primary hover:underline">
           View all
         </Link>
       </div>

@@ -219,6 +219,30 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     breadcrumbLabel: "Media Assets",
     adminPath: `${ADMIN}/copilot/content-library`,
   }),
+  workspaceDual("workspace-calls-live", "calls/live", "Live Calls", "workspace", { breadcrumbLabel: "Live" }),
+  workspace("workspace-calls-coaching", "calls/coaching", "Live Coaching", "workspace", "dual-route", {
+    migrated: true,
+    segment: "calls/coaching",
+    placeholder: false,
+    breadcrumbLabel: "Coaching",
+    adminPath: `${ADMIN}/calls/live-coaching`,
+  }),
+  workspaceDual("workspace-calls-voice-drops", "calls/voice-drops", "Voice Drops", "workspace", {
+    breadcrumbLabel: "Voice Drops",
+  }),
+  workspaceDual("workspace-leads-crm", "leads/crm", "CRM Leads", "workspace", { breadcrumbLabel: "CRM" }),
+  workspaceDual("workspace-leads-queue", "leads/queue", "Call Queue", "workspace", { breadcrumbLabel: "Call Queue" }),
+  workspaceDual("workspace-leads-captured", "leads/captured", "Recently Captured", "workspace", {
+    breadcrumbLabel: "Captured",
+  }),
+  workspaceDual("workspace-leads-lead-engine", "leads/lead-engine", "Lead Pipeline", "workspace", {
+    breadcrumbLabel: "Pipeline",
+  }),
+  workspaceDual("workspace-leads-detail", "leads/[leadId]", "Lead Detail", "workspace", {
+    breadcrumbLabel: "Lead",
+    dynamic: true,
+    dynamicMatch: /^leads\/[^/]+$/,
+  }),
   workspace("workspace-settings", "settings", "Settings", "settings", "placeholder", {
     migrated: true,
     segment: "settings",
@@ -281,21 +305,27 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   admin("admin-notifications", "notifications", "Notifications", "workspace", "admin-only"),
   admin("admin-aiden", "aiden", "Aiden", "workspace", "admin-only"),
   adminDual("admin-queue", "queue", "Queue", "workspace", "leads", { breadcrumbLabel: "Queue" }),
-  admin("admin-lead-detail", "leads/[leadId]", "Lead Detail", "workspace", "admin-only", {
+  adminDual("admin-lead-detail", "leads/[leadId]", "Lead Detail", "workspace", "leads/[leadId]", {
     dynamic: true,
     breadcrumbLabel: "Lead",
   }),
-  admin("admin-leads-queue", "leads/queue", "Call Queue", "workspace", "admin-only"),
-  admin("admin-leads-crm", "leads/crm", "CRM Leads", "workspace", "admin-only"),
-  admin("admin-leads-captured", "leads/captured", "Recently Captured", "workspace", "admin-only"),
-  admin("admin-leads-lead-engine", "leads/lead-engine", "Lead Pipeline", "workspace", "admin-only"),
+  adminDual("admin-leads-queue", "leads/queue", "Call Queue", "workspace", "leads/queue", { breadcrumbLabel: "Call Queue" }),
+  adminDual("admin-leads-crm", "leads/crm", "CRM Leads", "workspace", "leads/crm", { breadcrumbLabel: "CRM" }),
+  adminDual("admin-leads-captured", "leads/captured", "Recently Captured", "workspace", "leads/captured", {
+    breadcrumbLabel: "Captured",
+  }),
+  adminDual("admin-leads-lead-engine", "leads/lead-engine", "Lead Pipeline", "workspace", "leads/lead-engine", {
+    breadcrumbLabel: "Pipeline",
+  }),
   adminDual("admin-inbox", "inbox", "Inbox", "workspace", "inbox", { breadcrumbLabel: "Inbox" }),
   adminDual("admin-calls-workspace", "calls/workspace", "Calls Workspace", "workspace", "calls", {
     breadcrumbLabel: "Calls",
   }),
-  admin("admin-calls-live", "calls/live", "Live Calls", "workspace", "admin-only"),
-  admin("admin-calls-live-coaching", "calls/live-coaching", "Live Coaching", "workspace", "admin-only"),
-  admin("admin-calls-voice-drops", "calls/voice-drops", "Voice Drops", "workspace", "admin-only"),
+  adminDual("admin-calls-live", "calls/live", "Live Calls", "workspace", "calls/live"),
+  adminDual("admin-calls-live-coaching", "calls/live-coaching", "Live Coaching", "workspace", "calls/coaching", {
+    breadcrumbLabel: "Coaching",
+  }),
+  adminDual("admin-calls-voice-drops", "calls/voice-drops", "Voice Drops", "workspace", "calls/voice-drops"),
   adminDual("admin-meetings", "meetings", "Meetings", "workspace", "meetings", { breadcrumbLabel: "Meetings" }),
   admin("admin-opportunities-pipeline", "opportunities/pipeline", "Pipeline", "workspace", "admin-only"),
   admin("admin-opportunities", "opportunities", "Opportunities", "workspace", "admin-only"),

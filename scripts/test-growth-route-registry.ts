@@ -81,9 +81,9 @@ function discoverGrowthPageRoutePaths(): string[] {
 function runAudit(): void {
   console.log(`\n=== Growth route registry audit (${GROWTH_ROUTE_METADATA_QA_MARKER}) ===\n`)
 
-  assert.equal(GROWTH_ROUTE_CATALOG_INPUTS.length, 113, "catalog must define 113 routes")
-  assert.equal(GROWTH_ROUTE_METADATA.length, 113, "metadata must define 113 routes")
-  console.log("  ✓ 113 routes registered")
+  assert.equal(GROWTH_ROUTE_CATALOG_INPUTS.length, 121, "catalog must define 121 routes")
+  assert.equal(GROWTH_ROUTE_METADATA.length, 121, "metadata must define 121 routes")
+  console.log("  ✓ 121 routes registered")
 
   const ids = GROWTH_ROUTE_METADATA.map((entry) => entry.id)
   const paths = GROWTH_ROUTE_METADATA.map((entry) => entry.path)
@@ -120,7 +120,7 @@ function runAudit(): void {
   console.log("  ✓ orphan routes explicitly registered")
 
   const discoveredPaths = discoverGrowthPageRoutePaths()
-  assert.equal(discoveredPaths.length, 113, "expected 113 Growth page.tsx routes on disk")
+  assert.equal(discoveredPaths.length, 121, "expected 121 Growth page.tsx routes on disk")
   for (const discovered of discoveredPaths) {
     assert.ok(findGrowthRouteMetadataByAnyPath(discovered), `undocumented page route: ${discovered}`)
   }
@@ -163,9 +163,9 @@ function runAudit(): void {
   }
   console.log("  ✓ migration flags consistent")
 
-  assert.equal(GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length, 18)
-  assert.equal(getMigratedRoutes().length, 18)
-  console.log("  ✓ migrated workspace route count (18 routes)")
+  assert.equal(GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length, 26)
+  assert.equal(getMigratedRoutes().length, 26)
+  console.log("  ✓ migrated workspace route count (26 routes)")
 
   assert.equal(getPlaceholderRoutes().length, 1, "expected 1 placeholder workspace route (settings)")
   console.log("  ✓ placeholder workspace routes reduced to settings only")
@@ -199,8 +199,37 @@ function runAudit(): void {
   assert.equal(workspaceMedia.migrationStatus, "dual-route")
   console.log("  ✓ Phase 3A operator routes dual-route; diagnostics/providers remain admin-only")
 
+  const phase3CWorkspaceRoutes = [
+    "workspace-calls-live",
+    "workspace-calls-coaching",
+    "workspace-calls-voice-drops",
+    "workspace-leads-crm",
+    "workspace-leads-queue",
+    "workspace-leads-captured",
+    "workspace-leads-lead-engine",
+    "workspace-leads-detail",
+  ] as const
+  for (const routeId of phase3CWorkspaceRoutes) {
+    const entry = GROWTH_ROUTE_METADATA.find((row) => row.id === routeId)
+    assert.ok(entry, `Phase 3C workspace route missing: ${routeId}`)
+    assert.equal(entry.migrationStatus, "dual-route", `${routeId} must be dual-route`)
+    assert.equal(entry.migrated, true, `${routeId} must be migrated`)
+    assert.ok(entry.adminPath, `${routeId} must retain adminPath fallback`)
+  }
+  assert.equal(findGrowthRouteMetadataByPathname("/growth/leads/crm")?.id, "workspace-leads-crm")
+  assert.equal(findGrowthRouteMetadataByPathname("/growth/leads/sample-lead")?.id, "workspace-leads-detail")
+  console.log("  ✓ Phase 3C operator sub-routes dual-route; static lead routes beat dynamic detail")
+
+  const searchRoute = GROWTH_ROUTE_METADATA.find((entry) => entry.id === "admin-search")
+  assert.ok(searchRoute)
+  assert.equal(searchRoute.migrationStatus, "admin-only")
+  const sequencesRoute = GROWTH_ROUTE_METADATA.find((entry) => entry.id === "admin-sequences")
+  assert.ok(sequencesRoute)
+  assert.equal(sequencesRoute.migrationStatus, "admin-only")
+  console.log("  ✓ search/imports/acquisition and sequences remain admin-only")
+
   const report = buildGrowthRouteRegistryReport()
-  assert.equal(report.totalRoutes, 113)
+  assert.equal(report.totalRoutes, 121)
   assert.equal(getWorkspaceRoutes().length, report.bySection.workspace)
   assert.equal(getContentRoutes().length, report.bySection.content)
   assert.equal(getAutomationRoutes().length, report.bySection.automation)

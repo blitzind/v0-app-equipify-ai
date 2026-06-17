@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { ArrowRight, ShieldAlert } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { BuyingStageCard } from "@/components/growth/revenue-intelligence/buying-stage-card"
@@ -11,13 +12,15 @@ import { LeadScoreVisual } from "@/components/growth/revenue-intelligence/lead-s
 import { formatLabel, priorityTone } from "@/lib/growth/revenue-intelligence/revenue-intelligence-ux"
 import type { GrowthLeadInboxCardView } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import { cn } from "@/lib/utils"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 
 export function GrowthLeadInboxCard({ card }: { card: GrowthLeadInboxCardView }) {
+  const pathname = usePathname()
   const priority = priorityTone(card.candidate_priority)
 
   return (
     <Link
-      href={`/admin/growth/leads/${card.id}`}
+      href={growthFeaturePath(pathname, `leads/${card.id}`)}
       className={cn(
         "group block rounded-xl border border-border bg-card p-4 shadow-sm transition hover:border-primary/40 hover:shadow-md",
       )}

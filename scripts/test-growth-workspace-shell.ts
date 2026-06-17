@@ -35,7 +35,22 @@ const PHASE_3A_OPERATOR_ROUTES = [
 
 const PHASE_3B_OPERATOR_ROUTES = ["workspace-leads", "workspace-campaigns"] as const
 
-const PHASE_3_OPERATOR_ROUTES = [...PHASE_3A_OPERATOR_ROUTES, ...PHASE_3B_OPERATOR_ROUTES] as const
+const PHASE_3C_OPERATOR_SUB_ROUTES = [
+  "workspace-calls-live",
+  "workspace-calls-coaching",
+  "workspace-calls-voice-drops",
+  "workspace-leads-crm",
+  "workspace-leads-queue",
+  "workspace-leads-captured",
+  "workspace-leads-lead-engine",
+  "workspace-leads-detail",
+] as const
+
+const PHASE_3_OPERATOR_ROUTES = [
+  ...PHASE_3A_OPERATOR_ROUTES,
+  ...PHASE_3B_OPERATOR_ROUTES,
+  ...PHASE_3C_OPERATOR_SUB_ROUTES,
+] as const
 
 function workspacePagePathFromMetadata(entryPath: string): string | null {
   if (entryPath === "/growth") {
@@ -50,9 +65,9 @@ function runAudit(): void {
   console.log(`\n=== Growth workspace shell audit (${GROWTH_ROUTE_METADATA_QA_MARKER}) ===\n`)
 
   assert.equal(GROWTH_MIGRATED_ROUTE_REGISTRY.length, GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length)
-  assert.equal(GROWTH_MIGRATED_ROUTE_REGISTRY.length, 18)
+  assert.equal(GROWTH_MIGRATED_ROUTE_REGISTRY.length, 26)
   assert.deepEqual(GROWTH_MIGRATED_WORKSPACE_ROUTES, GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.map((entry) => entry.path))
-  console.log("  ✓ migrated workspace registry subset (18 routes)")
+  console.log("  ✓ migrated workspace registry subset (26 routes)")
 
   const paths = GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.map((entry) => entry.path)
   const ids = GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.map((entry) => entry.id)
@@ -111,6 +126,13 @@ function runAudit(): void {
     "media",
     "leads",
     "campaigns",
+    "calls/live",
+    "calls/coaching",
+    "calls/voice-drops",
+    "leads/crm",
+    "leads/queue",
+    "leads/captured",
+    "leads/lead-engine",
   ]) {
     const resolved = growthFeaturePath("/growth/share-pages", segment)
     assert.ok(resolved.startsWith("/growth/"), `workspace segment fell back to admin: ${segment} -> ${resolved}`)
@@ -128,6 +150,9 @@ function runAudit(): void {
   assert.equal(findGrowthRouteMetadataByPathname("/growth/automation/flow-1")?.id, "workspace-automation-edit")
   assert.equal(findGrowthRouteMetadataByPathname("/growth/media")?.id, "workspace-media")
   assert.equal(findGrowthRouteMetadataByPathname("/growth/leads")?.id, "workspace-leads")
+  assert.equal(findGrowthRouteMetadataByPathname("/growth/leads/crm")?.id, "workspace-leads-crm")
+  assert.equal(findGrowthRouteMetadataByPathname("/growth/leads/sample-lead")?.id, "workspace-leads-detail")
+  assert.equal(findGrowthRouteMetadataByPathname("/growth/calls/live")?.id, "workspace-calls-live")
   assert.equal(findGrowthRouteMetadataByPathname("/growth/campaigns")?.id, "workspace-campaigns")
   console.log("  ✓ static routes beat dynamic routes")
 
@@ -167,9 +192,10 @@ function runAudit(): void {
         qa_marker: GROWTH_ROUTE_METADATA_QA_MARKER,
         migrated_routes: GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length,
         placeholder_routes: placeholders.length,
-        total_registry_routes: 113,
+        total_registry_routes: 121,
         workspace_nav_items: workspaceNavHrefs.length,
         phase_3_operator_routes: PHASE_3_OPERATOR_ROUTES,
+        phase_3c_sub_routes: PHASE_3C_OPERATOR_SUB_ROUTES,
       },
       null,
       2,

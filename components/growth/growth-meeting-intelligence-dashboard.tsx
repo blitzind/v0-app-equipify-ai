@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { CalendarClock, Loader2, RefreshCw, Video, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
@@ -23,6 +23,7 @@ import {
 } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 import type { GrowthCalendarEventIntelligence } from "@/lib/growth/meeting-intelligence/calendar-event-intelligence-types"
 import { cn } from "@/lib/utils"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 
 const VIEW_LABELS: Record<GrowthMeetingInboxView, string> = {
   upcoming: "Upcoming",
@@ -38,11 +39,12 @@ function formatWhen(iso: string | null): string {
   return new Date(iso).toLocaleString()
 }
 
-function leadDrawerHref(meeting: GrowthMeeting): string {
-  return `/admin/growth/leads/crm?open=${meeting.leadId}&focus=meetings&highlight=${meeting.id}`
+function leadDrawerHref(meeting: GrowthMeeting, pathname: string): string {
+  return `${growthFeaturePath(pathname, "leads/crm")}?open=${meeting.leadId}&focus=meetings&highlight=${meeting.id}`
 }
 
 export function GrowthMeetingIntelligenceDashboard() {
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const deepLinkMeetingId = searchParams.get("meetingId") ?? searchParams.get("highlight")
 
@@ -273,7 +275,7 @@ export function GrowthMeetingIntelligenceDashboard() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Link href={leadDrawerHref(selectedMeeting)} className="text-xs text-indigo-600 hover:underline">
+              <Link href={leadDrawerHref(selectedMeeting, pathname)} className="text-xs text-indigo-600 hover:underline">
                 Open lead drawer
               </Link>
               <Button type="button" size="icon" variant="ghost" className="size-7" onClick={() => setSelectedMeetingId(null)}>

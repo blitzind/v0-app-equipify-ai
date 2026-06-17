@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import {
   CheckCircle2,
   ExternalLink,
@@ -19,6 +20,7 @@ import {
   type GrowthCapturedLeadFilter,
   type GrowthCapturedLeadRow,
 } from "@/lib/growth/captured-leads/captured-lead-types"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 
 const FILTER_LABELS: Record<GrowthCapturedLeadFilter, string> = {
   all: "All",
@@ -69,6 +71,7 @@ function verificationTone(status: GrowthCapturedLeadRow["verification_status"]):
 }
 
 export function GrowthCapturedLeadsDashboard() {
+  const pathname = usePathname()
   const [filter, setFilter] = useState<GrowthCapturedLeadFilter>("needs_review")
   const [rows, setRows] = useState<GrowthCapturedLeadRow[]>([])
   const [filterCounts, setFilterCounts] = useState<Record<string, number>>({})
@@ -254,7 +257,7 @@ export function GrowthCapturedLeadsDashboard() {
                     <td className="px-3 py-3">
                       <div className="flex min-w-[220px] flex-wrap gap-1">
                         <Button asChild size="sm" variant="outline" className="h-7 px-2 text-xs">
-                          <Link href={`/admin/growth/leads/${row.lead_id}`}>Open</Link>
+                          <Link href={growthFeaturePath(pathname, `leads/${row.lead_id}`)}>Open</Link>
                         </Button>
                         <Button
                           size="sm"

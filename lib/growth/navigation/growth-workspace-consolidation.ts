@@ -1,5 +1,11 @@
 /** Workspace navigation consolidation — unified Calls operating layer (client-safe). */
 
+import {
+  GROWTH_ADMIN_BASE_PATH,
+  GROWTH_WORKSPACE_BASE_PATH,
+  isGrowthWorkspacePathname,
+} from "@/lib/growth/navigation/growth-workspace-base-path"
+
 export const GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER = "growth-workspace-consolidation-v2" as const
 
 export const GROWTH_CALLS_RUNTIME_HARDENING_QA_MARKER = "growth-calls-runtime-hardening-v1" as const
@@ -22,10 +28,22 @@ export function isGrowthCallsOperatingView(value: string | null | undefined): va
   return GROWTH_CALLS_OPERATING_VIEWS.includes(value as GrowthCallsOperatingView)
 }
 
-export function growthCallsOperatingHref(view: GrowthCallsOperatingView = "operate"): string {
-  if (view === "operate") return GROWTH_CALLS_PRIMARY_HREF
-  if (view === "live") return "/admin/growth/calls/live"
-  return `${GROWTH_CALLS_PRIMARY_HREF}?view=overview`
+export function growthCallsOperatingBaseHref(pathname?: string | null): string {
+  return isGrowthWorkspacePathname(pathname) ? `${GROWTH_WORKSPACE_BASE_PATH}/calls` : GROWTH_CALLS_PRIMARY_HREF
+}
+
+export function growthCallsOperatingHref(
+  view: GrowthCallsOperatingView = "operate",
+  pathname?: string | null,
+): string {
+  const base = growthCallsOperatingBaseHref(pathname)
+  if (view === "operate") return base
+  if (view === "live") {
+    return isGrowthWorkspacePathname(pathname)
+      ? `${GROWTH_WORKSPACE_BASE_PATH}/calls/live`
+      : `${GROWTH_ADMIN_BASE_PATH}/calls/live`
+  }
+  return `${base}?view=overview`
 }
 
 /** Safe view resolution — invalid query values fall back to operate (never throw). */
@@ -33,7 +51,12 @@ export function resolveGrowthCallsOperatingView(input: {
   pathname: string
   viewParam: string | null
 }): GrowthCallsOperatingView {
-  if (input.pathname.startsWith("/admin/growth/calls/live")) return "live"
+  if (
+    input.pathname.startsWith(`${GROWTH_ADMIN_BASE_PATH}/calls/live`) ||
+    input.pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/calls/live`)
+  ) {
+    return "live"
+  }
   if (input.viewParam && !isGrowthCallsOperatingView(input.viewParam)) {
     logGrowthCallsRuntimeIssue("invalid_view_param", {
       pathname: input.pathname,

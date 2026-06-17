@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Loader2, RefreshCw, Workflow } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthLeadInboxCard } from "@/components/growth/lead-operator/growth-lead-inbox-card"
@@ -12,6 +13,7 @@ import {
   type GrowthLeadInboxSortMode,
 } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import { cn } from "@/lib/utils"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 
 const SORT_LABELS: Record<GrowthLeadInboxSortMode, string> = {
   priority: "Priority",
@@ -21,6 +23,7 @@ const SORT_LABELS: Record<GrowthLeadInboxSortMode, string> = {
 }
 
 export function GrowthLeadInboxDashboard() {
+  const pathname = usePathname()
   const [sort, setSort] = useState<GrowthLeadInboxSortMode>("priority")
   const [sections, setSections] = useState<GrowthLeadInboxDashboardSectionPayload[]>([])
   const [total, setTotal] = useState(0)
@@ -68,13 +71,13 @@ export function GrowthLeadInboxDashboard() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="sm">
-            <Link href="/admin/growth/leads/lead-engine">
+            <Link href={growthFeaturePath(pathname, "leads/lead-engine")}>
               <Workflow className="mr-2 size-4" />
               Lead Pipeline
             </Link>
           </Button>
           <Button asChild variant="outline" size="sm">
-            <Link href="/admin/growth/leads/crm">CRM leads</Link>
+            <Link href={growthFeaturePath(pathname, "leads/crm")}>CRM leads</Link>
           </Button>
           <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
             {loading ? (

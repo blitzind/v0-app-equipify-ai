@@ -71,13 +71,13 @@ const leadsRouteSource = fs.readFileSync(
 assert.match(leadsRouteSource, /archiveSchemaReady/, "list API exposes archive schema readiness")
 
 const pageSource = fs.readFileSync(
-  path.join(process.cwd(), "app/(admin)/admin/growth/leads/crm/page.tsx"),
+  path.join(process.cwd(), "components/growth/leads/growth-leads-crm-workspace.tsx"),
   "utf8",
 )
-assert.match(pageSource, /onArchiveLead=\{archiveLead\}/, "page wires archiveLead handler")
-assert.match(pageSource, /onBulkArchive=\{bulkArchiveLeads\}/, "page wires bulkArchiveLeads handler")
-assert.match(pageSource, /archiveAvailable=\{archiveSchemaReady\}/, "page passes archive availability to table")
-assert.doesNotMatch(pageSource, /onDeleteLead|updateLeadStatus|deletingLeadId/, "page no longer uses delete/status props")
+assert.match(pageSource, /onArchiveLead=\{archiveLead\}/, "CRM workspace wires archiveLead handler")
+assert.match(pageSource, /onBulkArchive=\{bulkArchiveLeads\}/, "CRM workspace wires bulkArchiveLeads handler")
+assert.match(pageSource, /archiveAvailable=\{archiveSchemaReady\}/, "CRM workspace passes archive availability to table")
+assert.doesNotMatch(pageSource, /onDeleteLead|updateLeadStatus|deletingLeadId/, "CRM workspace no longer uses delete/status props")
 
 const deleteRoute = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/leads/[leadId]/route.ts"),
