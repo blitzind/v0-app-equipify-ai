@@ -1,13 +1,19 @@
-/** Client-safe inbox thread queue views (Phase 3A). */
+/** Client-safe inbox thread queue views (Phase 3A + 7K call convergence). */
 
 import type { GrowthInboxThread } from "@/lib/growth/inbox/inbox-types"
+import {
+  GROWTH_INBOX_CALL_QUEUE_VIEWS,
+  GROWTH_INBOX_CALL_QUEUE_VIEW_LABELS,
+  isGrowthInboxCallQueueView,
+  type GrowthInboxCallQueueView,
+} from "@/lib/growth/inbox/inbox-call-communication-read-model"
 import {
   type GrowthInboxChannelFilter,
   GROWTH_INBOX_CHANNEL_FILTER_OPTIONS,
   filterInboxThreadsByChannel,
 } from "@/lib/growth/inbox/inbox-channel-types"
 
-export const GROWTH_INBOX_QUEUE_VIEWS = [
+export const GROWTH_INBOX_THREAD_QUEUE_VIEWS = [
   "all",
   "needs_action",
   "interested",
@@ -17,6 +23,13 @@ export const GROWTH_INBOX_QUEUE_VIEWS = [
   "unassigned",
   "waiting",
   "archived",
+] as const
+
+export type GrowthInboxThreadQueueView = (typeof GROWTH_INBOX_THREAD_QUEUE_VIEWS)[number]
+
+export const GROWTH_INBOX_QUEUE_VIEWS = [
+  ...GROWTH_INBOX_THREAD_QUEUE_VIEWS,
+  ...GROWTH_INBOX_CALL_QUEUE_VIEWS,
 ] as const
 
 export type GrowthInboxQueueView = (typeof GROWTH_INBOX_QUEUE_VIEWS)[number]
@@ -31,7 +44,10 @@ export const GROWTH_INBOX_QUEUE_VIEW_LABELS: Record<GrowthInboxQueueView, string
   unassigned: "Unassigned",
   waiting: "Waiting",
   archived: "Archived",
+  ...GROWTH_INBOX_CALL_QUEUE_VIEW_LABELS,
 }
+
+export { isGrowthInboxCallQueueView, type GrowthInboxCallQueueView }
 
 const INBOX_OBJECTION_CLASSIFICATIONS = new Set<GrowthInboxThread["classification"]>([
   "budget",
@@ -53,6 +69,7 @@ export function filterInboxThreadsByQueueView(
   threads: GrowthInboxThread[],
   view: GrowthInboxQueueView,
 ): GrowthInboxThread[] {
+  if (isGrowthInboxCallQueueView(view)) return []
   switch (view) {
     case "needs_action":
       return threads.filter(

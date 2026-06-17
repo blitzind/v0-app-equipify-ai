@@ -9,7 +9,13 @@ import {
   useState,
   type ReactNode,
 } from "react"
+import { useGrowthInboxCallCommunications } from "@/components/growth/inbox/use-growth-inbox-call-communications"
 import type { GrowthInboxThread } from "@/lib/growth/inbox/inbox-types"
+import {
+  filterCallCommunicationsByQueueView,
+  type GrowthInboxCallCommunicationItem,
+  isGrowthInboxCallQueueView,
+} from "@/lib/growth/inbox/inbox-call-communication-read-model"
 import {
   type GrowthInboxQueueView,
   GROWTH_INBOX_QUEUE_VIEWS,
@@ -20,8 +26,6 @@ import {
 } from "@/lib/growth/inbox/inbox-thread-queue-filters"
 import {
   type GrowthInboxChannelFilter,
-  GROWTH_INBOX_CHANNEL_FILTER_OPTIONS,
-  GROWTH_INBOX_CHANNEL_FILTER_LABELS,
   filterInboxThreadsByChannel,
 } from "@/lib/growth/inbox/inbox-channel-types"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
@@ -34,6 +38,9 @@ type GrowthInboxQueueContextValue = {
   searchQuery: string
   setSearchQuery: (query: string) => void
   visibleThreads: GrowthInboxThread[]
+  visibleCallItems: GrowthInboxCallCommunicationItem[]
+  callCommunicationItems: GrowthInboxCallCommunicationItem[]
+  callCommunicationsLoading: boolean
   queueCounts: Record<GrowthInboxQueueView, number>
   selectThreadByIndex: (index: number) => void
   selectAdjacentThread: (direction: "next" | "prev") => void
@@ -53,19 +60,37 @@ export function useGrowthInboxQueue(): GrowthInboxQueueContextValue {
 
 export function GrowthInboxQueueProvider({ children }: { children: ReactNode }) {
   const { threads, selectedThreadId, setSelectedThreadId, loadThreadDetail } = useGrowthInboxWorkspace()
+  const { items: callItems, counts: callCounts, loading: callCommunicationsLoading } = useGrowthInboxCallCommunications()
   const [queueView, setQueueView] = useState<GrowthInboxQueueView>("needs_action")
   const [channelFilter, setChannelFilter] = useState<GrowthInboxChannelFilter>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const searchInputRef = useRef<HTMLInputElement | null>(null)
 
   const visibleThreads = useMemo(() => {
+    if (isGrowthInboxCallQueueView(queueView)) return []
     const byChannel = filterInboxThreadsByChannel(threads, channelFilter)
     const byView = filterInboxThreadsByQueueView(byChannel, queueView)
     const bySearch = filterInboxThreadsBySearch(byView, searchQuery)
     return sortInboxQueueThreads(bySearch)
   }, [threads, channelFilter, queueView, searchQuery])
 
-  const queueCounts = useMemo(() => countInboxThreadsByQueueView(threads), [threads])
+  const visibleCallItems = useMemo(() => {
+    if (!isGrowthInboxCallQueueView(queueView)) return []
+    const filtered = filterCallCommunicationsByQueueView(callItems, queueView)
+    const normalized = searchQuery.trim().toLowerCase()
+    if (!normalized) return filtered
+    return filtered.filter((item) =>
+      [item.title, item.summary, item.companyName, item.kind].join(" ").toLowerCase().includes(normalized),
+    )
+  }, [callItems, queueView, searchQuery])
+
+  const queueCounts = useMemo(
+    () => ({
+      ...countInboxThreadsByQueueView(threads),
+      ...callCounts,
+    }),
+    [threads, callCounts],
+  )
 
   const selectThreadByIndex = useCallback(
     (index: number) => {
@@ -111,6 +136,9 @@ export function GrowthInboxQueueProvider({ children }: { children: ReactNode }) 
       searchQuery,
       setSearchQuery,
       visibleThreads,
+      visibleCallItems,
+      callCommunicationItems: callItems,
+      callCommunicationsLoading,
       queueCounts,
       selectThreadByIndex,
       selectAdjacentThread,
@@ -122,6 +150,9 @@ export function GrowthInboxQueueProvider({ children }: { children: ReactNode }) 
       channelFilter,
       searchQuery,
       visibleThreads,
+      visibleCallItems,
+      callItems,
+      callCommunicationsLoading,
       queueCounts,
       selectThreadByIndex,
       selectAdjacentThread,

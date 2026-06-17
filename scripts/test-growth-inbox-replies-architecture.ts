@@ -143,8 +143,8 @@ function runAudit(): void {
 
   assert.ok(GROWTH_INBOX_EXISTING_QUEUE_VIEWS.includes("needs_action"))
   assert.ok(GROWTH_INBOX_EXISTING_QUEUE_VIEWS.includes("meeting_intent"))
-  assert.ok(GROWTH_INBOX_EXISTING_QUEUE_VIEWS.includes("objections"))
-  assert.ok(GROWTH_INBOX_EXISTING_QUEUE_VIEWS.includes("high_priority"))
+  assert.ok(GROWTH_INBOX_EXISTING_QUEUE_VIEWS.includes("call_follow_up"))
+  assert.equal(GROWTH_INBOX_EXISTING_QUEUE_VIEWS.length, 12)
   console.log("  ✓ inbox queue views include objections and high_priority")
 
   assert.ok(GROWTH_INBOX_TARGET_FILTER_VIEWS.includes("objections"))

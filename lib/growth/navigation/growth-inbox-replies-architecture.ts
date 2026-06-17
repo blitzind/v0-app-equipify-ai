@@ -111,6 +111,9 @@ export const GROWTH_INBOX_EXISTING_QUEUE_VIEWS = [
   "unassigned",
   "waiting",
   "archived",
+  "call_follow_up",
+  "callback_requested",
+  "voicemail",
 ] as const
 
 /** Reply Inbox intelligence views (admin GrowthReplyInboxDashboard). */

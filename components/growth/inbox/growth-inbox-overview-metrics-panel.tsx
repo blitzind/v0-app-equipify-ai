@@ -6,11 +6,15 @@ import { Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
+import { useGrowthInboxQueue } from "@/components/growth/inbox/growth-inbox-queue-context"
 import { useGrowthReplyIntelligenceDashboard } from "@/components/growth/inbox/use-growth-reply-intelligence-dashboard"
 import {
   GROWTH_INBOX_OVERVIEW_METRICS_QA_MARKER,
   deriveGrowthInboxOverviewMetrics,
 } from "@/lib/growth/inbox/growth-inbox-overview-metrics"
+import {
+  deriveGrowthInboxCallCommunicationMetrics,
+} from "@/lib/growth/inbox/inbox-call-communication-read-model"
 import type { GrowthInboxQueueView } from "@/lib/growth/inbox/inbox-thread-queue-filters"
 import { growthWorkspaceInboxViewHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 
@@ -28,13 +32,26 @@ const CLICKABLE_OVERVIEW_METRICS: Array<{
   { key: "unreadConversations", label: "Unread Conversations" },
 ]
 
+const CLICKABLE_CALL_OVERVIEW_METRICS: Array<{
+  label: string
+  view: GrowthInboxQueueView
+  metricKey: keyof ReturnType<typeof deriveGrowthInboxCallCommunicationMetrics>
+}> = [
+  { label: "Callbacks", view: "callback_requested", metricKey: "callbacks" },
+  { label: "Voicemails", view: "voicemail", metricKey: "voicemails" },
+  { label: "Missed Calls", view: "callback_requested", metricKey: "missedCalls" },
+  { label: "Call Follow-Ups", view: "call_follow_up", metricKey: "callFollowUps" },
+]
+
 export function GrowthInboxOverviewMetricsPanel() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { threads } = useGrowthInboxWorkspace()
+  const { callCommunicationItems } = useGrowthInboxQueue()
   const { dashboard, loading, error, reload } = useGrowthReplyIntelligenceDashboard()
 
   const metrics = deriveGrowthInboxOverviewMetrics({ threads, replyDashboard: dashboard })
+  const callMetrics = deriveGrowthInboxCallCommunicationMetrics(callCommunicationItems)
 
   const applyQueueView = useCallback(
     (view: GrowthInboxQueueView) => {
@@ -74,6 +91,22 @@ export function GrowthInboxOverviewMetricsPanel() {
               onClick={() => applyQueueView(metric.view!)}
             >
               {content}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {CLICKABLE_CALL_OVERVIEW_METRICS.map((metric) => {
+          const value = callMetrics[metric.metricKey]
+          return (
+            <button
+              key={metric.label}
+              type="button"
+              className="text-left transition hover:opacity-90"
+              onClick={() => applyQueueView(metric.view)}
+            >
+              <StatTile label={metric.label} value={value} />
             </button>
           )
         })}

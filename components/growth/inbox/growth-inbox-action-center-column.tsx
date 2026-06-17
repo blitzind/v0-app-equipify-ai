@@ -3,6 +3,7 @@
 import { GrowthInboxActionCenterWorkflowEmbeds } from "@/components/growth/inbox/growth-inbox-action-center-workflow-embeds"
 import { GrowthInboxActionCenterReplyDraftEmbed } from "@/components/growth/inbox/growth-inbox-action-center-reply-draft-embed"
 import { GrowthInboxActionCenterSmsDraftEmbed } from "@/components/growth/inbox/growth-inbox-action-center-sms-draft-embed"
+import { GrowthInboxCallActionLinks } from "@/components/growth/inbox/growth-inbox-call-action-links"
 import { GrowthInboxQuickActions } from "@/components/growth/inbox/growth-inbox-quick-actions"
 import { GrowthInboxRecommendedActionCard } from "@/components/growth/inbox/growth-inbox-recommended-action-card"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
@@ -67,6 +68,10 @@ export function GrowthInboxActionCenterColumn() {
 
         <ActionSection title="Quick Actions">
           <GrowthInboxQuickActions />
+        </ActionSection>
+
+        <ActionSection title="Call Actions">
+          <GrowthInboxCallActionLinks />
         </ActionSection>
 
         <GrowthInboxActionCenterWorkflowEmbeds />

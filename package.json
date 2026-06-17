@@ -144,6 +144,7 @@
     "test:growth-inbox-workspace": "tsx scripts/test-growth-inbox-workspace.ts",
     "test:growth-inbox-metrics-parity": "tsx scripts/test-growth-inbox-metrics-parity.ts",
     "test:growth-workspace-link-normalization": "tsx scripts/test-growth-workspace-link-normalization.ts",
+    "test:growth-inbox-calls-convergence": "tsx scripts/test-growth-inbox-calls-convergence.ts",
     "test:growth-workspace-cleanup": "tsx scripts/test-growth-workspace-cleanup.ts",
     "test:growth-workspace-sidebar-behavior": "tsx scripts/test-growth-workspace-sidebar-behavior.ts",
     "test:growth-sidebar-org-context": "tsx scripts/test-growth-sidebar-org-context.ts",

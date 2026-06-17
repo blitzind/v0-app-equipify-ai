@@ -1,12 +1,15 @@
 "use client"
 
+import Link from "next/link"
 import { Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import {
   GROWTH_INBOX_QUEUE_VIEWS,
   GROWTH_INBOX_QUEUE_VIEW_LABELS,
+  isGrowthInboxCallQueueView,
 } from "@/lib/growth/inbox/inbox-thread-queue-filters"
+import { GROWTH_INBOX_CALL_COMMUNICATION_KIND_LABELS } from "@/lib/growth/inbox/inbox-call-communication-read-model"
 import {
   GROWTH_INBOX_CHANNEL_FILTER_OPTIONS,
   GROWTH_INBOX_CHANNEL_FILTER_LABELS,
@@ -37,6 +40,8 @@ export function GrowthInboxThreadQueueColumn() {
     searchQuery,
     setSearchQuery,
     visibleThreads,
+    visibleCallItems,
+    callCommunicationsLoading,
     queueCounts,
     searchInputRef,
   } = useGrowthInboxQueue()
@@ -102,7 +107,27 @@ export function GrowthInboxThreadQueueColumn() {
       </div>
 
       <div className="min-h-0 flex-1 space-y-1 overflow-auto">
-        {visibleThreads.length === 0 ? (
+        {isGrowthInboxCallQueueView(queueView) ? (
+          callCommunicationsLoading ? (
+            <p className="px-1 py-6 text-center text-xs text-muted-foreground">Loading call items…</p>
+          ) : visibleCallItems.length === 0 ? (
+            <p className="px-1 py-6 text-center text-xs text-muted-foreground">No call items in this queue view.</p>
+          ) : (
+            visibleCallItems.map((item) => (
+              <Link
+                key={item.id}
+                href={item.ctaHref}
+                className="block w-full rounded-lg border border-border/70 bg-card px-2 py-2 text-left transition-colors hover:bg-muted/40"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="truncate text-xs font-semibold">{item.companyName}</p>
+                  <GrowthBadge label={GROWTH_INBOX_CALL_COMMUNICATION_KIND_LABELS[item.kind]} tone="attention" />
+                </div>
+                <p className="mt-1 truncate text-[11px] text-muted-foreground">{item.summary}</p>
+              </Link>
+            ))
+          )
+        ) : visibleThreads.length === 0 ? (
           <p className="px-1 py-6 text-center text-xs text-muted-foreground">No threads in this queue view.</p>
         ) : (
           visibleThreads.map((thread) => {
