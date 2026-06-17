@@ -20,7 +20,7 @@
  * Do NOT create shared *-workspace.tsx wrappers that own both chrome and body.
  */
 
-export const GROWTH_CHROME_ARCHITECTURE_QA_MARKER = "growth-chrome-architecture-v1" as const
+export const GROWTH_CHROME_ARCHITECTURE_QA_MARKER = "growth-chrome-architecture-v2" as const
 
 /** Imports forbidden in dashboard body components. */
 export const GROWTH_DASHBOARD_BODY_FORBIDDEN_IMPORTS = [
@@ -63,6 +63,23 @@ export const GROWTH_PHASE_4_WORKSPACE_PAGES = [
   "app/(growth)/growth/opportunities/workspace/page.tsx",
   "app/(growth)/growth/conversations/page.tsx",
   "app/(growth)/growth/relationships/page.tsx",
+] as const
+
+/** Phase 6A workspace operator home dashboard body. */
+export const GROWTH_PHASE_6A_WORKSPACE_DASHBOARD_BODY =
+  "components/growth/workspace/growth-workspace-dashboard-body.tsx" as const
+
+export const GROWTH_PHASE_6A_WORKSPACE_PAGE = "app/(growth)/growth/page.tsx" as const
+
+/** All certified dashboard body components (Phase 4 dual-routes + Phase 6A operator home). */
+export const GROWTH_CERTIFIED_DASHBOARD_BODY_COMPONENTS = [
+  ...GROWTH_PHASE_4_DASHBOARD_BODY_COMPONENTS,
+  GROWTH_PHASE_6A_WORKSPACE_DASHBOARD_BODY,
+] as const
+
+export const GROWTH_CERTIFIED_WORKSPACE_HEADER_BODY_PAGES = [
+  ...GROWTH_PHASE_4_WORKSPACE_PAGES,
+  GROWTH_PHASE_6A_WORKSPACE_PAGE,
 ] as const
 
 export const GROWTH_PHASE_4_ADMIN_PAGES = [
