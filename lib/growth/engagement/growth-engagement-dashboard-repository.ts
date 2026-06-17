@@ -360,13 +360,17 @@ export async function fetchHighIntentSignals(
 
   const signalsProbe = await signalsTable(admin).select("id").limit(1)
   if (!signalsProbe.error) {
-    const { data, error } = await signalsTable(admin)
-      .select("id, signal_type, company_name, lead_id, occurred_at, signal_score, metadata")
+    let query = signalsTable(admin)
+      .select("id, signal_type, company_name, occurred_at, signal_score, metadata")
       .eq("organization_id", filters.organizationId)
       .gte("occurred_at", dateRange.startIso)
       .lte("occurred_at", dateRange.endIso)
       .order("occurred_at", { ascending: false })
       .limit(MAX_SIGNALS)
+
+    if (filters.leadId) query = query.contains("metadata", { lead_id: filters.leadId })
+
+    const { data, error } = await query
 
     if (error) throw new Error(error.message)
 
@@ -374,14 +378,15 @@ export async function fetchHighIntentSignals(
       const record = row as Record<string, unknown>
       const signalType = asString(record.signal_type)
       if (!isHighIntentSharePageSignalType(signalType)) continue
-      if (filters.leadId && asString(record.lead_id) !== filters.leadId) continue
 
       const metadata = asRecord(record.metadata)
+      if (filters.leadId && asString(metadata.lead_id) !== filters.leadId) continue
+
       items.push({
         id: asString(record.id),
         signalType,
         companyName: asString(record.company_name) || "Unknown company",
-        leadId: asString(record.lead_id) || null,
+        leadId: asString(metadata.lead_id) || null,
         sharePageId: asString(metadata.share_page_id) || null,
         assetId: null,
         occurredAt: asString(record.occurred_at),

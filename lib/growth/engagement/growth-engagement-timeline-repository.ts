@@ -253,14 +253,14 @@ async function loadHighIntentTimelineEvents(
   dateRange: ReturnType<typeof resolveEngagementTimelineDateRange>,
 ): Promise<GrowthEngagementTimelineEvent[]> {
   let query = signalsTable(admin)
-    .select("id, signal_type, company_name, lead_id, occurred_at, signal_score, metadata")
+    .select("id, signal_type, company_name, occurred_at, signal_score, metadata")
     .eq("organization_id", organizationId)
     .gte("occurred_at", dateRange.startIso)
     .lte("occurred_at", dateRange.endIso)
     .order("occurred_at", { ascending: false })
     .limit(500)
 
-  if (filters.leadId) query = query.eq("lead_id", filters.leadId)
+  if (filters.leadId) query = query.contains("metadata", { lead_id: filters.leadId })
 
   const { data, error } = await query
   if (error) throw new Error(error.message)
@@ -276,7 +276,7 @@ async function loadHighIntentTimelineEvents(
       eventId: asString(record.id),
       eventType: "high_intent_detected",
       occurredAt: asString(record.occurred_at),
-      leadId: asString(record.lead_id) || null,
+      leadId: asString(metadata.lead_id) || null,
       sharePageId: asString(metadata.share_page_id) || null,
       templateId: null,
       mediaAssetId: null,

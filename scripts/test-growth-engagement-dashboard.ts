@@ -178,6 +178,26 @@ function probeModules(paths: readonly string[]): Array<{ path: string; ok: boole
   }))
 }
 
+/** growth.signals has no lead_id column — engagement reads must use metadata.lead_id. */
+function assertEngagementSignalsMetadataLeadPattern(source: string, label: string): void {
+  assert.doesNotMatch(
+    source,
+    /select\("id, signal_type, company_name, lead_id/,
+    `${label} must not select signals.lead_id`,
+  )
+  assert.doesNotMatch(
+    source,
+    /signalsTable\(admin\)[\s\S]{0,1200}?\.eq\(["']lead_id["']/,
+    `${label} must not filter signals.lead_id`,
+  )
+  assert.match(
+    source,
+    /contains\(["']metadata["'],\s*\{\s*lead_id:/,
+    `${label} must filter signal lead ids via metadata.contains`,
+  )
+  assert.match(source, /metadata\.lead_id/, `${label} must map signal lead ids from metadata.lead_id`)
+}
+
 function runLocalRegression(): void {
   console.log(`\n=== S4-A local regression (${GROWTH_ENGAGEMENT_DASHBOARD_QA_MARKER}) ===\n`)
 
@@ -218,6 +238,7 @@ function runLocalRegression(): void {
   }
   assert.match(routeSource, /getGrowthEngagementDashboardOverview/)
   assert.match(dashboardUiSource, /\/api\/platform\/growth\/engagement-dashboard/)
+  assertEngagementSignalsMetadataLeadPattern(repositorySource, "dashboard repository")
   console.log("  ✓ read-only manifests and route wiring")
 
   const overview = aggregateOverviewFromSamples({
@@ -306,6 +327,7 @@ function runS4BLocalRegression(): void {
   assert.match(timelineRouteSource, /getGrowthEngagementTimeline/)
   assert.match(dashboardUiSource, /GrowthEngagementTimelinePanel/)
   assert.match(dashboardUiSource, /GrowthEngagementDrilldownDrawer/)
+  assertEngagementSignalsMetadataLeadPattern(timelineRepoSource, "timeline repository")
   console.log("  ✓ timeline routes, drilldown UI, and no mutation imports")
 
   assert.equal(mapSharePageEventType("SHARE_PAGE_VIEWED"), "share_page_viewed")
