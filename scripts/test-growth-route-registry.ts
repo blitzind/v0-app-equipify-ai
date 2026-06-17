@@ -81,9 +81,9 @@ function discoverGrowthPageRoutePaths(): string[] {
 function runAudit(): void {
   console.log(`\n=== Growth route registry audit (${GROWTH_ROUTE_METADATA_QA_MARKER}) ===\n`)
 
-  assert.equal(GROWTH_ROUTE_CATALOG_INPUTS.length, 112, "catalog must define 112 routes")
-  assert.equal(GROWTH_ROUTE_METADATA.length, 112, "metadata must define 112 routes")
-  console.log("  ✓ 112 routes registered")
+  assert.equal(GROWTH_ROUTE_CATALOG_INPUTS.length, 113, "catalog must define 113 routes")
+  assert.equal(GROWTH_ROUTE_METADATA.length, 113, "metadata must define 113 routes")
+  console.log("  ✓ 113 routes registered")
 
   const ids = GROWTH_ROUTE_METADATA.map((entry) => entry.id)
   const paths = GROWTH_ROUTE_METADATA.map((entry) => entry.path)
@@ -120,7 +120,7 @@ function runAudit(): void {
   console.log("  ✓ orphan routes explicitly registered")
 
   const discoveredPaths = discoverGrowthPageRoutePaths()
-  assert.equal(discoveredPaths.length, 112, "expected 112 Growth page.tsx routes on disk")
+  assert.equal(discoveredPaths.length, 113, "expected 113 Growth page.tsx routes on disk")
   for (const discovered of discoveredPaths) {
     assert.ok(findGrowthRouteMetadataByAnyPath(discovered), `undocumented page route: ${discovered}`)
   }
@@ -163,12 +163,31 @@ function runAudit(): void {
   }
   console.log("  ✓ migration flags consistent")
 
-  assert.equal(GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length, 17)
-  assert.equal(getMigratedRoutes().length, 17)
-  console.log("  ✓ migrated workspace route count unchanged (17)")
+  assert.equal(GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length, 18)
+  assert.equal(getMigratedRoutes().length, 18)
+  console.log("  ✓ migrated workspace route count (18 routes)")
+
+  assert.equal(getPlaceholderRoutes().length, 3, "expected 3 placeholder workspace routes (leads, campaigns, settings)")
+  console.log("  ✓ placeholder workspace routes reduced to leads/campaigns/settings")
+
+  const inboxDiagnostics = GROWTH_ROUTE_METADATA.find((entry) => entry.id === "admin-inbox-diagnostics")
+  assert.ok(inboxDiagnostics)
+  assert.equal(inboxDiagnostics.migrationStatus, "hidden")
+  assert.equal(inboxDiagnostics.path, `${GROWTH_ADMIN_BASE_PATH}/inbox/diagnostics`)
+
+  const callsProviders = GROWTH_ROUTE_METADATA.find((entry) => entry.id === "admin-calls-providers")
+  assert.ok(callsProviders)
+  assert.equal(callsProviders.migrationStatus, "admin-only")
+
+  const workspaceMedia = GROWTH_ROUTE_METADATA.find((entry) => entry.id === "workspace-media")
+  assert.ok(workspaceMedia)
+  assert.equal(workspaceMedia.path, `${GROWTH_WORKSPACE_BASE_PATH}/media`)
+  assert.equal(workspaceMedia.adminPath, `${GROWTH_ADMIN_BASE_PATH}/copilot/content-library`)
+  assert.equal(workspaceMedia.migrationStatus, "dual-route")
+  console.log("  ✓ Phase 3A operator routes dual-route; diagnostics/providers remain admin-only")
 
   const report = buildGrowthRouteRegistryReport()
-  assert.equal(report.totalRoutes, 112)
+  assert.equal(report.totalRoutes, 113)
   assert.equal(getWorkspaceRoutes().length, report.bySection.workspace)
   assert.equal(getContentRoutes().length, report.bySection.content)
   assert.equal(getAutomationRoutes().length, report.bySection.automation)

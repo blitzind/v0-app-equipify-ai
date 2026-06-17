@@ -5,6 +5,7 @@ import {
   Inbox,
   LayoutDashboard,
   LayoutTemplate,
+  Layers,
   Phone,
   Settings,
   Target,
@@ -52,6 +53,7 @@ const WORKSPACE_ICON_BY_ID: Record<string, LucideIcon> = {
   "workspace-inbox": Inbox,
   "workspace-calls": Phone,
   "workspace-meetings": Users,
+  "workspace-media": Layers,
   "workspace-settings": Settings,
 }
 

@@ -193,26 +193,30 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     placeholder: true,
     breadcrumbLabel: "Campaigns",
   }),
-  workspace("workspace-inbox", "inbox", "Inbox", "workspace", "placeholder", {
+  workspace("workspace-inbox", "inbox", "Inbox", "workspace", "dual-route", {
     migrated: true,
     segment: "inbox",
-    placeholder: true,
+    placeholder: false,
     breadcrumbLabel: "Inbox",
     adminPath: `${ADMIN}/inbox`,
   }),
-  workspace("workspace-calls", "calls", "Calls", "workspace", "placeholder", {
+  workspace("workspace-calls", "calls", "Calls", "workspace", "dual-route", {
     migrated: true,
     segment: "calls",
-    placeholder: true,
+    placeholder: false,
     breadcrumbLabel: "Calls",
     adminPath: `${ADMIN}/calls/workspace`,
   }),
-  workspace("workspace-meetings", "meetings", "Meetings", "workspace", "placeholder", {
+  workspace("workspace-meetings", "meetings", "Meetings", "workspace", "dual-route", {
     migrated: true,
     segment: "meetings",
-    placeholder: true,
+    placeholder: false,
     breadcrumbLabel: "Meetings",
     adminPath: `${ADMIN}/meetings`,
+  }),
+  workspaceDual("workspace-media", "media", "Media Assets", "content", {
+    breadcrumbLabel: "Media Assets",
+    adminPath: `${ADMIN}/copilot/content-library`,
   }),
   workspace("workspace-settings", "settings", "Settings", "settings", "placeholder", {
     migrated: true,
@@ -284,14 +288,14 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   admin("admin-leads-crm", "leads/crm", "CRM Leads", "workspace", "admin-only"),
   admin("admin-leads-captured", "leads/captured", "Recently Captured", "workspace", "admin-only"),
   admin("admin-leads-lead-engine", "leads/lead-engine", "Lead Pipeline", "workspace", "admin-only"),
-  admin("admin-inbox", "inbox", "Inbox", "workspace", "admin-only"),
-  admin("admin-calls-workspace", "calls/workspace", "Calls Workspace", "workspace", "admin-only", {
+  adminDual("admin-inbox", "inbox", "Inbox", "workspace", "inbox", { breadcrumbLabel: "Inbox" }),
+  adminDual("admin-calls-workspace", "calls/workspace", "Calls Workspace", "workspace", "calls", {
     breadcrumbLabel: "Calls",
   }),
   admin("admin-calls-live", "calls/live", "Live Calls", "workspace", "admin-only"),
   admin("admin-calls-live-coaching", "calls/live-coaching", "Live Coaching", "workspace", "admin-only"),
   admin("admin-calls-voice-drops", "calls/voice-drops", "Voice Drops", "workspace", "admin-only"),
-  admin("admin-meetings", "meetings", "Meetings", "workspace", "admin-only"),
+  adminDual("admin-meetings", "meetings", "Meetings", "workspace", "meetings", { breadcrumbLabel: "Meetings" }),
   admin("admin-opportunities-pipeline", "opportunities/pipeline", "Pipeline", "workspace", "admin-only"),
   admin("admin-opportunities", "opportunities", "Opportunities", "workspace", "admin-only"),
   admin("admin-opportunities-workspace", "opportunities/workspace", "Opportunity Workspace", "workspace", "admin-only"),
@@ -310,7 +314,9 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
 
   admin("admin-copilot", "copilot", "Copilot", "content", "admin-only"),
   admin("admin-copilot-playbooks", "copilot/playbooks", "Playbooks", "content", "admin-only"),
-  admin("admin-copilot-content-library", "copilot/content-library", "Media Assets", "content", "admin-only"),
+  adminDual("admin-copilot-content-library", "copilot/content-library", "Media Assets", "content", "media", {
+    breadcrumbLabel: "Media Assets",
+  }),
   admin("admin-copilot-reply-drafts", "copilot/reply-drafts", "Reply Drafts", "content", "admin-only"),
   admin("admin-copilot-personalization", "copilot/personalization", "Personalization", "content", "admin-only"),
   admin("admin-knowledge", "knowledge", "Knowledge Center", "content", "admin-only"),

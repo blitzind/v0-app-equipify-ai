@@ -90,7 +90,7 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
     label: "Content",
     items: [
       { id: "share-pages", label: "Share Pages", registryRouteId: "workspace-share-pages", icon: FileText, workspaceRoute: true },
-      { id: "media-assets", label: "Media Assets", registryRouteId: "admin-copilot-content-library", icon: Layers },
+      { id: "media-assets", label: "Media Assets", registryRouteId: "workspace-media", icon: Layers, workspaceRoute: true },
       { id: "templates", label: "Templates", registryRouteId: "workspace-share-pages-templates", icon: LayoutTemplate, workspaceRoute: true },
     ],
   },
