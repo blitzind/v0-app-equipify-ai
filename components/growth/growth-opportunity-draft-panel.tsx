@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import type { OpportunityDraftRow } from "@/lib/growth/meeting-intelligence/opportunity-draft-engine-types"
 import { OPPORTUNITY_APPROVAL_ENGINE_QA_MARKER } from "@/lib/growth/meeting-intelligence/opportunity-approval-engine-types"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 
 export function GrowthOpportunityDraftPanel({
   meetingId,
@@ -15,6 +17,7 @@ export function GrowthOpportunityDraftPanel({
   meetingId: string
   meetingStatus: string
 }) {
+  const pathname = usePathname()
   const [draft, setDraft] = useState<OpportunityDraftRow | null>(null)
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
@@ -191,7 +194,7 @@ export function GrowthOpportunityDraftPanel({
             <div className="rounded-md border border-emerald-300/60 bg-background/70 p-2">
               <p className="font-medium text-emerald-900 dark:text-emerald-100">Opportunity created</p>
               <Link
-                href={`/admin/growth/opportunities/pipeline?opportunityId=${encodeURIComponent(createdOpportunityId ?? draft.opportunity_id ?? "")}`}
+                href={`${growthFeaturePath(pathname, "opportunities/pipeline")}?opportunityId=${encodeURIComponent(createdOpportunityId ?? draft.opportunity_id ?? "")}`}
                 className="text-emerald-700 hover:underline dark:text-emerald-300"
               >
                 View opportunity in pipeline

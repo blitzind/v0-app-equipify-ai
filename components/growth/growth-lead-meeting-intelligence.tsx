@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { CalendarClock, Loader2, Video } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,6 +25,7 @@ import {
   type GrowthMeeting,
 } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 import type { GrowthLead } from "@/lib/growth/types"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import { GrowthCallIntelligenceScorecardCard } from "@/components/growth/growth-call-intelligence-scorecard-card"
 import { GrowthMeetingOutcomeIntelligenceInline } from "@/components/growth/growth-meeting-outcome-intelligence-inline"
 import { GrowthMeetingPrepPanel } from "@/components/growth/growth-meeting-prep-panel"
@@ -69,6 +71,7 @@ export function GrowthLeadMeetingIntelligence({
   pendingReplyId,
   onTimelineRefresh,
 }: GrowthLeadMeetingIntelligenceProps) {
+  const pathname = usePathname()
   const [meetings, setMeetings] = useState<GrowthMeeting[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -531,7 +534,7 @@ export function GrowthLeadMeetingIntelligence({
               </Button>
               {selected.opportunityId ? (
                 <Link
-                  href={`/admin/growth/opportunities/pipeline?opportunityId=${selected.opportunityId}`}
+                  href={`${growthFeaturePath(pathname, "opportunities/pipeline")}?opportunityId=${selected.opportunityId}`}
                   className="self-center text-sm text-indigo-600 hover:underline"
                 >
                   Review opportunity stage

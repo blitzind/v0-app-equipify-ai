@@ -81,9 +81,9 @@ function discoverGrowthPageRoutePaths(): string[] {
 function runAudit(): void {
   console.log(`\n=== Growth route registry audit (${GROWTH_ROUTE_METADATA_QA_MARKER}) ===\n`)
 
-  assert.equal(GROWTH_ROUTE_CATALOG_INPUTS.length, 121, "catalog must define 121 routes")
-  assert.equal(GROWTH_ROUTE_METADATA.length, 121, "metadata must define 121 routes")
-  console.log("  ✓ 121 routes registered")
+  assert.equal(GROWTH_ROUTE_CATALOG_INPUTS.length, 125, "catalog must define 125 routes")
+  assert.equal(GROWTH_ROUTE_METADATA.length, 125, "metadata must define 125 routes")
+  console.log("  ✓ 125 routes registered")
 
   const ids = GROWTH_ROUTE_METADATA.map((entry) => entry.id)
   const paths = GROWTH_ROUTE_METADATA.map((entry) => entry.path)
@@ -120,7 +120,7 @@ function runAudit(): void {
   console.log("  ✓ orphan routes explicitly registered")
 
   const discoveredPaths = discoverGrowthPageRoutePaths()
-  assert.equal(discoveredPaths.length, 121, "expected 121 Growth page.tsx routes on disk")
+  assert.equal(discoveredPaths.length, 125, "expected 125 Growth page.tsx routes on disk")
   for (const discovered of discoveredPaths) {
     assert.ok(findGrowthRouteMetadataByAnyPath(discovered), `undocumented page route: ${discovered}`)
   }
@@ -163,9 +163,9 @@ function runAudit(): void {
   }
   console.log("  ✓ migration flags consistent")
 
-  assert.equal(GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length, 26)
-  assert.equal(getMigratedRoutes().length, 26)
-  console.log("  ✓ migrated workspace route count (26 routes)")
+  assert.equal(GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length, 30)
+  assert.equal(getMigratedRoutes().length, 30)
+  console.log("  ✓ migrated workspace route count (30 routes)")
 
   assert.equal(getPlaceholderRoutes().length, 1, "expected 1 placeholder workspace route (settings)")
   console.log("  ✓ placeholder workspace routes reduced to settings only")
@@ -228,8 +228,47 @@ function runAudit(): void {
   assert.equal(sequencesRoute.migrationStatus, "admin-only")
   console.log("  ✓ search/imports/acquisition and sequences remain admin-only")
 
+  const workspaceInboxWorkflow = GROWTH_ROUTE_METADATA.find((entry) => entry.id === "workspace-inbox-workflow")
+  assert.ok(workspaceInboxWorkflow)
+  assert.equal(workspaceInboxWorkflow.path, `${GROWTH_WORKSPACE_BASE_PATH}/inbox/workflow`)
+  assert.equal(workspaceInboxWorkflow.adminPath, `${GROWTH_ADMIN_BASE_PATH}/replies/workflow`)
+  assert.equal(workspaceInboxWorkflow.migrationStatus, "dual-route")
+  assert.equal(workspaceInboxWorkflow.migrated, true)
+  assert.equal(workspaceInboxWorkflow.section, "workspace")
+
+  const adminRepliesWorkflow = GROWTH_ROUTE_METADATA.find((entry) => entry.id === "admin-replies-workflow")
+  assert.ok(adminRepliesWorkflow)
+  assert.equal(adminRepliesWorkflow.migrationStatus, "dual-route")
+  assert.equal(adminRepliesWorkflow.workspacePath, `${GROWTH_WORKSPACE_BASE_PATH}/inbox/workflow`)
+  assert.equal(findGrowthRouteMetadataByPathname("/growth/inbox/workflow")?.id, "workspace-inbox-workflow")
+  console.log("  ✓ Phase 4A reply workflow dual-route; admin replies intelligence dashboard remains admin-only")
+
+  const adminReplies = GROWTH_ROUTE_METADATA.find((entry) => entry.id === "admin-replies")
+  assert.ok(adminReplies)
+  assert.equal(adminReplies.migrationStatus, "admin-only")
+
+  const phase4BWorkspaceRoutes = [
+    "workspace-opportunities",
+    "workspace-opportunities-pipeline",
+    "workspace-opportunities-workspace",
+  ] as const
+  for (const routeId of phase4BWorkspaceRoutes) {
+    const entry = GROWTH_ROUTE_METADATA.find((row) => row.id === routeId)
+    assert.ok(entry, `Phase 4B workspace route missing: ${routeId}`)
+    assert.equal(entry.migrationStatus, "dual-route", `${routeId} must be dual-route`)
+    assert.equal(entry.migrated, true, `${routeId} must be migrated`)
+    assert.ok(entry.adminPath, `${routeId} must retain adminPath fallback`)
+  }
+  assert.equal(findGrowthRouteMetadataByPathname("/growth/opportunities/pipeline")?.id, "workspace-opportunities-pipeline")
+  assert.equal(findGrowthRouteMetadataByPathname("/growth/opportunities/workspace")?.id, "workspace-opportunities-workspace")
+
+  const adminOpportunityIntelligence = GROWTH_ROUTE_METADATA.find((entry) => entry.id === "admin-opportunity-intelligence")
+  assert.ok(adminOpportunityIntelligence)
+  assert.equal(adminOpportunityIntelligence.migrationStatus, "admin-only")
+  console.log("  ✓ Phase 4B opportunities dual-route; opportunity-intelligence remains admin-only")
+
   const report = buildGrowthRouteRegistryReport()
-  assert.equal(report.totalRoutes, 121)
+  assert.equal(report.totalRoutes, 125)
   assert.equal(getWorkspaceRoutes().length, report.bySection.workspace)
   assert.equal(getContentRoutes().length, report.bySection.content)
   assert.equal(getAutomationRoutes().length, report.bySection.automation)

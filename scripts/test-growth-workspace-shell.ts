@@ -46,10 +46,20 @@ const PHASE_3C_OPERATOR_SUB_ROUTES = [
   "workspace-leads-detail",
 ] as const
 
-const PHASE_3_OPERATOR_ROUTES = [
+const PHASE_4A_OPERATOR_ROUTES = ["workspace-inbox-workflow"] as const
+
+const PHASE_4B_OPERATOR_ROUTES = [
+  "workspace-opportunities",
+  "workspace-opportunities-pipeline",
+  "workspace-opportunities-workspace",
+] as const
+
+const PHASE_4_OPERATOR_ROUTES = [
   ...PHASE_3A_OPERATOR_ROUTES,
   ...PHASE_3B_OPERATOR_ROUTES,
   ...PHASE_3C_OPERATOR_SUB_ROUTES,
+  ...PHASE_4A_OPERATOR_ROUTES,
+  ...PHASE_4B_OPERATOR_ROUTES,
 ] as const
 
 function workspacePagePathFromMetadata(entryPath: string): string | null {
@@ -65,9 +75,9 @@ function runAudit(): void {
   console.log(`\n=== Growth workspace shell audit (${GROWTH_ROUTE_METADATA_QA_MARKER}) ===\n`)
 
   assert.equal(GROWTH_MIGRATED_ROUTE_REGISTRY.length, GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length)
-  assert.equal(GROWTH_MIGRATED_ROUTE_REGISTRY.length, 26)
+  assert.equal(GROWTH_MIGRATED_ROUTE_REGISTRY.length, 30)
   assert.deepEqual(GROWTH_MIGRATED_WORKSPACE_ROUTES, GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.map((entry) => entry.path))
-  console.log("  ✓ migrated workspace registry subset (26 routes)")
+  console.log("  ✓ migrated workspace registry subset (30 routes)")
 
   const paths = GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.map((entry) => entry.path)
   const ids = GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.map((entry) => entry.id)
@@ -75,7 +85,7 @@ function runAudit(): void {
   assert.equal(new Set(ids).size, ids.length, "duplicate migrated workspace ids detected")
   console.log("  ✓ no duplicate migrated workspace paths or ids")
 
-  for (const routeId of PHASE_3_OPERATOR_ROUTES) {
+  for (const routeId of PHASE_4_OPERATOR_ROUTES) {
     const entry = getGrowthRouteMetadataById(routeId)
     assert.ok(entry, `Phase 3 operator route missing: ${routeId}`)
     assert.equal(entry.migrationStatus, "dual-route", `${routeId} must be dual-route`)
@@ -192,9 +202,11 @@ function runAudit(): void {
         qa_marker: GROWTH_ROUTE_METADATA_QA_MARKER,
         migrated_routes: GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length,
         placeholder_routes: placeholders.length,
-        total_registry_routes: 121,
+        total_registry_routes: 125,
         workspace_nav_items: workspaceNavHrefs.length,
-        phase_3_operator_routes: PHASE_3_OPERATOR_ROUTES,
+        phase_4a_operator_routes: PHASE_4A_OPERATOR_ROUTES,
+        phase_4b_operator_routes: PHASE_4B_OPERATOR_ROUTES,
+        phase_4_operator_routes: PHASE_4_OPERATOR_ROUTES,
         phase_3c_sub_routes: PHASE_3C_OPERATOR_SUB_ROUTES,
       },
       null,

@@ -201,6 +201,13 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     breadcrumbLabel: "Inbox",
     adminPath: `${ADMIN}/inbox`,
   }),
+  workspace("workspace-inbox-workflow", "inbox/workflow", "Reply Workflow", "workspace", "dual-route", {
+    migrated: true,
+    segment: "inbox/workflow",
+    placeholder: false,
+    breadcrumbLabel: "Reply Workflow",
+    adminPath: `${ADMIN}/replies/workflow`,
+  }),
   workspace("workspace-calls", "calls", "Calls", "workspace", "dual-route", {
     migrated: true,
     segment: "calls",
@@ -327,9 +334,36 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   }),
   adminDual("admin-calls-voice-drops", "calls/voice-drops", "Voice Drops", "workspace", "calls/voice-drops"),
   adminDual("admin-meetings", "meetings", "Meetings", "workspace", "meetings", { breadcrumbLabel: "Meetings" }),
-  admin("admin-opportunities-pipeline", "opportunities/pipeline", "Pipeline", "workspace", "admin-only"),
-  admin("admin-opportunities", "opportunities", "Opportunities", "workspace", "admin-only"),
-  admin("admin-opportunities-workspace", "opportunities/workspace", "Opportunity Workspace", "workspace", "admin-only"),
+  workspace("workspace-opportunities", "opportunities", "Opportunities", "workspace", "dual-route", {
+    migrated: true,
+    segment: "opportunities",
+    placeholder: false,
+    breadcrumbLabel: "Opportunities",
+    adminPath: `${ADMIN}/opportunities`,
+  }),
+  workspace("workspace-opportunities-pipeline", "opportunities/pipeline", "Pipeline", "workspace", "dual-route", {
+    migrated: true,
+    segment: "opportunities/pipeline",
+    placeholder: false,
+    breadcrumbLabel: "Pipeline",
+    adminPath: `${ADMIN}/opportunities/pipeline`,
+  }),
+  workspace("workspace-opportunities-workspace", "opportunities/workspace", "Opportunity Workspace", "workspace", "dual-route", {
+    migrated: true,
+    segment: "opportunities/workspace",
+    placeholder: false,
+    breadcrumbLabel: "Workspace",
+    adminPath: `${ADMIN}/opportunities/workspace`,
+  }),
+  adminDual("admin-opportunities-pipeline", "opportunities/pipeline", "Pipeline", "workspace", "opportunities/pipeline", {
+    breadcrumbLabel: "Pipeline",
+  }),
+  adminDual("admin-opportunities", "opportunities", "Opportunities", "workspace", "opportunities", {
+    breadcrumbLabel: "Opportunities",
+  }),
+  adminDual("admin-opportunities-workspace", "opportunities/workspace", "Opportunity Workspace", "workspace", "opportunities/workspace", {
+    breadcrumbLabel: "Workspace",
+  }),
   admin("admin-search", "search", "Prospect Search", "workspace", "admin-only"),
   admin("admin-imports", "imports", "Imports", "workspace", "admin-only"),
   admin("admin-imports-batch", "imports/[batchId]", "Import Batch Detail", "workspace", "admin-only", {
@@ -374,7 +408,9 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   admin("admin-intent-pixel", "intent-pixel", "Intent Signals", "intelligence", "admin-only"),
   admin("admin-conversations", "conversations", "Conversations", "intelligence", "admin-only"),
   admin("admin-replies", "replies", "Reply Inbox", "intelligence", "admin-only"),
-  admin("admin-replies-workflow", "replies/workflow", "Reply Workflow", "intelligence", "admin-only"),
+  adminDual("admin-replies-workflow", "replies/workflow", "Reply Workflow", "intelligence", "inbox/workflow", {
+    breadcrumbLabel: "Reply Workflow",
+  }),
   admin("admin-relationships", "relationships", "Relationships", "intelligence", "admin-only"),
   admin("admin-relationship-memory", "intelligence/relationship-memory", "Relationship Memory", "intelligence", "admin-only"),
   admin("admin-experiments", "experiments", "Experiments", "system", "hidden", {

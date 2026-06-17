@@ -28,7 +28,7 @@ import {
 import { growthFeaturePath } from "../lib/growth/navigation/growth-workspace-base-path"
 import { resolveGrowthBreadcrumbs } from "../lib/growth/navigation/growth-route-registry"
 
-export const GROWTH_WORKSPACE_CONTINUITY_QA_MARKER = "growth-workspace-continuity-v1" as const
+export const GROWTH_WORKSPACE_CONTINUITY_QA_MARKER = "growth-workspace-continuity-v3" as const
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, "..")
@@ -87,6 +87,26 @@ const OPERATOR_CONTINUITY_SOURCES: Array<{ file: string; forbidden: RegExp[] }> 
     file: "components/growth/growth-realtime-live-dashboard.tsx",
     forbidden: [/\/admin\/growth\/leads\?open=/],
   },
+  {
+    file: "components/growth/inbox/growth-inbox-v2-supporting-panels.tsx",
+    forbidden: [/\/admin\/growth\/replies\/workflow/],
+  },
+  {
+    file: "components/growth/growth-reply-workflow-actions-panel.tsx",
+    forbidden: [/href="\/admin\/growth\/replies\/workflow"/],
+  },
+  {
+    file: "components/growth/growth-lead-meeting-intelligence.tsx",
+    forbidden: [/href=\{`\/admin\/growth\/opportunities\/pipeline/],
+  },
+  {
+    file: "components/growth/growth-opportunity-draft-panel.tsx",
+    forbidden: [/href=\{`\/admin\/growth\/opportunities\/pipeline/],
+  },
+  {
+    file: "components/growth/growth-opportunity-pipeline-dashboard.tsx",
+    forbidden: [/href=\{`\/admin\/growth\/leads\?leadId=/],
+  },
 ]
 
 const SIDEBAR_SUBTREE_CASES: Array<{ pathname: string; activeNavId: string }> = [
@@ -95,6 +115,7 @@ const SIDEBAR_SUBTREE_CASES: Array<{ pathname: string; activeNavId: string }> = 
   { pathname: "/growth/leads/sample-lead", activeNavId: "leads" },
   { pathname: "/growth/calls/live", activeNavId: "calls" },
   { pathname: "/growth/calls/coaching", activeNavId: "calls" },
+  { pathname: "/growth/inbox/workflow", activeNavId: "inbox" },
   { pathname: "/growth/share-pages/templates/new", activeNavId: "templates" },
   { pathname: "/growth/automation/flow-1", activeNavId: "automation-flows" },
 ]
@@ -105,6 +126,10 @@ const CMD_K_MIGRATED_RESOLUTIONS: Array<{ adminHref: string; workspaceSegment: s
   { adminHref: "/admin/growth/leads/crm", workspaceSegment: "leads/crm" },
   { adminHref: "/admin/growth/calls/live", workspaceSegment: "calls/live" },
   { adminHref: "/admin/growth/calls/workspace", workspaceSegment: "calls" },
+  { adminHref: "/admin/growth/replies/workflow", workspaceSegment: "inbox/workflow" },
+  { adminHref: "/admin/growth/opportunities", workspaceSegment: "opportunities" },
+  { adminHref: "/admin/growth/opportunities/pipeline", workspaceSegment: "opportunities/pipeline" },
+  { adminHref: "/admin/growth/opportunities/workspace", workspaceSegment: "opportunities/workspace" },
   { adminHref: "/admin/growth/multichannel", workspaceSegment: "campaigns" },
 ]
 
@@ -144,11 +169,25 @@ function runAudit(): void {
     assert.ok(crumbs.length >= 1, `breadcrumb missing for ${entry.path}`)
     assert.equal(crumbs[0]?.label, "Growth")
 
-    if (entry.segment?.startsWith("leads/") || entry.segment?.startsWith("calls/")) {
+    if (entry.segment?.startsWith("leads/") || entry.segment?.startsWith("calls/") || entry.segment?.startsWith("inbox/") || entry.segment?.startsWith("opportunities/")) {
       assert.ok(crumbs.length >= 2, `hierarchical breadcrumb expected for ${entry.path}`)
     }
   }
   console.log("  ✓ breadcrumbs cover all migrated workspace pages")
+
+  const inboxWorkflowCrumbs = resolveGrowthBreadcrumbs("/growth/inbox/workflow")
+  assert.deepEqual(
+    inboxWorkflowCrumbs.map((crumb) => crumb.label),
+    ["Growth", "Inbox", "Reply Workflow"],
+  )
+  console.log("  ✓ inbox/workflow breadcrumbs: Growth → Inbox → Reply Workflow")
+
+  const pipelineCrumbs = resolveGrowthBreadcrumbs("/growth/opportunities/pipeline")
+  assert.deepEqual(
+    pipelineCrumbs.map((crumb) => crumb.label),
+    ["Growth", "Opportunities", "Pipeline"],
+  )
+  console.log("  ✓ opportunities/pipeline breadcrumbs: Growth → Opportunities → Pipeline")
 
   for (const { adminHref, workspaceSegment } of CMD_K_MIGRATED_RESOLUTIONS) {
     const resolved = resolveGrowthCommandPaletteHref("/growth/inbox", adminHref)

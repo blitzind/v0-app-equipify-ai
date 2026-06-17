@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { ChevronRight, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
@@ -9,6 +10,7 @@ import { GrowthCallIntelligenceScorecardCard } from "@/components/growth/growth-
 import { GrowthNativeDialerLaunchButton } from "@/components/growth/growth-native-dialer-launch-button"
 import { GrowthPredictiveDealIntelligenceCard } from "@/components/growth/growth-predictive-deal-intelligence-card"
 import { nativeCallWorkspaceHref } from "@/lib/growth/native-dialer/native-dialer-navigation"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import type {
   GrowthOpportunity,
   GrowthOpportunityDetail,
@@ -84,6 +86,8 @@ function OpportunityDetailPanel({
   loading: boolean
   onStageChange: (stageKey: string) => Promise<void>
 }) {
+  const pathname = usePathname()
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -175,7 +179,7 @@ function OpportunityDetailPanel({
 
       <div className="flex flex-wrap items-center gap-3">
         <Link
-          href={`/admin/growth/leads?leadId=${detail.leadId}`}
+          href={`${growthFeaturePath(pathname, "leads")}?leadId=${detail.leadId}`}
           className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline"
         >
           Open linked lead
