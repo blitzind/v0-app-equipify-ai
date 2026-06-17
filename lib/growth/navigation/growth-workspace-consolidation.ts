@@ -3,8 +3,12 @@
 import {
   GROWTH_ADMIN_BASE_PATH,
   GROWTH_WORKSPACE_BASE_PATH,
-  isGrowthWorkspacePathname,
-} from "@/lib/growth/navigation/growth-workspace-base-path"
+} from "@/lib/growth/navigation/growth-route-metadata-types"
+
+function isGrowthWorkspacePathname(pathname: string | null | undefined): boolean {
+  if (!pathname) return false
+  return pathname === GROWTH_WORKSPACE_BASE_PATH || pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/`)
+}
 
 export const GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER = "growth-workspace-consolidation-v2" as const
 
