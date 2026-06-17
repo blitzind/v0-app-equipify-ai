@@ -87,6 +87,7 @@ function runAudit(): void {
   console.log("  ✓ tab routes resolve active states")
 
   const layoutSource = readSource("app/(growth)/growth/inbox/layout.tsx")
+  assert.match(layoutSource, /GrowthInboxWorkspaceProvider/)
   assert.match(layoutSource, /GrowthInboxShell/)
   const shellSource = readSource(GROWTH_INBOX_TAB_SHELL_COMPONENT)
   assert.match(shellSource, /GROWTH_INBOX_WORKSPACE_TABS/)
@@ -125,7 +126,10 @@ function runAudit(): void {
   ]
   assert.equal(filterInboxThreadsByQueueView(threads, "objections").length, 1)
   assert.equal(filterInboxThreadsByQueueView(threads, "high_priority").length, 1)
-  console.log("  ✓ objections and high_priority queue filters work")
+  const queueUrlSync = readSource("components/growth/inbox/growth-inbox-queue-url-sync.tsx")
+  assert.match(queueUrlSync, /useGrowthWorkspaceDefaultViewsReadonly/)
+  assert.match(queueUrlSync, /shouldApplyGrowthInboxSavedDefaultFilter/)
+  console.log("  ✓ inbox queue sync applies saved default filter when ?view= is absent")
 
   const workflowCrumbs = resolveGrowthBreadcrumbs(workflowRoute)
   assert.deepEqual(workflowCrumbs.map((crumb) => crumb.label), ["Growth", "Inbox", "Reply Workflow"])

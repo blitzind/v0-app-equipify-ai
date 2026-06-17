@@ -55,6 +55,7 @@ export function GrowthNotificationPreferencesPanel() {
   const [form, setForm] = useState<GrowthOperatorNotificationEffectivePreferences>({
     inAppEnabled: true,
     browserPushEnabled: true,
+    emailNotificationsEnabled: true,
     minimumSeverity: "low",
     disabledEventTypes: [],
     quietHoursEnabled: false,
@@ -76,6 +77,7 @@ export function GrowthNotificationPreferencesPanel() {
       setForm({
         inAppEnabled: data.preferences.inAppEnabled,
         browserPushEnabled: data.preferences.browserPushEnabled,
+        emailNotificationsEnabled: data.preferences.emailNotificationsEnabled,
         minimumSeverity: data.preferences.minimumSeverity,
         disabledEventTypes: [...data.preferences.disabledEventTypes],
         quietHoursEnabled: data.preferences.quietHoursEnabled,

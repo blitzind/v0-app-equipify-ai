@@ -11,7 +11,7 @@ import { GROWTH_INBOX_DIAGNOSTICS_HREF } from "@/lib/growth/inbox/inbox-workspac
 import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import { usePathname } from "next/navigation"
 
-export const GROWTH_INBOX_OPERATIONS_PANEL_QA_MARKER = "growth-inbox-operations-panel-v2" as const
+export const GROWTH_INBOX_OPERATIONS_PANEL_QA_MARKER = "growth-inbox-operations-panel-v3" as const
 
 /** Phase 8A — planning, orchestration, and diagnostics kept out of the operator queue. */
 export function GrowthInboxWorkspaceOperationsPanel() {

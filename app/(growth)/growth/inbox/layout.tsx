@@ -1,6 +1,7 @@
 "use client"
 
 import { GrowthInboxShell } from "@/components/growth/inbox/growth-inbox-shell"
+import { GrowthInboxWorkspaceProvider } from "@/components/growth/inbox/growth-inbox-workspace-provider"
 import type { ReactNode } from "react"
 
 type GrowthInboxLayoutProps = {
@@ -8,5 +9,9 @@ type GrowthInboxLayoutProps = {
 }
 
 export default function GrowthInboxLayout({ children }: GrowthInboxLayoutProps) {
-  return <GrowthInboxShell>{children}</GrowthInboxShell>
+  return (
+    <GrowthInboxWorkspaceProvider>
+      <GrowthInboxShell>{children}</GrowthInboxShell>
+    </GrowthInboxWorkspaceProvider>
+  )
 }

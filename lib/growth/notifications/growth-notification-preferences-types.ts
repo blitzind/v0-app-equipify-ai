@@ -15,6 +15,7 @@ export type GrowthOperatorNotificationPreferencesRecord = {
   userId: string
   inAppEnabled: boolean
   browserPushEnabled: boolean
+  emailNotificationsEnabled: boolean
   minimumSeverity: GrowthOperatorNotificationSeverity
   disabledEventTypes: GrowthOperatorNotificationEvent[]
   quietHoursEnabled: boolean
@@ -29,6 +30,7 @@ export type GrowthOperatorNotificationPreferencesUpsertInput = {
   organizationId?: string | null
   inAppEnabled?: boolean
   browserPushEnabled?: boolean
+  emailNotificationsEnabled?: boolean
   minimumSeverity?: GrowthOperatorNotificationSeverity
   disabledEventTypes?: GrowthOperatorNotificationEvent[]
   quietHoursEnabled?: boolean
@@ -40,6 +42,7 @@ export type GrowthOperatorNotificationPreferencesUpsertInput = {
 export type GrowthOperatorNotificationEffectivePreferences = {
   inAppEnabled: boolean
   browserPushEnabled: boolean
+  emailNotificationsEnabled: boolean
   minimumSeverity: GrowthOperatorNotificationSeverity
   disabledEventTypes: GrowthOperatorNotificationEvent[]
   quietHoursEnabled: boolean
@@ -54,6 +57,7 @@ export const DEFAULT_GROWTH_OPERATOR_NOTIFICATION_EFFECTIVE_PREFERENCES: GrowthO
   {
     inAppEnabled: true,
     browserPushEnabled: true,
+    emailNotificationsEnabled: true,
     minimumSeverity: "low",
     disabledEventTypes: [],
     quietHoursEnabled: false,

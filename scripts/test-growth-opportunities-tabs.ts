@@ -80,7 +80,8 @@ function runAudit(): void {
 
   const overviewSource = readSource("app/(growth)/growth/opportunities/page.tsx")
   assert.match(overviewSource, /embedded/)
-  console.log("  ✓ overview tab embeds hub body inside shared shell")
+  assert.match(layoutSource, /GrowthOpportunitiesDefaultTabSync/)
+  console.log("  ✓ opportunities layout applies saved default tab on overview route")
 
   const pipelineCrumbs = resolveGrowthBreadcrumbs(`${GROWTH_WORKSPACE_BASE_PATH}/opportunities/pipeline`)
   assert.deepEqual(pipelineCrumbs.map((crumb) => crumb.label), ["Growth", "Opportunities", "Pipeline"])

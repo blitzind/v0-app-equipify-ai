@@ -20,6 +20,7 @@ const patchSchema = z
   .object({
     inAppEnabled: z.boolean().optional(),
     browserPushEnabled: z.boolean().optional(),
+    emailNotificationsEnabled: z.boolean().optional(),
     minimumSeverity: z.enum(GROWTH_OPERATOR_NOTIFICATION_SEVERITIES).optional(),
     disabledEventTypes: z.array(z.enum(GROWTH_OPERATOR_NOTIFICATION_EVENTS)).optional(),
     quietHoursEnabled: z.boolean().optional(),

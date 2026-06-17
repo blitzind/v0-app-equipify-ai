@@ -132,7 +132,7 @@ function runAudit(): void {
   console.log("  ✓ Cmd+K registry parity unchanged")
 
   const inboxPage = readSource("app/(growth)/growth/inbox/page.tsx")
-  assert.match(inboxPage, /GrowthInboxWorkspaceProvider/)
+  assert.doesNotMatch(inboxPage, /GrowthInboxWorkspaceProvider/)
   assert.match(inboxPage, /GrowthUnifiedInboxDashboardPanel|GrowthInboxWorkspaceV2Panel/)
 
   const workflowPage = readSource("app/(growth)/growth/inbox/workflow/page.tsx")

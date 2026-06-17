@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation"
 import { ChevronDown } from "lucide-react"
 import { GrowthInboxTeamQueuePanel } from "@/components/growth/growth-inbox-team-queue-panel"
 import { GrowthInboxWidgetErrorBoundary } from "@/components/growth/growth-inbox-widget-error-boundary"
-import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
+import { GrowthInboxCompactPanelState } from "@/components/growth/inbox/growth-inbox-compact-panel-state"
+import { useOptionalGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
 import {
   Collapsible,
   CollapsibleContent,
@@ -17,8 +18,22 @@ import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base
 /** Secondary team/ownership surfaces — collapsed by default so Thread → Context → Action stays primary. */
 export function GrowthInboxV2SupportingPanels() {
   const pathname = usePathname()
-  const { selectedThread, actionLoading, setSelectedThreadId, loadThreadDetail, intelligence } =
-    useGrowthInboxWorkspace()
+  const workspace = useOptionalGrowthInboxWorkspace()
+
+  if (!workspace) {
+    return (
+      <GrowthInboxCompactPanelState
+        title="Inbox workspace unavailable."
+        state="error"
+        message="Inbox workspace unavailable."
+        onRetry={() => {
+          if (typeof window !== "undefined") window.location.reload()
+        }}
+      />
+    )
+  }
+
+  const { selectedThread, actionLoading, setSelectedThreadId, loadThreadDetail, intelligence } = workspace
 
   return (
     <Collapsible defaultOpen={false} className="rounded-lg border border-border/50 bg-muted/5">

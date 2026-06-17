@@ -375,8 +375,12 @@ export function GrowthInboxWorkspaceProvider({ children }: { children: ReactNode
   return <GrowthInboxWorkspaceContext.Provider value={value}>{children}</GrowthInboxWorkspaceContext.Provider>
 }
 
+export function useOptionalGrowthInboxWorkspace(): GrowthInboxWorkspaceState | null {
+  return useContext(GrowthInboxWorkspaceContext)
+}
+
 export function useGrowthInboxWorkspace(): GrowthInboxWorkspaceState {
-  const context = useContext(GrowthInboxWorkspaceContext)
+  const context = useOptionalGrowthInboxWorkspace()
   if (!context) throw new Error("useGrowthInboxWorkspace must be used within GrowthInboxWorkspaceProvider")
   return context
 }

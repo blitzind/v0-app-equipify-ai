@@ -57,6 +57,7 @@ function runAudit(): void {
 
   const operationsPanel = readSource("components/growth/inbox/growth-inbox-workspace-operations-panel.tsx")
   assert.match(operationsPanel, /GrowthInboxV2SupportingPanels/)
+  assert.match(operationsPanel, /growth-inbox-operations-panel-v3/)
   console.log("  ✓ team queue supporting panel relocated to operations tab")
 
   const compactState = readSource("components/growth/inbox/growth-inbox-compact-panel-state.tsx")

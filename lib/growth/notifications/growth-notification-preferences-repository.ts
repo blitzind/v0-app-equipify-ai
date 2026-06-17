@@ -17,7 +17,7 @@ import type { GrowthOperatorNotificationSeverity } from "@/lib/growth/notificati
 import { isNotificationAllowedByPreferences } from "@/lib/growth/notifications/growth-notification-preferences-utils"
 
 const SELECT =
-  "id, organization_id, user_id, in_app_enabled, browser_push_enabled, minimum_severity, disabled_event_types, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_timezone, created_at, updated_at"
+  "id, organization_id, user_id, in_app_enabled, browser_push_enabled, email_notifications_enabled, minimum_severity, disabled_event_types, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_timezone, created_at, updated_at"
 
 type PreferencesRow = {
   id: string
@@ -25,6 +25,7 @@ type PreferencesRow = {
   user_id: string
   in_app_enabled: boolean
   browser_push_enabled: boolean
+  email_notifications_enabled: boolean
   minimum_severity: string
   disabled_event_types: string[] | null
   quiet_hours_enabled: boolean
@@ -46,6 +47,7 @@ function mapRow(row: PreferencesRow): GrowthOperatorNotificationPreferencesRecor
     userId: row.user_id,
     inAppEnabled: row.in_app_enabled,
     browserPushEnabled: row.browser_push_enabled,
+    emailNotificationsEnabled: row.email_notifications_enabled,
     minimumSeverity: row.minimum_severity as GrowthOperatorNotificationSeverity,
     disabledEventTypes: normalizeGrowthOperatorNotificationDisabledEventTypes(row.disabled_event_types ?? []),
     quietHoursEnabled: row.quiet_hours_enabled,
@@ -79,6 +81,8 @@ export async function upsertPreferencesForUser(
     user_id: userId,
     in_app_enabled: input.inAppEnabled ?? existing?.inAppEnabled ?? true,
     browser_push_enabled: input.browserPushEnabled ?? existing?.browserPushEnabled ?? true,
+    email_notifications_enabled:
+      input.emailNotificationsEnabled ?? existing?.emailNotificationsEnabled ?? true,
     minimum_severity: input.minimumSeverity ?? existing?.minimumSeverity ?? "low",
     disabled_event_types: normalizeGrowthOperatorNotificationDisabledEventTypes(
       input.disabledEventTypes ?? existing?.disabledEventTypes ?? [],

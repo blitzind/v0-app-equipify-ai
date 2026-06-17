@@ -52,6 +52,7 @@ export function resolveEffectiveGrowthOperatorNotificationPreferences(
   return {
     inAppEnabled: record.inAppEnabled,
     browserPushEnabled: record.browserPushEnabled,
+    emailNotificationsEnabled: record.emailNotificationsEnabled,
     minimumSeverity: record.minimumSeverity,
     disabledEventTypes: [...record.disabledEventTypes],
     quietHoursEnabled: record.quietHoursEnabled,

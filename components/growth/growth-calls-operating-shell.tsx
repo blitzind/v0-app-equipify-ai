@@ -6,11 +6,12 @@ import { GrowthCallCopilotDashboard } from "@/components/growth/growth-call-copi
 import { GrowthCallWorkspace } from "@/components/growth/growth-call-workspace"
 import { GrowthCallsOperatingErrorBoundary } from "@/components/growth/growth-calls-operating-error-boundary"
 import { GrowthCallsOperatingHeader } from "@/components/growth/growth-calls-operating-tabs"
+import { useGrowthWorkspaceDefaultViewsReadonly } from "@/hooks/growth/use-growth-workspace-default-views-readonly"
 import {
   GROWTH_CALLS_RUNTIME_HARDENING_QA_MARKER,
   GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER,
-  resolveGrowthCallsOperatingView,
 } from "@/lib/growth/navigation/growth-workspace-consolidation"
+import { resolveGrowthCallsOperatingViewWithSavedDefault } from "@/lib/growth/settings/growth-workspace-settings-consumption"
 
 function ShellFallback() {
   return <p className="text-sm text-muted-foreground">Loading calls…</p>
@@ -19,9 +20,11 @@ function ShellFallback() {
 function GrowthCallsOperatingShellInner() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const view = resolveGrowthCallsOperatingView({
+  const { defaultViews, loaded } = useGrowthWorkspaceDefaultViewsReadonly()
+  const view = resolveGrowthCallsOperatingViewWithSavedDefault({
     pathname,
     viewParam: searchParams.get("view"),
+    savedCallsDefaultView: loaded ? defaultViews.callsDefaultView : null,
   })
 
   return (
