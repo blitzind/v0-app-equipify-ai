@@ -189,7 +189,28 @@ function runAudit(): void {
   const mediaNav = GROWTH_SHELL_NAV_GROUPS.flatMap((group) => group.items).find((item) => item.id === "media-assets")
   assert.ok(mediaNav)
   assert.equal(mediaNav.href, "/growth/media")
-  console.log("  ✓ sidebar workspace nav coverage; Media Assets → /growth/media")
+
+  const intelligenceNav = GROWTH_SHELL_NAV_GROUPS.find((group) => group.id === "intelligence")
+  assert.ok(intelligenceNav)
+  const intelligenceIds = intelligenceNav.items.map((item) => item.id)
+  assert.deepEqual(intelligenceIds, [
+    "engagement",
+    "opportunities",
+    "opportunities-pipeline",
+    "conversations",
+    "relationships",
+    "reports",
+    "signals",
+  ])
+  assert.equal(
+    intelligenceNav.items.find((item) => item.id === "opportunities")?.href,
+    "/growth/opportunities",
+  )
+  assert.equal(
+    intelligenceNav.items.find((item) => item.id === "conversations")?.href,
+    "/growth/conversations",
+  )
+  console.log("  ✓ sidebar workspace nav coverage; intelligence Phase 4 routes surfaced")
 
   const inboxDiagnostics = GROWTH_ROUTE_METADATA.find((entry) => entry.id === "admin-inbox-diagnostics")
   assert.ok(inboxDiagnostics?.hidden)

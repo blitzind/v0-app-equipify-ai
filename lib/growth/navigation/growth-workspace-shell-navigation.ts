@@ -11,10 +11,13 @@ import {
   BarChart3,
   FileText,
   GitBranch,
+  Handshake,
   Inbox,
+  Kanban,
   LayoutDashboard,
   LayoutTemplate,
   Layers,
+  MessageSquare,
   Phone,
   Radio,
   Settings,
@@ -33,7 +36,7 @@ import {
   GROWTH_WORKSPACE_BASE_PATH,
 } from "@/lib/growth/navigation/growth-route-metadata-types"
 
-export const GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER = "growth-workspace-shell-nav-v2" as const
+export const GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER = "growth-workspace-shell-nav-v3" as const
 
 /** Back-compat QA marker used by shell components. */
 export const GROWTH_SHELL_NAV_QA_MARKER = GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER
@@ -109,6 +112,16 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
     label: "Intelligence",
     items: [
       { id: "engagement", label: "Engagement", registryRouteId: "workspace-engagement", icon: Activity, workspaceRoute: true },
+      { id: "opportunities", label: "Opportunities", registryRouteId: "workspace-opportunities", icon: Target, workspaceRoute: true },
+      {
+        id: "opportunities-pipeline",
+        label: "Pipeline",
+        registryRouteId: "workspace-opportunities-pipeline",
+        icon: Kanban,
+        workspaceRoute: true,
+      },
+      { id: "conversations", label: "Conversations", registryRouteId: "workspace-conversations", icon: MessageSquare, workspaceRoute: true },
+      { id: "relationships", label: "Relationships", registryRouteId: "workspace-relationships", icon: Handshake, workspaceRoute: true },
       { id: "reports", label: "Reports", registryRouteId: "admin-revenue-intelligence", icon: TrendingUp },
       { id: "signals", label: "Signals", registryRouteId: "admin-intent-pixel", icon: Radio },
     ],
@@ -170,6 +183,17 @@ export function isGrowthShellNavItemActive(pathname: string, item: GrowthShellNa
 
   if (pathname === item.href) return true
   if (item.href === GROWTH_WORKSPACE_BASE_PATH) return pathname === GROWTH_WORKSPACE_BASE_PATH
+  if (item.id === "opportunities") {
+    if (pathname === `${GROWTH_WORKSPACE_BASE_PATH}/opportunities`) return true
+    if (pathname === `${GROWTH_WORKSPACE_BASE_PATH}/opportunities/workspace`) return true
+    return false
+  }
+  if (item.id === "opportunities-pipeline") {
+    return (
+      pathname === `${GROWTH_WORKSPACE_BASE_PATH}/opportunities/pipeline` ||
+      pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/opportunities/pipeline/`)
+    )
+  }
   if (item.workspaceRoute && pathname.startsWith(`${item.href}/`)) return true
   if (item.id === "share-pages" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/share-pages/`)) {
     return !pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/share-pages/templates`)

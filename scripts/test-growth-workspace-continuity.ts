@@ -28,7 +28,7 @@ import {
 import { growthFeaturePath } from "../lib/growth/navigation/growth-workspace-base-path"
 import { resolveGrowthBreadcrumbs } from "../lib/growth/navigation/growth-route-registry"
 
-export const GROWTH_WORKSPACE_CONTINUITY_QA_MARKER = "growth-workspace-continuity-v4" as const
+export const GROWTH_WORKSPACE_CONTINUITY_QA_MARKER = "growth-workspace-continuity-v5" as const
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, "..")
@@ -116,6 +116,11 @@ const SIDEBAR_SUBTREE_CASES: Array<{ pathname: string; activeNavId: string }> = 
   { pathname: "/growth/calls/live", activeNavId: "calls" },
   { pathname: "/growth/calls/coaching", activeNavId: "calls" },
   { pathname: "/growth/inbox/workflow", activeNavId: "inbox" },
+  { pathname: "/growth/opportunities", activeNavId: "opportunities" },
+  { pathname: "/growth/opportunities/pipeline", activeNavId: "opportunities-pipeline" },
+  { pathname: "/growth/opportunities/workspace", activeNavId: "opportunities" },
+  { pathname: "/growth/conversations", activeNavId: "conversations" },
+  { pathname: "/growth/relationships", activeNavId: "relationships" },
   { pathname: "/growth/share-pages/templates/new", activeNavId: "templates" },
   { pathname: "/growth/automation/flow-1", activeNavId: "automation-flows" },
 ]
@@ -164,7 +169,7 @@ function runAudit(): void {
       `expected ${activeNavId} active for ${pathname}, got ${activeItems.map((item) => item.id).join(", ") || "(none)"}`,
     )
   }
-  console.log("  ✓ sidebar active states cover leads/calls/share-pages/automation subtrees")
+  console.log("  ✓ sidebar active states cover leads/calls/share-pages/automation/opportunities/intelligence subtrees")
 
   for (const entry of GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.filter((row) => !row.placeholder)) {
     const crumbs = resolveGrowthBreadcrumbs(entry.path)
