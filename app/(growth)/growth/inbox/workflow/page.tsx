@@ -1,7 +1,7 @@
 "use client"
 
-import { GrowthReplyWorkflowDashboardBody } from "@/components/growth/replies/growth-reply-workflow-dashboard-body"
+import { GrowthInboxWorkspaceWorkflowPanel } from "@/components/growth/inbox/growth-inbox-workspace-workflow-panel"
 
 export default function GrowthInboxWorkflowPage() {
-  return <GrowthReplyWorkflowDashboardBody />
+  return <GrowthInboxWorkspaceWorkflowPanel />
 }

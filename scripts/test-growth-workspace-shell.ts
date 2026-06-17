@@ -218,7 +218,7 @@ function runAudit(): void {
         qa_marker: GROWTH_ROUTE_METADATA_QA_MARKER,
         migrated_routes: GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length,
         placeholder_routes: placeholders.length,
-        total_registry_routes: 146,
+        total_registry_routes: 147,
         workspace_nav_items: workspaceNavHrefs.length,
         phase_4a_operator_routes: PHASE_4A_OPERATOR_ROUTES,
         phase_4b_operator_routes: PHASE_4B_OPERATOR_ROUTES,

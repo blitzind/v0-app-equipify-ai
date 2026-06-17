@@ -227,6 +227,13 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     breadcrumbLabel: "Reply Workflow",
     adminPath: `${ADMIN}/replies/workflow`,
   }),
+  workspace("workspace-inbox-operations", "inbox/operations", "Inbox Operations", "workspace", "workspace", {
+    // Phase 8A: orchestration and diagnostics — not a separate sidebar destination.
+    migrated: true,
+    segment: "inbox/operations",
+    placeholder: false,
+    breadcrumbLabel: "Operations",
+  }),
   workspace("workspace-calls", "calls", "Calls", "workspace", "dual-route", {
     migrated: true,
     segment: "calls",

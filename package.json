@@ -142,6 +142,8 @@
     "test:growth-opportunities-tabs": "tsx scripts/test-growth-opportunities-tabs.ts",
     "test:growth-inbox-replies-architecture": "tsx scripts/test-growth-inbox-replies-architecture.ts",
     "test:growth-inbox-workspace": "tsx scripts/test-growth-inbox-workspace.ts",
+    "test:growth-inbox-ia-simplification": "tsx scripts/test-growth-inbox-ia-simplification.ts",
+    "test:growth-inbox-viewport-polish": "tsx scripts/test-growth-inbox-viewport-polish.ts",
     "test:growth-inbox-metrics-parity": "tsx scripts/test-growth-inbox-metrics-parity.ts",
     "test:growth-workspace-link-normalization": "tsx scripts/test-growth-workspace-link-normalization.ts",
     "test:growth-inbox-calls-convergence": "tsx scripts/test-growth-inbox-calls-convergence.ts",

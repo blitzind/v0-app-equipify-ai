@@ -278,6 +278,7 @@ export function GrowthReplyWorkflowActionsPanel({
   compact = false,
   showSequenceExit = true,
   hideRevenuePanel = false,
+  includeEmbeddedSurfaces = true,
   title = "Reply workflow actions",
   useExternalData = false,
   externalItems,
@@ -288,6 +289,8 @@ export function GrowthReplyWorkflowActionsPanel({
   compact?: boolean
   showSequenceExit?: boolean
   hideRevenuePanel?: boolean
+  /** Phase 8A.2 — when false, render action center only (workflow tab mounts surfaces separately). */
+  includeEmbeddedSurfaces?: boolean
   title?: string
   /** When true, skip internal fetch and consume preloaded inbox lead context data. */
   useExternalData?: boolean
@@ -508,6 +511,8 @@ export function GrowthReplyWorkflowActionsPanel({
         ) : null}
       </GrowthEngineCard>
 
+      {includeEmbeddedSurfaces ? (
+        <>
       <GrowthKnowledgeContextSection
         consumer="reply_intelligence"
         title="Knowledge Context"
@@ -532,6 +537,8 @@ export function GrowthReplyWorkflowActionsPanel({
       <GrowthHumanInterventionsPanel title="Human Interventions" leadId={leadId} compact={compact} />
 
       <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" leadId={leadId} compact={compact} />
+        </>
+      ) : null}
 
       {showSequenceExit && exitCandidates.length > 0 ? (
         <GrowthEngineCard title="Sequence exit review" subtitle="Inbound reply on active sequence — operator decides next step.">

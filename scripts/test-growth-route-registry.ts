@@ -81,9 +81,9 @@ function discoverGrowthPageRoutePaths(): string[] {
 function runAudit(): void {
   console.log(`\n=== Growth route registry audit (${GROWTH_ROUTE_METADATA_QA_MARKER}) ===\n`)
 
-  assert.equal(GROWTH_ROUTE_CATALOG_INPUTS.length, 146, "catalog must define 146 routes")
-  assert.equal(GROWTH_ROUTE_METADATA.length, 146, "metadata must define 146 routes")
-  console.log("  ✓ 146 routes registered")
+  assert.equal(GROWTH_ROUTE_CATALOG_INPUTS.length, 147, "catalog must define 147 routes")
+  assert.equal(GROWTH_ROUTE_METADATA.length, 147, "metadata must define 147 routes")
+  console.log("  ✓ 147 routes registered")
 
   const ids = GROWTH_ROUTE_METADATA.map((entry) => entry.id)
   const paths = GROWTH_ROUTE_METADATA.map((entry) => entry.path)
@@ -120,7 +120,7 @@ function runAudit(): void {
   console.log("  ✓ orphan routes explicitly registered")
 
   const discoveredPaths = discoverGrowthPageRoutePaths()
-  assert.equal(discoveredPaths.length, 146, "expected 146 Growth page.tsx routes on disk")
+  assert.equal(discoveredPaths.length, 147, "expected 147 Growth page.tsx routes on disk")
   for (const discovered of discoveredPaths) {
     assert.ok(findGrowthRouteMetadataByAnyPath(discovered), `undocumented page route: ${discovered}`)
   }
@@ -163,9 +163,9 @@ function runAudit(): void {
   }
   console.log("  ✓ migration flags consistent")
 
-  assert.equal(GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length, 51)
-  assert.equal(getMigratedRoutes().length, 51)
-  console.log("  ✓ migrated workspace route count (51 routes)")
+  assert.equal(GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length, 52)
+  assert.equal(getMigratedRoutes().length, 52)
+  console.log("  ✓ migrated workspace route count (52 routes)")
 
   assert.equal(getPlaceholderRoutes().length, 0, "Phase 7C settings shell removed placeholder-only workspace routes")
   console.log("  ✓ no placeholder-only workspace routes remain")
@@ -285,7 +285,7 @@ function runAudit(): void {
   console.log("  ✓ Phase 4C conversations/relationships dual-route; replies/revenue execution remain admin-only")
 
   const report = buildGrowthRouteRegistryReport()
-  assert.equal(report.totalRoutes, 146)
+  assert.equal(report.totalRoutes, 147)
   assert.equal(getWorkspaceRoutes().length, report.bySection.workspace)
   assert.equal(getContentRoutes().length, report.bySection.content)
   assert.equal(getAutomationRoutes().length, report.bySection.automation)

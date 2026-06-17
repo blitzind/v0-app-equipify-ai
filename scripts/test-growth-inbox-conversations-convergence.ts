@@ -135,10 +135,10 @@ function runAudit(): void {
   assert.match(conversationsDashboard, /fetchGrowthConversationsDashboard/)
   console.log("  ✓ inbox conversation column and conversations dashboard wire read-only context")
 
-  const overviewPanel = readSource("components/growth/inbox/growth-inbox-overview-metrics-panel.tsx")
-  assert.match(overviewPanel, /deriveGrowthInboxConversationOverviewMetrics/)
-  assert.match(overviewPanel, /useGrowthConversationsDashboard/)
-  console.log("  ✓ inbox overview wires conversation portfolio metrics")
+  const workflowSummary = readSource("components/growth/inbox/growth-inbox-workflow-intelligence-summary.tsx")
+  assert.match(workflowSummary, /deriveGrowthInboxConversationOverviewMetrics/)
+  assert.match(workflowSummary, /useGrowthConversationsDashboard/)
+  console.log("  ✓ workflow intelligence summary wires conversation portfolio metrics")
 
   assert.ok(GROWTH_INBOX_CONVERSATIONS_CONVERGENCE_MATRIX.some((row) => row.status === "available"))
   assert.ok(GROWTH_INBOX_CONVERSATIONS_CONVERGENCE_MATRIX.some((row) => row.status === "deferred"))

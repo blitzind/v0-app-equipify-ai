@@ -7,7 +7,7 @@ import {
 } from "@/lib/growth/inbox/inbox-thread-queue-filters"
 import type { GrowthSalesExecutionDashboard } from "@/lib/growth/reply-intelligence/reply-intent-types"
 
-export const GROWTH_INBOX_OVERVIEW_METRICS_QA_MARKER = "growth-inbox-overview-metrics-v1" as const
+export const GROWTH_INBOX_OVERVIEW_METRICS_QA_MARKER = "growth-inbox-overview-metrics-v3" as const
 
 export type GrowthInboxOverviewMetrics = {
   qaMarker: typeof GROWTH_INBOX_OVERVIEW_METRICS_QA_MARKER

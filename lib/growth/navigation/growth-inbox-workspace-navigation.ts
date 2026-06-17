@@ -1,12 +1,14 @@
 /**
- * Inbox workspace tab navigation (Phase 7G).
+ * Inbox workspace tab navigation (Phase 8A).
  *
- * Overview and Workflow are contextual tabs under Inbox — Replies are filters, not routes.
+ * Inbox — operator communications (thread queue, compact metrics).
+ * Workflow — human-in-the-loop execution and reply intelligence.
+ * Operations — orchestration, campaigns, and diagnostics.
  */
 
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
 
-export const GROWTH_INBOX_WORKSPACE_NAV_QA_MARKER = "growth-inbox-workspace-nav-v1" as const
+export const GROWTH_INBOX_WORKSPACE_NAV_QA_MARKER = "growth-inbox-workspace-nav-v2" as const
 
 export type GrowthInboxWorkspaceTab = {
   id: string
@@ -17,18 +19,25 @@ export type GrowthInboxWorkspaceTab = {
 
 export const GROWTH_INBOX_WORKSPACE_TABS: GrowthInboxWorkspaceTab[] = [
   {
-    id: "overview",
-    label: "Overview",
+    id: "inbox",
+    label: "Inbox",
     href: `${GROWTH_WORKSPACE_BASE_PATH}/inbox`,
     description:
-      "Unified operator inbox — thread queue, conversation, action center, operator notifications, and reply intelligence.",
+      "Operator queue — what needs attention, notifications, conversations, and next actions.",
   },
   {
     id: "workflow",
     label: "Workflow",
     href: `${GROWTH_WORKSPACE_BASE_PATH}/inbox/workflow`,
     description:
-      "Follow-up actions, human intervention, opportunity creation, meeting handling, and workflow execution.",
+      "Human interventions, reply intelligence, sequence preview, and follow-up policy execution.",
+  },
+  {
+    id: "operations",
+    label: "Operations",
+    href: `${GROWTH_WORKSPACE_BASE_PATH}/inbox/operations`,
+    description:
+      "Campaign builder, agent orchestration, event bus, and inbox diagnostics — planning surfaces kept out of the operator queue.",
   },
 ]
 
@@ -39,8 +48,9 @@ export function isGrowthInboxTabRoute(pathname: string): boolean {
 }
 
 export function resolveGrowthInboxActiveTabId(pathname: string): string | null {
-  if (pathname === `${GROWTH_WORKSPACE_BASE_PATH}/inbox`) return "overview"
+  if (pathname === `${GROWTH_WORKSPACE_BASE_PATH}/inbox`) return "inbox"
   if (pathname === `${GROWTH_WORKSPACE_BASE_PATH}/inbox/workflow`) return "workflow"
+  if (pathname === `${GROWTH_WORKSPACE_BASE_PATH}/inbox/operations`) return "operations"
   return null
 }
 

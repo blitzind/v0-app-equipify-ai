@@ -66,3 +66,7 @@ export function growthWorkspaceInboxWorkflowHref(leadId?: string | null): string
   const params = new URLSearchParams({ leadId })
   return `${GROWTH_WORKSPACE_CANONICAL_ALIASES.replyWorkflow}?${params.toString()}`
 }
+
+export function growthWorkspaceCallsHref(): string {
+  return `${GROWTH_WORKSPACE_BASE_PATH}/calls`
+}

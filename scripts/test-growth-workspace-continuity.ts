@@ -40,7 +40,7 @@ const ROOT = path.resolve(__dirname, "..")
 /** Operator continuity surfaces patched in Phase 3D — must not hardcode migrated admin paths. */
 const OPERATOR_CONTINUITY_SOURCES: Array<{ file: string; forbidden: RegExp[] }> = [
   {
-    file: "components/growth/inbox/growth-inbox-shell.tsx",
+    file: "components/growth/inbox/growth-inbox-workspace-operations-panel.tsx",
     forbidden: [/\/admin\/growth\/queue/],
   },
   {
@@ -120,6 +120,7 @@ const SIDEBAR_SUBTREE_CASES: Array<{ pathname: string; activeNavId: string }> = 
   { pathname: "/growth/calls/live", activeNavId: "calls" },
   { pathname: "/growth/calls/coaching", activeNavId: "calls" },
   { pathname: "/growth/inbox/workflow", activeNavId: "inbox" },
+  { pathname: "/growth/inbox/operations", activeNavId: "inbox" },
   { pathname: "/growth/opportunities", activeNavId: "opportunities" },
   { pathname: "/growth/opportunities/pipeline", activeNavId: "opportunities" },
   { pathname: "/growth/opportunities/workspace", activeNavId: "opportunities" },
@@ -202,6 +203,13 @@ function runAudit(): void {
     ["Growth", "Inbox", "Reply Workflow"],
   )
   console.log("  ✓ inbox/workflow breadcrumbs: Growth → Inbox → Reply Workflow")
+
+  const inboxOperationsCrumbs = resolveGrowthBreadcrumbs("/growth/inbox/operations")
+  assert.deepEqual(
+    inboxOperationsCrumbs.map((crumb) => crumb.label),
+    ["Growth", "Inbox", "Operations"],
+  )
+  console.log("  ✓ inbox/operations breadcrumbs: Growth → Inbox → Operations")
 
   const pipelineCrumbs = resolveGrowthBreadcrumbs("/growth/opportunities/pipeline")
   assert.deepEqual(

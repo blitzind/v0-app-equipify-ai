@@ -58,6 +58,19 @@ export const GROWTH_INBOX_OPERATOR_ROUTES: GrowthInboxRepliesRouteSurface[] = [
     purpose:
       "Reply-generated workflow actions — mark interested, create call/follow-up tasks, opportunity drafts, sequence exits. Child of Inbox, not a separate sidebar destination.",
   },
+  {
+    id: "workspace-inbox-operations",
+    label: "Inbox Operations",
+    workspacePath: `${GROWTH_WORKSPACE_BASE_PATH}/inbox/operations`,
+    adminPath: `${GROWTH_ADMIN_BASE_PATH}/inbox`,
+    registryRouteId: "workspace-inbox-operations",
+    migrationStatus: "workspace",
+    sidebarVisible: false,
+    cmdKLabel: "Inbox Operations",
+    breadcrumbTrail: ["Growth", "Inbox", "Operations"],
+    purpose:
+      "Campaign builder, agent orchestration, event bus, and inbox diagnostics — planning surfaces kept out of the operator queue.",
+  },
 ]
 
 export const GROWTH_REPLIES_OPERATOR_ROUTES: GrowthInboxRepliesRouteSurface[] = [

@@ -106,13 +106,16 @@ export function GrowthOperatorInboxPanel({
       title={title}
       icon={<Inbox className="h-4 w-4" />}
       data-qa-marker={OPERATOR_INBOX_QA_MARKER}
+      className={compact ? "p-3 sm:p-3" : undefined}
     >
-      <p className="mb-3 text-xs text-muted-foreground">
-        Human-reviewed operator queue — signals, replies, approvals, attention, and threads. No autonomous outreach
-        execution.
-      </p>
+      {!compact ? (
+        <p className="mb-3 text-xs text-muted-foreground">
+          Human-reviewed operator queue — signals, replies, approvals, attention, and threads. No autonomous outreach
+          execution.
+        </p>
+      ) : null}
 
-      <div className="mb-3 flex flex-wrap gap-2">
+      <div className={`mb-2 flex flex-wrap gap-2 ${compact ? "gap-1.5" : ""}`}>
         {OPERATOR_INBOX_FILTERS.map((value) => (
           <button
             key={value}
@@ -127,12 +130,12 @@ export function GrowthOperatorInboxPanel({
         ))}
       </div>
 
-      <Button size="sm" variant="outline" disabled={loading} onClick={() => void load()}>
+      <Button size="sm" variant={compact ? "ghost" : "outline"} className={compact ? "h-7 px-2 text-xs" : undefined} disabled={loading} onClick={() => void load()}>
         {loading ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
         Refresh queue
       </Button>
 
-      {queue ? (
+      {queue && !compact ? (
         <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
           <GrowthBadge tone="neutral">{queue.total} items</GrowthBadge>
           <GrowthBadge tone="attention">{queue.urgent_count} urgent/high</GrowthBadge>
@@ -147,11 +150,15 @@ export function GrowthOperatorInboxPanel({
         error={error}
         isEmpty={!loading && (queue?.items.length ?? 0) === 0}
         emptyKind="no_inbox_items"
+        emptyMessage="No notifications right now."
         onRetry={() => void load()}
         partialData={Boolean(queue)}
+        compact={compact}
+        compactTitle={title}
       >
+        <div className={compact ? "max-h-[7.5rem] space-y-2 overflow-y-auto pr-1" : "space-y-2"}>
         {queue?.items.map((item) => (
-          <div key={item.item_id} className="rounded-xl border border-border bg-muted/20 p-3">
+          <div key={item.item_id} className={`rounded-lg border border-border bg-muted/20 ${compact ? "p-2" : "p-3"}`}>
             <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
               <div>
                 <p className="text-sm font-medium">{item.title}</p>
@@ -204,14 +211,19 @@ export function GrowthOperatorInboxPanel({
             </div>
           </div>
         ))}
+        </div>
       </GrowthEnginePanelResilience>
     </GrowthEngineCard>
+    {!compact ? (
+      <>
     <GrowthConversationalPlaybooksPanel consumer="operator_inbox" title="Conversational Playbook" leadId={leadId} compact />
     <GrowthHumanInterventionsPanel title="Human Interventions" leadId={leadId} compact />
     <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" leadId={leadId} compact />
     <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" leadId={leadId} compact />
     <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" leadId={leadId} compact />
     <GrowthAgentOrchestrationPanel title="Agent Orchestration" leadId={leadId} compact />
+      </>
+    ) : null}
     </>
   )
 }

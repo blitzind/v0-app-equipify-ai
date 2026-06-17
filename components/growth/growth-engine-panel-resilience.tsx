@@ -4,6 +4,7 @@ import type { ReactNode } from "react"
 import { Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthEngineHonestEmptyState } from "@/components/growth/growth-engine-honest-empty-state"
+import { GrowthInboxCompactPanelState } from "@/components/growth/inbox/growth-inbox-compact-panel-state"
 import { sanitizeGrowthAdminUiError } from "@/lib/growth/admin-route-runtime-types"
 import { GROWTH_ENGINE_HARDENING_QA_MARKER } from "@/lib/growth/e2e/growth-engine-hardening-types"
 import type { GrowthEngineEmptyStateKind } from "@/lib/growth/e2e/growth-engine-hardening-types"
@@ -19,6 +20,9 @@ type GrowthEnginePanelResilienceProps = {
   onRetry: () => void
   refreshing?: boolean
   partialData?: boolean
+  /** Phase 8A.2 — compact 80–120px operator panel states. */
+  compact?: boolean
+  compactTitle?: string
   children: ReactNode
 }
 
@@ -33,8 +37,37 @@ export function GrowthEnginePanelResilience({
   onRetry,
   refreshing = false,
   partialData = false,
+  compact = false,
+  compactTitle,
   children,
 }: GrowthEnginePanelResilienceProps) {
+  if (compact) {
+    const title = compactTitle ?? "Panel"
+    if (loading && !partialData) {
+      return <GrowthInboxCompactPanelState title={title} state="loading" />
+    }
+    if (error && !partialData) {
+      return (
+        <GrowthInboxCompactPanelState
+          title={title}
+          state="error"
+          message={sanitizeGrowthAdminUiError(error)}
+          onRetry={onRetry}
+        />
+      )
+    }
+    if (isEmpty && !partialData) {
+      return (
+        <GrowthInboxCompactPanelState
+          title={title}
+          state="empty"
+          message={emptyMessage ?? emptyTitle ?? "Unavailable."}
+          onRetry={onRetry}
+        />
+      )
+    }
+  }
+
   if (loading && !partialData) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground" data-qa-marker={qaMarker}>

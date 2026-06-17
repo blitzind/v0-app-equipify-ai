@@ -39,6 +39,7 @@ const ROOT = path.resolve(__dirname, "..")
 const WORKSPACE_PAGE_PATHS = [
   "app/(growth)/growth/inbox/page.tsx",
   "app/(growth)/growth/inbox/workflow/page.tsx",
+  "app/(growth)/growth/inbox/operations/page.tsx",
 ] as const
 
 const ADMIN_PAGE_PATHS = [
@@ -135,7 +136,10 @@ function runAudit(): void {
   assert.match(inboxPage, /GrowthUnifiedInboxDashboardPanel|GrowthInboxWorkspaceV2Panel/)
 
   const workflowPage = readSource("app/(growth)/growth/inbox/workflow/page.tsx")
-  assert.match(workflowPage, /GrowthReplyWorkflowDashboardBody/)
+  assert.match(workflowPage, /GrowthInboxWorkspaceWorkflowPanel/)
+
+  const operationsPage = readSource("app/(growth)/growth/inbox/operations/page.tsx")
+  assert.match(operationsPage, /GrowthInboxWorkspaceOperationsPanel/)
 
   const replyInboxPage = readSource("app/(admin)/admin/growth/replies/page.tsx")
   assert.match(replyInboxPage, /GrowthReplyInboxDashboard/)

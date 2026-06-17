@@ -68,19 +68,22 @@ function sampleThread(overrides: Partial<GrowthInboxThread>): GrowthInboxThread 
 function runAudit(): void {
   console.log(`\n=== Growth inbox workspace audit (${GROWTH_INBOX_WORKSPACE_NAV_QA_MARKER}) ===\n`)
 
-  assert.equal(GROWTH_INBOX_WORKSPACE_TABS.length, 2)
+  assert.equal(GROWTH_INBOX_WORKSPACE_TABS.length, 3)
   assert.deepEqual(
     GROWTH_INBOX_WORKSPACE_TABS.map((tab) => tab.label),
-    ["Overview", "Workflow"],
+    ["Inbox", "Workflow", "Operations"],
   )
-  console.log("  ✓ tab manifest defines Overview and Workflow")
+  console.log("  ✓ tab manifest defines Inbox, Workflow, and Operations")
 
-  const overviewRoute = `${GROWTH_WORKSPACE_BASE_PATH}/inbox`
+  const inboxRoute = `${GROWTH_WORKSPACE_BASE_PATH}/inbox`
   const workflowRoute = `${GROWTH_WORKSPACE_BASE_PATH}/inbox/workflow`
-  assert.ok(isGrowthInboxTabRoute(overviewRoute))
+  const operationsRoute = `${GROWTH_WORKSPACE_BASE_PATH}/inbox/operations`
+  assert.ok(isGrowthInboxTabRoute(inboxRoute))
   assert.ok(isGrowthInboxTabRoute(workflowRoute))
-  assert.equal(resolveGrowthInboxActiveTabId(overviewRoute), "overview")
+  assert.ok(isGrowthInboxTabRoute(operationsRoute))
+  assert.equal(resolveGrowthInboxActiveTabId(inboxRoute), "inbox")
   assert.equal(resolveGrowthInboxActiveTabId(workflowRoute), "workflow")
+  assert.equal(resolveGrowthInboxActiveTabId(operationsRoute), "operations")
   console.log("  ✓ tab routes resolve active states")
 
   const layoutSource = readSource("app/(growth)/growth/inbox/layout.tsx")
@@ -97,10 +100,14 @@ function runAudit(): void {
   console.log("  ✓ tab pages omit duplicate GrowthWorkspacePageHeader chrome")
 
   const v2Panel = readSource("components/growth/inbox/growth-inbox-workspace-v2-panel.tsx")
-  assert.match(v2Panel, /GrowthInboxReplyIntelligencePanel/)
   assert.match(v2Panel, /GrowthInboxOverviewMetricsPanel/)
   assert.match(v2Panel, /GrowthOperatorInboxPanel/)
-  console.log("  ✓ overview v2 panel embeds reply intelligence and operator notifications")
+  assert.match(v2Panel, /GrowthInboxWorkspaceShell/)
+  assert.doesNotMatch(v2Panel, /GrowthInboxV2SupportingPanels/)
+  const metricsBeforeNotifications =
+    v2Panel.indexOf("GrowthInboxOverviewMetricsPanel") < v2Panel.indexOf("GrowthOperatorInboxPanel")
+  assert.ok(metricsBeforeNotifications)
+  console.log("  ✓ inbox tab embeds metrics, notifications before queue; no reply intelligence panel")
 
   const replyIntelPanel = readSource("components/growth/inbox/growth-inbox-reply-intelligence-panel.tsx")
   assert.match(replyIntelPanel, /replies\/timeline/)
@@ -130,9 +137,10 @@ function runAudit(): void {
   assert.equal(GROWTH_SHELL_NAV_GROUPS.flatMap((group) => group.items).length, 12)
   console.log("  ✓ sidebar highlights Inbox on workflow tab; remains 12 items")
 
-  assert.ok(findGrowthRouteMetadataByPathname(overviewRoute))
+  assert.ok(findGrowthRouteMetadataByPathname(inboxRoute))
   assert.ok(findGrowthRouteMetadataByPathname(workflowRoute))
-  console.log("  ✓ registry routes unchanged")
+  assert.ok(findGrowthRouteMetadataByPathname(operationsRoute))
+  console.log("  ✓ registry routes include operations tab")
 
   const replyDashboard = readSource("components/growth/growth-reply-inbox-dashboard.tsx")
   assert.doesNotMatch(replyDashboard, /href="\/admin\/growth\/replies\/workflow"/)

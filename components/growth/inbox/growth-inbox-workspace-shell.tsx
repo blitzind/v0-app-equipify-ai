@@ -16,7 +16,7 @@ export function GrowthInboxWorkspaceShell({
 }: GrowthInboxWorkspaceShellProps) {
   return (
     <div
-      className="flex min-h-[min(720px,72vh)] flex-col gap-3 lg:flex-row lg:items-stretch"
+      className="flex min-h-[min(420px,46vh)] flex-col gap-2 lg:flex-row lg:items-stretch"
       data-equipify-qa-marker={GROWTH_INBOX_WORKSPACE_V2_QA_MARKER}
     >
       <section

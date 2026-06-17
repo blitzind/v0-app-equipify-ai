@@ -66,6 +66,7 @@ export const GROWTH_PHASE_4_WORKSPACE_PAGES = [
 export const GROWTH_INBOX_TAB_SHELL_PAGES = [
   "app/(growth)/growth/inbox/page.tsx",
   "app/(growth)/growth/inbox/workflow/page.tsx",
+  "app/(growth)/growth/inbox/operations/page.tsx",
 ] as const
 
 export const GROWTH_INBOX_TAB_SHELL_COMPONENT = "components/growth/inbox/growth-inbox-shell.tsx" as const

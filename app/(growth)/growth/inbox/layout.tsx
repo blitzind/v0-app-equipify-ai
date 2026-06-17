@@ -1,6 +1,12 @@
-import type { ReactNode } from "react"
-import { GrowthInboxShell } from "@/components/growth/inbox/growth-inbox-shell"
+"use client"
 
-export default function GrowthInboxLayout({ children }: { children: ReactNode }) {
+import { GrowthInboxShell } from "@/components/growth/inbox/growth-inbox-shell"
+import type { ReactNode } from "react"
+
+type GrowthInboxLayoutProps = {
+  children: ReactNode
+}
+
+export default function GrowthInboxLayout({ children }: GrowthInboxLayoutProps) {
   return <GrowthInboxShell>{children}</GrowthInboxShell>
 }
