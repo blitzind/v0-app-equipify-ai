@@ -42,9 +42,6 @@ function isProtectedRoute(pathname: string) {
   if (pathname === "/") return true
   if (pathname === "/test-maintenance-plan-create") return true
   if (pathname.startsWith("/admin")) return true
-  if (isGrowthWorkspacePath(pathname)) {
-    return true
-  }
   return DASHBOARD_PREFIXES.some((prefix) => pathname.startsWith(prefix))
 }
 
@@ -54,7 +51,6 @@ function skipArchivedOrgGuard(pathname: string) {
     pathname.startsWith("/auth") ||
     pathname.startsWith("/onboarding") ||
     pathname.startsWith("/admin") ||
-    isGrowthWorkspacePath(pathname) ||
     pathname.startsWith("/api") ||
     pathname.startsWith("/portal")
   )
@@ -67,6 +63,7 @@ function shouldSkipSupabaseSessionRefresh(pathname: string): boolean {
 
 function shouldSkipMiddlewareAuth(pathname: string): boolean {
   if (shouldSkipSupabaseSessionRefresh(pathname)) return true
+  if (isGrowthWorkspacePath(pathname)) return true
   if (pathname.startsWith("/downloads/")) return true
   if (pathname.startsWith("/_next/")) return true
   if (pathname === "/favicon.ico") return true
@@ -87,13 +84,6 @@ export async function middleware(request: NextRequest) {
   const isAuthenticated = Boolean(user)
 
   if (pathname.startsWith("/admin")) {
-    if (!isAuthenticated) {
-      return NextResponse.redirect(new URL("/login", request.url))
-    }
-    return response
-  }
-
-  if (isGrowthWorkspacePath(pathname)) {
     if (!isAuthenticated) {
       return NextResponse.redirect(new URL("/login", request.url))
     }

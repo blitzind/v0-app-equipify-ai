@@ -9,7 +9,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { GROWTH_WORKSPACE_BASE_PATH } from "../lib/growth/navigation/growth-route-metadata-types"
 
-export const GROWTH_MIDDLEWARE_AUTH_QA_MARKER = "growth-middleware-auth-v1" as const
+export const GROWTH_MIDDLEWARE_AUTH_QA_MARKER = "growth-middleware-auth-v2" as const
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, "..")
@@ -36,23 +36,36 @@ function runAudit(): void {
   )
   console.log("  ✓ middleware avoids heavy Growth registry imports")
 
-  assert.match(middleware, /pathname === GROWTH_WORKSPACE_BASE_PATH \|\| pathname\.startsWith\(`\$\{GROWTH_WORKSPACE_BASE_PATH\}\/`\)/)
+  assert.match(
+    middleware,
+    /if \(isGrowthWorkspacePath\(pathname\)\) return true/,
+    "/growth/* must bypass middleware Supabase auth",
+  )
+  assert.doesNotMatch(
+    middleware,
+    /if \(isGrowthWorkspacePath\(pathname\)\) \{[\s\S]*?if \(!isAuthenticated\)/,
+    "/growth/* must not run middleware session gate",
+  )
   assert.equal(GROWTH_WORKSPACE_BASE_PATH, "/growth")
-  console.log("  ✓ /growth/* is intentionally matched for auth")
+  console.log("  ✓ /growth/* excluded from middleware Supabase auth work")
 
   assert.match(middleware, /\/downloads\//, "matcher or early return must bypass /downloads/*")
   assert.match(middleware, /zip/, "matcher should bypass zip downloads")
   assert.match(middleware, /shouldSkipSupabaseSessionRefresh/, "voice ingress bypass preserved")
   console.log("  ✓ static/download paths bypass middleware work")
 
-  assert.match(middleware, /if \(!isAuthenticated\)/, "unauthenticated users are redirected")
   assert.match(
-    growthLayout,
-    /loadPlatformAdminIdentity/,
-    "Growth route group layout must enforce platform-admin gate",
+    middleware,
+    /if \(pathname\.startsWith\("\/admin"\)\) \{[\s\S]*?if \(!isAuthenticated\)/,
+    "/admin/* must retain middleware session gate",
   )
+  console.log("  ✓ /admin/* protection unchanged in middleware")
+
+  assert.match(growthLayout, /createServerSupabaseClient/, "Growth layout must check session")
+  assert.match(growthLayout, /redirect\("\/login"\)/, "unauthenticated users redirected to login")
+  assert.match(growthLayout, /loadPlatformAdminIdentity/, "Growth layout must enforce platform-admin gate")
   assert.match(growthLayout, /redirect\("\/"\)/, "non-admin users redirected away from Growth workspace")
-  console.log("  ✓ /growth/* auth preserved via session + server layout gate")
+  console.log("  ✓ /growth/* auth enforced by server layout gate")
 
   assert.doesNotMatch(
     middleware,
