@@ -20,7 +20,6 @@ import {
   UserPlus,
   ChartNoAxesCombined,
 } from "lucide-react"
-import { BrandLogo, BrandMark } from "@/components/brand-logo"
 import { MaintenancePlansLucideIcon, MembershipsLucideIcon } from "@/lib/navigation/module-icons"
 import {
   NAV_ICON_ACTIVE_SIDEBAR,
@@ -30,6 +29,13 @@ import {
   NAV_ROW_INACTIVE_HOVER_SIDEBAR,
   NAV_SIDEBAR_ACTIVE_INDICATOR,
 } from "@/lib/navigation-chrome"
+import {
+  WORKSPACE_SIDEBAR_COLLAPSED_STORAGE_KEY,
+  WORKSPACE_SIDEBAR_SURFACE,
+  WORKSPACE_SIDEBAR_WIDTH_COLLAPSED,
+  WORKSPACE_SIDEBAR_WIDTH_EXPANDED,
+} from "@/lib/workspace/workspace-shell-tokens"
+import { WorkspaceShellBrand } from "@/components/workspace/workspace-shell-brand"
 
 type NavItem = {
   label: string
@@ -470,47 +476,7 @@ function SidebarBody({
   return (
     <>
       {/* ── Logo hero (full wordmark expanded · square mark collapsed) ─ */}
-      <div
-        className={cn(
-          "relative grid min-h-[52px] w-full shrink-0 place-items-center border-b border-sidebar-border [grid-template-areas:'stack']",
-          isCollapsed ? "px-0 py-2" : "px-3 py-3.5",
-        )}
-      >
-        <Link
-          href="/"
-          className="relative grid min-h-[2.5rem] w-full place-items-center [grid-template-areas:'stack'] rounded-md outline-none ring-sidebar-ring focus-visible:ring-2"
-          aria-label="Equipify — Home"
-        >
-          {/* Expanded: full logo (also mobile drawer — always expanded) */}
-          <span
-            className={cn(
-              "[grid-area:stack] flex w-full max-w-full items-center justify-center px-0.5 transition-opacity duration-200 ease-out motion-reduce:transition-none",
-              isCollapsed ? "pointer-events-none opacity-0" : "opacity-100"
-            )}
-            aria-hidden={isCollapsed}
-          >
-            <BrandLogo
-              priority
-              sizes="(min-width: 768px) 198px, 182px"
-              className="min-h-0 min-w-0 max-h-[calc(2.75rem-10px*280/1024)] w-full max-w-[calc(100%-10px)] select-none object-contain object-center sm:max-h-[calc(3rem-10px*280/1024)]"
-            />
-          </span>
-          {/* Collapsed desktop only: icon mark */}
-          <span
-            className={cn(
-              "[grid-area:stack] flex items-center justify-center transition-opacity duration-200 ease-out motion-reduce:transition-none",
-              isCollapsed ? "opacity-100" : "pointer-events-none opacity-0"
-            )}
-            aria-hidden={!isCollapsed}
-          >
-            <BrandMark
-              priority
-              sizes="40px"
-              className="h-10 w-10 max-h-10 max-w-10 select-none"
-            />
-          </span>
-        </Link>
-      </div>
+      <WorkspaceShellBrand collapsed={isCollapsed} homeHref="/" />
 
       {/* ── Workspace selector ──────────────────────────────────
           Collapsed rail (`w-14`) demands a square avatar slot, so we
@@ -824,7 +790,7 @@ function SidebarBody({
   )
 }
 
-const SIDEBAR_COLLAPSED_KEY = "equipify:nav:sidebar-collapsed/v1"
+const SIDEBAR_COLLAPSED_KEY = WORKSPACE_SIDEBAR_COLLAPSED_STORAGE_KEY
 
 export function AppSidebar() {
   const [collapsed, setCollapsedState] = useState(false)
@@ -859,8 +825,9 @@ export function AppSidebar() {
     <>
       {/* ── Desktop sidebar (hidden on mobile) ────────────────── */}
       <aside className={cn(
-        "hidden md:flex flex-col h-full border-r border-sidebar-border bg-[#0F172A] transition-all duration-200 shrink-0",
-        collapsed ? "w-14" : "w-[248px]"
+        "hidden md:flex",
+        WORKSPACE_SIDEBAR_SURFACE,
+        collapsed ? WORKSPACE_SIDEBAR_WIDTH_COLLAPSED : WORKSPACE_SIDEBAR_WIDTH_EXPANDED,
       )}>
         <SidebarBody collapsed={collapsed} setCollapsed={setCollapsed} />
       </aside>

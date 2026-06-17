@@ -42,6 +42,8 @@ import { formatRelativeTime } from "@/lib/notifications/format-relative"
 import { communicationEventPresentation } from "@/lib/notifications/event-icons"
 import { hrefForRelatedEntity } from "@/lib/notifications/event-links"
 import { GlobalSearchHeader } from "@/components/global-search-header"
+import { WorkspaceSwitcher } from "@/components/workspace/workspace-switcher"
+import { WORKSPACE_SHELL_TOPBAR } from "@/lib/workspace/workspace-shell-tokens"
 
 type FeedPreview = {
   id: string
@@ -279,7 +281,7 @@ export function AppTopbar() {
   useEffect(() => { setHubOpen(false) }, [pathname])
 
   return (
-    <header className="flex items-center h-14 md:h-16 px-3 md:px-6 bg-sidebar md:bg-card border-b border-sidebar-border md:border-border gap-3 shrink-0 relative z-30 sticky top-0">
+    <header className={WORKSPACE_SHELL_TOPBAR}>
       {/* Hamburger — mobile only */}
       <button
         type="button"
@@ -300,6 +302,9 @@ export function AppTopbar() {
       >
         <BrandLogo className="h-7 w-auto max-h-7" priority />
       </Link>
+
+      {/* Workspace switcher — desktop/tablet */}
+      <WorkspaceSwitcher compact className="hidden sm:flex shrink-0" />
 
       {/* Global search — desktop only; mobile uses sidebar navigation (no broken stub). */}
       <GlobalSearchHeader

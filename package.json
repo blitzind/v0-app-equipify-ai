@@ -139,6 +139,8 @@
     "test:growth-workspace-sidebar-ia": "tsx scripts/test-growth-workspace-sidebar-ia.ts",
     "test:growth-workspace-continuity": "tsx scripts/test-growth-workspace-continuity.ts",
     "test:growth-workspace-chrome-boundaries": "tsx scripts/test-growth-workspace-chrome-boundaries.ts",
+    "test:growth-workspace-modernization": "tsx scripts/test-growth-workspace-modernization.ts",
+    "test:growth-workspace-parity": "tsx scripts/test-growth-workspace-parity.ts",
     "test:growth-chrome-architecture": "tsx scripts/test-growth-chrome-architecture.ts",
     "test:growth-middleware-auth": "tsx scripts/test-growth-middleware-auth.ts",
     "test:growth-route-registry": "tsx scripts/test-growth-route-registry.ts",

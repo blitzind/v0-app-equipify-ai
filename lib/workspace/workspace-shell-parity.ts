@@ -1,0 +1,32 @@
+/**
+ * Workspace shell parity certification marker (Phase 6B.1).
+ */
+
+export const GROWTH_WORKSPACE_PARITY_QA_MARKER = "growth-workspace-parity-v1" as const
+
+export const WORKSPACE_SHELL_SHARED_PRIMITIVES = [
+  "WorkspaceShellBrand",
+  "WorkspaceSwitcher",
+  "WorkspaceSearch",
+  "WorkspaceContainer",
+  "GlobalSearchPanel",
+] as const
+
+export const WORKSPACE_SHELL_SHARED_TOKEN_IMPORTS = [
+  "WORKSPACE_SHELL_TOPBAR",
+  "WORKSPACE_SHELL_MAIN_INNER",
+  "WORKSPACE_SHELL_HORIZONTAL_PADDING",
+  "WORKSPACE_SIDEBAR_WIDTH_EXPANDED",
+  "WORKSPACE_SIDEBAR_WIDTH_COLLAPSED",
+  "WORKSPACE_SIDEBAR_SURFACE",
+  "WORKSPACE_SIDEBAR_COLLAPSED_STORAGE_KEY",
+] as const
+
+export const WORKSPACE_SHELL_SHARED_NAV_TOKENS = [
+  "NAV_PRIMARY_ROW_MOTION",
+  "NAV_ROW_ACTIVE_SIDEBAR",
+  "NAV_ROW_INACTIVE_HOVER_SIDEBAR",
+  "NAV_ICON_ACTIVE_SIDEBAR",
+  "NAV_ICON_INACTIVE_SIDEBAR",
+  "NAV_SIDEBAR_ACTIVE_INDICATOR",
+] as const
