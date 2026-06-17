@@ -1,11 +1,21 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Loader2, MessageSquare, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthConversationsActionCrossLinks } from "@/components/growth/inbox/growth-inbox-conversation-intelligence-context-strip"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import {
+  collectGrowthConversationsDashboardLeads,
+  findGrowthConversationsFocusedLead,
+  parseGrowthConversationsDeepLinkParams,
+  resolveGrowthConversationsFocusedLeadId,
+  shouldShowGrowthConversationsMissingContextMessage,
+} from "@/lib/growth/navigation/growth-conversations-deep-link"
 import type { GrowthLead } from "@/lib/growth/types"
+
+export const GROWTH_CONVERSATIONS_DASHBOARD_QA_MARKER = "growth-conversations-dashboard-v2" as const
 
 type DashboardPayload = {
   averageHealth: number
@@ -22,10 +32,14 @@ function LeadBucket({
   title,
   leads,
   metricKey,
+  focusedLeadId,
+  registerFocusedLeadRef,
 }: {
   title: string
   leads: Array<Partial<GrowthLead> & { id: string; companyName: string }>
   metricKey?: keyof GrowthLead
+  focusedLeadId: string | null
+  registerFocusedLeadRef: (node: HTMLLIElement | null) => void
 }) {
   return (
     <GrowthEngineCard title={title}>
@@ -33,25 +47,41 @@ function LeadBucket({
         <p className="text-sm text-muted-foreground">No leads in this bucket.</p>
       ) : (
         <ul className="space-y-2">
-          {leads.map((lead) => (
-            <li key={lead.id} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm">
-              <div>
-                <p className="font-medium">{lead.companyName}</p>
-                {lead.conversationSummary ? <p className="text-muted-foreground">{lead.conversationSummary}</p> : null}
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                <div className="flex items-center gap-2">
-                  {metricKey && lead[metricKey] != null ? (
-                    <span className="tabular-nums font-semibold">{String(lead[metricKey])}</span>
-                  ) : null}
-                  {lead.conversationHealthTier ? (
-                    <GrowthBadge label={lead.conversationHealthTier} tone="healthy" />
-                  ) : null}
+          {leads.map((lead) => {
+            const isFocused = focusedLeadId === lead.id
+            return (
+              <li
+                key={lead.id}
+                ref={isFocused ? registerFocusedLeadRef : undefined}
+                data-focused-lead={isFocused ? "true" : undefined}
+                className={[
+                  "flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm transition-colors",
+                  isFocused
+                    ? "border-primary/50 bg-primary/5 ring-2 ring-primary/20"
+                    : "border-border",
+                ].join(" ")}
+              >
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{lead.companyName}</p>
+                    {isFocused ? <GrowthBadge label="Focused" tone="healthy" /> : null}
+                  </div>
+                  {lead.conversationSummary ? <p className="text-muted-foreground">{lead.conversationSummary}</p> : null}
                 </div>
-                <GrowthConversationsActionCrossLinks leadId={lead.id} />
-              </div>
-            </li>
-          ))}
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-center gap-2">
+                    {metricKey && lead[metricKey] != null ? (
+                      <span className="tabular-nums font-semibold">{String(lead[metricKey])}</span>
+                    ) : null}
+                    {lead.conversationHealthTier ? (
+                      <GrowthBadge label={lead.conversationHealthTier} tone="healthy" />
+                    ) : null}
+                  </div>
+                  <GrowthConversationsActionCrossLinks leadId={lead.id} />
+                </div>
+              </li>
+            )
+          })}
         </ul>
       )}
     </GrowthEngineCard>
@@ -59,9 +89,20 @@ function LeadBucket({
 }
 
 export function GrowthConversationsDashboard() {
+  const searchParams = useSearchParams()
+  const deepLinkParams = useMemo(
+    () => parseGrowthConversationsDeepLinkParams(searchParams),
+    [searchParams],
+  )
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const focusedLeadRef = useRef<HTMLLIElement | null>(null)
+  const hasScrolledToFocus = useRef(false)
+
+  const registerFocusedLeadRef = useCallback((node: HTMLLIElement | null) => {
+    focusedLeadRef.current = node
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -83,6 +124,36 @@ export function GrowthConversationsDashboard() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const dashboardLeads = useMemo(
+    () => (dashboard ? collectGrowthConversationsDashboardLeads(dashboard) : []),
+    [dashboard],
+  )
+
+  const focusedLeadId = useMemo(
+    () => resolveGrowthConversationsFocusedLeadId(dashboardLeads, deepLinkParams),
+    [dashboardLeads, deepLinkParams],
+  )
+
+  const focusedLead = useMemo(
+    () => findGrowthConversationsFocusedLead(dashboardLeads, focusedLeadId),
+    [dashboardLeads, focusedLeadId],
+  )
+
+  const showMissingContextMessage = shouldShowGrowthConversationsMissingContextMessage({
+    params: deepLinkParams,
+    focusedLeadId,
+  })
+
+  useEffect(() => {
+    hasScrolledToFocus.current = false
+  }, [focusedLeadId, deepLinkParams.leadId, deepLinkParams.threadId])
+
+  useEffect(() => {
+    if (!focusedLeadId || !focusedLeadRef.current || hasScrolledToFocus.current) return
+    focusedLeadRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" })
+    hasScrolledToFocus.current = true
+  }, [focusedLeadId, dashboard])
 
   if (loading && !dashboard) {
     return (
@@ -108,7 +179,25 @@ export function GrowthConversationsDashboard() {
   if (!dashboard) return null
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-qa-marker={GROWTH_CONVERSATIONS_DASHBOARD_QA_MARKER}>
+      {focusedLead ? (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground">
+          <p className="font-medium">
+            Focused on {focusedLead.companyName ?? "lead"}
+            {deepLinkParams.threadId ? " · Opened from Inbox thread" : ""}
+          </p>
+          {deepLinkParams.threadId ? (
+            <p className="mt-1 text-xs text-muted-foreground">Thread context preserved for future drill-down.</p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {showMissingContextMessage ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Linked conversation context was not found in the current dashboard view.
+        </div>
+      ) : null}
+
       <div className="flex items-center justify-between gap-3">
         <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatTile label="Avg conversation health" value={dashboard.averageHealth} />
@@ -123,12 +212,48 @@ export function GrowthConversationsDashboard() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <LeadBucket title="Health leaders" leads={dashboard.strongHealth} metricKey="conversationHealthScore" />
-        <LeadBucket title="Buying intent" leads={dashboard.buyingIntent} metricKey="conversationBuyingIntent" />
-        <LeadBucket title="Sentiment shift" leads={dashboard.sentimentShift} metricKey="conversationSentiment" />
-        <LeadBucket title="Competitor mentions" leads={dashboard.competitorMentions} metricKey="conversationCompetitorPressure" />
-        <LeadBucket title="Urgency trends" leads={dashboard.urgencyTrends} metricKey="conversationUrgencyLevel" />
-        <LeadBucket title="Conversation risk" leads={dashboard.conversationRisk} metricKey="conversationMomentum" />
+        <LeadBucket
+          title="Health leaders"
+          leads={dashboard.strongHealth}
+          metricKey="conversationHealthScore"
+          focusedLeadId={focusedLeadId}
+          registerFocusedLeadRef={registerFocusedLeadRef}
+        />
+        <LeadBucket
+          title="Buying intent"
+          leads={dashboard.buyingIntent}
+          metricKey="conversationBuyingIntent"
+          focusedLeadId={focusedLeadId}
+          registerFocusedLeadRef={registerFocusedLeadRef}
+        />
+        <LeadBucket
+          title="Sentiment shift"
+          leads={dashboard.sentimentShift}
+          metricKey="conversationSentiment"
+          focusedLeadId={focusedLeadId}
+          registerFocusedLeadRef={registerFocusedLeadRef}
+        />
+        <LeadBucket
+          title="Competitor mentions"
+          leads={dashboard.competitorMentions}
+          metricKey="conversationCompetitorPressure"
+          focusedLeadId={focusedLeadId}
+          registerFocusedLeadRef={registerFocusedLeadRef}
+        />
+        <LeadBucket
+          title="Urgency trends"
+          leads={dashboard.urgencyTrends}
+          metricKey="conversationUrgencyLevel"
+          focusedLeadId={focusedLeadId}
+          registerFocusedLeadRef={registerFocusedLeadRef}
+        />
+        <LeadBucket
+          title="Conversation risk"
+          leads={dashboard.conversationRisk}
+          metricKey="conversationMomentum"
+          focusedLeadId={focusedLeadId}
+          registerFocusedLeadRef={registerFocusedLeadRef}
+        />
       </div>
 
       <GrowthEngineCard title="Top objections" icon={<MessageSquare className="size-4" />}>

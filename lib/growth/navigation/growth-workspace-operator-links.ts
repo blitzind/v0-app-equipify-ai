@@ -47,10 +47,14 @@ export function growthWorkspacePipelineHref(opportunityId?: string | null): stri
 export function growthWorkspaceConversationsHref(input?: {
   leadId?: string | null
   threadId?: string | null
+  companyId?: string | null
+  personId?: string | null
 }): string {
   const params = new URLSearchParams()
   if (input?.leadId) params.set("leadId", input.leadId)
   if (input?.threadId) params.set("threadId", input.threadId)
+  if (input?.companyId) params.set("companyId", input.companyId)
+  if (input?.personId) params.set("personId", input.personId)
   const query = params.toString()
   return query
     ? `${GROWTH_WORKSPACE_BASE_PATH}/conversations?${query}`

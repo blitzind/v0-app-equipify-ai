@@ -134,4 +134,11 @@ export const GROWTH_INBOX_CONVERSATIONS_CONVERGENCE_MATRIX: GrowthInboxConversat
     status: "deferred",
     notes: "Conversations tab shell and route migration explicitly deferred.",
   },
+  {
+    id: "conversations-deep-link",
+    inboxSurface: "Inbox View Conversation / View Timeline links",
+    conversationsSurface: "Query-param lead/thread focus on dashboard",
+    status: "available",
+    notes: "Phase 7O — client-side deep-link focus without API or route changes.",
+  },
 ]

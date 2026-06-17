@@ -146,6 +146,7 @@
     "test:growth-workspace-link-normalization": "tsx scripts/test-growth-workspace-link-normalization.ts",
     "test:growth-inbox-calls-convergence": "tsx scripts/test-growth-inbox-calls-convergence.ts",
     "test:growth-inbox-conversations-convergence": "tsx scripts/test-growth-inbox-conversations-convergence.ts",
+    "test:growth-conversations-deep-link": "tsx scripts/test-growth-conversations-deep-link.ts",
     "test:growth-call-notification-routing": "tsx scripts/test-growth-call-notification-routing.ts",
     "test:growth-operator-inbox-fallback-links": "tsx scripts/test-growth-operator-inbox-fallback-links.ts",
     "test:growth-workspace-cleanup": "tsx scripts/test-growth-workspace-cleanup.ts",

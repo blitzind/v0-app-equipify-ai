@@ -130,6 +130,8 @@ function runAudit(): void {
   assert.match(conversationColumn, /GrowthInboxConversationIntelligenceContextStrip/)
   const conversationsDashboard = readSource("components/growth/growth-conversations-dashboard.tsx")
   assert.match(conversationsDashboard, /GrowthConversationsActionCrossLinks/)
+  assert.match(conversationsDashboard, /parseGrowthConversationsDeepLinkParams/)
+  assert.match(conversationsDashboard, /focusedLeadId/)
   console.log("  ✓ inbox conversation column and conversations dashboard wire read-only context")
 
   assert.ok(GROWTH_INBOX_CONVERSATIONS_CONVERGENCE_MATRIX.some((row) => row.status === "available"))
