@@ -355,6 +355,20 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     breadcrumbLabel: "Workspace",
     adminPath: `${ADMIN}/opportunities/workspace`,
   }),
+  workspace("workspace-conversations", "conversations", "Conversations", "intelligence", "dual-route", {
+    migrated: true,
+    segment: "conversations",
+    placeholder: false,
+    breadcrumbLabel: "Conversations",
+    adminPath: `${ADMIN}/conversations`,
+  }),
+  workspace("workspace-relationships", "relationships", "Relationships", "intelligence", "dual-route", {
+    migrated: true,
+    segment: "relationships",
+    placeholder: false,
+    breadcrumbLabel: "Relationships",
+    adminPath: `${ADMIN}/relationships`,
+  }),
   adminDual("admin-opportunities-pipeline", "opportunities/pipeline", "Pipeline", "workspace", "opportunities/pipeline", {
     breadcrumbLabel: "Pipeline",
   }),
@@ -406,12 +420,16 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   }),
 
   admin("admin-intent-pixel", "intent-pixel", "Intent Signals", "intelligence", "admin-only"),
-  admin("admin-conversations", "conversations", "Conversations", "intelligence", "admin-only"),
+  adminDual("admin-conversations", "conversations", "Conversations", "intelligence", "conversations", {
+    breadcrumbLabel: "Conversations",
+  }),
   admin("admin-replies", "replies", "Reply Inbox", "intelligence", "admin-only"),
   adminDual("admin-replies-workflow", "replies/workflow", "Reply Workflow", "intelligence", "inbox/workflow", {
     breadcrumbLabel: "Reply Workflow",
   }),
-  admin("admin-relationships", "relationships", "Relationships", "intelligence", "admin-only"),
+  adminDual("admin-relationships", "relationships", "Relationships", "intelligence", "relationships", {
+    breadcrumbLabel: "Relationships",
+  }),
   admin("admin-relationship-memory", "intelligence/relationship-memory", "Relationship Memory", "intelligence", "admin-only"),
   admin("admin-experiments", "experiments", "Experiments", "system", "hidden", {
     hidden: true,

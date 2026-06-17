@@ -54,12 +54,15 @@ const PHASE_4B_OPERATOR_ROUTES = [
   "workspace-opportunities-workspace",
 ] as const
 
+const PHASE_4C_OPERATOR_ROUTES = ["workspace-conversations", "workspace-relationships"] as const
+
 const PHASE_4_OPERATOR_ROUTES = [
   ...PHASE_3A_OPERATOR_ROUTES,
   ...PHASE_3B_OPERATOR_ROUTES,
   ...PHASE_3C_OPERATOR_SUB_ROUTES,
   ...PHASE_4A_OPERATOR_ROUTES,
   ...PHASE_4B_OPERATOR_ROUTES,
+  ...PHASE_4C_OPERATOR_ROUTES,
 ] as const
 
 function workspacePagePathFromMetadata(entryPath: string): string | null {
@@ -75,9 +78,9 @@ function runAudit(): void {
   console.log(`\n=== Growth workspace shell audit (${GROWTH_ROUTE_METADATA_QA_MARKER}) ===\n`)
 
   assert.equal(GROWTH_MIGRATED_ROUTE_REGISTRY.length, GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length)
-  assert.equal(GROWTH_MIGRATED_ROUTE_REGISTRY.length, 30)
+  assert.equal(GROWTH_MIGRATED_ROUTE_REGISTRY.length, 32)
   assert.deepEqual(GROWTH_MIGRATED_WORKSPACE_ROUTES, GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.map((entry) => entry.path))
-  console.log("  ✓ migrated workspace registry subset (30 routes)")
+  console.log("  ✓ migrated workspace registry subset (32 routes)")
 
   const paths = GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.map((entry) => entry.path)
   const ids = GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.map((entry) => entry.id)
@@ -202,10 +205,11 @@ function runAudit(): void {
         qa_marker: GROWTH_ROUTE_METADATA_QA_MARKER,
         migrated_routes: GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length,
         placeholder_routes: placeholders.length,
-        total_registry_routes: 125,
+        total_registry_routes: 127,
         workspace_nav_items: workspaceNavHrefs.length,
         phase_4a_operator_routes: PHASE_4A_OPERATOR_ROUTES,
         phase_4b_operator_routes: PHASE_4B_OPERATOR_ROUTES,
+        phase_4c_operator_routes: PHASE_4C_OPERATOR_ROUTES,
         phase_4_operator_routes: PHASE_4_OPERATOR_ROUTES,
         phase_3c_sub_routes: PHASE_3C_OPERATOR_SUB_ROUTES,
       },

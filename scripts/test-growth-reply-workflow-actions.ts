@@ -68,6 +68,7 @@ const routes = [
   "app/api/platform/growth/replies/workflow-actions/create-opportunity/route.ts",
   "app/api/platform/growth/replies/sequence-exit-candidates/route.ts",
   "app/(admin)/admin/growth/replies/workflow/page.tsx",
+  "app/(growth)/growth/inbox/workflow/page.tsx",
 ]
 for (const route of routes) {
   assert.ok(fs.existsSync(path.join(process.cwd(), route)), `missing ${route}`)

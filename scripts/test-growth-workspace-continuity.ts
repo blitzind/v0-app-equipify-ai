@@ -28,7 +28,7 @@ import {
 import { growthFeaturePath } from "../lib/growth/navigation/growth-workspace-base-path"
 import { resolveGrowthBreadcrumbs } from "../lib/growth/navigation/growth-route-registry"
 
-export const GROWTH_WORKSPACE_CONTINUITY_QA_MARKER = "growth-workspace-continuity-v3" as const
+export const GROWTH_WORKSPACE_CONTINUITY_QA_MARKER = "growth-workspace-continuity-v4" as const
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, "..")
@@ -130,6 +130,8 @@ const CMD_K_MIGRATED_RESOLUTIONS: Array<{ adminHref: string; workspaceSegment: s
   { adminHref: "/admin/growth/opportunities", workspaceSegment: "opportunities" },
   { adminHref: "/admin/growth/opportunities/pipeline", workspaceSegment: "opportunities/pipeline" },
   { adminHref: "/admin/growth/opportunities/workspace", workspaceSegment: "opportunities/workspace" },
+  { adminHref: "/admin/growth/conversations", workspaceSegment: "conversations" },
+  { adminHref: "/admin/growth/relationships", workspaceSegment: "relationships" },
   { adminHref: "/admin/growth/multichannel", workspaceSegment: "campaigns" },
 ]
 
@@ -188,6 +190,12 @@ function runAudit(): void {
     ["Growth", "Opportunities", "Pipeline"],
   )
   console.log("  ✓ opportunities/pipeline breadcrumbs: Growth → Opportunities → Pipeline")
+
+  const conversationsCrumbs = resolveGrowthBreadcrumbs("/growth/conversations")
+  assert.deepEqual(conversationsCrumbs.map((crumb) => crumb.label), ["Growth", "Conversations"])
+  const relationshipsCrumbs = resolveGrowthBreadcrumbs("/growth/relationships")
+  assert.deepEqual(relationshipsCrumbs.map((crumb) => crumb.label), ["Growth", "Relationships"])
+  console.log("  ✓ intelligence breadcrumbs: Growth → Conversations / Relationships")
 
   for (const { adminHref, workspaceSegment } of CMD_K_MIGRATED_RESOLUTIONS) {
     const resolved = resolveGrowthCommandPaletteHref("/growth/inbox", adminHref)

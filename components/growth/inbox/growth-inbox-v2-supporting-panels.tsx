@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { ChevronDown } from "lucide-react"
 import { GrowthInboxTeamQueuePanel } from "@/components/growth/growth-inbox-team-queue-panel"
 import { GrowthInboxWidgetErrorBoundary } from "@/components/growth/growth-inbox-widget-error-boundary"
@@ -11,9 +12,11 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { GROWTH_INBOX_WORKSPACE_PHASE3_QA_MARKER } from "@/lib/growth/inbox/inbox-workspace-types"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 
 /** Secondary team/ownership surfaces — collapsed by default so Thread → Context → Action stays primary. */
 export function GrowthInboxV2SupportingPanels() {
+  const pathname = usePathname()
   const { selectedThread, actionLoading, setSelectedThreadId, loadThreadDetail, intelligence } =
     useGrowthInboxWorkspace()
 
@@ -35,7 +38,7 @@ export function GrowthInboxV2SupportingPanels() {
         </div>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
           Operator actions live in the Action Center.{" "}
-          <Link href="/admin/growth/replies/workflow" className="font-medium text-indigo-600 hover:underline">
+          <Link href={growthFeaturePath(pathname, "inbox/workflow")} className="font-medium text-indigo-600 hover:underline">
             Open full workflow center
           </Link>
         </p>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Loader2, RefreshCw, Sparkles, Phone, Target, X, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -29,6 +30,7 @@ import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-c
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GROWTH_REPLY_WORKFLOW_CENTER_QA_MARKER } from "@/lib/growth/reply-intelligence/workflow-actions-types"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 
 type FilterKey = "all" | "interested" | "call_task" | "follow_up" | "opportunity"
 
@@ -304,6 +306,7 @@ export function GrowthReplyWorkflowActionsPanel({
   const [oppDraft, setOppDraft] = useState<GrowthReplyOpportunityDraft | null>(null)
   const [oppOpen, setOppOpen] = useState(false)
   const [opportunityWorkflowActionId, setOpportunityWorkflowActionId] = useState<string | null>(null)
+  const pathname = usePathname()
 
   const loadInternal = useCallback(async () => {
     setLoading(true)
@@ -498,7 +501,7 @@ export function GrowthReplyWorkflowActionsPanel({
 
         {!compact ? (
           <p className="mt-3 text-xs text-muted-foreground">
-            <Link href="/admin/growth/replies/workflow" className="font-medium text-indigo-600 hover:underline">
+            <Link href={growthFeaturePath(pathname, "inbox/workflow")} className="font-medium text-indigo-600 hover:underline">
               Open full Workflow Action Center
             </Link>
           </p>
