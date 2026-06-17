@@ -57,8 +57,9 @@ function runAudit(): void {
   console.log("  ✓ /growth page remains thin workspace shell (header + body)")
 
   const bodySource = readSource("components/growth/workspace/growth-workspace-dashboard-body.tsx")
-  assert.match(bodySource, /data-section=\{section\.id\}/)
-  assert.match(bodySource, /data-section="quick-actions"/)
+  assert.match(bodySource, /data-section="welcome"/)
+  assert.match(bodySource, /data-section="recent-activity"/)
+  assert.match(bodySource, /data-section="continue-working"/)
   assert.match(bodySource, /data-qa-marker=\{GROWTH_WORKSPACE_DASHBOARD_QA_MARKER\}/)
   console.log("  ✓ dashboard sections render with stable section markers")
 
@@ -91,6 +92,7 @@ function runAudit(): void {
     callsDashboard: null,
   })
   assert.equal(emptyModel.qaMarker, GROWTH_WORKSPACE_DASHBOARD_QA_MARKER)
+  assert.equal(emptyModel.welcome.greeting, "Welcome back")
   assert.deepEqual(
     emptyModel.sections.map((section) => section.id),
     [...REQUIRED_SECTION_IDS],

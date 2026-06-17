@@ -5,6 +5,7 @@ import { GrowthBreadcrumbProvider } from "@/components/growth/shell/growth-bread
 import { GrowthBreadcrumbs } from "@/components/growth/shell/growth-breadcrumbs"
 import { GROWTH_WORKSPACE_SHELL_QA_MARKER } from "@/components/growth/shell/growth-brand"
 import { GrowthMobileNavDrawer } from "@/components/growth/shell/growth-mobile-nav-drawer"
+import { GrowthWorkspaceActivityTracker } from "@/components/growth/workspace/growth-workspace-activity-tracker"
 import { GrowthSidebar } from "@/components/growth/shell/growth-sidebar"
 import { GrowthTopbar } from "@/components/growth/shell/growth-topbar"
 import { WorkspaceContainer } from "@/components/workspace/workspace-container"
@@ -32,6 +33,7 @@ export function GrowthWorkspaceShell({ children }: GrowthWorkspaceShellProps) {
           </main>
         </div>
         <GrowthMobileNavDrawer open={mobileNavOpen} onOpenChange={setMobileNavOpen} />
+        <GrowthWorkspaceActivityTracker />
       </div>
     </GrowthBreadcrumbProvider>
   )

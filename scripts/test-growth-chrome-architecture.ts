@@ -9,6 +9,8 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import {
   GROWTH_ADMIN_DUAL_ROUTE_REQUIRED_PATTERNS,
+  GROWTH_CERTIFIED_DASHBOARD_BODY_COMPONENTS,
+  GROWTH_CERTIFIED_WORKSPACE_HEADER_BODY_PAGES,
   GROWTH_CHROME_ARCHITECTURE_QA_MARKER,
   GROWTH_CHROME_PATHNAME_BRANCH_FORBIDDEN_FILES,
   GROWTH_DASHBOARD_BODY_FILENAME_PATTERN,
@@ -16,7 +18,6 @@ import {
   GROWTH_LEGACY_MIXED_CHROME_COMPONENTS,
   GROWTH_PHASE_4_ADMIN_PAGES,
   GROWTH_PHASE_4_DASHBOARD_BODY_COMPONENTS,
-  GROWTH_PHASE_4_WORKSPACE_PAGES,
   GROWTH_REMOVED_LEGACY_WORKSPACE_WRAPPERS,
   GROWTH_WORKSPACE_PAGE_FORBIDDEN_IMPORTS,
 } from "../lib/growth/navigation/growth-chrome-architecture"
@@ -89,8 +90,8 @@ function runAudit(): void {
   const dashboardBodyFiles = collectDashboardBodyFiles()
   assert.deepEqual(
     dashboardBodyFiles,
-    [...GROWTH_PHASE_4_DASHBOARD_BODY_COMPONENTS].sort(),
-    "dashboard body files on disk must match Phase 4 certified set",
+    [...GROWTH_CERTIFIED_DASHBOARD_BODY_COMPONENTS].sort(),
+    "dashboard body files on disk must match certified set",
   )
   for (const file of dashboardBodyFiles) {
     const source = readSource(file)
@@ -105,12 +106,12 @@ function runAudit(): void {
   }
   console.log("  ✓ shared layout components have no pathname-based chrome branching")
 
-  for (const file of GROWTH_PHASE_4_WORKSPACE_PAGES) {
+  for (const file of GROWTH_CERTIFIED_WORKSPACE_HEADER_BODY_PAGES) {
     const source = readSource(file)
     assert.match(source, /GrowthWorkspacePageHeader/, `${file} must compose GrowthWorkspacePageHeader`)
     assert.match(source, /DashboardBody/, `${file} must compose a DashboardBody component`)
   }
-  console.log("  ✓ Phase 4 certified workspace pages follow header + DashboardBody pattern")
+  console.log("  ✓ certified workspace pages follow header + DashboardBody pattern")
 
   for (const file of GROWTH_PHASE_4_ADMIN_PAGES) {
     const source = readSource(file)
@@ -142,7 +143,9 @@ function runAudit(): void {
         qa_marker: GROWTH_CHROME_ARCHITECTURE_QA_MARKER,
         workspace_pages_checked: workspacePages.length,
         dashboard_body_components_checked: dashboardBodyFiles.length,
-        phase_4_certified_routes: GROWTH_PHASE_4_WORKSPACE_PAGES.length,
+        phase_4_certified_routes: GROWTH_PHASE_4_DASHBOARD_BODY_COMPONENTS.length,
+        certified_dashboard_bodies: GROWTH_CERTIFIED_DASHBOARD_BODY_COMPONENTS.length,
+        certified_workspace_pages: GROWTH_CERTIFIED_WORKSPACE_HEADER_BODY_PAGES.length,
         legacy_mixed_components: GROWTH_LEGACY_MIXED_CHROME_COMPONENTS,
         removed_legacy_wrappers: GROWTH_REMOVED_LEGACY_WORKSPACE_WRAPPERS.length,
       },

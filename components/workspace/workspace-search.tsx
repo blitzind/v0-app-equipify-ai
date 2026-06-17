@@ -8,6 +8,7 @@ import {
   GROWTH_WORKSPACE_SEARCH_QA_MARKER,
 } from "@/lib/workspace/growth-workspace-search-categories"
 import { runGrowthWorkspaceSearchClient } from "@/lib/workspace/run-growth-workspace-search-client"
+import { recordGrowthWorkspaceSearchRecent } from "@/lib/workspace/growth-workspace-search-recent"
 import {
   GlobalSearchPanel,
   WORKSPACE_SEARCH_DEBOUNCE_MS,
@@ -151,6 +152,7 @@ function WorkspaceSearchGrowth() {
     try {
       const nextGroups = await runGrowthWorkspaceSearchClient(q, ac.signal)
       setGroups(nextGroups)
+      if (nextGroups.length > 0) recordGrowthWorkspaceSearchRecent(q)
     } catch (e) {
       if ((e as Error)?.name === "AbortError") return
       setGroups([])
@@ -192,6 +194,7 @@ function WorkspaceSearchGrowth() {
       onRetry={() => void runSearch(query.trim())}
       qaMarker={GROWTH_WORKSPACE_SEARCH_QA_MARKER}
       keyboardShortcutEnabled={WORKSPACE_SEARCH_KEYBOARD_SHORTCUT_ENABLED_GROWTH}
+      enableRecentSearches
     />
   )
 }

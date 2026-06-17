@@ -7,6 +7,14 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import type { GlobalSearchGroup } from "@/lib/global-search/run-global-search"
 import { WORKSPACE_SEARCH_INTERACTION_QA_MARKER } from "@/lib/workspace/workspace-search-interactions"
+import {
+  readGrowthWorkspaceSearchRecent,
+  type GrowthWorkspaceSearchRecentEntry,
+} from "@/lib/workspace/growth-workspace-search-recent"
+import {
+  WorkspaceSearchResultIcon,
+  WorkspaceSearchResultsSkeleton,
+} from "@/components/workspace/workspace-search-result-icon"
 
 const DEBOUNCE_MS = 280
 
@@ -25,6 +33,7 @@ export type GlobalSearchPanelProps = {
   qaMarker?: string
   /** When true, Cmd/Ctrl+K focuses the search input (Core only — Growth uses Cmd+K for command palette). */
   keyboardShortcutEnabled?: boolean
+  enableRecentSearches?: boolean
 }
 
 export function GlobalSearchPanel({
@@ -41,11 +50,13 @@ export function GlobalSearchPanel({
   className,
   qaMarker,
   keyboardShortcutEnabled = false,
+  enableRecentSearches = false,
 }: GlobalSearchPanelProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
+  const [recentSearches, setRecentSearches] = useState<GrowthWorkspaceSearchRecentEntry[]>([])
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -62,6 +73,11 @@ export function GlobalSearchPanel({
     setOpen(false)
     setActiveIndex(-1)
   }, [pathname])
+
+  useEffect(() => {
+    if (!enableRecentSearches || !open) return
+    setRecentSearches(readGrowthWorkspaceSearchRecent())
+  }, [enableRecentSearches, open])
 
   useEffect(() => {
     if (!open) return
@@ -92,7 +108,9 @@ export function GlobalSearchPanel({
     setActiveIndex(flatResults.length > 0 ? 0 : -1)
   }, [flatResults])
 
-  const showPanel = open && !disabled && query.trim().length >= 2
+  const showPanel = open && !disabled && (query.trim().length >= 2 || (enableRecentSearches && query.trim().length === 0))
+  const showRecentPanel = enableRecentSearches && open && !disabled && query.trim().length === 0 && recentSearches.length > 0
+  const showResultsPanel = open && !disabled && query.trim().length >= 2
 
   const handleSelect = useCallback(
     (href: string) => {
@@ -190,7 +208,33 @@ export function GlobalSearchPanel({
           role="listbox"
           className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-[min(70vh,420px)] overflow-y-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-lg"
         >
-          {fetchError ? (
+          {showRecentPanel ? (
+            <div className="py-1">
+              <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Recent searches
+              </p>
+              <ul className="space-y-0.5 px-1 pb-2">
+                {recentSearches.map((entry) => (
+                  <li key={`${entry.query}:${entry.searchedAt}`}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors ds-hover-list-row"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        onQueryChange(entry.query)
+                        setOpen(true)
+                      }}
+                    >
+                      <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                      <span className="font-medium text-foreground">{entry.query}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {showResultsPanel && fetchError ? (
             <div className="px-4 py-5 text-center space-y-2">
               <AlertCircle className="mx-auto h-8 w-8 text-destructive/80" aria-hidden />
               <p className="text-sm font-medium text-destructive">{fetchError}</p>
@@ -210,13 +254,15 @@ export function GlobalSearchPanel({
                 </Button>
               ) : null}
             </div>
-          ) : groups.length === 0 && !loading ? (
+          ) : showResultsPanel && loading ? (
+            <WorkspaceSearchResultsSkeleton />
+          ) : showResultsPanel && groups.length === 0 && !loading ? (
             <div className="px-4 py-6 text-center space-y-2">
               <Search className="mx-auto h-8 w-8 text-muted-foreground/45" aria-hidden />
               <p className="text-sm font-medium text-foreground">No matches</p>
               <p className="text-xs text-muted-foreground leading-relaxed">{emptyHint}</p>
             </div>
-          ) : (
+          ) : showResultsPanel ? (
             <div className="py-1">
               {groups.map((g) => (
                 <div key={g.id} className="px-1 pb-2">
@@ -237,7 +283,7 @@ export function GlobalSearchPanel({
                             role="option"
                             aria-selected={selected}
                             className={cn(
-                              "w-full rounded-md px-2 py-2 text-left text-sm transition-colors ds-hover-list-row focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
+                              "flex w-full items-start gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors ds-hover-list-row focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
                               selected && "bg-accent/60",
                             )}
                             onMouseDown={(e) => e.preventDefault()}
@@ -246,12 +292,15 @@ export function GlobalSearchPanel({
                             }}
                             onClick={() => handleSelect(r.href)}
                           >
-                            <span className="font-medium text-foreground line-clamp-1">{r.title}</span>
-                            {r.subtitle ? (
-                              <span className="mt-0.5 block text-xs text-muted-foreground line-clamp-1">
-                                {r.subtitle}
-                              </span>
-                            ) : null}
+                            <WorkspaceSearchResultIcon kind={r.kind} />
+                            <span className="min-w-0 flex-1">
+                              <span className="font-medium text-foreground line-clamp-1">{r.title}</span>
+                              {r.subtitle ? (
+                                <span className="mt-0.5 block text-xs text-muted-foreground line-clamp-1">
+                                  {r.subtitle}
+                                </span>
+                              ) : null}
+                            </span>
                           </button>
                         </li>
                       )
@@ -260,7 +309,7 @@ export function GlobalSearchPanel({
                 </div>
               ))}
             </div>
-          )}
+          ) : null}
         </div>
       ) : null}
     </div>

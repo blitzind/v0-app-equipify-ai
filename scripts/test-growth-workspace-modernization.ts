@@ -147,9 +147,9 @@ function runAudit(): void {
 
   assert.equal(GROWTH_WORKSPACE_SEARCH_CATEGORIES.length, 11)
   assertIncludes(
-    "lib/workspace/run-growth-workspace-search-client.ts",
-    "runGrowthWorkspaceSearchClient",
-    "growth search client orchestrator must exist",
+    "lib/workspace/growth-workspace-search-providers.ts",
+    "runGrowthWorkspaceSearchProviders",
+    "growth search provider orchestrator must exist",
   )
   console.log("  ✓ growth search category architecture (11 categories)")
 

@@ -5,7 +5,7 @@
 
 import type { GlobalSearchGroup } from "@/lib/global-search/run-global-search"
 
-export const GROWTH_WORKSPACE_SEARCH_QA_MARKER = "growth-workspace-search-v1" as const
+export const GROWTH_WORKSPACE_SEARCH_QA_MARKER = "growth-workspace-search-v2" as const
 
 export const GROWTH_WORKSPACE_SEARCH_CATEGORIES = [
   { id: "leads", label: "Leads" },

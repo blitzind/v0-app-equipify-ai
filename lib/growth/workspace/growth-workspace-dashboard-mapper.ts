@@ -246,10 +246,21 @@ export function buildGrowthWorkspaceDashboardViewModel(
     generatedAt: new Date().toISOString(),
     operatorName: input.briefing?.operator_name ?? null,
     recommendedAction: input.briefing?.summary.recommended_action ?? null,
-    quickActions: GROWTH_WORKSPACE_DASHBOARD_QUICK_ACTIONS.map(({ id, label, href }) => ({
+    welcome: {
+      greeting: input.briefing?.greeting ?? "Welcome back",
+      operatorName: input.briefing?.operator_name ?? null,
+      recommendedAction: input.briefing?.summary.recommended_action ?? null,
+      todaysFocus:
+        input.briefing?.priorities?.[0]?.title ??
+        input.briefing?.section_summaries?.inbox ??
+        "Keep your queue, inbox, and pipeline moving.",
+    },
+    quickActions: GROWTH_WORKSPACE_DASHBOARD_QUICK_ACTIONS.map(({ id, label, href, description, shortcut }) => ({
       id,
       label,
       href,
+      description,
+      shortcut,
     })),
     sections: [
       {

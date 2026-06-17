@@ -8,10 +8,10 @@ import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import {
+  GROWTH_CERTIFIED_DASHBOARD_BODY_COMPONENTS,
+  GROWTH_CERTIFIED_WORKSPACE_HEADER_BODY_PAGES,
   GROWTH_CHROME_ARCHITECTURE_QA_MARKER,
   GROWTH_PHASE_4_ADMIN_PAGES,
-  GROWTH_PHASE_4_DASHBOARD_BODY_COMPONENTS,
-  GROWTH_PHASE_4_WORKSPACE_PAGES,
   GROWTH_REMOVED_LEGACY_WORKSPACE_WRAPPERS,
 } from "../lib/growth/navigation/growth-chrome-architecture"
 
@@ -35,14 +35,14 @@ function runAudit(): void {
   assert.match(sectionLayoutSource, /GrowthSectionSidebarNav/)
   console.log("  ✓ GrowthSectionLayout is admin-only chrome with no pathname branching")
 
-  for (const file of GROWTH_PHASE_4_WORKSPACE_PAGES) {
+  for (const file of GROWTH_CERTIFIED_WORKSPACE_HEADER_BODY_PAGES) {
     const source = readSource(file)
     assert.doesNotMatch(source, /GrowthSectionLayout/, `${file} must not import GrowthSectionLayout`)
     assert.doesNotMatch(source, /GrowthSectionSidebarNav/, `${file} must not import embedded admin nav`)
     assert.match(source, /GrowthWorkspacePageHeader/, `${file} must use workspace page header`)
     assert.match(source, /DashboardBody/, `${file} must compose a dashboard body component`)
   }
-  console.log("  ✓ Phase 4 workspace pages are header + body only")
+  console.log("  ✓ certified workspace pages are header + body only")
 
   for (const file of GROWTH_PHASE_4_ADMIN_PAGES) {
     const source = readSource(file)
@@ -52,7 +52,7 @@ function runAudit(): void {
   }
   console.log("  ✓ Phase 4 admin fallbacks retain Platform Admin + GrowthSectionLayout")
 
-  for (const file of GROWTH_PHASE_4_DASHBOARD_BODY_COMPONENTS) {
+  for (const file of GROWTH_CERTIFIED_DASHBOARD_BODY_COMPONENTS) {
     const source = readSource(file)
     assert.doesNotMatch(source, /GrowthSectionLayout/, `${file} must be body-only`)
     assert.doesNotMatch(source, /GrowthSectionSidebarNav/, `${file} must not embed admin nav`)
@@ -73,9 +73,9 @@ function runAudit(): void {
         ok: true,
         qa_marker: GROWTH_WORKSPACE_CHROME_BOUNDARIES_QA_MARKER,
         architecture_qa_marker: GROWTH_CHROME_ARCHITECTURE_QA_MARKER,
-        workspace_pages_checked: GROWTH_PHASE_4_WORKSPACE_PAGES.length,
+        workspace_pages_checked: GROWTH_CERTIFIED_WORKSPACE_HEADER_BODY_PAGES.length,
         admin_pages_checked: GROWTH_PHASE_4_ADMIN_PAGES.length,
-        dashboard_body_components_checked: GROWTH_PHASE_4_DASHBOARD_BODY_COMPONENTS.length,
+        dashboard_body_components_checked: GROWTH_CERTIFIED_DASHBOARD_BODY_COMPONENTS.length,
       },
       null,
       2,

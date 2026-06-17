@@ -1,6 +1,6 @@
 /** Growth workspace operator home dashboard (Phase 6A) — client-safe types. */
 
-export const GROWTH_WORKSPACE_DASHBOARD_QA_MARKER = "growth-workspace-dashboard-v1" as const
+export const GROWTH_WORKSPACE_DASHBOARD_QA_MARKER = "growth-workspace-dashboard-v2" as const
 
 export type GrowthWorkspaceDashboardMetricLink = {
   label: string
@@ -26,6 +26,15 @@ export type GrowthWorkspaceDashboardQuickAction = {
   id: string
   label: string
   href: string
+  description?: string
+  shortcut?: string
+}
+
+export type GrowthWorkspaceDashboardWelcome = {
+  greeting: string
+  operatorName: string | null
+  recommendedAction: string | null
+  todaysFocus: string | null
 }
 
 export type GrowthWorkspaceDashboardViewModel = {
@@ -33,6 +42,7 @@ export type GrowthWorkspaceDashboardViewModel = {
   generatedAt: string
   sections: GrowthWorkspaceDashboardSection[]
   quickActions: GrowthWorkspaceDashboardQuickAction[]
+  welcome: GrowthWorkspaceDashboardWelcome
   operatorName?: string | null
   recommendedAction?: string | null
 }

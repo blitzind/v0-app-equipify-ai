@@ -168,8 +168,10 @@ function assertSearchCertification(): void {
   assert.equal(WORKSPACE_SEARCH_KEYBOARD_SHORTCUT_ENABLED_GROWTH, false)
   assertIncludes("components/growth/growth-navigation-provider.tsx", 'event.key.toLowerCase() !== "k"', "Growth Cmd+K reserved for command palette")
   assertIncludes(PRIMITIVE_FILES.GlobalSearchPanel, "data-workspace-search-interaction", "search interaction QA marker present")
-  assertIncludes(PRIMITIVE_FILES.GlobalSearchPanel, "No matches", "empty state renders safely")
-  assertIncludes("lib/workspace/run-growth-workspace-search-client.ts", "normalizeGrowthWorkspaceSearchGroups", "growth empty categories do not crash")
+  assertIncludes(PRIMITIVE_FILES.GlobalSearchPanel, "WorkspaceSearchResultsSkeleton", "search loading skeletons present")
+  assertIncludes(PRIMITIVE_FILES.GlobalSearchPanel, "Recent searches", "recent searches support present")
+  assertIncludes("lib/workspace/growth-workspace-search-providers.ts", "Promise.allSettled", "growth search tolerates partial provider failures")
+  assertIncludes("lib/workspace/run-growth-workspace-search-client.ts", "runGrowthWorkspaceSearchProviders", "growth search client delegates to providers")
   console.log("  ✓ search certification (debounce, escape, route close, keyboard nav, Cmd/Ctrl+K contract)")
 }
 
