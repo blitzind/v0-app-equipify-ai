@@ -1,6 +1,6 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   Command,
@@ -14,6 +14,7 @@ import {
   CommandShortcut,
 } from "@/components/ui/command"
 import { useGrowthNavigation } from "@/components/growth/growth-navigation-provider"
+import { resolveGrowthCommandPaletteHref } from "@/lib/growth/navigation/growth-command-palette-derivation"
 import {
   GROWTH_COMMAND_PALETTE_ENTRIES,
   GROWTH_NAVIGATION_IA_QA_MARKER,
@@ -105,6 +106,7 @@ function GrowthCommandPaletteEmptyState({
 }
 
 export function GrowthCommandNavigationPalette() {
+  const pathname = usePathname()
   const router = useRouter()
   const { open, setOpen } = useGrowthNavigation()
   const [search, setSearch] = useState("")
@@ -121,11 +123,12 @@ export function GrowthCommandNavigationPalette() {
 
   const navigate = useCallback(
     (href: string, entry: { id: string; label: string }) => {
-      setUsage(recordGrowthNavigationUsage({ id: entry.id, href, label: entry.label }))
+      const resolvedHref = resolveGrowthCommandPaletteHref(pathname, href)
+      setUsage(recordGrowthNavigationUsage({ id: entry.id, href: resolvedHref, label: entry.label }))
       setOpen(false)
-      router.push(href)
+      router.push(resolvedHref)
     },
-    [router, setOpen],
+    [pathname, router, setOpen],
   )
 
   const rankedEntries = useMemo(

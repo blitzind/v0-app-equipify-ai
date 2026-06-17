@@ -6,6 +6,7 @@ import { Loader2, Plus, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { GrowthAutomationFlowCard } from "@/components/growth/automation/growth-automation-flow-card"
+import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
 import {
   GROWTH_AUTOMATION_BUILDER_QA_MARKER,
   GROWTH_AUTOMATION_FLOW_STATUSES,
@@ -20,6 +21,7 @@ type ListResponse = {
 }
 
 export function GrowthAutomationFlowLibrary() {
+  const newFlowPath = useGrowthFeaturePath("automation/new")
   const [items, setItems] = useState<GrowthAutomationFlow[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -108,7 +110,7 @@ export function GrowthAutomationFlowLibrary() {
             Refresh
           </Button>
           <Button size="sm" asChild>
-            <Link href="/admin/growth/automation/new">
+            <Link href={newFlowPath}>
               <Plus className="size-4" />
               New flow
             </Link>

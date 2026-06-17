@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -20,6 +21,7 @@ import {
   type GrowthSharePageTemplatePreviewContext,
 } from "@/lib/growth/share-pages/share-page-template-preview-context"
 import type { GrowthSharePageTemplate } from "@/lib/growth/share-pages/share-page-template-types"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 
 function draftFromTemplate(template: GrowthSharePageTemplate): GrowthSharePageTemplateEditorDraft {
   const version = template.currentVersion
@@ -42,6 +44,7 @@ export function GrowthSharePageTemplatePreviewPage({
 }: {
   template: GrowthSharePageTemplate
 }) {
+  const pathname = usePathname()
   const draft = useMemo(() => draftFromTemplate(template), [template])
   const [viewport, setViewport] = useState<GrowthSharePageTemplatePreviewViewport>("desktop")
   const [previewContext, setPreviewContext] = useState<GrowthSharePageTemplatePreviewContext>(
@@ -52,7 +55,7 @@ export function GrowthSharePageTemplatePreviewPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button asChild variant="outline" size="sm">
-          <Link href={`/admin/growth/share-pages/templates/${template.id}`}>
+          <Link href={growthFeaturePath(pathname, `share-pages/templates/${template.id}`)}>
             <ArrowLeft className="mr-1.5 size-3.5" />
             Back to editor
           </Link>

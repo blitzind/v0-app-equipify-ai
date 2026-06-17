@@ -18,6 +18,7 @@ import {
   GROWTH_SHARE_PAGE_TEMPLATES_QA_MARKER,
   type GrowthSharePageTemplate,
 } from "@/lib/growth/share-pages/share-page-template-types"
+import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
 
 type ListResponse = {
   ok: boolean
@@ -27,6 +28,7 @@ type ListResponse = {
 }
 
 export function GrowthSharePageTemplateLibrary() {
+  const newTemplatePath = useGrowthFeaturePath("share-pages/templates/new")
   const [items, setItems] = useState<GrowthSharePageTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -131,7 +133,7 @@ export function GrowthSharePageTemplateLibrary() {
             Refresh
           </Button>
           <Button asChild size="sm">
-            <Link href="/admin/growth/share-pages/templates/new">
+            <Link href={newTemplatePath}>
               <Plus className="mr-1.5 size-3.5" />
               New template
             </Link>

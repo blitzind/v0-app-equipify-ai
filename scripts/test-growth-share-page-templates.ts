@@ -97,6 +97,10 @@ const S1C_MODULE_PATHS = [
   "app/(admin)/admin/growth/share-pages/templates/new/page.tsx",
   "app/(admin)/admin/growth/share-pages/templates/[id]/page.tsx",
   "app/(admin)/admin/growth/share-pages/templates/[id]/preview/page.tsx",
+  "app/(growth)/growth/share-pages/templates/page.tsx",
+  "app/(growth)/growth/share-pages/templates/new/page.tsx",
+  "app/(growth)/growth/share-pages/templates/[id]/page.tsx",
+  "app/(growth)/growth/share-pages/templates/[id]/preview/page.tsx",
   "components/growth/share-pages/templates/growth-share-page-template-library.tsx",
   "components/growth/share-pages/templates/growth-share-page-template-card.tsx",
   "components/growth/share-pages/templates/growth-share-page-template-editor.tsx",
@@ -657,7 +661,7 @@ function runLocalRegression(): Promise<void> {
   )
   assert.ok(dialogSource.includes("Use template"))
   assert.ok(dialogSource.includes("/instantiate"))
-  assert.ok(dialogSource.includes("/admin/growth/share-pages/"))
+  assert.ok(dialogSource.includes("growthFeaturePath"))
   console.log("  ✓ instantiate dialog wiring")
 
   assert.equal(GROWTH_SHARE_PAGE_TEMPLATE_PREVIEW_QA_MARKER, "growth-share-page-template-preview-s1f-v1")

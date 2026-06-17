@@ -1,0 +1,438 @@
+/**
+ * Canonical Growth Engine route catalog inputs — one entry per physical page URL (112 total).
+ * Built into full metadata by `growth-route-metadata.ts`.
+ */
+
+import type {
+  GrowthRouteMigrationStatus,
+  GrowthRouteSection,
+} from "@/lib/growth/navigation/growth-route-metadata-types"
+
+export type GrowthRouteCatalogInput = {
+  id: string
+  path: string
+  title: string
+  section: GrowthRouteSection
+  migrationStatus: GrowthRouteMigrationStatus
+  breadcrumbLabel?: string
+  adminPath?: string
+  workspacePath?: string
+  segment?: string
+  migrated?: boolean
+  placeholder?: boolean
+  hidden?: boolean
+  system?: boolean
+  dynamic?: boolean
+  deprecated?: boolean
+  dynamicMatch?: RegExp
+  futurePath?: string
+  futureSection?: GrowthRouteSection
+}
+
+/** Routes flagged in the IA audit as easy to forget — diagnostics assert presence. */
+export const GROWTH_ORPHAN_ROUTE_IDS = [
+  "admin-knowledge",
+  "admin-ownership",
+  "admin-customer-lifecycle",
+  "admin-sequences-builder",
+  "admin-opportunities-workspace",
+  "admin-revenue",
+  "admin-revenue-operating",
+  "admin-revenue-intelligence",
+] as const
+
+const ADMIN = "/admin/growth"
+const WORKSPACE = "/growth"
+
+function settingsFuture(suffix: string): Pick<GrowthRouteCatalogInput, "futurePath" | "futureSection"> {
+  return {
+    futurePath: `${WORKSPACE}/settings/${suffix}`,
+    futureSection: "settings",
+  }
+}
+
+function admin(
+  id: string,
+  suffix: string,
+  title: string,
+  section: GrowthRouteSection,
+  migrationStatus: GrowthRouteMigrationStatus,
+  flags: Partial<GrowthRouteCatalogInput> = {},
+): GrowthRouteCatalogInput {
+  return {
+    id,
+    path: suffix ? `${ADMIN}/${suffix}` : ADMIN,
+    title,
+    section,
+    migrationStatus,
+    ...flags,
+  }
+}
+
+function workspace(
+  id: string,
+  suffix: string,
+  title: string,
+  section: GrowthRouteSection,
+  migrationStatus: GrowthRouteMigrationStatus,
+  flags: Partial<GrowthRouteCatalogInput> = {},
+): GrowthRouteCatalogInput {
+  return {
+    id,
+    path: suffix ? `${WORKSPACE}/${suffix}` : WORKSPACE,
+    title,
+    section,
+    migrationStatus,
+    ...flags,
+  }
+}
+
+function adminDual(
+  id: string,
+  suffix: string,
+  title: string,
+  section: GrowthRouteSection,
+  workspaceSuffix: string,
+  flags: Partial<GrowthRouteCatalogInput> = {},
+): GrowthRouteCatalogInput {
+  return admin(id, suffix, title, section, "dual-route", {
+    workspacePath: workspaceSuffix ? `${WORKSPACE}/${workspaceSuffix}` : WORKSPACE,
+    ...flags,
+  })
+}
+
+function workspaceDual(
+  id: string,
+  suffix: string,
+  title: string,
+  section: GrowthRouteSection,
+  flags: Partial<GrowthRouteCatalogInput> = {},
+): GrowthRouteCatalogInput {
+  return workspace(id, suffix, title, section, "dual-route", {
+    migrated: true,
+    adminPath: suffix ? `${ADMIN}/${suffix}` : ADMIN,
+    segment: suffix,
+    ...flags,
+  })
+}
+
+export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
+  admin("admin-root", "", "Growth Root Redirect", "workspace", "admin-only", {
+    deprecated: true,
+    breadcrumbLabel: "Growth",
+  }),
+  admin("admin-leads-redirect", "leads", "Leads Legacy Redirect", "workspace", "admin-only", {
+    deprecated: true,
+    workspacePath: `${WORKSPACE}/leads`,
+  }),
+  admin("admin-calls-redirect", "calls", "Calls Legacy Redirect", "workspace", "admin-only", {
+    deprecated: true,
+    workspacePath: `${WORKSPACE}/calls`,
+  }),
+
+  workspace("workspace-dashboard", "", "Dashboard", "workspace", "workspace", {
+    migrated: true,
+    segment: "",
+    breadcrumbLabel: "Dashboard",
+  }),
+  workspaceDual("workspace-share-pages", "share-pages", "Share Pages", "content", {
+    breadcrumbLabel: "Share Pages",
+  }),
+  workspaceDual("workspace-share-pages-detail", "share-pages/[id]", "Share Page Detail", "content", {
+    breadcrumbLabel: "Edit",
+    dynamic: true,
+    dynamicMatch: /^share-pages\/[^/]+$/,
+  }),
+  workspaceDual("workspace-share-pages-templates", "share-pages/templates", "Templates", "content", {
+    breadcrumbLabel: "Templates",
+  }),
+  workspaceDual("workspace-share-pages-templates-new", "share-pages/templates/new", "New Share Page Template", "content", {
+    breadcrumbLabel: "New",
+  }),
+  workspaceDual("workspace-share-pages-templates-edit", "share-pages/templates/[id]", "Edit Share Page Template", "content", {
+    breadcrumbLabel: "Edit",
+    dynamic: true,
+    dynamicMatch: /^share-pages\/templates\/[^/]+$/,
+  }),
+  workspaceDual(
+    "workspace-share-pages-templates-preview",
+    "share-pages/templates/[id]/preview",
+    "Template Preview",
+    "content",
+    {
+      breadcrumbLabel: "Preview",
+      dynamic: true,
+      dynamicMatch: /^share-pages\/templates\/[^/]+\/preview$/,
+    },
+  ),
+  workspaceDual("workspace-automation", "automation", "Automation Flows", "automation", {
+    breadcrumbLabel: "Automation",
+  }),
+  workspaceDual("workspace-automation-new", "automation/new", "New Automation Flow", "automation", {
+    breadcrumbLabel: "New Flow",
+  }),
+  workspaceDual("workspace-automation-edit", "automation/[id]", "Edit Automation Flow", "automation", {
+    breadcrumbLabel: "Edit Flow",
+    dynamic: true,
+    dynamicMatch: /^automation\/[^/]+$/,
+  }),
+  workspaceDual("workspace-engagement", "engagement", "Engagement", "intelligence", {
+    breadcrumbLabel: "Engagement",
+  }),
+
+  workspace("workspace-leads", "leads", "Leads", "workspace", "placeholder", {
+    migrated: true,
+    segment: "leads",
+    placeholder: true,
+    breadcrumbLabel: "Leads",
+    adminPath: `${ADMIN}/queue`,
+  }),
+  workspace("workspace-campaigns", "campaigns", "Campaigns", "workspace", "placeholder", {
+    migrated: true,
+    segment: "campaigns",
+    placeholder: true,
+    breadcrumbLabel: "Campaigns",
+  }),
+  workspace("workspace-inbox", "inbox", "Inbox", "workspace", "placeholder", {
+    migrated: true,
+    segment: "inbox",
+    placeholder: true,
+    breadcrumbLabel: "Inbox",
+    adminPath: `${ADMIN}/inbox`,
+  }),
+  workspace("workspace-calls", "calls", "Calls", "workspace", "placeholder", {
+    migrated: true,
+    segment: "calls",
+    placeholder: true,
+    breadcrumbLabel: "Calls",
+    adminPath: `${ADMIN}/calls/workspace`,
+  }),
+  workspace("workspace-meetings", "meetings", "Meetings", "workspace", "placeholder", {
+    migrated: true,
+    segment: "meetings",
+    placeholder: true,
+    breadcrumbLabel: "Meetings",
+    adminPath: `${ADMIN}/meetings`,
+  }),
+  workspace("workspace-settings", "settings", "Settings", "settings", "placeholder", {
+    migrated: true,
+    segment: "settings",
+    placeholder: true,
+    breadcrumbLabel: "Settings",
+    adminPath: `${ADMIN}/settings/growth`,
+  }),
+
+  adminDual("admin-share-pages", "share-pages", "Share Pages", "content", "share-pages", {
+    breadcrumbLabel: "Share Pages",
+  }),
+  adminDual("admin-share-pages-detail", "share-pages/[id]", "Share Page Detail", "content", "share-pages/[id]", {
+    breadcrumbLabel: "Edit",
+    dynamic: true,
+  }),
+  adminDual("admin-share-pages-templates", "share-pages/templates", "Templates", "content", "share-pages/templates", {
+    breadcrumbLabel: "Templates",
+  }),
+  adminDual(
+    "admin-share-pages-templates-new",
+    "share-pages/templates/new",
+    "New Share Page Template",
+    "content",
+    "share-pages/templates/new",
+    { breadcrumbLabel: "New" },
+  ),
+  adminDual(
+    "admin-share-pages-templates-edit",
+    "share-pages/templates/[id]",
+    "Edit Share Page Template",
+    "content",
+    "share-pages/templates/[id]",
+    { breadcrumbLabel: "Edit", dynamic: true },
+  ),
+  adminDual(
+    "admin-share-pages-templates-preview",
+    "share-pages/templates/[id]/preview",
+    "Template Preview",
+    "content",
+    "share-pages/templates/[id]/preview",
+    { breadcrumbLabel: "Preview", dynamic: true },
+  ),
+  adminDual("admin-automation", "automation", "Automation Flows", "automation", "automation", {
+    breadcrumbLabel: "Automation",
+  }),
+  adminDual("admin-automation-new", "automation/new", "New Automation Flow", "automation", "automation/new", {
+    breadcrumbLabel: "New Flow",
+  }),
+  adminDual("admin-automation-edit", "automation/[id]", "Edit Automation Flow", "automation", "automation/[id]", {
+    breadcrumbLabel: "Edit Flow",
+    dynamic: true,
+  }),
+  adminDual("admin-engagement", "engagement", "Engagement", "intelligence", "engagement", {
+    breadcrumbLabel: "Engagement",
+  }),
+
+  admin("admin-command", "command", "Command Center", "workspace", "admin-only", {
+    breadcrumbLabel: "Command Center",
+  }),
+  admin("admin-notifications", "notifications", "Notifications", "workspace", "admin-only"),
+  admin("admin-aiden", "aiden", "Aiden", "workspace", "admin-only"),
+  admin("admin-queue", "queue", "Queue", "workspace", "admin-only", { breadcrumbLabel: "Queue" }),
+  admin("admin-lead-detail", "leads/[leadId]", "Lead Detail", "workspace", "admin-only", {
+    dynamic: true,
+    breadcrumbLabel: "Lead",
+  }),
+  admin("admin-leads-queue", "leads/queue", "Call Queue", "workspace", "admin-only"),
+  admin("admin-leads-crm", "leads/crm", "CRM Leads", "workspace", "admin-only"),
+  admin("admin-leads-captured", "leads/captured", "Recently Captured", "workspace", "admin-only"),
+  admin("admin-leads-lead-engine", "leads/lead-engine", "Lead Pipeline", "workspace", "admin-only"),
+  admin("admin-inbox", "inbox", "Inbox", "workspace", "admin-only"),
+  admin("admin-calls-workspace", "calls/workspace", "Calls Workspace", "workspace", "admin-only", {
+    breadcrumbLabel: "Calls",
+  }),
+  admin("admin-calls-live", "calls/live", "Live Calls", "workspace", "admin-only"),
+  admin("admin-calls-live-coaching", "calls/live-coaching", "Live Coaching", "workspace", "admin-only"),
+  admin("admin-calls-voice-drops", "calls/voice-drops", "Voice Drops", "workspace", "admin-only"),
+  admin("admin-meetings", "meetings", "Meetings", "workspace", "admin-only"),
+  admin("admin-opportunities-pipeline", "opportunities/pipeline", "Pipeline", "workspace", "admin-only"),
+  admin("admin-opportunities", "opportunities", "Opportunities", "workspace", "admin-only"),
+  admin("admin-opportunities-workspace", "opportunities/workspace", "Opportunity Workspace", "workspace", "admin-only"),
+  admin("admin-search", "search", "Prospect Search", "workspace", "admin-only"),
+  admin("admin-imports", "imports", "Imports", "workspace", "admin-only"),
+  admin("admin-imports-batch", "imports/[batchId]", "Import Batch Detail", "workspace", "admin-only", {
+    dynamic: true,
+  }),
+  admin("admin-acquisition", "acquisition", "Acquisition Runs", "workspace", "admin-only"),
+  admin("admin-acquisition-run", "acquisition/[runId]", "Acquisition Run Detail", "workspace", "admin-only", {
+    dynamic: true,
+  }),
+  admin("admin-customer-lifecycle", "customer-lifecycle", "Customer Lifecycle", "workspace", "admin-only"),
+  admin("admin-executive", "executive", "Executive", "intelligence", "admin-only"),
+  admin("admin-capacity", "capacity", "Capacity", "intelligence", "admin-only"),
+
+  admin("admin-copilot", "copilot", "Copilot", "content", "admin-only"),
+  admin("admin-copilot-playbooks", "copilot/playbooks", "Playbooks", "content", "admin-only"),
+  admin("admin-copilot-content-library", "copilot/content-library", "Media Assets", "content", "admin-only"),
+  admin("admin-copilot-reply-drafts", "copilot/reply-drafts", "Reply Drafts", "content", "admin-only"),
+  admin("admin-copilot-personalization", "copilot/personalization", "Personalization", "content", "admin-only"),
+  admin("admin-knowledge", "knowledge", "Knowledge Center", "content", "admin-only"),
+
+  admin("admin-sequences", "sequences", "Sequences", "automation", "admin-only"),
+  admin("admin-sequences-builder", "sequences/builder", "Sequence Builder", "automation", "admin-only"),
+  admin("admin-sequences-execution", "sequences/execution", "Sequence Execution", "automation", "admin-only"),
+  admin("admin-sequences-enrollment", "sequences/enrollments/[enrollmentId]", "Enrollment Detail", "automation", "admin-only", {
+    dynamic: true,
+  }),
+  admin("admin-outreach", "outreach", "Outreach", "automation", "admin-only"),
+  admin("admin-outreach-approval", "outreach/approval", "Outreach Approval", "automation", "admin-only"),
+  admin("admin-outreach-legacy-queue", "outreach/legacy-queue", "Legacy Outreach Queue", "automation", "hidden", {
+    hidden: true,
+    system: true,
+    deprecated: true,
+  }),
+  admin("admin-execution", "execution", "Human Execution", "automation", "admin-only"),
+  admin("admin-booking-intelligence", "booking-intelligence", "Booking Intelligence", "automation", "admin-only"),
+  admin("admin-multichannel", "multichannel", "Multi-Channel", "automation", "admin-only"),
+
+  admin("admin-intent-pixel", "intent-pixel", "Intent Signals", "intelligence", "admin-only"),
+  admin("admin-conversations", "conversations", "Conversations", "intelligence", "admin-only"),
+  admin("admin-replies", "replies", "Reply Inbox", "intelligence", "admin-only"),
+  admin("admin-replies-workflow", "replies/workflow", "Reply Workflow", "intelligence", "admin-only"),
+  admin("admin-relationships", "relationships", "Relationships", "intelligence", "admin-only"),
+  admin("admin-relationship-memory", "intelligence/relationship-memory", "Relationship Memory", "intelligence", "admin-only"),
+  admin("admin-experiments", "experiments", "Experiments", "system", "hidden", {
+    hidden: true,
+    system: true,
+  }),
+  admin("admin-revenue-execution", "revenue-execution", "Revenue Execution", "intelligence", "admin-only"),
+  admin("admin-revenue-execution-review", "revenue-execution/review", "Revenue Execution Review", "intelligence", "admin-only"),
+  admin("admin-revenue-intelligence", "revenue-intelligence", "Revenue Intelligence", "intelligence", "admin-only"),
+  admin("admin-revenue-attribution", "revenue-attribution", "Revenue Attribution", "intelligence", "admin-only"),
+  admin("admin-revenue-operating", "revenue-operating", "Revenue Forecast", "intelligence", "admin-only"),
+  admin("admin-revenue", "revenue", "Revenue Forecast Intelligence", "intelligence", "admin-only"),
+  admin("admin-opportunity-intelligence", "opportunity-intelligence", "Opportunity Readiness", "intelligence", "admin-only"),
+
+  admin("admin-providers", "providers", "Provider Diagnostics", "settings", "admin-only", {
+    ...settingsFuture("providers"),
+  }),
+  admin("admin-providers-setup", "providers/setup", "Provider Setup", "settings", "admin-only", {
+    ...settingsFuture("providers/setup"),
+  }),
+  admin("admin-providers-delivery", "providers/delivery", "Send Routing", "settings", "admin-only", {
+    ...settingsFuture("providers/delivery"),
+  }),
+  admin("admin-providers-deliverability-ops", "providers/deliverability-ops", "Outbound Readiness", "settings", "admin-only", {
+    ...settingsFuture("providers/deliverability-ops"),
+  }),
+  admin("admin-providers-sender-pools", "providers/sender-pools", "Sender Pools", "settings", "admin-only", {
+    ...settingsFuture("providers/sender-pools"),
+  }),
+  admin("admin-providers-compliance", "providers/compliance", "Compliance", "settings", "admin-only", {
+    ...settingsFuture("compliance"),
+  }),
+  admin("admin-providers-webhooks", "providers/webhooks", "Webhooks", "settings", "admin-only", {
+    ...settingsFuture("providers/webhooks"),
+  }),
+  admin("admin-infrastructure", "infrastructure", "Sender Management", "settings", "admin-only", {
+    ...settingsFuture("infrastructure"),
+  }),
+  admin("admin-infrastructure-mailboxes", "infrastructure/mailboxes", "Mailbox Connections", "settings", "admin-only", {
+    ...settingsFuture("mailboxes"),
+  }),
+  admin("admin-infrastructure-deliverability", "infrastructure/deliverability", "Deliverability", "settings", "admin-only", {
+    ...settingsFuture("deliverability"),
+  }),
+  admin("admin-infrastructure-warmup", "infrastructure/warmup", "Warmup", "settings", "admin-only", {
+    ...settingsFuture("warmup"),
+  }),
+  admin("admin-infrastructure-outbound-ops", "infrastructure/outbound-operations", "Send Infrastructure", "settings", "admin-only", {
+    ...settingsFuture("outbound-operations"),
+  }),
+  admin("admin-operations-outbound", "operations/outbound", "Outbound Console", "settings", "admin-only", {
+    ...settingsFuture("outbound-console"),
+  }),
+  admin("admin-deliverability", "deliverability", "Deliverability Protection", "settings", "admin-only", {
+    ...settingsFuture("deliverability-protection"),
+  }),
+  admin("admin-settings", "settings", "Settings Root", "settings", "admin-only", { deprecated: true }),
+  admin("admin-settings-growth", "settings/growth", "Growth Settings", "settings", "admin-only", {
+    futurePath: `${WORKSPACE}/settings`,
+    futureSection: "settings",
+  }),
+  admin("admin-settings-communications", "settings/communications", "Communication Settings", "settings", "admin-only", {
+    ...settingsFuture("communications"),
+  }),
+  admin("admin-settings-governance", "settings/governance", "Governance", "settings", "admin-only", {
+    ...settingsFuture("governance"),
+  }),
+  admin("admin-settings-provider-health", "settings/provider-health", "Provider Health", "settings", "hidden", {
+    hidden: true,
+    system: true,
+    ...settingsFuture("provider-health"),
+  }),
+  admin("admin-ownership", "ownership", "Sales Ownership", "settings", "admin-only", {
+    ...settingsFuture("ownership"),
+  }),
+  admin("admin-calls-providers", "calls/providers", "Call Providers", "settings", "admin-only", {
+    ...settingsFuture("call-providers"),
+  }),
+  admin("admin-voice-readiness", "voice/readiness", "Voice Readiness", "settings", "admin-only", {
+    ...settingsFuture("voice/readiness"),
+  }),
+  admin("admin-inbox-diagnostics", "inbox/diagnostics", "Inbox Diagnostics", "settings", "hidden", {
+    hidden: true,
+    system: true,
+    ...settingsFuture("inbox-diagnostics"),
+  }),
+
+  admin("admin-browser-intake-test", "browser-intake-test", "Browser Intake Test", "system", "hidden", {
+    hidden: true,
+    system: true,
+  }),
+  admin("admin-dogfood", "dogfood", "Dogfood Validation Center", "system", "hidden", {
+    hidden: true,
+    system: true,
+  }),
+  admin("admin-identity-evidence", "identity-evidence", "Human Identity Evidence Review", "system", "hidden", {
+    hidden: true,
+    system: true,
+  }),
+]

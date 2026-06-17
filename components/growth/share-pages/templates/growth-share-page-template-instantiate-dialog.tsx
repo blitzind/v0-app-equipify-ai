@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { ExternalLink, Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,6 +18,7 @@ import { Label } from "@/components/ui/label"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { GROWTH_SHARE_PAGE_TEMPLATE_INSTANTIATION_QA_MARKER } from "@/lib/growth/share-pages/share-page-template-types"
 import type { GrowthSharePageTemplate } from "@/lib/growth/share-pages/share-page-template-types"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 
 type InstantiateResponse = {
   ok: boolean
@@ -37,6 +39,7 @@ export function GrowthSharePageTemplateInstantiateDialog({
   onOpenChange: (open: boolean) => void
   template: GrowthSharePageTemplate
 }) {
+  const pathname = usePathname()
   const [leadId, setLeadId] = useState("")
   const [bookingPageId, setBookingPageId] = useState("")
   const [draftTitle, setDraftTitle] = useState("")
@@ -118,7 +121,7 @@ export function GrowthSharePageTemplateInstantiateDialog({
                 Template v{result.template_version_number} frozen on share page {result.share_page_id}.
               </p>
               <Button asChild size="sm" className="mt-3" variant="outline">
-                <Link href={`/admin/growth/share-pages/${result.share_page_id}`}>
+                <Link href={growthFeaturePath(pathname, `share-pages/${result.share_page_id}`)}>
                   <ExternalLink className="mr-1.5 size-3.5" />
                   Open draft share page
                 </Link>

@@ -21,7 +21,8 @@ export function GrowthNavigationProvider({ children }: { children: ReactNode }) 
   const pathname = normalizeGrowthPathname(usePathname())
   const [open, setOpen] = useState(false)
 
-  const isGrowthRoute = pathname.startsWith("/admin/growth")
+  const isGrowthRoute =
+    pathname.startsWith("/admin/growth") || pathname.startsWith("/growth")
 
   const toggle = useCallback(() => setOpen((v) => !v), [])
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { GrowthAutomationCanvasLayout } from "@/components/growth/automation/growth-automation-canvas-layout"
+import { useGrowthBreadcrumbDetail } from "@/components/growth/shell/growth-breadcrumb-context"
 import {
   type GrowthAutomationEdge,
   type GrowthAutomationFlow,
@@ -51,6 +52,8 @@ export function GrowthAutomationFlowEditor({ flowId }: { flowId: string }) {
   useEffect(() => {
     void load()
   }, [load])
+
+  useGrowthBreadcrumbDetail(flow?.name, loading)
 
   if (loading) {
     return (

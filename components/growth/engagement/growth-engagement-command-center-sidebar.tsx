@@ -1,7 +1,9 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import type {
   GrowthEngagementCommandCenterSidebar,
   GrowthEngagementCommandCenterSourceAvailability,
@@ -23,6 +25,9 @@ export function GrowthEngagementCommandCenterSidebar({
   onSelectWatchlist: (watchlistId: string | null) => void
   onSelectSeverity: (severity: GrowthEngagementAlertSeverity | null) => void
 }) {
+  const pathname = usePathname()
+  const engagementBasePath = growthFeaturePath(pathname, "engagement")
+
   if (!sidebar) {
     return (
       <GrowthEngineCard title="Workspace sidebar">
@@ -85,7 +90,7 @@ export function GrowthEngagementCommandCenterSidebar({
           {sidebar.reportShortcuts.map((shortcut) => (
             <li key={shortcut.reportType} className="flex items-center justify-between gap-2">
               <Link
-                href={`/admin/growth/engagement?report=${encodeURIComponent(shortcut.reportType)}`}
+                href={`${engagementBasePath}?report=${encodeURIComponent(shortcut.reportType)}`}
                 className="underline"
               >
                 {shortcut.title}

@@ -1,9 +1,11 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Archive, Copy, Eye, Pencil, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import type { GrowthSharePageTemplate } from "@/lib/growth/share-pages/share-page-template-types"
 import { GROWTH_SHARE_PAGE_TEMPLATE_CATEGORIES } from "@/lib/growth/share-pages/share-page-template-types"
 
@@ -50,6 +52,9 @@ export function GrowthSharePageTemplateCard({
   onUseTemplate?: (template: GrowthSharePageTemplate) => void
   busy?: boolean
 }) {
+  const pathname = usePathname()
+  const editPath = growthFeaturePath(pathname, `share-pages/templates/${template.id}`)
+  const previewPath = growthFeaturePath(pathname, `share-pages/templates/${template.id}/preview`)
   const hasPublishedPointer = Boolean(template.publishedVersion)
   const hasDraftAhead =
     template.currentVersion &&
@@ -103,13 +108,13 @@ export function GrowthSharePageTemplateCard({
 
       <div className="mt-auto flex flex-wrap gap-2 border-t border-border pt-4">
         <Button asChild size="sm" variant="default">
-          <Link href={`/admin/growth/share-pages/templates/${template.id}`}>
+          <Link href={editPath}>
             <Pencil className="mr-1.5 size-3.5" />
             Edit
           </Link>
         </Button>
         <Button asChild size="sm" variant="outline">
-          <Link href={`/admin/growth/share-pages/templates/${template.id}/preview`}>
+          <Link href={previewPath}>
             <Eye className="mr-1.5 size-3.5" />
             Preview
           </Link>

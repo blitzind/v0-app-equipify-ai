@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Copy, ExternalLink, LayoutTemplate, Loader2, Plus, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
+import { useGrowthBreadcrumbDetail } from "@/components/growth/shell/growth-breadcrumb-context"
 import {
   GROWTH_SHARE_PAGE_SOURCE_CHANNELS,
   GROWTH_SHARE_PAGE_STATUSES,
@@ -17,6 +19,8 @@ import {
   GROWTH_SHARE_PAGES_OPERATOR_QA_MARKER,
   type GrowthSharePageListItem,
 } from "@/lib/growth/share-pages/share-page-operator-types"
+import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 
 type ListResponse = {
   ok: boolean
@@ -82,6 +86,8 @@ function saveSharePageTokens(
 }
 
 export function GrowthSharePagesDashboard() {
+  const pathname = usePathname()
+  const templatesPath = useGrowthFeaturePath("share-pages/templates")
   const [items, setItems] = useState<GrowthSharePageListItem[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -172,7 +178,7 @@ export function GrowthSharePagesDashboard() {
         previewToken: data.previewToken,
       })
       setCreateMessage("Share page created (pending review). Opening detail…")
-      window.location.href = `/admin/growth/share-pages/${data.page.id}`
+      window.location.href = growthFeaturePath(pathname, `share-pages/${data.page.id}`)
     } catch {
       setCreateMessage("Create request failed")
     } finally {
@@ -185,7 +191,7 @@ export function GrowthSharePagesDashboard() {
       <p className="mb-4 text-xs text-muted-foreground">
         Human-approved personalized pages — passive delivery only. No outreach sends, enrollments, or autonomous
         scheduling.{" "}
-        <Link href="/admin/growth/share-pages/templates" className="font-medium text-primary underline-offset-4 hover:underline">
+        <Link href={templatesPath} className="font-medium text-primary underline-offset-4 hover:underline">
           <LayoutTemplate className="mr-1 inline size-3.5" />
           Manage reusable templates
         </Link>
@@ -376,7 +382,7 @@ export function GrowthSharePagesDashboard() {
                   <td className="py-2 pr-3">{formatWhen(item.createdAt)}</td>
                   <td className="py-2">
                     <Button size="sm" variant="outline" asChild>
-                      <Link href={`/admin/growth/share-pages/${item.id}`}>Open</Link>
+                      <Link href={growthFeaturePath(pathname, `share-pages/${item.id}`)}>Open</Link>
                     </Button>
                   </td>
                 </tr>
@@ -462,6 +468,8 @@ export function GrowthSharePageDetailPanel({ sharePageId }: { sharePageId: strin
   useEffect(() => {
     void load()
   }, [load])
+
+  useGrowthBreadcrumbDetail(detail?.page.headline, loading)
 
   async function runAction(action: "preview" | "approve" | "revoke" | "archive") {
     setActing(action)

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Archive, Copy, Eye, FilePlus2, Loader2, Save, Send, Sparkles, Undo2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
@@ -28,6 +28,8 @@ import type {
   GrowthSharePageTemplateVersion,
 } from "@/lib/growth/share-pages/share-page-template-types"
 import type { GrowthBookingPageListItem } from "@/lib/growth/booking/booking-page-types"
+import { useGrowthBreadcrumbDetail } from "@/components/growth/shell/growth-breadcrumb-context"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 
 function parseTagsInput(value: string): string[] {
   return value
@@ -75,6 +77,7 @@ export function GrowthSharePageTemplateEditor({
   initialTemplate?: GrowthSharePageTemplate | null
 }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [template, setTemplate] = useState<GrowthSharePageTemplate | null>(initialTemplate ?? null)
   const [versions, setVersions] = useState<GrowthSharePageTemplateVersion[]>([])
   const [draft, setDraft] = useState<GrowthSharePageTemplateEditorDraft>(() =>
@@ -87,6 +90,7 @@ export function GrowthSharePageTemplateEditor({
   const [bookingPages, setBookingPages] = useState<GrowthBookingPageListItem[]>([])
   const [loading, setLoading] = useState(Boolean(templateId && !initialTemplate))
   const [versionsLoading, setVersionsLoading] = useState(false)
+  useGrowthBreadcrumbDetail(template?.name ?? draft.metadata.name, loading)
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [workflowBusy, setWorkflowBusy] = useState(false)
@@ -197,7 +201,7 @@ export function GrowthSharePageTemplateEditor({
           }
           syncFromTemplate(data.template)
           if (!input?.silent) setMessage("Template created.")
-          router.replace(`/admin/growth/share-pages/templates/${data.template.id}`)
+          router.replace(growthFeaturePath(pathname, `share-pages/templates/${data.template.id}`))
           return data.template.id
         }
 
@@ -228,7 +232,7 @@ export function GrowthSharePageTemplateEditor({
         setSaving(false)
       }
     },
-    [draft, router, syncFromTemplate, tagsInput, templateId],
+    [draft, pathname, router, syncFromTemplate, tagsInput, templateId],
   )
 
   useEffect(() => {
@@ -368,7 +372,7 @@ export function GrowthSharePageTemplateEditor({
         return
       }
       setMessage("Template duplicated.")
-      router.push(`/admin/growth/share-pages/templates/${data.template.id}`)
+      router.push(growthFeaturePath(pathname, `share-pages/templates/${data.template.id}`))
     } finally {
       setWorkflowBusy(false)
     }
@@ -488,7 +492,7 @@ export function GrowthSharePageTemplateEditor({
         <div className="flex flex-wrap gap-2">
           {templateId ? (
             <Button asChild variant="outline" size="sm">
-              <Link href={`/admin/growth/share-pages/templates/${templateId}/preview`}>
+              <Link href={growthFeaturePath(pathname, `share-pages/templates/${templateId}/preview`)}>
                 <Eye className="mr-1.5 size-3.5" />
                 Preview
               </Link>

@@ -52,6 +52,7 @@ import type {
   GrowthAutomationSimulationInput,
   GrowthAutomationSimulationResult,
 } from "@/lib/growth/automation/growth-automation-simulation-types"
+import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
 
 function mapInspectorNode(node: AutomationCanvasNode | null): GrowthAutomationNode | null {
   if (!node) return null
@@ -100,6 +101,7 @@ function CanvasEditorInner({
   const [message, setMessage] = useState<string | null>(null)
   const clipboardRef = useRef<{ nodes: AutomationCanvasNode[]; edges: AutomationCanvasEdge[] } | null>(null)
   const reactFlowRef = useRef<ReactFlowInstance | null>(null)
+  const automationLibraryPath = useGrowthFeaturePath("automation")
 
   const nodes = snapshot.nodes
   const edges = snapshot.edges
@@ -354,7 +356,7 @@ function CanvasEditorInner({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
             <Button variant="ghost" size="sm" className="h-8 shrink-0 px-2" asChild>
-              <Link href="/admin/growth/automation">
+              <Link href={automationLibraryPath}>
                 <ArrowLeft className="size-4" />
                 Back
               </Link>

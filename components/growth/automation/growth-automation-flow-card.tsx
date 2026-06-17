@@ -4,6 +4,7 @@ import Link from "next/link"
 import { Archive, GitBranch, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthAutomationPublishStatusBadge } from "@/components/growth/automation/growth-automation-publish-status-badge"
+import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
 import type { GrowthAutomationFlow } from "@/lib/growth/automation/growth-automation-types"
 
 type Props = {
@@ -13,6 +14,7 @@ type Props = {
 }
 
 export function GrowthAutomationFlowCard({ flow, busy, onArchive }: Props) {
+  const flowPath = useGrowthFeaturePath(`automation/${flow.id}`)
   return (
     <article className="rounded-xl border border-border bg-card p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -35,7 +37,7 @@ export function GrowthAutomationFlowCard({ flow, busy, onArchive }: Props) {
         </div>
         <div className="flex shrink-0 flex-col gap-2">
           <Button size="sm" variant="outline" asChild>
-            <Link href={`/admin/growth/automation/${flow.id}`}>Open</Link>
+            <Link href={flowPath}>Open</Link>
           </Button>
           {flow.status !== "archived" && onArchive ? (
             <Button size="sm" variant="ghost" disabled={busy} onClick={onArchive}>
