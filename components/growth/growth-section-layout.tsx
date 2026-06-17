@@ -9,7 +9,10 @@ type GrowthSectionLayoutProps = {
   children: ReactNode
 }
 
-/** Two-column Growth module layout: sidebar nav + main content. Place page hero above this wrapper. */
+/**
+ * Admin-only Growth section chrome (embedded sidebar nav + attention strip).
+ * Workspace routes must not use this — see `growth-chrome-architecture.ts`.
+ */
 export function GrowthSectionLayout({ children }: GrowthSectionLayoutProps) {
   return (
     <div

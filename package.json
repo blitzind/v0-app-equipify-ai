@@ -136,6 +136,8 @@
     "test:growth-share-pages:admin": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-share-pages-admin.ts",
     "test:growth-workspace-shell": "tsx scripts/test-growth-workspace-shell.ts",
     "test:growth-workspace-continuity": "tsx scripts/test-growth-workspace-continuity.ts",
+    "test:growth-workspace-chrome-boundaries": "tsx scripts/test-growth-workspace-chrome-boundaries.ts",
+    "test:growth-chrome-architecture": "tsx scripts/test-growth-chrome-architecture.ts",
     "test:growth-middleware-auth": "tsx scripts/test-growth-middleware-auth.ts",
     "test:growth-route-registry": "tsx scripts/test-growth-route-registry.ts",
     "test:growth-navigation-derivation": "tsx scripts/test-growth-navigation-derivation.ts",
