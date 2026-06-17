@@ -7,7 +7,7 @@ import type { SessionIdentity } from "@/lib/session-identity"
 
 /**
  * Loads the current user if they are listed in EQUIPIFY_PLATFORM_ADMIN_EMAILS.
- * Used to gate `/admin` layout (middleware already redirects non-admins).
+ * Used to gate `/admin` and `/growth` layouts (middleware enforces session only).
  */
 export async function loadPlatformAdminIdentity(): Promise<SessionIdentity | null> {
   const supabase = await createServerSupabaseClient()

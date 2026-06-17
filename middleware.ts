@@ -4,12 +4,9 @@ import {
   signOutAndRedirect,
   updateSession,
 } from "@/lib/supabase/middleware"
-import {
-  isPlatformAdminEmail,
-  logPlatformAdminDevDiagnostics,
-} from "@/lib/platform-admin-policy"
+import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { portalAuthGate } from "@/lib/portal/middleware-gate"
-import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-workspace-base-path"
+import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
 
 const PUBLIC_ROUTES = new Set(["/login", "/onboarding"])
 
@@ -34,6 +31,10 @@ const DASHBOARD_PREFIXES = [
   "/settings",
 ]
 
+function isGrowthWorkspacePath(pathname: string): boolean {
+  return pathname === GROWTH_WORKSPACE_BASE_PATH || pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/`)
+}
+
 function isProtectedRoute(pathname: string) {
   if (pathname.startsWith("/portal")) return false
   if (pathname.startsWith("/book")) return false
@@ -41,7 +42,7 @@ function isProtectedRoute(pathname: string) {
   if (pathname === "/") return true
   if (pathname === "/test-maintenance-plan-create") return true
   if (pathname.startsWith("/admin")) return true
-  if (pathname === GROWTH_WORKSPACE_BASE_PATH || pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/`)) {
+  if (isGrowthWorkspacePath(pathname)) {
     return true
   }
   return DASHBOARD_PREFIXES.some((prefix) => pathname.startsWith(prefix))
@@ -53,8 +54,7 @@ function skipArchivedOrgGuard(pathname: string) {
     pathname.startsWith("/auth") ||
     pathname.startsWith("/onboarding") ||
     pathname.startsWith("/admin") ||
-    pathname === GROWTH_WORKSPACE_BASE_PATH ||
-    pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/`) ||
+    isGrowthWorkspacePath(pathname) ||
     pathname.startsWith("/api") ||
     pathname.startsWith("/portal")
   )
@@ -65,10 +65,18 @@ function shouldSkipSupabaseSessionRefresh(pathname: string): boolean {
   return pathname.startsWith("/api/voice/")
 }
 
+function shouldSkipMiddlewareAuth(pathname: string): boolean {
+  if (shouldSkipSupabaseSessionRefresh(pathname)) return true
+  if (pathname.startsWith("/downloads/")) return true
+  if (pathname.startsWith("/_next/")) return true
+  if (pathname === "/favicon.ico") return true
+  return false
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  if (shouldSkipSupabaseSessionRefresh(pathname)) {
+  if (shouldSkipMiddlewareAuth(pathname)) {
     return NextResponse.next()
   }
 
@@ -79,23 +87,15 @@ export async function middleware(request: NextRequest) {
   const isAuthenticated = Boolean(user)
 
   if (pathname.startsWith("/admin")) {
-    logPlatformAdminDevDiagnostics("middleware:/admin gate", user?.email ?? undefined)
     if (!isAuthenticated) {
       return NextResponse.redirect(new URL("/login", request.url))
-    }
-    if (!isPlatformAdminEmail(user.email)) {
-      return NextResponse.redirect(new URL("/", request.url))
     }
     return response
   }
 
-  if (pathname === GROWTH_WORKSPACE_BASE_PATH || pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/`)) {
-    logPlatformAdminDevDiagnostics("middleware:/growth gate", user?.email ?? undefined)
+  if (isGrowthWorkspacePath(pathname)) {
     if (!isAuthenticated) {
       return NextResponse.redirect(new URL("/login", request.url))
-    }
-    if (!isPlatformAdminEmail(user.email)) {
-      return NextResponse.redirect(new URL("/", request.url))
     }
     return response
   }
@@ -128,6 +128,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|downloads/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|zip|woff|woff2|ttf|eot|pdf)$).*)",
   ],
 }
