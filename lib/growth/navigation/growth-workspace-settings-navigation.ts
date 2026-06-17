@@ -1,7 +1,7 @@
 /**
- * Growth workspace settings navigation manifest (Phase 7C).
+ * Growth workspace settings navigation manifest (Phase 7C shell, Phase 8B persistence foundation).
  *
- * Operator-facing settings IA — placeholders only; persistence lands in Phase 7D+.
+ * Five foundation sections persist via Supabase; remaining sections stay placeholder until migrated.
  */
 
 import type { LucideIcon } from "lucide-react"
@@ -25,7 +25,7 @@ import {
 } from "lucide-react"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
 
-export const GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER = "growth-workspace-settings-nav-v1" as const
+export const GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER = "growth-workspace-settings-nav-v2" as const
 
 export const GROWTH_WORKSPACE_SETTINGS_DEFAULT_SECTION_ID = "profile" as const
 
