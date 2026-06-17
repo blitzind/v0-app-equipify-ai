@@ -3,28 +3,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import type { ReactFlowInstance } from "reactflow"
-import { ArrowLeft, Copy, Download, Loader2, Save, Upload } from "lucide-react"
+import { ArrowLeft, Download, Loader2, Save, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { GrowthAutomationPublishPanel } from "@/components/growth/automation/growth-automation-publish-panel"
 import { GrowthAutomationPublishStatusBadge } from "@/components/growth/automation/growth-automation-publish-status-badge"
-import { GrowthAutomationCompilerPanel } from "@/components/growth/automation/growth-automation-compiler-panel"
-import { GrowthAutomationEnrollmentPanel } from "@/components/growth/automation/growth-automation-enrollment-panel"
-import { GrowthAutomationRuntimePreviewPanel } from "@/components/growth/automation/growth-automation-runtime-preview-panel"
-import { GrowthAutomationRuntimeStatusPanel } from "@/components/growth/automation/growth-automation-runtime-status-panel"
-import { GrowthAutomationObservabilityPanel } from "@/components/growth/automation/growth-automation-observability-panel"
-import { GrowthAutomationAnalyticsPanel } from "@/components/growth/automation/growth-automation-analytics-panel"
-import { GrowthAutomationSimulationPanel } from "@/components/growth/automation/growth-automation-simulation-panel"
 import { GrowthAutomationEdgeToolbar } from "@/components/growth/automation/growth-automation-edge-toolbar"
 import {
   GrowthAutomationHistoryProvider,
   useGrowthAutomationHistory,
 } from "@/components/growth/automation/growth-automation-history-provider"
+import { GrowthAutomationInspectorSidebar } from "@/components/growth/automation/growth-automation-inspector-sidebar"
 import { GrowthAutomationNodeCreationMenu } from "@/components/growth/automation/growth-automation-node-creation-menu"
-import { GrowthAutomationNodeInspector } from "@/components/growth/automation/growth-automation-node-inspector"
 import { GrowthAutomationNodeToolbar } from "@/components/growth/automation/growth-automation-node-toolbar"
 import { GrowthAutomationReactFlow } from "@/components/growth/automation/growth-automation-react-flow"
-import { GrowthAutomationValidationPanel } from "@/components/growth/automation/growth-automation-validation-panel"
 import { autoLayoutCanvasNodes } from "@/lib/growth/automation/growth-automation-canvas-layout"
 import {
   GROWTH_AUTOMATION_CANVAS_QA_MARKER,
@@ -49,27 +40,18 @@ import {
   filterCanvasNodesBySearch,
   sameSelectedNodeIds,
 } from "@/lib/growth/automation/growth-automation-canvas-utils"
-import {
-  GROWTH_AUTOMATION_API_SAFETY_FLAGS,
-  type GrowthAutomationEdge,
-  type GrowthAutomationFlow,
-  type GrowthAutomationFlowVersion,
-  type GrowthAutomationNode,
-  type GrowthAutomationValidationResult,
+import type {
+  GrowthAutomationEdge,
+  GrowthAutomationFlow,
+  GrowthAutomationFlowVersion,
+  GrowthAutomationNode,
+  GrowthAutomationValidationResult,
 } from "@/lib/growth/automation/growth-automation-types"
 import type { GrowthAutomationCompileResult } from "@/lib/growth/automation/growth-automation-compiler-types"
 import type {
   GrowthAutomationSimulationInput,
   GrowthAutomationSimulationResult,
 } from "@/lib/growth/automation/growth-automation-simulation-types"
-
-type FlowResponse = {
-  ok: boolean
-  flow: GrowthAutomationFlow
-  version: GrowthAutomationFlowVersion
-  nodes: GrowthAutomationNode[]
-  edges: GrowthAutomationEdge[]
-}
 
 function mapInspectorNode(node: AutomationCanvasNode | null): GrowthAutomationNode | null {
   if (!node) return null
@@ -364,123 +346,111 @@ function CanvasEditorInner({
   }, [edges, nodes, readOnly, redo, selectedNodeIds, undo, updateCanvas])
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/admin/growth/automation">
-            <ArrowLeft className="size-4" />
-            Back to library
-          </Link>
-        </Button>
-        <p className="text-xs text-muted-foreground" data-qa-marker={GROWTH_AUTOMATION_CANVAS_QA_MARKER}>
-          Visual builder · {GROWTH_AUTOMATION_CANVAS_SAFETY_FLAGS.no_sequence_execution ? "no execution" : ""}
-        </p>
-      </div>
-
-      <div className="rounded-xl border border-border bg-card p-4">
+    <div
+      className="flex h-[calc(100vh-14rem)] min-h-[640px] flex-col gap-3"
+      data-qa-marker={GROWTH_AUTOMATION_CANVAS_QA_MARKER}
+    >
+      <div className="shrink-0 rounded-xl border border-border bg-card p-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-medium">{flow.name}</h2>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <GrowthAutomationPublishStatusBadge status={flow.status} />
-              <span className="text-xs text-muted-foreground">v{version.versionNumber}</span>
+          <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
+            <Button variant="ghost" size="sm" className="h-8 shrink-0 px-2" asChild>
+              <Link href="/admin/growth/automation">
+                <ArrowLeft className="size-4" />
+                Back
+              </Link>
+            </Button>
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-medium">{flow.name}</h2>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <GrowthAutomationPublishStatusBadge status={flow.status} />
+                <span className="text-xs text-muted-foreground">v{version.versionNumber}</span>
+                <span className="text-xs text-muted-foreground">
+                  Visual builder · {GROWTH_AUTOMATION_CANVAS_SAFETY_FLAGS.no_sequence_execution ? "no execution" : ""}
+                </span>
+              </div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <GrowthAutomationNodeToolbar
+              disabled={readOnly}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onUndo={undo}
+              onRedo={redo}
+              onAutoLayout={handleAutoLayout}
+            />
             <Button size="sm" variant="outline" disabled={readOnly || saving} onClick={() => void saveCanvas()}>
               {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
               Save
             </Button>
             <Button size="sm" variant="outline" onClick={handleExport}>
               <Download className="size-4" />
-              Export JSON
+              Export
             </Button>
             <Button size="sm" variant="outline" disabled={readOnly} onClick={() => void handleImport()}>
               <Upload className="size-4" />
-              Import JSON
+              Import
             </Button>
           </div>
         </div>
         {message ? <p className="mt-2 text-sm text-muted-foreground">{message}</p> : null}
       </div>
 
-      <GrowthAutomationNodeToolbar
-        disabled={readOnly}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        onUndo={undo}
-        onRedo={redo}
-        onAutoLayout={handleAutoLayout}
-      />
-
-      <div className="grid gap-4 xl:grid-cols-[240px_minmax(0,1fr)_300px]">
-        <div className="flex flex-col gap-4">
-          <div className="rounded-xl border border-border bg-card p-4">
-            <h3 className="text-sm font-medium">Add nodes</h3>
-            <div className="mt-3">
-              <GrowthAutomationNodeCreationMenu disabled={readOnly} onAddNode={addNode} />
-            </div>
+      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(180px,200px)_minmax(0,1fr)_minmax(320px,400px)]">
+        <aside className="flex min-h-0 flex-col gap-2 overflow-y-auto rounded-xl border border-border bg-card p-3">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Palette</h3>
+          <GrowthAutomationNodeCreationMenu disabled={readOnly} onAddNode={addNode} />
+          <div className="border-t border-border/70 pt-2">
+            <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Edge type</h3>
+            <GrowthAutomationEdgeToolbar
+              selectedEdgeType={selectedEdgeType}
+              disabled={readOnly}
+              onSelectEdgeType={setSelectedEdgeType}
+            />
           </div>
-          <div className="rounded-xl border border-border bg-card p-4">
-            <h3 className="text-sm font-medium">Edge type</h3>
-            <div className="mt-3">
-              <GrowthAutomationEdgeToolbar
-                selectedEdgeType={selectedEdgeType}
-                disabled={readOnly}
-                onSelectEdgeType={setSelectedEdgeType}
-              />
-            </div>
+          <div className="border-t border-border/70 pt-2">
+            <Input
+              placeholder="Search nodes…"
+              className="h-8 text-xs"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            {search ? (
+              <p className="mt-1.5 text-[11px] text-muted-foreground">{visibleNodes.length} matching nodes</p>
+            ) : null}
           </div>
-          <Input placeholder="Search nodes…" value={search} onChange={(event) => setSearch(event.target.value)} />
-          {search ? (
-            <p className="text-xs text-muted-foreground">{visibleNodes.length} matching nodes</p>
-          ) : null}
-        </div>
+        </aside>
 
-        <GrowthAutomationReactFlow
-          nodes={nodes}
-          edges={edges}
-          readOnly={readOnly}
-          defaultEdgeType={selectedEdgeType}
-          onNodesChange={handleNodesChange}
-          onEdgesChange={handleEdgesChange}
-          onSelectionChange={handleSelectionChange}
-          onInit={handleReactFlowInit}
-        />
+        <main className="flex min-h-0 min-w-0 flex-col">
+          <GrowthAutomationReactFlow
+            nodes={nodes}
+            edges={edges}
+            readOnly={readOnly}
+            defaultEdgeType={selectedEdgeType}
+            onNodesChange={handleNodesChange}
+            onEdgesChange={handleEdgesChange}
+            onSelectionChange={handleSelectionChange}
+            onInit={handleReactFlowInit}
+          />
+        </main>
 
-        <div className="flex flex-col gap-4">
-          <GrowthAutomationNodeInspector node={mapInspectorNode(selectedNode)} />
-          <GrowthAutomationValidationPanel
+        <aside className="min-h-0 min-w-0">
+          <GrowthAutomationInspectorSidebar
+            flowId={flowId}
+            versionId={version.id}
+            runtimeActive={flow.status === "runtime_active"}
+            inspectorNode={mapInspectorNode(selectedNode)}
             validation={validation}
-            loading={validating}
+            validating={validating}
             onValidate={() => void runValidation()}
-          />
-          <GrowthAutomationCompilerPanel
-            flowId={flowId}
             compile={compile}
-            loading={compiling}
+            compiling={compiling}
             onCompile={() => void runCompilePreview()}
-          />
-          <GrowthAutomationSimulationPanel
-            flowId={flowId}
             simulation={simulation}
-            loading={simulating}
+            simulating={simulating}
             onSimulate={(input) => void runSimulationPreview(input)}
           />
-          <GrowthAutomationPublishPanel flowId={flowId} versionId={version.id} />
-          <GrowthAutomationRuntimePreviewPanel flowId={flowId} versionId={version.id} />
-          <GrowthAutomationRuntimeStatusPanel flowId={flowId} />
-          <GrowthAutomationObservabilityPanel flowId={flowId} />
-          <GrowthAutomationAnalyticsPanel flowId={flowId} />
-          <GrowthAutomationEnrollmentPanel
-            flowId={flowId}
-            runtimeActive={flow.status === "runtime_active"}
-          />
-          <div className="rounded-xl border border-dashed border-border p-3 text-xs text-muted-foreground">
-            <Copy className="mb-1 inline size-3.5" /> Cmd/Ctrl+C/V copy/paste · Delete removes selection ·{" "}
-            {GROWTH_AUTOMATION_API_SAFETY_FLAGS.read_only_runtime ? "read-only runtime" : ""}
-          </div>
-        </div>
+        </aside>
       </div>
     </div>
   )

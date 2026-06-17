@@ -124,7 +124,7 @@ export function GrowthAutomationReactFlow({
   )
 
   return (
-    <div className="h-[560px] w-full rounded-xl border border-border bg-muted/10">
+    <div className="h-full min-h-[480px] w-full rounded-xl border border-border bg-muted/10">
       {nodes.length === 0 ? (
         <GrowthAutomationEmptyState />
       ) : (
