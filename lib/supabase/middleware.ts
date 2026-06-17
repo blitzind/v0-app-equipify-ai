@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr"
 import { type NextRequest, NextResponse } from "next/server"
 import type { User } from "@supabase/supabase-js"
 import { userHasOnlyArchivedOrganizationMemberships } from "@/lib/supabase/archived-membership-query"
+import { raceMiddlewareAuthOperation } from "@/lib/supabase/middleware-timeout"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -40,9 +41,8 @@ export async function updateSession(
     },
   })
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const authResult = await raceMiddlewareAuthOperation(supabase.auth.getUser())
+  const user = authResult?.data.user ?? null
 
   return { response, user }
 }
@@ -65,7 +65,11 @@ export async function membershipOnlyArchivedOrgs(request: NextRequest, userId: s
     },
   })
 
-  return userHasOnlyArchivedOrganizationMemberships(supabase, userId)
+  const membershipResult = await raceMiddlewareAuthOperation(
+    userHasOnlyArchivedOrganizationMemberships(supabase, userId),
+  )
+  // Fail open on timeout — avoid false archived-org sign-outs during infra slowness.
+  return membershipResult ?? false
 }
 
 /** Signs out then redirects — clears session so API routes cannot keep using a blocked workspace session. */
@@ -84,6 +88,6 @@ export async function signOutAndRedirect(request: NextRequest, redirectPath: str
       },
     },
   })
-  await supabase.auth.signOut()
+  await raceMiddlewareAuthOperation(supabase.auth.signOut())
   return response
 }

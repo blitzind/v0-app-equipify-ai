@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { PORTAL_SESSION_COOKIE } from "@/lib/portal/constants"
 import { getPortalSessionSecret } from "@/lib/portal/env"
 import { verifyPortalToken } from "@/lib/portal/session-token"
+import { raceMiddlewareAuthOperation } from "@/lib/supabase/middleware-timeout"
 
 /**
  * Next.js middleware hook: non-login `/portal/*` routes require a valid signed portal cookie.
@@ -28,7 +29,7 @@ export async function portalAuthGate(request: NextRequest): Promise<NextResponse
     return NextResponse.redirect(login)
   }
 
-  const session = await verifyPortalToken(raw, secret)
+  const session = await raceMiddlewareAuthOperation(verifyPortalToken(raw, secret))
   if (!session) {
     const login = new URL("/portal/login", request.url)
     login.searchParams.set("next", pathname + request.nextUrl.search)

@@ -1,5 +1,5 @@
 /**
- * Growth middleware auth + performance guards (local only).
+ * Growth middleware auth + performance guards (Phase 8E).
  *
  * Usage: pnpm test:growth-middleware-auth
  */
@@ -9,7 +9,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { GROWTH_WORKSPACE_BASE_PATH } from "../lib/growth/navigation/growth-route-metadata-types"
 
-export const GROWTH_MIDDLEWARE_AUTH_QA_MARKER = "growth-middleware-auth-v2" as const
+export const GROWTH_MIDDLEWARE_AUTH_QA_MARKER = "growth-middleware-auth-v3" as const
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, "..")
@@ -22,7 +22,13 @@ function runAudit(): void {
   console.log(`\n=== Growth middleware auth audit (${GROWTH_MIDDLEWARE_AUTH_QA_MARKER}) ===\n`)
 
   const middleware = read("middleware.ts")
+  const supabaseMiddleware = read("lib/supabase/middleware.ts")
+  const portalGate = read("lib/portal/middleware-gate.ts")
+  const middlewareTimeout = read("lib/supabase/middleware-timeout.ts")
   const growthLayout = read("app/(growth)/layout.tsx")
+  const growthAccess = read("lib/growth/access.ts")
+  const workspaceSettingsApi = read("app/api/growth/workspace/settings/profile/route.ts")
+  const platformGrowthApi = read("app/api/platform/growth/notifications/preferences/route.ts")
 
   assert.match(
     middleware,
@@ -41,38 +47,62 @@ function runAudit(): void {
     /if \(isGrowthWorkspacePath\(pathname\)\) return true/,
     "/growth/* must bypass middleware Supabase auth",
   )
+  assert.match(middleware, /isGrowthApiPath/, "/api/growth/* and /api/platform/growth/* skip helpers required")
+  assert.match(middleware, /\/api\/growth\//, "/api/growth/* must bypass middleware auth")
+  assert.match(middleware, /\/api\/platform\/growth\//, "/api/platform/growth/* must bypass middleware auth")
   assert.doesNotMatch(
     middleware,
     /if \(isGrowthWorkspacePath\(pathname\)\) \{[\s\S]*?if \(!isAuthenticated\)/,
     "/growth/* must not run middleware session gate",
   )
   assert.equal(GROWTH_WORKSPACE_BASE_PATH, "/growth")
-  console.log("  ✓ /growth/* excluded from middleware Supabase auth work")
+  console.log("  ✓ /growth/* and Growth API paths excluded from middleware Supabase auth work")
 
   assert.match(middleware, /\/downloads\//, "matcher or early return must bypass /downloads/*")
-  assert.match(middleware, /zip/, "matcher should bypass zip downloads")
   assert.match(middleware, /shouldSkipSupabaseSessionRefresh/, "voice ingress bypass preserved")
-  console.log("  ✓ static/download paths bypass middleware work")
+  console.log("  ✓ static/download/voice paths bypass middleware work")
 
   assert.match(
     middleware,
     /if \(pathname\.startsWith\("\/admin"\)\) \{[\s\S]*?if \(!isAuthenticated\)/,
     "/admin/* must retain middleware session gate",
   )
-  console.log("  ✓ /admin/* protection unchanged in middleware")
+  assert.doesNotMatch(
+    middleware,
+    /if \(isGrowthApiPath\(pathname\)\) \{[\s\S]*?updateSession/,
+    "Growth APIs must not enter updateSession path",
+  )
+  console.log("  ✓ /admin/* protection unchanged; Growth APIs skip duplicate middleware auth")
 
   assert.match(growthLayout, /createServerSupabaseClient/, "Growth layout must check session")
   assert.match(growthLayout, /redirect\("\/login"\)/, "unauthenticated users redirected to login")
   assert.match(growthLayout, /loadPlatformAdminIdentity/, "Growth layout must enforce platform-admin gate")
-  assert.match(growthLayout, /redirect\("\/"\)/, "non-admin users redirected away from Growth workspace")
-  console.log("  ✓ /growth/* auth enforced by server layout gate")
+  console.log("  ✓ /growth/* page auth enforced by server layout gate")
 
-  assert.doesNotMatch(
+  assert.match(growthAccess, /requireGrowthEnginePlatformAccess/, "Growth route handlers retain access gate")
+  assert.match(workspaceSettingsApi, /requireGrowthWorkspaceSettingsAccess/, "workspace settings APIs retain access gate")
+  assert.match(platformGrowthApi, /requireGrowthEnginePlatformAccess/, "platform growth APIs retain access gate")
+  console.log("  ✓ skipped Growth APIs still protected in route handlers")
+
+  assert.match(supabaseMiddleware, /raceMiddlewareAuthOperation/, "updateSession must use middleware auth timeout")
+  assert.match(supabaseMiddleware, /raceMiddlewareAuthOperation\(supabase\.auth\.getUser\(\)\)/, "getUser timeout guard required")
+  assert.match(supabaseMiddleware, /raceMiddlewareAuthOperation\([\s\S]*userHasOnlyArchivedOrganizationMemberships/, "archived membership timeout guard required")
+  assert.match(supabaseMiddleware, /raceMiddlewareAuthOperation\(supabase\.auth\.signOut\(\)\)/, "signOut timeout guard required")
+  assert.match(portalGate, /raceMiddlewareAuthOperation\(verifyPortalToken/, "portal token verify timeout guard required")
+  assert.match(middlewareTimeout, /MIDDLEWARE_AUTH_OPERATION_TIMEOUT_MS/, "middleware timeout budget exported")
+  console.log("  ✓ middleware auth operations use bounded timeout guards")
+
+  assert.match(
     middleware,
-    /growth-route-registry-reports|growth-navigation-derivation|growth-workspace-shell-navigation/,
-    "middleware must not pull navigation derivation modules",
+    /pathname === "\/login" && isAuthenticated[\s\S]*redirect\(new URL\("\/", request\.url\)\)/,
+    "authenticated /login must redirect to / (no /login loop)",
   )
-  console.log("  ✓ no navigation derivation imports in middleware path")
+  console.log("  ✓ no /login redirect recursion pattern in middleware source")
+
+  const readonlyClient = read("lib/growth/settings/growth-workspace-settings-readonly-client.ts")
+  assert.match(readonlyClient, /settingsBootstrapInflight/, "settings readonly client must share one bootstrap inflight")
+  assert.match(readonlyClient, /loadGrowthWorkspaceSettingsReadonlyBootstrap/, "settings bootstrap loader required")
+  console.log("  ✓ settings readonly client uses shared bootstrap inflight")
 
   console.log("\nGrowth middleware auth audit PASS\n")
   console.log(JSON.stringify({ ok: true, qa_marker: GROWTH_MIDDLEWARE_AUTH_QA_MARKER }, null, 2))

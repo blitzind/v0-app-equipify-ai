@@ -56,6 +56,10 @@ function skipArchivedOrgGuard(pathname: string) {
   )
 }
 
+function isGrowthApiPath(pathname: string): boolean {
+  return pathname.startsWith("/api/growth/") || pathname.startsWith("/api/platform/growth/")
+}
+
 function shouldSkipSupabaseSessionRefresh(pathname: string): boolean {
   // Provider ingress only (Twilio webhooks, inbound TwiML, media websocket) — no operator session.
   return pathname.startsWith("/api/voice/")
@@ -64,6 +68,7 @@ function shouldSkipSupabaseSessionRefresh(pathname: string): boolean {
 function shouldSkipMiddlewareAuth(pathname: string): boolean {
   if (shouldSkipSupabaseSessionRefresh(pathname)) return true
   if (isGrowthWorkspacePath(pathname)) return true
+  if (isGrowthApiPath(pathname)) return true
   if (pathname.startsWith("/downloads/")) return true
   if (pathname.startsWith("/_next/")) return true
   if (pathname === "/favicon.ico") return true

@@ -104,6 +104,8 @@ function runAudit(): void {
   const readonlyClient = readSource("lib/growth/settings/growth-workspace-settings-readonly-client.ts")
   assert.match(readonlyClient, /catch/)
   assert.match(readonlyClient, /mergeGrowthWorkspaceDefaultViews/)
+  assert.match(readonlyClient, /settingsBootstrapInflight/)
+  assert.match(readonlyClient, /loadGrowthWorkspaceSettingsReadonlyBootstrap/)
   const merged = mergeGrowthWorkspaceDefaultViews(null)
   assert.equal(merged.inboxDefaultFilter, "all")
   console.log("  ✓ settings load failure fails open to built-in defaults")

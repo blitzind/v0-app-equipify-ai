@@ -10,11 +10,13 @@ import { mergeGrowthWorkspaceDefaultViews } from "@/lib/growth/settings/growth-w
 
 type ApiOk<T> = { ok?: boolean; preferences?: T; message?: string }
 
-let defaultViewsInflight: Promise<GrowthWorkspaceSettingsDefaultViews> | null = null
-let shellPreferencesInflight: Promise<{
+type GrowthWorkspaceSettingsReadonlyBootstrap = {
+  defaultViews: GrowthWorkspaceSettingsDefaultViews
   personal: GrowthWorkspaceSettingsPersonalPreferences
   sidebar: GrowthWorkspaceSettingsSidebarPreferences
-}> | null = null
+}
+
+let settingsBootstrapInflight: Promise<GrowthWorkspaceSettingsReadonlyBootstrap> | null = null
 
 const DEFAULT_PERSONAL: GrowthWorkspaceSettingsPersonalPreferences = {
   defaultLandingPage: DEFAULT_GROWTH_OPERATOR_WORKSPACE_PREFERENCES.defaultLandingPage,
@@ -39,37 +41,38 @@ async function fetchJson<T>(endpoint: string): Promise<T | null> {
   }
 }
 
-export async function loadGrowthWorkspaceDefaultViewsReadonly(): Promise<GrowthWorkspaceSettingsDefaultViews> {
-  if (!defaultViewsInflight) {
-    defaultViewsInflight = fetchJson<GrowthWorkspaceSettingsDefaultViews>(
-      "/api/growth/workspace/settings/default-views",
-    ).then((preferences) => mergeGrowthWorkspaceDefaultViews(preferences))
+async function loadGrowthWorkspaceSettingsReadonlyBootstrap(): Promise<GrowthWorkspaceSettingsReadonlyBootstrap> {
+  if (!settingsBootstrapInflight) {
+    settingsBootstrapInflight = Promise.all([
+      fetchJson<GrowthWorkspaceSettingsDefaultViews>("/api/growth/workspace/settings/default-views"),
+      fetchJson<GrowthWorkspaceSettingsPersonalPreferences>("/api/growth/workspace/settings/personal-preferences"),
+      fetchJson<GrowthWorkspaceSettingsSidebarPreferences>("/api/growth/workspace/settings/sidebar-preferences"),
+    ]).then(([defaultViews, personal, sidebar]) => ({
+      defaultViews: mergeGrowthWorkspaceDefaultViews(defaultViews),
+      personal: personal ?? DEFAULT_PERSONAL,
+      sidebar: sidebar ?? DEFAULT_SIDEBAR,
+    }))
   }
-  return defaultViewsInflight
+  return settingsBootstrapInflight
+}
+
+export async function loadGrowthWorkspaceDefaultViewsReadonly(): Promise<GrowthWorkspaceSettingsDefaultViews> {
+  const bootstrap = await loadGrowthWorkspaceSettingsReadonlyBootstrap()
+  return bootstrap.defaultViews
 }
 
 export async function loadGrowthWorkspaceShellPreferencesReadonly(): Promise<{
   personal: GrowthWorkspaceSettingsPersonalPreferences
   sidebar: GrowthWorkspaceSettingsSidebarPreferences
 }> {
-  if (!shellPreferencesInflight) {
-    shellPreferencesInflight = Promise.all([
-      fetchJson<GrowthWorkspaceSettingsPersonalPreferences>(
-        "/api/growth/workspace/settings/personal-preferences",
-      ),
-      fetchJson<GrowthWorkspaceSettingsSidebarPreferences>(
-        "/api/growth/workspace/settings/sidebar-preferences",
-      ),
-    ]).then(([personal, sidebar]) => ({
-      personal: personal ?? DEFAULT_PERSONAL,
-      sidebar: sidebar ?? DEFAULT_SIDEBAR,
-    }))
+  const bootstrap = await loadGrowthWorkspaceSettingsReadonlyBootstrap()
+  return {
+    personal: bootstrap.personal,
+    sidebar: bootstrap.sidebar,
   }
-  return shellPreferencesInflight
 }
 
 /** Test-only reset for module-level fetch dedupe caches. */
 export function resetGrowthWorkspaceSettingsReadonlyClientForTests(): void {
-  defaultViewsInflight = null
-  shellPreferencesInflight = null
+  settingsBootstrapInflight = null
 }
