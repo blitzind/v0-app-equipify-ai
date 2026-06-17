@@ -33,6 +33,10 @@ const PHASE_3A_OPERATOR_ROUTES = [
   "workspace-media",
 ] as const
 
+const PHASE_3B_OPERATOR_ROUTES = ["workspace-leads", "workspace-campaigns"] as const
+
+const PHASE_3_OPERATOR_ROUTES = [...PHASE_3A_OPERATOR_ROUTES, ...PHASE_3B_OPERATOR_ROUTES] as const
+
 function workspacePagePathFromMetadata(entryPath: string): string | null {
   if (entryPath === "/growth") {
     return path.join(ROOT, "app/(growth)/growth/page.tsx")
@@ -56,9 +60,9 @@ function runAudit(): void {
   assert.equal(new Set(ids).size, ids.length, "duplicate migrated workspace ids detected")
   console.log("  ✓ no duplicate migrated workspace paths or ids")
 
-  for (const routeId of PHASE_3A_OPERATOR_ROUTES) {
+  for (const routeId of PHASE_3_OPERATOR_ROUTES) {
     const entry = getGrowthRouteMetadataById(routeId)
-    assert.ok(entry, `Phase 3A route missing: ${routeId}`)
+    assert.ok(entry, `Phase 3 operator route missing: ${routeId}`)
     assert.equal(entry.migrationStatus, "dual-route", `${routeId} must be dual-route`)
     assert.equal(entry.placeholder, false, `${routeId} must not be placeholder`)
     assert.equal(entry.migrated, true, `${routeId} must be migrated`)
@@ -66,7 +70,7 @@ function runAudit(): void {
     const pageFile = workspacePagePathFromMetadata(entry.path)
     assert.ok(pageFile && fs.existsSync(pageFile), `missing workspace page for ${entry.path}`)
   }
-  console.log("  ✓ Phase 3A operator routes are dual-route with real workspace pages")
+  console.log("  ✓ Phase 3 operator routes are dual-route with real workspace pages")
 
   for (const entry of GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA) {
     const segmentCheck = entry.segment ?? ""
@@ -105,6 +109,8 @@ function runAudit(): void {
     "meetings",
     "calls",
     "media",
+    "leads",
+    "campaigns",
   ]) {
     const resolved = growthFeaturePath("/growth/share-pages", segment)
     assert.ok(resolved.startsWith("/growth/"), `workspace segment fell back to admin: ${segment} -> ${resolved}`)
@@ -121,15 +127,14 @@ function runAudit(): void {
   assert.equal(findGrowthRouteMetadataByPathname("/growth/automation/new")?.id, "workspace-automation-new")
   assert.equal(findGrowthRouteMetadataByPathname("/growth/automation/flow-1")?.id, "workspace-automation-edit")
   assert.equal(findGrowthRouteMetadataByPathname("/growth/media")?.id, "workspace-media")
+  assert.equal(findGrowthRouteMetadataByPathname("/growth/leads")?.id, "workspace-leads")
+  assert.equal(findGrowthRouteMetadataByPathname("/growth/campaigns")?.id, "workspace-campaigns")
   console.log("  ✓ static routes beat dynamic routes")
 
   const placeholders = GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.filter((row) => row.placeholder)
-  assert.equal(placeholders.length, 3)
-  assert.deepEqual(
-    placeholders.map((entry) => entry.id).sort(),
-    ["workspace-campaigns", "workspace-leads", "workspace-settings"],
-  )
-  console.log("  ✓ remaining placeholder routes are leads/campaigns/settings only")
+  assert.equal(placeholders.length, 1)
+  assert.deepEqual(placeholders.map((entry) => entry.id), ["workspace-settings"])
+  console.log("  ✓ remaining placeholder route is settings only")
 
   const workspaceNavHrefs = GROWTH_SHELL_NAV_GROUPS.flatMap((group) =>
     group.items.filter((item) => item.workspaceRoute).map((item) => item.href),
@@ -164,7 +169,7 @@ function runAudit(): void {
         placeholder_routes: placeholders.length,
         total_registry_routes: 113,
         workspace_nav_items: workspaceNavHrefs.length,
-        phase_3a_operator_routes: PHASE_3A_OPERATOR_ROUTES,
+        phase_3_operator_routes: PHASE_3_OPERATOR_ROUTES,
       },
       null,
       2,

@@ -167,8 +167,21 @@ function runAudit(): void {
   assert.equal(getMigratedRoutes().length, 18)
   console.log("  ✓ migrated workspace route count (18 routes)")
 
-  assert.equal(getPlaceholderRoutes().length, 3, "expected 3 placeholder workspace routes (leads, campaigns, settings)")
-  console.log("  ✓ placeholder workspace routes reduced to leads/campaigns/settings")
+  assert.equal(getPlaceholderRoutes().length, 1, "expected 1 placeholder workspace route (settings)")
+  console.log("  ✓ placeholder workspace routes reduced to settings only")
+
+  const workspaceLeads = GROWTH_ROUTE_METADATA.find((entry) => entry.id === "workspace-leads")
+  assert.ok(workspaceLeads)
+  assert.equal(workspaceLeads.path, `${GROWTH_WORKSPACE_BASE_PATH}/leads`)
+  assert.equal(workspaceLeads.adminPath, `${GROWTH_ADMIN_BASE_PATH}/queue`)
+  assert.equal(workspaceLeads.migrationStatus, "dual-route")
+
+  const workspaceCampaigns = GROWTH_ROUTE_METADATA.find((entry) => entry.id === "workspace-campaigns")
+  assert.ok(workspaceCampaigns)
+  assert.equal(workspaceCampaigns.path, `${GROWTH_WORKSPACE_BASE_PATH}/campaigns`)
+  assert.equal(workspaceCampaigns.adminPath, `${GROWTH_ADMIN_BASE_PATH}/multichannel`)
+  assert.equal(workspaceCampaigns.migrationStatus, "dual-route")
+  console.log("  ✓ Phase 3B leads/campaigns dual-route with admin fallbacks")
 
   const inboxDiagnostics = GROWTH_ROUTE_METADATA.find((entry) => entry.id === "admin-inbox-diagnostics")
   assert.ok(inboxDiagnostics)

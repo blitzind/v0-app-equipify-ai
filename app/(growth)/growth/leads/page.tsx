@@ -1,13 +1,24 @@
-import { Target } from "lucide-react"
-import { GrowthPlaceholderPage } from "@/components/growth/shell/growth-placeholder-page"
+"use client"
 
-export default function GrowthLeadsPlaceholderPage() {
+import { ListOrdered } from "lucide-react"
+import { GrowthLeadInboxDashboard } from "@/components/growth/lead-operator/growth-lead-inbox-dashboard"
+import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
+import { GROWTH_WORKSPACE_QUEUE_QA_MARKER } from "@/lib/growth/navigation/growth-navigation-destinations"
+
+export default function GrowthLeadsPage() {
   return (
-    <GrowthPlaceholderPage
-      title="Leads"
-      description="Lead queue, prioritization, and operator workflows will live in the dedicated Growth workspace."
-      icon={Target}
-      iconClassName="bg-violet-50 text-violet-600"
-    />
+    <div
+      className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8"
+      data-growth-workspace-queue-marker={GROWTH_WORKSPACE_QUEUE_QA_MARKER}
+    >
+      <GrowthWorkspacePageHeader
+        title="Revenue Queue"
+        description="Prioritized accounts requiring operator review, enrichment, approval, or pipeline action."
+        icon={ListOrdered}
+        iconClassName="bg-emerald-50 text-emerald-600"
+      />
+
+      <GrowthLeadInboxDashboard />
+    </div>
   )
 }

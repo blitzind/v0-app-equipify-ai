@@ -180,18 +180,19 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     breadcrumbLabel: "Engagement",
   }),
 
-  workspace("workspace-leads", "leads", "Leads", "workspace", "placeholder", {
+  workspace("workspace-leads", "leads", "Leads", "workspace", "dual-route", {
     migrated: true,
     segment: "leads",
-    placeholder: true,
+    placeholder: false,
     breadcrumbLabel: "Leads",
     adminPath: `${ADMIN}/queue`,
   }),
-  workspace("workspace-campaigns", "campaigns", "Campaigns", "workspace", "placeholder", {
+  workspace("workspace-campaigns", "campaigns", "Campaigns", "workspace", "dual-route", {
     migrated: true,
     segment: "campaigns",
-    placeholder: true,
+    placeholder: false,
     breadcrumbLabel: "Campaigns",
+    adminPath: `${ADMIN}/multichannel`,
   }),
   workspace("workspace-inbox", "inbox", "Inbox", "workspace", "dual-route", {
     migrated: true,
@@ -279,7 +280,7 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   }),
   admin("admin-notifications", "notifications", "Notifications", "workspace", "admin-only"),
   admin("admin-aiden", "aiden", "Aiden", "workspace", "admin-only"),
-  admin("admin-queue", "queue", "Queue", "workspace", "admin-only", { breadcrumbLabel: "Queue" }),
+  adminDual("admin-queue", "queue", "Queue", "workspace", "leads", { breadcrumbLabel: "Queue" }),
   admin("admin-lead-detail", "leads/[leadId]", "Lead Detail", "workspace", "admin-only", {
     dynamic: true,
     breadcrumbLabel: "Lead",
@@ -336,7 +337,9 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   }),
   admin("admin-execution", "execution", "Human Execution", "automation", "admin-only"),
   admin("admin-booking-intelligence", "booking-intelligence", "Booking Intelligence", "automation", "admin-only"),
-  admin("admin-multichannel", "multichannel", "Multi-Channel", "automation", "admin-only"),
+  adminDual("admin-multichannel", "multichannel", "Multi-Channel", "automation", "campaigns", {
+    breadcrumbLabel: "Campaigns",
+  }),
 
   admin("admin-intent-pixel", "intent-pixel", "Intent Signals", "intelligence", "admin-only"),
   admin("admin-conversations", "conversations", "Conversations", "intelligence", "admin-only"),
