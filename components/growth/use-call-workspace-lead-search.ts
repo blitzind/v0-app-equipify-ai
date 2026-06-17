@@ -1,6 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { usePathname } from "next/navigation"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import type {
   CallWorkspaceLeadSearchDiagnostics,
   CallWorkspaceLeadSearchResult,
@@ -35,6 +37,7 @@ export function useCallWorkspaceLeadSearch(input: {
     autoAttachDelayMs = 700,
   } = input
 
+  const pathname = usePathname()
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<CallWorkspaceLeadSearchResult[]>([])
   const [searchDiagnostics, setSearchDiagnostics] = useState<CallWorkspaceLeadSearchDiagnostics | null>(null)
@@ -186,7 +189,7 @@ export function useCallWorkspaceLeadSearch(input: {
   const showEmpty =
     searchQuery.trim().length >= 2 && !searching && !searchError && searchResults.length === 0 && !attachError
 
-  const createProspectHref = `/admin/growth/leads?${new URLSearchParams({
+  const createProspectHref = `${growthFeaturePath(pathname, "leads")}?${new URLSearchParams({
     ...(searchQuery.trim() ? { companyName: searchQuery.trim() } : {}),
   }).toString()}`
 

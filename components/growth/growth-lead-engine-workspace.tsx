@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
+import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
 import { AlertTriangle, Loader2, Play, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -37,6 +38,7 @@ import {
 
 export function GrowthLeadEngineWorkspace() {
   const searchParams = useSearchParams()
+  const revenueQueuePath = useGrowthFeaturePath("leads")
   const [input, setInput] = useState<GrowthLeadEngineSandboxInput>(LEAD_INTELLIGENCE_INSPECTOR_DEFAULT_INPUT)
   const [activePresetId, setActivePresetId] = useState<string | null>("medical-equipment")
   const [run, setRun] = useState<GrowthLeadEnginePipelineRun | null>(null)
@@ -123,7 +125,7 @@ export function GrowthLeadEngineWorkspace() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline" size="sm">
-              <Link href="/admin/growth/queue">Revenue Queue</Link>
+              <Link href={revenueQueuePath}>Revenue Queue</Link>
             </Button>
             <Button asChild variant="outline" size="sm">
               <Link href="/admin/growth/search">

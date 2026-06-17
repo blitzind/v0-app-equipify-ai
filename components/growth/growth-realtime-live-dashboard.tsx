@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react"
 import { Loader2, RefreshCw } from "lucide-react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 
@@ -26,6 +28,7 @@ type DashboardPayload = {
 }
 
 export function GrowthRealtimeLiveDashboard() {
+  const pathname = usePathname()
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -91,7 +94,7 @@ export function GrowthRealtimeLiveDashboard() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <Link
-                      href={`/admin/growth/leads?open=${session.leadId}&focus=call-copilot`}
+                      href={growthFeaturePath(pathname, `leads/${session.leadId}`)}
                       className="font-medium hover:underline"
                     >
                       {session.companyName}

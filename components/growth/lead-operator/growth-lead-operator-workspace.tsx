@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import {
   AlertTriangle,
   ChevronDown,
@@ -23,6 +24,7 @@ import { LEAD_ENGINE_STAGE_UI } from "@/lib/growth/lead-engine/lead-engine-stage
 import type { GrowthLeadEngineOrchestratorStageResult } from "@/lib/growth/lead-engine/orchestrator/lead-engine-run-types"
 import type { GrowthLeadOperatorWorkspacePayload } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import { formatLabel } from "@/lib/growth/revenue-intelligence/revenue-intelligence-ux"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import { useAdmin } from "@/lib/admin-store"
 
 function CollapsibleBlock({
@@ -123,6 +125,7 @@ function StageResultCard({ stage }: { stage: GrowthLeadEngineOrchestratorStageRe
 }
 
 export function GrowthLeadOperatorWorkspace({ leadId }: { leadId: string }) {
+  const pathname = usePathname()
   const { sessionIdentity } = useAdmin()
   const [workspace, setWorkspace] = useState<GrowthLeadOperatorWorkspacePayload | null>(null)
   const [loading, setLoading] = useState(true)
@@ -229,7 +232,7 @@ export function GrowthLeadOperatorWorkspace({ leadId }: { leadId: string }) {
   const actionsBar = (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <Button asChild variant="outline" size="sm">
-        <Link href="/admin/growth/queue">← Revenue Queue</Link>
+        <Link href={growthFeaturePath(pathname, "leads")}>← Revenue Queue</Link>
       </Button>
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" disabled={!!acting} onClick={() => void runAction("claim")}>

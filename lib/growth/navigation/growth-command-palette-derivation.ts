@@ -91,6 +91,17 @@ export function resolveGrowthCommandPaletteHref(pathname: string, href: string):
   const queryIndex = href.indexOf("?")
   const baseHref = queryIndex >= 0 ? href.slice(0, queryIndex) : href
   const query = queryIndex >= 0 ? href.slice(queryIndex) : ""
+
+  const route = findGrowthRouteMetadataForHref(baseHref)
+  const workspaceHref = route?.path.startsWith(GROWTH_WORKSPACE_BASE_PATH)
+    ? route.path
+    : route?.workspacePath?.startsWith(GROWTH_WORKSPACE_BASE_PATH)
+      ? route.workspacePath
+      : null
+  if (route?.migrationStatus === "dual-route" && workspaceHref) {
+    return `${workspaceHref}${query}`
+  }
+
   const segment = baseHref === GROWTH_ADMIN_BASE_PATH ? "" : baseHref.slice(GROWTH_ADMIN_BASE_PATH.length + 1)
   return `${growthFeaturePath(pathname, segment)}${query}`
 }

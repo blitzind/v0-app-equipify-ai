@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react"
 import { Loader2, RefreshCw } from "lucide-react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import { GrowthLiveCoachingSessionTimeline } from "@/components/growth/growth-live-coaching-session-timeline"
@@ -60,6 +62,7 @@ type DashboardPayload = {
 }
 
 export function GrowthLiveCoachingDashboard() {
+  const pathname = usePathname()
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null)
   const [qaProof, setQaProof] = useState<{ marker: string; label: string; verified: boolean } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -214,7 +217,7 @@ export function GrowthLiveCoachingDashboard() {
             {dashboard.highRiskCalls.slice(0, 6).map((call) => (
               <li key={call.sessionId} className="rounded-lg border border-rose-200 bg-rose-50/40 px-3 py-2 text-sm">
                 <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                  <Link href={`/admin/growth/leads?open=${call.leadId}&focus=call-copilot`} className="min-w-0 truncate font-medium hover:underline">
+                  <Link href={growthFeaturePath(pathname, `leads/${call.leadId}`)} className="min-w-0 truncate font-medium hover:underline">
                     {call.companyName}
                   </Link>
                   <div className="flex flex-wrap items-center gap-2">

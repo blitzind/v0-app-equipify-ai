@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useState, type ReactNode } from "react"
+import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
 import {
   AlertTriangle,
   ChevronDown,
@@ -167,6 +168,8 @@ function OperatorSummarySection({
 }
 
 function HumanApprovalActions() {
+  const leadsPath = useGrowthFeaturePath("leads")
+
   return (
     <div
       className="border-t border-border px-4 py-3"
@@ -180,13 +183,13 @@ function HumanApprovalActions() {
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button asChild size="sm" variant="default">
-          <Link href="/admin/growth/leads">Approve in Lead Inbox</Link>
+          <Link href={leadsPath}>Approve in Lead Inbox</Link>
         </Button>
         <Button asChild size="sm" variant="outline">
-          <Link href="/admin/growth/leads">Hold / request research</Link>
+          <Link href={leadsPath}>Hold / request research</Link>
         </Button>
         <Button asChild size="sm" variant="outline">
-          <Link href="/admin/growth/leads">Reject</Link>
+          <Link href={leadsPath}>Reject</Link>
         </Button>
       </div>
     </div>
@@ -194,6 +197,8 @@ function HumanApprovalActions() {
 }
 
 function ContactResearchActions() {
+  const leadsPath = useGrowthFeaturePath("leads")
+
   return (
     <div className="border-t border-border px-4 py-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -201,7 +206,7 @@ function ContactResearchActions() {
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
         <Button asChild size="sm" variant="outline">
-          <Link href="/admin/growth/leads">
+          <Link href={leadsPath}>
             Review contacts
             <ExternalLink className="ml-1.5 size-3" />
           </Link>

@@ -135,6 +135,7 @@
     "test:growth-share-pages:booking:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-share-pages-booking.ts --production",
     "test:growth-share-pages:admin": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-share-pages-admin.ts",
     "test:growth-workspace-shell": "tsx scripts/test-growth-workspace-shell.ts",
+    "test:growth-workspace-continuity": "tsx scripts/test-growth-workspace-continuity.ts",
     "test:growth-route-registry": "tsx scripts/test-growth-route-registry.ts",
     "test:growth-navigation-derivation": "tsx scripts/test-growth-navigation-derivation.ts",
     "test:growth-share-pages:admin:integration": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-share-pages-admin.ts --integration",

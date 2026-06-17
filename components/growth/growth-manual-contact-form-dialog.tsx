@@ -2,6 +2,8 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import {
   Dialog,
   DialogContent,
@@ -57,6 +59,7 @@ export function GrowthManualContactFormDialog({
   acquisitionRunId,
   onSuccess,
 }: GrowthManualContactFormDialogProps) {
+  const pathname = usePathname()
   const [form, setForm] = useState<GrowthManualContactFormValues>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -135,7 +138,7 @@ export function GrowthManualContactFormDialog({
 
   const leadHref =
     result && (result.status === "created" || result.status === "linked_duplicate")
-      ? `/admin/growth/leads/${result.lead_id}`
+      ? growthFeaturePath(pathname, `leads/${result.lead_id}`)
       : null
 
   return (

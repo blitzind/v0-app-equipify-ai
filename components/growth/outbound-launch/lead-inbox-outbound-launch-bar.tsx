@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
 import { ArrowRight, Bot, ListChecks, PlayCircle, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,6 +24,7 @@ export function LeadInboxOutboundLaunchBar({
   buyingStage?: string | null
   decisionMakerConfidence?: number | null
 }) {
+  const qualifyInboxPath = useGrowthFeaturePath(`leads/${row.id}`)
   const growthLeadId = row.existing_lead_match.matched ? row.existing_lead_match.ids[0] ?? null : null
   const companyLike = {
     is_suppressed: false,
@@ -104,7 +106,7 @@ export function LeadInboxOutboundLaunchBar({
         ) : null}
         {!growthLeadId ? (
           <Button asChild size="sm" variant="secondary">
-            <Link href={`/admin/growth/leads/${row.id}`}>
+            <Link href={qualifyInboxPath}>
               Qualify in inbox
               <ArrowRight className="ml-1 size-3.5" />
             </Link>

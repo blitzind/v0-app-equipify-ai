@@ -4,11 +4,15 @@ import Link from "next/link"
 import { ArrowRight, Phone, Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
 import { LEAD_STAGE_SUMMARY_QA_MARKER } from "@/lib/growth/lead-engine/lead-intelligence-inspector-qa"
 import { buildLeadIntelligenceStageOperatorSummary } from "@/lib/growth/lead-engine/lead-intelligence-stage-display"
 import type { GrowthLeadEnginePipelineRun } from "@/lib/growth/lead-engine/orchestrator/lead-engine-run-types"
 
 export function LeadIntelligenceOperatorSummaryCard({ run }: { run: GrowthLeadEnginePipelineRun }) {
+  const leadsPath = useGrowthFeaturePath("leads")
+  const callQueuePath = useGrowthFeaturePath("leads/queue")
+  const callsPath = useGrowthFeaturePath("calls")
   const leadScore = run.stage_results.find((s) => s.stage_id === "lead_score")
   const approval = run.stage_results.find((s) => s.stage_id === "human_approval")
   const execution = run.stage_results.find((s) => s.stage_id === "revenue_execution")
@@ -124,16 +128,16 @@ export function LeadIntelligenceOperatorSummaryCard({ run }: { run: GrowthLeadEn
 
       <div className="mt-4 flex flex-wrap gap-2">
         <Button asChild size="sm">
-          <Link href="/admin/growth/leads">
+          <Link href={leadsPath}>
             Open Lead Inbox
             <ArrowRight className="ml-1.5 size-3.5" />
           </Link>
         </Button>
         <Button asChild size="sm" variant="outline">
-          <Link href="/admin/growth/leads/queue">Call queue</Link>
+          <Link href={callQueuePath}>Call queue</Link>
         </Button>
         <Button asChild size="sm" variant="outline">
-          <Link href="/admin/growth/calls/workspace">
+          <Link href={callsPath}>
             <Phone className="mr-1.5 size-3.5" />
             Call workspace
           </Link>

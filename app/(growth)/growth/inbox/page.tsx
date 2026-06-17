@@ -8,6 +8,7 @@ import { GrowthInboxWorkspaceProvider } from "@/components/growth/inbox/growth-i
 import { GrowthInboxWorkspaceV2Panel } from "@/components/growth/inbox/growth-inbox-workspace-v2-panel"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 import { Button } from "@/components/ui/button"
+import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
 import {
   GROWTH_INBOX_DIAGNOSTICS_HREF,
   GROWTH_INBOX_WORKSPACE_V2_QA_MARKER,
@@ -24,6 +25,7 @@ function GrowthInboxWorkspaceContent() {
 export default function GrowthInboxPage() {
   const searchParams = useSearchParams()
   const workspaceV2 = resolveGrowthInboxWorkspaceV2FromSearchParams(searchParams)
+  const revenueQueuePath = useGrowthFeaturePath("leads")
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8">
@@ -47,7 +49,7 @@ export default function GrowthInboxPage() {
               <Link href={GROWTH_INBOX_DIAGNOSTICS_HREF}>Inbox Diagnostics</Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/admin/growth/queue">Revenue Queue</Link>
+              <Link href={revenueQueuePath}>Revenue Queue</Link>
             </Button>
           </>
         }
