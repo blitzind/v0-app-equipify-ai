@@ -1,7 +1,7 @@
 "use client"
 
 import { Handshake } from "lucide-react"
-import { GrowthRelationshipsWorkspace } from "@/components/growth/intelligence/growth-relationships-workspace"
+import { GrowthRelationshipsDashboardBody } from "@/components/growth/intelligence/growth-relationships-dashboard-body"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 
 export default function GrowthRelationshipsPage() {
@@ -14,7 +14,7 @@ export default function GrowthRelationshipsPage() {
         iconClassName="bg-sky-50 text-sky-600"
       />
 
-      <GrowthRelationshipsWorkspace showPageHeader={false} />
+      <GrowthRelationshipsDashboardBody />
     </div>
   )
 }

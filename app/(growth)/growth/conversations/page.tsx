@@ -1,7 +1,7 @@
 "use client"
 
 import { MessageSquare } from "lucide-react"
-import { GrowthConversationsWorkspace } from "@/components/growth/intelligence/growth-conversations-workspace"
+import { GrowthConversationsDashboardBody } from "@/components/growth/intelligence/growth-conversations-dashboard-body"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 
 export default function GrowthConversationsPage() {
@@ -14,7 +14,7 @@ export default function GrowthConversationsPage() {
         iconClassName="bg-emerald-50 text-emerald-600"
       />
 
-      <GrowthConversationsWorkspace showPageHeader={false} />
+      <GrowthConversationsDashboardBody />
     </div>
   )
 }

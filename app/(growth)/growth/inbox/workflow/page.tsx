@@ -1,7 +1,7 @@
 "use client"
 
 import { GitBranch } from "lucide-react"
-import { GrowthReplyWorkflowWorkspace } from "@/components/growth/replies/growth-reply-workflow-workspace"
+import { GrowthReplyWorkflowDashboardBody } from "@/components/growth/replies/growth-reply-workflow-dashboard-body"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 
 export default function GrowthInboxWorkflowPage() {
@@ -14,7 +14,7 @@ export default function GrowthInboxWorkflowPage() {
         iconClassName="bg-indigo-50 text-indigo-600"
       />
 
-      <GrowthReplyWorkflowWorkspace showPageHeader={false} />
+      <GrowthReplyWorkflowDashboardBody />
     </div>
   )
 }

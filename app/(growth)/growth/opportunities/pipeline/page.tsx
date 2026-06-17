@@ -1,7 +1,7 @@
 "use client"
 
 import { GitBranch } from "lucide-react"
-import { GrowthOpportunitiesPipelineWorkspace } from "@/components/growth/opportunities/growth-opportunities-pipeline-workspace"
+import { GrowthOpportunitiesPipelineDashboardBody } from "@/components/growth/opportunities/growth-opportunities-pipeline-dashboard-body"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 
 export default function GrowthOpportunitiesPipelinePage() {
@@ -14,7 +14,7 @@ export default function GrowthOpportunitiesPipelinePage() {
         iconClassName="bg-emerald-50 text-emerald-700"
       />
 
-      <GrowthOpportunitiesPipelineWorkspace showPageHeader={false} />
+      <GrowthOpportunitiesPipelineDashboardBody />
     </div>
   )
 }
