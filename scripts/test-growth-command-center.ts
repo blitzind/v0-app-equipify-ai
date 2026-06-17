@@ -34,6 +34,7 @@ import {
   GROWTH_COMMAND_CENTER_ACTIONS_QA_MARKER,
   GROWTH_COMMAND_CENTER_QUICK_ACTIONS,
 } from "../lib/growth/command/command-center-quick-actions"
+import { GROWTH_WORKSPACE_CANONICAL_ALIASES } from "../lib/growth/navigation/growth-workspace-cleanup-audit"
 import { GROWTH_COMMAND_CENTER_DAILY_ACTION_QUEUE_QA_MARKER } from "../lib/growth/command/command-center-daily-action-queue"
 import { GROWTH_COMMAND_OPEN_OPPORTUNITIES_QA_MARKER } from "../lib/growth/command/command-center-open-opportunities"
 import { GROWTH_COMMAND_SEQUENCE_QUEUE_QA_MARKER } from "../lib/growth/command/command-center-sequence-queue"
@@ -239,7 +240,7 @@ assert.deepEqual(
   ],
 )
 assert.equal(GROWTH_COMMAND_CENTER_QUICK_ACTIONS[0]?.href, "/admin/growth/search")
-assert.equal(GROWTH_COMMAND_CENTER_QUICK_ACTIONS[1]?.href, "/admin/growth/inbox")
+assert.equal(GROWTH_COMMAND_CENTER_QUICK_ACTIONS[1]?.href, GROWTH_WORKSPACE_CANONICAL_ALIASES.inbox)
 assert.ok(!GROWTH_COMMAND_CENTER_QUICK_ACTIONS.some((action) => action.label === "Import Leads"))
 assert.ok(!GROWTH_COMMAND_CENTER_QUICK_ACTIONS.some((action) => action.label === "View Intent Activity"))
 

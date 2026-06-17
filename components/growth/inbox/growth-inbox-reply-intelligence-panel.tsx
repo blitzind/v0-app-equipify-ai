@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { useGrowthReplyIntelligenceDashboard } from "@/components/growth/inbox/use-growth-reply-intelligence-dashboard"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Bot, History, Loader2, RefreshCw } from "lucide-react"
@@ -16,10 +17,9 @@ import {
   type GrowthReplyCopilotAssist,
   type GrowthReplyIntent,
   type GrowthReplyNextAction,
-  type GrowthSalesExecutionDashboard,
 } from "@/lib/growth/reply-intelligence/reply-intent-types"
 
-export const GROWTH_INBOX_REPLY_INTELLIGENCE_PANEL_QA_MARKER = "growth-inbox-reply-intelligence-panel-v1" as const
+export const GROWTH_INBOX_REPLY_INTELLIGENCE_PANEL_QA_MARKER = "growth-inbox-reply-intelligence-panel-v2" as const
 
 type InboxReplyItem = GrowthOutboundReply & { companyName: string | null }
 
@@ -30,38 +30,14 @@ type GrowthInboxReplyIntelligencePanelProps = {
 
 export function GrowthInboxReplyIntelligencePanel({ leadId, compact = false }: GrowthInboxReplyIntelligencePanelProps) {
   const pathname = usePathname()
-  const [dashboard, setDashboard] = useState<GrowthSalesExecutionDashboard | null>(null)
+  const { dashboard, loading, error, reload: loadDashboard } = useGrowthReplyIntelligenceDashboard()
   const [leadReply, setLeadReply] = useState<InboxReplyItem | null>(null)
   const [timeline, setTimeline] = useState<GrowthConversationTimelineEntry[]>([])
   const [copilot, setCopilot] = useState<GrowthReplyCopilotAssist | null>(null)
-  const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const workflowPath = growthFeaturePath(pathname, "inbox/workflow")
   const adminReplyInboxPath = growthFeaturePath(pathname, "replies")
-
-  const loadDashboard = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const params = new URLSearchParams({ view: "needs_action", limit: "1" })
-      const res = await fetch(`/api/platform/growth/replies/dashboard?${params.toString()}`, { cache: "no-store" })
-      const data = (await res.json().catch(() => ({}))) as {
-        ok?: boolean
-        dashboard?: GrowthSalesExecutionDashboard
-        message?: string
-      }
-      if (!res.ok || !data.ok || !data.dashboard) {
-        throw new Error(data.message ?? "Could not load reply intelligence.")
-      }
-      setDashboard(data.dashboard)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Reply intelligence unavailable.")
-    } finally {
-      setLoading(false)
-    }
-  }, [])
 
   const loadLeadDetail = useCallback(async (activeLeadId: string) => {
     setDetailLoading(true)
@@ -104,10 +80,6 @@ export function GrowthInboxReplyIntelligencePanel({ leadId, compact = false }: G
       setDetailLoading(false)
     }
   }, [])
-
-  useEffect(() => {
-    void loadDashboard()
-  }, [loadDashboard])
 
   useEffect(() => {
     if (!leadId) {
@@ -155,11 +127,12 @@ export function GrowthInboxReplyIntelligencePanel({ leadId, compact = false }: G
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
       {dashboard ? (
-        <div className={`grid gap-3 ${compact ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-2 lg:grid-cols-4"}`}>
+        <div className={`grid gap-3 ${compact ? "sm:grid-cols-2 lg:grid-cols-5" : "sm:grid-cols-2 lg:grid-cols-5"}`}>
           <StatTile label="Needs review" value={dashboard.needsReviewCount} />
           <StatTile label="Interested" value={dashboard.interestedCount} />
           <StatTile label="Objection-heavy" value={dashboard.objectionHeavyCount} />
           <StatTile label="Workflow tasks" value={dashboard.workflowTaskCount} />
+          <StatTile label="Meeting requests" value={dashboard.meetingRequestCount} />
         </div>
       ) : null}
 

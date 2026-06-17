@@ -1,5 +1,10 @@
 /** SN-7 — client-safe operator notification center helpers. */
 
+import {
+  growthWorkspaceInboxHref,
+  growthWorkspaceLeadHref,
+  growthWorkspaceSharePageHref,
+} from "@/lib/growth/navigation/growth-workspace-operator-links"
 import type { GrowthOperatorNotificationEvent } from "@/lib/growth/notifications/growth-notification-events"
 import type { GrowthOperatorNotificationRecord } from "@/lib/growth/notifications/growth-notification-persistence-types"
 import type { GrowthOperatorNotificationRecipientRole } from "@/lib/growth/notifications/growth-notification-routing"
@@ -33,17 +38,17 @@ export function resolveGrowthOperatorNotificationEntityLink(input: {
   switch (input.targetEntityType) {
     case "lead":
       return {
-        href: `/admin/growth/leads/${input.targetEntityId}`,
+        href: growthWorkspaceLeadHref(input.targetEntityId),
         label: "Open lead",
       }
     case "reply":
       return {
-        href: `/admin/growth/replies?replyId=${encodeURIComponent(input.targetEntityId)}`,
+        href: growthWorkspaceInboxHref({ replyId: input.targetEntityId, view: "needs_action" }),
         label: "Open reply",
       }
     case "share_page":
       return {
-        href: `/admin/growth/share-pages/${input.targetEntityId}`,
+        href: growthWorkspaceSharePageHref(input.targetEntityId),
         label: "Open share page",
       }
     case "sequence_enrollment":
@@ -53,7 +58,7 @@ export function resolveGrowthOperatorNotificationEntityLink(input: {
       }
     case "inbox_thread":
       return {
-        href: `/admin/growth/inbox?threadId=${encodeURIComponent(input.targetEntityId)}`,
+        href: growthWorkspaceInboxHref({ threadId: input.targetEntityId }),
         label: "Open thread",
       }
     default:

@@ -2,6 +2,7 @@
 
 import { GROWTH_CALLS_PRIMARY_HREF } from "@/lib/growth/navigation/growth-workspace-consolidation"
 import { GROWTH_REVENUE_QUEUE_HREF } from "@/lib/growth/navigation/growth-navigation-destinations"
+import { GROWTH_WORKSPACE_CANONICAL_ALIASES } from "@/lib/growth/navigation/growth-workspace-cleanup-audit"
 
 export type GrowthCommandNavLink = {
   label: string
@@ -15,21 +16,21 @@ export type GrowthCommandSectionTab = {
 
 export const GROWTH_COMMAND_JUMP_DESTINATIONS: readonly GrowthCommandNavLink[] = [
   { label: "Queue", href: GROWTH_REVENUE_QUEUE_HREF },
-  { label: "Reply Inbox", href: "/admin/growth/replies" },
-  { label: "Reply Workflow", href: "/admin/growth/replies/workflow" },
+  { label: "Inbox", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.inbox },
+  { label: "Reply Workflow", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.replyWorkflow },
   { label: "Meetings", href: "/admin/growth/meetings" },
   { label: "Call Queue", href: "/admin/growth/leads/queue" },
   { label: "Imports", href: "/admin/growth/imports" },
   { label: "Sequences", href: "/admin/growth/sequences" },
   { label: "Sequence Execution", href: "/admin/growth/sequences/execution" },
   { label: "Cadence Tasks", href: "/admin/growth/sequences/execution" },
-  { label: "Pipeline", href: "/admin/growth/opportunities/pipeline" },
-  { label: "Opportunities", href: "/admin/growth/opportunities" },
+  { label: "Pipeline", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.pipeline },
+  { label: "Opportunities", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.opportunities },
   { label: "Revenue Operating", href: "/admin/growth/revenue-operating" },
   { label: "Customer Lifecycle", href: "/admin/growth/customer-lifecycle" },
   { label: "Dogfood Validation", href: "/admin/growth/dogfood" },
   { label: "Providers", href: "/admin/growth/providers" },
-  { label: "Settings", href: "/admin/growth/settings/growth" },
+  { label: "Settings", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.settings },
 ] as const
 
 export const GROWTH_COMMAND_SECTION_TABS: readonly GrowthCommandSectionTab[] = [
@@ -51,7 +52,7 @@ export const GROWTH_COMMAND_COMM_SECTION_LINKS: readonly GrowthCommandNavLink[] 
 ] as const
 
 export const GROWTH_COMMAND_PIPELINE_SECTION_LINKS: readonly GrowthCommandNavLink[] = [
-  { label: "Pipeline", href: "/admin/growth/opportunities/pipeline" },
+  { label: "Pipeline", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.pipeline },
   { label: "Revenue Operating", href: "/admin/growth/revenue-operating" },
 ] as const
 

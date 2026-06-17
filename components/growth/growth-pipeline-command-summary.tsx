@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Loader2, TrendingUp } from "lucide-react"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
 import type { GrowthOpportunityPipelineDashboard } from "@/lib/growth/opportunity-pipeline/pipeline-types"
 
 function formatCurrency(value: number): string {
@@ -11,6 +12,7 @@ function formatCurrency(value: number): string {
 }
 
 export function GrowthPipelineCommandSummary() {
+  const pipelinePath = useGrowthFeaturePath("opportunities/pipeline")
   const [dashboard, setDashboard] = useState<GrowthOpportunityPipelineDashboard | null>(null)
   const [setupMessage, setSetupMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -62,7 +64,7 @@ export function GrowthPipelineCommandSummary() {
           <TrendingUp className="size-4" />
           Revenue operating layer — no autonomous stage movement.
         </div>
-        <Link href="/admin/growth/opportunities/pipeline" className="text-sm text-indigo-600 hover:underline">
+        <Link href={pipelinePath} className="text-sm text-indigo-600 hover:underline">
           Open pipeline
         </Link>
       </div>

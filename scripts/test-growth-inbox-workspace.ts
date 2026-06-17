@@ -98,6 +98,7 @@ function runAudit(): void {
 
   const v2Panel = readSource("components/growth/inbox/growth-inbox-workspace-v2-panel.tsx")
   assert.match(v2Panel, /GrowthInboxReplyIntelligencePanel/)
+  assert.match(v2Panel, /GrowthInboxOverviewMetricsPanel/)
   assert.match(v2Panel, /GrowthOperatorInboxPanel/)
   console.log("  ✓ overview v2 panel embeds reply intelligence and operator notifications")
 

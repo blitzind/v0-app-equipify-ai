@@ -1,4 +1,5 @@
 import { commandLeadFocusHref, commandOutreachHref, commandSequenceExecutionHref } from "@/lib/growth/command/command-action-catalog"
+import { growthWorkspaceInboxHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import type {
   ExecutionPrioritySignalsInput,
   ExecutionQueueCategory,
@@ -116,7 +117,7 @@ function resolveCta(ctx: ExecutionLeadContext): { label: string; href: string } 
     return { label: "Open sequence", href: commandSequenceExecutionHref(ctx.referenceIds.enrollmentId) }
   }
   if (ctx.unansweredReplies > 0) {
-    return { label: "Open reply inbox", href: "/admin/growth/replies?view=unanswered" }
+    return { label: "Open reply inbox", href: growthWorkspaceInboxHref({ view: "needs_action" }) }
   }
   if (ctx.meetingFollowUpOverdue) {
     return { label: "Open meetings", href: "/admin/growth/meetings?view=followups_due" }

@@ -3,11 +3,12 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { emitGrowthNotification } from "@/lib/growth/notifications/emit-growth-notification"
 import { growthMeetingScheduleHref } from "@/lib/growth/meeting-intelligence/process-meeting-intelligence"
+import { growthWorkspaceInboxHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import type { GrowthReplyIntent, GrowthReplyPriority } from "@/lib/growth/reply-intelligence/reply-intent-types"
 import { isReplyOverdue } from "@/lib/growth/reply-intelligence/reply-sla-tracker"
 
-function replyInboxHref(replyId: string): string {
-  return `/admin/growth/replies?replyId=${replyId}`
+function replyInboxHref(input: { leadId: string; replyId: string }): string {
+  return growthWorkspaceInboxHref({ leadId: input.leadId, replyId: input.replyId, view: "needs_action" })
 }
 
 export async function emitReplyWaitingNotification(
@@ -28,7 +29,7 @@ export async function emitReplyWaitingNotification(
     body: `${input.companyName} replied (${input.intent.replace(/_/g, " ")}).`,
     sourceSystem: "outreach",
     sourceId: input.replyId,
-    actionUrl: replyInboxHref(input.replyId),
+    actionUrl: replyInboxHref({ leadId: input.leadId, replyId: input.replyId }),
     metadata: { intent: input.intent, companyName: input.companyName },
   })
 }
@@ -53,7 +54,7 @@ export async function emitReplyOverdueNotification(
     body: `${input.companyName} reply is past SLA (${input.priority}).`,
     sourceSystem: "outreach",
     sourceId: input.replyId,
-    actionUrl: replyInboxHref(input.replyId),
+    actionUrl: replyInboxHref({ leadId: input.leadId, replyId: input.replyId }),
     metadata: { priority: input.priority, companyName: input.companyName },
   })
 }
@@ -97,7 +98,7 @@ export async function emitReplyCompetitorMentionedNotification(
     body: `${input.companyName} mentioned a competitor in their reply.`,
     sourceSystem: "outreach",
     sourceId: input.replyId,
-    actionUrl: replyInboxHref(input.replyId),
+    actionUrl: replyInboxHref({ leadId: input.leadId, replyId: input.replyId }),
     metadata: { companyName: input.companyName },
   })
 }
@@ -122,7 +123,7 @@ export async function emitHighPriorityReplyNotification(
     body: `${input.companyName}: ${input.intent.replace(/_/g, " ")} (${input.priority}).`,
     sourceSystem: "outreach",
     sourceId: input.replyId,
-    actionUrl: replyInboxHref(input.replyId),
+    actionUrl: replyInboxHref({ leadId: input.leadId, replyId: input.replyId }),
     metadata: { priority: input.priority, intent: input.intent, companyName: input.companyName },
   })
 }
@@ -146,7 +147,7 @@ export async function emitOwnerResponseGapNotification(
     body: `${input.companyName} reply has been waiting on owner action.`,
     sourceSystem: "outreach",
     sourceId: input.replyId,
-    actionUrl: replyInboxHref(input.replyId),
+    actionUrl: replyInboxHref({ leadId: input.leadId, replyId: input.replyId }),
     metadata: { gapMs: input.gapMs, companyName: input.companyName },
   })
 }

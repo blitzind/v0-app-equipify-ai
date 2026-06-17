@@ -6,6 +6,7 @@ import type { HumanExecutionQueueItem } from "@/lib/growth/human-execution/human
 import type { GrowthNotification } from "@/lib/growth/notifications/notification-types"
 import type { GrowthReplyWorkflowActionRecord } from "@/lib/growth/reply-intelligence/workflow-actions-types"
 import type { GrowthSignalFeedItem } from "@/lib/growth/signal-intelligence/signal-feed-types"
+import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
 import {
   OPERATOR_INBOX_QA_MARKER,
   type OperatorInboxItem,
@@ -80,7 +81,7 @@ export function normalizeReplyWorkflowAction(action: GrowthReplyWorkflowActionRe
     lead_id: action.leadId,
     company_name: action.companyName,
     occurred_at: action.createdAt,
-    cta_href: `/admin/growth/replies/workflow?leadId=${encodeURIComponent(action.leadId)}`,
+    cta_href: `${GROWTH_WORKSPACE_BASE_PATH}/inbox/workflow?leadId=${encodeURIComponent(action.leadId)}`,
     status: "new",
   })
 }
@@ -138,7 +139,7 @@ export function normalizeInboxThread(thread: GrowthInboxThread): OperatorInboxIt
     lead_id: thread.lead_id,
     company_name: thread.lead_label,
     occurred_at: thread.last_message_at ?? thread.updated_at,
-    cta_href: `/admin/growth/inbox?threadId=${encodeURIComponent(thread.id)}`,
+    cta_href: `${GROWTH_WORKSPACE_BASE_PATH}/inbox?threadId=${encodeURIComponent(thread.id)}`,
     status: "new",
   })
 }

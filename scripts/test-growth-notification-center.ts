@@ -120,7 +120,7 @@ function runLocalRegression(): void {
     targetEntityType: "lead",
     targetEntityId: "00000000-0000-4000-8000-000000000001",
   })
-  assert.match(leadLink.href ?? "", /\/admin\/growth\/leads\//)
+  assert.match(leadLink.href ?? "", /\/growth\/leads\//)
   console.log("  ✓ entity link mapping")
 
   const mapped = mapGrowthOperatorNotificationCenterItem({

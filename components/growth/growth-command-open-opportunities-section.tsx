@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Loader2, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
 import { GROWTH_COMMAND_OPEN_OPPORTUNITIES_QA_MARKER } from "@/lib/growth/command/command-center-open-opportunities"
 import type { GrowthOpportunityPipelineDashboard } from "@/lib/growth/opportunity-pipeline/pipeline-types"
 
@@ -13,6 +14,7 @@ function formatCurrency(value: number): string {
 }
 
 export function GrowthCommandOpenOpportunitiesSection() {
+  const pipelinePath = useGrowthFeaturePath("opportunities/pipeline")
   const [dashboard, setDashboard] = useState<GrowthOpportunityPipelineDashboard | null>(null)
   const [setupMessage, setSetupMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -76,7 +78,7 @@ export function GrowthCommandOpenOpportunitiesSection() {
 
       <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
         <Button asChild size="sm" variant="outline">
-          <Link href="/admin/growth/opportunities/pipeline">Open pipeline</Link>
+          <Link href={pipelinePath}>Open pipeline</Link>
         </Button>
       </div>
 

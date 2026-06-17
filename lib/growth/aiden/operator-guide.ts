@@ -1,6 +1,8 @@
 /** Static Aiden operator guide — edit here to update in-app coaching copy. */
 
-export const AIDEN_OPERATOR_GUIDE_QA_MARKER = "aiden-operator-guide-v3" as const
+import { GROWTH_WORKSPACE_CANONICAL_ALIASES } from "@/lib/growth/navigation/growth-workspace-cleanup-audit"
+
+export const AIDEN_OPERATOR_GUIDE_QA_MARKER = "aiden-operator-guide-v5" as const
 
 export type AidenGuideLink = {
   label: string
@@ -120,7 +122,7 @@ export const AIDEN_TODAY_POST_LAUNCH: AidenGuideStep[] = [
     title: "Check inbox",
     detail: "Open unified inbox for new threads after live sends. Run inbox diagnostics if sync looks stale.",
     links: [
-      { label: "Unified inbox", href: "/admin/growth/inbox" },
+      { label: "Unified inbox", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.inbox },
       { label: "Inbox diagnostics", href: "/admin/growth/inbox/diagnostics" },
     ],
   },
@@ -129,8 +131,8 @@ export const AIDEN_TODAY_POST_LAUNCH: AidenGuideStep[] = [
     title: "Review replies",
     detail: "Read each inbound message. Confirm classification and timeline update before responding.",
     links: [
-      { label: "Replies", href: "/admin/growth/replies" },
-      { label: "Reply workflow", href: "/admin/growth/replies/workflow" },
+      { label: "Replies", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.replyInboxAdmin },
+      { label: "Reply workflow", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.replyWorkflow },
     ],
   },
   {
@@ -147,8 +149,8 @@ export const AIDEN_TODAY_POST_LAUNCH: AidenGuideStep[] = [
     title: "Approve opportunities",
     detail: "Promote qualified conversations manually. No auto-opportunity creation.",
     links: [
-      { label: "Opportunities", href: "/admin/growth/opportunities" },
-      { label: "Opportunity pipeline", href: "/admin/growth/opportunities/pipeline" },
+      { label: "Opportunities", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.opportunities },
+      { label: "Opportunity pipeline", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.pipeline },
     ],
   },
   {
@@ -197,8 +199,8 @@ export const AIDEN_REPLY_SCENARIO_GUIDANCE = {
       message: "You have 1 new reply.",
       action: "Open unified inbox, read the thread, confirm classification before drafting a response.",
       links: [
-        { label: "Unified inbox", href: "/admin/growth/inbox" },
-        { label: "Reply workflow", href: "/admin/growth/replies/workflow" },
+        { label: "Unified inbox", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.inbox },
+        { label: "Reply workflow", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.replyWorkflow },
       ],
     },
     {
@@ -216,7 +218,7 @@ export const AIDEN_REPLY_SCENARIO_GUIDANCE = {
       signal: "objections > 0",
       message: "An objection requires follow-up.",
       action: "Acknowledge concern, use objection playbook, offer one clear next step. Do not argue or multi-blast.",
-      links: [{ label: "Reply handling", href: "/admin/growth/replies" }],
+      links: [{ label: "Reply handling", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.replyInboxAdmin }],
     },
     {
       id: "positive-interest",
@@ -225,7 +227,7 @@ export const AIDEN_REPLY_SCENARIO_GUIDANCE = {
       action: "Use reply draft, propose next step or meeting. Mark lead engaged before approving more outbound.",
       links: [
         { label: "Reply drafts", href: "/admin/growth/copilot/reply-drafts" },
-        { label: "Opportunities", href: "/admin/growth/opportunities" },
+        { label: "Opportunities", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.opportunities },
       ],
     },
     {
@@ -252,7 +254,7 @@ export const AIDEN_FIRST_REPLY_OPERATOR_STEPS: AidenGuideStep[] = [
     order: 2,
     title: "Verify pipeline artifacts",
     detail: "Confirm thread, classification, timeline event, and next best action on the lead record.",
-    links: [{ label: "Lead timeline", href: "/admin/growth/inbox" }],
+    links: [{ label: "Lead timeline", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.inbox }],
   },
   {
     order: 3,
@@ -266,7 +268,7 @@ export const AIDEN_FIRST_REPLY_OPERATOR_STEPS: AidenGuideStep[] = [
     detail: "Book meetings or create opportunities only when intent warrants it — both are manual.",
     links: [
       { label: "Meetings", href: "/admin/growth/meetings" },
-      { label: "Opportunities", href: "/admin/growth/opportunities" },
+      { label: "Opportunities", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.opportunities },
     ],
   },
   {
@@ -361,7 +363,7 @@ export const AIDEN_DAILY_ROUTINE: AidenGuideStep[] = [
     title: "Watch inbox",
     detail: "After sends go out, monitor the unified inbox for replies and bounces.",
     links: [
-      { label: "Unified inbox", href: "/admin/growth/inbox" },
+      { label: "Unified inbox", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.inbox },
       { label: "Inbox diagnostics", href: "/admin/growth/inbox/diagnostics" },
     ],
   },
@@ -370,8 +372,8 @@ export const AIDEN_DAILY_ROUTINE: AidenGuideStep[] = [
     title: "Respond to replies",
     detail: "Use reply drafts and workflow center. Classify intent before sending a follow-up.",
     links: [
-      { label: "Replies", href: "/admin/growth/replies" },
-      { label: "Reply workflow", href: "/admin/growth/replies/workflow" },
+      { label: "Replies", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.replyInboxAdmin },
+      { label: "Reply workflow", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.replyWorkflow },
       { label: "Reply drafts", href: "/admin/growth/copilot/reply-drafts" },
     ],
   },
@@ -389,8 +391,8 @@ export const AIDEN_DAILY_ROUTINE: AidenGuideStep[] = [
     title: "Approve opportunities",
     detail: "Promote qualified conversations to opportunities only after human review.",
     links: [
-      { label: "Opportunities", href: "/admin/growth/opportunities" },
-      { label: "Opportunity pipeline", href: "/admin/growth/opportunities/pipeline" },
+      { label: "Opportunities", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.opportunities },
+      { label: "Opportunity pipeline", href: GROWTH_WORKSPACE_CANONICAL_ALIASES.pipeline },
     ],
   },
   {

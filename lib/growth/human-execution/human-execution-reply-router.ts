@@ -1,4 +1,5 @@
 import { commandLeadFocusHref } from "@/lib/growth/command/command-action-catalog"
+import { growthWorkspaceInboxHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import type { GrowthReplyIntent } from "@/lib/growth/reply-intelligence/reply-intent-types"
 import type {
   HumanExecutionReplyRoute,
@@ -35,9 +36,11 @@ export function routeHumanExecutionReply(input: {
       routeLabel: HUMAN_EXECUTION_REPLY_ROUTE_LABELS.operator_queue,
       requiresHumanApproval: false,
       recommendation: "Route to operator reply inbox for human response.",
-      ctaHref: input.replyId
-        ? `/admin/growth/replies?replyId=${input.replyId}`
-        : "/admin/growth/replies?view=needs_action",
+      ctaHref: growthWorkspaceInboxHref({
+        leadId: input.leadId,
+        replyId: input.replyId ?? undefined,
+        view: "needs_action",
+      }),
     }
   }
 

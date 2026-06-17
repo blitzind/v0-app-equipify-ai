@@ -8,7 +8,9 @@ import { GrowthInboxSharedDataProvider } from "@/components/growth/inbox/growth-
 import { GrowthInboxActionCenterColumn } from "@/components/growth/inbox/growth-inbox-action-center-column"
 import { GrowthInboxConversationColumn } from "@/components/growth/inbox/growth-inbox-conversation-column"
 import { GrowthInboxQueueProvider } from "@/components/growth/inbox/growth-inbox-queue-context"
+import { GrowthInboxQueueUrlSync } from "@/components/growth/inbox/growth-inbox-queue-url-sync"
 import { GrowthInboxThreadQueueColumn } from "@/components/growth/inbox/growth-inbox-thread-queue-column"
+import { GrowthInboxOverviewMetricsPanel } from "@/components/growth/inbox/growth-inbox-overview-metrics-panel"
 import { GrowthInboxReplyIntelligencePanel } from "@/components/growth/inbox/growth-inbox-reply-intelligence-panel"
 import { GrowthInboxV2SupportingPanels } from "@/components/growth/inbox/growth-inbox-v2-supporting-panels"
 import { GrowthOperatorInboxPanel } from "@/components/growth/growth-operator-inbox-panel"
@@ -89,6 +91,8 @@ export function GrowthInboxWorkspaceV2Panel() {
 
       <GrowthInboxSharedDataProvider>
         <GrowthInboxQueueProvider>
+          <GrowthInboxQueueUrlSync />
+          <GrowthInboxOverviewMetricsPanel />
           <GrowthInboxLeadContextProvider
             leadId={selectedThread?.lead_id ?? null}
             threadId={selectedThread?.id ?? null}
