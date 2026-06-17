@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { ChevronRight, Loader2 } from "lucide-react"
 import { useGrowthBreadcrumbState } from "@/components/growth/shell/growth-breadcrumb-context"
 import { resolveGrowthBreadcrumbs } from "@/lib/growth/navigation/growth-route-registry"
+import { WORKSPACE_SHELL_HORIZONTAL_PADDING } from "@/lib/workspace/workspace-shell-tokens"
 import { cn } from "@/lib/utils"
 
 export const GROWTH_BREADCRUMBS_QA_MARKER = "growth-workspace-breadcrumbs-v1" as const
@@ -23,7 +24,11 @@ export function GrowthBreadcrumbs({ className }: GrowthBreadcrumbsProps) {
   return (
     <nav
       aria-label="Breadcrumb"
-      className={cn("border-b border-border/60 bg-muted/20 px-4 py-2 md:px-6", className)}
+      className={cn(
+        "border-b border-border/60 bg-muted/20 py-2",
+        WORKSPACE_SHELL_HORIZONTAL_PADDING,
+        className,
+      )}
       data-qa-marker={GROWTH_BREADCRUMBS_QA_MARKER}
     >
       <ol className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">

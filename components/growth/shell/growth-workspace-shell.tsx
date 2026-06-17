@@ -9,7 +9,12 @@ import { GrowthWorkspaceActivityTracker } from "@/components/growth/workspace/gr
 import { GrowthSidebar } from "@/components/growth/shell/growth-sidebar"
 import { GrowthTopbar } from "@/components/growth/shell/growth-topbar"
 import { WorkspaceContainer } from "@/components/workspace/workspace-container"
-import { WORKSPACE_SHELL_HORIZONTAL_PADDING } from "@/lib/workspace/workspace-shell-tokens"
+import { WorkspaceShellSkipLink } from "@/components/workspace/workspace-shell-skip-link"
+import {
+  WORKSPACE_SHELL_MAIN_CONTENT_ID,
+  WORKSPACE_SHELL_VIEWPORT_BODY,
+  WORKSPACE_SHELL_VIEWPORT_ROOT,
+} from "@/lib/workspace/workspace-shell-tokens"
 
 type GrowthWorkspaceShellProps = {
   children: ReactNode
@@ -20,17 +25,24 @@ export function GrowthWorkspaceShell({ children }: GrowthWorkspaceShellProps) {
 
   return (
     <GrowthBreadcrumbProvider>
-      <div
-        className="flex min-h-screen bg-background text-foreground"
-        data-qa-marker={GROWTH_WORKSPACE_SHELL_QA_MARKER}
-      >
-        <GrowthSidebar />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <GrowthTopbar onOpenMobileNav={() => setMobileNavOpen(true)} />
-          <GrowthBreadcrumbs className={WORKSPACE_SHELL_HORIZONTAL_PADDING} />
-          <main className="min-h-0 flex-1 overflow-y-auto outline-none scroll-mt-14 md:scroll-mt-16">
-            <WorkspaceContainer>{children}</WorkspaceContainer>
-          </main>
+      <div className={WORKSPACE_SHELL_VIEWPORT_ROOT} data-qa-marker={GROWTH_WORKSPACE_SHELL_QA_MARKER}>
+        <WorkspaceShellSkipLink />
+        <div className={WORKSPACE_SHELL_VIEWPORT_BODY}>
+          <GrowthSidebar />
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <GrowthTopbar
+              mobileNavOpen={mobileNavOpen}
+              onOpenMobileNav={() => setMobileNavOpen(true)}
+            />
+            <GrowthBreadcrumbs />
+            <main
+              id={WORKSPACE_SHELL_MAIN_CONTENT_ID}
+              tabIndex={-1}
+              className="min-h-0 flex-1 overflow-y-auto outline-none scroll-mt-14 md:scroll-mt-16"
+            >
+              <WorkspaceContainer>{children}</WorkspaceContainer>
+            </main>
+          </div>
         </div>
         <GrowthMobileNavDrawer open={mobileNavOpen} onOpenChange={setMobileNavOpen} />
         <GrowthWorkspaceActivityTracker />

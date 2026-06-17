@@ -11,10 +11,11 @@ import { WorkspaceSwitcher } from "@/components/workspace/workspace-switcher"
 import { cn } from "@/lib/utils"
 
 type GrowthTopbarProps = {
+  mobileNavOpen?: boolean
   onOpenMobileNav?: () => void
 }
 
-export function GrowthTopbar({ onOpenMobileNav }: GrowthTopbarProps) {
+export function GrowthTopbar({ mobileNavOpen = false, onOpenMobileNav }: GrowthTopbarProps) {
   const { sessionIdentity } = useAdmin()
   const displayName = sessionIdentity?.displayName?.trim() ?? ""
   const email = sessionIdentity?.email?.trim() ?? ""
@@ -32,6 +33,8 @@ export function GrowthTopbar({ onOpenMobileNav }: GrowthTopbarProps) {
         onClick={onOpenMobileNav}
         className="md:hidden flex items-center justify-center min-h-11 min-w-11 rounded-md hover:bg-sidebar-accent/60 transition-colors shrink-0 touch-manipulation"
         aria-label="Open menu"
+        aria-expanded={mobileNavOpen}
+        aria-controls="mobile-sidebar-nav"
       >
         <Menu className="w-5 h-5 text-sidebar-foreground" />
       </button>
@@ -44,7 +47,7 @@ export function GrowthTopbar({ onOpenMobileNav }: GrowthTopbarProps) {
         <BrandLogo className="h-7 w-auto max-h-7" priority />
       </Link>
 
-      <WorkspaceSwitcher compact className="hidden sm:flex" />
+      <WorkspaceSwitcher compact className="hidden sm:flex shrink-0" />
 
       <WorkspaceSearch workspace="growth" />
 

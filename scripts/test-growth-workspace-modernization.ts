@@ -134,6 +134,16 @@ function runAudit(): void {
     "Growth nav must use Core orange active rail",
   )
   assertIncludes(
+    "components/growth/shell/growth-workspace-shell.tsx",
+    "WORKSPACE_SHELL_VIEWPORT_ROOT",
+    "Growth shell must use Core-equivalent viewport height layout",
+  )
+  assertIncludes(
+    "components/growth/shell/growth-sidebar-nav-content.tsx",
+    "ChevronDown",
+    "Growth sidebar sections must be collapsible like Core",
+  )
+  assertIncludes(
     "components/growth/shell/growth-sidebar.tsx",
     "WORKSPACE_SIDEBAR_WIDTH_EXPANDED",
     "Growth sidebar expanded width must match Core",

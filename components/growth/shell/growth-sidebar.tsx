@@ -44,7 +44,7 @@ export function GrowthSidebar() {
   return (
     <aside
       className={cn(
-        "hidden md:flex",
+        "hidden md:flex self-stretch",
         WORKSPACE_SIDEBAR_SURFACE,
         collapsed ? WORKSPACE_SIDEBAR_WIDTH_COLLAPSED : WORKSPACE_SIDEBAR_WIDTH_EXPANDED,
       )}
@@ -52,7 +52,7 @@ export function GrowthSidebar() {
       aria-label="Growth Engine navigation"
     >
       <WorkspaceShellBrand collapsed={collapsed} homeHref={GROWTH_WORKSPACE_BASE_PATH} />
-      <div className="flex min-h-0 flex-1 flex-col" data-qa-marker={GROWTH_SHELL_NAV_QA_MARKER}>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden" data-qa-marker={GROWTH_SHELL_NAV_QA_MARKER}>
         <GrowthSidebarNavContent collapsed={collapsed} />
         <GrowthSidebarFooter
           collapsed={collapsed}

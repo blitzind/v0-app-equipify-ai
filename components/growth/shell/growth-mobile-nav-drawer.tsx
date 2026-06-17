@@ -21,6 +21,9 @@ export function GrowthMobileNavDrawer({ open, onOpenChange }: GrowthMobileNavDra
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="left"
+        id="mobile-sidebar-nav"
+        role="navigation"
+        aria-label="Growth Engine navigation"
         className="flex w-[min(85vw,280px)] flex-col border-r border-sidebar-border bg-[#0F172A] p-0 text-sidebar-foreground"
         data-qa-marker={GROWTH_WORKSPACE_SHELL_MOBILE_QA_MARKER}
         aria-describedby={undefined}
@@ -31,14 +34,14 @@ export function GrowthMobileNavDrawer({ open, onOpenChange }: GrowthMobileNavDra
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="absolute top-3 right-3 z-10 flex size-9 items-center justify-center rounded-md text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
+            className="absolute top-3 right-3 z-10 flex min-h-11 min-w-11 items-center justify-center rounded-md text-sidebar-foreground/50 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors touch-manipulation"
             aria-label="Close navigation menu"
           >
             <X className="size-4" />
           </button>
         </div>
-        <div data-qa-marker={GROWTH_SHELL_NAV_QA_MARKER} className="flex min-h-0 flex-1 flex-col">
-          <GrowthSidebarNavContent onNavigate={() => onOpenChange(false)} />
+        <div data-qa-marker={GROWTH_SHELL_NAV_QA_MARKER} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <GrowthSidebarNavContent onNavigate={() => onOpenChange(false)} collapsed={false} />
         </div>
       </SheetContent>
     </Sheet>

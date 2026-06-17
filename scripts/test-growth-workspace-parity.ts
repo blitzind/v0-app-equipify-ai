@@ -134,9 +134,12 @@ function assertNoDuplicateImplementations(): void {
 }
 
 function assertSidebarParity(): void {
-  assertIncludes(GROWTH_SHELL_FILES.sidebarNav, "h-10 px-3", "Growth nav row height/padding must match Core")
-  assertIncludes(GROWTH_SHELL_FILES.sidebarNav, "w-[17px] h-[17px]", "Growth nav icon size must match Core")
+  assertIncludes(GROWTH_SHELL_FILES.workspaceShell, "WORKSPACE_SHELL_VIEWPORT_ROOT", "Growth shell must use viewport-height root")
+  assertIncludes(GROWTH_SHELL_FILES.sidebarNav, "WORKSPACE_SIDEBAR_NAV_ROW", "Growth nav row height/padding must use shared token")
+  assertIncludes(GROWTH_SHELL_FILES.sidebarNav, "WORKSPACE_SIDEBAR_NAV_ICON", "Growth nav icon size must use shared token")
   assertIncludes(GROWTH_SHELL_FILES.sidebarNav, "overflow-y-auto", "Growth sidebar nav must scroll")
+  assertIncludes(GROWTH_SHELL_FILES.sidebarNav, "ChevronDown", "Growth sidebar groups must collapse like Core")
+  assertIncludes(GROWTH_SHELL_FILES.sidebarNav, "WORKSPACE_GROWTH_SIDEBAR_SECTIONS_STORAGE_KEY", "Growth section collapse persistence key")
   assertIncludes(GROWTH_SHELL_FILES.sidebar, "WORKSPACE_SIDEBAR_SURFACE", "Growth sidebar collapse animation via shared surface token")
   assertIncludes(CORE_SHELL_FILES.sidebar, "WORKSPACE_SIDEBAR_SURFACE", "Core sidebar collapse animation via shared surface token")
   assertIncludes(GROWTH_SHELL_FILES.sidebarNav, "NAV_PRIMARY_ROW_MOTION", "Growth nav must use shared motion token")
@@ -178,7 +181,7 @@ function assertSearchCertification(): void {
 function assertContainerSpacingCertification(): void {
   assertIncludes(CORE_SHELL_FILES.pageShell, "WORKSPACE_SHELL_MAIN_INNER", "Core uses shared main inner container token")
   assertIncludes(PRIMITIVE_FILES.WorkspaceContainer, "WORKSPACE_SHELL_MAIN_INNER", "WorkspaceContainer applies shared rhythm")
-  assertIncludes(GROWTH_SHELL_FILES.workspaceShell, "WORKSPACE_SHELL_HORIZONTAL_PADDING", "Growth breadcrumbs use shared horizontal padding")
+  assertIncludes("components/growth/shell/growth-breadcrumbs.tsx", "WORKSPACE_SHELL_HORIZONTAL_PADDING", "Growth breadcrumbs use shared horizontal padding")
   assertIncludes("lib/workspace/workspace-shell-tokens.ts", "max-w-[1440px]", "shared max width token")
   assertIncludes("lib/workspace/workspace-shell-tokens.ts", "p-3 sm:p-6", "shared horizontal/vertical padding breakpoints")
   assertIncludes("lib/workspace/workspace-shell-tokens.ts", "pb-24 lg:pb-6", "shared mobile bottom clearance rhythm")
