@@ -43,3 +43,22 @@ export function growthWorkspacePipelineHref(opportunityId?: string | null): stri
   const params = new URLSearchParams({ opportunityId })
   return `${GROWTH_WORKSPACE_CANONICAL_ALIASES.pipeline}?${params.toString()}`
 }
+
+export function growthWorkspaceConversationsHref(input?: {
+  leadId?: string | null
+  threadId?: string | null
+}): string {
+  const params = new URLSearchParams()
+  if (input?.leadId) params.set("leadId", input.leadId)
+  if (input?.threadId) params.set("threadId", input.threadId)
+  const query = params.toString()
+  return query
+    ? `${GROWTH_WORKSPACE_BASE_PATH}/conversations?${query}`
+    : `${GROWTH_WORKSPACE_BASE_PATH}/conversations`
+}
+
+export function growthWorkspaceInboxWorkflowHref(leadId?: string | null): string {
+  if (!leadId) return GROWTH_WORKSPACE_CANONICAL_ALIASES.replyWorkflow
+  const params = new URLSearchParams({ leadId })
+  return `${GROWTH_WORKSPACE_CANONICAL_ALIASES.replyWorkflow}?${params.toString()}`
+}

@@ -1,6 +1,7 @@
 "use client"
 
 import { Mail, MessageSquare } from "lucide-react"
+import { GrowthInboxConversationIntelligenceContextStrip } from "@/components/growth/inbox/growth-inbox-conversation-intelligence-context-strip"
 import { GrowthInboxConversationThreadOps } from "@/components/growth/inbox/growth-inbox-conversation-thread-ops"
 import { GrowthInboxInlineRevenueContext } from "@/components/growth/inbox/growth-inbox-inline-revenue-context"
 import { GrowthInboxRelationshipMemoryStrip } from "@/components/growth/inbox/growth-inbox-relationship-memory-strip"
@@ -75,6 +76,7 @@ export function GrowthInboxConversationColumn() {
         </p>
       </header>
 
+      <GrowthInboxConversationIntelligenceContextStrip />
       <GrowthInboxRelationshipMemoryStrip />
       <GrowthInboxInlineRevenueContext />
 

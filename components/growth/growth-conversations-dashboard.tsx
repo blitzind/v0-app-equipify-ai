@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Loader2, MessageSquare, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { GrowthConversationsActionCrossLinks } from "@/components/growth/inbox/growth-inbox-conversation-intelligence-context-strip"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import type { GrowthLead } from "@/lib/growth/types"
 
@@ -38,13 +39,16 @@ function LeadBucket({
                 <p className="font-medium">{lead.companyName}</p>
                 {lead.conversationSummary ? <p className="text-muted-foreground">{lead.conversationSummary}</p> : null}
               </div>
-              <div className="flex items-center gap-2">
-                {metricKey && lead[metricKey] != null ? (
-                  <span className="tabular-nums font-semibold">{String(lead[metricKey])}</span>
-                ) : null}
-                {lead.conversationHealthTier ? (
-                  <GrowthBadge label={lead.conversationHealthTier} tone="healthy" />
-                ) : null}
+              <div className="flex flex-col items-end gap-2">
+                <div className="flex items-center gap-2">
+                  {metricKey && lead[metricKey] != null ? (
+                    <span className="tabular-nums font-semibold">{String(lead[metricKey])}</span>
+                  ) : null}
+                  {lead.conversationHealthTier ? (
+                    <GrowthBadge label={lead.conversationHealthTier} tone="healthy" />
+                  ) : null}
+                </div>
+                <GrowthConversationsActionCrossLinks leadId={lead.id} />
               </div>
             </li>
           ))}
