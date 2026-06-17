@@ -33,7 +33,9 @@ export function isGrowthCallsOperatingView(value: string | null | undefined): va
 }
 
 export function growthCallsOperatingBaseHref(pathname?: string | null): string {
-  return isGrowthWorkspacePathname(pathname) ? `${GROWTH_WORKSPACE_BASE_PATH}/calls` : GROWTH_CALLS_PRIMARY_HREF
+  return isGrowthWorkspacePathname(pathname)
+    ? `${GROWTH_WORKSPACE_BASE_PATH}/calls/workspace`
+    : GROWTH_CALLS_PRIMARY_HREF
 }
 
 export function growthCallsOperatingHref(

@@ -1,11 +1,11 @@
 /**
- * Growth workspace sidebar IA boundaries (Phase 5A).
+ * Growth workspace sidebar IA boundaries (Phase 5A, consolidated Phase 7B).
  *
  * The workspace shell sidebar surfaces daily operator routes only.
  * Config, control-plane, reporting, and admin routes stay in Platform Admin / Cmd+K.
  */
 
-export const GROWTH_WORKSPACE_SIDEBAR_IA_QA_MARKER = "growth-workspace-sidebar-ia-v1" as const
+export const GROWTH_WORKSPACE_SIDEBAR_IA_QA_MARKER = "growth-workspace-sidebar-ia-v2" as const
 
 /** Operator-facing nav ids visible in the Growth workspace sidebar. */
 export const GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS = [
@@ -17,16 +17,13 @@ export const GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS = [
   "meetings",
   "share-pages",
   "media-assets",
-  "templates",
   "automation-flows",
-  "engagement",
   "opportunities",
-  "opportunities-pipeline",
   "conversations",
   "relationships",
 ] as const
 
-/** Nav ids removed from workspace sidebar in Phase 5A — routes remain in registry/admin. */
+/** Nav ids removed from workspace sidebar — routes remain in registry, Cmd+K, and direct URLs. */
 export const GROWTH_WORKSPACE_SIDEBAR_HIDDEN_NAV_IDS = [
   "approvals",
   "runtime",
@@ -37,6 +34,9 @@ export const GROWTH_WORKSPACE_SIDEBAR_HIDDEN_NAV_IDS = [
   "team",
   "compliance",
   "settings-home",
+  "templates",
+  "engagement",
+  "opportunities-pipeline",
 ] as const
 
 /** Workspace sidebar group ids after Phase 5A IA cleanup. */

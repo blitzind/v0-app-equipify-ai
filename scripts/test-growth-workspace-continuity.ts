@@ -40,7 +40,7 @@ const ROOT = path.resolve(__dirname, "..")
 /** Operator continuity surfaces patched in Phase 3D — must not hardcode migrated admin paths. */
 const OPERATOR_CONTINUITY_SOURCES: Array<{ file: string; forbidden: RegExp[] }> = [
   {
-    file: "app/(growth)/growth/inbox/page.tsx",
+    file: "components/growth/inbox/growth-inbox-shell.tsx",
     forbidden: [/\/admin\/growth\/queue/],
   },
   {
@@ -121,11 +121,11 @@ const SIDEBAR_SUBTREE_CASES: Array<{ pathname: string; activeNavId: string }> = 
   { pathname: "/growth/calls/coaching", activeNavId: "calls" },
   { pathname: "/growth/inbox/workflow", activeNavId: "inbox" },
   { pathname: "/growth/opportunities", activeNavId: "opportunities" },
-  { pathname: "/growth/opportunities/pipeline", activeNavId: "opportunities-pipeline" },
+  { pathname: "/growth/opportunities/pipeline", activeNavId: "opportunities" },
   { pathname: "/growth/opportunities/workspace", activeNavId: "opportunities" },
   { pathname: "/growth/conversations", activeNavId: "conversations" },
   { pathname: "/growth/relationships", activeNavId: "relationships" },
-  { pathname: "/growth/share-pages/templates/new", activeNavId: "templates" },
+  { pathname: "/growth/share-pages/templates/new", activeNavId: "share-pages" },
   { pathname: "/growth/automation/flow-1", activeNavId: "automation-flows" },
 ]
 
@@ -142,6 +142,8 @@ const CMD_K_MIGRATED_RESOLUTIONS: Array<{ adminHref: string; workspaceSegment: s
   { adminHref: "/admin/growth/conversations", workspaceSegment: "conversations" },
   { adminHref: "/admin/growth/relationships", workspaceSegment: "relationships" },
   { adminHref: "/admin/growth/multichannel", workspaceSegment: "campaigns" },
+  { adminHref: "/admin/growth/settings/growth", workspaceSegment: "settings" },
+  { adminHref: "/admin/growth/settings/communications", workspaceSegment: "settings/connected-mailboxes" },
 ]
 
 function readSource(relativePath: string): string {
@@ -207,6 +209,10 @@ function runAudit(): void {
     ["Growth", "Opportunities", "Pipeline"],
   )
   console.log("  ✓ opportunities/pipeline breadcrumbs: Growth → Opportunities → Pipeline")
+
+  const settingsProfileCrumbs = resolveGrowthBreadcrumbs("/growth/settings/profile")
+  assert.deepEqual(settingsProfileCrumbs.map((crumb) => crumb.label), ["Growth", "Settings", "Profile"])
+  console.log("  ✓ settings/profile breadcrumbs: Growth → Settings → Profile")
 
   const conversationsCrumbs = resolveGrowthBreadcrumbs("/growth/conversations")
   assert.deepEqual(conversationsCrumbs.map((crumb) => crumb.label), ["Growth", "Conversations"])

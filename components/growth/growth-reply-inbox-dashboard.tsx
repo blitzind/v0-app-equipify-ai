@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Bot, History, Inbox, Loader2, Mail, MessageSquare, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import type { GrowthOutboundReply } from "@/lib/growth/outbound/types"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import {
   GROWTH_REPLY_INBOX_VIEWS,
   GROWTH_REPLY_INTELLIGENCE_V2_QA_MARKER,
@@ -47,6 +49,9 @@ const SALES_VIEW_LABELS: Record<GrowthReplySalesExecutionView, string> = {
 }
 
 export function GrowthReplyInboxDashboard() {
+  const pathname = usePathname()
+  const workflowPath = growthFeaturePath(pathname, "inbox/workflow")
+  const leadsPath = growthFeaturePath(pathname, "leads")
   const [dashboard, setDashboard] = useState<GrowthSalesExecutionDashboard | null>(null)
   const [items, setItems] = useState<InboxItem[]>([])
   const [view, setView] = useState<GrowthReplyInboxView>("needs_action")
@@ -239,10 +244,10 @@ export function GrowthReplyInboxDashboard() {
                   >
                     Timeline & copilot
                   </button>
-                  <Link href={`/admin/growth/leads?leadId=${item.leadId}`} className="font-medium text-indigo-600 hover:underline">
+                  <Link href={`${leadsPath}?leadId=${item.leadId}`} className="font-medium text-indigo-600 hover:underline">
                     Open lead
                   </Link>
-                  <Link href="/admin/growth/replies/workflow" className="font-medium text-indigo-600 hover:underline">
+                  <Link href={workflowPath} className="font-medium text-indigo-600 hover:underline">
                     Workflow actions
                   </Link>
                 </div>

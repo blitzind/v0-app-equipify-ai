@@ -3,7 +3,7 @@ import type { LucideIcon } from "lucide-react"
 export const GROWTH_WORKSPACE_BASE_PATH = "/growth" as const
 export const GROWTH_ADMIN_BASE_PATH = "/admin/growth" as const
 
-export const GROWTH_ROUTE_METADATA_QA_MARKER = "growth-route-metadata-v8" as const
+export const GROWTH_ROUTE_METADATA_QA_MARKER = "growth-route-metadata-v10" as const
 
 export const GROWTH_ROUTE_SECTIONS = [
   "workspace",

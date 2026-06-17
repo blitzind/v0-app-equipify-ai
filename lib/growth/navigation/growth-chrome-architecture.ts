@@ -20,7 +20,7 @@
  * Do NOT create shared *-workspace.tsx wrappers that own both chrome and body.
  */
 
-export const GROWTH_CHROME_ARCHITECTURE_QA_MARKER = "growth-chrome-architecture-v2" as const
+export const GROWTH_CHROME_ARCHITECTURE_QA_MARKER = "growth-chrome-architecture-v4" as const
 
 /** Imports forbidden in dashboard body components. */
 export const GROWTH_DASHBOARD_BODY_FORBIDDEN_IMPORTS = [
@@ -57,13 +57,28 @@ export const GROWTH_PHASE_4_DASHBOARD_BODY_COMPONENTS = [
 ] as const
 
 export const GROWTH_PHASE_4_WORKSPACE_PAGES = [
-  "app/(growth)/growth/inbox/workflow/page.tsx",
-  "app/(growth)/growth/opportunities/page.tsx",
-  "app/(growth)/growth/opportunities/pipeline/page.tsx",
   "app/(growth)/growth/opportunities/workspace/page.tsx",
   "app/(growth)/growth/conversations/page.tsx",
   "app/(growth)/growth/relationships/page.tsx",
 ] as const
+
+/** Phase 7G — Inbox tab routes use GrowthInboxShell instead of page-level headers. */
+export const GROWTH_INBOX_TAB_SHELL_PAGES = [
+  "app/(growth)/growth/inbox/page.tsx",
+  "app/(growth)/growth/inbox/workflow/page.tsx",
+] as const
+
+export const GROWTH_INBOX_TAB_SHELL_COMPONENT = "components/growth/inbox/growth-inbox-shell.tsx" as const
+
+/** Phase 7E — Opportunities tab routes use GrowthOpportunitiesShell instead of page-level headers. */
+export const GROWTH_OPPORTUNITIES_TAB_SHELL_PAGES = [
+  "app/(growth)/growth/opportunities/page.tsx",
+  "app/(growth)/growth/opportunities/pipeline/page.tsx",
+  "app/(growth)/growth/opportunities/readiness/page.tsx",
+] as const
+
+export const GROWTH_OPPORTUNITIES_TAB_SHELL_COMPONENT =
+  "components/growth/opportunities/growth-opportunities-shell.tsx" as const
 
 /** Phase 6A workspace operator home dashboard body. */
 export const GROWTH_PHASE_6A_WORKSPACE_DASHBOARD_BODY =

@@ -8,25 +8,44 @@ import {
 } from "@/lib/growth/inbox/inbox-channel-types"
 
 export const GROWTH_INBOX_QUEUE_VIEWS = [
+  "all",
   "needs_action",
-  "unassigned",
   "interested",
   "meeting_intent",
+  "objections",
+  "high_priority",
+  "unassigned",
   "waiting",
   "archived",
-  "all",
 ] as const
 
 export type GrowthInboxQueueView = (typeof GROWTH_INBOX_QUEUE_VIEWS)[number]
 
 export const GROWTH_INBOX_QUEUE_VIEW_LABELS: Record<GrowthInboxQueueView, string> = {
+  all: "All",
   needs_action: "Needs Action",
-  unassigned: "Unassigned",
   interested: "Interested",
-  meeting_intent: "Meeting Intent",
+  meeting_intent: "Meetings",
+  objections: "Objections",
+  high_priority: "High Priority",
+  unassigned: "Unassigned",
   waiting: "Waiting",
   archived: "Archived",
-  all: "All",
+}
+
+const INBOX_OBJECTION_CLASSIFICATIONS = new Set<GrowthInboxThread["classification"]>([
+  "budget",
+  "timeline",
+  "competitor",
+  "not_interested",
+])
+
+function isInboxThreadObjection(thread: GrowthInboxThread): boolean {
+  return INBOX_OBJECTION_CLASSIFICATIONS.has(thread.classification)
+}
+
+function isInboxThreadHighPriority(thread: GrowthInboxThread): boolean {
+  return thread.priority_tier === "critical" || thread.priority_tier === "high"
 }
 
 
@@ -55,6 +74,14 @@ export function filterInboxThreadsByQueueView(
     case "meeting_intent":
       return threads.filter(
         (thread) => thread.thread_status !== "archived" && thread.classification === "meeting_intent",
+      )
+    case "objections":
+      return threads.filter(
+        (thread) => thread.thread_status !== "archived" && isInboxThreadObjection(thread),
+      )
+    case "high_priority":
+      return threads.filter(
+        (thread) => thread.thread_status !== "archived" && isInboxThreadHighPriority(thread),
       )
     case "waiting":
       return threads.filter((thread) => thread.thread_status === "waiting")

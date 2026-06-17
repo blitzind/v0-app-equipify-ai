@@ -139,6 +139,21 @@ export function resolveGrowthBreadcrumbs(
     return crumbs
   }
 
+  if (segment.startsWith("settings/")) {
+    crumbs.push({ label: "Settings", href: `${GROWTH_WORKSPACE_BASE_PATH}/settings` })
+    crumbs.push({
+      label: options?.detailLabel ?? entry.breadcrumbLabel ?? entry.title,
+      href: metadataHref(entry),
+      loading: options?.detailLoading && !options.detailLabel,
+    })
+    return crumbs
+  }
+
+  if (segment === "settings") {
+    crumbs.push({ label: "Settings", href: entry.path })
+    return crumbs
+  }
+
   crumbs.push({ label: entry.breadcrumbLabel ?? entry.title, href: metadataHref(entry) })
   return crumbs
 }

@@ -81,9 +81,9 @@ function discoverGrowthPageRoutePaths(): string[] {
 function runAudit(): void {
   console.log(`\n=== Growth route registry audit (${GROWTH_ROUTE_METADATA_QA_MARKER}) ===\n`)
 
-  assert.equal(GROWTH_ROUTE_CATALOG_INPUTS.length, 127, "catalog must define 127 routes")
-  assert.equal(GROWTH_ROUTE_METADATA.length, 127, "metadata must define 127 routes")
-  console.log("  ✓ 127 routes registered")
+  assert.equal(GROWTH_ROUTE_CATALOG_INPUTS.length, 146, "catalog must define 146 routes")
+  assert.equal(GROWTH_ROUTE_METADATA.length, 146, "metadata must define 146 routes")
+  console.log("  ✓ 146 routes registered")
 
   const ids = GROWTH_ROUTE_METADATA.map((entry) => entry.id)
   const paths = GROWTH_ROUTE_METADATA.map((entry) => entry.path)
@@ -120,7 +120,7 @@ function runAudit(): void {
   console.log("  ✓ orphan routes explicitly registered")
 
   const discoveredPaths = discoverGrowthPageRoutePaths()
-  assert.equal(discoveredPaths.length, 127, "expected 127 Growth page.tsx routes on disk")
+  assert.equal(discoveredPaths.length, 146, "expected 146 Growth page.tsx routes on disk")
   for (const discovered of discoveredPaths) {
     assert.ok(findGrowthRouteMetadataByAnyPath(discovered), `undocumented page route: ${discovered}`)
   }
@@ -163,12 +163,12 @@ function runAudit(): void {
   }
   console.log("  ✓ migration flags consistent")
 
-  assert.equal(GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length, 32)
-  assert.equal(getMigratedRoutes().length, 32)
-  console.log("  ✓ migrated workspace route count (32 routes)")
+  assert.equal(GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length, 51)
+  assert.equal(getMigratedRoutes().length, 51)
+  console.log("  ✓ migrated workspace route count (51 routes)")
 
-  assert.equal(getPlaceholderRoutes().length, 1, "expected 1 placeholder workspace route (settings)")
-  console.log("  ✓ placeholder workspace routes reduced to settings only")
+  assert.equal(getPlaceholderRoutes().length, 0, "Phase 7C settings shell removed placeholder-only workspace routes")
+  console.log("  ✓ no placeholder-only workspace routes remain")
 
   const workspaceLeads = GROWTH_ROUTE_METADATA.find((entry) => entry.id === "workspace-leads")
   assert.ok(workspaceLeads)
@@ -285,7 +285,7 @@ function runAudit(): void {
   console.log("  ✓ Phase 4C conversations/relationships dual-route; replies/revenue execution remain admin-only")
 
   const report = buildGrowthRouteRegistryReport()
-  assert.equal(report.totalRoutes, 127)
+  assert.equal(report.totalRoutes, 146)
   assert.equal(getWorkspaceRoutes().length, report.bySection.workspace)
   assert.equal(getContentRoutes().length, report.bySection.content)
   assert.equal(getAutomationRoutes().length, report.bySection.automation)

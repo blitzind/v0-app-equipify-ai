@@ -38,11 +38,10 @@ const SIDEBAR_ACTIVE_STATE_CASES: Array<{ pathname: string; activeNavId: string 
   { pathname: "/growth/meetings", activeNavId: "meetings" },
   { pathname: "/growth/share-pages", activeNavId: "share-pages" },
   { pathname: "/growth/media", activeNavId: "media-assets" },
-  { pathname: "/growth/share-pages/templates", activeNavId: "templates" },
+  { pathname: "/growth/share-pages/templates", activeNavId: "share-pages" },
   { pathname: "/growth/automation", activeNavId: "automation-flows" },
-  { pathname: "/growth/engagement", activeNavId: "engagement" },
   { pathname: "/growth/opportunities", activeNavId: "opportunities" },
-  { pathname: "/growth/opportunities/pipeline", activeNavId: "opportunities-pipeline" },
+  { pathname: "/growth/opportunities/pipeline", activeNavId: "opportunities" },
   { pathname: "/growth/conversations", activeNavId: "conversations" },
   { pathname: "/growth/relationships", activeNavId: "relationships" },
 ]
@@ -51,7 +50,6 @@ const CMD_K_ADMIN_ONLY_STAYS_ADMIN = [
   "/admin/growth/providers",
   "/admin/growth/ownership",
   "/admin/growth/providers/compliance",
-  "/admin/growth/settings/growth",
   "/admin/growth/revenue-intelligence",
   "/admin/growth/intent-pixel",
   "/admin/growth/outreach",
@@ -62,13 +60,15 @@ const CMD_K_MIGRATED_REWRITES = [
   { adminHref: "/admin/growth/engagement", workspaceSegment: "engagement" },
   { adminHref: "/admin/growth/opportunities", workspaceSegment: "opportunities" },
   { adminHref: "/admin/growth/conversations", workspaceSegment: "conversations" },
+  { adminHref: "/admin/growth/settings/growth", workspaceSegment: "settings" },
+  { adminHref: "/admin/growth/settings/communications", workspaceSegment: "settings/connected-mailboxes" },
 ] as const
 
 function runAudit(): void {
   console.log(`\n=== Growth workspace sidebar IA audit (${GROWTH_WORKSPACE_SIDEBAR_IA_QA_MARKER}) ===\n`)
   console.log(`  shell nav qa marker: ${GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER}`)
 
-  assert.equal(GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER, "growth-workspace-shell-nav-v4")
+  assert.equal(GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER, "growth-workspace-shell-nav-v5")
 
   assert.deepEqual(
     GROWTH_SHELL_NAV_GROUPS.map((group) => group.id),
@@ -78,7 +78,7 @@ function runAudit(): void {
 
   const manifestNavIds = GROWTH_WORKSPACE_SHELL_NAV_MANIFEST.flatMap((group) => group.items.map((item) => item.id))
   assert.deepEqual(manifestNavIds, [...GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS])
-  console.log("  ✓ manifest matches Phase 5A operator nav ids")
+  console.log("  ✓ manifest matches Phase 7B operator nav ids")
 
   for (const hiddenId of GROWTH_WORKSPACE_SIDEBAR_HIDDEN_NAV_IDS) {
     assert.ok(!manifestNavIds.includes(hiddenId), `hidden nav id still in manifest: ${hiddenId}`)

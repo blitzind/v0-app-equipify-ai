@@ -7,14 +7,11 @@
 
 import type { LucideIcon } from "lucide-react"
 import {
-  Activity,
   FileText,
   GitBranch,
   Handshake,
   Inbox,
-  Kanban,
   LayoutDashboard,
-  LayoutTemplate,
   Layers,
   MessageSquare,
   Phone,
@@ -32,7 +29,7 @@ import {
   GROWTH_WORKSPACE_BASE_PATH,
 } from "@/lib/growth/navigation/growth-route-metadata-types"
 
-export const GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER = "growth-workspace-shell-nav-v4" as const
+export const GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER = "growth-workspace-shell-nav-v5" as const
 
 /** Back-compat QA marker used by shell components. */
 export const GROWTH_SHELL_NAV_QA_MARKER = GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER
@@ -90,29 +87,20 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
     items: [
       { id: "share-pages", label: "Share Pages", registryRouteId: "workspace-share-pages", icon: FileText, workspaceRoute: true },
       { id: "media-assets", label: "Media Assets", registryRouteId: "workspace-media", icon: Layers, workspaceRoute: true },
-      { id: "templates", label: "Templates", registryRouteId: "workspace-share-pages-templates", icon: LayoutTemplate, workspaceRoute: true },
     ],
   },
   {
     id: "automation",
     label: "Automation",
     items: [
-      { id: "automation-flows", label: "Automation Flows", registryRouteId: "workspace-automation", icon: GitBranch, workspaceRoute: true },
+      { id: "automation-flows", label: "Automation", registryRouteId: "workspace-automation", icon: GitBranch, workspaceRoute: true },
     ],
   },
   {
     id: "intelligence",
     label: "Intelligence",
     items: [
-      { id: "engagement", label: "Engagement", registryRouteId: "workspace-engagement", icon: Activity, workspaceRoute: true },
       { id: "opportunities", label: "Opportunities", registryRouteId: "workspace-opportunities", icon: Target, workspaceRoute: true },
-      {
-        id: "opportunities-pipeline",
-        label: "Pipeline",
-        registryRouteId: "workspace-opportunities-pipeline",
-        icon: Kanban,
-        workspaceRoute: true,
-      },
       { id: "conversations", label: "Conversations", registryRouteId: "workspace-conversations", icon: MessageSquare, workspaceRoute: true },
       { id: "relationships", label: "Relationships", registryRouteId: "workspace-relationships", icon: Handshake, workspaceRoute: true },
     ],
@@ -170,19 +158,17 @@ export function isGrowthShellNavItemActive(pathname: string, item: GrowthShellNa
   if (item.id === "opportunities") {
     if (pathname === `${GROWTH_WORKSPACE_BASE_PATH}/opportunities`) return true
     if (pathname === `${GROWTH_WORKSPACE_BASE_PATH}/opportunities/workspace`) return true
-    return false
-  }
-  if (item.id === "opportunities-pipeline") {
-    return (
+    if (pathname === `${GROWTH_WORKSPACE_BASE_PATH}/opportunities/readiness`) return true
+    if (
       pathname === `${GROWTH_WORKSPACE_BASE_PATH}/opportunities/pipeline` ||
       pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/opportunities/pipeline/`)
-    )
+    ) {
+      return true
+    }
+    return false
   }
   if (item.workspaceRoute && pathname.startsWith(`${item.href}/`)) return true
-  if (item.id === "share-pages" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/share-pages/`)) {
-    return !pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/share-pages/templates`)
-  }
-  if (item.id === "templates" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/share-pages/templates`)) {
+  if (item.id === "share-pages" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/share-pages`)) {
     return true
   }
   if (item.id === "automation-flows" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/automation/`)) {

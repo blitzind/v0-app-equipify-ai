@@ -22,7 +22,7 @@ export default function GrowthOpportunitiesWorkspacePage() {
           <Button asChild size="sm" variant="outline">
             <Link href={growthFeaturePath(pathname, "opportunities")}>
               <ArrowLeft className="mr-2 size-4" />
-              Readiness view
+              Opportunities hub
             </Link>
           </Button>
         }

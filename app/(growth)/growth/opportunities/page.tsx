@@ -1,31 +1,8 @@
 "use client"
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Target } from "lucide-react"
-import { GrowthOpportunitiesReadinessDashboardBody } from "@/components/growth/opportunities/growth-opportunities-readiness-dashboard-body"
-import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
-import { Button } from "@/components/ui/button"
-import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
+import { GrowthWorkspaceHubPage } from "@/components/growth/hubs/growth-workspace-hub-page"
+import { GROWTH_OPPORTUNITIES_HUB_MANIFEST } from "@/lib/growth/hubs/growth-opportunities-hub-manifest"
 
 export default function GrowthOpportunitiesPage() {
-  const pathname = usePathname()
-
-  return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8">
-      <GrowthWorkspacePageHeader
-        title="Opportunity Readiness"
-        description="Sales-motion readiness scoring with blockers, accelerators, and executive close candidates — read-only intelligence, no send."
-        icon={Target}
-        iconClassName="bg-violet-50 text-violet-600"
-        actions={
-          <Button asChild size="sm">
-            <Link href={growthFeaturePath(pathname, "opportunities/workspace")}>Opportunity workspace</Link>
-          </Button>
-        }
-      />
-
-      <GrowthOpportunitiesReadinessDashboardBody />
-    </div>
-  )
+  return <GrowthWorkspaceHubPage manifest={GROWTH_OPPORTUNITIES_HUB_MANIFEST} embedded />
 }

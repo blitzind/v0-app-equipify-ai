@@ -259,8 +259,8 @@ async function main(): Promise<void> {
     path.join(process.cwd(), "lib/growth/inbox/inbox-thread-queue-filters.ts"),
     "utf8",
   )
-  assert.match(queueFilters, /needs_action/)
-  assert.match(queueFilters, /meeting_intent/)
+  assert.match(queueFilters, /objections/)
+  assert.match(queueFilters, /high_priority/)
 
   const orchestrator = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/inbox/inbox-recommendation-orchestrator.ts"),
@@ -284,6 +284,7 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(v2Panel, /GrowthInboxWorkspaceActionsMenu/)
+  assert.match(v2Panel, /GrowthInboxReplyIntelligencePanel/)
   assert.doesNotMatch(v2Panel, /Create Thread<\/p>/)
 
   const diagnosticsPage = fs.readFileSync(

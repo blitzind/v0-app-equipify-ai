@@ -31,10 +31,10 @@ function sampleThread(overrides: Partial<GrowthInboxThread>): GrowthInboxThread 
 }
 
 function main() {
-  assert.equal(GROWTH_INBOX_QUEUE_VIEWS.length, 7)
+  assert.equal(GROWTH_INBOX_QUEUE_VIEWS.length, 9)
 
   const threads = [
-    sampleThread({ id: "a", requires_human_review: true }),
+    sampleThread({ id: "a", requires_human_review: true, priority_tier: "normal" }),
     sampleThread({
       id: "b",
       owner_user_id: "user-1",
@@ -48,13 +48,27 @@ function main() {
       requires_human_review: false,
       priority_tier: "normal",
     }),
+    sampleThread({
+      id: "e",
+      classification: "budget",
+      requires_human_review: false,
+      priority_tier: "normal",
+    }),
+    sampleThread({
+      id: "f",
+      classification: "question",
+      priority_tier: "critical",
+      requires_human_review: false,
+    }),
     sampleThread({ id: "d", thread_status: "archived" }),
   ]
 
-  assert.equal(filterInboxThreadsByQueueView(threads, "needs_action").length, 1)
-  assert.equal(filterInboxThreadsByQueueView(threads, "unassigned").length, 2)
+  assert.equal(filterInboxThreadsByQueueView(threads, "needs_action").length, 2)
+  assert.equal(filterInboxThreadsByQueueView(threads, "unassigned").length, 4)
   assert.equal(filterInboxThreadsByQueueView(threads, "interested").length, 1)
   assert.equal(filterInboxThreadsByQueueView(threads, "meeting_intent").length, 1)
+  assert.equal(filterInboxThreadsByQueueView(threads, "objections").length, 1)
+  assert.equal(filterInboxThreadsByQueueView(threads, "high_priority").length, 1)
   assert.equal(filterInboxThreadsByQueueView(threads, "archived").length, 1)
 
   const { top } = orchestrateGrowthInboxRecommendations({

@@ -1,13 +1,7 @@
-import { Settings } from "lucide-react"
-import { GrowthPlaceholderPage } from "@/components/growth/shell/growth-placeholder-page"
+import { redirect } from "next/navigation"
+import { GROWTH_WORKSPACE_SETTINGS_DEFAULT_SECTION_ID } from "@/lib/growth/navigation/growth-workspace-settings-navigation"
+import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
 
-export default function GrowthSettingsPlaceholderPage() {
-  return (
-    <GrowthPlaceholderPage
-      title="Settings"
-      description="Growth Engine providers, team, and compliance settings will consolidate here in a future phase."
-      icon={Settings}
-      iconClassName="bg-slate-100 text-slate-600"
-    />
-  )
+export default function GrowthSettingsIndexPage() {
+  redirect(`${GROWTH_WORKSPACE_BASE_PATH}/settings/${GROWTH_WORKSPACE_SETTINGS_DEFAULT_SECTION_ID}`)
 }

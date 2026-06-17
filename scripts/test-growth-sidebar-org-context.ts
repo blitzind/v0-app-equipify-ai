@@ -108,11 +108,11 @@ function runAudit(): void {
   console.log("  ✓ org card styling + collapsed tooltip parity")
 
   const navItems = GROWTH_SHELL_NAV_GROUPS.flatMap((group) => group.items)
-  assert.equal(navItems.length, 15, "Growth sidebar must retain 15 operator nav items")
-  assert.equal(listGrowthWorkspaceShellNavHrefs().length, 15)
+  assert.equal(navItems.length, 12, "Growth sidebar must retain 12 operator nav items")
+  assert.equal(listGrowthWorkspaceShellNavHrefs().length, 12)
   assertIncludes(FILES.growthSidebarNav, "flex-1 overflow-y-auto", "Nav scroll region unchanged")
   assertIncludes(FILES.growthSidebarNav, "mt-auto", "Footer pin unchanged")
-  console.log("  ✓ 15 nav items + full-height sidebar behavior preserved")
+  console.log("  ✓ 12 nav items + full-height sidebar behavior preserved")
 
   for (const file of Object.values(FILES)) {
     assertExcludes(file, GROWTH_ADMIN_BASE_PATH, `${file} must not hardcode admin routes`)

@@ -67,11 +67,8 @@ const CANONICAL_WORKSPACE_SHELL_NAV_IDS = [
   "meetings",
   "share-pages",
   "media-assets",
-  "templates",
   "automation-flows",
-  "engagement",
   "opportunities",
-  "opportunities-pipeline",
   "conversations",
   "relationships",
 ] as const
@@ -180,7 +177,10 @@ function runAudit(): void {
 
   for (const item of getGrowthSettingsNavigationCandidates()) {
     if (item.href.startsWith("/admin/growth")) {
-      assert.ok(item.futurePath?.startsWith("/growth/settings"), `settings candidate missing futurePath: ${item.id}`)
+      assert.ok(
+        item.workspaceHref?.startsWith("/growth/settings") || item.futurePath?.startsWith("/growth/settings"),
+        `settings candidate missing workspace target: ${item.id}`,
+      )
     }
   }
   console.log("  ✓ settings navigation candidates include future workspace target paths")

@@ -20,7 +20,7 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, "..")
 
-export const GROWTH_WORKSPACE_SIDEBAR_BEHAVIOR_QA_MARKER = "growth-workspace-sidebar-behavior-v1" as const
+export const GROWTH_WORKSPACE_SIDEBAR_BEHAVIOR_QA_MARKER = "growth-workspace-sidebar-behavior-v2" as const
 
 const FILES = {
   workspaceShell: "components/growth/shell/growth-workspace-shell.tsx",
@@ -61,9 +61,9 @@ function runAudit(): void {
 
   assert.equal(GROWTH_SHELL_NAV_GROUPS.length, 4, "Growth sidebar must retain four operator groups")
   const navItems = GROWTH_SHELL_NAV_GROUPS.flatMap((group) => group.items)
-  assert.equal(navItems.length, 15, "Growth sidebar must retain 15 operator nav items")
-  assert.deepEqual(listGrowthWorkspaceShellNavHrefs().length, 15)
-  console.log("  ✓ all four groups and 15 nav items remain present")
+  assert.equal(navItems.length, 12, "Growth sidebar must retain 12 operator nav items")
+  assert.deepEqual(listGrowthWorkspaceShellNavHrefs().length, 12)
+  console.log("  ✓ all four groups and 12 nav items remain present")
 
   assertIncludes(
     FILES.sidebarNav,

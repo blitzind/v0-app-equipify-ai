@@ -116,6 +116,20 @@ function workspaceDual(
   })
 }
 
+function workspaceSettingsSection(
+  slug: string,
+  title: string,
+  breadcrumbLabel: string,
+  flags: Partial<GrowthRouteCatalogInput> = {},
+): GrowthRouteCatalogInput {
+  return workspace(`workspace-settings-${slug}`, `settings/${slug}`, title, "settings", "workspace", {
+    migrated: true,
+    segment: `settings/${slug}`,
+    breadcrumbLabel,
+    ...flags,
+  })
+}
+
 export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   admin("admin-root", "", "Growth Root Redirect", "workspace", "admin-only", {
     deprecated: true,
@@ -137,6 +151,9 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   }),
   workspaceDual("workspace-share-pages", "share-pages", "Share Pages", "content", {
     breadcrumbLabel: "Share Pages",
+  }),
+  workspaceDual("workspace-share-pages-manage", "share-pages/manage", "Manage Share Pages", "content", {
+    breadcrumbLabel: "Manage",
   }),
   workspaceDual("workspace-share-pages-detail", "share-pages/[id]", "Share Page Detail", "content", {
     breadcrumbLabel: "Edit",
@@ -195,6 +212,7 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     adminPath: `${ADMIN}/multichannel`,
   }),
   workspace("workspace-inbox", "inbox", "Inbox", "workspace", "dual-route", {
+    // Phase 7F: canonical unified operator inbox — threads, channels, action center.
     migrated: true,
     segment: "inbox",
     placeholder: false,
@@ -202,6 +220,7 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     adminPath: `${ADMIN}/inbox`,
   }),
   workspace("workspace-inbox-workflow", "inbox/workflow", "Reply Workflow", "workspace", "dual-route", {
+    // Phase 7F: Inbox child route — workflow actions, not a separate Replies surface.
     migrated: true,
     segment: "inbox/workflow",
     placeholder: false,
@@ -227,6 +246,11 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     adminPath: `${ADMIN}/copilot/content-library`,
   }),
   workspaceDual("workspace-calls-live", "calls/live", "Live Calls", "workspace", { breadcrumbLabel: "Live" }),
+  workspace("workspace-calls-workspace", "calls/workspace", "Call Workspace", "workspace", "workspace", {
+    migrated: true,
+    segment: "calls/workspace",
+    breadcrumbLabel: "Workspace",
+  }),
   workspace("workspace-calls-coaching", "calls/coaching", "Live Coaching", "workspace", "dual-route", {
     migrated: true,
     segment: "calls/coaching",
@@ -245,6 +269,9 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   workspaceDual("workspace-leads-lead-engine", "leads/lead-engine", "Lead Pipeline", "workspace", {
     breadcrumbLabel: "Pipeline",
   }),
+  workspaceDual("workspace-leads-research", "leads/research", "Revenue Queue", "workspace", {
+    breadcrumbLabel: "Research Queue",
+  }),
   workspaceDual("workspace-leads-detail", "leads/[leadId]", "Lead Detail", "workspace", {
     breadcrumbLabel: "Lead",
     dynamic: true,
@@ -253,10 +280,23 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   workspace("workspace-settings", "settings", "Settings", "settings", "placeholder", {
     migrated: true,
     segment: "settings",
-    placeholder: true,
     breadcrumbLabel: "Settings",
-    adminPath: `${ADMIN}/settings/growth`,
   }),
+  workspaceSettingsSection("profile", "Profile", "Profile"),
+  workspaceSettingsSection("notifications", "Notifications", "Notifications"),
+  workspaceSettingsSection("personal-preferences", "Personal Preferences", "Personal Preferences"),
+  workspaceSettingsSection("connected-mailboxes", "Connected Mailboxes", "Connected Mailboxes"),
+  workspaceSettingsSection("calling-preferences", "Calling Preferences", "Calling Preferences"),
+  workspaceSettingsSection("signatures", "Signatures", "Signatures"),
+  workspaceSettingsSection("calendar-preferences", "Calendar Preferences", "Calendar Preferences"),
+  workspaceSettingsSection("sidebar-preferences", "Sidebar Preferences", "Sidebar Preferences"),
+  workspaceSettingsSection("command-center-preferences", "Command Center Preferences", "Command Center Preferences"),
+  workspaceSettingsSection("ai-preferences", "AI Preferences", "AI Preferences"),
+  workspaceSettingsSection("default-views", "Default Views", "Default Views"),
+  workspaceSettingsSection("gmail", "Gmail", "Gmail"),
+  workspaceSettingsSection("microsoft-365", "Microsoft 365", "Microsoft 365"),
+  workspaceSettingsSection("calendar", "Calendar", "Calendar"),
+  workspaceSettingsSection("browser-notifications", "Browser Notifications", "Browser Notifications"),
 
   adminDual("admin-share-pages", "share-pages", "Share Pages", "content", "share-pages", {
     breadcrumbLabel: "Share Pages",
@@ -355,6 +395,9 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     breadcrumbLabel: "Workspace",
     adminPath: `${ADMIN}/opportunities/workspace`,
   }),
+  workspaceDual("workspace-opportunities-readiness", "opportunities/readiness", "Opportunity Readiness", "intelligence", {
+    breadcrumbLabel: "Readiness",
+  }),
   workspace("workspace-conversations", "conversations", "Conversations", "intelligence", "dual-route", {
     migrated: true,
     segment: "conversations",
@@ -423,7 +466,7 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   adminDual("admin-conversations", "conversations", "Conversations", "intelligence", "conversations", {
     breadcrumbLabel: "Conversations",
   }),
-  admin("admin-replies", "replies", "Reply Inbox", "intelligence", "admin-only"),
+  admin("admin-replies", "replies", "Reply Inbox", "intelligence", "admin-only"), // Phase 7F: admin-only until workspace port (7G).
   adminDual("admin-replies-workflow", "replies/workflow", "Reply Workflow", "intelligence", "inbox/workflow", {
     breadcrumbLabel: "Reply Workflow",
   }),
@@ -486,12 +529,13 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     ...settingsFuture("deliverability-protection"),
   }),
   admin("admin-settings", "settings", "Settings Root", "settings", "admin-only", { deprecated: true }),
-  admin("admin-settings-growth", "settings/growth", "Growth Settings", "settings", "admin-only", {
-    futurePath: `${WORKSPACE}/settings`,
-    futureSection: "settings",
+  admin("admin-settings-growth", "settings/growth", "Growth Settings", "settings", "dual-route", {
+    workspacePath: `${WORKSPACE}/settings`,
+    breadcrumbLabel: "Growth",
   }),
-  admin("admin-settings-communications", "settings/communications", "Communication Settings", "settings", "admin-only", {
-    ...settingsFuture("communications"),
+  admin("admin-settings-communications", "settings/communications", "Communication Settings", "settings", "dual-route", {
+    workspacePath: `${WORKSPACE}/settings/connected-mailboxes`,
+    breadcrumbLabel: "Communications",
   }),
   admin("admin-settings-governance", "settings/governance", "Governance", "settings", "admin-only", {
     ...settingsFuture("governance"),

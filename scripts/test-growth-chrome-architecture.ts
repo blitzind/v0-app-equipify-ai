@@ -13,6 +13,10 @@ import {
   GROWTH_CERTIFIED_WORKSPACE_HEADER_BODY_PAGES,
   GROWTH_CHROME_ARCHITECTURE_QA_MARKER,
   GROWTH_CHROME_PATHNAME_BRANCH_FORBIDDEN_FILES,
+  GROWTH_INBOX_TAB_SHELL_COMPONENT,
+  GROWTH_INBOX_TAB_SHELL_PAGES,
+  GROWTH_OPPORTUNITIES_TAB_SHELL_COMPONENT,
+  GROWTH_OPPORTUNITIES_TAB_SHELL_PAGES,
   GROWTH_DASHBOARD_BODY_FILENAME_PATTERN,
   GROWTH_DASHBOARD_BODY_FORBIDDEN_IMPORTS,
   GROWTH_LEGACY_MIXED_CHROME_COMPONENTS,
@@ -112,6 +116,23 @@ function runAudit(): void {
     assert.match(source, /DashboardBody/, `${file} must compose a DashboardBody component`)
   }
   console.log("  ✓ certified workspace pages follow header + DashboardBody pattern")
+
+  for (const file of GROWTH_OPPORTUNITIES_TAB_SHELL_PAGES) {
+    const source = readSource(file)
+    assert.doesNotMatch(source, /GrowthWorkspacePageHeader/, `${file} must defer header to GrowthOpportunitiesShell`)
+    assert.doesNotMatch(source, /PlatformAdminPageShell/, `${file} must remain workspace-only`)
+  }
+  const opportunitiesShellSource = readSource(GROWTH_OPPORTUNITIES_TAB_SHELL_COMPONENT)
+  assert.match(opportunitiesShellSource, /GROWTH_OPPORTUNITIES_WORKSPACE_TABS/)
+  console.log("  ✓ opportunities tab shell pages defer chrome to GrowthOpportunitiesShell")
+
+  for (const file of GROWTH_INBOX_TAB_SHELL_PAGES) {
+    const source = readSource(file)
+    assert.doesNotMatch(source, /GrowthWorkspacePageHeader/, `${file} must defer header to GrowthInboxShell`)
+  }
+  const inboxShellSource = readSource(GROWTH_INBOX_TAB_SHELL_COMPONENT)
+  assert.match(inboxShellSource, /GROWTH_INBOX_WORKSPACE_TABS/)
+  console.log("  ✓ inbox tab shell pages defer chrome to GrowthInboxShell")
 
   for (const file of GROWTH_PHASE_4_ADMIN_PAGES) {
     const source = readSource(file)

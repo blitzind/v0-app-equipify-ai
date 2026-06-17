@@ -9,6 +9,7 @@ import { GrowthInboxActionCenterColumn } from "@/components/growth/inbox/growth-
 import { GrowthInboxConversationColumn } from "@/components/growth/inbox/growth-inbox-conversation-column"
 import { GrowthInboxQueueProvider } from "@/components/growth/inbox/growth-inbox-queue-context"
 import { GrowthInboxThreadQueueColumn } from "@/components/growth/inbox/growth-inbox-thread-queue-column"
+import { GrowthInboxReplyIntelligencePanel } from "@/components/growth/inbox/growth-inbox-reply-intelligence-panel"
 import { GrowthInboxV2SupportingPanels } from "@/components/growth/inbox/growth-inbox-v2-supporting-panels"
 import { GrowthOperatorInboxPanel } from "@/components/growth/growth-operator-inbox-panel"
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
@@ -103,7 +104,9 @@ export function GrowthInboxWorkspaceV2Panel() {
         </GrowthInboxQueueProvider>
       </GrowthInboxSharedDataProvider>
 
-      <GrowthOperatorInboxPanel title="Unified Operator Inbox" compact />
+      <GrowthOperatorInboxPanel title="Operator Notifications" compact />
+
+      <GrowthInboxReplyIntelligencePanel leadId={selectedThread?.lead_id ?? null} compact />
 
       <GrowthConversationalPlaybooksPanel consumer="operator_inbox" title="Conversational Playbook" compact />
 

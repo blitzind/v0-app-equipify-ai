@@ -116,9 +116,9 @@ function runAudit(): void {
   console.log("  ✓ shell spacing uses shared Core container tokens")
 
   const navItems = GROWTH_SHELL_NAV_GROUPS.flatMap((group) => group.items)
-  assert.equal(navItems.length, 15, "sidebar must contain exactly 15 items")
+  assert.equal(navItems.length, 12, "sidebar must contain exactly 12 items")
   const hrefs = listGrowthWorkspaceShellNavHrefs()
-  assert.equal(hrefs.length, 15)
+  assert.equal(hrefs.length, 12)
   assert.deepEqual(hrefs, [
     "/growth",
     "/growth/leads",
@@ -128,15 +128,12 @@ function runAudit(): void {
     "/growth/meetings",
     "/growth/share-pages",
     "/growth/media",
-    "/growth/share-pages/templates",
     "/growth/automation",
-    "/growth/engagement",
     "/growth/opportunities",
-    "/growth/opportunities/pipeline",
     "/growth/conversations",
     "/growth/relationships",
   ])
-  console.log("  ✓ sidebar contains exactly 15 items with unchanged hrefs")
+  console.log("  ✓ sidebar contains exactly 12 items with unchanged hrefs")
 
   assertIncludes(
     "components/growth/shell/growth-sidebar-nav-content.tsx",

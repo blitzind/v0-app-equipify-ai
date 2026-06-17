@@ -78,9 +78,9 @@ function runAudit(): void {
   console.log(`\n=== Growth workspace shell audit (${GROWTH_ROUTE_METADATA_QA_MARKER}) ===\n`)
 
   assert.equal(GROWTH_MIGRATED_ROUTE_REGISTRY.length, GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length)
-  assert.equal(GROWTH_MIGRATED_ROUTE_REGISTRY.length, 32)
+  assert.equal(GROWTH_MIGRATED_ROUTE_REGISTRY.length, 51)
   assert.deepEqual(GROWTH_MIGRATED_WORKSPACE_ROUTES, GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.map((entry) => entry.path))
-  console.log("  ✓ migrated workspace registry subset (32 routes)")
+  console.log("  ✓ migrated workspace registry subset (51 routes)")
 
   const paths = GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.map((entry) => entry.path)
   const ids = GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.map((entry) => entry.id)
@@ -170,9 +170,8 @@ function runAudit(): void {
   console.log("  ✓ static routes beat dynamic routes")
 
   const placeholders = GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.filter((row) => row.placeholder)
-  assert.equal(placeholders.length, 1)
-  assert.deepEqual(placeholders.map((entry) => entry.id), ["workspace-settings"])
-  console.log("  ✓ remaining placeholder route is settings only")
+  assert.equal(placeholders.length, 0)
+  console.log("  ✓ no placeholder-only workspace routes remain after Phase 7C settings shell")
 
   const workspaceNavHrefs = GROWTH_SHELL_NAV_GROUPS.flatMap((group) =>
     group.items.filter((item) => item.workspaceRoute).map((item) => item.href),
@@ -193,13 +192,7 @@ function runAudit(): void {
   const intelligenceNav = GROWTH_SHELL_NAV_GROUPS.find((group) => group.id === "intelligence")
   assert.ok(intelligenceNav)
   const intelligenceIds = intelligenceNav.items.map((item) => item.id)
-  assert.deepEqual(intelligenceIds, [
-    "engagement",
-    "opportunities",
-    "opportunities-pipeline",
-    "conversations",
-    "relationships",
-  ])
+  assert.deepEqual(intelligenceIds, ["opportunities", "conversations", "relationships"])
   assert.ok(!GROWTH_SHELL_NAV_GROUPS.some((group) => group.id === "settings"), "settings group must not appear in workspace sidebar")
   assert.equal(
     intelligenceNav.items.find((item) => item.id === "opportunities")?.href,
@@ -225,7 +218,7 @@ function runAudit(): void {
         qa_marker: GROWTH_ROUTE_METADATA_QA_MARKER,
         migrated_routes: GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length,
         placeholder_routes: placeholders.length,
-        total_registry_routes: 127,
+        total_registry_routes: 146,
         workspace_nav_items: workspaceNavHrefs.length,
         phase_4a_operator_routes: PHASE_4A_OPERATOR_ROUTES,
         phase_4b_operator_routes: PHASE_4B_OPERATOR_ROUTES,
