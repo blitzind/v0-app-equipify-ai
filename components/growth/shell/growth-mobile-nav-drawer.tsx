@@ -6,6 +6,10 @@ import { GROWTH_WORKSPACE_SHELL_MOBILE_QA_MARKER } from "@/components/growth/she
 import { GROWTH_SHELL_NAV_QA_MARKER } from "@/components/growth/shell/growth-shell-navigation"
 import { useGrowthSidebarRouteClose } from "@/components/growth/shell/growth-sidebar"
 import { WorkspaceShellBrand } from "@/components/workspace/workspace-shell-brand"
+import {
+  WORKSPACE_SIDEBAR_GROWTH_ORGANIZATION_PROPS,
+  WorkspaceSidebarOrganizationCard,
+} from "@/components/workspace/workspace-sidebar-organization-card"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-registry"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 
@@ -40,6 +44,7 @@ export function GrowthMobileNavDrawer({ open, onOpenChange }: GrowthMobileNavDra
             <X className="size-4" />
           </button>
         </div>
+        <WorkspaceSidebarOrganizationCard collapsed={false} {...WORKSPACE_SIDEBAR_GROWTH_ORGANIZATION_PROPS} />
         <div data-qa-marker={GROWTH_SHELL_NAV_QA_MARKER} className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <GrowthSidebarNavContent onNavigate={() => onOpenChange(false)} collapsed={false} />
         </div>

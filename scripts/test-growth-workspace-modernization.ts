@@ -61,7 +61,22 @@ function runAudit(): void {
     "WorkspaceShellBrand",
     "mobile drawer must use logo-only WorkspaceShellBrand",
   )
-  console.log("  ✓ logo-only branding (no Growth Engine Workspace title)")
+  assertIncludes(
+    "components/growth/shell/growth-sidebar.tsx",
+    "WorkspaceSidebarOrganizationCard",
+    "Growth sidebar must render organization context under logo",
+  )
+  assertIncludes(
+    "components/growth/shell/growth-sidebar.tsx",
+    "WORKSPACE_SIDEBAR_GROWTH_ORGANIZATION_PROPS",
+    "Growth sidebar org card must use Growth Engine label props",
+  )
+  assertIncludes(
+    "components/growth/shell/growth-mobile-nav-drawer.tsx",
+    "WorkspaceSidebarOrganizationCard",
+    "Growth mobile drawer must render organization context under logo",
+  )
+  console.log("  ✓ organization context card under logo (Growth Engine label)")
 
   assertIncludes("components/app-topbar.tsx", "WorkspaceSwitcher", "Core topbar must include WorkspaceSwitcher")
   assertIncludes("components/growth/shell/growth-topbar.tsx", "WorkspaceSwitcher", "Growth topbar must include WorkspaceSwitcher")

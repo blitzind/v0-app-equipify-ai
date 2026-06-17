@@ -80,12 +80,12 @@ function runAudit(): void {
   assertIncludes(CORE.topbar, "WORKSPACE_SHELL_TOPBAR", "Core topbar must use shared topbar token")
   assertIncludes(GROWTH.topbar, "WorkspaceSwitcher", "Growth topbar must use shared switcher")
   assertIncludes(GROWTH.topbar, "hidden sm:flex shrink-0", "Growth switcher spacing must match Core")
+  assertIncludes(GROWTH.topbar, "WorkspaceTopbarAccountControls", "Growth topbar must use shared Core account controls")
+  assertIncludes(CORE.topbar, "WorkspaceTopbarAccountControls", "Core topbar must use shared account controls")
   assertIncludes(GROWTH.topbar, "WorkspaceSearch", "Growth topbar must use shared search primitive")
   assertIncludes(CORE.topbar, "GlobalSearchHeader", "Core topbar must route search through GlobalSearchHeader wrapper")
   assertIncludes(CORE.globalSearchHeader, 'workspace="core"', "Core search wrapper must delegate to WorkspaceSearch")
   console.log("  ✓ topbar token and primitive sharing")
-
-  assertIncludes(GROWTH.workspaceShell, "WorkspaceContainer", "Growth content must use WorkspaceContainer")
   assertIncludes(SHARED.container, "WORKSPACE_SHELL_MAIN_INNER", "WorkspaceContainer must use main inner rhythm token")
   assertIncludes(CORE.pageShell, "WORKSPACE_SHELL_MAIN_INNER", "Core PageShell must use same main inner rhythm token")
   assertIncludes(GROWTH.breadcrumbs, "WORKSPACE_SHELL_HORIZONTAL_PADDING", "Growth breadcrumbs must align horizontal padding token")
@@ -110,10 +110,12 @@ function runAudit(): void {
 
   const primitivePaths: Record<(typeof WORKSPACE_SHELL_SHARED_PRIMITIVES)[number], string> = {
     WorkspaceShellBrand: "components/workspace/workspace-shell-brand.tsx",
+    WorkspaceSidebarOrganizationCard: "components/workspace/workspace-sidebar-organization-card.tsx",
     WorkspaceSwitcher: "components/workspace/workspace-switcher.tsx",
     WorkspaceSearch: "components/workspace/workspace-search.tsx",
     WorkspaceContainer: "components/workspace/workspace-container.tsx",
     GlobalSearchPanel: "components/workspace/global-search-panel.tsx",
+    WorkspaceTopbarAccountControls: "components/workspace/workspace-topbar-account-controls.tsx",
   }
   for (const primitive of WORKSPACE_SHELL_SHARED_PRIMITIVES) {
     assert.ok(fs.existsSync(path.join(ROOT, primitivePaths[primitive])), `${primitive} shared primitive must exist`)
@@ -121,8 +123,15 @@ function runAudit(): void {
       assertIncludes(GROWTH.topbar, "WorkspaceSearch", "Growth topbar must consume search via WorkspaceSearch")
     } else if (primitive === "WorkspaceShellBrand") {
       assertIncludes(GROWTH.sidebar, "WorkspaceShellBrand", "Growth sidebar must consume WorkspaceShellBrand")
+    } else if (primitive === "WorkspaceSidebarOrganizationCard") {
+      assertIncludes(GROWTH.sidebar, "WorkspaceSidebarOrganizationCard", "Growth sidebar must consume shared org card")
+      assertIncludes(GROWTH.mobileDrawer, "WorkspaceSidebarOrganizationCard", "Growth mobile drawer must consume shared org card")
+      assertIncludes(CORE.sidebar, "WorkspaceSidebarOrganizationCard", "Core sidebar must consume shared org card")
     } else if (primitive === "WorkspaceContainer") {
       assertIncludes(GROWTH.workspaceShell, "WorkspaceContainer", "Growth shell must consume WorkspaceContainer")
+    } else if (primitive === "WorkspaceTopbarAccountControls") {
+      assertIncludes(GROWTH.topbar, "WorkspaceTopbarAccountControls", "Growth topbar must consume shared account controls")
+      assertIncludes(CORE.topbar, "WorkspaceTopbarAccountControls", "Core topbar must consume shared account controls")
     } else {
       assertIncludes(GROWTH.topbar, primitive, `Growth topbar must consume ${primitive}`)
     }
@@ -138,7 +147,6 @@ function runAudit(): void {
   console.log("  ✓ no admin hardcodes in Growth shell; middleware untouched")
 
   console.log("\n  Documented intentional deviations:")
-  console.log("    - Core topbar includes notifications/account hub; Growth topbar is operator-minimal")
   console.log("    - Core mobile drawer uses fixed overlay; Growth uses Sheet with equivalent nav content")
   console.log("    - Growth adds breadcrumb strip; Core uses PageHero on select routes")
   console.log("    - Growth Cmd+K remains command palette; Core Cmd+K focuses shared search")

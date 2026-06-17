@@ -40,10 +40,12 @@ const GROWTH_SHELL_FILES = {
 
 const PRIMITIVE_FILES = {
   WorkspaceShellBrand: "components/workspace/workspace-shell-brand.tsx",
+  WorkspaceSidebarOrganizationCard: "components/workspace/workspace-sidebar-organization-card.tsx",
   WorkspaceSwitcher: "components/workspace/workspace-switcher.tsx",
   WorkspaceSearch: "components/workspace/workspace-search.tsx",
   WorkspaceContainer: "components/workspace/workspace-container.tsx",
   GlobalSearchPanel: "components/workspace/global-search-panel.tsx",
+  WorkspaceTopbarAccountControls: "components/workspace/workspace-topbar-account-controls.tsx",
 } as const
 
 function read(relativePath: string): string {
@@ -106,6 +108,9 @@ function assertSharedPrimitiveConsumption(): void {
   assertIncludes(CORE_SHELL_FILES.sidebar, "WorkspaceShellBrand", "Core sidebar must consume WorkspaceShellBrand")
   assertIncludes(GROWTH_SHELL_FILES.sidebar, "WorkspaceShellBrand", "Growth sidebar must consume WorkspaceShellBrand")
   assertIncludes(GROWTH_SHELL_FILES.mobileDrawer, "WorkspaceShellBrand", "Growth mobile drawer must consume WorkspaceShellBrand")
+  assertIncludes(CORE_SHELL_FILES.sidebar, "WorkspaceSidebarOrganizationCard", "Core sidebar must consume shared org card")
+  assertIncludes(GROWTH_SHELL_FILES.sidebar, "WorkspaceSidebarOrganizationCard", "Growth sidebar must consume shared org card")
+  assertIncludes(GROWTH_SHELL_FILES.mobileDrawer, "WorkspaceSidebarOrganizationCard", "Growth mobile drawer must consume shared org card")
 
   assertIncludes(CORE_SHELL_FILES.topbar, "WorkspaceSwitcher", "Core topbar must consume WorkspaceSwitcher")
   assertIncludes(GROWTH_SHELL_FILES.topbar, "WorkspaceSwitcher", "Growth topbar must consume WorkspaceSwitcher")
@@ -113,6 +118,10 @@ function assertSharedPrimitiveConsumption(): void {
   assertIncludes(CORE_SHELL_FILES.topbar, "GlobalSearchHeader", "Core topbar must route search through GlobalSearchHeader wrapper")
   assertIncludes("components/global-search-header.tsx", "WorkspaceSearch", "GlobalSearchHeader must delegate to WorkspaceSearch")
   assertIncludes(GROWTH_SHELL_FILES.topbar, 'workspace="growth"', "Growth topbar must consume WorkspaceSearch")
+
+  assertIncludes(CORE_SHELL_FILES.topbar, "WorkspaceTopbarAccountControls", "Core topbar must consume shared account controls")
+  assertIncludes(GROWTH_SHELL_FILES.topbar, "WorkspaceTopbarAccountControls", "Growth topbar must consume shared account controls")
+  assertExcludes(GROWTH_SHELL_FILES.topbar, "initialsFromDisplayLabel", "Growth topbar must not duplicate account identity block")
 
   assertIncludes(GROWTH_SHELL_FILES.workspaceShell, "WorkspaceContainer", "Growth shell must consume WorkspaceContainer")
 }
@@ -129,6 +138,13 @@ function assertNoDuplicateImplementations(): void {
   assertExcludes(CORE_SHELL_FILES.topbar, "GlobalSearchPanel", "Core topbar must not import GlobalSearchPanel directly")
 
   assertExcludes(GROWTH_SHELL_FILES.topbar, "GrowthModuleSwitcher", "Growth topbar must not use legacy GrowthModuleSwitcher")
+  assertExcludes(GROWTH_SHELL_FILES.topbar, "sessionIdentity?.displayName", "Growth topbar must not render standalone account text")
+  assert.equal(
+    (read(PRIMITIVE_FILES.WorkspaceTopbarAccountControls).match(/export function WorkspaceTopbarAccountControls/g) ?? [])
+      .length,
+    1,
+    "WorkspaceTopbarAccountControls must have a single export",
+  )
   assertExcludes(GROWTH_SHELL_FILES.sidebar, "bg-[#13233F]", "Growth sidebar must not use legacy custom active fill")
   assertExcludes(GROWTH_SHELL_FILES.sidebarNav, "text-[#6EA8FF]", "Growth sidebar must not use legacy custom active text")
 }
@@ -142,6 +158,9 @@ function assertSidebarParity(): void {
   assertIncludes(GROWTH_SHELL_FILES.sidebarNav, "WORKSPACE_GROWTH_SIDEBAR_SECTIONS_STORAGE_KEY", "Growth section collapse persistence key")
   assertIncludes(GROWTH_SHELL_FILES.sidebar, "WORKSPACE_SIDEBAR_SURFACE", "Growth sidebar collapse animation via shared surface token")
   assertIncludes(CORE_SHELL_FILES.sidebar, "WORKSPACE_SIDEBAR_SURFACE", "Core sidebar collapse animation via shared surface token")
+  assertIncludes(GROWTH_SHELL_FILES.sidebar, "WORKSPACE_SIDEBAR_GROWTH_ORGANIZATION_PROPS", "Growth sidebar org card uses Growth label props")
+  assertIncludes("lib/workspace/workspace-shell-tokens.ts", "WORKSPACE_SIDEBAR_GROWTH_ENGINE_LABEL", "Growth Engine label token exported")
+  assertIncludes("lib/workspace/workspace-shell-tokens.ts", "WORKSPACE_SIDEBAR_SCALE_ACCENT_COLOR", "Scale accent token exported")
   assertIncludes(GROWTH_SHELL_FILES.sidebarNav, "NAV_PRIMARY_ROW_MOTION", "Growth nav must use shared motion token")
   assertIncludes(GROWTH_SHELL_FILES.sidebar, "localStorage.setItem", "Growth sidebar must persist collapse state")
   assertIncludes(CORE_SHELL_FILES.sidebar, "localStorage.setItem", "Core sidebar must persist collapse state")

@@ -3,12 +3,10 @@
 import Link from "next/link"
 import { Menu } from "lucide-react"
 import { BrandLogo } from "@/components/brand-logo"
-import { useAdmin } from "@/lib/admin-store"
-import { initialsFromDisplayLabel } from "@/lib/user-display"
 import { WORKSPACE_SHELL_TOPBAR } from "@/lib/workspace/workspace-shell-tokens"
 import { WorkspaceSearch } from "@/components/workspace/workspace-search"
 import { WorkspaceSwitcher } from "@/components/workspace/workspace-switcher"
-import { cn } from "@/lib/utils"
+import { WorkspaceTopbarAccountControls } from "@/components/workspace/workspace-topbar-account-controls"
 
 type GrowthTopbarProps = {
   mobileNavOpen?: boolean
@@ -16,16 +14,6 @@ type GrowthTopbarProps = {
 }
 
 export function GrowthTopbar({ mobileNavOpen = false, onOpenMobileNav }: GrowthTopbarProps) {
-  const { sessionIdentity } = useAdmin()
-  const displayName = sessionIdentity?.displayName?.trim() ?? ""
-  const email = sessionIdentity?.email?.trim() ?? ""
-  const line1 = displayName || email || "Operator"
-  const line2 =
-    displayName && email && displayName.toLowerCase() !== email.toLowerCase()
-      ? email
-      : (sessionIdentity?.platformRoleLabel ?? "Member")
-  const initials = initialsFromDisplayLabel(displayName || email || "?")
-
   return (
     <header className={WORKSPACE_SHELL_TOPBAR}>
       <button
@@ -51,19 +39,7 @@ export function GrowthTopbar({ mobileNavOpen = false, onOpenMobileNav }: GrowthT
 
       <WorkspaceSearch workspace="growth" />
 
-      <div className="flex items-center gap-1 ml-auto">
-        <div className="hidden text-right sm:block">
-          <p className="text-sm font-medium text-foreground leading-tight">{line1}</p>
-          <p className="text-xs text-muted-foreground leading-tight">{line2}</p>
-        </div>
-        <div
-          className={cn(
-            "flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold",
-          )}
-        >
-          {initials}
-        </div>
-      </div>
+      <WorkspaceTopbarAccountControls />
     </header>
   )
 }

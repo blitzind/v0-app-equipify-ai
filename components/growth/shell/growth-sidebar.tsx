@@ -11,6 +11,10 @@ import {
   WORKSPACE_SIDEBAR_WIDTH_EXPANDED,
 } from "@/lib/workspace/workspace-shell-tokens"
 import { WorkspaceShellBrand } from "@/components/workspace/workspace-shell-brand"
+import {
+  WORKSPACE_SIDEBAR_GROWTH_ORGANIZATION_PROPS,
+  WorkspaceSidebarOrganizationCard,
+} from "@/components/workspace/workspace-sidebar-organization-card"
 import { GROWTH_WORKSPACE_SHELL_QA_MARKER } from "@/components/growth/shell/growth-brand"
 import {
   GrowthSidebarFooter,
@@ -52,6 +56,7 @@ export function GrowthSidebar() {
       aria-label="Growth Engine navigation"
     >
       <WorkspaceShellBrand collapsed={collapsed} homeHref={GROWTH_WORKSPACE_BASE_PATH} />
+      <WorkspaceSidebarOrganizationCard collapsed={collapsed} {...WORKSPACE_SIDEBAR_GROWTH_ORGANIZATION_PROPS} />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden" data-qa-marker={GROWTH_SHELL_NAV_QA_MARKER}>
         <GrowthSidebarNavContent collapsed={collapsed} />
         <GrowthSidebarFooter

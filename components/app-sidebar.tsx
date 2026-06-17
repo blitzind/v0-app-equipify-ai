@@ -13,8 +13,8 @@ import { getOrgPermissionsForRole, type OrgMemberRole, type OrgPermissions } fro
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock, CalendarRange,
   HardHat, BarChart3,
-  ChevronLeft, Sparkles, ChevronDown, Check, Bot, Brain,
-  Building2, X, FileText, Receipt, ShoppingCart, Store, FileBadge2, Package, Landmark,
+  ChevronLeft, Sparkles, ChevronDown, Bot, Brain,
+  X, FileText, Receipt, ShoppingCart, Store, FileBadge2, Package, Landmark,
   Bell,
   Warehouse,
   UserPlus,
@@ -36,6 +36,9 @@ import {
   WORKSPACE_SIDEBAR_WIDTH_EXPANDED,
 } from "@/lib/workspace/workspace-shell-tokens"
 import { WorkspaceShellBrand } from "@/components/workspace/workspace-shell-brand"
+import {
+  WorkspaceSidebarOrganizationCard,
+} from "@/components/workspace/workspace-sidebar-organization-card"
 
 type NavItem = {
   label: string
@@ -323,15 +326,10 @@ function SidebarBody({
   const {
     organizations,
     organizationId,
-    switchOrganization,
     status: orgStatus,
-    switching,
     supportAccessActive,
   } = useActiveOrganization()
-  const [wsMenuOpen, setWsMenuOpen] = useState(false)
   const planMeta = planBadgeFromWorkspace(workspace)
-  const orgPickerLoading = orgStatus === "loading" || switching
-  const showOrgSwitcher = organizations.length > 1
 
   useEffect(() => {
     debugNavResolution({
@@ -342,11 +340,6 @@ function SidebarBody({
       organizationId: organizationId ?? null,
     })
   }, [role, permissionsStatus, orgStatus, organizationId])
-
-  function toggleWorkspaceMenu() {
-    if (!showOrgSwitcher) return
-    setWsMenuOpen((v) => !v)
-  }
 
   const navResolution = useMemo(
     () => {
@@ -478,131 +471,12 @@ function SidebarBody({
       {/* ── Logo hero (full wordmark expanded · square mark collapsed) ─ */}
       <WorkspaceShellBrand collapsed={isCollapsed} homeHref="/" />
 
-      {/* ── Workspace selector ──────────────────────────────────
-          Collapsed rail (`w-14`) demands a square avatar slot, so we
-          drop the default `w-full` button and switch to an explicit
-          `h-10 w-10` square that centers cleanly. The avatar itself is
-          locked to a square via `aspect-square` plus explicit min/max
-          sizes so neither flex-shrink nor intrinsic-image sizing can
-          deform the logo into a pill. */}
-      <div
-        className={cn(
-          "relative border-b border-sidebar-border shrink-0",
-          isCollapsed ? "px-0 py-2" : "px-3 py-3",
-        )}
-      >
-        <button
-          type="button"
-          onClick={toggleWorkspaceMenu}
-          aria-expanded={showOrgSwitcher ? wsMenuOpen : undefined}
-          aria-haspopup={showOrgSwitcher ? "menu" : undefined}
-          className={cn(
-            "flex items-center gap-3 rounded-xl border transition-all duration-150",
-            showOrgSwitcher && "hover:border-primary/40 hover:bg-sidebar-accent/50",
-            !showOrgSwitcher && "cursor-default",
-            isCollapsed
-              ? // 40x40 square button, fully centered in the rail.
-                "mx-auto h-10 w-10 aspect-square shrink-0 grow-0 justify-center p-1 border-transparent bg-transparent hover:bg-sidebar-accent/50"
-              : "w-full px-3.5 py-3 border-sidebar-border bg-sidebar-accent/30",
-          )}
-        >
-          {workspace.logoUrl ? (
-            <img
-              src={workspace.logoUrl}
-              alt=""
-              className={cn(
-                // Iron-clad square sizing — explicit width AND height,
-                // aspect-ratio guard, and a hard min/max that overrides
-                // any flex shrink behavior even at narrow rail widths.
-                "block h-8 w-8 min-h-8 min-w-8 max-h-8 max-w-8 aspect-square",
-                "shrink-0 grow-0 basis-8 select-none",
-                "rounded-lg border border-sidebar-border bg-white object-contain",
-              )}
-            />
-          ) : (
-            <div
-              className={cn(
-                "flex h-8 w-8 min-h-8 min-w-8 max-h-8 max-w-8 aspect-square",
-                "shrink-0 grow-0 basis-8 select-none items-center justify-center",
-                "rounded-lg uppercase text-white text-sm font-bold",
-              )}
-              style={{ background: workspace.primaryColor }}
-              suppressHydrationWarning
-            >
-              {workspace.name[0]}
-            </div>
-          )}
-          {!isCollapsed && (
-            <>
-              <div className="flex-1 min-w-0 text-left">
-                <p className="text-sm font-semibold text-sidebar-foreground truncate leading-tight">{workspace.name}</p>
-                {supportAccessActive ? (
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-violet-400">
-                    Support workspace
-                  </span>
-                ) : null}
-                <span className="text-[11px] font-semibold" style={{ color: planMeta.color }}>{planMeta.label}</span>
-              </div>
-              {showOrgSwitcher ? (
-                <ChevronDown
-                  size={14}
-                  className={cn(
-                    "shrink-0 text-sidebar-foreground/40 transition-transform duration-150",
-                    wsMenuOpen && "rotate-180",
-                  )}
-                />
-              ) : null}
-            </>
-          )}
-        </button>
-
-        {wsMenuOpen && showOrgSwitcher && !isCollapsed && (
-          <div className="absolute top-full left-3 right-3 z-50 mt-1 bg-sidebar border border-sidebar-border rounded-xl shadow-xl overflow-hidden">
-            <p className="px-3.5 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-              Your organizations
-            </p>
-            {organizations.length > 0 ? (
-              organizations.map((org) => (
-                <button
-                  key={org.id}
-                  type="button"
-                  disabled={orgPickerLoading}
-                  onClick={() => {
-                    void (async () => {
-                      await switchOrganization(org.id)
-                      setWsMenuOpen(false)
-                    })()
-                  }}
-                  className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-sidebar-accent/50 transition-colors disabled:opacity-50"
-                >
-                  <div
-                    className={cn(
-                      // Square org avatar in the switcher menu — same
-                      // ironclad sizing as the sidebar header avatar so a
-                      // long org name in a tight row never compresses it.
-                      "flex h-7 w-7 min-h-7 min-w-7 max-h-7 max-w-7 aspect-square",
-                      "shrink-0 grow-0 basis-7 items-center justify-center",
-                      "rounded-lg uppercase text-white text-[11px] font-bold",
-                    )}
-                    style={{ background: workspace.primaryColor }}
-                  >
-                    {org.name[0]}
-                  </div>
-                  <span className="text-sm text-sidebar-foreground truncate flex-1 text-left">{org.name}</span>
-                  {org.id === organizationId ? <Check size={13} className="text-primary shrink-0" /> : null}
-                </button>
-              ))
-            ) : (
-              <p className="px-3.5 py-3 text-xs text-sidebar-foreground/55">No organizations available.</p>
-            )}
-            <div className="border-t border-sidebar-border px-3.5 py-2.5">
-              <Link href="/onboarding" onClick={() => setWsMenuOpen(false)} className="flex items-center gap-1.5 text-xs text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors">
-                <Building2 size={13} /> Create new workspace
-              </Link>
-            </div>
-          </div>
-        )}
-      </div>
+      <WorkspaceSidebarOrganizationCard
+        collapsed={isCollapsed}
+        secondaryLabel={planMeta.label}
+        secondaryLabelColor={planMeta.color}
+        showSupportAccessBadge={supportAccessActive}
+      />
 
       {/* ── Navigation ────────────────────────────────────────── */}
       <nav

@@ -76,7 +76,13 @@ function runAudit(): void {
   assertIncludes(FILES.mobileDrawer, "GrowthSidebarNavContent", "Mobile drawer must render shared nav content")
   assertIncludes(FILES.mobileDrawer, 'collapsed={false}', "Mobile drawer must expand sidebar rail while keeping group collapse")
   assertIncludes(FILES.mobileDrawer, "flex min-h-0 flex-1 flex-col overflow-hidden", "Mobile drawer nav column must scroll")
-  console.log("  ✓ mobile drawer renders collapsible groups through shared nav content")
+  assertIncludes(FILES.mobileDrawer, "WorkspaceSidebarOrganizationCard", "Mobile drawer must render org context under logo")
+  console.log("  ✓ mobile drawer renders org card + collapsible groups through shared nav content")
+
+  assertIncludes(FILES.sidebar, "WorkspaceSidebarOrganizationCard", "Growth sidebar must render org context under logo")
+  assertIncludes(FILES.sidebar, "WORKSPACE_SIDEBAR_GROWTH_ORGANIZATION_PROPS", "Growth sidebar must use Growth org card props")
+  assertIncludes(FILES.coreSidebar, "WorkspaceSidebarOrganizationCard", "Core sidebar must use shared org card primitive")
+  console.log("  ✓ organization context card present in Growth + Core sidebars")
 
   for (const file of [FILES.sidebar, FILES.sidebarNav, FILES.mobileDrawer, FILES.workspaceShell]) {
     assert.ok(!read(file).includes(GROWTH_ADMIN_BASE_PATH), `${file} must not hardcode admin routes`)
@@ -85,7 +91,7 @@ function runAudit(): void {
 
   assertIncludes(FILES.coreSidebar, NAV_GROUP_STORAGE_KEY_LITERAL(), "Core sidebar must still persist section collapse")
   assertIncludes(FILES.coreSidebar, "flex-1 overflow-y-auto", "Core sidebar nav must still scroll internally")
-  console.log("  ✓ Core sidebar remains unchanged (section collapse + internal scroll intact)")
+  console.log("  ✓ Core sidebar section collapse + internal scroll intact (org card shared primitive)")
 
   console.log("\nGrowth workspace sidebar behavior certification PASS\n")
   console.log(

@@ -8,10 +8,12 @@ export const GROWTH_WORKSPACE_UX_PARITY_QA_MARKER = "growth-workspace-ux-parity-
 
 export const WORKSPACE_SHELL_SHARED_PRIMITIVES = [
   "WorkspaceShellBrand",
+  "WorkspaceSidebarOrganizationCard",
   "WorkspaceSwitcher",
   "WorkspaceSearch",
   "WorkspaceContainer",
   "GlobalSearchPanel",
+  "WorkspaceTopbarAccountControls",
 ] as const
 
 export const WORKSPACE_SHELL_SHARED_TOKEN_IMPORTS = [
@@ -22,6 +24,8 @@ export const WORKSPACE_SHELL_SHARED_TOKEN_IMPORTS = [
   "WORKSPACE_SIDEBAR_WIDTH_COLLAPSED",
   "WORKSPACE_SIDEBAR_SURFACE",
   "WORKSPACE_SIDEBAR_COLLAPSED_STORAGE_KEY",
+  "WORKSPACE_SIDEBAR_GROWTH_ENGINE_LABEL",
+  "WORKSPACE_SIDEBAR_SCALE_ACCENT_COLOR",
   "WORKSPACE_SHELL_VIEWPORT_ROOT",
   "WORKSPACE_SHELL_VIEWPORT_BODY",
   "WORKSPACE_SHELL_SKIP_LINK",
