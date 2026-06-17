@@ -132,7 +132,13 @@ function runAudit(): void {
   assert.match(conversationsDashboard, /GrowthConversationsActionCrossLinks/)
   assert.match(conversationsDashboard, /parseGrowthConversationsDeepLinkParams/)
   assert.match(conversationsDashboard, /focusedLeadId/)
+  assert.match(conversationsDashboard, /fetchGrowthConversationsDashboard/)
   console.log("  ✓ inbox conversation column and conversations dashboard wire read-only context")
+
+  const overviewPanel = readSource("components/growth/inbox/growth-inbox-overview-metrics-panel.tsx")
+  assert.match(overviewPanel, /deriveGrowthInboxConversationOverviewMetrics/)
+  assert.match(overviewPanel, /useGrowthConversationsDashboard/)
+  console.log("  ✓ inbox overview wires conversation portfolio metrics")
 
   assert.ok(GROWTH_INBOX_CONVERSATIONS_CONVERGENCE_MATRIX.some((row) => row.status === "available"))
   assert.ok(GROWTH_INBOX_CONVERSATIONS_CONVERGENCE_MATRIX.some((row) => row.status === "deferred"))

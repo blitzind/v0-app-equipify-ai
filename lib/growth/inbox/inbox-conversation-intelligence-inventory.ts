@@ -52,14 +52,15 @@ export const GROWTH_INBOX_CONVERSATION_INTELLIGENCE_INVENTORY: GrowthInboxConver
     sourceKind: "conversation_dashboard",
     tables: ["growth.leads"],
     apis: ["/api/platform/growth/conversations/dashboard"],
-    readModels: ["GrowthConversationDashboardPayload"],
-    hooks: [],
+    readModels: ["GrowthConversationDashboardPayload", "GrowthInboxConversationOverviewMetrics"],
+    hooks: ["useGrowthConversationsDashboard"],
     components: [
       "components/growth/growth-conversations-dashboard.tsx",
       "components/growth/intelligence/growth-conversations-dashboard-body.tsx",
+      "components/growth/inbox/growth-inbox-overview-metrics-panel.tsx",
     ],
     providers: ["fetchGrowthConversationDashboard"],
-    notes: "Intelligence surface only — portfolio buckets (health, risk, sentiment shift). Not an action queue.",
+    notes: "Intelligence surface plus read-only inbox overview metrics strip (Phase 7P).",
   },
   {
     id: "reply-timeline",

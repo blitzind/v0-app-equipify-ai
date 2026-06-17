@@ -7,6 +7,10 @@ import { Button } from "@/components/ui/button"
 import { GrowthConversationsActionCrossLinks } from "@/components/growth/inbox/growth-inbox-conversation-intelligence-context-strip"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import {
+  fetchGrowthConversationsDashboard,
+  type GrowthConversationsDashboardPayload,
+} from "@/lib/growth/conversations/growth-conversations-dashboard-client"
+import {
   collectGrowthConversationsDashboardLeads,
   findGrowthConversationsFocusedLead,
   parseGrowthConversationsDeepLinkParams,
@@ -17,16 +21,7 @@ import type { GrowthLead } from "@/lib/growth/types"
 
 export const GROWTH_CONVERSATIONS_DASHBOARD_QA_MARKER = "growth-conversations-dashboard-v2" as const
 
-type DashboardPayload = {
-  averageHealth: number
-  strongHealth: Array<Partial<GrowthLead> & { id: string; companyName: string }>
-  buyingIntent: Array<Partial<GrowthLead> & { id: string; companyName: string }>
-  sentimentShift: Array<Partial<GrowthLead> & { id: string; companyName: string }>
-  competitorMentions: Array<Partial<GrowthLead> & { id: string; companyName: string }>
-  topObjections: Array<{ key: string; count: number }>
-  urgencyTrends: Array<Partial<GrowthLead> & { id: string; companyName: string }>
-  conversationRisk: Array<Partial<GrowthLead> & { id: string; companyName: string }>
-}
+type DashboardPayload = GrowthConversationsDashboardPayload
 
 function LeadBucket({
   title,
@@ -108,12 +103,8 @@ export function GrowthConversationsDashboard() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/platform/growth/conversations/dashboard", { cache: "no-store" })
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; dashboard?: DashboardPayload; message?: string }
-      if (!res.ok || !data.ok || !data.dashboard) {
-        throw new Error(data.message ?? "Could not load conversation dashboard.")
-      }
-      setDashboard(data.dashboard)
+      const dashboard = await fetchGrowthConversationsDashboard()
+      setDashboard(dashboard)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed.")
     } finally {

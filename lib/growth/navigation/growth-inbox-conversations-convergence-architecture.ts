@@ -110,8 +110,8 @@ export const GROWTH_INBOX_CONVERSATIONS_CONVERGENCE_MATRIX: GrowthInboxConversat
     id: "inbox-overview-metrics",
     inboxSurface: "Conversation risk / sentiment shift metric strip",
     conversationsSurface: "Portfolio dashboard counts",
-    status: "partial",
-    notes: "Counts available via conversations dashboard API; inline metrics deferred to avoid duplicate fetch.",
+    status: "available",
+    notes: "Phase 7P — read-only counts from existing /conversations/dashboard fetch in inbox overview.",
   },
   {
     id: "inline-full-intelligence",
