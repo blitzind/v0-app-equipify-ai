@@ -54,7 +54,7 @@ export function GrowthInboxWorkspaceV2Panel() {
         <GrowthInboxWorkspaceActionsMenu />
       </div>
 
-      <GrowthInboxSharedDataProvider>
+      <GrowthInboxSharedDataProvider deferUntilLeadId={selectedThread?.lead_id ?? null}>
         <GrowthInboxQueueProvider>
           <GrowthInboxQueueUrlSync />
           <GrowthInboxOverviewMetricsPanel />

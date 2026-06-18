@@ -17,7 +17,11 @@ export function GrowthInboxWorkspaceWorkflowPanel() {
     <div className="space-y-4" data-qa-marker={GROWTH_INBOX_WORKFLOW_PANEL_QA_MARKER}>
       <GrowthInboxWorkflowIntelligenceSummary />
 
-      <GrowthInboxExpandableLazyPanel title="Workflow Action Center" description="Pending workflow actions and exits">
+      <GrowthInboxExpandableLazyPanel
+        panelId="workflow-action-center"
+        title="Workflow Action Center"
+        description="Pending workflow actions and exits"
+      >
         <GrowthReplyWorkflowActionsPanel
           showSequenceExit
           title="Workflow Action Center"
@@ -26,11 +30,24 @@ export function GrowthInboxWorkspaceWorkflowPanel() {
         />
       </GrowthInboxExpandableLazyPanel>
 
-      <GrowthInboxExpandableLazyPanel title="Human Interventions" description="Operator intervention queue">
-        <GrowthHumanInterventionsPanel title="Human Interventions" compact useInboxConcurrencyLimit />
+      <GrowthInboxExpandableLazyPanel
+        panelId="human-interventions"
+        title="Human Interventions"
+        description="Operator intervention queue"
+      >
+        <GrowthHumanInterventionsPanel
+          title="Human Interventions"
+          compact
+          useInboxConcurrencyLimit
+          lazyPanelId="human-interventions"
+        />
       </GrowthInboxExpandableLazyPanel>
 
-      <GrowthInboxExpandableLazyPanel title="Conversational Playbook" description="Knowledge-augmented coaching">
+      <GrowthInboxExpandableLazyPanel
+        panelId="conversational-playbook"
+        title="Conversational Playbook"
+        description="Knowledge-augmented coaching"
+      >
         <GrowthConversationalPlaybooksPanel
           consumer="operator_inbox"
           title="Conversational Playbook"
@@ -40,15 +57,27 @@ export function GrowthInboxWorkspaceWorkflowPanel() {
         />
       </GrowthInboxExpandableLazyPanel>
 
-      <GrowthInboxExpandableLazyPanel title="Reply Intelligence" description="Reply timeline and copilot context">
+      <GrowthInboxExpandableLazyPanel
+        panelId="reply-intelligence"
+        title="Reply Intelligence"
+        description="Reply timeline and copilot context"
+      >
         <GrowthInboxReplyIntelligencePanel leadId={null} compact />
       </GrowthInboxExpandableLazyPanel>
 
-      <GrowthInboxExpandableLazyPanel title="Smart Follow-Up Policies" description="Deterministic follow-up planning">
+      <GrowthInboxExpandableLazyPanel
+        panelId="smart-follow-up"
+        title="Smart Follow-Up Policies"
+        description="Deterministic follow-up planning"
+      >
         <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" compact useInboxConcurrencyLimit />
       </GrowthInboxExpandableLazyPanel>
 
-      <GrowthInboxExpandableLazyPanel title="Sequence Preview Studio" description="Sequence preview recommendations">
+      <GrowthInboxExpandableLazyPanel
+        panelId="sequence-preview"
+        title="Sequence Preview Studio"
+        description="Sequence preview recommendations"
+      >
         <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" compact useInboxConcurrencyLimit />
       </GrowthInboxExpandableLazyPanel>
     </div>

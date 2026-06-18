@@ -10,11 +10,13 @@ import {
   type GrowthInboxCallCommunicationItem,
 } from "@/lib/growth/inbox/inbox-call-communication-read-model"
 import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
+import { scheduleGrowthInboxIdleTask } from "@/lib/growth/inbox/inbox-load-scheduler"
 
 /** Phase 8F — callbacks metric only; no duplicate operator-inbox fan-out. */
-export function useGrowthInboxCallCommunications() {
+export function useGrowthInboxCallCommunications(options?: { deferLoad?: boolean }) {
+  const deferLoad = options?.deferLoad ?? false
   const [items, setItems] = useState<GrowthInboxCallCommunicationItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!deferLoad)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -56,8 +58,14 @@ export function useGrowthInboxCallCommunications() {
   }, [])
 
   useEffect(() => {
+    if (deferLoad) {
+      const cancelIdle = scheduleGrowthInboxIdleTask(() => {
+        void load()
+      })
+      return cancelIdle
+    }
     void load()
-  }, [load])
+  }, [deferLoad, load])
 
   return {
     items,

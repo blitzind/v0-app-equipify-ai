@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useState } from "react"
 import type { GrowthSalesExecutionDashboard } from "@/lib/growth/reply-intelligence/reply-intent-types"
 import { fetchGrowthReplyIntelligenceDashboard } from "@/lib/growth/replies/growth-reply-intelligence-dashboard-client"
+import { scheduleGrowthInboxIdleTask } from "@/lib/growth/inbox/inbox-load-scheduler"
 
-export function useGrowthReplyIntelligenceDashboard() {
+export function useGrowthReplyIntelligenceDashboard(options?: { deferLoad?: boolean }) {
+  const deferLoad = options?.deferLoad ?? false
   const [dashboard, setDashboard] = useState<GrowthSalesExecutionDashboard | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!deferLoad)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -23,8 +25,14 @@ export function useGrowthReplyIntelligenceDashboard() {
   }, [])
 
   useEffect(() => {
+    if (deferLoad) {
+      const cancelIdle = scheduleGrowthInboxIdleTask(() => {
+        void load()
+      })
+      return cancelIdle
+    }
     void load()
-  }, [load])
+  }, [deferLoad, load])
 
   return { dashboard, loading, error, reload: load }
 }

@@ -13,6 +13,8 @@ import {
 } from "@/lib/growth/inbox/inbox-runtime-types"
 import type { GrowthInboxSyncDashboard, GrowthInboxThreadSyncDetail } from "@/lib/growth/inbox-sync/inbox-sync-types"
 import { sanitizeInboxUiErrorMessage } from "@/components/growth/inbox/growth-inbox-shared-ui"
+import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
+import { scheduleGrowthInboxIdleTask } from "@/lib/growth/inbox/inbox-load-scheduler"
 
 type ListPayload = {
   ok?: boolean
@@ -139,7 +141,7 @@ export function GrowthInboxWorkspaceProvider({ children }: { children: ReactNode
   )
 
   const loadThreadDetail = useCallback(async (threadId: string) => {
-    const response = await fetch(`/api/platform/growth/inbox/thread/${threadId}`)
+    const response = await fetchPlatformGrowthClient(`/api/platform/growth/inbox/thread/${threadId}`)
     const payload = (await response.json()) as ThreadDetailPayload
     if (!response.ok) throw new Error(payload.message ?? "Could not load thread detail.")
     if (payload.thread) {
@@ -150,8 +152,8 @@ export function GrowthInboxWorkspaceProvider({ children }: { children: ReactNode
 
   const refreshThreads = useCallback(async () => {
     const [listResponse, dashboardResponse] = await Promise.all([
-      fetch("/api/platform/growth/inbox"),
-      fetch("/api/platform/growth/inbox/dashboard"),
+      fetchPlatformGrowthClient("/api/platform/growth/inbox"),
+      fetchPlatformGrowthClient("/api/platform/growth/inbox/dashboard"),
     ])
     const listPayload = (await listResponse.json()) as ListPayload
     const dashboardPayload = (await dashboardResponse.json()) as DashboardPayload
@@ -177,20 +179,30 @@ export function GrowthInboxWorkspaceProvider({ children }: { children: ReactNode
     [refreshThreads, loadThreadDetail],
   )
 
+  const loadSecondaryInboxData = useCallback(async () => {
+    const [syncResponse, mailboxesResponse] = await Promise.all([
+      fetchPlatformGrowthClient("/api/platform/growth/inbox/sync/dashboard"),
+      fetchPlatformGrowthClient("/api/platform/growth/mailboxes"),
+    ])
+    const syncPayload = (await syncResponse.json()) as SyncDashboardPayload
+    const mailboxesPayload = (await mailboxesResponse.json()) as MailboxesPayload
+    setSyncSchemaReady(syncResponse.ok)
+    if (syncResponse.ok && syncPayload.dashboard) setSyncDashboard(syncPayload.dashboard)
+    else setSyncDashboard(null)
+    if (mailboxesResponse.ok) setMailboxConnectionCount(mailboxesPayload.mailboxes?.length ?? 0)
+    else setMailboxConnectionCount(null)
+  }, [])
+
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [listResponse, dashboardResponse, syncResponse, mailboxesResponse] = await Promise.all([
-        fetch("/api/platform/growth/inbox"),
-        fetch("/api/platform/growth/inbox/dashboard"),
-        fetch("/api/platform/growth/inbox/sync/dashboard"),
-        fetch("/api/platform/growth/mailboxes"),
+      const [listResponse, dashboardResponse] = await Promise.all([
+        fetchPlatformGrowthClient("/api/platform/growth/inbox"),
+        fetchPlatformGrowthClient("/api/platform/growth/inbox/dashboard"),
       ])
       const listPayload = (await listResponse.json()) as ListPayload
       const dashboardPayload = (await dashboardResponse.json()) as DashboardPayload
-      const syncPayload = (await syncResponse.json()) as SyncDashboardPayload
-      const mailboxesPayload = (await mailboxesResponse.json()) as MailboxesPayload
       if (!listResponse.ok) {
         throw new Error(sanitizeInboxUiErrorMessage(listPayload.message) ?? "Could not load inbox threads.")
       }
@@ -204,25 +216,29 @@ export function GrowthInboxWorkspaceProvider({ children }: { children: ReactNode
       setDashboard(dashboardPayload.dashboard ?? null)
       setIntelligence(dashboardPayload.intelligence ?? null)
       setEvents(dashboardPayload.events ?? [])
-      setSyncSchemaReady(syncResponse.ok)
-      if (syncResponse.ok && syncPayload.dashboard) setSyncDashboard(syncPayload.dashboard)
-      else setSyncDashboard(null)
-      if (mailboxesResponse.ok) setMailboxConnectionCount(mailboxesPayload.mailboxes?.length ?? 0)
-      else setMailboxConnectionCount(null)
 
       const nextSelected = selectedThreadId || mergedThreads[0]?.id || ""
       if (nextSelected && !selectedThreadId) setSelectedThreadId(nextSelected)
-      if (nextSelected) await loadThreadDetail(nextSelected)
+
+      setLoading(false)
+
+      scheduleGrowthInboxIdleTask(() => {
+        void loadSecondaryInboxData()
+      })
+      if (nextSelected) {
+        scheduleGrowthInboxIdleTask(() => {
+          void loadThreadDetail(nextSelected)
+        })
+      }
     } catch (loadError) {
       setError(
         loadError instanceof Error
           ? sanitizeInboxUiErrorMessage(loadError.message) ?? "Could not load unified inbox."
           : "Could not load unified inbox.",
       )
-    } finally {
       setLoading(false)
     }
-  }, [loadThreadDetail, selectedThreadId])
+  }, [loadSecondaryInboxData, loadThreadDetail, selectedThreadId])
 
   useEffect(() => {
     void load()

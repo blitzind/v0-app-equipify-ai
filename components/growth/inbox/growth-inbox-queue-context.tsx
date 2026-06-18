@@ -60,7 +60,8 @@ export function useGrowthInboxQueue(): GrowthInboxQueueContextValue {
 
 export function GrowthInboxQueueProvider({ children }: { children: ReactNode }) {
   const { threads, selectedThreadId, setSelectedThreadId, loadThreadDetail } = useGrowthInboxWorkspace()
-  const { items: callItems, counts: callCounts, loading: callCommunicationsLoading } = useGrowthInboxCallCommunications()
+  const { items: callItems, counts: callCounts, loading: callCommunicationsLoading } =
+    useGrowthInboxCallCommunications({ deferLoad: true })
   const [queueView, setQueueView] = useState<GrowthInboxQueueView>("needs_action")
   const [channelFilter, setChannelFilter] = useState<GrowthInboxChannelFilter>("all")
   const [searchQuery, setSearchQuery] = useState("")

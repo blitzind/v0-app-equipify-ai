@@ -36,6 +36,7 @@ import {
 } from "@/lib/growth/inbox/inbox-revenue-context"
 import { useGrowthInboxSharedData } from "@/components/growth/inbox/growth-inbox-shared-data-provider"
 import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
+import { scheduleGrowthInboxIdleTask } from "@/lib/growth/inbox/inbox-load-scheduler"
 
 type GrowthInboxLeadContextValue = {
   leadId: string | null
@@ -198,67 +199,108 @@ export function GrowthInboxLeadContextProvider({
     setBookingRecommendations(bookings)
   }, [leadId, threadId])
 
-  const refresh = useCallback(async () => {
+  const refreshConversationCore = useCallback(async (): Promise<GrowthLead | null> => {
     if (!leadId) {
       clearLeadState()
-      return
+      return null
     }
 
     setLoading(true)
     setError(null)
     try {
       const encodedLeadId = encodeURIComponent(leadId)
-
-      const [memoryRes, timelineRes, copilotRes, leadRes, forecastRes, executionPlanRes] = await Promise.all([
-        fetchPlatformGrowthClient(`/api/platform/growth/lead-memory/profile/${encodedLeadId}`, { cache: "no-store" }),
+      const [timelineRes, leadRes] = await Promise.all([
         fetchPlatformGrowthClient(`/api/platform/growth/replies/timeline?leadId=${encodedLeadId}`, { cache: "no-store" }),
-        fetchPlatformGrowthClient(`/api/platform/growth/replies/copilot?leadId=${encodedLeadId}`, { cache: "no-store" }),
         fetchPlatformGrowthClient(`/api/platform/growth/leads/${encodedLeadId}`, { cache: "no-store" }),
-        fetchPlatformGrowthClient(`/api/platform/growth/revenue-execution/forecast-evidence?leadId=${encodedLeadId}`, {
-          cache: "no-store",
-        }),
-        fetchPlatformGrowthClient(`/api/platform/growth/revenue-execution/execution-plan?leadId=${encodedLeadId}`, {
-          cache: "no-store",
-        }),
       ])
 
-      const memoryPayload = (await memoryRes.json()) as { profile?: GrowthLeadMemoryProfileView }
       const timelinePayload = (await timelineRes.json()) as { timeline?: { entries?: GrowthConversationTimelineEntry[] } }
-      const copilotPayload = (await copilotRes.json()) as { assist?: GrowthReplyCopilotAssist }
       const leadPayload = (await leadRes.json()) as { lead?: GrowthLead }
-      const forecastPayload = (await forecastRes.json()) as { evidence?: GrowthRevenueForecastEvidence }
-      const executionPlanPayload = (await executionPlanRes.json()) as { plan?: GrowthSalesExecutionPlan }
-
-      if (memoryRes.ok && memoryPayload.profile) setMemoryProfile(memoryPayload.profile)
-      else setMemoryProfile(null)
+      const loadedLead = leadRes.ok && leadPayload.lead ? leadPayload.lead : null
 
       if (timelineRes.ok) setTimeline(timelinePayload.timeline?.entries ?? [])
       else setTimeline([])
 
-      if (copilotRes.ok && copilotPayload.assist) setCopilot(copilotPayload.assist)
-      else setCopilot(null)
-
-      if (leadRes.ok && leadPayload.lead) setLead(leadPayload.lead)
+      if (loadedLead) setLead(loadedLead)
       else setLead(null)
 
-      if (forecastRes.ok && forecastPayload.evidence) setForecastEvidence(forecastPayload.evidence)
-      else setForecastEvidence(null)
-
-      if (executionPlanRes.ok && executionPlanPayload.plan) setExecutionPlan(executionPlanPayload.plan)
-      else if (leadPayload.lead) setExecutionPlan(readExecutionPlanFromLeadMetadata(leadPayload.lead.metadata))
-      else setExecutionPlan(null)
-
-      await Promise.all([refreshWorkflow(), refreshRecommendations()])
+      return loadedLead
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Could not load lead context.")
+      return null
     } finally {
       setLoading(false)
     }
-  }, [leadId, clearLeadState, refreshWorkflow, refreshRecommendations])
+  }, [leadId, clearLeadState])
+
+  const refreshLeadEnrichment = useCallback(async (leadFallback?: GrowthLead | null) => {
+    if (!leadId) return
+
+    const encodedLeadId = encodeURIComponent(leadId)
+    const [memoryRes, copilotRes, forecastRes, executionPlanRes] = await Promise.all([
+      fetchPlatformGrowthClient(`/api/platform/growth/lead-memory/profile/${encodedLeadId}`, { cache: "no-store" }),
+      fetchPlatformGrowthClient(`/api/platform/growth/replies/copilot?leadId=${encodedLeadId}`, { cache: "no-store" }),
+      fetchPlatformGrowthClient(`/api/platform/growth/revenue-execution/forecast-evidence?leadId=${encodedLeadId}`, {
+        cache: "no-store",
+      }),
+      fetchPlatformGrowthClient(`/api/platform/growth/revenue-execution/execution-plan?leadId=${encodedLeadId}`, {
+        cache: "no-store",
+      }),
+    ])
+
+    const memoryPayload = (await memoryRes.json()) as { profile?: GrowthLeadMemoryProfileView }
+    const copilotPayload = (await copilotRes.json()) as { assist?: GrowthReplyCopilotAssist }
+    const forecastPayload = (await forecastRes.json()) as { evidence?: GrowthRevenueForecastEvidence }
+    const executionPlanPayload = (await executionPlanRes.json()) as { plan?: GrowthSalesExecutionPlan }
+
+    if (memoryRes.ok && memoryPayload.profile) setMemoryProfile(memoryPayload.profile)
+    else setMemoryProfile(null)
+
+    if (copilotRes.ok && copilotPayload.assist) setCopilot(copilotPayload.assist)
+    else setCopilot(null)
+
+    if (forecastRes.ok && forecastPayload.evidence) setForecastEvidence(forecastPayload.evidence)
+    else setForecastEvidence(null)
+
+    if (executionPlanRes.ok && executionPlanPayload.plan) setExecutionPlan(executionPlanPayload.plan)
+    else if (leadFallback) setExecutionPlan(readExecutionPlanFromLeadMetadata(leadFallback.metadata))
+    else setExecutionPlan(null)
+  }, [leadId])
+
+  const refresh = useCallback(async () => {
+    if (!leadId) {
+      clearLeadState()
+      return
+    }
+
+    await refreshConversationCore()
+    await Promise.all([refreshLeadEnrichment(), refreshWorkflow(), refreshRecommendations()])
+  }, [leadId, clearLeadState, refreshConversationCore, refreshLeadEnrichment, refreshWorkflow, refreshRecommendations])
 
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    if (!leadId) {
+      clearLeadState()
+      return
+    }
+
+    let cancelled = false
+    void refreshConversationCore().then((loadedLead) => {
+      if (cancelled) return
+      scheduleGrowthInboxIdleTask(() => {
+        if (!cancelled) void refreshLeadEnrichment(loadedLead)
+      })
+      scheduleGrowthInboxIdleTask(() => {
+        if (!cancelled) void refreshWorkflow()
+      })
+      scheduleGrowthInboxIdleTask(() => {
+        if (!cancelled) void refreshRecommendations()
+      })
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [leadId, threadId, clearLeadState, refreshConversationCore, refreshLeadEnrichment, refreshWorkflow, refreshRecommendations])
 
   const value = useMemo(
     () => ({

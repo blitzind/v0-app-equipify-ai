@@ -67,7 +67,7 @@ export function GrowthInboxOverviewMetricsPanel() {
   const searchParams = useSearchParams()
   const { threads } = useGrowthInboxWorkspace()
   const { callCommunicationItems } = useGrowthInboxQueue()
-  const { dashboard, loading, error, reload } = useGrowthReplyIntelligenceDashboard()
+  const { dashboard, loading, error, reload } = useGrowthReplyIntelligenceDashboard({ deferLoad: true })
 
   const metrics = deriveGrowthInboxOverviewMetrics({ threads, replyDashboard: dashboard })
   const callMetrics = deriveGrowthInboxCallCommunicationMetrics(callCommunicationItems)

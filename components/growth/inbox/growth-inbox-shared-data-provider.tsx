@@ -12,6 +12,7 @@ import {
 } from "react"
 import type { GrowthRevenueCommandCenterLead } from "@/lib/growth/revenue-execution/revenue-execution-types"
 import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
+import { scheduleGrowthInboxIdleTask } from "@/lib/growth/inbox/inbox-load-scheduler"
 
 type CommandCenterDashboard = {
   sections?: Record<string, GrowthRevenueCommandCenterLead[]>
@@ -47,7 +48,13 @@ export function useGrowthInboxSharedData(): GrowthInboxSharedDataValue {
 }
 
 /** Org-scoped inbox data — fetched once per workspace session (Phase 4B). */
-export function GrowthInboxSharedDataProvider({ children }: { children: ReactNode }) {
+export function GrowthInboxSharedDataProvider({
+  deferUntilLeadId = null,
+  children,
+}: {
+  deferUntilLeadId?: string | null
+  children: ReactNode
+}) {
   const [commandCenterDashboard, setCommandCenterDashboard] = useState<CommandCenterDashboard | null>(null)
   const [commandCenterLoading, setCommandCenterLoading] = useState(false)
   const loadedRef = useRef(false)
@@ -73,9 +80,12 @@ export function GrowthInboxSharedDataProvider({ children }: { children: ReactNod
   }, [])
 
   useEffect(() => {
-    if (loadedRef.current) return
-    void refreshCommandCenter()
-  }, [refreshCommandCenter])
+    if (loadedRef.current || !deferUntilLeadId) return
+    const cancelIdle = scheduleGrowthInboxIdleTask(() => {
+      if (!loadedRef.current) void refreshCommandCenter()
+    })
+    return cancelIdle
+  }, [deferUntilLeadId, refreshCommandCenter])
 
   const getCommandCenterLead = useCallback(
     (leadId: string) => findCommandCenterLead(commandCenterDashboard, leadId),

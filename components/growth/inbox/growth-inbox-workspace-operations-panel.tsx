@@ -36,23 +36,23 @@ export function GrowthInboxWorkspaceOperationsPanel() {
         </Button>
       </div>
 
-      <GrowthInboxExpandableLazyPanel title="Inbox Diagnostics" description="Dashboard and sync health">
+      <GrowthInboxExpandableLazyPanel panelId="inbox-diagnostics" title="Inbox Diagnostics" description="Dashboard and sync health">
         <GrowthInboxDiagnosticsPanel />
       </GrowthInboxExpandableLazyPanel>
 
-      <GrowthInboxExpandableLazyPanel title="Campaign Builder Wizard" description="Human-reviewed campaign planning">
+      <GrowthInboxExpandableLazyPanel panelId="campaign-builder" title="Campaign Builder Wizard" description="Human-reviewed campaign planning">
         <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" compact useInboxConcurrencyLimit />
       </GrowthInboxExpandableLazyPanel>
 
-      <GrowthInboxExpandableLazyPanel title="Agent Orchestration" description="Agent routing recommendations">
+      <GrowthInboxExpandableLazyPanel panelId="agent-orchestration" title="Agent Orchestration" description="Agent routing recommendations">
         <GrowthAgentOrchestrationPanel title="Agent Orchestration" compact useInboxConcurrencyLimit />
       </GrowthInboxExpandableLazyPanel>
 
-      <GrowthInboxExpandableLazyPanel title="Real-Time Event Bus" description="Growth realtime events">
+      <GrowthInboxExpandableLazyPanel panelId="realtime-event-bus" title="Real-Time Event Bus" description="Growth realtime events">
         <GrowthRealtimeEventBusPanel title="Real-Time Event Bus" compact useInboxConcurrencyLimit />
       </GrowthInboxExpandableLazyPanel>
 
-      <GrowthInboxExpandableLazyPanel title="Team Queue" description="Team inbox and thread routing">
+      <GrowthInboxExpandableLazyPanel panelId="team-queue" title="Team Queue" description="Team inbox and thread routing">
         <GrowthInboxV2SupportingPanels />
       </GrowthInboxExpandableLazyPanel>
     </div>

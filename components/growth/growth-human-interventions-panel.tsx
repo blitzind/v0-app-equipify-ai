@@ -16,6 +16,7 @@ import {
 } from "@/lib/growth/human-interventions/human-intervention-types"
 import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
 import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
+import { emitGrowthInboxLazyPanelFetch } from "@/lib/growth/inbox/growth-inbox-workflow-lazy-instrumentation"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
 import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
 import { GrowthAgentOrchestrationPanel } from "@/components/growth/growth-agent-orchestration-panel"
@@ -41,6 +42,7 @@ export function GrowthHumanInterventionsPanel({
   useInboxConcurrencyLimit = false,
   enableRealtimeRefresh = true,
   loadOnMount = true,
+  lazyPanelId,
 }: {
   title?: string
   leadId?: string | null
@@ -49,6 +51,7 @@ export function GrowthHumanInterventionsPanel({
   useInboxConcurrencyLimit?: boolean
   enableRealtimeRefresh?: boolean
   loadOnMount?: boolean
+  lazyPanelId?: string
 }) {
   const [filter, setFilter] = useState<HumanInterventionFilter>("all")
   const [loading, setLoading] = useState(false)
@@ -58,6 +61,7 @@ export function GrowthHumanInterventionsPanel({
   const [queue, setQueue] = useState<HumanInterventionsResponse | null>(null)
 
   const load = useCallback(async () => {
+    if (lazyPanelId) emitGrowthInboxLazyPanelFetch(lazyPanelId, "start")
     setLoading(true)
     setError(null)
     try {
@@ -81,8 +85,9 @@ export function GrowthHumanInterventionsPanel({
       setQueue(null)
     } finally {
       setLoading(false)
+      if (lazyPanelId) emitGrowthInboxLazyPanelFetch(lazyPanelId, "complete")
     }
-  }, [compact, filter, leadId, useInboxConcurrencyLimit])
+  }, [compact, filter, leadId, lazyPanelId, useInboxConcurrencyLimit])
 
   useEffect(() => {
     if (!loadOnMount) return
