@@ -35,6 +35,7 @@ import {
   resolveInboxRevenuePlaybook,
 } from "@/lib/growth/inbox/inbox-revenue-context"
 import { useGrowthInboxSharedData } from "@/components/growth/inbox/growth-inbox-shared-data-provider"
+import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 
 type GrowthInboxLeadContextValue = {
   leadId: string | null
@@ -145,8 +146,12 @@ export function GrowthInboxLeadContextProvider({
     const exitParams = new URLSearchParams({ pendingOnly: "true", limit: "20", leadId })
 
     const [workflowRes, exitRes] = await Promise.all([
-      fetch(`/api/platform/growth/replies/workflow-actions?${workflowParams.toString()}`, { cache: "no-store" }),
-      fetch(`/api/platform/growth/replies/sequence-exit-candidates?${exitParams.toString()}`, { cache: "no-store" }),
+      fetchPlatformGrowthClient(`/api/platform/growth/replies/workflow-actions?${workflowParams.toString()}`, {
+        cache: "no-store",
+      }),
+      fetchPlatformGrowthClient(`/api/platform/growth/replies/sequence-exit-candidates?${exitParams.toString()}`, {
+        cache: "no-store",
+      }),
     ])
 
     const workflowPayload = (await workflowRes.json()) as { items?: GrowthReplyWorkflowActionRecord[] }
@@ -170,8 +175,10 @@ export function GrowthInboxLeadContextProvider({
     const bookingParams = new URLSearchParams({ leadId, status: "pending_review" })
 
     const [opportunityDashboardRes, bookingRes] = await Promise.all([
-      fetch(`/api/platform/growth/opportunities/dashboard?leadId=${encodedLeadId}`, { cache: "no-store" }),
-      fetch(`/api/platform/growth/booking-intelligence/recommendations?${bookingParams.toString()}`, {
+      fetchPlatformGrowthClient(`/api/platform/growth/opportunities/dashboard?leadId=${encodedLeadId}`, {
+        cache: "no-store",
+      }),
+      fetchPlatformGrowthClient(`/api/platform/growth/booking-intelligence/recommendations?${bookingParams.toString()}`, {
         cache: "no-store",
       }),
     ])
@@ -203,12 +210,16 @@ export function GrowthInboxLeadContextProvider({
       const encodedLeadId = encodeURIComponent(leadId)
 
       const [memoryRes, timelineRes, copilotRes, leadRes, forecastRes, executionPlanRes] = await Promise.all([
-        fetch(`/api/platform/growth/lead-memory/profile/${encodedLeadId}`, { cache: "no-store" }),
-        fetch(`/api/platform/growth/replies/timeline?leadId=${encodedLeadId}`, { cache: "no-store" }),
-        fetch(`/api/platform/growth/replies/copilot?leadId=${encodedLeadId}`, { cache: "no-store" }),
-        fetch(`/api/platform/growth/leads/${encodedLeadId}`, { cache: "no-store" }),
-        fetch(`/api/platform/growth/revenue-execution/forecast-evidence?leadId=${encodedLeadId}`, { cache: "no-store" }),
-        fetch(`/api/platform/growth/revenue-execution/execution-plan?leadId=${encodedLeadId}`, { cache: "no-store" }),
+        fetchPlatformGrowthClient(`/api/platform/growth/lead-memory/profile/${encodedLeadId}`, { cache: "no-store" }),
+        fetchPlatformGrowthClient(`/api/platform/growth/replies/timeline?leadId=${encodedLeadId}`, { cache: "no-store" }),
+        fetchPlatformGrowthClient(`/api/platform/growth/replies/copilot?leadId=${encodedLeadId}`, { cache: "no-store" }),
+        fetchPlatformGrowthClient(`/api/platform/growth/leads/${encodedLeadId}`, { cache: "no-store" }),
+        fetchPlatformGrowthClient(`/api/platform/growth/revenue-execution/forecast-evidence?leadId=${encodedLeadId}`, {
+          cache: "no-store",
+        }),
+        fetchPlatformGrowthClient(`/api/platform/growth/revenue-execution/execution-plan?leadId=${encodedLeadId}`, {
+          cache: "no-store",
+        }),
       ])
 
       const memoryPayload = (await memoryRes.json()) as { profile?: GrowthLeadMemoryProfileView }

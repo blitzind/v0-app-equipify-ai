@@ -15,6 +15,7 @@ import {
   type HumanInterventionsResponse,
 } from "@/lib/growth/human-interventions/human-intervention-types"
 import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
+import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
 import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
 import { GrowthAgentOrchestrationPanel } from "@/components/growth/growth-agent-orchestration-panel"
@@ -36,10 +37,18 @@ export function GrowthHumanInterventionsPanel({
   title = "Human Interventions",
   leadId,
   compact = false,
+  includeOrchestrationSurfaces = false,
+  useInboxConcurrencyLimit = false,
+  enableRealtimeRefresh = true,
+  loadOnMount = true,
 }: {
   title?: string
   leadId?: string | null
   compact?: boolean
+  includeOrchestrationSurfaces?: boolean
+  useInboxConcurrencyLimit?: boolean
+  enableRealtimeRefresh?: boolean
+  loadOnMount?: boolean
 }) {
   const [filter, setFilter] = useState<HumanInterventionFilter>("all")
   const [loading, setLoading] = useState(false)
@@ -57,7 +66,9 @@ export function GrowthHumanInterventionsPanel({
       params.set("filter", filter)
       params.set("limit", compact ? "8" : "25")
 
-      const res = await fetch(`/api/platform/growth/human-interventions?${params.toString()}`)
+      const res = await fetchPlatformGrowthClient(`/api/platform/growth/human-interventions?${params.toString()}`, {
+        useInboxConcurrencyLimit,
+      })
       const data = (await res.json()) as HumanInterventionsResponse & { ok?: boolean }
       if (!res.ok) {
         setError("Human interventions request failed")
@@ -71,13 +82,18 @@ export function GrowthHumanInterventionsPanel({
     } finally {
       setLoading(false)
     }
-  }, [compact, filter, leadId])
+  }, [compact, filter, leadId, useInboxConcurrencyLimit])
 
   useEffect(() => {
+    if (!loadOnMount) return
     void load()
-  }, [load])
+  }, [load, loadOnMount])
 
-  useGrowthRealtimeRefresh({ subscriber: "human_interventions", onRefresh: () => void load() })
+  useGrowthRealtimeRefresh({
+    subscriber: "human_interventions",
+    onRefresh: () => void load(),
+    enabled: enableRealtimeRefresh,
+  })
 
   async function runAction(intervention: HumanIntervention, action: "mark_reviewed" | "dismiss") {
     setActingId(intervention.intervention_id)
@@ -212,13 +228,13 @@ export function GrowthHumanInterventionsPanel({
         ))}
       </GrowthEnginePanelResilience>
     </GrowthEngineCard>
-    {leadId ? (
+    {includeOrchestrationSurfaces && leadId ? (
       <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" leadId={leadId} compact={compact} />
     ) : null}
-    {leadId ? (
+    {includeOrchestrationSurfaces && leadId ? (
       <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" leadId={leadId} compact={compact} />
     ) : null}
-    {leadId ? (
+    {includeOrchestrationSurfaces && leadId ? (
       <GrowthAgentOrchestrationPanel title="Agent Orchestration" leadId={leadId} compact={compact} />
     ) : null}
     </>

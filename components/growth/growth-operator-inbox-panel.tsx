@@ -21,6 +21,7 @@ import {
   type OperatorInboxQueueResponse,
 } from "@/lib/growth/operator-inbox/operator-inbox-types"
 import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
+import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 
 function priorityTone(priority: OperatorInboxItem["priority"]) {
   switch (priority) {
@@ -59,7 +60,7 @@ export function GrowthOperatorInboxPanel({
       params.set("filter", filter)
       params.set("limit", compact ? "8" : "20")
 
-      const res = await fetch(`/api/platform/growth/operator-inbox?${params.toString()}`)
+      const res = await fetchPlatformGrowthClient(`/api/platform/growth/operator-inbox?${params.toString()}`)
       const data = (await res.json()) as OperatorInboxQueueResponse & { ok?: boolean }
       if (!res.ok) {
         setError("Operator inbox request failed")
@@ -79,7 +80,11 @@ export function GrowthOperatorInboxPanel({
     void load()
   }, [load])
 
-  useGrowthRealtimeRefresh({ subscriber: "operator_inbox", onRefresh: () => void load() })
+  useGrowthRealtimeRefresh({
+    subscriber: "operator_inbox",
+    onRefresh: () => void load(),
+    enabled: !compact,
+  })
 
   async function runAction(item: OperatorInboxItem, action: "mark_viewed" | "mark_reviewed" | "dismiss") {
     setActingId(item.item_id)

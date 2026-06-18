@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react"
 import type { GrowthRevenueCommandCenterLead } from "@/lib/growth/revenue-execution/revenue-execution-types"
+import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 
 type CommandCenterDashboard = {
   sections?: Record<string, GrowthRevenueCommandCenterLead[]>
@@ -54,7 +55,9 @@ export function GrowthInboxSharedDataProvider({ children }: { children: ReactNod
   const refreshCommandCenter = useCallback(async () => {
     setCommandCenterLoading(true)
     try {
-      const response = await fetch("/api/platform/growth/revenue-execution/command-center", { cache: "no-store" })
+      const response = await fetchPlatformGrowthClient("/api/platform/growth/revenue-execution/command-center", {
+        cache: "no-store",
+      })
       const payload = (await response.json()) as { dashboard?: CommandCenterDashboard }
       if (response.ok) {
         setCommandCenterDashboard(payload.dashboard ?? null)

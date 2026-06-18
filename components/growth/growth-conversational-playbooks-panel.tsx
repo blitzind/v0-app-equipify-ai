@@ -18,6 +18,7 @@ import {
   type ConversationalPlaybookSection,
 } from "@/lib/growth/conversational-playbooks/conversational-playbook-types"
 import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
+import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 
 function confidenceTone(score: number): "healthy" | "attention" | "critical" | "neutral" {
   if (score >= 70) return "healthy"
@@ -33,6 +34,10 @@ export function GrowthConversationalPlaybooksPanel({
   industry,
   defaultQuery,
   compact = false,
+  includeOrchestrationSurfaces = false,
+  useInboxConcurrencyLimit = false,
+  enableRealtimeRefresh = true,
+  loadOnMount = true,
 }: {
   consumer: ConversationalPlaybookConsumer
   title?: string
@@ -41,6 +46,10 @@ export function GrowthConversationalPlaybooksPanel({
   industry?: string | null
   defaultQuery?: string
   compact?: boolean
+  includeOrchestrationSurfaces?: boolean
+  useInboxConcurrencyLimit?: boolean
+  enableRealtimeRefresh?: boolean
+  loadOnMount?: boolean
 }) {
   const [query, setQuery] = useState(defaultQuery ?? "")
   const [loading, setLoading] = useState(false)
@@ -53,7 +62,7 @@ export function GrowthConversationalPlaybooksPanel({
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/platform/growth/conversational-playbooks/generate", {
+      const res = await fetchPlatformGrowthClient("/api/platform/growth/conversational-playbooks/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -65,6 +74,7 @@ export function GrowthConversationalPlaybooksPanel({
           include_private: Boolean(leadId),
           persist_audit: true,
         }),
+        useInboxConcurrencyLimit,
       })
       const data = (await res.json()) as { ok?: boolean; playbook?: ConversationalPlaybook }
       if (res.ok && data.playbook) {
@@ -84,13 +94,18 @@ export function GrowthConversationalPlaybooksPanel({
     } finally {
       setLoading(false)
     }
-  }, [companyId, consumer, industry, leadId, query])
+  }, [companyId, consumer, industry, leadId, query, useInboxConcurrencyLimit])
 
   useEffect(() => {
+    if (!loadOnMount) return
     void load()
-  }, [load])
+  }, [load, loadOnMount])
 
-  useGrowthRealtimeRefresh({ subscriber: "conversational_playbooks", onRefresh: () => void load() })
+  useGrowthRealtimeRefresh({
+    subscriber: "conversational_playbooks",
+    onRefresh: () => void load(),
+    enabled: enableRealtimeRefresh,
+  })
 
   async function markReviewed() {
     if (!playbook) return
@@ -276,8 +291,10 @@ export function GrowthConversationalPlaybooksPanel({
         <GrowthEngineHonestEmptyState kind="no_playbooks" />
       )}
     </GrowthEngineCard>
-    {leadId ? <GrowthHumanInterventionsPanel title="Human Interventions" leadId={leadId} compact={compact} /> : null}
-    {leadId ? (
+    {includeOrchestrationSurfaces && leadId ? (
+      <GrowthHumanInterventionsPanel title="Human Interventions" leadId={leadId} compact={compact} />
+    ) : null}
+    {includeOrchestrationSurfaces && leadId ? (
       <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" leadId={leadId} compact={compact} />
     ) : null}
     </>

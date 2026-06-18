@@ -38,6 +38,7 @@ function runAudit(): void {
   console.log("  ✓ inbox tab is viewport-first with compact states and no supporting panels")
 
   const workflowPanel = readSource("components/growth/inbox/growth-inbox-workspace-workflow-panel.tsx")
+  assert.match(workflowPanel, /GrowthInboxExpandableLazyPanel/)
   assert.match(workflowPanel, /includeEmbeddedSurfaces=\{false\}/)
   assert.equal((workflowPanel.match(/<GrowthHumanInterventionsPanel/g) ?? []).length, 1)
   assert.equal((workflowPanel.match(/<GrowthConversationalPlaybooksPanel/g) ?? []).length, 1)
@@ -45,7 +46,7 @@ function runAudit(): void {
   assert.equal((workflowPanel.match(/<GrowthSequencePreviewStudioPanel/g) ?? []).length, 1)
   assert.equal((workflowPanel.match(/<GrowthInboxReplyIntelligencePanel/g) ?? []).length, 1)
   assert.doesNotMatch(workflowPanel, /GrowthReplyWorkflowDashboardBody/)
-  console.log("  ✓ workflow tab mounts each execution surface once")
+  console.log("  ✓ workflow tab mounts each execution surface once behind lazy panels")
 
   const workflowActions = readSource("components/growth/growth-reply-workflow-actions-panel.tsx")
   assert.match(workflowActions, /includeEmbeddedSurfaces/)
@@ -56,9 +57,15 @@ function runAudit(): void {
   console.log("  ✓ tri-column shell height reduced for laptop viewport")
 
   const operationsPanel = readSource("components/growth/inbox/growth-inbox-workspace-operations-panel.tsx")
+  assert.match(operationsPanel, /GrowthInboxExpandableLazyPanel/)
   assert.match(operationsPanel, /GrowthInboxV2SupportingPanels/)
   assert.match(operationsPanel, /growth-inbox-operations-panel-v3/)
-  console.log("  ✓ team queue supporting panel relocated to operations tab")
+  console.log("  ✓ team queue supporting panel relocated to operations tab with lazy mounts")
+
+  const replyDraft = readSource("components/growth/inbox/growth-inbox-action-center-reply-draft-embed.tsx")
+  assert.doesNotMatch(replyDraft, /GrowthHumanInterventionsPanel/)
+  assert.doesNotMatch(replyDraft, /GrowthCampaignBuilderWizardPanel/)
+  console.log("  ✓ action center reply draft does not fan out orchestration APIs on inbox tab")
 
   const compactState = readSource("components/growth/inbox/growth-inbox-compact-panel-state.tsx")
   assert.match(compactState, /max-h-\[7\.5rem\]/)

@@ -15,6 +15,7 @@ import {
   type SequencePreviewStudioResponse,
 } from "@/lib/growth/sequence-preview/sequence-preview-types"
 import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
+import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
 import { GrowthAgentOrchestrationPanel } from "@/components/growth/growth-agent-orchestration-panel"
 
@@ -47,11 +48,19 @@ export function GrowthSequencePreviewStudioPanel({
   patternId,
   leadId,
   compact = false,
+  includeOrchestrationSurfaces = false,
+  useInboxConcurrencyLimit = false,
+  enableRealtimeRefresh = true,
+  loadOnMount = true,
 }: {
   title?: string
   patternId?: string | null
   leadId?: string | null
   compact?: boolean
+  includeOrchestrationSurfaces?: boolean
+  useInboxConcurrencyLimit?: boolean
+  enableRealtimeRefresh?: boolean
+  loadOnMount?: boolean
 }) {
   const [filter, setFilter] = useState<SequencePreviewFilter>("all")
   const [loading, setLoading] = useState(false)
@@ -70,7 +79,9 @@ export function GrowthSequencePreviewStudioPanel({
       params.set("filter", filter)
       params.set("limit", compact ? "5" : "15")
 
-      const res = await fetch(`/api/platform/growth/sequence-preview?${params.toString()}`)
+      const res = await fetchPlatformGrowthClient(`/api/platform/growth/sequence-preview?${params.toString()}`, {
+        useInboxConcurrencyLimit,
+      })
       const data = (await res.json()) as SequencePreviewStudioResponse & { ok?: boolean }
       if (!res.ok) {
         setError("Sequence preview request failed")
@@ -84,13 +95,18 @@ export function GrowthSequencePreviewStudioPanel({
     } finally {
       setLoading(false)
     }
-  }, [compact, filter, leadId, patternId])
+  }, [compact, filter, leadId, patternId, useInboxConcurrencyLimit])
 
   useEffect(() => {
+    if (!loadOnMount) return
     void load()
-  }, [load])
+  }, [load, loadOnMount])
 
-  useGrowthRealtimeRefresh({ subscriber: "sequence_preview", onRefresh: () => void load() })
+  useGrowthRealtimeRefresh({
+    subscriber: "sequence_preview",
+    onRefresh: () => void load(),
+    enabled: enableRealtimeRefresh,
+  })
 
   async function runAction(preview: SequencePreview, action: "mark_reviewed" | "dismiss") {
     setActingId(preview.preview_id)
@@ -294,18 +310,22 @@ export function GrowthSequencePreviewStudioPanel({
         ))}
       </GrowthEnginePanelResilience>
     </GrowthEngineCard>
-    <GrowthCampaignBuilderWizardPanel
-      title="Campaign Builder Wizard"
-      leadId={leadId}
-      patternId={patternId}
-      compact={compact}
-    />
-    <GrowthAgentOrchestrationPanel
-      title="Agent Orchestration"
-      leadId={leadId}
-      patternId={patternId}
-      compact={compact}
-    />
+    {includeOrchestrationSurfaces ? (
+      <GrowthCampaignBuilderWizardPanel
+        title="Campaign Builder Wizard"
+        leadId={leadId}
+        patternId={patternId}
+        compact={compact}
+      />
+    ) : null}
+    {includeOrchestrationSurfaces ? (
+      <GrowthAgentOrchestrationPanel
+        title="Agent Orchestration"
+        leadId={leadId}
+        patternId={patternId}
+        compact={compact}
+      />
+    ) : null}
     </>
   )
 }

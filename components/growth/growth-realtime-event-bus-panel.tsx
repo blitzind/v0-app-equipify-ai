@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
 import { subscribeToGrowthRealtimeEvents, type GrowthRealtimeSubscriptionMode } from "@/lib/growth/realtime-events/realtime-events-subscriber"
+import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 import {
   REALTIME_EVENT_FILTERS,
   REALTIME_EVENTS_QA_MARKER,
@@ -32,9 +33,15 @@ function deliveryTone(status: GrowthRealtimeEvent["delivery_status"]) {
 export function GrowthRealtimeEventBusPanel({
   title = "Real-Time Event Bus",
   compact = false,
+  useInboxConcurrencyLimit = false,
+  enableSubscription = true,
+  loadOnMount = true,
 }: {
   title?: string
   compact?: boolean
+  useInboxConcurrencyLimit?: boolean
+  enableSubscription?: boolean
+  loadOnMount?: boolean
 }) {
   const [filter, setFilter] = useState<RealtimeEventFilter>("all")
   const [loading, setLoading] = useState(false)
@@ -52,7 +59,9 @@ export function GrowthRealtimeEventBusPanel({
       const params = new URLSearchParams()
       params.set("filter", filter)
       params.set("limit", compact ? "8" : "25")
-      const res = await fetch(`/api/platform/growth/realtime-events?${params.toString()}`)
+      const res = await fetchPlatformGrowthClient(`/api/platform/growth/realtime-events?${params.toString()}`, {
+        useInboxConcurrencyLimit,
+      })
       const data = (await res.json()) as GrowthRealtimeEventsResponse & { ok?: boolean }
       if (!res.ok) {
         setError("Realtime events request failed")
@@ -66,13 +75,15 @@ export function GrowthRealtimeEventBusPanel({
     } finally {
       setLoading(false)
     }
-  }, [compact, filter])
+  }, [compact, filter, useInboxConcurrencyLimit])
 
   useEffect(() => {
+    if (!loadOnMount) return
     void load()
-  }, [load])
+  }, [load, loadOnMount])
 
   useEffect(() => {
+    if (!enableSubscription) return
     subscriptionRef.current?.unsubscribe()
     subscriptionRef.current = subscribeToGrowthRealtimeEvents({
       limit: compact ? 8 : 25,
@@ -96,7 +107,7 @@ export function GrowthRealtimeEventBusPanel({
       },
     })
     return () => subscriptionRef.current?.unsubscribe()
-  }, [compact])
+  }, [compact, enableSubscription])
 
   async function runAction(event: GrowthRealtimeEvent, action: "mark_reviewed" | "dismiss") {
     setActingId(event.event_id)

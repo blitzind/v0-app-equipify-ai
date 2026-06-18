@@ -15,6 +15,7 @@ import {
   type SmartFollowUpPolicy,
 } from "@/lib/growth/follow-up-policies/follow-up-policy-types"
 import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
+import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
 
 function priorityTone(priority: SmartFollowUpPolicy["priority"]) {
@@ -45,10 +46,18 @@ export function GrowthSmartFollowUpPoliciesPanel({
   title = "Smart Follow-Up Policies",
   leadId,
   compact = false,
+  includeOrchestrationSurfaces = false,
+  useInboxConcurrencyLimit = false,
+  enableRealtimeRefresh = true,
+  loadOnMount = true,
 }: {
   title?: string
   leadId?: string | null
   compact?: boolean
+  includeOrchestrationSurfaces?: boolean
+  useInboxConcurrencyLimit?: boolean
+  enableRealtimeRefresh?: boolean
+  loadOnMount?: boolean
 }) {
   const [filter, setFilter] = useState<SmartFollowUpFilter>("all")
   const [loading, setLoading] = useState(false)
@@ -66,7 +75,9 @@ export function GrowthSmartFollowUpPoliciesPanel({
       params.set("filter", filter)
       params.set("limit", compact ? "8" : "25")
 
-      const res = await fetch(`/api/platform/growth/follow-up-policies?${params.toString()}`)
+      const res = await fetchPlatformGrowthClient(`/api/platform/growth/follow-up-policies?${params.toString()}`, {
+        useInboxConcurrencyLimit,
+      })
       const data = (await res.json()) as SmartFollowUpPoliciesResponse & { ok?: boolean }
       if (!res.ok) {
         setError("Follow-up policies request failed")
@@ -80,13 +91,18 @@ export function GrowthSmartFollowUpPoliciesPanel({
     } finally {
       setLoading(false)
     }
-  }, [compact, filter, leadId])
+  }, [compact, filter, leadId, useInboxConcurrencyLimit])
 
   useEffect(() => {
+    if (!loadOnMount) return
     void load()
-  }, [load])
+  }, [load, loadOnMount])
 
-  useGrowthRealtimeRefresh({ subscriber: "follow_up_policies", onRefresh: () => void load() })
+  useGrowthRealtimeRefresh({
+    subscriber: "follow_up_policies",
+    onRefresh: () => void load(),
+    enabled: enableRealtimeRefresh,
+  })
 
   async function runAction(policy: SmartFollowUpPolicy, action: "mark_reviewed" | "dismiss") {
     setActingId(policy.policy_id)
@@ -272,7 +288,7 @@ export function GrowthSmartFollowUpPoliciesPanel({
         ))}
       </GrowthEnginePanelResilience>
     </GrowthEngineCard>
-    {leadId ? (
+    {includeOrchestrationSurfaces && leadId ? (
       <GrowthCampaignBuilderWizardPanel title="Campaign Builder Wizard" leadId={leadId} compact={compact} />
     ) : null}
     </>

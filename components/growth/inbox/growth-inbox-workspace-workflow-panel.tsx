@@ -7,24 +7,50 @@ import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-seq
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
+import { GrowthInboxExpandableLazyPanel } from "@/components/growth/inbox/growth-inbox-expandable-lazy-panel"
 
 export const GROWTH_INBOX_WORKFLOW_PANEL_QA_MARKER = "growth-inbox-workflow-panel-v3" as const
 
-/** Phase 8A.2 — each execution surface mounted once; no nested duplicate panels. */
+/** Phase 8F — workflow intelligence summary first; execution panels lazy-load on expand. */
 export function GrowthInboxWorkspaceWorkflowPanel() {
   return (
     <div className="space-y-4" data-qa-marker={GROWTH_INBOX_WORKFLOW_PANEL_QA_MARKER}>
       <GrowthInboxWorkflowIntelligenceSummary />
-      <GrowthReplyWorkflowActionsPanel
-        showSequenceExit
-        title="Workflow Action Center"
-        includeEmbeddedSurfaces={false}
-      />
-      <GrowthHumanInterventionsPanel title="Human Interventions" compact />
-      <GrowthConversationalPlaybooksPanel consumer="operator_inbox" title="Conversational Playbook" compact />
-      <GrowthInboxReplyIntelligencePanel leadId={null} compact />
-      <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" compact />
-      <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" compact />
+
+      <GrowthInboxExpandableLazyPanel title="Workflow Action Center" description="Pending workflow actions and exits">
+        <GrowthReplyWorkflowActionsPanel
+          showSequenceExit
+          title="Workflow Action Center"
+          includeEmbeddedSurfaces={false}
+          useInboxConcurrencyLimit
+        />
+      </GrowthInboxExpandableLazyPanel>
+
+      <GrowthInboxExpandableLazyPanel title="Human Interventions" description="Operator intervention queue">
+        <GrowthHumanInterventionsPanel title="Human Interventions" compact useInboxConcurrencyLimit />
+      </GrowthInboxExpandableLazyPanel>
+
+      <GrowthInboxExpandableLazyPanel title="Conversational Playbook" description="Knowledge-augmented coaching">
+        <GrowthConversationalPlaybooksPanel
+          consumer="operator_inbox"
+          title="Conversational Playbook"
+          compact
+          loadOnMount
+          useInboxConcurrencyLimit
+        />
+      </GrowthInboxExpandableLazyPanel>
+
+      <GrowthInboxExpandableLazyPanel title="Reply Intelligence" description="Reply timeline and copilot context">
+        <GrowthInboxReplyIntelligencePanel leadId={null} compact />
+      </GrowthInboxExpandableLazyPanel>
+
+      <GrowthInboxExpandableLazyPanel title="Smart Follow-Up Policies" description="Deterministic follow-up planning">
+        <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" compact useInboxConcurrencyLimit />
+      </GrowthInboxExpandableLazyPanel>
+
+      <GrowthInboxExpandableLazyPanel title="Sequence Preview Studio" description="Sequence preview recommendations">
+        <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" compact useInboxConcurrencyLimit />
+      </GrowthInboxExpandableLazyPanel>
     </div>
   )
 }

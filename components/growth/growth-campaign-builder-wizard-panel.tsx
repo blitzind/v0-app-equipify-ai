@@ -15,6 +15,7 @@ import {
   type CampaignBuilderWizardResponse,
 } from "@/lib/growth/campaign-builder/campaign-builder-types"
 import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
+import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 
 function statusTone(status: CampaignBuilderWizard["wizard_status"]) {
   switch (status) {
@@ -47,11 +48,17 @@ export function GrowthCampaignBuilderWizardPanel({
   leadId,
   patternId,
   compact = false,
+  useInboxConcurrencyLimit = false,
+  enableRealtimeRefresh = true,
+  loadOnMount = true,
 }: {
   title?: string
   leadId?: string | null
   patternId?: string | null
   compact?: boolean
+  useInboxConcurrencyLimit?: boolean
+  enableRealtimeRefresh?: boolean
+  loadOnMount?: boolean
 }) {
   const [filter, setFilter] = useState<CampaignBuilderFilter>("all")
   const [loading, setLoading] = useState(false)
@@ -70,7 +77,9 @@ export function GrowthCampaignBuilderWizardPanel({
       params.set("filter", filter)
       params.set("limit", compact ? "3" : "10")
 
-      const res = await fetch(`/api/platform/growth/campaign-builder?${params.toString()}`)
+      const res = await fetchPlatformGrowthClient(`/api/platform/growth/campaign-builder?${params.toString()}`, {
+        useInboxConcurrencyLimit,
+      })
       const data = (await res.json()) as CampaignBuilderWizardResponse & { ok?: boolean }
       if (!res.ok) {
         setError("Campaign builder request failed")
@@ -84,13 +93,18 @@ export function GrowthCampaignBuilderWizardPanel({
     } finally {
       setLoading(false)
     }
-  }, [compact, filter, leadId, patternId])
+  }, [compact, filter, leadId, patternId, useInboxConcurrencyLimit])
 
   useEffect(() => {
+    if (!loadOnMount) return
     void load()
-  }, [load])
+  }, [load, loadOnMount])
 
-  useGrowthRealtimeRefresh({ subscriber: "campaign_builder", onRefresh: () => void load() })
+  useGrowthRealtimeRefresh({
+    subscriber: "campaign_builder",
+    onRefresh: () => void load(),
+    enabled: enableRealtimeRefresh,
+  })
 
   async function runAction(wizard: CampaignBuilderWizard, action: "mark_reviewed" | "dismiss") {
     setActingId(wizard.wizard_id)

@@ -16,6 +16,7 @@ import {
   type GrowthAgentTask,
 } from "@/lib/growth/agent-orchestration/agent-orchestration-types"
 import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
+import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 
 function statusTone(status: GrowthAgentPlan["plan_status"]) {
   switch (status) {
@@ -49,11 +50,17 @@ export function GrowthAgentOrchestrationPanel({
   leadId,
   patternId,
   compact = false,
+  useInboxConcurrencyLimit = false,
+  enableRealtimeRefresh = true,
+  loadOnMount = true,
 }: {
   title?: string
   leadId?: string | null
   patternId?: string | null
   compact?: boolean
+  useInboxConcurrencyLimit?: boolean
+  enableRealtimeRefresh?: boolean
+  loadOnMount?: boolean
 }) {
   const [filter, setFilter] = useState<AgentOrchestrationFilter>("all")
   const [loading, setLoading] = useState(false)
@@ -72,7 +79,9 @@ export function GrowthAgentOrchestrationPanel({
       params.set("filter", filter)
       params.set("limit", compact ? "3" : "10")
 
-      const res = await fetch(`/api/platform/growth/agent-orchestration?${params.toString()}`)
+      const res = await fetchPlatformGrowthClient(`/api/platform/growth/agent-orchestration?${params.toString()}`, {
+        useInboxConcurrencyLimit,
+      })
       const data = (await res.json()) as GrowthAgentOrchestrationResponse & { ok?: boolean }
       if (!res.ok) {
         setError("Agent orchestration request failed")
@@ -86,13 +95,18 @@ export function GrowthAgentOrchestrationPanel({
     } finally {
       setLoading(false)
     }
-  }, [compact, filter, leadId, patternId])
+  }, [compact, filter, leadId, patternId, useInboxConcurrencyLimit])
 
   useEffect(() => {
+    if (!loadOnMount) return
     void load()
-  }, [load])
+  }, [load, loadOnMount])
 
-  useGrowthRealtimeRefresh({ subscriber: "agent_orchestration", onRefresh: () => void load() })
+  useGrowthRealtimeRefresh({
+    subscriber: "agent_orchestration",
+    onRefresh: () => void load(),
+    enabled: enableRealtimeRefresh,
+  })
 
   async function runAction(plan: GrowthAgentPlan, action: "mark_reviewed" | "dismiss") {
     setActingId(plan.plan_id)

@@ -100,6 +100,7 @@ function runAudit(): void {
 
   const workflowPanel = readSource("components/growth/inbox/growth-inbox-workspace-workflow-panel.tsx")
   assert.match(workflowPanel, /GrowthInboxWorkflowIntelligenceSummary/)
+  assert.match(workflowPanel, /GrowthInboxExpandableLazyPanel/)
   assert.match(workflowPanel, /includeEmbeddedSurfaces=\{false\}/)
   assert.match(workflowPanel, /GrowthHumanInterventionsPanel/)
   assert.match(workflowPanel, /GrowthConversationalPlaybooksPanel/)
@@ -109,15 +110,16 @@ function runAudit(): void {
   assert.doesNotMatch(workflowPanel, /GrowthReplyWorkflowDashboardBody/)
   assert.doesNotMatch(workflowPanel, /GrowthCampaignBuilderWizardPanel/)
   assert.doesNotMatch(workflowPanel, /GrowthRealtimeEventBusPanel/)
-  console.log("  ✓ workflow tab hosts execution surfaces without orchestration duplicates")
+  console.log("  ✓ workflow tab hosts execution surfaces behind lazy mounts without orchestration duplicates")
 
   const operationsPanel = readSource("components/growth/inbox/growth-inbox-workspace-operations-panel.tsx")
+  assert.match(operationsPanel, /GrowthInboxExpandableLazyPanel/)
   assert.match(operationsPanel, /GrowthInboxDiagnosticsPanel/)
   assert.match(operationsPanel, /GrowthCampaignBuilderWizardPanel/)
   assert.match(operationsPanel, /GrowthAgentOrchestrationPanel/)
   assert.match(operationsPanel, /GrowthRealtimeEventBusPanel/)
   assert.match(operationsPanel, /Sequence Execution/)
-  console.log("  ✓ operations tab hosts diagnostics and orchestration surfaces")
+  console.log("  ✓ operations tab hosts diagnostics and orchestration surfaces behind lazy mounts")
 
   for (const page of GROWTH_INBOX_TAB_SHELL_PAGES) {
     assert.ok(fs.existsSync(path.join(ROOT, page)), `missing tab page: ${page}`)

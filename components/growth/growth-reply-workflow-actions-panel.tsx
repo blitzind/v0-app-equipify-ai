@@ -31,6 +31,7 @@ import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GROWTH_REPLY_WORKFLOW_CENTER_QA_MARKER } from "@/lib/growth/reply-intelligence/workflow-actions-types"
 import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
+import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 
 type FilterKey = "all" | "interested" | "call_task" | "follow_up" | "opportunity"
 
@@ -284,6 +285,7 @@ export function GrowthReplyWorkflowActionsPanel({
   externalItems,
   externalExitCandidates,
   onExternalRefresh,
+  useInboxConcurrencyLimit = false,
 }: {
   leadId?: string
   compact?: boolean
@@ -297,6 +299,7 @@ export function GrowthReplyWorkflowActionsPanel({
   externalItems?: GrowthReplyWorkflowActionRecord[]
   externalExitCandidates?: GrowthSequenceExitCandidateRecord[]
   onExternalRefresh?: () => void | Promise<void>
+  useInboxConcurrencyLimit?: boolean
 }) {
   const [dashboard, setDashboard] = useState<GrowthReplyWorkflowActionDashboard | null>(null)
   const [items, setItems] = useState<GrowthReplyWorkflowActionRecord[]>([])
@@ -320,11 +323,15 @@ export function GrowthReplyWorkflowActionsPanel({
       const exitParams = new URLSearchParams({ pendingOnly: "true", limit: "20" })
       if (leadId) exitParams.set("leadId", leadId)
 
+      const fetchOpts = { cache: "no-store" as const, useInboxConcurrencyLimit }
       const [dashRes, itemsRes, exitRes] = await Promise.all([
-        fetch("/api/platform/growth/replies/workflow-actions/dashboard", { cache: "no-store" }),
-        fetch(`/api/platform/growth/replies/workflow-actions?${params.toString()}`, { cache: "no-store" }),
+        fetchPlatformGrowthClient("/api/platform/growth/replies/workflow-actions/dashboard", fetchOpts),
+        fetchPlatformGrowthClient(`/api/platform/growth/replies/workflow-actions?${params.toString()}`, fetchOpts),
         showSequenceExit
-          ? fetch(`/api/platform/growth/replies/sequence-exit-candidates?${exitParams.toString()}`, { cache: "no-store" })
+          ? fetchPlatformGrowthClient(
+              `/api/platform/growth/replies/sequence-exit-candidates?${exitParams.toString()}`,
+              fetchOpts,
+            )
           : Promise.resolve(null),
       ])
 
@@ -344,7 +351,7 @@ export function GrowthReplyWorkflowActionsPanel({
     } finally {
       setLoading(false)
     }
-  }, [leadId, showSequenceExit])
+  }, [leadId, showSequenceExit, useInboxConcurrencyLimit])
 
   const reloadData = useCallback(async () => {
     if (useExternalData) {

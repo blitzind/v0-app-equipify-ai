@@ -1,13 +1,16 @@
 /** Client-safe reply intelligence dashboard fetch (Phase 7I). */
 
 import type { GrowthSalesExecutionDashboard } from "@/lib/growth/reply-intelligence/reply-intent-types"
+import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 
 export const GROWTH_REPLY_INTELLIGENCE_DASHBOARD_CLIENT_QA_MARKER =
   "growth-reply-intelligence-dashboard-client-v1" as const
 
 export async function fetchGrowthReplyIntelligenceDashboard(): Promise<GrowthSalesExecutionDashboard> {
   const params = new URLSearchParams({ view: "needs_action", limit: "1" })
-  const res = await fetch(`/api/platform/growth/replies/dashboard?${params.toString()}`, { cache: "no-store" })
+  const res = await fetchPlatformGrowthClient(`/api/platform/growth/replies/dashboard?${params.toString()}`, {
+    cache: "no-store",
+  })
   const data = (await res.json().catch(() => ({}))) as {
     ok?: boolean
     dashboard?: GrowthSalesExecutionDashboard

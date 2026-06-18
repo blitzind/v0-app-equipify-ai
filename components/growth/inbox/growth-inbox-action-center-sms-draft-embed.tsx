@@ -5,9 +5,6 @@ import { CheckCircle2, Copy, Loader2, Phone, Send, Sparkles, Target } from "luci
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
-import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
-import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
-import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
 import { GrowthInboxWidgetErrorBoundary } from "@/components/growth/growth-inbox-widget-error-boundary"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
@@ -480,23 +477,6 @@ export function GrowthInboxActionCenterSmsDraftEmbed() {
           {suggestions?.memoryUsed.length ? (
             <p className="text-[10px] text-muted-foreground">Memory: {suggestions.memoryUsed.join(" · ")}</p>
           ) : null}
-
-          <GrowthConversationalPlaybooksPanel
-            consumer="sms"
-            title="SMS Conversational Playbook"
-            leadId={selectedThread.lead_id}
-            compact
-          />
-          <GrowthHumanInterventionsPanel
-            title="Human Interventions"
-            leadId={selectedThread.lead_id}
-            compact
-          />
-          <GrowthSmartFollowUpPoliciesPanel
-            title="Smart Follow-Up Policies"
-            leadId={selectedThread.lead_id}
-            compact
-          />
         </div>
       </GrowthInboxWidgetErrorBoundary>
     </div>

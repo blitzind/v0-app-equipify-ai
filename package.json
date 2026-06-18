@@ -145,6 +145,7 @@
     "test:growth-inbox-replies-architecture": "tsx scripts/test-growth-inbox-replies-architecture.ts",
     "test:growth-inbox-workspace": "tsx scripts/test-growth-inbox-workspace.ts",
     "test:growth-inbox-ia-simplification": "tsx scripts/test-growth-inbox-ia-simplification.ts",
+    "test:growth-inbox-api-fan-out": "tsx scripts/test-growth-inbox-api-fan-out.ts",
     "test:growth-inbox-viewport-polish": "tsx scripts/test-growth-inbox-viewport-polish.ts",
     "test:growth-inbox-operations-provider": "tsx scripts/test-growth-inbox-operations-provider.ts",
     "test:growth-inbox-metrics-parity": "tsx scripts/test-growth-inbox-metrics-parity.ts",
