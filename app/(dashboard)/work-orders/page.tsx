@@ -48,6 +48,7 @@ import {
   toScheduleAssigneePickerOptions,
 } from "@/lib/work-orders/load-technician-assign-options"
 import { workOrderTypeUiLabel } from "@/lib/work-orders/work-order-type-labels"
+import { WORK_ORDERS_LIST_PAGE_LIMIT } from "@/lib/work-orders/work-orders-list-limit"
 
 const UUID_PARAM =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -942,7 +943,7 @@ function WorkOrdersPageInner() {
           else q = q.in("id", scopedIds)
         }
         q = applyArchivedAtScope(q, archiveScope)
-        return q
+        return q.limit(WORK_ORDERS_LIST_PAGE_LIMIT)
       }
 
       let includeNum = true

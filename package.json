@@ -668,7 +668,12 @@
     "test:catalog-import-manufacturer": "tsx scripts/test-catalog-import-manufacturer.ts",
     "test:catalog-import-template": "tsx scripts/test-catalog-import-template.ts",
     "test:extract-price-list-from-csv": "tsx scripts/test-extract-price-list-from-csv.ts",
-    "test:technician-push": "tsx scripts/test-technician-push.ts"
+    "test:technician-push": "tsx scripts/test-technician-push.ts",
+    "test:equipify-core-certification-foundation": "tsx scripts/test-equipify-core-production-certification-foundation.ts",
+    "test:equipify-core-production-readiness": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-equipify-core-production.ts --mode=readiness",
+    "test:equipify-core-production-read-safe": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-equipify-core-production.ts --mode=read-safe",
+    "test:equipify-core-production-readiness:vercel": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-equipify-core-production.ts --mode=readiness",
+    "test:equipify-core-production-read-safe:vercel": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-equipify-core-production.ts --mode=read-safe"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
