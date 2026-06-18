@@ -1,4 +1,5 @@
 import { normalizePlanIdForRead } from "@/lib/billing/plan-id"
+import { getOrganizationPlanDisplayFromWorkspace } from "@/lib/billing/get-organization-plan-display"
 import type { TenantWorkspace } from "@/lib/tenant-data"
 
 /**
@@ -33,16 +34,21 @@ export function planBadgeFromWorkspace(workspace: TenantWorkspace): { label: str
 
   if (sub === undefined) {
     const id = normalizePlanIdForRead(workspace.planId)
-    return PLAN_BADGE_META[id] ?? MUTED
+    const meta = PLAN_BADGE_META[id] ?? MUTED
+    return {
+      ...meta,
+      label: getOrganizationPlanDisplayFromWorkspace(workspace),
+    }
   }
 
-  if (sub === null) return MUTED
+  if (sub === null) return { ...MUTED, label: "Equipify" }
 
   const id = normalizePlanIdForRead(sub.planId)
   const meta = PLAN_BADGE_META[id] ?? { label: id, color: "#64748b" }
   const trialing = String(sub.status).toLowerCase() === "trialing"
+  const branded = getOrganizationPlanDisplayFromWorkspace(workspace)
   return {
     ...meta,
-    label: trialing ? `${meta.label} Trial` : meta.label,
+    label: trialing ? `${branded} Trial` : branded,
   }
 }

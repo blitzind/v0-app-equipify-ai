@@ -673,7 +673,22 @@
     "test:equipify-core-production-readiness": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-equipify-core-production.ts --mode=readiness",
     "test:equipify-core-production-read-safe": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-equipify-core-production.ts --mode=read-safe",
     "test:equipify-core-production-readiness:vercel": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-equipify-core-production.ts --mode=readiness",
-    "test:equipify-core-production-read-safe:vercel": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-equipify-core-production.ts --mode=read-safe"
+    "test:equipify-core-production-read-safe:vercel": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-equipify-core-production.ts --mode=read-safe",
+    "test:equipify-core-production-mutation-dry-run": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-equipify-core-production.ts --mode=mutation-dry-run",
+    "test:equipify-core-production-payment-dry-run": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-equipify-core-production.ts --mode=payment-dry-run",
+    "test:equipify-core-production-browser-revenue": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-equipify-core-production.ts --mode=browser-revenue",
+    "test:equipify-core-production-mutation-dry-run:vercel": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-equipify-core-production.ts --mode=mutation-dry-run",
+    "test:equipify-core-production-payment-dry-run:vercel": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-equipify-core-production.ts --mode=payment-dry-run",
+    "test:equipify-core-production-browser-revenue:vercel": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-equipify-core-production.ts --mode=browser-revenue",
+    "test:equipify-plan-display-name": "tsx scripts/test-equipify-plan-display-name.ts",
+    "provision:equipify-core-revenue-fixtures": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/provision-equipify-core-revenue-fixtures.ts",
+    "provision:equipify-core-revenue-fixtures:vercel": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/provision-equipify-core-revenue-fixtures.ts",
+    "test:equipify-core-revenue-ec6": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-equipify-core-revenue-ec6.ts",
+    "test:equipify-core-revenue-ec6:vercel": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-equipify-core-revenue-ec6.ts",
+    "save:equipify-core-cert-storage-state": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/save-equipify-core-cert-storage-state.ts",
+    "save:equipify-core-cert-storage-state:vercel": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/save-equipify-core-cert-storage-state.ts",
+    "test:equipify-core-smoke-certification": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-equipify-core-smoke-certification.ts",
+    "test:equipify-core-smoke-certification:vercel": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-equipify-core-smoke.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -31,6 +31,10 @@ const REQUIRED_FILES = [
   "docs/EQUIPIFY_PLAN_NAMING_MIGRATION.md",
   "lib/certification/equipify-core-runtime-inventory.ts",
   "lib/certification/equipify-core-certification-helpers.ts",
+  "lib/certification/equipify-core-production-certification.ts",
+  "lib/certification/equipify-core-revenue-certification.ts",
+  "lib/certification/equipify-core-revenue-dependency-inventory.ts",
+  "scripts/certify-equipify-core-production.ts",
   "scripts/test-equipify-core-production-certification-foundation.ts",
 ] as const
 

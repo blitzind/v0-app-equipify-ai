@@ -28,3 +28,9 @@ e2e/screenshots/.auth/user.json
 screenshots/output/
 test-results/
 playwright-report/
+
+# Production certification artifacts (sessions, fixtures — never commit)
+scripts/.equipify-core-cert-storage-state.json
+scripts/.equipify-core-portal-cert-storage-state.json
+scripts/.equipify-core-revenue-fixtures.json
+scripts/.growth-cert-storage-state.json

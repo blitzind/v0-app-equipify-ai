@@ -27,7 +27,7 @@ import {
 } from "@/lib/growth/qa/supabase-cli-linked-project-bootstrap"
 import { EQUIPIFY_CORE_PRODUCTION_HOST } from "@/lib/certification/equipify-core-runtime-inventory"
 
-export const EQUIPIFY_CORE_PRODUCTION_CERT_QA_MARKER = "equipify-core-certification-ec-2-v1" as const
+export const EQUIPIFY_CORE_PRODUCTION_CERT_QA_MARKER = "equipify-core-certification-ec-4-v1" as const
 
 export const EQUIPIFY_CORE_PRODUCTION_ENV_SOURCES = [
   ".env.vercel.production",
@@ -40,6 +40,7 @@ export type EquipifyCoreCertMode =
   | "read-safe"
   | "mutation-dry-run"
   | "payment-dry-run"
+  | "browser-revenue"
 
 export type EnvPresenceStatus = "present" | "missing" | "optional_missing" | "disabled_by_flag"
 
@@ -313,7 +314,7 @@ export function runEquipifyCoreReadinessChecks(): ReadinessReport {
   }
 }
 
-async function fetchProductionRoute(
+export async function fetchProductionRoute(
   path: string,
   options?: { expectStatuses?: number[]; timeoutMs?: number },
 ): Promise<{ ok: boolean; status: number; durationMs: number; error?: string }> {
@@ -340,7 +341,7 @@ async function fetchProductionRoute(
   }
 }
 
-function detectWorkOrdersUnboundedClientLoad(): { unbounded: boolean; detail: string; limit: number | null } {
+export function detectWorkOrdersUnboundedClientLoad(): { unbounded: boolean; detail: string; limit: number | null } {
   const filePath = resolve(process.cwd(), "app/(dashboard)/work-orders/page.tsx")
   const limitModulePath = resolve(process.cwd(), "lib/work-orders/work-orders-list-limit.ts")
   if (!existsSync(filePath)) {
@@ -382,7 +383,7 @@ function detectWorkOrdersUnboundedClientLoad(): { unbounded: boolean; detail: st
   }
 }
 
-async function resolveCertOrganizationId(
+export async function resolveCertOrganizationId(
   admin: SupabaseClient,
 ): Promise<{ organizationId: string; source: string } | null> {
   const fromEnv = process.env.EQUIPIFY_CORE_CERT_ORGANIZATION_ID?.trim()
@@ -420,7 +421,7 @@ async function readListSample(
   return { ok: true, count: data?.length ?? 0 }
 }
 
-async function bootstrapEquipifyCoreReadSafeSupabase(): Promise<{
+export async function bootstrapEquipifyCoreCertSupabase(): Promise<{
   url: string
   jwt: string
   source: string
@@ -454,7 +455,7 @@ export async function runEquipifyCoreReadSafeChecks(): Promise<ReadSafeReport> {
   const executed_at = new Date().toISOString()
   const checks: CertCheckResult[] = []
 
-  const boot = await bootstrapEquipifyCoreReadSafeSupabase()
+  const boot = await bootstrapEquipifyCoreCertSupabase()
 
   if (!boot) {
     checks.push({
@@ -719,13 +720,5 @@ export async function runEquipifyCoreReadSafeChecks(): Promise<ReadSafeReport> {
     billing,
     ok,
     executed_at,
-  }
-}
-
-export function unsupportedModeReport(mode: EquipifyCoreCertMode): { ok: false; mode: EquipifyCoreCertMode; detail: string } {
-  return {
-    ok: false,
-    mode,
-    detail: `${mode} is not implemented in EC-2. Use --mode=readiness or --mode=read-safe.`,
   }
 }

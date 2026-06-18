@@ -13,7 +13,7 @@ import {
 } from "../lib/growth/navigation/growth-workspace-shell-navigation"
 import { GROWTH_ADMIN_BASE_PATH } from "../lib/growth/navigation/growth-route-metadata-types"
 import { GROWTH_WORKSPACE_SEARCH_CATEGORIES } from "../lib/workspace/growth-workspace-search-categories"
-import { WORKSPACE_SWITCHER_QA_MARKER } from "../components/workspace/workspace-switcher"
+import { WORKSPACE_SWITCHER_QA_MARKER } from "../lib/workspace/workspace-switcher-constants"
 import { WORKSPACE_SEARCH_QA_MARKER } from "../components/workspace/workspace-search"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
