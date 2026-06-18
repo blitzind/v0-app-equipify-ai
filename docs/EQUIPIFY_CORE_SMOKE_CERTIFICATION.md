@@ -3,7 +3,7 @@
 **QA marker:** `equipify-core-smoke-ec-7-v1`
 **Production host:** https://app.equipify.ai
 **Cert org:** fc7e7631-efb8-4e14-9db2-5c4cadfb74f0
-**Executed at:** 2026-06-18T14:06:30.477Z
+**Executed at:** 2026-06-18T14:56:32.689Z
 **Overall:** **PASS**
 
 Validation-only smoke certification. No mutations, emails, live payments, or deploys.

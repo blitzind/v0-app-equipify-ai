@@ -1,0 +1,153 @@
+/**
+ * GE-SET-2 — Workspace Settings consolidation Phase 1 verification (local only).
+ *
+ * Usage: pnpm test:workspace-settings-navigation-ge-set-2
+ */
+import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
+import { getEquipifyPlanDisplayName } from "../lib/billing/get-equipify-plan-display-name"
+import { getOrganizationPlanDisplay } from "../lib/billing/get-organization-plan-display"
+import { getOrgPermissionsForRole } from "../lib/permissions/model"
+import {
+  WORKSPACE_SETTINGS_DATA_ADMIN_BASE,
+  WORKSPACE_SETTINGS_GROWTH_ENGINE_BASE,
+  WORKSPACE_SETTINGS_NAV_QA_MARKER,
+  WORKSPACE_SETTINGS_GROWTH_ENGINE_DEFAULT_SECTION_ID,
+  WORKSPACE_SETTINGS_DATA_ADMIN_DEFAULT_SECTION_ID,
+  WORKSPACE_SETTINGS_GENERAL_GROUPS,
+  buildWorkspaceSettingsRootCategories,
+  getWorkspaceSettingsGrowthEngineSection,
+  getWorkspaceSettingsDataAdminSection,
+  listWorkspaceSettingsGrowthEngineSectionIds,
+  listWorkspaceSettingsDataAdminSectionIds,
+} from "../lib/settings/workspace-settings-navigation"
+import {
+  isDataAdministrationSettingsNavVisible,
+  isGrowthEngineSettingsNavVisible,
+  isGrowthEngineEnabledClient,
+} from "../lib/settings/workspace-settings-visibility"
+
+function ownerCtx(overrides: Partial<Parameters<typeof buildWorkspaceSettingsRootCategories>[0]["ctx"]> = {}) {
+  return {
+    permissions: getOrgPermissionsForRole("owner"),
+    growthEngineNavVisible: false,
+    dataAdministrationNavVisible: false,
+    ...overrides,
+  }
+}
+
+function runAudit(): void {
+  console.log(`\n=== Workspace Settings GE-SET-2 (${WORKSPACE_SETTINGS_NAV_QA_MARKER}) ===\n`)
+
+  const growthSections = listWorkspaceSettingsGrowthEngineSectionIds()
+  assert.equal(growthSections.length, 33)
+  console.log("  ✓ Growth Engine manifest defines 33 sections")
+
+  const dataAdminSections = listWorkspaceSettingsDataAdminSectionIds()
+  assert.equal(dataAdminSections.length, 5)
+  console.log("  ✓ Data & Administration manifest defines 5 sections")
+
+  for (const id of growthSections) {
+    const section = getWorkspaceSettingsGrowthEngineSection(id)
+    assert.ok(section, `missing growth-engine section: ${id}`)
+    assert.equal(section.href, `${WORKSPACE_SETTINGS_GROWTH_ENGINE_BASE}/${id}`)
+    assert.ok(section.existingConfigHref, `missing existingConfigHref for ${id}`)
+  }
+  console.log("  ✓ every Growth Engine section has route + deep link")
+
+  for (const id of dataAdminSections) {
+    const section = getWorkspaceSettingsDataAdminSection(id)
+    assert.ok(section, `missing data-admin section: ${id}`)
+    assert.equal(section.href, `${WORKSPACE_SETTINGS_DATA_ADMIN_BASE}/${id}`)
+    assert.ok(section.existingConfigHref, `missing existingConfigHref for ${id}`)
+  }
+  console.log("  ✓ every Data & Administration section has route + deep link")
+
+  assert.equal(getOrganizationPlanDisplay({ planId: "scale" }), "Equipify Scale")
+  assert.equal(getOrganizationPlanDisplay({ planId: "growth" }), "Equipify Growth")
+  assert.equal(getOrganizationPlanDisplay({ planId: "solo" }), "Equipify Solo")
+  assert.equal(getEquipifyPlanDisplayName({ planId: "enterprise" }), "Equipify Enterprise")
+  console.log("  ✓ dynamic plan labels resolve via existing helpers")
+
+  const soloNoGrowth = buildWorkspaceSettingsRootCategories({
+    planCategoryLabel: "Equipify Solo",
+    ctx: ownerCtx({ growthEngineNavVisible: false, dataAdministrationNavVisible: false }),
+  })
+  assert.deepEqual(
+    soloNoGrowth.map((category) => category.label),
+    ["General", "Equipify Solo"],
+  )
+  console.log("  ✓ Solo without Growth shows General + Equipify Solo only")
+
+  const scaleWithGrowth = buildWorkspaceSettingsRootCategories({
+    planCategoryLabel: "Equipify Scale",
+    ctx: ownerCtx({ growthEngineNavVisible: true, dataAdministrationNavVisible: true }),
+  })
+  assert.deepEqual(
+    scaleWithGrowth.map((category) => category.label),
+    ["General", "Equipify Scale", "Growth Engine", "Data & Administration"],
+  )
+  console.log("  ✓ Scale + Growth shows all four root categories")
+
+  const layoutSrc = readFileSync("app/(dashboard)/settings/layout.tsx", "utf8")
+  assert.match(layoutSrc, /WorkspaceSettingsNav/)
+  assert.doesNotMatch(layoutSrc, /const NAV_ITEMS/)
+  console.log("  ✓ settings layout uses grouped WorkspaceSettingsNav")
+
+  const nextConfig = readFileSync("next.config.mjs", "utf8")
+  assert.match(nextConfig, /NEXT_PUBLIC_GROWTH_ENGINE_ENABLED/)
+  console.log("  ✓ NEXT_PUBLIC_GROWTH_ENGINE_ENABLED exposed for client gating")
+
+  const placeholderSrc = readFileSync("components/settings/workspace-settings-phase-placeholder.tsx", "utf8")
+  assert.match(placeholderSrc, /Coming in \{phaseLabel\}/)
+  assert.match(placeholderSrc, /Open existing configuration/)
+  console.log("  ✓ placeholder shell supports phased copy + existing config CTA")
+
+  const growthPageSrc = readFileSync(
+    "app/(dashboard)/settings/growth-engine/[sectionId]/page.tsx",
+    "utf8",
+  )
+  assert.match(growthPageSrc, /WorkspaceSettingsGrowthEngineSectionPage/)
+  assert.doesNotMatch(growthPageSrc, /fetch\(/)
+  console.log("  ✓ growth-engine pages use lift router (GE-SET-4)")
+
+  assert.equal(
+    `${WORKSPACE_SETTINGS_GROWTH_ENGINE_BASE}/${WORKSPACE_SETTINGS_GROWTH_ENGINE_DEFAULT_SECTION_ID}`,
+    "/settings/growth-engine/connected-mailboxes",
+  )
+  assert.equal(
+    `${WORKSPACE_SETTINGS_DATA_ADMIN_BASE}/${WORKSPACE_SETTINGS_DATA_ADMIN_DEFAULT_SECTION_ID}`,
+    "/settings/data-administration/governance-exports",
+  )
+  console.log("  ✓ default section redirects resolve")
+
+  process.env.NEXT_PUBLIC_GROWTH_ENGINE_ENABLED = "true"
+  assert.equal(isGrowthEngineEnabledClient(), true)
+  assert.equal(isGrowthEngineSettingsNavVisible({ isPlatformAdmin: true }), true)
+  assert.equal(isGrowthEngineSettingsNavVisible({ isPlatformAdmin: false }), false)
+  assert.equal(isDataAdministrationSettingsNavVisible({ isPlatformAdmin: true }), true)
+  assert.equal(isDataAdministrationSettingsNavVisible({ isPlatformAdmin: false }), false)
+  console.log("  ✓ visibility gating helpers behave as expected")
+
+  const growthOperatorGroup = WORKSPACE_SETTINGS_GENERAL_GROUPS.find((group) => group.id === "general-growth-operator")
+  assert.ok(growthOperatorGroup)
+  assert.equal(growthOperatorGroup.items.length, 5)
+  assert.ok(growthOperatorGroup.items.every((item) => item.href.startsWith("/settings/growth-operator/")))
+  console.log("  ✓ Growth Operator nav uses /settings/growth-operator/* routes (GE-SET-3)")
+
+  console.log("\nWorkspace Settings GE-SET-2 verification PASS\n")
+  console.log(
+    JSON.stringify(
+      {
+        ok: true,
+        qa_marker: WORKSPACE_SETTINGS_NAV_QA_MARKER,
+        growth_engine_sections: growthSections.length,
+        data_admin_sections: dataAdminSections.length,
+      },
+      null,
+      2,
+    ),
+  )
+}
+
+runAudit()
