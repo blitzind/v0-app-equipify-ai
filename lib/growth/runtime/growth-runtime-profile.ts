@@ -8,7 +8,7 @@
 import type { GrowthFeatureKey, GrowthFeatureMode, GrowthFeatureTier } from "@/lib/growth/runtime/growth-feature-registry"
 import { GROWTH_FEATURE_REGISTRY, GROWTH_FEATURE_KEYS } from "@/lib/growth/runtime/growth-feature-registry"
 
-export const GROWTH_RUNTIME_PROFILE_VERSION = "8g.1" as const
+export const GROWTH_RUNTIME_PROFILE_VERSION = "8nc.1" as const
 
 export type GrowthRuntimeProfileId =
   | "operator_minimal"
@@ -78,17 +78,42 @@ export const GROWTH_RUNTIME_PROFILE_IDS = Object.keys(GROWTH_RUNTIME_PROFILES) a
 
 const PROFILE_ENV = "GROWTH_RUNTIME_PROFILE"
 
+/** Server-only / Node env (not available in browser bundles). */
 function readEnv(name: string): string | undefined {
   if (typeof process === "undefined") return undefined
   const value = process.env[name]?.trim()
   return value || undefined
 }
 
+/**
+ * Client-safe env — Next.js inlines `process.env.NEXT_PUBLIC_*` at build time even when
+ * `process` is absent in the browser runtime (Phase 8N-C).
+ */
+function readNextPublicVercelEnv(): string | undefined {
+  const value = process.env.NEXT_PUBLIC_VERCEL_ENV?.trim()
+  return value || undefined
+}
+
+function readNextPublicGrowthRuntimeProfile(): string | undefined {
+  const value = process.env.NEXT_PUBLIC_GROWTH_RUNTIME_PROFILE?.trim()
+  return value || undefined
+}
+
+function readNodeEnv(): string | undefined {
+  const value = process.env.NODE_ENV?.trim()
+  return value || undefined
+}
+
 function isGrowthProductionEnvironment(): boolean {
+  const publicVercel = readNextPublicVercelEnv()
+  if (publicVercel === "production" || publicVercel === "preview") return true
+  if (publicVercel === "development") return false
+
   const vercel = readEnv("VERCEL_ENV")
-  if (vercel === "production") return true
-  if (vercel === "preview" || vercel === "development") return false
-  return readEnv("NODE_ENV") === "production"
+  if (vercel === "production" || vercel === "preview") return true
+  if (vercel === "development") return false
+
+  return readNodeEnv() === "production"
 }
 
 function parseGrowthRuntimeProfileId(raw: string | undefined): GrowthRuntimeProfileId | null {
@@ -101,7 +126,9 @@ function parseGrowthRuntimeProfileId(raw: string | undefined): GrowthRuntimeProf
  * Production (Vercel) defaults to `operator_minimal` unless `GROWTH_RUNTIME_PROFILE` overrides.
  */
 export function resolveGrowthRuntimeProfileId(): GrowthRuntimeProfileId {
-  const explicit = parseGrowthRuntimeProfileId(readEnv(PROFILE_ENV))
+  const explicit =
+    parseGrowthRuntimeProfileId(readEnv(PROFILE_ENV)) ??
+    parseGrowthRuntimeProfileId(readNextPublicGrowthRuntimeProfile())
   if (explicit) return explicit
   return isGrowthProductionEnvironment() ? "operator_minimal" : "development_all"
 }
