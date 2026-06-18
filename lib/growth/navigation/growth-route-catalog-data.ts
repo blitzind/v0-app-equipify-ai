@@ -1,5 +1,5 @@
 /**
- * Canonical Growth Engine route catalog inputs — one entry per physical page URL (112 total).
+ * Canonical Growth Engine route catalog inputs — one entry per physical page URL (120 total).
  * Built into full metadata by `growth-route-metadata.ts`.
  */
 
@@ -193,6 +193,40 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     dynamic: true,
     dynamicMatch: /^automation\/[^/]+$/,
   }),
+  workspaceDual("workspace-videos", "videos", "Videos", "content", {
+    breadcrumbLabel: "Videos",
+  }),
+  workspaceDual("workspace-videos-library", "videos/library", "Video Library", "content", {
+    breadcrumbLabel: "Library",
+  }),
+  workspaceDual("workspace-videos-library-detail", "videos/library/[id]", "Video Asset Detail", "content", {
+    breadcrumbLabel: "Detail",
+    dynamic: true,
+    dynamicMatch: /^videos\/library\/[^/]+$/,
+  }),
+  workspaceDual("workspace-videos-pages", "videos/pages", "Video Pages", "content", {
+    breadcrumbLabel: "Pages",
+  }),
+  workspaceDual("workspace-videos-pages-new", "videos/pages/new", "New Video Page", "content", {
+    breadcrumbLabel: "New Page",
+  }),
+  workspaceDual("workspace-videos-pages-detail", "videos/pages/[id]", "Video Page Detail", "content", {
+    breadcrumbLabel: "Page Detail",
+    dynamic: true,
+    dynamicMatch: /^videos\/pages\/[^/]+$/,
+  }),
+  workspaceDual("workspace-videos-record", "videos/record", "Record Video", "content", {
+    breadcrumbLabel: "Record",
+  }),
+  workspaceDual("workspace-videos-templates", "videos/templates", "Video Templates", "content", {
+    breadcrumbLabel: "Templates",
+  }),
+  workspaceDual("workspace-videos-analytics", "videos/analytics", "Video Analytics", "content", {
+    breadcrumbLabel: "Analytics",
+  }),
+  workspaceDual("workspace-videos-settings", "videos/settings", "Video Settings", "content", {
+    breadcrumbLabel: "Settings",
+  }),
   workspaceDual("workspace-engagement", "engagement", "Engagement", "intelligence", {
     breadcrumbLabel: "Engagement",
   }),
@@ -348,6 +382,52 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   adminDual("admin-automation-edit", "automation/[id]", "Edit Automation Flow", "automation", "automation/[id]", {
     breadcrumbLabel: "Edit Flow",
     dynamic: true,
+  }),
+  adminDual("admin-videos", "videos", "Videos", "content", "videos", {
+    breadcrumbLabel: "Videos",
+  }),
+  adminDual("admin-videos-library", "videos/library", "Video Library", "content", "videos/library", {
+    breadcrumbLabel: "Library",
+  }),
+  adminDual(
+    "admin-videos-library-detail",
+    "videos/library/[id]",
+    "Video Asset Detail",
+    "content",
+    "videos/library/[id]",
+    { breadcrumbLabel: "Detail", dynamic: true },
+  ),
+  adminDual("admin-videos-pages", "videos/pages", "Video Pages", "content", "videos/pages", {
+    breadcrumbLabel: "Pages",
+  }),
+  adminDual("admin-videos-pages-new", "videos/pages/new", "New Video Page", "content", "videos/pages/new", {
+    breadcrumbLabel: "New Page",
+  }),
+  adminDual(
+    "admin-videos-pages-detail",
+    "videos/pages/[id]",
+    "Video Page Detail",
+    "content",
+    "videos/pages/[id]",
+    { breadcrumbLabel: "Page Detail", dynamic: true },
+  ),
+  adminDual("admin-videos-record", "videos/record", "Record Video", "content", "videos/record", {
+    breadcrumbLabel: "Record",
+  }),
+  adminDual("admin-videos-templates", "videos/templates", "Video Templates", "content", "videos/templates", {
+    breadcrumbLabel: "Templates",
+  }),
+  adminDual("admin-videos-analytics", "videos/analytics", "Video Analytics", "content", "videos/analytics", {
+    breadcrumbLabel: "Analytics",
+  }),
+  adminDual("admin-videos-settings", "videos/settings", "Video Settings", "content", "videos/settings", {
+    breadcrumbLabel: "Settings",
+  }),
+  adminDual("admin-video-templates", "video-templates", "Video Templates", "content", "videos/templates", {
+    breadcrumbLabel: "Templates",
+  }),
+  adminDual("admin-video-analytics", "video-analytics", "Video Analytics", "content", "videos/analytics", {
+    breadcrumbLabel: "Analytics",
   }),
   adminDual("admin-engagement", "engagement", "Engagement", "intelligence", "engagement", {
     breadcrumbLabel: "Engagement",
@@ -518,6 +598,9 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     ...settingsFuture("infrastructure"),
   }),
   admin("admin-infrastructure-mailboxes", "infrastructure/mailboxes", "Mailbox Connections", "settings", "admin-only", {
+    ...settingsFuture("mailboxes"),
+  }),
+  admin("admin-infrastructure-mailboxes-onboard", "infrastructure/mailboxes/onboard", "Mailbox Onboarding", "settings", "admin-only", {
     ...settingsFuture("mailboxes"),
   }),
   admin("admin-infrastructure-deliverability", "infrastructure/deliverability", "Deliverability", "settings", "admin-only", {

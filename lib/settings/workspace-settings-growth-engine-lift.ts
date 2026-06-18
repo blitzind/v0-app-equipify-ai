@@ -65,7 +65,7 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANEL_EXPORTS: Record<
   WorkspaceSettingsGrowthEngineLiftedSectionId,
   string
 > = {
-  "connected-mailboxes": "GrowthMailboxConnectionsDashboard",
+  "connected-mailboxes": "GrowthConnectedMailboxesDashboard",
   gmail: "GrowthProvidersDashboard",
   "microsoft-365": "GrowthProvidersDashboard",
   "inbox-routing": "GrowthCommunicationSettingsPanel",
@@ -112,7 +112,7 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_SECTION_CLASSIFICATION: Record<
 > = {
   "connected-mailboxes": {
     kind: "lifted",
-    reason: "Admin mailbox connections dashboard lifted in GE-SET-4.",
+    reason: "Connected mailboxes operator dashboard (GE-MAIL-1B).",
   },
   gmail: {
     kind: "lifted",

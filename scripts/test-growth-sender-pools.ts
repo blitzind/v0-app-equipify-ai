@@ -173,6 +173,20 @@ async function main(): Promise<void> {
   assert.match(routesSource, /requireGrowthEnginePlatformAccess/)
   assert.match(routesSource, /isGrowthSenderPoolIntelligenceSchemaReady/)
 
+  const memberRouteSource = readSource("app/api/platform/growth/sender-pools/[id]/members/[memberId]/route.ts")
+  assert.match(memberRouteSource, /updateSenderPoolMember/)
+  assert.match(memberRouteSource, /export async function PATCH/)
+  assert.match(memberRouteSource, /export async function DELETE/)
+
+  const poolUiSource = readSource("components/growth/growth-sender-pools-dashboard.tsx")
+  assert.match(poolUiSource, /GrowthSenderPoolManagementPanel/)
+  assert.match(poolUiSource, /GrowthSenderPoolSimulationCard/)
+  assert.match(poolUiSource, /sender-pools\/\$\{selectedPoolId\}\/members/)
+
+  const managementSource = readSource("components/growth/sender-pools/growth-sender-pool-management-panel.tsx")
+  assert.match(managementSource, /Activate pool/)
+  assert.match(managementSource, /Add sender/)
+
   const navSource = readSource("lib/growth/navigation/growth-navigation-destinations.ts")
   assert.match(navSource, /sender-pools/)
   assert.match(navSource, /Sender Pools/)

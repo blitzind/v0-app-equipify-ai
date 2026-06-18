@@ -61,9 +61,9 @@ function runAudit(): void {
 
   assert.equal(GROWTH_SHELL_NAV_GROUPS.length, 4, "Growth sidebar must retain four operator groups")
   const navItems = GROWTH_SHELL_NAV_GROUPS.flatMap((group) => group.items)
-  assert.equal(navItems.length, 12, "Growth sidebar must retain 12 operator nav items")
-  assert.deepEqual(listGrowthWorkspaceShellNavHrefs().length, 12)
-  console.log("  ✓ all four groups and 12 nav items remain present")
+  assert.equal(navItems.length, 13, "Growth sidebar must retain 13 operator nav items")
+  assert.deepEqual(listGrowthWorkspaceShellNavHrefs().length, 13)
+  console.log("  ✓ all four groups and 13 nav items remain present")
 
   assertIncludes(
     FILES.sidebarNav,

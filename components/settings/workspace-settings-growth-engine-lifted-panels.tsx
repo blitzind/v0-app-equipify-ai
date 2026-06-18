@@ -8,7 +8,7 @@ import { GrowthComplianceDashboardPanel } from "@/components/growth/growth-compl
 import { GrowthContentLibraryDashboardView } from "@/components/growth/growth-content-library-dashboard"
 import { GrowthDeliverabilityDashboard } from "@/components/growth/growth-deliverability-dashboard"
 import { GrowthGoogleCalendarSettingsPanel } from "@/components/growth/growth-google-calendar-settings-panel"
-import { GrowthMailboxConnectionsDashboard } from "@/components/growth/growth-mailbox-connections-dashboard"
+import { GrowthConnectedMailboxesDashboard } from "@/components/growth/mailboxes/growth-connected-mailboxes-dashboard"
 import { GrowthMeetingLocationSettingsPanel } from "@/components/growth/growth-meeting-location-settings-panel"
 import { GrowthNativeDialerSettingsPanel } from "@/components/growth/growth-native-dialer-settings-panel"
 import { GrowthProvidersDashboard } from "@/components/growth/growth-providers-dashboard"
@@ -25,7 +25,7 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANELS: Record<
   WorkspaceSettingsGrowthEngineLiftedSectionId,
   ComponentType
 > = {
-  "connected-mailboxes": GrowthMailboxConnectionsDashboard,
+  "connected-mailboxes": GrowthConnectedMailboxesDashboard,
   gmail: GrowthProvidersDashboard,
   "microsoft-365": GrowthProvidersDashboard,
   "inbox-routing": GrowthCommunicationSettingsPanel,

@@ -30,7 +30,8 @@ export function auditOperatorReadiness(cwd = process.cwd()): OpsFinding[] {
       })
     }
 
-    if (/GrowthOperatorInboxPanel/.test(source) && (source.match(/GrowthOperatorInboxPanel/g) ?? []).length > 1) {
+    const inboxPanelJsxCount = (source.match(/<GrowthOperatorInboxPanel[\s/>]/g) ?? []).length
+    if (inboxPanelJsxCount > 1) {
       findings.push({
         finding_id: `operator_duplicate_inbox_${relativePath}`,
         severity: "warning",

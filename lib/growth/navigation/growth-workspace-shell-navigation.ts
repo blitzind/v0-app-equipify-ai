@@ -17,9 +17,13 @@ import {
   Phone,
   Target,
   Users,
+  Video,
   Workflow,
 } from "lucide-react"
-import { GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS } from "@/lib/growth/navigation/growth-workspace-sidebar-ia"
+import {
+  GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS,
+} from "@/lib/growth/navigation/growth-workspace-sidebar-ia"
+import { isGrowthVideoWorkspaceEnabledClient } from "@/lib/growth/videos/growth-video-route-gates"
 import {
   findGrowthRouteMetadataForHref,
   getGrowthRouteMetadataById,
@@ -86,6 +90,7 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
     label: "Content",
     items: [
       { id: "share-pages", label: "Share Pages", registryRouteId: "workspace-share-pages", icon: FileText, workspaceRoute: true },
+      { id: "videos", label: "Videos", registryRouteId: "workspace-videos", icon: Video, workspaceRoute: true },
       { id: "media-assets", label: "Media Assets", registryRouteId: "workspace-media", icon: Layers, workspaceRoute: true },
     ],
   },
@@ -130,17 +135,21 @@ function resolveManifestHref(entry: GrowthWorkspaceShellNavManifestEntry): strin
 }
 
 export function buildGrowthWorkspaceShellNavGroups(): GrowthShellNavGroup[] {
+  const videoWorkspaceEnabled = isGrowthVideoWorkspaceEnabledClient()
+
   return GROWTH_WORKSPACE_SHELL_NAV_MANIFEST.map((group) => ({
     id: group.id,
     label: group.label,
-    items: group.items.map((item) => ({
-      id: item.id,
-      label: item.label,
-      href: resolveManifestHref(item),
-      icon: item.icon,
-      workspaceRoute: item.workspaceRoute,
-      registryRouteId: item.registryRouteId,
-    })),
+    items: group.items
+      .filter((item) => item.id !== "videos" || videoWorkspaceEnabled)
+      .map((item) => ({
+        id: item.id,
+        label: item.label,
+        href: resolveManifestHref(item),
+        icon: item.icon,
+        workspaceRoute: item.workspaceRoute,
+        registryRouteId: item.registryRouteId,
+      })),
   }))
 }
 
@@ -169,6 +178,9 @@ export function isGrowthShellNavItemActive(pathname: string, item: GrowthShellNa
   }
   if (item.workspaceRoute && pathname.startsWith(`${item.href}/`)) return true
   if (item.id === "share-pages" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/share-pages`)) {
+    return true
+  }
+  if (item.id === "videos" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/videos`)) {
     return true
   }
   if (item.id === "automation-flows" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/automation/`)) {

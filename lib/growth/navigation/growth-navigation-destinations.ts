@@ -290,6 +290,12 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     keywords: ["mailbox", "oauth", "google", "microsoft", "smtp", "token"],
   },
   {
+    id: "mailbox-onboarding",
+    label: "Mailbox Onboarding",
+    href: "/admin/growth/infrastructure/mailboxes/onboard",
+    keywords: ["mailbox", "onboard", "wizard", "gmail", "oauth", "sender"],
+  },
+  {
     id: "deliverability",
     label: "Deliverability",
     href: "/admin/growth/infrastructure/deliverability",

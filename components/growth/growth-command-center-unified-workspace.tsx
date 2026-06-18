@@ -80,7 +80,11 @@ export function GrowthCommandCenterUnifiedWorkspace({
     void load()
   }, [load])
 
-  useGrowthRealtimeRefresh({ subscriber: "command_center", onRefresh: () => void load() })
+  useGrowthRealtimeRefresh({
+    subscriber: "command_center",
+    onRefresh: () => void load(),
+    enabled: !compact,
+  })
 
   async function runAction(action: "mark_reviewed" | "view_details" | "navigate_to_source", navigationTarget?: string) {
     if (!workspace) return

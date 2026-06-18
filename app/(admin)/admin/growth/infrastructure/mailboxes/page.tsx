@@ -6,7 +6,7 @@ import Link from "next/link"
 import { useAdmin } from "@/lib/admin-store"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import { GrowthInfrastructureReadinessStrip } from "@/components/growth/growth-infrastructure-readiness-strip"
-import { GrowthMailboxConnectionsDashboard } from "@/components/growth/growth-mailbox-connections-dashboard"
+import { GrowthConnectedMailboxesDashboard } from "@/components/growth/mailboxes/growth-connected-mailboxes-dashboard"
 import {
   PlatformAdminPageShell,
   PlatformAdminTabNav,
@@ -35,15 +35,20 @@ export default function AdminGrowthMailboxConnectionsPage() {
                 <Mail size={17} />
               </span>
               <div>
-                <h1 className={PAGE_STANDARD_PAGE_TITLE}>Mailbox Connections</h1>
+                <h1 className={PAGE_STANDARD_PAGE_TITLE}>Connected Mailboxes</h1>
                 <p className="text-sm text-muted-foreground">
-                  Connect mailboxes to sender accounts, validate health, and monitor token status — infrastructure only.
+                  Operational dashboard for Gmail mailboxes — connection health, warmup, pools, and daily send capacity.
                 </p>
               </div>
             </div>
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/admin/growth/infrastructure">Back to Infrastructure</Link>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" asChild>
+                <Link href="/admin/growth/infrastructure/mailboxes/onboard">Onboard mailbox</Link>
+              </Button>
+              <Button type="button" variant="outline" size="sm" asChild>
+                <Link href="/admin/growth/infrastructure">Back to Infrastructure</Link>
+              </Button>
+            </div>
           </div>
         </section>
 
@@ -61,7 +66,7 @@ export default function AdminGrowthMailboxConnectionsPage() {
               </div>
             }
           >
-            <GrowthMailboxConnectionsDashboard />
+            <GrowthConnectedMailboxesDashboard />
           </Suspense>
         </GrowthSectionLayout>
       </div>

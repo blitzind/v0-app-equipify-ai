@@ -229,7 +229,8 @@ export function runGrowthEngineUxReview(cwd = process.cwd()): HardeningFinding[]
     const source = readSource(relativePath, cwd)
     if (!source) continue
 
-    if (/GrowthOperatorInboxPanel[\s\S]*GrowthOperatorInboxPanel/.test(source)) {
+    const nestedInboxPanelCount = (source.match(/<GrowthOperatorInboxPanel[\s/>]/g) ?? []).length
+    if (nestedInboxPanelCount > 1) {
       findings.push({
         finding_id: `ux_nested_inbox_${relativePath}`,
         severity: "warning",

@@ -244,6 +244,68 @@ export async function addSenderPoolMember(
   return { ...mapMember(data as Record<string, unknown>, label), senderEmail: label }
 }
 
+export async function getSenderPoolMember(
+  admin: SupabaseClient,
+  memberId: string,
+): Promise<GrowthSenderPoolMember | null> {
+  const { data, error } = await membersTable(admin).select("*").eq("id", memberId).maybeSingle()
+  if (error) throw new Error(error.message)
+  if (!data) return null
+
+  const senderAccountId = asString((data as Record<string, unknown>).sender_account_id)
+  const { data: sender } = await admin
+    .schema("growth")
+    .from("sender_accounts")
+    .select("email_address, display_name")
+    .eq("id", senderAccountId)
+    .maybeSingle()
+  const email = asString((sender as { email_address?: string } | null)?.email_address)
+  const displayName = asString((sender as { display_name?: string } | null)?.display_name)
+  const label = maskSenderLabel(email, displayName)
+  return { ...mapMember(data as Record<string, unknown>, label), senderEmail: email || label }
+}
+
+export async function updateSenderPoolMember(
+  admin: SupabaseClient,
+  memberId: string,
+  input: {
+    memberStatus?: GrowthSenderPoolMemberStatus
+    manualPriority?: number
+    priorityWeight?: number
+    notes?: string
+    operationalPauseReason?: string | null
+    actorUserId?: string | null
+    actorEmail?: string | null
+  },
+): Promise<GrowthSenderPoolMember> {
+  if (input.memberStatus != null) {
+    const { updateSenderPoolMemberOperationalStatus } = await import(
+      "@/lib/growth/sender-pools/sender-operational-pause"
+    )
+    await updateSenderPoolMemberOperationalStatus(admin, {
+      memberId,
+      memberStatus: input.memberStatus,
+      operationalPauseReason: input.operationalPauseReason,
+      actorUserId: input.actorUserId,
+      actorEmail: input.actorEmail,
+    })
+  }
+
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (input.manualPriority != null) patch.manual_priority = input.manualPriority
+  if (input.priorityWeight != null) patch.priority_weight = input.priorityWeight
+  if (input.notes != null) patch.notes = input.notes.trim()
+
+  if (Object.keys(patch).length > 1) {
+    const { error } = await membersTable(admin).update(patch).eq("id", memberId)
+    if (error) throw new Error(error.message)
+  }
+
+  const member = await getSenderPoolMember(admin, memberId)
+  if (!member) throw new Error("member_not_found")
+  return member
+}
+
 export async function removeSenderPoolMember(admin: SupabaseClient, memberId: string): Promise<void> {
   const { error } = await membersTable(admin).delete().eq("id", memberId)
   if (error) throw new Error(error.message)

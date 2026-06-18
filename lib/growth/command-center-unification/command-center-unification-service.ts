@@ -31,6 +31,7 @@ import { fetchGrowthRealtimeEvents } from "@/lib/growth/realtime-events/realtime
 import { fetchSequencePreviewStudio } from "@/lib/growth/sequence-preview/sequence-preview-service"
 import { loadGrowthSignalFeed } from "@/lib/growth/signal-intelligence/signal-feed-repository"
 import { isGrowthSignalFoundationSchemaReady } from "@/lib/growth/signals/signal-schema-health"
+import { resolveGrowthRuntimeProfileId } from "@/lib/growth/runtime/growth-runtime-profile"
 
 async function persistCommandCenterUnificationAudit(
   admin: SupabaseClient,
@@ -89,10 +90,16 @@ async function loadAggregationContext(
     pattern_id?: string | null
     limit?: number
     include_campaign_readiness?: boolean
+    include_tier2_aggregation?: boolean
   },
 ): Promise<CommandCenterAggregationContext> {
   const includeReadiness = input?.include_campaign_readiness !== false
   const limit = input?.limit ?? 15
+  const profileId = resolveGrowthRuntimeProfileId()
+  const includeTier2 =
+    input?.include_tier2_aggregation === true ||
+    (input?.include_tier2_aggregation !== false && profileId !== "operator_minimal")
+  const signalLimit = Math.min(50, Math.max(limit, input?.lead_id ? limit * 3 : limit * 2))
 
   const [
     signalFeed,
@@ -108,34 +115,44 @@ async function loadAggregationContext(
     readiness,
     lead,
   ] = await Promise.all([
-    loadGrowthSignalFeed(admin, { lead_id: input?.lead_id, limit: 50 }).catch(() => null),
+    loadGrowthSignalFeed(admin, { lead_id: input?.lead_id, limit: signalLimit }).catch(() => null),
     fetchOperatorInboxQueue(admin, { lead_id: input?.lead_id, limit }).catch(() => null),
-    input?.lead_id
-      ? fetchHumanInterventions(admin, { lead_id: input.lead_id, limit, persist_audit: false }).catch(() => null)
-      : fetchHumanInterventions(admin, { limit, persist_audit: false }).catch(() => null),
-    input?.lead_id
-      ? fetchSmartFollowUpPolicies(admin, { lead_id: input.lead_id, limit, persist_audit: false }).catch(() => null)
-      : fetchSmartFollowUpPolicies(admin, { limit, persist_audit: false }).catch(() => null),
-    fetchSequencePreviewStudio(admin, {
-      lead_id: input?.lead_id,
-      pattern_id: input?.pattern_id,
-      limit,
-      persist_audit: false,
-    }).catch(() => null),
-    fetchCampaignBuilderWizard(admin, {
-      lead_id: input?.lead_id,
-      pattern_id: input?.pattern_id,
-      limit,
-      include_campaign_readiness: false,
-      persist_audit: false,
-    }).catch(() => null),
-    fetchGrowthAgentOrchestration(admin, {
-      lead_id: input?.lead_id,
-      pattern_id: input?.pattern_id,
-      limit,
-      persist_audit: false,
-    }).catch(() => null),
-    fetchGrowthRealtimeEvents(admin, { limit: 20 }).catch(() => null),
+    includeTier2
+      ? input?.lead_id
+        ? fetchHumanInterventions(admin, { lead_id: input.lead_id, limit, persist_audit: false }).catch(() => null)
+        : fetchHumanInterventions(admin, { limit, persist_audit: false }).catch(() => null)
+      : Promise.resolve(null),
+    includeTier2
+      ? input?.lead_id
+        ? fetchSmartFollowUpPolicies(admin, { lead_id: input.lead_id, limit, persist_audit: false }).catch(() => null)
+        : fetchSmartFollowUpPolicies(admin, { limit, persist_audit: false }).catch(() => null)
+      : Promise.resolve(null),
+    includeTier2
+      ? fetchSequencePreviewStudio(admin, {
+          lead_id: input?.lead_id,
+          pattern_id: input?.pattern_id,
+          limit,
+          persist_audit: false,
+        }).catch(() => null)
+      : Promise.resolve(null),
+    includeTier2
+      ? fetchCampaignBuilderWizard(admin, {
+          lead_id: input?.lead_id,
+          pattern_id: input?.pattern_id,
+          limit,
+          include_campaign_readiness: false,
+          persist_audit: false,
+        }).catch(() => null)
+      : Promise.resolve(null),
+    includeTier2
+      ? fetchGrowthAgentOrchestration(admin, {
+          lead_id: input?.lead_id,
+          pattern_id: input?.pattern_id,
+          limit,
+          persist_audit: false,
+        }).catch(() => null)
+      : Promise.resolve(null),
+    includeTier2 ? fetchGrowthRealtimeEvents(admin, { limit: 20 }).catch(() => null) : Promise.resolve(null),
     fetchGrowthHumanExecutionQueueView(admin).catch(() => null),
     input?.lead_id
       ? loadConversationalPlaybookForRequest(admin, {
@@ -174,6 +191,7 @@ export async function fetchGrowthCommandCenterUnification(
     filter?: CommandCenterUnificationFilter
     limit?: number
     include_campaign_readiness?: boolean
+    include_tier2_aggregation?: boolean
     persist_audit?: boolean
     lead_workspace_limit?: number
   },

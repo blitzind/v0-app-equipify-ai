@@ -3,7 +3,6 @@
 import { AidenDailyBriefingPanel } from "@/components/growth/aiden-daily-briefing-panel"
 import { GrowthCommandDailyActionQueue } from "@/components/growth/growth-command-daily-action-queue"
 import { GrowthCommandCenterUnifiedWorkspace } from "@/components/growth/growth-command-center-unified-workspace"
-import { GrowthOperatorInboxPanel } from "@/components/growth/growth-operator-inbox-panel"
 import { GrowthCampaignReadinessPanel } from "@/components/growth/growth-campaign-readiness-panel"
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
@@ -48,8 +47,6 @@ export function GrowthCommandCenterDashboard() {
       <GrowthCommandCenterUnifiedWorkspace compact title="Unified Command Center" />
 
       <GrowthRealtimeEventBusPanel compact title="Real-Time Event Bus" />
-
-      <GrowthOperatorInboxPanel compact title="Unified Operator Inbox" />
 
       <GrowthCampaignReadinessPanel compact title="Campaign Readiness" />
 
