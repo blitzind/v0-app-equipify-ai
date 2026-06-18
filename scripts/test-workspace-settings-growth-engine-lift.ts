@@ -101,6 +101,8 @@ function runAudit(): void {
   )
   assert.match(sectionPageSrc, /liftKind === "canonical"/)
   assert.match(sectionPageSrc, /rendersGrowthEnginePhasePlaceholder/)
+  assert.match(sectionPageSrc, /phaseLabel="Phase 3"/)
+  assert.doesNotMatch(sectionPageSrc, /variant="admin"/)
   assert.doesNotMatch(sectionPageSrc, /redirect\(/)
   assert.doesNotMatch(sectionPageSrc, /fetch\(/)
   console.log("  ✓ section page has no redirects or new network requests")

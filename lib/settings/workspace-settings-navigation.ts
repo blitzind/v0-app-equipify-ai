@@ -667,7 +667,7 @@ export const WORKSPACE_SETTINGS_DATA_ADMIN_GROUPS: WorkspaceSettingsNavGroup[] =
       {
         id: "deliverability-operations",
         label: "Deliverability Operations",
-        description: "Deliverability operations console and remediation tools.",
+        description: "Monitor deliverability diagnostics, sender health, and support workflows for Growth Engine.",
         href: dataAdminHref("deliverability-operations"),
         icon: Server,
         existingConfigHref: `${ADMIN_GROWTH_PROVIDERS}/deliverability-ops`,

@@ -22,6 +22,9 @@ import {
   listWorkspaceSettingsDataAdminSectionIds,
 } from "../lib/settings/workspace-settings-navigation"
 import {
+  resolveWorkspaceSettingsDataAdminPlaceholderCopy,
+} from "../lib/settings/workspace-settings-data-admin-placeholder"
+import {
   isDataAdministrationSettingsNavVisible,
   isGrowthEngineSettingsNavVisible,
   isGrowthEngineEnabledClient,
@@ -101,7 +104,35 @@ function runAudit(): void {
   const placeholderSrc = readFileSync("components/settings/workspace-settings-phase-placeholder.tsx", "utf8")
   assert.match(placeholderSrc, /Coming in \{phaseLabel\}/)
   assert.match(placeholderSrc, /Open existing configuration/)
+  assert.match(placeholderSrc, /variant === "admin"/)
   console.log("  ✓ placeholder shell supports phased copy + existing config CTA")
+
+  const dataAdminSectionPageSrc = readFileSync("components/settings/workspace-settings-section-page.tsx", "utf8")
+  assert.match(dataAdminSectionPageSrc, /variant="admin"/)
+  assert.doesNotMatch(dataAdminSectionPageSrc, /Coming in Phase/)
+  console.log("  ✓ Data & Administration section page uses admin placeholder variant")
+
+  const dataAdminPlaceholderSrc = readFileSync(
+    "lib/settings/workspace-settings-data-admin-placeholder.ts",
+    "utf8",
+  )
+  assert.match(dataAdminPlaceholderSrc, /Administrative Tools/)
+  assert.match(dataAdminPlaceholderSrc, /deliverability-operations/)
+  assert.doesNotMatch(dataAdminPlaceholderSrc, /Coming in Phase/)
+  for (const id of dataAdminSections) {
+    const copy = resolveWorkspaceSettingsDataAdminPlaceholderCopy(id)
+    assert.doesNotMatch(copy.title, /Coming in Phase/i)
+    assert.doesNotMatch(copy.description, /migrate in later phases/i)
+    assert.doesNotMatch(copy.description, /migration completes/i)
+  }
+  const deliverabilityCopy = resolveWorkspaceSettingsDataAdminPlaceholderCopy("deliverability-operations")
+  assert.equal(deliverabilityCopy.title, "Deliverability Operations")
+  assert.match(deliverabilityCopy.description, /sender health, deliverability diagnostics/)
+  assert.equal(
+    resolveWorkspaceSettingsDataAdminPlaceholderCopy("governance-exports").title,
+    "Administrative Tools",
+  )
+  console.log("  ✓ Data & Administration placeholders use admin/support copy without phase language")
 
   const growthPageSrc = readFileSync(
     "app/(dashboard)/settings/growth-engine/[sectionId]/page.tsx",

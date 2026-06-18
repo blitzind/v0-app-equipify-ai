@@ -100,6 +100,11 @@ function runAudit(): void {
       true,
     )
     console.log("  ✓ Growth Operator nav items hidden when growthEngineNavVisible is false")
+
+    const dataAdminSectionPageSrc = readFileSync("components/settings/workspace-settings-section-page.tsx", "utf8")
+    assert.match(dataAdminSectionPageSrc, /variant="admin"/)
+    assert.doesNotMatch(dataAdminSectionPageSrc, /Coming in Phase/)
+    console.log("  ✓ Data & Administration section page avoids phase migration copy")
   } finally {
     if (savedGrowthFlag === undefined) {
       delete process.env.NEXT_PUBLIC_GROWTH_ENGINE_ENABLED

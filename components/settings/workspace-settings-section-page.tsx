@@ -2,6 +2,7 @@
 
 import { notFound } from "next/navigation"
 import { WorkspaceSettingsPhasePlaceholder } from "@/components/settings/workspace-settings-phase-placeholder"
+import { resolveWorkspaceSettingsDataAdminPlaceholderCopy } from "@/lib/settings/workspace-settings-data-admin-placeholder"
 import { getWorkspaceSettingsDataAdminSection } from "@/lib/settings/workspace-settings-navigation"
 
 type WorkspaceSettingsSectionPageProps = {
@@ -11,5 +12,14 @@ type WorkspaceSettingsSectionPageProps = {
 export function WorkspaceSettingsSectionPage({ sectionId }: WorkspaceSettingsSectionPageProps) {
   const section = getWorkspaceSettingsDataAdminSection(sectionId)
   if (!section) notFound()
-  return <WorkspaceSettingsPhasePlaceholder section={section} icon={section.icon} />
+  const placeholderCopy = resolveWorkspaceSettingsDataAdminPlaceholderCopy(sectionId)
+  return (
+    <WorkspaceSettingsPhasePlaceholder
+      section={section}
+      icon={section.icon}
+      variant="admin"
+      adminTitle={placeholderCopy.title}
+      adminDescription={placeholderCopy.description}
+    />
+  )
 }
