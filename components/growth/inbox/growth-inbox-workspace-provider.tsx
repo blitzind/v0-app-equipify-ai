@@ -15,13 +15,13 @@ import type { GrowthInboxSyncDashboard, GrowthInboxThreadSyncDetail } from "@/li
 import { sanitizeInboxUiErrorMessage } from "@/components/growth/inbox/growth-inbox-shared-ui"
 import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 import { scheduleGrowthInboxIdleTask } from "@/lib/growth/inbox/inbox-load-scheduler"
+import { isGrowthFeatureApiEnabled } from "@/lib/growth/runtime/growth-feature-helpers"
+import { shouldSkipGrowthInboxSecondaryHydration } from "@/lib/growth/inbox/growth-inbox-minimal-runtime-contract"
+import {
+  markGrowthInboxInitialLoadComplete,
+} from "@/lib/growth/inbox/growth-inbox-fetch-audit"
+import { recordGrowthInboxDuplicateThreadRequestPrevented } from "@/lib/growth/inbox/growth-inbox-query-metrics"
 
-type ListPayload = {
-  ok?: boolean
-  threads?: GrowthInboxThread[]
-  leads?: Array<{ id: string; label: string }>
-  message?: string
-}
 
 type DashboardPayload = {
   ok?: boolean
@@ -29,6 +29,7 @@ type DashboardPayload = {
   threads?: GrowthInboxThread[]
   intelligence?: GrowthReplyIntelligenceSummary
   events?: GrowthReplyIntelligenceEvent[]
+  leads?: Array<{ id: string; label: string }>
   message?: string
 }
 
@@ -151,22 +152,16 @@ export function GrowthInboxWorkspaceProvider({ children }: { children: ReactNode
   }, [])
 
   const refreshThreads = useCallback(async () => {
-    const [listResponse, dashboardResponse] = await Promise.all([
-      fetchPlatformGrowthClient("/api/platform/growth/inbox"),
-      fetchPlatformGrowthClient("/api/platform/growth/inbox/dashboard"),
-    ])
-    const listPayload = (await listResponse.json()) as ListPayload
+    const dashboardResponse = await fetchPlatformGrowthClient("/api/platform/growth/inbox/dashboard")
     const dashboardPayload = (await dashboardResponse.json()) as DashboardPayload
-    if (!listResponse.ok) {
-      throw new Error(sanitizeInboxUiErrorMessage(listPayload.message) ?? "Could not load inbox threads.")
-    }
     if (!dashboardResponse.ok) {
       throw new Error(sanitizeInboxUiErrorMessage(dashboardPayload.message) ?? "Could not load inbox dashboard.")
     }
 
-    const mergedThreads = dashboardPayload.threads ?? listPayload.threads ?? []
+    recordGrowthInboxDuplicateThreadRequestPrevented()
+    const mergedThreads = dashboardPayload.threads ?? []
     setThreads(mergedThreads)
-    setLeads(listPayload.leads ?? [])
+    setLeads(dashboardPayload.leads ?? [])
     setDashboard(dashboardPayload.dashboard ?? null)
     setIntelligence(dashboardPayload.intelligence ?? null)
     setEvents(dashboardPayload.events ?? [])
@@ -180,15 +175,20 @@ export function GrowthInboxWorkspaceProvider({ children }: { children: ReactNode
   )
 
   const loadSecondaryInboxData = useCallback(async () => {
-    const [syncResponse, mailboxesResponse] = await Promise.all([
-      fetchPlatformGrowthClient("/api/platform/growth/inbox/sync/dashboard"),
-      fetchPlatformGrowthClient("/api/platform/growth/mailboxes"),
-    ])
-    const syncPayload = (await syncResponse.json()) as SyncDashboardPayload
+    const mailboxesResponse = await fetchPlatformGrowthClient("/api/platform/growth/mailboxes")
     const mailboxesPayload = (await mailboxesResponse.json()) as MailboxesPayload
-    setSyncSchemaReady(syncResponse.ok)
-    if (syncResponse.ok && syncPayload.dashboard) setSyncDashboard(syncPayload.dashboard)
-    else setSyncDashboard(null)
+
+    if (isGrowthFeatureApiEnabled("diagnosticsDashboards")) {
+      const syncResponse = await fetchPlatformGrowthClient("/api/platform/growth/inbox/sync/dashboard")
+      const syncPayload = (await syncResponse.json()) as SyncDashboardPayload
+      setSyncSchemaReady(syncResponse.ok)
+      if (syncResponse.ok && syncPayload.dashboard) setSyncDashboard(syncPayload.dashboard)
+      else setSyncDashboard(null)
+    } else {
+      setSyncSchemaReady(true)
+      setSyncDashboard(null)
+    }
+
     if (mailboxesResponse.ok) setMailboxConnectionCount(mailboxesPayload.mailboxes?.length ?? 0)
     else setMailboxConnectionCount(null)
   }, [])
@@ -197,22 +197,16 @@ export function GrowthInboxWorkspaceProvider({ children }: { children: ReactNode
     setLoading(true)
     setError(null)
     try {
-      const [listResponse, dashboardResponse] = await Promise.all([
-        fetchPlatformGrowthClient("/api/platform/growth/inbox"),
-        fetchPlatformGrowthClient("/api/platform/growth/inbox/dashboard"),
-      ])
-      const listPayload = (await listResponse.json()) as ListPayload
+      const dashboardResponse = await fetchPlatformGrowthClient("/api/platform/growth/inbox/dashboard")
       const dashboardPayload = (await dashboardResponse.json()) as DashboardPayload
-      if (!listResponse.ok) {
-        throw new Error(sanitizeInboxUiErrorMessage(listPayload.message) ?? "Could not load inbox threads.")
-      }
       if (!dashboardResponse.ok) {
         throw new Error(sanitizeInboxUiErrorMessage(dashboardPayload.message) ?? "Could not load inbox dashboard.")
       }
 
-      const mergedThreads = dashboardPayload.threads ?? listPayload.threads ?? []
+      recordGrowthInboxDuplicateThreadRequestPrevented()
+      const mergedThreads = dashboardPayload.threads ?? []
       setThreads(mergedThreads)
-      setLeads(listPayload.leads ?? [])
+      setLeads(dashboardPayload.leads ?? [])
       setDashboard(dashboardPayload.dashboard ?? null)
       setIntelligence(dashboardPayload.intelligence ?? null)
       setEvents(dashboardPayload.events ?? [])
@@ -221,9 +215,12 @@ export function GrowthInboxWorkspaceProvider({ children }: { children: ReactNode
       if (nextSelected && !selectedThreadId) setSelectedThreadId(nextSelected)
 
       setLoading(false)
+      markGrowthInboxInitialLoadComplete()
 
       scheduleGrowthInboxIdleTask(() => {
-        void loadSecondaryInboxData()
+        if (!shouldSkipGrowthInboxSecondaryHydration()) {
+          void loadSecondaryInboxData()
+        }
       })
       if (nextSelected) {
         scheduleGrowthInboxIdleTask(() => {

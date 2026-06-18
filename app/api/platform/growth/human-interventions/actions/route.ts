@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { applyHumanInterventionAction } from "@/lib/growth/human-interventions/human-intervention-service"
+import { guardGrowthFeatureApiRoute } from "@/lib/growth/runtime/growth-feature-api-guards"
 import {
   HUMAN_INTERVENTION_ACTIONS,
   type HumanIntervention,
@@ -16,6 +17,8 @@ const ActionSchema = z.object({
 })
 
 export async function POST(request: Request) {
+  const coldGuard = await guardGrowthFeatureApiRoute("humanInterventionDashboard", request)
+  if (coldGuard) return coldGuard
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 

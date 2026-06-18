@@ -15,6 +15,7 @@ import {
   type HumanInterventionsResponse,
 } from "@/lib/growth/human-interventions/human-intervention-types"
 import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
+import { withGrowthFeatureShellGate } from "@/components/growth/runtime/with-growth-feature-shell-gate"
 import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 import { emitGrowthInboxLazyPanelFetch } from "@/lib/growth/inbox/growth-inbox-workflow-lazy-instrumentation"
 import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-sequence-preview-studio-panel"
@@ -34,7 +35,7 @@ function priorityTone(priority: HumanIntervention["priority"]) {
   }
 }
 
-export function GrowthHumanInterventionsPanel({
+function GrowthHumanInterventionsPanelInner({
   title = "Human Interventions",
   leadId,
   compact = false,
@@ -245,3 +246,9 @@ export function GrowthHumanInterventionsPanel({
     </>
   )
 }
+
+export const GrowthHumanInterventionsPanel = withGrowthFeatureShellGate(
+  "humanInterventionDashboard",
+  GrowthHumanInterventionsPanelInner,
+  "GrowthHumanInterventionsPanel",
+)

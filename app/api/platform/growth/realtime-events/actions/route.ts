@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { applyGrowthRealtimeEventAction } from "@/lib/growth/realtime-events/realtime-events-service"
+import { guardGrowthFeatureApiRoute } from "@/lib/growth/runtime/growth-feature-api-guards"
 import {
   REALTIME_EVENT_ACTIONS,
   type GrowthRealtimeEvent,
@@ -16,6 +17,8 @@ const ActionSchema = z.object({
 })
 
 export async function POST(request: Request) {
+  const coldGuard = await guardGrowthFeatureApiRoute("realtimeEventBus", request)
+  if (coldGuard) return coldGuard
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 

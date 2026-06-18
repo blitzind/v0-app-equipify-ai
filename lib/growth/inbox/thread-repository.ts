@@ -25,8 +25,11 @@ import type {
 import { computeInboxThreadSlaDueAt } from "@/lib/growth/inbox-team-ownership/inbox-sla-tracker"
 import { resolveInboxThreadChannel } from "@/lib/growth/inbox/inbox-channel-types"
 import { formatLeadLabel } from "@/lib/growth/lead-label"
+import { recordGrowthInboxThreadLabelBatchQuery } from "@/lib/growth/inbox/growth-inbox-query-metrics"
 
 type Row = Record<string, unknown>
+
+export const GROWTH_INBOX_THREAD_MESSAGE_LIMIT = 50 as const
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -52,9 +55,28 @@ function formatOwnerLabel(email: string | null | undefined): string {
   return local.replace(/[._-]+/g, " ").trim() || "Operator"
 }
 
-async function fetchLeadLabel(admin: SupabaseClient, leadId: string): Promise<string> {
-  const { data } = await admin.schema("growth").from("leads").select("company_name").eq("id", leadId).maybeSingle()
-  return formatLeadLabel(asString((data as Row | null)?.company_name))
+async function loadLeadLabels(admin: SupabaseClient, leadIds: string[]): Promise<Map<string, string>> {
+  const labels = new Map<string, string>()
+  const uniqueIds = [...new Set(leadIds.filter(Boolean))]
+  if (uniqueIds.length === 0) return labels
+
+  recordGrowthInboxThreadLabelBatchQuery()
+  const { data, error } = await admin
+    .schema("growth")
+    .from("leads")
+    .select("id, company_name")
+    .in("id", uniqueIds)
+
+  if (error) throw new Error(error.message)
+
+  for (const row of data ?? []) {
+    const record = row as Row
+    const id = asString(record.id)
+    if (!id) continue
+    labels.set(id, formatLeadLabel(asString(record.company_name)))
+  }
+
+  return labels
 }
 
 async function loadOwnerLabels(admin: SupabaseClient, threadIds: string[]): Promise<Map<string, string>> {
@@ -101,11 +123,15 @@ function mapMessage(row: Row): GrowthInboxMessage {
   }
 }
 
-async function mapThread(admin: SupabaseClient, row: Row, ownerLabels?: Map<string, string>): Promise<GrowthInboxThread> {
+function mapThread(
+  row: Row,
+  ownerLabels?: Map<string, string>,
+  leadLabels?: Map<string, string>,
+): GrowthInboxThread {
   const id = asString(row.id)
   const leadId = asString(row.lead_id)
   const ownerUserId = asString(row.owner_user_id) || null
-  const leadLabel = await fetchLeadLabel(admin, leadId)
+  const leadLabel = leadLabels?.get(leadId) ?? formatLeadLabel("")
   const ownerLabel = ownerUserId ? ownerLabels?.get(id) ?? "Assigned operator" : null
 
   return {
@@ -136,11 +162,22 @@ async function mapThread(admin: SupabaseClient, row: Row, ownerLabels?: Map<stri
   }
 }
 
+async function mapThreadRow(
+  admin: SupabaseClient,
+  row: Row,
+  ownerLabels?: Map<string, string>,
+): Promise<GrowthInboxThread> {
+  const leadId = asString(row.lead_id)
+  const leadLabels = await loadLeadLabels(admin, leadId ? [leadId] : [])
+  return mapThread(row, ownerLabels, leadLabels)
+}
+
 async function listThreadMessages(admin: SupabaseClient, threadId: string): Promise<GrowthInboxMessage[]> {
   const { data, error } = await messagesTable(admin)
     .select("*")
     .eq("thread_id", threadId)
     .order("message_timestamp", { ascending: false })
+    .limit(GROWTH_INBOX_THREAD_MESSAGE_LIMIT)
 
   if (error) throw new Error(error.message)
   return (data ?? []).map((row) => mapMessage(row as Row))
@@ -160,7 +197,7 @@ async function recomputeThreadIntelligence(
   if (loadError) throw new Error(loadError.message)
   if (!existing) throw new Error("inbox_thread_not_found")
 
-  const previous = await mapThread(admin, existing as Row)
+  const previous = await mapThreadRow(admin, existing as Row)
   const classificationResult = classifyReply({ subject: input.subject, body: input.body })
   const priorityScore = computeThreadPriorityScore({
     classification: classificationResult.classification,
@@ -197,7 +234,7 @@ async function recomputeThreadIntelligence(
 
   if (error) throw new Error(error.message)
 
-  const updated = await mapThread(admin, data as Row)
+  const updated = await mapThreadRow(admin, data as Row)
 
   if (input.isInbound) {
     const drafts = buildReplyIntelligenceEvents({
@@ -223,9 +260,13 @@ export async function listInboxThreads(
   if (error) throw new Error(error.message)
 
   const threadIds = (data ?? []).map((row) => asString((row as Row).id)).filter(Boolean)
-  const ownerLabels = await loadOwnerLabels(admin, threadIds)
+  const leadIds = (data ?? []).map((row) => asString((row as Row).lead_id)).filter(Boolean)
+  const [ownerLabels, leadLabels] = await Promise.all([
+    loadOwnerLabels(admin, threadIds),
+    loadLeadLabels(admin, leadIds),
+  ])
 
-  return Promise.all((data ?? []).map((row) => mapThread(admin, row as Row, ownerLabels)))
+  return (data ?? []).map((row) => mapThread(row as Row, ownerLabels, leadLabels))
 }
 
 export async function getInboxThread(admin: SupabaseClient, threadId: string, includeMessages = true): Promise<GrowthInboxThread | null> {
@@ -234,7 +275,7 @@ export async function getInboxThread(admin: SupabaseClient, threadId: string, in
   if (!data) return null
 
   const ownerLabels = await loadOwnerLabels(admin, [threadId])
-  const thread = await mapThread(admin, data as Row, ownerLabels)
+  const thread = await mapThreadRow(admin, data as Row, ownerLabels)
   if (includeMessages) thread.messages = await listThreadMessages(admin, threadId)
   return thread
 }
@@ -282,7 +323,7 @@ export async function createInboxThread(
     .single()
 
   if (error) throw new Error(error.message)
-  return mapThread(admin, data as Row)
+  return mapThreadRow(admin, data as Row)
 }
 
 export async function addInboxMessage(
@@ -426,7 +467,8 @@ export async function assignThreadOwner(
   })
 
   const ownerLabels = new Map([[threadId, ownerLabel]])
-  return mapThread(admin, data as Row, ownerLabels)
+  const leadLabels = await loadLeadLabels(admin, [existing.lead_id])
+  return mapThread(data as Row, ownerLabels, leadLabels)
 }
 
 export async function resolveInboxThread(
@@ -448,7 +490,7 @@ export async function resolveInboxThread(
     .single()
 
   if (error) throw new Error(error.message)
-  return mapThread(admin, data as Row)
+  return mapThreadRow(admin, data as Row)
 }
 
 export async function archiveInboxThread(
@@ -469,7 +511,7 @@ export async function archiveInboxThread(
     .single()
 
   if (error) throw new Error(error.message)
-  return mapThread(admin, data as Row)
+  return mapThreadRow(admin, data as Row)
 }
 
 export async function updateInboxThread(
@@ -491,7 +533,7 @@ export async function updateInboxThread(
 
   const { data, error } = await threadsTable(admin).update(updates).eq("id", threadId).select("*").single()
   if (error) throw new Error(error.message)
-  return mapThread(admin, data as Row)
+  return mapThreadRow(admin, data as Row)
 }
 
 export async function fetchInboxDashboard(admin: SupabaseClient): Promise<{
@@ -499,10 +541,12 @@ export async function fetchInboxDashboard(admin: SupabaseClient): Promise<{
   threads: GrowthInboxThread[]
   intelligence: GrowthReplyIntelligenceSummary
   events: GrowthReplyIntelligenceEvent[]
+  leads: Array<{ id: string; label: string }>
 }> {
-  const [threads, events] = await Promise.all([
+  const [threads, events, leads] = await Promise.all([
     listInboxThreads(admin),
     listReplyIntelligenceEvents(admin, { limit: 30 }),
+    listLeadsForInbox(admin),
   ])
 
   return {
@@ -510,6 +554,7 @@ export async function fetchInboxDashboard(admin: SupabaseClient): Promise<{
     threads,
     intelligence: buildReplyIntelligenceSummary(threads),
     events,
+    leads,
   }
 }
 

@@ -1,6 +1,11 @@
 /** Phase GS-4C — Client-side realtime subscription with polling fallback (client-safe). */
 
 import type { RealtimeChannel } from "@supabase/supabase-js"
+import {
+  isGrowthRealtimeEventBusRuntimeActive,
+  recordGrowthColdStoragePollerSuppressed,
+  recordGrowthColdStorageSubscriptionSuppressed,
+} from "@/lib/growth/runtime/growth-feature-api-client-guards"
 import type { GrowthRealtimeEvent } from "@/lib/growth/realtime-events/realtime-events-types"
 
 export type GrowthRealtimeSubscriptionMode = "realtime" | "polling" | "unavailable"
@@ -28,6 +33,14 @@ export function subscribeToGrowthRealtimeEvents(input: {
   onEvents: (events: GrowthRealtimeEvent[], mode: GrowthRealtimeSubscriptionMode) => void
   onError?: (error: string) => void
 }): GrowthRealtimeSubscriptionHandle {
+  if (!isGrowthRealtimeEventBusRuntimeActive()) {
+    recordGrowthColdStorageSubscriptionSuppressed("realtime-events-subscriber")
+    return {
+      mode: "unavailable",
+      unsubscribe: () => {},
+    }
+  }
+
   const limit = input.limit ?? 25
   const pollingIntervalMs = input.pollingIntervalMs ?? 30_000
   let disposed = false
@@ -47,6 +60,7 @@ export function subscribeToGrowthRealtimeEvents(input: {
 
   function startPolling(): void {
     mode = "polling"
+    recordGrowthColdStoragePollerSuppressed("realtime-events-subscriber")
     void pollOnce()
     pollTimer = setInterval(() => void pollOnce(), pollingIntervalMs)
   }

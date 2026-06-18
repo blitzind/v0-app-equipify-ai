@@ -10,6 +10,7 @@ import {
   deriveGrowthInboxConversationOverviewMetrics,
 } from "@/lib/growth/inbox/inbox-conversation-overview-metrics"
 import { deriveGrowthInboxCallCommunicationMetrics } from "@/lib/growth/inbox/inbox-call-communication-read-model"
+import { withGrowthFeatureShellGate } from "@/components/growth/runtime/with-growth-feature-shell-gate"
 import {
   growthWorkspaceCallsHref,
   growthWorkspaceConversationsHref,
@@ -67,7 +68,7 @@ function CompactIntelligenceCard({
 }
 
 /** Phase 8A.1 — intelligence summaries on Workflow tab (not on operator Inbox tab). */
-export function GrowthInboxWorkflowIntelligenceSummary() {
+function GrowthInboxWorkflowIntelligenceSummaryInner() {
   const { dashboard: replyDashboard } = useGrowthReplyIntelligenceDashboard()
   const {
     dashboard: conversationDashboard,
@@ -124,3 +125,9 @@ export function GrowthInboxWorkflowIntelligenceSummary() {
     </div>
   )
 }
+
+export const GrowthInboxWorkflowIntelligenceSummary = withGrowthFeatureShellGate(
+  "workflowSummaryAutofetch",
+  GrowthInboxWorkflowIntelligenceSummaryInner,
+  "GrowthInboxWorkflowIntelligenceSummary",
+)

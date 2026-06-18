@@ -10,6 +10,7 @@ import {
   type GrowthInboxSyncDashboard,
   inboxSyncStatusLabel,
 } from "@/lib/growth/inbox-sync/inbox-sync-types"
+import { withGrowthFeatureShellGate } from "@/components/growth/runtime/with-growth-feature-shell-gate"
 import { formatInboxDate, sanitizeInboxUiErrorMessage } from "@/components/growth/inbox/growth-inbox-shared-ui"
 
 type DashboardPayload = {
@@ -30,7 +31,7 @@ type GrowthInboxDiagnosticsPanelProps = {
   showHonestEmptyState?: boolean
 }
 
-export function GrowthInboxDiagnosticsPanel({
+function GrowthInboxDiagnosticsPanelInner({
   hideWhenEmpty = false,
   showHonestEmptyState = false,
 }: GrowthInboxDiagnosticsPanelProps) {
@@ -179,3 +180,9 @@ export function GrowthInboxDiagnosticsPanel({
     </div>
   )
 }
+
+export const GrowthInboxDiagnosticsPanel = withGrowthFeatureShellGate(
+  "diagnosticsDashboards",
+  GrowthInboxDiagnosticsPanelInner,
+  "GrowthInboxDiagnosticsPanel",
+)

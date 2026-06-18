@@ -1,5 +1,7 @@
 /** Client-side platform Growth API fetch with timeout guards (Phase 8F). */
 
+import { auditGrowthInboxFetch } from "@/lib/growth/inbox/growth-inbox-fetch-audit"
+
 export const PLATFORM_GROWTH_CLIENT_FETCH_TIMEOUT_MS = 9_000
 
 export const PLATFORM_GROWTH_INBOX_MAX_CONCURRENT_FETCHES = 2
@@ -43,6 +45,8 @@ export async function fetchPlatformGrowthClient(
   if (useInboxConcurrencyLimit) {
     await acquireInboxFetchSlot()
   }
+
+  auditGrowthInboxFetch(input, init)
 
   const controller = new AbortController()
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)

@@ -14,6 +14,8 @@ import { GrowthInboxWorkspaceKeyboardBridge } from "@/components/growth/inbox/gr
 import { GrowthInboxWorkspaceShell } from "@/components/growth/inbox/growth-inbox-workspace-shell"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
 import { GrowthInboxCompactPanelState } from "@/components/growth/inbox/growth-inbox-compact-panel-state"
+import { GrowthInboxTier1RefreshBridge } from "@/components/growth/inbox/growth-inbox-tier1-refresh-bridge"
+import { GrowthInboxTier1PollCoordinatorProvider } from "@/components/growth/inbox/growth-inbox-tier1-poll-coordinator"
 import { GROWTH_INBOX_WORKSPACE_V2_QA_MARKER } from "@/lib/growth/inbox/inbox-workspace-types"
 import { buildGrowthInboxSetupEmptyState } from "@/lib/growth/inbox/inbox-runtime-types"
 
@@ -55,7 +57,9 @@ export function GrowthInboxWorkspaceV2Panel() {
       </div>
 
       <GrowthInboxSharedDataProvider deferUntilLeadId={selectedThread?.lead_id ?? null}>
-        <GrowthInboxQueueProvider>
+        <GrowthInboxTier1PollCoordinatorProvider>
+          <GrowthInboxTier1RefreshBridge />
+          <GrowthInboxQueueProvider>
           <GrowthInboxQueueUrlSync />
           <GrowthInboxOverviewMetricsPanel />
           <GrowthOperatorInboxPanel title="Operator Notifications" compact />
@@ -72,6 +76,7 @@ export function GrowthInboxWorkspaceV2Panel() {
             <GrowthInboxWorkspaceKeyboardBridge />
           </GrowthInboxLeadContextProvider>
         </GrowthInboxQueueProvider>
+        </GrowthInboxTier1PollCoordinatorProvider>
       </GrowthInboxSharedDataProvider>
     </div>
   )

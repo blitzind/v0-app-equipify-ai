@@ -2,10 +2,11 @@
 
 import { useState, type ReactNode } from "react"
 import { ChevronDown } from "lucide-react"
+import { withGrowthFeatureShellGate } from "@/components/growth/runtime/with-growth-feature-shell-gate"
 import { GROWTH_OPERATOR_DIAGNOSTICS_DISCLOSURE_QA_MARKER } from "@/lib/growth/operator-ux/operator-ux-h3-types"
 import { cn } from "@/lib/utils"
 
-export function GrowthOperatorDiagnosticsDisclosure({
+function GrowthOperatorDiagnosticsDisclosureInner({
   title = "Advanced diagnostics",
   description = "Engineering telemetry, cron health, and infrastructure readiness.",
   defaultOpen = false,
@@ -41,3 +42,9 @@ export function GrowthOperatorDiagnosticsDisclosure({
     </div>
   )
 }
+
+export const GrowthOperatorDiagnosticsDisclosure = withGrowthFeatureShellGate(
+  "diagnosticsDashboards",
+  GrowthOperatorDiagnosticsDisclosureInner,
+  "GrowthOperatorDiagnosticsDisclosure",
+)

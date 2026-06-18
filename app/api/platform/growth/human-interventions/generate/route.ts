@@ -3,6 +3,7 @@ import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { fetchHumanInterventions } from "@/lib/growth/human-interventions/human-intervention-service"
 import { HUMAN_INTERVENTION_FILTERS } from "@/lib/growth/human-interventions/human-intervention-types"
+import { guardGrowthFeatureApiRoute } from "@/lib/growth/runtime/growth-feature-api-guards"
 
 export const runtime = "nodejs"
 export const maxDuration = 120
@@ -15,6 +16,8 @@ const GenerateSchema = z.object({
 })
 
 export async function POST(request: Request) {
+  const coldGuard = await guardGrowthFeatureApiRoute("humanInterventionDashboard", request)
+  if (coldGuard) return coldGuard
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 

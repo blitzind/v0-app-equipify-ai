@@ -13,6 +13,7 @@ import {
 import type { GrowthRevenueCommandCenterLead } from "@/lib/growth/revenue-execution/revenue-execution-types"
 import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 import { scheduleGrowthInboxIdleTask } from "@/lib/growth/inbox/inbox-load-scheduler"
+import { shouldDeferGrowthInboxTier3Hydration } from "@/lib/growth/inbox/growth-inbox-minimal-runtime-contract"
 
 type CommandCenterDashboard = {
   sections?: Record<string, GrowthRevenueCommandCenterLead[]>
@@ -81,6 +82,7 @@ export function GrowthInboxSharedDataProvider({
 
   useEffect(() => {
     if (loadedRef.current || !deferUntilLeadId) return
+    if (shouldDeferGrowthInboxTier3Hydration()) return
     const cancelIdle = scheduleGrowthInboxIdleTask(() => {
       if (!loadedRef.current) void refreshCommandCenter()
     })

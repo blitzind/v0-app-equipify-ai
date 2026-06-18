@@ -15,6 +15,7 @@ import {
   type CampaignBuilderWizardResponse,
 } from "@/lib/growth/campaign-builder/campaign-builder-types"
 import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
+import { withGrowthFeatureShellGate } from "@/components/growth/runtime/with-growth-feature-shell-gate"
 import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 
 function statusTone(status: CampaignBuilderWizard["wizard_status"]) {
@@ -43,7 +44,7 @@ function stepTone(status: CampaignBuilderWizard["steps"][number]["status"]) {
   }
 }
 
-export function GrowthCampaignBuilderWizardPanel({
+function GrowthCampaignBuilderWizardPanelInner({
   title = "Campaign Builder Wizard",
   leadId,
   patternId,
@@ -305,3 +306,9 @@ export function GrowthCampaignBuilderWizardPanel({
     </GrowthEngineCard>
   )
 }
+
+export const GrowthCampaignBuilderWizardPanel = withGrowthFeatureShellGate(
+  "campaignBuilder",
+  GrowthCampaignBuilderWizardPanelInner,
+  "GrowthCampaignBuilderWizardPanel",
+)

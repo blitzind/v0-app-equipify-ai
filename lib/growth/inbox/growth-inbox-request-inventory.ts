@@ -1,9 +1,10 @@
 /**
- * Documented inventory of Growth Inbox initial-load platform API requests (Phase 8F.2).
+ * Documented inventory of Growth Inbox initial-load platform API requests (Phase 8F.2, updated 8J).
  * Source-of-truth for audits — update when fetch paths change.
+ * Phase 8J contract: `lib/growth/inbox/growth-inbox-minimal-runtime-contract.ts`
  */
 
-export const GROWTH_INBOX_REQUEST_INVENTORY_QA_MARKER = "growth-inbox-request-inventory-v1" as const
+export const GROWTH_INBOX_REQUEST_INVENTORY_QA_MARKER = "growth-inbox-request-inventory-v2" as const
 
 export type GrowthInboxRequestInventoryEntry = {
   endpoint: string

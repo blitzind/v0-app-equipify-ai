@@ -2,13 +2,16 @@
 
 import { useState } from "react"
 import { ChevronDown } from "lucide-react"
+import { GrowthOnDemandFeature } from "@/components/growth/runtime/growth-on-demand-feature"
 import { GrowthInboxWidgetErrorBoundary } from "@/components/growth/growth-inbox-widget-error-boundary"
 import { GrowthReplyWorkflowActionsPanel } from "@/components/growth/growth-reply-workflow-actions-panel"
 import { GrowthInboxActionCenterBookingEmbed } from "@/components/growth/inbox/growth-inbox-action-center-booking-embed"
 import { GrowthInboxActionCenterCopilotEmbed } from "@/components/growth/inbox/growth-inbox-action-center-copilot-embed"
 import { GrowthInboxActionCenterOpportunityEmbed } from "@/components/growth/inbox/growth-inbox-action-center-opportunity-embed"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
+import { useGrowthInboxSharedData } from "@/components/growth/inbox/growth-inbox-shared-data-provider"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
+import { shouldDeferGrowthInboxTier3Hydration } from "@/lib/growth/inbox/growth-inbox-minimal-runtime-contract"
 import {
   Collapsible,
   CollapsibleContent,
@@ -52,8 +55,12 @@ export function GrowthInboxActionCenterWorkflowEmbeds() {
     bookingRecommendations,
     copilot,
     refreshWorkflow,
+    refreshRecommendations,
+    refreshSequenceExitCandidates,
   } = useGrowthInboxLeadContext()
+  const { refreshCommandCenter } = useGrowthInboxSharedData()
   const { actionLoading } = useGrowthInboxWorkspace()
+  const deferTier3 = shouldDeferGrowthInboxTier3Hydration()
 
   if (!leadId) return null
 
@@ -65,7 +72,7 @@ export function GrowthInboxActionCenterWorkflowEmbeds() {
     (copilot ? 1 : 0)
 
   return (
-    <div className="space-y-3" data-equipify-qa-marker={GROWTH_INBOX_WORKSPACE_PHASE4_QA_MARKER}>
+    <div className="space-y-3" data-qa-marker={GROWTH_INBOX_WORKSPACE_PHASE4_QA_MARKER}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           Workflow & Recommendations
@@ -73,13 +80,17 @@ export function GrowthInboxActionCenterWorkflowEmbeds() {
         <span className="shrink-0 text-[10px] text-muted-foreground">{totalItems} item(s)</span>
       </div>
 
-      <WorkflowGroup title="Workflow Actions" count={workflowActions.length} defaultOpen={workflowActions.length > 0}>
+      <WorkflowGroup
+        title="Workflow Actions"
+        count={workflowActions.length}
+        defaultOpen={workflowActions.length > 0}
+      >
         <GrowthInboxWidgetErrorBoundary label="Workflow actions">
           <div className={actionLoading ? "pointer-events-none opacity-60" : undefined}>
             <GrowthReplyWorkflowActionsPanel
               leadId={leadId}
               compact
-              showSequenceExit
+              showSequenceExit={!deferTier3}
               hideRevenuePanel
               title="Pending workflow actions"
               useExternalData
@@ -91,17 +102,87 @@ export function GrowthInboxActionCenterWorkflowEmbeds() {
         </GrowthInboxWidgetErrorBoundary>
       </WorkflowGroup>
 
+      {deferTier3 ? (
+        <GrowthOnDemandFeature
+          feature="sequenceExitCandidates"
+          scopeKey={leadId}
+          title="Sequence exit candidates"
+          description="Review pending sequence exits for this lead."
+          compact
+          load={async () => {
+            await refreshSequenceExitCandidates()
+          }}
+        >
+          <GrowthInboxWidgetErrorBoundary label="Sequence exits">
+            <GrowthReplyWorkflowActionsPanel
+              leadId={leadId}
+              compact
+              showSequenceExit
+              hideRevenuePanel
+              title="Sequence exit candidates"
+              useExternalData
+              externalItems={[]}
+              externalExitCandidates={sequenceExitCandidates}
+              onExternalRefresh={refreshWorkflow}
+            />
+          </GrowthInboxWidgetErrorBoundary>
+        </GrowthOnDemandFeature>
+      ) : null}
+
       <WorkflowGroup title="Opportunity Recommendations" count={opportunityRecommendations.length}>
-        <GrowthInboxActionCenterOpportunityEmbed />
+        {deferTier3 ? (
+          <GrowthOnDemandFeature
+            feature="opportunityRecommendations"
+            scopeKey={leadId}
+            title="Opportunity recommendations"
+            compact
+            load={async () => {
+              await refreshRecommendations()
+            }}
+          >
+            <GrowthInboxActionCenterOpportunityEmbed />
+          </GrowthOnDemandFeature>
+        ) : (
+          <GrowthInboxActionCenterOpportunityEmbed />
+        )}
       </WorkflowGroup>
 
       <WorkflowGroup title="Booking Recommendations" count={bookingRecommendations.length}>
-        <GrowthInboxActionCenterBookingEmbed />
+        {deferTier3 ? (
+          <GrowthOnDemandFeature
+            feature="bookingIntelligence"
+            scopeKey={leadId}
+            title="Booking recommendations"
+            compact
+            load={async () => {
+              await refreshRecommendations()
+            }}
+          >
+            <GrowthInboxActionCenterBookingEmbed />
+          </GrowthOnDemandFeature>
+        ) : (
+          <GrowthInboxActionCenterBookingEmbed />
+        )}
       </WorkflowGroup>
 
       <WorkflowGroup title="Reply Copilot" count={copilot ? 1 : 0}>
         <GrowthInboxActionCenterCopilotEmbed />
       </WorkflowGroup>
+
+      {deferTier3 ? (
+        <GrowthOnDemandFeature
+          feature="revenueCommandCenter"
+          scopeKey={leadId}
+          title="Revenue command center"
+          description="Cross-lead revenue signals for enriched recommendations."
+          compact
+          load={async () => {
+            await refreshCommandCenter()
+          }}
+        >
+          <p className="text-xs text-muted-foreground">Command center intelligence loaded for this session.</p>
+        </GrowthOnDemandFeature>
+      ) : null}
     </div>
   )
 }

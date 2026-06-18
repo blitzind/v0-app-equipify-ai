@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/collapsible"
 import { GrowthInboxLazyMount } from "@/components/growth/inbox/growth-inbox-lazy-mount"
 import { emitGrowthInboxLazyPanelActivated } from "@/lib/growth/inbox/growth-inbox-workflow-lazy-instrumentation"
+import type { GrowthFeatureKey } from "@/lib/growth/runtime/growth-feature-registry"
+import { useGrowthFeatureShellMounted } from "@/lib/growth/runtime/use-growth-feature-shell-mounted"
 import { cn } from "@/lib/utils"
 
 export const GROWTH_INBOX_EXPANDABLE_LAZY_PANEL_QA_MARKER = "growth-inbox-expandable-lazy-panel-v1" as const
@@ -19,20 +21,28 @@ export function GrowthInboxExpandableLazyPanel({
   title,
   description,
   defaultOpen = false,
+  feature,
   children,
 }: {
   panelId: string
   title: string
   description?: string
   defaultOpen?: boolean
+  /** When set, the entire panel chrome is omitted in operator_minimal cold storage. */
+  feature?: GrowthFeatureKey
   children: ReactNode
 }) {
+  const featureMounted = useGrowthFeatureShellMounted(feature ?? "prospectSearch")
   const [open, setOpen] = useState(defaultOpen)
   const [activated, setActivated] = useState(defaultOpen)
 
   useEffect(() => {
     if (activated) emitGrowthInboxLazyPanelActivated(panelId)
   }, [activated, panelId])
+
+  if (feature && !featureMounted) {
+    return null
+  }
 
   return (
     <Collapsible

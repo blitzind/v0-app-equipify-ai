@@ -2,6 +2,10 @@
 
 import { useEffect, useRef } from "react"
 import {
+  isGrowthRealtimeEventBusRuntimeActive,
+  recordGrowthColdStoragePollerSuppressed,
+} from "@/lib/growth/runtime/growth-feature-api-client-guards"
+import {
   subscribeToGrowthRealtimeEvents,
   type GrowthRealtimeSubscriptionMode,
 } from "@/lib/growth/realtime-events/realtime-events-subscriber"
@@ -24,6 +28,10 @@ export function useGrowthRealtimeRefresh(input: {
 
   useEffect(() => {
     if (input.enabled === false) return
+    if (!isGrowthRealtimeEventBusRuntimeActive()) {
+      recordGrowthColdStoragePollerSuppressed(`useGrowthRealtimeRefresh:${input.subscriber}`)
+      return
+    }
 
     const handle = subscribeToGrowthRealtimeEvents({
       limit: 15,

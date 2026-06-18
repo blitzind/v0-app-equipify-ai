@@ -3,6 +3,7 @@ import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { fetchGrowthRealtimeEvents } from "@/lib/growth/realtime-events/realtime-events-service"
 import { REALTIME_EVENT_FILTERS } from "@/lib/growth/realtime-events/realtime-events-types"
+import { guardGrowthFeatureApiRoute } from "@/lib/growth/runtime/growth-feature-api-guards"
 
 export const runtime = "nodejs"
 export const maxDuration = 120
@@ -13,6 +14,8 @@ const QuerySchema = z.object({
 })
 
 export async function GET(request: Request) {
+  const coldGuard = await guardGrowthFeatureApiRoute("realtimeEventBus", request)
+  if (coldGuard) return coldGuard
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 

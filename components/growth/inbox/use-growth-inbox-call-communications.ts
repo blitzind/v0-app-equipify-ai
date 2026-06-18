@@ -11,6 +11,7 @@ import {
 } from "@/lib/growth/inbox/inbox-call-communication-read-model"
 import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 import { scheduleGrowthInboxIdleTask } from "@/lib/growth/inbox/inbox-load-scheduler"
+import { shouldSkipGrowthInboxSecondaryHydration } from "@/lib/growth/inbox/growth-inbox-minimal-runtime-contract"
 
 /** Phase 8F — callbacks metric only; no duplicate operator-inbox fan-out. */
 export function useGrowthInboxCallCommunications(options?: { deferLoad?: boolean }) {
@@ -59,6 +60,7 @@ export function useGrowthInboxCallCommunications(options?: { deferLoad?: boolean
 
   useEffect(() => {
     if (deferLoad) {
+      if (shouldSkipGrowthInboxSecondaryHydration()) return
       const cancelIdle = scheduleGrowthInboxIdleTask(() => {
         void load()
       })

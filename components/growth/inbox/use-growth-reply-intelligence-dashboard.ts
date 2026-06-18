@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import type { GrowthSalesExecutionDashboard } from "@/lib/growth/reply-intelligence/reply-intent-types"
 import { fetchGrowthReplyIntelligenceDashboard } from "@/lib/growth/replies/growth-reply-intelligence-dashboard-client"
 import { scheduleGrowthInboxIdleTask } from "@/lib/growth/inbox/inbox-load-scheduler"
+import { shouldSkipGrowthInboxSecondaryHydration } from "@/lib/growth/inbox/growth-inbox-minimal-runtime-contract"
 
 export function useGrowthReplyIntelligenceDashboard(options?: { deferLoad?: boolean }) {
   const deferLoad = options?.deferLoad ?? false
@@ -26,6 +27,7 @@ export function useGrowthReplyIntelligenceDashboard(options?: { deferLoad?: bool
 
   useEffect(() => {
     if (deferLoad) {
+      if (shouldSkipGrowthInboxSecondaryHydration()) return
       const cancelIdle = scheduleGrowthInboxIdleTask(() => {
         void load()
       })

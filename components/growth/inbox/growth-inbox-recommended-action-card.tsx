@@ -6,6 +6,8 @@ import { GrowthInboxContextEmptyHint } from "@/components/growth/inbox/growth-in
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
 import { orchestrateGrowthInboxRecommendations } from "@/lib/growth/inbox/inbox-recommendation-orchestrator"
+import { shouldDeferGrowthInboxTier3Hydration } from "@/lib/growth/inbox/growth-inbox-minimal-runtime-contract"
+import { GROWTH_ON_DEMAND_DEFERRED_COPY } from "@/lib/growth/inbox/growth-inbox-fetch-audit"
 
 const SOURCE_LABELS = {
   workflow_action: "Workflow Action",
@@ -33,6 +35,12 @@ export function GrowthInboxRecommendedActionCard() {
     playbook,
     commandCenterLead,
   } = useGrowthInboxLeadContext()
+  const deferTier3 = shouldDeferGrowthInboxTier3Hydration()
+  const tier3Loaded =
+    Boolean(forecastEvidence) ||
+    opportunityRecommendations.length > 0 ||
+    bookingRecommendations.length > 0 ||
+    Boolean(commandCenterLead)
 
   const { top: recommendation, ranked } = useMemo(
     () =>
@@ -111,6 +119,9 @@ export function GrowthInboxRecommendedActionCard() {
         <p className="text-[10px] leading-relaxed text-muted-foreground">
           {ranked.length - 1} alternate recommendation(s) in workflow sections below.
         </p>
+      ) : null}
+      {deferTier3 && !tier3Loaded ? (
+        <p className="text-[10px] leading-relaxed text-muted-foreground">{GROWTH_ON_DEMAND_DEFERRED_COPY}</p>
       ) : null}
     </div>
   )

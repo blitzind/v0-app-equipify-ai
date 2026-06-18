@@ -15,9 +15,15 @@ function isMissingColumnError(error: { message: string; code?: string } | null):
   return looksLikePostgrestMissingSchemaError(error.message, error.code)
 }
 
+let cachedArchiveColumnsReady: boolean | null = null
+
 export async function probeGrowthLeadArchiveSchema(
   admin: SupabaseClient,
 ): Promise<GrowthLeadArchiveSchemaProbe> {
+  if (cachedArchiveColumnsReady === true) {
+    return { archiveColumns: true }
+  }
+
   if (cachedProbe && Date.now() - cachedProbe.checkedAt < CACHE_MS) {
     return cachedProbe.value
   }
@@ -29,6 +35,8 @@ export async function probeGrowthLeadArchiveSchema(
   const archivedAt = await admin.schema("growth").from("leads").select("archived_at").limit(1)
   if (isMissingColumnError(archivedAt.error)) {
     probe.archiveColumns = false
+  } else if (probe.archiveColumns) {
+    cachedArchiveColumnsReady = true
   }
 
   cachedProbe = { value: probe, checkedAt: Date.now() }
@@ -37,6 +45,7 @@ export async function probeGrowthLeadArchiveSchema(
 
 export function resetGrowthLeadArchiveSchemaProbeCacheForTests(): void {
   cachedProbe = null
+  cachedArchiveColumnsReady = null
 }
 
 export function invalidateGrowthLeadArchiveSchemaProbeCache(): void {

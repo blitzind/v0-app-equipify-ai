@@ -5,11 +5,14 @@ import {
   AGENT_ORCHESTRATION_CONFIRM,
 } from "@/lib/growth/agent-orchestration/agent-orchestration-route-gates"
 import { executeAgentOrchestrationCertification } from "@/lib/growth/agent-orchestration/agent-orchestration-certification"
+import { guardGrowthFeatureApiRoute } from "@/lib/growth/runtime/growth-feature-api-guards"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
 
 export async function POST(request: Request) {
+  const coldGuard = await guardGrowthFeatureApiRoute("agentOrchestrationDashboard", request)
+  if (coldGuard) return coldGuard
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 

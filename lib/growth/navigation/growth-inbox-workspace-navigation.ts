@@ -57,3 +57,11 @@ export function resolveGrowthInboxActiveTabId(pathname: string): string | null {
 export function getGrowthInboxWorkspaceTabById(id: string): GrowthInboxWorkspaceTab | null {
   return GROWTH_INBOX_WORKSPACE_TABS.find((tab) => tab.id === id) ?? null
 }
+
+/** Phase 8H — hide Operations tab when Tier 2 shell is cold (operator_minimal). */
+export function resolveGrowthInboxWorkspaceTabs(options?: { tier2ShellVisible?: boolean }): GrowthInboxWorkspaceTab[] {
+  if (options?.tier2ShellVisible === false) {
+    return GROWTH_INBOX_WORKSPACE_TABS.filter((tab) => tab.id !== "operations")
+  }
+  return GROWTH_INBOX_WORKSPACE_TABS
+}

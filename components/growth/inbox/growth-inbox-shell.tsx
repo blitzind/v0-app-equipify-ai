@@ -4,12 +4,14 @@ import type { ReactNode } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Mail } from "lucide-react"
+import { GrowthFeatureLink } from "@/components/growth/runtime/growth-feature-link"
 import {
   GROWTH_INBOX_WORKSPACE_NAV_QA_MARKER,
-  GROWTH_INBOX_WORKSPACE_TABS,
   isGrowthInboxTabRoute,
   resolveGrowthInboxActiveTabId,
+  resolveGrowthInboxWorkspaceTabs,
 } from "@/lib/growth/navigation/growth-inbox-workspace-navigation"
+import { useGrowthTier2ShellVisible } from "@/lib/growth/runtime/use-growth-feature-shell-mounted"
 import { cnDrawerTabButton } from "@/components/ui/tabs-chrome"
 
 type GrowthInboxShellProps = {
@@ -18,18 +20,21 @@ type GrowthInboxShellProps = {
 
 export function GrowthInboxShell({ children }: GrowthInboxShellProps) {
   const pathname = usePathname()
+  const tier2ShellVisible = useGrowthTier2ShellVisible()
 
   if (!isGrowthInboxTabRoute(pathname)) {
     return <>{children}</>
   }
 
   const activeTabId = resolveGrowthInboxActiveTabId(pathname)
-  const activeTab = GROWTH_INBOX_WORKSPACE_TABS.find((tab) => tab.id === activeTabId)
+  const tabs = resolveGrowthInboxWorkspaceTabs({ tier2ShellVisible })
+  const activeTab = tabs.find((tab) => tab.id === activeTabId)
 
   return (
     <div
       className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-4 md:px-6"
       data-qa-marker={GROWTH_INBOX_WORKSPACE_NAV_QA_MARKER}
+      data-growth-tier2-shell-visible={tier2ShellVisible ? "true" : "false"}
     >
       <header className="flex min-h-[4.25rem] items-center gap-3 border-b border-border pb-3">
         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-700">
@@ -44,15 +49,15 @@ export function GrowthInboxShell({ children }: GrowthInboxShellProps) {
       </header>
 
       <nav aria-label="Inbox sections" className="flex flex-wrap gap-2 border-b border-border pb-2">
-        {GROWTH_INBOX_WORKSPACE_TABS.map((tab) => (
-          <Link
+        {tabs.map((tab) => (
+          <GrowthFeatureLink
             key={tab.id}
             href={tab.href}
             className={cnDrawerTabButton(activeTabId === tab.id)}
             aria-current={activeTabId === tab.id ? "page" : undefined}
           >
             {tab.label}
-          </Link>
+          </GrowthFeatureLink>
         ))}
       </nav>
 

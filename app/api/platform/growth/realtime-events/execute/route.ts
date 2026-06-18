@@ -5,11 +5,14 @@ import {
   REALTIME_EVENTS_CONFIRM,
 } from "@/lib/growth/realtime-events/realtime-events-route-gates"
 import { executeRealtimeEventsCertification } from "@/lib/growth/realtime-events/realtime-events-certification"
+import { guardGrowthFeatureApiRoute } from "@/lib/growth/runtime/growth-feature-api-guards"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
 
 export async function POST(request: Request) {
+  const coldGuard = await guardGrowthFeatureApiRoute("realtimeEventBus", request)
+  if (coldGuard) return coldGuard
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 

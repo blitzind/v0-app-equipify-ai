@@ -5,11 +5,14 @@ import {
   HUMAN_INTERVENTION_CONFIRM,
 } from "@/lib/growth/human-interventions/human-intervention-route-gates"
 import { executeHumanInterventionCertification } from "@/lib/growth/human-interventions/human-intervention-certification"
+import { guardGrowthFeatureApiRoute } from "@/lib/growth/runtime/growth-feature-api-guards"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
 
 export async function POST(request: Request) {
+  const coldGuard = await guardGrowthFeatureApiRoute("humanInterventionDashboard", request)
+  if (coldGuard) return coldGuard
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 

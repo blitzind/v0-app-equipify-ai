@@ -1,5 +1,6 @@
 "use client"
 
+import { GrowthOnDemandFeature } from "@/components/growth/runtime/growth-on-demand-feature"
 import { GrowthReplyWorkflowActionsPanel } from "@/components/growth/growth-reply-workflow-actions-panel"
 import { GrowthInboxReplyIntelligencePanel } from "@/components/growth/inbox/growth-inbox-reply-intelligence-panel"
 import { GrowthInboxWorkflowIntelligenceSummary } from "@/components/growth/inbox/growth-inbox-workflow-intelligence-summary"
@@ -34,6 +35,7 @@ export function GrowthInboxWorkspaceWorkflowPanel() {
         panelId="human-interventions"
         title="Human Interventions"
         description="Operator intervention queue"
+        feature="humanInterventionDashboard"
       >
         <GrowthHumanInterventionsPanel
           title="Human Interventions"
@@ -48,13 +50,20 @@ export function GrowthInboxWorkspaceWorkflowPanel() {
         title="Conversational Playbook"
         description="Knowledge-augmented coaching"
       >
-        <GrowthConversationalPlaybooksPanel
-          consumer="operator_inbox"
+        <GrowthOnDemandFeature
+          feature="conversationalPlaybooks"
           title="Conversational Playbook"
-          compact
-          loadOnMount
-          useInboxConcurrencyLimit
-        />
+          description="Knowledge-augmented coaching for this workspace."
+          load={async () => {}}
+        >
+          <GrowthConversationalPlaybooksPanel
+            consumer="operator_inbox"
+            title="Conversational Playbook"
+            compact
+            loadOnMount={false}
+            useInboxConcurrencyLimit
+          />
+        </GrowthOnDemandFeature>
       </GrowthInboxExpandableLazyPanel>
 
       <GrowthInboxExpandableLazyPanel
@@ -70,13 +79,21 @@ export function GrowthInboxWorkspaceWorkflowPanel() {
         title="Smart Follow-Up Policies"
         description="Deterministic follow-up planning"
       >
-        <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" compact useInboxConcurrencyLimit />
+        <GrowthOnDemandFeature
+          feature="smartFollowUpPolicies"
+          title="Smart Follow-Up Policies"
+          description="Deterministic follow-up planning for sequences."
+          load={async () => {}}
+        >
+          <GrowthSmartFollowUpPoliciesPanel title="Smart Follow-Up Policies" compact useInboxConcurrencyLimit />
+        </GrowthOnDemandFeature>
       </GrowthInboxExpandableLazyPanel>
 
       <GrowthInboxExpandableLazyPanel
         panelId="sequence-preview"
         title="Sequence Preview Studio"
         description="Sequence preview recommendations"
+        feature="sequencePreviewStudio"
       >
         <GrowthSequencePreviewStudioPanel title="Sequence Preview Studio" compact useInboxConcurrencyLimit />
       </GrowthInboxExpandableLazyPanel>

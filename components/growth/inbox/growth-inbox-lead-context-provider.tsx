@@ -37,6 +37,12 @@ import {
 import { useGrowthInboxSharedData } from "@/components/growth/inbox/growth-inbox-shared-data-provider"
 import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 import { scheduleGrowthInboxIdleTask } from "@/lib/growth/inbox/inbox-load-scheduler"
+import { shouldDeferGrowthInboxTier3Hydration } from "@/lib/growth/inbox/growth-inbox-minimal-runtime-contract"
+import {
+  markGrowthInboxExplicitOperatorAction,
+  markGrowthInboxThreadCleared,
+  markGrowthInboxThreadSelected,
+} from "@/lib/growth/inbox/growth-inbox-fetch-audit"
 
 type GrowthInboxLeadContextValue = {
   leadId: string | null
@@ -60,6 +66,8 @@ type GrowthInboxLeadContextValue = {
   refresh: () => Promise<void>
   refreshWorkflow: () => Promise<void>
   refreshRecommendations: () => Promise<void>
+  refreshLeadTier3Enrichment: () => Promise<void>
+  refreshSequenceExitCandidates: () => Promise<void>
 }
 
 const GrowthInboxLeadContext = createContext<GrowthInboxLeadContextValue | null>(null)
@@ -136,34 +144,42 @@ export function GrowthInboxLeadContextProvider({
     setError(null)
   }, [])
 
-  const refreshWorkflow = useCallback(async () => {
+  const refreshWorkflowActionsOnly = useCallback(async () => {
     if (!leadId) {
       setWorkflowActions([])
-      setSequenceExitCandidates([])
       return
     }
 
     const workflowParams = new URLSearchParams({ status: "pending_review", limit: "20", leadId })
-    const exitParams = new URLSearchParams({ pendingOnly: "true", limit: "20", leadId })
-
-    const [workflowRes, exitRes] = await Promise.all([
-      fetchPlatformGrowthClient(`/api/platform/growth/replies/workflow-actions?${workflowParams.toString()}`, {
-        cache: "no-store",
-      }),
-      fetchPlatformGrowthClient(`/api/platform/growth/replies/sequence-exit-candidates?${exitParams.toString()}`, {
-        cache: "no-store",
-      }),
-    ])
-
+    const workflowRes = await fetchPlatformGrowthClient(
+      `/api/platform/growth/replies/workflow-actions?${workflowParams.toString()}`,
+      { cache: "no-store" },
+    )
     const workflowPayload = (await workflowRes.json()) as { items?: GrowthReplyWorkflowActionRecord[] }
-    const exitPayload = (await exitRes.json()) as { items?: GrowthSequenceExitCandidateRecord[] }
-
     if (workflowRes.ok) setWorkflowActions(workflowPayload.items ?? [])
     else setWorkflowActions([])
+  }, [leadId])
 
+  const refreshSequenceExitCandidates = useCallback(async () => {
+    if (!leadId) {
+      setSequenceExitCandidates([])
+      return
+    }
+
+    const exitParams = new URLSearchParams({ pendingOnly: "true", limit: "20", leadId })
+    const exitRes = await fetchPlatformGrowthClient(
+      `/api/platform/growth/replies/sequence-exit-candidates?${exitParams.toString()}`,
+      { cache: "no-store" },
+    )
+    const exitPayload = (await exitRes.json()) as { items?: GrowthSequenceExitCandidateRecord[] }
     if (exitRes.ok) setSequenceExitCandidates(exitPayload.items ?? [])
     else setSequenceExitCandidates([])
   }, [leadId])
+
+  const refreshWorkflow = useCallback(async () => {
+    await refreshWorkflowActionsOnly()
+    await refreshSequenceExitCandidates()
+  }, [refreshWorkflowActionsOnly, refreshSequenceExitCandidates])
 
   const refreshRecommendations = useCallback(async () => {
     if (!leadId) {
@@ -233,13 +249,30 @@ export function GrowthInboxLeadContextProvider({
     }
   }, [leadId, clearLeadState])
 
-  const refreshLeadEnrichment = useCallback(async (leadFallback?: GrowthLead | null) => {
+  const refreshLeadEssentials = useCallback(async () => {
     if (!leadId) return
 
     const encodedLeadId = encodeURIComponent(leadId)
-    const [memoryRes, copilotRes, forecastRes, executionPlanRes] = await Promise.all([
+    const [memoryRes, copilotRes] = await Promise.all([
       fetchPlatformGrowthClient(`/api/platform/growth/lead-memory/profile/${encodedLeadId}`, { cache: "no-store" }),
       fetchPlatformGrowthClient(`/api/platform/growth/replies/copilot?leadId=${encodedLeadId}`, { cache: "no-store" }),
+    ])
+
+    const memoryPayload = (await memoryRes.json()) as { profile?: GrowthLeadMemoryProfileView }
+    const copilotPayload = (await copilotRes.json()) as { assist?: GrowthReplyCopilotAssist }
+
+    if (memoryRes.ok && memoryPayload.profile) setMemoryProfile(memoryPayload.profile)
+    else setMemoryProfile(null)
+
+    if (copilotRes.ok && copilotPayload.assist) setCopilot(copilotPayload.assist)
+    else setCopilot(null)
+  }, [leadId])
+
+  const refreshLeadTier3Enrichment = useCallback(async (leadFallback?: GrowthLead | null) => {
+    if (!leadId) return
+
+    const encodedLeadId = encodeURIComponent(leadId)
+    const [forecastRes, executionPlanRes] = await Promise.all([
       fetchPlatformGrowthClient(`/api/platform/growth/revenue-execution/forecast-evidence?leadId=${encodedLeadId}`, {
         cache: "no-store",
       }),
@@ -248,16 +281,8 @@ export function GrowthInboxLeadContextProvider({
       }),
     ])
 
-    const memoryPayload = (await memoryRes.json()) as { profile?: GrowthLeadMemoryProfileView }
-    const copilotPayload = (await copilotRes.json()) as { assist?: GrowthReplyCopilotAssist }
     const forecastPayload = (await forecastRes.json()) as { evidence?: GrowthRevenueForecastEvidence }
     const executionPlanPayload = (await executionPlanRes.json()) as { plan?: GrowthSalesExecutionPlan }
-
-    if (memoryRes.ok && memoryPayload.profile) setMemoryProfile(memoryPayload.profile)
-    else setMemoryProfile(null)
-
-    if (copilotRes.ok && copilotPayload.assist) setCopilot(copilotPayload.assist)
-    else setCopilot(null)
 
     if (forecastRes.ok && forecastPayload.evidence) setForecastEvidence(forecastPayload.evidence)
     else setForecastEvidence(null)
@@ -273,34 +298,68 @@ export function GrowthInboxLeadContextProvider({
       return
     }
 
-    await refreshConversationCore()
-    await Promise.all([refreshLeadEnrichment(), refreshWorkflow(), refreshRecommendations()])
-  }, [leadId, clearLeadState, refreshConversationCore, refreshLeadEnrichment, refreshWorkflow, refreshRecommendations])
+    markGrowthInboxExplicitOperatorAction()
+    const loadedLead = await refreshConversationCore()
+    await refreshLeadEssentials()
+    await refreshLeadTier3Enrichment(loadedLead)
+    await refreshWorkflowActionsOnly()
+    await refreshSequenceExitCandidates()
+    await refreshRecommendations()
+  }, [
+    leadId,
+    clearLeadState,
+    refreshConversationCore,
+    refreshLeadEssentials,
+    refreshLeadTier3Enrichment,
+    refreshWorkflowActionsOnly,
+    refreshSequenceExitCandidates,
+    refreshRecommendations,
+  ])
 
   useEffect(() => {
     if (!leadId) {
       clearLeadState()
+      markGrowthInboxThreadCleared()
       return
     }
 
+    markGrowthInboxThreadSelected()
     let cancelled = false
     void refreshConversationCore().then((loadedLead) => {
       if (cancelled) return
       scheduleGrowthInboxIdleTask(() => {
-        if (!cancelled) void refreshLeadEnrichment(loadedLead)
+        if (!cancelled) void refreshLeadEssentials()
       })
       scheduleGrowthInboxIdleTask(() => {
-        if (!cancelled) void refreshWorkflow()
+        if (!cancelled) void refreshWorkflowActionsOnly()
       })
-      scheduleGrowthInboxIdleTask(() => {
-        if (!cancelled) void refreshRecommendations()
-      })
+      if (!shouldDeferGrowthInboxTier3Hydration()) {
+        scheduleGrowthInboxIdleTask(() => {
+          if (!cancelled) void refreshLeadTier3Enrichment(loadedLead)
+        })
+        scheduleGrowthInboxIdleTask(() => {
+          if (!cancelled) void refreshSequenceExitCandidates()
+        })
+        scheduleGrowthInboxIdleTask(() => {
+          if (!cancelled) void refreshRecommendations()
+        })
+      }
     })
 
     return () => {
       cancelled = true
     }
-  }, [leadId, threadId, clearLeadState, refreshConversationCore, refreshLeadEnrichment, refreshWorkflow, refreshRecommendations])
+  }, [
+    leadId,
+    threadId,
+    clearLeadState,
+    refreshConversationCore,
+    refreshLeadEssentials,
+    refreshLeadTier3Enrichment,
+    refreshWorkflowActionsOnly,
+    refreshSequenceExitCandidates,
+    refreshRecommendations,
+  ])
 
   const value = useMemo(
     () => ({
@@ -325,6 +384,8 @@ export function GrowthInboxLeadContextProvider({
       refresh,
       refreshWorkflow,
       refreshRecommendations,
+      refreshLeadTier3Enrichment,
+      refreshSequenceExitCandidates,
     }),
     [
       leadId,
@@ -348,6 +409,8 @@ export function GrowthInboxLeadContextProvider({
       refresh,
       refreshWorkflow,
       refreshRecommendations,
+      refreshLeadTier3Enrichment,
+      refreshSequenceExitCandidates,
     ],
   )
 

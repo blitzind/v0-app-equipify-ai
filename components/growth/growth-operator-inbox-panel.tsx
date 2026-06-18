@@ -20,8 +20,10 @@ import {
   type OperatorInboxItem,
   type OperatorInboxQueueResponse,
 } from "@/lib/growth/operator-inbox/operator-inbox-types"
+import { useGrowthInboxTier1PollRefresh } from "@/components/growth/inbox/growth-inbox-tier1-poll-coordinator"
 import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
 import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
+import { isGrowthFeatureApiEnabled } from "@/lib/growth/runtime/growth-feature-helpers"
 
 function priorityTone(priority: OperatorInboxItem["priority"]) {
   switch (priority) {
@@ -59,6 +61,7 @@ export function GrowthOperatorInboxPanel({
       if (leadId) params.set("lead_id", leadId)
       params.set("filter", filter)
       params.set("limit", compact ? "8" : "20")
+      params.set("mode", compact ? "compact" : "full")
 
       const res = await fetchPlatformGrowthClient(`/api/platform/growth/operator-inbox?${params.toString()}`)
       const data = (await res.json()) as OperatorInboxQueueResponse & { ok?: boolean }
@@ -80,11 +83,15 @@ export function GrowthOperatorInboxPanel({
     void load()
   }, [load])
 
+  const eventBusActive = isGrowthFeatureApiEnabled("realtimeEventBus")
+
   useGrowthRealtimeRefresh({
     subscriber: "operator_inbox",
     onRefresh: () => void load(),
-    enabled: !compact,
+    enabled: !compact && eventBusActive,
   })
+
+  useGrowthInboxTier1PollRefresh(() => void load(), compact || !eventBusActive)
 
   async function runAction(item: OperatorInboxItem, action: "mark_viewed" | "mark_reviewed" | "dismiss") {
     setActingId(item.item_id)

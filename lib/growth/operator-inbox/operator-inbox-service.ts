@@ -4,6 +4,10 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { fetchHumanExecutionQueue } from "@/lib/growth/human-execution/human-execution-dashboard-repository"
+import {
+  recordGrowthInboxCompactOperatorInboxRequest,
+  recordGrowthInboxFullOperatorInboxRequest,
+} from "@/lib/growth/inbox/growth-inbox-query-metrics"
 import { aggregateOperatorInboxQueue } from "@/lib/growth/operator-inbox/operator-inbox-aggregator"
 import type {
   OperatorInboxActionRequest,
@@ -17,17 +21,32 @@ import { applySignalFeedAction } from "@/lib/growth/signal-intelligence/signal-f
 import { loadGrowthSignalFeed } from "@/lib/growth/signal-intelligence/signal-feed-repository"
 import { isGrowthSignalFoundationSchemaReady } from "@/lib/growth/signals/signal-schema-health"
 
+export const OPERATOR_INBOX_QUEUE_MODES = ["compact", "full"] as const
+export type OperatorInboxQueueMode = (typeof OPERATOR_INBOX_QUEUE_MODES)[number]
+
 export async function fetchOperatorInboxQueue(
   admin: SupabaseClient,
   input?: {
     lead_id?: string | null
     filter?: OperatorInboxFilter
     limit?: number
+    /** compact: Tier 1 inbox (no human execution dashboard). full: admin surfaces. */
+    mode?: OperatorInboxQueueMode
   },
 ): Promise<OperatorInboxQueueResponse> {
+  const mode = input?.mode ?? "full"
+
+  if (mode === "compact") {
+    recordGrowthInboxCompactOperatorInboxRequest()
+  } else {
+    recordGrowthInboxFullOperatorInboxRequest()
+  }
+
+  const signalLimit = mode === "compact" ? 15 : 50
+
   const [signals, replyWorkflowActions, attention, humanQueue, inboxThreads] = await Promise.all([
     isGrowthSignalFoundationSchemaReady(admin)
-      ? loadGrowthSignalFeed(admin, { lead_id: input?.lead_id, limit: 50 })
+      ? loadGrowthSignalFeed(admin, { lead_id: input?.lead_id, limit: signalLimit })
       : Promise.resolve({ items: [] as Awaited<ReturnType<typeof loadGrowthSignalFeed>>["items"] }),
     listReplyWorkflowActions(admin, {
       leadId: input?.lead_id ?? undefined,
@@ -39,7 +58,9 @@ export async function fetchOperatorInboxQueue(
       view: "needs_action",
       limit: 30,
     }).catch(() => ({ items: [] })),
-    fetchHumanExecutionQueue(admin).catch(() => ({ items: [] })),
+    mode === "full"
+      ? fetchHumanExecutionQueue(admin).catch(() => ({ items: [] }))
+      : Promise.resolve({ items: [] as Awaited<ReturnType<typeof fetchHumanExecutionQueue>>["items"] }),
     listInboxThreads(admin, { limit: 30 })
       .then((threads) =>
         threads.filter(

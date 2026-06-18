@@ -16,6 +16,7 @@ import {
   type GrowthAgentTask,
 } from "@/lib/growth/agent-orchestration/agent-orchestration-types"
 import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
+import { withGrowthFeatureShellGate } from "@/components/growth/runtime/with-growth-feature-shell-gate"
 import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 
 function statusTone(status: GrowthAgentPlan["plan_status"]) {
@@ -45,7 +46,7 @@ function taskTone(status: GrowthAgentTask["status"]) {
   }
 }
 
-export function GrowthAgentOrchestrationPanel({
+function GrowthAgentOrchestrationPanelInner({
   title = "Agent Orchestration",
   leadId,
   patternId,
@@ -308,3 +309,9 @@ export function GrowthAgentOrchestrationPanel({
     </GrowthEngineCard>
   )
 }
+
+export const GrowthAgentOrchestrationPanel = withGrowthFeatureShellGate(
+  "agentOrchestrationDashboard",
+  GrowthAgentOrchestrationPanelInner,
+  "GrowthAgentOrchestrationPanel",
+)

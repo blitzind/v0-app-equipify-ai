@@ -1,5 +1,6 @@
 import { createServiceRoleClient } from "@/lib/supabase/admin"
 import { runGrowthCronJob } from "@/lib/growth/runtime/growth-cron-runner"
+import { guardGrowthFeatureCronJob } from "@/lib/growth/runtime/growth-feature-api-guards"
 import { growthCronApiPath } from "@/lib/growth/runtime/cron-telemetry-types"
 import {
   buildGrowthProviderRuntimeDiagnosticsSnapshot,
@@ -12,6 +13,9 @@ export const maxDuration = 60
 const CRON_ROUTE = growthCronApiPath("growth-provider-runtime-diagnostics")
 
 export async function POST(request: Request) {
+  const coldCron = guardGrowthFeatureCronJob("diagnosticsDashboards")
+  if (coldCron) return coldCron
+
   const admin = createServiceRoleClient()
   return runGrowthCronJob(
     {

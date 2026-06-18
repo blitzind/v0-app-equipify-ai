@@ -1,9 +1,8 @@
 "use client"
 
-import Link from "next/link"
 import { Loader2, Plus, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { GrowthFeatureLink } from "@/components/growth/runtime/growth-feature-link"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -79,10 +78,12 @@ export function GrowthUnifiedInboxDashboardPanel() {
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
-            <Link href={GROWTH_INBOX_DIAGNOSTICS_HREF}>Inbox Diagnostics</Link>
+            <GrowthFeatureLink feature="diagnosticsDashboards" href={GROWTH_INBOX_DIAGNOSTICS_HREF}>
+              Inbox Diagnostics
+            </GrowthFeatureLink>
           </Button>
           <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/admin/growth/sequences/execution">Sequence Execution</Link>
+            <GrowthFeatureLink href="/admin/growth/sequences/execution">Sequence Execution</GrowthFeatureLink>
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={Boolean(actionLoading)}>
             <RefreshCw className="mr-1.5 size-3.5" />

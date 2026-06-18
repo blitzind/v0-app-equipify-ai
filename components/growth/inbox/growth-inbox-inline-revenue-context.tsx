@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { TrendingUp } from "lucide-react"
+import { GrowthOnDemandFeature } from "@/components/growth/runtime/growth-on-demand-feature"
 import { GrowthInboxContextEmptyHint } from "@/components/growth/inbox/growth-inbox-context-empty-hint"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
 import { executionPlanProgress } from "@/lib/growth/inbox/inbox-revenue-context"
@@ -22,7 +23,7 @@ function CompactChip({ label, value }: { label: string; value: string }) {
   )
 }
 
-export function GrowthInboxInlineRevenueContext() {
+function GrowthInboxInlineRevenueContextInner() {
   const {
     leadId,
     revenueReadiness,
@@ -105,5 +106,26 @@ export function GrowthInboxInlineRevenueContext() {
         </Link>
       </div>
     </section>
+  )
+}
+
+export function GrowthInboxInlineRevenueContext() {
+  const { leadId, refreshLeadTier3Enrichment } = useGrowthInboxLeadContext()
+
+  if (!leadId) return null
+
+  return (
+    <GrowthOnDemandFeature
+      feature="forecastEvidence"
+      scopeKey={leadId}
+      title="Revenue intelligence"
+      description="Forecast evidence and execution plan for this lead."
+      compact
+      load={async () => {
+        await refreshLeadTier3Enrichment()
+      }}
+    >
+      <GrowthInboxInlineRevenueContextInner />
+    </GrowthOnDemandFeature>
   )
 }

@@ -15,6 +15,7 @@ import {
   type SequencePreviewStudioResponse,
 } from "@/lib/growth/sequence-preview/sequence-preview-types"
 import { useGrowthRealtimeRefresh } from "@/lib/growth/realtime-events/use-growth-realtime-refresh"
+import { withGrowthFeatureShellGate } from "@/components/growth/runtime/with-growth-feature-shell-gate"
 import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
 import { GrowthAgentOrchestrationPanel } from "@/components/growth/growth-agent-orchestration-panel"
@@ -43,7 +44,7 @@ function channelTone(status: SequencePreview["steps"][number]["channel_status"])
   }
 }
 
-export function GrowthSequencePreviewStudioPanel({
+function GrowthSequencePreviewStudioPanelInner({
   title = "Sequence Preview Studio",
   patternId,
   leadId,
@@ -329,3 +330,9 @@ export function GrowthSequencePreviewStudioPanel({
     </>
   )
 }
+
+export const GrowthSequencePreviewStudioPanel = withGrowthFeatureShellGate(
+  "sequencePreviewStudio",
+  GrowthSequencePreviewStudioPanelInner,
+  "GrowthSequencePreviewStudioPanel",
+)

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
-import { fetchOperatorInboxQueue } from "@/lib/growth/operator-inbox/operator-inbox-service"
+import {
+  fetchOperatorInboxQueue,
+  OPERATOR_INBOX_QUEUE_MODES,
+} from "@/lib/growth/operator-inbox/operator-inbox-service"
 import { OPERATOR_INBOX_FILTERS } from "@/lib/growth/operator-inbox/operator-inbox-types"
 
 export const runtime = "nodejs"
@@ -11,6 +14,8 @@ const QuerySchema = z.object({
   lead_id: z.string().max(120).optional(),
   filter: z.enum(OPERATOR_INBOX_FILTERS).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
+  /** compact: Tier 1 inbox panel (default). full: admin / human execution surfaces. */
+  mode: z.enum(OPERATOR_INBOX_QUEUE_MODES).optional(),
 })
 
 export async function GET(request: Request) {
@@ -23,8 +28,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "invalid_query" }, { status: 400 })
   }
 
+  const mode = parsed.data.mode ?? "compact"
+
   try {
-    const queue = await fetchOperatorInboxQueue(access.admin, parsed.data)
+    const queue = await fetchOperatorInboxQueue(access.admin, { ...parsed.data, mode })
     return NextResponse.json({
       ok: true,
       ...queue,

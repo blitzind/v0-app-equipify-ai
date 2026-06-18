@@ -3,6 +3,7 @@ import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { fetchGrowthAgentOrchestration } from "@/lib/growth/agent-orchestration/agent-orchestration-service"
 import { AGENT_ORCHESTRATION_FILTERS } from "@/lib/growth/agent-orchestration/agent-orchestration-types"
+import { guardGrowthFeatureApiRoute } from "@/lib/growth/runtime/growth-feature-api-guards"
 
 export const runtime = "nodejs"
 export const maxDuration = 120
@@ -16,6 +17,8 @@ const QuerySchema = z.object({
 })
 
 export async function GET(request: Request) {
+  const coldGuard = await guardGrowthFeatureApiRoute("agentOrchestrationDashboard", request)
+  if (coldGuard) return coldGuard
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 

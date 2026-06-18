@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
 import { subscribeToGrowthRealtimeEvents, type GrowthRealtimeSubscriptionMode } from "@/lib/growth/realtime-events/realtime-events-subscriber"
+import { withGrowthFeatureShellGate } from "@/components/growth/runtime/with-growth-feature-shell-gate"
 import { fetchPlatformGrowthClient } from "@/lib/growth/platform-growth-client-fetch"
 import {
   REALTIME_EVENT_FILTERS,
@@ -30,7 +31,7 @@ function deliveryTone(status: GrowthRealtimeEvent["delivery_status"]) {
   }
 }
 
-export function GrowthRealtimeEventBusPanel({
+function GrowthRealtimeEventBusPanelInner({
   title = "Real-Time Event Bus",
   compact = false,
   useInboxConcurrencyLimit = false,
@@ -269,3 +270,9 @@ export function GrowthRealtimeEventBusPanel({
     </GrowthEngineCard>
   )
 }
+
+export const GrowthRealtimeEventBusPanel = withGrowthFeatureShellGate(
+  "realtimeEventBus",
+  GrowthRealtimeEventBusPanelInner,
+  "GrowthRealtimeEventBusPanel",
+)
