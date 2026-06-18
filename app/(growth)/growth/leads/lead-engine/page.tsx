@@ -3,6 +3,7 @@
 import { Workflow } from "lucide-react"
 import { GrowthLeadEngineWorkspace } from "@/components/growth/growth-lead-engine-workspace"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
+import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 import {
   GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER,
   GROWTH_LEAD_PIPELINE_IA_QA_MARKER,
@@ -13,8 +14,7 @@ import { GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER } from "@/lib/growth
 
 export default function GrowthLeadsLeadEnginePage() {
   return (
-    <div
-      className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8"
+    <GrowthWorkspacePageContent
       data-qa-marker={GROWTH_LEAD_INTELLIGENCE_INSPECTOR_QA_MARKER}
       data-lead-pipeline-ia-marker={GROWTH_LEAD_PIPELINE_IA_QA_MARKER}
       data-qa={GROWTH_NAV_LEAD_INTELLIGENCE_SINGLE_HOME_QA_MARKER}
@@ -27,6 +27,6 @@ export default function GrowthLeadsLeadEnginePage() {
       />
 
       <GrowthLeadEngineWorkspace />
-    </div>
+    </GrowthWorkspacePageContent>
   )
 }

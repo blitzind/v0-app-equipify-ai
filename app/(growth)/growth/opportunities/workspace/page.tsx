@@ -7,12 +7,13 @@ import { GrowthOpportunitiesOperatorDashboardBody } from "@/components/growth/op
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 import { Button } from "@/components/ui/button"
 import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
+import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
 export default function GrowthOpportunitiesWorkspacePage() {
   const pathname = usePathname()
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8">
+    <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
         title="Opportunity Workspace"
         description="Evidence-backed opportunity signals, buying momentum, committee intelligence, and operator recommendations — no autonomous deal progression."
@@ -29,6 +30,6 @@ export default function GrowthOpportunitiesWorkspacePage() {
       />
 
       <GrowthOpportunitiesOperatorDashboardBody />
-    </div>
+    </GrowthWorkspacePageContent>
   )
 }

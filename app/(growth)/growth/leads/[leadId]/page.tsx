@@ -3,6 +3,7 @@
 import { use } from "react"
 import { GrowthLeadOperatorWorkspace } from "@/components/growth/lead-operator/growth-lead-operator-workspace"
 import { useGrowthBreadcrumbDetail } from "@/components/growth/shell/growth-breadcrumb-context"
+import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
 type PageProps = { params: Promise<{ leadId: string }> }
 
@@ -11,8 +12,8 @@ export default function GrowthLeadOperatorPage({ params }: PageProps) {
   useGrowthBreadcrumbDetail(leadId)
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8">
+    <GrowthWorkspacePageContent>
       <GrowthLeadOperatorWorkspace leadId={leadId} />
-    </div>
+    </GrowthWorkspacePageContent>
   )
 }

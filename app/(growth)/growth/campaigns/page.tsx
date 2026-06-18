@@ -3,10 +3,11 @@
 import { Layers } from "lucide-react"
 import { GrowthMultichannelDashboardView } from "@/components/growth/growth-multichannel-dashboard"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
+import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
 export default function GrowthCampaignsPage() {
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8">
+    <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
         title="Multi-Channel"
         description="Controlled multi-channel sequence orchestration — human tasks for calls, LinkedIn, and booking follow-ups."
@@ -15,6 +16,6 @@ export default function GrowthCampaignsPage() {
       />
 
       <GrowthMultichannelDashboardView />
-    </div>
+    </GrowthWorkspacePageContent>
   )
 }

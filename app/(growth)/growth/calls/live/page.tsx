@@ -6,6 +6,7 @@ import { GrowthCallsOperatingErrorBoundary } from "@/components/growth/growth-ca
 import { GrowthCallsOperatingHeader } from "@/components/growth/growth-calls-operating-tabs"
 import { GrowthRealtimeLiveDashboard } from "@/components/growth/growth-realtime-live-dashboard"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
+import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 import {
   GROWTH_CALLS_RUNTIME_HARDENING_QA_MARKER,
   GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER,
@@ -17,8 +18,7 @@ function LiveFallback() {
 
 export default function GrowthCallsLivePage() {
   return (
-    <div
-      className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8"
+    <GrowthWorkspacePageContent
       data-growth-workspace-consolidation-marker={GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER}
       data-growth-calls-runtime-hardening-marker={GROWTH_CALLS_RUNTIME_HARDENING_QA_MARKER}
     >
@@ -37,6 +37,6 @@ export default function GrowthCallsLivePage() {
           </Suspense>
         </GrowthCallsOperatingErrorBoundary>
       </div>
-    </div>
+    </GrowthWorkspacePageContent>
   )
 }

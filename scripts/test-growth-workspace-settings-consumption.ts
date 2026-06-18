@@ -115,8 +115,10 @@ function runAudit(): void {
   assert.match(shell, /data-growth-compact/)
   assert.match(shell, /data-growth-reduced-motion/)
   const sidebar = readSource("components/growth/shell/growth-sidebar.tsx")
-  assert.match(sidebar, /useGrowthWorkspaceShellPreferences/)
-  console.log("  ✓ workspace shell consumes compact, reduced motion, and sidebar collapsed")
+  assert.match(sidebar, /WORKSPACE_SIDEBAR_COLLAPSED_STORAGE_KEY/)
+  assert.doesNotMatch(sidebar, /sidebar\.sidebarCollapsed/)
+  assert.doesNotMatch(sidebar, /settingsCollapsedApplied/)
+  console.log("  ✓ workspace sidebar collapse uses explicit localStorage toggle only (not settings hydration)")
 
   const persistence = readSource("scripts/test-growth-workspace-settings-persistence.ts")
   const shellSource = readSource("components/growth/shell/growth-sidebar-nav-content.tsx")

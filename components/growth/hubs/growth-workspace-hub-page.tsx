@@ -9,6 +9,7 @@ import type { GrowthWorkspaceHubManifest } from "@/lib/growth/hubs/growth-worksp
 import { GROWTH_WORKSPACE_HUB_QA_MARKER } from "@/lib/growth/hubs/growth-workspace-hub-types"
 import { readGrowthWorkspaceRecentViews } from "@/lib/growth/workspace/growth-workspace-activity-memory"
 import { cn } from "@/lib/utils"
+import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
 type GrowthWorkspaceHubPageProps = {
   manifest: GrowthWorkspaceHubManifest
@@ -167,8 +168,7 @@ export function GrowthWorkspaceHubPage({ manifest, embedded = false }: GrowthWor
   const primaryAction = manifest.quickActions[0]
 
   return (
-    <div
-      className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8"
+    <GrowthWorkspacePageContent
       data-qa-marker={GROWTH_WORKSPACE_HUB_QA_MARKER}
       data-growth-workspace-hub={manifest.id}
     >
@@ -187,6 +187,6 @@ export function GrowthWorkspaceHubPage({ manifest, embedded = false }: GrowthWor
       />
 
       <HubBody manifest={manifest} />
-    </div>
+    </GrowthWorkspacePageContent>
   )
 }

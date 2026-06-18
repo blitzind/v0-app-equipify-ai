@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { GrowthSharePageDetailPanel } from "@/components/growth/share-pages/growth-share-pages-admin-panel"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
+import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
 export default function GrowthSharePageDetailPage({
   params,
@@ -17,7 +18,7 @@ export default function GrowthSharePageDetailPage({
   const listPath = useGrowthFeaturePath("share-pages")
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8">
+    <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
         title="Share Page Detail"
         description="Review, preview, approve, and monitor engagement."
@@ -33,6 +34,6 @@ export default function GrowthSharePageDetailPage({
         }
       />
       <GrowthSharePageDetailPanel sharePageId={id} />
-    </div>
+    </GrowthWorkspacePageContent>
   )
 }

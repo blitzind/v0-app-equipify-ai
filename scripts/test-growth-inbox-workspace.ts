@@ -90,7 +90,8 @@ function runAudit(): void {
   assert.match(layoutSource, /GrowthInboxWorkspaceProvider/)
   assert.match(layoutSource, /GrowthInboxShell/)
   const shellSource = readSource(GROWTH_INBOX_TAB_SHELL_COMPONENT)
-  assert.match(shellSource, /GROWTH_INBOX_WORKSPACE_TABS/)
+  assert.match(shellSource, /resolveGrowthInboxWorkspaceTabs/)
+  assert.match(shellSource, /GrowthWorkspacePageHeader/)
   assert.match(shellSource, /cnDrawerTabButton/)
   console.log("  ✓ inbox layout composes link-based tab shell")
 
@@ -108,7 +109,8 @@ function runAudit(): void {
   const metricsBeforeNotifications =
     v2Panel.indexOf("GrowthInboxOverviewMetricsPanel") < v2Panel.indexOf("GrowthOperatorInboxPanel")
   assert.ok(metricsBeforeNotifications)
-  console.log("  ✓ inbox tab embeds metrics, notifications before queue; no reply intelligence panel")
+  assert.match(v2Panel, /notifications=\{<GrowthOperatorInboxPanel/)
+  console.log("  ✓ inbox tab embeds metrics before notifications; notifications align in workspace grid")
 
   const replyIntelPanel = readSource("components/growth/inbox/growth-inbox-reply-intelligence-panel.tsx")
   assert.match(replyIntelPanel, /replies\/timeline/)

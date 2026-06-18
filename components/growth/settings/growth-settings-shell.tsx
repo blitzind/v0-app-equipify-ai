@@ -11,6 +11,7 @@ import {
 } from "@/lib/growth/navigation/growth-workspace-settings-navigation"
 import { cn } from "@/lib/utils"
 import { NAV_ROW_ACTIVE_SIDEBAR, NAV_SIDEBAR_ACTIVE_INDICATOR } from "@/lib/navigation-chrome"
+import { GROWTH_WORKSPACE_PAGE_STACK } from "@/lib/workspace/workspace-shell-tokens"
 
 type GrowthSettingsShellProps = {
   children: ReactNode
@@ -21,7 +22,7 @@ export function GrowthSettingsShell({ children }: GrowthSettingsShellProps) {
 
   return (
     <div
-      className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8"
+      className={GROWTH_WORKSPACE_PAGE_STACK}
       data-qa-marker={GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER}
     >
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">

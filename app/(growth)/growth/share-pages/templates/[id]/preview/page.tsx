@@ -6,6 +6,7 @@ import { GrowthSharePageTemplatePreviewPage } from "@/components/growth/share-pa
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 import { useGrowthBreadcrumbDetail } from "@/components/growth/shell/growth-breadcrumb-context"
 import type { GrowthSharePageTemplate } from "@/lib/growth/share-pages/share-page-template-types"
+import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
 export default function GrowthSharePageTemplatePreviewRoute({
   params,
@@ -34,7 +35,7 @@ export default function GrowthSharePageTemplatePreviewRoute({
   useGrowthBreadcrumbDetail(template?.name, loading)
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8">
+    <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
         title="Template Preview"
         description="Responsive preview of the current template draft or published version."
@@ -43,6 +44,6 @@ export default function GrowthSharePageTemplatePreviewRoute({
       />
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {template ? <GrowthSharePageTemplatePreviewPage template={template} /> : null}
-    </div>
+    </GrowthWorkspacePageContent>
   )
 }

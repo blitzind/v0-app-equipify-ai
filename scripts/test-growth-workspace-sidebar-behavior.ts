@@ -79,6 +79,11 @@ function runAudit(): void {
   assertIncludes(FILES.mobileDrawer, "WorkspaceSidebarOrganizationCard", "Mobile drawer must render org context under logo")
   console.log("  ✓ mobile drawer renders org card + collapsible groups through shared nav content")
 
+  assertIncludes(FILES.sidebar, "WORKSPACE_SIDEBAR_COLLAPSED_STORAGE_KEY", "Growth sidebar must persist collapse via shared localStorage key")
+  assertIncludes(FILES.coreSidebar, "WORKSPACE_SIDEBAR_COLLAPSED_STORAGE_KEY", "Core sidebar must persist collapse via shared localStorage key")
+  assert.ok(!read(FILES.sidebar).includes("sidebar.sidebarCollapsed"), "Growth sidebar must not auto-collapse from settings hydration")
+  assert.ok(!read(FILES.sidebar).includes("settingsCollapsedApplied"), "Growth sidebar must not apply settings collapsed flag on load")
+  console.log("  ✓ desktop sidebar collapse is explicit-toggle + localStorage only (defaults open)")
   assertIncludes(FILES.sidebar, "WorkspaceSidebarOrganizationCard", "Growth sidebar must render org context under logo")
   assertIncludes(FILES.sidebar, "WORKSPACE_SIDEBAR_GROWTH_ORGANIZATION_PROPS", "Growth sidebar must use Growth org card props")
   assertIncludes(FILES.coreSidebar, "WorkspaceSidebarOrganizationCard", "Core sidebar must use shared org card primitive")

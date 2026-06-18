@@ -201,9 +201,11 @@ function assertContainerSpacingCertification(): void {
   assertIncludes(CORE_SHELL_FILES.pageShell, "WORKSPACE_SHELL_MAIN_INNER", "Core uses shared main inner container token")
   assertIncludes(PRIMITIVE_FILES.WorkspaceContainer, "WORKSPACE_SHELL_MAIN_INNER", "WorkspaceContainer applies shared rhythm")
   assertIncludes("components/growth/shell/growth-breadcrumbs.tsx", "WORKSPACE_SHELL_HORIZONTAL_PADDING", "Growth breadcrumbs use shared horizontal padding")
+  assertIncludes("components/growth/shell/growth-workspace-page-content.tsx", "GROWTH_WORKSPACE_PAGE_STACK", "Growth page content uses shared page stack token")
   assertIncludes("lib/workspace/workspace-shell-tokens.ts", "max-w-[1440px]", "shared max width token")
   assertIncludes("lib/workspace/workspace-shell-tokens.ts", "p-3 sm:p-6", "shared horizontal/vertical padding breakpoints")
   assertIncludes("lib/workspace/workspace-shell-tokens.ts", "pb-24 lg:pb-6", "shared mobile bottom clearance rhythm")
+  assertExcludes("app/(growth)/growth/page.tsx", "max-w-7xl", "Growth dashboard must not double-narrow with legacy max-w-7xl wrapper")
   console.log("  ✓ container spacing certification (max width, padding, breakpoints)")
 }
 

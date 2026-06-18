@@ -4,11 +4,11 @@ import { ListOrdered } from "lucide-react"
 import { GrowthLeadInboxDashboard } from "@/components/growth/lead-operator/growth-lead-inbox-dashboard"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 import { GROWTH_WORKSPACE_QUEUE_QA_MARKER } from "@/lib/growth/navigation/growth-navigation-destinations"
+import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
 export default function GrowthLeadsResearchPage() {
   return (
-    <div
-      className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8"
+    <GrowthWorkspacePageContent
       data-growth-workspace-queue-marker={GROWTH_WORKSPACE_QUEUE_QA_MARKER}
     >
       <GrowthWorkspacePageHeader
@@ -19,6 +19,6 @@ export default function GrowthLeadsResearchPage() {
       />
 
       <GrowthLeadInboxDashboard />
-    </div>
+    </GrowthWorkspacePageContent>
   )
 }

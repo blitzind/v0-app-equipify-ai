@@ -3,10 +3,11 @@
 import { Sparkles } from "lucide-react"
 import { GrowthLiveCoachingDashboard } from "@/components/growth/growth-live-coaching-dashboard"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
+import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
 export default function GrowthCallsCoachingPage() {
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8">
+    <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
         title="Live Coaching"
         description="Operator execution scores, guidance effectiveness, and high-risk call patterns — human in control, no autonomous actions."
@@ -15,6 +16,6 @@ export default function GrowthCallsCoachingPage() {
       />
 
       <GrowthLiveCoachingDashboard />
-    </div>
+    </GrowthWorkspacePageContent>
   )
 }

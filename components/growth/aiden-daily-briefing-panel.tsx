@@ -4,6 +4,10 @@ import Link from "next/link"
 import { ArrowRight, Loader2, RefreshCw, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
+import {
+  GrowthOperatorBriefingOperationalSummary,
+  GrowthOperatorBriefingPriorities,
+} from "@/components/growth/growth-operator-briefing-compact"
 import { useAidenBriefing } from "@/components/growth/use-aiden-briefing"
 import type { AidenDailyBriefing } from "@/lib/growth/aiden/aiden-daily-briefing"
 import { AIDEN_DAILY_BRIEFING_QA_MARKER } from "@/lib/growth/aiden/aiden-daily-briefing"
@@ -54,23 +58,7 @@ function SectionCard({
 }
 
 function CompactBriefingHeader({ briefing }: { briefing: AidenDailyBriefing }) {
-  const mailboxTone =
-    briefing.summary.mailbox_label === "Healthy"
-      ? "ok"
-      : briefing.summary.mailbox_label === "Expired"
-        ? "warn"
-        : "neutral"
-
-  return (
-    <div className="grid gap-2 rounded-lg border border-border/60 bg-background/80 p-4 sm:grid-cols-2 lg:grid-cols-3">
-      <SummaryRow label="Mailbox Health" value={briefing.summary.mailbox_label} tone={mailboxTone} />
-      <SummaryRow label="Replies Needing Attention" value={briefing.summary.replies_needing_attention} />
-      <SummaryRow label="Meeting Requests" value={briefing.inbox.meeting_requests} />
-      <SummaryRow label="Pending Approvals" value={briefing.summary.pending_approvals} />
-      <SummaryRow label="Blocked Jobs" value={briefing.summary.blocked_jobs} />
-      <SummaryRow label="Today's Recommended Action" value={briefing.summary.recommended_action} />
-    </div>
-  )
+  return <GrowthOperatorBriefingOperationalSummary briefing={briefing} />
 }
 
 export function AidenDailyBriefingPanel({
@@ -149,26 +137,13 @@ export function AidenDailyBriefingPanel({
       {headerVariant === "compact" ? (
         <div className="mt-4 space-y-4">
           <CompactBriefingHeader briefing={briefing} />
-          {briefing.priorities.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Top priorities</p>
-              {briefing.priorities.map((item) => (
-                <Link
-                  key={item.priority}
-                  href={item.href}
-                  className="flex items-start justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2.5 text-sm transition hover:border-indigo-200 hover:bg-indigo-50/30"
-                >
-                  <div>
-                    <p className="font-medium">
-                      Priority {item.priority}: {item.title}
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{item.detail}</p>
-                  </div>
-                  <ArrowRight className="mt-0.5 size-4 shrink-0 text-indigo-500" />
-                </Link>
-              ))}
-            </div>
-          ) : null}
+          <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 px-4 py-3 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
+              Recommended action
+            </p>
+            <p className="mt-1 text-sm font-medium">{briefing.summary.recommended_action}</p>
+          </div>
+          <GrowthOperatorBriefingPriorities briefing={briefing} />
         </div>
       ) : (
         <>

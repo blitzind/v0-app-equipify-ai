@@ -1,6 +1,7 @@
 import type { ElementType } from "react"
 import { Construction } from "lucide-react"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
+import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
 type GrowthPlaceholderPageProps = {
   title: string
@@ -16,7 +17,7 @@ export function GrowthPlaceholderPage({
   iconClassName,
 }: GrowthPlaceholderPageProps) {
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8">
+    <GrowthWorkspacePageContent className="max-w-3xl">
       <GrowthWorkspacePageHeader
         title={title}
         description={description}
@@ -33,6 +34,6 @@ export function GrowthPlaceholderPage({
           available under `/admin/growth/*` until this route is fully migrated.
         </p>
       </section>
-    </div>
+    </GrowthWorkspacePageContent>
   )
 }

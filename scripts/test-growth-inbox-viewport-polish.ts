@@ -54,7 +54,11 @@ function runAudit(): void {
 
   const shell = readSource("components/growth/inbox/growth-inbox-workspace-shell.tsx")
   assert.match(shell, /min-h-\[min\(420px,46vh\)\]/)
-  console.log("  ✓ tri-column shell height reduced for laptop viewport")
+  assert.match(shell, /GROWTH_INBOX_WORKSPACE_GRID_QA_MARKER/)
+  assert.match(shell, /lg:grid-cols-\[22fr_50fr_28fr\]/)
+  assert.match(shell, /notifications\?:/)
+  assert.match(shell, /lg:row-span-2/)
+  console.log("  ✓ tri-column shell grid aligns notifications with action center")
 
   const operationsPanel = readSource("components/growth/inbox/growth-inbox-workspace-operations-panel.tsx")
   assert.match(operationsPanel, /GrowthInboxExpandableLazyPanel/)

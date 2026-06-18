@@ -4,6 +4,7 @@ import { use } from "react"
 import { LayoutTemplate } from "lucide-react"
 import { GrowthSharePageTemplateEditor } from "@/components/growth/share-pages/templates/growth-share-page-template-editor"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
+import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
 export default function GrowthSharePageTemplateEditPage({
   params,
@@ -13,7 +14,7 @@ export default function GrowthSharePageTemplateEditPage({
   const { id } = use(params)
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8">
+    <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
         title="Edit Share Page Template"
         description="Build sections, theme, and metadata before publishing to the library."
@@ -21,6 +22,6 @@ export default function GrowthSharePageTemplateEditPage({
         iconClassName="bg-violet-50 text-violet-600"
       />
       <GrowthSharePageTemplateEditor templateId={id} />
-    </div>
+    </GrowthWorkspacePageContent>
   )
 }

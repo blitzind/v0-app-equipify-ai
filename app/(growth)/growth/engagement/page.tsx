@@ -5,10 +5,11 @@ import { GrowthEngagementCommandCenter } from "@/components/growth/engagement/gr
 import { GrowthEngagementDashboardPanel } from "@/components/growth/engagement/growth-engagement-dashboard"
 import { GrowthEngagementDashboard as GrowthLeadEngagementDashboard } from "@/components/growth/growth-engagement-dashboard"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
+import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
 export default function GrowthEngagementPage() {
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8">
+    <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
         title="Engagement Dashboard"
         description="Share page, media, CTA, Q&A, conversational, and booking handoff engagement — read-only rollup, no outreach execution."
@@ -39,6 +40,6 @@ export default function GrowthEngagementPage() {
           <GrowthLeadEngagementDashboard />
         </section>
       </div>
-    </div>
+    </GrowthWorkspacePageContent>
   )
 }

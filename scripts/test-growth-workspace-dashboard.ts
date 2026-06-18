@@ -32,8 +32,10 @@ const REQUIRED_SECTION_IDS = [
 const WORKSPACE_DASHBOARD_FILES = [
   "app/(growth)/growth/page.tsx",
   "components/growth/workspace/growth-workspace-dashboard-body.tsx",
+  "components/growth/growth-operator-briefing-compact.tsx",
   "components/growth/workspace/use-growth-workspace-dashboard.ts",
   "lib/growth/workspace/growth-workspace-dashboard-mapper.ts",
+  "lib/growth/workspace/growth-workspace-briefing-links.ts",
   "lib/growth/workspace/growth-workspace-dashboard-quick-actions.ts",
   "lib/growth/workspace/growth-workspace-dashboard-types.ts",
 ] as const
@@ -58,6 +60,8 @@ function runAudit(): void {
 
   const bodySource = readSource("components/growth/workspace/growth-workspace-dashboard-body.tsx")
   assert.match(bodySource, /data-section="welcome"/)
+  assert.match(bodySource, /GrowthOperatorBriefingOperationalSummary/)
+  assert.match(bodySource, /GrowthOperatorBriefingPriorities/)
   assert.match(bodySource, /data-section="recent-activity"/)
   assert.match(bodySource, /data-section="continue-working"/)
   assert.match(bodySource, /data-qa-marker=\{GROWTH_WORKSPACE_DASHBOARD_QA_MARKER\}/)
@@ -92,6 +96,7 @@ function runAudit(): void {
     callsDashboard: null,
   })
   assert.equal(emptyModel.qaMarker, GROWTH_WORKSPACE_DASHBOARD_QA_MARKER)
+  assert.equal(emptyModel.briefing, null)
   assert.equal(emptyModel.welcome.greeting, "Welcome back")
   assert.deepEqual(
     emptyModel.sections.map((section) => section.id),
@@ -185,6 +190,8 @@ function runAudit(): void {
 
   const myQueue = populatedModel.sections.find((section) => section.id === "my-queue") as GrowthWorkspaceDashboardSection
   assert.equal(myQueue.metrics.find((metric) => metric.label === "Leads needing action")?.value, 3)
+  assert.ok(populatedModel.briefing?.summary.replies_needing_attention === 3)
+  assert.equal(populatedModel.welcome.recommendedAction, "Review inbox replies first.")
   assert.equal(
     populatedModel.sections.find((section) => section.id === "activity")?.metrics.find((metric) => metric.label === "Calls today")
       ?.value,

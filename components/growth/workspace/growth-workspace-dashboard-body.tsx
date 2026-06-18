@@ -9,6 +9,11 @@ import {
   GROWTH_WORKSPACE_DASHBOARD_QUICK_ACTION_QA_MARKER,
 } from "@/lib/growth/workspace/growth-workspace-dashboard-quick-actions"
 import {
+  GrowthOperatorBriefingOperationalSummary,
+  GrowthOperatorBriefingPriorities,
+} from "@/components/growth/growth-operator-briefing-compact"
+import type { AidenDailyBriefing } from "@/lib/growth/aiden/aiden-daily-briefing"
+import {
   GROWTH_WORKSPACE_DASHBOARD_QA_MARKER,
   type GrowthWorkspaceDashboardMetricLink,
   type GrowthWorkspaceDashboardSection,
@@ -81,7 +86,13 @@ function MetricGrid({ section }: { section: GrowthWorkspaceDashboardSection }) {
   )
 }
 
-function WelcomeSection({ welcome }: { welcome: GrowthWorkspaceDashboardWelcome }) {
+function WelcomeSection({
+  welcome,
+  briefing,
+}: {
+  welcome: GrowthWorkspaceDashboardWelcome
+  briefing: AidenDailyBriefing | null
+}) {
   const headline = welcome.operatorName
     ? welcome.greeting.includes(welcome.operatorName)
       ? welcome.greeting
@@ -94,18 +105,25 @@ function WelcomeSection({ welcome }: { welcome: GrowthWorkspaceDashboardWelcome 
       data-section="welcome"
     >
       <p className="text-lg font-semibold tracking-tight text-foreground">{headline}</p>
-      {welcome.recommendedAction ? (
-        <p className="mt-2 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">Recommended next action: </span>
-          {welcome.recommendedAction}
-        </p>
-      ) : null}
-      {welcome.todaysFocus ? (
-        <p className="mt-2 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">Today&apos;s focus: </span>
-          {welcome.todaysFocus}
-        </p>
-      ) : null}
+
+      <div className="mt-4 space-y-4">
+        <GrowthOperatorBriefingOperationalSummary briefing={briefing} />
+
+        {welcome.recommendedAction ? (
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Recommended next action: </span>
+            {welcome.recommendedAction}
+          </p>
+        ) : null}
+        {welcome.todaysFocus ? (
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Today&apos;s focus: </span>
+            {welcome.todaysFocus}
+          </p>
+        ) : null}
+
+        <GrowthOperatorBriefingPriorities briefing={briefing} />
+      </div>
     </section>
   )
 }
@@ -245,7 +263,7 @@ export function GrowthWorkspaceDashboardBody() {
 
   return (
     <div className="space-y-6" data-qa-marker={GROWTH_WORKSPACE_DASHBOARD_QA_MARKER}>
-      <WelcomeSection welcome={dashboard.welcome} />
+      <WelcomeSection welcome={dashboard.welcome} briefing={dashboard.briefing} />
 
       {error ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">

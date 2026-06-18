@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
-import { useGrowthWorkspaceShellPreferences } from "@/components/growth/settings/growth-workspace-shell-preferences-context"
 import { cn } from "@/lib/utils"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-registry"
 import {
@@ -24,25 +23,18 @@ import {
 import { GROWTH_SHELL_NAV_QA_MARKER } from "@/components/growth/shell/growth-shell-navigation"
 
 export function GrowthSidebar() {
-  const { sidebar, loaded: shellPreferencesLoaded } = useGrowthWorkspaceShellPreferences()
   const [collapsed, setCollapsedState] = useState(false)
-  const [settingsCollapsedApplied, setSettingsCollapsedApplied] = useState(false)
 
+  // Restore desktop sidebar collapsed state — explicit toggle only (matches Core AppSidebar).
   useEffect(() => {
     if (typeof window === "undefined") return
     try {
       const raw = window.localStorage.getItem(WORKSPACE_SIDEBAR_COLLAPSED_STORAGE_KEY)
       if (raw === "1") setCollapsedState(true)
     } catch {
-      // ignore
+      // ignore — fall back to default expanded.
     }
   }, [])
-
-  useEffect(() => {
-    if (!shellPreferencesLoaded || settingsCollapsedApplied) return
-    if (sidebar.sidebarCollapsed) setCollapsedState(true)
-    setSettingsCollapsedApplied(true)
-  }, [shellPreferencesLoaded, settingsCollapsedApplied, sidebar.sidebarCollapsed])
 
   const setCollapsed = useCallback((value: boolean) => {
     setCollapsedState(value)

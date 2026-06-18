@@ -1,5 +1,7 @@
 /** Growth workspace operator home dashboard (Phase 6A) — client-safe types. */
 
+import type { AidenDailyBriefing } from "@/lib/growth/aiden/aiden-daily-briefing"
+
 export const GROWTH_WORKSPACE_DASHBOARD_QA_MARKER = "growth-workspace-dashboard-v2" as const
 
 export type GrowthWorkspaceDashboardMetricLink = {
@@ -43,6 +45,8 @@ export type GrowthWorkspaceDashboardViewModel = {
   sections: GrowthWorkspaceDashboardSection[]
   quickActions: GrowthWorkspaceDashboardQuickAction[]
   welcome: GrowthWorkspaceDashboardWelcome
+  /** Aiden briefing already loaded in dashboard batch — reused for operator home parity. */
+  briefing: AidenDailyBriefing | null
   operatorName?: string | null
   recommendedAction?: string | null
 }

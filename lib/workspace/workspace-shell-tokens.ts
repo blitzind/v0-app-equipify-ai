@@ -11,6 +11,15 @@ export const WORKSPACE_SHELL_HORIZONTAL_PADDING = "px-3 sm:px-6" as const
 export const WORKSPACE_SHELL_MAIN_INNER =
   "max-w-[1440px] mx-auto p-3 sm:p-6 pb-24 lg:pb-6" as const
 
+/**
+ * Growth workspace page stack — shell `WorkspaceContainer` already applies
+ * `WORKSPACE_SHELL_MAIN_INNER`; do not add max-width or horizontal padding here.
+ */
+export const GROWTH_WORKSPACE_PAGE_STACK = "flex min-w-0 w-full flex-col gap-6" as const
+
+/** Tighter vertical rhythm for section-tab shells (e.g. Inbox). */
+export const GROWTH_WORKSPACE_SECTION_TAB_STACK = "flex min-w-0 w-full flex-col gap-3" as const
+
 /** Topbar height + padding — matches `AppTopbar`. */
 export const WORKSPACE_SHELL_TOPBAR =
   "flex items-center h-14 md:h-16 px-3 md:px-6 bg-sidebar md:bg-card border-b border-sidebar-border md:border-border gap-3 shrink-0 relative z-30 sticky top-0" as const

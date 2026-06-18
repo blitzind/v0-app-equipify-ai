@@ -3,10 +3,11 @@
 import { Target } from "lucide-react"
 import { GrowthLeadsCrmWorkspace } from "@/components/growth/leads/growth-leads-crm-workspace"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
+import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
 export default function GrowthLeadsCrmPage() {
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8">
+    <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
         title="CRM Growth Leads"
         description="Legacy CRM lead records — separate from the Revenue Queue workspace."
@@ -15,6 +16,6 @@ export default function GrowthLeadsCrmPage() {
       />
 
       <GrowthLeadsCrmWorkspace showPageHeader={false} />
-    </div>
+    </GrowthWorkspacePageContent>
   )
 }

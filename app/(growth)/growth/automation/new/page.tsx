@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
+import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
 export default function GrowthAutomationNewPage() {
   const router = useRouter()
@@ -43,7 +44,7 @@ export default function GrowthAutomationNewPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8">
+    <GrowthWorkspacePageContent className="max-w-3xl">
       <GrowthWorkspacePageHeader
         title="New Automation Flow"
         description="Creates a draft flow with version 1."
@@ -70,6 +71,6 @@ export default function GrowthAutomationNewPage() {
           Create draft flow
         </Button>
       </div>
-    </div>
+    </GrowthWorkspacePageContent>
   )
 }

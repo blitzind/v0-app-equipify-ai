@@ -56,9 +56,10 @@ function runAudit(): void {
   const shellSource = readSource("components/growth/inbox/growth-inbox-shell.tsx")
   assert.doesNotMatch(shellSource, /Inbox Diagnostics/)
   assert.doesNotMatch(shellSource, /Revenue Queue/)
+  assert.match(shellSource, /GrowthWorkspacePageHeader/)
   assert.match(shellSource, /Unified communications workspace for email, SMS, calls, and workflow actions/)
-  assert.match(shellSource, /min-h-\[4\.25rem\]/)
-  console.log("  ✓ compact inbox shell header without diagnostics toolbar")
+  assert.doesNotMatch(shellSource, /min-h-\[4\.25rem\]/)
+  console.log("  ✓ inbox shell header uses shared workspace page card")
 
   const metricsPanel = readSource("components/growth/inbox/growth-inbox-overview-metrics-panel.tsx")
   assert.match(metricsPanel, /GROWTH_INBOX_OVERVIEW_METRICS_QA_MARKER/)

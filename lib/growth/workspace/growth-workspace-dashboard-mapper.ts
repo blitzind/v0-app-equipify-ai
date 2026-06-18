@@ -244,6 +244,7 @@ export function buildGrowthWorkspaceDashboardViewModel(
   return {
     qaMarker: GROWTH_WORKSPACE_DASHBOARD_QA_MARKER,
     generatedAt: new Date().toISOString(),
+    briefing: input.briefing,
     operatorName: input.briefing?.operator_name ?? null,
     recommendedAction: input.briefing?.summary.recommended_action ?? null,
     welcome: {

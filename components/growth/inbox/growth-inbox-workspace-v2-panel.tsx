@@ -60,22 +60,22 @@ export function GrowthInboxWorkspaceV2Panel() {
         <GrowthInboxTier1PollCoordinatorProvider>
           <GrowthInboxTier1RefreshBridge />
           <GrowthInboxQueueProvider>
-          <GrowthInboxQueueUrlSync />
-          <GrowthInboxOverviewMetricsPanel />
-          <GrowthOperatorInboxPanel title="Operator Notifications" compact />
-          <GrowthInboxLeadContextProvider
-            leadId={selectedThread?.lead_id ?? null}
-            threadId={selectedThread?.id ?? null}
-            thread={selectedThread}
-          >
-            <GrowthInboxWorkspaceShell
-              threadQueue={<GrowthInboxThreadQueueColumn />}
-              conversation={<GrowthInboxConversationColumn />}
-              actionCenter={<GrowthInboxActionCenterColumn />}
-            />
-            <GrowthInboxWorkspaceKeyboardBridge />
-          </GrowthInboxLeadContextProvider>
-        </GrowthInboxQueueProvider>
+            <GrowthInboxQueueUrlSync />
+            <GrowthInboxOverviewMetricsPanel />
+            <GrowthInboxLeadContextProvider
+              leadId={selectedThread?.lead_id ?? null}
+              threadId={selectedThread?.id ?? null}
+              thread={selectedThread}
+            >
+              <GrowthInboxWorkspaceShell
+                notifications={<GrowthOperatorInboxPanel title="Operator Notifications" compact />}
+                threadQueue={<GrowthInboxThreadQueueColumn />}
+                conversation={<GrowthInboxConversationColumn />}
+                actionCenter={<GrowthInboxActionCenterColumn />}
+              />
+              <GrowthInboxWorkspaceKeyboardBridge />
+            </GrowthInboxLeadContextProvider>
+          </GrowthInboxQueueProvider>
         </GrowthInboxTier1PollCoordinatorProvider>
       </GrowthInboxSharedDataProvider>
     </div>

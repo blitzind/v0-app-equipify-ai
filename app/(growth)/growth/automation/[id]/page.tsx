@@ -2,6 +2,7 @@
 
 import { use } from "react"
 import { GrowthAutomationFlowEditor } from "@/components/growth/automation/growth-automation-flow-editor"
+import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
 export default function GrowthAutomationEditPage({
   params,
@@ -11,8 +12,8 @@ export default function GrowthAutomationEditPage({
   const { id } = use(params)
 
   return (
-    <div className="px-4 py-4 md:px-6 md:py-6">
+    <GrowthWorkspacePageContent>
       <GrowthAutomationFlowEditor flowId={id} />
-    </div>
+    </GrowthWorkspacePageContent>
   )
 }

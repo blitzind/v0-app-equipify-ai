@@ -3,10 +3,11 @@
 import { PhoneCall } from "lucide-react"
 import { GrowthCallQueueWorkspace } from "@/components/growth/growth-call-queue-workspace"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
+import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
 export default function GrowthLeadsCallQueuePage() {
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8">
+    <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
         title="Call Queue"
         description="Ranked Growth Leads worth calling next, based on research fit and workflow signals."
@@ -15,6 +16,6 @@ export default function GrowthLeadsCallQueuePage() {
       />
 
       <GrowthCallQueueWorkspace showPageHeader={false} />
-    </div>
+    </GrowthWorkspacePageContent>
   )
 }
