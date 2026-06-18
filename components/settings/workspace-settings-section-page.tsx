@@ -2,13 +2,14 @@
 
 import { notFound } from "next/navigation"
 import { WorkspaceSettingsPhasePlaceholder } from "@/components/settings/workspace-settings-phase-placeholder"
-import type { WorkspaceSettingsNavItem } from "@/lib/settings/workspace-settings-navigation"
+import { getWorkspaceSettingsDataAdminSection } from "@/lib/settings/workspace-settings-navigation"
 
 type WorkspaceSettingsSectionPageProps = {
-  section: WorkspaceSettingsNavItem | null
+  sectionId: string
 }
 
-export function WorkspaceSettingsSectionPage({ section }: WorkspaceSettingsSectionPageProps) {
+export function WorkspaceSettingsSectionPage({ sectionId }: WorkspaceSettingsSectionPageProps) {
+  const section = getWorkspaceSettingsDataAdminSection(sectionId)
   if (!section) notFound()
   return <WorkspaceSettingsPhasePlaceholder section={section} icon={section.icon} />
 }

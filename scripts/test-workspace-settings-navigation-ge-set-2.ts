@@ -111,6 +111,15 @@ function runAudit(): void {
   assert.doesNotMatch(growthPageSrc, /fetch\(/)
   console.log("  ✓ growth-engine pages use lift router (GE-SET-4)")
 
+  const dataAdminPageSrc = readFileSync(
+    "app/(dashboard)/settings/data-administration/[sectionId]/page.tsx",
+    "utf8",
+  )
+  assert.match(dataAdminPageSrc, /WorkspaceSettingsSectionPage/)
+  assert.match(dataAdminPageSrc, /sectionId=\{sectionId\}/)
+  assert.doesNotMatch(dataAdminPageSrc, /section=\{section\}/)
+  console.log("  ✓ data-administration pages pass sectionId only (no RSC icon serialization)")
+
   assert.equal(
     `${WORKSPACE_SETTINGS_GROWTH_ENGINE_BASE}/${WORKSPACE_SETTINGS_GROWTH_ENGINE_DEFAULT_SECTION_ID}`,
     "/settings/growth-engine/connected-mailboxes",
@@ -125,9 +134,12 @@ function runAudit(): void {
   assert.equal(isGrowthEngineEnabledClient(), true)
   assert.equal(isGrowthEngineSettingsNavVisible({ isPlatformAdmin: true }), true)
   assert.equal(isGrowthEngineSettingsNavVisible({ isPlatformAdmin: false }), false)
+  process.env.NEXT_PUBLIC_GROWTH_ENGINE_ENABLED = "false"
+  assert.equal(isGrowthEngineSettingsNavVisible({ isPlatformAdmin: true }), true)
+  assert.equal(isGrowthEngineSettingsNavVisible({ isPlatformAdmin: false }), false)
   assert.equal(isDataAdministrationSettingsNavVisible({ isPlatformAdmin: true }), true)
   assert.equal(isDataAdministrationSettingsNavVisible({ isPlatformAdmin: false }), false)
-  console.log("  ✓ visibility gating helpers behave as expected")
+  console.log("  ✓ visibility gating helpers behave as expected (platform admin only, not env flag)")
 
   const growthOperatorGroup = WORKSPACE_SETTINGS_GENERAL_GROUPS.find((group) => group.id === "general-growth-operator")
   assert.ok(growthOperatorGroup)

@@ -141,6 +141,7 @@
     "test:growth-workspace-settings-persistence": "tsx scripts/test-growth-workspace-settings-persistence.ts",
     "test:growth-workspace-settings-consumption": "tsx scripts/test-growth-workspace-settings-consumption.ts",
     "test:workspace-settings-navigation-ge-set-2": "tsx scripts/test-workspace-settings-navigation-ge-set-2.ts",
+    "test:workspace-settings-visibility": "tsx scripts/test-workspace-settings-visibility.ts",
     "test:workspace-settings-growth-operator": "tsx scripts/test-workspace-settings-growth-operator.ts",
     "test:workspace-settings-growth-engine-lift": "tsx scripts/test-workspace-settings-growth-engine-lift.ts",
     "test:growth-workspace-hubs": "tsx scripts/test-growth-workspace-hubs.ts",
