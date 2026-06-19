@@ -5,6 +5,7 @@ import {
   GROWTH_VIDEO_FOUNDATION_QA_MARKER,
   type GrowthVideoTemplate,
 } from "@/lib/growth/videos/growth-video-types"
+import { GROWTH_VIDEO_WORKSPACE_SETTINGS_TEMPLATE_NAME } from "@/lib/growth/videos/growth-video-settings-types"
 import { isGrowthVideoTemplatesSchemaReady } from "@/lib/growth/videos/growth-video-schema-health"
 
 const TEMPLATE_SELECT =
@@ -50,6 +51,7 @@ export class GrowthVideoTemplateService {
       .from("video_templates")
       .select(TEMPLATE_SELECT)
       .eq("organization_id", input.organizationId)
+      .neq("name", GROWTH_VIDEO_WORKSPACE_SETTINGS_TEMPLATE_NAME)
       .order("updated_at", { ascending: false })
       .limit(input.limit ?? 50)
 

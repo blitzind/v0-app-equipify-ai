@@ -8,6 +8,7 @@ import { GrowthAutomationApprovalQueue } from "@/components/growth/automation/gr
 import { GrowthAutomationCompilerPanel } from "@/components/growth/automation/growth-automation-compiler-panel"
 import { GrowthAutomationEnrollmentPanel } from "@/components/growth/automation/growth-automation-enrollment-panel"
 import { GrowthAutomationNodeInspector } from "@/components/growth/automation/growth-automation-node-inspector"
+import { GrowthAutomationVideoAttachmentPicker } from "@/components/growth/automation/growth-automation-video-attachment-picker"
 import { GrowthAutomationObservabilityPanel } from "@/components/growth/automation/growth-automation-observability-panel"
 import { GrowthAutomationPublishPanel } from "@/components/growth/automation/growth-automation-publish-panel"
 import { GrowthAutomationRuntimePreviewPanel } from "@/components/growth/automation/growth-automation-runtime-preview-panel"
@@ -83,6 +84,7 @@ export function GrowthAutomationInspectorSidebar({
             {activeTab === "build" ? (
               <>
                 <GrowthAutomationNodeInspector node={inspectorNode} />
+                <GrowthAutomationVideoAttachmentPicker flowId={flowId} node={inspectorNode} />
                 <GrowthAutomationValidationPanel
                   validation={validation}
                   loading={validating}
