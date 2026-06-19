@@ -42,6 +42,8 @@ const REQUIRED_FILES = [
   "app/v/[slug]/page.tsx",
   "components/growth/videos/growth-video-pages-panel.tsx",
   "components/growth/videos/growth-video-page-create-panel.tsx",
+  "components/growth/videos/growth-video-page-preview-card.tsx",
+  "components/growth/videos/growth-video-page-step-card.tsx",
   "components/growth/videos/growth-video-page-detail-panel.tsx",
   "components/growth/videos/growth-video-public-page-view.tsx",
   "components/growth/videos/use-growth-video-pages.ts",

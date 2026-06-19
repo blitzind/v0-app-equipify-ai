@@ -13,6 +13,10 @@ import { resolveApprovedTemplateContent } from "@/lib/growth/content/dashboard"
 import { isApolloEmailPlaceholderContent } from "@/lib/growth/apollo/apollo-sequence-placeholder-guard"
 import { getApprovedPersonalizationForJob } from "@/lib/growth/personalization/dashboard"
 import type { GrowthSequenceSendPayload } from "@/lib/growth/sequences/execution/sequence-execution-types"
+import {
+  applySequenceVideoAttachmentToEmailHtml,
+  wireApprovedSequenceVideoAttachment,
+} from "@/lib/growth/sequences/growth-sequence-video-send-builder-service"
 
 const UNSUBSCRIBE_FOOTER =
   '<p style="font-size:12px;color:#666;margin-top:24px;">{{unsubscribe_link}} — Reply STOP to unsubscribe.</p>'
@@ -174,6 +178,18 @@ export async function buildSequenceExecutionSendPayload(
     }).html ?? html
   }
 
+  const videoWire = await wireApprovedSequenceVideoAttachment(admin, {
+    organizationId: lead.promotedOrganizationId,
+    sequencePatternStepId: step.sequencePatternStepId,
+    channel: "email",
+    leadId: lead.id,
+    sequenceExecutionJobId: input.sequenceExecutionJobId ?? null,
+    enrollmentStepId: step.id,
+  })
+  if (videoWire) {
+    html = applySequenceVideoAttachmentToEmailHtml(html, videoWire)
+  }
+
   const text = `${body}\n\nReply STOP to unsubscribe.`
 
   return {
@@ -194,5 +210,6 @@ export async function buildSequenceExecutionSendPayload(
     contentTemplateVersionId,
     contentTemplateId,
     personalizationGenerationId,
+    sequenceVideoAttachment: videoWire?.attribution ?? null,
   }
 }

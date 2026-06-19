@@ -8,6 +8,7 @@ import {
 } from "@/lib/growth/videos/growth-video-types"
 import { assertGrowthVideoPageEventType } from "@/lib/growth/videos/growth-video-page-validation"
 import { isGrowthVideoPagesSchemaReady } from "@/lib/growth/videos/growth-video-schema-health"
+import { processGrowthVideoPageEventIntelligence } from "@/lib/growth/sequences/growth-sequence-video-intelligence-service"
 
 type VideoPageEventRow = {
   id: string
@@ -56,7 +57,7 @@ export class GrowthVideoPageEventService {
     const { data: pages, error: pageError } = await this.admin
       .schema("growth")
       .from("video_pages")
-      .select("id, organization_id, video_asset_id, status")
+      .select("id, organization_id, video_asset_id, status, metadata_json")
       .eq("slug", input.slug.trim().toLowerCase())
       .eq("status", "published")
       .limit(2)
@@ -69,10 +70,12 @@ export class GrowthVideoPageEventService {
       id: string
       organization_id: string
       video_asset_id: string
+      metadata_json: Record<string, unknown> | null
     }
 
     const visitorIdentifier = input.visitorIdentifier?.trim().slice(0, 128) ?? null
     const metadata = input.metadata ?? {}
+    const pageMetadata = (page.metadata_json ?? {}) as Record<string, unknown>
 
     const { data, error } = await this.admin
       .schema("growth")
@@ -93,6 +96,17 @@ export class GrowthVideoPageEventService {
         "id, organization_id, video_page_id, video_asset_id, event_type, visitor_identifier, session_id, metadata_json, created_at",
       )
       .single()
+
+    if (!error) {
+      void processGrowthVideoPageEventIntelligence(this.admin, {
+        organizationId: page.organization_id,
+        videoPageId: page.id,
+        sessionId,
+        leadId:
+          (typeof metadata.lead_id === "string" ? metadata.lead_id : null) ??
+          (typeof pageMetadata.lead_id === "string" ? pageMetadata.lead_id : null),
+      }).catch(() => undefined)
+    }
 
     if (error) return { ok: false, error: error.message }
     return { ok: true, event: mapEventRow(data as VideoPageEventRow) }

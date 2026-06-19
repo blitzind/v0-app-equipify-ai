@@ -9,6 +9,10 @@ import { buildOutreachContextPacket } from "@/lib/growth/outreach/personalizatio
 import { fetchGrowthSequenceEnrollmentStepById } from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
 import { evaluateApolloSmsSendReadiness } from "@/lib/growth/apollo/apollo-sequence-placeholder-guard"
 import type { GrowthSequenceSmsSendPayload } from "@/lib/growth/sequences/execution/sequence-execution-types"
+import {
+  applySequenceVideoAttachmentToSmsBody,
+  wireApprovedSequenceVideoAttachment,
+} from "@/lib/growth/sequences/growth-sequence-video-send-builder-service"
 
 export async function buildSequenceExecutionSmsPayload(
   admin: SupabaseClient,
@@ -49,11 +53,24 @@ export async function buildSequenceExecutionSmsPayload(
     return { error: smsReadiness.code ?? "apollo_sms_placeholder_blocked" }
   }
 
+  const videoWire = await wireApprovedSequenceVideoAttachment(admin, {
+    organizationId: lead.promotedOrganizationId,
+    sequencePatternStepId: step.sequencePatternStepId,
+    channel: "sms",
+    leadId: lead.id,
+    enrollmentStepId: step.id,
+  })
+
+  const finalBody = videoWire
+    ? applySequenceVideoAttachmentToSmsBody(body.trim(), videoWire)
+    : body.trim()
+
   return {
     leadId: lead.id,
     toE164,
-    body: body.trim(),
+    body: finalBody,
     sequenceEnrollmentId: input.sequenceEnrollmentId ?? step.enrollmentId,
     sequenceStepId: step.id,
+    sequenceVideoAttachment: videoWire?.attribution ?? null,
   }
 }

@@ -186,6 +186,11 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "share_page_booking_started",
   "share_page_booking_completed",
   "share_page_resource_opened",
+  "video_page_viewed",
+  "video_video_played",
+  "video_video_completed",
+  "video_cta_clicked",
+  "video_calendar_clicked",
 ] as const
 
 export type GrowthLeadTimelineEventType = (typeof GROWTH_LEAD_TIMELINE_EVENT_TYPES)[number]

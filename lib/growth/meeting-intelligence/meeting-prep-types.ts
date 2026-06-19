@@ -4,6 +4,7 @@ import type { ApolloAccountPlaybookCommitteeRoleCategory } from "@/lib/growth/ap
 import type { ApolloMeetingBridgeAttributionRecord } from "@/lib/growth/apollo/apollo-meeting-bridge-types"
 import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
 import type { GrowthMeeting } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
+import type { GrowthVideoMeetingPrepContext } from "@/lib/growth/sequences/growth-sequence-video-intelligence-types"
 
 export const GROWTH_MEETING_PREP_QA_MARKER = "growth-meeting-prep-v1" as const
 
@@ -144,4 +145,5 @@ export type GrowthMeetingPrepBundle = {
   recommendedObjectives: MeetingPrepObjective[]
   readiness: MeetingPrepReadiness
   accountPlaybookContext: MeetingPrepAccountPlaybookContext | null
+  videoEngagementContext: GrowthVideoMeetingPrepContext | null
 }

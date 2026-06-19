@@ -51,3 +51,25 @@ export const growthSequenceVideoAttachmentApproveSchema = z.object({
   action: z.enum(["approve", "remove", "replace"]),
   replace_with: growthSequenceVideoAttachmentAttachSchema.partial().optional(),
 })
+
+export const growthSequenceVideoSendPreviewSchema = z.object({
+  sequence_pattern_step_id: z.string().uuid(),
+  attachment_type: z.enum(GROWTH_SEQUENCE_VIDEO_ATTACHMENT_TYPES),
+  lead_id: z.string().uuid(),
+  sequence_execution_job_id: z.string().uuid().optional(),
+  enrollment_step_id: z.string().uuid().optional(),
+})
+
+export const growthSequenceVideoAnalyticsDiagnosticsSchema = z.object({
+  attachment_id: z.string().uuid(),
+  lead_id: z.string().uuid().optional(),
+})
+
+export const growthSequenceVideoIntelligenceDiagnosticsSchema = z.object({
+  attachment_id: z.string().uuid().optional(),
+  video_page_id: z.string().uuid().optional(),
+  lead_id: z.string().uuid().optional(),
+  session_id: z.string().trim().max(120).optional(),
+}).refine((value) => Boolean(value.attachment_id || value.video_page_id), {
+  message: "attachment_id_or_video_page_id_required",
+})

@@ -12,6 +12,10 @@ import { getVoiceDropCampaign } from "@/lib/voice/repository/voice-drop-reposito
 import { isComplianceOrchestrationEnabled } from "@/lib/voice/compliance-orchestration/compliance-orchestration-service"
 import { isVoiceDropEnabled } from "@/lib/voice/voice-drops/provider-types"
 import { VOICE_DROP_APPROVAL_REQUIRED } from "@/lib/voice/voice-drops/types"
+import {
+  applySequenceVideoAttachmentToVoiceDropMessage,
+  wireApprovedSequenceVideoAttachment,
+} from "@/lib/growth/sequences/growth-sequence-video-send-builder-service"
 
 export type SequenceVoiceDropPreflightCode =
   | "step_not_found"
@@ -83,15 +87,29 @@ export async function buildSequenceExecutionVoiceDropPayload(
     last_interaction_summary: step.instructions?.trim() ?? "",
   }).rendered
 
+  const videoWire = await wireApprovedSequenceVideoAttachment(admin, {
+    organizationId,
+    sequencePatternStepId: step.sequencePatternStepId,
+    channel: "voice_drop",
+    leadId: lead.id,
+    enrollmentStepId: step.id,
+  })
+
+  const renderedMessage = videoWire
+    ? applySequenceVideoAttachmentToVoiceDropMessage(rendered, videoWire)
+    : rendered
+
   return {
     leadId: lead.id,
     organizationId,
     toE164,
     voiceDropCampaignId: campaign.id,
     campaignName: campaign.name,
-    renderedMessage: rendered,
+    renderedMessage,
     sequenceEnrollmentId: input.sequenceEnrollmentId ?? step.enrollmentId,
     sequenceStepId: step.id,
+    videoAttachmentSummary: videoWire?.channelPreview.voiceDropSummary ?? null,
+    sequenceVideoAttachment: videoWire?.attribution ?? null,
   }
 }
 

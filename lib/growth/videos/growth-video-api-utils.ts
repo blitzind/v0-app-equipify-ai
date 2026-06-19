@@ -7,6 +7,11 @@ export function mapGrowthVideoApiError(error: unknown): NextResponse {
 
   const statusMap: Record<string, number> = {
     not_found: 404,
+    draft_not_ready: 400,
+    recommendation_not_approved: 400,
+    page_not_available: 400,
+    attachment_not_available: 400,
+    media_draft_not_available: 400,
     organization_scope_mismatch: 403,
     invalid_video_mime_type: 400,
     invalid_file_size: 400,

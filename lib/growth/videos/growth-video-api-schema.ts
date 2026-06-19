@@ -260,3 +260,66 @@ export const growthVideoPageScriptPatchSchema = z
     current_version_id: z.string().uuid().nullable().optional(),
   })
   .strict()
+
+export const growthVideoAutopilotListQuerySchema = z.object({
+  lead_id: z.string().uuid(),
+})
+
+export const growthVideoAutopilotRecommendationQuerySchema = z.object({
+  lead_id: z.string().uuid(),
+})
+
+export const growthVideoAutopilotGeneratePreviewSchema = z.object({
+  lead_id: z.string().uuid(),
+  persist: z.boolean().optional(),
+  public_preview_url: z.string().trim().url().max(2048).nullable().optional(),
+})
+
+export const growthVideoAutopilotReviewSchema = z.object({
+  lead_id: z.string().uuid(),
+  status: z.enum(["approved", "dismissed"]),
+})
+
+export const growthVideoAutopilotDraftListQuerySchema = z.object({
+  lead_id: z.string().uuid(),
+})
+
+export const growthVideoAutopilotDraftQuerySchema = z.object({
+  lead_id: z.string().uuid(),
+})
+
+export const growthVideoAutopilotDraftBuildSchema = z.object({
+  lead_id: z.string().uuid(),
+  recommendation_id: z.string().uuid(),
+  video_asset_id: z.string().uuid().nullable().optional(),
+  automation_node_id: z.string().uuid().nullable().optional(),
+  sequence_pattern_step_id: z.string().uuid().nullable().optional(),
+  automation_flow_id: z.string().uuid().nullable().optional(),
+  public_preview_url: z.string().trim().url().max(2048).nullable().optional(),
+})
+
+export const growthVideoAutopilotDraftDiscardSchema = z.object({
+  lead_id: z.string().uuid(),
+})
+
+export const growthVideoOperatorWorkspaceListQuerySchema = z.object({
+  lead_id: z.string().uuid(),
+})
+
+export const growthVideoOperatorWorkspaceQuerySchema = z.object({
+  lead_id: z.string().uuid(),
+})
+
+export const growthVideoOperatorWorkspaceActionSchema = z.object({
+  lead_id: z.string().uuid(),
+})
+
+export const growthVideoOperatorWorkspaceApproveSchema = z.object({
+  lead_id: z.string().uuid(),
+  scope: z.enum(["draft", "attachment"]).default("draft"),
+})
+
+export const growthVideoOperatorWorkspaceQueueMediaSchema = z.object({
+  lead_id: z.string().uuid(),
+  media_type: z.enum(["voice", "avatar", "both"]).default("both"),
+})

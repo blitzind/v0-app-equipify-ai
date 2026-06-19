@@ -10,7 +10,6 @@ import type {
   MeetingPrepBuyingStage,
   MeetingPrepLeadScore,
 } from "@/lib/growth/meeting-intelligence/meeting-prep-types"
-import { fetchGrowthMeetingById } from "@/lib/growth/meeting-intelligence/meeting-repository"
 import type { GrowthMeeting } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 import { loadProspectSearchContactIntelligenceBatch } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-loader"
 import {
@@ -20,6 +19,7 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-qualification-overlays"
 import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
 import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
+import { readGrowthVideoMeetingPrepFromLeadMetadata } from "@/lib/growth/sequences/growth-sequence-video-intelligence-mappings"
 
 function metaRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {}
@@ -105,6 +105,7 @@ export async function gatherMeetingPrepBundleForMeeting(
     contactIntelligence,
     research,
     accountPlaybookContext,
+    videoEngagementContext: readGrowthVideoMeetingPrepFromLeadMetadata(metadata),
     relationshipMemory: memory.available
       ? {
           summary: memory.relationshipSummary,

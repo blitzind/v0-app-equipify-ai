@@ -108,3 +108,35 @@ export type GrowthSequenceVideoAttachmentView = GrowthSequenceVideoAttachmentRec
     publicPath: string | null
   }
 }
+
+export const GROWTH_SEQUENCE_VIDEO_SEND_BUILDER_QA_MARKER =
+  "growth-sequence-video-send-builders-d2-v1" as const
+
+export const GROWTH_SEQUENCE_VIDEO_SEND_BUILDER_CONFIRM =
+  "RUN_GROWTH_SEQUENCE_VIDEO_SEND_BUILDER_CERTIFICATION" as const
+
+export const GROWTH_SEQUENCE_VIDEO_D3_SIGNALS = [
+  "video_viewed",
+  "video_high_intent",
+  "video_cta_clicked",
+  "video_calendar_clicked",
+  "video_return_visitor",
+  "video_completed",
+  "video_multiple_sessions",
+] as const
+
+export type GrowthSequenceVideoD3Signal = (typeof GROWTH_SEQUENCE_VIDEO_D3_SIGNALS)[number]
+
+export type GrowthSequenceVideoSendAttribution = {
+  attachmentId: string
+  videoAssetId: string | null
+  videoPageId: string | null
+  thumbnailUrl: string | null
+  voiceMediaAssetId: string | null
+  avatarMediaAssetId: string | null
+  publicUrl: string | null
+  metadataHooks: GrowthSequenceVideoAttachmentMetadataHooks
+  analyticsHooks: GrowthSequenceVideoAttachmentAnalyticsHooks
+  aiPayload: GrowthSequenceVideoAttachmentAiPayload
+  d3Signals: GrowthSequenceVideoD3Signal[]
+}

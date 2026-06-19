@@ -18,6 +18,7 @@ import {
   type MeetingPrepRiskPriority,
   type MeetingPrepTerritoryContext,
 } from "@/lib/growth/meeting-intelligence/meeting-prep-types"
+import type { GrowthVideoMeetingPrepContext } from "@/lib/growth/sequences/growth-sequence-video-intelligence-types"
 import type { GrowthMeeting } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 import type { GrowthLead } from "@/lib/growth/types"
 
@@ -110,6 +111,21 @@ export function buildMeetingPrepSignals(
     signals.push(`Technologies: ${research.detectedTechnologies.slice(0, 3).join(", ")}`)
   }
   return [...new Set(signals.map((item) => item.trim()).filter(Boolean))].slice(0, 6)
+}
+
+function appendVideoEngagementSignals(
+  signals: string[],
+  videoEngagementContext?: GrowthVideoMeetingPrepContext | null,
+): string[] {
+  if (!videoEngagementContext?.prospectWatched) return signals
+  const next = [...signals]
+  next.push(
+    `Prospect watched: ${videoEngagementContext.prospectWatched} (${Math.round(videoEngagementContext.completionPercent)}% completion, ${videoEngagementContext.viewCount} views)`,
+  )
+  next.push(
+    `Video CTA: ${videoEngagementContext.ctaClicked ? "clicked" : "not clicked"} · Calendar: ${videoEngagementContext.calendarClicked ? "clicked" : "not clicked"}`,
+  )
+  return [...new Set(next.map((item) => item.trim()).filter(Boolean))].slice(0, 8)
 }
 
 export function buildMeetingPrepOpenRisks(input: {
@@ -455,6 +471,7 @@ export function assembleMeetingPrepBundle(input: {
   contactIntelligence: GrowthProspectSearchContactIntelligence | null
   research: GrowthResearchRunPublicView | null
   accountPlaybookContext?: MeetingPrepAccountPlaybookContext | null
+  videoEngagementContext?: GrowthVideoMeetingPrepContext | null
   relationshipMemory?: {
     summary: string | null
     topObjections: string[]
@@ -468,12 +485,15 @@ export function assembleMeetingPrepBundle(input: {
   const territoryContext = buildMeetingPrepTerritoryContext(input.lead)
   const mappedDecisionMakers = mapDecisionMakersForPrep(input.decisionMakers)
   const researchSummary = buildMeetingPrepResearchSummary(input.research)
-  const signals = buildMeetingPrepSignals(input.lead, input.research, {
-    summary: input.relationshipMemory?.summary ?? null,
-    priorInteractions: input.relationshipMemory?.priorInteractions ?? [],
-    commitments: input.relationshipMemory?.commitments ?? [],
-    preferences: input.relationshipMemory?.preferences ?? [],
-  })
+  const signals = appendVideoEngagementSignals(
+    buildMeetingPrepSignals(input.lead, input.research, {
+      summary: input.relationshipMemory?.summary ?? null,
+      priorInteractions: input.relationshipMemory?.priorInteractions ?? [],
+      commitments: input.relationshipMemory?.commitments ?? [],
+      preferences: input.relationshipMemory?.preferences ?? [],
+    }),
+    input.videoEngagementContext,
+  )
   const openRisks = buildMeetingPrepOpenRisks({
     lead: input.lead,
     buyingStage: input.buyingStage,
@@ -530,5 +550,6 @@ export function assembleMeetingPrepBundle(input: {
     recommendedObjectives,
     readiness,
     accountPlaybookContext: input.accountPlaybookContext ?? null,
+    videoEngagementContext: input.videoEngagementContext ?? null,
   }
 }

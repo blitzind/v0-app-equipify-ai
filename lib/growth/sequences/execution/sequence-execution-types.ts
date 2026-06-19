@@ -169,6 +169,7 @@ export type GrowthSequenceSendPayload = {
   contentTemplateVersionId?: string | null
   contentTemplateId?: string | null
   personalizationGenerationId?: string | null
+  sequenceVideoAttachment?: import("@/lib/growth/sequences/growth-sequence-video-attachment-types").GrowthSequenceVideoSendAttribution | null
 }
 
 export type GrowthSequenceSmsSendPayload = {
@@ -177,6 +178,7 @@ export type GrowthSequenceSmsSendPayload = {
   body: string
   sequenceEnrollmentId: string
   sequenceStepId: string
+  sequenceVideoAttachment?: import("@/lib/growth/sequences/growth-sequence-video-attachment-types").GrowthSequenceVideoSendAttribution | null
 }
 
 export type GrowthSequenceVoiceDropSendPayload = {
@@ -188,6 +190,8 @@ export type GrowthSequenceVoiceDropSendPayload = {
   renderedMessage: string
   sequenceEnrollmentId: string
   sequenceStepId: string
+  videoAttachmentSummary?: string | null
+  sequenceVideoAttachment?: import("@/lib/growth/sequences/growth-sequence-video-attachment-types").GrowthSequenceVideoSendAttribution | null
 }
 
 export type GrowthSequenceVoiceDropExecutionMetrics = {
