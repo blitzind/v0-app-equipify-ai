@@ -98,7 +98,8 @@ const operatingTabs = fs.readFileSync(
   "utf8",
 )
 assert.match(operatingTabs, /from "@\/components\/ui\/button"/)
-assert.match(operatingTabs, /resolveGrowthCallsOperatingView/)
+assert.match(operatingTabs, /resolveGrowthCallsOperatingViewWithSavedDefault/)
+assert.match(operatingTabs, /useGrowthWorkspaceDefaultViewsReadonly/)
 assert.match(operatingTabs, /Suspense/)
 
 const workspaceComponent = fs.readFileSync(

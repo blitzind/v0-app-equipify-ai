@@ -7,6 +7,7 @@ import { Headphones, LayoutDashboard, Radio } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
+import { useGrowthWorkspaceDefaultViewsReadonly } from "@/hooks/growth/use-growth-workspace-default-views-readonly"
 import {
   GROWTH_CALLS_PAGE_DESCRIPTION,
   GROWTH_CALLS_PAGE_TITLE,
@@ -14,8 +15,8 @@ import {
   GROWTH_WORKSPACE_CONSOLIDATION_QA_MARKER,
   growthCallsOperatingHref,
   type GrowthCallsOperatingView,
-  resolveGrowthCallsOperatingView,
 } from "@/lib/growth/navigation/growth-workspace-consolidation"
+import { resolveGrowthCallsOperatingViewWithSavedDefault } from "@/lib/growth/settings/growth-workspace-settings-consumption"
 
 const VIEW_TAB_DEFS: Array<{
   id: GrowthCallsOperatingView
@@ -30,9 +31,11 @@ const VIEW_TAB_DEFS: Array<{
 function GrowthCallsOperatingTabsInner({ className }: { className?: string }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const activeView = resolveGrowthCallsOperatingView({
+  const { defaultViews, loaded } = useGrowthWorkspaceDefaultViewsReadonly()
+  const activeView = resolveGrowthCallsOperatingViewWithSavedDefault({
     pathname,
     viewParam: searchParams.get("view"),
+    savedCallsDefaultView: loaded ? defaultViews.callsDefaultView : null,
   })
   const viewTabs = VIEW_TAB_DEFS.map((tab) => ({
     ...tab,

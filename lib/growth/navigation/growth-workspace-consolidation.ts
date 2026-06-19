@@ -43,7 +43,7 @@ export function growthCallsOperatingHref(
   pathname?: string | null,
 ): string {
   const base = growthCallsOperatingBaseHref(pathname)
-  if (view === "operate") return base
+  if (view === "operate") return `${base}?view=operate`
   if (view === "live") {
     return isGrowthWorkspacePathname(pathname)
       ? `${GROWTH_WORKSPACE_BASE_PATH}/calls/live`
