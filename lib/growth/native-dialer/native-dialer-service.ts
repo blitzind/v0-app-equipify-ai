@@ -16,6 +16,13 @@ import {
   startNativeCallSession,
   fetchNativeDialerSettingsRow,
   updateNativeDialerSettingsRow,
+  updateNativeCallSessionNotesDraft,
+  markNativeDialerQueueItemPreviewing,
+  skipNativeDialerQueueItem,
+  snoozeNativeDialerQueueItem,
+  completeNativeDialerQueueItem,
+  fetchNextNativeDialerQueueItem,
+  scheduleNativeDialerCallbackQueueItem,
 } from "@/lib/growth/native-dialer/native-dialer-repository"
 import { emitNativeDialerNotifications } from "@/lib/growth/native-dialer/native-dialer-notifications"
 import type { NativeCallWrapupInput } from "@/lib/growth/native-dialer/native-dialer-wrapup-engine"
@@ -185,5 +192,54 @@ export {
   startCallWorkspaceLiveCoaching,
 } from "@/lib/growth/native-dialer/call-workspace-coaching-service"
 export { resolveCallWorkspaceLeadByPhone } from "@/lib/growth/native-dialer/call-workspace-phone-lead-resolve"
+
+export async function updateGrowthNativeCallSessionNotes(
+  admin: SupabaseClient,
+  sessionId: string,
+  notesDraft: string,
+): Promise<NativeCallWorkspaceSessionPublicView> {
+  return updateNativeCallSessionNotesDraft(admin, sessionId, notesDraft)
+}
+
+export async function applyGrowthNativeDialerQueueAction(
+  admin: SupabaseClient,
+  input: { queueItemId: string; action: "preview" | "skip" | "snooze" | "complete" },
+): Promise<NativeDialerQueueItemPublicView | null> {
+  switch (input.action) {
+    case "preview":
+      return markNativeDialerQueueItemPreviewing(admin, input.queueItemId)
+    case "skip":
+      return skipNativeDialerQueueItem(admin, input.queueItemId)
+    case "snooze":
+      return snoozeNativeDialerQueueItem(admin, input.queueItemId)
+    case "complete":
+      await completeNativeDialerQueueItem(admin, input.queueItemId)
+      return null
+    default:
+      throw new Error("Unsupported queue action.")
+  }
+}
+
+export async function fetchNextGrowthNativeDialerQueueItem(
+  admin: SupabaseClient,
+  input?: { excludeQueueItemId?: string | null; modes?: NativeDialerQueueMode[] },
+): Promise<NativeDialerQueueItemPublicView | null> {
+  return fetchNextNativeDialerQueueItem(admin, input)
+}
+
+export async function scheduleGrowthNativeDialerCallbackQueueItem(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    phoneNumber: string
+    contactName?: string | null
+    companyName?: string | null
+    callbackDueAt: string
+    reason?: string
+    ownerUserId?: string | null
+  },
+): Promise<NativeDialerQueueItemPublicView> {
+  return scheduleNativeDialerCallbackQueueItem(admin, input)
+}
 
 export { fetchActiveNativeCallSession }

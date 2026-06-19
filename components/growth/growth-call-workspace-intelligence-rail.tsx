@@ -43,6 +43,7 @@ import type {
   NativeDialerLeadContext,
 } from "@/lib/growth/native-dialer/native-dialer-types"
 import { GrowthCallWorkspaceRelationshipSummaryPanel } from "@/components/growth/growth-call-workspace-relationship-summary-panel"
+import { GrowthCallWorkspaceSequencePanel } from "@/components/growth/growth-call-workspace-sequence-panel"
 import { isPanelVisible } from "@/lib/voice/workspace-context/panel-prioritization"
 import type { VoiceWorkspaceContextSnapshot } from "@/lib/voice/workspace-context/types"
 import { cn } from "@/lib/utils"
@@ -245,6 +246,8 @@ export function GrowthCallWorkspaceIntelligenceRail({
           {showRelationshipSummary ? (
             <GrowthCallWorkspaceRelationshipSummaryPanel leadId={leadContext.leadId} />
           ) : null}
+
+          <GrowthCallWorkspaceSequencePanel leadId={leadContext.leadId} />
 
           <div className="rounded-xl border border-border/50 px-3 dark:border-white/5">
             <IntelligenceRow

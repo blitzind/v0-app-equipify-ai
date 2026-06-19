@@ -10,6 +10,17 @@ import { GrowthCallWorkspaceUnifiedContextRail } from "@/components/growth/growt
 import { GrowthCallWorkspaceActiveWorkflowStrip } from "@/components/growth/growth-call-workspace-active-workflow-strip"
 import { GrowthCallWorkspaceMobileActionBar } from "@/components/growth/growth-call-workspace-mobile-action-bar"
 import { GrowthCallWorkspaceQueueCard } from "@/components/growth/growth-call-workspace-queue-card"
+import { useCallWorkspaceNotesAutosave } from "@/hooks/growth/use-call-workspace-notes-autosave"
+import {
+  GROWTH_CALL_WORKSPACE_OPS_QA_MARKER,
+  type QueuePreviewState,
+  type CallWorkspacePowerDialSettings,
+} from "@/lib/growth/native-dialer/call-workspace-operator-types"
+import {
+  readCallWorkspacePowerDialSettings,
+  writeCallWorkspacePowerDialSettings,
+} from "@/lib/growth/native-dialer/call-workspace-operator-settings"
+import { queueItemToPreviewState } from "@/lib/growth/native-dialer/call-workspace-queue-preview-utils"
 import type {
   NativeCallWrapupOutcome,
   NativeCallWrapupPublicView,
@@ -179,6 +190,21 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   const [callActionPending, setCallActionPending] = useState(false)
   const [contextRailExpanded, setContextRailExpanded] = useState(false)
   const [deepIntelligenceExpanded, setDeepIntelligenceExpanded] = useState(false)
+  const [queuePreview, setQueuePreview] = useState<QueuePreviewState | null>(null)
+  const [previewDialEnabled, setPreviewDialEnabled] = useState(true)
+  const [powerDialEnabled, setPowerDialEnabled] = useState(false)
+  const [powerDialSettings, setPowerDialSettings] = useState<CallWorkspacePowerDialSettings>(() =>
+    readCallWorkspacePowerDialSettings(),
+  )
+  const [queueActionPendingId, setQueueActionPendingId] = useState<string | null>(null)
+  const [previewActionLoading, setPreviewActionLoading] = useState(false)
+  const [autoDialSeconds, setAutoDialSeconds] = useState<number | null>(null)
+  const [notesDraft, setNotesDraft] = useState("")
+  const [showNotesPanel, setShowNotesPanel] = useState(false)
+  const [showKeypadDrawer, setShowKeypadDrawer] = useState(false)
+  const autoDialTimerRef = useRef<number | null>(null)
+  const autoDialIntervalRef = useRef<number | null>(null)
+  const activeQueueItemIdRef = useRef<string | null>(null)
   const lastInboundOfferVoiceCallIdRef = useRef<string | null>(null)
   const lastRenderedIncomingSessionIdRef = useRef<string | null>(null)
   const suppressedInboundOfferVoiceCallIdRef = useRef<string | null>(null)
@@ -349,6 +375,15 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
         applyServerSession(dashData.workspaceDashboard?.activeSession ?? null)
       }
       setQueue(queueData.queue ?? [])
+
+      const settingsRes = await fetch("/api/platform/growth/calls/settings", { cache: "no-store" })
+      const settingsData = (await settingsRes.json().catch(() => ({}))) as {
+        settings?: { powerDialEnabled?: boolean; previewDialEnabled?: boolean }
+      }
+      if (settingsRes.ok && settingsData.settings) {
+        setPowerDialEnabled(Boolean(settingsData.settings.powerDialEnabled))
+        setPreviewDialEnabled(settingsData.settings.previewDialEnabled !== false)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load call workspace.")
     } finally {
@@ -364,6 +399,134 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       setPhone(normalizeDialPhoneDigits(data.leadContext.contactPhone))
     }
   }, [phone])
+
+  useEffect(() => {
+    if (activeSession?.notesDraft != null) setNotesDraft(activeSession.notesDraft)
+  }, [activeSession?.id, activeSession?.notesDraft])
+
+  useEffect(() => {
+    return () => {
+      if (autoDialTimerRef.current) window.clearTimeout(autoDialTimerRef.current)
+      if (autoDialIntervalRef.current) window.clearInterval(autoDialIntervalRef.current)
+    }
+  }, [])
+
+  function updatePowerDialSettings(next: CallWorkspacePowerDialSettings) {
+    setPowerDialSettings(next)
+    writeCallWorkspacePowerDialSettings(next)
+  }
+
+  function clearAutoDialCountdown() {
+    if (autoDialTimerRef.current) window.clearTimeout(autoDialTimerRef.current)
+    if (autoDialIntervalRef.current) window.clearInterval(autoDialIntervalRef.current)
+    autoDialTimerRef.current = null
+    autoDialIntervalRef.current = null
+    setAutoDialSeconds(null)
+  }
+
+  async function runQueueAction(item: NativeDialerQueueItemPublicView, action: "preview" | "skip" | "snooze") {
+    setQueueActionPendingId(item.id)
+    setError(null)
+    try {
+      const res = await fetch(`/api/platform/growth/calls/queue/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
+      if (!res.ok || !data.ok) throw new Error(data.message ?? "Queue action failed.")
+      await load({ background: true })
+      if (action === "skip" || action === "snooze") {
+        if (queuePreview?.queueItemId === item.id) {
+          clearAutoDialCountdown()
+          setQueuePreview(null)
+        }
+        await advanceToNextLead(item.id)
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Queue action failed.")
+    } finally {
+      setQueueActionPendingId(null)
+    }
+  }
+
+  async function applyQueuePreview(item: NativeDialerQueueItemPublicView) {
+    clearAutoDialCountdown()
+    activeQueueItemIdRef.current = item.id
+    setQueuePreview(queueItemToPreviewState(item))
+    setContextRailExpanded(true)
+    if (item.phoneNumber) setPhone(normalizeDialPhoneDigits(item.phoneNumber))
+    if (item.leadId) {
+      setLeadLinked(true)
+      setCoachingMode("lead_linked")
+      void loadLeadContext(item.leadId)
+    }
+    setQueueActionPendingId(item.id)
+    try {
+      await fetch(`/api/platform/growth/calls/queue/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "preview" }),
+      })
+    } finally {
+      setQueueActionPendingId(null)
+    }
+    if (
+      powerDialEnabled &&
+      powerDialSettings.powerDialAutoAdvance &&
+      (item.queueMode === "power" || item.queueMode === "preview")
+    ) {
+      const delayMs = powerDialSettings.powerDialAutoDialDelayMs
+      const seconds = Math.max(1, Math.ceil(delayMs / 1000))
+      setAutoDialSeconds(seconds)
+      autoDialIntervalRef.current = window.setInterval(() => {
+        setAutoDialSeconds((current) => (current == null ? null : Math.max(0, current - 1)))
+      }, 1000)
+      autoDialTimerRef.current = window.setTimeout(() => {
+        clearAutoDialCountdown()
+        void startCallFromPreview()
+      }, delayMs)
+    }
+  }
+
+  async function advanceToNextLead(excludeQueueItemId?: string | null) {
+    if (!powerDialEnabled || !powerDialSettings.powerDialAutoAdvance) return
+    const res = await fetch(
+      `/api/platform/growth/calls/queue/next?excludeQueueItemId=${encodeURIComponent(excludeQueueItemId ?? "")}`,
+      { cache: "no-store" },
+    )
+    const data = (await res.json().catch(() => ({}))) as {
+      nextItem?: NativeDialerQueueItemPublicView | null
+    }
+    if (!res.ok || !data.nextItem) {
+      setQueuePreview(null)
+      return
+    }
+    await applyQueuePreview(data.nextItem)
+  }
+
+  async function startCallFromPreview() {
+    if (!queuePreview) return
+    setPreviewActionLoading(true)
+    try {
+      await startCall({
+        phoneNumber: normalizeDialPhoneForApi(queuePreview.phone ?? phone),
+        leadId: queuePreview.leadId ?? null,
+        queueItemId: queuePreview.queueItemId ?? null,
+      })
+      setQueuePreview(null)
+      clearAutoDialCountdown()
+    } finally {
+      setPreviewActionLoading(false)
+    }
+  }
+
+  async function handleFollowUpComplete() {
+    clearAutoDialCountdown()
+    setQueuePreview(null)
+    await load({ background: true })
+    await advanceToNextLead(activeQueueItemIdRef.current)
+  }
 
   const lifecycleLocks = getLifecycleLocks()
   const syncWorkspaceSessionId = resolveWorkspaceSessionPinForBrowserSync({
@@ -595,6 +758,15 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       bridgeSession: activeSession?.status === "external_bridge_pending",
     })
   }, [activeSession?.status, callAuthority])
+
+  useCallWorkspaceNotesAutosave({
+    sessionId: activeSession?.id,
+    notesDraft,
+    enabled: workspacePhase === "active" || workspacePhase === "bridge_pending",
+    onSaved: (saved) => {
+      setActiveSession((prev) => (prev ? { ...prev, notesDraft: saved } : prev))
+    },
+  })
 
   const displayOperatorAssist = useMemo(() => {
     if (workspacePhase === "idle") return null
@@ -1733,6 +1905,7 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
       data-voice-missed-call-recovery-qa-marker={VOICE_MISSED_CALL_RECOVERY_QA_MARKER}
       data-voice-unified-operator-workspace-ux-qa-marker={VOICE_UNIFIED_OPERATOR_WORKSPACE_UX_QA_MARKER}
       data-workspace-mode={workspaceContext.mode}
+      data-growth-call-workspace-ops-marker={GROWTH_CALL_WORKSPACE_OPS_QA_MARKER}
     >
       {voiceBrowser.registrationState === "error" && voiceBrowser.error ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
@@ -1806,10 +1979,20 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
 
           <GrowthCallWorkspaceQueueCard
             items={queue}
+            loading={loading}
             dialingId={dialingQueueId}
+            previewItemId={queuePreview?.queueItemId ?? null}
+            actionPendingId={queueActionPendingId}
+            previewDialEnabled={previewDialEnabled}
+            powerDialEnabled={powerDialEnabled}
+            powerDialSettings={powerDialSettings}
+            onPowerDialSettingsChange={updatePowerDialSettings}
+            onPreviewItem={(item) => void applyQueuePreview(item)}
             onDialItem={(item) => {
+              clearAutoDialCountdown()
               const phoneNumber = normalizeDialPhoneForApi(item.phoneNumber ?? phone)
               setDialingQueueId(item.id)
+              activeQueueItemIdRef.current = item.id
               setPhone(normalizeDialPhoneDigits(item.phoneNumber ?? phone))
               void startCall({
                 phoneNumber,
@@ -1817,6 +2000,8 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
                 queueItemId: item.id,
               })
             }}
+            onSkipItem={(item) => void runQueueAction(item, "skip")}
+            onSnoozeItem={(item) => void runQueueAction(item, "snooze")}
           />
         </aside>
 
@@ -1871,6 +2056,28 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
           mediaStreamDiagnostic={mediaStreamDiagnostic}
           onRetryMediaStream={() => void retryMediaStream()}
           onSubmitWrapup={submitWrapup}
+          queuePreview={queuePreview}
+          previewAutoDialSeconds={autoDialSeconds}
+          previewLoading={previewActionLoading}
+          onPreviewCall={() => void startCallFromPreview()}
+          onPreviewSkip={() => {
+            const item = queue.find((entry) => entry.id === queuePreview?.queueItemId)
+            if (item) void runQueueAction(item, "skip")
+          }}
+          onPreviewSnooze={() => {
+            const item = queue.find((entry) => entry.id === queuePreview?.queueItemId)
+            if (item) void runQueueAction(item, "snooze")
+          }}
+          onPreviewNext={() => void advanceToNextLead(queuePreview?.queueItemId ?? null)}
+          showNotesPanel={showNotesPanel}
+          onToggleNotesPanel={() => setShowNotesPanel((value) => !value)}
+          notesDraft={notesDraft}
+          onNotesDraftChange={setNotesDraft}
+          showKeypadDrawer={showKeypadDrawer}
+          onToggleKeypadDrawer={() => setShowKeypadDrawer((value) => !value)}
+          keypadPhone={phone}
+          onKeypadPhoneChange={(value) => setPhone(normalizeDialPhoneDigits(value))}
+          onFollowUpComplete={() => void handleFollowUpComplete()}
         />
 
         <GrowthCallWorkspaceUnifiedContextRail

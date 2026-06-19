@@ -1093,7 +1093,10 @@ export async function saveNativeCallWrapup(
   await ensureNativeCallSessionReadyForWrapup(admin, input.sessionId)
 
   const orgId = await getGrowthEngineAiOrgId(admin)
-  const { data: session, error: sessionError } = await sessionsTable(admin).select("id, lead_id").eq("id", input.sessionId).maybeSingle()
+  const { data: session, error: sessionError } = await sessionsTable(admin)
+    .select("id, lead_id, queue_item_id")
+    .eq("id", input.sessionId)
+    .maybeSingle()
   if (sessionError) throw new Error(sessionError.message)
   if (!session) throw new Error("Call session not found.")
 
@@ -1134,6 +1137,12 @@ export async function saveNativeCallWrapup(
   await sessionsTable(admin)
     .update({ status: "completed", updated_at: now })
     .eq("id", input.sessionId)
+
+  if (session.queue_item_id) {
+    await queueTable(admin)
+      .update({ status: "completed", updated_at: now })
+      .eq("id", session.queue_item_id as string)
+  }
 
   await completeCallWorkspaceLiveCoachingForNativeSession(admin, { nativeSessionId: input.sessionId }).catch(
     () => undefined,
@@ -1219,6 +1228,41 @@ export async function seedNativeDialerQueueFromCallQueue(
   return mapQueueRow(data as QueueRow)
 }
 
+export async function scheduleNativeDialerCallbackQueueItem(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    phoneNumber: string
+    contactName?: string | null
+    companyName?: string | null
+    callbackDueAt: string
+    reason?: string
+    ownerUserId?: string | null
+  },
+): Promise<NativeDialerQueueItemPublicView> {
+  const orgId = await getGrowthEngineAiOrgId(admin)
+  const { data, error } = await queueTable(admin)
+    .insert({
+      organization_id: orgId,
+      lead_id: input.leadId,
+      owner_user_id: input.ownerUserId ?? null,
+      queue_mode: "callback",
+      status: "callback_due",
+      priority_score: 60,
+      callback_due_at: input.callbackDueAt,
+      phone_number: input.phoneNumber,
+      contact_name: input.contactName ?? null,
+      company_name: input.companyName ?? null,
+      reason: input.reason ?? "Operator-scheduled callback from call workspace",
+      source_system: "call_workspace",
+      source_id: input.leadId,
+    })
+    .select("id, lead_id, owner_user_id, queue_mode, status, priority_score, callback_due_at, phone_number, contact_name, company_name, reason")
+    .single()
+  if (error) throw new Error(error.message)
+  return mapQueueRow(data as QueueRow)
+}
+
 export async function fetchNativeCallSessionById(
   admin: SupabaseClient,
   sessionId: string,
@@ -1293,6 +1337,86 @@ export async function attachLeadToNativeCallSession(
     .single()
   if (error) throw new Error(error.message)
   return mapNativeCallSessionRow(data as SessionRow)
+}
+
+export async function updateNativeCallSessionNotesDraft(
+  admin: SupabaseClient,
+  sessionId: string,
+  notesDraft: string,
+): Promise<NativeCallWorkspaceSessionPublicView> {
+  const { data, error } = await sessionsTable(admin)
+    .update({ notes_draft: notesDraft, updated_at: new Date().toISOString() })
+    .eq("id", sessionId)
+    .select(SESSION_SELECT)
+    .single()
+  if (error) throw new Error(error.message)
+  return mapNativeCallSessionRow(data as SessionRow)
+}
+
+export async function markNativeDialerQueueItemPreviewing(
+  admin: SupabaseClient,
+  queueItemId: string,
+): Promise<NativeDialerQueueItemPublicView> {
+  const { data, error } = await queueTable(admin)
+    .update({ status: "previewing", updated_at: new Date().toISOString() })
+    .eq("id", queueItemId)
+    .select("id, lead_id, owner_user_id, queue_mode, status, priority_score, callback_due_at, phone_number, contact_name, company_name, reason")
+    .single()
+  if (error) throw new Error(error.message)
+  return mapQueueRow(data as QueueRow)
+}
+
+export async function skipNativeDialerQueueItem(
+  admin: SupabaseClient,
+  queueItemId: string,
+): Promise<NativeDialerQueueItemPublicView> {
+  const { data, error } = await queueTable(admin)
+    .update({ status: "skipped", updated_at: new Date().toISOString() })
+    .eq("id", queueItemId)
+    .select("id, lead_id, owner_user_id, queue_mode, status, priority_score, callback_due_at, phone_number, contact_name, company_name, reason")
+    .single()
+  if (error) throw new Error(error.message)
+  return mapQueueRow(data as QueueRow)
+}
+
+export async function snoozeNativeDialerQueueItem(
+  admin: SupabaseClient,
+  queueItemId: string,
+): Promise<NativeDialerQueueItemPublicView> {
+  const { data: existing, error: fetchError } = await queueTable(admin)
+    .select("priority_score")
+    .eq("id", queueItemId)
+    .maybeSingle()
+  if (fetchError) throw new Error(fetchError.message)
+  if (!existing) throw new Error("Queue item not found.")
+
+  const snoozedScore = Math.max(0, (existing.priority_score as number) - 25)
+  const { data, error } = await queueTable(admin)
+    .update({
+      status: "pending",
+      priority_score: snoozedScore,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", queueItemId)
+    .select("id, lead_id, owner_user_id, queue_mode, status, priority_score, callback_due_at, phone_number, contact_name, company_name, reason")
+    .single()
+  if (error) throw new Error(error.message)
+  return mapQueueRow(data as QueueRow)
+}
+
+export async function completeNativeDialerQueueItem(admin: SupabaseClient, queueItemId: string): Promise<void> {
+  const { error } = await queueTable(admin)
+    .update({ status: "completed", updated_at: new Date().toISOString() })
+    .eq("id", queueItemId)
+  if (error) throw new Error(error.message)
+}
+
+export async function fetchNextNativeDialerQueueItem(
+  admin: SupabaseClient,
+  input?: { excludeQueueItemId?: string | null; modes?: NativeDialerQueueMode[] },
+): Promise<NativeDialerQueueItemPublicView | null> {
+  const items = await listNativeDialerQueue(admin, { limit: 50, modes: input?.modes })
+  return items.find((item) => item.id !== input?.excludeQueueItemId) ?? null
 }
 
 export { commandLeadFocusHref }

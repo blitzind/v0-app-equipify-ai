@@ -20,6 +20,9 @@ import { GrowthIncomingCallPanel } from "@/components/growth/growth-incoming-cal
 import { GrowthCallWorkspaceGoogleVoiceBridgePanel } from "@/components/growth/growth-call-workspace-google-voice-bridge-panel"
 import { GrowthCallWorkspaceUnifiedAssistPanel } from "@/components/growth/growth-call-workspace-unified-assist-panel"
 import { GrowthPostCallWrapup } from "@/components/growth/growth-post-call-wrapup"
+import { GrowthCallWorkspaceFollowUpPanel } from "@/components/growth/growth-call-workspace-follow-up-panel"
+import { GrowthCallWorkspaceQueuePreviewPanel } from "@/components/growth/growth-call-workspace-queue-preview-panel"
+import { GrowthNativeDialer } from "@/components/growth/growth-native-dialer"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { isExternalBridgeSession } from "@/lib/growth/native-dialer/native-dialer-bridge"
 import {
@@ -33,6 +36,7 @@ import type {
   NativeCallWrapupPublicView,
   NativeCallWorkspaceSessionPublicView,
 } from "@/lib/growth/native-dialer/native-dialer-types"
+import type { QueuePreviewState } from "@/lib/growth/native-dialer/call-workspace-operator-types"
 import type {
   VoiceBrowserCallState,
   VoiceCallRecordingVisibilityView,
@@ -250,6 +254,22 @@ export function GrowthCallWorkspaceCenterPanel({
   onStartLiveCoaching,
   onSubmitWrapup,
   inboundVoiceCallCreatedAt,
+  queuePreview = null,
+  previewAutoDialSeconds = null,
+  previewLoading = false,
+  onPreviewCall,
+  onPreviewSkip,
+  onPreviewSnooze,
+  onPreviewNext,
+  showNotesPanel = false,
+  onToggleNotesPanel,
+  notesDraft = "",
+  onNotesDraftChange,
+  showKeypadDrawer = false,
+  onToggleKeypadDrawer,
+  keypadPhone = "",
+  onKeypadPhoneChange,
+  onFollowUpComplete,
 }: {
   phase: GrowthCallWorkspacePhase
   activeSession: NativeCallWorkspaceSessionPublicView | null
@@ -307,12 +327,33 @@ export function GrowthCallWorkspaceCenterPanel({
     notes?: string
   }) => Promise<NativeCallWrapupPublicView | null>
   inboundVoiceCallCreatedAt?: string | null
+  queuePreview?: QueuePreviewState | null
+  previewAutoDialSeconds?: number | null
+  previewLoading?: boolean
+  onPreviewCall?: () => void
+  onPreviewSkip?: () => void
+  onPreviewSnooze?: () => void
+  onPreviewNext?: () => void
+  showNotesPanel?: boolean
+  onToggleNotesPanel?: () => void
+  notesDraft?: string
+  onNotesDraftChange?: (value: string) => void
+  showKeypadDrawer?: boolean
+  onToggleKeypadDrawer?: () => void
+  keypadPhone?: string
+  onKeypadPhoneChange?: (value: string) => void
+  onFollowUpComplete?: () => void
 }) {
+  const [savedWrapup, setSavedWrapup] = useState<NativeCallWrapupPublicView | null>(null)
   const [elapsed, setElapsed] = useState(activeSession?.durationSeconds ?? 0)
   const externalBridge = isExternalBridgeSession(activeSession)
   const liveCoachingFocusMode = phase === "active" || phase === "bridge_pending"
   const showSecondaryAssist = !liveCoachingFocusMode && !workspaceContext?.deferredAnalytics
   const assistCompactMode = workspaceContext?.deferredAnalytics ?? false
+
+  useEffect(() => {
+    if (phase !== "wrapup") setSavedWrapup(null)
+  }, [phase, activeSession?.id])
 
   useEffect(() => {
     if (!activeSession || !["active", "on_hold"].includes(activeSession.status) || !activeSession.connectedAt) {
@@ -363,6 +404,17 @@ export function GrowthCallWorkspaceCenterPanel({
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         {phase === "idle" ? (
           <>
+            {queuePreview ? (
+              <GrowthCallWorkspaceQueuePreviewPanel
+                preview={queuePreview}
+                autoDialSeconds={previewAutoDialSeconds}
+                loading={previewLoading}
+                onCall={() => onPreviewCall?.()}
+                onSkip={() => onPreviewSkip?.()}
+                onSnooze={() => onPreviewSnooze?.()}
+                onNext={() => onPreviewNext?.()}
+              />
+            ) : null}
             <GrowthCallWorkspaceUnifiedAssistPanel
               phase="idle"
               nativeSessionId={null}
@@ -487,13 +539,23 @@ export function GrowthCallWorkspaceCenterPanel({
               qaAction="live-call-details-toggle"
             >
               <div className="space-y-3">
-                <Textarea
-                  placeholder="Call notes (operator)"
-                  value={activeSession.notesDraft}
-                  readOnly
-                  rows={2}
-                  className="resize-none text-sm"
-                />
+                {showNotesPanel ? (
+                  <Textarea
+                    placeholder="Call notes (operator)"
+                    value={notesDraft}
+                    onChange={(event) => onNotesDraftChange?.(event.target.value)}
+                    rows={4}
+                    className="resize-none text-sm"
+                  />
+                ) : (
+                  <Textarea
+                    placeholder="Call notes (operator)"
+                    value={notesDraft || activeSession.notesDraft}
+                    onChange={(event) => onNotesDraftChange?.(event.target.value)}
+                    rows={2}
+                    className="resize-none text-sm"
+                  />
+                )}
                 <VoiceCallTimelinePanel
                   timeline={voiceTimeline}
                   recording={voiceRecording}
@@ -523,22 +585,56 @@ export function GrowthCallWorkspaceCenterPanel({
 
         {phase === "wrapup" && activeSession ? (
           <>
-            <GrowthCallWorkspaceUnifiedAssistPanel
-              phase="wrapup"
-              nativeSessionId={activeSession.id}
-              sessionLeadId={activeSession.leadId}
-              coachingMode={coachingMode}
-              leadLinked={leadLinked}
-              operatorAssist={operatorAssist}
-              aiCopilot={aiCopilot}
-              aiReceptionist={aiReceptionist}
-              missedCallRecovery={missedCallRecovery}
-              voiceCallId={voiceCallId}
-            />
-            <GrowthPostCallWrapup session={activeSession} submitting={submittingWrapup} onSubmit={onSubmitWrapup} embedded />
+            {savedWrapup ? (
+              <GrowthCallWorkspaceFollowUpPanel
+                wrapup={savedWrapup}
+                leadId={activeSession.leadId}
+                phoneNumber={activeSession.phoneNumber}
+                contactName={activeSession.contactName}
+                companyName={activeSession.companyName}
+                onComplete={() => onFollowUpComplete?.()}
+              />
+            ) : (
+              <>
+                <GrowthCallWorkspaceUnifiedAssistPanel
+                  phase="wrapup"
+                  nativeSessionId={activeSession.id}
+                  sessionLeadId={activeSession.leadId}
+                  coachingMode={coachingMode}
+                  leadLinked={leadLinked}
+                  operatorAssist={operatorAssist}
+                  aiCopilot={aiCopilot}
+                  aiReceptionist={aiReceptionist}
+                  missedCallRecovery={missedCallRecovery}
+                  voiceCallId={voiceCallId}
+                />
+                <GrowthPostCallWrapup
+                  session={activeSession}
+                  submitting={submittingWrapup}
+                  embedded
+                  onSubmit={async (input) => {
+                    const result = await onSubmitWrapup(input)
+                    if (result) setSavedWrapup(result)
+                    return result
+                  }}
+                />
+              </>
+            )}
           </>
         ) : null}
       </div>
+
+      {showKeypadDrawer && phase !== "idle" ? (
+        <div className="mt-3 rounded-xl border border-border/60 bg-muted/10 p-3 dark:border-white/5">
+          <GrowthNativeDialer
+            phone={keypadPhone}
+            onPhoneChange={(value) => onKeypadPhoneChange?.(value)}
+            onStartCall={() => undefined}
+            disabled
+            showLeadSearch={false}
+          />
+        </div>
+      ) : null}
 
       {phase !== "bridge_pending" ? (
         <div className="mt-auto space-y-3 pt-4">
@@ -568,8 +664,8 @@ export function GrowthCallWorkspaceCenterPanel({
                   />
                 </>
               ) : null}
-              <ControlDockButton label="Keypad" icon={Grid3X3} disabled={!controlsEnabled && !bridgeControlsEnabled} />
-              <ControlDockButton label="Notes" icon={SquarePen} disabled={phase === "idle"} />
+              <ControlDockButton label="Keypad" icon={Grid3X3} disabled={!controlsEnabled && !bridgeControlsEnabled} onClick={onToggleKeypadDrawer} active={showKeypadDrawer} />
+              <ControlDockButton label="Notes" icon={SquarePen} disabled={phase === "idle"} onClick={onToggleNotesPanel} active={showNotesPanel} />
               <ControlDockButton
                 label={ending ? "Ending…" : "End"}
                 icon={PhoneOff}

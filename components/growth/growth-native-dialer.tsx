@@ -26,6 +26,7 @@ type GrowthNativeDialerProps = {
   nativeSessionId?: string | null
   leadContextAttached?: boolean
   onLeadAttached?: (leadId: string, session?: NativeCallWorkspaceSessionPublicView) => void
+  showLeadSearch?: boolean
 }
 
 const KEYPAD = [
@@ -52,6 +53,7 @@ export function GrowthNativeDialer({
   nativeSessionId,
   leadContextAttached = false,
   onLeadAttached,
+  showLeadSearch = true,
 }: GrowthNativeDialerProps) {
   const {
     searchQuery,
@@ -100,28 +102,32 @@ export function GrowthNativeDialer({
 
   return (
     <div className="space-y-3" data-qa-marker="growth-native-dialer-controls">
-      <div className="relative">
-        <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
-        <Input
-          placeholder="Search lead, contact, company, or account..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="h-9 pl-9"
-          data-qa-action="native-dialer-lead-search-input"
-        />
-      </div>
+      {showLeadSearch ? (
+        <>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+            <Input
+              placeholder="Search lead, contact, company, or account..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-9 pl-9"
+              data-qa-action="native-dialer-lead-search-input"
+            />
+          </div>
 
-      <CallWorkspaceLeadSearchResultsPanel
-        searching={searching}
-        searchError={searchError}
-        searchResults={searchResults}
-        showEmpty={showEmpty}
-        attachingId={attachingId}
-        autoSelectedLeadId={searchDiagnostics?.autoSelectedLeadId ?? null}
-        attachError={attachError}
-        createProspectHref={createProspectHref}
-        onSelect={handleSelect}
-      />
+          <CallWorkspaceLeadSearchResultsPanel
+            searching={searching}
+            searchError={searchError}
+            searchResults={searchResults}
+            showEmpty={showEmpty}
+            attachingId={attachingId}
+            autoSelectedLeadId={searchDiagnostics?.autoSelectedLeadId ?? null}
+            attachError={attachError}
+            createProspectHref={createProspectHref}
+            onSelect={handleSelect}
+          />
+        </>
+      ) : null}
 
       <div className="relative">
         <Input
