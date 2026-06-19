@@ -151,6 +151,7 @@ function buildPreviewFormVariables(previewForm: Record<string, string> | null | 
     "lead.email": previewForm.email ?? "",
     "lead.pain_point": previewForm.painPoint ?? previewForm.pain_point ?? "",
     "sender.name": previewForm.senderName ?? previewForm.sender_name ?? "",
+    "sender.company": previewForm.senderCompany ?? previewForm.sender_company ?? "",
     "sender.email": previewForm.senderEmail ?? previewForm.sender_email ?? "",
     "booking.link": previewForm.bookingLink ?? previewForm.calendarUrl ?? previewForm.calendar_url ?? "",
     "lead.cta_url": previewForm.ctaUrl ?? previewForm.cta_url ?? "",

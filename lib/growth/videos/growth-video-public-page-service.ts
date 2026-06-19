@@ -5,6 +5,7 @@ import {
   GROWTH_VIDEO_PAGES_QA_MARKER,
   GROWTH_VIDEO_PERSONALIZATION_QA_MARKER,
   GROWTH_VIDEO_THUMBNAILS_QA_MARKER,
+  GROWTH_VIDEO_OVERLAYS_QA_MARKER,
   type GrowthVideoPublicPage,
 } from "@/lib/growth/videos/growth-video-types"
 import {
@@ -13,6 +14,12 @@ import {
   buildGrowthVideoPublicPath,
 } from "@/lib/growth/videos/growth-video-page-validation"
 import { renderGrowthVideoPageFields } from "@/lib/growth/videos/growth-video-personalization-service"
+import { buildGrowthVideoBrandingPreview } from "@/lib/growth/videos/growth-video-branding-service"
+import {
+  GROWTH_VIDEO_OVERLAY_B2_METADATA_KEY,
+  normalizeGrowthVideoOverlayConfig,
+} from "@/lib/growth/videos/growth-video-overlay-render-service"
+import { resolveGrowthVideoPublicOverlays } from "@/lib/growth/videos/growth-video-overlay-service"
 import { resolveGrowthVideoPublicThumbnailUrls } from "@/lib/growth/videos/growth-video-thumbnail-service"
 import { createGrowthVideoService } from "@/lib/growth/videos/growth-video-service"
 import { createGrowthVideoStorageService } from "@/lib/growth/videos/growth-video-storage-factory"
@@ -150,11 +157,25 @@ export async function resolveGrowthVideoPublicPageBySlug(
     ctaLabel: rendered.ctaLabel,
   })
 
-  const qaMarker = thumbnailUrls.ogImageUrl
-    ? GROWTH_VIDEO_THUMBNAILS_QA_MARKER
-    : hasMergeTokens
-      ? GROWTH_VIDEO_PERSONALIZATION_QA_MARKER
-      : GROWTH_VIDEO_PAGES_QA_MARKER
+  const overlayRaw = metadata[GROWTH_VIDEO_OVERLAY_B2_METADATA_KEY]
+  const overlayConfig =
+    overlayRaw && typeof overlayRaw === "object"
+      ? normalizeGrowthVideoOverlayConfig(overlayRaw as Parameters<typeof normalizeGrowthVideoOverlayConfig>[0])
+      : normalizeGrowthVideoOverlayConfig(null)
+  const brandingPreview = buildGrowthVideoBrandingPreview(branding, overlayConfig.branding)
+  const overlayItems = resolveGrowthVideoPublicOverlays({
+    config: overlayConfig,
+    mergeValues: rendered.mergeContext.variables,
+    accentColor: brandingPreview.accentColor,
+  })
+
+  const qaMarker = overlayConfig.enabled && overlayItems.length > 0
+    ? GROWTH_VIDEO_OVERLAYS_QA_MARKER
+    : thumbnailUrls.ogImageUrl
+      ? GROWTH_VIDEO_THUMBNAILS_QA_MARKER
+      : hasMergeTokens
+        ? GROWTH_VIDEO_PERSONALIZATION_QA_MARKER
+        : GROWTH_VIDEO_PAGES_QA_MARKER
 
   return {
     ok: true,
@@ -175,6 +196,8 @@ export async function resolveGrowthVideoPublicPageBySlug(
       missingVariables: rendered.missingVariables,
       thumbnailUrl: thumbnailUrls.thumbnailUrl,
       ogImageUrl: thumbnailUrls.ogImageUrl,
+      overlaysEnabled: overlayConfig.enabled && overlayItems.length > 0,
+      overlayItems,
       qa_marker: qaMarker,
     },
   }

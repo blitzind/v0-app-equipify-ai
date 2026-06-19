@@ -2,6 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { GrowthVideoPublicPage } from "@/lib/growth/videos/growth-video-types"
+import {
+  growthVideoOverlayB2InlineStyle,
+  growthVideoOverlayB2PositionClass,
+} from "@/lib/growth/videos/growth-video-overlay-render-service"
+import { cn } from "@/lib/utils"
 
 function createSessionId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -82,21 +87,43 @@ export function GrowthVideoPublicPageView({ page }: { page: GrowthVideoPublicPag
         </header>
 
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl">
-          {page.playbackUrl ? (
-            <video
-              ref={videoRef}
-              className="aspect-video w-full bg-black"
-              controls
-              playsInline
-              src={page.playbackUrl}
-              onPlay={handlePlay}
-              onTimeUpdate={handleTimeUpdate}
-            />
-          ) : (
-            <div className="aspect-video flex items-center justify-center text-sm text-slate-400">
-              Video unavailable
-            </div>
-          )}
+          <div className="relative">
+            {page.playbackUrl ? (
+              <video
+                ref={videoRef}
+                className="aspect-video w-full bg-black"
+                controls
+                playsInline
+                src={page.playbackUrl}
+                onPlay={handlePlay}
+                onTimeUpdate={handleTimeUpdate}
+              />
+            ) : (
+              <div className="aspect-video flex items-center justify-center text-sm text-slate-400">
+                Video unavailable
+              </div>
+            )}
+
+            {page.overlaysEnabled && page.overlayItems?.length ? (
+              <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+                {page.overlayItems.map((overlay) => (
+                  <div
+                    key={overlay.id}
+                    className={cn(
+                      "absolute z-10 max-w-[90%] text-xs font-medium shadow-sm",
+                      growthVideoOverlayB2PositionClass(overlay.position),
+                      overlay.position === "lower_third" ? "text-left" : "text-center",
+                    )}
+                    style={growthVideoOverlayB2InlineStyle(overlay.style)}
+                  >
+                    <span className="block whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                      {overlay.text}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
 
         <div className="mt-6 space-y-3">

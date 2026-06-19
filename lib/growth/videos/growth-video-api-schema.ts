@@ -172,3 +172,91 @@ export const growthVideoPageThumbnailPatchSchema = z
     preview_form: growthVideoThumbnailPreviewFormSchema.optional(),
   })
   .strict()
+
+const growthVideoOverlayStyleSchema = z.object({
+  backgroundColor: z.string().trim().max(32).nullable().optional(),
+  textColor: z.string().trim().max(32).nullable().optional(),
+  accentColor: z.string().trim().max(32).nullable().optional(),
+  opacity: z.number().min(0).max(1).nullable().optional(),
+})
+
+const growthVideoOverlayItemSchema = z.object({
+  id: z.string().trim().min(1).max(120),
+  type: z.enum(["intro_banner", "company_badge", "cta_overlay", "calendar_overlay", "lower_third"]),
+  enabled: z.boolean(),
+  textTemplate: z.string().trim().max(2000),
+  position: z.enum(["top", "bottom", "lower_third", "center"]),
+  style: growthVideoOverlayStyleSchema.optional(),
+})
+
+const growthVideoOverlayPreviewFormSchema = z.object({
+  first_name: z.string().trim().max(120).optional(),
+  last_name: z.string().trim().max(120).optional(),
+  company: z.string().trim().max(240).optional(),
+  industry: z.string().trim().max(120).optional(),
+  title: z.string().trim().max(240).optional(),
+  sender_name: z.string().trim().max(240).optional(),
+  sender_company: z.string().trim().max(240).optional(),
+  cta_label: z.string().trim().max(120).optional(),
+})
+
+export const growthVideoOverlayPreviewSchema = z.object({
+  page_id: z.string().uuid().optional(),
+  overlays: z
+    .object({
+      enabled: z.boolean(),
+      items: z.array(growthVideoOverlayItemSchema),
+      branding: z
+        .object({
+          logoUrl: z.string().trim().url().max(2048).nullable().optional(),
+          primaryColor: z.string().trim().max(32).nullable().optional(),
+          accentColor: z.string().trim().max(32).nullable().optional(),
+          buttonLabelOverride: z.string().trim().max(120).nullable().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  preview_form: growthVideoOverlayPreviewFormSchema.optional(),
+})
+
+export const growthVideoPageOverlayPatchSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    items: z.array(growthVideoOverlayItemSchema).optional(),
+    branding: z
+      .object({
+        logoUrl: z.string().trim().url().max(2048).nullable().optional(),
+        primaryColor: z.string().trim().max(32).nullable().optional(),
+        accentColor: z.string().trim().max(32).nullable().optional(),
+        buttonLabelOverride: z.string().trim().max(120).nullable().optional(),
+      })
+      .optional(),
+    preview_form: growthVideoOverlayPreviewFormSchema.optional(),
+  })
+  .strict()
+
+export const growthVideoScriptGenerationSchema = z.object({
+  video_page_id: z.string().uuid().optional(),
+  video_asset_id: z.string().uuid().optional(),
+  lead_id: z.string().uuid().optional(),
+  company_candidate_id: z.string().uuid().optional(),
+  person_candidate_id: z.string().uuid().optional(),
+  personalization_profile_id: z.string().uuid().optional(),
+  sequence_candidate_id: z.string().trim().max(120).optional(),
+  goal: z.string().trim().max(500).optional(),
+  target_persona: z.string().trim().max(500).optional(),
+  pain_point: z.string().trim().max(1000).optional(),
+  offer: z.string().trim().max(500).optional(),
+  cta: z.string().trim().max(240).optional(),
+  tone: z.enum(["professional", "friendly", "direct", "consultative"]).optional(),
+  length_seconds: z.number().int().min(15).max(120).optional(),
+  persist: z.boolean().optional(),
+})
+
+export const growthVideoScriptPreviewSchema = growthVideoScriptGenerationSchema.omit({ persist: true })
+
+export const growthVideoPageScriptPatchSchema = z
+  .object({
+    current_version_id: z.string().uuid().nullable().optional(),
+  })
+  .strict()

@@ -11,7 +11,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
 import { GrowthVideoPageAnalyticsSection } from "@/components/growth/videos/growth-video-page-analytics-section"
+import { GrowthVideoPageOverlaySection } from "@/components/growth/videos/growth-video-page-overlay-section"
 import { GrowthVideoPagePersonalizationSection } from "@/components/growth/videos/growth-video-page-personalization-section"
+import { GrowthVideoPageScriptSection } from "@/components/growth/videos/growth-video-page-script-section"
+import { GrowthVideoPageVoiceSection } from "@/components/growth/videos/growth-video-page-voice-section"
+import { GrowthVideoPageAvatarSection } from "@/components/growth/videos/growth-video-page-avatar-section"
 import { GrowthVideoPageThumbnailSection } from "@/components/growth/videos/growth-video-page-thumbnail-section"
 import { GrowthVideoWorkspaceShell } from "@/components/growth/videos/growth-video-workspace-shell"
 import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
@@ -45,7 +49,7 @@ export function GrowthVideoPageDetailPanel({ pageId }: { pageId: string }) {
   const [ctaUrl, setCtaUrl] = useState("")
   const [calendarUrl, setCalendarUrl] = useState("")
   const [activeTab, setActiveTab] = useState<
-    "details" | "analytics" | "personalization" | "thumbnail"
+    "details" | "analytics" | "personalization" | "thumbnail" | "overlays" | "scripts" | "voice" | "avatar"
   >("details")
 
   const load = useCallback(async () => {
@@ -159,9 +163,45 @@ export function GrowthVideoPageDetailPanel({ pageId }: { pageId: string }) {
               >
                 Thumbnail
               </Button>
+              <Button
+                size="sm"
+                variant={activeTab === "overlays" ? "default" : "outline"}
+                onClick={() => setActiveTab("overlays")}
+              >
+                Overlays
+              </Button>
+              <Button
+                size="sm"
+                variant={activeTab === "scripts" ? "default" : "outline"}
+                onClick={() => setActiveTab("scripts")}
+              >
+                Scripts
+              </Button>
+              <Button
+                size="sm"
+                variant={activeTab === "voice" ? "default" : "outline"}
+                onClick={() => setActiveTab("voice")}
+              >
+                Voice
+              </Button>
+              <Button
+                size="sm"
+                variant={activeTab === "avatar" ? "default" : "outline"}
+                onClick={() => setActiveTab("avatar")}
+              >
+                Avatar
+              </Button>
             </div>
 
-            {activeTab === "thumbnail" ? (
+            {activeTab === "avatar" ? (
+              <GrowthVideoPageAvatarSection pageId={pageId} />
+            ) : activeTab === "voice" ? (
+              <GrowthVideoPageVoiceSection pageId={pageId} />
+            ) : activeTab === "scripts" ? (
+              <GrowthVideoPageScriptSection pageId={pageId} />
+            ) : activeTab === "overlays" ? (
+              <GrowthVideoPageOverlaySection pageId={pageId} />
+            ) : activeTab === "thumbnail" ? (
               <GrowthVideoPageThumbnailSection pageId={pageId} />
             ) : activeTab === "personalization" ? (
               <GrowthVideoPagePersonalizationSection pageId={pageId} />

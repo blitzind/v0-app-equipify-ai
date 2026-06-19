@@ -47,6 +47,12 @@ export const GROWTH_VIDEO_WORKSPACE_TABS: GrowthVideoWorkspaceTab[] = [
     description: "Views, watch rate, CTA clicks, and meetings booked.",
   },
   {
+    id: "jobs",
+    label: "Jobs",
+    href: `${BASE}/jobs`,
+    description: "Persistent media generation jobs for voice, avatar, and video workflows.",
+  },
+  {
     id: "settings",
     label: "Settings",
     href: `${BASE}/settings`,
@@ -66,6 +72,7 @@ export function resolveGrowthVideoActiveTabId(pathname: string): string | null {
   if (pathname === `${BASE}/record`) return "record"
   if (pathname === `${BASE}/templates`) return "templates"
   if (pathname === `${BASE}/analytics`) return "analytics"
+  if (pathname === `${BASE}/jobs`) return "jobs"
   if (pathname === `${BASE}/settings`) return "settings"
   if (pathname === BASE) return "library"
   return null

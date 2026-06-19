@@ -39,6 +39,188 @@ export const GROWTH_VIDEO_THUMBNAILS_QA_MARKER = "growth-video-thumbnails-b3-v1"
 
 export const GROWTH_VIDEO_THUMBNAILS_CONFIRM = "RUN_GROWTH_VIDEO_THUMBNAILS_CERTIFICATION" as const
 
+export const GROWTH_VIDEO_OVERLAYS_QA_MARKER = "growth-video-overlays-b2-v1" as const
+
+export const GROWTH_VIDEO_OVERLAYS_CONFIRM = "RUN_GROWTH_VIDEO_OVERLAYS_CERTIFICATION" as const
+
+export const GROWTH_VIDEO_SCRIPTS_QA_MARKER = "growth-video-scripts-b4-v1" as const
+
+export const GROWTH_VIDEO_SCRIPTS_CONFIRM = "RUN_GROWTH_VIDEO_SCRIPTS_CERTIFICATION" as const
+
+export const GROWTH_VIDEO_SCRIPT_TONES = [
+  "professional",
+  "friendly",
+  "direct",
+  "consultative",
+] as const
+
+export type GrowthVideoScriptTone = (typeof GROWTH_VIDEO_SCRIPT_TONES)[number]
+
+export type GrowthVideoScriptGenerationInput = {
+  videoPageId?: string | null
+  videoAssetId?: string | null
+  leadId?: string | null
+  companyCandidateId?: string | null
+  personCandidateId?: string | null
+  personalizationProfileId?: string | null
+  sequenceCandidateId?: string | null
+  goal?: string | null
+  targetPersona?: string | null
+  painPoint?: string | null
+  offer?: string | null
+  cta?: string | null
+  tone?: GrowthVideoScriptTone | null
+  lengthSeconds?: number | null
+}
+
+export type GrowthVideoScriptGeneratedOutput = {
+  script: string
+  hook: string
+  talking_points: string[]
+  cta_copy: string
+  landing_page_title: string
+  landing_page_description: string
+  follow_up_email: string
+  follow_up_sms: string
+  voiceover_notes: string
+  personalization_summary: string
+  recommended_thumbnail_text: string
+  recommended_overlay_text: string
+  sources_used: string[]
+  requires_human_review: true
+  autonomous_execution_enabled: false
+}
+
+export type GrowthVideoScriptVersion = {
+  id: string
+  createdAt: string
+  input: GrowthVideoScriptGenerationInput
+  output: GrowthVideoScriptGeneratedOutput
+  provider: string
+  model?: string | null
+}
+
+export type GrowthVideoScriptB4Metadata = {
+  current_version_id: string | null
+  versions: GrowthVideoScriptVersion[]
+  aiPayload?: GrowthVideoScriptAiPayload | null
+  sources_used: string[]
+  requires_human_review: true
+  autonomous_execution_enabled: false
+}
+
+export type GrowthVideoScriptAiPayload = {
+  script_generation_input: GrowthVideoScriptGenerationInput
+  resolved_variables: Record<string, string>
+  personalization_context: Record<string, unknown>
+  generated_script: GrowthVideoScriptGeneratedOutput | null
+  recommended_thumbnail_text: string
+  recommended_overlay_text: string
+  follow_up_assets: {
+    email: string
+    sms: string
+    landing_page_title: string
+    landing_page_description: string
+  }
+  sources_used: string[]
+  requires_human_review: true
+  autonomous_execution_enabled: false
+}
+
+export type GrowthVideoScriptPreviewContext = {
+  promptPreview: string
+  mergeVariables: Record<string, string>
+  sourcesUsed: string[]
+  engagementSummary?: string | null
+  overlayHints?: string[]
+  thumbnailHints?: string[]
+}
+
+export const GROWTH_VIDEO_OVERLAY_B2_TYPES = [
+  "intro_banner",
+  "company_badge",
+  "cta_overlay",
+  "calendar_overlay",
+  "lower_third",
+] as const
+
+export type GrowthVideoOverlayB2Type = (typeof GROWTH_VIDEO_OVERLAY_B2_TYPES)[number]
+
+export const GROWTH_VIDEO_OVERLAY_B2_POSITIONS = ["top", "bottom", "lower_third", "center"] as const
+
+export type GrowthVideoOverlayB2Position = (typeof GROWTH_VIDEO_OVERLAY_B2_POSITIONS)[number]
+
+export type GrowthVideoOverlayB2Style = {
+  backgroundColor?: string | null
+  textColor?: string | null
+  accentColor?: string | null
+  opacity?: number | null
+}
+
+export type GrowthVideoOverlayB2Item = {
+  id: string
+  type: GrowthVideoOverlayB2Type
+  enabled: boolean
+  textTemplate: string
+  position: GrowthVideoOverlayB2Position
+  style: GrowthVideoOverlayB2Style
+}
+
+export type GrowthVideoOverlayBrandingPreview = {
+  logoUrl?: string | null
+  primaryColor?: string | null
+  accentColor?: string | null
+  buttonLabelOverride?: string | null
+}
+
+export type GrowthVideoOverlayB2Config = {
+  enabled: boolean
+  items: GrowthVideoOverlayB2Item[]
+  branding?: GrowthVideoOverlayBrandingPreview
+}
+
+export type GrowthVideoOverlayPreviewFormInput = {
+  firstName?: string
+  lastName?: string
+  company?: string
+  industry?: string
+  title?: string
+  senderName?: string
+  senderCompany?: string
+  ctaLabel?: string
+}
+
+export type GrowthVideoOverlayResolvedPreviewItem = {
+  id: string
+  type: GrowthVideoOverlayB2Type
+  position: GrowthVideoOverlayB2Position
+  resolvedText: string
+  usedFallback: boolean
+  style: GrowthVideoOverlayB2Style
+}
+
+export type GrowthVideoOverlayAiPayload = {
+  overlay_variables: Record<string, string>
+  resolved_values: Record<string, string>
+  overlay_items: Array<{
+    id: string
+    type: GrowthVideoOverlayB2Type
+    resolved_text: string
+    position: GrowthVideoOverlayB2Position
+  }>
+  missing_variables: string[]
+  sources_used: string[]
+  overlay_score: number
+}
+
+export type GrowthVideoPublicOverlayItem = {
+  id: string
+  type: GrowthVideoOverlayB2Type
+  text: string
+  position: GrowthVideoOverlayB2Position
+  style: GrowthVideoOverlayB2Style
+}
+
 export const GROWTH_VIDEO_THUMBNAIL_TYPES = ["prospect", "company", "cta", "open_graph"] as const
 
 export type GrowthVideoThumbnailType = (typeof GROWTH_VIDEO_THUMBNAIL_TYPES)[number]
@@ -448,10 +630,13 @@ export type GrowthVideoPublicPage = {
   missingVariables?: string[]
   thumbnailUrl?: string | null
   ogImageUrl?: string | null
+  overlaysEnabled?: boolean
+  overlayItems?: GrowthVideoPublicOverlayItem[]
   qa_marker:
     | typeof GROWTH_VIDEO_PAGES_QA_MARKER
     | typeof GROWTH_VIDEO_PERSONALIZATION_QA_MARKER
     | typeof GROWTH_VIDEO_THUMBNAILS_QA_MARKER
+    | typeof GROWTH_VIDEO_OVERLAYS_QA_MARKER
 }
 
 export type GrowthVideoWorkspaceRouteId =
