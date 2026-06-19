@@ -16,6 +16,10 @@ import {
   GROWTH_WORKSPACE_BASE_PATH,
 } from "@/lib/growth/navigation/growth-route-metadata-types"
 import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
+import {
+  GROWTH_ADMIN_PROSPECT_SEARCH_DISCOVER_HREF,
+  GROWTH_WORKSPACE_PROSPECT_SEARCH_DISCOVER_HREF,
+} from "@/lib/growth/navigation/growth-prospect-search-paths"
 
 export const GROWTH_COMMAND_PALETTE_DERIVATION_QA_MARKER = "growth-command-palette-derivation-v1" as const
 
@@ -99,7 +103,14 @@ export function resolveGrowthCommandPaletteHref(pathname: string, href: string):
       ? route.workspacePath
       : null
   if (route?.migrationStatus === "dual-route" && workspaceHref) {
-    return `${workspaceHref}${query}`
+    const resolved = `${workspaceHref}${query}`
+    if (
+      href === GROWTH_ADMIN_PROSPECT_SEARCH_DISCOVER_HREF ||
+      (baseHref === `${GROWTH_ADMIN_BASE_PATH}/search` && query.includes("mode=discover"))
+    ) {
+      return GROWTH_WORKSPACE_PROSPECT_SEARCH_DISCOVER_HREF
+    }
+    return resolved
   }
 
   const segment = baseHref === GROWTH_ADMIN_BASE_PATH ? "" : baseHref.slice(GROWTH_ADMIN_BASE_PATH.length + 1)

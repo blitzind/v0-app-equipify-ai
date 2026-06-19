@@ -19,6 +19,12 @@ import {
   type GrowthProspectWorkflowContext,
   type GrowthWorkflowContextHandoff,
 } from "@/lib/growth/prospect-search/prospect-workflow-context"
+import { growthProspectSearchHref } from "@/lib/growth/navigation/growth-prospect-search-paths"
+import {
+  GROWTH_ADMIN_BASE_PATH,
+  GROWTH_WORKSPACE_BASE_PATH,
+} from "@/lib/growth/navigation/growth-route-metadata-types"
+import { resolveGrowthFeatureBasePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 
 export type {
   GrowthProspectPipelineRecommendation,
@@ -514,18 +520,27 @@ export function buildProspectWorkflowLauncherActions(input: {
 export function buildSavedSearchWorkflowLaunchLinks(input?: {
   savedSearchId?: string | null
   query?: string
+  pathname?: string | null
 }): Array<{ id: string; label: string; href: string }> {
   const params = new URLSearchParams()
   if (input?.savedSearchId) params.set("savedSearchId", input.savedSearchId)
   if (input?.query?.trim()) params.set("q", input.query.trim())
   const suffix = params.toString() ? `?${params.toString()}` : ""
+  const base = resolveGrowthFeatureBasePath(input?.pathname)
+  const searchHref = `${growthProspectSearchHref(input?.pathname)}${suffix}`
+  const batchSuffix = suffix ? `${suffix}&batchOutbound=1` : "?batchOutbound=1"
+  const opportunitiesHref =
+    base === GROWTH_WORKSPACE_BASE_PATH
+      ? `${GROWTH_WORKSPACE_BASE_PATH}/opportunities/workspace${suffix}`
+      : `${GROWTH_ADMIN_BASE_PATH}/opportunities/workspace${suffix}`
+  const leadEngineHref = `${base}/leads/lead-engine${suffix}`
   return [
-    { id: "launch_workflow", label: "Launch workflow", href: `/admin/growth/search${suffix}` },
-    { id: "review_opportunities", label: "Review opportunities", href: `/admin/growth/opportunities/workspace${suffix}` },
-    { id: "run_qualification", label: "Run qualification", href: `/admin/growth/leads/lead-engine${suffix}` },
-    { id: "open_outreach_queue", label: "Open sequence approvals", href: `/admin/growth/sequences/execution${suffix}` },
-    { id: "batch_outbound_preview", label: "Batch outbound preview", href: `/admin/growth/search${suffix}${suffix ? "&" : "?"}batchOutbound=1` },
-    { id: "executive_review", label: "Executive review", href: `/admin/growth/executive${suffix}` },
+    { id: "launch_workflow", label: "Launch workflow", href: searchHref },
+    { id: "review_opportunities", label: "Review opportunities", href: opportunitiesHref },
+    { id: "run_qualification", label: "Run qualification", href: leadEngineHref },
+    { id: "open_outreach_queue", label: "Open sequence approvals", href: `${GROWTH_ADMIN_BASE_PATH}/sequences/execution${suffix}` },
+    { id: "batch_outbound_preview", label: "Batch outbound preview", href: `${growthProspectSearchHref(input?.pathname)}${batchSuffix}` },
+    { id: "executive_review", label: "Executive review", href: `${GROWTH_ADMIN_BASE_PATH}/executive${suffix}` },
   ]
 }
 

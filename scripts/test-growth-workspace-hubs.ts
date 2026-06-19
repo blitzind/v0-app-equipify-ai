@@ -48,19 +48,23 @@ function runAudit(): void {
   console.log(`\n=== Growth workspace hub audit (${GROWTH_WORKSPACE_HUB_QA_MARKER}) ===\n`)
 
   const navItems = GROWTH_SHELL_NAV_GROUPS.flatMap((group) => group.items)
-  assert.equal(navItems.length, 12)
-  console.log("  ✓ primary sidebar remains 12 items")
+  assert.equal(navItems.length, 13)
+  console.log("  ✓ primary sidebar remains 13 items")
 
   for (const hub of HUB_PAGES) {
     const source = readSource(hub.file)
-    assert.match(source, /GrowthWorkspaceHubPage/)
-    assert.match(source, /manifest={/)
+    if (hub.manifest.id === "leads") {
+      assert.match(source, /GrowthLeadsHubPage/)
+    } else {
+      assert.match(source, /GrowthWorkspaceHubPage/)
+      assert.match(source, /manifest={/)
+    }
     const route = findGrowthRouteMetadataByPathname(hub.route)
     assert.ok(route, `missing registry route: ${hub.route}`)
     assert.equal(hub.manifest.quickActions.length > 0, true)
     assert.equal(hub.manifest.sections.length > 0, true)
   }
-  console.log("  ✓ four hub pages render GrowthWorkspaceHubPage manifests")
+  console.log("  ✓ hub pages render workspace operator shells")
 
   assert.ok(findGrowthRouteMetadataByPathname(GROWTH_LEADS_HUB_RESEARCH_HREF))
   assert.ok(findGrowthRouteMetadataByPathname(GROWTH_CALLS_HUB_WORKSPACE_HREF))
@@ -76,7 +80,13 @@ function runAudit(): void {
 
   const researchCrumbs = resolveGrowthBreadcrumbs(GROWTH_LEADS_HUB_RESEARCH_HREF)
   assert.deepEqual(researchCrumbs.map((crumb) => crumb.label), ["Growth", "Leads", "Research Queue"])
-  console.log("  ✓ pipeline, templates, and research breadcrumbs unchanged")
+
+  assert.ok(GROWTH_LEADS_HUB_MANIFEST.quickActions.every((item) => item.href.startsWith(GROWTH_WORKSPACE_BASE_PATH)))
+  assert.doesNotMatch(
+    GROWTH_LEADS_HUB_MANIFEST.quickActions.map((item) => item.href).join("\n"),
+    /\/admin\/growth/,
+  )
+  console.log("  ✓ leads hub quick actions remain workspace-scoped")
 
   const opportunitiesPipeline = GROWTH_OPPORTUNITIES_HUB_MANIFEST.quickActions.find((item) => item.id === "pipeline")
   assert.ok(opportunitiesPipeline?.href.endsWith("/opportunities/pipeline"))

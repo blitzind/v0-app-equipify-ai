@@ -49,7 +49,7 @@ const OPERATOR_CONTINUITY_SOURCES: Array<{ file: string; forbidden: RegExp[] }> 
   },
   {
     file: "components/growth/growth-lead-engine-workspace.tsx",
-    forbidden: [/\/admin\/growth\/queue/],
+    forbidden: [/\/admin\/growth\/queue/, /href="\/admin\/growth\/search"/],
   },
   {
     file: "components/growth/lead-intelligence-inspector/lead-intelligence-operator-summary-card.tsx",

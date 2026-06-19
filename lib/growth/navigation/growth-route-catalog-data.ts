@@ -316,6 +316,20 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   workspaceDual("workspace-leads-research", "leads/research", "Revenue Queue", "workspace", {
     breadcrumbLabel: "Research Queue",
   }),
+  workspaceDual("workspace-leads-prospect-search", "leads/prospect-search", "Prospect Search", "workspace", {
+    breadcrumbLabel: "Prospect Search",
+    adminPath: `${ADMIN}/search`,
+  }),
+  workspaceDual(
+    "workspace-leads-prospect-search-discover",
+    "leads/prospect-search/discover",
+    "Discover Companies",
+    "workspace",
+    {
+      breadcrumbLabel: "Discover",
+      adminPath: `${ADMIN}/search`,
+    },
+  ),
   workspaceDual("workspace-leads-detail", "leads/[leadId]", "Lead Detail", "workspace", {
     breadcrumbLabel: "Lead",
     dynamic: true,

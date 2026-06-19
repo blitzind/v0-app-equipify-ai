@@ -78,9 +78,9 @@ function runAudit(): void {
   console.log(`\n=== Growth workspace shell audit (${GROWTH_ROUTE_METADATA_QA_MARKER}) ===\n`)
 
   assert.equal(GROWTH_MIGRATED_ROUTE_REGISTRY.length, GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length)
-  assert.equal(GROWTH_MIGRATED_ROUTE_REGISTRY.length, 63)
+  assert.equal(GROWTH_MIGRATED_ROUTE_REGISTRY.length, 65)
   assert.deepEqual(GROWTH_MIGRATED_WORKSPACE_ROUTES, GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.map((entry) => entry.path))
-  console.log("  ✓ migrated workspace registry subset (63 routes)")
+  console.log("  ✓ migrated workspace registry subset (65 routes)")
 
   const paths = GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.map((entry) => entry.path)
   const ids = GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.map((entry) => entry.id)

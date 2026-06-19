@@ -4,6 +4,11 @@ import type {
   GrowthProspectSearchDiscoveryMode,
   GrowthProspectSearchSavedSearchRow,
 } from "@/lib/growth/prospect-search/prospect-search-types"
+import { growthProspectSearchHref } from "@/lib/growth/navigation/growth-prospect-search-paths"
+import {
+  growthFeaturePath,
+  resolveGrowthFeatureBasePath,
+} from "@/lib/growth/navigation/growth-workspace-base-path"
 
 export const GROWTH_SAVED_SEARCH_WORKFLOWS_QA_MARKER = "growth-saved-search-workflows-v1" as const
 
@@ -166,5 +171,15 @@ export const GROWTH_SAVED_SEARCH_WORKFLOW_LINKS = {
   unifiedInbox: "/admin/growth/inbox",
   leadEngine: "/admin/growth/leads/lead-engine",
 } as const
+
+export function resolveGrowthSavedSearchWorkflowLinks(pathname: string | null | undefined) {
+  const base = resolveGrowthFeatureBasePath(pathname)
+  return {
+    prospectSearch: growthProspectSearchHref(pathname),
+    leadInbox: `${base}/leads/research`,
+    unifiedInbox: growthFeaturePath(pathname, "inbox"),
+    leadEngine: `${base}/leads/lead-engine`,
+  }
+}
 
 export { buildSavedSearchWorkflowLaunchLinks } from "@/lib/growth/prospect-search/prospect-pipeline-automation"
