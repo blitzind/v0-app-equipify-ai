@@ -100,3 +100,13 @@ export const growthVideoPageEventSchema = z.object({
   visitor_identifier: z.string().trim().max(128).nullable().optional(),
   metadata: z.record(z.unknown()).optional(),
 })
+
+export const growthVideoAnalyticsQuerySchema = z.object({
+  since: z.string().datetime().optional(),
+  until: z.string().datetime().optional(),
+  video_asset_id: z.string().uuid().optional(),
+  video_page_id: z.string().uuid().optional(),
+  visitor_identifier: z.string().trim().max(128).optional(),
+  session_id: z.string().trim().max(120).optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+})

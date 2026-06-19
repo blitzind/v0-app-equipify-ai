@@ -8,6 +8,7 @@ import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/gro
 import {
   GrowthInfrastructureReadinessBadge,
 } from "@/components/growth/growth-infrastructure-readiness-badge"
+import { GrowthDomainDeliverabilitySetupDrawer } from "@/components/growth/growth-domain-deliverability-setup-drawer"
 import { GrowthOperatorDiagnosticsDisclosure } from "@/components/growth/growth-operator-diagnostics-disclosure"
 import { dnsHealthTierLabel } from "@/lib/growth/deliverability/dns-health"
 import {
@@ -87,6 +88,7 @@ export function GrowthDeliverabilityDashboard() {
   const [liveDnsEnabled, setLiveDnsEnabled] = useState(false)
   const [readinessCatalog, setReadinessCatalog] = useState<GrowthInfrastructureReadinessCatalogEntry[]>([])
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [setupDrawerDomain, setSetupDrawerDomain] = useState<GrowthDeliverabilityDomainRow | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -391,15 +393,25 @@ export function GrowthDeliverabilityDashboard() {
                       </td>
                       <td className="px-2 py-3">{formatDate(row.last_checked_at)}</td>
                       <td className="px-2 py-3">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={Boolean(actionLoading)}
-                          onClick={() => void validateDomain(row.domain_id)}
-                        >
-                          Validate domain
-                        </Button>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSetupDrawerDomain(row)}
+                          >
+                            View Setup Instructions
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={Boolean(actionLoading)}
+                            onClick={() => void validateDomain(row.domain_id)}
+                          >
+                            Validate domain
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -482,6 +494,16 @@ export function GrowthDeliverabilityDashboard() {
           ) : null}
         </div>
       ) : null}
+
+      <GrowthDomainDeliverabilitySetupDrawer
+        domainId={setupDrawerDomain?.domain_id ?? null}
+        domainLabel={setupDrawerDomain?.domain ?? null}
+        open={Boolean(setupDrawerDomain)}
+        onOpenChange={(open) => {
+          if (!open) setSetupDrawerDomain(null)
+        }}
+        onDomainUpdated={() => void load()}
+      />
 
       <GrowthOperatorDiagnosticsDisclosure
         title="Developer diagnostics"

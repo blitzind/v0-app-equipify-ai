@@ -21,6 +21,91 @@ export const GROWTH_VIDEO_PAGES_QA_MARKER = "growth-video-pages-a3-v1" as const
 
 export const GROWTH_VIDEO_PAGES_CONFIRM = "RUN_GROWTH_VIDEO_PAGES_CERTIFICATION" as const
 
+export const GROWTH_VIDEO_ANALYTICS_MIGRATION =
+  "20270828160000_growth_engine_video_analytics_a4.sql" as const
+
+export const GROWTH_VIDEO_ANALYTICS_QA_MARKER = "growth-video-analytics-a4-v1" as const
+
+export const GROWTH_VIDEO_ANALYTICS_CONFIRM = "RUN_GROWTH_VIDEO_ANALYTICS_CERTIFICATION" as const
+
+export const GROWTH_VIDEO_AI_ENGAGEMENT_SIGNALS = [
+  "video_viewed",
+  "video_high_intent",
+  "video_cta_clicked",
+  "video_calendar_clicked",
+  "video_return_visitor",
+] as const
+
+export type GrowthVideoAiEngagementSignal = (typeof GROWTH_VIDEO_AI_ENGAGEMENT_SIGNALS)[number]
+
+export type GrowthVideoEngagementSummary = {
+  id: string
+  organizationId: string
+  videoAssetId: string
+  videoPageId: string
+  visitorIdentifier: string | null
+  sessionId: string
+  totalViews: number
+  totalWatchSeconds: number
+  highestPercentWatched: number
+  totalCtaClicks: number
+  totalCalendarClicks: number
+  firstViewedAt: string | null
+  lastViewedAt: string | null
+  engagementScore: number
+  metadata: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+}
+
+export type GrowthVideoAnalyticsOverview = {
+  totalViews: number
+  uniqueVisitors: number
+  averageWatchPercent: number | null
+  ctaClicks: number
+  calendarClicks: number
+  meetingsBooked: number | null
+  averageEngagementScore: number | null
+}
+
+export type GrowthVideoAnalyticsTimeSeriesPoint = {
+  date: string
+  views: number
+  uniqueSessions: number
+}
+
+export type GrowthVideoAnalyticsDistributionBucket = {
+  label: string
+  count: number
+}
+
+export type GrowthVideoAnalyticsTopItem = {
+  id: string
+  title: string
+  views: number
+  engagementScore: number | null
+}
+
+export type GrowthVideoEngagementTimelineStep = {
+  id: string
+  eventType: string
+  label: string
+  occurredAt: string
+  sessionId: string | null
+  videoPageId: string
+  videoAssetId: string
+  metadata: Record<string, unknown>
+}
+
+export type GrowthVideoVisitorProfile = {
+  visitorIdentifier: string
+  sessionCount: number
+  totalViews: number
+  highestEngagementScore: number
+  lastViewedAt: string | null
+  aiSignals: Record<GrowthVideoAiEngagementSignal, boolean>
+}
+
 export const GROWTH_VIDEOS_STORAGE_BUCKET = "growth-videos" as const
 
 export const GROWTH_VIDEO_MAX_UPLOAD_BYTES = 262_144_000 as const

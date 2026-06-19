@@ -3,6 +3,7 @@ import {
   GROWTH_VIDEO_FOUNDATION_MIGRATION,
   GROWTH_VIDEO_ASSETS_UPLOAD_MIGRATION,
   GROWTH_VIDEO_PAGES_MIGRATION,
+  GROWTH_VIDEO_ANALYTICS_MIGRATION,
   GROWTH_VIDEO_FOUNDATION_QA_MARKER,
   GROWTH_VIDEOS_STORAGE_BUCKET,
 } from "@/lib/growth/videos/growth-video-types"
@@ -69,6 +70,19 @@ export const GROWTH_VIDEO_SCHEMA_OBJECTS = [
     label: "growth.video_page_events",
     columns: ["id", "organization_id", "video_page_id", "video_asset_id", "event_type", "session_id"],
   },
+  {
+    table: "video_engagement_summaries",
+    label: "growth.video_engagement_summaries",
+    columns: [
+      "id",
+      "organization_id",
+      "video_asset_id",
+      "video_page_id",
+      "session_id",
+      "engagement_score",
+      "total_views",
+    ],
+  },
 ] as const
 
 export async function isGrowthVideoAssetsSchemaReady(admin: SupabaseClient): Promise<boolean> {
@@ -126,6 +140,17 @@ export async function isGrowthVideoPageEventsSchemaReady(admin: SupabaseClient):
   return !error
 }
 
+export async function isGrowthVideoAnalyticsSchemaReady(admin: SupabaseClient): Promise<boolean> {
+  const object = GROWTH_VIDEO_SCHEMA_OBJECTS.find((entry) => entry.table === "video_engagement_summaries")
+  if (!object) return false
+  const { error } = await admin
+    .schema("growth")
+    .from(object.table)
+    .select(object.columns.join(", "))
+    .limit(1)
+  return !error
+}
+
 export async function isGrowthVideoFoundationSchemaReady(admin: SupabaseClient): Promise<boolean> {
   const checks = await Promise.all([
     isGrowthVideoAssetsSchemaReady(admin),
@@ -164,9 +189,11 @@ export async function probeGrowthVideoFoundationSchema(admin: SupabaseClient): P
   ready: boolean
   upload_schema_ready: boolean
   pages_schema_ready: boolean
+  analytics_schema_ready: boolean
   migration: typeof GROWTH_VIDEO_FOUNDATION_MIGRATION
   upload_migration: typeof GROWTH_VIDEO_ASSETS_UPLOAD_MIGRATION
   pages_migration: typeof GROWTH_VIDEO_PAGES_MIGRATION
+  analytics_migration: typeof GROWTH_VIDEO_ANALYTICS_MIGRATION
   storage_bucket: Awaited<ReturnType<typeof probeGrowthVideoStorageBucketHealth>>
   tables: Array<{ table: string; ok: boolean; error: string | null }>
 }> {
@@ -190,9 +217,11 @@ export async function probeGrowthVideoFoundationSchema(admin: SupabaseClient): P
     ready: tables.every((entry) => entry.ok),
     upload_schema_ready: await isGrowthVideoAssetsUploadSchemaReady(admin),
     pages_schema_ready: await isGrowthVideoPagesSchemaReady(admin),
+    analytics_schema_ready: await isGrowthVideoAnalyticsSchemaReady(admin),
     migration: GROWTH_VIDEO_FOUNDATION_MIGRATION,
     upload_migration: GROWTH_VIDEO_ASSETS_UPLOAD_MIGRATION,
     pages_migration: GROWTH_VIDEO_PAGES_MIGRATION,
+    analytics_migration: GROWTH_VIDEO_ANALYTICS_MIGRATION,
     storage_bucket: await probeGrowthVideoStorageBucketHealth(admin),
     tables,
   }

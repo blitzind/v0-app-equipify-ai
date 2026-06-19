@@ -32,8 +32,8 @@ export function computeDeliverabilityScore(input: DeliverabilityScoreInput): num
 
   if (isSpfMissing(input)) score -= 25
   if (isDkimMissing(input)) score -= 25
-  if (isDmarcMissing(input)) score -= 20
-  if (isMxInvalid(input)) score -= 20
+  if (isDmarcMissing(input)) score -= 25
+  if (isMxInvalid(input)) score -= 25
 
   const warnings = input.warnings ?? []
   if (warnings.length > 2) score -= 10
@@ -67,5 +67,5 @@ export function computeAuthenticationScore(input: GrowthDnsCheckResult): number 
 }
 
 export function computeInfrastructureScore(input: GrowthDnsCheckResult): number {
-  return input.mx_present && input.mx_valid ? 100 : clampScore(100 - 20)
+  return input.mx_present && input.mx_valid ? 100 : clampScore(100 - 25)
 }

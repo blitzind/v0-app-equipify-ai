@@ -123,3 +123,21 @@ Consolidates mailboxes, domains (manual DNS verification), sender pools, queue/c
 **Sender operational pause:** Critical fatigue auto-pauses pool members with audit trail — no automatic re-enable.
 
 **DNS:** MANUAL VERIFICATION REQUIRED — stub flags only; readiness states include `error` and `degraded`.
+
+## Domain DNS setup instructions (GE-MAIL-1D)
+
+QA marker: `growth-domain-deliverability-setup-1d-v1`
+
+**Primary surface:** `/admin/growth/infrastructure/deliverability` → **View Setup Instructions** on each sending domain.
+
+Operators publish MX, SPF, DKIM, and DMARC from a single drawer (copy buttons, per-record status, verification timestamps). Google Workspace domains pre-populate Google MX + SPF, DKIM Admin steps, and recommended DMARC. **Copy Setup From Another Domain** mirrors observed DNS from a verified domain's `domain_dns_checks.raw_dns_responses`.
+
+**APIs:** `GET /api/platform/growth/deliverability/domain/[id]/setup-instructions`, `POST …/copy-setup`, `POST …/validate` (verify / refresh / recalculate).
+
+**Scoring display:** SPF, DKIM, DMARC, MX each 25 points → Healthy (100), Warning (50–99), At Risk (0–49).
+
+**Operator runbook:** Open deliverability dashboard → View Setup Instructions → copy DNS values → publish at DNS host → Verify DNS → confirm 100/100 before pool activation.
+
+**Tests:** `pnpm test:growth-domain-deliverability-setup`
+
+Architecture diagram: `lib/growth/deliverability/deliverability-dns-setup-architecture.ts`

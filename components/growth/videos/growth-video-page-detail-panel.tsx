@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
+import { GrowthVideoPageAnalyticsSection } from "@/components/growth/videos/growth-video-page-analytics-section"
 import { GrowthVideoWorkspaceShell } from "@/components/growth/videos/growth-video-workspace-shell"
 import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import { buildGrowthVideoPublicPath } from "@/lib/growth/videos/growth-video-page-validation"
@@ -33,7 +34,6 @@ export function GrowthVideoPageDetailPanel({ pageId }: { pageId: string }) {
   const [page, setPage] = useState<GrowthVideoPage | null>(null)
   const [asset, setAsset] = useState<GrowthVideoAsset | null>(null)
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null)
-  const [eventCounts, setEventCounts] = useState<Record<string, number>>({})
   const [acting, setActing] = useState(false)
   const [saveNotice, setSaveNotice] = useState<string | null>(null)
 
@@ -53,7 +53,6 @@ export function GrowthVideoPageDetailPanel({ pageId }: { pageId: string }) {
         page?: GrowthVideoPage
         asset?: GrowthVideoAsset | null
         playbackUrl?: string | null
-        eventCounts?: Record<string, number>
         message?: string
       }
       if (!res.ok || !data.ok || !data.page) {
@@ -62,7 +61,6 @@ export function GrowthVideoPageDetailPanel({ pageId }: { pageId: string }) {
       setPage(data.page)
       setAsset(data.asset ?? null)
       setPlaybackUrl(data.playbackUrl ?? null)
-      setEventCounts(data.eventCounts ?? {})
       setTitle(data.page.title)
       setDescription(data.page.description ?? "")
       setCtaLabel(data.page.ctaLabel ?? "")
@@ -210,20 +208,7 @@ export function GrowthVideoPageDetailPanel({ pageId }: { pageId: string }) {
                 <p className="text-xs text-muted-foreground">Upload status: {asset?.uploadStatus ?? "—"}</p>
               </div>
 
-              <div className="rounded-xl border border-border bg-card p-4">
-                <h3 className="text-sm font-medium">Event summary (placeholder)</h3>
-                <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                  {Object.keys(eventCounts).length === 0 ? (
-                    <li>No events recorded yet.</li>
-                  ) : (
-                    Object.entries(eventCounts).map(([type, count]) => (
-                      <li key={type}>
-                        {type}: {count}
-                      </li>
-                    ))
-                  )}
-                </ul>
-              </div>
+              <GrowthVideoPageAnalyticsSection pageId={pageId} />
             </div>
           </div>
         ) : null}

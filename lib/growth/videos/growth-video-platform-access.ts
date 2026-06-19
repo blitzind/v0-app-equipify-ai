@@ -7,6 +7,7 @@ import { isGrowthVideoWorkspaceEnabled } from "@/lib/growth/videos/growth-video-
 import {
   isGrowthVideoAssetsSchemaReady,
   isGrowthVideoAssetsUploadSchemaReady,
+  isGrowthVideoAnalyticsSchemaReady,
   isGrowthVideoPagesSchemaReady,
 } from "@/lib/growth/videos/growth-video-schema-health"
 
@@ -89,6 +90,22 @@ export async function requireGrowthVideoPagesSchemaReady(
         ok: false,
         error: "pages_schema_not_ready",
         message: "Video pages schema is not ready. Apply A3 migration.",
+      },
+      { status: 503 },
+    )
+  }
+  return null
+}
+
+export async function requireGrowthVideoAnalyticsSchemaReady(
+  access: GrowthVideoPlatformAccess & { ok: true },
+): Promise<NextResponse | null> {
+  if (!(await isGrowthVideoAnalyticsSchemaReady(access.admin))) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "analytics_schema_not_ready",
+        message: "Video analytics schema is not ready. Apply A4 migration.",
       },
       { status: 503 },
     )

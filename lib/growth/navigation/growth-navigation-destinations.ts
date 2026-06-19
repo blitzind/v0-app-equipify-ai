@@ -299,7 +299,7 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
     id: "deliverability",
     label: "Deliverability",
     href: "/admin/growth/infrastructure/deliverability",
-    keywords: ["deliverability", "dns", "spf", "dkim", "dmarc", "mailbox setup", "mx", "domain authentication"],
+    keywords: ["deliverability", "dns", "spf", "dkim", "dmarc", "mailbox setup", "mx", "domain authentication", "setup instructions", "dns setup drawer"],
   },
   {
     id: "warmup",

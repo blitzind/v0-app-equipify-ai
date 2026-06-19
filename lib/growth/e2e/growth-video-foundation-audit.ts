@@ -242,11 +242,11 @@ export function auditGrowthVideoFoundationFeatureFlag(): GrowthVideoFoundationAu
 export function auditGrowthVideoFoundationServices(): GrowthVideoFoundationAuditFinding[] {
   const findings: GrowthVideoFoundationAuditFinding[] = []
 
-  if (GROWTH_VIDEO_SCHEMA_OBJECTS.length !== 5) {
+  if (GROWTH_VIDEO_SCHEMA_OBJECTS.length !== 6) {
     findings.push({
       id: "video_schema_objects",
       severity: "critical",
-      message: "Expected five video schema objects",
+      message: "Expected six video schema objects",
     })
   }
 

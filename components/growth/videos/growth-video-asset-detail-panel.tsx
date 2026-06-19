@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
 import { GrowthVideoWorkspaceShell } from "@/components/growth/videos/growth-video-workspace-shell"
+import { GrowthVideoAssetAnalyticsPanel } from "@/components/growth/videos/growth-video-asset-analytics-panel"
 import { fetchGrowthVideoAsset } from "@/components/growth/videos/use-growth-video-assets"
 import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import type { GrowthVideoAsset } from "@/lib/growth/videos/growth-video-types"
@@ -19,6 +20,7 @@ export function GrowthVideoAssetDetailPanel({ assetId }: { assetId: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [acting, setActing] = useState(false)
+  const [activeTab, setActiveTab] = useState<"details" | "analytics">("details")
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -76,6 +78,27 @@ export function GrowthVideoAssetDetailPanel({ assetId }: { assetId: string }) {
 
             {asset.description ? <p className="text-sm text-muted-foreground">{asset.description}</p> : null}
 
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant={activeTab === "details" ? "default" : "outline"}
+                onClick={() => setActiveTab("details")}
+              >
+                Details
+              </Button>
+              <Button
+                size="sm"
+                variant={activeTab === "analytics" ? "default" : "outline"}
+                onClick={() => setActiveTab("analytics")}
+              >
+                Analytics
+              </Button>
+            </div>
+
+            {activeTab === "analytics" ? (
+              <GrowthVideoAssetAnalyticsPanel assetId={assetId} />
+            ) : (
+              <>
             <div className="rounded-xl border border-border bg-muted/20 p-4">
               {playbackUrl ? (
                 <video src={playbackUrl} controls className="w-full max-h-[360px] rounded-lg bg-black" />
@@ -96,11 +119,6 @@ export function GrowthVideoAssetDetailPanel({ assetId }: { assetId: string }) {
               <div><dt className="text-muted-foreground">Created</dt><dd>{new Date(asset.createdAt).toLocaleString()}</dd></div>
               <div><dt className="text-muted-foreground">Updated</dt><dd>{new Date(asset.updatedAt).toLocaleString()}</dd></div>
             </dl>
-
-            <div className="rounded-xl border border-border bg-card p-4">
-              <p className="text-sm font-medium">Analytics placeholder</p>
-              <p className="text-xs text-muted-foreground">Views, watch rate, and CTA metrics arrive in a later phase.</p>
-            </div>
 
             <div className="flex flex-wrap gap-2">
               <Button
@@ -124,6 +142,8 @@ export function GrowthVideoAssetDetailPanel({ assetId }: { assetId: string }) {
                 Delete
               </Button>
             </div>
+              </>
+            )}
           </div>
         ) : null}
       </GrowthEnginePanelResilience>
