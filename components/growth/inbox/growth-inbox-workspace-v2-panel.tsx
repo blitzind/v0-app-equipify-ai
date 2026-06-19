@@ -2,26 +2,28 @@
 
 import { GrowthInboxLeadContextProvider } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
 import { GrowthInboxSharedDataProvider } from "@/components/growth/inbox/growth-inbox-shared-data-provider"
-import { GrowthInboxActionCenterColumn } from "@/components/growth/inbox/growth-inbox-action-center-column"
 import { GrowthInboxConversationColumn } from "@/components/growth/inbox/growth-inbox-conversation-column"
 import { GrowthInboxQueueProvider } from "@/components/growth/inbox/growth-inbox-queue-context"
 import { GrowthInboxQueueUrlSync } from "@/components/growth/inbox/growth-inbox-queue-url-sync"
 import { GrowthInboxThreadQueueColumn } from "@/components/growth/inbox/growth-inbox-thread-queue-column"
-import { GrowthInboxOverviewMetricsPanel } from "@/components/growth/inbox/growth-inbox-overview-metrics-panel"
-import { GrowthOperatorInboxPanel } from "@/components/growth/growth-operator-inbox-panel"
 import { GrowthInboxWorkspaceActionsMenu } from "@/components/growth/inbox/growth-inbox-workspace-actions-menu"
 import { GrowthInboxWorkspaceKeyboardBridge } from "@/components/growth/inbox/growth-inbox-workspace-keyboard-bridge"
-import { GrowthInboxWorkspaceShell } from "@/components/growth/inbox/growth-inbox-workspace-shell"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
 import { GrowthInboxCompactPanelState } from "@/components/growth/inbox/growth-inbox-compact-panel-state"
 import { GrowthInboxTier1RefreshBridge } from "@/components/growth/inbox/growth-inbox-tier1-refresh-bridge"
 import { GrowthInboxTier1PollCoordinatorProvider } from "@/components/growth/inbox/growth-inbox-tier1-poll-coordinator"
+import { GrowthInboxResumeWorkHero } from "@/components/growth/hubs/inbox/growth-inbox-resume-work-hero"
+import { GrowthInboxPrimaryWorkspace } from "@/components/growth/hubs/inbox/growth-inbox-primary-workspace"
+import { GrowthInboxIntelligenceSidebar } from "@/components/growth/inbox/growth-inbox-intelligence-sidebar"
+import { GrowthInboxAdvancedTools } from "@/components/growth/hubs/inbox/growth-inbox-advanced-tools"
+import { GROWTH_INBOX_FINAL_POLISH_QA_MARKER } from "@/lib/growth/hubs/growth-inbox-conversation-workspace-config"
+import { GROWTH_INBOX_HUB_UX_QA_MARKER } from "@/lib/growth/hubs/growth-inbox-hub-config"
 import { GROWTH_INBOX_WORKSPACE_V2_QA_MARKER } from "@/lib/growth/inbox/inbox-workspace-types"
 import { buildGrowthInboxSetupEmptyState } from "@/lib/growth/inbox/inbox-runtime-types"
 
-export const GROWTH_INBOX_OPERATOR_PANEL_QA_MARKER = "growth-inbox-operator-panel-v3" as const
+export const GROWTH_INBOX_OPERATOR_PANEL_QA_MARKER = "growth-inbox-operator-panel-v5" as const
 
-/** Phase 8A.2 — viewport-first inbox: metrics → notifications → tri-column only. */
+/** UX-AUDIT-9 — operator daily-driver inbox workspace. */
 export function GrowthInboxWorkspaceV2Panel() {
   const {
     loading,
@@ -43,6 +45,8 @@ export function GrowthInboxWorkspaceV2Panel() {
       className="space-y-2"
       data-equipify-qa-marker={GROWTH_INBOX_WORKSPACE_V2_QA_MARKER}
       data-qa-marker={GROWTH_INBOX_OPERATOR_PANEL_QA_MARKER}
+      data-growth-inbox-hub-ux={GROWTH_INBOX_HUB_UX_QA_MARKER}
+      data-growth-inbox-final-polish={GROWTH_INBOX_FINAL_POLISH_QA_MARKER}
     >
       {error ? (
         <GrowthInboxCompactPanelState title="Inbox" state="error" message={error} onRetry={() => void load()} />
@@ -61,20 +65,20 @@ export function GrowthInboxWorkspaceV2Panel() {
           <GrowthInboxTier1RefreshBridge />
           <GrowthInboxQueueProvider>
             <GrowthInboxQueueUrlSync />
-            <GrowthInboxOverviewMetricsPanel />
+            <GrowthInboxResumeWorkHero />
             <GrowthInboxLeadContextProvider
               leadId={selectedThread?.lead_id ?? null}
               threadId={selectedThread?.id ?? null}
               thread={selectedThread}
             >
-              <GrowthInboxWorkspaceShell
-                notifications={<GrowthOperatorInboxPanel title="Operator Notifications" compact />}
+              <GrowthInboxPrimaryWorkspace
                 threadQueue={<GrowthInboxThreadQueueColumn />}
                 conversation={<GrowthInboxConversationColumn />}
-                actionCenter={<GrowthInboxActionCenterColumn />}
+                intelligenceSidebar={<GrowthInboxIntelligenceSidebar />}
               />
               <GrowthInboxWorkspaceKeyboardBridge />
             </GrowthInboxLeadContextProvider>
+            <GrowthInboxAdvancedTools />
           </GrowthInboxQueueProvider>
         </GrowthInboxTier1PollCoordinatorProvider>
       </GrowthInboxSharedDataProvider>

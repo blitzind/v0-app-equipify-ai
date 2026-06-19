@@ -10,6 +10,8 @@ import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { GROWTH_CALLS_HUB_MANIFEST } from "../lib/growth/hubs/growth-calls-hub-manifest"
+import { GROWTH_INBOX_CONVERSATION_ROUTE_INVENTORY } from "../lib/growth/hubs/growth-inbox-conversation-workspace-config"
+import { GROWTH_INBOX_HUB_MANIFEST } from "../lib/growth/hubs/growth-inbox-hub-manifest"
 import {
   GROWTH_LEADS_HUB_MANIFEST,
   GROWTH_LEADS_HUB_SECONDARY_DESTINATIONS,
@@ -137,6 +139,7 @@ function runAudit(mode: "local" | "production"): void {
   console.log(`  ✓ leads hub inventory (${leadsInventory.length} destinations, 0 broken fallbacks)`)
 
   for (const hub of [
+    GROWTH_INBOX_HUB_MANIFEST,
     GROWTH_CALLS_HUB_MANIFEST,
     GROWTH_OPPORTUNITIES_HUB_MANIFEST,
     GROWTH_SHARE_PAGES_HUB_MANIFEST,
@@ -145,7 +148,17 @@ function runAudit(mode: "local" | "production"): void {
     const hubBroken = inventory.filter((entry) => entry.status === "broken_fallback")
     assert.equal(hubBroken.length, 0, `${hub.id} broken: ${JSON.stringify(hubBroken)}`)
   }
-  console.log("  ✓ calls, opportunities, share-pages hub links remain workspace-scoped")
+  console.log("  ✓ inbox, calls, opportunities, share-pages hub links remain workspace-scoped")
+
+  const conversationInventoryBroken = GROWTH_INBOX_CONVERSATION_ROUTE_INVENTORY.filter(
+    (entry) => entry.status === "workspace" && entry.workspaceRoute.startsWith(GROWTH_ADMIN_BASE_PATH),
+  )
+  assert.equal(conversationInventoryBroken.length, 0)
+  const conversationWorkspaceSources = readSource("components/growth/inbox/growth-inbox-intelligence-sidebar.tsx")
+  assert.doesNotMatch(conversationWorkspaceSources, /href="\/admin\/growth/)
+  console.log(
+    `  ✓ inbox conversation workspace route inventory (${GROWTH_INBOX_CONVERSATION_ROUTE_INVENTORY.length} destinations, 0 admin fallbacks)`,
+  )
 
   assert.equal(growthProspectSearchHref("/growth/leads"), GROWTH_WORKSPACE_PROSPECT_SEARCH_HREF)
   assert.equal(
@@ -193,7 +206,11 @@ function runAudit(mode: "local" | "production"): void {
 
     assert.ok(fs.existsSync(path.join(ROOT, "app/(growth)/growth/leads/prospect-search/page.tsx")))
     assert.ok(fs.existsSync(path.join(ROOT, "app/(growth)/growth/leads/prospect-search/discover/page.tsx")))
-    console.log("  ✓ workspace page files and manifest contain no admin fallbacks")
+    const inboxPanel = readSource("components/growth/inbox/growth-inbox-workspace-v2-panel.tsx")
+    assert.doesNotMatch(inboxPanel, /href="\/admin\/growth/)
+    assert.match(inboxPanel, /GrowthInboxResumeWorkHero/)
+    assert.doesNotMatch(inboxPanel, /GrowthOperatorInboxPanel/)
+    console.log("  ✓ workspace page files, inbox panel, and manifest contain no admin fallbacks")
   }
 
   const migratedCount = GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length

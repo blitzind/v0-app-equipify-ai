@@ -8,11 +8,13 @@ import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { GROWTH_CALLS_HUB_MANIFEST } from "../lib/growth/hubs/growth-calls-hub-manifest"
+import { GROWTH_CAMPAIGNS_HUB_MANIFEST } from "../lib/growth/hubs/growth-campaigns-hub-manifest"
 import { GROWTH_LEADS_HUB_MANIFEST } from "../lib/growth/hubs/growth-leads-hub-manifest"
 import { GROWTH_OPPORTUNITIES_HUB_MANIFEST } from "../lib/growth/hubs/growth-opportunities-hub-manifest"
 import { GROWTH_SHARE_PAGES_HUB_MANIFEST } from "../lib/growth/hubs/growth-share-pages-hub-manifest"
 import {
   GROWTH_CALLS_HUB_WORKSPACE_HREF,
+  GROWTH_CAMPAIGNS_HUB_SEQUENCES_HREF,
   GROWTH_LEADS_HUB_RESEARCH_HREF,
   GROWTH_SHARE_PAGES_HUB_MANAGE_HREF,
 } from "../lib/growth/hubs/growth-workspace-hub-paths"
@@ -27,6 +29,11 @@ const ROOT = path.resolve(__dirname, "..")
 
 const HUB_PAGES = [
   { route: `${GROWTH_WORKSPACE_BASE_PATH}/leads`, file: "app/(growth)/growth/leads/page.tsx", manifest: GROWTH_LEADS_HUB_MANIFEST },
+  {
+    route: `${GROWTH_WORKSPACE_BASE_PATH}/campaigns`,
+    file: "app/(growth)/growth/campaigns/page.tsx",
+    manifest: GROWTH_CAMPAIGNS_HUB_MANIFEST,
+  },
   { route: `${GROWTH_WORKSPACE_BASE_PATH}/calls`, file: "app/(growth)/growth/calls/page.tsx", manifest: GROWTH_CALLS_HUB_MANIFEST },
   {
     route: `${GROWTH_WORKSPACE_BASE_PATH}/opportunities`,
@@ -55,6 +62,8 @@ function runAudit(): void {
     const source = readSource(hub.file)
     if (hub.manifest.id === "leads") {
       assert.match(source, /GrowthLeadsHubPage/)
+    } else if (hub.manifest.id === "campaigns") {
+      assert.match(source, /GrowthCampaignsHubPage/)
     } else {
       assert.match(source, /GrowthWorkspaceHubPage/)
       assert.match(source, /manifest={/)
@@ -68,7 +77,8 @@ function runAudit(): void {
 
   assert.ok(findGrowthRouteMetadataByPathname(GROWTH_LEADS_HUB_RESEARCH_HREF))
   assert.ok(findGrowthRouteMetadataByPathname(GROWTH_CALLS_HUB_WORKSPACE_HREF))
-  assert.ok(findGrowthRouteMetadataByPathname(GROWTH_SHARE_PAGES_HUB_MANAGE_HREF))
+  assert.ok(findGrowthRouteMetadataByPathname(GROWTH_CAMPAIGNS_HUB_SEQUENCES_HREF))
+  assert.ok(findGrowthRouteMetadataByPathname(`${GROWTH_WORKSPACE_BASE_PATH}/campaigns/bookings`))
   assert.ok(findGrowthRouteMetadataByPathname(`${GROWTH_WORKSPACE_BASE_PATH}/opportunities/readiness`))
   console.log("  ✓ drill-down routes registered for relocated operator surfaces")
 

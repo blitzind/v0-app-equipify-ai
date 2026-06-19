@@ -1,14 +1,15 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Loader2, RefreshCw, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   buildSavedSearchWorkflowLaunchLinks,
   formatSavedSearchCountDelta,
   formatSavedSearchRefreshedAt,
-  GROWTH_SAVED_SEARCH_WORKFLOW_LINKS,
   GROWTH_SAVED_SEARCH_WORKFLOWS_QA_MARKER,
+  resolveGrowthSavedSearchWorkflowLinks,
   type GrowthProspectSearchSavedSearchWithWorkflow,
 } from "@/lib/growth/prospect-search/saved-search-workflows"
 import { cn } from "@/lib/utils"
@@ -28,6 +29,9 @@ export function SavedSearchWorkflowSidebar({
   onRefreshCounts: (id?: string) => void
   onDelete: (id: string) => void
 }) {
+  const pathname = usePathname()
+  const workflowLinks = resolveGrowthSavedSearchWorkflowLinks(pathname)
+
   if (savedSearches.length === 0) return null
 
   return (
@@ -139,12 +143,13 @@ export function SavedSearchWorkflowSidebar({
                 </div>
 
                 <div className="mt-2 flex flex-wrap gap-1">
-                  <WorkflowLink href={GROWTH_SAVED_SEARCH_WORKFLOW_LINKS.leadInbox} label="Inbox" />
-                  <WorkflowLink href={GROWTH_SAVED_SEARCH_WORKFLOW_LINKS.leadEngine} label="Research" />
-                  <WorkflowLink href={GROWTH_SAVED_SEARCH_WORKFLOW_LINKS.unifiedInbox} label="Replies" />
+                  <WorkflowLink href={workflowLinks.leadInbox} label="Inbox" />
+                  <WorkflowLink href={workflowLinks.leadEngine} label="Research" />
+                  <WorkflowLink href={workflowLinks.unifiedInbox} label="Replies" />
                   {buildSavedSearchWorkflowLaunchLinks({
                     savedSearchId: saved.id,
                     query: saved.query_text,
+                    pathname,
                   }).map((link) => (
                     <WorkflowLink key={link.id} href={link.href} label={link.label} />
                   ))}

@@ -35,7 +35,10 @@ import {
 import { saveSharePageTokens } from "@/components/growth/share-pages/growth-share-page-manage-panel"
 import { GrowthSharePageStepCard } from "@/components/growth/share-pages/growth-share-page-step-card"
 import { GrowthSharePageTemplatePicker } from "@/components/growth/share-pages/growth-share-page-template-picker"
-import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
+import {
+  growthFeaturePath,
+  resolveGrowthFeatureBasePath,
+} from "@/lib/growth/navigation/growth-workspace-base-path"
 import {
   GROWTH_SHARE_PAGE_SOURCE_CHANNELS,
   type GrowthSharePageSourceChannel,
@@ -587,7 +590,7 @@ export function GrowthSharePageBuilder() {
       >
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Button type="button" variant="ghost" asChild>
-            <Link href={growthFeaturePath(pathname, "share-pages/manage")}>Cancel</Link>
+            <Link href={`${resolveGrowthFeatureBasePath(pathname)}/share-pages/manage`}>Cancel</Link>
           </Button>
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" onClick={scrollToPreview}>

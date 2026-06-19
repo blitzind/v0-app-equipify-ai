@@ -14,6 +14,7 @@ import { WorkspaceShellSkipLink } from "@/components/workspace/workspace-shell-s
 import { GROWTH_WORKSPACE_SETTINGS_CONSUMPTION_QA_MARKER } from "@/lib/growth/settings/growth-workspace-settings-consumption"
 import { cn } from "@/lib/utils"
 import {
+  GROWTH_WORKSPACE_SHELL_MAIN_INNER,
   WORKSPACE_SHELL_MAIN_CONTENT_ID,
   WORKSPACE_SHELL_VIEWPORT_BODY,
   WORKSPACE_SHELL_VIEWPORT_ROOT,
@@ -54,7 +55,7 @@ function GrowthWorkspaceShellInner({ children }: GrowthWorkspaceShellProps) {
               tabIndex={-1}
               className="min-h-0 flex-1 overflow-y-auto outline-none scroll-mt-14 md:scroll-mt-16"
             >
-              <WorkspaceContainer>{children}</WorkspaceContainer>
+              <WorkspaceContainer className={GROWTH_WORKSPACE_SHELL_MAIN_INNER}>{children}</WorkspaceContainer>
             </main>
           </div>
         </div>

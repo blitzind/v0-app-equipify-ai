@@ -13,7 +13,7 @@ import { GROWTH_SHARE_PAGE_STATUS_LABELS } from "@/lib/growth/share-pages/share-
 import { GROWTH_SHARE_PAGES_OPERATOR_QA_MARKER } from "@/lib/growth/share-pages/share-page-operator-types"
 
 export function GrowthSharePagesDashboard() {
-  return <GrowthSharePagesManagePanel />
+  return <GrowthSharePagesManagePanel basePath="/admin/growth/share-pages/manage" />
 }
 
 export { saveSharePageTokens }

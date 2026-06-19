@@ -14,7 +14,12 @@ import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-
 
 export const GROWTH_INBOX_CALL_ACTION_LINKS_QA_MARKER = "growth-inbox-call-action-links-v1" as const
 
-export function GrowthInboxCallActionLinks() {
+type GrowthInboxCallActionLinksProps = {
+  /** utilities: callback + coaching only (workspace link lives under Actions) */
+  variant?: "all" | "utilities"
+}
+
+export function GrowthInboxCallActionLinks({ variant = "all" }: GrowthInboxCallActionLinksProps) {
   const pathname = usePathname()
   const { selectedThread } = useGrowthInboxWorkspace()
   const { leadId } = useGrowthInboxLeadContext()
@@ -27,35 +32,46 @@ export function GrowthInboxCallActionLinks() {
   const coachingHref = growthWorkspaceCallsCoachingHref({ leadId })
   const callsHubHref = growthFeaturePath(pathname, "calls")
 
+  const showWorkspace = variant === "all"
+  const showUtilities = variant === "all" || variant === "utilities"
+
   return (
     <div className="grid grid-cols-2 gap-2" data-qa-marker={GROWTH_INBOX_CALL_ACTION_LINKS_QA_MARKER}>
-      <Button type="button" size="sm" variant="outline" className="justify-start" asChild>
-        <Link href={callWorkspaceHref}>
-          <Headphones className="mr-1.5 size-3.5" />
-          Open Call Workspace
-        </Link>
-      </Button>
-      <Button type="button" size="sm" variant="outline" className="justify-start" asChild>
-        <Link href={callbackHref}>
-          <Phone className="mr-1.5 size-3.5" />
-          Start Callback
-        </Link>
-      </Button>
-      <Button type="button" size="sm" variant="outline" className="justify-start" asChild>
-        <Link href={voicemailHref}>
-          <Mic className="mr-1.5 size-3.5" />
-          Review Voicemail
-        </Link>
-      </Button>
-      <Button type="button" size="sm" variant="outline" className="justify-start" asChild>
-        <Link href={coachingHref}>
-          <Sparkles className="mr-1.5 size-3.5" />
-          Review Coaching
-        </Link>
-      </Button>
-      <Button type="button" size="sm" variant="ghost" className="col-span-2 justify-start text-xs" asChild>
-        <Link href={callsHubHref}>Calls hub</Link>
-      </Button>
+      {showWorkspace ? (
+        <Button type="button" size="sm" variant="outline" className="justify-start" asChild>
+          <Link href={callWorkspaceHref}>
+            <Headphones className="mr-1.5 size-3.5" />
+            Open Call Workspace
+          </Link>
+        </Button>
+      ) : null}
+      {showUtilities ? (
+        <>
+          <Button type="button" size="sm" variant="outline" className="justify-start" asChild>
+            <Link href={callbackHref}>
+              <Phone className="mr-1.5 size-3.5" />
+              Start Callback
+            </Link>
+          </Button>
+          <Button type="button" size="sm" variant="outline" className="justify-start" asChild>
+            <Link href={voicemailHref}>
+              <Mic className="mr-1.5 size-3.5" />
+              Review Voicemail
+            </Link>
+          </Button>
+          <Button type="button" size="sm" variant="outline" className="justify-start" asChild>
+            <Link href={coachingHref}>
+              <Sparkles className="mr-1.5 size-3.5" />
+              Review Coaching
+            </Link>
+          </Button>
+        </>
+      ) : null}
+      {showWorkspace ? (
+        <Button type="button" size="sm" variant="ghost" className="col-span-2 justify-start text-xs" asChild>
+          <Link href={callsHubHref}>Calls hub</Link>
+        </Button>
+      ) : null}
     </div>
   )
 }

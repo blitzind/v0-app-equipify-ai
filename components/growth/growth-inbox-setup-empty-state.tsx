@@ -1,8 +1,10 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import {
   GROWTH_INBOX_HONEST_EMPTY_STATE_QA_MARKER,
   buildGrowthInboxSetupEmptyState,
@@ -10,6 +12,8 @@ import {
 } from "@/lib/growth/inbox/inbox-runtime-types"
 
 export function GrowthInboxSetupEmptyState({ phase }: { phase: GrowthInboxSetupPhase }) {
+  const pathname = usePathname()
+  const providersHref = growthFeaturePath(pathname, "settings/connected-mailboxes")
   const state = buildGrowthInboxSetupEmptyState(phase)
   if (!state) return null
 
@@ -30,7 +34,7 @@ export function GrowthInboxSetupEmptyState({ phase }: { phase: GrowthInboxSetupP
       </ul>
       {phase === "no_mailbox_providers" ? (
         <Button asChild size="sm" variant="outline" className="mt-3">
-          <Link href="/admin/growth/providers">Connect provider</Link>
+          <Link href={providersHref}>Connect provider</Link>
         </Button>
       ) : null}
     </div>

@@ -66,6 +66,7 @@ const CANONICAL_WORKSPACE_SHELL_NAV_IDS = [
   "calls",
   "meetings",
   "share-pages",
+  "videos",
   "media-assets",
   "automation-flows",
   "opportunities",

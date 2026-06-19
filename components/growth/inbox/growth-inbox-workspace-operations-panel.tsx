@@ -58,10 +58,10 @@ export function GrowthInboxWorkspaceOperationsPanel() {
           <GrowthFeatureLink href={revenueQueuePath}>Revenue Queue</GrowthFeatureLink>
         </Button>
         <Button type="button" variant="outline" size="sm" asChild>
-          <GrowthFeatureLink href="/admin/growth/revenue-execution">Revenue Execution</GrowthFeatureLink>
+          <GrowthFeatureLink href={growthFeaturePath(pathname, "opportunities/pipeline")}>Revenue Execution</GrowthFeatureLink>
         </Button>
         <Button type="button" variant="outline" size="sm" asChild>
-          <GrowthFeatureLink href="/admin/growth/sequences/execution">Sequence Execution</GrowthFeatureLink>
+          <GrowthFeatureLink href={growthFeaturePath(pathname, "sequences/execution")}>Sequence Execution</GrowthFeatureLink>
         </Button>
       </div>
 

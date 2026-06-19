@@ -16,7 +16,7 @@ export default function GrowthSharePagesManagePage() {
         iconClassName="bg-emerald-50 text-emerald-600"
       />
       <GrowthSharePagesWorkspaceTabs />
-      <GrowthSharePagesManagePanel />
+      <GrowthSharePagesManagePanel basePath="/growth/share-pages/manage" />
     </GrowthWorkspacePageContent>
   )
 }

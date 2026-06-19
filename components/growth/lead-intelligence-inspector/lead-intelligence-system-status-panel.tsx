@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Activity, CircleDot } from "lucide-react"
 import { GROWTH_BUYING_STAGE_QA_MARKER } from "@/lib/growth/buying-stage/buying-stage-types"
 import { GROWTH_CONTACT_DISCOVERY_QA_MARKER } from "@/lib/growth/contact-discovery/contact-discovery-types"
@@ -12,6 +13,7 @@ import {
 } from "@/lib/growth/lead-engine/lead-intelligence-inspector-types"
 import { GROWTH_PROVIDER_CACHE_QA_MARKER } from "@/lib/growth/provider-cache/provider-cache-types"
 import { GROWTH_PROSPECT_SEARCH_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-types"
+import { growthProspectSearchHref } from "@/lib/growth/navigation/growth-prospect-search-paths"
 import { GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER } from "@/lib/growth/real-world-discovery/real-world-discovery-types"
 import type { GrowthLeadEnginePipelineRun } from "@/lib/growth/lead-engine/orchestrator/lead-engine-run-types"
 import { cn } from "@/lib/utils"
@@ -30,7 +32,6 @@ const BASE_SYSTEM_ROWS: LeadIntelligenceSystemStatusRow[] = [
     label: "Prospect Discovery",
     status: "ready",
     detail: "Prospect Search index + filters",
-    href: "/admin/growth/search",
     qaMarker: GROWTH_PROSPECT_SEARCH_QA_MARKER,
   },
   {
@@ -38,7 +39,6 @@ const BASE_SYSTEM_ROWS: LeadIntelligenceSystemStatusRow[] = [
     label: "Company Discovery",
     status: "fixture",
     detail: "Google Places + SERP providers (sample data when unconfigured)",
-    href: "/admin/growth/search",
     qaMarker: GROWTH_REAL_WORLD_COMPANY_DISCOVERY_QA_MARKER,
   },
   {
@@ -100,6 +100,15 @@ export function LeadIntelligenceSystemStatusPanel({
   run: GrowthLeadEnginePipelineRun | null
   className?: string
 }) {
+  const pathname = usePathname()
+  const prospectSearchPath = growthProspectSearchHref(pathname)
+  const rows = BASE_SYSTEM_ROWS.map((row) => {
+    if (row.id === "prospect_discovery" || row.id === "company_discovery") {
+      return { ...row, href: prospectSearchPath }
+    }
+    return row
+  })
+
   return (
     <section
       className={cn("rounded-2xl border border-border bg-card p-5 shadow-sm", className)}
@@ -114,7 +123,7 @@ export function LeadIntelligenceSystemStatusPanel({
       </p>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        {BASE_SYSTEM_ROWS.map((row) => {
+        {rows.map((row) => {
           const body = (
             <>
               <div className="flex items-center justify-between gap-2">

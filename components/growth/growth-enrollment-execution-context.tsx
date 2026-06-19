@@ -10,6 +10,7 @@ import type { PatternEnrollmentDetailView } from "@/lib/growth/sequence-enrollme
 import {
   growthPatternEnrollmentDetailHref,
   growthSequenceExecutionHref,
+  isGrowthSequenceExecutionPathname,
 } from "@/lib/growth/sequence-enrollment/enrollment-navigation"
 import { dispatchSequenceExecutionJobFocus } from "@/lib/growth/sequence-enrollment/sequence-execution-job-focus"
 import type { GrowthSequenceSchedulerRunResult } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
@@ -37,14 +38,17 @@ export function GrowthEnrollmentExecutionContext({
 
   const navigateToExecutionJob = useCallback(
     (jobId: string) => {
-      const href = growthSequenceExecutionHref({
-        enrollmentId: detail?.enrollment.id ?? enrollmentId ?? undefined,
-        leadId: detail?.leadId ?? leadId ?? undefined,
-        sequencePatternId: sequencePatternId ?? undefined,
-        highlightJobId: jobId,
-      })
+      const href = growthSequenceExecutionHref(
+        {
+          enrollmentId: detail?.enrollment.id ?? enrollmentId ?? undefined,
+          leadId: detail?.leadId ?? leadId ?? undefined,
+          sequencePatternId: sequencePatternId ?? undefined,
+          highlightJobId: jobId,
+        },
+        pathname,
+      )
 
-      if (pathname === "/admin/growth/sequences/execution") {
+      if (isGrowthSequenceExecutionPathname(pathname)) {
         router.push(href, { scroll: false })
         dispatchSequenceExecutionJobFocus(jobId)
         return

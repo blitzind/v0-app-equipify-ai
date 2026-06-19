@@ -102,15 +102,17 @@ function runAudit(): void {
   console.log("  ✓ tab pages omit duplicate GrowthWorkspacePageHeader chrome")
 
   const v2Panel = readSource("components/growth/inbox/growth-inbox-workspace-v2-panel.tsx")
-  assert.match(v2Panel, /GrowthInboxOverviewMetricsPanel/)
-  assert.match(v2Panel, /GrowthOperatorInboxPanel/)
-  assert.match(v2Panel, /GrowthInboxWorkspaceShell/)
-  assert.doesNotMatch(v2Panel, /GrowthInboxV2SupportingPanels/)
-  const metricsBeforeNotifications =
-    v2Panel.indexOf("GrowthInboxOverviewMetricsPanel") < v2Panel.indexOf("GrowthOperatorInboxPanel")
-  assert.ok(metricsBeforeNotifications)
-  assert.match(v2Panel, /notifications=\{<GrowthOperatorInboxPanel/)
-  console.log("  ✓ inbox tab embeds metrics before notifications; notifications align in workspace grid")
+  assert.match(v2Panel, /GrowthInboxResumeWorkHero/)
+  assert.match(v2Panel, /GrowthInboxPrimaryWorkspace/)
+  assert.match(v2Panel, /GrowthInboxIntelligenceSidebar/)
+  assert.doesNotMatch(v2Panel, /GrowthInboxOperatorCopilot/)
+  assert.doesNotMatch(v2Panel, /GrowthOperatorInboxPanel/)
+  assert.doesNotMatch(v2Panel, /GrowthInboxOverviewMetricsPanel/)
+  assert.doesNotMatch(v2Panel, /GrowthInboxWorkspaceShell/)
+  const heroBeforeQueue =
+    v2Panel.indexOf("GrowthInboxResumeWorkHero") < v2Panel.indexOf("GrowthInboxPrimaryWorkspace")
+  assert.ok(heroBeforeQueue)
+  console.log("  ✓ inbox tab uses daily-driver IA with resume hero and primary workspace")
 
   const replyIntelPanel = readSource("components/growth/inbox/growth-inbox-reply-intelligence-panel.tsx")
   assert.match(replyIntelPanel, /replies\/timeline/)
@@ -140,8 +142,8 @@ function runAudit(): void {
   const inboxNav = GROWTH_SHELL_NAV_GROUPS.flatMap((group) => group.items).find((item) => item.id === "inbox")
   assert.ok(inboxNav)
   assert.equal(isGrowthShellNavItemActive(workflowRoute, inboxNav), true)
-  assert.equal(GROWTH_SHELL_NAV_GROUPS.flatMap((group) => group.items).length, 12)
-  console.log("  ✓ sidebar highlights Inbox on workflow tab; remains 12 items")
+  assert.equal(GROWTH_SHELL_NAV_GROUPS.flatMap((group) => group.items).length, 13)
+  console.log("  ✓ sidebar highlights Inbox on workflow tab; remains 13 items")
 
   assert.ok(findGrowthRouteMetadataByPathname(inboxRoute))
   assert.ok(findGrowthRouteMetadataByPathname(workflowRoute))

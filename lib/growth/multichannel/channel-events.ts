@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { GROWTH_CAMPAIGNS_HUB_BOOKINGS_HREF } from "@/lib/growth/hubs/growth-workspace-hub-paths"
 import type {
   GrowthChannelRoutingRule,
   GrowthSequenceChannelTask,
@@ -52,7 +53,7 @@ function mapTask(row: Row, leadLabel: string): GrowthSequenceChannelTask {
     bookingRecommendationId,
     sequenceExecutionJobId: row.sequence_execution_job_id ? String(row.sequence_execution_job_id) : null,
     callWorkspaceHref: row.call_workspace_href ? String(row.call_workspace_href) : null,
-    bookingIntelligenceHref: bookingRecommendationId ? "/admin/growth/booking-intelligence" : null,
+    bookingIntelligenceHref: bookingRecommendationId ? GROWTH_CAMPAIGNS_HUB_BOOKINGS_HREF : null,
     scheduledFor: row.scheduled_for ? String(row.scheduled_for) : null,
     resolvedAt: row.resolved_at ? String(row.resolved_at) : null,
     createdAt: String(row.created_at),

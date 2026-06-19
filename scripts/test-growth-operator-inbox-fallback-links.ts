@@ -111,7 +111,7 @@ function runAudit(): void {
   console.log("  ✓ coaching notifications fall back to calls coaching workspace")
 
   const adminFallback = growthOperatorInboxFallbackHref({ notificationType: "sequence_failed" })
-  assert.equal(adminFallback, "/admin/growth/sequences/execution")
+  assert.equal(adminFallback, "/growth/campaigns/sequences")
   const providerFallback = growthOperatorInboxFallbackHref({ notificationType: "provider_degraded" })
   assert.equal(providerFallback, "/admin/growth/providers")
   console.log("  ✓ admin control-plane fallbacks remain admin")

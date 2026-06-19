@@ -18,8 +18,10 @@ import {
   GROWTH_SHARE_PAGES_OPERATOR_QA_MARKER,
   type GrowthSharePageListItem,
 } from "@/lib/growth/share-pages/share-page-operator-types"
-import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
-import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
+import {
+  growthFeaturePath,
+  resolveGrowthFeatureBasePath,
+} from "@/lib/growth/navigation/growth-workspace-base-path"
 
 type ListResponse = {
   ok: boolean
@@ -64,10 +66,17 @@ export function saveSharePageTokens(
   }
 }
 
-export function GrowthSharePagesManagePanel() {
+export function GrowthSharePagesManagePanel({
+  basePath,
+}: {
+  /** Workspace: /growth/share-pages/manage · Admin: /admin/growth/share-pages/manage */
+  basePath?: string
+} = {}) {
   const pathname = usePathname()
-  const templatesPath = useGrowthFeaturePath("share-pages/templates")
-  const createPath = growthFeaturePath(pathname, "share-pages/manage/new")
+  const featureBasePath = resolveGrowthFeatureBasePath(pathname)
+  const manageBasePath = basePath ?? `${featureBasePath}/share-pages/manage`
+  const templatesPath = growthFeaturePath(pathname, "share-pages/templates")
+  const createPath = `${manageBasePath}/new`
   const [items, setItems] = useState<GrowthSharePageListItem[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -217,7 +226,7 @@ export function GrowthSharePagesManagePanel() {
                   <td className="py-2 pr-3">{formatWhen(item.createdAt)}</td>
                   <td className="py-2">
                     <Button size="sm" variant="outline" asChild>
-                      <Link href={growthFeaturePath(pathname, `share-pages/${item.id}`)}>Open</Link>
+                      <Link href={`${featureBasePath}/share-pages/${item.id}`}>Open</Link>
                     </Button>
                   </td>
                 </tr>

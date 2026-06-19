@@ -1,11 +1,14 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { ArrowRight, Workflow } from "lucide-react"
-import { LEAD_INTELLIGENCE_OPERATOR_WORKFLOW_STEPS } from "@/lib/growth/lead-engine/lead-intelligence-inspector-types"
+import { resolveLeadIntelligenceOperatorWorkflowSteps } from "@/lib/growth/lead-engine/lead-intelligence-inspector-types"
 import { cn } from "@/lib/utils"
 
 export function LeadIntelligenceWorkflowCard({ className }: { className?: string }) {
+  const pathname = usePathname()
+  const steps = resolveLeadIntelligenceOperatorWorkflowSteps(pathname)
   return (
     <section
       className={cn("rounded-2xl border border-border bg-card p-5 shadow-sm", className)}
@@ -21,7 +24,7 @@ export function LeadIntelligenceWorkflowCard({ className }: { className?: string
             Prospect discovery through outreach — use this inspector after pushing a lead to the inbox.
           </p>
           <ol className="mt-4 flex flex-wrap items-center gap-2">
-            {LEAD_INTELLIGENCE_OPERATOR_WORKFLOW_STEPS.map((step, index) => (
+            {steps.map((step, index) => (
               <li key={step.id} className="flex items-center gap-2">
                 <Link
                   href={step.href}
@@ -32,7 +35,7 @@ export function LeadIntelligenceWorkflowCard({ className }: { className?: string
                 >
                   {step.label}
                 </Link>
-                {index < LEAD_INTELLIGENCE_OPERATOR_WORKFLOW_STEPS.length - 1 ? (
+                {index < steps.length - 1 ? (
                   <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
                 ) : null}
               </li>

@@ -20,7 +20,12 @@ import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbo
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
 import type { GrowthReplyOpportunityDraft } from "@/lib/growth/reply-intelligence/workflow-actions-types"
 
-export function GrowthInboxQuickActions() {
+type GrowthInboxQuickActionsProps = {
+  /** primary: Reply/Call/Task/Opp — utilities: Assign/Archive */
+  mode?: "all" | "primary" | "utilities"
+}
+
+export function GrowthInboxQuickActions({ mode = "all" }: GrowthInboxQuickActionsProps) {
   const pathname = usePathname()
   const { selectedThread, actionLoading, runAction, assignOwner, archiveThread } = useGrowthInboxWorkspace()
   const { leadId, refreshRecommendations, refreshWorkflow } = useGrowthInboxLeadContext()
@@ -124,67 +129,78 @@ export function GrowthInboxQuickActions() {
 
   if (!selectedThread || !leadId) return null
 
+  const showPrimary = mode === "all" || mode === "primary"
+  const showUtilities = mode === "all" || mode === "utilities"
+
   return (
     <>
       <div className="space-y-2">
         {error ? <p className="text-xs text-rose-600">{error}</p> : null}
         <div className="grid grid-cols-2 gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="justify-start gap-1.5"
-            disabled={Boolean(actionLoading)}
-            onClick={() => void runAction("assign", assignOwner)}
-          >
-            <UserPlus className="mr-1.5 size-3.5" />
-            Assign
-          </Button>
-          <Button type="button" size="sm" variant="outline" className="justify-start" asChild>
-            <Link href={`${growthFeaturePath(pathname, "calls")}?leadId=${encodeURIComponent(leadId)}`}>
-              <Phone className="mr-1.5 size-3.5" />
-              Call
-            </Link>
-          </Button>
-          <Button type="button" size="sm" variant="outline" className="justify-start" asChild>
-            <a href="#inbox-reply-draft">
-              <Reply className="mr-1.5 size-3.5" />
-              Reply
-            </a>
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="justify-start gap-1.5"
-            disabled={Boolean(taskLoading)}
-            onClick={() => void createTask("follow_up")}
-          >
-            <ClipboardList className="mr-1.5 size-3.5" />
-            Create Task
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="justify-start gap-1.5"
-            disabled={Boolean(taskLoading)}
-            onClick={() => void openOpportunityDialog()}
-          >
-            <Target className="mr-1.5 size-3.5" />
-            Create Opportunity
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="justify-start gap-1.5"
-            disabled={Boolean(actionLoading)}
-            onClick={() => void runAction("archive", archiveThread)}
-          >
-            <Archive className="mr-1.5 size-3.5" />
-            Archive
-          </Button>
+          {showPrimary ? (
+            <>
+              <Button type="button" size="sm" variant="outline" className="justify-start" asChild>
+                <a href="#inbox-reply-draft">
+                  <Reply className="mr-1.5 size-3.5" />
+                  Reply
+                </a>
+              </Button>
+              <Button type="button" size="sm" variant="outline" className="justify-start" asChild>
+                <Link href={`${growthFeaturePath(pathname, "calls")}?leadId=${encodeURIComponent(leadId)}`}>
+                  <Phone className="mr-1.5 size-3.5" />
+                  Call
+                </Link>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="justify-start gap-1.5"
+                disabled={Boolean(taskLoading)}
+                onClick={() => void createTask("follow_up")}
+              >
+                <ClipboardList className="mr-1.5 size-3.5" />
+                Create Task
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="justify-start gap-1.5"
+                disabled={Boolean(taskLoading)}
+                onClick={() => void openOpportunityDialog()}
+              >
+                <Target className="mr-1.5 size-3.5" />
+                Create Opportunity
+              </Button>
+            </>
+          ) : null}
+          {showUtilities ? (
+            <>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="justify-start gap-1.5"
+                disabled={Boolean(actionLoading)}
+                onClick={() => void runAction("assign", assignOwner)}
+              >
+                <UserPlus className="mr-1.5 size-3.5" />
+                Assign
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="justify-start gap-1.5"
+                disabled={Boolean(actionLoading)}
+                onClick={() => void runAction("archive", archiveThread)}
+              >
+                <Archive className="mr-1.5 size-3.5" />
+                Archive
+              </Button>
+            </>
+          ) : null}
         </div>
       </div>
 

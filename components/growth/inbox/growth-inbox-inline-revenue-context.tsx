@@ -7,6 +7,7 @@ import { GrowthInboxContextEmptyHint } from "@/components/growth/inbox/growth-in
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
 import { executionPlanProgress } from "@/lib/growth/inbox/inbox-revenue-context"
 import { GROWTH_INBOX_WORKSPACE_PHASE3_QA_MARKER } from "@/lib/growth/inbox/inbox-workspace-types"
+import { growthWorkspaceInboxWorkflowHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import { revenueReadinessTierLabel } from "@/lib/growth/revenue-workflow/revenue-workflow-types"
 import { relationshipStageLabel } from "@/lib/growth/lead-memory/memory-types"
 
@@ -99,8 +100,8 @@ function GrowthInboxInlineRevenueContextInner() {
         )}
 
         <Link
-          href={`/admin/growth/revenue-execution/review${forecastEvidence ? `?leadId=${encodeURIComponent(leadId)}` : ""}`}
-          className="ml-auto shrink-0 text-[9px] font-medium text-indigo-600 hover:underline"
+          href={growthWorkspaceInboxWorkflowHref(leadId)}
+          className="ml-auto shrink-0 text-[9px] font-medium text-indigo-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           Open review
         </Link>

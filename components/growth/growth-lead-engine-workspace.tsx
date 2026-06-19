@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
+import { growthProspectSearchHref } from "@/lib/growth/navigation/growth-prospect-search-paths"
 import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
 import { AlertTriangle, Loader2, Play, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -37,8 +38,10 @@ import {
 } from "@/lib/growth/prospect-search/prospect-workflow-context"
 
 export function GrowthLeadEngineWorkspace() {
+  const pathname = usePathname()
   const searchParams = useSearchParams()
-  const revenueQueuePath = useGrowthFeaturePath("leads")
+  const revenueQueuePath = useGrowthFeaturePath("leads/research")
+  const prospectSearchPath = growthProspectSearchHref(pathname)
   const [input, setInput] = useState<GrowthLeadEngineSandboxInput>(LEAD_INTELLIGENCE_INSPECTOR_DEFAULT_INPUT)
   const [activePresetId, setActivePresetId] = useState<string | null>("medical-equipment")
   const [run, setRun] = useState<GrowthLeadEnginePipelineRun | null>(null)
@@ -128,7 +131,7 @@ export function GrowthLeadEngineWorkspace() {
               <Link href={revenueQueuePath}>Revenue Queue</Link>
             </Button>
             <Button asChild variant="outline" size="sm">
-              <Link href="/admin/growth/search">
+              <Link href={prospectSearchPath}>
                 <Search className="mr-1.5 size-3.5" />
                 Prospect Search
               </Link>

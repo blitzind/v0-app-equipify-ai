@@ -1,5 +1,5 @@
 /**
- * Canonical Growth Engine route catalog inputs — one entry per physical page URL (120 total).
+ * Canonical Growth Engine route catalog inputs — one entry per physical page URL (122 total).
  * Built into full metadata by `growth-route-metadata.ts`.
  */
 
@@ -247,6 +247,14 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     placeholder: false,
     breadcrumbLabel: "Campaigns",
     adminPath: `${ADMIN}/multichannel`,
+  }),
+  workspaceDual("workspace-campaigns-sequences", "campaigns/sequences", "Sequence Execution", "workspace", {
+    breadcrumbLabel: "Sequence Execution",
+    adminPath: `${ADMIN}/sequences/execution`,
+  }),
+  workspaceDual("workspace-campaigns-bookings", "campaigns/bookings", "Booking Intelligence", "workspace", {
+    breadcrumbLabel: "Booking Intelligence",
+    adminPath: `${ADMIN}/booking-intelligence`,
   }),
   workspace("workspace-inbox", "inbox", "Inbox", "workspace", "dual-route", {
     // Phase 7F: canonical unified operator inbox — threads, channels, action center.
@@ -552,7 +560,9 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
 
   admin("admin-sequences", "sequences", "Sequences", "automation", "admin-only"),
   admin("admin-sequences-builder", "sequences/builder", "Sequence Builder", "automation", "admin-only"),
-  admin("admin-sequences-execution", "sequences/execution", "Sequence Execution", "automation", "admin-only"),
+  adminDual("admin-sequences-execution", "sequences/execution", "Sequence Execution", "automation", "campaigns/sequences", {
+    breadcrumbLabel: "Execution",
+  }),
   admin("admin-sequences-enrollment", "sequences/enrollments/[enrollmentId]", "Enrollment Detail", "automation", "admin-only", {
     dynamic: true,
   }),
@@ -564,7 +574,9 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     deprecated: true,
   }),
   admin("admin-execution", "execution", "Human Execution", "automation", "admin-only"),
-  admin("admin-booking-intelligence", "booking-intelligence", "Booking Intelligence", "automation", "admin-only"),
+  adminDual("admin-booking-intelligence", "booking-intelligence", "Booking Intelligence", "automation", "campaigns/bookings", {
+    breadcrumbLabel: "Bookings",
+  }),
   adminDual("admin-multichannel", "multichannel", "Multi-Channel", "automation", "campaigns", {
     breadcrumbLabel: "Campaigns",
   }),

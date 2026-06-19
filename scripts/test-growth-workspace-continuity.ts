@@ -143,6 +143,8 @@ const CMD_K_MIGRATED_RESOLUTIONS: Array<{ adminHref: string; workspaceSegment: s
   { adminHref: "/admin/growth/conversations", workspaceSegment: "conversations" },
   { adminHref: "/admin/growth/relationships", workspaceSegment: "relationships" },
   { adminHref: "/admin/growth/multichannel", workspaceSegment: "campaigns" },
+  { adminHref: "/admin/growth/sequences/execution", workspaceSegment: "campaigns/sequences" },
+  { adminHref: "/admin/growth/booking-intelligence", workspaceSegment: "campaigns/bookings" },
   { adminHref: "/admin/growth/settings/growth", workspaceSegment: "settings" },
   { adminHref: "/admin/growth/settings/communications", workspaceSegment: "settings/connected-mailboxes" },
 ]

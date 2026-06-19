@@ -1,5 +1,6 @@
 /** Client-safe operator inbox fallback link builders (Phase 7M). */
 
+import { GROWTH_CAMPAIGNS_HUB_SEQUENCES_HREF } from "@/lib/growth/hubs/growth-workspace-hub-paths"
 import {
   growthWorkspaceCallWorkspaceHref,
   growthWorkspaceCallsCoachingHref,
@@ -104,7 +105,7 @@ const ADMIN_CONTROL_PLANE_NOTIFICATION_TYPES = new Set([
 
 function resolveAdminControlPlaneFallback(notificationType: string, leadId?: string | null): string {
   if (notificationType.startsWith("provider_")) return "/admin/growth/providers"
-  if (notificationType === "sequence_failed") return "/admin/growth/sequences/execution"
+  if (notificationType === "sequence_failed") return GROWTH_CAMPAIGNS_HUB_SEQUENCES_HREF
   if (notificationType === "suppression_blocked") return "/admin/growth/deliverability"
   if (notificationType.startsWith("dogfood_") || notificationType === "validation_complete") {
     return "/admin/growth/dogfood"

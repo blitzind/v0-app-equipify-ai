@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Layers, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
 import {
   channelTypeLabel,
   GROWTH_MULTICHANNEL_SEQUENCES_PRIVACY_NOTE,
@@ -37,7 +38,13 @@ type DashboardPayload = {
   message?: string
 }
 
-export function GrowthMultichannelDashboardView() {
+export function GrowthMultichannelDashboardView({
+  advancedSettingsMode = false,
+}: {
+  advancedSettingsMode?: boolean
+}) {
+  const sequenceExecutionHref = useGrowthFeaturePath("sequences/execution")
+  const bookingIntelligenceHref = useGrowthFeaturePath("booking-intelligence")
   const [loading, setLoading] = useState(true)
   const [planning, setPlanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -119,12 +126,16 @@ export function GrowthMultichannelDashboardView() {
           <p className="text-xs text-muted-foreground">{GROWTH_MULTICHANNEL_SEQUENCES_PRIVACY_NOTE}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/admin/growth/sequences/execution">Sequence Execution</Link>
-          </Button>
-          <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/admin/growth/booking-intelligence">Booking Intelligence</Link>
-          </Button>
+          {!advancedSettingsMode ? (
+            <>
+              <Button type="button" variant="outline" size="sm" asChild>
+                <Link href={sequenceExecutionHref}>Sequence Execution</Link>
+              </Button>
+              <Button type="button" variant="outline" size="sm" asChild>
+                <Link href={bookingIntelligenceHref}>Booking Intelligence</Link>
+              </Button>
+            </>
+          ) : null}
           <Button type="button" variant="outline" size="sm" onClick={() => void planTasks()} disabled={planning}>
             {planning ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : null}
             Plan Tasks
@@ -175,7 +186,7 @@ export function GrowthMultichannelDashboardView() {
                       ) : null}
                       {task.bookingIntelligenceHref ? (
                         <Button type="button" size="sm" variant="outline" asChild>
-                          <Link href={task.bookingIntelligenceHref}>Booking Intelligence</Link>
+                          <Link href={bookingIntelligenceHref}>Booking Intelligence</Link>
                         </Button>
                       ) : null}
                     </div>

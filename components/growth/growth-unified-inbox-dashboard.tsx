@@ -1,6 +1,7 @@
 "use client"
 
 import { Loader2, Plus, RefreshCw } from "lucide-react"
+import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { GrowthFeatureLink } from "@/components/growth/runtime/growth-feature-link"
 import { Label } from "@/components/ui/label"
@@ -29,8 +30,10 @@ import { threadStatusLabel } from "@/lib/growth/inbox/thread-health"
 import { GROWTH_INBOX_DIAGNOSTICS_HREF } from "@/lib/growth/inbox/inbox-workspace-types"
 import { GROWTH_INBOX_RUNTIME_STABLE_QA_MARKER } from "@/lib/growth/inbox/inbox-runtime-types"
 import { GROWTH_UNIFIED_INBOX_FOUNDATION_QA_MARKER } from "@/lib/growth/inbox/inbox-types"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 
 export function GrowthUnifiedInboxDashboardPanel() {
+  const pathname = usePathname()
   const {
     loading,
     error,
@@ -83,7 +86,7 @@ export function GrowthUnifiedInboxDashboardPanel() {
             </GrowthFeatureLink>
           </Button>
           <Button type="button" variant="outline" size="sm" asChild>
-            <GrowthFeatureLink href="/admin/growth/sequences/execution">Sequence Execution</GrowthFeatureLink>
+            <GrowthFeatureLink href={growthFeaturePath(pathname, "sequences/execution")}>Sequence Execution</GrowthFeatureLink>
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={Boolean(actionLoading)}>
             <RefreshCw className="mr-1.5 size-3.5" />

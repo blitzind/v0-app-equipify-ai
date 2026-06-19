@@ -13,6 +13,12 @@ import { GrowthSequencePreviewStudioPanel } from "@/components/growth/growth-seq
 import { GrowthCampaignBuilderWizardPanel } from "@/components/growth/growth-campaign-builder-wizard-panel"
 import { GrowthAgentOrchestrationPanel } from "@/components/growth/growth-agent-orchestration-panel"
 import {
+  GROWTH_INBOX_NOTIFICATION_OPERATOR_FILTERS,
+  refineGrowthInboxNotificationItems,
+  resolveGrowthInboxNotificationApiFilter,
+  type GrowthInboxNotificationOperatorFilterId,
+} from "@/lib/growth/hubs/growth-inbox-hub-notification-filters"
+import {
   OPERATOR_INBOX_FILTERS,
   OPERATOR_INBOX_QA_MARKER,
   OPERATOR_INBOX_SOURCE_LABELS,
@@ -42,12 +48,15 @@ export function GrowthOperatorInboxPanel({
   title = "Unified Operator Inbox",
   leadId,
   compact = false,
+  operatorHome = false,
 }: {
   title?: string
   leadId?: string | null
   compact?: boolean
+  operatorHome?: boolean
 }) {
   const [filter, setFilter] = useState<OperatorInboxFilter>("all")
+  const [displayFilter, setDisplayFilter] = useState<GrowthInboxNotificationOperatorFilterId>("all")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [queue, setQueue] = useState<OperatorInboxQueueResponse | null>(null)
@@ -59,7 +68,8 @@ export function GrowthOperatorInboxPanel({
     try {
       const params = new URLSearchParams()
       if (leadId) params.set("lead_id", leadId)
-      params.set("filter", filter)
+      const apiFilter = operatorHome ? resolveGrowthInboxNotificationApiFilter(displayFilter) : filter
+      params.set("filter", apiFilter)
       params.set("limit", compact ? "8" : "20")
       params.set("mode", compact ? "compact" : "full")
 
@@ -77,7 +87,11 @@ export function GrowthOperatorInboxPanel({
     } finally {
       setLoading(false)
     }
-  }, [compact, filter, leadId])
+  }, [compact, displayFilter, filter, leadId, operatorHome])
+
+  const visibleItems = operatorHome
+    ? refineGrowthInboxNotificationItems(queue?.items ?? [], displayFilter)
+    : queue?.items ?? []
 
   useEffect(() => {
     void load()
@@ -128,18 +142,31 @@ export function GrowthOperatorInboxPanel({
       ) : null}
 
       <div className={`mb-2 flex flex-wrap gap-2 ${compact ? "gap-1.5" : ""}`}>
-        {OPERATOR_INBOX_FILTERS.map((value) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setFilter(value)}
-            className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${
-              filter === value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {value.replace(/_/g, " ")}
-          </button>
-        ))}
+        {operatorHome
+          ? GROWTH_INBOX_NOTIFICATION_OPERATOR_FILTERS.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                onClick={() => setDisplayFilter(entry.id)}
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  displayFilter === entry.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
+              >
+                {entry.label}
+              </button>
+            ))
+          : OPERATOR_INBOX_FILTERS.map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setFilter(value)}
+                className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${
+                  filter === value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {value.replace(/_/g, " ")}
+              </button>
+            ))}
       </div>
 
       <Button size="sm" variant={compact ? "ghost" : "outline"} className={compact ? "h-7 px-2 text-xs" : undefined} disabled={loading} onClick={() => void load()}>
@@ -160,7 +187,7 @@ export function GrowthOperatorInboxPanel({
       <GrowthEnginePanelResilience
         loading={loading && !queue}
         error={error}
-        isEmpty={!loading && (queue?.items.length ?? 0) === 0}
+        isEmpty={!loading && visibleItems.length === 0}
         emptyKind="no_inbox_items"
         emptyMessage="No notifications right now."
         onRetry={() => void load()}
@@ -168,15 +195,16 @@ export function GrowthOperatorInboxPanel({
         compact={compact}
         compactTitle={title}
       >
-        <div className={compact ? "max-h-[7.5rem] space-y-2 overflow-y-auto pr-1" : "space-y-2"}>
-        {queue?.items.map((item) => (
-          <div key={item.item_id} className={`rounded-lg border border-border bg-muted/20 ${compact ? "p-2" : "p-3"}`}>
+        <div className={compact ? "max-h-[16rem] space-y-2 overflow-y-auto pr-1" : "space-y-2"}>
+        {visibleItems.map((item) => (
+          <div key={item.item_id} className={`rounded-lg border border-border bg-card ${compact ? "p-2.5" : "p-3"}`}>
             <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <p className="text-sm font-medium">{item.title}</p>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">{item.title}</p>
                 <p className="text-xs text-muted-foreground">
                   {OPERATOR_INBOX_SOURCE_LABELS[item.source]}
                   {item.company_name ? ` · ${item.company_name}` : ""}
+                  {operatorHome ? ` · ${new Date(item.occurred_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">

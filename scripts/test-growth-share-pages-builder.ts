@@ -57,7 +57,9 @@ function runLocalRegression(): void {
     path.join(process.cwd(), "components/growth/share-pages/growth-share-page-manage-panel.tsx"),
     "utf8",
   )
-  assert.match(managePanel, /share-pages\/manage\/new/)
+  assert.match(managePanel, /manageBasePath/)
+  assert.match(managePanel, /\$\{manageBasePath\}\/new/)
+  assert.ok(!managePanel.includes('growthFeaturePath(pathname, "share-pages/manage/new")'))
   assert.ok(!managePanel.includes("Lead ID *"))
   assert.ok(!managePanel.includes("showCreate"))
   console.log("  ✓ manage panel routes to builder (no inline UUID form)")

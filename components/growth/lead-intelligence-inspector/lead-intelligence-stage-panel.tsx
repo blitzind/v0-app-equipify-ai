@@ -2,7 +2,9 @@
 
 import Link from "next/link"
 import { useState, type ReactNode } from "react"
+import { usePathname } from "next/navigation"
 import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
+import { growthProspectSearchHref } from "@/lib/growth/navigation/growth-prospect-search-paths"
 import {
   AlertTriangle,
   ChevronDown,
@@ -197,7 +199,9 @@ function HumanApprovalActions() {
 }
 
 function ContactResearchActions() {
+  const pathname = usePathname()
   const leadsPath = useGrowthFeaturePath("leads")
+  const prospectSearchPath = growthProspectSearchHref(pathname)
 
   return (
     <div className="border-t border-border px-4 py-3">
@@ -212,7 +216,7 @@ function ContactResearchActions() {
           </Link>
         </Button>
         <Button asChild size="sm" variant="outline">
-          <Link href="/admin/growth/search">Request enrichment</Link>
+          <Link href={prospectSearchPath}>Request enrichment</Link>
         </Button>
       </div>
     </div>

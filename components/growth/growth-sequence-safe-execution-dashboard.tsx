@@ -20,6 +20,7 @@ import {
   sequenceExecutionJobRowId,
 } from "@/lib/growth/sequence-enrollment/sequence-execution-job-focus"
 import { channelTypeLabel, taskStatusLabel, type GrowthSequenceChannelTask } from "@/lib/growth/multichannel/multichannel-types"
+import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
 import { ApolloDraftReadinessBadges } from "@/components/growth/apollo-pipeline-attribution-panel"
 import { cn } from "@/lib/utils"
 
@@ -49,6 +50,8 @@ export function GrowthSequenceSafeExecutionDashboard({
   highlightJobId?: string | null
   enrollmentId?: string | null
 } = {}) {
+  const bookingIntelligenceHref = useGrowthFeaturePath("booking-intelligence")
+  const multichannelHref = useGrowthFeaturePath("multichannel")
   const [dashboard, setDashboard] = useState<GrowthSequenceSafeExecutionDashboard | null>(null)
   const [meetingIntentReviews, setMeetingIntentReviews] = useState(0)
   const [sequenceStopCandidates, setSequenceStopCandidates] = useState(0)
@@ -307,7 +310,7 @@ export function GrowthSequenceSafeExecutionDashboard({
               <GrowthBadge label={`${sequenceStopCandidates} sequence stop candidates`} tone="critical" />
             ) : null}
             <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/admin/growth/booking-intelligence">Booking Intelligence</Link>
+              <Link href={bookingIntelligenceHref}>Booking Intelligence</Link>
             </Button>
           </div>
         ) : null}
@@ -399,7 +402,7 @@ export function GrowthSequenceSafeExecutionDashboard({
                     </Button>
                   ) : null}
                   <Button type="button" size="sm" variant="ghost" asChild>
-                    <Link href="/admin/growth/multichannel">Multi-Channel</Link>
+                    <Link href={multichannelHref}>Multi-Channel</Link>
                   </Button>
                 </div>
               </div>
