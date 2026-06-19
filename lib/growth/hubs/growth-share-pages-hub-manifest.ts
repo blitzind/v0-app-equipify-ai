@@ -41,6 +41,13 @@ export const GROWTH_SHARE_PAGES_HUB_MANIFEST: GrowthWorkspaceHubManifest = {
       icon: Layers,
     },
     {
+      id: "workspace",
+      label: "Workspace",
+      description: "Operator review workspace for share pages.",
+      href: `${BASE}/share-pages/workspace`,
+      icon: Sparkles,
+    },
+    {
       id: "engagement",
       label: "Engagement",
       description: "Engagement intelligence for templates and share pages.",

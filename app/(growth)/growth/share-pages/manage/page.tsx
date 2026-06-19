@@ -1,7 +1,8 @@
 "use client"
 
 import { FileText } from "lucide-react"
-import { GrowthSharePagesDashboard } from "@/components/growth/share-pages/growth-share-pages-admin-panel"
+import { GrowthSharePagesManagePanel } from "@/components/growth/share-pages/growth-share-page-manage-panel"
+import { GrowthSharePagesWorkspaceTabs } from "@/components/growth/share-pages/growth-share-pages-workspace-tabs"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
@@ -14,7 +15,8 @@ export default function GrowthSharePagesManagePage() {
         icon={FileText}
         iconClassName="bg-emerald-50 text-emerald-600"
       />
-      <GrowthSharePagesDashboard />
+      <GrowthSharePagesWorkspaceTabs />
+      <GrowthSharePagesManagePanel />
     </GrowthWorkspacePageContent>
   )
 }

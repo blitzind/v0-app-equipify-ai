@@ -2,6 +2,7 @@
 
 import { LayoutTemplate } from "lucide-react"
 import { GrowthSharePageTemplateLibrary } from "@/components/growth/share-pages/templates/growth-share-page-template-library"
+import { GrowthSharePagesWorkspaceTabs } from "@/components/growth/share-pages/growth-share-pages-workspace-tabs"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
@@ -14,6 +15,7 @@ export default function GrowthSharePageTemplatesPage() {
         icon={LayoutTemplate}
         iconClassName="bg-violet-50 text-violet-600"
       />
+      <GrowthSharePagesWorkspaceTabs />
       <GrowthSharePageTemplateLibrary />
     </GrowthWorkspacePageContent>
   )

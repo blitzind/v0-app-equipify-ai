@@ -30,6 +30,7 @@ import { recordSharePageAttributionEngagement } from "@/lib/growth/tracking/trac
 import { dispatchSequenceEventWakeSafely } from "@/lib/growth/sequences/conditions/sequence-event-wake-engine"
 import { mapSharePageEventToSequenceWakeEvent } from "@/lib/growth/sequences/conditions/sequence-event-wake-types"
 import { emitSharePageOperatorNotification } from "@/lib/growth/share-pages/share-page-operator-notifications"
+import { processGrowthSharePageEventIntelligence } from "@/lib/growth/share-pages/growth-share-page-intelligence-service"
 
 export const SHARE_PAGE_ENGAGEMENT_DURATION_MS = 30_000
 export const SHARE_PAGE_ENGAGEMENT_SCROLL_PCT = 50
@@ -545,6 +546,15 @@ export async function ingestSharePageAnalyticsForPage(
       event: "share_page.engaged",
       occurredAt,
     })
+  }
+
+  if (!deduplicated && page.leadId) {
+    await processGrowthSharePageEventIntelligence(admin, {
+      organizationId: page.organizationId,
+      sharePageId: page.id,
+      leadId: page.leadId,
+      sessionId: sessionKey,
+    }).catch(() => undefined)
   }
 
   return {

@@ -39,6 +39,8 @@ export { GROWTH_ORPHAN_ROUTE_IDS } from "@/lib/growth/navigation/growth-route-ca
 const WORKSPACE_ICON_BY_ID: Record<string, LucideIcon> = {
   "workspace-dashboard": LayoutDashboard,
   "workspace-share-pages": FileText,
+  "workspace-share-pages-manage": FileText,
+  "workspace-share-pages-workspace": FileText,
   "workspace-share-pages-detail": FileText,
   "workspace-share-pages-templates": LayoutTemplate,
   "workspace-share-pages-templates-new": LayoutTemplate,

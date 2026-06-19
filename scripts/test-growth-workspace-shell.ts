@@ -78,9 +78,9 @@ function runAudit(): void {
   console.log(`\n=== Growth workspace shell audit (${GROWTH_ROUTE_METADATA_QA_MARKER}) ===\n`)
 
   assert.equal(GROWTH_MIGRATED_ROUTE_REGISTRY.length, GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length)
-  assert.equal(GROWTH_MIGRATED_ROUTE_REGISTRY.length, 62)
+  assert.equal(GROWTH_MIGRATED_ROUTE_REGISTRY.length, 63)
   assert.deepEqual(GROWTH_MIGRATED_WORKSPACE_ROUTES, GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.map((entry) => entry.path))
-  console.log("  ✓ migrated workspace registry subset (62 routes)")
+  console.log("  ✓ migrated workspace registry subset (63 routes)")
 
   const paths = GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.map((entry) => entry.path)
   const ids = GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.map((entry) => entry.id)
@@ -159,6 +159,7 @@ function runAudit(): void {
     "workspace-share-pages-templates-preview",
   )
   assert.equal(findGrowthRouteMetadataByPathname("/growth/share-pages/templates")?.id, "workspace-share-pages-templates")
+  assert.equal(findGrowthRouteMetadataByPathname("/growth/share-pages/workspace")?.id, "workspace-share-pages-workspace")
   assert.equal(findGrowthRouteMetadataByPathname("/growth/automation/new")?.id, "workspace-automation-new")
   assert.equal(findGrowthRouteMetadataByPathname("/growth/automation/flow-1")?.id, "workspace-automation-edit")
   assert.equal(findGrowthRouteMetadataByPathname("/growth/media")?.id, "workspace-media")

@@ -155,6 +155,9 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   workspaceDual("workspace-share-pages-manage", "share-pages/manage", "Manage Share Pages", "content", {
     breadcrumbLabel: "Manage",
   }),
+  workspaceDual("workspace-share-pages-workspace", "share-pages/workspace", "Share Page Workspace", "content", {
+    breadcrumbLabel: "Workspace",
+  }),
   workspaceDual("workspace-share-pages-detail", "share-pages/[id]", "Share Page Detail", "content", {
     breadcrumbLabel: "Edit",
     dynamic: true,
@@ -345,6 +348,9 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   adminDual("admin-share-pages-detail", "share-pages/[id]", "Share Page Detail", "content", "share-pages/[id]", {
     breadcrumbLabel: "Edit",
     dynamic: true,
+  }),
+  adminDual("admin-share-pages-workspace", "share-pages/workspace", "Share Page Workspace", "content", "share-pages/workspace", {
+    breadcrumbLabel: "Workspace",
   }),
   adminDual("admin-share-pages-templates", "share-pages/templates", "Templates", "content", "share-pages/templates", {
     breadcrumbLabel: "Templates",

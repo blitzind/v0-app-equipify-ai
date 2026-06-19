@@ -73,3 +73,23 @@ export const growthSharePagePatchSchema = z.object({
 export const growthSharePagePreviewSchema = z.object({
   rebuild_context: z.boolean().optional(),
 })
+
+export const growthSharePageOperatorWorkspaceListQuerySchema = z.object({
+  lead_id: z.string().uuid().optional(),
+  page_id: z.string().uuid().optional(),
+})
+
+export const growthSharePageOperatorWorkspaceQuerySchema = z.object({
+  lead_id: z.string().uuid(),
+  page_id: z.string().uuid().optional(),
+})
+
+export const growthSharePageOperatorWorkspaceActionSchema = z.object({
+  lead_id: z.string().uuid(),
+})
+
+export const growthSharePageIntelligenceQuerySchema = z.object({
+  share_page_id: z.string().uuid().optional(),
+  lead_id: z.string().uuid().optional(),
+  session_id: z.string().min(8).max(120).optional(),
+})
