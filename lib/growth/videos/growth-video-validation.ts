@@ -59,3 +59,23 @@ export function buildGrowthVideoThumbnailPlaceholderPath(input: {
 }): string {
   return `organizations/${input.organizationId}/videos/${input.assetId}/thumbnail.jpg`
 }
+
+export function buildGrowthVideoPersonalizedThumbnailPath(input: {
+  organizationId: string
+  assetId: string
+  thumbnailType: string
+  extension?: string
+}): string {
+  const ext = (input.extension ?? "jpg").replace(/^\./, "").toLowerCase()
+  const safeType = input.thumbnailType.replace(/[^a-z0-9_-]+/gi, "-").toLowerCase() || "prospect"
+  return `organizations/${input.organizationId}/videos/${input.assetId}/thumbnails/${safeType}.${ext}`
+}
+
+export function buildGrowthVideoOgImagePath(input: {
+  organizationId: string
+  assetId: string
+  extension?: string
+}): string {
+  const ext = (input.extension ?? "jpg").replace(/^\./, "").toLowerCase()
+  return `organizations/${input.organizationId}/videos/${input.assetId}/og/open-graph.${ext}`
+}

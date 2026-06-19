@@ -91,6 +91,7 @@ export type UpdateGrowthVideoPagePatch = {
   calendarUrl?: string | null
   branding?: Record<string, unknown>
   personalization?: Record<string, unknown>
+  metadata?: Record<string, unknown>
   status?: GrowthVideoPageStatus
 }
 
@@ -210,6 +211,15 @@ export class GrowthVideoPageService {
     }
     if (input.patch.branding) patch.branding_json = input.patch.branding
     if (input.patch.personalization) patch.personalization_json = input.patch.personalization
+    if (input.patch.metadata) {
+      const existing = await this.getPageById(input)
+      if (!existing) throw new Error("not_found")
+      patch.metadata_json = {
+        ...existing.metadata,
+        ...input.patch.metadata,
+        qa_marker: GROWTH_VIDEO_PAGES_QA_MARKER,
+      }
+    }
     if (input.patch.status) patch.status = input.patch.status
 
     const { data, error } = await pagesTable(this.admin)

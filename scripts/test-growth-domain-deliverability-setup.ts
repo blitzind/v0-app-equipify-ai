@@ -116,9 +116,18 @@ async function main(): Promise<void> {
   assert.match(drawerSource, /Verify DNS/)
   assert.match(drawerSource, /Copy setup/)
 
+  const tableSource = readSource("components/growth/growth-domain-deliverability-domains-table.tsx")
+  assert.match(tableSource, /View Setup Instructions/)
+  assert.match(tableSource, /Verify DNS/)
+  assert.match(tableSource, /Refresh DNS/)
+  assert.match(tableSource, /GrowthDomainDeliverabilitySetupDrawer/)
+  assert.match(tableSource, /ChevronRight/)
+
   const dashboardSource = readSource("components/growth/growth-deliverability-dashboard.tsx")
-  assert.match(dashboardSource, /View Setup Instructions/)
-  assert.match(dashboardSource, /GrowthDomainDeliverabilitySetupDrawer/)
+  assert.match(dashboardSource, /GrowthDomainDeliverabilityDomainsTable/)
+
+  const senderDashboardSource = readSource("components/growth/growth-sender-infrastructure-dashboard.tsx")
+  assert.match(senderDashboardSource, /GrowthDomainDeliverabilityDomainsTable/)
 
   console.log("growth domain deliverability setup checks passed")
 }

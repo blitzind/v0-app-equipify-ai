@@ -28,6 +28,21 @@ export const GROWTH_VIDEO_ANALYTICS_QA_MARKER = "growth-video-analytics-a4-v1" a
 
 export const GROWTH_VIDEO_ANALYTICS_CONFIRM = "RUN_GROWTH_VIDEO_ANALYTICS_CERTIFICATION" as const
 
+export const GROWTH_VIDEO_PERSONALIZATION_QA_MARKER = "growth-video-personalization-b1-v1" as const
+
+export const GROWTH_VIDEO_PERSONALIZATION_CONFIRM = "RUN_GROWTH_VIDEO_PERSONALIZATION_CERTIFICATION" as const
+
+export const GROWTH_VIDEO_THUMBNAILS_MIGRATION =
+  "20270828170000_growth_engine_video_thumbnails_b3.sql" as const
+
+export const GROWTH_VIDEO_THUMBNAILS_QA_MARKER = "growth-video-thumbnails-b3-v1" as const
+
+export const GROWTH_VIDEO_THUMBNAILS_CONFIRM = "RUN_GROWTH_VIDEO_THUMBNAILS_CERTIFICATION" as const
+
+export const GROWTH_VIDEO_THUMBNAIL_TYPES = ["prospect", "company", "cta", "open_graph"] as const
+
+export type GrowthVideoThumbnailType = (typeof GROWTH_VIDEO_THUMBNAIL_TYPES)[number]
+
 export const GROWTH_VIDEO_AI_ENGAGEMENT_SIGNALS = [
   "video_viewed",
   "video_high_intent",
@@ -276,6 +291,115 @@ export type GrowthVideoPagePersonalization = {
   previewContext?: Record<string, string>
 }
 
+export type GrowthVideoSequenceHookMetadata = {
+  sequence_candidate_id?: string | null
+  enrollment_candidate_id?: string | null
+  company_candidate_id?: string | null
+  person_candidate_id?: string | null
+  lead_id?: string | null
+}
+
+export type GrowthVideoMergeContextResult = {
+  variables: Record<string, string>
+  aliases: Record<string, string>
+  missing: string[]
+  sourcesUsed: string[]
+}
+
+export type GrowthVideoPreviewFormInput = {
+  firstName?: string
+  lastName?: string
+  company?: string
+  title?: string
+  industry?: string
+  city?: string
+  state?: string
+  email?: string
+  country?: string
+  painPoint?: string
+  senderName?: string
+  senderEmail?: string
+  bookingLink?: string
+  calendarUrl?: string
+  ctaUrl?: string
+}
+
+export type GrowthVideoRenderedPreview = {
+  title: string
+  description: string | null
+  ctaLabel: string | null
+  ctaUrl: string | null
+  calendarUrl: string | null
+  buttonLabelOverride: string | null
+}
+
+export type GrowthVideoAiPayload = {
+  resolved_variables: Record<string, string>
+  aliases_used: Record<string, string>
+  missing_variables: string[]
+  sources_used: string[]
+  personalization_score: number
+  rendered_preview: GrowthVideoRenderedPreview
+  sequence_hooks?: GrowthVideoSequenceHookMetadata
+}
+
+export type GrowthVideoThumbnailPreviewFormInput = {
+  firstName?: string
+  lastName?: string
+  company?: string
+  industry?: string
+  title?: string
+  companyLogoUrl?: string
+  ctaLabel?: string
+}
+
+export type GrowthVideoThumbnailLayout = {
+  headline: string
+  subheadline: string
+  badge: string
+  ctaText: string
+}
+
+export type GrowthVideoThumbnailRenderResult = {
+  type: GrowthVideoThumbnailType
+  layout: GrowthVideoThumbnailLayout
+  mergeValues: Record<string, string>
+  svg: string
+  width: number
+  height: number
+}
+
+export type GrowthVideoThumbnailMetadata = {
+  type: GrowthVideoThumbnailType
+  thumbnailStoragePath: string | null
+  ogStoragePath: string | null
+  thumbnailSignedUrl?: string | null
+  ogSignedUrl?: string | null
+  mergeValues: Record<string, string>
+  layout: GrowthVideoThumbnailLayout
+  generatedAt: string | null
+  videoAssetId: string
+  videoPageId: string
+  hooks?: GrowthVideoThumbnailHookMetadata
+}
+
+export type GrowthVideoThumbnailHookMetadata = {
+  lead_id?: string | null
+  company_candidate_id?: string | null
+  person_candidate_id?: string | null
+  video_page_id?: string | null
+  video_asset_id?: string | null
+}
+
+export type GrowthVideoThumbnailAiPayload = {
+  thumbnail_variables: Record<string, string>
+  resolved_values: Record<string, string>
+  rendered_thumbnail_url: string | null
+  rendered_og_image_url: string | null
+  sources_used: string[]
+  thumbnail_score: number
+}
+
 export type GrowthVideoPage = {
   id: string
   organizationId: string
@@ -319,7 +443,15 @@ export type GrowthVideoPublicPage = {
   playbackUrl: string | null
   playbackExpiresAt: string | null
   videoTitle: string | null
-  qa_marker: typeof GROWTH_VIDEO_PAGES_QA_MARKER
+  /** B1 — merge context applied server-side; raw templates never exposed when personalized. */
+  personalizationApplied?: boolean
+  missingVariables?: string[]
+  thumbnailUrl?: string | null
+  ogImageUrl?: string | null
+  qa_marker:
+    | typeof GROWTH_VIDEO_PAGES_QA_MARKER
+    | typeof GROWTH_VIDEO_PERSONALIZATION_QA_MARKER
+    | typeof GROWTH_VIDEO_THUMBNAILS_QA_MARKER
 }
 
 export type GrowthVideoWorkspaceRouteId =

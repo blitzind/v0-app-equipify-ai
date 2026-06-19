@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
 import { GrowthVideoPageAnalyticsSection } from "@/components/growth/videos/growth-video-page-analytics-section"
+import { GrowthVideoPagePersonalizationSection } from "@/components/growth/videos/growth-video-page-personalization-section"
+import { GrowthVideoPageThumbnailSection } from "@/components/growth/videos/growth-video-page-thumbnail-section"
 import { GrowthVideoWorkspaceShell } from "@/components/growth/videos/growth-video-workspace-shell"
 import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import { buildGrowthVideoPublicPath } from "@/lib/growth/videos/growth-video-page-validation"
@@ -42,6 +44,9 @@ export function GrowthVideoPageDetailPanel({ pageId }: { pageId: string }) {
   const [ctaLabel, setCtaLabel] = useState("")
   const [ctaUrl, setCtaUrl] = useState("")
   const [calendarUrl, setCalendarUrl] = useState("")
+  const [activeTab, setActiveTab] = useState<
+    "details" | "analytics" | "personalization" | "thumbnail"
+  >("details")
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -124,6 +129,45 @@ export function GrowthVideoPageDetailPanel({ pageId }: { pageId: string }) {
     <GrowthVideoWorkspaceShell title="Video Page" description="Edit metadata, preview playback, and manage publish state.">
       <GrowthEnginePanelResilience loading={loading} error={error}>
         {page ? (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant={activeTab === "details" ? "default" : "outline"}
+                onClick={() => setActiveTab("details")}
+              >
+                Details
+              </Button>
+              <Button
+                size="sm"
+                variant={activeTab === "analytics" ? "default" : "outline"}
+                onClick={() => setActiveTab("analytics")}
+              >
+                Analytics
+              </Button>
+              <Button
+                size="sm"
+                variant={activeTab === "personalization" ? "default" : "outline"}
+                onClick={() => setActiveTab("personalization")}
+              >
+                Personalization
+              </Button>
+              <Button
+                size="sm"
+                variant={activeTab === "thumbnail" ? "default" : "outline"}
+                onClick={() => setActiveTab("thumbnail")}
+              >
+                Thumbnail
+              </Button>
+            </div>
+
+            {activeTab === "thumbnail" ? (
+              <GrowthVideoPageThumbnailSection pageId={pageId} />
+            ) : activeTab === "personalization" ? (
+              <GrowthVideoPagePersonalizationSection pageId={pageId} />
+            ) : activeTab === "analytics" ? (
+              <GrowthVideoPageAnalyticsSection pageId={pageId} />
+            ) : (
           <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-2">
@@ -210,6 +254,8 @@ export function GrowthVideoPageDetailPanel({ pageId }: { pageId: string }) {
 
               <GrowthVideoPageAnalyticsSection pageId={pageId} />
             </div>
+          </div>
+            )}
           </div>
         ) : null}
       </GrowthEnginePanelResilience>

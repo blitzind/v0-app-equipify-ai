@@ -110,3 +110,65 @@ export const growthVideoAnalyticsQuerySchema = z.object({
   session_id: z.string().trim().max(120).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
 })
+
+export const growthVideoPersonalizationPreviewSchema = z.object({
+  page_id: z.string().uuid().optional(),
+  sample_text: z.string().trim().max(4000).optional(),
+  preview_form: z
+    .object({
+      first_name: z.string().trim().max(120).optional(),
+      last_name: z.string().trim().max(120).optional(),
+      company: z.string().trim().max(240).optional(),
+      title: z.string().trim().max(240).optional(),
+      industry: z.string().trim().max(120).optional(),
+      city: z.string().trim().max(120).optional(),
+      state: z.string().trim().max(120).optional(),
+    })
+    .optional(),
+})
+
+export const growthVideoPagePersonalizationPatchSchema = z
+  .object({
+    personalization: growthVideoPageCreateSchema.shape.personalization,
+    metadata: z
+      .object({
+        sequence_candidate_id: z.string().trim().max(120).nullable().optional(),
+        enrollment_candidate_id: z.string().trim().max(120).nullable().optional(),
+        company_candidate_id: z.string().uuid().nullable().optional(),
+        person_candidate_id: z.string().uuid().nullable().optional(),
+        lead_id: z.string().uuid().nullable().optional(),
+      })
+      .partial()
+      .optional(),
+  })
+  .strict()
+
+const growthVideoThumbnailPreviewFormSchema = z.object({
+  first_name: z.string().trim().max(120).optional(),
+  last_name: z.string().trim().max(120).optional(),
+  company: z.string().trim().max(240).optional(),
+  industry: z.string().trim().max(120).optional(),
+  title: z.string().trim().max(240).optional(),
+  company_logo_url: z.string().trim().url().max(2048).optional(),
+  cta_label: z.string().trim().max(120).optional(),
+})
+
+export const growthVideoThumbnailGenerateSchema = z.object({
+  page_id: z.string().uuid(),
+  thumbnail_type: z.enum(["prospect", "company", "cta", "open_graph"]).optional(),
+  preview_form: growthVideoThumbnailPreviewFormSchema.optional(),
+  persist: z.boolean().optional(),
+})
+
+export const growthVideoThumbnailPreviewSchema = z.object({
+  page_id: z.string().uuid().optional(),
+  thumbnail_type: z.enum(["prospect", "company", "cta", "open_graph"]).optional(),
+  preview_form: growthVideoThumbnailPreviewFormSchema.optional(),
+})
+
+export const growthVideoPageThumbnailPatchSchema = z
+  .object({
+    thumbnail_type: z.enum(["prospect", "company", "cta", "open_graph"]).optional(),
+    preview_form: growthVideoThumbnailPreviewFormSchema.optional(),
+  })
+  .strict()

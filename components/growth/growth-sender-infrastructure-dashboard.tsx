@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthDomainDeliverabilityDomainsTable } from "@/components/growth/growth-domain-deliverability-domains-table"
 import type {
   GrowthSenderAccount,
   GrowthSenderDomain,
@@ -61,10 +62,6 @@ const SEVERITY_TONE: Record<string, "healthy" | "medium" | "attention" | "critic
   medium: "medium",
   high: "attention",
   critical: "critical",
-}
-
-function boolBadge(value: boolean): { label: string; tone: "healthy" | "critical" | "neutral" } {
-  return value ? { label: "Valid", tone: "healthy" } : { label: "Missing", tone: "critical" }
 }
 
 type DashboardPayload = {
@@ -369,52 +366,24 @@ export function GrowthSenderInfrastructureDashboard() {
       </GrowthEngineCard>
 
       <GrowthEngineCard title="Domains">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-2 py-2">Domain</th>
-                <th className="px-2 py-2">SPF</th>
-                <th className="px-2 py-2">DKIM</th>
-                <th className="px-2 py-2">DMARC</th>
-                <th className="px-2 py-2">MX</th>
-                <th className="px-2 py-2">Deliverability</th>
-                <th className="px-2 py-2">Health</th>
-              </tr>
-            </thead>
-            <tbody>
-              {domains.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-2 py-6 text-muted-foreground">
-                    Domains appear when sender emails are registered.
-                  </td>
-                </tr>
-              ) : (
-                domains.map((domain) => (
-                  <tr key={domain.id} className="border-b border-border/60">
-                    <td className="px-2 py-3 font-medium">{domain.domain}</td>
-                    <td className="px-2 py-3">
-                      <GrowthBadge {...boolBadge(domain.spf_valid)} />
-                    </td>
-                    <td className="px-2 py-3">
-                      <GrowthBadge {...boolBadge(domain.dkim_valid)} />
-                    </td>
-                    <td className="px-2 py-3">
-                      <GrowthBadge {...boolBadge(domain.dmarc_valid)} />
-                    </td>
-                    <td className="px-2 py-3">
-                      <GrowthBadge {...boolBadge(domain.mx_valid)} />
-                    </td>
-                    <td className="px-2 py-3">{domain.deliverability_score}%</td>
-                    <td className="px-2 py-3">
-                      <GrowthBadge label={domain.status} tone={STATUS_TONE[domain.status] ?? "neutral"} />
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Click a domain row or use Actions to open DNS setup instructions (MX, SPF, DKIM, DMARC).
+        </p>
+        <GrowthDomainDeliverabilityDomainsTable
+          rows={domains.map((domain) => ({
+            domainId: domain.id,
+            domain: domain.domain,
+            spfValid: domain.spf_valid,
+            dkimValid: domain.dkim_valid,
+            dmarcValid: domain.dmarc_valid,
+            mxValid: domain.mx_valid,
+            deliverabilityScore: domain.deliverability_score,
+            healthLabel: domain.status,
+            lastCheckedAt: domain.dns_checked_at ?? domain.last_verified_at,
+          }))}
+          onDomainUpdated={() => void load()}
+          emptyMessage="Domains appear when sender emails are registered."
+        />
       </GrowthEngineCard>
 
       <GrowthEngineCard title="Health Feed">

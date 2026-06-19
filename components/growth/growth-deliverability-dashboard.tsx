@@ -8,7 +8,7 @@ import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/gro
 import {
   GrowthInfrastructureReadinessBadge,
 } from "@/components/growth/growth-infrastructure-readiness-badge"
-import { GrowthDomainDeliverabilitySetupDrawer } from "@/components/growth/growth-domain-deliverability-setup-drawer"
+import { GrowthDomainDeliverabilityDomainsTable } from "@/components/growth/growth-domain-deliverability-domains-table"
 import { GrowthOperatorDiagnosticsDisclosure } from "@/components/growth/growth-operator-diagnostics-disclosure"
 import { dnsHealthTierLabel } from "@/lib/growth/deliverability/dns-health"
 import {
@@ -55,10 +55,6 @@ const CHECKLIST_TONE: Record<
   internal_only: "neutral",
 }
 
-function boolBadge(value: boolean): { label: string; tone: "healthy" | "critical" | "neutral" } {
-  return value ? { label: "Valid", tone: "healthy" } : { label: "Missing", tone: "critical" }
-}
-
 function formatDate(value: string | null | undefined): string {
   if (!value) return "—"
   const date = new Date(value)
@@ -88,7 +84,6 @@ export function GrowthDeliverabilityDashboard() {
   const [liveDnsEnabled, setLiveDnsEnabled] = useState(false)
   const [readinessCatalog, setReadinessCatalog] = useState<GrowthInfrastructureReadinessCatalogEntry[]>([])
   const [actionLoading, setActionLoading] = useState<string | null>(null)
-  const [setupDrawerDomain, setSetupDrawerDomain] = useState<GrowthDeliverabilityDomainRow | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -160,27 +155,6 @@ export function GrowthDeliverabilityDashboard() {
 
   const dnsValidationEntry = readinessCatalog.find((entry) => entry.surfaceId === "dns_validation") ?? null
   const deliverabilityEntry = readinessCatalog.find((entry) => entry.surfaceId === "deliverability") ?? null
-
-  async function validateDomain(domainId: string) {
-    setActionLoading(domainId)
-    setError(null)
-    try {
-      const response = await fetch(`/api/platform/growth/deliverability/domain/${domainId}/validate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      })
-      const payload = (await response.json()) as { message?: string }
-      if (!response.ok) {
-        throw new Error(payload.message ?? "Domain validation failed.")
-      }
-      await load()
-    } catch (validateError) {
-      setError(validateError instanceof Error ? validateError.message : "Domain validation failed.")
-    } finally {
-      setActionLoading(null)
-    }
-  }
 
   async function resolveEvent(eventId: string) {
     setActionLoading(`resolve-${eventId}`)
@@ -333,93 +307,33 @@ export function GrowthDeliverabilityDashboard() {
       )}
 
       <GrowthEngineCard title="Sending domains">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-2 py-2">Domain</th>
-                <th className="px-2 py-2">SPF</th>
-                <th className="px-2 py-2">DKIM</th>
-                <th className="px-2 py-2">DMARC</th>
-                <th className="px-2 py-2">MX</th>
-                <th className="px-2 py-2">Health</th>
-                <th className="px-2 py-2">Deliverability</th>
-                <th className="px-2 py-2">Risk</th>
-                <th className="px-2 py-2">Last check</th>
-                <th className="px-2 py-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {domains.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="px-2 py-4 text-muted-foreground">
-                    No sending domains yet.{" "}
-                    <Link href="/admin/growth/infrastructure" className="font-medium text-foreground underline-offset-2 hover:underline">
-                      Register senders in Infrastructure
-                    </Link>{" "}
-                    to start DNS setup.
-                  </td>
-                </tr>
-              ) : (
-                domains.map((row) => {
-                  const spf = boolBadge(row.spf_present && row.spf_valid)
-                  const dkim = boolBadge(row.dkim_present && row.dkim_valid)
-                  const dmarc = boolBadge(row.dmarc_present && row.dmarc_valid)
-                  const mx = boolBadge(row.mx_present && row.mx_valid)
-                  return (
-                    <tr key={row.domain_id} className="border-b border-border/60">
-                      <td className="px-2 py-3 font-medium">{row.domain}</td>
-                      <td className="px-2 py-3">
-                        <GrowthBadge label={spf.label} tone={spf.tone} />
-                      </td>
-                      <td className="px-2 py-3">
-                        <GrowthBadge label={dkim.label} tone={dkim.tone} />
-                      </td>
-                      <td className="px-2 py-3">
-                        <GrowthBadge label={dmarc.label} tone={dmarc.tone} />
-                      </td>
-                      <td className="px-2 py-3">
-                        <GrowthBadge label={mx.label} tone={mx.tone} />
-                      </td>
-                      <td className="px-2 py-3">
-                        <GrowthBadge
-                          label={dnsHealthTierLabel(row.health_tier)}
-                          tone={TIER_TONE[row.health_tier] ?? "neutral"}
-                        />
-                      </td>
-                      <td className="px-2 py-3">{row.deliverability_score}%</td>
-                      <td className="px-2 py-3">
-                        <GrowthBadge label={row.risk_level} tone={TIER_TONE[row.risk_level] ?? "neutral"} />
-                      </td>
-                      <td className="px-2 py-3">{formatDate(row.last_checked_at)}</td>
-                      <td className="px-2 py-3">
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setSetupDrawerDomain(row)}
-                          >
-                            View Setup Instructions
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={Boolean(actionLoading)}
-                            onClick={() => void validateDomain(row.domain_id)}
-                          >
-                            Validate domain
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+        <GrowthDomainDeliverabilityDomainsTable
+          rows={domains.map((row) => ({
+            domainId: row.domain_id,
+            domain: row.domain,
+            spfValid: row.spf_present && row.spf_valid,
+            dkimValid: row.dkim_present && row.dkim_valid,
+            dmarcValid: row.dmarc_present && row.dmarc_valid,
+            mxValid: row.mx_present && row.mx_valid,
+            deliverabilityScore: row.deliverability_score,
+            healthLabel: dnsHealthTierLabel(row.health_tier),
+            healthTier: row.health_tier,
+            lastCheckedAt: row.last_checked_at,
+            riskLevel: row.risk_level,
+          }))}
+          showRisk
+          showLastCheck
+          onDomainUpdated={() => void load()}
+          emptyMessage={
+            <>
+              No sending domains yet.{" "}
+              <Link href="/admin/growth/infrastructure" className="font-medium text-foreground underline-offset-2 hover:underline">
+                Register senders in Infrastructure
+              </Link>{" "}
+              to start DNS setup.
+            </>
+          }
+        />
       </GrowthEngineCard>
 
       {showRecommendations || showHealthFeed ? (
@@ -494,16 +408,6 @@ export function GrowthDeliverabilityDashboard() {
           ) : null}
         </div>
       ) : null}
-
-      <GrowthDomainDeliverabilitySetupDrawer
-        domainId={setupDrawerDomain?.domain_id ?? null}
-        domainLabel={setupDrawerDomain?.domain ?? null}
-        open={Boolean(setupDrawerDomain)}
-        onOpenChange={(open) => {
-          if (!open) setSetupDrawerDomain(null)
-        }}
-        onDomainUpdated={() => void load()}
-      />
 
       <GrowthOperatorDiagnosticsDisclosure
         title="Developer diagnostics"
