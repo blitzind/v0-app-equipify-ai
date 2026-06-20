@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Loader2, Plus, RefreshCw, Sparkles } from "lucide-react"
+import { Loader2, Plus, RefreshCw, Rocket, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -64,6 +64,12 @@ export function GrowthSendrWorkspaceHome() {
           <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             Refresh
+          </Button>
+          <Button size="sm" asChild>
+            <Link href="/growth/sendr/launch">
+              <Rocket className="mr-1 h-4 w-4" />
+              Launch Campaign
+            </Link>
           </Button>
           <Button size="sm" asChild>
             <Link href="/growth/sendr/new">

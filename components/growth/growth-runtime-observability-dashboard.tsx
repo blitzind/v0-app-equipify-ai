@@ -88,6 +88,11 @@ type ObservabilityResponse = {
       intentCalculationsToday: number
       recommendationsGeneratedToday: number
       timelineWritesToday: number
+      launchesToday: number
+      launchPreviewsToday: number
+      launchFailuresToday: number
+      launchThrottlesToday: number
+      membersEnrolledViaLaunchesToday: number
       rowsReadToday: number
       rowsWrittenToday: number
       failuresToday: number
@@ -446,6 +451,26 @@ export function GrowthRuntimeObservabilityDashboard() {
                 <div className="flex justify-between">
                   <span>Timeline writes today</span>
                   <span>{snapshot.sendr.timelineWritesToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Launches today</span>
+                  <span>{snapshot.sendr.launchesToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Launch previews today</span>
+                  <span>{snapshot.sendr.launchPreviewsToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Launch failures</span>
+                  <span>{snapshot.sendr.launchFailuresToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Launch throttles</span>
+                  <span>{snapshot.sendr.launchThrottlesToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Members enrolled via launches</span>
+                  <span>{snapshot.sendr.membersEnrolledViaLaunchesToday}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Rows read / written</span>

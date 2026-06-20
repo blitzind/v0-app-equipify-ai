@@ -8,6 +8,12 @@ import {
   countGrowthSendrEngagementEventsToday,
 } from "@/lib/growth/sendr/growth-sendr-engagement-event-service"
 import { countGrowthSendrLandingPagesPublishedToday } from "@/lib/growth/sendr/growth-sendr-landing-page-repository"
+import {
+  countSendrLaunchFailuresToday,
+  countSendrLaunchPreviewsToday,
+  countSendrLaunchesToday,
+  sumSendrLaunchMembersEnrolledToday,
+} from "@/lib/growth/sendr/growth-sendr-launch-run-repository"
 import { countGrowthSendrMediaAssetsCreatedToday } from "@/lib/growth/sendr/growth-sendr-media-asset-repository"
 import { countSendrLinksCreatedToday, countSendrTimelineEventsToday } from "@/lib/growth/sendr/growth-sendr-sequence-link-repository"
 import { countSendrIntelligenceUpdatesToday } from "@/lib/growth/sendr/growth-sendr-timeline-intelligence-service"
@@ -39,6 +45,11 @@ export async function getGrowthSendrObservabilitySnapshot(
     intentCalculationsToday: 0,
     recommendationsGeneratedToday: 0,
     timelineWritesToday: 0,
+    launchesToday: 0,
+    launchPreviewsToday: 0,
+    launchFailuresToday: 0,
+    launchThrottlesToday: 0,
+    membersEnrolledViaLaunchesToday: 0,
     rowsReadToday: 0,
     rowsWrittenToday: 0,
     failuresToday: 0,
@@ -62,6 +73,10 @@ export async function getGrowthSendrObservabilitySnapshot(
       pagesLinkedToday,
       timelineEventsToday,
       intentCalculationsToday,
+      launchesToday,
+      launchPreviewsToday,
+      launchFailuresToday,
+      membersEnrolledViaLaunchesToday,
     ] = await Promise.all([
       countGrowthSendrMediaAssetsCreatedToday(admin, input.organizationId, dayStart),
       countGrowthSendrLandingPagesPublishedToday(admin, input.organizationId, dayStart),
@@ -74,6 +89,10 @@ export async function getGrowthSendrObservabilitySnapshot(
       countSendrLinksCreatedToday(admin, input.organizationId, dayStart),
       countSendrTimelineEventsToday(admin, input.organizationId, dayStart),
       countSendrIntelligenceUpdatesToday(admin, input.organizationId, dayStart),
+      countSendrLaunchesToday(admin, input.organizationId, dayStart),
+      countSendrLaunchPreviewsToday(admin, input.organizationId),
+      countSendrLaunchFailuresToday(admin, input.organizationId, dayStart),
+      sumSendrLaunchMembersEnrolledToday(admin, input.organizationId, dayStart),
     ])
 
     return {
@@ -91,14 +110,25 @@ export async function getGrowthSendrObservabilitySnapshot(
       intentCalculationsToday,
       recommendationsGeneratedToday: intentCalculationsToday,
       timelineWritesToday: timelineEventsToday,
-      rowsReadToday: engagementEventsToday * 2 + pagesLinkedToday + intentCalculationsToday,
+      launchesToday,
+      launchPreviewsToday,
+      launchFailuresToday,
+      launchThrottlesToday: 0,
+      membersEnrolledViaLaunchesToday,
+      rowsReadToday:
+        engagementEventsToday * 2 +
+        pagesLinkedToday +
+        intentCalculationsToday +
+        launchPreviewsToday * 120,
       rowsWrittenToday:
         engagementEventsToday +
         assetsCreatedToday +
         pagesPublishedToday +
         pagesLinkedToday +
-        intentCalculationsToday,
-      failuresToday: 0,
+        intentCalculationsToday +
+        launchesToday * 120 +
+        membersEnrolledViaLaunchesToday,
+      failuresToday: launchFailuresToday,
       throttlesToday: 0,
     }
   } catch {

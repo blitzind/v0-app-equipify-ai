@@ -14,11 +14,17 @@ export const GROWTH_SENDR_SEQUENCE_BRIDGE_QA_MARKER =
 export const GROWTH_SENDR_INTELLIGENCE_QA_MARKER =
   "growth-sendr-intelligence-gs-sendr-2e-v1" as const
 
+export const GROWTH_SENDR_LAUNCH_QA_MARKER =
+  "growth-sendr-launch-gs-sendr-3a-v1" as const
+
 export const GROWTH_SENDR_SEQUENCE_BRIDGE_SCHEMA_MIGRATION =
   "20270901190000_growth_sendr_sequence_bridge_gs_sendr_2d.sql" as const
 
 export const GROWTH_SENDR_INTELLIGENCE_SCHEMA_MIGRATION =
   "20270901200000_growth_sendr_intelligence_gs_sendr_2e.sql" as const
+
+export const GROWTH_SENDR_LAUNCH_SCHEMA_MIGRATION =
+  "20270902120000_growth_sendr_launch_gs_sendr_3a.sql" as const
 
 /** Merge token resolved at sequence send time. */
 export const GROWTH_SENDR_PAGE_URL_MERGE_TOKEN = "{{sendr_page_url}}" as const
@@ -120,6 +126,11 @@ export const GROWTH_SENDR_LIMITS = {
   MAX_SENDR_INTENT_RECALCULATIONS_PER_DAY: 10_000,
   MAX_SENDR_RECOMMENDATIONS_PER_DAY: 5_000,
   MAX_SENDR_TIMELINE_WRITES_PER_DAY: 10_000,
+  MAX_SENDR_LAUNCH_RUNS_PER_DAY: 500,
+  MAX_SENDR_PREVIEW_MEMBERS: 10_000,
+  MAX_SENDR_LAUNCH_PREVIEW_CHUNK: 500,
+  MAX_SENDR_LAUNCH_ENROLLMENT_CHUNK: 100,
+  MAX_SENDR_LAUNCH_STEP_DURATION_MS: 15_000,
 } as const
 
 /** Deterministic intent signal weights — no AI, sum capped at 100. */
@@ -153,7 +164,16 @@ export const GROWTH_SENDR_RESOURCE_ESTIMATES = {
   intentRecalculation: { maxReadsPerRun: 25, maxWritesPerRun: 2, maxSideEffectsPerRun: 1, maxRunsPerDay: 10_000 },
   recommendationGeneration: { maxReadsPerRun: 5, maxWritesPerRun: 0, maxSideEffectsPerRun: 0, maxRunsPerDay: 5_000 },
   timelineIntelligenceUpdate: { maxReadsPerRun: 3, maxWritesPerRun: 1, maxSideEffectsPerRun: 0, maxRunsPerDay: 10_000 },
+  launchPreview: { maxReadsPerRun: 120, maxWritesPerRun: 0, maxSideEffectsPerRun: 0, maxRunsPerDay: 500 },
+  launchRun: { maxReadsPerRun: 250, maxWritesPerRun: 120, maxSideEffectsPerRun: 0, maxRunsPerDay: 500 },
 } as const
+
+export const GROWTH_SENDR_LAUNCH_KILL_SWITCHES = [
+  "sendr_launch_enabled",
+  "sendr_launch_preview_enabled",
+] as const
+
+export type GrowthSendrLaunchKillSwitchKey = (typeof GROWTH_SENDR_LAUNCH_KILL_SWITCHES)[number]
 
 export const GROWTH_SENDR_SEQUENCE_BRIDGE_KILL_SWITCHES = [
   "sendr_sequence_bridge_enabled",

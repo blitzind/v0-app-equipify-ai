@@ -196,10 +196,100 @@ export type GrowthSendrObservabilitySnapshot = {
   intentCalculationsToday: number
   recommendationsGeneratedToday: number
   timelineWritesToday: number
+  launchesToday: number
+  launchPreviewsToday: number
+  launchFailuresToday: number
+  launchThrottlesToday: number
+  membersEnrolledViaLaunchesToday: number
   rowsReadToday: number
   rowsWrittenToday: number
   failuresToday: number
   throttlesToday: number
+}
+
+export type GrowthSendrLaunchRunStatus =
+  | "pending"
+  | "previewing"
+  | "ready_to_enroll"
+  | "enrolling"
+  | "completed"
+  | "failed"
+  | "cancelled"
+
+export type GrowthSendrLaunchNextAction = "continue" | "done" | "cancelled"
+
+export type GrowthSendrLaunchRun = {
+  id: string
+  organizationId: string
+  audienceId: string
+  sequencePatternId: string
+  landingPageId: string
+  previewId: string | null
+  enrollmentRunId: string | null
+  sequenceLinkId: string | null
+  status: GrowthSendrLaunchRunStatus
+  requestedCount: number
+  enrolledCount: number
+  processedCount: number
+  remainingCount: number
+  cursor: Record<string, unknown>
+  lastStep: string | null
+  lastError: string | null
+  startedAt: string
+  completedAt: string | null
+  metadata: Record<string, unknown>
+  createdAt: string
+}
+
+export type GrowthSendrLaunchPreviewResult = {
+  memberCount: number
+  eligibleCount: number
+  alreadyEnrolledCount: number
+  missingLeadCount: number
+  suppressedCount: number
+  blockedCount: number
+  sendrPageUrl: string | null
+  sampleVariables: Record<string, string>
+  estimatedReads: number
+  estimatedWrites: number
+}
+
+export type GrowthSendrLaunchWorkspaceSummary = {
+  audiences: Array<{
+    id: string
+    name: string
+    memberCount: number | null
+    lastSnapshotId: string | null
+  }>
+  publishedPages: Array<{
+    id: string
+    title: string
+    slug: string | null
+    publishedAt: string | null
+  }>
+  sequencePatterns: Array<{
+    id: string
+    name: string
+    channelMix: string | null
+  }>
+  recentLaunches: GrowthSendrLaunchRun[]
+}
+
+export type GrowthSendrLaunchRunProgress = {
+  launchRunId: string
+  enrollmentRunId: string | null
+  sequenceLinkId: string | null
+  previewId: string | null
+  status: GrowthSendrLaunchRunStatus
+  requestedCount: number
+  enrolledCount: number
+  processedCount: number
+  remainingCount: number
+  nextAction: GrowthSendrLaunchNextAction
+  hasMore: boolean
+  rowsRead: number
+  rowsWritten: number
+  error: string | null
 }
 
 export type GrowthSendrSequencePageLink = {

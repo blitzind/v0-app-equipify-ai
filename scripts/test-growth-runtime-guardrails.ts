@@ -80,6 +80,18 @@ async function main(): Promise<void> {
   assert.match(guardrailConfig, /sendr_timeline_updates/)
   assert.match(guardrailConfig, /sendr_intelligence_enabled/)
   assert.match(guardrailConfig, /sendr_recommendations_enabled/)
+  assert.match(guardrailConfig, /sendr_launches/)
+  assert.match(guardrailConfig, /sendr_launch_previews/)
+  assert.match(guardrailConfig, /sendr_launch_enabled/)
+  assert.match(guardrailConfig, /sendr_launch_preview_enabled/)
+
+  assert.match(sendrGuardrails, /sendr_launches/)
+  assert.match(sendrGuardrails, /sendr_launch_previews/)
+
+  const launchConfig = readSource("lib/growth/sendr/growth-sendr-config.ts")
+  assert.match(launchConfig, /MAX_SENDR_LAUNCH_PREVIEW_CHUNK/)
+  assert.match(launchConfig, /MAX_SENDR_LAUNCH_ENROLLMENT_CHUNK/)
+  assert.match(launchConfig, /MAX_SENDR_LAUNCH_STEP_DURATION_MS/)
 
   const observabilityPage = readSource("app/(growth)/growth/admin/runtime/page.tsx")
   assert.match(observabilityPage, /Runtime Guardrails/)
