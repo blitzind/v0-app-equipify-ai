@@ -13,6 +13,11 @@ export const GROWTH_RUNTIME_GUARDRAIL_LIMITS = {
   MAX_ESTIMATE_CALLS_PER_HOUR: 240,
   MAX_REFRESH_CALLS_PER_HOUR: 60,
   MAX_AUDIENCE_REFRESH_SIZE: 2_000,
+  MAX_AUDIENCE_MEMBERS_PER_SNAPSHOT: 10_000,
+  MAX_AUDIENCE_REFRESHES_PER_DAY: 20,
+  MAX_AUDIENCE_GENERATIONS_PER_HOUR: 10,
+  MAX_AUDIENCE_ENROLLMENTS_PER_RUN: 100,
+  MAX_AUDIENCE_ENROLLMENTS_PER_DAY: 500,
   MAX_WAKE_EVALUATIONS_PER_RUN: 50,
   MAX_WAKE_EVALUATIONS_PER_ORG: 500,
   MAX_MEDIA_EVENTS_PER_SESSION: 200,
@@ -38,6 +43,9 @@ export type GrowthRuntimeResourceType =
   | "automation_executions"
   | "headless_objectives"
   | "event_side_effects"
+  | "audience_generations"
+  | "audience_refreshes"
+  | "audience_enrollments"
 
 export type GrowthRuntimeBudgetWindowKind = "hourly" | "daily" | "monthly"
 
@@ -47,6 +55,7 @@ export type GrowthRuntimeKillSwitchKey =
   | "search_execution_enabled"
   | "retention_worker_enabled"
   | "cascade_budget_enforcement_enabled"
+  | "audience_snapshot_enabled"
 
 export const GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES: Record<GrowthRuntimeKillSwitchKey, boolean> = {
   wake_execution_enabled: true,
@@ -54,6 +63,7 @@ export const GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES: Record<GrowthRuntimeKillSwitc
   search_execution_enabled: true,
   retention_worker_enabled: true,
   cascade_budget_enforcement_enabled: true,
+  audience_snapshot_enabled: true,
 }
 
 /** Daily budget caps keyed by resource type. Zero = unlimited. */
@@ -68,6 +78,8 @@ export const GROWTH_RUNTIME_DAILY_BUDGET_CAPS: Partial<Record<GrowthRuntimeResou
   sequence_enrollments: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_SEQUENCE_ENROLLMENTS_PER_DAY,
   automation_executions: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_AUTOMATION_EXECUTIONS_PER_DAY,
   headless_objectives: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_HEADLESS_OBJECTIVES_PER_DAY,
+  audience_refreshes: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_AUDIENCE_REFRESHES_PER_DAY,
+  audience_enrollments: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_AUDIENCE_ENROLLMENTS_PER_DAY,
 }
 
 /** Hourly budget caps keyed by resource type. */
@@ -76,6 +88,7 @@ export const GROWTH_RUNTIME_HOURLY_BUDGET_CAPS: Partial<Record<GrowthRuntimeReso
   estimates: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_ESTIMATE_CALLS_PER_HOUR,
   refreshes: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_REFRESH_CALLS_PER_HOUR,
   wake_evaluations: 200,
+  audience_generations: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_AUDIENCE_GENERATIONS_PER_HOUR,
 }
 
 /** Per-user hourly caps — evaluated AND org limits. */
@@ -84,6 +97,7 @@ export const GROWTH_RUNTIME_HOURLY_USER_BUDGET_CAPS: Partial<Record<GrowthRuntim
   estimates: 200,
   refreshes: 50,
   hydrations: 500,
+  audience_generations: 5,
 }
 
 export function getBudgetCapForResource(

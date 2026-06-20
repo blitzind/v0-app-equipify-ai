@@ -14,6 +14,7 @@ import {
 } from "@/lib/growth/runtime-guardrails/growth-runtime-schema-probe"
 import { recordRuntimeHealthRead } from "@/lib/growth/runtime-guardrails/growth-runtime-health-counter-service"
 import { getWakeBatchState } from "@/lib/growth/runtime-guardrails/growth-wake-batch-state-repository"
+import { getGrowthAudienceObservabilitySnapshot } from "@/lib/growth/audiences/growth-audience-observability"
 
 export type GrowthRuntimeObservabilitySnapshot = {
   status: GrowthRuntimeSchemaStatus
@@ -46,6 +47,7 @@ export type GrowthRuntimeObservabilitySnapshot = {
     wakeBatch: Awaited<ReturnType<typeof getWakeBatchState>>
     timeoutWakeBatch: Awaited<ReturnType<typeof getWakeBatchState>>
   }
+  audiences: Awaited<ReturnType<typeof getGrowthAudienceObservabilitySnapshot>> | null
 }
 
 async function safeLoad<T>(
@@ -79,6 +81,7 @@ export async function getGrowthRuntimeObservabilitySnapshot(
       search_execution_enabled: true,
       retention_worker_enabled: true,
       cascade_budget_enforcement_enabled: true,
+      audience_snapshot_enabled: true,
     },
   )
 
@@ -167,6 +170,17 @@ export async function getGrowthRuntimeObservabilitySnapshot(
   const wakeBacklog =
     liveWakeCount ?? wakeBatch.remainingCount + timeoutWakeBatch.remainingCount
 
+  let audiences: GrowthRuntimeObservabilitySnapshot["audiences"] = null
+  if (input?.organizationId) {
+    try {
+      audiences = await getGrowthAudienceObservabilitySnapshot(admin, {
+        organizationId: input.organizationId,
+      })
+    } catch {
+      audiences = null
+    }
+  }
+
   return {
     status: probe.status,
     missingResources: probe.missingResources,
@@ -192,6 +206,7 @@ export async function getGrowthRuntimeObservabilitySnapshot(
       wakeBatch,
       timeoutWakeBatch,
     },
+    audiences,
   }
 }
 

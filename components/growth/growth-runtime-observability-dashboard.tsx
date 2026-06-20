@@ -54,6 +54,18 @@ type ObservabilityResponse = {
       wakeBatch: { processedCount: number; remainingCount: number; wakeCursor: string | null }
       timeoutWakeBatch: { processedCount: number; remainingCount: number; wakeCursor: string | null }
     }
+    audiences: {
+      schemaReady: boolean
+      snapshotsGeneratedToday: number
+      refreshesToday: number
+      enrollmentsToday: number
+      rowsReadToday: number
+      rowsWrittenToday: number
+      failuresToday: number
+      throttlesToday: number
+      snapshotBacklog: number
+      refreshBacklog: number
+    } | null
   }
 }
 
@@ -275,6 +287,54 @@ export function GrowthRuntimeObservabilityDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {snapshot.audiences ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Audience metrics</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {!snapshot.audiences.schemaReady ? (
+              <p className="text-muted-foreground">Audience schema not applied (GS-RG-2A).</p>
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <span>Snapshots today</span>
+                  <span>{snapshot.audiences.snapshotsGeneratedToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Refreshes today</span>
+                  <span>{snapshot.audiences.refreshesToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Enrollments today</span>
+                  <span>{snapshot.audiences.enrollmentsToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Rows read / written</span>
+                  <span>
+                    {snapshot.audiences.rowsReadToday} / {snapshot.audiences.rowsWrittenToday}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Failures / throttles</span>
+                  <span>
+                    {snapshot.audiences.failuresToday} / {snapshot.audiences.throttlesToday}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Snapshot backlog estimate</span>
+                  <span>{snapshot.audiences.snapshotBacklog}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>In-progress refreshes</span>
+                  <span>{snapshot.audiences.refreshBacklog}</span>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>
