@@ -170,6 +170,94 @@ export async function consumeAudienceEnrollmentBudget(
   return { allowed: true, reason: null }
 }
 
+export async function checkAudienceDiffEnabled(
+  admin: SupabaseClient,
+): Promise<AudienceGuardrailResult> {
+  const enabled = await isRuntimeKillSwitchEnabled(admin, "audience_diff_enabled")
+  if (!enabled) {
+    return {
+      allowed: false,
+      reason: "Audience diff generation disabled by kill switch.",
+      blockedBy: "kill_switch",
+    }
+  }
+  return { allowed: true, reason: null }
+}
+
+export async function checkAudienceLeadCreationEnabled(
+  admin: SupabaseClient,
+): Promise<AudienceGuardrailResult> {
+  const enabled = await isRuntimeKillSwitchEnabled(admin, "audience_lead_creation_enabled")
+  if (!enabled) {
+    return {
+      allowed: false,
+      reason: "Audience lead creation disabled by kill switch.",
+      blockedBy: "kill_switch",
+    }
+  }
+  return { allowed: true, reason: null }
+}
+
+/** Consume org budget for snapshot diff generation (daily cap). */
+export async function consumeAudienceDiffBudget(
+  admin: SupabaseClient,
+  input: { organizationId: string; userId?: string | null },
+): Promise<AudienceGuardrailResult> {
+  const killCheck = await checkAudienceDiffEnabled(admin)
+  if (!killCheck.allowed) return killCheck
+
+  return checkAndConsumeBudget(admin, {
+    ...input,
+    resourceType: "audience_diffs",
+    windowKind: "daily",
+  })
+}
+
+/** Consume org + user budgets for inbox bridge lead creation (daily cap). */
+export async function consumeAudienceLeadCreationBudget(
+  admin: SupabaseClient,
+  input: { organizationId: string; userId?: string | null; volume: number },
+): Promise<AudienceGuardrailResult> {
+  const killCheck = await checkAudienceLeadCreationEnabled(admin)
+  if (!killCheck.allowed) return killCheck
+
+  const orgResult = await consumeBudget(admin, {
+    organizationId: input.organizationId,
+    resourceType: "audience_lead_creations",
+    windowKind: "daily",
+    volume: input.volume,
+  })
+  if (!orgResult.allowed) {
+    return {
+      allowed: false,
+      reason: orgResult.reason ?? "Daily audience lead creation budget exceeded.",
+      blockedBy: "org",
+    }
+  }
+
+  if (input.userId) {
+    const userTableProbe = await probeRuntimeTable(admin, "runtime_user_budgets")
+    if (!userTableProbe.missing) {
+      const userResult = await consumeUserBudget(admin, {
+        organizationId: input.organizationId,
+        userId: input.userId,
+        resourceType: "audience_lead_creations",
+        windowKind: "daily",
+        volume: input.volume,
+      })
+      if (!userResult.allowed) {
+        return {
+          allowed: false,
+          reason: userResult.reason ?? "Daily user lead creation budget exceeded.",
+          blockedBy: "user",
+        }
+      }
+    }
+  }
+
+  return { allowed: true, reason: null }
+}
+
 export async function recordAudienceGuardrailFailure(
   admin: SupabaseClient,
   message: string,

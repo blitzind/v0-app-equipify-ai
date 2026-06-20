@@ -1,8 +1,11 @@
-/** GS-RG-2A — Dynamic Audience types (client-safe). */
+/** GS-RG-2B — Dynamic Audience types (client-safe). */
 
 import type {
+  GrowthAudienceDiffStatus,
+  GrowthAudienceMemberDiffKind,
   GrowthAudienceRefreshPolicy,
   GrowthAudienceRefreshRunStatus,
+  GrowthAudienceResultMode,
 } from "@/lib/growth/audiences/growth-audience-config"
 import { GROWTH_AUDIENCE_QA_MARKER } from "@/lib/growth/audiences/growth-audience-config"
 
@@ -16,6 +19,9 @@ export type GrowthAudience = {
   lastSnapshotId: string | null
   lastRefreshAt: string | null
   refreshPolicy: GrowthAudienceRefreshPolicy
+  refreshIntervalDays: number | null
+  nextRefreshAt: string | null
+  resultMode: GrowthAudienceResultMode
   createdAt: string
   updatedAt: string
   qaMarker: typeof GROWTH_AUDIENCE_QA_MARKER
@@ -35,14 +41,28 @@ export type GrowthAudienceSnapshot = {
   generatedBy: string | null
   generationDurationMs: number | null
   createdAt: string
+  previousSnapshotId: string | null
+  previousMemberCount: number
+  addedCount: number
+  removedCount: number
+  unchangedCount: number
+  resultMode: GrowthAudienceResultMode
 }
 
 export type GrowthAudienceMember = {
   id: string
   snapshotId: string
   organizationId: string
+  memberKey: string | null
+  memberKind: "company" | "person"
   leadId: string | null
   companyId: string | null
+  growthPersonId: string | null
+  canonicalPersonId: string | null
+  companyName: string | null
+  personName: string | null
+  personTitle: string | null
+  companyRelationshipJson: Record<string, unknown>
   fitScore: number | null
   intentScore: number | null
   engagementScore: number | null
@@ -70,6 +90,69 @@ export type GrowthAudienceRefreshRun = {
   updatedAt: string
 }
 
+export type GrowthAudienceSnapshotDiff = {
+  id: string
+  audienceId: string
+  organizationId: string
+  snapshotId: string
+  previousSnapshotId: string | null
+  status: GrowthAudienceDiffStatus
+  previousMemberCount: number
+  currentMemberCount: number
+  addedCount: number
+  removedCount: number
+  unchangedCount: number
+  rowsRead: number
+  rowsWritten: number
+  durationMs: number | null
+  error: string | null
+  createdAt: string
+}
+
+export type GrowthAudienceMemberDiff = {
+  id: string
+  diffId: string
+  snapshotId: string
+  memberKey: string
+  changeKind: GrowthAudienceMemberDiffKind
+  memberKind: "company" | "person"
+  displayLabel: string | null
+  createdAt: string
+}
+
+export type GrowthAudienceLeadCreationRun = {
+  id: string
+  audienceId: string
+  organizationId: string
+  snapshotId: string
+  status: GrowthAudienceRefreshRunStatus
+  requestedCount: number
+  createdCount: number
+  skippedCount: number
+  failedCount: number
+  rowsRead: number
+  rowsWritten: number
+  durationMs: number | null
+  dryRun: boolean
+  error: string | null
+  createdAt: string
+}
+
+export type GrowthAudienceLeadCreationProgress = {
+  runId: string
+  status: GrowthAudienceRefreshRunStatus
+  requestedCount: number
+  createdCount: number
+  skippedCount: number
+  failedCount: number
+  processedCount: number
+  hasMore: boolean
+  rowsRead: number
+  rowsWritten: number
+  durationMs: number | null
+  error: string | null
+}
+
 export type GrowthAudienceSnapshotProgress = {
   refreshRunId: string
   snapshotId: string | null
@@ -83,4 +166,11 @@ export type GrowthAudienceSnapshotProgress = {
   rowsWritten: number
   durationMs: number | null
   error: string | null
+  addedCount?: number
+  removedCount?: number
+  unchangedCount?: number
+}
+
+export type GrowthAudienceRefreshPolicyUpdate = {
+  refreshPolicy: GrowthAudienceRefreshPolicy
 }

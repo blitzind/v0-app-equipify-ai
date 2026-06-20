@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import {
+  GROWTH_AUDIENCE_2B_SCHEMA_MIGRATION,
   GROWTH_AUDIENCE_QA_MARKER,
   GROWTH_AUDIENCE_SCHEMA_MIGRATION,
 } from "@/lib/growth/audiences/growth-audience-config"
@@ -11,12 +12,15 @@ export const GROWTH_AUDIENCE_SCHEMA_TABLES = [
   "growth.growth_audience_snapshots",
   "growth.growth_audience_members",
   "growth.growth_audience_refresh_runs",
+  "growth.growth_audience_snapshot_diffs",
+  "growth.growth_audience_member_diffs",
+  "growth.growth_audience_lead_creation_runs",
 ] as const
 
-export { GROWTH_AUDIENCE_SCHEMA_MIGRATION, GROWTH_AUDIENCE_QA_MARKER }
+export { GROWTH_AUDIENCE_SCHEMA_MIGRATION, GROWTH_AUDIENCE_2B_SCHEMA_MIGRATION, GROWTH_AUDIENCE_QA_MARKER }
 
 export const GROWTH_AUDIENCE_SCHEMA_SETUP_MESSAGE =
-  "Dynamic audience schema is not ready. Apply migration 20270901140000_growth_dynamic_audiences_gs_rg_2a.sql."
+  "Dynamic audience schema is not ready. Apply migrations 20270901140000 (GS-RG-2A) and 20270901150000 (GS-RG-2B)."
 
 export async function probeAudienceTable(
   admin: SupabaseClient,
@@ -32,5 +36,10 @@ export async function probeAudienceTable(
 
 export async function isGrowthAudienceSchemaReady(admin: SupabaseClient): Promise<boolean> {
   const probe = await probeAudienceTable(admin, "growth_audiences")
+  return !probe.missing
+}
+
+export async function isGrowthAudience2BSchemaReady(admin: SupabaseClient): Promise<boolean> {
+  const probe = await probeAudienceTable(admin, "growth_audience_snapshot_diffs")
   return !probe.missing
 }

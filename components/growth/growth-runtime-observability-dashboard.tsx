@@ -59,6 +59,10 @@ type ObservabilityResponse = {
       snapshotsGeneratedToday: number
       refreshesToday: number
       enrollmentsToday: number
+      diffsGeneratedToday: number
+      membersAddedToday: number
+      membersRemovedToday: number
+      leadCreationsToday: number
       rowsReadToday: number
       rowsWrittenToday: number
       failuresToday: number
@@ -309,6 +313,18 @@ export function GrowthRuntimeObservabilityDashboard() {
                 <div className="flex justify-between">
                   <span>Enrollments today</span>
                   <span>{snapshot.audiences.enrollmentsToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Diffs today (+ / −)</span>
+                  <span>
+                    {snapshot.audiences.diffsGeneratedToday ?? 0} · +
+                    {snapshot.audiences.membersAddedToday ?? 0} / −
+                    {snapshot.audiences.membersRemovedToday ?? 0}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Lead creations today</span>
+                  <span>{snapshot.audiences.leadCreationsToday ?? 0}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Rows read / written</span>

@@ -45,6 +45,15 @@ async function main(): Promise<void> {
   assert.match(mediaService, /incrementMediaAssetEventRollup/)
   assert.doesNotMatch(mediaService, /recomputeMediaAssetEventRollup/)
 
+  assert.equal(GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_AUDIENCE_LEAD_CREATIONS_PER_RUN, 100)
+  assert.equal(GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_AUDIENCE_DIFF_MEMBERS, 10_000)
+
+  const guardrailConfig = readSource("lib/growth/runtime-guardrails/growth-runtime-guardrail-config.ts")
+  assert.match(guardrailConfig, /audience_diffs/)
+  assert.match(guardrailConfig, /audience_lead_creations/)
+  assert.match(guardrailConfig, /audience_diff_enabled/)
+  assert.match(guardrailConfig, /audience_lead_creation_enabled/)
+
   const observabilityPage = readSource("app/(growth)/growth/admin/runtime/page.tsx")
   assert.match(observabilityPage, /Runtime Guardrails/)
 
