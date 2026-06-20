@@ -25,6 +25,11 @@ export type SequenceEventWakeResult = {
   resolvedWaits: number
   blockedWaits: number
   skippedWaits: number
+  wakeCursor?: string | null
+  processedCount?: number
+  remainingCount?: number
+  wakeExecutionEnabled?: boolean
+  truncated?: boolean
 }
 
 const SHARE_PAGE_WAKE_MAP: Partial<Record<GrowthSharePageEventType, SequenceConditionEvent>> = {

@@ -282,6 +282,8 @@ export async function listActiveWaitsForWakeEvent(
     sequenceEnrollmentId?: string | null
     waitedForSource: SequenceConditionSource
     waitedForEvent: SequenceConditionEvent
+    limit?: number
+    cursor?: string | null
   },
 ): Promise<SequenceEnrollmentWait[]> {
   let enrollmentIds: string[] | null = null
@@ -300,13 +302,28 @@ export async function listActiveWaitsForWakeEvent(
     if (enrollmentIds.length === 0) return []
   }
 
-  const { data, error } = await waitsTable(admin)
+  let query = waitsTable(admin)
     .select(WAIT_SELECT)
     .in("enrollment_id", enrollmentIds)
     .in("status", ["pending", "active"])
     .eq("waited_for_source", input.waitedForSource)
     .eq("waited_for_event", input.waitedForEvent)
     .order("created_at", { ascending: true })
+
+  if (input.cursor) {
+    const [cursorCreatedAt, cursorWaitId] = input.cursor.split("|")
+    if (cursorCreatedAt && cursorWaitId) {
+      query = query.or(
+        `created_at.gt.${cursorCreatedAt},and(created_at.eq.${cursorCreatedAt},id.gt.${cursorWaitId})`,
+      )
+    }
+  }
+
+  if (input.limit != null) {
+    query = query.limit(Math.max(1, input.limit))
+  }
+
+  const { data, error } = await query
 
   if (error) throw new Error(error.message)
   return ((data ?? []) as WaitRow[]).map(mapWaitRow)

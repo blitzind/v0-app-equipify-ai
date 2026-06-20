@@ -14,8 +14,11 @@ import {
   getMediaAssetEventRollup,
   insertMediaAssetEvent,
   listMediaAssetEventRollups,
-  recomputeMediaAssetEventRollup,
 } from "@/lib/growth/media/media-asset-analytics-repository"
+import { incrementMediaAssetEventRollup } from "@/lib/growth/runtime-guardrails/growth-media-rollup-service"
+import { consumeBudget } from "@/lib/growth/runtime-guardrails/growth-runtime-budget-service"
+import { isRuntimeKillSwitchEnabled } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
+import { createCascadeBudgetTracker } from "@/lib/growth/runtime-guardrails/growth-cascade-budget-service"
 
 function isPlaybackEventType(value: string): value is GrowthMediaPlaybackAnalyticsIngestInput["eventType"] {
   return (GROWTH_MEDIA_PLAYBACK_ANALYTICS_EVENT_TYPES as readonly string[]).includes(value)
@@ -70,12 +73,48 @@ export async function ingestGrowthMediaPlaybackAnalyticsEvent(
     eventTimestamp: input.eventTimestamp,
   })
 
-  const rollup = await recomputeMediaAssetEventRollup(admin, {
+  const cascade = await createCascadeBudgetTracker(admin, {
+    eventId: event.id,
     organizationId: input.organizationId,
-    assetId: input.assetId,
   })
+  cascade.recordWrite(1)
 
-  if (event.leadId) {
+  const mediaBudget = await consumeBudget(admin, {
+    organizationId: input.organizationId,
+    resourceType: "media_events",
+    windowKind: "daily",
+    volume: 1,
+  })
+  if (!mediaBudget.allowed) {
+    await cascade.flush()
+    throw new Error("media_event_budget_exceeded")
+  }
+
+  const rollupEnabled = await isRuntimeKillSwitchEnabled(admin, "media_rollup_enabled")
+  const rollup = rollupEnabled
+    ? await incrementMediaAssetEventRollup(admin, {
+        organizationId: input.organizationId,
+        assetId: input.assetId,
+        event,
+      })
+    : (await getMediaAssetEventRollup(admin, {
+        organizationId: input.organizationId,
+        assetId: input.assetId,
+      })) ?? {
+        assetId: input.assetId,
+        organizationId: input.organizationId,
+        views: 0,
+        uniqueViews: 0,
+        playStarts: 0,
+        completions: 0,
+        completionRate: 0,
+        averageWatchSeconds: 0,
+        ctaClicks: 0,
+        lastEventAt: null,
+        updatedAt: new Date().toISOString(),
+      }
+
+  if (event.leadId && cascade.recordWakeEvaluation(1)) {
     const { dispatchMediaSequenceWakeSafely } = await import(
       "@/lib/growth/sequences/runtime/sequence-trigger-runtime-dispatchers"
     )
@@ -92,6 +131,8 @@ export async function ingestGrowthMediaPlaybackAnalyticsEvent(
       playbackEventType: input.eventType,
     })
   }
+
+  await cascade.flush()
 
   return { event, rollup }
 }

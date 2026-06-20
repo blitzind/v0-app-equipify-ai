@@ -9,6 +9,8 @@ import {
 import { assertGrowthVideoPageEventType } from "@/lib/growth/videos/growth-video-page-validation"
 import { isGrowthVideoPagesSchemaReady } from "@/lib/growth/videos/growth-video-schema-health"
 import { processGrowthVideoPageEventIntelligence } from "@/lib/growth/sequences/growth-sequence-video-intelligence-service"
+import { incrementVideoPageEventRollup } from "@/lib/growth/runtime-guardrails/growth-video-page-rollup-service"
+import { isRuntimeKillSwitchEnabled } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
 
 type VideoPageEventRow = {
   id: string
@@ -98,6 +100,19 @@ export class GrowthVideoPageEventService {
       .single()
 
     if (!error) {
+      const rollupEnabled = await isRuntimeKillSwitchEnabled(this.admin, "media_rollup_enabled")
+      if (rollupEnabled) {
+        const watchPercent = Number(metadata.watch_percent ?? metadata.progress_percent ?? 0)
+        await incrementVideoPageEventRollup(this.admin, {
+          organizationId: page.organization_id,
+          videoPageId: page.id,
+          eventType,
+          sessionId,
+          watchPercent: Number.isFinite(watchPercent) ? watchPercent : undefined,
+          eventTimestamp: (data as VideoPageEventRow).created_at,
+        })
+      }
+
       void processGrowthVideoPageEventIntelligence(this.admin, {
         organizationId: page.organization_id,
         videoPageId: page.id,

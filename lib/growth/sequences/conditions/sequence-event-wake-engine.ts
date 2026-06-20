@@ -12,26 +12,105 @@ import {
   type SequenceEventWakeResult,
 } from "@/lib/growth/sequences/conditions/sequence-event-wake-types"
 import { isTerminalEnrollmentWaitStatus } from "@/lib/growth/sequences/conditions/sequence-wait-types"
+import { consumeBudget } from "@/lib/growth/runtime-guardrails/growth-runtime-budget-service"
+import { isWakeExecutionEnabled } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
+import {
+  buildWakeBatchResult,
+  parseWakeCursor,
+  planWakeEvaluationBatch,
+} from "@/lib/growth/runtime-guardrails/growth-wake-guardrails"
+import {
+  getWakeBatchState,
+  persistWakeBatchState,
+} from "@/lib/growth/runtime-guardrails/growth-wake-batch-state-repository"
+import { GROWTH_RUNTIME_GUARDRAIL_LIMITS } from "@/lib/growth/runtime-guardrails/growth-runtime-guardrail-config"
 
 export { GROWTH_SEQUENCE_EVENT_WAKE_QA_MARKER }
+
+async function resolveLeadOrganizationId(
+  admin: SupabaseClient,
+  leadId: string,
+): Promise<string | null> {
+  const { data, error } = await admin
+    .schema("growth")
+    .from("leads")
+    .select("organization_id")
+    .eq("id", leadId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return data ? String((data as { organization_id: string }).organization_id) : null
+}
 
 export async function processSequenceAttributedWakeEvent(
   admin: SupabaseClient,
   input: SequenceAttributedWakeEvent,
 ): Promise<SequenceEventWakeResult> {
-  const now = input.occurredAt ?? new Date().toISOString()
-  const waits = await listActiveWaitsForWakeEvent(admin, {
+  const wakeExecutionEnabled = await isWakeExecutionEnabled(admin)
+  if (!wakeExecutionEnabled) {
+    return {
+      scannedWaits: 0,
+      resolvedWaits: 0,
+      blockedWaits: 0,
+      skippedWaits: 0,
+      wakeExecutionEnabled: false,
+      processedCount: 0,
+      remainingCount: 0,
+      truncated: false,
+    }
+  }
+
+  const organizationId = await resolveLeadOrganizationId(admin, input.leadId)
+  if (organizationId) {
+    const budget = await consumeBudget(admin, {
+      organizationId,
+      resourceType: "wake_evaluations",
+      windowKind: "daily",
+      volume: 1,
+    })
+    if (!budget.allowed) {
+      return {
+        scannedWaits: 0,
+        resolvedWaits: 0,
+        blockedWaits: 0,
+        skippedWaits: 0,
+        wakeExecutionEnabled: true,
+        processedCount: 0,
+        remainingCount: 0,
+        truncated: true,
+      }
+    }
+  }
+
+  const batchState = await getWakeBatchState(admin, "sequence_event_wake")
+  const { createdAt: cursorCreatedAt, waitId: cursorWaitId } = parseWakeCursor(batchState.wakeCursor)
+  const cursor =
+    cursorCreatedAt && cursorWaitId ? `${cursorCreatedAt}|${cursorWaitId}` : batchState.wakeCursor
+
+  const perRunCap = GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_WAKE_EVALUATIONS_PER_RUN
+  const fetchedWaits = await listActiveWaitsForWakeEvent(admin, {
     leadId: input.leadId,
     sequenceEnrollmentId: input.sequenceEnrollmentId,
     waitedForSource: input.source,
     waitedForEvent: input.event,
+    limit: perRunCap + 1,
+    cursor,
   })
+
+  const plan = planWakeEvaluationBatch({
+    totalWaits: fetchedWaits.length,
+    cursor,
+    wakeExecutionEnabled,
+  })
+
+  const waits = fetchedWaits.slice(0, plan.effectiveLimit)
+  const now = input.occurredAt ?? new Date().toISOString()
 
   const result: SequenceEventWakeResult = {
     scannedWaits: waits.length,
     resolvedWaits: 0,
     blockedWaits: 0,
     skippedWaits: 0,
+    wakeExecutionEnabled: true,
   }
 
   const { resolveWaitMatched } = await import(
@@ -77,6 +156,25 @@ export async function processSequenceAttributedWakeEvent(
       result.skippedWaits += 1
     }
   }
+
+  const batchResult = buildWakeBatchResult({
+    waits: waits.map((wait) => ({ id: wait.id, createdAt: wait.createdAt })),
+    totalAvailable: fetchedWaits.length,
+    processedThisRun: waits.length,
+    priorCursor: cursor,
+  })
+
+  await persistWakeBatchState(admin, {
+    processorKey: "sequence_event_wake",
+    wakeCursor: batchResult.wakeCursor,
+    processedCount: batchState.processedCount + batchResult.processedCount,
+    remainingCount: batchResult.remainingCount,
+  })
+
+  result.wakeCursor = batchResult.wakeCursor
+  result.processedCount = batchResult.processedCount
+  result.remainingCount = batchResult.remainingCount
+  result.truncated = batchResult.truncated
 
   return result
 }

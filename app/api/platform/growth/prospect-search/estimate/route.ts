@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { getGrowthEngineAiOrgId, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { estimateProspectSearchMatches } from "@/lib/growth/prospect-search/prospect-search-estimation"
+import { withProspectSearchGuardrails } from "@/lib/growth/runtime-guardrails/growth-search-rate-limiter"
 import type {
   GrowthProspectSearchDiscoveryMode,
   GrowthProspectSearchFilters,
@@ -27,11 +28,32 @@ export async function GET(request: Request) {
   const discovery_mode: GrowthProspectSearchDiscoveryMode =
     url.searchParams.get("mode") === "discover_external" ? "discover_external" : "internal"
 
-  const estimate = await estimateProspectSearchMatches(access.admin, {
+  const organizationId = getGrowthEngineAiOrgId()
+  if (!organizationId) {
+    return NextResponse.json({ error: "growth_engine_org_not_configured" }, { status: 503 })
+  }
+
+  const guarded = await withProspectSearchGuardrails(access.admin, {
+    organizationId,
+    userId: access.userId,
+    operation: "estimate",
     query,
-    filters,
-    discovery_mode,
+    execute: async () => {
+      const estimate = await estimateProspectSearchMatches(access.admin, {
+        query,
+        filters,
+        discovery_mode,
+      })
+      return {
+        result: estimate,
+        rowsReturned: estimate.estimated_matches ?? 0,
+      }
+    },
   })
 
-  return NextResponse.json({ ok: true, estimate })
+  if (!guarded.ok) {
+    return NextResponse.json({ error: guarded.error }, { status: guarded.status })
+  }
+
+  return NextResponse.json({ ok: true, estimate: guarded.result })
 }

@@ -9,6 +9,10 @@ export type SequenceWaitTimeoutProcessorResult = {
   blocked: number
   failed: number
   processedWaitIds: string[]
+  wakeCursor?: string | null
+  processedCount?: number
+  remainingCount?: number
+  truncated?: boolean
 }
 
 export type SequenceWaitRecoveryIssue = {

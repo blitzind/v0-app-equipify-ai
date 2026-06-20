@@ -12,6 +12,13 @@ import {
   GROWTH_SEQUENCE_WAIT_TIMEOUT_QA_MARKER,
   type SequenceWaitTimeoutProcessorResult,
 } from "@/lib/growth/sequences/conditions/sequence-wait-timeout-types"
+import { isWakeExecutionEnabled } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
+import { GROWTH_RUNTIME_GUARDRAIL_LIMITS } from "@/lib/growth/runtime-guardrails/growth-runtime-guardrail-config"
+import {
+  getWakeBatchState,
+  persistWakeBatchState,
+} from "@/lib/growth/runtime-guardrails/growth-wake-batch-state-repository"
+import { buildWakeBatchResult } from "@/lib/growth/runtime-guardrails/growth-wake-guardrails"
 
 export { GROWTH_SEQUENCE_WAIT_TIMEOUT_QA_MARKER }
 
@@ -60,10 +67,10 @@ function mapWaitRow(row: WaitRow): SequenceEnrollmentWait {
 
 export async function listExpiredActiveSequenceWaits(
   admin: SupabaseClient,
-  input: { now?: string; limit?: number },
+  input: { now?: string; limit?: number; cursor?: string | null },
 ): Promise<SequenceEnrollmentWait[]> {
   const now = input.now ?? new Date().toISOString()
-  const { data, error } = await admin
+  let query = admin
     .schema("growth")
     .from("sequence_enrollment_step_waits")
     .select(WAIT_SELECT)
@@ -71,7 +78,18 @@ export async function listExpiredActiveSequenceWaits(
     .not("timeout_at", "is", null)
     .lte("timeout_at", now)
     .order("timeout_at", { ascending: true })
-    .limit(input.limit ?? 50)
+    .limit(input.limit ?? GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_WAKE_EVALUATIONS_PER_RUN)
+
+  if (input.cursor) {
+    const [cursorTimeoutAt, cursorWaitId] = input.cursor.split("|")
+    if (cursorTimeoutAt && cursorWaitId) {
+      query = query.or(
+        `timeout_at.gt.${cursorTimeoutAt},and(timeout_at.eq.${cursorTimeoutAt},id.gt.${cursorWaitId})`,
+      )
+    }
+  }
+
+  const { data, error } = await query
 
   if (error) throw new Error(error.message)
   return ((data ?? []) as WaitRow[]).map(mapWaitRow)
@@ -92,8 +110,37 @@ export async function processExpiredSequenceWaits(
   admin: SupabaseClient,
   input?: { now?: string; limit?: number },
 ): Promise<SequenceWaitTimeoutProcessorResult> {
+  const wakeExecutionEnabled = await isWakeExecutionEnabled(admin)
+  if (!wakeExecutionEnabled) {
+    return {
+      scanned: 0,
+      resolved: 0,
+      blocked: 0,
+      failed: 0,
+      processedWaitIds: [],
+      processedCount: 0,
+      remainingCount: 0,
+      truncated: false,
+    }
+  }
+
   const now = input?.now ?? new Date().toISOString()
-  const waits = await listExpiredActiveSequenceWaits(admin, { now, limit: input?.limit ?? 50 })
+  const batchState = await getWakeBatchState(admin, "sequence_wait_timeouts")
+  const perRunLimit = input?.limit ?? GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_WAKE_EVALUATIONS_PER_RUN
+
+  const { count: totalExpired } = await admin
+    .schema("growth")
+    .from("sequence_enrollment_step_waits")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["pending", "active"])
+    .not("timeout_at", "is", null)
+    .lte("timeout_at", now)
+
+  const waits = await listExpiredActiveSequenceWaits(admin, {
+    now,
+    limit: perRunLimit,
+    cursor: batchState.wakeCursor,
+  })
 
   const result: SequenceWaitTimeoutProcessorResult = {
     scanned: waits.length,
@@ -145,6 +192,25 @@ export async function processExpiredSequenceWaits(
       result.processedWaitIds.push(wait.id)
     }
   }
+
+  const batchResult = buildWakeBatchResult({
+    waits: waits.map((wait) => ({ id: wait.id, createdAt: wait.timeoutAt ?? wait.createdAt })),
+    totalAvailable: totalExpired ?? waits.length,
+    processedThisRun: waits.length,
+    priorCursor: batchState.wakeCursor,
+  })
+
+  await persistWakeBatchState(admin, {
+    processorKey: "sequence_wait_timeouts",
+    wakeCursor: batchResult.wakeCursor,
+    processedCount: batchState.processedCount + batchResult.processedCount,
+    remainingCount: batchResult.remainingCount,
+  })
+
+  result.wakeCursor = batchResult.wakeCursor
+  result.processedCount = batchResult.processedCount
+  result.remainingCount = batchResult.remainingCount
+  result.truncated = batchResult.truncated
 
   return result
 }

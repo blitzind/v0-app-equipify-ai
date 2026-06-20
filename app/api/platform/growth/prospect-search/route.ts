@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { getGrowthEngineAiOrgId, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { executeProspectSearchAction } from "@/lib/growth/prospect-search/prospect-search-actions"
 import { listProspectSearchLists } from "@/lib/growth/prospect-search/list-management"
 import { runProspectSearch } from "@/lib/growth/prospect-search/prospect-search-repository"
@@ -19,6 +19,8 @@ import {
   type GrowthProspectSearchResultAction,
   type GrowthProspectSearchSourceType,
 } from "@/lib/growth/prospect-search/prospect-search-types"
+import { withProspectSearchGuardrails } from "@/lib/growth/runtime-guardrails/growth-search-rate-limiter"
+import { truncateSearchResults } from "@/lib/growth/runtime-guardrails/growth-runtime-guardrail-config"
 
 export const runtime = "nodejs"
 
@@ -93,16 +95,52 @@ export async function GET(request: Request) {
       : "people"
 
   try {
-    const result = await runProspectSearch(access.admin, {
+    const organizationId = getGrowthEngineAiOrgId()
+    if (!organizationId) {
+      return NextResponse.json({ error: "growth_engine_org_not_configured" }, { status: 503 })
+    }
+
+    const guarded = await withProspectSearchGuardrails(access.admin, {
+      organizationId,
+      userId: access.userId,
+      operation: "search",
       query,
-      filters,
-      discovery_mode,
-      sort_by,
-      created_by: access.userId,
-      page: Number.isFinite(page) ? page : 1,
-      page_size: Number.isFinite(page_size) ? page_size : 50,
-      result_mode,
+      execute: async () => {
+        const result = await runProspectSearch(access.admin, {
+          query,
+          filters,
+          discovery_mode,
+          sort_by,
+          created_by: access.userId,
+          page: Number.isFinite(page) ? page : 1,
+          page_size: Number.isFinite(page_size) ? page_size : 50,
+          result_mode,
+        })
+
+        const people = truncateSearchResults(result.people ?? [])
+        const companies = truncateSearchResults(result.companies ?? [])
+
+        return {
+          result: {
+            ...result,
+            people: people.rows,
+            companies: companies.rows,
+            guardrails: {
+              people_truncated: people.truncated,
+              companies_truncated: companies.truncated,
+            },
+          },
+          rowsReturned: (result.people?.length ?? 0) + (result.companies?.length ?? 0),
+          rowsHydrated: result.discovery_hydration?.hydrated_count ?? 0,
+        }
+      },
     })
+
+    if (!guarded.ok) {
+      return NextResponse.json({ error: guarded.error }, { status: guarded.status })
+    }
+
+    const result = guarded.result
 
     if (!includeMeta) {
       return NextResponse.json({
