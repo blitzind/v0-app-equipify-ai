@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Loader2, Play, RefreshCw, Sparkles, UserPlus } from "lucide-react"
+import { GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL } from "@/lib/growth/sendr/growth-sendr-branding"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -393,16 +394,16 @@ export function GrowthAudienceDetail({ audienceId }: { audienceId: string }) {
               {sendrBridgeMember ? (
                 <Link
                   href={`/growth/sendr/new?leadId=${sendrBridgeMember.leadId}&audienceMemberId=${sendrBridgeMember.id}&companyId=${sendrBridgeMember.companyId ?? ""}&title=${encodeURIComponent(
-                    sendrBridgeMember.personName ?? sendrBridgeMember.companyName ?? "SENDR page",
+                    sendrBridgeMember.personName ?? sendrBridgeMember.companyName ?? GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL,
                   )}`}
                 >
                   <Sparkles className="mr-1 h-4 w-4" />
-                  Create SENDR Page
+                  Create {GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL}
                 </Link>
               ) : (
                 <>
                   <Sparkles className="mr-1 h-4 w-4" />
-                  Create SENDR Page (1 lead)
+                  Create {GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL} (1 lead)
                 </>
               )}
             </Button>

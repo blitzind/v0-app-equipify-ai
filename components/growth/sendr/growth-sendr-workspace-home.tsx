@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Loader2, Plus, RefreshCw, Rocket, Sparkles } from "lucide-react"
+import { Loader2, Plus, RefreshCw, Rocket, Sparkles, BarChart3, Activity } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,6 +11,7 @@ import type {
   GrowthSendrMediaAsset,
   GrowthSendrWorkspaceSummary,
 } from "@/lib/growth/sendr/growth-sendr-types"
+import { GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL, GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL } from "@/lib/growth/sendr/growth-sendr-branding"
 import { GROWTH_SENDR_INTELLIGENCE_QA_MARKER } from "@/lib/growth/sendr/growth-sendr-config"
 
 type WorkspaceResponse = {
@@ -37,13 +38,13 @@ export function GrowthSendrWorkspaceHome() {
       const res = await fetch("/api/platform/growth/sendr/workspace", { cache: "no-store" })
       const data = (await res.json()) as WorkspaceResponse
       if (!res.ok) {
-        setError(data.message ?? "SENDR workspace unavailable")
+        setError(data.message ?? `${GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL} workspace unavailable`)
         setSummary(null)
         return
       }
       setSummary(data.summary ?? null)
     } catch {
-      setError("SENDR workspace unavailable")
+      setError(`${GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL} workspace unavailable`)
       setSummary(null)
     } finally {
       setLoading(false)
@@ -64,6 +65,18 @@ export function GrowthSendrWorkspaceHome() {
           <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             Refresh
+          </Button>
+          <Button size="sm" variant="outline" asChild>
+            <Link href="/growth/sendr/activity">
+              <Activity className="mr-1 h-4 w-4" />
+              Activity
+            </Link>
+          </Button>
+          <Button size="sm" variant="outline" asChild>
+            <Link href="/growth/sendr/analytics">
+              <BarChart3 className="mr-1 h-4 w-4" />
+              Analytics
+            </Link>
           </Button>
           <Button size="sm" asChild>
             <Link href="/growth/sendr/launch">
@@ -156,14 +169,14 @@ export function GrowthSendrWorkspaceHome() {
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               {summary.intelligence.highIntentProspects.length === 0 ? (
-                <p className="text-muted-foreground">No high-intent SENDR prospects yet.</p>
+                <p className="text-muted-foreground">No high-intent prospects yet.</p>
               ) : (
                 summary.intelligence.highIntentProspects.map((prospect) => (
                   <div key={prospect.leadId} className="rounded-md border p-2">
                     <p className="font-medium">{prospect.contactName ?? prospect.companyName ?? prospect.leadId}</p>
                     <p className="text-xs text-muted-foreground">
                       Score {prospect.intentScore} ({prospect.intentLevel}) ·{" "}
-                      {prospect.landingPageTitle ?? "SENDR page"}
+                      {prospect.landingPageTitle ?? GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL}
                     </p>
                     {prospect.recommendations[0] ? (
                       <p className="mt-1 text-xs">{prospect.recommendations[0].title}</p>

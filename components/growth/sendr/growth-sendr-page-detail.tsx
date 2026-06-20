@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { GROWTH_SENDR_LANDING_PAGE_SECTION_TYPES } from "@/lib/growth/sendr/growth-sendr-config"
+import { buildSendrPagePublicLink, buildSendrPagePublicPath } from "@/lib/growth/sendr/growth-sendr-slug-runtime"
 import type {
   GrowthSendrBookingAsset,
   GrowthSendrLandingPage,
@@ -102,7 +103,9 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
     const slug = currentPage?.publishedSlug ?? currentPage?.slug
     const link =
       detail?.publicLink ??
-      (slug ? `${window.location.origin}/sendr/${slug}` : `${window.location.origin}/sendr/${pageId}`)
+      (slug
+        ? buildSendrPagePublicLink(slug, window.location.origin)
+        : `${window.location.origin}/growth/sendr/${pageId}`)
     await navigator.clipboard.writeText(link)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -392,7 +395,7 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
           {(page.publishedSlug ?? page.slug) ? (
             <Button size="sm" variant="outline" asChild>
               <a
-                href={`/sendr/${page.publishedSlug ?? page.slug}`}
+                href={buildSendrPagePublicLink(page.publishedSlug ?? page.slug ?? "", window.location.origin)}
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -432,7 +435,7 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
                 Public link:{" "}
                 {publicLink ??
                   (page.publishedSlug ?? page.slug
-                    ? `/sendr/${page.publishedSlug ?? page.slug}`
+                    ? buildSendrPagePublicPath(page.publishedSlug ?? page.slug ?? "")
                     : "Publish to generate slug")}
               </p>
               {page.publishedAt ? (

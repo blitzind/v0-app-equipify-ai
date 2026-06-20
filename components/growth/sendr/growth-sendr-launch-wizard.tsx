@@ -14,6 +14,7 @@ import type {
   GrowthSendrLaunchRunProgress,
   GrowthSendrLaunchWorkspaceSummary,
 } from "@/lib/growth/sendr/growth-sendr-types"
+import { GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL, GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL } from "@/lib/growth/sendr/growth-sendr-branding"
 
 type WizardStep =
   | "audience"
@@ -33,7 +34,7 @@ function stepLabel(step: WizardStep): string {
     case "sequence":
       return "Sequence"
     case "page":
-      return "SENDR page"
+      return GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL
     case "preview":
       return "Preview"
     case "confirm":
@@ -235,7 +236,7 @@ export function GrowthSendrLaunchWizard() {
   }
 
   if (!summary) {
-    return <p className="text-sm text-destructive">SENDR launch workspace unavailable.</p>
+    return <p className="text-sm text-destructive">{GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL} launch workspace unavailable.</p>
   }
 
   return (

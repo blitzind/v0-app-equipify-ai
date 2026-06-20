@@ -149,13 +149,13 @@ export function GrowthSequencePatternBuilder() {
 
   return (
     <div className="space-y-6" data-sequence-voice-drop-builder-qa={GROWTH_SEQUENCE_VOICE_DROP_VD_3_QA_MARKER}>
-      <GrowthEngineCard title="SENDR sequence bridge">
+      <GrowthEngineCard title="Personalized video sequence bridge">
         <p className="text-sm text-muted-foreground">
           Insert <code className="rounded bg-muted px-1">{"{{sendr_page_url}}"}</code> in email step instructions
-          or templates. Resolves at send time to the published SENDR page URL when a page is attached to the sequence.
+          or templates. Resolves at send time to the published personalized video page URL when a page is attached to the sequence.
         </p>
         <p className="mt-2 text-xs text-muted-foreground" data-qa-marker={GROWTH_SENDR_SEQUENCE_BRIDGE_QA_MARKER}>
-          Attach pages from Audience enrollment or the SENDR sequence-links API — operator-initiated only.
+          Attach pages from Audience enrollment or the sequence-links API — operator-initiated only.
         </p>
       </GrowthEngineCard>
 

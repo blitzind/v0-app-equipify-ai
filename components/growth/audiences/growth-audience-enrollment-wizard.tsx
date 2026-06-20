@@ -25,7 +25,7 @@ import type {
   GrowthAudienceEnrollmentRunProgress,
 } from "@/lib/growth/audiences/growth-audience-types"
 import type { GrowthSequencePattern } from "@/lib/growth/sequence-types"
-import type { GrowthSendrAssetPickerItem } from "@/lib/growth/sendr/growth-sendr-types"
+import { GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL } from "@/lib/growth/sendr/growth-sendr-branding"
 import { GrowthSendrAssetPickerPanel } from "@/components/growth/sendr/growth-sendr-asset-picker-panel"
 
 type WizardStep = "configure" | "preview" | "confirm" | "enrolling" | "done"
@@ -217,7 +217,7 @@ export function GrowthAudienceEnrollmentWizard({
               <Switch id="dry-run" checked={dryRun} onCheckedChange={setDryRun} />
             </div>
             <div className="space-y-2">
-              <Label>Attach SENDR page (optional)</Label>
+              <Label>Attach {GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL.toLowerCase()} (optional)</Label>
               <p className="text-xs text-muted-foreground">
                 Links a published page to the sequence for {"{{sendr_page_url}}"} resolution — never auto-launches.
               </p>
@@ -290,7 +290,7 @@ export function GrowthAudienceEnrollmentWizard({
             </div>
             {preview.sendrPageAttachment ? (
               <div className="rounded-md border p-3 text-sm">
-                <p className="font-medium">SENDR page attachment</p>
+                <p className="font-medium">{GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL} attachment</p>
                 <p>{preview.sendrPageAttachment.title}</p>
                 <p className="text-muted-foreground">Slug: {preview.sendrPageAttachment.slug ?? "—"}</p>
                 <p className="text-muted-foreground">

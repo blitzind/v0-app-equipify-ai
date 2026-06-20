@@ -15,6 +15,7 @@ import {
   Layers,
   MessageSquare,
   Phone,
+  Sparkles,
   Target,
   Users,
   Video,
@@ -90,6 +91,13 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
     label: "Content",
     items: [
       { id: "share-pages", label: "Share Pages", registryRouteId: "workspace-share-pages", icon: FileText, workspaceRoute: true },
+      {
+        id: "personalized-videos",
+        label: "Personalized Videos",
+        registryRouteId: "workspace-personalized-videos",
+        icon: Sparkles,
+        workspaceRoute: true,
+      },
       { id: "videos", label: "Videos", registryRouteId: "workspace-videos", icon: Video, workspaceRoute: true },
       { id: "media-assets", label: "Media Assets", registryRouteId: "workspace-media", icon: Layers, workspaceRoute: true },
     ],
@@ -178,6 +186,12 @@ export function isGrowthShellNavItemActive(pathname: string, item: GrowthShellNa
   }
   if (item.workspaceRoute && pathname.startsWith(`${item.href}/`)) return true
   if (item.id === "share-pages" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/share-pages`)) {
+    return true
+  }
+  if (
+    item.id === "personalized-videos" &&
+    pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/sendr`)
+  ) {
     return true
   }
   if (item.id === "videos" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/videos`)) {

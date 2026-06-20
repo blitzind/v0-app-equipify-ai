@@ -1,21 +1,21 @@
 "use client"
 
-import { Rocket } from "lucide-react"
-import { GrowthSendrLaunchWizard } from "@/components/growth/sendr/growth-sendr-launch-wizard"
+import { Activity } from "lucide-react"
+import { GrowthSendrActivityDashboard } from "@/components/growth/sendr/growth-sendr-activity-dashboard"
 import { GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL } from "@/lib/growth/sendr/growth-sendr-branding"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
-export default function GrowthSendrLaunchPage() {
+export default function GrowthSendrActivityPage() {
   return (
     <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
-        title={`${GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL} Launch`}
-        description="Guided operator workflow — audience, sequence, personalized video page, preview, confirm, enroll. No autonomous sends."
-        icon={Rocket}
+        title={`${GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL} Activity`}
+        description="Prospect activity timeline and follow-up workspace — read-only intelligence, operator-driven actions."
+        icon={Activity}
         iconClassName="bg-fuchsia-50 text-fuchsia-600"
       />
-      <GrowthSendrLaunchWizard />
+      <GrowthSendrActivityDashboard />
     </GrowthWorkspacePageContent>
   )
 }

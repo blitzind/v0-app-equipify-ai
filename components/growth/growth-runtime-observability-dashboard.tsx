@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL } from "@/lib/growth/sendr/growth-sendr-branding"
 
 type ObservabilityResponse = {
   ok: boolean
@@ -93,6 +94,14 @@ type ObservabilityResponse = {
       launchFailuresToday: number
       launchThrottlesToday: number
       membersEnrolledViaLaunchesToday: number
+      analyticsLoadsToday: number
+      dashboardRefreshesToday: number
+      analyticsFailuresToday: number
+      analyticsThrottlesToday: number
+      activityLoadsToday: number
+      feedRefreshesToday: number
+      activityFailuresToday: number
+      activityThrottlesToday: number
       rowsReadToday: number
       rowsWrittenToday: number
       failuresToday: number
@@ -393,11 +402,11 @@ export function GrowthRuntimeObservabilityDashboard() {
       {snapshot.sendr ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Personalized Media (SENDR)</CardTitle>
+            <CardTitle className="text-base">{GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             {!snapshot.sendr.schemaReady ? (
-              <p className="text-muted-foreground">SENDR schema not ready — apply GS-SENDR-2A migration.</p>
+              <p className="text-muted-foreground">Personalized Videos schema not ready — apply the personalized media runtime migration.</p>
             ) : (
               <>
                 <div className="flex justify-between">
@@ -471,6 +480,34 @@ export function GrowthRuntimeObservabilityDashboard() {
                 <div className="flex justify-between">
                   <span>Members enrolled via launches</span>
                   <span>{snapshot.sendr.membersEnrolledViaLaunchesToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Analytics loads today</span>
+                  <span>{snapshot.sendr.analyticsLoadsToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Dashboard refreshes today</span>
+                  <span>{snapshot.sendr.dashboardRefreshesToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Analytics failures / throttles</span>
+                  <span>
+                    {snapshot.sendr.analyticsFailuresToday} / {snapshot.sendr.analyticsThrottlesToday}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Activity loads today</span>
+                  <span>{snapshot.sendr.activityLoadsToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Feed refreshes today</span>
+                  <span>{snapshot.sendr.feedRefreshesToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Activity failures / throttles</span>
+                  <span>
+                    {snapshot.sendr.activityFailuresToday} / {snapshot.sendr.activityThrottlesToday}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Rows read / written</span>

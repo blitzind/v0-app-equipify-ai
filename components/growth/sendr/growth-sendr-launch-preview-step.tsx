@@ -2,6 +2,9 @@
 
 import { Loader2 } from "lucide-react"
 import type { GrowthSendrLaunchPreviewResult } from "@/lib/growth/sendr/growth-sendr-types"
+import {
+  GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL,
+} from "@/lib/growth/sendr/growth-sendr-branding"
 
 type Props = {
   preview: GrowthSendrLaunchPreviewResult | null
@@ -35,7 +38,7 @@ export function GrowthSendrLaunchPreviewStep({ preview, loading, error }: Props)
   if (!preview) {
     return (
       <p className="text-sm text-muted-foreground">
-        Continue to load member counts, SENDR URL, and sample variables.
+        Continue to load member counts, personalized video URL, and sample variables.
       </p>
     )
   }
@@ -58,7 +61,7 @@ export function GrowthSendrLaunchPreviewStep({ preview, loading, error }: Props)
 
       {preview.sendrPageUrl ? (
         <div className="space-y-1">
-          <p className="text-xs font-medium uppercase text-muted-foreground">SENDR page URL</p>
+          <p className="text-xs font-medium uppercase text-muted-foreground">{GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL} URL</p>
           <p className="break-all text-sm">{preview.sendrPageUrl}</p>
         </div>
       ) : null}

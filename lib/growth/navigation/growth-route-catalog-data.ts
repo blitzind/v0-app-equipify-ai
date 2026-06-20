@@ -196,6 +196,26 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     dynamic: true,
     dynamicMatch: /^automation\/[^/]+$/,
   }),
+  workspaceDual("workspace-personalized-videos", "sendr", "Personalized Videos", "content", {
+    breadcrumbLabel: "Personalized Videos",
+  }),
+  workspaceDual("workspace-personalized-videos-new", "sendr/new", "New Personalized Video Page", "content", {
+    breadcrumbLabel: "New Page",
+  }),
+  workspaceDual("workspace-personalized-videos-detail", "sendr/[pageId]", "Personalized Video Page", "content", {
+    breadcrumbLabel: "Page Detail",
+    dynamic: true,
+    dynamicMatch: /^sendr\/[^/]+$/,
+  }),
+  workspaceDual("workspace-personalized-videos-activity", "sendr/activity", "Personalized Videos Activity", "content", {
+    breadcrumbLabel: "Activity",
+  }),
+  workspaceDual("workspace-personalized-videos-analytics", "sendr/analytics", "Personalized Videos Analytics", "content", {
+    breadcrumbLabel: "Analytics",
+  }),
+  workspaceDual("workspace-personalized-videos-launch", "sendr/launch", "Personalized Videos Launch", "content", {
+    breadcrumbLabel: "Launch",
+  }),
   workspaceDual("workspace-videos", "videos", "Videos", "content", {
     breadcrumbLabel: "Videos",
   }),
