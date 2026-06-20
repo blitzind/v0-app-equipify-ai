@@ -25,7 +25,9 @@ import type {
   GrowthSendrLandingPageSection,
   GrowthSendrPersonalizationPreviewResult,
   GrowthSendrVideoAsset,
+  GrowthSendrAssetPickerItem,
 } from "@/lib/growth/sendr/growth-sendr-types"
+import { GrowthSendrAssetPickerPanel } from "@/components/growth/sendr/growth-sendr-asset-picker-panel"
 
 type DetailResponse = {
   ok: boolean
@@ -172,6 +174,58 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
         return
       }
       setPreview(data.preview ?? null)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function attachExistingVideo(item: GrowthSendrAssetPickerItem) {
+    if (item.assetKind !== "video") return
+    setBusy(true)
+    setMessage(null)
+    try {
+      const attachRes = await fetch("/api/platform/growth/sendr/video-assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "attach",
+          landingPageId: pageId,
+          videoAssetId: item.id,
+        }),
+      })
+      const attachData = (await attachRes.json()) as { ok: boolean; message?: string }
+      if (!attachRes.ok) {
+        setMessage(attachData.message ?? "Video attach failed")
+        return
+      }
+      setMessage("Existing video attached")
+      void load()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function attachExistingBooking(item: GrowthSendrAssetPickerItem) {
+    if (item.assetKind !== "booking") return
+    setBusy(true)
+    setMessage(null)
+    try {
+      const attachRes = await fetch("/api/platform/growth/sendr/booking-assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "attach",
+          landingPageId: pageId,
+          bookingAssetId: item.id,
+        }),
+      })
+      const attachData = (await attachRes.json()) as { ok: boolean; message?: string }
+      if (!attachRes.ok) {
+        setMessage(attachData.message ?? "Booking attach failed")
+        return
+      }
+      setMessage("Existing booking attached")
+      void load()
     } finally {
       setBusy(false)
     }
@@ -510,6 +564,12 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
               <Button size="sm" disabled={busy} onClick={() => void registerAndAttachVideo()}>
                 Register & attach video
               </Button>
+              <GrowthSendrAssetPickerPanel
+                kind="video"
+                selectedId={videoAsset?.id}
+                disabled={busy}
+                onSelect={(item) => void attachExistingVideo(item)}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -544,6 +604,12 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
               <Button size="sm" disabled={busy} onClick={() => void registerAndAttachBooking()}>
                 Register & attach booking
               </Button>
+              <GrowthSendrAssetPickerPanel
+                kind="booking"
+                selectedId={bookingAsset?.id}
+                disabled={busy}
+                onSelect={(item) => void attachExistingBooking(item)}
+              />
             </CardContent>
           </Card>
         </TabsContent>

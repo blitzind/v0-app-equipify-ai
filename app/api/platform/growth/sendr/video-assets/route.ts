@@ -13,7 +13,7 @@ import {
 export const runtime = "nodejs"
 
 const BodySchema = z.object({
-  action: z.enum(["register", "update_metadata", "attach"]).optional(),
+  action: z.enum(["register", "update_metadata", "attach", "attach_existing"]).optional(),
   videoAssetId: z.string().uuid().optional(),
   landingPageId: z.string().uuid().optional(),
   mediaAssetId: z.string().uuid().optional(),
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, videoAsset, qa_marker: GROWTH_SENDR_WORKSPACE_QA_MARKER })
     }
 
-    if (action === "attach") {
+    if (action === "attach" || action === "attach_existing") {
       if (!parsed.data.landingPageId || !parsed.data.videoAssetId) {
         return NextResponse.json({ ok: false, error: "attach_fields_required" }, { status: 400 })
       }

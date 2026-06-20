@@ -25,6 +25,8 @@ import type {
   GrowthAudienceEnrollmentRunProgress,
 } from "@/lib/growth/audiences/growth-audience-types"
 import type { GrowthSequencePattern } from "@/lib/growth/sequence-types"
+import type { GrowthSendrAssetPickerItem } from "@/lib/growth/sendr/growth-sendr-types"
+import { GrowthSendrAssetPickerPanel } from "@/components/growth/sendr/growth-sendr-asset-picker-panel"
 
 type WizardStep = "configure" | "preview" | "confirm" | "enrolling" | "done"
 
@@ -55,6 +57,8 @@ export function GrowthAudienceEnrollmentWizard({
   const [preview, setPreview] = useState<GrowthAudienceEnrollmentPreviewProgress | null>(null)
   const [enrollProgress, setEnrollProgress] = useState<GrowthAudienceEnrollmentRunProgress | null>(null)
   const [enrollMode, setEnrollMode] = useState<"selected" | "eligible">("eligible")
+  const [sendrPageId, setSendrPageId] = useState<string>("")
+  const [sendrPageLabel, setSendrPageLabel] = useState<string>("")
 
   const reset = useCallback(() => {
     setStep("configure")
@@ -82,7 +86,10 @@ export function GrowthAudienceEnrollmentWizard({
       const res = await fetch(`/api/platform/growth/audiences/${audienceId}/enrollment-preview`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          ...body,
+          sendrLandingPageId: sendrPageId || undefined,
+        }),
       })
       const data = (await res.json()) as {
         ok: boolean
@@ -158,6 +165,7 @@ export function GrowthAudienceEnrollmentWizard({
         memberIds: enrollMode === "selected" ? selectedMemberIds : undefined,
         startImmediately,
         dryRun,
+        sendrLandingPageId: sendrPageId || undefined,
       })
       setStep("done")
       onComplete?.(
@@ -208,6 +216,36 @@ export function GrowthAudienceEnrollmentWizard({
               <Label htmlFor="dry-run">Dry run (no writes)</Label>
               <Switch id="dry-run" checked={dryRun} onCheckedChange={setDryRun} />
             </div>
+            <div className="space-y-2">
+              <Label>Attach SENDR page (optional)</Label>
+              <p className="text-xs text-muted-foreground">
+                Links a published page to the sequence for {"{{sendr_page_url}}"} resolution — never auto-launches.
+              </p>
+              {sendrPageLabel ? (
+                <p className="text-sm">
+                  Selected: <span className="font-medium">{sendrPageLabel}</span>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="ml-2 h-auto p-0"
+                    onClick={() => {
+                      setSendrPageId("")
+                      setSendrPageLabel("")
+                    }}
+                  >
+                    Clear
+                  </Button>
+                </p>
+              ) : null}
+              <GrowthSendrAssetPickerPanel
+                kind="landing_page"
+                selectedId={sendrPageId || null}
+                onSelect={(item: GrowthSendrAssetPickerItem) => {
+                  setSendrPageId(item.id)
+                  setSendrPageLabel(item.name)
+                }}
+              />
+            </div>
           </div>
         ) : null}
 
@@ -250,6 +288,26 @@ export function GrowthAudienceEnrollmentWizard({
                 </SelectContent>
               </Select>
             </div>
+            {preview.sendrPageAttachment ? (
+              <div className="rounded-md border p-3 text-sm">
+                <p className="font-medium">SENDR page attachment</p>
+                <p>{preview.sendrPageAttachment.title}</p>
+                <p className="text-muted-foreground">Slug: {preview.sendrPageAttachment.slug ?? "—"}</p>
+                <p className="text-muted-foreground">
+                  Published:{" "}
+                  {preview.sendrPageAttachment.publishedAt
+                    ? new Date(preview.sendrPageAttachment.publishedAt).toLocaleString()
+                    : "—"}
+                </p>
+                <p className="text-muted-foreground">
+                  Video: {preview.sendrPageAttachment.videoAssetId ?? "none"} · Booking:{" "}
+                  {preview.sendrPageAttachment.bookingAssetId ?? "none"}
+                </p>
+                {preview.sendrPageAttachment.publicUrl ? (
+                  <p className="truncate text-xs text-muted-foreground">{preview.sendrPageAttachment.publicUrl}</p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
 

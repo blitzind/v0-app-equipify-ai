@@ -26,6 +26,10 @@ import {
 import type { GrowthAudienceEnrollmentRunProgress } from "@/lib/growth/audiences/growth-audience-types"
 import { bulkEnrollLeadsInGrowthSequence } from "@/lib/growth/sequence-enrollment/bulk-sequence-enrollment"
 import { recordRuntimeHealthRead, recordRuntimeHealthWrite } from "@/lib/growth/runtime-guardrails/growth-runtime-health-counter-service"
+import {
+  attachSendrPageOnAudienceEnrollment,
+  buildSendrEnrollmentPageAttachment,
+} from "@/lib/growth/sendr/growth-sendr-audience-enrollment-bridge-service"
 
 type RunCursor = { leadOffset: number }
 
@@ -116,6 +120,7 @@ export async function startAudienceEnrollmentRun(
     enrollAll?: boolean
     startImmediately?: boolean
     dryRun?: boolean
+    sendrLandingPageId?: string | null
   },
 ): Promise<GrowthAudienceEnrollmentRunProgress> {
   const enabled = await checkAudienceEnrollmentEnabled(admin)
@@ -166,6 +171,21 @@ export async function startAudienceEnrollmentRun(
     dryRun: input.dryRun ?? false,
     initiatedBy: input.userId,
   })
+
+  if (input.sendrLandingPageId && !input.dryRun) {
+    try {
+      await attachSendrPageOnAudienceEnrollment(admin, {
+        organizationId: input.organizationId,
+        landingPageId: input.sendrLandingPageId,
+        sequencePatternId: input.sequencePatternId,
+        enrollmentRunId: run.id,
+        attachedBy: input.userId,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "sendr_attach_failed"
+      await recordAudienceGuardrailFailure(admin, message)
+    }
+  }
 
   return processAudienceEnrollmentRunBatch(admin, {
     runId: run.id,

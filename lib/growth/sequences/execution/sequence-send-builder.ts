@@ -14,6 +14,10 @@ import { isApolloEmailPlaceholderContent } from "@/lib/growth/apollo/apollo-sequ
 import { getApprovedPersonalizationForJob } from "@/lib/growth/personalization/dashboard"
 import type { GrowthSequenceSendPayload } from "@/lib/growth/sequences/execution/sequence-execution-types"
 import {
+  applySendrPageUrlMergeFields,
+  resolveSendrPageUrlForSequenceStep,
+} from "@/lib/growth/sendr/growth-sendr-sequence-bridge-service"
+import {
   applySequenceVideoAttachmentToEmailHtml,
   wireApprovedSequenceVideoAttachment,
 } from "@/lib/growth/sequences/growth-sequence-video-send-builder-service"
@@ -169,6 +173,17 @@ export async function buildSequenceExecutionSendPayload(
   body = experimentOverlay.body
   sender.senderAccountId = experimentOverlay.senderAccountId
   sender.providerId = experimentOverlay.providerId
+
+  if (lead.promotedOrganizationId) {
+    const sendrPageUrl = await resolveSendrPageUrlForSequenceStep(admin, {
+      organizationId: lead.promotedOrganizationId,
+      sequencePatternStepId: step.sequencePatternStepId,
+    })
+    if (sendrPageUrl) {
+      subject = applySendrPageUrlMergeFields(subject, sendrPageUrl)
+      body = applySendrPageUrlMergeFields(body, sendrPageUrl)
+    }
+  }
 
   let html = sanitizeHtml(`<div>${body.replace(/\n/g, "<br/>")}</div>${UNSUBSCRIBE_FOOTER}`)
   if (input.deliveryAttemptId && process.env.GROWTH_TRACKING_DISABLED?.trim() !== "true") {

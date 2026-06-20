@@ -1,5 +1,5 @@
 /**
- * GS-SENDR-2C — SENDR observability certification.
+ * GS-SENDR-2E — SENDR observability certification.
  * Run: pnpm test:growth-sendr-observability
  */
 import assert from "node:assert/strict"
@@ -11,20 +11,22 @@ function readSource(relativePath: string): string {
 }
 
 function main(): void {
-  console.log("\n=== GS-SENDR-2C Observability Certification ===\n")
+  console.log("\n=== GS-SENDR-2E Observability Certification ===\n")
 
   const observability = readSource("lib/growth/sendr/growth-sendr-observability.ts")
-  assert.match(observability, /publicPageViewsToday/)
-  assert.match(observability, /ctaClicksToday/)
-  assert.match(observability, /countGrowthSendrEngagementEventsByTypeToday/)
+  assert.match(observability, /pagesLinkedToday/)
+  assert.match(observability, /intentCalculationsToday/)
+  assert.match(observability, /recommendationsGeneratedToday/)
+  assert.match(observability, /timelineWritesToday/)
 
   const dashboard = readSource("components/growth/growth-runtime-observability-dashboard.tsx")
-  assert.match(dashboard, /Public page views today/)
-  assert.match(dashboard, /CTA clicks today/)
+  assert.match(dashboard, /Intent calculations today/)
+  assert.match(dashboard, /Recommendations generated/)
+  assert.match(dashboard, /Timeline writes today/)
   assert.doesNotMatch(dashboard, /setInterval/)
 
-  console.log("  ✓ Runtime dashboard extended for public SENDR metrics")
-  console.log("\nGS-SENDR-2C observability certification passed.\n")
+  console.log("  ✓ Runtime dashboard extended for SENDR intelligence metrics")
+  console.log("\nGS-SENDR-2E observability certification passed.\n")
 }
 
 main()

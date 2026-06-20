@@ -72,8 +72,8 @@ export async function recordSendrLandingPageViewedTimeline(
   await recordSendrTimelineEvent(admin, {
     ...input,
     eventType: "landing_page_viewed",
-    title: "Landing page viewed",
-    summary: input.pageUrl ? `Viewed SENDR page (${input.pageUrl})` : "Viewed personalized landing page.",
+    title: "SENDR page viewed",
+    summary: input.pageUrl ? `Viewed SENDR page (${input.pageUrl})` : "Viewed SENDR personalized landing page.",
   })
 }
 
@@ -84,7 +84,7 @@ export async function recordSendrVideoStartedTimeline(
   await recordSendrTimelineEvent(admin, {
     ...input,
     eventType: "video_started",
-    title: "Video started",
+    title: "SENDR video started",
     summary: "Started video on SENDR landing page.",
   })
 }
@@ -96,7 +96,7 @@ export async function recordSendrVideoCompletedTimeline(
   await recordSendrTimelineEvent(admin, {
     ...input,
     eventType: "video_completed",
-    title: "Video completed",
+    title: "SENDR video completed",
     summary: "Completed video on SENDR landing page.",
   })
 }
@@ -108,8 +108,8 @@ export async function recordSendrCtaClickedTimeline(
   await recordSendrTimelineEvent(admin, {
     ...input,
     eventType: "cta_clicked",
-    title: "CTA clicked",
-    summary: input.ctaLabel ? `Clicked "${input.ctaLabel}"` : "Clicked call-to-action on landing page.",
+    title: "SENDR CTA clicked",
+    summary: input.ctaLabel ? `Clicked "${input.ctaLabel}" on SENDR page` : "Clicked call-to-action on SENDR page.",
   })
 }
 
@@ -120,7 +120,7 @@ export async function recordSendrBookingStartedTimeline(
   await recordSendrTimelineEvent(admin, {
     ...input,
     eventType: "booking_started",
-    title: "Booking started",
+    title: "SENDR booking started",
     summary: "Started booking flow from SENDR landing page.",
   })
 }
@@ -132,7 +132,7 @@ export async function recordSendrBookingCompletedTimeline(
   await recordSendrTimelineEvent(admin, {
     ...input,
     eventType: "booking_completed",
-    title: "Booking completed",
+    title: "SENDR booking completed",
     summary: "Completed booking from SENDR landing page.",
   })
 }

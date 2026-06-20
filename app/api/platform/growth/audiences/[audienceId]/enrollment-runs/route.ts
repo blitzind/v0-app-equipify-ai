@@ -25,6 +25,7 @@ const BodySchema = z.object({
   dryRun: z.boolean().optional(),
   runId: z.string().uuid().optional(),
   cancel: z.boolean().optional(),
+  sendrLandingPageId: z.string().uuid().optional(),
 })
 
 type RouteContext = { params: Promise<{ audienceId: string }> }
@@ -75,6 +76,7 @@ export async function POST(request: Request, context: RouteContext) {
         enrollAll: parsed.data.enrollAll,
         startImmediately: parsed.data.startImmediately,
         dryRun: parsed.data.dryRun,
+        sendrLandingPageId: parsed.data.sendrLandingPageId,
       })
     }
 

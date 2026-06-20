@@ -9,6 +9,8 @@ import {
 } from "@/lib/growth/sendr/growth-sendr-engagement-event-service"
 import { countGrowthSendrLandingPagesPublishedToday } from "@/lib/growth/sendr/growth-sendr-landing-page-repository"
 import { countGrowthSendrMediaAssetsCreatedToday } from "@/lib/growth/sendr/growth-sendr-media-asset-repository"
+import { countSendrLinksCreatedToday, countSendrTimelineEventsToday } from "@/lib/growth/sendr/growth-sendr-sequence-link-repository"
+import { countSendrIntelligenceUpdatesToday } from "@/lib/growth/sendr/growth-sendr-timeline-intelligence-service"
 import { probeSendrSchemaReady } from "@/lib/growth/sendr/growth-sendr-schema-health"
 import type { GrowthSendrObservabilitySnapshot } from "@/lib/growth/sendr/growth-sendr-types"
 import { countGrowthSendrVideoEventsToday } from "@/lib/growth/sendr/growth-sendr-video-runtime-repository"
@@ -31,6 +33,12 @@ export async function getGrowthSendrObservabilitySnapshot(
     bookingsToday: 0,
     ctaClicksToday: 0,
     agentEventsToday: 0,
+    pagesLinkedToday: 0,
+    urlResolutionsToday: 0,
+    timelineEventsToday: 0,
+    intentCalculationsToday: 0,
+    recommendationsGeneratedToday: 0,
+    timelineWritesToday: 0,
     rowsReadToday: 0,
     rowsWrittenToday: 0,
     failuresToday: 0,
@@ -51,6 +59,9 @@ export async function getGrowthSendrObservabilitySnapshot(
       ctaClicksToday,
       agentEventsToday,
       engagementEventsToday,
+      pagesLinkedToday,
+      timelineEventsToday,
+      intentCalculationsToday,
     ] = await Promise.all([
       countGrowthSendrMediaAssetsCreatedToday(admin, input.organizationId, dayStart),
       countGrowthSendrLandingPagesPublishedToday(admin, input.organizationId, dayStart),
@@ -60,6 +71,9 @@ export async function getGrowthSendrObservabilitySnapshot(
       countGrowthSendrEngagementEventsByTypeToday(admin, input.organizationId, dayStart, "cta_click"),
       countGrowthSendrAgentEventsToday(admin, input.organizationId, dayStart),
       countGrowthSendrEngagementEventsToday(admin, input.organizationId, dayStart),
+      countSendrLinksCreatedToday(admin, input.organizationId, dayStart),
+      countSendrTimelineEventsToday(admin, input.organizationId, dayStart),
+      countSendrIntelligenceUpdatesToday(admin, input.organizationId, dayStart),
     ])
 
     return {
@@ -71,8 +85,19 @@ export async function getGrowthSendrObservabilitySnapshot(
       bookingsToday,
       ctaClicksToday,
       agentEventsToday,
-      rowsReadToday: engagementEventsToday * 2,
-      rowsWrittenToday: engagementEventsToday + assetsCreatedToday + pagesPublishedToday,
+      pagesLinkedToday,
+      urlResolutionsToday: publicPageViewsToday,
+      timelineEventsToday,
+      intentCalculationsToday,
+      recommendationsGeneratedToday: intentCalculationsToday,
+      timelineWritesToday: timelineEventsToday,
+      rowsReadToday: engagementEventsToday * 2 + pagesLinkedToday + intentCalculationsToday,
+      rowsWrittenToday:
+        engagementEventsToday +
+        assetsCreatedToday +
+        pagesPublishedToday +
+        pagesLinkedToday +
+        intentCalculationsToday,
       failuresToday: 0,
       throttlesToday: 0,
     }

@@ -25,6 +25,7 @@ import {
 import type { GrowthAudienceEnrollmentPreviewProgress } from "@/lib/growth/audiences/growth-audience-types"
 import type { GrowthAudienceEnrollmentPreviewCategory } from "@/lib/growth/audiences/growth-audience-config"
 import { recordRuntimeHealthRead, recordRuntimeHealthWrite } from "@/lib/growth/runtime-guardrails/growth-runtime-health-counter-service"
+import { buildSendrEnrollmentPageAttachment } from "@/lib/growth/sendr/growth-sendr-audience-enrollment-bridge-service"
 
 type PreviewCursor = { offset: number }
 
@@ -45,6 +46,7 @@ function decodePreviewCursor(raw: string | null): PreviewCursor {
 function buildPreviewProgress(
   preview: Awaited<ReturnType<typeof getGrowthAudienceEnrollmentPreview>>,
   hasMore: boolean,
+  sendrPageAttachment?: GrowthAudienceEnrollmentPreviewProgress["sendrPageAttachment"],
 ): GrowthAudienceEnrollmentPreviewProgress {
   if (!preview) throw new Error("preview_missing")
   return {
@@ -62,7 +64,18 @@ function buildPreviewProgress(
     rowsWritten: preview.rowsWritten,
     durationMs: preview.durationMs,
     error: preview.error,
+    sendrPageAttachment: sendrPageAttachment ?? null,
   }
+}
+
+async function enrichPreviewProgress(
+  admin: SupabaseClient,
+  progress: GrowthAudienceEnrollmentPreviewProgress,
+  sendrLandingPageId?: string | null,
+): Promise<GrowthAudienceEnrollmentPreviewProgress> {
+  if (!sendrLandingPageId || progress.hasMore) return progress
+  const attachment = await buildSendrEnrollmentPageAttachment(admin, sendrLandingPageId)
+  return { ...progress, sendrPageAttachment: attachment }
 }
 
 export async function startAudienceEnrollmentPreview(
@@ -73,6 +86,7 @@ export async function startAudienceEnrollmentPreview(
     userId: string
     snapshotId: string
     sequencePatternId: string
+    sendrLandingPageId?: string | null
   },
 ): Promise<GrowthAudienceEnrollmentPreviewProgress> {
   const enabled = await checkAudiencePreviewEnabled(admin)
@@ -109,7 +123,7 @@ export async function startAudienceEnrollmentPreview(
     initiatedBy: input.userId,
   })
 
-  return processAudienceEnrollmentPreviewBatch(admin, {
+  const progress = await processAudienceEnrollmentPreviewBatch(admin, {
     previewId: preview.id,
     audienceId: input.audienceId,
     organizationId: input.organizationId,
@@ -117,6 +131,7 @@ export async function startAudienceEnrollmentPreview(
     sequencePatternId: input.sequencePatternId,
     startedAt: Date.now(),
   })
+  return enrichPreviewProgress(admin, progress, input.sendrLandingPageId)
 }
 
 export async function continueAudienceEnrollmentPreview(
@@ -126,6 +141,7 @@ export async function continueAudienceEnrollmentPreview(
     organizationId: string
     previewId: string
     sequencePatternId: string
+    sendrLandingPageId?: string | null
   },
 ): Promise<GrowthAudienceEnrollmentPreviewProgress> {
   const preview = await getGrowthAudienceEnrollmentPreview(admin, input.previewId)
@@ -136,7 +152,7 @@ export async function continueAudienceEnrollmentPreview(
     return buildPreviewProgress(preview, false)
   }
 
-  return processAudienceEnrollmentPreviewBatch(admin, {
+  const progress = await processAudienceEnrollmentPreviewBatch(admin, {
     previewId: preview.id,
     audienceId: input.audienceId,
     organizationId: input.organizationId,
@@ -144,6 +160,7 @@ export async function continueAudienceEnrollmentPreview(
     sequencePatternId: input.sequencePatternId,
     startedAt: Date.now() - (preview.durationMs ?? 0),
   })
+  return enrichPreviewProgress(admin, progress, input.sendrLandingPageId)
 }
 
 async function processAudienceEnrollmentPreviewBatch(

@@ -22,6 +22,12 @@ const KILL_SWITCH_MAP: Partial<Record<GrowthRuntimeResourceType, GrowthRuntimeKi
   agent_events: "agent_tracking_enabled",
   bookings: "booking_tracking_enabled",
   page_views: "landing_pages_enabled",
+  sendr_page_links: "sendr_sequence_bridge_enabled",
+  sendr_url_resolutions: "sendr_sequence_bridge_enabled",
+  sendr_timeline_events: "sendr_timeline_enabled",
+  sendr_intelligence: "sendr_intelligence_enabled",
+  sendr_recommendations: "sendr_recommendations_enabled",
+  sendr_timeline_updates: "sendr_intelligence_enabled",
 }
 
 export async function checkSendrKillSwitch(

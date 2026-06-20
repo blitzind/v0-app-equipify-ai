@@ -11,6 +11,7 @@ import type {
   GrowthSendrMediaAsset,
   GrowthSendrWorkspaceSummary,
 } from "@/lib/growth/sendr/growth-sendr-types"
+import { GROWTH_SENDR_INTELLIGENCE_QA_MARKER } from "@/lib/growth/sendr/growth-sendr-config"
 
 type WorkspaceResponse = {
   ok: boolean
@@ -74,6 +75,118 @@ export function GrowthSendrWorkspaceHome() {
       </div>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+      {summary?.metrics ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Published pages</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-semibold">{summary.metrics.publishedPagesTotal}</p>
+              <p className="text-xs text-muted-foreground">
+                {summary.metrics.viewsToday} views · {summary.metrics.ctaClicksToday} CTA clicks today
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Attached to sequences</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-semibold">{summary.metrics.attachedToSequencesCount}</p>
+              <p className="text-xs text-muted-foreground">
+                {summary.metrics.activeSequenceCount} active sequences
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Top pages (today)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1 text-xs">
+              {summary.metrics.topPages.length === 0 ? (
+                <p className="text-muted-foreground">No engagement yet.</p>
+              ) : (
+                summary.metrics.topPages.map((page) => (
+                  <div key={page.landingPageId} className="flex justify-between gap-2">
+                    <span className="truncate">{page.title}</span>
+                    <span className="shrink-0 text-muted-foreground">
+                      {page.views}v · {page.ctaRate}% CTA
+                    </span>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
+      {summary?.intelligence ? (
+        <div className="grid gap-4 lg:grid-cols-3" data-qa-marker={GROWTH_SENDR_INTELLIGENCE_QA_MARKER}>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Top performing pages</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {summary.intelligence.topPerformingPages.length === 0 ? (
+                <p className="text-muted-foreground">No page engagement yet.</p>
+              ) : (
+                summary.intelligence.topPerformingPages.map((page) => (
+                  <div key={page.landingPageId} className="rounded-md border p-2">
+                    <p className="font-medium">{page.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {page.pageViews} views · {page.bookingCompletes} bookings · {page.ctaRate}% CTA
+                    </p>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">High intent prospects</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {summary.intelligence.highIntentProspects.length === 0 ? (
+                <p className="text-muted-foreground">No high-intent SENDR prospects yet.</p>
+              ) : (
+                summary.intelligence.highIntentProspects.map((prospect) => (
+                  <div key={prospect.leadId} className="rounded-md border p-2">
+                    <p className="font-medium">{prospect.contactName ?? prospect.companyName ?? prospect.leadId}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Score {prospect.intentScore} ({prospect.intentLevel}) ·{" "}
+                      {prospect.landingPageTitle ?? "SENDR page"}
+                    </p>
+                    {prospect.recommendations[0] ? (
+                      <p className="mt-1 text-xs">{prospect.recommendations[0].title}</p>
+                    ) : null}
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Pages needing attention</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {summary.intelligence.pagesNeedingAttention.length === 0 ? (
+                <p className="text-muted-foreground">All pages performing within expected ranges.</p>
+              ) : (
+                summary.intelligence.pagesNeedingAttention.map((page) => (
+                  <div key={page.landingPageId} className="rounded-md border p-2">
+                    <p className="font-medium">{page.title}</p>
+                    <p className="text-xs text-muted-foreground">{page.attentionReason}</p>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
 
       {summary ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

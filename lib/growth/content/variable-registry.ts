@@ -67,6 +67,15 @@ export const DEFAULT_CONTENT_VARIABLE_SEED: Array<
     fallbackToken: "[booking link]",
   },
   {
+    variableKey: "sendr.page_url",
+    label: "SENDR page URL",
+    description: "Published personalized landing page URL (resolved at send time)",
+    namespace: "sendr",
+    allowed: true,
+    exampleValue: "https://app.equipify.ai/sendr/example",
+    fallbackToken: "[sendr page]",
+  },
+  {
     variableKey: "unsubscribe.link",
     label: "Unsubscribe link",
     description: "Compliance unsubscribe URL",

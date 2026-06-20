@@ -35,6 +35,13 @@ export const GROWTH_RUNTIME_GUARDRAIL_LIMITS = {
   MAX_AGENT_EVENTS_PER_SESSION: 200,
   MAX_BOOKINGS_PER_DAY: 500,
   MAX_MEDIA_EVENT_BATCH: 500,
+  MAX_SENDR_PAGE_ATTACHMENTS_PER_SEQUENCE: 10,
+  MAX_SENDR_SEQUENCE_LINKS_PER_PAGE: 25,
+  MAX_SENDR_URL_RESOLUTIONS_PER_BATCH: 500,
+  MAX_SENDR_TIMELINE_EVENTS_PER_SESSION: 20,
+  MAX_SENDR_INTENT_RECALCULATIONS_PER_DAY: 10_000,
+  MAX_SENDR_RECOMMENDATIONS_PER_DAY: 5_000,
+  MAX_SENDR_TIMELINE_WRITES_PER_DAY: 10_000,
   MAX_ENRICHMENTS_PER_DAY: 5_000,
   MAX_SEQUENCE_ENROLLMENTS_PER_DAY: 2_000,
   MAX_AUTOMATION_EXECUTIONS_PER_DAY: 1_000,
@@ -68,6 +75,12 @@ export type GrowthRuntimeResourceType =
   | "agent_events"
   | "bookings"
   | "page_views"
+  | "sendr_page_links"
+  | "sendr_url_resolutions"
+  | "sendr_timeline_events"
+  | "sendr_intelligence"
+  | "sendr_recommendations"
+  | "sendr_timeline_updates"
 
 export type GrowthRuntimeBudgetWindowKind = "hourly" | "daily" | "monthly"
 
@@ -87,6 +100,10 @@ export type GrowthRuntimeKillSwitchKey =
   | "video_tracking_enabled"
   | "agent_tracking_enabled"
   | "booking_tracking_enabled"
+  | "sendr_sequence_bridge_enabled"
+  | "sendr_timeline_enabled"
+  | "sendr_intelligence_enabled"
+  | "sendr_recommendations_enabled"
 
 export const GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES: Record<GrowthRuntimeKillSwitchKey, boolean> = {
   wake_execution_enabled: true,
@@ -104,6 +121,10 @@ export const GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES: Record<GrowthRuntimeKillSwitc
   video_tracking_enabled: true,
   agent_tracking_enabled: true,
   booking_tracking_enabled: true,
+  sendr_sequence_bridge_enabled: true,
+  sendr_timeline_enabled: true,
+  sendr_intelligence_enabled: true,
+  sendr_recommendations_enabled: true,
 }
 
 /** Daily budget caps keyed by resource type. Zero = unlimited. */
@@ -129,6 +150,12 @@ export const GROWTH_RUNTIME_DAILY_BUDGET_CAPS: Partial<Record<GrowthRuntimeResou
   agent_events: 50_000,
   bookings: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_BOOKINGS_PER_DAY,
   page_views: 50_000,
+  sendr_page_links: 500,
+  sendr_url_resolutions: 50_000,
+  sendr_timeline_events: 10_000,
+  sendr_intelligence: 10_000,
+  sendr_recommendations: 5_000,
+  sendr_timeline_updates: 10_000,
 }
 
 /** Hourly budget caps keyed by resource type. */

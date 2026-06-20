@@ -16,12 +16,15 @@ import {
   recordSendrVideoStartedTimeline,
 } from "@/lib/growth/sendr/growth-sendr-analytics-timeline"
 import { appendGrowthSendrEngagementEvents } from "@/lib/growth/sendr/growth-sendr-engagement-event-service"
+import { consumeSendrBudget } from "@/lib/growth/sendr/growth-sendr-guardrails"
+import { syncSendrLeadTimelineIntelligence } from "@/lib/growth/sendr/growth-sendr-timeline-intelligence-service"
 import {
   resolveSendrPublicPageContext,
   type SendrPublicPageContext,
 } from "@/lib/growth/sendr/growth-sendr-public-page-service"
 import type { GrowthSendrEngagementEventInput } from "@/lib/growth/sendr/growth-sendr-types"
 import type { GrowthRuntimeResourceType } from "@/lib/growth/runtime-guardrails/growth-runtime-guardrail-config"
+import { isRuntimeKillSwitchEnabled } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
 
 export type SendrPublicEngagementEventInput = {
   eventType: GrowthSendrEngagementEventType
@@ -133,6 +136,13 @@ export async function ingestSendrPublicEngagementEvents(
   for (const event of batch) {
     if (result.accepted === 0) break
     try {
+      const timelineEnabled = await isRuntimeKillSwitchEnabled(admin, "sendr_timeline_enabled")
+      if (!timelineEnabled) continue
+      const timelineBudget = await consumeSendrBudget(admin, {
+        organizationId: ctx.organizationId,
+        resourceType: "sendr_timeline_events",
+      })
+      if (!timelineBudget.allowed) continue
       await writeTimelineForEvent(admin, ctx, {
         sessionId: input.sessionId,
         eventType: event.eventType,
@@ -141,6 +151,17 @@ export async function ingestSendrPublicEngagementEvents(
       })
     } catch {
       // timeline is best-effort; never fail public ingest
+    }
+  }
+
+  if (ctx.leadId && result.accepted > 0) {
+    try {
+      await syncSendrLeadTimelineIntelligence(admin, {
+        organizationId: ctx.organizationId,
+        leadId: ctx.leadId,
+      })
+    } catch {
+      // intelligence sync is best-effort
     }
   }
 

@@ -14,6 +14,8 @@ import {
 import { getGrowthSendrObservabilitySnapshot } from "@/lib/growth/sendr/growth-sendr-observability"
 import { probeSendrSchemaReady } from "@/lib/growth/sendr/growth-sendr-schema-health"
 import type { GrowthSendrWorkspaceSummary } from "@/lib/growth/sendr/growth-sendr-types"
+import { getGrowthSendrWorkspaceMetrics } from "@/lib/growth/sendr/growth-sendr-workspace-metrics-service"
+import { getGrowthSendrWorkspaceIntelligence } from "@/lib/growth/sendr/growth-sendr-workspace-intelligence-service"
 
 function startOfUtcDay(): string {
   const now = new Date()
@@ -25,11 +27,13 @@ export async function getGrowthSendrWorkspaceSummary(
   organizationId: string,
 ): Promise<GrowthSendrWorkspaceSummary> {
   const dayStart = startOfUtcDay()
-  const [pages, assets, observability, schemaReady] = await Promise.all([
+  const [pages, assets, observability, schemaReady, metrics, intelligence] = await Promise.all([
     listGrowthSendrLandingPages(admin, { organizationId, limit: 10 }),
     listGrowthSendrMediaAssets(admin, { organizationId, limit: 10 }),
     getGrowthSendrObservabilitySnapshot(admin, { organizationId }),
     probeSendrSchemaReady(admin),
+    getGrowthSendrWorkspaceMetrics(admin, organizationId).catch(() => null),
+    getGrowthSendrWorkspaceIntelligence(admin, organizationId).catch(() => null),
   ])
 
   const [pagesPublishedToday, pagesCreatedToday, assetsCreatedToday, engagementEventsToday] =
@@ -50,6 +54,8 @@ export async function getGrowthSendrWorkspaceSummary(
     failuresToday: observability.failuresToday,
     throttlesToday: observability.throttlesToday,
     schemaReady,
+    metrics: metrics ?? undefined,
+    intelligence: intelligence ?? undefined,
   }
 }
 

@@ -8,6 +8,22 @@ export const GROWTH_SENDR_WORKSPACE_QA_MARKER =
 export const GROWTH_SENDR_PUBLIC_QA_MARKER =
   "growth-sendr-public-runtime-gs-sendr-2c-v1" as const
 
+export const GROWTH_SENDR_SEQUENCE_BRIDGE_QA_MARKER =
+  "growth-sendr-sequence-bridge-gs-sendr-2d-v1" as const
+
+export const GROWTH_SENDR_INTELLIGENCE_QA_MARKER =
+  "growth-sendr-intelligence-gs-sendr-2e-v1" as const
+
+export const GROWTH_SENDR_SEQUENCE_BRIDGE_SCHEMA_MIGRATION =
+  "20270901190000_growth_sendr_sequence_bridge_gs_sendr_2d.sql" as const
+
+export const GROWTH_SENDR_INTELLIGENCE_SCHEMA_MIGRATION =
+  "20270901200000_growth_sendr_intelligence_gs_sendr_2e.sql" as const
+
+/** Merge token resolved at sequence send time. */
+export const GROWTH_SENDR_PAGE_URL_MERGE_TOKEN = "{{sendr_page_url}}" as const
+export const GROWTH_SENDR_PAGE_URL_VARIABLE_KEY = "sendr.page_url" as const
+
 export const GROWTH_SENDR_SCHEMA_MIGRATION =
   "20270901170000_growth_personalized_media_runtime_gs_sendr_2a.sql" as const
 
@@ -97,7 +113,33 @@ export const GROWTH_SENDR_LIMITS = {
   MAX_MEDIA_EVENT_BATCH: 500,
   MAX_MEDIA_ASSET_VERSIONS_PER_ASSET: 50,
   MAX_LANDING_PAGE_PUBLICATIONS_PER_PAGE: 100,
+  MAX_SENDR_PAGE_ATTACHMENTS_PER_SEQUENCE: 10,
+  MAX_SENDR_SEQUENCE_LINKS_PER_PAGE: 25,
+  MAX_SENDR_URL_RESOLUTIONS_PER_BATCH: 500,
+  MAX_SENDR_TIMELINE_EVENTS_PER_SESSION: 20,
+  MAX_SENDR_INTENT_RECALCULATIONS_PER_DAY: 10_000,
+  MAX_SENDR_RECOMMENDATIONS_PER_DAY: 5_000,
+  MAX_SENDR_TIMELINE_WRITES_PER_DAY: 10_000,
 } as const
+
+/** Deterministic intent signal weights — no AI, sum capped at 100. */
+export const GROWTH_SENDR_INTENT_SIGNAL_WEIGHTS = {
+  page_view: 5,
+  video_start: 10,
+  video_complete: 20,
+  cta_click: 15,
+  calendar_open: 20,
+  booking_started: 25,
+  booking_completed: 40,
+  repeat_visit: 15,
+} as const
+
+export const GROWTH_SENDR_INTENT_LEVEL_THRESHOLDS = {
+  medium: 34,
+  high: 67,
+} as const
+
+export type GrowthSendrIntentLevel = "low" | "medium" | "high"
 
 export const GROWTH_SENDR_RESOURCE_ESTIMATES = {
   mediaAssetCreate: { maxReadsPerRun: 3, maxWritesPerRun: 3, maxSideEffectsPerRun: 0, maxRunsPerDay: 500 },
@@ -106,7 +148,28 @@ export const GROWTH_SENDR_RESOURCE_ESTIMATES = {
   videoMetadataRegister: { maxReadsPerRun: 2, maxWritesPerRun: 2, maxSideEffectsPerRun: 0, maxRunsPerDay: 500 },
   publicPageLoad: { maxReadsPerRun: 4, maxWritesPerRun: 0, maxSideEffectsPerRun: 0, maxRunsPerDay: 50_000 },
   publicEventIngest: { maxReadsPerRun: 8, maxWritesPerRun: 6, maxSideEffectsPerRun: 1, maxRunsPerDay: 10_000 },
+  sequenceLinkAttach: { maxReadsPerRun: 5, maxWritesPerRun: 2, maxSideEffectsPerRun: 0, maxRunsPerDay: 500 },
+  urlResolution: { maxReadsPerRun: 3, maxWritesPerRun: 0, maxSideEffectsPerRun: 0, maxRunsPerDay: 50_000 },
+  intentRecalculation: { maxReadsPerRun: 25, maxWritesPerRun: 2, maxSideEffectsPerRun: 1, maxRunsPerDay: 10_000 },
+  recommendationGeneration: { maxReadsPerRun: 5, maxWritesPerRun: 0, maxSideEffectsPerRun: 0, maxRunsPerDay: 5_000 },
+  timelineIntelligenceUpdate: { maxReadsPerRun: 3, maxWritesPerRun: 1, maxSideEffectsPerRun: 0, maxRunsPerDay: 10_000 },
 } as const
+
+export const GROWTH_SENDR_SEQUENCE_BRIDGE_KILL_SWITCHES = [
+  "sendr_sequence_bridge_enabled",
+  "sendr_timeline_enabled",
+] as const
+
+export const GROWTH_SENDR_INTELLIGENCE_KILL_SWITCHES = [
+  "sendr_intelligence_enabled",
+  "sendr_recommendations_enabled",
+] as const
+
+export type GrowthSendrIntelligenceKillSwitchKey =
+  (typeof GROWTH_SENDR_INTELLIGENCE_KILL_SWITCHES)[number]
+
+export type GrowthSendrSequenceBridgeKillSwitchKey =
+  (typeof GROWTH_SENDR_SEQUENCE_BRIDGE_KILL_SWITCHES)[number]
 
 export const GROWTH_SENDR_KILL_SWITCHES = [
   "media_assets_enabled",

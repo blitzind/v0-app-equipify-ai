@@ -170,6 +170,8 @@ export type GrowthSendrWorkspaceSummary = {
   failuresToday: number
   throttlesToday: number
   schemaReady: boolean
+  metrics?: GrowthSendrWorkspaceMetrics
+  intelligence?: GrowthSendrWorkspaceIntelligence
 }
 
 export type GrowthSendrPersonalizationPreviewResult = {
@@ -188,8 +190,113 @@ export type GrowthSendrObservabilitySnapshot = {
   bookingsToday: number
   ctaClicksToday: number
   agentEventsToday: number
+  pagesLinkedToday: number
+  urlResolutionsToday: number
+  timelineEventsToday: number
+  intentCalculationsToday: number
+  recommendationsGeneratedToday: number
+  timelineWritesToday: number
   rowsReadToday: number
   rowsWrittenToday: number
   failuresToday: number
   throttlesToday: number
+}
+
+export type GrowthSendrSequencePageLink = {
+  id: string
+  organizationId: string
+  landingPageId: string
+  sequencePatternId: string
+  sequencePatternStepId: string | null
+  enrollmentRunId: string | null
+  linkStatus: "draft" | "approved" | "removed"
+  metadata: Record<string, unknown>
+  attachedBy: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type GrowthSendrAssetPickerItem = {
+  id: string
+  assetKind: "media" | "video" | "booking" | "landing_page"
+  name: string
+  subtitle: string | null
+  status: string
+  previewUrl: string | null
+  metadata: Record<string, unknown>
+}
+
+export type GrowthSendrWorkspaceMetrics = {
+  publishedPagesTotal: number
+  viewsToday: number
+  ctaClicksToday: number
+  attachedToSequencesCount: number
+  activeSequenceCount: number
+  topPages: Array<{
+    landingPageId: string
+    title: string
+    slug: string | null
+    views: number
+    bookings: number
+    ctaClicks: number
+    ctaRate: number
+  }>
+}
+
+export type GrowthSendrPageEngagementIntelligence = {
+  landingPageId: string
+  title: string
+  slug: string | null
+  pageViews: number
+  uniqueVisitors: number
+  repeatVisitors: number
+  videoStarts: number
+  videoCompletes: number
+  ctaClicks: number
+  calendarOpens: number
+  bookingStarts: number
+  bookingCompletes: number
+  viewRate: number
+  ctaRate: number
+  bookingRate: number
+  completionRate: number
+  repeatEngagementRate: number
+}
+
+export type GrowthSendrLeadIntelligence = {
+  leadId: string
+  contactName: string | null
+  companyName: string | null
+  landingPageId: string | null
+  landingPageTitle: string | null
+  intentScore: number
+  intentLevel: "low" | "medium" | "high"
+  lastSendrActivityAt: string | null
+  sendrEngagementCount: number
+  recommendations: GrowthSendrRecommendation[]
+}
+
+export type GrowthSendrRecommendation = {
+  id: string
+  priority: number
+  title: string
+  reason: string
+  actionKind: "call" | "email" | "meeting" | "reminder" | "archive" | "page_review"
+}
+
+export type GrowthSendrWorkspaceIntelligence = {
+  topPerformingPages: GrowthSendrPageEngagementIntelligence[]
+  highIntentProspects: GrowthSendrLeadIntelligence[]
+  pagesNeedingAttention: Array<
+    GrowthSendrPageEngagementIntelligence & { attentionReason: string }
+  >
+}
+
+export type GrowthSendrLeadIntelligenceMetadata = {
+  intentScore: number
+  intentLevel: "low" | "medium" | "high"
+  lastSendrActivityAt: string | null
+  sendrEngagementCount: number
+  lastUpdatedAt: string
+  qa_marker: string
 }

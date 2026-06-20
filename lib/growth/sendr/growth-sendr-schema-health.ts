@@ -21,6 +21,7 @@ export const GROWTH_SENDR_TABLES = [
   "growth_booking_events",
   "growth_engagement_events",
   "growth_engagement_event_rollups",
+  "growth_sendr_sequence_page_links",
 ] as const
 
 export type GrowthSendrTableName = (typeof GROWTH_SENDR_TABLES)[number]

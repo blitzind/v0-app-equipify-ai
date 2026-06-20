@@ -251,6 +251,15 @@ export type GrowthAudienceEnrollmentPreviewProgress = {
   rowsWritten: number
   durationMs: number | null
   error: string | null
+  sendrPageAttachment?: {
+    landingPageId: string
+    title: string
+    slug: string | null
+    publishedAt: string | null
+    publicUrl: string | null
+    videoAssetId: string | null
+    bookingAssetId: string | null
+  } | null
 }
 
 export type GrowthAudienceEnrollmentRunProgress = {

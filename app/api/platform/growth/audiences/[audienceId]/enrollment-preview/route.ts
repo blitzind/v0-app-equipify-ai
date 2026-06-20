@@ -20,6 +20,7 @@ const BodySchema = z.object({
   sequencePatternId: z.string().uuid(),
   previewId: z.string().uuid().optional(),
   cancel: z.boolean().optional(),
+  sendrLandingPageId: z.string().uuid().optional(),
 })
 
 type RouteContext = { params: Promise<{ audienceId: string }> }
@@ -85,6 +86,7 @@ export async function POST(request: Request, context: RouteContext) {
         organizationId: access.organizationId,
         previewId: parsed.data.previewId,
         sequencePatternId: parsed.data.sequencePatternId,
+        sendrLandingPageId: parsed.data.sendrLandingPageId,
       })
     } else {
       progress = await startAudienceEnrollmentPreview(access.admin, {
@@ -93,6 +95,7 @@ export async function POST(request: Request, context: RouteContext) {
         userId: access.userId,
         snapshotId: parsed.data.snapshotId,
         sequencePatternId: parsed.data.sequencePatternId,
+        sendrLandingPageId: parsed.data.sendrLandingPageId,
       })
     }
 

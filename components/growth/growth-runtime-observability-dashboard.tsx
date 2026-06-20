@@ -82,6 +82,12 @@ type ObservabilityResponse = {
       bookingsToday: number
       ctaClicksToday: number
       agentEventsToday: number
+      pagesLinkedToday: number
+      urlResolutionsToday: number
+      timelineEventsToday: number
+      intentCalculationsToday: number
+      recommendationsGeneratedToday: number
+      timelineWritesToday: number
       rowsReadToday: number
       rowsWrittenToday: number
       failuresToday: number
@@ -416,6 +422,30 @@ export function GrowthRuntimeObservabilityDashboard() {
                 <div className="flex justify-between">
                   <span>Agent events today</span>
                   <span>{snapshot.sendr.agentEventsToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Pages linked today</span>
+                  <span>{snapshot.sendr.pagesLinkedToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>URL resolutions today</span>
+                  <span>{snapshot.sendr.urlResolutionsToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Timeline events today</span>
+                  <span>{snapshot.sendr.timelineEventsToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Intent calculations today</span>
+                  <span>{snapshot.sendr.intentCalculationsToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Recommendations generated</span>
+                  <span>{snapshot.sendr.recommendationsGeneratedToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Timeline writes today</span>
+                  <span>{snapshot.sendr.timelineWritesToday}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Rows read / written</span>
