@@ -178,6 +178,7 @@ export async function buildSequenceExecutionSendPayload(
     const sendrPageUrl = await resolveSendrPageUrlForSequenceStep(admin, {
       organizationId: lead.promotedOrganizationId,
       sequencePatternStepId: step.sequencePatternStepId,
+      leadId: input.leadId,
     })
     if (sendrPageUrl) {
       subject = applySendrPageUrlMergeFields(subject, sendrPageUrl)

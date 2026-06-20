@@ -21,6 +21,8 @@ const BodySchema = z.object({
   slug: z.string().min(3).max(80),
   sessionId: z.string().min(8).max(120),
   pageUrl: z.string().max(2000).optional(),
+  leadId: z.string().uuid().optional(),
+  token: z.string().min(16).max(512).optional(),
   events: z.array(EventSchema).min(1).max(500),
 })
 
@@ -51,6 +53,10 @@ export async function POST(request: Request) {
       sessionId: parsed.data.sessionId,
       pageUrl: parsed.data.pageUrl,
       events: parsed.data.events,
+      renderContext: {
+        leadId: parsed.data.leadId ?? null,
+        token: parsed.data.token ?? null,
+      },
     })
 
     return NextResponse.json(

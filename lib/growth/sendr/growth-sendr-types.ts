@@ -142,6 +142,14 @@ export type GrowthSendrPublicPageSection = {
   content: Record<string, unknown>
 }
 
+export type GrowthSendrPublicPagePersonalizationMeta = {
+  applied: boolean
+  mode: "anonymous" | "lead" | "token"
+  fallbackReason?: "invalid_lead" | "invalid_token" | "expired_token" | "org_mismatch" | "lead_not_found" | null
+  missingVariables?: string[]
+  qaMarker?: string
+}
+
 export type GrowthSendrPublicPagePayload = {
   title: string
   publishedVersion: number
@@ -158,6 +166,7 @@ export type GrowthSendrPublicPagePayload = {
     durationMinutes: number | null
     timezone: string | null
   } | null
+  personalization?: GrowthSendrPublicPagePersonalizationMeta
 }
 
 export type GrowthSendrWorkspaceSummary = {
@@ -201,6 +210,14 @@ export type GrowthSendrObservabilitySnapshot = {
   launchFailuresToday: number
   launchThrottlesToday: number
   membersEnrolledViaLaunchesToday: number
+  analyticsLoadsToday: number
+  dashboardRefreshesToday: number
+  analyticsFailuresToday: number
+  analyticsThrottlesToday: number
+  activityLoadsToday: number
+  feedRefreshesToday: number
+  activityFailuresToday: number
+  activityThrottlesToday: number
   rowsReadToday: number
   rowsWrittenToday: number
   failuresToday: number
@@ -389,4 +406,170 @@ export type GrowthSendrLeadIntelligenceMetadata = {
   sendrEngagementCount: number
   lastUpdatedAt: string
   qa_marker: string
+}
+
+export type GrowthSendrAnalyticsDateRangePreset = "today" | "last_7_days" | "last_30_days" | "custom"
+
+export type GrowthSendrAnalyticsDateRange = {
+  preset: GrowthSendrAnalyticsDateRangePreset
+  startAt: string
+  endAt: string
+  label: string
+}
+
+export type GrowthSendrAnalyticsOverview = {
+  pagesPublished: number
+  launches: number
+  publicViews: number
+  ctaClicks: number
+  bookingsStarted: number
+  bookingsCompleted: number
+  highIntentProspects: number
+}
+
+export type GrowthSendrAnalyticsFunnelStep = {
+  key: string
+  label: string
+  count: number
+  conversionPercent: number | null
+  dropOffPercent: number | null
+}
+
+export type GrowthSendrAnalyticsFunnel = {
+  steps: GrowthSendrAnalyticsFunnelStep[]
+  dateRange: GrowthSendrAnalyticsDateRange
+}
+
+export type GrowthSendrAnalyticsPageRow = {
+  landingPageId: string
+  title: string
+  slug: string | null
+  status: string
+  views: number
+  ctaClicks: number
+  bookings: number
+  conversionPercent: number
+  lastActivityAt: string | null
+}
+
+export type GrowthSendrAnalyticsProspectRow = {
+  leadId: string
+  contactName: string | null
+  companyName: string | null
+  intentScore: number
+  intentLevel: "low" | "medium" | "high"
+  lastActivityAt: string | null
+  sendrPageViewed: string | null
+  sendrPageId: string | null
+  recommendation: string | null
+}
+
+export type GrowthSendrAnalyticsLaunchRow = {
+  launchRunId: string
+  audienceName: string | null
+  sequenceName: string | null
+  sendrPageTitle: string | null
+  sendrPageId: string
+  enrolled: number
+  views: number
+  ctaClicks: number
+  bookings: number
+  status: GrowthSendrLaunchRunStatus
+  startedAt: string
+}
+
+export type GrowthSendrAnalyticsAttentionRow = {
+  landingPageId: string
+  title: string
+  slug: string | null
+  recommendation: string
+  rule: "no_views_7d" | "views_no_cta" | "cta_no_bookings"
+}
+
+export type GrowthSendrAnalyticsWorkspaceSummary = {
+  overview: GrowthSendrAnalyticsOverview
+  topPages: GrowthSendrAnalyticsPageRow[]
+  highIntentProspects: GrowthSendrAnalyticsProspectRow[]
+  launchesNeedingAttention: GrowthSendrAnalyticsLaunchRow[]
+  pagesNeedingAttention: GrowthSendrAnalyticsAttentionRow[]
+  dateRange: GrowthSendrAnalyticsDateRange
+}
+
+export type GrowthSendrActivityEventLabel =
+  | "Page Viewed"
+  | "Video Started"
+  | "Video Completed"
+  | "CTA Clicked"
+  | "Booking Started"
+  | "Booking Completed"
+  | "Launch Sent"
+
+export type GrowthSendrActivityFeedRow = {
+  id: string
+  occurredAt: string
+  eventType: string
+  eventLabel: GrowthSendrActivityEventLabel
+  leadId: string | null
+  leadName: string | null
+  companyName: string | null
+  landingPageId: string | null
+  landingPageTitle: string | null
+  sessionId: string | null
+  intentScore: number | null
+  metadata: Record<string, unknown>
+}
+
+export type GrowthSendrActivityHotProspect = {
+  leadId: string
+  leadName: string | null
+  companyName: string | null
+  intentScore: number
+  intentLevel: "low" | "medium" | "high"
+  lastActivityAt: string | null
+  pageViews: number
+  videoCompletionPercent: number
+  ctaClicks: number
+  bookingStatus: "none" | "started" | "completed"
+  recommendations: string[]
+  landingPageId: string | null
+  landingPageTitle: string | null
+}
+
+export type GrowthSendrActivityTimelineEvent = {
+  id: string
+  occurredAt: string
+  eventType: string
+  eventLabel: GrowthSendrActivityEventLabel
+  title: string
+  summary: string | null
+  landingPageId: string | null
+  landingPageTitle: string | null
+  landingPageSlug: string | null
+  sessionId: string | null
+  metadata: Record<string, unknown>
+}
+
+export type GrowthSendrActivityLeadTimeline = {
+  leadId: string
+  leadName: string | null
+  companyName: string | null
+  intentScore: number | null
+  events: GrowthSendrActivityTimelineEvent[]
+}
+
+export type GrowthSendrActivitySummary = {
+  totalEvents: number
+  uniqueLeads: number
+  pageViews: number
+  videoCompletes: number
+  ctaClicks: number
+  bookingsCompleted: number
+  hotProspects: number
+}
+
+export type GrowthSendrActivityWorkspaceSummary = {
+  summary: GrowthSendrActivitySummary
+  recentActivity: GrowthSendrActivityFeedRow[]
+  hotProspects: GrowthSendrActivityHotProspect[]
+  dateRange: GrowthSendrAnalyticsDateRange
 }

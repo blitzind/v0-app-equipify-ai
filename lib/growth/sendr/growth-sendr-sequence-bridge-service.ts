@@ -12,15 +12,20 @@ import {
   createSendrSequencePageLink,
   resolveSendrLinkForSequenceStep,
 } from "@/lib/growth/sendr/growth-sendr-sequence-link-repository"
-import { buildSendrPagePublicLink } from "@/lib/growth/sendr/growth-sendr-slug-runtime"
+import { resolveSendrExternalPageUrl } from "@/lib/growth/sendr/growth-sendr-personalized-url-service"
 import type { GrowthSendrSequencePageLink } from "@/lib/growth/sendr/growth-sendr-types"
 import { isRuntimeKillSwitchEnabled } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
 
 const urlCache = new Map<string, { url: string; expiresAt: number }>()
 const CACHE_TTL_MS = 60_000
 
-function cacheKey(orgId: string, stepId: string | null, patternId: string | null): string {
-  return `${orgId}:${stepId ?? ""}:${patternId ?? ""}`
+function cacheKey(
+  orgId: string,
+  stepId: string | null,
+  patternId: string | null,
+  leadId?: string | null,
+): string {
+  return `${orgId}:${stepId ?? ""}:${patternId ?? ""}:${leadId?.trim() ?? ""}`
 }
 
 export async function attachSendrPageToSequence(
@@ -70,12 +75,18 @@ export async function resolveSendrPageUrlForSequenceStep(
     organizationId: string
     sequencePatternStepId: string | null
     sequencePatternId?: string | null
+    leadId?: string | null
   },
 ): Promise<string | null> {
   const bridge = await isRuntimeKillSwitchEnabled(admin, "sendr_sequence_bridge_enabled")
   if (!bridge) return null
 
-  const key = cacheKey(input.organizationId, input.sequencePatternStepId, input.sequencePatternId ?? null)
+  const key = cacheKey(
+    input.organizationId,
+    input.sequencePatternStepId,
+    input.sequencePatternId ?? null,
+    input.leadId,
+  )
   const cached = urlCache.get(key)
   if (cached && cached.expiresAt > Date.now()) return cached.url
 
@@ -92,7 +103,11 @@ export async function resolveSendrPageUrlForSequenceStep(
   const slug = page?.publishedSlug ?? page?.slug
   if (!slug) return null
 
-  const url = buildSendrPagePublicLink(slug)
+  const url = resolveSendrExternalPageUrl({
+    slug,
+    landingPageId: link.landingPageId,
+    leadId: input.leadId,
+  })
   urlCache.set(key, { url, expiresAt: Date.now() + CACHE_TTL_MS })
   return url
 }
@@ -107,17 +122,27 @@ export async function resolveSendrPageUrlBatch(
   admin: SupabaseClient,
   input: {
     organizationId: string
-    items: Array<{ sequencePatternStepId: string | null; sequencePatternId?: string | null }>
+    items: Array<{
+      sequencePatternStepId: string | null
+      sequencePatternId?: string | null
+      leadId?: string | null
+    }>
   },
 ): Promise<Map<string, string | null>> {
   const results = new Map<string, string | null>()
   const batch = input.items.slice(0, 500)
   for (const item of batch) {
-    const key = cacheKey(input.organizationId, item.sequencePatternStepId, item.sequencePatternId ?? null)
+    const key = cacheKey(
+      input.organizationId,
+      item.sequencePatternStepId,
+      item.sequencePatternId ?? null,
+      item.leadId,
+    )
     const url = await resolveSendrPageUrlForSequenceStep(admin, {
       organizationId: input.organizationId,
       sequencePatternStepId: item.sequencePatternStepId,
       sequencePatternId: item.sequencePatternId,
+      leadId: item.leadId,
     })
     results.set(key, url)
   }

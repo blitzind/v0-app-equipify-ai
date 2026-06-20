@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
-import { GROWTH_SENDR_PUBLIC_QA_MARKER } from "@/lib/growth/sendr/growth-sendr-config"
+import {
+  GROWTH_SENDR_PUBLIC_QA_MARKER,
+  GROWTH_SENDR_VISITOR_PERSONALIZATION_QA_MARKER,
+} from "@/lib/growth/sendr/growth-sendr-config"
 import { loadSendrPublicPageBySlug } from "@/lib/growth/sendr/growth-sendr-public-page-service"
+import { parseSendrVisitorRenderContext } from "@/lib/growth/sendr/growth-sendr-visitor-render-context"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
 
 export const runtime = "nodejs"
@@ -16,7 +20,7 @@ export async function OPTIONS() {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ slug: string }> },
 ) {
   const admin = createServiceRoleClient()
@@ -28,7 +32,9 @@ export async function GET(
   }
 
   const { slug } = await context.params
-  const result = await loadSendrPublicPageBySlug(admin, slug)
+  const url = new URL(request.url)
+  const renderContext = parseSendrVisitorRenderContext(Object.fromEntries(url.searchParams.entries()))
+  const result = await loadSendrPublicPageBySlug(admin, slug, renderContext)
   if (!result.ok) {
     return NextResponse.json(
       { ok: false, error: result.error },
@@ -37,7 +43,13 @@ export async function GET(
   }
 
   return NextResponse.json(
-    { ok: true, slug: result.slug, page: result.payload, qa_marker: GROWTH_SENDR_PUBLIC_QA_MARKER },
+    {
+      ok: true,
+      slug: result.slug,
+      page: result.payload,
+      qa_marker: GROWTH_SENDR_PUBLIC_QA_MARKER,
+      visitor_personalization_qa_marker: GROWTH_SENDR_VISITOR_PERSONALIZATION_QA_MARKER,
+    },
     { headers: CORS_HEADERS },
   )
 }

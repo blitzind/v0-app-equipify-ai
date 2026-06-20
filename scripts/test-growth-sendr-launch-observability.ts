@@ -18,6 +18,8 @@ function main(): void {
   assert.match(observability, /launchPreviewsToday/)
   assert.match(observability, /launchFailuresToday/)
   assert.match(observability, /membersEnrolledViaLaunchesToday/)
+  assert.match(observability, /analyticsLoadsToday/)
+  assert.match(observability, /dashboardRefreshesToday/)
 
   const launchService = readSource("lib/growth/sendr/growth-sendr-launch-run-service.ts")
   assert.match(launchService, /continueSendrLaunchRun/)
@@ -29,6 +31,8 @@ function main(): void {
   assert.match(dashboard, /Launches today/)
   assert.match(dashboard, /Launch previews today/)
   assert.match(dashboard, /Members enrolled via launches/)
+  assert.match(dashboard, /Analytics loads today/)
+  assert.match(dashboard, /Dashboard refreshes today/)
 
   console.log("  ✓ SENDR launch metrics on runtime card")
   console.log("\nGS-SENDR-3A launch observability certification passed.\n")

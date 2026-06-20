@@ -22,6 +22,7 @@ import {
   resolveSendrPublicPageContext,
   type SendrPublicPageContext,
 } from "@/lib/growth/sendr/growth-sendr-public-page-service"
+import type { SendrVisitorRenderContext } from "@/lib/growth/sendr/growth-sendr-visitor-render-context"
 import type { GrowthSendrEngagementEventInput } from "@/lib/growth/sendr/growth-sendr-types"
 import type { GrowthRuntimeResourceType } from "@/lib/growth/runtime-guardrails/growth-runtime-guardrail-config"
 import { isRuntimeKillSwitchEnabled } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
@@ -95,9 +96,10 @@ export async function ingestSendrPublicEngagementEvents(
     sessionId: string
     events: SendrPublicEngagementEventInput[]
     pageUrl?: string
+    renderContext?: SendrVisitorRenderContext
   },
 ): Promise<{ ok: boolean; status: number; accepted: number; throttled: number; error?: string }> {
-  const ctx = await resolveSendrPublicPageContext(admin, input.slug)
+  const ctx = await resolveSendrPublicPageContext(admin, input.slug, input.renderContext)
   if (!ctx) {
     return { ok: false, status: 404, accepted: 0, throttled: 0, error: "not_found" }
   }
@@ -124,6 +126,7 @@ export async function ingestSendrPublicEngagementEvents(
       ...(event.eventValue ?? {}),
       published_slug: ctx.publishedSlug,
       qa_marker: GROWTH_SENDR_PUBLIC_QA_MARKER,
+      ...(ctx.leadId ? { visitor_lead_id: ctx.leadId } : {}),
     },
   }))
 

@@ -18,8 +18,9 @@ export type GrowthSendrEnrollmentPageAttachment = {
 export async function buildSendrEnrollmentPageAttachment(
   admin: SupabaseClient,
   landingPageId: string,
+  options?: { leadId?: string | null },
 ): Promise<GrowthSendrEnrollmentPageAttachment | null> {
-  const preview = await getSendrPageAttachmentPreview(admin, landingPageId)
+  const preview = await getSendrPageAttachmentPreview(admin, landingPageId, options)
   if (!preview?.page) return null
   const page = preview.page
   return {

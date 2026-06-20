@@ -7,6 +7,7 @@ import { listGrowthSendrMediaAssets } from "@/lib/growth/sendr/growth-sendr-medi
 import type { GrowthSendrAssetPickerItem } from "@/lib/growth/sendr/growth-sendr-types"
 import { getGrowthSendrVideoAsset } from "@/lib/growth/sendr/growth-sendr-video-runtime-repository"
 import { buildSendrPagePublicLink } from "@/lib/growth/sendr/growth-sendr-slug-runtime"
+import { resolveSendrExternalPageUrl } from "@/lib/growth/sendr/growth-sendr-personalized-url-service"
 
 export async function listSendrAssetPickerItems(
   admin: SupabaseClient,
@@ -135,6 +136,7 @@ export async function listSendrAssetPickerItems(
 export async function getSendrPageAttachmentPreview(
   admin: SupabaseClient,
   landingPageId: string,
+  options?: { leadId?: string | null },
 ): Promise<{
   page: Awaited<ReturnType<typeof getGrowthSendrLandingPage>>
   video: Awaited<ReturnType<typeof getGrowthSendrVideoAsset>>
@@ -152,6 +154,12 @@ export async function getSendrPageAttachmentPreview(
     page,
     video: videoId ? await getGrowthSendrVideoAsset(admin, videoId) : null,
     booking: bookingId ? await getGrowthSendrBookingAsset(admin, bookingId) : null,
-    publicUrl: slug ? buildSendrPagePublicLink(slug) : null,
+    publicUrl: slug
+      ? resolveSendrExternalPageUrl({
+          slug,
+          landingPageId: page.id,
+          leadId: options?.leadId,
+        })
+      : null,
   }
 }

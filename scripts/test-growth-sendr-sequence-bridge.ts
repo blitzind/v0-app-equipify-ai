@@ -36,6 +36,7 @@ function main(): void {
 
   const sendBuilder = readSource("lib/growth/sequences/execution/sequence-send-builder.ts")
   assert.match(sendBuilder, /resolveSendrPageUrlForSequenceStep/)
+  assert.match(sendBuilder, /leadId: input\.leadId/)
 
   const builder = readSource("components/growth/growth-sequence-pattern-builder.tsx")
   assert.match(builder, /sendr_page_url/)

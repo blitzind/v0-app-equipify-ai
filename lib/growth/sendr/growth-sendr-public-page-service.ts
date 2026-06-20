@@ -17,6 +17,11 @@ import type {
 } from "@/lib/growth/sendr/growth-sendr-types"
 import { getGrowthSendrVideoAsset } from "@/lib/growth/sendr/growth-sendr-video-runtime-repository"
 import { probeSendrSchemaReady } from "@/lib/growth/sendr/growth-sendr-schema-health"
+import {
+  personalizeSendrPublicPagePayload,
+  resolveSendrVisitorLeadId,
+} from "@/lib/growth/sendr/growth-sendr-visitor-personalization-service"
+import type { SendrVisitorRenderContext } from "@/lib/growth/sendr/growth-sendr-visitor-render-context"
 
 type PublicationSnapshot = {
   page?: Record<string, unknown>
@@ -52,6 +57,7 @@ function snapshotFromPublication(
 export async function loadSendrPublicPageBySlug(
   admin: SupabaseClient,
   rawSlug: string,
+  renderContext?: SendrVisitorRenderContext,
 ): Promise<
   | { ok: true; slug: string; payload: GrowthSendrPublicPagePayload }
   | { ok: false; status: number; error: string }
@@ -111,7 +117,13 @@ export async function loadSendrPublicPageBySlug(
     }
   }
 
-  return { ok: true, slug, payload }
+  const personalizedPayload = await personalizeSendrPublicPagePayload(admin, {
+    page,
+    payload,
+    renderContext,
+  })
+
+  return { ok: true, slug, payload: personalizedPayload }
 }
 
 export type SendrPublicPageContext = {
@@ -126,6 +138,7 @@ export type SendrPublicPageContext = {
 export async function resolveSendrPublicPageContext(
   admin: SupabaseClient,
   rawSlug: string,
+  renderContext?: SendrVisitorRenderContext,
 ): Promise<SendrPublicPageContext | null> {
   const slug = normalizeSendrSlugInput(rawSlug)
   if (!isValidSendrPublicSlug(slug)) return null
@@ -133,10 +146,12 @@ export async function resolveSendrPublicPageContext(
   const page = await getGrowthSendrLandingPageByPublishedSlug(admin, slug)
   if (!page || page.status !== "published") return null
 
+  const visitorLead = await resolveSendrVisitorLeadId(admin, page, renderContext)
+
   return {
     organizationId: page.organizationId,
     landingPageId: page.id,
-    leadId: page.leadId,
+    leadId: visitorLead.leadId ?? page.leadId,
     publishedSlug: slug,
     videoAssetId:
       typeof page.mobileMetadata.videoAssetId === "string" ? page.mobileMetadata.videoAssetId : null,

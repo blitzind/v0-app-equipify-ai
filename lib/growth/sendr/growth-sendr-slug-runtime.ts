@@ -23,6 +23,14 @@ export function isValidSendrPublicSlug(slug: string): boolean {
 export function buildSendrPagePublicLink(
   slug: string,
   origin = "https://app.equipify.ai",
+  options?: { leadId?: string | null; token?: string | null },
 ): string {
-  return `${origin.replace(/\/$/, "")}/sendr/${slug}`
+  const base = `${origin.replace(/\/$/, "")}/sendr/${slug}`
+  const params = new URLSearchParams()
+  const leadId = options?.leadId?.trim()
+  const token = options?.token?.trim()
+  if (leadId) params.set("leadId", leadId)
+  if (token) params.set("token", token)
+  const query = params.toString()
+  return query ? `${base}?${query}` : base
 }

@@ -13,11 +13,23 @@ function getOrCreateSessionId(): string {
   return next
 }
 
+function getVisitorAttributionFromUrl(): { leadId?: string; token?: string } {
+  if (typeof window === "undefined") return {}
+  const params = new URLSearchParams(window.location.search)
+  const leadId = params.get("leadId")?.trim()
+  const token = params.get("token")?.trim()
+  return {
+    ...(leadId ? { leadId } : {}),
+    ...(token ? { token } : {}),
+  }
+}
+
 async function trackEvents(
   slug: string,
   sessionId: string,
   events: Array<{ eventType: string; eventValue?: Record<string, unknown> }>,
 ) {
+  const attribution = getVisitorAttributionFromUrl()
   await fetch("/api/public/sendr/events", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -25,6 +37,7 @@ async function trackEvents(
       slug,
       sessionId,
       pageUrl: window.location.href,
+      ...attribution,
       events,
     }),
   }).catch(() => undefined)

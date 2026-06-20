@@ -30,6 +30,10 @@ const KILL_SWITCH_MAP: Partial<Record<GrowthRuntimeResourceType, GrowthRuntimeKi
   sendr_timeline_updates: "sendr_intelligence_enabled",
   sendr_launches: "sendr_launch_enabled",
   sendr_launch_previews: "sendr_launch_preview_enabled",
+  sendr_analytics: "sendr_analytics_enabled",
+  sendr_dashboard_refreshes: "sendr_analytics_enabled",
+  sendr_activity: "sendr_activity_enabled",
+  sendr_activity_refreshes: "sendr_activity_enabled",
 }
 
 export async function checkSendrKillSwitch(

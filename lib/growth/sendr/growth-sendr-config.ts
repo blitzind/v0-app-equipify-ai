@@ -17,6 +17,18 @@ export const GROWTH_SENDR_INTELLIGENCE_QA_MARKER =
 export const GROWTH_SENDR_LAUNCH_QA_MARKER =
   "growth-sendr-launch-gs-sendr-3a-v1" as const
 
+export const GROWTH_SENDR_ANALYTICS_QA_MARKER =
+  "growth-sendr-analytics-gs-sendr-3b-v1" as const
+
+export const GROWTH_SENDR_ACTIVITY_QA_MARKER =
+  "growth-sendr-activity-gs-sendr-3c-v1" as const
+
+export const GROWTH_SENDR_VISITOR_PERSONALIZATION_QA_MARKER =
+  "growth-sendr-visitor-personalization-gs-sendr-3c-v1" as const
+
+export const GROWTH_SENDR_PERSONALIZED_URL_DELIVERY_QA_MARKER =
+  "growth-sendr-personalized-url-delivery-gs-sendr-3d-v1" as const
+
 export const GROWTH_SENDR_SEQUENCE_BRIDGE_SCHEMA_MIGRATION =
   "20270901190000_growth_sendr_sequence_bridge_gs_sendr_2d.sql" as const
 
@@ -131,6 +143,12 @@ export const GROWTH_SENDR_LIMITS = {
   MAX_SENDR_LAUNCH_PREVIEW_CHUNK: 500,
   MAX_SENDR_LAUNCH_ENROLLMENT_CHUNK: 100,
   MAX_SENDR_LAUNCH_STEP_DURATION_MS: 15_000,
+  MAX_SENDR_ANALYTICS_ROWS: 1_000,
+  MAX_SENDR_ANALYTICS_LEADS: 500,
+  MAX_SENDR_ANALYTICS_PAGES: 500,
+  MAX_SENDR_ACTIVITY_ROWS: 1_000,
+  MAX_SENDR_ACTIVITY_FEED: 500,
+  MAX_SENDR_ACTIVITY_PROSPECTS: 500,
 } as const
 
 /** Deterministic intent signal weights — no AI, sum capped at 100. */
@@ -166,7 +184,20 @@ export const GROWTH_SENDR_RESOURCE_ESTIMATES = {
   timelineIntelligenceUpdate: { maxReadsPerRun: 3, maxWritesPerRun: 1, maxSideEffectsPerRun: 0, maxRunsPerDay: 10_000 },
   launchPreview: { maxReadsPerRun: 120, maxWritesPerRun: 0, maxSideEffectsPerRun: 0, maxRunsPerDay: 500 },
   launchRun: { maxReadsPerRun: 250, maxWritesPerRun: 120, maxSideEffectsPerRun: 0, maxRunsPerDay: 500 },
+  analyticsLoad: { maxReadsPerRun: 400, maxWritesPerRun: 0, maxSideEffectsPerRun: 0, maxRunsPerDay: 2_000 },
+  dashboardRefresh: { maxReadsPerRun: 0, maxWritesPerRun: 0, maxSideEffectsPerRun: 0, maxRunsPerDay: 500 },
+  activityLoad: { maxReadsPerRun: 450, maxWritesPerRun: 0, maxSideEffectsPerRun: 0, maxRunsPerDay: 2_000 },
+  activityRefresh: { maxReadsPerRun: 0, maxWritesPerRun: 0, maxSideEffectsPerRun: 0, maxRunsPerDay: 500 },
 } as const
+
+export const GROWTH_SENDR_ACTIVITY_KILL_SWITCHES = ["sendr_activity_enabled"] as const
+
+export type GrowthSendrActivityKillSwitchKey = (typeof GROWTH_SENDR_ACTIVITY_KILL_SWITCHES)[number]
+
+export const GROWTH_SENDR_ANALYTICS_KILL_SWITCHES = ["sendr_analytics_enabled"] as const
+
+export type GrowthSendrAnalyticsKillSwitchKey =
+  (typeof GROWTH_SENDR_ANALYTICS_KILL_SWITCHES)[number]
 
 export const GROWTH_SENDR_LAUNCH_KILL_SWITCHES = [
   "sendr_launch_enabled",

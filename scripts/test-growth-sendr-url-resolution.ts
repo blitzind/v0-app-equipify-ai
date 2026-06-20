@@ -17,6 +17,8 @@ function main(): void {
 
   const bridge = readSource("lib/growth/sendr/growth-sendr-sequence-bridge-service.ts")
   assert.match(bridge, /resolveSendrPageUrlForSequenceStep/)
+  assert.match(bridge, /resolveSendrExternalPageUrl/)
+  assert.match(bridge, /leadId\?: string \| null/)
   assert.match(bridge, /Read-only cached URL resolution/)
   assert.match(bridge, /CACHE_TTL_MS/)
   assert.match(bridge, /sendr_url_resolutions/)

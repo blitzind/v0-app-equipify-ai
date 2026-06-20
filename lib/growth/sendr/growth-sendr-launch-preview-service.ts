@@ -48,9 +48,6 @@ export async function computeSendrLaunchPreview(
     throw new Error("landing_page_not_published")
   }
 
-  const attachment = await buildSendrEnrollmentPageAttachment(admin, input.landingPageId)
-  const sendrPageUrl = attachment?.publicUrl ?? null
-
   const cap = Math.min(
     GROWTH_SENDR_LIMITS.MAX_SENDR_PREVIEW_MEMBERS,
     GROWTH_AUDIENCE_LIMITS.MAX_AUDIENCE_PREVIEW_MEMBERS,
@@ -109,6 +106,11 @@ export async function computeSendrLaunchPreview(
     offset += items.length
     if (items.length < batchSize) break
   }
+
+  const attachment = await buildSendrEnrollmentPageAttachment(admin, input.landingPageId, {
+    leadId: sampleLeadId,
+  })
+  const sendrPageUrl = attachment?.publicUrl ?? null
 
   const personalization = await previewSendrPersonalization(admin, {
     leadId: sampleLeadId,
