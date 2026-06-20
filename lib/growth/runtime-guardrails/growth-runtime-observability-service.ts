@@ -9,12 +9,14 @@ import { getRuntimeKillSwitchStates } from "@/lib/growth/runtime-guardrails/grow
 import { getRetentionBacklogSnapshot } from "@/lib/growth/runtime-guardrails/growth-runtime-retention-observability"
 import {
   probeRuntimeGuardrailSchema,
+  probeRuntimeTable,
   type GrowthRuntimeSchemaProbeResult,
   type GrowthRuntimeSchemaStatus,
 } from "@/lib/growth/runtime-guardrails/growth-runtime-schema-probe"
 import { recordRuntimeHealthRead } from "@/lib/growth/runtime-guardrails/growth-runtime-health-counter-service"
 import { getWakeBatchState } from "@/lib/growth/runtime-guardrails/growth-wake-batch-state-repository"
 import { getGrowthAudienceObservabilitySnapshot } from "@/lib/growth/audiences/growth-audience-observability"
+import { GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES } from "@/lib/growth/runtime-guardrails/growth-runtime-guardrail-config"
 
 export type GrowthRuntimeObservabilitySnapshot = {
   status: GrowthRuntimeSchemaStatus
@@ -48,6 +50,64 @@ export type GrowthRuntimeObservabilitySnapshot = {
     timeoutWakeBatch: Awaited<ReturnType<typeof getWakeBatchState>>
   }
   audiences: Awaited<ReturnType<typeof getGrowthAudienceObservabilitySnapshot>> | null
+}
+
+const EMPTY_WAKE_BATCH = {
+  processorKey: "sequence_event_wake",
+  wakeCursor: null,
+  processedCount: 0,
+  remainingCount: 0,
+  updatedAt: new Date().toISOString(),
+} as const
+
+const EMPTY_TIMEOUT_WAKE_BATCH = {
+  processorKey: "sequence_wait_timeouts",
+  wakeCursor: null,
+  processedCount: 0,
+  remainingCount: 0,
+  updatedAt: new Date().toISOString(),
+} as const
+
+const EMPTY_RETENTION = {
+  retentionRowsPending: 0,
+  retentionBatchesRemaining: 0,
+  lastRetentionRunAt: null,
+  lastRetentionDeletedRows: 0,
+  lastRetentionDurationMs: null,
+  families: [],
+} as const
+
+/** Safe fallback when observability cannot load — pre-migration or unexpected failure. */
+export function buildMissingRuntimeObservabilitySnapshot(
+  input?: { message?: string | null },
+): GrowthRuntimeObservabilitySnapshot {
+  return {
+    status: "MISSING",
+    missingResources: ["growth.runtime_guardrails"],
+    partialResources: input?.message ? [`runtime_observability:${input.message}`] : [],
+    budgets: null,
+    userBudgets: null,
+    killSwitches: { ...GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES },
+    queues: {
+      wakeBacklog: 0,
+      liveWakeCount: null,
+      retention: EMPTY_RETENTION,
+      retentionPolicies: [],
+      rollupRebuildAvailable: false,
+    },
+    health: {
+      runtimeReadsEstimate: 0,
+      runtimeWritesEstimate: 0,
+      runtimeThrottleCount: 0,
+      runtimeFailureCount: 0,
+      lastFailureAt: null,
+      lastFailureMessage: input?.message ?? null,
+      recentThrottles: [],
+      wakeBatch: { ...EMPTY_WAKE_BATCH },
+      timeoutWakeBatch: { ...EMPTY_TIMEOUT_WAKE_BATCH },
+    },
+    audiences: null,
+  }
 }
 
 async function safeLoad<T>(

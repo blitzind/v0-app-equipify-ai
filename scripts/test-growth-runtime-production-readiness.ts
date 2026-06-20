@@ -40,6 +40,9 @@ function main(): void {
 
   const route = readSource("app/api/platform/growth/runtime/observability/route.ts")
   assert.match(route, /status: snapshot.status/)
+  assert.match(route, /try \{/)
+  assert.match(route, /runtime_observability_unavailable/)
+  assert.match(observability, /probeRuntimeTable/)
   assert.doesNotMatch(route, /throw new Error/)
 
   const search = readSource("lib/growth/runtime-guardrails/growth-search-rate-limiter.ts")

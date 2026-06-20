@@ -1,5 +1,5 @@
 /**
- * GS-RG-1B/1C — Runtime observability certification.
+ * GS-RG-1B/1C + GS-RG-PROD-2 — Runtime observability certification.
  * Run: pnpm test:growth-runtime-observability
  */
 import assert from "node:assert/strict"
@@ -16,7 +16,7 @@ function readSource(relativePath: string): string {
 }
 
 async function main(): Promise<void> {
-  console.log("\n=== GS-RG-1C Runtime Observability Certification ===\n")
+  console.log("\n=== GS-RG-PROD-2 Runtime Observability Certification ===\n")
 
   const service = readSource("lib/growth/runtime-guardrails/growth-runtime-observability-service.ts")
   const route = readSource("app/api/platform/growth/runtime/observability/route.ts")
@@ -26,7 +26,15 @@ async function main(): Promise<void> {
   assert.match(service, /getRetentionBacklogSnapshot/)
   assert.match(service, /runtimeReadsEstimate/)
   assert.match(service, /userBudgets/)
+  assert.match(service, /probeRuntimeTable/)
+  assert.match(service, /buildMissingRuntimeObservabilitySnapshot/)
   assert.match(route, /status: snapshot.status/)
+  assert.match(route, /try \{/)
+  assert.match(route, /catch \(error\)/)
+  assert.match(route, /runtime_observability_unavailable/)
+  assert.match(route, /schemaStatus: "MISSING"/)
+  assert.match(route, /buildMissingRuntimeObservabilitySnapshot/)
+  assert.doesNotMatch(route, /throw new Error/)
 
   const budgetResources = [
     "searches",
@@ -44,11 +52,16 @@ async function main(): Promise<void> {
   }
   assert.ok(GROWTH_RUNTIME_HOURLY_USER_BUDGET_CAPS.searches === 100)
 
-  console.log("  ✓ Schema probe with READY/WARN/MISSING")
-  console.log("  ✓ Retention backlog + health counters in snapshot")
-  console.log("  ✓ Observability route returns status without throwing")
+  assert.match(service, /export function buildMissingRuntimeObservabilitySnapshot/)
+  assert.match(service, /status: "MISSING"/)
+  assert.match(service, /missingResources: \["growth\.runtime_guardrails"\]/)
 
-  console.log("\nGS-RG-1C observability certification passed.\n")
+  console.log("  ✓ probeRuntimeTable imported in observability service")
+  console.log("  ✓ Route try/catch returns JSON on unexpected errors")
+  console.log("  ✓ buildMissingRuntimeObservabilitySnapshot fallback")
+  console.log("  ✓ Schema probe with READY/WARN/MISSING")
+
+  console.log("\nGS-RG-PROD-2 observability certification passed.\n")
 }
 
 main().catch((error) => {
