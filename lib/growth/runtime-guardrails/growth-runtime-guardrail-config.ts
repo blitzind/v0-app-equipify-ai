@@ -28,6 +28,13 @@ export const GROWTH_RUNTIME_GUARDRAIL_LIMITS = {
   MAX_WAKE_EVALUATIONS_PER_ORG: 500,
   MAX_MEDIA_EVENTS_PER_SESSION: 200,
   MAX_MEDIA_ROLLUP_BATCH: 500,
+  MAX_MEDIA_ASSETS_PER_ORG: 5_000,
+  MAX_PAGE_SECTIONS: 100,
+  MAX_PAGE_VIEWS_PER_SESSION: 100,
+  MAX_VIDEO_EVENTS_PER_SESSION: 200,
+  MAX_AGENT_EVENTS_PER_SESSION: 200,
+  MAX_BOOKINGS_PER_DAY: 500,
+  MAX_MEDIA_EVENT_BATCH: 500,
   MAX_ENRICHMENTS_PER_DAY: 5_000,
   MAX_SEQUENCE_ENROLLMENTS_PER_DAY: 2_000,
   MAX_AUTOMATION_EXECUTIONS_PER_DAY: 1_000,
@@ -55,6 +62,12 @@ export type GrowthRuntimeResourceType =
   | "audience_diffs"
   | "audience_lead_creations"
   | "audience_enrollment_previews"
+  | "media_assets"
+  | "landing_pages"
+  | "video_events"
+  | "agent_events"
+  | "bookings"
+  | "page_views"
 
 export type GrowthRuntimeBudgetWindowKind = "hourly" | "daily" | "monthly"
 
@@ -69,6 +82,11 @@ export type GrowthRuntimeKillSwitchKey =
   | "audience_lead_creation_enabled"
   | "audience_preview_enabled"
   | "audience_enrollment_enabled"
+  | "media_assets_enabled"
+  | "landing_pages_enabled"
+  | "video_tracking_enabled"
+  | "agent_tracking_enabled"
+  | "booking_tracking_enabled"
 
 export const GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES: Record<GrowthRuntimeKillSwitchKey, boolean> = {
   wake_execution_enabled: true,
@@ -81,6 +99,11 @@ export const GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES: Record<GrowthRuntimeKillSwitc
   audience_lead_creation_enabled: true,
   audience_preview_enabled: true,
   audience_enrollment_enabled: true,
+  media_assets_enabled: true,
+  landing_pages_enabled: true,
+  video_tracking_enabled: true,
+  agent_tracking_enabled: true,
+  booking_tracking_enabled: true,
 }
 
 /** Daily budget caps keyed by resource type. Zero = unlimited. */
@@ -100,6 +123,12 @@ export const GROWTH_RUNTIME_DAILY_BUDGET_CAPS: Partial<Record<GrowthRuntimeResou
   audience_diffs: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_AUDIENCE_REFRESHES_PER_DAY,
   audience_lead_creations: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_AUDIENCE_LEAD_CREATIONS_PER_DAY,
   audience_enrollment_previews: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_AUDIENCE_REFRESHES_PER_DAY,
+  media_assets: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_MEDIA_ASSETS_PER_ORG,
+  landing_pages: 200,
+  video_events: 50_000,
+  agent_events: 50_000,
+  bookings: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_BOOKINGS_PER_DAY,
+  page_views: 50_000,
 }
 
 /** Hourly budget caps keyed by resource type. */

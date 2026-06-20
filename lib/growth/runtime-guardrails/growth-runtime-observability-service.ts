@@ -16,6 +16,7 @@ import {
 import { recordRuntimeHealthRead } from "@/lib/growth/runtime-guardrails/growth-runtime-health-counter-service"
 import { getWakeBatchState } from "@/lib/growth/runtime-guardrails/growth-wake-batch-state-repository"
 import { getGrowthAudienceObservabilitySnapshot } from "@/lib/growth/audiences/growth-audience-observability"
+import { getGrowthSendrObservabilitySnapshot } from "@/lib/growth/sendr/growth-sendr-observability"
 import { GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES } from "@/lib/growth/runtime-guardrails/growth-runtime-guardrail-config"
 
 export type GrowthRuntimeObservabilitySnapshot = {
@@ -50,6 +51,7 @@ export type GrowthRuntimeObservabilitySnapshot = {
     timeoutWakeBatch: Awaited<ReturnType<typeof getWakeBatchState>>
   }
   audiences: Awaited<ReturnType<typeof getGrowthAudienceObservabilitySnapshot>> | null
+  sendr: Awaited<ReturnType<typeof getGrowthSendrObservabilitySnapshot>> | null
 }
 
 const EMPTY_WAKE_BATCH = {
@@ -107,6 +109,7 @@ export function buildMissingRuntimeObservabilitySnapshot(
       timeoutWakeBatch: { ...EMPTY_TIMEOUT_WAKE_BATCH },
     },
     audiences: null,
+    sendr: null,
   }
 }
 
@@ -231,6 +234,7 @@ export async function getGrowthRuntimeObservabilitySnapshot(
     liveWakeCount ?? wakeBatch.remainingCount + timeoutWakeBatch.remainingCount
 
   let audiences: GrowthRuntimeObservabilitySnapshot["audiences"] = null
+  let sendr: GrowthRuntimeObservabilitySnapshot["sendr"] = null
   if (input?.organizationId) {
     try {
       audiences = await getGrowthAudienceObservabilitySnapshot(admin, {
@@ -238,6 +242,13 @@ export async function getGrowthRuntimeObservabilitySnapshot(
       })
     } catch {
       audiences = null
+    }
+    try {
+      sendr = await getGrowthSendrObservabilitySnapshot(admin, {
+        organizationId: input.organizationId,
+      })
+    } catch {
+      sendr = null
     }
   }
 
@@ -267,6 +278,7 @@ export async function getGrowthRuntimeObservabilitySnapshot(
       timeoutWakeBatch,
     },
     audiences,
+    sendr,
   }
 }
 

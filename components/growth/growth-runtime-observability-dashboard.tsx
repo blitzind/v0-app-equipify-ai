@@ -73,6 +73,20 @@ type ObservabilityResponse = {
       snapshotBacklog: number
       refreshBacklog: number
     } | null
+    sendr: {
+      schemaReady: boolean
+      assetsCreatedToday: number
+      pagesPublishedToday: number
+      publicPageViewsToday: number
+      videoEventsToday: number
+      bookingsToday: number
+      ctaClicksToday: number
+      agentEventsToday: number
+      rowsReadToday: number
+      rowsWrittenToday: number
+      failuresToday: number
+      throttlesToday: number
+    } | null
   }
 }
 
@@ -358,6 +372,62 @@ export function GrowthRuntimeObservabilityDashboard() {
                 <div className="flex justify-between">
                   <span>In-progress refreshes</span>
                   <span>{snapshot.audiences.refreshBacklog}</span>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {snapshot.sendr ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Personalized Media (SENDR)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {!snapshot.sendr.schemaReady ? (
+              <p className="text-muted-foreground">SENDR schema not ready — apply GS-SENDR-2A migration.</p>
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <span>Assets created today</span>
+                  <span>{snapshot.sendr.assetsCreatedToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Pages published today</span>
+                  <span>{snapshot.sendr.pagesPublishedToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Public page views today</span>
+                  <span>{snapshot.sendr.publicPageViewsToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Video events today</span>
+                  <span>{snapshot.sendr.videoEventsToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Bookings today</span>
+                  <span>{snapshot.sendr.bookingsToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>CTA clicks today</span>
+                  <span>{snapshot.sendr.ctaClicksToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Agent events today</span>
+                  <span>{snapshot.sendr.agentEventsToday}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Rows read / written</span>
+                  <span>
+                    {snapshot.sendr.rowsReadToday} / {snapshot.sendr.rowsWrittenToday}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Failures / throttles</span>
+                  <span>
+                    {snapshot.sendr.failuresToday} / {snapshot.sendr.throttlesToday}
+                  </span>
                 </div>
               </>
             )}

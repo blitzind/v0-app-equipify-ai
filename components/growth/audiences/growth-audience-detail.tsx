@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Loader2, Play, RefreshCw, UserPlus } from "lucide-react"
+import Link from "next/link"
+import { Loader2, Play, RefreshCw, Sparkles, UserPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -206,6 +207,10 @@ export function GrowthAudienceDetail({ audienceId }: { audienceId: string }) {
   const enrollLeadIds = members
     .filter((m) => selected.has(m.id) && m.leadId)
     .map((m) => m.leadId!)
+  const selectedMembers = members.filter((m) => selected.has(m.id))
+  const selectedWithLead = selectedMembers.filter((m) => m.leadId)
+  const sendrBridgeMember =
+    selectedWithLead.length === 1 ? selectedWithLead[0]! : null
   const selectedWithoutLead = members.filter((m) => selected.has(m.id) && !m.leadId)
   const withoutLeadCount = members.filter((m) => !m.leadId).length
 
@@ -383,6 +388,23 @@ export function GrowthAudienceDetail({ audienceId }: { audienceId: string }) {
               onClick={() => setEnrollOpen(true)}
             >
               Enroll Selected ({enrollLeadIds.length})
+            </Button>
+            <Button size="sm" variant="outline" disabled={!sendrBridgeMember} asChild={Boolean(sendrBridgeMember)}>
+              {sendrBridgeMember ? (
+                <Link
+                  href={`/growth/sendr/new?leadId=${sendrBridgeMember.leadId}&audienceMemberId=${sendrBridgeMember.id}&companyId=${sendrBridgeMember.companyId ?? ""}&title=${encodeURIComponent(
+                    sendrBridgeMember.personName ?? sendrBridgeMember.companyName ?? "SENDR page",
+                  )}`}
+                >
+                  <Sparkles className="mr-1 h-4 w-4" />
+                  Create SENDR Page
+                </Link>
+              ) : (
+                <>
+                  <Sparkles className="mr-1 h-4 w-4" />
+                  Create SENDR Page (1 lead)
+                </>
+              )}
             </Button>
           </div>
         </CardHeader>

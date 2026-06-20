@@ -194,6 +194,12 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "video_video_completed",
   "video_cta_clicked",
   "video_calendar_clicked",
+  "landing_page_viewed",
+  "video_started",
+  "video_completed",
+  "cta_clicked",
+  "booking_started",
+  "booking_completed",
 ] as const
 
 export type GrowthLeadTimelineEventType = (typeof GROWTH_LEAD_TIMELINE_EVENT_TYPES)[number]
