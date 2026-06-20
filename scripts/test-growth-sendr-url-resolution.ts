@@ -27,7 +27,7 @@ function main(): void {
 
   assert.equal(
     buildSendrPagePublicLink("acme-demo"),
-    "https://app.equipify.ai/sendr/acme-demo",
+    "https://app.equipify.ai/videos/acme-demo",
   )
   assert.ok(GROWTH_SENDR_LIMITS.MAX_SENDR_URL_RESOLUTIONS_PER_BATCH >= 500)
 

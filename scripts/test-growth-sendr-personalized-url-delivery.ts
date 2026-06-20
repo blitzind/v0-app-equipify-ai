@@ -58,7 +58,7 @@ function main(): void {
 
   assert.equal(
     buildSendrPagePublicLink("acme-demo"),
-    "https://app.equipify.ai/sendr/acme-demo",
+    "https://app.equipify.ai/videos/acme-demo",
   )
   console.log("  ✓ Anonymous bare slug URLs unchanged")
 
@@ -67,12 +67,12 @@ function main(): void {
   const slug = "acme-demo"
 
   const tokenized = resolveSendrExternalPageUrl({ slug, landingPageId: pageId, leadId })
-  assert.match(tokenized, /^https:\/\/app\.equipify\.ai\/sendr\/acme-demo\?token=/)
+  assert.match(tokenized, /^https:\/\/app\.equipify\.ai\/videos\/acme-demo\?token=/)
   assert.doesNotMatch(tokenized, /leadId=/)
   assert.ok(verifySendrVisitorToken(new URL(tokenized).searchParams.get("token") ?? "", pageId))
 
   const anonymous = resolveSendrExternalPageUrl({ slug, landingPageId: pageId })
-  assert.equal(anonymous, "https://app.equipify.ai/sendr/acme-demo")
+  assert.equal(anonymous, "https://app.equipify.ai/videos/acme-demo")
 
   const direct = buildSendrPersonalizedVisitorLink({ slug, landingPageId: pageId, leadId })
   assert.match(direct, /\?token=/)

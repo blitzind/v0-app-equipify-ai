@@ -72,8 +72,10 @@ export async function recordSendrLandingPageViewedTimeline(
   await recordSendrTimelineEvent(admin, {
     ...input,
     eventType: "landing_page_viewed",
-    title: "SENDR page viewed",
-    summary: input.pageUrl ? `Viewed SENDR page (${input.pageUrl})` : "Viewed SENDR personalized landing page.",
+    title: "Personalized video page viewed",
+    summary: input.pageUrl
+      ? `Viewed personalized video page (${input.pageUrl})`
+      : "Viewed personalized video page.",
   })
 }
 
@@ -84,8 +86,8 @@ export async function recordSendrVideoStartedTimeline(
   await recordSendrTimelineEvent(admin, {
     ...input,
     eventType: "video_started",
-    title: "SENDR video started",
-    summary: "Started video on SENDR landing page.",
+    title: "Personalized video started",
+    summary: "Started video on personalized video page.",
   })
 }
 
@@ -96,8 +98,8 @@ export async function recordSendrVideoCompletedTimeline(
   await recordSendrTimelineEvent(admin, {
     ...input,
     eventType: "video_completed",
-    title: "SENDR video completed",
-    summary: "Completed video on SENDR landing page.",
+    title: "Personalized video completed",
+    summary: "Completed video on personalized video page.",
   })
 }
 
@@ -108,8 +110,10 @@ export async function recordSendrCtaClickedTimeline(
   await recordSendrTimelineEvent(admin, {
     ...input,
     eventType: "cta_clicked",
-    title: "SENDR CTA clicked",
-    summary: input.ctaLabel ? `Clicked "${input.ctaLabel}" on SENDR page` : "Clicked call-to-action on SENDR page.",
+    title: "Personalized video CTA clicked",
+    summary: input.ctaLabel
+      ? `Clicked "${input.ctaLabel}" on personalized video page`
+      : "Clicked call-to-action on personalized video page.",
   })
 }
 
@@ -120,8 +124,8 @@ export async function recordSendrBookingStartedTimeline(
   await recordSendrTimelineEvent(admin, {
     ...input,
     eventType: "booking_started",
-    title: "SENDR booking started",
-    summary: "Started booking flow from SENDR landing page.",
+    title: "Personalized video booking started",
+    summary: "Started booking flow from personalized video page.",
   })
 }
 
@@ -132,7 +136,7 @@ export async function recordSendrBookingCompletedTimeline(
   await recordSendrTimelineEvent(admin, {
     ...input,
     eventType: "booking_completed",
-    title: "SENDR booking completed",
-    summary: "Completed booking from SENDR landing page.",
+    title: "Personalized video booking completed",
+    summary: "Completed booking from personalized video page.",
   })
 }

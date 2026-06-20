@@ -75,9 +75,12 @@ function main(): void {
   assert.match(service, /parseSendrVisitorRenderContext|personalizeSendrPublicPagePayload/)
   assert.doesNotMatch(service, /setInterval|WebSocket|subscribe|poll/i)
 
-  const pageRoute = readSource("app/sendr/[slug]/page.tsx")
+  const pageRoute = readSource("app/videos/[slug]/page.tsx")
   assert.match(pageRoute, /searchParams/)
   assert.match(pageRoute, /parseSendrVisitorRenderContext/)
+
+  const legacyRoute = readSource("app/sendr/[slug]/page.tsx")
+  assert.match(legacyRoute, /redirect\(/)
 
   const publicApi = readSource("app/api/public/sendr/[slug]/route.ts")
   assert.match(publicApi, /parseSendrVisitorRenderContext/)
@@ -170,11 +173,11 @@ function main(): void {
 
   assert.equal(
     buildSendrPagePublicLink("demo-page", "https://app.equipify.ai", { leadId }),
-    `https://app.equipify.ai/sendr/demo-page?leadId=${leadId}`,
+    `https://app.equipify.ai/videos/demo-page?leadId=${leadId}`,
   )
   assert.equal(
     buildSendrPagePublicLink("demo-page", "https://app.equipify.ai", { token }),
-    `https://app.equipify.ai/sendr/demo-page?token=${encodeURIComponent(token)}`,
+    `https://app.equipify.ai/videos/demo-page?token=${encodeURIComponent(token)}`,
   )
   console.log("  ✓ Public link builder supports leadId/token query params")
 

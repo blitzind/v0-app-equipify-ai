@@ -12,7 +12,7 @@ export function generateSendrActivityFollowUpRecommendations(input: {
   const recommendations: string[] = []
 
   if (input.signals.pageViews > 0 && input.signals.ctaClicks === 0) {
-    recommendations.push("Viewed SENDR page but no CTA click — review page offer and CTA placement.")
+    recommendations.push("Viewed personalized video page but no CTA click — review page offer and CTA placement.")
   }
 
   if (input.signals.videoCompletes > 0) {

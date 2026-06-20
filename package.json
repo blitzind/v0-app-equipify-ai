@@ -707,6 +707,7 @@
     "test:growth-sendr-timeline-workspace": "tsx scripts/test-growth-sendr-timeline-workspace.ts",
     "test:growth-sendr-visitor-personalization": "tsx scripts/test-growth-sendr-visitor-personalization.ts",
     "test:growth-sendr-personalized-url-delivery": "tsx scripts/test-growth-sendr-personalized-url-delivery.ts",
+    "test:growth-sendr-branding-alignment": "tsx scripts/test-growth-sendr-branding-alignment.ts",
     "test:growth-multichannel-sequences": "tsx scripts/test-growth-multichannel-sequences.ts",
     "test:growth-sender-pools": "tsx scripts/test-growth-sender-pools.ts",
     "test:growth-connected-mailboxes": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-connected-mailboxes.ts",

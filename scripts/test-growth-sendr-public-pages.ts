@@ -9,6 +9,7 @@ import { GROWTH_SENDR_PUBLIC_QA_MARKER } from "../lib/growth/sendr/growth-sendr-
 function main(): void {
   console.log("\n=== GS-SENDR-2C Public Pages Certification ===\n")
   assert.equal(GROWTH_SENDR_PUBLIC_QA_MARKER, "growth-sendr-public-runtime-gs-sendr-2c-v1")
+  assert.ok(fs.existsSync("app/videos/[slug]/page.tsx"))
   assert.ok(fs.existsSync("app/sendr/[slug]/page.tsx"))
   assert.ok(fs.existsSync("app/api/public/sendr/[slug]/route.ts"))
   assert.ok(fs.existsSync("components/sendr/sendr-public-page-client.tsx"))
@@ -18,7 +19,10 @@ function main(): void {
   assert.match(client, /\/api\/public\/sendr\/events/)
   assert.doesNotMatch(client, /setInterval/)
 
-  console.log("  ✓ Public /sendr/[slug] route with engagement tracking")
+  const legacyRoute = fs.readFileSync("app/sendr/[slug]/page.tsx", "utf8")
+  assert.match(legacyRoute, /redirect\(/)
+
+  console.log("  ✓ Public /videos/[slug] route with legacy /sendr redirect")
   console.log("\nGS-SENDR-2C public pages certification passed.\n")
 }
 

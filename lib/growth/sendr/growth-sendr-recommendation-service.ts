@@ -23,7 +23,7 @@ export function generateSendrRecommendations(input: {
       id: "book_meeting_immediately",
       priority: 1,
       title: "Book meeting immediately",
-      reason: "High SENDR intent or completed booking signal detected.",
+      reason: "High personalized video intent or completed booking signal detected.",
       actionKind: "meeting",
     })
   }
@@ -33,7 +33,7 @@ export function generateSendrRecommendations(input: {
       id: "call_prospect_video_complete",
       priority: 2,
       title: "Call prospect",
-      reason: "Prospect completed video on SENDR page.",
+      reason: "Prospect completed video on personalized video page.",
       actionKind: "call",
     })
   }
@@ -43,7 +43,7 @@ export function generateSendrRecommendations(input: {
       id: "send_follow_up_email_repeat_view",
       priority: 3,
       title: "Send follow-up email",
-      reason: "Prospect viewed SENDR page more than once.",
+      reason: "Prospect viewed personalized video page more than once.",
       actionKind: "email",
     })
   }
@@ -53,7 +53,7 @@ export function generateSendrRecommendations(input: {
       id: "send_booking_reminder",
       priority: 4,
       title: "Send reminder",
-      reason: "Booking started but not completed on SENDR page.",
+      reason: "Booking started but not completed on personalized video page.",
       actionKind: "reminder",
     })
   }
@@ -68,7 +68,7 @@ export function generateSendrRecommendations(input: {
       id: "archive_or_retry_stale",
       priority: 5,
       title: "Archive or retry",
-      reason: "No SENDR engagement in 7+ days after initial activity.",
+      reason: "No personalized video engagement in 7+ days after initial activity.",
       actionKind: "archive",
     })
   }
