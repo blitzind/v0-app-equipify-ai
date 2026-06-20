@@ -18,7 +18,7 @@ function readSource(relativePath: string): string {
 function main(): void {
   console.log("\n=== GS-RG-2B Audience Diff Engine Certification ===\n")
 
-  assert.equal(GROWTH_AUDIENCE_QA_MARKER, "growth-dynamic-audiences-gs-rg-2b-v1")
+  assert.equal(GROWTH_AUDIENCE_QA_MARKER, "growth-dynamic-audiences-gs-rg-2c-v1")
   assert.equal(GROWTH_AUDIENCE_LIMITS.MAX_AUDIENCE_DIFF_MEMBERS, 10_000)
   assert.equal(GROWTH_AUDIENCE_LIMITS.DIFF_MEMBER_BATCH, 500)
 

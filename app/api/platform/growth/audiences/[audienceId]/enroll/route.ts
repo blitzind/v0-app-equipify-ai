@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { enrollAudienceMembersInSequence } from "@/lib/growth/audiences/growth-audience-enrollment-service"
+import { startAudienceEnrollmentRun } from "@/lib/growth/audiences/growth-audience-enrollment-run-service"
 import { getGrowthAudience } from "@/lib/growth/audiences/growth-audience-repository"
 import {
   assertAudienceOrgScope,
@@ -21,6 +21,7 @@ const BodySchema = z.object({
 
 type RouteContext = { params: Promise<{ audienceId: string }> }
 
+/** Legacy enroll endpoint — delegates to resumable enrollment runs (GS-RG-2C). */
 export async function POST(request: Request, context: RouteContext) {
   const access = await requireAudiencePlatformAccess()
   if (!access.ok) return access.response
@@ -39,7 +40,7 @@ export async function POST(request: Request, context: RouteContext) {
     const scope = assertAudienceOrgScope(audience, access.organizationId)
     if (scope) return scope
 
-    const result = await enrollAudienceMembersInSequence(access.admin, {
+    const progress = await startAudienceEnrollmentRun(access.admin, {
       audienceId,
       organizationId: access.organizationId,
       userId: access.userId,
@@ -52,8 +53,26 @@ export async function POST(request: Request, context: RouteContext) {
       dryRun: parsed.data.dryRun,
     })
 
-    const status = result.blocked ? 429 : 200
-    return NextResponse.json({ ok: !result.blocked, result, qa_marker: GROWTH_AUDIENCE_QA_MARKER }, { status })
+    const blocked = progress.status === "throttled"
+    return NextResponse.json(
+      {
+        ok: !blocked,
+        progress,
+        result: {
+          qaMarker: GROWTH_AUDIENCE_QA_MARKER,
+          audienceId,
+          snapshotId: parsed.data.snapshotId,
+          requested: progress.requestedCount,
+          enrollable: progress.requestedCount,
+          skippedNoLead: 0,
+          bulk: null,
+          blocked,
+          reason: progress.error,
+        },
+        qa_marker: GROWTH_AUDIENCE_QA_MARKER,
+      },
+      { status: blocked ? 429 : 200 },
+    )
   } catch (error) {
     return NextResponse.json(
       { ok: false, message: error instanceof Error ? error.message : "enroll_failed" },

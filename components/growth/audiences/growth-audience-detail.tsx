@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { GrowthBulkSequenceEnrollmentDialog } from "@/components/growth/growth-bulk-sequence-enrollment-dialog"
+import { GrowthAudienceEnrollmentWizard } from "@/components/growth/audiences/growth-audience-enrollment-wizard"
 import type {
   GrowthAudience,
   GrowthAudienceLeadCreationProgress,
@@ -206,7 +206,6 @@ export function GrowthAudienceDetail({ audienceId }: { audienceId: string }) {
   const enrollLeadIds = members
     .filter((m) => selected.has(m.id) && m.leadId)
     .map((m) => m.leadId!)
-  const allLeadIds = members.filter((m) => m.leadId).map((m) => m.leadId!)
   const selectedWithoutLead = members.filter((m) => selected.has(m.id) && !m.leadId)
   const withoutLeadCount = members.filter((m) => !m.leadId).length
 
@@ -372,22 +371,18 @@ export function GrowthAudienceDetail({ audienceId }: { audienceId: string }) {
             </Button>
             <Button
               size="sm"
-              variant="outline"
-              disabled={enrollLeadIds.length === 0}
+              disabled={!audience.lastSnapshotId || busy}
               onClick={() => setEnrollOpen(true)}
             >
-              Enroll Selected ({enrollLeadIds.length})
+              Preview Enrollment
             </Button>
             <Button
               size="sm"
               variant="outline"
-              disabled={allLeadIds.length === 0}
-              onClick={async () => {
-                setSelected(new Set(members.filter((m) => m.leadId).map((m) => m.id)))
-                setEnrollOpen(true)
-              }}
+              disabled={enrollLeadIds.length === 0 || !audience.lastSnapshotId}
+              onClick={() => setEnrollOpen(true)}
             >
-              Enroll All ({allLeadIds.length})
+              Enroll Selected ({enrollLeadIds.length})
             </Button>
           </div>
         </CardHeader>
@@ -428,13 +423,16 @@ export function GrowthAudienceDetail({ audienceId }: { audienceId: string }) {
         </CardContent>
       </Card>
 
-      <GrowthBulkSequenceEnrollmentDialog
+      <GrowthAudienceEnrollmentWizard
         open={enrollOpen}
         onOpenChange={setEnrollOpen}
-        leadIds={enrollLeadIds}
-        onDismissAfterSuccess={() => {
+        audienceId={audienceId}
+        snapshotId={audience.lastSnapshotId}
+        selectedMemberIds={[...selected]}
+        onComplete={(msg) => {
           setEnrollOpen(false)
-          setMessage(`Enrollment completed for ${enrollLeadIds.length} leads`)
+          setMessage(msg)
+          void load()
         }}
       />
     </div>

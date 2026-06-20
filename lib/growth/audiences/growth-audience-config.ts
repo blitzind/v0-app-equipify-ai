@@ -1,12 +1,15 @@
-/** GS-RG-2B — Dynamic Audience Snapshots config (client-safe). */
+/** GS-RG-2C — Dynamic Audience Snapshots config (client-safe). */
 
-export const GROWTH_AUDIENCE_QA_MARKER = "growth-dynamic-audiences-gs-rg-2b-v1" as const
+export const GROWTH_AUDIENCE_QA_MARKER = "growth-dynamic-audiences-gs-rg-2c-v1" as const
 
 export const GROWTH_AUDIENCE_SCHEMA_MIGRATION =
   "20270901140000_growth_dynamic_audiences_gs_rg_2a.sql" as const
 
 export const GROWTH_AUDIENCE_2B_SCHEMA_MIGRATION =
   "20270901150000_growth_dynamic_audiences_gs_rg_2b.sql" as const
+
+export const GROWTH_AUDIENCE_2C_SCHEMA_MIGRATION =
+  "20270901160000_growth_dynamic_audiences_gs_rg_2c.sql" as const
 
 /** Informational only — never auto-executes. */
 export const GROWTH_AUDIENCE_REFRESH_POLICIES = ["manual", "daily", "weekly"] as const
@@ -41,6 +44,28 @@ export const GROWTH_AUDIENCE_MEMBER_DIFF_KINDS = ["added", "removed"] as const
 
 export type GrowthAudienceMemberDiffKind = (typeof GROWTH_AUDIENCE_MEMBER_DIFF_KINDS)[number]
 
+export const GROWTH_AUDIENCE_ENROLLMENT_PREVIEW_CATEGORIES = [
+  "eligible",
+  "already_enrolled",
+  "suppressed",
+  "missing_contact",
+  "blocked_by_limits",
+] as const
+
+export type GrowthAudienceEnrollmentPreviewCategory =
+  (typeof GROWTH_AUDIENCE_ENROLLMENT_PREVIEW_CATEGORIES)[number]
+
+export const GROWTH_AUDIENCE_ENROLLMENT_RUN_STATUSES = [
+  "pending",
+  "in_progress",
+  "completed",
+  "failed",
+  "throttled",
+  "cancelled",
+] as const
+
+export type GrowthAudienceEnrollmentRunStatus = (typeof GROWTH_AUDIENCE_ENROLLMENT_RUN_STATUSES)[number]
+
 /** Hard caps — every audience operation must answer guardrail questions before shipping. */
 export const GROWTH_AUDIENCE_LIMITS = {
   MAX_AUDIENCE_MEMBERS_PER_SNAPSHOT: 10_000,
@@ -48,6 +73,9 @@ export const GROWTH_AUDIENCE_LIMITS = {
   MAX_AUDIENCE_GENERATIONS_PER_HOUR: 10,
   MAX_AUDIENCE_ENROLLMENTS_PER_RUN: 100,
   MAX_AUDIENCE_ENROLLMENTS_PER_DAY: 500,
+  MAX_AUDIENCE_PREVIEW_MEMBERS: 10_000,
+  MAX_AUDIENCE_PREVIEW_BATCH: 500,
+  MAX_AUDIENCE_ENROLLMENT_BATCH: 100,
   MAX_AUDIENCE_DIFF_MEMBERS: 10_000,
   MAX_AUDIENCE_REFRESH_BATCH: 500,
   MAX_AUDIENCE_LEAD_CREATIONS_PER_RUN: 100,

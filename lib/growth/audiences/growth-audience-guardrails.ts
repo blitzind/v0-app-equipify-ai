@@ -130,7 +130,7 @@ export async function consumeAudienceEnrollmentBudget(
   admin: SupabaseClient,
   input: { organizationId: string; userId?: string | null; volume: number },
 ): Promise<AudienceGuardrailResult> {
-  const killCheck = await checkAudienceSnapshotEnabled(admin)
+  const killCheck = await checkAudienceEnrollmentEnabled(admin)
   if (!killCheck.allowed) return killCheck
 
   const orgResult = await consumeBudget(admin, {
@@ -267,4 +267,47 @@ export async function recordAudienceGuardrailFailure(
   } catch {
     // Never fail caller on observability write.
   }
+}
+
+export async function checkAudiencePreviewEnabled(
+  admin: SupabaseClient,
+): Promise<AudienceGuardrailResult> {
+  const enabled = await isRuntimeKillSwitchEnabled(admin, "audience_preview_enabled")
+  if (!enabled) {
+    return {
+      allowed: false,
+      reason: "Audience enrollment preview disabled by kill switch.",
+      blockedBy: "kill_switch",
+    }
+  }
+  return { allowed: true, reason: null }
+}
+
+export async function checkAudienceEnrollmentEnabled(
+  admin: SupabaseClient,
+): Promise<AudienceGuardrailResult> {
+  const enabled = await isRuntimeKillSwitchEnabled(admin, "audience_enrollment_enabled")
+  if (!enabled) {
+    return {
+      allowed: false,
+      reason: "Audience enrollment disabled by kill switch.",
+      blockedBy: "kill_switch",
+    }
+  }
+  return { allowed: true, reason: null }
+}
+
+/** Consume org budget for enrollment preview generation (daily cap). */
+export async function consumeAudiencePreviewBudget(
+  admin: SupabaseClient,
+  input: { organizationId: string; userId?: string | null },
+): Promise<AudienceGuardrailResult> {
+  const killCheck = await checkAudiencePreviewEnabled(admin)
+  if (!killCheck.allowed) return killCheck
+
+  return checkAndConsumeBudget(admin, {
+    ...input,
+    resourceType: "audience_enrollment_previews",
+    windowKind: "daily",
+  })
 }

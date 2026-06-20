@@ -22,6 +22,8 @@ export const GROWTH_RUNTIME_GUARDRAIL_LIMITS = {
   MAX_AUDIENCE_REFRESH_BATCH: 500,
   MAX_AUDIENCE_LEAD_CREATIONS_PER_RUN: 100,
   MAX_AUDIENCE_LEAD_CREATIONS_PER_DAY: 500,
+  MAX_AUDIENCE_PREVIEW_MEMBERS: 10_000,
+  MAX_AUDIENCE_PREVIEW_BATCH: 500,
   MAX_WAKE_EVALUATIONS_PER_RUN: 50,
   MAX_WAKE_EVALUATIONS_PER_ORG: 500,
   MAX_MEDIA_EVENTS_PER_SESSION: 200,
@@ -52,6 +54,7 @@ export type GrowthRuntimeResourceType =
   | "audience_enrollments"
   | "audience_diffs"
   | "audience_lead_creations"
+  | "audience_enrollment_previews"
 
 export type GrowthRuntimeBudgetWindowKind = "hourly" | "daily" | "monthly"
 
@@ -64,6 +67,8 @@ export type GrowthRuntimeKillSwitchKey =
   | "audience_snapshot_enabled"
   | "audience_diff_enabled"
   | "audience_lead_creation_enabled"
+  | "audience_preview_enabled"
+  | "audience_enrollment_enabled"
 
 export const GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES: Record<GrowthRuntimeKillSwitchKey, boolean> = {
   wake_execution_enabled: true,
@@ -74,6 +79,8 @@ export const GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES: Record<GrowthRuntimeKillSwitc
   audience_snapshot_enabled: true,
   audience_diff_enabled: true,
   audience_lead_creation_enabled: true,
+  audience_preview_enabled: true,
+  audience_enrollment_enabled: true,
 }
 
 /** Daily budget caps keyed by resource type. Zero = unlimited. */
@@ -92,6 +99,7 @@ export const GROWTH_RUNTIME_DAILY_BUDGET_CAPS: Partial<Record<GrowthRuntimeResou
   audience_enrollments: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_AUDIENCE_ENROLLMENTS_PER_DAY,
   audience_diffs: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_AUDIENCE_REFRESHES_PER_DAY,
   audience_lead_creations: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_AUDIENCE_LEAD_CREATIONS_PER_DAY,
+  audience_enrollment_previews: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_AUDIENCE_REFRESHES_PER_DAY,
 }
 
 /** Hourly budget caps keyed by resource type. */

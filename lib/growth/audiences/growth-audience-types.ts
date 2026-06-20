@@ -1,7 +1,9 @@
-/** GS-RG-2B — Dynamic Audience types (client-safe). */
+/** GS-RG-2C — Dynamic Audience types (client-safe). */
 
 import type {
   GrowthAudienceDiffStatus,
+  GrowthAudienceEnrollmentPreviewCategory,
+  GrowthAudienceEnrollmentRunStatus,
   GrowthAudienceMemberDiffKind,
   GrowthAudienceRefreshPolicy,
   GrowthAudienceRefreshRunStatus,
@@ -173,4 +175,95 @@ export type GrowthAudienceSnapshotProgress = {
 
 export type GrowthAudienceRefreshPolicyUpdate = {
   refreshPolicy: GrowthAudienceRefreshPolicy
+}
+
+export type GrowthAudienceEnrollmentPreview = {
+  id: string
+  audienceId: string
+  organizationId: string
+  snapshotId: string
+  sequencePatternId: string
+  status: GrowthAudienceEnrollmentRunStatus
+  totalMembers: number
+  eligibleCount: number
+  alreadyEnrolledCount: number
+  suppressedCount: number
+  missingContactCount: number
+  blockedCount: number
+  processedCount: number
+  rowsRead: number
+  rowsWritten: number
+  durationMs: number | null
+  generatedAt: string | null
+  previewCursor: string | null
+  error: string | null
+  createdAt: string
+}
+
+export type GrowthAudienceEnrollmentPreviewMember = {
+  id: string
+  previewId: string
+  audienceMemberId: string
+  snapshotId: string
+  leadId: string | null
+  category: GrowthAudienceEnrollmentPreviewCategory
+  reason: string | null
+  displayLabel: string | null
+  createdAt: string
+}
+
+export type GrowthAudienceEnrollmentRun = {
+  id: string
+  audienceId: string
+  organizationId: string
+  snapshotId: string
+  previewId: string | null
+  sequencePatternId: string
+  status: GrowthAudienceEnrollmentRunStatus
+  requestedCount: number
+  enrolledCount: number
+  skippedCount: number
+  failedCount: number
+  processedCount: number
+  rowsRead: number
+  rowsWritten: number
+  durationMs: number | null
+  startImmediately: boolean
+  dryRun: boolean
+  cancelledAt: string | null
+  runCursor: string | null
+  error: string | null
+  createdAt: string
+}
+
+export type GrowthAudienceEnrollmentPreviewProgress = {
+  previewId: string
+  status: GrowthAudienceEnrollmentRunStatus
+  totalMembers: number
+  eligibleCount: number
+  alreadyEnrolledCount: number
+  suppressedCount: number
+  missingContactCount: number
+  blockedCount: number
+  processedCount: number
+  hasMore: boolean
+  rowsRead: number
+  rowsWritten: number
+  durationMs: number | null
+  error: string | null
+}
+
+export type GrowthAudienceEnrollmentRunProgress = {
+  runId: string
+  status: GrowthAudienceEnrollmentRunStatus
+  requestedCount: number
+  enrolledCount: number
+  skippedCount: number
+  failedCount: number
+  processedCount: number
+  hasMore: boolean
+  rowsRead: number
+  rowsWritten: number
+  durationMs: number | null
+  error: string | null
 }

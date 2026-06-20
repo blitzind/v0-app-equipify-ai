@@ -1,6 +1,11 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import {
+  aggregateEnrollmentPreviewMetricsToday,
+  aggregateEnrollmentRunMetricsToday,
+  countEnrollmentPreviewsToday,
+} from "@/lib/growth/audiences/growth-audience-enrollment-repository"
 import { probeAudienceTable } from "@/lib/growth/audiences/growth-audience-schema-health"
 import {
   aggregateAudienceDiffMetricsToday,
@@ -14,6 +19,9 @@ export type GrowthAudienceObservabilitySnapshot = {
   snapshotsGeneratedToday: number
   refreshesToday: number
   enrollmentsToday: number
+  previewsGeneratedToday: number
+  membersEvaluatedToday: number
+  membersEnrolledToday: number
   diffsGeneratedToday: number
   membersAddedToday: number
   membersRemovedToday: number
@@ -41,6 +49,9 @@ export async function getGrowthAudienceObservabilitySnapshot(
     snapshotsGeneratedToday: 0,
     refreshesToday: 0,
     enrollmentsToday: 0,
+    previewsGeneratedToday: 0,
+    membersEvaluatedToday: 0,
+    membersEnrolledToday: 0,
     diffsGeneratedToday: 0,
     membersAddedToday: 0,
     membersRemovedToday: 0,
@@ -60,6 +71,8 @@ export async function getGrowthAudienceObservabilitySnapshot(
     const refreshRuns = admin.schema("growth").from("growth_audience_refresh_runs")
     const snapshots = admin.schema("growth").from("growth_audience_snapshots")
     const snapshotDiffs = admin.schema("growth").from("growth_audience_snapshot_diffs")
+    const previews = admin.schema("growth").from("growth_audience_enrollment_previews")
+    const enrollmentRuns = admin.schema("growth").from("growth_audience_enrollment_runs")
 
     const [
       completedToday,
@@ -72,6 +85,11 @@ export async function getGrowthAudienceObservabilitySnapshot(
       diffFailuresToday,
       diffThrottlesToday,
       diffMetricsAgg,
+      previewFailuresToday,
+      previewThrottlesToday,
+      previewMetricsAgg,
+      runMetricsAgg,
+      runFailuresToday,
     ] = await Promise.all([
       snapshots
         .select("id", { count: "exact", head: true })
@@ -117,6 +135,31 @@ export async function getGrowthAudienceObservabilitySnapshot(
         .eq("organization_id", input.organizationId)
         .gte("created_at", dayStart)
         .limit(100),
+      previews
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", input.organizationId)
+        .eq("status", "failed")
+        .gte("created_at", dayStart),
+      previews
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", input.organizationId)
+        .eq("status", "throttled")
+        .gte("created_at", dayStart),
+      previews
+        .select("rows_read, rows_written")
+        .eq("organization_id", input.organizationId)
+        .gte("created_at", dayStart)
+        .limit(100),
+      enrollmentRuns
+        .select("rows_read, rows_written")
+        .eq("organization_id", input.organizationId)
+        .gte("created_at", dayStart)
+        .limit(100),
+      enrollmentRuns
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", input.organizationId)
+        .eq("status", "failed")
+        .gte("created_at", dayStart),
     ])
 
     let rowsReadToday = 0
@@ -126,6 +169,14 @@ export async function getGrowthAudienceObservabilitySnapshot(
       rowsWrittenToday += Number((row as { rows_written: number }).rows_written ?? 0)
     }
     for (const row of diffMetricsAgg.data ?? []) {
+      rowsReadToday += Number((row as { rows_read: number }).rows_read ?? 0)
+      rowsWrittenToday += Number((row as { rows_written: number }).rows_written ?? 0)
+    }
+    for (const row of previewMetricsAgg.data ?? []) {
+      rowsReadToday += Number((row as { rows_read: number }).rows_read ?? 0)
+      rowsWrittenToday += Number((row as { rows_written: number }).rows_written ?? 0)
+    }
+    for (const row of runMetricsAgg.data ?? []) {
       rowsReadToday += Number((row as { rows_read: number }).rows_read ?? 0)
       rowsWrittenToday += Number((row as { rows_written: number }).rows_written ?? 0)
     }
@@ -144,10 +195,20 @@ export async function getGrowthAudienceObservabilitySnapshot(
       .eq("window_kind", "daily")
       .gte("window_start", dayStart)
 
-    const [diffsGeneratedToday, diffMemberMetrics, leadCreationsToday] = await Promise.all([
+    const [
+      diffsGeneratedToday,
+      diffMemberMetrics,
+      leadCreationsToday,
+      previewsGeneratedToday,
+      previewMemberMetrics,
+      enrollmentRunMetrics,
+    ] = await Promise.all([
       countAudienceDiffsToday(admin, input.organizationId, dayStart),
       aggregateAudienceDiffMetricsToday(admin, input.organizationId, dayStart),
       countAudienceLeadCreationsToday(admin, input.organizationId, dayStart),
+      countEnrollmentPreviewsToday(admin, input.organizationId, dayStart),
+      aggregateEnrollmentPreviewMetricsToday(admin, input.organizationId, dayStart),
+      aggregateEnrollmentRunMetricsToday(admin, input.organizationId, dayStart),
     ])
 
     return {
@@ -155,14 +216,21 @@ export async function getGrowthAudienceObservabilitySnapshot(
       snapshotsGeneratedToday: completedToday.count ?? 0,
       refreshesToday: refreshesToday.count ?? 0,
       enrollmentsToday: enrollmentsToday ?? 0,
+      previewsGeneratedToday,
+      membersEvaluatedToday: previewMemberMetrics.membersEvaluated,
+      membersEnrolledToday: enrollmentRunMetrics.membersEnrolled,
       diffsGeneratedToday,
       membersAddedToday: diffMemberMetrics.membersAdded,
       membersRemovedToday: diffMemberMetrics.membersRemoved,
       leadCreationsToday,
       rowsReadToday,
       rowsWrittenToday,
-      failuresToday: (failuresToday.count ?? 0) + (diffFailuresToday.count ?? 0),
-      throttlesToday: (throttlesToday.count ?? 0) + (diffThrottlesToday.count ?? 0),
+      failuresToday:
+        (failuresToday.count ?? 0) +
+        (diffFailuresToday.count ?? 0) +
+        (previewFailuresToday.count ?? 0) +
+        (runFailuresToday.count ?? 0),
+      throttlesToday: (throttlesToday.count ?? 0) + (diffThrottlesToday.count ?? 0) + (previewThrottlesToday.count ?? 0),
       snapshotBacklog: snapshotBacklogEstimate,
       refreshBacklog,
     }
