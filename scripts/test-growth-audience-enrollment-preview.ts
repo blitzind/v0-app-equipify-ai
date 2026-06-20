@@ -46,7 +46,11 @@ function main(): void {
   assert.match(previewService, /processAudienceEnrollmentPreviewBatch/)
   assert.doesNotMatch(previewService, /setInterval/)
 
+  const repository = readSource("lib/growth/audiences/growth-audience-enrollment-repository.ts")
+  assert.match(repository, /\.order\("created_at", \{ ascending: true \}\)\s*\n\s*\.order\("id", \{ ascending: true \}\)/)
+
   console.log("  ✓ Preview engine with eligibility categories")
+  console.log("  ✓ Stable preview member pagination (created_at, id)")
   console.log("\nGS-RG-2C enrollment preview certification passed.\n")
 }
 

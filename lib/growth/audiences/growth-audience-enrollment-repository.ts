@@ -229,6 +229,7 @@ export async function listGrowthAudienceEnrollmentPreviewMembers(
     .select("*", { count: "exact" })
     .eq("preview_id", input.previewId)
     .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
 
   if (input.category) query = query.eq("category", input.category)
 
@@ -255,6 +256,7 @@ export async function listEligiblePreviewLeadIds(
       .eq("category", "eligible")
       .not("lead_id", "is", null)
       .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
       .range(offset, offset + batch - 1)
     if (error) throw new Error(error.message)
     if (!data?.length) break
