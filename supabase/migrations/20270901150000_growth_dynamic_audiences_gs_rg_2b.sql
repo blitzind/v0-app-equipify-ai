@@ -12,7 +12,22 @@ $$;
 
 -- -----------------------------------------------------------------------------
 -- Extend growth_audiences — refresh policy metadata (informational only)
+-- Order: drop constraint → expand → migrate values → tighten constraint + default
 -- -----------------------------------------------------------------------------
+
+do $$
+begin
+  alter table growth.growth_audiences
+    drop constraint if exists growth_audiences_refresh_policy_check;
+
+  alter table growth.growth_audiences
+    add constraint growth_audiences_refresh_policy_check
+    check (refresh_policy in ('manual_only', 'manual', 'daily', 'weekly'));
+exception
+  when duplicate_object then
+    null;
+end;
+$$;
 
 update growth.growth_audiences
 set refresh_policy = 'manual'
@@ -22,15 +37,18 @@ alter table growth.growth_audiences
   drop constraint if exists growth_audiences_refresh_policy_check;
 
 alter table growth.growth_audiences
+  add constraint growth_audiences_refresh_policy_check
+  check (refresh_policy in ('manual', 'daily', 'weekly'));
+
+alter table growth.growth_audiences
+  alter column refresh_policy set default 'manual';
+
+alter table growth.growth_audiences
   add column if not exists refresh_interval_days integer
     check (refresh_interval_days is null or refresh_interval_days > 0),
   add column if not exists next_refresh_at timestamptz,
   add column if not exists result_mode text not null default 'companies'
     check (result_mode in ('companies', 'people'));
-
-alter table growth.growth_audiences
-  add constraint growth_audiences_refresh_policy_check
-  check (refresh_policy in ('manual', 'daily', 'weekly', 'manual_only'));
 
 comment on column growth.growth_audiences.refresh_policy is
   'GS-RG-2B informational refresh policy — never auto-executes.';
