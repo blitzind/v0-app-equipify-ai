@@ -29,6 +29,12 @@ export const GROWTH_SENDR_VISITOR_PERSONALIZATION_QA_MARKER =
 export const GROWTH_SENDR_PERSONALIZED_URL_DELIVERY_QA_MARKER =
   "growth-sendr-personalized-url-delivery-gs-sendr-3d-v1" as const
 
+export const GROWTH_SENDR_GROWTH_VIDEO_INTEGRATION_QA_MARKER =
+  "growth-sendr-growth-video-integration-gs-sendr-4a-v1" as const
+
+export const GROWTH_SENDR_VIDEO_WORKFLOW_QA_MARKER =
+  "growth-sendr-video-workflow-gs-sendr-4b-v1" as const
+
 export const GROWTH_SENDR_SEQUENCE_BRIDGE_SCHEMA_MIGRATION =
   "20270901190000_growth_sendr_sequence_bridge_gs_sendr_2d.sql" as const
 

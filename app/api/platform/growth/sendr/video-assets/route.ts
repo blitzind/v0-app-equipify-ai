@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { GROWTH_SENDR_WORKSPACE_QA_MARKER } from "@/lib/growth/sendr/growth-sendr-config"
+import { GROWTH_SENDR_GROWTH_VIDEO_INTEGRATION_QA_MARKER, GROWTH_SENDR_VIDEO_WORKFLOW_QA_MARKER, GROWTH_SENDR_WORKSPACE_QA_MARKER } from "@/lib/growth/sendr/growth-sendr-config"
 import { consumeSendrBudget } from "@/lib/growth/sendr/growth-sendr-guardrails"
+import {
+  detachGrowthVideoFromSendrPage,
+  detachGrowthVideoFromSendrSection,
+  linkGrowthVideoAssetToSendrPage,
+  linkGrowthVideoAssetToSendrSection,
+  resolveGrowthVideoPlaybackForSendr,
+} from "@/lib/growth/sendr/growth-sendr-growth-video-bridge-service"
 import { updateGrowthSendrLandingPage, getGrowthSendrLandingPage } from "@/lib/growth/sendr/growth-sendr-landing-page-repository"
 import { requireSendrPlatformAccess } from "@/lib/growth/sendr/growth-sendr-platform-access"
 import {
@@ -13,9 +20,22 @@ import {
 export const runtime = "nodejs"
 
 const BodySchema = z.object({
-  action: z.enum(["register", "update_metadata", "attach", "attach_existing"]).optional(),
+  action: z
+    .enum([
+      "register",
+      "update_metadata",
+      "attach",
+      "attach_existing",
+      "attach_growth_video",
+      "attach_growth_video_section",
+      "detach_page_video",
+      "detach_section_video",
+    ])
+    .optional(),
   videoAssetId: z.string().uuid().optional(),
+  growthVideoAssetId: z.string().uuid().optional(),
   landingPageId: z.string().uuid().optional(),
+  sectionId: z.string().uuid().optional(),
   mediaAssetId: z.string().uuid().optional(),
   sourceUrl: z.string().max(2000).optional().nullable(),
   posterUrl: z.string().max(2000).optional().nullable(),
@@ -90,9 +110,71 @@ export async function POST(request: Request) {
         mobileMetadata: {
           ...currentPage.mobileMetadata,
           videoAssetId: parsed.data.videoAssetId,
+          videoSource: existing.legacyVideoAssetId ? "growth_library" : "sendr_metadata",
+          growthVideoAssetId: existing.legacyVideoAssetId ?? undefined,
         },
       })
       return NextResponse.json({ ok: true, page, videoAsset: existing, qa_marker: GROWTH_SENDR_WORKSPACE_QA_MARKER })
+    }
+
+    if (action === "attach_growth_video") {
+      if (!parsed.data.landingPageId || !parsed.data.growthVideoAssetId) {
+        return NextResponse.json({ ok: false, error: "attach_growth_video_fields_required" }, { status: 400 })
+      }
+      const linked = await linkGrowthVideoAssetToSendrPage(access.admin, {
+        organizationId: access.organizationId,
+        ownerUserId: access.userId,
+        landingPageId: parsed.data.landingPageId,
+        growthVideoAssetId: parsed.data.growthVideoAssetId,
+      })
+      return NextResponse.json({
+        ok: true,
+        page: linked.page,
+        videoAsset: linked.videoAsset,
+        qa_marker: GROWTH_SENDR_GROWTH_VIDEO_INTEGRATION_QA_MARKER,
+      })
+    }
+
+    if (action === "attach_growth_video_section") {
+      if (!parsed.data.landingPageId || !parsed.data.sectionId || !parsed.data.growthVideoAssetId) {
+        return NextResponse.json({ ok: false, error: "attach_growth_video_section_fields_required" }, { status: 400 })
+      }
+      const linked = await linkGrowthVideoAssetToSendrSection(access.admin, {
+        organizationId: access.organizationId,
+        ownerUserId: access.userId,
+        landingPageId: parsed.data.landingPageId,
+        sectionId: parsed.data.sectionId,
+        growthVideoAssetId: parsed.data.growthVideoAssetId,
+      })
+      return NextResponse.json({
+        ok: true,
+        section: linked.section,
+        videoAsset: linked.videoAsset,
+        qa_marker: GROWTH_SENDR_VIDEO_WORKFLOW_QA_MARKER,
+      })
+    }
+
+    if (action === "detach_page_video") {
+      if (!parsed.data.landingPageId) {
+        return NextResponse.json({ ok: false, error: "landing_page_id_required" }, { status: 400 })
+      }
+      const page = await detachGrowthVideoFromSendrPage(access.admin, {
+        organizationId: access.organizationId,
+        landingPageId: parsed.data.landingPageId,
+      })
+      return NextResponse.json({ ok: true, page, qa_marker: GROWTH_SENDR_VIDEO_WORKFLOW_QA_MARKER })
+    }
+
+    if (action === "detach_section_video") {
+      if (!parsed.data.landingPageId || !parsed.data.sectionId) {
+        return NextResponse.json({ ok: false, error: "section_fields_required" }, { status: 400 })
+      }
+      const section = await detachGrowthVideoFromSendrSection(access.admin, {
+        organizationId: access.organizationId,
+        landingPageId: parsed.data.landingPageId,
+        sectionId: parsed.data.sectionId,
+      })
+      return NextResponse.json({ ok: true, section, qa_marker: GROWTH_SENDR_VIDEO_WORKFLOW_QA_MARKER })
     }
 
     return NextResponse.json({ ok: false, error: "unknown_action" }, { status: 400 })
@@ -109,6 +191,23 @@ export async function GET(request: Request) {
   if (!access.ok) return access.response
 
   const videoAssetId = new URL(request.url).searchParams.get("videoAssetId")
+  const growthVideoAssetId = new URL(request.url).searchParams.get("growthVideoAssetId")
+
+  if (growthVideoAssetId) {
+    const preview = await resolveGrowthVideoPlaybackForSendr(access.admin, {
+      organizationId: access.organizationId,
+      growthVideoAssetId,
+    })
+    if (!preview) {
+      return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 })
+    }
+    return NextResponse.json({
+      ok: true,
+      preview,
+      qa_marker: GROWTH_SENDR_GROWTH_VIDEO_INTEGRATION_QA_MARKER,
+    })
+  }
+
   if (!videoAssetId) {
     return NextResponse.json({ ok: false, error: "video_asset_id_required" }, { status: 400 })
   }

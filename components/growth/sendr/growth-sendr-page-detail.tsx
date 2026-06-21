@@ -1,7 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { Check, Copy, Loader2, RefreshCw, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,6 +30,12 @@ import type {
   GrowthSendrAssetPickerItem,
 } from "@/lib/growth/sendr/growth-sendr-types"
 import { GrowthSendrAssetPickerPanel } from "@/components/growth/sendr/growth-sendr-asset-picker-panel"
+import { GrowthSendrSectionVideoEditor } from "@/components/growth/sendr/growth-sendr-section-video-editor"
+import {
+  buildSendrPageDetailPath,
+  buildSendrVideoReturnContextForPage,
+  parseSendrReturnAttachParams,
+} from "@/lib/growth/sendr/growth-sendr-video-return-flow"
 
 type DetailResponse = {
   ok: boolean
@@ -42,6 +49,7 @@ type DetailResponse = {
 }
 
 export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
+  const searchParams = useSearchParams()
   const [detail, setDetail] = useState<DetailResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -97,6 +105,62 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
   useEffect(() => {
     void load()
   }, [load])
+
+  const attachGrowthVideoToTarget = useCallback(
+    async (growthVideoAssetId: string, sectionId?: string) => {
+      setBusy(true)
+      setMessage(null)
+      try {
+        const res = await fetch("/api/platform/growth/sendr/video-assets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            sectionId
+              ? {
+                  action: "attach_growth_video_section",
+                  landingPageId: pageId,
+                  sectionId,
+                  growthVideoAssetId,
+                }
+              : {
+                  action: "attach_growth_video",
+                  landingPageId: pageId,
+                  growthVideoAssetId,
+                },
+          ),
+        })
+        const data = (await res.json()) as { ok: boolean; message?: string }
+        if (!res.ok) {
+          setMessage(data.message ?? "Video attach failed")
+          return false
+        }
+        setMessage(sectionId ? "Section video attached" : "Growth Video attached")
+        void load()
+        return true
+      } finally {
+        setBusy(false)
+      }
+    },
+    [load, pageId],
+  )
+
+  const returnAttachHandled = useRef(false)
+
+  useEffect(() => {
+    if (returnAttachHandled.current) return
+    const attachParams = parseSendrReturnAttachParams(searchParams)
+    if (!attachParams || attachParams.landingPageId !== pageId) return
+
+    returnAttachHandled.current = true
+    void (async () => {
+      const attached = await attachGrowthVideoToTarget(attachParams.assetId, attachParams.sectionId)
+      if (attached) {
+        window.history.replaceState({}, "", buildSendrPageDetailPath(pageId))
+      } else {
+        setMessage("Return attach failed — select the video manually or upload again.")
+      }
+    })()
+  }, [attachGrowthVideoToTarget, pageId, searchParams])
 
   async function copyLink() {
     const currentPage = detail?.page
@@ -182,26 +246,59 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
     }
   }
 
+  async function detachPageVideo() {
+    setBusy(true)
+    setMessage(null)
+    try {
+      const res = await fetch("/api/platform/growth/sendr/video-assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "detach_page_video",
+          landingPageId: pageId,
+        }),
+      })
+      const data = (await res.json()) as { ok: boolean; message?: string }
+      if (!res.ok) {
+        setMessage(data.message ?? "Video remove failed")
+        return
+      }
+      setMessage("Page video removed")
+      void load()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function attachExistingVideo(item: GrowthSendrAssetPickerItem) {
     if (item.assetKind !== "video") return
     setBusy(true)
     setMessage(null)
     try {
+      const isGrowthLibrary = item.metadata.source === "growth_library"
       const attachRes = await fetch("/api/platform/growth/sendr/video-assets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "attach",
-          landingPageId: pageId,
-          videoAssetId: item.id,
-        }),
+        body: JSON.stringify(
+          isGrowthLibrary
+            ? {
+                action: "attach_growth_video",
+                landingPageId: pageId,
+                growthVideoAssetId: item.id,
+              }
+            : {
+                action: "attach",
+                landingPageId: pageId,
+                videoAssetId: item.id,
+              },
+        ),
       })
       const attachData = (await attachRes.json()) as { ok: boolean; message?: string }
       if (!attachRes.ok) {
         setMessage(attachData.message ?? "Video attach failed")
         return
       }
-      setMessage("Existing video attached")
+      setMessage(isGrowthLibrary ? "Growth Video attached" : "Existing video attached")
       void load()
     } finally {
       setBusy(false)
@@ -371,6 +468,12 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
   }
 
   const { page, sections = [], publications = [], videoAsset, bookingAsset, publicLink } = detail
+  const growthVideoAssetId =
+    typeof page?.mobileMetadata.growthVideoAssetId === "string"
+      ? page.mobileMetadata.growthVideoAssetId
+      : videoAsset?.legacyVideoAssetId ?? null
+  const pageReturnContext = buildSendrVideoReturnContextForPage({ landingPageId: pageId })
+  const selectedVideoPickerId = growthVideoAssetId ?? videoAsset?.id ?? null
 
   return (
     <div className="space-y-4">
@@ -471,16 +574,27 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
           </Card>
           <div className="space-y-2">
             {sections.map((section) => (
-              <div key={section.id} className="flex items-start justify-between rounded-md border p-3 text-sm">
-                <div>
-                  <Badge variant="outline">{section.sectionType}</Badge>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    order {section.sortOrder} · {String(section.content.body ?? "").slice(0, 120)}
-                  </p>
+              <div key={section.id} className="rounded-md border p-3 text-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <Badge variant="outline">{section.sectionType}</Badge>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      order {section.sortOrder} · {String(section.content.body ?? section.content.videoTitle ?? "").slice(0, 120)}
+                    </p>
+                  </div>
+                  <Button size="sm" variant="ghost" disabled={busy} onClick={() => void removeSection(section.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
-                <Button size="sm" variant="ghost" disabled={busy} onClick={() => void removeSection(section.id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {section.sectionType === "video" || section.sectionType === "avatar_video" ? (
+                  <GrowthSendrSectionVideoEditor
+                    pageId={pageId}
+                    section={section}
+                    disabled={busy}
+                    onUpdated={() => void load()}
+                    onMessage={setMessage}
+                  />
+                ) : null}
               </div>
             ))}
           </div>
@@ -546,31 +660,60 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
         <TabsContent value="media" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Video metadata (no upload)</CardTitle>
+              <CardTitle className="text-base">Video</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {videoAsset ? (
-                <p className="text-sm text-muted-foreground">Attached: {videoAsset.id}</p>
-              ) : null}
-              <div className="space-y-2">
-                <Label>Source URL</Label>
-                <Input value={videoSourceUrl} onChange={(e) => setVideoSourceUrl(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Poster URL</Label>
-                <Input value={videoPosterUrl} onChange={(e) => setVideoPosterUrl(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Existing media asset ID (optional)</Label>
-                <Input value={videoMediaAssetId} onChange={(e) => setVideoMediaAssetId(e.target.value)} />
-              </div>
-              <Button size="sm" disabled={busy} onClick={() => void registerAndAttachVideo()}>
-                Register & attach video
-              </Button>
+                <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-medium">Attached video</p>
+                      <p className="text-muted-foreground">
+                        {growthVideoAssetId
+                          ? `Growth Video library asset ${growthVideoAssetId}`
+                          : `Metadata asset ${videoAsset.id}`}
+                      </p>
+                      {videoAsset.durationSeconds ? (
+                        <p className="text-xs text-muted-foreground">Duration: {videoAsset.durationSeconds}s</p>
+                      ) : null}
+                    </div>
+                    <Button size="sm" variant="ghost" disabled={busy} onClick={() => void detachPageVideo()}>
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Record, upload, or select an existing Growth Video asset to attach to this page.
+                </p>
+              )}
+              <details className="rounded-md border p-3">
+                <summary className="cursor-pointer text-sm font-medium">Legacy metadata URL (optional)</summary>
+                <div className="mt-3 space-y-3">
+                  <div className="space-y-2">
+                    <Label>Source URL</Label>
+                    <Input value={videoSourceUrl} onChange={(e) => setVideoSourceUrl(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Poster URL</Label>
+                    <Input value={videoPosterUrl} onChange={(e) => setVideoPosterUrl(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Existing media asset ID (optional)</Label>
+                    <Input value={videoMediaAssetId} onChange={(e) => setVideoMediaAssetId(e.target.value)} />
+                  </div>
+                  <Button size="sm" disabled={busy} onClick={() => void registerAndAttachVideo()}>
+                    Register & attach metadata URL
+                  </Button>
+                </div>
+              </details>
               <GrowthSendrAssetPickerPanel
                 kind="video"
-                selectedId={videoAsset?.id}
+                selectedId={selectedVideoPickerId}
                 disabled={busy}
+                showVideoShortcuts
+                returnContext={pageReturnContext}
+                attachLabel={videoAsset ? "Replace" : "Attach"}
                 onSelect={(item) => void attachExistingVideo(item)}
               />
             </CardContent>

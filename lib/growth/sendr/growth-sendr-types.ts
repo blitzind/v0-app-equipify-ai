@@ -135,6 +135,13 @@ export type GrowthSendrLandingPagePublication = {
   publishedSlug: string | null
 }
 
+export type GrowthSendrPublicSectionVideoPlayback = {
+  sourceUrl: string | null
+  posterUrl: string | null
+  durationSeconds: number | null
+  videoAssetId: string | null
+}
+
 /** Public visitor payload — no internal UUIDs exposed. */
 export type GrowthSendrPublicPageSection = {
   type: GrowthSendrLandingPageSectionType

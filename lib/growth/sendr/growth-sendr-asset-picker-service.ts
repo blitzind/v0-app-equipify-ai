@@ -5,6 +5,7 @@ import { getGrowthSendrBookingAsset } from "@/lib/growth/sendr/growth-sendr-book
 import { getGrowthSendrLandingPage } from "@/lib/growth/sendr/growth-sendr-landing-page-repository"
 import { listGrowthSendrMediaAssets } from "@/lib/growth/sendr/growth-sendr-media-asset-repository"
 import type { GrowthSendrAssetPickerItem } from "@/lib/growth/sendr/growth-sendr-types"
+import { listGrowthVideoAssetsForSendrPicker } from "@/lib/growth/sendr/growth-sendr-growth-video-bridge-service"
 import { getGrowthSendrVideoAsset } from "@/lib/growth/sendr/growth-sendr-video-runtime-repository"
 import { buildSendrPagePublicLink } from "@/lib/growth/sendr/growth-sendr-slug-runtime"
 import { resolveSendrExternalPageUrl } from "@/lib/growth/sendr/growth-sendr-personalized-url-service"
@@ -43,12 +44,20 @@ export async function listSendrAssetPickerItems(
   }
 
   if (kind === "all" || kind === "video") {
+    const growthVideos = await listGrowthVideoAssetsForSendrPicker(admin, {
+      organizationId: input.organizationId,
+      search: search || undefined,
+      limit,
+    })
+    items.push(...growthVideos)
+
     const { data, error } = await admin
       .schema("growth")
       .from("growth_video_assets")
-      .select("id, source_url, poster_url, duration_seconds, created_at")
+      .select("id, source_url, poster_url, duration_seconds, created_at, legacy_video_asset_id")
       .eq("organization_id", input.organizationId)
       .is("deleted_at", null)
+      .is("legacy_video_asset_id", null)
       .order("created_at", { ascending: false })
       .limit(limit)
     if (!error) {
@@ -60,10 +69,16 @@ export async function listSendrAssetPickerItems(
           id: String(r.id),
           assetKind: "video",
           name,
-          subtitle: r.duration_seconds != null ? `${r.duration_seconds}s` : "video",
+          subtitle: r.duration_seconds != null ? `${r.duration_seconds}s` : "legacy metadata",
           status: "registered",
           previewUrl: r.poster_url ? String(r.poster_url) : null,
-          metadata: { sourceUrl: r.source_url, posterUrl: r.poster_url },
+          metadata: {
+            source: "sendr_metadata",
+            sourceUrl: r.source_url,
+            posterUrl: r.poster_url,
+            durationSeconds: r.duration_seconds,
+            createdAt: r.created_at,
+          },
         })
       }
     }

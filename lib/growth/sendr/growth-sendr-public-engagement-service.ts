@@ -116,7 +116,11 @@ export async function ingestSendrPublicEngagementEvents(
     sessionId: input.sessionId,
     eventType: event.eventType,
     landingPageId: ctx.landingPageId,
-    videoAssetId: event.eventType.startsWith("video_") ? ctx.videoAssetId : null,
+    videoAssetId: event.eventType.startsWith("video_")
+      ? typeof event.eventValue?.videoAssetId === "string"
+        ? event.eventValue.videoAssetId
+        : ctx.videoAssetId
+      : null,
     bookingAssetId:
       event.eventType === "calendar_open" ||
       event.eventType.startsWith("booking_")

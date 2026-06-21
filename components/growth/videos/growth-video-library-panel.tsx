@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Archive, Eye, Loader2, Pencil, Search, Trash2, Upload } from "lucide-react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { Archive, ArrowLeft, Eye, Loader2, Pencil, Search, Trash2, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
@@ -13,7 +13,12 @@ import { GrowthVideoWorkspaceShell } from "@/components/growth/videos/growth-vid
 import { GrowthVideoUploadModal } from "@/components/growth/videos/growth-video-upload-modal"
 import { useGrowthVideoAssets } from "@/components/growth/videos/use-growth-video-assets"
 import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
-import type { GrowthVideoAssetStatus } from "@/lib/growth/videos/growth-video-types"
+import type { GrowthVideoAsset, GrowthVideoAssetStatus } from "@/lib/growth/videos/growth-video-types"
+import {
+  buildSendrReturnWithAssetPath,
+  parseSendrVideoReturnContext,
+  SENDR_VIDEO_RETURN_QUERY,
+} from "@/lib/growth/sendr/growth-sendr-video-return-flow"
 
 const FILTERS: Array<{ label: string; value?: GrowthVideoAssetStatus }> = [
   { label: "All" },
@@ -43,11 +48,20 @@ function formatBytes(bytes: number | null): string {
 
 export function GrowthVideoLibraryPanel() {
   const pathname = usePathname()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const returnContext = parseSendrVideoReturnContext(searchParams)
   const { items, loading, error, load } = useGrowthVideoAssets()
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<GrowthVideoAssetStatus | undefined>(undefined)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [actingId, setActingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (searchParams.get(SENDR_VIDEO_RETURN_QUERY.upload) === "1") {
+      setUploadOpen(true)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     void load({ status: filter, search })
@@ -83,11 +97,33 @@ export function GrowthVideoLibraryPanel() {
     }
   }
 
+  function handleUploadedAsset(asset: GrowthVideoAsset) {
+    if (returnContext) {
+      router.push(buildSendrReturnWithAssetPath(returnContext, asset.id))
+      return
+    }
+    void load({ status: filter, search })
+  }
+
   return (
     <GrowthVideoWorkspaceShell
       title="Video Library"
       description="Upload and manage video assets for personalized video pages."
     >
+      {returnContext ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 p-3 text-sm">
+          <p>
+            Upload or choose a video to return to your Personalized Video Page
+            {returnContext.sectionId ? " section" : ""}.
+          </p>
+          <Button size="sm" variant="outline" asChild>
+            <Link href={returnContext.returnTo}>
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              Back to page
+            </Link>
+          </Button>
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -152,6 +188,11 @@ export function GrowthVideoLibraryPanel() {
                   <p>Created: {new Date(asset.createdAt).toLocaleDateString()}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {returnContext ? (
+                    <Button size="sm" asChild>
+                      <Link href={buildSendrReturnWithAssetPath(returnContext, asset.id)}>Use for page</Link>
+                    </Button>
+                  ) : null}
                   <Button size="sm" variant="outline" asChild>
                     <Link href={growthFeaturePath(pathname, `videos/library/${asset.id}`)}>
                       <Eye className="mr-1 h-3 w-3" />
@@ -204,7 +245,7 @@ export function GrowthVideoLibraryPanel() {
       <GrowthVideoUploadModal
         open={uploadOpen}
         onOpenChange={setUploadOpen}
-        onUploaded={() => void load({ status: filter, search })}
+        onUploaded={handleUploadedAsset}
       />
     </GrowthVideoWorkspaceShell>
   )

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Loader2, Plus, RefreshCw, Rocket, Sparkles, BarChart3, Activity } from "lucide-react"
+import { Loader2, Plus, RefreshCw, Rocket, Sparkles, BarChart3, Activity, Video, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -76,6 +76,18 @@ export function GrowthSendrWorkspaceHome() {
             <Link href="/growth/sendr/analytics">
               <BarChart3 className="mr-1 h-4 w-4" />
               Analytics
+            </Link>
+          </Button>
+          <Button size="sm" variant="outline" asChild>
+            <Link href="/growth/videos/record">
+              <Video className="mr-1 h-4 w-4" />
+              Record Video
+            </Link>
+          </Button>
+          <Button size="sm" variant="outline" asChild>
+            <Link href="/growth/videos/library">
+              <ExternalLink className="mr-1 h-4 w-4" />
+              Video Library
             </Link>
           </Button>
           <Button size="sm" asChild>

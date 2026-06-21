@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { GROWTH_VIDEO_MAX_UPLOAD_BYTES } from "@/lib/growth/videos/growth-video-types"
+import type { GrowthVideoAsset } from "@/lib/growth/videos/growth-video-types"
 import { uploadGrowthVideoFile } from "@/components/growth/videos/use-growth-video-assets"
 
 const ALLOWED_TYPES = ["video/mp4", "video/webm", "video/quicktime"]
@@ -25,7 +26,7 @@ export function GrowthVideoUploadModal({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onUploaded: () => void
+  onUploaded: (asset: GrowthVideoAsset) => void
 }) {
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
@@ -72,7 +73,7 @@ export function GrowthVideoUploadModal({
       return
     }
 
-    onUploaded()
+    onUploaded(result.asset)
     onOpenChange(false)
     reset()
   }

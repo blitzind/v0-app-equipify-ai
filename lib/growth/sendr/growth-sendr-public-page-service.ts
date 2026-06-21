@@ -15,6 +15,7 @@ import type {
   GrowthSendrPublicPagePayload,
   GrowthSendrPublicPageSection,
 } from "@/lib/growth/sendr/growth-sendr-types"
+import { resolveSendrPublicVideoPlayback, enrichSendrPublicSectionsWithVideoPlayback } from "@/lib/growth/sendr/growth-sendr-growth-video-bridge-service"
 import { getGrowthSendrVideoAsset } from "@/lib/growth/sendr/growth-sendr-video-runtime-repository"
 import { probeSendrSchemaReady } from "@/lib/growth/sendr/growth-sendr-schema-health"
 import {
@@ -97,13 +98,29 @@ export async function loadSendrPublicPageBySlug(
   if (videoAssetId) {
     const video = await getGrowthSendrVideoAsset(admin, videoAssetId)
     if (video) {
+      const playback = await resolveSendrPublicVideoPlayback(admin, video)
       payload.video = {
-        sourceUrl: video.sourceUrl,
-        posterUrl: video.posterUrl,
-        durationSeconds: video.durationSeconds,
+        sourceUrl: playback.sourceUrl,
+        posterUrl: playback.posterUrl,
+        durationSeconds: playback.durationSeconds,
       }
     }
   }
+
+  const pageVideoFallback = payload.video
+    ? {
+        sourceUrl: payload.video.sourceUrl,
+        posterUrl: payload.video.posterUrl,
+        durationSeconds: payload.video.durationSeconds,
+        videoAssetId,
+      }
+    : null
+
+  payload.sections = await enrichSendrPublicSectionsWithVideoPlayback(admin, {
+    organizationId: page.organizationId,
+    sections: payload.sections,
+    pageVideoFallback,
+  })
 
   if (bookingAssetId) {
     const booking = await getGrowthSendrBookingAsset(admin, bookingAssetId)

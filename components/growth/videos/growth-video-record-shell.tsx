@@ -1,8 +1,14 @@
 "use client"
 
-import { Monitor, Video, Webcam } from "lucide-react"
+import Link from "next/link"
+import { useSearchParams } from "next/navigation"
+import { ArrowLeft, Monitor, Video, Webcam } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthVideoWorkspaceShell } from "@/components/growth/videos/growth-video-workspace-shell"
+import {
+  buildGrowthVideoLibraryHref,
+  parseSendrVideoReturnContext,
+} from "@/lib/growth/sendr/growth-sendr-video-return-flow"
 
 const RECORDING_MODES = [
   {
@@ -26,11 +32,36 @@ const RECORDING_MODES = [
 ] as const
 
 export function GrowthVideoRecordShell() {
+  const searchParams = useSearchParams()
+  const returnContext = parseSendrVideoReturnContext(searchParams)
+
   return (
     <GrowthVideoWorkspaceShell
       title="Recording Studio"
-      description="Choose a capture mode. Recording controls are disabled until the capture pipeline ships."
+      description="Choose a capture mode. When recording completes, you will return to your Personalized Video Page."
     >
+      {returnContext ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 p-3 text-sm">
+          <p>
+            After saving a recording, continue in the Video Library to attach it to your Personalized Video Page
+            {returnContext.sectionId ? " section" : ""}.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" asChild>
+              <Link href={returnContext.returnTo}>
+                <ArrowLeft className="mr-1 h-4 w-4" />
+                Back to page
+              </Link>
+            </Button>
+            <Button size="sm" asChild>
+              <Link href={buildGrowthVideoLibraryHref(returnContext, { openUpload: true })}>
+                Upload instead
+              </Link>
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-3">
         {RECORDING_MODES.map((mode) => {
           const Icon = mode.icon
@@ -43,7 +74,9 @@ export function GrowthVideoRecordShell() {
                 <p className="text-sm font-semibold">{mode.title}</p>
               </div>
               <p className="mb-4 text-xs text-muted-foreground">{mode.description}</p>
-              <Button size="sm" disabled className="w-full">Start recording</Button>
+              <Button size="sm" disabled className="w-full">
+                Start recording
+              </Button>
             </div>
           )
         })}
@@ -55,7 +88,17 @@ export function GrowthVideoRecordShell() {
             <p className="text-sm font-medium">Upload Video</p>
             <p className="text-xs text-muted-foreground">Upload existing files without recording.</p>
           </div>
-          <Button size="sm" variant="outline" disabled>Upload video</Button>
+          <Button size="sm" variant="outline" asChild>
+            <Link
+              href={
+                returnContext
+                  ? buildGrowthVideoLibraryHref(returnContext, { openUpload: true })
+                  : "/growth/videos/library?upload=1"
+              }
+            >
+              Upload video
+            </Link>
+          </Button>
         </div>
       </div>
     </GrowthVideoWorkspaceShell>

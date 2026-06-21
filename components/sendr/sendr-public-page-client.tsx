@@ -58,6 +58,79 @@ function SectionBlock({
 }) {
   const videoStarted = useRef(false)
   const content = section.content
+  const sectionPlayback =
+    content.videoPlayback && typeof content.videoPlayback === "object"
+      ? (content.videoPlayback as {
+          sourceUrl?: string | null
+          posterUrl?: string | null
+          durationSeconds?: number | null
+          videoAssetId?: string | null
+        })
+      : null
+
+  const renderVideoPlayer = (
+    playback: {
+      sourceUrl: string | null
+      posterUrl?: string | null
+      durationSeconds?: number | null
+      videoAssetId?: string | null
+    },
+  ) => (
+    <>
+      {playback.posterUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={playback.posterUrl} alt="" className="max-h-64 rounded-md object-cover" />
+      ) : null}
+      {playback.sourceUrl ? (
+        <video
+          controls
+          className="w-full max-w-2xl rounded-md"
+          poster={playback.posterUrl ?? undefined}
+          onPlay={() => {
+            if (videoStarted.current) return
+            videoStarted.current = true
+            void trackEvents(slug, sessionId, [
+              {
+                eventType: "video_start",
+                eventValue: playback.videoAssetId ? { videoAssetId: playback.videoAssetId } : undefined,
+              },
+            ])
+          }}
+          onEnded={() =>
+            void trackEvents(slug, sessionId, [
+              {
+                eventType: "video_complete",
+                eventValue: playback.videoAssetId ? { videoAssetId: playback.videoAssetId } : undefined,
+              },
+            ])
+          }
+          onTimeUpdate={(e) => {
+            const el = e.currentTarget
+            if (!el.duration) return
+            const pct = Math.round((el.currentTime / el.duration) * 100)
+            if (pct % 25 === 0 && pct > 0) {
+              void trackEvents(slug, sessionId, [
+                {
+                  eventType: "video_progress",
+                  eventValue: {
+                    progressPct: pct,
+                    ...(playback.videoAssetId ? { videoAssetId: playback.videoAssetId } : {}),
+                  },
+                },
+              ])
+            }
+          }}
+        >
+          <source src={playback.sourceUrl} />
+        </video>
+      ) : (
+        <p className="text-sm text-muted-foreground">Video metadata registered — no source URL.</p>
+      )}
+      {playback.durationSeconds ? (
+        <p className="text-xs text-muted-foreground">Duration: {playback.durationSeconds}s</p>
+      ) : null}
+    </>
+  )
 
   if (section.type === "hero" || section.type === "text") {
     return (
@@ -72,44 +145,23 @@ function SectionBlock({
     )
   }
 
-  if (section.type === "video" && video) {
+  if (section.type === "video" || section.type === "avatar_video") {
+    const playback = sectionPlayback ?? (video ? { ...video, videoAssetId: null } : null)
+    if (!playback) {
+      return (
+        <section className="space-y-3">
+          <h3 className="text-lg font-medium">Video</h3>
+          <p className="text-sm text-muted-foreground">No video attached to this section.</p>
+        </section>
+      )
+    }
+
     return (
       <section className="space-y-3">
-        <h3 className="text-lg font-medium">Video</h3>
-        {video.posterUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={video.posterUrl} alt="" className="max-h-64 rounded-md object-cover" />
-        ) : null}
-        {video.sourceUrl ? (
-          <video
-            controls
-            className="w-full max-w-2xl rounded-md"
-            poster={video.posterUrl ?? undefined}
-            onPlay={() => {
-              if (videoStarted.current) return
-              videoStarted.current = true
-              void trackEvents(slug, sessionId, [{ eventType: "video_start" }])
-            }}
-            onEnded={() => void trackEvents(slug, sessionId, [{ eventType: "video_complete" }])}
-            onTimeUpdate={(e) => {
-              const el = e.currentTarget
-              if (!el.duration) return
-              const pct = Math.round((el.currentTime / el.duration) * 100)
-              if (pct % 25 === 0 && pct > 0) {
-                void trackEvents(slug, sessionId, [
-                  { eventType: "video_progress", eventValue: { progressPct: pct } },
-                ])
-              }
-            }}
-          >
-            <source src={video.sourceUrl} />
-          </video>
-        ) : (
-          <p className="text-sm text-muted-foreground">Video metadata registered — no source URL.</p>
-        )}
-        {video.durationSeconds ? (
-          <p className="text-xs text-muted-foreground">Duration: {video.durationSeconds}s</p>
-        ) : null}
+        <h3 className="text-lg font-medium">
+          {typeof content.headline === "string" ? content.headline : "Video"}
+        </h3>
+        {renderVideoPlayer(playback)}
       </section>
     )
   }
