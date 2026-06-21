@@ -19,6 +19,25 @@ import {
 
 export const runtime = "nodejs"
 
+function mapVideoAssetRouteError(error: unknown): { status: number; message: string } {
+  const message = error instanceof Error ? error.message : "video_asset_failed"
+  if (
+    message === "growth_video_asset_not_found" ||
+    message === "landing_page_not_found" ||
+    message === "section_not_found"
+  ) {
+    return { status: 404, message }
+  }
+  if (
+    message === "landing_page_not_published" ||
+    message.includes("_required") ||
+    message.includes("invalid")
+  ) {
+    return { status: 400, message }
+  }
+  return { status: 500, message }
+}
+
 const BodySchema = z.object({
   action: z
     .enum([
@@ -179,10 +198,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: false, error: "unknown_action" }, { status: 400 })
   } catch (error) {
-    return NextResponse.json(
-      { ok: false, message: error instanceof Error ? error.message : "video_asset_failed" },
-      { status: 500 },
-    )
+    const mapped = mapVideoAssetRouteError(error)
+    return NextResponse.json({ ok: false, message: mapped.message }, { status: mapped.status })
   }
 }
 

@@ -117,6 +117,8 @@ function growthAssetToPickerItem(
     previewUrl,
     metadata: {
       source: "growth_library",
+      attachable: true,
+      attachAction: "attach_growth_video",
       growthVideoAssetId: asset.id,
       durationSeconds: asset.durationSeconds,
       createdAt: asset.createdAt,

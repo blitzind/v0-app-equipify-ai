@@ -12,15 +12,21 @@ function settingsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("runtime_guardrail_settings")
 }
 
+/** Missing keys default to enabled so new kill switches cannot silently disable runtime. */
+function resolveKillSwitchDefault(key: GrowthRuntimeKillSwitchKey): boolean {
+  const configured = GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES[key]
+  return configured !== undefined ? configured : true
+}
+
 export async function isRuntimeKillSwitchEnabled(
   admin: SupabaseClient,
   key: GrowthRuntimeKillSwitchKey,
 ): Promise<boolean> {
   const probe = await probeRuntimeTable(admin, "runtime_guardrail_settings")
-  if (probe.missing) return GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES[key]
+  if (probe.missing) return resolveKillSwitchDefault(key)
 
   const { data, error } = await settingsTable(admin).select("enabled").eq("key", key).maybeSingle()
-  if (error || !data) return GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES[key]
+  if (error || !data) return resolveKillSwitchDefault(key)
   return Boolean((data as { enabled: boolean }).enabled)
 }
 

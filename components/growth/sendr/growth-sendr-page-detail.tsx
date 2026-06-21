@@ -295,6 +295,10 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
       })
       const attachData = (await attachRes.json()) as { ok: boolean; message?: string }
       if (!attachRes.ok) {
+        if (isGrowthLibrary && attachData.message === "growth_video_asset_not_found") {
+          setMessage("Growth Video asset not found. Upload it from Video Library first.")
+          return
+        }
         setMessage(attachData.message ?? "Video attach failed")
         return
       }

@@ -33,6 +33,12 @@ type PreviewPayload = {
   durationSeconds: number | null
 }
 
+type VideoLibraryHints = {
+  growthAssetCount: number
+  legacyMetadataCount: number
+  isEmpty: boolean
+}
+
 type Props = {
   kind?: "media" | "video" | "booking" | "landing_page" | "all"
   onSelect: (item: GrowthSendrAssetPickerItem) => void
@@ -53,6 +59,7 @@ export function GrowthSendrAssetPickerPanel({
   returnContext = null,
 }: Props) {
   const [items, setItems] = useState<GrowthSendrAssetPickerItem[]>([])
+  const [videoLibrary, setVideoLibrary] = useState<VideoLibraryHints | null>(null)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState("")
   const [filterKind, setFilterKind] = useState<string>(kind)
@@ -71,8 +78,13 @@ export function GrowthSendrAssetPickerPanel({
       const res = await fetch(`/api/platform/growth/sendr/assets?${params.toString()}`, {
         cache: "no-store",
       })
-      const data = (await res.json()) as { ok: boolean; items?: GrowthSendrAssetPickerItem[] }
+      const data = (await res.json()) as {
+        ok: boolean
+        items?: GrowthSendrAssetPickerItem[]
+        videoLibrary?: VideoLibraryHints
+      }
       setItems(data.items ?? [])
+      setVideoLibrary(data.videoLibrary ?? null)
     } catch {
       setItems([])
     } finally {
@@ -85,6 +97,25 @@ export function GrowthSendrAssetPickerPanel({
   }, [load])
 
   const filtered = useMemo(() => items, [items])
+
+  const displayItems = useMemo(() => {
+    if (!showVideoShortcuts) return filtered
+    return filtered.filter(
+      (item) => item.assetKind !== "video" || item.metadata.source === "growth_library",
+    )
+  }, [filtered, showVideoShortcuts])
+
+  const growthLibraryEmpty =
+    showVideoShortcuts &&
+    (videoLibrary?.isEmpty ?? displayItems.filter((item) => item.assetKind === "video").length === 0)
+
+  function isItemAttachable(item: GrowthSendrAssetPickerItem): boolean {
+    if (item.metadata.attachable === false) return false
+    if (showVideoShortcuts && item.assetKind === "video" && item.metadata.source !== "growth_library") {
+      return false
+    }
+    return true
+  }
 
   async function openPreview(item: GrowthSendrAssetPickerItem) {
     setPreviewItem(item)
@@ -186,12 +217,26 @@ export function GrowthSendrAssetPickerPanel({
       </div>
 
       <div className="max-h-72 space-y-2 overflow-y-auto">
-        {loading && filtered.length === 0 ? (
+        {loading && displayItems.length === 0 ? (
           <p className="text-sm text-muted-foreground">Loading assets…</p>
-        ) : filtered.length === 0 ? (
+        ) : growthLibraryEmpty ? (
+          <div className="space-y-2 rounded-md border border-dashed p-4">
+            <p className="text-sm font-medium">No Growth Video assets yet</p>
+            <p className="text-xs text-muted-foreground">
+              Upload an MP4 from the Video Library, then return here to attach it to this page.
+              Recording is not available yet — use Upload Video for now.
+            </p>
+            {(videoLibrary?.legacyMetadataCount ?? 0) > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Legacy URL-only metadata rows are hidden here. Re-upload through Growth Video Library
+                for signed playback on Personalized Video pages.
+              </p>
+            ) : null}
+          </div>
+        ) : displayItems.length === 0 ? (
           <p className="text-sm text-muted-foreground">No assets found.</p>
         ) : (
-          filtered.map((item) => (
+          displayItems.map((item) => (
             <div
               key={`${item.assetKind}-${item.id}`}
               className={`flex items-center gap-3 rounded-md border p-2 ${
@@ -218,6 +263,9 @@ export function GrowthSendrAssetPickerPanel({
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <Badge variant="outline">{item.status}</Badge>
+                {item.metadata.source === "sendr_metadata" ? (
+                  <Badge variant="secondary">Legacy</Badge>
+                ) : null}
                 {item.assetKind === "video" ? (
                   <Button
                     size="sm"
@@ -232,7 +280,7 @@ export function GrowthSendrAssetPickerPanel({
                 <Button
                   size="sm"
                   variant="secondary"
-                  disabled={disabled}
+                  disabled={disabled || !isItemAttachable(item)}
                   onClick={() => onSelect(item)}
                 >
                   {selectedId === item.id ? "Replace" : attachLabel}

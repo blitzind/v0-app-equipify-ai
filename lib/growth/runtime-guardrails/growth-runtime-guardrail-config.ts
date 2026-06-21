@@ -85,6 +85,10 @@ export type GrowthRuntimeResourceType =
   | "sendr_timeline_updates"
   | "sendr_launches"
   | "sendr_launch_previews"
+  | "sendr_analytics"
+  | "sendr_dashboard_refreshes"
+  | "sendr_activity"
+  | "sendr_activity_refreshes"
 
 export type GrowthRuntimeBudgetWindowKind = "hourly" | "daily" | "monthly"
 
@@ -110,6 +114,8 @@ export type GrowthRuntimeKillSwitchKey =
   | "sendr_recommendations_enabled"
   | "sendr_launch_enabled"
   | "sendr_launch_preview_enabled"
+  | "sendr_analytics_enabled"
+  | "sendr_activity_enabled"
 
 export const GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES: Record<GrowthRuntimeKillSwitchKey, boolean> = {
   wake_execution_enabled: true,
@@ -133,6 +139,8 @@ export const GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES: Record<GrowthRuntimeKillSwitc
   sendr_recommendations_enabled: true,
   sendr_launch_enabled: true,
   sendr_launch_preview_enabled: true,
+  sendr_analytics_enabled: true,
+  sendr_activity_enabled: true,
 }
 
 /** Daily budget caps keyed by resource type. Zero = unlimited. */
@@ -166,6 +174,10 @@ export const GROWTH_RUNTIME_DAILY_BUDGET_CAPS: Partial<Record<GrowthRuntimeResou
   sendr_timeline_updates: 10_000,
   sendr_launches: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_SENDR_LAUNCH_RUNS_PER_DAY,
   sendr_launch_previews: GROWTH_RUNTIME_GUARDRAIL_LIMITS.MAX_SENDR_LAUNCH_RUNS_PER_DAY,
+  sendr_analytics: 2_000,
+  sendr_dashboard_refreshes: 500,
+  sendr_activity: 2_000,
+  sendr_activity_refreshes: 500,
 }
 
 /** Hourly budget caps keyed by resource type. */

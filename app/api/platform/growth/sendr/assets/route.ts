@@ -30,9 +30,21 @@ export async function GET(request: Request) {
       search,
       limit,
     })
+    const videoItems = items.filter((item) => item.assetKind === "video")
+    const growthLibraryVideoCount = videoItems.filter(
+      (item) => item.metadata.source === "growth_library",
+    ).length
+    const legacyMetadataVideoCount = videoItems.filter(
+      (item) => item.metadata.source === "sendr_metadata",
+    ).length
     return NextResponse.json({
       ok: true,
       items,
+      videoLibrary: {
+        growthAssetCount: growthLibraryVideoCount,
+        legacyMetadataCount: legacyMetadataVideoCount,
+        isEmpty: growthLibraryVideoCount === 0,
+      },
       qa_marker: GROWTH_SENDR_WORKSPACE_QA_MARKER,
     })
   } catch (error) {
