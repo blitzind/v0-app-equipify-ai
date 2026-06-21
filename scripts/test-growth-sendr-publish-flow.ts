@@ -19,8 +19,12 @@ function main(): void {
   assert.match(repo, /archiveGrowthSendrLandingPage/)
 
   const detail = fs.readFileSync("components/growth/sendr/growth-sendr-page-detail.tsx", "utf8")
-  assert.match(detail, /Copy link/)
-  assert.match(detail, /Publication history/)
+  const builderHeader = fs.readFileSync("components/growth/sendr/builder/growth-sendr-builder-header.tsx", "utf8")
+  const builderPublish = fs.readFileSync("components/growth/sendr/builder/growth-sendr-builder-publish-panel.tsx", "utf8")
+  assert.match(detail, /copyLink/)
+  assert.match(builderHeader, /Copy link/)
+  assert.match(builderPublish, /Copy link/)
+  assert.match(builderPublish, /Publication history/)
 
   console.log("  ✓ Draft → Published → Archived with immutable snapshots")
   console.log("\nGS-SENDR-2B publish flow certification passed.\n")

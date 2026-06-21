@@ -710,6 +710,8 @@
     "test:growth-sendr-branding-alignment": "tsx scripts/test-growth-sendr-branding-alignment.ts",
     "test:growth-sendr-video-integration": "tsx scripts/test-growth-sendr-video-integration.ts",
     "test:growth-sendr-video-workflow": "tsx scripts/test-growth-sendr-video-workflow.ts",
+    "test:growth-sendr-presentation-ux": "tsx scripts/test-growth-sendr-presentation-ux.ts",
+    "test:growth-sendr-builder-ux": "tsx scripts/test-growth-sendr-builder-ux.ts",
     "test:growth-multichannel-sequences": "tsx scripts/test-growth-multichannel-sequences.ts",
     "test:growth-sender-pools": "tsx scripts/test-growth-sender-pools.ts",
     "test:growth-connected-mailboxes": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-connected-mailboxes.ts",

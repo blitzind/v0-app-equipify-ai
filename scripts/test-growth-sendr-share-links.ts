@@ -11,8 +11,9 @@ function main(): void {
   assert.equal(buildSendrPagePublicLink("acme-intro-a1b2c3d4"), "https://app.equipify.ai/videos/acme-intro-a1b2c3d4")
 
   const detail = fs.readFileSync("components/growth/sendr/growth-sendr-page-detail.tsx", "utf8")
-  assert.match(detail, /Open page/)
-  assert.match(detail, /buildSendrPagePublicLink|buildSendrPagePublicPath/)
+  const builderHeader = fs.readFileSync("components/growth/sendr/builder/growth-sendr-builder-header.tsx", "utf8")
+  assert.match(builderHeader, /Open live page/)
+  assert.match(detail, /buildSendrPagePublicLink/)
   assert.doesNotMatch(detail, /Copy link[\s\S]*\/growth\/sendr\/\$\{pageId\}/)
 
   const route = fs.readFileSync("app/api/platform/growth/sendr/landing-pages/route.ts", "utf8")

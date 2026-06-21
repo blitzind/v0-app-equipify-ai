@@ -1,14 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { Check, Copy, Loader2, RefreshCw, Trash2 } from "lucide-react"
+import { Loader2, Plus, Sparkles, Video, CalendarDays, Wand2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -19,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { GROWTH_SENDR_LANDING_PAGE_SECTION_TYPES } from "@/lib/growth/sendr/growth-sendr-config"
-import { buildSendrPagePublicLink, buildSendrPagePublicPath } from "@/lib/growth/sendr/growth-sendr-slug-runtime"
+import { buildSendrPagePublicLink } from "@/lib/growth/sendr/growth-sendr-slug-runtime"
 import type {
   GrowthSendrBookingAsset,
   GrowthSendrLandingPage,
@@ -36,6 +34,16 @@ import {
   buildSendrVideoReturnContextForPage,
   parseSendrReturnAttachParams,
 } from "@/lib/growth/sendr/growth-sendr-video-return-flow"
+import {
+  GrowthSendrBuilderHeader,
+  GrowthSendrBuilderMessage,
+} from "@/components/growth/sendr/builder/growth-sendr-builder-header"
+import { GrowthSendrBuilderLivePreview } from "@/components/growth/sendr/builder/growth-sendr-builder-live-preview"
+import { GrowthSendrBuilderSectionCard } from "@/components/growth/sendr/builder/growth-sendr-builder-section-card"
+import { GrowthSendrBuilderEmptyState } from "@/components/growth/sendr/builder/growth-sendr-builder-empty-state"
+import { GrowthSendrBuilderReadinessPanel } from "@/components/growth/sendr/builder/growth-sendr-builder-readiness-panel"
+import { GrowthSendrBuilderPublishPanel } from "@/components/growth/sendr/builder/growth-sendr-builder-publish-panel"
+import { getGrowthSendrBuilderSectionMeta } from "@/lib/growth/sendr/growth-sendr-builder-section-meta"
 
 type DetailResponse = {
   ok: boolean
@@ -479,335 +487,368 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
   const pageReturnContext = buildSendrVideoReturnContextForPage({ landingPageId: pageId })
   const selectedVideoPickerId = growthVideoAssetId ?? videoAsset?.id ?? null
 
+  const hasCtaSection = sections.some((s) => s.sectionType === "cta" || s.sectionType === "calendar")
+  const hasBooking = Boolean(bookingAsset?.meetingLink)
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-semibold">{page.title}</h2>
-            <Badge variant="outline">{page.status}</Badge>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {page.id} · Lead {page.leadId ?? "none"} · Owner {page.ownerUserId.slice(0, 8)}…
-          </p>
+    <div className="space-y-6 pb-8">
+      <GrowthSendrBuilderHeader
+        page={page}
+        loading={loading}
+        copied={copied}
+        onRefresh={() => void load()}
+        onCopyLink={() => void copyLink()}
+      />
+
+      {message ? <GrowthSendrBuilderMessage>{message}</GrowthSendrBuilderMessage> : null}
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_min(100%,480px)] xl:grid-cols-[minmax(0,1fr)_520px]">
+        <div className="min-w-0">
+          <Tabs defaultValue="overview" className="space-y-4">
+            <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 bg-slate-100/80 p-1 dark:bg-slate-900/60">
+              <TabsTrigger value="overview" className="text-xs sm:text-sm">
+                Overview
+              </TabsTrigger>
+              <TabsTrigger value="sections" className="text-xs sm:text-sm">
+                Sections
+              </TabsTrigger>
+              <TabsTrigger value="personalization" className="text-xs sm:text-sm">
+                Personalization
+              </TabsTrigger>
+              <TabsTrigger value="media" className="text-xs sm:text-sm">
+                Media
+              </TabsTrigger>
+              <TabsTrigger value="booking" className="text-xs sm:text-sm">
+                Booking
+              </TabsTrigger>
+              <TabsTrigger value="publish" className="text-xs sm:text-sm">
+                Publish
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-4">
+              <div className="lg:hidden">
+                <GrowthSendrBuilderLivePreview
+                  page={page}
+                  sections={sections}
+                  videoAsset={videoAsset}
+                  bookingAsset={bookingAsset}
+                  personalizationPreview={preview}
+                />
+              </div>
+              <GrowthSendrBuilderReadinessPanel
+                page={page}
+                sections={sections}
+                videoAsset={videoAsset}
+                bookingAsset={bookingAsset}
+                publicLink={publicLink}
+              />
+            </TabsContent>
+
+            <TabsContent value="sections" className="space-y-4">
+              <Card className="rounded-2xl border-slate-200/80 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold">Add a section</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Build your page like a presentation — hero, video, testimonials, then booking.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Select value={newSectionType} onValueChange={setNewSectionType}>
+                    <SelectTrigger className="h-11">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {GROWTH_SENDR_LANDING_PAGE_SECTION_TYPES.filter((t) => t !== "custom_html").map((type) => {
+                        const meta = getGrowthSendrBuilderSectionMeta(type)
+                        return (
+                          <SelectItem key={type} value={type}>
+                            {meta.label} — {meta.description}
+                          </SelectItem>
+                        )
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <Textarea
+                    value={newSectionBody}
+                    onChange={(e) => setNewSectionBody(e.target.value)}
+                    rows={3}
+                    placeholder="Hi {{first_name}} from {{company_name}}"
+                  />
+                  <Button disabled={busy} onClick={() => void addSection()}>
+                    <Plus className="mr-1.5 size-4" />
+                    Add section
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {sections.length === 0 ? (
+                <GrowthSendrBuilderEmptyState
+                  icon={Sparkles}
+                  title="Start with your hero"
+                  description="Add a hero section to introduce your prospect, then layer video, resources, testimonials, and a booking CTA."
+                  action={
+                    <Button disabled={busy} onClick={() => void addSection()}>
+                      <Plus className="mr-1.5 size-4" />
+                      Add hero section
+                    </Button>
+                  }
+                />
+              ) : (
+                <div className="space-y-3">
+                  {sections
+                    .slice()
+                    .sort((a, b) => a.sortOrder - b.sortOrder)
+                    .map((section, index) => (
+                      <GrowthSendrBuilderSectionCard
+                        key={section.id}
+                        section={section}
+                        index={index}
+                        disabled={busy}
+                        onRemove={() => void removeSection(section.id)}
+                      >
+                        {section.sectionType === "video" || section.sectionType === "avatar_video" ? (
+                          <GrowthSendrSectionVideoEditor
+                            pageId={pageId}
+                            section={section}
+                            disabled={busy}
+                            onUpdated={() => void load()}
+                            onMessage={setMessage}
+                          />
+                        ) : null}
+                      </GrowthSendrBuilderSectionCard>
+                    ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="personalization" className="space-y-4">
+              <Card className="rounded-2xl border-slate-200/80 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold">Preview personalization</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    See how variables resolve before you send — then toggle View as prospect in the live preview.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Lead ID</Label>
+                    <Input value={previewLeadId} onChange={(e) => setPreviewLeadId(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Company ID</Label>
+                    <Input value={previewCompanyId} onChange={(e) => setPreviewCompanyId(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Custom variables (JSON)</Label>
+                    <Textarea value={previewCustom} onChange={(e) => setPreviewCustom(e.target.value)} rows={3} />
+                  </div>
+                  <Button disabled={busy} onClick={() => void runPreview()}>
+                    <Wand2 className="mr-1.5 size-4" />
+                    Run personalization preview
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {!preview ? (
+                <GrowthSendrBuilderEmptyState
+                  icon={Wand2}
+                  title="Preview as your prospect"
+                  description="Run a personalization preview to see resolved names, company labels, and CTA copy in the live preview panel."
+                  compact
+                />
+              ) : (
+                <Card className="rounded-2xl border-slate-200/80 shadow-sm">
+                  <CardHeader>
+                    <CardTitle className="text-base">Resolved variables</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div>
+                      <p className="font-medium">Resolved</p>
+                      <pre className="mt-1 overflow-x-auto rounded-lg bg-muted p-3 text-xs">
+                        {JSON.stringify(preview.resolved, null, 2)}
+                      </pre>
+                    </div>
+                    <div>
+                      <p className="font-medium">Fallbacks</p>
+                      <pre className="mt-1 overflow-x-auto rounded-lg bg-muted p-3 text-xs">
+                        {JSON.stringify(preview.fallbacks, null, 2)}
+                      </pre>
+                    </div>
+                    {preview.missing.length > 0 ? (
+                      <p className="text-destructive">Missing: {preview.missing.join(", ")}</p>
+                    ) : (
+                      <p className="text-emerald-600 dark:text-emerald-400">All variables resolved — prospect view ready</p>
+                    )}
+                    <div>
+                      <p className="font-medium">Rendered samples</p>
+                      <pre className="mt-1 overflow-x-auto rounded-lg bg-muted p-3 text-xs">
+                        {JSON.stringify(preview.renderedSamples, null, 2)}
+                      </pre>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="media" className="space-y-4">
+              <Card className="rounded-2xl border-slate-200/80 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold">Page video</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Attach a Growth Video walkthrough — this becomes the hero playback on your prospect page.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {videoAsset ? (
+                    <div className="rounded-xl border border-emerald-500/20 bg-emerald-50/50 p-4 text-sm dark:bg-emerald-950/20">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-slate-900 dark:text-slate-50">Video attached</p>
+                          <p className="mt-1 text-muted-foreground">
+                            {growthVideoAssetId
+                              ? `Growth Video · ${growthVideoAssetId.slice(0, 12)}…`
+                              : `Asset · ${videoAsset.id.slice(0, 12)}…`}
+                          </p>
+                          {videoAsset.durationSeconds ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {Math.round(videoAsset.durationSeconds / 60)} min walkthrough
+                            </p>
+                          ) : null}
+                        </div>
+                        <Button size="sm" variant="outline" disabled={busy} onClick={() => void detachPageVideo()}>
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <GrowthSendrBuilderEmptyState
+                      icon={Video}
+                      title="Add your personalized video"
+                      description="Record, upload, or pick from Growth Video library. Prospects see a premium player with your walkthrough front and center."
+                      compact
+                    />
+                  )}
+                  <details className="rounded-xl border border-slate-200/80 p-4 dark:border-slate-800">
+                    <summary className="cursor-pointer text-sm font-medium">Legacy metadata URL (optional)</summary>
+                    <div className="mt-4 space-y-3">
+                      <div className="space-y-2">
+                        <Label>Source URL</Label>
+                        <Input value={videoSourceUrl} onChange={(e) => setVideoSourceUrl(e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Poster URL</Label>
+                        <Input value={videoPosterUrl} onChange={(e) => setVideoPosterUrl(e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Existing media asset ID (optional)</Label>
+                        <Input value={videoMediaAssetId} onChange={(e) => setVideoMediaAssetId(e.target.value)} />
+                      </div>
+                      <Button size="sm" disabled={busy} onClick={() => void registerAndAttachVideo()}>
+                        Register & attach metadata URL
+                      </Button>
+                    </div>
+                  </details>
+                  <GrowthSendrAssetPickerPanel
+                    kind="video"
+                    selectedId={selectedVideoPickerId}
+                    disabled={busy}
+                    showVideoShortcuts
+                    returnContext={pageReturnContext}
+                    attachLabel={videoAsset ? "Replace video" : "Attach video"}
+                    onSelect={(item) => void attachExistingVideo(item)}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="booking" className="space-y-4">
+              <Card className="rounded-2xl border-slate-200/80 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold">Booking & demo scheduling</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Connect a Calendly or meeting link — prospects see a premium Schedule Demo CTA.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {bookingAsset ? (
+                    <div className="rounded-xl border border-emerald-500/20 bg-emerald-50/50 p-4 text-sm dark:bg-emerald-950/20">
+                      <p className="font-semibold">Booking connected</p>
+                      <p className="mt-1 text-muted-foreground">{bookingAsset.meetingLink ?? bookingAsset.id}</p>
+                    </div>
+                  ) : !hasCtaSection ? (
+                    <GrowthSendrBuilderEmptyState
+                      icon={CalendarDays}
+                      title="Add a booking path"
+                      description="Attach a meeting link or add a calendar section so prospects can schedule while they watch."
+                      compact
+                    />
+                  ) : null}
+                  <div className="space-y-2">
+                    <Label>Meeting link</Label>
+                    <Input value={meetingLink} onChange={(e) => setMeetingLink(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Meeting type</Label>
+                    <Input value={meetingType} onChange={(e) => setMeetingType(e.target.value)} />
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Duration (minutes)</Label>
+                      <Input value={durationMinutes} onChange={(e) => setDurationMinutes(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Timezone</Label>
+                      <Input value={timezone} onChange={(e) => setTimezone(e.target.value)} />
+                    </div>
+                  </div>
+                  <Button disabled={busy} onClick={() => void registerAndAttachBooking()}>
+                    Register & attach booking
+                  </Button>
+                  <GrowthSendrAssetPickerPanel
+                    kind="booking"
+                    selectedId={bookingAsset?.id}
+                    disabled={busy}
+                    onSelect={(item) => void attachExistingBooking(item)}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="publish" className="space-y-4">
+              <GrowthSendrBuilderPublishPanel
+                page={page}
+                publications={publications}
+                publicLink={publicLink}
+                busy={busy}
+                copied={copied}
+                onPublish={() => void publishPage()}
+                onArchive={() => void archivePage()}
+                onCopyLink={() => void copyLink()}
+              />
+              {page.status !== "published" && !hasBooking && !hasCtaSection ? (
+                <GrowthSendrBuilderEmptyState
+                  icon={CalendarDays}
+                  title="Add a CTA before you publish"
+                  description="Prospects need a clear next step — attach booking or add a calendar/CTA section first."
+                  compact
+                />
+              ) : null}
+            </TabsContent>
+          </Tabs>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => void copyLink()}>
-            {copied ? <Check className="mr-1 h-4 w-4" /> : <Copy className="mr-1 h-4 w-4" />}
-            Copy link
-          </Button>
-          {(page.publishedSlug ?? page.slug) ? (
-            <Button size="sm" variant="outline" asChild>
-              <a
-                href={buildSendrPagePublicLink(page.publishedSlug ?? page.slug ?? "", window.location.origin)}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Open page
-              </a>
-            </Button>
-          ) : null}
-          <Button size="sm" variant="outline" asChild>
-            <Link href="/growth/sendr">Back</Link>
-          </Button>
+
+        <div className="hidden min-w-0 lg:block">
+          <GrowthSendrBuilderLivePreview
+            page={page}
+            sections={sections}
+            videoAsset={videoAsset}
+            bookingAsset={bookingAsset}
+            personalizationPreview={preview}
+            sticky
+          />
         </div>
       </div>
-
-      {message ? <p className="text-sm">{message}</p> : null}
-
-      <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="sections">Sections</TabsTrigger>
-          <TabsTrigger value="personalization">Personalization</TabsTrigger>
-          <TabsTrigger value="media">Media</TabsTrigger>
-          <TabsTrigger value="booking">Booking</TabsTrigger>
-          <TabsTrigger value="publish">Publish</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Page overview</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p>Template: {String(page.mobileMetadata.templateType ?? "default")}</p>
-              <p>Sections: {sections.length}</p>
-              <p>Video: {videoAsset?.id ?? "none"}</p>
-              <p>Booking: {bookingAsset?.id ?? "none"}</p>
-              <p>
-                Public link:{" "}
-                {publicLink ??
-                  (page.publishedSlug ?? page.slug
-                    ? buildSendrPagePublicPath(page.publishedSlug ?? page.slug ?? "")
-                    : "Publish to generate slug")}
-              </p>
-              {page.publishedAt ? (
-                <p>Published: {new Date(page.publishedAt).toLocaleString()} · v{page.publishedVersion ?? 1}</p>
-              ) : null}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="sections" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Add section</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Select value={newSectionType} onValueChange={setNewSectionType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {GROWTH_SENDR_LANDING_PAGE_SECTION_TYPES.filter((t) => t !== "custom_html").map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Textarea value={newSectionBody} onChange={(e) => setNewSectionBody(e.target.value)} rows={3} />
-              <Button size="sm" disabled={busy} onClick={() => void addSection()}>
-                Add section
-              </Button>
-            </CardContent>
-          </Card>
-          <div className="space-y-2">
-            {sections.map((section) => (
-              <div key={section.id} className="rounded-md border p-3 text-sm">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <Badge variant="outline">{section.sectionType}</Badge>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      order {section.sortOrder} · {String(section.content.body ?? section.content.videoTitle ?? "").slice(0, 120)}
-                    </p>
-                  </div>
-                  <Button size="sm" variant="ghost" disabled={busy} onClick={() => void removeSection(section.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-                {section.sectionType === "video" || section.sectionType === "avatar_video" ? (
-                  <GrowthSendrSectionVideoEditor
-                    pageId={pageId}
-                    section={section}
-                    disabled={busy}
-                    onUpdated={() => void load()}
-                    onMessage={setMessage}
-                  />
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="personalization" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Preview personalization</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-2">
-                <Label>Lead ID</Label>
-                <Input value={previewLeadId} onChange={(e) => setPreviewLeadId(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Company ID</Label>
-                <Input value={previewCompanyId} onChange={(e) => setPreviewCompanyId(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Custom variables (JSON)</Label>
-                <Textarea value={previewCustom} onChange={(e) => setPreviewCustom(e.target.value)} rows={3} />
-              </div>
-              <Button size="sm" disabled={busy} onClick={() => void runPreview()}>
-                Preview
-              </Button>
-            </CardContent>
-          </Card>
-          {preview ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Resolved variables</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div>
-                  <p className="font-medium">Resolved</p>
-                  <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 text-xs">
-                    {JSON.stringify(preview.resolved, null, 2)}
-                  </pre>
-                </div>
-                <div>
-                  <p className="font-medium">Fallbacks</p>
-                  <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 text-xs">
-                    {JSON.stringify(preview.fallbacks, null, 2)}
-                  </pre>
-                </div>
-                {preview.missing.length > 0 ? (
-                  <p className="text-destructive">Missing: {preview.missing.join(", ")}</p>
-                ) : (
-                  <p className="text-muted-foreground">No missing variables</p>
-                )}
-                <div>
-                  <p className="font-medium">Rendered samples</p>
-                  <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 text-xs">
-                    {JSON.stringify(preview.renderedSamples, null, 2)}
-                  </pre>
-                </div>
-              </CardContent>
-            </Card>
-          ) : null}
-        </TabsContent>
-
-        <TabsContent value="media" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Video</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {videoAsset ? (
-                <div className="rounded-md border bg-muted/30 p-3 text-sm">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-medium">Attached video</p>
-                      <p className="text-muted-foreground">
-                        {growthVideoAssetId
-                          ? `Growth Video library asset ${growthVideoAssetId}`
-                          : `Metadata asset ${videoAsset.id}`}
-                      </p>
-                      {videoAsset.durationSeconds ? (
-                        <p className="text-xs text-muted-foreground">Duration: {videoAsset.durationSeconds}s</p>
-                      ) : null}
-                    </div>
-                    <Button size="sm" variant="ghost" disabled={busy} onClick={() => void detachPageVideo()}>
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Record, upload, or select an existing Growth Video asset to attach to this page.
-                </p>
-              )}
-              <details className="rounded-md border p-3">
-                <summary className="cursor-pointer text-sm font-medium">Legacy metadata URL (optional)</summary>
-                <div className="mt-3 space-y-3">
-                  <div className="space-y-2">
-                    <Label>Source URL</Label>
-                    <Input value={videoSourceUrl} onChange={(e) => setVideoSourceUrl(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Poster URL</Label>
-                    <Input value={videoPosterUrl} onChange={(e) => setVideoPosterUrl(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Existing media asset ID (optional)</Label>
-                    <Input value={videoMediaAssetId} onChange={(e) => setVideoMediaAssetId(e.target.value)} />
-                  </div>
-                  <Button size="sm" disabled={busy} onClick={() => void registerAndAttachVideo()}>
-                    Register & attach metadata URL
-                  </Button>
-                </div>
-              </details>
-              <GrowthSendrAssetPickerPanel
-                kind="video"
-                selectedId={selectedVideoPickerId}
-                disabled={busy}
-                showVideoShortcuts
-                returnContext={pageReturnContext}
-                attachLabel={videoAsset ? "Replace" : "Attach"}
-                onSelect={(item) => void attachExistingVideo(item)}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="booking" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Booking link</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {bookingAsset ? (
-                <p className="text-sm text-muted-foreground">Attached: {bookingAsset.id}</p>
-              ) : null}
-              <div className="space-y-2">
-                <Label>Meeting link</Label>
-                <Input value={meetingLink} onChange={(e) => setMeetingLink(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Meeting type</Label>
-                <Input value={meetingType} onChange={(e) => setMeetingType(e.target.value)} />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Duration (minutes)</Label>
-                  <Input value={durationMinutes} onChange={(e) => setDurationMinutes(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Timezone</Label>
-                  <Input value={timezone} onChange={(e) => setTimezone(e.target.value)} />
-                </div>
-              </div>
-              <Button size="sm" disabled={busy} onClick={() => void registerAndAttachBooking()}>
-                Register & attach booking
-              </Button>
-              <GrowthSendrAssetPickerPanel
-                kind="booking"
-                selectedId={bookingAsset?.id}
-                disabled={busy}
-                onSelect={(item) => void attachExistingBooking(item)}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="publish" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Publish flow</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Draft → Published creates an immutable publication snapshot. Archived pages stay in history.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" disabled={busy || page.status === "published"} onClick={() => void publishPage()}>
-                  Publish
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy || page.status === "archived"}
-                  onClick={() => void archivePage()}
-                >
-                  Archive
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => void copyLink()}>
-                  Copy public link
-                </Button>
-              </div>
-              {publications.length > 0 ? (
-                <div className="text-sm">
-                  <p className="font-medium">Publication history</p>
-                  <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                    {publications.map((pub, index) => (
-                      <li key={pub.id}>
-                        v{publications.length - index} · {new Date(pub.publishedAt).toLocaleString()} ·{" "}
-                        {pub.publishedBy?.slice(0, 8) ?? "system"}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">Not published yet.</p>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
     </div>
   )
 }
