@@ -163,6 +163,8 @@ export type GrowthPersonalizationGenerationView = GrowthPersonalizationGeneratio
   operatorMetadata?: GrowthPersonalizationOperatorGenerationMetadata | null
   /** GS-AI-PLAYBOOK-4D.1 — Stack B audit diagnostics from personalization_generations.metadata. */
   stackBDiagnostics?: import("@/lib/growth/personalization/growth-personalization-stack-b-metadata").GrowthPersonalizationStackBDiagnosticsMetadata | null
+  /** GS-AI-PLAYBOOK-4D.2 — immutable Stack B / AI draft snapshot for split editor. */
+  originalAiDraft?: import("@/lib/growth/personalization/growth-personalization-stack-b-metadata").GrowthPersonalizationOriginalAiDraftSnapshot | null
 }
 
 export type GrowthPersonalizationProfile = {

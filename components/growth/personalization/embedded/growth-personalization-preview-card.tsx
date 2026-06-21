@@ -1,7 +1,7 @@
 "use client"
 
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
-import { formatPersonalizationDraftBodyForDisplay } from "@/lib/growth/personalization/growth-personalization-draft-formatting"
+import { formatPersonalizationDraftBodyForDisplay } from "@/lib/growth/personalization/personalization-generation-ux"
 import type { GrowthPersonalizationLeadSummary } from "@/lib/growth/personalization/embedded/growth-personalization-embedded-types"
 import { personalizationStatusLabel } from "@/lib/growth/personalization/personalization-types"
 

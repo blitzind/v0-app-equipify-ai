@@ -1,5 +1,16 @@
 /** GS-AI-PLAYBOOK-1D — Personalization generation UX helpers (client-safe). */
 
+export const GROWTH_PERSONALIZATION_WORKSPACE_PATH = "/growth/personalization" as const
+
+export const GROWTH_PERSONALIZATION_LEGACY_ADMIN_PATH =
+  "/admin/growth/copilot/personalization" as const
+
+export const GROWTH_PERSONALIZATION_WORKSPACE_QA_MARKER =
+  "growth-personalization-workspace-gs-ai-playbook-4d2-v1" as const
+
+export const GROWTH_PERSONALIZATION_DIAGNOSTICS_PREFERENCES_STORAGE_KEY =
+  "growth-personalization-diagnostics-prefs-v1" as const
+
 import type {
   GrowthPersonalizationGeneration,
   GrowthPersonalizationOperatorGenerationMetadata,
@@ -54,8 +65,8 @@ export function buildGrowthPersonalizationWorkspaceHref(input?: {
   if (input?.generationId?.trim()) params.set("generationId", input.generationId.trim())
   const query = params.toString()
   return query
-    ? `/admin/growth/copilot/personalization?${query}`
-    : "/admin/growth/copilot/personalization"
+    ? `${GROWTH_PERSONALIZATION_WORKSPACE_PATH}?${query}`
+    : GROWTH_PERSONALIZATION_WORKSPACE_PATH
 }
 
 export function regenerationFeedbackLabel(
@@ -170,4 +181,111 @@ export function parsePersonalizationOperatorMetadata(
   }
 
   return Object.keys(result).length > 0 ? result : null
+}
+
+const SENTENCE_SPLIT_RE = /(?<=[.!?])\s+(?=[A-Z0-9"(\[])/
+
+function normalizeDraftBody(body: string): string {
+  return body.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim()
+}
+
+function splitSentences(text: string): string[] {
+  const normalized = text.replace(/\n+/g, " ").replace(/\s+/g, " ").trim()
+  if (!normalized) return []
+  const parts = normalized.split(SENTENCE_SPLIT_RE).map((entry) => entry.trim()).filter(Boolean)
+  return parts.length > 0 ? parts : [normalized]
+}
+
+function groupSentences(sentences: string[], maxSentencesPerParagraph: number): string[] {
+  if (sentences.length <= maxSentencesPerParagraph) return [sentences.join(" ")]
+  const paragraphs: string[] = []
+  for (let index = 0; index < sentences.length; index += maxSentencesPerParagraph) {
+    paragraphs.push(sentences.slice(index, index + maxSentencesPerParagraph).join(" "))
+  }
+  return paragraphs
+}
+
+export function formatPersonalizationDraftBodyForDisplay(body: string): string {
+  const normalized = normalizeDraftBody(body)
+  if (!normalized) return ""
+
+  if (normalized.includes("\n\n")) {
+    return normalized
+      .split(/\n\n+/)
+      .map((paragraph) => paragraph.replace(/\s+/g, " ").trim())
+      .filter(Boolean)
+      .join("\n\n")
+  }
+
+  const sentences = splitSentences(normalized)
+  const maxPerParagraph = sentences.length <= 4 ? 2 : 3
+  return groupSentences(sentences, maxPerParagraph).join("\n\n")
+}
+
+export function formatPersonalizationDraftTimestamp(value: string | null | undefined): string {
+  if (!value) return "—"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "—"
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+}
+
+export type GrowthPersonalizationDiagnosticsSectionKey =
+  | "intelligence"
+  | "quality"
+  | "reasoning"
+  | "sequence"
+
+export type GrowthPersonalizationDiagnosticsPreferences = Record<
+  GrowthPersonalizationDiagnosticsSectionKey,
+  boolean
+>
+
+export const GROWTH_PERSONALIZATION_DIAGNOSTICS_DEFAULTS: GrowthPersonalizationDiagnosticsPreferences =
+  {
+    intelligence: true,
+    quality: true,
+    reasoning: false,
+    sequence: false,
+  }
+
+export function readPersonalizationDiagnosticsPreferences(): GrowthPersonalizationDiagnosticsPreferences {
+  if (typeof window === "undefined") return { ...GROWTH_PERSONALIZATION_DIAGNOSTICS_DEFAULTS }
+  try {
+    const raw = window.localStorage.getItem(GROWTH_PERSONALIZATION_DIAGNOSTICS_PREFERENCES_STORAGE_KEY)
+    if (!raw) return { ...GROWTH_PERSONALIZATION_DIAGNOSTICS_DEFAULTS }
+    const parsed = JSON.parse(raw) as Partial<GrowthPersonalizationDiagnosticsPreferences>
+    return {
+      intelligence: parsed.intelligence ?? GROWTH_PERSONALIZATION_DIAGNOSTICS_DEFAULTS.intelligence,
+      quality: parsed.quality ?? GROWTH_PERSONALIZATION_DIAGNOSTICS_DEFAULTS.quality,
+      reasoning: parsed.reasoning ?? GROWTH_PERSONALIZATION_DIAGNOSTICS_DEFAULTS.reasoning,
+      sequence: parsed.sequence ?? GROWTH_PERSONALIZATION_DIAGNOSTICS_DEFAULTS.sequence,
+    }
+  } catch {
+    return { ...GROWTH_PERSONALIZATION_DIAGNOSTICS_DEFAULTS }
+  }
+}
+
+export function persistPersonalizationDiagnosticsPreferences(
+  preferences: GrowthPersonalizationDiagnosticsPreferences,
+): GrowthPersonalizationDiagnosticsPreferences {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(
+      GROWTH_PERSONALIZATION_DIAGNOSTICS_PREFERENCES_STORAGE_KEY,
+      JSON.stringify(preferences),
+    )
+  }
+  return preferences
+}
+
+export function togglePersonalizationDiagnosticsSection(
+  section: GrowthPersonalizationDiagnosticsSectionKey,
+): GrowthPersonalizationDiagnosticsPreferences {
+  const current = readPersonalizationDiagnosticsPreferences()
+  const next = { ...current, [section]: !current[section] }
+  return persistPersonalizationDiagnosticsPreferences(next)
 }

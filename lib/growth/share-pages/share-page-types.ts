@@ -79,6 +79,13 @@ export type GrowthSharePageTheme = {
   heroImageUrl: string | null
   publicThemeMode: GrowthSharePagePublicThemeMode
   footerNote: string | null
+  pageBackground?: string
+  pageText?: string
+  surfaceColor?: string
+  buttonBackground?: string
+  buttonText?: string
+  headerBackground?: string
+  headerText?: string
 }
 
 export type GrowthSharePageCTA = {
@@ -362,3 +369,201 @@ export type GrowthSharePageRenderModel = {
 }
 
 export const GROWTH_SHARE_PAGES_SSR_QA_MARKER = "share-pages-ssr-sr2b2-v1" as const
+
+export const GROWTH_SHARE_PAGE_THEME_QA_MARKER = "growth-share-page-theme-gs-share-7b-v1" as const
+
+export const GROWTH_SHARE_PAGE_OPERATOR_DEFAULT_THEME: Required<
+  Pick<
+    GrowthSharePageTheme,
+    | "pageBackground"
+    | "pageText"
+    | "surfaceColor"
+    | "buttonBackground"
+    | "buttonText"
+    | "headerBackground"
+    | "headerText"
+    | "brandColor"
+    | "accentColor"
+  >
+> = {
+  pageBackground: "#f8fafc",
+  pageText: "#0f172a",
+  surfaceColor: "#ffffff",
+  brandColor: "#2563eb",
+  accentColor: "#2563eb",
+  buttonBackground: "#f59e0b",
+  buttonText: "#111827",
+  headerBackground: "#07111f",
+  headerText: "#ffffff",
+}
+
+const SHARE_PAGE_HEX_COLOR = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
+
+export function normalizeSharePageThemeColor(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback
+  const trimmed = value.trim()
+  if (!SHARE_PAGE_HEX_COLOR.test(trimmed)) return fallback
+  return trimmed.length === 4
+    ? `#${trimmed[1]}${trimmed[1]}${trimmed[2]}${trimmed[2]}${trimmed[3]}${trimmed[3]}`
+    : trimmed
+}
+
+export function hasSharePageExtendedTheme(theme: GrowthSharePageTheme): boolean {
+  return Boolean(
+    theme.pageBackground ||
+      theme.pageText ||
+      theme.surfaceColor ||
+      theme.buttonBackground ||
+      theme.buttonText ||
+      theme.headerBackground ||
+      theme.headerText,
+  )
+}
+
+export function parseSharePageExtendedTheme(
+  source: Partial<GrowthSharePageTheme> | null | undefined,
+  fallback = GROWTH_SHARE_PAGE_OPERATOR_DEFAULT_THEME,
+): GrowthSharePageTheme {
+  const base = { ...DEFAULT_GROWTH_SHARE_PAGE_THEME, ...fallback, ...(source ?? {}) }
+  return {
+    brandColor: normalizeSharePageThemeColor(source?.brandColor, base.brandColor),
+    accentColor: normalizeSharePageThemeColor(source?.accentColor, base.accentColor),
+    logoUrl: typeof source?.logoUrl === "string" && source.logoUrl.trim() ? source.logoUrl.trim() : null,
+    heroImageUrl:
+      typeof source?.heroImageUrl === "string" && source.heroImageUrl.trim() ? source.heroImageUrl.trim() : null,
+    publicThemeMode:
+      source?.publicThemeMode === "light" || source?.publicThemeMode === "dark" || source?.publicThemeMode === "system"
+        ? source.publicThemeMode
+        : DEFAULT_GROWTH_SHARE_PAGE_THEME.publicThemeMode,
+    footerNote: typeof source?.footerNote === "string" && source.footerNote.trim() ? source.footerNote.trim() : null,
+    pageBackground: normalizeSharePageThemeColor(source?.pageBackground, base.pageBackground!),
+    pageText: normalizeSharePageThemeColor(source?.pageText, base.pageText!),
+    surfaceColor: normalizeSharePageThemeColor(source?.surfaceColor, base.surfaceColor!),
+    buttonBackground: normalizeSharePageThemeColor(source?.buttonBackground, base.buttonBackground!),
+    buttonText: normalizeSharePageThemeColor(source?.buttonText, base.buttonText!),
+    headerBackground: normalizeSharePageThemeColor(source?.headerBackground, base.headerBackground!),
+    headerText: normalizeSharePageThemeColor(source?.headerText, base.headerText!),
+  }
+}
+
+export function sharePageExtendedThemeCssVars(theme: GrowthSharePageTheme): Record<string, string> {
+  const resolved = parseSharePageExtendedTheme(theme)
+  return {
+    ["--share-brand-color" as string]: resolved.brandColor,
+    ["--share-accent-color" as string]: resolved.accentColor,
+    ["--share-page-bg" as string]: resolved.pageBackground ?? resolved.brandColor,
+    ["--share-page-text" as string]: resolved.pageText ?? "#0f172a",
+    ["--share-surface" as string]: resolved.surfaceColor ?? "#ffffff",
+    ["--share-button-bg" as string]: resolved.buttonBackground ?? resolved.brandColor,
+    ["--share-button-text" as string]: resolved.buttonText ?? "#ffffff",
+    ["--share-header-bg" as string]: resolved.headerBackground ?? resolved.brandColor,
+    ["--share-header-text" as string]: resolved.headerText ?? "#ffffff",
+  }
+}
+
+export type SharePageQuickTemplate = {
+  id: string
+  label: string
+  description: string
+  headline: string
+  heroMessage: string
+  whyReachingOut: string
+  companyObservations: string[]
+  ctaLabel: string
+  footerNote?: string
+}
+
+export const GROWTH_SHARE_PAGE_QUICK_TEMPLATES: SharePageQuickTemplate[] = [
+  {
+    id: "equipment_service_demo",
+    label: "Equipment Service Demo",
+    description: "Demo outreach for commercial equipment service teams.",
+    headline: "A personalized walkthrough for {{company.name}}",
+    heroMessage:
+      "Hi {{lead.first_name}} — I put together a short overview of how Equipify helps equipment service teams dispatch smarter and keep customers informed.",
+    whyReachingOut: "Your team likely juggles dispatch, scheduling, and customer updates across multiple tools.",
+    companyObservations: ["Dispatch & routing", "Scheduling & capacity", "Customer portal", "Equipment tracking"],
+    ctaLabel: "Schedule Demo",
+  },
+  {
+    id: "roofing_restoration",
+    label: "Roofing & Restoration",
+    description: "For roofing and restoration operators.",
+    headline: "How {{company.name}} can streamline field operations",
+    heroMessage:
+      "Hi {{lead.first_name}} — here's a tailored look at how service businesses like yours coordinate crews, photos, and customer updates in one place.",
+    whyReachingOut: "Restoration teams need fast coordination between estimators, crews, and homeowners.",
+    companyObservations: ["Job documentation", "Crew coordination", "Customer updates", "Photo capture"],
+    ctaLabel: "Book a walkthrough",
+  },
+  {
+    id: "hvac_service_demo",
+    label: "HVAC Service Demo",
+    description: "HVAC install and service workflows.",
+    headline: "Equipify for {{company.name}}",
+    heroMessage:
+      "Hi {{lead.first_name}} — this page summarizes how HVAC teams use Equipify for scheduling, dispatch, and customer communication.",
+    whyReachingOut: "Seasonal demand makes capacity planning and technician routing especially important.",
+    companyObservations: ["Technician routing", "Maintenance plans", "Customer notifications", "Job costing"],
+    ctaLabel: "Schedule Demo",
+  },
+  {
+    id: "general_field_service",
+    label: "General Field Service Demo",
+    description: "Default field service outreach page.",
+    headline: "Personalized overview for {{company.name}}",
+    heroMessage:
+      "Hi {{lead.first_name}} — I recorded a quick overview of how Equipify helps field service teams run day-to-day operations.",
+    whyReachingOut: "Most teams we talk to want fewer spreadsheets and clearer customer communication.",
+    companyObservations: ["Dispatch", "Scheduling", "Invoicing handoff", "Customer portal"],
+    ctaLabel: "Schedule a call",
+  },
+  {
+    id: "proposal_follow_up",
+    label: "Proposal Follow-Up",
+    description: "Follow up after sending a proposal or quote.",
+    headline: "Following up on your Equipify overview",
+    heroMessage:
+      "Hi {{lead.first_name}} — wanted to share a concise recap and answer any questions about the proposal we discussed.",
+    whyReachingOut: "Happy to clarify pricing, rollout, or how your team would adopt the platform.",
+    companyObservations: ["Implementation timeline", "Team training", "Integrations", "Support"],
+    ctaLabel: "Book follow-up",
+  },
+  {
+    id: "re_engagement",
+    label: "Re-engagement",
+    description: "Re-open a stalled conversation.",
+    headline: "Checking back in with {{company.name}}",
+    heroMessage:
+      "Hi {{lead.first_name}} — sharing an updated overview in case timing is better now for a quick conversation.",
+    whyReachingOut: "No pressure — this page is here whenever your team is ready to revisit operations software.",
+    companyObservations: ["What's changed since we last spoke", "New product updates", "Customer stories"],
+    ctaLabel: "Pick a time",
+  },
+  {
+    id: "customer_portal_walkthrough",
+    label: "Customer Portal Walkthrough",
+    description: "Highlight customer-facing portal capabilities.",
+    headline: "Customer portal walkthrough for {{company.name}}",
+    heroMessage:
+      "Hi {{lead.first_name}} — here's how your customers would experience scheduling, updates, and service history through Equipify.",
+    whyReachingOut: "A modern portal reduces phone tag and improves customer satisfaction.",
+    companyObservations: ["Self-service scheduling", "Job status updates", "Document sharing", "Branded experience"],
+    ctaLabel: "See it live",
+  },
+  {
+    id: "meeting_follow_up",
+    label: "Meeting Follow-Up",
+    description: "Recap after a discovery call or demo.",
+    headline: "Recap from our conversation",
+    heroMessage:
+      "Hi {{lead.first_name}} — thanks for the time today. Here's a recap of what we covered and suggested next steps for {{company.name}}.",
+    whyReachingOut: "Let me know if you'd like to involve additional stakeholders on a follow-up call.",
+    companyObservations: ["Key takeaways", "Open questions", "Recommended next steps", "Resources"],
+    ctaLabel: "Schedule next steps",
+  },
+]
+
+export function getSharePageQuickTemplate(id: string): SharePageQuickTemplate | null {
+  return GROWTH_SHARE_PAGE_QUICK_TEMPLATES.find((template) => template.id === id) ?? null
+}

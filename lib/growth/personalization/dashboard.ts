@@ -11,8 +11,8 @@ import {
   GROWTH_PERSONALIZATION_STACK_B_UNIFICATION_QA_MARKER,
   parsePersonalizationStackBDiagnostics,
 } from "@/lib/growth/personalization/growth-personalization-stack-b-metadata"
-import { buildOriginalAiDraftSnapshot } from "@/lib/growth/personalization/growth-personalization-ai-draft-metadata"
-import { parseOriginalAiDraftSnapshot } from "@/lib/growth/personalization/growth-personalization-ai-draft-metadata"
+import { buildOriginalAiDraftSnapshot } from "@/lib/growth/personalization/growth-personalization-stack-b-metadata"
+import { parseOriginalAiDraftSnapshot } from "@/lib/growth/personalization/growth-personalization-stack-b-metadata"
 import {
   buildPersonalizationEvidenceBundle,
   computeEvidenceCoverageScore,

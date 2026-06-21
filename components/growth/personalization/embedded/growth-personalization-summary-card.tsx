@@ -2,7 +2,7 @@
 
 import { Loader2, Sparkles } from "lucide-react"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
-import { formatPersonalizationDraftTimestamp } from "@/lib/growth/personalization/growth-personalization-draft-formatting"
+import { formatPersonalizationDraftTimestamp } from "@/lib/growth/personalization/personalization-generation-ux"
 import type { GrowthPersonalizationLeadSummary } from "@/lib/growth/personalization/embedded/growth-personalization-embedded-types"
 import { GROWTH_PERSONALIZATION_EMBEDDED_QA_MARKER } from "@/lib/growth/personalization/embedded/growth-personalization-embedded-types"
 import { GrowthPersonalizationActions } from "@/components/growth/personalization/embedded/growth-personalization-actions"

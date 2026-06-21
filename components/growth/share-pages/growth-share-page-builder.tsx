@@ -35,23 +35,23 @@ import {
 } from "@/components/growth/share-pages/growth-share-page-review-card"
 import { saveSharePageTokens } from "@/components/growth/share-pages/growth-share-page-manage-panel"
 import { GrowthSharePageStepCard } from "@/components/growth/share-pages/growth-share-page-step-card"
-import { GrowthStickyActionBar } from "@/components/growth/shell/growth-sticky-action-bar"
-import { GrowthWorkspaceSafeArea } from "@/components/growth/shell/growth-workspace-safe-area"
+import { GrowthStickyActionBar } from "@/components/growth/shell/growth-workspace-page-content"
+import { GrowthWorkspaceSafeArea } from "@/components/growth/shell/growth-workspace-page-content"
 import { GrowthSharePageTemplatePicker } from "@/components/growth/share-pages/growth-share-page-template-picker"
-import { GrowthSharePageBrandingFields } from "@/components/growth/share-pages/builder/growth-share-page-branding-fields"
-import { GrowthSharePageBookingPagePicker } from "@/components/growth/share-pages/builder/growth-share-page-booking-page-picker"
+import { GrowthSharePageBrandingFields } from "@/components/growth/share-pages/growth-share-page-template-picker"
+import { GrowthSharePageBookingPagePicker } from "@/components/growth/share-pages/growth-share-page-template-picker"
 import {
   GrowthSharePageAiDraftPanel,
   type SharePageAiDraftResult,
-} from "@/components/growth/share-pages/builder/growth-share-page-ai-draft-panel"
-import { GrowthSharePageQuickTemplatePicker } from "@/components/growth/share-pages/builder/growth-share-page-quick-template-picker"
+} from "@/components/growth/share-pages/growth-share-page-template-picker"
+import { GrowthSharePageQuickTemplatePicker } from "@/components/growth/share-pages/growth-share-page-template-picker"
 import {
   getSharePageQuickTemplate,
-} from "@/lib/growth/share-pages/share-page-quick-templates"
+} from "@/lib/growth/share-pages/share-page-types"
 import {
   GROWTH_SHARE_PAGE_OPERATOR_DEFAULT_THEME,
   parseSharePageExtendedTheme,
-} from "@/lib/growth/share-pages/share-page-extended-theme"
+} from "@/lib/growth/share-pages/share-page-types"
 import type { GrowthSharePageTheme } from "@/lib/growth/share-pages/share-page-types"
 import {
   growthFeaturePath,
