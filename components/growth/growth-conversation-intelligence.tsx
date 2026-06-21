@@ -4,6 +4,7 @@ import { MessageSquare } from "lucide-react"
 import { GrowthBadge, GrowthActionRequiredBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import { growthLeadConversationActionRequired } from "@/lib/growth/growth-lead-drawer-badges"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
+import { GrowthPersonalizationEmbeddedPanel } from "@/components/growth/personalization/embedded/growth-personalization-embedded-panel"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthConversationIntelligenceProps = {
@@ -124,6 +125,8 @@ export function GrowthConversationIntelligence({ lead }: GrowthConversationIntel
             </ul>
           </div>
         ) : null}
+
+        <GrowthPersonalizationEmbeddedPanel leadId={lead.id} surface="conversation" compact />
       </div>
     </GrowthCollapsibleEngineCard>
   )

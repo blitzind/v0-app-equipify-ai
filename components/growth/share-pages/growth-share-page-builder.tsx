@@ -28,13 +28,31 @@ import {
   GrowthSharePageRecipientPicker,
   type GrowthSharePageRecipientSelection,
 } from "@/components/growth/share-pages/growth-share-page-recipient-picker"
+import { GrowthPersonalizationEmbeddedPanel } from "@/components/growth/personalization/embedded/growth-personalization-embedded-panel"
 import {
   GrowthSharePageReviewCard,
   growthSharePagePersonalizationScore,
 } from "@/components/growth/share-pages/growth-share-page-review-card"
 import { saveSharePageTokens } from "@/components/growth/share-pages/growth-share-page-manage-panel"
 import { GrowthSharePageStepCard } from "@/components/growth/share-pages/growth-share-page-step-card"
+import { GrowthStickyActionBar } from "@/components/growth/shell/growth-sticky-action-bar"
+import { GrowthWorkspaceSafeArea } from "@/components/growth/shell/growth-workspace-safe-area"
 import { GrowthSharePageTemplatePicker } from "@/components/growth/share-pages/growth-share-page-template-picker"
+import { GrowthSharePageBrandingFields } from "@/components/growth/share-pages/builder/growth-share-page-branding-fields"
+import { GrowthSharePageBookingPagePicker } from "@/components/growth/share-pages/builder/growth-share-page-booking-page-picker"
+import {
+  GrowthSharePageAiDraftPanel,
+  type SharePageAiDraftResult,
+} from "@/components/growth/share-pages/builder/growth-share-page-ai-draft-panel"
+import { GrowthSharePageQuickTemplatePicker } from "@/components/growth/share-pages/builder/growth-share-page-quick-template-picker"
+import {
+  getSharePageQuickTemplate,
+} from "@/lib/growth/share-pages/share-page-quick-templates"
+import {
+  GROWTH_SHARE_PAGE_OPERATOR_DEFAULT_THEME,
+  parseSharePageExtendedTheme,
+} from "@/lib/growth/share-pages/share-page-extended-theme"
+import type { GrowthSharePageTheme } from "@/lib/growth/share-pages/share-page-types"
 import {
   growthFeaturePath,
   resolveGrowthFeatureBasePath,
@@ -90,9 +108,15 @@ export function GrowthSharePageBuilder() {
   const [calendarUrl, setCalendarUrl] = useState("")
   const [heroImageUrl, setHeroImageUrl] = useState("")
   const [logoUrl, setLogoUrl] = useState("")
-  const [primaryColor, setPrimaryColor] = useState("#059669")
-  const [accentColor, setAccentColor] = useState("#047857")
+  const [theme, setTheme] = useState<GrowthSharePageTheme>(() =>
+    parseSharePageExtendedTheme(GROWTH_SHARE_PAGE_OPERATOR_DEFAULT_THEME),
+  )
   const [footerText, setFooterText] = useState("")
+  const [whyReachingOut, setWhyReachingOut] = useState("")
+  const [companyObservations, setCompanyObservations] = useState<string[]>([])
+  const [quickTemplateId, setQuickTemplateId] = useState("general_field_service")
+  const [aiMessage, setAiMessage] = useState<string | null>(null)
+  const [showAiPanel, setShowAiPanel] = useState(false)
   const [advanced, setAdvanced] = useState<AdvancedSettings>(DEFAULT_ADVANCED)
 
   useGrowthBreadcrumbDetail("New share page")
@@ -128,24 +152,18 @@ export function GrowthSharePageBuilder() {
       ctaUrl,
       calendarUrl,
       footerText,
-      primaryColor,
-      accentColor,
+      primaryColor: theme.brandColor,
+      accentColor: theme.accentColor,
       recipientName: recipient?.displayName.split(/\s+/)[0] ?? "",
       companyName: recipient?.companyName ?? "",
+      theme: {
+        ...theme,
+        logoUrl: logoUrl.trim() || null,
+        heroImageUrl: heroImageUrl.trim() || null,
+        footerNote: footerText.trim() || null,
+      },
     }),
-    [
-      logoUrl,
-      heroImageUrl,
-      headline,
-      introCopy,
-      ctaText,
-      ctaUrl,
-      calendarUrl,
-      footerText,
-      primaryColor,
-      accentColor,
-      recipient,
-    ],
+    [logoUrl, heroImageUrl, headline, introCopy, ctaText, ctaUrl, calendarUrl, footerText, theme, recipient],
   )
 
   const canSubmit = Boolean(recipient?.leadId) && !submitting && !publishing
@@ -178,8 +196,51 @@ export function GrowthSharePageBuilder() {
     }
   }
 
+  function buildThemePayload(): GrowthSharePageTheme {
+    return parseSharePageExtendedTheme({
+      ...theme,
+      logoUrl: logoUrl.trim() || null,
+      heroImageUrl: heroImageUrl.trim() || null,
+      footerNote: footerText.trim() || null,
+    })
+  }
+
+  function applyQuickTemplate(templateId: string) {
+    const quick = getSharePageQuickTemplate(templateId)
+    if (!quick) return
+    setHeadline(quick.headline)
+    setIntroCopy(quick.heroMessage)
+    setWhyReachingOut(quick.whyReachingOut)
+    setCompanyObservations(quick.companyObservations)
+    setCtaText(quick.ctaLabel)
+    if (quick.footerNote) setFooterText(quick.footerNote)
+  }
+
+  function applyAiDraft(draft: SharePageAiDraftResult) {
+    setHeadline(draft.headline)
+    setIntroCopy(draft.heroMessage)
+    setWhyReachingOut(draft.whyReachingOut)
+    setCompanyObservations(draft.companyObservations)
+    setCtaText(draft.ctaLabel)
+    setShowAiPanel(false)
+  }
+
   function buildCtaConfig() {
-    if (!ctaText.trim() || !ctaUrl.trim()) return undefined
+    if (!ctaText.trim()) return undefined
+    const hasBooking = Boolean(advanced.bookingPageId.trim()) || Boolean(calendarUrl.trim())
+    if (hasBooking && !ctaUrl.trim()) {
+      return [
+        {
+          id: "primary",
+          label: ctaText.trim(),
+          kind: "primary" as const,
+          action: "book_meeting" as const,
+          destinationUrl: calendarUrl.trim() || null,
+          trackingKey: "primary_cta",
+        },
+      ]
+    }
+    if (!ctaUrl.trim()) return undefined
     return [
       {
         id: "primary",
@@ -190,6 +251,10 @@ export function GrowthSharePageBuilder() {
         trackingKey: "primary_cta",
       },
     ]
+  }
+
+  function buildThemePatchBody() {
+    return { theme: buildThemePayload() }
   }
 
   async function createSharePageDraft(): Promise<string> {
@@ -219,6 +284,19 @@ export function GrowthSharePageBuilder() {
           body: JSON.stringify({
             hero_media_url: heroImageUrl.trim(),
             hero_media_type: "image",
+            ...buildThemePatchBody(),
+            why_reaching_out: whyReachingOut.trim() || null,
+            company_observations: companyObservations,
+          }),
+        })
+      } else {
+        await fetch(`/api/platform/growth/share-pages/${data.share_page_id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...buildThemePatchBody(),
+            why_reaching_out: whyReachingOut.trim() || null,
+            company_observations: companyObservations,
           }),
         })
       }
@@ -234,7 +312,10 @@ export function GrowthSharePageBuilder() {
         build_context: true,
         headline: headline.trim() || undefined,
         hero_message: introCopy.trim() || undefined,
+        why_reaching_out: whyReachingOut.trim() || undefined,
+        company_observations: companyObservations.length > 0 ? companyObservations : undefined,
         cta_config: buildCtaConfig(),
+        theme: buildThemePayload(),
         ...buildAdvancedPayload(),
       }),
     })
@@ -254,7 +335,9 @@ export function GrowthSharePageBuilder() {
       previewToken: data.previewToken,
     })
 
-    const patch: Record<string, unknown> = {}
+    const patch: Record<string, unknown> = { ...buildThemePatchBody() }
+    if (whyReachingOut.trim()) patch.why_reaching_out = whyReachingOut.trim()
+    if (companyObservations.length > 0) patch.company_observations = companyObservations
     if (heroImageUrl.trim()) {
       patch.hero_media_url = heroImageUrl.trim()
       patch.hero_media_type = "image"
@@ -307,10 +390,7 @@ export function GrowthSharePageBuilder() {
   }
 
   return (
-    <div
-      className="mx-auto w-full max-w-[1200px] pb-24"
-      data-qa-marker={GROWTH_SHARE_PAGES_OPERATOR_QA_MARKER}
-    >
+    <GrowthWorkspaceSafeArea variant="sticky-footer" className="mx-auto w-full max-w-[1200px]" data-qa-marker={GROWTH_SHARE_PAGES_OPERATOR_QA_MARKER}>
       <header className="mb-6 flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -323,7 +403,13 @@ export function GrowthSharePageBuilder() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          <Button type="button" variant="outline" size="sm" disabled title="Coming soon">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAiPanel((open) => !open)}
+            title="Generate a draft with AI — operator review required before publish"
+          >
             <Sparkles className="mr-1.5 size-4" aria-hidden />
             Generate With AI
           </Button>
@@ -343,11 +429,32 @@ export function GrowthSharePageBuilder() {
           <form id={FORM_ID} className="space-y-8" onSubmit={(e) => void handleSaveDraft(e)}>
             <GrowthSharePageStepCard step={1} title="Select Recipient" icon={UserRound} required>
               <GrowthSharePageRecipientPicker value={recipient} onChange={setRecipient} />
+              {recipient?.leadId ? (
+                <div className="mt-3">
+                  <GrowthPersonalizationEmbeddedPanel leadId={recipient.leadId} surface="share" compact />
+                </div>
+              ) : null}
             </GrowthSharePageStepCard>
 
             <GrowthSharePageStepCard step={2} title="Select Template" icon={CheckCircle2}>
               <GrowthSharePageTemplatePicker value={template} onChange={setTemplate} />
+              <div className="mt-4">
+                <GrowthSharePageQuickTemplatePicker
+                  value={quickTemplateId}
+                  disabled={submitting || publishing}
+                  onChange={setQuickTemplateId}
+                  onApply={applyQuickTemplate}
+                />
+              </div>
             </GrowthSharePageStepCard>
+
+            {showAiPanel ? (
+              <GrowthSharePageAiDraftPanel
+                disabled={submitting || publishing}
+                onDraftReady={applyAiDraft}
+                onMessage={setAiMessage}
+              />
+            ) : null}
 
             <GrowthSharePageStepCard step={3} title="Personalize" icon={Palette}>
               <div className="space-y-4">
@@ -365,66 +472,32 @@ export function GrowthSharePageBuilder() {
                     placeholder="Personalized message for your recipient…"
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="whyReachingOut">Why reaching out</Label>
+                  <Textarea
+                    id="whyReachingOut"
+                    value={whyReachingOut}
+                    onChange={(e) => setWhyReachingOut(e.target.value)}
+                    rows={2}
+                  />
+                </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="ctaText">CTA text</Label>
                     <Input id="ctaText" value={ctaText} onChange={(e) => setCtaText(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="ctaUrl">CTA URL</Label>
+                    <Label htmlFor="ctaUrl">CTA URL (optional if booking selected)</Label>
                     <Input id="ctaUrl" value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)} inputMode="url" />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="calendarUrl">Calendar URL</Label>
-                  <Input
-                    id="calendarUrl"
-                    value={calendarUrl}
-                    onChange={(e) => setCalendarUrl(e.target.value)}
-                    inputMode="url"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="heroImageUrl">Hero image URL</Label>
-                  <Input
-                    id="heroImageUrl"
-                    value={heroImageUrl}
-                    onChange={(e) => setHeroImageUrl(e.target.value)}
-                    inputMode="url"
-                  />
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="primaryColor">Brand color</Label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={primaryColor}
-                        onChange={(e) => setPrimaryColor(e.target.value)}
-                        className="size-10 rounded-md border border-border"
-                        aria-label="Pick brand color"
-                      />
-                      <Input id="primaryColor" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="accentColor">Accent color</Label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={accentColor}
-                        onChange={(e) => setAccentColor(e.target.value)}
-                        className="size-10 rounded-md border border-border"
-                        aria-label="Pick accent color"
-                      />
-                      <Input id="accentColor" value={accentColor} onChange={(e) => setAccentColor(e.target.value)} />
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="logoUrl">Logo URL</Label>
-                  <Input id="logoUrl" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} inputMode="url" />
-                </div>
+                <GrowthSharePageBookingPagePicker
+                  bookingPageId={advanced.bookingPageId}
+                  calendarUrl={calendarUrl}
+                  disabled={submitting || publishing}
+                  onBookingPageIdChange={(id) => setAdvanced((prev) => ({ ...prev, bookingPageId: id }))}
+                  onCalendarUrlChange={setCalendarUrl}
+                />
                 <div className="rounded-lg border border-border bg-muted/20 p-3">
                   <p className="text-xs font-medium text-muted-foreground">Available merge variables</p>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -438,7 +511,22 @@ export function GrowthSharePageBuilder() {
               </div>
             </GrowthSharePageStepCard>
 
-            <GrowthSharePageStepCard step={4} title="Review & Approve" icon={CheckCircle2}>
+            <GrowthSharePageStepCard step={4} title="Branding & theme" icon={Palette}>
+              <GrowthSharePageBrandingFields
+                theme={{ ...theme, logoUrl: logoUrl.trim() || null }}
+                footerText={footerText}
+                heroImageUrl={heroImageUrl}
+                disabled={submitting || publishing}
+                onThemeChange={(next) => {
+                  setTheme(next)
+                  setLogoUrl(next.logoUrl ?? "")
+                }}
+                onFooterTextChange={setFooterText}
+                onHeroImageUrlChange={setHeroImageUrl}
+              />
+            </GrowthSharePageStepCard>
+
+            <GrowthSharePageStepCard step={5} title="Review & Approve" icon={CheckCircle2}>
               <GrowthSharePageReviewCard
                 recipient={recipient}
                 template={template}
@@ -515,14 +603,6 @@ export function GrowthSharePageBuilder() {
                     />
                   </div>
                   <div>
-                    <Label className="text-xs">Booking page ID</Label>
-                    <Input
-                      className="mt-1"
-                      value={advanced.bookingPageId}
-                      onChange={(e) => setAdvanced((prev) => ({ ...prev, bookingPageId: e.target.value }))}
-                    />
-                  </div>
-                  <div>
                     <Label className="text-xs">Source channel</Label>
                     <select
                       className="mt-1 block w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
@@ -550,6 +630,7 @@ export function GrowthSharePageBuilder() {
                 {error}
               </p>
             ) : null}
+            {aiMessage ? <p className="text-sm text-muted-foreground">{aiMessage}</p> : null}
           </form>
         </div>
 
@@ -584,29 +665,24 @@ export function GrowthSharePageBuilder() {
         </aside>
       </div>
 
-      <footer
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
-        aria-label="Share page actions"
-      >
-        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <Button type="button" variant="ghost" asChild>
-            <Link href={`${resolveGrowthFeatureBasePath(pathname)}/share-pages/manage`}>Cancel</Link>
+      <GrowthStickyActionBar ariaLabel="Share page actions">
+        <Button type="button" variant="ghost" asChild>
+          <Link href={`${resolveGrowthFeatureBasePath(pathname)}/share-pages/manage`}>Cancel</Link>
+        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" onClick={scrollToPreview}>
+            Preview
           </Button>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" onClick={scrollToPreview}>
-              Preview
-            </Button>
-            <Button type="submit" form={FORM_ID} disabled={!canSubmit}>
-              {submitting ? <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden /> : null}
-              Save Draft
-            </Button>
-            <Button type="button" disabled={!canSubmit || publishing} onClick={() => void handlePublish()}>
-              {publishing ? <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden /> : null}
-              Publish
-            </Button>
-          </div>
+          <Button type="submit" form={FORM_ID} disabled={!canSubmit}>
+            {submitting ? <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden /> : null}
+            Save Draft
+          </Button>
+          <Button type="button" disabled={!canSubmit || publishing} onClick={() => void handlePublish()}>
+            {publishing ? <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden /> : null}
+            Publish
+          </Button>
         </div>
-      </footer>
-    </div>
+      </GrowthStickyActionBar>
+    </GrowthWorkspaceSafeArea>
   )
 }

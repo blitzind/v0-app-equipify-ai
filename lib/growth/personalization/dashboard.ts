@@ -11,6 +11,8 @@ import {
   GROWTH_PERSONALIZATION_STACK_B_UNIFICATION_QA_MARKER,
   parsePersonalizationStackBDiagnostics,
 } from "@/lib/growth/personalization/growth-personalization-stack-b-metadata"
+import { buildOriginalAiDraftSnapshot } from "@/lib/growth/personalization/growth-personalization-ai-draft-metadata"
+import { parseOriginalAiDraftSnapshot } from "@/lib/growth/personalization/growth-personalization-ai-draft-metadata"
 import {
   buildPersonalizationEvidenceBundle,
   computeEvidenceCoverageScore,
@@ -243,6 +245,7 @@ async function loadGenerationView(admin: SupabaseClient, generationId: string): 
     stackBDiagnostics: parsePersonalizationStackBDiagnostics(
       (data as Record<string, unknown>).metadata,
     ),
+    originalAiDraft: parseOriginalAiDraftSnapshot((data as Record<string, unknown>).metadata),
     evidence: ((evidenceRes.data ?? []) as Record<string, unknown>[]).map((row) => ({
       id: asString(row.id),
       sourceType: asString(row.source_type) as GrowthPersonalizationGenerationView["evidence"][number]["sourceType"],
@@ -380,6 +383,11 @@ export async function generatePersonalizationDraft(
       ? { outcomeGuidanceDiagnostics: stackBMetadata.outcomeGuidanceDiagnostics }
       : {}),
     ...(stackBMetadata.stackBGeneration ? { stackBGeneration: stackBMetadata.stackBGeneration } : {}),
+    original_ai_draft: buildOriginalAiDraftSnapshot({
+      subject: draft.subject,
+      body: draft.body,
+      capturedAt: now,
+    }),
   }
 
   const { data: generationRow, error } = await generationsTable(admin)
@@ -473,6 +481,23 @@ export async function updatePersonalizationGeneration(
 
   const status: GrowthPersonalizationGenerationStatus = validation.blocked ? "blocked" : "draft"
   const now = new Date().toISOString()
+
+  const { data: existingRow } = await generationsTable(admin)
+    .select("metadata")
+    .eq("id", generationId)
+    .maybeSingle()
+  const existingMetadata =
+    existingRow && typeof (existingRow as { metadata?: unknown }).metadata === "object"
+      ? ((existingRow as { metadata?: Record<string, unknown> }).metadata ?? {})
+      : {}
+  const preservedOriginalDraft =
+    parseOriginalAiDraftSnapshot(existingMetadata) ??
+    buildOriginalAiDraftSnapshot({
+      subject: existing.subject,
+      body: existing.body,
+      capturedAt: existing.createdAt,
+    })
+
   await generationsTable(admin)
     .update({
       subject,
@@ -482,6 +507,10 @@ export async function updatePersonalizationGeneration(
       risk_level: aggregatePersonalizationRiskLevel(validation.riskFindings),
       blocked_reason: validation.blockedReason,
       updated_at: now,
+      metadata: {
+        ...existingMetadata,
+        original_ai_draft: preservedOriginalDraft,
+      },
     })
     .eq("id", generationId)
 
@@ -708,3 +737,16 @@ export async function getApprovedPersonalizationForJob(
 }
 
 export { maskPersonalizationLeadLabel }
+
+export async function fetchPersonalizationSummaryForLead(
+  admin: SupabaseClient,
+  leadId: string,
+): Promise<import("@/lib/growth/personalization/embedded/growth-personalization-embedded-types").GrowthPersonalizationLeadSummary> {
+  const { buildPersonalizationLeadSummary } = await import(
+    "@/lib/growth/personalization/embedded/growth-personalization-summary-builder"
+  )
+  const generations = await listPersonalizationGenerations(admin, { leadId, limit: 1 })
+  const latestId = generations[0]?.id
+  const generation = latestId ? await loadGenerationView(admin, latestId) : null
+  return buildPersonalizationLeadSummary({ leadId, generation })
+}

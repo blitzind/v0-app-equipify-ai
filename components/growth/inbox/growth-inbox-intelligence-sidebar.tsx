@@ -11,6 +11,7 @@ import { GrowthInboxActionCenterReplyDraftEmbed } from "@/components/growth/inbo
 import { GrowthInboxCallActionLinks } from "@/components/growth/inbox/growth-inbox-call-action-links"
 import { GrowthInboxQuickActions } from "@/components/growth/inbox/growth-inbox-quick-actions"
 import { GrowthInboxRecommendedReplyCard } from "@/components/growth/inbox/growth-inbox-recommended-reply-card"
+import { GrowthPersonalizationEmbeddedPanel } from "@/components/growth/personalization/embedded/growth-personalization-embedded-panel"
 import { GrowthOnDemandFeature } from "@/components/growth/runtime/growth-on-demand-feature"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
 import { useGrowthInboxSharedData } from "@/components/growth/inbox/growth-inbox-shared-data-provider"
@@ -142,6 +143,10 @@ export function GrowthInboxIntelligenceSidebar() {
             Loading…
           </div>
         ) : null}
+
+        <SidebarCard title="Suggested Personalized Follow-Up" sectionId="inbox-sidebar-personalization">
+          {leadId ? <GrowthPersonalizationEmbeddedPanel leadId={leadId} surface="inbox" compact /> : null}
+        </SidebarCard>
 
         <SidebarCard title="Next Best Action" sectionId="inbox-sidebar-next-best-action">
           <GrowthInboxNextBestActionLinks />

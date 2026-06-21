@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import { GrowthVoiceRevenueIntelligencePassiveCard } from "@/components/growth/growth-voice-revenue-intelligence-passive-card"
 import { GrowthVoiceRetentionIntelligencePassiveCard } from "@/components/growth/growth-voice-retention-intelligence-passive-card"
+import { GrowthPersonalizationEmbeddedPanel } from "@/components/growth/personalization/embedded/growth-personalization-embedded-panel"
 import {
   GROWTH_OPPORTUNITY_WORKSPACE_VIEWS,
   GROWTH_REVENUE_INTELLIGENCE_PRIVACY_NOTE,
@@ -165,6 +166,7 @@ export function GrowthOpportunityWorkspaceDashboard() {
               <p><span className="font-medium">Objections:</span> {copilot.objectionSummary}</p>
               <p><span className="font-medium">Next action:</span> {copilot.suggestedNextAction}</p>
               <p className="text-xs text-muted-foreground">{copilot.confidenceNote}</p>
+              <GrowthPersonalizationEmbeddedPanel leadId={selectedLeadId} surface="opportunity" compact />
             </div>
           )}
         </GrowthEngineCard>

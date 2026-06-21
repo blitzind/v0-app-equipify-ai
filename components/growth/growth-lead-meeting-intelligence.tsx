@@ -29,6 +29,7 @@ import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base
 import { GrowthCallIntelligenceScorecardCard } from "@/components/growth/growth-call-intelligence-scorecard-card"
 import { GrowthMeetingOutcomeIntelligenceInline } from "@/components/growth/growth-meeting-outcome-intelligence-inline"
 import { GrowthMeetingPrepPanel } from "@/components/growth/growth-meeting-prep-panel"
+import { GrowthPersonalizationEmbeddedPanel } from "@/components/growth/personalization/embedded/growth-personalization-embedded-panel"
 import { GrowthOpportunityDraftPanel } from "@/components/growth/growth-opportunity-draft-panel"
 import type { MeetingOutcomeIntelligenceScorePublicView } from "@/lib/growth/meeting-outcome-intelligence/meeting-outcome-intelligence-types"
 
@@ -365,6 +366,7 @@ export function GrowthLeadMeetingIntelligence({
         {selected ? (
           <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
             <GrowthMeetingPrepPanel meetingId={selected.id} meetingStatus={selected.status} />
+            <GrowthPersonalizationEmbeddedPanel leadId={lead.id} surface="meeting" compact />
             <GrowthOpportunityDraftPanel meetingId={selected.id} meetingStatus={selected.status} />
             <p className="text-sm font-medium">Update {selected.title}</p>
             <div className="grid gap-2 text-xs sm:grid-cols-2">

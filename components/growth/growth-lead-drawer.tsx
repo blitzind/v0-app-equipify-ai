@@ -28,6 +28,7 @@ import { GrowthVoiceRetentionIntelligencePassiveCard } from "@/components/growth
 import { GrowthExecutiveOperatingIntelligence } from "@/components/growth/growth-executive-operating-intelligence"
 import { GrowthOperationalCapacityIntelligence } from "@/components/growth/growth-operational-capacity-intelligence"
 import { GrowthAiCopilot } from "@/components/growth/growth-ai-copilot"
+import { GrowthPersonalizationEmbeddedPanel } from "@/components/growth/personalization/embedded/growth-personalization-embedded-panel"
 import { GrowthCallCopilot } from "@/components/growth/growth-call-copilot"
 import { GrowthRealtimeCallIntelligence } from "@/components/growth/growth-realtime-call-intelligence"
 import { GrowthLeadCommandCenter } from "@/components/growth/growth-lead-command-center"
@@ -163,6 +164,8 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLe
           <GrowthLeadCompliance lead={activeLead} />
 
           <GrowthCallCopilot lead={activeLead} />
+
+          <GrowthPersonalizationEmbeddedPanel leadId={activeLead.id} surface="lead" compact className="px-1" />
 
           <GrowthRealtimeCallIntelligence lead={activeLead} />
 

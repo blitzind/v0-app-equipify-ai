@@ -41,8 +41,7 @@ import {
 import { GrowthSendrBuilderLivePreview } from "@/components/growth/sendr/builder/growth-sendr-builder-live-preview"
 import { GrowthSendrBuilderSectionCard } from "@/components/growth/sendr/builder/growth-sendr-builder-section-card"
 import { GrowthSendrBuilderEmptyState } from "@/components/growth/sendr/builder/growth-sendr-builder-empty-state"
-import { GrowthSendrBuilderReadinessPanel } from "@/components/growth/sendr/builder/growth-sendr-builder-readiness-panel"
-import { GrowthSendrBuilderPublishPanel } from "@/components/growth/sendr/builder/growth-sendr-builder-publish-panel"
+import { GrowthPersonalizationEmbeddedPanel } from "@/components/growth/personalization/embedded/growth-personalization-embedded-panel"
 import { getGrowthSendrBuilderSectionMeta } from "@/lib/growth/sendr/growth-sendr-builder-section-meta"
 
 type DetailResponse = {
@@ -385,48 +384,6 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
     }
   }
 
-  async function registerAndAttachBooking() {
-    setBusy(true)
-    setMessage(null)
-    try {
-      const regRes = await fetch("/api/platform/growth/sendr/booking-assets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "register",
-          meetingLink: meetingLink || null,
-          meetingType,
-          durationMinutes: Number(durationMinutes) || 30,
-          timezone,
-          calendarProvider: "manual",
-        }),
-      })
-      const regData = (await regRes.json()) as { ok: boolean; bookingAsset?: { id: string }; message?: string }
-      if (!regRes.ok) {
-        setMessage(regData.message ?? "Booking register failed")
-        return
-      }
-      const attachRes = await fetch("/api/platform/growth/sendr/booking-assets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "attach",
-          landingPageId: pageId,
-          bookingAssetId: regData.bookingAsset?.id,
-        }),
-      })
-      const attachData = (await attachRes.json()) as { ok: boolean; message?: string }
-      if (!attachRes.ok) {
-        setMessage(attachData.message ?? "Booking attach failed")
-        return
-      }
-      setMessage("Booking link attached")
-      void load()
-    } finally {
-      setBusy(false)
-    }
-  }
-
   async function publishPage() {
     setBusy(true)
     setMessage(null)
@@ -517,6 +474,12 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
               </TabsTrigger>
               <TabsTrigger value="media" className="text-xs sm:text-sm">
                 Media
+              </TabsTrigger>
+              <TabsTrigger value="branding" className="text-xs sm:text-sm">
+                Branding
+              </TabsTrigger>
+              <TabsTrigger value="ai" className="text-xs sm:text-sm">
+                AI & templates
               </TabsTrigger>
               <TabsTrigger value="booking" className="text-xs sm:text-sm">
                 Booking
@@ -647,6 +610,14 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
                     <Wand2 className="mr-1.5 size-4" />
                     Run personalization preview
                   </Button>
+                  {previewLeadId.trim() ? (
+                    <GrowthPersonalizationEmbeddedPanel
+                      leadId={previewLeadId.trim()}
+                      surface="sendr"
+                      compact
+                      className="mt-3"
+                    />
+                  ) : null}
                 </CardContent>
               </Card>
 
@@ -762,6 +733,24 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
               </Card>
             </TabsContent>
 
+            <TabsContent value="branding" className="space-y-4">
+              <GrowthSendrBuilderBrandingPanel
+                page={page}
+                disabled={busy}
+                onSaved={() => void load()}
+                onMessage={setMessage}
+              />
+            </TabsContent>
+
+            <TabsContent value="ai" className="space-y-4">
+              <GrowthSendrBuilderAiDraftPanel
+                pageId={pageId}
+                disabled={busy}
+                onDraftApplied={() => void load()}
+                onMessage={setMessage}
+              />
+            </TabsContent>
+
             <TabsContent value="booking" className="space-y-4">
               <Card className="rounded-2xl border-slate-200/80 shadow-sm">
                 <CardHeader className="pb-3">
@@ -784,27 +773,20 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
                       compact
                     />
                   ) : null}
-                  <div className="space-y-2">
-                    <Label>Meeting link</Label>
-                    <Input value={meetingLink} onChange={(e) => setMeetingLink(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Meeting type</Label>
-                    <Input value={meetingType} onChange={(e) => setMeetingType(e.target.value)} />
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>Duration (minutes)</Label>
-                      <Input value={durationMinutes} onChange={(e) => setDurationMinutes(e.target.value)} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Timezone</Label>
-                      <Input value={timezone} onChange={(e) => setTimezone(e.target.value)} />
-                    </div>
-                  </div>
-                  <Button disabled={busy} onClick={() => void registerAndAttachBooking()}>
-                    Register & attach booking
-                  </Button>
+                  <GrowthSendrBuilderBookingPagePicker
+                    pageId={pageId}
+                    meetingLink={meetingLink}
+                    meetingType={meetingType}
+                    durationMinutes={durationMinutes}
+                    timezone={timezone}
+                    disabled={busy}
+                    onMeetingLinkChange={setMeetingLink}
+                    onMeetingTypeChange={setMeetingType}
+                    onDurationChange={setDurationMinutes}
+                    onTimezoneChange={setTimezone}
+                    onAttached={() => void load()}
+                    onMessage={setMessage}
+                  />
                   <GrowthSendrAssetPickerPanel
                     kind="booking"
                     selectedId={bookingAsset?.id}

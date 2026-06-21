@@ -88,14 +88,14 @@ function main(): void {
   assert.equal(regenerationFeedbackLabel("too_generic"), "Too generic")
   console.log("  ✓ regeneration feedback labels")
 
-  const dashboard = readSource("components/growth/growth-ai-personalization-dashboard.tsx")
+  const dashboard = readSource("components/growth/personalization/growth-personalization-workspace.tsx")
   assert.doesNotMatch(dashboard, /Lead ID \(generate draft\)/)
   assert.doesNotMatch(dashboard, /placeholder="Lead UUID"/)
   assert.match(dashboard, /GrowthPersonalizationLeadPicker/)
-  assert.match(dashboard, /Generate Draft/)
+  assert.match(dashboard, /Generate/)
   assert.match(dashboard, /Generation Rejected/)
   assert.match(dashboard, /Generate New Version/)
-  assert.match(dashboard, /GrowthPersonalizationVersionHistory/)
+  assert.match(dashboard, /GrowthPersonalizationGenerationsPanel/)
   assert.match(dashboard, /GROWTH_PERSONALIZATION_GENERATION_UX_QA_MARKER/)
   console.log("  ✓ dashboard UX — search picker replaces UUID input")
 
@@ -120,19 +120,19 @@ function main(): void {
   assert.match(launchLink, /buildGrowthPersonalizationWorkspaceHref/)
 
   const leadDrawer = readSource("components/growth/growth-lead-drawer.tsx")
-  assert.match(leadDrawer, /GrowthPersonalizationLaunchLink/)
+  assert.match(leadDrawer, /GrowthPersonalizationEmbeddedPanel/)
 
-  const inboxStrip = readSource("components/growth/inbox/growth-inbox-conversation-intelligence-context-strip.tsx")
-  assert.match(inboxStrip, /GrowthPersonalizationLaunchLink/)
+  const inboxStrip = readSource("components/growth/inbox/growth-inbox-intelligence-sidebar.tsx")
+  assert.match(inboxStrip, /GrowthPersonalizationEmbeddedPanel/)
 
   const callRail = readSource("components/growth/growth-call-workspace-intelligence-rail.tsx")
-  assert.match(callRail, /GrowthPersonalizationLaunchLink/)
+  assert.match(callRail, /GrowthPersonalizationEmbeddedPanel/)
 
   const sendrDetail = readSource("components/growth/sendr/growth-sendr-page-detail.tsx")
-  assert.match(sendrDetail, /GrowthPersonalizationLaunchLink/)
+  assert.match(sendrDetail, /GrowthPersonalizationEmbeddedPanel/)
 
   const shareBuilder = readSource("components/growth/share-pages/growth-share-page-builder.tsx")
-  assert.match(shareBuilder, /GrowthPersonalizationLaunchLink/)
+  assert.match(shareBuilder, /GrowthPersonalizationEmbeddedPanel/)
   console.log("  ✓ contextual launch actions wired")
 
   const evidenceEngine = readSource("lib/growth/personalization/personalization-evidence-engine.ts")

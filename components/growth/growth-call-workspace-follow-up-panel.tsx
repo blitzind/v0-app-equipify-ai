@@ -5,6 +5,7 @@ import { Calendar, CheckCircle2, Loader2, Mail, MessageSquare, PhoneForwarded } 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { GrowthPersonalizationEmbeddedPanel } from "@/components/growth/personalization/embedded/growth-personalization-embedded-panel"
 import { GROWTH_CALL_WORKSPACE_OPS_QA_MARKER } from "@/lib/growth/native-dialer/call-workspace-operator-types"
 import type { NativeCallWrapupPublicView } from "@/lib/growth/native-dialer/native-dialer-types"
 
@@ -84,6 +85,12 @@ export function GrowthCallWorkspaceFollowUpPanel({
             <li key={action}>• {action}</li>
           ))}
         </ul>
+      ) : null}
+
+      {leadId ? (
+        <div className="mb-4">
+          <GrowthPersonalizationEmbeddedPanel leadId={leadId} surface="call" compact />
+        </div>
       ) : null}
 
       <div className="mb-3 flex flex-wrap gap-2">

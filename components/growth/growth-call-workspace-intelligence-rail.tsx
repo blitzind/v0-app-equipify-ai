@@ -21,6 +21,7 @@ import { GrowthCallWorkspaceRevenueIntelligencePanel } from "@/components/growth
 import { GrowthCallWorkspaceRetentionIntelligencePanel } from "@/components/growth/growth-call-workspace-retention-intelligence-panel"
 import { useCallWorkspaceLeadSearch } from "@/components/growth/use-call-workspace-lead-search"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
+import { GrowthPersonalizationEmbeddedPanel } from "@/components/growth/personalization/embedded/growth-personalization-embedded-panel"
 import {
   GROWTH_CALL_WORKSPACE_PANEL,
   executionReadinessLabel,
@@ -242,6 +243,8 @@ export function GrowthCallWorkspaceIntelligenceRail({
               <Link href={commandLeadFocusHref(leadContext.leadId, "command")}>View Lead</Link>
             </Button>
           </div>
+
+          <GrowthPersonalizationEmbeddedPanel leadId={leadContext.leadId} surface="call" compact />
 
           {showRelationshipSummary ? (
             <GrowthCallWorkspaceRelationshipSummaryPanel leadId={leadContext.leadId} />

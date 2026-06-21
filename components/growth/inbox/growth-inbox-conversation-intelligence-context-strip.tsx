@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { ExternalLink, MessageSquare, Workflow } from "lucide-react"
+import { GrowthPersonalizationEmbeddedPanel } from "@/components/growth/personalization/embedded/growth-personalization-embedded-panel"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthActionRequiredBadge } from "@/components/growth/growth-ui-utils"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
@@ -93,7 +94,9 @@ export function GrowthInboxConversationCrossLinks({
 
 export function GrowthConversationsActionCrossLinks({ leadId }: { leadId: string }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="space-y-2">
+      <GrowthPersonalizationEmbeddedPanel leadId={leadId} surface="conversation" compact />
+      <div className="flex flex-wrap gap-2">
       <Button type="button" size="sm" variant="outline" className="h-7 text-xs" asChild>
         <Link href={growthWorkspaceInboxHref({ leadId })}>
           <MessageSquare className="mr-1 size-3" />
@@ -106,6 +109,7 @@ export function GrowthConversationsActionCrossLinks({ leadId }: { leadId: string
           Open Workflow
         </Link>
       </Button>
+      </div>
     </div>
   )
 }
