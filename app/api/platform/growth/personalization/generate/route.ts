@@ -7,11 +7,23 @@ import { GROWTH_AI_PERSONALIZATION_PRIVACY_NOTE } from "@/lib/growth/personaliza
 
 export const runtime = "nodejs"
 
+import {
+  GROWTH_PERSONALIZATION_REGENERATION_FEEDBACK_OPTIONS,
+} from "@/lib/growth/personalization/personalization-types"
+
 const BodySchema = z.object({
   leadId: z.string().uuid(),
   contentTemplateVersionId: z.string().uuid().optional().nullable(),
   snippetIds: z.array(z.string().uuid()).optional(),
   sequenceExecutionJobId: z.string().uuid().optional().nullable(),
+  priorGenerationId: z.string().uuid().optional().nullable(),
+  regenerationFeedback: z
+    .object({
+      category: z.enum(GROWTH_PERSONALIZATION_REGENERATION_FEEDBACK_OPTIONS),
+      customNotes: z.string().max(1000).optional().nullable(),
+    })
+    .optional()
+    .nullable(),
 })
 
 export async function POST(request: Request) {
@@ -35,6 +47,18 @@ export async function POST(request: Request) {
       contentTemplateVersionId: parsed.data.contentTemplateVersionId ?? null,
       snippetIds: parsed.data.snippetIds,
       sequenceExecutionJobId: parsed.data.sequenceExecutionJobId ?? null,
+      operatorMetadata: parsed.data.regenerationFeedback
+        ? {
+            prior_generation_id: parsed.data.priorGenerationId ?? null,
+            regeneration_feedback: {
+              category: parsed.data.regenerationFeedback.category,
+              customNotes: parsed.data.regenerationFeedback.customNotes ?? null,
+              recordedAt: new Date().toISOString(),
+            },
+          }
+        : parsed.data.priorGenerationId
+          ? { prior_generation_id: parsed.data.priorGenerationId }
+          : null,
     })
     return NextResponse.json({
       ok: true,

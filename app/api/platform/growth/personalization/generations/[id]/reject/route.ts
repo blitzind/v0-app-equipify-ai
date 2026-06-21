@@ -3,11 +3,23 @@ import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { rejectPersonalizationGeneration } from "@/lib/growth/personalization/dashboard"
 import { isGrowthAiPersonalizationSchemaReady } from "@/lib/growth/personalization/schema-health"
-import { GROWTH_AI_PERSONALIZATION_PRIVACY_NOTE } from "@/lib/growth/personalization/personalization-types"
+import {
+  GROWTH_AI_PERSONALIZATION_PRIVACY_NOTE,
+  GROWTH_PERSONALIZATION_REGENERATION_FEEDBACK_OPTIONS,
+} from "@/lib/growth/personalization/personalization-types"
 
 export const runtime = "nodejs"
 
-const BodySchema = z.object({ reason: z.string().max(500).optional() })
+const BodySchema = z.object({
+  reason: z.string().max(500).optional(),
+  rejectionFeedback: z
+    .object({
+      category: z.enum(GROWTH_PERSONALIZATION_REGENERATION_FEEDBACK_OPTIONS).optional().nullable(),
+      customNotes: z.string().max(1000).optional().nullable(),
+    })
+    .optional()
+    .nullable(),
+})
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -31,6 +43,13 @@ export async function POST(request: Request, context: RouteContext) {
       actorUserId: access.userId,
       actorEmail: access.userEmail,
       reason: parsed.data.reason,
+      rejectionFeedback: parsed.data.rejectionFeedback
+        ? {
+            category: parsed.data.rejectionFeedback.category ?? null,
+            customNotes: parsed.data.rejectionFeedback.customNotes ?? null,
+            recordedAt: new Date().toISOString(),
+          }
+        : undefined,
     })
     return NextResponse.json({
       ok: true,

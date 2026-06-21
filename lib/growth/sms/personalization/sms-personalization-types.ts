@@ -10,6 +10,7 @@ import type {
   PersonalizationWarning,
   ResearchOpenerMetadata,
 } from "@/lib/growth/outreach/personalization/personalization-types"
+import type { GrowthPersonalizationQualityDiagnostics } from "@/lib/growth/personalization/quality/growth-personalization-quality-types"
 import { GROWTH_SMS_PERSONALIZATION_QA_MARKER } from "@/lib/growth/sms/personalization/sms-personalization-audit"
 
 export { GROWTH_SMS_PERSONALIZATION_QA_MARKER }
@@ -34,6 +35,7 @@ export const SMS_OPENING_HOOK_STRATEGIES = [
   "follow_up_question",
   "customer_check_in",
   "generic_question",
+  "industry_playbook",
 ] as const
 export type SmsOpeningHookStrategy = (typeof SMS_OPENING_HOOK_STRATEGIES)[number]
 
@@ -102,6 +104,15 @@ export type SmsPersonalizationAudit = {
   contextQuality?: OutreachContextQualityMetadata
   memoryQuality?: MemoryQualityMetadata
   qualityScore: SmsQualityScore
+  /** GS-AI-PLAYBOOK-3B — deterministic quality pass diagnostics. */
+  qualityDiagnostics?: GrowthPersonalizationQualityDiagnostics
+  qualityApplied?: boolean
+  /** GS-AI-PLAYBOOK-4B — reasoning & planning diagnostics. */
+  reasoningDiagnostics?: import("@/lib/growth/reasoning/growth-reasoning-types").GrowthReasoningDiagnostics
+  reasoningApplied?: boolean
+  /** GS-AI-PLAYBOOK-4C — sequence intelligence diagnostics. */
+  sequenceDiagnostics?: import("@/lib/growth/sequence-intelligence/growth-sequence-state-types").GrowthSequenceDiagnostics
+  sequenceGuidanceApplied?: boolean
 }
 
 export type GrowthSmsInboxDraftSuggestion = {

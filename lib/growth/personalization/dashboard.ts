@@ -35,8 +35,10 @@ import {
   type GrowthPersonalizationGenerationStatus,
   type GrowthPersonalizationGenerationView,
   type GrowthPersonalizationIndustryPlaybookDiagnostics,
+  type GrowthPersonalizationOperatorGenerationMetadata,
   type GrowthPersonalizationSource,
 } from "@/lib/growth/personalization/personalization-types"
+import { parsePersonalizationOperatorMetadata } from "@/lib/growth/personalization/personalization-generation-ux"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -142,6 +144,9 @@ async function loadGenerationView(admin: SupabaseClient, generationId: string): 
     industryPlaybookDiagnostics: parseIndustryPlaybookDiagnostics(
       (data as Record<string, unknown>).metadata,
     ),
+    operatorMetadata: parsePersonalizationOperatorMetadata(
+      (data as Record<string, unknown>).metadata,
+    ),
     evidence: ((evidenceRes.data ?? []) as Record<string, unknown>[]).map((row) => ({
       id: asString(row.id),
       sourceType: asString(row.source_type) as GrowthPersonalizationGenerationView["evidence"][number]["sourceType"],
@@ -196,6 +201,7 @@ export async function generatePersonalizationDraft(
     contentTemplateVersionId?: string | null
     snippetIds?: string[]
     sequenceExecutionJobId?: string | null
+    operatorMetadata?: GrowthPersonalizationOperatorGenerationMetadata | null
   },
 ): Promise<GrowthPersonalizationGenerationView> {
   await enforceGovernanceIfReady(admin, {
@@ -262,6 +268,18 @@ export async function generatePersonalizationDraft(
     topSources: sourceSummary,
   })
 
+  const generationMetadata = {
+    ...(evidenceBundle.industryPlaybookDiagnostics
+      ? { industry_playbook_diagnostics: evidenceBundle.industryPlaybookDiagnostics }
+      : {}),
+    ...(input.operatorMetadata?.prior_generation_id
+      ? { prior_generation_id: input.operatorMetadata.prior_generation_id }
+      : {}),
+    ...(input.operatorMetadata?.regeneration_feedback
+      ? { regeneration_feedback: input.operatorMetadata.regeneration_feedback }
+      : {}),
+  }
+
   const { data: generationRow, error } = await generationsTable(admin)
     .insert({
       lead_id: input.leadId,
@@ -281,9 +299,7 @@ export async function generatePersonalizationDraft(
       requires_human_review: true,
       created_by: input.actorUserId,
       updated_at: now,
-      metadata: evidenceBundle.industryPlaybookDiagnostics
-        ? { industry_playbook_diagnostics: evidenceBundle.industryPlaybookDiagnostics }
-        : {},
+      metadata: generationMetadata,
     })
     .select("*")
     .single()
@@ -455,12 +471,27 @@ export async function approvePersonalizationGeneration(
 
 export async function rejectPersonalizationGeneration(
   admin: SupabaseClient,
-  input: { generationId: string; actorUserId: string; actorEmail: string; reason?: string },
+  input: {
+    generationId: string
+    actorUserId: string
+    actorEmail: string
+    reason?: string
+    rejectionFeedback?: GrowthPersonalizationOperatorGenerationMetadata["rejection_feedback"]
+  },
 ): Promise<GrowthPersonalizationGenerationView> {
   const existing = await loadGenerationView(admin, input.generationId)
   if (!existing) throw new Error("generation_not_found")
 
   const now = new Date().toISOString()
+  const { data: existingRow } = await generationsTable(admin)
+    .select("metadata")
+    .eq("id", input.generationId)
+    .maybeSingle()
+  const existingMetadata =
+    existingRow && typeof (existingRow as { metadata?: unknown }).metadata === "object"
+      ? ((existingRow as { metadata?: Record<string, unknown> }).metadata ?? {})
+      : {}
+
   await generationsTable(admin)
     .update({
       status: "rejected",
@@ -468,6 +499,12 @@ export async function rejectPersonalizationGeneration(
       rejected_at: now,
       blocked_reason: input.reason?.trim() || existing.blockedReason,
       updated_at: now,
+      metadata: {
+        ...existingMetadata,
+        ...(input.rejectionFeedback
+          ? { rejection_feedback: input.rejectionFeedback }
+          : {}),
+      },
     })
     .eq("id", input.generationId)
 

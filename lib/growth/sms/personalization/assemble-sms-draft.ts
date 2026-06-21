@@ -1,5 +1,6 @@
 /** Assemble personalized SMS draft (Phase 5.3). Client-safe. */
 
+import { buildIndustryContextSmsDraft } from "@/lib/growth/playbooks/growth-industry-context"
 import { computeContextUtilization } from "@/lib/growth/outreach/personalization/context-utilization"
 import { computeMemoryUtilization } from "@/lib/growth/outreach/personalization/memory-utilization"
 import { buildPersonalizationVariationKey } from "@/lib/growth/outreach/personalization/message-variability"
@@ -14,7 +15,14 @@ import { selectSmsOpeningHook } from "@/lib/growth/sms/personalization/sms-openi
 import {
   assembleSmsBody,
   scoreSmsPersonalizationQuality,
+  estimateSmsSegments,
+  trimSmsToMaxChars,
 } from "@/lib/growth/sms/personalization/sms-quality-scoring"
+import { applyGrowthPersonalizationQualityPassWithIndustryContext } from "@/lib/growth/personalization/quality/growth-personalization-quality-engine"
+import { buildAllowedFactsFromContextPacket } from "@/lib/growth/outreach/personalization/allowed-facts-from-context-packet"
+import { collectAllowedFacts } from "@/lib/growth/outreach/personalization/ai-refinement-guard"
+import { buildGrowthReasoningContext } from "@/lib/growth/reasoning/growth-reasoning-engine"
+import { buildGrowthSequenceIntelligenceContext } from "@/lib/growth/sequence-intelligence/growth-sequence-engine"
 import type {
   SmsMessageType,
   SmsPersonalizationAudit,
@@ -32,6 +40,20 @@ export function buildPersonalizedSmsDraft(input: {
 }): { audit: SmsPersonalizationAudit; draft: SmsPersonalizationDraft } {
   const maxChars = input.maxChars ?? SMS_PERSONALIZATION_DEFAULT_MAX_CHARS
   const packet = input.context.packet
+  const sequenceIntelligenceContext = buildGrowthSequenceIntelligenceContext({ packet })
+  if (packet.industryContext) {
+    packet.industryContext = {
+      ...packet.industryContext,
+      sequenceIntelligenceContext,
+    }
+  }
+  const reasoningContext = buildGrowthReasoningContext({ packet, channel: "SMS" })
+  if (packet.industryContext) {
+    packet.industryContext = {
+      ...packet.industryContext,
+      reasoningContext,
+    }
+  }
   const signals = extractPersonalizationSignals(packet)
   const messageType =
     input.messageType ??
@@ -44,13 +66,28 @@ export function buildPersonalizedSmsDraft(input: {
   const variationKey = buildPersonalizationVariationKey({
     leadId: input.leadId,
     angle: messageType,
-    industry: "general",
+    industry: packet.industryContext?.industryId ?? "general",
     blockIds: [messageType],
   })
 
-  const hook = selectSmsOpeningHook({ packet, messageType, variationKey })
+  const playbookSms = packet.industryContext?.playbookApplied
+    ? buildIndustryContextSmsDraft(packet.industryContext)
+    : null
+  const hook = playbookSms
+    ? {
+        strategy: "industry_playbook" as const,
+        evidence: packet.industryContext?.industryFacts[0] ?? null,
+        evidenceSource: "industry_playbook" as const,
+        text: playbookSms,
+      }
+    : selectSmsOpeningHook({ packet, messageType, variationKey })
   const cta = buildSmsCta({ packet, signals, messageType, variationKey })
-  const draft = assembleSmsBody(hook.text, cta.text, maxChars)
+  let draft = playbookSms
+    ? (() => {
+        const body = trimSmsToMaxChars(playbookSms, maxChars)
+        return { body, charCount: body.length, segmentCount: estimateSmsSegments(body.length) }
+      })()
+    : assembleSmsBody(hook.text, cta.text, maxChars)
 
   const pseudoStrategy = {
     blocks: [
@@ -90,6 +127,23 @@ export function buildPersonalizedSmsDraft(input: {
     confidenceScore: confidence.score,
   })
 
+  const qualityPass = applyGrowthPersonalizationQualityPassWithIndustryContext({
+    channel: "SMS",
+    body: draft.body,
+    companyName: packet.companyName,
+    contactName: packet.decisionMakerName,
+    allowedFacts: collectAllowedFacts(buildAllowedFactsFromContextPacket(packet)),
+    industryContext: packet.industryContext,
+    reasoningDiagnostics: reasoningContext.diagnostics,
+    sequenceDiagnostics: sequenceIntelligenceContext.diagnostics,
+    maxChars,
+  })
+  draft = {
+    body: qualityPass.body,
+    charCount: qualityPass.body.length,
+    segmentCount: estimateSmsSegments(qualityPass.body.length),
+  }
+
   const audit: SmsPersonalizationAudit = {
     strategyVersion: SMS_PERSONALIZATION_STRATEGY_VERSION,
     messageType,
@@ -117,6 +171,12 @@ export function buildPersonalizedSmsDraft(input: {
     contextQuality,
     memoryQuality,
     qualityScore,
+    qualityDiagnostics: qualityPass.diagnostics,
+    qualityApplied: qualityPass.qualityApplied,
+    reasoningDiagnostics: reasoningContext.diagnostics,
+    reasoningApplied: reasoningContext.diagnostics.topInsights.length > 0,
+    sequenceDiagnostics: sequenceIntelligenceContext.diagnostics,
+    sequenceGuidanceApplied: sequenceIntelligenceContext.diagnostics.guidanceApplied,
   }
 
   return { audit, draft }

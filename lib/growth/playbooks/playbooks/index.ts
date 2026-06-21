@@ -1,273 +1,28 @@
-/** GS-AI-PLAYBOOK-1A — Seeded industry playbooks (foundation content only). */
+/** GS-AI-PLAYBOOK-1A/2A — Industry playbooks (seed + enriched reference). */
 
 import type { GrowthIndustryPlaybook } from "@/lib/growth/playbooks/industry-playbook-types"
 import { buildSeededIndustryPlaybook } from "@/lib/growth/playbooks/playbooks/_playbook-seed-helper"
+import { GROWTH_PRIORITY_ENRICHED_PLAYBOOK_BUILDERS } from "@/lib/growth/playbooks/playbooks/enriched/priority-playbooks"
 
-export const GROWTH_INDUSTRY_PLAYBOOK_BIOMEDICAL_EQUIPMENT = buildSeededIndustryPlaybook({
-  industryId: "biomedical_equipment",
-  overview:
-    "Biomedical and clinical engineering teams maintain regulated devices across hospitals, clinics, and IDN sites. Work is driven by PM cadences, recall management, and audit-ready documentation.",
-  pains: [
-    "PM due dates and recall actions live in spreadsheets disconnected from work orders.",
-    "Technicians lack unified device history before entering sensitive clinical areas.",
-    "Compliance documentation is rebuilt manually for Joint Commission or CMS surveys.",
-    "Multi-site HTM teams cannot see backlog risk by modality or campus.",
-    "Parts usage and loaner tracking are inconsistent across biomed shops.",
-  ],
-  discoveryQuestions: [
-    "How do you track PM, calibration, and recall due dates today?",
-    "Where does device service history live before a tech arrives on unit?",
-    "How do you prepare documentation for accreditation or audit requests?",
-    "Which modalities create the most repeat truck rolls or overdue PM?",
-    "Do loaner pools and parts usage tie back to asset records?",
-  ],
-  objections: [
-    "We already use a CMMS tied to the hospital.",
-    "Clinical engineering workflows are too specialized for generic software.",
-    "Security and compliance reviews block new vendors.",
-  ],
-  proofPoints: [
-    "Single asset register with PM schedules and service history per device.",
-    "Work orders linked to equipment, parts, and technician notes for audit trails.",
-    "Dashboard visibility into overdue PM and open corrective actions by site.",
-    "Certificate and calibration due tracking without duplicate spreadsheets.",
-    "Multi-campus HTM teams share one operational picture.",
-  ],
-  capabilityMappings: [
-    {
-      capability: "Regulated PM tracking",
-      painSignal: "Overdue PM on patient-connected devices",
-      equipifyModule: "Maintenance Plans + Equipment",
-    },
-    {
-      capability: "Recall and corrective work",
-      painSignal: "Recall actions not tied to open work orders",
-      equipifyModule: "Work Orders",
-    },
-    {
-      capability: "Audit-ready history",
-      painSignal: "Manual documentation for surveys",
-      equipifyModule: "Service History + Reports",
-    },
-  ],
-  videoStorylines: [
-    {
-      title: "HTM backlog visibility",
-      hook: "Walk through how a biomed director surfaces overdue PM by campus before survey season.",
-      audience: "HTM / clinical engineering director",
-    },
-    {
-      title: "Recall to work order",
-      hook: "Show closing the loop from recall notice to assigned corrective work with asset context.",
-      audience: "Biomed shop supervisor",
-    },
-  ],
-  sharePageStorylines: [
-    {
-      title: "Clinical engineering readiness",
-      hook: "A share page framing audit-ready PM and device history for hospital HTM teams.",
-      audience: "Hospital operator",
-    },
-  ],
-  recommendedCtas: [
-    "Review HTM workflow fit",
-    "See PM and recall tracking",
-    "Book a 20-minute HTM walkthrough",
-  ],
-})
-
-export const GROWTH_INDUSTRY_PLAYBOOK_MEDICAL_EQUIPMENT = buildSeededIndustryPlaybook({
-  industryId: "medical_equipment",
-  overview:
-    "Medical equipment dealers and field service organizations support imaging, DME, and clinical devices for provider accounts with contract SLAs and depot repair workflows.",
-  pains: [
-    "Contract SLAs and response windows are tracked outside dispatch.",
-    "Depot and field repair workflows split history across systems.",
-    "Sales and service teams lack shared visibility into account equipment.",
-    "Quote-to-service handoffs lose context on recurring failures.",
-    "Installed base data is stale when renewals approach.",
-  ],
-  discoveryQuestions: [
-    "How do you track SLA response and uptime commitments by account?",
-    "Where does depot repair history live versus field service?",
-    "How does sales see installed base before renewal conversations?",
-    "What breaks when a repeat failure needs escalation?",
-    "How do you schedule PM against contract entitlements?",
-  ],
-  proofPoints: [
-    "Account-level equipment visibility for sales and service.",
-    "Work orders respect SLA tiers and capture field vs depot paths.",
-    "Service history informs renewal and upsell conversations.",
-    "Quotes linked to assets and follow-on work orders.",
-    "PM schedules aligned to contract coverage.",
-  ],
-  recommendedCtas: ["See installed base workflow", "Review SLA dispatch fit", "Book a service ops demo"],
-})
-
-export const GROWTH_INDUSTRY_PLAYBOOK_COMMERCIAL_EQUIPMENT = buildSeededIndustryPlaybook({
-  industryId: "commercial_equipment",
-  overview:
-    "Commercial equipment service teams maintain mixed capital assets across customer sites with PM contracts, emergency response, and parts-heavy repairs.",
-  pains: [
-    "Technicians arrive without complete asset and prior repair context.",
-    "PM contracts do not drive scheduling consistently.",
-    "Emergency and contract work compete in the same dispatch queue.",
-    "Parts usage is logged after the fact, hurting margin visibility.",
-    "Multi-site customers lack a single service history view.",
-  ],
-  discoveryQuestions: [
-    "How do PM contracts translate into scheduled work today?",
-    "What do techs see before a repeat failure visit?",
-    "How are emergency calls prioritized against contract PM?",
-    "Where is parts usage captured relative to the job?",
-    "How do you report service history back to multi-site accounts?",
-  ],
-  proofPoints: [
-    "Asset-centric work orders with full service history.",
-    "PM plans generate scheduled work automatically.",
-    "Dispatch prioritization by contract tier and urgency.",
-    "Parts tied to jobs for margin and repeat failure analysis.",
-    "Customer portal-ready history for account managers.",
-  ],
-  recommendedCtas: ["See PM-to-dispatch flow", "Review asset history demo", "Book an operations walkthrough"],
-})
-
-export const GROWTH_INDUSTRY_PLAYBOOK_INDUSTRIAL_EQUIPMENT = buildSeededIndustryPlaybook({
-  industryId: "industrial_equipment",
-  overview:
-    "Industrial equipment service providers support plants, utilities, and OEM field teams with outage windows, predictive programs, and safety-critical PM.",
-  pains: [
-    "Outage PM windows are coordinated manually across trades.",
-    "Vibration and inspection findings do not flow into work orders.",
-    "Safety lockout documentation is separate from job records.",
-    "Multi-crew shutdowns lack shared visibility on scope completion.",
-    "Spares and rebuild tracking for rotating assets is fragmented.",
-  ],
-  discoveryQuestions: [
-    "How do you plan and track outage PM scope?",
-    "Where do inspection findings become assigned work?",
-    "How is safety documentation attached to jobs?",
-    "What visibility do supervisors have during shutdowns?",
-    "How do you track spares and rebuild cycles on critical assets?",
-  ],
-  proofPoints: [
-    "Shutdown work packages with shared scope visibility.",
-    "Inspection-to-work-order linkage for rotating equipment.",
-    "Safety and job documentation in one record.",
-    "Asset rebuild and spares history over time.",
-    "Reporting on PM compliance by plant area.",
-  ],
-  recommendedCtas: ["Review outage PM workflow", "See plant asset register", "Book an industrial ops demo"],
-})
-
-export const GROWTH_INDUSTRY_PLAYBOOK_FIELD_SERVICE = buildSeededIndustryPlaybook({
-  industryId: "field_service",
-  overview:
-    "General field service operators run dispatch-heavy mixed-trade operations across regions with varied equipment and account types.",
-  pains: [
-    "Dispatch relies on phone and spreadsheets as volume grows.",
-    "Technicians lack consistent mobile access to job and asset context.",
-    "Repeat visits happen because history is not visible on route.",
-    "Billing and job closeout lag behind completed work.",
-    "KPI reporting requires manual exports from multiple tools.",
-  ],
-  discoveryQuestions: [
-    "How are today's jobs assigned and re-prioritized?",
-    "What context does a tech see on mobile before arrival?",
-    "How do you identify accounts with repeat truck rolls?",
-    "What slows job closeout and invoicing?",
-    "Which KPIs do you report weekly and where do they come from?",
-  ],
-  proofPoints: [
-    "Dispatch board with live job status and technician assignment.",
-    "Mobile-friendly work orders with asset and customer context.",
-    "Repeat failure visibility by account and asset.",
-    "Job completion flows that support faster invoicing.",
-    "Operational dashboards without spreadsheet exports.",
-  ],
-  recommendedCtas: ["See dispatch workflow", "Review mobile job flow", "Book a field ops demo"],
-})
-
-export const GROWTH_INDUSTRY_PLAYBOOK_CALIBRATION_INSPECTION = buildSeededIndustryPlaybook({
-  industryId: "calibration_inspection",
-  overview:
-    "Calibration and inspection firms manage traceable standards, certificate renewals, and field routes with strict due-date compliance.",
-  pains: [
-    "Certificate due dates live outside the work order system.",
-    "Field and lab workflows use different tracking methods.",
-    "Recall of out-of-tolerance instruments is manual.",
-    "Customer asset registers drift from actual installed base.",
-    "Batch certificate generation is error-prone at month end.",
-  ],
-  discoveryQuestions: [
-    "How do you track calibration due dates by customer asset?",
-    "How do lab and field teams share the same asset record?",
-    "What happens when an instrument fails calibration?",
-    "How often is the customer asset register reconciled?",
-    "How are certificates delivered and archived?",
-  ],
-  proofPoints: [
-    "Due-date driven scheduling for cal and inspection routes.",
-    "Unified asset records for lab and field teams.",
-    "Failed cal events trigger corrective workflows.",
-    "Certificate history attached to each asset.",
-    "Customer reporting on upcoming and overdue due dates.",
-  ],
-  recommendedCtas: ["See due-date scheduling", "Review certificate workflow", "Book a metrology demo"],
-})
-
-export const GROWTH_INDUSTRY_PLAYBOOK_FACILITY_MAINTENANCE = buildSeededIndustryPlaybook({
-  industryId: "facility_maintenance",
-  overview:
-    "Facility maintenance teams coordinate building systems, vendor work, and preventive rounds across portfolios.",
-  pains: [
-    "Tenant requests, vendor jobs, and internal PM sit in separate queues.",
-    "Building rounds generate paper that never ties to assets.",
-    "Vendor SLA tracking is reactive instead of proactive.",
-    "Capital replacement planning lacks service history context.",
-    "Multi-building portfolios lack unified backlog visibility.",
-  ],
-  discoveryQuestions: [
-    "How do tenant requests become tracked work?",
-    "How are building rounds documented and followed up?",
-    "How do you monitor vendor SLA performance?",
-    "What data informs capital replacement decisions?",
-    "How do you see backlog across buildings?",
-  ],
-  proofPoints: [
-    "Unified queue for tenant, vendor, and internal work.",
-    "Round findings linked to assets and follow-up jobs.",
-    "Vendor job tracking with SLA timestamps.",
-    "Asset history informs replacement planning.",
-    "Portfolio-level backlog and PM compliance views.",
-  ],
-  recommendedCtas: ["See facilities queue", "Review vendor tracking", "Book a portfolio walkthrough"],
-})
-
-export const GROWTH_INDUSTRY_PLAYBOOK_HVAC_R = buildSeededIndustryPlaybook({
-  industryId: "hvac_r",
-  overview: "HVAC-R contractors service comfort and refrigeration systems with seasonal PM spikes and emergency demand.",
-  pains: [
-    "Seasonal PM volume overwhelms manual scheduling.",
-    "Refrigerant and warranty details are not on the work order.",
-    "Emergency calls disrupt planned routes.",
-    "Maintenance agreements do not auto-generate visits.",
-    "Technician notes rarely feed asset history consistently.",
-  ],
-  discoveryQuestions: [
-    "How do you schedule seasonal PM today?",
-    "Where do warranty and refrigerant details live on jobs?",
-    "How are emergencies prioritized against PM routes?",
-    "Do service agreements create scheduled work automatically?",
-  ],
-  proofPoints: [
-    "Agreement-driven PM scheduling.",
-    "Asset history with refrigerant and warranty context.",
-    "Dispatch that balances emergency and PM workload.",
-    "Seasonal capacity visibility for ops leads.",
-  ],
-  recommendedCtas: ["See seasonal PM scheduling", "Review HVAC dispatch demo"],
-})
+export const GROWTH_INDUSTRY_PLAYBOOK_BIOMEDICAL_EQUIPMENT =
+  GROWTH_PRIORITY_ENRICHED_PLAYBOOK_BUILDERS.biomedical_equipment()
+export const GROWTH_INDUSTRY_PLAYBOOK_MEDICAL_EQUIPMENT =
+  GROWTH_PRIORITY_ENRICHED_PLAYBOOK_BUILDERS.medical_equipment()
+export const GROWTH_INDUSTRY_PLAYBOOK_COMMERCIAL_EQUIPMENT =
+  GROWTH_PRIORITY_ENRICHED_PLAYBOOK_BUILDERS.commercial_equipment()
+export const GROWTH_INDUSTRY_PLAYBOOK_INDUSTRIAL_EQUIPMENT =
+  GROWTH_PRIORITY_ENRICHED_PLAYBOOK_BUILDERS.industrial_equipment()
+export const GROWTH_INDUSTRY_PLAYBOOK_FIELD_SERVICE =
+  GROWTH_PRIORITY_ENRICHED_PLAYBOOK_BUILDERS.field_service()
+export const GROWTH_INDUSTRY_PLAYBOOK_CALIBRATION_INSPECTION =
+  GROWTH_PRIORITY_ENRICHED_PLAYBOOK_BUILDERS.calibration_inspection()
+export const GROWTH_INDUSTRY_PLAYBOOK_FACILITY_MAINTENANCE =
+  GROWTH_PRIORITY_ENRICHED_PLAYBOOK_BUILDERS.facility_maintenance()
+export const GROWTH_INDUSTRY_PLAYBOOK_HVAC_R = GROWTH_PRIORITY_ENRICHED_PLAYBOOK_BUILDERS.hvac_r()
+export const GROWTH_INDUSTRY_PLAYBOOK_COMMERCIAL_HVAC =
+  GROWTH_PRIORITY_ENRICHED_PLAYBOOK_BUILDERS.commercial_hvac()
+export const GROWTH_INDUSTRY_PLAYBOOK_COMMERCIAL_KITCHEN =
+  GROWTH_PRIORITY_ENRICHED_PLAYBOOK_BUILDERS.commercial_kitchen()
 
 export const GROWTH_INDUSTRY_PLAYBOOK_ELECTRICAL = buildSeededIndustryPlaybook({
   industryId: "electrical",
@@ -486,46 +241,6 @@ export const GROWTH_INDUSTRY_PLAYBOOK_MEP = buildSeededIndustryPlaybook({
     "Building-level PM history across trades.",
   ],
   recommendedCtas: ["See MEP coordination demo", "Book a building ops walkthrough"],
-})
-
-export const GROWTH_INDUSTRY_PLAYBOOK_COMMERCIAL_HVAC = buildSeededIndustryPlaybook({
-  industryId: "commercial_hvac",
-  overview: "Commercial HVAC teams maintain RTUs, BAS-linked comfort systems, and multi-site mechanical contracts.",
-  pains: [
-    "RTU PM routes are hard to balance across campuses.",
-    "BAS trends do not tie to assigned corrective work.",
-    "Filter and belt PM kits are not linked to assets.",
-  ],
-  discoveryQuestions: [
-    "How do you plan RTU PM across multiple sites?",
-    "How are comfort complaints tracked to assets?",
-  ],
-  proofPoints: [
-    "Campus-level PM scheduling for RTUs.",
-    "Complaint-to-work-order linkage with asset context.",
-    "PM parts checklist tied to equipment.",
-  ],
-  recommendedCtas: ["Review commercial HVAC PM", "Book a mechanical ops demo"],
-})
-
-export const GROWTH_INDUSTRY_PLAYBOOK_COMMERCIAL_KITCHEN = buildSeededIndustryPlaybook({
-  industryId: "commercial_kitchen",
-  overview: "Commercial kitchen equipment service teams support restaurants, chains, and foodservice distributors.",
-  pains: [
-    "Downtime SLAs are tracked outside dispatch.",
-    "Line equipment history is split by brand and site.",
-    "PM for hood and refrigeration lines is inconsistent.",
-  ],
-  discoveryQuestions: [
-    "How do you track downtime SLAs for chain accounts?",
-    "How is line equipment history shared across locations?",
-  ],
-  proofPoints: [
-    "SLA-aware dispatch for kitchen downtime.",
-    "Site and line-level asset history.",
-    "PM programs for refrigeration and cooking lines.",
-  ],
-  recommendedCtas: ["See kitchen SLA dispatch", "Book a foodservice demo"],
 })
 
 export const GROWTH_INDUSTRY_PLAYBOOK_GENERATOR_POWER = buildSeededIndustryPlaybook({

@@ -4,10 +4,12 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { getGrowthAiProvider } from "@/lib/growth/ai-copilot-provider"
 import { growthAiCopilotModelSchema, mapGrowthAiCopilotModelOutput } from "@/lib/growth/ai-copilot-schema"
 import type { GrowthAiCopilotGenerationType } from "@/lib/growth/ai-copilot-types"
+import { buildOutreachContextPacket } from "@/lib/growth/outreach/personalization/context-packet-builder"
 import {
   buildAllowedFactsFromContextPacket,
-  buildOutreachContextPacket,
-} from "@/lib/growth/outreach/personalization/context-packet-builder"
+  buildIndustryFactsFromContextPacket,
+  buildVerifiedFactsFromContextPacket,
+} from "@/lib/growth/outreach/personalization/allowed-facts-from-context-packet"
 import {
   buildOutreachRefinementSystemPrompt,
   buildOutreachRefinementUserPrompt,
@@ -17,8 +19,13 @@ import {
   sanitizeRefinedBody,
   validateOutreachRefinement,
 } from "@/lib/growth/outreach/personalization/ai-refinement-guard"
+import { applyGrowthPersonalizationQualityPassWithIndustryContext } from "@/lib/growth/personalization/quality/growth-personalization-quality-engine"
 import { buildPersonalizedOutreachDraft } from "@/lib/growth/outreach/personalization/assemble-draft"
+import { buildGrowthReasoningContext } from "@/lib/growth/reasoning/growth-reasoning-engine"
+import { buildGrowthSequenceIntelligenceContext } from "@/lib/growth/sequence-intelligence/growth-sequence-engine"
+import type { GrowthAiCopilotPlaybookResolvedRule } from "@/lib/growth/ai-copilot-playbook-types"
 import {
+  OUTREACH_INDUSTRY_PLAYBOOK_INTEGRATION_QA_MARKER,
   OUTREACH_PERSONALIZATION_DEFAULT_MAX_WORDS,
   OUTREACH_PERSONALIZATION_STRATEGY_VERSION,
   type OutreachPersonalizationAudit,
@@ -44,11 +51,25 @@ export async function runOutreachPersonalizationGeneration(
     actingUserId: string
     maxWords?: number
     aiRefinementEnabled?: boolean
+    playbookRules?: GrowthAiCopilotPlaybookResolvedRule[]
   },
 ): Promise<RunOutreachPersonalizationResult> {
-  void admin
   const maxWords = input.maxWords ?? OUTREACH_PERSONALIZATION_DEFAULT_MAX_WORDS
   const contextPacket = await buildOutreachContextPacket(admin, input.lead)
+  const sequenceIntelligenceContext = buildGrowthSequenceIntelligenceContext({ packet: contextPacket })
+  if (contextPacket.industryContext) {
+    contextPacket.industryContext = {
+      ...contextPacket.industryContext,
+      sequenceIntelligenceContext,
+    }
+  }
+  const reasoningContext = buildGrowthReasoningContext({ packet: contextPacket, channel: "EMAIL" })
+  if (contextPacket.industryContext) {
+    contextPacket.industryContext = {
+      ...contextPacket.industryContext,
+      reasoningContext,
+    }
+  }
   const signals = extractPersonalizationSignals(contextPacket)
   const { strategy, draft, contextQuality, memoryQuality } = buildPersonalizedOutreachDraft({
     leadId: input.lead.id,
@@ -83,6 +104,11 @@ export async function runOutreachPersonalizationGeneration(
         draft,
         blocks: strategy.blocks,
         allowedFacts,
+        verifiedFacts: buildVerifiedFactsFromContextPacket(contextPacket),
+        industryFacts: buildIndustryFactsFromContextPacket(contextPacket),
+        industryContext: contextPacket.industryContext,
+        playbookRules: input.playbookRules,
+        generationType: input.generationType,
         maxWords,
         avoidRepeatingTopics: contextPacket.memoryAvoidRepeating,
       })
@@ -125,6 +151,22 @@ export async function runOutreachPersonalizationGeneration(
     }
   }
 
+  const allowedFacts = collectAllowedFacts(buildAllowedFactsFromContextPacket(contextPacket))
+  const qualityPass = applyGrowthPersonalizationQualityPassWithIndustryContext({
+    channel: "EMAIL",
+    subject: finalSubject,
+    body: finalBody,
+    companyName: contextPacket.companyName,
+    contactName: contextPacket.decisionMakerName,
+    allowedFacts,
+    industryContext: contextPacket.industryContext,
+    reasoningDiagnostics: reasoningContext.diagnostics,
+    sequenceDiagnostics: sequenceIntelligenceContext.diagnostics,
+    maxWords,
+  })
+  finalSubject = qualityPass.subject
+  finalBody = qualityPass.body
+
   const audit: OutreachPersonalizationAudit = {
     strategyVersion: OUTREACH_PERSONALIZATION_STRATEGY_VERSION,
     contextPacket,
@@ -148,6 +190,18 @@ export async function runOutreachPersonalizationGeneration(
     memoryOpener: strategy.memoryOpener,
     memoryInfluence: strategy.memoryInfluence,
     communicationStyle: strategy.communicationStyle,
+    industryPlaybookApplied: Boolean(contextPacket.industryContext?.playbookApplied),
+    industryContextQaMarker: OUTREACH_INDUSTRY_PLAYBOOK_INTEGRATION_QA_MARKER,
+    qualityDiagnostics: qualityPass.diagnostics,
+    qualityApplied: qualityPass.qualityApplied,
+    outcomeGuidanceDiagnostics: contextPacket.industryContext?.outcomeGuidanceContext?.diagnostics,
+    outcomeGuidanceApplied: contextPacket.industryContext?.outcomeGuidanceContext?.diagnostics.guidanceApplied,
+    buyerJourneyDiagnostics: contextPacket.industryContext?.buyerJourneyContext?.diagnostics,
+    buyerJourneyApplied: contextPacket.industryContext?.buyerJourneyContext?.diagnostics.guidanceApplied,
+    reasoningDiagnostics: reasoningContext.diagnostics,
+    reasoningApplied: reasoningContext.diagnostics.topInsights.length > 0,
+    sequenceDiagnostics: sequenceIntelligenceContext.diagnostics,
+    sequenceGuidanceApplied: sequenceIntelligenceContext.diagnostics.guidanceApplied,
   }
 
   return {

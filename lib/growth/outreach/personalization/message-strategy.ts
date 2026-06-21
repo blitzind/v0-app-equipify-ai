@@ -35,6 +35,7 @@ import type {
   SelectedMessageStrategy,
 } from "@/lib/growth/outreach/personalization/personalization-types"
 import { OUTREACH_PERSONALIZATION_STRATEGY_VERSION } from "@/lib/growth/outreach/personalization/personalization-types"
+import { applyPlaybookIndustryBlocksToStrategy } from "@/lib/growth/outreach/personalization/outreach-industry-playbook-blocks"
 
 type StrategyPick = {
   angle: MessageAngleKey
@@ -298,7 +299,7 @@ export function selectMessageStrategy(input: {
     }
   }
 
-  if (input.packet.researchRecommendedNextAction?.trim()) {
+  if (input.packet.researchRecommendedNextAction?.trim() && !input.packet.industryContext?.playbookApplied) {
     const proofIndex = blocks.findIndex((block) => block.key === "proof")
     if (proofIndex >= 0) {
       blocks[proofIndex] = {
@@ -306,6 +307,20 @@ export function selectMessageStrategy(input: {
         text: `${blocks[proofIndex].text} Recommended next step from research: ${input.packet.researchRecommendedNextAction.trim()}.`,
       }
     }
+  }
+
+  if (input.packet.industryContext?.playbookApplied) {
+    blocks.splice(
+      0,
+      blocks.length,
+      ...applyPlaybookIndustryBlocksToStrategy({
+        blocks,
+        context: input.packet.industryContext,
+        packet: input.packet,
+        usedMemoryOpener: useMemoryOpener,
+        usedResearchOpener: Boolean(researchOpener),
+      }),
+    )
   }
 
   const memoryPainUsed = Boolean(input.packet.memoryAvailable && resolveMemoryInfluencedPainId(input.packet))

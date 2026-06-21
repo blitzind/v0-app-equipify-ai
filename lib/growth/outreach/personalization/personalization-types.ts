@@ -1,8 +1,13 @@
 /** Client-safe outreach personalization types (Growth Engine slice 6.15B). */
 
 import type { GrowthAiCopilotGenerationType } from "@/lib/growth/ai-copilot-types"
+import type { GrowthPersonalizationQualityDiagnostics } from "@/lib/growth/personalization/quality/growth-personalization-quality-types"
+import type { GrowthIndustryContext } from "@/lib/growth/playbooks/growth-industry-context-types"
 
-export const OUTREACH_PERSONALIZATION_STRATEGY_VERSION = "6.15B-v1" as const
+export const OUTREACH_PERSONALIZATION_STRATEGY_VERSION = "6.15C-v1" as const
+
+export const OUTREACH_INDUSTRY_PLAYBOOK_INTEGRATION_QA_MARKER =
+  "outreach-industry-playbook-gs-ai-playbook-1c-v1" as const
 
 export const OUTREACH_PERSONALIZATION_DEFAULT_MAX_WORDS = 120 as const
 
@@ -326,6 +331,8 @@ export type OutreachContextPacket = {
   memoryUnresolvedObjectionCount: number
   /** Read-only Lead Engine advisory guidance (Phase 4.4D). */
   leadEngineGuidance: OutreachLeadEngineGuidance | null
+  /** GS-AI-PLAYBOOK-1C — resolved industry playbook context (verified vs industry separated). */
+  industryContext: GrowthIndustryContext | null
 }
 
 export type SelectedMessageBlock = {
@@ -378,6 +385,23 @@ export type OutreachPersonalizationAudit = {
   memoryOpener?: MemoryOpenerMetadata
   memoryInfluence?: MemoryInfluenceMetadata
   communicationStyle?: MemoryCommunicationStyle
+  industryPlaybookApplied?: boolean
+  industryContextQaMarker?: typeof OUTREACH_INDUSTRY_PLAYBOOK_INTEGRATION_QA_MARKER
+  /** GS-AI-PLAYBOOK-3B — deterministic quality pass diagnostics. */
+  qualityDiagnostics?: GrowthPersonalizationQualityDiagnostics
+  qualityApplied?: boolean
+  /** GS-AI-PLAYBOOK-3C — outcome learning guidance diagnostics. */
+  outcomeGuidanceDiagnostics?: import("@/lib/growth/playbooks/outcomes/growth-playbook-outcome-types").GrowthPlaybookOutcomeGuidanceDiagnostics
+  outcomeGuidanceApplied?: boolean
+  /** GS-AI-PLAYBOOK-4A — buying stage guidance diagnostics. */
+  buyerJourneyDiagnostics?: import("@/lib/growth/buyer-journey/growth-buying-stage-types").GrowthBuyingStageDiagnostics
+  buyerJourneyApplied?: boolean
+  /** GS-AI-PLAYBOOK-4B — reasoning & planning diagnostics. */
+  reasoningDiagnostics?: import("@/lib/growth/reasoning/growth-reasoning-types").GrowthReasoningDiagnostics
+  reasoningApplied?: boolean
+  /** GS-AI-PLAYBOOK-4C — sequence intelligence diagnostics. */
+  sequenceDiagnostics?: import("@/lib/growth/sequence-intelligence/growth-sequence-state-types").GrowthSequenceDiagnostics
+  sequenceGuidanceApplied?: boolean
 }
 
 export function isOutreachPersonalizationEmailType(

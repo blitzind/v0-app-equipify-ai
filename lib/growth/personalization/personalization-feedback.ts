@@ -2,6 +2,10 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GrowthPersonalizationFeedbackType } from "@/lib/growth/personalization/personalization-types"
+import type {
+  GrowthPersonalizationNegativeFeedbackReason,
+  GrowthPersonalizationOperatorEvaluationSentiment,
+} from "@/lib/growth/personalization/evaluation/growth-personalization-evaluation-types"
 
 export async function recordPersonalizationFeedback(
   admin: SupabaseClient,
@@ -12,6 +16,7 @@ export async function recordPersonalizationFeedback(
     notes?: string
     actorUserId: string
     actorEmail: string
+    metadata?: Record<string, unknown>
   },
 ): Promise<void> {
   const { error } = await admin.schema("growth").from("personalization_feedback").insert({
@@ -21,8 +26,39 @@ export async function recordPersonalizationFeedback(
     notes: input.notes?.trim() ?? "",
     actor_user_id: input.actorUserId,
     actor_email: input.actorEmail,
+    metadata: input.metadata ?? {},
   })
   if (error) throw new Error(error.message)
+}
+
+export async function recordPersonalizationOperatorEvaluationFeedback(
+  admin: SupabaseClient,
+  input: {
+    generationId: string
+    leadId: string
+    sentiment: GrowthPersonalizationOperatorEvaluationSentiment
+    negativeReason?: GrowthPersonalizationNegativeFeedbackReason | null
+    customNote?: string | null
+    actorUserId: string
+    actorEmail: string
+  },
+): Promise<void> {
+  await recordPersonalizationFeedback(admin, {
+    generationId: input.generationId,
+    leadId: input.leadId,
+    feedbackType: input.sentiment === "helpful" ? "performed_well" : "performed_poorly",
+    notes: input.customNote?.trim() ?? "",
+    actorUserId: input.actorUserId,
+    actorEmail: input.actorEmail,
+    metadata: {
+      evaluation_kind: "operator_quality",
+      evaluation_sentiment: input.sentiment,
+      ...(input.sentiment === "not_helpful" && input.negativeReason
+        ? { negative_reason: input.negativeReason }
+        : {}),
+      ...(input.customNote?.trim() ? { custom_note: input.customNote.trim() } : {}),
+    },
+  })
 }
 
 export async function listPersonalizationFeedback(admin: SupabaseClient, generationId: string) {

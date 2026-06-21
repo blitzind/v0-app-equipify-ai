@@ -1,24 +1,44 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Loader2, RefreshCw, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { GrowthPersonalizationLeadPicker } from "@/components/growth/personalization/growth-personalization-lead-picker"
+import { GrowthPersonalizationEvaluationPanel } from "@/components/growth/personalization/growth-personalization-evaluation-panel"
+import { GrowthPersonalizationOperatorFeedbackPanel } from "@/components/growth/personalization/growth-personalization-operator-feedback-panel"
+import { GrowthPersonalizationRegenerationFeedbackPanel } from "@/components/growth/personalization/growth-personalization-regeneration-feedback-panel"
+import {
+  GrowthPersonalizationVersionCompare,
+  GrowthPersonalizationVersionHistory,
+} from "@/components/growth/personalization/growth-personalization-version-history"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import {
+  assignGenerationVersionNumbers,
+  buildGrowthPersonalizationWorkspaceHref,
+  readLastPersonalizationLeadId,
+  regenerationFeedbackLabel,
+  type GrowthPersonalizationRecentLeadSelection,
+} from "@/lib/growth/personalization/personalization-generation-ux"
 import {
   GROWTH_AI_PERSONALIZATION_LAYOUT_ALIGNED_QA_MARKER,
   GROWTH_AI_PERSONALIZATION_PRIVACY_NOTE,
   GROWTH_AI_PERSONALIZATION_QA_MARKER,
+  GROWTH_PERSONALIZATION_GENERATION_UX_QA_MARKER,
+  GROWTH_PERSONALIZATION_EVALUATION_QA_MARKER,
   personalizationSourceLabel,
   personalizationStatusLabel,
   type GrowthAiPersonalizationDashboard,
+  type GrowthPersonalizationGeneration,
   type GrowthPersonalizationGenerationView,
   type GrowthPersonalizationIndustryPlaybookDiagnostics,
+  type GrowthPersonalizationRegenerationFeedbackCategory,
 } from "@/lib/growth/personalization/personalization-types"
+import type { GrowthPersonalizationEvaluationReport } from "@/lib/growth/personalization/evaluation/growth-personalization-evaluation-types"
 
-type TabKey = "generations" | "evidence" | "risk" | "feedback" | "performance"
+type TabKey = "generations" | "evidence" | "risk" | "feedback" | "performance" | "evaluation"
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "blocked" | "neutral"> = {
   draft: "attention",
@@ -59,16 +79,6 @@ function IndustryPlaybookDiagnosticsPanel({
         <p className="mt-1">Matched: {diagnostics.matchedSignals.join(", ")}</p>
       ) : null}
       <p className="mt-1">Playbook evidence count: {diagnostics.playbookEvidenceCount}</p>
-      {diagnostics.addedEvidenceLabels.length ? (
-        <div className="mt-2">
-          <p className="font-medium">Added evidence:</p>
-          <ul className="mt-1 list-inside list-disc text-sky-900/90">
-            {diagnostics.addedEvidenceLabels.slice(0, 8).map((label) => (
-              <li key={label}>{label}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
     </div>
   )
 }
@@ -79,17 +89,55 @@ type DashboardPayload = {
   message?: string
 }
 
-export function GrowthAiPersonalizationDashboardView() {
+export function GrowthAiPersonalizationDashboardView({
+  initialLeadId = null,
+  initialGenerationId = null,
+}: {
+  initialLeadId?: string | null
+  initialGenerationId?: string | null
+}) {
   const [tab, setTab] = useState<TabKey>("generations")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dashboard, setDashboard] = useState<GrowthAiPersonalizationDashboard | null>(null)
+  const [selectedLead, setSelectedLead] = useState<GrowthPersonalizationRecentLeadSelection | null>(null)
+  const [leadVersions, setLeadVersions] = useState<GrowthPersonalizationGeneration[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selected, setSelected] = useState<GrowthPersonalizationGenerationView | null>(null)
+  const [compareId, setCompareId] = useState<string | null>(null)
+  const [compareGeneration, setCompareGeneration] = useState<GrowthPersonalizationGenerationView | null>(null)
   const [actionId, setActionId] = useState<string | null>(null)
-  const [leadIdInput, setLeadIdInput] = useState("")
   const [editSubject, setEditSubject] = useState("")
   const [editBody, setEditBody] = useState("")
+  const [showRegenerationFeedback, setShowRegenerationFeedback] = useState(false)
+  const [evaluationReport, setEvaluationReport] = useState<GrowthPersonalizationEvaluationReport | null>(null)
+  const [evaluationLoading, setEvaluationLoading] = useState(false)
+
+  const syncWorkspaceUrl = useCallback((leadId: string | null, generationId: string | null) => {
+    if (typeof window === "undefined") return
+    const href = buildGrowthPersonalizationWorkspaceHref({ leadId, generationId })
+    window.history.replaceState(null, "", href)
+  }, [])
+
+  const loadEvaluation = useCallback(async () => {
+    setEvaluationLoading(true)
+    try {
+      const response = await fetch("/api/platform/growth/personalization/evaluation", { cache: "no-store" })
+      const payload = (await response.json()) as {
+        ok?: boolean
+        report?: GrowthPersonalizationEvaluationReport
+        message?: string
+      }
+      if (!response.ok || !payload.ok || !payload.report) {
+        throw new Error(payload.message ?? "Could not load evaluation report.")
+      }
+      setEvaluationReport(payload.report)
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Could not load evaluation report.")
+    } finally {
+      setEvaluationLoading(false)
+    }
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -101,53 +149,147 @@ export function GrowthAiPersonalizationDashboardView() {
         throw new Error(payload.message ?? "Could not load personalization dashboard.")
       }
       setDashboard(payload.dashboard)
+      await loadEvaluation()
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Could not load personalization dashboard.")
     } finally {
       setLoading(false)
     }
+  }, [loadEvaluation])
+
+  const loadLeadVersions = useCallback(async (leadId: string) => {
+    const response = await fetch(
+      `/api/platform/growth/personalization/generations?leadId=${encodeURIComponent(leadId)}&limit=50`,
+      { cache: "no-store" },
+    )
+    const payload = (await response.json()) as {
+      ok?: boolean
+      generations?: GrowthPersonalizationGeneration[]
+      message?: string
+    }
+    if (!response.ok || !payload.ok || !payload.generations) {
+      throw new Error(payload.message ?? "Could not load lead versions.")
+    }
+    setLeadVersions(payload.generations)
+    return payload.generations
   }, [])
 
-  const loadGeneration = useCallback(async (generationId: string) => {
-    setActionId(`load:${generationId}`)
-    setError(null)
-    try {
-      const response = await fetch(`/api/platform/growth/personalization/generations/${generationId}`, { cache: "no-store" })
-      const payload = (await response.json()) as { ok?: boolean; generation?: GrowthPersonalizationGenerationView; message?: string }
-      if (!response.ok || !payload.ok || !payload.generation) {
-        throw new Error(payload.message ?? "Could not load generation.")
+  const loadGeneration = useCallback(
+    async (generationId: string) => {
+      setActionId(`load:${generationId}`)
+      setError(null)
+      try {
+        const response = await fetch(`/api/platform/growth/personalization/generations/${generationId}`, {
+          cache: "no-store",
+        })
+        const payload = (await response.json()) as {
+          ok?: boolean
+          generation?: GrowthPersonalizationGenerationView
+          message?: string
+        }
+        if (!response.ok || !payload.ok || !payload.generation) {
+          throw new Error(payload.message ?? "Could not load generation.")
+        }
+        setSelected(payload.generation)
+        setSelectedId(generationId)
+        setEditSubject(payload.generation.subject)
+        setEditBody(payload.generation.body)
+        setShowRegenerationFeedback(false)
+        syncWorkspaceUrl(payload.generation.leadId, generationId)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not load generation.")
+      } finally {
+        setActionId(null)
       }
-      setSelected(payload.generation)
-      setSelectedId(generationId)
-      setEditSubject(payload.generation.subject)
-      setEditBody(payload.generation.body)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load generation.")
-    } finally {
-      setActionId(null)
-    }
-  }, [])
+    },
+    [syncWorkspaceUrl],
+  )
 
   useEffect(() => {
     void load()
   }, [load])
 
-  async function generateDraft() {
-    if (!leadIdInput.trim()) return
+  useEffect(() => {
+    const bootstrapLeadId = initialLeadId ?? readLastPersonalizationLeadId()
+    if (!bootstrapLeadId) return
+    setSelectedLead({
+      leadId: bootstrapLeadId,
+      companyName: "Selected lead",
+      lastSelectedAt: new Date().toISOString(),
+    })
+    void loadLeadVersions(bootstrapLeadId).catch(() => undefined)
+    if (initialGenerationId) void loadGeneration(initialGenerationId)
+  }, [initialGenerationId, initialLeadId, loadGeneration, loadLeadVersions])
+
+  useEffect(() => {
+    if (!compareId) {
+      setCompareGeneration(null)
+      return
+    }
+    if (compareId === selectedId) {
+      setCompareGeneration(selected)
+      return
+    }
+    void fetch(`/api/platform/growth/personalization/generations/${compareId}`, { cache: "no-store" })
+      .then(async (response) => {
+        const payload = (await response.json()) as { generation?: GrowthPersonalizationGenerationView }
+        setCompareGeneration(payload.generation ?? null)
+      })
+      .catch(() => setCompareGeneration(null))
+  }, [compareId, selected, selectedId])
+
+  const versionEntries = useMemo(() => assignGenerationVersionNumbers(leadVersions), [leadVersions])
+
+  async function handleLeadSelect(selection: GrowthPersonalizationRecentLeadSelection) {
+    setSelectedLead(selection)
+    setCompareId(null)
+    syncWorkspaceUrl(selection.leadId, null)
+    try {
+      const versions = await loadLeadVersions(selection.leadId)
+      const newest = versions[0]
+      if (newest) await loadGeneration(newest.id)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load lead history.")
+    }
+  }
+
+  async function generateDraft(input?: {
+    priorGenerationId?: string | null
+    regenerationFeedback?: {
+      category: GrowthPersonalizationRegenerationFeedbackCategory
+      customNotes?: string
+    }
+  }) {
+    if (!selectedLead?.leadId) return
     setActionId("generate")
     setError(null)
     try {
       const response = await fetch("/api/platform/growth/personalization/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leadId: leadIdInput.trim() }),
+        body: JSON.stringify({
+          leadId: selectedLead.leadId,
+          priorGenerationId: input?.priorGenerationId ?? selectedId,
+          regenerationFeedback: input?.regenerationFeedback
+            ? {
+                category: input.regenerationFeedback.category,
+                customNotes: input.regenerationFeedback.customNotes ?? null,
+              }
+            : null,
+        }),
       })
-      const payload = (await response.json()) as { ok?: boolean; generation?: GrowthPersonalizationGenerationView; message?: string }
+      const payload = (await response.json()) as {
+        ok?: boolean
+        generation?: GrowthPersonalizationGenerationView
+        message?: string
+      }
       if (!response.ok || !payload.ok || !payload.generation) {
         throw new Error(payload.message ?? "Generation failed.")
       }
       await load()
+      await loadLeadVersions(selectedLead.leadId)
       await loadGeneration(payload.generation.id)
+      setShowRegenerationFeedback(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Generation failed.")
     } finally {
@@ -165,12 +307,17 @@ export function GrowthAiPersonalizationDashboardView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ subject: editSubject, body: editBody }),
       })
-      const payload = (await response.json()) as { ok?: boolean; generation?: GrowthPersonalizationGenerationView; message?: string }
+      const payload = (await response.json()) as {
+        ok?: boolean
+        generation?: GrowthPersonalizationGenerationView
+        message?: string
+      }
       if (!response.ok || !payload.ok || !payload.generation) {
         throw new Error(payload.message ?? "Edit failed.")
       }
       setSelected(payload.generation)
       await load()
+      if (selectedLead?.leadId) await loadLeadVersions(selectedLead.leadId)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Edit failed.")
     } finally {
@@ -188,12 +335,17 @@ export function GrowthAiPersonalizationDashboardView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ humanApprovalConfirmed: true }),
       })
-      const payload = (await response.json()) as { ok?: boolean; generation?: GrowthPersonalizationGenerationView; message?: string }
+      const payload = (await response.json()) as {
+        ok?: boolean
+        generation?: GrowthPersonalizationGenerationView
+        message?: string
+      }
       if (!response.ok || !payload.ok || !payload.generation) {
         throw new Error(payload.message ?? "Approval failed.")
       }
       setSelected(payload.generation)
       await load()
+      if (selectedLead?.leadId) await loadLeadVersions(selectedLead.leadId)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Approval failed.")
     } finally {
@@ -201,7 +353,10 @@ export function GrowthAiPersonalizationDashboardView() {
     }
   }
 
-  async function rejectGeneration() {
+  async function rejectGeneration(feedback?: {
+    category?: GrowthPersonalizationRegenerationFeedbackCategory
+    customNotes?: string
+  }) {
     if (!selectedId) return
     setActionId("reject")
     setError(null)
@@ -209,14 +364,28 @@ export function GrowthAiPersonalizationDashboardView() {
       const response = await fetch(`/api/platform/growth/personalization/generations/${selectedId}/reject`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: "Rejected during human review." }),
+        body: JSON.stringify({
+          reason: feedback?.customNotes?.trim() || "Rejected during human review.",
+          rejectionFeedback: feedback
+            ? {
+                category: feedback.category ?? null,
+                customNotes: feedback.customNotes ?? null,
+              }
+            : null,
+        }),
       })
-      const payload = (await response.json()) as { ok?: boolean; generation?: GrowthPersonalizationGenerationView; message?: string }
+      const payload = (await response.json()) as {
+        ok?: boolean
+        generation?: GrowthPersonalizationGenerationView
+        message?: string
+      }
       if (!response.ok || !payload.ok || !payload.generation) {
         throw new Error(payload.message ?? "Reject failed.")
       }
       setSelected(payload.generation)
+      setShowRegenerationFeedback(true)
       await load()
+      if (selectedLead?.leadId) await loadLeadVersions(selectedLead.leadId)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Reject failed.")
     } finally {
@@ -235,32 +404,38 @@ export function GrowthAiPersonalizationDashboardView() {
 
   const tabs: Array<{ key: TabKey; label: string }> = [
     { key: "generations", label: "Generations" },
+    { key: "evaluation", label: "Evaluation" },
     { key: "evidence", label: "Evidence" },
     { key: "risk", label: "Risk Events" },
     { key: "feedback", label: "Feedback" },
     { key: "performance", label: "Performance" },
   ]
 
+  const compareLeft = selected
+  const compareRight =
+    compareId && compareId !== selectedId
+      ? compareGeneration
+      : compareId === selectedId
+        ? null
+        : compareGeneration
+
   return (
     <div
       className="flex min-w-0 flex-col gap-5"
       data-qa={GROWTH_AI_PERSONALIZATION_LAYOUT_ALIGNED_QA_MARKER}
+      data-ux-marker={GROWTH_PERSONALIZATION_GENERATION_UX_QA_MARKER}
     >
       <GrowthEngineCard title="AI Prospect Personalization" icon={<Sparkles className="size-4" />}>
         <p className="mb-4 text-xs text-muted-foreground">{GROWTH_AI_PERSONALIZATION_PRIVACY_NOTE}</p>
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <GrowthBadge label={GROWTH_AI_PERSONALIZATION_QA_MARKER} tone="neutral" />
+          <GrowthBadge label={GROWTH_PERSONALIZATION_GENERATION_UX_QA_MARKER} tone="neutral" />
+          <GrowthBadge label={GROWTH_PERSONALIZATION_EVALUATION_QA_MARKER} tone="neutral" />
           <Button variant="outline" size="sm" asChild>
             <Link href="/admin/growth/copilot/content-library">Content Library</Link>
           </Button>
           <Button variant="outline" size="sm" asChild>
             <Link href="/admin/growth/intelligence/relationship-memory">Relationship Memory</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/admin/growth/sequences/execution">Sequence Execution</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/admin/growth/settings/governance">Governance</Link>
           </Button>
           <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
             <RefreshCw className={`mr-1 size-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -278,29 +453,47 @@ export function GrowthAiPersonalizationDashboardView() {
           <StatTile label="Top Sources" value={dashboard?.topSources.length ?? 0} />
         </div>
 
-        <div className="mt-4 flex flex-wrap items-end gap-2">
-          <div className="min-w-[240px] flex-1">
-            <label className="mb-1 block text-xs text-muted-foreground">Lead ID (generate draft)</label>
-            <Input value={leadIdInput} onChange={(e) => setLeadIdInput(e.target.value)} placeholder="Lead UUID" />
+        <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+          <GrowthPersonalizationLeadPicker
+            selectedLeadId={selectedLead?.leadId ?? null}
+            onSelect={(selection) => void handleLeadSelect(selection)}
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              onClick={() => void generateDraft()}
+              disabled={actionId === "generate" || !selectedLead?.leadId}
+            >
+              {actionId === "generate" ? <Loader2 className="mr-1 size-3.5 animate-spin" /> : <Sparkles className="mr-1 size-3.5" />}
+              Generate Draft
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void generateDraft({ priorGenerationId: selectedId })}
+              disabled={actionId === "generate" || !selectedLead?.leadId}
+            >
+              Regenerate
+            </Button>
           </div>
-          <Button size="sm" onClick={() => void generateDraft()} disabled={actionId === "generate" || !leadIdInput.trim()}>
-            {actionId === "generate" ? <Loader2 className="mr-1 size-3.5 animate-spin" /> : <Sparkles className="mr-1 size-3.5" />}
-            Generate personalization
-          </Button>
         </div>
       </GrowthEngineCard>
 
-      {dashboard?.topSources.length ? (
-        <GrowthEngineCard title="Top Personalization Sources">
-          <ul className="space-y-2">
-            {dashboard.topSources.map((entry) => (
-              <li key={entry.source} className="flex items-center justify-between text-sm">
-                <span>{personalizationSourceLabel(entry.source)}</span>
-                <GrowthBadge label={String(entry.count)} tone="neutral" />
-              </li>
-            ))}
-          </ul>
-        </GrowthEngineCard>
+      {selectedLead ? (
+        <GrowthPersonalizationVersionHistory
+          companyLabel={selectedLead.companyName}
+          versions={versionEntries}
+          selectedId={selectedId}
+          compareId={compareId}
+          onSelect={(generationId) => void loadGeneration(generationId)}
+          onToggleCompare={(generationId) =>
+            setCompareId((current) => (current === generationId ? null : generationId))
+          }
+        />
+      ) : null}
+
+      {compareLeft && compareRight ? (
+        <GrowthPersonalizationVersionCompare left={compareLeft} right={compareRight} />
       ) : null}
 
       <div className="flex flex-wrap gap-2">
@@ -313,8 +506,22 @@ export function GrowthAiPersonalizationDashboardView() {
 
       <div className="grid min-w-0 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-4">
+          {tab === "evaluation" ? (
+            evaluationLoading && !evaluationReport ? (
+              <GrowthEngineCard title="Evaluation">
+                <p className="text-sm text-muted-foreground">Loading evaluation metrics…</p>
+              </GrowthEngineCard>
+            ) : evaluationReport ? (
+              <GrowthPersonalizationEvaluationPanel report={evaluationReport} />
+            ) : (
+              <GrowthEngineCard title="Evaluation">
+                <p className="text-sm text-muted-foreground">Evaluation report unavailable.</p>
+              </GrowthEngineCard>
+            )
+          ) : null}
+
           {tab === "generations" ? (
-            <GrowthEngineCard title="Generations">
+            <GrowthEngineCard title="Recent Generations">
               {!dashboard?.generations.length ? (
                 <p className="text-sm text-muted-foreground">No personalization generations yet.</p>
               ) : (
@@ -330,15 +537,9 @@ export function GrowthAiPersonalizationDashboardView() {
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="font-medium">{generation.leadLabel}</span>
-                          <div className="flex flex-wrap gap-1">
-                            <GrowthBadge label={personalizationStatusLabel(generation.status)} tone={STATUS_TONE[generation.status] ?? "neutral"} />
-                            <GrowthBadge label={generation.riskLevel} tone={RISK_TONE[generation.riskLevel] ?? "neutral"} />
-                          </div>
+                          <GrowthBadge label={personalizationStatusLabel(generation.status)} tone={STATUS_TONE[generation.status] ?? "neutral"} />
                         </div>
                         <p className="mt-1 truncate text-xs text-muted-foreground">{generation.subject}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Evidence {generation.evidenceCoverageScore}% · Score {generation.personalizationScore} · {formatWhen(generation.createdAt)}
-                        </p>
                       </button>
                     </li>
                   ))}
@@ -355,11 +556,7 @@ export function GrowthAiPersonalizationDashboardView() {
                 <ul className="space-y-2 text-sm">
                   {dashboard.recentEvidence.map((entry) => (
                     <li key={entry.id} className="rounded-lg border border-border/60 px-3 py-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <GrowthBadge label={personalizationSourceLabel(entry.sourceType)} tone="neutral" />
-                        <GrowthBadge label={entry.confidence} tone="medium" />
-                      </div>
-                      <p className="mt-1 font-medium">{entry.claimKey.replace(/_/g, " ")}</p>
+                      <GrowthBadge label={personalizationSourceLabel(entry.sourceType)} tone="neutral" />
                       <p className="mt-1 text-xs text-muted-foreground">{entry.evidenceSnippet}</p>
                     </li>
                   ))}
@@ -376,12 +573,8 @@ export function GrowthAiPersonalizationDashboardView() {
                 <ul className="space-y-2 text-sm">
                   {dashboard.recentRiskEvents.map((entry) => (
                     <li key={entry.id} className="rounded-lg border border-border/60 px-3 py-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="font-medium">{entry.title}</span>
-                        <GrowthBadge label={entry.severity} tone={RISK_TONE[entry.severity] ?? "attention"} />
-                      </div>
+                      <span className="font-medium">{entry.title}</span>
                       <p className="mt-1 text-xs text-muted-foreground">{entry.description}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{formatWhen(entry.recordedAt)}</p>
                     </li>
                   ))}
                 </ul>
@@ -397,12 +590,8 @@ export function GrowthAiPersonalizationDashboardView() {
                 <ul className="space-y-2 text-sm">
                   {dashboard.recentFeedback.map((entry) => (
                     <li key={entry.id} className="rounded-lg border border-border/60 px-3 py-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <GrowthBadge label={entry.feedbackType.replace(/_/g, " ")} tone="neutral" />
-                        <span className="text-xs text-muted-foreground">{formatWhen(entry.recordedAt)}</span>
-                      </div>
+                      <GrowthBadge label={entry.feedbackType.replace(/_/g, " ")} tone="neutral" />
                       <p className="mt-1">{entry.notes || "—"}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{entry.actorEmail}</p>
                     </li>
                   ))}
                 </ul>
@@ -413,16 +602,13 @@ export function GrowthAiPersonalizationDashboardView() {
           {tab === "performance" ? (
             <GrowthEngineCard title="Performance Attribution">
               {!dashboard?.performanceSnapshots.length ? (
-                <p className="text-sm text-muted-foreground">No performance snapshots yet. Approve generations to seed attribution.</p>
+                <p className="text-sm text-muted-foreground">No performance snapshots yet.</p>
               ) : (
                 <ul className="space-y-2 text-sm">
                   {dashboard.performanceSnapshots.map((entry) => (
                     <li key={entry.id} className="rounded-lg border border-border/60 px-3 py-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <GrowthBadge label={personalizationSourceLabel(entry.sourceType)} tone="neutral" />
-                        <GrowthBadge label={`${entry.attributionScore}%`} tone="healthy" />
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">{formatWhen(entry.recordedAt)}</p>
+                      <GrowthBadge label={personalizationSourceLabel(entry.sourceType)} tone="neutral" />
+                      <GrowthBadge label={`${entry.attributionScore}%`} tone="healthy" />
                     </li>
                   ))}
                 </ul>
@@ -433,14 +619,25 @@ export function GrowthAiPersonalizationDashboardView() {
 
         <GrowthEngineCard title="Preview & Review">
           {!selected ? (
-            <p className="text-sm text-muted-foreground">Select a generation to preview evidence, edit before approve, and review risk warnings.</p>
+            <p className="text-sm text-muted-foreground">
+              Search for a lead or company, then generate a draft to review evidence and approve.
+            </p>
           ) : (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-2">
                 <GrowthBadge label={personalizationStatusLabel(selected.status)} tone={STATUS_TONE[selected.status] ?? "neutral"} />
                 <GrowthBadge label={`Risk: ${selected.riskLevel}`} tone={RISK_TONE[selected.riskLevel] ?? "neutral"} />
-                {selected.requiresHumanReview ? <GrowthBadge label="Human review required" tone="attention" /> : null}
               </div>
+
+              {selected.operatorMetadata?.regeneration_feedback ? (
+                <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs">
+                  Regeneration feedback:{" "}
+                  {regenerationFeedbackLabel(selected.operatorMetadata.regeneration_feedback.category)}
+                  {selected.operatorMetadata.regeneration_feedback.customNotes
+                    ? ` — ${selected.operatorMetadata.regeneration_feedback.customNotes}`
+                    : ""}
+                </div>
+              ) : null}
 
               {selected.blockedReason ? (
                 <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">
@@ -448,23 +645,16 @@ export function GrowthAiPersonalizationDashboardView() {
                 </div>
               ) : null}
 
-              {selected.riskEvents.length ? (
-                <div className="space-y-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Risk warnings</p>
-                  {selected.riskEvents.map((event) => (
-                    <div key={event.id} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-                      <span className="font-medium">{event.title}</span> — {event.description}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-
               <div className="space-y-2">
                 <label className="text-xs text-muted-foreground">Subject</label>
-                <Input value={editSubject} onChange={(e) => setEditSubject(e.target.value)} disabled={selected.status === "blocked" || selected.status === "approved"} />
+                <Input
+                  value={editSubject}
+                  onChange={(e) => setEditSubject(e.target.value)}
+                  disabled={selected.status === "blocked" || selected.status === "approved"}
+                />
               </div>
               <div className="space-y-2">
-                <label className="text-xs text-muted-foreground">Body (edit before approve)</label>
+                <label className="text-xs text-muted-foreground">Body</label>
                 <Textarea
                   value={editBody}
                   onChange={(e) => setEditBody(e.target.value)}
@@ -473,35 +663,26 @@ export function GrowthAiPersonalizationDashboardView() {
                 />
               </div>
 
-              {selected.sourceSummary.length ? (
-                <div>
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Personalization sources</p>
-                  <div className="flex flex-wrap gap-1">
-                    {selected.sourceSummary.map((source) => (
-                      <GrowthBadge key={source} label={personalizationSourceLabel(source)} tone="neutral" />
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
               {selected.industryPlaybookDiagnostics ? (
                 <IndustryPlaybookDiagnosticsPanel diagnostics={selected.industryPlaybookDiagnostics} />
               ) : null}
 
+              <GrowthPersonalizationOperatorFeedbackPanel
+                generationId={selected.id}
+                disabled={Boolean(actionId)}
+                onSubmitted={() => void loadEvaluation()}
+              />
+
               <div>
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Evidence side panel</p>
-                {!selected.evidence.length ? (
-                  <p className="text-xs text-muted-foreground">No evidence attached.</p>
-                ) : (
-                  <ul className="max-h-48 space-y-2 overflow-y-auto text-xs">
-                    {selected.evidence.map((entry) => (
-                      <li key={entry.id} className="rounded border border-border/60 px-2 py-1.5">
-                        <span className="font-medium">{entry.claimKey}</span>
-                        <p className="text-muted-foreground">{entry.evidenceSnippet}</p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Evidence</p>
+                <ul className="max-h-48 space-y-2 overflow-y-auto text-xs">
+                  {selected.evidence.map((entry) => (
+                    <li key={entry.id} className="rounded border border-border/60 px-2 py-1.5">
+                      <span className="font-medium">{entry.claimKey}</span>
+                      <p className="text-muted-foreground">{entry.evidenceSnippet}</p>
+                    </li>
+                  ))}
+                </ul>
               </div>
 
               {selected.status === "draft" ? (
@@ -510,17 +691,51 @@ export function GrowthAiPersonalizationDashboardView() {
                     Save edits
                   </Button>
                   <Button size="sm" onClick={() => void approveGeneration()} disabled={actionId === "approve"}>
-                    Approve (human confirmed)
+                    Approve
                   </Button>
                   <Button size="sm" variant="destructive" onClick={() => void rejectGeneration()} disabled={actionId === "reject"}>
                     Reject
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void generateDraft({ priorGenerationId: selectedId })}
+                    disabled={actionId === "generate"}
+                  >
+                    Regenerate
+                  </Button>
                 </div>
+              ) : null}
+
+              {selected.status === "rejected" ? (
+                <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-3 text-sm text-amber-950">
+                  <p className="font-medium">Generation Rejected</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => void generateDraft({ priorGenerationId: selectedId })} disabled={actionId === "generate"}>
+                      Generate New Version
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setShowRegenerationFeedback(true)}>
+                      Regenerate with Feedback
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
+              {showRegenerationFeedback ? (
+                <GrowthPersonalizationRegenerationFeedbackPanel
+                  disabled={actionId === "generate"}
+                  onSubmit={(feedback) =>
+                    void generateDraft({
+                      priorGenerationId: selectedId,
+                      regenerationFeedback: feedback,
+                    })
+                  }
+                />
               ) : null}
 
               {selected.status === "approved" ? (
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
-                  Approved content merge preview — attach generation ID to sequence execution jobs. AI output is never auto-sent.
+                  Approved — attach this generation to sequence execution when ready. AI output is never auto-sent.
                 </div>
               ) : null}
             </div>

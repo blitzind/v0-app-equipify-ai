@@ -1,8 +1,8 @@
-/** Allowed facts guardrails for outreach AI refinement (Phase 4.4C). Client-safe. */
+/** Allowed facts guardrails for outreach AI refinement (Phase 4.4C + GS-AI-PLAYBOOK-1C). Client-safe. */
 
 import type { OutreachContextPacket } from "@/lib/growth/outreach/personalization/personalization-types"
 
-export function buildAllowedFactsFromContextPacket(packet: OutreachContextPacket): string[] {
+function baseAllowedFacts(packet: OutreachContextPacket): string[] {
   const leadEngineFacts = packet.leadEngineGuidance
     ? [
         packet.leadEngineGuidance.personalizationSummary,
@@ -40,7 +40,6 @@ export function buildAllowedFactsFromContextPacket(packet: OutreachContextPacket
     ...packet.websiteFindings,
     ...packet.hiringSignals,
     ...packet.enrichmentFindings,
-    ...packet.researchPainPoints,
     ...packet.equipmentServiceIndicators,
     ...(packet.companySummary ? [packet.companySummary] : []),
     ...packet.outreachAngles,
@@ -60,4 +59,31 @@ export function buildAllowedFactsFromContextPacket(packet: OutreachContextPacket
     ...(packet.memoryProgressionScore != null ? [`Relationship progression: ${packet.memoryProgressionScore}`] : []),
     ...leadEngineFacts,
   ].filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+}
+
+export function buildVerifiedFactsFromContextPacket(packet: OutreachContextPacket): string[] {
+  const verified = packet.industryContext?.verifiedFacts ?? []
+  if (verified.length > 0) return verified
+  return [
+    packet.companyName,
+    packet.companySummary,
+    packet.websiteSummary,
+    ...packet.websiteFindings,
+    ...packet.equipmentServiceIndicators,
+    ...packet.outreachAngles,
+    ...packet.enrichmentFindings,
+    ...packet.hiringSignals,
+    packet.decisionMakerTitle,
+    packet.websiteTextExcerpt,
+  ].filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+}
+
+export function buildIndustryFactsFromContextPacket(packet: OutreachContextPacket): string[] {
+  return packet.industryContext?.industryFacts ?? []
+}
+
+export function buildAllowedFactsFromContextPacket(packet: OutreachContextPacket): string[] {
+  const industryFacts = buildIndustryFactsFromContextPacket(packet)
+  const verifiedFacts = buildVerifiedFactsFromContextPacket(packet)
+  return [...new Set([...baseAllowedFacts(packet), ...verifiedFacts, ...industryFacts])]
 }

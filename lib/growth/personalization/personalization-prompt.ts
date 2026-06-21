@@ -1,6 +1,9 @@
 import {
   isPersonalizationPlaybookSource,
 } from "@/lib/growth/personalization/personalization-industry-playbook-evidence"
+import { buildGrowthPlaybookOrchestratedPromptBlock } from "@/lib/growth/playbooks/narrative/growth-playbook-prompt-orchestrator"
+import { buildGrowthIndustryContext } from "@/lib/growth/playbooks/growth-industry-context"
+import type { GrowthIndustryContext } from "@/lib/growth/playbooks/growth-industry-context-types"
 import type { GrowthPersonalizationContext } from "@/lib/growth/personalization/personalization-types"
 import type { PersonalizationEvidenceCandidate } from "@/lib/growth/personalization/personalization-evidence-engine"
 
@@ -33,21 +36,47 @@ function formatEvidenceSection(
 export function buildPersonalizationUserPrompt(input: {
   context: GrowthPersonalizationContext
   evidence: PersonalizationEvidenceCandidate[]
+  industryContext?: GrowthIndustryContext | null
 }): string {
   const verifiedEvidence = input.evidence.filter((entry) => !isPersonalizationPlaybookSource(entry.sourceType))
   const industryEvidence = input.evidence.filter((entry) => isPersonalizationPlaybookSource(entry.sourceType))
+
+  const industryContext =
+    input.industryContext ??
+    buildGrowthIndustryContext({
+      companyName: input.context.companyName,
+      industryLabel: input.context.industryLabel,
+      description: input.context.companyDescription,
+      websiteText: input.context.websiteSignals.join(" "),
+      researchSummary: [input.context.companySummary, ...input.context.researchPainPoints].filter(Boolean).join(" "),
+      naics: input.context.naicsCodes,
+      sic: input.context.sicCodes,
+      verifiedFacts: input.context.companySignals,
+      leadSignals: [...input.context.buyingSignals, ...input.context.opportunitySignals],
+      researchSignals: input.context.researchPainPoints,
+      hiringSignals: input.context.hiringSignals,
+      websiteSignals: input.context.websiteSignals,
+    })
+
+  const orchestratedPrompt = buildGrowthPlaybookOrchestratedPromptBlock({
+    industryContext,
+    narrativeContext: industryContext.narrativeContext,
+    channel: "email",
+  })
 
   return [
     `Company: ${input.context.companyName}`,
     input.context.industryLabel ? `Industry: ${input.context.industryLabel}` : null,
     input.context.relationshipStage ? `Relationship stage: ${input.context.relationshipStage}` : null,
     input.context.templateOverlay ? `Approved template overlay:\n${input.context.templateOverlay}` : null,
+    orchestratedPrompt || null,
     formatEvidenceSection("Verified facts (research, memory, engagement — company-specific when stated)", verifiedEvidence),
     formatEvidenceSection(
       "Industry context (playbook intelligence — likely relevance only, NOT verified company facts)",
       industryEvidence,
     ),
     "Write a concise outbound email subject and body.",
+    "Follow narrative direction and context weighting above.",
     "Ground company-specific statements in verified facts only.",
     "Use industry context to improve relevance without claiming unverified pains or events.",
   ]

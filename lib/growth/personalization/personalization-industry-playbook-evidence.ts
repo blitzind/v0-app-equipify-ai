@@ -1,5 +1,6 @@
-/** GS-AI-PLAYBOOK-1B — Industry playbook evidence (client-safe, industry-level only). */
+/** GS-AI-PLAYBOOK-1B/2B — Industry playbook evidence (client-safe, industry-level only). */
 
+import { buildGrowthPlaybookContextFromPlaybook } from "@/lib/growth/playbooks/context/growth-playbook-context-builder"
 import { resolveIndustryPlaybook } from "@/lib/growth/playbooks/industry-playbook-registry"
 import { GROWTH_INDUSTRY_TAXONOMY } from "@/lib/growth/playbooks/industry-taxonomy"
 import type { GrowthIndustryPlaybook } from "@/lib/growth/playbooks/industry-playbook-types"
@@ -48,6 +49,19 @@ function industryPlaybookPrefix(displayName: string): string {
   return `Industry playbook (${displayName}): teams in this space often`
 }
 
+function buildPlaybookSelectionInput(context: GrowthPersonalizationContext) {
+  return {
+    verifiedFacts: context.companySignals,
+    leadSignals: [...context.buyingSignals, ...context.opportunitySignals, ...context.bookingSignals],
+    researchSignals: [...context.researchPainPoints, ...context.outreachAngles, context.companySummary].filter(
+      Boolean,
+    ) as string[],
+    hiringSignals: context.hiringSignals,
+    websiteSignals: context.websiteSignals,
+    evidenceLabels: context.sourcesUsed,
+  }
+}
+
 export function buildIndustryPlaybookEvidenceBundle(context: GrowthPersonalizationContext): {
   candidates: PersonalizationEvidenceCandidate[]
   diagnostics: GrowthPersonalizationIndustryPlaybookDiagnostics | null
@@ -74,8 +88,9 @@ export function buildIndustryPlaybookEvidenceBundle(context: GrowthPersonalizati
   }
 
   const confidence = mapResolverConfidenceToEvidenceConfidence(resolution.confidence)
-  const candidates = buildPlaybookEvidenceCandidates(playbook, confidence)
-  const addedEvidenceLabels = collectPlaybookEvidenceLabels(playbook)
+  const playbookContext = buildGrowthPlaybookContextFromPlaybook(playbook, buildPlaybookSelectionInput(context))
+  const candidates = buildPlaybookEvidenceCandidates(playbook, playbookContext, confidence)
+  const addedEvidenceLabels = collectPlaybookEvidenceLabels(playbookContext)
 
   const diagnostics: GrowthPersonalizationIndustryPlaybookDiagnostics = {
     resolvedIndustryId: resolution.industryId,
@@ -98,6 +113,7 @@ export function buildIndustryPlaybookEvidenceBundle(context: GrowthPersonalizati
 
 function buildPlaybookEvidenceCandidates(
   playbook: GrowthIndustryPlaybook,
+  playbookContext: ReturnType<typeof buildGrowthPlaybookContextFromPlaybook>,
   confidence: PersonalizationEvidenceCandidate["confidence"],
 ): PersonalizationEvidenceCandidate[] {
   const candidates: PersonalizationEvidenceCandidate[] = []
@@ -113,7 +129,7 @@ function buildPlaybookEvidenceCandidates(
     candidates.push({ sourceType, claimKey, evidenceSnippet, confidence })
   }
 
-  for (const [index, pain] of playbook.pains.slice(0, 3).entries()) {
+  for (const [index, pain] of playbookContext.selectedPains.entries()) {
     push(
       "industry_playbook",
       `industry_playbook_pain_${index}`,
@@ -121,7 +137,7 @@ function buildPlaybookEvidenceCandidates(
     )
   }
 
-  for (const [index, mapping] of playbook.capabilityMappings.slice(0, 3).entries()) {
+  for (const [index, mapping] of playbookContext.selectedCapabilities.entries()) {
     push(
       "capability_mapping",
       `industry_playbook_capability_${slugify(mapping.capability) || index}`,
@@ -129,7 +145,7 @@ function buildPlaybookEvidenceCandidates(
     )
   }
 
-  for (const [index, question] of playbook.discoveryQuestions.slice(0, 2).entries()) {
+  for (const [index, question] of playbookContext.selectedDiscoveryQuestions.slice(0, 2).entries()) {
     push(
       "industry_playbook",
       `industry_playbook_discovery_${index}`,
@@ -137,7 +153,7 @@ function buildPlaybookEvidenceCandidates(
     )
   }
 
-  for (const [index, storyline] of playbook.videoStorylines.slice(0, 2).entries()) {
+  for (const [index, storyline] of playbookContext.selectedStorylines.slice(0, 2).entries()) {
     push(
       "video_storyline",
       `industry_playbook_video_storyline_${index}`,
@@ -148,12 +164,14 @@ function buildPlaybookEvidenceCandidates(
   return candidates
 }
 
-function collectPlaybookEvidenceLabels(playbook: GrowthIndustryPlaybook): string[] {
+function collectPlaybookEvidenceLabels(
+  playbookContext: ReturnType<typeof buildGrowthPlaybookContextFromPlaybook>,
+): string[] {
   return [
-    ...playbook.pains.slice(0, 3),
-    ...playbook.capabilityMappings.slice(0, 3).map((entry) => entry.capability),
-    ...playbook.discoveryQuestions.slice(0, 2),
-    ...playbook.videoStorylines.slice(0, 2).map((entry) => entry.title),
+    ...playbookContext.selectedPains,
+    ...playbookContext.selectedCapabilities.map((entry) => entry.capability),
+    ...playbookContext.selectedDiscoveryQuestions.slice(0, 2),
+    ...playbookContext.selectedStorylines.slice(0, 2).map((entry) => entry.title),
   ]
     .map((entry) => entry.trim())
     .filter(Boolean)

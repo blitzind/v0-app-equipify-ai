@@ -15,6 +15,12 @@ import { fetchLatestUsableGrowthLeadResearchRun } from "@/lib/growth/research-re
 import { normalizeGrowthResearchConfidence } from "@/lib/growth/research/research-confidence"
 import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
 import { resolveLeadEngineGuidanceFromLeadMetadata } from "@/lib/growth/outreach/personalization/lead-engine-guidance-bridge"
+import { buildOutreachVerifiedFactsFromPacket } from "@/lib/growth/outreach/personalization/outreach-verified-facts"
+import {
+  buildOutreachIndustryContextForLead,
+  fetchLatestPersonalizationRegenerationFeedback,
+} from "@/lib/growth/outreach/personalization/outreach-industry-context-builder"
+import { buildGrowthIndustryContext } from "@/lib/growth/playbooks/growth-industry-context"
 import { buildLeadMemoryInfluenceContext, mergeMemoryObjectionSummaries } from "@/lib/growth/lead-memory/memory-influence-context"
 import {
   filterUsableOutreachMemorySnippet,
@@ -243,9 +249,24 @@ export async function buildOutreachContextPacket(
     lead.conversationBuyingIntent ??
     (lead.opportunityBuyingSignalStrength !== "none" ? lead.opportunityBuyingSignalStrength : null)
 
-  return {
+  const metadata = (lead.metadata ?? {}) as Record<string, unknown>
+  const metadataCodes = (...keys: string[]): string[] => {
+    const values: string[] = []
+    for (const key of keys) {
+      const raw = metadata[key]
+      if (typeof raw === "string" && raw.trim()) values.push(raw.trim())
+      if (Array.isArray(raw)) {
+        for (const entry of raw) {
+          if (typeof entry === "string" && entry.trim()) values.push(entry.trim())
+        }
+      }
+    }
+    return [...new Set(values)]
+  }
+
+  const packetBase = {
     companyName: lead.companyName,
-    industryLabel: research?.likelyServiceCategory ?? lead.sourceChannel,
+    industryLabel: research?.likelyServiceCategory ?? lead.industry ?? lead.sourceChannel,
     website: lead.website,
     employeeSize: lead.estimatedEmployeeCount ?? research?.estimatedEmployeeCount ?? null,
     location: locationLabel(lead),
@@ -310,7 +331,74 @@ export async function buildOutreachContextPacket(
     memoryProgressionScore: memory.progressionScore,
     memoryUnresolvedObjectionCount: memory.unresolvedObjectionCount,
     leadEngineGuidance,
+  } satisfies Omit<OutreachContextPacket, "industryContext">
+
+  const regenerationFeedback = await fetchLatestPersonalizationRegenerationFeedback(admin, lead.id)
+  const verifiedFacts = buildOutreachVerifiedFactsFromPacket(packetBase as OutreachContextPacket)
+  const industryContext = buildGrowthIndustryContext({
+    companyName: lead.companyName,
+    industryLabel: packetBase.industryLabel,
+    description: research?.companySummary ?? null,
+    websiteText: researchRun?.websiteTextExcerpt ?? null,
+    researchSummary: research?.websiteSummary ?? null,
+    naics: metadataCodes("naics", "naics_codes", "naicsCodes"),
+    sic: metadataCodes("sic", "sic_codes", "sicCodes"),
+    verifiedFacts,
+    regenerationFeedback,
+    leadSignals: [
+      ...(packetBase.researchPainPoints ?? []),
+      ...(packetBase.equipmentServiceIndicators ?? []),
+      ...(packetBase.hiringSignals ?? []),
+    ],
+    researchSignals: [
+      packetBase.companySummary,
+      ...(packetBase.outreachAngles ?? []),
+      ...(packetBase.websiteFindings ?? []),
+    ].filter(Boolean) as string[],
+    hiringSignals: packetBase.hiringSignals ?? [],
+    websiteSignals: [
+      packetBase.websiteTextExcerpt,
+      ...(packetBase.websiteFindings ?? []),
+      ...(packetBase.equipmentServiceIndicators ?? []),
+    ].filter(Boolean) as string[],
+    companySize: packetBase.employeeSize,
+    decisionMakerTitle: packetBase.decisionMakerTitle,
+    accountIntelligence: {
+      outreachAngles: packetBase.outreachAngles,
+      equipmentServiceIndicators: packetBase.equipmentServiceIndicators,
+      enrichmentFindings: packetBase.enrichmentFindings,
+      websiteFindings: packetBase.websiteFindings,
+      researchFindings: packetBase.researchPainPoints,
+      researchConfidence: packetBase.researchConfidence,
+      observedAt: researchRun?.finishedAt ?? prospectRun?.completedAt ?? null,
+      leadMetadata: {
+        crmDetected: lead.crmDetected,
+        fieldServiceStackDetected: lead.fieldServiceStackDetected,
+        estimatedEmployeeCount: lead.estimatedEmployeeCount,
+        estimatedAnnualRevenue: lead.estimatedAnnualRevenue,
+        fleetSizeEstimate: lead.fleetSizeEstimate,
+      },
+      crmMetadata: {
+        industry: packetBase.industryLabel,
+        location: packetBase.location,
+        buyingIntent: packetBase.buyingIntent,
+        competitorPressure: packetBase.competitorPressure,
+      },
+    },
+  })
+
+  return {
+    ...packetBase,
+    industryContext,
   }
+}
+
+export async function resolveOutreachLeadIndustryTags(
+  admin: SupabaseClient,
+  lead: GrowthLead,
+): Promise<string[]> {
+  const context = await buildOutreachIndustryContextForLead(admin, lead)
+  return context.leadIndustryTags
 }
 
 export { buildAllowedFactsFromContextPacket } from "@/lib/growth/outreach/personalization/allowed-facts-from-context-packet"

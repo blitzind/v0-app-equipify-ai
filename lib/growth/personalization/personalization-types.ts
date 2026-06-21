@@ -49,6 +49,53 @@ export type GrowthPersonalizationIndustryPlaybookDiagnostics = {
   addedEvidenceLabels: string[]
 }
 
+export const GROWTH_PERSONALIZATION_GENERATION_UX_QA_MARKER =
+  "growth-personalization-generation-ux-gs-ai-playbook-1d-v1" as const
+
+export const GROWTH_PERSONALIZATION_EVALUATION_QA_MARKER =
+  "growth-personalization-evaluation-gs-ai-playbook-1e-v1" as const
+
+export const GROWTH_PERSONALIZATION_NEGATIVE_FEEDBACK_REASONS = [
+  "too_generic",
+  "wrong_industry_assumptions",
+  "too_salesy",
+  "missing_company_context",
+  "too_long",
+  "too_technical",
+  "other",
+] as const
+
+export type GrowthPersonalizationNegativeFeedbackReason =
+  (typeof GROWTH_PERSONALIZATION_NEGATIVE_FEEDBACK_REASONS)[number]
+
+export type GrowthPersonalizationOperatorEvaluationSentiment = "helpful" | "not_helpful"
+
+export const GROWTH_PERSONALIZATION_REGENERATION_FEEDBACK_OPTIONS = [
+  "too_generic",
+  "wrong_industry_assumptions",
+  "too_salesy",
+  "not_enough_personalization",
+  "missing_company_context",
+  "custom",
+] as const
+
+export type GrowthPersonalizationRegenerationFeedbackCategory =
+  (typeof GROWTH_PERSONALIZATION_REGENERATION_FEEDBACK_OPTIONS)[number]
+
+export type GrowthPersonalizationOperatorGenerationMetadata = {
+  prior_generation_id?: string | null
+  regeneration_feedback?: {
+    category: GrowthPersonalizationRegenerationFeedbackCategory
+    customNotes?: string | null
+    recordedAt?: string
+  } | null
+  rejection_feedback?: {
+    category?: GrowthPersonalizationRegenerationFeedbackCategory | null
+    customNotes?: string | null
+    recordedAt?: string
+  } | null
+}
+
 export const GROWTH_PERSONALIZATION_RISK_LEVELS = ["low", "medium", "high", "critical"] as const
 export type GrowthPersonalizationRiskLevel = (typeof GROWTH_PERSONALIZATION_RISK_LEVELS)[number]
 
@@ -84,6 +131,8 @@ export type GrowthPersonalizationFeedback = {
   notes: string
   actorEmail: string
   recordedAt: string
+  evaluationSentiment?: GrowthPersonalizationOperatorEvaluationSentiment | null
+  negativeReason?: GrowthPersonalizationNegativeFeedbackReason | null
 }
 
 export type GrowthPersonalizationGeneration = {
@@ -111,6 +160,7 @@ export type GrowthPersonalizationGenerationView = GrowthPersonalizationGeneratio
   riskEvents: GrowthPersonalizationRiskEvent[]
   feedback: GrowthPersonalizationFeedback[]
   industryPlaybookDiagnostics?: GrowthPersonalizationIndustryPlaybookDiagnostics | null
+  operatorMetadata?: GrowthPersonalizationOperatorGenerationMetadata | null
 }
 
 export type GrowthPersonalizationProfile = {
