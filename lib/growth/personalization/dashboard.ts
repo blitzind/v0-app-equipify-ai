@@ -1,10 +1,16 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { runAiTask } from "@/lib/ai/server"
-import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import { getGrowthAiProvider } from "@/lib/growth/ai-copilot-provider"
 import { enforceGovernanceIfReady } from "@/lib/growth/governance/governance-enforcement"
+import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { runOutreachPersonalizationGeneration } from "@/lib/growth/outreach/personalization/run-outreach-personalization"
 import { buildPersonalizationContext } from "@/lib/growth/personalization/personalization-context-builder"
+import {
+  buildPersonalizationStackBMetadataFromAudit,
+  GROWTH_PERSONALIZATION_STACK_B_UNIFICATION_QA_MARKER,
+  parsePersonalizationStackBDiagnostics,
+} from "@/lib/growth/personalization/growth-personalization-stack-b-metadata"
 import {
   buildPersonalizationEvidenceBundle,
   computeEvidenceCoverageScore,
@@ -16,12 +22,7 @@ import {
   recordPersonalizationPerformanceSnapshot,
 } from "@/lib/growth/personalization/personalization-attribution"
 import { appendPersonalizationTimelineEvent } from "@/lib/growth/personalization/personalization-events"
-import {
-  buildDeterministicPersonalizationDraft,
-  buildPersonalizationSystemPrompt,
-  buildPersonalizationUserPrompt,
-  parsePersonalizationModelOutput,
-} from "@/lib/growth/personalization/personalization-prompt"
+import { buildDeterministicPersonalizationDraft } from "@/lib/growth/personalization/personalization-prompt"
 import { aggregatePersonalizationRiskLevel } from "@/lib/growth/personalization/personalization-risk-engine"
 import {
   assertPersonalizationCanBeApproved,
@@ -70,6 +71,98 @@ function parseIndustryPlaybookDiagnostics(
 
 function generationsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("personalization_generations")
+}
+
+async function seedRegenerationFeedbackForStackB(
+  admin: SupabaseClient,
+  operatorMetadata?: GrowthPersonalizationOperatorGenerationMetadata | null,
+): Promise<void> {
+  const feedback = operatorMetadata?.regeneration_feedback
+  const priorId = operatorMetadata?.prior_generation_id
+  if (!feedback || !priorId) return
+
+  const { data } = await generationsTable(admin).select("metadata").eq("id", priorId).maybeSingle()
+  const existing =
+    data && typeof (data as { metadata?: unknown }).metadata === "object"
+      ? ((data as { metadata?: Record<string, unknown> }).metadata ?? {})
+      : {}
+
+  await generationsTable(admin)
+    .update({
+      metadata: {
+        ...existing,
+        regeneration_feedback: feedback,
+        prior_generation_id: priorId,
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", priorId)
+}
+
+async function resolvePersonalizationDraftFromStackB(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    actorUserId: string
+    context: Awaited<ReturnType<typeof buildPersonalizationContext>>
+    evidence: ReturnType<typeof buildPersonalizationEvidenceBundle>["candidates"]
+  },
+): Promise<{
+  draft: { subject: string; body: string }
+  stackBMetadata: ReturnType<typeof buildPersonalizationStackBMetadataFromAudit>
+  legacyFallback: boolean
+}> {
+  try {
+    const lead = await fetchGrowthLeadById(admin, input.leadId)
+    if (!lead) throw new Error("lead_not_found")
+
+    const stackB = await runOutreachPersonalizationGeneration(admin, {
+      lead,
+      generationType: "cold_email",
+      actingUserId: input.actorUserId,
+      aiRefinementEnabled: true,
+    })
+
+    const subject = stackB.subject?.trim() ?? ""
+    const body = stackB.content?.trim() ?? ""
+    if (!subject && !body) throw new Error("stack_b_empty_output")
+
+    return {
+      draft: { subject, body },
+      stackBMetadata: buildPersonalizationStackBMetadataFromAudit(stackB.audit, { legacyFallback: false }),
+      legacyFallback: false,
+    }
+  } catch (error) {
+    const provider = getGrowthAiProvider()
+    const providerAvailable = await provider.health().then((health) => health.ok).catch(() => false)
+    if (input.evidence.length === 0 && !providerAvailable) {
+      const draft = buildDeterministicPersonalizationDraft({
+        context: input.context,
+        evidence: input.evidence,
+      })
+      return {
+        draft,
+        stackBMetadata: {
+          stackBGeneration: {
+            qaMarker: GROWTH_PERSONALIZATION_STACK_B_UNIFICATION_QA_MARKER,
+            generationType: "cold_email",
+            strategyVersion: "legacy-fallback",
+            variationKey: "legacy-fallback",
+            confidenceScore: 0,
+            refinedByAi: false,
+            industryPlaybookApplied: false,
+            reasoningApplied: false,
+            sequenceGuidanceApplied: false,
+            buyerJourneyApplied: false,
+            qualityApplied: false,
+            legacyFallback: true,
+          },
+        },
+        legacyFallback: true,
+      }
+    }
+    throw error instanceof Error ? error : new Error("stack_b_generation_failed")
+  }
 }
 
 function profilesTable(admin: SupabaseClient) {
@@ -145,6 +238,9 @@ async function loadGenerationView(admin: SupabaseClient, generationId: string): 
       (data as Record<string, unknown>).metadata,
     ),
     operatorMetadata: parsePersonalizationOperatorMetadata(
+      (data as Record<string, unknown>).metadata,
+    ),
+    stackBDiagnostics: parsePersonalizationStackBDiagnostics(
       (data as Record<string, unknown>).metadata,
     ),
     evidence: ((evidenceRes.data ?? []) as Record<string, unknown>[]).map((row) => ({
@@ -231,23 +327,14 @@ export async function generatePersonalizationDraft(
     ]),
   ]
 
-  let draft = buildDeterministicPersonalizationDraft({ context, evidence })
-  const orgId = getGrowthEngineAiOrgId()
-  if (orgId && evidence.length > 0) {
-    try {
-      const aiResult = await runAiTask({
-        orgId,
-        taskKey: "growth_ai_personalization",
-        systemPrompt: buildPersonalizationSystemPrompt(),
-        userPrompt: buildPersonalizationUserPrompt({ context, evidence }),
-        responseFormat: "json",
-      })
-      const parsed = parsePersonalizationModelOutput(aiResult.outputText)
-      if (parsed) draft = parsed
-    } catch {
-      // deterministic fallback only
-    }
-  }
+  await seedRegenerationFeedbackForStackB(admin, input.operatorMetadata)
+
+  const { draft, stackBMetadata } = await resolvePersonalizationDraftFromStackB(admin, {
+    leadId: input.leadId,
+    actorUserId: input.actorUserId,
+    context,
+    evidence,
+  })
 
   const validation = validatePersonalizationGeneration({
     subject: draft.subject,
@@ -278,6 +365,21 @@ export async function generatePersonalizationDraft(
     ...(input.operatorMetadata?.regeneration_feedback
       ? { regeneration_feedback: input.operatorMetadata.regeneration_feedback }
       : {}),
+    ...(stackBMetadata.industryDiagnostics
+      ? { industryDiagnostics: stackBMetadata.industryDiagnostics }
+      : {}),
+    ...(stackBMetadata.personaDiagnostics ? { personaDiagnostics: stackBMetadata.personaDiagnostics } : {}),
+    ...(stackBMetadata.accountDiagnostics ? { accountDiagnostics: stackBMetadata.accountDiagnostics } : {}),
+    ...(stackBMetadata.buyerJourneyDiagnostics
+      ? { buyerJourneyDiagnostics: stackBMetadata.buyerJourneyDiagnostics }
+      : {}),
+    ...(stackBMetadata.reasoningDiagnostics ? { reasoningDiagnostics: stackBMetadata.reasoningDiagnostics } : {}),
+    ...(stackBMetadata.sequenceDiagnostics ? { sequenceDiagnostics: stackBMetadata.sequenceDiagnostics } : {}),
+    ...(stackBMetadata.qualityDiagnostics ? { qualityDiagnostics: stackBMetadata.qualityDiagnostics } : {}),
+    ...(stackBMetadata.outcomeGuidanceDiagnostics
+      ? { outcomeGuidanceDiagnostics: stackBMetadata.outcomeGuidanceDiagnostics }
+      : {}),
+    ...(stackBMetadata.stackBGeneration ? { stackBGeneration: stackBMetadata.stackBGeneration } : {}),
   }
 
   const { data: generationRow, error } = await generationsTable(admin)

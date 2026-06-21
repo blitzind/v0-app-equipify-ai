@@ -783,6 +783,7 @@
     "test:growth-sequence-fatigue": "GS_PLAYBOOK_4C_CERT_SECTION=fatigue tsx scripts/test-growth-sequence-4c.ts",
     "test:growth-sequence-guidance": "GS_PLAYBOOK_4C_CERT_SECTION=guidance tsx scripts/test-growth-sequence-4c.ts",
     "test:growth-sequence-regression": "GS_PLAYBOOK_4C_CERT_SECTION=regression tsx scripts/test-growth-sequence-4c.ts",
+    "test:growth-playbook-runtime-unification": "tsx scripts/test-growth-playbook-runtime-unification-4d1.ts",
     "test:growth-personalization-feedback": "GS_PLAYBOOK_1E_CERT_SECTION=feedback tsx scripts/test-growth-personalization-evaluation.ts",
     "test:growth-personalization-industry-analytics": "GS_PLAYBOOK_1E_CERT_SECTION=industry tsx scripts/test-growth-personalization-evaluation.ts",
     "test:growth-personalization-recommendations": "GS_PLAYBOOK_1E_CERT_SECTION=recommendations tsx scripts/test-growth-personalization-evaluation.ts",

@@ -10,6 +10,7 @@ import { GrowthPersonalizationLeadPicker } from "@/components/growth/personaliza
 import { GrowthPersonalizationEvaluationPanel } from "@/components/growth/personalization/growth-personalization-evaluation-panel"
 import { GrowthPersonalizationOperatorFeedbackPanel } from "@/components/growth/personalization/growth-personalization-operator-feedback-panel"
 import { GrowthPersonalizationRegenerationFeedbackPanel } from "@/components/growth/personalization/growth-personalization-regeneration-feedback-panel"
+import { GrowthPersonalizationStackBPreview } from "@/components/growth/personalization/growth-personalization-stack-b-preview"
 import {
   GrowthPersonalizationVersionCompare,
   GrowthPersonalizationVersionHistory,
@@ -665,6 +666,10 @@ export function GrowthAiPersonalizationDashboardView({
 
               {selected.industryPlaybookDiagnostics ? (
                 <IndustryPlaybookDiagnosticsPanel diagnostics={selected.industryPlaybookDiagnostics} />
+              ) : null}
+
+              {selected.stackBDiagnostics ? (
+                <GrowthPersonalizationStackBPreview diagnostics={selected.stackBDiagnostics} />
               ) : null}
 
               <GrowthPersonalizationOperatorFeedbackPanel

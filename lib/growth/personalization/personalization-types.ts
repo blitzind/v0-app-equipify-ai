@@ -161,6 +161,8 @@ export type GrowthPersonalizationGenerationView = GrowthPersonalizationGeneratio
   feedback: GrowthPersonalizationFeedback[]
   industryPlaybookDiagnostics?: GrowthPersonalizationIndustryPlaybookDiagnostics | null
   operatorMetadata?: GrowthPersonalizationOperatorGenerationMetadata | null
+  /** GS-AI-PLAYBOOK-4D.1 — Stack B audit diagnostics from personalization_generations.metadata. */
+  stackBDiagnostics?: import("@/lib/growth/personalization/growth-personalization-stack-b-metadata").GrowthPersonalizationStackBDiagnosticsMetadata | null
 }
 
 export type GrowthPersonalizationProfile = {
