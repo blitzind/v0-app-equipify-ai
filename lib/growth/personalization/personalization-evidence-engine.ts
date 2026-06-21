@@ -1,7 +1,12 @@
 import {
+  buildIndustryPlaybookEvidenceBundle,
+  isPersonalizationPlaybookSource,
+} from "@/lib/growth/personalization/personalization-industry-playbook-evidence"
+import {
   sanitizePersonalizationEvidenceSnippet,
   type GrowthPersonalizationContext,
   type GrowthPersonalizationEvidence,
+  type GrowthPersonalizationIndustryPlaybookDiagnostics,
   type GrowthPersonalizationSource,
 } from "@/lib/growth/personalization/personalization-types"
 
@@ -12,9 +17,18 @@ export type PersonalizationEvidenceCandidate = {
   confidence: "low" | "medium" | "high" | "verified"
 }
 
-export function buildPersonalizationEvidenceFromContext(
-  context: GrowthPersonalizationContext,
-): PersonalizationEvidenceCandidate[] {
+export type PersonalizationEvidenceBundle = {
+  candidates: PersonalizationEvidenceCandidate[]
+  industryPlaybookDiagnostics: GrowthPersonalizationIndustryPlaybookDiagnostics | null
+}
+
+const PLAYBOOK_DEPTH_POINTS = 4
+const PLAYBOOK_DEPTH_CAP = 32
+const PLAYBOOK_BREADTH_POINTS = 18
+const PLAYBOOK_TOTAL_BONUS_CAP = 50
+const VERIFIED_SCORE_LOW_CONTEXT_CAP = 65
+
+function buildVerifiedEvidenceCandidates(context: GrowthPersonalizationContext): PersonalizationEvidenceCandidate[] {
   const candidates: PersonalizationEvidenceCandidate[] = []
 
   const push = (
@@ -61,11 +75,48 @@ export function buildPersonalizationEvidenceFromContext(
   })
 }
 
+export function buildPersonalizationEvidenceBundle(context: GrowthPersonalizationContext): PersonalizationEvidenceBundle {
+  const verifiedCandidates = buildVerifiedEvidenceCandidates(context)
+  const playbookBundle = buildIndustryPlaybookEvidenceBundle(context)
+
+  const seen = new Set<string>()
+  const candidates = [...verifiedCandidates, ...playbookBundle.candidates].filter((candidate) => {
+    const key = `${candidate.sourceType}:${candidate.claimKey}:${candidate.evidenceSnippet.slice(0, 80)}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
+  return {
+    candidates,
+    industryPlaybookDiagnostics: playbookBundle.diagnostics,
+  }
+}
+
+export function buildPersonalizationEvidenceFromContext(
+  context: GrowthPersonalizationContext,
+): PersonalizationEvidenceCandidate[] {
+  return buildPersonalizationEvidenceBundle(context).candidates
+}
+
 export function computeEvidenceCoverageScore(candidates: PersonalizationEvidenceCandidate[]): number {
-  const sourceCount = new Set(candidates.map((entry) => entry.sourceType)).size
-  const depth = Math.min(50, candidates.length * 8)
-  const breadth = Math.min(50, sourceCount * 10)
-  return Math.min(100, Math.round(depth + breadth))
+  const verifiedCandidates = candidates.filter((entry) => !isPersonalizationPlaybookSource(entry.sourceType))
+  const playbookCandidates = candidates.filter((entry) => isPersonalizationPlaybookSource(entry.sourceType))
+
+  const verifiedSourceCount = new Set(verifiedCandidates.map((entry) => entry.sourceType)).size
+  const verifiedDepth = Math.min(50, verifiedCandidates.length * 8)
+  const verifiedBreadth = Math.min(50, verifiedSourceCount * 10)
+  const verifiedScore = verifiedDepth + verifiedBreadth
+
+  const playbookDepth = Math.min(PLAYBOOK_DEPTH_CAP, playbookCandidates.length * PLAYBOOK_DEPTH_POINTS)
+  const playbookBreadth = playbookCandidates.length > 0 ? PLAYBOOK_BREADTH_POINTS : 0
+  const playbookBonus = Math.min(PLAYBOOK_TOTAL_BONUS_CAP, playbookDepth + playbookBreadth)
+
+  const combined = verifiedScore + playbookBonus
+  if (verifiedScore < 30) {
+    return Math.min(VERIFIED_SCORE_LOW_CONTEXT_CAP, Math.round(combined))
+  }
+  return Math.min(100, Math.round(combined))
 }
 
 export function mapEvidenceCandidatesToRecords(

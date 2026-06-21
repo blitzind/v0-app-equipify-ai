@@ -18,6 +18,20 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
 
+function metadataStringList(metadata: Record<string, unknown>, ...keys: string[]): string[] {
+  const values: string[] = []
+  for (const key of keys) {
+    const raw = metadata[key]
+    if (typeof raw === "string" && raw.trim()) values.push(raw.trim())
+    if (Array.isArray(raw)) {
+      for (const entry of raw) {
+        if (typeof entry === "string" && entry.trim()) values.push(entry.trim())
+      }
+    }
+  }
+  return [...new Set(values)]
+}
+
 export async function buildPersonalizationContext(
   admin: SupabaseClient,
   input: {
@@ -162,6 +176,15 @@ export async function buildPersonalizationContext(
 
   if (committeeContext.length) sourcesUsed.push("committee_context")
 
+  const leadMetadata = (lead.metadata ?? {}) as Record<string, unknown>
+  const naicsCodes = metadataStringList(leadMetadata, "naics", "naics_code", "naicsCode", "naics_codes")
+  const sicCodes = metadataStringList(leadMetadata, "sic", "sic_code", "sicCode", "sic_codes")
+  const companyDescription =
+    asString(leadMetadata.description) ||
+    asString(leadMetadata.company_description) ||
+    research?.companySummary?.trim() ||
+    null
+
   return {
     leadLabel,
     companyName: lead.companyName ?? leadLabel,
@@ -187,5 +210,8 @@ export async function buildPersonalizationContext(
     researchPainPoints,
     hiringSignals,
     researchConfidence,
+    companyDescription,
+    naicsCodes,
+    sicCodes,
   }
 }

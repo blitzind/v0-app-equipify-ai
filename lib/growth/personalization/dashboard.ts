@@ -6,7 +6,7 @@ import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
 import { enforceGovernanceIfReady } from "@/lib/growth/governance/governance-enforcement"
 import { buildPersonalizationContext } from "@/lib/growth/personalization/personalization-context-builder"
 import {
-  buildPersonalizationEvidenceFromContext,
+  buildPersonalizationEvidenceBundle,
   computeEvidenceCoverageScore,
 } from "@/lib/growth/personalization/personalization-evidence-engine"
 import { recordPersonalizationFeedback } from "@/lib/growth/personalization/personalization-feedback"
@@ -34,11 +34,36 @@ import {
   type GrowthPersonalizationGeneration,
   type GrowthPersonalizationGenerationStatus,
   type GrowthPersonalizationGenerationView,
+  type GrowthPersonalizationIndustryPlaybookDiagnostics,
   type GrowthPersonalizationSource,
 } from "@/lib/growth/personalization/personalization-types"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
+}
+
+function parseIndustryPlaybookDiagnostics(
+  metadata: unknown,
+): GrowthPersonalizationIndustryPlaybookDiagnostics | null {
+  if (!metadata || typeof metadata !== "object") return null
+  const raw = (metadata as Record<string, unknown>).industry_playbook_diagnostics
+  if (!raw || typeof raw !== "object") return null
+  const entry = raw as Record<string, unknown>
+  if (entry.isIndustryLevelIntelligence !== true) return null
+  return {
+    resolvedIndustryId: asString(entry.resolvedIndustryId) || null,
+    resolvedIndustryLabel: asString(entry.resolvedIndustryLabel) || null,
+    resolverConfidence: Number(entry.resolverConfidence ?? 0),
+    matchedSignals: Array.isArray(entry.matchedSignals)
+      ? entry.matchedSignals.filter((signal): signal is string => typeof signal === "string")
+      : [],
+    playbookDisplayName: asString(entry.playbookDisplayName) || null,
+    playbookEvidenceCount: Number(entry.playbookEvidenceCount ?? 0),
+    isIndustryLevelIntelligence: true,
+    addedEvidenceLabels: Array.isArray(entry.addedEvidenceLabels)
+      ? entry.addedEvidenceLabels.filter((label): label is string => typeof label === "string")
+      : [],
+  }
 }
 
 function generationsTable(admin: SupabaseClient) {
@@ -114,6 +139,9 @@ async function loadGenerationView(admin: SupabaseClient, generationId: string): 
 
   return {
     ...mapGeneration(data as Record<string, unknown>),
+    industryPlaybookDiagnostics: parseIndustryPlaybookDiagnostics(
+      (data as Record<string, unknown>).metadata,
+    ),
     evidence: ((evidenceRes.data ?? []) as Record<string, unknown>[]).map((row) => ({
       id: asString(row.id),
       sourceType: asString(row.source_type) as GrowthPersonalizationGenerationView["evidence"][number]["sourceType"],
@@ -187,8 +215,15 @@ export async function generatePersonalizationDraft(
     contentTemplateVersionId: input.contentTemplateVersionId,
     snippetIds: input.snippetIds,
   })
-  const evidence = buildPersonalizationEvidenceFromContext(context)
+  const evidenceBundle = buildPersonalizationEvidenceBundle(context)
+  const evidence = evidenceBundle.candidates
   const evidenceCoverageScore = computeEvidenceCoverageScore(evidence)
+  const sourceSummary = [
+    ...new Set([
+      ...context.sourcesUsed,
+      ...(evidenceBundle.industryPlaybookDiagnostics ? ["industry_playbook" as const] : []),
+    ]),
+  ]
 
   let draft = buildDeterministicPersonalizationDraft({ context, evidence })
   const orgId = getGrowthEngineAiOrgId()
@@ -224,7 +259,7 @@ export async function generatePersonalizationDraft(
     leadLabel: context.leadLabel,
     personalizationScore: validation.personalizationScore,
     evidenceCoverageScore,
-    topSources: context.sourcesUsed,
+    topSources: sourceSummary,
   })
 
   const { data: generationRow, error } = await generationsTable(admin)
@@ -239,13 +274,16 @@ export async function generatePersonalizationDraft(
       evidence_coverage_score: evidenceCoverageScore,
       risk_level: riskLevel,
       blocked_reason: validation.blockedReason,
-      source_summary: context.sourcesUsed,
+      source_summary: sourceSummary,
       content_template_version_id: input.contentTemplateVersionId ?? null,
       snippet_ids: input.snippetIds ?? [],
       sequence_execution_job_id: input.sequenceExecutionJobId ?? null,
       requires_human_review: true,
       created_by: input.actorUserId,
       updated_at: now,
+      metadata: evidenceBundle.industryPlaybookDiagnostics
+        ? { industry_playbook_diagnostics: evidenceBundle.industryPlaybookDiagnostics }
+        : {},
     })
     .select("*")
     .single()

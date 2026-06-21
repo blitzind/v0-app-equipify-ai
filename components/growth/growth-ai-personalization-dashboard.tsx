@@ -15,6 +15,7 @@ import {
   personalizationStatusLabel,
   type GrowthAiPersonalizationDashboard,
   type GrowthPersonalizationGenerationView,
+  type GrowthPersonalizationIndustryPlaybookDiagnostics,
 } from "@/lib/growth/personalization/personalization-types"
 
 type TabKey = "generations" | "evidence" | "risk" | "feedback" | "performance"
@@ -40,6 +41,36 @@ function formatWhen(value: string | null | undefined): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "—"
   return date.toLocaleString()
+}
+
+function IndustryPlaybookDiagnosticsPanel({
+  diagnostics,
+}: {
+  diagnostics: GrowthPersonalizationIndustryPlaybookDiagnostics
+}) {
+  return (
+    <div className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-950">
+      <p className="font-medium uppercase tracking-wide">Industry playbook (industry-level, not company-verified)</p>
+      <p className="mt-1">
+        Industry Playbook: {diagnostics.playbookDisplayName ?? diagnostics.resolvedIndustryLabel ?? "—"}
+      </p>
+      <p className="mt-1">Confidence: {diagnostics.resolverConfidence}%</p>
+      {diagnostics.matchedSignals.length ? (
+        <p className="mt-1">Matched: {diagnostics.matchedSignals.join(", ")}</p>
+      ) : null}
+      <p className="mt-1">Playbook evidence count: {diagnostics.playbookEvidenceCount}</p>
+      {diagnostics.addedEvidenceLabels.length ? (
+        <div className="mt-2">
+          <p className="font-medium">Added evidence:</p>
+          <ul className="mt-1 list-inside list-disc text-sky-900/90">
+            {diagnostics.addedEvidenceLabels.slice(0, 8).map((label) => (
+              <li key={label}>{label}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 type DashboardPayload = {
@@ -451,6 +482,10 @@ export function GrowthAiPersonalizationDashboardView() {
                     ))}
                   </div>
                 </div>
+              ) : null}
+
+              {selected.industryPlaybookDiagnostics ? (
+                <IndustryPlaybookDiagnosticsPanel diagnostics={selected.industryPlaybookDiagnostics} />
               ) : null}
 
               <div>

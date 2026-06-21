@@ -1,34 +1,55 @@
+import {
+  isPersonalizationPlaybookSource,
+} from "@/lib/growth/personalization/personalization-industry-playbook-evidence"
 import type { GrowthPersonalizationContext } from "@/lib/growth/personalization/personalization-types"
 import type { PersonalizationEvidenceCandidate } from "@/lib/growth/personalization/personalization-evidence-engine"
 
 export function buildPersonalizationSystemPrompt(): string {
   return [
     "You generate evidence-backed outbound personalization for B2B sales.",
-    "Use ONLY facts provided in the evidence packet.",
+    "Use ONLY facts provided in the verified evidence packet for company-specific claims.",
+    "Industry context from playbooks describes likely relevance for teams in that space — not verified facts about this company.",
     "Do not invent metrics, awards, funding, or company events.",
     "Do not claim prior conversations unless explicitly evidenced.",
+    "Do not claim the company specifically has a pain unless verified in the evidence packet.",
+    "When using industry context, phrase as 'teams in this space often...' or 'companies like yours often...'.",
     "Keep tone professional and respectful.",
     "Return JSON with subject and body fields only.",
   ].join(" ")
+}
+
+function formatEvidenceSection(
+  title: string,
+  entries: PersonalizationEvidenceCandidate[],
+): string {
+  if (entries.length === 0) return `${title}:\n- None.`
+  const lines = entries
+    .slice(0, 12)
+    .map((entry) => `- [${entry.sourceType}] ${entry.claimKey}: ${entry.evidenceSnippet}`)
+    .join("\n")
+  return `${title}:\n${lines}`
 }
 
 export function buildPersonalizationUserPrompt(input: {
   context: GrowthPersonalizationContext
   evidence: PersonalizationEvidenceCandidate[]
 }): string {
-  const evidenceLines = input.evidence
-    .slice(0, 20)
-    .map((entry) => `- [${entry.sourceType}] ${entry.claimKey}: ${entry.evidenceSnippet}`)
-    .join("\n")
+  const verifiedEvidence = input.evidence.filter((entry) => !isPersonalizationPlaybookSource(entry.sourceType))
+  const industryEvidence = input.evidence.filter((entry) => isPersonalizationPlaybookSource(entry.sourceType))
 
   return [
     `Company: ${input.context.companyName}`,
     input.context.industryLabel ? `Industry: ${input.context.industryLabel}` : null,
     input.context.relationshipStage ? `Relationship stage: ${input.context.relationshipStage}` : null,
     input.context.templateOverlay ? `Approved template overlay:\n${input.context.templateOverlay}` : null,
-    "Evidence packet:",
-    evidenceLines || "- No evidence available.",
-    "Write a concise outbound email subject and body grounded only in evidence.",
+    formatEvidenceSection("Verified facts (research, memory, engagement — company-specific when stated)", verifiedEvidence),
+    formatEvidenceSection(
+      "Industry context (playbook intelligence — likely relevance only, NOT verified company facts)",
+      industryEvidence,
+    ),
+    "Write a concise outbound email subject and body.",
+    "Ground company-specific statements in verified facts only.",
+    "Use industry context to improve relevance without claiming unverified pains or events.",
   ]
     .filter(Boolean)
     .join("\n\n")
@@ -39,9 +60,13 @@ export function buildDeterministicPersonalizationDraft(input: {
   evidence: PersonalizationEvidenceCandidate[]
 }): { subject: string; body: string } {
   const company = input.context.companyName
+  const verifiedEvidence = input.evidence.filter((entry) => !isPersonalizationPlaybookSource(entry.sourceType))
+  const industryEvidence = input.evidence.filter((entry) => isPersonalizationPlaybookSource(entry.sourceType))
+
   const opener =
-    input.evidence.find((entry) => entry.sourceType === "relationship_memory")?.evidenceSnippet ??
-    input.evidence[0]?.evidenceSnippet ??
+    verifiedEvidence.find((entry) => entry.sourceType === "relationship_memory")?.evidenceSnippet ??
+    verifiedEvidence[0]?.evidenceSnippet ??
+    industryEvidence[0]?.evidenceSnippet ??
     `Teams like ${company} often evaluate operational improvements this quarter.`
 
   const objectionLine = input.context.topObjections[0]

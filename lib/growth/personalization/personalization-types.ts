@@ -29,8 +29,25 @@ export const GROWTH_PERSONALIZATION_SOURCES = [
   "committee_context",
   "buying_signals",
   "company_signals",
+  "industry_playbook",
+  "capability_mapping",
+  "video_storyline",
 ] as const
 export type GrowthPersonalizationSource = (typeof GROWTH_PERSONALIZATION_SOURCES)[number]
+
+export const GROWTH_AI_PERSONALIZATION_PLAYBOOK_EVIDENCE_QA_MARKER =
+  "growth-personalization-industry-playbook-evidence-gs-ai-playbook-1b-v1" as const
+
+export type GrowthPersonalizationIndustryPlaybookDiagnostics = {
+  resolvedIndustryId: string | null
+  resolvedIndustryLabel: string | null
+  resolverConfidence: number
+  matchedSignals: string[]
+  playbookDisplayName: string | null
+  playbookEvidenceCount: number
+  isIndustryLevelIntelligence: true
+  addedEvidenceLabels: string[]
+}
 
 export const GROWTH_PERSONALIZATION_RISK_LEVELS = ["low", "medium", "high", "critical"] as const
 export type GrowthPersonalizationRiskLevel = (typeof GROWTH_PERSONALIZATION_RISK_LEVELS)[number]
@@ -93,6 +110,7 @@ export type GrowthPersonalizationGenerationView = GrowthPersonalizationGeneratio
   evidence: GrowthPersonalizationEvidence[]
   riskEvents: GrowthPersonalizationRiskEvent[]
   feedback: GrowthPersonalizationFeedback[]
+  industryPlaybookDiagnostics?: GrowthPersonalizationIndustryPlaybookDiagnostics | null
 }
 
 export type GrowthPersonalizationProfile = {
@@ -156,6 +174,9 @@ export type GrowthPersonalizationContext = {
   researchPainPoints: string[]
   hiringSignals: string[]
   researchConfidence: number | null
+  companyDescription: string | null
+  naicsCodes: string[]
+  sicCodes: string[]
 }
 
 export function sanitizePersonalizationEvidenceSnippet(text: string, maxLength = 280): string {
@@ -175,8 +196,24 @@ export function maskPersonalizationLeadLabel(leadId: string, companyName?: strin
   return `Account ${leadId.slice(0, 8)}…`
 }
 
+const PERSONALIZATION_SOURCE_LABELS: Partial<Record<GrowthPersonalizationSource, string>> = {
+  industry_playbook: "Industry playbook",
+  capability_mapping: "Capability mapping",
+  video_storyline: "Video storyline",
+  relationship_memory: "Relationship memory",
+  opportunity_intelligence: "Opportunity intelligence",
+  booking_intelligence: "Booking intelligence",
+  market_graph: "Market graph",
+  territory_intelligence: "Territory intelligence",
+  website_intelligence: "Website intelligence",
+  engagement_history: "Engagement history",
+  committee_context: "Committee context",
+  buying_signals: "Buying signals",
+  company_signals: "Company signals",
+}
+
 export function personalizationSourceLabel(source: GrowthPersonalizationSource): string {
-  return source.replace(/_/g, " ")
+  return PERSONALIZATION_SOURCE_LABELS[source] ?? source.replace(/_/g, " ")
 }
 
 export function personalizationStatusLabel(status: GrowthPersonalizationGenerationStatus): string {

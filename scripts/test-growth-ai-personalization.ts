@@ -46,7 +46,7 @@ async function main(): Promise<void> {
   assert.match(GROWTH_AI_PERSONALIZATION_PRIVACY_NOTE, /no hallucinated company facts/i)
   assert.match(GROWTH_AI_PERSONALIZATION_PRIVACY_NOTE, /no hidden AI generation/i)
   assert.equal(GROWTH_PERSONALIZATION_GENERATION_STATUSES.length, 6)
-  assert.equal(GROWTH_PERSONALIZATION_SOURCES.length, 10)
+  assert.equal(GROWTH_PERSONALIZATION_SOURCES.length, 13)
   assert.equal(GROWTH_PERSONALIZATION_RISK_LEVELS.length, 4)
   assert.equal(GROWTH_PERSONALIZATION_FEEDBACK_TYPES.length, 5)
 
@@ -85,6 +85,14 @@ async function main(): Promise<void> {
     sequenceHistory: ["Step 1 delivered."],
     templateOverlay: null,
     sourcesUsed: ["relationship_memory" as const, "opportunity_intelligence" as const],
+    companySummary: null,
+    outreachAngles: [],
+    researchPainPoints: [],
+    hiringSignals: [],
+    researchConfidence: null,
+    companyDescription: null,
+    naicsCodes: [],
+    sicCodes: [],
   }
 
   const evidence = buildPersonalizationEvidenceFromContext(context)
@@ -162,6 +170,11 @@ async function main(): Promise<void> {
   assert.match(uiSource, /GROWTH_AI_PERSONALIZATION_QA_MARKER/)
   assert.match(uiSource, /GROWTH_AI_PERSONALIZATION_LAYOUT_ALIGNED_QA_MARKER/)
   assert.match(uiSource, /humanApprovalConfirmed/)
+  assert.match(uiSource, /IndustryPlaybookDiagnosticsPanel/)
+
+  const promptSource = readSource("lib/growth/personalization/personalization-prompt.ts")
+  assert.match(promptSource, /Verified facts/)
+  assert.match(promptSource, /Industry context/)
 
   console.log("growth-ai-personalization: all checks passed")
 }
