@@ -243,6 +243,25 @@ export async function getWarmupProfile(admin: SupabaseClient, profileId: string)
   return mapProfile(admin, data as WarmupRow, true)
 }
 
+export async function findWarmupProfileBySenderAccount(
+  admin: SupabaseClient,
+  senderAccountId: string,
+): Promise<GrowthWarmupProfile | null> {
+  const trimmed = senderAccountId.trim()
+  if (!trimmed) return null
+
+  const { data, error } = await activeProfilesQuery(admin)
+    .select("*")
+    .eq("sender_account_id", trimmed)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  if (!data) return null
+  return mapProfile(admin, data as WarmupRow, true)
+}
+
 export async function createWarmupProfile(
   admin: SupabaseClient,
   input: {
@@ -255,6 +274,9 @@ export async function createWarmupProfile(
 ): Promise<GrowthWarmupProfile> {
   const sender = await getSenderAccount(admin, input.sender_account_id)
   if (!sender) throw new Error("sender_not_found")
+
+  const existing = await findWarmupProfileBySenderAccount(admin, input.sender_account_id)
+  if (existing) throw new Error("warmup_profile_already_exists")
 
   const warmup_days = Math.max(1, input.warmup_days ?? 30)
   const scheduleDraft = generateWarmupScheduleDays(warmup_days)

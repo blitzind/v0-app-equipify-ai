@@ -333,32 +333,23 @@ export function GrowthConnectedMailboxesDashboard({
   }
 
   async function startWarmup(row: GrowthConnectedMailboxRow) {
-    let profileId = row.warmupProfileId
-    if (!profileId) {
-      const createRes = await fetch("/api/platform/growth/warmup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ senderAccountId: row.senderId, warmupDays: 30 }),
-      })
-      const createData = (await createRes.json().catch(() => ({}))) as {
-        message?: string
-        profile?: { id: string }
-      }
-      if (!createRes.ok || !createData.profile?.id) {
-        throw new Error(createData.message ?? "Could not create warmup profile.")
-      }
-      profileId = createData.profile.id
+    const res = await fetch("/api/platform/growth/warmup/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ senderAccountId: row.senderId, warmupDays: 30 }),
+    })
+    const data = (await res.json().catch(() => ({}))) as {
+      ok?: boolean
+      message?: string
+      action?: string
     }
-
-    const generateRes = await fetch(`/api/platform/growth/warmup/${profileId}/generate`, { method: "POST" })
-    const generateData = (await generateRes.json().catch(() => ({}))) as { message?: string }
-    if (!generateRes.ok) {
-      throw new Error(generateData.message ?? "Could not start warmup schedule.")
+    if (!res.ok || !data.ok) {
+      throw new Error(data.message ?? "Could not start warmup schedule.")
     }
 
     setWarmupNotice({
       tone: "success",
-      message: `Warmup started for ${row.email}. Daily cap synced to day-1 ramp.`,
+      message: data.message ?? `Warmup updated for ${row.email}.`,
     })
   }
 

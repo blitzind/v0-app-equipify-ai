@@ -838,6 +838,7 @@
     "test:growth-multichannel-sequences": "tsx scripts/test-growth-multichannel-sequences.ts",
     "test:growth-sender-pools": "tsx scripts/test-growth-sender-pools.ts",
     "test:growth-connected-mailboxes": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-connected-mailboxes.ts",
+    "test:growth-warmup-startup-8m": "tsx scripts/test-growth-warmup-startup-8m.ts",
     "test:growth-google-oauth-flow-7c": "tsx scripts/test-growth-google-oauth-flow-7c.ts",
     "test:growth-mailbox-persistence-7c": "tsx scripts/test-growth-mailbox-persistence-7c.ts",
     "test:growth-mailbox-read-model-7c": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-mailbox-read-model-7c.ts",

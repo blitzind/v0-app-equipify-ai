@@ -6,7 +6,7 @@ import { isGrowthWarmupFoundationSchemaReady } from "@/lib/growth/warmup/warmup-
 export const runtime = "nodejs"
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   const access = await requireGrowthCommunicationsSettingsAccess(request)

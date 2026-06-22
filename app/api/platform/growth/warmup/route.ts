@@ -77,7 +77,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, profile }, { status: 201 })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not create warmup profile."
-    const status = message === "sender_not_found" ? 404 : 500
-    return NextResponse.json({ error: "warmup_create_failed", message }, { status })
+    const status =
+      message === "sender_not_found" ? 404
+      : message === "warmup_profile_already_exists" ? 409
+      : 500
+    const friendlyMessage =
+      message === "warmup_profile_already_exists"
+        ? "Warmup profile already exists for this sender. Use Start Warmup to generate the schedule."
+        : message
+    return NextResponse.json({ error: "warmup_create_failed", message: friendlyMessage }, { status })
   }
 }

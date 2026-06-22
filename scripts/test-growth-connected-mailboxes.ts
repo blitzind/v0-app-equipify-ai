@@ -61,7 +61,11 @@ async function main(): Promise<void> {
   assert.match(uiSource, /Connect Gmail/)
   assert.match(uiSource, /Reconnect Gmail/)
   assert.match(uiSource, /Remove from pool/)
-  assert.match(uiSource, /Test send/)
+  assert.match(uiSource, /Start Warmup/)
+  assert.match(uiSource, /\/api\/platform\/growth\/warmup\/start/)
+
+  const warmupLabelSource = readSource("lib/growth/mailboxes/connected-mailbox-warmup-label.ts")
+  assert.match(warmupLabelSource, /Ready to Generate/)
 
   const adminPageSource = readSource("app/(admin)/admin/growth/infrastructure/mailboxes/page.tsx")
   assert.match(adminPageSource, /GrowthConnectedMailboxesDashboard/)
