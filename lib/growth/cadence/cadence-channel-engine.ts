@@ -14,6 +14,7 @@ import {
   type GrowthSequenceStepChannel,
 } from "@/lib/growth/sequence-types"
 import { growthWorkspaceLeadQueueHref } from "@/lib/growth/navigation/growth-call-notification-links"
+import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 
 export function isCadenceEmailChannel(channel: GrowthSequenceStepChannel): boolean {
   return channel === GROWTH_CADENCE_EMAIL_CHANNEL
@@ -113,7 +114,5 @@ export function cadenceCallQueueHref(leadId: string): string {
 }
 
 export function cadenceLeadDrawerHref(leadId: string, focus?: string): string {
-  const params = new URLSearchParams({ open: leadId })
-  if (focus) params.set("focus", focus)
-  return `/admin/growth/leads?${params.toString()}`
+  return buildGrowthLeadHref(leadId, focus ? { focus } : undefined)
 }

@@ -11,7 +11,7 @@ export default function GrowthSharePageTemplatesPage() {
     <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
         title="Share Page Templates"
-        description="Reusable Sendr-style layouts for future share page creation. Template publish updates the library only."
+        description="Reusable share page template layouts for future share page creation. Template publish updates the library only."
         icon={LayoutTemplate}
         iconClassName="bg-violet-50 text-violet-600"
       />

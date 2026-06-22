@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback } from "react"
+import Link from "next/link"
 import { Bell, Loader2 } from "lucide-react"
 import {
   GrowthSettingsCard,
@@ -29,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { GROWTH_CORE_SETTINGS_WORKSPACE_NOTIFICATIONS_PATH } from "@/lib/growth/navigation/growth-workspace-core-settings-links"
 import { GROWTH_OPERATOR_NOTIFICATION_SEVERITIES } from "@/lib/growth/notifications/growth-notification-severity"
 
 const ENDPOINT = "/api/growth/workspace/settings/notifications"
@@ -72,10 +74,22 @@ export function GrowthSettingsNotificationsPanel() {
     <div className={GROWTH_SETTINGS_SECTION_GAP}>
       <GrowthWorkspacePageHeader
         title="Notifications"
-        description="In-app, browser, email, and inbox notification preferences."
+        description="Outreach, inbox, campaign, and operator activity alerts for the Growth workspace."
         icon={Bell}
         iconClassName="bg-amber-50 text-amber-700"
       />
+
+      <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+        <p className="font-medium text-foreground">Growth operator notifications</p>
+        <p className="mt-1">
+          Configure outreach, inbox, campaign, and operator activity alerts here. For workspace operational alerts
+          (equipment, work orders, digest settings), use{" "}
+          <Link href={GROWTH_CORE_SETTINGS_WORKSPACE_NOTIFICATIONS_PATH} className="font-medium text-primary underline-offset-4 hover:underline">
+            Core workspace notifications
+          </Link>
+          .
+        </p>
+      </div>
 
       {loading ? <GrowthSettingsSectionLoadingState /> : null}
       {!loading && error ? <GrowthSettingsSectionErrorState message={error} onRetry={() => void refresh()} /> : null}

@@ -3,6 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { buildGrowthAiCopilotInput } from "@/lib/growth/ai-copilot-input"
 import { resolveGrowthAiCopilotPlaybookRules } from "@/lib/growth/ai-copilot-playbook-resolver"
+import { resolveOutreachLeadIndustryTags } from "@/lib/growth/outreach/personalization/context-packet-builder"
 import { fetchGrowthCopilotSettings } from "@/lib/growth/ai-copilot-repository"
 import { getInboxThread } from "@/lib/growth/inbox/thread-repository"
 import { fetchInboxThreadSyncDetail } from "@/lib/growth/inbox-sync/inbox-sync-repository"
@@ -59,10 +60,11 @@ export async function buildReplyDraftContext(
 
   let playbookInfluence: string[] = []
   if (settings.aiCopilotPlaybookEnabled) {
+    const leadIndustryTags = await resolveOutreachLeadIndustryTags(admin, lead)
     const rules = await resolveGrowthAiCopilotPlaybookRules(admin, {
       generationType: "response_draft",
       maxRules: settings.aiCopilotPlaybookMaxRulesPerGeneration,
-      leadIndustryTags: [],
+      leadIndustryTags,
     })
     playbookInfluence = rules.rules.slice(0, 5).map((rule) => truncate(rule.rule_text, 80))
   }

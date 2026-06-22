@@ -2,21 +2,27 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { emitGrowthNotification } from "@/lib/growth/notifications/emit-growth-notification"
+import {
+  buildGrowthLeadHref,
+  buildGrowthMeetingsHref,
+} from "@/lib/growth/navigation/growth-workspace-operator-links"
 
 export function growthMeetingScheduleHref(input: {
   leadId: string
   meetingId?: string
   replyId?: string
 }): string {
-  const params = new URLSearchParams({ open: input.leadId, focus: "meetings" })
-  if (input.meetingId) params.set("highlight", input.meetingId)
-  if (input.replyId) params.set("replyId", input.replyId)
-  return `/admin/growth/leads?${params.toString()}`
+  if (input.replyId) {
+    return buildGrowthLeadHref(input.leadId, {
+      focus: "meetings",
+      highlight: input.meetingId ?? undefined,
+    })
+  }
+  return buildGrowthMeetingsHref({ leadId: input.leadId, meetingId: input.meetingId })
 }
 
 export function growthMeetingDashboardHref(meetingId?: string): string {
-  if (meetingId) return `/admin/growth/meetings?meetingId=${meetingId}`
-  return "/admin/growth/meetings"
+  return buildGrowthMeetingsHref({ meetingId })
 }
 
 export async function emitMeetingRequestedNotification(

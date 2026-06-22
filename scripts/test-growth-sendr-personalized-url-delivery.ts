@@ -8,7 +8,9 @@ import path from "node:path"
 import {
   GROWTH_SENDR_PAGE_URL_MERGE_TOKEN,
   GROWTH_SENDR_PERSONALIZED_URL_DELIVERY_QA_MARKER,
+  GROWTH_VIDEO_PAGE_URL_MERGE_TOKEN,
 } from "../lib/growth/sendr/growth-sendr-config"
+import { applySendrPageUrlMergeFields } from "../lib/growth/sendr/growth-sendr-page-url-merge"
 import {
   buildSendrPersonalizedVisitorLink,
   resolveSendrExternalPageUrl,
@@ -88,11 +90,16 @@ function main(): void {
   assert.equal(verifySendrVisitorToken("tampered.token", pageId), null)
   console.log("  ✓ Token validation: invalid, expired, tampered")
 
-  const merged = `Hi {{first_name}}, ${GROWTH_SENDR_PAGE_URL_MERGE_TOKEN}`
-  const resolved = merged.replace(GROWTH_SENDR_PAGE_URL_MERGE_TOKEN, tokenized)
-  assert.match(resolved, /\?token=/)
-  assert.doesNotMatch(resolved, /\{\{sendr_page_url\}\}/)
-  console.log("  ✓ {{sendr_page_url}} resolves to tokenized URL shape")
+  const legacyMerged = `Hi {{first_name}}, ${GROWTH_SENDR_PAGE_URL_MERGE_TOKEN}`
+  const legacyResolved = applySendrPageUrlMergeFields(legacyMerged, tokenized)
+  assert.match(legacyResolved, /\?token=/)
+  assert.doesNotMatch(legacyResolved, /\{\{sendr_page_url\}\}/)
+  console.log("  ✓ {{sendr_page_url}} resolves to tokenized /videos/ URL shape")
+
+  const preferredMerged = `Hi {{first_name}}, ${GROWTH_VIDEO_PAGE_URL_MERGE_TOKEN}`
+  const preferredResolved = applySendrPageUrlMergeFields(preferredMerged, tokenized)
+  assert.equal(preferredResolved, legacyResolved)
+  console.log("  ✓ {{video_page_url}} resolves to the same tokenized URL as legacy")
 
   const client = readSource("components/sendr/sendr-public-page-client.tsx")
   assert.doesNotMatch(client, /setInterval|WebSocket|subscribe|poll/i)

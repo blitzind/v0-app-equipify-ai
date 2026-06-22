@@ -37,6 +37,11 @@ import {
   OUTREACH_PERSONALIZATION_STRATEGY_VERSION,
 } from "@/lib/growth/outreach/personalization/personalization-types"
 import { runOutreachPersonalizationGeneration } from "@/lib/growth/outreach/personalization/run-outreach-personalization"
+import { resolveOutreachLeadIndustryTags } from "@/lib/growth/outreach/personalization/context-packet-builder"
+import { buildOutreachIndustryContextForLead } from "@/lib/growth/outreach/personalization/outreach-industry-context-builder"
+import { buildGrowthReasoningDiagnosticsFromIndustryInput } from "@/lib/growth/reasoning/growth-reasoning-engine"
+import type { GrowthReasoningChannel } from "@/lib/growth/reasoning/growth-reasoning-types"
+import { buildGrowthSequenceIntelligenceFromIndustryInput } from "@/lib/growth/sequence-intelligence/growth-sequence-engine"
 import {
   persistOutreachPerformanceAttribution,
 } from "@/lib/growth/outreach/performance/performance-attribution-repository"
@@ -126,12 +131,14 @@ export async function runGrowthAiCopilotGeneration(
     snapshot,
   })
 
+  const leadIndustryTags = await resolveOutreachLeadIndustryTags(input.admin, lead)
+
   const playbookResolution =
     settings.aiCopilotPlaybookEnabled
       ? await resolveGrowthAiCopilotPlaybookRules(input.admin, {
           generationType: input.generationType,
           maxRules: settings.aiCopilotPlaybookMaxRulesPerGeneration,
-          leadIndustryTags: [],
+          leadIndustryTags,
         })
       : { rules: [], conflicts: [] }
 
@@ -151,6 +158,7 @@ export async function runGrowthAiCopilotGeneration(
       actingUserId: input.actingUserId,
       maxWords: settings.outreachPersonalizationMaxWords,
       aiRefinementEnabled: settings.aiCopilotEnabled,
+      playbookRules: playbookResolution.rules,
     })
 
     const mapped = {
@@ -218,6 +226,46 @@ export async function runGrowthAiCopilotGeneration(
     createdBy: actingUserId,
   })
 
+  if (playbookResolution.rules.length > 0) {
+    await linkGrowthAiCopilotGenerationPlaybookRules(input.admin, {
+      generationId: generation.id,
+      rules: playbookResolution.rules,
+    })
+
+    for (const rule of playbookResolution.rules) {
+      await insertGrowthAiCopilotPlaybookEffectiveness(input.admin, {
+        approvedRuleId: rule.id,
+        sourceId: rule.sourceId,
+        generationId: generation.id,
+        leadId: lead.id,
+        outcome: "applied",
+        category: rule.category,
+        playbookInfluenceScore,
+        effectivenessScore: Math.min(100, rule.priority + 10),
+        metadata: { generationType: generation.generationType, outreachPersonalization: true },
+      })
+    }
+  }
+
+  if (playbookResolution.conflicts.length > 0) {
+    await insertGrowthAiCopilotPlaybookEffectiveness(input.admin, {
+      generationId: generation.id,
+      leadId: lead.id,
+      outcome: "conflict_detected",
+      playbookInfluenceScore,
+      effectivenessScore: 0,
+      metadata: { conflicts: playbookResolution.conflicts, outreachPersonalization: true },
+    })
+
+    await emitGrowthLeadPlaybookConflictDetectedTimeline(input.admin, {
+      leadId: lead.id,
+      generationId: generation.id,
+      summary: `${playbookResolution.conflicts.length} playbook conflict(s) detected during outreach generation`,
+      conflicts: playbookResolution.conflicts,
+      actor: { userId: input.actingUserId, email: input.actingUserEmail },
+    })
+  }
+
     const performanceAttribution = await persistOutreachPerformanceAttribution(input.admin, {
       generationId: generation.id,
       leadId: lead.id,
@@ -273,7 +321,34 @@ export async function runGrowthAiCopilotGeneration(
     promptVariant,
     playbookResolution.rules,
   )
-  const userPrompt = buildGrowthAiCopilotUserPrompt(input.generationType, snapshot)
+  const industryContextBase = await buildOutreachIndustryContextForLead(input.admin, lead)
+  const reasoningChannel: GrowthReasoningChannel = input.generationType.startsWith("call_")
+    ? "VOICE"
+    : "COPILOT"
+  const reasoningDiagnostics = buildGrowthReasoningDiagnosticsFromIndustryInput({
+    channel: reasoningChannel,
+    industryContext: industryContextBase,
+    companyName: lead.companyName,
+    contactName: lead.contactName,
+    researchPainPoints: snapshot.researchSummary ? [snapshot.researchSummary] : [],
+    priorTouchCount: snapshot.recentOutbound?.length ?? 0,
+    engagementScore: snapshot.growthSignalScore ?? null,
+  })
+  const sequenceIntelligenceContext = buildGrowthSequenceIntelligenceFromIndustryInput({
+    priorTouchCount: snapshot.recentOutbound?.length ?? 0,
+    priorOutboundSubjects: snapshot.recentOutbound?.map((entry) => entry.subject ?? "").filter(Boolean),
+    engagementScore: snapshot.growthSignalScore ?? null,
+    industryContext: industryContextBase,
+  })
+  const industryContext = {
+    ...industryContextBase,
+    sequenceIntelligenceContext,
+    reasoningContext: { channel: reasoningChannel, diagnostics: reasoningDiagnostics },
+  }
+  const userPrompt = buildGrowthAiCopilotUserPrompt(input.generationType, snapshot, {
+    industryContext,
+    narrativeContext: industryContext.narrativeContext,
+  })
 
   const aiResult = await provider.generate({
     generationType: input.generationType,

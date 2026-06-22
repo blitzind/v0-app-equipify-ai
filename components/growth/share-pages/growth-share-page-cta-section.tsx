@@ -32,7 +32,7 @@ export function GrowthSharePageCtaSection({
           const className = cn(
             "inline-flex items-center rounded-full px-5 py-2.5 text-sm font-medium transition",
             cta.kind === "primary"
-              ? "bg-[var(--share-brand-color)] text-white"
+              ? "text-[var(--share-button-text)] bg-[var(--share-button-bg)]"
               : cta.kind === "secondary"
                 ? "border border-[var(--share-accent-color)] text-[var(--share-accent-color)]"
                 : "text-[var(--share-brand-color)] underline decoration-[var(--share-brand-color)]/40",

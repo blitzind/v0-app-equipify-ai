@@ -3,6 +3,9 @@
 import { cn } from "@/lib/utils"
 import { sharePageThemeStyle } from "@/components/growth/share-pages/share-page-theme-utils"
 
+import type { GrowthSharePageTheme } from "@/lib/growth/share-pages/share-page-types"
+import { hasSharePageExtendedTheme } from "@/lib/growth/share-pages/share-page-types"
+
 export type GrowthSharePagePreviewModel = {
   logoUrl: string
   heroImageUrl: string
@@ -16,6 +19,7 @@ export type GrowthSharePagePreviewModel = {
   accentColor: string
   recipientName: string
   companyName: string
+  theme?: GrowthSharePageTheme
 }
 
 export function GrowthSharePagePreviewCard({
@@ -27,16 +31,18 @@ export function GrowthSharePagePreviewCard({
   className?: string
   id?: string
 }) {
-  const primaryColor = model.primaryColor.trim() || "#059669"
-  const accentColor = model.accentColor.trim() || primaryColor
-  const themeStyle = sharePageThemeStyle({
-    brandColor: primaryColor,
-    accentColor,
+  const resolvedTheme: GrowthSharePageTheme = model.theme ?? {
+    brandColor: model.primaryColor.trim() || "#059669",
+    accentColor: model.accentColor.trim() || model.primaryColor.trim() || "#047857",
     logoUrl: model.logoUrl.trim() || null,
     heroImageUrl: model.heroImageUrl.trim() || null,
     publicThemeMode: "system",
     footerNote: model.footerText.trim() || null,
-  })
+  }
+  const themeStyle = sharePageThemeStyle(resolvedTheme)
+  const extended = hasSharePageExtendedTheme(resolvedTheme)
+  const buttonBg = resolvedTheme.buttonBackground ?? resolvedTheme.brandColor
+  const buttonText = resolvedTheme.buttonText ?? "#ffffff"
 
   return (
     <div
@@ -49,8 +55,23 @@ export function GrowthSharePagePreviewCard({
         <p className="text-xs text-muted-foreground">Visual only — updates as you edit.</p>
       </div>
 
-      <div className="bg-background p-4 sm:p-5" style={themeStyle}>
-        <header className="mb-4 flex items-center gap-3">
+      <div
+        className="bg-background p-4 sm:p-5"
+        style={{
+          ...themeStyle,
+          ...(extended
+            ? { backgroundColor: "var(--share-page-bg)", color: "var(--share-page-text)" }
+            : undefined),
+        }}
+      >
+        <header
+          className="mb-4 flex items-center gap-3 rounded-xl p-3"
+          style={
+            extended
+              ? { backgroundColor: "var(--share-header-bg)", color: "var(--share-header-text)" }
+              : undefined
+          }
+        >
           {model.logoUrl.trim() ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={model.logoUrl.trim()} alt="" className="h-8 w-auto max-w-[140px] object-contain" />
@@ -85,8 +106,8 @@ export function GrowthSharePagePreviewCard({
         <div className="mt-5 flex flex-wrap gap-2">
           {model.ctaText.trim() ? (
             <span
-              className="inline-flex items-center rounded-full px-4 py-2 text-xs font-medium text-white"
-              style={{ backgroundColor: primaryColor }}
+              className="inline-flex items-center rounded-full px-4 py-2 text-xs font-medium"
+              style={{ backgroundColor: buttonBg, color: buttonText }}
             >
               {model.ctaText}
             </span>
@@ -98,7 +119,7 @@ export function GrowthSharePagePreviewCard({
           {model.calendarUrl.trim() ? (
             <span
               className="inline-flex items-center rounded-full border px-4 py-2 text-xs font-medium"
-              style={{ borderColor: accentColor, color: accentColor }}
+              style={{ borderColor: resolvedTheme.accentColor, color: resolvedTheme.accentColor }}
             >
               Book a meeting
             </span>

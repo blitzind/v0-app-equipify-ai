@@ -2,6 +2,7 @@ import "server-only"
 
 import type { GrowthMeeting } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 import { assertGrowthMeetingScheduleTimes, resolveGrowthMeetingTimezone } from "@/lib/growth/calendar/calendar-timezone"
+import { buildGrowthLeadHref, buildGrowthOpportunityHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 
 type GoogleCalendarEvent = {
   id?: string
@@ -73,9 +74,9 @@ export async function createGoogleCalendarEvent(input: {
     endAt: input.meeting.endAt,
   })
   const timezone = resolveGrowthMeetingTimezone(input.meeting.timezone)
-  const leadLink = `${input.appOrigin}/admin/growth/leads?open=${input.meeting.leadId}&focus=meetings&highlight=${input.meeting.id}`
+  const leadLink = `${input.appOrigin}${buildGrowthLeadHref(input.meeting.leadId, { focus: "meetings", highlight: input.meeting.id })}`
   const opportunityLink = input.meeting.opportunityId
-    ? `${input.appOrigin}/admin/growth/opportunities/pipeline?opportunityId=${input.meeting.opportunityId}`
+    ? `${input.appOrigin}${buildGrowthOpportunityHref({ opportunityId: input.meeting.opportunityId })}`
     : null
 
   const attendees = (input.attendeeEmails ?? [])
@@ -143,9 +144,9 @@ export async function updateGoogleCalendarEvent(input: {
     endAt: input.meeting.endAt,
   })
   const timezone = resolveGrowthMeetingTimezone(input.meeting.timezone)
-  const leadLink = `${input.appOrigin}/admin/growth/leads?open=${input.meeting.leadId}&focus=meetings&highlight=${input.meeting.id}`
+  const leadLink = `${input.appOrigin}${buildGrowthLeadHref(input.meeting.leadId, { focus: "meetings", highlight: input.meeting.id })}`
   const opportunityLink = input.meeting.opportunityId
-    ? `${input.appOrigin}/admin/growth/opportunities/pipeline?opportunityId=${input.meeting.opportunityId}`
+    ? `${input.appOrigin}${buildGrowthOpportunityHref({ opportunityId: input.meeting.opportunityId })}`
     : null
 
   const body = {

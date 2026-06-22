@@ -10,6 +10,7 @@ import {
 import { fetchGrowthCopilotSettings } from "@/lib/growth/ai-copilot-repository"
 import { buildPlaybookAttribution, computePlaybookInfluenceScore } from "@/lib/growth/ai-copilot-playbook-influence"
 import { resolveGrowthAiCopilotPlaybookRules } from "@/lib/growth/ai-copilot-playbook-resolver"
+import { resolveOutreachLeadIndustryTags } from "@/lib/growth/outreach/personalization/context-packet-builder"
 import type { GrowthCallCopilotBriefing } from "@/lib/growth/call-copilot-types"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
@@ -46,12 +47,14 @@ export async function buildGrowthCallCopilotBriefing(
     ...describeFrameworkKeys(frameworks.objections, GROWTH_AI_COPILOT_OBJECTION_FRAMEWORK),
   ].filter((entry, index, all) => all.indexOf(entry) === index)
 
+  const leadIndustryTags = await resolveOutreachLeadIndustryTags(admin, lead)
+
   const playbookRules = settings.aiCopilotPlaybookEnabled
     ? (
         await resolveGrowthAiCopilotPlaybookRules(admin, {
           generationType: "call_opening",
           maxRules: settings.aiCopilotPlaybookMaxRulesPerGeneration,
-          leadIndustryTags: [],
+          leadIndustryTags,
         })
       ).rules
     : []

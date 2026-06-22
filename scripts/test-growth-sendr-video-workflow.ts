@@ -60,11 +60,14 @@ function main(): void {
   assert.match(record, /parseSendrVideoReturnContext/)
   assert.match(record, /buildGrowthVideoLibraryHref/)
 
-  const client = readSource("components/sendr/sendr-public-page-client.tsx")
-  assert.match(client, /videoPlayback/)
-  assert.match(client, /videoAssetId/)
-  assert.match(client, /video_start/)
-  assert.doesNotMatch(client, /setInterval/)
+  const layout = readSource("components/growth/sendr/presentation/sendr-public-presentation-layout.tsx")
+  assert.match(layout, /videoPlayback/)
+  assert.match(layout, /videoAssetId/)
+  assert.match(layout, /video_start/)
+
+  const videoHero = readSource("components/growth/sendr/presentation/presentation-video-hero.tsx")
+  assert.match(videoHero, /onVideoStart/)
+  assert.doesNotMatch(videoHero, /transcode|upload/i)
 
   console.log("  ✓ Return flow: record/upload/library → page detail with asset attach")
   console.log("  ✓ Section-level video attach/replace/remove/preview")

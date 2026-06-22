@@ -32,7 +32,7 @@ export default function AdminGrowthSharePageTemplatesPage() {
             <div>
               <h1 className={PAGE_STANDARD_PAGE_TITLE}>Share Page Templates</h1>
               <p className="text-sm text-muted-foreground">
-                Reusable Sendr-style layouts for future share page creation. Template publish updates the library only.
+                Reusable share page template layouts for future share page creation. Template publish updates the library only.
               </p>
             </div>
           </div>

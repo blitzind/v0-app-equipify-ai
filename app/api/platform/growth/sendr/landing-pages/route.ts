@@ -21,6 +21,8 @@ import {
   updateGrowthSendrLandingPageSection,
   upsertGrowthSendrLandingPageSection,
 } from "@/lib/growth/sendr/growth-sendr-landing-page-repository"
+import { generateGrowthSendrPageDraft } from "@/lib/growth/sendr/growth-sendr-launch-preview-service"
+import { getGrowthSendrPageTemplate } from "@/lib/growth/sendr/growth-sendr-builder-config"
 import { requireSendrPlatformAccess } from "@/lib/growth/sendr/growth-sendr-platform-access"
 import { getGrowthSendrVideoAsset } from "@/lib/growth/sendr/growth-sendr-video-runtime-repository"
 import { buildSendrPagePublicLink } from "@/lib/growth/sendr/growth-sendr-slug-runtime"
@@ -37,6 +39,9 @@ const BodySchema = z.object({
       "remove_section",
       "publish",
       "archive",
+      "apply_template",
+      "generate_ai_draft",
+      "apply_page_draft",
     ])
     .optional(),
   title: z.string().min(1).max(200).optional(),
@@ -54,6 +59,29 @@ const BodySchema = z.object({
   sortOrder: z.number().int().min(0).optional(),
   content: z.record(z.unknown()).optional(),
   status: z.enum(GROWTH_SENDR_LANDING_PAGE_STATUSES).optional(),
+  templateId: z.string().max(80).optional(),
+  replaceExistingSections: z.boolean().optional(),
+  aiInput: z
+    .object({
+      targetCompany: z.string().max(200).optional(),
+      targetPerson: z.string().max(200).optional(),
+      industry: z.string().max(120).optional(),
+      painPoints: z.string().max(2000).optional(),
+      desiredCta: z.string().max(120).optional(),
+      tone: z.string().max(120).optional(),
+      templateId: z.string().max(80).optional(),
+    })
+    .optional(),
+  draftSections: z
+    .array(
+      z.object({
+        sectionType: z.enum(GROWTH_SENDR_LANDING_PAGE_SECTION_TYPES),
+        sortOrder: z.number().int().min(0),
+        content: z.record(z.unknown()),
+      }),
+    )
+    .optional(),
+  draftTitle: z.string().max(200).optional(),
 })
 
 export async function POST(request: Request) {
@@ -161,6 +189,94 @@ export async function POST(request: Request) {
         organizationId: access.organizationId,
       })
       return NextResponse.json({ ok: true, qa_marker: GROWTH_SENDR_QA_MARKER })
+    }
+
+    if (action === "apply_template") {
+      if (!parsed.data.landingPageId || !parsed.data.templateId) {
+        return NextResponse.json({ ok: false, error: "template_fields_required" }, { status: 400 })
+      }
+      const template = getGrowthSendrPageTemplate(parsed.data.templateId)
+      if (!template) {
+        return NextResponse.json({ ok: false, error: "template_not_found" }, { status: 404 })
+      }
+      const current = await getGrowthSendrLandingPage(access.admin, parsed.data.landingPageId)
+      if (!current || current.organizationId !== access.organizationId) {
+        return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 })
+      }
+      const existing = await listGrowthSendrLandingPageSections(access.admin, parsed.data.landingPageId)
+      if (parsed.data.replaceExistingSections) {
+        for (const section of existing) {
+          await deleteGrowthSendrLandingPageSection(access.admin, {
+            sectionId: section.id,
+            landingPageId: parsed.data.landingPageId,
+            organizationId: access.organizationId,
+          })
+        }
+      }
+      const startOrder = parsed.data.replaceExistingSections ? 0 : existing.length
+      for (const [index, section] of template.sections.entries()) {
+        await upsertGrowthSendrLandingPageSection(access.admin, {
+          landingPageId: parsed.data.landingPageId,
+          organizationId: access.organizationId,
+          sectionType: section.sectionType,
+          sortOrder: startOrder + index,
+          content: section.content,
+        })
+      }
+      const page = await updateGrowthSendrLandingPage(access.admin, {
+        landingPageId: parsed.data.landingPageId,
+        organizationId: access.organizationId,
+        title: parsed.data.title ?? current.title,
+        mobileMetadata: {
+          ...current.mobileMetadata,
+          templateType: template.id,
+        },
+      })
+      const sections = await listGrowthSendrLandingPageSections(access.admin, parsed.data.landingPageId)
+      return NextResponse.json({ ok: true, page, sections, qa_marker: GROWTH_SENDR_QA_MARKER })
+    }
+
+    if (action === "generate_ai_draft") {
+      const draft = await generateGrowthSendrPageDraft(parsed.data.aiInput ?? {})
+      return NextResponse.json({ ok: true, draft, qa_marker: draft.qaMarker })
+    }
+
+    if (action === "apply_page_draft") {
+      if (!parsed.data.landingPageId || !parsed.data.draftSections?.length) {
+        return NextResponse.json({ ok: false, error: "draft_fields_required" }, { status: 400 })
+      }
+      const current = await getGrowthSendrLandingPage(access.admin, parsed.data.landingPageId)
+      if (!current || current.organizationId !== access.organizationId) {
+        return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 })
+      }
+      if (parsed.data.replaceExistingSections !== false) {
+        const existing = await listGrowthSendrLandingPageSections(access.admin, parsed.data.landingPageId)
+        for (const section of existing) {
+          await deleteGrowthSendrLandingPageSection(access.admin, {
+            sectionId: section.id,
+            landingPageId: parsed.data.landingPageId,
+            organizationId: access.organizationId,
+          })
+        }
+      }
+      for (const section of parsed.data.draftSections) {
+        await upsertGrowthSendrLandingPageSection(access.admin, {
+          landingPageId: parsed.data.landingPageId,
+          organizationId: access.organizationId,
+          sectionType: section.sectionType,
+          sortOrder: section.sortOrder,
+          content: section.content,
+        })
+      }
+      const page = parsed.data.draftTitle
+        ? await updateGrowthSendrLandingPage(access.admin, {
+            landingPageId: parsed.data.landingPageId,
+            organizationId: access.organizationId,
+            title: parsed.data.draftTitle,
+          })
+        : current
+      const sections = await listGrowthSendrLandingPageSections(access.admin, parsed.data.landingPageId)
+      return NextResponse.json({ ok: true, page, sections, qa_marker: GROWTH_SENDR_QA_MARKER })
     }
 
     if (action === "publish") {

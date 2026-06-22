@@ -33,7 +33,7 @@ export function GrowthSettingsShell({ children }: GrowthSettingsShellProps) {
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Operator-facing Growth preferences — mailbox and delivery setup live under Delivery Setup.
+              Operator-facing Growth preferences — mailboxes, DNS, warmup, and outbound readiness live under Communications.
             </p>
           </div>
         </div>

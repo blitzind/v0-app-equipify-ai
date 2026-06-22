@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { fetchSenderInfrastructureDashboard } from "@/lib/growth/sender/sender-health-dashboard"
 import { listSenderHealthEvents, listSenderTimelineEvents } from "@/lib/growth/sender/sender-health-events"
 import { isGrowthSenderInfrastructureSchemaReady } from "@/lib/growth/sender/sender-schema-health"
@@ -7,8 +7,8 @@ import { GROWTH_SENDER_INFRASTRUCTURE_PRIVACY_NOTE } from "@/lib/growth/sender/s
 
 export const runtime = "nodejs"
 
-export async function GET() {
-  const access = await requireGrowthEnginePlatformAccess()
+export async function GET(request: Request) {
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   if (!(await isGrowthSenderInfrastructureSchemaReady(access.admin))) {

@@ -1,9 +1,22 @@
 import type { GrowthSharePageRenderModel } from "@/lib/growth/share-pages/share-page-types"
+import { hasSharePageExtendedTheme } from "@/lib/growth/share-pages/share-page-types"
 import { ImageIcon, Mic, Video } from "lucide-react"
 
 export function GrowthSharePageHero({ model }: { model: GrowthSharePageRenderModel }) {
+  const extended = hasSharePageExtendedTheme(model.theme)
   return (
-    <header className="space-y-6">
+    <header
+      className="space-y-6 rounded-2xl p-1 sm:p-2"
+      style={
+        extended
+          ? {
+              backgroundColor: "var(--share-header-bg)",
+              color: "var(--share-header-text)",
+              padding: "1.25rem",
+            }
+          : undefined
+      }
+    >
       <div className="flex items-center justify-between gap-4">
         {model.theme.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -16,14 +29,29 @@ export function GrowthSharePageHero({ model }: { model: GrowthSharePageRenderMod
       </div>
 
       <div className="space-y-3">
-        <p className="text-sm text-slate-600 dark:text-slate-400">
+        <p
+          className="text-sm"
+          style={extended ? { color: "color-mix(in srgb, var(--share-header-text) 75%, transparent)" } : undefined}
+        >
           Hi {model.prospectName}, a personalized note for {model.companyName}
         </p>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-4xl">
+        <h1
+          className="text-3xl font-semibold tracking-tight sm:text-4xl"
+          style={extended ? { color: "var(--share-header-text)" } : undefined}
+        >
           {model.headline}
         </h1>
         {model.subheadline ? (
-          <p className="text-base text-slate-600 dark:text-slate-400">{model.subheadline}</p>
+          <p
+            className="text-base"
+            style={
+              extended
+                ? { color: "color-mix(in srgb, var(--share-header-text) 75%, transparent)" }
+                : undefined
+            }
+          >
+            {model.subheadline}
+          </p>
         ) : null}
       </div>
 

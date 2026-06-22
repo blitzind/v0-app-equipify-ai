@@ -9,6 +9,7 @@ import {
   GROWTH_SENDR_PAGE_URL_MERGE_TOKEN,
   GROWTH_SENDR_SEQUENCE_BRIDGE_QA_MARKER,
   GROWTH_SENDR_LIMITS,
+  GROWTH_VIDEO_PAGE_URL_MERGE_TOKEN,
 } from "../lib/growth/sendr/growth-sendr-config"
 
 function readSource(relativePath: string): string {
@@ -19,6 +20,7 @@ function main(): void {
   console.log("\n=== GS-SENDR-2D Sequence Bridge Certification ===\n")
 
   assert.equal(GROWTH_SENDR_SEQUENCE_BRIDGE_QA_MARKER, "growth-sendr-sequence-bridge-gs-sendr-2d-v1")
+  assert.equal(GROWTH_VIDEO_PAGE_URL_MERGE_TOKEN, "{{video_page_url}}")
   assert.equal(GROWTH_SENDR_PAGE_URL_MERGE_TOKEN, "{{sendr_page_url}}")
   assert.ok(GROWTH_SENDR_LIMITS.MAX_SENDR_PAGE_ATTACHMENTS_PER_SEQUENCE > 0)
 
@@ -33,13 +35,17 @@ function main(): void {
   const bridge = readSource("lib/growth/sendr/growth-sendr-sequence-bridge-service.ts")
   assert.match(bridge, /attachSendrPageToSequence/)
   assert.match(bridge, /applySendrPageUrlMergeFields/)
+  assert.match(readSource("lib/growth/sendr/growth-sendr-page-url-merge.ts"), /GROWTH_VIDEO_PAGE_URL_MERGE_TOKEN/)
 
   const sendBuilder = readSource("lib/growth/sequences/execution/sequence-send-builder.ts")
   assert.match(sendBuilder, /resolveSendrPageUrlForSequenceStep/)
   assert.match(sendBuilder, /leadId: input\.leadId/)
 
   const builder = readSource("components/growth/growth-sequence-pattern-builder.tsx")
-  assert.match(builder, /sendr_page_url/)
+  assert.match(builder, /GROWTH_VIDEO_PAGE_URL_MERGE_TOKEN/)
+  const merge = readSource("lib/growth/sendr/growth-sendr-page-url-merge.ts")
+  assert.match(merge, /GROWTH_VIDEO_PAGE_URL_MERGE_TOKEN/)
+  assert.match(merge, /GROWTH_SENDR_PAGE_URL_MERGE_TOKEN/)
 
   console.log("  ✓ Sequence bridge link registry + merge token wiring")
   console.log("\nGS-SENDR-2D sequence bridge certification passed.\n")

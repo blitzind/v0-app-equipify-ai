@@ -43,6 +43,15 @@ import {
 } from "lucide-react"
 import type { OrgPermissions } from "@/lib/permissions/model"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
+import {
+  GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH,
+  GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
+  GROWTH_COMMUNICATIONS_REPUTATION_PATH,
+  GROWTH_COMMUNICATIONS_SENDER_POOLS_PATH,
+  GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH,
+  GROWTH_COMMUNICATIONS_WARMUP_PATH,
+} from "@/lib/growth/navigation/growth-communications-settings-navigation"
+import { GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH } from "@/lib/growth/navigation/growth-workspace-core-settings-links"
 import { WORKSPACE_SETTINGS_GROWTH_OPERATOR_SECTIONS } from "@/lib/settings/workspace-settings-growth-operator"
 
 export const WORKSPACE_SETTINGS_NAV_QA_MARKER = "workspace-settings-nav-ge-set-2-v1" as const
@@ -99,6 +108,10 @@ function dataAdminHref(segment: string): string {
 function growthSettingsHref(segment: string): string {
   return `${GROWTH_SETTINGS}/${segment}`
 }
+
+const GROWTH_CANONICAL_NOTIFICATIONS_PATH = `${GROWTH_SETTINGS}/notifications`
+const GROWTH_CANONICAL_AI_PREFERENCES_PATH = `${GROWTH_SETTINGS}/ai-preferences`
+const GROWTH_CANONICAL_CALENDAR_PREFERENCES_PATH = `${GROWTH_SETTINGS}/calendar-preferences`
 
 export const WORKSPACE_SETTINGS_GENERAL_GROUPS: WorkspaceSettingsNavGroup[] = [
   {
@@ -296,8 +309,8 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_GROUPS: WorkspaceSettingsNavGroup[
         description: "Mailbox connections used for outbound and reply workflows.",
         href: growthEngineHref("connected-mailboxes"),
         icon: Mailbox,
-        existingConfigHref: `${ADMIN_GROWTH_INFRA}/mailboxes`,
-        existingConfigLabel: "Open existing configuration",
+        existingConfigHref: GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
+        existingConfigLabel: "Open communications mailboxes",
       },
       {
         id: "gmail",
@@ -305,8 +318,8 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_GROUPS: WorkspaceSettingsNavGroup[
         description: "Google mailbox OAuth and send permissions for operator outreach.",
         href: growthEngineHref("gmail"),
         icon: Mail,
-        existingConfigHref: growthSettingsHref("gmail"),
-        existingConfigLabel: "Open existing configuration",
+        existingConfigHref: GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
+        existingConfigLabel: "Open communications mailboxes",
       },
       {
         id: "microsoft-365",
@@ -314,8 +327,8 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_GROUPS: WorkspaceSettingsNavGroup[
         description: "Microsoft mailbox and calendar connection preferences.",
         href: growthEngineHref("microsoft-365"),
         icon: Mail,
-        existingConfigHref: growthSettingsHref("microsoft-365"),
-        existingConfigLabel: "Open existing configuration",
+        existingConfigHref: GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
+        existingConfigLabel: "Open communications mailboxes",
       },
       {
         id: "email-signatures",
@@ -348,8 +361,8 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_GROUPS: WorkspaceSettingsNavGroup[
         description: "Outbound domains, SPF alignment, and sender identity.",
         href: growthEngineHref("sending-domains"),
         icon: Globe,
-        existingConfigHref: ADMIN_GROWTH_INFRA,
-        existingConfigLabel: "Open existing configuration",
+        existingConfigHref: GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH,
+        existingConfigLabel: "Open sending domains",
       },
       {
         id: "dns-verification",
@@ -357,8 +370,8 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_GROUPS: WorkspaceSettingsNavGroup[
         description: "DNS records, verification status, and deliverability checklist.",
         href: growthEngineHref("dns-verification"),
         icon: ShieldCheck,
-        existingConfigHref: `${ADMIN_GROWTH_INFRA}/deliverability`,
-        existingConfigLabel: "Open existing configuration",
+        existingConfigHref: GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH,
+        existingConfigLabel: "Open deliverability & DNS",
       },
       {
         id: "warmup",
@@ -366,8 +379,8 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_GROUPS: WorkspaceSettingsNavGroup[
         description: "Mailbox warmup schedules and ramp curves.",
         href: growthEngineHref("warmup"),
         icon: Activity,
-        existingConfigHref: `${ADMIN_GROWTH_INFRA}/warmup`,
-        existingConfigLabel: "Open existing configuration",
+        existingConfigHref: GROWTH_COMMUNICATIONS_WARMUP_PATH,
+        existingConfigLabel: "Open warmup settings",
       },
       {
         id: "sending-limits",
@@ -375,8 +388,8 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_GROUPS: WorkspaceSettingsNavGroup[
         description: "Throttle limits, reputation protection, and send caps.",
         href: growthEngineHref("sending-limits"),
         icon: SlidersHorizontal,
-        existingConfigHref: `${ADMIN_GROWTH}/deliverability`,
-        existingConfigLabel: "Open existing configuration",
+        existingConfigHref: GROWTH_COMMUNICATIONS_REPUTATION_PATH,
+        existingConfigLabel: "Open reputation settings",
       },
       {
         id: "sender-pools",
@@ -384,8 +397,8 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_GROUPS: WorkspaceSettingsNavGroup[
         description: "Sender pool rotation and capacity allocation.",
         href: growthEngineHref("sender-pools"),
         icon: Layers,
-        existingConfigHref: `${ADMIN_GROWTH_PROVIDERS}/sender-pools`,
-        existingConfigLabel: "Open existing configuration",
+        existingConfigHref: GROWTH_COMMUNICATIONS_SENDER_POOLS_PATH,
+        existingConfigLabel: "Open sender pools",
       },
       {
         id: "mailbox-health",
@@ -393,8 +406,8 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_GROUPS: WorkspaceSettingsNavGroup[
         description: "Mailbox reputation, bounce rates, and health signals.",
         href: growthEngineHref("mailbox-health"),
         icon: Activity,
-        existingConfigHref: `${ADMIN_GROWTH}/deliverability`,
-        existingConfigLabel: "Open existing configuration",
+        existingConfigHref: GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH,
+        existingConfigLabel: "Open deliverability & DNS",
       },
     ],
   },
@@ -479,8 +492,8 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_GROUPS: WorkspaceSettingsNavGroup[
         description: "Meeting booking defaults, availability, and calendar routing.",
         href: growthEngineHref("meeting-preferences"),
         icon: Calendar,
-        existingConfigHref: growthSettingsHref("calendar-preferences"),
-        existingConfigLabel: "Open existing configuration",
+        existingConfigHref: GROWTH_CANONICAL_CALENDAR_PREFERENCES_PATH,
+        existingConfigLabel: "Open calendar preferences",
       },
     ],
   },
@@ -522,8 +535,8 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_GROUPS: WorkspaceSettingsNavGroup[
         description: "Aiden guidance, copilot tone, and AI assist defaults.",
         href: growthEngineHref("copilot-preferences"),
         icon: Sparkles,
-        existingConfigHref: growthSettingsHref("ai-preferences"),
-        existingConfigLabel: "Open existing configuration",
+        existingConfigHref: GROWTH_CANONICAL_AI_PREFERENCES_PATH,
+        existingConfigLabel: "Open AI preferences",
       },
       {
         id: "media-ai-providers",
@@ -581,8 +594,8 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_GROUPS: WorkspaceSettingsNavGroup[
         description: "Growth operator notification delivery and alert preferences.",
         href: growthEngineHref("notification-preferences"),
         icon: Bell,
-        existingConfigHref: "/settings/growth-operator/notifications",
-        existingConfigLabel: "Open existing configuration",
+        existingConfigHref: GROWTH_CANONICAL_NOTIFICATIONS_PATH,
+        existingConfigLabel: "Open Growth notifications",
       },
       {
         id: "automation-defaults",
@@ -615,8 +628,8 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_GROUPS: WorkspaceSettingsNavGroup[
         description: "Unsubscribe links, footers, and compliance copy.",
         href: growthEngineHref("unsubscribe-settings"),
         icon: ShieldCheck,
-        existingConfigHref: `${ADMIN_GROWTH_PROVIDERS}/compliance`,
-        existingConfigLabel: "Open existing configuration",
+        existingConfigHref: GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
+        existingConfigLabel: "Open compliance settings",
       },
       {
         id: "suppression-lists",
@@ -624,8 +637,8 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_GROUPS: WorkspaceSettingsNavGroup[
         description: "Global and workspace suppression list management.",
         href: growthEngineHref("suppression-lists"),
         icon: Shield,
-        existingConfigHref: `${ADMIN_GROWTH_PROVIDERS}/compliance`,
-        existingConfigLabel: "Open existing configuration",
+        existingConfigHref: GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
+        existingConfigLabel: "Open compliance settings",
       },
       {
         id: "compliance-rules",
@@ -633,8 +646,8 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_GROUPS: WorkspaceSettingsNavGroup[
         description: "CAN-SPAM, consent, and outreach compliance policies.",
         href: growthEngineHref("compliance-rules"),
         icon: ShieldCheck,
-        existingConfigHref: `${ADMIN_GROWTH_PROVIDERS}/compliance`,
-        existingConfigLabel: "Open existing configuration",
+        existingConfigHref: GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
+        existingConfigLabel: "Open compliance settings",
       },
     ],
   },

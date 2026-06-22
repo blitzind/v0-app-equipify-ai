@@ -23,7 +23,7 @@ function main(): void {
 
   const followUp = readSource("lib/growth/sendr/growth-sendr-activity-follow-up-service.ts")
   assert.match(followUp, /generateSendrActivityFollowUpRecommendations/)
-  assert.match(followUp, /Viewed SENDR page but no CTA/)
+  assert.match(followUp, /Viewed personalized video page but no CTA/)
 
   console.log("  ✓ Hot prospects queue with deterministic recommendations")
   console.log("\nGS-SENDR-3C hot prospects certification passed.\n")

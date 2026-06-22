@@ -53,7 +53,7 @@ async function main(): Promise<void> {
 
   const apiSource = readSource("app/api/platform/growth/mailboxes/operator-dashboard/route.ts")
   assert.match(apiSource, /buildConnectedMailboxesDashboard/)
-  assert.match(apiSource, /requireGrowthEnginePlatformAccess/)
+  assert.match(apiSource, /requireGrowthCommunicationsSettingsAccess/)
 
   const uiSource = readSource("components/growth/mailboxes/growth-connected-mailboxes-dashboard.tsx")
   assert.match(uiSource, /GrowthConnectedMailboxesDashboard/)

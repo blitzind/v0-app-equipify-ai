@@ -18,6 +18,9 @@ import {
   microsoftProviderOAuthEnvWarnings,
 } from "../lib/growth/provider-setup/microsoft-oauth"
 import {
+  GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
+} from "../lib/growth/navigation/growth-communications-settings-navigation"
+import {
   normalizeProviderSetupReturnTo,
   signProviderSetupOAuthState,
   verifyProviderSetupOAuthState,
@@ -66,7 +69,7 @@ function main(): void {
     assert.equal(key in sanitized, false, `expected ${key} stripped`)
   }
 
-  assert.equal(normalizeProviderSetupReturnTo("/admin/evil"), "/growth/settings/delivery")
+  assert.equal(normalizeProviderSetupReturnTo("/admin/evil"), GROWTH_COMMUNICATIONS_MAILBOXES_PATH)
   assert.equal(
     normalizeProviderSetupReturnTo("/admin/growth/providers/setup?x=1", "admin"),
     "/admin/growth/providers/setup?x=1",

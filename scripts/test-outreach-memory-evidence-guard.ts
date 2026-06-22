@@ -76,6 +76,7 @@ const packet = {
   hasWebsiteResearch: false,
   hasDecisionMaker: true,
   leadEngineGuidance: null,
+  industryContext: null,
 } satisfies OutreachContextPacket
 
 const opening =

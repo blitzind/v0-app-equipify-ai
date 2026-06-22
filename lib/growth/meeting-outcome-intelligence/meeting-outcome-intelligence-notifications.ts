@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { emitGrowthNotification } from "@/lib/growth/notifications/emit-growth-notification"
+import { buildGrowthMeetingsHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import type { MeetingOutcomeIntelligenceScorePublicView } from "@/lib/growth/meeting-outcome-intelligence/meeting-outcome-intelligence-types"
 
 export async function emitMeetingOutcomeIntelligenceNotifications(
@@ -9,7 +10,7 @@ export async function emitMeetingOutcomeIntelligenceNotifications(
   input: { score: MeetingOutcomeIntelligenceScorePublicView; companyName: string },
 ): Promise<void> {
   const { score, companyName } = input
-  const actionUrl = `/admin/growth/leads?open=${score.leadId}&focus=meetings&highlight=${score.meetingId}`
+  const actionUrl = buildGrowthMeetingsHref({ leadId: score.leadId, meetingId: score.meetingId })
 
   if (score.followUpRecommendation === "needs_follow_up" || score.followUpRecommendation === "risk_of_stall") {
     await emitGrowthNotification(admin, {

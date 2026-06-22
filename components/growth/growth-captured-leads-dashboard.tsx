@@ -21,6 +21,7 @@ import {
   type GrowthCapturedLeadRow,
 } from "@/lib/growth/captured-leads/captured-lead-types"
 import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
+import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 
 const FILTER_LABELS: Record<GrowthCapturedLeadFilter, string> = {
   all: "All",
@@ -257,7 +258,7 @@ export function GrowthCapturedLeadsDashboard() {
                     <td className="px-3 py-3">
                       <div className="flex min-w-[220px] flex-wrap gap-1">
                         <Button asChild size="sm" variant="outline" className="h-7 px-2 text-xs">
-                          <Link href={growthFeaturePath(pathname, `leads/${row.lead_id}`)}>Open</Link>
+                          <Link href={buildGrowthLeadHref(row.lead_id)}>Open</Link>
                         </Button>
                         <Button
                           size="sm"

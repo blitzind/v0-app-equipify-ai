@@ -875,7 +875,7 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
   },
   {
     id: "providers-nav",
-    label: "Delivery Ops",
+    label: "Delivery (Admin)",
     items: [
       {
         id: "outbound-operations",
@@ -917,46 +917,11 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
           !path.startsWith("/admin/growth/infrastructure/outbound-operations"),
       },
       {
-        id: "sender-pools",
-        href: "/admin/growth/providers/sender-pools",
-        label: "Sender Pools",
-        section: GROWTH_DELIVERY_OPS_NAV_SECTIONS.sendingAssets,
-        match: prefixMatch("/admin/growth/providers/sender-pools"),
-      },
-      {
-        id: "mailbox-connections",
-        href: "/admin/growth/infrastructure/mailboxes",
-        label: "Mailbox Connections",
-        section: GROWTH_DELIVERY_OPS_NAV_SECTIONS.sendingAssets,
-        match: prefixMatch("/admin/growth/infrastructure/mailboxes"),
-      },
-      {
         id: "internal-outbound-operations",
         href: "/admin/growth/infrastructure/outbound-operations",
         label: "Send Infrastructure",
         section: GROWTH_DELIVERY_OPS_NAV_SECTIONS.sendingAssets,
         match: prefixMatch("/admin/growth/infrastructure/outbound-operations"),
-      },
-      {
-        id: "deliverability",
-        href: "/admin/growth/infrastructure/deliverability",
-        label: "Deliverability",
-        section: GROWTH_DELIVERY_OPS_NAV_SECTIONS.deliverability,
-        match: prefixMatch("/admin/growth/infrastructure/deliverability"),
-      },
-      {
-        id: "warmup",
-        href: "/admin/growth/infrastructure/warmup",
-        label: "Warmup",
-        section: GROWTH_DELIVERY_OPS_NAV_SECTIONS.deliverability,
-        match: prefixMatch("/admin/growth/infrastructure/warmup"),
-      },
-      {
-        id: "deliverability-protection",
-        href: "/admin/growth/deliverability",
-        label: "Protection",
-        section: GROWTH_DELIVERY_OPS_NAV_SECTIONS.deliverability,
-        match: prefixMatch("/admin/growth/deliverability"),
       },
       {
         id: "provider-compliance",

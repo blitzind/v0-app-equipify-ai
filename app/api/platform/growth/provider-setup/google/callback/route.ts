@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { completeOAuthProviderConnection } from "@/lib/growth/provider-setup/dashboard"
 import { logGrowthGoogleOAuthFlow } from "@/lib/growth/provider-setup/google-oauth-flow-log"
 import {
@@ -25,7 +25,7 @@ function redirectResult(request: NextRequest, returnTo: string, search: Record<s
 }
 
 export async function GET(request: NextRequest) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   const returnTo = defaultGrowthProviderOAuthReturnTo("growth")
@@ -115,6 +115,17 @@ export async function GET(request: NextRequest) {
       email: profile.email,
       provider: "google",
       connectionState: result.settings.status,
+      settingsStatus: result.settings.status,
+      returnTo: consumed.return_to,
+    })
+
+    logGrowthGoogleOAuthFlow("redirect_generated", {
+      userId: access.userId,
+      senderId: senderAccountId,
+      mailboxId: result.mailbox_connection_id,
+      email: profile.email,
+      provider: "google",
+      connectionState: "provider_connected=google",
       returnTo: consumed.return_to,
     })
 
@@ -127,6 +138,15 @@ export async function GET(request: NextRequest) {
       mailboxId: mailboxConnectionId,
       provider: "google",
       connectionState: "persistence_failed",
+      returnTo: consumed.return_to,
+      error: message.slice(0, 200),
+    })
+    logGrowthGoogleOAuthFlow("redirect_generated", {
+      userId: access.userId,
+      senderId: senderAccountId,
+      mailboxId: mailboxConnectionId,
+      provider: "google",
+      connectionState: "provider_error",
       returnTo: consumed.return_to,
       error: message.slice(0, 200),
     })

@@ -1,4 +1,5 @@
 import type { GrowthCommandActionKind, GrowthCommandBossBattleKind, GrowthCommandOperatorRank } from "@/lib/growth/command/command-action-types"
+import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 
 export const COMMAND_ACTION_BASE_IMPACT: Record<GrowthCommandActionKind, number> = {
   executive_intervention: 100,
@@ -90,9 +91,7 @@ export const OPERATOR_RANK_THRESHOLDS: Array<{ min: number; rank: GrowthCommandO
 ]
 
 export function commandLeadFocusHref(leadId: string, focus: string, referenceId?: string | null): string {
-  const params = new URLSearchParams({ open: leadId, focus })
-  if (referenceId) params.set("highlight", referenceId)
-  return `/admin/growth/leads?${params.toString()}`
+  return buildGrowthLeadHref(leadId, { focus, highlight: referenceId })
 }
 
 export function commandOutreachHref(queueId: string): string {

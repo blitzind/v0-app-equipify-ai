@@ -4,7 +4,11 @@
  * Client-safe manifest — no panel component imports.
  */
 
-import { WORKSPACE_SETTINGS_GROWTH_OPERATOR_BASE } from "@/lib/settings/workspace-settings-growth-operator"
+import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
+import { GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH } from "@/lib/growth/navigation/growth-workspace-core-settings-links"
+
+const GROWTH_SETTINGS_NOTIFICATIONS_PATH = `${GROWTH_WORKSPACE_BASE_PATH}/settings/notifications` as const
+const GROWTH_SETTINGS_AI_PREFERENCES_PATH = `${GROWTH_WORKSPACE_BASE_PATH}/settings/ai-preferences` as const
 
 export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFT_QA_MARKER =
   "workspace-settings-growth-engine-lift-ge-set-5-v1" as const
@@ -25,7 +29,11 @@ export type GrowthEngineSectionClassification = {
 export const WORKSPACE_SETTINGS_GROWTH_ENGINE_CANONICAL_SECTION_ID = "notification-preferences" as const
 
 export const WORKSPACE_SETTINGS_GROWTH_ENGINE_CANONICAL_HREFS: Record<string, string> = {
-  [WORKSPACE_SETTINGS_GROWTH_ENGINE_CANONICAL_SECTION_ID]: `${WORKSPACE_SETTINGS_GROWTH_OPERATOR_BASE}/notifications`,
+  [WORKSPACE_SETTINGS_GROWTH_ENGINE_CANONICAL_SECTION_ID]: GROWTH_SETTINGS_NOTIFICATIONS_PATH,
+  "copilot-preferences": GROWTH_SETTINGS_AI_PREFERENCES_PATH,
+  "unsubscribe-settings": GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
+  "suppression-lists": GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
+  "compliance-rules": GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
 }
 
 export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_SECTION_IDS = [
@@ -184,7 +192,7 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_SECTION_CLASSIFICATION: Record<
   },
   "notification-preferences": {
     kind: "canonical",
-    reason: "Editor lives at /settings/growth-operator/notifications — single canonical surface.",
+    reason: "Editor lives at /growth/settings/notifications — canonical Growth workspace surface.",
   },
   "unsubscribe-settings": {
     kind: "lifted",

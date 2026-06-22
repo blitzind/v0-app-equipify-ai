@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { buildDeliverabilityProtectionConsole } from "@/lib/growth/deliverability/deliverability-protection-console"
 
 export const runtime = "nodejs"
 
-export async function GET() {
-  const access = await requireGrowthEnginePlatformAccess()
+export async function GET(request: Request) {
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   try {

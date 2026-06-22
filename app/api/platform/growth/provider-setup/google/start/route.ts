@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { requireGrowthEnginePlatformAccess, getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { logGrowthGoogleOAuthFlow } from "@/lib/growth/provider-setup/google-oauth-flow-log"
 import { buildGoogleProviderAuthorizeUrl, getGoogleOAuthScopes, googleProviderOAuthConfigured } from "@/lib/growth/provider-setup/google-oauth"
 import {
@@ -19,7 +20,7 @@ import { resolveOAuthStartMailboxPointer } from "@/lib/growth/provider-setup/oau
 export const runtime = "nodejs"
 
 export async function POST(request: Request) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   if (!googleProviderOAuthConfigured()) {

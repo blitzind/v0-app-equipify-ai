@@ -1,33 +1,57 @@
 /**
- * Growth workspace settings navigation manifest (Phase 7C shell, Phase 8B persistence foundation).
- *
- * Five foundation sections persist via Supabase; remaining sections stay placeholder until migrated.
+ * Growth workspace settings navigation manifest (GS-GROWTH-SETTINGS-8F canonical IA).
  */
 
 import type { LucideIcon } from "lucide-react"
 import {
   Bell,
   Bot,
-  Calendar,
+  Building2,
   Chrome,
   Command,
+  CreditCard,
   Eye,
+  Flame,
+  Globe,
   LayoutTemplate,
   Mail,
   Mailbox,
   PanelLeft,
   Phone,
+  Plug,
   Settings2,
+  Shield,
+  ShieldAlert,
+  ShieldCheck,
   Signature,
   SlidersHorizontal,
   Sparkles,
   Truck,
   User,
+  Users,
 } from "lucide-react"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
-import { GROWTH_DELIVERY_SETTINGS_CONNECTED_MAILBOXES_HREF } from "@/lib/growth/navigation/growth-delivery-settings-navigation"
+import {
+  GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH,
+  GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
+  GROWTH_COMMUNICATIONS_REPUTATION_PATH,
+  GROWTH_COMMUNICATIONS_SENDER_POOLS_PATH,
+  GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH,
+  GROWTH_COMMUNICATIONS_SETTINGS_PATH,
+  GROWTH_COMMUNICATIONS_WARMUP_PATH,
+  isGrowthCommunicationsSettingsPath,
+} from "@/lib/growth/navigation/growth-communications-settings-navigation"
+import {
+  GROWTH_WORKSPACE_SETTINGS_ADVANCED_PATH,
+  GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
+  GROWTH_WORKSPACE_SETTINGS_WORKSPACE_BILLING_PATH,
+  GROWTH_WORKSPACE_SETTINGS_WORKSPACE_INTEGRATIONS_PATH,
+  GROWTH_WORKSPACE_SETTINGS_WORKSPACE_ORGANIZATION_PATH,
+  GROWTH_WORKSPACE_SETTINGS_WORKSPACE_PATH,
+  GROWTH_WORKSPACE_SETTINGS_WORKSPACE_TEAM_PATH,
+} from "@/lib/growth/navigation/growth-workspace-core-settings-links"
 
-export const GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER = "growth-workspace-settings-nav-v3" as const
+export const GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER = "growth-workspace-settings-nav-8f-v1" as const
 
 export const GROWTH_WORKSPACE_SETTINGS_DEFAULT_SECTION_ID = "profile" as const
 
@@ -37,7 +61,6 @@ export type GrowthSettingsNavItem = {
   description: string
   href: string
   icon: LucideIcon
-  /** Platform Admin fallback while workspace persistence is not wired yet. */
   adminFallbackHref?: string
   adminFallbackLabel?: string
 }
@@ -56,6 +79,7 @@ type GrowthSettingsNavManifestEntry = {
   icon: LucideIcon
   adminFallbackSuffix?: string
   adminFallbackLabel?: string
+  href?: string
 }
 
 type GrowthSettingsNavManifestGroup = {
@@ -81,7 +105,7 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
       {
         id: "notifications",
         label: "Notifications",
-        description: "In-app and delivery preferences for Growth operator alerts.",
+        description: "Outreach, inbox, campaign, and operator activity alerts.",
         segment: "notifications",
         icon: Bell,
       },
@@ -94,81 +118,12 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
         adminFallbackSuffix: "growth",
         adminFallbackLabel: "Growth settings (admin)",
       },
-    ],
-  },
-  {
-    id: "communications",
-    label: "Communications",
-    items: [
-      {
-        id: "delivery",
-        label: "Delivery Setup",
-        description: "Mailbox OAuth, connected senders, delivery readiness, and test sends.",
-        segment: "delivery",
-        icon: Truck,
-      },
-      {
-        id: "connected-mailboxes",
-        label: "Connected Mailboxes",
-        description: "Mailbox connections used for outbound and reply workflows.",
-        segment: "connected-mailboxes",
-        icon: Mailbox,
-      },
-      {
-        id: "calling-preferences",
-        label: "Calling Preferences",
-        description: "Dialer defaults, call disposition behavior, and live-call preferences.",
-        segment: "calling-preferences",
-        icon: Phone,
-        adminFallbackSuffix: "communications",
-        adminFallbackLabel: "Communications settings (admin)",
-      },
-      {
-        id: "signatures",
-        label: "Signatures",
-        description: "Email signatures and sender identity used in operator outreach.",
-        segment: "signatures",
-        icon: Signature,
-        adminFallbackSuffix: "communications",
-        adminFallbackLabel: "Communications settings (admin)",
-      },
-      {
-        id: "calendar-preferences",
-        label: "Calendar Preferences",
-        description: "Meeting booking defaults, availability, and calendar routing rules.",
-        segment: "calendar-preferences",
-        icon: Calendar,
-        adminFallbackSuffix: "communications",
-        adminFallbackLabel: "Communications settings (admin)",
-      },
-    ],
-  },
-  {
-    id: "workspace",
-    label: "Workspace",
-    items: [
       {
         id: "sidebar-preferences",
         label: "Sidebar Preferences",
         description: "Collapse behavior and section defaults for the Growth sidebar.",
         segment: "sidebar-preferences",
         icon: PanelLeft,
-      },
-      {
-        id: "command-center-preferences",
-        label: "Command Center Preferences",
-        description: "Cmd+K shortcuts, pinned destinations, and command palette ordering.",
-        segment: "command-center-preferences",
-        icon: Command,
-      },
-      {
-        id: "ai-preferences",
-        label: "AI Preferences",
-        description: "Aiden guidance, copilot tone, and AI assist defaults for operators.",
-        segment: "ai-preferences",
-        icon: Bot,
-        adminFallbackSuffix: "growth",
-        adminFallbackLabel: "Growth settings (admin)",
       },
       {
         id: "default-views",
@@ -180,42 +135,157 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
     ],
   },
   {
-    id: "integrations",
-    label: "Integrations",
+    id: "communications",
+    label: "Communications",
     items: [
       {
-        id: "gmail",
-        label: "Gmail",
-        description: "Google mailbox OAuth and send permissions for operator outreach.",
-        segment: "gmail",
-        icon: Mail,
+        id: "communications",
+        label: "Communications",
+        description: "Overview of mailboxes, DNS, warmup, pools, and reputation settings.",
+        segment: "communications",
+        icon: Truck,
+        href: GROWTH_COMMUNICATIONS_SETTINGS_PATH,
+      },
+      {
+        id: "mailboxes",
+        label: "Mailboxes",
+        description: "Connect Gmail or Microsoft mailboxes for outbound and inbox tracking.",
+        segment: "communications/mailboxes",
+        icon: Mailbox,
+        href: GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
         adminFallbackSuffix: "communications",
         adminFallbackLabel: "Communications settings (admin)",
       },
       {
-        id: "microsoft-365",
-        label: "Microsoft 365",
-        description: "Microsoft mailbox and calendar connection preferences.",
-        segment: "microsoft-365",
-        icon: Mail,
+        id: "sending-domains",
+        label: "Sending Domains",
+        description: "Add domains used for outbound email.",
+        segment: "communications/sending-domains",
+        icon: Globe,
+        href: GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH,
+      },
+      {
+        id: "deliverability",
+        label: "Deliverability & DNS",
+        description: "Verify SPF, DKIM, DMARC, MX, and domain health.",
+        segment: "communications/deliverability",
+        icon: ShieldCheck,
+        href: GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH,
+      },
+      {
+        id: "warmup",
+        label: "Warmup",
+        description: "Ramp sending safely using native sequence sends, caps, and reputation tracking.",
+        segment: "communications/warmup",
+        icon: Flame,
+        href: GROWTH_COMMUNICATIONS_WARMUP_PATH,
+      },
+      {
+        id: "sender-pools",
+        label: "Sender Pools",
+        description: "Group senders for campaign rotation and limits.",
+        segment: "communications/sender-pools",
+        icon: Users,
+        href: GROWTH_COMMUNICATIONS_SENDER_POOLS_PATH,
+      },
+      {
+        id: "reputation",
+        label: "Reputation",
+        description: "Monitor bounce rate, reply rate, complaints, and sender/domain risk.",
+        segment: "communications/reputation",
+        icon: ShieldAlert,
+        href: GROWTH_COMMUNICATIONS_REPUTATION_PATH,
+      },
+    ],
+  },
+  {
+    id: "workspace",
+    label: "Workspace",
+    items: [
+      {
+        id: "workspace",
+        label: "Workspace",
+        description: "Team, organization, billing, and integrations — links to canonical workspace settings.",
+        segment: "workspace",
+        icon: Building2,
+        href: GROWTH_WORKSPACE_SETTINGS_WORKSPACE_PATH,
+      },
+      {
+        id: "team",
+        label: "Team",
+        description: "Manage users, invites, roles, and permissions.",
+        segment: "workspace/team",
+        icon: Users,
+        href: GROWTH_WORKSPACE_SETTINGS_WORKSPACE_TEAM_PATH,
+      },
+      {
+        id: "organization",
+        label: "Organization",
+        description: "Configure workspace profile, branding, and organization details.",
+        segment: "workspace/organization",
+        icon: Building2,
+        href: GROWTH_WORKSPACE_SETTINGS_WORKSPACE_ORGANIZATION_PATH,
+      },
+      {
+        id: "billing",
+        label: "Billing",
+        description: "Manage subscriptions, payment methods, invoices, and usage.",
+        segment: "workspace/billing",
+        icon: CreditCard,
+        href: GROWTH_WORKSPACE_SETTINGS_WORKSPACE_BILLING_PATH,
+      },
+      {
+        id: "integrations",
+        label: "Integrations",
+        description: "Connect and manage third-party services and platform integrations.",
+        segment: "workspace/integrations",
+        icon: Plug,
+        href: GROWTH_WORKSPACE_SETTINGS_WORKSPACE_INTEGRATIONS_PATH,
+      },
+    ],
+  },
+  {
+    id: "ai",
+    label: "AI",
+    items: [
+      {
+        id: "ai-preferences",
+        label: "AI Preferences",
+        description: "Aiden guidance, copilot tone, and AI assist defaults for operators.",
+        segment: "ai-preferences",
+        icon: Bot,
         adminFallbackSuffix: "communications",
         adminFallbackLabel: "Communications settings (admin)",
       },
+    ],
+  },
+  {
+    id: "compliance",
+    label: "Compliance",
+    items: [
       {
-        id: "calendar",
-        label: "Calendar",
-        description: "External calendar integrations and booking sync preferences.",
-        segment: "calendar",
-        icon: Calendar,
+        id: "compliance",
+        label: "Compliance",
+        description: "Unsubscribe settings, suppression lists, and outreach compliance rules.",
+        segment: "compliance",
+        icon: Shield,
+        href: GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
         adminFallbackSuffix: "communications",
         adminFallbackLabel: "Communications settings (admin)",
       },
+    ],
+  },
+  {
+    id: "advanced",
+    label: "Advanced",
+    items: [
       {
-        id: "browser-notifications",
-        label: "Browser Notifications",
-        description: "Desktop notification permissions for live operator signals.",
-        segment: "browser-notifications",
-        icon: Chrome,
+        id: "advanced",
+        label: "Advanced",
+        description: "Command center, browser notifications, and settings still migrating into Growth.",
+        segment: "advanced",
+        icon: Command,
+        href: GROWTH_WORKSPACE_SETTINGS_ADVANCED_PATH,
       },
     ],
   },
@@ -238,10 +308,7 @@ export function buildGrowthWorkspaceSettingsNavGroups(): GrowthSettingsNavGroup[
       id: item.id,
       label: item.label,
       description: item.description,
-      href:
-        item.id === "connected-mailboxes"
-          ? GROWTH_DELIVERY_SETTINGS_CONNECTED_MAILBOXES_HREF
-          : resolveSettingsHref(item.segment),
+      href: item.href ?? resolveSettingsHref(item.segment),
       icon: item.icon,
       adminFallbackHref: resolveAdminFallbackHref(item.adminFallbackSuffix),
       adminFallbackLabel: item.adminFallbackLabel,
@@ -265,19 +332,30 @@ export function getGrowthWorkspaceSettingsSectionById(id: string): GrowthSetting
 }
 
 export function isGrowthWorkspaceSettingsNavItemActive(pathname: string, item: GrowthSettingsNavItem): boolean {
-  if (item.id === "connected-mailboxes") {
-    return pathname === GROWTH_DELIVERY_SETTINGS_CONNECTED_MAILBOXES_HREF.split("#")[0]
+  if (item.id === "communications") {
+    return pathname === GROWTH_COMMUNICATIONS_SETTINGS_PATH
   }
-  if (item.id === "delivery") {
+  if (item.id === "mailboxes") {
+    return pathname === GROWTH_COMMUNICATIONS_MAILBOXES_PATH || pathname.startsWith(`${GROWTH_COMMUNICATIONS_MAILBOXES_PATH}/`)
+  }
+  if (item.id === "workspace") {
+    return pathname === GROWTH_WORKSPACE_SETTINGS_WORKSPACE_PATH
+  }
+  if (item.id === "advanced") {
+    return pathname === GROWTH_WORKSPACE_SETTINGS_ADVANCED_PATH
+  }
+  if (item.id === "compliance") {
+    return pathname === GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH
+  }
+  if (isGrowthCommunicationsSettingsPath(pathname) && item.href.startsWith(GROWTH_COMMUNICATIONS_SETTINGS_PATH)) {
     return pathname === item.href || pathname.startsWith(`${item.href}/`)
+  }
+  if (item.href.startsWith(GROWTH_WORKSPACE_SETTINGS_WORKSPACE_PATH)) {
+    return pathname === item.href
   }
   return pathname === item.href || pathname.startsWith(`${item.href}/`)
 }
 
-/** Settings shell header icon — shared across section placeholders. */
 export const GROWTH_WORKSPACE_SETTINGS_SHELL_ICON = Settings2
-
-/** Content section icon for template-driven placeholders. */
 export const GROWTH_WORKSPACE_SETTINGS_CONTENT_ICON = LayoutTemplate
-
 export const GROWTH_WORKSPACE_SETTINGS_AI_ICON = Sparkles

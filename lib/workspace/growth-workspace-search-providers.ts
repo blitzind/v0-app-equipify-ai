@@ -17,11 +17,12 @@ import {
   growthSearchFetchJson,
   growthSearchMatchesQuery,
 } from "@/lib/workspace/growth-workspace-search-utils"
+import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 
 const LEADS_SEARCH_URL = "/api/platform/growth/calls/workspace/leads/search"
 
 function leadHref(leadId: string): string {
-  return `/growth/leads/${encodeURIComponent(leadId)}`
+  return buildGrowthLeadHref(leadId)
 }
 
 function leadSearchHref(hit: CallWorkspaceLeadSearchResult): string {

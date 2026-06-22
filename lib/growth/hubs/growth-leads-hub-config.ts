@@ -113,7 +113,7 @@ export const GROWTH_LEADS_HUB_KEYBOARD_HINTS = [
 
 export const GROWTH_LEADS_HUB_CREATE_ACTIONS: GrowthLeadsHubCreateAction[] = [
   { id: "prospect-search", label: "Prospect Search", href: GROWTH_LEADS_HUB_PROSPECT_SEARCH_HREF },
-  { id: "import-leads", label: "Import Leads", href: `${BASE}/leads/captured` },
+  { id: "import-leads", label: "Recently Captured", href: `${BASE}/leads/captured` },
   { id: "add-lead", label: "Add Lead", href: `${BASE}/leads/crm` },
   { id: "start-research-run", label: "Research Run", href: `${BASE}/leads/lead-engine` },
 ]
@@ -151,8 +151,8 @@ export const GROWTH_LEADS_HUB_PRIMARY_ACTIONS: GrowthLeadsHubPrimaryAction[] = [
   },
   {
     id: "import-leads",
-    label: "Import Leads",
-    description: "Import CSVs and captured prospects.",
+    label: "Recently Captured",
+    description: "Review browser-captured prospects and triage into CRM.",
     href: `${BASE}/leads/captured`,
     icon: Upload,
   },

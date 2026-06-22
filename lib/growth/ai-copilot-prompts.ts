@@ -5,6 +5,9 @@ import type {
 } from "@/lib/growth/ai-copilot-types"
 import type { GrowthAiCopilotPlaybookResolvedRule } from "@/lib/growth/ai-copilot-playbook-types"
 import { formatPlaybookRulesForCopilotPrompt } from "@/lib/growth/ai-copilot-playbook-prompts"
+import type { GrowthNarrativeContext } from "@/lib/growth/playbooks/narrative/growth-playbook-narrative-types"
+import { buildGrowthPlaybookOrchestratedPromptBlock } from "@/lib/growth/playbooks/narrative/growth-playbook-prompt-orchestrator"
+import type { GrowthIndustryContext } from "@/lib/growth/playbooks/growth-industry-context-types"
 import {
   describeFrameworkKeys,
   GROWTH_AI_COPILOT_BUYING_SIGNAL_FRAMEWORK,
@@ -58,6 +61,10 @@ export function buildGrowthAiCopilotSystemPrompt(
 export function buildGrowthAiCopilotUserPrompt(
   generationType: GrowthAiCopilotGenerationType,
   snapshot: GrowthAiCopilotInputSnapshot,
+  options?: {
+    industryContext?: GrowthIndustryContext | null
+    narrativeContext?: GrowthNarrativeContext | null
+  },
 ): string {
   const objectionNotes = describeFrameworkKeys(
     snapshot.frameworks.objections,
@@ -72,9 +79,24 @@ export function buildGrowthAiCopilotUserPrompt(
     GROWTH_AI_COPILOT_COMMITMENT_SIGNAL_FRAMEWORK,
   )
 
+  const narrativeBlock =
+    options?.industryContext?.playbookApplied
+      ? buildGrowthPlaybookOrchestratedPromptBlock({
+          industryContext: options.industryContext,
+          narrativeContext: options.narrativeContext ?? options.industryContext.narrativeContext,
+          channel: generationType.startsWith("call_") ? "voice" : "copilot",
+        })
+      : ""
+
   return JSON.stringify(
     {
       generationType,
+      narrativeOrchestration: narrativeBlock || undefined,
+      reasoningDiagnostics: options?.industryContext?.reasoningContext?.diagnostics ?? undefined,
+      sequenceDiagnostics: options?.industryContext?.sequenceIntelligenceContext?.diagnostics ?? undefined,
+      personaDiagnostics: options?.industryContext?.personaMessagingContext?.diagnostics ?? undefined,
+      accountIntelligenceDiagnostics:
+        options?.industryContext?.accountIntelligenceContext?.diagnostics ?? undefined,
       lead: {
         companyName: snapshot.companyName,
         contactName: snapshot.contactName,

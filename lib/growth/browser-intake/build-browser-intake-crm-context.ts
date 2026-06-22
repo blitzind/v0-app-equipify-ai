@@ -18,6 +18,10 @@ import { loadCompanyIntelligenceOperatorStatus } from "@/lib/growth/company-inte
 import { loadBuyingCommitteeIntelligenceOperatorStatus } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-operator-status"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { normalizeCompanyName, normalizeWebsiteDomain } from "@/lib/growth/import/normalize"
+import {
+  buildGrowthLeadHref,
+  buildGrowthOpportunityHref,
+} from "@/lib/growth/navigation/growth-workspace-operator-links"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { GROWTH_NEXT_BEST_ACTION_LABELS } from "@/lib/growth/nba-types"
 import { fetchGrowthOpportunityByLeadId } from "@/lib/growth/opportunity-pipeline/pipeline-repository"
@@ -137,13 +141,13 @@ async function countRelatedCompanyContacts(
   }
 }
 
-function buildAdminLinks(leadId: string, companyName: string, opportunityId: string | null) {
+function buildAdminLinks(leadId: string, _companyName: string, opportunityId: string | null) {
   return {
-    lead: `/admin/growth/leads/${leadId}`,
-    company: `/admin/growth/leads/crm`,
+    lead: buildGrowthLeadHref(leadId),
+    company: "/growth/leads/crm",
     opportunity: opportunityId
-      ? `/admin/growth/opportunities/pipeline?opportunityId=${encodeURIComponent(opportunityId)}`
-      : `/admin/growth/leads?leadId=${encodeURIComponent(leadId)}`,
+      ? buildGrowthOpportunityHref({ opportunityId })
+      : buildGrowthLeadHref(leadId),
   }
 }
 

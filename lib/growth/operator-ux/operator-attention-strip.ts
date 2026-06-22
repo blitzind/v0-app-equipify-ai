@@ -82,7 +82,7 @@ export async function buildGrowthOperatorAttentionStrip(
     label: "Deliverability blocks",
     summary: "Pre-send suppression and reputation blocks (24h)",
     count: outbound?.suppression.pre_send_blocks_24h ?? 0,
-    href: "/admin/growth/deliverability",
+    href: "/growth/settings/communications/reputation",
     severity: (outbound?.suppression.pre_send_blocks_24h ?? 0) >= 3 ? "high" : "medium",
   })
 
@@ -94,7 +94,7 @@ export async function buildGrowthOperatorAttentionStrip(
     count:
       (attention?.providerIssueCount ?? 0) +
       (outbound?.transport.failed_attempts_24h ?? 0),
-    href: "/growth/settings/delivery",
+    href: "/growth/settings/communications/mailboxes",
     severity: (attention?.providerIssueCount ?? 0) > 0 ? "critical" : "medium",
   })
 

@@ -77,7 +77,7 @@ export function answerAidenQuestion(rawQuestion: string, briefing: BriefingSigna
       return {
         question: rawQuestion,
         answer: `${briefing.mailbox.expired_mailboxes} mailbox connection(s) expired — sends block until reconnected.`,
-        links: [{ label: "Delivery Setup", href: "/growth/settings/delivery" }],
+        links: [{ label: "Communications", href: "/growth/settings/communications/mailboxes" }],
         source: "mailbox",
       }
     }
@@ -129,8 +129,8 @@ export function answerAidenQuestion(rawQuestion: string, briefing: BriefingSigna
             ? `${briefing.mailbox.warnings} warning(s). Validate connections before approving sends.`
             : "Mailbox looks healthy. No recovery needed.",
       links: [
-        { label: "Delivery Setup", href: "/growth/settings/delivery" },
-        { label: "Mailboxes", href: "/admin/growth/infrastructure/mailboxes" },
+        { label: "Communications", href: "/growth/settings/communications/mailboxes" },
+        { label: "Mailboxes", href: "/growth/settings/communications/mailboxes" },
       ],
       source: "mailbox",
     }

@@ -22,6 +22,7 @@ function readSource(relativePath: string): string {
 
 function main(): void {
   assert.ok(GROWTH_PROVIDER_SETUP_ALLOWED_RETURN_PREFIXES.includes("/growth/settings/delivery"))
+  assert.ok(GROWTH_PROVIDER_SETUP_ALLOWED_RETURN_PREFIXES.includes("/growth/settings/communications"))
 
   const googleCallback = readSource("app/api/platform/growth/provider-setup/google/callback/route.ts")
   assert.match(googleCallback, /defaultGrowthProviderOAuthReturnTo\("growth"\)/)

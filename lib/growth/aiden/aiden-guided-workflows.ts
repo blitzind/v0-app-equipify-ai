@@ -93,15 +93,15 @@ function mailboxRecoverySteps(): AidenGuideStep[] {
       title: "Open provider setup",
       detail: playbook?.operatorAction ?? "Reconnect Google OAuth and validate mailbox.",
       links: [
-        { label: "Delivery Setup", href: "/growth/settings/delivery" },
-        { label: "Mailboxes", href: "/admin/growth/infrastructure/mailboxes" },
+        { label: "Communications", href: "/growth/settings/communications/mailboxes" },
+        { label: "Mailboxes", href: "/growth/settings/communications/mailboxes" },
       ],
     },
     {
       order: 2,
       title: "Validate connection",
       detail: "Confirm mailbox status is connected before approving sends.",
-      links: [{ label: "Mailbox health", href: "/admin/growth/infrastructure/mailboxes" }],
+      links: [{ label: "Mailbox health", href: "/growth/settings/communications/mailboxes" }],
     },
     {
       order: 3,
@@ -217,8 +217,8 @@ export function buildAidenGuidedWorkflowCards(signals: AidenBriefingSignals): Ai
             : `${signals.mailbox.healthy_mailboxes} healthy connection(s).`,
       steps: mailboxRecoverySteps(),
       links: [
-        { label: "Delivery Setup", href: "/growth/settings/delivery" },
-        { label: "Mailboxes", href: "/admin/growth/infrastructure/mailboxes" },
+        { label: "Communications", href: "/growth/settings/communications/mailboxes" },
+        { label: "Mailboxes", href: "/growth/settings/communications/mailboxes" },
       ],
     },
     {

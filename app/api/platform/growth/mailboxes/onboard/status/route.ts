@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { buildMailboxOnboardingStatus } from "@/lib/growth/mailboxes/mailbox-onboarding-service"
 import { isGrowthMailboxConnectionSchemaReady } from "@/lib/growth/mailboxes/mailbox-schema-health"
 
 export const runtime = "nodejs"
 
 export async function GET(request: Request) {
-  const access = await requireGrowthEnginePlatformAccess(request)
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   if (!(await isGrowthMailboxConnectionSchemaReady(access.admin))) {

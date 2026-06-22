@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { fetchWarmupDashboard, listWarmupEvents } from "@/lib/growth/warmup/warmup-repository"
 import { listWarmupTimelineEvents } from "@/lib/growth/warmup/warmup-events"
 import { isGrowthWarmupFoundationSchemaReady } from "@/lib/growth/warmup/warmup-schema-health"
@@ -7,8 +7,8 @@ import { GROWTH_WARMUP_PRIVACY_NOTE } from "@/lib/growth/warmup/warmup-types"
 
 export const runtime = "nodejs"
 
-export async function GET() {
-  const access = await requireGrowthEnginePlatformAccess()
+export async function GET(request: Request) {
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   if (!(await isGrowthWarmupFoundationSchemaReady(access.admin))) {

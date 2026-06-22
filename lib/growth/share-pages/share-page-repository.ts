@@ -13,6 +13,10 @@ import {
   sharePageAttributionToDbRow,
 } from "@/lib/growth/sequences/attribution/sequence-attribution"
 import {
+  GROWTH_SHARE_PAGE_OPERATOR_DEFAULT_THEME,
+  normalizeSharePageThemeColor,
+} from "@/lib/growth/share-pages/share-page-types"
+import {
   DEFAULT_GROWTH_SHARE_PAGE_THEME,
   EMPTY_GROWTH_SHARE_PAGE_ENGAGEMENT_SUMMARY,
   GROWTH_SHARE_PAGES_QA_MARKER,
@@ -152,7 +156,7 @@ function asObjectArray<T>(value: unknown): T[] {
 
 function mapTheme(value: Record<string, unknown> | null | undefined): GrowthSharePageTheme {
   const theme = value ?? {}
-  return {
+  const result: GrowthSharePageTheme = {
     brandColor: asString(theme.brandColor) || DEFAULT_GROWTH_SHARE_PAGE_THEME.brandColor,
     accentColor: asString(theme.accentColor) || DEFAULT_GROWTH_SHARE_PAGE_THEME.accentColor,
     logoUrl: asString(theme.logoUrl) || null,
@@ -163,6 +167,40 @@ function mapTheme(value: Record<string, unknown> | null | undefined): GrowthShar
         : DEFAULT_GROWTH_SHARE_PAGE_THEME.publicThemeMode,
     footerNote: asString(theme.footerNote) || null,
   }
+  if (asString(theme.pageBackground)) {
+    result.pageBackground = normalizeSharePageThemeColor(
+      theme.pageBackground,
+      GROWTH_SHARE_PAGE_OPERATOR_DEFAULT_THEME.pageBackground,
+    )
+  }
+  if (asString(theme.pageText)) {
+    result.pageText = normalizeSharePageThemeColor(theme.pageText, GROWTH_SHARE_PAGE_OPERATOR_DEFAULT_THEME.pageText)
+  }
+  if (asString(theme.surfaceColor)) {
+    result.surfaceColor = normalizeSharePageThemeColor(
+      theme.surfaceColor,
+      GROWTH_SHARE_PAGE_OPERATOR_DEFAULT_THEME.surfaceColor,
+    )
+  }
+  if (asString(theme.buttonBackground)) {
+    result.buttonBackground = normalizeSharePageThemeColor(
+      theme.buttonBackground,
+      GROWTH_SHARE_PAGE_OPERATOR_DEFAULT_THEME.buttonBackground,
+    )
+  }
+  if (asString(theme.buttonText)) {
+    result.buttonText = normalizeSharePageThemeColor(theme.buttonText, GROWTH_SHARE_PAGE_OPERATOR_DEFAULT_THEME.buttonText)
+  }
+  if (asString(theme.headerBackground)) {
+    result.headerBackground = normalizeSharePageThemeColor(
+      theme.headerBackground,
+      GROWTH_SHARE_PAGE_OPERATOR_DEFAULT_THEME.headerBackground,
+    )
+  }
+  if (asString(theme.headerText)) {
+    result.headerText = normalizeSharePageThemeColor(theme.headerText, GROWTH_SHARE_PAGE_OPERATOR_DEFAULT_THEME.headerText)
+  }
+  return result
 }
 
 function mapEngagementSummary(value: Record<string, unknown> | null | undefined): GrowthSharePageEngagementSummary {

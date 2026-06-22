@@ -14,9 +14,9 @@ function main(): void {
   console.log("\n=== GS-SENDR-2E Timeline Intelligence Certification ===\n")
 
   const timeline = readSource("lib/growth/sendr/growth-sendr-analytics-timeline.ts")
-  assert.match(timeline, /SENDR page viewed/)
-  assert.match(timeline, /SENDR video started/)
-  assert.match(timeline, /SENDR booking completed/)
+  assert.match(timeline, /Viewed personalized video page/)
+  assert.match(timeline, /Started video on personalized video page/)
+  assert.match(timeline, /Completed booking from personalized video page/)
 
   const intel = readSource("lib/growth/sendr/growth-sendr-timeline-intelligence-service.ts")
   assert.match(intel, /syncSendrLeadTimelineIntelligence/)

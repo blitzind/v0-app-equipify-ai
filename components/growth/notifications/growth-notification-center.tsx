@@ -161,7 +161,7 @@ export function GrowthNotificationCenter() {
           </span>
           <div>
             <p className="text-sm text-muted-foreground">
-              Sendr-style operator notification center — read and acknowledge persisted SN-2 events.
+              Growth operator notification center — read and acknowledge persisted SN-2 events.
             </p>
             <p className="text-xs text-muted-foreground">{GROWTH_OPERATOR_NOTIFICATION_CENTER_QA_MARKER}</p>
           </div>

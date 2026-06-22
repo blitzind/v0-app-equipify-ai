@@ -8,9 +8,13 @@ import fs from "node:fs"
 function main(): void {
   console.log("\n=== GS-SENDR-2C Booking Runtime Certification ===\n")
   const client = fs.readFileSync("components/sendr/sendr-public-page-client.tsx", "utf8")
-  assert.match(client, /booking_started/)
-  assert.match(client, /calendar_open/)
+  const layout = fs.readFileSync(
+    "components/growth/sendr/presentation/sendr-public-presentation-layout.tsx",
+    "utf8",
+  )
   assert.match(client, /booking_completed/)
+  assert.match(layout, /booking_started/)
+  assert.match(layout, /calendar_open/)
 
   const service = fs.readFileSync("lib/growth/sendr/growth-sendr-public-engagement-service.ts", "utf8")
   assert.match(service, /recordSendrBookingStartedTimeline/)

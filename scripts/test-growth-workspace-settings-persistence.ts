@@ -59,7 +59,7 @@ function runAudit(): void {
 
   assert.equal(GROWTH_WORKSPACE_SETTINGS_QA_MARKER, "growth-workspace-settings-persistence-8b-v1")
   assert.equal(GROWTH_WORKSPACE_SETTINGS_MIGRATION, "20270828120000_growth_operator_workspace_preferences_8b.sql")
-  assert.equal(GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER, "growth-workspace-settings-nav-v2")
+  assert.equal(GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER, "growth-workspace-settings-nav-8f-v1")
   console.log("  ✓ QA markers + migration id")
 
   for (const relativePath of MODULE_PATHS) {
@@ -81,9 +81,8 @@ function runAudit(): void {
     path.join(process.cwd(), "components/growth/settings/growth-settings-section-page.tsx"),
     "utf8",
   )
-  for (const sectionId of GROWTH_WORKSPACE_SETTINGS_PERSISTED_SECTION_IDS) {
-    assert.match(sectionPage, new RegExp(sectionId.replace("-", "\\-")))
-  }
+  assert.match(sectionPage, /isGrowthWorkspaceSettingsPersistedSection/)
+  assert.match(sectionPage, /GrowthSettingsPersistedPanel/)
   assert.match(sectionPage, /GrowthSettingsSectionPlaceholder/)
   console.log("  ✓ section page routes persisted panels; placeholders remain for unmigrated sections")
 
@@ -124,13 +123,13 @@ function runAudit(): void {
   const placeholderSections = listGrowthWorkspaceSettingsSectionIds().filter(
     (id) => !isGrowthWorkspaceSettingsPersistedSection(id),
   )
-  assert.equal(placeholderSections.length, 10)
+  assert.equal(placeholderSections.length, 15)
   const communicationsSection = fs.readFileSync(
     path.join(process.cwd(), "components/growth/settings/growth-settings-section-placeholder.tsx"),
     "utf8",
   )
   assert.match(communicationsSection, /adminFallbackHref/)
-  console.log("  ✓ ten settings sections remain placeholder with admin fallbacks")
+  console.log("  ✓ fifteen non-persisted nav sections (communications, workspace links, compliance, AI, advanced)")
 
   const settingsCmdK = resolveGrowthCommandPaletteHref(
     `${GROWTH_WORKSPACE_BASE_PATH}/inbox`,

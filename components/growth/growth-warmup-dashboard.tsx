@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Loader2, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,7 +30,12 @@ import type {
   GrowthWarmupEvent,
   GrowthWarmupProfile,
 } from "@/lib/growth/warmup/warmup-types"
-import { GROWTH_WARMUP_FOUNDATION_QA_MARKER } from "@/lib/growth/warmup/warmup-types"
+import {
+  GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH,
+  GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
+  GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH,
+} from "@/lib/growth/navigation/growth-communications-settings-navigation"
+import { GROWTH_WARMUP_PRIVACY_NOTE } from "@/lib/growth/warmup/warmup-types"
 import type { GrowthSenderAccount } from "@/lib/growth/sender/sender-types"
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked"> = {
@@ -76,6 +82,8 @@ type DashboardPayload = {
 }
 
 export function GrowthWarmupDashboardPanel() {
+  const searchParams = useSearchParams()
+  const deepLinkSenderId = searchParams.get("sender")?.trim() ?? ""
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [profiles, setProfiles] = useState<GrowthWarmupProfile[]>([])
@@ -93,6 +101,16 @@ export function GrowthWarmupDashboardPanel() {
     [profiles, selectedProfileId],
   )
 
+  const deepLinkSender = useMemo(
+    () => senders.find((sender) => sender.id === deepLinkSenderId) ?? null,
+    [senders, deepLinkSenderId],
+  )
+
+  const deepLinkProfile = useMemo(
+    () => profiles.find((profile) => profile.sender_account_id === deepLinkSenderId) ?? null,
+    [profiles, deepLinkSenderId],
+  )
+
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -105,19 +123,30 @@ export function GrowthWarmupDashboardPanel() {
       const dashboardPayload = (await dashboardResponse.json()) as DashboardPayload
       if (!listResponse.ok) throw new Error(listPayload.message ?? "Could not load warmup profiles.")
       if (!dashboardResponse.ok) throw new Error(dashboardPayload.message ?? "Could not load warmup dashboard.")
-      setProfiles(listPayload.profiles ?? [])
-      setSenders(listPayload.senders ?? [])
+      const nextProfiles = listPayload.profiles ?? []
+      const nextSenders = listPayload.senders ?? []
+      setProfiles(nextProfiles)
+      setSenders(nextSenders)
       setDashboard(dashboardPayload.dashboard ?? null)
       setEvents(dashboardPayload.events ?? [])
-      if (!selectedProfileId && (listPayload.profiles?.length ?? 0) > 0) {
-        setSelectedProfileId(listPayload.profiles![0].id)
+
+      if (deepLinkSenderId) {
+        const linkedProfile = nextProfiles.find((profile) => profile.sender_account_id === deepLinkSenderId)
+        if (linkedProfile) {
+          setSelectedProfileId(linkedProfile.id)
+          setNewSenderId(deepLinkSenderId)
+        } else {
+          setNewSenderId(deepLinkSenderId)
+        }
+      } else if (nextProfiles.length > 0) {
+        setSelectedProfileId((current) => current || nextProfiles[0].id)
       }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Could not load warmup dashboard.")
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [deepLinkSenderId])
 
   useEffect(() => {
     void load()
@@ -133,6 +162,35 @@ export function GrowthWarmupDashboardPanel() {
       setError(actionError instanceof Error ? actionError.message : "Warmup action failed.")
     } finally {
       setActionLoading(null)
+    }
+  }
+
+  async function startWarmupForSender(senderId: string) {
+    let profileId = profiles.find((profile) => profile.sender_account_id === senderId)?.id
+    if (!profileId) {
+      const warmupDays = Number.parseInt(newWarmupDays, 10)
+      const createResponse = await fetch("/api/platform/growth/warmup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          senderAccountId: senderId,
+          warmupDays: Number.isFinite(warmupDays) ? warmupDays : 30,
+        }),
+      })
+      const createPayload = (await createResponse.json()) as { message?: string; profile?: { id: string } }
+      if (!createResponse.ok || !createPayload.profile?.id) {
+        throw new Error(createPayload.message ?? "Could not create warmup profile.")
+      }
+      profileId = createPayload.profile.id
+    }
+
+    const generateResponse = await fetch(`/api/platform/growth/warmup/${profileId}/generate`, { method: "POST" })
+    const generatePayload = (await generateResponse.json()) as { message?: string; profile?: GrowthWarmupProfile }
+    if (!generateResponse.ok) {
+      throw new Error(generatePayload.message ?? "Could not start warmup schedule.")
+    }
+    if (generatePayload.profile) {
+      setSelectedProfileId(generatePayload.profile.id)
     }
   }
 
@@ -177,17 +235,18 @@ export function GrowthWarmupDashboardPanel() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
-          {GROWTH_WARMUP_FOUNDATION_QA_MARKER} · Schedule planning only — no sending, provider execution, or inbox interaction.
+          Native warmup uses approved sequence sends, progression schedules, automated daily caps, pre-send guards, and
+          reputation tracking. {GROWTH_WARMUP_PRIVACY_NOTE}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/admin/growth/providers/deliverability-ops">Deliverability Ops</Link>
+            <Link href={GROWTH_COMMUNICATIONS_MAILBOXES_PATH}>Mailboxes</Link>
           </Button>
           <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/admin/growth/infrastructure/deliverability">Deliverability</Link>
+            <Link href={GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH}>Deliverability</Link>
           </Button>
           <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/admin/growth/infrastructure">Sender Infrastructure</Link>
+            <Link href={GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH}>Sending domains</Link>
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={Boolean(actionLoading)}>
             <RefreshCw className="mr-1.5 size-3.5" />
@@ -198,6 +257,31 @@ export function GrowthWarmupDashboardPanel() {
 
       {error ? (
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">{error}</div>
+      ) : null}
+
+      {deepLinkSenderId && deepLinkSender && !deepLinkProfile ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p className="font-medium">Start warmup for {deepLinkSender.email_address}</p>
+          <p className="mt-1 text-amber-900/90">
+            This sender does not have a warmup profile yet. Create one and generate the schedule to enter Warming.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            className="mt-3"
+            disabled={Boolean(actionLoading)}
+            onClick={() => void runAction(`deep-link-${deepLinkSenderId}`, () => startWarmupForSender(deepLinkSenderId))}
+          >
+            Start Warmup for this sender
+          </Button>
+        </div>
+      ) : null}
+
+      {deepLinkSenderId && deepLinkProfile ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
+          Showing warmup for <span className="font-medium">{deepLinkProfile.sender_email}</span>
+          {deepLinkProfile.status === "warming" ? " · Warming" : ` · ${deepLinkProfile.status}`}
+        </div>
       ) : null}
 
       <GrowthEngineCard title="Warmup Overview">
@@ -219,16 +303,12 @@ export function GrowthWarmupDashboardPanel() {
         </Button>
       </GrowthEngineCard>
 
-      <GrowthEngineCard title="Live Warmup Execution">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-border px-4 py-3">
-          <p className="text-sm text-muted-foreground">
-            Outbound warmup execution and provider workers are not enabled in this foundation phase.
-          </p>
-          <Button type="button" variant="outline" size="sm" disabled>
-            Live Warmup Execution
-            <GrowthBadge label="Coming Soon" tone="neutral" className="ml-2" />
-          </Button>
-        </div>
+      <GrowthEngineCard title="How native warmup works">
+        <p className="text-sm text-muted-foreground">
+          Create a warmup profile, generate the schedule to enter <strong>Warming</strong>, then approve sequence sends as
+          usual. Each successful transport send counts toward the daily ramp. Cron progression advances days and syncs
+          sender daily caps. Reputation protection may throttle or pause warmup automatically.
+        </p>
       </GrowthEngineCard>
 
       <GrowthEngineCard title="Warmup Profiles">
@@ -290,7 +370,11 @@ export function GrowthWarmupDashboardPanel() {
                 profiles.map((profile) => (
                   <tr
                     key={profile.id}
-                    className={`border-b border-border/60 ${selectedProfile?.id === profile.id ? "bg-muted/30" : ""}`}
+                    className={`border-b border-border/60 ${
+                      selectedProfile?.id === profile.id || profile.sender_account_id === deepLinkSenderId
+                        ? "bg-muted/30"
+                        : ""
+                    }`}
                     onClick={() => setSelectedProfileId(profile.id)}
                   >
                     <td className="px-2 py-3">

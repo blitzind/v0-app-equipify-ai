@@ -22,6 +22,7 @@ function main(): void {
   assert.equal(GROWTH_SENDR_LIMITS.MAX_SENDR_ACTIVITY_FEED, 500)
   assert.equal(GROWTH_SENDR_LIMITS.MAX_SENDR_ACTIVITY_PROSPECTS, 500)
 
+  assert.ok(fs.existsSync("app/(growth)/growth/activity/page.tsx"))
   assert.ok(fs.existsSync("app/(growth)/growth/sendr/activity/page.tsx"))
   assert.ok(fs.existsSync("app/api/platform/growth/sendr/activity/route.ts"))
 

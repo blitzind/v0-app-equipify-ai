@@ -19,13 +19,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
+import { GROWTH_AIDEN_SAFE_AREA_PR } from "@/lib/layout/aiden-safe-area"
+import { cn } from "@/lib/utils"
 import type {
   GrowthAudienceEnrollmentPreviewProgress,
   GrowthAudienceEnrollmentRunProgress,
 } from "@/lib/growth/audiences/growth-audience-types"
 import type { GrowthSequencePattern } from "@/lib/growth/sequence-types"
-import { GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL } from "@/lib/growth/sendr/growth-sendr-branding"
+import { GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL, GROWTH_VIDEO_PAGE_URL_MERGE_TOKEN } from "@/lib/growth/sendr/growth-sendr-branding"
 import { GrowthSendrAssetPickerPanel } from "@/components/growth/sendr/growth-sendr-asset-picker-panel"
 
 type WizardStep = "configure" | "preview" | "confirm" | "enrolling" | "done"
@@ -219,7 +220,7 @@ export function GrowthAudienceEnrollmentWizard({
             <div className="space-y-2">
               <Label>Attach {GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL.toLowerCase()} (optional)</Label>
               <p className="text-xs text-muted-foreground">
-                Links a published page to the sequence for {"{{sendr_page_url}}"} resolution — never auto-launches.
+                Links a published page to the sequence for {GROWTH_VIDEO_PAGE_URL_MERGE_TOKEN} resolution — never auto-launches.
               </p>
               {sendrPageLabel ? (
                 <p className="text-sm">
@@ -325,7 +326,7 @@ export function GrowthAudienceEnrollmentWizard({
           </p>
         ) : null}
 
-        <DialogFooter>
+        <DialogFooter className={cn(GROWTH_AIDEN_SAFE_AREA_PR, "sm:justify-end")}>
           {step === "configure" ? (
             <Button disabled={!snapshotId || !patternId || loading} onClick={() => void handlePreview()}>
               Preview Enrollment

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { fetchGrowthSenderPoolDashboard } from "@/lib/growth/sender-pools/sender-pool-dashboard"
 import { isGrowthSenderPoolIntelligenceSchemaReady } from "@/lib/growth/sender-pools/sender-pool-schema-health"
 import { GROWTH_SENDER_POOL_INTELLIGENCE_PRIVACY_NOTE } from "@/lib/growth/sender-pools/sender-pool-types"
@@ -7,7 +7,7 @@ import { GROWTH_SENDER_POOL_INTELLIGENCE_PRIVACY_NOTE } from "@/lib/growth/sende
 export const runtime = "nodejs"
 
 export async function GET(request: Request) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   if (!(await isGrowthSenderPoolIntelligenceSchemaReady(access.admin))) {

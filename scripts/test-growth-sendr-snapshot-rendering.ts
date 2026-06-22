@@ -13,9 +13,12 @@ function main(): void {
   assert.match(service, /GrowthSendrPublicPagePayload/)
   assert.doesNotMatch(service, /listGrowthSendrLandingPageSections/)
 
-  const client = fs.readFileSync("components/sendr/sendr-public-page-client.tsx", "utf8")
+  const layout = fs.readFileSync(
+    "components/growth/sendr/presentation/sendr-public-presentation-layout.tsx",
+    "utf8",
+  )
   for (const type of ["hero", "text", "video", "calendar", "cta", "faq", "custom_html"]) {
-    assert.match(client, new RegExp(type))
+    assert.match(layout, new RegExp(type))
   }
 
   console.log("  ✓ Renders published snapshot only (no draft sections)")

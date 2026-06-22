@@ -104,9 +104,9 @@ const ADMIN_CONTROL_PLANE_NOTIFICATION_TYPES = new Set([
 ])
 
 function resolveAdminControlPlaneFallback(notificationType: string, leadId?: string | null): string {
-  if (notificationType.startsWith("provider_")) return "/growth/settings/delivery"
+  if (notificationType.startsWith("provider_")) return "/growth/settings/communications/mailboxes"
   if (notificationType === "sequence_failed") return GROWTH_CAMPAIGNS_HUB_SEQUENCES_HREF
-  if (notificationType === "suppression_blocked") return "/admin/growth/deliverability"
+  if (notificationType === "suppression_blocked") return "/growth/settings/communications/reputation"
   if (notificationType.startsWith("dogfood_") || notificationType === "validation_complete") {
     return "/admin/growth/dogfood"
   }

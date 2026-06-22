@@ -9,9 +9,7 @@ import type { GrowthPersonalizationEmbeddedSurface } from "@/lib/growth/personal
 import { GROWTH_PERSONALIZATION_EMBEDDED_QA_MARKER } from "@/lib/growth/personalization/embedded/growth-personalization-embedded-types"
 import { useGrowthLeadPersonalization } from "@/lib/growth/personalization/embedded/use-growth-lead-personalization"
 import { GrowthPersonalizationSummaryCard } from "@/components/growth/personalization/embedded/growth-personalization-summary-card"
-import { growthWorkspaceInboxWorkflowHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
-import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
-import { usePathname } from "next/navigation"
+import { buildGrowthSharePageWorkspaceHref, growthWorkspaceInboxHref, growthWorkspaceInboxWorkflowHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import { Button } from "@/components/ui/button"
 
 const SURFACE_TITLES: Record<GrowthPersonalizationEmbeddedSurface, string> = {
@@ -38,7 +36,6 @@ export function GrowthPersonalizationEmbeddedPanel({
   compact = false,
   className,
 }: Props) {
-  const pathname = usePathname()
   const { summary, loading, generating, error, generate, regenerate, refresh } =
     useGrowthLeadPersonalization(leadId)
   const [approving, setApproving] = useState(false)
@@ -91,14 +88,14 @@ export function GrowthPersonalizationEmbeddedPanel({
           <p className="text-[10px] text-muted-foreground">No auto-send — generate drafts only.</p>
           {packageSms ? (
             <Button type="button" size="sm" variant="outline" className="h-7 text-xs" asChild>
-              <Link href={`${growthFeaturePath(pathname, "inbox")}?leadId=${encodeURIComponent(leadId)}`}>
+              <Link href={growthWorkspaceInboxHref({ leadId })}>
                 Open SMS workflow
               </Link>
             </Button>
           ) : null}
           {packageShare ? (
             <Button type="button" size="sm" variant="outline" className="h-7 text-xs" asChild>
-              <Link href={`${growthFeaturePath(pathname, "share-pages")}?leadId=${encodeURIComponent(leadId)}`}>
+              <Link href={buildGrowthSharePageWorkspaceHref({ leadId })}>
                 Open Share Pages
               </Link>
             </Button>

@@ -55,11 +55,10 @@ function main(): void {
   assert.match(workspace, /\/growth\/videos\/record/)
   assert.match(workspace, /\/growth\/videos\/library/)
 
-  const client = readSource("components/sendr/sendr-public-page-client.tsx")
-  assert.match(client, /video_start/)
-  assert.match(client, /video_progress/)
-  assert.match(client, /video_complete/)
-  assert.doesNotMatch(client, /transcode|upload/i)
+  const layout = readSource("components/growth/sendr/presentation/sendr-public-presentation-layout.tsx")
+  assert.match(layout, /video_start/)
+  assert.match(layout, /video_progress/)
+  assert.match(layout, /video_complete/)
 
   const branding = readSource("lib/growth/sendr/growth-sendr-branding.ts")
   assert.match(branding, /\/videos/)

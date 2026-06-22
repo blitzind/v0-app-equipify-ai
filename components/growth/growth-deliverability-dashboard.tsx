@@ -26,7 +26,11 @@ import type {
 } from "@/lib/growth/deliverability/deliverability-types"
 import { GROWTH_DNS_DELIVERABILITY_QA_MARKER } from "@/lib/growth/deliverability/deliverability-types"
 import type { GrowthInfrastructureReadinessCatalogEntry } from "@/lib/growth/infrastructure/infrastructure-readiness-types"
-import { hasActionableDnsSetupStatus } from "@/lib/growth/operator-ux/operator-attention-utils"
+import {
+  GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
+  GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH,
+  GROWTH_COMMUNICATIONS_WARMUP_PATH,
+} from "@/lib/growth/navigation/growth-communications-settings-navigation"
 
 const TIER_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked"> = {
   healthy: "healthy",
@@ -188,13 +192,13 @@ export function GrowthDeliverabilityDashboard() {
         <p className="max-w-3xl text-sm text-muted-foreground">{summary.headline}</p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/admin/growth/infrastructure/mailboxes">Mailbox connections</Link>
+            <Link href={GROWTH_COMMUNICATIONS_MAILBOXES_PATH}>Mailboxes</Link>
           </Button>
           <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/admin/growth/infrastructure/warmup">Warmup</Link>
+            <Link href={GROWTH_COMMUNICATIONS_WARMUP_PATH}>Warmup</Link>
           </Button>
           <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/admin/growth/infrastructure">Sender infrastructure</Link>
+            <Link href={GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH}>Sending domains</Link>
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={Boolean(actionLoading)}>
             <RefreshCw className="mr-1.5 size-3.5" />
@@ -327,7 +331,7 @@ export function GrowthDeliverabilityDashboard() {
           emptyMessage={
             <>
               No sending domains yet.{" "}
-              <Link href="/admin/growth/infrastructure" className="font-medium text-foreground underline-offset-2 hover:underline">
+              <Link href={GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH} className="font-medium text-foreground underline-offset-2 hover:underline">
                 Register senders in Infrastructure
               </Link>{" "}
               to start DNS setup.

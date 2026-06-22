@@ -157,7 +157,7 @@ export async function emitGrowthProviderAttentionNotification(
     body: `${input.providerLabel} requires attention before live operations continue.`,
     sourceSystem: "provider",
     sourceId: input.connectionId,
-    actionUrl: `/growth/settings/delivery`,
+    actionUrl: `/growth/settings/communications/mailboxes`,
     metadata: { connectionId: input.connectionId, providerLabel: input.providerLabel },
   })
 }

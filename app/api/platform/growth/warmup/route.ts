@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { listSenderAccounts } from "@/lib/growth/sender/sender-repository"
 import { listSenderProviderCapabilities } from "@/lib/growth/sender/provider-sender-capabilities"
 import { createWarmupProfile, listWarmupProfiles } from "@/lib/growth/warmup/warmup-repository"
@@ -18,8 +18,8 @@ const CreateWarmupSchema = z.object({
   notes: z.string().trim().max(2000).nullable().optional(),
 })
 
-export async function GET() {
-  const access = await requireGrowthEnginePlatformAccess()
+export async function GET(request: Request) {
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   if (!(await isGrowthWarmupFoundationSchemaReady(access.admin))) {
@@ -54,7 +54,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   if (!(await isGrowthWarmupFoundationSchemaReady(access.admin))) {

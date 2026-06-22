@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { runProviderTestSend } from "@/lib/growth/provider-setup/provider-test-send"
 import {
   isGrowthProviderSetupFamily,
@@ -11,7 +11,7 @@ export const runtime = "nodejs"
 type RouteContext = { params: Promise<{ providerFamily: string }> }
 
 export async function POST(request: Request, context: RouteContext) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   const { providerFamily } = await context.params

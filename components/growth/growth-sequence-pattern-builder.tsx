@@ -28,6 +28,7 @@ import {
   listVoiceDropStepsMissingCampaign,
 } from "@/lib/growth/sequences/sequence-voice-drop-pattern-readiness"
 import { GROWTH_SENDR_SEQUENCE_BRIDGE_QA_MARKER } from "@/lib/growth/sendr/growth-sendr-config"
+import { GROWTH_VIDEO_PAGE_URL_MERGE_TOKEN } from "@/lib/growth/sendr/growth-sendr-branding"
 import type { VoiceDropCampaignPublicView } from "@/lib/voice/voice-drops/types"
 
 type ApprovedCampaignsResponse = {
@@ -151,7 +152,7 @@ export function GrowthSequencePatternBuilder() {
     <div className="space-y-6" data-sequence-voice-drop-builder-qa={GROWTH_SEQUENCE_VOICE_DROP_VD_3_QA_MARKER}>
       <GrowthEngineCard title="Personalized video sequence bridge">
         <p className="text-sm text-muted-foreground">
-          Insert <code className="rounded bg-muted px-1">{"{{sendr_page_url}}"}</code> in email step instructions
+          Insert <code className="rounded bg-muted px-1">{GROWTH_VIDEO_PAGE_URL_MERGE_TOKEN}</code> in email step instructions
           or templates. Resolves at send time to the published personalized video page URL when a page is attached to the sequence.
         </p>
         <p className="mt-2 text-xs text-muted-foreground" data-qa-marker={GROWTH_SENDR_SEQUENCE_BRIDGE_QA_MARKER}>

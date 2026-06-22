@@ -68,11 +68,32 @@
   --aiden-launcher-bottom: 6rem; /* bottom-24 below lg */
   --aiden-launcher-btn-height: 3rem; /* h-12 */
   --aiden-launcher-clearance-gap: 0.75rem;
+  --aiden-launcher-right: 1rem; /* right-4 */
+  /*
+   * Max chip width — dashboard “Ask AIden” and Growth coach subtitle share h-12 shell.
+   * Slightly generous so 1024px / 125% zoom laptops keep Continue/Publish clickable.
+   */
+  --aiden-launcher-chip-width: 13.75rem;
+  --aiden-safe-area-right: calc(
+    var(--aiden-launcher-right) + var(--aiden-launcher-chip-width) + var(--aiden-launcher-clearance-gap)
+  );
+  --aiden-safe-area-bottom: calc(
+    env(safe-area-inset-bottom, 0px) + var(--aiden-launcher-bottom) + var(--aiden-launcher-btn-height) +
+      var(--aiden-launcher-clearance-gap)
+  );
+  --growth-sticky-action-bar-height: 4.25rem;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --aiden-launcher-right: 1.25rem; /* sm:right-5 */
+  }
 }
 
 @media (min-width: 1024px) {
   :root {
     --aiden-launcher-bottom: 1.5rem; /* lg:bottom-6 */
+    --aiden-launcher-right: 1.5rem; /* lg:right-6 */
   }
 }
 
@@ -329,6 +350,51 @@
     .br-stack-clear-aiden {
       right: 1.5rem;
     }
+  }
+
+  /*
+   * Growth workspace — reserve bottom-right inset for AIden (Part 9).
+   * Pair with `GrowthStickyActionBar`, `GrowthWizardActionRow`, `GrowthWorkspaceSafeArea`.
+   */
+  .growth-aiden-safe-area-pr {
+    padding-right: max(var(--aiden-safe-area-right), env(safe-area-inset-right, 0px));
+  }
+
+  .growth-aiden-safe-area-pb-scroll {
+    padding-bottom: max(var(--aiden-safe-area-bottom), 1.5rem);
+  }
+
+  .growth-workspace-safe-area {
+    padding-right: max(var(--aiden-safe-area-right), env(safe-area-inset-right, 0px));
+    padding-bottom: max(var(--aiden-safe-area-bottom), 1.5rem);
+  }
+
+  .growth-workspace-safe-area-sticky-footer {
+    padding-bottom: calc(var(--growth-sticky-action-bar-height) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .growth-sticky-action-bar {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 40;
+  }
+
+  .growth-sticky-action-bar__inner {
+    padding-right: max(1rem, var(--aiden-safe-area-right));
+  }
+
+  @media (min-width: 640px) {
+    .growth-sticky-action-bar__inner {
+      padding-right: max(1.5rem, var(--aiden-safe-area-right));
+    }
+  }
+
+  .growth-wizard-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   /* ── Alert / callout rows ─────────────────────────────────────────────────

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import { PresentationPageShell } from "@/components/growth/sendr/presentation/presentation-page-shell"
+import { PresentationThemeProvider } from "@/components/growth/sendr/presentation/presentation-section"
 import { SendrPublicPresentationLayout } from "@/components/growth/sendr/presentation/sendr-public-presentation-layout"
 import type { GrowthSendrPublicPagePayload } from "@/lib/growth/sendr/growth-sendr-types"
 
@@ -84,8 +85,10 @@ export function SendrPublicPageClient({
   }, [onTrack, sendScroll])
 
   return (
-    <PresentationPageShell>
-      <SendrPublicPresentationLayout page={page} onTrack={onTrack} />
-    </PresentationPageShell>
+    <PresentationThemeProvider theme={page.theme}>
+      <PresentationPageShell>
+        <SendrPublicPresentationLayout page={page} onTrack={onTrack} />
+      </PresentationPageShell>
+    </PresentationThemeProvider>
   )
 }

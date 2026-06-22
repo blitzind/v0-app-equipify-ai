@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
-import { GROWTH_DELIVERY_SETTINGS_CONNECTED_MAILBOXES_HREF } from "@/lib/growth/navigation/growth-delivery-settings-navigation"
+import { GROWTH_COMMUNICATIONS_MAILBOXES_PATH } from "@/lib/growth/navigation/growth-communications-settings-navigation"
 
-export default function GrowthConnectedMailboxesSettingsPage() {
-  redirect(GROWTH_DELIVERY_SETTINGS_CONNECTED_MAILBOXES_HREF)
+export default function GrowthConnectedMailboxesRedirectPage() {
+  redirect(GROWTH_COMMUNICATIONS_MAILBOXES_PATH)
 }

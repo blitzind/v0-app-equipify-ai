@@ -5,6 +5,7 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
+import { GROWTH_COMMUNICATIONS_MAILBOXES_PATH, GROWTH_COMMUNICATIONS_SETTINGS_PATH } from "../lib/growth/navigation/growth-communications-settings-navigation"
 import { GROWTH_DELIVERY_SETTINGS_PATH } from "../lib/growth/navigation/growth-delivery-settings-navigation"
 
 function readSource(relativePath: string): string {
@@ -30,7 +31,7 @@ const ADMIN_SURFACES_PRESERVED = [
 function main(): void {
   for (const relativePath of OPERATOR_SURFACES) {
     const source = readSource(relativePath)
-    assert.match(source, /\/growth\/settings\/delivery/, `${relativePath} should link to growth delivery setup`)
+    assert.match(source, /\/growth\/settings\/(delivery|communications)/, `${relativePath} should link to growth communications settings`)
     assert.doesNotMatch(
       source,
       /\/admin\/growth\/providers\/setup/,
@@ -48,10 +49,11 @@ function main(): void {
   assert.match(adminSetup, /variant="admin"/)
 
   const deliveryPanel = readSource("components/growth/delivery/growth-delivery-setup-panel.tsx")
-  assert.match(deliveryPanel, /Delivery Setup/)
+  assert.match(deliveryPanel, /Communications/)
   assert.doesNotMatch(deliveryPanel, /Provider Setup/)
 
-  assert.equal(GROWTH_DELIVERY_SETTINGS_PATH, "/growth/settings/delivery")
+  assert.equal(GROWTH_DELIVERY_SETTINGS_PATH, GROWTH_COMMUNICATIONS_SETTINGS_PATH)
+  assert.equal(GROWTH_COMMUNICATIONS_MAILBOXES_PATH, "/growth/settings/communications/mailboxes")
 
   console.log("growth-operator-facing-admin-link-cleanup-7d: ok")
 }

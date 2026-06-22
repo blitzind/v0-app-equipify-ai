@@ -63,7 +63,7 @@ function runAudit(): void {
   assert.equal(resolveGrowthEngineSectionLiftKind("notification-preferences"), "canonical")
   assert.equal(
     getWorkspaceSettingsGrowthEngineCanonicalHref("notification-preferences"),
-    "/settings/growth-operator/notifications",
+    "/growth/settings/notifications",
   )
   const canonicalSrc = readFileSync("components/settings/workspace-settings-canonical-route-panel.tsx", "utf8")
   assert.doesNotMatch(canonicalSrc, /GrowthSettingsNotificationsPanel/)

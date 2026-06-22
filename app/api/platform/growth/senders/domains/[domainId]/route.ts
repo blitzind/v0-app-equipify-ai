@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { updateSenderDomain } from "@/lib/growth/sender/sender-repository"
 import { isGrowthSenderInfrastructureSchemaReady } from "@/lib/growth/sender/sender-schema-health"
 
@@ -20,7 +20,7 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ domainId: string }> },
 ) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   if (!(await isGrowthSenderInfrastructureSchemaReady(access.admin))) {

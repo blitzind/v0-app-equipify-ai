@@ -3,9 +3,26 @@
 import { z } from "zod"
 import {
   GROWTH_SHARE_PAGE_HERO_MEDIA_TYPES,
+  GROWTH_SHARE_PAGE_PUBLIC_THEME_MODES,
   GROWTH_SHARE_PAGE_SOURCE_CHANNELS,
   GROWTH_SHARE_PAGE_STATUSES,
 } from "@/lib/growth/share-pages/share-page-types"
+
+const sharePageThemeSchema = z.object({
+  brandColor: z.string().max(32).optional(),
+  accentColor: z.string().max(32).optional(),
+  logoUrl: z.string().max(2048).nullable().optional(),
+  heroImageUrl: z.string().max(2048).nullable().optional(),
+  publicThemeMode: z.enum(GROWTH_SHARE_PAGE_PUBLIC_THEME_MODES).optional(),
+  footerNote: z.string().max(500).nullable().optional(),
+  pageBackground: z.string().max(32).optional(),
+  pageText: z.string().max(32).optional(),
+  surfaceColor: z.string().max(32).optional(),
+  buttonBackground: z.string().max(32).optional(),
+  buttonText: z.string().max(32).optional(),
+  headerBackground: z.string().max(32).optional(),
+  headerText: z.string().max(32).optional(),
+})
 
 const ctaSchema = z.object({
   id: z.string().min(1).max(80),
@@ -51,6 +68,7 @@ export const growthSharePageCreateSchema = z.object({
   company_observations: z.array(z.string().max(500)).max(12).optional(),
   cta_config: z.array(ctaSchema).max(8).optional(),
   resources: z.array(resourceSchema).max(12).optional(),
+  theme: sharePageThemeSchema.optional(),
   build_context: z.boolean().optional(),
 })
 
@@ -68,6 +86,7 @@ export const growthSharePagePatchSchema = z.object({
   hero_media_type: z.enum(GROWTH_SHARE_PAGE_HERO_MEDIA_TYPES).optional(),
   hero_media_url: z.string().max(2048).nullable().optional(),
   hero_media_thumbnail_url: z.string().max(2048).nullable().optional(),
+  theme: sharePageThemeSchema.optional(),
 })
 
 export const growthSharePagePreviewSchema = z.object({
@@ -86,6 +105,17 @@ export const growthSharePageOperatorWorkspaceQuerySchema = z.object({
 
 export const growthSharePageOperatorWorkspaceActionSchema = z.object({
   lead_id: z.string().uuid(),
+})
+
+export const growthSharePageAiDraftSchema = z.object({
+  targetCompany: z.string().max(240).optional(),
+  targetPerson: z.string().max(240).optional(),
+  industry: z.string().max(240).optional(),
+  pageObjective: z.string().max(500).optional(),
+  painPoints: z.string().max(2000).optional(),
+  desiredCta: z.string().max(120).optional(),
+  tone: z.string().max(120).optional(),
+  templateId: z.string().max(80).optional(),
 })
 
 export const growthSharePageIntelligenceQuerySchema = z.object({

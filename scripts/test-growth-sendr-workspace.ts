@@ -17,12 +17,13 @@ function main(): void {
   console.log("\n=== GS-SENDR-2B SENDR Workspace Certification ===\n")
   assert.equal(GROWTH_SENDR_WORKSPACE_QA_MARKER, "growth-sendr-operator-workspace-gs-sendr-2b-v1")
 
+  assert.ok(fs.existsSync("app/(growth)/growth/videos/personalized/page.tsx"))
   assert.ok(fs.existsSync("app/(growth)/growth/sendr/page.tsx"))
   assert.ok(fs.existsSync("app/api/platform/growth/sendr/workspace/route.ts"))
 
   const home = readSource("components/growth/sendr/growth-sendr-workspace-home.tsx")
   assert.match(home, /\/api\/platform\/growth\/sendr\/workspace/)
-  assert.match(home, /Create Page/)
+  assert.match(home, /Create Video Page/)
   assert.doesNotMatch(home, /setInterval/)
 
   const service = readSource("lib/growth/sendr/growth-sendr-workspace-service.ts")

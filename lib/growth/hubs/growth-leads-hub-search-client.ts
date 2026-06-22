@@ -8,6 +8,7 @@ import type { GrowthProspectSearchSavedSearchWithWorkflow } from "@/lib/growth/p
 import { attachSavedSearchWorkflow } from "@/lib/growth/prospect-search/saved-search-workflows"
 import type { GrowthProspectSearchSavedSearchRow } from "@/lib/growth/prospect-search/prospect-search-types"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-workspace-base-path"
+import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import { growthLeadsHubSavedSearchRunHref } from "@/lib/growth/hubs/growth-leads-hub-config"
 import { runGrowthWorkspaceSearchProviders } from "@/lib/workspace/growth-workspace-search-providers"
 import type { GlobalSearchGroup } from "@/lib/global-search/run-global-search"
@@ -74,7 +75,7 @@ const WORKSPACE_GROUP_MAP: Record<string, GrowthLeadsHubSearchResultKind> = {
 }
 
 function leadHref(leadId: string): string {
-  return `${GROWTH_WORKSPACE_BASE_PATH}/leads/${encodeURIComponent(leadId)}`
+  return buildGrowthLeadHref(leadId)
 }
 
 function mapEntityKind(source: CallWorkspaceLeadSearchResult["source"]): GrowthLeadsHubSearchResultKind {

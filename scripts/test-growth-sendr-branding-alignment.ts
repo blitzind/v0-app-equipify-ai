@@ -10,6 +10,7 @@ import {
   GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL,
   GROWTH_PERSONALIZED_VIDEOS_PUBLIC_PATH,
   GROWTH_PERSONALIZED_VIDEOS_LEGACY_PUBLIC_PATH,
+  GROWTH_VIDEO_PAGE_URL_MERGE_TOKEN,
 } from "../lib/growth/sendr/growth-sendr-branding"
 import { buildSendrPagePublicLink, buildSendrPagePublicPath } from "../lib/growth/sendr/growth-sendr-slug-runtime"
 import { createSendrVisitorAccessToken, verifySendrVisitorToken } from "../lib/growth/sendr/growth-sendr-visitor-token"
@@ -23,6 +24,7 @@ function main(): void {
 
   assert.equal(GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL, "Personalized Videos")
   assert.equal(GROWTH_PERSONALIZED_VIDEOS_PUBLIC_PATH, "/videos")
+  assert.equal(GROWTH_VIDEO_PAGE_URL_MERGE_TOKEN, "{{video_page_url}}")
   assert.equal(GROWTH_PERSONALIZED_VIDEOS_LEGACY_PUBLIC_PATH, "/sendr")
   assert.equal(
     GROWTH_PERSONALIZED_VIDEOS_BRANDING_QA_MARKER,
@@ -31,6 +33,7 @@ function main(): void {
 
   assert.ok(fs.existsSync("app/videos/[slug]/page.tsx"))
   assert.ok(fs.existsSync("app/sendr/[slug]/page.tsx"))
+  assert.ok(fs.existsSync("app/(growth)/growth/videos/personalized/page.tsx"))
 
   const legacyRoute = readSource("app/sendr/[slug]/page.tsx")
   assert.match(legacyRoute, /redirect\(/)
@@ -56,7 +59,7 @@ function main(): void {
   assert.match(nav, /Personalized Videos/)
   assert.match(nav, /personalized-videos/)
 
-  const workspacePage = readSource("app/(growth)/growth/sendr/page.tsx")
+  const workspacePage = readSource("app/(growth)/growth/videos/personalized/page.tsx")
   assert.match(workspacePage, /GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL/)
   assert.doesNotMatch(workspacePage, /title="SENDR"/)
 

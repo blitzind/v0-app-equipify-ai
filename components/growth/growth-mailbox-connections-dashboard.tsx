@@ -230,7 +230,7 @@ export function GrowthMailboxConnectionsDashboard() {
       body: JSON.stringify({
         sender_account_id: mailbox.sender_account_id,
         mailbox_connection_id: mailbox.id,
-        return_to: "/admin/growth/infrastructure/mailboxes",
+        return_to: "/growth/settings/communications/mailboxes",
       }),
     })
     const data = (await res.json().catch(() => ({}))) as {
@@ -354,7 +354,7 @@ export function GrowthMailboxConnectionsDashboard() {
 
         <div className="mb-4 flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/growth/settings/delivery">Delivery Setup</Link>
+            <Link href="/growth/settings/communications/mailboxes">Communications</Link>
           </Button>
         </div>
 

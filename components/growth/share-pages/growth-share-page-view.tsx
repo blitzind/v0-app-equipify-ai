@@ -1,5 +1,6 @@
 import type { GrowthSharePageRenderModel } from "@/lib/growth/share-pages/share-page-types"
 import { sharePageThemeStyle } from "@/components/growth/share-pages/share-page-theme-utils"
+import { hasSharePageExtendedTheme } from "@/lib/growth/share-pages/share-page-types"
 import { GrowthSharePageHero } from "@/components/growth/share-pages/growth-share-page-hero"
 import { GrowthSharePageMessage } from "@/components/growth/share-pages/growth-share-page-message"
 import { GrowthSharePageObservations } from "@/components/growth/share-pages/growth-share-page-observations"
@@ -11,12 +12,26 @@ import { SharePageTracker, useSharePageTracker } from "@/components/growth/share
 import { PublicBookingThemeShell } from "@/components/growth/public-booking-theme-shell"
 import { GROWTH_SHARE_PAGES_SSR_QA_MARKER } from "@/lib/growth/share-pages/share-page-types"
 
+function sharePageShellStyle(model: GrowthSharePageRenderModel) {
+  const extended = hasSharePageExtendedTheme(model.theme)
+  const base = sharePageThemeStyle(model.theme)
+  if (!extended) {
+    return base
+  }
+  return {
+    ...base,
+    backgroundColor: "var(--share-page-bg)",
+    color: "var(--share-page-text)",
+  }
+}
+
 function GrowthSharePageStaticLayout({ model }: { model: GrowthSharePageRenderModel }) {
+  const extended = hasSharePageExtendedTheme(model.theme)
   return (
     <div
-      className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
+      className={extended ? "min-h-screen" : "min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"}
       data-qa-marker={GROWTH_SHARE_PAGES_SSR_QA_MARKER}
-      style={sharePageThemeStyle(model.theme)}
+      style={sharePageShellStyle(model)}
     >
       {model.previewMode ? (
         <div className="sticky top-0 z-20 border-b border-amber-300/60 bg-amber-100/95 px-4 py-2 text-center text-xs font-semibold uppercase tracking-[0.2em] text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/90 dark:text-amber-200">
@@ -41,6 +56,7 @@ function GrowthSharePageStaticLayout({ model }: { model: GrowthSharePageRenderMo
 
 function GrowthSharePageTrackedLayout({ model }: { model: GrowthSharePageRenderModel }) {
   const { trackEvent } = useSharePageTracker()
+  const extended = hasSharePageExtendedTheme(model.theme)
 
   const trackBookingStarted = () => {
     void trackEvent("SHARE_PAGE_BOOKING_STARTED", { metadata: { source: "share_page_booking_section" } })
@@ -61,9 +77,9 @@ function GrowthSharePageTrackedLayout({ model }: { model: GrowthSharePageRenderM
 
   return (
     <div
-      className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
+      className={extended ? "min-h-screen" : "min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"}
       data-qa-marker={GROWTH_SHARE_PAGES_SSR_QA_MARKER}
-      style={sharePageThemeStyle(model.theme)}
+      style={sharePageShellStyle(model)}
     >
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
         <GrowthSharePageHero model={model} />

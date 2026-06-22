@@ -171,6 +171,8 @@ async function main(): Promise<void> {
   assert.match(uiSource, /GROWTH_AI_PERSONALIZATION_LAYOUT_ALIGNED_QA_MARKER/)
   assert.match(uiSource, /humanApprovalConfirmed/)
   assert.match(uiSource, /IndustryPlaybookDiagnosticsPanel/)
+  assert.match(uiSource, /GrowthPersonalizationLeadPicker/)
+  assert.match(uiSource, /GROWTH_PERSONALIZATION_GENERATION_UX_QA_MARKER/)
 
   const promptSource = readSource("lib/growth/personalization/personalization-prompt.ts")
   assert.match(promptSource, /Verified facts/)

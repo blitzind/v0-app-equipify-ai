@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { finalizeMailboxOnboarding } from "@/lib/growth/mailboxes/mailbox-onboarding-service"
 import { GROWTH_MAILBOX_ONBOARDING_QA_MARKER } from "@/lib/growth/mailboxes/mailbox-onboarding-types"
 import { isGrowthMailboxConnectionSchemaReady } from "@/lib/growth/mailboxes/mailbox-schema-health"
@@ -18,7 +18,7 @@ const FinalizeSchema = z.object({
 })
 
 export async function POST(request: Request) {
-  const access = await requireGrowthEnginePlatformAccess(request)
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   if (!(await isGrowthMailboxConnectionSchemaReady(access.admin))) {

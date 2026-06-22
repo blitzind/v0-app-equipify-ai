@@ -124,7 +124,7 @@ function main(): void {
   assert.ok(prospect.actions.length >= 2)
   console.log("  ✓ high intent rail view model")
 
-  assert.equal(buildGrowthLeadWorkspaceHref("lead-1"), "/growth/leads/lead-1")
+  assert.equal(buildGrowthLeadWorkspaceHref("lead-1"), "/growth/leads/crm?open=lead-1")
   assert.match(buildGrowthPersonalizationForLeadHref("lead-1"), /^\/growth\/personalization\?leadId=/)
   console.log("  ✓ cross-workspace quick actions")
 

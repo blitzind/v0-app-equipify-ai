@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import {
   getSenderPoolMember,
   removeSenderPoolMember,
@@ -23,7 +23,7 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string; memberId: string }> },
 ) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   if (!(await isGrowthSenderPoolIntelligenceSchemaReady(access.admin))) {
@@ -58,7 +58,7 @@ export async function DELETE(
   _request: Request,
   context: { params: Promise<{ id: string; memberId: string }> },
 ) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   if (!(await isGrowthSenderPoolIntelligenceSchemaReady(access.admin))) {

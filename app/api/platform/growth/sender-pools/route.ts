@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { createSenderPool, listSenderPools } from "@/lib/growth/sender-pools/sender-pool-repository"
 import { appendSenderPoolTimelineEvent } from "@/lib/growth/sender-pools/sender-pool-events"
 import { isGrowthSenderPoolIntelligenceSchemaReady } from "@/lib/growth/sender-pools/sender-pool-schema-health"
@@ -24,8 +24,8 @@ const CreatePoolSchema = z.object({
   allowAutoRotation: z.boolean().optional(),
 })
 
-export async function GET() {
-  const access = await requireGrowthEnginePlatformAccess()
+export async function GET(request: Request) {
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   if (!(await isGrowthSenderPoolIntelligenceSchemaReady(access.admin))) {
@@ -47,7 +47,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   if (!(await isGrowthSenderPoolIntelligenceSchemaReady(access.admin))) {

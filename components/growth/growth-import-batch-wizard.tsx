@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
+import { GrowthWizardActionRow } from "@/components/growth/shell/growth-workspace-shell"
 import {
   GROWTH_IMPORT_CANONICAL_FIELDS,
   GROWTH_IMPORT_DUPLICATE_STRATEGIES,
@@ -354,7 +355,7 @@ export function GrowthImportBatchWizard({ batchId }: GrowthImportBatchWizardProp
             </div>
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
+        <GrowthWizardActionRow className="mt-4">
           <Button variant="outline" disabled={working} onClick={() => void saveMapping()}>
             Save mapping
           </Button>
@@ -369,7 +370,7 @@ export function GrowthImportBatchWizard({ batchId }: GrowthImportBatchWizardProp
             {working ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Play className="mr-2 size-4" />}
             Commit import
           </Button>
-        </div>
+        </GrowthWizardActionRow>
         {estimatedCallReady != null ? (
           <p className="mt-2 text-sm font-medium text-foreground">
             Estimated call ready leads: {estimatedCallReady}

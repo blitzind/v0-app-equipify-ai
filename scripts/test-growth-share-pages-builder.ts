@@ -44,14 +44,18 @@ function runLocalRegression(): void {
   assert.match(builder, /lg:col-span-3/)
   assert.match(builder, /lg:col-span-2/)
   assert.match(builder, /space-y-8/)
-  assert.match(builder, /fixed inset-x-0 bottom-0/)
+  assert.match(builder, /GrowthSharePageBrandingFields/)
+  assert.match(builder, /GrowthSharePageBookingPagePicker/)
+  assert.match(builder, /GrowthSharePageAiDraftPanel/)
+  assert.match(builder, /GrowthStickyActionBar/)
+  assert.match(builder, /GrowthWorkspaceSafeArea/)
   assert.match(builder, /form=\{FORM_ID\}/)
   assert.match(builder, /Generate With AI/)
   assert.match(builder, /Advanced settings/)
   assert.match(builder, /aria-expanded/)
   assert.ok(!builder.includes('Label className="text-xs">Lead ID'))
   assert.ok(!builder.match(/Lead ID \*/))
-  console.log("  ✓ guided builder layout, steps, sticky footer, advanced collapse")
+  console.log("  ✓ guided builder layout, steps, AIden-safe sticky footer, advanced collapse")
 
   const managePanel = fs.readFileSync(
     path.join(process.cwd(), "components/growth/share-pages/growth-share-page-manage-panel.tsx"),

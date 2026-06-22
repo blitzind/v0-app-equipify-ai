@@ -11,6 +11,10 @@ import type {
   ApolloVoiceDropScript,
   ApolloVoiceDropScriptType,
 } from "@/lib/growth/apollo/apollo-voice-drop-automation-types"
+import {
+  buildIndustryContextVoiceScript,
+  type GrowthIndustryContext,
+} from "@/lib/growth/playbooks/growth-industry-context"
 
 export const APOLLO_VOICE_DROP_SCRIPT_GENERATION_QA_MARKER =
   "apollo-voice-drop-script-generation-v1" as const
@@ -164,4 +168,50 @@ export function generateApolloVoiceDropScriptFromUnifiedContext(input: {
   }
 
   return script
+}
+
+/** GS-AI-PLAYBOOK-1C — Industry playbook voice script overlay (evidence-only, no send). */
+export function generateApolloVoiceDropScriptFromIndustryContext(input: {
+  script_type: ApolloVoiceDropScriptType
+  full_name: string
+  company_name: string
+  title?: string | null
+  industryContext: GrowthIndustryContext
+  assigned_rep?: string | null
+  callback_number?: string | null
+  research_line?: string | null
+}): ApolloVoiceDropScript {
+  const playbookLine = buildIndustryContextVoiceScript(input.industryContext, input.company_name)
+  const base = generateApolloVoiceDropScript({
+    script_type: input.script_type,
+    full_name: input.full_name,
+    company_name: input.company_name,
+    title: input.title,
+    assigned_rep: input.assigned_rep,
+    callback_number: input.callback_number,
+    research_line: input.research_line ?? null,
+  })
+
+  if (!playbookLine || !input.industryContext.playbookApplied) return base
+
+  const mapping = input.industryContext.capabilityMappings[0]
+  const value_proposition = mapping
+    ? `Equipify helps with ${mapping.capability.toLowerCase()} and ${mapping.equipifyModule.toLowerCase()}.`
+    : base.value_proposition
+  const industryChallenge = input.industryContext.industryFacts[0] ?? base.value_proposition
+  const personalization_line = input.industryContext.verifiedFacts[0]
+    ? `We noticed ${input.company_name} ${input.industryContext.verifiedFacts[0]!.replace(/^(Summary|Observed|Service focus):\s*/i, "")}.`
+    : base.personalization_line
+  const call_to_action = input.industryContext.recommendedCtas[0] ?? base.call_to_action
+  const full_script = [base.intro, industryChallenge, value_proposition, personalization_line, call_to_action]
+    .filter(Boolean)
+    .join(" ")
+
+  return {
+    ...base,
+    value_proposition,
+    personalization_line,
+    call_to_action,
+    full_script,
+  }
 }

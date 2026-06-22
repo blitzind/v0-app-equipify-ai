@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { emitGrowthNotification } from "@/lib/growth/notifications/emit-growth-notification"
+import { buildGrowthCallWorkspaceHref, buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import type { HumanExecutionApprovalItem } from "@/lib/growth/human-execution/human-execution-types"
 
 export async function emitHumanExecutionReadyNotification(
@@ -68,7 +69,7 @@ export async function emitHumanExecutionFatigueNotification(
     body: `${input.companyName}: ${input.reason}`,
     sourceSystem: "human_execution",
     sourceId: input.leadId,
-    actionUrl: `/admin/growth/execution?leadId=${input.leadId}`,
+    actionUrl: buildGrowthLeadHref(input.leadId, { focus: "execution" }),
     metadata: { reason: input.reason },
   })
 }
@@ -85,7 +86,7 @@ export async function emitHumanExecutionCallNowNotification(
     body: `${input.companyName}: readiness ${input.readinessScore}/100 — operator call recommended.`,
     sourceSystem: "human_execution",
     sourceId: input.leadId,
-    actionUrl: `/admin/growth/leads?leadId=${input.leadId}`,
+    actionUrl: buildGrowthCallWorkspaceHref({ leadId: input.leadId }),
     metadata: { readinessScore: input.readinessScore },
   })
 }

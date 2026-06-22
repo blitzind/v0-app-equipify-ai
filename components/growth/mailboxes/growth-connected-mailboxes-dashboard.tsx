@@ -34,10 +34,30 @@ import {
   isGrowthWorkspacePathname,
 } from "@/lib/growth/navigation/growth-workspace-base-path"
 import {
-  GROWTH_DELIVERY_SETTINGS_PATH,
+  GROWTH_WORKSPACE_DNS_VERIFICATION_PATH,
+  GROWTH_WORKSPACE_MAILBOXES_PATH,
+  GROWTH_WORKSPACE_REPUTATION_PATH,
   GROWTH_WORKSPACE_SENDER_POOLS_PATH,
   GROWTH_WORKSPACE_SENDER_SETUP_PATH,
+  GROWTH_WORKSPACE_WARMUP_PATH,
 } from "@/lib/growth/navigation/growth-delivery-settings-navigation"
+import {
+  GROWTH_COMMUNICATIONS_MAILBOXES_ONBOARD_PATH,
+  GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
+  growthCommunicationsWarmupHref,
+} from "@/lib/growth/navigation/growth-communications-settings-navigation"
+import { resolveConnectedMailboxWarmupDisplay } from "@/lib/growth/mailboxes/connected-mailbox-warmup-label"
+import type { GrowthMailboxConnectionSummary } from "@/lib/growth/mailboxes/mailbox-types"
+
+type MailboxValidationFeedback = {
+  ok: boolean
+  message: string
+  status: string
+  healthTier: string
+  healthReason: string | null
+  lastValidationAt: string | null
+  suggestedNextStep: string | null
+}
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked" | "medium"> = {
   connected: "healthy",
@@ -89,39 +109,79 @@ function isUnhealthyRow(row: GrowthConnectedMailboxRow): boolean {
   return !isHealthyRow(row)
 }
 
+function validationSuggestedNextStep(
+  row: GrowthConnectedMailboxRow,
+  mailbox: GrowthMailboxConnectionSummary,
+): string | null {
+  if (row.needsReconnect || !mailbox.token_configured) {
+    return "Reconnect Gmail to refresh OAuth tokens."
+  }
+  if (mailbox.status === "expired") {
+    return "Token expired — reconnect Gmail, then validate again."
+  }
+  if (mailbox.status === "error") {
+    return "Review OAuth connection and provider setup, then retry validation."
+  }
+  if (mailbox.status === "warning") {
+    return "Confirm the connected Google account matches this mailbox email."
+  }
+  if (mailbox.status !== "connected") {
+    return "Complete Gmail connection before scaling outbound volume."
+  }
+  return null
+}
+
 function useConnectedMailboxesNavPaths(oauthReturnTo?: string) {
   const pathname = usePathname() ?? ""
   const isWorkspaceSettings = pathname.startsWith("/settings/growth-engine")
   const isGrowthWorkspace = isGrowthWorkspacePathname(pathname)
+
+  const workspaceCommPaths = {
+    returnTo: GROWTH_WORKSPACE_MAILBOXES_PATH,
+    senderHref: GROWTH_WORKSPACE_SENDER_SETUP_PATH,
+    poolHref: GROWTH_WORKSPACE_SENDER_POOLS_PATH,
+    deliverabilityHref: GROWTH_WORKSPACE_DNS_VERIFICATION_PATH,
+    warmupHref: GROWTH_WORKSPACE_WARMUP_PATH,
+    reputationHref: GROWTH_WORKSPACE_REPUTATION_PATH,
+    onboardHref: GROWTH_COMMUNICATIONS_MAILBOXES_ONBOARD_PATH,
+  }
 
   if (oauthReturnTo) {
     return {
       returnTo: oauthReturnTo,
       senderHref: GROWTH_WORKSPACE_SENDER_SETUP_PATH,
       poolHref: GROWTH_WORKSPACE_SENDER_POOLS_PATH,
+      deliverabilityHref: GROWTH_WORKSPACE_DNS_VERIFICATION_PATH,
+      warmupHref: GROWTH_WORKSPACE_WARMUP_PATH,
+      reputationHref: GROWTH_WORKSPACE_REPUTATION_PATH,
+      onboardHref: GROWTH_COMMUNICATIONS_MAILBOXES_ONBOARD_PATH,
     }
   }
 
   if (isWorkspaceSettings) {
     return {
-      returnTo: pathname || "/settings/growth-engine/connected-mailboxes",
-      senderHref: "/settings/growth-engine/sending-domains",
-      poolHref: "/settings/growth-engine/sender-pools",
+      returnTo: pathname || GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
+      senderHref: GROWTH_WORKSPACE_SENDER_SETUP_PATH,
+      poolHref: GROWTH_WORKSPACE_SENDER_POOLS_PATH,
+      deliverabilityHref: GROWTH_WORKSPACE_DNS_VERIFICATION_PATH,
+      warmupHref: GROWTH_WORKSPACE_WARMUP_PATH,
+      reputationHref: GROWTH_WORKSPACE_REPUTATION_PATH,
+      onboardHref: GROWTH_COMMUNICATIONS_MAILBOXES_ONBOARD_PATH,
     }
   }
 
   if (isGrowthWorkspace) {
-    return {
-      returnTo: pathname || GROWTH_DELIVERY_SETTINGS_PATH,
-      senderHref: GROWTH_WORKSPACE_SENDER_SETUP_PATH,
-      poolHref: GROWTH_WORKSPACE_SENDER_POOLS_PATH,
-    }
+    return workspaceCommPaths
   }
 
   return {
     returnTo: pathname || "/admin/growth/infrastructure/mailboxes",
     senderHref: `${GROWTH_ADMIN_BASE_PATH}/infrastructure`,
     poolHref: `${GROWTH_ADMIN_BASE_PATH}/providers/sender-pools`,
+    deliverabilityHref: `${GROWTH_ADMIN_BASE_PATH}/infrastructure/deliverability`,
+    warmupHref: `${GROWTH_ADMIN_BASE_PATH}/infrastructure/warmup`,
+    reputationHref: `${GROWTH_ADMIN_BASE_PATH}/deliverability`,
+    onboardHref: `${GROWTH_ADMIN_BASE_PATH}/infrastructure/mailboxes/onboard`,
   }
 }
 
@@ -143,6 +203,8 @@ export function GrowthConnectedMailboxesDashboard({
   const [testSendRow, setTestSendRow] = useState<GrowthConnectedMailboxRow | null>(null)
   const [testSendTo, setTestSendTo] = useState("")
   const [testSendApproval, setTestSendApproval] = useState(false)
+  const [validationFeedback, setValidationFeedback] = useState<Record<string, MailboxValidationFeedback>>({})
+  const [warmupNotice, setWarmupNotice] = useState<{ tone: "success" | "error"; message: string } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -232,8 +294,72 @@ export function GrowthConnectedMailboxesDashboard({
   async function validateMailbox(row: GrowthConnectedMailboxRow) {
     if (!row.mailboxId) throw new Error("No mailbox connection to validate.")
     const res = await fetch(`/api/platform/growth/mailboxes/${row.mailboxId}/validate`, { method: "POST" })
-    const data = (await res.json().catch(() => ({}))) as { message?: string }
-    if (!res.ok) throw new Error(data.message ?? "Validation failed.")
+    const data = (await res.json().catch(() => ({}))) as {
+      message?: string
+      mailbox?: GrowthMailboxConnectionSummary
+    }
+    if (!res.ok) {
+      const failureMessage = data.message ?? "Validation failed."
+      setValidationFeedback((prev) => ({
+        ...prev,
+        [row.senderId]: {
+          ok: false,
+          message: failureMessage,
+          status: row.connectionStatus,
+          healthTier: row.healthTier,
+          healthReason: null,
+          lastValidationAt: row.lastValidationAt,
+          suggestedNextStep: row.needsReconnect ? "Reconnect Gmail to refresh OAuth tokens." : "Retry validation or contact support.",
+        },
+      }))
+      throw new Error(failureMessage)
+    }
+
+    const mailbox = data.mailbox
+    if (!mailbox) return
+
+    setValidationFeedback((prev) => ({
+      ...prev,
+      [row.senderId]: {
+        ok: mailbox.status === "connected",
+        message: mailbox.validation_message ?? mailbox.health_reason ?? "Validation completed.",
+        status: mailbox.status,
+        healthTier: mailbox.health_tier,
+        healthReason: mailbox.health_reason,
+        lastValidationAt: mailbox.last_validation_at,
+        suggestedNextStep: validationSuggestedNextStep(row, mailbox),
+      },
+    }))
+  }
+
+  async function startWarmup(row: GrowthConnectedMailboxRow) {
+    let profileId = row.warmupProfileId
+    if (!profileId) {
+      const createRes = await fetch("/api/platform/growth/warmup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ senderAccountId: row.senderId, warmupDays: 30 }),
+      })
+      const createData = (await createRes.json().catch(() => ({}))) as {
+        message?: string
+        profile?: { id: string }
+      }
+      if (!createRes.ok || !createData.profile?.id) {
+        throw new Error(createData.message ?? "Could not create warmup profile.")
+      }
+      profileId = createData.profile.id
+    }
+
+    const generateRes = await fetch(`/api/platform/growth/warmup/${profileId}/generate`, { method: "POST" })
+    const generateData = (await generateRes.json().catch(() => ({}))) as { message?: string }
+    if (!generateRes.ok) {
+      throw new Error(generateData.message ?? "Could not start warmup schedule.")
+    }
+
+    setWarmupNotice({
+      tone: "success",
+      message: `Warmup started for ${row.email}. Daily cap synced to day-1 ramp.`,
+    })
   }
 
   async function pauseSender(row: GrowthConnectedMailboxRow) {
@@ -321,7 +447,7 @@ export function GrowthConnectedMailboxesDashboard({
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/admin/growth/infrastructure/mailboxes/onboard">Onboard mailbox</Link>
+            <Link href={navPaths.onboardHref}>Onboard mailbox</Link>
           </Button>
           <Button type="button" variant="outline" size="sm" asChild>
             <Link href={navPaths.senderHref}>Sender infrastructure</Link>
@@ -345,6 +471,18 @@ export function GrowthConnectedMailboxesDashboard({
           }
         >
           {oauthNotice.message}
+        </div>
+      ) : null}
+
+      {warmupNotice ? (
+        <div
+          className={
+            warmupNotice.tone === "success"
+              ? "rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+              : "rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"
+          }
+        >
+          {warmupNotice.message}
         </div>
       ) : null}
 
@@ -448,6 +586,8 @@ export function GrowthConnectedMailboxesDashboard({
                   const googleOAuth = row.providerFamily === "google"
                   const oauthLabel = row.mailboxTokenConfigured ? "Reconnect Gmail" : "Connect Gmail"
                   const senderPaused = row.senderStatus === "disabled"
+                  const warmupDisplay = resolveConnectedMailboxWarmupDisplay(row)
+                  const validation = validationFeedback[row.senderId]
                   return (
                     <tr key={row.senderId} className="border-b border-border/60">
                       <td className="px-2 py-3">
@@ -472,11 +612,7 @@ export function GrowthConnectedMailboxesDashboard({
                         </div>
                       </td>
                       <td className="px-2 py-3">
-                        {row.warmupStatus ? (
-                          <GrowthBadge label={row.warmupStatus} tone={STATUS_TONE[row.warmupStatus] ?? "neutral"} />
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
+                        <GrowthBadge label={warmupDisplay.label} tone={warmupDisplay.tone} />
                       </td>
                       <td className="px-2 py-3">
                         {row.poolMemberships.length === 0 ? (
@@ -497,7 +633,28 @@ export function GrowthConnectedMailboxesDashboard({
                       </td>
                       <td className="px-2 py-3">{row.dailyCap}</td>
                       <td className="px-2 py-3">{row.dailyUsed}</td>
-                      <td className="px-2 py-3">{formatDate(row.lastValidationAt)}</td>
+                      <td className="px-2 py-3">
+                        <div className="space-y-1">
+                          <span>{formatDate(validation?.lastValidationAt ?? row.lastValidationAt)}</span>
+                          {validation ? (
+                            <div
+                              className={
+                                validation.ok
+                                  ? "rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-900"
+                                  : "rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-900"
+                              }
+                            >
+                              <p>{validation.message}</p>
+                              <p className="mt-0.5 text-[11px] opacity-90">
+                                Status: {validation.status} · Health: {validation.healthTier}
+                              </p>
+                              {validation.suggestedNextStep ? (
+                                <p className="mt-1 font-medium">{validation.suggestedNextStep}</p>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      </td>
                       <td className="px-2 py-3">
                         <div className="flex flex-wrap gap-1">
                           {googleOAuth ? (
@@ -527,6 +684,32 @@ export function GrowthConnectedMailboxesDashboard({
                               Validate
                             </Button>
                           ) : null}
+                          {warmupDisplay.canStart ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={Boolean(actionLoading) || row.connectionStatus !== "connected"}
+                              onClick={() =>
+                                void runAction(`warmup-start-${row.senderId}`, async () => {
+                                  setWarmupNotice(null)
+                                  await startWarmup(row)
+                                })
+                              }
+                            >
+                              Start Warmup
+                            </Button>
+                          ) : (
+                            <Button type="button" size="sm" variant="outline" asChild>
+                              <Link href={growthCommunicationsWarmupHref(row.senderId)}>View Warmup</Link>
+                            </Button>
+                          )}
+                          <Button type="button" size="sm" variant="ghost" asChild>
+                            <Link href={navPaths.deliverabilityHref}>DNS</Link>
+                          </Button>
+                          <Button type="button" size="sm" variant="ghost" asChild>
+                            <Link href={navPaths.reputationHref}>Reputation</Link>
+                          </Button>
                           {senderPaused ? (
                             <Button
                               type="button"

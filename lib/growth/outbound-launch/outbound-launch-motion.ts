@@ -8,6 +8,7 @@ import {
   type GrowthWorkflowContextHandoff,
 } from "@/lib/growth/prospect-search/prospect-workflow-context"
 import type { GrowthOutreachQueueStatus } from "@/lib/growth/outreach/outreach-queue-types"
+import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 
 export const GROWTH_OUTBOUND_LAUNCH_MOTION_QA_MARKER = "growth-outbound-launch-motion-v1" as const
 
@@ -302,8 +303,8 @@ export function buildOutboundLaunchUrls(input: {
     copilot: growthLeadId
       ? withContext(`/admin/growth/copilot?leadId=${encodeURIComponent(growthLeadId)}`)
       : null,
-    lead_drawer: growthLeadId ? `/admin/growth/leads?leadId=${encodeURIComponent(growthLeadId)}` : null,
-    lead_inbox_workspace: inboxId ? `/admin/growth/leads/${encodeURIComponent(inboxId)}` : null,
+    lead_drawer: growthLeadId ? buildGrowthLeadHref(growthLeadId) : null,
+    lead_inbox_workspace: inboxId ? buildGrowthLeadHref(inboxId) : null,
   }
 }
 

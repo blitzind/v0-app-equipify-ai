@@ -15,8 +15,8 @@ export const WORKSPACE_SHELL_MAIN_INNER =
  * Growth workspace main inner — FAB clearance on small viewports without the large
  * gray dead zone from `pb-24` on long operator hub pages (UX-AUDIT-6).
  */
-export const GROWTH_WORKSPACE_SHELL_MAIN_INNER =
-  "max-w-[1440px] mx-auto p-3 sm:p-6 pb-6 max-lg:pb-20" as const
+/** Bottom/right AIden inset applied in `growth-workspace-shell.tsx` via `growth-aiden-safe-area-*`. */
+export const GROWTH_WORKSPACE_SHELL_MAIN_INNER = "max-w-[1440px] mx-auto p-3 sm:p-6" as const
 
 /**
  * Growth workspace page stack — shell `WorkspaceContainer` already applies

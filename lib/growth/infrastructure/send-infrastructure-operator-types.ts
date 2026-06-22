@@ -229,7 +229,7 @@ export function buildSendInfrastructureChecklist(
           : input.totalMailboxes > 0
             ? "Mailbox connections exist but none are fully connected yet."
             : "No mailbox providers connected yet.",
-      href: "/admin/growth/infrastructure/mailboxes",
+      href: "/growth/settings/communications/mailboxes",
     },
     {
       id: "sending_domain",
@@ -309,7 +309,7 @@ export function buildSendInfrastructureChecklist(
         : input.totalMailboxes > 0
           ? "Set daily send limits before scaling outbound volume."
           : "Connect mailboxes before configuring send caps.",
-      href: "/admin/growth/infrastructure/mailboxes",
+      href: "/growth/settings/communications/mailboxes",
     },
     {
       id: "live_dns",
@@ -440,7 +440,7 @@ export function buildSendInfrastructureProviderCards(
       mailboxesAttached: googleMailboxes.length,
       lastActivityLabel: snapshot.googleOAuthConfigured ? "OAuth configured" : "OAuth not configured",
       ctaLabel: snapshot.googleOAuthConfigured ? "Configure" : "Connect",
-      ctaHref: "/growth/settings/delivery",
+      ctaHref: "/growth/settings/communications/mailboxes",
       detail: snapshot.googleOAuthConfigured
         ? "Google Workspace send path is configured."
         : "Connect Google Workspace to send and sync replies.",
@@ -454,7 +454,7 @@ export function buildSendInfrastructureProviderCards(
         sanitizeInfrastructureReadinessDetailForOperator(microsoftEntry?.readiness.detail) ??
         "Microsoft 365 connection not configured.",
       ctaLabel: microsoftMailboxes.length > 0 ? "Configure" : "Connect",
-      ctaHref: "/growth/settings/delivery",
+      ctaHref: "/growth/settings/communications/mailboxes",
       detail: "Microsoft 365 mailbox integration for outbound and inbox sync.",
     },
     {
@@ -465,7 +465,7 @@ export function buildSendInfrastructureProviderCards(
       lastActivityLabel:
         smtpMailboxes.length > 0 ? `${smtpMailboxes.length} SMTP mailbox(es)` : "No SMTP mailboxes connected",
       ctaLabel: smtpMailboxes.length > 0 ? "Review issues" : "Connect",
-      ctaHref: "/admin/growth/infrastructure/mailboxes",
+      ctaHref: "/growth/settings/communications/mailboxes",
       detail: "SMTP/IMAP mailboxes for operator testing and alternate send paths.",
     },
     {
@@ -475,7 +475,7 @@ export function buildSendInfrastructureProviderCards(
       mailboxesAttached: customMailboxes.length,
       lastActivityLabel: customMailboxes.length > 0 ? "Custom mailboxes attached" : "Not connected",
       ctaLabel: customMailboxes.length > 0 ? "Configure" : "Connect",
-      ctaHref: "/admin/growth/infrastructure/mailboxes",
+      ctaHref: "/growth/settings/communications/mailboxes",
       detail: "Custom provider connections for specialized mailbox setups.",
     },
   ]

@@ -18,6 +18,7 @@ import {
   filterHumanInterventions,
   rankHumanInterventions,
 } from "@/lib/growth/human-interventions/human-intervention-priority"
+import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import type { OperatorInboxItem } from "@/lib/growth/operator-inbox/operator-inbox-types"
 import type { HumanInterventionFilter } from "@/lib/growth/human-interventions/human-intervention-types"
 
@@ -117,7 +118,7 @@ function interventionFromInboxItem(item: OperatorInboxItem): HumanIntervention {
       entity_type: "lead",
       entity_id: item.lead_id,
       label: item.company_name ?? "Lead",
-      href: `/admin/growth/leads/${item.lead_id}`,
+      href: buildGrowthLeadHref(item.lead_id),
     })
   }
   if (item.source === "inbox_thread") {
@@ -224,7 +225,7 @@ function interventionsFromCampaignReadiness(assessment: CampaignReadinessAssessm
                 entity_type: "lead",
                 entity_id: assessment.lead_id,
                 label: assessment.company_name ?? "Lead",
-                href: `/admin/growth/leads/${assessment.lead_id}`,
+                href: buildGrowthLeadHref(assessment.lead_id),
               },
               {
                 entity_type: "campaign",
@@ -243,7 +244,7 @@ function interventionsFromCampaignReadiness(assessment: CampaignReadinessAssessm
         lead_id: assessment.lead_id,
         company_name: assessment.company_name,
         occurred_at: assessment.generated_at,
-        related_href: blocker.related_asset_href ?? (assessment.lead_id ? `/admin/growth/leads/${assessment.lead_id}` : null),
+        related_href: blocker.related_asset_href ?? (assessment.lead_id ? buildGrowthLeadHref(assessment.lead_id) : null),
         requires_human_review: true,
         autonomous_execution_enabled: false,
       }

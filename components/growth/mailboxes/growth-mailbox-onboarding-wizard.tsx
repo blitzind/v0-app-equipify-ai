@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthWizardActionRow } from "@/components/growth/shell/growth-workspace-shell"
 import {
   GROWTH_MAILBOX_ONBOARDING_QA_MARKER,
   GROWTH_MAILBOX_ONBOARDING_STEPS,
@@ -34,7 +35,16 @@ import { interpolateWarmupVolume } from "@/lib/growth/warmup/warmup-scheduler"
 import { GROWTH_SENDER_PROVIDER_FAMILIES, type GrowthSenderProviderFamily } from "@/lib/growth/sender/sender-types"
 import type { GrowthSenderPool } from "@/lib/growth/sender-pools/sender-pool-types"
 
-const ONBOARD_RETURN_PATH = "/admin/growth/infrastructure/mailboxes/onboard"
+const ADMIN_ONBOARD_PATHS = {
+  returnBasePath: "/admin/growth/infrastructure/mailboxes/onboard",
+  connectedMailboxesHref: "/admin/growth/infrastructure/mailboxes",
+} as const
+
+export type GrowthMailboxOnboardingWizardPaths = {
+  returnBasePath: string
+  connectedMailboxesHref: string
+}
+
 const SESSION_KEY = "growth-mailbox-onboard-draft-v1"
 
 const PROVIDER_LABELS: Record<GrowthSenderProviderFamily, string> = {
@@ -108,9 +118,15 @@ function clearDraft() {
   sessionStorage.removeItem(SESSION_KEY)
 }
 
-export function GrowthMailboxOnboardingWizard() {
+export function GrowthMailboxOnboardingWizard({
+  paths = ADMIN_ONBOARD_PATHS,
+}: {
+  paths?: GrowthMailboxOnboardingWizardPaths
+}) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const returnBasePath = paths.returnBasePath
+  const connectedMailboxesHref = paths.connectedMailboxesHref
   const [draft, setDraft] = useState<WizardDraft>(DEFAULT_DRAFT)
   const [step, setStep] = useState<GrowthMailboxOnboardingStep>("create_sender")
   const [senderId, setSenderId] = useState<string | null>(null)
@@ -201,7 +217,7 @@ export function GrowthMailboxOnboardingWizard() {
     const resolvedId = id ?? senderId
     if (resolvedId) params.set("senderId", resolvedId)
     params.set("step", next)
-    router.replace(`${ONBOARD_RETURN_PATH}?${params.toString()}`)
+    router.replace(`${returnBasePath}?${params.toString()}`)
   }
 
   async function createSender() {
@@ -243,7 +259,7 @@ export function GrowthMailboxOnboardingWizard() {
       throw new Error(prepareData.message ?? "Could not prepare mailbox connection.")
     }
 
-    const returnTo = `${ONBOARD_RETURN_PATH}?senderId=${senderId}&step=validate`
+    const returnTo = `${returnBasePath}?senderId=${senderId}&step=validate`
     const oauthRes = await fetch("/api/platform/growth/provider-setup/google/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -334,7 +350,7 @@ export function GrowthMailboxOnboardingWizard() {
     setStatus(null)
     setStep("create_sender")
     setOauthNotice(null)
-    router.replace(ONBOARD_RETURN_PATH)
+    router.replace(returnBasePath)
   }
 
   const review = useMemo(() => status, [status])
@@ -356,7 +372,7 @@ export function GrowthMailboxOnboardingWizard() {
           assignment.
         </p>
         <Button type="button" variant="outline" size="sm" asChild>
-          <Link href="/admin/growth/infrastructure/mailboxes">Connected mailboxes</Link>
+          <Link href={connectedMailboxesHref}>Connected mailboxes</Link>
         </Button>
       </div>
 
@@ -458,12 +474,12 @@ export function GrowthMailboxOnboardingWizard() {
               />
             </div>
           </div>
-          <div className="mt-4 flex justify-end">
+          <GrowthWizardActionRow align="end" className="mt-4">
             <Button type="button" disabled={loading} onClick={() => void runStepAction(createSender)}>
               Continue
               <ChevronRight className="ml-1.5 size-4" />
             </Button>
-          </div>
+          </GrowthWizardActionRow>
         </GrowthEngineCard>
       ) : null}
 
@@ -490,7 +506,7 @@ export function GrowthMailboxOnboardingWizard() {
               </Button>
             </div>
           )}
-          <div className="mt-4 flex justify-between">
+          <GrowthWizardActionRow className="mt-4">
             <Button type="button" variant="outline" disabled={loading} onClick={() => goToStep("create_sender")}>
               <ChevronLeft className="mr-1.5 size-4" />
               Back
@@ -504,7 +520,7 @@ export function GrowthMailboxOnboardingWizard() {
               Skip to validate
               <ChevronRight className="ml-1.5 size-4" />
             </Button>
-          </div>
+          </GrowthWizardActionRow>
         </GrowthEngineCard>
       ) : null}
 
@@ -530,7 +546,7 @@ export function GrowthMailboxOnboardingWizard() {
               Retry validation
             </Button>
           </div>
-          <div className="mt-4 flex justify-between">
+          <GrowthWizardActionRow className="mt-4">
             <Button type="button" variant="outline" onClick={() => goToStep("connect_gmail")}>
               <ChevronLeft className="mr-1.5 size-4" />
               Back
@@ -543,7 +559,7 @@ export function GrowthMailboxOnboardingWizard() {
               Continue
               <ChevronRight className="ml-1.5 size-4" />
             </Button>
-          </div>
+          </GrowthWizardActionRow>
         </GrowthEngineCard>
       ) : null}
 
@@ -581,7 +597,7 @@ export function GrowthMailboxOnboardingWizard() {
               <p className="text-sm text-muted-foreground">Warmup can be enabled later from Infrastructure → Warmup.</p>
             )}
           </div>
-          <div className="mt-4 flex justify-between">
+          <GrowthWizardActionRow className="mt-4">
             <Button type="button" variant="outline" onClick={() => goToStep("validate")}>
               <ChevronLeft className="mr-1.5 size-4" />
               Back
@@ -590,7 +606,7 @@ export function GrowthMailboxOnboardingWizard() {
               Continue
               <ChevronRight className="ml-1.5 size-4" />
             </Button>
-          </div>
+          </GrowthWizardActionRow>
         </GrowthEngineCard>
       ) : null}
 
@@ -642,7 +658,7 @@ export function GrowthMailboxOnboardingWizard() {
               </div>
             ) : null}
           </div>
-          <div className="mt-4 flex justify-between">
+          <GrowthWizardActionRow className="mt-4">
             <Button type="button" variant="outline" onClick={() => goToStep("warmup")}>
               <ChevronLeft className="mr-1.5 size-4" />
               Back
@@ -651,7 +667,7 @@ export function GrowthMailboxOnboardingWizard() {
               Continue
               <ChevronRight className="ml-1.5 size-4" />
             </Button>
-          </div>
+          </GrowthWizardActionRow>
         </GrowthEngineCard>
       ) : null}
 
@@ -718,7 +734,7 @@ export function GrowthMailboxOnboardingWizard() {
               Test send
             </Button>
             <Button type="button" variant="outline" asChild>
-              <Link href="/admin/growth/infrastructure/mailboxes">Finish</Link>
+              <Link href={connectedMailboxesHref}>Finish</Link>
             </Button>
             <Button type="button" variant="ghost" onClick={resetWizard}>
               Add another mailbox

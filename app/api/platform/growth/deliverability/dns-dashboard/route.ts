@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { collectTopIssues } from "@/lib/growth/deliverability/deliverability-dashboard"
 import {
   fetchDeliverabilityDashboard,
@@ -12,8 +12,8 @@ import { isLiveDnsVerificationEnabled } from "@/lib/growth/deliverability/live-d
 export const runtime = "nodejs"
 
 /** DNS & Setup dashboard — separate from reputation protection at `/deliverability/dashboard`. */
-export async function GET() {
-  const access = await requireGrowthEnginePlatformAccess()
+export async function GET(request: Request) {
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   if (!(await isGrowthDnsDeliverabilitySchemaReady(access.admin))) {

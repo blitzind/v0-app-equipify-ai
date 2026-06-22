@@ -2,6 +2,7 @@
 
 import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import { GROWTH_CAMPAIGNS_HUB_SEQUENCES_HREF } from "@/lib/growth/hubs/growth-workspace-hub-paths"
+import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 
 export const GROWTH_PATTERN_ENROLLMENT_DETAIL_QA_MARKER = "growth-pattern-enrollment-detail-v1" as const
 
@@ -35,25 +36,20 @@ export function growthSequenceExecutionHref(
 }
 
 export function growthLeadsCrmHref(): string {
-  return "/admin/growth/leads/crm"
+  return "/growth/leads/crm"
 }
 
 /** Deep-link into the CRM growth.leads drawer (`growth.leads` table). */
 export function growthCrmLeadDetailHref(leadId: string, focus?: string | null): string {
-  const params = new URLSearchParams({ open: leadId })
-  if (focus) params.set("focus", focus)
-  return `/admin/growth/leads/crm?${params.toString()}`
+  return buildGrowthLeadHref(leadId, focus ? { focus } : undefined)
 }
 
 export type GrowthLeadNavigationSource = "growth.leads" | "lead_inbox"
 
-/** Route to the correct lead workspace based on lead source/table. */
+/** Route to the canonical operator lead workspace. */
 export function growthLeadDetailHref(
   leadId: string,
-  source: GrowthLeadNavigationSource = "growth.leads",
+  _source: GrowthLeadNavigationSource = "growth.leads",
 ): string {
-  if (source === "lead_inbox") {
-    return `/admin/growth/leads/${leadId}`
-  }
-  return growthCrmLeadDetailHref(leadId)
+  return buildGrowthLeadHref(leadId)
 }

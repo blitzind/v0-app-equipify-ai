@@ -113,7 +113,7 @@ function runAudit(): void {
   const adminFallback = growthOperatorInboxFallbackHref({ notificationType: "sequence_failed" })
   assert.equal(adminFallback, "/growth/campaigns/sequences")
   const providerFallback = growthOperatorInboxFallbackHref({ notificationType: "provider_degraded" })
-  assert.equal(providerFallback, "/admin/growth/providers")
+  assert.equal(providerFallback, "/growth/settings/communications/mailboxes")
   console.log("  ✓ admin control-plane fallbacks remain admin")
 
   const unknownFallback = growthOperatorInboxFallbackHref({ leadId: "lead-unknown" })

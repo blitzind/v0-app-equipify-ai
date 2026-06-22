@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { memberContextToRoutingInsight } from "@/lib/growth/sender-pools/health-aware-routing"
 import { GROWTH_HEALTH_AWARE_ROUTING_QA_MARKER } from "@/lib/growth/sender-pools/health-aware-routing-types"
 import {
@@ -27,7 +27,7 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   if (!(await isGrowthSenderPoolIntelligenceSchemaReady(access.admin))) {

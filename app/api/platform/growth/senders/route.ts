@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { listSenderProviderCapabilities } from "@/lib/growth/sender/provider-sender-capabilities"
 import { createSenderAccount, listSenderAccounts } from "@/lib/growth/sender/sender-repository"
 import { isGrowthSenderInfrastructureSchemaReady } from "@/lib/growth/sender/sender-schema-health"
@@ -23,8 +23,8 @@ const CreateSenderSchema = z.object({
   status: z.enum(["pending", "connecting", "connected", "warning", "disabled", "error"]).optional(),
 })
 
-export async function GET() {
-  const access = await requireGrowthEnginePlatformAccess()
+export async function GET(request: Request) {
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   if (!(await isGrowthSenderInfrastructureSchemaReady(access.admin))) {
@@ -55,7 +55,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const access = await requireGrowthCommunicationsSettingsAccess(request)
   if (!access.ok) return access.response
 
   if (!(await isGrowthSenderInfrastructureSchemaReady(access.admin))) {
