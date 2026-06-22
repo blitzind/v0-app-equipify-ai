@@ -12,6 +12,10 @@ import {
   fetchBlitzpayMembershipDashboard,
 } from "@/lib/blitzpay/blitzpay-memberships"
 import { insertOrgInvoice } from "@/lib/org-quotes-invoices/repository"
+import {
+  invoiceBillingSnapshotFromProfile,
+  resolveCustomerBillingProfile,
+} from "@/lib/customers/billing-profile"
 import { billingAddressFromCustomerLike, lineItemsForTaxEngine, mapSalesTaxToInvoiceInsertFields } from "@/lib/tax/invoice-tax-bridge"
 import { resolveSalesTaxForLines } from "@/lib/tax/resolve-document-sales-tax"
 import { BLITZPAY_AUTOPAY_RETRY_INTERVALS_HOURS } from "@/lib/blitzpay/blitzpay-recurring-autopay-rules"
@@ -119,6 +123,12 @@ export async function generateMembershipInvoiceIfDue(
   const uiMode = resolution.status === "exempt" ? "exempt" : resolution.status !== "skipped" ? "automated" : "manual"
   const taxFields = mapSalesTaxToInvoiceInsertFields({ resolution, uiMode })
 
+  const billingProfile = await resolveCustomerBillingProfile(admin, {
+    organizationId: orgId,
+    customerId: membership.customer_id,
+  })
+  const billingSnapshot = billingProfile ? invoiceBillingSnapshotFromProfile(billingProfile) : null
+
   const res = await insertOrgInvoice(admin, {
     organizationId: orgId,
     customerId: membership.customer_id,
@@ -135,6 +145,19 @@ export async function generateMembershipInvoiceIfDue(
     lineItems,
     notes: `Membership billing period ${periodStart} – ${periodEnd}.`,
     internalNotes: `BlitzPay membership trace\nmembership_id:${membership.id}\ngeneration_key:${genKey}`,
+    billingCustomerId: billingSnapshot?.billingCustomerId ?? null,
+    billingName: billingSnapshot?.billingName ?? null,
+    billingContactName: billingSnapshot?.billingContactName ?? null,
+    billingContactEmail: billingSnapshot?.billingContactEmail ?? null,
+    billingContactPhone: billingSnapshot?.billingContactPhone ?? null,
+    billingAddressLine1: billingSnapshot?.billingAddressLine1 ?? null,
+    billingAddressLine2: billingSnapshot?.billingAddressLine2 ?? null,
+    billingCity: billingSnapshot?.billingCity ?? null,
+    billingState: billingSnapshot?.billingState ?? null,
+    billingPostalCode: billingSnapshot?.billingPostalCode ?? null,
+    billingCountry: billingSnapshot?.billingCountry ?? null,
+    poNumber: billingSnapshot?.poNumber ?? null,
+    invoiceInstructions: billingSnapshot?.invoiceInstructions ?? null,
     taxCalculationMode: taxFields.taxCalculationMode,
     taxBasis: taxFields.taxBasis,
     taxJurisdictionLabel: taxFields.taxJurisdictionLabel,

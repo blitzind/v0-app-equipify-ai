@@ -227,3 +227,38 @@ export async function resolveCustomerBillingProfile(
 
   return buildProfile(customer, source, serviceLocation)
 }
+
+export type InvoiceBillingSnapshotInsertFields = {
+  billingCustomerId: string
+  billingName: string
+  billingContactName: string | null
+  billingContactEmail: string | null
+  billingContactPhone: string | null
+  billingAddressLine1: string | null
+  billingAddressLine2: string | null
+  billingCity: string | null
+  billingState: string | null
+  billingPostalCode: string | null
+  billingCountry: string | null
+  poNumber: string | null
+  invoiceInstructions: string | null
+}
+
+/** Maps a resolved billing profile to org_invoices billing snapshot columns. */
+export function invoiceBillingSnapshotFromProfile(profile: CustomerBillingProfile): InvoiceBillingSnapshotInsertFields {
+  return {
+    billingCustomerId: profile.billingCustomerId,
+    billingName: profile.billingName,
+    billingContactName: profile.billingContactName,
+    billingContactEmail: profile.billingContactEmail,
+    billingContactPhone: profile.billingContactPhone,
+    billingAddressLine1: profile.addressLine1.trim() || null,
+    billingAddressLine2: profile.addressLine2,
+    billingCity: profile.city.trim() || null,
+    billingState: profile.state.trim() || null,
+    billingPostalCode: profile.postalCode.trim() || null,
+    billingCountry: profile.country,
+    poNumber: profile.defaultPoNumber,
+    invoiceInstructions: profile.invoiceInstructions,
+  }
+}

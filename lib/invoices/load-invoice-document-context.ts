@@ -8,6 +8,7 @@ import {
 } from "@/lib/billing/invoice-payment-allocation"
 import { formatBillingAddressPartsBlock, splitLineItemDescription } from "@/lib/documents/document-address"
 import { loadCustomerDocumentFields } from "@/lib/documents/load-customer-document-fields"
+import { resolveInvoiceBillToFields } from "@/lib/invoices/resolve-invoice-bill-to-fields"
 import { profileLabelById } from "@/lib/documents/profile-label"
 import { getOrganizationDocumentBranding } from "@/lib/organization/document-branding"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
@@ -80,6 +81,8 @@ export async function loadInvoiceDocumentContext(
         "notes",
         "invoice_instructions",
         "billing_name",
+        "billing_contact_phone",
+        "billing_contact_email",
         "billing_address_line1",
         "billing_address_line2",
         "billing_city",
@@ -118,6 +121,8 @@ export async function loadInvoiceDocumentContext(
     notes?: string | null
     invoice_instructions?: string | null
     billing_name?: string | null
+    billing_contact_phone?: string | null
+    billing_contact_email?: string | null
     billing_address_line1?: string | null
     billing_address_line2?: string | null
     billing_city?: string | null
@@ -255,9 +260,9 @@ export async function loadInvoiceDocumentContext(
     return row
   })
 
-  const billToName = inv.billing_name?.trim() || null
-  const billToAddressBlock = formatBillingAddressPartsBlock(
+  const { billToName, billToAddressBlock } = resolveInvoiceBillToFields(
     {
+      billing_name: inv.billing_name,
       billing_address_line1: inv.billing_address_line1,
       billing_address_line2: inv.billing_address_line2,
       billing_city: inv.billing_city,
@@ -265,8 +270,8 @@ export async function loadInvoiceDocumentContext(
       billing_postal_code: inv.billing_postal_code,
       billing_country: inv.billing_country,
     },
-    billToName,
-  ).trim()
+    customerFields,
+  )
 
   const taxRateNum = inv.tax_rate_percent == null ? null : Number(inv.tax_rate_percent)
 

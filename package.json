@@ -79,6 +79,7 @@
     "test:invoice-pdf": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-invoice-pdf.ts",
     "test:purchase-order-pdf": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-purchase-order-pdf.ts",
     "test:document-address": "tsx scripts/test-document-address.ts",
+    "test:document-customer-info-hotfix": "tsx scripts/test-document-customer-info-hotfix.ts",
     "test:operational-timeline-intelligence": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-operational-timeline-intelligence.ts",
     "test:executive-operational-report": "tsx scripts/test-executive-operational-report.ts",
     "test:operational-workflow-recommendations": "tsx scripts/test-operational-workflow-recommendations.ts",

@@ -6,6 +6,10 @@
 import { randomBytes } from "node:crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { insertOrgInvoice, insertOrgQuote } from "@/lib/org-quotes-invoices/repository"
+import {
+  invoiceBillingSnapshotFromProfile,
+  resolveCustomerBillingProfile,
+} from "@/lib/customers/billing-profile"
 import type { LineItemJson } from "@/lib/org-quotes-invoices/map"
 import { sha256Hex } from "@/lib/portal/token-hash"
 
@@ -303,6 +307,9 @@ async function locateOrCreateInvoice(
     return { invoice_id: existing.id as string, created: false }
   }
 
+  const billingProfile = await resolveCustomerBillingProfile(admin, { organizationId, customerId })
+  const billingSnapshot = billingProfile ? invoiceBillingSnapshotFromProfile(billingProfile) : null
+
   const viaRepo = await insertOrgInvoice(
     admin,
     {
@@ -321,6 +328,19 @@ async function locateOrCreateInvoice(
       lineItems: EC_INVOICE_LINE_ITEMS,
       notes: "EC-6 revenue certification fixture — unpaid test invoice.",
       internalNotes: null,
+      billingCustomerId: billingSnapshot?.billingCustomerId ?? null,
+      billingName: billingSnapshot?.billingName ?? null,
+      billingContactName: billingSnapshot?.billingContactName ?? null,
+      billingContactEmail: billingSnapshot?.billingContactEmail ?? null,
+      billingContactPhone: billingSnapshot?.billingContactPhone ?? null,
+      billingAddressLine1: billingSnapshot?.billingAddressLine1 ?? null,
+      billingAddressLine2: billingSnapshot?.billingAddressLine2 ?? null,
+      billingCity: billingSnapshot?.billingCity ?? null,
+      billingState: billingSnapshot?.billingState ?? null,
+      billingPostalCode: billingSnapshot?.billingPostalCode ?? null,
+      billingCountry: billingSnapshot?.billingCountry ?? null,
+      poNumber: billingSnapshot?.poNumber ?? null,
+      invoiceInstructions: billingSnapshot?.invoiceInstructions ?? null,
     },
     { skipQuickBooksQueue: true, skipWorkOrderBillingStateSync: true },
   )

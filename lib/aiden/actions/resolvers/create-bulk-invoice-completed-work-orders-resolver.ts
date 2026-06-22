@@ -13,12 +13,14 @@ import type { AidenPreparedWorkspaceRouteGate } from "@/lib/aiden/prepared-works
 import {
   buildCreateInvoiceFromWorkOrderPreviewFromWorkOrder,
   listActiveInvoicesForWorkOrder,
+  mapBillingProfileToPreviewCustomer,
   mapCustomerRow,
   rankCustomerMatches,
   workOrderIsAlreadyInvoiced,
   type CreateInvoiceResolverCustomerRow,
   type CreateInvoiceResolverWorkOrderRow,
 } from "@/lib/aiden/actions/resolvers/create-invoice-from-work-order-resolver"
+import { resolveCustomerBillingProfile } from "@/lib/customers/billing-profile"
 import { getAidenActionMembership } from "@/lib/permissions/aiden-actions"
 import { isTrialActive, type OrganizationSubscription } from "@/lib/billing/subscriptions"
 import { fetchWorkOrderLineItems, type DbWorkOrderLineItemRow } from "@/lib/work-orders/work-order-tab-data"
@@ -239,9 +241,18 @@ export async function resolveBulkInvoiceCompletedWorkOrdersPreview(
       partsRows = []
     }
 
+    const billingProfile = await resolveCustomerBillingProfile(supabase, {
+      organizationId: input.organizationId,
+      customerId: customerRow.id,
+    })
+    const customer = billingProfile
+      ? mapBillingProfileToPreviewCustomer(customerRow, billingProfile)
+      : mapCustomerRow(customerRow)
+
     const invoicePreview = buildCreateInvoiceFromWorkOrderPreviewFromWorkOrder({
       workOrder: wo,
       customerRow,
+      customer,
       partsRows,
     })
 
@@ -255,7 +266,7 @@ export async function resolveBulkInvoiceCompletedWorkOrdersPreview(
       anomalies.push("existing_invoice_link")
     }
 
-    const cust = mapCustomerRow(customerRow)
+    const cust = billingProfile ? mapBillingProfileToPreviewCustomer(customerRow, billingProfile) : mapCustomerRow(customerRow)
     const label = cust.billingName?.trim() ? `${cust.companyName} (${cust.billingName})` : cust.companyName
 
     items.push({
