@@ -24,6 +24,10 @@ import {
 } from "@/lib/growth/provider-setup/provider-setup-types"
 import { logGrowthGoogleOAuthFlow } from "@/lib/growth/provider-setup/google-oauth-flow-log"
 import {
+  logProviderOAuthMailboxFlow,
+  resolveOAuthConnectionMailboxId,
+} from "@/lib/growth/provider-setup/oauth-mailbox-resolution"
+import {
   GROWTH_LIVE_PROVIDER_SETUP_SCHEMA_SETUP_MESSAGE,
   isGrowthLiveProviderSetupSchemaReady,
 } from "@/lib/growth/provider-setup/schema-health"
@@ -335,33 +339,36 @@ export async function completeOAuthProviderConnection(
   } = await import("@/lib/growth/mailboxes/mailbox-repository")
   const { appendMailboxTimelineEvent } = await import("@/lib/growth/mailboxes/mailbox-events")
 
-  let mailboxId: string | null = null
-
-  if (input.mailboxConnectionId) {
-    const mailbox = await getMailboxConnection(admin, input.mailboxConnectionId)
-    if (mailbox && mailbox.provider_family === input.providerFamily) {
-      mailboxId = mailbox.id
-    }
-  }
-
-  if (!mailboxId && input.senderAccountId) {
-    const bySender = await getMailboxConnectionBySender(admin, input.senderAccountId)
-    if (bySender && bySender.provider_family === input.providerFamily) {
-      mailboxId = bySender.id
-    }
-  }
-
-  if (!mailboxId) {
-    const existing = await getProviderConnectionSettings(admin, input.providerFamily)
-    if (existing?.mailbox_connection_id) {
-      mailboxId = existing.mailbox_connection_id
-    }
-  }
+  let mailboxId = await resolveOAuthConnectionMailboxId(
+    admin,
+    {
+      providerFamily: input.providerFamily,
+      senderAccountId: input.senderAccountId,
+      mailboxConnectionId: input.mailboxConnectionId,
+      oauthEmail: input.email,
+      actorUserId: input.actorUserId,
+    },
+    { getMailboxConnection, getMailboxConnectionBySender },
+  )
 
   let resolvedSenderAccountId = input.senderAccountId
   if (!resolvedSenderAccountId && mailboxId) {
     const linkedMailbox = await getMailboxConnection(admin, mailboxId)
     resolvedSenderAccountId = linkedMailbox?.sender_account_id ?? null
+  }
+
+  if (input.providerFamily === "google") {
+    const resolvedMailbox = mailboxId ? await getMailboxConnection(admin, mailboxId) : null
+    logGrowthGoogleOAuthFlow("mailbox_resolved", {
+      userId: input.actorUserId,
+      senderId: resolvedSenderAccountId,
+      mailboxId,
+      email: input.email,
+      provider: input.providerFamily,
+      connectionState: resolvedMailbox?.status ?? "mailbox_unresolved",
+      resolvedMailboxId: mailboxId,
+      resolvedSenderId: resolvedSenderAccountId,
+    })
   }
 
   const tokenPatch = {
@@ -392,6 +399,13 @@ export async function completeOAuthProviderConnection(
       actorEmail: input.actorEmail,
     })
     mailboxId = mailbox.id
+    logProviderOAuthMailboxFlow("mailbox_created", {
+      provider: input.providerFamily,
+      senderId: resolvedSenderAccountId,
+      mailboxId,
+      email: input.email,
+      userId: input.actorUserId,
+    })
   } else {
     throw new Error("sender_account_id is required for first OAuth connection.")
   }
@@ -401,17 +415,35 @@ export async function completeOAuthProviderConnection(
     actorEmail: input.actorEmail,
   })
 
+  if (input.providerFamily === "google") {
+    logGrowthGoogleOAuthFlow("mailbox_validated", {
+      userId: input.actorUserId,
+      senderId: resolvedSenderAccountId,
+      mailboxId,
+      email: validated.email_address,
+      provider: input.providerFamily,
+      connectionState: validated.status,
+      validationStatus: validated.status,
+      validationReason: validated.health_reason,
+      resolvedMailboxId: mailboxId,
+      resolvedSenderId: resolvedSenderAccountId,
+    })
+  }
+
   if (validated.status !== "connected") {
+    const validationMessage = validated.validation_message ?? null
     await appendMailboxTimelineEvent(admin, {
       eventType: "mailbox_validation_failed",
       title: `OAuth reconnect validation: ${validated.email_address}`,
-      summary: validated.health_reason ?? "Mailbox validation did not reach connected status.",
+      summary: validationMessage ?? validated.health_reason ?? "Mailbox validation did not reach connected status.",
       mailboxConnectionId: mailboxId,
       actorUserId: input.actorUserId,
       actorEmail: input.actorEmail,
       payload: { oauth: true, status: validated.status },
     })
-    throw new Error(validated.health_reason ?? "Mailbox validation failed after OAuth reconnect.")
+    throw new Error(
+      validationMessage ?? validated.health_reason ?? "Mailbox validation failed after OAuth reconnect.",
+    )
   }
 
   const settings = await upsertProviderConnectionSettings(admin, {

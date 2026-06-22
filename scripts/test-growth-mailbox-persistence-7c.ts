@@ -19,6 +19,7 @@ function main(): void {
   assert.match(dashboard, /upsertProviderConnectionSettings/)
   assert.match(dashboard, /wireOAuthProviderTransportAfterConnection/)
   assert.match(dashboard, /resolvedSenderAccountId/)
+  assert.match(dashboard, /resolveOAuthConnectionMailboxId/)
   assert.match(dashboard, /mailbox_connection_id: mailboxId/)
 
   const oauthState = readSource("lib/growth/provider-setup/oauth-state.ts")
@@ -55,6 +56,7 @@ function main(): void {
   const start = readSource("app/api/platform/growth/provider-setup/google/start/route.ts")
   assert.match(start, /createProviderSetupOAuthStateRecord/)
   assert.match(start, /upsertProviderConnectionSettings/)
+  assert.match(start, /resolveOAuthStartMailboxPointer/)
   assert.match(start, /senderAccountId: statePayload\.senderAccountId/)
 
   console.log("growth-mailbox-persistence-7c: ok")

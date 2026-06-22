@@ -452,7 +452,8 @@ export async function validateMailboxConnection(
     })
   }
 
-  return recomputeMailboxHealth(admin, updated as MailboxRow)
+  const summary = await recomputeMailboxHealth(admin, updated as MailboxRow)
+  return { ...summary, validation_message: validation.message }
 }
 
 export async function fetchMailboxHealthDashboard(admin: SupabaseClient): Promise<GrowthMailboxHealthDashboard> {

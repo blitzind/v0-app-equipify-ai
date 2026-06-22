@@ -14,6 +14,7 @@ import {
 import { recordProviderSecretAuditEvent } from "@/lib/growth/provider-setup/provider-setup-events"
 import { GROWTH_LIVE_PROVIDER_SETUP_QA_MARKER } from "@/lib/growth/provider-setup/provider-setup-types"
 import { upsertProviderConnectionSettings } from "@/lib/growth/provider-setup/dashboard"
+import { resolveOAuthStartMailboxPointer } from "@/lib/growth/provider-setup/oauth-mailbox-resolution"
 
 export const runtime = "nodejs"
 
@@ -36,17 +37,32 @@ export async function POST(request: Request) {
   }
 
   const senderAccountId = body.sender_account_id?.trim() || null
-  const mailboxConnectionId = body.mailbox_connection_id?.trim() || null
+  const requestedMailboxConnectionId = body.mailbox_connection_id?.trim() || null
   const workspace: GrowthProviderOAuthWorkspace = body.workspace === "admin" ? "admin" : "growth"
   const organizationId = getGrowthEngineAiOrgId()
+  const normalizedReturnTo = normalizeProviderSetupReturnTo(body.return_to, workspace)
+
+  const { getMailboxConnection, getMailboxConnectionBySender } = await import(
+    "@/lib/growth/mailboxes/mailbox-repository"
+  )
+
+  const { mailboxConnectionId, pendingSettingsMailboxConnectionId } = await resolveOAuthStartMailboxPointer(
+    access.admin,
+    {
+      providerFamily: "google",
+      senderAccountId,
+      mailboxConnectionId: requestedMailboxConnectionId,
+      actorUserId: access.userId,
+      returnTo: normalizedReturnTo,
+    },
+    { getMailboxConnection },
+  )
 
   let loginHint: string | null = null
   if (mailboxConnectionId) {
-    const { getMailboxConnection } = await import("@/lib/growth/mailboxes/mailbox-repository")
     const mailbox = await getMailboxConnection(access.admin, mailboxConnectionId)
     loginHint = mailbox?.email_address ?? null
   } else if (senderAccountId) {
-    const { getMailboxConnectionBySender } = await import("@/lib/growth/mailboxes/mailbox-repository")
     const { getSenderAccount } = await import("@/lib/growth/sender/sender-repository")
     const mailbox = await getMailboxConnectionBySender(access.admin, senderAccountId)
     const sender = await getSenderAccount(access.admin, senderAccountId)
@@ -56,7 +72,7 @@ export async function POST(request: Request) {
   const statePayload = {
     userId: access.userId,
     providerFamily: "google" as const,
-    returnTo: normalizeProviderSetupReturnTo(body.return_to, workspace),
+    returnTo: normalizedReturnTo,
     senderAccountId: senderAccountId,
     mailboxConnectionId: mailboxConnectionId,
     workspace,
@@ -87,7 +103,9 @@ export async function POST(request: Request) {
     provider_family: "google",
     status: "pending",
     ...(statePayload.senderAccountId ? { sender_account_id: statePayload.senderAccountId } : {}),
-    ...(statePayload.mailboxConnectionId ? { mailbox_connection_id: statePayload.mailboxConnectionId } : {}),
+    ...(pendingSettingsMailboxConnectionId !== undefined
+      ? { mailbox_connection_id: pendingSettingsMailboxConnectionId }
+      : {}),
     actorUserId: access.userId,
   })
 

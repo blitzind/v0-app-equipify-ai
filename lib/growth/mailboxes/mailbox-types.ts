@@ -49,6 +49,8 @@ export type GrowthMailboxConnectionSummary = {
   connection_health: number
   health_tier: GrowthMailboxHealthTier
   health_reason: string | null
+  /** Populated by validateMailboxConnection only — not persisted. */
+  validation_message?: string
   created_at: string
   updated_at: string
 }

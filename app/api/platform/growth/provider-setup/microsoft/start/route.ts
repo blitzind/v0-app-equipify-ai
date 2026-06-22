@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess, getGrowthEngineAiOrgId } from "@/lib/growth/access"
 import { upsertProviderConnectionSettings } from "@/lib/growth/provider-setup/dashboard"
+import { resolveOAuthStartMailboxPointer } from "@/lib/growth/provider-setup/oauth-mailbox-resolution"
 import type { GrowthProviderOAuthWorkspace } from "@/lib/growth/navigation/growth-delivery-settings-navigation"
 import {
   buildMicrosoftProviderAuthorizeUrl,
@@ -37,12 +38,26 @@ export async function POST(request: Request) {
 
   const workspace: GrowthProviderOAuthWorkspace = body.workspace === "admin" ? "admin" : "growth"
   const senderAccountId = body.sender_account_id?.trim() || null
-  const mailboxConnectionId = body.mailbox_connection_id?.trim() || null
+  const requestedMailboxConnectionId = body.mailbox_connection_id?.trim() || null
+  const normalizedReturnTo = normalizeProviderSetupReturnTo(body.return_to, workspace)
+
+  const { getMailboxConnection } = await import("@/lib/growth/mailboxes/mailbox-repository")
+  const { mailboxConnectionId, pendingSettingsMailboxConnectionId } = await resolveOAuthStartMailboxPointer(
+    access.admin,
+    {
+      providerFamily: "microsoft",
+      senderAccountId,
+      mailboxConnectionId: requestedMailboxConnectionId,
+      actorUserId: access.userId,
+      returnTo: normalizedReturnTo,
+    },
+    { getMailboxConnection },
+  )
 
   const statePayload = {
     userId: access.userId,
     providerFamily: "microsoft" as const,
-    returnTo: normalizeProviderSetupReturnTo(body.return_to, workspace),
+    returnTo: normalizedReturnTo,
     senderAccountId,
     mailboxConnectionId,
     workspace,
@@ -73,7 +88,9 @@ export async function POST(request: Request) {
     provider_family: "microsoft",
     status: "pending",
     ...(statePayload.senderAccountId ? { sender_account_id: statePayload.senderAccountId } : {}),
-    ...(statePayload.mailboxConnectionId ? { mailbox_connection_id: statePayload.mailboxConnectionId } : {}),
+    ...(pendingSettingsMailboxConnectionId !== undefined
+      ? { mailbox_connection_id: pendingSettingsMailboxConnectionId }
+      : {}),
     actorUserId: access.userId,
   })
 
