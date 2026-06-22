@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { CalendarClock, Loader2, RefreshCw, Video, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
@@ -25,6 +25,13 @@ import {
 import type { GrowthCalendarEventIntelligence } from "@/lib/growth/meeting-intelligence/calendar-event-intelligence-types"
 import { cn } from "@/lib/utils"
 import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
+import {
+  buildGrowthMeetingsWorkspaceHref,
+  GROWTH_OPS_URL_STATE_7A1_QA_MARKER,
+  resolveGrowthMeetingIdFromSearchParams,
+  resolveGrowthMeetingsLeadIdFromSearchParams,
+  selectNewestGrowthMeetingForLead,
+} from "@/lib/growth/navigation/growth-workspace-url-state-7a1"
 
 const VIEW_LABELS: Record<GrowthMeetingInboxView, string> = {
   upcoming: "Upcoming",
@@ -45,8 +52,12 @@ function leadDrawerHref(meeting: GrowthMeeting): string {
 }
 
 export function GrowthMeetingIntelligenceDashboard() {
+  const router = useRouter()
   const searchParams = useSearchParams()
-  const deepLinkMeetingId = searchParams.get("meetingId") ?? searchParams.get("highlight")
+  const deepLinkMeetingId = resolveGrowthMeetingIdFromSearchParams(searchParams)
+  const deepLinkLeadId = resolveGrowthMeetingsLeadIdFromSearchParams(searchParams)
+  const syncingFromUrlRef = useRef(false)
+  const lastPushedMeetingIdRef = useRef<string | null>(null)
 
   const [dashboard, setDashboard] = useState<GrowthMeetingIntelligenceDashboard | null>(null)
   const [items, setItems] = useState<GrowthMeeting[]>([])
@@ -152,10 +163,44 @@ export function GrowthMeetingIntelligenceDashboard() {
   }, [load, view])
 
   useEffect(() => {
+    if (items.length === 0) return
+
+    syncingFromUrlRef.current = true
     if (deepLinkMeetingId && items.some((meeting) => meeting.id === deepLinkMeetingId)) {
       setSelectedMeetingId(deepLinkMeetingId)
+      syncingFromUrlRef.current = false
+      return
     }
-  }, [deepLinkMeetingId, items])
+    if (deepLinkLeadId) {
+      const match = selectNewestGrowthMeetingForLead(items, deepLinkLeadId)
+      if (match) setSelectedMeetingId(match.id)
+    }
+    syncingFromUrlRef.current = false
+  }, [deepLinkLeadId, deepLinkMeetingId, items])
+
+  const selectMeeting = useCallback((meetingId: string | null) => {
+    setSelectedMeetingId(meetingId)
+    if (!meetingId) lastPushedMeetingIdRef.current = null
+  }, [])
+
+  useEffect(() => {
+    if (syncingFromUrlRef.current) return
+    if (!selectedMeetingId) return
+    if (lastPushedMeetingIdRef.current === selectedMeetingId) return
+    if (resolveGrowthMeetingIdFromSearchParams(searchParams) === selectedMeetingId) {
+      lastPushedMeetingIdRef.current = selectedMeetingId
+      return
+    }
+
+    const meeting = items.find((entry) => entry.id === selectedMeetingId)
+    const href = buildGrowthMeetingsWorkspaceHref({
+      meetingId: selectedMeetingId,
+      leadId: meeting?.leadId ?? deepLinkLeadId,
+      preserve: searchParams,
+    })
+    lastPushedMeetingIdRef.current = selectedMeetingId
+    router.replace(href, { scroll: false })
+  }, [deepLinkLeadId, items, router, searchParams, selectedMeetingId])
 
   if (loading && !dashboard && !setupMessage) {
     return (
@@ -167,7 +212,7 @@ export function GrowthMeetingIntelligenceDashboard() {
   }
 
   return (
-    <div className="space-y-6" data-qa-marker="growth-calendar-intelligence-dashboard-v1">
+    <div className="space-y-6" data-qa-marker="growth-calendar-intelligence-dashboard-v1" data-growth-ops-url-state={GROWTH_OPS_URL_STATE_7A1_QA_MARKER}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
           {GROWTH_MEETING_INBOX_VIEWS.map((option) => (
@@ -278,7 +323,7 @@ export function GrowthMeetingIntelligenceDashboard() {
               <Link href={leadDrawerHref(selectedMeeting)} className="text-xs text-indigo-600 hover:underline">
                 Open lead drawer
               </Link>
-              <Button type="button" size="icon" variant="ghost" className="size-7" onClick={() => setSelectedMeetingId(null)}>
+              <Button type="button" size="icon" variant="ghost" className="size-7" onClick={() => selectMeeting(null)}>
                 <X className="size-4" />
               </Button>
             </div>
@@ -313,7 +358,7 @@ export function GrowthMeetingIntelligenceDashboard() {
                       "flex w-full flex-wrap items-start justify-between gap-3 py-3 text-left first:pt-0",
                       selected ? "bg-indigo-50/40 dark:bg-indigo-500/10" : "hover:bg-muted/20",
                     )}
-                    onClick={() => setSelectedMeetingId(meeting.id)}
+                    onClick={() => selectMeeting(meeting.id)}
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">

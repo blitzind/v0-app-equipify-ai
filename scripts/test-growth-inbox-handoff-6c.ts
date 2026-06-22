@@ -34,8 +34,8 @@ function main(): void {
 
   const header = readSource("components/growth/inbox/growth-inbox-conversation-header.tsx")
   assert.match(header, /Reply/)
-  assert.match(header, /buildGrowthCallWorkspaceHref/)
-  console.log("  ✓ header retains primary reply workflow")
+  assert.doesNotMatch(header, /buildGrowthCallWorkspaceHref/)
+  console.log("  ✓ header retains Reply as primary workflow; Call moved to context strip")
 
   console.log("\nGS-GROWTH-OPS-6C inbox handoff certification passed.\n")
 }

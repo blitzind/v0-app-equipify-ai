@@ -1,8 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { ChevronRight, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
@@ -18,6 +18,12 @@ import {
   growthWorkspaceMeetingsHref,
   resolveGrowthLeadIdFromSearchParams,
 } from "@/lib/growth/navigation/growth-workspace-operator-links"
+import {
+  buildGrowthOpportunityPipelineHref,
+  GROWTH_OPS_URL_STATE_7A1_QA_MARKER,
+  resolveGrowthOpportunityIdFromSearchParams,
+  selectNewestGrowthOpportunityForLead,
+} from "@/lib/growth/navigation/growth-workspace-url-state-7a1"
 import type {
   GrowthOpportunity,
   GrowthOpportunityDetail,
@@ -217,7 +223,10 @@ function OpportunityDetailPanel({
 }
 
 export function GrowthOpportunityPipelineDashboard() {
+  const router = useRouter()
   const searchParams = useSearchParams()
+  const syncingFromUrlRef = useRef(false)
+  const lastPushedOpportunityIdRef = useRef<string | null>(null)
   const [dashboard, setDashboard] = useState<GrowthOpportunityPipelineDashboard | null>(null)
   const [items, setItems] = useState<GrowthOpportunity[]>([])
   const [view, setView] = useState<GrowthOpportunityPipelineView>("all_pipeline")
@@ -285,16 +294,48 @@ export function GrowthOpportunityPipelineDashboard() {
   }, [load, view])
 
   useEffect(() => {
-    const opportunityId = searchParams.get("opportunityId")
+    const opportunityId = resolveGrowthOpportunityIdFromSearchParams(searchParams)
     const leadId = resolveGrowthLeadIdFromSearchParams(searchParams)
+    syncingFromUrlRef.current = true
     if (opportunityId) {
       setSelectedId(opportunityId)
+      syncingFromUrlRef.current = false
       return
     }
-    if (!leadId || items.length === 0) return
-    const match = items.find((item) => item.leadId === leadId)
+    if (!leadId || items.length === 0) {
+      syncingFromUrlRef.current = false
+      return
+    }
+    const match = selectNewestGrowthOpportunityForLead(items, leadId)
     if (match) setSelectedId(match.id)
+    syncingFromUrlRef.current = false
   }, [items, searchParams])
+
+  const selectOpportunity = useCallback(
+    (opportunityId: string) => {
+      setSelectedId(opportunityId)
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (syncingFromUrlRef.current) return
+    if (!selectedId) return
+    if (lastPushedOpportunityIdRef.current === selectedId) return
+    if (resolveGrowthOpportunityIdFromSearchParams(searchParams) === selectedId) {
+      lastPushedOpportunityIdRef.current = selectedId
+      return
+    }
+
+    const item = items.find((entry) => entry.id === selectedId)
+    const href = buildGrowthOpportunityPipelineHref({
+      opportunityId: selectedId,
+      leadId: item?.leadId ?? resolveGrowthLeadIdFromSearchParams(searchParams),
+      preserve: searchParams,
+    })
+    lastPushedOpportunityIdRef.current = selectedId
+    router.replace(href, { scroll: false })
+  }, [items, router, searchParams, selectedId])
 
   useEffect(() => {
     if (!selectedId) {
@@ -331,7 +372,7 @@ export function GrowthOpportunityPipelineDashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-growth-ops-url-state={GROWTH_OPS_URL_STATE_7A1_QA_MARKER}>
       <GrowthEngineCard title="Opportunity Operating Dashboard">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -395,7 +436,7 @@ export function GrowthOpportunityPipelineDashboard() {
                   key={item.id}
                   item={item}
                   selected={selectedId === item.id}
-                  onSelect={() => setSelectedId(item.id)}
+                  onSelect={() => selectOpportunity(item.id)}
                 />
               ))
             )}

@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { emitGrowthNotification } from "@/lib/growth/notifications/emit-growth-notification"
+import { growthOperatorOpportunityNotificationHref } from "@/lib/growth/notifications/growth-operator-notification-links"
 
 export async function emitGrowthForecastGapNotification(
   admin: SupabaseClient,
@@ -67,7 +68,10 @@ export async function emitGrowthStaleHighValueDealNotification(
     body: `${input.companyName} ($${input.amount.toLocaleString()}) needs executive review.`,
     sourceSystem: "opportunity",
     sourceId: input.opportunityId,
-    actionUrl: `/admin/growth/opportunities/pipeline?opportunityId=${input.opportunityId}`,
+    actionUrl: growthOperatorOpportunityNotificationHref({
+      opportunityId: input.opportunityId,
+      leadId: input.leadId,
+    }),
     metadata: { amount: input.amount },
   })
 }
@@ -90,7 +94,10 @@ export async function emitGrowthCloseDateSlippedNotification(
     body: `${input.companyName} expected close date has passed.`,
     sourceSystem: "opportunity",
     sourceId: input.opportunityId,
-    actionUrl: `/admin/growth/opportunities/pipeline?opportunityId=${input.opportunityId}`,
+    actionUrl: growthOperatorOpportunityNotificationHref({
+      opportunityId: input.opportunityId,
+      leadId: input.leadId,
+    }),
     metadata: { companyName: input.companyName },
   })
 }

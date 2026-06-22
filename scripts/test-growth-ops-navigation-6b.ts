@@ -122,10 +122,11 @@ function main(): void {
   }
   console.log("  ✓ operator surfaces free of admin lead links and sendr hrefs")
 
+  const inboxContextStrip = readSource("components/growth/inbox/growth-inbox-conversation-intelligence-context-strip.tsx")
+  assert.match(inboxContextStrip, /buildGrowthCallWorkspaceHref/)
   const inboxHeader = readSource("components/growth/inbox/growth-inbox-conversation-header.tsx")
-  assert.match(inboxHeader, /buildGrowthCallWorkspaceHref/)
   assert.doesNotMatch(inboxHeader, /growthFeaturePath\(.*"calls"\)/)
-  console.log("  ✓ inbox call links target /growth/calls/workspace")
+  console.log("  ✓ inbox call links target /growth/calls/workspace via context strip")
 
   const embedPanel = readSource("components/growth/personalization/embedded/growth-personalization-embedded-panel.tsx")
   assert.match(embedPanel, /buildGrowthSharePageWorkspaceHref/)

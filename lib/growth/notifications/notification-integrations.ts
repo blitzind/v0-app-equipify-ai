@@ -4,6 +4,10 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { emitGrowthNotification } from "@/lib/growth/notifications/emit-growth-notification"
 import { commandLeadFocusHref, commandOutreachHref } from "@/lib/growth/command/command-action-catalog"
 import { growthWorkspaceCallsCoachingHref } from "@/lib/growth/navigation/growth-call-notification-links"
+import {
+  growthOperatorFollowUpNotificationHref,
+  growthOperatorOpportunityNotificationHref,
+} from "@/lib/growth/notifications/growth-operator-notification-links"
 
 export async function emitGrowthLeadAssignedNotification(
   admin: SupabaseClient,
@@ -345,9 +349,10 @@ export async function emitGrowthOpportunityAtRiskNotification(
     body: `${input.companyName} readiness is declining (score ${input.score}).`,
     sourceSystem: "opportunity",
     sourceId: input.opportunityId ?? input.leadId,
-    actionUrl: input.opportunityId
-      ? `/admin/growth/opportunities/pipeline?opportunityId=${input.opportunityId}`
-      : commandLeadFocusHref(input.leadId, "command"),
+    actionUrl: growthOperatorOpportunityNotificationHref({
+      opportunityId: input.opportunityId,
+      leadId: input.leadId,
+    }),
     metadata: { score: input.score, opportunityId: input.opportunityId ?? null },
   })
 }
@@ -370,9 +375,10 @@ export async function emitGrowthStaleOpportunityNotification(
     body: `${input.companyName} has stalled — review next steps.`,
     sourceSystem: "opportunity",
     sourceId: input.opportunityId ?? input.leadId,
-    actionUrl: input.opportunityId
-      ? `/admin/growth/opportunities/pipeline?opportunityId=${input.opportunityId}`
-      : commandLeadFocusHref(input.leadId, "command"),
+    actionUrl: growthOperatorOpportunityNotificationHref({
+      opportunityId: input.opportunityId,
+      leadId: input.leadId,
+    }),
     metadata: { companyName: input.companyName, opportunityId: input.opportunityId ?? null },
   })
 }
@@ -394,7 +400,7 @@ export async function emitGrowthFollowupNeededNotification(
     body: `${input.companyName} follow-up is overdue.`,
     sourceSystem: "opportunity",
     sourceId: input.leadId,
-    actionUrl: commandLeadFocusHref(input.leadId, "command"),
+    actionUrl: growthOperatorFollowUpNotificationHref(input.leadId),
     metadata: { followUpAt: input.followUpAt },
   })
 }
@@ -441,7 +447,10 @@ export async function emitGrowthOpportunityCloseDatePassedNotification(
     body: `${input.companyName} expected close date has passed.`,
     sourceSystem: "opportunity",
     sourceId: input.opportunityId,
-    actionUrl: `/admin/growth/opportunities/pipeline?opportunityId=${input.opportunityId}`,
+    actionUrl: growthOperatorOpportunityNotificationHref({
+      opportunityId: input.opportunityId,
+      leadId: input.leadId,
+    }),
     metadata: { expectedCloseDate: input.expectedCloseDate },
   })
 }
@@ -465,7 +474,10 @@ export async function emitGrowthOpportunityOwnerOverloadedNotification(
     body: `${input.companyName} owner is at capacity — review deal load.`,
     sourceSystem: "opportunity",
     sourceId: input.opportunityId,
-    actionUrl: `/admin/growth/opportunities/pipeline?opportunityId=${input.opportunityId}`,
+    actionUrl: growthOperatorOpportunityNotificationHref({
+      opportunityId: input.opportunityId,
+      leadId: input.leadId,
+    }),
     metadata: { companyName: input.companyName },
   })
 }

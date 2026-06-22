@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +12,12 @@ import {
   personalizationStatusLabel,
   type GrowthPersonalizationGenerationView,
 } from "@/lib/growth/personalization/personalization-types"
+import {
+  GROWTH_OPS_CLICK_REDUCTION_7A2_QA_MARKER,
+  GROWTH_SEQUENCE_SEND_REVIEW_CONTROL_PLANE_LABELS,
+  GROWTH_SEQUENCE_SEND_REVIEW_HREF,
+  GROWTH_SEQUENCE_SEND_REVIEW_LABEL,
+} from "@/lib/growth/operator-ux/growth-operator-primary-actions-7a2"
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "blocked" | "neutral"> = {
   draft: "attention",
@@ -68,12 +75,13 @@ export function GrowthPersonalizationDraftEditor({
     <section
       aria-labelledby="personalization-draft-heading"
       className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm"
+      data-growth-ops-click-reduction={GROWTH_OPS_CLICK_REDUCTION_7A2_QA_MARKER}
     >
       <header className="shrink-0 border-b border-border/60 px-3 py-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 id="personalization-draft-heading" className="text-sm font-semibold">
-              Draft Preview
+              Preview & Review
             </h2>
             <p className="text-xs text-muted-foreground">{generation.leadLabel}</p>
           </div>
@@ -177,8 +185,14 @@ export function GrowthPersonalizationDraftEditor({
       ) : null}
 
       {generation.status === "approved" ? (
-        <footer className="shrink-0 border-t border-border/60 px-3 py-2.5 text-xs text-emerald-800">
-          Approved — attach this generation to sequence execution when ready. AI output is never auto-sent.
+        <footer className="shrink-0 space-y-2 border-t border-border/60 bg-emerald-50/60 px-3 py-3 text-xs text-emerald-950 dark:bg-emerald-500/10 dark:text-emerald-100">
+          <p>Approved — queue for operator send review. AI output is never auto-sent.</p>
+          <Button size="sm" asChild>
+            <Link href={GROWTH_SEQUENCE_SEND_REVIEW_HREF}>{GROWTH_SEQUENCE_SEND_REVIEW_LABEL}</Link>
+          </Button>
+          <p className="text-[11px] text-muted-foreground">
+            {GROWTH_SEQUENCE_SEND_REVIEW_CONTROL_PLANE_LABELS.join(" · ")}
+          </p>
         </footer>
       ) : null}
     </section>

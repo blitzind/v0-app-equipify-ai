@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Loader2, Plus, RefreshCw, Sparkles, Target, Users } from "lucide-react"
+import { Loader2, Plus, RefreshCw, Sparkles, Target } from "lucide-react"
 import { usePathname, useSearchParams } from "next/navigation"
 import { useAdmin } from "@/lib/admin-store"
 import { Button } from "@/components/ui/button"
@@ -322,19 +322,10 @@ export function GrowthLeadsCrmWorkspace({ showPageHeader = true }: { showPageHea
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button asChild variant="outline" size="sm">
-                <Link href={growthFeaturePath(pathname, "")}>Revenue Queue</Link>
-              </Button>
-              <Button asChild variant="outline" size="sm">
+              <Button asChild size="sm" variant="outline">
                 <Link href={growthFeaturePath(pathname, "leads/lead-engine")}>
                   <Sparkles className="mr-2 size-4" />
                   Lead Pipeline
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/admin/growth/ownership">
-                  <Users className="mr-2 size-4" />
-                  Ownership
                 </Link>
               </Button>
               <Button
@@ -359,6 +350,14 @@ export function GrowthLeadsCrmWorkspace({ showPageHeader = true }: { showPageHea
                 Add lead
               </Button>
             </div>
+            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+              <Link href={growthFeaturePath(pathname, "leads/research")} className="hover:text-foreground hover:underline">
+                Revenue Queue
+              </Link>
+              <Link href="/admin/growth/ownership" className="hover:text-foreground hover:underline">
+                Ownership
+              </Link>
+            </div>
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -370,6 +369,26 @@ export function GrowthLeadsCrmWorkspace({ showPageHeader = true }: { showPageHea
             ))}
           </div>
         </section> : null}
+
+        {!showPageHeader ? (
+          <section className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2.5 shadow-sm">
+            <p className="text-xs text-muted-foreground">CRM growth leads — add contacts or open a record from the table.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+                {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : <RefreshCw className="mr-2 size-4" />}
+                Refresh
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setManualContactOpen(true)}>
+                <Plus className="mr-2 size-4" />
+                Add contact manually
+              </Button>
+              <Button size="sm" onClick={() => setCreateOpen(true)}>
+                <Plus className="mr-2 size-4" />
+                Add lead
+              </Button>
+            </div>
+          </section>
+        ) : null}
 
         <div className="space-y-6">
         {error ? (

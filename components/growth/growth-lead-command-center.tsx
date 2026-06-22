@@ -1,15 +1,18 @@
 "use client"
 
 import { useEffect, useMemo, useState, type ReactNode } from "react"
+import Link from "next/link"
 import {
   Activity,
   Clock,
   ExternalLink,
   Loader2,
   Mail,
+  MapPin,
   Pencil,
   Phone,
   Search,
+  Sparkles,
   UserPlus,
 } from "lucide-react"
 import { GrowthLeadEditContactDialog } from "@/components/growth/growth-lead-edit-contact-dialog"
@@ -39,6 +42,11 @@ import {
   workflowHealthTone,
 } from "@/components/growth/growth-ui-utils"
 import { GROWTH_NEXT_BEST_ACTION_LABELS } from "@/lib/growth/nba-types"
+import {
+  buildGrowthLeadDirectionsHref,
+  GROWTH_OPS_CLICK_REDUCTION_7A2_QA_MARKER,
+} from "@/lib/growth/operator-ux/growth-operator-primary-actions-7a2"
+import { buildGrowthPersonalizationHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import type { GrowthLeadCallDisposition } from "@/lib/growth/call-types"
 import type { GrowthLead } from "@/lib/growth/types"
 import { cn } from "@/lib/utils"
@@ -90,6 +98,8 @@ export function GrowthLeadCommandCenter({
   const phone = lead.contactPhone?.trim() || null
   const email = lead.contactEmail?.trim() || null
   const website = lead.website?.trim() || null
+  const directionsHref = buildGrowthLeadDirectionsHref(lead)
+  const personalizationHref = buildGrowthPersonalizationHref(lead.id)
 
   useEffect(() => {
     let cancelled = false
@@ -218,7 +228,7 @@ export function GrowthLeadCommandCenter({
 
   return (
     <>
-      <GrowthEngineCard>
+      <GrowthEngineCard data-growth-ops-click-reduction={GROWTH_OPS_CLICK_REDUCTION_7A2_QA_MARKER}>
         <div className="space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -298,46 +308,83 @@ export function GrowthLeadCommandCenter({
           ) : null}
 
           <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
+            <Button size="lg" className="h-11 w-full justify-start gap-2" asChild>
+              <Link href={personalizationHref}>
+                <Sparkles className="size-4" />
+                Generate Personalization
+              </Link>
+            </Button>
+
+            <div className="grid grid-cols-3 gap-2">
               {phone ? (
-                <>
-                  <Button size="lg" className="h-11 justify-start gap-2" onClick={() => setCallSheetOpen(true)}>
-                    <Phone className="size-4" />
-                    Call
-                  </Button>
-                  <GrowthNativeDialerLaunchButton leadId={lead.id} phone={phone} label="Workspace" size="lg" variant="secondary" />
-                </>
+                <Button size="sm" variant="secondary" className="h-10 justify-start gap-2" onClick={() => setCallSheetOpen(true)}>
+                  <Phone className="size-4" />
+                  Call
+                </Button>
               ) : (
-                <Button size="lg" variant="outline" className="h-11 justify-start gap-2" disabled>
+                <Button size="sm" variant="outline" className="h-10 justify-start gap-2" disabled>
                   <Phone className="size-4" />
                   Call
                 </Button>
               )}
-              <Button size="lg" variant="outline" className="h-11 justify-start gap-2" onClick={() => scrollTo("growth-research")}>
-                <Search className="size-4" />
-                Research
-              </Button>
+              {email ? (
+                <Button size="sm" variant="outline" className="h-10 justify-start gap-2" asChild>
+                  <a href={`mailto:${email}`}>
+                    <Mail className="size-4" />
+                    Email
+                  </a>
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" className="h-10 justify-start gap-2" disabled>
+                  <Mail className="size-4" />
+                  Email
+                </Button>
+              )}
+              {directionsHref ? (
+                <Button size="sm" variant="outline" className="h-10 justify-start gap-2" asChild>
+                  <a href={directionsHref} target="_blank" rel="noopener noreferrer">
+                    <MapPin className="size-4" />
+                    Directions
+                  </a>
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" className="h-10 justify-start gap-2" disabled>
+                  <MapPin className="size-4" />
+                  Directions
+                </Button>
+              )}
             </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <Button size="lg" variant="outline" className="h-11 justify-start gap-2" onClick={openFollowUpDialog}>
-                <Clock className="size-4" />
-                Follow Up
-              </Button>
-              <Button size="lg" variant="outline" className="h-11 justify-start gap-2" onClick={onAddDecisionMaker}>
-                <UserPlus className="size-4" />
-                Add Decision Maker
-              </Button>
-              <Button
-                size="lg"
-                variant="ghost"
-                className="h-11 justify-start gap-2 text-muted-foreground hover:text-foreground"
-                disabled={touchSaving}
-                onClick={() => void recordManualTouch()}
-              >
-                {touchSaving ? <Loader2 className="size-4 animate-spin" /> : <Activity className="size-4" />}
-                Manual Touch
-              </Button>
-            </div>
+
+            <details className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+              <summary className="cursor-pointer text-xs font-medium text-muted-foreground">More lead actions</summary>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {phone ? (
+                  <GrowthNativeDialerLaunchButton leadId={lead.id} phone={phone} label="Call workspace" size="sm" variant="outline" />
+                ) : null}
+                <Button size="sm" variant="ghost" className="h-9 justify-start gap-2" onClick={() => scrollTo("growth-research")}>
+                  <Search className="size-4" />
+                  Research
+                </Button>
+                <Button size="sm" variant="ghost" className="h-9 justify-start gap-2" onClick={openFollowUpDialog}>
+                  <Clock className="size-4" />
+                  Follow Up
+                </Button>
+                <Button size="sm" variant="ghost" className="h-9 justify-start gap-2" onClick={onAddDecisionMaker}>
+                  <UserPlus className="size-4" />
+                  Add Decision Maker
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-9 justify-start gap-2 text-muted-foreground hover:text-foreground"
+                  disabled={touchSaving}
+                  onClick={() => void recordManualTouch()}
+                >
+                  {touchSaving ? <Loader2 className="size-4 animate-spin" /> : <Activity className="size-4" />}
+                  Manual Touch
+                </Button>
+              </div>
+            </details>
           </div>
 
           {lead.nextBestAction ? (
@@ -348,12 +395,17 @@ export function GrowthLeadCommandCenter({
         </div>
       </GrowthEngineCard>
 
-      <GrowthLeadAssignmentPanel
-        lead={lead}
-        compact
-        onLeadUpdated={onLeadUpdated}
-        onTimelineRefresh={onTimelineRefresh}
-      />
+      <details className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3">
+        <summary className="cursor-pointer text-sm font-medium text-muted-foreground">Ownership &amp; assignment</summary>
+        <div className="mt-3">
+          <GrowthLeadAssignmentPanel
+            lead={lead}
+            compact
+            onLeadUpdated={onLeadUpdated}
+            onTimelineRefresh={onTimelineRefresh}
+          />
+        </div>
+      </details>
 
       <Dialog open={followUpOpen} onOpenChange={(open) => !followUpSaving && setFollowUpOpen(open)}>
         <DialogContent>

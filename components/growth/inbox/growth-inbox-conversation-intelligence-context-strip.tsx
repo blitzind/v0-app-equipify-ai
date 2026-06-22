@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Activity, ExternalLink, MessageSquare, Phone, Sparkles, UserRound, Workflow } from "lucide-react"
+import { Activity, CalendarClock, ExternalLink, MessageSquare, Phone, Sparkles, UserRound, Workflow } from "lucide-react"
 import { GrowthPersonalizationEmbeddedPanel } from "@/components/growth/personalization/embedded/growth-personalization-embedded-panel"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthActionRequiredBadge } from "@/components/growth/growth-ui-utils"
@@ -20,6 +20,8 @@ import {
   growthWorkspaceInboxHref,
   growthWorkspaceInboxWorkflowHref,
 } from "@/lib/growth/navigation/growth-workspace-operator-links"
+import { GROWTH_CAMPAIGNS_HUB_BOOKINGS_HREF } from "@/lib/growth/hubs/growth-workspace-hub-paths"
+import { GROWTH_OPS_CLICK_REDUCTION_7A2_QA_MARKER } from "@/lib/growth/operator-ux/growth-operator-primary-actions-7a2"
 
 export const GROWTH_INBOX_CONVERSATION_INTELLIGENCE_CONTEXT_STRIP_QA_MARKER =
   "growth-inbox-conversation-intelligence-context-strip-v1" as const
@@ -38,6 +40,7 @@ export function GrowthInboxConversationIntelligenceContextStrip() {
       className="shrink-0 space-y-2 border-b border-border bg-muted/20 px-4 py-3"
       data-qa-marker={GROWTH_INBOX_CONVERSATION_INTELLIGENCE_CONTEXT_STRIP_QA_MARKER}
       data-growth-ops-handoff={GROWTH_OPS_HANDOFF_6C_QA_MARKER}
+      data-growth-ops-click-reduction={GROWTH_OPS_CLICK_REDUCTION_7A2_QA_MARKER}
     >
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Conversation context</p>
@@ -74,22 +77,16 @@ export function GrowthInboxConversationIntelligenceContextStrip() {
             Personalization
           </Link>
         </Button>
-        <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" asChild>
+        <Button type="button" size="sm" variant="outline" className="h-7 text-xs" asChild>
           <Link href={buildGrowthActivityHref({ leadId })}>
             <Activity className="mr-1 size-3" />
             Activity
           </Link>
         </Button>
-        <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" asChild>
-          <Link href={preview.conversationsHref}>
-            <MessageSquare className="mr-1 size-3" />
-            View Conversation
-          </Link>
-        </Button>
-        <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" asChild>
-          <Link href={preview.timelineHref}>
-            <ExternalLink className="mr-1 size-3" />
-            View Timeline
+        <Button type="button" size="sm" variant="outline" className="h-7 text-xs" asChild>
+          <Link href={GROWTH_CAMPAIGNS_HUB_BOOKINGS_HREF}>
+            <CalendarClock className="mr-1 size-3" />
+            Book Meeting
           </Link>
         </Button>
       </div>

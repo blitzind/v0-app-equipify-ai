@@ -5,6 +5,7 @@ import { GrowthInboxSharedDataProvider } from "@/components/growth/inbox/growth-
 import { GrowthInboxConversationColumn } from "@/components/growth/inbox/growth-inbox-conversation-column"
 import { GrowthInboxQueueProvider } from "@/components/growth/inbox/growth-inbox-queue-context"
 import { GrowthInboxQueueUrlSync } from "@/components/growth/inbox/growth-inbox-queue-url-sync"
+import { GrowthInboxThreadUrlSync } from "@/components/growth/inbox/growth-inbox-thread-url-sync"
 import { GrowthInboxThreadQueueColumn } from "@/components/growth/inbox/growth-inbox-thread-queue-column"
 import { GrowthInboxWorkspaceActionsMenu } from "@/components/growth/inbox/growth-inbox-workspace-actions-menu"
 import { GrowthInboxWorkspaceKeyboardBridge } from "@/components/growth/inbox/growth-inbox-workspace-keyboard-bridge"
@@ -65,6 +66,7 @@ export function GrowthInboxWorkspaceV2Panel() {
           <GrowthInboxTier1RefreshBridge />
           <GrowthInboxQueueProvider>
             <GrowthInboxQueueUrlSync />
+            <GrowthInboxThreadUrlSync />
             <GrowthInboxResumeWorkHero />
             <GrowthInboxLeadContextProvider
               leadId={selectedThread?.lead_id ?? null}

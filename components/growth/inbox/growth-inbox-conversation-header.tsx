@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { CalendarClock, Phone, Reply, UserRound } from "lucide-react"
+import { Reply } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
@@ -20,10 +20,8 @@ import {
   resolveInboxStatusBadgeLabels,
 } from "@/lib/growth/inbox/inbox-message-display-utils"
 import { classificationLabel } from "@/lib/growth/inbox/reply-classifier"
-import {
-  GROWTH_CAMPAIGNS_HUB_BOOKINGS_HREF,
-} from "@/lib/growth/hubs/growth-workspace-hub-paths"
-import { growthWorkspaceInboxWorkflowHref, growthWorkspaceLeadHref, buildGrowthCallWorkspaceHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
+import { growthWorkspaceInboxWorkflowHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
+import { GROWTH_OPS_CLICK_REDUCTION_7A2_QA_MARKER } from "@/lib/growth/operator-ux/growth-operator-primary-actions-7a2"
 
 export const GROWTH_INBOX_CONVERSATION_HEADER_QA_MARKER = "growth-inbox-conversation-header-v2" as const
 
@@ -69,15 +67,14 @@ export function GrowthInboxConversationHeader() {
 
   const { company, contact } = parseInboxLeadLabelParts(selectedThread.lead_label)
   const statusLabels = resolveInboxStatusBadgeLabels(selectedThread)
-  const callsHref = buildGrowthCallWorkspaceHref({ leadId: selectedThread.lead_id })
   const workflowHref = growthWorkspaceInboxWorkflowHref(selectedThread.lead_id)
-  const leadHref = growthWorkspaceLeadHref(selectedThread.lead_id)
 
   return (
     <header
       className="sticky top-0 z-20 shrink-0 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80"
       data-qa-marker={GROWTH_INBOX_CONVERSATION_HEADER_QA_MARKER}
       data-growth-inbox-final-polish={GROWTH_INBOX_FINAL_POLISH_QA_MARKER}
+      data-growth-ops-click-reduction={GROWTH_OPS_CLICK_REDUCTION_7A2_QA_MARKER}
     >
       <div className="px-3 py-2">
         <div className="min-w-0">
@@ -103,24 +100,6 @@ export function GrowthInboxConversationHeader() {
             <Link href={workflowHref}>
               <Reply className="mr-1 size-3" aria-hidden />
               Reply
-            </Link>
-          </Button>
-          <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-xs" asChild>
-            <Link href={callsHref}>
-              <Phone className="mr-1 size-3" aria-hidden />
-              Call
-            </Link>
-          </Button>
-          <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-xs" asChild>
-            <Link href={GROWTH_CAMPAIGNS_HUB_BOOKINGS_HREF}>
-              <CalendarClock className="mr-1 size-3" aria-hidden />
-              Book Meeting
-            </Link>
-          </Button>
-          <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" asChild>
-            <Link href={leadHref}>
-              <UserRound className="mr-1 size-3" aria-hidden />
-              Open Lead
             </Link>
           </Button>
         </div>

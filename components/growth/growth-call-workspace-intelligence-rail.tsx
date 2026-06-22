@@ -31,7 +31,12 @@ import {
 } from "@/lib/growth/native-dialer/native-dialer-workspace-ui"
 import { GROWTH_NATIVE_DIALER_LEAD_SEARCH_QA_MARKER } from "@/lib/growth/native-dialer/call-workspace-lead-search-types"
 import { GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
-import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
+import {
+  buildGrowthActivityHref,
+  buildGrowthLeadHref,
+  buildGrowthMeetingsHref,
+} from "@/lib/growth/navigation/growth-workspace-operator-links"
+import { GROWTH_OPS_CLICK_REDUCTION_7A2_QA_MARKER } from "@/lib/growth/operator-ux/growth-operator-primary-actions-7a2"
 import type { UnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/types"
 import type { VoiceRelationshipMemoryWorkspaceSnapshot } from "@/lib/voice/relationship-memory/types"
 import { VOICE_RELATIONSHIP_MEMORY_QA_MARKER } from "@/lib/voice/relationship-memory/types"
@@ -164,6 +169,7 @@ export function GrowthCallWorkspaceIntelligenceRail({
       data-voice-relationship-memory-qa-marker={VOICE_RELATIONSHIP_MEMORY_QA_MARKER}
       data-voice-revenue-intelligence-qa-marker={VOICE_REVENUE_INTELLIGENCE_QA_MARKER}
       data-voice-retention-intelligence-qa-marker={VOICE_RETENTION_INTELLIGENCE_QA_MARKER}
+      data-growth-ops-click-reduction={GROWTH_OPS_CLICK_REDUCTION_7A2_QA_MARKER}
     >
       {embedded ? null : <h3 className="mb-3 text-sm font-semibold">Prospect Intelligence</h3>}
 
@@ -241,6 +247,15 @@ export function GrowthCallWorkspaceIntelligenceRail({
             </div>
             <Button asChild size="sm" variant="outline" className="h-7 shrink-0 px-2 text-xs">
               <Link href={buildGrowthLeadHref(leadContext.leadId, { focus: "command" })}>View Lead</Link>
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            <Button asChild size="sm" variant="outline" className="h-7 px-2 text-xs">
+              <Link href={buildGrowthActivityHref({ leadId: leadContext.leadId })}>Activity</Link>
+            </Button>
+            <Button asChild size="sm" variant="outline" className="h-7 px-2 text-xs">
+              <Link href={buildGrowthMeetingsHref({ leadId: leadContext.leadId })}>Meetings</Link>
             </Button>
           </div>
 

@@ -1,7 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Loader2, RefreshCw, Search } from "lucide-react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { GrowthActivityEventCard } from "@/components/growth/activity/growth-activity-event-card"
@@ -25,8 +26,14 @@ import type {
   GrowthActivityEventView,
   GrowthActivityFilterId,
   GrowthActivityMetricsView,
+  GrowthActivityRailQueueId,
   GrowthActivityRailQueues,
 } from "@/lib/growth/activity/growth-activity-workspace-types"
+import {
+  buildGrowthActivityWorkspaceHref,
+  GROWTH_OPS_URL_STATE_7A1_QA_MARKER,
+  readGrowthActivityUrlState,
+} from "@/lib/growth/navigation/growth-workspace-url-state-7a1"
 import {
   buildGrowthActivityRailQueues,
   computeGrowthActivityMetrics,
@@ -63,15 +70,55 @@ function buildQuery(dateRange: GrowthSendrAnalyticsDateRangePreset): string {
 }
 
 export function GrowthActivityWorkspace() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const hydratingFromUrlRef = useRef(false)
+  const lastPushedStateRef = useRef("")
+
   const [dateRange, setDateRange] = useState<GrowthSendrAnalyticsDateRangePreset>(
     GROWTH_SENDR_ANALYTICS_DEFAULT_PRESET,
   )
   const [filterId, setFilterId] = useState<GrowthActivityFilterId>("all")
   const [search, setSearch] = useState("")
+  const [focusedRailQueue, setFocusedRailQueue] = useState<GrowthActivityRailQueueId | null>(null)
   const [events, setEvents] = useState<GrowthActivityEventView[]>([])
   const [railQueues, setRailQueues] = useState<GrowthActivityRailQueues>(EMPTY_RAIL_QUEUES)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const next = readGrowthActivityUrlState(searchParams)
+    const key = `${next.filterId}|${next.search}|${next.range}|${next.railQueue ?? ""}`
+    if (lastPushedStateRef.current === key) return
+    hydratingFromUrlRef.current = true
+    setFilterId(next.filterId)
+    setSearch(next.search)
+    setDateRange(next.range)
+    setFocusedRailQueue(next.railQueue)
+    hydratingFromUrlRef.current = false
+  }, [searchParams])
+
+  useEffect(() => {
+    if (hydratingFromUrlRef.current) return
+    const key = `${filterId}|${search}|${dateRange}|${focusedRailQueue ?? ""}`
+    if (lastPushedStateRef.current === key) return
+    const href = buildGrowthActivityWorkspaceHref({
+      filter: filterId,
+      search,
+      range: dateRange,
+      rail: focusedRailQueue,
+    })
+    lastPushedStateRef.current = key
+    router.replace(href, { scroll: false })
+  }, [dateRange, filterId, focusedRailQueue, router, search])
+
+  const selectFilter = useCallback((nextFilterId: GrowthActivityFilterId) => {
+    setFilterId(nextFilterId)
+  }, [])
+
+  const selectRailQueue = useCallback((queueId: GrowthActivityRailQueueId | null) => {
+    setFocusedRailQueue(queueId)
+  }, [])
 
   const query = useMemo(() => buildQuery(dateRange), [dateRange])
 
@@ -121,7 +168,7 @@ export function GrowthActivityWorkspace() {
   const displayMetrics = loading && events.length === 0 ? EMPTY_METRICS : metrics
 
   return (
-    <div className="space-y-6" data-qa={GROWTH_ACTIVITY_WORKSPACE_QA_MARKER}>
+    <div className="space-y-6" data-qa={GROWTH_ACTIVITY_WORKSPACE_QA_MARKER} data-growth-ops-url-state={GROWTH_OPS_URL_STATE_7A1_QA_MARKER}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           Cross-workspace command feed — communication, personalization, sales, intelligence, and content in one timeline.
@@ -175,7 +222,7 @@ export function GrowthActivityWorkspace() {
             <button
               key={option.id}
               type="button"
-              onClick={() => setFilterId(option.id)}
+              onClick={() => selectFilter(option.id)}
               className={`w-full rounded-md px-2 py-2 text-left text-sm transition ${
                 filterId === option.id ? "bg-primary/10 font-medium text-primary" : "hover:bg-muted/50"
               }`}
@@ -207,7 +254,11 @@ export function GrowthActivityWorkspace() {
         {loading && events.length === 0 ? (
           <GrowthActivityRailSkeleton />
         ) : (
-          <GrowthActivityHighIntentRail queues={railQueues} />
+          <GrowthActivityHighIntentRail
+            queues={railQueues}
+            focusedQueueId={focusedRailQueue}
+            onFocusQueue={selectRailQueue}
+          />
         )}
       </div>
     </div>

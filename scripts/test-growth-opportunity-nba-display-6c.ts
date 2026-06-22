@@ -18,11 +18,8 @@ function main(): void {
   const card = readSource("components/growth/growth-opportunity-next-best-action-card.tsx")
   assert.match(card, /GROWTH_NEXT_BEST_ACTION_LABELS/)
   assert.match(card, /nextBestAction/)
-  assert.match(card, /Generate Follow-Up/)
-  assert.match(card, /Open Personalization/)
-  assert.match(card, /Start Call/)
-  assert.match(card, /Open Activity/)
-  assert.match(card, /Book Meeting/)
+  assert.match(card, /resolveGrowthOpportunityNbaPrimaryAction/)
+  assert.match(card, /buildGrowthOpportunityNbaSecondaryActions/)
   assert.doesNotMatch(card, /nextBestActionScore|recompute|calculate/)
   console.log("  ✓ NBA card is display-only with operator action shortcuts")
 

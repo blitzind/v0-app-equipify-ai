@@ -2,18 +2,22 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Activity, CalendarClock, Loader2, Phone, Sparkles } from "lucide-react"
+import { Loader2, MoreHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { GROWTH_NEXT_BEST_ACTION_LABELS } from "@/lib/growth/nba-types"
 import {
-  buildGrowthActivityHref,
-  buildGrowthCallWorkspaceHref,
-  buildGrowthPersonalizationHref,
-  GROWTH_OPS_HANDOFF_6C_QA_MARKER,
-  growthWorkspaceMeetingsHref,
-} from "@/lib/growth/navigation/growth-workspace-operator-links"
-import { GROWTH_CAMPAIGNS_HUB_BOOKINGS_HREF } from "@/lib/growth/hubs/growth-workspace-hub-paths"
+  buildGrowthOpportunityNbaSecondaryActions,
+  GROWTH_OPS_CLICK_REDUCTION_7A2_QA_MARKER,
+  resolveGrowthOpportunityNbaPrimaryAction,
+} from "@/lib/growth/operator-ux/growth-operator-primary-actions-7a2"
+import { GROWTH_OPS_HANDOFF_6C_QA_MARKER } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import type { GrowthLead } from "@/lib/growth/types"
 
 export const GROWTH_OPPORTUNITY_NEXT_BEST_ACTION_CARD_QA_MARKER =
@@ -53,12 +57,15 @@ export function GrowthOpportunityNextBestActionCard({
     ? GROWTH_NEXT_BEST_ACTION_LABELS[action] ?? action.replace(/_/g, " ")
     : "No persisted next action"
   const reason = lead?.nextBestActionReason ?? "Run research or refresh workflow signals to populate NBA."
+  const primaryAction = resolveGrowthOpportunityNbaPrimaryAction(action, leadId)
+  const secondaryActions = buildGrowthOpportunityNbaSecondaryActions(leadId, primaryAction.label)
 
   return (
     <div
       className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 dark:border-indigo-500/30 dark:bg-indigo-500/10"
       data-qa-marker={GROWTH_OPPORTUNITY_NEXT_BEST_ACTION_CARD_QA_MARKER}
       data-growth-ops-handoff={GROWTH_OPS_HANDOFF_6C_QA_MARKER}
+      data-growth-ops-click-reduction={GROWTH_OPS_CLICK_REDUCTION_7A2_QA_MARKER}
     >
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Next best action</p>
@@ -76,37 +83,27 @@ export function GrowthOpportunityNextBestActionCard({
           <p className="mt-1 text-sm text-muted-foreground">{reason}</p>
         </>
       )}
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button type="button" size="sm" variant="default" className="h-7 text-xs" asChild>
-          <Link href={buildGrowthPersonalizationHref(leadId)}>
-            <Sparkles className="mr-1 size-3" />
-            Generate Follow-Up
-          </Link>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button type="button" size="sm" variant="default" className="h-8 text-xs" asChild>
+          <Link href={primaryAction.href}>{primaryAction.label}</Link>
         </Button>
-        <Button type="button" size="sm" variant="outline" className="h-7 text-xs" asChild>
-          <Link href={buildGrowthPersonalizationHref(leadId)}>Open Personalization</Link>
-        </Button>
-        <Button type="button" size="sm" variant="outline" className="h-7 text-xs" asChild>
-          <Link href={buildGrowthCallWorkspaceHref({ leadId })}>
-            <Phone className="mr-1 size-3" />
-            Start Call
-          </Link>
-        </Button>
-        <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" asChild>
-          <Link href={buildGrowthActivityHref({ leadId })}>
-            <Activity className="mr-1 size-3" />
-            Open Activity
-          </Link>
-        </Button>
-        <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" asChild>
-          <Link href={growthWorkspaceMeetingsHref(leadId)}>
-            <CalendarClock className="mr-1 size-3" />
-            Meetings
-          </Link>
-        </Button>
-        <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" asChild>
-          <Link href={GROWTH_CAMPAIGNS_HUB_BOOKINGS_HREF}>Book Meeting</Link>
-        </Button>
+        {secondaryActions.length > 0 ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" size="sm" variant="outline" className="h-8 px-2 text-xs">
+                <MoreHorizontal className="size-4" />
+                <span className="sr-only">More actions</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {secondaryActions.map((entry) => (
+                <DropdownMenuItem key={entry.id} asChild>
+                  <Link href={entry.href}>{entry.label}</Link>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
       </div>
     </div>
   )

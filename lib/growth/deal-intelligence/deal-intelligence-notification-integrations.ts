@@ -1,7 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { commandLeadFocusHref } from "@/lib/growth/command/command-action-catalog"
+import { growthOperatorOpportunityNotificationHref } from "@/lib/growth/notifications/growth-operator-notification-links"
 import type { DealIntelligenceScorePublicView } from "@/lib/growth/deal-intelligence/deal-intelligence-types"
 import { dealNeedsOperatorAction } from "@/lib/growth/deal-intelligence/deal-recommendation-engine"
 import { emitGrowthNotification } from "@/lib/growth/notifications/emit-growth-notification"
@@ -19,9 +19,10 @@ export async function emitDealIntelligenceNotifications(
   admin: SupabaseClient,
   input: DealIntelligenceNotificationContext,
 ): Promise<void> {
-  const actionUrl = input.opportunityId
-    ? `/admin/growth/opportunities/pipeline?opportunityId=${input.opportunityId}`
-    : commandLeadFocusHref(input.leadId, "opportunity")
+  const actionUrl = growthOperatorOpportunityNotificationHref({
+    opportunityId: input.opportunityId,
+    leadId: input.leadId,
+  })
 
   if (input.score.riskLevel === "critical" || input.score.riskLevel === "high") {
     const prevRisk = input.previousScore?.dealRiskScore ?? 0
