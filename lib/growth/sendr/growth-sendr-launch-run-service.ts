@@ -65,6 +65,7 @@ async function ensureSendrSequenceLink(
     sequencePatternId: string
     attachedBy: string
     enrollmentRunId?: string | null
+    preferredSenderAccountId?: string | null
   },
 ) {
   const existing = await listSendrSequencePageLinks(admin, {
@@ -81,6 +82,9 @@ async function ensureSendrSequenceLink(
     sequencePatternId: input.sequencePatternId,
     enrollmentRunId: input.enrollmentRunId ?? null,
     attachedBy: input.attachedBy,
+    metadata: input.preferredSenderAccountId
+      ? { preferredSenderAccountId: input.preferredSenderAccountId }
+      : undefined,
   })
 }
 
@@ -368,11 +372,16 @@ async function processSendrLaunchChunk(
 
   try {
     if (current.status === "pending") {
+      const preferredSenderAccountId =
+        typeof current.metadata.preferredSenderAccountId === "string"
+          ? current.metadata.preferredSenderAccountId
+          : null
       const link = await ensureSendrSequenceLink(admin, {
         organizationId: current.organizationId,
         landingPageId: current.landingPageId,
         sequencePatternId: current.sequencePatternId,
         attachedBy: input.userId,
+        preferredSenderAccountId,
       })
       current = await updateSendrLaunchRun(admin, current.id, {
         sequenceLinkId: link.id,
@@ -437,6 +446,7 @@ export async function startSendrLaunchRun(
     audienceId: string
     sequencePatternId: string
     landingPageId: string
+    senderAccountId?: string | null
   },
 ): Promise<GrowthSendrLaunchRunProgress> {
   await assertLaunchEnabled(admin)
@@ -457,6 +467,7 @@ export async function startSendrLaunchRun(
       source: "sendr_launch_wizard",
       snapshotId: audience.lastSnapshotId,
       qa_marker: GROWTH_SENDR_LAUNCH_QA_MARKER,
+      ...(input.senderAccountId ? { preferredSenderAccountId: input.senderAccountId } : {}),
     },
   })
 

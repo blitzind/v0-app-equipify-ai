@@ -3,6 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { listGrowthAudiences } from "@/lib/growth/audiences/growth-audience-repository"
 import { listGrowthSequencePatterns } from "@/lib/growth/sequence-pattern-repository"
+import { listSenderProfiles } from "@/lib/growth/signatures/sender-profile-repository"
 import { listSendrAssetPickerItems } from "@/lib/growth/sendr/growth-sendr-asset-picker-service"
 import { listRecentSendrLaunchRuns } from "@/lib/growth/sendr/growth-sendr-launch-run-repository"
 import type { GrowthSendrLaunchWorkspaceSummary } from "@/lib/growth/sendr/growth-sendr-types"
@@ -11,7 +12,7 @@ export async function getSendrLaunchWorkspaceSummary(
   admin: SupabaseClient,
   input: { organizationId: string },
 ): Promise<GrowthSendrLaunchWorkspaceSummary> {
-  const [audiencesResult, pageItems, patterns, recentLaunches] = await Promise.all([
+  const [audiencesResult, pageItems, patterns, recentLaunches, senderProfiles] = await Promise.all([
     listGrowthAudiences(admin, { organizationId: input.organizationId, limit: 50 }),
     listSendrAssetPickerItems(admin, {
       organizationId: input.organizationId,
@@ -20,6 +21,7 @@ export async function getSendrLaunchWorkspaceSummary(
     }),
     listGrowthSequencePatterns(admin),
     listRecentSendrLaunchRuns(admin, { organizationId: input.organizationId, limit: 10 }),
+    listSenderProfiles(admin),
   ])
 
   const publishedPages = pageItems
@@ -44,6 +46,15 @@ export async function getSendrLaunchWorkspaceSummary(
       name: pattern.label,
       channelMix: pattern.patternKind,
     })),
+    senderProfiles: senderProfiles
+      .filter((profile) => profile.active)
+      .map((profile) => ({
+        id: profile.id,
+        senderAccountId: profile.sender_account_id,
+        displayName: profile.display_name,
+        title: profile.title,
+        email: profile.email,
+      })),
     recentLaunches,
   }
 }

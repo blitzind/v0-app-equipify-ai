@@ -76,6 +76,15 @@ export const DEFAULT_CONTENT_VARIABLE_SEED: Array<
     fallbackToken: "[sender email]",
   },
   {
+    variableKey: "sender.signature",
+    label: "Sender signature",
+    description: "Rendered outbound email signature block",
+    namespace: "sender",
+    allowed: true,
+    exampleValue: "Jamie Rivera\nFounder · Equipify",
+    fallbackToken: "",
+  },
+  {
     variableKey: "sender.phone",
     label: "Sender phone",
     description: "Outbound sender phone number",

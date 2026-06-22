@@ -297,6 +297,13 @@ export type GrowthSendrLaunchWorkspaceSummary = {
     name: string
     channelMix: string | null
   }>
+  senderProfiles: Array<{
+    id: string
+    senderAccountId: string
+    displayName: string
+    title: string | null
+    email: string
+  }>
   recentLaunches: GrowthSendrLaunchRun[]
 }
 

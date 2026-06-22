@@ -30,6 +30,7 @@ import {
 } from "@/components/growth/sendr/presentation/presentation-video-hero"
 import { PresentationVideoEmptyState } from "@/components/growth/sendr/presentation/presentation-video-empty-state"
 import { usePresentationTheme } from "@/components/growth/sendr/presentation/presentation-section"
+import { cn } from "@/lib/utils"
 
 type Section = GrowthSendrPublicPagePayload["sections"][number]
 

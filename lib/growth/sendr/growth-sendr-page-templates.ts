@@ -198,6 +198,79 @@ export const GROWTH_SENDR_PAGE_TEMPLATES: GrowthSendrPageTemplate[] = [
       { sectionType: "calendar", content: { label: "Pick a time", href: "{{meeting_link}}" } },
     ],
   },
+  {
+    id: "equipify_demo",
+    label: "Equipify Demo",
+    description: "Canonical Equipify sales experience — hero, video, benefits, booking, social proof.",
+    industry: "medical equipment",
+    suggestedTitle: "{{company_name}} — Equipify Demo",
+    sections: [
+      {
+        sectionType: "hero",
+        content: {
+          headline: "A personalized Equipify walkthrough for {{company_name}}",
+          body: "Hi {{first_name}} — see how Equipify helps medical equipment service teams dispatch smarter, track assets, and grow service revenue.",
+          trustLine: "Built for biomedical, ISO, and imaging service teams.",
+        },
+      },
+      {
+        sectionType: "text",
+        content: {
+          presentationKind: "intro",
+          headline: "Personalized for your team",
+          body: "{{first_name}}, this page was prepared for {{company_name}}. Press play when you are ready — book time below if you want a live walkthrough.",
+        },
+      },
+      {
+        sectionType: "video",
+        content: {
+          headline: "Equipify platform demo",
+          caption: "Replace with your uploaded demo video in Media Assets when ready.",
+        },
+      },
+      {
+        sectionType: "text",
+        content: {
+          presentationKind: "benefits",
+          headline: "Why medical equipment teams choose Equipify",
+          items: [
+            { title: "Dispatch & technician routing" },
+            { title: "Equipment asset tracking" },
+            { title: "Service contract visibility" },
+            { title: "Customer communication portal" },
+          ],
+        },
+      },
+      {
+        sectionType: "cta",
+        content: { label: "Schedule a live demo", href: "{{meeting_link}}" },
+      },
+      {
+        sectionType: "calendar",
+        content: { label: "Book with Equipify", href: "{{meeting_link}}" },
+      },
+      {
+        sectionType: "text",
+        content: {
+          presentationKind: "testimonials",
+          headline: "Social proof",
+          items: [
+            {
+              quote: "Equipify helped us cut dispatch chaos and respond to hospital customers faster.",
+              author: "Operations Director",
+              company: "Regional biomedical service company",
+            },
+          ],
+        },
+      },
+      {
+        sectionType: "custom_html",
+        content: {
+          html: '<footer style="font-family:Arial,sans-serif;font-size:12px;color:#6b7280;text-align:center;padding:24px 0;">© Equipify · <a href="https://equipify.ai">equipify.ai</a></footer>',
+        },
+      },
+    ],
+  },
 ]
 
 export function getGrowthSendrPageTemplate(id: string): GrowthSendrPageTemplate | null {

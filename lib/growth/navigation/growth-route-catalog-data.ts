@@ -386,8 +386,7 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     breadcrumbLabel: "Prospect Search",
     adminPath: `${ADMIN}/search`,
   }),
-  workspaceDual(
-    "workspace-leads-prospect-search-discover",
+  workspaceDual("workspace-leads-prospect-search-discover",
     "leads/prospect-search/discover",
     "Discover Companies",
     "workspace",
@@ -396,6 +395,17 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
       adminPath: `${ADMIN}/search`,
     },
   ),
+  workspaceDual("workspace-audiences", "audiences", "Audiences", "workspace", {
+    breadcrumbLabel: "Audiences",
+  }),
+  workspaceDual("workspace-audiences-detail", "audiences/[id]", "Audience Detail", "workspace", {
+    breadcrumbLabel: "Audience",
+    dynamic: true,
+    dynamicMatch: /^audiences\/[^/]+$/,
+  }),
+  workspaceDual("workspace-runbook", "runbook", "Launch Runbook", "workspace", {
+    breadcrumbLabel: "Runbook",
+  }),
   workspaceDual("workspace-leads-detail", "leads/[leadId]", "Lead Detail", "workspace", {
     breadcrumbLabel: "Lead",
     dynamic: true,

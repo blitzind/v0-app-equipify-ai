@@ -11,18 +11,17 @@ export const GROWTH_WORKSPACE_SIDEBAR_IA_QA_MARKER = "growth-workspace-sidebar-i
 export const GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS = [
   "dashboard",
   "leads",
+  "audiences",
   "campaigns",
   "inbox",
   "calls",
   "meetings",
-  "share-pages",
   "personalized-videos",
-  "personalization",
-  "videos",
   "media-assets",
   "automation-flows",
   "opportunities",
   "activity",
+  "engagement",
   "conversations",
   "relationships",
 ] as const
@@ -39,7 +38,9 @@ export const GROWTH_WORKSPACE_SIDEBAR_HIDDEN_NAV_IDS = [
   "compliance",
   "settings-home",
   "templates",
-  "engagement",
+  "share-pages",
+  "personalization",
+  "videos",
   "opportunities-pipeline",
 ] as const
 

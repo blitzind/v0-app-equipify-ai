@@ -8,7 +8,6 @@
 import type { LucideIcon } from "lucide-react"
 import {
   Activity,
-  FileText,
   GitBranch,
   Handshake,
   Inbox,
@@ -19,8 +18,6 @@ import {
   Sparkles,
   Target,
   Users,
-  Video,
-  Wand2,
   Workflow,
 } from "lucide-react"
 import {
@@ -36,7 +33,7 @@ import {
   GROWTH_WORKSPACE_BASE_PATH,
 } from "@/lib/growth/navigation/growth-route-metadata-types"
 
-export const GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER = "growth-workspace-shell-nav-v5" as const
+export const GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER = "growth-workspace-shell-nav-v6" as const
 
 /** Back-compat QA marker used by shell components. */
 export const GROWTH_SHELL_NAV_QA_MARKER = GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER
@@ -82,6 +79,7 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
     items: [
       { id: "dashboard", label: "Dashboard", registryRouteId: "workspace-dashboard", icon: LayoutDashboard, workspaceRoute: true },
       { id: "leads", label: "Leads", registryRouteId: "workspace-leads", icon: Target, workspaceRoute: true },
+      { id: "audiences", label: "Audiences", registryRouteId: "workspace-audiences", icon: Users, workspaceRoute: true },
       { id: "campaigns", label: "Campaigns", registryRouteId: "workspace-campaigns", icon: Workflow, workspaceRoute: true },
       { id: "inbox", label: "Inbox", registryRouteId: "workspace-inbox", icon: Inbox, workspaceRoute: true },
       { id: "calls", label: "Calls", registryRouteId: "workspace-calls", icon: Phone, workspaceRoute: true },
@@ -92,7 +90,6 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
     id: "content",
     label: "Content",
     items: [
-      { id: "share-pages", label: "Share Pages", registryRouteId: "workspace-share-pages", icon: FileText, workspaceRoute: true },
       {
         id: "personalized-videos",
         label: "Personalized Videos",
@@ -100,14 +97,6 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
         icon: Sparkles,
         workspaceRoute: true,
       },
-      {
-        id: "personalization",
-        label: "Personalization",
-        registryRouteId: "workspace-personalization",
-        icon: Wand2,
-        workspaceRoute: true,
-      },
-      { id: "videos", label: "Videos", registryRouteId: "workspace-videos", icon: Video, workspaceRoute: true },
       { id: "media-assets", label: "Media Assets", registryRouteId: "workspace-media", icon: Layers, workspaceRoute: true },
     ],
   },
@@ -124,6 +113,7 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
     items: [
       { id: "opportunities", label: "Opportunities", registryRouteId: "workspace-opportunities", icon: Target, workspaceRoute: true },
       { id: "activity", label: "Activity", registryRouteId: "workspace-activity", icon: Activity, workspaceRoute: true },
+      { id: "engagement", label: "Engagement", registryRouteId: "workspace-engagement", icon: Activity, workspaceRoute: true },
       { id: "conversations", label: "Conversations", registryRouteId: "workspace-conversations", icon: MessageSquare, workspaceRoute: true },
       { id: "relationships", label: "Relationships", registryRouteId: "workspace-relationships", icon: Handshake, workspaceRoute: true },
     ],
@@ -211,6 +201,12 @@ export function isGrowthShellNavItemActive(pathname: string, item: GrowthShellNa
     return true
   }
   if (item.id === "activity" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/activity`)) {
+    return true
+  }
+  if (item.id === "engagement" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/engagement`)) {
+    return true
+  }
+  if (item.id === "audiences" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/audiences`)) {
     return true
   }
   if (item.id === "videos" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/videos`)) {

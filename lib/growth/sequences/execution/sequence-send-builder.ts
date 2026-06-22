@@ -15,8 +15,10 @@ import { getApprovedPersonalizationForJob } from "@/lib/growth/personalization/d
 import type { GrowthSequenceSendPayload } from "@/lib/growth/sequences/execution/sequence-execution-types"
 import {
   applySendrPageUrlMergeFields,
+  resolvePreferredSenderAccountFromSendrLink,
   resolveSendrPageUrlForSequenceStep,
 } from "@/lib/growth/sendr/growth-sendr-sequence-bridge-service"
+import { fetchGrowthSequenceEnrollmentById } from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
 import {
   applySequenceVideoAttachmentToEmailHtml,
   wireApprovedSequenceVideoAttachment,
@@ -118,6 +120,33 @@ export async function buildSequenceExecutionSendPayload(
   })
   if (!sender) return { error: "no_sender_route" }
 
+  let preferredSenderAccountId: string | null = null
+  if (lead.promotedOrganizationId) {
+    let sequencePatternId: string | null = null
+    if (input.sequenceEnrollmentId) {
+      const enrollment = await fetchGrowthSequenceEnrollmentById(admin, input.sequenceEnrollmentId)
+      sequencePatternId = enrollment?.sequencePatternId ?? null
+    }
+    preferredSenderAccountId = await resolvePreferredSenderAccountFromSendrLink(admin, {
+      organizationId: lead.promotedOrganizationId,
+      sequencePatternStepId: step.sequencePatternStepId,
+      sequencePatternId,
+    })
+  }
+
+  const manualSenderAccountId =
+    input.manualSenderAccountId ?? preferredSenderAccountId ?? sender.manualSenderAccountId ?? null
+  let resolvedSender =
+    manualSenderAccountId && manualSenderAccountId !== sender.senderAccountId
+      ? await resolveSequenceExecutionSender(admin, {
+          senderPoolId: input.senderPoolId,
+          allowAutoRotation: false,
+          manualSenderAccountId,
+          sequenceExecutionJobId: input.sequenceExecutionJobId,
+        })
+      : sender
+  if (!resolvedSender) return { error: "no_sender_route" }
+
   let subject = "Follow up"
   let body = step.instructions?.trim() || "Following up on our conversation."
   let contentTemplateVersionId: string | null = input.contentTemplateVersionId ?? null
@@ -166,14 +195,14 @@ export async function buildSequenceExecutionSendPayload(
     sequenceStepId: input.sequenceStepId,
     subject,
     body,
-    senderAccountId: sender.senderAccountId,
-    providerId: sender.providerId,
+    senderAccountId: resolvedSender.senderAccountId,
+    providerId: resolvedSender.providerId,
   })
 
   subject = experimentOverlay.subject
   body = experimentOverlay.body
-  sender.senderAccountId = experimentOverlay.senderAccountId
-  sender.providerId = experimentOverlay.providerId
+  resolvedSender.senderAccountId = experimentOverlay.senderAccountId
+  resolvedSender.providerId = experimentOverlay.providerId
 
   if (lead.promotedOrganizationId) {
     const sendrPageUrl = await resolveSendrPageUrlForSequenceStep(admin, {
@@ -188,7 +217,7 @@ export async function buildSequenceExecutionSendPayload(
   }
 
   const prepared = await prepareOutboundEmailContent(admin, {
-    senderAccountId: sender.senderAccountId,
+    senderAccountId: resolvedSender.senderAccountId,
     subject,
     bodyText: body,
     unsubscribeFooterHtml: UNSUBSCRIBE_FOOTER,
@@ -224,13 +253,14 @@ export async function buildSequenceExecutionSendPayload(
     subject: subject.slice(0, 500),
     html,
     text,
-    senderAccountId: sender.senderAccountId,
-    providerId: sender.providerId,
-    senderPoolId: sender.senderPoolId ?? input.senderPoolId ?? null,
-    allowAutoRotation: sender.allowAutoRotation ?? input.allowAutoRotation ?? true,
-    manualSenderAccountId: sender.manualSenderAccountId ?? input.manualSenderAccountId ?? null,
-    rotationReason: sender.rotationReason ?? null,
-    rotationRiskLevel: sender.rotationRiskLevel ?? null,
+    senderAccountId: resolvedSender.senderAccountId,
+    providerId: resolvedSender.providerId,
+    senderPoolId: resolvedSender.senderPoolId ?? input.senderPoolId ?? null,
+    allowAutoRotation: resolvedSender.allowAutoRotation ?? input.allowAutoRotation ?? true,
+    manualSenderAccountId:
+      resolvedSender.manualSenderAccountId ?? manualSenderAccountId ?? input.manualSenderAccountId ?? null,
+    rotationReason: resolvedSender.rotationReason ?? null,
+    rotationRiskLevel: resolvedSender.rotationRiskLevel ?? null,
     experimentId: experimentOverlay.experimentId,
     experimentVariantId: experimentOverlay.variantId,
     experimentVariantLabel: experimentOverlay.variantLabel,

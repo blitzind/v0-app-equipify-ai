@@ -116,12 +116,18 @@ function buildResolvedSignature(
   resolutionSource: OutboundSignatureResolutionSource,
 ): ResolvedOutboundSignature {
   const rendered = renderSignatureFromProfile(profile)
+  const mergeFields = buildSenderMergeFields(
+    profile,
+    sender.email_address,
+    sender.display_name,
+    rendered.text,
+  )
   return {
     signature: rendered,
     profileId: profile.id,
     senderAccountId: sender.id,
     displayName: profile.display_name,
-    mergeFields: buildSenderMergeFields(profile, sender.email_address, sender.display_name),
+    mergeFields,
     resolutionSource,
     activeProfile: profile,
   }

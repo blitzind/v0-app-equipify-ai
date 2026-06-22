@@ -840,6 +840,8 @@
     "test:growth-connected-mailboxes": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-connected-mailboxes.ts",
     "test:growth-warmup-startup-8m": "tsx scripts/test-growth-warmup-startup-8m.ts",
     "test:growth-sender-profiles-1a": "tsx scripts/test-growth-sender-profiles-1a.ts",
+    "test:ge-v1-1-operational-baseline": "tsx scripts/test-ge-v1-1-operational-baseline.ts",
+    "seed:ge-v1-1-operational-baseline": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/seed-ge-v1-1-operational-baseline.ts",
     "test:growth-signatures-1a": "tsx scripts/test-growth-signatures-1a.ts",
     "test:growth-signatures-runtime-1b": "tsx scripts/test-growth-signatures-runtime-1b.ts",
     "test:growth-signature-injection-1b": "tsx scripts/test-growth-signature-injection-1b.ts",

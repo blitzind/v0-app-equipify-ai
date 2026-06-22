@@ -54,14 +54,20 @@ export function GrowthSendrLaunchCompleteStep({ progress, onStartOver }: Props) 
       ) : null}
 
       <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="default" asChild>
+          <Link href="/growth/campaigns/sequences">Review pending approvals</Link>
+        </Button>
         <Button size="sm" variant="outline" asChild>
-          <Link href="/admin/growth/sequences/execution">Sequence status</Link>
+          <Link href="/growth/campaigns/sequences">Sequence execution</Link>
+        </Button>
+        <Button size="sm" variant="outline" asChild>
+          <Link href="/growth/engagement">Engagement</Link>
+        </Button>
+        <Button size="sm" variant="outline" asChild>
+          <Link href="/growth/runbook">Launch runbook</Link>
         </Button>
         <Button size="sm" variant="outline" asChild>
           <Link href={GROWTH_PERSONALIZED_VIDEOS_WORKSPACE_PATH}>{GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL} workspace</Link>
-        </Button>
-        <Button size="sm" variant="outline" asChild>
-          <Link href="/growth/admin/runtime">Runtime dashboard</Link>
         </Button>
         <Button size="sm" onClick={onStartOver}>
           Launch another

@@ -16,6 +16,7 @@ const BodySchema = z.discriminatedUnion("action", [
     audienceId: z.string().uuid(),
     sequencePatternId: z.string().uuid(),
     landingPageId: z.string().uuid(),
+    senderAccountId: z.string().uuid().nullable().optional(),
   }),
   z.object({
     action: z.literal("continue"),
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
         audienceId: parsed.data.audienceId,
         sequencePatternId: parsed.data.sequencePatternId,
         landingPageId: parsed.data.landingPageId,
+        senderAccountId: parsed.data.senderAccountId ?? null,
       })
     } else if (parsed.data.action === "continue") {
       progress = await continueSendrLaunchRun(access.admin, {

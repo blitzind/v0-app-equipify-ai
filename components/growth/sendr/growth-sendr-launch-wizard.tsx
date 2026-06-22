@@ -8,6 +8,7 @@ import { GrowthSendrLaunchAudienceStep } from "@/components/growth/sendr/growth-
 import { GrowthSendrLaunchCompleteStep } from "@/components/growth/sendr/growth-sendr-launch-complete-step"
 import { GrowthSendrLaunchPageStep } from "@/components/growth/sendr/growth-sendr-launch-page-step"
 import { GrowthSendrLaunchPreviewStep } from "@/components/growth/sendr/growth-sendr-launch-preview-step"
+import { GrowthSendrLaunchSenderStep } from "@/components/growth/sendr/growth-sendr-launch-sender-step"
 import { GrowthSendrLaunchSequenceStep } from "@/components/growth/sendr/growth-sendr-launch-sequence-step"
 import { GrowthWizardActionRow } from "@/components/growth/shell/growth-workspace-shell"
 import type {
@@ -20,13 +21,14 @@ import { GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL, GROWTH_PERSONALIZED_VIDEOS_PRODU
 type WizardStep =
   | "audience"
   | "sequence"
+  | "sender"
   | "page"
   | "preview"
   | "confirm"
   | "launching"
   | "complete"
 
-const STEPS: WizardStep[] = ["audience", "sequence", "page", "preview", "confirm", "launching", "complete"]
+const STEPS: WizardStep[] = ["audience", "sequence", "sender", "page", "preview", "confirm", "launching", "complete"]
 
 function stepLabel(step: WizardStep): string {
   switch (step) {
@@ -34,6 +36,8 @@ function stepLabel(step: WizardStep): string {
       return "Audience"
     case "sequence":
       return "Sequence"
+    case "sender":
+      return "Sender"
     case "page":
       return GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL
     case "preview":
@@ -55,6 +59,7 @@ export function GrowthSendrLaunchWizard() {
   const [loadingSummary, setLoadingSummary] = useState(true)
   const [audienceId, setAudienceId] = useState("")
   const [sequencePatternId, setSequencePatternId] = useState("")
+  const [senderAccountId, setSenderAccountId] = useState("")
   const [landingPageId, setLandingPageId] = useState("")
   const [preview, setPreview] = useState<GrowthSendrLaunchPreviewResult | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -89,6 +94,7 @@ export function GrowthSendrLaunchWizard() {
     setStep("audience")
     setAudienceId("")
     setSequencePatternId("")
+    setSenderAccountId("")
     setLandingPageId("")
     setPreview(null)
     setPreviewError(null)
@@ -147,6 +153,7 @@ export function GrowthSendrLaunchWizard() {
         audienceId,
         sequencePatternId,
         landingPageId,
+        senderAccountId: senderAccountId || null,
       })
       setLaunchProgress(progress)
       if (progress.nextAction === "continue") {
@@ -204,7 +211,8 @@ export function GrowthSendrLaunchWizard() {
 
   function goNext() {
     if (step === "audience") setStep("sequence")
-    else if (step === "sequence") setStep("page")
+    else if (step === "sequence") setStep("sender")
+    else if (step === "sender") setStep("page")
     else if (step === "page") {
       setStep("preview")
       void loadPreview()
@@ -214,7 +222,8 @@ export function GrowthSendrLaunchWizard() {
 
   function goBack() {
     if (step === "sequence") setStep("audience")
-    else if (step === "page") setStep("sequence")
+    else if (step === "sender") setStep("sequence")
+    else if (step === "page") setStep("sender")
     else if (step === "preview") setStep("page")
     else if (step === "confirm") setStep("preview")
   }
@@ -223,6 +232,7 @@ export function GrowthSendrLaunchWizard() {
   const canNext =
     (step === "audience" && audienceId) ||
     (step === "sequence" && sequencePatternId) ||
+    (step === "sender" && (senderAccountId || (summary?.senderProfiles?.length ?? 0) === 0)) ||
     (step === "page" && landingPageId) ||
     step === "preview" ||
     step === "confirm"
@@ -244,6 +254,13 @@ export function GrowthSendrLaunchWizard() {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Campaign launch wizard</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Need the full path? See the{" "}
+          <a href="/growth/runbook" className="text-indigo-600 hover:underline">
+            Launch Runbook
+          </a>
+          .
+        </p>
         <div className="flex flex-wrap gap-2 pt-2">
           {STEPS.filter((s) => s !== "launching").map((s) => (
             <span
@@ -272,6 +289,15 @@ export function GrowthSendrLaunchWizard() {
             summary={summary}
             sequencePatternId={sequencePatternId}
             onSequencePatternIdChange={setSequencePatternId}
+            disabled={busy}
+          />
+        ) : null}
+
+        {step === "sender" ? (
+          <GrowthSendrLaunchSenderStep
+            summary={summary}
+            senderAccountId={senderAccountId}
+            onSenderAccountIdChange={setSenderAccountId}
             disabled={busy}
           />
         ) : null}

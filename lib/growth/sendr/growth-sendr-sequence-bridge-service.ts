@@ -36,6 +36,7 @@ export async function attachSendrPageToSequence(
     sequencePatternStepId?: string | null
     enrollmentRunId?: string | null
     attachedBy?: string | null
+    metadata?: Record<string, unknown>
   },
 ): Promise<GrowthSendrSequencePageLink> {
   const bridge = await checkSendrKillSwitch(admin, "sendr_page_links")
@@ -63,6 +64,7 @@ export async function attachSendrPageToSequence(
     metadata: {
       publishedSlug: page.publishedSlug ?? page.slug,
       qa_marker: GROWTH_SENDR_SEQUENCE_BRIDGE_QA_MARKER,
+      ...(input.metadata ?? {}),
     },
   })
 }
@@ -142,4 +144,18 @@ export async function resolveSendrPageUrlBatch(
     results.set(key, url)
   }
   return results
+}
+
+/** Preferred outbound sender from launch wizard / campaign link metadata (GE-v1-1). */
+export async function resolvePreferredSenderAccountFromSendrLink(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string
+    sequencePatternStepId: string | null
+    sequencePatternId?: string | null
+  },
+): Promise<string | null> {
+  const link = await resolveSendrLinkForSequenceStep(admin, input)
+  const raw = link?.metadata?.preferredSenderAccountId
+  return typeof raw === "string" && raw.trim() ? raw.trim() : null
 }

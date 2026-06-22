@@ -14,7 +14,20 @@ export const GROWTH_SENDER_MERGE_FIELD_KEYS = [
   "sender.phone",
   "sender.company",
   "sender.website",
+  "sender.signature",
 ] as const
+
+/** Legacy underscore tokens supported alongside dotted keys (GE-v1-1). */
+export const GROWTH_SENDER_MERGE_FIELD_LEGACY_ALIASES: Record<string, string> = {
+  sender_name: "sender.name",
+  sender_title: "sender.title",
+  sender_email: "sender.email",
+  sender_phone: "sender.phone",
+  sender_company: "sender.company",
+  sender_signature: "sender.signature",
+  sender_first_name: "sender.first_name",
+  sender_last_name: "sender.last_name",
+}
 
 export type GrowthSenderMergeFieldKey = (typeof GROWTH_SENDER_MERGE_FIELD_KEYS)[number]
 
@@ -40,6 +53,7 @@ export function buildSenderMergeFields(
   profile: GrowthSenderProfile | null,
   senderEmail: string,
   senderDisplayName?: string | null,
+  signatureText?: string | null,
 ): Record<string, string> {
   const displayName = profile?.display_name?.trim() || senderDisplayName?.trim() || ""
   const { firstName, lastName } = splitDisplayName(displayName)
@@ -56,6 +70,7 @@ export function buildSenderMergeFields(
     "sender.company": companyFromProfile(profile, website),
     "sender.website": website,
     "sender.linkedin": profile?.linkedin_url?.trim() ?? "",
+    "sender.signature": signatureText?.trim() ?? "",
   }
 }
 
@@ -64,16 +79,38 @@ function escapeRegExp(value: string): string {
 }
 
 /**
- * Replaces `{{sender.name}}` style tokens. Unknown keys are left unchanged.
+ * Replaces `{{sender.name}}` and legacy `{{sender_name}}` tokens. Unknown keys are left unchanged.
  */
 export function applySenderMergeFieldsToText(text: string, mergeFields: Record<string, string>): string {
-  if (!text) return text
+  return applySenderMergeFieldsToTextWithResult(text, mergeFields).text
+}
+
+export function applySenderMergeFieldsToTextWithResult(
+  text: string,
+  mergeFields: Record<string, string>,
+): { text: string; inlineSignatureUsed: boolean } {
+  if (!text) return { text, inlineSignatureUsed: false }
 
   let rendered = text
+  let inlineSignatureUsed = false
+
+  for (const [legacyKey, canonicalKey] of Object.entries(GROWTH_SENDER_MERGE_FIELD_LEGACY_ALIASES)) {
+    const value = mergeFields[canonicalKey] ?? ""
+    const pattern = new RegExp(`\\{\\{\\s*${escapeRegExp(legacyKey)}\\s*\\}\\}`, "gi")
+    if (pattern.test(rendered)) {
+      if (legacyKey === "sender_signature") inlineSignatureUsed = true
+      rendered = rendered.replace(new RegExp(`\\{\\{\\s*${escapeRegExp(legacyKey)}\\s*\\}\\}`, "gi"), value)
+    }
+  }
+
   for (const key of GROWTH_SENDER_MERGE_FIELD_KEYS) {
     const value = mergeFields[key] ?? ""
-    const pattern = new RegExp(`\\{\\{\\s*${escapeRegExp(key)}\\s*\\}\\}`, "gi")
-    rendered = rendered.replace(pattern, value)
+    const dottedPattern = new RegExp(`\\{\\{\\s*${escapeRegExp(key)}\\s*\\}\\}`, "gi")
+    if (dottedPattern.test(rendered)) {
+      if (key === "sender.signature") inlineSignatureUsed = true
+      rendered = rendered.replace(dottedPattern, value)
+    }
   }
-  return rendered
+
+  return { text: rendered, inlineSignatureUsed }
 }

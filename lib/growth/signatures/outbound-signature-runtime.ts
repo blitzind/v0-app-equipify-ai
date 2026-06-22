@@ -7,7 +7,7 @@ import {
   type OutboundSignatureInjectionResult,
 } from "@/lib/growth/signatures/signature-injection"
 import {
-  applySenderMergeFieldsToText,
+  applySenderMergeFieldsToTextWithResult,
   buildSenderMergeFields,
 } from "@/lib/growth/signatures/sender-merge-fields"
 import {
@@ -65,8 +65,16 @@ export async function prepareOutboundEmailContent(
     mailboxConnectionId,
   })
 
-  const subject = applySenderMergeFieldsToText(input.subject, resolved.mergeFields)
-  const bodyText = applySenderMergeFieldsToText(input.bodyText, resolved.mergeFields)
+  const mergeFields = {
+    ...resolved.mergeFields,
+    "sender.signature": resolved.signature?.text?.trim() ?? resolved.mergeFields["sender.signature"] ?? "",
+  }
+
+  const subjectResult = applySenderMergeFieldsToTextWithResult(input.subject, mergeFields)
+  const bodyResult = applySenderMergeFieldsToTextWithResult(input.bodyText, mergeFields)
+  const subject = subjectResult.text
+  const bodyText = bodyResult.text
+  const inlineSignatureUsed = bodyResult.inlineSignatureUsed
 
   const contentHtml = input.htmlBody?.trim() ? input.htmlBody : plainTextToHtmlBody(bodyText)
   const footerHtml = input.unsubscribeFooterHtml?.trim() ?? ""
@@ -74,11 +82,14 @@ export async function prepareOutboundEmailContent(
 
   const baseText = buildPlaintextBody(bodyText, input.unsubscribeTextSuffix)
 
-  const injected: OutboundSignatureInjectionResult = appendSignatureToOutboundBody({
-    htmlBody: htmlWithFooter,
-    textBody: baseText,
-    signature: resolved.signature,
-  })
+  const injected: OutboundSignatureInjectionResult =
+    inlineSignatureUsed || !resolved.signature?.html?.trim()
+      ? { htmlBody: htmlWithFooter, textBody: baseText, signatureInjected: false }
+      : appendSignatureToOutboundBody({
+          htmlBody: htmlWithFooter,
+          textBody: baseText,
+          signature: resolved.signature,
+        })
 
   return {
     subject,
@@ -86,7 +97,7 @@ export async function prepareOutboundEmailContent(
     htmlBody: injected.htmlBody,
     textBody: injected.textBody,
     signatureInjected: injected.signatureInjected,
-    mergeFields: resolved.mergeFields,
+    mergeFields,
     resolutionSource: resolved.resolutionSource,
     signature: resolved.signature,
   }

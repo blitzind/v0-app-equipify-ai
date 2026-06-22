@@ -93,6 +93,21 @@ export async function resolveSendrVisitorLeadId(
   return { leadId: lead.id, mode, fallbackReason: null }
 }
 
+function buildPageFallbackPersonalizationContext(
+  page: Pick<GrowthSendrLandingPage, "variableMap">,
+): GrowthSendrPersonalizationContext {
+  const customVariables = Object.fromEntries(
+    Object.entries(page.variableMap).filter(
+      ([key]) => !(GROWTH_SENDR_PERSONALIZATION_VARIABLES as readonly string[]).includes(key),
+    ),
+  )
+  return {
+    variables: {},
+    fallbacks: page.variableMap,
+    customVariables,
+  }
+}
+
 export async function personalizeSendrPublicPagePayload(
   admin: SupabaseClient,
   input: {
@@ -104,7 +119,23 @@ export async function personalizeSendrPublicPagePayload(
   const resolution = await resolveSendrVisitorLeadId(admin, input.page, input.renderContext)
   if (!resolution.leadId) {
     if (!hasSendrVisitorRenderContext(input.renderContext)) {
-      return input.payload
+      if (Object.keys(input.page.variableMap).length === 0) {
+        return input.payload
+      }
+      const { payload, missingVariables } = applySendrRuntimePersonalizationToPayload(
+        input.payload,
+        buildPageFallbackPersonalizationContext(input.page),
+      )
+      return {
+        ...payload,
+        personalization: {
+          applied: true,
+          mode: "anonymous",
+          fallbackReason: null,
+          missingVariables,
+          qaMarker: GROWTH_SENDR_VISITOR_PERSONALIZATION_QA_MARKER,
+        },
+      }
     }
     return {
       ...input.payload,
