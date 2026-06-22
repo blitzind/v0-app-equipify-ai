@@ -354,7 +354,7 @@ export function GrowthMailboxConnectionsDashboard() {
 
         <div className="mb-4 flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/admin/growth/providers/setup">Provider Setup (all OAuth families)</Link>
+            <Link href="/growth/settings/delivery">Delivery Setup</Link>
           </Button>
         </div>
 

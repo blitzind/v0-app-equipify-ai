@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getMailboxConnection } from "@/lib/growth/mailboxes/mailbox-repository"
+import { logGrowthGoogleOAuthFlow } from "@/lib/growth/provider-setup/google-oauth-flow-log"
 import { upsertProviderConnectionSettings } from "@/lib/growth/provider-setup/dashboard"
 import {
   createDeliveryProvider,
@@ -135,6 +136,25 @@ export async function wireOAuthProviderTransportAfterConnection(
     mailboxEmail: mailbox.email_address,
     actorUserId: input.actorUserId,
   })
+
+  if (input.providerFamily === "google") {
+    logGrowthGoogleOAuthFlow("sender_linked", {
+      userId: input.actorUserId,
+      senderId: input.senderAccountId,
+      mailboxId: input.mailboxConnectionId,
+      email: mailbox.email_address,
+      provider: input.providerFamily,
+      connectionState: sender.status === "connected" ? "connected" : "promoted_to_connected",
+    })
+    logGrowthGoogleOAuthFlow("mailbox_sync_started", {
+      userId: input.actorUserId,
+      senderId: input.senderAccountId,
+      mailboxId: input.mailboxConnectionId,
+      email: mailbox.email_address,
+      provider: input.providerFamily,
+      connectionState: "reply_ingestion_wired",
+    })
+  }
 
   return {
     qaMarker: GROWTH_OUTBOUND_TRANSPORT_READINESS_QA_MARKER,

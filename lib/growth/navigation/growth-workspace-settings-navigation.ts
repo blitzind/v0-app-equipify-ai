@@ -21,11 +21,13 @@ import {
   Signature,
   SlidersHorizontal,
   Sparkles,
+  Truck,
   User,
 } from "lucide-react"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
+import { GROWTH_DELIVERY_SETTINGS_CONNECTED_MAILBOXES_HREF } from "@/lib/growth/navigation/growth-delivery-settings-navigation"
 
-export const GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER = "growth-workspace-settings-nav-v2" as const
+export const GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER = "growth-workspace-settings-nav-v3" as const
 
 export const GROWTH_WORKSPACE_SETTINGS_DEFAULT_SECTION_ID = "profile" as const
 
@@ -99,13 +101,18 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
     label: "Communications",
     items: [
       {
+        id: "delivery",
+        label: "Delivery Setup",
+        description: "Mailbox OAuth, connected senders, delivery readiness, and test sends.",
+        segment: "delivery",
+        icon: Truck,
+      },
+      {
         id: "connected-mailboxes",
         label: "Connected Mailboxes",
         description: "Mailbox connections used for outbound and reply workflows.",
         segment: "connected-mailboxes",
         icon: Mailbox,
-        adminFallbackSuffix: "communications",
-        adminFallbackLabel: "Communications settings (admin)",
       },
       {
         id: "calling-preferences",
@@ -231,7 +238,10 @@ export function buildGrowthWorkspaceSettingsNavGroups(): GrowthSettingsNavGroup[
       id: item.id,
       label: item.label,
       description: item.description,
-      href: resolveSettingsHref(item.segment),
+      href:
+        item.id === "connected-mailboxes"
+          ? GROWTH_DELIVERY_SETTINGS_CONNECTED_MAILBOXES_HREF
+          : resolveSettingsHref(item.segment),
       icon: item.icon,
       adminFallbackHref: resolveAdminFallbackHref(item.adminFallbackSuffix),
       adminFallbackLabel: item.adminFallbackLabel,
@@ -255,6 +265,12 @@ export function getGrowthWorkspaceSettingsSectionById(id: string): GrowthSetting
 }
 
 export function isGrowthWorkspaceSettingsNavItemActive(pathname: string, item: GrowthSettingsNavItem): boolean {
+  if (item.id === "connected-mailboxes") {
+    return pathname === GROWTH_DELIVERY_SETTINGS_CONNECTED_MAILBOXES_HREF.split("#")[0]
+  }
+  if (item.id === "delivery") {
+    return pathname === item.href || pathname.startsWith(`${item.href}/`)
+  }
   return pathname === item.href || pathname.startsWith(`${item.href}/`)
 }
 

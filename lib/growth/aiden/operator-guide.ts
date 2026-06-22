@@ -114,7 +114,7 @@ export const AIDEN_TODAY_POST_LAUNCH: AidenGuideStep[] = [
     detail: "Confirm outbound mailbox stays connected. Expired tokens block future sends even if today's sends completed.",
     links: [
       { label: "Mailboxes", href: "/admin/growth/infrastructure/mailboxes" },
-      { label: "Provider setup", href: "/admin/growth/providers/setup" },
+      { label: "Delivery Setup", href: "/growth/settings/delivery" },
     ],
   },
   {
@@ -331,7 +331,7 @@ export const AIDEN_DAILY_ROUTINE: AidenGuideStep[] = [
     detail: "Confirm outbound mailbox is connected and token is valid. Expired mailboxes block every send.",
     links: [
       { label: "Mailboxes", href: "/admin/growth/infrastructure/mailboxes" },
-      { label: "Provider setup", href: "/admin/growth/providers/setup" },
+      { label: "Delivery Setup", href: "/growth/settings/delivery" },
     ],
   },
   {

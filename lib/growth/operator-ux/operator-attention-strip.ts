@@ -94,7 +94,7 @@ export async function buildGrowthOperatorAttentionStrip(
     count:
       (attention?.providerIssueCount ?? 0) +
       (outbound?.transport.failed_attempts_24h ?? 0),
-    href: "/admin/growth/providers/setup",
+    href: "/growth/settings/delivery",
     severity: (attention?.providerIssueCount ?? 0) > 0 ? "critical" : "medium",
   })
 

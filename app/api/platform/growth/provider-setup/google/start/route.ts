@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { requireGrowthEnginePlatformAccess, getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import { logGrowthGoogleOAuthFlow } from "@/lib/growth/provider-setup/google-oauth-flow-log"
 import { buildGoogleProviderAuthorizeUrl, getGoogleOAuthScopes, googleProviderOAuthConfigured } from "@/lib/growth/provider-setup/google-oauth"
+import {
+  type GrowthProviderOAuthWorkspace,
+} from "@/lib/growth/navigation/growth-delivery-settings-navigation"
 import {
   createProviderSetupOAuthNonce,
   createProviderSetupOAuthStateRecord,
@@ -28,10 +32,13 @@ export async function POST(request: Request) {
     return_to?: string
     sender_account_id?: string
     mailbox_connection_id?: string
+    workspace?: GrowthProviderOAuthWorkspace
   }
 
   const senderAccountId = body.sender_account_id?.trim() || null
   const mailboxConnectionId = body.mailbox_connection_id?.trim() || null
+  const workspace: GrowthProviderOAuthWorkspace = body.workspace === "admin" ? "admin" : "growth"
+  const organizationId = getGrowthEngineAiOrgId()
 
   let loginHint: string | null = null
   if (mailboxConnectionId) {
@@ -49,8 +56,11 @@ export async function POST(request: Request) {
   const statePayload = {
     userId: access.userId,
     providerFamily: "google" as const,
-    returnTo: normalizeProviderSetupReturnTo(body.return_to),
+    returnTo: normalizeProviderSetupReturnTo(body.return_to, workspace),
     senderAccountId: senderAccountId,
+    mailboxConnectionId: mailboxConnectionId,
+    workspace,
+    organizationId,
     ts: Date.now(),
     nonce: createProviderSetupOAuthNonce(),
   }
@@ -67,13 +77,17 @@ export async function POST(request: Request) {
     userId: access.userId,
     returnTo: statePayload.returnTo,
     senderAccountId: statePayload.senderAccountId,
+    mailboxConnectionId: statePayload.mailboxConnectionId,
+    workspace: statePayload.workspace,
+    organizationId: statePayload.organizationId,
     stateToken: state,
   })
 
   await upsertProviderConnectionSettings(access.admin, {
     provider_family: "google",
     status: "pending",
-    sender_account_id: statePayload.senderAccountId,
+    ...(statePayload.senderAccountId ? { sender_account_id: statePayload.senderAccountId } : {}),
+    ...(statePayload.mailboxConnectionId ? { mailbox_connection_id: statePayload.mailboxConnectionId } : {}),
     actorUserId: access.userId,
   })
 
@@ -81,6 +95,15 @@ export async function POST(request: Request) {
     providerFamily: "google",
     action: "oauth_reconnect_started",
     actorUserId: access.userId,
+  })
+
+  logGrowthGoogleOAuthFlow("oauth_start", {
+    userId: access.userId,
+    senderId: statePayload.senderAccountId,
+    mailboxId: statePayload.mailboxConnectionId,
+    provider: "google",
+    connectionState: "pending",
+    returnTo: statePayload.returnTo,
   })
 
   return NextResponse.json({

@@ -142,9 +142,14 @@ export function providerSetupFamilyLabel(family: GrowthProviderSetupFamily): str
 }
 
 export const GROWTH_PROVIDER_SETUP_ALLOWED_RETURN_PREFIXES = [
+  "/growth/settings/delivery",
   "/admin/growth/providers/setup",
   "/admin/growth/infrastructure/mailboxes",
   "/admin/growth/providers/delivery",
+  "/growth/settings/connected-mailboxes",
+  "/growth/settings",
+  "/growth",
+  "/settings/growth-engine",
 ] as const
 
 export const GROWTH_PROVIDER_SETUP_INTERNAL_FIELD_NAMES = [

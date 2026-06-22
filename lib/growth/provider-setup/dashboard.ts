@@ -22,6 +22,7 @@ import {
   type GrowthProviderSetupReadinessResult,
   providerSetupFamilyLabel,
 } from "@/lib/growth/provider-setup/provider-setup-types"
+import { logGrowthGoogleOAuthFlow } from "@/lib/growth/provider-setup/google-oauth-flow-log"
 import {
   GROWTH_LIVE_PROVIDER_SETUP_SCHEMA_SETUP_MESSAGE,
   isGrowthLiveProviderSetupSchemaReady,
@@ -357,6 +358,12 @@ export async function completeOAuthProviderConnection(
     }
   }
 
+  let resolvedSenderAccountId = input.senderAccountId
+  if (!resolvedSenderAccountId && mailboxId) {
+    const linkedMailbox = await getMailboxConnection(admin, mailboxId)
+    resolvedSenderAccountId = linkedMailbox?.sender_account_id ?? null
+  }
+
   const tokenPatch = {
     access_token: input.accessToken,
     refresh_token: input.refreshToken,
@@ -372,9 +379,9 @@ export async function completeOAuthProviderConnection(
       status: "connecting",
       validation_failure_count: 0,
     })
-  } else if (input.senderAccountId) {
+  } else if (resolvedSenderAccountId) {
     const mailbox = await createMailboxConnection(admin, {
-      sender_account_id: input.senderAccountId,
+      sender_account_id: resolvedSenderAccountId,
       provider_family: input.providerFamily,
       email_address: input.email,
       display_name: input.displayName ?? input.email,
@@ -410,7 +417,7 @@ export async function completeOAuthProviderConnection(
   const settings = await upsertProviderConnectionSettings(admin, {
     provider_family: input.providerFamily,
     status: "connected",
-    sender_account_id: input.senderAccountId,
+    ...(resolvedSenderAccountId ? { sender_account_id: resolvedSenderAccountId } : {}),
     mailbox_connection_id: mailboxId,
     oauth_account_email: input.email,
     oauth_scopes: input.scopes,
@@ -437,16 +444,27 @@ export async function completeOAuthProviderConnection(
     payload: { provider_family: input.providerFamily, scopes: input.scopes },
   })
 
-  if (input.senderAccountId && mailboxId) {
+  if (resolvedSenderAccountId && mailboxId) {
     const { wireOAuthProviderTransportAfterConnection } = await import(
       "@/lib/growth/provider-setup/oauth-transport-auto-wire"
     )
     await wireOAuthProviderTransportAfterConnection(admin, {
       providerFamily: input.providerFamily,
-      senderAccountId: input.senderAccountId,
+      senderAccountId: resolvedSenderAccountId,
       mailboxConnectionId: mailboxId,
       actorUserId: input.actorUserId,
       actorEmail: input.actorEmail ?? null,
+    })
+  }
+
+  if (input.providerFamily === "google") {
+    logGrowthGoogleOAuthFlow("status_recomputed", {
+      userId: input.actorUserId,
+      senderId: resolvedSenderAccountId,
+      mailboxId,
+      email: input.email,
+      provider: input.providerFamily,
+      connectionState: validated.status,
     })
   }
 

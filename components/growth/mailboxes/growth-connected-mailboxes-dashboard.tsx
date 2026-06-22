@@ -31,10 +31,13 @@ import {
 } from "@/lib/growth/mailboxes/connected-mailboxes-dashboard-types"
 import {
   GROWTH_ADMIN_BASE_PATH,
-  growthFeaturePath,
   isGrowthWorkspacePathname,
-  resolveGrowthFeatureBasePath,
 } from "@/lib/growth/navigation/growth-workspace-base-path"
+import {
+  GROWTH_DELIVERY_SETTINGS_PATH,
+  GROWTH_WORKSPACE_SENDER_POOLS_PATH,
+  GROWTH_WORKSPACE_SENDER_SETUP_PATH,
+} from "@/lib/growth/navigation/growth-delivery-settings-navigation"
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked" | "medium"> = {
   connected: "healthy",
@@ -86,10 +89,18 @@ function isUnhealthyRow(row: GrowthConnectedMailboxRow): boolean {
   return !isHealthyRow(row)
 }
 
-function useConnectedMailboxesNavPaths() {
+function useConnectedMailboxesNavPaths(oauthReturnTo?: string) {
   const pathname = usePathname() ?? ""
   const isWorkspaceSettings = pathname.startsWith("/settings/growth-engine")
   const isGrowthWorkspace = isGrowthWorkspacePathname(pathname)
+
+  if (oauthReturnTo) {
+    return {
+      returnTo: oauthReturnTo,
+      senderHref: GROWTH_WORKSPACE_SENDER_SETUP_PATH,
+      poolHref: GROWTH_WORKSPACE_SENDER_POOLS_PATH,
+    }
+  }
 
   if (isWorkspaceSettings) {
     return {
@@ -101,9 +112,9 @@ function useConnectedMailboxesNavPaths() {
 
   if (isGrowthWorkspace) {
     return {
-      returnTo: pathname || `${resolveGrowthFeatureBasePath(pathname)}/settings/connected-mailboxes`,
-      senderHref: growthFeaturePath(pathname, "infrastructure"),
-      poolHref: growthFeaturePath(pathname, "providers/sender-pools"),
+      returnTo: pathname || GROWTH_DELIVERY_SETTINGS_PATH,
+      senderHref: GROWTH_WORKSPACE_SENDER_SETUP_PATH,
+      poolHref: GROWTH_WORKSPACE_SENDER_POOLS_PATH,
     }
   }
 
@@ -114,9 +125,13 @@ function useConnectedMailboxesNavPaths() {
   }
 }
 
-export function GrowthConnectedMailboxesDashboard() {
+export function GrowthConnectedMailboxesDashboard({
+  oauthReturnTo,
+}: {
+  oauthReturnTo?: string
+} = {}) {
   const searchParams = useSearchParams()
-  const navPaths = useConnectedMailboxesNavPaths()
+  const navPaths = useConnectedMailboxesNavPaths(oauthReturnTo)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dashboard, setDashboard] = useState<GrowthConnectedMailboxesDashboardPayload | null>(null)
@@ -204,6 +219,7 @@ export function GrowthConnectedMailboxesDashboard() {
         sender_account_id: row.senderId,
         mailbox_connection_id: row.mailboxId ?? undefined,
         return_to: navPaths.returnTo,
+        workspace: navPaths.returnTo.startsWith("/admin/growth/providers") ? "admin" : "growth",
       }),
     })
     const data = (await res.json().catch(() => ({}))) as { authorize_url?: string; message?: string }

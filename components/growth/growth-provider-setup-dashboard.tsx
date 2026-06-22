@@ -18,6 +18,11 @@ import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/gro
 import type { GrowthProviderSetupDashboard } from "@/lib/growth/provider-setup/provider-setup-types"
 import { GROWTH_LIVE_PROVIDER_SETUP_QA_MARKER } from "@/lib/growth/provider-setup/provider-setup-types"
 import type { GrowthSenderAccount } from "@/lib/growth/sender/sender-types"
+import {
+  GROWTH_ADMIN_PROVIDER_SETUP_PATH,
+  GROWTH_DELIVERY_SETTINGS_PATH,
+  GROWTH_WORKSPACE_DNS_VERIFICATION_PATH,
+} from "@/lib/growth/navigation/growth-delivery-settings-navigation"
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked"> = {
   connected: "healthy",
@@ -29,7 +34,19 @@ const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutra
   not_configured: "neutral",
 }
 
-export function GrowthProviderSetupDashboard() {
+type GrowthProviderSetupDashboardProps = {
+  variant?: "admin" | "operator"
+  oauthReturnTo?: string
+}
+
+export function GrowthProviderSetupDashboard({
+  variant = "admin",
+  oauthReturnTo,
+}: GrowthProviderSetupDashboardProps = {}) {
+  const isOperator = variant === "operator"
+  const resolvedOAuthReturnTo =
+    oauthReturnTo ?? (isOperator ? GROWTH_DELIVERY_SETTINGS_PATH : GROWTH_ADMIN_PROVIDER_SETUP_PATH)
+  const oauthWorkspace = isOperator ? "growth" : "admin"
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dashboard, setDashboard] = useState<GrowthProviderSetupDashboard | null>(null)
@@ -113,7 +130,8 @@ export function GrowthProviderSetupDashboard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         sender_account_id: selectedSenderId || undefined,
-        return_to: "/admin/growth/providers/setup",
+        return_to: resolvedOAuthReturnTo,
+        workspace: oauthWorkspace,
       }),
     })
     const data = (await res.json().catch(() => ({}))) as { authorize_url?: string; message?: string }
@@ -125,7 +143,7 @@ export function GrowthProviderSetupDashboard() {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" />
-        Loading provider setup…
+        Loading {isOperator ? "delivery setup" : "provider setup"}…
       </div>
     )
   }
@@ -183,7 +201,7 @@ export function GrowthProviderSetupDashboard() {
         </div>
       </GrowthEngineCard>
 
-      <GrowthEngineCard title="Sender + OAuth" className="overflow-visible" data-qa="growth-sender-select-overlay-fix-v1">
+      <GrowthEngineCard title={isOperator ? "Sender + Mailbox OAuth" : "Sender + OAuth"} className="overflow-visible" data-qa="growth-sender-select-overlay-fix-v1">
         <div className="relative z-20 mb-4 grid gap-3 overflow-visible md:grid-cols-2">
           <div className="relative z-20 space-y-2 overflow-visible">
             <Label htmlFor="sender-account">Sender account</Label>
@@ -212,6 +230,7 @@ export function GrowthProviderSetupDashboard() {
         </div>
       </GrowthEngineCard>
 
+      {!isOperator ? (
       <div className="grid gap-6 lg:grid-cols-3">
         <GrowthEngineCard title="SMTP">
           <div className="space-y-3">
@@ -298,13 +317,18 @@ export function GrowthProviderSetupDashboard() {
             </Button>
           </div>
         </GrowthEngineCard>
+        </GrowthEngineCard>
       </div>
+      ) : null}
 
-      <GrowthEngineCard title="Webhooks + Test Send">
+      <GrowthEngineCard title={isOperator ? "Test Send" : "Webhooks + Test Send"}>
         <div className="space-y-4">
+          {!isOperator ? (
           <p className="text-sm text-muted-foreground">
             Webhook URL template: <code className="text-xs">{dashboard.webhook_url_template}</code>
           </p>
+          ) : null}
+          {!isOperator ? (
           <div className="flex flex-wrap gap-2">
             {(["google", "microsoft", "ses", "resend", "smtp"] as const).map((family) => (
               <Button
@@ -328,6 +352,7 @@ export function GrowthProviderSetupDashboard() {
               </Button>
             ))}
           </div>
+          ) : null}
 
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-2">
@@ -343,7 +368,8 @@ export function GrowthProviderSetupDashboard() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {(["google", "smtp", "ses", "resend"] as const).map((family) => (
+            {!isOperator
+              ? (["google", "smtp", "ses", "resend"] as const).map((family) => (
               <Button
                 key={`test-${family}`}
                 type="button"
@@ -360,7 +386,8 @@ export function GrowthProviderSetupDashboard() {
                 <RefreshCw className="mr-2 size-4" />
                 Test {family}
               </Button>
-            ))}
+            ))
+              : null}
             <Button
               type="button"
               disabled={!!actionLoading || !humanApprovalConfirmed || !testTo || !selectedSenderId}
@@ -387,19 +414,36 @@ export function GrowthProviderSetupDashboard() {
         </div>
       </GrowthEngineCard>
 
-      <GrowthEngineCard title="DNS + Governance">
+      <GrowthEngineCard title={isOperator ? "DNS & Deliverability" : "DNS + Governance"}>
         <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
           <ShieldCheck className="size-4" />
-          <span>Verify DNS in Deliverability Ops before production volume.</span>
-          <Button type="button" variant="link" asChild className="h-auto p-0">
-            <Link href="/admin/growth/providers/deliverability-ops">Open Deliverability Ops</Link>
-          </Button>
-          <Button type="button" variant="link" asChild className="h-auto p-0">
-            <Link href="/admin/growth/providers/delivery">Open Provider Delivery</Link>
-          </Button>
-          <Button type="button" variant="link" asChild className="h-auto p-0">
-            <Link href="/admin/growth/infrastructure/mailboxes">Mailbox Connections</Link>
-          </Button>
+          <span>
+            {isOperator
+              ? "Verify DNS and sender reputation before production volume."
+              : "Verify DNS in Deliverability Ops before production volume."}
+          </span>
+          {isOperator ? (
+            <>
+              <Button type="button" variant="link" asChild className="h-auto p-0">
+                <Link href={GROWTH_WORKSPACE_DNS_VERIFICATION_PATH}>Open DNS &amp; Deliverability</Link>
+              </Button>
+              <Button type="button" variant="link" asChild className="h-auto p-0">
+                <Link href={`${GROWTH_DELIVERY_SETTINGS_PATH}#connected-mailboxes`}>Connected Mailboxes</Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button type="button" variant="link" asChild className="h-auto p-0">
+                <Link href="/admin/growth/providers/deliverability-ops">Open Deliverability Ops</Link>
+              </Button>
+              <Button type="button" variant="link" asChild className="h-auto p-0">
+                <Link href="/admin/growth/providers/delivery">Open Provider Delivery</Link>
+              </Button>
+              <Button type="button" variant="link" asChild className="h-auto p-0">
+                <Link href="/admin/growth/infrastructure/mailboxes">Mailbox Connections</Link>
+              </Button>
+            </>
+          )}
         </div>
       </GrowthEngineCard>
     </div>

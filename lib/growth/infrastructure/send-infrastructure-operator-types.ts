@@ -440,7 +440,7 @@ export function buildSendInfrastructureProviderCards(
       mailboxesAttached: googleMailboxes.length,
       lastActivityLabel: snapshot.googleOAuthConfigured ? "OAuth configured" : "OAuth not configured",
       ctaLabel: snapshot.googleOAuthConfigured ? "Configure" : "Connect",
-      ctaHref: "/admin/growth/providers/setup",
+      ctaHref: "/growth/settings/delivery",
       detail: snapshot.googleOAuthConfigured
         ? "Google Workspace send path is configured."
         : "Connect Google Workspace to send and sync replies.",
@@ -454,7 +454,7 @@ export function buildSendInfrastructureProviderCards(
         sanitizeInfrastructureReadinessDetailForOperator(microsoftEntry?.readiness.detail) ??
         "Microsoft 365 connection not configured.",
       ctaLabel: microsoftMailboxes.length > 0 ? "Configure" : "Connect",
-      ctaHref: "/admin/growth/providers/setup",
+      ctaHref: "/growth/settings/delivery",
       detail: "Microsoft 365 mailbox integration for outbound and inbox sync.",
     },
     {

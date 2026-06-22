@@ -54,7 +54,7 @@ export default function AdminGrowthProviderSetupPage() {
         />
 
         <GrowthSectionLayout>
-          <GrowthProviderSetupDashboard />
+          <GrowthProviderSetupDashboard variant="admin" oauthReturnTo="/admin/growth/providers/setup" />
         </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>

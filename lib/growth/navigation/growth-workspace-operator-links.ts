@@ -86,6 +86,11 @@ export function buildGrowthActivityHref(input?: { filter?: string | null; leadId
   return query ? `${GROWTH_ACTIVITY_WORKSPACE_PATH}?${query}` : GROWTH_ACTIVITY_WORKSPACE_PATH
 }
 
+export {
+  GROWTH_DELIVERY_SETTINGS_PATH,
+  growthWorkspaceDeliverySetupHref,
+} from "@/lib/growth/navigation/growth-delivery-settings-navigation"
+
 export function buildGrowthMeetingsHref(input?: {
   leadId?: string | null
   meetingId?: string | null

@@ -11,6 +11,12 @@ import {
   type AidenRevenueJourneyStageKey,
   type AidenRevenueJourneyTracker,
 } from "@/lib/growth/aiden/aiden-revenue-journey-types"
+import {
+  buildGrowthLeadHref,
+  buildGrowthMeetingsHref,
+  buildGrowthOpportunityHref,
+  growthWorkspaceInboxHref,
+} from "@/lib/growth/navigation/growth-workspace-operator-links"
 
 type LeadRow = {
   id: string
@@ -18,7 +24,7 @@ type LeadRow = {
 }
 
 function leadDeepLink(leadId: string): string {
-  return `/admin/growth/leads?lead=${leadId}`
+  return buildGrowthLeadHref(leadId)
 }
 
 function stageLink(key: AidenRevenueJourneyStageKey, leadId: string): string {
@@ -26,11 +32,11 @@ function stageLink(key: AidenRevenueJourneyStageKey, leadId: string): string {
     case "email_sent":
       return `/admin/growth/sequences/execution?lead=${leadId}`
     case "reply_received":
-      return `/admin/growth/inbox?lead=${leadId}`
+      return growthWorkspaceInboxHref({ leadId })
     case "meeting":
-      return `/admin/growth/meetings?lead=${leadId}`
+      return buildGrowthMeetingsHref({ leadId })
     case "opportunity":
-      return `/admin/growth/opportunities?lead=${leadId}`
+      return buildGrowthOpportunityHref({ leadId })
     case "revenue":
       return `/admin/growth/revenue-attribution?lead=${leadId}`
     default:

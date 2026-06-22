@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { completeOAuthProviderConnection } from "@/lib/growth/provider-setup/dashboard"
 import {
+  defaultGrowthProviderOAuthReturnTo,
+} from "@/lib/growth/navigation/growth-delivery-settings-navigation"
+import {
   exchangeMicrosoftProviderOAuthCode,
   fetchMicrosoftProviderAccountProfile,
   getMicrosoftOAuthScopes,
@@ -24,7 +27,7 @@ export async function GET(request: NextRequest) {
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 
-  const returnTo = "/admin/growth/providers/setup"
+  const returnTo = defaultGrowthProviderOAuthReturnTo("growth")
   const oauthError = request.nextUrl.searchParams.get("error")
   if (oauthError) return redirectResult(request, returnTo, { provider_error: oauthError })
 
@@ -55,6 +58,7 @@ export async function GET(request: NextRequest) {
     await completeOAuthProviderConnection(access.admin, {
       providerFamily: "microsoft",
       senderAccountId: consumed.sender_account_id ?? payload.senderAccountId ?? null,
+      mailboxConnectionId: consumed.mailbox_connection_id ?? payload.mailboxConnectionId ?? null,
       email: profile.email,
       displayName: profile.displayName,
       accessToken: tokens.access_token,

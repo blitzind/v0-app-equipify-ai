@@ -5,12 +5,19 @@ import type {
   GrowthProviderSetupOAuthFamily,
 } from "@/lib/growth/provider-setup/provider-setup-types"
 import { GROWTH_PROVIDER_SETUP_ALLOWED_RETURN_PREFIXES } from "@/lib/growth/provider-setup/provider-setup-types"
+import {
+  defaultGrowthProviderOAuthReturnTo,
+  type GrowthProviderOAuthWorkspace,
+} from "@/lib/growth/navigation/growth-delivery-settings-navigation"
 
 export type GrowthProviderOAuthStatePayload = {
   userId: string
   providerFamily: GrowthProviderSetupOAuthFamily
   returnTo: string
   senderAccountId?: string | null
+  mailboxConnectionId?: string | null
+  workspace?: GrowthProviderOAuthWorkspace | null
+  organizationId?: string | null
   ts: number
   nonce: string
 }
@@ -22,10 +29,14 @@ function getSecret(): string | null {
   return secret && secret.length >= 16 ? secret : null
 }
 
-export function normalizeProviderSetupReturnTo(returnTo: string | null | undefined): string {
-  const value = returnTo?.trim() || "/admin/growth/providers/setup"
+export function normalizeProviderSetupReturnTo(
+  returnTo: string | null | undefined,
+  workspace: GrowthProviderOAuthWorkspace = "growth",
+): string {
+  const fallback = defaultGrowthProviderOAuthReturnTo(workspace)
+  const value = returnTo?.trim() || fallback
   if (!GROWTH_PROVIDER_SETUP_ALLOWED_RETURN_PREFIXES.some((prefix) => value.startsWith(prefix))) {
-    return "/admin/growth/providers/setup"
+    return fallback
   }
   return value
 }
@@ -69,7 +80,10 @@ export function verifyProviderSetupOAuthState(
     return null
   }
   if (Date.now() - parsed.ts > maxAgeMs) return null
-  parsed.returnTo = normalizeProviderSetupReturnTo(parsed.returnTo)
+  parsed.returnTo = normalizeProviderSetupReturnTo(
+    parsed.returnTo,
+    parsed.workspace === "admin" ? "admin" : "growth",
+  )
   return parsed
 }
 
@@ -80,18 +94,28 @@ export async function createProviderSetupOAuthStateRecord(
     userId: string
     returnTo: string
     senderAccountId?: string | null
+    mailboxConnectionId?: string | null
+    workspace?: GrowthProviderOAuthWorkspace | null
+    organizationId?: string | null
     stateToken: string
   },
 ): Promise<void> {
   const expiresAt = new Date(Date.now() + STATE_MAX_AGE_MS).toISOString()
+  const workspace = input.workspace === "admin" ? "admin" : "growth"
   const { error } = await admin.schema("growth").from("provider_oauth_states").insert({
     provider_family: input.providerFamily,
     state_token: input.stateToken,
     user_id: input.userId,
-    return_to: normalizeProviderSetupReturnTo(input.returnTo),
+    return_to: normalizeProviderSetupReturnTo(input.returnTo, workspace),
     sender_account_id: input.senderAccountId ?? null,
     expires_at: expiresAt,
-    metadata: { qa_marker: "growth-live-provider-setup-v1" },
+    metadata: {
+      qa_marker: "growth-live-provider-setup-v1",
+      mailbox_connection_id: input.mailboxConnectionId ?? null,
+      workspace,
+      organization_id: input.organizationId ?? null,
+      sender_account_id: input.senderAccountId ?? null,
+    },
   })
   if (error) throw new Error(error.message)
 }
@@ -99,11 +123,17 @@ export async function createProviderSetupOAuthStateRecord(
 export async function consumeProviderSetupOAuthStateRecord(
   admin: SupabaseClient,
   input: { stateToken: string; providerFamily: GrowthProviderSetupFamily; userId: string },
-): Promise<{ return_to: string; sender_account_id: string | null } | null> {
+): Promise<{
+  return_to: string
+  sender_account_id: string | null
+  mailbox_connection_id: string | null
+  workspace: GrowthProviderOAuthWorkspace
+  organization_id: string | null
+} | null> {
   const { data, error } = await admin
     .schema("growth")
     .from("provider_oauth_states")
-    .select("id, return_to, sender_account_id, consumed_at, expires_at, user_id, provider_family")
+    .select("id, return_to, sender_account_id, metadata, consumed_at, expires_at, user_id, provider_family")
     .eq("state_token", input.stateToken)
     .maybeSingle()
 
@@ -123,9 +153,27 @@ export async function consumeProviderSetupOAuthStateRecord(
     .is("consumed_at", null)
 
   if (updateError) throw new Error(updateError.message)
+
+  const metadata =
+    data.metadata && typeof data.metadata === "object"
+      ? (data.metadata as Record<string, unknown>)
+      : {}
+  const mailboxConnectionId =
+    typeof metadata.mailbox_connection_id === "string" && metadata.mailbox_connection_id.trim()
+      ? metadata.mailbox_connection_id.trim()
+      : null
+  const workspace: GrowthProviderOAuthWorkspace = metadata.workspace === "admin" ? "admin" : "growth"
+  const organizationId =
+    typeof metadata.organization_id === "string" && metadata.organization_id.trim()
+      ? metadata.organization_id.trim()
+      : null
+
   return {
-    return_to: normalizeProviderSetupReturnTo(data.return_to),
+    return_to: normalizeProviderSetupReturnTo(data.return_to, workspace),
     sender_account_id: data.sender_account_id ?? null,
+    mailbox_connection_id: mailboxConnectionId,
+    workspace,
+    organization_id: organizationId,
   }
 }
 

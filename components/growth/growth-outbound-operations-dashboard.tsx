@@ -150,7 +150,7 @@ function GrowthOutboundOperationsDegradedState({
               <Link href="/admin/growth/sequences/execution">Open sequence approvals</Link>
             </Button>
             <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/admin/growth/providers/setup">Provider setup</Link>
+              <Link href="/growth/settings/delivery">Delivery Setup</Link>
             </Button>
           </div>
         </div>
@@ -461,7 +461,7 @@ function GrowthOutboundOperationsDashboardContent() {
             )}
           </ul>
           <Button type="button" variant="outline" size="sm" className="mt-3" asChild>
-            <Link href="/admin/growth/providers/setup">Open provider setup</Link>
+            <Link href="/growth/settings/delivery">Open Delivery Setup</Link>
           </Button>
         </GrowthEngineCard>
       </div>
@@ -521,7 +521,7 @@ function GrowthOutboundOperationsDashboardContent() {
                     <Link href="/admin/growth/deliverability">Deliverability protection</Link>
                   </Button>
                   <Button type="button" variant="ghost" size="sm" asChild>
-                    <Link href="/admin/growth/providers/setup">Provider setup</Link>
+                    <Link href="/growth/settings/delivery">Delivery Setup</Link>
                   </Button>
                 </div>
               </div>

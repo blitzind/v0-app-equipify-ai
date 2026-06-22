@@ -65,7 +65,7 @@ export function buildAidenPriorityRecommendations(
       rank: 1,
       title: "Reconnect expired mailbox",
       detail: `${signals.mailbox.expired_mailboxes} mailbox connection expired — sends will block until reconnected.`,
-      href: "/admin/growth/providers/setup",
+      href: "/growth/settings/delivery",
     })
   } else if (signals.mailbox.warnings > 0) {
     candidates.push({
