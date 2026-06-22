@@ -16,7 +16,9 @@ import {
 import { GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH } from "@/lib/growth/navigation/growth-workspace-core-settings-links"
 
 export const GROWTH_WORKSPACE_SETTINGS_CANONICAL_QA_MARKER =
-  "growth-workspace-settings-canonical-8i-v1" as const
+  "growth-workspace-settings-canonical-8j-v1" as const
+
+const WORKSPACE_SETTINGS_GROWTH_ENGINE_BASE = "/settings/growth-engine" as const
 
 const GROWTH_SETTINGS_NOTIFICATIONS_PATH = `${GROWTH_WORKSPACE_BASE_PATH}/settings/notifications` as const
 const GROWTH_SETTINGS_AI_PREFERENCES_PATH = `${GROWTH_WORKSPACE_BASE_PATH}/settings/ai-preferences` as const
@@ -100,6 +102,38 @@ const GROWTH_ENGINE_SECTION_ADMIN_FALLBACK_HREFS: Record<string, string> = {
   "meeting-preferences": "/admin/growth/settings/communications",
 }
 
+/** Primary Growth workspace path → Core settings bridge section (8J return link). */
+export const GROWTH_SETTINGS_PATH_TO_BRIDGE_SECTION_ID: Record<string, string> = {
+  [GROWTH_COMMUNICATIONS_MAILBOXES_PATH]: "connected-mailboxes",
+  [GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH]: "sending-domains",
+  [GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH]: "dns-verification",
+  [GROWTH_COMMUNICATIONS_WARMUP_PATH]: "warmup",
+  [GROWTH_COMMUNICATIONS_SENDER_POOLS_PATH]: "sender-pools",
+  [GROWTH_COMMUNICATIONS_REPUTATION_PATH]: "sending-limits",
+  [GROWTH_SETTINGS_NOTIFICATIONS_PATH]: "notification-preferences",
+  [GROWTH_SETTINGS_AI_PREFERENCES_PATH]: "copilot-preferences",
+  [GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH]: "compliance-rules",
+  [GROWTH_SETTINGS_CALENDAR_PREFERENCES_PATH]: "meeting-preferences",
+}
+
+const GROWTH_ENGINE_SECTION_BRIDGE_SWITCH_LABELS: Record<string, string> = {
+  "connected-mailboxes": "Switch to Growth Engine Mailboxes",
+  gmail: "Switch to Growth Engine Mailboxes",
+  "microsoft-365": "Switch to Growth Engine Mailboxes",
+  "sending-domains": "Switch to Growth Engine Sending Domains",
+  "dns-verification": "Switch to Growth Engine Deliverability",
+  "mailbox-health": "Switch to Growth Engine Deliverability",
+  warmup: "Switch to Growth Engine Warmup",
+  "sending-limits": "Switch to Growth Engine Reputation",
+  "sender-pools": "Switch to Growth Engine Sender Pools",
+  "notification-preferences": "Switch to Growth Engine Notifications",
+  "copilot-preferences": "Switch to Growth Engine AI Preferences",
+  "unsubscribe-settings": "Switch to Growth Engine Compliance",
+  "suppression-lists": "Switch to Growth Engine Compliance",
+  "compliance-rules": "Switch to Growth Engine Compliance",
+  "meeting-preferences": "Switch to Growth Engine Meeting Preferences",
+}
+
 export function isGrowthEngineSettingsBridgeSection(sectionId: string): boolean {
   return sectionId in GROWTH_ENGINE_SECTION_BRIDGE_HREFS
 }
@@ -122,4 +156,20 @@ export function getGrowthEngineSettingsBridgeDescription(sectionId: string, sect
 
 export function getGrowthEngineSettingsAdminFallbackHref(sectionId: string): string | null {
   return GROWTH_ENGINE_SECTION_ADMIN_FALLBACK_HREFS[sectionId] ?? null
+}
+
+export function getGrowthEngineSettingsBridgeSwitchLabel(sectionId: string): string {
+  return (
+    GROWTH_ENGINE_SECTION_BRIDGE_SWITCH_LABELS[sectionId] ?? "Switch to Growth Engine Settings"
+  )
+}
+
+export function resolveWorkspaceSettingsBridgeHrefFromGrowthPath(pathname: string): string {
+  const normalized = pathname.split("?")[0]?.split("#")[0] ?? ""
+  for (const [growthPath, sectionId] of Object.entries(GROWTH_SETTINGS_PATH_TO_BRIDGE_SECTION_ID)) {
+    if (normalized === growthPath || normalized.startsWith(`${growthPath}/`)) {
+      return `${WORKSPACE_SETTINGS_GROWTH_ENGINE_BASE}/${sectionId}`
+    }
+  }
+  return WORKSPACE_SETTINGS_GROWTH_ENGINE_BASE
 }

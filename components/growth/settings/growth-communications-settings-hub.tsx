@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { ArrowRight, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -8,9 +9,13 @@ import {
   GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER,
 } from "@/lib/growth/navigation/growth-communications-settings-navigation"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
+import { resolveWorkspaceSettingsBridgeHrefFromGrowthPath } from "@/lib/growth/navigation/growth-workspace-settings-canonical"
 import { Truck } from "lucide-react"
 
 export function GrowthCommunicationsSettingsHub() {
+  const pathname = usePathname()
+  const workspaceSettingsBridgeHref = resolveWorkspaceSettingsBridgeHrefFromGrowthPath(pathname)
+
   return (
     <div className="space-y-6" data-qa-marker={GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER}>
       <GrowthWorkspacePageHeader
@@ -18,6 +23,11 @@ export function GrowthCommunicationsSettingsHub() {
         description="Mailbox delivery, DNS authentication, warmup, sender pools, and reputation — configure outbound email readiness here."
         icon={Truck}
         iconClassName="bg-emerald-50 text-emerald-700"
+        actions={
+          <Button type="button" variant="ghost" size="sm" asChild>
+            <Link href={workspaceSettingsBridgeHref}>Back to Workspace Settings</Link>
+          </Button>
+        }
       />
 
       <div className="grid gap-4 sm:grid-cols-2">

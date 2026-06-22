@@ -31,7 +31,7 @@ function readSource(relativePath: string): string {
 
 function main(): void {
   assert.equal(GROWTH_SETTINGS_BRIDGE_8I_QA_MARKER, "growth-settings-bridge-8i-v1")
-  assert.equal(GROWTH_WORKSPACE_SETTINGS_CANONICAL_QA_MARKER, "growth-workspace-settings-canonical-8i-v1")
+  assert.equal(GROWTH_WORKSPACE_SETTINGS_CANONICAL_QA_MARKER, "growth-workspace-settings-canonical-8j-v1")
 
   const growthEnginePage = readSource("app/(dashboard)/settings/growth-engine/[sectionId]/page.tsx")
   assert.doesNotMatch(growthEnginePage, /redirect\(/)
@@ -43,9 +43,10 @@ function main(): void {
   assert.doesNotMatch(sectionPage, /WorkspaceSettingsCanonicalRoutePanel/)
 
   const bridgePanel = readSource("components/settings/workspace-settings-growth-engine-bridge-panel.tsx")
-  assert.match(bridgePanel, /workspace-settings-growth-engine-bridge-8i-v1/)
-  assert.match(bridgePanel, /Open Growth Settings/)
-  assert.match(bridgePanel, /existingConfigLabel/)
+  assert.match(bridgePanel, /workspace-settings-growth-engine-bridge-8j-v1/)
+  assert.match(bridgePanel, /getGrowthEngineSettingsBridgeSwitchLabel/)
+  const canonical = readSource("lib/growth/navigation/growth-workspace-settings-canonical.ts")
+  assert.match(canonical, /Switch to Growth Engine/)
 
   const growthSettingsNotificationsPath = `${GROWTH_WORKSPACE_BASE_PATH}/settings/notifications`
   const growthSettingsAiPreferencesPath = `${GROWTH_WORKSPACE_BASE_PATH}/settings/ai-preferences`

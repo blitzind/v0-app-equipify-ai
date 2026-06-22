@@ -36,7 +36,7 @@ function readSource(relativePath: string): string {
 }
 
 function main(): void {
-  assert.equal(GROWTH_WORKSPACE_SETTINGS_CANONICAL_QA_MARKER, "growth-workspace-settings-canonical-8i-v1")
+  assert.equal(GROWTH_WORKSPACE_SETTINGS_CANONICAL_QA_MARKER, "growth-workspace-settings-canonical-8j-v1")
   assert.equal(GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER, "growth-workspace-settings-nav-8f-v1")
 
   const workspaceGroup = GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS.find((group) => group.id === "workspace")

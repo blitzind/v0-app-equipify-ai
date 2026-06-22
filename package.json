@@ -845,6 +845,7 @@
     "test:growth-settings-hotfix-8h": "tsx scripts/test-growth-settings-hotfix-8h.ts",
     "test:growth-settings-canonicalization-8f": "tsx scripts/test-growth-settings-canonicalization-8f.ts",
     "test:growth-settings-bridge-8i": "tsx scripts/test-growth-settings-bridge-8i.ts",
+    "test:growth-settings-bridge-8j": "tsx scripts/test-growth-settings-bridge-8j.ts",
     "test:growth-mailbox-provider-routing-7d": "tsx scripts/test-growth-mailbox-provider-routing-7d.ts",
     "test:growth-google-oauth-return-routing-7d": "tsx scripts/test-growth-google-oauth-return-routing-7d.ts",
     "test:growth-mailbox-cross-sender-guard-7f": "tsx scripts/test-growth-mailbox-cross-sender-guard-7f.ts",
