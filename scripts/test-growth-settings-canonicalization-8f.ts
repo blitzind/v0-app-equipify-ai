@@ -21,21 +21,22 @@ import {
 } from "../lib/growth/navigation/growth-workspace-core-settings-links"
 import { GROWTH_WORKSPACE_BASE_PATH } from "../lib/growth/navigation/growth-route-metadata-types"
 import {
-  GROWTH_ENGINE_SECTION_CANONICAL_REDIRECTS,
+  GROWTH_ENGINE_SECTION_BRIDGE_HREFS,
   GROWTH_WORKSPACE_SETTINGS_CANONICAL_QA_MARKER,
-  resolveGrowthEngineSettingsCanonicalRedirect,
+  resolveGrowthEngineSettingsBridgeHref,
 } from "../lib/growth/navigation/growth-workspace-settings-canonical"
 import {
   GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER,
   GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS,
 } from "../lib/growth/navigation/growth-workspace-settings-navigation"
+import { resolveGrowthEngineSectionLiftKind } from "../lib/settings/workspace-settings-growth-engine-lift"
 
 function readSource(relativePath: string): string {
   return fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
 }
 
 function main(): void {
-  assert.equal(GROWTH_WORKSPACE_SETTINGS_CANONICAL_QA_MARKER, "growth-workspace-settings-canonical-8f-v1")
+  assert.equal(GROWTH_WORKSPACE_SETTINGS_CANONICAL_QA_MARKER, "growth-workspace-settings-canonical-8i-v1")
   assert.equal(GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER, "growth-workspace-settings-nav-8f-v1")
 
   const workspaceGroup = GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS.find((group) => group.id === "workspace")
@@ -71,20 +72,25 @@ function main(): void {
   assert.match(billingPage, /GROWTH_CORE_SETTINGS_BILLING_PATH/)
 
   const growthEnginePage = readSource("app/(dashboard)/settings/growth-engine/[sectionId]/page.tsx")
-  assert.match(growthEnginePage, /resolveGrowthEngineSettingsCanonicalRedirect/)
-  assert.match(growthEnginePage, /redirect\(canonicalHref\)/)
+  assert.doesNotMatch(growthEnginePage, /redirect\(/)
+  assert.match(growthEnginePage, /WorkspaceSettingsGrowthEngineSectionPage/)
+
+  const sectionPage = readSource("components/settings/workspace-settings-growth-engine-section-page.tsx")
+  assert.match(sectionPage, /WorkspaceSettingsGrowthEngineBridgePanel/)
+  assert.match(sectionPage, /liftKind === "bridged"/)
 
   assert.equal(
-    resolveGrowthEngineSettingsCanonicalRedirect("connected-mailboxes"),
+    resolveGrowthEngineSettingsBridgeHref("connected-mailboxes"),
     GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
   )
-  assert.ok(GROWTH_ENGINE_SECTION_CANONICAL_REDIRECTS["connected-mailboxes"])
+  assert.ok(GROWTH_ENGINE_SECTION_BRIDGE_HREFS["connected-mailboxes"])
+  assert.equal(resolveGrowthEngineSectionLiftKind("connected-mailboxes"), "bridged")
 
   const growthSettingsNotificationsPath = `${GROWTH_WORKSPACE_BASE_PATH}/settings/notifications`
   const growthSettingsAiPreferencesPath = `${GROWTH_WORKSPACE_BASE_PATH}/settings/ai-preferences`
   const growthSettingsCalendarPreferencesPath = `${GROWTH_WORKSPACE_BASE_PATH}/settings/calendar-preferences`
 
-  const redirectExpectations: Array<[string, string]> = [
+  const bridgeExpectations: Array<[string, string]> = [
     ["connected-mailboxes", GROWTH_COMMUNICATIONS_MAILBOXES_PATH],
     ["sending-domains", GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH],
     ["dns-verification", GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH],
@@ -101,8 +107,9 @@ function main(): void {
     ["gmail", GROWTH_COMMUNICATIONS_MAILBOXES_PATH],
     ["microsoft-365", GROWTH_COMMUNICATIONS_MAILBOXES_PATH],
   ]
-  for (const [sectionId, expectedHref] of redirectExpectations) {
-    assert.equal(resolveGrowthEngineSettingsCanonicalRedirect(sectionId), expectedHref, sectionId)
+  for (const [sectionId, expectedHref] of bridgeExpectations) {
+    assert.equal(resolveGrowthEngineSettingsBridgeHref(sectionId), expectedHref, sectionId)
+    assert.equal(resolveGrowthEngineSectionLiftKind(sectionId), "bridged", sectionId)
   }
 
   const aiPage = readSource("app/(growth)/growth/settings/ai-preferences/page.tsx")

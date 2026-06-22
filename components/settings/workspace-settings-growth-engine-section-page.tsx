@@ -1,13 +1,13 @@
 "use client"
 
 import { notFound } from "next/navigation"
-import { WorkspaceSettingsCanonicalRoutePanel } from "@/components/settings/workspace-settings-canonical-route-panel"
+import { WorkspaceSettingsGrowthEngineBridgePanel } from "@/components/settings/workspace-settings-growth-engine-bridge-panel"
 import { getWorkspaceSettingsGrowthEngineLiftedPanel } from "@/components/settings/workspace-settings-growth-engine-lifted-panels"
 import { WorkspaceSettingsPhasePlaceholder } from "@/components/settings/workspace-settings-phase-placeholder"
+import { resolveGrowthEngineSettingsBridgeHref } from "@/lib/growth/navigation/growth-workspace-settings-canonical"
 import { getWorkspaceSettingsGrowthEngineSection } from "@/lib/settings/workspace-settings-navigation"
 import {
   getGrowthEngineSectionClassification,
-  getWorkspaceSettingsGrowthEngineCanonicalHref,
   rendersGrowthEnginePhasePlaceholder,
   resolveGrowthEngineSectionLiftKind,
   WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFT_QA_MARKER,
@@ -19,6 +19,14 @@ export function WorkspaceSettingsGrowthEngineSectionPage({ sectionId }: { sectio
 
   const liftKind = resolveGrowthEngineSectionLiftKind(sectionId)
   const classification = getGrowthEngineSectionClassification(sectionId)
+  const bridgeHref = resolveGrowthEngineSettingsBridgeHref(sectionId)
+
+  if (liftKind === "bridged" && bridgeHref) {
+    const growthSettingsHref = section.existingConfigHref ?? bridgeHref
+    return (
+      <WorkspaceSettingsGrowthEngineBridgePanel section={section} growthSettingsHref={growthSettingsHref} />
+    )
+  }
 
   if (liftKind === "lifted") {
     const Panel = getWorkspaceSettingsGrowthEngineLiftedPanel(sectionId)
@@ -27,19 +35,6 @@ export function WorkspaceSettingsGrowthEngineSectionPage({ sectionId }: { sectio
       <div className="flex flex-col gap-6" data-qa-marker={WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFT_QA_MARKER}>
         <Panel />
       </div>
-    )
-  }
-
-  if (liftKind === "canonical") {
-    const canonicalHref = getWorkspaceSettingsGrowthEngineCanonicalHref(sectionId)
-    if (!canonicalHref) notFound()
-    return (
-      <WorkspaceSettingsCanonicalRoutePanel
-        section={section}
-        canonicalHref={canonicalHref}
-        canonicalLabel="Open notification preferences"
-        icon={section.icon}
-      />
     )
   }
 

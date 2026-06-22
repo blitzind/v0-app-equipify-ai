@@ -15,6 +15,7 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFT_QA_MARKER =
 
 export type GrowthEngineSectionLiftKind =
   | "lifted"
+  | "bridged"
   | "canonical"
   | "placeholder"
   | "admin_only"
@@ -37,16 +38,7 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_CANONICAL_HREFS: Record<string, st
 }
 
 export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_SECTION_IDS = [
-  "connected-mailboxes",
-  "gmail",
-  "microsoft-365",
   "inbox-routing",
-  "sending-domains",
-  "dns-verification",
-  "warmup",
-  "sending-limits",
-  "sender-pools",
-  "mailbox-health",
   "calling-providers",
   "phone-numbers",
   "dialer-settings",
@@ -54,12 +46,7 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_SECTION_IDS = [
   "voicemail",
   "calendar-providers",
   "booking-pages",
-  "meeting-preferences",
-  "unsubscribe-settings",
-  "suppression-lists",
-  "compliance-rules",
   "openai",
-  "copilot-preferences",
   "share-page-branding",
   "booking-branding",
   "media-defaults",
@@ -73,16 +60,7 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANEL_EXPORTS: Record<
   WorkspaceSettingsGrowthEngineLiftedSectionId,
   string
 > = {
-  "connected-mailboxes": "GrowthConnectedMailboxesDashboard",
-  gmail: "GrowthProvidersDashboard",
-  "microsoft-365": "GrowthProvidersDashboard",
   "inbox-routing": "GrowthCommunicationSettingsPanel",
-  "sending-domains": "GrowthSenderInfrastructureDashboard",
-  "dns-verification": "GrowthDeliverabilityDashboard",
-  warmup: "GrowthWarmupDashboardPanel",
-  "sending-limits": "GrowthReputationProtectionDashboardView",
-  "sender-pools": "GrowthSenderPoolsDashboardView",
-  "mailbox-health": "GrowthDeliverabilityDashboard",
   "calling-providers": "GrowthRealtimeProvidersDashboard",
   "phone-numbers": "GrowthVoiceInfrastructureSettingsPanel",
   "dialer-settings": "GrowthNativeDialerSettingsPanel",
@@ -90,12 +68,7 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANEL_EXPORTS: Record<
   voicemail: "GrowthVoiceInfrastructureSettingsPanel",
   "calendar-providers": "GrowthGoogleCalendarSettingsPanel",
   "booking-pages": "GrowthBookingPagesPanel",
-  "meeting-preferences": "GrowthMeetingLocationSettingsPanel",
-  "unsubscribe-settings": "GrowthComplianceDashboardPanel",
-  "suppression-lists": "GrowthComplianceDashboardPanel",
-  "compliance-rules": "GrowthComplianceDashboardPanel",
   openai: "GrowthRealtimeProvidersDashboard",
-  "copilot-preferences": "GrowthAiCopilotSettingsPanel",
   "share-page-branding": "GrowthSharePagesDashboard",
   "booking-branding": "GrowthBookingPagesPanel",
   "media-defaults": "GrowthContentLibraryDashboardView",
@@ -119,44 +92,44 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_SECTION_CLASSIFICATION: Record<
   GrowthEngineSectionClassification
 > = {
   "connected-mailboxes": {
-    kind: "lifted",
-    reason: "Connected mailboxes operator dashboard (GE-MAIL-1B).",
+    kind: "bridged",
+    reason: "Canonical editor lives in Growth workspace Communications → Mailboxes (8I bridge).",
   },
   gmail: {
-    kind: "lifted",
-    reason: "Provider connections dashboard lifted in GE-SET-4.",
+    kind: "bridged",
+    reason: "Mailbox provider connections canonical in Growth workspace Communications (8I bridge).",
   },
   "microsoft-365": {
-    kind: "lifted",
-    reason: "Provider connections dashboard lifted in GE-SET-4.",
+    kind: "bridged",
+    reason: "Mailbox provider connections canonical in Growth workspace Communications (8I bridge).",
   },
   "inbox-routing": {
     kind: "lifted",
     reason: "Communication preferences panel lifted in GE-SET-4.",
   },
   "sending-domains": {
-    kind: "lifted",
-    reason: "Sender infrastructure dashboard lifted in GE-SET-4.",
+    kind: "bridged",
+    reason: "Sender infrastructure canonical in Growth workspace Communications (8I bridge).",
   },
   "dns-verification": {
-    kind: "lifted",
-    reason: "Deliverability DNS dashboard lifted in GE-SET-4.",
+    kind: "bridged",
+    reason: "Deliverability DNS canonical in Growth workspace Communications (8I bridge).",
   },
   warmup: {
-    kind: "lifted",
-    reason: "Warmup dashboard panel lifted in GE-SET-4.",
+    kind: "bridged",
+    reason: "Warmup dashboard canonical in Growth workspace Communications (8I bridge).",
   },
   "sending-limits": {
-    kind: "lifted",
-    reason: "Reputation protection console lifted in GE-SET-4.",
+    kind: "bridged",
+    reason: "Reputation protection canonical in Growth workspace Communications (8I bridge).",
   },
   "sender-pools": {
-    kind: "lifted",
-    reason: "Sender pools dashboard lifted in GE-SET-4.",
+    kind: "bridged",
+    reason: "Sender pools canonical in Growth workspace Communications (8I bridge).",
   },
   "mailbox-health": {
-    kind: "lifted",
-    reason: "Deliverability dashboard lifted in GE-SET-4.",
+    kind: "bridged",
+    reason: "Mailbox health canonical in Growth workspace Communications (8I bridge).",
   },
   "calling-providers": {
     kind: "lifted",
@@ -187,32 +160,32 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_SECTION_CLASSIFICATION: Record<
     reason: "Booking pages panel lifted in GE-SET-4.",
   },
   "meeting-preferences": {
-    kind: "lifted",
-    reason: "Meeting location settings panel lifted in GE-SET-4.",
+    kind: "bridged",
+    reason: "Meeting preferences canonical in Growth workspace settings (8I bridge).",
   },
   "notification-preferences": {
-    kind: "canonical",
-    reason: "Editor lives at /growth/settings/notifications — canonical Growth workspace surface.",
+    kind: "bridged",
+    reason: "Editor lives at /growth/settings/notifications — bridge from Core settings shell (8I).",
   },
   "unsubscribe-settings": {
-    kind: "lifted",
-    reason: "GrowthComplianceDashboardPanel includes unsubscribe workflows and APIs.",
+    kind: "bridged",
+    reason: "Compliance editor canonical in Growth workspace settings (8I bridge).",
   },
   "suppression-lists": {
-    kind: "lifted",
-    reason: "GrowthComplianceDashboardPanel includes suppression table and APIs.",
+    kind: "bridged",
+    reason: "Compliance editor canonical in Growth workspace settings (8I bridge).",
   },
   "compliance-rules": {
-    kind: "lifted",
-    reason: "GrowthComplianceDashboardPanel is the compliance rules console.",
+    kind: "bridged",
+    reason: "Compliance editor canonical in Growth workspace settings (8I bridge).",
   },
   openai: {
     kind: "lifted",
     reason: "GrowthRealtimeProvidersDashboard is the existing OpenAI realtime provider panel.",
   },
   "copilot-preferences": {
-    kind: "lifted",
-    reason: "GrowthAiCopilotSettingsPanel is persisted in admin communications settings.",
+    kind: "bridged",
+    reason: "AI copilot preferences canonical in Growth workspace settings (8I bridge).",
   },
   "share-page-branding": {
     kind: "lifted",
