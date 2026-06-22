@@ -16,13 +16,14 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import type { GrowthProviderSetupDashboard } from "@/lib/growth/provider-setup/provider-setup-types"
-import { GROWTH_LIVE_PROVIDER_SETUP_QA_MARKER } from "@/lib/growth/provider-setup/provider-setup-types"
-import type { GrowthSenderAccount } from "@/lib/growth/sender/sender-types"
 import {
   GROWTH_ADMIN_PROVIDER_SETUP_PATH,
   GROWTH_DELIVERY_SETTINGS_PATH,
+  GROWTH_LIVE_PROVIDER_SETUP_QA_MARKER,
+  GROWTH_PROVIDER_SETUP_SENDER_SELECT_QA,
   GROWTH_WORKSPACE_DNS_VERIFICATION_PATH,
-} from "@/lib/growth/navigation/growth-delivery-settings-navigation"
+} from "@/lib/growth/provider-setup/growth-provider-setup-constants"
+import type { GrowthSenderAccount } from "@/lib/growth/sender/sender-types"
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked"> = {
   connected: "healthy",
@@ -201,7 +202,7 @@ export function GrowthProviderSetupDashboard({
         </div>
       </GrowthEngineCard>
 
-      <GrowthEngineCard title={isOperator ? "Sender + Mailbox OAuth" : "Sender + OAuth"} className="overflow-visible" data-qa="growth-sender-select-overlay-fix-v1">
+      <GrowthEngineCard title={isOperator ? "Sender + Mailbox OAuth" : "Sender + OAuth"} className="overflow-visible" data-qa={GROWTH_PROVIDER_SETUP_SENDER_SELECT_QA}>
         <div className="relative z-20 mb-4 grid gap-3 overflow-visible md:grid-cols-2">
           <div className="relative z-20 space-y-2 overflow-visible">
             <Label htmlFor="sender-account">Sender account</Label>
@@ -316,7 +317,6 @@ export function GrowthProviderSetupDashboard({
               Save Resend API Key
             </Button>
           </div>
-        </GrowthEngineCard>
         </GrowthEngineCard>
       </div>
       ) : null}

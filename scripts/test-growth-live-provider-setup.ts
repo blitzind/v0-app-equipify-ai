@@ -66,16 +66,21 @@ function main(): void {
     assert.equal(key in sanitized, false, `expected ${key} stripped`)
   }
 
-  assert.equal(normalizeProviderSetupReturnTo("/admin/evil"), "/admin/growth/providers/setup")
+  assert.equal(normalizeProviderSetupReturnTo("/admin/evil"), "/growth/settings/delivery")
   assert.equal(
-    normalizeProviderSetupReturnTo("/admin/growth/providers/setup?x=1"),
+    normalizeProviderSetupReturnTo("/admin/growth/providers/setup?x=1", "admin"),
     "/admin/growth/providers/setup?x=1",
+  )
+  assert.equal(
+    normalizeProviderSetupReturnTo("/growth/settings/delivery", "growth"),
+    "/growth/settings/delivery",
   )
 
   const state = signProviderSetupOAuthState({
     userId: "user-1",
     providerFamily: "google",
     returnTo: "/admin/growth/providers/setup",
+    workspace: "admin",
     ts: Date.now(),
     nonce: "abc",
   })
@@ -122,7 +127,12 @@ function main(): void {
     "utf8",
   )
   assert.match(uiSource, /GROWTH_LIVE_PROVIDER_SETUP_QA_MARKER/)
-  assert.match(uiSource, /growth-sender-select-overlay-fix-v1/)
+  assert.match(uiSource, /GROWTH_PROVIDER_SETUP_SENDER_SELECT_QA/)
+  const constantsSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/provider-setup/growth-provider-setup-constants.ts"),
+    "utf8",
+  )
+  assert.match(constantsSource, /growth-sender-select-overlay-fix-v1/)
   assert.match(uiSource, /Connect \/ Reconnect Google/)
   assert.match(uiSource, /humanApprovalConfirmed/)
   assert.match(uiSource, /position="popper"/)
