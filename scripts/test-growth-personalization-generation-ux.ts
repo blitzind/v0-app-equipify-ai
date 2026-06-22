@@ -99,6 +99,10 @@ function main(): void {
   assert.match(dashboard, /GrowthPersonalizationVersionHistoryDrawer/)
   assert.doesNotMatch(dashboard, /GrowthPersonalizationGenerationsPanel/)
   assert.match(dashboard, /GROWTH_PERSONALIZATION_GENERATION_UX_QA_MARKER/)
+
+  const pageClient = readSource("components/growth/personalization/growth-personalization-page-client.tsx")
+  assert.match(pageClient, /GrowthPersonalizationWorkspace/)
+  assert.doesNotMatch(pageClient, /GrowthAiPersonalizationDashboardView/)
   console.log("  ✓ dashboard UX — search picker replaces UUID input")
 
   const picker = readSource("components/growth/personalization/growth-personalization-lead-picker.tsx")

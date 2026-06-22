@@ -14,10 +14,16 @@ import { ctaStageLabel } from "@/lib/growth/sequence-intelligence/growth-cta-pro
 import { buyingStageLabel } from "@/lib/growth/buyer-journey/growth-buying-stage-guidance"
 import { nextBestActionOperatorLabels } from "@/lib/growth/buyer-journey/growth-next-best-action"
 
-function bodyPreview(body: string | null | undefined, maxLength = 180): string | null {
+function normalizeSummaryBody(body: string | null | undefined): string | null {
   if (!body?.trim()) return null
-  const cleaned = body.replace(/\s+/g, " ").trim()
-  return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength - 1)}…` : cleaned
+  return body.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim()
+}
+
+function bodyPreview(body: string | null | undefined, maxLength = 180): string | null {
+  const normalized = normalizeSummaryBody(body)
+  if (!normalized) return null
+  const collapsed = normalized.replace(/\s+/g, " ").trim()
+  return collapsed.length > maxLength ? `${collapsed.slice(0, maxLength - 1)}…` : collapsed
 }
 
 export function buildPersonalizationLeadSummary(input: {
@@ -32,6 +38,7 @@ export function buildPersonalizationLeadSummary(input: {
       generationId: null,
       status: null,
       subject: null,
+      body: null,
       bodyPreview: null,
       personalizationScore: null,
       qualityScore: null,
@@ -73,6 +80,7 @@ export function buildPersonalizationLeadSummary(input: {
     generationId: generation.id,
     status: generation.status,
     subject: generation.subject || null,
+    body: normalizeSummaryBody(generation.body),
     bodyPreview: bodyPreview(generation.body),
     personalizationScore: generation.personalizationScore,
     qualityScore: qualityPreview?.qualityScore ?? null,

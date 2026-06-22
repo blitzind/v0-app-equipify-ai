@@ -1,7 +1,7 @@
 "use client"
 
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
-import { formatPersonalizationDraftBodyForDisplay } from "@/lib/growth/personalization/personalization-generation-ux"
+import { GrowthPersonalizationDraftBodyPreview } from "@/components/growth/personalization/growth-personalization-draft-body-preview"
 import type { GrowthPersonalizationLeadSummary } from "@/lib/growth/personalization/embedded/growth-personalization-embedded-types"
 import { personalizationStatusLabel } from "@/lib/growth/personalization/personalization-types"
 
@@ -29,21 +29,18 @@ export function GrowthPersonalizationPreviewCard({ summary, title, compact = fal
     )
   }
 
-  const formattedBody = summary.bodyPreview
-    ? formatPersonalizationDraftBodyForDisplay(summary.bodyPreview)
-    : null
-
   return (
     <div className="space-y-2" data-qa="growth-personalization-preview-card">
       {title ? <p className="text-xs font-medium text-foreground">{title}</p> : null}
       <div className="rounded-lg border border-border/60 bg-muted/15 px-3 py-2">
         <p className={`font-medium ${compact ? "text-xs" : "text-sm"}`}>{summary.subject ?? "—"}</p>
-        {formattedBody ? (
-          <p
-            className={`mt-2 whitespace-pre-wrap text-muted-foreground ${compact ? "text-xs leading-relaxed" : "text-sm leading-relaxed"}`}
-          >
-            {formattedBody}
-          </p>
+        {summary.body || summary.bodyPreview ? (
+          <GrowthPersonalizationDraftBodyPreview
+            body={summary.body ?? summary.bodyPreview ?? ""}
+            className="mt-2"
+            compact={compact}
+            paragraphClassName={compact ? "text-muted-foreground" : undefined}
+          />
         ) : null}
       </div>
       <div className="flex flex-wrap gap-1.5">

@@ -21,6 +21,8 @@ export type GrowthPersonalizationLeadSummary = {
   generationId: string | null
   status: GrowthPersonalizationGenerationStatus | null
   subject: string | null
+  /** Full draft body for formatted paragraph preview (display only). */
+  body: string | null
   bodyPreview: string | null
   personalizationScore: number | null
   qualityScore: number | null

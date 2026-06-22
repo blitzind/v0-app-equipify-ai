@@ -39,6 +39,11 @@ function runRouteCert(): void {
   assert.match(workspacePage, /GrowthPersonalizationPageClient/)
   assert.match(workspacePage, /GROWTH_PERSONALIZATION_WORKSPACE_QA_MARKER/)
 
+  const pageClient = readSource("components/growth/personalization/growth-personalization-page-client.tsx")
+  assert.match(pageClient, /GrowthPersonalizationWorkspace/)
+  assert.doesNotMatch(pageClient, /GrowthAiPersonalizationDashboardView/)
+  assert.doesNotMatch(pageClient, /growth-ai-personalization-dashboard/)
+
   const legacyPage = readSource("app/(admin)/admin/growth/copilot/personalization/page.tsx")
   assert.match(legacyPage, /redirect/)
   assert.match(legacyPage, /GROWTH_PERSONALIZATION_WORKSPACE_PATH/)

@@ -1,7 +1,7 @@
 "use client"
 
 import { useSearchParams } from "next/navigation"
-import { GrowthAiPersonalizationDashboardView } from "@/components/growth/growth-ai-personalization-dashboard"
+import { GrowthPersonalizationWorkspace } from "@/components/growth/personalization/growth-personalization-workspace"
 
 export function GrowthPersonalizationPageClient() {
   const searchParams = useSearchParams()
@@ -9,7 +9,7 @@ export function GrowthPersonalizationPageClient() {
   const initialGenerationId = searchParams.get("generationId")
 
   return (
-    <GrowthAiPersonalizationDashboardView
+    <GrowthPersonalizationWorkspace
       initialLeadId={initialLeadId}
       initialGenerationId={initialGenerationId}
     />

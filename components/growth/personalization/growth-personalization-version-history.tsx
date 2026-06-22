@@ -1,6 +1,7 @@
 "use client"
 
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthPersonalizationDraftBodyPreview } from "@/components/growth/personalization/growth-personalization-draft-body-preview"
 import {
   personalizationStatusLabel,
   type GrowthPersonalizationGeneration,
@@ -98,7 +99,12 @@ export function GrowthPersonalizationVersionCompare({
         {[left, right].map((entry) => (
           <div key={entry.id} className="rounded-lg border border-border/60 p-3 text-sm">
             <p className="font-medium">{entry.subject}</p>
-            <p className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">{entry.body}</p>
+            <GrowthPersonalizationDraftBodyPreview
+              body={entry.body}
+              className="mt-2"
+              compact
+              paragraphClassName="text-muted-foreground"
+            />
             <p className="mt-2 text-xs text-muted-foreground">
               Evidence {entry.evidenceCoverageScore}% · Score {entry.personalizationScore}
             </p>

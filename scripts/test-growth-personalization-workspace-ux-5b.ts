@@ -19,6 +19,7 @@ function main(): void {
   const pageClient = readSource("components/growth/personalization/growth-personalization-page-client.tsx")
   assert.match(pageClient, /GrowthPersonalizationWorkspace/)
   assert.doesNotMatch(pageClient, /GrowthAiPersonalizationDashboardView/)
+  assert.doesNotMatch(pageClient, /growth-ai-personalization-dashboard/)
   console.log("  ✓ personalization page wired to workspace component")
 
   const draftEditor = readSource("components/growth/personalization/growth-personalization-draft-editor.tsx")
