@@ -180,6 +180,25 @@ export async function ingestSendrPublicEngagementEvents(
     } catch {
       // intelligence sync is best-effort
     }
+
+    try {
+      const runtimeEnabled = await isRuntimeKillSwitchEnabled(admin, "automation_runtime_enabled")
+      if (runtimeEnabled) {
+        const { ingestGeV15AutomationRuntimeFromSendrEvents } = await import(
+          "@/lib/growth/automation-runtime/ge-v1-5-automation-runtime-signal-processor"
+        )
+        await ingestGeV15AutomationRuntimeFromSendrEvents(admin, {
+          organizationId: ctx.organizationId,
+          leadId: ctx.leadId,
+          events: batch.map((e) => ({
+            eventType: e.eventType,
+            eventValue: e.eventValue,
+          })),
+        })
+      }
+    } catch {
+      // automation runtime is best-effort; never fail public ingest
+    }
   }
 
   return {

@@ -117,6 +117,7 @@ export type GrowthRuntimeKillSwitchKey =
   | "sendr_launch_preview_enabled"
   | "sendr_analytics_enabled"
   | "sendr_activity_enabled"
+  | "automation_runtime_enabled"
 
 export const GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES: Record<GrowthRuntimeKillSwitchKey, boolean> = {
   wake_execution_enabled: true,
@@ -143,6 +144,7 @@ export const GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES: Record<GrowthRuntimeKillSwitc
   sendr_launch_preview_enabled: true,
   sendr_analytics_enabled: true,
   sendr_activity_enabled: true,
+  automation_runtime_enabled: true,
 }
 
 /** Daily budget caps keyed by resource type. Zero = unlimited. */

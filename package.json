@@ -847,6 +847,8 @@
     "test:ge-v1-3-elevenlabs-live:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-v1-3-elevenlabs-live.ts --production",
     "test:ge-v1-4-retell-demo-assistant": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-v1-4-retell-demo-assistant.ts",
     "test:ge-v1-4-retell-demo-assistant:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-v1-4-retell-demo-assistant.ts --production",
+    "test:ge-v1-5-automation-runtime": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-v1-5-automation-runtime.ts",
+    "test:ge-v1-5-automation-runtime:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-v1-5-automation-runtime.ts --production",
     "seed:ge-v1-1-operational-baseline": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/seed-ge-v1-1-operational-baseline.ts",
     "test:growth-signatures-1a": "tsx scripts/test-growth-signatures-1a.ts",
     "test:growth-signatures-runtime-1b": "tsx scripts/test-growth-signatures-runtime-1b.ts",

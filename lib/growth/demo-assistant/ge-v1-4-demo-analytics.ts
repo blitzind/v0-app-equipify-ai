@@ -6,6 +6,7 @@ import {
   type GeV14DemoAssistantEventType,
 } from "@/lib/growth/demo-assistant/ge-v1-4-types"
 import { ingestSendrPublicEngagementEvents } from "@/lib/growth/sendr/growth-sendr-public-engagement-service"
+import { resolveSendrPublicPageContext } from "@/lib/growth/sendr/growth-sendr-public-page-service"
 import type { SendrVisitorRenderContext } from "@/lib/growth/sendr/growth-sendr-visitor-render-context"
 import { syncGeV14DemoAssistantRecommendations } from "@/lib/growth/demo-assistant/ge-v1-4-demo-recommendations"
 
@@ -51,5 +52,24 @@ export async function recordGeV14DemoAssistantEngagementEvents(
       renderContext: input.renderContext,
       events: intentEvents,
     })
+
+    const ctx = await resolveSendrPublicPageContext(admin, input.slug, input.renderContext)
+    if (ctx?.leadId) {
+      try {
+        const { ingestGeV15AutomationRuntimeFromSendrEvents } = await import(
+          "@/lib/growth/automation-runtime/ge-v1-5-automation-runtime-signal-processor"
+        )
+        await ingestGeV15AutomationRuntimeFromSendrEvents(admin, {
+          organizationId: ctx.organizationId,
+          leadId: ctx.leadId,
+          events: intentEvents.map((e) => ({
+            eventType: e.eventType,
+            eventValue: e.eventValue,
+          })),
+        })
+      } catch {
+        // automation runtime is best-effort
+      }
+    }
   }
 }
