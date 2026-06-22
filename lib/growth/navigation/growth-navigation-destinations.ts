@@ -77,6 +77,10 @@ function prefixMatch(prefix: string, exclude: string[] = []) {
   }
 }
 
+function exactMatch(target: string) {
+  return (path: string) => path === target
+}
+
 function growthCallsNavMatch(path: string): boolean {
   if (path.startsWith("/admin/growth/calls/providers")) return false
   if (path.startsWith("/admin/growth/calls/voice-drops")) return false
