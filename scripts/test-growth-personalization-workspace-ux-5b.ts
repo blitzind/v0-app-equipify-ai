@@ -27,7 +27,11 @@ function main(): void {
   assert.match(draftEditor, /AI Draft Preview/)
   assert.match(draftEditor, /Editable Subject/)
   assert.match(draftEditor, /My Edits/)
-  console.log("  ✓ draft preview + editable subject/body")
+  assert.match(draftEditor, /Preview & Review/)
+  assert.match(draftEditor, /onApprove/)
+  assert.match(draftEditor, /onReject/)
+  assert.match(draftEditor, /onSaveDraft/)
+  console.log("  ✓ draft preview + editable subject/body + review actions")
 
   const nicoleBody =
     "Hi Nicole, many biomedical equipment service organizations often find that PM due dates for patient-connected devices are tracked in spreadsheets that are disconnected from work orders. We noticed that you are the President and Founder of Sterling Biomedical. Equipify helps teams centralize regulated PM scheduling through Maintenance Plans + Equipment. Is service visibility a bottleneck for you right now?"
@@ -56,11 +60,18 @@ function main(): void {
   const workspace = readSource("components/growth/personalization/growth-personalization-workspace.tsx")
   assert.match(workspace, /GrowthPersonalizationVersionHistorySummary/)
   assert.match(workspace, /GrowthPersonalizationVersionHistoryDrawer/)
+  assert.match(workspace, /GrowthPersonalizationRecentGenerationsPanel/)
   assert.match(workspace, /GrowthPersonalizationDraftEditor/)
   assert.match(workspace, /GrowthPersonalizationDiagnosticsPanel/)
   assert.doesNotMatch(workspace, /GrowthPersonalizationGenerationsPanel/)
-  assert.match(workspace, /initialGenerationId/)
-  console.log("  ✓ workspace draft-first layout + drawer version history")
+  assert.match(workspace, /showReviewEmptyState/)
+  assert.match(workspace, /versionEntries\[0\]/)
+  assert.match(workspace, /lg:grid-cols-\[minmax\(240px,300px\)_minmax\(0,1fr\)\]/)
+
+  const recentPanel = readSource("components/growth/personalization/growth-personalization-recent-generations-panel.tsx")
+  assert.match(recentPanel, /Recent Generations/)
+  assert.doesNotMatch(recentPanel, /Compare/)
+  console.log("  ✓ workspace two-column review layout + drawer version history")
 
   console.log("\nPersonalization workspace UX 5B certification passed.\n")
 }

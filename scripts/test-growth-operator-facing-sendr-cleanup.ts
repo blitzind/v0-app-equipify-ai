@@ -77,6 +77,8 @@ function main(): void {
   const shellNav = readSource("lib/growth/navigation/growth-workspace-shell-navigation.ts")
   assert.match(shellNav, /Personalized Videos/)
   assert.match(shellNav, /videos\/personalized/)
+  assert.match(shellNav, /id: "activity"/)
+  assert.doesNotMatch(shellNav, /sendr\/activity/)
   assert.doesNotMatch(shellNav, /label: "Sendr"/)
 
   const catalog = readSource("lib/growth/navigation/growth-route-catalog-data.ts")

@@ -22,6 +22,7 @@ export const GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS = [
   "media-assets",
   "automation-flows",
   "opportunities",
+  "activity",
   "conversations",
   "relationships",
 ] as const

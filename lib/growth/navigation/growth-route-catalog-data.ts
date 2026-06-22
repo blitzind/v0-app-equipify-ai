@@ -207,7 +207,7 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     dynamic: true,
     dynamicMatch: /^videos\/personalized\/[^/]+$/,
   }),
-  workspaceDual("workspace-activity", "activity", "Activity", "content", {
+  workspaceDual("workspace-activity", "activity", "Activity", "intelligence", {
     breadcrumbLabel: "Activity",
   }),
   workspaceDual("workspace-personalized-videos-analytics", "videos/personalized/analytics", "Personalized Videos Analytics", "content", {

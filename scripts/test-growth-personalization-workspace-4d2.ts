@@ -77,15 +77,25 @@ function runNavigationCert(): void {
 function runWorkspaceLayoutCert(): void {
   const workspace = readSource("components/growth/personalization/growth-personalization-workspace.tsx")
   assert.match(workspace, /GrowthPersonalizationDraftEditor/)
+  assert.match(workspace, /GrowthPersonalizationRecentGenerationsPanel/)
   assert.match(workspace, /GrowthPersonalizationDiagnosticsPanel/)
   assert.match(workspace, /GrowthPersonalizationVersionHistorySummary/)
   assert.match(workspace, /GrowthPersonalizationVersionHistoryDrawer/)
   assert.doesNotMatch(workspace, /GrowthPersonalizationGenerationsPanel/)
+  assert.match(workspace, /lg:grid-cols-\[minmax\(240px,300px\)_minmax\(0,1fr\)\]/)
+  assert.match(workspace, /showReviewEmptyState/)
+  assert.match(workspace, /versionEntries\[0\]/)
   assert.match(workspace, /overflow-y-auto/)
-  console.log("✓ workspace layout — draft-first, version history drawer, scroll regions")
+  console.log("✓ workspace layout — two-column review, version history drawer, auto-select latest")
 }
 
 function runGenerationsPanelCert(): void {
+  const recentPanel = readSource("components/growth/personalization/growth-personalization-recent-generations-panel.tsx")
+  assert.match(recentPanel, /Recent Generations/)
+  assert.match(recentPanel, /RECENT_GENERATIONS_LIMIT = 10/)
+  assert.match(recentPanel, /formatPersonalizationDraftTimestamp/)
+  assert.doesNotMatch(recentPanel, /Compare/)
+
   const summary = readSource("components/growth/personalization/growth-personalization-version-history-summary.tsx")
   assert.match(summary, /Version History/)
   assert.match(summary, /View History/)
@@ -98,7 +108,7 @@ function runGenerationsPanelCert(): void {
   assert.match(drawer, /Use This Version/)
   assert.match(drawer, /Regenerate From This Version/)
   assert.match(drawer, /max-h-\[100dvh\]/)
-  console.log("✓ compact version summary + searchable drawer")
+  console.log("✓ recent generations panel + compact version summary + searchable drawer")
 }
 
 function runDraftFormattingCert(): void {
@@ -115,6 +125,16 @@ function runDraftFormattingCert(): void {
 }
 
 const SENTENCE_SPLIT = /(?<=[.!?])\s+/
+
+function runDraftActionsCert(): void {
+  const editor = readSource("components/growth/personalization/growth-personalization-draft-editor.tsx")
+  assert.match(editor, /Preview & Review/)
+  assert.match(editor, /onApprove/)
+  assert.match(editor, /onReject/)
+  assert.match(editor, /onSaveDraft/)
+  assert.match(editor, /onRegenerate/)
+  console.log("✓ preview & review column retains approve/reject/save/regenerate actions")
+}
 
 function runSplitEditorCert(): void {
   const editor = readSource("components/growth/personalization/growth-personalization-draft-editor.tsx")
@@ -187,6 +207,7 @@ async function main(): Promise<void> {
   runNavigationCert()
   runWorkspaceLayoutCert()
   runGenerationsPanelCert()
+  runDraftActionsCert()
   runDraftFormattingCert()
   runSplitEditorCert()
   runDiagnosticsUxCert()

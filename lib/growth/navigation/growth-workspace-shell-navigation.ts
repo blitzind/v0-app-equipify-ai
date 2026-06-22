@@ -7,6 +7,7 @@
 
 import type { LucideIcon } from "lucide-react"
 import {
+  Activity,
   FileText,
   GitBranch,
   Handshake,
@@ -122,6 +123,7 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
     label: "Intelligence",
     items: [
       { id: "opportunities", label: "Opportunities", registryRouteId: "workspace-opportunities", icon: Target, workspaceRoute: true },
+      { id: "activity", label: "Activity", registryRouteId: "workspace-activity", icon: Activity, workspaceRoute: true },
       { id: "conversations", label: "Conversations", registryRouteId: "workspace-conversations", icon: MessageSquare, workspaceRoute: true },
       { id: "relationships", label: "Relationships", registryRouteId: "workspace-relationships", icon: Handshake, workspaceRoute: true },
     ],
@@ -203,10 +205,12 @@ export function isGrowthShellNavItemActive(pathname: string, item: GrowthShellNa
   ) {
     return true
   }
-  if (
-    item.id === "personalization" &&
+  if (item.id === "personalization" &&
     pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/personalization`)
   ) {
+    return true
+  }
+  if (item.id === "activity" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/activity`)) {
     return true
   }
   if (item.id === "videos" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/videos`)) {

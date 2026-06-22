@@ -24,6 +24,10 @@ import {
   mapSendrHotProspectToHighIntentView,
 } from "../lib/growth/activity/growth-activity-workspace-view-model"
 import type { GrowthActivityEventView } from "../lib/growth/activity/growth-activity-workspace-types"
+import {
+  buildGrowthWorkspaceShellNavGroups,
+  isGrowthShellNavItemActive,
+} from "../lib/growth/navigation/growth-workspace-shell-navigation"
 
 function readSource(relativePath: string): string {
   return fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
@@ -127,7 +131,22 @@ function main(): void {
   const shellNav = readSource("lib/growth/navigation/growth-workspace-shell-navigation.ts")
   assert.match(shellNav, /id: "activity"/)
   assert.match(shellNav, /registryRouteId: "workspace-activity"/)
-  console.log("  ✓ activity registered in workspace sidebar")
+  assert.match(shellNav, /id: "intelligence"/)
+  const intelligenceBlock = shellNav.slice(
+    shellNav.indexOf('id: "intelligence"'),
+    shellNav.indexOf("export const GROWTH_WORKSPACE_SHELL_OPERATOR_NAV_IDS"),
+  )
+  assert.match(intelligenceBlock, /id: "activity"/)
+  assert.match(intelligenceBlock, /label: "Activity"/)
+  assert.doesNotMatch(intelligenceBlock, /sendr\/activity/)
+
+  const activityNav = buildGrowthWorkspaceShellNavGroups()
+    .find((group) => group.id === "intelligence")
+    ?.items.find((item) => item.id === "activity")
+  assert.ok(activityNav)
+  assert.equal(activityNav.href, GROWTH_ACTIVITY_WORKSPACE_PATH)
+  assert.equal(isGrowthShellNavItemActive(GROWTH_ACTIVITY_WORKSPACE_PATH, activityNav), true)
+  console.log("  ✓ activity registered in Intelligence sidebar with active state")
 
   console.log("\nActivity center 5B certification passed.\n")
 }

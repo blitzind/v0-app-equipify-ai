@@ -8,6 +8,7 @@ import { GrowthPersonalizationDiagnosticsPanel } from "@/components/growth/perso
 import { GrowthPersonalizationEvaluationPanel } from "@/components/growth/personalization/growth-personalization-evaluation-panel"
 import { GrowthPersonalizationLeadPicker } from "@/components/growth/personalization/growth-personalization-lead-picker"
 import { GrowthPersonalizationOperatorFeedbackPanel } from "@/components/growth/personalization/growth-personalization-operator-feedback-panel"
+import { GrowthPersonalizationRecentGenerationsPanel } from "@/components/growth/personalization/growth-personalization-recent-generations-panel"
 import { GrowthPersonalizationRegenerationFeedbackPanel } from "@/components/growth/personalization/growth-personalization-regeneration-feedback-panel"
 import { GrowthPersonalizationVersionCompare } from "@/components/growth/personalization/growth-personalization-version-history"
 import { GrowthPersonalizationVersionHistoryDrawer } from "@/components/growth/personalization/growth-personalization-version-history-drawer"
@@ -35,15 +36,7 @@ import {
 } from "@/lib/growth/personalization/personalization-types"
 import type { GrowthPersonalizationEvaluationReport } from "@/lib/growth/personalization/evaluation/growth-personalization-evaluation-types"
 
-type BottomTabKey =
-  | "intelligence"
-  | "reasoning"
-  | "sequence"
-  | "quality"
-  | "evaluation"
-  | "evidence"
-  | "feedback"
-  | "performance"
+type BottomTabKey = "evaluation" | "evidence" | "feedback" | "performance"
 
 type DashboardPayload = {
   ok?: boolean
@@ -180,8 +173,18 @@ export function GrowthPersonalizationWorkspace({
       companyName: "Selected lead",
       lastSelectedAt: new Date().toISOString(),
     })
-    void loadLeadVersions(bootstrapLeadId).catch(() => undefined)
-    if (initialGenerationId) void loadGeneration(initialGenerationId)
+    void (async () => {
+      try {
+        const versions = await loadLeadVersions(bootstrapLeadId)
+        if (initialGenerationId) {
+          await loadGeneration(initialGenerationId)
+        } else if (versions[0]) {
+          await loadGeneration(versions[0].id)
+        }
+      } catch {
+        // Bootstrap is best-effort; operator can re-select the lead.
+      }
+    })()
   }, [initialGenerationId, initialLeadId, loadGeneration, loadLeadVersions])
 
   useEffect(() => {
@@ -202,6 +205,11 @@ export function GrowthPersonalizationWorkspace({
   }, [compareId, selectedId])
 
   const versionEntries = useMemo(() => assignGenerationVersionNumbers(leadVersions), [leadVersions])
+
+  useEffect(() => {
+    if (!selectedLead || selectedId || versionEntries.length === 0) return
+    void loadGeneration(versionEntries[0].id)
+  }, [loadGeneration, selectedId, selectedLead, versionEntries])
 
   const originalAiDraft = useMemo(() => {
     if (!selected) return null
@@ -368,15 +376,13 @@ export function GrowthPersonalizationWorkspace({
   }
 
   const bottomTabs: Array<{ key: BottomTabKey; label: string }> = [
-    { key: "intelligence", label: "Intelligence" },
-    { key: "reasoning", label: "Reasoning" },
-    { key: "sequence", label: "Sequence" },
-    { key: "quality", label: "Quality" },
     { key: "evaluation", label: "Evaluation" },
     { key: "evidence", label: "Evidence" },
     { key: "feedback", label: "Feedback" },
     { key: "performance", label: "Performance" },
   ]
+
+  const showReviewEmptyState = !selectedLead || versionEntries.length === 0
 
   if (loading && !dashboard) {
     return (
@@ -476,29 +482,53 @@ export function GrowthPersonalizationWorkspace({
       ) : null}
 
       <div className="min-h-0 flex-1">
-        {selected && originalAiDraft ? (
-          <GrowthPersonalizationDraftEditor
-            generation={selected}
-            originalAiDraft={originalAiDraft}
-            editSubject={editSubject}
-            editBody={editBody}
-            disabled={Boolean(actionId)}
-            actionId={actionId}
-            onEditSubject={setEditSubject}
-            onEditBody={setEditBody}
-            onResetToAiDraft={() => {
-              setEditSubject(originalAiDraft.subject)
-              setEditBody(originalAiDraft.body)
-            }}
-            onSaveDraft={() => void saveEdits()}
-            onApprove={() => void approveGeneration()}
-            onReject={() => void rejectGeneration()}
-            onRegenerate={() => void generateDraft({ priorGenerationId: selectedId })}
-          />
-        ) : (
+        {showReviewEmptyState ? (
           <section className="flex min-h-[240px] items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
             Select a lead and generate a draft to preview and review.
           </section>
+        ) : (
+          <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)]">
+            <GrowthPersonalizationRecentGenerationsPanel
+              companyLabel={selectedLead!.companyName}
+              versions={versionEntries}
+              selectedId={selectedId}
+              disabled={Boolean(actionId)}
+              onSelect={(generationId) => void loadGeneration(generationId)}
+            />
+            <div className="flex min-h-0 min-w-0 flex-col gap-3">
+              {selected && originalAiDraft ? (
+                <>
+                  <GrowthPersonalizationDraftEditor
+                    generation={selected}
+                    originalAiDraft={originalAiDraft}
+                    editSubject={editSubject}
+                    editBody={editBody}
+                    disabled={Boolean(actionId)}
+                    actionId={actionId}
+                    onEditSubject={setEditSubject}
+                    onEditBody={setEditBody}
+                    onResetToAiDraft={() => {
+                      setEditSubject(originalAiDraft.subject)
+                      setEditBody(originalAiDraft.body)
+                    }}
+                    onSaveDraft={() => void saveEdits()}
+                    onApprove={() => void approveGeneration()}
+                    onReject={() => void rejectGeneration()}
+                    onRegenerate={() => void generateDraft({ priorGenerationId: selectedId })}
+                  />
+                  <GrowthPersonalizationDiagnosticsPanel
+                    stackBDiagnostics={selected.stackBDiagnostics}
+                    industryPlaybookDiagnostics={selected.industryPlaybookDiagnostics}
+                  />
+                </>
+              ) : (
+                <section className="flex min-h-[240px] items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" />
+                  Loading draft…
+                </section>
+              )}
+            </div>
+          </div>
         )}
       </div>
 
@@ -529,16 +559,6 @@ export function GrowthPersonalizationWorkspace({
           </div>
 
           <div className="max-h-[min(360px,40vh)] min-h-[120px] overflow-y-auto">
-            {bottomTab === "intelligence" ||
-            bottomTab === "reasoning" ||
-            bottomTab === "sequence" ||
-            bottomTab === "quality" ? (
-              <GrowthPersonalizationDiagnosticsPanel
-                stackBDiagnostics={selected.stackBDiagnostics}
-                industryPlaybookDiagnostics={selected.industryPlaybookDiagnostics}
-              />
-            ) : null}
-
             {bottomTab === "evaluation" ? (
               evaluationLoading && !evaluationReport ? (
                 <p className="text-sm text-muted-foreground">Loading evaluation metrics…</p>
