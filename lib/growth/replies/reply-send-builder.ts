@@ -5,6 +5,7 @@ import { applyOutboundEmailTracking } from "@/lib/growth/tracking/tracking-links
 import { resolveSequenceExecutionSender } from "@/lib/growth/sequences/execution/sequence-send-builder"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import type { GrowthReplyDraft } from "@/lib/growth/replies/reply-draft-types"
+import { prepareOutboundEmailContent } from "@/lib/growth/signatures/outbound-signature-runtime"
 
 const UNSUBSCRIBE_FOOTER =
   '<p style="font-size:12px;color:#666;margin-top:24px;">{{unsubscribe_link}} — Reply STOP to unsubscribe.</p>'
@@ -32,16 +33,24 @@ export async function buildApprovedReplySendPayload(
   if (!sender) return { error: "no_sender_route" }
 
   const body = input.draft.draftBody.trim()
-  let html = `<div>${body.replace(/\n/g, "<br/>")}</div>${UNSUBSCRIBE_FOOTER}`
+  const prepared = await prepareOutboundEmailContent(admin, {
+    senderAccountId: sender.senderAccountId,
+    subject: input.draft.draftSubject ?? "Re: follow up",
+    bodyText: body,
+    unsubscribeFooterHtml: UNSUBSCRIBE_FOOTER,
+    unsubscribeTextSuffix: "Reply STOP to unsubscribe.",
+  })
+
+  let html = prepared.htmlBody
   if (input.deliveryAttemptId && process.env.GROWTH_TRACKING_DISABLED?.trim() !== "true") {
     html = applyOutboundEmailTracking({ html, deliveryAttemptId: input.deliveryAttemptId }).html ?? html
   }
 
   return {
     to: lead.contactEmail,
-    subject: (input.draft.draftSubject ?? "Re: follow up").slice(0, 500),
+    subject: prepared.subject.slice(0, 500),
     html: html.slice(0, 20000),
-    text: `${body}\n\nReply STOP to unsubscribe.`.slice(0, 10000),
+    text: prepared.textBody.slice(0, 10000),
     senderAccountId: sender.senderAccountId,
     providerId: sender.providerId,
   }

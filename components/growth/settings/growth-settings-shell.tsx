@@ -75,7 +75,7 @@ export function GrowthSettingsShell({ children }: GrowthSettingsShellProps) {
           </div>
         </nav>
 
-        <div className="min-w-0 flex-1">{children}</div>
+        <div className="min-w-0 flex-1 w-full">{children}</div>
       </div>
     </div>
   )

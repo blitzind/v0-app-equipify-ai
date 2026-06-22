@@ -1,5 +1,5 @@
-import { GrowthSettingsSectionPage } from "@/components/growth/settings/growth-settings-section-page"
+import { GrowthEmailSignaturesPanel } from "@/components/growth/signatures/growth-email-signatures-panel"
 
 export default function Page() {
-  return <GrowthSettingsSectionPage sectionId="signatures" />
+  return <GrowthEmailSignaturesPanel />
 }

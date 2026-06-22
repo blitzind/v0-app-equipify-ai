@@ -34,11 +34,11 @@ function runAudit(): void {
   console.log("  ✓ Growth Engine manifest still defines 33 sections")
 
   const lifted = listWorkspaceSettingsGrowthEngineLiftedSectionIds()
-  assert.equal(lifted.length, 27)
-  console.log("  ✓ 27 sections registered as lifted panels in Workspace Settings shell")
+  assert.equal(lifted.length, 28)
+  console.log("  ✓ 28 sections registered as lifted panels in Workspace Settings shell")
 
-  assert.equal(GROWTH_ENGINE_CUSTOMER_SETTINGS_SECTION_IDS.length, 15)
-  console.log("  ✓ 15 customer settings sections canonical under /settings/growth-engine (8K)")
+  assert.equal(GROWTH_ENGINE_CUSTOMER_SETTINGS_SECTION_IDS.length, 16)
+  console.log("  ✓ 16 customer settings sections canonical under /settings/growth-engine (8K)")
 
   const liftSrc = readFileSync("components/settings/workspace-settings-growth-engine-lifted-panels.tsx", "utf8")
   for (const sectionId of lifted) {
@@ -73,7 +73,7 @@ function runAudit(): void {
   assert.doesNotMatch(sectionPageSrc, /WorkspaceSettingsGrowthEngineBridgePanel/)
   console.log("  ✓ notification-preferences renders panel in Workspace Settings (8K canonical)")
 
-  assert.equal(resolveGrowthEngineSectionLiftKind("email-signatures"), "missing")
+  assert.equal(resolveGrowthEngineSectionLiftKind("email-signatures"), "lifted")
   assert.equal(resolveGrowthEngineSectionLiftKind("elevenlabs"), "operational_only")
   assert.equal(resolveGrowthEngineSectionLiftKind("retell"), "operational_only")
   assert.equal(resolveGrowthEngineSectionLiftKind("media-ai-providers"), "operational_only")
@@ -85,8 +85,8 @@ function runAudit(): void {
     const kind = resolveGrowthEngineSectionLiftKind(sectionId)
     assert.notEqual(kind, "lifted", `${sectionId} must not be lifted`)
   }
-  assert.equal(WORKSPACE_SETTINGS_GROWTH_ENGINE_DEFERRED_SECTION_IDS.length, 6)
-  console.log("  ✓ 6 sections remain Phase 3 placeholders")
+  assert.equal(WORKSPACE_SETTINGS_GROWTH_ENGINE_DEFERRED_SECTION_IDS.length, 5)
+  console.log("  ✓ 5 sections remain Phase 3 placeholders")
 
   const classifiedCount = Object.keys(WORKSPACE_SETTINGS_GROWTH_ENGINE_SECTION_CLASSIFICATION).length
   assert.equal(classifiedCount, 33)

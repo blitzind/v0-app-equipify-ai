@@ -36,6 +36,7 @@ function baseRow(overrides: Partial<GrowthConnectedMailboxRow> = {}): GrowthConn
     providerFamily: "google",
     needsReconnect: false,
     operationalPaused: false,
+    signatureStatus: "missing",
     ...overrides,
   }
 }
@@ -78,6 +79,12 @@ async function main(): Promise<void> {
 
   const disconnected = baseRow({ connectionStatus: "error", healthTier: "critical", healthScore: 20 })
   assert.notEqual(disconnected.connectionStatus, "connected")
+
+  assert.match(readModelSource, /signatureStatus/)
+  assert.match(readModelSource, /listSenderProfiles/)
+  assert.match(uiSource, /Configure Signature/)
+  assert.match(uiSource, /email-signatures/)
+  assert.match(uiSource, /signatureStatus/)
 
   console.log("growth connected mailboxes dashboard checks passed")
 }

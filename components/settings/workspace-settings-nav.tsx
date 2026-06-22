@@ -110,7 +110,7 @@ export function WorkspaceSettingsNav({ variant }: WorkspaceSettingsNavProps) {
 
   return (
     <nav
-      className="hidden md:flex w-56 shrink-0 flex-col gap-4 sticky top-4"
+      className="hidden md:flex w-56 shrink-0 flex-col gap-4 sticky top-4 self-start"
       aria-label="Settings navigation"
       data-qa-marker={WORKSPACE_SETTINGS_NAV_QA_MARKER}
       data-workspace-settings-nav-variant="desktop"

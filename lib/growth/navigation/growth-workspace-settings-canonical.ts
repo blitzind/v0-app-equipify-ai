@@ -38,6 +38,7 @@ export const GROWTH_ENGINE_CUSTOMER_SETTINGS_SECTION_IDS = [
   "meeting-preferences",
   "gmail",
   "microsoft-365",
+  "email-signatures",
 ] as const
 
 export type GrowthEngineCustomerSettingsSectionId =
@@ -68,6 +69,7 @@ export const GROWTH_ENGINE_LEGACY_GROWTH_WORKSPACE_HREFS: Record<string, string>
   "meeting-preferences": GROWTH_SETTINGS_CALENDAR_PREFERENCES_PATH,
   gmail: `${GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE}/mailboxes`,
   "microsoft-365": `${GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE}/mailboxes`,
+  "email-signatures": `${GROWTH_WORKSPACE_BASE_PATH}/settings/signatures`,
 }
 
 /** @deprecated 8K — customer canonical is `/settings/growth-engine/*`. */

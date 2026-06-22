@@ -1,16 +1,25 @@
 "use client"
 
 import { WorkspaceSettingsNav } from "@/components/settings/workspace-settings-nav"
+import {
+  WORKSPACE_SETTINGS_SHELL_BODY,
+  WORKSPACE_SETTINGS_SHELL_CONTENT,
+  WORKSPACE_SETTINGS_SHELL_LAYOUT_QA_MARKER,
+  WORKSPACE_SETTINGS_SHELL_ROOT,
+} from "@/lib/settings/workspace-settings-shell-tokens"
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-0 md:gap-5">
+    <div
+      className={WORKSPACE_SETTINGS_SHELL_ROOT}
+      data-qa-marker={WORKSPACE_SETTINGS_SHELL_LAYOUT_QA_MARKER}
+    >
       <WorkspaceSettingsNav variant="mobile" />
 
-      <div className="flex gap-8 items-start mt-3 md:mt-0">
+      <div className={WORKSPACE_SETTINGS_SHELL_BODY}>
         <WorkspaceSettingsNav variant="desktop" />
 
-        <div className="flex-1 min-w-0 pb-24 md:pb-6">{children}</div>
+        <div className={WORKSPACE_SETTINGS_SHELL_CONTENT}>{children}</div>
       </div>
     </div>
   )

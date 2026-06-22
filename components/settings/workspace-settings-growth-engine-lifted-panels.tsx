@@ -19,6 +19,7 @@ import { GrowthVoiceInfrastructureSettingsPanel } from "@/components/growth/grow
 import { GrowthWarmupDashboardPanel } from "@/components/growth/growth-warmup-dashboard"
 import { GrowthSettingsNotificationsPanel } from "@/components/growth/settings/growth-settings-notifications-panel"
 import { GrowthConnectedMailboxesDashboard } from "@/components/growth/mailboxes/growth-connected-mailboxes-dashboard"
+import { GrowthEmailSignaturesPanel } from "@/components/growth/signatures/growth-email-signatures-panel"
 import { GrowthSharePagesDashboard } from "@/components/growth/share-pages/growth-share-pages-admin-panel"
 import { growthEngineCustomerSettingsHref } from "@/lib/growth/navigation/growth-workspace-settings-canonical"
 import type { WorkspaceSettingsGrowthEngineLiftedSectionId } from "@/lib/settings/workspace-settings-growth-engine-lift"
@@ -80,6 +81,7 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANELS: Record<
   "share-page-branding": GrowthSharePagesDashboard,
   "booking-branding": GrowthBookingPagesPanel,
   "media-defaults": GrowthContentLibraryDashboardView,
+  "email-signatures": GrowthEmailSignaturesPanel,
 }
 
 export function getWorkspaceSettingsGrowthEngineLiftedPanel(

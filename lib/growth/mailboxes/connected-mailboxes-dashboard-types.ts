@@ -31,6 +31,7 @@ export type GrowthConnectedMailboxRow = {
   providerFamily: string
   needsReconnect: boolean
   operationalPaused: boolean
+  signatureStatus: "configured" | "missing" | "inherited"
 }
 
 export type GrowthConnectedMailboxesSummary = {

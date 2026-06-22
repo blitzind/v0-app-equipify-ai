@@ -65,6 +65,7 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_SECTION_IDS = [
   "share-page-branding",
   "booking-branding",
   "media-defaults",
+  "email-signatures",
 ] as const
 
 export type WorkspaceSettingsGrowthEngineLiftedSectionId =
@@ -101,12 +102,12 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANEL_EXPORTS: Record<
   "share-page-branding": "GrowthSharePagesDashboard",
   "booking-branding": "GrowthBookingPagesPanel",
   "media-defaults": "GrowthContentLibraryDashboardView",
+  "email-signatures": "GrowthEmailSignaturesPanel",
   "notification-preferences": "GrowthSettingsNotificationsPanel",
 }
 
 /** Deferred sections — remain Phase 3 placeholders with CTA where applicable. */
 export const WORKSPACE_SETTINGS_GROWTH_ENGINE_DEFERRED_SECTION_IDS = [
-  "email-signatures",
   "elevenlabs",
   "retell",
   "media-ai-providers",
@@ -230,8 +231,8 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_SECTION_CLASSIFICATION: Record<
     reason: "GrowthContentLibraryDashboardView is the existing media/content defaults console.",
   },
   "email-signatures": {
-    kind: "missing",
-    reason: "No signature editor exists — /growth/settings/signatures is placeholder only.",
+    kind: "lifted",
+    reason: "GrowthEmailSignaturesPanel — sender profiles and signature templates (GS-GROWTH-SIGNATURES-1A).",
   },
   elevenlabs: {
     kind: "operational_only",

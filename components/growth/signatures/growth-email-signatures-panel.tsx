@@ -1,0 +1,505 @@
+"use client"
+
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { Eye, Loader2, Pencil, Plus, RefreshCw } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import {
+  GROWTH_SENDER_PROFILES_QA_MARKER,
+  GROWTH_SENDER_PROFILE_SIGNATURE_STATUS_LABELS,
+  GROWTH_SIGNATURE_PRIVACY_NOTE,
+  GROWTH_SIGNATURE_TEMPLATE_LABELS,
+  type GrowthSenderProfileSignatureStatus,
+  type GrowthSenderProfilesDashboardPayload,
+  type GrowthSenderProfile,
+  type GrowthSignatureTemplateId,
+} from "@/lib/growth/signatures/signature-types"
+import { renderSignatureTemplate } from "@/lib/growth/signatures/signature-template-render"
+
+type ProfileFormState = {
+  senderAccountId: string
+  mailboxConnectionId: string | null
+  displayName: string
+  title: string
+  email: string
+  phone: string
+  website: string
+  linkedinUrl: string
+  avatarUrl: string
+  logoUrl: string
+  active: boolean
+  signatureTemplate: GrowthSignatureTemplateId
+  notes: string
+}
+
+const EMPTY_FORM: ProfileFormState = {
+  senderAccountId: "",
+  mailboxConnectionId: null,
+  displayName: "",
+  title: "",
+  email: "",
+  phone: "",
+  website: "",
+  linkedinUrl: "",
+  avatarUrl: "",
+  logoUrl: "",
+  active: true,
+  signatureTemplate: "simple",
+  notes: "",
+}
+
+function signatureStatusTone(
+  status: GrowthSenderProfileSignatureStatus,
+): "healthy" | "attention" | "neutral" | "blocked" | "medium" {
+  switch (status) {
+    case "configured":
+      return "healthy"
+    case "inherited":
+      return "medium"
+    case "missing":
+      return "attention"
+    case "disabled":
+      return "blocked"
+    default:
+      return "neutral"
+  }
+}
+
+export function GrowthEmailSignaturesPanel() {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [dashboard, setDashboard] = useState<GrowthSenderProfilesDashboardPayload | null>(null)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState<ProfileFormState>(EMPTY_FORM)
+  const [previewHtml, setPreviewHtml] = useState("")
+  const [previewText, setPreviewText] = useState("")
+  const [selectedTemplate, setSelectedTemplate] = useState<GrowthSignatureTemplateId>("simple")
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/platform/growth/sender-profiles/dashboard", { cache: "no-store" })
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        dashboard?: GrowthSenderProfilesDashboardPayload
+        message?: string
+      }
+      if (!res.ok || !data.ok || !data.dashboard) {
+        throw new Error(data.message ?? "Could not load sender profiles.")
+      }
+      setDashboard(data.dashboard)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Load failed.")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const templateCards = dashboard?.templates ?? []
+
+  function openCreate(senderId: string, email: string, displayName: string, mailboxId: string | null) {
+    setEditingId(null)
+    setForm({
+      ...EMPTY_FORM,
+      senderAccountId: senderId,
+      mailboxConnectionId: mailboxId,
+      displayName: displayName || email.split("@")[0],
+      email,
+    })
+    setEditOpen(true)
+  }
+
+  function openEdit(profile: GrowthSenderProfile) {
+    setEditingId(profile.id)
+    setForm({
+      senderAccountId: profile.sender_account_id,
+      mailboxConnectionId: profile.mailbox_connection_id,
+      displayName: profile.display_name,
+      title: profile.title ?? "",
+      email: profile.email,
+      phone: profile.phone ?? "",
+      website: profile.website ?? "",
+      linkedinUrl: profile.linkedin_url ?? "",
+      avatarUrl: profile.avatar_url ?? "",
+      logoUrl: profile.logo_url ?? "",
+      active: profile.active,
+      signatureTemplate: profile.signature_template,
+      notes: profile.notes ?? "",
+    })
+    setEditOpen(true)
+  }
+
+  async function runPreview(profileId: string, templateOverride?: GrowthSignatureTemplateId) {
+    setActionLoading(`preview-${profileId}`)
+    try {
+      const res = await fetch(`/api/platform/growth/sender-profiles/${profileId}/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          templateOverride ? { signatureTemplate: templateOverride } : {},
+        ),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        signature?: { html: string; text: string }
+        message?: string
+      }
+      if (!res.ok) throw new Error(data.message ?? "Preview failed.")
+      setPreviewHtml(data.signature?.html ?? "")
+      setPreviewText(data.signature?.text ?? "")
+      setPreviewOpen(true)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Preview failed.")
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function saveProfile() {
+    setActionLoading("save")
+    setError(null)
+    try {
+      const payload = {
+        senderAccountId: form.senderAccountId,
+        mailboxConnectionId: form.mailboxConnectionId,
+        displayName: form.displayName,
+        title: form.title.trim() || null,
+        email: form.email,
+        phone: form.phone.trim() || null,
+        website: form.website.trim() || null,
+        linkedinUrl: form.linkedinUrl.trim() || null,
+        avatarUrl: form.avatarUrl.trim() || null,
+        logoUrl: form.logoUrl.trim() || null,
+        active: form.active,
+        signatureTemplate: form.signatureTemplate,
+        notes: form.notes.trim() || null,
+      }
+
+      const res = editingId
+        ? await fetch(`/api/platform/growth/sender-profiles/${editingId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              mailboxConnectionId: payload.mailboxConnectionId,
+              displayName: payload.displayName,
+              title: payload.title,
+              email: payload.email,
+              phone: payload.phone,
+              website: payload.website,
+              linkedinUrl: payload.linkedinUrl,
+              avatarUrl: payload.avatarUrl,
+              logoUrl: payload.logoUrl,
+              active: payload.active,
+              signatureTemplate: payload.signatureTemplate,
+              notes: payload.notes,
+            }),
+          })
+        : await fetch("/api/platform/growth/sender-profiles", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+
+      const data = (await res.json().catch(() => ({}))) as { message?: string }
+      if (!res.ok) throw new Error(data.message ?? "Save failed.")
+      setEditOpen(false)
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Save failed.")
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function toggleActive(profile: GrowthSenderProfile) {
+    setActionLoading(`active-${profile.id}`)
+    try {
+      const res = await fetch(`/api/platform/growth/sender-profiles/${profile.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: !profile.active }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { message?: string }
+      if (!res.ok) throw new Error(data.message ?? "Could not update status.")
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Update failed.")
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const previewTemplateSample = useMemo(
+    () => ({
+      display_name: "Michael Short",
+      title: "Founder",
+      email: "mike@equipifyai.com",
+      phone: "865-555-0100",
+      website: "equipify.ai",
+      linkedin_url: "linkedin.com/in/michaelshort",
+      logo_url: "",
+      avatar_url: "",
+    }),
+    [],
+  )
+
+  const templatePreviewHtml = useMemo(
+    () => renderSignatureTemplate(selectedTemplate, previewTemplateSample).html,
+    [selectedTemplate, previewTemplateSample],
+  )
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-8 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" />
+        Loading sender profiles and signatures…
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">
+          {GROWTH_SENDER_PROFILES_QA_MARKER} · {GROWTH_SIGNATURE_PRIVACY_NOTE}
+        </p>
+        <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={Boolean(actionLoading)}>
+          <RefreshCw className="mr-1.5 size-3.5" />
+          Refresh
+        </Button>
+      </div>
+
+      {error ? (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">{error}</div>
+      ) : null}
+
+      <GrowthEngineCard title="Sender Profiles">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <th className="px-2 py-2">Sender</th>
+                <th className="px-2 py-2">Mailbox</th>
+                <th className="px-2 py-2">Title</th>
+                <th className="px-2 py-2">Signature</th>
+                <th className="px-2 py-2">Status</th>
+                <th className="px-2 py-2">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(dashboard?.profiles ?? []).length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-2 py-6 text-muted-foreground">
+                    No sender profiles yet. Create one from an unassigned mailbox below.
+                  </td>
+                </tr>
+              ) : (
+                dashboard?.profiles.map((row) => (
+                  <tr key={row.profile.id} className="border-b border-border/60">
+                    <td className="px-2 py-3">
+                      <div className="font-medium">{row.profile.display_name}</div>
+                      <div className="text-xs text-muted-foreground">{row.senderEmail}</div>
+                    </td>
+                    <td className="px-2 py-3">{row.mailboxEmail ?? row.senderEmail}</td>
+                    <td className="px-2 py-3">{row.profile.title ?? "—"}</td>
+                    <td className="px-2 py-3">
+                      {GROWTH_SIGNATURE_TEMPLATE_LABELS[row.profile.signature_template]}
+                    </td>
+                    <td className="px-2 py-3">
+                      <GrowthBadge
+                        label={GROWTH_SENDER_PROFILE_SIGNATURE_STATUS_LABELS[row.signatureStatus]}
+                        tone={signatureStatusTone(row.signatureStatus)}
+                      />
+                    </td>
+                    <td className="px-2 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        <Button type="button" size="sm" variant="outline" onClick={() => openEdit(row.profile)}>
+                          <Pencil className="mr-1 size-3.5" />
+                          Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={actionLoading === `preview-${row.profile.id}`}
+                          onClick={() => void runPreview(row.profile.id)}
+                        >
+                          <Eye className="mr-1 size-3.5" />
+                          Preview
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={Boolean(actionLoading)}
+                          onClick={() => void toggleActive(row.profile)}
+                        >
+                          {row.profile.active ? "Deactivate" : "Activate"}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </GrowthEngineCard>
+
+      {(dashboard?.unassignedSenders ?? []).length > 0 ? (
+        <GrowthEngineCard title="Assign Mailbox → Sender Profile">
+          <div className="space-y-2">
+            {dashboard?.unassignedSenders.map((sender) => (
+              <div
+                key={sender.senderId}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 px-3 py-2"
+              >
+                <div>
+                  <div className="font-medium">{sender.email}</div>
+                  <div className="text-xs text-muted-foreground">{sender.displayName}</div>
+                  <GrowthBadge
+                    label={GROWTH_SENDER_PROFILE_SIGNATURE_STATUS_LABELS[sender.signatureStatus]}
+                    tone={signatureStatusTone(sender.signatureStatus)}
+                    className="mt-1"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    openCreate(sender.senderId, sender.email, sender.displayName, sender.mailboxId)
+                  }
+                >
+                  <Plus className="mr-1 size-3.5" />
+                  Create profile
+                </Button>
+              </div>
+            ))}
+          </div>
+        </GrowthEngineCard>
+      ) : null}
+
+      <GrowthEngineCard title="Signature Templates">
+        <div className="grid gap-3 md:grid-cols-3">
+          {templateCards.map((tpl) => (
+            <button
+              key={tpl.id}
+              type="button"
+              className={`rounded-xl border p-4 text-left transition-colors ${
+                selectedTemplate === tpl.id ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40"
+              }`}
+              onClick={() => setSelectedTemplate(tpl.id)}
+            >
+              <div className="font-medium">{tpl.label}</div>
+              <p className="mt-1 text-xs text-muted-foreground">{tpl.description}</p>
+            </button>
+          ))}
+        </div>
+        <div className="mt-4 rounded-xl border border-dashed border-border bg-muted/20 p-4">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Template preview</p>
+          <div
+            className="rounded-lg border border-border bg-white p-4 text-sm"
+            dangerouslySetInnerHTML={{ __html: templatePreviewHtml }}
+          />
+        </div>
+      </GrowthEngineCard>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingId ? "Edit sender profile" : "Create sender profile"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="space-y-1.5">
+              <Label>Display name</Label>
+              <Input value={form.displayName} onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Title</Label>
+              <Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Phone</Label>
+                <Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Website</Label>
+                <Input value={form.website} onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>LinkedIn URL</Label>
+              <Input value={form.linkedinUrl} onChange={(e) => setForm((f) => ({ ...f, linkedinUrl: e.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Signature template</Label>
+              <Select
+                value={form.signatureTemplate}
+                onValueChange={(v) => setForm((f) => ({ ...f, signatureTemplate: v as GrowthSignatureTemplateId }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {templateCards.map((tpl) => (
+                    <SelectItem key={tpl.id} value={tpl.id}>{tpl.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Notes</Label>
+              <Textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={2} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button type="button" disabled={actionLoading === "save"} onClick={() => void saveProfile()}>
+              Save profile
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Signature preview</DialogTitle>
+          </DialogHeader>
+          <div className="rounded-lg border border-border bg-white p-4 text-sm" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+          <pre className="rounded-lg border border-border bg-muted/30 p-3 text-xs whitespace-pre-wrap">{previewText}</pre>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}

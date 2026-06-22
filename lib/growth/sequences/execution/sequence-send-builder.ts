@@ -21,6 +21,7 @@ import {
   applySequenceVideoAttachmentToEmailHtml,
   wireApprovedSequenceVideoAttachment,
 } from "@/lib/growth/sequences/growth-sequence-video-send-builder-service"
+import { prepareOutboundEmailContent } from "@/lib/growth/signatures/outbound-signature-runtime"
 
 const UNSUBSCRIBE_FOOTER =
   '<p style="font-size:12px;color:#666;margin-top:24px;">{{unsubscribe_link}} — Reply STOP to unsubscribe.</p>'
@@ -186,7 +187,17 @@ export async function buildSequenceExecutionSendPayload(
     }
   }
 
-  let html = sanitizeHtml(`<div>${body.replace(/\n/g, "<br/>")}</div>${UNSUBSCRIBE_FOOTER}`)
+  const prepared = await prepareOutboundEmailContent(admin, {
+    senderAccountId: sender.senderAccountId,
+    subject,
+    bodyText: body,
+    unsubscribeFooterHtml: UNSUBSCRIBE_FOOTER,
+    unsubscribeTextSuffix: "Reply STOP to unsubscribe.",
+  })
+
+  subject = prepared.subject
+  body = prepared.bodyText
+  let html = sanitizeHtml(prepared.htmlBody)
   if (input.deliveryAttemptId && process.env.GROWTH_TRACKING_DISABLED?.trim() !== "true") {
     html = applyOutboundEmailTracking({
       html,
@@ -206,13 +217,13 @@ export async function buildSequenceExecutionSendPayload(
     html = applySequenceVideoAttachmentToEmailHtml(html, videoWire)
   }
 
-  const text = `${body}\n\nReply STOP to unsubscribe.`
+  const text = prepared.textBody.slice(0, 10000)
 
   return {
     to: lead.contactEmail,
     subject: subject.slice(0, 500),
     html,
-    text: text.slice(0, 10000),
+    text,
     senderAccountId: sender.senderAccountId,
     providerId: sender.providerId,
     senderPoolId: sender.senderPoolId ?? input.senderPoolId ?? null,

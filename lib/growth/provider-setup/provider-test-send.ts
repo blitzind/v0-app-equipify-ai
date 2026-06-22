@@ -8,6 +8,7 @@ import {
 import { recordProviderConnectionCheck, recordProviderSecretAuditEvent } from "@/lib/growth/provider-setup/provider-setup-events"
 import type { GrowthProviderConnectionCheckResult, GrowthProviderSetupFamily } from "@/lib/growth/provider-setup/provider-setup-types"
 import { getProviderConnectionSettings } from "@/lib/growth/provider-setup/dashboard"
+import { prepareOutboundEmailContent } from "@/lib/growth/signatures/outbound-signature-runtime"
 
 export type ProviderTestSendInput = {
   providerFamily: GrowthProviderSetupFamily
@@ -70,12 +71,22 @@ export async function runProviderTestSend(
   }
 
   try {
+    const defaultText =
+      input.text?.trim() ||
+      "Equipify Growth Engine provider setup test send. Sender merge fields and signature render at send time."
+    const prepared = await prepareOutboundEmailContent(admin, {
+      senderAccountId: input.senderAccountId,
+      subject: input.subject,
+      bodyText: defaultText,
+      htmlBody: input.html,
+    })
+
     const result = await executeTransportSend(admin, {
       sender_account_id: input.senderAccountId,
       to: input.to,
-      subject: input.subject,
-      text: input.text,
-      html: input.html,
+      subject: prepared.subject,
+      text: prepared.textBody,
+      html: prepared.htmlBody,
       human_approved: true,
       human_approval_confirmed: true,
       actorUserId: input.actorUserId,

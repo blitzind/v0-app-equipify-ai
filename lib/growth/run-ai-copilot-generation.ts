@@ -60,6 +60,8 @@ import {
   linkGrowthAiCopilotGenerationPlaybookRules,
 } from "@/lib/growth/ai-copilot-playbook-repository"
 import { resolveGrowthAiCopilotPlaybookRules } from "@/lib/growth/ai-copilot-playbook-resolver"
+import { prepareOutboundEmailContent } from "@/lib/growth/signatures/outbound-signature-runtime"
+import { applyOutboundEmailTracking } from "@/lib/growth/tracking/tracking-links"
 
 export type RunGrowthAiCopilotGenerationInput = {
   admin: SupabaseClient
@@ -548,4 +550,54 @@ export async function discardGrowthAiCopilotGeneration(
   })
 
   return updated
+}
+
+const AI_COPILOT_UNSUBSCRIBE_FOOTER =
+  '<p style="font-size:12px;color:#666;margin-top:24px;">{{unsubscribe_link}} — Reply STOP to unsubscribe.</p>'
+
+/**
+ * Prepares AI copilot outbound email bodies with sender merge fields and signature injection.
+ * Used by transport send paths for approved AI-generated email content.
+ */
+export async function prepareGrowthAiCopilotOutboundEmailContent(
+  admin: SupabaseClient,
+  input: {
+    senderAccountId: string
+    mailboxConnectionId?: string | null
+    subject: string
+    body: string
+    deliveryAttemptId?: string | null
+  },
+): Promise<{
+  subject: string
+  html: string
+  text: string
+  signatureInjected: boolean
+  mergeFields: Record<string, string>
+}> {
+  const prepared = await prepareOutboundEmailContent(admin, {
+    senderAccountId: input.senderAccountId,
+    mailboxConnectionId: input.mailboxConnectionId,
+    subject: input.subject,
+    bodyText: input.body,
+    unsubscribeFooterHtml: AI_COPILOT_UNSUBSCRIBE_FOOTER,
+    unsubscribeTextSuffix: "Reply STOP to unsubscribe.",
+  })
+
+  let html = prepared.htmlBody
+  if (input.deliveryAttemptId && process.env.GROWTH_TRACKING_DISABLED?.trim() !== "true") {
+    html =
+      applyOutboundEmailTracking({
+        html,
+        deliveryAttemptId: input.deliveryAttemptId,
+      }).html ?? html
+  }
+
+  return {
+    subject: prepared.subject,
+    html,
+    text: prepared.textBody,
+    signatureInjected: prepared.signatureInjected,
+    mergeFields: prepared.mergeFields,
+  }
 }

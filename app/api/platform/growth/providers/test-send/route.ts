@@ -8,6 +8,7 @@ import {
   executeTransportSend,
 } from "@/lib/growth/providers/transport/transport-orchestrator"
 import { GROWTH_LIVE_PROVIDER_TRANSPORT_PRIVACY_NOTE } from "@/lib/growth/providers/adapters/provider-adapter-types"
+import { prepareOutboundEmailContent } from "@/lib/growth/signatures/outbound-signature-runtime"
 
 export const runtime = "nodejs"
 
@@ -48,12 +49,23 @@ export async function POST(request: Request) {
   }
 
   try {
+    const defaultSubject = parsed.data.subject ?? "[Equipify] Live Send Test"
+    const defaultText =
+      parsed.data.text ??
+      "This is a human-approved live send test from Growth Engine transport. Signature and sender merge fields render at send time."
+    const prepared = await prepareOutboundEmailContent(access.admin, {
+      senderAccountId: parsed.data.senderAccountId,
+      subject: defaultSubject,
+      bodyText: defaultText,
+      htmlBody: parsed.data.html,
+    })
+
     const result = await executeTransportSend(access.admin, {
       sender_account_id: parsed.data.senderAccountId,
       to: parsed.data.to,
-      subject: parsed.data.subject ?? "[Equipify] Live Send Test",
-      html: parsed.data.html ?? "<p>This is a human-approved live send test from Growth Engine transport.</p>",
-      text: parsed.data.text ?? "This is a human-approved live send test from Growth Engine transport.",
+      subject: prepared.subject,
+      html: prepared.htmlBody,
+      text: prepared.textBody,
       human_approved: true,
       human_approval_confirmed: true,
       actorUserId: access.userId,

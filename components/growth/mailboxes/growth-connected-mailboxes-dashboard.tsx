@@ -41,6 +41,7 @@ import {
   GROWTH_WORKSPACE_SENDER_SETUP_PATH,
   GROWTH_WORKSPACE_WARMUP_PATH,
 } from "@/lib/growth/navigation/growth-delivery-settings-navigation"
+import { growthEngineCustomerSettingsHref } from "@/lib/growth/navigation/growth-workspace-settings-canonical"
 import {
   GROWTH_COMMUNICATIONS_MAILBOXES_ONBOARD_PATH,
   GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
@@ -557,6 +558,7 @@ export function GrowthConnectedMailboxesDashboard({
                 <th className="px-2 py-2">Connection</th>
                 <th className="px-2 py-2">Health</th>
                 <th className="px-2 py-2">Warmup</th>
+                <th className="px-2 py-2">Signature</th>
                 <th className="px-2 py-2">Pool</th>
                 <th className="px-2 py-2">Daily cap</th>
                 <th className="px-2 py-2">Daily used</th>
@@ -567,7 +569,7 @@ export function GrowthConnectedMailboxesDashboard({
             <tbody>
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-2 py-6 text-muted-foreground">
+                  <td colSpan={12} className="px-2 py-6 text-muted-foreground">
                     No mailboxes match the current filters.
                   </td>
                 </tr>
@@ -604,6 +606,33 @@ export function GrowthConnectedMailboxesDashboard({
                       </td>
                       <td className="px-2 py-3">
                         <GrowthBadge label={warmupDisplay.label} tone={warmupDisplay.tone} />
+                      </td>
+                      <td className="px-2 py-3">
+                        <div className="flex flex-col gap-1">
+                          <GrowthBadge
+                            label={
+                              row.signatureStatus === "configured"
+                                ? "Configured"
+                                : row.signatureStatus === "inherited"
+                                  ? "Inherited"
+                                  : "Missing"
+                            }
+                            tone={
+                              row.signatureStatus === "configured"
+                                ? "healthy"
+                                : row.signatureStatus === "inherited"
+                                  ? "medium"
+                                  : "attention"
+                            }
+                          />
+                          {row.signatureStatus === "missing" ? (
+                            <Button type="button" size="sm" variant="link" className="h-auto p-0 text-xs" asChild>
+                              <Link href={growthEngineCustomerSettingsHref("email-signatures")}>
+                                Configure Signature
+                              </Link>
+                            </Button>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-2 py-3">
                         {row.poolMemberships.length === 0 ? (

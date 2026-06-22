@@ -7,9 +7,16 @@ export const WORKSPACE_SHELL_QA_MARKER = "workspace-shell-v1" as const
 /** Horizontal padding aligned with PageShell / PageHero. */
 export const WORKSPACE_SHELL_HORIZONTAL_PADDING = "px-3 sm:px-6" as const
 
-/** Main content container — matches `PageShell` inner wrapper. */
+/** Main content container — matches `PageShell` inner wrapper (non-settings routes). */
 export const WORKSPACE_SHELL_MAIN_INNER =
   "max-w-[1440px] mx-auto p-3 sm:p-6 pb-24 lg:pb-6" as const
+
+/**
+ * Workspace Settings main inner — fills remaining viewport width (no max-width cap).
+ * Applied by `PageShell` when pathname is under `/settings/*`.
+ */
+export const WORKSPACE_SETTINGS_SHELL_MAIN_INNER =
+  "w-full min-w-0 p-3 sm:p-6 pb-24 lg:pb-6" as const
 
 /**
  * Growth workspace main inner — FAB clearance on small viewports without the large

@@ -10,7 +10,8 @@ import { useBillingAccess } from "@/lib/billing-access-context"
 import { blockCreateIfNotEligible } from "@/lib/billing/guard-toast"
 import { PageHeroCard } from "@/components/page-hero-card"
 import { PAGE_HERO_SHELL_OUTER } from "@/lib/page-hero-tokens"
-import { WORKSPACE_SHELL_MAIN_INNER } from "@/lib/workspace/workspace-shell-tokens"
+import { WORKSPACE_SHELL_MAIN_INNER, WORKSPACE_SETTINGS_SHELL_MAIN_INNER } from "@/lib/workspace/workspace-shell-tokens"
+import { isWorkspaceSettingsPathname } from "@/lib/settings/workspace-settings-shell-tokens"
 import {
   LayoutDashboard, Users, Wrench, ClipboardList, CalendarClock,
   HardHat, BarChart3, Globe, Settings, FileText, Receipt, Plug, ShoppingCart,
@@ -279,6 +280,8 @@ function PageHero({
 export function PageShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const meta = resolveMeta(pathname)
+  const isSettingsRoute = isWorkspaceSettingsPathname(pathname)
+  const mainInnerClass = isSettingsRoute ? WORKSPACE_SETTINGS_SHELL_MAIN_INNER : WORKSPACE_SHELL_MAIN_INNER
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const { standardCreateEligibility } = useBillingAccess()
   useQuickAdd("schedule-service", () => {
@@ -307,7 +310,7 @@ export function PageShell({ children }: { children: React.ReactNode }) {
       )}
       <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto outline-none scroll-mt-14 md:scroll-mt-16">
         {/* pb-24 on mobile gives clearance above the fixed bottom nav (≈80px bar + safe area) */}
-        <div className={WORKSPACE_SHELL_MAIN_INNER}>
+        <div className={mainInnerClass} data-settings-full-width={isSettingsRoute ? "true" : undefined}>
           {children}
         </div>
       </main>

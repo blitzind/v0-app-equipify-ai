@@ -13,6 +13,7 @@ import { extractDomainFromEmail } from "@/lib/growth/sender/sender-domain-valida
 import { listSenderAccounts } from "@/lib/growth/sender/sender-repository"
 import { listSenderPoolMembers, listSenderPools } from "@/lib/growth/sender-pools/sender-pool-repository"
 import { listWarmupProfiles } from "@/lib/growth/warmup/warmup-repository"
+import { listSenderProfiles } from "@/lib/growth/signatures/sender-profile-repository"
 
 function isDisconnectedMailbox(status: string | null | undefined): boolean {
   return !status || status === "pending" || status === "connecting" || status === "error" || status === "expired"
@@ -70,12 +71,13 @@ function buildSummary(rows: GrowthConnectedMailboxRow[]): GrowthConnectedMailbox
 export async function buildConnectedMailboxesDashboard(
   admin: SupabaseClient,
 ): Promise<GrowthConnectedMailboxesDashboardPayload> {
-  const [senders, mailboxes, pools, warmupProfiles, routes] = await Promise.all([
+  const [senders, mailboxes, pools, warmupProfiles, routes, senderProfiles] = await Promise.all([
     listSenderAccounts(admin),
     listMailboxConnections(admin),
     listSenderPools(admin),
     listWarmupProfiles(admin).catch(() => []),
     listDeliveryRoutes(admin),
+    listSenderProfiles(admin).catch(() => []),
   ])
 
   const membersNested = await Promise.all(pools.map((pool) => listSenderPoolMembers(admin, pool.id)))
@@ -105,6 +107,31 @@ export async function buildConnectedMailboxesDashboard(
     if (route.sender_account_id && route.enabled) {
       routesBySender.set(route.sender_account_id, true)
     }
+  }
+
+  const activeProfileBySender = new Map<string, { active: boolean; mailbox_connection_id: string | null }>()
+  const activeProfileByMailbox = new Map<string, boolean>()
+  for (const profile of senderProfiles) {
+    if (!profile.active) continue
+    activeProfileBySender.set(profile.sender_account_id, {
+      active: true,
+      mailbox_connection_id: profile.mailbox_connection_id,
+    })
+    if (profile.mailbox_connection_id) {
+      activeProfileByMailbox.set(profile.mailbox_connection_id, true)
+    }
+  }
+
+  function resolveMailboxSignatureStatus(
+    senderId: string,
+    mailboxId: string | null,
+  ): GrowthConnectedMailboxRow["signatureStatus"] {
+    const senderProfile = activeProfileBySender.get(senderId)
+    if (senderProfile?.active) {
+      return senderProfile.mailbox_connection_id ? "inherited" : "configured"
+    }
+    if (mailboxId && activeProfileByMailbox.has(mailboxId)) return "inherited"
+    return "missing"
   }
 
   const rows: GrowthConnectedMailboxRow[] = senders.map((sender) => {
@@ -145,6 +172,7 @@ export async function buildConnectedMailboxesDashboard(
       providerFamily: sender.provider_family,
       needsReconnect,
       operationalPaused,
+      signatureStatus: resolveMailboxSignatureStatus(sender.id, mailbox?.id ?? null),
     }
   })
 
