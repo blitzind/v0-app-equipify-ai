@@ -95,7 +95,9 @@ function main(): void {
   assert.match(dashboard, /Generate/)
   assert.match(dashboard, /Generation Rejected/)
   assert.match(dashboard, /Generate New Version/)
-  assert.match(dashboard, /GrowthPersonalizationGenerationsPanel/)
+  assert.match(dashboard, /GrowthPersonalizationVersionHistorySummary/)
+  assert.match(dashboard, /GrowthPersonalizationVersionHistoryDrawer/)
+  assert.doesNotMatch(dashboard, /GrowthPersonalizationGenerationsPanel/)
   assert.match(dashboard, /GROWTH_PERSONALIZATION_GENERATION_UX_QA_MARKER/)
   console.log("  ✓ dashboard UX — search picker replaces UUID input")
 

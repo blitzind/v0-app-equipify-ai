@@ -8,6 +8,9 @@ export const GROWTH_PERSONALIZATION_LEGACY_ADMIN_PATH =
 export const GROWTH_PERSONALIZATION_WORKSPACE_QA_MARKER =
   "growth-personalization-workspace-gs-ai-playbook-4d2-v1" as const
 
+export const GROWTH_PERSONALIZATION_VERSION_HISTORY_DRAWER_QA_MARKER =
+  "growth-personalization-version-history-drawer-v1" as const
+
 export const GROWTH_PERSONALIZATION_DIAGNOSTICS_PREFERENCES_STORAGE_KEY =
   "growth-personalization-diagnostics-prefs-v1" as const
 
@@ -183,56 +186,11 @@ export function parsePersonalizationOperatorMetadata(
   return Object.keys(result).length > 0 ? result : null
 }
 
-const SENTENCE_SPLIT_RE = /(?<=[.!?])\s+(?=[A-Z0-9"(\[])/
-
-function normalizeDraftBody(body: string): string {
-  return body.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim()
-}
-
-function splitSentences(text: string): string[] {
-  const normalized = text.replace(/\n+/g, " ").replace(/\s+/g, " ").trim()
-  if (!normalized) return []
-  const parts = normalized.split(SENTENCE_SPLIT_RE).map((entry) => entry.trim()).filter(Boolean)
-  return parts.length > 0 ? parts : [normalized]
-}
-
-function groupSentences(sentences: string[], maxSentencesPerParagraph: number): string[] {
-  if (sentences.length <= maxSentencesPerParagraph) return [sentences.join(" ")]
-  const paragraphs: string[] = []
-  for (let index = 0; index < sentences.length; index += maxSentencesPerParagraph) {
-    paragraphs.push(sentences.slice(index, index + maxSentencesPerParagraph).join(" "))
-  }
-  return paragraphs
-}
-
-export function formatPersonalizationDraftBodyForDisplay(body: string): string {
-  const normalized = normalizeDraftBody(body)
-  if (!normalized) return ""
-
-  if (normalized.includes("\n\n")) {
-    return normalized
-      .split(/\n\n+/)
-      .map((paragraph) => paragraph.replace(/\s+/g, " ").trim())
-      .filter(Boolean)
-      .join("\n\n")
-  }
-
-  const sentences = splitSentences(normalized)
-  const maxPerParagraph = sentences.length <= 4 ? 2 : 3
-  return groupSentences(sentences, maxPerParagraph).join("\n\n")
-}
-
-export function formatPersonalizationDraftTimestamp(value: string | null | undefined): string {
-  if (!value) return "—"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "—"
-  return date.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  })
-}
+export {
+  formatPersonalizationDraftBodyForDisplay,
+  formatPersonalizationDraftBodyParagraphsForDisplay,
+  formatPersonalizationDraftTimestamp,
+} from "@/lib/growth/personalization/growth-personalization-draft-formatting"
 
 export type GrowthPersonalizationDiagnosticsSectionKey =
   | "intelligence"
