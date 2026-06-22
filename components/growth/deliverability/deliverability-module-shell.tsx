@@ -10,6 +10,7 @@ import {
   type GrowthDeliverabilityModuleResult,
   type GrowthDeliverabilityProtectionModuleId,
 } from "@/lib/growth/deliverability/deliverability-protection-console-types"
+import { emptyModuleStatusLabel } from "@/lib/growth/deliverability/deliverability-console-state"
 
 function formatWhen(value: string | null | undefined): string {
   if (!value) return "—"
@@ -139,7 +140,14 @@ export function DeliverabilityModuleShell({
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           {module ? (
-            <GrowthBadge label={module.status.replace(/_/g, " ")} tone={moduleStatusTone(module.status)} />
+            <GrowthBadge
+              label={
+                module.status === "empty"
+                  ? emptyModuleStatusLabel(moduleId)
+                  : module.status.replace(/_/g, " ")
+              }
+              tone={moduleStatusTone(module.status)}
+            />
           ) : null}
           <Button type="button" variant="ghost" size="sm" onClick={() => void onRetry()} disabled={loading}>
             {loading ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
@@ -171,7 +179,10 @@ export function DeliverabilityModuleShell({
         ) : null}
 
         {module?.status === "empty" ? (
-          <div className="rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">
+          <div
+            className="rounded-lg border border-dashed border-border bg-muted/20 p-3 text-sm text-muted-foreground"
+            data-setup-state={emptyModuleStatusLabel(moduleId)}
+          >
             {emptyContent ?? module.error?.message ?? "No live data connected for this module."}
           </div>
         ) : null}

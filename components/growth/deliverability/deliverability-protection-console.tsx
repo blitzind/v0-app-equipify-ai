@@ -25,6 +25,12 @@ import {
   type GrowthDeliverabilitySenderHealthModule,
   type GrowthDeliverabilitySequenceSafetyModule,
 } from "@/lib/growth/deliverability/deliverability-protection-console-types"
+import {
+  DELIVERABILITY_SETUP_ONBOARDING_MESSAGE,
+  GROWTH_DELIVERABILITY_SETUP_IN_PROGRESS_QA_MARKER,
+  hasDeliverabilitySetupInProgress,
+  isDeliverabilityConsoleDegraded,
+} from "@/lib/growth/deliverability/deliverability-console-state"
 import { GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_QA_MARKER } from "@/lib/growth/deliverability/reputation-protection-types"
 import { mailboxHealthStateLabel } from "@/lib/growth/deliverability/mailbox-health-score"
 import type { GrowthMailboxHealthState } from "@/lib/growth/deliverability/mailbox-health-score-types"
@@ -368,7 +374,9 @@ export function GrowthDeliverabilityProtectionConsole() {
   }, [loadHeader])
 
   const alerts = consoleSnapshot?.alerts ?? []
-  const degraded = consoleSnapshot?.degraded_mode ?? false
+  const degraded =
+    Boolean(headerError) || isDeliverabilityConsoleDegraded(consoleSnapshot?.modules)
+  const setupInProgress = hasDeliverabilitySetupInProgress(consoleSnapshot?.modules)
 
   return (
     <div
@@ -380,11 +388,19 @@ export function GrowthDeliverabilityProtectionConsole() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-3xl space-y-1">
           <p className="text-sm text-muted-foreground">
-            Operational deliverability console — each module loads independently with degraded-mode fallbacks.
+            Operational deliverability console — modules load independently; empty telemetry is normal during setup.
           </p>
+          {setupInProgress ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-qa={GROWTH_DELIVERABILITY_SETUP_IN_PROGRESS_QA_MARKER}
+            >
+              {DELIVERABILITY_SETUP_ONBOARDING_MESSAGE}
+            </p>
+          ) : null}
           {degraded ? (
             <p className="text-xs text-amber-800" data-qa={GROWTH_DELIVERABILITY_DEGRADED_MODE_QA_MARKER}>
-              Degraded mode: one or more modules are empty or unavailable. Working sections remain active below.
+              Degraded mode: one or more modules failed to load. Working sections remain active below.
             </p>
           ) : null}
         </div>
@@ -457,6 +473,7 @@ export function GrowthDeliverabilityProtectionConsole() {
         <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
           <p>Generated: {consoleSnapshot?.generated_at ?? "—"}</p>
           <p>Degraded mode: {degraded ? "yes" : "no"}</p>
+          <p>Setup in progress: {setupInProgress ? "yes" : "no"}</p>
           <p>Alert count: {alerts.length}</p>
           <p>{consoleSnapshot?.privacy_note}</p>
         </div>

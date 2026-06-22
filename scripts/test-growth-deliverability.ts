@@ -394,7 +394,11 @@ async function main(): Promise<void> {
     "app/api/platform/growth/deliverability/events/[id]/route.ts",
   ]) {
     const apiSource = fs.readFileSync(path.join(process.cwd(), route), "utf8")
-    assert.match(apiSource, /requireGrowthEnginePlatformAccess/)
+    assert.ok(
+      /requireGrowthEnginePlatformAccess/.test(apiSource) ||
+        /requireGrowthCommunicationsSettingsAccess/.test(apiSource),
+      `expected growth access guard in ${route}`,
+    )
   }
 
   assert.match(
@@ -415,7 +419,10 @@ async function main(): Promise<void> {
   )
   assert.match(consoleSource, /GROWTH_DELIVERABILITY_OPS_V2_QA_MARKER/)
   assert.match(consoleSource, /GROWTH_DELIVERABILITY_WIDGET_FALLBACK_QA_MARKER/)
+  assert.match(consoleSource, /GROWTH_DELIVERABILITY_SETUP_IN_PROGRESS_QA_MARKER/)
   assert.match(consoleSource, /GROWTH_DELIVERABILITY_DEGRADED_MODE_QA_MARKER/)
+  assert.match(consoleSource, /Degraded mode: one or more modules failed to load/)
+  assert.doesNotMatch(consoleSource, /one or more modules are empty or unavailable/)
   assert.match(consoleSource, /GROWTH_DELIVERABILITY_QUEUE_OPS_QA_MARKER/)
   assert.match(consoleSource, /GROWTH_DELIVERABILITY_SENDER_HEALTH_QA_MARKER/)
   assert.match(consoleSource, /GROWTH_DELIVERABILITY_DNS_HEALTH_QA_MARKER/)
@@ -428,7 +435,7 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(shellSource, /DeliverabilityModuleShell/)
-  assert.match(shellSource, /still_available/)
+  assert.match(shellSource, /emptyModuleStatusLabel/)
 
   const builderSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/deliverability/deliverability-protection-console.ts"),
@@ -437,6 +444,7 @@ async function main(): Promise<void> {
   assert.match(builderSource, /buildSenderHealthModule/)
   assert.match(builderSource, /buildQueueOpsModule/)
   assert.match(builderSource, /buildDeliverabilityOpsAlerts/)
+  assert.match(builderSource, /activeSendingDomainNames/)
   assert.match(builderSource, /safeModule/)
 
   const uiSource = fs.readFileSync(
@@ -445,7 +453,7 @@ async function main(): Promise<void> {
   )
   assert.match(uiSource, /GROWTH_DNS_SETUP_OPERATOR_READY_QA_MARKER/)
   assert.match(uiSource, /Setup checklist/)
-  assert.match(uiSource, /Validate domain/)
+  assert.match(uiSource, /Sending domains/)
   assert.match(uiSource, /GrowthOperatorDiagnosticsDisclosure/)
   assert.doesNotMatch(uiSource, /Stub-safe DNS intelligence/)
   assert.doesNotMatch(uiSource, /Coming Soon/)
