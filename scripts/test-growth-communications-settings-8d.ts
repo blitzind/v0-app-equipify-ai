@@ -20,7 +20,7 @@ function readSource(relativePath: string): string {
 }
 
 function main(): void {
-  assert.equal(GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER, "growth-communications-settings-8d-v1")
+  assert.equal(GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER, "growth-communications-settings-8k-v1")
 
   const apiAccessSource = readSource("lib/growth/settings/growth-workspace-settings-api-access.ts")
   assert.match(apiAccessSource, /growth-workspace-settings-api-access-8h-v1/)
@@ -89,7 +89,7 @@ function main(): void {
   assert.equal(GROWTH_COMMUNICATIONS_MAILBOXES_ONBOARD_PATH, "/growth/settings/communications/mailboxes/onboard")
   assert.equal(
     growthCommunicationsWarmupHref("sender-id"),
-    `${GROWTH_COMMUNICATIONS_WARMUP_PATH}?sender=sender-id`,
+    "/settings/growth-engine/warmup?sender=sender-id",
   )
 
   const aidenGuide = readSource("lib/growth/aiden/operator-guide.ts")

@@ -32,15 +32,13 @@ import {
 } from "lucide-react"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
 import {
-  GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH,
-  GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
-  GROWTH_COMMUNICATIONS_REPUTATION_PATH,
-  GROWTH_COMMUNICATIONS_SENDER_POOLS_PATH,
-  GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH,
   GROWTH_COMMUNICATIONS_SETTINGS_PATH,
-  GROWTH_COMMUNICATIONS_WARMUP_PATH,
   isGrowthCommunicationsSettingsPath,
 } from "@/lib/growth/navigation/growth-communications-settings-navigation"
+import {
+  growthEngineCustomerSettingsHref,
+  GROWTH_ENGINE_CUSTOMER_SETTINGS_BASE,
+} from "@/lib/growth/navigation/growth-workspace-settings-canonical"
 import {
   GROWTH_WORKSPACE_SETTINGS_ADVANCED_PATH,
   GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
@@ -144,7 +142,7 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
         description: "Overview of mailboxes, DNS, warmup, pools, and reputation settings.",
         segment: "communications",
         icon: Truck,
-        href: GROWTH_COMMUNICATIONS_SETTINGS_PATH,
+        href: growthEngineCustomerSettingsHref("connected-mailboxes"),
       },
       {
         id: "mailboxes",
@@ -152,7 +150,7 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
         description: "Connect Gmail or Microsoft mailboxes for outbound and inbox tracking.",
         segment: "communications/mailboxes",
         icon: Mailbox,
-        href: GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
+        href: growthEngineCustomerSettingsHref("connected-mailboxes"),
         adminFallbackSuffix: "communications",
         adminFallbackLabel: "Communications settings (admin)",
       },
@@ -162,7 +160,7 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
         description: "Add domains used for outbound email.",
         segment: "communications/sending-domains",
         icon: Globe,
-        href: GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH,
+        href: growthEngineCustomerSettingsHref("sending-domains"),
       },
       {
         id: "deliverability",
@@ -170,7 +168,7 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
         description: "Verify SPF, DKIM, DMARC, MX, and domain health.",
         segment: "communications/deliverability",
         icon: ShieldCheck,
-        href: GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH,
+        href: growthEngineCustomerSettingsHref("dns-verification"),
       },
       {
         id: "warmup",
@@ -178,7 +176,7 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
         description: "Ramp sending safely using native sequence sends, caps, and reputation tracking.",
         segment: "communications/warmup",
         icon: Flame,
-        href: GROWTH_COMMUNICATIONS_WARMUP_PATH,
+        href: growthEngineCustomerSettingsHref("warmup"),
       },
       {
         id: "sender-pools",
@@ -186,7 +184,7 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
         description: "Group senders for campaign rotation and limits.",
         segment: "communications/sender-pools",
         icon: Users,
-        href: GROWTH_COMMUNICATIONS_SENDER_POOLS_PATH,
+        href: growthEngineCustomerSettingsHref("sender-pools"),
       },
       {
         id: "reputation",
@@ -194,7 +192,7 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
         description: "Monitor bounce rate, reply rate, complaints, and sender/domain risk.",
         segment: "communications/reputation",
         icon: ShieldAlert,
-        href: GROWTH_COMMUNICATIONS_REPUTATION_PATH,
+        href: growthEngineCustomerSettingsHref("sending-limits"),
       },
     ],
   },
@@ -333,10 +331,11 @@ export function getGrowthWorkspaceSettingsSectionById(id: string): GrowthSetting
 
 export function isGrowthWorkspaceSettingsNavItemActive(pathname: string, item: GrowthSettingsNavItem): boolean {
   if (item.id === "communications") {
-    return pathname === GROWTH_COMMUNICATIONS_SETTINGS_PATH
+    return pathname === growthEngineCustomerSettingsHref("connected-mailboxes")
   }
   if (item.id === "mailboxes") {
-    return pathname === GROWTH_COMMUNICATIONS_MAILBOXES_PATH || pathname.startsWith(`${GROWTH_COMMUNICATIONS_MAILBOXES_PATH}/`)
+    const mailboxesHref = growthEngineCustomerSettingsHref("connected-mailboxes")
+    return pathname === mailboxesHref || pathname.startsWith(`${mailboxesHref}/`) || isGrowthCommunicationsSettingsPath(pathname)
   }
   if (item.id === "workspace") {
     return pathname === GROWTH_WORKSPACE_SETTINGS_WORKSPACE_PATH
@@ -346,6 +345,9 @@ export function isGrowthWorkspaceSettingsNavItemActive(pathname: string, item: G
   }
   if (item.id === "compliance") {
     return pathname === GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH
+  }
+  if (item.href.startsWith(GROWTH_ENGINE_CUSTOMER_SETTINGS_BASE)) {
+    return pathname === item.href || pathname.startsWith(`${item.href}/`)
   }
   if (isGrowthCommunicationsSettingsPath(pathname) && item.href.startsWith(GROWTH_COMMUNICATIONS_SETTINGS_PATH)) {
     return pathname === item.href || pathname.startsWith(`${item.href}/`)

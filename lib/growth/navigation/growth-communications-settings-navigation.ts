@@ -1,13 +1,14 @@
 /**
- * Growth workspace Communications settings routes (GS-GROWTH-SETTINGS-8C).
- * Client-safe path constants — no server-only imports.
+ * Growth workspace Communications settings routes (GS-GROWTH-SETTINGS-8C, 8K compatibility).
+ * Customer canonical paths: `/settings/growth-engine/*` via growth-workspace-settings-canonical.
  */
 
 import type { LucideIcon } from "lucide-react"
 import { Flame, Globe, Mailbox, ShieldAlert, ShieldCheck, Users } from "lucide-react"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
+import { growthEngineCustomerSettingsHref } from "@/lib/growth/navigation/growth-workspace-settings-canonical"
 
-export const GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER = "growth-communications-settings-8d-v1" as const
+export const GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER = "growth-communications-settings-8k-v1" as const
 
 export const GROWTH_COMMUNICATIONS_SETTINGS_PATH =
   `${GROWTH_WORKSPACE_BASE_PATH}/settings/communications` as const
@@ -53,7 +54,7 @@ export const GROWTH_COMMUNICATIONS_SETTINGS_CARDS: GrowthCommunicationsSettingsC
     id: "mailboxes",
     title: "Mailboxes",
     description: "Connect Gmail or Microsoft mailboxes for outbound and inbox tracking.",
-    href: GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
+    href: growthEngineCustomerSettingsHref("connected-mailboxes"),
     icon: Mailbox,
     adminFallbackHref: "/admin/growth/infrastructure/mailboxes",
   },
@@ -61,7 +62,7 @@ export const GROWTH_COMMUNICATIONS_SETTINGS_CARDS: GrowthCommunicationsSettingsC
     id: "sending-domains",
     title: "Sending Domains",
     description: "Add domains used for outbound email.",
-    href: GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH,
+    href: growthEngineCustomerSettingsHref("sending-domains"),
     icon: Globe,
     adminFallbackHref: "/admin/growth/infrastructure",
   },
@@ -69,7 +70,7 @@ export const GROWTH_COMMUNICATIONS_SETTINGS_CARDS: GrowthCommunicationsSettingsC
     id: "deliverability",
     title: "Deliverability & DNS",
     description: "Verify SPF, DKIM, DMARC, MX, and domain health.",
-    href: GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH,
+    href: growthEngineCustomerSettingsHref("dns-verification"),
     icon: ShieldCheck,
     adminFallbackHref: "/admin/growth/infrastructure/deliverability",
   },
@@ -78,7 +79,7 @@ export const GROWTH_COMMUNICATIONS_SETTINGS_CARDS: GrowthCommunicationsSettingsC
     title: "Warmup",
     description:
       "Ramp sending safely using native sequence sends, caps, pre-send guards, and reputation tracking.",
-    href: GROWTH_COMMUNICATIONS_WARMUP_PATH,
+    href: growthEngineCustomerSettingsHref("warmup"),
     icon: Flame,
     adminFallbackHref: "/admin/growth/infrastructure/warmup",
   },
@@ -86,7 +87,7 @@ export const GROWTH_COMMUNICATIONS_SETTINGS_CARDS: GrowthCommunicationsSettingsC
     id: "sender-pools",
     title: "Sender Pools",
     description: "Group senders for campaign rotation and limits.",
-    href: GROWTH_COMMUNICATIONS_SENDER_POOLS_PATH,
+    href: growthEngineCustomerSettingsHref("sender-pools"),
     icon: Users,
     adminFallbackHref: "/admin/growth/providers/sender-pools",
   },
@@ -94,7 +95,7 @@ export const GROWTH_COMMUNICATIONS_SETTINGS_CARDS: GrowthCommunicationsSettingsC
     id: "reputation",
     title: "Reputation",
     description: "Monitor bounce rate, reply rate, complaints, warmup score, and sender/domain risk.",
-    href: GROWTH_COMMUNICATIONS_REPUTATION_PATH,
+    href: growthEngineCustomerSettingsHref("sending-limits"),
     icon: ShieldAlert,
     adminFallbackHref: "/admin/growth/deliverability",
   },
@@ -105,6 +106,7 @@ export function isGrowthCommunicationsSettingsPath(pathname: string): boolean {
 }
 
 export function growthCommunicationsWarmupHref(senderId?: string): string {
-  if (!senderId) return GROWTH_COMMUNICATIONS_WARMUP_PATH
-  return `${GROWTH_COMMUNICATIONS_WARMUP_PATH}?sender=${encodeURIComponent(senderId)}`
+  const base = growthEngineCustomerSettingsHref("warmup")
+  if (!senderId) return base
+  return `${base}?sender=${encodeURIComponent(senderId)}`
 }

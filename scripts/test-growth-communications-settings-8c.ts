@@ -26,10 +26,10 @@ function readSource(relativePath: string): string {
 }
 
 function main(): void {
-  assert.equal(GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER, "growth-communications-settings-8d-v1")
-  assert.equal(GROWTH_DELIVERY_SETTINGS_QA_MARKER, "growth-delivery-settings-8c-v1")
+  assert.equal(GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER, "growth-communications-settings-8k-v1")
+  assert.equal(GROWTH_DELIVERY_SETTINGS_QA_MARKER, "growth-delivery-settings-8k-v1")
   assert.equal(GROWTH_DELIVERY_SETTINGS_PATH, GROWTH_COMMUNICATIONS_SETTINGS_PATH)
-  assert.equal(GROWTH_WORKSPACE_MAILBOXES_PATH, GROWTH_COMMUNICATIONS_MAILBOXES_PATH)
+  assert.equal(GROWTH_WORKSPACE_MAILBOXES_PATH, "/settings/growth-engine/connected-mailboxes")
 
   const routes = [
     "app/(growth)/growth/settings/communications/page.tsx",
@@ -59,15 +59,15 @@ function main(): void {
 
   const communicationsSection = getGrowthWorkspaceSettingsSectionById("communications")
   assert.ok(communicationsSection)
-  assert.equal(communicationsSection!.href, GROWTH_COMMUNICATIONS_SETTINGS_PATH)
+  assert.equal(communicationsSection!.href, "/settings/growth-engine/connected-mailboxes")
 
   const mailboxesNav = getGrowthWorkspaceSettingsSectionById("mailboxes")
   assert.ok(mailboxesNav)
-  assert.equal(mailboxesNav!.href, GROWTH_COMMUNICATIONS_MAILBOXES_PATH)
+  assert.equal(mailboxesNav!.href, "/settings/growth-engine/connected-mailboxes")
 
   const communications = GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS.find((group) => group.id === "communications")
   assert.ok(communications?.items.some((item) => item.id === "deliverability"))
-  assert.equal(GROWTH_WORKSPACE_DNS_VERIFICATION_PATH, "/growth/settings/communications/deliverability")
+  assert.equal(GROWTH_WORKSPACE_DNS_VERIFICATION_PATH, "/settings/growth-engine/dns-verification")
 
   const deliveryRedirect = readSource("app/(growth)/growth/settings/delivery/page.tsx")
   assert.match(deliveryRedirect, /redirect/)

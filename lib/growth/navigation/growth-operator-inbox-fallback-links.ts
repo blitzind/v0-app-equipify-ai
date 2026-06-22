@@ -11,6 +11,7 @@ import {
   growthWorkspacePipelineHref,
 } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import { GROWTH_WORKSPACE_CANONICAL_ALIASES } from "@/lib/growth/navigation/growth-workspace-cleanup-audit"
+import { growthEngineCustomerSettingsHref } from "@/lib/growth/navigation/growth-workspace-settings-canonical"
 
 export const GROWTH_OPERATOR_INBOX_FALLBACK_LINKS_QA_MARKER = "growth-operator-inbox-fallback-links-v1" as const
 
@@ -104,9 +105,9 @@ const ADMIN_CONTROL_PLANE_NOTIFICATION_TYPES = new Set([
 ])
 
 function resolveAdminControlPlaneFallback(notificationType: string, leadId?: string | null): string {
-  if (notificationType.startsWith("provider_")) return "/growth/settings/communications/mailboxes"
+  if (notificationType.startsWith("provider_")) return growthEngineCustomerSettingsHref("connected-mailboxes")
   if (notificationType === "sequence_failed") return GROWTH_CAMPAIGNS_HUB_SEQUENCES_HREF
-  if (notificationType === "suppression_blocked") return "/growth/settings/communications/reputation"
+  if (notificationType === "suppression_blocked") return growthEngineCustomerSettingsHref("sending-limits")
   if (notificationType.startsWith("dogfood_") || notificationType === "validation_complete") {
     return "/admin/growth/dogfood"
   }

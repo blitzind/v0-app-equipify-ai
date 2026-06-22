@@ -8,6 +8,7 @@ import type {
   GrowthInfrastructureReadinessCatalogEntry,
   GrowthInfrastructureReadinessStatus,
 } from "@/lib/growth/infrastructure/infrastructure-readiness-types"
+import { growthEngineCustomerSettingsHref } from "@/lib/growth/navigation/growth-workspace-settings-canonical"
 
 export const GROWTH_SEND_INFRASTRUCTURE_OPERATOR_READY_QA_MARKER =
   "growth-send-infrastructure-operator-ready-v1" as const
@@ -229,7 +230,7 @@ export function buildSendInfrastructureChecklist(
           : input.totalMailboxes > 0
             ? "Mailbox connections exist but none are fully connected yet."
             : "No mailbox providers connected yet.",
-      href: "/growth/settings/communications/mailboxes",
+      href: growthEngineCustomerSettingsHref("connected-mailboxes"),
     },
     {
       id: "sending_domain",
@@ -309,7 +310,7 @@ export function buildSendInfrastructureChecklist(
         : input.totalMailboxes > 0
           ? "Set daily send limits before scaling outbound volume."
           : "Connect mailboxes before configuring send caps.",
-      href: "/growth/settings/communications/mailboxes",
+      href: growthEngineCustomerSettingsHref("connected-mailboxes"),
     },
     {
       id: "live_dns",
@@ -440,7 +441,7 @@ export function buildSendInfrastructureProviderCards(
       mailboxesAttached: googleMailboxes.length,
       lastActivityLabel: snapshot.googleOAuthConfigured ? "OAuth configured" : "OAuth not configured",
       ctaLabel: snapshot.googleOAuthConfigured ? "Configure" : "Connect",
-      ctaHref: "/growth/settings/communications/mailboxes",
+      ctaHref: growthEngineCustomerSettingsHref("connected-mailboxes"),
       detail: snapshot.googleOAuthConfigured
         ? "Google Workspace send path is configured."
         : "Connect Google Workspace to send and sync replies.",
@@ -454,7 +455,7 @@ export function buildSendInfrastructureProviderCards(
         sanitizeInfrastructureReadinessDetailForOperator(microsoftEntry?.readiness.detail) ??
         "Microsoft 365 connection not configured.",
       ctaLabel: microsoftMailboxes.length > 0 ? "Configure" : "Connect",
-      ctaHref: "/growth/settings/communications/mailboxes",
+      ctaHref: growthEngineCustomerSettingsHref("connected-mailboxes"),
       detail: "Microsoft 365 mailbox integration for outbound and inbox sync.",
     },
     {
@@ -465,7 +466,7 @@ export function buildSendInfrastructureProviderCards(
       lastActivityLabel:
         smtpMailboxes.length > 0 ? `${smtpMailboxes.length} SMTP mailbox(es)` : "No SMTP mailboxes connected",
       ctaLabel: smtpMailboxes.length > 0 ? "Review issues" : "Connect",
-      ctaHref: "/growth/settings/communications/mailboxes",
+      ctaHref: growthEngineCustomerSettingsHref("connected-mailboxes"),
       detail: "SMTP/IMAP mailboxes for operator testing and alternate send paths.",
     },
     {
@@ -475,7 +476,7 @@ export function buildSendInfrastructureProviderCards(
       mailboxesAttached: customMailboxes.length,
       lastActivityLabel: customMailboxes.length > 0 ? "Custom mailboxes attached" : "Not connected",
       ctaLabel: customMailboxes.length > 0 ? "Configure" : "Connect",
-      ctaHref: "/growth/settings/communications/mailboxes",
+      ctaHref: growthEngineCustomerSettingsHref("connected-mailboxes"),
       detail: "Custom provider connections for specialized mailbox setups.",
     },
   ]

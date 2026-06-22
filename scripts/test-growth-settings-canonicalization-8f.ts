@@ -6,24 +6,14 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
 import {
-  GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH,
-  GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
-  GROWTH_COMMUNICATIONS_REPUTATION_PATH,
-  GROWTH_COMMUNICATIONS_SENDER_POOLS_PATH,
-  GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH,
-  GROWTH_COMMUNICATIONS_WARMUP_PATH,
-} from "../lib/growth/navigation/growth-communications-settings-navigation"
-import {
   GROWTH_CORE_SETTINGS_BILLING_PATH,
   GROWTH_CORE_SETTINGS_TEAM_PATH,
-  GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
   GROWTH_WORKSPACE_SETTINGS_WORKSPACE_PATH,
 } from "../lib/growth/navigation/growth-workspace-core-settings-links"
-import { GROWTH_WORKSPACE_BASE_PATH } from "../lib/growth/navigation/growth-route-metadata-types"
 import {
-  GROWTH_ENGINE_SECTION_BRIDGE_HREFS,
+  GROWTH_ENGINE_CUSTOMER_SETTINGS_BASE,
   GROWTH_WORKSPACE_SETTINGS_CANONICAL_QA_MARKER,
-  resolveGrowthEngineSettingsBridgeHref,
+  growthEngineCustomerSettingsHref,
 } from "../lib/growth/navigation/growth-workspace-settings-canonical"
 import {
   GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER,
@@ -36,7 +26,7 @@ function readSource(relativePath: string): string {
 }
 
 function main(): void {
-  assert.equal(GROWTH_WORKSPACE_SETTINGS_CANONICAL_QA_MARKER, "growth-workspace-settings-canonical-8j-v1")
+  assert.equal(GROWTH_WORKSPACE_SETTINGS_CANONICAL_QA_MARKER, "growth-workspace-settings-canonical-8k-v1")
   assert.equal(GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER, "growth-workspace-settings-nav-8f-v1")
 
   const workspaceGroup = GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS.find((group) => group.id === "workspace")
@@ -76,41 +66,37 @@ function main(): void {
   assert.match(growthEnginePage, /WorkspaceSettingsGrowthEngineSectionPage/)
 
   const sectionPage = readSource("components/settings/workspace-settings-growth-engine-section-page.tsx")
-  assert.match(sectionPage, /WorkspaceSettingsGrowthEngineBridgePanel/)
-  assert.match(sectionPage, /liftKind === "bridged"/)
+  assert.match(sectionPage, /getWorkspaceSettingsGrowthEngineLiftedPanel/)
+  assert.match(sectionPage, /liftKind === "lifted"/)
 
   assert.equal(
-    resolveGrowthEngineSettingsBridgeHref("connected-mailboxes"),
-    GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
+    growthEngineCustomerSettingsHref("connected-mailboxes"),
+    "/settings/growth-engine/connected-mailboxes",
   )
-  assert.ok(GROWTH_ENGINE_SECTION_BRIDGE_HREFS["connected-mailboxes"])
-  assert.equal(resolveGrowthEngineSectionLiftKind("connected-mailboxes"), "bridged")
+  assert.equal(resolveGrowthEngineSectionLiftKind("connected-mailboxes"), "lifted")
 
-  const growthSettingsNotificationsPath = `${GROWTH_WORKSPACE_BASE_PATH}/settings/notifications`
-  const growthSettingsAiPreferencesPath = `${GROWTH_WORKSPACE_BASE_PATH}/settings/ai-preferences`
-  const growthSettingsCalendarPreferencesPath = `${GROWTH_WORKSPACE_BASE_PATH}/settings/calendar-preferences`
-
-  const bridgeExpectations: Array<[string, string]> = [
-    ["connected-mailboxes", GROWTH_COMMUNICATIONS_MAILBOXES_PATH],
-    ["sending-domains", GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH],
-    ["dns-verification", GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH],
-    ["mailbox-health", GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH],
-    ["warmup", GROWTH_COMMUNICATIONS_WARMUP_PATH],
-    ["sender-pools", GROWTH_COMMUNICATIONS_SENDER_POOLS_PATH],
-    ["sending-limits", GROWTH_COMMUNICATIONS_REPUTATION_PATH],
-    ["notification-preferences", growthSettingsNotificationsPath],
-    ["copilot-preferences", growthSettingsAiPreferencesPath],
-    ["unsubscribe-settings", GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH],
-    ["suppression-lists", GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH],
-    ["compliance-rules", GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH],
-    ["meeting-preferences", growthSettingsCalendarPreferencesPath],
-    ["gmail", GROWTH_COMMUNICATIONS_MAILBOXES_PATH],
-    ["microsoft-365", GROWTH_COMMUNICATIONS_MAILBOXES_PATH],
+  const customerSettingsExpectations: Array<[string, string]> = [
+    ["connected-mailboxes", growthEngineCustomerSettingsHref("connected-mailboxes")],
+    ["sending-domains", growthEngineCustomerSettingsHref("sending-domains")],
+    ["dns-verification", growthEngineCustomerSettingsHref("dns-verification")],
+    ["mailbox-health", growthEngineCustomerSettingsHref("mailbox-health")],
+    ["warmup", growthEngineCustomerSettingsHref("warmup")],
+    ["sender-pools", growthEngineCustomerSettingsHref("sender-pools")],
+    ["sending-limits", growthEngineCustomerSettingsHref("sending-limits")],
+    ["notification-preferences", growthEngineCustomerSettingsHref("notification-preferences")],
+    ["copilot-preferences", growthEngineCustomerSettingsHref("copilot-preferences")],
+    ["unsubscribe-settings", growthEngineCustomerSettingsHref("unsubscribe-settings")],
+    ["suppression-lists", growthEngineCustomerSettingsHref("suppression-lists")],
+    ["compliance-rules", growthEngineCustomerSettingsHref("compliance-rules")],
+    ["meeting-preferences", growthEngineCustomerSettingsHref("meeting-preferences")],
+    ["gmail", growthEngineCustomerSettingsHref("gmail")],
+    ["microsoft-365", growthEngineCustomerSettingsHref("microsoft-365")],
   ]
-  for (const [sectionId, expectedHref] of bridgeExpectations) {
-    assert.equal(resolveGrowthEngineSettingsBridgeHref(sectionId), expectedHref, sectionId)
-    assert.equal(resolveGrowthEngineSectionLiftKind(sectionId), "bridged", sectionId)
+  for (const [sectionId, expectedHref] of customerSettingsExpectations) {
+    assert.equal(growthEngineCustomerSettingsHref(sectionId), expectedHref, sectionId)
+    assert.equal(resolveGrowthEngineSectionLiftKind(sectionId), "lifted", sectionId)
   }
+  assert.equal(GROWTH_ENGINE_CUSTOMER_SETTINGS_BASE, "/settings/growth-engine")
 
   const aiPage = readSource("app/(growth)/growth/settings/ai-preferences/page.tsx")
   assert.match(aiPage, /GrowthAiCopilotSettingsPanel/)
@@ -126,13 +112,13 @@ function main(): void {
   assert.doesNotMatch(shell, /delivery setup/i)
 
   const workspaceNav = readSource("lib/settings/workspace-settings-navigation.ts")
-  assert.match(workspaceNav, /GROWTH_COMMUNICATIONS_MAILBOXES_PATH/)
-  assert.match(workspaceNav, /GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH/)
+  assert.match(workspaceNav, /growthEngineHref\("connected-mailboxes"\)/)
+  assert.match(workspaceNav, /growthEngineHref\("unsubscribe-settings"\)/)
   assert.match(workspaceNav, /GROWTH_CANONICAL_NOTIFICATIONS_PATH/)
 
   const connectedDashboard = readSource("components/growth/mailboxes/growth-connected-mailboxes-dashboard.tsx")
   assert.doesNotMatch(connectedDashboard, /\/settings\/growth-engine\//)
-  assert.match(connectedDashboard, /GROWTH_COMMUNICATIONS_MAILBOXES_PATH/)
+  assert.match(connectedDashboard, /\/settings\/growth-engine/)
 
   assert.equal(GROWTH_WORKSPACE_SETTINGS_WORKSPACE_PATH, "/growth/settings/workspace")
   assert.equal(GROWTH_CORE_SETTINGS_TEAM_PATH, "/settings/team")
