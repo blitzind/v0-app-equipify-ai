@@ -1,3 +1,5 @@
+"use client"
+
 import { ShieldCheck } from "lucide-react"
 import { GrowthDeliverabilityDashboard } from "@/components/growth/growth-deliverability-dashboard"
 import { GrowthCommunicationsSettingsSection } from "@/components/growth/settings/growth-communications-settings-section"

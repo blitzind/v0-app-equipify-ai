@@ -1,3 +1,5 @@
+"use client"
+
 import { Mailbox } from "lucide-react"
 import { GrowthConnectedMailboxesDashboard } from "@/components/growth/mailboxes/growth-connected-mailboxes-dashboard"
 import { GrowthCommunicationsSettingsSection } from "@/components/growth/settings/growth-communications-settings-section"

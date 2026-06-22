@@ -13,7 +13,7 @@ import type { SessionIdentity } from "@/lib/session-identity"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 export const GROWTH_WORKSPACE_SETTINGS_PAGE_ACCESS_QA_MARKER =
-  "growth-workspace-settings-page-access-8d-v1" as const
+  "growth-workspace-settings-page-access-8h-v1" as const
 
 export type GrowthWorkspaceSettingsPageAccessResult =
   | {
@@ -41,6 +41,30 @@ async function isActiveGrowthWorkspaceOrgMember(
   return Boolean(data)
 }
 
+async function buildWorkspaceSettingsIdentity(
+  userId: string,
+  userEmail: string,
+  isPlatformAdmin: boolean,
+): Promise<SessionIdentity> {
+  const supabase = await createServerSupabaseClient()
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", userId)
+    .maybeSingle()
+
+  return {
+    authUserId: userId,
+    email: userEmail,
+    displayName: displayNameFromProfile(
+      (profile as { full_name?: string | null } | null)?.full_name,
+      userEmail,
+    ),
+    platformAdmin: isPlatformAdmin,
+    platformRoleLabel: isPlatformAdmin ? "Platform Admin" : "Growth Operator",
+  }
+}
+
 /**
  * Server gate for Growth workspace settings pages.
  * Platform admin OR active member of GROWTH_ENGINE_AI_ORG_ID when Growth Engine is enabled.
@@ -50,52 +74,65 @@ async function isActiveGrowthWorkspaceOrgMember(
 export async function resolveGrowthWorkspaceSettingsPageAccess(
   request?: Request,
 ): Promise<GrowthWorkspaceSettingsPageAccessResult> {
-  if (!isGrowthEngineEnabledEnv()) {
-    return { ok: false, reason: "feature_disabled" }
-  }
-
-  const resolution = await resolveGrowthEnginePlatformUserResolution(request)
-  const resolvedUser = resolution.resolved_user
-  if (!resolvedUser) {
-    return { ok: false, reason: "unauthenticated" }
-  }
-
-  const isPlatformAdmin = isPlatformAdminEmail(resolvedUser.userEmail)
-  const organizationId = getGrowthEngineAiOrgId()
-
-  let allowed = isPlatformAdmin
-  if (!allowed && organizationId) {
-    try {
-      const admin = createServiceRoleSupabaseClient()
-      allowed = await isActiveGrowthWorkspaceOrgMember(admin, resolvedUser.userId, organizationId)
-    } catch {
-      allowed = false
+  try {
+    const resolution = await resolveGrowthEnginePlatformUserResolution(request)
+    const resolvedUser = resolution.resolved_user
+    if (!resolvedUser) {
+      return { ok: false, reason: "unauthenticated" }
     }
-  }
 
-  if (!allowed) {
+    const isPlatformAdmin = isPlatformAdminEmail(resolvedUser.userEmail)
+    const organizationId = getGrowthEngineAiOrgId()
+
+    if (isPlatformAdmin) {
+      const identity = await buildWorkspaceSettingsIdentity(
+        resolvedUser.userId,
+        resolvedUser.userEmail,
+        true,
+      )
+      return {
+        ok: true,
+        identity,
+        isPlatformAdmin: true,
+        organizationId,
+      }
+    }
+
+    if (!isGrowthEngineEnabledEnv()) {
+      return { ok: false, reason: "feature_disabled" }
+    }
+
+    let allowed = false
+    if (organizationId) {
+      try {
+        const admin = createServiceRoleSupabaseClient()
+        allowed = await isActiveGrowthWorkspaceOrgMember(
+          admin,
+          resolvedUser.userId,
+          organizationId,
+        )
+      } catch {
+        allowed = false
+      }
+    }
+
+    if (!allowed) {
+      return { ok: false, reason: "forbidden" }
+    }
+
+    const identity = await buildWorkspaceSettingsIdentity(
+      resolvedUser.userId,
+      resolvedUser.userEmail,
+      false,
+    )
+
+    return {
+      ok: true,
+      identity,
+      isPlatformAdmin: false,
+      organizationId,
+    }
+  } catch {
     return { ok: false, reason: "forbidden" }
-  }
-
-  const supabase = await createServerSupabaseClient()
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("id", resolvedUser.userId)
-    .maybeSingle()
-
-  const identity: SessionIdentity = {
-    authUserId: resolvedUser.userId,
-    email: resolvedUser.userEmail,
-    displayName: displayNameFromProfile((profile as { full_name?: string | null } | null)?.full_name, resolvedUser.userEmail),
-    platformAdmin: isPlatformAdmin,
-    platformRoleLabel: isPlatformAdmin ? "Platform Admin" : "Growth Operator",
-  }
-
-  return {
-    ok: true,
-    identity,
-    isPlatformAdmin,
-    organizationId,
   }
 }

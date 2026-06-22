@@ -1,3 +1,5 @@
+"use client"
+
 import { Globe } from "lucide-react"
 import { GrowthSenderInfrastructureDashboard } from "@/components/growth/growth-sender-infrastructure-dashboard"
 import { GrowthCommunicationsSettingsSection } from "@/components/growth/settings/growth-communications-settings-section"

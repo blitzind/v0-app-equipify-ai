@@ -79,6 +79,15 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   if (shouldSkipMiddlewareAuth(pathname)) {
+    if (isGrowthWorkspacePath(pathname)) {
+      const requestHeaders = new Headers(request.headers)
+      requestHeaders.set("x-growth-pathname", pathname)
+      return NextResponse.next({
+        request: {
+          headers: requestHeaders,
+        },
+      })
+    }
     return NextResponse.next()
   }
 

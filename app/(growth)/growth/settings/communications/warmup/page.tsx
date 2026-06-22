@@ -1,3 +1,5 @@
+"use client"
+
 import { Suspense } from "react"
 import { Flame } from "lucide-react"
 import { GrowthWarmupDashboardPanel } from "@/components/growth/growth-warmup-dashboard"

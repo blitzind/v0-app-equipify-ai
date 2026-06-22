@@ -1,3 +1,5 @@
+"use client"
+
 import { ShieldAlert } from "lucide-react"
 import { GrowthReputationProtectionDashboardView } from "@/components/growth/growth-reputation-protection-dashboard"
 import { GrowthCommunicationsSettingsSection } from "@/components/growth/settings/growth-communications-settings-section"

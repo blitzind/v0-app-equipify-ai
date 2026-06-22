@@ -1,3 +1,5 @@
+"use client"
+
 import { Users } from "lucide-react"
 import { GrowthSenderPoolsDashboardView } from "@/components/growth/growth-sender-pools-dashboard"
 import { GrowthCommunicationsSettingsSection } from "@/components/growth/settings/growth-communications-settings-section"

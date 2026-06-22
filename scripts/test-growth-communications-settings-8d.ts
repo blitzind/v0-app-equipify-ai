@@ -23,10 +23,10 @@ function main(): void {
   assert.equal(GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER, "growth-communications-settings-8d-v1")
 
   const apiAccessSource = readSource("lib/growth/settings/growth-workspace-settings-api-access.ts")
-  assert.match(apiAccessSource, /growth-workspace-settings-api-access-8d-v1/)
+  assert.match(apiAccessSource, /growth-workspace-settings-api-access-8h-v1/)
 
   const pageAccessSource = readSource("lib/growth/settings/growth-workspace-settings-page-access.ts")
-  assert.match(pageAccessSource, /growth-workspace-settings-page-access-8d-v1/)
+  assert.match(pageAccessSource, /growth-workspace-settings-page-access-8h-v1/)
 
   const workspaceRoutes = [
     "app/(growth)/growth/settings/communications/page.tsx",
@@ -62,6 +62,7 @@ function main(): void {
   assert.match(connectedRedirect, /redirect/)
 
   const growthLayout = readSource("app/(growth)/layout.tsx")
+  assert.match(growthLayout, /loadPlatformAdminIdentity\(\)/)
   assert.match(growthLayout, /resolveGrowthWorkspaceSettingsPageAccess/)
   assert.match(growthLayout, /isGrowthCommunicationsSettingsPath/)
 

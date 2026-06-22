@@ -1,3 +1,5 @@
+"use client"
+
 import { Suspense } from "react"
 import { MailPlus } from "lucide-react"
 import { GrowthMailboxOnboardingWizard } from "@/components/growth/mailboxes/growth-mailbox-onboarding-wizard"

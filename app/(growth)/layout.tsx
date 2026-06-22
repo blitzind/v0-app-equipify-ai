@@ -21,21 +21,22 @@ export default async function GrowthRouteGroupLayout({ children }: { children: R
 
   const headersList = await headers()
   const pathname = headersList.get("x-growth-pathname") ?? ""
-  const communicationsSettingsRoute = isGrowthCommunicationsSettingsPath(pathname)
 
-  let identity: SessionIdentity | null = null
+  // Platform admin always passes — communications RBAC is a secondary gate for non-admins.
+  let identity: SessionIdentity | null = await loadPlatformAdminIdentity()
 
-  if (communicationsSettingsRoute) {
-    const access = await resolveGrowthWorkspaceSettingsPageAccess()
-    if (!access.ok) {
-      redirect(access.reason === "unauthenticated" ? "/login" : "/")
-    }
-    identity = access.identity
-  } else {
-    identity = await loadPlatformAdminIdentity()
-    if (!identity) {
+  if (!identity && isGrowthCommunicationsSettingsPath(pathname)) {
+    try {
+      const access = await resolveGrowthWorkspaceSettingsPageAccess()
+      if (!access.ok) {
+        redirect(access.reason === "unauthenticated" ? "/login" : "/")
+      }
+      identity = access.identity
+    } catch {
       redirect("/")
     }
+  } else if (!identity) {
+    redirect("/")
   }
 
   return (
