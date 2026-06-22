@@ -5,6 +5,31 @@ export const GROWTH_REPAIR_MAILBOX_LINKS_QA_MARKER = "growth-repair-mailbox-stal
 export const GROWTH_REPAIR_MAILBOX_LINKS_CONFIRM_ENV = "GROWTH_REPAIR_MAILBOX_LINKS_CONFIRM" as const
 export const GROWTH_REPAIR_MAILBOX_LINKS_CONFIRM_VALUE = "yes" as const
 
+/** CLI-safe structured log — no server-only / Next request imports. */
+export function logRepairMailboxLinkCliEvent(
+  event: "mailbox_repaired",
+  details: {
+    provider_family: string
+    sender_account_id: string | null
+    mailbox_connection_id: string
+    mailbox_owner_sender_id: string
+    sender_email: string | null
+  },
+): void {
+  const provider = details.provider_family === "microsoft" ? "microsoft" : "google"
+  console.log(
+    JSON.stringify({
+      qa_marker: GROWTH_REPAIR_MAILBOX_LINKS_QA_MARKER,
+      event: `growth_${provider}_oauth_${event}`,
+      provider,
+      sender_id: details.sender_account_id,
+      mailbox_id: details.mailbox_connection_id,
+      mailbox_sender_id: details.mailbox_owner_sender_id,
+      email: details.sender_email,
+    }),
+  )
+}
+
 export type StaleProviderMailboxLinkRow = {
   provider_family: string
   settings_id: string

@@ -12,6 +12,7 @@ import {
   GROWTH_REPAIR_MAILBOX_LINKS_QA_MARKER,
   auditStaleProviderMailboxLinks,
   repairStaleProviderMailboxLinks,
+  logRepairMailboxLinkCliEvent,
 } from "../lib/growth/provider-setup/repair-mailbox-stale-provider-links"
 
 function resolveMode(argv: string[]): "dry_run" | "confirm" | null {
@@ -67,15 +68,13 @@ async function main(): Promise<void> {
   }
 
   const result = await repairStaleProviderMailboxLinks(admin, { dryRun: false })
-  const { logProviderOAuthMailboxFlow } = await import("../lib/growth/provider-setup/oauth-mailbox-resolution")
   for (const row of result.cleared) {
-    const provider = row.provider_family === "microsoft" ? "microsoft" : "google"
-    logProviderOAuthMailboxFlow("mailbox_repaired", {
-      provider,
-      senderId: row.sender_account_id,
-      mailboxId: row.mailbox_connection_id,
-      mailboxSenderId: row.mailbox_owner_sender_id,
-      email: row.sender_email,
+    logRepairMailboxLinkCliEvent("mailbox_repaired", {
+      provider_family: row.provider_family,
+      sender_account_id: row.sender_account_id,
+      mailbox_connection_id: row.mailbox_connection_id,
+      mailbox_owner_sender_id: row.mailbox_owner_sender_id,
+      sender_email: row.sender_email,
     })
   }
   console.log(
@@ -83,7 +82,7 @@ async function main(): Promise<void> {
       {
         qa_marker: GROWTH_REPAIR_MAILBOX_LINKS_QA_MARKER,
         mode: "confirm",
-        cleared_count: result.cleared.length,
+        repaired_count: result.cleared.length,
         cleared: result.cleared,
       },
       null,
