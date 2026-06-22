@@ -16,11 +16,13 @@ export type CustomerDocumentFields = {
 
 export type CustomerContactRow = {
   company_name?: string | null
-  phone?: string | null
   billing_email?: string | null
   billing_contact_phone?: string | null
   default_po_number?: string | null
   billing_name?: string | null
+  /** Primary customer_contacts row when billing fields are empty. */
+  primary_contact_email?: string | null
+  primary_contact_phone?: string | null
 }
 
 /** Pure assembly used by loaders and regression tests. */
@@ -29,8 +31,9 @@ export function customerDocumentFieldsFromCustomerAndHierarchy(
   hierarchy: CustomerHierarchySummary | null,
 ): CustomerDocumentFields {
   const customerCompanyName = row.company_name?.trim() || "Customer"
-  const customerPhone = row.billing_contact_phone?.trim() || row.phone?.trim() || null
-  const customerEmail = row.billing_email?.trim() || null
+  const customerPhone =
+    row.billing_contact_phone?.trim() || row.primary_contact_phone?.trim() || null
+  const customerEmail = row.billing_email?.trim() || row.primary_contact_email?.trim() || null
   const poNumber = row.default_po_number?.trim() || null
 
   if (!hierarchy) {

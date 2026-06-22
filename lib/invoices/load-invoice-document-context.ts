@@ -9,6 +9,7 @@ import {
 import { formatBillingAddressPartsBlock, splitLineItemDescription } from "@/lib/documents/document-address"
 import { loadCustomerDocumentFields } from "@/lib/documents/load-customer-document-fields"
 import { resolveInvoiceBillToFields } from "@/lib/invoices/resolve-invoice-bill-to-fields"
+import { resolveInvoiceDocumentCustomerIds } from "@/lib/invoices/resolve-invoice-document-customer-ids"
 import { profileLabelById } from "@/lib/documents/profile-label"
 import { getOrganizationDocumentBranding } from "@/lib/organization/document-branding"
 import { getWorkOrderDisplay } from "@/lib/work-orders/display"
@@ -63,6 +64,7 @@ export async function loadInvoiceDocumentContext(
         "id",
         "organization_id",
         "customer_id",
+        "billing_customer_id",
         "equipment_id",
         "work_order_id",
         "calibration_record_id",
@@ -103,6 +105,7 @@ export async function loadInvoiceDocumentContext(
   const inv = invRow as unknown as {
     id: string
     customer_id: string
+    billing_customer_id?: string | null
     equipment_id: string | null
     work_order_id: string | null
     calibration_record_id?: string | null
@@ -140,10 +143,21 @@ export async function loadInvoiceDocumentContext(
     if (dbStatusLower === "void") return null
   }
 
-  const [branding, customerFields, authorName, equipRes, payRes, refundRes] = await Promise.all([
-    getOrganizationDocumentBranding(supabase, organizationId),
-    loadCustomerDocumentFields(supabase, organizationId, inv.customer_id),
-    profileLabelById(supabase, inv.created_by),
+  const { operationalCustomerId, billToCustomerId } = resolveInvoiceDocumentCustomerIds(
+    inv.customer_id,
+    inv.billing_customer_id,
+  )
+
+  const [branding, billToCustomerFields, serviceCustomerFields, authorName, equipRes, payRes, refundRes] =
+    await Promise.all([
+      getOrganizationDocumentBranding(supabase, organizationId),
+      billToCustomerId
+        ? loadCustomerDocumentFields(supabase, organizationId, billToCustomerId)
+        : Promise.resolve(null),
+      operationalCustomerId && operationalCustomerId !== billToCustomerId
+        ? loadCustomerDocumentFields(supabase, organizationId, operationalCustomerId)
+        : Promise.resolve(null),
+      profileLabelById(supabase, inv.created_by),
     inv.equipment_id ?
       supabase
         .from("equipment")
@@ -164,6 +178,9 @@ export async function loadInvoiceDocumentContext(
       .eq("org_invoice_id", invoiceId)
       .eq("status", "succeeded"),
   ])
+
+  const customerFieldsForBillTo = billToCustomerFields
+  const customerFieldsForService = serviceCustomerFields ?? billToCustomerFields
 
   let workOrderLabel: string | null = null
   let serviceDateLabel: string | null = null
@@ -270,7 +287,7 @@ export async function loadInvoiceDocumentContext(
       billing_postal_code: inv.billing_postal_code,
       billing_country: inv.billing_country,
     },
-    customerFields,
+    customerFieldsForBillTo,
   )
 
   const taxRateNum = inv.tax_rate_percent == null ? null : Number(inv.tax_rate_percent)
@@ -287,7 +304,7 @@ export async function loadInvoiceDocumentContext(
   return {
     organizationId,
     invoiceId: inv.id,
-    customerId: inv.customer_id,
+    customerId: operationalCustomerId ?? inv.customer_id,
     organizationName: branding.organizationName,
     documentLogoUrl: branding.documentLogoUrl,
     logoUrl: branding.appLogoUrl,
@@ -297,12 +314,14 @@ export async function loadInvoiceDocumentContext(
     companyEmail: branding.companyEmail,
     invoiceNumberLabel: String(inv.invoice_number ?? "").trim() || "Invoice",
     invoiceTitle: inv.title?.trim() ? inv.title.trim() : null,
-    customerCompanyName: customerFields?.customerCompanyName ?? "Customer",
-    customerPhone: customerFields?.customerPhone ?? (inv.billing_contact_phone?.trim() || null),
-    customerEmail: customerFields?.customerEmail ?? (inv.billing_contact_email?.trim() || null),
+    customerCompanyName: customerFieldsForBillTo?.customerCompanyName ?? "Customer",
+    customerPhone:
+      customerFieldsForBillTo?.customerPhone ?? (inv.billing_contact_phone?.trim() || null),
+    customerEmail:
+      customerFieldsForBillTo?.customerEmail ?? (inv.billing_contact_email?.trim() || null),
     billToName,
     billToAddressBlock,
-    serviceAddressBlock: customerFields?.serviceAddressBlock ?? null,
+    serviceAddressBlock: customerFieldsForService?.serviceAddressBlock ?? null,
     equipmentName,
     workOrderLabel,
     serviceDateLabel,
