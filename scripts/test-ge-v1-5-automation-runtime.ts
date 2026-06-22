@@ -283,13 +283,20 @@ function runLocalRegression(): void {
 }
 
 async function runProductionProbe(): Promise<void> {
-  bootstrapVerifiedChannelsCertEnv(PRODUCTION_ENV_SOURCES)
+  const boot = bootstrapVerifiedChannelsCertEnv({
+    sources: PRODUCTION_ENV_SOURCES,
+    protectedSnapshot: {
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
+      SUPABASE_URL: process.env.SUPABASE_URL ?? "",
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+    },
+  })
+  assert.ok(
+    boot,
+    "Production Supabase unavailable — link Supabase CLI project or ensure production env files contain a service_role JWT.",
+  )
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
-  assert.ok(url && key, "Production Supabase env required for --production probe")
-
-  const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+  const admin = createClient(boot!.url, boot!.jwt, { auth: { persistSession: false, autoRefreshToken: false } })
   const report = await buildGeV15ProviderReadinessReport(admin)
 
   assert.equal(report.qaMarker, GE_V1_5_AUTOMATION_RUNTIME_QA_MARKER)

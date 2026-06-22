@@ -102,4 +102,4 @@ export type GrowthWarmupDashboard = {
 }
 
 export const GROWTH_WARMUP_PRIVACY_NOTE =
-  "Native warmup counts approved sequence transport sends toward daily ramp caps. No peer warmup bots or synthetic inbox placement."
+  "Native warmup counts approved sequence transport and owned executor sends toward daily ramp caps. No peer warmup bots or synthetic inbox placement."

@@ -109,6 +109,10 @@
       "schedule": "15 0 * * *"
     },
     {
+      "path": "/api/cron/growth-warmup-send-executor",
+      "schedule": "0 13-21 * * *"
+    },
+    {
       "path": "/api/cron/growth-provider-runtime-diagnostics",
       "schedule": "0 0 1 1 *"
     },

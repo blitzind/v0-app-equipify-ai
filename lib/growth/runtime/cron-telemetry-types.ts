@@ -28,6 +28,7 @@ export const GROWTH_CRON_ROUTE_IDS = [
   "growth-lifecycle-maintenance",
   "growth-reputation-snapshot",
   "growth-warmup-progression",
+  "growth-warmup-send-executor",
   "growth-provider-runtime-diagnostics",
   "growth-pdl-test-lookup-run",
   "growth-pdl-coverage-audit-run",

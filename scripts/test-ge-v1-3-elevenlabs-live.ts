@@ -136,14 +136,20 @@ function runLocalRegression(): void {
 async function runProductionCertification(): Promise<void> {
   console.log("\n=== GE-v1-3 Production Certification ===\n")
 
-  const env = bootstrapVerifiedChannelsCertEnv({
-    confirmToken: GE_V1_3_ELEVENLABS_LIVE_CONFIRM,
-    envSources: PRODUCTION_ENV_SOURCES,
+  const boot = bootstrapVerifiedChannelsCertEnv({
+    sources: PRODUCTION_ENV_SOURCES,
+    protectedSnapshot: {
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
+      SUPABASE_URL: process.env.SUPABASE_URL ?? "",
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+    },
   })
-  assert.ok(env.supabaseUrl)
-  assert.ok(env.serviceRoleKey)
+  assert.ok(
+    boot,
+    "Production Supabase unavailable — link Supabase CLI project or ensure production env files contain a service_role JWT.",
+  )
 
-  const admin = createClient(env.supabaseUrl, env.serviceRoleKey, {
+  const admin = createClient(boot!.url, boot!.jwt, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 

@@ -37,6 +37,7 @@ import {
 } from "@/lib/growth/navigation/growth-communications-settings-navigation"
 import { GROWTH_WARMUP_PRIVACY_NOTE } from "@/lib/growth/warmup/warmup-types"
 import type { GrowthSenderAccount } from "@/lib/growth/sender/sender-types"
+import { GrowthWarmupExecutorPanel } from "@/components/growth/growth-warmup-executor-panel"
 
 const STATUS_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked"> = {
   new: "neutral",
@@ -453,6 +454,8 @@ export function GrowthWarmupDashboardPanel() {
           </table>
         </div>
       </GrowthEngineCard>
+
+      <GrowthWarmupExecutorPanel profiles={profiles} />
 
       <GrowthEngineCard title="Schedule Viewer">
         {!selectedProfile ? (
