@@ -9,11 +9,12 @@ import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-wor
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 import { Button } from "@/components/ui/button"
 import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
+import { resolveGrowthLeadIdFromSearchParams } from "@/lib/growth/navigation/growth-workspace-operator-links"
 
 export default function GrowthSharePagesWorkspacePage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const leadId = searchParams.get("lead_id")
+  const leadId = resolveGrowthLeadIdFromSearchParams(searchParams)
   const pageId = searchParams.get("page_id")
 
   return (
@@ -39,7 +40,7 @@ export default function GrowthSharePagesWorkspacePage() {
         <GrowthSharePageOperatorWorkspace leadId={leadId} initialPageId={pageId} />
       ) : (
         <div className="rounded-lg border p-4 text-sm text-muted-foreground">
-          Open this workspace with <code>?lead_id=</code> and optional <code>?page_id=</code> to review share pages
+          Open this workspace with <code>?leadId=</code> and optional <code>?page_id=</code> to review share pages
           for a lead.
         </div>
       )}

@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
 import { CalendarClock, Phone, Reply, UserRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
@@ -15,13 +14,11 @@ import { classificationLabel } from "@/lib/growth/inbox/reply-classifier"
 import {
   GROWTH_CAMPAIGNS_HUB_BOOKINGS_HREF,
 } from "@/lib/growth/hubs/growth-workspace-hub-paths"
-import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
-import { growthWorkspaceInboxWorkflowHref, growthWorkspaceLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
+import { growthWorkspaceInboxWorkflowHref, growthWorkspaceLeadHref, buildGrowthCallWorkspaceHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 
 export const GROWTH_INBOX_NEXT_BEST_ACTION_BAR_QA_MARKER = "growth-inbox-next-best-action-bar-v1" as const
 
 export function GrowthInboxNextBestActionBar() {
-  const pathname = usePathname()
   const { selectedThread } = useGrowthInboxWorkspace()
   const { copilot } = useGrowthInboxLeadContext()
 
@@ -30,7 +27,7 @@ export function GrowthInboxNextBestActionBar() {
   const recommended = resolveInboxNextBestAction(selectedThread)
   const replyConfidence = copilot?.confidenceTier ?? resolveInboxReplyConfidence(selectedThread)
   const meetingPropensity = resolveInboxMeetingPropensity(selectedThread)
-  const callsHref = `${growthFeaturePath(pathname, "calls")}?leadId=${encodeURIComponent(selectedThread.lead_id)}`
+  const callsHref = buildGrowthCallWorkspaceHref({ leadId: selectedThread.lead_id })
   const workflowHref = growthWorkspaceInboxWorkflowHref(selectedThread.lead_id)
   const leadHref = growthWorkspaceLeadHref(selectedThread.lead_id)
 

@@ -2,15 +2,22 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { ChevronRight, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import { GrowthCallIntelligenceScorecardCard } from "@/components/growth/growth-call-intelligence-scorecard-card"
 import { GrowthNativeDialerLaunchButton } from "@/components/growth/growth-native-dialer-launch-button"
+import { GrowthOpportunityNextBestActionCard } from "@/components/growth/growth-opportunity-next-best-action-card"
 import { GrowthPredictiveDealIntelligenceCard } from "@/components/growth/growth-predictive-deal-intelligence-card"
 import { nativeCallWorkspaceHref } from "@/lib/growth/native-dialer/native-dialer-navigation"
-import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
+import {
+  buildGrowthLeadHref,
+  buildGrowthActivityHref,
+  growthWorkspaceConversationsHref,
+  growthWorkspaceMeetingsHref,
+  resolveGrowthLeadIdFromSearchParams,
+} from "@/lib/growth/navigation/growth-workspace-operator-links"
 import type {
   GrowthOpportunity,
   GrowthOpportunityDetail,
@@ -86,8 +93,6 @@ function OpportunityDetailPanel({
   loading: boolean
   onStageChange: (stageKey: string) => Promise<void>
 }) {
-  const pathname = usePathname()
-
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -135,6 +140,8 @@ function OpportunityDetailPanel({
         </div>
       ) : null}
 
+      <GrowthOpportunityNextBestActionCard leadId={detail.leadId} companyName={detail.companyName} />
+
       <GrowthPredictiveDealIntelligenceCard
         opportunityId={detail.id}
         leadId={detail.leadId}
@@ -179,11 +186,26 @@ function OpportunityDetailPanel({
 
       <div className="flex flex-wrap items-center gap-3">
         <Link
-          href={`${growthFeaturePath(pathname, "leads")}?leadId=${detail.leadId}`}
+          href={buildGrowthLeadHref(detail.leadId)}
           className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:underline"
         >
           Open linked lead
           <ChevronRight className="size-4" />
+        </Link>
+        <Link
+          href={growthWorkspaceConversationsHref({ leadId: detail.leadId })}
+          className="text-sm text-muted-foreground hover:underline"
+        >
+          Conversations
+        </Link>
+        <Link href={buildGrowthActivityHref({ leadId: detail.leadId })} className="text-sm text-muted-foreground hover:underline">
+          Activity
+        </Link>
+        <Link
+          href={growthWorkspaceMeetingsHref(detail.leadId)}
+          className="text-sm text-muted-foreground hover:underline"
+        >
+          Meetings
         </Link>
         <GrowthNativeDialerLaunchButton leadId={detail.leadId} label="Call workspace" size="sm" variant="outline" />
         <Link href={nativeCallWorkspaceHref({ leadId: detail.leadId })} className="text-sm text-muted-foreground hover:underline">
@@ -195,6 +217,7 @@ function OpportunityDetailPanel({
 }
 
 export function GrowthOpportunityPipelineDashboard() {
+  const searchParams = useSearchParams()
   const [dashboard, setDashboard] = useState<GrowthOpportunityPipelineDashboard | null>(null)
   const [items, setItems] = useState<GrowthOpportunity[]>([])
   const [view, setView] = useState<GrowthOpportunityPipelineView>("all_pipeline")
@@ -260,6 +283,18 @@ export function GrowthOpportunityPipelineDashboard() {
   useEffect(() => {
     void load(view)
   }, [load, view])
+
+  useEffect(() => {
+    const opportunityId = searchParams.get("opportunityId")
+    const leadId = resolveGrowthLeadIdFromSearchParams(searchParams)
+    if (opportunityId) {
+      setSelectedId(opportunityId)
+      return
+    }
+    if (!leadId || items.length === 0) return
+    const match = items.find((item) => item.leadId === leadId)
+    if (match) setSelectedId(match.id)
+  }, [items, searchParams])
 
   useEffect(() => {
     if (!selectedId) {

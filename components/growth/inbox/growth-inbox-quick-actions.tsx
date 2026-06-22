@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
+import { buildGrowthCallWorkspaceHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import { Archive, ClipboardList, Phone, Reply, Target, UserPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -26,7 +25,6 @@ type GrowthInboxQuickActionsProps = {
 }
 
 export function GrowthInboxQuickActions({ mode = "all" }: GrowthInboxQuickActionsProps) {
-  const pathname = usePathname()
   const { selectedThread, actionLoading, runAction, assignOwner, archiveThread } = useGrowthInboxWorkspace()
   const { leadId, refreshRecommendations, refreshWorkflow } = useGrowthInboxLeadContext()
   const [taskLoading, setTaskLoading] = useState<string | null>(null)
@@ -146,7 +144,7 @@ export function GrowthInboxQuickActions({ mode = "all" }: GrowthInboxQuickAction
                 </a>
               </Button>
               <Button type="button" size="sm" variant="outline" className="justify-start" asChild>
-                <Link href={`${growthFeaturePath(pathname, "calls")}?leadId=${encodeURIComponent(leadId)}`}>
+                <Link href={buildGrowthCallWorkspaceHref({ leadId })}>
                   <Phone className="mr-1.5 size-3.5" />
                   Call
                 </Link>

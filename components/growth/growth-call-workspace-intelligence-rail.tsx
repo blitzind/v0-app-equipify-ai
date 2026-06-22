@@ -31,7 +31,7 @@ import {
 } from "@/lib/growth/native-dialer/native-dialer-workspace-ui"
 import { GROWTH_NATIVE_DIALER_LEAD_SEARCH_QA_MARKER } from "@/lib/growth/native-dialer/call-workspace-lead-search-types"
 import { GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
-import { commandLeadFocusHref } from "@/lib/growth/command/command-action-catalog"
+import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import type { UnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/types"
 import type { VoiceRelationshipMemoryWorkspaceSnapshot } from "@/lib/voice/relationship-memory/types"
 import { VOICE_RELATIONSHIP_MEMORY_QA_MARKER } from "@/lib/voice/relationship-memory/types"
@@ -240,7 +240,7 @@ export function GrowthCallWorkspaceIntelligenceRail({
               <p className="truncate text-xs text-muted-foreground">{leadContext.companyName}</p>
             </div>
             <Button asChild size="sm" variant="outline" className="h-7 shrink-0 px-2 text-xs">
-              <Link href={commandLeadFocusHref(leadContext.leadId, "command")}>View Lead</Link>
+              <Link href={buildGrowthLeadHref(leadContext.leadId, { focus: "command" })}>View Lead</Link>
             </Button>
           </div>
 

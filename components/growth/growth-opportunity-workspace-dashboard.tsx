@@ -5,9 +5,11 @@ import Link from "next/link"
 import { Bot, Loader2, RefreshCw, Target, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { GrowthOpportunityNextBestActionCard } from "@/components/growth/growth-opportunity-next-best-action-card"
 import { GrowthVoiceRevenueIntelligencePassiveCard } from "@/components/growth/growth-voice-revenue-intelligence-passive-card"
 import { GrowthVoiceRetentionIntelligencePassiveCard } from "@/components/growth/growth-voice-retention-intelligence-passive-card"
 import { GrowthPersonalizationEmbeddedPanel } from "@/components/growth/personalization/embedded/growth-personalization-embedded-panel"
+import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import {
   GROWTH_OPPORTUNITY_WORKSPACE_VIEWS,
   GROWTH_REVENUE_INTELLIGENCE_PRIVACY_NOTE,
@@ -142,7 +144,7 @@ export function GrowthOpportunityWorkspaceDashboard() {
                   <button type="button" className="font-medium text-indigo-600 hover:underline" onClick={() => setSelectedLeadId(item.leadId)}>
                     Revenue copilot
                   </button>
-                  <Link href={`/admin/growth/leads?leadId=${item.leadId}`} className="font-medium text-indigo-600 hover:underline">
+                  <Link href={buildGrowthLeadHref(item.leadId)} className="font-medium text-indigo-600 hover:underline">
                     Open lead
                   </Link>
                 </div>
@@ -158,6 +160,7 @@ export function GrowthOpportunityWorkspaceDashboard() {
             <p className="text-sm text-muted-foreground">Select an account above for AI-assisted revenue intelligence (human executes all actions).</p>
           ) : (
             <div className="space-y-3 text-sm">
+              <GrowthOpportunityNextBestActionCard leadId={selectedLeadId} />
               <GrowthVoiceRevenueIntelligencePassiveCard leadId={selectedLeadId} compact />
               <GrowthVoiceRetentionIntelligencePassiveCard leadId={selectedLeadId} compact />
               <GrowthBadge label={copilot.assistedLabel} tone="attention" />

@@ -41,7 +41,7 @@ function runAudit(): void {
   console.log("  ✓ workspace inbox href builder")
 
   const leadHref = growthWorkspaceLeadHref("00000000-0000-4000-8000-000000000001")
-  assert.equal(leadHref, "/growth/leads/00000000-0000-4000-8000-000000000001")
+  assert.equal(leadHref, "/growth/leads/crm?open=00000000-0000-4000-8000-000000000001")
   console.log("  ✓ workspace lead href builder")
 
   const replyNotifications = readSource("lib/growth/reply-intelligence/reply-intelligence-notifications.ts")

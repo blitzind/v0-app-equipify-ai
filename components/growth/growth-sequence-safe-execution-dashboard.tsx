@@ -193,8 +193,21 @@ export function GrowthSequenceSafeExecutionDashboard({
   }
 
   return (
-    <div className="space-y-6">
-      <GrowthEngineCard title="Execution Jobs" icon={<ShieldCheck className="size-4" />}>
+    <div className="space-y-6" data-qa-marker={GROWTH_SEQUENCE_SAFE_EXECUTION_QA_MARKER}>
+      <div className="rounded-lg border border-slate-200 bg-slate-50/90 px-4 py-3 text-sm text-slate-900">
+        <p className="font-semibold">Control-plane review — admin approval queue</p>
+        <p className="mt-1 text-slate-700">
+          Sequence send approval lives here for platform administrators. This is not the primary operator outreach
+          workspace — use Inbox, Personalization, and Calls for day-to-day operator execution.
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <GrowthBadge label="Admin approval queue" tone="attention" />
+          <GrowthBadge label="Sequence send approval" tone="neutral" />
+          <GrowthBadge label="Control-plane review" tone="neutral" />
+        </div>
+      </div>
+
+      <GrowthEngineCard title="Sequence send approval" icon={<ShieldCheck className="size-4" />}>
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
           <div className="flex items-start gap-2">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" />

@@ -1,10 +1,7 @@
 "use client"
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
 import { lazy, Suspense, useState } from "react"
-import { CalendarClock, ChevronDown, Loader2, Phone, Reply, UserRound } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { ChevronDown, Loader2 } from "lucide-react"
 import { GrowthInboxActionCenterBookingEmbed } from "@/components/growth/inbox/growth-inbox-action-center-booking-embed"
 import { GrowthInboxActionCenterOpportunityEmbed } from "@/components/growth/inbox/growth-inbox-action-center-opportunity-embed"
 import { GrowthInboxActionCenterReplyDraftEmbed } from "@/components/growth/inbox/growth-inbox-action-center-reply-draft-embed"
@@ -21,11 +18,6 @@ import {
   GROWTH_INBOX_FINAL_POLISH_QA_MARKER,
 } from "@/lib/growth/hubs/growth-inbox-conversation-workspace-config"
 import { shouldDeferGrowthInboxTier3Hydration } from "@/lib/growth/inbox/growth-inbox-minimal-runtime-contract"
-import {
-  GROWTH_CAMPAIGNS_HUB_BOOKINGS_HREF,
-} from "@/lib/growth/hubs/growth-workspace-hub-paths"
-import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
-import { growthWorkspaceInboxWorkflowHref, growthWorkspaceLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 
@@ -58,45 +50,6 @@ function SidebarCard({
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-2 border-t border-border/60 px-2.5 py-2">{children}</CollapsibleContent>
     </Collapsible>
-  )
-}
-
-function GrowthInboxNextBestActionLinks() {
-  const pathname = usePathname()
-  const { selectedThread } = useGrowthInboxWorkspace()
-  if (!selectedThread) return null
-
-  const callsHref = `${growthFeaturePath(pathname, "calls")}?leadId=${encodeURIComponent(selectedThread.lead_id)}`
-  const workflowHref = growthWorkspaceInboxWorkflowHref(selectedThread.lead_id)
-  const leadHref = growthWorkspaceLeadHref(selectedThread.lead_id)
-
-  return (
-    <div className="grid grid-cols-2 gap-1.5">
-      <Button type="button" size="sm" variant="default" className="h-7 justify-start text-xs" asChild>
-        <Link href={workflowHref}>
-          <Reply className="mr-1 size-3" aria-hidden />
-          Reply
-        </Link>
-      </Button>
-      <Button type="button" size="sm" variant="outline" className="h-7 justify-start text-xs" asChild>
-        <Link href={callsHref}>
-          <Phone className="mr-1 size-3" aria-hidden />
-          Call
-        </Link>
-      </Button>
-      <Button type="button" size="sm" variant="outline" className="h-7 justify-start text-xs" asChild>
-        <Link href={GROWTH_CAMPAIGNS_HUB_BOOKINGS_HREF}>
-          <CalendarClock className="mr-1 size-3" aria-hidden />
-          Book Meeting
-        </Link>
-      </Button>
-      <Button type="button" size="sm" variant="ghost" className="h-7 justify-start text-xs" asChild>
-        <Link href={leadHref}>
-          <UserRound className="mr-1 size-3" aria-hidden />
-          Open Lead
-        </Link>
-      </Button>
-    </div>
   )
 }
 
@@ -149,7 +102,9 @@ export function GrowthInboxIntelligenceSidebar() {
         </SidebarCard>
 
         <SidebarCard title="Next Best Action" sectionId="inbox-sidebar-next-best-action">
-          <GrowthInboxNextBestActionLinks />
+          <p className="text-[10px] text-muted-foreground">
+            Primary handoff actions live in the conversation header and context strip.
+          </p>
           <GrowthInboxRecommendedReplyCard compact />
           <GrowthInboxActionCenterReplyDraftEmbed />
           {selectedThread.channel === "sms" ? (

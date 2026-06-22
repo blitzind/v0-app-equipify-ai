@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ExternalLink, MessageSquare, Workflow } from "lucide-react"
+import { Activity, ExternalLink, MessageSquare, Phone, Sparkles, UserRound, Workflow } from "lucide-react"
 import { GrowthPersonalizationEmbeddedPanel } from "@/components/growth/personalization/embedded/growth-personalization-embedded-panel"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthActionRequiredBadge } from "@/components/growth/growth-ui-utils"
@@ -11,6 +11,11 @@ import {
   hasInboxConversationIntelligencePreview,
 } from "@/lib/growth/inbox/inbox-conversation-intelligence-read-model"
 import {
+  buildGrowthActivityHref,
+  buildGrowthCallWorkspaceHref,
+  buildGrowthLeadHref,
+  buildGrowthPersonalizationHref,
+  GROWTH_OPS_HANDOFF_6C_QA_MARKER,
   growthWorkspaceConversationsHref,
   growthWorkspaceInboxHref,
   growthWorkspaceInboxWorkflowHref,
@@ -32,6 +37,7 @@ export function GrowthInboxConversationIntelligenceContextStrip() {
     <div
       className="shrink-0 space-y-2 border-b border-border bg-muted/20 px-4 py-3"
       data-qa-marker={GROWTH_INBOX_CONVERSATION_INTELLIGENCE_CONTEXT_STRIP_QA_MARKER}
+      data-growth-ops-handoff={GROWTH_OPS_HANDOFF_6C_QA_MARKER}
     >
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Conversation context</p>
@@ -51,6 +57,30 @@ export function GrowthInboxConversationIntelligenceContextStrip() {
       ) : null}
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" variant="outline" className="h-7 text-xs" asChild>
+          <Link href={buildGrowthLeadHref(leadId)}>
+            <UserRound className="mr-1 size-3" />
+            Open Lead
+          </Link>
+        </Button>
+        <Button type="button" size="sm" variant="outline" className="h-7 text-xs" asChild>
+          <Link href={buildGrowthCallWorkspaceHref({ leadId })}>
+            <Phone className="mr-1 size-3" />
+            Call
+          </Link>
+        </Button>
+        <Button type="button" size="sm" variant="outline" className="h-7 text-xs" asChild>
+          <Link href={buildGrowthPersonalizationHref(leadId)}>
+            <Sparkles className="mr-1 size-3" />
+            Personalization
+          </Link>
+        </Button>
+        <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" asChild>
+          <Link href={buildGrowthActivityHref({ leadId })}>
+            <Activity className="mr-1 size-3" />
+            Activity
+          </Link>
+        </Button>
+        <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" asChild>
           <Link href={preview.conversationsHref}>
             <MessageSquare className="mr-1 size-3" />
             View Conversation

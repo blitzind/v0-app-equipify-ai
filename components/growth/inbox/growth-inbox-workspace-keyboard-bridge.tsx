@@ -1,15 +1,14 @@
 "use client"
 
 import { useCallback } from "react"
-import { usePathname, useRouter } from "next/navigation"
-import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
+import { useRouter } from "next/navigation"
+import { buildGrowthCallWorkspaceHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import { GrowthInboxKeyboardWorkflow } from "@/components/growth/inbox/growth-inbox-keyboard-workflow"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
 
 export function GrowthInboxWorkspaceKeyboardBridge() {
   const router = useRouter()
-  const pathname = usePathname()
   const { selectedThreadId, runAction, assignOwner, archiveThread } = useGrowthInboxWorkspace()
   const { leadId, refreshWorkflow } = useGrowthInboxLeadContext()
 
@@ -25,8 +24,8 @@ export function GrowthInboxWorkspaceKeyboardBridge() {
 
   const onCall = useCallback(() => {
     if (!leadId) return
-    router.push(`${growthFeaturePath(pathname, "calls")}?leadId=${encodeURIComponent(leadId)}`)
-  }, [leadId, pathname, router])
+    router.push(buildGrowthCallWorkspaceHref({ leadId }))
+  }, [leadId, router])
 
   const onReply = useCallback(() => {
     const draftSection = document.getElementById("inbox-reply-draft")

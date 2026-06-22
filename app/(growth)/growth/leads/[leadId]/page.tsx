@@ -1,19 +1,10 @@
-"use client"
-
-import { use } from "react"
-import { GrowthLeadOperatorWorkspace } from "@/components/growth/lead-operator/growth-lead-operator-workspace"
-import { useGrowthBreadcrumbDetail } from "@/components/growth/shell/growth-breadcrumb-context"
-import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
+import { redirect } from "next/navigation"
+import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 
 type PageProps = { params: Promise<{ leadId: string }> }
 
-export default function GrowthLeadOperatorPage({ params }: PageProps) {
-  const { leadId } = use(params)
-  useGrowthBreadcrumbDetail(leadId)
-
-  return (
-    <GrowthWorkspacePageContent>
-      <GrowthLeadOperatorWorkspace leadId={leadId} />
-    </GrowthWorkspacePageContent>
-  )
+/** Legacy lead detail path — canonical operator surface is CRM drawer (`?open=`). */
+export default async function GrowthLeadDetailRedirectPage({ params }: PageProps) {
+  const { leadId } = await params
+  redirect(buildGrowthLeadHref(leadId))
 }

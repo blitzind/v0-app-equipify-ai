@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
 import { CalendarClock, Phone, Reply, UserRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
@@ -24,8 +23,7 @@ import { classificationLabel } from "@/lib/growth/inbox/reply-classifier"
 import {
   GROWTH_CAMPAIGNS_HUB_BOOKINGS_HREF,
 } from "@/lib/growth/hubs/growth-workspace-hub-paths"
-import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
-import { growthWorkspaceInboxWorkflowHref, growthWorkspaceLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
+import { growthWorkspaceInboxWorkflowHref, growthWorkspaceLeadHref, buildGrowthCallWorkspaceHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 
 export const GROWTH_INBOX_CONVERSATION_HEADER_QA_MARKER = "growth-inbox-conversation-header-v2" as const
 
@@ -65,14 +63,13 @@ function GrowthInboxCrmSummaryStrip() {
 }
 
 export function GrowthInboxConversationHeader() {
-  const pathname = usePathname()
   const { selectedThread } = useGrowthInboxWorkspace()
 
   if (!selectedThread) return null
 
   const { company, contact } = parseInboxLeadLabelParts(selectedThread.lead_label)
   const statusLabels = resolveInboxStatusBadgeLabels(selectedThread)
-  const callsHref = `${growthFeaturePath(pathname, "calls")}?leadId=${encodeURIComponent(selectedThread.lead_id)}`
+  const callsHref = buildGrowthCallWorkspaceHref({ leadId: selectedThread.lead_id })
   const workflowHref = growthWorkspaceInboxWorkflowHref(selectedThread.lead_id)
   const leadHref = growthWorkspaceLeadHref(selectedThread.lead_id)
 

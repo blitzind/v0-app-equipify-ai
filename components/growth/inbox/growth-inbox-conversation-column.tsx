@@ -1,6 +1,7 @@
 "use client"
 
 import { GrowthInboxConversationEmptyState } from "@/components/growth/inbox/growth-inbox-conversation-empty-state"
+import { GrowthInboxConversationIntelligenceContextStrip } from "@/components/growth/inbox/growth-inbox-conversation-intelligence-context-strip"
 import { GrowthInboxConversationHeader } from "@/components/growth/inbox/growth-inbox-conversation-header"
 import { GrowthInboxConversationThreadOps } from "@/components/growth/inbox/growth-inbox-conversation-thread-ops"
 import { GrowthInboxConversationTimeline } from "@/components/growth/inbox/growth-inbox-conversation-timeline"
@@ -27,6 +28,7 @@ export function GrowthInboxConversationColumn() {
       data-growth-inbox-final-polish={GROWTH_INBOX_FINAL_POLISH_QA_MARKER}
     >
       <GrowthInboxConversationHeader />
+      <GrowthInboxConversationIntelligenceContextStrip />
       <GrowthInboxConversationTimeline />
 
       {syncDetail?.sequenceExitCandidate ? (
