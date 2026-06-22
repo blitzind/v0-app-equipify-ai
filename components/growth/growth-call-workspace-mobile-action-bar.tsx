@@ -3,6 +3,7 @@
 import { Phone, PhoneOff, PhoneForwarded, Shield, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { VoiceWorkspaceContextSnapshot } from "@/lib/voice/workspace-context/types"
+import { GrowthStickyActionBar } from "@/components/growth/shell/growth-workspace-shell"
 import { cn } from "@/lib/utils"
 
 export function GrowthCallWorkspaceMobileActionBar({
@@ -28,15 +29,13 @@ export function GrowthCallWorkspaceMobileActionBar({
   if (elevated.length === 0 && workspaceContext.mode === "idle") return null
 
   return (
-    <div
-      className={cn(
-        "fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-background/95 px-3 py-2 backdrop-blur lg:hidden",
-        className,
-      )}
+    <GrowthStickyActionBar
+      ariaLabel="Call workspace actions"
+      className={cn("lg:hidden", className)}
+      innerClassName="mx-auto flex max-w-lg items-center justify-around gap-2 px-3 py-2"
       data-qa-action="call-workspace-mobile-action-bar"
       data-workspace-mode={workspaceContext.mode}
     >
-      <div className="mx-auto flex max-w-lg items-center justify-around gap-2">
         {elevated.some((a) => a.id === "dial") ? (
           <Button type="button" size="sm" onClick={onDial} disabled={disabled}>
             <Phone className="mr-1 size-4" />
@@ -78,7 +77,6 @@ export function GrowthCallWorkspaceMobileActionBar({
             End
           </Button>
         ) : null}
-      </div>
-    </div>
+    </GrowthStickyActionBar>
   )
 }

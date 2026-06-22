@@ -9,6 +9,7 @@ import { GrowthSendrLaunchCompleteStep } from "@/components/growth/sendr/growth-
 import { GrowthSendrLaunchPageStep } from "@/components/growth/sendr/growth-sendr-launch-page-step"
 import { GrowthSendrLaunchPreviewStep } from "@/components/growth/sendr/growth-sendr-launch-preview-step"
 import { GrowthSendrLaunchSequenceStep } from "@/components/growth/sendr/growth-sendr-launch-sequence-step"
+import { GrowthWizardActionRow } from "@/components/growth/shell/growth-workspace-shell"
 import type {
   GrowthSendrLaunchPreviewResult,
   GrowthSendrLaunchRunProgress,
@@ -325,7 +326,7 @@ export function GrowthSendrLaunchWizard() {
               </div>
             </div>
             {launchError ? <p className="text-destructive">{launchError}</p> : null}
-            <div className="flex flex-wrap gap-2 pt-2">
+            <GrowthWizardActionRow className="pt-2">
               {launchProgress.nextAction === "continue" ? (
                 <Button onClick={() => void runLaunchContinue()} disabled={busy}>
                   Continue
@@ -334,7 +335,7 @@ export function GrowthSendrLaunchWizard() {
               <Button variant="outline" onClick={() => void runLaunchCancel()} disabled={busy}>
                 Cancel launch
               </Button>
-            </div>
+            </GrowthWizardActionRow>
           </div>
         ) : null}
 
@@ -350,14 +351,14 @@ export function GrowthSendrLaunchWizard() {
         ) : null}
 
         {step !== "complete" && step !== "launching" ? (
-          <div className="flex justify-between gap-2">
+          <GrowthWizardActionRow>
             <Button variant="outline" onClick={goBack} disabled={stepIndex <= 0 || busy}>
               Back
             </Button>
             <Button onClick={goNext} disabled={!canNext || busy || previewLoading}>
               {step === "confirm" ? "Launch enrollment" : "Continue"}
             </Button>
-          </div>
+          </GrowthWizardActionRow>
         ) : null}
       </CardContent>
     </Card>

@@ -32,6 +32,8 @@ import {
   type GrowthVideoPagePreviewModel,
 } from "@/components/growth/videos/growth-video-page-preview-card"
 import { GrowthVideoPageStepCard } from "@/components/growth/videos/growth-video-page-step-card"
+import { GrowthStickyActionBar } from "@/components/growth/shell/growth-workspace-shell"
+import { GrowthWorkspaceSafeArea } from "@/components/growth/shell/growth-workspace-shell"
 import { useGrowthVideoAssetsForPages } from "@/components/growth/videos/use-growth-video-pages"
 import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import {
@@ -187,10 +189,7 @@ export function GrowthVideoPageCreatePanel() {
   }
 
   return (
-    <div
-      className="mx-auto w-full max-w-[1200px] pb-24"
-      data-qa-marker={GROWTH_VIDEO_FOUNDATION_QA_MARKER}
-    >
+    <GrowthWorkspaceSafeArea variant="sticky-footer" className="mx-auto w-full max-w-[1200px]" data-qa-marker={GROWTH_VIDEO_FOUNDATION_QA_MARKER}>
       <header className="mb-6 flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -206,9 +205,14 @@ export function GrowthVideoPageCreatePanel() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          <Button type="button" variant="outline" size="sm" disabled title="Coming soon">
-            <Sparkles className="mr-1.5 size-4" aria-hidden />
-            Generate With AI
+          <Button type="button" variant="outline" size="sm" asChild>
+            <Link
+              href={growthFeaturePath(pathname, "sendr/new")}
+              title="AI page generation lives in Personalized Videos — operator review required before publish"
+            >
+              <Sparkles className="mr-1.5 size-4" aria-hidden />
+              Generate With AI
+            </Link>
           </Button>
           <Button
             type="button"
@@ -511,25 +515,20 @@ export function GrowthVideoPageCreatePanel() {
         </aside>
       </div>
 
-      <footer
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
-        aria-label="Page actions"
-      >
-        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <Button type="button" variant="ghost" asChild>
-            <Link href={growthFeaturePath(pathname, "videos/pages")}>Cancel</Link>
+      <GrowthStickyActionBar ariaLabel="Page actions">
+        <Button type="button" variant="ghost" asChild>
+          <Link href={growthFeaturePath(pathname, "videos/pages")}>Cancel</Link>
+        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" onClick={scrollToPreview}>
+            Preview
           </Button>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" onClick={scrollToPreview}>
-              Preview
-            </Button>
-            <Button type="submit" form={FORM_ID} disabled={!canSubmit}>
-              {submitting ? <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden /> : null}
-              Save Draft
-            </Button>
-          </div>
+          <Button type="submit" form={FORM_ID} disabled={!canSubmit}>
+            {submitting ? <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden /> : null}
+            Save Draft
+          </Button>
         </div>
-      </footer>
-    </div>
+      </GrowthStickyActionBar>
+    </GrowthWorkspaceSafeArea>
   )
 }

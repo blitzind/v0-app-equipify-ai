@@ -187,6 +187,7 @@ import {
   safeFetchJson,
 } from "@/lib/growth/prospect-search/prospect-search-safe-fetch-json"
 import { ProspectSearchPeopleBulkActionBar } from "@/components/growth/prospect-search/prospect-search-people-bulk-action-bar"
+import { GrowthStickyActionBar } from "@/components/growth/shell/growth-workspace-shell"
 import { ProspectSearchContactEvidenceDrawer } from "@/components/growth/prospect-search/prospect-search-contact-evidence-drawer"
 import { enrichPeopleRowWithIdentityReview } from "@/components/growth/prospect-search/prospect-search-contact-identity-panel"
 import { applyProspectSearchContactIdentityOperatorReview } from "@/lib/growth/prospect-search/prospect-search-contact-identity-operator-review"
@@ -2420,7 +2421,11 @@ function ProspectSearchShellInner() {
 
       {selectedCompany &&
       (discoveryMode === "internal" ? hasSearched : searchCompleted) ? (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 backdrop-blur md:hidden">
+        <GrowthStickyActionBar
+          ariaLabel="Prospect workflow actions"
+          className="md:hidden"
+          innerClassName="mx-auto max-w-lg p-3"
+        >
           <ProspectWorkflowLauncher
             company={selectedCompany}
             query={query}
@@ -2437,7 +2442,7 @@ function ProspectSearchShellInner() {
               })
             }
           />
-        </div>
+        </GrowthStickyActionBar>
       ) : null}
 
       <ProspectSearchContactEvidenceDrawer
