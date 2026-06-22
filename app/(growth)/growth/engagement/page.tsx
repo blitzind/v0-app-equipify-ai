@@ -2,8 +2,7 @@
 
 import { Activity } from "lucide-react"
 import { GrowthEngagementCommandCenter } from "@/components/growth/engagement/growth-engagement-command-center"
-import { GrowthEngagementDashboardPanel } from "@/components/growth/engagement/growth-engagement-dashboard"
-import { GrowthEngagementDashboard as GrowthLeadEngagementDashboard } from "@/components/growth/growth-engagement-dashboard"
+import { GrowthUnifiedEngagementFeed } from "@/components/growth/engagement/growth-unified-engagement-feed"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 
@@ -11,34 +10,15 @@ export default function GrowthEngagementPage() {
   return (
     <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
-        title="Engagement Dashboard"
-        description="Share page, media, CTA, Q&A, conversational, and booking handoff engagement — read-only rollup, no outreach execution."
+        title="Engagement"
+        description="One command center for prospect engagement — video views, CTAs, replies, bookings, and high-intent signals."
         icon={Activity}
         iconClassName="bg-emerald-50 text-emerald-600"
       />
 
       <div className="space-y-8">
+        <GrowthUnifiedEngagementFeed limit={50} />
         <GrowthEngagementCommandCenter />
-
-        <section className="space-y-3 border-t border-border pt-8">
-          <div>
-            <h2 className="text-lg font-semibold">Engagement dashboard panels</h2>
-            <p className="text-sm text-muted-foreground">
-              S4-A through S4-D detailed panels preserved alongside the unified command center workspace.
-            </p>
-          </div>
-          <GrowthEngagementDashboardPanel />
-        </section>
-
-        <section className="space-y-3 border-t border-border pt-8">
-          <div>
-            <h2 className="text-lg font-semibold">Lead engagement intelligence</h2>
-            <p className="text-sm text-muted-foreground">
-              Cross-channel lead scoring and queue prioritization (Slice 5.4A) — preserved alongside S4-A rollups.
-            </p>
-          </div>
-          <GrowthLeadEngagementDashboard />
-        </section>
       </div>
     </GrowthWorkspacePageContent>
   )

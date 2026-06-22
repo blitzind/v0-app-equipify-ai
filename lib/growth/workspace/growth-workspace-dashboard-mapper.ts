@@ -191,7 +191,7 @@ export function buildGrowthWorkspaceDashboardViewModel(
     {
       label: "Active campaigns",
       value: activeTemplates,
-      href: `${GROWTH_WORKSPACE_BASE_PATH}/campaigns`,
+      href: `${GROWTH_WORKSPACE_BASE_PATH}/campaigns/sequences`,
       emptyHint: "No active campaigns",
     },
     {
@@ -203,14 +203,53 @@ export function buildGrowthWorkspaceDashboardViewModel(
     {
       label: "Executions today",
       value: executionsToday,
-      href: `${GROWTH_WORKSPACE_BASE_PATH}/campaigns`,
+      href: `${GROWTH_WORKSPACE_BASE_PATH}/campaigns/sequences`,
       emptyHint: "No executions today",
     },
     {
       label: "Approval queue",
       value: approvalQueueCount,
-      href: `${GROWTH_WORKSPACE_BASE_PATH}/campaigns`,
+      href: `${GROWTH_WORKSPACE_BASE_PATH}/campaigns/sequences`,
       emptyHint: "Approval queue clear",
+    },
+  ]
+
+  const operatorActionCards = [
+    ...(approvalQueueCount > 0
+      ? [
+          {
+            id: "approve-sends",
+            title: "Approve pending sends",
+            description: `${approvalQueueCount} sequence step(s) waiting for human approval.`,
+            href: `${GROWTH_WORKSPACE_BASE_PATH}/campaigns/sequences`,
+          },
+        ]
+      : []),
+    ...(leadsNeedingAction > 0
+      ? [
+          {
+            id: "review-leads",
+            title: "Review leads needing action",
+            description: `${leadsNeedingAction} lead(s) in your priority queue.`,
+            href: `${GROWTH_WORKSPACE_BASE_PATH}/leads`,
+          },
+        ]
+      : []),
+    ...(hotCompanies > 0
+      ? [
+          {
+            id: "monitor-engagement",
+            title: "Monitor hot engagement",
+            description: `${hotCompanies} high-intent signal(s) in the last 7 days.`,
+            href: `${GROWTH_WORKSPACE_BASE_PATH}/engagement`,
+          },
+        ]
+      : []),
+    {
+      id: "launch-runbook",
+      title: "Follow the launch runbook",
+      description: "Repeatable path from prospect search to booked demo.",
+      href: `${GROWTH_WORKSPACE_BASE_PATH}/runbook`,
     },
   ]
 
@@ -263,6 +302,7 @@ export function buildGrowthWorkspaceDashboardViewModel(
       description,
       shortcut,
     })),
+    operatorActionCards,
     sections: [
       {
         id: "my-queue",

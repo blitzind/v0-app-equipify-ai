@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { growthAiVoiceGenerateSchema } from "@/lib/growth/media/growth-ai-voice-generation-api-schema"
 import { createGrowthAiVoiceGenerationJob } from "@/lib/growth/media/growth-ai-voice-generation-service"
 import { GROWTH_AI_VOICE_GENERATION_QA_MARKER } from "@/lib/growth/media/growth-ai-voice-generation-types"
+import { mapGeV13ProspectFromApiBody } from "@/lib/growth/media/ge-v1-3-api-utils"
 import {
   mapGrowthMediaGenerationApiError,
   requireGrowthMediaGenerationPlatformAccess,
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
         provider: parsed.data.provider ?? "elevenlabs",
         settings: parsed.data.settings,
         dryRun: parsed.data.dry_run,
+        prospect: mapGeV13ProspectFromApiBody(parsed.data),
       },
     })
 

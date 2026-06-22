@@ -3,7 +3,15 @@
 import { useCallback, useEffect, useState } from "react"
 import { Bot, Check, Copy, Loader2, Sparkles, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { GrowthOutreachPersonalizationPreview } from "@/components/growth/growth-outreach-personalization-preview"
+import { GrowthOutboundSenderContextBadge } from "@/components/growth/signatures/growth-outbound-sender-context-badge"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type {
@@ -12,6 +20,7 @@ import type {
 } from "@/lib/growth/ai-copilot-types"
 import type { GrowthOutreachQueueItem } from "@/lib/growth/outreach/outreach-queue-types"
 import type { GrowthLead } from "@/lib/growth/types"
+import type { GrowthSenderProfilesDashboardPayload } from "@/lib/growth/signatures/signature-types"
 
 type GrowthAiCopilotProps = {
   lead: GrowthLead
@@ -62,6 +71,8 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [queueItems, setQueueItems] = useState<GrowthOutreachQueueItem[]>([])
   const [queueEventsById, setQueueEventsById] = useState<Record<string, Array<{ eventType: string; createdAt: string }>>>({})
+  const [senderProfiles, setSenderProfiles] = useState<GrowthSenderProfilesDashboardPayload["profiles"]>([])
+  const [selectedSenderAccountId, setSelectedSenderAccountId] = useState<string>("__default__")
 
   const loadQueueItems = useCallback(async () => {
     try {
@@ -107,6 +118,12 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
   useEffect(() => {
     void load()
     void loadQueueItems()
+    void fetch("/api/platform/growth/sender-profiles/dashboard", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data: { dashboard?: GrowthSenderProfilesDashboardPayload }) => {
+        setSenderProfiles(data.dashboard?.profiles ?? [])
+      })
+      .catch(() => undefined)
   }, [load, loadQueueItems])
 
   async function generate(generationType: GrowthAiCopilotGenerationType) {
@@ -116,7 +133,12 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
       const res = await fetch(`/api/platform/growth/leads/${lead.id}/copilot/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ generationType }),
+        body: JSON.stringify({
+          generationType,
+          ...(selectedSenderAccountId && selectedSenderAccountId !== "__default__"
+            ? { senderAccountId: selectedSenderAccountId }
+            : {}),
+        }),
       })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
@@ -230,6 +252,26 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
           Advisory drafts only — human approval required. Deterministic intelligence remains authoritative. No auto-send.
         </p>
 
+        {senderProfiles.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Write as sender</p>
+            <Select value={selectedSenderAccountId} onValueChange={setSelectedSenderAccountId}>
+              <SelectTrigger className="max-w-md">
+                <SelectValue placeholder="Default outbound sender" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__default__">Default outbound sender</SelectItem>
+                {senderProfiles.map((row) => (
+                  <SelectItem key={row.profile.id} value={row.profile.sender_account_id}>
+                    {row.profile.display_name}
+                    {row.profile.title ? ` — ${row.profile.title}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+
         <div>
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Generate email</p>
           <div className="flex flex-wrap gap-2">
@@ -310,6 +352,9 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
               {generations.slice(0, 5).map((entry) => {
                 const expanded = expandedId === entry.id
                 const sourceAttribution = playbookSourceAttributionLabel(entry.playbookAttribution)
+                const outboundIdentity = entry.inputSnapshot?.outboundIdentity as
+                  | { displayName?: string; title?: string | null }
+                  | undefined
                 return (
                   <li key={entry.id} className="rounded-lg border border-border p-3 text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -326,6 +371,7 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
                         {sourceAttribution ? (
                           <GrowthBadge label={`Influenced by: ${sourceAttribution}`} tone="neutral" />
                         ) : null}
+                        <GrowthOutboundSenderContextBadge identity={outboundIdentity} />
                       </div>
                       <div className="flex flex-wrap gap-1">
                         <Button
@@ -415,9 +461,11 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
                             audit={entry.classification.personalization}
                             generatedSubject={entry.generatedSubject}
                             generatedContent={entry.generatedContent}
+                            outboundIdentity={outboundIdentity}
                           />
                         ) : (
                           <>
+                            <GrowthOutboundSenderContextBadge identity={outboundIdentity} />
                             {entry.generatedSubject ? (
                               <p className="font-medium">Subject: {entry.generatedSubject}</p>
                             ) : null}

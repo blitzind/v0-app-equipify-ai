@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { growthAiAvatarGenerateSchema } from "@/lib/growth/media/growth-ai-avatar-generation-api-schema"
 import { createGrowthAiAvatarGenerationJob } from "@/lib/growth/media/growth-ai-avatar-generation-service"
 import { GROWTH_AI_AVATAR_GENERATION_QA_MARKER } from "@/lib/growth/media/growth-ai-avatar-generation-types"
+import { mapGeV13ProspectFromApiBody } from "@/lib/growth/media/ge-v1-3-api-utils"
 import {
   mapGrowthMediaGenerationApiError,
   requireGrowthMediaGenerationPlatformAccess,
@@ -32,6 +33,8 @@ export async function POST(request: Request) {
         voiceMediaAssetId: parsed.data.voice_media_asset_id ?? null,
         settings: parsed.data.settings,
         dryRun: parsed.data.dry_run,
+        prospect: mapGeV13ProspectFromApiBody(parsed.data),
+        attachToPageOnComplete: parsed.data.attach_to_page_on_complete ?? false,
       },
     })
 

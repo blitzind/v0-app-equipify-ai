@@ -2,6 +2,8 @@
 
 import { formatPlaybookRulesForCopilotPrompt } from "@/lib/growth/ai-copilot-playbook-prompts"
 import type { GrowthAiCopilotPlaybookResolvedRule } from "@/lib/growth/ai-copilot-playbook-types"
+import type { GrowthOutboundIdentityContext } from "@/lib/growth/signatures/outbound-identity-types"
+import { buildGrowthOutboundIdentitySystemPromptAppendix } from "@/lib/growth/signatures/outbound-sender-persona-instructions"
 import type { GrowthAiCopilotGenerationType } from "@/lib/growth/ai-copilot-types"
 import type {
   OutreachPersonalizationDraft,
@@ -15,9 +17,14 @@ import { buildGrowthPlaybookOrchestratedPrompt } from "@/lib/growth/playbooks/na
 import { buildGrowthNarrativeBriefPromptBlock } from "@/lib/growth/reasoning/growth-reasoning-diagnostics"
 import { buildGrowthSequenceGuidancePromptBlock } from "@/lib/growth/sequence-intelligence/growth-sequence-diagnostics"
 
-export function buildOutreachRefinementSystemPrompt(maxWords: number): string {
+export function buildOutreachRefinementSystemPrompt(
+  maxWords: number,
+  outboundIdentity?: GrowthOutboundIdentityContext | null,
+): string {
+  const identityBlock = buildGrowthOutboundIdentitySystemPromptAppendix(outboundIdentity)
   return [
     "You refine pre-written B2B outreach copy for Equipify Growth Engine.",
+    identityBlock,
     "You may ONLY smooth wording, improve flow, improve readability, reduce spam language, and vary phrasing.",
     "You must NOT invent research, website findings, pain points, company facts, metrics, or personalization.",
     "Do NOT add compliments, urgency, hype, or claims not present in the deterministic draft or allowed facts list.",
@@ -40,6 +47,7 @@ export function buildOutreachRefinementUserPrompt(input: {
   generationType?: GrowthAiCopilotGenerationType
   maxWords: number
   avoidRepeatingTopics?: string[]
+  outboundIdentity?: GrowthOutboundIdentityContext | null
 }): string {
   const verifiedFacts = input.verifiedFacts ?? input.industryContext?.verifiedFacts ?? []
   const industryFacts = input.industryFacts ?? input.industryContext?.industryFacts ?? []
@@ -135,6 +143,14 @@ export function buildOutreachRefinementUserPrompt(input: {
       })),
       allowedFacts: input.allowedFacts,
       avoidRepeatingTopics: input.avoidRepeatingTopics ?? [],
+      outboundIdentity: input.outboundIdentity
+        ? {
+            displayName: input.outboundIdentity.displayName,
+            title: input.outboundIdentity.title,
+            company: input.outboundIdentity.company,
+            personaKey: input.outboundIdentity.personaKey,
+          }
+        : undefined,
     },
     null,
     2,

@@ -61,6 +61,8 @@ import {
 } from "@/lib/growth/ai-copilot-playbook-repository"
 import { resolveGrowthAiCopilotPlaybookRules } from "@/lib/growth/ai-copilot-playbook-resolver"
 import { prepareOutboundEmailContent } from "@/lib/growth/signatures/outbound-signature-runtime"
+import { resolveGrowthOutboundIdentityContext } from "@/lib/growth/signatures/outbound-identity-context"
+import type { GrowthOutboundIdentityContext } from "@/lib/growth/signatures/outbound-identity-types"
 import { applyOutboundEmailTracking } from "@/lib/growth/tracking/tracking-links"
 
 export type RunGrowthAiCopilotGenerationInput = {
@@ -72,6 +74,11 @@ export type RunGrowthAiCopilotGenerationInput = {
   snapshotOverrides?: Partial<GrowthAiCopilotInputSnapshot>
   actingUserId: string
   actingUserEmail: string
+  senderAccountId?: string | null
+  senderProfileId?: string | null
+  sequencePatternStepId?: string | null
+  sequencePatternId?: string | null
+  organizationId?: string | null
 }
 
 export type RunGrowthAiCopilotGenerationResult =
@@ -121,10 +128,18 @@ export async function runGrowthAiCopilotGeneration(
   }
 
   const promptVariant = input.promptVariant ?? settings.aiCopilotDefaultPromptVariant
+  const outboundIdentity = await resolveGrowthOutboundIdentityContext(input.admin, {
+    senderAccountId: input.senderAccountId,
+    senderProfileId: input.senderProfileId,
+    sequencePatternStepId: input.sequencePatternStepId,
+    sequencePatternId: input.sequencePatternId,
+    organizationId: input.organizationId,
+  })
   const snapshot = {
     ...(await buildGrowthAiCopilotInput(input.admin, lead, {
       sourceReplyId: input.sourceReplyId,
     })),
+    ...(outboundIdentity ? { outboundIdentity: serializeOutboundIdentityForSnapshot(outboundIdentity) } : {}),
     ...(input.snapshotOverrides ?? {}),
   }
   const inputHash = growthAiCopilotInputHash({
@@ -161,6 +176,7 @@ export async function runGrowthAiCopilotGeneration(
       maxWords: settings.outreachPersonalizationMaxWords,
       aiRefinementEnabled: settings.aiCopilotEnabled,
       playbookRules: playbookResolution.rules,
+      outboundIdentity,
     })
 
     const mapped = {
@@ -322,6 +338,7 @@ export async function runGrowthAiCopilotGeneration(
     input.generationType,
     promptVariant,
     playbookResolution.rules,
+    outboundIdentity,
   )
   const industryContextBase = await buildOutreachIndustryContextForLead(input.admin, lead)
   const reasoningChannel: GrowthReasoningChannel = input.generationType.startsWith("call_")
@@ -350,6 +367,7 @@ export async function runGrowthAiCopilotGeneration(
   const userPrompt = buildGrowthAiCopilotUserPrompt(input.generationType, snapshot, {
     industryContext,
     narrativeContext: industryContext.narrativeContext,
+    outboundIdentity,
   })
 
   const aiResult = await provider.generate({
@@ -550,6 +568,22 @@ export async function discardGrowthAiCopilotGeneration(
   })
 
   return updated
+}
+
+function serializeOutboundIdentityForSnapshot(
+  identity: GrowthOutboundIdentityContext,
+): GrowthAiCopilotInputSnapshot["outboundIdentity"] {
+  return {
+    senderAccountId: identity.senderAccountId,
+    senderProfileId: identity.senderProfileId,
+    displayName: identity.displayName,
+    title: identity.title,
+    company: identity.company,
+    website: identity.website,
+    email: identity.email,
+    personaKey: identity.personaKey,
+    personaInstructions: identity.personaInstructions,
+  }
 }
 
 const AI_COPILOT_UNSUBSCRIBE_FOOTER =

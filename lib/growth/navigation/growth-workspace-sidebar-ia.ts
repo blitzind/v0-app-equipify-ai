@@ -5,25 +5,22 @@
  * Config, control-plane, reporting, and admin routes stay in Platform Admin / Cmd+K.
  */
 
-export const GROWTH_WORKSPACE_SIDEBAR_IA_QA_MARKER = "growth-workspace-sidebar-ia-v2" as const
+export const GROWTH_WORKSPACE_SIDEBAR_IA_QA_MARKER = "growth-workspace-sidebar-ia-v3" as const
 
-/** Operator-facing nav ids visible in the Growth workspace sidebar. */
+/** Operator-facing nav ids visible in the Growth workspace sidebar (GE-v1-2 daily workflow). */
 export const GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS = [
   "dashboard",
   "leads",
   "audiences",
+  "personalized-videos",
   "campaigns",
   "inbox",
   "calls",
   "meetings",
-  "personalized-videos",
-  "media-assets",
-  "automation-flows",
-  "opportunities",
+  "settings",
+  "runbook",
   "activity",
   "engagement",
-  "conversations",
-  "relationships",
 ] as const
 
 /** Nav ids removed from workspace sidebar — routes remain in registry, Cmd+K, and direct URLs. */
@@ -42,10 +39,15 @@ export const GROWTH_WORKSPACE_SIDEBAR_HIDDEN_NAV_IDS = [
   "personalization",
   "videos",
   "opportunities-pipeline",
+  "media-assets",
+  "automation-flows",
+  "opportunities",
+  "conversations",
+  "relationships",
 ] as const
 
-/** Workspace sidebar group ids after Phase 5A IA cleanup. */
-export const GROWTH_WORKSPACE_SIDEBAR_GROUP_IDS = ["workspace", "content", "automation", "intelligence"] as const
+/** Workspace sidebar group ids after GE-v1-2 operator IA cleanup. */
+export const GROWTH_WORKSPACE_SIDEBAR_GROUP_IDS = ["workspace", "intelligence"] as const
 
 /** Registry route ids that must never appear in the workspace sidebar manifest. */
 export const GROWTH_WORKSPACE_SIDEBAR_FORBIDDEN_REGISTRY_ROUTE_IDS = [
@@ -55,7 +57,6 @@ export const GROWTH_WORKSPACE_SIDEBAR_FORBIDDEN_REGISTRY_ROUTE_IDS = [
   "admin-providers",
   "admin-ownership",
   "admin-providers-compliance",
-  "workspace-settings",
 ] as const
 
 /** Migration statuses that must not appear in workspace sidebar unless workspaceRoute is true. */

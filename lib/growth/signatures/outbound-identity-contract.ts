@@ -1,9 +1,16 @@
 /**
  * AI / campaign sender identity chain (GS-GROWTH-SIGNATURES-1A architecture prep).
- * No runtime behavior — documents how campaigns will resolve sender persona later.
+ * GS-GROWTH-SENDER-AI-1D extends with runtime AI prompt identity context.
  */
 
 import type { GrowthSignatureTemplateId } from "@/lib/growth/signatures/signature-types"
+
+export {
+  GROWTH_OUTBOUND_IDENTITY_AI_QA_MARKER,
+  type GrowthOutboundIdentityContext,
+  type GrowthOutboundSenderPersonaKey,
+  formatOutboundIdentityPreviewLabel,
+} from "@/lib/growth/signatures/outbound-identity-types"
 
 export const GROWTH_OUTBOUND_IDENTITY_CHAIN_QA_MARKER = "growth-outbound-identity-chain-1a-v1" as const
 

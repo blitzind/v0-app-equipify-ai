@@ -34,6 +34,15 @@ export function GrowthVideoPageAvatarSection({ pageId }: { pageId: string }) {
   const [voiceAssets, setVoiceAssets] = useState<GrowthAiAvatarVoiceAssetOption[]>([])
   const [job, setJob] = useState<GrowthAiAvatarJobView | null>(null)
   const [providerStates, setProviderStates] = useState<GrowthAiAvatarProviderStates | null>(null)
+  const [leadId, setLeadId] = useState("")
+  const [operatorInstructions, setOperatorInstructions] = useState("")
+  const [attachOnComplete, setAttachOnComplete] = useState(true)
+  const [providerReadiness, setProviderReadiness] = useState<{
+    ready?: boolean
+    dryRunOnly?: boolean
+    warnings?: string[]
+    blockers?: string[]
+  } | null>(null)
 
   const avatars = useMemo(() => listEnabledMediaAvatars(provider), [provider])
   const activeProviderState = providerStates?.[provider] ?? null
@@ -106,6 +115,20 @@ export function GrowthVideoPageAvatarSection({ pageId }: { pageId: string }) {
           setProvider(jobData.job.provider === "retell" ? "retell" : "elevenlabs")
         }
       }
+
+      const readinessRes = await fetch("/api/growth/media/elevenlabs/provider-readiness")
+      const readinessData = (await readinessRes.json().catch(() => ({}))) as {
+        ok?: boolean
+        report?: {
+          ready?: boolean
+          dryRunOnly?: boolean
+          warnings?: string[]
+          blockers?: string[]
+        }
+      }
+      if (readinessRes.ok && readinessData.ok && readinessData.report) {
+        setProviderReadiness(readinessData.report)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed.")
     } finally {
@@ -135,6 +158,9 @@ export function GrowthVideoPageAvatarSection({ pageId }: { pageId: string }) {
           provider,
           voice_media_asset_id: voiceMediaAssetId,
           settings: { resolution, background, theme },
+          lead_id: leadId.trim() || null,
+          operator_instructions: operatorInstructions.trim() || null,
+          attach_to_page_on_complete: attachOnComplete,
         }),
       })
       const data = (await res.json().catch(() => ({}))) as {
@@ -193,6 +219,33 @@ export function GrowthVideoPageAvatarSection({ pageId }: { pageId: string }) {
     }
   }
 
+  async function runAttachToPage() {
+    if (!job?.outputMediaAssetId) {
+      setError("Generate a completed avatar video before attaching to the page.")
+      return
+    }
+    setActing(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/growth/media/generated-video/attach-page", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          video_page_id: pageId,
+          media_asset_id: job.outputMediaAssetId,
+          lead_id: leadId.trim() || null,
+          media_generation_run_id: job.runId,
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
+      if (!res.ok || !data.ok) throw new Error(data.message ?? "Attach failed.")
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Attach failed.")
+    } finally {
+      setActing(false)
+    }
+  }
+
   const selectedScript = scriptVersions.find((version) => version.id === selectedScriptVersionId)
 
   return (
@@ -219,6 +272,60 @@ export function GrowthVideoPageAvatarSection({ pageId }: { pageId: string }) {
                 <p className="text-xs text-muted-foreground whitespace-pre-wrap">{selectedScript.output.script}</p>
               ) : null}
             </div>
+          )}
+        </GrowthEngineCard>
+
+        <GrowthEngineCard title="Prospect personalization">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Lead ID (optional)</Label>
+              <Input
+                value={leadId}
+                onChange={(e) => setLeadId(e.target.value)}
+                placeholder="UUID — merges lead/company/sender variables before generation"
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Operator instructions (optional)</Label>
+              <Input
+                value={operatorInstructions}
+                onChange={(e) => setOperatorInstructions(e.target.value)}
+                placeholder="Extra narration guidance appended to merged script"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm sm:col-span-2">
+              <input
+                type="checkbox"
+                checked={attachOnComplete}
+                onChange={(e) => setAttachOnComplete(e.target.checked)}
+              />
+              Attach generated video to this page when generation completes
+            </label>
+          </div>
+        </GrowthEngineCard>
+
+        <GrowthEngineCard title="Provider diagnostics">
+          {providerReadiness ? (
+            <div className="space-y-2 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <GrowthBadge tone={providerReadiness.ready ? "healthy" : "blocked"}>
+                  {providerReadiness.ready ? "Ready" : "Not ready"}
+                </GrowthBadge>
+                {providerReadiness.dryRunOnly ? <GrowthBadge tone="neutral">Dry run only</GrowthBadge> : null}
+              </div>
+              {(providerReadiness.blockers ?? []).map((blocker) => (
+                <p key={blocker} className="text-destructive">
+                  Blocker: {blocker}
+                </p>
+              ))}
+              {(providerReadiness.warnings ?? []).slice(0, 4).map((warning) => (
+                <p key={warning} className="text-muted-foreground">
+                  {warning}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Loading ElevenLabs provider readiness…</p>
           )}
         </GrowthEngineCard>
 
@@ -345,6 +452,11 @@ export function GrowthVideoPageAvatarSection({ pageId }: { pageId: string }) {
                     {job.outputMediaAssetId ? (
                       <Button type="button" size="sm" variant="outline" asChild>
                         <a href={`/growth/media?asset=${job.outputMediaAssetId}`}>Media asset</a>
+                      </Button>
+                    ) : null}
+                    {job.status === "completed" && job.outputMediaAssetId ? (
+                      <Button type="button" size="sm" onClick={() => void runAttachToPage()} disabled={acting}>
+                        Attach to page
                       </Button>
                     ) : null}
                   </div>

@@ -1,5 +1,7 @@
 /** Growth Engine C1 — AI voice generation types (client-safe). */
 
+import type { GeV13ProspectGenerationInput } from "@/lib/growth/media/ge-v1-3-types"
+
 export const GROWTH_AI_VOICE_GENERATION_QA_MARKER = "growth-ai-voice-generation-c1-v1" as const
 
 export const GROWTH_AI_VOICE_GENERATION_CONFIRM = "RUN_GROWTH_AI_VOICE_GENERATION_CERTIFICATION" as const
@@ -25,6 +27,7 @@ export type GrowthAiVoiceGenerationInput = {
   provider?: string | null
   settings?: Partial<GrowthAiVoiceSettings>
   dryRun?: boolean
+  prospect?: GeV13ProspectGenerationInput | null
 }
 
 export type GrowthAiVoiceProviderState = {

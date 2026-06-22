@@ -28,6 +28,8 @@ import {
   parseGrowthVideoScriptMetadata,
 } from "@/lib/growth/videos/growth-video-script-version-service"
 import type { GrowthMediaGenerationRun } from "@/lib/growth/media/growth-media-generation-types"
+import { resolvePersonalizedVideoGenerationScript } from "@/lib/growth/media/ge-v1-3-prospect-script-resolution"
+import type { GeV13ProspectGenerationInput } from "@/lib/growth/media/ge-v1-3-types"
 
 function normalizeSettings(input?: Partial<GrowthAiVoiceSettings>): GrowthAiVoiceSettings {
   return {
@@ -49,8 +51,35 @@ function resolveScriptVersion(
 
 export async function resolveVideoPageVoiceScript(
   admin: SupabaseClient,
-  input: { organizationId: string; videoPageId: string; scriptVersionId?: string | null },
-): Promise<{ script: string; scriptVersionId: string | null; videoAssetId: string | null }> {
+  input: {
+    organizationId: string
+    videoPageId: string
+    scriptVersionId?: string | null
+    prospect?: GeV13ProspectGenerationInput | null
+  },
+): Promise<{
+  script: string
+  scriptVersionId: string | null
+  videoAssetId: string | null
+  missingVariables?: string[]
+  degraded?: boolean
+}> {
+  if (input.prospect) {
+    const resolved = await resolvePersonalizedVideoGenerationScript(admin, {
+      organizationId: input.organizationId,
+      videoPageId: input.videoPageId,
+      scriptVersionId: input.scriptVersionId,
+      prospect: input.prospect,
+    })
+    return {
+      script: resolved.mergedScript,
+      scriptVersionId: resolved.scriptVersionId,
+      videoAssetId: resolved.videoAssetId,
+      missingVariables: resolved.missingVariables,
+      degraded: resolved.degraded,
+    }
+  }
+
   const state = await getGrowthVideoPageScriptState(admin, {
     organizationId: input.organizationId,
     pageId: input.videoPageId,
@@ -124,16 +153,21 @@ export async function createGrowthAiVoiceGenerationJob(
 
   const providerState = getGrowthElevenLabsVoiceProviderState()
   const settings = normalizeSettings(input.generation.settings)
-  const { script, scriptVersionId, videoAssetId } = await resolveVideoPageVoiceScript(admin, {
-    organizationId: input.organizationId,
-    videoPageId: input.generation.videoPageId,
-    scriptVersionId: input.generation.scriptVersionId,
-  })
+  const { script, scriptVersionId, videoAssetId, missingVariables, degraded } =
+    await resolveVideoPageVoiceScript(admin, {
+      organizationId: input.organizationId,
+      videoPageId: input.generation.videoPageId,
+      scriptVersionId: input.generation.scriptVersionId,
+      prospect: input.generation.prospect,
+    })
 
   const hooks = {
     video_page_id: input.generation.videoPageId,
     video_asset_id: videoAssetId,
     script_version_id: scriptVersionId,
+    lead_id: input.generation.prospect?.leadId ?? null,
+    missing_variables: missingVariables ?? [],
+    merge_degraded: degraded ?? false,
   }
 
   const run = await createMediaGenerationJob(admin, {

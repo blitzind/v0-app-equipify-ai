@@ -360,6 +360,8 @@ export function GrowthSequenceSafeExecutionDashboard({
                   <th className="px-2 py-2 font-medium">Lead</th>
                   <th className="px-2 py-2 font-medium">Sequence</th>
                   <th className="px-2 py-2 font-medium">Step</th>
+                  <th className="px-2 py-2 font-medium">Channel</th>
+                  <th className="px-2 py-2 font-medium">Age</th>
                   <th className="px-2 py-2 font-medium">Status</th>
                   <th className="px-2 py-2 font-medium">Due</th>
                   <th className="px-2 py-2 font-medium">Approval</th>
@@ -464,9 +466,15 @@ function JobRow({
       <td className="px-2 py-3 font-medium">{job.leadLabel}</td>
       <td className="px-2 py-3 text-muted-foreground">{job.sequenceLabel}</td>
       <td className="px-2 py-3 text-muted-foreground">{job.stepLabel}</td>
+      <td className="px-2 py-3 text-muted-foreground">{channelTypeLabel(job.channel)}</td>
+      <td className="px-2 py-3 tabular-nums text-muted-foreground">
+        {typeof job.jobAgeDays === "number" ? `${job.jobAgeDays}d` : "—"}
+      </td>
       <td className="px-2 py-3">
         <div className="flex flex-wrap items-center gap-1">
           <GrowthBadge label={sequenceExecutionStatusLabel(job.status)} tone={STATUS_TONE[job.status] ?? "neutral"} />
+          {job.isStaleApproval ? <GrowthBadge label="Stale approval" tone="attention" /> : null}
+          {job.isCertOrTestJob ? <GrowthBadge label="Cert/test job" tone="critical" /> : null}
           {job.draftReadinessLabel ? (
             <ApolloDraftReadinessBadges labels={[job.draftReadinessLabel]} />
           ) : null}
@@ -477,6 +485,11 @@ function JobRow({
         {job.apolloDraftApprovalBlocked && job.apolloDraftApprovalMessage ? (
           <p className="mt-1 text-[11px] text-amber-700">{job.apolloDraftApprovalMessage}</p>
         ) : null}
+        {job.operatorWarnings?.map((warning) => (
+          <p key={warning} className="mt-1 text-[11px] text-amber-700">
+            {warning}
+          </p>
+        ))}
       </td>
       <td className="px-2 py-3 tabular-nums text-muted-foreground">{formatWhen(job.scheduledFor)}</td>
       <td className="px-2 py-3">

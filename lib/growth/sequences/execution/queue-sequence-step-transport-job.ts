@@ -1,7 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { logGrowthEngine } from "@/lib/growth/access"
+import { logGrowthEngine, getGrowthEngineAiOrgId } from "@/lib/growth/access"
 import { fetchGrowthAiCopilotGenerationById } from "@/lib/growth/ai-copilot-repository"
 import type { GrowthAiCopilotGenerationType } from "@/lib/growth/ai-copilot-types"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
@@ -17,6 +17,7 @@ import {
 } from "@/lib/growth/sequence-enrollment/scheduler-step-failure-types"
 import {
   updateGrowthSequenceEnrollmentStep,
+  fetchGrowthSequenceEnrollmentById,
 } from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
 import { computeStepExecutionConfidence } from "@/lib/growth/sequence-enrollment/sequence-enrollment-health"
 import { buildSequenceSchedulerIdempotencyKey } from "@/lib/growth/sequence-enrollment/sequence-scheduler-types"
@@ -419,6 +420,7 @@ export async function queueSequenceStepTransportJob(
     const generationType = (input.step.generationType ?? "follow_up_email") as GrowthAiCopilotGenerationType
     const provider = getGrowthAiProvider()
     const providerHealth = await provider.health()
+    const enrollment = await fetchGrowthSequenceEnrollmentById(admin, input.enrollmentId)
 
     let generationResult: Awaited<ReturnType<typeof runGrowthAiCopilotGeneration>>
     try {
@@ -428,6 +430,9 @@ export async function queueSequenceStepTransportJob(
         generationType,
         actingUserId: input.actingUserId,
         actingUserEmail: input.actingUserEmail,
+        sequencePatternStepId: input.step.sequencePatternStepId,
+        sequencePatternId: enrollment?.sequencePatternId ?? null,
+        organizationId: getGrowthEngineAiOrgId(),
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

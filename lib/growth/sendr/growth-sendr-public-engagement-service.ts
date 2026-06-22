@@ -35,6 +35,15 @@ export type SendrPublicEngagementEventInput = {
 function resourceTypeForEvent(eventType: GrowthSendrEngagementEventType): GrowthRuntimeResourceType {
   if (eventType.startsWith("video_")) return "video_events"
   if (eventType.startsWith("booking_") || eventType === "calendar_open") return "bookings"
+  if (
+    eventType.startsWith("agent_") ||
+    eventType === "question_asked" ||
+    eventType === "response_generated" ||
+    eventType === "booking_offered" ||
+    eventType === "conversation_completed"
+  ) {
+    return "agent_events"
+  }
   return "page_views"
 }
 
@@ -123,7 +132,8 @@ export async function ingestSendrPublicEngagementEvents(
       : null,
     bookingAssetId:
       event.eventType === "calendar_open" ||
-      event.eventType.startsWith("booking_")
+      event.eventType.startsWith("booking_") ||
+      event.eventType === "booking_offered"
         ? ctx.bookingAssetId
         : null,
     eventValue: {

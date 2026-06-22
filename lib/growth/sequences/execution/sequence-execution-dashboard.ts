@@ -13,6 +13,7 @@ import {
   listSequenceExecutionJobs,
 } from "@/lib/growth/sequences/execution/sequence-job-repository"
 import { evaluateApolloSequenceExecutionJobApprovalGate } from "@/lib/growth/apollo/apollo-sequence-execution-job-gate"
+import { evaluateSequenceExecutionOperatorWarnings } from "@/lib/growth/sequences/execution/sequence-execution-operator-warnings"
 import { resolveApolloSequenceExecutionCandidateStatusForEnrollment } from "@/lib/growth/apollo/apollo-sequence-execution-job-gate-server"
 import {
   APOLLO_SEQUENCE_DRAFT_PLACEHOLDER_SENTINEL,
@@ -54,6 +55,14 @@ export async function fetchGrowthSequenceSafeExecutionDashboard(
       gate.apollo_candidate_status === "pending_draft_approval" ||
       gate.apollo_candidate_status === "draft_rejected"
 
+    const warnings = evaluateSequenceExecutionOperatorWarnings({
+      status: view.status,
+      createdAt: view.createdAt,
+      sequenceLabel: view.sequenceLabel,
+      qaDeliverabilityBypassUsed: view.qaDeliverabilityBypassUsed,
+      nowMs: now,
+    })
+
     return {
       ...view,
       apolloDraftApprovalBlocked: !gate.allowed,
@@ -64,6 +73,10 @@ export async function fetchGrowthSequenceSafeExecutionDashboard(
           ? "Draft Approved"
           : "Not Send Ready",
       isPlaceholderDraft,
+      jobAgeDays: warnings.jobAgeDays,
+      isStaleApproval: warnings.isStaleApproval,
+      isCertOrTestJob: warnings.isCertOrTestJob,
+      operatorWarnings: warnings.operatorWarnings,
     }
   })
 

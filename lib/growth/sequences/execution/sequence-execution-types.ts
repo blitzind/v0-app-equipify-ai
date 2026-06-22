@@ -104,6 +104,10 @@ export type GrowthSequenceExecutionJobView = GrowthSequenceExecutionJob & {
   apolloDraftApprovalMessage?: string | null
   draftReadinessLabel?: string | null
   isPlaceholderDraft?: boolean
+  jobAgeDays?: number
+  isStaleApproval?: boolean
+  isCertOrTestJob?: boolean
+  operatorWarnings?: string[]
 }
 
 export type GrowthSequenceSafeExecutionDashboard = {

@@ -8,6 +8,8 @@ import { formatPlaybookRulesForCopilotPrompt } from "@/lib/growth/ai-copilot-pla
 import type { GrowthNarrativeContext } from "@/lib/growth/playbooks/narrative/growth-playbook-narrative-types"
 import { buildGrowthPlaybookOrchestratedPromptBlock } from "@/lib/growth/playbooks/narrative/growth-playbook-prompt-orchestrator"
 import type { GrowthIndustryContext } from "@/lib/growth/playbooks/growth-industry-context-types"
+import type { GrowthOutboundIdentityContext } from "@/lib/growth/signatures/outbound-identity-types"
+import { buildGrowthOutboundIdentitySystemPromptAppendix } from "@/lib/growth/signatures/outbound-sender-persona-instructions"
 import {
   describeFrameworkKeys,
   GROWTH_AI_COPILOT_BUYING_SIGNAL_FRAMEWORK,
@@ -39,10 +41,13 @@ export function buildGrowthAiCopilotSystemPrompt(
   generationType: GrowthAiCopilotGenerationType,
   promptVariant: GrowthAiCopilotPromptVariant | string,
   playbookRules: GrowthAiCopilotPlaybookResolvedRule[] = [],
+  outboundIdentity?: GrowthOutboundIdentityContext | null,
 ): string {
   const playbookBlock = formatPlaybookRulesForCopilotPrompt(playbookRules, generationType)
+  const identityBlock = buildGrowthOutboundIdentitySystemPromptAppendix(outboundIdentity)
   return [
     "You are Equipify Growth Engine AI Communication Copilot.",
+    identityBlock,
     "You suggest copy only. You do NOT send email, place calls, or modify CRM data.",
     "Do not invent facts not present in the input snapshot.",
     "When relationshipMemory is present, honor avoidRepeatingTopics and do not re-ask answered questions.",
@@ -64,6 +69,7 @@ export function buildGrowthAiCopilotUserPrompt(
   options?: {
     industryContext?: GrowthIndustryContext | null
     narrativeContext?: GrowthNarrativeContext | null
+    outboundIdentity?: GrowthOutboundIdentityContext | null
   },
 ): string {
   const objectionNotes = describeFrameworkKeys(
@@ -129,6 +135,15 @@ export function buildGrowthAiCopilotUserPrompt(
         topSignals: snapshot.topGrowthSignals,
       },
       relationshipMemory: snapshot.relationshipMemory ?? { available: false },
+      outboundIdentity: options?.outboundIdentity
+        ? {
+            displayName: options.outboundIdentity.displayName,
+            title: options.outboundIdentity.title,
+            company: options.outboundIdentity.company,
+            email: options.outboundIdentity.email,
+            personaKey: options.outboundIdentity.personaKey,
+          }
+        : undefined,
       frameworks: {
         objections: objectionNotes,
         buyingSignals: buyingNotes,

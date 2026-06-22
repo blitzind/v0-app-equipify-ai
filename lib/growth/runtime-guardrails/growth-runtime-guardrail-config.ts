@@ -108,6 +108,7 @@ export type GrowthRuntimeKillSwitchKey =
   | "video_tracking_enabled"
   | "agent_tracking_enabled"
   | "booking_tracking_enabled"
+  | "demo_assistant_enabled"
   | "sendr_sequence_bridge_enabled"
   | "sendr_timeline_enabled"
   | "sendr_intelligence_enabled"
@@ -133,6 +134,7 @@ export const GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES: Record<GrowthRuntimeKillSwitc
   video_tracking_enabled: true,
   agent_tracking_enabled: true,
   booking_tracking_enabled: true,
+  demo_assistant_enabled: true,
   sendr_sequence_bridge_enabled: true,
   sendr_timeline_enabled: true,
   sendr_intelligence_enabled: true,

@@ -5,6 +5,7 @@ import { runAiTask } from "@/lib/ai/server"
 import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
 import { growthAiCopilotModelSchema, mapGrowthAiCopilotModelOutput } from "@/lib/growth/ai-copilot-schema"
 import { runGrowthAiCopilotGeneration } from "@/lib/growth/run-ai-copilot-generation"
+import { resolveSequenceExecutionSender } from "@/lib/growth/sequences/execution/sequence-send-builder"
 import { assertPreSendSuppressionAllowed } from "@/lib/growth/compliance/suppression-engine"
 import { enforceGovernanceIfReady } from "@/lib/growth/governance/governance-enforcement"
 import { addInboxMessage } from "@/lib/growth/inbox/thread-repository"
@@ -187,6 +188,8 @@ export async function generateInboxReplyDraft(
   let confidence = 60
   let classification = built.context.classification
 
+  const replySender = await resolveSequenceExecutionSender(admin)
+
   const copilot = await runGrowthAiCopilotGeneration({
     admin,
     leadId: built.leadId,
@@ -194,6 +197,7 @@ export async function generateInboxReplyDraft(
     snapshotOverrides: buildReplyDraftSnapshotOverrides(built.context),
     actingUserId: input.actingUserId,
     actingUserEmail: input.actingUserEmail,
+    senderAccountId: replySender?.senderAccountId ?? null,
   })
 
   if (copilot.ok) {

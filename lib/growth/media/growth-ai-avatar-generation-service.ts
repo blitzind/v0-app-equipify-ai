@@ -28,6 +28,7 @@ import {
 import { resolveMediaStorageProvider } from "@/lib/growth/media/media-asset-storage-providers"
 import { getMediaAvatarById } from "@/lib/growth/media/media-avatar-types"
 import { resolveVideoPageVoiceScript } from "@/lib/growth/media/growth-ai-voice-generation-service"
+import { attachGeneratedMediaAssetToVideoPage } from "@/lib/growth/media/ge-v1-3-generated-video-page-attach"
 import { buildGrowthVideoBrandingPreview } from "@/lib/growth/videos/growth-video-branding-service"
 import type { GrowthMediaGenerationRun } from "@/lib/growth/media/growth-media-generation-types"
 
@@ -136,11 +137,13 @@ export async function createGrowthAiAvatarGenerationJob(
   const providerState = getGrowthAvatarProviderState(provider)
   const providerStates = getGrowthAvatarProviderStates()
   const settings = normalizeSettings(input.generation.settings)
-  const { script, scriptVersionId, videoAssetId } = await resolveVideoPageVoiceScript(admin, {
-    organizationId: input.organizationId,
-    videoPageId: input.generation.videoPageId,
-    scriptVersionId: input.generation.scriptVersionId,
-  })
+  const { script, scriptVersionId, videoAssetId, missingVariables, degraded } =
+    await resolveVideoPageVoiceScript(admin, {
+      organizationId: input.organizationId,
+      videoPageId: input.generation.videoPageId,
+      scriptVersionId: input.generation.scriptVersionId,
+      prospect: input.generation.prospect,
+    })
 
   const { data: pageRow } = await admin
     .schema("growth")
@@ -169,6 +172,10 @@ export async function createGrowthAiAvatarGenerationJob(
     video_asset_id: videoAssetId,
     script_version_id: scriptVersionId,
     voice_media_asset_id: input.generation.voiceMediaAssetId ?? null,
+    lead_id: input.generation.prospect?.leadId ?? null,
+    missing_variables: missingVariables ?? [],
+    merge_degraded: degraded ?? false,
+    attach_to_page_on_complete: Boolean(input.generation.attachToPageOnComplete),
   }
 
   const run = await createMediaGenerationJob(admin, {
@@ -200,6 +207,25 @@ export async function createGrowthAiAvatarGenerationJob(
     createdBy: input.createdBy,
     forceDryRun: input.generation.dryRun ?? providerState.dryRunOnly,
   })
+
+  if (input.generation.attachToPageOnComplete && processed.status === "completed") {
+    const output = processed.output as Record<string, unknown>
+    const writeback =
+      output.storage_writeback && typeof output.storage_writeback === "object"
+        ? (output.storage_writeback as Record<string, unknown>)
+        : null
+    const mediaAssetId = typeof writeback?.asset_id === "string" ? writeback.asset_id : null
+    if (mediaAssetId) {
+      await attachGeneratedMediaAssetToVideoPage(admin, {
+        organizationId: input.organizationId,
+        createdBy: input.createdBy,
+        videoPageId: input.generation.videoPageId,
+        mediaAssetId,
+        leadId: input.generation.prospect?.leadId ?? null,
+        mediaGenerationRunId: processed.id,
+      }).catch(() => undefined)
+    }
+  }
 
   const signedUrl = await resolveAvatarJobVideoUrl(admin, {
     organizationId: input.organizationId,

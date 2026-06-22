@@ -15,6 +15,7 @@ import { getGrowthAvatarProviderState } from "@/lib/growth/media/growth-ai-avata
 import { getGrowthElevenLabsVoiceProviderState } from "@/lib/growth/media/growth-ai-voice-provider-config"
 import { writebackGeneratedAudioAsset } from "@/lib/growth/media/growth-media-audio-writeback-service"
 import { writebackGeneratedAvatarVideoAsset } from "@/lib/growth/media/growth-media-video-writeback-service"
+import { recordGeV13GenerationLifecycleEvent } from "@/lib/growth/media/ge-v1-3-generation-analytics"
 import {
   cancelMediaGenerationJob,
   getMediaGenerationJobById,
@@ -211,6 +212,24 @@ export async function processVoiceGenerationRun(
     progressPercent: 100,
     message: dryRun ? "Dry-run voice generation completed." : "Voice generation completed.",
     status: "completed",
+  })
+
+  await recordGeV13GenerationLifecycleEvent(admin, {
+    organizationId: input.organizationId,
+    eventType: "video_generated",
+    videoPageId: run.input.metadata_hooks?.video_page_id ?? null,
+    videoAssetId: run.input.metadata_hooks?.video_asset_id ?? null,
+    mediaAssetId: writeback.assetId,
+    leadId:
+      typeof run.input.metadata_hooks?.lead_id === "string" ? run.input.metadata_hooks.lead_id : null,
+    mediaGenerationRunId: input.runId,
+    generationType: "voice_generation",
+    provider: run.provider,
+    dryRun: voiceResult.dryRun ?? dryRun,
+    metadata: {
+      missing_variables: run.input.metadata_hooks?.missing_variables ?? [],
+      merge_degraded: Boolean(run.input.metadata_hooks?.merge_degraded),
+    },
   })
 
   return updateMediaGenerationRunRow(admin, {
@@ -441,6 +460,24 @@ export async function processAvatarGenerationRun(
     progressPercent: 100,
     message: dryRun ? "Dry-run avatar generation completed." : "Avatar generation completed.",
     status: "completed",
+  })
+
+  await recordGeV13GenerationLifecycleEvent(admin, {
+    organizationId: input.organizationId,
+    eventType: "video_generated",
+    videoPageId: run.input.metadata_hooks?.video_page_id ?? null,
+    videoAssetId: run.input.metadata_hooks?.video_asset_id ?? null,
+    mediaAssetId: writeback.assetId,
+    leadId:
+      typeof run.input.metadata_hooks?.lead_id === "string" ? run.input.metadata_hooks.lead_id : null,
+    mediaGenerationRunId: input.runId,
+    generationType: "avatar_generation",
+    provider: run.provider,
+    dryRun: avatarResult.dryRun ?? dryRun,
+    metadata: {
+      missing_variables: run.input.metadata_hooks?.missing_variables ?? [],
+      merge_degraded: Boolean(run.input.metadata_hooks?.merge_degraded),
+    },
   })
 
   return updateMediaGenerationRunRow(admin, {

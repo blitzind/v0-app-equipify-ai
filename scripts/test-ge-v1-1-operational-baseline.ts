@@ -80,7 +80,7 @@ function testNavigationPromotions() {
   assert.ok(GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS.includes("audiences"))
   assert.ok(GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS.includes("engagement"))
   assert.ok(!GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS.includes("share-pages"))
-  assert.equal(GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER, "growth-workspace-shell-nav-v6")
+  assert.equal(GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER, "growth-workspace-shell-nav-v7")
   const catalog = readSource("lib/growth/navigation/growth-route-catalog-data.ts")
   assert.match(catalog, /workspace-audiences/)
   assert.match(catalog, /workspace-runbook/)

@@ -77,6 +77,12 @@ function testApplyMergeFields() {
   assert.equal(rendered, "Hi — Michael from equipify.ai (mike@equipifyai.com)")
 }
 
+function testLegacyUnderscoreTokens() {
+  const fields = buildSenderMergeFields(sampleProfile(), "mike@equipifyai.com", null, "— Michael")
+  const rendered = applySenderMergeFieldsToText("{{sender_name}} · {{sender_title}} · {{sender_email}}", fields)
+  assert.equal(rendered, "Michael Short · Founder · mike@equipifyai.com")
+}
+
 function testApplyMergeFieldsMissingNeverThrows() {
   const rendered = applySenderMergeFieldsToText("Hello {{sender.name}}", {})
   assert.equal(rendered, "Hello ")
@@ -93,6 +99,7 @@ const tests: Array<{ name: string; fn: () => void }> = [
   { name: "missing fields empty string", fn: testMissingFieldsEmptyString },
   { name: "fallback without profile", fn: testFallbackWithoutProfile },
   { name: "apply merge fields", fn: testApplyMergeFields },
+  { name: "legacy underscore tokens", fn: testLegacyUnderscoreTokens },
   { name: "missing merge never throws", fn: testApplyMergeFieldsMissingNeverThrows },
   { name: "unknown tokens unchanged", fn: testUnknownTokensLeftUnchanged },
 ]

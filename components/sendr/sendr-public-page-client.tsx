@@ -87,7 +87,12 @@ export function SendrPublicPageClient({
   return (
     <PresentationThemeProvider theme={page.theme}>
       <PresentationPageShell>
-        <SendrPublicPresentationLayout page={page} onTrack={onTrack} />
+        <SendrPublicPresentationLayout
+          page={page}
+          onTrack={onTrack}
+          slug={slug}
+          publicSessionId={sessionId}
+        />
       </PresentationPageShell>
     </PresentationThemeProvider>
   )

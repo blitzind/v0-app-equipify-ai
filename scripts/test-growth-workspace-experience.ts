@@ -131,7 +131,7 @@ function runAudit(): void {
   assertExcludes("lib/workspace/growth-workspace-search-providers.ts", GROWTH_ADMIN_BASE_PATH, "search providers must not hardcode admin paths")
   console.log("  ✓ no admin hardcodes; middleware/auth untouched in experience modules")
 
-  assert.equal(GROWTH_WORKSPACE_DASHBOARD_QA_MARKER, "growth-workspace-dashboard-v2")
+  assert.equal(GROWTH_WORKSPACE_DASHBOARD_QA_MARKER, "growth-workspace-dashboard-v3")
   assert.equal(GROWTH_WORKSPACE_SEARCH_QA_MARKER, "growth-workspace-search-v2")
   assert.equal(GROWTH_WORKSPACE_ACTIVITY_QA_MARKER, "growth-workspace-activity-v1")
   console.log("  ✓ experience QA markers present")

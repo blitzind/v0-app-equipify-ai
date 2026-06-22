@@ -128,6 +128,10 @@ export const GROWTH_SENDR_ENGAGEMENT_EVENT_TYPES = [
   "agent_opened",
   "agent_question",
   "agent_completed",
+  "question_asked",
+  "response_generated",
+  "booking_offered",
+  "conversation_completed",
 ] as const
 
 export type GrowthSendrEngagementEventType = (typeof GROWTH_SENDR_ENGAGEMENT_EVENT_TYPES)[number]
@@ -240,6 +244,7 @@ export const GROWTH_SENDR_KILL_SWITCHES = [
   "video_tracking_enabled",
   "agent_tracking_enabled",
   "booking_tracking_enabled",
+  "demo_assistant_enabled",
 ] as const
 
 export type GrowthSendrKillSwitchKey = (typeof GROWTH_SENDR_KILL_SWITCHES)[number]

@@ -1,7 +1,7 @@
 /** Workspace operator home quick actions — always under `/growth/*`. */
 
 import type { LucideIcon } from "lucide-react"
-import { GitBranch, Inbox, Phone, Search, Share2, UserPlus } from "lucide-react"
+import { GitBranch, Inbox, Phone, Rocket, Search, UserPlus } from "lucide-react"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-workspace-base-path"
 import type { GrowthWorkspaceDashboardQuickAction } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
 
@@ -51,12 +51,12 @@ export const GROWTH_WORKSPACE_DASHBOARD_QUICK_ACTIONS: readonly GrowthWorkspaceD
     icon: GitBranch,
   },
   {
-    id: "create-share-page",
-    label: "Create share page",
-    description: "Build a personalized share page for a lead.",
+    id: "launch-personalized-video",
+    label: "Launch personalized video",
+    description: "Run the campaign launch wizard for a personalized video sequence.",
     shortcut: "6",
-    href: `${GROWTH_WORKSPACE_BASE_PATH}/share-pages`,
-    icon: Share2,
+    href: `${GROWTH_WORKSPACE_BASE_PATH}/videos/personalized/launch`,
+    icon: Rocket,
   },
 ] as const
 

@@ -32,18 +32,16 @@ import { growthFeaturePath } from "../lib/growth/navigation/growth-workspace-bas
 const SIDEBAR_ACTIVE_STATE_CASES: Array<{ pathname: string; activeNavId: string }> = [
   { pathname: "/growth", activeNavId: "dashboard" },
   { pathname: "/growth/leads", activeNavId: "leads" },
+  { pathname: "/growth/audiences", activeNavId: "audiences" },
+  { pathname: "/growth/videos/personalized", activeNavId: "personalized-videos" },
   { pathname: "/growth/campaigns", activeNavId: "campaigns" },
   { pathname: "/growth/inbox", activeNavId: "inbox" },
   { pathname: "/growth/calls", activeNavId: "calls" },
   { pathname: "/growth/meetings", activeNavId: "meetings" },
-  { pathname: "/growth/share-pages", activeNavId: "share-pages" },
-  { pathname: "/growth/media", activeNavId: "media-assets" },
-  { pathname: "/growth/share-pages/templates", activeNavId: "share-pages" },
-  { pathname: "/growth/automation", activeNavId: "automation-flows" },
-  { pathname: "/growth/opportunities", activeNavId: "opportunities" },
-  { pathname: "/growth/opportunities/pipeline", activeNavId: "opportunities" },
-  { pathname: "/growth/conversations", activeNavId: "conversations" },
-  { pathname: "/growth/relationships", activeNavId: "relationships" },
+  { pathname: "/growth/settings", activeNavId: "settings" },
+  { pathname: "/growth/runbook", activeNavId: "runbook" },
+  { pathname: "/growth/activity", activeNavId: "activity" },
+  { pathname: "/growth/engagement", activeNavId: "engagement" },
 ]
 
 const CMD_K_ADMIN_ONLY_STAYS_ADMIN = [
@@ -53,11 +51,11 @@ const CMD_K_ADMIN_ONLY_STAYS_ADMIN = [
   "/admin/growth/revenue-intelligence",
   "/admin/growth/intent-pixel",
   "/admin/growth/outreach",
-  "/admin/growth/sequences/execution",
 ] as const
 
 const CMD_K_MIGRATED_REWRITES = [
   { adminHref: "/admin/growth/engagement", workspaceSegment: "engagement" },
+  { adminHref: "/admin/growth/sequences/execution", workspaceSegment: "campaigns/sequences" },
   { adminHref: "/admin/growth/opportunities", workspaceSegment: "opportunities" },
   { adminHref: "/admin/growth/conversations", workspaceSegment: "conversations" },
   { adminHref: "/admin/growth/settings/growth", workspaceSegment: "settings" },
@@ -68,7 +66,7 @@ function runAudit(): void {
   console.log(`\n=== Growth workspace sidebar IA audit (${GROWTH_WORKSPACE_SIDEBAR_IA_QA_MARKER}) ===\n`)
   console.log(`  shell nav qa marker: ${GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER}`)
 
-  assert.equal(GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER, "growth-workspace-shell-nav-v5")
+  assert.equal(GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER, "growth-workspace-shell-nav-v7")
 
   assert.deepEqual(
     GROWTH_SHELL_NAV_GROUPS.map((group) => group.id),

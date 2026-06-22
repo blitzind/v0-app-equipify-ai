@@ -36,6 +36,7 @@ import {
   computePersonalizationConfidence,
 } from "@/lib/growth/outreach/personalization/personalization-warnings"
 import type { GrowthLead } from "@/lib/growth/types"
+import type { GrowthOutboundIdentityContext } from "@/lib/growth/signatures/outbound-identity-types"
 
 export type RunOutreachPersonalizationResult = {
   subject: string | null
@@ -52,6 +53,7 @@ export async function runOutreachPersonalizationGeneration(
     maxWords?: number
     aiRefinementEnabled?: boolean
     playbookRules?: GrowthAiCopilotPlaybookResolvedRule[]
+    outboundIdentity?: GrowthOutboundIdentityContext | null
   },
 ): Promise<RunOutreachPersonalizationResult> {
   const maxWords = input.maxWords ?? OUTREACH_PERSONALIZATION_DEFAULT_MAX_WORDS
@@ -99,7 +101,7 @@ export async function runOutreachPersonalizationGeneration(
     const health = await provider.health()
     if (health.ok) {
       const allowedFacts = collectAllowedFacts(buildAllowedFactsFromContextPacket(contextPacket))
-      const systemPrompt = buildOutreachRefinementSystemPrompt(maxWords)
+      const systemPrompt = buildOutreachRefinementSystemPrompt(maxWords, input.outboundIdentity)
       const userPrompt = buildOutreachRefinementUserPrompt({
         draft,
         blocks: strategy.blocks,
@@ -111,6 +113,7 @@ export async function runOutreachPersonalizationGeneration(
         generationType: input.generationType,
         maxWords,
         avoidRepeatingTopics: contextPacket.memoryAvoidRepeating,
+        outboundIdentity: input.outboundIdentity,
       })
 
       try {

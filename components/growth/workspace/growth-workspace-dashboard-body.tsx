@@ -13,8 +13,10 @@ import {
   GrowthOperatorBriefingPriorities,
 } from "@/components/growth/growth-operator-briefing-compact"
 import type { AidenDailyBriefing } from "@/lib/growth/aiden/aiden-daily-briefing"
+import { GrowthOperatorSetupHealthPanel } from "@/components/growth/operational/growth-operator-setup-health-panel"
 import {
   GROWTH_WORKSPACE_DASHBOARD_QA_MARKER,
+  type GrowthWorkspaceDashboardActionCard,
   type GrowthWorkspaceDashboardMetricLink,
   type GrowthWorkspaceDashboardSection,
   type GrowthWorkspaceDashboardWelcome,
@@ -125,6 +127,33 @@ function WelcomeSection({
         <GrowthOperatorBriefingPriorities briefing={briefing} />
       </div>
     </section>
+  )
+}
+
+function OperatorActionCardsSection({ cards }: { cards: GrowthWorkspaceDashboardActionCard[] }) {
+  if (cards.length === 0) return null
+
+  return (
+    <GrowthEngineCard title="What should I do next?" data-section="operator-action-cards">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {cards.map((card) => (
+          <Link
+            key={card.id}
+            href={card.href}
+            className="group flex min-h-24 flex-col justify-between rounded-xl border border-border/80 p-4 transition-colors hover:border-primary/30 hover:bg-muted/20"
+          >
+            <div>
+              <p className="font-medium text-foreground">{card.title}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{card.description}</p>
+            </div>
+            <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary">
+              Open
+              <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" aria-hidden />
+            </span>
+          </Link>
+        ))}
+      </div>
+    </GrowthEngineCard>
   )
 }
 
@@ -264,6 +293,9 @@ export function GrowthWorkspaceDashboardBody() {
   return (
     <div className="space-y-6" data-qa-marker={GROWTH_WORKSPACE_DASHBOARD_QA_MARKER}>
       <WelcomeSection welcome={dashboard.welcome} briefing={dashboard.briefing} />
+
+      <OperatorActionCardsSection cards={dashboard.operatorActionCards} />
+      <GrowthOperatorSetupHealthPanel compact />
 
       {error ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">

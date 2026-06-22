@@ -189,4 +189,15 @@ export type GrowthAiCopilotInputSnapshot = {
     riskFlags: string[]
     committeeContext: string[]
   }
+  outboundIdentity?: {
+    senderAccountId: string | null
+    senderProfileId: string | null
+    displayName: string
+    title: string | null
+    company: string
+    website: string | null
+    email: string | null
+    personaKey: string
+    personaInstructions: string
+  }
 }

@@ -8,13 +8,11 @@
 import type { LucideIcon } from "lucide-react"
 import {
   Activity,
-  GitBranch,
-  Handshake,
+  BookOpen,
   Inbox,
   LayoutDashboard,
-  Layers,
-  MessageSquare,
   Phone,
+  Settings,
   Sparkles,
   Target,
   Users,
@@ -33,7 +31,7 @@ import {
   GROWTH_WORKSPACE_BASE_PATH,
 } from "@/lib/growth/navigation/growth-route-metadata-types"
 
-export const GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER = "growth-workspace-shell-nav-v6" as const
+export const GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER = "growth-workspace-shell-nav-v7" as const
 
 /** Back-compat QA marker used by shell components. */
 export const GROWTH_SHELL_NAV_QA_MARKER = GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER
@@ -80,42 +78,21 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
       { id: "dashboard", label: "Dashboard", registryRouteId: "workspace-dashboard", icon: LayoutDashboard, workspaceRoute: true },
       { id: "leads", label: "Leads", registryRouteId: "workspace-leads", icon: Target, workspaceRoute: true },
       { id: "audiences", label: "Audiences", registryRouteId: "workspace-audiences", icon: Users, workspaceRoute: true },
+      { id: "personalized-videos", label: "Personalized Videos", registryRouteId: "workspace-personalized-videos", icon: Sparkles, workspaceRoute: true },
       { id: "campaigns", label: "Campaigns", registryRouteId: "workspace-campaigns", icon: Workflow, workspaceRoute: true },
       { id: "inbox", label: "Inbox", registryRouteId: "workspace-inbox", icon: Inbox, workspaceRoute: true },
       { id: "calls", label: "Calls", registryRouteId: "workspace-calls", icon: Phone, workspaceRoute: true },
       { id: "meetings", label: "Meetings", registryRouteId: "workspace-meetings", icon: Users, workspaceRoute: true },
-    ],
-  },
-  {
-    id: "content",
-    label: "Content",
-    items: [
-      {
-        id: "personalized-videos",
-        label: "Personalized Videos",
-        registryRouteId: "workspace-personalized-videos",
-        icon: Sparkles,
-        workspaceRoute: true,
-      },
-      { id: "media-assets", label: "Media Assets", registryRouteId: "workspace-media", icon: Layers, workspaceRoute: true },
-    ],
-  },
-  {
-    id: "automation",
-    label: "Automation",
-    items: [
-      { id: "automation-flows", label: "Automation", registryRouteId: "workspace-automation", icon: GitBranch, workspaceRoute: true },
+      { id: "settings", label: "Settings", registryRouteId: "workspace-settings", icon: Settings, workspaceRoute: true },
+      { id: "runbook", label: "Runbook", registryRouteId: "workspace-runbook", icon: BookOpen, workspaceRoute: true },
     ],
   },
   {
     id: "intelligence",
     label: "Intelligence",
     items: [
-      { id: "opportunities", label: "Opportunities", registryRouteId: "workspace-opportunities", icon: Target, workspaceRoute: true },
       { id: "activity", label: "Activity", registryRouteId: "workspace-activity", icon: Activity, workspaceRoute: true },
       { id: "engagement", label: "Engagement", registryRouteId: "workspace-engagement", icon: Activity, workspaceRoute: true },
-      { id: "conversations", label: "Conversations", registryRouteId: "workspace-conversations", icon: MessageSquare, workspaceRoute: true },
-      { id: "relationships", label: "Relationships", registryRouteId: "workspace-relationships", icon: Handshake, workspaceRoute: true },
     ],
   },
 ]

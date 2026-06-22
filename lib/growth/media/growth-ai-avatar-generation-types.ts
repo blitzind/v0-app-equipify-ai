@@ -1,5 +1,7 @@
 /** Growth Engine C2 — AI avatar generation types (client-safe). */
 
+import type { GeV13ProspectGenerationInput } from "@/lib/growth/media/ge-v1-3-types"
+
 export const GROWTH_AI_AVATAR_GENERATION_QA_MARKER = "growth-ai-avatar-generation-c2-v1" as const
 
 export const GROWTH_AI_AVATAR_GENERATION_CONFIRM = "RUN_GROWTH_AI_AVATAR_GENERATION_CERTIFICATION" as const
@@ -36,6 +38,8 @@ export type GrowthAiAvatarGenerationInput = {
   voiceMediaAssetId?: string | null
   settings?: Partial<GrowthAiAvatarSettings>
   dryRun?: boolean
+  prospect?: GeV13ProspectGenerationInput | null
+  attachToPageOnComplete?: boolean
 }
 
 export type GrowthAiAvatarProviderState = {

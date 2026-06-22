@@ -9,11 +9,16 @@ import { buildGrowthPlaybookOutcomeOperatorPreview } from "@/lib/growth/playbook
 import { buildGrowthBuyingStageOperatorPreview } from "@/lib/growth/buyer-journey/growth-buying-stage-engine"
 import { formatGrowthReasoningOperatorPreview } from "@/lib/growth/reasoning/growth-reasoning-diagnostics"
 import { formatGrowthSequenceOperatorPreview } from "@/lib/growth/sequence-intelligence/growth-sequence-diagnostics"
+import { GrowthOutboundSenderContextBadge } from "@/components/growth/signatures/growth-outbound-sender-context-badge"
 
 type Props = {
   audit: OutreachPersonalizationAudit
   generatedSubject?: string | null
   generatedContent: string
+  outboundIdentity?: {
+    displayName?: string | null
+    title?: string | null
+  } | null
 }
 
 function confidenceTone(label: OutreachPersonalizationAudit["confidenceLabel"]): "healthy" | "attention" | "critical" {
@@ -28,7 +33,7 @@ function warningTone(severity: OutreachPersonalizationAudit["warnings"][number][
   return "neutral"
 }
 
-export function GrowthOutreachPersonalizationPreview({ audit, generatedSubject, generatedContent }: Props) {
+export function GrowthOutreachPersonalizationPreview({ audit, generatedSubject, generatedContent, outboundIdentity }: Props) {
   const qualityPreview = audit.qualityDiagnostics
     ? buildPersonalizationQualityOperatorPreview(audit.qualityDiagnostics)
     : null
@@ -48,6 +53,7 @@ export function GrowthOutreachPersonalizationPreview({ audit, generatedSubject, 
   return (
     <div className="space-y-4 rounded-lg border border-border bg-muted/20 p-3">
       <div className="flex flex-wrap items-center gap-2">
+        <GrowthOutboundSenderContextBadge identity={outboundIdentity} />
         <GrowthBadge label={`Confidence ${audit.confidenceScore}`} tone={confidenceTone(audit.confidenceLabel)} />
         {qualityPreview ? (
           <GrowthBadge label={`Quality ${qualityPreview.qualityScore}`} tone={qualityPreview.qualityScore >= 80 ? "healthy" : qualityPreview.qualityScore >= 65 ? "attention" : "critical"} />

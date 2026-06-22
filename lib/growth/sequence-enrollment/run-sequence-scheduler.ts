@@ -1,7 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { logGrowthEngine } from "@/lib/growth/access"
+import { logGrowthEngine, getGrowthEngineAiOrgId } from "@/lib/growth/access"
 import { fetchGrowthAiCopilotGenerationById } from "@/lib/growth/ai-copilot-repository"
 import type { GrowthAiCopilotGenerationType } from "@/lib/growth/ai-copilot-types"
 import { fetchGrowthPlatformCommunicationSettings } from "@/lib/growth/communication/settings-repository"
@@ -232,6 +232,9 @@ async function queueSequenceStepOutreach(
       generationType,
       actingUserId: input.actingUserId,
       actingUserEmail: input.actingUserEmail,
+      sequencePatternStepId: input.step.sequencePatternStepId,
+      sequencePatternId: input.sequencePatternId,
+      organizationId: getGrowthEngineAiOrgId(),
     })
     if (!result.ok) return { queued: false, reason: result.code }
     generation = result.generation

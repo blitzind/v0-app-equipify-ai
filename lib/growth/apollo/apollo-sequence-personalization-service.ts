@@ -10,7 +10,12 @@ import { buildPersonalizedSmsDraft } from "@/lib/growth/sms/personalization/asse
 import { projectSmsPersonalizationContext } from "@/lib/growth/sms/personalization/sms-context-projection"
 import { normalizeToE164 } from "@/lib/growth/sms/phone-normalization"
 import { runGrowthAiCopilotGeneration } from "@/lib/growth/run-ai-copilot-generation"
-import { updateGrowthSequenceEnrollmentStep } from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
+import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import {
+  fetchGrowthSequenceEnrollmentById,
+  fetchGrowthSequenceEnrollmentStepById,
+  updateGrowthSequenceEnrollmentStep,
+} from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
 import { updateSequenceExecutionJob } from "@/lib/growth/sequences/execution/sequence-job-repository"
 import {
   buildApolloCallIntelligence,
@@ -158,15 +163,26 @@ async function personalizeEmailDraft(
     leadId: string
     actingUserId: string
     actingUserEmail: string
+    sequenceEnrollmentId?: string | null
   },
 ): Promise<ApolloSequenceExecutionDraftRecord> {
   const generationType = resolveEmailGenerationType(input.step)
+  const enrollmentStep = input.jobLink?.sequence_step_id
+    ? await fetchGrowthSequenceEnrollmentStepById(admin, input.jobLink.sequence_step_id)
+    : null
+  const enrollment = input.sequenceEnrollmentId
+    ? await fetchGrowthSequenceEnrollmentById(admin, input.sequenceEnrollmentId)
+    : null
+
   const result = await runGrowthAiCopilotGeneration({
     admin,
     leadId: input.leadId,
     generationType,
     actingUserId: input.actingUserId,
     actingUserEmail: input.actingUserEmail,
+    sequencePatternStepId: enrollmentStep?.sequencePatternStepId ?? null,
+    sequencePatternId: enrollment?.sequencePatternId ?? null,
+    organizationId: getGrowthEngineAiOrgId(),
   })
 
   if (!result.ok) {
@@ -372,6 +388,7 @@ export async function personalizeApolloSequenceCandidateContent(
           leadId,
           actingUserId: input.acting_user_id,
           actingUserEmail: input.acting_user_email,
+          sequenceEnrollmentId: input.candidate.sequence_enrollment_id,
         }),
       )
       continue

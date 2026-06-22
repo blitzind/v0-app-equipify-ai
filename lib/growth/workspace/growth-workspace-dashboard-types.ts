@@ -2,7 +2,7 @@
 
 import type { AidenDailyBriefing } from "@/lib/growth/aiden/aiden-daily-briefing"
 
-export const GROWTH_WORKSPACE_DASHBOARD_QA_MARKER = "growth-workspace-dashboard-v2" as const
+export const GROWTH_WORKSPACE_DASHBOARD_QA_MARKER = "growth-workspace-dashboard-v3" as const
 
 export type GrowthWorkspaceDashboardMetricLink = {
   label: string
@@ -39,11 +39,19 @@ export type GrowthWorkspaceDashboardWelcome = {
   todaysFocus: string | null
 }
 
+export type GrowthWorkspaceDashboardActionCard = {
+  id: string
+  title: string
+  description: string
+  href: string
+}
+
 export type GrowthWorkspaceDashboardViewModel = {
   qaMarker: typeof GROWTH_WORKSPACE_DASHBOARD_QA_MARKER
   generatedAt: string
   sections: GrowthWorkspaceDashboardSection[]
   quickActions: GrowthWorkspaceDashboardQuickAction[]
+  operatorActionCards: GrowthWorkspaceDashboardActionCard[]
   welcome: GrowthWorkspaceDashboardWelcome
   /** Aiden briefing already loaded in dashboard batch — reused for operator home parity. */
   briefing: AidenDailyBriefing | null

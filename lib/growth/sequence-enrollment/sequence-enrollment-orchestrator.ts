@@ -1,7 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { logGrowthEngine } from "@/lib/growth/access"
+import { logGrowthEngine, getGrowthEngineAiOrgId } from "@/lib/growth/access"
 import type { GrowthAiCopilotGenerationType } from "@/lib/growth/ai-copilot-types"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { listGrowthSequencePatterns } from "@/lib/growth/sequence-pattern-repository"
@@ -249,6 +249,9 @@ export async function materializeGrowthSequenceEnrollmentStep(
       generationType,
       actingUserId: input.actingUserId,
       actingUserEmail: input.actingUserEmail,
+      sequencePatternStepId: step.sequencePatternStepId,
+      sequencePatternId: enrollment.sequencePatternId,
+      organizationId: getGrowthEngineAiOrgId(),
     })
     if (!result.ok) throw new Error(result.code)
 

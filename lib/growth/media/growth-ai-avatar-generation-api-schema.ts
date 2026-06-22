@@ -17,6 +17,13 @@ export const growthAiAvatarGenerateSchema = z.object({
     })
     .optional(),
   dry_run: z.boolean().optional(),
+  lead_id: z.string().uuid().nullable().optional(),
+  company_candidate_id: z.string().uuid().nullable().optional(),
+  person_candidate_id: z.string().uuid().nullable().optional(),
+  personalization_profile_id: z.string().uuid().nullable().optional(),
+  sender_profile_id: z.string().uuid().nullable().optional(),
+  operator_instructions: z.string().trim().max(4000).nullable().optional(),
+  attach_to_page_on_complete: z.boolean().optional(),
 })
 
 export const growthAiAvatarJobActionSchema = z

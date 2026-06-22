@@ -16,6 +16,8 @@ const BodySchema = z.object({
   generationType: z.enum(GROWTH_AI_COPILOT_GENERATION_TYPES),
   promptVariant: z.enum(GROWTH_AI_COPILOT_PROMPT_VARIANTS).optional(),
   sourceReplyId: z.string().uuid().nullable().optional(),
+  senderAccountId: z.string().uuid().optional(),
+  senderProfileId: z.string().uuid().optional(),
 })
 
 export async function POST(
@@ -41,6 +43,8 @@ export async function POST(
     generationType: parsed.data.generationType,
     promptVariant: parsed.data.promptVariant,
     sourceReplyId: parsed.data.sourceReplyId,
+    senderAccountId: parsed.data.senderAccountId,
+    senderProfileId: parsed.data.senderProfileId,
     actingUserId: access.userId,
     actingUserEmail: access.userEmail,
   })

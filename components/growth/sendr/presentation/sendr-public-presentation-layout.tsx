@@ -29,6 +29,7 @@ import {
   type PresentationVideoPlayback,
 } from "@/components/growth/sendr/presentation/presentation-video-hero"
 import { PresentationVideoEmptyState } from "@/components/growth/sendr/presentation/presentation-video-empty-state"
+import { GrowthDemoAssistantWidget } from "@/components/growth/demo-assistant/growth-demo-assistant-widget"
 import { usePresentationTheme } from "@/components/growth/sendr/presentation/presentation-section"
 import { cn } from "@/lib/utils"
 
@@ -325,10 +326,14 @@ export function SendrPublicPresentationLayout({
   page,
   onTrack,
   previewMode = false,
+  slug,
+  publicSessionId,
 }: {
   page: GrowthSendrPublicPagePayload
   onTrack: TrackFn
   previewMode?: boolean
+  slug?: string
+  publicSessionId?: string
 }) {
   const theme = usePresentationTheme()
   const personalized = page.personalization?.applied === true
@@ -482,6 +487,16 @@ export function SendrPublicPresentationLayout({
             }
           />
         )}
+
+        {slug && publicSessionId ? (
+          <GrowthDemoAssistantWidget
+            slug={slug}
+            publicSessionId={publicSessionId}
+            bookingUrl={primaryCtaHref ?? page.booking?.meetingLink ?? null}
+            previewMode={previewMode}
+            onTrack={onTrack}
+          />
+        ) : null}
 
         {primaryCtaHref ? (
           <div className="hidden lg:block">
