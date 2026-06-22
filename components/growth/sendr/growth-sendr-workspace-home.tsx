@@ -11,7 +11,7 @@ import type {
   GrowthSendrMediaAsset,
   GrowthSendrWorkspaceSummary,
 } from "@/lib/growth/sendr/growth-sendr-types"
-import { GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL, GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL } from "@/lib/growth/sendr/growth-sendr-branding"
+import { GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL, GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL, GROWTH_PERSONALIZED_VIDEOS_ACTIVITY_PATH, buildGrowthPersonalizedVideosPageDetailPath, buildGrowthPersonalizedVideosWorkspaceHref } from "@/lib/growth/sendr/growth-sendr-branding"
 import { GROWTH_SENDR_INTELLIGENCE_QA_MARKER } from "@/lib/growth/sendr/growth-sendr-config"
 
 type WorkspaceResponse = {
@@ -59,7 +59,7 @@ export function GrowthSendrWorkspaceHome() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          Operator launch center — create personalized pages, attach media & booking, publish manually.
+          Create personalized video pages, attach media and booking, publish manually.
         </p>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
@@ -67,13 +67,13 @@ export function GrowthSendrWorkspaceHome() {
             Refresh
           </Button>
           <Button size="sm" variant="outline" asChild>
-            <Link href="/growth/sendr/activity">
+            <Link href={GROWTH_PERSONALIZED_VIDEOS_ACTIVITY_PATH}>
               <Activity className="mr-1 h-4 w-4" />
               Activity
             </Link>
           </Button>
           <Button size="sm" variant="outline" asChild>
-            <Link href="/growth/sendr/analytics">
+            <Link href={buildGrowthPersonalizedVideosWorkspaceHref("analytics")}>
               <BarChart3 className="mr-1 h-4 w-4" />
               Analytics
             </Link>
@@ -91,15 +91,15 @@ export function GrowthSendrWorkspaceHome() {
             </Link>
           </Button>
           <Button size="sm" asChild>
-            <Link href="/growth/sendr/launch">
+            <Link href={buildGrowthPersonalizedVideosWorkspaceHref("launch")}>
               <Rocket className="mr-1 h-4 w-4" />
               Launch Campaign
             </Link>
           </Button>
           <Button size="sm" asChild>
-            <Link href="/growth/sendr/new">
+            <Link href={buildGrowthPersonalizedVideosWorkspaceHref("new")}>
               <Plus className="mr-1 h-4 w-4" />
-              Create Page
+              Create Video Page
             </Link>
           </Button>
         </div>
@@ -283,7 +283,7 @@ export function GrowthSendrWorkspaceHome() {
               summary?.recentPages.map((page: GrowthSendrLandingPage) => (
                 <Link
                   key={page.id}
-                  href={`/growth/sendr/${page.id}`}
+                  href={buildGrowthPersonalizedVideosPageDetailPath(page.id)}
                   className="flex items-center justify-between rounded-md border p-3 text-sm hover:bg-muted/50"
                 >
                   <div>

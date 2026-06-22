@@ -2,10 +2,9 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import {
-  GROWTH_SENDR_PAGE_URL_MERGE_TOKEN,
-  GROWTH_SENDR_PAGE_URL_VARIABLE_KEY,
   GROWTH_SENDR_SEQUENCE_BRIDGE_QA_MARKER,
 } from "@/lib/growth/sendr/growth-sendr-config"
+import { applySendrPageUrlMergeFields } from "@/lib/growth/sendr/growth-sendr-config"
 import { consumeSendrBudget, checkSendrKillSwitch } from "@/lib/growth/sendr/growth-sendr-guardrails"
 import { getGrowthSendrLandingPage } from "@/lib/growth/sendr/growth-sendr-landing-page-repository"
 import {
@@ -112,11 +111,7 @@ export async function resolveSendrPageUrlForSequenceStep(
   return url
 }
 
-export function applySendrPageUrlMergeFields(text: string, url: string): string {
-  return text
-    .replaceAll(GROWTH_SENDR_PAGE_URL_MERGE_TOKEN, url)
-    .replaceAll(`{{${GROWTH_SENDR_PAGE_URL_VARIABLE_KEY}}}`, url)
-}
+export { applySendrPageUrlMergeFields } from "@/lib/growth/sendr/growth-sendr-config"
 
 export async function resolveSendrPageUrlBatch(
   admin: SupabaseClient,

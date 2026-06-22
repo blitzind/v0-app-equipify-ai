@@ -1,21 +1,24 @@
-"use client"
+import { redirect } from "next/navigation"
+import { buildGrowthPersonalizedVideosWorkspaceHref } from "@/lib/growth/sendr/growth-sendr-branding"
 
-import { Rocket } from "lucide-react"
-import { GrowthSendrLaunchWizard } from "@/components/growth/sendr/growth-sendr-launch-wizard"
-import { GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL } from "@/lib/growth/sendr/growth-sendr-branding"
-import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
-import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
+type LegacySendrLaunchPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}
 
-export default function GrowthSendrLaunchPage() {
-  return (
-    <GrowthWorkspacePageContent>
-      <GrowthWorkspacePageHeader
-        title={`${GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL} Launch`}
-        description="Guided operator workflow — audience, sequence, personalized video page, preview, confirm, enroll. No autonomous sends."
-        icon={Rocket}
-        iconClassName="bg-fuchsia-50 text-fuchsia-600"
-      />
-      <GrowthSendrLaunchWizard />
-    </GrowthWorkspacePageContent>
-  )
+/** Legacy alias — preserves bookmarks and deep links to `/growth/sendr/launch`. */
+export default async function LegacyGrowthSendrLaunchRedirect({ searchParams }: LegacySendrLaunchPageProps) {
+  const params = await searchParams
+  const target = buildGrowthPersonalizedVideosWorkspaceHref("launch")
+  const qs = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === "string" && value.trim()) {
+      qs.set(key, value.trim())
+    } else if (Array.isArray(value)) {
+      for (const entry of value) {
+        if (typeof entry === "string" && entry.trim()) qs.append(key, entry.trim())
+      }
+    }
+  }
+  const query = qs.toString()
+  redirect(query ? `${target}?${query}` : target)
 }

@@ -29,6 +29,7 @@ import {
 } from "@/lib/growth/sendr/growth-sendr-builder-config"
 import { buildGrowthSendrPagePreviewPayload } from "@/lib/growth/sendr/growth-sendr-page-preview-payload"
 import { PresentationPageShell } from "@/components/growth/sendr/presentation/presentation-page-shell"
+import { PresentationThemeProvider } from "@/components/growth/sendr/presentation/presentation-section"
 import { SendrPublicPresentationLayout } from "@/components/growth/sendr/presentation/sendr-public-presentation-layout"
 import { cn } from "@/lib/utils"
 
@@ -164,19 +165,30 @@ export function GrowthSendrBuilderLivePreview({
               transform: `scale(${scale})`,
             }}
           >
-            <div className={cn(device !== "desktop" && "overflow-hidden rounded-[0.85rem] bg-white dark:bg-slate-900")}>
-              {prospectMode ? (
-                <PresentationPageShell className="min-h-0 bg-transparent px-0 py-0 sm:px-0 sm:py-0">
-                  <SendrPublicPresentationLayout page={payload} onTrack={() => {}} previewMode />
-                </PresentationPageShell>
-              ) : (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-white p-2 dark:border-slate-700 dark:bg-slate-900">
-                  <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                    Builder frame
-                  </p>
-                  <SendrPublicPresentationLayout page={payload} onTrack={() => {}} previewMode />
-                </div>
-              )}
+            <div className={cn(device !== "desktop" && "overflow-hidden rounded-[0.85rem]")} style={{ backgroundColor: "var(--sendr-page-bg)" }}>
+              <PresentationThemeProvider theme={payload.theme}>
+                {prospectMode ? (
+                  <PresentationPageShell className="min-h-0 bg-transparent px-0 py-0 sm:px-0 sm:py-0">
+                    <SendrPublicPresentationLayout page={payload} onTrack={() => {}} previewMode />
+                  </PresentationPageShell>
+                ) : (
+                  <div
+                    className="rounded-xl border border-dashed p-2"
+                    style={{
+                      borderColor: "color-mix(in srgb, var(--sendr-page-text) 25%, transparent)",
+                      backgroundColor: "var(--sendr-surface)",
+                    }}
+                  >
+                    <p
+                      className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wide"
+                      style={{ color: "color-mix(in srgb, var(--sendr-page-text) 45%, transparent)" }}
+                    >
+                      Builder frame
+                    </p>
+                    <SendrPublicPresentationLayout page={payload} onTrack={() => {}} previewMode />
+                  </div>
+                )}
+              </PresentationThemeProvider>
             </div>
           </div>
         </div>

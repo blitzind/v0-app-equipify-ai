@@ -2,11 +2,9 @@
 
 import { CalendarDays, Clock, Globe, MessageCircle, Sparkles, Star, Video, Zap } from "lucide-react"
 import type { GrowthSendrPublicPagePayload } from "@/lib/growth/sendr/growth-sendr-types"
-import {
-  GROWTH_SENDR_PRESENTATION_ACCENT,
-  GROWTH_SENDR_PRESENTATION_FEATURE_BADGES,
-} from "@/lib/growth/sendr/growth-sendr-presentation-config"
+import { GROWTH_SENDR_PRESENTATION_FEATURE_BADGES } from "@/lib/growth/sendr/growth-sendr-presentation-config"
 import { PresentationCtaButton } from "@/components/growth/sendr/presentation/presentation-cta-button"
+import { usePresentationTheme } from "@/components/growth/sendr/presentation/presentation-section"
 import { cn } from "@/lib/utils"
 
 type HeroContent = {
@@ -48,7 +46,8 @@ export function PresentationSidebarBrand({
   personalized = false,
   className,
 }: Props) {
-  const accent = GROWTH_SENDR_PRESENTATION_ACCENT
+  const theme = usePresentationTheme()
+  const accent = theme.accentColor ?? "#2563eb"
   const headline = hero?.headline ?? pageTitle
   const body = hero?.body
   const pill = resolvePersonalizationPill(hero, personalized)
@@ -57,17 +56,34 @@ export function PresentationSidebarBrand({
   return (
     <aside
       className={cn(
-        "relative flex flex-col border-b border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white lg:min-h-[720px] lg:border-b-0 lg:border-r dark:border-slate-800",
+        "relative flex flex-col border-b lg:min-h-[720px] lg:border-b-0 lg:border-r",
         className,
       )}
+      style={{
+        backgroundColor: "var(--sendr-header-bg)",
+        color: "var(--sendr-header-text)",
+        borderColor: "color-mix(in srgb, var(--sendr-header-text) 12%, transparent)",
+      }}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.22),transparent_55%)]" />
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: `radial-gradient(circle at top left, color-mix(in srgb, var(--sendr-accent) 22%, transparent), transparent 55%)`,
+        }}
+      />
 
       <div className="relative flex flex-1 flex-col gap-7 p-6 sm:p-8 lg:gap-8 lg:p-10 xl:p-12">
         <div className="space-y-5">
           <div className="flex items-center gap-2.5">
-            <Sparkles className="size-6" style={{ color: accent }} />
-            <span className="text-lg font-bold tracking-tight">Equipify.ai</span>
+            {theme.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={theme.logoUrl} alt="" className="h-8 max-w-[180px] object-contain" />
+            ) : (
+              <>
+                <Sparkles className="size-6" style={{ color: accent }} />
+                <span className="text-lg font-bold tracking-tight">Equipify.ai</span>
+              </>
+            )}
           </div>
 
           <span
@@ -83,27 +99,46 @@ export function PresentationSidebarBrand({
               {headline}
             </h1>
             {body ? (
-              <p className="max-w-md text-base leading-relaxed text-slate-300 sm:text-[1.0625rem] whitespace-pre-wrap">
+              <p
+                className="max-w-md text-base leading-relaxed sm:text-[1.0625rem] whitespace-pre-wrap"
+                style={{ color: "color-mix(in srgb, var(--sendr-header-text) 75%, transparent)" }}
+              >
                 {body}
               </p>
             ) : null}
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+        <div
+          className="rounded-2xl border p-5 backdrop-blur-sm"
+          style={{
+            borderColor: "color-mix(in srgb, var(--sendr-header-text) 12%, transparent)",
+            backgroundColor: "color-mix(in srgb, var(--sendr-header-text) 6%, transparent)",
+          }}
+        >
           <div className="flex gap-0.5 text-amber-400">
             {Array.from({ length: 5 }).map((_, index) => (
               <Star key={index} className="size-4 fill-current" />
             ))}
           </div>
-          <p className="mt-3 text-sm leading-relaxed text-slate-200 sm:text-[0.9375rem]">{trustLine}</p>
+          <p
+            className="mt-3 text-sm leading-relaxed sm:text-[0.9375rem]"
+            style={{ color: "color-mix(in srgb, var(--sendr-header-text) 85%, transparent)" }}
+          >
+            {trustLine}
+          </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
           {GROWTH_SENDR_PRESENTATION_FEATURE_BADGES.map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-200"
+              className="inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium"
+              style={{
+                borderColor: "color-mix(in srgb, var(--sendr-header-text) 12%, transparent)",
+                backgroundColor: "color-mix(in srgb, var(--sendr-header-text) 6%, transparent)",
+                color: "color-mix(in srgb, var(--sendr-header-text) 85%, transparent)",
+              }}
             >
               {tag}
             </span>
@@ -125,37 +160,51 @@ export function PresentationSidebarBrand({
         ) : null}
 
         {booking ? (
-          <div className="mt-auto rounded-2xl border border-white/10 bg-black/25 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Meeting information</p>
-            <ul className="mt-4 space-y-3 text-sm text-slate-200">
+          <div
+            className="mt-auto rounded-2xl border p-5"
+            style={{
+              borderColor: "color-mix(in srgb, var(--sendr-header-text) 12%, transparent)",
+              backgroundColor: "color-mix(in srgb, var(--sendr-header-bg) 70%, black)",
+            }}
+          >
+            <p
+              className="text-xs font-semibold uppercase tracking-[0.14em]"
+              style={{ color: "color-mix(in srgb, var(--sendr-header-text) 55%, transparent)" }}
+            >
+              Meeting information
+            </p>
+            <ul
+              className="mt-4 space-y-3 text-sm"
+              style={{ color: "color-mix(in srgb, var(--sendr-header-text) 85%, transparent)" }}
+            >
               {booking.durationMinutes ? (
                 <li className="flex items-center gap-2.5">
-                  <Clock className="size-4 shrink-0 text-slate-400" />
+                  <Clock className="size-4 shrink-0 opacity-60" />
                   {booking.durationMinutes}-minute walkthrough
                 </li>
               ) : null}
               {booking.meetingLink ? (
                 <li className="flex items-center gap-2.5">
-                  <Video className="size-4 shrink-0 text-slate-400" />
+                  <Video className="size-4 shrink-0 opacity-60" />
                   Google Meet
                 </li>
               ) : null}
               <li className="flex items-center gap-2.5">
-                <MessageCircle className="size-4 shrink-0 text-slate-400" />
+                <MessageCircle className="size-4 shrink-0 opacity-60" />
                 Live Q&amp;A
               </li>
               <li className="flex items-center gap-2.5">
-                <CalendarDays className="size-4 shrink-0 text-slate-400" />
+                <CalendarDays className="size-4 shrink-0 opacity-60" />
                 No commitment required
               </li>
               {booking.timezone ? (
                 <li className="flex items-center gap-2.5">
-                  <Globe className="size-4 shrink-0 text-slate-400" />
+                  <Globe className="size-4 shrink-0 opacity-60" />
                   {booking.timezone}
                 </li>
               ) : null}
               {booking.meetingType ? (
-                <li className="flex items-center gap-2.5 text-slate-400">
+                <li className="flex items-center gap-2.5 opacity-70">
                   <span className="size-4 shrink-0" />
                   {booking.meetingType}
                 </li>

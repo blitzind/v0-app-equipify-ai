@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react"
 import type { GrowthSendrLaunchPreviewResult } from "@/lib/growth/sendr/growth-sendr-types"
 import {
   GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL,
+  formatGrowthVideoPageSampleVariableKey,
 } from "@/lib/growth/sendr/growth-sendr-branding"
 
 type Props = {
@@ -69,9 +70,11 @@ export function GrowthSendrLaunchPreviewStep({ preview, loading, error }: Props)
       <div className="space-y-1">
         <p className="text-xs font-medium uppercase text-muted-foreground">Sample variables</p>
         <div className="rounded-md bg-muted/50 p-3 text-sm">
-          {Object.entries(preview.sampleVariables).map(([key, value]) => (
+          {Object.entries(preview.sampleVariables)
+            .filter(([key]) => key !== "sendr_page_url")
+            .map(([key, value]) => (
             <div key={key} className="flex justify-between gap-2">
-              <span className="text-muted-foreground">{key}</span>
+              <span className="text-muted-foreground">{formatGrowthVideoPageSampleVariableKey(key)}</span>
               <span className="truncate font-mono text-xs">{value || "—"}</span>
             </div>
           ))}

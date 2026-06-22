@@ -1,28 +1,29 @@
-"use client"
+import { redirect } from "next/navigation"
+import { buildGrowthPersonalizedVideosPageDetailPath } from "@/lib/growth/sendr/growth-sendr-branding"
 
-import { use } from "react"
-import { Sparkles } from "lucide-react"
-import { GrowthSendrPageDetail } from "@/components/growth/sendr/growth-sendr-page-detail"
-import { GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL } from "@/lib/growth/sendr/growth-sendr-branding"
-import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
-import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
-
-export default function GrowthSendrPageDetailRoute({
-  params,
-}: {
+type LegacySendrPageDetailProps = {
   params: Promise<{ pageId: string }>
-}) {
-  const { pageId } = use(params)
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}
 
-  return (
-    <GrowthWorkspacePageContent>
-      <GrowthWorkspacePageHeader
-        title={GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL}
-        description="Sections, personalization preview, media & booking attachment, publish."
-        icon={Sparkles}
-        iconClassName="bg-fuchsia-50 text-fuchsia-600"
-      />
-      <GrowthSendrPageDetail pageId={pageId} />
-    </GrowthWorkspacePageContent>
-  )
+/** Legacy alias — preserves bookmarks and deep links to `/growth/sendr/[pageId]`. */
+export default async function LegacyGrowthSendrPageDetailRedirect({
+  params,
+  searchParams,
+}: LegacySendrPageDetailProps) {
+  const { pageId } = await params
+  const target = buildGrowthPersonalizedVideosPageDetailPath(pageId)
+  const resolvedParams = await searchParams
+  const qs = new URLSearchParams()
+  for (const [key, value] of Object.entries(resolvedParams)) {
+    if (typeof value === "string" && value.trim()) {
+      qs.set(key, value.trim())
+    } else if (Array.isArray(value)) {
+      for (const entry of value) {
+        if (typeof entry === "string" && entry.trim()) qs.append(key, entry.trim())
+      }
+    }
+  }
+  const query = qs.toString()
+  redirect(query ? `${target}?${query}` : target)
 }

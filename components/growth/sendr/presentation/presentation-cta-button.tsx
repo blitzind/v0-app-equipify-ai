@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react"
 import { cn } from "@/lib/utils"
-import { GROWTH_SENDR_PRESENTATION_ACCENT } from "@/lib/growth/sendr/growth-sendr-presentation-config"
 
 type Props = {
   href: string
@@ -35,15 +34,28 @@ export function PresentationCtaButton({
         size === "default" && "min-h-11 px-6 py-2.5 text-sm",
         size === "large" && "min-h-[3.25rem] px-8 py-3 text-base",
         fullWidth && "w-full",
-        variant === "primary" &&
-          "text-white shadow-[0_8px_24px_rgb(37,99,235,0.35)] hover:shadow-[0_12px_32px_rgb(37,99,235,0.45)]",
+        variant === "primary" && "shadow-[0_8px_24px_rgb(0,0,0,0.18)] hover:shadow-[0_12px_32px_rgb(0,0,0,0.24)]",
         variant === "secondary" &&
-          "border border-slate-200 bg-white text-slate-900 shadow-sm hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:bg-slate-800",
+          "border shadow-sm hover:opacity-95",
         variant === "ghost" &&
-          "border border-white/20 bg-white/5 text-white shadow-none hover:border-white/30 hover:bg-white/10",
+          "border shadow-none hover:opacity-95",
         className,
       )}
-      style={variant === "primary" ? { backgroundColor: GROWTH_SENDR_PRESENTATION_ACCENT } : undefined}
+      style={
+        variant === "primary"
+          ? { backgroundColor: "var(--sendr-button-bg)", color: "var(--sendr-button-text)" }
+          : variant === "ghost"
+            ? {
+                borderColor: "color-mix(in srgb, var(--sendr-header-text) 25%, transparent)",
+                backgroundColor: "color-mix(in srgb, var(--sendr-header-text) 8%, transparent)",
+                color: "var(--sendr-header-text)",
+              }
+            : {
+                borderColor: "color-mix(in srgb, var(--sendr-page-text) 15%, transparent)",
+                backgroundColor: "var(--sendr-surface)",
+                color: "var(--sendr-page-text)",
+              }
+      }
     >
       {children}
     </a>

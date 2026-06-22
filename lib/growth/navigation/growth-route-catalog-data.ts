@@ -196,25 +196,63 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     dynamic: true,
     dynamicMatch: /^automation\/[^/]+$/,
   }),
-  workspaceDual("workspace-personalized-videos", "sendr", "Personalized Videos", "content", {
+  workspaceDual("workspace-personalized-videos", "videos/personalized", "Personalized Videos", "content", {
     breadcrumbLabel: "Personalized Videos",
   }),
-  workspaceDual("workspace-personalized-videos-new", "sendr/new", "New Personalized Video Page", "content", {
+  workspaceDual("workspace-personalized-videos-new", "videos/personalized/new", "New Personalized Video Page", "content", {
     breadcrumbLabel: "New Page",
   }),
-  workspaceDual("workspace-personalized-videos-detail", "sendr/[pageId]", "Personalized Video Page", "content", {
+  workspaceDual("workspace-personalized-videos-detail", "videos/personalized/[pageId]", "Personalized Video Page", "content", {
     breadcrumbLabel: "Page Detail",
     dynamic: true,
-    dynamicMatch: /^sendr\/[^/]+$/,
+    dynamicMatch: /^videos\/personalized\/[^/]+$/,
   }),
-  workspaceDual("workspace-personalized-videos-activity", "sendr/activity", "Personalized Videos Activity", "content", {
+  workspaceDual("workspace-activity", "activity", "Activity", "content", {
     breadcrumbLabel: "Activity",
   }),
-  workspaceDual("workspace-personalized-videos-analytics", "sendr/analytics", "Personalized Videos Analytics", "content", {
+  workspaceDual("workspace-personalized-videos-analytics", "videos/personalized/analytics", "Personalized Videos Analytics", "content", {
     breadcrumbLabel: "Analytics",
   }),
-  workspaceDual("workspace-personalized-videos-launch", "sendr/launch", "Personalized Videos Launch", "content", {
+  workspaceDual("workspace-personalized-videos-launch", "videos/personalized/launch", "Personalized Videos Launch", "content", {
     breadcrumbLabel: "Launch",
+  }),
+  workspace("workspace-personalized-videos-legacy-root", "sendr", "Personalized Videos Legacy Redirect", "content", "workspace", {
+    deprecated: true,
+    migrated: true,
+    segment: "sendr",
+    workspacePath: `${WORKSPACE}/videos/personalized`,
+  }),
+  workspace("workspace-personalized-videos-legacy-new", "sendr/new", "New Personalized Video Page Legacy Redirect", "content", "workspace", {
+    deprecated: true,
+    migrated: true,
+    segment: "sendr/new",
+    workspacePath: `${WORKSPACE}/videos/personalized/new`,
+  }),
+  workspace("workspace-personalized-videos-legacy-detail", "sendr/[pageId]", "Personalized Video Page Legacy Redirect", "content", "workspace", {
+    deprecated: true,
+    migrated: true,
+    segment: "sendr/[pageId]",
+    dynamic: true,
+    dynamicMatch: /^sendr\/[^/]+$/,
+    workspacePath: `${WORKSPACE}/videos/personalized/[pageId]`,
+  }),
+  workspace("workspace-personalized-videos-legacy-activity", "sendr/activity", "Activity Legacy Redirect", "content", "workspace", {
+    deprecated: true,
+    migrated: true,
+    segment: "sendr/activity",
+    workspacePath: `${WORKSPACE}/activity`,
+  }),
+  workspace("workspace-personalized-videos-legacy-analytics", "sendr/analytics", "Personalized Videos Analytics Legacy Redirect", "content", "workspace", {
+    deprecated: true,
+    migrated: true,
+    segment: "sendr/analytics",
+    workspacePath: `${WORKSPACE}/videos/personalized/analytics`,
+  }),
+  workspace("workspace-personalized-videos-legacy-launch", "sendr/launch", "Personalized Videos Launch Legacy Redirect", "content", "workspace", {
+    deprecated: true,
+    migrated: true,
+    segment: "sendr/launch",
+    workspacePath: `${WORKSPACE}/videos/personalized/launch`,
   }),
   workspaceDual("workspace-videos", "videos", "Videos", "content", {
     breadcrumbLabel: "Videos",
@@ -575,7 +613,14 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     breadcrumbLabel: "Media Assets",
   }),
   admin("admin-copilot-reply-drafts", "copilot/reply-drafts", "Reply Drafts", "content", "admin-only"),
-  admin("admin-copilot-personalization", "copilot/personalization", "Personalization", "content", "admin-only"),
+  admin("admin-copilot-personalization", "copilot/personalization", "Personalization", "content", "dual-route", {
+    deprecated: true,
+    workspacePath: `${WORKSPACE}/personalization`,
+    segment: "personalization",
+  }),
+  workspaceDual("workspace-personalization", "personalization", "Personalization", "content", {
+    adminPath: `${ADMIN}/copilot/personalization`,
+  }),
   admin("admin-knowledge", "knowledge", "Knowledge Center", "content", "admin-only"),
 
   admin("admin-sequences", "sequences", "Sequences", "automation", "admin-only"),

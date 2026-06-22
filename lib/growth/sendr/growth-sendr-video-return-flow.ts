@@ -1,5 +1,11 @@
 /** GS-SENDR-4B — Operator return flow between Personalized Videos and Growth Video. */
 
+import {
+  buildGrowthPersonalizedVideosPageDetailPath,
+  GROWTH_PERSONALIZED_VIDEOS_LEGACY_WORKSPACE_PREFIX,
+  GROWTH_PERSONALIZED_VIDEOS_WORKSPACE_PATH,
+} from "@/lib/growth/sendr/growth-sendr-branding"
+
 export const SENDR_VIDEO_RETURN_QUERY = {
   returnTo: "returnTo",
   landingPageId: "landingPageId",
@@ -23,14 +29,18 @@ export function isSendrUuid(value: string | null | undefined): value is string {
 }
 
 export function isSafeSendrReturnPath(path: string): boolean {
-  if (!path.startsWith("/growth/sendr/")) return false
+  const allowedPrefixes = [
+    `${GROWTH_PERSONALIZED_VIDEOS_WORKSPACE_PATH}/`,
+    `${GROWTH_PERSONALIZED_VIDEOS_LEGACY_WORKSPACE_PREFIX}/`,
+  ]
+  if (!allowedPrefixes.some((prefix) => path.startsWith(prefix))) return false
   if (path.includes("//") || path.includes("..")) return false
   if (path.includes("?")) return false
   return true
 }
 
 export function buildSendrPageDetailPath(landingPageId: string): string {
-  return `/growth/sendr/${landingPageId}`
+  return buildGrowthPersonalizedVideosPageDetailPath(landingPageId)
 }
 
 export function buildSendrVideoReturnQuery(ctx: SendrVideoReturnContext): URLSearchParams {

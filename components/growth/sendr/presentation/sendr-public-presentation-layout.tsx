@@ -29,7 +29,7 @@ import {
   type PresentationVideoPlayback,
 } from "@/components/growth/sendr/presentation/presentation-video-hero"
 import { PresentationVideoEmptyState } from "@/components/growth/sendr/presentation/presentation-video-empty-state"
-import { cn } from "@/lib/utils"
+import { usePresentationTheme } from "@/components/growth/sendr/presentation/presentation-section"
 
 type Section = GrowthSendrPublicPagePayload["sections"][number]
 
@@ -94,7 +94,9 @@ function CtaSectionBlock({
         icon={section.type === "calendar" ? CalendarDays : MousePointerClick}
         variant="muted"
       >
-        <p className="text-sm text-slate-500">Ask your rep to connect a booking or destination link.</p>
+        <p className="text-sm" style={{ color: "color-mix(in srgb, var(--sendr-page-text) 55%, transparent)" }}>
+          Ask your rep to connect a booking or destination link.
+        </p>
       </PresentationSection>
     )
   }
@@ -162,10 +164,19 @@ function FaqSectionBlock({ section }: { section: Section }) {
           return (
             <div
               key={index}
-              className="rounded-xl border border-slate-200/80 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/50"
+              className="rounded-xl border p-4"
+              style={{
+                backgroundColor: "var(--sendr-surface)",
+                borderColor: "color-mix(in srgb, var(--sendr-page-text) 12%, transparent)",
+              }}
             >
-              <p className="font-medium text-slate-900 dark:text-slate-50">{String(row.question ?? "")}</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+              <p className="font-medium" style={{ color: "var(--sendr-page-text)" }}>
+                {String(row.question ?? "")}
+              </p>
+              <p
+                className="mt-2 text-sm leading-relaxed"
+                style={{ color: "color-mix(in srgb, var(--sendr-page-text) 70%, transparent)" }}
+              >
                 {String(row.answer ?? "")}
               </p>
             </div>
@@ -195,7 +206,12 @@ function BenefitsSectionBlock({ section }: { section: Section }) {
             return (
               <li
                 key={index}
-                className="rounded-xl border border-slate-200/80 bg-slate-50/60 px-4 py-3 text-sm font-medium text-slate-800 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
+                className="rounded-xl border px-4 py-3 text-sm font-medium"
+                style={{
+                  backgroundColor: "color-mix(in srgb, var(--sendr-page-bg) 55%, var(--sendr-surface))",
+                  borderColor: "color-mix(in srgb, var(--sendr-page-text) 12%, transparent)",
+                  color: "var(--sendr-page-text)",
+                }}
               >
                 {label}
               </li>
@@ -203,7 +219,12 @@ function BenefitsSectionBlock({ section }: { section: Section }) {
           })}
         </ul>
       ) : typeof content.body === "string" ? (
-        <p className="text-sm leading-relaxed text-slate-600 whitespace-pre-wrap dark:text-slate-400">{content.body}</p>
+        <p
+          className="text-sm leading-relaxed whitespace-pre-wrap"
+          style={{ color: "color-mix(in srgb, var(--sendr-page-text) 70%, transparent)" }}
+        >
+          {content.body}
+        </p>
       ) : null}
     </PresentationSection>
   )
@@ -259,7 +280,12 @@ function TextSectionBlock({ section }: { section: Section }) {
       variant="muted"
     >
       {typeof content.body === "string" ? (
-        <p className="text-sm leading-relaxed text-slate-600 whitespace-pre-wrap dark:text-slate-400">{content.body}</p>
+        <p
+          className="text-sm leading-relaxed whitespace-pre-wrap"
+          style={{ color: "color-mix(in srgb, var(--sendr-page-text) 70%, transparent)" }}
+        >
+          {content.body}
+        </p>
       ) : null}
     </PresentationSection>
   )
@@ -303,6 +329,7 @@ export function SendrPublicPresentationLayout({
   onTrack: TrackFn
   previewMode?: boolean
 }) {
+  const theme = usePresentationTheme()
   const personalized = page.personalization?.applied === true
   const heroSection = page.sections.find((s) => s.type === "hero")
   const videoSections = page.sections.filter((s) => s.type === "video" || s.type === "avatar_video")
@@ -421,7 +448,10 @@ export function SendrPublicPresentationLayout({
         }
       />
 
-      <section className="flex flex-col gap-8 p-6 sm:gap-10 sm:p-8 lg:min-h-[720px] lg:p-10 xl:gap-12 xl:p-12">
+      <section
+        className="flex flex-col gap-8 p-6 sm:gap-10 sm:p-8 lg:min-h-[720px] lg:p-10 xl:gap-12 xl:p-12"
+        style={{ backgroundColor: "var(--sendr-page-bg)", color: "var(--sendr-page-text)" }}
+      >
         {hasPlayableVideo(firstVideoPlayback) && firstVideoPlayback ? (
           <PresentationVideoHero
             title={
@@ -576,8 +606,14 @@ export function SendrPublicPresentationLayout({
           </PresentationFinaleCta>
         ) : null}
 
-        <footer className="mt-auto border-t border-slate-200/80 pt-6 text-xs text-slate-400 dark:border-slate-800">
-          Personalized video experience · Secure viewing
+        <footer
+          className="mt-auto border-t pt-6 text-xs"
+          style={{
+            borderColor: "color-mix(in srgb, var(--sendr-page-text) 12%, transparent)",
+            color: "color-mix(in srgb, var(--sendr-page-text) 45%, transparent)",
+          }}
+        >
+          {theme.footerText ?? "Personalized video experience · Secure viewing"}
         </footer>
       </section>
     </div>

@@ -2,7 +2,12 @@
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL } from "@/lib/growth/sendr/growth-sendr-branding"
+import {
+  GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL,
+  GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL,
+  GROWTH_PERSONALIZED_VIDEOS_WORKSPACE_PATH,
+  buildGrowthPersonalizedVideosPageDetailPath,
+} from "@/lib/growth/sendr/growth-sendr-branding"
 import type { GrowthSendrLaunchRunProgress } from "@/lib/growth/sendr/growth-sendr-types"
 
 type Props = {
@@ -53,7 +58,7 @@ export function GrowthSendrLaunchCompleteStep({ progress, onStartOver }: Props) 
           <Link href="/admin/growth/sequences/execution">Sequence status</Link>
         </Button>
         <Button size="sm" variant="outline" asChild>
-          <Link href="/growth/sendr">{GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL} workspace</Link>
+          <Link href={GROWTH_PERSONALIZED_VIDEOS_WORKSPACE_PATH}>{GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL} workspace</Link>
         </Button>
         <Button size="sm" variant="outline" asChild>
           <Link href="/growth/admin/runtime">Runtime dashboard</Link>

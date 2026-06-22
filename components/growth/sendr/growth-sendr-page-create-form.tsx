@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Loader2 } from "lucide-react"
+import { Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,8 +14,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { GROWTH_SENDR_PAGE_TEMPLATES } from "@/lib/growth/sendr/growth-sendr-builder-config"
+import { buildGrowthPersonalizedVideosPageDetailPath } from "@/lib/growth/sendr/growth-sendr-branding"
 
-const TEMPLATE_TYPES = ["default", "intro", "follow_up", "meeting_recap"] as const
 const SOURCE_TYPES = ["manual", "lead", "company", "audience_member"] as const
 
 export function GrowthSendrPageCreateForm() {
@@ -31,7 +32,8 @@ export function GrowthSendrPageCreateForm() {
   const [leadId, setLeadId] = useState(searchParams.get("leadId") ?? "")
   const [companyId, setCompanyId] = useState(searchParams.get("companyId") ?? "")
   const [audienceMemberId, setAudienceMemberId] = useState(searchParams.get("audienceMemberId") ?? "")
-  const [templateType, setTemplateType] = useState<string>("default")
+  const [quickStartTemplateId, setQuickStartTemplateId] = useState<string>("general_field_service")
+  const [applyQuickStart, setApplyQuickStart] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -46,7 +48,7 @@ export function GrowthSendrPageCreateForm() {
       const body: Record<string, unknown> = {
         action: "create",
         title: title.trim(),
-        templateType,
+        templateType: "default",
       }
       if (sourceType === "lead" && leadId.trim()) body.leadId = leadId.trim()
       if (sourceType === "company" && companyId.trim()) body.companyId = companyId.trim()
@@ -67,7 +69,19 @@ export function GrowthSendrPageCreateForm() {
         return
       }
       if (data.page?.id) {
-        router.push(`/growth/sendr/${data.page.id}`)
+        if (applyQuickStart) {
+          await fetch("/api/platform/growth/sendr/landing-pages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "apply_template",
+              landingPageId: data.page.id,
+              templateId: quickStartTemplateId,
+              replaceExistingSections: true,
+            }),
+          })
+        }
+        router.push(buildGrowthPersonalizedVideosPageDetailPath(data.page.id))
       }
     } catch {
       setError("Create failed")
@@ -130,19 +144,42 @@ export function GrowthSendrPageCreateForm() {
         )}
 
         <div className="space-y-2">
-          <Label>Template type</Label>
-          <Select value={templateType} onValueChange={setTemplateType}>
+          <Label>Quick-start template</Label>
+          <Select value={quickStartTemplateId} onValueChange={setQuickStartTemplateId}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {TEMPLATE_TYPES.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type.replace("_", " ")}
+              {GROWTH_SENDR_PAGE_TEMPLATES.map((template) => (
+                <SelectItem key={template.id} value={template.id}>
+                  {template.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          <p className="text-xs text-muted-foreground">
+            Seeds hero, benefits, FAQ, and CTA sections — no AI required. Edit before publishing.
+          </p>
+        </div>
+
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={applyQuickStart}
+            onChange={(e) => setApplyQuickStart(e.target.checked)}
+          />
+          Apply quick-start template on create
+        </label>
+
+        <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+          <p className="flex items-center gap-1.5 font-medium text-foreground">
+            <Sparkles className="size-4" />
+            AI-assisted drafts
+          </p>
+          <p className="mt-1">
+            After creating the page, open the <strong>AI &amp; templates</strong> tab to generate a personalized draft
+            with operator review.
+          </p>
         </div>
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}

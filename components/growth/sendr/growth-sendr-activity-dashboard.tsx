@@ -14,7 +14,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
-import { GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL } from "@/lib/growth/sendr/growth-sendr-branding"
+import {
+  GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL,
+  buildGrowthPersonalizedVideosPageDetailPath,
+} from "@/lib/growth/sendr/growth-sendr-branding"
 import { GROWTH_SENDR_ACTIVITY_QA_MARKER } from "@/lib/growth/sendr/growth-sendr-config"
 import { GROWTH_SENDR_ANALYTICS_DEFAULT_PRESET } from "@/lib/growth/sendr/growth-sendr-analytics-date-range"
 import type {
@@ -199,7 +202,7 @@ export function GrowthSendrActivityDashboard() {
                         ) : null}
                         {row.landingPageId ? (
                           <Button size="sm" variant="ghost" asChild>
-                            <Link href={`/growth/sendr/${row.landingPageId}`}>Page</Link>
+                            <Link href={buildGrowthPersonalizedVideosPageDetailPath(row.landingPageId)}>Page</Link>
                           </Button>
                         ) : null}
                       </div>
@@ -238,7 +241,7 @@ export function GrowthSendrActivityDashboard() {
                   </Button>
                   {prospect.landingPageId ? (
                     <Button size="sm" variant="ghost" asChild>
-                      <Link href={`/growth/sendr/${prospect.landingPageId}`}>Open Page</Link>
+                      <Link href={buildGrowthPersonalizedVideosPageDetailPath(prospect.landingPageId)}>Open Page</Link>
                     </Button>
                   ) : null}
                 </div>

@@ -17,6 +17,7 @@ export const GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS = [
   "meetings",
   "share-pages",
   "personalized-videos",
+  "personalization",
   "videos",
   "media-assets",
   "automation-flows",

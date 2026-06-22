@@ -12,6 +12,7 @@ import type { GrowthSendrLaunchWorkspaceSummary } from "@/lib/growth/sendr/growt
 import {
   GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL,
   GROWTH_PERSONALIZED_VIDEOS_PUBLIC_PATH,
+  GROWTH_VIDEO_PAGE_URL_MERGE_TOKEN,
 } from "@/lib/growth/sendr/growth-sendr-branding"
 
 type Props = {
@@ -32,7 +33,7 @@ export function GrowthSendrLaunchPageStep({
       <div>
         <h3 className="text-sm font-medium">Choose published {GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL.toLowerCase()}</h3>
         <p className="text-sm text-muted-foreground">
-          The page URL resolves as {"{{sendr_page_url}}"} in sequence content.
+          The page URL resolves as {GROWTH_VIDEO_PAGE_URL_MERGE_TOKEN} in sequence content.
         </p>
       </div>
       <div className="space-y-2">

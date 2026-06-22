@@ -1,21 +1,24 @@
-"use client"
+import { redirect } from "next/navigation"
+import { buildGrowthPersonalizedVideosWorkspaceHref } from "@/lib/growth/sendr/growth-sendr-branding"
 
-import { Sparkles } from "lucide-react"
-import { GrowthSendrPageCreateForm } from "@/components/growth/sendr/growth-sendr-page-create-form"
-import { GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL } from "@/lib/growth/sendr/growth-sendr-branding"
-import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
-import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
+type LegacySendrNewPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}
 
-export default function GrowthSendrNewPage() {
-  return (
-    <GrowthWorkspacePageContent>
-      <GrowthWorkspacePageHeader
-        title={`Create ${GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL}`}
-        description="Lead-aware page creation — operator-initiated, no automation."
-        icon={Sparkles}
-        iconClassName="bg-fuchsia-50 text-fuchsia-600"
-      />
-      <GrowthSendrPageCreateForm />
-    </GrowthWorkspacePageContent>
-  )
+/** Legacy alias — preserves bookmarks and deep links to `/growth/sendr/new`. */
+export default async function LegacyGrowthSendrNewRedirect({ searchParams }: LegacySendrNewPageProps) {
+  const params = await searchParams
+  const target = buildGrowthPersonalizedVideosWorkspaceHref("new")
+  const qs = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === "string" && value.trim()) {
+      qs.set(key, value.trim())
+    } else if (Array.isArray(value)) {
+      for (const entry of value) {
+        if (typeof entry === "string" && entry.trim()) qs.append(key, entry.trim())
+      }
+    }
+  }
+  const query = qs.toString()
+  redirect(query ? `${target}?${query}` : target)
 }

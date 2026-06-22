@@ -22,6 +22,7 @@ import {
   personalizeSendrPublicPagePayload,
   resolveSendrVisitorLeadId,
 } from "@/lib/growth/sendr/growth-sendr-visitor-personalization-service"
+import { resolveGrowthSendrPageTheme } from "@/lib/growth/sendr/growth-sendr-config"
 import type { SendrVisitorRenderContext } from "@/lib/growth/sendr/growth-sendr-visitor-render-context"
 
 type PublicationSnapshot = {
@@ -139,6 +140,10 @@ export async function loadSendrPublicPageBySlug(
     payload,
     renderContext,
   })
+
+  personalizedPayload.theme = resolveGrowthSendrPageTheme(
+    (snapshot.page?.mobileMetadata as Record<string, unknown> | undefined) ?? page.mobileMetadata,
+  )
 
   return { ok: true, slug, payload: personalizedPayload }
 }

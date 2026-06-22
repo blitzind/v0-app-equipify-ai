@@ -17,6 +17,7 @@ import { GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import {
   GROWTH_PERSONALIZED_VIDEOS_PAGE_LABEL,
   GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL,
+  buildGrowthPersonalizedVideosPageDetailPath,
 } from "@/lib/growth/sendr/growth-sendr-branding"
 import { GROWTH_SENDR_ANALYTICS_QA_MARKER } from "@/lib/growth/sendr/growth-sendr-config"
 import { GROWTH_SENDR_ANALYTICS_DEFAULT_PRESET } from "@/lib/growth/sendr/growth-sendr-analytics-date-range"
@@ -176,7 +177,7 @@ export function GrowthSendrAnalyticsDashboard() {
               {summary.topPages.map((page) => (
                 <div key={page.landingPageId} className="flex items-start justify-between gap-3 border-b border-border/50 pb-2">
                   <div className="min-w-0">
-                    <Link href={`/growth/sendr/${page.landingPageId}`} className="font-medium hover:underline">
+                    <Link href={buildGrowthPersonalizedVideosPageDetailPath(page.landingPageId)} className="font-medium hover:underline">
                       {page.title}
                     </Link>
                     <p className="text-xs text-muted-foreground">
@@ -184,7 +185,7 @@ export function GrowthSendrAnalyticsDashboard() {
                     </p>
                   </div>
                   <Button size="sm" variant="ghost" asChild>
-                    <Link href={`/growth/sendr/${page.landingPageId}`}>
+                    <Link href={buildGrowthPersonalizedVideosPageDetailPath(page.landingPageId)}>
                       <ExternalLink className="h-4 w-4" />
                     </Link>
                   </Button>
@@ -213,7 +214,7 @@ export function GrowthSendrAnalyticsDashboard() {
                     </Button>
                     {prospect.sendrPageId ? (
                       <Button size="sm" variant="ghost" asChild>
-                        <Link href={`/growth/sendr/${prospect.sendrPageId}`}>Page</Link>
+                        <Link href={buildGrowthPersonalizedVideosPageDetailPath(prospect.sendrPageId)}>Page</Link>
                       </Button>
                     ) : null}
                   </div>
@@ -252,7 +253,7 @@ export function GrowthSendrAnalyticsDashboard() {
             <div className="space-y-2 text-sm">
               {summary.pagesNeedingAttention.map((page) => (
                 <div key={page.landingPageId} className="border-b border-border/50 pb-2">
-                  <Link href={`/growth/sendr/${page.landingPageId}`} className="font-medium hover:underline">
+                  <Link href={buildGrowthPersonalizedVideosPageDetailPath(page.landingPageId)} className="font-medium hover:underline">
                     {page.title}
                   </Link>
                   <p className="text-xs text-muted-foreground">{page.recommendation}</p>

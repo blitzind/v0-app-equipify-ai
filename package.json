@@ -710,6 +710,7 @@
     "test:growth-sendr-personalized-url-delivery": "tsx scripts/test-growth-sendr-personalized-url-delivery.ts",
     "test:growth-sendr-operator-copy": "tsx scripts/test-growth-sendr-operator-copy.ts",
     "test:growth-sendr-branding-alignment": "tsx scripts/test-growth-sendr-branding-alignment.ts",
+    "test:growth-operator-facing-sendr-cleanup": "tsx scripts/test-growth-operator-facing-sendr-cleanup.ts",
     "test:growth-sendr-8a-production-cert": "tsx scripts/test-growth-sendr-8a-production-cert.ts",
     "test:growth-industry-playbook-foundation": "tsx scripts/test-growth-industry-playbook-foundation.ts",
     "test:growth-personalization-evidence-playbooks": "tsx scripts/test-growth-personalization-evidence-playbooks.ts",

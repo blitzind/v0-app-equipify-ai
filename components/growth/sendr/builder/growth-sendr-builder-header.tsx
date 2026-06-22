@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import type { GrowthSendrLandingPage } from "@/lib/growth/sendr/growth-sendr-types"
 import { buildSendrPagePublicLink } from "@/lib/growth/sendr/growth-sendr-slug-runtime"
+import { GROWTH_PERSONALIZED_VIDEOS_WORKSPACE_PATH } from "@/lib/growth/sendr/growth-sendr-branding"
 import { cn } from "@/lib/utils"
 
 function statusTone(status: string): { badge: "default" | "secondary" | "outline"; label: string; hint: string } {
@@ -60,7 +61,7 @@ export function GrowthSendrBuilderHeader({
           <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" variant="ghost" className="h-8 px-2 text-muted-foreground" asChild>
-                <Link href="/growth/sendr">
+                <Link href={GROWTH_PERSONALIZED_VIDEOS_WORKSPACE_PATH}>
                   <ArrowLeft className="mr-1.5 size-4" />
                   Workspace
                 </Link>

@@ -19,6 +19,7 @@ import {
   Target,
   Users,
   Video,
+  Wand2,
   Workflow,
 } from "lucide-react"
 import {
@@ -96,6 +97,13 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
         label: "Personalized Videos",
         registryRouteId: "workspace-personalized-videos",
         icon: Sparkles,
+        workspaceRoute: true,
+      },
+      {
+        id: "personalization",
+        label: "Personalization",
+        registryRouteId: "workspace-personalization",
+        icon: Wand2,
         workspaceRoute: true,
       },
       { id: "videos", label: "Videos", registryRouteId: "workspace-videos", icon: Video, workspaceRoute: true },
@@ -190,7 +198,14 @@ export function isGrowthShellNavItemActive(pathname: string, item: GrowthShellNa
   }
   if (
     item.id === "personalized-videos" &&
-    pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/sendr`)
+    (pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/videos/personalized`) ||
+      pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/sendr`))
+  ) {
+    return true
+  }
+  if (
+    item.id === "personalization" &&
+    pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/personalization`)
   ) {
     return true
   }

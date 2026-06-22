@@ -6,6 +6,7 @@ import type {
   GrowthSendrPublicPagePayload,
   GrowthSendrVideoAsset,
 } from "@/lib/growth/sendr/growth-sendr-types"
+import { resolveGrowthSendrPageTheme } from "@/lib/growth/sendr/growth-sendr-config"
 
 function applyPreviewVariables(text: string, resolved: Record<string, string>): string {
   return text.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_, key: string) => resolved[key] ?? `{{${key}}}`)
@@ -71,5 +72,6 @@ export function buildGrowthSendrPagePreviewPayload(input: {
       applied: personalizationApplied,
       mode: hasPersonalizationPreview ? "lead" : "anonymous",
     },
+    theme: resolveGrowthSendrPageTheme(input.page.mobileMetadata),
   }
 }

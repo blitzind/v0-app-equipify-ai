@@ -174,6 +174,7 @@ export type GrowthSendrPublicPagePayload = {
     timezone: string | null
   } | null
   personalization?: GrowthSendrPublicPagePersonalizationMeta
+  theme?: import("@/lib/growth/sendr/growth-sendr-config").GrowthSendrPageTheme
 }
 
 export type GrowthSendrWorkspaceSummary = {

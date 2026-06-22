@@ -85,8 +85,11 @@ function growthCallsNavMatch(path: string): boolean {
   return false
 }
 
-function exactMatch(route: string) {
-  return (path: string) => path === route
+function growthPersonalizationNavMatch(path: string): boolean {
+  return (
+    path.startsWith("/growth/personalization") ||
+    path.startsWith("/admin/growth/copilot/personalization")
+  )
 }
 
 export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] = [
@@ -329,7 +332,7 @@ export const GROWTH_COMMAND_PALETTE_DESTINATIONS: GrowthNavigationDestination[] 
   {
     id: "ai-personalization",
     label: "AI Personalization",
-    href: "/admin/growth/copilot/personalization",
+    href: "/growth/personalization",
     keywords: [
       "ai personalization",
       "personalization",
@@ -1016,10 +1019,10 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
       },
       {
         id: "ai-personalization",
-        href: "/admin/growth/copilot/personalization",
+        href: "/growth/personalization",
         label: "Personalization",
         consoleKey: "ai-personalization",
-        match: prefixMatch("/admin/growth/copilot/personalization"),
+        match: growthPersonalizationNavMatch,
       },
     ],
   },

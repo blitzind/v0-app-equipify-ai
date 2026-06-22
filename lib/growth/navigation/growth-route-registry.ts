@@ -149,6 +149,23 @@ export function resolveGrowthBreadcrumbs(
     return crumbs
   }
 
+  if (segment.startsWith("videos/personalized/") && segment !== "videos/personalized") {
+    crumbs.push({
+      label: "Personalized Videos",
+      href: `${GROWTH_WORKSPACE_BASE_PATH}/videos/personalized`,
+    })
+    crumbs.push({
+      label: options?.detailLabel ?? entry.breadcrumbLabel ?? entry.title,
+      loading: options?.detailLoading && !options.detailLabel,
+    })
+    return crumbs
+  }
+
+  if (segment === "videos/personalized") {
+    crumbs.push({ label: "Personalized Videos", href: entry.path })
+    return crumbs
+  }
+
   if (segment === "settings") {
     crumbs.push({ label: "Settings", href: entry.path })
     return crumbs

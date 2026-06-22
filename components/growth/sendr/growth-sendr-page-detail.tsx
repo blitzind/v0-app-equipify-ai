@@ -176,7 +176,7 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
       detail?.publicLink ??
       (slug
         ? buildSendrPagePublicLink(slug, window.location.origin)
-        : `${window.location.origin}/growth/sendr/${pageId}`)
+        : `${window.location.origin}${buildSendrPageDetailPath(pageId)}`)
     await navigator.clipboard.writeText(link)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
