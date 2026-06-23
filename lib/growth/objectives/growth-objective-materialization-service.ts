@@ -14,6 +14,9 @@ import {
   findObjectiveArtifact,
 } from "@/lib/growth/objectives/growth-objective-execution-context"
 import {
+  requireObjectiveActorContext,
+} from "@/lib/growth/objectives/growth-objective-actor-resolution"
+import {
   createObjectiveSendrLandingPage,
   createObjectiveVideoPageWithGeneration,
   ensureSendrPageSequenceLink,
@@ -664,6 +667,17 @@ export async function materializeGrowthObjectiveStage(
   },
 ): Promise<{ objective: GrowthObjective; context: GrowthObjectiveExecutionContext }> {
   let context = normalizeObjectiveExecutionContext(input.objective.executionContext)
+
+  if (!input.certificationMode) {
+    const actor = await requireObjectiveActorContext(admin, input.objective, {
+      requireOutboundIdentity: input.stageId === "launch",
+    })
+    input = {
+      ...input,
+      actorUserId: input.actorUserId ?? actor.userId,
+      actorUserEmail: input.actorUserEmail ?? actor.userEmail,
+    }
+  }
 
   switch (input.stageId) {
     case "discover":

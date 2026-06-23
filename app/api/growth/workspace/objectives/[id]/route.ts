@@ -27,6 +27,13 @@ export const runtime = "nodejs"
 
 type RouteContext = { params: Promise<{ id: string }> }
 
+function operatorRuntimeInput(access: { userId: string; userEmail: string }) {
+  return {
+    actorUserId: access.userId,
+    actorUserEmail: access.userEmail,
+  }
+}
+
 export async function GET(request: Request, context: RouteContext) {
   const access = await requireGrowthWorkspaceSettingsAccess(request)
   if (!access.ok) return access.response
@@ -66,11 +73,11 @@ export async function PATCH(request: Request, context: RouteContext) {
         return jsonObjective(await pauseGrowthObjective(access.admin, access.organizationId, id))
       case "resume":
         return jsonObjective(
-          await resumeGrowthObjective(access.admin, access.organizationId, id, { certificationMode: true }),
+          await resumeGrowthObjective(access.admin, access.organizationId, id, operatorRuntimeInput(access)),
         )
       case "start":
         return jsonObjective(
-          await startGrowthObjectiveRuntime(access.admin, access.organizationId, id, { certificationMode: true }),
+          await startGrowthObjectiveRuntime(access.admin, access.organizationId, id, operatorRuntimeInput(access)),
         )
       case "stop":
         return jsonObjective(
@@ -78,11 +85,11 @@ export async function PATCH(request: Request, context: RouteContext) {
         )
       case "tick":
         return jsonObjective(
-          await tickGrowthObjectiveRuntime(access.admin, access.organizationId, id, { certificationMode: true }),
+          await tickGrowthObjectiveRuntime(access.admin, access.organizationId, id, operatorRuntimeInput(access)),
         )
       case "retry_stage":
         return jsonObjective(
-          await retryGrowthObjectiveStage(access.admin, access.organizationId, id, { certificationMode: true }),
+          await retryGrowthObjectiveStage(access.admin, access.organizationId, id, operatorRuntimeInput(access)),
         )
       case "ingest_signal": {
         const signal = body.signal as GrowthObjectiveInboundSignal
@@ -90,9 +97,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           return growthWorkspaceSettingsJsonError("invalid_signal", "Signal type required.", 400)
         }
         return jsonObjective(
-          await ingestGrowthObjectiveSignal(access.admin, access.organizationId, id, signal, {
-            certificationMode: true,
-          }),
+          await ingestGrowthObjectiveSignal(access.admin, access.organizationId, id, signal, operatorRuntimeInput(access)),
         )
       }
       case "replan":

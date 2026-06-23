@@ -41,6 +41,7 @@
 - **Accessibility:** Semantic headings, focus rings (`--ring`), sufficient contrast; prefer Radix primitives from `components/ui`.
 
 ## Known Limitations / Technical Debt
+- **Growth Engine autonomy batch (GE-AUTO-1A–2I):** implemented locally, **not committed/deployed** as of 2026-06-23. Production autonomy cert verdict: `GROWTH_ENGINE_AUTONOMY_READY_WITH_MINOR_FOLLOWUPS`. Autonomous outbound **not** broadly enabled; autonomous approvals **disabled**; default autonomous daily budgets **0**. See **Growth Engine Autonomy System** section in master context for enablement checklist. GE-AUTO-3 **not started**.
 - Growth outbound operational send plane v1 + internal outbound ops Phase 1 (`growth-internal-outbound-ops-v1`): live Google mailbox + transport orchestrator; internal ops center at `/admin/growth/infrastructure/outbound-operations`; Microsoft preview-only; warmup execution disabled; unified pre-send gate with infrastructure guards; DNS manual verification only. See `docs/GROWTH_OUTBOUND_OPERATIONAL_READINESS.md`.
 - Demo/mock layers (`tenant-store`, some portal pages) can drift from production RBAC.
 - Settings surfaces: **personal** notification channel preferences and static reminder cadence cards are **not** persisted until dedicated APIs exist — workspace alert/digest/quiet prefs use `notification-preferences` — see `docs/SETTINGS_WIRING_AUDIT.md`.

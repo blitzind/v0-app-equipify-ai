@@ -1,17 +1,17 @@
-/** GE-AUTO-1F/2A/2B/2C/2D/2E/2F — Objective-driven planning & runtime types (client-safe). */
+/** GE-AUTO-2G — Objective-driven planning & runtime types (client-safe). */
 
 import type { GrowthAutonomyCapability } from "@/lib/growth/autonomy/growth-autonomy-types"
 
-export const GROWTH_OBJECTIVE_QA_MARKER = "growth-objective-ge-auto-2f-v1" as const
+export const GROWTH_OBJECTIVE_QA_MARKER = "growth-objective-ge-auto-2g-v1" as const
 
-export const GROWTH_OBJECTIVE_PHASE = "GE-AUTO-2F" as const
+export const GROWTH_OBJECTIVE_PHASE = "GE-AUTO-2G" as const
 
-export const GROWTH_OBJECTIVE_RUNTIME_QA_MARKER = "growth-objective-ge-auto-2f-v1" as const
+export const GROWTH_OBJECTIVE_RUNTIME_QA_MARKER = "growth-objective-ge-auto-2g-v1" as const
 
 export const GROWTH_OBJECTIVE_EVENT_SUBSCRIPTIONS_QA_MARKER =
-  "growth-objective-ge-auto-2f-v1" as const
+  "growth-objective-ge-auto-2g-v1" as const
 
-export const GROWTH_OBJECTIVE_EXECUTION_CONTEXT_QA_MARKER = "growth-objective-ge-auto-2f-v1" as const
+export const GROWTH_OBJECTIVE_EXECUTION_CONTEXT_QA_MARKER = "growth-objective-ge-auto-2g-v1" as const
 
 export const GROWTH_OBJECTIVE_SCHEMA_MIGRATION =
   "20270929140000_growth_autonomy_ge_auto_1f.sql" as const
@@ -28,16 +28,16 @@ export const GROWTH_OBJECTIVE_PRODUCTION_SCHEMA_MIGRATION =
 export const GROWTH_OBJECTIVE_EXECUTION_CONTEXT_SCHEMA_MIGRATION =
   "20270933150000_growth_objective_ge_auto_2e.sql" as const
 
-export const GROWTH_OBJECTIVE_EVENT_ROUTER_QA_MARKER = "growth-objective-ge-auto-2f-v1" as const
+export const GROWTH_OBJECTIVE_EVENT_ROUTER_QA_MARKER = "growth-objective-ge-auto-2g-v1" as const
 
-export const GROWTH_OBJECTIVE_RUNTIME_SCHEDULER_QA_MARKER = "growth-objective-ge-auto-2f-v1" as const
+export const GROWTH_OBJECTIVE_RUNTIME_SCHEDULER_QA_MARKER = "growth-objective-ge-auto-2g-v1" as const
 
-export const GROWTH_OBJECTIVE_PRODUCTION_FANIN_QA_MARKER = "growth-objective-ge-auto-2f-v1" as const
+export const GROWTH_OBJECTIVE_PRODUCTION_FANIN_QA_MARKER = "growth-objective-ge-auto-2g-v1" as const
 
-export const GROWTH_OBJECTIVE_PRODUCTION_DEDUPE_QA_MARKER = "growth-objective-ge-auto-2f-v1" as const
+export const GROWTH_OBJECTIVE_PRODUCTION_DEDUPE_QA_MARKER = "growth-objective-ge-auto-2g-v1" as const
 
 export const GROWTH_OBJECTIVE_PRODUCTION_MATERIALIZATION_QA_MARKER =
-  "growth-objective-ge-auto-2f-v1" as const
+  "growth-objective-ge-auto-2g-v1" as const
 
 export type GrowthObjectiveType =
   | "demos_booked"

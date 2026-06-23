@@ -25,6 +25,10 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "path": "/api/cron/growth-objective-runtime-scheduler",
+      "schedule": "*/20 * * * *"
+    },
+    {
       "path": "/api/cron/growth-sequence-safe-execute",
       "schedule": "*/5 * * * *"
     },

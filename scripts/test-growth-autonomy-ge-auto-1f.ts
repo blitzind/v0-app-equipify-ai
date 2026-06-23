@@ -157,7 +157,7 @@ async function main() {
   resetGrowthObjectiveMemoryStore()
 
   assert.equal(GROWTH_AUTONOMY_QA_MARKER, "growth-autonomy-ge-auto-1f-v1")
-  assert.equal(GROWTH_OBJECTIVE_QA_MARKER, "growth-objective-ge-auto-2b-v1")
+  assert.equal(GROWTH_OBJECTIVE_QA_MARKER, "growth-objective-ge-auto-2g-v1")
   console.log("  ✓ QA markers")
 
   const migration = readSource("supabase/migrations/20270929140000_growth_autonomy_ge_auto_1f.sql")
@@ -253,7 +253,8 @@ async function main() {
     description: objective.description,
     objectiveType: "demos_booked",
     targetValue: 20,
-  })
+    ownerUserId: "cert-owner-1",
+  }, { autoStart: false })
   assert.ok(created.objective.plan)
   assert.equal(created.objective.status, "active")
   console.log("  ✓ Create objective with plan + orchestration evaluation")

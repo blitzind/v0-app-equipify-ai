@@ -29,7 +29,7 @@ import { createGrowthVideoService } from "@/lib/growth/videos/growth-video-servi
 import { slugFromGrowthVideoPageTitle } from "@/lib/growth/videos/growth-video-page-validation"
 
 export const GROWTH_OBJECTIVE_PRODUCTION_MATERIALIZATION_QA_MARKER =
-  "growth-objective-ge-auto-2f-v1" as const
+  "growth-objective-ge-auto-2g-v1" as const
 
 const OBJECTIVE_SEQUENCE_QA_MARKER = GROWTH_OBJECTIVE_PRODUCTION_MATERIALIZATION_QA_MARKER
 
@@ -52,17 +52,12 @@ function artifact(
   return { ...input, createdAt: new Date().toISOString() }
 }
 
-export async function resolveObjectiveActorContext(
-  admin: SupabaseClient,
-  objective: GrowthObjective,
-): Promise<{ userId: string; userEmail: string } | null> {
-  const userId = objective.ownerUserId
-  if (!userId) return null
-  const { data } = await admin.from("profiles").select("email").eq("id", userId).maybeSingle()
-  const email = data?.email
-  if (!email || typeof email !== "string") return null
-  return { userId, userEmail: email }
-}
+export {
+  auditObjectiveActorContext,
+  ObjectiveActorResolutionError,
+  requireObjectiveActorContext,
+  resolveObjectiveActorContext,
+} from "@/lib/growth/objectives/growth-objective-actor-resolution"
 
 export async function findOrCreateObjectiveSequencePattern(
   admin: SupabaseClient,

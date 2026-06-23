@@ -19,7 +19,10 @@ import {
 import { executeGrowthObjectiveStage } from "@/lib/growth/objectives/growth-objective-stage-executors"
 import { OBJECTIVE_MATERIALIZATION_STAGE_IDS } from "@/lib/growth/objectives/growth-objective-execution-context"
 import { recoverGrowthObjectiveRuntimeContext } from "@/lib/growth/objectives/growth-objective-materialization-service"
-import { resolveObjectiveActorContext } from "@/lib/growth/objectives/growth-objective-production-materialization"
+import {
+  requireObjectiveActorContext,
+  resolveObjectiveActorContext,
+} from "@/lib/growth/objectives/growth-objective-actor-resolution"
 import {
   buildInitialObjectiveRuntimeStageRecords,
   computeObjectiveProgressPercent,
@@ -46,12 +49,22 @@ async function resolveTickActorContext(
   admin: SupabaseClient,
   objective: GrowthObjective,
   input?: GrowthObjectiveRuntimeTickInput,
-): Promise<{ userId: string | null; userEmail: string | null }> {
+): Promise<{ userId: string; userEmail: string }> {
   if (input?.actorUserId && input?.actorUserEmail) {
     return { userId: input.actorUserId, userEmail: input.actorUserEmail }
   }
-  const resolved = await resolveObjectiveActorContext(admin, objective).catch(() => null)
-  return { userId: resolved?.userId ?? input?.actorUserId ?? null, userEmail: resolved?.userEmail ?? input?.actorUserEmail ?? null }
+
+  if (input?.certificationMode) {
+    const resolved = await resolveObjectiveActorContext(admin, objective)
+    if (resolved) return resolved
+    return {
+      userId: objective.ownerUserId ?? "certification-actor",
+      userEmail: "certification@equipify.internal",
+    }
+  }
+
+  const report = await requireObjectiveActorContext(admin, objective)
+  return { userId: report.userId, userEmail: report.userEmail }
 }
 
 function historyEntry(input: Omit<GrowthObjectiveExecutionHistoryEntry, "id" | "ts">): GrowthObjectiveExecutionHistoryEntry {
@@ -85,7 +98,7 @@ function initRuntime(objective: GrowthObjective): GrowthObjectiveRuntimeState {
 }
 
 function syncPlanStages(objective: GrowthObjective): GrowthObjective["plan"] {
-  if (!objective.plan || !objective.runtime) return objective.plan
+  if (!objective.plan || !objective.runtime?.stageStates) return objective.plan
   return {
     ...objective.plan,
     stages: objective.plan.stages.map((stage) => {
@@ -158,11 +171,22 @@ export async function startGrowthObjectiveRuntime(
   }
 
   const plan = objective.plan ?? planGrowthObjective(objective)
+  const baseRuntime = initRuntime({ ...objective, plan })
+  const existingRuntime = objective.runtime
+  const runtime =
+    existingRuntime?.currentStageId && existingRuntime.stageStates
+      ? {
+          ...baseRuntime,
+          ...existingRuntime,
+          stageStates: { ...baseRuntime.stageStates, ...existingRuntime.stageStates },
+        }
+      : baseRuntime
+
   let next: GrowthObjective = {
     ...objective,
     plan,
     status: "active",
-    runtime: objective.runtime ?? initRuntime({ ...objective, plan }),
+    runtime,
     executionHistory: objective.executionHistory ?? [],
     recentSignals: objective.recentSignals ?? [],
   }
@@ -216,10 +240,19 @@ export async function tickGrowthObjectiveRuntime(
   }
 
   const stageId = objective.runtime.currentStageId
-  const stageRecord = objective.runtime.stageStates[stageId]
+  let stageStates = { ...objective.runtime.stageStates }
+  let stageRecord = stageStates[stageId]
+  if (!stageRecord) {
+    const initialized = buildInitialObjectiveRuntimeStageRecords()
+    stageStates = { ...initialized, ...stageStates }
+    stageRecord = stageStates[stageId] ?? initialized.discover
+    objective = {
+      ...objective,
+      runtime: { ...objective.runtime, stageStates, currentStageId: stageId ?? "discover" },
+    }
+  }
 
-  let runtime = { ...objective.runtime }
-  let stageStates = { ...runtime.stageStates }
+  let runtime = { ...objective.runtime, stageStates }
 
   if (stageRecord.state === "pending" || stageRecord.state === "blocked") {
     stageStates[stageId] = transitionObjectiveRuntimeStage(stageRecord, "running")

@@ -68,7 +68,11 @@ export async function POST(request: Request) {
       priority: body.priority === "low" || body.priority === "medium" || body.priority === "critical" ? body.priority : "high",
       autonomyLevel: "objective",
       safetyMode: body.safetyMode === "balanced" || body.safetyMode === "shadow" ? body.safetyMode : "strict",
-    }, { certificationMode: true, autoStart: true })
+    }, {
+      autoStart: body.autoStart !== false,
+      actorUserId: access.userId,
+      actorUserEmail: access.userEmail,
+    })
     return NextResponse.json({
       ok: true,
       qa_marker: GROWTH_OBJECTIVE_QA_MARKER,

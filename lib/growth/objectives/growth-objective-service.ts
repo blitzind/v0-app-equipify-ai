@@ -72,7 +72,12 @@ export async function createGrowthObjectiveWithPlan(
   admin: SupabaseClient,
   organizationId: string,
   input: GrowthObjectiveCreateInput,
-  options?: { certificationMode?: boolean; autoStart?: boolean },
+  options?: {
+    certificationMode?: boolean
+    autoStart?: boolean
+    actorUserId?: string
+    actorUserEmail?: string
+  },
 ): Promise<{ objective: GrowthObjective; orchestration: Awaited<ReturnType<typeof evaluateObjectivePlanOrchestration>> }> {
   const created = await insertGrowthObjective(admin, organizationId, input)
   const plan = planGrowthObjective(created)
@@ -89,9 +94,19 @@ export async function createGrowthObjectiveWithPlan(
     recentSignals: [],
   })
 
-  const objective = await startGrowthObjectiveRuntime(admin, organizationId, created.id, {
+  if (options?.autoStart === false) {
+    const objective = await getGrowthObjective(admin, organizationId, created.id)
+    if (!objective) throw new Error("Objective not found after create.")
+    return { objective, orchestration }
+  }
+
+  const runtimeInput = {
     certificationMode: options?.certificationMode ?? false,
-  })
+    actorUserId: options?.actorUserId ?? input.ownerUserId ?? null,
+    actorUserEmail: options?.actorUserEmail ?? null,
+  }
+
+  const objective = await startGrowthObjectiveRuntime(admin, organizationId, created.id, runtimeInput)
 
   return { objective, orchestration }
 }
@@ -134,9 +149,7 @@ export async function adaptGrowthObjective(
   let objective = await getGrowthObjective(admin, organizationId, objectiveId)
   if (!objective) throw new Error("Objective not found.")
   for (const signal of inbound) {
-    objective = await ingestGrowthObjectiveSignal(admin, organizationId, objectiveId, signal, {
-      certificationMode: true,
-    })
+    objective = await ingestGrowthObjectiveSignal(admin, organizationId, objectiveId, signal)
   }
   if (inbound.length === 0) {
     objective = await ingestGrowthObjectiveSignal(
@@ -147,7 +160,6 @@ export async function adaptGrowthObjective(
         type: "engagement_open",
         payload: signals as unknown as Record<string, unknown>,
       },
-      { certificationMode: true },
     )
   }
   return objective

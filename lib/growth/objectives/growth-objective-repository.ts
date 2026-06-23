@@ -41,6 +41,15 @@ function normalizeType(value: unknown): GrowthObjectiveType {
   return "custom"
 }
 
+function normalizeRuntimeState(value: unknown): GrowthObjective["runtime"] {
+  if (!value || typeof value !== "object") return null
+  const runtime = value as GrowthObjective["runtime"]
+  if (!runtime?.currentStageId || !runtime.stageStates || Object.keys(runtime.stageStates).length === 0) {
+    return null
+  }
+  return runtime
+}
+
 function mapRow(row: Record<string, unknown>): GrowthObjective {
   return {
     id: String(row.id),
@@ -58,7 +67,7 @@ function mapRow(row: Record<string, unknown>): GrowthObjective {
     autonomyLevel: (row.autonomy_level as GrowthObjective["autonomyLevel"]) ?? "objective",
     safetyMode: (row.safety_mode as GrowthObjective["safetyMode"]) ?? "strict",
     plan: (row.plan as GrowthObjective["plan"]) ?? null,
-    runtime: (row.runtime_state as GrowthObjective["runtime"]) ?? null,
+    runtime: normalizeRuntimeState(row.runtime_state),
     executionHistory: Array.isArray(row.execution_history)
       ? (row.execution_history as GrowthObjective["executionHistory"])
       : [],
@@ -178,14 +187,14 @@ export async function insertGrowthObjective(
       priority: objective.priority,
       autonomy_level: objective.autonomyLevel,
       safety_mode: objective.safetyMode,
-      plan: objective.plan,
-      runtime_state: objective.runtime,
-      execution_history: objective.executionHistory,
-      recent_signals: objective.recentSignals,
-      recommendations: objective.recommendations,
+      plan: objective.plan ?? {},
+      runtime_state: objective.runtime ?? {},
+      execution_history: objective.executionHistory ?? [],
+      recent_signals: objective.recentSignals ?? [],
+      recommendations: objective.recommendations ?? [],
       emergency_stop_active: objective.emergencyStopActive,
-      event_subscriptions: objective.eventSubscriptions,
-      execution_context: objective.executionContext,
+      event_subscriptions: objective.eventSubscriptions ?? {},
+      execution_context: objective.executionContext ?? {},
       qa_marker: GROWTH_OBJECTIVE_QA_MARKER,
     })
     .select("*")
@@ -237,7 +246,7 @@ export async function updateGrowthObjective(
       autonomy_level: next.autonomyLevel,
       safety_mode: next.safetyMode,
       plan: next.plan,
-      runtime_state: next.runtime,
+      runtime_state: next.runtime ?? {},
       execution_history: next.executionHistory,
       recent_signals: next.recentSignals,
       recommendations: next.recommendations,

@@ -134,8 +134,8 @@ async function runTests(): Promise<void> {
 
   resetGrowthObjectiveMemoryStore()
 
-  assert.equal(GROWTH_OBJECTIVE_PHASE, "GE-AUTO-2F")
-  assert.equal(GROWTH_OBJECTIVE_QA_MARKER, "growth-objective-ge-auto-2f-v1")
+  assert.equal(GROWTH_OBJECTIVE_PHASE, "GE-AUTO-2G")
+  assert.equal(GROWTH_OBJECTIVE_QA_MARKER, "growth-objective-ge-auto-2g-v1")
   console.log("  ✓ 2E QA marker + phase")
 
   const migration = readSource(`supabase/migrations/${GROWTH_OBJECTIVE_EXECUTION_CONTEXT_SCHEMA_MIGRATION}`)

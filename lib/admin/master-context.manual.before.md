@@ -483,5 +483,171 @@ Do **not** paste Supabase URLs, anon/service keys, OAuth secrets, or Stripe secr
 - **Growth Engine GS-GROWTH-OPS-7A.2 — Click Reduction & Primary Action Cleanup (2026-06-21, local only):** **Status:** operator click-reduction pass implemented locally, **not committed/deployed**. **CRM drawer:** primary CTA Generate Personalization; secondary Call/Email/Directions; Ownership/Revenue Queue demoted. **Call workspace:** Activity + Meetings shortcuts on intelligence rail. **Inbox:** header Reply-only; context strip owns Lead/Call/Personalization/Activity/Book Meeting. **Opportunity NBA:** one persisted-NBA primary action + overflow secondary links (display-only). **Activity:** hot-prospect hero card with Open Lead primary + Personalize/Call/Opportunity secondary. **Personalization:** approved state shows Queue for Send Review → admin sequence execution with control-plane labels. QA marker `growth-ops-click-reduction-7a2-v1`. **Certification:** `pnpm test:growth-click-reduction-7a2` (+ crm/call/inbox/opportunity/send sub-certs) + regression `test:growth-ops-handoff-6c`, `test:growth-notification-truth-7a1`, `test:growth-workspace-link-normalization`, `check:tracked-imports`. **No migrations, no prompt/generation/scoring/approval/provider changes.**
 - **Growth Engine GS-GROWTH-OPS-7B — Test Data Reset & Production Baseline (2026-06-21, local only):** **Status:** reset utility implemented locally, **not committed/deployed**. **Purpose:** audit + dependency-safe cleanup of Growth test/demo/historical noise while preserving system config, integrations, content assets, and a permanent Precision Biomedical certification dataset. **Script:** `pnpm growth:reset-test-data --dry-run` (audit only, writes counts to `tmp/growth-reset-report-before.json`), `GROWTH_RESET_TEST_DATA_CONFIRM=yes pnpm growth:reset-test-data --confirm` (deletes DELETE-classified rows in dependency order, preserves golden fixtures, writes before/after/summary JSON), `pnpm growth:reset-test-data --report` (reads or regenerates summary). **Inventory:** 420 `growth.*` tables from migrations — classified KEEP (100) / DELETE (307) / MANUAL_REVIEW (13). **Golden fixtures:** resolves Precision Biomedical org (`precision-biomedical-demo`) + 1 lead/company/contact/opportunity/meeting/generation/sequence enrollment/inbox thread/call session/timeline chain; override via `GROWTH_RESET_PRESERVED_*` env IDs or `metadata.fixture_type` in (`golden`,`certification`). **Modules:** `lib/growth/reset/*`, `scripts/reset-growth-test-data.ts`. QA marker `growth-ops-test-data-reset-7b-v1`. **Certification:** `pnpm test:growth-reset-test-data-7b` (structure), production dry-run requires prod Supabase env (no `.env.local`). **Rollback:** counts-only backups — no row export; PITR or manual re-seed. **No migrations, no prompt/scoring/approval/provider changes, no autonomous sends.**
 
+## Growth Engine Autonomy System
+
+**Current status (2026-06-23):** GE-AUTO-1A through GE-AUTO-2I implemented locally; **autonomy batch not yet committed/deployed to Vercel Production**. Production Supabase has GE-AUTO migrations applied; platform kill switches for autonomy are intentionally enabled for certification org with **outbound locked**. **Certification verdicts:** `GROWTH_ENGINE_AUTONOMY_READY_WITH_MINOR_FOLLOWUPS` (GE-AUTO-2H/2I live cert: **29 pass · 4 blocked · 0 fail**). **GE-AUTO-3 not started.** **Autonomous approvals remain disabled** (`autonomous_approval_enabled=false`). **Broad autonomous outbound is NOT enabled** unless `autonomy_outbound_enabled` + explicit cert approval.
+
+### Phase map (GE-AUTO + Growth Engine v1 foundation)
+
+| Phase | Scope | QA marker |
+|-------|--------|-----------|
+| GE-AUTO-1A | Graduated autonomy foundation, `organization_autonomy_settings` | `growth-autonomy-ge-auto-1a-v1` |
+| GE-AUTO-1B | Autonomy controls, policy enforcement, operator vs autonomous triggers | `growth-autonomy-ge-auto-1b-v1` |
+| GE-AUTO-1C | Outbound prepare policy (email/SMS/voice), channel permissions | `growth-autonomy-ge-auto-1c-v1` |
+| GE-AUTO-1D | Human approval queue, edit-before-approval, approved execution path | `growth-autonomy-ge-auto-1d-v1` |
+| GE-AUTO-1E | Outbound send policy, confidence gating, allowlists, quiet hours | `growth-autonomy-ge-auto-1e-v1` |
+| GE-AUTO-1F | Objective planner, adaptive orchestration, `organization_growth_objectives` | `growth-autonomy-ge-auto-1f-v1` |
+| GE-AUTO-2A | Closed-loop objective runtime, stage state machine, tick/start/stop | `growth-objective-ge-auto-2g-v1` |
+| GE-AUTO-2B | Event subscriptions, signal ingest, event-driven progression | `growth-objective-ge-auto-2g-v1` |
+| GE-AUTO-2C | Event router + bridge fan-in from engagement sources | `growth-objective-ge-auto-2g-v1` |
+| GE-AUTO-2D | Production materialization (real UUID resource binding) | `growth-objective-ge-auto-2g-v1` |
+| GE-AUTO-2E | Execution context persistence, recovery, dashboard summaries | `growth-objective-ge-auto-2g-v1` |
+| GE-AUTO-2F | Scheduler cron, stalled detection, retry persistence | `growth-objective-ge-auto-2g-v1` |
+| GE-AUTO-2G | Production activation: actor resolution, operator APIs, cert-mode removal | `growth-objective-ge-auto-2g-v1` |
+| GE-AUTO-2H | Live autonomous execution certification (production script) | `growth-objective-ge-auto-2h-cert-v1` |
+| GE-AUTO-2I | Sender identity unblock, orphan route cleanup, live cert without outbound | (ops + 2H re-run) |
+
+**Pre-commit cert matrix (local, 2026-06-23):** `pnpm test:growth-autonomy-ge-auto-1{a-f}` + `pnpm test:growth-objective-ge-auto-2{a-g}` — **all pass**. Production live cert: `pnpm test:growth-objective-ge-auto-2h:production` with `CONFIRM_GE_AUTO_2H_LIVE=1`.
+
+### Autonomy framework
+
+- **Master modes (`growth.organization_autonomy_settings.master_mode`):** `manual` → `assisted` → `guardrailed` → `channel` → `objective` (Level 0 manual through objective-driven autonomy).
+- **Capability toggles:** research, enrichment, audience_generation, page_generation, video_generation, recommendations, task_creation, email_execution, sms_execution, voice_execution, campaign_launch, strategy_adaptation.
+- **Channel permissions + outbound controls:** per-channel prepare/send limits, allowed sender profiles/sequences/audiences, minimum confidence, quiet hours, approval policy (`always_require_approval` default).
+- **Daily budgets (org):** stored in settings + enforced via `growth.runtime_budgets` resource types including `autonomous_research_runs`, `autonomous_page_generations`, `autonomous_video_generations`, `autonomous_campaigns`, `autonomous_outbound_actions`, `autonomous_email_prepare`, `autonomous_sms_prepare`, `autonomous_voice_prepare`. **Default daily caps for autonomous_* are 0 (fail-closed)** in `GROWTH_RUNTIME_DAILY_BUDGET_CAPS`.
+- **Shadow mode:** `GrowthObjectiveSafetyMode` includes `shadow` (planner/runtime diagnostics without side effects where wired).
+- **Operator controls:** workspace objective APIs, emergency stop, kill switches, approval queue (human-in-the-loop).
+- **Emergency stop:** objective-level `emergencyStopActive` + platform `autonomy_enabled` kill switch stops runtime ticks.
+
+### Policy engine
+
+- **Core:** `lib/growth/autonomy/growth-autonomy-policy-service.ts` — `evaluateAutonomyCapability()`, `evaluateAutonomyOutboundSendPolicy()`.
+- **Trigger sources:** `operator` (bypasses autonomous enforcement where allowed) vs `autonomous` (full kill switch + budget + capability + approval policy checks).
+- **Orchestration hook:** `evaluateObjectivePlanOrchestration()` gates objective plan stages through autonomy policy before runtime materialization.
+- **Outbound:** prepare paths (email/SMS/voice) require send context + outbound policy; **no autonomous approval path** (`GE_V1_5_AUTOMATION_RUNTIME_SAFETY_FLAGS.autonomous_approval_enabled=false`).
+- **Logging:** structured `autonomy_policy_evaluated` / `autonomy_blocked` events with kill switch snapshot + budget state.
+
+### Platform kill switches (`growth.runtime_guardrail_settings`)
+
+| Key | Default | Role |
+|-----|---------|------|
+| `autonomy_enabled` | false | Master autonomy gate |
+| `autonomy_generation_enabled` | false | Research/page/video/campaign generation |
+| `autonomy_outbound_enabled` | false | Outbound prepare/send autonomy |
+| `autonomy_objective_mode_enabled` | false | Objective-mode runtime |
+
+Production certification org may have autonomy enabled with **outbound intentionally false**.
+
+### Objective runtime architecture
+
+- **Types:** `lib/growth/objectives/growth-objective-types.ts` — `GrowthObjective`, objective types (`demos_booked`, `meetings_booked`, `opportunities_created`, `pipeline_value`, `customers_acquired`, `custom`).
+- **Planner:** `planGrowthObjective()` — ICP strategy, saved searches, audiences, research requirements, forecast model, 10-stage execution plan.
+- **Runtime service:** `lib/growth/objectives/growth-objective-runtime-service.ts` — start/tick/pause/resume/stop, signal ingest, adaptive loop, auto-continue after events.
+- **Scheduler:** `lib/growth/objectives/growth-objective-runtime-scheduler.ts` + cron `/api/cron/growth-objective-runtime-scheduler` (Vercel production).
+- **Operator APIs:** `app/api/growth/workspace/objectives/route.ts`, `[id]/route.ts` — **certification mode removed**; passes `actorUserId` / `actorUserEmail`.
+- **Completion:** target value + signal-driven progress; status transitions to `completed` when `isObjectiveComplete()`.
+
+### Objective stages (10, exact order)
+
+1. **Discover** (`discover`) — saved search / prospect discovery
+2. **Research** (`research`) — research runs
+3. **Enrich** (`enrich`) — enrichment runs
+4. **Buying Committee** (`buying_committee`) — committee intelligence
+5. **Generate Assets** (`generate_assets`) — pages + videos
+6. **Launch** (`launch`) — sequence + SENDR/campaign launch
+7. **Monitor** (`monitor`) — engagement monitoring
+8. **Adapt** (`adapt`) — strategy adaptation / replan signals
+9. **Book** (`book`) — booking/meeting progression
+10. **Complete** (`complete`) — terminal stage
+
+### Event fan-in and router
+
+- **Bridge:** `lib/growth/objectives/growth-objective-event-bridge.ts` dispatches engagement events into the router.
+- **Router:** `routeGrowthObjectiveSourceEvent()` — subscription match → dedupe receipt → `ingestGrowthObjectiveSignal()` → `autoContinueGrowthObjectiveRuntime()`.
+- **Mapper:** `lib/growth/objectives/growth-objective-signal-mapper.ts` normalizes source events (email opens/clicks/replies, page visits, video start/complete, CTA clicks, booking started/completed, meeting booked, sequence events, automation runtime events, opportunity/customer signals).
+- **Subscriptions:** persisted on objective as `event_subscriptions` JSON; matcher `objectiveMatchesSourceEvent()`.
+- **Dedupe:** `growth.objective_source_event_receipts` — PK `idempotency_key`; `rememberObjectiveSourceEventReceipt()` fail-closed on duplicates.
+
+### Materialization and execution context
+
+- **Service:** `lib/growth/objectives/growth-objective-materialization-service.ts` — stage executors materialize real resources (saved searches, audiences, research/enrichment runs, pages, videos, sequences, launches, booking pages).
+- **Production path:** `growth-objective-production-materialization.ts` binds real UUIDs (no synthetic cert artifacts in production paths).
+- **Execution context:** JSON column `execution_context` — per-stage artifacts, recovery timestamp, summaries via `summarizeObjectiveExecutionContext()` / `listObjectiveArtifacts()`.
+- **Recovery:** `recoverGrowthObjectiveRuntimeContext()` rebuilds context without duplicating bound resources.
+- **Launch gate:** `requireObjectiveActorContext(..., { requireOutboundIdentity: true })` on launch stage only.
+
+### Actor / sender identity (GE-AUTO-2G/2I)
+
+- **Module:** `lib/growth/objectives/growth-objective-actor-resolution.ts` — `requireObjectiveActorContext()`, `auditObjectiveActorContext()`.
+- **Requirements (fail-closed):** `organizationId`, `ownerUserId`, owner `profiles.email`, active sender profile **email match**, connected mailbox on resolved sender account.
+- **Route selection:** skips enabled delivery routes without profile/mailbox; prefers sender whose profile email matches objective owner.
+- **Production cert owner:** `mike@goequipify.com` → `GE_AUTO_2H_OWNER_USER_ID=99d0d4e4-1ff6-48ac-b846-0b5d4f6e3e6c` (operator org `5876176a-61ec-4532-ad99-0c31482d5a91`).
+- **Orphan route cleanup (2026-06-23):** disabled delivery route for sender `46d733bd-554e-4fe4-89b0-8509a74004e9` (enabled but no profile/mailbox).
+- **Ops script:** `scripts/ge-auto-2i-link-sender-owner.ts` — link sender-profile email to org member (service role, linked Supabase).
+
+### Database objects and migrations
+
+| Object | Purpose |
+|--------|---------|
+| `growth.organization_autonomy_settings` | master_mode, capability_toggles, channel_permissions, approval_policies, daily_budget_limits |
+| `growth.organization_growth_objectives` | objectives + `runtime_state`, `execution_history`, `recent_signals`, `event_subscriptions`, `execution_context` |
+| `growth.objective_source_event_receipts` | persistent idempotent event dedupe |
+| `growth.runtime_guardrail_settings` | platform kill switches (incl. autonomy_*) |
+| `growth.runtime_budgets` | org resource consumption windows |
+
+**GE-AUTO migration IDs (apply before deploy):**
+
+- `20270927140000_growth_autonomy_ge_auto_1a.sql`
+- `20270928120000_growth_autonomy_ge_auto_1c.sql`
+- `20270929140000_growth_autonomy_ge_auto_1f.sql`
+- `20270930140000_growth_objective_ge_auto_2a.sql`
+- `20270931140000_growth_objective_ge_auto_2b.sql`
+- `20270932150000_growth_objective_ge_auto_2d.sql`
+- `20270933150000_growth_objective_ge_auto_2e.sql`
+
+_(GE-AUTO-1B/1D/1E/2C/2F/2G share code paths; schema concentrated in the migrations above.)_
+
+### Safety guarantees (non-negotiable)
+
+- **No autonomous approvals** — approval queue is human-in-the-loop; auto-approval flag hard-coded false.
+- **Outbound policy gated** — `autonomy_outbound_enabled` + channel permissions + suppression/opt-out/DNC/quiet hours on send paths.
+- **Budget enforcement** — autonomous resource types default cap **0** until intentionally raised.
+- **Kill switches** — platform emergency stop via `autonomy_enabled=false`.
+- **Actor resolution** — launch/outbound identity enforced; owner email must match sender profile.
+- **Persistent dedupe** — `objective_source_event_receipts.idempotency_key`.
+- **No certification mode in production** — operator/runtime paths use real actor context only.
+- **Fail-closed** — missing identity, budget, kill switch, or approval → blocked stage with policy-gated history entry.
+
+### Production certification status (2026-06-23)
+
+| Verdict | Meaning |
+|---------|---------|
+| `GROWTH_ENGINE_V1_CERTIFIED_WITH_MINOR_FOLLOWUPS` | Growth Engine v1 platform foundation (guardrails, audiences, SENDR, runtime budgets) — certified with documented follow-ups |
+| `GROWTH_ENGINE_AUTONOMY_READY_WITH_MINOR_FOLLOWUPS` | **Current** — autonomy + objective runtime live on production DB; deploy + budgets + completion blocked |
+| `GROWTH_ENGINE_AUTONOMY_PRODUCTION_CERTIFIED` | Not yet — requires deploy, non-zero budgets, optional outbound approval, real booking completion |
+| `GROWTH_ENGINE_AUTONOMY_BLOCKED` | Hard failures in cert script |
+
+**GE-AUTO-2I live cert (without outbound) — blocked items:**
+
+1. GE-AUTO batch **commit + GitHub → Vercel deploy** pending (operator APIs still pre-2G on production until merge).
+2. **Autonomy daily budgets = 0** — discover/research/page/video/campaign stages policy-block (expected fail-closed).
+3. **Outbound locked** — no live engagement/booking events without `CONFIRM_GE_AUTO_2H_ENABLE_OUTBOUND=1` + kill switch.
+4. **Full completion** requires real booking events (no manual signal injection in cert).
+
+**GE-AUTO-2I live cert — passing highlights:** sender actor audit, objective create, runtime start, scheduler retries (8 rounds), subscriptions bound (12), recovery, emergency stop + tick rejection, execution history persisted, event router + dedupe table.
+
+### Production enablement checklist
+
+1. Commit + push GE-AUTO batch to `main` → wait for Vercel production deploy (**never** `vercel deploy` from cert scripts).
+2. Verify operator objective APIs + actor resolution on production (no `certificationMode`).
+3. Confirm migrations applied on production Supabase (7 IDs above).
+4. Set **small non-zero** autonomy daily budgets for operator org (research/page/video/campaign/outbound as intended).
+5. Enable kill switches intentionally: `autonomy_enabled`, `autonomy_objective_mode_enabled`, `autonomy_generation_enabled`; keep `autonomy_outbound_enabled=false` until approved.
+6. Configure sender identity (`GE_AUTO_2H_OWNER_USER_ID` or `scripts/ge-auto-2i-link-sender-owner.ts`).
+7. Re-run: `GE_AUTO_2H_OWNER_USER_ID=… CONFIRM_GE_AUTO_2H_ENABLE_AUTONOMY=1 CONFIRM_GE_AUTO_2H_LIVE=1 pnpm test:growth-objective-ge-auto-2h:production`
+8. Enable outbound **only** with explicit approval: `CONFIRM_GE_AUTO_2H_ENABLE_OUTBOUND=1` + low send budgets + test audience.
+
+**Key modules:** `lib/growth/autonomy/*`, `lib/growth/objectives/*`, `lib/growth/runtime-guardrails/*`, `components/growth/objectives/*`, `app/(growth)/growth/objectives/page.tsx`.
+
 ## API Routes Summary
 Organized Route Handlers under `app/api`: **organization-scoped** JSON APIs at `/api/organizations/[organizationId]/...` for workspace, catalog, inventory, communications, workflows, AI, QuickBooks, calibration import, customers/locations, portal invites, reports, etc.; **portal** APIs at `/api/portal/...`; **platform admin** at `/api/platform/...`; **cron** at `/api/cron/...` (secret-protected); **webhooks** (`/api/stripe/webhook`); **email** helpers; **session/team/invites**; **integrations/quickbooks** OAuth. Exact file list and counts are auto-generated below.

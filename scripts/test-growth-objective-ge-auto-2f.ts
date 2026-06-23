@@ -1,5 +1,5 @@
 /**
- * GE-AUTO-2F — Production materialization & autonomous execution completion.
+ * GE-AUTO-2G — Production materialization & autonomous execution completion.
  * Run: pnpm test:growth-objective-ge-auto-2f
  */
 import assert from "node:assert/strict"
@@ -141,13 +141,13 @@ function createMockAdmin(): { schema: () => { from: (table: string) => MockQuery
 }
 
 async function runTests(): Promise<void> {
-  console.log("\n=== GE-AUTO-2F — Production Materialization & Execution Completion ===\n")
+  console.log("\n=== GE-AUTO-2G — Production Materialization & Execution Completion ===\n")
 
   resetGrowthObjectiveMemoryStore()
 
-  assert.equal(GROWTH_OBJECTIVE_PHASE, "GE-AUTO-2F")
-  assert.equal(GROWTH_OBJECTIVE_QA_MARKER, "growth-objective-ge-auto-2f-v1")
-  assert.equal(GROWTH_OBJECTIVE_PRODUCTION_MATERIALIZATION_QA_MARKER, "growth-objective-ge-auto-2f-v1")
+  assert.equal(GROWTH_OBJECTIVE_PHASE, "GE-AUTO-2G")
+  assert.equal(GROWTH_OBJECTIVE_QA_MARKER, "growth-objective-ge-auto-2g-v1")
+  assert.equal(GROWTH_OBJECTIVE_PRODUCTION_MATERIALIZATION_QA_MARKER, "growth-objective-ge-auto-2g-v1")
   console.log("  ✓ 2F QA marker + phase")
 
   const migration2b = readSource(`supabase/migrations/${GROWTH_OBJECTIVE_EVENT_SCHEMA_MIGRATION}`)
@@ -243,7 +243,7 @@ async function runTests(): Promise<void> {
   assert.ok(["monitor", "adapt", "book"].includes(objective.runtime?.currentStageId ?? ""))
   console.log("  ✓ End-to-end certification advances into monitor/adapt/book loop")
 
-  console.log("\nGE-AUTO-2F passed.\n")
+  console.log("\nGE-AUTO-2G passed.\n")
 }
 
 void runTests()

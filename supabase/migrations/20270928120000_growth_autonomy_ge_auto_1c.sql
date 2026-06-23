@@ -1,0 +1,16 @@
+-- GE-AUTO-1C — Channel autonomy preparation (channel_permissions JSONB extension).
+-- Extends organization_autonomy_settings.channel_permissions with per-channel prepare config.
+-- No autonomous sending. No schema column changes required — JSONB shape documented here.
+--
+-- channel_permissions.email | sms | voice:
+-- {
+--   "enabled_for_prepare": false,
+--   "max_prepared_per_day": 0,
+--   "allowed_sender_profiles": [],
+--   "allowed_sequences": [],
+--   "allowed_audiences": [],
+--   "minimum_confidence_score": 0,
+--   "quiet_hours": { "enabled": false, "startHourUtc": 22, "endHourUtc": 13 }
+-- }
+--
+-- DO NOT APPLY until operator approves migration.
