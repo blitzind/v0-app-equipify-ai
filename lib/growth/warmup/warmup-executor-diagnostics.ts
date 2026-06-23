@@ -10,6 +10,46 @@ import type { GrowthWarmupProfile, GrowthWarmupProfileStatus } from "@/lib/growt
 
 export const GROWTH_WARMUP_EXECUTOR_1B_QA_MARKER = "growth-warmup-executor-1b-v1" as const
 
+/** GS-GROWTH-WARMUP-EXECUTOR-1E — one send attempt per warming profile per manual/cron run. */
+export const MAX_SENDS_PER_PROFILE_PER_RUN = 1 as const
+
+/** Platform safety ceiling when eligible profile count is extremely high. */
+export const DEFAULT_WARMUP_EXECUTOR_TOTAL_SENDS_SAFETY_CAP = 100 as const
+
+export function computeWarmupExecutorRunSendPlan(input: {
+  eligibleProfileCount: number
+  maxSendsOverride?: number
+}): {
+  maxSendsPerProfile: number
+  maxTotalSends: number
+  plannedSendsThisRun: number
+} {
+  const naturalTotal = Math.max(0, input.eligibleProfileCount) * MAX_SENDS_PER_PROFILE_PER_RUN
+  const cappedTotal = Math.min(naturalTotal, DEFAULT_WARMUP_EXECUTOR_TOTAL_SENDS_SAFETY_CAP)
+  const maxTotalSends = input.maxSendsOverride ?? cappedTotal
+  return {
+    maxSendsPerProfile: MAX_SENDS_PER_PROFILE_PER_RUN,
+    maxTotalSends,
+    plannedSendsThisRun: Math.min(naturalTotal, maxTotalSends),
+  }
+}
+
+export function buildWarmupExecutorPacingMessage(input: {
+  eligibleProfiles: number
+  plannedSendsThisRun: number
+  plannedTodayPerMailbox?: number | null
+}): string {
+  const parts = [
+    `${input.eligibleProfiles} profile(s) eligible.`,
+    `Would send up to ${input.plannedSendsThisRun} warmup message(s) now.`,
+    "Each eligible mailbox sends at most 1 message per run.",
+  ]
+  if (input.plannedTodayPerMailbox != null && input.plannedTodayPerMailbox > 0) {
+    parts.push(`Today's target remains ${input.plannedTodayPerMailbox} per mailbox.`)
+  }
+  return parts.join(" ")
+}
+
 export type { WarmupExecutorProfileDiagnostic, WarmupExecutorRunSummary }
 
 /** Profiles the executor scans (dashboard-visible, non-disabled). */
@@ -142,8 +182,8 @@ export function describeWarmupExecutorProfileDiagnostic(input: {
     ...base,
     eligibility: "eligible",
     skipCode: null,
-    reason: `Eligible: up to ${remainingCapacity} warmup send(s) remaining today.`,
-    nextAction: "Run warmup batch when ready.",
+    reason: `Eligible: ${remainingCapacity} remaining today; next run can send ${MAX_SENDS_PER_PROFILE_PER_RUN}.`,
+    nextAction: `Next run can send up to ${MAX_SENDS_PER_PROFILE_PER_RUN} warmup message.`,
   }
 }
 
@@ -152,6 +192,8 @@ export function summarizeWarmupExecutorRun(input: {
   scannableProfiles: GrowthWarmupProfile[]
   diagnostics: WarmupExecutorProfileDiagnostic[]
   approvedRecipientCount: number
+  plannedSendsThisRun?: number
+  pacingMessage?: string
 }): WarmupExecutorRunSummary {
   const warmingProfiles = input.scannableProfiles.filter((p) => p.status === "warming").length
   const throttledProfiles = input.scannableProfiles.filter((p) => p.status === "throttled").length
@@ -183,5 +225,8 @@ export function summarizeWarmupExecutorRun(input: {
     pausedProfiles,
     eligibleProfiles,
     primaryMessage,
+    maxSendsPerProfilePerRun: MAX_SENDS_PER_PROFILE_PER_RUN,
+    plannedSendsThisRun: input.plannedSendsThisRun,
+    pacingMessage: input.pacingMessage,
   }
 }

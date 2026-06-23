@@ -29,9 +29,10 @@ function runTests(): void {
   assert.match(executorSource, /idempotency_key/)
   assert.match(executorSource, /findExistingRun/)
   assert.match(executorSource, /idempotent_skip/)
-  assert.match(executorSource, /MAX_SENDS_PER_CRON_RUN = 1/)
+  assert.match(executorSource, /MAX_SENDS_PER_PROFILE_PER_RUN/)
+  assert.match(executorSource, /computeWarmupExecutorRunSendPlan/)
   assert.match(executorSource, /enforceSendingWindow/)
-  console.log("  ✓ Executor idempotency + hourly batch limit + sending window")
+  console.log("  ✓ Executor idempotency + per-profile pacing + sending window")
 
   const manualRoute = fs.readFileSync(
     path.join(process.cwd(), "app/api/platform/growth/warmup/executor/run/route.ts"),

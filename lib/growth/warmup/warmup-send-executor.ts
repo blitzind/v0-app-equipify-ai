@@ -29,6 +29,9 @@ import {
   isWarmupExecutorScannableProfile,
   isWarmupExecutorSendEligibleStatus,
   summarizeWarmupExecutorRun,
+  computeWarmupExecutorRunSendPlan,
+  buildWarmupExecutorPacingMessage,
+  MAX_SENDS_PER_PROFILE_PER_RUN,
 } from "@/lib/growth/warmup/warmup-executor-diagnostics"
 import {
   GROWTH_WARMUP_EXECUTOR_QA_MARKER,
@@ -43,9 +46,9 @@ import {
 import type { GrowthWarmupProfile } from "@/lib/growth/warmup/warmup-types"
 
 export const GROWTH_WARMUP_EXECUTOR_1D_QA_MARKER = "growth-warmup-executor-1d-v1" as const
+export const GROWTH_WARMUP_EXECUTOR_1E_QA_MARKER = "growth-warmup-executor-1e-v1" as const
 
-const MAX_SENDS_PER_CRON_RUN = 1
-const MAX_SENDS_PER_MANUAL_RUN = 5
+export { MAX_SENDS_PER_PROFILE_PER_RUN } from "@/lib/growth/warmup/warmup-executor-diagnostics"
 
 function utcDateString(date = new Date()): string {
   return date.toISOString().slice(0, 10)
@@ -339,7 +342,7 @@ async function executeWarmupSendForProfile(
     event_type: "warmup_executor_send",
     severity: "low",
     title: "Warmup executor send",
-    description: `Sent warmup message to ${selection.recipient.email} (${base.sent}/${remainingCapacity} remaining before send).`,
+    description: `Sent warmup message to ${selection.recipient.email} (${Math.max(0, remainingCapacity - 1)} remaining today after send).`,
     metadata: {
       recipient_id: selection.recipient.id,
       template_id: template.id,
@@ -489,11 +492,30 @@ export async function runWarmupSendExecutor(
     })
   })
 
+  const eligibleProfileCount = profileDiagnostics.filter((d) => d.eligibility === "eligible").length
+  const sendPlan = computeWarmupExecutorRunSendPlan({
+    eligibleProfileCount,
+    maxSendsOverride: input?.maxSends,
+  })
+  const representativePlannedToday =
+    scannableProfiles.find((p) => p.status === "warming") != null
+      ? resolveWarmupDailyCapacity(
+          scannableProfiles.find((p) => p.status === "warming")!,
+        )
+      : null
+  const pacingMessage = buildWarmupExecutorPacingMessage({
+    eligibleProfiles: eligibleProfileCount,
+    plannedSendsThisRun: sendPlan.plannedSendsThisRun,
+    plannedTodayPerMailbox: representativePlannedToday,
+  })
+
   const runSummary = summarizeWarmupExecutorRun({
     allProfiles,
     scannableProfiles,
     diagnostics: profileDiagnostics,
     approvedRecipientCount: approvedRecipients.length,
+    plannedSendsThisRun: sendPlan.plannedSendsThisRun,
+    pacingMessage,
   })
 
   if (allProfiles.length === 0) {
@@ -529,14 +551,12 @@ export async function runWarmupSendExecutor(
     isWarmupExecutorSendEligibleStatus(profile.status),
   )
 
-  const maxSends =
-    input?.maxSends ?? (runKind === "manual" ? MAX_SENDS_PER_MANUAL_RUN : MAX_SENDS_PER_CRON_RUN)
-
   logGrowthEngine("warmup_executor_send_plan", {
     qa_marker: GROWTH_WARMUP_EXECUTOR_1D_QA_MARKER,
     preview_only: previewOnly,
     run_kind: runKind,
     profile_count: sendCandidateProfiles.length,
+    eligible_profile_count: eligibleProfileCount,
     profile_ids: sendCandidateProfiles.map((row) => row.id),
     sender_account_ids: sendCandidateProfiles.map((row) => row.sender_account_id),
     remaining_sends: sendCandidateProfiles.map((row) => {
@@ -544,7 +564,9 @@ export async function runWarmupSendExecutor(
       return Math.max(0, resolveWarmupDailyCapacity(row) - sendsToday)
     }),
     approved_recipient_count: approvedRecipients.length,
-    max_sends: maxSends,
+    max_sends_per_profile: sendPlan.maxSendsPerProfile,
+    max_total_sends: sendPlan.maxTotalSends,
+    planned_sends_this_run: sendPlan.plannedSendsThisRun,
   })
 
   let runId: string | null = null
@@ -561,11 +583,14 @@ export async function runWarmupSendExecutor(
   let sendsSucceeded = 0
   let sendsFailed = 0
   let sendsSkipped = 0
-  let totalSentThisRun = 0
+  let successfulSendsThisRun = 0
 
   for (const profile of sendCandidateProfiles) {
-    if (totalSentThisRun >= maxSends) {
-      skipReasons.push({ code: "batch_limit_reached", message: "Batch send limit reached for this run." })
+    if (sendPlan.maxTotalSends > 0 && successfulSendsThisRun >= sendPlan.maxTotalSends) {
+      skipReasons.push({
+        code: "batch_limit_reached",
+        message: "Run safety cap reached for this batch.",
+      })
       break
     }
 
@@ -582,7 +607,7 @@ export async function runWarmupSendExecutor(
       sendsSucceeded += result.sent
       sendsFailed += result.failed
       sendsSkipped += result.skipped
-      totalSentThisRun += result.sent
+      successfulSendsThisRun += result.sent
     } catch (error) {
       const message = error instanceof Error ? error.message : "Profile send failed unexpectedly."
       const stack = error instanceof Error ? error.stack : undefined
@@ -698,6 +723,8 @@ export async function buildWarmupExecutorDashboardStats(
       skipReason: diagnostic.eligibility === "skipped" ? diagnostic.reason : null,
       nextAction: diagnostic.nextAction,
       throttleReason: profile.throttle_reason,
+      nextRunCanSend:
+        diagnostic.eligibility === "eligible" && remainingToday > 0 ? MAX_SENDS_PER_PROFILE_PER_RUN : 0,
     })
   }
   return stats

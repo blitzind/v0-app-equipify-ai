@@ -346,9 +346,10 @@ async function runTests(): Promise<void> {
     enforceSendingWindow: false,
   })
   assert.equal(cappedPreview.runSummary?.eligibleProfiles, 6)
-  assert.equal(cappedPreview.sendsSucceeded, 5, "manual batch cap remains 5 sends per run")
-  assert.ok(cappedPreview.skipReasons.some((skip) => skip.code === "batch_limit_reached"))
-  console.log("  ✓ Manual preview respects existing batch cap without crashing")
+  assert.equal(cappedPreview.sendsSucceeded, 6, "per-profile pacing plans one send per eligible mailbox")
+  assert.equal(cappedPreview.runSummary?.plannedSendsThisRun, 6)
+  assert.ok(!cappedPreview.skipReasons.some((skip) => skip.code === "batch_limit_reached"))
+  console.log("  ✓ Preview with 6 profiles plans one send per eligible profile")
 
   assert.doesNotMatch(executorSource, /profiles\.map\(\(\) => \{[\s\S]*profile\.id/)
   console.log("  ✓ No anonymous map callbacks reference unbound profile variable")

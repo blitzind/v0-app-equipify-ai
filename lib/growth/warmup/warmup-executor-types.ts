@@ -115,6 +115,9 @@ export type WarmupExecutorRunSummary = {
   pausedProfiles: number
   eligibleProfiles: number
   primaryMessage: string
+  maxSendsPerProfilePerRun?: number
+  plannedSendsThisRun?: number
+  pacingMessage?: string
 }
 
 export type GrowthWarmupProfileExecutorStats = {
@@ -133,6 +136,7 @@ export type GrowthWarmupProfileExecutorStats = {
   skipReason: string | null
   nextAction: string | null
   throttleReason: string | null
+  nextRunCanSend: number
 }
 
 /** Conservative business-hours window 13:00–22:00 UTC. TODO: sender timezone. */

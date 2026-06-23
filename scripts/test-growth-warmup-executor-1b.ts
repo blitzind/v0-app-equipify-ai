@@ -95,7 +95,8 @@ function runTests(): void {
     approvedRecipientCount: 2,
   })
   assert.equal(eligibleDiag.eligibility, "eligible")
-  assert.match(eligibleDiag.reason, /3 warmup send/)
+  assert.match(eligibleDiag.reason, /3 remaining today/)
+  assert.match(eligibleDiag.reason, /next run can send 1/)
   console.log("  ✓ Warming profile with capacity: eligible")
 
   const noRecipientsDiag = describeWarmupExecutorProfileDiagnostic({

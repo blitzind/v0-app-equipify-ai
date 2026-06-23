@@ -270,13 +270,12 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
                   />
                 </div>
                 <p className="mt-1 text-muted-foreground">
-                  Status: {stat.profileStatus} · Today: {stat.realOutboundCounted} real + {stat.executorSendsToday}{" "}
-                  warmup = {stat.sendsToday} / {stat.plannedToday} complete
-                  {stat.remainingToday > 0 ? ` · ${stat.remainingToday} remaining` : ""}
+                  Today: {stat.executorSendsToday} warmup sent / {stat.plannedToday} planned · Remaining today:{" "}
+                  {stat.remainingToday}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {stat.eligibility === "eligible"
-                    ? `Eligible: ${stat.remainingToday} warmup send(s) remaining today.`
+                    ? `Next run can send: ${stat.nextRunCanSend}`
                     : `Skipped: ${stat.skipReason}`}
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -434,11 +433,13 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
               <div className="space-y-2 text-sm">
                 {preview ? (
                   <>
-                    <p>{preview.runSummary?.primaryMessage ?? "Warmup batch preview ready."}</p>
+                    <p>{preview.runSummary?.pacingMessage ?? preview.runSummary?.primaryMessage ?? "Warmup batch preview ready."}</p>
                     <p>
-                      Would send up to {preview.sendsSucceeded || preview.senderResults.reduce((s, r) => s + r.sent, 0)}{" "}
-                      warmup message(s) across {preview.runSummary?.eligibleProfiles ?? 0} eligible profile(s) (
-                      {preview.profilesScanned} scanned).
+                      {preview.runSummary?.eligibleProfiles ?? 0} profile(s) eligible · Would send up to{" "}
+                      {preview.runSummary?.plannedSendsThisRun ??
+                        (preview.sendsSucceeded ||
+                          preview.senderResults.reduce((s, r) => s + r.sent, 0))}{" "}
+                      warmup message(s) now ({preview.profilesScanned} scanned).
                     </p>
                     {(preview.profileDiagnostics ?? executorStats.map(diagnosticForStat).filter(Boolean)).length >
                     0 ? (
