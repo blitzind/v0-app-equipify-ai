@@ -354,7 +354,9 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {stat.eligibility === "eligible"
-                    ? `Next run can send: ${stat.nextRunCanSend}`
+                    ? stat.controlledWarmupAllowed && stat.senderHealthNote
+                      ? stat.senderHealthNote
+                      : `Next run can send: ${stat.nextRunCanSend}`
                     : `Skipped: ${stat.skipReason}`}
                 </p>
                 <p className="text-xs text-muted-foreground">

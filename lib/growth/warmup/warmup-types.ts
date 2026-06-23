@@ -70,6 +70,10 @@ export type GrowthWarmupProfile = {
   updated_at: string
   deleted_at: string | null
   schedule?: GrowthWarmupScheduleDay[]
+  /** Populated on dashboard reads when sender account health differs from warmup health. */
+  sender_account_health_status?: string | null
+  sender_account_status?: string | null
+  controlled_warmup_allowed?: boolean | null
 }
 
 export type GrowthWarmupEvent = {

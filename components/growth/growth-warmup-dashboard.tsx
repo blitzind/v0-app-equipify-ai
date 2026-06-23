@@ -386,10 +386,20 @@ export function GrowthWarmupDashboardPanel() {
                       <GrowthBadge label={profile.status} tone={STATUS_TONE[profile.status] ?? "neutral"} />
                     </td>
                     <td className="px-2 py-3">
-                      <GrowthBadge
-                        label={warmupHealthTierLabel(profile.warmup_health)}
-                        tone={STATUS_TONE[profile.warmup_health] ?? "neutral"}
-                      />
+                      <div className="space-y-1">
+                        <GrowthBadge
+                          label={warmupHealthTierLabel(profile.warmup_health)}
+                          tone={STATUS_TONE[profile.warmup_health] ?? "neutral"}
+                        />
+                        {profile.sender_account_health_status &&
+                        profile.sender_account_health_status !== profile.warmup_health ? (
+                          <div className="text-xs text-muted-foreground">
+                            Sender account:{" "}
+                            <span className="capitalize">{profile.sender_account_health_status}</span>
+                            {profile.controlled_warmup_allowed ? " · controlled warmup allowed" : null}
+                          </div>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-2 py-3">{profile.current_daily_volume}</td>
                     <td className="px-2 py-3">{profile.target_daily_volume}</td>

@@ -26,6 +26,7 @@ import type {
   GrowthWarmupScheduleDay,
 } from "@/lib/growth/warmup/warmup-types"
 import { getSenderAccount } from "@/lib/growth/sender/sender-repository"
+import { isControlledWarmupSenderHealthAllowed } from "@/lib/growth/warmup/warmup-sender-health-gate"
 
 type WarmupRow = Record<string, unknown>
 
@@ -53,10 +54,15 @@ function activeProfilesQuery(admin: SupabaseClient) {
 async function loadSenderSummary(
   admin: SupabaseClient,
   senderAccountId: string,
-): Promise<{ email: string; display_name: string }> {
+): Promise<{ email: string; display_name: string; health_status: string | null; status: string | null }> {
   const sender = await getSenderAccount(admin, senderAccountId)
-  if (!sender) return { email: "", display_name: "" }
-  return { email: sender.email_address, display_name: sender.display_name }
+  if (!sender) return { email: "", display_name: "", health_status: null, status: null }
+  return {
+    email: sender.email_address,
+    display_name: sender.display_name,
+    health_status: sender.health_status,
+    status: sender.status,
+  }
 }
 
 function mapScheduleRow(row: WarmupRow): GrowthWarmupScheduleDay {
@@ -110,6 +116,17 @@ async function mapProfile(admin: SupabaseClient, row: WarmupRow, includeSchedule
     created_at: asString(row.created_at),
     updated_at: asString(row.updated_at),
     deleted_at: asString(row.deleted_at) || null,
+  }
+
+  if (sender.status && sender.health_status) {
+    profile.sender_account_status = sender.status
+    profile.sender_account_health_status = sender.health_status
+    profile.controlled_warmup_allowed = isControlledWarmupSenderHealthAllowed({
+      senderStatus: sender.status,
+      senderHealthStatus: sender.health_status,
+      profileStatus: profile.status,
+      warmupHealth: profile.warmup_health,
+    })
   }
 
   if (includeSchedule) {

@@ -7,9 +7,11 @@ import type {
 } from "@/lib/growth/warmup/warmup-executor-types"
 import { isWithinWarmupSendingWindow } from "@/lib/growth/warmup/warmup-executor-types"
 import type { GrowthWarmupProfile, GrowthWarmupProfileStatus } from "@/lib/growth/warmup/warmup-types"
+import { evaluateWarmupExecutorSenderHealthGate } from "@/lib/growth/warmup/warmup-sender-health-gate"
 
 export const GROWTH_WARMUP_EXECUTOR_1B_QA_MARKER = "growth-warmup-executor-1b-v1" as const
 export const GROWTH_WARMUP_EXECUTOR_1F_QA_MARKER = "growth-warmup-executor-1f-v1" as const
+export { GROWTH_WARMUP_HEALTH_FIX_1K_QA_MARKER } from "@/lib/growth/warmup/warmup-sender-health-gate"
 
 /** GS-GROWTH-WARMUP-EXECUTOR-1E — one send attempt per warming profile per manual/cron run. */
 export const MAX_SENDS_PER_PROFILE_PER_RUN = 1 as const
@@ -83,15 +85,21 @@ export function describeWarmupExecutorProfileDiagnostic(input: {
   approvedRecipientCount: number
   enforceSendingWindow?: boolean
   now?: Date
+  senderAccount?: {
+    status: string
+    health_status: string
+  } | null
 }): WarmupExecutorProfileDiagnostic {
   const { profile, remainingCapacity, approvedRecipientCount } = input
   const throttleReason = profile.throttle_reason ?? null
+  const senderHealthStatus = input.senderAccount?.health_status ?? profile.sender_account_health_status ?? null
   const base = {
     profileId: profile.id,
     senderEmail: profile.sender_email,
     profileStatus: profile.status,
     remainingCapacity,
     throttleReason,
+    senderHealthStatus,
   }
 
   if (profile.status === "paused") {
@@ -183,6 +191,40 @@ export function describeWarmupExecutorProfileDiagnostic(input: {
       skipCode: "outside_sending_window",
       reason: "Outside conservative executor sending window (UTC 13–21).",
       nextAction: "Manual preview works anytime; cron sends during business hours UTC.",
+    }
+  }
+
+  if (input.senderAccount || senderHealthStatus) {
+    const gate = evaluateWarmupExecutorSenderHealthGate({
+      senderStatus: input.senderAccount?.status ?? profile.sender_account_status ?? null,
+      senderHealthStatus,
+      profileStatus: profile.status,
+      warmupHealth: profile.warmup_health,
+    })
+
+    if (!gate.allowed) {
+      return {
+        ...base,
+        eligibility: "skipped",
+        skipCode: gate.skipCode ?? "sender_unhealthy",
+        reason: gate.message ?? "Sender health blocked warmup send.",
+        nextAction: gate.nextAction ?? "Review sender health before warmup continues.",
+        controlledWarmupAllowed: false,
+        senderHealthNote: gate.senderHealthNote,
+      }
+    }
+
+    const capacityReason = `Eligible: ${remainingCapacity} remaining today; next run can send ${MAX_SENDS_PER_PROFILE_PER_RUN}.`
+    return {
+      ...base,
+      eligibility: "eligible",
+      skipCode: null,
+      reason: gate.controlledWarmupAllowed
+        ? `${capacityReason} ${gate.senderHealthNote ?? ""}`.trim()
+        : capacityReason,
+      nextAction: `Next run can send up to ${MAX_SENDS_PER_PROFILE_PER_RUN} warmup message.`,
+      controlledWarmupAllowed: gate.controlledWarmupAllowed,
+      senderHealthNote: gate.senderHealthNote,
     }
   }
 

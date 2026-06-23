@@ -6,13 +6,14 @@ import { assessMailboxReputation } from "@/lib/growth/deliverability/mailbox-rep
 import { recordInternalOutboundAuditEvent } from "@/lib/growth/operations/internal-outbound-audit"
 import { getSenderAccount, updateSenderAccount } from "@/lib/growth/sender/sender-repository"
 import { computeCurrentWarmupDay } from "@/lib/growth/warmup/warmup-health"
+import { resolveWarmupAlignedSenderHealthStatus } from "@/lib/growth/warmup/warmup-sender-health-gate"
 import {
   GROWTH_NATIVE_WARMUP_EXECUTION_QA_MARKER,
   type GrowthWarmupProgressionRunResult,
 } from "@/lib/growth/warmup/warmup-execution-types"
 import { getPlannedVolumeForDay, interpolateWarmupVolume } from "@/lib/growth/warmup/warmup-scheduler"
 import type { GrowthWarmupProfile, GrowthWarmupProfileStatus } from "@/lib/growth/warmup/warmup-types"
-import { getWarmupProfile, recomputeWarmupProfile } from "@/lib/growth/warmup/warmup-repository"
+import { getWarmupProfile, recomputeWarmupProfile, listWarmupProfiles } from "@/lib/growth/warmup/warmup-repository"
 
 function utcDateString(date = new Date()): string {
   return date.toISOString().slice(0, 10)
@@ -56,31 +57,21 @@ export async function syncSenderWarmupCapacity(
 ): Promise<void> {
   const dailyCap = resolveWarmupDailyCapacity(profile)
   const warmupActive = profile.status === "warming" || profile.status === "throttled"
-  const senderHealth =
-    profile.status === "throttled" || profile.warmup_health === "critical"
-      ? "degraded"
-      : profile.status === "warming"
-        ? "warming"
-        : profile.warmup_health === "degraded"
-          ? "degraded"
-          : "healthy"
+  const senderHealth = resolveWarmupAlignedSenderHealthStatus({
+    profileStatus: profile.status,
+    warmupHealth: profile.warmup_health,
+  })
+
+  const existingSender = await getSenderAccount(admin, profile.sender_account_id)
+  const preserveBlocked = String(existingSender?.health_status ?? "") === "blocked"
 
   await updateSenderAccount(admin, profile.sender_account_id, {
     warmup_eligible: true,
     warmup_enabled: warmupActive,
     daily_send_limit: profile.status === "active" ? Math.max(dailyCap, profile.target_daily_volume) : dailyCap,
     daily_send_used: profile.sends_today,
+    ...(preserveBlocked ? {} : { health_status: senderHealth, skipHealthRecompute: true }),
   })
-
-  const sender = await getSenderAccount(admin, profile.sender_account_id)
-  if (sender && sender.health_status !== "blocked") {
-    await admin
-      .schema("growth")
-      .from("sender_accounts")
-      .update({ health_status: senderHealth, updated_at: new Date().toISOString() })
-      .eq("id", profile.sender_account_id)
-      .is("deleted_at", null)
-  }
 
   const now = new Date().toISOString()
   await admin
@@ -94,6 +85,58 @@ export async function syncSenderWarmupCapacity(
     })
     .eq("id", profile.id)
     .is("deleted_at", null)
+}
+
+export type WarmupSenderHealthRepairResult = {
+  scanned: number
+  repaired: number
+  skipped: number
+  repaired_profile_ids: string[]
+}
+
+/** Re-align sender_accounts health for warming profiles clobbered by DNS-stub recompute. */
+export async function repairWarmupAlignedSenderHealthBatch(
+  admin: SupabaseClient,
+  input?: { profileIds?: string[] },
+): Promise<WarmupSenderHealthRepairResult> {
+  const profiles = input?.profileIds?.length
+    ? (
+        await Promise.all(input.profileIds.map((profileId) => getWarmupProfile(admin, profileId)))
+      ).filter((profile): profile is GrowthWarmupProfile => profile != null)
+    : await listWarmupProfiles(admin)
+
+  let repaired = 0
+  let skipped = 0
+  const repairedProfileIds: string[] = []
+
+  for (const profile of profiles) {
+    if (profile.status !== "warming" || profile.warmup_health === "critical") {
+      skipped += 1
+      continue
+    }
+
+    const sender = await getSenderAccount(admin, profile.sender_account_id)
+    if (!sender || sender.status !== "connected") {
+      skipped += 1
+      continue
+    }
+
+    if (sender.health_status !== "degraded") {
+      skipped += 1
+      continue
+    }
+
+    await syncSenderWarmupCapacity(admin, profile)
+    repaired += 1
+    repairedProfileIds.push(profile.id)
+  }
+
+  return {
+    scanned: profiles.length,
+    repaired,
+    skipped,
+    repaired_profile_ids: repairedProfileIds,
+  }
 }
 
 async function emitWarmupStageChanged(

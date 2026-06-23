@@ -7,7 +7,7 @@ import { GROWTH_CRON_ACTOR_EMAIL } from "@/lib/growth/actor-user-id"
 import { GROWTH_WARMUP_EXECUTOR_1C_QA_MARKER } from "@/lib/growth/warmup/warmup-executor-api-response"
 import { assertPreSendAllowed } from "@/lib/growth/compliance/pre-send-assertion"
 import { executeTransportSend } from "@/lib/growth/providers/transport/transport-orchestrator"
-import { getSenderAccount } from "@/lib/growth/sender/sender-repository"
+import { evaluateWarmupExecutorSenderHealthGate } from "@/lib/growth/warmup/warmup-sender-health-gate"
 import { prepareOutboundEmailContent } from "@/lib/growth/signatures/outbound-signature-runtime"
 import { createWarmupEvent } from "@/lib/growth/warmup/warmup-events"
 import {
@@ -49,6 +49,7 @@ import {
   type WarmupExecutorRecipientPoolSummary,
 } from "@/lib/growth/warmup/warmup-executor-types"
 import type { GrowthWarmupProfile } from "@/lib/growth/warmup/warmup-types"
+import { getSenderAccount } from "@/lib/growth/sender/sender-repository"
 
 export const GROWTH_WARMUP_EXECUTOR_1D_QA_MARKER = "growth-warmup-executor-1d-v1" as const
 export const GROWTH_WARMUP_EXECUTOR_1E_QA_MARKER = "growth-warmup-executor-1e-v1" as const
@@ -81,6 +82,36 @@ function utcDateString(date = new Date()): string {
 
 function utcDayStartIso(date = new Date()): string {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())).toISOString()
+}
+
+async function loadSenderAccountGateContext(
+  admin: SupabaseClient,
+  senderAccountIds: string[],
+): Promise<Map<string, { status: string; health_status: string }>> {
+  const uniqueIds = [...new Set(senderAccountIds.filter(Boolean))]
+  if (uniqueIds.length === 0) return new Map()
+
+  const { data, error } = await admin
+    .schema("growth")
+    .from("sender_accounts")
+    .select("id, status, health_status")
+    .in("id", uniqueIds)
+    .is("deleted_at", null)
+
+  if (error) throw new Error(error.message)
+
+  return new Map(
+    (data ?? []).map((row) => {
+      const record = row as Record<string, unknown>
+      return [
+        String(record.id),
+        {
+          status: String(record.status ?? ""),
+          health_status: String(record.health_status ?? ""),
+        },
+      ] as const
+    }),
+  )
 }
 
 function buildIdempotencyKey(kind: GrowthWarmupSendRunKind, now = new Date()): string {
@@ -148,19 +179,25 @@ async function finalizeSendRun(
 
 async function assertSenderHealthy(
   admin: SupabaseClient,
-  senderAccountId: string,
-): Promise<{ ok: true } | { ok: false; code: GrowthWarmupExecutorSkipCode; message: string }> {
-  const sender = await getSenderAccount(admin, senderAccountId)
-  if (!sender) {
-    return { ok: false, code: "sender_not_connected", message: "Sender account not found." }
+  profile: GrowthWarmupProfile,
+): Promise<{ ok: true; controlledWarmupAllowed: boolean } | { ok: false; code: GrowthWarmupExecutorSkipCode; message: string }> {
+  const sender = await getSenderAccount(admin, profile.sender_account_id)
+  const gate = evaluateWarmupExecutorSenderHealthGate({
+    senderStatus: sender?.status ?? null,
+    senderHealthStatus: sender?.health_status ?? null,
+    profileStatus: profile.status,
+    warmupHealth: profile.warmup_health,
+  })
+
+  if (!gate.allowed) {
+    return {
+      ok: false,
+      code: gate.skipCode ?? "sender_unhealthy",
+      message: gate.message ?? "Sender health blocked warmup send.",
+    }
   }
-  if (sender.status !== "connected") {
-    return { ok: false, code: "sender_not_connected", message: `Sender not connected (${sender.status}).` }
-  }
-  if (sender.health_status === "critical" || sender.health_status === "degraded") {
-    return { ok: false, code: "sender_unhealthy", message: `Sender health is ${sender.health_status}.` }
-  }
-  return { ok: true }
+
+  return { ok: true, controlledWarmupAllowed: gate.controlledWarmupAllowed }
 }
 
 async function executeWarmupSendForProfile(
@@ -245,7 +282,7 @@ async function executeWarmupSendForProfile(
     return base
   }
 
-  const senderHealth = await assertSenderHealthy(admin, profile.sender_account_id)
+  const senderHealth = await assertSenderHealthy(admin, profile)
   if (!senderHealth.ok) {
     skipReasons.push({ code: senderHealth.code, message: senderHealth.message })
     base.skipped = 1
@@ -510,6 +547,10 @@ export async function runWarmupSendExecutor(
   const scannableProfiles = allProfiles.filter(isWarmupExecutorScannableProfile)
   const approvedRecipients = await listWarmupRecipients(admin, { activeOnly: true, approvedOnly: true })
   const recipientPoolSummary = await buildRecipientPoolSummary(admin, approvedRecipients)
+  const senderGateContext = await loadSenderAccountGateContext(
+    admin,
+    scannableProfiles.map((profile) => profile.sender_account_id),
+  )
 
   const profileDiagnostics: WarmupExecutorProfileDiagnostic[] = scannableProfiles.map((profile) => {
     const sendsToday = profile.sends_today_date === utcDateString(now) ? profile.sends_today : 0
@@ -521,6 +562,7 @@ export async function runWarmupSendExecutor(
       approvedRecipientCount: approvedRecipients.length,
       enforceSendingWindow: runKind === "cron" && input?.enforceSendingWindow !== false,
       now,
+      senderAccount: senderGateContext.get(profile.sender_account_id) ?? null,
     })
   })
 
@@ -743,6 +785,10 @@ export async function buildWarmupExecutorDashboardStats(
     () => [],
   )
   const latestRun = await getLatestWarmupSendRun(admin)
+  const senderGateContext = await loadSenderAccountGateContext(
+    admin,
+    profiles.map((profile) => profile.sender_account_id),
+  )
 
   const stats = []
   for (const profile of profiles) {
@@ -755,6 +801,7 @@ export async function buildWarmupExecutorDashboardStats(
       remainingCapacity: remainingToday,
       approvedRecipientCount: recipients.length,
       enforceSendingWindow: false,
+      senderAccount: senderGateContext.get(profile.sender_account_id) ?? null,
     })
     stats.push({
       profileId: profile.id,
@@ -774,6 +821,9 @@ export async function buildWarmupExecutorDashboardStats(
       throttleReason: profile.throttle_reason,
       nextRunCanSend:
         diagnostic.eligibility === "eligible" && remainingToday > 0 ? MAX_SENDS_PER_PROFILE_PER_RUN : 0,
+      senderHealthStatus: diagnostic.senderHealthStatus ?? null,
+      controlledWarmupAllowed: diagnostic.controlledWarmupAllowed ?? false,
+      senderHealthNote: diagnostic.senderHealthNote ?? null,
     })
   }
   return stats

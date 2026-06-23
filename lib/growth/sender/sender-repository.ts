@@ -272,11 +272,14 @@ export async function updateSenderAccount(
     daily_send_used: number
     warmup_eligible: boolean
     warmup_enabled: boolean
+    health_status: GrowthSenderAccount["health_status"]
     notes: string | null
     provider_connection_id: string | null
   }> & {
     actorUserId?: string | null
     actorEmail?: string | null
+    /** GS-GROWTH-WARMUP-HEALTH-FIX-1K — skip DNS-derived recompute during warmup capacity sync. */
+    skipHealthRecompute?: boolean
   },
 ): Promise<GrowthSenderAccount> {
   const existing = await getSenderAccount(admin, senderId)
@@ -291,6 +294,9 @@ export async function updateSenderAccount(
   if (input.warmup_enabled != null) patch.warmup_enabled = input.warmup_enabled
   if (input.notes !== undefined) patch.notes = input.notes
   if (input.provider_connection_id !== undefined) patch.provider_connection_id = input.provider_connection_id
+  if (input.skipHealthRecompute && input.health_status != null) {
+    patch.health_status = input.health_status
+  }
 
   const { data, error } = await accountsTable(admin)
     .update(patch)
@@ -302,14 +308,16 @@ export async function updateSenderAccount(
   if (error) throw new Error(error.message)
   let account = mapAccount(data as Record<string, unknown>)
 
-  const domainName = extractDomainFromEmail(account.email_address)
-  const domain = domainName
-    ? await domainsTable(admin).select("*").eq("domain", domainName).maybeSingle().then((res) =>
-        res.data ? mapDomain(res.data as Record<string, unknown>) : null,
-      )
-    : null
+  if (!input.skipHealthRecompute) {
+    const domainName = extractDomainFromEmail(account.email_address)
+    const domain = domainName
+      ? await domainsTable(admin).select("*").eq("domain", domainName).maybeSingle().then((res) =>
+          res.data ? mapDomain(res.data as Record<string, unknown>) : null,
+        )
+      : null
 
-  account = await recomputeSenderHealth(admin, account, domain)
+    account = await recomputeSenderHealth(admin, account, domain)
+  }
 
   if (input.status === "disabled" && existing.status !== "disabled") {
     await appendSenderTimelineEvent(admin, {

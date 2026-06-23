@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { getWarmupProfile } from "@/lib/growth/warmup/warmup-repository"
-import { runWarmupProgressionForProfile } from "@/lib/growth/warmup/warmup-execution"
+import { runWarmupProgressionForProfile, repairWarmupAlignedSenderHealthBatch } from "@/lib/growth/warmup/warmup-execution"
 
 export const runtime = "nodejs"
 
@@ -30,10 +30,14 @@ export async function POST(
   }
 
   try {
+    const senderHealthRepair = await repairWarmupAlignedSenderHealthBatch(access.admin, {
+      profileIds: [id],
+    })
     const progression = await runWarmupProgressionForProfile(access.admin, id)
     const after = await getWarmupProfile(access.admin, id)
     return NextResponse.json({
       ok: true,
+      sender_health_repair: senderHealthRepair,
       progression,
       profile: after,
       cleared_throttle: before.status === "throttled" && after?.status === "warming",

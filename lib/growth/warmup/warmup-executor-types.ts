@@ -108,6 +108,9 @@ export type WarmupExecutorProfileDiagnostic = {
   nextAction: string
   remainingCapacity: number
   throttleReason: string | null
+  senderHealthStatus?: string | null
+  controlledWarmupAllowed?: boolean
+  senderHealthNote?: string | null
 }
 
 export type WarmupExecutorRunSummary = {
@@ -147,6 +150,9 @@ export type GrowthWarmupProfileExecutorStats = {
   nextAction: string | null
   throttleReason: string | null
   nextRunCanSend: number
+  senderHealthStatus?: string | null
+  controlledWarmupAllowed?: boolean
+  senderHealthNote?: string | null
 }
 
 /** Conservative business-hours window 13:00–22:00 UTC. TODO: sender timezone. */
