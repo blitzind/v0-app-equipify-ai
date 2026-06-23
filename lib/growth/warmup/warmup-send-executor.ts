@@ -23,12 +23,20 @@ import {
 import { selectWarmupRecipientForSend } from "@/lib/growth/warmup/warmup-recipient-selector"
 import { pickWarmupMessageTemplate } from "@/lib/growth/warmup/warmup-message-templates"
 import {
+  describeWarmupExecutorProfileDiagnostic,
+  isWarmupExecutorScannableProfile,
+  isWarmupExecutorSendEligibleStatus,
+  summarizeWarmupExecutorRun,
+} from "@/lib/growth/warmup/warmup-executor-diagnostics"
+import {
   GROWTH_WARMUP_EXECUTOR_QA_MARKER,
   isWithinWarmupSendingWindow,
   type GrowthWarmupExecutorRunResult,
   type GrowthWarmupExecutorSenderResult,
   type GrowthWarmupExecutorSkipCode,
+  type GrowthWarmupProfileExecutorStats,
   type GrowthWarmupSendRunKind,
+  type WarmupExecutorProfileDiagnostic,
 } from "@/lib/growth/warmup/warmup-executor-types"
 import type { GrowthWarmupProfile } from "@/lib/growth/warmup/warmup-types"
 
@@ -157,10 +165,28 @@ async function executeWarmupSendForProfile(
     skipReasons,
   }
 
+  if (profile.status === "paused") {
+    skipReasons.push({
+      code: "warmup_paused",
+      message: "Warmup profile is paused by operator.",
+    })
+    base.skipped = 1
+    return base
+  }
+
+  if (profile.status === "throttled") {
+    skipReasons.push({
+      code: "warmup_throttled",
+      message: profile.throttle_reason ?? "Warmup throttled — reputation protection active.",
+    })
+    base.skipped = 1
+    return base
+  }
+
   if (profile.status !== "warming") {
     skipReasons.push({
-      code: profile.status === "paused" ? "warmup_paused" : "warmup_throttled",
-      message: `Profile status is ${profile.status}.`,
+      code: "pre_send_blocked",
+      message: `Profile status is ${profile.status} — executor only sends from warming profiles.`,
     })
     base.skipped = 1
     return base
@@ -431,8 +457,31 @@ export async function runWarmupSendExecutor(
     }
   }
 
-  const profiles = (await listWarmupProfiles(admin)).filter((p) => p.status === "warming")
-  if (profiles.length === 0) {
+  const allProfiles = await listWarmupProfiles(admin)
+  const scannableProfiles = allProfiles.filter(isWarmupExecutorScannableProfile)
+  const approvedRecipients = await listWarmupRecipients(admin, { activeOnly: true, approvedOnly: true })
+
+  const profileDiagnostics: WarmupExecutorProfileDiagnostic[] = scannableProfiles.map((profile) => {
+    const sendsToday = profile.sends_today_date === utcDateString(now) ? profile.sends_today : 0
+    const plannedToday = resolveWarmupDailyCapacity(profile)
+    const remainingCapacity = Math.max(0, plannedToday - sendsToday)
+    return describeWarmupExecutorProfileDiagnostic({
+      profile,
+      remainingCapacity,
+      approvedRecipientCount: approvedRecipients.length,
+      enforceSendingWindow: runKind === "cron" && input?.enforceSendingWindow !== false,
+      now,
+    })
+  })
+
+  const runSummary = summarizeWarmupExecutorRun({
+    allProfiles,
+    scannableProfiles,
+    diagnostics: profileDiagnostics,
+    approvedRecipientCount: approvedRecipients.length,
+  })
+
+  if (allProfiles.length === 0) {
     return {
       qa_marker: GROWTH_WARMUP_EXECUTOR_QA_MARKER,
       runId: null,
@@ -445,21 +494,31 @@ export async function runWarmupSendExecutor(
       sendsFailed: 0,
       sendsSkipped: 0,
       senderResults: [],
-      skipReasons: [{ code: "no_warming_profiles", message: "No warming profiles found." }],
+      skipReasons: [{ code: "no_warming_profiles", message: runSummary.primaryMessage }],
       previewOnly,
+      profileDiagnostics,
+      runSummary,
     }
   }
 
-  const recipients = await listWarmupRecipients(admin, { activeOnly: true, approvedOnly: true })
-  if (recipients.length === 0) {
+  if (approvedRecipients.length === 0) {
     skipReasons.push({ code: "no_approved_recipients", message: "No approved warmup recipients configured." })
+  } else if (runSummary.eligibleProfiles === 0) {
+    skipReasons.push({
+      code: "no_warming_profiles",
+      message: runSummary.primaryMessage,
+    })
   }
+
+  const sendCandidateProfiles = scannableProfiles.filter((profile) =>
+    isWarmupExecutorSendEligibleStatus(profile.status),
+  )
 
   const maxSends =
     input?.maxSends ?? (runKind === "manual" ? MAX_SENDS_PER_MANUAL_RUN : MAX_SENDS_PER_CRON_RUN)
 
   let runId: string | null = null
-  if (!previewOnly) {
+  if (!previewOnly && sendCandidateProfiles.length > 0) {
     runId = await createSendRun(admin, {
       runKind,
       idempotencyKey,
@@ -474,7 +533,7 @@ export async function runWarmupSendExecutor(
   let sendsSkipped = 0
   let totalSentThisRun = 0
 
-  for (const profile of profiles) {
+  for (const profile of sendCandidateProfiles) {
     if (totalSentThisRun >= maxSends) {
       skipReasons.push({ code: "batch_limit_reached", message: "Batch send limit reached for this run." })
       break
@@ -510,7 +569,7 @@ export async function runWarmupSendExecutor(
     runKind,
     idempotencyKey,
     status,
-    profilesScanned: profiles.length,
+    profilesScanned: scannableProfiles.length,
     sendsAttempted,
     sendsSucceeded,
     sendsFailed,
@@ -518,6 +577,8 @@ export async function runWarmupSendExecutor(
     senderResults,
     skipReasons,
     previewOnly,
+    profileDiagnostics,
+    runSummary,
   }
 
   if (runId) {
@@ -530,20 +591,7 @@ export async function runWarmupSendExecutor(
 export async function buildWarmupExecutorDashboardStats(
   admin: SupabaseClient,
   profiles: GrowthWarmupProfile[],
-): Promise<
-  Array<{
-    profileId: string
-    senderEmail: string
-    plannedToday: number
-    sendsToday: number
-    executorSendsToday: number
-    realOutboundCounted: number
-    remainingToday: number
-    lastExecutorRunAt: string | null
-    pausedOrThrottled: boolean
-    recipientPoolActive: number
-  }>
-> {
+): Promise<GrowthWarmupProfileExecutorStats[]> {
   const today = utcDateString()
   const dayStart = utcDayStartIso()
   const recipients = await listWarmupRecipients(admin, { activeOnly: true, approvedOnly: true }).catch(
@@ -556,18 +604,29 @@ export async function buildWarmupExecutorDashboardStats(
     const plannedToday = resolveWarmupDailyCapacity(profile)
     const sendsToday = profile.sends_today_date === today ? profile.sends_today : 0
     const executorSendsToday = await countExecutorSendsForProfileToday(admin, profile.id, dayStart)
-    const realOutboundCounted = Math.max(0, sendsToday - executorSendsToday)
+    const remainingToday = Math.max(0, plannedToday - sendsToday)
+    const diagnostic = describeWarmupExecutorProfileDiagnostic({
+      profile,
+      remainingCapacity: remainingToday,
+      approvedRecipientCount: recipients.length,
+      enforceSendingWindow: false,
+    })
     stats.push({
       profileId: profile.id,
       senderEmail: profile.sender_email,
+      profileStatus: profile.status,
       plannedToday,
       sendsToday,
       executorSendsToday,
-      realOutboundCounted,
-      remainingToday: Math.max(0, plannedToday - sendsToday),
+      realOutboundCounted: Math.max(0, sendsToday - executorSendsToday),
+      remainingToday,
       lastExecutorRunAt: latestRun?.finished_at ?? latestRun?.started_at ?? null,
       pausedOrThrottled: profile.status === "paused" || profile.status === "throttled",
       recipientPoolActive: recipients.length,
+      eligibility: diagnostic.eligibility,
+      skipReason: diagnostic.eligibility === "skipped" ? diagnostic.reason : null,
+      nextAction: diagnostic.nextAction,
+      throttleReason: profile.throttle_reason,
     })
   }
   return stats

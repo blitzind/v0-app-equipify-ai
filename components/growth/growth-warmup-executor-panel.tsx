@@ -29,6 +29,7 @@ import {
   type GrowthWarmupExecutorRunResult,
   type GrowthWarmupProfileExecutorStats,
   type GrowthWarmupRecipient,
+  type WarmupExecutorProfileDiagnostic,
 } from "@/lib/growth/warmup/warmup-executor-types"
 
 function formatDate(value: string | null | undefined): string {
@@ -131,6 +132,52 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
     }
   }
 
+  async function syncProgression(profileId: string) {
+    setActionLoading(`sync-${profileId}`)
+    setError(null)
+    try {
+      const response = await fetch(`/api/platform/growth/warmup/${profileId}/sync-progression`, {
+        method: "POST",
+      })
+      const payload = (await response.json()) as { message?: string; cleared_throttle?: boolean }
+      if (!response.ok) throw new Error(payload.message ?? "Could not sync warmup progression.")
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not sync warmup progression.")
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function resumeWarmup(profileId: string) {
+    setActionLoading(`resume-${profileId}`)
+    setError(null)
+    try {
+      const response = await fetch(`/api/platform/growth/warmup/${profileId}/resume`, { method: "POST" })
+      const payload = (await response.json()) as { message?: string }
+      if (!response.ok) throw new Error(payload.message ?? "Could not resume warmup.")
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not resume warmup.")
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  function diagnosticForStat(stat: GrowthWarmupProfileExecutorStats): WarmupExecutorProfileDiagnostic | null {
+    return {
+      profileId: stat.profileId,
+      senderEmail: stat.senderEmail,
+      profileStatus: stat.profileStatus,
+      eligibility: stat.eligibility,
+      skipCode: null,
+      reason: stat.skipReason ?? stat.nextAction ?? "",
+      nextAction: stat.nextAction ?? "",
+      remainingCapacity: stat.remainingToday,
+      throttleReason: stat.throttleReason,
+    }
+  }
+
   async function loadPreview() {
     setActionLoading("preview")
     setError(null)
@@ -206,17 +253,55 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
           ) : (
             executorStats.map((stat) => (
               <div key={stat.profileId} className="rounded-lg border border-border/60 p-3 text-sm">
-                <div className="font-medium">{stat.senderEmail}</div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="font-medium">{stat.senderEmail}</div>
+                  <GrowthBadge
+                    label={stat.eligibility === "eligible" ? "eligible" : "skipped"}
+                    tone={stat.eligibility === "eligible" ? "healthy" : "attention"}
+                  />
+                </div>
                 <p className="mt-1 text-muted-foreground">
-                  Today: {stat.realOutboundCounted} real + {stat.executorSendsToday} warmup = {stat.sendsToday} /{" "}
-                  {stat.plannedToday} complete
+                  Status: {stat.profileStatus} · Today: {stat.realOutboundCounted} real + {stat.executorSendsToday}{" "}
+                  warmup = {stat.sendsToday} / {stat.plannedToday} complete
                   {stat.remainingToday > 0 ? ` · ${stat.remainingToday} remaining` : ""}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {stat.eligibility === "eligible"
+                    ? `Eligible: ${stat.remainingToday} warmup send(s) remaining today.`
+                    : `Skipped: ${stat.skipReason}`}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Last executor run: {formatDate(stat.lastExecutorRunAt)} · Active recipients:{" "}
                   {stat.recipientPoolActive}
-                  {stat.pausedOrThrottled ? " · Paused/throttled" : ""}
+                  {stat.throttleReason ? ` · Throttle: ${stat.throttleReason}` : ""}
                 </p>
+                {stat.nextAction ? (
+                  <p className="mt-1 text-xs text-muted-foreground">Next: {stat.nextAction}</p>
+                ) : null}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {stat.profileStatus === "paused" ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={Boolean(actionLoading)}
+                      onClick={() => void resumeWarmup(stat.profileId)}
+                    >
+                      Resume Warmup
+                    </Button>
+                  ) : null}
+                  {stat.profileStatus === "throttled" ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={Boolean(actionLoading)}
+                      onClick={() => void syncProgression(stat.profileId)}
+                    >
+                      Clear Throttle
+                    </Button>
+                  ) : null}
+                </div>
               </div>
             ))
           )}
@@ -340,10 +425,24 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
               <div className="space-y-2 text-sm">
                 {preview ? (
                   <>
+                    <p>{preview.runSummary?.primaryMessage ?? "Warmup batch preview ready."}</p>
                     <p>
                       Would send up to {preview.sendsSucceeded || preview.senderResults.reduce((s, r) => s + r.sent, 0)}{" "}
-                      warmup message(s) across {preview.profilesScanned} warming profile(s).
+                      warmup message(s) across {preview.runSummary?.eligibleProfiles ?? 0} eligible profile(s) (
+                      {preview.profilesScanned} scanned).
                     </p>
+                    {(preview.profileDiagnostics ?? executorStats.map(diagnosticForStat).filter(Boolean)).length >
+                    0 ? (
+                      <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
+                        {(preview.profileDiagnostics ??
+                          executorStats.map(diagnosticForStat).filter(Boolean) as WarmupExecutorProfileDiagnostic[]
+                        ).map((row) => (
+                          <li key={row.profileId}>
+                            {row.senderEmail}: {row.eligibility === "eligible" ? row.reason : `Skipped — ${row.reason}`}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                     {preview.skipReasons.length > 0 ? (
                       <ul className="list-disc pl-4 text-muted-foreground">
                         {preview.skipReasons.map((skip) => (

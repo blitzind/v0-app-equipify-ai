@@ -1,5 +1,7 @@
 /** GS-GROWTH-WARMUP-EXECUTOR-1A — types (client-safe). */
 
+import type { GrowthWarmupProfileStatus } from "@/lib/growth/warmup/warmup-types"
+
 export const GROWTH_WARMUP_EXECUTOR_QA_MARKER = "growth-warmup-executor-1a-v1" as const
 
 export const GROWTH_WARMUP_EXECUTOR_MIGRATION =
@@ -88,11 +90,36 @@ export type GrowthWarmupExecutorRunResult = {
   senderResults: GrowthWarmupExecutorSenderResult[]
   skipReasons: Array<{ code: GrowthWarmupExecutorSkipCode; message: string }>
   previewOnly: boolean
+  profileDiagnostics?: WarmupExecutorProfileDiagnostic[]
+  runSummary?: WarmupExecutorRunSummary
+}
+
+export type WarmupExecutorProfileDiagnostic = {
+  profileId: string
+  senderEmail: string
+  profileStatus: GrowthWarmupProfileStatus
+  eligibility: "eligible" | "skipped"
+  skipCode: GrowthWarmupExecutorSkipCode | null
+  reason: string
+  nextAction: string
+  remainingCapacity: number
+  throttleReason: string | null
+}
+
+export type WarmupExecutorRunSummary = {
+  totalProfiles: number
+  scannableProfiles: number
+  warmingProfiles: number
+  throttledProfiles: number
+  pausedProfiles: number
+  eligibleProfiles: number
+  primaryMessage: string
 }
 
 export type GrowthWarmupProfileExecutorStats = {
   profileId: string
   senderEmail: string
+  profileStatus: GrowthWarmupProfileStatus
   plannedToday: number
   sendsToday: number
   executorSendsToday: number
@@ -101,6 +128,10 @@ export type GrowthWarmupProfileExecutorStats = {
   lastExecutorRunAt: string | null
   pausedOrThrottled: boolean
   recipientPoolActive: number
+  eligibility: "eligible" | "skipped"
+  skipReason: string | null
+  nextAction: string | null
+  throttleReason: string | null
 }
 
 /** Conservative business-hours window 13:00–22:00 UTC. TODO: sender timezone. */

@@ -615,6 +615,7 @@
     "test:growth-outbound-lifecycle-ops": "tsx scripts/test-growth-outbound-lifecycle-ops.ts",
     "test:growth-warmup": "tsx scripts/test-growth-warmup.ts",
     "test:growth-warmup-executor-1a": "tsx scripts/test-growth-warmup-executor-1a.ts",
+    "test:growth-warmup-executor-1b": "tsx scripts/test-growth-warmup-executor-1b.ts",
     "test:growth-warmup-recipient-safety-1a": "tsx scripts/test-growth-warmup-recipient-safety-1a.ts",
     "test:growth-warmup-cron-1a": "tsx scripts/test-growth-warmup-cron-1a.ts",
     "test:growth-native-warmup-execution": "tsx scripts/test-growth-native-warmup-execution.ts",
