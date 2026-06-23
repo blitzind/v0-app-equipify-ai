@@ -80,6 +80,7 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
       { id: "audiences", label: "Audiences", registryRouteId: "workspace-audiences", icon: Users, workspaceRoute: true },
       { id: "personalized-videos", label: "Personalized Videos", registryRouteId: "workspace-personalized-videos", icon: Sparkles, workspaceRoute: true },
       { id: "campaigns", label: "Campaigns", registryRouteId: "workspace-campaigns", icon: Workflow, workspaceRoute: true },
+      { id: "objectives", label: "Objectives", registryRouteId: "workspace-objectives", icon: Target, workspaceRoute: true },
       { id: "inbox", label: "Inbox", registryRouteId: "workspace-inbox", icon: Inbox, workspaceRoute: true },
       { id: "calls", label: "Calls", registryRouteId: "workspace-calls", icon: Phone, workspaceRoute: true },
       { id: "meetings", label: "Meetings", registryRouteId: "workspace-meetings", icon: Users, workspaceRoute: true },

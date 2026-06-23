@@ -395,6 +395,9 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
       adminPath: `${ADMIN}/search`,
     },
   ),
+  workspaceDual("workspace-objectives", "objectives", "Objectives", "workspace", {
+    breadcrumbLabel: "Objectives",
+  }),
   workspaceDual("workspace-audiences", "audiences", "Audiences", "workspace", {
     breadcrumbLabel: "Audiences",
   }),

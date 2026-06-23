@@ -92,6 +92,22 @@ export async function buildGrowthVideoAutopilotPageDraft(
     },
   })
 
+  void (async () => {
+    try {
+      const { bindGrowthObjectiveResource } = await import(
+        "@/lib/growth/objectives/growth-objective-resource-binding"
+      )
+      await bindGrowthObjectiveResource(admin, {
+        organizationId: input.build.organizationId,
+        resourceType: "video_page",
+        resourceId: page.id,
+        label: page.title,
+      })
+    } catch {
+      // Best-effort objective resource binding.
+    }
+  })()
+
   return {
     videoPageId: page.id,
     videoAssetId: page.videoAssetId,

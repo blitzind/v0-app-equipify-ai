@@ -48,7 +48,7 @@ export function buildWarmupExecutorPacingMessage(input: {
   const parts = [
     `${input.eligibleProfiles} profile(s) eligible.`,
     `Would send up to ${input.plannedSendsThisRun} warmup message(s) now.`,
-    "Each eligible mailbox sends at most 1 message per run.",
+    "Manual runs send immediately (1 per eligible mailbox). Cron sends hourly during UTC 13–21.",
   ]
   if (input.representativeRemainingToday != null && input.representativeRemainingToday > 0) {
     parts.push(`Each mailbox has ${input.representativeRemainingToday} remaining today.`)

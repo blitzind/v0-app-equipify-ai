@@ -176,16 +176,25 @@ export async function enforceGrowthAutonomyCapability(
       enforcementRequested: true,
     })
     await logGrowthAutonomyPolicyDecision(admin, { ...input, result })
+    if (result.allowed && !result.blocked) {
+      return {
+        allowed: true,
+        blocked: false,
+        reason: null,
+        result,
+        skipped: false,
+      }
+    }
     await logGrowthAutonomyBlockedAttempt(admin, {
       organizationId: input.organizationId,
       capability: input.capability,
       runtimeContext: input.runtimeContext,
-      reason: "Campaign launch autonomy requires human review.",
+      reason: result.reason ?? "Campaign launch autonomy requires human review.",
     })
     return {
       allowed: false,
       blocked: true,
-      reason: "Campaign launch autonomy requires human review.",
+      reason: result.reason ?? "Campaign launch autonomy requires human review.",
       result,
       skipped: false,
     }
@@ -199,16 +208,25 @@ export async function enforceGrowthAutonomyCapability(
       enforcementRequested: true,
     })
     await logGrowthAutonomyPolicyDecision(admin, { ...input, result })
+    if (result.allowed && !result.blocked) {
+      return {
+        allowed: true,
+        blocked: false,
+        reason: null,
+        result,
+        skipped: false,
+      }
+    }
     await logGrowthAutonomyBlockedAttempt(admin, {
       organizationId: input.organizationId,
       capability: input.capability,
       runtimeContext: input.runtimeContext,
-      reason: result.reason ?? "Capability not enforceable in GE-AUTO-1B.",
+      reason: result.reason ?? "Capability blocked by autonomy policy.",
     })
     return {
       allowed: false,
       blocked: true,
-      reason: result.reason ?? "Capability not enforceable in GE-AUTO-1B.",
+      reason: result.reason ?? "Capability blocked by autonomy policy.",
       result,
       skipped: false,
     }

@@ -1,8 +1,11 @@
 /** GE-AUTO-1A/1B/1C — Graduated autonomy configuration and policy types (client-safe). */
 
-export const GROWTH_AUTONOMY_QA_MARKER = "growth-autonomy-ge-auto-1c-v1" as const
+export const GROWTH_AUTONOMY_QA_MARKER = "growth-autonomy-ge-auto-1f-v1" as const
 
-export const GROWTH_AUTONOMY_PHASE = "GE-AUTO-1C" as const
+export const GROWTH_AUTONOMY_PHASE = "GE-AUTO-1F" as const
+
+/** GE-AUTO-1E — default minimum confidence for autonomous send (0–100). */
+export const GROWTH_AUTONOMY_DEFAULT_MIN_SEND_CONFIDENCE = 90 as const
 
 export type GrowthAutonomyTriggerSource = "operator" | "autonomous"
 
@@ -100,6 +103,10 @@ export type GrowthAutonomyQuietHours = {
 export type GrowthAutonomyChannelPrepareConfig = {
   enabled_for_prepare: boolean
   max_prepared_per_day: number
+  /** GE-AUTO-1E — autonomous send controls (defaults off). */
+  enabled_for_send: boolean
+  max_sends_per_day: number
+  minimum_send_confidence: number
   allowed_sender_profiles: string[]
   allowed_sequences: string[]
   allowed_audiences: string[]
@@ -108,6 +115,11 @@ export type GrowthAutonomyChannelPrepareConfig = {
   /** Legacy GE-AUTO-1A field — mirrored from enabled_for_prepare when reading. */
   enabled?: boolean
   approvalPolicy?: GrowthAutonomyApprovalPolicy
+}
+
+export type GrowthAutonomyOutboundControls = {
+  /** Shadow mode — log would-send / would-queue decisions without transport. */
+  shadowModeEnabled: boolean
 }
 
 export type GrowthAutonomyPrepareCapability = "email_prepare" | "sms_prepare" | "voice_prepare"
@@ -126,20 +138,39 @@ export type GrowthAutonomyPrepareContext = {
   now?: Date
 }
 
+export type GrowthAutonomySendContext = GrowthAutonomyPrepareContext & {
+  leadId?: string | null
+  hasPendingApprovalItem?: boolean
+  duplicateSend?: boolean
+}
+
 export type GrowthAutonomyChannelPolicyMetadata = {
   channel: GrowthAutonomyChannelKey
   prepareEnabled: boolean
+  sendEnabled: boolean
   quietHoursActive: boolean
   confidenceMet: boolean
+  sendConfidenceMet: boolean
   senderAllowed: boolean
   sequenceAllowed: boolean
   audienceAllowed: boolean
-  outboundSendBlocked: true
+  outboundSendBlocked: boolean
+  shadowModeActive: boolean
   maxPreparedPerDay: number
   preparedToday: number
+  maxSendsPerDay: number
+  sentToday: number
   minimumConfidenceScore: number
+  minimumSendConfidence: number
   confidenceScore: number | null
 }
+
+export type GrowthAutonomySendDecision =
+  | "autonomous_send"
+  | "approval_queue"
+  | "shadow_would_send"
+  | "shadow_would_queue"
+  | "blocked"
 
 /** @deprecated Use GrowthAutonomyChannelPrepareConfig */
 export type GrowthAutonomyChannelPermission = {
@@ -181,6 +212,7 @@ export type GrowthAutonomySettings = {
   approvalPolicies: GrowthAutonomyApprovalPolicies
   channelPermissions: GrowthAutonomyChannelPermissions
   dailyBudgetLimits: GrowthAutonomyDailyBudgetLimits
+  outboundControls: GrowthAutonomyOutboundControls
   updatedAt: string | null
 }
 

@@ -6,6 +6,7 @@ import type { GrowthAutonomyBudgetSnapshot } from "@/lib/growth/autonomy/growth-
 import type {
   GrowthAutonomyCapability,
   GrowthAutonomyPolicyResult,
+  GrowthAutonomySendDecision,
 } from "@/lib/growth/autonomy/growth-autonomy-types"
 import { GROWTH_AUTONOMY_QA_MARKER } from "@/lib/growth/autonomy/growth-autonomy-types"
 import { evaluateAutonomyCapability } from "@/lib/growth/autonomy/growth-autonomy-policy-service"
@@ -143,6 +144,51 @@ export async function logGrowthAutonomySettingsChange(
       resourceType: "autonomy:settings",
       severity: input.emergencyStop ? "warning" : "info",
       message: input.emergencyStop ? "Autonomy emergency stop activated" : "Autonomy settings updated",
+      context: payload,
+    })
+  } catch {
+    // Best effort.
+  }
+}
+
+export async function logGrowthAutonomyOutboundSendDecision(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string
+    leadId: string
+    preparedActionId: string
+    channel: string
+    decision: GrowthAutonomySendDecision
+    reason: string | null
+    humanReadableSummary: string | null
+    policyResult: GrowthAutonomyPolicyResult
+    trigger: string
+    confidenceScore: number | null
+  },
+): Promise<void> {
+  const payload = {
+    qa_marker: GROWTH_AUTONOMY_QA_MARKER,
+    lead_id: input.leadId,
+    prepared_action_id: input.preparedActionId,
+    channel: input.channel,
+    decision: input.decision,
+    reason: input.reason,
+    human_readable_summary: input.humanReadableSummary,
+    trigger: input.trigger,
+    confidence_score: input.confidenceScore,
+    policy_metadata: input.policyResult.policyMetadata,
+    kill_switch_state: input.policyResult.policyMetadata.killSwitchState,
+    budget_state: input.policyResult.policyMetadata.budgetState,
+  }
+
+  logGrowthEngine("autonomy_outbound_send_decision", payload)
+
+  try {
+    await recordRuntimeGuardrailAudit(admin, {
+      organizationId: input.organizationId,
+      resourceType: `autonomy:outbound:${input.channel}`,
+      severity: input.decision === "autonomous_send" ? "info" : "warning",
+      message: input.humanReadableSummary ?? `Outbound decision: ${input.decision}`,
       context: payload,
     })
   } catch {

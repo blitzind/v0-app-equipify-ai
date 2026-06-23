@@ -100,7 +100,7 @@ function createMockAdmin(input: {
 }
 
 async function main(): Promise<void> {
-  assert.equal(GROWTH_AUTONOMY_QA_MARKER, "growth-autonomy-ge-auto-1c-v1")
+  assert.equal(GROWTH_AUTONOMY_QA_MARKER, "growth-autonomy-ge-auto-1f-v1")
   assert.equal(GROWTH_AUTONOMY_DEFAULT_MASTER_MODE, "manual")
 
   const migration = readSource(`supabase/migrations/${GROWTH_AUTONOMY_SCHEMA_MIGRATION}`)
@@ -245,8 +245,8 @@ async function main(): Promise<void> {
     organizationId: orgId,
     capability: "strategy_adaptation",
   })
-  assert.equal(objectiveStrategy.allowed, false)
-  assert.equal(objectiveStrategy.blocked, true)
+  assert.equal(objectiveStrategy.allowed, true)
+  assert.equal(objectiveStrategy.requiresApproval, true)
 
   for (const capability of GROWTH_AUTONOMY_CAPABILITIES) {
     assert.equal(isCapabilityPermittedByMasterMode("manual", capability), false)

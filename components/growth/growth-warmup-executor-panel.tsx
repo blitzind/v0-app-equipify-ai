@@ -31,7 +31,17 @@ import {
   type GrowthWarmupRecipient,
   type WarmupExecutorProfileDiagnostic,
 } from "@/lib/growth/warmup/warmup-executor-types"
-import { fetchWarmupExecutorJson } from "@/lib/growth/warmup/warmup-executor-api-response"
+import {
+  fetchWarmupExecutorJson,
+  GROWTH_WARMUP_EXECUTOR_BUILD_MARKER,
+  type WarmupExecutorManualRunBreakdown,
+} from "@/lib/growth/warmup/warmup-executor-api-response"
+import {
+  formatWarmupCronAvailability,
+  isWarmupExecutorBuildMarkerCurrent,
+  labelWarmupSkipCode,
+  WARMUP_MANUAL_RUN_BEHAVIOR,
+} from "@/lib/growth/warmup/warmup-executor-manual-run-diagnostics"
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "—"
@@ -51,6 +61,8 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
   const [schemaReady, setSchemaReady] = useState(false)
   const [executorStats, setExecutorStats] = useState<GrowthWarmupProfileExecutorStats[]>([])
   const [preview, setPreview] = useState<GrowthWarmupExecutorRunResult | null>(null)
+  const [lastRunBreakdown, setLastRunBreakdown] = useState<WarmupExecutorManualRunBreakdown | null>(null)
+  const [executorBuildMarker, setExecutorBuildMarker] = useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
@@ -186,11 +198,14 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
       const parsed = await fetchWarmupExecutorJson<{
         preview?: GrowthWarmupExecutorRunResult
         result?: GrowthWarmupExecutorRunResult
+        manualRunBreakdown?: WarmupExecutorManualRunBreakdown | null
+        executor_build_marker?: string
         error?: string
         message?: string
       }>("/api/platform/growth/warmup/executor/preview", { method: "POST" })
       if (!parsed.ok) throw new Error(parsed.error)
       setPreview(parsed.data.preview ?? parsed.data.result ?? null)
+      setExecutorBuildMarker(parsed.data.executor_build_marker ?? null)
       setConfirmOpen(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Preview failed.")
@@ -206,16 +221,23 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
       const parsed = await fetchWarmupExecutorJson<{
         result?: GrowthWarmupExecutorRunResult
         profileResults?: GrowthWarmupExecutorRunResult["senderResults"]
+        manualRunBreakdown?: WarmupExecutorManualRunBreakdown | null
+        executor_build_marker?: string
         error?: string
         message?: string
       }>("/api/platform/growth/warmup/executor/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirmed: true }),
+        body: JSON.stringify({
+          confirmed: true,
+          client_build_marker: GROWTH_WARMUP_EXECUTOR_BUILD_MARKER,
+        }),
       })
       if (!parsed.ok) throw new Error(parsed.error)
       setConfirmOpen(false)
       setPreview(null)
+      setLastRunBreakdown(parsed.data.manualRunBreakdown ?? null)
+      setExecutorBuildMarker(parsed.data.executor_build_marker ?? null)
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Warmup batch failed.")
@@ -245,10 +267,20 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
       ) : null}
 
       <GrowthEngineCard title="Warmup executor">
-        <p className="mb-4 text-xs text-muted-foreground">
+        <p className="mb-2 text-xs text-muted-foreground">
           Sends low-volume, human-safe warmup emails from connected senders to approved recipients. No peer network. No
-          fake replies. Hourly cron during business hours (UTC 13–21).
+          fake replies. {WARMUP_MANUAL_RUN_BEHAVIOR}
         </p>
+        <p className="mb-2 text-xs text-muted-foreground">{formatWarmupCronAvailability()}</p>
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
+          <GrowthBadge
+            label={`Build: ${executorBuildMarker ?? GROWTH_WARMUP_EXECUTOR_BUILD_MARKER}`}
+            tone={isWarmupExecutorBuildMarkerCurrent(executorBuildMarker ?? GROWTH_WARMUP_EXECUTOR_BUILD_MARKER) ? "healthy" : "attention"}
+          />
+          {!isWarmupExecutorBuildMarkerCurrent(executorBuildMarker) && executorBuildMarker ? (
+            <span className="text-amber-700">Production is not running 1F executor.</span>
+          ) : null}
+        </div>
         <div className="mb-4 flex flex-wrap gap-2">
           <Button type="button" size="sm" disabled={Boolean(actionLoading)} onClick={() => void loadPreview()}>
             <Play className="mr-1 size-3.5" />
@@ -256,6 +288,53 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
           </Button>
         </div>
         {error ? <p className="mb-3 text-sm text-destructive">{error}</p> : null}
+        {lastRunBreakdown ? (
+          <div
+            className={`mb-4 rounded-lg border p-3 text-sm ${
+              lastRunBreakdown.sent === 0 ? "border-amber-500/40 bg-amber-500/5" : "border-border/60"
+            }`}
+          >
+            <p className="font-medium">
+              Last batch: {lastRunBreakdown.sent} sent · {lastRunBreakdown.planned} planned ·{" "}
+              {lastRunBreakdown.eligibleProfiles} eligible
+            </p>
+            {lastRunBreakdown.sent === 0 && lastRunBreakdown.noSendExplanation ? (
+              <p className="mt-2 text-amber-800">{lastRunBreakdown.noSendExplanation}</p>
+            ) : null}
+            {lastRunBreakdown.recipientPool.exhausted ? (
+              <p className="mt-2 text-muted-foreground">
+                Active approved recipients: {lastRunBreakdown.recipientPool.activeApprovedRecipients} · Available now:{" "}
+                {lastRunBreakdown.recipientPool.availableNow}
+              </p>
+            ) : null}
+            {lastRunBreakdown.skipSummary.length > 0 ? (
+              <ul className="mt-2 list-disc pl-4 text-xs text-muted-foreground">
+                {lastRunBreakdown.skipSummary.map((row) => (
+                  <li key={row.code}>
+                    {row.label}: {row.count} profile(s)
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {lastRunBreakdown.profileResults.length > 0 ? (
+              <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                {lastRunBreakdown.profileResults.map((row) => (
+                  <li key={row.profileId}>
+                    {row.sender}:{" "}
+                    {row.sent > 0
+                      ? `sent ${row.sent}`
+                      : row.skipReason
+                        ? `${labelWarmupSkipCode(row.skipCode ?? "profile_not_warming")} — ${row.skipReason}`
+                        : row.eligible
+                          ? `eligible (${row.remainingToday} remaining today)`
+                          : "skipped"}
+                    {row.nextAction ? ` · ${row.nextAction}` : ""}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
         <div className="space-y-3">
           {executorStats.length === 0 ? (
             <p className="text-sm text-muted-foreground">No executor stats yet.</p>

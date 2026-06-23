@@ -34,6 +34,11 @@ export type GrowthAutonomySettingsPatchInput = {
   killSwitches?: {
     autonomyEnabled?: boolean
     autonomyGenerationEnabled?: boolean
+    autonomyOutboundEnabled?: boolean
+    autonomyObjectiveModeEnabled?: boolean
+  }
+  outboundControls?: {
+    shadowModeEnabled?: boolean
   }
   emergencyStop?: boolean
 }
@@ -73,9 +78,6 @@ export function validateGrowthAutonomySettingsPatch(body: unknown): GrowthAutono
     patch.capabilityToggles = {}
     for (const [key, value] of Object.entries(toggles)) {
       if (typeof value !== "boolean") continue
-      if ((GROWTH_AUTONOMY_LOCKED_OUTBOUND_CAPABILITIES as readonly string[]).includes(key) && value === true) {
-        return { ok: false, error: `Outbound capability ${key} is locked until a later phase.` }
-      }
       if (!(GROWTH_AUTONOMY_EDITABLE_CAPABILITIES as readonly string[]).includes(key)) {
         return { ok: false, error: `Capability ${key} is not editable.` }
       }
@@ -116,9 +118,6 @@ export function validateGrowthAutonomySettingsPatch(body: unknown): GrowthAutono
     const limits = input.dailyBudgetLimits as Record<string, unknown>
     patch.dailyBudgetLimits = {}
     for (const [key, value] of Object.entries(limits)) {
-      if (key === "autonomous_outbound_actions") {
-        return { ok: false, error: "Outbound autonomy budget is locked until a later phase." }
-      }
       if (!(GROWTH_AUTONOMY_EDITABLE_BUDGET_KEYS as readonly string[]).includes(key)) {
         return { ok: false, error: `Budget ${key} is not editable.` }
       }
@@ -134,18 +133,28 @@ export function validateGrowthAutonomySettingsPatch(body: unknown): GrowthAutono
       return { ok: false, error: "Invalid kill switches." }
     }
     const killSwitches = input.killSwitches as Record<string, unknown>
-    if ("autonomyOutboundEnabled" in killSwitches && killSwitches.autonomyOutboundEnabled === true) {
-      return { ok: false, error: "autonomy_outbound_enabled is locked until a later phase." }
-    }
-    if ("autonomyObjectiveModeEnabled" in killSwitches && killSwitches.autonomyObjectiveModeEnabled === true) {
-      return { ok: false, error: "autonomy_objective_mode_enabled is locked until a later phase." }
-    }
     patch.killSwitches = {}
     if (typeof killSwitches.autonomyEnabled === "boolean") {
       patch.killSwitches.autonomyEnabled = killSwitches.autonomyEnabled
     }
     if (typeof killSwitches.autonomyGenerationEnabled === "boolean") {
       patch.killSwitches.autonomyGenerationEnabled = killSwitches.autonomyGenerationEnabled
+    }
+    if (typeof killSwitches.autonomyOutboundEnabled === "boolean") {
+      patch.killSwitches.autonomyOutboundEnabled = killSwitches.autonomyOutboundEnabled
+    }
+    if (typeof killSwitches.autonomyObjectiveModeEnabled === "boolean") {
+      patch.killSwitches.autonomyObjectiveModeEnabled = killSwitches.autonomyObjectiveModeEnabled
+    }
+  }
+
+  if (input.outboundControls !== undefined) {
+    if (typeof input.outboundControls !== "object" || !input.outboundControls) {
+      return { ok: false, error: "Invalid outbound controls." }
+    }
+    patch.outboundControls = {}
+    if (typeof input.outboundControls.shadowModeEnabled === "boolean") {
+      patch.outboundControls.shadowModeEnabled = input.outboundControls.shadowModeEnabled
     }
   }
 
@@ -159,6 +168,7 @@ export function validateGrowthAutonomySettingsPatch(body: unknown): GrowthAutono
     (patch.channelPermissions && Object.keys(patch.channelPermissions).length > 0) ||
     (patch.dailyBudgetLimits && Object.keys(patch.dailyBudgetLimits).length > 0) ||
     (patch.killSwitches && Object.keys(patch.killSwitches).length > 0) ||
+    (patch.outboundControls && Object.keys(patch.outboundControls).length > 0) ||
     patch.emergencyStop === true
 
   if (!hasChanges) {
@@ -177,9 +187,6 @@ export function mergeGrowthAutonomyCapabilityToggles(
     ...defaults,
     ...current,
     ...patch,
-    email_execution: false,
-    sms_execution: false,
-    voice_execution: false,
   }
 }
 
@@ -214,6 +221,5 @@ export function mergeGrowthAutonomyDailyBudgetLimits(
   return {
     ...current,
     ...patch,
-    autonomous_outbound_actions: 0,
   }
 }

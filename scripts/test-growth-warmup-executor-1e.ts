@@ -279,7 +279,7 @@ async function runTests(): Promise<void> {
   })
   assert.match(pacingCopy, /6 profile\(s\) eligible/)
   assert.match(pacingCopy, /up to 6 warmup message/)
-  assert.match(pacingCopy, /at most 1 message per run/)
+  assert.match(pacingCopy, /1 per eligible mailbox/)
   assert.match(pacingCopy, /Today's target remains 5 per mailbox/)
   console.log("  ✓ Pacing plan + preview copy helpers")
 

@@ -13,6 +13,7 @@ import {
   GrowthOperatorBriefingPriorities,
 } from "@/components/growth/growth-operator-briefing-compact"
 import type { AidenDailyBriefing } from "@/lib/growth/aiden/aiden-daily-briefing"
+import { GeV15AutomationRuntimeApprovalInbox } from "@/components/growth/automation/ge-v1-5-automation-runtime-approval-inbox"
 import { GrowthAutonomyStatusBanner } from "@/components/growth/autonomy/growth-autonomy-status-banner"
 import { GrowthOperatorSetupHealthPanel } from "@/components/growth/operational/growth-operator-setup-health-panel"
 import {
@@ -296,6 +297,8 @@ export function GrowthWorkspaceDashboardBody() {
       <WelcomeSection welcome={dashboard.welcome} briefing={dashboard.briefing} />
 
       <GrowthAutonomyStatusBanner />
+
+      <GeV15AutomationRuntimeApprovalInbox limit={10} />
 
       <OperatorActionCardsSection cards={dashboard.operatorActionCards} />
       <GrowthOperatorSetupHealthPanel compact />

@@ -9,8 +9,11 @@ import {
 } from "@/lib/growth/warmup/warmup-executor-api-response"
 import type { GrowthWarmupExecutorRunResult } from "@/lib/growth/warmup/warmup-executor-types"
 
-export function warmupExecutorJsonSuccess(result: GrowthWarmupExecutorRunResult): NextResponse {
-  return NextResponse.json(buildWarmupExecutorSuccessBody(result), { status: 200 })
+export function warmupExecutorJsonSuccess(
+  result: GrowthWarmupExecutorRunResult,
+  options?: { clientBuildMarker?: string | null },
+): NextResponse {
+  return NextResponse.json(buildWarmupExecutorSuccessBody(result, options), { status: 200 })
 }
 
 export function warmupExecutorJsonError(input: {

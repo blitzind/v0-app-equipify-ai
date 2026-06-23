@@ -650,6 +650,23 @@ export async function runGrowthSequenceScheduler(
         stepId: step.id,
         message: error instanceof Error ? error.message : String(error),
       })
+      void (async () => {
+        try {
+          const { fanInGrowthObjectiveSequenceEvent } = await import(
+            "@/lib/growth/objectives/growth-objective-sequence-fan-in"
+          )
+          await fanInGrowthObjectiveSequenceEvent(admin, {
+            leadId: step.leadId,
+            signalType: "step_failed",
+            enrollmentId: enrollment.id,
+            sequencePatternId: enrollment.sequencePatternId,
+            stepId: step.id,
+            metadata: { message: error instanceof Error ? error.message : String(error) },
+          })
+        } catch {
+          // Best-effort objective fan-in.
+        }
+      })()
     }
   }
 

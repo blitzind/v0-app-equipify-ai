@@ -1,9 +1,18 @@
-/** GS-GROWTH-WARMUP-EXECUTOR-1C — API response helpers (client-safe). */
+/** GS-GROWTH-WARMUP-EXECUTOR-1C/1G — API response helpers (client-safe). */
 
 import type { GrowthWarmupExecutorRunResult } from "@/lib/growth/warmup/warmup-executor-types"
 import { GROWTH_WARMUP_EXECUTOR_QA_MARKER } from "@/lib/growth/warmup/warmup-executor-types"
+import {
+  buildWarmupExecutorManualRunBreakdown,
+  GROWTH_WARMUP_EXECUTOR_1G_QA_MARKER,
+  GROWTH_WARMUP_EXECUTOR_BUILD_MARKER,
+  type WarmupExecutorManualRunBreakdown,
+} from "@/lib/growth/warmup/warmup-executor-manual-run-diagnostics"
 
 export const GROWTH_WARMUP_EXECUTOR_1C_QA_MARKER = "growth-warmup-executor-1c-v1" as const
+
+export { GROWTH_WARMUP_EXECUTOR_1G_QA_MARKER, GROWTH_WARMUP_EXECUTOR_BUILD_MARKER }
+export type { WarmupExecutorManualRunBreakdown }
 
 export type WarmupExecutorApiSuccessBody = {
   ok: true
@@ -21,7 +30,10 @@ export type WarmupExecutorApiSuccessBody = {
   }
   summary: GrowthWarmupExecutorRunResult["runSummary"] | null
   profileResults: GrowthWarmupExecutorRunResult["senderResults"]
+  manualRunBreakdown: WarmupExecutorManualRunBreakdown | null
+  executor_build_marker: string
   qa_marker: typeof GROWTH_WARMUP_EXECUTOR_QA_MARKER
+  diagnostics_qa_marker: typeof GROWTH_WARMUP_EXECUTOR_1G_QA_MARKER
 }
 
 export type WarmupExecutorApiErrorBody = {
@@ -35,7 +47,23 @@ export type WarmupExecutorApiErrorBody = {
 
 export function buildWarmupExecutorSuccessBody(
   result: GrowthWarmupExecutorRunResult,
+  input?: {
+    manualRunBreakdown?: WarmupExecutorManualRunBreakdown | null
+    clientBuildMarker?: string | null
+  },
 ): WarmupExecutorApiSuccessBody {
+  const executorBuildMarker = result.executorBuildMarker ?? GROWTH_WARMUP_EXECUTOR_BUILD_MARKER
+  const manualRunBreakdown =
+    input?.manualRunBreakdown ??
+    (result.recipientPoolSummary
+      ? buildWarmupExecutorManualRunBreakdown({
+          result,
+          recipientPool: result.recipientPoolSummary,
+          executorBuildMarker,
+          clientBuildMarker: input?.clientBuildMarker,
+        })
+      : null)
+
   return {
     ok: true,
     result,
@@ -52,7 +80,10 @@ export function buildWarmupExecutorSuccessBody(
     },
     summary: result.runSummary ?? null,
     profileResults: result.senderResults,
+    manualRunBreakdown,
+    executor_build_marker: executorBuildMarker,
     qa_marker: GROWTH_WARMUP_EXECUTOR_QA_MARKER,
+    diagnostics_qa_marker: GROWTH_WARMUP_EXECUTOR_1G_QA_MARKER,
   }
 }
 

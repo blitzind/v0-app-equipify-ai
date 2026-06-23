@@ -14,7 +14,7 @@ import type {
   GrowthAutonomyPrepareCapability,
   GrowthAutonomySettings,
 } from "@/lib/growth/autonomy/growth-autonomy-types"
-import { buildDefaultGrowthAutonomyChannelPermissions } from "@/lib/growth/autonomy/growth-autonomy-channel-prepare"
+import { buildDefaultGrowthAutonomyChannelPermissions, buildDefaultGrowthAutonomyOutboundControls } from "@/lib/growth/autonomy/growth-autonomy-channel-prepare"
 
 export const GROWTH_AUTONOMY_DEFAULT_MASTER_MODE: GrowthAutonomyMasterMode = "manual"
 
@@ -83,25 +83,23 @@ export const GROWTH_AUTONOMY_EDITABLE_CAPABILITIES: readonly GrowthAutonomyCapab
   "video_generation",
   "recommendations",
   "task_creation",
+  "email_execution",
+  "sms_execution",
+  "voice_execution",
   "campaign_launch",
   "strategy_adaptation",
 ] as const
 
-export const GROWTH_AUTONOMY_LOCKED_OUTBOUND_CAPABILITIES: readonly GrowthAutonomyCapability[] = [
-  "email_execution",
-  "sms_execution",
-  "voice_execution",
-] as const
+export const GROWTH_AUTONOMY_LOCKED_OUTBOUND_CAPABILITIES: readonly GrowthAutonomyCapability[] = [] as const
 
-export const GROWTH_AUTONOMY_LOCKED_BUDGET_KEYS: readonly GrowthAutonomyBudgetKey[] = [
-  "autonomous_outbound_actions",
-] as const
+export const GROWTH_AUTONOMY_LOCKED_BUDGET_KEYS: readonly GrowthAutonomyBudgetKey[] = [] as const
 
 export const GROWTH_AUTONOMY_EDITABLE_BUDGET_KEYS: readonly GrowthAutonomyBudgetKey[] = [
   "autonomous_research_runs",
   "autonomous_page_generations",
   "autonomous_video_generations",
   "autonomous_campaigns",
+  "autonomous_outbound_actions",
 ] as const
 
 export const GROWTH_AUTONOMY_MAX_DAILY_BUDGET = 10_000 as const
@@ -133,8 +131,8 @@ export const GROWTH_AUTONOMY_MASTER_MODE_DESCRIPTIONS: Record<GrowthAutonomyMast
   manual: "Everything requires human approval. Current production behavior.",
   assisted: "AI may research, enrich, and generate — outbound still requires approval.",
   guardrailed: "Low-risk internal actions may run automatically — outbound blocked.",
-  channel: "Per-channel prepare controls — drafts queue for approval; sending remains locked.",
-  objective: "Future planner mode — visible in GE-AUTO-1C, execution remains disabled.",
+  channel: "Per-channel prepare and optional confidence-gated send — fully operator controlled.",
+  objective: "Objective planner mode — orchestrates plans toward measurable outcomes; all execution policy-gated.",
 }
 
 export const GROWTH_AUTONOMY_APPROVAL_POLICY_LABELS: Record<GrowthAutonomyApprovalPolicy, string> = {
@@ -211,6 +209,7 @@ export function buildDefaultGrowthAutonomySettings(organizationId: string): Grow
     approvalPolicies: buildDefaultGrowthAutonomyApprovalPolicies(),
     channelPermissions: buildDefaultGrowthAutonomyChannelPermissions(),
     dailyBudgetLimits: { ...GROWTH_AUTONOMY_DEFAULT_DAILY_BUDGET_LIMITS },
+    outboundControls: buildDefaultGrowthAutonomyOutboundControls(),
     updatedAt: null,
   }
 }
@@ -224,7 +223,12 @@ export function isGrowthAutonomyPrepareCapability(
 export function isPrepareCapabilityPermittedByMasterMode(
   masterMode: GrowthAutonomyMasterMode,
 ): boolean {
-  return masterMode === "assisted" || masterMode === "guardrailed" || masterMode === "channel"
+  return (
+    masterMode === "assisted" ||
+    masterMode === "guardrailed" ||
+    masterMode === "channel" ||
+    masterMode === "objective"
+  )
 }
 
 export function isGrowthAutonomyOutboundCapability(
@@ -250,13 +254,24 @@ export function resolveEffectiveAutonomyApprovalPolicy(
   return configured ?? GROWTH_AUTONOMY_DEFAULT_APPROVAL_POLICY
 }
 
+export const GROWTH_AUTONOMY_OBJECTIVE_RUNTIME_CAPABILITIES: readonly GrowthAutonomyCapability[] = [
+  "research",
+  "enrichment",
+  "audience_generation",
+  "page_generation",
+  "video_generation",
+  "recommendations",
+  "strategy_adaptation",
+  "campaign_launch",
+] as const
+
 export function isCapabilityPermittedByMasterMode(
   masterMode: GrowthAutonomyMasterMode,
   capability: GrowthAutonomyCapability,
 ): boolean {
   if (masterMode === "manual") return false
   if (masterMode === "objective") {
-    return capability === "strategy_adaptation" || capability === "recommendations"
+    return (GROWTH_AUTONOMY_OBJECTIVE_RUNTIME_CAPABILITIES as readonly string[]).includes(capability)
   }
   if (masterMode === "channel") {
     return (

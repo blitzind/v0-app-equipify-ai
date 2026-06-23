@@ -471,6 +471,45 @@ export async function startSendrLaunchRun(
     },
   })
 
+  void (async () => {
+    try {
+      const { bindGrowthObjectiveResources } = await import(
+        "@/lib/growth/objectives/growth-objective-resource-binding"
+      )
+      await bindGrowthObjectiveResources(admin, {
+        organizationId: input.organizationId,
+        resources: [
+          {
+            organizationId: input.organizationId,
+            resourceType: "campaign",
+            resourceId: launchRun.id,
+            label: "Sendr launch",
+          },
+          {
+            organizationId: input.organizationId,
+            resourceType: "audience",
+            resourceId: input.audienceId,
+            label: audience.name,
+          },
+          {
+            organizationId: input.organizationId,
+            resourceType: "sequence",
+            resourceId: input.sequencePatternId,
+            label: "Launch sequence",
+          },
+          {
+            organizationId: input.organizationId,
+            resourceType: "landing_page",
+            resourceId: input.landingPageId,
+            label: "Launch landing page",
+          },
+        ],
+      })
+    } catch {
+      // Best-effort objective resource binding.
+    }
+  })()
+
   return processSendrLaunchChunk(admin, {
     run: launchRun,
     userId: input.userId,

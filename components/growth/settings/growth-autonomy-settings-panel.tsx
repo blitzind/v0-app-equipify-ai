@@ -175,9 +175,10 @@ export function GrowthAutonomySettingsPanel() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Channel prepare controls</CardTitle>
+          <CardTitle>Channel prepare &amp; send controls</CardTitle>
           <CardDescription>
-            Growth Engine may prepare this channel, but cannot send without human approval.
+            Prepare drafts always; autonomous send requires master outbound ON, channel send ON, and confidence ≥
+            90 by default.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -187,10 +188,12 @@ export function GrowthAutonomySettingsPanel() {
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="font-medium">{channel.label}</p>
-                    <Badge variant="outline">Sending locked</Badge>
+                    <Badge variant="outline">
+                      {channel.sendingLocked ? "Send gated" : "Send enabled"}
+                    </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Prepare drafts only — operator approval required before every send.
+                    Low confidence routes to approval queue. Shadow mode logs would-send without transport.
                   </p>
                 </div>
                 <Switch
@@ -200,6 +203,23 @@ export function GrowthAutonomySettingsPanel() {
                     void savePatch({
                       channelPermissions: {
                         [channel.id]: { enabled_for_prepare: enabled },
+                      },
+                    })
+                  }
+                />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium">Autonomous send</p>
+                  <p className="text-xs text-muted-foreground">Confidence-gated send when policy qualifies.</p>
+                </div>
+                <Switch
+                  checked={channel.sendEnabled}
+                  disabled={saving || channel.sendingLocked}
+                  onCheckedChange={(enabled) =>
+                    void savePatch({
+                      channelPermissions: {
+                        [channel.id]: { enabled_for_send: enabled },
                       },
                     })
                   }
@@ -239,6 +259,44 @@ export function GrowthAutonomySettingsPanel() {
                       void savePatch({
                         channelPermissions: {
                           [channel.id]: { minimum_confidence_score: Math.floor(value) },
+                        },
+                      })
+                    }}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Daily send limit</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={1000}
+                    defaultValue={channel.maxSendsPerDay}
+                    disabled={saving || channel.sendingLocked}
+                    onBlur={(event) => {
+                      const value = Number(event.target.value)
+                      if (!Number.isFinite(value)) return
+                      void savePatch({
+                        channelPermissions: {
+                          [channel.id]: { max_sends_per_day: Math.floor(value) },
+                        },
+                      })
+                    }}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Minimum send confidence</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    defaultValue={channel.minimumSendConfidence}
+                    disabled={saving || channel.sendingLocked}
+                    onBlur={(event) => {
+                      const value = Number(event.target.value)
+                      if (!Number.isFinite(value)) return
+                      void savePatch({
+                        channelPermissions: {
+                          [channel.id]: { minimum_send_confidence: Math.floor(value) },
                         },
                       })
                     }}
@@ -319,6 +377,25 @@ export function GrowthAutonomySettingsPanel() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Shadow mode</CardTitle>
+          <CardDescription>
+            Log would-send / would-queue decisions without transport. Safe way to observe autonomous policy.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+            <p className="font-medium">Shadow mode enabled</p>
+            <Switch
+              checked={viewModel.outboundControls.shadowModeEnabled}
+              disabled={saving}
+              onCheckedChange={(enabled) => void savePatch({ outboundControls: { shadowModeEnabled: enabled } })}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Budgets</CardTitle>
           <CardDescription>Daily caps for autonomous safe actions. Zero disables the budget.</CardDescription>
         </CardHeader>
@@ -330,9 +407,7 @@ export function GrowthAutonomySettingsPanel() {
                 {budget.locked ? <Badge variant="outline">Locked</Badge> : null}
               </div>
               {budget.locked ? (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Outbound autonomy budget is locked until a later phase.
-                </p>
+                <p className="mt-2 text-xs text-muted-foreground">This budget is locked.</p>
               ) : (
                 <div className="mt-2 flex items-center gap-2">
                   <Input

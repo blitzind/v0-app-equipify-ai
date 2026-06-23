@@ -160,6 +160,23 @@ export async function runSequenceSmsExecutionJob(
     },
   })
 
+  void (async () => {
+    try {
+      const { fanInGrowthObjectiveSequenceEvent } = await import(
+        "@/lib/growth/objectives/growth-objective-sequence-fan-in"
+      )
+      await fanInGrowthObjectiveSequenceEvent(admin, {
+        leadId: job.leadId,
+        signalType: "sms_sent",
+        enrollmentId: job.sequenceEnrollmentId,
+        stepId: job.sequenceStepId,
+        deliveryAttemptId: smsResult.deliveryAttemptId,
+      })
+    } catch {
+      // Best-effort objective fan-in.
+    }
+  })()
+
   await advanceGrowthSequenceEnrollmentAfterStep(admin, {
     enrollmentStepId: job.sequenceStepId,
     actingUserId: input.auditActorUserId,

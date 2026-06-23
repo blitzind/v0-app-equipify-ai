@@ -400,11 +400,43 @@ export async function createSharePage(
 
   if (error) throw new Error(error.message)
 
-  return {
+  const result = {
     page: mapPage(data as SharePageRow),
     publicToken: publicTokenBundle.rawToken,
     previewToken: previewTokenBundle.rawToken,
   }
+
+  void (async () => {
+    try {
+      const { bindGrowthObjectiveResources } = await import(
+        "@/lib/growth/objectives/growth-objective-resource-binding"
+      )
+      const resources = [
+        {
+          organizationId: input.organizationId,
+          resourceType: "landing_page" as const,
+          resourceId: result.page.id,
+          label: input.title ?? result.page.title,
+        },
+      ]
+      if (input.bookingPageId) {
+        resources.push({
+          organizationId: input.organizationId,
+          resourceType: "booking_page" as const,
+          resourceId: input.bookingPageId,
+          label: input.title ?? result.page.title,
+        })
+      }
+      await bindGrowthObjectiveResources(admin, {
+        organizationId: input.organizationId,
+        resources,
+      })
+    } catch {
+      // Best-effort objective resource binding.
+    }
+  })()
+
+  return result
 }
 
 export async function updateSharePage(

@@ -686,6 +686,24 @@ export async function runSequenceExecutionJob(
     },
   }).catch(() => undefined)
 
+  void (async () => {
+    try {
+      const { fanInGrowthObjectiveSequenceEvent } = await import(
+        "@/lib/growth/objectives/growth-objective-sequence-fan-in"
+      )
+      await fanInGrowthObjectiveSequenceEvent(admin, {
+        leadId: locked.leadId,
+        signalType: "email_sent",
+        enrollmentId: locked.sequenceEnrollmentId,
+        stepId: locked.sequenceStepId,
+        deliveryAttemptId: transport.attempt.id,
+        occurredAt: new Date().toISOString(),
+      })
+    } catch {
+      // Best-effort objective fan-in.
+    }
+  })()
+
   await advanceGrowthSequenceEnrollmentAfterStep(admin, {
     enrollmentStepId: locked.sequenceStepId,
     actingUserId: auditActorUserId,

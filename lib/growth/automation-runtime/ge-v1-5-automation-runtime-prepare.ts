@@ -1,4 +1,4 @@
-/** GE-AUTO-1C — Channel prepare orchestration for GE-v1-5 runtime (server-only). */
+/** GE-AUTO-1C/1D — Channel prepare orchestration for GE-v1-5 runtime (server-only). */
 
 import "server-only"
 
@@ -9,6 +9,7 @@ import {
   type GrowthAutonomyConfidenceInput,
 } from "@/lib/growth/autonomy/growth-autonomy-confidence-scorer"
 import { enforceGrowthAutonomyCapability } from "@/lib/growth/autonomy/growth-autonomy-enforcement"
+import { evaluateGeV15PrepareSuppression } from "@/lib/growth/automation-runtime/ge-v1-5-automation-runtime-prepare-guards"
 import { emitGrowthNotification } from "@/lib/growth/notifications/emit-growth-notification"
 import type { GeV15PlaybookActionSpec } from "@/lib/growth/automation-runtime/ge-v1-5-automation-runtime-playbooks"
 import { resolveGeV15InitialApprovalStatus } from "@/lib/growth/automation-runtime/ge-v1-5-automation-runtime-approval"
@@ -112,6 +113,32 @@ export async function prepareGeV15OutboundAction(
   })
   if (input.existingPreparedActions.some((action) => action.dedupeKey === dedupeKey && action.status !== "rejected")) {
     return { prepared: null, notificationEmitted: false, blockedReason: "duplicate_prepare" }
+  }
+
+  const channel = channelForAction(input.spec.action)
+  if (!channel) {
+    return { prepared: null, notificationEmitted: false, blockedReason: "not_prepare_action" }
+  }
+
+  if (!input.senderProfileId) {
+    return { prepared: null, notificationEmitted: false, blockedReason: "missing_sender_profile" }
+  }
+
+  const suppression = await evaluateGeV15PrepareSuppression(admin, {
+    channel,
+    organizationId: input.organizationId,
+    leadId: input.leadId,
+    recipientEmail: input.recipientEmail,
+    recipientPhone: typeof input.triggerPayload?.recipient_phone === "string" ? input.triggerPayload.recipient_phone : null,
+    senderProfileId: input.senderProfileId,
+    sequenceId: input.sequenceId,
+  })
+  if (!suppression.allowed) {
+    return {
+      prepared: null,
+      notificationEmitted: false,
+      blockedReason: suppression.reason ?? suppression.code ?? "suppression_blocked",
+    }
   }
 
   const confidenceScore = scoreAutonomyOutboundConfidence(

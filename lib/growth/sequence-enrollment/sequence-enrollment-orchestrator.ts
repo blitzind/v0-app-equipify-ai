@@ -197,6 +197,37 @@ export async function confirmGrowthSequenceEnrollment(
   const updated = await syncEnrollmentHealth(admin, enrollment.id, pattern?.steps.length ?? 0)
   const steps = await listGrowthSequenceEnrollmentSteps(admin, enrollment.id)
 
+  void (async () => {
+    try {
+      const { fanInGrowthObjectiveSequenceEvent } = await import(
+        "@/lib/growth/objectives/growth-objective-sequence-fan-in"
+      )
+      await fanInGrowthObjectiveSequenceEvent(admin, {
+        leadId: input.leadId,
+        signalType: "enrollment_created",
+        enrollmentId: enrollment.id,
+        sequencePatternId: enrollment.sequencePatternId,
+        sequencePatternKey: pattern?.key ?? null,
+        occurredAt: now,
+      })
+      const { bindGrowthObjectiveResource } = await import(
+        "@/lib/growth/objectives/growth-objective-resource-binding"
+      )
+      const orgId = lead.promotedOrganizationId
+      if (orgId) {
+        await bindGrowthObjectiveResource(admin, {
+          organizationId: orgId,
+          resourceType: "sequence",
+          resourceId: enrollment.sequencePatternId,
+          resourceKey: pattern?.key ?? undefined,
+          label: pattern?.label ?? "Sequence",
+        })
+      }
+    } catch {
+      // Best-effort objective fan-in.
+    }
+  })()
+
   return {
     ...updated,
     steps,
@@ -238,6 +269,29 @@ export async function materializeGrowthSequenceEnrollmentStep(
 
   if (scheduled.scheduledFor && Date.parse(scheduled.scheduledFor) > Date.now()) {
     await updateGrowthSequenceEnrollmentStep(admin, step.id, { scheduledFor: scheduled.scheduledFor })
+
+    const patterns = await listGrowthSequencePatterns(admin)
+    const pattern = patterns.find((entry) => entry.id === enrollment.sequencePatternId)
+    void (async () => {
+      try {
+        const { fanInGrowthObjectiveSequenceEvent } = await import(
+          "@/lib/growth/objectives/growth-objective-sequence-fan-in"
+        )
+        await fanInGrowthObjectiveSequenceEvent(admin, {
+          leadId: enrollment.leadId,
+          signalType: "step_scheduled",
+          enrollmentId: enrollment.id,
+          sequencePatternId: enrollment.sequencePatternId,
+          sequencePatternKey: pattern?.key ?? null,
+          stepId: step.id,
+          occurredAt: scheduled.scheduledFor ?? undefined,
+          metadata: { stepOrder: step.stepOrder },
+        })
+      } catch {
+        // Best-effort objective fan-in.
+      }
+    })()
+
     return
   }
 
@@ -481,6 +535,25 @@ export async function advanceGrowthSequenceEnrollmentAfterStep(
     stepOrder: step.stepOrder,
   })
 
+  void (async () => {
+    try {
+      const { fanInGrowthObjectiveSequenceEvent } = await import(
+        "@/lib/growth/objectives/growth-objective-sequence-fan-in"
+      )
+      await fanInGrowthObjectiveSequenceEvent(admin, {
+        leadId: step.leadId,
+        signalType: "step_completed",
+        enrollmentId: enrollment.id,
+        sequencePatternId: enrollment.sequencePatternId,
+        sequencePatternKey: pattern?.key ?? null,
+        stepId: step.id,
+        occurredAt: now,
+      })
+    } catch {
+      // Best-effort objective fan-in.
+    }
+  })()
+
   const nextOrder = step.stepOrder + 1
   await updateGrowthSequenceEnrollment(admin, enrollment.id, { currentStepOrder: step.stepOrder })
 
@@ -495,6 +568,25 @@ export async function advanceGrowthSequenceEnrollmentAfterStep(
       leadId: step.leadId,
       enrollmentId: enrollment.id,
     })
+
+    void (async () => {
+      try {
+        const { fanInGrowthObjectiveSequenceEvent } = await import(
+          "@/lib/growth/objectives/growth-objective-sequence-fan-in"
+        )
+        await fanInGrowthObjectiveSequenceEvent(admin, {
+          leadId: step.leadId,
+          signalType: "enrollment_completed",
+          enrollmentId: enrollment.id,
+          sequencePatternId: enrollment.sequencePatternId,
+          sequencePatternKey: pattern?.key ?? null,
+          occurredAt: now,
+        })
+      } catch {
+        // Best-effort objective fan-in.
+      }
+    })()
+
     return
   }
 
@@ -518,10 +610,32 @@ export async function pauseGrowthSequenceEnrollment(
   if (!enrollment || enrollment.leadId !== input.leadId) throw new Error("not_found")
   if (enrollment.status !== "active") throw new Error("invalid_status")
 
-  return updateGrowthSequenceEnrollment(admin, enrollment.id, {
+  const updated = await updateGrowthSequenceEnrollment(admin, enrollment.id, {
     status: "paused",
     pauseReason: input.pauseReason,
   })
+
+  void (async () => {
+    try {
+      const patterns = await listGrowthSequencePatterns(admin)
+      const pattern = patterns.find((entry) => entry.id === enrollment.sequencePatternId)
+      const { fanInGrowthObjectiveSequenceEvent } = await import(
+        "@/lib/growth/objectives/growth-objective-sequence-fan-in"
+      )
+      await fanInGrowthObjectiveSequenceEvent(admin, {
+        leadId: input.leadId,
+        signalType: "enrollment_paused",
+        enrollmentId: enrollment.id,
+        sequencePatternId: enrollment.sequencePatternId,
+        sequencePatternKey: pattern?.key ?? null,
+        metadata: { pauseReason: input.pauseReason },
+      })
+    } catch {
+      // Best-effort objective fan-in.
+    }
+  })()
+
+  return updated
 }
 
 export async function resumeGrowthSequenceEnrollment(

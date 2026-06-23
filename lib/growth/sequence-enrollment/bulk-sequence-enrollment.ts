@@ -299,9 +299,25 @@ async function enrollSingleLeadInGrowthSequence(
         schedulerEligible: true,
       })),
     }
-  } catch (error) {
-    const code = error instanceof Error ? error.message : "enrollment_failed"
-    if (code === "active_enrollment") {
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "enrollment_failed"
+      void (async () => {
+        try {
+          const { fanInGrowthObjectiveSequenceEvent } = await import(
+            "@/lib/growth/objectives/growth-objective-sequence-fan-in"
+          )
+          await fanInGrowthObjectiveSequenceEvent(admin, {
+            leadId: input.leadId,
+            signalType: "enrollment_failed",
+            enrollmentId: input.leadId,
+            sequencePatternId: input.patternId ?? null,
+            metadata: { code },
+          })
+        } catch {
+          // Best-effort objective fan-in.
+        }
+      })()
+      if (code === "active_enrollment") {
       return {
         bucket: "skippedAlreadyEnrolled",
         item: await buildActiveEnrollmentConflictOutcome(admin, {

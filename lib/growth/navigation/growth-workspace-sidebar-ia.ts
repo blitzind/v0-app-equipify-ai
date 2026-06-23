@@ -14,6 +14,7 @@ export const GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS = [
   "audiences",
   "personalized-videos",
   "campaigns",
+  "objectives",
   "inbox",
   "calls",
   "meetings",

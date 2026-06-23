@@ -60,10 +60,16 @@ export function GrowthAutonomyStatusBanner({ compact = false }: { compact?: bool
                 Paused
               </Badge>
             ) : null}
-            <Badge variant="outline" className="gap-1">
-              <Lock className="h-3 w-3" />
-              Outbound locked
-            </Badge>
+            {status.outboundLocked ? (
+              <Badge variant="outline" className="gap-1">
+                <Lock className="h-3 w-3" />
+                Outbound locked
+              </Badge>
+            ) : status.shadowModeEnabled ? (
+              <Badge variant="secondary">Shadow mode</Badge>
+            ) : status.sendEnabled ? (
+              <Badge variant="secondary">Autonomous send on</Badge>
+            ) : null}
           </div>
           {!compact ? (
             <p className="text-sm text-muted-foreground">

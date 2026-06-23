@@ -97,6 +97,8 @@ export async function routeLeadSignalEvent(
     attention_evaluated = true
   }
 
+  await fanOutLeadSignalToObjectives(admin, scoredEvent)
+
   return {
     qa_marker: LEAD_SIGNAL_EVENT_ROUTER_QA_MARKER,
     ok: true,
@@ -108,6 +110,20 @@ export async function routeLeadSignalEvent(
     attention_evaluated,
     queue_hint,
     dedupe_hash: dedupeHash,
+  }
+}
+
+async function fanOutLeadSignalToObjectives(
+  admin: SupabaseClient,
+  event: LeadSignalEvent,
+): Promise<void> {
+  try {
+    const { dispatchGrowthObjectiveLeadSignalEvent } = await import(
+      "@/lib/growth/objectives/growth-objective-event-bridge"
+    )
+    await dispatchGrowthObjectiveLeadSignalEvent(admin, event)
+  } catch {
+    // Best-effort objective fan-in.
   }
 }
 

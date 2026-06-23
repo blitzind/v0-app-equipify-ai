@@ -91,18 +91,83 @@ export function approveGeV15PreparedAction(
 export function rejectGeV15PreparedAction(
   actions: GeV15PreparedAction[],
   actionId: string,
+  input?: { rejectedBy?: string | null; reason?: string | null; now?: Date },
 ): GeV15PreparedAction[] {
+  const now = (input?.now ?? new Date()).toISOString()
   return actions.map((action) => {
     if (action.id !== actionId) return action
-    return transitionGeV15PreparedAction(action, "rejected")
+    const updated = transitionGeV15PreparedAction(action, "rejected", { now: input?.now })
+    return {
+      ...updated,
+      rejectReason: input?.reason ?? null,
+      rejectedBy: input?.rejectedBy ?? null,
+      rejectedAt: now,
+    }
   })
+}
+
+export function editGeV15PreparedAction(
+  actions: GeV15PreparedAction[],
+  actionId: string,
+  input: {
+    editedDraftContent?: string | null
+    editedSubject?: string | null
+    editedBy?: string | null
+    now?: Date
+  },
+): GeV15PreparedAction[] {
+  const now = (input.now ?? new Date()).toISOString()
+  return actions.map((action) => {
+    if (action.id !== actionId) return action
+    if (action.status !== "pending_approval" && action.status !== "prepared") {
+      throw new Error("Only pending prepared actions can be edited.")
+    }
+    return {
+      ...action,
+      originalDraftContent: action.originalDraftContent ?? action.draftContent ?? null,
+      editedDraftContent: input.editedDraftContent ?? action.editedDraftContent ?? null,
+      editedSubject: input.editedSubject ?? action.editedSubject ?? null,
+      editedBy: input.editedBy ?? null,
+      editedAt: now,
+      updatedAt: now,
+    }
+  })
+}
+
+export function listGeV15ApprovedOutboundActions(
+  actions: GeV15PreparedAction[],
+): GeV15PreparedAction[] {
+  return actions.filter(
+    (action) =>
+      action.status === "approved" &&
+      (action.action === "prepare_email" ||
+        action.action === "prepare_sms" ||
+        action.action === "prepare_voice_drop"),
+  )
+}
+
+export function listGeV15OperatorReviewActions(
+  actions: GeV15PreparedAction[],
+): GeV15PreparedAction[] {
+  const seen = new Set<string>()
+  const combined = [...listGeV15PendingApprovals(actions), ...listGeV15ApprovedOutboundActions(actions)]
+  const result: GeV15PreparedAction[] = []
+  for (const action of combined) {
+    if (seen.has(action.id)) continue
+    seen.add(action.id)
+    result.push(action)
+  }
+  return result.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
 }
 
 export function markGeV15PreparedActionExecuted(
   actions: GeV15PreparedAction[],
   actionId: string,
 ): GeV15PreparedAction[] {
-  if (!GE_V1_5_AUTOMATION_RUNTIME_SAFETY_FLAGS.outbound_send_execution_enabled) {
+  const operatorExecuteEnabled = GE_V1_5_AUTOMATION_RUNTIME_SAFETY_FLAGS.operator_approved_send_execution_enabled
+  const autonomousExecuteEnabled = GE_V1_5_AUTOMATION_RUNTIME_SAFETY_FLAGS.outbound_send_execution_enabled
+  const policyGatedSendEnabled = GE_V1_5_AUTOMATION_RUNTIME_SAFETY_FLAGS.policy_gated_autonomous_send_enabled
+  if (!operatorExecuteEnabled && !autonomousExecuteEnabled && !policyGatedSendEnabled) {
     return actions
   }
   return actions.map((action) => {
@@ -112,5 +177,19 @@ export function markGeV15PreparedActionExecuted(
       throw new Error("Cannot execute action that is not approved")
     }
     return transitionGeV15PreparedAction(action, "executed")
+  })
+}
+
+export function markGeV15PreparedActionFailed(
+  actions: GeV15PreparedAction[],
+  actionId: string,
+  error: string,
+): GeV15PreparedAction[] {
+  return actions.map((action) => {
+    if (action.id !== actionId) return action
+    return {
+      ...transitionGeV15PreparedAction(action, "failed"),
+      executionError: error,
+    }
   })
 }

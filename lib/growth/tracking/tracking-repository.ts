@@ -208,6 +208,30 @@ export async function recordEmailOpen(
       event: "email.opened",
       occurredAt: openedAt,
     })
+
+    void (async () => {
+      try {
+        const { fetchGrowthLeadById } = await import("@/lib/growth/lead-repository")
+        const { dispatchGrowthObjectiveEngagementEvent } = await import(
+          "@/lib/growth/objectives/growth-objective-event-bridge"
+        )
+        const lead = await fetchGrowthLeadById(admin, attempt.lead_id!)
+        const organizationId = lead?.promotedOrganizationId
+        if (!organizationId) return
+        await dispatchGrowthObjectiveEngagementEvent(admin, {
+          organizationId,
+          leadId: attempt.lead_id!,
+          signalType: "email_opened",
+          resourceType: "sequence",
+          resourceKey: attempt.id,
+          sourceEventId: attempt.id,
+          occurredAt: openedAt,
+          idempotencyKey: `email-open:${attempt.id}`,
+        })
+      } catch {
+        // Best-effort objective fan-in.
+      }
+    })()
   }
 
   return { recorded: true, open: mapOpen(data as OpenRow) }
@@ -303,6 +327,30 @@ export async function recordEmailClick(
       event: "email.clicked",
       occurredAt: clickedAt,
     })
+
+    void (async () => {
+      try {
+        const { fetchGrowthLeadById } = await import("@/lib/growth/lead-repository")
+        const { dispatchGrowthObjectiveEngagementEvent } = await import(
+          "@/lib/growth/objectives/growth-objective-event-bridge"
+        )
+        const lead = await fetchGrowthLeadById(admin, attempt.lead_id!)
+        const organizationId = lead?.promotedOrganizationId
+        if (!organizationId) return
+        await dispatchGrowthObjectiveEngagementEvent(admin, {
+          organizationId,
+          leadId: attempt.lead_id!,
+          signalType: "email_clicked",
+          resourceType: "sequence",
+          resourceKey: attempt.id,
+          sourceEventId: attempt.id,
+          occurredAt: clickedAt,
+          idempotencyKey: `email-click:${attempt.id}`,
+        })
+      } catch {
+        // Best-effort objective fan-in.
+      }
+    })()
   }
 
   return { recorded: true, click: mapClick(data as ClickRow), redirectUrl: input.destinationUrl }

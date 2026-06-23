@@ -256,7 +256,36 @@ export async function createGrowthAudience(
     .select("*")
     .single()
   if (error || !data) throw new Error(error?.message ?? "audience_create_failed")
-  return mapAudience(data as Record<string, unknown>)
+  const audience = mapAudience(data as Record<string, unknown>)
+
+  void (async () => {
+    try {
+      const { bindGrowthObjectiveResources } = await import(
+        "@/lib/growth/objectives/growth-objective-resource-binding"
+      )
+      await bindGrowthObjectiveResources(admin, {
+        organizationId: input.organizationId,
+        resources: [
+          {
+            organizationId: input.organizationId,
+            resourceType: "audience",
+            resourceId: audience.id,
+            label: audience.name,
+          },
+          {
+            organizationId: input.organizationId,
+            resourceType: "saved_search",
+            resourceId: input.savedSearchId,
+            label: audience.name,
+          },
+        ],
+      })
+    } catch {
+      // Best-effort objective resource binding.
+    }
+  })()
+
+  return audience
 }
 
 export async function updateGrowthAudienceRefreshPolicy(

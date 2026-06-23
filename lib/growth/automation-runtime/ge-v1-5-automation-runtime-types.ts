@@ -17,7 +17,11 @@ export const GE_V1_5_AUTOMATION_RUNTIME_SAFETY_FLAGS = {
   notification_actions_enabled: true,
   task_actions_enabled: true,
   prepare_outbound_enabled: true,
+  /** GE-AUTO-1E — policy-gated autonomous send enabled when org configures outbound; code default off. */
+  policy_gated_autonomous_send_enabled: true,
   outbound_send_execution_enabled: false,
+  /** GE-AUTO-1D — operator-approved sends only; autonomous playbook send remains disabled. */
+  operator_approved_send_execution_enabled: true,
   autonomous_approval_enabled: false,
   no_autonomous_sending: true,
   no_background_jobs: true,
@@ -202,6 +206,24 @@ export type GeV15PreparedAction = {
   audienceId?: string | null
   channelPolicyMetadata?: Record<string, unknown> | null
   dedupeKey?: string | null
+  originalDraftContent?: string | null
+  editedDraftContent?: string | null
+  editedSubject?: string | null
+  editedBy?: string | null
+  editedAt?: string | null
+  rejectReason?: string | null
+  rejectedBy?: string | null
+  rejectedAt?: string | null
+  voiceDropCampaignId?: string | null
+  executionIdempotencyKey?: string | null
+  executionError?: string | null
+  /** GE-AUTO-1E — autonomous send audit */
+  autonomySend?: boolean
+  autonomySendDecision?: import("@/lib/growth/autonomy/growth-autonomy-types").GrowthAutonomySendDecision
+  autonomySendReason?: string | null
+  autonomySendSummary?: string | null
+  sendPolicyMetadata?: Record<string, unknown> | null
+  shadowWouldSend?: boolean
 }
 
 export type GeV15PendingDelay = {

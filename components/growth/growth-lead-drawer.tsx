@@ -15,6 +15,7 @@ import { GrowthOpportunityReadiness } from "@/components/growth/growth-opportuni
 import { GrowthLeadOpportunityIntelligencePanel } from "@/components/growth/growth-lead-opportunity-intelligence-panel"
 import { GrowthLeadBookingIntelligencePanel } from "@/components/growth/growth-lead-booking-intelligence-panel"
 import { GrowthLeadRelationshipMemoryPanel } from "@/components/growth/growth-lead-relationship-memory-panel"
+import { GeV15AutomationRuntimeApprovalPanel } from "@/components/growth/automation/ge-v1-5-automation-runtime-approval-panel"
 import { GrowthReplyWorkflowActionsPanel } from "@/components/growth/growth-reply-workflow-actions-panel"
 import { GrowthLeadMultichannelTimelinePanel } from "@/components/growth/growth-lead-multichannel-timeline-panel"
 import { GrowthRevenueReadinessPanel } from "@/components/growth/growth-revenue-readiness-panel"
@@ -101,6 +102,8 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLe
           />
 
           <GrowthReplyWorkflowActionsPanel leadId={activeLead.id} compact showSequenceExit />
+
+          <GeV15AutomationRuntimeApprovalPanel leadId={activeLead.id} />
 
           <GrowthExecutiveOperatingIntelligence lead={activeLead} />
 

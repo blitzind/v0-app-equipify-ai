@@ -6,9 +6,13 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { fetchGrowthLeadById, updateGrowthLead } from "@/lib/growth/lead-repository"
 import {
   approveGeV15PreparedAction,
-  listGeV15PendingApprovals,
+  listGeV15OperatorReviewActions,
   rejectGeV15PreparedAction,
 } from "@/lib/growth/automation-runtime/ge-v1-5-automation-runtime-approval"
+import {
+  editGeV15LeadPreparedAction,
+  executeGeV15ApprovedPreparedAction,
+} from "@/lib/growth/automation-runtime/ge-v1-5-automation-runtime-execute"
 import {
   appendGeV15RuntimeLog,
   buildGeV15ApprovalLogMessage,
@@ -26,7 +30,7 @@ export async function listGeV15LeadPendingApprovals(
   const lead = await fetchGrowthLeadById(admin, leadId)
   if (!lead) return []
   const state = parseGeV15RuntimeState(lead.metadata)
-  return listGeV15PendingApprovals(state.preparedActions)
+  return listGeV15OperatorReviewActions(state.preparedActions)
 }
 
 export async function approveGeV15LeadPreparedAction(
@@ -71,7 +75,7 @@ export async function approveGeV15LeadPreparedAction(
 
 export async function rejectGeV15LeadPreparedAction(
   admin: SupabaseClient,
-  input: { leadId: string; actionId: string },
+  input: { leadId: string; actionId: string; rejectedBy?: string | null; reason?: string | null },
 ): Promise<{ ok: boolean; error?: string }> {
   const lead = await fetchGrowthLeadById(admin, input.leadId)
   if (!lead) return { ok: false, error: "lead_not_found" }
@@ -82,11 +86,15 @@ export async function rejectGeV15LeadPreparedAction(
 
   state = {
     ...state,
-    preparedActions: rejectGeV15PreparedAction(state.preparedActions, input.actionId),
+    preparedActions: rejectGeV15PreparedAction(state.preparedActions, input.actionId, {
+      rejectedBy: input.rejectedBy,
+      reason: input.reason,
+    }),
   }
   state = appendGeV15RuntimeLog(state, {
     phase: "approval",
     message: buildGeV15ApprovalLogMessage(input.actionId, existing.status, "rejected"),
+    metadata: { rejectedBy: input.rejectedBy, reason: input.reason },
   })
 
   await updateGrowthLead(admin, input.leadId, {
@@ -96,5 +104,29 @@ export async function rejectGeV15LeadPreparedAction(
     },
   })
 
+  void (async () => {
+    try {
+      const organizationId = lead.promotedOrganizationId
+      if (!organizationId) return
+      const { dispatchGrowthObjectiveAutomationRuntimeEvent } = await import(
+        "@/lib/growth/objectives/growth-objective-event-bridge"
+      )
+      await dispatchGrowthObjectiveAutomationRuntimeEvent(admin, {
+        organizationId,
+        leadId: input.leadId,
+        signalType: "rejected_action",
+        channel: existing.channel ?? null,
+        resourceId: existing.sequenceId ?? null,
+        confidence: existing.confidenceScore ?? null,
+        sourceEventId: input.actionId,
+        policyMetadata: { reason: input.reason ?? null },
+      })
+    } catch {
+      // Best-effort objective fan-in.
+    }
+  })()
+
   return { ok: true }
 }
+
+export { editGeV15LeadPreparedAction, executeGeV15ApprovedPreparedAction }

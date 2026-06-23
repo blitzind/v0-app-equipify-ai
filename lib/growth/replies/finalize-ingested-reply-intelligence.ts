@@ -148,6 +148,26 @@ export async function finalizeIngestedReplyIntelligence(
     }),
   )
 
+  if (input.sequenceEnrollmentId) {
+    void (async () => {
+      try {
+        const { fanInGrowthObjectiveSequenceEvent } = await import(
+          "@/lib/growth/objectives/growth-objective-sequence-fan-in"
+        )
+        await fanInGrowthObjectiveSequenceEvent(admin, {
+          leadId: input.leadId,
+          signalType: "reply_received",
+          enrollmentId: input.sequenceEnrollmentId!,
+          campaignId: input.campaignId ?? null,
+          occurredAt: input.outboundReply.receivedAt,
+          metadata: { replyId: input.outboundReply.id },
+        })
+      } catch {
+        // Best-effort objective fan-in.
+      }
+    })()
+  }
+
   await maybeBridgeApolloPipelineToMeetingIntelligenceForLead(admin, {
     lead_id: input.leadId,
     outbound_reply_id: input.outboundReply.id,

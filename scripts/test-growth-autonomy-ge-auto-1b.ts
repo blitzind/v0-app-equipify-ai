@@ -100,7 +100,7 @@ function createMockAdmin(input: {
 }
 
 async function main(): Promise<void> {
-  assert.equal(GROWTH_AUTONOMY_QA_MARKER, "growth-autonomy-ge-auto-1c-v1")
+  assert.equal(GROWTH_AUTONOMY_QA_MARKER, "growth-autonomy-ge-auto-1f-v1")
 
   const migration = readSource(`supabase/migrations/${GROWTH_AUTONOMY_SCHEMA_MIGRATION}`)
   assert.match(migration, /organization_autonomy_settings/)
@@ -113,7 +113,7 @@ async function main(): Promise<void> {
 
   const settingsPanel = readSource("components/growth/settings/growth-autonomy-settings-panel.tsx")
   assert.match(settingsPanel, /Pause all autonomy/)
-  assert.match(settingsPanel, /locked until a later phase/)
+  assert.match(settingsPanel, /Channel prepare &amp; send controls/)
 
   const enforcement = readSource("lib/growth/autonomy/growth-autonomy-enforcement.ts")
   assert.match(enforcement, /triggerSource === "operator"/)
@@ -122,20 +122,25 @@ async function main(): Promise<void> {
   assert.match(actions, /enforceGrowthAutonomyCapability/)
   assert.match(actions, /recommendationsGate\.allowed/)
 
-  const rejected = validateGrowthAutonomySettingsPatch({
+  const rejectedUnknownCapability = validateGrowthAutonomySettingsPatch({
+    capabilityToggles: { not_a_capability: true },
+  })
+  assert.equal(rejectedUnknownCapability.ok, false)
+
+  const acceptedEmailExecution = validateGrowthAutonomySettingsPatch({
     capabilityToggles: { email_execution: true },
   })
-  assert.equal(rejected.ok, false)
+  assert.equal(acceptedEmailExecution.ok, true)
 
   const rejectedApproval = validateGrowthAutonomySettingsPatch({
     approvalPolicies: { research: "fully_autonomous" },
   })
   assert.equal(rejectedApproval.ok, false)
 
-  const rejectedOutboundKill = validateGrowthAutonomySettingsPatch({
+  const acceptedOutboundKill = validateGrowthAutonomySettingsPatch({
     killSwitches: { autonomyOutboundEnabled: true },
   })
-  assert.equal(rejectedOutboundKill.ok, false)
+  assert.equal(acceptedOutboundKill.ok, true)
 
   const merged = mergeGrowthAutonomyCapabilityToggles({}, { research: true })
   assert.equal(merged.email_execution, false)

@@ -12,6 +12,7 @@ export const runtime = "nodejs"
 
 const BodySchema = z.object({
   confirmed: z.boolean(),
+  client_build_marker: z.string().optional(),
 })
 
 export async function POST(request: Request) {
@@ -47,7 +48,9 @@ export async function POST(request: Request) {
       enforceSendingWindow: false,
     })
 
-    return warmupExecutorJsonSuccess(result)
+    return warmupExecutorJsonSuccess(result, {
+      clientBuildMarker: parsed.data.client_build_marker ?? null,
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Warmup batch failed unexpectedly."
     logWarmupExecutorFailure("warmup_executor_run_failed", {

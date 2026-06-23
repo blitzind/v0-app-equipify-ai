@@ -109,8 +109,8 @@ function createMockAdmin(input: {
 async function main(): Promise<void> {
   console.log("\n=== GE-AUTO-1C — Channel Autonomy Preparation ===\n")
 
-  assert.equal(GROWTH_AUTONOMY_QA_MARKER, "growth-autonomy-ge-auto-1c-v1")
-  assert.equal(GROWTH_AUTONOMY_CHANNEL_PREPARE_QA_MARKER, "growth-autonomy-ge-auto-1c-v1")
+  assert.equal(GROWTH_AUTONOMY_QA_MARKER, "growth-autonomy-ge-auto-1f-v1")
+  assert.equal(GROWTH_AUTONOMY_CHANNEL_PREPARE_QA_MARKER, "growth-autonomy-ge-auto-1f-v1")
   console.log("  ✓ QA markers")
 
   const migration = readSource("supabase/migrations/20270928120000_growth_autonomy_ge_auto_1c.sql")
@@ -246,10 +246,10 @@ async function main(): Promise<void> {
   console.log("  ✓ GE-v1-5 prepare actions wired through autonomy gate")
 
   const settingsPanel = readSource("components/growth/settings/growth-autonomy-settings-panel.tsx")
-  assert.match(settingsPanel, /Channel prepare controls/)
-  assert.match(settingsPanel, /cannot send without human approval/)
-  assert.match(settingsPanel, /Sending locked/)
-  console.log("  ✓ Settings UI exposes channel prepare controls with locked sending copy")
+  assert.match(settingsPanel, /Channel prepare &amp; send controls/)
+  assert.match(settingsPanel, /Autonomous send/)
+  assert.match(settingsPanel, /Shadow mode/)
+  console.log("  ✓ Settings UI exposes channel prepare + send controls and shadow mode")
 
   const approvalPanel = readSource("components/growth/automation/ge-v1-5-automation-runtime-approval-panel.tsx")
   assert.match(approvalPanel, /Autonomy prepared/)

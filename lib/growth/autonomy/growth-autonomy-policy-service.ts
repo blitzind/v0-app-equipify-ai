@@ -176,15 +176,21 @@ async function evaluatePrepareCapability(
   const channelPolicyMetadata: GrowthAutonomyChannelPolicyMetadata = {
     channel,
     prepareEnabled: channelPermission.enabled_for_prepare,
+    sendEnabled: channelPermission.enabled_for_send,
     quietHoursActive: isWithinChannelQuietHours(channelPermission.quiet_hours, now),
     confidenceMet,
+    sendConfidenceMet: confidenceMet,
     senderAllowed: isSenderProfileAllowed(channelPermission, input.prepareContext?.senderProfileId),
     sequenceAllowed: isSequenceAllowed(channelPermission, input.prepareContext?.sequenceId),
     audienceAllowed: isAudienceAllowed(channelPermission, input.prepareContext?.audienceId),
-    outboundSendBlocked: true,
+    outboundSendBlocked: !killSwitchState.autonomyOutboundEnabled,
+    shadowModeActive: settings.outboundControls.shadowModeEnabled,
     maxPreparedPerDay: channelPermission.max_prepared_per_day,
     preparedToday: prepareBudget.consumed,
+    maxSendsPerDay: channelPermission.max_sends_per_day,
+    sentToday: 0,
     minimumConfidenceScore: channelPermission.minimum_confidence_score,
+    minimumSendConfidence: channelPermission.minimum_send_confidence,
     confidenceScore,
   }
 
@@ -232,8 +238,8 @@ async function evaluatePrepareCapability(
     return baseBlocked("Autonomy disabled by platform kill switch.")
   }
 
-  if (settings.masterMode === "objective") {
-    return baseBlocked("Objective mode execution is not available in GE-AUTO-1C.")
+  if (settings.masterMode === "objective" && !killSwitchState.autonomyObjectiveModeEnabled) {
+    return baseBlocked("Objective mode requires autonomy_objective_mode_enabled kill switch.")
   }
 
   if (settings.masterMode === "manual") {
@@ -278,10 +284,6 @@ async function evaluatePrepareCapability(
     return baseBlocked("Audience not allowed for channel prepare.")
   }
 
-  if (killSwitchState.autonomyOutboundEnabled) {
-    return baseBlocked("Outbound send remains blocked — prepare only in GE-AUTO-1C.")
-  }
-
   return buildResult({
     settings,
     capability: input.capability,
@@ -300,7 +302,7 @@ async function evaluatePrepareCapability(
 
 /**
  * Pure autonomy policy evaluation — no side effects, no execution.
- * GE-AUTO-1C: channel prepare allowed when configured; outbound send remains blocked.
+ * GE-AUTO-1E: channel prepare allowed when configured; outbound send via evaluateAutonomyOutboundSendPolicy.
  */
 export async function evaluateAutonomyCapability(
   admin: SupabaseClient,
@@ -363,20 +365,28 @@ export async function evaluateAutonomyCapability(
     return baseBlocked("Autonomy disabled by platform kill switch.")
   }
 
-  if (settings.masterMode === "objective") {
-    return baseBlocked("Objective mode execution is not available in GE-AUTO-1C.")
-  }
-
-  if (isGrowthAutonomyOutboundCapability(input.capability)) {
-    return baseBlocked("Outbound send autonomy is locked — prepare and approve only in GE-AUTO-1C.", true)
+  if (settings.masterMode === "objective" && !killSwitchState.autonomyObjectiveModeEnabled) {
+    return baseBlocked("Objective mode requires autonomy_objective_mode_enabled kill switch.")
   }
 
   if (input.capability === "campaign_launch") {
-    return baseBlocked("Campaign launch autonomy requires human review.", true)
+    if (settings.masterMode !== "objective") {
+      return baseBlocked("Campaign launch autonomy requires objective mode.", true)
+    }
+  } else if (isGrowthAutonomyOutboundCapability(input.capability)) {
+    return baseBlocked(
+      "Outbound send requires send context — use evaluateAutonomyOutboundSendPolicy.",
+      true,
+    )
   }
 
   if (input.capability === "strategy_adaptation") {
-    return baseBlocked("Strategy adaptation execution is not available in GE-AUTO-1C.")
+    if (!killSwitchState.autonomyObjectiveModeEnabled) {
+      return baseBlocked("Strategy adaptation requires objective mode kill switch.", true)
+    }
+    if (settings.masterMode !== "objective") {
+      return baseBlocked("Strategy adaptation requires objective autonomy level.", true)
+    }
   }
 
   if (isGrowthAutonomyGenerationCapability(input.capability) && !killSwitchState.autonomyGenerationEnabled) {

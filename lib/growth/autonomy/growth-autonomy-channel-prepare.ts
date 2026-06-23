@@ -1,13 +1,17 @@
-/** GE-AUTO-1C — Channel prepare configuration helpers (client-safe). */
+/** GE-AUTO-1C/1E — Channel prepare + send configuration helpers (client-safe). */
 
+import {
+  GROWTH_AUTONOMY_DEFAULT_MIN_SEND_CONFIDENCE,
+} from "@/lib/growth/autonomy/growth-autonomy-types"
 import type {
   GrowthAutonomyChannelKey,
   GrowthAutonomyChannelPrepareConfig,
+  GrowthAutonomyOutboundControls,
   GrowthAutonomyPrepareCapability,
   GrowthAutonomyQuietHours,
 } from "@/lib/growth/autonomy/growth-autonomy-types"
 
-export const GROWTH_AUTONOMY_CHANNEL_PREPARE_QA_MARKER = "growth-autonomy-ge-auto-1c-v1" as const
+export const GROWTH_AUTONOMY_CHANNEL_PREPARE_QA_MARKER = "growth-autonomy-ge-auto-1f-v1" as const
 
 export const GROWTH_AUTONOMY_CHANNEL_KEYS: readonly GrowthAutonomyChannelKey[] = [
   "email",
@@ -39,6 +43,15 @@ export const GROWTH_AUTONOMY_CHANNEL_TO_PREPARE_CAPABILITY: Record<
   voice: "voice_prepare",
 }
 
+export const GROWTH_AUTONOMY_CHANNEL_TO_EXECUTION_CAPABILITY: Record<
+  GrowthAutonomyChannelKey,
+  "email_execution" | "sms_execution" | "voice_execution"
+> = {
+  email: "email_execution",
+  sms: "sms_execution",
+  voice: "voice_execution",
+}
+
 export const GROWTH_AUTONOMY_CHANNEL_PREPARE_BUDGET_RESOURCE: Record<
   GrowthAutonomyChannelKey,
   `autonomous_${GrowthAutonomyChannelKey}_prepare`
@@ -46,6 +59,15 @@ export const GROWTH_AUTONOMY_CHANNEL_PREPARE_BUDGET_RESOURCE: Record<
   email: "autonomous_email_prepare",
   sms: "autonomous_sms_prepare",
   voice: "autonomous_voice_prepare",
+}
+
+export const GROWTH_AUTONOMY_CHANNEL_SEND_BUDGET_RESOURCE: Record<
+  GrowthAutonomyChannelKey,
+  `autonomous_${GrowthAutonomyChannelKey}_send`
+> = {
+  email: "autonomous_email_send",
+  sms: "autonomous_sms_send",
+  voice: "autonomous_voice_send",
 }
 
 export function buildDefaultGrowthAutonomyQuietHours(): GrowthAutonomyQuietHours {
@@ -60,12 +82,31 @@ export function buildDefaultGrowthAutonomyChannelPrepareConfig(): GrowthAutonomy
   return {
     enabled_for_prepare: false,
     max_prepared_per_day: 0,
+    enabled_for_send: false,
+    max_sends_per_day: 0,
+    minimum_send_confidence: GROWTH_AUTONOMY_DEFAULT_MIN_SEND_CONFIDENCE,
     allowed_sender_profiles: [],
     allowed_sequences: [],
     allowed_audiences: [],
     minimum_confidence_score: 0,
     quiet_hours: buildDefaultGrowthAutonomyQuietHours(),
     approvalPolicy: "always_require_approval",
+  }
+}
+
+export function buildDefaultGrowthAutonomyOutboundControls(): GrowthAutonomyOutboundControls {
+  return {
+    shadowModeEnabled: false,
+  }
+}
+
+export function normalizeGrowthAutonomyOutboundControls(raw: unknown): GrowthAutonomyOutboundControls {
+  const defaults = buildDefaultGrowthAutonomyOutboundControls()
+  if (!raw || typeof raw !== "object") return defaults
+  const input = raw as Record<string, unknown>
+  return {
+    shadowModeEnabled:
+      typeof input.shadowModeEnabled === "boolean" ? input.shadowModeEnabled : defaults.shadowModeEnabled,
   }
 }
 
@@ -115,6 +156,18 @@ export function normalizeGrowthAutonomyChannelPrepareConfig(
       typeof input.max_prepared_per_day === "number" && input.max_prepared_per_day >= 0
         ? Math.floor(input.max_prepared_per_day)
         : 0,
+    enabled_for_send:
+      typeof input.enabled_for_send === "boolean" ? input.enabled_for_send : false,
+    max_sends_per_day:
+      typeof input.max_sends_per_day === "number" && input.max_sends_per_day >= 0
+        ? Math.floor(input.max_sends_per_day)
+        : 0,
+    minimum_send_confidence:
+      typeof input.minimum_send_confidence === "number" &&
+      input.minimum_send_confidence >= 0 &&
+      input.minimum_send_confidence <= 100
+        ? Math.floor(input.minimum_send_confidence)
+        : GROWTH_AUTONOMY_DEFAULT_MIN_SEND_CONFIDENCE,
     allowed_sender_profiles: Array.isArray(input.allowed_sender_profiles)
       ? input.allowed_sender_profiles.filter((v): v is string => typeof v === "string")
       : [],

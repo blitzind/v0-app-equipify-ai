@@ -79,6 +79,8 @@ export type GrowthWarmupExecutorSenderResult = {
 
 export type GrowthWarmupExecutorRunResult = {
   qa_marker: typeof GROWTH_WARMUP_EXECUTOR_QA_MARKER
+  /** GS-GROWTH-WARMUP-EXECUTOR-1G — build marker for stale-deploy detection. */
+  executorBuildMarker?: string
   runId: string | null
   runKind: GrowthWarmupSendRunKind
   idempotencyKey: string
@@ -93,6 +95,7 @@ export type GrowthWarmupExecutorRunResult = {
   previewOnly: boolean
   profileDiagnostics?: WarmupExecutorProfileDiagnostic[]
   runSummary?: WarmupExecutorRunSummary
+  recipientPoolSummary?: WarmupExecutorRecipientPoolSummary
 }
 
 export type WarmupExecutorProfileDiagnostic = {
@@ -118,6 +121,13 @@ export type WarmupExecutorRunSummary = {
   maxSendsPerProfilePerRun?: number
   plannedSendsThisRun?: number
   pacingMessage?: string
+}
+
+export type WarmupExecutorRecipientPoolSummary = {
+  activeApprovedRecipients: number
+  availableNow: number
+  exhausted: boolean
+  message: string | null
 }
 
 export type GrowthWarmupProfileExecutorStats = {

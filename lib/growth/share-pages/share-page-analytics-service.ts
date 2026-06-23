@@ -32,6 +32,34 @@ import { mapSharePageEventToSequenceWakeEvent } from "@/lib/growth/sequences/con
 import { emitSharePageOperatorNotification } from "@/lib/growth/share-pages/share-page-operator-notifications"
 import { processGrowthSharePageEventIntelligence } from "@/lib/growth/share-pages/growth-share-page-intelligence-service"
 
+async function fanInSharePageObjectiveEvent(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string
+    leadId: string
+    sharePageId: string
+    signalType:
+      | "landing_page_visit"
+      | "cta_clicked"
+      | "video_view_started"
+      | "video_completed"
+      | "booking_started"
+      | "booking_completed"
+    sharePageViewId?: string | null
+    occurredAt?: string
+    metadata?: Record<string, unknown>
+  },
+): Promise<void> {
+  try {
+    const { dispatchGrowthObjectiveSharePageEvent } = await import(
+      "@/lib/growth/objectives/growth-objective-event-bridge"
+    )
+    await dispatchGrowthObjectiveSharePageEvent(admin, input)
+  } catch {
+    // Best-effort objective fan-in.
+  }
+}
+
 export const SHARE_PAGE_ENGAGEMENT_DURATION_MS = 30_000
 export const SHARE_PAGE_ENGAGEMENT_SCROLL_PCT = 50
 
@@ -281,6 +309,14 @@ async function handleSideEffects(
       leadOwnerUserId,
       occurredAt: input.occurredAt,
     })
+    await fanInSharePageObjectiveEvent(admin, {
+      organizationId: page.organizationId,
+      leadId: page.leadId,
+      sharePageId: page.id,
+      signalType: "landing_page_visit",
+      sharePageViewId: input.sharePageViewId,
+      occurredAt: input.occurredAt,
+    })
   }
 
   if (input.eventType === "SHARE_PAGE_CTA_CLICKED" && !input.deduplicated) {
@@ -314,6 +350,15 @@ async function handleSideEffects(
       occurredAt: input.occurredAt,
       ctaLabel: input.eventLabel ?? null,
     })
+    await fanInSharePageObjectiveEvent(admin, {
+      organizationId: page.organizationId,
+      leadId: page.leadId,
+      sharePageId: page.id,
+      signalType: "cta_clicked",
+      sharePageViewId: input.sharePageViewId,
+      occurredAt: input.occurredAt,
+      metadata: input.metadata,
+    })
   }
 
   if (input.eventType === "SHARE_PAGE_BOOKING_STARTED" && !input.deduplicated) {
@@ -336,6 +381,14 @@ async function handleSideEffects(
       sharePageViewId: input.sharePageViewId,
       companyLabel: companyName,
       leadOwnerUserId,
+      occurredAt: input.occurredAt,
+    })
+    await fanInSharePageObjectiveEvent(admin, {
+      organizationId: page.organizationId,
+      leadId: page.leadId,
+      sharePageId: page.id,
+      signalType: "booking_started",
+      sharePageViewId: input.sharePageViewId,
       occurredAt: input.occurredAt,
     })
   }
@@ -371,12 +424,29 @@ async function handleSideEffects(
       leadOwnerUserId,
       occurredAt: input.occurredAt,
     })
+    await fanInSharePageObjectiveEvent(admin, {
+      organizationId: page.organizationId,
+      leadId: page.leadId,
+      sharePageId: page.id,
+      signalType: "booking_completed",
+      sharePageViewId: input.sharePageViewId,
+      occurredAt: input.occurredAt,
+    })
   }
 
   if (input.eventType === "SHARE_PAGE_RESOURCE_OPENED" && !input.deduplicated) {
     await recordSharePageResourceOpenedTimelineEvent(admin, {
       ...context,
       resourceTitle: input.eventLabel ?? null,
+    })
+    await fanInSharePageObjectiveEvent(admin, {
+      organizationId: page.organizationId,
+      leadId: page.leadId,
+      sharePageId: page.id,
+      signalType: "video_view_started",
+      sharePageViewId: input.sharePageViewId,
+      occurredAt: input.occurredAt,
+      metadata: input.metadata,
     })
   }
 
@@ -432,6 +502,18 @@ async function handleSideEffects(
         companyLabel: companyName,
         leadOwnerUserId,
         occurredAt: input.occurredAt,
+      })
+      await fanInSharePageObjectiveEvent(admin, {
+        organizationId: page.organizationId,
+        leadId: page.leadId,
+        sharePageId: page.id,
+        signalType: "video_completed",
+        sharePageViewId: input.sharePageViewId,
+        occurredAt: input.occurredAt,
+        metadata: {
+          duration_ms: input.durationMs ?? null,
+          scroll_depth_pct: input.scrollDepthPct ?? null,
+        },
       })
     }
   }

@@ -176,9 +176,23 @@ export async function executeGeV15PlaybookActions(
           dryRun: input.dryRun,
         })
         if (result.prepared) {
+          let storedAction = result.prepared
+          if (!input.dryRun) {
+            const { maybeAutonomousSendGeV15PreparedAction } = await import(
+              "@/lib/growth/automation-runtime/ge-v1-5-automation-runtime-autonomous-send"
+            )
+            const autonomous = await maybeAutonomousSendGeV15PreparedAction(admin, {
+              organizationId: input.organizationId,
+              leadId: input.leadId,
+              preparedAction: result.prepared,
+              existingPreparedActions: state.preparedActions,
+              dryRun: input.dryRun,
+            })
+            storedAction = autonomous.action
+          }
           state = {
             ...state,
-            preparedActions: [result.prepared, ...state.preparedActions].slice(0, 30),
+            preparedActions: [storedAction, ...state.preparedActions].slice(0, 30),
           }
           actionsPrepared += 1
           if (result.notificationEmitted) notificationsEmitted += 1

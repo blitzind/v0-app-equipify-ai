@@ -45,8 +45,10 @@ export type GrowthAutonomyStatusSummary = {
   masterMode: GrowthAutonomySettingsSnapshot["masterMode"]
   masterModeLabel: string
   autonomyPaused: boolean
-  outboundLocked: true
+  outboundLocked: boolean
+  shadowModeEnabled: boolean
   prepareEnabled: boolean
+  sendEnabled: boolean
   emergencyStopAvailable: true
   enabledCapabilities: string[]
   remainingBudgets: Array<{
@@ -98,16 +100,22 @@ export type GrowthAutonomySettingsViewModel = {
     id: "email" | "sms" | "voice"
     label: string
     prepareEnabled: boolean
+    sendEnabled: boolean
     maxPreparedPerDay: number
+    maxSendsPerDay: number
     minimumConfidenceScore: number
+    minimumSendConfidence: number
     quietHoursEnabled: boolean
     quietHoursStartUtc: number
     quietHoursEndUtc: number
     allowedSenderProfiles: string
     allowedSequences: string
     allowedAudiences: string
-    sendingLocked: true
+    sendingLocked: boolean
   }>
+  outboundControls: {
+    shadowModeEnabled: boolean
+  }
   notice: string
 }
 
@@ -144,9 +152,13 @@ async function buildStatusSummary(
     masterMode: snapshot.masterMode,
     masterModeLabel: GROWTH_AUTONOMY_MASTER_MODE_LABELS[snapshot.masterMode],
     autonomyPaused: !snapshot.killSwitches.autonomyEnabled,
-    outboundLocked: true,
+    outboundLocked: !snapshot.killSwitches.autonomyOutboundEnabled,
+    shadowModeEnabled: snapshot.outboundControls.shadowModeEnabled,
     prepareEnabled: GROWTH_AUTONOMY_CHANNEL_KEYS.some(
       (channel) => snapshot.channelPermissions[channel]?.enabled_for_prepare,
+    ),
+    sendEnabled: GROWTH_AUTONOMY_CHANNEL_KEYS.some(
+      (channel) => snapshot.channelPermissions[channel]?.enabled_for_send,
     ),
     emergencyStopAvailable: true,
     enabledCapabilities,
@@ -192,7 +204,7 @@ export async function loadGrowthAutonomySettingsViewModel(
         enabled: Boolean(settings.capabilityToggles[capability]),
         editable: (GROWTH_AUTONOMY_EDITABLE_CAPABILITIES as readonly string[]).includes(capability),
         locked,
-        lockReason: locked ? "Outbound autonomy is locked until a later phase." : null,
+        lockReason: locked ? null : null,
         approvalPolicy: settings.approvalPolicies[capability] ?? "always_require_approval",
         approvalPolicyLabel:
           GROWTH_AUTONOMY_APPROVAL_POLICY_LABELS[
@@ -202,13 +214,13 @@ export async function loadGrowthAutonomySettingsViewModel(
     }),
     budgets: GROWTH_AUTONOMY_BUDGET_KEYS.map((key) => {
       const remaining = status.remainingBudgets.find((entry) => entry.id === key)
-      const locked = key === "autonomous_outbound_actions"
+      const locked = false
       return {
         id: key,
         label: GROWTH_AUTONOMY_BUDGET_LABELS[key],
         dailyLimit: settings.dailyBudgetLimits[key] ?? 0,
         remaining: remaining?.remaining ?? 0,
-        editable: !locked,
+        editable: (GROWTH_AUTONOMY_EDITABLE_BUDGET_KEYS as readonly string[]).includes(key),
         locked,
       }
     }),
@@ -222,10 +234,10 @@ export async function loadGrowthAutonomySettingsViewModel(
       },
       {
         id: "autonomyOutboundEnabled",
-        label: "Autonomous outbound enabled",
+        label: "Master outbound autonomy",
         enabled: snapshot.killSwitches.autonomyOutboundEnabled,
-        editable: false,
-        locked: true,
+        editable: true,
+        locked: false,
       },
       {
         id: "autonomyGenerationEnabled",
@@ -238,8 +250,8 @@ export async function loadGrowthAutonomySettingsViewModel(
         id: "autonomyObjectiveModeEnabled",
         label: "Objective mode enabled",
         enabled: snapshot.killSwitches.autonomyObjectiveModeEnabled,
-        editable: false,
-        locked: true,
+        editable: true,
+        locked: false,
       },
     ],
     channels: GROWTH_AUTONOMY_CHANNEL_KEYS.map((channel) => {
@@ -248,19 +260,25 @@ export async function loadGrowthAutonomySettingsViewModel(
         id: channel,
         label: GROWTH_AUTONOMY_CHANNEL_LABELS[channel],
         prepareEnabled: Boolean(config?.enabled_for_prepare),
+        sendEnabled: Boolean(config?.enabled_for_send),
         maxPreparedPerDay: config?.max_prepared_per_day ?? 0,
+        maxSendsPerDay: config?.max_sends_per_day ?? 0,
         minimumConfidenceScore: config?.minimum_confidence_score ?? 0,
+        minimumSendConfidence: config?.minimum_send_confidence ?? 90,
         quietHoursEnabled: Boolean(config?.quiet_hours.enabled),
         quietHoursStartUtc: config?.quiet_hours.startHourUtc ?? 22,
         quietHoursEndUtc: config?.quiet_hours.endHourUtc ?? 13,
         allowedSenderProfiles: (config?.allowed_sender_profiles ?? []).join(", "),
         allowedSequences: (config?.allowed_sequences ?? []).join(", "),
         allowedAudiences: (config?.allowed_audiences ?? []).join(", "),
-        sendingLocked: true as const,
+        sendingLocked: !snapshot.killSwitches.autonomyOutboundEnabled,
       }
     }),
+    outboundControls: {
+      shadowModeEnabled: settings.outboundControls.shadowModeEnabled,
+    },
     notice:
-      "GE-AUTO-1C: Growth Engine may prepare email, SMS, and voice drafts when enabled — every send still requires human approval.",
+      "GE-AUTO-1E: Outbound send is opt-in, confidence-gated, and instantly reversible. Autonomous approval remains disabled.",
   }
 }
 
@@ -301,11 +319,26 @@ export async function patchGrowthAutonomySettings(
     })
   }
 
+  if (input.patch.killSwitches?.autonomyOutboundEnabled !== undefined) {
+    await setRuntimeKillSwitch(admin, {
+      key: "autonomy_outbound_enabled",
+      enabled: input.patch.killSwitches.autonomyOutboundEnabled,
+    })
+  }
+
+  if (input.patch.killSwitches?.autonomyObjectiveModeEnabled !== undefined) {
+    await setRuntimeKillSwitch(admin, {
+      key: "autonomy_objective_mode_enabled",
+      enabled: input.patch.killSwitches.autonomyObjectiveModeEnabled,
+    })
+  }
+
   if (
     input.patch.masterMode !== undefined ||
     input.patch.capabilityToggles !== undefined ||
     input.patch.channelPermissions !== undefined ||
-    input.patch.dailyBudgetLimits !== undefined
+    input.patch.dailyBudgetLimits !== undefined ||
+    input.patch.outboundControls !== undefined
   ) {
     await upsertGrowthAutonomySettings(admin, input.organizationId, {
       masterMode: input.patch.masterMode,
@@ -321,6 +354,10 @@ export async function patchGrowthAutonomySettings(
         current.dailyBudgetLimits,
         input.patch.dailyBudgetLimits,
       ),
+      outboundControls: {
+        ...current.outboundControls,
+        ...input.patch.outboundControls,
+      },
     })
   }
 

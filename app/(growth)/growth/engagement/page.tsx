@@ -1,6 +1,7 @@
 "use client"
 
 import { Activity } from "lucide-react"
+import { GeV15AutomationRuntimeApprovalInbox } from "@/components/growth/automation/ge-v1-5-automation-runtime-approval-inbox"
 import { GrowthEngagementCommandCenter } from "@/components/growth/engagement/growth-engagement-command-center"
 import { GrowthUnifiedEngagementFeed } from "@/components/growth/engagement/growth-unified-engagement-feed"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
@@ -17,6 +18,7 @@ export default function GrowthEngagementPage() {
       />
 
       <div className="space-y-8">
+        <GeV15AutomationRuntimeApprovalInbox limit={10} />
         <GrowthUnifiedEngagementFeed limit={50} />
         <GrowthEngagementCommandCenter />
       </div>

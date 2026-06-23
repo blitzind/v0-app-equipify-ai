@@ -73,6 +73,24 @@ export async function emitSequenceVoiceDropTimelineEvent(
       occurredAt: input.occurredAt ?? new Date().toISOString(),
       payload,
     })
+
+    void (async () => {
+      try {
+        const { fanInGrowthObjectiveSequenceEvent } = await import(
+          "@/lib/growth/objectives/growth-objective-sequence-fan-in"
+        )
+        await fanInGrowthObjectiveSequenceEvent(admin, {
+          leadId: input.leadId,
+          signalType: "voice_sent",
+          enrollmentId: input.enrollmentId,
+          stepId: input.stepId ?? null,
+          deliveryAttemptId: input.deliveryAttemptId ?? null,
+          occurredAt: input.occurredAt,
+        })
+      } catch {
+        // Best-effort objective fan-in.
+      }
+    })()
   }
 }
 

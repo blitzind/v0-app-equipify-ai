@@ -23,7 +23,10 @@ import {
   listWarmupRecipients,
   updateWarmupRecipient,
 } from "@/lib/growth/warmup/warmup-recipient-repository"
-import { selectWarmupRecipientForSend } from "@/lib/growth/warmup/warmup-recipient-selector"
+import { selectWarmupRecipientForSend, countAvailableWarmupRecipients } from "@/lib/growth/warmup/warmup-recipient-selector"
+import {
+  summarizeRecipientPoolPressure,
+} from "@/lib/growth/warmup/warmup-executor-manual-run-diagnostics"
 import { pickWarmupMessageTemplate } from "@/lib/growth/warmup/warmup-message-templates"
 import {
   describeWarmupExecutorProfileDiagnostic,
@@ -43,6 +46,7 @@ import {
   type GrowthWarmupProfileExecutorStats,
   type GrowthWarmupSendRunKind,
   type WarmupExecutorProfileDiagnostic,
+  type WarmupExecutorRecipientPoolSummary,
 } from "@/lib/growth/warmup/warmup-executor-types"
 import type { GrowthWarmupProfile } from "@/lib/growth/warmup/warmup-types"
 
@@ -51,6 +55,25 @@ export const GROWTH_WARMUP_EXECUTOR_1E_QA_MARKER = "growth-warmup-executor-1e-v1
 export const GROWTH_WARMUP_EXECUTOR_1F_QA_MARKER = "growth-warmup-executor-1f-v1" as const
 
 export { MAX_SENDS_PER_PROFILE_PER_RUN } from "@/lib/growth/warmup/warmup-executor-diagnostics"
+
+async function buildRecipientPoolSummary(
+  admin: SupabaseClient,
+  recipients: Awaited<ReturnType<typeof listWarmupRecipients>>,
+): Promise<WarmupExecutorRecipientPoolSummary> {
+  const availableNow = await countAvailableWarmupRecipients(admin, recipients)
+  return summarizeRecipientPoolPressure({ recipients, availableNow })
+}
+
+function withExecutorBuildMarker(
+  result: GrowthWarmupExecutorRunResult,
+  recipientPoolSummary?: WarmupExecutorRecipientPoolSummary,
+): GrowthWarmupExecutorRunResult {
+  return {
+    ...result,
+    executorBuildMarker: GROWTH_WARMUP_EXECUTOR_1F_QA_MARKER,
+    recipientPoolSummary: recipientPoolSummary ?? result.recipientPoolSummary,
+  }
+}
 
 function utcDateString(date = new Date()): string {
   return date.toISOString().slice(0, 10)
@@ -237,7 +260,9 @@ async function executeWarmupSendForProfile(
     excludeEmails: excludeRecipientEmails,
   })
   if (!selection.ok) {
-    skipReasons.push({ code: selection.code, message: selection.message })
+    const skipCode: GrowthWarmupExecutorSkipCode =
+      selection.code === "no_recipients" ? "no_approved_recipients" : selection.code
+    skipReasons.push({ code: skipCode, message: selection.message })
     base.skipped = 1
     return base
   }
@@ -407,7 +432,7 @@ export async function runWarmupSendExecutor(
 
   const schemaReady = await isGrowthWarmupExecutorSchemaReady(admin)
   if (!schemaReady) {
-    return {
+    return withExecutorBuildMarker({
       qa_marker: GROWTH_WARMUP_EXECUTOR_QA_MARKER,
       runId: null,
       runKind,
@@ -421,7 +446,7 @@ export async function runWarmupSendExecutor(
       senderResults: [],
       skipReasons: [{ code: "schema_not_ready", message: "Warmup executor schema not applied." }],
       previewOnly,
-    }
+    })
   }
 
   if (runKind === "manual" && !previewOnly && !input?.confirmed) {
@@ -484,6 +509,7 @@ export async function runWarmupSendExecutor(
   const allProfiles = await listWarmupProfiles(admin)
   const scannableProfiles = allProfiles.filter(isWarmupExecutorScannableProfile)
   const approvedRecipients = await listWarmupRecipients(admin, { activeOnly: true, approvedOnly: true })
+  const recipientPoolSummary = await buildRecipientPoolSummary(admin, approvedRecipients)
 
   const profileDiagnostics: WarmupExecutorProfileDiagnostic[] = scannableProfiles.map((profile) => {
     const sendsToday = profile.sends_today_date === utcDateString(now) ? profile.sends_today : 0
@@ -535,23 +561,26 @@ export async function runWarmupSendExecutor(
   })
 
   if (allProfiles.length === 0) {
-    return {
-      qa_marker: GROWTH_WARMUP_EXECUTOR_QA_MARKER,
-      runId: null,
-      runKind,
-      idempotencyKey,
-      status: "skipped",
-      profilesScanned: 0,
-      sendsAttempted: 0,
-      sendsSucceeded: 0,
-      sendsFailed: 0,
-      sendsSkipped: 0,
-      senderResults: [],
-      skipReasons: [{ code: "no_warming_profiles", message: runSummary.primaryMessage }],
-      previewOnly,
-      profileDiagnostics,
-      runSummary,
-    }
+    return withExecutorBuildMarker(
+      {
+        qa_marker: GROWTH_WARMUP_EXECUTOR_QA_MARKER,
+        runId: null,
+        runKind,
+        idempotencyKey,
+        status: "skipped",
+        profilesScanned: 0,
+        sendsAttempted: 0,
+        sendsSucceeded: 0,
+        sendsFailed: 0,
+        sendsSkipped: 0,
+        senderResults: [],
+        skipReasons: [{ code: "no_warming_profiles", message: runSummary.primaryMessage }],
+        previewOnly,
+        profileDiagnostics,
+        runSummary,
+      },
+      recipientPoolSummary,
+    )
   }
 
   if (approvedRecipients.length === 0) {
@@ -701,7 +730,7 @@ export async function runWarmupSendExecutor(
     }
   }
 
-  return finalResult
+  return withExecutorBuildMarker(finalResult, recipientPoolSummary)
 }
 
 export async function buildWarmupExecutorDashboardStats(

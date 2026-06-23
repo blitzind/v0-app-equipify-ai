@@ -9,7 +9,9 @@ import {
 } from "@/lib/growth/autonomy/growth-autonomy-config"
 import {
   buildDefaultGrowthAutonomyChannelPermissions,
+  buildDefaultGrowthAutonomyOutboundControls,
   normalizeGrowthAutonomyChannelPrepareConfig,
+  normalizeGrowthAutonomyOutboundControls,
 } from "@/lib/growth/autonomy/growth-autonomy-channel-prepare"
 import {
   GROWTH_AUTONOMY_APPROVAL_POLICIES,
@@ -25,6 +27,7 @@ import {
   type GrowthAutonomyChannelPermissions,
   type GrowthAutonomyDailyBudgetLimits,
   type GrowthAutonomyMasterMode,
+  type GrowthAutonomyOutboundControls,
   type GrowthAutonomySettings,
 } from "@/lib/growth/autonomy/growth-autonomy-types"
 import { probeRuntimeTable } from "@/lib/growth/runtime-guardrails/growth-runtime-schema-probe"
@@ -78,6 +81,22 @@ function normalizeChannelPermissions(raw: unknown): GrowthAutonomyChannelPermiss
   return result
 }
 
+function readOutboundControlsFromChannelPermissions(raw: unknown): GrowthAutonomyOutboundControls {
+  if (!raw || typeof raw !== "object") return buildDefaultGrowthAutonomyOutboundControls()
+  const input = raw as Record<string, unknown>
+  return normalizeGrowthAutonomyOutboundControls(input._outbound)
+}
+
+function writeOutboundControlsToChannelPermissions(
+  permissions: GrowthAutonomyChannelPermissions,
+  outboundControls: GrowthAutonomyOutboundControls,
+): GrowthAutonomyChannelPermissions & { _outbound: GrowthAutonomyOutboundControls } {
+  return {
+    ...permissions,
+    _outbound: outboundControls,
+  }
+}
+
 function normalizeDailyBudgetLimits(raw: unknown): GrowthAutonomyDailyBudgetLimits {
   const defaults = { ...GROWTH_AUTONOMY_DEFAULT_DAILY_BUDGET_LIMITS }
   if (!raw || typeof raw !== "object") return defaults
@@ -100,6 +119,7 @@ function mapRow(organizationId: string, row: Record<string, unknown>): GrowthAut
     approvalPolicies: normalizeApprovalPolicies(row.approval_policies),
     channelPermissions: normalizeChannelPermissions(row.channel_permissions),
     dailyBudgetLimits: normalizeDailyBudgetLimits(row.daily_budget_limits),
+    outboundControls: readOutboundControlsFromChannelPermissions(row.channel_permissions),
     updatedAt: row.updated_at ? String(row.updated_at) : null,
   }
 }
@@ -127,17 +147,19 @@ export async function upsertGrowthAutonomySettings(
   patch: Partial<
     Pick<
       GrowthAutonomySettings,
-      "masterMode" | "capabilityToggles" | "approvalPolicies" | "channelPermissions" | "dailyBudgetLimits"
+      "masterMode" | "capabilityToggles" | "approvalPolicies" | "channelPermissions" | "dailyBudgetLimits" | "outboundControls"
     >
   >,
 ): Promise<GrowthAutonomySettings> {
   const current = await fetchGrowthAutonomySettings(admin, organizationId)
+  const channelPermissions = patch.channelPermissions ?? current.channelPermissions
+  const outboundControls = patch.outboundControls ?? current.outboundControls
   const next = {
     organization_id: organizationId,
     master_mode: patch.masterMode ?? current.masterMode,
     capability_toggles: patch.capabilityToggles ?? current.capabilityToggles,
     approval_policies: patch.approvalPolicies ?? current.approvalPolicies,
-    channel_permissions: patch.channelPermissions ?? current.channelPermissions,
+    channel_permissions: writeOutboundControlsToChannelPermissions(channelPermissions, outboundControls),
     daily_budget_limits: patch.dailyBudgetLimits ?? current.dailyBudgetLimits,
     qa_marker: GROWTH_AUTONOMY_QA_MARKER,
     updated_at: new Date().toISOString(),

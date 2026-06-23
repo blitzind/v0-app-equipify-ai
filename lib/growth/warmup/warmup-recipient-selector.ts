@@ -80,3 +80,23 @@ export async function selectWarmupRecipientForSend(
     message: "All approved recipients reached daily or weekly caps.",
   }
 }
+
+/** Count recipients that can accept a send right now (under daily/weekly caps). */
+export async function countAvailableWarmupRecipients(
+  admin: SupabaseClient,
+  recipients: GrowthWarmupRecipient[],
+): Promise<number> {
+  let available = 0
+  const dayStart = utcDayStart()
+  const weekStart = utcWeekStart()
+
+  for (const recipient of recipients.filter((r) => r.active && r.approved)) {
+    const dailyCount = await countRecipientSendsSince(admin, recipient.id, dayStart)
+    if (dailyCount >= recipient.max_emails_per_day) continue
+    const weeklyCount = await countRecipientSendsSince(admin, recipient.id, weekStart)
+    if (weeklyCount >= recipient.max_emails_per_week) continue
+    available += 1
+  }
+
+  return available
+}

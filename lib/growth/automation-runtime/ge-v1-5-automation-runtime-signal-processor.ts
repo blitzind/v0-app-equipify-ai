@@ -263,6 +263,43 @@ export async function processGeV15AutomationRuntimeSignal(
     await persistGeV15RuntimeState(admin, input.leadId, lead.metadata ?? {}, state)
   }
 
+  if (!input.dryRun) {
+    try {
+      const { dispatchGrowthObjectiveAutomationRuntimeEvent } = await import(
+        "@/lib/growth/objectives/growth-objective-event-bridge"
+      )
+      const organizationId = input.organizationId
+      const resourceKey =
+        typeof input.triggerPayload?.sequence_id === "string"
+          ? input.triggerPayload.sequence_id
+          : null
+
+      if (actionsPrepared > 0) {
+        await dispatchGrowthObjectiveAutomationRuntimeEvent(admin, {
+          organizationId,
+          leadId: input.leadId,
+          signalType: "prepared_action",
+          resourceKey,
+          sourceEventId: `${input.trigger}:prepared:${actionsPrepared}`,
+          policyMetadata: { playbooksMatched, actionsPrepared },
+        })
+      }
+
+      if (playbooksMatched > 0) {
+        await dispatchGrowthObjectiveAutomationRuntimeEvent(admin, {
+          organizationId,
+          leadId: input.leadId,
+          signalType: "execution",
+          resourceKey,
+          sourceEventId: `${input.trigger}:${state.lastSignalAt}`,
+          policyMetadata: { trigger: input.trigger, playbooksMatched },
+        })
+      }
+    } catch {
+      // Best-effort objective fan-in.
+    }
+  }
+
   return {
     ok: true,
     trigger: input.trigger,
