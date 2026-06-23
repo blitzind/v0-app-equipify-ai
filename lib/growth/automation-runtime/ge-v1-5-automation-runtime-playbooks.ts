@@ -46,9 +46,21 @@ export const GE_V1_5_BUILTIN_PLAYBOOKS: GeV15AutomationPlaybook[] = [
         actionKind: "meeting",
       },
       {
+        action: "prepare_email",
+        title: "Pricing follow-up email",
+        summary: "Draft pricing follow-up for operator approval.",
+        draftContent:
+          "Hi {{first_name}},\n\nThanks for your pricing question. Happy to share options tailored to your team.\n\nBest,",
+      },
+      {
+        action: "queue_approval_item",
+        title: "Review pricing follow-up",
+        summary: "Prepared pricing follow-up email awaiting operator approval.",
+      },
+      {
         action: "operator_notification",
         title: "Pricing question detected",
-        summary: "Prospect asked about pricing — review and follow up.",
+        summary: "Prospect asked about pricing — review prepared follow-up before sending.",
       },
       {
         action: "request_follow_up",
@@ -162,6 +174,47 @@ export const GE_V1_5_BUILTIN_PLAYBOOKS: GeV15AutomationPlaybook[] = [
         action: "inbox_notification",
         title: "Reply in inbox",
         summary: "New reply thread activity detected.",
+      },
+    ],
+  },
+  {
+    id: "booking_started_incomplete",
+    name: "Booking started but not completed",
+    description: "Prospect started booking but did not finish → prepare SMS reminder.",
+    triggers: ["booking_started"],
+    conditions: [{ kind: "intent_score", operator: "gte", value: 40 }],
+    actions: [
+      {
+        action: "prepare_sms",
+        title: "Booking reminder SMS",
+        summary: "Draft SMS reminder to complete booking.",
+        draftContent: "Hi {{first_name}}, noticed you started booking — want help finishing your demo slot?",
+      },
+      {
+        action: "operator_notification",
+        title: "Booking incomplete",
+        summary: "Prospect started booking but did not complete — review SMS before sending.",
+      },
+    ],
+  },
+  {
+    id: "strong_buying_intent",
+    name: "Strong buying intent",
+    description: "High intent signal → prepare voice drop for operator approval.",
+    triggers: ["cta_clicked", "booking_offered"],
+    conditions: [{ kind: "intent_score", operator: "gte", value: 75 }],
+    actions: [
+      {
+        action: "prepare_voice_drop",
+        title: "High-intent voice drop",
+        summary: "Draft voice drop script for strong buying intent.",
+        draftContent:
+          "Hi {{first_name}}, this is {{sender_name}} from Equipify. Saw strong interest on your personalized page — happy to walk through next steps.",
+      },
+      {
+        action: "dashboard_card",
+        title: "Strong buying intent",
+        summary: "High-intent prospect — review prepared voice drop before sending.",
       },
     ],
   },

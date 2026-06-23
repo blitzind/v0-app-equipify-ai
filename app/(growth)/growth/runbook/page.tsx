@@ -2,6 +2,7 @@
 
 import { BookOpen } from "lucide-react"
 import { GrowthLaunchRunbookPanel } from "@/components/growth/operational/growth-launch-runbook-panel"
+import { GrowthAutonomyStatusBanner } from "@/components/growth/autonomy/growth-autonomy-status-banner"
 import { GrowthOperatorSetupHealthPanel } from "@/components/growth/operational/growth-operator-setup-health-panel"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
@@ -16,6 +17,7 @@ export default function GrowthLaunchRunbookPage() {
         iconClassName="bg-indigo-50 text-indigo-600"
       />
       <div className="space-y-8">
+        <GrowthAutonomyStatusBanner />
         <GrowthOperatorSetupHealthPanel />
         <GrowthLaunchRunbookPanel embedded />
       </div>

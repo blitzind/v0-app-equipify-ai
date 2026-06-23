@@ -27,6 +27,7 @@ import {
 } from "@/lib/growth/automation-runtime/ge-v1-5-automation-runtime-types"
 import { consumeBudget } from "@/lib/growth/runtime-guardrails/growth-runtime-budget-service"
 import { isRuntimeKillSwitchEnabled } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
+import { enforceGrowthAutonomyCapability } from "@/lib/growth/autonomy/growth-autonomy-enforcement"
 
 const MS_PER_DAY = 86_400_000
 
@@ -100,6 +101,16 @@ export async function processGeV15AutomationRuntimeSignal(
   })
   if (!budget.allowed) {
     return { ...baseResult, skippedReason: "budget_exceeded" }
+  }
+
+  const recommendationsGate = await enforceGrowthAutonomyCapability(admin, {
+    organizationId: input.organizationId,
+    capability: "recommendations",
+    runtimeContext: "ge_v1_5_automation_runtime_signal",
+    triggerSource: "autonomous",
+  })
+  if (!recommendationsGate.allowed) {
+    return { ...baseResult, skippedReason: "autonomy_blocked" }
   }
 
   const lead = await fetchGrowthLeadById(admin, input.leadId)
@@ -203,9 +214,27 @@ export async function processGeV15AutomationRuntimeSignal(
       ownerUserId: input.ownerUserId,
       playbookId: playbook.id,
       trigger: input.trigger,
+      triggerPayload: input.triggerPayload,
       actions: playbook.actions,
       state,
       dryRun: input.dryRun,
+      leadScore: lead.score ?? null,
+      intentScore:
+        typeof (lead.metadata?.sendr_intelligence as { intentScore?: number } | undefined)?.intentScore ===
+        "number"
+          ? (lead.metadata?.sendr_intelligence as { intentScore?: number }).intentScore
+          : null,
+      senderProfileId:
+        typeof input.triggerPayload?.sender_profile_id === "string"
+          ? input.triggerPayload.sender_profile_id
+          : typeof lead.metadata?.default_sender_profile_id === "string"
+            ? lead.metadata.default_sender_profile_id
+            : null,
+      recipientEmail: lead.email ?? null,
+      sequenceId:
+        typeof input.triggerPayload?.sequence_id === "string" ? input.triggerPayload.sequence_id : null,
+      audienceId:
+        typeof input.triggerPayload?.audience_id === "string" ? input.triggerPayload.audience_id : null,
     })
 
     state = actionResult.state

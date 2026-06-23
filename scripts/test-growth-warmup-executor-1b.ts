@@ -138,6 +138,7 @@ function runTests(): void {
   assert.match(uiSource, /Skipped:/)
   assert.match(uiSource, /Resume Warmup/)
   assert.match(uiSource, /Clear Throttle/)
+  assert.match(uiSource, /fetchWarmupExecutorJson/)
   console.log("  ✓ Executor panel shows skip reasons and safe operator actions")
 
   const syncRoute = path.join(

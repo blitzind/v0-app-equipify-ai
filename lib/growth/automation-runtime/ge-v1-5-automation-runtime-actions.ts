@@ -16,6 +16,8 @@ import {
   type GeV15AutomationRuntimeTrigger,
   type GeV15PreparedAction,
 } from "@/lib/growth/automation-runtime/ge-v1-5-automation-runtime-types"
+import { prepareGeV15OutboundAction } from "@/lib/growth/automation-runtime/ge-v1-5-automation-runtime-prepare"
+import { enforceGrowthAutonomyCapability } from "@/lib/growth/autonomy/growth-autonomy-enforcement"
 
 export type GeV15ActionExecutionResult = {
   recommendationsCreated: number
@@ -87,11 +89,31 @@ export async function executeGeV15PlaybookActions(
     ownerUserId?: string | null
     playbookId: string
     trigger: GeV15AutomationRuntimeTrigger
+    triggerPayload?: Record<string, unknown>
     actions: GeV15PlaybookActionSpec[]
     state: GeV15AutomationRuntimeLeadState
     dryRun?: boolean
+    leadScore?: number | null
+    intentScore?: number | null
+    senderProfileId?: string | null
+    recipientEmail?: string | null
+    sequenceId?: string | null
+    audienceId?: string | null
   },
 ): Promise<GeV15ActionExecutionResult> {
+  const recommendationsGate = await enforceGrowthAutonomyCapability(admin, {
+    organizationId: input.organizationId,
+    capability: "recommendations",
+    runtimeContext: "ge_v1_5_automation_runtime_actions",
+    triggerSource: "autonomous",
+  })
+  const tasksGate = await enforceGrowthAutonomyCapability(admin, {
+    organizationId: input.organizationId,
+    capability: "task_creation",
+    runtimeContext: "ge_v1_5_automation_runtime_actions",
+    triggerSource: "autonomous",
+  })
+
   let state = { ...input.state }
   let recommendationsCreated = 0
   let actionsPrepared = 0
@@ -102,6 +124,7 @@ export async function executeGeV15PlaybookActions(
     switch (spec.action) {
       case "create_recommendation":
       case "request_follow_up": {
+        if (!recommendationsGate.allowed) break
         const rec = buildRecommendation(spec, input.playbookId, input.trigger)
         state = {
           ...state,
@@ -112,6 +135,7 @@ export async function executeGeV15PlaybookActions(
       }
 
       case "elevate_recommendation": {
+        if (!recommendationsGate.allowed) break
         const elevated = state.recommendations.map((rec, index) =>
           index === 0 ? { ...rec, elevated: true, priority: 1 } : rec,
         )
@@ -134,18 +158,39 @@ export async function executeGeV15PlaybookActions(
       case "prepare_email":
       case "prepare_sms":
       case "prepare_voice_drop": {
-        if (!GE_V1_5_AUTOMATION_RUNTIME_SAFETY_FLAGS.prepare_outbound_enabled) break
-        const prepared = buildPreparedAction(spec, input.playbookId, input.trigger)
-        state = {
-          ...state,
-          preparedActions: [prepared, ...state.preparedActions].slice(0, 30),
+        const result = await prepareGeV15OutboundAction(admin, {
+          organizationId: input.organizationId,
+          leadId: input.leadId,
+          ownerUserId: input.ownerUserId,
+          playbookId: input.playbookId,
+          trigger: input.trigger,
+          triggerPayload: input.triggerPayload,
+          spec,
+          existingPreparedActions: state.preparedActions,
+          leadScore: input.leadScore,
+          intentScore: input.intentScore,
+          senderProfileId: input.senderProfileId,
+          recipientEmail: input.recipientEmail,
+          sequenceId: input.sequenceId,
+          audienceId: input.audienceId,
+          dryRun: input.dryRun,
+        })
+        if (result.prepared) {
+          state = {
+            ...state,
+            preparedActions: [result.prepared, ...state.preparedActions].slice(0, 30),
+          }
+          actionsPrepared += 1
+          if (result.notificationEmitted) notificationsEmitted += 1
         }
-        actionsPrepared += 1
         break
       }
 
       case "queue_approval_item": {
         const prepared = buildPreparedAction(spec, input.playbookId, input.trigger)
+        prepared.autonomyPrepared = true
+        prepared.approvalRequired = true
+        prepared.triggerReason = spec.summary
         state = {
           ...state,
           preparedActions: [prepared, ...state.preparedActions].slice(0, 30),
@@ -156,6 +201,7 @@ export async function executeGeV15PlaybookActions(
 
       case "create_task":
       case "assign_task": {
+        if (!tasksGate.allowed) break
         if (!GE_V1_5_AUTOMATION_RUNTIME_SAFETY_FLAGS.task_actions_enabled || input.dryRun) break
         const prepared = buildPreparedAction(spec, input.playbookId, input.trigger)
         try {

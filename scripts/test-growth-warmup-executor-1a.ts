@@ -73,9 +73,12 @@ function runTests(): void {
     "lib/growth/warmup/warmup-recipient-repository.ts",
     "lib/growth/warmup/warmup-recipient-selector.ts",
     "lib/growth/warmup/warmup-message-templates.ts",
+    "lib/growth/warmup/warmup-executor-api-response.ts",
+    "lib/growth/warmup/warmup-executor-route-utils.ts",
     "app/api/cron/growth-warmup-send-executor/route.ts",
     "app/api/platform/growth/warmup/recipients/route.ts",
     "app/api/platform/growth/warmup/executor/run/route.ts",
+    "app/api/platform/growth/warmup/executor/preview/route.ts",
     "components/growth/growth-warmup-executor-panel.tsx",
   ]
   for (const file of requiredFiles) {
@@ -130,6 +133,14 @@ function runTests(): void {
   const vercel = fs.readFileSync(path.join(process.cwd(), "vercel.json"), "utf8")
   assert.match(vercel, /growth-warmup-send-executor/)
   console.log("  ✓ Cron registered in vercel.json")
+
+  const runRoute = fs.readFileSync(
+    path.join(process.cwd(), "app/api/platform/growth/warmup/executor/run/route.ts"),
+    "utf8",
+  )
+  assert.match(runRoute, /warmupExecutorJsonSuccess/)
+  assert.match(runRoute, /catch \(error\)/)
+  console.log("  ✓ Manual run route returns JSON on success and caught failures")
 
   console.log("\nGS-GROWTH-WARMUP-EXECUTOR-1A passed.\n")
 }

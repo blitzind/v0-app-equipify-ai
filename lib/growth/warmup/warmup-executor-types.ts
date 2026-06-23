@@ -60,6 +60,7 @@ export type GrowthWarmupExecutorSkipCode =
   | "transport_failed"
   | "idempotent_skip"
   | "batch_limit_reached"
+  | "profile_execution_failed"
 
 export type GrowthWarmupExecutorSenderResult = {
   senderAccountId: string

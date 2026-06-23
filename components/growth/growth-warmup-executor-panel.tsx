@@ -31,6 +31,7 @@ import {
   type GrowthWarmupRecipient,
   type WarmupExecutorProfileDiagnostic,
 } from "@/lib/growth/warmup/warmup-executor-types"
+import { fetchWarmupExecutorJson } from "@/lib/growth/warmup/warmup-executor-api-response"
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return "—"
@@ -182,10 +183,14 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
     setActionLoading("preview")
     setError(null)
     try {
-      const response = await fetch("/api/platform/growth/warmup/executor/preview", { method: "POST" })
-      const payload = (await response.json()) as { preview?: GrowthWarmupExecutorRunResult; message?: string }
-      if (!response.ok) throw new Error(payload.message ?? "Preview failed.")
-      setPreview(payload.preview ?? null)
+      const parsed = await fetchWarmupExecutorJson<{
+        preview?: GrowthWarmupExecutorRunResult
+        result?: GrowthWarmupExecutorRunResult
+        error?: string
+        message?: string
+      }>("/api/platform/growth/warmup/executor/preview", { method: "POST" })
+      if (!parsed.ok) throw new Error(parsed.error)
+      setPreview(parsed.data.preview ?? parsed.data.result ?? null)
       setConfirmOpen(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Preview failed.")
@@ -198,13 +203,17 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
     setActionLoading("run")
     setError(null)
     try {
-      const response = await fetch("/api/platform/growth/warmup/executor/run", {
+      const parsed = await fetchWarmupExecutorJson<{
+        result?: GrowthWarmupExecutorRunResult
+        profileResults?: GrowthWarmupExecutorRunResult["senderResults"]
+        error?: string
+        message?: string
+      }>("/api/platform/growth/warmup/executor/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ confirmed: true }),
       })
-      const payload = (await response.json()) as { message?: string }
-      if (!response.ok) throw new Error(payload.message ?? "Warmup batch failed.")
+      if (!parsed.ok) throw new Error(parsed.error)
       setConfirmOpen(false)
       setPreview(null)
       await load()

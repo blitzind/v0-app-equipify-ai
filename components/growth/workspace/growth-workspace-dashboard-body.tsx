@@ -13,6 +13,7 @@ import {
   GrowthOperatorBriefingPriorities,
 } from "@/components/growth/growth-operator-briefing-compact"
 import type { AidenDailyBriefing } from "@/lib/growth/aiden/aiden-daily-briefing"
+import { GrowthAutonomyStatusBanner } from "@/components/growth/autonomy/growth-autonomy-status-banner"
 import { GrowthOperatorSetupHealthPanel } from "@/components/growth/operational/growth-operator-setup-health-panel"
 import {
   GROWTH_WORKSPACE_DASHBOARD_QA_MARKER,
@@ -293,6 +294,8 @@ export function GrowthWorkspaceDashboardBody() {
   return (
     <div className="space-y-6" data-qa-marker={GROWTH_WORKSPACE_DASHBOARD_QA_MARKER}>
       <WelcomeSection welcome={dashboard.welcome} briefing={dashboard.briefing} />
+
+      <GrowthAutonomyStatusBanner />
 
       <OperatorActionCardsSection cards={dashboard.operatorActionCards} />
       <GrowthOperatorSetupHealthPanel compact />

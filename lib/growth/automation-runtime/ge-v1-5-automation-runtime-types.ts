@@ -191,6 +191,17 @@ export type GeV15PreparedAction = {
   approvedAt?: string | null
   approvedBy?: string | null
   executedAt?: string | null
+  /** GE-AUTO-1C — autonomy-prepared outbound metadata */
+  autonomyPrepared?: boolean
+  approvalRequired?: boolean
+  confidenceScore?: number | null
+  triggerReason?: string | null
+  senderProfileId?: string | null
+  recipientEmail?: string | null
+  sequenceId?: string | null
+  audienceId?: string | null
+  channelPolicyMetadata?: Record<string, unknown> | null
+  dedupeKey?: string | null
 }
 
 export type GeV15PendingDelay = {

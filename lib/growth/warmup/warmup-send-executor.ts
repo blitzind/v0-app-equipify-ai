@@ -1,7 +1,9 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { logGrowthEngine } from "@/lib/growth/access"
 import { GROWTH_CRON_ACTOR_EMAIL } from "@/lib/growth/actor-user-id"
+import { GROWTH_WARMUP_EXECUTOR_1C_QA_MARKER } from "@/lib/growth/warmup/warmup-executor-api-response"
 import { assertPreSendAllowed } from "@/lib/growth/compliance/pre-send-assertion"
 import { executeTransportSend } from "@/lib/growth/providers/transport/transport-orchestrator"
 import { getSenderAccount } from "@/lib/growth/sender/sender-repository"
@@ -289,6 +291,16 @@ async function executeWarmupSendForProfile(
   })
 
   if (!transport.ok) {
+    logGrowthEngine("warmup_executor_transport_failed", {
+      qa_marker: GROWTH_WARMUP_EXECUTOR_1C_QA_MARKER,
+      profile_id: profile.id,
+      sender_account_id: profile.sender_account_id,
+      recipient_id: selection.recipient.id,
+      recipient_email: selection.recipient.email,
+      run_id: input.runId,
+      skip_reason: "transport_failed",
+      transport_error: transport.error ?? "Transport send failed.",
+    })
     skipReasons.push({
       code: "transport_failed",
       message: transport.error ?? "Transport send failed.",
@@ -539,19 +551,47 @@ export async function runWarmupSendExecutor(
       break
     }
 
-    const result = await executeWarmupSendForProfile(admin, {
-      profile,
-      runId,
-      previewOnly,
-      actorUserId: input?.actorUserId,
-      actorEmail: input?.actorEmail,
-    })
-    senderResults.push(result)
-    sendsAttempted += result.attempted
-    sendsSucceeded += result.sent
-    sendsFailed += result.failed
-    sendsSkipped += result.skipped
-    totalSentThisRun += result.sent
+    try {
+      const result = await executeWarmupSendForProfile(admin, {
+        profile,
+        runId,
+        previewOnly,
+        actorUserId: input?.actorUserId,
+        actorEmail: input?.actorEmail,
+      })
+      senderResults.push(result)
+      sendsAttempted += result.attempted
+      sendsSucceeded += result.sent
+      sendsFailed += result.failed
+      sendsSkipped += result.skipped
+      totalSentThisRun += result.sent
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Profile send failed unexpectedly."
+      logGrowthEngine("warmup_executor_profile_failed", {
+        qa_marker: GROWTH_WARMUP_EXECUTOR_1C_QA_MARKER,
+        profile_id: profile.id,
+        sender_account_id: profile.sender_account_id,
+        run_id: runId,
+        skip_reason: "profile_execution_failed",
+        error: message,
+      })
+      skipReasons.push({ code: "profile_execution_failed", message })
+      sendsFailed += 1
+      senderResults.push({
+        senderAccountId: profile.sender_account_id,
+        senderEmail: profile.sender_email,
+        profileId: profile.id,
+        plannedToday: resolveWarmupDailyCapacity(profile),
+        sendsToday: profile.sends_today_date === utcDateString(now) ? profile.sends_today : 0,
+        executorSendsToday: 0,
+        remainingCapacity: 0,
+        attempted: 1,
+        sent: 0,
+        failed: 1,
+        skipped: 0,
+        skipReasons: [{ code: "profile_execution_failed", message }],
+      })
+    }
   }
 
   const status: GrowthWarmupExecutorRunResult["status"] =
@@ -582,7 +622,18 @@ export async function runWarmupSendExecutor(
   }
 
   if (runId) {
-    await finalizeSendRun(admin, runId, finalResult)
+    try {
+      await finalizeSendRun(admin, runId, finalResult)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not finalize warmup send run."
+      logGrowthEngine("warmup_executor_finalize_failed", {
+        qa_marker: GROWTH_WARMUP_EXECUTOR_1C_QA_MARKER,
+        run_id: runId,
+        error: message,
+        sends_succeeded: finalResult.sendsSucceeded,
+        sends_failed: finalResult.sendsFailed,
+      })
+    }
   }
 
   return finalResult

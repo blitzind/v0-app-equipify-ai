@@ -89,6 +89,14 @@ export type GrowthRuntimeResourceType =
   | "sendr_dashboard_refreshes"
   | "sendr_activity"
   | "sendr_activity_refreshes"
+  | "autonomous_research_runs"
+  | "autonomous_page_generations"
+  | "autonomous_video_generations"
+  | "autonomous_campaigns"
+  | "autonomous_outbound_actions"
+  | "autonomous_email_prepare"
+  | "autonomous_sms_prepare"
+  | "autonomous_voice_prepare"
 
 export type GrowthRuntimeBudgetWindowKind = "hourly" | "daily" | "monthly"
 
@@ -118,6 +126,10 @@ export type GrowthRuntimeKillSwitchKey =
   | "sendr_analytics_enabled"
   | "sendr_activity_enabled"
   | "automation_runtime_enabled"
+  | "autonomy_enabled"
+  | "autonomy_outbound_enabled"
+  | "autonomy_generation_enabled"
+  | "autonomy_objective_mode_enabled"
 
 export const GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES: Record<GrowthRuntimeKillSwitchKey, boolean> = {
   wake_execution_enabled: true,
@@ -145,6 +157,10 @@ export const GROWTH_RUNTIME_DEFAULT_KILL_SWITCHES: Record<GrowthRuntimeKillSwitc
   sendr_analytics_enabled: true,
   sendr_activity_enabled: true,
   automation_runtime_enabled: true,
+  autonomy_enabled: false,
+  autonomy_outbound_enabled: false,
+  autonomy_generation_enabled: false,
+  autonomy_objective_mode_enabled: false,
 }
 
 /** Daily budget caps keyed by resource type. Zero = unlimited. */
@@ -182,6 +198,14 @@ export const GROWTH_RUNTIME_DAILY_BUDGET_CAPS: Partial<Record<GrowthRuntimeResou
   sendr_dashboard_refreshes: 500,
   sendr_activity: 2_000,
   sendr_activity_refreshes: 500,
+  autonomous_research_runs: 0,
+  autonomous_page_generations: 0,
+  autonomous_video_generations: 0,
+  autonomous_campaigns: 0,
+  autonomous_outbound_actions: 0,
+  autonomous_email_prepare: 0,
+  autonomous_sms_prepare: 0,
+  autonomous_voice_prepare: 0,
 }
 
 /** Hourly budget caps keyed by resource type. */
