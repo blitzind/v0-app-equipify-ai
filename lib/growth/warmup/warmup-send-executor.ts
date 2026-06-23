@@ -42,6 +42,8 @@ import {
 } from "@/lib/growth/warmup/warmup-executor-types"
 import type { GrowthWarmupProfile } from "@/lib/growth/warmup/warmup-types"
 
+export const GROWTH_WARMUP_EXECUTOR_1D_QA_MARKER = "growth-warmup-executor-1d-v1" as const
+
 const MAX_SENDS_PER_CRON_RUN = 1
 const MAX_SENDS_PER_MANUAL_RUN = 5
 
@@ -144,6 +146,7 @@ async function executeWarmupSendForProfile(
     excludeRecipientEmails?: string[]
   },
 ): Promise<GrowthWarmupExecutorSenderResult> {
+  const { profile, runId, previewOnly, actorUserId, actorEmail, excludeRecipientEmails } = input
   const skipReasons: GrowthWarmupExecutorSenderResult["skipReasons"] = []
   const today = utcDateString()
   const dayStart = utcDayStartIso()
@@ -223,7 +226,7 @@ async function executeWarmupSendForProfile(
   const selection = await selectWarmupRecipientForSend(admin, {
     recipients,
     senderAccountId: profile.sender_account_id,
-    excludeEmails: input.excludeRecipientEmails,
+    excludeEmails: excludeRecipientEmails,
   })
   if (!selection.ok) {
     skipReasons.push({ code: selection.code, message: selection.message })
@@ -235,7 +238,7 @@ async function executeWarmupSendForProfile(
     seed: `${profile.id}:${selection.recipient.email}:${sendsToday}`,
   })
 
-  if (input.previewOnly) {
+  if (previewOnly) {
     base.attempted = 1
     base.sent = 1
     return base
@@ -246,14 +249,14 @@ async function executeWarmupSendForProfile(
   const preSend = await assertPreSendAllowed(admin, {
     email: selection.recipient.email,
     senderAccountId: profile.sender_account_id,
-    actingUserEmail: input.actorEmail ?? GROWTH_CRON_ACTOR_EMAIL,
-    actingUserId: input.actorUserId ?? null,
+    actingUserEmail: actorEmail ?? GROWTH_CRON_ACTOR_EMAIL,
+    actingUserId: actorUserId ?? null,
   })
   if (!preSend.allowed) {
     skipReasons.push({ code: "pre_send_blocked", message: preSend.reason ?? "Pre-send blocked." })
     base.skipped = 1
     await recordAttempt(admin, {
-      runId: input.runId,
+      runId,
       profile,
       recipient: selection.recipient,
       template,
@@ -277,8 +280,8 @@ async function executeWarmupSendForProfile(
     html: prepared.htmlBody,
     human_approved: true,
     human_approval_confirmed: true,
-    actorUserId: input.actorUserId ?? "",
-    actorEmail: input.actorEmail ?? GROWTH_CRON_ACTOR_EMAIL,
+    actorUserId: actorUserId ?? "",
+    actorEmail: actorEmail ?? GROWTH_CRON_ACTOR_EMAIL,
     is_test: false,
     metadata: {
       warmup_executor: true,
@@ -297,7 +300,7 @@ async function executeWarmupSendForProfile(
       sender_account_id: profile.sender_account_id,
       recipient_id: selection.recipient.id,
       recipient_email: selection.recipient.email,
-      run_id: input.runId,
+      run_id: runId,
       skip_reason: "transport_failed",
       transport_error: transport.error ?? "Transport send failed.",
     })
@@ -307,7 +310,7 @@ async function executeWarmupSendForProfile(
     })
     base.failed = 1
     await recordAttempt(admin, {
-      runId: input.runId,
+      runId,
       profile,
       recipient: selection.recipient,
       template,
@@ -323,7 +326,7 @@ async function executeWarmupSendForProfile(
     last_sent_at: new Date().toISOString(),
   })
   await recordAttempt(admin, {
-    runId: input.runId,
+    runId,
     profile,
     recipient: selection.recipient,
     template,
@@ -529,6 +532,21 @@ export async function runWarmupSendExecutor(
   const maxSends =
     input?.maxSends ?? (runKind === "manual" ? MAX_SENDS_PER_MANUAL_RUN : MAX_SENDS_PER_CRON_RUN)
 
+  logGrowthEngine("warmup_executor_send_plan", {
+    qa_marker: GROWTH_WARMUP_EXECUTOR_1D_QA_MARKER,
+    preview_only: previewOnly,
+    run_kind: runKind,
+    profile_count: sendCandidateProfiles.length,
+    profile_ids: sendCandidateProfiles.map((row) => row.id),
+    sender_account_ids: sendCandidateProfiles.map((row) => row.sender_account_id),
+    remaining_sends: sendCandidateProfiles.map((row) => {
+      const sendsToday = row.sends_today_date === utcDateString(now) ? row.sends_today : 0
+      return Math.max(0, resolveWarmupDailyCapacity(row) - sendsToday)
+    }),
+    approved_recipient_count: approvedRecipients.length,
+    max_sends: maxSends,
+  })
+
   let runId: string | null = null
   if (!previewOnly && sendCandidateProfiles.length > 0) {
     runId = await createSendRun(admin, {
@@ -567,13 +585,15 @@ export async function runWarmupSendExecutor(
       totalSentThisRun += result.sent
     } catch (error) {
       const message = error instanceof Error ? error.message : "Profile send failed unexpectedly."
+      const stack = error instanceof Error ? error.stack : undefined
       logGrowthEngine("warmup_executor_profile_failed", {
-        qa_marker: GROWTH_WARMUP_EXECUTOR_1C_QA_MARKER,
-        profile_id: profile.id,
-        sender_account_id: profile.sender_account_id,
+        qa_marker: GROWTH_WARMUP_EXECUTOR_1D_QA_MARKER,
+        profileId: profile.id,
+        senderAccountId: profile.sender_account_id,
         run_id: runId,
         skip_reason: "profile_execution_failed",
         error: message,
+        stack,
       })
       skipReasons.push({ code: "profile_execution_failed", message })
       sendsFailed += 1
