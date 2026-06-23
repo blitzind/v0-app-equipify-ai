@@ -268,9 +268,11 @@ async function runTests(): Promise<void> {
   const executorSource = readSource("lib/growth/warmup/warmup-send-executor.ts")
   const executeBody = extractExecuteWarmupSendForProfileBody(executorSource)
 
-  assert.match(executeBody, /const \{ profile, runId, previewOnly, actorUserId, actorEmail, excludeRecipientEmails \} = input/)
-  const afterDestructure = executeBody.slice(executeBody.indexOf("} = input"))
-  assert.match(afterDestructure, /profile\.sends_today_date/)
+  assert.match(
+    executeBody,
+    /const \{ profile, runId, previewOnly, actorUserId, actorEmail, excludeRecipientEmails, runRecipientEmailsUsed \} =/,
+  )
+  assert.match(executeBody, /profile\.sends_today_date/)
   console.log("  ✓ executeWarmupSendForProfile binds profile from input (ReferenceError fix)")
 
   assert.match(executorSource, /warmup_executor_send_plan/)

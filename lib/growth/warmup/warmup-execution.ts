@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { appendDeliverabilityGovernanceEvent } from "@/lib/growth/deliverability/deliverability-governance-events"
 import { assessMailboxReputation } from "@/lib/growth/deliverability/mailbox-reputation-repository"
 import { recordInternalOutboundAuditEvent } from "@/lib/growth/operations/internal-outbound-audit"
-import { getSenderAccount, incrementSenderDailySendUsed, updateSenderAccount } from "@/lib/growth/sender/sender-repository"
+import { getSenderAccount, updateSenderAccount } from "@/lib/growth/sender/sender-repository"
 import { computeCurrentWarmupDay } from "@/lib/growth/warmup/warmup-health"
 import {
   GROWTH_NATIVE_WARMUP_EXECUTION_QA_MARKER,
@@ -182,10 +182,14 @@ export async function recordNativeWarmupSend(
       .eq("id", scheduleDay.id)
   }
 
-  await incrementSenderDailySendUsed(admin, input.senderAccountId, 1).catch(() => undefined)
-
   const refreshed = await getWarmupProfile(admin, profile.id)
   if (!refreshed) return
+
+  await syncSenderWarmupCapacity(admin, {
+    ...refreshed,
+    sends_today: sendsToday,
+    current_warmup_day: dayNumber,
+  }).catch(() => undefined)
 
   if (refreshed.status === "warming" && sendsToday >= dailyCap) {
     await recomputeWarmupProfile(admin, profile.id, {})

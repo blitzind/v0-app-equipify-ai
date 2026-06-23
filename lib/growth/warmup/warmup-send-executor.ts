@@ -1,5 +1,6 @@
 import "server-only"
 
+import { randomUUID } from "node:crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { GROWTH_CRON_ACTOR_EMAIL } from "@/lib/growth/actor-user-id"
@@ -14,7 +15,7 @@ import {
   resolveWarmupDailyCapacity,
 } from "@/lib/growth/warmup/warmup-execution"
 import { evaluateWarmupPreSendAllowed } from "@/lib/growth/warmup/warmup-pre-send-guard"
-import { listWarmupProfiles } from "@/lib/growth/warmup/warmup-repository"
+import { listWarmupProfiles, getWarmupProfile } from "@/lib/growth/warmup/warmup-repository"
 import { isGrowthWarmupExecutorSchemaReady } from "@/lib/growth/warmup/warmup-executor-schema-health"
 import {
   countExecutorSendsForProfileToday,
@@ -47,6 +48,7 @@ import type { GrowthWarmupProfile } from "@/lib/growth/warmup/warmup-types"
 
 export const GROWTH_WARMUP_EXECUTOR_1D_QA_MARKER = "growth-warmup-executor-1d-v1" as const
 export const GROWTH_WARMUP_EXECUTOR_1E_QA_MARKER = "growth-warmup-executor-1e-v1" as const
+export const GROWTH_WARMUP_EXECUTOR_1F_QA_MARKER = "growth-warmup-executor-1f-v1" as const
 
 export { MAX_SENDS_PER_PROFILE_PER_RUN } from "@/lib/growth/warmup/warmup-executor-diagnostics"
 
@@ -62,7 +64,7 @@ function buildIdempotencyKey(kind: GrowthWarmupSendRunKind, now = new Date()): s
   if (kind === "cron") {
     return `warmup-cron:${utcDateString(now)}:${now.getUTCHours()}`
   }
-  return `warmup-manual:${now.toISOString()}`
+  return `warmup-manual:${now.toISOString()}:${randomUUID()}`
 }
 
 async function findExistingRun(
@@ -147,9 +149,11 @@ async function executeWarmupSendForProfile(
     actorUserId?: string | null
     actorEmail?: string | null
     excludeRecipientEmails?: string[]
+    runRecipientEmailsUsed?: string[]
   },
 ): Promise<GrowthWarmupExecutorSenderResult> {
-  const { profile, runId, previewOnly, actorUserId, actorEmail, excludeRecipientEmails } = input
+  const { profile, runId, previewOnly, actorUserId, actorEmail, excludeRecipientEmails, runRecipientEmailsUsed } =
+    input
   const skipReasons: GrowthWarmupExecutorSenderResult["skipReasons"] = []
   const today = utcDateString()
   const dayStart = utcDayStartIso()
@@ -229,6 +233,7 @@ async function executeWarmupSendForProfile(
   const selection = await selectWarmupRecipientForSend(admin, {
     recipients,
     senderAccountId: profile.sender_account_id,
+    profileId: profile.id,
     excludeEmails: excludeRecipientEmails,
   })
   if (!selection.ok) {
@@ -325,6 +330,7 @@ async function executeWarmupSendForProfile(
   }
 
   base.sent = 1
+  runRecipientEmailsUsed?.push(selection.recipient.email.toLowerCase())
   await updateWarmupRecipient(admin, selection.recipient.id, {
     last_sent_at: new Date().toISOString(),
   })
@@ -503,10 +509,20 @@ export async function runWarmupSendExecutor(
           scannableProfiles.find((p) => p.status === "warming")!,
         )
       : null
+  const eligibleRemaining = profileDiagnostics
+    .filter((d) => d.eligibility === "eligible")
+    .map((d) => d.remainingCapacity)
+  const representativeRemainingToday =
+    eligibleRemaining.length > 0
+      ? eligibleRemaining.every((value) => value === eligibleRemaining[0])
+        ? eligibleRemaining[0]
+        : Math.min(...eligibleRemaining)
+      : null
   const pacingMessage = buildWarmupExecutorPacingMessage({
     eligibleProfiles: eligibleProfileCount,
     plannedSendsThisRun: sendPlan.plannedSendsThisRun,
     plannedTodayPerMailbox: representativePlannedToday,
+    representativeRemainingToday,
   })
 
   const runSummary = summarizeWarmupExecutorRun({
@@ -584,6 +600,7 @@ export async function runWarmupSendExecutor(
   let sendsFailed = 0
   let sendsSkipped = 0
   let successfulSendsThisRun = 0
+  const recipientsUsedThisRun: string[] = []
 
   for (const profile of sendCandidateProfiles) {
     if (sendPlan.maxTotalSends > 0 && successfulSendsThisRun >= sendPlan.maxTotalSends) {
@@ -595,12 +612,15 @@ export async function runWarmupSendExecutor(
     }
 
     try {
+      const freshProfile = (await getWarmupProfile(admin, profile.id)) ?? profile
       const result = await executeWarmupSendForProfile(admin, {
-        profile,
+        profile: freshProfile,
         runId,
         previewOnly,
         actorUserId: input?.actorUserId,
         actorEmail: input?.actorEmail,
+        excludeRecipientEmails: recipientsUsedThisRun,
+        runRecipientEmailsUsed: recipientsUsedThisRun,
       })
       senderResults.push(result)
       sendsAttempted += result.attempted

@@ -63,14 +63,6 @@ export async function evaluatePreSendInfrastructureAllowed(
     }
   }
 
-  if (sender.daily_send_used >= sender.daily_send_limit) {
-    return {
-      allowed: false,
-      reason: "Sender daily send cap exhausted.",
-      blockCode: "daily_cap_exhausted",
-    }
-  }
-
   const warmup = await evaluateWarmupPreSendAllowed(admin, {
     senderAccountId: input.senderAccountId,
   })
@@ -79,6 +71,20 @@ export async function evaluatePreSendInfrastructureAllowed(
       allowed: false,
       reason: warmup.reason ?? "Warmup policy blocked send.",
       blockCode: warmup.blockCode,
+    }
+  }
+
+  // Warming mailboxes pace against warmup daily targets (profile sends_today vs planned).
+  // Do not treat a stale/low sender_accounts.daily_send_limit as a one-send-per-day cap.
+  const warmupPacesSenderDailyCap = warmup.profile_status === "warming"
+  if (
+    !warmupPacesSenderDailyCap &&
+    sender.daily_send_used >= sender.daily_send_limit
+  ) {
+    return {
+      allowed: false,
+      reason: "Sender daily send cap exhausted.",
+      blockCode: "daily_cap_exhausted",
     }
   }
 

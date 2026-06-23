@@ -9,6 +9,7 @@ import { isWithinWarmupSendingWindow } from "@/lib/growth/warmup/warmup-executor
 import type { GrowthWarmupProfile, GrowthWarmupProfileStatus } from "@/lib/growth/warmup/warmup-types"
 
 export const GROWTH_WARMUP_EXECUTOR_1B_QA_MARKER = "growth-warmup-executor-1b-v1" as const
+export const GROWTH_WARMUP_EXECUTOR_1F_QA_MARKER = "growth-warmup-executor-1f-v1" as const
 
 /** GS-GROWTH-WARMUP-EXECUTOR-1E — one send attempt per warming profile per manual/cron run. */
 export const MAX_SENDS_PER_PROFILE_PER_RUN = 1 as const
@@ -38,13 +39,20 @@ export function buildWarmupExecutorPacingMessage(input: {
   eligibleProfiles: number
   plannedSendsThisRun: number
   plannedTodayPerMailbox?: number | null
+  representativeRemainingToday?: number | null
 }): string {
+  if (input.eligibleProfiles === 0) {
+    return "All eligible profiles reached today's warmup target."
+  }
+
   const parts = [
     `${input.eligibleProfiles} profile(s) eligible.`,
     `Would send up to ${input.plannedSendsThisRun} warmup message(s) now.`,
     "Each eligible mailbox sends at most 1 message per run.",
   ]
-  if (input.plannedTodayPerMailbox != null && input.plannedTodayPerMailbox > 0) {
+  if (input.representativeRemainingToday != null && input.representativeRemainingToday > 0) {
+    parts.push(`Each mailbox has ${input.representativeRemainingToday} remaining today.`)
+  } else if (input.plannedTodayPerMailbox != null && input.plannedTodayPerMailbox > 0) {
     parts.push(`Today's target remains ${input.plannedTodayPerMailbox} per mailbox.`)
   }
   return parts.join(" ")

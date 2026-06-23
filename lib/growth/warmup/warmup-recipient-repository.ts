@@ -166,6 +166,28 @@ export async function countExecutorSendsForProfileToday(
   return count ?? 0
 }
 
+export async function listWarmupRecipientEmailsForProfileSince(
+  admin: SupabaseClient,
+  profileId: string,
+  sinceIso: string,
+): Promise<string[]> {
+  const { data, error } = await admin
+    .schema("growth")
+    .from("warmup_send_attempts")
+    .select("recipient_email")
+    .eq("warmup_profile_id", profileId)
+    .eq("status", "sent")
+    .gte("created_at", sinceIso)
+  if (error?.message?.includes("does not exist")) return []
+  if (error) throw new Error(error.message)
+  const emails = new Set<string>()
+  for (const row of data ?? []) {
+    const email = asString((row as Record<string, unknown>).recipient_email).toLowerCase()
+    if (email) emails.add(email)
+  }
+  return [...emails]
+}
+
 export async function getLatestWarmupSendRun(
   admin: SupabaseClient,
 ): Promise<{ id: string; finished_at: string | null; started_at: string } | null> {
