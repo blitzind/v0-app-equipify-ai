@@ -28,9 +28,9 @@ export const GROWTH_WORKSPACE_SHELL_MAIN_INNER = "max-w-[1440px] mx-auto p-3 sm:
 /**
  * Growth workspace settings main inner — fills remaining viewport width (no max-width cap).
  * Applied by `GrowthWorkspaceShell` when pathname is under `/growth/settings/*`.
+ * GE-AUTO-UI-3: identical to Core `WORKSPACE_SETTINGS_SHELL_MAIN_INNER`.
  */
-export const GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER =
-  "w-full min-w-0 p-3 sm:p-6" as const
+export const GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER = WORKSPACE_SETTINGS_SHELL_MAIN_INNER
 
 /**
  * Growth workspace page stack — shell `WorkspaceContainer` already applies

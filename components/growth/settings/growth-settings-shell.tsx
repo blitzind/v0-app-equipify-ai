@@ -9,9 +9,15 @@ import {
   GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER,
   isGrowthWorkspaceSettingsNavItemActive,
 } from "@/lib/growth/navigation/growth-workspace-settings-navigation"
+import {
+  GROWTH_WORKSPACE_SETTINGS_SHELL_BODY,
+  GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT,
+  GROWTH_WORKSPACE_SETTINGS_SHELL_LAYOUT_QA_MARKER,
+  GROWTH_WORKSPACE_SETTINGS_SHELL_ROOT,
+  GROWTH_WORKSPACE_SETTINGS_SHELL_SIDEBAR,
+} from "@/lib/growth/settings/growth-workspace-settings-shell-tokens"
 import { cn } from "@/lib/utils"
 import { NAV_ROW_ACTIVE_SIDEBAR, NAV_SIDEBAR_ACTIVE_INDICATOR } from "@/lib/navigation-chrome"
-import { GROWTH_WORKSPACE_PAGE_STACK } from "@/lib/workspace/workspace-shell-tokens"
 
 type GrowthSettingsShellProps = {
   children: ReactNode
@@ -22,15 +28,17 @@ export function GrowthSettingsShell({ children }: GrowthSettingsShellProps) {
 
   return (
     <div
-      className={GROWTH_WORKSPACE_PAGE_STACK}
+      className={GROWTH_WORKSPACE_SETTINGS_SHELL_ROOT}
       data-qa-marker={GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER}
+      data-growth-settings-shell={GROWTH_WORKSPACE_SETTINGS_SHELL_LAYOUT_QA_MARKER}
+      data-growth-settings-full-width="true"
     >
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <section className="w-full min-w-0 max-w-none rounded-2xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-start gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600">
             <Settings2 size={17} />
           </span>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Operator-facing Growth preferences — mailboxes, DNS, warmup, and outbound readiness live under Communications.
@@ -39,10 +47,10 @@ export function GrowthSettingsShell({ children }: GrowthSettingsShellProps) {
         </div>
       </section>
 
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+      <div className={GROWTH_WORKSPACE_SETTINGS_SHELL_BODY}>
         <nav
           aria-label="Growth settings sections"
-          className="w-full shrink-0 rounded-xl border border-border bg-card p-3 shadow-sm lg:sticky lg:top-6 lg:w-64"
+          className={GROWTH_WORKSPACE_SETTINGS_SHELL_SIDEBAR}
         >
           <div className="space-y-4">
             {GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS.map((group) => (
@@ -75,7 +83,7 @@ export function GrowthSettingsShell({ children }: GrowthSettingsShellProps) {
           </div>
         </nav>
 
-        <div className="min-w-0 flex-1 w-full">{children}</div>
+        <div className={GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT}>{children}</div>
       </div>
     </div>
   )

@@ -19,10 +19,12 @@ function main(): void {
 
   const tokens = readSource("lib/workspace/workspace-shell-tokens.ts")
   assert.match(tokens, /GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER/)
-  const settingsInner = tokens.match(/GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER\s*=\s*\n?\s*"([^"]+)"/)
-  assert.ok(settingsInner, "GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER expected")
-  assert.ok(!/\bmax-w-/.test(settingsInner[1]), "growth settings inner must not cap max-width")
-  assert.match(settingsInner[1], /\bw-full\b/)
+  const settingsInner = tokens.match(/GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER\s*=\s*WORKSPACE_SETTINGS_SHELL_MAIN_INNER/)
+  assert.ok(settingsInner, "GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER must alias WORKSPACE_SETTINGS_SHELL_MAIN_INNER")
+  const workspaceSettingsInner = tokens.match(/WORKSPACE_SETTINGS_SHELL_MAIN_INNER\s*=\s*\n?\s*"([^"]+)"/)
+  assert.ok(workspaceSettingsInner)
+  assert.ok(!/\bmax-w-/.test(workspaceSettingsInner[1]))
+  assert.doesNotMatch(workspaceSettingsInner[1], /mx-auto/)
   console.log("  ✓ Growth settings shell inner is full width")
 
   const growthShell = readSource("components/growth/shell/growth-workspace-shell.tsx")
@@ -37,7 +39,8 @@ function main(): void {
   console.log("  ✓ Autonomy control center content wrapper is unconstrained")
 
   const settingsShell = readSource("components/growth/settings/growth-settings-shell.tsx")
-  assert.match(settingsShell, /min-w-0 flex-1 w-full/)
+  assert.match(settingsShell, /GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT/)
+  assert.match(settingsShell, /data-growth-settings-full-width/)
   console.log("  ✓ Growth settings shell content column is flex-1")
 
   const operatorUi = readSource("lib/growth/autonomy/growth-autonomy-operator-ui.ts")

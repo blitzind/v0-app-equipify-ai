@@ -143,7 +143,7 @@ export function GrowthAutonomyControlCenter() {
               </span>
               <div className="min-w-0">
                 <CardTitle className="text-2xl">{GROWTH_AUTONOMY_CONTROL_CENTER_TITLE}</CardTitle>
-                <CardDescription className="mt-1 max-w-3xl text-sm">
+                <CardDescription className="mt-1 text-sm">
                   {GROWTH_AUTONOMY_CONTROL_CENTER_SUBTITLE}
                 </CardDescription>
               </div>

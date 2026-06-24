@@ -75,7 +75,11 @@ function testMobileNavPreserved() {
 
 function testGrowthSettingsShellContentWidth() {
   const shell = readSource("components/growth/settings/growth-settings-shell.tsx")
-  assert.match(shell, /min-w-0 flex-1 w-full/)
+  const tokens = readSource("lib/growth/settings/growth-workspace-settings-shell-tokens.ts")
+  assert.match(shell, /GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT/)
+  assert.match(shell, /data-growth-settings-full-width="true"/)
+  assert.match(tokens, /max-w-none/)
+  assert.doesNotMatch(shell, /max-w-\[1440px\]/)
 }
 
 const tests: Array<{ name: string; fn: () => void }> = [
