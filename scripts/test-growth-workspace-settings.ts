@@ -22,9 +22,9 @@ function runAudit(): void {
   console.log(`\n=== Growth workspace settings audit (${GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER}) ===\n`)
 
   const sectionIds = listGrowthWorkspaceSettingsSectionIds()
-  assert.equal(sectionIds.length, 15)
-  assert.equal(GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS.length, 4)
-  console.log("  ✓ settings manifest defines 4 groups and 15 sections")
+  assert.equal(sectionIds.length, 16)
+  assert.equal(GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS.length, 5)
+  console.log("  ✓ settings manifest defines 5 groups and 16 sections")
 
   for (const id of sectionIds) {
     const route = findGrowthRouteMetadataByPathname(`${GROWTH_WORKSPACE_BASE_PATH}/settings/${id}`)

@@ -2,10 +2,8 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { AdminSessionSeed } from "@/components/admin-session-seed"
 import { AdminWorkspaceShell } from "@/components/admin-workspace-shell"
-import { isGrowthWorkspaceSettingsPathname } from "@/lib/growth/navigation/growth-workspace-settings-paths"
-import { resolveGrowthWorkspaceSettingsPageAccess } from "@/lib/growth/settings/growth-workspace-settings-page-access"
-import { loadPlatformAdminIdentity } from "@/lib/load-platform-admin-identity"
-import type { SessionIdentity } from "@/lib/session-identity"
+import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
+import { resolveGrowthWorkspacePageAccess } from "@/lib/growth/rbac/growth-access-resolution"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 /** Growth workspace route group — auth enforced here (middleware bypasses /growth/*). */
@@ -20,28 +18,16 @@ export default async function GrowthRouteGroupLayout({ children }: { children: R
   }
 
   const headersList = await headers()
-  const pathname = headersList.get("x-growth-pathname") ?? ""
+  const pathname = headersList.get("x-growth-pathname") ?? GROWTH_WORKSPACE_BASE_PATH
 
-  // Platform admin always passes — workspace settings RBAC is a secondary gate for non-admins.
-  let identity: SessionIdentity | null = await loadPlatformAdminIdentity()
-
-  if (!identity && isGrowthWorkspaceSettingsPathname(pathname)) {
-    try {
-      const access = await resolveGrowthWorkspaceSettingsPageAccess()
-      if (!access.ok) {
-        redirect(access.reason === "unauthenticated" ? "/login" : "/")
-      }
-      identity = access.identity
-    } catch {
-      redirect("/")
-    }
-  } else if (!identity) {
-    redirect("/")
+  const access = await resolveGrowthWorkspacePageAccess({ pathname })
+  if (!access.ok) {
+    redirect(access.reason === "unauthenticated" ? "/login" : "/")
   }
 
   return (
     <AdminWorkspaceShell>
-      <AdminSessionSeed identity={identity} />
+      <AdminSessionSeed identity={access.identity} />
       {children}
     </AdminWorkspaceShell>
   )

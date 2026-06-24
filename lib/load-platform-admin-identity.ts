@@ -3,11 +3,12 @@ import "server-only"
 import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { isPlatformAdminEmail } from "@/lib/platform-admin-policy"
 import { displayNameFromProfile } from "@/lib/user-display"
+import { loadGrowthSessionIdentity } from "@/lib/growth/rbac/growth-access-resolution"
 import type { SessionIdentity } from "@/lib/session-identity"
 
 /**
  * Loads the current user if they are listed in EQUIPIFY_PLATFORM_ADMIN_EMAILS.
- * Used to gate `/admin` and `/growth` layouts (middleware enforces session only).
+ * Used to gate `/admin` layouts (middleware enforces session only).
  */
 export async function loadPlatformAdminIdentity(): Promise<SessionIdentity | null> {
   const supabase = await createServerSupabaseClient()
@@ -34,5 +35,11 @@ export async function loadPlatformAdminIdentity(): Promise<SessionIdentity | nul
     displayName: displayNameFromProfile(row?.full_name, email),
     platformAdmin: true,
     platformRoleLabel: "Platform Admin",
+    growthRole: "platform_admin",
   }
+}
+
+/** Loads Growth workspace identity for any authorized Growth role. */
+export async function loadGrowthWorkspaceIdentity(): Promise<SessionIdentity | null> {
+  return loadGrowthSessionIdentity()
 }

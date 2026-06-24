@@ -20,11 +20,18 @@ const sample = {
 }
 
 function testSimpleTemplate() {
-  const out = renderSignatureTemplate("simple", sample)
+  const out = renderSignatureTemplate("simple", {
+    ...sample,
+    company_name: "Equipify.ai",
+    website: "https://equipify.ai",
+  })
   assert.match(out.text, /Michael Short/)
   assert.match(out.text, /Founder/)
+  assert.match(out.text, /Equipify\.ai/)
   assert.match(out.text, /865-555-0100/)
+  assert.ok(!out.text.includes("https://"))
   assert.match(out.html, /Michael Short/)
+  assert.match(out.html, /<a href="https:\/\/equipify\.ai"/)
 }
 
 function testBrandedTemplate() {
@@ -34,9 +41,11 @@ function testBrandedTemplate() {
 }
 
 function testMinimalTemplate() {
-  const out = renderSignatureTemplate("minimal", sample)
-  assert.match(out.text, /^— Michael/m)
-  assert.match(out.html, /Michael/)
+  const out = renderSignatureTemplate("minimal", { ...sample, company_name: "Equipify.ai", website: "https://equipify.ai" })
+  assert.match(out.text, /Michael Short/)
+  assert.match(out.text, /Founder \| Equipify\.ai/)
+  assert.match(out.html, /Michael Short/)
+  assert.ok(!out.text.includes("https://"))
 }
 
 function testHtmlEscaping() {

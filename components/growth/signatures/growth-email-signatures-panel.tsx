@@ -1,8 +1,9 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { Eye, Loader2, Pencil, Plus, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -31,6 +32,10 @@ import {
   type GrowthSenderProfile,
   type GrowthSignatureTemplateId,
 } from "@/lib/growth/signatures/signature-types"
+import {
+  GROWTH_SIGNATURE_DEFAULT_BOOKING_LABEL,
+  GROWTH_SIGNATURE_TOGGLES_DEFAULT,
+} from "@/lib/growth/signatures/signature-profile-defaults"
 import { renderSignatureTemplate } from "@/lib/growth/signatures/signature-template-render"
 
 type ProfileFormState = {
@@ -40,10 +45,18 @@ type ProfileFormState = {
   title: string
   email: string
   phone: string
+  companyName: string
+  companyTagline: string
   website: string
   linkedinUrl: string
   avatarUrl: string
   logoUrl: string
+  bookingUrl: string
+  bookingLabel: string
+  showEmailInSignature: boolean
+  showPhoneInSignature: boolean
+  showWebsiteInSignature: boolean
+  showBookingCta: boolean
   active: boolean
   signatureTemplate: GrowthSignatureTemplateId
   notes: string
@@ -56,13 +69,51 @@ const EMPTY_FORM: ProfileFormState = {
   title: "",
   email: "",
   phone: "",
+  companyName: "",
+  companyTagline: "",
   website: "",
   linkedinUrl: "",
   avatarUrl: "",
   logoUrl: "",
+  bookingUrl: "",
+  bookingLabel: GROWTH_SIGNATURE_DEFAULT_BOOKING_LABEL,
+  showEmailInSignature: GROWTH_SIGNATURE_TOGGLES_DEFAULT.show_email_in_signature,
+  showPhoneInSignature: GROWTH_SIGNATURE_TOGGLES_DEFAULT.show_phone_in_signature,
+  showWebsiteInSignature: GROWTH_SIGNATURE_TOGGLES_DEFAULT.show_website_in_signature,
+  showBookingCta: GROWTH_SIGNATURE_TOGGLES_DEFAULT.show_booking_cta,
   active: true,
   signatureTemplate: "simple",
   notes: "",
+}
+
+function FormSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="space-y-3 rounded-lg border border-border/60 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+      {children}
+    </div>
+  )
+}
+
+function ToggleRow({
+  id,
+  label,
+  checked,
+  onCheckedChange,
+}: {
+  id: string
+  label: string
+  checked: boolean
+  onCheckedChange: (checked: boolean) => void
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <Checkbox id={id} checked={checked} onCheckedChange={(v) => onCheckedChange(v === true)} />
+      <Label htmlFor={id} className="cursor-pointer font-normal">
+        {label}
+      </Label>
+    </div>
+  )
 }
 
 function signatureStatusTone(
@@ -143,10 +194,18 @@ export function GrowthEmailSignaturesPanel() {
       title: profile.title ?? "",
       email: profile.email,
       phone: profile.phone ?? "",
+      companyName: profile.company_name ?? "",
+      companyTagline: profile.company_tagline ?? "",
       website: profile.website ?? "",
       linkedinUrl: profile.linkedin_url ?? "",
       avatarUrl: profile.avatar_url ?? "",
       logoUrl: profile.logo_url ?? "",
+      bookingUrl: profile.booking_url ?? "",
+      bookingLabel: profile.booking_label ?? GROWTH_SIGNATURE_DEFAULT_BOOKING_LABEL,
+      showEmailInSignature: profile.show_email_in_signature,
+      showPhoneInSignature: profile.show_phone_in_signature,
+      showWebsiteInSignature: profile.show_website_in_signature,
+      showBookingCta: profile.show_booking_cta,
       active: profile.active,
       signatureTemplate: profile.signature_template,
       notes: profile.notes ?? "",
@@ -190,10 +249,18 @@ export function GrowthEmailSignaturesPanel() {
         title: form.title.trim() || null,
         email: form.email,
         phone: form.phone.trim() || null,
+        companyName: form.companyName.trim() || null,
+        companyTagline: form.companyTagline.trim() || null,
         website: form.website.trim() || null,
         linkedinUrl: form.linkedinUrl.trim() || null,
         avatarUrl: form.avatarUrl.trim() || null,
         logoUrl: form.logoUrl.trim() || null,
+        bookingUrl: form.bookingUrl.trim() || null,
+        bookingLabel: form.bookingLabel.trim() || null,
+        showEmailInSignature: form.showEmailInSignature,
+        showPhoneInSignature: form.showPhoneInSignature,
+        showWebsiteInSignature: form.showWebsiteInSignature,
+        showBookingCta: form.showBookingCta,
         active: form.active,
         signatureTemplate: form.signatureTemplate,
         notes: form.notes.trim() || null,
@@ -209,10 +276,18 @@ export function GrowthEmailSignaturesPanel() {
               title: payload.title,
               email: payload.email,
               phone: payload.phone,
+              companyName: payload.companyName,
+              companyTagline: payload.companyTagline,
               website: payload.website,
               linkedinUrl: payload.linkedinUrl,
               avatarUrl: payload.avatarUrl,
               logoUrl: payload.logoUrl,
+              bookingUrl: payload.bookingUrl,
+              bookingLabel: payload.bookingLabel,
+              showEmailInSignature: payload.showEmailInSignature,
+              showPhoneInSignature: payload.showPhoneInSignature,
+              showWebsiteInSignature: payload.showWebsiteInSignature,
+              showBookingCta: payload.showBookingCta,
               active: payload.active,
               signatureTemplate: payload.signatureTemplate,
               notes: payload.notes,
@@ -258,11 +333,19 @@ export function GrowthEmailSignaturesPanel() {
       display_name: "Michael Short",
       title: "Founder",
       email: "mike@equipifyai.com",
-      phone: "865-555-0100",
-      website: "equipify.ai",
+      phone: "(562) 362-5489",
+      company_name: "Equipify.ai",
+      company_tagline: "Field Service Infrastructure for Biomedical Organizations",
+      website: "https://equipify.ai",
       linkedin_url: "linkedin.com/in/michaelshort",
       logo_url: "",
       avatar_url: "",
+      booking_url: "https://equipify.ai/demo",
+      booking_label: GROWTH_SIGNATURE_DEFAULT_BOOKING_LABEL,
+      show_email_in_signature: false,
+      show_phone_in_signature: true,
+      show_website_in_signature: true,
+      show_booking_cta: true,
     }),
     [],
   )
@@ -405,7 +488,7 @@ export function GrowthEmailSignaturesPanel() {
       ) : null}
 
       <GrowthEngineCard title="Signature Templates">
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           {templateCards.map((tpl) => (
             <button
               key={tpl.id}
@@ -430,53 +513,141 @@ export function GrowthEmailSignaturesPanel() {
       </GrowthEngineCard>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingId ? "Edit sender profile" : "Create sender profile"}</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3">
-            <div className="space-y-1.5">
-              <Label>Display name</Label>
-              <Input value={form.displayName} onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Title</Label>
-              <Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Email</Label>
-              <Input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label>Phone</Label>
-                <Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+          <div className="grid gap-4">
+            <FormSection title="Identity">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Display name</Label>
+                  <Input value={form.displayName} onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Title</Label>
+                  <Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Email</Label>
+                  <Input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Phone</Label>
+                  <Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>LinkedIn URL</Label>
+                  <Input value={form.linkedinUrl} onChange={(e) => setForm((f) => ({ ...f, linkedinUrl: e.target.value }))} />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>Website</Label>
-                <Input value={form.website} onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))} />
+            </FormSection>
+
+            <FormSection title="Company">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Company name</Label>
+                  <Input
+                    value={form.companyName}
+                    onChange={(e) => setForm((f) => ({ ...f, companyName: e.target.value }))}
+                    placeholder="Equipify.ai"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Website URL</Label>
+                  <Input
+                    value={form.website}
+                    onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
+                    placeholder="https://equipify.ai"
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Company tagline</Label>
+                  <Input
+                    value={form.companyTagline}
+                    onChange={(e) => setForm((f) => ({ ...f, companyTagline: e.target.value }))}
+                    placeholder="Field Service Infrastructure for Biomedical Organizations"
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Logo URL</Label>
+                  <Input
+                    value={form.logoUrl}
+                    onChange={(e) => setForm((f) => ({ ...f, logoUrl: e.target.value }))}
+                    placeholder="https://…"
+                  />
+                </div>
               </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>LinkedIn URL</Label>
-              <Input value={form.linkedinUrl} onChange={(e) => setForm((f) => ({ ...f, linkedinUrl: e.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Signature template</Label>
-              <Select
-                value={form.signatureTemplate}
-                onValueChange={(v) => setForm((f) => ({ ...f, signatureTemplate: v as GrowthSignatureTemplateId }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {templateCards.map((tpl) => (
-                    <SelectItem key={tpl.id} value={tpl.id}>{tpl.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            </FormSection>
+
+            <FormSection title="Booking CTA">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Booking URL</Label>
+                  <Input
+                    value={form.bookingUrl}
+                    onChange={(e) => setForm((f) => ({ ...f, bookingUrl: e.target.value }))}
+                    placeholder="https://equipify.ai/demo"
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Booking label</Label>
+                  <Input
+                    value={form.bookingLabel}
+                    onChange={(e) => setForm((f) => ({ ...f, bookingLabel: e.target.value }))}
+                    placeholder={GROWTH_SIGNATURE_DEFAULT_BOOKING_LABEL}
+                  />
+                </div>
+                <ToggleRow
+                  id="show-booking-cta"
+                  label="Show booking CTA in signature"
+                  checked={form.showBookingCta}
+                  onCheckedChange={(checked) => setForm((f) => ({ ...f, showBookingCta: checked }))}
+                />
+              </div>
+            </FormSection>
+
+            <FormSection title="Signature options">
+              <div className="grid gap-3">
+                <div className="space-y-1.5">
+                  <Label>Signature template</Label>
+                  <Select
+                    value={form.signatureTemplate}
+                    onValueChange={(v) => setForm((f) => ({ ...f, signatureTemplate: v as GrowthSignatureTemplateId }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {templateCards.map((tpl) => (
+                        <SelectItem key={tpl.id} value={tpl.id}>{tpl.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <ToggleRow
+                    id="show-email"
+                    label="Show email"
+                    checked={form.showEmailInSignature}
+                    onCheckedChange={(checked) => setForm((f) => ({ ...f, showEmailInSignature: checked }))}
+                  />
+                  <ToggleRow
+                    id="show-phone"
+                    label="Show phone"
+                    checked={form.showPhoneInSignature}
+                    onCheckedChange={(checked) => setForm((f) => ({ ...f, showPhoneInSignature: checked }))}
+                  />
+                  <ToggleRow
+                    id="show-website"
+                    label="Show website / company link"
+                    checked={form.showWebsiteInSignature}
+                    onCheckedChange={(checked) => setForm((f) => ({ ...f, showWebsiteInSignature: checked }))}
+                  />
+                </div>
+              </div>
+            </FormSection>
+
             <div className="space-y-1.5">
               <Label>Notes</Label>
               <Textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={2} />

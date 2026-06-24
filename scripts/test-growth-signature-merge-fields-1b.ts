@@ -9,6 +9,7 @@ import {
   GROWTH_SENDER_MERGE_FIELD_KEYS,
 } from "../lib/growth/signatures/sender-merge-fields"
 import type { GrowthSenderProfile } from "../lib/growth/signatures/signature-types"
+import { GROWTH_SIGNATURE_PROFILE_FIELD_DEFAULTS } from "../lib/growth/signatures/signature-profile-defaults"
 
 function sampleProfile(overrides: Partial<GrowthSenderProfile> = {}): GrowthSenderProfile {
   return {
@@ -19,6 +20,7 @@ function sampleProfile(overrides: Partial<GrowthSenderProfile> = {}): GrowthSend
     title: "Founder",
     email: "mike@equipifyai.com",
     phone: "865-555-0100",
+    company_name: null,
     website: "https://equipify.ai",
     linkedin_url: null,
     avatar_url: null,
@@ -29,6 +31,7 @@ function sampleProfile(overrides: Partial<GrowthSenderProfile> = {}): GrowthSend
     created_at: "2026-01-01T00:00:00.000Z",
     updated_at: "2026-01-01T00:00:00.000Z",
     deleted_at: null,
+    ...GROWTH_SIGNATURE_PROFILE_FIELD_DEFAULTS,
     ...overrides,
   }
 }

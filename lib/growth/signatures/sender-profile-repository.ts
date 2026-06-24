@@ -6,6 +6,7 @@ import {
   type GrowthSenderProfile,
   type GrowthSignatureTemplateId,
 } from "@/lib/growth/signatures/signature-types"
+import { GROWTH_SIGNATURE_TOGGLES_DEFAULT } from "@/lib/growth/signatures/signature-profile-defaults"
 
 type ProfileRow = Record<string, unknown>
 
@@ -38,10 +39,18 @@ function mapProfile(row: ProfileRow): GrowthSenderProfile {
     title: asString(row.title) || null,
     email: asString(row.email),
     phone: asString(row.phone) || null,
+    company_name: asString(row.company_name) || null,
+    company_tagline: asString(row.company_tagline) || null,
     website: asString(row.website) || null,
     linkedin_url: asString(row.linkedin_url) || null,
     avatar_url: asString(row.avatar_url) || null,
     logo_url: asString(row.logo_url) || null,
+    booking_url: asString(row.booking_url) || null,
+    booking_label: asString(row.booking_label) || null,
+    show_email_in_signature: asBool(row.show_email_in_signature, GROWTH_SIGNATURE_TOGGLES_DEFAULT.show_email_in_signature),
+    show_phone_in_signature: asBool(row.show_phone_in_signature, GROWTH_SIGNATURE_TOGGLES_DEFAULT.show_phone_in_signature),
+    show_website_in_signature: asBool(row.show_website_in_signature, GROWTH_SIGNATURE_TOGGLES_DEFAULT.show_website_in_signature),
+    show_booking_cta: asBool(row.show_booking_cta, GROWTH_SIGNATURE_TOGGLES_DEFAULT.show_booking_cta),
     active: asBool(row.active, true),
     signature_template,
     notes: asString(row.notes) || null,
@@ -107,10 +116,18 @@ export async function createSenderProfile(
     title?: string | null
     email: string
     phone?: string | null
+    company_name?: string | null
+    company_tagline?: string | null
     website?: string | null
     linkedin_url?: string | null
     avatar_url?: string | null
     logo_url?: string | null
+    booking_url?: string | null
+    booking_label?: string | null
+    show_email_in_signature?: boolean
+    show_phone_in_signature?: boolean
+    show_website_in_signature?: boolean
+    show_booking_cta?: boolean
     active?: boolean
     signature_template?: GrowthSignatureTemplateId
     notes?: string | null
@@ -129,10 +146,18 @@ export async function createSenderProfile(
       title: input.title?.trim() || null,
       email: input.email.trim(),
       phone: input.phone?.trim() || null,
+      company_name: input.company_name?.trim() || null,
+      company_tagline: input.company_tagline?.trim() || null,
       website: input.website?.trim() || null,
       linkedin_url: input.linkedin_url?.trim() || null,
       avatar_url: input.avatar_url?.trim() || null,
       logo_url: input.logo_url?.trim() || null,
+      booking_url: input.booking_url?.trim() || null,
+      booking_label: input.booking_label?.trim() || null,
+      show_email_in_signature: input.show_email_in_signature ?? GROWTH_SIGNATURE_TOGGLES_DEFAULT.show_email_in_signature,
+      show_phone_in_signature: input.show_phone_in_signature ?? GROWTH_SIGNATURE_TOGGLES_DEFAULT.show_phone_in_signature,
+      show_website_in_signature: input.show_website_in_signature ?? GROWTH_SIGNATURE_TOGGLES_DEFAULT.show_website_in_signature,
+      show_booking_cta: input.show_booking_cta ?? GROWTH_SIGNATURE_TOGGLES_DEFAULT.show_booking_cta,
       active: input.active ?? true,
       signature_template: input.signature_template ?? "simple",
       notes: input.notes?.trim() || null,
@@ -155,10 +180,18 @@ export async function updateSenderProfile(
     title: string | null
     email: string
     phone: string | null
+    company_name: string | null
+    company_tagline: string | null
     website: string | null
     linkedin_url: string | null
     avatar_url: string | null
     logo_url: string | null
+    booking_url: string | null
+    booking_label: string | null
+    show_email_in_signature: boolean
+    show_phone_in_signature: boolean
+    show_website_in_signature: boolean
+    show_booking_cta: boolean
     active: boolean
     signature_template: GrowthSignatureTemplateId
     notes: string | null
@@ -184,10 +217,18 @@ export async function updateSenderProfile(
   if (patch.title !== undefined) updates.title = patch.title?.trim() || null
   if (patch.email !== undefined) updates.email = patch.email.trim()
   if (patch.phone !== undefined) updates.phone = patch.phone?.trim() || null
+  if (patch.company_name !== undefined) updates.company_name = patch.company_name?.trim() || null
+  if (patch.company_tagline !== undefined) updates.company_tagline = patch.company_tagline?.trim() || null
   if (patch.website !== undefined) updates.website = patch.website?.trim() || null
   if (patch.linkedin_url !== undefined) updates.linkedin_url = patch.linkedin_url?.trim() || null
   if (patch.avatar_url !== undefined) updates.avatar_url = patch.avatar_url?.trim() || null
   if (patch.logo_url !== undefined) updates.logo_url = patch.logo_url?.trim() || null
+  if (patch.booking_url !== undefined) updates.booking_url = patch.booking_url?.trim() || null
+  if (patch.booking_label !== undefined) updates.booking_label = patch.booking_label?.trim() || null
+  if (patch.show_email_in_signature !== undefined) updates.show_email_in_signature = patch.show_email_in_signature
+  if (patch.show_phone_in_signature !== undefined) updates.show_phone_in_signature = patch.show_phone_in_signature
+  if (patch.show_website_in_signature !== undefined) updates.show_website_in_signature = patch.show_website_in_signature
+  if (patch.show_booking_cta !== undefined) updates.show_booking_cta = patch.show_booking_cta
   if (patch.active !== undefined) updates.active = patch.active
   if (patch.signature_template !== undefined) updates.signature_template = patch.signature_template
   if (patch.notes !== undefined) updates.notes = patch.notes?.trim() || null

@@ -1,6 +1,7 @@
 import { isPlatformAdminEmail } from "@/lib/platform-admin"
 import type { GrowthGovernanceAction } from "@/lib/growth/governance/governance-types"
 
+/** Governance policy changes remain platform-admin-only in GS-RBAC-1A. */
 export function isGovernanceActorAllowed(actorEmail: string): boolean {
   return isPlatformAdminEmail(actorEmail)
 }

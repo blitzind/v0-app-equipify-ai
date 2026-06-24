@@ -2,7 +2,7 @@
 
 export const GROWTH_SENDER_PROFILES_QA_MARKER = "growth-sender-profiles-1a-v1" as const
 
-export const GROWTH_SIGNATURE_TEMPLATES = ["simple", "branded", "minimal"] as const
+export const GROWTH_SIGNATURE_TEMPLATES = ["simple", "branded", "minimal", "professional"] as const
 export type GrowthSignatureTemplateId = (typeof GROWTH_SIGNATURE_TEMPLATES)[number]
 
 export type GrowthSenderProfile = {
@@ -13,10 +13,18 @@ export type GrowthSenderProfile = {
   title: string | null
   email: string
   phone: string | null
+  company_name: string | null
+  company_tagline: string | null
   website: string | null
   linkedin_url: string | null
   avatar_url: string | null
   logo_url: string | null
+  booking_url: string | null
+  booking_label: string | null
+  show_email_in_signature: boolean
+  show_phone_in_signature: boolean
+  show_website_in_signature: boolean
+  show_booking_cta: boolean
   active: boolean
   signature_template: GrowthSignatureTemplateId
   notes: string | null
@@ -62,6 +70,7 @@ export const GROWTH_SIGNATURE_TEMPLATE_LABELS: Record<GrowthSignatureTemplateId,
   simple: "Simple",
   branded: "Branded",
   minimal: "Minimal",
+  professional: "Professional",
 }
 
 export const GROWTH_SENDER_PROFILE_SIGNATURE_STATUSES = [

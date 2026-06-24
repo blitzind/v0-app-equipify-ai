@@ -1,8 +1,4 @@
-/**
- * Sender merge field substitution (GS-GROWTH-SIGNATURES-1B).
- * Client-safe — missing fields resolve to empty string; never throws.
- */
-
+import { resolveSignatureCompanyFields } from "@/lib/growth/signatures/signature-company-fields"
 import type { GrowthSenderProfile } from "@/lib/growth/signatures/signature-types"
 
 export const GROWTH_SENDER_MERGE_FIELD_KEYS = [
@@ -38,15 +34,12 @@ function splitDisplayName(displayName: string): { firstName: string; lastName: s
   return { firstName: parts[0] ?? "", lastName: parts.slice(1).join(" ") }
 }
 
-function companyFromProfile(profile: GrowthSenderProfile | null, website: string): string {
-  const websiteTrimmed = website.trim()
-  if (!websiteTrimmed) return ""
-  try {
-    const host = new URL(websiteTrimmed.includes("://") ? websiteTrimmed : `https://${websiteTrimmed}`).hostname
-    return host.replace(/^www\./, "")
-  } catch {
-    return websiteTrimmed
-  }
+function resolveCompanyLabel(profile: GrowthSenderProfile | null): string {
+  return resolveSignatureCompanyFields({
+    company_name: profile?.company_name,
+    website: profile?.website,
+    fallbackLabel: null,
+  }).companyLabel
 }
 
 export function buildSenderMergeFields(
@@ -67,7 +60,7 @@ export function buildSenderMergeFields(
     "sender.title": profile?.title?.trim() ?? "",
     "sender.email": email,
     "sender.phone": profile?.phone?.trim() ?? "",
-    "sender.company": companyFromProfile(profile, website),
+    "sender.company": resolveCompanyLabel(profile),
     "sender.website": website,
     "sender.linkedin": profile?.linkedin_url?.trim() ?? "",
     "sender.signature": signatureText?.trim() ?? "",

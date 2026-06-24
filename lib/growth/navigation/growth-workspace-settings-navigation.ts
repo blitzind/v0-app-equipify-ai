@@ -6,10 +6,8 @@ import type { LucideIcon } from "lucide-react"
 import {
   Bell,
   Bot,
-  Building2,
   Chrome,
   Command,
-  CreditCard,
   Eye,
   Flame,
   Gauge,
@@ -19,7 +17,6 @@ import {
   Mailbox,
   PanelLeft,
   Phone,
-  Plug,
   Settings2,
   Shield,
   ShieldAlert,
@@ -43,14 +40,9 @@ import {
 import {
   GROWTH_WORKSPACE_SETTINGS_ADVANCED_PATH,
   GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
-  GROWTH_WORKSPACE_SETTINGS_WORKSPACE_BILLING_PATH,
-  GROWTH_WORKSPACE_SETTINGS_WORKSPACE_INTEGRATIONS_PATH,
-  GROWTH_WORKSPACE_SETTINGS_WORKSPACE_ORGANIZATION_PATH,
-  GROWTH_WORKSPACE_SETTINGS_WORKSPACE_PATH,
-  GROWTH_WORKSPACE_SETTINGS_WORKSPACE_TEAM_PATH,
 } from "@/lib/growth/navigation/growth-workspace-core-settings-links"
 
-export const GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER = "growth-workspace-settings-nav-8f-v1" as const
+export const GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER = "growth-workspace-settings-nav-1a-v1" as const
 
 export const GROWTH_WORKSPACE_SETTINGS_DEFAULT_SECTION_ID = "profile" as const
 
@@ -198,52 +190,6 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
     ],
   },
   {
-    id: "workspace",
-    label: "Workspace",
-    items: [
-      {
-        id: "workspace",
-        label: "Workspace",
-        description: "Team, organization, billing, and integrations — links to canonical workspace settings.",
-        segment: "workspace",
-        icon: Building2,
-        href: GROWTH_WORKSPACE_SETTINGS_WORKSPACE_PATH,
-      },
-      {
-        id: "team",
-        label: "Team",
-        description: "Manage users, invites, roles, and permissions.",
-        segment: "workspace/team",
-        icon: Users,
-        href: GROWTH_WORKSPACE_SETTINGS_WORKSPACE_TEAM_PATH,
-      },
-      {
-        id: "organization",
-        label: "Organization",
-        description: "Configure workspace profile, branding, and organization details.",
-        segment: "workspace/organization",
-        icon: Building2,
-        href: GROWTH_WORKSPACE_SETTINGS_WORKSPACE_ORGANIZATION_PATH,
-      },
-      {
-        id: "billing",
-        label: "Billing",
-        description: "Manage subscriptions, payment methods, invoices, and usage.",
-        segment: "workspace/billing",
-        icon: CreditCard,
-        href: GROWTH_WORKSPACE_SETTINGS_WORKSPACE_BILLING_PATH,
-      },
-      {
-        id: "integrations",
-        label: "Integrations",
-        description: "Connect and manage third-party services and platform integrations.",
-        segment: "workspace/integrations",
-        icon: Plug,
-        href: GROWTH_WORKSPACE_SETTINGS_WORKSPACE_INTEGRATIONS_PATH,
-      },
-    ],
-  },
-  {
     id: "ai",
     label: "AI",
     items: [
@@ -345,9 +291,6 @@ export function isGrowthWorkspaceSettingsNavItemActive(pathname: string, item: G
     const mailboxesHref = growthEngineCustomerSettingsHref("connected-mailboxes")
     return pathname === mailboxesHref || pathname.startsWith(`${mailboxesHref}/`) || isGrowthCommunicationsSettingsPath(pathname)
   }
-  if (item.id === "workspace") {
-    return pathname === GROWTH_WORKSPACE_SETTINGS_WORKSPACE_PATH
-  }
   if (item.id === "advanced") {
     return pathname === GROWTH_WORKSPACE_SETTINGS_ADVANCED_PATH
   }
@@ -359,9 +302,6 @@ export function isGrowthWorkspaceSettingsNavItemActive(pathname: string, item: G
   }
   if (isGrowthCommunicationsSettingsPath(pathname) && item.href.startsWith(GROWTH_COMMUNICATIONS_SETTINGS_PATH)) {
     return pathname === item.href || pathname.startsWith(`${item.href}/`)
-  }
-  if (item.href.startsWith(GROWTH_WORKSPACE_SETTINGS_WORKSPACE_PATH)) {
-    return pathname === item.href
   }
   return pathname === item.href || pathname.startsWith(`${item.href}/`)
 }

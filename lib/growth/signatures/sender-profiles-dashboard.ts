@@ -72,10 +72,12 @@ export async function buildSenderProfilesDashboard(
       label: GROWTH_SIGNATURE_TEMPLATE_LABELS[id],
       description:
         id === "simple"
-          ? "Name, title, company, phone, website"
+          ? "Name, title, company (linked), phone"
           : id === "branded"
-            ? "Logo, name, title, company, contact links"
-            : "Short sign-off with company",
+            ? "Logo, name, title, tagline, contact lines, booking CTA"
+            : id === "professional"
+              ? "Two-column layout with logo, company, tagline, and booking CTA"
+              : "Compact name, title, and company",
     })),
   }
 }

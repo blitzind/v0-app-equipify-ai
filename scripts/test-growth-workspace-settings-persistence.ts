@@ -59,7 +59,7 @@ function runAudit(): void {
 
   assert.equal(GROWTH_WORKSPACE_SETTINGS_QA_MARKER, "growth-workspace-settings-persistence-8b-v1")
   assert.equal(GROWTH_WORKSPACE_SETTINGS_MIGRATION, "20270828120000_growth_operator_workspace_preferences_8b.sql")
-  assert.equal(GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER, "growth-workspace-settings-nav-8f-v1")
+  assert.equal(GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER, "growth-workspace-settings-nav-1a-v1")
   console.log("  ✓ QA markers + migration id")
 
   for (const relativePath of MODULE_PATHS) {

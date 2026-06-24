@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getSenderAccount } from "@/lib/growth/sender/sender-repository"
+import { buildSignatureRenderInput } from "@/lib/growth/signatures/signature-profile-defaults"
 import { renderSignatureTemplate } from "@/lib/growth/signatures/signature-template-render"
 import { buildSenderMergeFields } from "@/lib/growth/signatures/sender-merge-fields"
 import type { GrowthRenderedSignature, GrowthSenderProfile } from "@/lib/growth/signatures/signature-types"
@@ -150,14 +151,5 @@ function emptyResolution(
 }
 
 export function renderSignatureFromProfile(profile: GrowthSenderProfile): GrowthRenderedSignature {
-  return renderSignatureTemplate(profile.signature_template, {
-    display_name: profile.display_name,
-    title: profile.title,
-    email: profile.email,
-    phone: profile.phone,
-    website: profile.website,
-    linkedin_url: profile.linkedin_url,
-    avatar_url: profile.avatar_url,
-    logo_url: profile.logo_url,
-  })
+  return renderSignatureTemplate(profile.signature_template, buildSignatureRenderInput(profile))
 }

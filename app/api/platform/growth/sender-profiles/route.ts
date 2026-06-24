@@ -3,7 +3,10 @@ import { z } from "zod"
 import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { createSenderProfile, listSenderProfiles } from "@/lib/growth/signatures/sender-profile-repository"
 import { isGrowthSenderProfilesSchemaReady } from "@/lib/growth/signatures/sender-profile-schema-health"
-import { GROWTH_SIGNATURE_TEMPLATES } from "@/lib/growth/signatures/signature-types"
+import {
+  growthSignatureProfileFieldsSchema,
+  mapSignatureProfileApiFields,
+} from "@/lib/growth/signatures/signature-profile-api-schema"
 
 export const runtime = "nodejs"
 
@@ -14,12 +17,8 @@ const CreateSchema = z.object({
   title: z.string().trim().max(200).nullable().optional(),
   email: z.string().trim().email().max(320),
   phone: z.string().trim().max(80).nullable().optional(),
-  website: z.string().trim().max(500).nullable().optional(),
-  linkedinUrl: z.string().trim().max(500).nullable().optional(),
-  avatarUrl: z.string().trim().max(2000).nullable().optional(),
-  logoUrl: z.string().trim().max(2000).nullable().optional(),
+  ...growthSignatureProfileFieldsSchema,
   active: z.boolean().optional(),
-  signatureTemplate: z.enum(GROWTH_SIGNATURE_TEMPLATES).optional(),
   notes: z.string().trim().max(2000).nullable().optional(),
 })
 
@@ -63,12 +62,8 @@ export async function POST(request: Request) {
       title: parsed.data.title ?? null,
       email: parsed.data.email,
       phone: parsed.data.phone ?? null,
-      website: parsed.data.website ?? null,
-      linkedin_url: parsed.data.linkedinUrl ?? null,
-      avatar_url: parsed.data.avatarUrl ?? null,
-      logo_url: parsed.data.logoUrl ?? null,
+      ...mapSignatureProfileApiFields(parsed.data),
       active: parsed.data.active,
-      signature_template: parsed.data.signatureTemplate,
       notes: parsed.data.notes ?? null,
     })
     return NextResponse.json({ ok: true, profile }, { status: 201 })

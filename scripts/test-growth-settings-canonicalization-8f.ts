@@ -27,12 +27,10 @@ function readSource(relativePath: string): string {
 
 function main(): void {
   assert.equal(GROWTH_WORKSPACE_SETTINGS_CANONICAL_QA_MARKER, "growth-workspace-settings-canonical-8k-v1")
-  assert.equal(GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER, "growth-workspace-settings-nav-8f-v1")
+  assert.equal(GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER, "growth-workspace-settings-nav-1a-v1")
 
   const workspaceGroup = GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS.find((group) => group.id === "workspace")
-  assert.ok(workspaceGroup)
-  assert.ok(workspaceGroup!.items.some((item) => item.id === "team"))
-  assert.ok(workspaceGroup!.items.some((item) => item.id === "billing"))
+  assert.equal(workspaceGroup, undefined, "duplicate workspace group removed from Growth settings nav")
 
   const complianceGroup = GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS.find((group) => group.id === "compliance")
   assert.ok(complianceGroup?.items.some((item) => item.id === "compliance"))

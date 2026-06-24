@@ -8,7 +8,10 @@ import {
   updateSenderProfile,
 } from "@/lib/growth/signatures/sender-profile-repository"
 import { isGrowthSenderProfilesSchemaReady } from "@/lib/growth/signatures/sender-profile-schema-health"
-import { GROWTH_SIGNATURE_TEMPLATES } from "@/lib/growth/signatures/signature-types"
+import {
+  growthSignatureProfileFieldsSchema,
+  mapSignatureProfileApiFields,
+} from "@/lib/growth/signatures/signature-profile-api-schema"
 
 export const runtime = "nodejs"
 
@@ -19,12 +22,8 @@ const PatchSchema = z.object({
   title: z.string().trim().max(200).nullable().optional(),
   email: z.string().trim().email().max(320).optional(),
   phone: z.string().trim().max(80).nullable().optional(),
-  website: z.string().trim().max(500).nullable().optional(),
-  linkedinUrl: z.string().trim().max(500).nullable().optional(),
-  avatarUrl: z.string().trim().max(2000).nullable().optional(),
-  logoUrl: z.string().trim().max(2000).nullable().optional(),
+  ...growthSignatureProfileFieldsSchema,
   active: z.boolean().optional(),
-  signatureTemplate: z.enum(GROWTH_SIGNATURE_TEMPLATES).optional(),
   notes: z.string().trim().max(2000).nullable().optional(),
 })
 
@@ -73,12 +72,8 @@ export async function PATCH(
       title: parsed.data.title,
       email: parsed.data.email,
       phone: parsed.data.phone,
-      website: parsed.data.website,
-      linkedin_url: parsed.data.linkedinUrl,
-      avatar_url: parsed.data.avatarUrl,
-      logo_url: parsed.data.logoUrl,
+      ...mapSignatureProfileApiFields(parsed.data),
       active: parsed.data.active,
-      signature_template: parsed.data.signatureTemplate,
       notes: parsed.data.notes,
     })
     return NextResponse.json({ ok: true, profile })

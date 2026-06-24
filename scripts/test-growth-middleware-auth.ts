@@ -47,13 +47,14 @@ function runAudit(): void {
     /if \(isGrowthWorkspacePath\(pathname\)\) return true/,
     "/growth/* must bypass middleware Supabase auth",
   )
-  assert.match(middleware, /isGrowthApiPath/, "/api/growth/* and /api/platform/growth/* skip helpers required")
+  assert.match(middleware, /x-growth-api-pathname/, "Growth API paths must inject pathname header for RBAC")
+  console.log("  ✓ Growth API paths inject x-growth-api-pathname for centralized RBAC")
   assert.match(middleware, /\/api\/growth\//, "/api/growth/* must bypass middleware auth")
   assert.match(middleware, /\/api\/platform\/growth\//, "/api/platform/growth/* must bypass middleware auth")
-  assert.doesNotMatch(
+  assert.match(
     middleware,
-    /if \(isGrowthWorkspacePath\(pathname\)\) \{[\s\S]*?if \(!isAuthenticated\)/,
-    "/growth/* must not run middleware session gate",
+    /if \(isGrowthWorkspacePath\(pathname\)\) \{[\s\S]*?x-growth-pathname[\s\S]*?return NextResponse\.next/,
+    "/growth/* must short-circuit before session refresh",
   )
   assert.equal(GROWTH_WORKSPACE_BASE_PATH, "/growth")
   console.log("  ✓ /growth/* and Growth API paths excluded from middleware Supabase auth work")
@@ -67,17 +68,17 @@ function runAudit(): void {
     /if \(pathname\.startsWith\("\/admin"\)\) \{[\s\S]*?if \(!isAuthenticated\)/,
     "/admin/* must retain middleware session gate",
   )
-  assert.doesNotMatch(
+  assert.match(
     middleware,
-    /if \(isGrowthApiPath\(pathname\)\) \{[\s\S]*?updateSession/,
-    "Growth APIs must not enter updateSession path",
+    /if \(isGrowthApiPath\(pathname\)\) \{[\s\S]*?x-growth-api-pathname[\s\S]*?return NextResponse\.next/,
+    "Growth APIs must short-circuit before session refresh",
   )
   console.log("  ✓ /admin/* protection unchanged; Growth APIs skip duplicate middleware auth")
 
-  assert.match(growthLayout, /createServerSupabaseClient/, "Growth layout must check session")
+  assert.match(growthLayout, /resolveGrowthWorkspacePageAccess/, "Growth layout must enforce Growth RBAC gate")
   assert.match(growthLayout, /redirect\("\/login"\)/, "unauthenticated users redirected to login")
-  assert.match(growthLayout, /loadPlatformAdminIdentity/, "Growth layout must enforce platform-admin gate")
-  console.log("  ✓ /growth/* page auth enforced by server layout gate")
+  assert.doesNotMatch(growthLayout, /loadPlatformAdminIdentity/, "Growth layout must not require platform admin only")
+  console.log("  ✓ /growth/* page auth enforced by Growth RBAC layout gate")
 
   assert.match(growthAccess, /requireGrowthEnginePlatformAccess/, "Growth route handlers retain access gate")
   assert.match(workspaceSettingsApi, /requireGrowthWorkspaceSettingsAccess/, "workspace settings APIs retain access gate")
