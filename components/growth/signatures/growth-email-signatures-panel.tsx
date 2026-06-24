@@ -37,6 +37,7 @@ import {
   GROWTH_SIGNATURE_TOGGLES_DEFAULT,
 } from "@/lib/growth/signatures/signature-profile-defaults"
 import { renderSignatureTemplate } from "@/lib/growth/signatures/signature-template-render"
+import { GrowthMediaPicker } from "@/components/growth/media-library/growth-media-picker"
 
 type ProfileFormState = {
   senderAccountId: string
@@ -570,11 +571,12 @@ export function GrowthEmailSignaturesPanel() {
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label>Logo URL</Label>
-                  <Input
+                  <GrowthMediaPicker
+                    label="Logo"
                     value={form.logoUrl}
-                    onChange={(e) => setForm((f) => ({ ...f, logoUrl: e.target.value }))}
-                    placeholder="https://…"
+                    acceptedTypes={["logo", "image"]}
+                    allowManualUrl
+                    onChange={(url) => setForm((f) => ({ ...f, logoUrl: url }))}
                   />
                 </div>
               </div>

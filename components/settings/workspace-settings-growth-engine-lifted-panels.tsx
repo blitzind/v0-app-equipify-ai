@@ -20,6 +20,7 @@ import { GrowthWarmupDashboardPanel } from "@/components/growth/growth-warmup-da
 import { GrowthSettingsNotificationsPanel } from "@/components/growth/settings/growth-settings-notifications-panel"
 import { GrowthConnectedMailboxesDashboard } from "@/components/growth/mailboxes/growth-connected-mailboxes-dashboard"
 import { GrowthEmailSignaturesPanel } from "@/components/growth/signatures/growth-email-signatures-panel"
+import { GrowthMediaLibraryPanel } from "@/components/growth/media-library/growth-media-library-panel"
 import { GrowthSharePagesDashboard } from "@/components/growth/share-pages/growth-share-pages-admin-panel"
 import { growthEngineCustomerSettingsHref } from "@/lib/growth/navigation/growth-workspace-settings-canonical"
 import type { WorkspaceSettingsGrowthEngineLiftedSectionId } from "@/lib/settings/workspace-settings-growth-engine-lift"
@@ -79,6 +80,7 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANELS: Record<
   openai: GrowthRealtimeProvidersDashboard,
   "copilot-preferences": GrowthAiCopilotSettingsPanel,
   "share-page-branding": GrowthSharePagesDashboard,
+  "media-library": GrowthMediaLibraryPanel,
   "booking-branding": GrowthBookingPagesPanel,
   "media-defaults": GrowthContentLibraryDashboardView,
   "email-signatures": GrowthEmailSignaturesPanel,

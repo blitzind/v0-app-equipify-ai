@@ -63,6 +63,7 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_SECTION_IDS = [
   "openai",
   "copilot-preferences",
   "share-page-branding",
+  "media-library",
   "booking-branding",
   "media-defaults",
   "email-signatures",
@@ -100,6 +101,7 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANEL_EXPORTS: Record<
   openai: "GrowthRealtimeProvidersDashboard",
   "copilot-preferences": "GrowthAiCopilotSettingsPanel",
   "share-page-branding": "GrowthSharePagesDashboard",
+  "media-library": "GrowthMediaLibraryPanel",
   "booking-branding": "GrowthBookingPagesPanel",
   "media-defaults": "GrowthContentLibraryDashboardView",
   "email-signatures": "GrowthEmailSignaturesPanel",
@@ -221,6 +223,10 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_SECTION_CLASSIFICATION: Record<
   "share-page-branding": {
     kind: "lifted",
     reason: "GrowthSharePagesDashboard is the admin share page configuration console.",
+  },
+  "media-library": {
+    kind: "lifted",
+    reason: "GrowthMediaLibraryPanel — shared logos and images (GS-GROWTH-MEDIA-LIBRARY-1A).",
   },
   "booking-branding": {
     kind: "lifted",

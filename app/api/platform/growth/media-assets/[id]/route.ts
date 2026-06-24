@@ -73,7 +73,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       title: parsed.data.title,
       description: parsed.data.description,
       tags: parsed.data.tags,
-      metadata: parsed.data.metadata,
+      metadata:
+        parsed.data.metadata !== undefined
+          ? { ...existing.metadata, ...parsed.data.metadata }
+          : undefined,
       thumbnailStorageKey: parsed.data.thumbnail_storage_key,
       waveformStorageKey: parsed.data.waveform_storage_key,
       durationSeconds: parsed.data.duration_seconds,

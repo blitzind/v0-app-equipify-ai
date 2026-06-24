@@ -18,6 +18,7 @@ import {
   Eye,
   FileText,
   Globe,
+  Image,
   Inbox,
   Layers,
   Lock,
@@ -553,6 +554,13 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_GROUPS: WorkspaceSettingsNavGroup[
         icon: Megaphone,
         existingConfigHref: `${GROWTH_WORKSPACE_BASE_PATH}/share-pages`,
         existingConfigLabel: "Open existing configuration",
+      },
+      {
+        id: "media-library",
+        label: "Media Library",
+        description: "Reusable logos and images for signatures, booking pages, and share pages.",
+        href: growthEngineHref("media-library"),
+        icon: Image,
       },
       {
         id: "booking-branding",

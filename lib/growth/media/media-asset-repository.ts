@@ -134,6 +134,7 @@ export type ListMediaAssetsInput = {
   search?: string
   limit?: number
   offset?: number
+  excludeArchived?: boolean
 }
 
 export type AttachMediaAssetInput = {
@@ -257,6 +258,7 @@ export async function listMediaAssets(
 
   if (input.assetType) query = query.eq("asset_type", input.assetType)
   if (input.status) query = query.eq("status", input.status)
+  if (input.excludeArchived) query = query.neq("status", "archived")
   if (input.provider) query = query.eq("provider", input.provider)
   if (input.tag) query = query.contains("tags", [input.tag])
   if (input.search?.trim()) {

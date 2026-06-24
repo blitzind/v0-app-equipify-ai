@@ -12,6 +12,11 @@ import {
 } from "@/lib/growth/media/media-asset-repository"
 import { requireMediaAssetPlatformAccess } from "@/lib/growth/media/media-asset-platform-access"
 import { mapMediaAssetError } from "@/lib/growth/media/media-asset-route-utils"
+import { listGrowthMediaLibraryAssets } from "@/lib/growth/media-library/growth-media-library-service"
+import {
+  GROWTH_MEDIA_LIBRARY_KIND_TAGS,
+  GROWTH_MEDIA_LIBRARY_QA_MARKER,
+} from "@/lib/growth/media-library/growth-media-library-types"
 import { z } from "zod"
 
 export const runtime = "nodejs"
@@ -50,8 +55,32 @@ export async function GET(request: Request) {
     providerParam && (GROWTH_MEDIA_ASSET_PROVIDERS as readonly string[]).includes(providerParam)
       ? (providerParam as (typeof GROWTH_MEDIA_ASSET_PROVIDERS)[number])
       : undefined
+  const library = url.searchParams.get("library") === "1"
+  const libraryKindParam = url.searchParams.get("library_kind")
+  const libraryKind =
+    libraryKindParam && libraryKindParam in GROWTH_MEDIA_LIBRARY_KIND_TAGS
+      ? (libraryKindParam as "image" | "logo" | "avatar")
+      : undefined
 
   try {
+    if (library) {
+      const result = await listGrowthMediaLibraryAssets(access.admin, {
+        organizationId: access.organizationId,
+        libraryKind,
+        includeArchived: url.searchParams.get("include_archived") === "1",
+        search: url.searchParams.get("search") ?? undefined,
+        limit: Number(url.searchParams.get("limit") ?? "50"),
+        offset: Number(url.searchParams.get("offset") ?? "0"),
+        origin: url.origin,
+      })
+      return NextResponse.json({
+        ok: true,
+        items: result.items,
+        total: result.total,
+        qa_marker: GROWTH_MEDIA_LIBRARY_QA_MARKER,
+      })
+    }
+
     const result = await listMediaAssets(access.admin, {
       organizationId: access.organizationId,
       status,

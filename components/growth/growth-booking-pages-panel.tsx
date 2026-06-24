@@ -36,6 +36,7 @@ import {
   formatIanaTimezoneOption,
   resolveBookingTimezone,
 } from "@/lib/growth/booking/booking-timezone-utils"
+import { GrowthMediaPicker } from "@/components/growth/media-library/growth-media-picker"
 
 import {
   weeklyScheduleToWindows,
@@ -366,14 +367,20 @@ export function GrowthBookingPagesPanel() {
                       <Label className="text-xs">Brand / company name</Label>
                       <Input className="h-9" value={editor.brandName} onChange={(e) => setEditor({ ...editor, brandName: e.target.value })} />
                     </div>
-                    <div className={GROWTH_SETTINGS_FORM_GAP}>
-                      <Label className="text-xs">Logo URL</Label>
-                      <Input className="h-9" value={editor.logoUrl} onChange={(e) => setEditor({ ...editor, logoUrl: e.target.value })} />
-                    </div>
-                    <div className={GROWTH_SETTINGS_FORM_GAP}>
-                      <Label className="text-xs">Hero / banner URL</Label>
-                      <Input className="h-9" value={editor.heroImageUrl} onChange={(e) => setEditor({ ...editor, heroImageUrl: e.target.value })} />
-                    </div>
+                    <GrowthMediaPicker
+                      label="Logo"
+                      value={editor.logoUrl}
+                      acceptedTypes={["logo", "image"]}
+                      allowManualUrl
+                      onChange={(url) => setEditor({ ...editor, logoUrl: url })}
+                    />
+                    <GrowthMediaPicker
+                      label="Hero / banner image"
+                      value={editor.heroImageUrl}
+                      acceptedTypes={["image"]}
+                      allowManualUrl
+                      onChange={(url) => setEditor({ ...editor, heroImageUrl: url })}
+                    />
                     <div className={GROWTH_SETTINGS_FORM_GAP}>
                       <Label className="text-xs">Brand color</Label>
                       <Input className="h-9" type="color" value={editor.brandColor} onChange={(e) => setEditor({ ...editor, brandColor: e.target.value })} />

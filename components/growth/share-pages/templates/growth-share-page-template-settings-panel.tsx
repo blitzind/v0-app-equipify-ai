@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthMediaPicker } from "@/components/growth/media-library/growth-media-picker"
 import type { GrowthSharePageTemplateEditorMetadata } from "@/lib/growth/share-pages/share-page-template-editor-utils"
 import {
   GROWTH_SHARE_PAGE_TEMPLATE_CATEGORIES,
@@ -114,22 +115,22 @@ export function GrowthSharePageTemplateSettingsPanel({
             />
           </div>
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs">Logo URL</Label>
-          <Input
-            value={theme.logoUrl ?? ""}
-            disabled={disabled}
-            onChange={(e) => onThemeChange({ ...theme, logoUrl: e.target.value || null })}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs">Hero image URL</Label>
-          <Input
-            value={theme.heroImageUrl ?? ""}
-            disabled={disabled}
-            onChange={(e) => onThemeChange({ ...theme, heroImageUrl: e.target.value || null })}
-          />
-        </div>
+        <GrowthMediaPicker
+          label="Logo"
+          value={theme.logoUrl ?? ""}
+          disabled={disabled}
+          acceptedTypes={["logo", "image"]}
+          allowManualUrl
+          onChange={(url) => onThemeChange({ ...theme, logoUrl: url || null })}
+        />
+        <GrowthMediaPicker
+          label="Hero image"
+          value={theme.heroImageUrl ?? ""}
+          disabled={disabled}
+          acceptedTypes={["image"]}
+          allowManualUrl
+          onChange={(url) => onThemeChange({ ...theme, heroImageUrl: url || null })}
+        />
         <div className="space-y-1.5">
           <Label className="text-xs">Public theme mode</Label>
           <select

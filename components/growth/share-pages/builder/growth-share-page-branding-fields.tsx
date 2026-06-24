@@ -3,6 +3,7 @@
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { GrowthBuilderColorField } from "@/components/growth/builder/growth-builder-color-field"
+import { GrowthMediaPicker } from "@/components/growth/media-library/growth-media-picker"
 import {
   GROWTH_SHARE_PAGE_OPERATOR_DEFAULT_THEME,
   parseSharePageExtendedTheme,
@@ -40,27 +41,23 @@ export function GrowthSharePageBrandingFields({
         Saved with your share page — applies to live preview and published public pages at /p/[token].
       </p>
 
-      <div className="space-y-2">
-        <Label htmlFor="logoUrl">Logo URL</Label>
-        <Input
-          id="logoUrl"
-          value={theme.logoUrl ?? ""}
-          disabled={disabled}
-          onChange={(e) => update({ logoUrl: e.target.value || null })}
-          inputMode="url"
-        />
-      </div>
+      <GrowthMediaPicker
+        label="Logo"
+        value={theme.logoUrl ?? ""}
+        disabled={disabled}
+        acceptedTypes={["logo", "image"]}
+        allowManualUrl
+        onChange={(url) => update({ logoUrl: url || null })}
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="heroImageUrl">Hero image URL</Label>
-        <Input
-          id="heroImageUrl"
-          value={heroImageUrl}
-          disabled={disabled}
-          onChange={(e) => onHeroImageUrlChange(e.target.value)}
-          inputMode="url"
-        />
-      </div>
+      <GrowthMediaPicker
+        label="Hero image"
+        value={heroImageUrl}
+        disabled={disabled}
+        acceptedTypes={["image"]}
+        allowManualUrl
+        onChange={(url) => onHeroImageUrlChange(url)}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <GrowthBuilderColorField
