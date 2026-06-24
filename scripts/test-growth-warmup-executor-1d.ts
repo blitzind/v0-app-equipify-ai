@@ -270,9 +270,10 @@ async function runTests(): Promise<void> {
 
   assert.match(
     executeBody,
-    /const \{ profile, runId, previewOnly, actorUserId, actorEmail, excludeRecipientEmails, runRecipientEmailsUsed \} =/,
+    /const \{ profile, runId, previewOnly, actorUserId, actorEmail \} = input/,
   )
   assert.match(executeBody, /profile\.sends_today_date/)
+  assert.match(executorSource, /sortWarmupSendCandidateProfiles/)
   console.log("  ✓ executeWarmupSendForProfile binds profile from input (ReferenceError fix)")
 
   assert.match(executorSource, /warmup_executor_send_plan/)

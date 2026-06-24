@@ -20,27 +20,16 @@ export const MAX_SENDS_PER_PROFILE_PER_RUN = 1 as const
 /** Platform safety ceiling when eligible profile count is extremely high. */
 export const DEFAULT_WARMUP_EXECUTOR_TOTAL_SENDS_SAFETY_CAP = 100 as const
 
-export function computeWarmupExecutorRunSendPlan(input: {
-  eligibleProfileCount: number
-  maxSendsOverride?: number
-}): {
-  maxSendsPerProfile: number
-  maxTotalSends: number
-  plannedSendsThisRun: number
-} {
-  const naturalTotal = Math.max(0, input.eligibleProfileCount) * MAX_SENDS_PER_PROFILE_PER_RUN
-  const cappedTotal = Math.min(naturalTotal, DEFAULT_WARMUP_EXECUTOR_TOTAL_SENDS_SAFETY_CAP)
-  const maxTotalSends = input.maxSendsOverride ?? cappedTotal
-  return {
-    maxSendsPerProfile: MAX_SENDS_PER_PROFILE_PER_RUN,
-    maxTotalSends,
-    plannedSendsThisRun: Math.min(naturalTotal, maxTotalSends),
-  }
-}
+export {
+  computeWarmupExecutorRunSendPlan,
+  buildWarmupRecipientPoolPressureMessage,
+} from "@/lib/growth/warmup/warmup-executor-fairness"
 
 export function buildWarmupExecutorPacingMessage(input: {
   eligibleProfiles: number
   plannedSendsThisRun: number
+  waitingProfilesThisRun?: number
+  activeApprovedRecipients?: number
   plannedTodayPerMailbox?: number | null
   representativeRemainingToday?: number | null
 }): string {
@@ -53,6 +42,17 @@ export function buildWarmupExecutorPacingMessage(input: {
     `Would send up to ${input.plannedSendsThisRun} warmup message(s) now.`,
     "Manual runs send immediately (1 per eligible mailbox). Cron sends hourly during UTC 13–21.",
   ]
+  if (input.waitingProfilesThisRun != null && input.waitingProfilesThisRun > 0) {
+    parts.push(`${input.waitingProfilesThisRun} sender(s) will wait this run.`)
+  } else if (
+    input.activeApprovedRecipients != null &&
+    input.activeApprovedRecipients > 0 &&
+    input.activeApprovedRecipients < input.eligibleProfiles
+  ) {
+    parts.push(
+      `${input.activeApprovedRecipients} approved recipient(s) for ${input.eligibleProfiles} senders — recipients may be reused across senders this run.`,
+    )
+  }
   if (input.representativeRemainingToday != null && input.representativeRemainingToday > 0) {
     parts.push(`Each mailbox has ${input.representativeRemainingToday} remaining today.`)
   } else if (input.plannedTodayPerMailbox != null && input.plannedTodayPerMailbox > 0) {
@@ -255,6 +255,8 @@ export function summarizeWarmupExecutorRun(input: {
   diagnostics: WarmupExecutorProfileDiagnostic[]
   approvedRecipientCount: number
   plannedSendsThisRun?: number
+  waitingProfilesThisRun?: number
+  poolPressureMessage?: string | null
   pacingMessage?: string
 }): WarmupExecutorRunSummary {
   const warmingProfiles = input.scannableProfiles.filter((p) => p.status === "warming").length
@@ -289,6 +291,8 @@ export function summarizeWarmupExecutorRun(input: {
     primaryMessage,
     maxSendsPerProfilePerRun: MAX_SENDS_PER_PROFILE_PER_RUN,
     plannedSendsThisRun: input.plannedSendsThisRun,
+    waitingProfilesThisRun: input.waitingProfilesThisRun,
+    poolPressureMessage: input.poolPressureMessage,
     pacingMessage: input.pacingMessage,
   }
 }

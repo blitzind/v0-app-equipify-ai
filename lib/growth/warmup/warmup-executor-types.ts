@@ -62,6 +62,13 @@ export type GrowthWarmupExecutorSkipCode =
   | "batch_limit_reached"
   | "profile_execution_failed"
 
+export type GrowthWarmupExecutorRunSkipReason = {
+  code: GrowthWarmupExecutorSkipCode
+  message: string
+  count?: number
+  profiles?: string[]
+}
+
 export type GrowthWarmupExecutorSenderResult = {
   senderAccountId: string
   senderEmail: string
@@ -91,7 +98,7 @@ export type GrowthWarmupExecutorRunResult = {
   sendsFailed: number
   sendsSkipped: number
   senderResults: GrowthWarmupExecutorSenderResult[]
-  skipReasons: Array<{ code: GrowthWarmupExecutorSkipCode; message: string }>
+  skipReasons: GrowthWarmupExecutorRunSkipReason[]
   previewOnly: boolean
   profileDiagnostics?: WarmupExecutorProfileDiagnostic[]
   runSummary?: WarmupExecutorRunSummary
@@ -124,6 +131,8 @@ export type WarmupExecutorRunSummary = {
   primaryMessage: string
   maxSendsPerProfilePerRun?: number
   plannedSendsThisRun?: number
+  waitingProfilesThisRun?: number
+  poolPressureMessage?: string | null
   pacingMessage?: string
 }
 
@@ -132,6 +141,10 @@ export type WarmupExecutorRecipientPoolSummary = {
   availableNow: number
   exhausted: boolean
   message: string | null
+  eligibleProfiles?: number
+  plannedSendsThisRun?: number
+  waitingProfilesThisRun?: number
+  poolPressureMessage?: string | null
 }
 
 export type GrowthWarmupProfileExecutorStats = {

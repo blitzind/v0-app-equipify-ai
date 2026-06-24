@@ -54,6 +54,8 @@ export type WarmupExecutorManualRunBreakdown = {
   planned: number
   eligibleProfiles: number
   remainingProfiles: number
+  waitingProfilesThisRun: number
+  poolPressureMessage: string | null
   skipSummary: Array<{ code: WarmupExecutorDisplaySkipCode; count: number; label: string }>
   profileResults: WarmupExecutorProfileResultView[]
   recipientPool: WarmupExecutorRecipientPoolSummary
@@ -281,6 +283,12 @@ export function buildWarmupExecutorManualRunBreakdown(input: {
   const planned = result.runSummary?.plannedSendsThisRun ?? eligibleProfiles * MAX_SENDS_PER_PROFILE_PER_RUN
   const remainingProfiles = profileResults.filter((row) => row.remainingToday > 0 && row.sent === 0).length
   const skipSummary = buildSkipSummary(profileResults)
+  const waitingProfilesThisRun =
+    input.recipientPool.waitingProfilesThisRun ??
+    result.runSummary?.waitingProfilesThisRun ??
+    Math.max(0, eligibleProfiles - planned)
+  const poolPressureMessage =
+    input.recipientPool.poolPressureMessage ?? result.runSummary?.poolPressureMessage ?? null
 
   if (productionBuildStale) {
     skipSummary.unshift({
@@ -296,6 +304,8 @@ export function buildWarmupExecutorManualRunBreakdown(input: {
     planned,
     eligibleProfiles,
     remainingProfiles,
+    waitingProfilesThisRun,
+    poolPressureMessage,
     skipSummary,
     profileResults,
     recipientPool: input.recipientPool,

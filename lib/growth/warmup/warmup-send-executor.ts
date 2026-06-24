@@ -35,8 +35,15 @@ import {
   summarizeWarmupExecutorRun,
   computeWarmupExecutorRunSendPlan,
   buildWarmupExecutorPacingMessage,
+  buildWarmupRecipientPoolPressureMessage,
   MAX_SENDS_PER_PROFILE_PER_RUN,
 } from "@/lib/growth/warmup/warmup-executor-diagnostics"
+import {
+  GROWTH_WARMUP_FAIRNESS_1P_QA_MARKER,
+  mergeWarmupExecutorRunSkipReasons,
+  sortWarmupSendCandidateProfiles,
+  WARMUP_EXECUTOR_RECIPIENT_DEDUP_POLICY,
+} from "@/lib/growth/warmup/warmup-executor-fairness"
 import {
   GROWTH_WARMUP_EXECUTOR_QA_MARKER,
   isWithinWarmupSendingWindow,
@@ -54,6 +61,7 @@ import { getSenderAccount } from "@/lib/growth/sender/sender-repository"
 export const GROWTH_WARMUP_EXECUTOR_1D_QA_MARKER = "growth-warmup-executor-1d-v1" as const
 export const GROWTH_WARMUP_EXECUTOR_1E_QA_MARKER = "growth-warmup-executor-1e-v1" as const
 export const GROWTH_WARMUP_EXECUTOR_1F_QA_MARKER = "growth-warmup-executor-1f-v1" as const
+export { GROWTH_WARMUP_FAIRNESS_1P_QA_MARKER, WARMUP_EXECUTOR_RECIPIENT_DEDUP_POLICY } from "@/lib/growth/warmup/warmup-executor-fairness"
 
 export { MAX_SENDS_PER_PROFILE_PER_RUN } from "@/lib/growth/warmup/warmup-executor-diagnostics"
 
@@ -87,14 +95,14 @@ function utcDayStartIso(date = new Date()): string {
 async function loadSenderAccountGateContext(
   admin: SupabaseClient,
   senderAccountIds: string[],
-): Promise<Map<string, { status: string; health_status: string }>> {
+): Promise<Map<string, { status: string; health_status: string; last_send_at: string | null }>> {
   const uniqueIds = [...new Set(senderAccountIds.filter(Boolean))]
   if (uniqueIds.length === 0) return new Map()
 
   const { data, error } = await admin
     .schema("growth")
     .from("sender_accounts")
-    .select("id, status, health_status")
+    .select("id, status, health_status, last_send_at")
     .in("id", uniqueIds)
     .is("deleted_at", null)
 
@@ -103,11 +111,14 @@ async function loadSenderAccountGateContext(
   return new Map(
     (data ?? []).map((row) => {
       const record = row as Record<string, unknown>
+      const lastSendAt = record.last_send_at
       return [
         String(record.id),
         {
           status: String(record.status ?? ""),
           health_status: String(record.health_status ?? ""),
+          last_send_at:
+            typeof lastSendAt === "string" && lastSendAt.trim().length > 0 ? lastSendAt.trim() : null,
         },
       ] as const
     }),
@@ -208,12 +219,9 @@ async function executeWarmupSendForProfile(
     previewOnly: boolean
     actorUserId?: string | null
     actorEmail?: string | null
-    excludeRecipientEmails?: string[]
-    runRecipientEmailsUsed?: string[]
   },
 ): Promise<GrowthWarmupExecutorSenderResult> {
-  const { profile, runId, previewOnly, actorUserId, actorEmail, excludeRecipientEmails, runRecipientEmailsUsed } =
-    input
+  const { profile, runId, previewOnly, actorUserId, actorEmail } = input
   const skipReasons: GrowthWarmupExecutorSenderResult["skipReasons"] = []
   const today = utcDateString()
   const dayStart = utcDayStartIso()
@@ -294,13 +302,25 @@ async function executeWarmupSendForProfile(
     recipients,
     senderAccountId: profile.sender_account_id,
     profileId: profile.id,
-    excludeEmails: excludeRecipientEmails,
   })
   if (!selection.ok) {
     const skipCode: GrowthWarmupExecutorSkipCode =
       selection.code === "no_recipients" ? "no_approved_recipients" : selection.code
     skipReasons.push({ code: skipCode, message: selection.message })
     base.skipped = 1
+    base.attempted = 1
+    await recordAttempt(admin, {
+      runId,
+      profile,
+      status: "skipped",
+      skipReason: selection.message,
+      skipCode,
+      selectionContext: {
+        selection_code: selection.code,
+        approved_recipient_count: recipients.length,
+        recipient_dedup_policy: WARMUP_EXECUTOR_RECIPIENT_DEDUP_POLICY,
+      },
+    })
     return base
   }
 
@@ -397,7 +417,6 @@ async function executeWarmupSendForProfile(
   }
 
   base.sent = 1
-  runRecipientEmailsUsed?.push(selection.recipient.email.toLowerCase())
   await updateWarmupRecipient(admin, selection.recipient.id, {
     last_sent_at: new Date().toISOString(),
   })
@@ -431,11 +450,13 @@ async function recordAttempt(
   input: {
     runId: string | null
     profile: GrowthWarmupProfile
-    recipient: { id: string; email: string }
-    template: { id: string; subject: string }
+    recipient?: { id: string; email: string } | null
+    template?: { id: string; subject: string } | null
     status: "sent" | "failed" | "skipped"
     skipReason?: string | null
+    skipCode?: GrowthWarmupExecutorSkipCode | null
     deliveryAttemptId?: string | null
+    selectionContext?: Record<string, unknown>
   },
 ): Promise<void> {
   if (!input.runId) return
@@ -443,14 +464,19 @@ async function recordAttempt(
     warmup_send_run_id: input.runId,
     warmup_profile_id: input.profile.id,
     sender_account_id: input.profile.sender_account_id,
-    warmup_recipient_id: input.recipient.id,
-    recipient_email: input.recipient.email,
-    subject: input.template.subject,
+    warmup_recipient_id: input.recipient?.id ?? null,
+    recipient_email: input.recipient?.email ?? "",
+    subject: input.template?.subject ?? "",
     status: input.status,
     skip_reason: input.skipReason ?? null,
     delivery_attempt_id: input.deliveryAttemptId ?? null,
-    template_id: input.template.id,
-    metadata: { qa_marker: GROWTH_WARMUP_EXECUTOR_QA_MARKER },
+    template_id: input.template?.id ?? null,
+    metadata: {
+      qa_marker: GROWTH_WARMUP_EXECUTOR_QA_MARKER,
+      fairness_qa_marker: GROWTH_WARMUP_FAIRNESS_1P_QA_MARKER,
+      skip_code: input.skipCode ?? null,
+      ...input.selectionContext,
+    },
   })
 }
 
@@ -576,6 +602,13 @@ export async function runWarmupSendExecutor(
     eligibleProfileCount,
     maxSendsOverride: input?.maxSends,
   })
+  const poolPressureMessage = buildWarmupRecipientPoolPressureMessage({
+    activeApprovedRecipients: approvedRecipients.length,
+    eligibleProfiles: eligibleProfileCount,
+    plannedSendsThisRun: sendPlan.plannedSendsThisRun,
+    waitingProfilesThisRun: sendPlan.waitingProfilesThisRun,
+    availableNow: recipientPoolSummary.availableNow,
+  })
   const representativePlannedToday =
     scannableProfiles.find((p) => p.status === "warming") != null
       ? resolveEffectiveWarmupDailyCapacity(
@@ -594,6 +627,8 @@ export async function runWarmupSendExecutor(
   const pacingMessage = buildWarmupExecutorPacingMessage({
     eligibleProfiles: eligibleProfileCount,
     plannedSendsThisRun: sendPlan.plannedSendsThisRun,
+    waitingProfilesThisRun: sendPlan.waitingProfilesThisRun,
+    activeApprovedRecipients: approvedRecipients.length,
     plannedTodayPerMailbox: representativePlannedToday,
     representativeRemainingToday,
   })
@@ -604,8 +639,19 @@ export async function runWarmupSendExecutor(
     diagnostics: profileDiagnostics,
     approvedRecipientCount: approvedRecipients.length,
     plannedSendsThisRun: sendPlan.plannedSendsThisRun,
+    waitingProfilesThisRun: sendPlan.waitingProfilesThisRun,
+    poolPressureMessage,
     pacingMessage,
   })
+
+  const enrichedRecipientPoolSummary: WarmupExecutorRecipientPoolSummary = {
+    ...recipientPoolSummary,
+    eligibleProfiles: eligibleProfileCount,
+    plannedSendsThisRun: sendPlan.plannedSendsThisRun,
+    waitingProfilesThisRun: sendPlan.waitingProfilesThisRun,
+    poolPressureMessage,
+    message: poolPressureMessage ?? recipientPoolSummary.message,
+  }
 
   if (allProfiles.length === 0) {
     return withExecutorBuildMarker(
@@ -625,8 +671,9 @@ export async function runWarmupSendExecutor(
         previewOnly,
         profileDiagnostics,
         runSummary,
+        recipientPoolSummary: enrichedRecipientPoolSummary,
       },
-      recipientPoolSummary,
+      enrichedRecipientPoolSummary,
     )
   }
 
@@ -639,8 +686,14 @@ export async function runWarmupSendExecutor(
     })
   }
 
-  const sendCandidateProfiles = scannableProfiles.filter((profile) =>
-    isWarmupExecutorSendEligibleStatus(profile.status),
+  const sendCandidateProfiles = sortWarmupSendCandidateProfiles(
+    scannableProfiles.filter((profile) => isWarmupExecutorSendEligibleStatus(profile.status)),
+    {
+      now,
+      senderLastSendAt: new Map(
+        [...senderGateContext.entries()].map(([id, sender]) => [id, sender.last_send_at]),
+      ),
+    },
   )
 
   logGrowthEngine("warmup_executor_send_plan", {
@@ -659,6 +712,9 @@ export async function runWarmupSendExecutor(
     max_sends_per_profile: sendPlan.maxSendsPerProfile,
     max_total_sends: sendPlan.maxTotalSends,
     planned_sends_this_run: sendPlan.plannedSendsThisRun,
+    waiting_profiles_this_run: sendPlan.waitingProfilesThisRun,
+    recipient_dedup_policy: WARMUP_EXECUTOR_RECIPIENT_DEDUP_POLICY,
+    fairness_qa_marker: GROWTH_WARMUP_FAIRNESS_1P_QA_MARKER,
   })
 
   let runId: string | null = null
@@ -676,7 +732,6 @@ export async function runWarmupSendExecutor(
   let sendsFailed = 0
   let sendsSkipped = 0
   let successfulSendsThisRun = 0
-  const recipientsUsedThisRun: string[] = []
 
   for (const profile of sendCandidateProfiles) {
     if (sendPlan.maxTotalSends > 0 && successfulSendsThisRun >= sendPlan.maxTotalSends) {
@@ -695,8 +750,6 @@ export async function runWarmupSendExecutor(
         previewOnly,
         actorUserId: input?.actorUserId,
         actorEmail: input?.actorEmail,
-        excludeRecipientEmails: recipientsUsedThisRun,
-        runRecipientEmailsUsed: recipientsUsedThisRun,
       })
       senderResults.push(result)
       sendsAttempted += result.attempted
@@ -744,6 +797,8 @@ export async function runWarmupSendExecutor(
           ? "completed"
           : "skipped"
 
+  const mergedSkipReasons = mergeWarmupExecutorRunSkipReasons(skipReasons, senderResults)
+
   const finalResult: GrowthWarmupExecutorRunResult = {
     qa_marker: GROWTH_WARMUP_EXECUTOR_QA_MARKER,
     runId,
@@ -756,7 +811,7 @@ export async function runWarmupSendExecutor(
     sendsFailed,
     sendsSkipped,
     senderResults,
-    skipReasons,
+    skipReasons: mergedSkipReasons,
     previewOnly,
     profileDiagnostics,
     runSummary,
@@ -777,7 +832,7 @@ export async function runWarmupSendExecutor(
     }
   }
 
-  return withExecutorBuildMarker(finalResult, recipientPoolSummary)
+  return withExecutorBuildMarker(finalResult, enrichedRecipientPoolSummary)
 }
 
 export async function buildWarmupExecutorDashboardStats(

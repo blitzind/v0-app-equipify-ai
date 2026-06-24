@@ -326,7 +326,7 @@ async function runTests(): Promise<void> {
   assert.match(executionSource, /syncSenderWarmupCapacity/)
   assert.doesNotMatch(executionSource, /incrementSenderDailySendUsed/)
   assert.match(executorSource, /getWarmupProfile/)
-  assert.match(executorSource, /recipientsUsedThisRun/)
+  assert.match(executorSource, /sortWarmupSendCandidateProfiles/)
   console.log("  ✓ Source guards against stale sender daily cap + reloads profiles between runs")
 
   for (const sendsToday of [0, 1, 4]) {

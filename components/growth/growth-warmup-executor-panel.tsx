@@ -285,6 +285,29 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
           fake replies. {WARMUP_MANUAL_RUN_BEHAVIOR}
         </p>
         <p className="mb-2 text-xs text-muted-foreground">{formatWarmupCronAvailability()}</p>
+        {schemaReady ? (
+          <p className="mb-3 rounded-md border border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Recipient pool</span>
+            {" · "}
+            {recipients.filter((row) => row.active && row.approved).length} approved recipient(s) available
+            {" · "}
+            {profiles.filter((row) => row.status === "warming").length} warming sender(s)
+            {preview?.runSummary?.poolPressureMessage ?? preview?.recipientPoolSummary?.poolPressureMessage ? (
+              <>
+                {" · "}
+                {preview.runSummary?.poolPressureMessage ?? preview.recipientPoolSummary?.poolPressureMessage}
+              </>
+            ) : lastRunBreakdown?.poolPressureMessage ? (
+              <> · {lastRunBreakdown.poolPressureMessage}</>
+            ) : null}
+            {preview?.runSummary?.waitingProfilesThisRun != null &&
+            preview.runSummary.waitingProfilesThisRun > 0 ? (
+              <span className="mt-1 block text-amber-800">
+                {preview.runSummary.waitingProfilesThisRun} sender(s) will wait this run.
+              </span>
+            ) : null}
+          </p>
+        ) : null}
         <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
           <GrowthBadge
             label={`Build: ${executorBuildMarker ?? GROWTH_WARMUP_EXECUTOR_BUILD_MARKER}`}
@@ -310,7 +333,13 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
             <p className="font-medium">
               Last batch: {lastRunBreakdown.sent} sent · {lastRunBreakdown.planned} planned ·{" "}
               {lastRunBreakdown.eligibleProfiles} eligible
+              {lastRunBreakdown.waitingProfilesThisRun > 0
+                ? ` · ${lastRunBreakdown.waitingProfilesThisRun} waiting`
+                : ""}
             </p>
+            {lastRunBreakdown.poolPressureMessage ? (
+              <p className="mt-2 text-muted-foreground">{lastRunBreakdown.poolPressureMessage}</p>
+            ) : null}
             {lastRunBreakdown.sent === 0 && lastRunBreakdown.noSendExplanation ? (
               <p className="mt-2 text-amber-800">{lastRunBreakdown.noSendExplanation}</p>
             ) : null}
@@ -545,6 +574,23 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
                           preview.senderResults.reduce((s, r) => s + r.sent, 0))}{" "}
                       warmup message(s) now ({preview.profilesScanned} scanned).
                     </p>
+                    {preview.runSummary?.poolPressureMessage ?? preview.recipientPoolSummary?.poolPressureMessage ? (
+                      <p className="text-muted-foreground">
+                        {preview.runSummary?.poolPressureMessage ?? preview.recipientPoolSummary?.poolPressureMessage}
+                      </p>
+                    ) : null}
+                    {(preview.recipientPoolSummary?.activeApprovedRecipients ?? recipients.filter((r) => r.active && r.approved).length) >
+                      0 ? (
+                      <p className="text-muted-foreground">
+                        Available recipients:{" "}
+                        {preview.recipientPoolSummary?.availableNow ??
+                          recipients.filter((r) => r.active && r.approved).length}{" "}
+                        · Eligible profiles: {preview.runSummary?.eligibleProfiles ?? 0}
+                        {(preview.runSummary?.waitingProfilesThisRun ?? 0) > 0
+                          ? ` · Waiting: ${preview.runSummary?.waitingProfilesThisRun}`
+                          : ""}
+                      </p>
+                    ) : null}
                     {(preview.profileDiagnostics ?? executorStats.map(diagnosticForStat).filter(Boolean)).length >
                     0 ? (
                       <ul className="list-disc space-y-1 pl-4 text-muted-foreground">

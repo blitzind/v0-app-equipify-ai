@@ -65,6 +65,8 @@ export async function selectWarmupRecipientForSend(
   })
 
   for (const recipient of sorted) {
+    if (profileUsedToday.has(recipient.email.toLowerCase())) continue
+
     const dailyCount = await countRecipientSendsSince(admin, recipient.id, dayStart)
     if (dailyCount >= recipient.max_emails_per_day) continue
 
