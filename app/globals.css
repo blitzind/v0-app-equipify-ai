@@ -364,6 +364,17 @@
     padding-bottom: max(var(--aiden-safe-area-bottom), 1.5rem);
   }
 
+  /*
+   * GE-AUTO-UI-4 — Growth workspace settings must fill main content width.
+   * Applied when settings shell or workspace shell marks full-width mode.
+   */
+  #main-content > [data-growth-settings-full-width="true"] {
+    width: 100% !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
   .growth-workspace-safe-area {
     padding-right: max(var(--aiden-safe-area-right), env(safe-area-inset-right, 0px));
     padding-bottom: max(var(--aiden-safe-area-bottom), 1.5rem);

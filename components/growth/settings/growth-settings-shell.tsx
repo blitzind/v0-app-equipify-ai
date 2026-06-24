@@ -12,10 +12,12 @@ import {
 import {
   GROWTH_WORKSPACE_SETTINGS_SHELL_BODY,
   GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT,
+  GROWTH_WORKSPACE_SETTINGS_SHELL_HEADER,
   GROWTH_WORKSPACE_SETTINGS_SHELL_LAYOUT_QA_MARKER,
   GROWTH_WORKSPACE_SETTINGS_SHELL_ROOT,
   GROWTH_WORKSPACE_SETTINGS_SHELL_SIDEBAR,
 } from "@/lib/growth/settings/growth-workspace-settings-shell-tokens"
+import { GrowthSettingsShellWidthEnforcer } from "@/components/growth/settings/growth-settings-shell-width-enforcer"
 import { cn } from "@/lib/utils"
 import { NAV_ROW_ACTIVE_SIDEBAR, NAV_SIDEBAR_ACTIVE_INDICATOR } from "@/lib/navigation-chrome"
 
@@ -31,9 +33,14 @@ export function GrowthSettingsShell({ children }: GrowthSettingsShellProps) {
       className={GROWTH_WORKSPACE_SETTINGS_SHELL_ROOT}
       data-qa-marker={GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER}
       data-growth-settings-shell={GROWTH_WORKSPACE_SETTINGS_SHELL_LAYOUT_QA_MARKER}
+      data-growth-settings-layout-root
       data-growth-settings-full-width="true"
     >
-      <section className="w-full min-w-0 max-w-none rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <GrowthSettingsShellWidthEnforcer />
+      <section
+        className={GROWTH_WORKSPACE_SETTINGS_SHELL_HEADER}
+        data-growth-settings-header
+      >
         <div className="flex items-start gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600">
             <Settings2 size={17} />
@@ -47,7 +54,7 @@ export function GrowthSettingsShell({ children }: GrowthSettingsShellProps) {
         </div>
       </section>
 
-      <div className={GROWTH_WORKSPACE_SETTINGS_SHELL_BODY}>
+      <div className={GROWTH_WORKSPACE_SETTINGS_SHELL_BODY} data-growth-settings-body>
         <nav
           aria-label="Growth settings sections"
           className={GROWTH_WORKSPACE_SETTINGS_SHELL_SIDEBAR}
@@ -83,7 +90,9 @@ export function GrowthSettingsShell({ children }: GrowthSettingsShellProps) {
           </div>
         </nav>
 
-        <div className={GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT}>{children}</div>
+        <div className={GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT} data-growth-settings-content>
+          {children}
+        </div>
       </div>
     </div>
   )

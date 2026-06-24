@@ -44,7 +44,7 @@ function main(): void {
   console.log("  ✓ Settings pathname helper includes trailing-slash variants")
 
   const growthShell = readSource("components/growth/shell/growth-workspace-shell.tsx")
-  assert.match(growthShell, /isGrowthWorkspaceSettingsPathname/)
+  assert.match(growthShell, /useGrowthWorkspaceSettingsRoute/)
   assert.match(growthShell, /GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER/)
   assert.match(growthShell, /max-w-none mx-0/)
   assert.match(growthShell, /min-w-0 w-full flex-1/)

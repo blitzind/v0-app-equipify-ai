@@ -18,7 +18,7 @@ function testSettingsMainInnerHasNoMaxWidth() {
   const match = tokens.match(/WORKSPACE_SETTINGS_SHELL_MAIN_INNER\s*=\s*\n?\s*"([^"]+)"/)
   assert.ok(match, "WORKSPACE_SETTINGS_SHELL_MAIN_INNER constant expected")
   const classes = match[1]
-  assert.ok(!/\bmax-w-/.test(classes), "settings main inner must not cap max-width")
+  assert.ok(!/\bmax-w-/.test(classes) || /\bmax-w-none\b/.test(classes), "settings main inner must not cap max-width")
   assert.match(classes, /\bflex-1\b|\bw-full\b/)
   assert.match(classes, /\bmin-w-0\b/)
 

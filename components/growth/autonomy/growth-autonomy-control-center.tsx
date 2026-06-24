@@ -131,8 +131,9 @@ export function GrowthAutonomyControlCenter() {
 
   return (
     <div
-      className="w-full min-w-0 space-y-6"
+      className="w-full min-w-0 max-w-none space-y-6"
       data-qa-marker={GE_AUTO_UI_2_QA_MARKER}
+      data-growth-autonomy-control-center
     >
       <Card className="border-violet-200/60 bg-gradient-to-br from-violet-50/80 via-background to-background dark:border-violet-900/40 dark:from-violet-950/20">
         <CardHeader className="gap-4 pb-4">

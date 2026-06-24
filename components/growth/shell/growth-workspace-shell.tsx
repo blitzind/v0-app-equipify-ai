@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, type ComponentPropsWithoutRef, type ReactNode } from "react"
-import { usePathname } from "next/navigation"
 import { GrowthWorkspaceShellPreferencesProvider, useGrowthWorkspaceShellPreferences } from "@/components/growth/settings/growth-workspace-shell-preferences-context"
+import { useGrowthWorkspaceSettingsRoute } from "@/lib/growth/settings/use-growth-workspace-settings-route"
 import { GrowthBreadcrumbProvider } from "@/components/growth/shell/growth-breadcrumb-context"
 import { GrowthBreadcrumbs } from "@/components/growth/shell/growth-breadcrumbs"
 import { GROWTH_WORKSPACE_SHELL_QA_MARKER } from "@/components/growth/shell/growth-brand"
@@ -12,7 +12,6 @@ import { GrowthSidebar } from "@/components/growth/shell/growth-sidebar"
 import { GrowthTopbar } from "@/components/growth/shell/growth-topbar"
 import { WorkspaceShellSkipLink } from "@/components/workspace/workspace-shell-skip-link"
 import { GROWTH_WORKSPACE_SETTINGS_CONSUMPTION_QA_MARKER } from "@/lib/growth/settings/growth-workspace-settings-consumption"
-import { isGrowthWorkspaceSettingsPathname } from "@/lib/growth/navigation/growth-workspace-settings-paths"
 import {
   GROWTH_AIDEN_SAFE_AREA_PB_SCROLL,
   GROWTH_AIDEN_SAFE_AREA_PR,
@@ -39,9 +38,8 @@ type GrowthWorkspaceShellProps = {
 
 function GrowthWorkspaceShellInner({ children }: GrowthWorkspaceShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const pathname = usePathname()
+  const isSettingsRoute = useGrowthWorkspaceSettingsRoute()
   const { personal } = useGrowthWorkspaceShellPreferences()
-  const isSettingsRoute = isGrowthWorkspaceSettingsPathname(pathname)
   const mainInnerClass = isSettingsRoute
     ? GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER
     : GROWTH_WORKSPACE_SHELL_MAIN_INNER

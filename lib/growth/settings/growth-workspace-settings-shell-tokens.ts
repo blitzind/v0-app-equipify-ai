@@ -8,13 +8,16 @@ import {
 } from "@/lib/workspace/workspace-shell-tokens"
 
 export const GROWTH_WORKSPACE_SETTINGS_SHELL_LAYOUT_QA_MARKER =
-  "growth-workspace-settings-shell-layout-ui-3-v1" as const
+  "growth-workspace-settings-shell-layout-ui-4-v1" as const
 
 /** Reuse Core settings main inner — full width, no max-w cap. */
 export const GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER = WORKSPACE_SETTINGS_SHELL_MAIN_INNER
 
 export const GROWTH_WORKSPACE_SETTINGS_SHELL_ROOT =
   "flex w-full min-w-0 max-w-none flex-col gap-6" as const
+
+export const GROWTH_WORKSPACE_SETTINGS_SHELL_HEADER =
+  "w-full min-w-0 max-w-none rounded-2xl border border-border bg-card p-5 shadow-sm" as const
 
 export const GROWTH_WORKSPACE_SETTINGS_SHELL_BODY =
   "flex w-full min-w-0 max-w-none flex-col gap-6 lg:flex-row lg:items-start" as const

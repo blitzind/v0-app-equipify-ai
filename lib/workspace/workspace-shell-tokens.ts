@@ -16,7 +16,7 @@ export const WORKSPACE_SHELL_MAIN_INNER =
  * Applied by `PageShell` when pathname is under `/settings/*`.
  */
 export const WORKSPACE_SETTINGS_SHELL_MAIN_INNER =
-  "w-full min-w-0 p-3 sm:p-6 pb-24 lg:pb-6" as const
+  "w-full min-w-0 max-w-none mx-0 p-3 sm:p-6 pb-24 lg:pb-6" as const
 
 /**
  * Growth workspace main inner — FAB clearance on small viewports without the large
