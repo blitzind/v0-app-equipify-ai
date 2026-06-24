@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
+import { GrowthMediaPicker } from "@/components/growth/media-library/growth-media-picker"
 import { useGrowthBreadcrumbDetail } from "@/components/growth/shell/growth-breadcrumb-context"
 import {
   GrowthVideoPagePreviewCard,
@@ -395,23 +396,13 @@ export function GrowthVideoPageCreatePanel() {
 
             <GrowthVideoPageStepCard step={4} title="Branding" icon={Palette}>
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="logoUrl">Logo URL</Label>
-                  <Input
-                    id="logoUrl"
-                    value={logoUrl}
-                    onChange={(e) => setLogoUrl(e.target.value)}
-                    placeholder="https://"
-                    inputMode="url"
-                  />
-                  {logoUrl.trim() ? (
-                    <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-3">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={logoUrl.trim()} alt="" className="h-8 w-auto max-w-[160px] object-contain" />
-                      <span className="text-xs text-muted-foreground">Logo preview</span>
-                    </div>
-                  ) : null}
-                </div>
+                <GrowthMediaPicker
+                  label="Logo"
+                  value={logoUrl}
+                  acceptedTypes={["logo", "image"]}
+                  allowManualUrl
+                  onChange={setLogoUrl}
+                />
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">

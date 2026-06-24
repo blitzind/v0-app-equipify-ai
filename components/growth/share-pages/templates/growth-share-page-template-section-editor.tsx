@@ -13,6 +13,7 @@ import { createTestimonialEntry } from "@/lib/growth/share-pages/share-page-temp
 import type { GrowthSharePageTemplateBlock } from "@/lib/growth/share-pages/share-page-template-block-types"
 import type { GrowthBookingPageListItem } from "@/lib/growth/booking/booking-page-types"
 import { GROWTH_SHARE_PAGE_PUBLIC_THEME_MODES } from "@/lib/growth/share-pages/share-page-types"
+import { GrowthMediaPicker } from "@/components/growth/media-library/growth-media-picker"
 import { GrowthSharePageTemplateVideoAssetPanel } from "@/components/growth/share-pages/templates/growth-share-page-template-video-asset-panel"
 
 function Field({
@@ -112,20 +113,20 @@ export function GrowthSharePageTemplateSectionEditor({
             />
             Show logo from theme
           </label>
-          <Field label="Hero image URL">
-            <Input
-              value={block.heroMediaUrl ?? ""}
-              disabled={disabled}
-              onChange={(e) =>
-                onChange({
-                  ...block,
-                  heroMediaType: e.target.value ? "image" : "none",
-                  heroMediaUrl: e.target.value || null,
-                })
-              }
-              placeholder="https://..."
-            />
-          </Field>
+          <GrowthMediaPicker
+            label="Hero image"
+            value={block.heroMediaUrl ?? ""}
+            disabled={disabled}
+            acceptedTypes={["hero", "image"]}
+            allowManualUrl
+            onChange={(url) =>
+              onChange({
+                ...block,
+                heroMediaType: url ? "image" : "none",
+                heroMediaUrl: url || null,
+              })
+            }
+          />
         </>
       ) : null}
 
@@ -147,9 +148,14 @@ export function GrowthSharePageTemplateSectionEditor({
 
       {block.type === "image" ? (
         <>
-          <Field label="Image URL">
-            <Input value={block.imageUrl ?? ""} disabled={disabled} onChange={(e) => onChange({ ...block, imageUrl: e.target.value || null })} />
-          </Field>
+          <GrowthMediaPicker
+            label="Image"
+            value={block.imageUrl ?? ""}
+            disabled={disabled}
+            acceptedTypes={["image", "hero"]}
+            allowManualUrl
+            onChange={(url) => onChange({ ...block, imageUrl: url || null })}
+          />
           <Field label="Alt text">
             <Input value={block.altText} disabled={disabled} onChange={(e) => onChange({ ...block, altText: e.target.value })} />
           </Field>

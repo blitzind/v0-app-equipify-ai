@@ -15,6 +15,7 @@ import {
   GrowthSettingsSectionForm,
   GrowthSettingsSectionLoadingState,
 } from "@/components/growth/settings/growth-settings-section-form-state"
+import { GrowthMediaPicker } from "@/components/growth/media-library/growth-media-picker"
 import { GrowthVideoSettingsSectionLayout } from "@/components/growth/videos/growth-video-settings-section-layout"
 import { useGrowthVideoSettings } from "@/hooks/growth/use-growth-video-settings"
 import type { GrowthVideoSettingsBranding } from "@/lib/growth/videos/growth-video-settings-types"
@@ -55,11 +56,12 @@ export function GrowthVideoBrandingSettingsPanel() {
           <div className={GROWTH_SETTINGS_SECTION_GAP}>
             <GrowthSettingsCard title="Visual defaults">
               <div className={GROWTH_SETTINGS_FORM_GAP}>
-                <GrowthSettingsField label="Logo URL">
-                  <Input
+                <GrowthSettingsField label="Logo">
+                  <GrowthMediaPicker
                     value={draft.logoUrl ?? ""}
-                    onChange={(event) => setDraft((current) => ({ ...current!, logoUrl: event.target.value || null }))}
-                    placeholder="https://…"
+                    acceptedTypes={["logo", "image"]}
+                    allowManualUrl
+                    onChange={(url) => setDraft((current) => ({ ...current!, logoUrl: url || null }))}
                   />
                 </GrowthSettingsField>
                 <GrowthSettingsField label="Primary color">

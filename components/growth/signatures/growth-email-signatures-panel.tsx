@@ -541,6 +541,15 @@ export function GrowthEmailSignaturesPanel() {
                   <Label>LinkedIn URL</Label>
                   <Input value={form.linkedinUrl} onChange={(e) => setForm((f) => ({ ...f, linkedinUrl: e.target.value }))} />
                 </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <GrowthMediaPicker
+                    label="Team photo"
+                    value={form.avatarUrl}
+                    acceptedTypes={["team"]}
+                    allowManualUrl
+                    onChange={(url) => setForm((f) => ({ ...f, avatarUrl: url }))}
+                  />
+                </div>
               </div>
             </FormSection>
 

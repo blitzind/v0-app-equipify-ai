@@ -296,6 +296,8 @@
     "test:growth-automation-builder:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-automation-builder.ts --production",
     "test:growth-media-assets": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-media-assets.ts",
     "test:growth-media-library-1a": "tsx scripts/test-growth-media-library-1a.ts",
+    "test:growth-media-library-1b": "tsx scripts/test-growth-media-library-1b.ts",
+    "test:growth-media-library-2a": "tsx scripts/test-growth-media-library-2a.ts",
     "test:growth-media-assets:integration": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-media-assets.ts --integration",
     "test:growth-media-assets:production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-media-assets.ts --production",
     "test:growth-engagement-dashboard": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-engagement-dashboard.ts",

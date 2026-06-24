@@ -2,15 +2,22 @@
 
 export const GROWTH_MEDIA_LIBRARY_QA_MARKER = "growth-media-library-1a-v1" as const
 
+export const GROWTH_MEDIA_LIBRARY_1B_QA_MARKER = "growth-media-library-1b-v1" as const
+
+export const GROWTH_MEDIA_LIBRARY_2A_QA_MARKER = "growth-media-library-2a-v1" as const
+
 export const GROWTH_MEDIA_LIBRARY_TAG = "growth-media-library" as const
 
 export const GROWTH_MEDIA_LIBRARY_KIND_TAGS = {
   image: "library-kind:image",
   logo: "library-kind:logo",
+  team: "library-kind:team",
+  hero: "library-kind:hero",
+  /** @deprecated Legacy tag — resolves to team */
   avatar: "library-kind:avatar",
 } as const
 
-export type GrowthMediaLibraryKind = keyof typeof GROWTH_MEDIA_LIBRARY_KIND_TAGS
+export type GrowthMediaLibraryKind = "logo" | "team" | "hero" | "image"
 
 export const GROWTH_MEDIA_LIBRARY_MIME_TYPES = [
   "image/jpeg",

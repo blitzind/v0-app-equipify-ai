@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
+import { GrowthMediaPicker } from "@/components/growth/media-library/growth-media-picker"
 import type {
   GrowthVideoThumbnailAiPayload,
   GrowthVideoThumbnailMetadata,
@@ -209,9 +210,14 @@ export function GrowthVideoPageThumbnailSection({ pageId }: { pageId: string }) 
               <Label>Title</Label>
               <Input value={title} onChange={(e) => setTitle(e.target.value)} />
             </div>
-            <div className="space-y-2">
-              <Label>Company Logo URL</Label>
-              <Input value={companyLogoUrl} onChange={(e) => setCompanyLogoUrl(e.target.value)} />
+            <div className="space-y-2 sm:col-span-2">
+              <GrowthMediaPicker
+                label="Company logo"
+                value={companyLogoUrl}
+                acceptedTypes={["logo", "image"]}
+                allowManualUrl
+                onChange={setCompanyLogoUrl}
+              />
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label>CTA Label</Label>

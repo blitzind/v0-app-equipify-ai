@@ -81,14 +81,14 @@ export function GrowthSharePageTemplateSettingsPanel({
         />
       </div>
 
-      <div className="space-y-1.5">
-        <Label className="text-xs">Preview image URL</Label>
-        <Input
-          value={metadata.previewImageUrl ?? ""}
-          disabled={disabled}
-          onChange={(e) => onMetadataChange({ ...metadata, previewImageUrl: e.target.value || null })}
-        />
-      </div>
+      <GrowthMediaPicker
+        label="Preview image"
+        value={metadata.previewImageUrl ?? ""}
+        disabled={disabled}
+        acceptedTypes={["image", "hero"]}
+        allowManualUrl
+        onChange={(url) => onMetadataChange({ ...metadata, previewImageUrl: url || null })}
+      />
 
       <label className="flex items-center gap-2 text-sm text-muted-foreground">
         <input type="checkbox" checked disabled readOnly />
@@ -127,7 +127,7 @@ export function GrowthSharePageTemplateSettingsPanel({
           label="Hero image"
           value={theme.heroImageUrl ?? ""}
           disabled={disabled}
-          acceptedTypes={["image"]}
+          acceptedTypes={["hero", "image"]}
           allowManualUrl
           onChange={(url) => onThemeChange({ ...theme, heroImageUrl: url || null })}
         />

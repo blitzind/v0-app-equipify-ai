@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { Loader2, User } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   GrowthSettingsCard,
@@ -15,6 +14,7 @@ import {
   GrowthSettingsSectionForm,
   GrowthSettingsSectionLoadingState,
 } from "@/components/growth/settings/growth-settings-section-form-state"
+import { GrowthMediaPicker } from "@/components/growth/media-library/growth-media-picker"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 import { useGrowthWorkspaceSettingsResource } from "@/hooks/growth/use-growth-workspace-settings-resource"
 import { GROWTH_WORKSPACE_SETTINGS_TIMEZONE_OPTIONS } from "@/lib/growth/settings/growth-workspace-settings-options"
@@ -131,40 +131,20 @@ export function GrowthSettingsProfilePanel() {
               </GrowthSettingsField>
 
               <GrowthSettingsField
-                label="Avatar URL"
-                description="Public image URL for your operator avatar."
+                label="Team photo"
+                description="Headshot stored in the Growth media library and reused across surfaces."
               >
-                <Input
+                <GrowthMediaPicker
                   value={draft.avatarUrl}
-                  onChange={(event) => setDraft((current) => ({ ...current, avatarUrl: event.target.value }))}
-                  onBlur={() => void commitField("avatarUrl")}
+                  acceptedTypes={["team"]}
+                  allowManualUrl
                   disabled={saving}
-                  placeholder="https://…"
+                  onChange={(url) => {
+                    setDraft((current) => ({ ...current, avatarUrl: url }))
+                    void patch({ avatarUrl: url })
+                  }}
                 />
               </GrowthSettingsField>
-
-              {draft.avatarUrl ? (
-                <div className="flex items-center gap-3 rounded-lg border border-border/70 px-3 py-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={draft.avatarUrl}
-                    alt=""
-                    className="size-10 rounded-full object-cover"
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={saving}
-                    onClick={() => {
-                      setDraft((current) => ({ ...current, avatarUrl: "" }))
-                      void patch({ avatarUrl: "" })
-                    }}
-                  >
-                    Clear avatar URL
-                  </Button>
-                </div>
-              ) : null}
             </div>
           </GrowthSettingsCard>
         </GrowthSettingsSectionForm>

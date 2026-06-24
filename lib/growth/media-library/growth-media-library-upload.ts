@@ -3,8 +3,14 @@ import {
   type GrowthMediaLibraryAsset,
   type GrowthMediaLibraryKind,
 } from "@/lib/growth/media-library/growth-media-library-types"
+import { readImageFileDimensions } from "@/lib/growth/media-library/growth-media-library-format"
 import { validateGrowthMediaLibraryFile } from "@/lib/growth/media-library/growth-media-library-validation"
+import {
+  GROWTH_MEDIA_LIBRARY_TAG,
+  growthMediaLibraryKindTag,
+} from "@/lib/growth/media-library/growth-media-library-types"
 import { buildGrowthMediaLibraryPublicUrl } from "@/lib/growth/media-library/growth-media-library-url"
+import { normalizeGrowthMediaLibraryPersistedUrl } from "@/lib/growth/media-library/growth-media-library-canonical-url"
 
 export type GrowthMediaLibraryUploadResult = {
   asset: GrowthMediaLibraryAsset
@@ -76,6 +82,7 @@ export async function uploadGrowthMediaLibraryFile(input: {
   await uploadFileToSignedUrl(writeUrl, input.file)
 
   input.onProgress?.("Finalizing…")
+  const dimensions = await readImageFileDimensions(input.file)
   const completeResponse = await fetch(
     `/api/platform/growth/media-assets/${sessionPayload.asset.id}/complete-upload`,
     {
@@ -93,13 +100,27 @@ export async function uploadGrowthMediaLibraryFile(input: {
     throw new Error(completePayload.error ?? completePayload.message ?? "upload_complete_failed")
   }
 
-  const origin = typeof window !== "undefined" ? window.location.origin : null
-  const publicUrl =
-    sessionPayload.public_url ?? buildGrowthMediaLibraryPublicUrl(sessionPayload.asset.id, origin)
+  if (dimensions) {
+    await fetch(`/api/platform/growth/media-assets/${sessionPayload.asset.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        width: dimensions.width,
+        height: dimensions.height,
+      }),
+    })
+  }
+
+  const publicUrl = normalizeGrowthMediaLibraryPersistedUrl(
+    sessionPayload.public_url ?? buildGrowthMediaLibraryPublicUrl(sessionPayload.asset.id),
+    { assetId: sessionPayload.asset.id },
+  )
 
   return {
     asset: {
       ...sessionPayload.asset,
+      width: dimensions?.width ?? sessionPayload.asset.width,
+      height: dimensions?.height ?? sessionPayload.asset.height,
       publicUrl,
       previewUrl: publicUrl,
     },
@@ -108,11 +129,13 @@ export async function uploadGrowthMediaLibraryFile(input: {
 }
 
 export async function listGrowthMediaLibraryAssets(input?: {
-  libraryKind?: GrowthMediaLibraryKind
+  libraryKind?: GrowthMediaLibraryKind | "all"
   search?: string
 }): Promise<GrowthMediaLibraryAsset[]> {
   const params = new URLSearchParams({ library: "1", limit: "100" })
-  if (input?.libraryKind) params.set("library_kind", input.libraryKind)
+  if (input?.libraryKind && input.libraryKind !== "all") {
+    params.set("library_kind", input.libraryKind)
+  }
   if (input?.search?.trim()) params.set("search", input.search.trim())
 
   const response = await fetch(`/api/platform/growth/media-assets?${params.toString()}`, {
@@ -127,6 +150,38 @@ export async function listGrowthMediaLibraryAssets(input?: {
     throw new Error(payload.error ?? "library_list_failed")
   }
   return payload.items ?? []
+}
+
+export async function updateGrowthMediaLibraryAsset(input: {
+  assetId: string
+  title?: string
+  altText?: string | null
+  libraryKind?: GrowthMediaLibraryKind
+}): Promise<void> {
+  const body: Record<string, unknown> = {}
+  if (input.title !== undefined) body.title = input.title.trim()
+  if (input.altText !== undefined) body.metadata = { alt_text: input.altText?.trim() || null }
+  if (input.libraryKind) {
+    body.tags = [GROWTH_MEDIA_LIBRARY_TAG, growthMediaLibraryKindTag(input.libraryKind)]
+  }
+
+  const response = await fetch(`/api/platform/growth/media-assets/${input.assetId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+  const payload = (await response.json()) as { ok?: boolean; error?: string }
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error ?? "update_failed")
+  }
+}
+
+export async function archiveGrowthMediaLibraryAsset(assetId: string): Promise<void> {
+  const response = await fetch(`/api/platform/growth/media-assets/${assetId}`, { method: "DELETE" })
+  const payload = (await response.json()) as { ok?: boolean; error?: string }
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.error ?? "archive_failed")
+  }
 }
 
 export { GROWTH_MEDIA_LIBRARY_ACCEPT_ATTR }

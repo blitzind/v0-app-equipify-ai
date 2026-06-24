@@ -1,5 +1,6 @@
 import type { GrowthMediaLibraryKind } from "@/lib/growth/media-library/growth-media-library-types"
 import { GROWTH_MEDIA_LIBRARY_KIND_TAGS } from "@/lib/growth/media-library/growth-media-library-types"
+import { buildCanonicalGrowthMediaLibraryPublicUrl } from "@/lib/growth/media-library/growth-media-library-canonical-url"
 
 export const GROWTH_MEDIA_LIBRARY_CONTENT_PATH_PREFIX = "/api/growth/media-library" as const
 
@@ -8,16 +9,18 @@ export function buildGrowthMediaLibraryContentPath(assetId: string): string {
 }
 
 export function buildGrowthMediaLibraryPublicUrl(assetId: string, origin?: string | null): string {
-  const path = buildGrowthMediaLibraryContentPath(assetId)
-  if (origin && origin.trim()) {
-    return `${origin.trim().replace(/\/$/, "")}${path}`
-  }
-  return path
+  return buildCanonicalGrowthMediaLibraryPublicUrl(assetId, origin)
 }
 
 export function resolveGrowthMediaLibraryKindFromTags(tags: string[]): GrowthMediaLibraryKind {
   if (tags.includes(GROWTH_MEDIA_LIBRARY_KIND_TAGS.logo)) return "logo"
-  if (tags.includes(GROWTH_MEDIA_LIBRARY_KIND_TAGS.avatar)) return "avatar"
+  if (tags.includes(GROWTH_MEDIA_LIBRARY_KIND_TAGS.hero)) return "hero"
+  if (
+    tags.includes(GROWTH_MEDIA_LIBRARY_KIND_TAGS.team) ||
+    tags.includes(GROWTH_MEDIA_LIBRARY_KIND_TAGS.avatar)
+  ) {
+    return "team"
+  }
   return "image"
 }
 
