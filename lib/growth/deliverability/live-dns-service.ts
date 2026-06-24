@@ -3,6 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import {
   isLiveDnsVerificationEnabled,
+  normalizeLiveDnsRawResponses,
   verifyDomainDnsLive,
   type LiveDnsVerifyResult,
 } from "@/lib/growth/deliverability/live-dns-verifier"
@@ -31,6 +32,11 @@ async function persistLiveDnsCheck(
   result: LiveDnsVerifyResult,
 ): Promise<void> {
   const now = new Date().toISOString()
+  const raw_dns_responses =
+    result.source === "live"
+      ? normalizeLiveDnsRawResponses(result.raw_dns_responses)
+      : result.raw_dns_responses
+
   await dnsChecksTable(admin).insert({
     domain_id: domainId,
     spf_present: result.check.spf_present,
@@ -50,7 +56,7 @@ async function persistLiveDnsCheck(
     last_verified_at: result.last_verified_at,
     verification_source: result.source,
     verification_error: result.verification_error,
-    raw_dns_responses: result.raw_dns_responses,
+    raw_dns_responses,
     probe_duration_ms: result.probe_duration_ms,
     updated_at: now,
   })

@@ -1,6 +1,6 @@
 import "server-only"
 
-import { promises as dns } from "node:dns"
+import { Resolver } from "node:dns/promises"
 import { evaluateDnsHealth } from "@/lib/growth/deliverability/dns-health"
 import { generateDnsWarnings, generateDnsRecommendations } from "@/lib/growth/deliverability/dns-recommendations"
 import type { GrowthDnsCheckResult } from "@/lib/growth/deliverability/deliverability-types"
@@ -27,28 +27,85 @@ export type LiveDnsVerifyResult = {
   tracking_domain_ready: boolean
 }
 
+export type LiveDnsProbeLogEntry = {
+  domain: string
+  resolver_used: string[]
+  spf_records_returned: string[]
+  dmarc_records_returned: string[]
+  dkim_selector_attempted: string | null
+  resolver_error: string | null
+}
+
+const PUBLIC_DNS_RESOLVERS = ["1.1.1.1", "1.0.0.1", "8.8.8.8", "8.8.4.4"] as const
+
+const RECOVERABLE_DNS_ERROR_CODES = new Set([
+  "ENODATA",
+  "ENOTFOUND",
+  "ETIMEOUT",
+  "ETIMEDOUT",
+  "ESERVFAIL",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EAI_AGAIN",
+])
+
 const DEFAULT_DKIM_SELECTORS = ["google", "default", "s1", "selector1", "k1"]
+
+const EMPTY_DKIM_PROBE = {
+  present: false,
+  valid: false,
+  selector: null as string | null,
+  records: [] as string[],
+}
 
 function normalizeDomain(domain: string): string {
   return domain.trim().toLowerCase().replace(/^@/, "")
 }
 
-async function resolveTxtSafe(name: string): Promise<string[][]> {
-  try {
-    return await dns.resolveTxt(name)
-  } catch (error) {
+function createPublicDnsResolver(): Resolver {
+  const resolver = new Resolver()
+  resolver.setServers([...PUBLIC_DNS_RESOLVERS])
+  return resolver
+}
+
+function resolverErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
     const code = (error as NodeJS.ErrnoException).code
-    if (code === "ENODATA" || code === "ENOTFOUND") return []
+    return code ? `${code}: ${error.message}` : error.message
+  }
+  return String(error)
+}
+
+function isRecoverableDnsError(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException).code
+  return typeof code === "string" && RECOVERABLE_DNS_ERROR_CODES.has(code)
+}
+
+function logLiveDnsProbe(entry: LiveDnsProbeLogEntry): void {
+  console.info("[growth-live-dns]", JSON.stringify(entry))
+}
+
+async function resolveTxtSafe(resolver: Resolver, name: string): Promise<{ records: string[][]; error: string | null }> {
+  try {
+    return { records: await resolver.resolveTxt(name), error: null }
+  } catch (error) {
+    if (isRecoverableDnsError(error)) {
+      return { records: [], error: resolverErrorMessage(error) }
+    }
     throw error
   }
 }
 
-async function resolveMxSafe(domain: string): Promise<Array<{ exchange: string; priority: number }>> {
+async function resolveMxSafe(
+  resolver: Resolver,
+  domain: string,
+): Promise<{ records: Array<{ exchange: string; priority: number }>; error: string | null }> {
   try {
-    return await dns.resolveMx(domain)
+    return { records: await resolver.resolveMx(domain), error: null }
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code
-    if (code === "ENODATA" || code === "ENOTFOUND") return []
+    if (isRecoverableDnsError(error)) {
+      return { records: [], error: resolverErrorMessage(error) }
+    }
     throw error
   }
 }
@@ -77,16 +134,40 @@ function validateDmarc(dmarc: string | null): { present: boolean; valid: boolean
   return { present: true, valid }
 }
 
-async function probeDkim(domain: string, selectors: string[]): Promise<{ present: boolean; valid: boolean; selector: string | null; records: string[] }> {
+async function probeDkim(
+  resolver: Resolver,
+  domain: string,
+  selectors: string[],
+  probeLog: LiveDnsProbeLogEntry[],
+): Promise<{ present: boolean; valid: boolean; selector: string | null; records: string[]; selector_errors: string[] }> {
+  const selector_errors: string[] = []
+
   for (const selector of selectors) {
     const host = `${selector}._domainkey.${domain}`
-    const txt = flattenTxt(await resolveTxtSafe(host))
+    const { records: txtChunks, error } = await resolveTxtSafe(resolver, host)
+    const txt = flattenTxt(txtChunks)
+
+    probeLog.push({
+      domain,
+      resolver_used: [...PUBLIC_DNS_RESOLVERS],
+      spf_records_returned: [],
+      dmarc_records_returned: [],
+      dkim_selector_attempted: selector,
+      resolver_error: error,
+    })
+
+    if (error) {
+      selector_errors.push(`${selector}: ${error}`)
+      continue
+    }
+
     const dkim = txt.find((record) => record.includes("v=DKIM1") || record.includes("p="))
     if (dkim) {
-      return { present: true, valid: dkim.includes("p="), selector, records: txt }
+      return { present: true, valid: dkim.includes("p="), selector, records: txt, selector_errors }
     }
   }
-  return { present: false, valid: false, selector: null, records: [] }
+
+  return { present: false, valid: false, selector: null, records: [], selector_errors }
 }
 
 function inferMxProvider(mxRecords: Array<{ exchange: string; priority: number }>): string | null {
@@ -101,7 +182,19 @@ export function isLiveDnsVerificationEnabled(): boolean {
   return process.env.GROWTH_LIVE_DNS_VERIFICATION?.trim() === "true"
 }
 
-/** Live DNS verification — deterministic resolver probes only. No stub fallback when enabled. */
+export function normalizeLiveDnsRawResponses(raw: Record<string, unknown>): Record<string, unknown> {
+  return {
+    resolver_used: raw.resolver_used ?? [...PUBLIC_DNS_RESOLVERS],
+    probe_log: raw.probe_log ?? [],
+    root_txt: raw.root_txt ?? [],
+    dmarc_txt: raw.dmarc_txt ?? [],
+    mx: raw.mx ?? [],
+    dkim: raw.dkim ?? EMPTY_DKIM_PROBE,
+    ...raw,
+  }
+}
+
+/** Live DNS verification — explicit public resolvers; partial results preserved on probe errors. */
 export async function verifyDomainDnsLive(input: LiveDnsVerifyInput): Promise<LiveDnsVerifyResult> {
   const started = Date.now()
   const domain = normalizeDomain(input.domain)
@@ -115,99 +208,127 @@ export async function verifyDomainDnsLive(input: LiveDnsVerifyInput): Promise<Li
     throw new Error("live_dns_verification_disabled")
   }
 
-  const raw_dns_responses: Record<string, unknown> = {}
+  const resolver = createPublicDnsResolver()
+  const probeLog: LiveDnsProbeLogEntry[] = []
+  const raw_dns_responses: Record<string, unknown> = {
+    resolver_used: [...PUBLIC_DNS_RESOLVERS],
+    probe_log: probeLog,
+    root_txt: [],
+    dmarc_txt: [],
+    mx: [],
+    dkim: EMPTY_DKIM_PROBE,
+  }
+
   let verification_error: string | null = null
+  const warnings: string[] = []
 
-  try {
-    const rootTxt = flattenTxt(await resolveTxtSafe(domain))
-    raw_dns_responses.root_txt = rootTxt
+  const rootLookup = await resolveTxtSafe(resolver, domain)
+  const rootTxt = flattenTxt(rootLookup.records)
+  raw_dns_responses.root_txt = rootTxt
+  logLiveDnsProbe({
+    domain,
+    resolver_used: [...PUBLIC_DNS_RESOLVERS],
+    spf_records_returned: rootTxt,
+    dmarc_records_returned: [],
+    dkim_selector_attempted: null,
+    resolver_error: rootLookup.error,
+  })
+  if (rootLookup.error) {
+    warnings.push(`SPF lookup warning: ${rootLookup.error}`)
+  }
 
-    const spfRecord = findSpfRecord(rootTxt)
-    const spf = validateSpf(spfRecord)
+  const spf = validateSpf(findSpfRecord(rootTxt))
 
-    const dmarcTxt = flattenTxt(await resolveTxtSafe(`_dmarc.${domain}`))
-    raw_dns_responses.dmarc_txt = dmarcTxt
-    const dmarc = validateDmarc(findDmarcRecord(dmarcTxt))
+  const dmarcLookup = await resolveTxtSafe(resolver, `_dmarc.${domain}`)
+  const dmarcTxt = flattenTxt(dmarcLookup.records)
+  raw_dns_responses.dmarc_txt = dmarcTxt
+  logLiveDnsProbe({
+    domain,
+    resolver_used: [...PUBLIC_DNS_RESOLVERS],
+    spf_records_returned: [],
+    dmarc_records_returned: dmarcTxt,
+    dkim_selector_attempted: null,
+    resolver_error: dmarcLookup.error,
+  })
+  if (dmarcLookup.error) {
+    warnings.push(`DMARC lookup warning: ${dmarcLookup.error}`)
+  }
 
-    const mxRecords = await resolveMxSafe(domain)
-    raw_dns_responses.mx = mxRecords
-    const mx_present = mxRecords.length > 0
-    const mx_valid = mx_present
-    const mx_provider = inferMxProvider(mxRecords)
+  const dmarc = validateDmarc(findDmarcRecord(dmarcTxt))
 
-    const selectors = [...new Set([...(input.dkimSelectors ?? []), ...DEFAULT_DKIM_SELECTORS])]
-    const dkim = await probeDkim(domain, selectors)
-    raw_dns_responses.dkim = dkim
+  const mxLookup = await resolveMxSafe(resolver, domain)
+  raw_dns_responses.mx = mxLookup.records
+  if (mxLookup.error) {
+    warnings.push(`MX lookup warning: ${mxLookup.error}`)
+  }
 
-    let tracking_domain_ready = false
-    if (input.trackingDomain?.trim()) {
-      const tracking = normalizeDomain(input.trackingDomain)
-      const cname = await dns.resolveCname(tracking).catch(() => null)
+  const mx_present = mxLookup.records.length > 0
+  const mx_valid = mx_present
+  const mx_provider = inferMxProvider(mxLookup.records)
+
+  const selectors = [...new Set([...(input.dkimSelectors ?? []), ...DEFAULT_DKIM_SELECTORS])]
+  const dkim = await probeDkim(resolver, domain, selectors, probeLog)
+  raw_dns_responses.dkim = {
+    present: dkim.present,
+    valid: dkim.valid,
+    selector: dkim.selector,
+    records: dkim.records,
+    selector_errors: dkim.selector_errors,
+  }
+  if (dkim.selector_errors.length > 0) {
+    warnings.push(`DKIM selector probe warnings: ${dkim.selector_errors.join("; ")}`)
+  }
+
+  let tracking_domain_ready = false
+  if (input.trackingDomain?.trim()) {
+    const tracking = normalizeDomain(input.trackingDomain)
+    try {
+      const cname = await resolver.resolveCname(tracking).catch(() => null)
       raw_dns_responses.tracking_cname = cname
       tracking_domain_ready = Boolean(cname)
+    } catch (error) {
+      if (isRecoverableDnsError(error)) {
+        raw_dns_responses.tracking_cname = null
+        warnings.push(`Tracking domain lookup warning: ${resolverErrorMessage(error)}`)
+      } else {
+        throw error
+      }
     }
+  }
 
-    const check: GrowthDnsCheckResult = {
-      spf_present: spf.present,
-      spf_valid: spf.valid,
-      dkim_present: dkim.present,
-      dkim_valid: dkim.valid,
-      dmarc_present: dmarc.present,
-      dmarc_valid: dmarc.valid,
-      mx_present,
-      mx_valid,
-      mx_provider,
-    }
+  const check: GrowthDnsCheckResult = {
+    spf_present: spf.present,
+    spf_valid: spf.valid,
+    dkim_present: dkim.present,
+    dkim_valid: dkim.valid,
+    dmarc_present: dmarc.present,
+    dmarc_valid: dmarc.valid,
+    mx_present,
+    mx_valid,
+    mx_provider,
+  }
 
-    const evaluation = evaluateDnsHealth({ ...check, stub_mode: false })
-    const warnings = generateDnsWarnings({ ...check, stub_mode: false })
-    const recommendations = generateDnsRecommendations({ ...check, stub_mode: false })
+  const evaluation = evaluateDnsHealth({ ...check, stub_mode: false })
+  const recommendations = generateDnsRecommendations({ ...check, stub_mode: false })
+  warnings.push(...generateDnsWarnings({ ...check, stub_mode: false }))
 
-    if (!spf.valid) warnings.push("SPF record missing or invalid (live probe).")
-    if (!dkim.valid) warnings.push("DKIM record not found for configured selectors (live probe).")
-    if (!dmarc.valid) warnings.push("DMARC record missing or policy not found (live probe).")
-    if (!mx_valid) warnings.push("MX records missing (live probe).")
+  if (!spf.valid) warnings.push("SPF record missing or invalid (live probe).")
+  if (!dkim.valid) warnings.push("DKIM record not found for configured selectors (live probe).")
+  if (!dmarc.valid) warnings.push("DMARC record missing or policy not found (live probe).")
+  if (!mx_valid) warnings.push("MX records missing (live probe).")
 
-    return {
-      source: "live",
-      check,
-      dns_health_score: evaluation.dns_health_score,
-      health_tier: evaluation.health_tier,
-      warnings,
-      recommendations,
-      raw_dns_responses,
-      verification_error: null,
-      probe_duration_ms: Date.now() - started,
-      last_verified_at,
-      tracking_domain_ready,
-    }
-  } catch (error) {
-    verification_error = error instanceof Error ? error.message : String(error)
-    const emptyCheck: GrowthDnsCheckResult = {
-      spf_present: false,
-      spf_valid: false,
-      dkim_present: false,
-      dkim_valid: false,
-      dmarc_present: false,
-      dmarc_valid: false,
-      mx_present: false,
-      mx_valid: false,
-      mx_provider: null,
-    }
-    const evaluation = evaluateDnsHealth({ ...emptyCheck, stub_mode: false })
-    return {
-      source: "live",
-      check: emptyCheck,
-      dns_health_score: evaluation.dns_health_score,
-      health_tier: "critical",
-      warnings: [`Live DNS probe failed: ${verification_error}`],
-      recommendations: ["Verify DNS propagation and retry live verification."],
-      raw_dns_responses,
-      verification_error,
-      probe_duration_ms: Date.now() - started,
-      last_verified_at,
-      tracking_domain_ready: false,
-    }
+  return {
+    source: "live",
+    check,
+    dns_health_score: evaluation.dns_health_score,
+    health_tier: evaluation.health_tier,
+    warnings: [...new Set(warnings)],
+    recommendations,
+    raw_dns_responses: normalizeLiveDnsRawResponses(raw_dns_responses),
+    verification_error,
+    probe_duration_ms: Date.now() - started,
+    last_verified_at,
+    tracking_domain_ready,
   }
 }
 
