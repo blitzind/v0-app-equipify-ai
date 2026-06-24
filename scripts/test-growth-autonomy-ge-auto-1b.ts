@@ -111,9 +111,9 @@ async function main(): Promise<void> {
   assert.match(apiRoute, /export async function PATCH/)
   assert.match(apiRoute, /validateGrowthAutonomySettingsPatch/)
 
-  const settingsPanel = readSource("components/growth/settings/growth-autonomy-settings-panel.tsx")
+  const settingsPanel = readSource("components/growth/autonomy/growth-autonomy-control-center.tsx")
   assert.match(settingsPanel, /Pause all autonomy/)
-  assert.match(settingsPanel, /Channel prepare &amp; send controls/)
+  assert.match(settingsPanel, /Outreach controls/)
 
   const enforcement = readSource("lib/growth/autonomy/growth-autonomy-enforcement.ts")
   assert.match(enforcement, /triggerSource === "operator"/)

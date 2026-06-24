@@ -245,10 +245,10 @@ async function main(): Promise<void> {
   assert.match(actionsSource, /prepareGeV15OutboundAction/)
   console.log("  ✓ GE-v1-5 prepare actions wired through autonomy gate")
 
-  const settingsPanel = readSource("components/growth/settings/growth-autonomy-settings-panel.tsx")
-  assert.match(settingsPanel, /Channel prepare &amp; send controls/)
-  assert.match(settingsPanel, /Autonomous send/)
-  assert.match(settingsPanel, /Shadow mode/)
+  const settingsPanel = readSource("components/growth/autonomy/growth-autonomy-control-center.tsx")
+  assert.match(settingsPanel, /Outreach controls/)
+  assert.match(settingsPanel, /Send automatically/)
+  assert.match(settingsPanel, /Enable shadow mode/)
   console.log("  ✓ Settings UI exposes channel prepare + send controls and shadow mode")
 
   const approvalPanel = readSource("components/growth/automation/ge-v1-5-automation-runtime-approval-panel.tsx")

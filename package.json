@@ -890,6 +890,8 @@
     "test:growth-communications-settings-8d": "tsx scripts/test-growth-communications-settings-8d.ts",
     "test:growth-settings-hotfix-8h": "tsx scripts/test-growth-settings-hotfix-8h.ts",
     "test:ge-auto-settings-hotfix-1": "tsx scripts/test-ge-auto-settings-hotfix-1.ts",
+    "test:ge-auto-ui-1": "tsx scripts/test-ge-auto-ui-1.ts",
+    "test:ge-auto-ui-2": "tsx scripts/test-ge-auto-ui-2.ts",
     "test:growth-settings-canonicalization-8f": "tsx scripts/test-growth-settings-canonicalization-8f.ts",
     "test:growth-settings-bridge-8i": "tsx scripts/test-growth-settings-bridge-8i.ts",
     "test:growth-settings-bridge-8j": "tsx scripts/test-growth-settings-bridge-8j.ts",

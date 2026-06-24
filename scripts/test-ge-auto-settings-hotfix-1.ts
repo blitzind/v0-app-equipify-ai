@@ -56,7 +56,7 @@ function main(): void {
   console.log("  ✓ Warmup settings route remains client-rendered")
 
   const outboundPanel = readSource("components/growth/autonomy/growth-autonomy-outbound-dashboard-panel.tsx")
-  assert.match(outboundPanel, /Outbound dashboard is available to platform admins/)
+  assert.match(outboundPanel, /Advanced outbound metrics are available to platform admins/)
   assert.match(outboundPanel, /response\.status === 403/)
   console.log("  ✓ Outbound dashboard degrades gracefully on 403")
 

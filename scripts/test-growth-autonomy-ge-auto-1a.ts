@@ -127,7 +127,7 @@ async function main(): Promise<void> {
   assert.match(signalProcessor, /enforceGrowthAutonomyCapability/)
 
   const settingsPage = readSource("app/(growth)/growth/settings/autonomy/page.tsx")
-  assert.match(settingsPage, /GrowthAutonomySettingsPanel/)
+  assert.match(settingsPage, /GrowthAutonomyControlCenter/)
 
   const orgId = "00000000-0000-4000-8000-000000000001"
   const manualAdmin = createMockAdmin({
