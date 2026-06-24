@@ -894,6 +894,7 @@
     "test:ge-auto-ui-2": "tsx scripts/test-ge-auto-ui-2.ts",
     "test:ge-auto-ui-3": "tsx scripts/test-ge-auto-ui-3.ts",
     "test:ge-auto-ui-4": "tsx scripts/test-ge-auto-ui-4-layout-width.ts",
+    "test:ge-auto-ui-5": "tsx scripts/test-ge-auto-ui-5-layout-parity.ts",
     "test:growth-settings-canonicalization-8f": "tsx scripts/test-growth-settings-canonicalization-8f.ts",
     "test:growth-settings-bridge-8i": "tsx scripts/test-growth-settings-bridge-8i.ts",
     "test:growth-settings-bridge-8j": "tsx scripts/test-growth-settings-bridge-8j.ts",

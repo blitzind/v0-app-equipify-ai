@@ -146,7 +146,7 @@ async function browserAudit(baseUrl: string): Promise<void> {
 
 async function main(): Promise<void> {
   console.log(`\n=== GE-AUTO-UI-4 (${GE_AUTO_UI_4_QA_MARKER}) ===\n`)
-  assert.equal(GROWTH_SETTINGS_SHELL_WIDTH_ENFORCER_QA_MARKER, "growth-settings-shell-width-enforcer-ui-4-v1")
+  assert.equal(GROWTH_SETTINGS_SHELL_WIDTH_ENFORCER_QA_MARKER, "growth-settings-shell-width-enforcer-ui-5-v1")
 
   staticAudit()
 

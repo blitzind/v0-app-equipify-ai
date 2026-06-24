@@ -13,13 +13,16 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
     <div
       className={WORKSPACE_SETTINGS_SHELL_ROOT}
       data-qa-marker={WORKSPACE_SETTINGS_SHELL_LAYOUT_QA_MARKER}
+      data-workspace-settings-layout-root
     >
       <WorkspaceSettingsNav variant="mobile" />
 
-      <div className={WORKSPACE_SETTINGS_SHELL_BODY}>
+      <div className={WORKSPACE_SETTINGS_SHELL_BODY} data-workspace-settings-body>
         <WorkspaceSettingsNav variant="desktop" />
 
-        <div className={WORKSPACE_SETTINGS_SHELL_CONTENT}>{children}</div>
+        <div className={WORKSPACE_SETTINGS_SHELL_CONTENT} data-workspace-settings-content>
+          {children}
+        </div>
       </div>
     </div>
   )

@@ -1,38 +1,25 @@
 /**
- * Growth workspace settings shell layout tokens (GE-AUTO-UI-3).
- * Mirrors Core `workspace-settings-shell-tokens.ts` for full-width settings pages.
+ * GE-AUTO-UI-5 — Growth settings shell tokens mirror Core Workspace Settings exactly.
+ * Growth-only chrome (header card) uses separate tokens below.
  */
 
-import {
-  WORKSPACE_SETTINGS_SHELL_MAIN_INNER,
-} from "@/lib/workspace/workspace-shell-tokens"
+export {
+  WORKSPACE_SETTINGS_SHELL_MAIN_INNER as GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER,
+  WORKSPACE_SETTINGS_SHELL_ROOT as GROWTH_WORKSPACE_SETTINGS_SHELL_ROOT,
+  WORKSPACE_SETTINGS_SHELL_BODY as GROWTH_WORKSPACE_SETTINGS_SHELL_BODY,
+  WORKSPACE_SETTINGS_SHELL_CONTENT as GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT,
+} from "@/lib/settings/workspace-settings-shell-tokens"
 
 export const GROWTH_WORKSPACE_SETTINGS_SHELL_LAYOUT_QA_MARKER =
-  "growth-workspace-settings-shell-layout-ui-4-v1" as const
+  "growth-workspace-settings-shell-layout-ui-5-v1" as const
 
-/** Reuse Core settings main inner — full width, no max-w cap. */
-export const GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER = WORKSPACE_SETTINGS_SHELL_MAIN_INNER
-
-export const GROWTH_WORKSPACE_SETTINGS_SHELL_ROOT =
-  "flex w-full min-w-0 max-w-none flex-col gap-6" as const
-
+/** Growth settings hub header — full width, outside Core body/nav split. */
 export const GROWTH_WORKSPACE_SETTINGS_SHELL_HEADER =
   "w-full min-w-0 max-w-none rounded-2xl border border-border bg-card p-5 shadow-sm" as const
 
-export const GROWTH_WORKSPACE_SETTINGS_SHELL_BODY =
-  "flex w-full min-w-0 max-w-none flex-col gap-6 lg:flex-row lg:items-start" as const
-
-/** Content column to the right of the settings nav — expands to fill remaining width. */
-export const GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT =
-  "flex-1 min-w-0 w-full max-w-none" as const
-
-/** Desktop settings nav — fixed width, does not shrink. */
+/** Desktop nav width matches Core `WORKSPACE_SETTINGS_SHELL_SIDEBAR_DESKTOP` (w-56). */
 export const GROWTH_WORKSPACE_SETTINGS_SHELL_SIDEBAR =
-  "w-full shrink-0 rounded-xl border border-border bg-card p-3 shadow-sm lg:sticky lg:top-6 lg:w-64" as const
-
-export function growthWorkspaceSettingsMainInnerClasses(isSettingsRoute: boolean): string {
-  return isSettingsRoute ? GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER : ""
-}
+  "w-full shrink-0 rounded-xl border border-border bg-card p-3 shadow-sm md:sticky md:top-4 md:w-56 md:self-start" as const
 
 export function assertGrowthWorkspaceSettingsMainInnerHasNoMaxWidth(classes: string): void {
   if (/\bmax-w-/.test(classes) && !/\bmax-w-none\b/.test(classes)) {

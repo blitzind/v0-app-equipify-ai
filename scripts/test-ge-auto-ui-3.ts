@@ -59,9 +59,10 @@ function main(): void {
   assert.doesNotMatch(settingsShell, /mx-auto/)
   console.log("  ✓ GrowthSettingsShell uses full-width settings shell tokens")
 
-  assert.match(GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT, /max-w-none/)
   assert.match(GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT, /flex-1/)
-  console.log("  ✓ Settings content column expands (flex-1, max-w-none)")
+  assert.match(GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT, /w-full/)
+  assert.match(GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT, /min-w-0/)
+  console.log("  ✓ Settings content column expands (flex-1, w-full, min-w-0 — matches Core)")
 
   console.log("\nGE-AUTO-UI-3 passed.\n")
 }

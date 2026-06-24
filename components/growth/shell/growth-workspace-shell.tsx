@@ -72,14 +72,14 @@ function GrowthWorkspaceShellInner({ children }: GrowthWorkspaceShellProps) {
               className="min-h-0 min-w-0 w-full flex-1 overflow-y-auto outline-none scroll-mt-14 md:scroll-mt-16"
             >
               <div
-                className={cn(
-                  mainInnerClass,
-                  isSettingsRoute && "max-w-none mx-0",
-                  GROWTH_AIDEN_SAFE_AREA_PR,
-                  GROWTH_AIDEN_SAFE_AREA_PB_SCROLL,
-                )}
+                className={
+                  isSettingsRoute
+                    ? cn(mainInnerClass, "max-w-none mx-0")
+                    : cn(mainInnerClass, GROWTH_AIDEN_SAFE_AREA_PR, GROWTH_AIDEN_SAFE_AREA_PB_SCROLL)
+                }
                 data-qa-marker={WORKSPACE_SHELL_QA_MARKER}
                 data-growth-settings-full-width={isSettingsRoute ? "true" : undefined}
+                data-growth-settings-shell-parity={isSettingsRoute ? "core-matched" : undefined}
               >
                 {children}
               </div>
