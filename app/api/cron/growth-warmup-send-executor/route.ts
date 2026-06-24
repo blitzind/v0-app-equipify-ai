@@ -4,6 +4,10 @@ import { createServiceRoleClient } from "@/lib/supabase/admin"
 import { runGrowthCronJob } from "@/lib/growth/runtime/growth-cron-runner"
 import { growthCronApiPath } from "@/lib/growth/runtime/cron-telemetry-types"
 import { runWarmupSendExecutor } from "@/lib/growth/warmup/warmup-send-executor"
+import {
+  deriveWarmupCronExecutionOk,
+  deriveWarmupCronFailureReason,
+} from "@/lib/growth/warmup/warmup-cron-telemetry"
 
 export const runtime = "nodejs"
 
@@ -23,14 +27,17 @@ export async function POST(request: Request) {
         enforceSendingWindow: true,
       }),
     (result) => ({
-      processedCount: result.sendsAttempted,
+      processedCount: result.sendsSucceeded,
       failedCount: result.sendsFailed,
       skippedCount: result.sendsSkipped,
+      executionOk: deriveWarmupCronExecutionOk(result),
       metadata: {
         qa_marker: result.qa_marker,
         status: result.status,
         sends_succeeded: result.sendsSucceeded,
+        sends_failed: result.sendsFailed,
         profiles_scanned: result.profilesScanned,
+        failure_reason: deriveWarmupCronFailureReason(result),
       },
     }),
   )

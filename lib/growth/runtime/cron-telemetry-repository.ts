@@ -84,6 +84,8 @@ export type GrowthCronExecutionMetrics = {
   failedCount?: number
   skippedCount?: number
   queueLagMinutes?: number | null
+  /** When false, cron completed without throwing but business outcome failed (e.g. all sends failed). */
+  executionOk?: boolean
   metadata?: Record<string, unknown>
 }
 

@@ -43,13 +43,14 @@ export async function runGrowthCronJob<T extends Record<string, unknown>>(
     const result = await execute()
     const finishedAt = new Date().toISOString()
     const metrics = metricsOverride?.(result) ?? extractGrowthCronMetricsFromResult(result)
+    const executionOk = metrics.executionOk ?? true
 
     const recorded = await recordGrowthCronExecutionRun(ctx.admin, {
       cronRoute: ctx.cronRoute,
       category: ctx.category,
       startedAt,
       finishedAt,
-      ok: true,
+      ok: executionOk,
       metrics: {
         ...metrics,
         metadata: {
@@ -63,10 +64,15 @@ export async function runGrowthCronJob<T extends Record<string, unknown>>(
     }
 
     console.info(
-      `[growth-cron] ${ctx.cronRoute} ok processed=${metrics.processedCount ?? 0} failed=${metrics.failedCount ?? 0} duration_ms=${Date.now() - startedMs}`,
+      `[growth-cron] ${ctx.cronRoute} ${executionOk ? "ok" : "failed"} processed=${metrics.processedCount ?? 0} failed=${metrics.failedCount ?? 0} duration_ms=${Date.now() - startedMs}`,
     )
 
-    return NextResponse.json({ ok: true, cron_route: ctx.cronRoute, duration_ms: Date.now() - startedMs, ...result })
+    return NextResponse.json({
+      ok: executionOk,
+      cron_route: ctx.cronRoute,
+      duration_ms: Date.now() - startedMs,
+      ...result,
+    })
   } catch (error) {
     const finishedAt = new Date().toISOString()
     const message = error instanceof Error ? error.message : String(error)

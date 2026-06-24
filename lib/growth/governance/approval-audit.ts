@@ -1,11 +1,12 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { normalizeGrowthActorUserIdForDb } from "@/lib/growth/actor-user-id"
 import { appendGovernancePolicyEvent } from "@/lib/growth/governance/governance-events"
 import type { GrowthGovernanceEvaluationResult } from "@/lib/growth/governance/governance-types"
 
 export type AppendGovernanceApprovalAuditInput = {
-  actorUserId: string
+  actorUserId?: string | null
   actorEmail: string
   action: string
   entityType: string
@@ -19,8 +20,10 @@ export async function appendGovernanceApprovalAudit(
   admin: SupabaseClient,
   input: AppendGovernanceApprovalAuditInput,
 ): Promise<void> {
+  const actorUserId = normalizeGrowthActorUserIdForDb(input.actorUserId)
+
   const { error } = await admin.schema("growth").from("governance_approval_audit").insert({
-    actor_user_id: input.actorUserId,
+    actor_user_id: actorUserId,
     actor_email: input.actorEmail,
     action: input.action,
     entity_type: input.entityType,
@@ -41,7 +44,7 @@ export async function appendGovernanceApprovalAudit(
     severity: input.evaluation.riskFlags.length > 0 ? "medium" : "info",
     title: "Governance approval audited",
     description: `${input.action} on ${input.entityType}`,
-    actorUserId: input.actorUserId,
+    actorUserId,
     actorEmail: input.actorEmail,
     metadata: {
       entityId: input.entityId ?? null,

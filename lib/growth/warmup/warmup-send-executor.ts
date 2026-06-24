@@ -3,7 +3,7 @@ import "server-only"
 import { randomUUID } from "node:crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
-import { GROWTH_CRON_ACTOR_EMAIL } from "@/lib/growth/actor-user-id"
+import { GROWTH_CRON_ACTOR_EMAIL, resolveGrowthActorForDb } from "@/lib/growth/actor-user-id"
 import { GROWTH_WARMUP_EXECUTOR_1C_QA_MARKER } from "@/lib/growth/warmup/warmup-executor-api-response"
 import { assertPreSendAllowed } from "@/lib/growth/compliance/pre-send-assertion"
 import { executeTransportSend } from "@/lib/growth/providers/transport/transport-orchestrator"
@@ -342,6 +342,11 @@ async function executeWarmupSendForProfile(
     bodyText: template.body,
   })
 
+  const actor = resolveGrowthActorForDb({
+    actorUserId,
+    actorEmail: actorEmail ?? GROWTH_CRON_ACTOR_EMAIL,
+  })
+
   const transport = await executeTransportSend(admin, {
     sender_account_id: profile.sender_account_id,
     to: selection.recipient.email,
@@ -350,8 +355,8 @@ async function executeWarmupSendForProfile(
     html: prepared.htmlBody,
     human_approved: true,
     human_approval_confirmed: true,
-    actorUserId: actorUserId ?? "",
-    actorEmail: actorEmail ?? GROWTH_CRON_ACTOR_EMAIL,
+    actorUserId: actor.actorUserId,
+    actorEmail: actor.actorEmail ?? GROWTH_CRON_ACTOR_EMAIL,
     is_test: false,
     metadata: {
       warmup_executor: true,

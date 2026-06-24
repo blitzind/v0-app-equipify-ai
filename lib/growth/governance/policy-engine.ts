@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { normalizeGrowthActorUserIdForDb } from "@/lib/growth/actor-user-id"
 import { appendGovernancePolicyEvent } from "@/lib/growth/governance/governance-events"
 import type {
   GrowthGovernanceAction,
@@ -36,7 +37,7 @@ export class GovernancePolicyBlockedError extends Error {
 
 export type GovernanceEvaluationInput = {
   action: GrowthGovernanceAction
-  actorUserId: string
+  actorUserId?: string | null
   actorEmail: string
   sourceRoute: string
   approvalReason?: string
@@ -305,7 +306,7 @@ export async function runGovernanceGateWithAudit(
   if (input.recordAudit !== false) {
     const { appendGovernanceApprovalAudit } = await import("@/lib/growth/governance/approval-audit")
     await appendGovernanceApprovalAudit(admin, {
-      actorUserId: input.actorUserId,
+      actorUserId: normalizeGrowthActorUserIdForDb(input.actorUserId),
       actorEmail: input.actorEmail,
       action: input.action,
       entityType: input.entityType,

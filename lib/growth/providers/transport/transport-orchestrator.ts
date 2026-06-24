@@ -31,6 +31,7 @@ import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 import { resolveTransportSenderWithPool } from "@/lib/growth/sender-pools/sender-pool-rotation-service"
 import type { GrowthSenderRotationFallbackCandidate } from "@/lib/growth/sender-pools/sender-pool-types"
 import { recordNativeWarmupSend } from "@/lib/growth/warmup/warmup-execution"
+import { resolveGrowthActorForDb } from "@/lib/growth/actor-user-id"
 
 export class TransportHumanApprovalRequiredError extends Error {
   constructor() {
@@ -54,7 +55,7 @@ export type TransportSendInput = {
   manual_sender_account_id?: string | null
   human_approved: boolean
   human_approval_confirmed?: boolean
-  actorUserId: string
+  actorUserId?: string | null
   actorEmail: string
   is_test?: boolean
   metadata?: Record<string, unknown>
@@ -387,29 +388,39 @@ export async function executeTransportSend(
   assertHumanApproval(input)
   assertGrowthProductionRuntimeSafe("transport.send")
 
-  await enforceGovernanceIfReady(admin, {
-    action: input.is_test ? "provider_test_send" : "provider_send",
+  const actor = resolveGrowthActorForDb({
     actorUserId: input.actorUserId,
     actorEmail: input.actorEmail,
-    sourceRoute: input.is_test ? "provider.test_send" : "provider.send",
+  })
+  const resolvedInput: TransportSendInput = {
+    ...input,
+    actorUserId: actor.actorUserId,
+    actorEmail: actor.actorEmail ?? input.actorEmail,
+  }
+
+  await enforceGovernanceIfReady(admin, {
+    action: resolvedInput.is_test ? "provider_test_send" : "provider_send",
+    actorUserId: resolvedInput.actorUserId,
+    actorEmail: resolvedInput.actorEmail,
+    sourceRoute: resolvedInput.is_test ? "provider.test_send" : "provider.send",
     entityType: "delivery_attempt",
-    recipientEmail: input.to,
-    humanApprovalConfirmed: input.human_approval_confirmed,
-    recordAudit: !input.metadata?.governance_audit_recorded,
-    approvalReason: input.is_test ? "Human confirmed provider test send." : "Human confirmed provider send.",
+    recipientEmail: resolvedInput.to,
+    humanApprovalConfirmed: resolvedInput.human_approval_confirmed,
+    recordAudit: !resolvedInput.metadata?.governance_audit_recorded,
+    approvalReason: resolvedInput.is_test ? "Human confirmed provider test send." : "Human confirmed provider send.",
   })
 
-  let senderAccountId = input.sender_account_id
+  let senderAccountId = resolvedInput.sender_account_id
   let rotationMeta: TransportSendResult["sender_rotation"]
   let poolFallbackSenders: GrowthSenderRotationFallbackCandidate[] = []
 
-  if (input.sender_pool_id) {
+  if (resolvedInput.sender_pool_id) {
     const resolved = await resolveTransportSenderWithPool(admin, {
-      senderAccountId: input.sender_account_id,
-      senderPoolId: input.sender_pool_id,
-      allowAutoRotation: input.allow_auto_rotation,
-      manualSenderAccountId: input.manual_sender_account_id,
-      sequenceExecutionJobId: input.sequence_execution_job_id,
+      senderAccountId: resolvedInput.sender_account_id,
+      senderPoolId: resolvedInput.sender_pool_id,
+      allowAutoRotation: resolvedInput.allow_auto_rotation,
+      manualSenderAccountId: resolvedInput.manual_sender_account_id,
+      sequenceExecutionJobId: resolvedInput.sequence_execution_job_id,
     })
     if (!resolved?.senderAccountId) {
       return {
@@ -436,8 +447,8 @@ export async function executeTransportSend(
 
   const primaryResult = await executeTransportOnSenderRoute(admin, {
     senderAccountId,
-    transportInput: input,
-    extra_metadata: input.metadata,
+    transportInput: resolvedInput,
+    extra_metadata: resolvedInput.metadata,
   })
 
   if (primaryResult.ok) {
@@ -445,16 +456,16 @@ export async function executeTransportSend(
   }
 
   if (
-    input.sender_pool_id &&
+    resolvedInput.sender_pool_id &&
     poolFallbackSenders.length > 0 &&
     transportFailureEligibleForPoolSenderFailover(primaryResult)
   ) {
     for (const candidate of poolFallbackSenders) {
       const alternateResult = await executeTransportOnSenderRoute(admin, {
         senderAccountId: candidate.senderAccountId,
-        transportInput: input,
+        transportInput: resolvedInput,
         extra_metadata: {
-          ...(input.metadata ?? {}),
+          ...(resolvedInput.metadata ?? {}),
           pool_sender_failover: true,
           primary_sender_account_id: senderAccountId,
         },
@@ -470,8 +481,8 @@ export async function executeTransportSend(
             primary_sender_account_id: senderAccountId,
             failover_sender_account_id: candidate.senderAccountId,
           },
-          actorUserId: input.actorUserId,
-          actorEmail: input.actorEmail,
+          actorUserId: resolvedInput.actorUserId,
+          actorEmail: resolvedInput.actorEmail,
           attemptId: alternateResult.attempt?.id,
         })
         return {
