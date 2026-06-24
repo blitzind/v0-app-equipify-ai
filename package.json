@@ -887,6 +887,7 @@
     "test:growth-signatures-1a": "tsx scripts/test-growth-signatures-1a.ts",
     "test:growth-sendr-signature-1a": "tsx scripts/test-growth-sendr-signature-1a.ts",
     "test:growth-signatures-branded-1c": "tsx scripts/test-growth-signatures-branded-1c.ts",
+    "test:growth-signatures-booking-1d": "tsx scripts/test-growth-signatures-booking-1d.ts",
     "test:growth-signatures-runtime-1b": "tsx scripts/test-growth-signatures-runtime-1b.ts",
     "test:growth-signature-injection-1b": "tsx scripts/test-growth-signature-injection-1b.ts",
     "test:growth-signature-merge-fields-1b": "tsx scripts/test-growth-signature-merge-fields-1b.ts",

@@ -38,6 +38,7 @@ import {
 } from "@/lib/growth/signatures/signature-profile-defaults"
 import { renderSignatureTemplate } from "@/lib/growth/signatures/signature-template-render"
 import { GrowthMediaPicker } from "@/components/growth/media-library/growth-media-picker"
+import { GrowthSignatureBookingCtaFields } from "@/components/growth/signatures/growth-signature-booking-cta-fields"
 
 type ProfileFormState = {
   senderAccountId: string
@@ -592,30 +593,14 @@ export function GrowthEmailSignaturesPanel() {
             </FormSection>
 
             <FormSection title="Booking CTA">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label>Booking URL</Label>
-                  <Input
-                    value={form.bookingUrl}
-                    onChange={(e) => setForm((f) => ({ ...f, bookingUrl: e.target.value }))}
-                    placeholder="https://equipify.ai/demo"
-                  />
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label>Booking label</Label>
-                  <Input
-                    value={form.bookingLabel}
-                    onChange={(e) => setForm((f) => ({ ...f, bookingLabel: e.target.value }))}
-                    placeholder={GROWTH_SIGNATURE_DEFAULT_BOOKING_LABEL}
-                  />
-                </div>
-                <ToggleRow
-                  id="show-booking-cta"
-                  label="Show booking CTA in signature"
-                  checked={form.showBookingCta}
-                  onCheckedChange={(checked) => setForm((f) => ({ ...f, showBookingCta: checked }))}
-                />
-              </div>
+              <GrowthSignatureBookingCtaFields
+                bookingUrl={form.bookingUrl}
+                bookingLabel={form.bookingLabel}
+                showBookingCta={form.showBookingCta}
+                onBookingUrlChange={(url) => setForm((f) => ({ ...f, bookingUrl: url }))}
+                onBookingLabelChange={(label) => setForm((f) => ({ ...f, bookingLabel: label }))}
+                onShowBookingCtaChange={(checked) => setForm((f) => ({ ...f, showBookingCta: checked }))}
+              />
             </FormSection>
 
             <FormSection title="Signature options">
