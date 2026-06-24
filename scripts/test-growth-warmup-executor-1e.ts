@@ -265,7 +265,7 @@ async function runTests(): Promise<void> {
   assert.match(executorSource, /MAX_SENDS_PER_PROFILE_PER_RUN/)
   assert.match(executorSource, /computeWarmupExecutorRunSendPlan/)
   assert.doesNotMatch(executorSource, /MAX_SENDS_PER_MANUAL_RUN/)
-  assert.match(panelSource, /Next run can send/)
+  assert.match(panelSource, /Eligible — next run can send/)
   assert.match(panelSource, /pacingMessage/)
   console.log("  ✓ Executor uses per-profile pacing constants and dashboard copy updated")
 

@@ -8,12 +8,19 @@ import { getSenderAccount, updateSenderAccount } from "@/lib/growth/sender/sende
 import { computeCurrentWarmupDay } from "@/lib/growth/warmup/warmup-health"
 import { resolveWarmupAlignedSenderHealthStatus } from "@/lib/growth/warmup/warmup-sender-health-gate"
 import {
+  applyWarmupVelocityReduction,
+  evaluateWarmupReputationThrottle,
+  evaluateWarmupThrottleClear,
+  GROWTH_WARMUP_REPUTATION_THROTTLE_1L_QA_MARKER,
+} from "@/lib/growth/warmup/warmup-reputation-throttle-policy"
+import {
   GROWTH_NATIVE_WARMUP_EXECUTION_QA_MARKER,
   type GrowthWarmupProgressionRunResult,
 } from "@/lib/growth/warmup/warmup-execution-types"
 import { getPlannedVolumeForDay, interpolateWarmupVolume } from "@/lib/growth/warmup/warmup-scheduler"
 import type { GrowthWarmupProfile, GrowthWarmupProfileStatus } from "@/lib/growth/warmup/warmup-types"
 import { getWarmupProfile, recomputeWarmupProfile, listWarmupProfiles } from "@/lib/growth/warmup/warmup-repository"
+import { createWarmupEvent } from "@/lib/growth/warmup/warmup-events"
 
 function utcDateString(date = new Date()): string {
   return date.toISOString().slice(0, 10)
@@ -51,11 +58,27 @@ export function resolveWarmupDailyCapacity(profile: GrowthWarmupProfile, dayNumb
   return interpolateWarmupVolume(day)
 }
 
+/** Planned cap after reputation velocity reduction (if any). */
+export function resolveEffectiveWarmupDailyCapacity(
+  profile: GrowthWarmupProfile,
+  dayNumber?: number,
+): number {
+  const planned = resolveWarmupDailyCapacity(profile, dayNumber)
+  if (
+    profile.current_daily_volume > 0 &&
+    profile.current_daily_volume < planned &&
+    (profile.status === "warming" || profile.status === "throttled")
+  ) {
+    return profile.current_daily_volume
+  }
+  return planned
+}
+
 export async function syncSenderWarmupCapacity(
   admin: SupabaseClient,
   profile: GrowthWarmupProfile,
 ): Promise<void> {
-  const dailyCap = resolveWarmupDailyCapacity(profile)
+  const dailyCap = resolveEffectiveWarmupDailyCapacity(profile)
   const warmupActive = profile.status === "warming" || profile.status === "throttled"
   const senderHealth = resolveWarmupAlignedSenderHealthStatus({
     profileStatus: profile.status,
@@ -92,6 +115,14 @@ export type WarmupSenderHealthRepairResult = {
   repaired: number
   skipped: number
   repaired_profile_ids: string[]
+}
+
+export type WarmupStaleThrottleRepairResult = {
+  scanned: number
+  cleared: number
+  still_blocked: number
+  cleared_profile_ids: string[]
+  blocked_details: Array<{ profile_id: string; sender_email: string; reason: string }>
 }
 
 /** Re-align sender_accounts health for warming profiles clobbered by DNS-stub recompute. */
@@ -136,6 +167,110 @@ export async function repairWarmupAlignedSenderHealthBatch(
     repaired,
     skipped,
     repaired_profile_ids: repairedProfileIds,
+  }
+}
+
+/** Clears stale warmup throttles where controlled warmup is safe per reputation policy. */
+export async function repairStaleWarmupThrottlesBatch(
+  admin: SupabaseClient,
+  input?: { profileIds?: string[] },
+): Promise<WarmupStaleThrottleRepairResult> {
+  const profiles = input?.profileIds?.length
+    ? (
+        await Promise.all(input.profileIds.map((profileId) => getWarmupProfile(admin, profileId)))
+      ).filter((profile): profile is GrowthWarmupProfile => profile != null)
+    : (await listWarmupProfiles(admin)).filter((profile) => profile.status === "throttled")
+
+  let cleared = 0
+  let stillBlocked = 0
+  const clearedProfileIds: string[] = []
+  const blockedDetails: WarmupStaleThrottleRepairResult["blocked_details"] = []
+
+  for (const profile of profiles) {
+    if (profile.status !== "throttled") {
+      stillBlocked += 1
+      blockedDetails.push({
+        profile_id: profile.id,
+        sender_email: profile.sender_email,
+        reason: `Profile status is ${profile.status}, not throttled.`,
+      })
+      continue
+    }
+
+    const sender = await getSenderAccount(admin, profile.sender_account_id)
+    const reputation = await assessMailboxReputation(admin, profile.sender_account_id).catch(() => null)
+    const clearEval = evaluateWarmupThrottleClear({
+      profileWarmupHealth: profile.warmup_health,
+      profileStatus: profile.status,
+      senderStatus: sender?.status ?? null,
+      senderHealthStatus: sender?.health_status ?? null,
+      reputation,
+    })
+
+    if (!clearEval.canClear) {
+      stillBlocked += 1
+      blockedDetails.push({
+        profile_id: profile.id,
+        sender_email: profile.sender_email,
+        reason: clearEval.reason,
+      })
+      continue
+    }
+
+    const now = new Date().toISOString()
+    await admin
+      .schema("growth")
+      .from("warmup_profiles")
+      .update({
+        status: "warming",
+        throttle_reason: null,
+        throttled_at: null,
+        updated_at: now,
+      })
+      .eq("id", profile.id)
+      .is("deleted_at", null)
+
+    await createWarmupEvent(admin, {
+      warmup_profile_id: profile.id,
+      event_type: "warmup_throttle_cleared",
+      severity: "low",
+      title: "Warmup throttle cleared",
+      description: `${profile.sender_email}: ${clearEval.reason}`,
+      metadata: {
+        qa_marker: GROWTH_WARMUP_REPUTATION_THROTTLE_1L_QA_MARKER,
+        previous_status: "throttled",
+        classification: clearEval.classification,
+      },
+    }).catch(() => undefined)
+
+    await recordInternalOutboundAuditEvent(admin, {
+      eventType: "warmup_throttle_repaired",
+      severity: "low",
+      title: "Stale warmup throttle cleared",
+      summary: `${profile.sender_email}: ${clearEval.reason}`,
+      senderAccountId: profile.sender_account_id,
+      metadata: {
+        warmup_profile_id: profile.id,
+        qa_marker: GROWTH_WARMUP_REPUTATION_THROTTLE_1L_QA_MARKER,
+        classification: clearEval.classification,
+      },
+    }).catch(() => undefined)
+
+    const refreshed = await getWarmupProfile(admin, profile.id)
+    if (refreshed) {
+      await syncSenderWarmupCapacity(admin, refreshed)
+    }
+
+    cleared += 1
+    clearedProfileIds.push(profile.id)
+  }
+
+  return {
+    scanned: profiles.length,
+    cleared,
+    still_blocked: stillBlocked,
+    cleared_profile_ids: clearedProfileIds,
+    blocked_details: blockedDetails,
   }
 }
 
@@ -297,21 +432,37 @@ export async function runWarmupProgressionForProfile(
   let throttleReason: string | null = profile.throttle_reason
   let throttled = false
   let activated = false
+  let velocityReductionReason: string | null = null
 
+  const sender = await getSenderAccount(admin, profile.sender_account_id).catch(() => null)
   const reputation = await assessMailboxReputation(admin, profile.sender_account_id).catch(() => null)
-  if (
-    reputation &&
-    (reputation.health_tier === "high_risk" ||
-      reputation.health_tier === "paused" ||
-      reputation.risk_score >= 75) &&
-    profile.status === "warming"
-  ) {
+  const throttleDecision = evaluateWarmupReputationThrottle({
+    profileWarmupHealth: profile.warmup_health,
+    profileStatus: profile.status,
+    senderStatus: sender?.status ?? null,
+    senderHealthStatus: sender?.health_status ?? null,
+    reputation,
+  })
+
+  if (profile.status === "warming" && throttleDecision.action === "full_throttle") {
     nextStatus = "throttled"
-    throttleReason = reputation.risk_reasons[0] ?? "Reputation protection requires reduced velocity."
+    throttleReason = throttleDecision.reason ?? "Reputation protection requires reduced velocity."
     throttled = true
-  } else if (profile.status === "throttled" && reputation && reputation.health_tier === "healthy") {
+  } else if (profile.status === "throttled" && throttleDecision.action !== "full_throttle") {
     nextStatus = "warming"
     throttleReason = null
+  }
+
+  if (throttleDecision.action === "velocity_reduction") {
+    velocityReductionReason = throttleDecision.reason
+  }
+
+  let effectiveDailyCap = resolveWarmupDailyCapacity(profile, dayNumber)
+  if (throttleDecision.action === "velocity_reduction") {
+    effectiveDailyCap = applyWarmupVelocityReduction(
+      effectiveDailyCap,
+      throttleDecision.velocityReductionFactor,
+    )
   }
 
   const refreshedForProgress = await getWarmupProfile(admin, profileId)
@@ -340,15 +491,47 @@ export async function runWarmupProgressionForProfile(
         profile: mapped,
         previousStatus: profile.status,
         nextStatus,
-        reason: throttleReason ?? undefined,
+        reason: throttleReason ?? velocityReductionReason ?? undefined,
       })
     }
+  } else if (
+    velocityReductionReason &&
+    profile.status === "warming" &&
+    effectiveDailyCap < resolveWarmupDailyCapacity(profile, dayNumber) &&
+    profile.current_daily_volume >= resolveWarmupDailyCapacity(profile, dayNumber)
+  ) {
+    await createWarmupEvent(admin, {
+      warmup_profile_id: profileId,
+      event_type: "warmup_velocity_reduction",
+      severity: "medium",
+      title: "Warmup velocity reduced",
+      description: `${profile.sender_email}: ${velocityReductionReason}`,
+      metadata: {
+        qa_marker: GROWTH_WARMUP_REPUTATION_THROTTLE_1L_QA_MARKER,
+        daily_cap: effectiveDailyCap,
+      },
+    }).catch(() => undefined)
   }
 
   await recomputeWarmupProfile(admin, profileId, { forceStatus: nextStatus })
   const finalProfile = await getWarmupProfile(admin, profileId)
   if (finalProfile) {
-    await syncSenderWarmupCapacity(admin, { ...finalProfile, sends_today: sendsToday, current_warmup_day: dayNumber })
+    await admin
+      .schema("growth")
+      .from("warmup_profiles")
+      .update({
+        current_daily_volume: effectiveDailyCap,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", profileId)
+      .is("deleted_at", null)
+
+    await syncSenderWarmupCapacity(admin, {
+      ...finalProfile,
+      sends_today: sendsToday,
+      current_warmup_day: dayNumber,
+      current_daily_volume: effectiveDailyCap,
+    })
   }
 
   return {

@@ -152,8 +152,21 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
       const response = await fetch(`/api/platform/growth/warmup/${profileId}/sync-progression`, {
         method: "POST",
       })
-      const payload = (await response.json()) as { message?: string; cleared_throttle?: boolean }
-      if (!response.ok) throw new Error(payload.message ?? "Could not sync warmup progression.")
+      const payload = (await response.json()) as {
+        message?: string
+        cleared_throttle?: boolean
+        throttle_clear?: {
+          cleared?: boolean
+          still_blocked?: boolean
+          reason_after?: string | null
+        }
+      }
+      if (!response.ok) throw new Error(payload.message ?? payload.throttle_clear?.reason_after ?? "Could not sync warmup progression.")
+      if (payload.cleared_throttle) {
+        setError(null)
+      } else if (payload.throttle_clear?.still_blocked && payload.throttle_clear.reason_after) {
+        setError(`Throttle not cleared: ${payload.throttle_clear.reason_after}`)
+      }
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not sync warmup progression.")
@@ -356,8 +369,18 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
                   {stat.eligibility === "eligible"
                     ? stat.controlledWarmupAllowed && stat.senderHealthNote
                       ? stat.senderHealthNote
-                      : `Next run can send: ${stat.nextRunCanSend}`
-                    : `Skipped: ${stat.skipReason}`}
+                      : `Eligible — next run can send ${stat.nextRunCanSend}`
+                    : stat.profileStatus === "paused"
+                      ? `Skipped — manually paused: ${stat.skipReason}`
+                      : stat.profileStatus === "throttled"
+                        ? stat.throttleClearable
+                          ? `Skipped — reputation throttle: ${stat.throttleReason ?? stat.skipReason}. Throttle can be cleared — controlled warmup allowed.`
+                          : `Skipped — reputation throttle: ${stat.throttleReason ?? stat.skipReason}`
+                        : stat.skipCode === "sender_unhealthy"
+                          ? `Skipped — critical sender health: ${stat.skipReason}`
+                          : stat.skipCode === "no_approved_recipients"
+                            ? `Skipped — recipient pool exhausted: ${stat.skipReason}`
+                            : `Skipped: ${stat.skipReason}`}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Last executor run: {formatDate(stat.lastExecutorRunAt)} · Active recipients:{" "}

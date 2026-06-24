@@ -12,7 +12,7 @@ import { prepareOutboundEmailContent } from "@/lib/growth/signatures/outbound-si
 import { createWarmupEvent } from "@/lib/growth/warmup/warmup-events"
 import {
   getWarmupProfileForSender,
-  resolveWarmupDailyCapacity,
+  resolveEffectiveWarmupDailyCapacity,
 } from "@/lib/growth/warmup/warmup-execution"
 import { evaluateWarmupPreSendAllowed } from "@/lib/growth/warmup/warmup-pre-send-guard"
 import { listWarmupProfiles, getWarmupProfile } from "@/lib/growth/warmup/warmup-repository"
@@ -218,7 +218,7 @@ async function executeWarmupSendForProfile(
   const today = utcDateString()
   const dayStart = utcDayStartIso()
   const sendsToday = profile.sends_today_date === today ? profile.sends_today : 0
-  const plannedToday = resolveWarmupDailyCapacity(profile)
+  const plannedToday = resolveEffectiveWarmupDailyCapacity(profile)
   const executorSendsToday = await countExecutorSendsForProfileToday(admin, profile.id, dayStart)
   const remainingCapacity = Math.max(0, plannedToday - sendsToday)
 
@@ -554,7 +554,7 @@ export async function runWarmupSendExecutor(
 
   const profileDiagnostics: WarmupExecutorProfileDiagnostic[] = scannableProfiles.map((profile) => {
     const sendsToday = profile.sends_today_date === utcDateString(now) ? profile.sends_today : 0
-    const plannedToday = resolveWarmupDailyCapacity(profile)
+    const plannedToday = resolveEffectiveWarmupDailyCapacity(profile)
     const remainingCapacity = Math.max(0, plannedToday - sendsToday)
     return describeWarmupExecutorProfileDiagnostic({
       profile,
@@ -573,7 +573,7 @@ export async function runWarmupSendExecutor(
   })
   const representativePlannedToday =
     scannableProfiles.find((p) => p.status === "warming") != null
-      ? resolveWarmupDailyCapacity(
+      ? resolveEffectiveWarmupDailyCapacity(
           scannableProfiles.find((p) => p.status === "warming")!,
         )
       : null
@@ -648,7 +648,7 @@ export async function runWarmupSendExecutor(
     sender_account_ids: sendCandidateProfiles.map((row) => row.sender_account_id),
     remaining_sends: sendCandidateProfiles.map((row) => {
       const sendsToday = row.sends_today_date === utcDateString(now) ? row.sends_today : 0
-      return Math.max(0, resolveWarmupDailyCapacity(row) - sendsToday)
+      return Math.max(0, resolveEffectiveWarmupDailyCapacity(row) - sendsToday)
     }),
     approved_recipient_count: approvedRecipients.length,
     max_sends_per_profile: sendPlan.maxSendsPerProfile,
@@ -717,7 +717,7 @@ export async function runWarmupSendExecutor(
         senderAccountId: profile.sender_account_id,
         senderEmail: profile.sender_email,
         profileId: profile.id,
-        plannedToday: resolveWarmupDailyCapacity(profile),
+        plannedToday: resolveEffectiveWarmupDailyCapacity(profile),
         sendsToday: profile.sends_today_date === utcDateString(now) ? profile.sends_today : 0,
         executorSendsToday: 0,
         remainingCapacity: 0,
@@ -792,7 +792,7 @@ export async function buildWarmupExecutorDashboardStats(
 
   const stats = []
   for (const profile of profiles) {
-    const plannedToday = resolveWarmupDailyCapacity(profile)
+    const plannedToday = resolveEffectiveWarmupDailyCapacity(profile)
     const sendsToday = profile.sends_today_date === today ? profile.sends_today : 0
     const executorSendsToday = await countExecutorSendsForProfileToday(admin, profile.id, dayStart)
     const remainingToday = Math.max(0, plannedToday - sendsToday)
@@ -824,6 +824,7 @@ export async function buildWarmupExecutorDashboardStats(
       senderHealthStatus: diagnostic.senderHealthStatus ?? null,
       controlledWarmupAllowed: diagnostic.controlledWarmupAllowed ?? false,
       senderHealthNote: diagnostic.senderHealthNote ?? null,
+      throttleClearable: diagnostic.throttleClearable ?? false,
     })
   }
   return stats

@@ -7,6 +7,7 @@ import type {
 } from "@/lib/growth/warmup/warmup-executor-types"
 import { isWithinWarmupSendingWindow } from "@/lib/growth/warmup/warmup-executor-types"
 import type { GrowthWarmupProfile, GrowthWarmupProfileStatus } from "@/lib/growth/warmup/warmup-types"
+import { isWarmupThrottleLikelyClearable } from "@/lib/growth/warmup/warmup-reputation-throttle-policy"
 import { evaluateWarmupExecutorSenderHealthGate } from "@/lib/growth/warmup/warmup-sender-health-gate"
 
 export const GROWTH_WARMUP_EXECUTOR_1B_QA_MARKER = "growth-warmup-executor-1b-v1" as const
@@ -113,13 +114,24 @@ export function describeWarmupExecutorProfileDiagnostic(input: {
   }
 
   if (profile.status === "throttled") {
+    const likelyClearable = isWarmupThrottleLikelyClearable({
+      profileStatus: profile.status,
+      profileWarmupHealth: profile.warmup_health,
+      senderStatus: input.senderAccount?.status ?? profile.sender_account_status ?? null,
+      senderHealthStatus,
+    })
+    const throttleLabel = throttleReason ?? "reputation protection active"
     return {
       ...base,
       eligibility: "skipped",
       skipCode: "warmup_throttled",
-      reason: throttleReason ?? "Warmup throttled — reputation protection active.",
-      nextAction:
-        "Run Clear throttle after reputation is healthy, or wait for the daily progression cron.",
+      reason: likelyClearable
+        ? `Skipped — reputation throttle: ${throttleLabel}`
+        : `Skipped — reputation throttle: ${throttleLabel}`,
+      nextAction: likelyClearable
+        ? "Run Clear Throttle to re-evaluate reputation — controlled warmup may be allowed."
+        : "Resolve the reputation issue before clearing throttle.",
+      throttleClearable: likelyClearable,
     }
   }
 

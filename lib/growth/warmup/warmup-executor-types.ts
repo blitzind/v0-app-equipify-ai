@@ -111,6 +111,7 @@ export type WarmupExecutorProfileDiagnostic = {
   senderHealthStatus?: string | null
   controlledWarmupAllowed?: boolean
   senderHealthNote?: string | null
+  throttleClearable?: boolean
 }
 
 export type WarmupExecutorRunSummary = {
@@ -153,6 +154,7 @@ export type GrowthWarmupProfileExecutorStats = {
   senderHealthStatus?: string | null
   controlledWarmupAllowed?: boolean
   senderHealthNote?: string | null
+  throttleClearable?: boolean
 }
 
 /** Conservative business-hours window 13:00–22:00 UTC. TODO: sender timezone. */

@@ -73,6 +73,7 @@ function runTests(): void {
     profile: throttled,
     remainingCapacity: 5,
     approvedRecipientCount: 4,
+    senderAccount: { status: "connected", health_status: "degraded" },
   })
   assert.equal(throttledDiag.eligibility, "skipped")
   assert.equal(throttledDiag.skipCode, "warmup_throttled")
