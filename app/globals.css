@@ -365,8 +365,10 @@
   }
 
   /*
-   * GE-AUTO-UI-5 — Growth settings main inner matches Core padding (no AIden right inset).
+   * GE-AUTO-UI-5 / GS-DNS-UI-SYNC-1A — Growth workspace main inner fills available width.
+   * AIden is fixed; do not reserve right inset on the shell wrapper.
    */
+  #main-content > [data-growth-workspace-full-width="true"],
   #main-content > [data-growth-settings-full-width="true"] {
     width: 100% !important;
     max-width: none !important;
@@ -376,6 +378,7 @@
   }
 
   @media (max-width: 639px) {
+    #main-content > [data-growth-workspace-full-width="true"],
     #main-content > [data-growth-settings-full-width="true"] {
       padding-right: 0.75rem !important;
     }

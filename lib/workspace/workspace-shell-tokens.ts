@@ -19,11 +19,10 @@ export const WORKSPACE_SETTINGS_SHELL_MAIN_INNER =
   "w-full min-w-0 max-w-none mx-0 p-3 sm:p-6 pb-24 lg:pb-6" as const
 
 /**
- * Growth workspace main inner — FAB clearance on small viewports without the large
- * gray dead zone from `pb-24` on long operator hub pages (UX-AUDIT-6).
+ * Growth workspace main inner — full viewport width between sidebar and right edge.
+ * AIden uses fixed positioning; wizards/builders reserve inset via `GrowthWorkspaceSafeArea`.
  */
-/** Bottom/right AIden inset applied in `growth-workspace-shell.tsx` via `growth-aiden-safe-area-*`. */
-export const GROWTH_WORKSPACE_SHELL_MAIN_INNER = "max-w-[1440px] mx-auto p-3 sm:p-6" as const
+export const GROWTH_WORKSPACE_SHELL_MAIN_INNER = WORKSPACE_SETTINGS_SHELL_MAIN_INNER
 
 /**
  * Growth workspace settings main inner — fills remaining viewport width (no max-width cap).

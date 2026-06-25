@@ -2,7 +2,6 @@
 
 import { useState, type ComponentPropsWithoutRef, type ReactNode } from "react"
 import { GrowthWorkspaceShellPreferencesProvider, useGrowthWorkspaceShellPreferences } from "@/components/growth/settings/growth-workspace-shell-preferences-context"
-import { useGrowthWorkspaceSettingsRoute } from "@/lib/growth/settings/use-growth-workspace-settings-route"
 import { GrowthBreadcrumbProvider } from "@/components/growth/shell/growth-breadcrumb-context"
 import { GrowthBreadcrumbs } from "@/components/growth/shell/growth-breadcrumbs"
 import { GROWTH_WORKSPACE_SHELL_QA_MARKER } from "@/components/growth/shell/growth-brand"
@@ -13,8 +12,6 @@ import { GrowthTopbar } from "@/components/growth/shell/growth-topbar"
 import { WorkspaceShellSkipLink } from "@/components/workspace/workspace-shell-skip-link"
 import { GROWTH_WORKSPACE_SETTINGS_CONSUMPTION_QA_MARKER } from "@/lib/growth/settings/growth-workspace-settings-consumption"
 import {
-  GROWTH_AIDEN_SAFE_AREA_PB_SCROLL,
-  GROWTH_AIDEN_SAFE_AREA_PR,
   GROWTH_FLOATING_INSET_QA_MARKER,
   GROWTH_STICKY_ACTION_BAR_INNER_LAYOUT,
   GROWTH_STICKY_ACTION_BAR_SURFACE,
@@ -25,7 +22,6 @@ import {
 import { cn } from "@/lib/utils"
 import {
   GROWTH_WORKSPACE_SHELL_MAIN_INNER,
-  GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER,
   WORKSPACE_SHELL_MAIN_CONTENT_ID,
   WORKSPACE_SHELL_QA_MARKER,
   WORKSPACE_SHELL_VIEWPORT_BODY,
@@ -38,11 +34,7 @@ type GrowthWorkspaceShellProps = {
 
 function GrowthWorkspaceShellInner({ children }: GrowthWorkspaceShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const isSettingsRoute = useGrowthWorkspaceSettingsRoute()
   const { personal } = useGrowthWorkspaceShellPreferences()
-  const mainInnerClass = isSettingsRoute
-    ? GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER
-    : GROWTH_WORKSPACE_SHELL_MAIN_INNER
 
   return (
     <GrowthBreadcrumbProvider>
@@ -72,14 +64,11 @@ function GrowthWorkspaceShellInner({ children }: GrowthWorkspaceShellProps) {
               className="min-h-0 min-w-0 w-full flex-1 overflow-y-auto outline-none scroll-mt-14 md:scroll-mt-16"
             >
               <div
-                className={
-                  isSettingsRoute
-                    ? cn(mainInnerClass, "max-w-none mx-0")
-                    : cn(mainInnerClass, GROWTH_AIDEN_SAFE_AREA_PR, GROWTH_AIDEN_SAFE_AREA_PB_SCROLL)
-                }
+                className={cn(GROWTH_WORKSPACE_SHELL_MAIN_INNER, "max-w-none mx-0")}
                 data-qa-marker={WORKSPACE_SHELL_QA_MARKER}
-                data-growth-settings-full-width={isSettingsRoute ? "true" : undefined}
-                data-growth-settings-shell-parity={isSettingsRoute ? "core-matched" : undefined}
+                data-growth-workspace-full-width="true"
+                data-growth-settings-full-width="true"
+                data-growth-settings-shell-parity="core-matched"
               >
                 {children}
               </div>
