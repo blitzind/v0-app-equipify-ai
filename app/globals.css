@@ -366,6 +366,21 @@
   }
 
   /*
+   * Growth workspace shell — scroll containment (hub bottom void fix).
+   * Hub section headings use `.sr-only` (position:absolute). Without a positioned
+   * section ancestor they inflate documentElement.scrollHeight and create phantom
+   * document scroll below the h-dvh shell — the gray void under last content.
+   * Real scroll lives in #main-content; AIden stays a fixed overlay (no pb-24 reserve).
+   */
+  html:has([data-qa-marker="growth-workspace-shell-v2"]) {
+    overflow: hidden;
+  }
+
+  [data-qa-marker="growth-workspace-shell-v2"] #main-content section {
+    position: relative;
+  }
+
+  /*
    * GE-AUTO-UI-5 / GS-DNS-UI-SYNC-1A — Growth workspace main inner fills available width.
    * AIden is fixed; do not reserve right inset on the shell wrapper.
    */
