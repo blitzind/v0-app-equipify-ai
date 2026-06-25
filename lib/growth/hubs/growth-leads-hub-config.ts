@@ -278,6 +278,9 @@ export const GROWTH_LEADS_HUB_SEARCH_EMPTY_HINT =
 export const GROWTH_LEADS_HUB_RECENT_WORK_EMPTY =
   "No recent activity yet.\nYour recent searches and lead activity will appear here."
 
+export const GROWTH_LEADS_HUB_RECOMMENDATIONS_EMPTY =
+  "No recommended actions right now. Run a saved search or review your revenue queue to generate new work."
+
 export const GROWTH_LEADS_HUB_SAVED_SEARCHES_EMPTY =
   "No favorite saved searches yet. Star a search in Prospect Search to pin it here."
 

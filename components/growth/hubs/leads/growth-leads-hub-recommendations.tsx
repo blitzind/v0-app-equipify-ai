@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import { buildGrowthLeadsHubRecommendations } from "@/lib/growth/hubs/growth-leads-hub-recommendations"
+import { GROWTH_LEADS_HUB_RECOMMENDATIONS_EMPTY } from "@/lib/growth/hubs/growth-leads-hub-config"
 import {
   readSnoozedGrowthLeadsRecommendationIds,
   snoozeGrowthLeadsRecommendation,
@@ -57,53 +58,65 @@ export function GrowthLeadsHubRecommendations() {
         <h2 id="leads-hub-recommendations-heading" className="sr-only">
           Recommended next actions work inbox
         </h2>
-        <ul className="divide-y divide-border/70 rounded-xl border border-border/80">
-          {recommendations.map((item) => (
-            <li
-              key={item.id}
-              className={cn("px-4 py-3 first:rounded-t-xl last:rounded-b-xl", SEVERITY_STYLES[item.severity])}
-              data-recommendation-id={item.id}
-              data-recommendation-severity={item.severity}
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    [{item.severity}]
-                  </p>
-                  <p className="mt-1 text-base font-semibold text-foreground">{item.label}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{item.timestampLabel}</p>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <Button asChild size="sm">
-                    <Link
-                      href={item.href}
-                      onClick={() =>
-                        recordGrowthLeadsActivity({
-                          id: item.id,
-                          verb: "Opened",
-                          label: item.label,
-                          href: item.href,
-                        })
-                      }
+        {recommendations.length === 0 ? (
+          <div
+            className="rounded-xl border border-dashed border-border/80 bg-muted/10 px-4 py-10 text-center sm:min-h-[12rem] sm:py-12"
+            data-recommendations-empty="true"
+          >
+            <p className="text-sm font-medium text-foreground">You&apos;re caught up</p>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+              {GROWTH_LEADS_HUB_RECOMMENDATIONS_EMPTY}
+            </p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-border/70 rounded-xl border border-border/80">
+            {recommendations.map((item) => (
+              <li
+                key={item.id}
+                className={cn("px-4 py-3 first:rounded-t-xl last:rounded-b-xl", SEVERITY_STYLES[item.severity])}
+                data-recommendation-id={item.id}
+                data-recommendation-severity={item.severity}
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      [{item.severity}]
+                    </p>
+                    <p className="mt-1 text-base font-semibold text-foreground">{item.label}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{item.timestampLabel}</p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <Button asChild size="sm">
+                      <Link
+                        href={item.href}
+                        onClick={() =>
+                          recordGrowthLeadsActivity({
+                            id: item.id,
+                            verb: "Opened",
+                            label: item.label,
+                            href: item.href,
+                          })
+                        }
+                      >
+                        Open
+                      </Link>
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleSnooze(item.id)}
+                      aria-label={`Snooze recommendation: ${item.label}`}
                     >
-                      Open
-                    </Link>
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleSnooze(item.id)}
-                    aria-label={`Snooze recommendation: ${item.label}`}
-                  >
-                    Snooze
-                  </Button>
+                      Snooze
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+        )}
       </GrowthEngineCard>
     </section>
   )
