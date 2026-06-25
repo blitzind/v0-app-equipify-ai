@@ -385,7 +385,7 @@ export function NaturalLanguageDiscoveryPanel({
                 </GrowthBadge>
                 <GrowthBadge tone="neutral">~{executionPlan.estimated_companies} companies</GrowthBadge>
                 <GrowthBadge tone="neutral">~{executionPlan.estimated_contacts} contacts</GrowthBadge>
-                <GrowthBadge tone="neutral">~{executionPlan.estimated_credits} Apollo credits</GrowthBadge>
+                <GrowthBadge tone="neutral">~{executionPlan.estimated_credits} discovery credits</GrowthBadge>
                 <GrowthBadge tone="neutral">
                   ~{Math.round(executionPlan.estimated_runtime_seconds / 60)} min runtime
                 </GrowthBadge>

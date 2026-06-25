@@ -15,7 +15,7 @@ export default function GrowthLeadsProspectSearchPage() {
     <GrowthWorkspacePageContent data-growth-workspace-prospect-search="v1">
       <GrowthWorkspacePageHeader
         title="Prospect Search"
-        description="Discover and qualify accounts with ICP filters, saved searches, and lists."
+        description="AI-guided account discovery with ICP recommendations, saved searches, and review-first results."
         icon={Search}
         iconClassName="bg-cyan-50 text-cyan-700"
       />

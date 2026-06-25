@@ -73,12 +73,12 @@ export function ApolloPrimaryContactOperatorReviewPanel({
         message?: string
       }
       if (!res.ok || !json.ok || !json.snapshot) {
-        throw new Error(json.message ?? "Could not load Apollo acquisition review.")
+        throw new Error(json.message ?? "Could not load contact acquisition review.")
       }
       setSnapshot(json.snapshot)
     } catch (e) {
       setSnapshot(null)
-      setError(e instanceof Error ? e.message : "Could not load Apollo acquisition review.")
+      setError(e instanceof Error ? e.message : "Could not load contact acquisition review.")
     } finally {
       setLoading(false)
     }
@@ -165,7 +165,7 @@ export function ApolloPrimaryContactOperatorReviewPanel({
         <div className="flex flex-wrap items-center gap-2">
           <Sparkles className="size-4 text-indigo-700" />
           <h4 className="text-sm font-semibold text-indigo-950">
-            Apollo acquisition review — {companyName}
+            Contact acquisition review — {companyName}
           </h4>
           {summary ? (
             <GrowthBadge
@@ -196,7 +196,7 @@ export function ApolloPrimaryContactOperatorReviewPanel({
       </div>
 
       <p className="mt-2 text-xs text-muted-foreground">
-        Review Apollo-acquired contacts before outreach. Approvals mark readiness only — no auto-enrollment,
+        Review discovered contacts before outreach. Approvals mark readiness only — no auto-enrollment,
         sequences, email, SMS, voice, or calls.
       </p>
 
@@ -240,14 +240,14 @@ export function ApolloPrimaryContactOperatorReviewPanel({
       {loading && !snapshot ? (
         <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="size-3.5 animate-spin" />
-          Loading Apollo contacts…
+          Loading contacts…
         </p>
       ) : null}
 
       {!loading && snapshot && filteredContacts.length === 0 ? (
         <p className="mt-3 text-xs text-muted-foreground">
           {snapshot.contacts.length === 0
-            ? "No Apollo-acquired contacts found for this company yet. Run contact discovery first."
+            ? "No discovered contacts found for this company yet. Run contact discovery first."
             : "No contacts match the selected filter."}
         </p>
       ) : null}

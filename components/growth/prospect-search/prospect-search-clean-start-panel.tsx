@@ -1,15 +1,13 @@
 "use client"
 
-import { Search } from "lucide-react"
+import { Sparkles } from "lucide-react"
 import {
   GROWTH_SEARCH_CLEAN_START_QA_MARKER,
-  PROSPECT_SEARCH_SUGGESTED_SEARCHES,
 } from "@/components/growth/prospect-search/prospect-search-ux-constants"
 import type { GrowthProspectSearchSavedSearchWithWorkflow } from "@/lib/growth/prospect-search/saved-search-workflows"
 
 export function ProspectSearchCleanStartPanel({
   savedSearches,
-  onRunQuery,
   onRestoreSavedSearch,
 }: {
   savedSearches: GrowthProspectSearchSavedSearchWithWorkflow[]
@@ -18,15 +16,16 @@ export function ProspectSearchCleanStartPanel({
 }) {
   return (
     <div
-      className="rounded-2xl border border-dashed border-border bg-muted/15 px-6 py-12 text-center"
+      className="rounded-2xl border border-dashed border-border bg-muted/15 px-6 py-10 text-center"
       data-qa-marker={GROWTH_SEARCH_CLEAN_START_QA_MARKER}
     >
       <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-violet-100 text-violet-700">
-        <Search className="size-6" />
+        <Sparkles className="size-6" />
       </div>
-      <h3 className="mt-4 text-lg font-semibold tracking-tight">Find your next prospects</h3>
+      <h3 className="mt-4 text-lg font-semibold tracking-tight">Ready when you are</h3>
       <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
-        Search by company type, industry, location, technology, or plain English.
+        Choose a recommended search above, describe your market in the search bar, or open advanced filters
+        for manual precision. Results stay staged for review before you add accounts to your pipeline.
       </p>
 
       {savedSearches.length > 0 ? (
@@ -49,25 +48,6 @@ export function ProspectSearchCleanStartPanel({
           </ul>
         </div>
       ) : null}
-
-      <div className="mx-auto mt-8 max-w-md text-left">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Try a suggested search
-        </h4>
-        <ul className="mt-2 space-y-1.5">
-          {PROSPECT_SEARCH_SUGGESTED_SEARCHES.map((entry) => (
-            <li key={entry.query}>
-              <button
-                type="button"
-                className="text-sm text-muted-foreground hover:text-violet-700"
-                onClick={() => onRunQuery(entry.query)}
-              >
-                {entry.label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
     </div>
   )
 }

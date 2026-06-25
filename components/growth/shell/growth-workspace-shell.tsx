@@ -61,7 +61,7 @@ function GrowthWorkspaceShellInner({ children }: GrowthWorkspaceShellProps) {
             <main
               id={WORKSPACE_SHELL_MAIN_CONTENT_ID}
               tabIndex={-1}
-              className="min-h-0 min-w-0 w-full flex-1 overflow-y-auto outline-none scroll-mt-14 md:scroll-mt-16"
+              className="min-h-0 min-w-0 w-full flex-1 overflow-y-auto bg-background outline-none scroll-mt-14 md:scroll-mt-16"
             >
               <div
                 className={cn(GROWTH_WORKSPACE_SHELL_MAIN_INNER, "max-w-none mx-0")}

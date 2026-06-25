@@ -176,11 +176,12 @@ async function main(): Promise<void> {
   assert.match(shellSource, /GROWTH_PROSPECT_SEARCH_LAYOUT_V2_QA_MARKER/)
   assert.match(shellSource, /flex flex-col gap-4/)
   assert.doesNotMatch(shellSource, /lg:grid-cols-2/)
-  assert.match(shellSource, /SearchRecommendations/)
+  assert.match(shellSource, /ProspectSearchAiFirstWorkspace/)
+  assert.match(shellSource, /applyAiSearchSuggestion/)
+  assert.match(shellSource, /advancedFiltersOpen/)
   assert.match(shellSource, /CompanyResultCard/)
   assert.doesNotMatch(shellSource, /runLeadEnginePipeline/)
   assert.match(shellSource, /data-ux-marker/)
-  assert.match(shellSource, /DiscoveryModeToggle/)
   assert.match(shellSource, /mode.*discover_external|discover_external/)
   assert.match(shellSource, /useSearchParams/)
   assert.match(shellSource, /resolveProspectSearchDiscoveryMode/)
@@ -2472,8 +2473,31 @@ async function main(): Promise<void> {
     path.join(process.cwd(), "components/growth/prospect-search/prospect-search-clean-start-panel.tsx"),
     "utf8",
   )
-  assert.match(cleanStartSource, /Find your next prospects/)
-  assert.match(cleanStartSource, /Search by company type, industry, location, technology, or plain English/)
+  assert.match(cleanStartSource, /Ready when you are/)
+  assert.match(cleanStartSource, /recommended search above/)
+
+  const aiFirstConfigSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-ai-icp-config.ts"),
+    "utf8",
+  )
+  assert.match(aiFirstConfigSource, /Find your next best accounts/)
+  assert.match(aiFirstConfigSource, /Recommend my next search/)
+
+  const aiFirstSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-ai-first-workspace.tsx"),
+    "utf8",
+  )
+  assert.match(aiFirstSource, /PROSPECT_SEARCH_AI_FIRST_HERO/)
+  assert.match(aiFirstSource, /Use this search/)
+
+  const filterRailAiSource = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/prospect-search/prospect-search-filter-rail.tsx"),
+    "utf8",
+  )
+  assert.match(filterRailAiSource, /Advanced filters/)
+  assert.doesNotMatch(filterRailAiSource, /NaturalLanguageDiscoveryPanel/)
+  assert.doesNotMatch(shellSource, /No Apollo, Seamless, Clay, or PDL/)
+  assert.match(cleanStartSource, /Choose a recommended search above/)
 
   const providerStatusLayoutSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/real-world-provider-status.tsx"),
@@ -3435,7 +3459,28 @@ async function testProspectSearchFilterUx(): Promise<void> {
   } = await import("../lib/growth/prospect-search/prospect-search-filter-ux")
 
   assert.equal(GROWTH_PROSPECT_SEARCH_FILTER_UX_QA_MARKER, "growth-prospect-search-filter-ux-v1")
-  assert.equal(PROSPECT_SEARCH_FILTER_ACCORDION_SECTIONS.length, 10)
+
+  const expectedProspectSearchFilterAccordionSections = [
+    "industry",
+    "company-size",
+    "location",
+    "territory",
+    "intent",
+    "technology",
+    "title-targeting",
+    "revenue",
+    "confidence-fit",
+    "account-safety",
+    "engine-intelligence",
+    "engine-readiness",
+  ] as const
+  assert.deepEqual([...PROSPECT_SEARCH_FILTER_ACCORDION_SECTIONS], [...expectedProspectSearchFilterAccordionSections])
+  for (const sectionId of expectedProspectSearchFilterAccordionSections) {
+    assert.ok(
+      PROSPECT_SEARCH_FILTER_ACCORDION_SECTIONS.includes(sectionId),
+      `expected advanced filter accordion section ${sectionId}`,
+    )
+  }
   assert.equal(allProspectSearchFilterSectionsExpanded([...PROSPECT_SEARCH_FILTER_ACCORDION_SECTIONS]), true)
   assert.equal(allProspectSearchFilterSectionsCollapsed([]), true)
   assert.deepEqual(
@@ -3449,6 +3494,7 @@ async function testProspectSearchFilterUx(): Promise<void> {
     "utf8",
   )
   assert.match(filterRailSource, /data-filter-ux-qa-marker=\{GROWTH_PROSPECT_SEARCH_FILTER_UX_QA_MARKER\}/)
+  assert.match(filterRailSource, /data-advanced-filters-collapsed-default=\{advancedFiltersOpen \? "false" : "true"\}/)
 
   const icpBuilderSource = fs.readFileSync(
     path.join(process.cwd(), "components/growth/prospect-search/guided-icp-builder.tsx"),

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense, type SetStateAction } from "react"
 import { useSearchParams } from "next/navigation"
-import { Bookmark, LayoutTemplate, Loader2, Search } from "lucide-react"
+import { Bookmark } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -18,8 +18,9 @@ import {
   ProspectSearchBulkActionBar,
   ProspectSearchBulkPushSummary,
 } from "@/components/growth/prospect-search/prospect-search-bulk-action-bar"
-import { DiscoveryModeToggle } from "@/components/growth/prospect-search/discovery-mode-toggle"
 import { IcpTemplatesDrawer } from "@/components/growth/prospect-search/icp-templates-drawer"
+import { ProspectSearchAiFirstWorkspace } from "@/components/growth/prospect-search/prospect-search-ai-first-workspace"
+import { ProspectSearchIcpSetupSheet } from "@/components/growth/prospect-search/prospect-search-icp-setup-sheet"
 import { ProspectSearchFilterRail } from "@/components/growth/prospect-search/prospect-search-filter-rail"
 import { ProspectSearchCleanStartPanel } from "@/components/growth/prospect-search/prospect-search-clean-start-panel"
 import { ProspectSearchDiscoverReadyPanel } from "@/components/growth/prospect-search/prospect-search-discover-ready-panel"
@@ -47,7 +48,6 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-territory-prioritization"
 import { PersonResultCard } from "@/components/growth/prospect-search/person-result-card"
 import { SearchEmptyState } from "@/components/growth/prospect-search/search-empty-state"
-import { SearchRecommendations } from "@/components/growth/prospect-search/search-recommendations"
 import { SearchViewToggle } from "@/components/growth/prospect-search/search-view-toggle"
 import { rotateHeroPlaceholder } from "@/components/growth/prospect-search/search-suggestion-engine"
 import { executeProspectSearchActionableResearch } from "@/lib/growth/prospect-search/prospect-search-actionable-research-execute"
@@ -76,7 +76,14 @@ import type {
   GrowthProspectSearchSavedSearchRow,
   GrowthProspectSearchSortBy,
 } from "@/lib/growth/prospect-search/prospect-search-types"
-import { GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-types"
+import {
+  GROWTH_LIVE_PROVIDER_QUERY_EXPANSION_QA_MARKER,
+} from "@/lib/growth/prospect-search/prospect-search-types"
+import {
+  PROSPECT_SEARCH_AI_SEARCH_SUGGESTIONS,
+  type ProspectSearchAiIcpProfile,
+  type ProspectSearchAiSearchSuggestion,
+} from "@/lib/growth/prospect-search/prospect-search-ai-icp-config"
 import { GROWTH_PROSPECT_PIPELINE_AUTOMATION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-pipeline-automation"
 import type { GrowthProspectWorkflowContinuityEventKind } from "@/lib/growth/prospect-search/prospect-pipeline-automation"
 import { ProspectWorkflowLauncher } from "@/components/growth/prospect-search/prospect-workflow-launcher"
@@ -315,6 +322,11 @@ function ProspectSearchShellInner() {
   const [placeholderIndex, setPlaceholderIndex] = useState(0)
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null)
   const [icpTemplatesOpen, setIcpTemplatesOpen] = useState(false)
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false)
+  const [icpSetupOpen, setIcpSetupOpen] = useState(false)
+  const [icpSetupMode, setIcpSetupMode] = useState<"set" | "refine">("refine")
+  const [icpProfile, setIcpProfile] = useState<ProspectSearchAiIcpProfile | null>(null)
+  const [highlightedSuggestionId, setHighlightedSuggestionId] = useState<string | null>(null)
   const [discoveryMode, setDiscoveryMode] = useState<GrowthProspectSearchDiscoveryMode>(() =>
     resolveProspectSearchDiscoveryMode(searchParams.get("mode")),
   )
@@ -668,7 +680,7 @@ function ProspectSearchShellInner() {
         if (cancelled) return
         if (!res.ok || !json.ok || !json.company || !json.result) {
           setOperatorDeepLinkActive(false)
-          setError(json.message ?? "Could not load company for Apollo operator review.")
+          setError(json.message ?? "Could not load company for operator review.")
           return
         }
 
@@ -684,12 +696,12 @@ function ProspectSearchShellInner() {
         setLastSearchedCriteriaKey(criteriaKey)
         setOperatorDeepLinkMessage(
           json.message ??
-            `Operator deep link — ${company.company_name} loaded for Apollo acquisition review.`,
+            `Operator deep link — ${company.company_name} loaded for contact acquisition review.`,
         )
       } catch (e) {
         if (cancelled || (e instanceof DOMException && e.name === "AbortError")) return
         setOperatorDeepLinkActive(false)
-        setError(e instanceof Error ? e.message : "Could not load company for Apollo operator review.")
+        setError(e instanceof Error ? e.message : "Could not load company for operator review.")
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -1060,6 +1072,44 @@ function ProspectSearchShellInner() {
       trigger: "icp_template_selection",
     })
   }, [runSearch, replaceFilters])
+
+  const applyAiSearchSuggestion = useCallback(
+    (suggestion: ProspectSearchAiSearchSuggestion) => {
+      const nextFilters = { ...EMPTY_FILTERS, ...suggestion.filters }
+      setActiveTemplateId(null)
+      setActiveSavedSearchId(null)
+      setQuery(suggestion.query)
+      replaceFilters(nextFilters)
+      setHighlightedSuggestionId(suggestion.id)
+      setPendingProviderSearchHint(
+        discoveryMode === "discover_external"
+          ? "Search configured — review filters, then click Search market."
+          : "Search configured — review filters, then click Search.",
+      )
+      document.getElementById("growth-prospect-search-results")?.scrollIntoView({ behavior: "smooth" })
+    },
+    [discoveryMode, replaceFilters],
+  )
+
+  const handleRecommendNextSearch = useCallback(() => {
+    const first = PROSPECT_SEARCH_AI_SEARCH_SUGGESTIONS[0]
+    if (!first) return
+    setHighlightedSuggestionId(first.id)
+    document
+      .querySelector(`[data-ai-search-suggestion="${first.id}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" })
+  }, [])
+
+  const handleSearchManually = useCallback(() => {
+    setAdvancedFiltersOpen(true)
+    document
+      .getElementById("growth-prospect-search-advanced-filters")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [])
+
+  const handleApplyIcpProfile = useCallback((profile: ProspectSearchAiIcpProfile) => {
+    setIcpProfile(profile)
+  }, [])
 
   const suggestedSaveName = useMemo(() => {
     const parts = [filters.industry, filters.territory_filter?.states?.[0], filters.location]
@@ -1765,68 +1815,38 @@ function ProspectSearchShellInner() {
       data-last-searched-criteria-key={lastSearchedCriteriaKey ?? ""}
       data-criteria-stale={criteriaStale ? "true" : "false"}
     >
-      {/* Search hero */}
-      <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-violet-50/80 via-card to-cyan-50/50 p-6 shadow-sm dark:from-violet-950/30 dark:to-cyan-950/20">
-        <h2 className="text-lg font-semibold tracking-tight sm:text-xl">Discover your ideal customer profile</h2>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          {discoveryMode === "internal"
-            ? "Search observable Growth Engine + CRM records. No scraping, no outbound."
-            : "Discover new companies from real-world public sources (Google Places, SERP, business directory). No Apollo, Seamless, Clay, or PDL. Candidates are not automatic leads."}
-        </p>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <DiscoveryModeToggle
-            mode={discoveryMode}
-            onChange={(mode) => {
-              setDiscoveryMode(mode)
-              resetExecutionState()
-            }}
-          />
-          <Button type="button" variant="outline" size="sm" onClick={() => setIcpTemplatesOpen(true)}>
-            <LayoutTemplate className="mr-1.5 size-3.5" />
-            ICP Templates
-          </Button>
-        </div>
-        <div className="mt-5">
-          <div className="relative flex flex-col gap-2 sm:block">
-          <Search className="pointer-events-none absolute left-4 top-1/2 hidden size-5 -translate-y-1/2 text-muted-foreground sm:block" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => setHeroFocused(true)}
-            onBlur={() => setTimeout(() => setHeroFocused(false), 180)}
-            onKeyDown={(e) => e.key === "Enter" && !searchButtonDisabled && void runSearch({ trigger: "explicit_operator_search" })}
-            placeholder={heroPlaceholder}
-            className="h-14 w-full rounded-xl border border-border bg-background/90 pl-4 pr-4 text-base shadow-inner focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 sm:pl-12 sm:pr-36"
-          />
-          <Button
-            className="w-full sm:absolute sm:right-2 sm:top-1/2 sm:w-auto sm:-translate-y-1/2"
-            size="lg"
-            onClick={() => void runSearch({ trigger: "explicit_operator_search" })}
-            disabled={searchButtonDisabled}
-            aria-label={discoveryMode === "discover_external" ? "Search companies" : "Search"}
-          >
-            {loading ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                {searchLoadingLabel}
-              </>
-            ) : (
-              heroSearchButtonLabel
-            )}
-          </Button>
-          <SearchRecommendations
-            query={query}
-            savedSearchNames={savedSearchNames}
-            visible={heroFocused}
-            onSelect={(v) => {
-              setQuery(v)
-              void runSearch({ queryText: v, trigger: "search_recommendation_select" })
-            }}
-          />
-          </div>
-        </div>
-      </section>
+      <ProspectSearchAiFirstWorkspace
+        discoveryMode={discoveryMode}
+        onDiscoveryModeChange={(mode) => {
+          setDiscoveryMode(mode)
+          resetExecutionState()
+        }}
+        query={query}
+        onQueryChange={setQuery}
+        heroPlaceholder={heroPlaceholder}
+        heroFocused={heroFocused}
+        onHeroFocusChange={setHeroFocused}
+        savedSearchNames={savedSearchNames}
+        searchButtonDisabled={searchButtonDisabled}
+        searchLoading={loading}
+        searchLoadingLabel={searchLoadingLabel}
+        heroSearchButtonLabel={heroSearchButtonLabel}
+        onRunSearch={() => void runSearch({ trigger: "explicit_operator_search" })}
+        onRecommendNextSearch={handleRecommendNextSearch}
+        onSearchManually={handleSearchManually}
+        onUseAiSuggestion={applyAiSearchSuggestion}
+        onSetIcp={() => {
+          setIcpSetupMode("set")
+          setIcpSetupOpen(true)
+        }}
+        onRefineIcp={() => {
+          setIcpSetupMode("refine")
+          setIcpSetupOpen(true)
+        }}
+        onUseSavedIcp={() => setIcpTemplatesOpen(true)}
+        icpProfile={icpProfile ?? undefined}
+        highlightedSuggestionId={highlightedSuggestionId}
+      />
 
       {pendingProviderSearchHint || stagedSearchPendingMessage ? (
         <p
@@ -1872,6 +1892,8 @@ function ProspectSearchShellInner() {
           refreshingSavedCounts={refreshingSavedCounts}
           onRefreshSavedCounts={(id) => void refreshSavedCounts(id)}
           onDeleteSavedSearch={(id) => void deleteSavedSearch(id)}
+          advancedFiltersOpen={advancedFiltersOpen}
+          onAdvancedFiltersOpenChange={setAdvancedFiltersOpen}
         />
 
         <div
@@ -1882,11 +1904,11 @@ function ProspectSearchShellInner() {
             <>
               {operatorDeepLinkActive && operatorDeepLinkMessage ? (
                 <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 px-4 py-3 text-sm text-indigo-950">
-                  <p className="font-medium">Apollo operator review deep link</p>
+                  <p className="font-medium">Operator review deep link</p>
                   <p className="mt-1 text-xs text-indigo-900/90">{operatorDeepLinkMessage}</p>
                   <p className="mt-1 text-[10px] text-muted-foreground">
-                    Staging company loaded for review only — no provider search, Apollo acquisition,
-                    enrollment, or outreach was triggered.
+                    Staging company loaded for review only — no search, contact acquisition, enrollment,
+                    or outreach was triggered.
                   </p>
                 </div>
               ) : null}
@@ -2398,6 +2420,13 @@ function ProspectSearchShellInner() {
           )}
         </div>
       </div>
+
+      <ProspectSearchIcpSetupSheet
+        open={icpSetupOpen}
+        onOpenChange={setIcpSetupOpen}
+        mode={icpSetupMode}
+        onApplyProfile={handleApplyIcpProfile}
+      />
 
       <IcpTemplatesDrawer
         open={icpTemplatesOpen}

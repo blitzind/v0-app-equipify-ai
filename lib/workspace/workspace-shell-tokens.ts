@@ -21,8 +21,11 @@ export const WORKSPACE_SETTINGS_SHELL_MAIN_INNER =
 /**
  * Growth workspace main inner — full viewport width between sidebar and right edge.
  * AIden uses fixed positioning; wizards/builders reserve inset via `GrowthWorkspaceSafeArea`.
+ * Growth has no mobile bottom nav — use modest pb-6 instead of Core pb-24 clearance.
+ * min-h-full + bg-background keeps the scroll area visually consistent on long pages.
  */
-export const GROWTH_WORKSPACE_SHELL_MAIN_INNER = WORKSPACE_SETTINGS_SHELL_MAIN_INNER
+export const GROWTH_WORKSPACE_SHELL_MAIN_INNER =
+  "w-full min-w-0 max-w-none mx-0 p-3 sm:p-6 pb-6 min-h-full bg-background" as const
 
 /**
  * Growth workspace settings main inner — fills remaining viewport width (no max-width cap).
