@@ -353,8 +353,9 @@
   }
 
   /*
-   * Growth workspace — reserve bottom-right inset for AIden (Part 9).
-   * Pair with `GrowthStickyActionBar`, `GrowthWizardActionRow`, `GrowthWorkspaceSafeArea`.
+   * Growth workspace — local bottom-right inset for AIden (Part 9).
+   * Apply only on wizard/builder surfaces (`GrowthWorkspaceSafeArea`, sticky footers).
+   * Never on `GrowthWorkspaceShell` main inner — AIden is a fixed overlay.
    */
   .growth-aiden-safe-area-pr {
     padding-right: max(var(--aiden-safe-area-right), env(safe-area-inset-right, 0px));

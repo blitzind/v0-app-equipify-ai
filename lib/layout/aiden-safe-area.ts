@@ -3,7 +3,8 @@
  * Fixed toasts and secondary banners use `.br-stack-clear-aiden` (see `app/globals.css`) so they sit above
  * the launcher. CSS variables `--aiden-launcher-*` must stay aligned with the launcher’s Tailwind offsets.
  *
- * Part 9 — Growth workspace builders/wizards reserve bottom-right inset so primary actions stay above AIden.
+ * Part 9 — Growth workspace builders/wizards may opt into `GrowthWorkspaceSafeArea` locally so primary
+ * actions stay above the fixed AIden chip. Do not apply safe-area padding on `GrowthWorkspaceShell` main.
  * Keep chip width in sync with `aiden-chat-launcher.tsx` and `aiden-ask-launcher.tsx`.
  */
 export const BR_STACK_CLEAR_AIDEN = "br-stack-clear-aiden"

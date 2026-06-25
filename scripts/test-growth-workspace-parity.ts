@@ -78,7 +78,8 @@ function assertSharedTokenConsumption(): void {
   assertIncludes(GROWTH_SHELL_FILES.topbar, "WORKSPACE_SHELL_TOPBAR", "Growth topbar must consume WORKSPACE_SHELL_TOPBAR")
 
   assertIncludes(CORE_SHELL_FILES.pageShell, "WORKSPACE_SHELL_MAIN_INNER", "Core page shell must consume container token")
-  assertIncludes(GROWTH_SHELL_FILES.workspaceShell, "WorkspaceContainer", "Growth shell must consume WorkspaceContainer")
+  assertIncludes(GROWTH_SHELL_FILES.workspaceShell, "GROWTH_WORKSPACE_SHELL_MAIN_INNER", "Growth shell must consume main inner token")
+  assertIncludes(GROWTH_SHELL_FILES.workspaceShell, "data-growth-workspace-full-width", "Growth shell must mark full-width main inner")
 
   assertIncludes(CORE_SHELL_FILES.sidebar, "WORKSPACE_SIDEBAR_COLLAPSED_STORAGE_KEY", "Core sidebar must share collapse storage key")
   assertIncludes(GROWTH_SHELL_FILES.sidebar, "WORKSPACE_SIDEBAR_COLLAPSED_STORAGE_KEY", "Growth sidebar must share collapse storage key")
@@ -123,7 +124,8 @@ function assertSharedPrimitiveConsumption(): void {
   assertIncludes(GROWTH_SHELL_FILES.topbar, "WorkspaceTopbarAccountControls", "Growth topbar must consume shared account controls")
   assertExcludes(GROWTH_SHELL_FILES.topbar, "initialsFromDisplayLabel", "Growth topbar must not duplicate account identity block")
 
-  assertIncludes(GROWTH_SHELL_FILES.workspaceShell, "WorkspaceContainer", "Growth shell must consume WorkspaceContainer")
+  assertIncludes(GROWTH_SHELL_FILES.workspaceShell, "GROWTH_WORKSPACE_SHELL_MAIN_INNER", "Growth shell must consume main inner token")
+  assertIncludes(GROWTH_SHELL_FILES.workspaceShell, "data-growth-workspace-full-width", "Growth shell must mark full-width main inner")
 }
 
 function assertNoDuplicateImplementations(): void {
@@ -202,9 +204,11 @@ function assertContainerSpacingCertification(): void {
   assertIncludes(PRIMITIVE_FILES.WorkspaceContainer, "WORKSPACE_SHELL_MAIN_INNER", "WorkspaceContainer applies shared rhythm")
   assertIncludes("components/growth/shell/growth-breadcrumbs.tsx", "WORKSPACE_SHELL_HORIZONTAL_PADDING", "Growth breadcrumbs use shared horizontal padding")
   assertIncludes("components/growth/shell/growth-workspace-page-content.tsx", "GROWTH_WORKSPACE_PAGE_STACK", "Growth page content uses shared page stack token")
-  assertIncludes("lib/workspace/workspace-shell-tokens.ts", "max-w-[1440px]", "shared max width token")
+  assertIncludes("lib/workspace/workspace-shell-tokens.ts", "max-w-none", "Growth workspace main inner uses full width")
   assertIncludes("lib/workspace/workspace-shell-tokens.ts", "p-3 sm:p-6", "shared horizontal/vertical padding breakpoints")
-  assertIncludes("lib/workspace/workspace-shell-tokens.ts", "pb-24 lg:pb-6", "shared mobile bottom clearance rhythm")
+  assertIncludes("lib/workspace/workspace-shell-tokens.ts", "GROWTH_WORKSPACE_SHELL_MAIN_INNER", "Growth workspace main inner token")
+  assertIncludes("lib/workspace/workspace-shell-tokens.ts", "pb-6 bg-background", "Growth scroll area uses modest bottom padding without min-height reserve")
+  assertIncludes("lib/workspace/workspace-shell-tokens.ts", "pb-24 lg:pb-6", "Core settings mobile bottom clearance rhythm")
   assertExcludes("app/(growth)/growth/page.tsx", "max-w-7xl", "Growth dashboard must not double-narrow with legacy max-w-7xl wrapper")
   console.log("  ✓ container spacing certification (max width, padding, breakpoints)")
 }

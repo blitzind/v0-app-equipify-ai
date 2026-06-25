@@ -33,9 +33,14 @@ function main(): void {
   assert.doesNotMatch(GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER, /mx-auto/)
   console.log("  ✓ Growth settings main inner matches Core settings (no max-w, no mx-auto)")
 
-  assert.match(GROWTH_WORKSPACE_SHELL_MAIN_INNER, /max-w-\[1440px\]/)
-  assert.match(GROWTH_WORKSPACE_SHELL_MAIN_INNER, /mx-auto/)
-  console.log("  ✓ Non-settings Growth routes retain max-width cap")
+  assertGrowthWorkspaceSettingsMainInnerHasNoMaxWidth(GROWTH_WORKSPACE_SHELL_MAIN_INNER)
+  assert.doesNotMatch(GROWTH_WORKSPACE_SHELL_MAIN_INNER, /mx-auto/)
+  assert.match(GROWTH_WORKSPACE_SHELL_MAIN_INNER, /max-w-none/)
+  assert.match(GROWTH_WORKSPACE_SHELL_MAIN_INNER, /pb-6/)
+  assert.match(GROWTH_WORKSPACE_SHELL_MAIN_INNER, /bg-background/)
+  assert.doesNotMatch(GROWTH_WORKSPACE_SHELL_MAIN_INNER, /min-h-full/)
+  assert.doesNotMatch(GROWTH_WORKSPACE_SHELL_MAIN_INNER, /pb-24/)
+  console.log("  ✓ All Growth workspace routes use full-width main inner token")
 
   assert.equal(isGrowthWorkspaceSettingsPathname("/growth/settings/autonomy"), true)
   assert.equal(isGrowthWorkspaceSettingsPathname("/growth/settings/autonomy/"), true)
@@ -44,11 +49,13 @@ function main(): void {
   console.log("  ✓ Settings pathname helper includes trailing-slash variants")
 
   const growthShell = readSource("components/growth/shell/growth-workspace-shell.tsx")
-  assert.match(growthShell, /useGrowthWorkspaceSettingsRoute/)
-  assert.match(growthShell, /GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER/)
+  assert.match(growthShell, /GROWTH_WORKSPACE_SHELL_MAIN_INNER/)
+  assert.match(growthShell, /data-growth-workspace-full-width/)
   assert.match(growthShell, /max-w-none mx-0/)
   assert.match(growthShell, /min-w-0 w-full flex-1/)
-  console.log("  ✓ GrowthWorkspaceShell applies full-width inner + override classes on settings routes")
+  assert.doesNotMatch(growthShell, /GROWTH_AIDEN_SAFE_AREA_PR/)
+  assert.doesNotMatch(growthShell, /GROWTH_AIDEN_SAFE_AREA_PB_SCROLL/)
+  console.log("  ✓ GrowthWorkspaceShell applies full-width inner on all workspace routes")
 
   const settingsShell = readSource("components/growth/settings/growth-settings-shell.tsx")
   assert.match(settingsShell, /GROWTH_WORKSPACE_SETTINGS_SHELL_ROOT/)
@@ -62,7 +69,9 @@ function main(): void {
   assert.match(GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT, /flex-1/)
   assert.match(GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT, /w-full/)
   assert.match(GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT, /min-w-0/)
-  console.log("  ✓ Settings content column expands (flex-1, w-full, min-w-0 — matches Core)")
+  assert.match(GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT, /pb-6/)
+  assert.doesNotMatch(GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT, /pb-24/)
+  console.log("  ✓ Settings content column expands without Core mobile bottom-nav reserve")
 
   console.log("\nGE-AUTO-UI-3 passed.\n")
 }

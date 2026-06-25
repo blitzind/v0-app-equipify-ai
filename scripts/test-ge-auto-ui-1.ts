@@ -29,11 +29,11 @@ function main(): void {
   console.log("  ✓ Growth settings shell inner is full width")
 
   const growthShell = readSource("components/growth/shell/growth-workspace-shell.tsx")
-  assert.match(growthShell, /useGrowthWorkspaceSettingsRoute/)
-  assert.match(growthShell, /GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER/)
+  assert.match(growthShell, /GROWTH_WORKSPACE_SHELL_MAIN_INNER/)
+  assert.match(growthShell, /data-growth-workspace-full-width/)
   assert.match(growthShell, /data-growth-settings-full-width/)
   assert.doesNotMatch(growthShell, /WorkspaceContainer/)
-  console.log("  ✓ GrowthWorkspaceShell switches inner for /growth/settings/*")
+  console.log("  ✓ GrowthWorkspaceShell uses full-width inner for all workspace routes")
 
   const controlCenter = readSource("components/growth/autonomy/growth-autonomy-control-center.tsx")
   assert.match(controlCenter, /w-full min-w-0/)
@@ -58,8 +58,14 @@ function main(): void {
 
   const growthMainInner = tokens.match(/GROWTH_WORKSPACE_SHELL_MAIN_INNER\s*=\s*\n?\s*"([^"]+)"/)
   assert.ok(growthMainInner)
-  assert.match(growthMainInner[1], /max-w-\[1440px\]/)
-  console.log("  ✓ Non-settings Growth routes retain max-width cap")
+  assert.match(growthMainInner[1], /max-w-none/)
+  assert.match(growthMainInner[1], /mx-0/)
+  assert.match(growthMainInner[1], /pb-6/)
+  assert.match(growthMainInner[1], /bg-background/)
+  assert.doesNotMatch(growthMainInner[1], /min-h-full/)
+  assert.doesNotMatch(growthMainInner[1], /pb-24/)
+  assert.doesNotMatch(growthMainInner[1], /max-w-\[1440px\]/)
+  console.log("  ✓ Growth workspace main inner is full width on all routes")
 
   console.log("\nGE-AUTO-UI-1 passed.\n")
 }

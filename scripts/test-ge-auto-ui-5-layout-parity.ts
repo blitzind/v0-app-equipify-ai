@@ -43,23 +43,22 @@ function readSource(relativePath: string): string {
 function staticTokenParityAudit(): void {
   assert.equal(GROWTH_WORKSPACE_SETTINGS_SHELL_ROOT, WORKSPACE_SETTINGS_SHELL_ROOT)
   assert.equal(GROWTH_WORKSPACE_SETTINGS_SHELL_BODY, WORKSPACE_SETTINGS_SHELL_BODY)
-  assert.equal(GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT, WORKSPACE_SETTINGS_SHELL_CONTENT)
   assert.equal(GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER, WORKSPACE_SETTINGS_SHELL_MAIN_INNER)
-  console.log("  ✓ Growth settings ROOT/BODY/CONTENT/MAIN_INNER alias Core tokens exactly")
+  assert.match(GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT, /flex-1/)
+  assert.match(GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT, /pb-6/)
+  assert.doesNotMatch(GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT, /pb-24/)
+  assert.notEqual(GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT, WORKSPACE_SETTINGS_SHELL_CONTENT)
+  console.log("  ✓ Growth settings ROOT/BODY/MAIN_INNER alias Core; CONTENT uses Growth pb-6 rhythm")
 
   assert.match(GROWTH_WORKSPACE_SETTINGS_SHELL_SIDEBAR, /\bmd:w-56\b/)
   assert.doesNotMatch(GROWTH_WORKSPACE_SETTINGS_SHELL_SIDEBAR, /\blg:w-64\b/)
   console.log("  ✓ Growth settings sidebar desktop width matches Core (md:w-56)")
 
   const growthShell = readSource("components/growth/shell/growth-workspace-shell.tsx")
-  assert.match(growthShell, /isSettingsRoute\s*\?/)
-  assert.match(growthShell, /GROWTH_AIDEN_SAFE_AREA_PR/)
-  assert.match(growthShell, /!isSettingsRoute|isSettingsRoute\s*\?\s*cn\(mainInnerClass/)
-  assert.doesNotMatch(
-    growthShell,
-    /cn\(\s*mainInnerClass,\s*isSettingsRoute[^)]*GROWTH_AIDEN_SAFE_AREA_PR/s,
-  )
-  console.log("  ✓ Growth workspace shell omits AIden safe-area padding on settings routes")
+  assert.match(growthShell, /data-growth-workspace-full-width/)
+  assert.doesNotMatch(growthShell, /GROWTH_AIDEN_SAFE_AREA_PR/)
+  assert.doesNotMatch(growthShell, /GROWTH_AIDEN_SAFE_AREA_PB_SCROLL/)
+  console.log("  ✓ Growth workspace shell uses full-width main inner without AIden layout inset")
 
   const enforcer = readSource("components/growth/settings/growth-settings-shell-width-enforcer.tsx")
   assert.match(enforcer, /growth-aiden-safe-area-pr/)
@@ -80,8 +79,9 @@ function staticTokenParityAudit(): void {
   console.log("  ✓ Core settings layout exposes DOM audit markers for parity comparison")
 
   const nonSettingsGrowth = readSource("components/growth/shell/growth-workspace-shell.tsx")
-  assert.match(nonSettingsGrowth, /GROWTH_AIDEN_SAFE_AREA_PR/)
-  console.log("  ✓ Non-settings Growth routes retain AIden safe-area padding")
+  assert.match(nonSettingsGrowth, /data-growth-workspace-full-width/)
+  assert.doesNotMatch(nonSettingsGrowth, /GROWTH_AIDEN_SAFE_AREA_PR/)
+  console.log("  ✓ All Growth workspace routes use full-width shell (AIden fixed overlay only)")
 }
 
 async function measureLayer(page: Page, layer: string, selector: string): Promise<LayerMeasurement> {

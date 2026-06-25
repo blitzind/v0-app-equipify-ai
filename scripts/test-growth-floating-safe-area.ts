@@ -50,8 +50,15 @@ function main(): void {
   }
 
   const shell = readSource("components/growth/shell/growth-workspace-shell.tsx")
-  assert.match(shell, /GROWTH_AIDEN_SAFE_AREA_PR/)
-  assert.match(shell, /GROWTH_AIDEN_SAFE_AREA_PB_SCROLL/)
+  assert.match(shell, /data-growth-workspace-full-width/)
+  assert.doesNotMatch(shell, /GROWTH_AIDEN_SAFE_AREA_PR/)
+  assert.doesNotMatch(shell, /GROWTH_AIDEN_SAFE_AREA_PB_SCROLL/)
+  const growthMainInnerToken = readSource("lib/workspace/workspace-shell-tokens.ts").match(
+    /GROWTH_WORKSPACE_SHELL_MAIN_INNER\s*=\s*\n?\s*"([^"]+)"/,
+  )
+  assert.ok(growthMainInnerToken)
+  assert.doesNotMatch(growthMainInnerToken[1], /min-h-full/)
+  assert.doesNotMatch(growthMainInnerToken[1], /pb-24/)
 
   for (const file of [
     "components/growth/shell/growth-sticky-action-bar.tsx",

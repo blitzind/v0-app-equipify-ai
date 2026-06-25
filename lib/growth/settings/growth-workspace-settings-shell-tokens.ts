@@ -7,8 +7,10 @@ export {
   WORKSPACE_SETTINGS_SHELL_MAIN_INNER as GROWTH_WORKSPACE_SETTINGS_SHELL_MAIN_INNER,
   WORKSPACE_SETTINGS_SHELL_ROOT as GROWTH_WORKSPACE_SETTINGS_SHELL_ROOT,
   WORKSPACE_SETTINGS_SHELL_BODY as GROWTH_WORKSPACE_SETTINGS_SHELL_BODY,
-  WORKSPACE_SETTINGS_SHELL_CONTENT as GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT,
 } from "@/lib/settings/workspace-settings-shell-tokens"
+
+/** Growth settings content column — no Core mobile bottom-nav pb-24 reserve. */
+export const GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT = "flex-1 min-w-0 w-full pb-6" as const
 
 export const GROWTH_WORKSPACE_SETTINGS_SHELL_LAYOUT_QA_MARKER =
   "growth-workspace-settings-shell-layout-ui-5-v1" as const
