@@ -56,6 +56,8 @@ export type GrowthWarmupExecutorSkipCode =
   | "sender_unhealthy"
   | "recipient_daily_cap"
   | "recipient_weekly_cap"
+  | "per_sender_dedup_exhausted"
+  | "recipient_pool_exhausted_for_sender"
   | "pre_send_blocked"
   | "transport_failed"
   | "idempotent_skip"
@@ -139,8 +141,12 @@ export type WarmupExecutorRunSummary = {
 export type WarmupExecutorRecipientPoolSummary = {
   activeApprovedRecipients: number
   availableNow: number
+  availableForSender?: number | null
   exhausted: boolean
   message: string | null
+  healthTier?: "healthy" | "warning" | "critical"
+  healthMessage?: string | null
+  recommendations?: string[]
   eligibleProfiles?: number
   plannedSendsThisRun?: number
   waitingProfilesThisRun?: number
@@ -159,6 +165,9 @@ export type GrowthWarmupProfileExecutorStats = {
   lastExecutorRunAt: string | null
   pausedOrThrottled: boolean
   recipientPoolActive: number
+  recipientsAvailableForSender?: number
+  recipientPoolHealthTier?: "healthy" | "warning" | "critical"
+  recipientPoolHealthMessage?: string | null
   eligibility: "eligible" | "skipped"
   skipReason: string | null
   nextAction: string | null

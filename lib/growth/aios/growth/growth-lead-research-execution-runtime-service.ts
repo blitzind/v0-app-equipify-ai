@@ -15,6 +15,10 @@ import {
   type GrowthLeadResearchExecutionRuntimeSummaryItem,
 } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-types"
 import {
+  buildDryRunEligiblePlans,
+} from "@/lib/growth/aios/growth/growth-lead-research-execution-dry-run-service"
+import { GROWTH_LEAD_RESEARCH_EXECUTION_DRY_RUN_RULE } from "@/lib/growth/aios/growth/growth-lead-research-execution-dry-run-types"
+import {
   createGrowthLeadResearchExecutionRuntimeStore,
   resolveExecutionRuntimeEnabled,
 } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-lifecycle-service"
@@ -42,12 +46,17 @@ export async function buildGrowthLeadResearchExecutionRuntimeReadModel(
   const store = createGrowthLeadResearchExecutionRuntimeStore(admin, input.organizationId)
   const records = await store.list(input.organizationId)
   const summaries = records.map(mapSummary)
+  const dryRunEligiblePlans = await buildDryRunEligiblePlans(admin, {
+    organizationId: input.organizationId,
+  })
 
   return {
     qaMarker: GROWTH_LEAD_RESEARCH_EXECUTION_RUNTIME_QA_MARKER,
     generatedAt: input.generatedAt ?? nowIso(),
     runtimeEnabled,
     runtimeRule: GROWTH_LEAD_RESEARCH_EXECUTION_RUNTIME_RULE,
+    dryRunRule: GROWTH_LEAD_RESEARCH_EXECUTION_DRY_RUN_RULE,
+    dryRunEligiblePlans,
     systemSummary: buildExecutionRuntimeSystemSummary({ runtimeEnabled, records }),
     queuedExecutions: summaries.filter((row) => row.state === "queued"),
     activeExecutions: summaries.filter((row) => isActiveExecutionState(row.state)),

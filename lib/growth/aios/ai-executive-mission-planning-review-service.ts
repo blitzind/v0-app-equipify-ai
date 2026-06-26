@@ -23,6 +23,7 @@ import type {
   AiExecutiveMissionPlanningReviewReadModel,
 } from "@/lib/growth/aios/ai-executive-mission-planning-review-types"
 import { findExecutionRuntimeRecordForPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-service"
+import { buildDryRunEligibilityForPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-dry-run-service"
 import { listAiWorkOrders } from "@/lib/growth/aios/ai-work-order-repository"
 import {
   isAiWorkOrderActiveStatus,
@@ -183,6 +184,10 @@ async function listLeadResearchExecutionPlansForMission(
     let simulatedSuccessProbability = null
     let runtimeState = null
     let runtimeSummary = null
+    let dryRunEligible = false
+    let dryRunSummary = null
+    let dryRunBlockedReasons: string[] = []
+    let latestDryRunStatus = null
 
     if (approvalStatus === "approved_for_future_execution") {
       readinessState = resolveApprovedPlanReadinessState({
@@ -265,6 +270,18 @@ async function listLeadResearchExecutionPlansForMission(
       runtimeSummary = `${runtimeRecord.state.replaceAll("_", " ")} — ${completed}/${runtimeRecord.steps.length} steps`
     }
 
+    const dryRunEligibility = await buildDryRunEligibilityForPlan(admin, {
+      organizationId: input.organizationId,
+      executionPlan: snapshot.executionPlan,
+      approvalState: approvalStatus,
+      confidence,
+      planId,
+    })
+    dryRunEligible = dryRunEligibility.dryRunEligible
+    dryRunSummary = dryRunEligibility.dryRunSummary
+    dryRunBlockedReasons = dryRunEligibility.dryRunBlockedReasons
+    latestDryRunStatus = dryRunEligibility.latestDryRunStatus
+
     plans.push({
       leadId,
       companyName: lead?.companyName ?? null,
@@ -289,6 +306,10 @@ async function listLeadResearchExecutionPlansForMission(
       simulatedSuccessProbability,
       runtimeState,
       runtimeSummary,
+      dryRunEligible,
+      dryRunSummary,
+      dryRunBlockedReasons,
+      latestDryRunStatus,
       reason:
         snapshot.nextBestAction?.reason ??
         snapshot.opportunityAssessment?.summary ??

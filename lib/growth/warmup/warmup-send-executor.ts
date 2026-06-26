@@ -23,7 +23,11 @@ import {
   listWarmupRecipients,
   updateWarmupRecipient,
 } from "@/lib/growth/warmup/warmup-recipient-repository"
-import { selectWarmupRecipientForSend, countAvailableWarmupRecipients } from "@/lib/growth/warmup/warmup-recipient-selector"
+import {
+  selectWarmupRecipientForSend,
+  countAvailableWarmupRecipients,
+  countAvailableWarmupRecipientsForSender,
+} from "@/lib/growth/warmup/warmup-recipient-selector"
 import {
   summarizeRecipientPoolPressure,
 } from "@/lib/growth/warmup/warmup-executor-manual-run-diagnostics"
@@ -57,6 +61,11 @@ import {
 } from "@/lib/growth/warmup/warmup-executor-types"
 import type { GrowthWarmupProfile } from "@/lib/growth/warmup/warmup-types"
 import { getSenderAccount } from "@/lib/growth/sender/sender-repository"
+import { getMailboxConnectionBySender } from "@/lib/growth/mailboxes/mailbox-repository"
+import {
+  computeWarmupRecipientPoolHealth,
+  type WarmupRecipientPoolHealth,
+} from "@/lib/growth/warmup/warmup-recipient-pool-health"
 
 export const GROWTH_WARMUP_EXECUTOR_1D_QA_MARKER = "growth-warmup-executor-1d-v1" as const
 export const GROWTH_WARMUP_EXECUTOR_1E_QA_MARKER = "growth-warmup-executor-1e-v1" as const
@@ -68,9 +77,32 @@ export { MAX_SENDS_PER_PROFILE_PER_RUN } from "@/lib/growth/warmup/warmup-execut
 async function buildRecipientPoolSummary(
   admin: SupabaseClient,
   recipients: Awaited<ReturnType<typeof listWarmupRecipients>>,
+  input?: {
+    warmingSenderCount?: number
+    profileId?: string
+  },
 ): Promise<WarmupExecutorRecipientPoolSummary> {
   const availableNow = await countAvailableWarmupRecipients(admin, recipients)
-  return summarizeRecipientPoolPressure({ recipients, availableNow })
+  const activeApprovedRecipients = recipients.filter((row) => row.active && row.approved).length
+  const availableForSender =
+    input?.profileId != null
+      ? await countAvailableWarmupRecipientsForSender(admin, {
+          recipients,
+          profileId: input.profileId,
+        })
+      : null
+  const health = computeWarmupRecipientPoolHealth({
+    approvedRecipients: activeApprovedRecipients,
+    availableGlobally: availableNow,
+    availableForSender,
+    warmingSenderCount: input?.warmingSenderCount ?? 0,
+  })
+  return summarizeRecipientPoolPressure({
+    recipients,
+    availableNow,
+    availableForSender,
+    health,
+  })
 }
 
 function withExecutorBuildMarker(
@@ -208,6 +240,15 @@ async function assertSenderHealthy(
     }
   }
 
+  const mailbox = await getMailboxConnectionBySender(admin, profile.sender_account_id).catch(() => null)
+  if (mailbox && !["connected", "healthy", "warning"].includes(mailbox.status)) {
+    return {
+      ok: false,
+      code: "pre_send_blocked",
+      message: `Mailbox connection unhealthy (${mailbox.status}).`,
+    }
+  }
+
   return { ok: true, controlledWarmupAllowed: gate.controlledWarmupAllowed }
 }
 
@@ -302,6 +343,7 @@ async function executeWarmupSendForProfile(
     recipients,
     senderAccountId: profile.sender_account_id,
     profileId: profile.id,
+    recipientDedupPolicy: WARMUP_EXECUTOR_RECIPIENT_DEDUP_POLICY,
   })
   if (!selection.ok) {
     const skipCode: GrowthWarmupExecutorSkipCode =
@@ -315,11 +357,7 @@ async function executeWarmupSendForProfile(
       status: "skipped",
       skipReason: selection.message,
       skipCode,
-      selectionContext: {
-        selection_code: selection.code,
-        approved_recipient_count: recipients.length,
-        recipient_dedup_policy: WARMUP_EXECUTOR_RECIPIENT_DEDUP_POLICY,
-      },
+      selectionContext: selection.metadata,
     })
     return base
   }
@@ -577,7 +615,10 @@ export async function runWarmupSendExecutor(
   const allProfiles = await listWarmupProfiles(admin)
   const scannableProfiles = allProfiles.filter(isWarmupExecutorScannableProfile)
   const approvedRecipients = await listWarmupRecipients(admin, { activeOnly: true, approvedOnly: true })
-  const recipientPoolSummary = await buildRecipientPoolSummary(admin, approvedRecipients)
+  const warmingSenderCount = scannableProfiles.filter((profile) => profile.status === "warming").length
+  const recipientPoolSummary = await buildRecipientPoolSummary(admin, approvedRecipients, {
+    warmingSenderCount,
+  })
   const senderGateContext = await loadSenderAccountGateContext(
     admin,
     scannableProfiles.map((profile) => profile.sender_account_id),
@@ -851,17 +892,34 @@ export async function buildWarmupExecutorDashboardStats(
   )
 
   const stats = []
+  const warmingSenderCount = profiles.filter((profile) => profile.status === "warming").length
+  const poolHealth = computeWarmupRecipientPoolHealth({
+    approvedRecipients: recipients.length,
+    availableGlobally: await countAvailableWarmupRecipients(admin, recipients),
+    warmingSenderCount,
+  })
+
   for (const profile of profiles) {
     const plannedToday = resolveEffectiveWarmupDailyCapacity(profile)
     const sendsToday = profile.sends_today_date === today ? profile.sends_today : 0
     const executorSendsToday = await countExecutorSendsForProfileToday(admin, profile.id, dayStart)
     const remainingToday = Math.max(0, plannedToday - sendsToday)
+    const recipientsAvailableForSender = await countAvailableWarmupRecipientsForSender(admin, {
+      recipients,
+      profileId: profile.id,
+    })
     const diagnostic = describeWarmupExecutorProfileDiagnostic({
       profile,
       remainingCapacity: remainingToday,
       approvedRecipientCount: recipients.length,
       enforceSendingWindow: false,
       senderAccount: senderGateContext.get(profile.sender_account_id) ?? null,
+    })
+    const profilePoolHealth = computeWarmupRecipientPoolHealth({
+      approvedRecipients: recipients.length,
+      availableGlobally: poolHealth.availableGlobally,
+      availableForSender: recipientsAvailableForSender,
+      warmingSenderCount,
     })
     stats.push({
       profileId: profile.id,
@@ -875,6 +933,9 @@ export async function buildWarmupExecutorDashboardStats(
       lastExecutorRunAt: latestRun?.finished_at ?? latestRun?.started_at ?? null,
       pausedOrThrottled: profile.status === "paused" || profile.status === "throttled",
       recipientPoolActive: recipients.length,
+      recipientsAvailableForSender,
+      recipientPoolHealthTier: profilePoolHealth.tier,
+      recipientPoolHealthMessage: profilePoolHealth.message,
       eligibility: diagnostic.eligibility,
       skipReason: diagnostic.eligibility === "skipped" ? diagnostic.reason : null,
       nextAction: diagnostic.nextAction,

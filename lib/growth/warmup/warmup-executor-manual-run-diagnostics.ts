@@ -8,6 +8,7 @@ import type {
   WarmupExecutorRecipientPoolSummary,
 } from "@/lib/growth/warmup/warmup-executor-types"
 import { isWithinWarmupSendingWindow } from "@/lib/growth/warmup/warmup-executor-types"
+import { computeWarmupRecipientPoolHealth, type WarmupRecipientPoolHealth } from "@/lib/growth/warmup/warmup-recipient-pool-health"
 import { GROWTH_WARMUP_EXECUTOR_1F_QA_MARKER, MAX_SENDS_PER_PROFILE_PER_RUN } from "@/lib/growth/warmup/warmup-executor-diagnostics"
 
 export const GROWTH_WARMUP_EXECUTOR_1G_QA_MARKER = "growth-warmup-executor-1g-v1" as const
@@ -22,6 +23,8 @@ export type WarmupExecutorDisplaySkipCode =
   | "daily_target_reached"
   | "recipient_daily_cap"
   | "recipient_weekly_cap"
+  | "per_sender_dedup_exhausted"
+  | "recipient_pool_exhausted_for_sender"
   | "sender_daily_cap"
   | "pre_send_guard_blocked"
   | "idempotency_duplicate"
@@ -70,6 +73,8 @@ const SKIP_LABELS: Record<string, string> = {
   daily_target_reached: "Daily warmup target reached",
   recipient_daily_cap: "Recipient daily cap",
   recipient_weekly_cap: "Recipient weekly cap",
+  per_sender_dedup_exhausted: "Per-sender dedup exhausted",
+  recipient_pool_exhausted_for_sender: "No unique recipients for sender",
   sender_daily_cap: "Sender daily send cap",
   pre_send_guard_blocked: "Pre-send guard blocked",
   idempotency_duplicate: "Duplicate run (idempotency)",
@@ -147,16 +152,36 @@ export function formatWarmupCronAvailability(now = new Date()): string {
 export function summarizeRecipientPoolPressure(input: {
   recipients: GrowthWarmupRecipient[]
   availableNow: number
+  availableForSender?: number | null
+  health?: WarmupRecipientPoolHealth
 }): WarmupExecutorRecipientPoolSummary {
   const activeApprovedRecipients = input.recipients.filter((r) => r.active && r.approved).length
   const exhausted = activeApprovedRecipients > 0 && input.availableNow === 0
+  const health =
+    input.health ??
+    computeWarmupRecipientPoolHealth({
+      approvedRecipients: activeApprovedRecipients,
+      availableGlobally: input.availableNow,
+      availableForSender: input.availableForSender ?? null,
+      warmingSenderCount: 0,
+    })
+
+  let message = health.message
+  if (input.availableForSender === 0 && input.availableNow > 0) {
+    message = "This sender has already used every available approved recipient today."
+  } else if (exhausted) {
+    message = "All approved recipients reached daily or weekly caps."
+  }
+
   return {
     activeApprovedRecipients,
     availableNow: input.availableNow,
+    availableForSender: input.availableForSender ?? null,
     exhausted,
-    message: exhausted
-      ? "Recipient pool exhausted. Add more approved recipients or increase recipient caps."
-      : null,
+    message,
+    healthTier: health.tier,
+    healthMessage: health.message,
+    recommendations: health.recommendations,
   }
 }
 
@@ -236,6 +261,9 @@ function buildNoSendExplanation(input: {
   if (top) {
     if (top.code === "recipient_daily_cap" || top.code === "recipient_weekly_cap") {
       return `${top.count} profile(s) blocked: all approved recipients reached daily or weekly caps. Add recipients or raise caps.`
+    }
+    if (top.code === "per_sender_dedup_exhausted" || top.code === "recipient_pool_exhausted_for_sender") {
+      return `${top.count} profile(s) blocked: this sender has already used every available approved recipient today. Add more approved recipients.`
     }
     if (top.code === "daily_target_reached") {
       return `${top.count} profile(s) already reached today's warmup target.`

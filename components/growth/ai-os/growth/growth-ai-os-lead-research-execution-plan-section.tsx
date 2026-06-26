@@ -11,6 +11,7 @@ import type { GrowthLeadResearchExecutionBoundaryClassification } from "@/lib/gr
 import type { GrowthLeadResearchExecutionPreflightStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-preflight-types"
 import type { GrowthLeadResearchExecutionSimulationStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-simulation-types"
 import type { GrowthLeadResearchExecutionState } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-types"
+import type { GrowthLeadResearchExecutionDryRunStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-dry-run-types"
 import { cn } from "@/lib/utils"
 
 function readinessBadgeVariant(readiness: GrowthLeadResearchExecutionPlan["executionReadiness"]) {
@@ -43,6 +44,10 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   simulatedSuccessProbability,
   runtimeState,
   runtimeSummary,
+  dryRunEligible,
+  dryRunSummary,
+  dryRunBlockedReasons = [],
+  latestDryRunStatus,
 }: {
   plan: GrowthLeadResearchExecutionPlan
   title?: string
@@ -66,6 +71,10 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   simulatedSuccessProbability?: number | null
   runtimeState?: GrowthLeadResearchExecutionState | null
   runtimeSummary?: string | null
+  dryRunEligible?: boolean
+  dryRunSummary?: string | null
+  dryRunBlockedReasons?: string[]
+  latestDryRunStatus?: GrowthLeadResearchExecutionDryRunStatus | null
 }) {
   return (
     <Card data-qa-marker={GROWTH_LEAD_RESEARCH_EXECUTION_PLAN_QA_MARKER} data-qa-section="execution-plan">
@@ -182,6 +191,31 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
             {runtimeSummary ? (
               <p className="text-muted-foreground">
                 <span className="font-medium text-foreground">Runtime:</span> {runtimeSummary}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        {dryRunEligible != null ? (
+          <div className="space-y-1 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={dryRunEligible ? "secondary" : "outline"}>
+                Dry-run · {dryRunEligible ? "eligible" : "not eligible"}
+              </Badge>
+              {latestDryRunStatus ? (
+                <Badge variant={latestDryRunStatus === "dry_run_passed" ? "secondary" : "outline"}>
+                  Latest · {latestDryRunStatus.replaceAll("_", " ")}
+                </Badge>
+              ) : null}
+              <Badge variant="outline">Non-persistent</Badge>
+            </div>
+            {dryRunSummary ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Dry-run:</span> {dryRunSummary}
+              </p>
+            ) : null}
+            {dryRunBlockedReasons.length > 0 ? (
+              <p className="text-amber-700">
+                Blocked: {dryRunBlockedReasons.slice(0, compact ? 2 : 5).join(" · ")}
               </p>
             ) : null}
           </div>

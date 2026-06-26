@@ -119,6 +119,14 @@ export function buildWarmupRecipientPoolPressureMessage(input: {
 
   if (input.availableNow === 0 && input.activeApprovedRecipients > 0) {
     parts.push("All approved recipients reached daily or weekly caps.")
+  } else if (
+    input.availableNow > 0 &&
+    input.activeApprovedRecipients > 0 &&
+    input.activeApprovedRecipients < input.eligibleProfiles
+  ) {
+    parts.push(
+      "Some senders may exhaust per-sender daily dedup before others — add more approved recipients than warming senders.",
+    )
   }
 
   return parts.join(" ")

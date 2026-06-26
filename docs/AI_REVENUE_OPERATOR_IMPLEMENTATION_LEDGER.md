@@ -58,6 +58,7 @@ For each GE-AI-2X phase, maintain one entry with:
 | GE-AIOS-GROWTH-2B | Execution Guardrail Preflight Checklist | Complete (local cert) |
 | GE-AIOS-GROWTH-2C | Execution Simulation Engine | Complete (local cert) |
 | GE-AIOS-GROWTH-3A | Execution Runtime Foundation | Complete (local cert) |
+| GE-AIOS-GROWTH-3B | Internal Workflow Dry Run Harness | Complete (local cert) |
 | GE-AI-2D | Memory Facade (ledger) | Complete via GE-AIOS-2F |
 | GE-AI-2A | Decision Record Foundation (ledger) | Complete via GE-AIOS-2D |
 | GE-AI-2B | Event Bus Unification | Partial (foundation in GE-AIOS-2B) |
@@ -1145,6 +1146,35 @@ Pending — in-memory only, no migrations, no persistence
 ### Production certification
 
 Pending — no outbound, no provider calls, no Core mutations from runtime path
+
+---
+
+## GE-AIOS-GROWTH-3B — Internal Workflow Dry Run Harness
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-3B (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-3A execution runtime foundation |
+
+### Scope delivered
+
+- Deterministic dry-run engine reusing 3A gate chain and step runner
+- Dry-run report model with simulated transitions, steps, mutations, predicted audit events
+- Statuses: `dry_run_passed`, `dry_run_blocked`, `dry_run_failed_gate_validation`, `dry_run_not_allowed`
+- Side-effect counters guaranteed zero (provider/outbound/Core/Work Orders)
+- API `POST /api/platform/growth/ai-os/execution-runtime/dry-run` (no DB writes)
+- Command Center dry-run actions + session-scoped latest report
+- Mission Planning Review dry-run eligibility summary
+- No migrations, no new event types
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-3b-internal-workflow-dry-run`
+
+### Production certification
+
+Pending — dry-run is non-persistent; real runtime remains disabled by default
 
 ---
 

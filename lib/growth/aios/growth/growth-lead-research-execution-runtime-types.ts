@@ -180,11 +180,24 @@ export type GrowthLeadResearchExecutionRuntimeSystemSummary = {
   headline: string
 }
 
+export type GrowthLeadResearchExecutionRuntimeDryRunEligiblePlan = {
+  planId: string
+  leadId: string
+  companyName: string | null
+  workflowType: GrowthLeadResearchInternalMutationRuntimeWorkflow
+  approvalState: GrowthLeadResearchExecutionPlanApprovalStatus
+  confidence: number | null
+  executionPlan: GrowthLeadResearchExecutionPlan
+  observationHref: string | null
+}
+
 export type GrowthLeadResearchExecutionRuntimeReadModel = {
   qaMarker: typeof GROWTH_LEAD_RESEARCH_EXECUTION_RUNTIME_QA_MARKER
   generatedAt: string
   runtimeEnabled: boolean
   runtimeRule: typeof GROWTH_LEAD_RESEARCH_EXECUTION_RUNTIME_RULE
+  dryRunRule: string
+  dryRunEligiblePlans: GrowthLeadResearchExecutionRuntimeDryRunEligiblePlan[]
   systemSummary: GrowthLeadResearchExecutionRuntimeSystemSummary
   queuedExecutions: GrowthLeadResearchExecutionRuntimeSummaryItem[]
   activeExecutions: GrowthLeadResearchExecutionRuntimeSummaryItem[]

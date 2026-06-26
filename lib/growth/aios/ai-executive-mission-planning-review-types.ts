@@ -15,6 +15,7 @@ import type { GrowthLeadResearchExecutionBoundaryClassification } from "@/lib/gr
 import type { GrowthLeadResearchExecutionPreflightStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-preflight-types"
 import type { GrowthLeadResearchExecutionSimulationStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-simulation-types"
 import type { GrowthLeadResearchExecutionState } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-types"
+import type { GrowthLeadResearchExecutionDryRunStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-dry-run-types"
 
 export const GROWTH_AIOS_3E_PHASE = "GE-AIOS-3E" as const
 
@@ -74,6 +75,10 @@ export type AiExecutiveMissionPlanningLeadResearchExecutionPlanSummary = {
   simulatedSuccessProbability: number | null
   runtimeState: GrowthLeadResearchExecutionState | null
   runtimeSummary: string | null
+  dryRunEligible: boolean
+  dryRunSummary: string | null
+  dryRunBlockedReasons: string[]
+  latestDryRunStatus: GrowthLeadResearchExecutionDryRunStatus | null
   reason: string
   createdAt: string
   reviewUpdatedAt: string | null

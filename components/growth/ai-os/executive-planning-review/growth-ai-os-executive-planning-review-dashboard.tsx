@@ -76,6 +76,10 @@ export function GrowthAiOsExecutPlanningReviewDashboard({
               simulatedSuccessProbability={entry.simulatedSuccessProbability}
               runtimeState={entry.runtimeState}
               runtimeSummary={entry.runtimeSummary}
+              dryRunEligible={entry.dryRunEligible}
+              dryRunSummary={entry.dryRunSummary}
+              dryRunBlockedReasons={entry.dryRunBlockedReasons}
+              latestDryRunStatus={entry.latestDryRunStatus}
               compact
               title={`Planning Review · ${entry.companyName ?? entry.leadId.slice(0, 8)}`}
               description="Lead research execution plan — read-only, no Work Order execution."
