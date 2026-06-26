@@ -119,7 +119,11 @@ function runCertification(): void {
     resolveGrowthApiMinimumRole("/api/platform/growth/automation"),
     "growth_manager",
   )
-  assert.ok(growthRoleCanAccessGrowthApiPath("growth_operator", "/api/platform/growth/leads/abc"))
+  assert.equal(
+    resolveGrowthApiMinimumRole("/api/platform/growth/ai-os/command-center"),
+    "growth_operator",
+  )
+  assert.ok(growthRoleCanAccessGrowthApiPath("growth_operator", "/api/platform/growth/ai-os/command-center"))
   assert.ok(!growthRoleCanAccessGrowthApiPath("growth_operator", "/api/platform/growth/providers"))
   console.log("  ✓ API route matrix resolves operator/manager/admin tiers")
 

@@ -58,6 +58,32 @@ function mapSupabaseUser(user: { id: string; email?: string | null } | null | un
   return { userId: user.id, userEmail: email }
 }
 
+type CookieSessionAuthSnapshot = {
+  cookieSessionResult: Awaited<ReturnType<Awaited<ReturnType<typeof createServerSupabaseClient>>["auth"]["getUser"]>> | null
+  cookieUser: { userId: string; userEmail: string } | null
+}
+
+/** Coalesce concurrent cookie-session getUser calls (layout + API handlers share Supabase auth lock). */
+let inflightCookieSessionAuth: Promise<CookieSessionAuthSnapshot> | null = null
+
+async function resolveCookieSessionUser(
+  cookieClient: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+): Promise<CookieSessionAuthSnapshot> {
+  if (!inflightCookieSessionAuth) {
+    inflightCookieSessionAuth = (async () => {
+      const cookieSessionResult = await raceMiddlewareAuthOperation(cookieClient.auth.getUser())
+      return {
+        cookieSessionResult,
+        cookieUser: mapSupabaseUser(cookieSessionResult?.data.user),
+      }
+    })().finally(() => {
+      inflightCookieSessionAuth = null
+    })
+  }
+
+  return inflightCookieSessionAuth
+}
+
 async function resolveGrowthEngineBearerUser(
   bearer: string,
   cookieClient: Awaited<ReturnType<typeof createServerSupabaseClient>>,
@@ -124,8 +150,7 @@ export async function resolveGrowthEnginePlatformUserResolution(
   const bearer = request ? getBearerAccessToken(request) : null
   const tokenMeta = getGrowthEngineBearerTokenMetadata(bearer)
 
-  const cookieSessionResult = await raceMiddlewareAuthOperation(cookieClient.auth.getUser())
-  const cookieUser = mapSupabaseUser(cookieSessionResult?.data.user)
+  const { cookieSessionResult, cookieUser } = await resolveCookieSessionUser(cookieClient)
   const cookie_user_resolved = Boolean(cookieUser)
 
   let bearer_user_resolved = false

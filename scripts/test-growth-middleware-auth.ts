@@ -77,8 +77,13 @@ function runAudit(): void {
   console.log("  ✓ /admin/* protection unchanged; Growth APIs skip duplicate middleware auth")
 
   assert.match(growthLayout, /resolveGrowthWorkspacePageAccess/, "Growth layout must enforce Growth RBAC gate")
-  assert.match(growthLayout, /redirect\("\/login"\)/, "unauthenticated users redirected to login")
+  assert.match(growthLayout, /redirect\(access\.reason === "unauthenticated" \? "\/login"/, "unauthenticated users redirected to login")
   assert.doesNotMatch(growthLayout, /loadPlatformAdminIdentity/, "Growth layout must not require platform admin only")
+  assert.doesNotMatch(
+    growthLayout,
+    /createServerSupabaseClient[\s\S]*?auth\.getUser[\s\S]*?resolveGrowthWorkspacePageAccess/,
+    "Growth layout must not duplicate Supabase getUser before RBAC resolver",
+  )
   console.log("  ✓ /growth/* page auth enforced by Growth RBAC layout gate")
 
   assert.match(growthAccess, /requireGrowthEnginePlatformAccess/, "Growth route handlers retain access gate")
@@ -87,6 +92,11 @@ function runAudit(): void {
     growthEngineSession,
     /raceMiddlewareAuthOperation\(cookieClient\.auth\.getUser\(\)\)/,
     "Growth cookie session auth must time out",
+  )
+  assert.match(
+    growthEngineSession,
+    /inflightCookieSessionAuth/,
+    "Growth cookie session auth must dedupe concurrent getUser calls",
   )
   assert.match(workspaceSettingsApi, /requireGrowthWorkspaceSettingsAccess/, "workspace settings APIs retain access gate")
   assert.match(platformGrowthApi, /requireGrowthEnginePlatformAccess/, "platform growth APIs retain access gate")

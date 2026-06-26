@@ -59,7 +59,8 @@ assert.equal(service.includes("approvePreview"), false)
 
 const route = readSource("app/api/platform/growth/ai-os/command-center/route.ts")
 assert.ok(route.includes("fetchAiOsCommandCenterReadModel"))
-assert.ok(route.includes('export async function GET'))
+assert.ok(route.includes('export async function GET(request: Request)'))
+assert.ok(route.includes("requireGrowthEnginePlatformAccess(request)"))
 assert.equal(route.includes("POST"), false)
 
 const panel = readSource("components/growth/ai-os/command-center/growth-ai-os-command-center-panel.tsx")

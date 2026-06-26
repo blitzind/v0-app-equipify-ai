@@ -164,6 +164,12 @@ const GROWTH_OPERATOR_PAGE_RULES: GrowthRouteAccessRule[] = [
     label: "Engagement",
   },
   {
+    id: "ai-operations",
+    pattern: /^\/growth\/os(?:\/|$)/,
+    minimumRole: "growth_operator",
+    label: "AI Operations",
+  },
+  {
     id: "audiences",
     pattern: /^\/growth\/audiences(?:\/|$)/,
     minimumRole: "growth_operator",
@@ -254,6 +260,7 @@ const GROWTH_OPERATOR_API_RULES: GrowthRouteAccessRule[] = [
   { id: "api-operator", pattern: /^\/api\/platform\/growth\/operator(?:\/|$)/, minimumRole: "growth_operator", label: "Operator API" },
   { id: "api-assignment-run", pattern: /^\/api\/platform\/growth\/assignment\/(?:run|dashboard)(?:\/|$)/, minimumRole: "growth_operator", label: "Assignment Operator API" },
   { id: "api-growth-workspace", pattern: /^\/api\/growth(?:\/|$)/, minimumRole: "growth_operator", label: "Growth Workspace API" },
+  { id: "api-ai-os", pattern: /^\/api\/platform\/growth\/ai-os(?:\/|$)/, minimumRole: "growth_operator", label: "AI OS API" },
   { id: "api-platform-growth-default", pattern: /^\/api\/platform\/growth(?:\/|$)/, minimumRole: "growth_operator", label: "Growth Platform API" },
 ]
 
