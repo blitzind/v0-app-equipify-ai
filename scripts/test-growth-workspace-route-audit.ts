@@ -207,6 +207,9 @@ function runAudit(mode: "local" | "production"): void {
     assert.ok(fs.existsSync(path.join(ROOT, "app/(growth)/growth/leads/prospect-search/page.tsx")))
     assert.ok(fs.existsSync(path.join(ROOT, "app/(growth)/growth/leads/prospect-search/discover/page.tsx")))
     assert.ok(fs.existsSync(path.join(ROOT, "app/(growth)/growth/os/page.tsx")))
+    assert.ok(
+      fs.existsSync(path.join(ROOT, "app/(growth)/growth/os/missions/[missionId]/planning/page.tsx")),
+    )
     const inboxPanel = readSource("components/growth/inbox/growth-inbox-workspace-v2-panel.tsx")
     assert.doesNotMatch(inboxPanel, /href="\/admin\/growth/)
     assert.match(inboxPanel, /GrowthInboxResumeWorkHero/)
@@ -216,7 +219,7 @@ function runAudit(mode: "local" | "production"): void {
 
   assert.ok(!fs.existsSync(path.join(ROOT, "app(growth)")), "erroneous root app(growth) folder must not exist")
   assert.ok(!fs.existsSync(path.join(ROOT, "app/growth)")), "erroneous app/growth) folder must not exist")
-  console.log("  ✓ AI Operations route lives under app/(growth)/growth/os/page.tsx")
+  console.log("  ✓ AI Operations + Mission Planning Review routes live under app/(growth)/growth/os/")
 
   const migratedCount = GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.length
   assert.ok(migratedCount >= 65)

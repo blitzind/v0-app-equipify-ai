@@ -4,6 +4,9 @@
  * Usage: pnpm test:growth-workspace-sidebar-ia
  */
 import assert from "node:assert/strict"
+import fs from "node:fs"
+import path from "node:path"
+import { buildAiOsMissionPlanningHref } from "../lib/growth/aios/ai-os-public-routes"
 import {
   GROWTH_ADMIN_BASE_PATH,
   GROWTH_WORKSPACE_BASE_PATH,
@@ -42,6 +45,11 @@ const SIDEBAR_ACTIVE_STATE_CASES: Array<{ pathname: string; activeNavId: string 
   { pathname: "/growth/runbook", activeNavId: "runbook" },
   { pathname: "/growth/activity", activeNavId: "activity" },
   { pathname: "/growth/engagement", activeNavId: "engagement" },
+  { pathname: "/growth/os", activeNavId: "ai-operations" },
+  {
+    pathname: "/growth/os/missions/d702724e-6565-4db7-a2f0-d686fea7623a/planning",
+    activeNavId: "ai-operations",
+  },
 ]
 
 const CMD_K_ADMIN_ONLY_STAYS_ADMIN = [
@@ -145,6 +153,28 @@ function runAudit(): void {
 
   assertGrowthCommandPaletteRegistryParity()
   console.log("  ✓ Cmd+K registry parity unchanged")
+
+  const missionPlanningPage = path.join(
+    process.cwd(),
+    "app/(growth)/growth/os/missions/[missionId]/planning/page.tsx",
+  )
+  assert.ok(fs.existsSync(missionPlanningPage), "Mission Planning Review route must exist under app/(growth)")
+  assert.ok(!manifestNavIds.includes("mission-planning"), "Mission Planning Review is deep-link only — not sidebar")
+  assert.equal(
+    buildAiOsMissionPlanningHref("d702724e-6565-4db7-a2f0-d686fea7623a"),
+    "/growth/os/missions/d702724e-6565-4db7-a2f0-d686fea7623a/planning",
+  )
+  const operationsDashboard = fs.readFileSync(
+    path.join(process.cwd(), "components/growth/ai-os/operations/growth-ai-os-operations-dashboard.tsx"),
+    "utf8",
+  )
+  assert.match(operationsDashboard, /Mission Planning Review/)
+  const intelligenceItems = GROWTH_WORKSPACE_SHELL_NAV_MANIFEST.find((group) => group.id === "intelligence")?.items ?? []
+  assert.deepEqual(
+    intelligenceItems.map((item) => item.id),
+    ["ai-operations", "activity", "engagement"],
+  )
+  console.log("  ✓ Mission Planning Review route + deep-link IA (not duplicated in Intelligence sidebar)")
 
   console.log("\nGrowth workspace sidebar IA audit PASS\n")
   console.log(
