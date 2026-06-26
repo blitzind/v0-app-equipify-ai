@@ -4,9 +4,11 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { buildAiOsPilotLeadResearchHref } from "@/lib/growth/aios/ai-os-public-routes"
-import { buildGrowthLeadResearchExecutionPlanId } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
 import type { GrowthLeadResearchExecutionPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
-import type { GrowthLeadResearchExecutionPlanApprovalStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-types"
+import {
+  buildGrowthLeadResearchExecutionPlanId,
+  type GrowthLeadResearchExecutionPlanApprovalStatus,
+} from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-types"
 import { resolveApprovedPlanReadinessState } from "@/lib/growth/aios/growth/growth-lead-research-approved-plan-readiness-types"
 import { buildGrowthLeadResearchApprovedPlanReadinessQueue } from "@/lib/growth/aios/growth/growth-lead-research-approved-plan-readiness-service"
 import {

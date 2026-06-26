@@ -182,7 +182,7 @@ function buildEventsFromPlanStates(
   return events
 }
 
-function dedupeEvents(events: GrowthAgentEventRecord[]):): GrowthAgentEventRecord[] {
+function dedupeEvents(events: GrowthAgentEventRecord[]): GrowthAgentEventRecord[] {
   const seen = new Set<string>()
   const result: GrowthAgentEventRecord[] = []
 
