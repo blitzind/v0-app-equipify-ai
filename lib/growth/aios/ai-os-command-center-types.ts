@@ -17,6 +17,7 @@ import type { GrowthAgentMemoryReadModel } from "@/lib/growth/aios/growth/growth
 import type { GrowthMissionFrameworkReadModel } from "@/lib/growth/aios/growth/growth-mission-framework-types"
 import type { GrowthMissionPriorityReadModel } from "@/lib/growth/aios/growth/growth-mission-priority-types"
 import type { GrowthSchedulerReadinessReadModel } from "@/lib/growth/aios/growth/growth-scheduler-readiness-types"
+import type { GrowthAutonomousQualificationPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-types"
 import type { GrowthAutonomousResearchPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-types"
 import type { AiOsOperationsDashboardReadModel } from "@/lib/growth/aios/ai-os-operations-dashboard-types"
 import type { GrowthAiOsAutonomyPolicyReadModel } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-types"
@@ -200,6 +201,7 @@ export type AiOsCommandCenterReadModel = {
   missionPriority: GrowthMissionPriorityReadModel
   schedulerReadiness: GrowthSchedulerReadinessReadModel
   autonomousResearchPilot: GrowthAutonomousResearchPilotReadModel
+  autonomousQualificationPilot: GrowthAutonomousQualificationPilotReadModel
   safeMode: AiOsCommandCenterSafeMode
   dailyBriefing: AiOsDailyBriefing
   operationsDashboard: AiOsOperationsDashboardReadModel

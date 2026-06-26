@@ -3,6 +3,8 @@
 import type { GrowthAgentKind, GrowthAgentPermissionProfile } from "@/lib/growth/aios/growth/growth-agent-framework-types"
 import { GROWTH_AGENT_KINDS } from "@/lib/growth/aios/growth/growth-agent-framework-types"
 import type { GrowthAgentFrameworkReadModel } from "@/lib/growth/aios/growth/growth-agent-framework-types"
+import type { GrowthAutonomousQualificationPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-types"
+import { GROWTH_AUTONOMOUS_QUALIFICATION_PILOT_BUDGET } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-types"
 import type { GrowthAutonomousResearchPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-types"
 import { GROWTH_AUTONOMOUS_RESEARCH_PILOT_BUDGET } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-types"
 import type {
@@ -22,6 +24,7 @@ import {
 } from "@/lib/growth/autonomy/growth-autonomy-config"
 import type {
   GrowthAiOsAgentAutonomyPolicyState,
+  GrowthAiOsAutonomyPolicyEvaluationContext,
   GrowthAiOsAutonomyPolicyIntegrationSummary,
   GrowthAiOsAutonomyPolicyReadModel,
   GrowthAiOsAutonomyPolicyRuntimeGate,
@@ -44,6 +47,10 @@ export type GrowthAiOsAutonomyPolicyBuildInput = {
   runtimeEnabled: boolean
   runtimePilotEnabled: boolean
   researchPilotTelemetry?: {
+    budgetConsumptionHour: number
+    budgetConsumptionDay: number
+  }
+  qualificationPilotTelemetry?: {
     budgetConsumptionHour: number
     budgetConsumptionDay: number
   }
@@ -304,9 +311,11 @@ export function buildGrowthAiOsAutonomyPolicyReadModel(
   )
   const enabledAgents = agentStates.filter((state) => state.enabled).map((state) => state.agentKind)
   const researchAutonomyEnabled = agentStates.find((s) => s.agentKind === "research_agent")?.enabled ?? false
+  const qualificationAutonomyEnabled =
+    agentStates.find((s) => s.agentKind === "qualification_agent")?.enabled ?? false
 
   const activeAutonomousAgents = enabledAgents.filter((kind) =>
-    ["research_agent", "revenue_operator_agent"].includes(kind),
+    ["research_agent", "qualification_agent", "revenue_operator_agent"].includes(kind),
   )
 
   const dailyBudgets = Object.entries(input.budgetRemaining ?? {}).map(([resourceKey, snapshot]) => ({
@@ -318,6 +327,10 @@ export function buildGrowthAiOsAutonomyPolicyReadModel(
   }))
 
   const telemetry = input.researchPilotTelemetry ?? {
+    budgetConsumptionHour: 0,
+    budgetConsumptionDay: 0,
+  }
+  const qualificationTelemetry = input.qualificationPilotTelemetry ?? {
     budgetConsumptionHour: 0,
     budgetConsumptionDay: 0,
   }
@@ -338,6 +351,7 @@ export function buildGrowthAiOsAutonomyPolicyReadModel(
     runtimePilotEnabled: input.runtimePilotEnabled && autonomyEnabled,
     outboundEnabled: kill.autonomyOutboundEnabled,
     researchAutonomyEnabled,
+    qualificationAutonomyEnabled,
     autonomyEnabled,
     humanApprovalRequired: input.settings.masterMode !== "objective",
     killSwitches: kill,
@@ -350,8 +364,12 @@ export function buildGrowthAiOsAutonomyPolicyReadModel(
       researchRunsPerDay: GROWTH_AUTONOMOUS_RESEARCH_PILOT_BUDGET.maxRunsPerDay,
       researchHourlyConsumed: telemetry.budgetConsumptionHour,
       researchDailyConsumed: telemetry.budgetConsumptionDay,
+      qualificationRunsPerHour: GROWTH_AUTONOMOUS_QUALIFICATION_PILOT_BUDGET.maxRunsPerHour,
+      qualificationRunsPerDay: GROWTH_AUTONOMOUS_QUALIFICATION_PILOT_BUDGET.maxRunsPerDay,
+      qualificationHourlyConsumed: qualificationTelemetry.budgetConsumptionHour,
+      qualificationDailyConsumed: qualificationTelemetry.budgetConsumptionDay,
     },
-    throttleSummary: `${GROWTH_AUTONOMOUS_RESEARCH_PILOT_BUDGET.maxRunsPerHour}/hr · ${GROWTH_AUTONOMOUS_RESEARCH_PILOT_BUDGET.maxRunsPerDay}/day research budget`,
+    throttleSummary: `${GROWTH_AUTONOMOUS_RESEARCH_PILOT_BUDGET.maxRunsPerHour}/hr · ${GROWTH_AUTONOMOUS_RESEARCH_PILOT_BUDGET.maxRunsPerDay}/day research · ${GROWTH_AUTONOMOUS_QUALIFICATION_PILOT_BUDGET.maxRunsPerHour}/hr · ${GROWTH_AUTONOMOUS_QUALIFICATION_PILOT_BUDGET.maxRunsPerDay}/day qualification`,
     cooldownSummary: "Scheduler cooldown rules derived from 5A readiness plan (inactive in this phase).",
     approvalSummary: input.settings.masterMode === "objective"
       ? "Objective mode — conditional approvals apply."
@@ -533,6 +551,73 @@ export function evaluateRuntimeAutonomyPolicyGate(
   return { allowed: true, blockReason: null, policyKey: null }
 }
 
+export function evaluateQualificationPilotAutonomyPolicyGate(
+  context: GrowthAiOsAutonomyPolicyEvaluationContext,
+): GrowthAiOsAutonomyPolicyRuntimeGate {
+  const { policy } = context
+
+  if (policy.emergencyStopActive) {
+    return {
+      allowed: false,
+      blockReason: "Emergency stop active — configure in Growth Autonomy.",
+      policyKey: "emergency_stop",
+    }
+  }
+
+  if (!policy.autonomyEnabled) {
+    return {
+      allowed: false,
+      blockReason: "Autonomy disabled by platform policy.",
+      policyKey: "autonomy_disabled",
+    }
+  }
+
+  if (!policy.qualificationAutonomyEnabled) {
+    return {
+      allowed: false,
+      blockReason: "Qualification autonomy disabled — enable enrichment capability in Growth Autonomy.",
+      policyKey: "qualification_autonomy_disabled",
+    }
+  }
+
+  const qualificationAgent = policy.agentStates.find((state) => state.agentKind === "qualification_agent")
+  if (qualificationAgent && !qualificationAgent.enabled) {
+    return {
+      allowed: false,
+      blockReason: qualificationAgent.disabledReason ?? "Qualification agent blocked by policy.",
+      policyKey: qualificationAgent.policyEvaluation,
+    }
+  }
+
+  return { allowed: true, blockReason: null, policyKey: null }
+}
+
+export function deriveQualificationPilotControlFromPolicy(
+  policy: GrowthAiOsAutonomyPolicyReadModel,
+  storedControlState: GrowthAutonomousQualificationPilotReadModel["controlState"],
+): GrowthAutonomousQualificationPilotReadModel["controlState"] {
+  if (!policy.qualificationAutonomyEnabled || policy.emergencyStopActive) return "disabled"
+  if (storedControlState === "paused") return "paused"
+  return "active"
+}
+
+export function enrichAutonomousQualificationPilotWithAutonomyPolicy(
+  pilot: GrowthAutonomousQualificationPilotReadModel,
+  policy: GrowthAiOsAutonomyPolicyReadModel,
+): GrowthAutonomousQualificationPilotReadModel {
+  const effectiveControlState = deriveQualificationPilotControlFromPolicy(policy, pilot.controlState)
+  const enabled = effectiveControlState === "active"
+
+  return {
+    ...pilot,
+    controlState: effectiveControlState,
+    enabled,
+    policyDerived: true,
+    configureHref: policy.controlPlaneHref,
+    autonomyPolicySource: policy.qaMarker,
+  }
+}
+
 export function evaluateResearchPilotAutonomyPolicyGate(
   policy: GrowthAiOsAutonomyPolicyReadModel,
 ): GrowthAiOsAutonomyPolicyRuntimeGate {
@@ -579,6 +664,9 @@ export function buildAutonomyPolicyIntegrationSummary(
     schedulerReadinessLabel: `${policy.schedulerMode.replaceAll("_", " ")} · ${policy.enabledAgents.length} agent(s) enabled`,
     agentFrameworkLabel: `${policy.enabledAgents.length}/${policy.agentStates.length} agents policy-enabled`,
     researchPilotLabel: policy.researchAutonomyEnabled ? "Research autonomy allowed" : "Research autonomy blocked",
+    qualificationPilotLabel: policy.qualificationAutonomyEnabled
+      ? "Qualification autonomy allowed"
+      : "Qualification autonomy blocked",
     activeAutonomousAgentCount: policy.activeAutonomousAgents.length,
     operationsDashboardHref: "/growth/os",
   }

@@ -8,6 +8,7 @@ import { GrowthAiOsApprovedPlanReadinessSection } from "@/components/growth/ai-o
 import { GrowthAiOsAgentEventsSection } from "@/components/growth/ai-os/command-center/growth-ai-os-agent-events-section"
 import { GrowthAiOsAgentFrameworkSection } from "@/components/growth/ai-os/command-center/growth-ai-os-agent-framework-section"
 import { GrowthAiOsAgentMemorySection } from "@/components/growth/ai-os/command-center/growth-ai-os-agent-memory-section"
+import { GrowthAiOsAutonomousQualificationPilotSection } from "@/components/growth/ai-os/command-center/growth-ai-os-autonomous-qualification-pilot-section"
 import { GrowthAiOsAutonomousResearchPilotSection } from "@/components/growth/ai-os/command-center/growth-ai-os-autonomous-research-pilot-section"
 import { GrowthAiOsExecutionBoundaryAuditSection } from "@/components/growth/ai-os/command-center/growth-ai-os-execution-boundary-audit-section"
 import { GrowthAiOsExecutionPlanReviewSection } from "@/components/growth/ai-os/command-center/growth-ai-os-execution-plan-review-section"
@@ -41,7 +42,7 @@ export function GrowthAiOsCommandCenterDiagnosticsSections({
   return (
     <div className="space-y-6 border-t border-dashed border-border pt-6" data-qa-section="engineering-diagnostics">
       <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-4 py-3 text-sm text-amber-900">
-        Engineering diagnostics mode — full AI OS phase sections (1A–5B) for implementation review.
+        Engineering diagnostics mode — full AI OS phase sections (1A–5C) for implementation review.
       </div>
 
       <GrowthAiOsGrowthLeadResearchWorkflowSection workflow={model.growthLeadResearchWorkflow} />
@@ -82,6 +83,12 @@ export function GrowthAiOsCommandCenterDiagnosticsSections({
       <div id="autonomous-research-pilot">
         <GrowthAiOsAutonomousResearchPilotSection
           autonomousResearchPilot={model.autonomousResearchPilot}
+        />
+      </div>
+
+      <div id="autonomous-qualification-pilot">
+        <GrowthAiOsAutonomousQualificationPilotSection
+          autonomousQualificationPilot={model.autonomousQualificationPilot}
         />
       </div>
 

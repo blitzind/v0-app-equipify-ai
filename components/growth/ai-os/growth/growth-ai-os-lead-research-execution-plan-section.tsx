@@ -19,6 +19,7 @@ import type { GrowthAgentMemoryPlanContext } from "@/lib/growth/aios/growth/grow
 import type { GrowthMissionPlanContext } from "@/lib/growth/aios/growth/growth-mission-framework-types"
 import type { GrowthMissionPriorityPlanContext } from "@/lib/growth/aios/growth/growth-mission-priority-types"
 import type { GrowthSchedulerReadinessPlanContext } from "@/lib/growth/aios/growth/growth-scheduler-readiness-types"
+import type { GrowthAutonomousQualificationPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-types"
 import type { GrowthAutonomousResearchPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-types"
 import { cn } from "@/lib/utils"
 
@@ -70,6 +71,7 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   missionPriorityContext,
   schedulerReadinessContext,
   autonomousResearchPilotContext,
+  autonomousQualificationPilotContext,
 }: {
   plan: GrowthLeadResearchExecutionPlan
   title?: string
@@ -111,6 +113,7 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   missionPriorityContext?: GrowthMissionPriorityPlanContext | null
   schedulerReadinessContext?: GrowthSchedulerReadinessPlanContext | null
   autonomousResearchPilotContext?: GrowthAutonomousResearchPilotPlanContext | null
+  autonomousQualificationPilotContext?: GrowthAutonomousQualificationPilotPlanContext | null
 }) {
   return (
     <Card data-qa-marker={GROWTH_LEAD_RESEARCH_EXECUTION_PLAN_QA_MARKER} data-qa-section="execution-plan">
@@ -512,6 +515,43 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
             <p className="text-muted-foreground">
               <span className="font-medium text-foreground">Wake:</span>{" "}
               {autonomousResearchPilotContext.wakeRecommendation}
+            </p>
+          </div>
+        ) : null}
+
+        {autonomousQualificationPilotContext ? (
+          <div className="space-y-1 text-sm" data-qa-section="autonomous-qualification-pilot-context">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">
+                Qualification · {autonomousQualificationPilotContext.qualificationStatus.replaceAll("_", " ")}
+              </Badge>
+              <Badge variant="outline">
+                Owner · {autonomousQualificationPilotContext.qualificationAgentOwner.replaceAll("_", " ")}
+              </Badge>
+              {autonomousQualificationPilotContext.confidence != null ? (
+                <Badge variant="secondary">
+                  Confidence {autonomousQualificationPilotContext.confidence}
+                </Badge>
+              ) : null}
+              {autonomousQualificationPilotContext.icpFitScore != null ? (
+                <Badge variant="secondary">Fit {autonomousQualificationPilotContext.icpFitScore}</Badge>
+              ) : null}
+            </div>
+            {autonomousQualificationPilotContext.blockedReason ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Blocked:</span>{" "}
+                {autonomousQualificationPilotContext.blockedReason}
+              </p>
+            ) : null}
+            {autonomousQualificationPilotContext.revenueOperatorHandoff ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Handoff:</span>{" "}
+                {autonomousQualificationPilotContext.revenueOperatorHandoff.replaceAll("_", " ")}
+              </p>
+            ) : null}
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Wake:</span>{" "}
+              {autonomousQualificationPilotContext.wakeRecommendation}
             </p>
           </div>
         ) : null}

@@ -40,8 +40,13 @@ import type { GrowthAiOsAutonomyPolicyIntegrationSummary } from "@/lib/growth/au
 import { fetchGrowthAiOsAutonomyPolicy } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-engine-service"
 import {
   buildAutonomyPolicyIntegrationSummary,
+  deriveQualificationPilotControlFromPolicy,
   deriveResearchPilotControlFromPolicy,
 } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-synthesizer"
+import {
+  getAutonomousQualificationPilotOrgState,
+  setAutonomousQualificationPilotControlState,
+} from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-store"
 import {
   getAutonomousResearchPilotOrgState,
   setAutonomousResearchPilotControlState,
@@ -174,6 +179,23 @@ async function buildStatusSummary(
     emergencyStopAvailable: true,
     enabledCapabilities,
     remainingBudgets,
+  }
+}
+
+async function syncAutonomousQualificationPilotFromPolicy(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<void> {
+  const generatedAt = new Date().toISOString()
+  const policy = await fetchGrowthAiOsAutonomyPolicy(admin, { organizationId, generatedAt })
+  const orgState = getAutonomousQualificationPilotOrgState(organizationId, generatedAt)
+  const nextControlState = deriveQualificationPilotControlFromPolicy(policy, orgState.controlState)
+  if (nextControlState !== orgState.controlState) {
+    setAutonomousQualificationPilotControlState({
+      organizationId,
+      controlState: nextControlState,
+      now: generatedAt,
+    })
   }
 }
 
@@ -333,6 +355,7 @@ export async function patchGrowthAutonomySettings(
       emergencyStop: true,
     })
     await syncAutonomousResearchPilotFromPolicy(admin, input.organizationId)
+    await syncAutonomousQualificationPilotFromPolicy(admin, input.organizationId)
     return loadGrowthAutonomySettingsViewModel(admin, input.organizationId)
   }
 
@@ -400,6 +423,7 @@ export async function patchGrowthAutonomySettings(
   })
 
   await syncAutonomousResearchPilotFromPolicy(admin, input.organizationId)
+  await syncAutonomousQualificationPilotFromPolicy(admin, input.organizationId)
 
   return loadGrowthAutonomySettingsViewModel(admin, input.organizationId)
 }

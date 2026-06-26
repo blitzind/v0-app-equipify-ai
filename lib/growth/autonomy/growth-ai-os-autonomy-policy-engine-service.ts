@@ -21,6 +21,7 @@ import type {
   GrowthAutonomyCapability,
   GrowthAutonomySettingsSnapshot,
 } from "@/lib/growth/autonomy/growth-autonomy-types"
+import { getAutonomousQualificationPilotOrgState } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-store"
 import { getAutonomousResearchPilotOrgState } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-store"
 import {
   resolveExecutionRuntimeEnabled,
@@ -84,7 +85,9 @@ async function buildGrowthAiOsAutonomyPolicyPackage(
   const settings = await buildSettingsSnapshot(admin, input.organizationId)
   const budgetRemaining = await buildBudgetRemaining(admin, input.organizationId)
   const pilotState = getAutonomousResearchPilotOrgState(input.organizationId, generatedAt)
+  const qualificationPilotState = getAutonomousQualificationPilotOrgState(input.organizationId, generatedAt)
   const recentRuns = pilotState.runs
+  const recentQualificationRuns = qualificationPilotState.runs
   const hourAgo = Date.parse(generatedAt) - 60 * 60 * 1000
   const dayAgo = Date.parse(generatedAt) - 24 * 60 * 60 * 1000
   const researchHourlyConsumed = recentRuns.filter(
@@ -92,6 +95,12 @@ async function buildGrowthAiOsAutonomyPolicyPackage(
   ).length
   const researchDailyConsumed = recentRuns.filter(
     (run) => Date.parse(run.completedAt) >= dayAgo,
+  ).length
+  const qualificationHourlyConsumed = recentQualificationRuns.filter(
+    (run) => run.outcome !== "skipped" && Date.parse(run.completedAt) >= hourAgo,
+  ).length
+  const qualificationDailyConsumed = recentQualificationRuns.filter(
+    (run) => run.outcome !== "skipped" && Date.parse(run.completedAt) >= dayAgo,
   ).length
   const [runtimeEnabled, runtimePilotEnabled] = await Promise.all([
     resolveExecutionRuntimeEnabled(admin, { organizationId: input.organizationId }),
@@ -107,6 +116,10 @@ async function buildGrowthAiOsAutonomyPolicyPackage(
     researchPilotTelemetry: {
       budgetConsumptionHour: researchHourlyConsumed,
       budgetConsumptionDay: researchDailyConsumed,
+    },
+    qualificationPilotTelemetry: {
+      budgetConsumptionHour: qualificationHourlyConsumed,
+      budgetConsumptionDay: qualificationDailyConsumed,
     },
     budgetRemaining,
   })

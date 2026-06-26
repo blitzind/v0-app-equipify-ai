@@ -141,7 +141,9 @@ function buildExecutiveOverview(
         : healthStatus === "degraded"
           ? "AI systems need review"
           : "AI systems blocked or degraded",
-    activeAutonomousRuns: commandCenter.autonomousResearchPilot.telemetry.activeRuns,
+    activeAutonomousRuns:
+      commandCenter.autonomousResearchPilot.telemetry.activeRuns +
+      commandCenter.autonomousQualificationPilot.telemetry.activeRuns,
     priorityWorkLabel: priorityWork ?? null,
     needsAttentionCount: commandCenter.needsAttention.length,
     approvalBacklogCount: approvalBacklog,
@@ -212,6 +214,16 @@ function buildActiveWork(commandCenter: AiOsCommandCenterReadModel): AiOsOperati
       title: "Autonomous research pilot",
       summary: `${commandCenter.autonomousResearchPilot.telemetry.activeRuns} active run(s) · ${commandCenter.autonomousResearchPilot.controlState}`,
       href: `${GROWTH_AI_OS_PUBLIC_BASE_PATH}#autonomous-research-pilot`,
+    })
+  }
+
+  if (commandCenter.autonomousQualificationPilot.enabled) {
+    items.push({
+      id: "autonomous-qualification-pilot",
+      category: "autonomous_qualification",
+      title: "Autonomous qualification pilot",
+      summary: `${commandCenter.autonomousQualificationPilot.telemetry.eligibleLeads} eligible · ${commandCenter.autonomousQualificationPilot.telemetry.successfulRuns} completed · ${commandCenter.autonomousQualificationPilot.controlState}`,
+      href: `${GROWTH_AI_OS_PUBLIC_BASE_PATH}#autonomous-qualification-pilot`,
     })
   }
 
@@ -299,6 +311,17 @@ function buildActivityTimeline(commandCenter: AiOsCommandCenterReadModel): AiOsO
     })
   }
 
+  for (const run of commandCenter.autonomousQualificationPilot.recentRuns) {
+    items.push({
+      id: `aq-${run.runId}`,
+      source: "autonomous_qualification",
+      title: `Qualification run · ${run.outcome}`,
+      summary: run.reasoning ?? run.skipReason ?? `${run.qualificationStatus ?? run.outcome} · ${run.companyName ?? run.leadId}`,
+      occurredAt: run.completedAt,
+      href: `${GROWTH_AI_OS_PUBLIC_BASE_PATH}/pilot/lead-research/${run.leadId}`,
+    })
+  }
+
   for (const runtime of commandCenter.executionRuntime.activeExecutions.slice(0, 6)) {
     items.push({
       id: `rt-${runtime.executionId}`,
@@ -356,10 +379,18 @@ function buildHealthSummary(commandCenter: AiOsCommandCenterReadModel): AiOsOper
     schedulerBlocked,
   })
 
-  const budgetHour = commandCenter.autonomousResearchPilot.telemetry.budgetConsumptionHour
-  const budgetDay = commandCenter.autonomousResearchPilot.telemetry.budgetConsumptionDay
-  const budgetMaxHour = commandCenter.autonomousResearchPilot.budgetLimits.maxRunsPerHour
-  const budgetMaxDay = commandCenter.autonomousResearchPilot.budgetLimits.maxRunsPerDay
+  const budgetHour =
+    commandCenter.autonomousResearchPilot.telemetry.budgetConsumptionHour +
+    commandCenter.autonomousQualificationPilot.telemetry.budgetConsumptionHour
+  const budgetDay =
+    commandCenter.autonomousResearchPilot.telemetry.budgetConsumptionDay +
+    commandCenter.autonomousQualificationPilot.telemetry.budgetConsumptionDay
+  const budgetMaxHour =
+    commandCenter.autonomousResearchPilot.budgetLimits.maxRunsPerHour +
+    commandCenter.autonomousQualificationPilot.budgetLimits.maxRunsPerHour
+  const budgetMaxDay =
+    commandCenter.autonomousResearchPilot.budgetLimits.maxRunsPerDay +
+    commandCenter.autonomousQualificationPilot.budgetLimits.maxRunsPerDay
 
   return {
     overallStatus,
