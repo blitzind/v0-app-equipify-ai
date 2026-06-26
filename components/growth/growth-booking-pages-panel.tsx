@@ -377,7 +377,7 @@ export function GrowthBookingPagesPanel() {
                     <GrowthMediaPicker
                       label="Hero / banner image"
                       value={editor.heroImageUrl}
-                      acceptedTypes={["image"]}
+                      acceptedTypes={["hero", "image"]}
                       allowManualUrl
                       onChange={(url) => setEditor({ ...editor, heroImageUrl: url })}
                     />
