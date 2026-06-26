@@ -108,7 +108,7 @@ const navManifest = readSource("lib/growth/navigation/growth-workspace-shell-nav
 assert.ok(navManifest.includes('label: "AI Operations"'))
 assert.ok(navManifest.includes('id: "ai-operations"'))
 
-const page = readSource("app(growth)/growth/os/page.tsx")
+const page = readSource("app/(growth)/growth/os/page.tsx")
 assert.ok(page.includes('title="AI Operations"'))
 
 const defaultAutonomySettings = buildDefaultGrowthAutonomySettings("org-test-1b")
@@ -436,7 +436,7 @@ const minimalCommandCenter = {
     schedulerMode: "controlled_agent_wake" as const,
     controlState: "disabled" as const,
     enabled: false,
-    disabledAgentKinds: ["outreach_agent", "meeting_agent"],
+    disabledAgentKinds: ["meeting_agent"],
     budgetLimits: { maxRunsPerHour: 20, maxRunsPerDay: 200, maxRetriesPerLeadPerDay: 3, cooldownAfterFailureMinutes: 30 },
     telemetry: {
       successfulRuns: 0,
@@ -469,7 +469,7 @@ const minimalCommandCenter = {
     schedulerMode: "controlled_agent_wake" as const,
     controlState: "disabled" as const,
     enabled: false,
-    disabledAgentKinds: ["outreach_agent", "meeting_agent"],
+    disabledAgentKinds: ["meeting_agent"],
     budgetLimits: { maxRunsPerHour: 15, maxRunsPerDay: 150, maxRetriesPerLeadPerDay: 2, cooldownAfterFailureMinutes: 30 },
     telemetry: {
       successfulRuns: 0,
@@ -538,6 +538,88 @@ const minimalCommandCenter = {
     },
     wakeConditionsSupported: [],
   },
+  autonomousOutreachPreparationPilot: {
+    qaMarker: "growth-aios-growth-5f-autonomous-outreach-preparation-pilot-v1",
+    generatedAt: new Date().toISOString(),
+    rule: "rule",
+    agentKind: "outreach_agent" as const,
+    schedulerMode: "controlled_agent_wake" as const,
+    controlState: "disabled" as const,
+    enabled: false,
+    preparationModeOnly: true as const,
+    allowedWorkflow: "outreach_generation" as const,
+    disabledAgentKinds: ["meeting_agent"],
+    budgetLimits: {
+      maxRunsPerHour: 20,
+      maxRunsPerDay: 200,
+      maxRetriesPerLeadPerDay: 3,
+      cooldownAfterFailureMinutes: 30,
+    },
+    telemetry: {
+      successfulRuns: 0,
+      failedRuns: 0,
+      skippedRuns: 0,
+      eligibleLeads: 0,
+      draftsPrepared: 0,
+      approvalPackagesWaiting: 0,
+      blockedPreparations: 0,
+      budgetConsumptionHour: 0,
+      budgetConsumptionDay: 0,
+      activeRuns: 0,
+    },
+    latestPackages: [],
+    recentRuns: [],
+    revenueOperatorSupervision: {
+      approveWakeRecommendation: "",
+      budgetMonitorSummary: "",
+      failureMonitorSummary: "",
+      pauseRecommendation: null,
+      escalationRecommendation: null,
+      latestOutcomeRecommendation: null,
+    },
+    wakeConditionsSupported: [],
+  },
+  autonomousMeetingPilot: {
+    qaMarker: "growth-aios-growth-5g-autonomous-meeting-pilot-v1",
+    generatedAt: new Date().toISOString(),
+    rule: "rule",
+    agentKind: "meeting_agent" as const,
+    schedulerMode: "controlled_agent_wake" as const,
+    controlState: "disabled" as const,
+    enabled: false,
+    preparationModeOnly: true as const,
+    allowedWorkflow: "meeting_preparation" as const,
+    disabledAgentKinds: [],
+    budgetLimits: {
+      maxRunsPerHour: 20,
+      maxRunsPerDay: 200,
+      maxRetriesPerLeadPerDay: 3,
+      cooldownAfterFailureMinutes: 30,
+    },
+    telemetry: {
+      successfulRuns: 0,
+      failedRuns: 0,
+      skippedRuns: 0,
+      eligibleLeads: 0,
+      briefsPrepared: 0,
+      preparationPackagesWaiting: 0,
+      blockedPreparations: 0,
+      budgetConsumptionHour: 0,
+      budgetConsumptionDay: 0,
+      activeRuns: 0,
+    },
+    latestPackages: [],
+    recentRuns: [],
+    revenueOperatorSupervision: {
+      approveWakeRecommendation: "",
+      budgetMonitorSummary: "",
+      failureMonitorSummary: "",
+      pauseRecommendation: null,
+      escalationRecommendation: null,
+      latestOutcomeRecommendation: null,
+    },
+    wakeConditionsSupported: [],
+  },
   safeMode: {
     emergencyStopActive: false,
     objectiveModeEnabled: false,
@@ -569,7 +651,10 @@ assert.equal(dashboard.autonomyState.configureHref, "/growth/settings/autonomy")
 assert.equal(dashboard.approvalSummary.categories.find((c) => c.id === "automation")?.count, 2)
 assert.ok(dashboard.missionPriorities.length <= 10)
 assert.equal(typeof dashboard.executionAgentStatus.budgetLabel, "string")
-assert.equal(dashboard.executionAgentStatus.configureHref, "/growth/settings/autonomy")
+assert.equal(typeof dashboard.outreachAgentStatus.budgetLabel, "string")
+assert.equal(typeof dashboard.meetingAgentStatus.budgetLabel, "string")
+assert.equal(dashboard.outreachAgentStatus.configureHref, "/growth/settings/autonomy")
+assert.equal(dashboard.meetingAgentStatus.configureHref, "/growth/settings/autonomy")
 
 for (const file of [
   "lib/growth/aios/ai-os-operations-dashboard-synthesizer.ts",

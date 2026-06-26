@@ -46,7 +46,7 @@ assert.equal(
 assert.equal(mapAiOsLegacyPublicPathToCanonical("/growth/ai-os"), "/growth/os")
 
 const canonicalPages = [
-  "app(growth)/growth/os/page.tsx",
+  "app/(growth)/growth/os/page.tsx",
   "app/(growth)/growth/os/missions/[missionId]/planning/page.tsx",
   "app/(growth)/growth/os/pilot/lead-research/[leadId]/page.tsx",
 ]

@@ -166,7 +166,7 @@ export function GrowthObjectivesDashboard() {
           </CardContent>
         </Card>
 
-        {selected?.plan ? (
+        {selected?.plan?.icpStrategy ? (
           <Card>
             <CardHeader>
               <CardTitle>Live runtime</CardTitle>

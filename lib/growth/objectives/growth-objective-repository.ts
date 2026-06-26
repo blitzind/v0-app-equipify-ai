@@ -8,6 +8,7 @@ import {
   GROWTH_OBJECTIVE_STATUSES,
   type GrowthObjective,
   type GrowthObjectiveCreateInput,
+  type GrowthObjectiveExecutionPlan,
   type GrowthObjectiveStatus,
   type GrowthObjectiveType,
 } from "@/lib/growth/objectives/growth-objective-types"
@@ -50,6 +51,23 @@ function normalizeRuntimeState(value: unknown): GrowthObjective["runtime"] {
   return runtime
 }
 
+export function normalizeGrowthObjectiveExecutionPlan(
+  value: unknown,
+): GrowthObjectiveExecutionPlan | null {
+  if (!value || typeof value !== "object") return null
+  const plan = value as Partial<GrowthObjectiveExecutionPlan>
+  if (
+    typeof plan.icpStrategy?.summary !== "string" ||
+    !Array.isArray(plan.stages) ||
+    plan.stages.length === 0 ||
+    !plan.forecast ||
+    typeof plan.forecast.leadsNeeded !== "number"
+  ) {
+    return null
+  }
+  return plan as GrowthObjectiveExecutionPlan
+}
+
 function mapRow(row: Record<string, unknown>): GrowthObjective {
   return {
     id: String(row.id),
@@ -66,7 +84,7 @@ function mapRow(row: Record<string, unknown>): GrowthObjective {
     priority: (row.priority as GrowthObjective["priority"]) ?? "medium",
     autonomyLevel: (row.autonomy_level as GrowthObjective["autonomyLevel"]) ?? "objective",
     safetyMode: (row.safety_mode as GrowthObjective["safetyMode"]) ?? "strict",
-    plan: (row.plan as GrowthObjective["plan"]) ?? null,
+    plan: normalizeGrowthObjectiveExecutionPlan(row.plan),
     runtime: normalizeRuntimeState(row.runtime_state),
     executionHistory: Array.isArray(row.execution_history)
       ? (row.execution_history as GrowthObjective["executionHistory"])
@@ -187,7 +205,7 @@ export async function insertGrowthObjective(
       priority: objective.priority,
       autonomy_level: objective.autonomyLevel,
       safety_mode: objective.safetyMode,
-      plan: objective.plan ?? {},
+      plan: objective.plan,
       runtime_state: objective.runtime ?? {},
       execution_history: objective.executionHistory ?? [],
       recent_signals: objective.recentSignals ?? [],

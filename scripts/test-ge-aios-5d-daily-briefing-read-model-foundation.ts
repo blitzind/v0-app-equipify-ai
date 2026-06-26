@@ -51,7 +51,7 @@ const files = [
   "lib/growth/aios/ai-os-command-center-types.ts",
   "lib/growth/aios/ai-os-command-center-service.ts",
   "components/growth/ai-os/command-center/growth-ai-os-command-center-panel.tsx",
-  "app(growth)/growth/os/page.tsx",
+  "app/(growth)/growth/os/page.tsx",
 ]
 for (const file of files) {
   assert.ok(fs.existsSync(path.join(process.cwd(), file)), `${file} must exist`)

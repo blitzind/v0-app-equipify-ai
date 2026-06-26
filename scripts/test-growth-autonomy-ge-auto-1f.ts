@@ -13,6 +13,7 @@ import { buildGrowthObjectiveForecast } from "../lib/growth/objectives/growth-ob
 import { evaluateObjectivePlanOrchestration } from "../lib/growth/objectives/growth-objective-orchestration"
 import { planGrowthObjective } from "../lib/growth/objectives/growth-objective-planner"
 import {
+  normalizeGrowthObjectiveExecutionPlan,
   resetGrowthObjectiveMemoryStore,
 } from "../lib/growth/objectives/growth-objective-repository"
 import {
@@ -269,7 +270,13 @@ async function main() {
 
   assert.ok(fs.existsSync(path.join(process.cwd(), "app/(growth)/growth/objectives/page.tsx")))
   assert.ok(fs.existsSync(path.join(process.cwd(), "components/growth/objectives/growth-objectives-dashboard.tsx")))
-  console.log("  ✓ Objectives dashboard page + component")
+  const dashboardSource = readSource("components/growth/objectives/growth-objectives-dashboard.tsx")
+  assert.match(dashboardSource, /selected\?\.plan\?\.icpStrategy/)
+  assert.equal(normalizeGrowthObjectiveExecutionPlan({}), null)
+  assert.equal(normalizeGrowthObjectiveExecutionPlan(null), null)
+  const completePlan = planGrowthObjective(objective)
+  assert.ok(normalizeGrowthObjectiveExecutionPlan(completePlan)?.icpStrategy.summary)
+  console.log("  ✓ Objectives dashboard page + plan contract normalization")
 
   console.log("\nGE-AUTO-1F passed.\n")
 }

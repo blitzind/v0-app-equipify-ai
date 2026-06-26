@@ -31,7 +31,7 @@ const files = [
   "lib/growth/aios/ai-os-command-center-types.ts",
   "lib/growth/aios/ai-os-command-center-service.ts",
   "app/api/platform/growth/ai-os/command-center/route.ts",
-  "app(growth)/growth/os/page.tsx",
+  "app/(growth)/growth/os/page.tsx",
   "components/growth/ai-os/command-center/growth-ai-os-command-center-panel.tsx",
 ]
 for (const file of files) {
@@ -81,7 +81,7 @@ assert.ok(diagnostics.includes("Mission Planning Review"))
 assert.equal(panel.includes("method: \"POST\""), false)
 assert.equal(panel.includes("Create Work Orders"), false)
 
-const page = readSource("app(growth)/growth/os/page.tsx")
+const page = readSource("app/(growth)/growth/os/page.tsx")
 assert.ok(page.includes("GrowthAiOsCommandCenterPanel"))
 
 for (const file of files) {

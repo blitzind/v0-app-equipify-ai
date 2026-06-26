@@ -11,6 +11,7 @@ import {
   getGrowthObjective,
   insertGrowthObjective,
   listGrowthObjectives,
+  normalizeGrowthObjectiveExecutionPlan,
   updateGrowthObjective,
 } from "@/lib/growth/objectives/growth-objective-repository"
 import {
@@ -46,11 +47,22 @@ export type GrowthObjectiveDashboardModel = {
 
 export type GrowthObjectiveExecutionSummary = ReturnType<typeof summarizeObjectiveExecutionContext>
 
+function hydrateObjectivePlanForRead(objective: GrowthObjective): GrowthObjective {
+  if (objective.plan) return objective
+  if (objective.status === "draft" || objective.status === "planning" || objective.status === "archived") {
+    return objective
+  }
+  return {
+    ...objective,
+    plan: planGrowthObjective(objective),
+  }
+}
+
 export async function loadGrowthObjectiveDashboard(
   admin: SupabaseClient,
   organizationId: string,
 ): Promise<GrowthObjectiveDashboardModel> {
-  const objectives = await listGrowthObjectives(admin, organizationId)
+  const objectives = (await listGrowthObjectives(admin, organizationId)).map(hydrateObjectivePlanForRead)
   const killSwitches = await getRuntimeKillSwitchStates(admin)
 
   return {
