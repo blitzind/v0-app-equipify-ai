@@ -22,9 +22,10 @@ function readSource(relativePath: string): string {
 
 function staticAudit(): void {
   const growthShell = readSource("components/growth/shell/growth-workspace-shell.tsx")
-  assert.match(growthShell, /useGrowthWorkspaceSettingsRoute/)
+  assert.match(growthShell, /data-growth-workspace-full-width/)
+  assert.match(growthShell, /GROWTH_WORKSPACE_SHELL_MAIN_INNER/)
   assert.doesNotMatch(growthShell, /isGrowthWorkspaceSettingsPathname\(pathname\)/)
-  console.log("  ✓ Workspace shell uses layout-segment settings route hook")
+  console.log("  ✓ Workspace shell uses full-width main inner on all Growth routes")
 
   const routeHook = readSource("lib/growth/settings/use-growth-workspace-settings-route.ts")
   assert.match(routeHook, /useSelectedLayoutSegments/)

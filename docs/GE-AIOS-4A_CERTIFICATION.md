@@ -37,7 +37,7 @@ Prospect Created
 
 | Route | Purpose |
 |-------|---------|
-| `/growth/ai-os/pilot/lead-research/[leadId]` | Step-by-step pilot observation |
+| `/growth/os/pilot/lead-research/[leadId]` | Step-by-step pilot observation (legacy redirects) |
 | `GET /api/platform/growth/ai-os/pilot/lead-research/[leadId]` | Observation API |
 
 ---

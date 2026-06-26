@@ -73,10 +73,13 @@ assert.ok(readRouteSource.includes("fetchExecutiveMissionPlanningReviewReadModel
 assert.equal(readRouteSource.includes("runExecutiveMissionPlanningTick"), false)
 
 const uiSource = readSource("components/growth/ai-os/growth-ai-os-mission-planning-review-panel.tsx")
+const approvalUi = readSource(
+  "components/growth/ai-os/executive-planning-review/growth-ai-os-approval-action-card.tsx",
+)
 assert.ok(uiSource.includes("/planning/preview"))
 assert.ok(uiSource.includes("/planning/approve"))
-assert.ok(uiSource.includes("Run dry-run preview"))
-assert.ok(uiSource.includes("prepareDecision"))
+assert.ok(uiSource.includes("Run dry-run preview") || approvalUi.includes("Run dry-run preview"))
+assert.ok(uiSource.includes("prepareDecision") || approvalUi.includes("prepareDecision"))
 
 const reviewFiles = [
   "lib/growth/aios/ai-executive-mission-planning-review-types.ts",
@@ -85,7 +88,7 @@ const reviewFiles = [
   "app/api/platform/growth/ai-os/missions/[missionId]/planning/preview/route.ts",
   "app/api/platform/growth/ai-os/missions/[missionId]/planning/approve/route.ts",
   "components/growth/ai-os/growth-ai-os-mission-planning-review-panel.tsx",
-  "app/(growth)/growth/ai-os/missions/[missionId]/planning/page.tsx",
+  "app/(growth)/growth/os/missions/[missionId]/planning/page.tsx",
 ]
 for (const file of reviewFiles) {
   assertNoCoreTouch(file, ["public.invoices", "public.quotes", "blitzpay"])

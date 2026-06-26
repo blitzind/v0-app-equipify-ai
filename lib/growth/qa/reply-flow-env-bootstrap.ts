@@ -6,13 +6,13 @@
 import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 
+/** Pulled Vercel Production env — canonical for local build/cert workflows (BUILD-ENV-1). */
+export const GROWTH_VERCEL_BUILD_ENV_FILE = ".env.build" as const
+
 /** Later entries override earlier entries when merged. */
 export const GROWTH_PRODUCTION_ENV_SOURCES = [
-  ".env.local",
-  ".env.local.active",
-  ".env.production.local",
+  GROWTH_VERCEL_BUILD_ENV_FILE,
   ".env.vercel.production",
-  ".vercel/.env.production.local",
 ] as const
 
 export const GROWTH_REPLY_FLOW_REQUIRED_ENV_KEYS = [
@@ -263,7 +263,8 @@ export function formatGrowthProductionEnvBootstrapReport(
 
   if (!result.ok) {
     lines.push("")
-    lines.push("Fix: populate keys in .env.local / .env.production.local, or run:")
+    lines.push("Fix: pull Vercel Production env or run with vercel env run:")
+    lines.push("  pnpm env:pull:production")
     lines.push("  vercel env run -e production -- pnpm qa:growth-reply-flow -- ...")
   }
 

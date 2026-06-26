@@ -557,6 +557,16 @@ export async function createGrowthLead(
     sourceKind: lead.sourceKind,
     companyName: lead.companyName,
   })
+
+  const { scheduleLeadResearchPilotForProspect } = await import(
+    "@/lib/growth/aios/pilot/lead-research-pilot-orchestrator"
+  )
+  scheduleLeadResearchPilotForProspect(admin, {
+    leadId: lead.id,
+    createdBy: input.createdBy ?? null,
+    source: "growth_lead_repository",
+  })
+
   return lead
 }
 

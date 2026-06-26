@@ -1,5 +1,22 @@
 /** GE-AIOS-4A — Lead Research Pilot types (client-safe). */
 
+import type { AiWorkOrderType } from "@/lib/growth/aios/ai-work-order-types"
+import type {
+  GrowthLeadResearchQualificationOutput,
+  GrowthLeadResearchWorkflowStatus,
+} from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
+import type {
+  GrowthLeadResearchEvidenceSummary,
+  GrowthLeadResearchNextBestAction,
+  GrowthLeadResearchOpportunityAssessment,
+} from "@/lib/growth/aios/growth/growth-lead-research-opportunity-assessment"
+import type { GrowthLeadResearchExecutionPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
+import {
+  GROWTH_LEAD_RESEARCH_WORKFLOW_KEY,
+  type GrowthLeadResearchQualificationOutput,
+  type GrowthLeadResearchWorkflowStatus,
+} from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
+
 export const GROWTH_AIOS_4A_PHASE = "GE-AIOS-4A" as const
 
 export const GROWTH_AI_OS_LEAD_RESEARCH_PILOT_QA_MARKER =
@@ -54,6 +71,15 @@ export type LeadResearchPilotObservation = {
   steps: LeadResearchPilotStepRecord[]
   lastError: string | null
   updatedAt: string | null
+  /** GE-AIOS-GROWTH-1A — normalized Growth workflow snapshot fields. */
+  workflowKey: typeof GROWTH_LEAD_RESEARCH_WORKFLOW_KEY
+  workflowStatus: GrowthLeadResearchWorkflowStatus
+  qualification: GrowthLeadResearchQualificationOutput | null
+  recommendedWorkOrderType: AiWorkOrderType | null
+  opportunityAssessment: GrowthLeadResearchOpportunityAssessment | null
+  nextBestAction: GrowthLeadResearchNextBestAction | null
+  evidenceSummary: GrowthLeadResearchEvidenceSummary | null
+  executionPlan: GrowthLeadResearchExecutionPlan | null
 }
 
 export const LEAD_RESEARCH_PILOT_STEP_LABELS: Record<LeadResearchPilotStepId, string> = {

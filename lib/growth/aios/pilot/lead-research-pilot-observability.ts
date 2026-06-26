@@ -17,6 +17,14 @@ import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { listGrowthLeadResearchRuns } from "@/lib/growth/research-repository"
 import { listAiWorkOrders } from "@/lib/growth/aios/ai-work-order-repository"
 import { isLeadResearchPilotEnabled, resolveLeadResearchPilotConfig } from "@/lib/growth/aios/pilot/lead-research-pilot-config"
+import {
+  fetchLatestGrowthLeadResearchWorkflowSnapshot,
+  publishGrowthLeadResearchWorkflowStatus,
+} from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
+import {
+  GROWTH_LEAD_RESEARCH_WORKFLOW_KEY,
+  deriveGrowthLeadResearchWorkflowStatus,
+} from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
 
 /** AI OS events store correlation_id as uuid — use lead id directly. */
 function pilotCorrelationId(leadId: string): string {
@@ -145,17 +153,37 @@ export async function fetchLeadResearchPilotObservation(
   const researchRuns = await listGrowthLeadResearchRuns(admin, input.leadId, 1)
   const latestRun = researchRuns.find((run) => run.modelTask === "ai_os_pilot_research_company") ?? researchRuns[0]
 
+  const workflowSnapshot = await fetchLatestGrowthLeadResearchWorkflowSnapshot(admin, {
+    organizationId: input.organizationId,
+    leadId: input.leadId,
+  })
+
+  const workflowStatus = deriveGrowthLeadResearchWorkflowStatus({
+    steps,
+    explicitStatus: workflowSnapshot?.workflowStatus ?? null,
+    qualification: workflowSnapshot?.qualification ?? null,
+    hasOpportunityAssessment: Boolean(workflowSnapshot?.opportunityAssessment),
+  })
+
   return {
     leadId: input.leadId,
     companyName: lead?.companyName ?? null,
     missionId,
     workOrderId,
-    researchRunId: latestRun?.id ?? null,
+    researchRunId: latestRun?.id ?? workflowSnapshot?.researchRunId ?? null,
     pilotEnabled: isLeadResearchPilotEnabled(),
     enableAiEvidence: resolveLeadResearchPilotConfig().enableAiEvidence,
     correlationId,
     steps,
     lastError,
-    updatedAt,
+    updatedAt: workflowSnapshot?.updatedAt ?? updatedAt,
+    workflowKey: GROWTH_LEAD_RESEARCH_WORKFLOW_KEY,
+    workflowStatus,
+    qualification: workflowSnapshot?.qualification ?? null,
+    recommendedWorkOrderType: workflowSnapshot?.qualification?.recommendedWorkOrderType ?? null,
+    opportunityAssessment: workflowSnapshot?.opportunityAssessment ?? null,
+    nextBestAction: workflowSnapshot?.nextBestAction ?? null,
+    evidenceSummary: workflowSnapshot?.evidenceSummary ?? null,
+    executionPlan: workflowSnapshot?.executionPlan ?? null,
   }
 }

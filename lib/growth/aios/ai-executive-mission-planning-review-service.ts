@@ -35,6 +35,11 @@ import {
   resolveAiOsMissionIdParam,
 } from "@/lib/growth/aios/ai-os-mission-route-params"
 import { fetchAiExecutivePlanningReport } from "@/lib/growth/aios/ai-executive-planning-report-service"
+import { LEAD_RESEARCH_PILOT_MISSION_TITLE } from "@/lib/growth/aios/pilot/lead-research-pilot-types"
+import { fetchLatestGrowthLeadResearchWorkflowSnapshot } from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
+import { buildAiOsPilotLeadResearchHref } from "@/lib/growth/aios/ai-os-public-routes"
+import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import type { AiExecutiveMissionPlanningLeadResearchExecutionPlanSummary } from "@/lib/growth/aios/ai-executive-mission-planning-review-types"
 
 const PLANNING_REVIEW_EXECUTIVE_INSTANCE_ID = "ge-aios-planning-review" as const
 
@@ -81,6 +86,43 @@ async function listActiveWorkOrdersForMission(
     missionId: input.missionId,
   })
   return workOrders.filter((row) => isAiWorkOrderActiveStatus(row.status)).map(mapActiveWorkOrderSummary)
+}
+
+async function listLeadResearchExecutionPlansForMission(
+  admin: SupabaseClient,
+  input: { organizationId: string; missionId: string; objectiveTitle: string },
+): Promise<AiExecutiveMissionPlanningLeadResearchExecutionPlanSummary[]> {
+  if (input.objectiveTitle !== LEAD_RESEARCH_PILOT_MISSION_TITLE) return []
+
+  const workOrders = await listAiWorkOrders(admin, {
+    organizationId: input.organizationId,
+    missionId: input.missionId,
+  })
+  const leadIds = [
+    ...new Set(
+      workOrders
+        .filter((row) => row.entityType === "lead" && row.entityId)
+        .map((row) => row.entityId as string),
+    ),
+  ].slice(0, 5)
+
+  const plans: AiExecutiveMissionPlanningLeadResearchExecutionPlanSummary[] = []
+  for (const leadId of leadIds) {
+    const snapshot = await fetchLatestGrowthLeadResearchWorkflowSnapshot(admin, {
+      organizationId: input.organizationId,
+      leadId,
+    })
+    if (!snapshot?.executionPlan) continue
+    const lead = await fetchGrowthLeadById(admin, leadId)
+    plans.push({
+      leadId,
+      companyName: lead?.companyName ?? null,
+      executionPlan: snapshot.executionPlan,
+      observationHref: buildAiOsPilotLeadResearchHref(leadId) ?? `/growth/os/pilot/lead-research/${leadId}`,
+    })
+  }
+
+  return plans
 }
 
 async function resolveExecutiveRuntimeForPlanningReview(
@@ -156,11 +198,18 @@ export async function fetchExecutiveMissionPlanningReviewReadModel(
     missionId,
   })
 
+  const leadResearchExecutionPlans = await listLeadResearchExecutionPlansForMission(admin, {
+    organizationId: input.organizationId,
+    missionId,
+    objectiveTitle: objective.title,
+  })
+
   return {
     mission: mapMissionSummary(objective),
     executiveRuntimeId,
     activeWorkOrders,
     executivePlanningReport,
+    leadResearchExecutionPlans,
     readOnly: true,
   }
 }

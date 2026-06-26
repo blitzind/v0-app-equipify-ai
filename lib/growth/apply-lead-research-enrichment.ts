@@ -48,11 +48,13 @@ export async function applyGrowthLeadResearchEnrichment(
   },
 ): Promise<GrowthLead | null> {
   const intelligencePatch = {
-    estimatedAnnualRevenue: trimOrNull(result.estimatedAnnualRevenue),
-    estimatedEmployeeCount: trimOrNull(result.estimatedEmployeeCount ?? result.companySizeEstimate),
-    fleetSizeEstimate: trimOrNull(result.fleetSizeEstimate),
-    crmDetected: trimOrNull(result.crmDetected),
-    fieldServiceStackDetected: trimOrNull(result.fieldServiceStackDetected),
+    estimatedAnnualRevenue: trimOrNull(input.result.estimatedAnnualRevenue),
+    estimatedEmployeeCount: trimOrNull(
+      input.result.estimatedEmployeeCount ?? input.result.companySizeEstimate,
+    ),
+    fleetSizeEstimate: trimOrNull(input.result.fleetSizeEstimate),
+    crmDetected: trimOrNull(input.result.crmDetected),
+    fieldServiceStackDetected: trimOrNull(input.result.fieldServiceStackDetected),
   }
 
   await updateGrowthLead(admin, input.lead.id, intelligencePatch)

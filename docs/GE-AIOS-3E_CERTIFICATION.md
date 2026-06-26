@@ -27,7 +27,7 @@
 | `GET /api/platform/growth/ai-os/missions/[missionId]/planning` | Read-only mission + active Work Orders |
 | `POST …/planning/preview` | Dry-run planning tick preview |
 | `POST …/planning/approve` | Explicit operator Work Order creation |
-| `/growth/ai-os/missions/[missionId]/planning` | Internal Growth/AI OS UI |
+| `/growth/os/missions/[missionId]/planning` | Internal Growth/AI OS UI (legacy redirects) |
 
 ---
 

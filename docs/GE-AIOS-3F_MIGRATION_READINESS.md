@@ -45,7 +45,7 @@ Apply in filename order — each migration includes dependency guards:
 | 1 | Schema health probes | Run growth AI OS schema health endpoints (when wired) or SQL spot-check tables |
 | 2 | Re-run stack cert | `pnpm test:ge-aios-3f-stack-certification-foundation` |
 | 3 | Confirm no Core tables altered | Verify `public.work_orders` unchanged |
-| 4 | Smoke planning review UI | Load `/growth/ai-os/missions/[missionId]/planning` with test mission |
+| 4 | Smoke planning review UI | Load `/growth/os/missions/[missionId]/planning` with test mission |
 | 5 | Confirm no cron/autonomous wiring | No new scheduled jobs in this batch |
 
 ---

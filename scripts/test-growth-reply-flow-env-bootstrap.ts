@@ -20,13 +20,7 @@ function readSource(relativePath: string): string {
   return fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
 }
 
-assert.deepEqual(GROWTH_PRODUCTION_ENV_SOURCES, [
-  ".env.local",
-  ".env.local.active",
-  ".env.production.local",
-  ".env.vercel.production",
-  ".vercel/.env.production.local",
-])
+assert.deepEqual(GROWTH_PRODUCTION_ENV_SOURCES, [".env.build", ".env.vercel.production"])
 
 assert.equal(GROWTH_REPLY_FLOW_REQUIRED_ENV_KEYS.length, 4)
 
@@ -61,21 +55,21 @@ const noAlias = applySupabaseUrlPublicAlias({
 assert.equal(noAlias.mapped, false)
 
 const merged = mergeGrowthProductionEnvLayers([
-  { source: ".env.local", values: { A: "1", B: "local" } },
-  { source: ".env.production.local", values: { B: "production", C: "3" } },
+  { source: ".env.build", values: { A: "1", B: "build" } },
+  { source: ".env.vercel.production", values: { B: "production", C: "3" } },
 ])
 assert.equal(merged.merged.A, "1")
 assert.equal(merged.merged.B, "production")
-assert.equal(merged.sources.B, ".env.production.local")
+assert.equal(merged.sources.B, ".env.vercel.production")
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "growth-env-bootstrap-"))
 try {
   fs.writeFileSync(
-    path.join(tempDir, ".env.local"),
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY=anon-from-local\nB=local\n",
+    path.join(tempDir, ".env.build"),
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY=anon-from-build\nB=build\n",
   )
   fs.writeFileSync(
-    path.join(tempDir, ".env.production.local"),
+    path.join(tempDir, ".env.vercel.production"),
     [
       "NEXT_PUBLIC_SUPABASE_URL=",
       "SUPABASE_URL=https://prod.supabase.co",
@@ -95,7 +89,7 @@ try {
   assert.match(result.sources.NEXT_PUBLIC_SUPABASE_URL ?? "", /mapped to NEXT_PUBLIC_SUPABASE_URL/)
 
   const incompleteDir = fs.mkdtempSync(path.join(os.tmpdir(), "growth-env-bootstrap-missing-"))
-  fs.writeFileSync(path.join(incompleteDir, ".env.local"), "SUPABASE_URL=https://only-url.supabase.co\n")
+  fs.writeFileSync(path.join(incompleteDir, ".env.build"), "SUPABASE_URL=https://only-url.supabase.co\n")
   const missing = bootstrapGrowthProductionEnv({ cwd: incompleteDir, inheritProcessEnv: false })
   assert.equal(missing.ok, false)
   assert.ok(missing.missing.includes("NEXT_PUBLIC_SUPABASE_ANON_KEY"))

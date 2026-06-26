@@ -46,6 +46,11 @@ For each GE-AI-2X phase, maintain one entry with:
 | GE-AIOS-4A | Autonomous Growth Pilot (Lead Research) | Complete (local cert) |
 | GE-AIOS-5A | Executive Intelligence v1 (Planning Report) | Complete (local cert) |
 | GE-AIOS-URL-1 | Public route namespace (`/growth/os`) | Complete (local cert) |
+| GE-AIOS-5C | AI OS Command Center read model | Complete (local cert) |
+| GE-AIOS-5D | AI OS Daily Briefing read model | Complete (local cert) |
+| GE-AIOS-GROWTH-1A | Growth Lead Research workflow normalization | Complete (local cert) |
+| GE-AIOS-GROWTH-1B | Opportunity Assessment & Next Best Action | Complete (local cert) |
+| GE-AIOS-GROWTH-1C | Next Best Action Workflow Planner | Complete (local cert) |
 | GE-AI-2D | Memory Facade (ledger) | Complete via GE-AIOS-2F |
 | GE-AI-2A | Decision Record Foundation (ledger) | Complete via GE-AIOS-2D |
 | GE-AI-2B | Event Bus Unification | Partial (foundation in GE-AIOS-2B) |
@@ -781,6 +786,169 @@ Pending — deploy with existing AI OS stack (no migrations)
 ### Production certification
 
 Pending — no migrations; safe redirect-only deploy
+
+---
+
+## GE-AIOS-5B — Executive Planning Review UX
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-5B (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-3E, GE-AIOS-5A |
+
+### Scope delivered
+
+- Executive Summary KPI cards (stage, progress, confidence, revenue, timeline, risk, ROI, primary action)
+- Mission Progress executive funnel + progress bar
+- Work Order roadmap (visual workflow)
+- Proposed Work Orders card grid directly under summary (auto dry-run on load)
+- Approval primary action card with **Create Work Orders** CTA
+- Collapsible Executive Reasoning (detailed 5A report, collapsed by default)
+- Risk + Business Outcomes visual cards
+- Responsive single-column mobile / multi-column desktop layout
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-5b-executive-planning-review-ux-foundation`
+
+### Production certification
+
+Pending — UI-only, no migrations
+
+---
+
+## GE-AIOS-5C — AI OS Command Center Read Model
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-5C (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-URL-1, GE-AIOS 2A–4A read paths |
+
+### Scope delivered
+
+- Read-only Command Center read model (`fetchAiOsCommandCenterReadModel`)
+- `GET /api/platform/growth/ai-os/command-center`
+- `/growth/os` home page with minimal read-only dashboard
+- Aggregates missions, Work Order queues, events, decisions, agent/provider health, pilot flags, kill switches
+- Links only to Planning Review, Pilot observation, Growth objectives
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-5c-command-center-read-model-foundation`
+
+### Production certification
+
+Pending — read-only, no migrations
+
+---
+
+## GE-AIOS-5D — AI OS Daily Briefing Read Model
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-5D (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-5C Command Center read model |
+
+### Scope delivered
+
+- Client-safe briefing types + QA marker (`growth-aios-5d-daily-briefing-v1`)
+- Deterministic synthesizer from Command Center read model (`synthesizeAiOsDailyBriefing`)
+- `dailyBriefing` field on Command Center read model (no extra API round-trip)
+- Daily Briefing card section at top of `/growth/os` Command Center panel
+- Outputs: headline, what changed, top 3 priorities, approvals, blockers, wins, risks, next actions, suggested links
+- Links only — Mission Planning Review, Pilot observation, Objectives, Leads — no execution buttons
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-5d-daily-briefing-read-model-foundation`
+
+### Production certification
+
+Pending — read-only synthesis, no migrations
+
+---
+
+## GE-AIOS-GROWTH-1A — Growth Lead Research Workflow Normalization
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-1A (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-4A Lead Research Pilot, GE-AIOS-5C Command Center |
+
+### Scope delivered
+
+- Canonical workflow key `growth_lead_research` with backward-compatible pilot aliases
+- Feature flags: `GROWTH_AIOS_LEAD_RESEARCH_PILOT_ENABLED` and `GROWTH_AIOS_GROWTH_LEAD_RESEARCH_WORKFLOW_ENABLED` (default OFF)
+- Workflow statuses via `growth.workflow.status_changed` events
+- Deterministic qualification output after research save (fit score, next action, confidence, reason, missing evidence)
+- Command Center section: active, qualified, blocked leads + recommended next actions
+- Pilot observation UI extended with workflow status + qualification
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-1a-growth-workflow-normalization-foundation`
+
+### Production certification
+
+Pending — feature-flagged, no migrations
+
+---
+
+## GE-AIOS-GROWTH-1B — Opportunity Assessment & Next Best Action
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-1B (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-1A Growth Lead Research workflow |
+
+### Scope delivered
+
+- Deterministic Opportunity Assessment (`assessGrowthLeadResearchOpportunity`)
+- Next Best Action recommendation (advisory labels only)
+- Evidence summary: verified, missing, risks, assumptions, human review notes
+- Workflow status extension: `qualified` → `assessed`
+- Command Center opportunity cards with score, recommendation, revenue, confidence, risk, NBA, priority
+- Pilot observation UI shows assessment intelligence
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-1b-opportunity-assessment-foundation`
+
+### Production certification
+
+Pending — intelligence-only, feature-flagged, no migrations
+
+---
+
+## GE-AIOS-GROWTH-1C — Next Best Action Workflow Planner
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-1C (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-1B Opportunity Assessment |
+
+### Scope delivered
+
+- Deterministic Execution Plan (`planGrowthLeadResearchExecution`)
+- Canonical workflow mapping (verify_email, buying_committee, outreach_generation, meeting_preparation, monitoring, approval, close, research_company)
+- Readiness, prerequisites, required Work Orders (future), success/failure criteria, rollback strategy
+- Intelligence pipeline attaches execution plan after assessment
+- Command Center assessed leads show readiness, missing prerequisites, duration, cost, approval
+- Mission Planning Review and pilot observation show read-only Planning Review (no execution buttons)
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-1c-execution-plan-foundation`
+
+### Production certification
+
+Pending — planning-only, feature-flagged, no migrations
 
 ---
 

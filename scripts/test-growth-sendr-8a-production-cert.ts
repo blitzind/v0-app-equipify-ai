@@ -126,7 +126,8 @@ function verifyBuilderBreakpoints(): CertResult {
   assert.match(preview, /sticky|top-/i)
 
   const shell = readSource("components/growth/shell/growth-workspace-shell.tsx")
-  assert.match(shell, /GROWTH_AIDEN_SAFE_AREA/)
+  assert.match(shell, /data-growth-workspace-full-width/)
+  assert.match(shell, /GrowthWorkspaceSafeArea|growth-workspace-safe-area/)
 
   const publish = readSource("components/growth/sendr/builder/growth-sendr-builder-publish-panel.tsx")
   assert.match(publish, /Ready to send/)

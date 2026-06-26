@@ -75,6 +75,7 @@ export const AI_EVENT_REGISTRY: readonly AiEventRegistryEntry[] = [
   { eventType: "pilot.lead_research_step_completed", category: "system", eventVersion: 1, schemaVersion: "1.0", description: "Lead Research Pilot step completed" },
   { eventType: "pilot.lead_research_step_failed", category: "system", eventVersion: 1, schemaVersion: "1.0", description: "Lead Research Pilot step failed" },
   { eventType: "pilot.lead_research_completed", category: "system", eventVersion: 1, schemaVersion: "1.0", description: "Lead Research Pilot completed successfully" },
+  { eventType: "growth.workflow.status_changed", category: "system", eventVersion: 1, schemaVersion: "1.0", description: "Growth workflow status transition (e.g. growth_lead_research)" },
   { eventType: "growth.prospect_created", category: "mission", eventVersion: 1, schemaVersion: "1.0", description: "Growth prospect (lead) created — bridged to AI OS" },
   { eventType: "briefing.generated", category: "executive", eventVersion: 1, schemaVersion: "1.0", description: "Operator briefing generated" },
   { eventType: "provider.selected", category: "provider", eventVersion: 1, schemaVersion: "1.0", description: "Provider selected" },

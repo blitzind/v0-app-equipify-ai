@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import type { LeadResearchPilotObservation, LeadResearchPilotStepRecord } from "@/lib/growth/aios/pilot/lead-research-pilot-types"
 import { GROWTH_AI_OS_LEAD_RESEARCH_PILOT_QA_MARKER } from "@/lib/growth/aios/pilot/lead-research-pilot-types"
+import { GrowthAiOsLeadResearchExecutionPlanSection } from "@/components/growth/ai-os/growth/growth-ai-os-lead-research-execution-plan-section"
 import { buildAiOsMissionPlanningHref } from "@/lib/growth/aios/ai-os-mission-route-params"
 
 function stepBadgeVariant(status: LeadResearchPilotStepRecord["status"]) {
@@ -124,6 +125,63 @@ export function GrowthAiOsLeadResearchPilotPanel({ leadId }: { leadId: string })
             <span className="text-muted-foreground">AI evidence (decision prep):</span>{" "}
             {observation.enableAiEvidence ? "opt-in enabled" : "off"}
           </p>
+          <p>
+            <span className="text-muted-foreground">Workflow:</span>{" "}
+            <Badge variant="secondary">{observation.workflowKey}</Badge>{" "}
+            <Badge variant="outline">{observation.workflowStatus.replaceAll("_", " ")}</Badge>
+          </p>
+          {observation.qualification ? (
+            <div className="rounded-md border border-border/70 bg-muted/20 p-3 space-y-1">
+              <p className="font-medium">Qualification</p>
+              <p>Fit score: {observation.qualification.fitScore}</p>
+              <p>Confidence: {Math.round(observation.qualification.confidence * 100)}%</p>
+              <p>Next: {observation.qualification.recommendedNextAction}</p>
+              {observation.recommendedWorkOrderType ? (
+                <p className="text-xs text-muted-foreground">
+                  Suggested Work Order: {observation.recommendedWorkOrderType.replaceAll("_", " ")}
+                </p>
+              ) : null}
+              <p className="text-muted-foreground">{observation.qualification.reason}</p>
+              {observation.qualification.missingEvidence.length > 0 ? (
+                <ul className="list-disc pl-4 text-xs text-muted-foreground">
+                  {observation.qualification.missingEvidence.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+          {observation.opportunityAssessment ? (
+            <div className="rounded-md border border-indigo-200/70 bg-indigo-50/40 p-3 space-y-1">
+              <p className="font-medium">Opportunity Assessment</p>
+              <p>Opportunity score: {observation.opportunityAssessment.opportunityScore}</p>
+              <p>Recommendation: {observation.opportunityAssessment.recommendation.replaceAll("_", " ")}</p>
+              <p>Revenue: {observation.opportunityAssessment.estimatedRevenueRange}</p>
+              <p>Sales cycle: {observation.opportunityAssessment.estimatedSalesCycle}</p>
+              <p className="text-muted-foreground">{observation.opportunityAssessment.summary}</p>
+            </div>
+          ) : null}
+          {observation.nextBestAction ? (
+            <div className="rounded-md border border-border/70 p-3 space-y-1">
+              <p className="font-medium">Next Best Action</p>
+              <p>{observation.nextBestAction.label}</p>
+              <p className="text-sm text-muted-foreground">{observation.nextBestAction.reason}</p>
+              <p className="text-xs text-muted-foreground">
+                Priority: {observation.nextBestAction.priority} · Urgency: {observation.nextBestAction.urgency}
+              </p>
+            </div>
+          ) : null}
+          {observation.evidenceSummary ? (
+            <div className="rounded-md border border-border/70 p-3 space-y-2 text-xs text-muted-foreground">
+              <p className="font-medium text-sm text-foreground">Evidence summary</p>
+              {observation.evidenceSummary.potentialRisks.length > 0 ? (
+                <p>Risks: {observation.evidenceSummary.potentialRisks.join("; ")}</p>
+              ) : null}
+              {observation.evidenceSummary.missingEvidence.length > 0 ? (
+                <p>Missing: {observation.evidenceSummary.missingEvidence.join("; ")}</p>
+              ) : null}
+            </div>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => void load()}>
               Refresh
@@ -134,6 +192,14 @@ export function GrowthAiOsLeadResearchPilotPanel({ leadId }: { leadId: string })
           </div>
         </CardContent>
       </Card>
+
+      {observation.executionPlan ? (
+        <GrowthAiOsLeadResearchExecutionPlanSection
+          plan={observation.executionPlan}
+          title="Planning Review"
+          description="Recommended workflow and execution plan — read-only, no Work Order creation."
+        />
+      ) : null}
 
       <Card>
         <CardHeader>

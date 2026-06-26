@@ -111,10 +111,17 @@ assert.ok(reviewService.includes("fetchAiExecutivePlanningReport"))
 
 const ui = readSource("components/growth/ai-os/growth-ai-os-executive-planning-report-section.tsx")
 assert.ok(ui.includes("GrowthAiOs" + "E" + "xecutivePlanningReportSection"))
-assert.ok(ui.includes("Business Reasoning"))
+const reasoning = readSource(
+  "components/growth/ai-os/executive-planning-review/growth-ai-os-executive-reasoning-collapsible.tsx",
+)
+assert.ok(reasoning.includes("Business reasoning"))
 
 const panel = readSource("components/growth/ai-os/growth-ai-os-mission-planning-review-panel.tsx")
-assert.ok(panel.includes("GrowthAiOs" + "E" + "xecutivePlanningReportSection"))
+assert.ok(
+  panel.includes("GrowthAiOsExecutPlanningReviewDashboard") ||
+    panel.includes("GrowthAiOs" + "E" + "xecutivePlanningReportSection"),
+)
+assert.ok(panel.includes("executivePlanningReport"))
 
 const files = [
   "lib/growth/aios/ai-executive-planning-report-types.ts",

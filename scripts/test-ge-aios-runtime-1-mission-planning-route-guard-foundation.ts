@@ -41,7 +41,7 @@ assert.equal(valid.ok, true)
 if (valid.ok) {
   assert.equal(
     buildAiOsMissionPlanningHref(valid.missionId),
-    "/growth/ai-os/missions/d702724e-6565-4db7-a2f0-d686fea7623a/planning",
+    "/growth/os/missions/d702724e-6565-4db7-a2f0-d686fea7623a/planning",
   )
 }
 
@@ -52,7 +52,7 @@ const guardedFiles = [
   "app/api/platform/growth/ai-os/missions/[missionId]/planning/route.ts",
   "app/api/platform/growth/ai-os/missions/[missionId]/planning/preview/route.ts",
   "app/api/platform/growth/ai-os/missions/[missionId]/planning/approve/route.ts",
-  "app/(growth)/growth/ai-os/missions/[missionId]/planning/page.tsx",
+  "app/(growth)/growth/os/missions/[missionId]/planning/page.tsx",
   "components/growth/ai-os/growth-ai-os-mission-planning-review-panel.tsx",
   "components/growth/ai-os/growth-ai-os-lead-research-pilot-panel.tsx",
   "lib/growth/aios/ai-executive-mission-planning-review-service.ts",

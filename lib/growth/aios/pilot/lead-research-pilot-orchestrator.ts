@@ -21,6 +21,7 @@ import {
 import {
   publishLeadResearchPilotStepEvent,
 } from "@/lib/growth/aios/pilot/lead-research-pilot-observability"
+import { publishGrowthLeadResearchWorkflowStatus } from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
 import {
   LEAD_RESEARCH_PILOT_EXECUTIVE_INSTANCE_ID,
   type LeadResearchPilotStepId,
@@ -143,6 +144,13 @@ export async function startLeadResearchPilotForProspect(
   const source = input.source ?? "lead_research_pilot_orchestrator"
 
   try {
+    await publishGrowthLeadResearchWorkflowStatus(admin, {
+      organizationId,
+      leadId: input.leadId,
+      workflowStatus: "researching",
+      detail: source,
+    })
+
     await markPilotStep(admin, {
       organizationId,
       leadId: input.leadId,
@@ -274,6 +282,13 @@ export async function startLeadResearchPilotForProspect(
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
+    await publishGrowthLeadResearchWorkflowStatus(admin, {
+      organizationId,
+      leadId: input.leadId,
+      workflowStatus: "failed",
+      detail,
+    }).catch(() => undefined)
+
     await markPilotStep(admin, {
       organizationId,
       leadId: input.leadId,
@@ -295,6 +310,16 @@ export function scheduleLeadResearchPilotForProspect(
   input: Omit<LeadResearchPilotStartInput, "admin">,
 ): void {
   if (!isLeadResearchPilotEnabled()) return
+
+  const organizationId = input.organizationId ?? getGrowthEngineAiOrgId()
+  if (organizationId) {
+    void publishGrowthLeadResearchWorkflowStatus(admin, {
+      organizationId,
+      leadId: input.leadId,
+      workflowStatus: "scheduled",
+      detail: input.source ?? "lead_created",
+    }).catch(() => undefined)
+  }
 
   void startLeadResearchPilotForProspect(admin, { ...input, admin }).catch((error) => {
     const detail = error instanceof Error ? error.message : String(error)

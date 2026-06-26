@@ -16,7 +16,7 @@
 =================================================
 
 **Document role:** Living engineering state — current phase, production status, rules, certifications, risks, and priorities.  
-**Last updated:** 2026-06-25 (GE-AIOS-URL-1 public route namespace)  
+**Last updated:** 2026-06-25 (GE-AIOS-GROWTH-1C Next Best Action Workflow Planner)  
 **Regeneration:** `pnpm update:master-context` (inventory scan + this document's manual sections)  
 **Admin UI:** `/admin/master-context`
 
@@ -46,7 +46,7 @@
 |-------|--------|
 | **Architecture phase** | GE-AI-1X — **Complete** (Constitution v1.0 frozen) |
 | **Documentation phase** | GE-DOC-1 — **Complete** |
-| **Current phase** | **GE-AIOS-URL-1** — Public AI OS route namespace `/growth/os` (**certified locally**, not committed) |
+| **Current phase** | **GE-AIOS-GROWTH-1C** — Next Best Action Workflow Planner (**certified locally**, not committed) |
 | **Next phase** | GE-AI-2F — Meta-Recommender |
 
 **Transition:** Official move from Architecture Phase (GE-AI-1X) to Engineering Phase (GE-AI-2X).
@@ -221,11 +221,27 @@ Full list: `lib/admin/master-context.manual.after.md` § Known Limitations.
 | GE-AIOS-4A | Autonomous Growth Pilot (Lead Research) | Complete (local cert) |
 | GE-AIOS-5A | Executive Intelligence v1 (Planning Report) | Complete (local cert) |
 | GE-AIOS-URL-1 | Public route namespace (`/growth/os`) | Complete (local cert) |
+| GE-AIOS-5B | Executive Planning Review UX | Complete (local cert) |
+| GE-AIOS-5C | AI OS Command Center read model | Complete (local cert) |
+| GE-AIOS-5D | AI OS Daily Briefing read model | Complete (local cert) |
+| GE-AIOS-GROWTH-1A | Growth Lead Research workflow normalization | Complete (local cert) |
+| GE-AIOS-GROWTH-1B | Opportunity Assessment & Next Best Action | Complete (local cert) |
+| GE-AIOS-GROWTH-1C | Next Best Action Workflow Planner | Complete (local cert) |
 
 ### Current phase
 
-**GE-AIOS-URL-1 — Public route namespace**  
-Public Equipify AI OS UI routes canonical at `/growth/os/*`; legacy `/growth/ai-os/*` permanent redirects. Status: **Complete (local cert)**.
+**GE-AIOS-GROWTH-1C — Next Best Action Workflow Planner**  
+Deterministic Execution Plan from Next Best Action with canonical workflow mapping, readiness, and Command Center / Planning Review surfacing. Status: **Complete (local cert)**.
+
+### Previous phase
+
+**GE-AIOS-GROWTH-1B — Opportunity Assessment**  
+Deterministic business-grade assessment after qualification with Next Best Action and Command Center surfacing. Status: **Complete (local cert)**.
+
+### Prior phase
+
+**GE-AIOS-GROWTH-1A — Growth Lead Research Workflow**  
+Canonical `growth_lead_research` workflow with status, qualification, and Command Center surfacing. Status: **Complete (local cert)**.
 
 ### Next phases (ordered)
 
@@ -275,6 +291,12 @@ GE-AUTO-1A through 2I implemented locally; GE-AUTO-3 not started. See manual bef
 | GE-AIOS-4A Lead Research Pilot | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-5A Executive Planning Report | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-URL-1 Public route namespace | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-5B Executive Planning Review UX | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-5C AI OS Command Center | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-5D AI OS Daily Briefing | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-1A Growth Lead Research workflow | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-1B Opportunity Assessment | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-1C Execution Plan | **PASS (local)** | 2026-06-25 |
 | GE-AI-2A+ implementation (production) | Pending | — |
 
 Outbound operational readiness: `docs/GROWTH_OUTBOUND_OPERATIONAL_READINESS.md`
@@ -415,9 +437,11 @@ Outbound operational readiness: `docs/GROWTH_OUTBOUND_OPERATIONAL_READINESS.md`
 - GET read model: mission + active Work Orders (no tick)
 - POST preview: dry-run via `runExecutiveMissionPlanningTick`; emits `executive.planning_review_created`
 - POST approve: explicit operator create; emits `executive.planning_review_approved`
+- UI: `/growth/os` Command Center (read-only home + Daily Briefing)
 - UI: `/growth/os/missions/[missionId]/planning` (legacy `/growth/ai-os/...` redirects)
 - Optional `prepareDecision` / `enableAiEvidence` on approve only — never on preview
 - **GE-AIOS-5A:** GET read model includes read-only `executivePlanningReport` (strategy intelligence)
+- **GE-AIOS-5B:** Planning Review UI is an executive dashboard (summary KPIs, roadmap, approval-first)
 
 ### Executive Planning Report (GE-AIOS-5A)
 
@@ -525,6 +549,18 @@ Full list: `lib/admin/master-context.manual.after.md` § Current Priorities.
 | [GE-AIOS-5A Certification](./GE-AIOS-5A_CERTIFICATION.md) | Executive Planning Report cert |
 | [GE-AIOS-URL-1 Certification](./GE-AIOS-URL-1_CERTIFICATION.md) | Public route namespace cert |
 | [GE-AIOS-URL-1 Infrastructure Audit](./GE-AIOS-URL-1_INFRASTRUCTURE_AUDIT.md) | Route rename audit |
+| [GE-AIOS-5B Certification](./GE-AIOS-5B_CERTIFICATION.md) | Executive Planning Review UX cert |
+| [GE-AIOS-5B Infrastructure Audit](./GE-AIOS-5B_INFRASTRUCTURE_AUDIT.md) | Planning Review UX audit |
+| [GE-AIOS-5C Certification](./GE-AIOS-5C_CERTIFICATION.md) | Command Center cert |
+| [GE-AIOS-5C Infrastructure Audit](./GE-AIOS-5C_INFRASTRUCTURE_AUDIT.md) | Command Center audit |
+| [GE-AIOS-5D Certification](./GE-AIOS-5D_CERTIFICATION.md) | Daily Briefing cert |
+| [GE-AIOS-5D Infrastructure Audit](./GE-AIOS-5D_INFRASTRUCTURE_AUDIT.md) | Daily Briefing audit |
+| [GE-AIOS-GROWTH-1A Certification](./GE-AIOS-GROWTH-1A_CERTIFICATION.md) | Growth workflow cert |
+| [GE-AIOS-GROWTH-1A Infrastructure Audit](./GE-AIOS-GROWTH-1A_INFRASTRUCTURE_AUDIT.md) | Growth workflow audit |
+| [GE-AIOS-GROWTH-1B Certification](./GE-AIOS-GROWTH-1B_CERTIFICATION.md) | Opportunity Assessment cert |
+| [GE-AIOS-GROWTH-1B Infrastructure Audit](./GE-AIOS-GROWTH-1B_INFRASTRUCTURE_AUDIT.md) | Opportunity Assessment audit |
+| [GE-AIOS-GROWTH-1C Certification](./GE-AIOS-GROWTH-1C_CERTIFICATION.md) | Execution Plan cert |
+| [GE-AIOS-GROWTH-1C Infrastructure Audit](./GE-AIOS-GROWTH-1C_INFRASTRUCTURE_AUDIT.md) | Execution Plan audit |
 
 ### Legacy / generated inventory
 

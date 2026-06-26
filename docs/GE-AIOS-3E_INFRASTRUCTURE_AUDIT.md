@@ -14,7 +14,7 @@
 | `ai-executive-mission-planning-review-service.ts` | Read model, dry-run preview, operator approve |
 | Platform API routes under `ai-os/missions/[missionId]/planning` | GET read, POST preview, POST approve |
 | `growth-ai-os-mission-planning-review-panel.tsx` | Minimal operator UI |
-| `/growth/ai-os/missions/[missionId]/planning` | Internal review page |
+| `/growth/os/missions/[missionId]/planning` | Internal review page (legacy `/growth/ai-os/...` redirects) |
 
 ---
 

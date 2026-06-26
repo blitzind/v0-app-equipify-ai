@@ -30,7 +30,8 @@ docs/GE-AIOS-*                            # Per-phase cert + audit docs
 docs/MASTER_CONTEXT_DOCUMENT.md           # Living engineering state
 docs/AI_REVENUE_OPERATOR_IMPLEMENTATION_LEDGER.md
 app/api/platform/growth/ai-os/            # Planning review API only
-app/(growth)/growth/ai-os/                # Planning review UI
+app/(growth)/growth/os/                  # Planning review + pilot UI (canonical)
+app/(growth)/growth/ai-os/                # Legacy permanent redirects
 components/growth/ai-os/                  # Planning review panel
 ```
 

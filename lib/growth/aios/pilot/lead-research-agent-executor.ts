@@ -36,6 +36,11 @@ import {
 import { transitionAiWorkOrder } from "@/lib/growth/aios/ai-work-order-service"
 import type { AiWorkOrder } from "@/lib/growth/aios/ai-work-order-types"
 import { LEAD_RESEARCH_PILOT_RESEARCH_AGENT_INSTANCE_ID } from "@/lib/growth/aios/pilot/lead-research-pilot-types"
+import { publishGrowthLeadResearchWorkflowStatus } from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
+import { qualifyGrowthLeadResearch } from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
+import { assessGrowthLeadResearchOpportunity } from "@/lib/growth/aios/growth/growth-lead-research-opportunity-assessment"
+import type { GrowthLeadResearchIntelligenceOutput } from "@/lib/growth/aios/growth/growth-lead-research-opportunity-assessment"
+import type { GrowthLeadResearchQualificationOutput } from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
 
 function normalizeResearchProviderPayload(raw: unknown): unknown {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw
@@ -128,7 +133,13 @@ export async function executeResearchCompanyWorkOrderViaAiOs(
     leadId: string
     createdBy?: string | null
   },
-): Promise<{ workOrder: AiWorkOrder; researchRunId: string | null }> {
+): Promise<{
+  workOrder: AiWorkOrder
+  researchRunId: string | null
+  qualification: GrowthLeadResearchQualificationOutput | null
+  intelligence: GrowthLeadResearchIntelligenceOutput | null
+  workflowTerminalStatus: "qualified" | "blocked" | "failed" | "research_complete" | "assessed"
+}> {
   const startedAt = Date.now()
   let workOrder = await fetchAiWorkOrderById(admin, {
     organizationId: input.organizationId,
@@ -320,6 +331,67 @@ export async function executeResearchCompanyWorkOrderViaAiOs(
     detail: researchRun.id,
   })
 
+  const runStatus =
+    websiteFetch.status === "ok" || websiteFetch.status === "skipped" ? "succeeded" : "partial"
+
+  await publishGrowthLeadResearchWorkflowStatus(admin, {
+    organizationId: input.organizationId,
+    leadId: input.leadId,
+    missionId: workOrder.missionId,
+    workOrderId: workOrder.id,
+    researchRunId: researchRun.id,
+    workflowStatus: "research_complete",
+    detail: researchRun.id,
+  })
+
+  const qualificationResult = qualifyGrowthLeadResearch({
+    result: researchResult,
+    researchRunStatus: runStatus,
+  })
+
+  await publishGrowthLeadResearchWorkflowStatus(admin, {
+    organizationId: input.organizationId,
+    leadId: input.leadId,
+    missionId: workOrder.missionId,
+    workOrderId: workOrder.id,
+    researchRunId: researchRun.id,
+    workflowStatus: qualificationResult.terminalStatus,
+    qualification: qualificationResult.qualification,
+    detail: qualificationResult.qualification.recommendedNextAction,
+  })
+
+  let intelligence: GrowthLeadResearchIntelligenceOutput | null = null
+  let workflowTerminalStatus:
+    | "qualified"
+    | "blocked"
+    | "failed"
+    | "research_complete"
+    | "assessed" = qualificationResult.terminalStatus
+
+  if (qualificationResult.terminalStatus === "qualified") {
+    intelligence = assessGrowthLeadResearchOpportunity({
+      result: researchResult,
+      qualification: qualificationResult.qualification,
+    })
+
+    await publishGrowthLeadResearchWorkflowStatus(admin, {
+      organizationId: input.organizationId,
+      leadId: input.leadId,
+      missionId: workOrder.missionId,
+      workOrderId: workOrder.id,
+      researchRunId: researchRun.id,
+      workflowStatus: "assessed",
+      qualification: qualificationResult.qualification,
+      opportunityAssessment: intelligence.opportunityAssessment,
+      nextBestAction: intelligence.nextBestAction,
+      evidenceSummary: intelligence.evidenceSummary,
+      executionPlan: intelligence.executionPlan,
+      detail: intelligence.nextBestAction.label,
+    })
+
+    workflowTerminalStatus = "assessed"
+  }
+
   const completed = await transitionAiWorkOrder(admin, {
     organizationId: input.organizationId,
     workOrderId: workOrder.id,
@@ -348,5 +420,11 @@ export async function executeResearchCompanyWorkOrderViaAiOs(
     status: "completed",
   })
 
-  return { workOrder, researchRunId: researchRun.id }
+  return {
+    workOrder,
+    researchRunId: researchRun.id,
+    qualification: qualificationResult.qualification,
+    intelligence,
+    workflowTerminalStatus,
+  }
 }
