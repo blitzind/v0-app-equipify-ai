@@ -32,7 +32,7 @@ const DEFAULT_SIDEBAR: GrowthWorkspaceSettingsSidebarPreferences = {
 
 async function fetchJson<T>(endpoint: string): Promise<T | null> {
   try {
-    const res = await fetch(endpoint, { cache: "no-store" })
+    const res = await fetch(endpoint, { cache: "no-store", signal: AbortSignal.timeout(8_000) })
     const data = (await res.json().catch(() => ({}))) as ApiOk<T>
     if (!res.ok || !data.ok || !data.preferences) return null
     return data.preferences

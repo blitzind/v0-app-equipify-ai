@@ -175,7 +175,10 @@ export function ActiveOrganizationProvider({ children }: { children: ReactNode }
       organizationSlug?: string
     } | null = null
     try {
-      const res = await fetch("/api/platform/support-session", { cache: "no-store" })
+      const res = await fetch("/api/platform/support-session", {
+        cache: "no-store",
+        signal: AbortSignal.timeout(8_000),
+      })
       supportData = (await res.json().catch(() => ({}))) as typeof supportData
     } catch {
       supportData = null

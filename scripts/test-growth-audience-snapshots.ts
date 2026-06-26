@@ -43,7 +43,13 @@ function main(): void {
   assert.equal(est.searchPages, 20)
   assert.equal(est.memberInsertBatches, 50)
 
+  const audienceLibrary = readSource("components/growth/audiences/growth-audience-library.tsx")
+  assert.match(audienceLibrary, /fetchPlatformGrowthClient/)
+  assert.match(audienceLibrary, /PlatformGrowthClientFetchTimeoutError/)
+  assert.match(audienceLibrary, /loading && items\.length === 0 && !error/)
+
   console.log("  ✓ Migration + batched snapshot generation")
+  console.log("  ✓ Audience library uses bounded fetch + error state (no infinite spinner)")
   console.log("\nGS-RG-2A audience snapshots certification passed.\n")
 }
 

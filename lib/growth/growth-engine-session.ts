@@ -10,6 +10,7 @@ import {
   createSupabaseClientWithAccessToken,
   getBearerAccessToken,
 } from "@/lib/supabase/server"
+import { raceMiddlewareAuthOperation } from "@/lib/supabase/middleware-timeout"
 
 /** Global kill switch for Growth Engine platform routes. Default off. */
 export function isGrowthEngineEnabledEnv(): boolean {
@@ -67,8 +68,8 @@ async function resolveGrowthEngineBearerUser(
   bearer_resolution_error_message_safe: string | null
 }> {
   const bearerClient = createSupabaseClientWithAccessToken(bearer)
-  const bearerClientResult = await bearerClient.auth.getUser()
-  const bearerUser = mapSupabaseUser(bearerClientResult.data.user)
+  const bearerClientResult = await raceMiddlewareAuthOperation(bearerClient.auth.getUser())
+  const bearerUser = mapSupabaseUser(bearerClientResult?.data.user)
   if (bearerUser) {
     return {
       bearer_user_resolved: true,
@@ -78,16 +79,16 @@ async function resolveGrowthEngineBearerUser(
     }
   }
 
-  let errorInfo = classifyGrowthEngineBearerAuthError(bearerClientResult.error)
-  if (!bearerClientResult.error && bearerClientResult.data.user?.id && !bearerUser) {
+  let errorInfo = classifyGrowthEngineBearerAuthError(bearerClientResult?.error)
+  if (!bearerClientResult?.error && bearerClientResult?.data.user?.id && !bearerUser) {
     errorInfo = {
       code: "email_missing",
       message_safe: "Supabase user resolved without email",
     }
   }
 
-  const cookieBearerResult = await cookieClient.auth.getUser(bearer)
-  const cookieBearerUser = mapSupabaseUser(cookieBearerResult.data.user)
+  const cookieBearerResult = await raceMiddlewareAuthOperation(cookieClient.auth.getUser(bearer))
+  const cookieBearerUser = mapSupabaseUser(cookieBearerResult?.data.user)
   if (cookieBearerUser) {
     return {
       bearer_user_resolved: true,
@@ -97,8 +98,15 @@ async function resolveGrowthEngineBearerUser(
     }
   }
 
-  if (cookieBearerResult.error) {
+  if (cookieBearerResult?.error) {
     errorInfo = classifyGrowthEngineBearerAuthError(cookieBearerResult.error)
+  }
+
+  if (!bearerClientResult && !cookieBearerResult) {
+    errorInfo = {
+      code: "auth_timeout",
+      message_safe: "Growth Engine auth resolution timed out.",
+    }
   }
 
   return {
@@ -116,10 +124,8 @@ export async function resolveGrowthEnginePlatformUserResolution(
   const bearer = request ? getBearerAccessToken(request) : null
   const tokenMeta = getGrowthEngineBearerTokenMetadata(bearer)
 
-  const {
-    data: { user: cookieSessionUser },
-  } = await cookieClient.auth.getUser()
-  const cookieUser = mapSupabaseUser(cookieSessionUser)
+  const cookieSessionResult = await raceMiddlewareAuthOperation(cookieClient.auth.getUser())
+  const cookieUser = mapSupabaseUser(cookieSessionResult?.data.user)
   const cookie_user_resolved = Boolean(cookieUser)
 
   let bearer_user_resolved = false

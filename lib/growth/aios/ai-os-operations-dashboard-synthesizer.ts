@@ -1,5 +1,6 @@
 /** GE-AIOS-CONSOLIDATION-1B — AI Operations dashboard synthesizer (client-safe). */
 
+import { buildOperationsOutreachAgentStatus } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-engine"
 import { buildOperationsExecutionAgentStatus } from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-engine"
 import type { AiOsCommandCenterReadModel } from "@/lib/growth/aios/ai-os-command-center-types"
 import type { GrowthAiOsAutonomyPolicyReadModel } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-types"
@@ -27,10 +28,79 @@ import {
 } from "@/lib/growth/aios/ai-os-operations-dashboard-types"
 import type { GrowthAgentKind } from "@/lib/growth/aios/growth/growth-agent-framework-types"
 import type { GrowthMissionQueueBucket } from "@/lib/growth/aios/growth/growth-mission-priority-types"
+import type { GrowthAutonomousExecutionPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-types"
+import type { GrowthAutonomousOutreachPreparationPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
+import {
+  GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_AGENT,
+  GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_ALLOWED_WORKFLOW,
+  GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_BUDGET,
+  GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_QA_MARKER,
+  GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_RULE,
+  GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_SCHEDULER_MODE,
+  GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_WAKE_CONDITIONS,
+} from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
+
+const DISABLED_OUTREACH_PREPARATION_PILOT: GrowthAutonomousOutreachPreparationPilotReadModel = {
+  qaMarker: GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_QA_MARKER,
+  generatedAt: "",
+  rule: GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_RULE,
+  agentKind: GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_AGENT,
+  schedulerMode: GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_SCHEDULER_MODE,
+  controlState: "disabled",
+  enabled: false,
+  preparationModeOnly: true,
+  allowedWorkflow: GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_ALLOWED_WORKFLOW,
+  disabledAgentKinds: ["meeting_agent"],
+  budgetLimits: GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_BUDGET,
+  telemetry: {
+    successfulRuns: 0,
+    failedRuns: 0,
+    skippedRuns: 0,
+    eligibleLeads: 0,
+    draftsPrepared: 0,
+    approvalPackagesWaiting: 0,
+    blockedPreparations: 0,
+    budgetConsumptionHour: 0,
+    budgetConsumptionDay: 0,
+    activeRuns: 0,
+  },
+  latestPackages: [],
+  recentRuns: [],
+  revenueOperatorSupervision: {
+    approveWakeRecommendation: "",
+    budgetMonitorSummary: "",
+    failureMonitorSummary: "",
+    pauseRecommendation: null,
+    escalationRecommendation: null,
+    latestOutcomeRecommendation: null,
+  },
+  wakeConditionsSupported: GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_WAKE_CONDITIONS,
+}
 
 const TOP_PRIORITY_LIMIT = 10
 const ACTIVITY_LIMIT = 24
 const ACTIVE_WORK_LIMIT = 12
+
+function resolveExecutionPilot(
+  commandCenter: AiOsCommandCenterReadModel,
+): GrowthAutonomousExecutionPilotReadModel {
+  const pilot = (
+    commandCenter as AiOsCommandCenterReadModel & {
+      autonomousExecutionPilot?: GrowthAutonomousExecutionPilotReadModel
+    }
+  ).autonomousExecutionPilot
+  return pilot ?? commandCenter.autonomousExecutionPilot
+}
+
+function resolveOutreachPreparationPilot(
+  commandCenter: AiOsCommandCenterReadModel,
+): GrowthAutonomousOutreachPreparationPilotReadModel | null {
+  return (
+    commandCenter as AiOsCommandCenterReadModel & {
+      autonomousOutreachPreparationPilot?: GrowthAutonomousOutreachPreparationPilotReadModel
+    }
+  ).autonomousOutreachPreparationPilot ?? commandCenter.autonomousOutreachPreparationPilot ?? null
+}
 
 function urgencyFromScore(score: number): AiOsOperationsUrgencyLevel {
   if (score >= 0.7) return "high"
@@ -107,6 +177,8 @@ function buildExecutiveOverview(
   commandCenter: AiOsCommandCenterReadModel,
   policy?: GrowthAiOsAutonomyPolicyReadModel,
 ): AiOsOperationsExecutiveOverview {
+  const executionPilot = resolveExecutionPilot(commandCenter)
+  const outreachPilot = resolveOutreachPreparationPilot(commandCenter)
   const healthyAgents = commandCenter.agentHealth.agents.filter(
     (agent) => agent.healthStatus === "healthy",
   ).length
@@ -146,7 +218,8 @@ function buildExecutiveOverview(
       commandCenter.autonomousResearchPilot.telemetry.activeRuns +
       commandCenter.autonomousQualificationPilot.telemetry.activeRuns +
       commandCenter.autonomousPlanningPilot.telemetry.activeRuns +
-      commandCenter.autonomousExecutionPilot.telemetry.activeRuns,
+      executionPilot.telemetry.activeRuns +
+      (outreachPilot?.telemetry.activeRuns ?? 0),
     priorityWorkLabel: priorityWork ?? null,
     needsAttentionCount: commandCenter.needsAttention.length,
     approvalBacklogCount: approvalBacklog,
@@ -187,6 +260,8 @@ function buildAutonomyStateSummary(
 
 function buildActiveWork(commandCenter: AiOsCommandCenterReadModel): AiOsOperationsActiveWorkItem[] {
   const items: AiOsOperationsActiveWorkItem[] = []
+  const executionPilot = resolveExecutionPilot(commandCenter)
+  const outreachPilot = resolveOutreachPreparationPilot(commandCenter)
 
   for (const ranked of commandCenter.missionPriority.rankedMissions.slice(0, 5)) {
     items.push({
@@ -240,12 +315,22 @@ function buildActiveWork(commandCenter: AiOsCommandCenterReadModel): AiOsOperati
     })
   }
 
-  if (commandCenter.autonomousExecutionPilot.enabled) {
+  if (executionPilot.enabled) {
     items.push({
       id: "autonomous-execution-pilot",
       category: "autonomous_execution",
       title: "Execution Agent",
-      summary: `${commandCenter.autonomousExecutionPilot.telemetry.eligiblePlans} eligible · ${commandCenter.autonomousExecutionPilot.telemetry.activeExecutions} active · ${commandCenter.autonomousExecutionPilot.controlState}`,
+      summary: `${executionPilot.telemetry.eligiblePlans} eligible · ${executionPilot.telemetry.activeExecutions} active · ${executionPilot.controlState}`,
+      href: GROWTH_AI_OS_AUTONOMY_CONTROL_PLANE_PATH,
+    })
+  }
+
+  if (outreachPilot?.enabled) {
+    items.push({
+      id: "autonomous-outreach-preparation-pilot",
+      category: "autonomous_outreach",
+      title: "Outreach Agent",
+      summary: `${outreachPilot.telemetry.draftsPrepared} drafts · ${outreachPilot.telemetry.approvalPackagesWaiting} awaiting approval · ${outreachPilot.controlState}`,
       href: GROWTH_AI_OS_AUTONOMY_CONTROL_PLANE_PATH,
     })
   }
@@ -289,6 +374,8 @@ function buildActiveWork(commandCenter: AiOsCommandCenterReadModel): AiOsOperati
 
 function buildActivityTimeline(commandCenter: AiOsCommandCenterReadModel): AiOsOperationsActivityTimelineItem[] {
   const items: AiOsOperationsActivityTimelineItem[] = []
+  const executionPilot = resolveExecutionPilot(commandCenter)
+  const outreachPilot = resolveOutreachPreparationPilot(commandCenter)
 
   for (const event of commandCenter.recentActivity) {
     items.push({
@@ -356,12 +443,23 @@ function buildActivityTimeline(commandCenter: AiOsCommandCenterReadModel): AiOsO
     })
   }
 
-  for (const run of commandCenter.autonomousExecutionPilot.recentRuns) {
+  for (const run of executionPilot.recentRuns) {
     items.push({
       id: `ae-${run.runId}`,
       source: "autonomous_execution",
       title: `Execution run · ${run.outcome}`,
       summary: run.blockReason ?? run.skipReason ?? `${run.workflowType ?? "research_company"} · ${run.companyName ?? run.leadId}`,
+      occurredAt: run.completedAt,
+      href: `${GROWTH_AI_OS_PUBLIC_BASE_PATH}/pilot/lead-research/${run.leadId}`,
+    })
+  }
+
+  for (const run of outreachPilot?.recentRuns ?? []) {
+    items.push({
+      id: `ao-${run.runId}`,
+      source: "autonomous_outreach",
+      title: `Outreach prep · ${run.outcome}`,
+      summary: run.blockReason ?? run.skipReason ?? `${run.approvalPackage?.generatedAssets.length ?? 0} assets · ${run.companyName ?? run.leadId}`,
       occurredAt: run.completedAt,
       href: `${GROWTH_AI_OS_PUBLIC_BASE_PATH}/pilot/lead-research/${run.leadId}`,
     })
@@ -405,6 +503,8 @@ function buildActivityTimeline(commandCenter: AiOsCommandCenterReadModel): AiOsO
 }
 
 function buildHealthSummary(commandCenter: AiOsCommandCenterReadModel): AiOsOperationsHealthSummary {
+  const executionPilot = resolveExecutionPilot(commandCenter)
+  const outreachPilot = resolveOutreachPreparationPilot(commandCenter)
   const healthyAgents = commandCenter.agentHealth.agents.filter(
     (agent) => agent.healthStatus === "healthy" && !agent.stale,
   ).length
@@ -428,22 +528,26 @@ function buildHealthSummary(commandCenter: AiOsCommandCenterReadModel): AiOsOper
     commandCenter.autonomousResearchPilot.telemetry.budgetConsumptionHour +
     commandCenter.autonomousQualificationPilot.telemetry.budgetConsumptionHour +
     commandCenter.autonomousPlanningPilot.telemetry.budgetConsumptionHour +
-    commandCenter.autonomousExecutionPilot.telemetry.budgetConsumptionHour
+    executionPilot.telemetry.budgetConsumptionHour +
+    (outreachPilot?.telemetry.budgetConsumptionHour ?? 0)
   const budgetDay =
     commandCenter.autonomousResearchPilot.telemetry.budgetConsumptionDay +
     commandCenter.autonomousQualificationPilot.telemetry.budgetConsumptionDay +
     commandCenter.autonomousPlanningPilot.telemetry.budgetConsumptionDay +
-    commandCenter.autonomousExecutionPilot.telemetry.budgetConsumptionDay
+    executionPilot.telemetry.budgetConsumptionDay +
+    (outreachPilot?.telemetry.budgetConsumptionDay ?? 0)
   const budgetMaxHour =
     commandCenter.autonomousResearchPilot.budgetLimits.maxRunsPerHour +
     commandCenter.autonomousQualificationPilot.budgetLimits.maxRunsPerHour +
     commandCenter.autonomousPlanningPilot.budgetLimits.maxRunsPerHour +
-    commandCenter.autonomousExecutionPilot.budgetLimits.maxRunsPerHour
+    executionPilot.budgetLimits.maxRunsPerHour +
+    (outreachPilot?.budgetLimits.maxRunsPerHour ?? 0)
   const budgetMaxDay =
     commandCenter.autonomousResearchPilot.budgetLimits.maxRunsPerDay +
     commandCenter.autonomousQualificationPilot.budgetLimits.maxRunsPerDay +
     commandCenter.autonomousPlanningPilot.budgetLimits.maxRunsPerDay +
-    commandCenter.autonomousExecutionPilot.budgetLimits.maxRunsPerDay
+    executionPilot.budgetLimits.maxRunsPerDay +
+    (outreachPilot?.budgetLimits.maxRunsPerDay ?? 0)
 
   return {
     overallStatus,
@@ -628,6 +732,8 @@ export function synthesizeAiOsOperationsDashboard(
   policy?: GrowthAiOsAutonomyPolicyReadModel,
 ): AiOsOperationsDashboardReadModel {
   const configureHref = policy?.controlPlaneHref ?? GROWTH_AI_OS_AUTONOMY_CONTROL_PLANE_PATH
+  const executionPilot = resolveExecutionPilot(commandCenter)
+  const outreachPilot = resolveOutreachPreparationPilot(commandCenter) ?? DISABLED_OUTREACH_PREPARATION_PILOT
 
   return {
     readOnly: true,
@@ -636,7 +742,11 @@ export function synthesizeAiOsOperationsDashboard(
     executiveOverview: buildExecutiveOverview(commandCenter, policy),
     autonomyState: buildAutonomyStateSummary(policy),
     executionAgentStatus: buildOperationsExecutionAgentStatus({
-      pilot: commandCenter.autonomousExecutionPilot,
+      pilot: executionPilot,
+      configureHref,
+    }),
+    outreachAgentStatus: buildOperationsOutreachAgentStatus({
+      pilot: outreachPilot,
       configureHref,
     }),
     activeWork: buildActiveWork(commandCenter),

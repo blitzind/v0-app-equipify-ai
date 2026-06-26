@@ -27,6 +27,7 @@ function runAudit(): void {
   const middlewareTimeout = read("lib/supabase/middleware-timeout.ts")
   const growthLayout = read("app/(growth)/layout.tsx")
   const growthAccess = read("lib/growth/access.ts")
+  const growthEngineSession = read("lib/growth/growth-engine-session.ts")
   const workspaceSettingsApi = read("app/api/growth/workspace/settings/profile/route.ts")
   const platformGrowthApi = read("app/api/platform/growth/notifications/preferences/route.ts")
 
@@ -81,6 +82,12 @@ function runAudit(): void {
   console.log("  ✓ /growth/* page auth enforced by Growth RBAC layout gate")
 
   assert.match(growthAccess, /requireGrowthEnginePlatformAccess/, "Growth route handlers retain access gate")
+  assert.match(growthEngineSession, /raceMiddlewareAuthOperation/, "Growth API auth must use bounded timeout guards")
+  assert.match(
+    growthEngineSession,
+    /raceMiddlewareAuthOperation\(cookieClient\.auth\.getUser\(\)\)/,
+    "Growth cookie session auth must time out",
+  )
   assert.match(workspaceSettingsApi, /requireGrowthWorkspaceSettingsAccess/, "workspace settings APIs retain access gate")
   assert.match(platformGrowthApi, /requireGrowthEnginePlatformAccess/, "platform growth APIs retain access gate")
   console.log("  ✓ skipped Growth APIs still protected in route handlers")

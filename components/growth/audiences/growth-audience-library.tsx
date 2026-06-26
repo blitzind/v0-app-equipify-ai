@@ -23,6 +23,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
+import {
+  fetchPlatformGrowthClient,
+  PlatformGrowthClientFetchTimeoutError,
+} from "@/lib/growth/platform-growth-client-fetch"
 import type { GrowthAudience } from "@/lib/growth/audiences/growth-audience-types"
 
 type ListResponse = {
@@ -50,7 +54,9 @@ export function GrowthAudienceLibrary() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/platform/growth/audiences?limit=100")
+      const res = await fetchPlatformGrowthClient("/api/platform/growth/audiences?limit=100", {
+        cache: "no-store",
+      })
       const data = (await res.json()) as ListResponse
       if (!res.ok) {
         setError(data.message ?? "Failed to load audiences")
@@ -58,8 +64,12 @@ export function GrowthAudienceLibrary() {
         return
       }
       setItems(data.items ?? [])
-    } catch {
-      setError("Audiences unavailable")
+    } catch (error) {
+      setError(
+        error instanceof PlatformGrowthClientFetchTimeoutError
+          ? "Audiences request timed out. Try again."
+          : "Audiences unavailable",
+      )
       setItems([])
     } finally {
       setLoading(false)
@@ -173,7 +183,7 @@ export function GrowthAudienceLibrary() {
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      {loading && items.length === 0 ? (
+      {loading && items.length === 0 && !error ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading audiences…

@@ -43,6 +43,8 @@ import { buildGrowthAgentMemoryReadModel } from "@/lib/growth/aios/growth/growth
 import { buildGrowthMissionFrameworkReadModel } from "@/lib/growth/aios/growth/growth-mission-framework-service"
 import { buildGrowthMissionPriorityReadModel } from "@/lib/growth/aios/growth/growth-mission-priority-service"
 import { buildGrowthSchedulerReadinessReadModel } from "@/lib/growth/aios/growth/growth-scheduler-readiness-service"
+import { buildGrowthAutonomousOutreachPreparationPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-service"
+import { buildAutonomousOutreachPreparationPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-engine"
 import { buildGrowthAutonomousExecutionPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-service"
 import { buildGrowthAutonomousPlanningPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-planning-pilot-service"
 import { buildGrowthAutonomousQualificationPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-service"
@@ -62,6 +64,7 @@ import { fetchGrowthAiOsAutonomyPolicy } from "@/lib/growth/autonomy/growth-ai-o
 import {
   buildCommandCenterSafeModeFromPolicy,
   enrichAgentFrameworkWithAutonomyPolicy,
+  enrichAutonomousOutreachPreparationPilotWithAutonomyPolicy,
   enrichAutonomousExecutionPilotWithAutonomyPolicy,
   enrichAutonomousPlanningPilotWithAutonomyPolicy,
   enrichAutonomousQualificationPilotWithAutonomyPolicy,
@@ -69,6 +72,7 @@ import {
   enrichRevenueOperatorWithAutonomyPolicy,
 } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-synthesizer"
 import { listGeV15OrganizationApprovalInbox } from "@/lib/growth/automation-runtime/ge-v1-5-automation-runtime-approval-inbox"
+import { logGrowthEngine } from "@/lib/growth/growth-engine-session"
 
 const DEFAULT_LIMIT = 12
 
@@ -487,6 +491,31 @@ export async function fetchAiOsCommandCenterReadModel(
     }),
     autonomyPolicy,
   )
+  let autonomousOutreachPreparationPilot
+  try {
+    autonomousOutreachPreparationPilot = enrichAutonomousOutreachPreparationPilotWithAutonomyPolicy(
+      await buildGrowthAutonomousOutreachPreparationPilotReadModel(admin, {
+        organizationId: input.organizationId,
+        generatedAt,
+      }),
+      autonomyPolicy,
+    )
+  } catch (error) {
+    logGrowthEngine("outreach_preparation_read_model_failed", {
+      organizationId: input.organizationId,
+      message: error instanceof Error ? error.message : String(error),
+    })
+    autonomousOutreachPreparationPilot = enrichAutonomousOutreachPreparationPilotWithAutonomyPolicy(
+      buildAutonomousOutreachPreparationPilotReadModel({
+        controlState: "disabled",
+        runs: [],
+        generatedAt,
+        eligibleLeads: 0,
+        activeRuns: 0,
+      }),
+      autonomyPolicy,
+    )
+  }
 
   const automationApprovalInbox = await listGeV15OrganizationApprovalInbox(admin, {
     organizationId: input.organizationId,
@@ -535,6 +564,7 @@ export async function fetchAiOsCommandCenterReadModel(
     autonomousQualificationPilot,
     autonomousPlanningPilot,
     autonomousExecutionPilot,
+    autonomousOutreachPreparationPilot,
     safeMode,
   }
 
