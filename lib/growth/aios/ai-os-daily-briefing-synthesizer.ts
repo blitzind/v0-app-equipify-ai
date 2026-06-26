@@ -602,5 +602,6 @@ export function buildAiOsDailyBriefingCertFixture(): AiOsDailyBriefingSource {
     },
     executionPlanReviewQueue: [],
     approvedPlanReadinessQueue: [],
+    futureExecutionHandoffContracts: [],
   }
 }

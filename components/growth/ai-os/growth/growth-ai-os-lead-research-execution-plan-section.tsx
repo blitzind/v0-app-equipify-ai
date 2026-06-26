@@ -6,6 +6,7 @@ import type { GrowthLeadResearchExecutionPlan } from "@/lib/growth/aios/growth/g
 import { GROWTH_LEAD_RESEARCH_EXECUTION_PLAN_QA_MARKER } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
 import type { GrowthLeadResearchExecutionPlanApprovalStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-types"
 import type { GrowthLeadResearchApprovedPlanReadinessState } from "@/lib/growth/aios/growth/growth-lead-research-approved-plan-readiness-types"
+import type { GrowthLeadResearchFutureExecutionHandoffState } from "@/lib/growth/aios/growth/growth-lead-research-future-execution-handoff-types"
 import { cn } from "@/lib/utils"
 
 function readinessBadgeVariant(readiness: GrowthLeadResearchExecutionPlan["executionReadiness"]) {
@@ -25,6 +26,8 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   readinessReason,
   futureExecutionSummary,
   auditTrailSummary,
+  handoffState,
+  handoffSummary,
 }: {
   plan: GrowthLeadResearchExecutionPlan
   title?: string
@@ -35,6 +38,8 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   readinessReason?: string | null
   futureExecutionSummary?: string | null
   auditTrailSummary?: string | null
+  handoffState?: GrowthLeadResearchFutureExecutionHandoffState | null
+  handoffSummary?: string | null
 }) {
   return (
     <Card data-qa-marker={GROWTH_LEAD_RESEARCH_EXECUTION_PLAN_QA_MARKER} data-qa-section="execution-plan">
@@ -72,6 +77,12 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
         {auditTrailSummary ? (
           <p className="text-sm text-muted-foreground">
             <span className="font-medium text-foreground">Audit trail:</span> {auditTrailSummary}
+          </p>
+        ) : null}
+        {handoffState ? (
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Handoff ({handoffState.replaceAll("_", " ")}):</span>{" "}
+            {handoffSummary}
           </p>
         ) : null}
 

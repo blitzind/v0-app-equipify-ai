@@ -63,6 +63,8 @@ export function GrowthAiOsExecutPlanningReviewDashboard({
               readinessReason={entry.readinessReason}
               futureExecutionSummary={entry.futureExecutionSummary}
               auditTrailSummary={entry.auditTrailSummary}
+              handoffState={entry.handoffState}
+              handoffSummary={entry.handoffSummary}
               title={`Planning Review · ${entry.companyName ?? entry.leadId.slice(0, 8)}`}
               description="Lead research execution plan — read-only, no Work Order execution."
             />

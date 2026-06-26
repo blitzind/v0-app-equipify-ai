@@ -5,6 +5,7 @@ import type { AiOsProviderHealthReport } from "@/lib/growth/aios/ai-provider-hea
 import type { AiOsDailyBriefing } from "@/lib/growth/aios/ai-os-daily-briefing-types"
 import type { GrowthLeadResearchExecutionPlanQueueItem } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-types"
 import type { GrowthLeadResearchApprovedPlanReadinessItem } from "@/lib/growth/aios/growth/growth-lead-research-approved-plan-readiness-types"
+import type { GrowthLeadResearchFutureExecutionHandoffContract } from "@/lib/growth/aios/growth/growth-lead-research-future-execution-handoff-types"
 import type { GrowthObjectiveStageId } from "@/lib/growth/objectives/growth-objective-types"
 import type { AiWorkOrderStatus, AiWorkOrderType } from "@/lib/growth/aios/ai-work-order-types"
 
@@ -172,6 +173,7 @@ export type AiOsCommandCenterReadModel = {
   growthLeadResearchWorkflow: AiOsCommandCenterGrowthLeadResearchWorkflow
   executionPlanReviewQueue: GrowthLeadResearchExecutionPlanQueueItem[]
   approvedPlanReadinessQueue: GrowthLeadResearchApprovedPlanReadinessItem[]
+  futureExecutionHandoffContracts: GrowthLeadResearchFutureExecutionHandoffContract[]
   safeMode: AiOsCommandCenterSafeMode
   dailyBriefing: AiOsDailyBriefing
 }

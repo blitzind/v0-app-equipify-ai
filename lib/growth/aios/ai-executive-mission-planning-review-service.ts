@@ -51,6 +51,11 @@ import {
   resolveFutureExecutionSummary,
   summarizeExecutionPlanAuditTrail,
 } from "@/lib/growth/aios/growth/growth-lead-research-approved-plan-readiness-types"
+import {
+  buildFutureExecutionHandoffContract,
+  summarizeFutureExecutionHandoffContract,
+} from "@/lib/growth/aios/growth/growth-lead-research-future-execution-handoff-types"
+import { resolveFutureExecutionHandoffInfrastructure } from "@/lib/growth/aios/growth/growth-lead-research-future-execution-handoff-service"
 import { buildAiOsPilotLeadResearchHref } from "@/lib/growth/aios/ai-os-public-routes"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import type { AiExecutiveMissionPlanningLeadResearchExecutionPlanSummary } from "@/lib/growth/aios/ai-executive-mission-planning-review-types"
@@ -120,6 +125,10 @@ async function listLeadResearchExecutionPlansForMission(
     ),
   ].slice(0, 5)
 
+  const handoffInfrastructure = await resolveFutureExecutionHandoffInfrastructure(admin, {
+    organizationId: input.organizationId,
+  })
+
   const plans: AiExecutiveMissionPlanningLeadResearchExecutionPlanSummary[] = []
   for (const leadId of leadIds) {
     const snapshot = await fetchLatestGrowthLeadResearchWorkflowSnapshot(admin, {
@@ -146,6 +155,8 @@ async function listLeadResearchExecutionPlansForMission(
     let futureExecutionEligible = null
     let futureExecutionSummary = null
     let auditTrailSummary = null
+    let handoffState = null
+    let handoffSummary = null
 
     if (approvalStatus === "approved_for_future_execution") {
       readinessState = resolveApprovedPlanReadinessState({
@@ -170,6 +181,23 @@ async function listLeadResearchExecutionPlansForMission(
         planId,
       })
       auditTrailSummary = summarizeExecutionPlanAuditTrail(auditTrail.entries)
+      const handoffContract = buildFutureExecutionHandoffContract({
+        planId,
+        leadId,
+        companyName: lead?.companyName ?? null,
+        plan: snapshot.executionPlan,
+        approvalState: approvalStatus,
+        readinessState,
+        readinessReason,
+        futureExecutionEligible: futureExecution.eligible,
+        evidenceSummary: snapshot.evidenceSummary,
+        auditTrail,
+        infrastructure: handoffInfrastructure,
+        generatedAt: nowIso(),
+        observationHref: buildAiOsPilotLeadResearchHref(leadId) ?? `/growth/os/pilot/lead-research/${leadId}`,
+      })
+      handoffState = handoffContract.handoffState
+      handoffSummary = summarizeFutureExecutionHandoffContract(handoffContract)
     }
 
     plans.push({
@@ -183,6 +211,8 @@ async function listLeadResearchExecutionPlansForMission(
       futureExecutionEligible,
       futureExecutionSummary,
       auditTrailSummary,
+      handoffState,
+      handoffSummary,
       reason:
         snapshot.nextBestAction?.reason ??
         snapshot.opportunityAssessment?.summary ??

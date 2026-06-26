@@ -53,6 +53,7 @@ For each GE-AI-2X phase, maintain one entry with:
 | GE-AIOS-GROWTH-1C | Next Best Action Workflow Planner | Complete (local cert) |
 | GE-AIOS-GROWTH-1D | Execution Plan Approval Queue | Complete (local cert) |
 | GE-AIOS-GROWTH-1E | Approved Plan Readiness & Audit Trail | Complete (local cert) |
+| GE-AIOS-GROWTH-1F | Future Execution Handoff Contract | Complete (local cert) |
 | GE-AI-2D | Memory Facade (ledger) | Complete via GE-AIOS-2F |
 | GE-AI-2A | Decision Record Foundation (ledger) | Complete via GE-AIOS-2D |
 | GE-AI-2B | Event Bus Unification | Partial (foundation in GE-AIOS-2B) |
@@ -1000,6 +1001,32 @@ Pending — planning-only, feature-flagged, no migrations
 ### Implementation certification
 
 **PASS (local)** — `pnpm test:ge-aios-growth-1e-approved-plan-readiness`
+
+### Production certification
+
+Pending — read-only, feature-flagged, no migrations
+
+---
+
+## GE-AIOS-GROWTH-1F — Future Execution Handoff Contract
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-1F (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-1E Approved Plan Readiness |
+
+### Scope delivered
+
+- Deterministic handoff contract from execution plan, approval, readiness, audit trail, provider health, guardrails
+- Handoff states: handoff_ready, blocked variants, not_applicable
+- Command Center Future Execution Handoff section (approved plans, filters, no execute CTAs)
+- Mission Planning Review compact handoff summary on approved plan cards
+- Expected Work Order type when handoff ready (specification only)
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-1f-future-execution-handoff`
 
 ### Production certification
 

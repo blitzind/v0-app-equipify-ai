@@ -29,6 +29,10 @@ import { buildGrowthLeadResearchWorkflowCommandCenterSummary } from "@/lib/growt
 import { buildGrowthLeadResearchExecutionPlanApprovalQueue } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-service"
 import { buildGrowthLeadResearchApprovedPlanReadinessQueue } from "@/lib/growth/aios/growth/growth-lead-research-approved-plan-readiness-service"
 import {
+  buildGrowthLeadResearchFutureExecutionHandoffContracts,
+  resolveFutureExecutionHandoffInfrastructure,
+} from "@/lib/growth/aios/growth/growth-lead-research-future-execution-handoff-service"
+import {
   buildAiOsMissionPlanningHref,
   GROWTH_AI_OS_PUBLIC_BASE_PATH,
 } from "@/lib/growth/aios/ai-os-public-routes"
@@ -367,6 +371,17 @@ export async function fetchAiOsCommandCenterReadModel(
     limit,
   })
 
+  const handoffInfrastructure = await resolveFutureExecutionHandoffInfrastructure(admin, {
+    organizationId: input.organizationId,
+  })
+
+  const futureExecutionHandoffContracts = await buildGrowthLeadResearchFutureExecutionHandoffContracts(admin, {
+    organizationId: input.organizationId,
+    limit,
+    infrastructure: handoffInfrastructure,
+    generatedAt: nowIso(),
+  })
+
   const commandCenterBase = {
     readOnly: true as const,
     qaMarker: GROWTH_AI_OS_COMMAND_CENTER_QA_MARKER,
@@ -393,6 +408,7 @@ export async function fetchAiOsCommandCenterReadModel(
     growthLeadResearchWorkflow,
     executionPlanReviewQueue,
     approvedPlanReadinessQueue,
+    futureExecutionHandoffContracts,
     safeMode,
   }
 
