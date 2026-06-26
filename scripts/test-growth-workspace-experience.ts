@@ -117,7 +117,7 @@ function runAudit(): void {
   for (const file of primitiveFiles) {
     assert.ok(fs.existsSync(path.join(ROOT, file)), `${file} must exist`)
   }
-  assertIncludes("components/growth/shell/growth-workspace-shell.tsx", "WorkspaceContainer", "Growth shell still uses shared container")
+  assertIncludes("components/growth/shell/growth-workspace-shell.tsx", "data-growth-workspace-full-width", "Growth shell uses full-width main inner")
   assertIncludes("components/app-topbar.tsx", "WORKSPACE_SHELL_TOPBAR", "Core shell still uses shared topbar token")
   console.log("  ✓ shared shell primitives remain in use")
 

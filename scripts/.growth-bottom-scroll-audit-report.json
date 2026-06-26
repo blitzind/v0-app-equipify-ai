@@ -1,0 +1,1554 @@
+{
+  "marker": "growth-bottom-scroll-audit-v1",
+  "results": [
+    {
+      "route": "/growth/campaigns",
+      "url": "https://app.equipify.ai/growth/campaigns",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "document": {
+        "scrollHeight": 2076,
+        "clientHeight": 900
+      },
+      "body": {
+        "scrollHeight": 900,
+        "clientHeight": 900
+      },
+      "main": {
+        "selector": "#main-content",
+        "label": "main",
+        "found": true,
+        "rect": {
+          "top": 97,
+          "bottom": 900,
+          "height": 803,
+          "width": 1192
+        },
+        "scroll": {
+          "scrollHeight": 2371,
+          "clientHeight": 803,
+          "scrollTop": 1568
+        },
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "803px",
+          "maxHeight": "none",
+          "overflowY": "auto",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "min-h-0 min-w-0 w-full flex-1 overflow-y-auto bg-background outline-none scroll-mt-14 md:scroll-mt-16",
+        "dataAttributes": {}
+      },
+      "mainInner": {
+        "selector": "main-inner",
+        "label": "main inner",
+        "found": true,
+        "rect": {
+          "top": -1471,
+          "bottom": 899.515625,
+          "height": 2370.515625,
+          "width": 1192
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "24px",
+          "paddingBottom": "24px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "2370.52px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "w-full min-w-0 px-3 pt-3 sm:px-6 sm:pt-6 pb-6 bg-background max-w-none mx-0",
+        "dataAttributes": {
+          "data-qa-marker": "workspace-shell-v1",
+          "data-growth-workspace-full-width": "true",
+          "data-growth-settings-full-width": "true",
+          "data-growth-settings-shell-parity": "core-matched"
+        }
+      },
+      "pageRoot": {
+        "selector": "page-root",
+        "label": "page root",
+        "found": true,
+        "rect": {
+          "top": -1447,
+          "bottom": 875.515625,
+          "height": 2322.515625,
+          "width": 1144
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "2322.52px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "flex min-w-0 w-full flex-col gap-6",
+        "dataAttributes": {
+          "data-qa-marker": "growth-workspace-hub-v1",
+          "data-growth-campaigns-hub-ux": "growth-campaigns-hub-operator-home-v1",
+          "data-growth-workspace-hub": "campaigns"
+        }
+      },
+      "lastSection": {
+        "selector": "last-section",
+        "label": "last visible section/card",
+        "found": true,
+        "rect": {
+          "top": 805.515625,
+          "bottom": 875.515625,
+          "height": 70,
+          "width": 1144
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "70px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "",
+        "dataAttributes": {
+          "data-section": "advanced-settings"
+        }
+      },
+      "aidenLauncher": {
+        "selector": "[data-aiden-ask-launcher]",
+        "label": "Aiden launcher",
+        "found": true,
+        "rect": {
+          "top": 828,
+          "bottom": 876,
+          "height": 48,
+          "width": 216.234375
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "48px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "fixed"
+        },
+        "className": "pointer-events-auto fixed bottom-24 right-4 z-[95] sm:right-5 lg:bottom-6 lg:right-6",
+        "dataAttributes": {
+          "data-aiden-ask-launcher": "growth-v1",
+          "data-screenshot-chrome": "hide"
+        }
+      },
+      "aidenParent": {
+        "selector": "aiden-parent",
+        "label": "Aiden launcher parent",
+        "found": true,
+        "rect": {
+          "top": 0,
+          "bottom": 900,
+          "height": 900,
+          "width": 1440
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "900px",
+          "height": "900px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "min-h-screen bg-background text-foreground",
+        "dataAttributes": {}
+      },
+      "bottomReservePx": 24.484375,
+      "lastContentToScrollBottomPx": 0.484375,
+      "culpritCandidates": [
+        {
+          "label": "main inner",
+          "selector": "main-inner",
+          "extraBottomPx": 24.484375,
+          "paddingBottomPx": 24,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "w-full min-w-0 px-3 pt-3 sm:px-6 sm:pt-6 pb-6 bg-background max-w-none mx-0"
+        },
+        {
+          "label": "main",
+          "selector": "#main-content",
+          "extraBottomPx": 0.484375,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "min-h-0 min-w-0 w-full flex-1 overflow-y-auto bg-background outline-none scroll-mt-14 md:scroll-mt-16"
+        },
+        {
+          "label": "documentElement",
+          "selector": "html",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "bg-background h-full"
+        },
+        {
+          "label": "body",
+          "selector": "body",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "font-sans antialiased h-full"
+        },
+        {
+          "label": "page root",
+          "selector": "page-root",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "flex min-w-0 w-full flex-col gap-6"
+        },
+        {
+          "label": "last section",
+          "selector": "last-section",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": ""
+        },
+        {
+          "label": "aiden launcher",
+          "selector": "[data-aiden-ask-launcher]",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "pointer-events-auto fixed bottom-24 right-4 z-[95] sm:right-5 lg:bottom-6 lg:right-6"
+        }
+      ],
+      "marker": "growth-bottom-scroll-audit-v1"
+    },
+    {
+      "route": "/growth/leads",
+      "url": "https://app.equipify.ai/growth/leads",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "document": {
+        "scrollHeight": 2062,
+        "clientHeight": 900
+      },
+      "body": {
+        "scrollHeight": 900,
+        "clientHeight": 900
+      },
+      "main": {
+        "selector": "#main-content",
+        "label": "main",
+        "found": true,
+        "rect": {
+          "top": 97,
+          "bottom": 900,
+          "height": 803,
+          "width": 1192
+        },
+        "scroll": {
+          "scrollHeight": 2321,
+          "clientHeight": 803,
+          "scrollTop": 1518
+        },
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "803px",
+          "maxHeight": "none",
+          "overflowY": "auto",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "min-h-0 min-w-0 w-full flex-1 overflow-y-auto bg-background outline-none scroll-mt-14 md:scroll-mt-16",
+        "dataAttributes": {}
+      },
+      "mainInner": {
+        "selector": "main-inner",
+        "label": "main inner",
+        "found": true,
+        "rect": {
+          "top": -1421,
+          "bottom": 899.703125,
+          "height": 2320.703125,
+          "width": 1192
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "24px",
+          "paddingBottom": "24px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "2320.7px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "w-full min-w-0 px-3 pt-3 sm:px-6 sm:pt-6 pb-6 bg-background max-w-none mx-0",
+        "dataAttributes": {
+          "data-qa-marker": "workspace-shell-v1",
+          "data-growth-workspace-full-width": "true",
+          "data-growth-settings-full-width": "true",
+          "data-growth-settings-shell-parity": "core-matched"
+        }
+      },
+      "pageRoot": {
+        "selector": "page-root",
+        "label": "page root",
+        "found": true,
+        "rect": {
+          "top": -1397,
+          "bottom": 875.703125,
+          "height": 2272.703125,
+          "width": 1144
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "2272.7px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "flex min-w-0 w-full flex-col gap-6",
+        "dataAttributes": {
+          "data-qa-marker": "growth-workspace-hub-v1",
+          "data-growth-leads-hub-ux": "growth-leads-hub-operator-home-v5",
+          "data-growth-workspace-hub": "leads"
+        }
+      },
+      "lastSection": {
+        "selector": "last-section",
+        "label": "last visible section/card",
+        "found": true,
+        "rect": {
+          "top": 470,
+          "bottom": 875.703125,
+          "height": 405.703125,
+          "width": 1144
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "20px",
+          "paddingBottom": "20px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "405.703px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "rounded-xl border border-border bg-card shadow-sm dark:bg-[#0B111E] dark:border-[#25324C] p-4 sm:p-5",
+        "dataAttributes": {
+          "data-section": "all-saved-searches"
+        }
+      },
+      "aidenLauncher": {
+        "selector": "[data-aiden-ask-launcher]",
+        "label": "Aiden launcher",
+        "found": true,
+        "rect": {
+          "top": 828,
+          "bottom": 876,
+          "height": 48,
+          "width": 216.234375
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "48px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "fixed"
+        },
+        "className": "pointer-events-auto fixed bottom-24 right-4 z-[95] sm:right-5 lg:bottom-6 lg:right-6",
+        "dataAttributes": {
+          "data-aiden-ask-launcher": "growth-v1",
+          "data-screenshot-chrome": "hide"
+        }
+      },
+      "aidenParent": {
+        "selector": "aiden-parent",
+        "label": "Aiden launcher parent",
+        "found": true,
+        "rect": {
+          "top": 0,
+          "bottom": 900,
+          "height": 900,
+          "width": 1440
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "900px",
+          "height": "900px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "min-h-screen bg-background text-foreground",
+        "dataAttributes": {}
+      },
+      "bottomReservePx": 24.296875,
+      "lastContentToScrollBottomPx": 0.296875,
+      "culpritCandidates": [
+        {
+          "label": "main inner",
+          "selector": "main-inner",
+          "extraBottomPx": 24.296875,
+          "paddingBottomPx": 24,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "w-full min-w-0 px-3 pt-3 sm:px-6 sm:pt-6 pb-6 bg-background max-w-none mx-0"
+        },
+        {
+          "label": "last section",
+          "selector": "last-section",
+          "extraBottomPx": 20,
+          "paddingBottomPx": 20,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "rounded-xl border border-border bg-card shadow-sm dark:bg-[#0B111E] dark:border-[#25324C] p-4 sm:p-5"
+        },
+        {
+          "label": "main",
+          "selector": "#main-content",
+          "extraBottomPx": 0.296875,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "min-h-0 min-w-0 w-full flex-1 overflow-y-auto bg-background outline-none scroll-mt-14 md:scroll-mt-16"
+        },
+        {
+          "label": "documentElement",
+          "selector": "html",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "bg-background h-full"
+        },
+        {
+          "label": "body",
+          "selector": "body",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "font-sans antialiased h-full"
+        },
+        {
+          "label": "page root",
+          "selector": "page-root",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "flex min-w-0 w-full flex-col gap-6"
+        },
+        {
+          "label": "aiden launcher",
+          "selector": "[data-aiden-ask-launcher]",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "pointer-events-auto fixed bottom-24 right-4 z-[95] sm:right-5 lg:bottom-6 lg:right-6"
+        }
+      ],
+      "marker": "growth-bottom-scroll-audit-v1"
+    },
+    {
+      "route": "/growth/leads/prospect-search",
+      "url": "https://app.equipify.ai/growth/leads/prospect-search",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "document": {
+        "scrollHeight": 900,
+        "clientHeight": 900
+      },
+      "body": {
+        "scrollHeight": 900,
+        "clientHeight": 900
+      },
+      "main": {
+        "selector": "#main-content",
+        "label": "main",
+        "found": true,
+        "rect": {
+          "top": 97,
+          "bottom": 900,
+          "height": 803,
+          "width": 1192
+        },
+        "scroll": {
+          "scrollHeight": 2121,
+          "clientHeight": 803,
+          "scrollTop": 1318
+        },
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "803px",
+          "maxHeight": "none",
+          "overflowY": "auto",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "min-h-0 min-w-0 w-full flex-1 overflow-y-auto bg-background outline-none scroll-mt-14 md:scroll-mt-16",
+        "dataAttributes": {}
+      },
+      "mainInner": {
+        "selector": "main-inner",
+        "label": "main inner",
+        "found": true,
+        "rect": {
+          "top": -1221,
+          "bottom": 899.5,
+          "height": 2120.5,
+          "width": 1192
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "24px",
+          "paddingBottom": "24px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "2120.5px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "w-full min-w-0 px-3 pt-3 sm:px-6 sm:pt-6 pb-6 bg-background max-w-none mx-0",
+        "dataAttributes": {
+          "data-qa-marker": "workspace-shell-v1",
+          "data-growth-workspace-full-width": "true",
+          "data-growth-settings-full-width": "true",
+          "data-growth-settings-shell-parity": "core-matched"
+        }
+      },
+      "pageRoot": {
+        "selector": "page-root",
+        "label": "page root",
+        "found": true,
+        "rect": {
+          "top": -1197,
+          "bottom": 875.5,
+          "height": 2072.5,
+          "width": 1144
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "2072.5px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "flex min-w-0 w-full flex-col gap-6",
+        "dataAttributes": {
+          "data-qa-marker": "growth-workspace-page-content-v1",
+          "data-growth-workspace-prospect-search": "v1"
+        }
+      },
+      "lastSection": {
+        "selector": "last-section",
+        "label": "last visible section/card",
+        "found": true,
+        "rect": {
+          "top": 103.5,
+          "bottom": 875.5,
+          "height": 772,
+          "width": 340
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "auto",
+          "height": "772px",
+          "maxHeight": "772px",
+          "overflowY": "hidden",
+          "boxSizing": "border-box",
+          "position": "sticky"
+        },
+        "className": "flex w-full shrink-0 flex-col rounded-2xl border border-border bg-card shadow-sm lg:sticky lg:top-4 lg:w-[340px] lg:max-h-[calc(100vh-8rem)] lg:overflow-hidden",
+        "dataAttributes": {
+          "data-qa-marker": "growth-prospect-search-layout-v2",
+          "data-filter-ux-qa-marker": "growth-prospect-search-filter-ux-v1",
+          "data-prospect-search-advanced-filters-rail": "true"
+        }
+      },
+      "aidenLauncher": {
+        "selector": "[data-aiden-ask-launcher]",
+        "label": "Aiden launcher",
+        "found": true,
+        "rect": {
+          "top": 828,
+          "bottom": 876,
+          "height": 48,
+          "width": 216.234375
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "48px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "fixed"
+        },
+        "className": "pointer-events-auto fixed bottom-24 right-4 z-[95] sm:right-5 lg:bottom-6 lg:right-6",
+        "dataAttributes": {
+          "data-aiden-ask-launcher": "growth-v1",
+          "data-screenshot-chrome": "hide"
+        }
+      },
+      "aidenParent": {
+        "selector": "aiden-parent",
+        "label": "Aiden launcher parent",
+        "found": true,
+        "rect": {
+          "top": 0,
+          "bottom": 900,
+          "height": 900,
+          "width": 1440
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "900px",
+          "height": "900px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "min-h-screen bg-background text-foreground",
+        "dataAttributes": {}
+      },
+      "bottomReservePx": 24.5,
+      "lastContentToScrollBottomPx": 0.5,
+      "culpritCandidates": [
+        {
+          "label": "main inner",
+          "selector": "main-inner",
+          "extraBottomPx": 24.5,
+          "paddingBottomPx": 24,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "w-full min-w-0 px-3 pt-3 sm:px-6 sm:pt-6 pb-6 bg-background max-w-none mx-0"
+        },
+        {
+          "label": "main",
+          "selector": "#main-content",
+          "extraBottomPx": 0.5,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "min-h-0 min-w-0 w-full flex-1 overflow-y-auto bg-background outline-none scroll-mt-14 md:scroll-mt-16"
+        },
+        {
+          "label": "documentElement",
+          "selector": "html",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "bg-background h-full"
+        },
+        {
+          "label": "body",
+          "selector": "body",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "font-sans antialiased h-full"
+        },
+        {
+          "label": "page root",
+          "selector": "page-root",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "flex min-w-0 w-full flex-col gap-6"
+        },
+        {
+          "label": "last section",
+          "selector": "last-section",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "flex w-full shrink-0 flex-col rounded-2xl border border-border bg-card shadow-sm lg:sticky lg:top-4 lg:w-[340px] lg:max-h-[calc(100vh-8rem)] lg:overflow-hidden"
+        },
+        {
+          "label": "aiden launcher",
+          "selector": "[data-aiden-ask-launcher]",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "pointer-events-auto fixed bottom-24 right-4 z-[95] sm:right-5 lg:bottom-6 lg:right-6"
+        }
+      ],
+      "marker": "growth-bottom-scroll-audit-v1"
+    },
+    {
+      "route": "/growth/campaigns",
+      "url": "https://app.equipify.ai/growth/campaigns",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "document": {
+        "scrollHeight": 5618,
+        "clientHeight": 844
+      },
+      "body": {
+        "scrollHeight": 844,
+        "clientHeight": 844
+      },
+      "main": {
+        "selector": "#main-content",
+        "label": "main",
+        "found": true,
+        "rect": {
+          "top": 109,
+          "bottom": 844,
+          "height": 735,
+          "width": 142
+        },
+        "scroll": {
+          "scrollHeight": 7437,
+          "clientHeight": 735,
+          "scrollTop": 6702
+        },
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "735px",
+          "maxHeight": "none",
+          "overflowY": "auto",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "min-h-0 min-w-0 w-full flex-1 overflow-y-auto bg-background outline-none scroll-mt-14 md:scroll-mt-16",
+        "dataAttributes": {}
+      },
+      "mainInner": {
+        "selector": "main-inner",
+        "label": "main inner",
+        "found": true,
+        "rect": {
+          "top": -6593,
+          "bottom": 844.046875,
+          "height": 7437.046875,
+          "width": 142
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "12px",
+          "paddingBottom": "24px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "7437.05px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "w-full min-w-0 px-3 pt-3 sm:px-6 sm:pt-6 pb-6 bg-background max-w-none mx-0",
+        "dataAttributes": {
+          "data-qa-marker": "workspace-shell-v1",
+          "data-growth-workspace-full-width": "true",
+          "data-growth-settings-full-width": "true",
+          "data-growth-settings-shell-parity": "core-matched"
+        }
+      },
+      "pageRoot": {
+        "selector": "page-root",
+        "label": "page root",
+        "found": true,
+        "rect": {
+          "top": -6581,
+          "bottom": 820.046875,
+          "height": 7401.046875,
+          "width": 118
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "7401.05px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "flex min-w-0 w-full flex-col gap-6",
+        "dataAttributes": {
+          "data-qa-marker": "growth-workspace-hub-v1",
+          "data-growth-campaigns-hub-ux": "growth-campaigns-hub-operator-home-v1",
+          "data-growth-workspace-hub": "campaigns"
+        }
+      },
+      "lastSection": {
+        "selector": "last-section",
+        "label": "last visible section/card",
+        "found": true,
+        "rect": {
+          "top": 586.046875,
+          "bottom": 820.046875,
+          "height": 234,
+          "width": 118
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "234px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "",
+        "dataAttributes": {
+          "data-section": "advanced-settings"
+        }
+      },
+      "aidenLauncher": {
+        "selector": "[data-aiden-ask-launcher]",
+        "label": "Aiden launcher",
+        "found": true,
+        "rect": {
+          "top": 700,
+          "bottom": 748,
+          "height": 48,
+          "width": 216.234375
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "48px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "fixed"
+        },
+        "className": "pointer-events-auto fixed bottom-24 right-4 z-[95] sm:right-5 lg:bottom-6 lg:right-6",
+        "dataAttributes": {
+          "data-aiden-ask-launcher": "growth-v1",
+          "data-screenshot-chrome": "hide"
+        }
+      },
+      "aidenParent": {
+        "selector": "aiden-parent",
+        "label": "Aiden launcher parent",
+        "found": true,
+        "rect": {
+          "top": 0,
+          "bottom": 844,
+          "height": 844,
+          "width": 390
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "844px",
+          "height": "844px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "min-h-screen bg-background text-foreground",
+        "dataAttributes": {}
+      },
+      "bottomReservePx": 23.953125,
+      "lastContentToScrollBottomPx": 0,
+      "culpritCandidates": [
+        {
+          "label": "main inner",
+          "selector": "main-inner",
+          "extraBottomPx": 23.953125,
+          "paddingBottomPx": 24,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "w-full min-w-0 px-3 pt-3 sm:px-6 sm:pt-6 pb-6 bg-background max-w-none mx-0"
+        },
+        {
+          "label": "documentElement",
+          "selector": "html",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "bg-background h-full"
+        },
+        {
+          "label": "body",
+          "selector": "body",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "font-sans antialiased h-full"
+        },
+        {
+          "label": "main",
+          "selector": "#main-content",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "min-h-0 min-w-0 w-full flex-1 overflow-y-auto bg-background outline-none scroll-mt-14 md:scroll-mt-16"
+        },
+        {
+          "label": "page root",
+          "selector": "page-root",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "flex min-w-0 w-full flex-col gap-6"
+        },
+        {
+          "label": "last section",
+          "selector": "last-section",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": ""
+        },
+        {
+          "label": "aiden launcher",
+          "selector": "[data-aiden-ask-launcher]",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "pointer-events-auto fixed bottom-24 right-4 z-[95] sm:right-5 lg:bottom-6 lg:right-6"
+        }
+      ],
+      "marker": "growth-bottom-scroll-audit-v1"
+    },
+    {
+      "route": "/growth/leads",
+      "url": "https://app.equipify.ai/growth/leads",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "document": {
+        "scrollHeight": 5598,
+        "clientHeight": 844
+      },
+      "body": {
+        "scrollHeight": 844,
+        "clientHeight": 844
+      },
+      "main": {
+        "selector": "#main-content",
+        "label": "main",
+        "found": true,
+        "rect": {
+          "top": 89,
+          "bottom": 844,
+          "height": 755,
+          "width": 142
+        },
+        "scroll": {
+          "scrollHeight": 6770,
+          "clientHeight": 755,
+          "scrollTop": 6015
+        },
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "755px",
+          "maxHeight": "none",
+          "overflowY": "auto",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "min-h-0 min-w-0 w-full flex-1 overflow-y-auto bg-background outline-none scroll-mt-14 md:scroll-mt-16",
+        "dataAttributes": {}
+      },
+      "mainInner": {
+        "selector": "main-inner",
+        "label": "main inner",
+        "found": true,
+        "rect": {
+          "top": -5926,
+          "bottom": 844.25,
+          "height": 6770.25,
+          "width": 142
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "12px",
+          "paddingBottom": "24px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "6770.25px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "w-full min-w-0 px-3 pt-3 sm:px-6 sm:pt-6 pb-6 bg-background max-w-none mx-0",
+        "dataAttributes": {
+          "data-qa-marker": "workspace-shell-v1",
+          "data-growth-workspace-full-width": "true",
+          "data-growth-settings-full-width": "true",
+          "data-growth-settings-shell-parity": "core-matched"
+        }
+      },
+      "pageRoot": {
+        "selector": "page-root",
+        "label": "page root",
+        "found": true,
+        "rect": {
+          "top": -5914,
+          "bottom": 820.25,
+          "height": 6734.25,
+          "width": 118
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "6734.25px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "flex min-w-0 w-full flex-col gap-6",
+        "dataAttributes": {
+          "data-qa-marker": "growth-workspace-hub-v1",
+          "data-growth-leads-hub-ux": "growth-leads-hub-operator-home-v5",
+          "data-growth-workspace-hub": "leads"
+        }
+      },
+      "lastSection": {
+        "selector": "last-section",
+        "label": "last visible section/card",
+        "found": true,
+        "rect": {
+          "top": -489.75,
+          "bottom": 820.25,
+          "height": 1310,
+          "width": 118
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "16px",
+          "paddingBottom": "16px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "1310px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "rounded-xl border border-border bg-card shadow-sm dark:bg-[#0B111E] dark:border-[#25324C] p-4 sm:p-5",
+        "dataAttributes": {
+          "data-section": "all-saved-searches"
+        }
+      },
+      "aidenLauncher": {
+        "selector": "[data-aiden-ask-launcher]",
+        "label": "Aiden launcher",
+        "found": true,
+        "rect": {
+          "top": 700,
+          "bottom": 748,
+          "height": 48,
+          "width": 216.234375
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "48px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "fixed"
+        },
+        "className": "pointer-events-auto fixed bottom-24 right-4 z-[95] sm:right-5 lg:bottom-6 lg:right-6",
+        "dataAttributes": {
+          "data-aiden-ask-launcher": "growth-v1",
+          "data-screenshot-chrome": "hide"
+        }
+      },
+      "aidenParent": {
+        "selector": "aiden-parent",
+        "label": "Aiden launcher parent",
+        "found": true,
+        "rect": {
+          "top": 0,
+          "bottom": 844,
+          "height": 844,
+          "width": 390
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "844px",
+          "height": "844px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "min-h-screen bg-background text-foreground",
+        "dataAttributes": {}
+      },
+      "bottomReservePx": 23.75,
+      "lastContentToScrollBottomPx": 0,
+      "culpritCandidates": [
+        {
+          "label": "main inner",
+          "selector": "main-inner",
+          "extraBottomPx": 23.75,
+          "paddingBottomPx": 24,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "w-full min-w-0 px-3 pt-3 sm:px-6 sm:pt-6 pb-6 bg-background max-w-none mx-0"
+        },
+        {
+          "label": "last section",
+          "selector": "last-section",
+          "extraBottomPx": 16,
+          "paddingBottomPx": 16,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "rounded-xl border border-border bg-card shadow-sm dark:bg-[#0B111E] dark:border-[#25324C] p-4 sm:p-5"
+        },
+        {
+          "label": "documentElement",
+          "selector": "html",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "bg-background h-full"
+        },
+        {
+          "label": "body",
+          "selector": "body",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "font-sans antialiased h-full"
+        },
+        {
+          "label": "main",
+          "selector": "#main-content",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "min-h-0 min-w-0 w-full flex-1 overflow-y-auto bg-background outline-none scroll-mt-14 md:scroll-mt-16"
+        },
+        {
+          "label": "page root",
+          "selector": "page-root",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "flex min-w-0 w-full flex-col gap-6"
+        },
+        {
+          "label": "aiden launcher",
+          "selector": "[data-aiden-ask-launcher]",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "pointer-events-auto fixed bottom-24 right-4 z-[95] sm:right-5 lg:bottom-6 lg:right-6"
+        }
+      ],
+      "marker": "growth-bottom-scroll-audit-v1"
+    },
+    {
+      "route": "/growth/leads/prospect-search",
+      "url": "https://app.equipify.ai/growth/leads/prospect-search",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "document": {
+        "scrollHeight": 844,
+        "clientHeight": 844
+      },
+      "body": {
+        "scrollHeight": 844,
+        "clientHeight": 844
+      },
+      "main": {
+        "selector": "#main-content",
+        "label": "main",
+        "found": true,
+        "rect": {
+          "top": 109,
+          "bottom": 844,
+          "height": 735,
+          "width": 142
+        },
+        "scroll": {
+          "scrollHeight": 8700,
+          "clientHeight": 735,
+          "scrollTop": 7965
+        },
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "735px",
+          "maxHeight": "none",
+          "overflowY": "auto",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "min-h-0 min-w-0 w-full flex-1 overflow-y-auto bg-background outline-none scroll-mt-14 md:scroll-mt-16",
+        "dataAttributes": {}
+      },
+      "mainInner": {
+        "selector": "main-inner",
+        "label": "main inner",
+        "found": true,
+        "rect": {
+          "top": -7856,
+          "bottom": 843.5,
+          "height": 8699.5,
+          "width": 142
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "12px",
+          "paddingBottom": "24px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "8699.5px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "w-full min-w-0 px-3 pt-3 sm:px-6 sm:pt-6 pb-6 bg-background max-w-none mx-0",
+        "dataAttributes": {
+          "data-qa-marker": "workspace-shell-v1",
+          "data-growth-workspace-full-width": "true",
+          "data-growth-settings-full-width": "true",
+          "data-growth-settings-shell-parity": "core-matched"
+        }
+      },
+      "pageRoot": {
+        "selector": "page-root",
+        "label": "page root",
+        "found": true,
+        "rect": {
+          "top": -7844,
+          "bottom": 819.5,
+          "height": 8663.5,
+          "width": 118
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "8663.5px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "flex min-w-0 w-full flex-col gap-6",
+        "dataAttributes": {
+          "data-qa-marker": "growth-workspace-page-content-v1",
+          "data-growth-workspace-prospect-search": "v1"
+        }
+      },
+      "lastSection": {
+        "selector": "last-section",
+        "label": "last visible section/card",
+        "found": true,
+        "rect": {
+          "top": 89.5,
+          "bottom": 819.5,
+          "height": 730,
+          "width": 118
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "48px",
+          "paddingBottom": "48px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "auto",
+          "height": "730px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "rounded-2xl border border-dashed border-violet-200/80 bg-violet-50/40 px-6 py-12 text-center dark:border-violet-900/40 dark:bg-violet-950/20",
+        "dataAttributes": {
+          "data-qa": "growth-discover-ready-to-search-v1",
+          "data-qa-marker": "growth-discover-ready-to-search-v1"
+        }
+      },
+      "aidenLauncher": {
+        "selector": "[data-aiden-ask-launcher]",
+        "label": "Aiden launcher",
+        "found": true,
+        "rect": {
+          "top": 700,
+          "bottom": 748,
+          "height": 48,
+          "width": 216.234375
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "0px",
+          "height": "48px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "fixed"
+        },
+        "className": "pointer-events-auto fixed bottom-24 right-4 z-[95] sm:right-5 lg:bottom-6 lg:right-6",
+        "dataAttributes": {
+          "data-aiden-ask-launcher": "growth-v1",
+          "data-screenshot-chrome": "hide"
+        }
+      },
+      "aidenParent": {
+        "selector": "aiden-parent",
+        "label": "Aiden launcher parent",
+        "found": true,
+        "rect": {
+          "top": 0,
+          "bottom": 844,
+          "height": 844,
+          "width": 390
+        },
+        "scroll": null,
+        "computed": {
+          "paddingTop": "0px",
+          "paddingBottom": "0px",
+          "marginTop": "0px",
+          "marginBottom": "0px",
+          "minHeight": "844px",
+          "height": "844px",
+          "maxHeight": "none",
+          "overflowY": "visible",
+          "boxSizing": "border-box",
+          "position": "static"
+        },
+        "className": "min-h-screen bg-background text-foreground",
+        "dataAttributes": {}
+      },
+      "bottomReservePx": 24.5,
+      "lastContentToScrollBottomPx": 0.5,
+      "culpritCandidates": [
+        {
+          "label": "last section",
+          "selector": "last-section",
+          "extraBottomPx": 48,
+          "paddingBottomPx": 48,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "rounded-2xl border border-dashed border-violet-200/80 bg-violet-50/40 px-6 py-12 text-center dark:border-violet-900/40 dark:bg-violet-950/20"
+        },
+        {
+          "label": "main inner",
+          "selector": "main-inner",
+          "extraBottomPx": 24.5,
+          "paddingBottomPx": 24,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "w-full min-w-0 px-3 pt-3 sm:px-6 sm:pt-6 pb-6 bg-background max-w-none mx-0"
+        },
+        {
+          "label": "main",
+          "selector": "#main-content",
+          "extraBottomPx": 0.5,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "min-h-0 min-w-0 w-full flex-1 overflow-y-auto bg-background outline-none scroll-mt-14 md:scroll-mt-16"
+        },
+        {
+          "label": "documentElement",
+          "selector": "html",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "bg-background h-full"
+        },
+        {
+          "label": "body",
+          "selector": "body",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "font-sans antialiased h-full"
+        },
+        {
+          "label": "page root",
+          "selector": "page-root",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "flex min-w-0 w-full flex-col gap-6"
+        },
+        {
+          "label": "aiden launcher",
+          "selector": "[data-aiden-ask-launcher]",
+          "extraBottomPx": 0,
+          "paddingBottomPx": 0,
+          "marginBottomPx": 0,
+          "minHeightPx": 0,
+          "className": "pointer-events-auto fixed bottom-24 right-4 z-[95] sm:right-5 lg:bottom-6 lg:right-6"
+        }
+      ],
+      "marker": "growth-bottom-scroll-audit-v1"
+    }
+  ]
+}
