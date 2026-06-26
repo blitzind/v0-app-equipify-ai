@@ -44,6 +44,8 @@ For each GE-AI-2X phase, maintain one entry with:
 | GE-AIOS-3E | Mission Planning Review Surface | Complete (local cert) |
 | GE-AIOS-3F | AI OS Stack Certification & Migration Readiness | Complete (local cert) |
 | GE-AIOS-4A | Autonomous Growth Pilot (Lead Research) | Complete (local cert) |
+| GE-AIOS-5A | Executive Intelligence v1 (Planning Report) | Complete (local cert) |
+| GE-AIOS-URL-1 | Public route namespace (`/growth/os`) | Complete (local cert) |
 | GE-AI-2D | Memory Facade (ledger) | Complete via GE-AIOS-2F |
 | GE-AI-2A | Decision Record Foundation (ledger) | Complete via GE-AIOS-2D |
 | GE-AI-2B | Event Bus Unification | Partial (foundation in GE-AIOS-2B) |
@@ -652,7 +654,7 @@ Pending
 - Read-only GET review model (mission, stage context, active Work Orders)
 - Dry-run preview API wrapping `runExecutiveMissionPlanningTick` (`dry_run` only)
 - Explicit operator approve API for Work Order creation (`create` mode)
-- Minimal internal UI at `/growth/ai-os/missions/[missionId]/planning`
+- Minimal internal UI at `/growth/os/missions/[missionId]/planning` (legacy `/growth/ai-os/...` redirects)
 - Events: `executive.planning_review_created`, `executive.planning_review_approved`
 - Optional `prepareDecision` / `enableAiEvidence` on approve only
 
@@ -728,6 +730,57 @@ Pending — ready for commit/migration review
 ### Production certification
 
 Pending — requires flag enable + staging smoke
+
+---
+
+## GE-AIOS-5A — Executive Intelligence v1 (Planning Report)
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-5A (Equipify AI OS) |
+| **Dependencies** | GE-AIOS 3D/3E, GE-AUTO objective planner, 2J/2D/2F read paths |
+
+### Scope delivered
+
+- Read-only **Executive Planning Report** on Mission Planning Review GET read model
+- Deterministic synthesis: mission analysis, strategy steps, outcomes, risks, alternatives, success criteria
+- UI section above Work Order preview — Work Order preview/approve unchanged
+- No providers, no planning tick, no Work Order creation from report fetch
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-5a-executive-planning-report-foundation`
+
+### Production certification
+
+Pending — deploy with existing AI OS stack (no migrations)
+
+---
+
+## GE-AIOS-URL-1 — Public Route Namespace
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-URL-1 (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-3E, GE-AIOS-4A (existing UI surfaces) |
+
+### Scope delivered
+
+- Canonical public UI namespace: `/growth/os/*`
+- Permanent backwards-compatible redirects from `/growth/ai-os/*`
+- Shared helpers in `lib/growth/aios/ai-os-public-routes.ts`
+- API namespace unchanged: `/api/platform/growth/ai-os/*`
+- Internal architecture identifiers unchanged (folders, services, events)
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-url-1-public-route-namespace-foundation`
+
+### Production certification
+
+Pending — no migrations; safe redirect-only deploy
 
 ---
 

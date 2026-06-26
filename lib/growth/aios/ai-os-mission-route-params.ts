@@ -7,6 +7,8 @@ export const GROWTH_AI_OS_MISSION_ID_INVALID_ERROR = "growth_ai_os_mission_id_in
 /** Safe fallback when no real mission id is available for AI OS planning links. */
 export const GROWTH_AI_OS_SAFE_INDEX_HREF = "/growth/objectives" as const
 
+export { buildAiOsMissionPlanningHref, buildAiOsPilotLeadResearchHref } from "@/lib/growth/aios/ai-os-public-routes"
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -40,12 +42,6 @@ export function resolveAiOsMissionIdParam(
     return { ok: false, reason: "invalid", error: GROWTH_AI_OS_MISSION_ID_INVALID_ERROR }
   }
   return { ok: true, missionId }
-}
-
-export function buildAiOsMissionPlanningHref(missionId: string | null | undefined): string | null {
-  const resolved = resolveAiOsMissionIdParam(missionId)
-  if (!resolved.ok) return null
-  return `/growth/ai-os/missions/${resolved.missionId}/planning`
 }
 
 export function aiOsMissionIdValidationMessage(

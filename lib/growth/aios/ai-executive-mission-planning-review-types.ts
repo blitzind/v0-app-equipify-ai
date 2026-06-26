@@ -6,6 +6,7 @@ import type {
   AiExecutiveWorkOrderProposal,
 } from "@/lib/growth/aios/ai-executive-mission-planning-types"
 import type { AiWorkOrderStatus, AiWorkOrderType } from "@/lib/growth/aios/ai-work-order-types"
+import type { AiExecutivePlanningReport } from "@/lib/growth/aios/ai-executive-planning-report-types"
 
 export const GROWTH_AIOS_3E_PHASE = "GE-AIOS-3E" as const
 
@@ -36,6 +37,7 @@ export type AiExecutiveMissionPlanningReviewReadModel = {
   mission: AiExecutiveMissionPlanningMissionSummary
   executiveRuntimeId: string
   activeWorkOrders: AiExecutiveMissionPlanningActiveWorkOrderSummary[]
+  executivePlanningReport: AiExecutivePlanningReport
   readOnly: true
 }
 

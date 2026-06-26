@@ -90,6 +90,7 @@ export async function invokeAiOsProviderWithContextPackage(
     messages,
     temperature,
     maxOutputTokens,
+    structuredMode: input.purpose === "research_company" ? "json_object" : "none",
     onProviderDegraded: async ({ providerId, error }) => {
       await updateAiProviderRuntimeCounters(admin, {
         organizationId: input.organizationId,

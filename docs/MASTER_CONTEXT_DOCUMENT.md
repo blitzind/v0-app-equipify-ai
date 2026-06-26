@@ -16,7 +16,7 @@
 =================================================
 
 **Document role:** Living engineering state — current phase, production status, rules, certifications, risks, and priorities.  
-**Last updated:** 2026-06-25 (GE-AIOS-4A Lead Research Pilot)  
+**Last updated:** 2026-06-25 (GE-AIOS-URL-1 public route namespace)  
 **Regeneration:** `pnpm update:master-context` (inventory scan + this document's manual sections)  
 **Admin UI:** `/admin/master-context`
 
@@ -46,7 +46,7 @@
 |-------|--------|
 | **Architecture phase** | GE-AI-1X — **Complete** (Constitution v1.0 frozen) |
 | **Documentation phase** | GE-DOC-1 — **Complete** |
-| **Current phase** | **GE-AIOS-4A** — Autonomous Growth Pilot / Lead Research Pipeline (**certified locally**, not committed) |
+| **Current phase** | **GE-AIOS-URL-1** — Public AI OS route namespace `/growth/os` (**certified locally**, not committed) |
 | **Next phase** | GE-AI-2F — Meta-Recommender |
 
 **Transition:** Official move from Architecture Phase (GE-AI-1X) to Engineering Phase (GE-AI-2X).
@@ -219,11 +219,13 @@ Full list: `lib/admin/master-context.manual.after.md` § Known Limitations.
 | GE-AIOS-3E | Mission Planning Review Surface | Complete (local cert) |
 | GE-AIOS-3F | AI OS Stack Certification & Migration Readiness | Complete (local cert) |
 | GE-AIOS-4A | Autonomous Growth Pilot (Lead Research) | Complete (local cert) |
+| GE-AIOS-5A | Executive Intelligence v1 (Planning Report) | Complete (local cert) |
+| GE-AIOS-URL-1 | Public route namespace (`/growth/os`) | Complete (local cert) |
 
 ### Current phase
 
-**GE-AIOS-4A — Autonomous Growth Pilot**  
-Single Lead Research Pipeline wired end-to-end through AI OS infrastructure. Status: **Complete (local cert)**.
+**GE-AIOS-URL-1 — Public route namespace**  
+Public Equipify AI OS UI routes canonical at `/growth/os/*`; legacy `/growth/ai-os/*` permanent redirects. Status: **Complete (local cert)**.
 
 ### Next phases (ordered)
 
@@ -271,6 +273,8 @@ GE-AUTO-1A through 2I implemented locally; GE-AUTO-3 not started. See manual bef
 | GE-AIOS-3E Mission Planning Review Surface | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-3F AI OS Stack Certification (2A–3E) | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-4A Lead Research Pilot | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-5A Executive Planning Report | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-URL-1 Public route namespace | **PASS (local)** | 2026-06-25 |
 | GE-AI-2A+ implementation (production) | Pending | — |
 
 Outbound operational readiness: `docs/GROWTH_OUTBOUND_OPERATIONAL_READINESS.md`
@@ -411,8 +415,16 @@ Outbound operational readiness: `docs/GROWTH_OUTBOUND_OPERATIONAL_READINESS.md`
 - GET read model: mission + active Work Orders (no tick)
 - POST preview: dry-run via `runExecutiveMissionPlanningTick`; emits `executive.planning_review_created`
 - POST approve: explicit operator create; emits `executive.planning_review_approved`
-- UI: `/growth/ai-os/missions/[missionId]/planning`
+- UI: `/growth/os/missions/[missionId]/planning` (legacy `/growth/ai-os/...` redirects)
 - Optional `prepareDecision` / `enableAiEvidence` on approve only — never on preview
+- **GE-AIOS-5A:** GET read model includes read-only `executivePlanningReport` (strategy intelligence)
+
+### Executive Planning Report (GE-AIOS-5A)
+
+- Service: `lib/growth/aios/ai-executive-planning-report-*.ts` — `fetchAiExecutivePlanningReport`
+- Synthesizes mission analysis, multi-step strategy, outcomes, risks from objective planner + mission planner + context assembly reads
+- Displayed above Work Order preview on Planning Review UI — no execution, providers, or tick side effects
+- Cert: `pnpm test:ge-aios-5a-executive-planning-report-foundation`
 
 ### AI OS Stack Certification (GE-AIOS-3F)
 
@@ -425,7 +437,7 @@ Outbound operational readiness: `docs/GROWTH_OUTBOUND_OPERATIONAL_READINESS.md`
 - Orchestrator: `lib/growth/aios/pilot/lead-research-pilot-orchestrator.ts`
 - Trigger: `createGrowthLead` → `scheduleLeadResearchPilotForProspect` (feature-flagged)
 - Flow: planning tick → research_company WO → decision prep → agent claim → context → provider → save research
-- Observation: `/growth/ai-os/pilot/lead-research/[leadId]`
+- Observation: `/growth/os/pilot/lead-research/[leadId]` (legacy `/growth/ai-os/...` redirects)
 - Flags: `GROWTH_AIOS_LEAD_RESEARCH_PILOT_ENABLED`, optional `GROWTH_AIOS_LEAD_RESEARCH_PILOT_ENABLE_AI_EVIDENCE`
 
 ### Not yet runtime-bound to Constitution
@@ -510,6 +522,9 @@ Full list: `lib/admin/master-context.manual.after.md` § Current Priorities.
 | [GE-AIOS-3F File Impact](./GE-AIOS-3F_FILE_IMPACT_SUMMARY.md) | File impact summary |
 | [GE-AIOS-3F Known Risks](./GE-AIOS-3F_KNOWN_RISKS.md) | Risks and deferred items |
 | [GE-AIOS-4A Certification](./GE-AIOS-4A_CERTIFICATION.md) | Lead Research Pilot cert |
+| [GE-AIOS-5A Certification](./GE-AIOS-5A_CERTIFICATION.md) | Executive Planning Report cert |
+| [GE-AIOS-URL-1 Certification](./GE-AIOS-URL-1_CERTIFICATION.md) | Public route namespace cert |
+| [GE-AIOS-URL-1 Infrastructure Audit](./GE-AIOS-URL-1_INFRASTRUCTURE_AUDIT.md) | Route rename audit |
 
 ### Legacy / generated inventory
 

@@ -2,7 +2,7 @@
 
 import "server-only"
 
-import type { AiChatMessage } from "@/lib/ai/types"
+import type { AiChatMessage, AiStructuredMode } from "@/lib/ai/types"
 import { invokeCoreProviderAdapter } from "@/lib/growth/aios/ai-provider-core-bridge"
 import { normalizeAiOsProviderResponse } from "@/lib/growth/aios/ai-provider-normalizer"
 import type {
@@ -16,6 +16,7 @@ export type AiOsProviderFailoverInput = {
   messages: AiChatMessage[]
   temperature: number
   maxOutputTokens: number
+  structuredMode?: AiStructuredMode
   timeoutMs?: number
   maxRetries?: number
   onProviderDegraded?: (input: {
@@ -61,7 +62,7 @@ export async function invokeAiOsProviderWithFailover(
         messages: input.messages,
         temperature: input.temperature,
         maxOutputTokens: input.maxOutputTokens,
-        structuredMode: "none",
+        structuredMode: input.structuredMode ?? "none",
         timeoutMs: input.timeoutMs ?? 60_000,
         maxRetries: input.maxRetries ?? 1,
       })

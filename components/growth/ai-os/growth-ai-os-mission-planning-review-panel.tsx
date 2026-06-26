@@ -22,6 +22,7 @@ import type {
 } from "@/lib/growth/aios/ai-executive-mission-planning-review-types"
 import { GROWTH_AI_EXECUTIVE_MISSION_PLANNING_REVIEW_QA_MARKER } from "@/lib/growth/aios/ai-executive-mission-planning-review-types"
 import type { AiExecutiveWorkOrderProposal } from "@/lib/growth/aios/ai-executive-mission-planning-types"
+import { GrowthAiOsExecutivePlanningReportSection } from "@/components/growth/ai-os/growth-ai-os-executive-planning-report-section"
 
 type ApiReadResponse = {
   ok?: boolean
@@ -257,6 +258,9 @@ export function GrowthAiOsMissionPlanningReviewPanel({ missionId }: { missionId:
       data-qa-marker={GROWTH_AI_EXECUTIVE_MISSION_PLANNING_REVIEW_QA_MARKER}
       data-mission-id={resolvedMissionId}
     >
+      {readModel?.executivePlanningReport ? (
+        <GrowthAiOsExecutivePlanningReportSection report={readModel.executivePlanningReport} />
+      ) : null}
       <Card>
         <CardHeader>
           <CardTitle className="flex flex-wrap items-center gap-2">

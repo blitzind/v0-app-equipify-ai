@@ -37,6 +37,17 @@ import { transitionAiWorkOrder } from "@/lib/growth/aios/ai-work-order-service"
 import type { AiWorkOrder } from "@/lib/growth/aios/ai-work-order-types"
 import { LEAD_RESEARCH_PILOT_RESEARCH_AGENT_INSTANCE_ID } from "@/lib/growth/aios/pilot/lead-research-pilot-types"
 
+function normalizeResearchProviderPayload(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw
+  const record = { ...(raw as Record<string, unknown>) }
+  if (Array.isArray(record.decision_maker_candidates)) {
+    record.decision_maker_candidates = record.decision_maker_candidates.filter(
+      (candidate) => candidate && typeof candidate === "object" && !Array.isArray(candidate),
+    )
+  }
+  return record
+}
+
 function parseProviderJson(text: string): unknown {
   const trimmed = text.trim()
   if (!trimmed) throw new Error("ai_provider_empty_response")
@@ -239,7 +250,9 @@ export async function executeResearchCompanyWorkOrderViaAiOs(
     },
   })
 
-  const parsedModel = growthLeadResearchModelSchema.parse(parseProviderJson(providerResult.response.text))
+  const parsedModel = growthLeadResearchModelSchema.parse(
+    normalizeResearchProviderPayload(parseProviderJson(providerResult.response.text)),
+  )
   const researchResult = mapGrowthLeadResearchModelToResult(parsedModel)
 
   await publishLeadResearchPilotStepEvent(admin, {

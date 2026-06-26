@@ -32,6 +32,20 @@ const nextConfig = {
     root: __dirname,
   },
   outputFileTracingRoot: __dirname,
+  async redirects() {
+    return [
+      {
+        source: "/growth/ai-os",
+        destination: "/growth/os",
+        permanent: true,
+      },
+      {
+        source: "/growth/ai-os/:path*",
+        destination: "/growth/os/:path*",
+        permanent: true,
+      },
+    ]
+  },
 }
 
 export default nextConfig

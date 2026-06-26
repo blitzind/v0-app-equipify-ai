@@ -1,27 +1,14 @@
-"use client"
-
-import { use } from "react"
-import { FlaskConical } from "lucide-react"
-import { GrowthAiOsLeadResearchPilotPanel } from "@/components/growth/ai-os/growth-ai-os-lead-research-pilot-panel"
-import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
-import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
+import { redirect, RedirectType } from "next/navigation"
+import { mapAiOsLegacyPublicPathToCanonical } from "@/lib/growth/aios/ai-os-public-routes"
 
 type PageProps = {
   params: Promise<{ leadId: string }>
 }
 
-export default function GrowthAiOsLeadResearchPilotPage({ params }: PageProps) {
-  const { leadId } = use(params)
-
-  return (
-    <GrowthWorkspacePageContent>
-      <GrowthWorkspacePageHeader
-        title="Lead Research Pilot"
-        description="Observe the GE-AIOS-4A autonomous Lead Research Pipeline across the full AI OS stack."
-        icon={FlaskConical}
-        iconClassName="bg-emerald-50 text-emerald-600"
-      />
-      <GrowthAiOsLeadResearchPilotPanel leadId={leadId} />
-    </GrowthWorkspacePageContent>
-  )
+export default async function GrowthAiOsLegacyLeadResearchPilotRedirectPage({ params }: PageProps) {
+  const { leadId } = await params
+  const target =
+    mapAiOsLegacyPublicPathToCanonical(`/growth/ai-os/pilot/lead-research/${leadId}`) ??
+    "/growth/os/pilot/lead-research"
+  redirect(target, RedirectType.permanent)
 }

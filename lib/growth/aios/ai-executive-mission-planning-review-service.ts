@@ -34,6 +34,7 @@ import {
   GROWTH_AI_OS_MISSION_ID_INVALID_ERROR,
   resolveAiOsMissionIdParam,
 } from "@/lib/growth/aios/ai-os-mission-route-params"
+import { fetchAiExecutivePlanningReport } from "@/lib/growth/aios/ai-executive-planning-report-service"
 
 const PLANNING_REVIEW_EXECUTIVE_INSTANCE_ID = "ge-aios-planning-review" as const
 
@@ -150,10 +151,16 @@ export async function fetchExecutiveMissionPlanningReviewReadModel(
     missionId,
   })
 
+  const executivePlanningReport = await fetchAiExecutivePlanningReport(admin, {
+    organizationId: input.organizationId,
+    missionId,
+  })
+
   return {
     mission: mapMissionSummary(objective),
     executiveRuntimeId,
     activeWorkOrders,
+    executivePlanningReport,
     readOnly: true,
   }
 }

@@ -18,8 +18,9 @@ import { listGrowthLeadResearchRuns } from "@/lib/growth/research-repository"
 import { listAiWorkOrders } from "@/lib/growth/aios/ai-work-order-repository"
 import { isLeadResearchPilotEnabled, resolveLeadResearchPilotConfig } from "@/lib/growth/aios/pilot/lead-research-pilot-config"
 
+/** AI OS events store correlation_id as uuid — use lead id directly. */
 function pilotCorrelationId(leadId: string): string {
-  return `lead-research-pilot:${leadId}`
+  return leadId
 }
 
 function defaultSteps(): LeadResearchPilotStepRecord[] {
