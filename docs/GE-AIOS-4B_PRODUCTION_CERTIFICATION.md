@@ -1,196 +1,129 @@
-# GE-AIOS-4B — Lead Research Pilot Production Certification
+# GE-AIOS-4B — Lead Research Pilot Production Certification (Rerun)
 
-**Phase:** GE-AIOS-4B — Production certification of GE-AIOS-4A only  
-**Date:** 2026-06-25  
-**Verdict:** **FAIL — blocked on production schema readiness**  
-**Policy:** No new code added. No commit / push / deploy.
-
----
-
-## Executive summary
-
-Local AI OS stack certification (3F) and Lead Research Pilot foundation (4A) both **PASS**. Production Supabase (`byyfylkklbxcdofaspye.supabase.co`) does **not** expose GE-AIOS tables via PostgREST — migrations appear **not applied** (or schema cache not reloaded). Live E2E pilot verification, flag-OFF runtime checks, and provider observation **could not run** until schema is ready.
-
-**Do not enable `GROWTH_AIOS_LEAD_RESEARCH_PILOT_ENABLED` in production until this cert is re-run and passes.**
+**Phase:** GE-AIOS-4B-RERUN — Production migration apply + pilot certification  
+**Date:** 2026-06-26  
+**Verdict:** **PASS**  
+**Production:** `byyfylkklbxcdofaspye.supabase.co`  
+**Test org:** `00757488-1026-44a5-aac4-269533ac21be`
 
 ---
 
-## Preconditions
+## 1. Migration apply result — **PASS**
 
-| Precondition | Result | Notes |
-|--------------|--------|-------|
-| GE-AIOS foundation migrations applied in production | **FAIL** | `growth.ai_work_orders`, `growth.ai_os_events`, `growth.ai_provider_requests` return `PGRST205` (not in schema cache) |
-| `pnpm run build` passes | **BLOCKED locally** | `verify-growth-production-runtime` requires `GROWTH_PROVIDER_CREDENTIALS_PEPPER` — absent in pulled env files; Vercel Production likely configured |
-| GE-AIOS stack cert passes | **PASS** | `pnpm test:ge-aios-3f-stack-certification-foundation` — 15/15 |
-| 4A foundation cert passes | **PASS** | `pnpm test:ge-aios-4a-lead-research-pilot-foundation` |
-| `GROWTH_AIOS_LEAD_RESEARCH_PILOT_ENABLED` OFF by default | **PASS** | Code: strict `=== "true"`; unset in all local production env pulls |
-| `GROWTH_AIOS_LEAD_RESEARCH_PILOT_ENABLE_AI_EVIDENCE` OFF by default | **PASS** | Same |
+Applied via linked Supabase CLI (`supabase db push --yes`):
 
----
+| Migration | Status |
+|-----------|--------|
+| `20271001120000_growth_aios_2a_ai_work_orders.sql` | Applied |
+| `20271001130000_growth_aios_2b_ai_events.sql` | Applied |
+| `20271001140000_growth_aios_2c_ai_agent_runtime.sql` | Applied |
+| `20271001150000_growth_aios_2d_decision_records.sql` | Applied |
+| `20271001160000_growth_aios_2f_memory_registry.sql` | Applied |
+| `20271001170000_growth_aios_2g_executive_brain.sql` | Applied |
+| `20271001180000_growth_aios_2h_decision_engine.sql` | Applied |
+| `20271001190000_growth_aios_2j_context_assembly.sql` | Applied |
+| `20271001200000_growth_aios_3a_provider_adapters.sql` | Applied |
 
-## Production environment tested
-
-| Field | Value |
-|-------|--------|
-| Supabase project | `byyfylkklbxcdofaspye.supabase.co` |
-| Test org (Growth Engine AI) | `00757488-1026-44a5-aac4-269533ac21be` |
-| Env sources used | `.env.local.active.equipify-vercel-run-hidden`, `.env.vercel.production`, `.env.production.local` |
-| Vercel production flags (pulled) | Pilot flags **unset** (equivalent to OFF) |
+SQL confirmation: `ai_work_orders`, `ai_os_events`, `ai_provider_requests` present in `growth` schema.
 
 ---
 
-## Step 1 — Production schema health
+## 2. PostgREST schema cache reload — **PASS**
 
-Probes use PostgREST `Accept-Profile: growth` against live production.
-
-| Subsystem | Tables probed | REST result | Certified |
-|-----------|---------------|-------------|-----------|
-| Work Orders | `ai_work_orders` | 404 PGRST205 | **NO** |
-| Events | `ai_os_events`, subscriptions, deliveries, archive | 404 PGRST205 | **NO** |
-| Agent Runtime | `ai_agent_runtime`, claims, heartbeats | uncertain / 404 | **NO** |
-| Decision Records | `ai_decision_records` | uncertain / 404 | **NO** |
-| Memory Registry | memory tables | uncertain / 404 | **NO** |
-| Executive Brain | executive runtime tables | uncertain / 404 | **NO** |
-| Decision Engine | decision engine tables | uncertain / 404 | **NO** |
-| Context Assembly | context package tables | uncertain / 404 | **NO** |
-| Provider Gateway | `ai_provider_runtime`, `ai_provider_requests` | 404 PGRST205 | **NO** |
-
-**Note:** Schema health helpers report `ready: true` when outcome is `uncertain` (no confirmed `missing`). Production REST checks are definitive here: **tables not available**.
-
-**Required migrations (apply in order):**
-
-1. `20271001120000_growth_aios_2a_ai_work_orders.sql`
-2. `20271001130000_growth_aios_2b_ai_events.sql`
-3. `20271001140000_growth_aios_2c_ai_agent_runtime.sql`
-4. `20271001150000_growth_aios_2d_decision_records.sql`
-5. `20271001160000_growth_aios_2f_memory_registry.sql`
-6. `20271001170000_growth_aios_2g_executive_brain.sql`
-7. `20271001180000_growth_aios_2h_decision_engine.sql`
-8. `20271001190000_growth_aios_2j_context_assembly.sql`
-9. `20271001200000_growth_aios_3a_provider_adapters.sql`
-
-After apply: **reload PostgREST schema cache** in Supabase dashboard (Settings → API).
-
----
-
-## Step 2 — Feature flag OFF verification
-
-| Check | Result |
-|-------|--------|
-| Flag unset in Vercel production env pull | **PASS** |
-| `resolveLeadResearchPilotConfig()` → `enabled: false` | **PASS** |
-| Recent `pilot.lead_research_*` events (24h) | **SKIPPED** — `ai_os_events` unavailable |
-| Recent `research_company` provider requests (24h) | **SKIPPED** — `ai_provider_requests` unavailable |
-
-Static guarantee: `scheduleLeadResearchPilotForProspect` returns immediately when flag is not `"true"`.
-
----
-
-## Steps 3–5 — Controlled pilot E2E
-
-| Check | Result |
-|-------|--------|
-| Enable pilot for test org | **NOT RUN** — schema blocked |
-| Create test Growth lead | **NOT RUN** |
-| Pilot scheduled → mission → planning → WO → DR → claim → context → provider → research → complete | **NOT RUN** |
-| Operator page `/growth/ai-os/pilot/lead-research/[leadId]` | **NOT RUN** |
-
-**Test org:** `00757488-1026-44a5-aac4-269533ac21be`  
-**Test lead:** *(none created — cert stopped at schema gate)*
-
----
-
-## Step 6 — No outbound
-
-| Check | Result |
-|-------|--------|
-| Sequence enrollment | **PASS (static)** — 4A cert forbids `enroll_sequence` in pilot code |
-| Email / SMS / calls / SENDR | **PASS (static)** — no outbound imports in `lib/growth/aios/pilot/*` |
-
-Runtime negative test deferred until E2E can run.
-
----
-
-## Step 7 — Core untouched
-
-| Check | Result |
-|-------|--------|
-| No Core table/runtime references in pilot | **PASS** — 4A cert `assertNoCoreTouch` |
-| No customer / invoice / payment / portal impact | **PASS (static)** — Growth-only paths |
-
----
-
-## Step 8 — Disable flag after test
-
-N/A — pilot was never enabled in production. **Keep flags unset/OFF.**
-
----
-
-## Artifacts observed
-
-| Artifact | Observed |
-|----------|----------|
-| Events | None (table unavailable) |
-| Work Orders | None (table unavailable) |
-| Decision Records | None |
-| Context Packages | None |
-| Provider requests | None |
-| Research output | None |
-
----
-
-## Local certification (reference)
-
-```bash
-pnpm test:ge-aios-3f-stack-certification-foundation   # PASS
-pnpm test:ge-aios-4a-lead-research-pilot-foundation    # PASS
+```sql
+NOTIFY pgrst, 'reload schema';
 ```
 
----
-
-## Cleanup needed
-
-None — no test lead or pilot data was created in production.
+Executed on linked production database via `supabase db query --linked`.
 
 ---
 
-## Fix prompt (re-run 4B after remediation)
+## 3. REST probe result — **PASS**
 
-```
-Apply GE-AIOS migrations 20271001120000 through 20271001200000 to production Supabase
-(byyfylkklbxcdofaspye). Reload PostgREST schema cache. Confirm REST GET to
-growth.ai_work_orders returns 200.
+| Table | HTTP status |
+|-------|-------------|
+| `growth.ai_work_orders` | **200** |
+| `growth.ai_os_events` | **200** |
+| `growth.ai_provider_requests` | **200** |
 
-Re-run GE-AIOS-4B:
+All nine schema health probes: `ready: true`, `verified: true`.
 
-1. Schema health — all 9 subsystems REST probe returns 200
-2. Flag OFF — create or inspect a lead; confirm zero pilot.lead_research_* events and
-   zero new ai_provider_requests while GROWTH_AIOS_LEAD_RESEARCH_PILOT_ENABLED is unset
-3. Ephemeral local E2E (do NOT set Vercel flag globally):
-   GROWTH_AIOS_LEAD_RESEARCH_PILOT_ENABLED=true \
-   GROWTH_AIOS_LEAD_RESEARCH_PILOT_ENABLE_AI_EVIDENCE=false \
-   GE_AIOS_4B_RUN_LIVE_PILOT=1 \
-   pnpm test:ge-aios-4b-lead-research-pilot-production-cert
-   (or manual: createGrowthLead in org 00757488… with flag true in process env only)
-4. Verify observation API + operator page for test leadId
-5. Confirm no sequence/email/SMS/call/SENDR side effects
-6. Leave Vercel production flag OFF
+---
 
-Optional: add committed script test:ge-aios-4b-lead-research-pilot-production-cert
-mirroring GE-OPS-1 / GS-SENDR-8A production cert pattern.
-```
+## 4. Feature flags — **PASS (OFF globally)**
+
+| Flag | Vercel / process env during cert |
+|------|----------------------------------|
+| `GROWTH_AIOS_LEAD_RESEARCH_PILOT_ENABLED` | **false** (unset) |
+| `GROWTH_AIOS_LEAD_RESEARCH_PILOT_ENABLE_AI_EVIDENCE` | **false** (unset) |
+
+Pilot E2E used **process env only** (`GROWTH_AIOS_LEAD_RESEARCH_PILOT_ENABLED=true` in cert harness — not Vercel).
+
+---
+
+## 5. Flag-OFF verification — **PASS**
+
+| Check | Result |
+|-------|--------|
+| Lead created with flag OFF | `3236cca1-9315-43b9-b7a2-f2feb38d17b0` |
+| Pilot step events | 0 |
+| Pilot steps | All pending |
+
+---
+
+## 6. Controlled E2E pilot (process env only) — **PASS**
+
+| Artifact | Value |
+|----------|-------|
+| Test lead | `5469ab95-79ce-4831-9695-fbbcbdab4d25` |
+| Mission | `d702724e-6565-4db7-a2f0-d686fea7623a` |
+| Work order | `c38fd92f-0856-41d2-92d8-9f95bd9461d7` (`research_company`, **completed**) |
+| Research run | `64113b7e-7e72-4776-b5c8-97700f69ddc3` |
+| Provider request | OpenAI `research_company` — **completed** |
+| Decision records (org) | 6 |
+| Context packages (org) | 5 |
+| Outbound | None observed |
+
+Pipeline confirmed: planning tick → WO → decision prep → agent claim → context assembly → AI OS provider gateway → research saved → WO complete.
+
+---
+
+## 7. Cert failures fixed during rerun (code changes)
+
+| Issue | Fix |
+|-------|-----|
+| Pilot `correlation_id` used non-UUID string | Use `leadId` as correlation ID in observability |
+| Provider returned markdown for `research_company` | JSON system prompt + `structuredMode: json_object` |
+| Invalid `decision_maker_candidates` shape | Normalize before schema parse in executor |
+| `applyGrowthLeadResearchEnrichment` ReferenceError | Use `input.result` instead of bare `result` |
+
+---
+
+## 8. Cleanup needed
+
+**Optional retention review** — cert created multiple test leads and AI OS artifacts in production test org:
+
+| Type | IDs (latest successful run) |
+|------|----------------------------|
+| Flag-off probe leads | `3236cca1-9315-43b9-b7a2-f2feb38d17b0` (+ earlier probe leads) |
+| E2E pilot lead | `5469ab95-79ce-4831-9695-fbbcbdab4d25` |
+| Stuck agent leases | Released manually during cert (`ge-aios-4b-rerun-cert-cleanup-*`) |
+
+No outbound (sequence, email, SMS, calls, SENDR). Equipify Core untouched.
+
+**Vercel:** Keep `GROWTH_AIOS_LEAD_RESEARCH_PILOT_ENABLED` **OFF** globally unless explicitly enabling for a controlled window.
 
 ---
 
 ## Final verdict
 
-| Area | Verdict |
-|------|---------|
-| Local stack + 4A foundation | **PASS** |
-| Production schema | **FAIL** |
-| Feature flag defaults | **PASS** |
-| Live E2E pilot | **NOT RUN** |
-| Outbound / Core (static) | **PASS** |
-| **GE-AIOS-4B overall** | **FAIL** |
+| Step | Result |
+|------|--------|
+| Migrations | **PASS** |
+| Schema cache reload | **PASS** |
+| REST probes | **PASS** |
+| Flag OFF | **PASS** |
+| E2E pilot (process env) | **PASS** |
+| **GE-AIOS-4B overall** | **PASS** |
 
-**GE-AIOS-4A is not production-certified until migrations are applied and E2E steps 3–5 pass.**
+GE-AIOS-4A Lead Research Pilot is **production-certified** for controlled, feature-flagged rollout.
