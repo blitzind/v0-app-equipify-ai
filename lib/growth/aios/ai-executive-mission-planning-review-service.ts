@@ -22,7 +22,7 @@ import type {
   AiExecutiveMissionPlanningReviewPreviewResult,
   AiExecutiveMissionPlanningReviewReadModel,
 } from "@/lib/growth/aios/ai-executive-mission-planning-review-types"
-import { publishAiOsEvent } from "@/lib/growth/aios/ai-event-service"
+import { findExecutionRuntimeRecordForPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-service"
 import { listAiWorkOrders } from "@/lib/growth/aios/ai-work-order-repository"
 import {
   isAiWorkOrderActiveStatus,
@@ -62,6 +62,15 @@ import {
   summarizePlanBoundaryStatus,
 } from "@/lib/growth/aios/growth/growth-lead-research-execution-boundary-audit-types"
 import type { GrowthLeadResearchCanonicalWorkflowType } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
+import {
+  buildPlanPreflightChecklist,
+  buildWorkflowPreflightChecklist,
+  summarizePlanPreflightChecklist,
+} from "@/lib/growth/aios/growth/growth-lead-research-execution-preflight-types"
+import {
+  buildPlanExecutionSimulation,
+  summarizePlanExecutionSimulation,
+} from "@/lib/growth/aios/growth/growth-lead-research-execution-simulation-types"
 import { buildAiOsPilotLeadResearchHref } from "@/lib/growth/aios/ai-os-public-routes"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import type { AiExecutiveMissionPlanningLeadResearchExecutionPlanSummary } from "@/lib/growth/aios/ai-executive-mission-planning-review-types"
@@ -166,6 +175,14 @@ async function listLeadResearchExecutionPlansForMission(
     let boundaryClassification = null
     let boundarySummary = null
     let boundaryWarnings: string[] = []
+    let preflightStatus = null
+    let preflightSummary = null
+    let preflightMissingRequirements: string[] = []
+    let simulationStatus = null
+    let simulationSummary = null
+    let simulatedSuccessProbability = null
+    let runtimeState = null
+    let runtimeSummary = null
 
     if (approvalStatus === "approved_for_future_execution") {
       readinessState = resolveApprovedPlanReadinessState({
@@ -215,6 +232,37 @@ async function listLeadResearchExecutionPlansForMission(
       boundaryClassification = planBoundary.classification
       boundarySummary = summarizePlanBoundaryStatus(planBoundary)
       boundaryWarnings = planBoundary.boundaryWarnings
+      const workflowPreflight = buildWorkflowPreflightChecklist({ boundary: workflowReport, infrastructure: handoffInfrastructure })
+      const planPreflight = buildPlanPreflightChecklist({ handoff: handoffContract, workflowChecklist: workflowPreflight })
+      preflightStatus = planPreflight.preflightStatus
+      preflightSummary = summarizePlanPreflightChecklist(planPreflight)
+      preflightMissingRequirements = planPreflight.missingRequirements
+      const planSimulation = buildPlanExecutionSimulation({
+        plan: snapshot.executionPlan,
+        planId,
+        leadId,
+        companyName: lead?.companyName ?? null,
+        approvalState: approvalStatus,
+        readinessState,
+        boundary: workflowReport,
+        workflowPreflight,
+        planPreflight,
+        handoff: handoffContract,
+        observationHref: buildAiOsPilotLeadResearchHref(leadId) ?? `/growth/os/pilot/lead-research/${leadId}`,
+      })
+      simulationStatus = planSimulation.simulatedExecutionStatus
+      simulationSummary = summarizePlanExecutionSimulation(planSimulation)
+      simulatedSuccessProbability = planSimulation.confidence
+    }
+
+    const runtimeRecord = await findExecutionRuntimeRecordForPlan(admin, {
+      organizationId: input.organizationId,
+      planId,
+    })
+    if (runtimeRecord) {
+      runtimeState = runtimeRecord.state
+      const completed = runtimeRecord.steps.filter((step) => step.status === "completed").length
+      runtimeSummary = `${runtimeRecord.state.replaceAll("_", " ")} — ${completed}/${runtimeRecord.steps.length} steps`
     }
 
     plans.push({
@@ -233,6 +281,14 @@ async function listLeadResearchExecutionPlansForMission(
       boundaryClassification,
       boundarySummary,
       boundaryWarnings,
+      preflightStatus,
+      preflightSummary,
+      preflightMissingRequirements,
+      simulationStatus,
+      simulationSummary,
+      simulatedSuccessProbability,
+      runtimeState,
+      runtimeSummary,
       reason:
         snapshot.nextBestAction?.reason ??
         snapshot.opportunityAssessment?.summary ??

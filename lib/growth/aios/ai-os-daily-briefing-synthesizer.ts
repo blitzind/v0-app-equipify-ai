@@ -621,5 +621,37 @@ export function buildAiOsDailyBriefingCertFixture(): AiOsDailyBriefingSource {
       },
       planBoundaries: [],
     },
+    executionPreflightChecklist: {
+      readOnly: true,
+      qaMarker: "growth-aios-growth-2b-execution-preflight-checklist-v1",
+      generatedAt: "2026-06-25T12:00:00.000Z",
+      workflowChecklists: [],
+      planChecklists: [],
+      systemSummary: {
+        workflowsChecked: 0,
+        preflightPassedCount: 0,
+        blockedCount: 0,
+        notAllowedCount: 0,
+        blockedWorkflows: [],
+        headline: "Fixture — no preflight checklist data",
+      },
+    },
+    executionSimulation: {
+      readOnly: true,
+      qaMarker: "growth-aios-growth-2c-execution-simulation-v1",
+      generatedAt: "2026-06-25T12:00:00.000Z",
+      workflowSimulations: [],
+      planSimulations: [],
+      systemSummary: {
+        simulationsGenerated: 0,
+        successCount: 0,
+        partialSuccessCount: 0,
+        readyCount: 0,
+        blockedCount: 0,
+        failedPreflightCount: 0,
+        notAllowedCount: 0,
+        headline: "Fixture — no execution simulation data",
+      },
+    },
   }
 }

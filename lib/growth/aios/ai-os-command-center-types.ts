@@ -7,6 +7,9 @@ import type { GrowthLeadResearchExecutionPlanQueueItem } from "@/lib/growth/aios
 import type { GrowthLeadResearchApprovedPlanReadinessItem } from "@/lib/growth/aios/growth/growth-lead-research-approved-plan-readiness-types"
 import type { GrowthLeadResearchFutureExecutionHandoffContract } from "@/lib/growth/aios/growth/growth-lead-research-future-execution-handoff-types"
 import type { GrowthLeadResearchExecutionBoundaryAuditReadModel } from "@/lib/growth/aios/growth/growth-lead-research-execution-boundary-audit-types"
+import type { GrowthLeadResearchExecutionPreflightReadModel } from "@/lib/growth/aios/growth/growth-lead-research-execution-preflight-types"
+import type { GrowthLeadResearchExecutionSimulationReadModel } from "@/lib/growth/aios/growth/growth-lead-research-execution-simulation-types"
+import type { GrowthLeadResearchExecutionRuntimeReadModel } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-types"
 import type { GrowthObjectiveStageId } from "@/lib/growth/objectives/growth-objective-types"
 import type { AiWorkOrderStatus, AiWorkOrderType } from "@/lib/growth/aios/ai-work-order-types"
 
@@ -176,6 +179,9 @@ export type AiOsCommandCenterReadModel = {
   approvedPlanReadinessQueue: GrowthLeadResearchApprovedPlanReadinessItem[]
   futureExecutionHandoffContracts: GrowthLeadResearchFutureExecutionHandoffContract[]
   executionBoundaryAudit: GrowthLeadResearchExecutionBoundaryAuditReadModel
+  executionPreflightChecklist: GrowthLeadResearchExecutionPreflightReadModel
+  executionSimulation: GrowthLeadResearchExecutionSimulationReadModel
+  executionRuntime: GrowthLeadResearchExecutionRuntimeReadModel
   safeMode: AiOsCommandCenterSafeMode
   dailyBriefing: AiOsDailyBriefing
 }

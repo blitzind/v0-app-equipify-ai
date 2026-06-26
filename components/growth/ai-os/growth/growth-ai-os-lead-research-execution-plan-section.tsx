@@ -8,6 +8,9 @@ import type { GrowthLeadResearchExecutionPlanApprovalStatus } from "@/lib/growth
 import type { GrowthLeadResearchApprovedPlanReadinessState } from "@/lib/growth/aios/growth/growth-lead-research-approved-plan-readiness-types"
 import type { GrowthLeadResearchFutureExecutionHandoffState } from "@/lib/growth/aios/growth/growth-lead-research-future-execution-handoff-types"
 import type { GrowthLeadResearchExecutionBoundaryClassification } from "@/lib/growth/aios/growth/growth-lead-research-execution-boundary-audit-types"
+import type { GrowthLeadResearchExecutionPreflightStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-preflight-types"
+import type { GrowthLeadResearchExecutionSimulationStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-simulation-types"
+import type { GrowthLeadResearchExecutionState } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-types"
 import { cn } from "@/lib/utils"
 
 function readinessBadgeVariant(readiness: GrowthLeadResearchExecutionPlan["executionReadiness"]) {
@@ -32,6 +35,14 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   boundaryClassification,
   boundarySummary,
   boundaryWarnings = [],
+  preflightStatus,
+  preflightSummary,
+  preflightMissingRequirements = [],
+  simulationStatus,
+  simulationSummary,
+  simulatedSuccessProbability,
+  runtimeState,
+  runtimeSummary,
 }: {
   plan: GrowthLeadResearchExecutionPlan
   title?: string
@@ -47,6 +58,14 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   boundaryClassification?: GrowthLeadResearchExecutionBoundaryClassification | null
   boundarySummary?: string | null
   boundaryWarnings?: string[]
+  preflightStatus?: GrowthLeadResearchExecutionPreflightStatus | null
+  preflightSummary?: string | null
+  preflightMissingRequirements?: string[]
+  simulationStatus?: GrowthLeadResearchExecutionSimulationStatus | null
+  simulationSummary?: string | null
+  simulatedSuccessProbability?: number | null
+  runtimeState?: GrowthLeadResearchExecutionState | null
+  runtimeSummary?: string | null
 }) {
   return (
     <Card data-qa-marker={GROWTH_LEAD_RESEARCH_EXECUTION_PLAN_QA_MARKER} data-qa-section="execution-plan">
@@ -102,6 +121,70 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
           <p className="text-sm text-amber-700">
             Boundary warning: {boundaryWarnings[0]}
           </p>
+        ) : null}
+        {preflightStatus ? (
+          <div className="space-y-1 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                variant={
+                  preflightStatus === "preflight_passed"
+                    ? "secondary"
+                    : preflightStatus === "preflight_not_allowed"
+                      ? "outline"
+                      : "destructive"
+                }
+              >
+                Preflight · {preflightStatus.replaceAll("_", " ")}
+              </Badge>
+            </div>
+            {preflightSummary ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Preflight:</span> {preflightSummary}
+              </p>
+            ) : null}
+            {preflightMissingRequirements.length > 0 ? (
+              <p className="text-amber-700">
+                Missing: {preflightMissingRequirements.slice(0, compact ? 2 : 5).join(" · ")}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        {simulationStatus ? (
+          <div className="space-y-1 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                variant={
+                  simulationStatus === "simulation_success"
+                    ? "secondary"
+                    : simulationStatus === "simulation_not_allowed"
+                      ? "outline"
+                      : "default"
+                }
+              >
+                Simulation · {simulationStatus.replaceAll("_", " ")}
+              </Badge>
+              {simulatedSuccessProbability != null ? (
+                <Badge variant="outline">{Math.round(simulatedSuccessProbability * 100)}% success probability</Badge>
+              ) : null}
+            </div>
+            {simulationSummary ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Simulation:</span> {simulationSummary}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        {runtimeState ? (
+          <div className="space-y-1 text-sm">
+            <Badge variant={runtimeState === "completed" ? "secondary" : runtimeState === "failed" ? "destructive" : "outline"}>
+              Runtime · {runtimeState.replaceAll("_", " ")}
+            </Badge>
+            {runtimeSummary ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Runtime:</span> {runtimeSummary}
+              </p>
+            ) : null}
+          </div>
         ) : null}
 
         <div className="grid gap-2 sm:grid-cols-2">

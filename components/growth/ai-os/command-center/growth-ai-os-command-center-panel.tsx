@@ -13,6 +13,9 @@ import { GrowthAiOsExecutionPlanReviewSection } from "@/components/growth/ai-os/
 import { GrowthAiOsApprovedPlanReadinessSection } from "@/components/growth/ai-os/command-center/growth-ai-os-approved-plan-readiness-section"
 import { GrowthAiOsFutureExecutionHandoffSection } from "@/components/growth/ai-os/command-center/growth-ai-os-future-execution-handoff-section"
 import { GrowthAiOsExecutionBoundaryAuditSection } from "@/components/growth/ai-os/command-center/growth-ai-os-execution-boundary-audit-section"
+import { GrowthAiOsExecutionPreflightChecklistSection } from "@/components/growth/ai-os/command-center/growth-ai-os-execution-preflight-checklist-section"
+import { GrowthAiOsExecutionSimulationSection } from "@/components/growth/ai-os/command-center/growth-ai-os-execution-simulation-section"
+import { GrowthAiOsExecutionRuntimeSection } from "@/components/growth/ai-os/command-center/growth-ai-os-execution-runtime-section"
 import type { AiOsCommandCenterReadModel } from "@/lib/growth/aios/ai-os-command-center-types"
 import { GROWTH_AI_OS_COMMAND_CENTER_QA_MARKER } from "@/lib/growth/aios/ai-os-command-center-types"
 import { buildAiOsPilotLeadResearchHref } from "@/lib/growth/aios/ai-os-public-routes"
@@ -105,6 +108,11 @@ export function GrowthAiOsCommandCenterPanel() {
       <GrowthAiOsFutureExecutionHandoffSection handoffContracts={model.futureExecutionHandoffContracts} />
 
       <GrowthAiOsExecutionBoundaryAuditSection audit={model.executionBoundaryAudit} />
+
+      <GrowthAiOsExecutionPreflightChecklistSection preflight={model.executionPreflightChecklist} />
+
+      <GrowthAiOsExecutionSimulationSection simulation={model.executionSimulation} />
+      <GrowthAiOsExecutionRuntimeSection executionRuntime={model.executionRuntime} onRefresh={() => void load()} />
 
       <SectionCard
         title=" Executive Summary"

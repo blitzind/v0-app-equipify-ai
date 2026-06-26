@@ -55,6 +55,9 @@ For each GE-AI-2X phase, maintain one entry with:
 | GE-AIOS-GROWTH-1E | Approved Plan Readiness & Audit Trail | Complete (local cert) |
 | GE-AIOS-GROWTH-1F | Future Execution Handoff Contract | Complete (local cert) |
 | GE-AIOS-GROWTH-2A | Execution Runtime Boundary Audit | Complete (local cert) |
+| GE-AIOS-GROWTH-2B | Execution Guardrail Preflight Checklist | Complete (local cert) |
+| GE-AIOS-GROWTH-2C | Execution Simulation Engine | Complete (local cert) |
+| GE-AIOS-GROWTH-3A | Execution Runtime Foundation | Complete (local cert) |
 | GE-AI-2D | Memory Facade (ledger) | Complete via GE-AIOS-2F |
 | GE-AI-2A | Decision Record Foundation (ledger) | Complete via GE-AIOS-2D |
 | GE-AI-2B | Event Bus Unification | Partial (foundation in GE-AIOS-2B) |
@@ -1059,6 +1062,89 @@ Pending — read-only, feature-flagged, no migrations
 ### Production certification
 
 Pending — audit-only, no migrations, no provider calls from audit path
+
+---
+
+## GE-AIOS-GROWTH-2B — Execution Guardrail Preflight Checklist
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-2B (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-2A Execution Runtime Boundary Audit |
+
+### Scope delivered
+
+- Deterministic preflight statuses for all 8 canonical workflow types
+- Workflow-level and plan-level preflight checklists
+- System-level preflight summary
+- Command Center Execution Preflight Checklist section
+- Mission Planning Review compact preflight on approved plans
+- Execution Preflight Checklist reference doc
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-2b-execution-preflight-checklist`
+
+### Production certification
+
+Pending — audit-only, no migrations, no provider calls from preflight path
+
+---
+
+## GE-AIOS-GROWTH-2C — Execution Simulation Engine
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-2C (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-2B Execution Guardrail Preflight Checklist |
+
+### Scope delivered
+
+- Deterministic in-memory simulation for all 8 canonical workflow types
+- Plan-level and workflow-level simulation reports
+- Predicted timeline, Work Orders, approvals, outbound, rollback, audit, costs, failure points
+- Command Center Execution Simulation section
+- Mission Planning Review compact simulation summary with success probability
+- Execution Simulation reference doc
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-2c-execution-simulation`
+
+### Production certification
+
+Pending — in-memory only, no migrations, no persistence
+
+---
+
+## GE-AIOS-GROWTH-3A — Execution Runtime Foundation
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-3A (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-1A–2C planning stack |
+
+### Scope delivered
+
+- Execution state machine (queued → validating → ready → executing → paused/completed/cancelled/failed)
+- Gate chain: approval, readiness, handoff, preflight, boundary, `internal_mutation_only` only
+- Deterministic step runner (Growth-internal mutations only)
+- Event-sourced persistence via `ai_os_events` (no new schema)
+- Pause / resume / cancel lifecycle
+- Command Center Execution Runtime section
+- Mission Planning Review runtime state display
+- Runtime disabled by default
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-3a-runtime-foundation`
+
+### Production certification
+
+Pending — no outbound, no provider calls, no Core mutations from runtime path
 
 ---
 

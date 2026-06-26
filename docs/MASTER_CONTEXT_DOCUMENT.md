@@ -16,7 +16,7 @@
 =================================================
 
 **Document role:** Living engineering state — current phase, production status, rules, certifications, risks, and priorities.  
-**Last updated:** 2026-06-25 (GE-AIOS-GROWTH-2A Execution Runtime Boundary Audit)  
+**Last updated:** 2026-06-25 (GE-AIOS-GROWTH-3A Execution Runtime Foundation)  
 **Regeneration:** `pnpm update:master-context` (inventory scan + this document's manual sections)  
 **Admin UI:** `/admin/master-context`
 
@@ -46,7 +46,7 @@
 |-------|--------|
 | **Architecture phase** | GE-AI-1X — **Complete** (Constitution v1.0 frozen) |
 | **Documentation phase** | GE-DOC-1 — **Complete** |
-| **Current phase** | **GE-AIOS-GROWTH-2A** — Execution Runtime Boundary Audit (**certified locally**, not committed) |
+| **Current phase** | **GE-AIOS-GROWTH-3A** — Execution Runtime Foundation (**certified locally**, not committed) |
 | **Next phase** | GE-AI-2F — Meta-Recommender |
 
 **Transition:** Official move from Architecture Phase (GE-AI-1X) to Engineering Phase (GE-AI-2X).
@@ -231,8 +231,28 @@ Full list: `lib/admin/master-context.manual.after.md` § Known Limitations.
 | GE-AIOS-GROWTH-1E | Approved Plan Readiness & Audit Trail | Complete (local cert) |
 | GE-AIOS-GROWTH-1F | Future Execution Handoff Contract | Complete (local cert) |
 | GE-AIOS-GROWTH-2A | Execution Runtime Boundary Audit | Complete (local cert) |
+| GE-AIOS-GROWTH-2B | Execution Guardrail Preflight Checklist | Complete (local cert) |
+| GE-AIOS-GROWTH-2C | Execution Simulation Engine | Complete (local cert) |
+| GE-AIOS-GROWTH-3A | Execution Runtime Foundation | Complete (local cert) |
+
+| GE-AIOS-GROWTH-3A | Execution Runtime Foundation | Complete (local cert) |
 
 ### Current phase
+
+**GE-AIOS-GROWTH-3A — Execution Runtime Foundation**  
+First phase permitted to mutate execution state for `internal_mutation_only` workflows. Runtime disabled by default; no outbound, providers, or Core. Status: **Complete (local cert)**.
+
+### Previous phase
+
+**GE-AIOS-GROWTH-2C — Execution Simulation Engine**  
+In-memory execution prediction for approved plans before any runtime implementation. Status: **Complete (local cert)**.
+
+### Previous phase
+
+**GE-AIOS-GROWTH-2B — Execution Guardrail Preflight Checklist**  
+Deterministic guardrail preflight audit before any future runtime implementation. Status: **Complete (local cert)**.
+
+### Previous phase
 
 **GE-AIOS-GROWTH-2A — Execution Runtime Boundary Audit**  
 Read-only audit of future execution pathways, guardrails, and risk classifications before any runtime is built. Status: **Complete (local cert)**.
@@ -325,6 +345,9 @@ GE-AUTO-1A through 2I implemented locally; GE-AUTO-3 not started. See manual bef
 | GE-AIOS-GROWTH-1E Approved Plan Readiness | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-GROWTH-1F Future Execution Handoff | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-GROWTH-2A Execution Boundary Audit | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-2B Execution Preflight Checklist | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-2C Execution Simulation Engine | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-3A Execution Runtime Foundation | **PASS (local)** | 2026-06-25 |
 | GE-AI-2A+ implementation (production) | Pending | — |
 
 Outbound operational readiness: `docs/GROWTH_OUTBOUND_OPERATIONAL_READINESS.md`
@@ -597,7 +620,16 @@ Full list: `lib/admin/master-context.manual.after.md` § Current Priorities.
 | [GE-AIOS-GROWTH-1F Infrastructure Audit](./GE-AIOS-GROWTH-1F_INFRASTRUCTURE_AUDIT.md) | Handoff Contract audit |
 | [GE-AIOS-GROWTH-2A Certification](./GE-AIOS-GROWTH-2A_CERTIFICATION.md) | Boundary Audit cert |
 | [GE-AIOS-GROWTH-2A Infrastructure Audit](./GE-AIOS-GROWTH-2A_INFRASTRUCTURE_AUDIT.md) | Boundary Audit audit |
+| [GE-AIOS-GROWTH-2B Certification](./GE-AIOS-GROWTH-2B_CERTIFICATION.md) | Preflight Checklist cert |
+| [GE-AIOS-GROWTH-2B Infrastructure Audit](./GE-AIOS-GROWTH-2B_INFRASTRUCTURE_AUDIT.md) | Preflight Checklist audit |
 | [GE-AIOS-GROWTH Execution Boundary Matrix](./GE-AIOS-GROWTH_EXECUTION_BOUNDARY_MATRIX.md) | Workflow boundary matrix |
+| [GE-AIOS-GROWTH Execution Preflight Checklist](./GE-AIOS-GROWTH_EXECUTION_PREFLIGHT_CHECKLIST.md) | Workflow preflight checklist |
+| [GE-AIOS-GROWTH-2C Certification](./GE-AIOS-GROWTH-2C_CERTIFICATION.md) | Execution Simulation cert |
+| [GE-AIOS-GROWTH-2C Infrastructure Audit](./GE-AIOS-GROWTH-2C_INFRASTRUCTURE_AUDIT.md) | Execution Simulation audit |
+| [GE-AIOS-GROWTH-3A Certification](./GE-AIOS-GROWTH-3A_CERTIFICATION.md) | Execution Runtime cert |
+| [GE-AIOS-GROWTH-3A Runtime Architecture](./GE-AIOS-GROWTH-3A_RUNTIME_ARCHITECTURE.md) | Execution Runtime architecture |
+| [GE-AIOS-GROWTH-3A Infrastructure Audit](./GE-AIOS-GROWTH-3A_INFRASTRUCTURE_AUDIT.md) | Execution Runtime audit |
+| [GE-AIOS-GROWTH Execution Simulation](./GE-AIOS-GROWTH_EXECUTION_SIMULATION.md) | Execution simulation reference |
 
 ### Legacy / generated inventory
 

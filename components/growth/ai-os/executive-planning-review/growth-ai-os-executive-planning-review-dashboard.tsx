@@ -68,6 +68,15 @@ export function GrowthAiOsExecutPlanningReviewDashboard({
               boundaryClassification={entry.boundaryClassification}
               boundarySummary={entry.boundarySummary}
               boundaryWarnings={entry.boundaryWarnings}
+              preflightStatus={entry.preflightStatus}
+              preflightSummary={entry.preflightSummary}
+              preflightMissingRequirements={entry.preflightMissingRequirements}
+              simulationStatus={entry.simulationStatus}
+              simulationSummary={entry.simulationSummary}
+              simulatedSuccessProbability={entry.simulatedSuccessProbability}
+              runtimeState={entry.runtimeState}
+              runtimeSummary={entry.runtimeSummary}
+              compact
               title={`Planning Review · ${entry.companyName ?? entry.leadId.slice(0, 8)}`}
               description="Lead research execution plan — read-only, no Work Order execution."
             />
