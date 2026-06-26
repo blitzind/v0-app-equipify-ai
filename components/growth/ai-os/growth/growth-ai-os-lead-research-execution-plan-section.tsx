@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import type { GrowthLeadResearchExecutionPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
 import { GROWTH_LEAD_RESEARCH_EXECUTION_PLAN_QA_MARKER } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
+import type { GrowthLeadResearchExecutionPlanApprovalStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-types"
 import { cn } from "@/lib/utils"
 
 function readinessBadgeVariant(readiness: GrowthLeadResearchExecutionPlan["executionReadiness"]) {
@@ -18,11 +19,13 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   title = "Execution Plan",
   description = "Planning-only workflow map — no Work Orders are created from this surface.",
   compact = false,
+  approvalStatus,
 }: {
   plan: GrowthLeadResearchExecutionPlan
   title?: string
   description?: string
   compact?: boolean
+  approvalStatus?: GrowthLeadResearchExecutionPlanApprovalStatus
 }) {
   return (
     <Card data-qa-marker={GROWTH_LEAD_RESEARCH_EXECUTION_PLAN_QA_MARKER} data-qa-section="execution-plan">
@@ -37,6 +40,9 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
             {plan.executionReadiness.replaceAll("_", " ")}
           </Badge>
           {plan.approvalRequired ? <Badge variant="secondary">Approval required</Badge> : null}
+          {approvalStatus ? (
+            <Badge variant="outline">{approvalStatus.replaceAll("_", " ")}</Badge>
+          ) : null}
         </div>
 
         <div className="grid gap-2 sm:grid-cols-2">

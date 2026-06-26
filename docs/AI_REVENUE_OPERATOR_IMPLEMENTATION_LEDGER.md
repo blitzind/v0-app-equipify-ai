@@ -51,6 +51,7 @@ For each GE-AI-2X phase, maintain one entry with:
 | GE-AIOS-GROWTH-1A | Growth Lead Research workflow normalization | Complete (local cert) |
 | GE-AIOS-GROWTH-1B | Opportunity Assessment & Next Best Action | Complete (local cert) |
 | GE-AIOS-GROWTH-1C | Next Best Action Workflow Planner | Complete (local cert) |
+| GE-AIOS-GROWTH-1D | Execution Plan Approval Queue | Complete (local cert) |
 | GE-AI-2D | Memory Facade (ledger) | Complete via GE-AIOS-2F |
 | GE-AI-2A | Decision Record Foundation (ledger) | Complete via GE-AIOS-2D |
 | GE-AI-2B | Event Bus Unification | Partial (foundation in GE-AIOS-2B) |
@@ -945,6 +946,33 @@ Pending — intelligence-only, feature-flagged, no migrations
 ### Implementation certification
 
 **PASS (local)** — `pnpm test:ge-aios-growth-1c-execution-plan-foundation`
+
+### Production certification
+
+Pending — planning-only, feature-flagged, no migrations
+
+---
+
+## GE-AIOS-GROWTH-1D — Execution Plan Approval Queue
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-1D (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-1C Execution Plan |
+
+### Scope delivered
+
+- Approval queue read model for assessed lead execution plans
+- Deterministic approval states: pending_review, approved_for_future_execution, needs_changes, blocked, dismissed
+- Command Center Execution Plan Review section with readiness/approval filters
+- Review actions (approve, needs changes, block, dismiss) — planning state only
+- Persistence via `growth.execution_plan.review_changed` AI OS events (no migration)
+- Mission Planning Review shows approval status on execution plan cards
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-1d-execution-plan-approval-queue`
 
 ### Production certification
 

@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { GrowthAiOsKpiCard } from "@/components/growth/ai-os/executive-planning-review/growth-ai-os-executive-planning-ux-utils"
 import { GrowthAiOsDailyBriefingSection } from "@/components/growth/ai-os/command-center/growth-ai-os-daily-briefing-section"
 import { GrowthAiOsGrowthLeadResearchWorkflowSection } from "@/components/growth/ai-os/command-center/growth-ai-os-growth-lead-research-workflow-section"
+import { GrowthAiOsExecutionPlanReviewSection } from "@/components/growth/ai-os/command-center/growth-ai-os-execution-plan-review-section"
 import type { AiOsCommandCenterReadModel } from "@/lib/growth/aios/ai-os-command-center-types"
 import { GROWTH_AI_OS_COMMAND_CENTER_QA_MARKER } from "@/lib/growth/aios/ai-os-command-center-types"
 import { buildAiOsPilotLeadResearchHref } from "@/lib/growth/aios/ai-os-public-routes"
@@ -93,6 +94,8 @@ export function GrowthAiOsCommandCenterPanel() {
       <GrowthAiOsDailyBriefingSection briefing={model.dailyBriefing} />
 
       <GrowthAiOsGrowthLeadResearchWorkflowSection workflow={model.growthLeadResearchWorkflow} />
+
+      <GrowthAiOsExecutionPlanReviewSection queue={model.executionPlanReviewQueue} onQueueUpdated={load} />
 
       <SectionCard
         title=" Executive Summary"

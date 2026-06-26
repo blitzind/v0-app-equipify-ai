@@ -600,5 +600,6 @@ export function buildAiOsDailyBriefingCertFixture(): AiOsDailyBriefingSource {
       blockedLeads: [],
       recommendedNextActions: [],
     },
+    executionPlanReviewQueue: [],
   }
 }

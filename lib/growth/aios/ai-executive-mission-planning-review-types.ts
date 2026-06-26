@@ -8,6 +8,7 @@ import type {
 import type { AiWorkOrderStatus, AiWorkOrderType } from "@/lib/growth/aios/ai-work-order-types"
 import type { AiExecutivePlanningReport } from "@/lib/growth/aios/ai-executive-planning-report-types"
 import type { GrowthLeadResearchExecutionPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
+import type { GrowthLeadResearchExecutionPlanApprovalStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-types"
 
 export const GROWTH_AIOS_3E_PHASE = "GE-AIOS-3E" as const
 
@@ -46,7 +47,12 @@ export type AiExecutiveMissionPlanningReviewReadModel = {
 export type AiExecutiveMissionPlanningLeadResearchExecutionPlanSummary = {
   leadId: string
   companyName: string | null
+  planId: string
   executionPlan: GrowthLeadResearchExecutionPlan
+  approvalStatus: GrowthLeadResearchExecutionPlanApprovalStatus
+  reason: string
+  createdAt: string
+  reviewUpdatedAt: string | null
   observationHref: string
 }
 

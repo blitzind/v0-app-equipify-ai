@@ -16,7 +16,7 @@
 =================================================
 
 **Document role:** Living engineering state — current phase, production status, rules, certifications, risks, and priorities.  
-**Last updated:** 2026-06-25 (GE-AIOS-GROWTH-1C Next Best Action Workflow Planner)  
+**Last updated:** 2026-06-25 (GE-AIOS-GROWTH-1D Execution Plan Approval Queue)  
 **Regeneration:** `pnpm update:master-context` (inventory scan + this document's manual sections)  
 **Admin UI:** `/admin/master-context`
 
@@ -46,7 +46,7 @@
 |-------|--------|
 | **Architecture phase** | GE-AI-1X — **Complete** (Constitution v1.0 frozen) |
 | **Documentation phase** | GE-DOC-1 — **Complete** |
-| **Current phase** | **GE-AIOS-GROWTH-1C** — Next Best Action Workflow Planner (**certified locally**, not committed) |
+| **Current phase** | **GE-AIOS-GROWTH-1D** — Execution Plan Approval Queue (**certified locally**, not committed) |
 | **Next phase** | GE-AI-2F — Meta-Recommender |
 
 **Transition:** Official move from Architecture Phase (GE-AI-1X) to Engineering Phase (GE-AI-2X).
@@ -227,8 +227,14 @@ Full list: `lib/admin/master-context.manual.after.md` § Known Limitations.
 | GE-AIOS-GROWTH-1A | Growth Lead Research workflow normalization | Complete (local cert) |
 | GE-AIOS-GROWTH-1B | Opportunity Assessment & Next Best Action | Complete (local cert) |
 | GE-AIOS-GROWTH-1C | Next Best Action Workflow Planner | Complete (local cert) |
+| GE-AIOS-GROWTH-1D | Execution Plan Approval Queue | Complete (local cert) |
 
 ### Current phase
+
+**GE-AIOS-GROWTH-1D — Execution Plan Approval Queue**  
+Operator review queue for execution plans with deterministic approval states and AI OS event persistence. Status: **Complete (local cert)**.
+
+### Previous phase
 
 **GE-AIOS-GROWTH-1C — Next Best Action Workflow Planner**  
 Deterministic Execution Plan from Next Best Action with canonical workflow mapping, readiness, and Command Center / Planning Review surfacing. Status: **Complete (local cert)**.
@@ -297,6 +303,7 @@ GE-AUTO-1A through 2I implemented locally; GE-AUTO-3 not started. See manual bef
 | GE-AIOS-GROWTH-1A Growth Lead Research workflow | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-GROWTH-1B Opportunity Assessment | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-GROWTH-1C Execution Plan | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-1D Execution Plan Approval Queue | **PASS (local)** | 2026-06-25 |
 | GE-AI-2A+ implementation (production) | Pending | — |
 
 Outbound operational readiness: `docs/GROWTH_OUTBOUND_OPERATIONAL_READINESS.md`
@@ -561,6 +568,8 @@ Full list: `lib/admin/master-context.manual.after.md` § Current Priorities.
 | [GE-AIOS-GROWTH-1B Infrastructure Audit](./GE-AIOS-GROWTH-1B_INFRASTRUCTURE_AUDIT.md) | Opportunity Assessment audit |
 | [GE-AIOS-GROWTH-1C Certification](./GE-AIOS-GROWTH-1C_CERTIFICATION.md) | Execution Plan cert |
 | [GE-AIOS-GROWTH-1C Infrastructure Audit](./GE-AIOS-GROWTH-1C_INFRASTRUCTURE_AUDIT.md) | Execution Plan audit |
+| [GE-AIOS-GROWTH-1D Certification](./GE-AIOS-GROWTH-1D_CERTIFICATION.md) | Approval Queue cert |
+| [GE-AIOS-GROWTH-1D Infrastructure Audit](./GE-AIOS-GROWTH-1D_INFRASTRUCTURE_AUDIT.md) | Approval Queue audit |
 
 ### Legacy / generated inventory
 

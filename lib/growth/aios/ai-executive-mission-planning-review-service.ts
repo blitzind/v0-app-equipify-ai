@@ -37,6 +37,11 @@ import {
 import { fetchAiExecutivePlanningReport } from "@/lib/growth/aios/ai-executive-planning-report-service"
 import { LEAD_RESEARCH_PILOT_MISSION_TITLE } from "@/lib/growth/aios/pilot/lead-research-pilot-types"
 import { fetchLatestGrowthLeadResearchWorkflowSnapshot } from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
+import {
+  buildGrowthLeadResearchExecutionPlanId,
+  resolveEffectiveExecutionPlanApprovalStatus,
+} from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-types"
+import { fetchLatestExecutionPlanReviewForLead } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-service"
 import { buildAiOsPilotLeadResearchHref } from "@/lib/growth/aios/ai-os-public-routes"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import type { AiExecutiveMissionPlanningLeadResearchExecutionPlanSummary } from "@/lib/growth/aios/ai-executive-mission-planning-review-types"
@@ -114,10 +119,28 @@ async function listLeadResearchExecutionPlansForMission(
     })
     if (!snapshot?.executionPlan) continue
     const lead = await fetchGrowthLeadById(admin, leadId)
+    const planId = buildGrowthLeadResearchExecutionPlanId({ leadId, plan: snapshot.executionPlan })
+    const review = await fetchLatestExecutionPlanReviewForLead(admin, {
+      organizationId: input.organizationId,
+      leadId,
+    })
+    const approvalStatus = resolveEffectiveExecutionPlanApprovalStatus({
+      plan: snapshot.executionPlan,
+      review,
+      planId,
+    })
     plans.push({
       leadId,
       companyName: lead?.companyName ?? null,
+      planId,
       executionPlan: snapshot.executionPlan,
+      approvalStatus,
+      reason:
+        snapshot.nextBestAction?.reason ??
+        snapshot.opportunityAssessment?.summary ??
+        snapshot.executionPlan.expectedOutcome,
+      createdAt: snapshot.updatedAt ?? new Date(0).toISOString(),
+      reviewUpdatedAt: review?.reviewedAt ?? null,
       observationHref: buildAiOsPilotLeadResearchHref(leadId) ?? `/growth/os/pilot/lead-research/${leadId}`,
     })
   }
