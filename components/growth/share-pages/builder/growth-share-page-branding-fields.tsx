@@ -54,7 +54,7 @@ export function GrowthSharePageBrandingFields({
         label="Hero image"
         value={heroImageUrl}
         disabled={disabled}
-        acceptedTypes={["image"]}
+        acceptedTypes={["hero", "image"]}
         allowManualUrl
         onChange={(url) => onHeroImageUrlChange(url)}
       />
