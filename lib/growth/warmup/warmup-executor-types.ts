@@ -105,6 +105,7 @@ export type GrowthWarmupExecutorRunResult = {
   profileDiagnostics?: WarmupExecutorProfileDiagnostic[]
   runSummary?: WarmupExecutorRunSummary
   recipientPoolSummary?: WarmupExecutorRecipientPoolSummary
+  dailyCapacityPlan?: import("@/lib/growth/warmup/warmup-capacity-engine").WarmupDailyCapacityPlan
 }
 
 export type WarmupExecutorProfileDiagnostic = {
@@ -152,6 +153,8 @@ export type WarmupExecutorRecipientPoolSummary = {
   waitingProfilesThisRun?: number
   poolPressureMessage?: string | null
 }
+
+export type { WarmupDailyCapacityPlan, WarmupCapacityStatus, WarmupSenderCapacitySnapshot } from "@/lib/growth/warmup/warmup-capacity-engine"
 
 export type GrowthWarmupProfileExecutorStats = {
   profileId: string

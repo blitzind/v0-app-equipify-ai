@@ -60,6 +60,9 @@ For each GE-AI-2X phase, maintain one entry with:
 | GE-AIOS-GROWTH-3A | Execution Runtime Foundation | Complete (local cert) |
 | GE-AIOS-GROWTH-3B | Internal Workflow Dry Run Harness | Complete (local cert) |
 | GE-AIOS-GROWTH-3C | Execution Runtime Pilot (`research_company`) | Complete (local cert) |
+| GE-AIOS-GROWTH-4A | Agent Framework Foundation | Complete (local cert) |
+| GE-AIOS-GROWTH-4B | Revenue Operator Orchestration Engine | Complete (local cert) |
+| GE-AIOS-GROWTH-4C | Agent Event & Scheduling Framework | Complete (local cert) |
 | GE-AI-2D | Memory Facade (ledger) | Complete via GE-AIOS-2F |
 | GE-AI-2A | Decision Record Foundation (ledger) | Complete via GE-AIOS-2D |
 | GE-AI-2B | Event Bus Unification | Partial (foundation in GE-AIOS-2B) |
@@ -1206,6 +1209,96 @@ Pending — dry-run is non-persistent; real runtime remains disabled by default
 ### Production certification
 
 Pending — requires explicit pilot + runtime flags; `research_company` only
+
+---
+
+## GE-AIOS-GROWTH-4A — Agent Framework Foundation
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-4A (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-3A–3C execution runtime foundation |
+
+### Scope delivered
+
+- Seven agent kinds with deterministic read-only registry (all disabled by default)
+- Permission profiles: read_only, planning_only, internal_mutation, outbound_requires_approval, core_requires_explicit_approval, supervisor
+- Run contract preview model (read-only — no execution)
+- Scheduler placeholder (manual/hourly/daily/event_driven/disabled — no jobs started)
+- Telemetry model with zero provider/outbound/Core counters
+- Command Center Agent Framework section
+- Mission Planning Review agent context (owning agent, gates, blocked reasons)
+- Execution Agent references 3C pilot; Outreach blocked; Revenue Operator supervisor-only
+- No migrations, no new event types
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-4a-agent-framework`
+
+### Production certification
+
+Pending — framework visibility only; no agent execution
+
+---
+
+## GE-AIOS-GROWTH-4B — Revenue Operator Orchestration Engine
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-4B (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-4A Agent Framework, GE-AIOS-GROWTH-3C runtime pilot gates |
+
+### Scope delivered
+
+- Orchestration model: lifecycle stage, ownership, decision states, confidence, reasoning, gates, escalation
+- Deterministic ownership resolver (`resolveOwningAgent`, `resolveCandidateAgents`)
+- Read-only handoff contracts (`buildAgentHandoff`)
+- Revenue Operator reasoning for ownership change, blockers, and human review
+- Orchestration service: `buildRevenueOperatorReadModel`, `buildRevenueOperatorPlanContext`
+- Command Center Revenue Operator section (no Execute/Start controls)
+- Mission Planning Review orchestration context (owner, next owner, handoff summary, reasoning)
+- Scheduler inactive — recommendation-only, no execution side effects
+- No migrations, no event writes
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-4b-revenue-operator`
+
+### Production certification
+
+Pending — orchestration visibility only; no autonomous execution
+
+---
+
+## GE-AIOS-GROWTH-4C — Agent Event & Scheduling Framework
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-4C (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-2B event bus, GE-AIOS-GROWTH-4A/4B agent and orchestration layers |
+
+### Scope delivered
+
+- Fifteen deterministic agent event types with full event model
+- Event → agent routing rules (recommendation-only)
+- Scheduling mode definitions per agent (manual, event_driven, hourly, daily, disabled — all inactive)
+- Read-only event queue (pending, ignored, blocked, completed recommendations)
+- Revenue Operator event consumption (ownership, recommendation, escalation, handoff preview)
+- AI OS event bus read-only observation + plan-state derived events
+- Command Center Agent Events section
+- Mission Planning Review agent event context
+- No migrations, no event writes
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-4c-agent-events`
+
+### Production certification
+
+Pending — event visibility only; no scheduler activation
 
 ---
 

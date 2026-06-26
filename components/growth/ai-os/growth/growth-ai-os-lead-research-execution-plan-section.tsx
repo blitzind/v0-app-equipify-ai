@@ -12,6 +12,9 @@ import type { GrowthLeadResearchExecutionPreflightStatus } from "@/lib/growth/ai
 import type { GrowthLeadResearchExecutionSimulationStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-simulation-types"
 import type { GrowthLeadResearchExecutionState } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-types"
 import type { GrowthLeadResearchExecutionDryRunStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-dry-run-types"
+import type { GrowthAgentPlanContext } from "@/lib/growth/aios/growth/growth-agent-framework-types"
+import type { RevenueOperatorOrchestrationPlanContext } from "@/lib/growth/aios/growth/growth-revenue-operator-orchestration-types"
+import type { GrowthAgentEventPlanContext } from "@/lib/growth/aios/growth/growth-agent-event-types"
 import { cn } from "@/lib/utils"
 
 function readinessBadgeVariant(readiness: GrowthLeadResearchExecutionPlan["executionReadiness"]) {
@@ -54,6 +57,9 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   pilotEnabled,
   runtimeEnabled,
   dryRunRequired,
+  agentContext,
+  orchestrationContext,
+  agentEventContext,
 }: {
   plan: GrowthLeadResearchExecutionPlan
   title?: string
@@ -87,6 +93,9 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   pilotEnabled?: boolean
   runtimeEnabled?: boolean
   dryRunRequired?: boolean
+  agentContext?: GrowthAgentPlanContext | null
+  orchestrationContext?: RevenueOperatorOrchestrationPlanContext | null
+  agentEventContext?: GrowthAgentEventPlanContext | null
 }) {
   return (
     <Card data-qa-marker={GROWTH_LEAD_RESEARCH_EXECUTION_PLAN_QA_MARKER} data-qa-section="execution-plan">
@@ -260,6 +269,89 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
                 Blocked: {pilotBlockedReasons.slice(0, compact ? 2 : 5).join(" · ")}
               </p>
             ) : null}
+          </div>
+        ) : null}
+        {agentContext ? (
+          <div className="space-y-1 text-sm" data-qa-section="agent-context">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={agentContext.agentAllowed ? "secondary" : "outline"}>
+                Agent · {agentContext.owningAgentName}
+              </Badge>
+              <Badge variant="outline">{agentContext.permissionProfile.replaceAll("_", " ")}</Badge>
+              <Badge variant="outline">
+                Run · {agentContext.runContractPreview.runStatus.replaceAll("_", " ")}
+              </Badge>
+            </div>
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Agent:</span> {agentContext.agentSummary}
+            </p>
+            {agentContext.requiredGates.length > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Required gates: {agentContext.requiredGates.join(" · ")}
+              </p>
+            ) : null}
+            {agentContext.blockedReasons.length > 0 ? (
+              <p className="text-amber-700">
+                Blocked: {agentContext.blockedReasons.slice(0, compact ? 2 : 5).join(" · ")}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        {orchestrationContext ? (
+          <div className="space-y-1 text-sm" data-qa-section="orchestration-context">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">
+                Revenue Operator · {orchestrationContext.orchestrationDecision.replaceAll("_", " ")}
+              </Badge>
+              <Badge variant="outline">
+                Escalation · {orchestrationContext.escalationLevel}
+              </Badge>
+            </div>
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Owner:</span>{" "}
+              {orchestrationContext.currentOwner.replaceAll("_", " ")} →{" "}
+              {orchestrationContext.nextOwner.replaceAll("_", " ")}
+            </p>
+            {orchestrationContext.handoffSummary ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Handoff:</span>{" "}
+                {orchestrationContext.handoffSummary}
+              </p>
+            ) : null}
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Reasoning:</span>{" "}
+              {orchestrationContext.orchestrationReasoning}
+            </p>
+            {orchestrationContext.blockedReasons.length > 0 ? (
+              <p className="text-amber-700">
+                Blocked: {orchestrationContext.blockedReasons.slice(0, compact ? 2 : 5).join(" · ")}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        {agentEventContext ? (
+          <div className="space-y-1 text-sm" data-qa-section="agent-event-context">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">
+                Event · {agentEventContext.latestTriggeringEvent.replaceAll("_", " ")}
+              </Badge>
+              <Badge variant="outline">
+                Queue · {agentEventContext.queueStatus.replaceAll("_", " ")}
+              </Badge>
+            </div>
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Owner:</span>{" "}
+              {agentEventContext.owningAgent.replaceAll("_", " ")} · Routed:{" "}
+              {agentEventContext.routedAgent.replaceAll("_", " ")}
+            </p>
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Trigger:</span>{" "}
+              {agentEventContext.latestTriggeringReason}
+            </p>
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Routing:</span>{" "}
+              {agentEventContext.routingExplanation}
+            </p>
           </div>
         ) : null}
 

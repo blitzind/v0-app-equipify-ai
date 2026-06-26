@@ -16,7 +16,7 @@
 =================================================
 
 **Document role:** Living engineering state — current phase, production status, rules, certifications, risks, and priorities.  
-**Last updated:** 2026-06-25 (GE-AIOS-GROWTH-3C Execution Runtime Pilot)  
+**Last updated:** 2026-06-25 (GE-AIOS-GROWTH-4C Agent Event & Scheduling Framework)  
 **Regeneration:** `pnpm update:master-context` (inventory scan + this document's manual sections)  
 **Admin UI:** `/admin/master-context`
 
@@ -46,7 +46,7 @@
 |-------|--------|
 | **Architecture phase** | GE-AI-1X — **Complete** (Constitution v1.0 frozen) |
 | **Documentation phase** | GE-DOC-1 — **Complete** |
-| **Current phase** | **GE-AIOS-GROWTH-3C** — Execution Runtime Pilot (`research_company` only) (**certified locally**, not committed) |
+| **Current phase** | **GE-AIOS-GROWTH-4C** — Agent Event & Scheduling Framework (**certified locally**, not committed) |
 | **Next phase** | GE-AI-2F — Meta-Recommender |
 
 **Transition:** Official move from Architecture Phase (GE-AI-1X) to Engineering Phase (GE-AI-2X).
@@ -236,8 +236,24 @@ Full list: `lib/admin/master-context.manual.after.md` § Known Limitations.
 | GE-AIOS-GROWTH-3A | Execution Runtime Foundation | Complete (local cert) |
 | GE-AIOS-GROWTH-3B | Internal Workflow Dry Run Harness | Complete (local cert) |
 | GE-AIOS-GROWTH-3C | Execution Runtime Pilot (`research_company`) | Complete (local cert) |
+| GE-AIOS-GROWTH-4A | Agent Framework Foundation | Complete (local cert) |
+| GE-AIOS-GROWTH-4B | Revenue Operator Orchestration Engine | Complete (local cert) |
+| GE-AIOS-GROWTH-4C | Agent Event & Scheduling Framework | Complete (local cert) |
 
 ### Current phase
+
+**GE-AIOS-GROWTH-4C — Agent Event & Scheduling Framework**
+Read-only agent event model, deterministic routing, scheduling mode definitions (all inactive), event queue partitions, Revenue Operator event consumption, Command Center and Mission Planning Review visibility. Recommendation-only — no agent execution, scheduler activation, runtime, outbound, providers, Work Orders, or Core mutations. Status: **Complete (local cert)**.
+
+### Previous phase
+
+**GE-AIOS-GROWTH-4B — Revenue Operator Orchestration Engine**
+Read-only orchestration layer for the Revenue Operator supervisor: ownership resolver, handoff contracts, orchestration decisions, Command Center visibility, and Mission Planning Review context. Recommendation-only — no agent execution, scheduler, runtime, outbound, providers, Work Orders, or Core mutations. Status: **Complete (local cert)**.
+
+### Previous phase
+
+**GE-AIOS-GROWTH-4A — Agent Framework Foundation**
+Shared read-only agent registry, permissions, run contracts, scheduler placeholders, and telemetry for Growth AI OS. Agents coordinate intent; execution runtime enforces gates. No execution, outbound, providers, Work Orders, or Core mutations. Status: **Complete (local cert)**.
 
 **GE-AIOS-GROWTH-3C — Execution Runtime Pilot**
 Single-workflow runtime pilot for `research_company` only. Requires global runtime + pilot flags and dry-run pass before enqueue. Persists lifecycle via existing AI OS events. No outbound/providers/Core/Work Orders. Status: **Complete (local cert)**.
@@ -358,6 +374,9 @@ GE-AUTO-1A through 2I implemented locally; GE-AUTO-3 not started. See manual bef
 | GE-AIOS-GROWTH-3A Execution Runtime Foundation | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-GROWTH-3B Internal Workflow Dry Run | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-GROWTH-3C Execution Runtime Pilot | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-4A Agent Framework Foundation | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-4B Revenue Operator Orchestration | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-4C Agent Event & Scheduling | **PASS (local)** | 2026-06-25 |
 | GE-AI-2A+ implementation (production) | Pending | — |
 
 Outbound operational readiness: `docs/GROWTH_OUTBOUND_OPERATIONAL_READINESS.md`
@@ -644,6 +663,15 @@ Full list: `lib/admin/master-context.manual.after.md` § Current Priorities.
 | [GE-AIOS-GROWTH-3C Certification](./GE-AIOS-GROWTH-3C_CERTIFICATION.md) | Runtime pilot cert |
 | [GE-AIOS-GROWTH-3C Runtime Pilot](./GE-AIOS-GROWTH-3C_RUNTIME_PILOT.md) | Runtime pilot architecture |
 | [GE-AIOS-GROWTH-3C Infrastructure Audit](./GE-AIOS-GROWTH-3C_INFRASTRUCTURE_AUDIT.md) | Runtime pilot audit |
+| [GE-AIOS-GROWTH-4A Certification](./GE-AIOS-GROWTH-4A_CERTIFICATION.md) | Agent framework cert |
+| [GE-AIOS-GROWTH-4A Agent Framework](./GE-AIOS-GROWTH-4A_AGENT_FRAMEWORK.md) | Agent framework architecture |
+| [GE-AIOS-GROWTH-4A Infrastructure Audit](./GE-AIOS-GROWTH-4A_INFRASTRUCTURE_AUDIT.md) | Agent framework audit |
+| [GE-AIOS-GROWTH-4B Certification](./GE-AIOS-GROWTH-4B_CERTIFICATION.md) | Revenue Operator orchestration cert |
+| [GE-AIOS-GROWTH-4B Revenue Operator](./GE-AIOS-GROWTH-4B_REVENUE_OPERATOR.md) | Orchestration architecture |
+| [GE-AIOS-GROWTH-4B Infrastructure Audit](./GE-AIOS-GROWTH-4B_INFRASTRUCTURE_AUDIT.md) | Orchestration audit |
+| [GE-AIOS-GROWTH-4C Certification](./GE-AIOS-GROWTH-4C_CERTIFICATION.md) | Agent events cert |
+| [GE-AIOS-GROWTH-4C Agent Events](./GE-AIOS-GROWTH-4C_AGENT_EVENTS.md) | Event architecture |
+| [GE-AIOS-GROWTH-4C Infrastructure Audit](./GE-AIOS-GROWTH-4C_INFRASTRUCTURE_AUDIT.md) | Event framework audit |
 | [GE-AIOS-GROWTH Internal Workflow Dry Run](./GE-AIOS-GROWTH_INTERNAL_WORKFLOW_DRY_RUN.md) | Dry-run operator guide |
 | [GE-AIOS-GROWTH Execution Simulation](./GE-AIOS-GROWTH_EXECUTION_SIMULATION.md) | Execution simulation reference |
 

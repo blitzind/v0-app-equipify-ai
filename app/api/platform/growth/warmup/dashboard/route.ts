@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { fetchWarmupDashboard, listWarmupEvents, listWarmupProfiles } from "@/lib/growth/warmup/warmup-repository"
 import { listWarmupTimelineEvents } from "@/lib/growth/warmup/warmup-events"
-import { buildWarmupExecutorDashboardStats, buildRecipientPoolSummary } from "@/lib/growth/warmup/warmup-send-executor"
+import { buildWarmupExecutorDashboardStats, buildRecipientPoolSummary, buildWarmupDailyCapacityPlan } from "@/lib/growth/warmup/warmup-send-executor"
 import { listWarmupRecipients } from "@/lib/growth/warmup/warmup-recipient-repository"
 import { isGrowthWarmupFoundationSchemaReady } from "@/lib/growth/warmup/warmup-schema-health"
 import { GROWTH_WARMUP_PRIVACY_NOTE } from "@/lib/growth/warmup/warmup-types"
@@ -37,6 +37,10 @@ export async function GET(request: Request) {
       warmingSenderCount,
     })
     const executor_stats = await buildWarmupExecutorDashboardStats(access.admin, profiles).catch(() => [])
+    const daily_capacity_plan = await buildWarmupDailyCapacityPlan(access.admin, {
+      profiles,
+      recipients: approvedRecipients,
+    })
 
     return NextResponse.json({
       ok: true,
@@ -45,6 +49,7 @@ export async function GET(request: Request) {
       timeline,
       executor_stats,
       recipient_pool_summary: recipientPoolSummary,
+      daily_capacity_plan,
       privacy_note: GROWTH_WARMUP_PRIVACY_NOTE,
     })
   } catch (error) {

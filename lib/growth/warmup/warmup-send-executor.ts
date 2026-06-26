@@ -21,6 +21,7 @@ import {
   countExecutorSendsForProfileToday,
   getLatestWarmupSendRun,
   listWarmupRecipients,
+  listWarmupRecipientEmailsForProfileSince,
   updateWarmupRecipient,
 } from "@/lib/growth/warmup/warmup-recipient-repository"
 import {
@@ -65,11 +66,18 @@ import { getMailboxConnectionBySender } from "@/lib/growth/mailboxes/mailbox-rep
 import {
   computeWarmupRecipientPoolHealth,
 } from "@/lib/growth/warmup/warmup-recipient-pool-health"
+import {
+  aggregateWarmupDailyCapacityPlan,
+  buildWarmupSenderCapacitySnapshot,
+  GROWTH_WARMUP_CAPACITY_FIX_1B_QA_MARKER,
+  type WarmupDailyCapacityPlan,
+} from "@/lib/growth/warmup/warmup-capacity-engine"
 
 export const GROWTH_WARMUP_EXECUTOR_1D_QA_MARKER = "growth-warmup-executor-1d-v1" as const
 export const GROWTH_WARMUP_EXECUTOR_1E_QA_MARKER = "growth-warmup-executor-1e-v1" as const
 export const GROWTH_WARMUP_EXECUTOR_1F_QA_MARKER = "growth-warmup-executor-1f-v1" as const
 export { GROWTH_WARMUP_FAIRNESS_1P_QA_MARKER, WARMUP_EXECUTOR_RECIPIENT_DEDUP_POLICY } from "@/lib/growth/warmup/warmup-executor-fairness"
+export { GROWTH_WARMUP_CAPACITY_FIX_1B_QA_MARKER } from "@/lib/growth/warmup/warmup-capacity-engine"
 
 export { MAX_SENDS_PER_PROFILE_PER_RUN } from "@/lib/growth/warmup/warmup-executor-diagnostics"
 
@@ -104,14 +112,61 @@ export async function buildRecipientPoolSummary(
   })
 }
 
+export async function buildWarmupDailyCapacityPlan(
+  admin: SupabaseClient,
+  input: {
+    profiles: GrowthWarmupProfile[]
+    recipients?: Awaited<ReturnType<typeof listWarmupRecipients>>
+    now?: Date
+  },
+): Promise<WarmupDailyCapacityPlan> {
+  const now = input.now ?? new Date()
+  const today = utcDateString(now)
+  const dayStart = utcDayStartIso(now)
+  const recipients =
+    input.recipients ??
+    (await listWarmupRecipients(admin, { activeOnly: true, approvedOnly: true }).catch(() => []))
+  const approvedRecipients = recipients.filter((row) => row.active && row.approved).length
+
+  const senderSnapshots = []
+  for (const profile of input.profiles.filter((row) => row.status === "warming")) {
+    const plannedToday = resolveEffectiveWarmupDailyCapacity(profile)
+    const sendsToday = profile.sends_today_date === today ? profile.sends_today : 0
+    const remainingVolumeToday = Math.max(0, plannedToday - sendsToday)
+    const recipientsRemaining = await countAvailableWarmupRecipientsForSender(admin, {
+      recipients,
+      profileId: profile.id,
+    })
+    const usedEmails = await listWarmupRecipientEmailsForProfileSince(admin, profile.id, dayStart)
+    senderSnapshots.push(
+      buildWarmupSenderCapacitySnapshot({
+        profileId: profile.id,
+        senderEmail: profile.sender_email,
+        profileStatus: profile.status,
+        approvedRecipients,
+        recipientsUsedToday: usedEmails.length,
+        recipientsRemaining,
+        remainingVolumeToday,
+      }),
+    )
+  }
+
+  return aggregateWarmupDailyCapacityPlan({
+    senders: senderSnapshots,
+    approvedRecipients,
+  })
+}
+
 function withExecutorBuildMarker(
   result: GrowthWarmupExecutorRunResult,
   recipientPoolSummary?: WarmupExecutorRecipientPoolSummary,
+  dailyCapacityPlan?: WarmupDailyCapacityPlan,
 ): GrowthWarmupExecutorRunResult {
   return {
     ...result,
     executorBuildMarker: GROWTH_WARMUP_EXECUTOR_1F_QA_MARKER,
     recipientPoolSummary: recipientPoolSummary ?? result.recipientPoolSummary,
+    dailyCapacityPlan: dailyCapacityPlan ?? result.dailyCapacityPlan,
   }
 }
 
@@ -620,6 +675,11 @@ export async function runWarmupSendExecutor(
   const recipientPoolSummary = await buildRecipientPoolSummary(admin, approvedRecipients, {
     warmingSenderCount,
   })
+  const dailyCapacityPlan = await buildWarmupDailyCapacityPlan(admin, {
+    profiles: allProfiles,
+    recipients: approvedRecipients,
+    now,
+  })
   const senderGateContext = await loadSenderAccountGateContext(
     admin,
     scannableProfiles.map((profile) => profile.sender_account_id),
@@ -716,6 +776,7 @@ export async function runWarmupSendExecutor(
         recipientPoolSummary: enrichedRecipientPoolSummary,
       },
       enrichedRecipientPoolSummary,
+      dailyCapacityPlan,
     )
   }
 
@@ -874,7 +935,7 @@ export async function runWarmupSendExecutor(
     }
   }
 
-  return withExecutorBuildMarker(finalResult, enrichedRecipientPoolSummary)
+  return withExecutorBuildMarker(finalResult, enrichedRecipientPoolSummary, dailyCapacityPlan)
 }
 
 export async function buildWarmupExecutorDashboardStats(

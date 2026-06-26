@@ -16,6 +16,9 @@ import { GrowthAiOsExecutionBoundaryAuditSection } from "@/components/growth/ai-
 import { GrowthAiOsExecutionPreflightChecklistSection } from "@/components/growth/ai-os/command-center/growth-ai-os-execution-preflight-checklist-section"
 import { GrowthAiOsExecutionSimulationSection } from "@/components/growth/ai-os/command-center/growth-ai-os-execution-simulation-section"
 import { GrowthAiOsExecutionRuntimeSection } from "@/components/growth/ai-os/command-center/growth-ai-os-execution-runtime-section"
+import { GrowthAiOsAgentFrameworkSection } from "@/components/growth/ai-os/command-center/growth-ai-os-agent-framework-section"
+import { GrowthAiOsRevenueOperatorSection } from "@/components/growth/ai-os/command-center/growth-ai-os-revenue-operator-section"
+import { GrowthAiOsAgentEventsSection } from "@/components/growth/ai-os/command-center/growth-ai-os-agent-events-section"
 import type { AiOsCommandCenterReadModel } from "@/lib/growth/aios/ai-os-command-center-types"
 import { GROWTH_AI_OS_COMMAND_CENTER_QA_MARKER } from "@/lib/growth/aios/ai-os-command-center-types"
 import { buildAiOsPilotLeadResearchHref } from "@/lib/growth/aios/ai-os-public-routes"
@@ -113,6 +116,9 @@ export function GrowthAiOsCommandCenterPanel() {
 
       <GrowthAiOsExecutionSimulationSection simulation={model.executionSimulation} />
       <GrowthAiOsExecutionRuntimeSection executionRuntime={model.executionRuntime} onRefresh={() => void load()} />
+      <GrowthAiOsAgentFrameworkSection agentFramework={model.agentFramework} />
+      <GrowthAiOsRevenueOperatorSection revenueOperator={model.revenueOperator} />
+      <GrowthAiOsAgentEventsSection agentEvents={model.agentEvents} />
 
       <SectionCard
         title=" Executive Summary"

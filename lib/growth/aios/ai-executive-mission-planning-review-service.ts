@@ -25,6 +25,9 @@ import type {
 import { findExecutionRuntimeRecordForPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-service"
 import { buildDryRunEligibilityForPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-dry-run-service"
 import { buildPilotEligibilityForPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-pilot-service"
+import { buildAgentPlanContext } from "@/lib/growth/aios/growth/growth-agent-framework-permissions"
+import { buildRevenueOperatorPlanContext } from "@/lib/growth/aios/growth/growth-revenue-operator-orchestration-service"
+import { buildGrowthAgentEventPlanContext } from "@/lib/growth/aios/growth/growth-agent-event-service"
 import { listAiWorkOrders } from "@/lib/growth/aios/ai-work-order-repository"
 import {
   isAiWorkOrderActiveStatus,
@@ -195,6 +198,9 @@ async function listLeadResearchExecutionPlansForMission(
     let pilotEnabled = false
     let runtimeEnabled = false
     let dryRunRequired = true
+    let agentContext = null
+    let orchestrationContext = null
+    let agentEventContext = null
 
     if (approvalStatus === "approved_for_future_execution") {
       readinessState = resolveApprovedPlanReadinessState({
@@ -303,6 +309,45 @@ async function listLeadResearchExecutionPlansForMission(
     runtimeEnabled = pilotEligibility.runtimeEnabled
     dryRunRequired = pilotEligibility.dryRunRequired
 
+    agentContext = buildAgentPlanContext({
+      workflowType: snapshot.executionPlan.workflowType,
+      leadId,
+      companyName: lead?.companyName ?? null,
+    })
+
+    const orchestration = await buildRevenueOperatorPlanContext(admin, {
+      leadId,
+      companyId: leadId,
+      companyName: lead?.companyName ?? null,
+      planId,
+      workflowType: snapshot.executionPlan.workflowType,
+      approvalStatus,
+      readinessState,
+      preflightStatus,
+      pilotEligible,
+      pilotBlockedReasons,
+      runtimeState,
+      latestDryRunStatus,
+      confidence,
+    })
+    orchestrationContext = orchestration.planContext
+
+    agentEventContext = await buildGrowthAgentEventPlanContext(admin, {
+      leadId,
+      companyId: leadId,
+      companyName: lead?.companyName ?? null,
+      planId,
+      workflowType: snapshot.executionPlan.workflowType,
+      approvalStatus,
+      readinessState,
+      preflightStatus,
+      pilotEligible,
+      pilotBlockedReasons,
+      runtimeState,
+      latestDryRunStatus,
+      confidence,
+    })
+
     plans.push({
       leadId,
       companyName: lead?.companyName ?? null,
@@ -337,6 +382,9 @@ async function listLeadResearchExecutionPlansForMission(
       pilotEnabled,
       runtimeEnabled,
       dryRunRequired,
+      agentContext,
+      orchestrationContext,
+      agentEventContext,
       reason:
         snapshot.nextBestAction?.reason ??
         snapshot.opportunityAssessment?.summary ??

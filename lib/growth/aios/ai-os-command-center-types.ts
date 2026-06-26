@@ -10,6 +10,9 @@ import type { GrowthLeadResearchExecutionBoundaryAuditReadModel } from "@/lib/gr
 import type { GrowthLeadResearchExecutionPreflightReadModel } from "@/lib/growth/aios/growth/growth-lead-research-execution-preflight-types"
 import type { GrowthLeadResearchExecutionSimulationReadModel } from "@/lib/growth/aios/growth/growth-lead-research-execution-simulation-types"
 import type { GrowthLeadResearchExecutionRuntimeReadModel } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-types"
+import type { GrowthAgentFrameworkReadModel } from "@/lib/growth/aios/growth/growth-agent-framework-types"
+import type { RevenueOperatorReadModel } from "@/lib/growth/aios/growth/growth-revenue-operator-orchestration-types"
+import type { GrowthAgentEventsReadModel } from "@/lib/growth/aios/growth/growth-agent-event-types"
 import type { GrowthObjectiveStageId } from "@/lib/growth/objectives/growth-objective-types"
 import type { AiWorkOrderStatus, AiWorkOrderType } from "@/lib/growth/aios/ai-work-order-types"
 
@@ -182,6 +185,9 @@ export type AiOsCommandCenterReadModel = {
   executionPreflightChecklist: GrowthLeadResearchExecutionPreflightReadModel
   executionSimulation: GrowthLeadResearchExecutionSimulationReadModel
   executionRuntime: GrowthLeadResearchExecutionRuntimeReadModel
+  agentFramework: GrowthAgentFrameworkReadModel
+  revenueOperator: RevenueOperatorReadModel
+  agentEvents: GrowthAgentEventsReadModel
   safeMode: AiOsCommandCenterSafeMode
   dailyBriefing: AiOsDailyBriefing
 }

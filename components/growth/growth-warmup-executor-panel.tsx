@@ -33,6 +33,11 @@ import {
   type WarmupExecutorRecipientPoolSummary,
 } from "@/lib/growth/warmup/warmup-executor-types"
 import {
+  formatWarmupCapacityStatusLabel,
+  GROWTH_WARMUP_CAPACITY_FIX_1B_QA_MARKER,
+  type WarmupDailyCapacityPlan,
+} from "@/lib/growth/warmup/warmup-capacity-engine"
+import {
   fetchWarmupExecutorJson,
   GROWTH_WARMUP_EXECUTOR_BUILD_MARKER,
   type WarmupExecutorManualRunBreakdown,
@@ -62,6 +67,7 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
   const [schemaReady, setSchemaReady] = useState(false)
   const [executorStats, setExecutorStats] = useState<GrowthWarmupProfileExecutorStats[]>([])
   const [recipientPoolSummary, setRecipientPoolSummary] = useState<WarmupExecutorRecipientPoolSummary | null>(null)
+  const [dailyCapacityPlan, setDailyCapacityPlan] = useState<WarmupDailyCapacityPlan | null>(null)
   const [preview, setPreview] = useState<GrowthWarmupExecutorRunResult | null>(null)
   const [lastRunBreakdown, setLastRunBreakdown] = useState<WarmupExecutorManualRunBreakdown | null>(null)
   const [executorBuildMarker, setExecutorBuildMarker] = useState<string | null>(null)
@@ -89,11 +95,13 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
       const dashboardPayload = (await dashboardRes.json()) as {
         executor_stats?: GrowthWarmupProfileExecutorStats[]
         recipient_pool_summary?: WarmupExecutorRecipientPoolSummary
+        daily_capacity_plan?: WarmupDailyCapacityPlan
       }
       setRecipients(recipientsPayload.recipients ?? [])
       setSchemaReady(Boolean(recipientsPayload.schema_ready))
       setExecutorStats(dashboardPayload.executor_stats ?? [])
       setRecipientPoolSummary(dashboardPayload.recipient_pool_summary ?? null)
+      setDailyCapacityPlan(dashboardPayload.daily_capacity_plan ?? null)
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Could not load warmup executor.")
     } finally {
@@ -289,6 +297,56 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
           fake replies. {WARMUP_MANUAL_RUN_BEHAVIOR}
         </p>
         <p className="mb-2 text-xs text-muted-foreground">{formatWarmupCronAvailability()}</p>
+        {schemaReady && dailyCapacityPlan ? (
+          <div
+            className="mb-3 rounded-md border border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground"
+            data-qa-marker={GROWTH_WARMUP_CAPACITY_FIX_1B_QA_MARKER}
+            data-qa-section="warmup-daily-capacity-plan"
+          >
+            <p className="font-medium text-foreground">Today&apos;s Plan</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <p>
+                <span className="font-medium text-foreground">Planned:</span> {dailyCapacityPlan.totalPlannedToday}
+              </p>
+              <p>
+                <span className="font-medium text-foreground">Maximum Possible:</span>{" "}
+                {dailyCapacityPlan.expectedMaxToday}
+              </p>
+              <p>
+                <span className="font-medium text-foreground">Recipient Network:</span>{" "}
+                <GrowthBadge
+                  label={formatWarmupCapacityStatusLabel(dailyCapacityPlan.status)}
+                  tone={
+                    dailyCapacityPlan.status === "healthy"
+                      ? "healthy"
+                      : dailyCapacityPlan.status === "constrained"
+                        ? "attention"
+                        : "critical"
+                  }
+                />
+              </p>
+              {dailyCapacityPlan.capacityShortfall > 0 ? (
+                <p>
+                  <span className="font-medium text-foreground">Capacity shortfall:</span>{" "}
+                  {dailyCapacityPlan.capacityShortfall}
+                </p>
+              ) : null}
+            </div>
+            <p className="mt-2">
+              <span className="font-medium text-foreground">Reason:</span> {dailyCapacityPlan.statusReason}
+            </p>
+            {dailyCapacityPlan.recommendation ? (
+              <p className="mt-1">
+                <span className="font-medium text-foreground">Recommendation:</span>{" "}
+                {dailyCapacityPlan.recommendation}
+              </p>
+            ) : null}
+            <p className="mt-2 text-[11px]">
+              {dailyCapacityPlan.warmingSenders} warming sender(s) · {dailyCapacityPlan.approvedRecipients} approved
+              recipient(s) · Dedup: {dailyCapacityPlan.dedupPolicy.replaceAll("_", " ")}
+            </p>
+          </div>
+        ) : null}
         {schemaReady ? (
           <p className="mb-3 rounded-md border border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground">
             <span className="font-medium text-foreground">Recipient pool</span>
@@ -450,11 +508,26 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
                             ? `Skipped — recipient pool exhausted: ${stat.skipReason}`
                             : `Skipped: ${stat.skipReason}`}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Last executor run: {formatDate(stat.lastExecutorRunAt)} · Active recipients:{" "}
                   {stat.recipientPoolActive}
                   {stat.recipientsAvailableForSender != null ? (
                     <> · Recipients available for this sender: {stat.recipientsAvailableForSender}</>
+                  ) : null}
+                  {dailyCapacityPlan?.senders.find((row) => row.profileId === stat.profileId) ? (
+                    <>
+                      {" "}
+                      · Used today:{" "}
+                      {
+                        dailyCapacityPlan.senders.find((row) => row.profileId === stat.profileId)!
+                          .recipientsUsedToday
+                      }{" "}
+                      · Max additional today:{" "}
+                      {
+                        dailyCapacityPlan.senders.find((row) => row.profileId === stat.profileId)!
+                          .maxAdditionalSendsToday
+                      }
+                    </>
                   ) : null}
                   {stat.recipientPoolHealthTier ? (
                     <> · Pool health: {stat.recipientPoolHealthTier.replaceAll("_", " ")}</>

@@ -15,7 +15,9 @@ import type { GrowthLeadResearchExecutionBoundaryClassification } from "@/lib/gr
 import type { GrowthLeadResearchExecutionPreflightStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-preflight-types"
 import type { GrowthLeadResearchExecutionSimulationStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-simulation-types"
 import type { GrowthLeadResearchExecutionState } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-types"
-import type { GrowthLeadResearchExecutionDryRunStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-dry-run-types"
+import type { GrowthAgentPlanContext } from "@/lib/growth/aios/growth/growth-agent-framework-types"
+import type { RevenueOperatorOrchestrationPlanContext } from "@/lib/growth/aios/growth/growth-revenue-operator-orchestration-types"
+import type { GrowthAgentEventPlanContext } from "@/lib/growth/aios/growth/growth-agent-event-types"
 
 export const GROWTH_AIOS_3E_PHASE = "GE-AIOS-3E" as const
 
@@ -85,6 +87,9 @@ export type AiExecutiveMissionPlanningLeadResearchExecutionPlanSummary = {
   pilotEnabled: boolean
   runtimeEnabled: boolean
   dryRunRequired: boolean
+  agentContext: GrowthAgentPlanContext | null
+  orchestrationContext: RevenueOperatorOrchestrationPlanContext | null
+  agentEventContext: GrowthAgentEventPlanContext | null
   reason: string
   createdAt: string
   reviewUpdatedAt: string | null

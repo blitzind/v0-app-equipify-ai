@@ -36,6 +36,9 @@ import { buildGrowthLeadResearchExecutionBoundaryAudit } from "@/lib/growth/aios
 import { buildGrowthLeadResearchExecutionPreflightChecklist } from "@/lib/growth/aios/growth/growth-lead-research-execution-preflight-service"
 import { buildGrowthLeadResearchExecutionSimulation } from "@/lib/growth/aios/growth/growth-lead-research-execution-simulation-service"
 import { buildGrowthLeadResearchExecutionRuntimeReadModel } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-service"
+import { buildGrowthAgentFrameworkReadModel } from "@/lib/growth/aios/growth/growth-agent-framework-service"
+import { buildRevenueOperatorReadModel } from "@/lib/growth/aios/growth/growth-revenue-operator-orchestration-service"
+import { buildGrowthAgentEventsReadModel } from "@/lib/growth/aios/growth/growth-agent-event-service"
 import {
   buildAiOsMissionPlanningHref,
   GROWTH_AI_OS_PUBLIC_BASE_PATH,
@@ -411,6 +414,16 @@ export async function fetchAiOsCommandCenterReadModel(
     generatedAt,
   })
 
+  const agentFramework = await buildGrowthAgentFrameworkReadModel(admin, { generatedAt })
+  const revenueOperator = await buildRevenueOperatorReadModel(admin, {
+    organizationId: input.organizationId,
+    generatedAt,
+  })
+  const agentEvents = await buildGrowthAgentEventsReadModel(admin, {
+    organizationId: input.organizationId,
+    generatedAt,
+  })
+
   const commandCenterBase = {
     readOnly: true as const,
     qaMarker: GROWTH_AI_OS_COMMAND_CENTER_QA_MARKER,
@@ -442,6 +455,9 @@ export async function fetchAiOsCommandCenterReadModel(
     executionPreflightChecklist,
     executionSimulation,
     executionRuntime,
+    agentFramework,
+    revenueOperator,
+    agentEvents,
     safeMode,
   }
 
