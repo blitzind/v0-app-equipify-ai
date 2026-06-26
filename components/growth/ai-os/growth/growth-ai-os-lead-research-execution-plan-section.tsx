@@ -15,6 +15,11 @@ import type { GrowthLeadResearchExecutionDryRunStatus } from "@/lib/growth/aios/
 import type { GrowthAgentPlanContext } from "@/lib/growth/aios/growth/growth-agent-framework-types"
 import type { RevenueOperatorOrchestrationPlanContext } from "@/lib/growth/aios/growth/growth-revenue-operator-orchestration-types"
 import type { GrowthAgentEventPlanContext } from "@/lib/growth/aios/growth/growth-agent-event-types"
+import type { GrowthAgentMemoryPlanContext } from "@/lib/growth/aios/growth/growth-agent-memory-types"
+import type { GrowthMissionPlanContext } from "@/lib/growth/aios/growth/growth-mission-framework-types"
+import type { GrowthMissionPriorityPlanContext } from "@/lib/growth/aios/growth/growth-mission-priority-types"
+import type { GrowthSchedulerReadinessPlanContext } from "@/lib/growth/aios/growth/growth-scheduler-readiness-types"
+import type { GrowthAutonomousResearchPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-types"
 import { cn } from "@/lib/utils"
 
 function readinessBadgeVariant(readiness: GrowthLeadResearchExecutionPlan["executionReadiness"]) {
@@ -60,6 +65,11 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   agentContext,
   orchestrationContext,
   agentEventContext,
+  agentMemoryContext,
+  missionPlanContext,
+  missionPriorityContext,
+  schedulerReadinessContext,
+  autonomousResearchPilotContext,
 }: {
   plan: GrowthLeadResearchExecutionPlan
   title?: string
@@ -96,6 +106,11 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   agentContext?: GrowthAgentPlanContext | null
   orchestrationContext?: RevenueOperatorOrchestrationPlanContext | null
   agentEventContext?: GrowthAgentEventPlanContext | null
+  agentMemoryContext?: GrowthAgentMemoryPlanContext | null
+  missionPlanContext?: GrowthMissionPlanContext | null
+  missionPriorityContext?: GrowthMissionPriorityPlanContext | null
+  schedulerReadinessContext?: GrowthSchedulerReadinessPlanContext | null
+  autonomousResearchPilotContext?: GrowthAutonomousResearchPilotPlanContext | null
 }) {
   return (
     <Card data-qa-marker={GROWTH_LEAD_RESEARCH_EXECUTION_PLAN_QA_MARKER} data-qa-section="execution-plan">
@@ -351,6 +366,152 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
             <p className="text-muted-foreground">
               <span className="font-medium text-foreground">Routing:</span>{" "}
               {agentEventContext.routingExplanation}
+            </p>
+          </div>
+        ) : null}
+        {agentMemoryContext ? (
+          <div className="space-y-1 text-sm" data-qa-section="agent-memory-context">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">
+                Memory · {agentMemoryContext.completenessState.replaceAll("_", " ")}
+              </Badge>
+              <Badge variant="outline">
+                Owner · {agentMemoryContext.owningAgent.replaceAll("_", " ")}
+              </Badge>
+            </div>
+            {agentMemoryContext.missingContext.length > 0 ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Missing:</span>{" "}
+                {agentMemoryContext.missingContext.slice(0, compact ? 2 : 5).join(" · ")}
+              </p>
+            ) : null}
+            {agentMemoryContext.conflicts.length > 0 ? (
+              <p className="text-amber-800">
+                Conflicts:{" "}
+                {agentMemoryContext.conflicts.slice(0, compact ? 1 : 3).map((c) => c.summary).join(" · ")}
+              </p>
+            ) : null}
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Remediation:</span>{" "}
+              {agentMemoryContext.recommendedRemediation}
+            </p>
+          </div>
+        ) : null}
+        {missionPlanContext ? (
+          <div className="space-y-1 text-sm" data-qa-section="mission-plan-context">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">
+                Mission · {missionPlanContext.primaryMissionType?.replaceAll("_", " ") ?? "planned"}
+              </Badge>
+              <Badge variant="outline">
+                Health · {missionPlanContext.health.state}
+              </Badge>
+            </div>
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Summary:</span>{" "}
+              {missionPlanContext.missionSummary}
+            </p>
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Stage:</span>{" "}
+              {missionPlanContext.currentStage.replaceAll("_", " ")} · Owner:{" "}
+              {missionPlanContext.ownerAgent.replaceAll("_", " ")}
+            </p>
+            {missionPlanContext.blockers.length > 0 ? (
+              <p className="text-amber-800">
+                Blockers: {missionPlanContext.blockers.slice(0, compact ? 2 : 4).join(" · ")}
+              </p>
+            ) : null}
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Next milestone:</span>{" "}
+              {missionPlanContext.recommendedNextMilestone}
+            </p>
+          </div>
+        ) : null}
+        {missionPriorityContext ? (
+          <div className="space-y-1 text-sm" data-qa-section="mission-priority-context">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">
+                Priority {missionPriorityContext.missionPriority.overallPriority}
+              </Badge>
+              <Badge variant="outline">
+                Queue · {missionPriorityContext.queueBucket.replaceAll("_", " ")}
+              </Badge>
+              <Badge variant="secondary">ROI {missionPriorityContext.estimatedRoi}</Badge>
+              <Badge variant="outline">Urgency {missionPriorityContext.urgencyScore}</Badge>
+            </div>
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Allocation:</span>{" "}
+              {missionPriorityContext.allocationReason}
+            </p>
+            {missionPriorityContext.deferReason ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Defer:</span>{" "}
+                {missionPriorityContext.deferReason}
+              </p>
+            ) : null}
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Recommended:</span>{" "}
+              {missionPriorityContext.recommendedAction}
+            </p>
+          </div>
+        ) : null}
+        {schedulerReadinessContext ? (
+          <div className="space-y-1 text-sm" data-qa-section="scheduler-readiness-context">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">
+                Scheduler · {schedulerReadinessContext.schedulerEligibility.replaceAll("_", " ")}
+              </Badge>
+            </div>
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Queue:</span>{" "}
+              {schedulerReadinessContext.queueSource}
+            </p>
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Wake:</span>{" "}
+              {schedulerReadinessContext.wakeRecommendation}
+            </p>
+            {schedulerReadinessContext.blockedReasons.length > 0 ? (
+              <p className="text-amber-800">
+                Blocked:{" "}
+                {schedulerReadinessContext.blockedReasons.slice(0, compact ? 2 : 4).join(" · ")}
+              </p>
+            ) : null}
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Budget:</span>{" "}
+              {schedulerReadinessContext.cooldownBudgetSummary}
+            </p>
+          </div>
+        ) : null}
+        {autonomousResearchPilotContext ? (
+          <div className="space-y-1 text-sm" data-qa-section="autonomous-research-pilot-context">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">
+                Research · {autonomousResearchPilotContext.autonomousResearchStatus.replaceAll("_", " ")}
+              </Badge>
+              <Badge variant="outline">
+                Stale · {autonomousResearchPilotContext.staleStatus}
+              </Badge>
+              {autonomousResearchPilotContext.confidence != null ? (
+                <Badge variant="secondary">
+                  Confidence {autonomousResearchPilotContext.confidence}
+                </Badge>
+              ) : null}
+            </div>
+            {autonomousResearchPilotContext.lastRefreshAt ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Last refresh:</span>{" "}
+                {autonomousResearchPilotContext.lastRefreshAt}
+              </p>
+            ) : null}
+            {autonomousResearchPilotContext.nextScheduledRefresh ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Next refresh:</span>{" "}
+                {autonomousResearchPilotContext.nextScheduledRefresh}
+              </p>
+            ) : null}
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Wake:</span>{" "}
+              {autonomousResearchPilotContext.wakeRecommendation}
             </p>
           </div>
         ) : null}

@@ -18,6 +18,11 @@ import type { GrowthLeadResearchExecutionState } from "@/lib/growth/aios/growth/
 import type { GrowthAgentPlanContext } from "@/lib/growth/aios/growth/growth-agent-framework-types"
 import type { RevenueOperatorOrchestrationPlanContext } from "@/lib/growth/aios/growth/growth-revenue-operator-orchestration-types"
 import type { GrowthAgentEventPlanContext } from "@/lib/growth/aios/growth/growth-agent-event-types"
+import type { GrowthAgentMemoryPlanContext } from "@/lib/growth/aios/growth/growth-agent-memory-types"
+import type { GrowthMissionPlanContext } from "@/lib/growth/aios/growth/growth-mission-framework-types"
+import type { GrowthMissionPriorityPlanContext } from "@/lib/growth/aios/growth/growth-mission-priority-types"
+import type { GrowthSchedulerReadinessPlanContext } from "@/lib/growth/aios/growth/growth-scheduler-readiness-types"
+import type { GrowthAutonomousResearchPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-types"
 
 export const GROWTH_AIOS_3E_PHASE = "GE-AIOS-3E" as const
 
@@ -90,6 +95,11 @@ export type AiExecutiveMissionPlanningLeadResearchExecutionPlanSummary = {
   agentContext: GrowthAgentPlanContext | null
   orchestrationContext: RevenueOperatorOrchestrationPlanContext | null
   agentEventContext: GrowthAgentEventPlanContext | null
+  agentMemoryContext: GrowthAgentMemoryPlanContext | null
+  missionPlanContext: GrowthMissionPlanContext | null
+  missionPriorityContext: GrowthMissionPriorityPlanContext | null
+  schedulerReadinessContext: GrowthSchedulerReadinessPlanContext | null
+  autonomousResearchPilotContext: GrowthAutonomousResearchPilotPlanContext | null
   reason: string
   createdAt: string
   reviewUpdatedAt: string | null

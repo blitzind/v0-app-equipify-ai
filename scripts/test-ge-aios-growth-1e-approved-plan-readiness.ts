@@ -5,6 +5,7 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
+import { readGeAiOsCommandCenterUiBundle } from "./ge-aios-command-center-ui-cert-utils"
 import {
   GROWTH_AIOS_GROWTH_1E_PHASE,
   GROWTH_LEAD_RESEARCH_APPROVED_PLAN_READINESS_QA_MARKER,
@@ -77,7 +78,7 @@ assert.ok(readinessService.includes("buildGrowthLeadResearchApprovedPlanReadines
 assert.equal(readinessService.includes("publishAiOsEvent"), false)
 assert.equal(readinessService.includes("createAiWorkOrder"), false)
 
-const panel = readSource("components/growth/ai-os/command-center/growth-ai-os-command-center-panel.tsx")
+const panel = readGeAiOsCommandCenterUiBundle()
 assert.ok(panel.includes("GrowthAiOsApprovedPlanReadinessSection"))
 assert.ok(panel.includes("approvedPlanReadinessQueue"))
 

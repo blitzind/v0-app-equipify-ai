@@ -13,6 +13,13 @@ import type { GrowthLeadResearchExecutionRuntimeReadModel } from "@/lib/growth/a
 import type { GrowthAgentFrameworkReadModel } from "@/lib/growth/aios/growth/growth-agent-framework-types"
 import type { RevenueOperatorReadModel } from "@/lib/growth/aios/growth/growth-revenue-operator-orchestration-types"
 import type { GrowthAgentEventsReadModel } from "@/lib/growth/aios/growth/growth-agent-event-types"
+import type { GrowthAgentMemoryReadModel } from "@/lib/growth/aios/growth/growth-agent-memory-types"
+import type { GrowthMissionFrameworkReadModel } from "@/lib/growth/aios/growth/growth-mission-framework-types"
+import type { GrowthMissionPriorityReadModel } from "@/lib/growth/aios/growth/growth-mission-priority-types"
+import type { GrowthSchedulerReadinessReadModel } from "@/lib/growth/aios/growth/growth-scheduler-readiness-types"
+import type { GrowthAutonomousResearchPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-types"
+import type { AiOsOperationsDashboardReadModel } from "@/lib/growth/aios/ai-os-operations-dashboard-types"
+import type { GrowthAiOsAutonomyPolicyReadModel } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-types"
 import type { GrowthObjectiveStageId } from "@/lib/growth/objectives/growth-objective-types"
 import type { AiWorkOrderStatus, AiWorkOrderType } from "@/lib/growth/aios/ai-work-order-types"
 
@@ -188,8 +195,15 @@ export type AiOsCommandCenterReadModel = {
   agentFramework: GrowthAgentFrameworkReadModel
   revenueOperator: RevenueOperatorReadModel
   agentEvents: GrowthAgentEventsReadModel
+  agentMemory: GrowthAgentMemoryReadModel
+  missionFramework: GrowthMissionFrameworkReadModel
+  missionPriority: GrowthMissionPriorityReadModel
+  schedulerReadiness: GrowthSchedulerReadinessReadModel
+  autonomousResearchPilot: GrowthAutonomousResearchPilotReadModel
   safeMode: AiOsCommandCenterSafeMode
   dailyBriefing: AiOsDailyBriefing
+  operationsDashboard: AiOsOperationsDashboardReadModel
+  autonomyPolicy: GrowthAiOsAutonomyPolicyReadModel
 }
 
 export const AI_OS_COMMAND_CENTER_RUNTIME_RULE =

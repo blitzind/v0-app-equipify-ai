@@ -9,8 +9,8 @@ export default function GrowthAiOsCommandCenterPage() {
   return (
     <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
-        title="Equipify AI OS"
-        description="Command Center — read-only view of missions, Work Orders, and operator attention."
+        title="AI Operations"
+        description="Operator dashboard for AI activity, priorities, approvals, and health — read-only."
         icon={LayoutDashboard}
         iconClassName="bg-indigo-50 text-indigo-600"
       />

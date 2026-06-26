@@ -23,8 +23,6 @@ const enqueueBodySchema = z.object({
   executionPlan: z.object({}).passthrough(),
   approvalState: z.literal("approved_for_future_execution"),
   confidence: z.number().nullable(),
-  runtimeEnabled: z.boolean().optional(),
-  pilotEnabled: z.boolean().optional(),
 })
 
 export async function POST(request: Request) {
@@ -59,8 +57,6 @@ export async function POST(request: Request) {
       executionPlan,
       approvalState: body.approvalState,
       confidence: body.confidence,
-      runtimeOverride: body.runtimeEnabled,
-      pilotOverride: body.pilotEnabled,
     })
 
     if (!pilotValidation.allowed) {

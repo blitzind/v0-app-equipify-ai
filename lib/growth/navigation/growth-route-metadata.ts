@@ -1,5 +1,6 @@
 import {
   Activity,
+  Bot,
   FileText,
   GitBranch,
   Inbox,
@@ -50,6 +51,7 @@ const WORKSPACE_ICON_BY_ID: Record<string, LucideIcon> = {
   "workspace-automation-new": GitBranch,
   "workspace-automation-edit": GitBranch,
   "workspace-engagement": Activity,
+  "workspace-ai-operations": Bot,
   "workspace-leads": Target,
   "workspace-campaigns": Workflow,
   "workspace-inbox": Inbox,

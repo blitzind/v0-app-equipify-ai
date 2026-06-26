@@ -5,6 +5,7 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
+import { readGeAiOsCommandCenterUiBundle } from "./ge-aios-command-center-ui-cert-utils"
 import { GROWTH_LEAD_RESEARCH_CANONICAL_WORKFLOW_TYPES } from "../lib/growth/aios/growth/growth-lead-research-execution-plan"
 import {
   auditWorkflowBoundary,
@@ -113,7 +114,7 @@ assert.ok(preflightService.includes("buildGrowthLeadResearchExecutionPreflightCh
 assert.equal(preflightService.includes("createAiWorkOrder"), false)
 assert.equal(preflightService.includes("evaluateAiOsProviderHealth"), false)
 
-const panel = readSource("components/growth/ai-os/command-center/growth-ai-os-command-center-panel.tsx")
+const panel = readGeAiOsCommandCenterUiBundle()
 assert.ok(panel.includes("GrowthAiOsExecutionPreflightChecklistSection"))
 assert.ok(panel.includes("executionPreflightChecklist"))
 

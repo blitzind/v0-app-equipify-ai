@@ -1,6 +1,7 @@
 /** GE-AIOS-GROWTH-4A — Growth Agent Framework types (client-safe). */
 
 import type { GrowthLeadResearchCanonicalWorkflowType } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
+import type { GrowthAiOsAgentAutonomyPolicyState } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-types"
 
 export const GROWTH_AIOS_GROWTH_4A_PHASE = "GE-AIOS-GROWTH-4A" as const
 
@@ -160,6 +161,8 @@ export type GrowthAgentFrameworkReadModel = {
     outboundBlockedAgents: number
     coreMutationBlockedAgents: number
   }
+  agentAutonomyPolicy?: GrowthAiOsAgentAutonomyPolicyState[]
+  autonomyPolicySource?: string
 }
 
 export type GrowthAgentPlanContext = {

@@ -291,6 +291,11 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   workspaceDual("workspace-engagement", "engagement", "Engagement", "intelligence", {
     breadcrumbLabel: "Engagement",
   }),
+  workspace("workspace-ai-operations", "os", "AI Operations", "intelligence", "workspace", {
+    migrated: true,
+    segment: "os",
+    breadcrumbLabel: "AI Operations",
+  }),
 
   workspace("workspace-leads", "leads", "Leads", "workspace", "dual-route", {
     migrated: true,

@@ -119,9 +119,10 @@ async function main() {
   console.log("  ✓ Safety flags: policy-gated send on, auto-approval off, compile-time outbound off")
 
   const outboundPolicy = readSource("lib/growth/autonomy/growth-autonomy-outbound-send-policy.ts")
-  assert.match(outboundPolicy, /evaluateAutonomyOutboundSendPolicy/)
-  assert.match(outboundPolicy, /shadow_would_send/)
-  assert.match(outboundPolicy, /approval_queue/)
+  const outboundEvaluation = readSource("lib/growth/autonomy/growth-ai-os-autonomy-policy-evaluation-service.ts")
+  assert.match(outboundPolicy, /evaluateAutonomyOutboundSendPolicyFromPolicyEngine/)
+  assert.match(outboundEvaluation, /shadow_would_send/)
+  assert.match(outboundEvaluation, /approval_queue/)
   console.log("  ✓ Outbound send policy evaluator with shadow + queue paths")
 
   const autonomousSend = readSource(

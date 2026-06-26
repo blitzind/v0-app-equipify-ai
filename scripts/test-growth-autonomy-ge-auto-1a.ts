@@ -120,8 +120,9 @@ async function main(): Promise<void> {
   assert.match(guardrailConfig, /autonomy_enabled: false/)
 
   const policyService = readSource("lib/growth/autonomy/growth-autonomy-policy-service.ts")
-  assert.match(policyService, /evaluateAutonomyCapability/)
-  assert.match(policyService, /enforcementActive/)
+  const evaluationService = readSource("lib/growth/autonomy/growth-ai-os-autonomy-policy-evaluation-service.ts")
+  assert.match(policyService, /evaluateAutonomyCapabilityFromPolicyEngine/)
+  assert.match(evaluationService, /enforcementActive/)
 
   const signalProcessor = readSource("lib/growth/automation-runtime/ge-v1-5-automation-runtime-signal-processor.ts")
   assert.match(signalProcessor, /enforceGrowthAutonomyCapability/)

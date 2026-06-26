@@ -5,6 +5,7 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
+import { readGeAiOsCommandCenterUiBundle } from "./ge-aios-command-center-ui-cert-utils"
 import { GROWTH_LEAD_RESEARCH_CANONICAL_WORKFLOW_TYPES } from "../lib/growth/aios/growth/growth-lead-research-execution-plan"
 import {
   auditWorkflowBoundary,
@@ -119,7 +120,7 @@ const simulationService = readSource("lib/growth/aios/growth/growth-lead-researc
 assert.ok(simulationService.includes("buildGrowthLeadResearchExecutionSimulation"))
 assert.equal(simulationService.includes("createAiWorkOrder"), false)
 
-const panel = readSource("components/growth/ai-os/command-center/growth-ai-os-command-center-panel.tsx")
+const panel = readGeAiOsCommandCenterUiBundle()
 assert.ok(panel.includes("GrowthAiOsExecutionSimulationSection"))
 assert.ok(panel.includes("executionSimulation"))
 

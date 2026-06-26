@@ -63,6 +63,14 @@ For each GE-AI-2X phase, maintain one entry with:
 | GE-AIOS-GROWTH-4A | Agent Framework Foundation | Complete (local cert) |
 | GE-AIOS-GROWTH-4B | Revenue Operator Orchestration Engine | Complete (local cert) |
 | GE-AIOS-GROWTH-4C | Agent Event & Scheduling Framework | Complete (local cert) |
+| GE-AIOS-GROWTH-4D | Agent Memory & Shared Context | Complete (local cert) |
+| GE-AIOS-GROWTH-4E | Mission & Goal Planning Framework | Complete (local cert) |
+| GE-AIOS-GROWTH-4F | Mission Prioritization & Resource Allocation | Complete (local cert) |
+| GE-AIOS-GROWTH-5A | Scheduler Readiness & Activation Plan | Complete (local cert) |
+| GE-AIOS-GROWTH-5B | Autonomous Research Agent Pilot | Complete (local cert) |
+| GE-AIOS-CONSOLIDATION-1B | Growth OS Information Architecture (AI Operations dashboard) | Complete (local cert) |
+| GE-AIOS-CONSOLIDATION-1C | Growth Autonomy Control Plane (AI policy engine) | Complete (local cert) |
+| GE-AIOS-CONSOLIDATION-1E | Policy Evaluation Unification | Complete (local cert) |
 | GE-AI-2D | Memory Facade (ledger) | Complete via GE-AIOS-2F |
 | GE-AI-2A | Decision Record Foundation (ledger) | Complete via GE-AIOS-2D |
 | GE-AI-2B | Event Bus Unification | Partial (foundation in GE-AIOS-2B) |
@@ -1299,6 +1307,235 @@ Pending — orchestration visibility only; no autonomous execution
 ### Production certification
 
 Pending — event visibility only; no scheduler activation
+
+---
+
+## GE-AIOS-GROWTH-4D — Agent Memory & Shared Context
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-4D (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-1A–4C existing read models and orchestration |
+
+### Scope delivered
+
+- Shared agent memory model per lead (research through orchestration)
+- Agent-specific context views for all seven Growth agents
+- Read-only aggregation from snapshots, plans, readiness, handoff, boundary, preflight, simulation, runtime, dry-run, pilot, orchestration, events
+- Deterministic completeness scoring and missing field detection
+- Conflict detection without auto-resolution
+- Command Center Agent Memory section
+- Mission Planning Review agent memory context
+- No memory writes, migrations, or new event types
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-4d-agent-memory`
+
+### Production certification
+
+Pending — memory visibility only; no persistent memory layer
+
+---
+
+## GE-AIOS-GROWTH-4E — Mission & Goal Planning Framework
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-4E (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-4D shared agent memory |
+
+### Scope delivered
+
+- Mission model with eight mission types and seven statuses
+- Revenue Operator mission planner (active, completed, stalled, recommend new/retire)
+- Mission decomposition into agent responsibilities
+- Mission dependencies (prerequisite, blocking, optional, parallel)
+- Mission health assessment with reasoning
+- Derivation from shared agent memory (read-only)
+- Command Center Missions section
+- Mission Planning Review mission context
+- No migrations, persistence, or execution
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-4e-mission-framework`
+
+### Production certification
+
+Pending — mission visibility only; no mission execution
+
+---
+
+## GE-AIOS-GROWTH-4F — Mission Prioritization & Resource Allocation
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-4F (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-4E mission framework |
+
+### Scope delivered
+
+- Mission priority model (0–100 scores, ROI, age, SLA, dependencies, strategic importance)
+- Conceptual capacity pool (six lanes, no scheduler)
+- Allocation recommendations (allocated, deferred, blocked, abandon, waiting states)
+- Deterministic queue buckets (immediate, today, this week, backlog, archive candidate)
+- Starvation detection with remediation recommendations
+- Revenue Operator capacity guidance (highest value, today, defer, abandon, capacity spend)
+- Command Center Mission Priorities section
+- Mission Planning Review priority context
+- No migrations, persistence, or execution
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-4f-priority-engine`
+
+### Production certification
+
+Pending — prioritization visibility only; no mission execution
+
+---
+
+## GE-AIOS-GROWTH-5A — Scheduler Readiness & Activation Plan
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-5A (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-4F mission priority engine |
+
+### Scope delivered
+
+- Scheduler readiness model with eight activation statuses
+- Five scheduler modes (only disabled + priority_queue_preview allowed in 5A)
+- Priority queue integration from 4F (immediate, today, week, backlog, archive, capacity, starvation)
+- Deterministic wake rules for all seven agents (no wake in 5A)
+- Conceptual budget and throttle limits
+- Kill switch and approval requirements
+- Recommended activation path
+- Command Center Scheduler Readiness section
+- Mission Planning Review scheduler context
+- No migrations, persistence, cron, or activation
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-5a-scheduler-readiness`
+
+### Production certification
+
+Pending — scheduler readiness visibility only; no scheduler activation
+
+---
+
+## GE-AIOS-GROWTH-5B — Autonomous Research Agent Pilot
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-5B (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-5A scheduler readiness, GE-AIOS-GROWTH-4F priority engine |
+
+### Scope delivered
+
+- Research Agent autonomous pilot under `controlled_agent_wake`
+- Deterministic wake conditions (stale, new lead, manual, scheduled)
+- Budget enforcement (10 runs/hour, 100/day)
+- Internal research snapshot refresh via existing AI OS events
+- In-memory pilot store with Pause/Resume/Disable controls
+- Revenue Operator supervision recommendations
+- Telemetry (runs, confidence, budget, stale resolved)
+- Command Center Autonomous Research Agent section
+- Mission Planning Review autonomous research context
+- No outbound, providers, runtime enqueue, Work Orders, or Core mutations
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-5b-autonomous-research-agent`
+
+### Production certification
+
+Pending — pilot scoped to Research Agent internal refresh only
+
+---
+
+## GE-AIOS-CONSOLIDATION-1B — Growth OS Information Architecture
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-CONSOLIDATION-1B |
+| **Dependencies** | GE-AIOS-5C Command Center, GE-AIOS-5D Daily Briefing, GE-AIOS-GROWTH-1A–5B read models |
+
+### Scope delivered
+
+- `AiOsOperationsDashboardReadModel` synthesized from existing Command Center data
+- Operator dashboard widgets: executive overview, active work, AI activity, AI health, approval summary, top-10 mission priorities, active objectives
+- Engineering diagnostics summary chips + toggle for full phase sections (1A–5B)
+- Workspace nav **AI Operations** at `/growth/os`
+- Read-only — no backend service rewrites, no runtime/autonomy behavior changes
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-consolidation-1b-information-architecture`
+
+### Production certification
+
+Pending — UX/read-model consolidation only
+
+---
+
+## GE-AIOS-CONSOLIDATION-1C — Growth Autonomy Control Plane
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-CONSOLIDATION-1C |
+| **Dependencies** | GE-AIOS-CONSOLIDATION-1B, GE-AIOS-GROWTH-1A–5B, Growth Autonomy settings |
+
+### Scope delivered
+
+- Unified `GrowthAiOsAutonomyPolicyReadModel` read-through from existing settings (no duplicate storage)
+- `fetchGrowthAiOsAutonomyPolicy()` consumed by Command Center, Runtime validation, Research pilot cycle
+- Growth Autonomy UI AI OS integration panel; AI Operations autonomy summary + deep links
+- Removed duplicate pilot controls from AI Operations diagnostics
+- Policy enrichment for Agent Framework, Scheduler Readiness, Revenue Operator, Autonomous Research
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-consolidation-1c-autonomy-control-plane`
+
+### Production certification
+
+Pending — policy read-through and UI wiring only; no runtime behavior expansion
+
+---
+
+## GE-AIOS-CONSOLIDATION-1E — Policy Evaluation Unification
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-CONSOLIDATION-1E |
+| **Dependencies** | GE-AIOS-CONSOLIDATION-1C, GE-AUTO autonomy enforcement |
+
+### Scope delivered
+
+- Canonical evaluation via `growth-ai-os-autonomy-policy-evaluation-service.ts`
+- Legacy wrappers delegate only (no independent policy logic)
+- Scheduler service, Command Center safe mode, Revenue Operator annotations unified
+- Research pilot action API policy-gated; manual refresh uses policy gate
+- Runtime API request-body overrides removed
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-consolidation-1e-policy-unification`
+
+### Production certification
+
+Pending — evaluation unification only; no new autonomous capabilities
 
 ---
 

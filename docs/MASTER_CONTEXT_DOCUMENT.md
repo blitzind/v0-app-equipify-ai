@@ -16,7 +16,7 @@
 =================================================
 
 **Document role:** Living engineering state — current phase, production status, rules, certifications, risks, and priorities.  
-**Last updated:** 2026-06-25 (GE-AIOS-GROWTH-4C Agent Event & Scheduling Framework)  
+**Last updated:** 2026-06-25 (GE-AIOS-GROWTH-5B Autonomous Research Agent Pilot)  
 **Regeneration:** `pnpm update:master-context` (inventory scan + this document's manual sections)  
 **Admin UI:** `/admin/master-context`
 
@@ -46,7 +46,7 @@
 |-------|--------|
 | **Architecture phase** | GE-AI-1X — **Complete** (Constitution v1.0 frozen) |
 | **Documentation phase** | GE-DOC-1 — **Complete** |
-| **Current phase** | **GE-AIOS-GROWTH-4C** — Agent Event & Scheduling Framework (**certified locally**, not committed) |
+| **Current phase** | **GE-AIOS-GROWTH-5B** — Autonomous Research Agent Pilot (**certified locally**, not committed) |
 | **Next phase** | GE-AI-2F — Meta-Recommender |
 
 **Transition:** Official move from Architecture Phase (GE-AI-1X) to Engineering Phase (GE-AI-2X).
@@ -239,8 +239,56 @@ Full list: `lib/admin/master-context.manual.after.md` § Known Limitations.
 | GE-AIOS-GROWTH-4A | Agent Framework Foundation | Complete (local cert) |
 | GE-AIOS-GROWTH-4B | Revenue Operator Orchestration Engine | Complete (local cert) |
 | GE-AIOS-GROWTH-4C | Agent Event & Scheduling Framework | Complete (local cert) |
+| GE-AIOS-GROWTH-4D | Agent Memory & Shared Context | Complete (local cert) |
+| GE-AIOS-GROWTH-4E | Mission & Goal Planning Framework | Complete (local cert) |
+| GE-AIOS-GROWTH-4F | Mission Prioritization & Resource Allocation | Complete (local cert) |
+| GE-AIOS-GROWTH-5A | Scheduler Readiness & Activation Plan | Complete (local cert) |
+| GE-AIOS-GROWTH-5B | Autonomous Research Agent Pilot | Complete (local cert) |
+| GE-AIOS-CONSOLIDATION-1B | Growth OS Information Architecture (AI Operations dashboard) | Complete (local cert) |
+| GE-AIOS-CONSOLIDATION-1C | Growth Autonomy Control Plane (AI policy engine) | Complete (local cert) |
+| GE-AIOS-CONSOLIDATION-1E | Policy Evaluation Unification | Complete (local cert) |
 
 ### Current phase
+
+**GE-AIOS-CONSOLIDATION-1E — Policy Evaluation Unification**
+All autonomous policy evaluation flows through `fetchGrowthAiOsAutonomyPolicyEvaluationContext`. Legacy evaluators are compatibility wrappers. Scheduler, Command Center, Revenue Operator, Runtime, and Research Agent consume the policy engine. Status: **Complete (local cert)**.
+
+### Previous phase
+
+**GE-AIOS-CONSOLIDATION-1C — Growth Autonomy Control Plane**
+Growth Autonomy (`/growth/settings/autonomy`) is the canonical AI control plane — unified read-through policy engine consumed by Agent Framework, Scheduler Readiness, Revenue Operator, Autonomous Research, and Execution Runtime. AI Operations remains read-only with deep links. No duplicate configuration surfaces, no migrations, no new autonomous capabilities. Status: **Complete (local cert)**.
+
+### Previous phase
+
+**GE-AIOS-CONSOLIDATION-1B — Growth OS Information Architecture Refactor**
+Operator-first AI Operations dashboard at `/growth/os` — consolidates Command Center read models into executive overview, active work, activity, health, approvals, mission priorities, and objectives widgets. Engineering phase sections (1A–5B) preserved behind diagnostics toggle. Read-only — no backend behavior changes. Status: **Complete (local cert)**.
+
+### Previous phase
+
+**GE-AIOS-GROWTH-5B — Autonomous Research Agent Pilot**
+First controlled autonomous agent activation — Research Agent only under `controlled_agent_wake` with budget limits (10/hr, 100/day). Internal research snapshot refresh via existing AI OS events. Command Center operator controls (Pause/Resume/Disable) and Revenue Operator supervision. No outbound, providers, runtime enqueue, Work Orders, or Core mutations. Status: **Complete (local cert)**.
+
+### Previous phase
+
+**GE-AIOS-GROWTH-5A — Scheduler Readiness & Activation Plan**
+Read-only scheduler readiness from GE-AIOS-GROWTH-4F priority queues. Defines activation statuses, agent wake rules, budget/throttle limits, and recommended activation paths. Readiness-only — no scheduler activation, cron, workers, outbound, providers, Work Orders, or Core mutations. Status: **Complete (local cert)**.
+
+### Previous phase
+
+**GE-AIOS-GROWTH-4F — Mission Prioritization & Resource Allocation**
+Read-only mission priority scoring, conceptual capacity allocation, queue optimization, and starvation detection from GE-AIOS-GROWTH-4E missions. Command Center Mission Priorities and Mission Planning Review priority context. Recommendation-only — no mission execution, scheduler, outbound, providers, Work Orders, or Core mutations. Status: **Complete (local cert)**.
+
+### Previous phase
+
+**GE-AIOS-GROWTH-4E — Mission & Goal Planning Framework**
+Read-only mission derivation from shared agent memory. Revenue Operator mission planner, decomposition, dependencies, and health assessment. Command Center and Mission Planning Review visibility. Recommendation-only — no mission execution, scheduler, outbound, providers, Work Orders, or Core mutations. Status: **Complete (local cert)**.
+
+### Previous phase
+
+**GE-AIOS-GROWTH-4D — Agent Memory & Shared Context**
+Read-only shared memory aggregation per lead from existing Growth AI OS sources. Deterministic completeness scoring, conflict detection, and agent-specific context views. Command Center and Mission Planning Review visibility. No memory writes, execution, scheduler, outbound, providers, Work Orders, or Core mutations. Status: **Complete (local cert)**.
+
+### Previous phase
 
 **GE-AIOS-GROWTH-4C — Agent Event & Scheduling Framework**
 Read-only agent event model, deterministic routing, scheduling mode definitions (all inactive), event queue partitions, Revenue Operator event consumption, Command Center and Mission Planning Review visibility. Recommendation-only — no agent execution, scheduler activation, runtime, outbound, providers, Work Orders, or Core mutations. Status: **Complete (local cert)**.
@@ -377,6 +425,14 @@ GE-AUTO-1A through 2I implemented locally; GE-AUTO-3 not started. See manual bef
 | GE-AIOS-GROWTH-4A Agent Framework Foundation | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-GROWTH-4B Revenue Operator Orchestration | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-GROWTH-4C Agent Event & Scheduling | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-4D Agent Memory & Shared Context | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-4E Mission & Goal Planning | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-4F Mission Prioritization & Allocation | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-5A Scheduler Readiness & Activation | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-5B Autonomous Research Agent Pilot | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-CONSOLIDATION-1B AI Operations Information Architecture | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-CONSOLIDATION-1C Autonomy Control Plane | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-CONSOLIDATION-1E Policy Evaluation Unification | **PASS (local)** | 2026-06-25 |
 | GE-AI-2A+ implementation (production) | Pending | — |
 
 Outbound operational readiness: `docs/GROWTH_OUTBOUND_OPERATIONAL_READINESS.md`
@@ -672,6 +728,21 @@ Full list: `lib/admin/master-context.manual.after.md` § Current Priorities.
 | [GE-AIOS-GROWTH-4C Certification](./GE-AIOS-GROWTH-4C_CERTIFICATION.md) | Agent events cert |
 | [GE-AIOS-GROWTH-4C Agent Events](./GE-AIOS-GROWTH-4C_AGENT_EVENTS.md) | Event architecture |
 | [GE-AIOS-GROWTH-4C Infrastructure Audit](./GE-AIOS-GROWTH-4C_INFRASTRUCTURE_AUDIT.md) | Event framework audit |
+| [GE-AIOS-GROWTH-4D Certification](./GE-AIOS-GROWTH-4D_CERTIFICATION.md) | Agent memory cert |
+| [GE-AIOS-GROWTH-4D Agent Memory](./GE-AIOS-GROWTH-4D_AGENT_MEMORY.md) | Shared memory architecture |
+| [GE-AIOS-GROWTH-4D Infrastructure Audit](./GE-AIOS-GROWTH-4D_INFRASTRUCTURE_AUDIT.md) | Memory audit |
+| [GE-AIOS-GROWTH-4E Certification](./GE-AIOS-GROWTH-4E_CERTIFICATION.md) | Mission framework cert |
+| [GE-AIOS-GROWTH-4E Mission Framework](./GE-AIOS-GROWTH-4E_MISSION_FRAMEWORK.md) | Mission architecture |
+| [GE-AIOS-GROWTH-4E Infrastructure Audit](./GE-AIOS-GROWTH-4E_INFRASTRUCTURE_AUDIT.md) | Mission audit |
+| [GE-AIOS-GROWTH-4F Certification](./GE-AIOS-GROWTH-4F_CERTIFICATION.md) | Priority engine cert |
+| [GE-AIOS-GROWTH-4F Priority Engine](./GE-AIOS-GROWTH-4F_PRIORITY_ENGINE.md) | Prioritization architecture |
+| [GE-AIOS-GROWTH-4F Infrastructure Audit](./GE-AIOS-GROWTH-4F_INFRASTRUCTURE_AUDIT.md) | Priority audit |
+| [GE-AIOS-GROWTH-5A Certification](./GE-AIOS-GROWTH-5A_CERTIFICATION.md) | Scheduler readiness cert |
+| [GE-AIOS-GROWTH-5A Scheduler Readiness](./GE-AIOS-GROWTH-5A_SCHEDULER_READINESS.md) | Scheduler architecture |
+| [GE-AIOS-GROWTH-5A Infrastructure Audit](./GE-AIOS-GROWTH-5A_INFRASTRUCTURE_AUDIT.md) | Scheduler audit |
+| [GE-AIOS-GROWTH-5B Certification](./GE-AIOS-GROWTH-5B_CERTIFICATION.md) | Autonomous research cert |
+| [GE-AIOS-GROWTH-5B Autonomous Research Agent](./GE-AIOS-GROWTH-5B_AUTONOMOUS_RESEARCH_AGENT.md) | Pilot architecture |
+| [GE-AIOS-GROWTH-5B Infrastructure Audit](./GE-AIOS-GROWTH-5B_INFRASTRUCTURE_AUDIT.md) | Pilot audit |
 | [GE-AIOS-GROWTH Internal Workflow Dry Run](./GE-AIOS-GROWTH_INTERNAL_WORKFLOW_DRY_RUN.md) | Dry-run operator guide |
 | [GE-AIOS-GROWTH Execution Simulation](./GE-AIOS-GROWTH_EXECUTION_SIMULATION.md) | Execution simulation reference |
 

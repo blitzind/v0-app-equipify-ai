@@ -36,6 +36,16 @@ import {
   type GrowthAutonomyCapability,
   type GrowthAutonomySettingsSnapshot,
 } from "@/lib/growth/autonomy/growth-autonomy-types"
+import type { GrowthAiOsAutonomyPolicyIntegrationSummary } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-types"
+import { fetchGrowthAiOsAutonomyPolicy } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-engine-service"
+import {
+  buildAutonomyPolicyIntegrationSummary,
+  deriveResearchPilotControlFromPolicy,
+} from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-synthesizer"
+import {
+  getAutonomousResearchPilotOrgState,
+  setAutonomousResearchPilotControlState,
+} from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-store"
 import {
   getRuntimeKillSwitchStates,
   setRuntimeKillSwitch,
@@ -117,6 +127,7 @@ export type GrowthAutonomySettingsViewModel = {
     shadowModeEnabled: boolean
   }
   notice: string
+  aiOsIntegration: GrowthAiOsAutonomyPolicyIntegrationSummary
 }
 
 async function buildStatusSummary(
@@ -166,6 +177,23 @@ async function buildStatusSummary(
   }
 }
 
+async function syncAutonomousResearchPilotFromPolicy(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<void> {
+  const generatedAt = new Date().toISOString()
+  const policy = await fetchGrowthAiOsAutonomyPolicy(admin, { organizationId, generatedAt })
+  const orgState = getAutonomousResearchPilotOrgState(organizationId, generatedAt)
+  const nextControlState = deriveResearchPilotControlFromPolicy(policy, orgState.controlState)
+  if (nextControlState !== orgState.controlState) {
+    setAutonomousResearchPilotControlState({
+      organizationId,
+      controlState: nextControlState,
+      now: generatedAt,
+    })
+  }
+}
+
 export async function loadGrowthAutonomySettingsViewModel(
   admin: SupabaseClient,
   organizationId: string,
@@ -184,6 +212,7 @@ export async function loadGrowthAutonomySettingsViewModel(
   }
 
   const status = await buildStatusSummary(admin, organizationId, snapshot)
+  const autonomyPolicy = await fetchGrowthAiOsAutonomyPolicy(admin, { organizationId })
 
   return {
     qaMarker: GROWTH_AUTONOMY_QA_MARKER,
@@ -279,6 +308,7 @@ export async function loadGrowthAutonomySettingsViewModel(
     },
     notice:
       "GE-AUTO-1E: Outbound send is opt-in, confidence-gated, and instantly reversible. Autonomous approval remains disabled.",
+    aiOsIntegration: buildAutonomyPolicyIntegrationSummary(autonomyPolicy),
   }
 }
 
@@ -302,6 +332,7 @@ export async function patchGrowthAutonomySettings(
       patch: input.patch as Record<string, unknown>,
       emergencyStop: true,
     })
+    await syncAutonomousResearchPilotFromPolicy(admin, input.organizationId)
     return loadGrowthAutonomySettingsViewModel(admin, input.organizationId)
   }
 
@@ -367,6 +398,8 @@ export async function patchGrowthAutonomySettings(
     actorEmail: input.actorEmail,
     patch: input.patch as Record<string, unknown>,
   })
+
+  await syncAutonomousResearchPilotFromPolicy(admin, input.organizationId)
 
   return loadGrowthAutonomySettingsViewModel(admin, input.organizationId)
 }

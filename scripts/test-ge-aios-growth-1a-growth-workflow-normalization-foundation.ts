@@ -5,6 +5,7 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
+import { readGeAiOsCommandCenterUiBundle } from "./ge-aios-command-center-ui-cert-utils"
 import {
   GROWTH_AIOS_GROWTH_1A_PHASE,
   GROWTH_LEAD_RESEARCH_WORKFLOW_KEY,
@@ -94,7 +95,7 @@ const commandCenter = readSource("lib/growth/aios/ai-os-command-center-service.t
 assert.ok(commandCenter.includes("buildGrowthLeadResearchWorkflowCommandCenterSummary"))
 assert.ok(commandCenter.includes("growthLeadResearchWorkflow"))
 
-const panel = readSource("components/growth/ai-os/command-center/growth-ai-os-command-center-panel.tsx")
+const panel = readGeAiOsCommandCenterUiBundle()
 assert.ok(panel.includes("GrowthAiOsGrowthLeadResearchWorkflowSection"))
 assert.ok(panel.includes("model.growthLeadResearchWorkflow"))
 

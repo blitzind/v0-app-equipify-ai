@@ -10,6 +10,7 @@ import type {
   GrowthAgentKind,
   GrowthAgentRequiredGate,
 } from "@/lib/growth/aios/growth/growth-agent-framework-types"
+import type { GrowthAiOsRevenueOperatorPolicyAwareness } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-types"
 
 export const GROWTH_AIOS_GROWTH_4B_PHASE = "GE-AIOS-GROWTH-4B" as const
 
@@ -103,6 +104,9 @@ export type RevenueOperatorOrchestrationRecord = {
   escalationLevel: RevenueOperatorEscalationLevel
   recommendedNextAction: string
   handoffPreview: RevenueOperatorAgentHandoffContract | null
+  /** Policy engine block keys when recommended agent is policy-blocked (GE-AIOS-CONSOLIDATION-1E). */
+  policyEvaluationKeys?: string[]
+  policyBlockReasons?: string[]
 }
 
 export type RevenueOperatorOrchestrationPlanContext = {
@@ -128,6 +132,8 @@ export type RevenueOperatorReadModel = {
     executionReady: number
   }
   orchestrations: RevenueOperatorOrchestrationRecord[]
+  autonomyPolicyAwareness?: GrowthAiOsRevenueOperatorPolicyAwareness
+  autonomyPolicySource?: string
 }
 
 export type RevenueOperatorOrchestrationEngineResult = {

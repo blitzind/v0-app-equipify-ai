@@ -6,6 +6,10 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
 import {
+  GE_AIOS_OPERATIONS_DASHBOARD_PATH,
+  readGeAiOsCommandCenterUiBundle,
+} from "./ge-aios-command-center-ui-cert-utils"
+import {
   AI_OS_DAILY_BRIEFING_RUNTIME_RULE,
   GROWTH_AIOS_5D_PHASE,
   GROWTH_AI_OS_DAILY_BRIEFING_QA_MARKER,
@@ -65,12 +69,13 @@ const service = readSource("lib/growth/aios/ai-os-command-center-service.ts")
 assert.ok(service.includes("synthesizeAiOsDailyBriefing"))
 assert.ok(service.includes("dailyBriefing"))
 
-const panel = readSource("components/growth/ai-os/command-center/growth-ai-os-command-center-panel.tsx")
+const panel = readGeAiOsCommandCenterUiBundle()
 assert.ok(panel.includes("GrowthAiOsDailyBriefingSection"))
-assert.ok(panel.includes("model.dailyBriefing"))
-const briefingIndex = panel.indexOf("GrowthAiOsDailyBriefingSection")
-const executiveIndex = panel.indexOf('qaSection="executive-summary"')
-assert.ok(briefingIndex >= 0 && executiveIndex >= 0 && briefingIndex < executiveIndex)
+const operationsDashboard = readSource(GE_AIOS_OPERATIONS_DASHBOARD_PATH)
+assert.ok(operationsDashboard.includes("dashboard.dailyBriefing"))
+const briefingUsageIndex = operationsDashboard.indexOf("<GrowthAiOsDailyBriefingSection")
+const executiveIndex = operationsDashboard.indexOf('qaSection="operations-executive-overview"')
+assert.ok(briefingUsageIndex >= 0 && executiveIndex >= 0 && executiveIndex < briefingUsageIndex)
 
 const briefingUi = readSource("components/growth/ai-os/command-center/growth-ai-os-daily-briefing-section.tsx")
 assert.ok(briefingUi.includes('data-qa-section="daily-briefing"'))

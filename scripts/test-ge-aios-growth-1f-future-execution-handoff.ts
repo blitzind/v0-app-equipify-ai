@@ -5,6 +5,7 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
+import { readGeAiOsCommandCenterUiBundle } from "./ge-aios-command-center-ui-cert-utils"
 import {
   buildFutureExecutionHandoffContract,
   GROWTH_AIOS_GROWTH_1F_PHASE,
@@ -95,7 +96,7 @@ assert.ok(handoffService.includes("resolveFutureExecutionHandoffInfrastructure")
 assert.equal(handoffService.includes("createAiWorkOrder"), false)
 assert.equal(handoffService.includes("publishAiOsEvent"), false)
 
-const panel = readSource("components/growth/ai-os/command-center/growth-ai-os-command-center-panel.tsx")
+const panel = readGeAiOsCommandCenterUiBundle()
 assert.ok(panel.includes("GrowthAiOsFutureExecutionHandoffSection"))
 assert.ok(panel.includes("futureExecutionHandoffContracts"))
 

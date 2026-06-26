@@ -39,6 +39,11 @@ import { buildGrowthLeadResearchExecutionRuntimeReadModel } from "@/lib/growth/a
 import { buildGrowthAgentFrameworkReadModel } from "@/lib/growth/aios/growth/growth-agent-framework-service"
 import { buildRevenueOperatorReadModel } from "@/lib/growth/aios/growth/growth-revenue-operator-orchestration-service"
 import { buildGrowthAgentEventsReadModel } from "@/lib/growth/aios/growth/growth-agent-event-service"
+import { buildGrowthAgentMemoryReadModel } from "@/lib/growth/aios/growth/growth-agent-memory-service"
+import { buildGrowthMissionFrameworkReadModel } from "@/lib/growth/aios/growth/growth-mission-framework-service"
+import { buildGrowthMissionPriorityReadModel } from "@/lib/growth/aios/growth/growth-mission-priority-service"
+import { buildGrowthSchedulerReadinessReadModel } from "@/lib/growth/aios/growth/growth-scheduler-readiness-service"
+import { buildGrowthAutonomousResearchPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-service"
 import {
   buildAiOsMissionPlanningHref,
   GROWTH_AI_OS_PUBLIC_BASE_PATH,
@@ -50,8 +55,14 @@ import {
 } from "@/lib/growth/aios/ai-work-order-types"
 import { listGrowthObjectives } from "@/lib/growth/objectives/growth-objective-repository"
 import type { GrowthObjective } from "@/lib/growth/objectives/growth-objective-types"
-import { getRuntimeKillSwitchStates } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
-import { synthesizeAiOsDailyBriefing } from "@/lib/growth/aios/ai-os-daily-briefing-synthesizer"
+import { fetchGrowthAiOsAutonomyPolicy } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-engine-service"
+import {
+  buildCommandCenterSafeModeFromPolicy,
+  enrichAgentFrameworkWithAutonomyPolicy,
+  enrichAutonomousResearchPilotWithAutonomyPolicy,
+  enrichRevenueOperatorWithAutonomyPolicy,
+} from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-synthesizer"
+import { listGeV15OrganizationApprovalInbox } from "@/lib/growth/automation-runtime/ge-v1-5-automation-runtime-approval-inbox"
 
 const DEFAULT_LIMIT = 12
 
@@ -234,6 +245,12 @@ export async function fetchAiOsCommandCenterReadModel(
 ): Promise<AiOsCommandCenterReadModel> {
   const limit = input.limit ?? DEFAULT_LIMIT
   const pilotConfig = resolveLeadResearchPilotConfig()
+  const generatedAt = nowIso()
+
+  const autonomyPolicy = await fetchGrowthAiOsAutonomyPolicy(admin, {
+    organizationId: input.organizationId,
+    generatedAt,
+  })
 
   const [
     objectives,
@@ -243,7 +260,6 @@ export async function fetchAiOsCommandCenterReadModel(
     recentDecisions,
     agentHealth,
     providerHealth,
-    killSwitches,
     executiveRuntimes,
   ] = await Promise.all([
     listGrowthObjectives(admin, input.organizationId),
@@ -253,7 +269,6 @@ export async function fetchAiOsCommandCenterReadModel(
     listAiDecisionRecords(admin, { organizationId: input.organizationId, limit }),
     evaluateAiOsAgentHealth(admin, { organizationId: input.organizationId }),
     evaluateAiOsProviderHealth(admin, { organizationId: input.organizationId }),
-    getRuntimeKillSwitchStates(admin),
     listAiExecutiveBrainRuntimes(admin, { organizationId: input.organizationId }),
   ])
 
@@ -348,12 +363,7 @@ export async function fetchAiOsCommandCenterReadModel(
 
   const primaryFocus = needsAttention[0]?.title ?? activeMissions[0]?.title ?? null
 
-  const safeMode: AiOsCommandCenterSafeMode = {
-    emergencyStopActive: !killSwitches.autonomy_enabled,
-    objectiveModeEnabled: Boolean(killSwitches.autonomy_objective_mode_enabled),
-    autonomyEnabled: Boolean(killSwitches.autonomy_enabled),
-    killSwitches,
-  }
+  const safeMode = buildCommandCenterSafeModeFromPolicy(autonomyPolicy)
 
   const pilotStatus: AiOsCommandCenterPilotStatus = {
     featureEnabled: pilotConfig.enabled,
@@ -381,8 +391,6 @@ export async function fetchAiOsCommandCenterReadModel(
   const handoffInfrastructure = await resolveFutureExecutionHandoffInfrastructure(admin, {
     organizationId: input.organizationId,
   })
-
-  const generatedAt = nowIso()
 
   const futureExecutionHandoffContracts = await buildGrowthLeadResearchFutureExecutionHandoffContracts(admin, {
     organizationId: input.organizationId,
@@ -414,14 +422,48 @@ export async function fetchAiOsCommandCenterReadModel(
     generatedAt,
   })
 
-  const agentFramework = await buildGrowthAgentFrameworkReadModel(admin, { generatedAt })
-  const revenueOperator = await buildRevenueOperatorReadModel(admin, {
-    organizationId: input.organizationId,
-    generatedAt,
-  })
+  const agentFramework = enrichAgentFrameworkWithAutonomyPolicy(
+    await buildGrowthAgentFrameworkReadModel(admin, { generatedAt }),
+    autonomyPolicy,
+  )
+  const revenueOperator = enrichRevenueOperatorWithAutonomyPolicy(
+    await buildRevenueOperatorReadModel(admin, {
+      organizationId: input.organizationId,
+      generatedAt,
+    }),
+    autonomyPolicy,
+  )
   const agentEvents = await buildGrowthAgentEventsReadModel(admin, {
     organizationId: input.organizationId,
     generatedAt,
+  })
+  const agentMemory = await buildGrowthAgentMemoryReadModel(admin, {
+    organizationId: input.organizationId,
+    generatedAt,
+  })
+  const missionFramework = await buildGrowthMissionFrameworkReadModel(admin, {
+    organizationId: input.organizationId,
+    generatedAt,
+  })
+  const missionPriority = await buildGrowthMissionPriorityReadModel(admin, {
+    organizationId: input.organizationId,
+    generatedAt,
+  })
+  const schedulerReadiness = await buildGrowthSchedulerReadinessReadModel(admin, {
+    organizationId: input.organizationId,
+    generatedAt,
+  })
+  const autonomousResearchPilot = enrichAutonomousResearchPilotWithAutonomyPolicy(
+    await buildGrowthAutonomousResearchPilotReadModel(admin, {
+      organizationId: input.organizationId,
+      generatedAt,
+    }),
+    autonomyPolicy,
+  )
+
+  const automationApprovalInbox = await listGeV15OrganizationApprovalInbox(admin, {
+    organizationId: input.organizationId,
+    limit: 250,
   })
 
   const commandCenterBase = {
@@ -458,11 +500,24 @@ export async function fetchAiOsCommandCenterReadModel(
     agentFramework,
     revenueOperator,
     agentEvents,
+    agentMemory,
+    missionFramework,
+    missionPriority,
+    schedulerReadiness,
+    autonomousResearchPilot,
     safeMode,
   }
 
-  return {
+  const withDailyBriefing = {
     ...commandCenterBase,
     dailyBriefing: synthesizeAiOsDailyBriefing(commandCenterBase),
+  }
+
+  return {
+    ...withDailyBriefing,
+    autonomyPolicy,
+    operationsDashboard: synthesizeAiOsOperationsDashboard(withDailyBriefing, {
+      automationApprovalCount: automationApprovalInbox.length,
+    }, autonomyPolicy),
   }
 }

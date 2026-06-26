@@ -39,6 +39,8 @@ import {
 } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-pilot-types"
 import type { GrowthLeadResearchExecutionPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
 import type { GrowthLeadResearchExecutionPlanApprovalStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-types"
+import { evaluateRuntimeAutonomyPolicyGate } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-synthesizer"
+import { fetchGrowthAiOsAutonomyPolicy } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-engine-service"
 
 export type GrowthLeadResearchExecutionEnqueueInput = {
   organizationId: string
@@ -176,6 +178,11 @@ export async function buildExecutionRuntimeValidation(
     organizationId: input.organizationId,
     override: input.runtimeEnabled,
   })
+  const autonomyPolicy = await fetchGrowthAiOsAutonomyPolicy(admin, {
+    organizationId: input.organizationId,
+  })
+  const policyGate = evaluateRuntimeAutonomyPolicyGate(autonomyPolicy)
+  const effectiveRuntimeEnabled = runtimeEnabled && policyGate.allowed
   const infrastructure = await resolveFutureExecutionHandoffInfrastructure(admin, {
     organizationId: input.organizationId,
   })
@@ -205,7 +212,7 @@ export async function buildExecutionRuntimeValidation(
   const planPreflight = buildPlanPreflightChecklist({ handoff, workflowChecklist: workflowPreflight })
 
   return validateExecutionRuntimeGates({
-    runtimeEnabled,
+    runtimeEnabled: effectiveRuntimeEnabled,
     workflowType,
     approvalState: input.approvalState,
     readinessState,

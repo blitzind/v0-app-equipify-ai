@@ -28,6 +28,11 @@ import { buildPilotEligibilityForPlan } from "@/lib/growth/aios/growth/growth-le
 import { buildAgentPlanContext } from "@/lib/growth/aios/growth/growth-agent-framework-permissions"
 import { buildRevenueOperatorPlanContext } from "@/lib/growth/aios/growth/growth-revenue-operator-orchestration-service"
 import { buildGrowthAgentEventPlanContext } from "@/lib/growth/aios/growth/growth-agent-event-service"
+import { buildGrowthAgentMemoryPlanContext } from "@/lib/growth/aios/growth/growth-agent-memory-service"
+import { buildGrowthMissionPlanContext } from "@/lib/growth/aios/growth/growth-mission-framework-service"
+import { buildGrowthMissionPriorityPlanContext } from "@/lib/growth/aios/growth/growth-mission-priority-service"
+import { buildGrowthSchedulerReadinessPlanContext } from "@/lib/growth/aios/growth/growth-scheduler-readiness-service"
+import { buildGrowthAutonomousResearchPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-service"
 import { listAiWorkOrders } from "@/lib/growth/aios/ai-work-order-repository"
 import {
   isAiWorkOrderActiveStatus,
@@ -201,6 +206,11 @@ async function listLeadResearchExecutionPlansForMission(
     let agentContext = null
     let orchestrationContext = null
     let agentEventContext = null
+    let agentMemoryContext = null
+    let missionPlanContext = null
+    let missionPriorityContext = null
+    let schedulerReadinessContext = null
+    let autonomousResearchPilotContext = null
 
     if (approvalStatus === "approved_for_future_execution") {
       readinessState = resolveApprovedPlanReadinessState({
@@ -348,6 +358,36 @@ async function listLeadResearchExecutionPlansForMission(
       confidence,
     })
 
+    agentMemoryContext = await buildGrowthAgentMemoryPlanContext(admin, {
+      organizationId: input.organizationId,
+      leadId,
+      generatedAt: nowIso(),
+    })
+
+    missionPlanContext = await buildGrowthMissionPlanContext(admin, {
+      organizationId: input.organizationId,
+      leadId,
+      generatedAt: nowIso(),
+    })
+
+    missionPriorityContext = await buildGrowthMissionPriorityPlanContext(admin, {
+      organizationId: input.organizationId,
+      leadId,
+      generatedAt: nowIso(),
+    })
+
+    schedulerReadinessContext = await buildGrowthSchedulerReadinessPlanContext(admin, {
+      organizationId: input.organizationId,
+      leadId,
+      generatedAt: nowIso(),
+    })
+
+    autonomousResearchPilotContext = await buildGrowthAutonomousResearchPilotPlanContext(admin, {
+      organizationId: input.organizationId,
+      leadId,
+      generatedAt: nowIso(),
+    })
+
     plans.push({
       leadId,
       companyName: lead?.companyName ?? null,
@@ -385,6 +425,11 @@ async function listLeadResearchExecutionPlansForMission(
       agentContext,
       orchestrationContext,
       agentEventContext,
+      agentMemoryContext,
+      missionPlanContext,
+      missionPriorityContext,
+      schedulerReadinessContext,
+      autonomousResearchPilotContext,
       reason:
         snapshot.nextBestAction?.reason ??
         snapshot.opportunityAssessment?.summary ??

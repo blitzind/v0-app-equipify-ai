@@ -20,7 +20,6 @@ const actionBodySchema = z.object({
   executionPlan: z.object({}).passthrough().optional(),
   approvalState: z.literal("approved_for_future_execution").optional(),
   confidence: z.number().nullable().optional(),
-  runtimeEnabled: z.boolean().optional(),
 })
 
 export async function POST(request: Request, context: RouteContext) {
@@ -84,7 +83,6 @@ export async function POST(request: Request, context: RouteContext) {
       executionPlan: body.executionPlan ?? existing.executionPlan,
       approvalState: body.approvalState ?? "approved_for_future_execution",
       confidence: body.confidence ?? null,
-      runtimeEnabled: body.runtimeEnabled,
     })
 
     const result = await resumeGrowthLeadResearchExecution(store, {

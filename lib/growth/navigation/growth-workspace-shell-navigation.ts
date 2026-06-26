@@ -9,6 +9,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   Activity,
   BookOpen,
+  Bot,
   Inbox,
   LayoutDashboard,
   Phone,
@@ -92,6 +93,7 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
     id: "intelligence",
     label: "Intelligence",
     items: [
+      { id: "ai-operations", label: "AI Operations", registryRouteId: "workspace-ai-operations", icon: Bot, workspaceRoute: true },
       { id: "activity", label: "Activity", registryRouteId: "workspace-activity", icon: Activity, workspaceRoute: true },
       { id: "engagement", label: "Engagement", registryRouteId: "workspace-engagement", icon: Activity, workspaceRoute: true },
     ],
@@ -176,6 +178,9 @@ export function isGrowthShellNavItemActive(pathname: string, item: GrowthShellNa
   if (item.id === "personalization" &&
     pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/personalization`)
   ) {
+    return true
+  }
+  if (item.id === "ai-operations" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/os`)) {
     return true
   }
   if (item.id === "activity" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/activity`)) {

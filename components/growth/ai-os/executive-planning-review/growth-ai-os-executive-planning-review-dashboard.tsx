@@ -89,6 +89,11 @@ export function GrowthAiOsExecutPlanningReviewDashboard({
               agentContext={entry.agentContext}
               orchestrationContext={entry.orchestrationContext}
               agentEventContext={entry.agentEventContext}
+              agentMemoryContext={entry.agentMemoryContext}
+              missionPlanContext={entry.missionPlanContext}
+              missionPriorityContext={entry.missionPriorityContext}
+              schedulerReadinessContext={entry.schedulerReadinessContext}
+              autonomousResearchPilotContext={entry.autonomousResearchPilotContext}
               compact
               title={`Planning Review · ${entry.companyName ?? entry.leadId.slice(0, 8)}`}
               description="Lead research execution plan — read-only, no Work Order execution."

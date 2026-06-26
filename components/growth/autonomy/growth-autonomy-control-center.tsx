@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { GrowthAutonomyOutboundDashboardPanel } from "@/components/growth/autonomy/growth-autonomy-outbound-dashboard-panel"
+import { GrowthAutonomyAiOsIntegrationPanel } from "@/components/growth/autonomy/growth-autonomy-ai-os-integration-panel"
 import type { GrowthAutonomySettingsViewModel } from "@/lib/growth/autonomy/growth-autonomy-settings-service"
 import {
   countAllowedEntries,
@@ -198,6 +199,8 @@ export function GrowthAutonomyControlCenter() {
       </Card>
 
       <GrowthAutonomyOutboundDashboardPanel />
+
+      <GrowthAutonomyAiOsIntegrationPanel integration={viewModel.aiOsIntegration} />
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
