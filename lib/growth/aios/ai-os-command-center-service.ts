@@ -32,6 +32,7 @@ import {
   buildGrowthLeadResearchFutureExecutionHandoffContracts,
   resolveFutureExecutionHandoffInfrastructure,
 } from "@/lib/growth/aios/growth/growth-lead-research-future-execution-handoff-service"
+import { buildGrowthLeadResearchExecutionBoundaryAudit } from "@/lib/growth/aios/growth/growth-lead-research-execution-boundary-audit-service"
 import {
   buildAiOsMissionPlanningHref,
   GROWTH_AI_OS_PUBLIC_BASE_PATH,
@@ -375,11 +376,19 @@ export async function fetchAiOsCommandCenterReadModel(
     organizationId: input.organizationId,
   })
 
+  const generatedAt = nowIso()
+
   const futureExecutionHandoffContracts = await buildGrowthLeadResearchFutureExecutionHandoffContracts(admin, {
     organizationId: input.organizationId,
     limit,
     infrastructure: handoffInfrastructure,
-    generatedAt: nowIso(),
+    generatedAt,
+  })
+
+  const executionBoundaryAudit = await buildGrowthLeadResearchExecutionBoundaryAudit(admin, {
+    organizationId: input.organizationId,
+    limit,
+    generatedAt,
   })
 
   const commandCenterBase = {
@@ -409,6 +418,7 @@ export async function fetchAiOsCommandCenterReadModel(
     executionPlanReviewQueue,
     approvedPlanReadinessQueue,
     futureExecutionHandoffContracts,
+    executionBoundaryAudit,
     safeMode,
   }
 

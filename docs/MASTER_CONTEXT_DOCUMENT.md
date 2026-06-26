@@ -16,7 +16,7 @@
 =================================================
 
 **Document role:** Living engineering state — current phase, production status, rules, certifications, risks, and priorities.  
-**Last updated:** 2026-06-25 (GE-AIOS-GROWTH-1F Future Execution Handoff Contract)  
+**Last updated:** 2026-06-25 (GE-AIOS-GROWTH-2A Execution Runtime Boundary Audit)  
 **Regeneration:** `pnpm update:master-context` (inventory scan + this document's manual sections)  
 **Admin UI:** `/admin/master-context`
 
@@ -46,7 +46,7 @@
 |-------|--------|
 | **Architecture phase** | GE-AI-1X — **Complete** (Constitution v1.0 frozen) |
 | **Documentation phase** | GE-DOC-1 — **Complete** |
-| **Current phase** | **GE-AIOS-GROWTH-1F** — Future Execution Handoff Contract (**certified locally**, not committed) |
+| **Current phase** | **GE-AIOS-GROWTH-2A** — Execution Runtime Boundary Audit (**certified locally**, not committed) |
 | **Next phase** | GE-AI-2F — Meta-Recommender |
 
 **Transition:** Official move from Architecture Phase (GE-AI-1X) to Engineering Phase (GE-AI-2X).
@@ -230,8 +230,14 @@ Full list: `lib/admin/master-context.manual.after.md` § Known Limitations.
 | GE-AIOS-GROWTH-1D | Execution Plan Approval Queue | Complete (local cert) |
 | GE-AIOS-GROWTH-1E | Approved Plan Readiness & Audit Trail | Complete (local cert) |
 | GE-AIOS-GROWTH-1F | Future Execution Handoff Contract | Complete (local cert) |
+| GE-AIOS-GROWTH-2A | Execution Runtime Boundary Audit | Complete (local cert) |
 
 ### Current phase
+
+**GE-AIOS-GROWTH-2A — Execution Runtime Boundary Audit**  
+Read-only audit of future execution pathways, guardrails, and risk classifications before any runtime is built. Status: **Complete (local cert)**.
+
+### Previous phase
 
 **GE-AIOS-GROWTH-1F — Future Execution Handoff Contract**  
 Read-only handoff specification for approved execution plans with provider/guardrail requirements. Status: **Complete (local cert)**.
@@ -318,6 +324,7 @@ GE-AUTO-1A through 2I implemented locally; GE-AUTO-3 not started. See manual bef
 | GE-AIOS-GROWTH-1D Execution Plan Approval Queue | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-GROWTH-1E Approved Plan Readiness | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-GROWTH-1F Future Execution Handoff | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-2A Execution Boundary Audit | **PASS (local)** | 2026-06-25 |
 | GE-AI-2A+ implementation (production) | Pending | — |
 
 Outbound operational readiness: `docs/GROWTH_OUTBOUND_OPERATIONAL_READINESS.md`
@@ -588,6 +595,9 @@ Full list: `lib/admin/master-context.manual.after.md` § Current Priorities.
 | [GE-AIOS-GROWTH-1E Infrastructure Audit](./GE-AIOS-GROWTH-1E_INFRASTRUCTURE_AUDIT.md) | Approved Plan Readiness audit |
 | [GE-AIOS-GROWTH-1F Certification](./GE-AIOS-GROWTH-1F_CERTIFICATION.md) | Handoff Contract cert |
 | [GE-AIOS-GROWTH-1F Infrastructure Audit](./GE-AIOS-GROWTH-1F_INFRASTRUCTURE_AUDIT.md) | Handoff Contract audit |
+| [GE-AIOS-GROWTH-2A Certification](./GE-AIOS-GROWTH-2A_CERTIFICATION.md) | Boundary Audit cert |
+| [GE-AIOS-GROWTH-2A Infrastructure Audit](./GE-AIOS-GROWTH-2A_INFRASTRUCTURE_AUDIT.md) | Boundary Audit audit |
+| [GE-AIOS-GROWTH Execution Boundary Matrix](./GE-AIOS-GROWTH_EXECUTION_BOUNDARY_MATRIX.md) | Workflow boundary matrix |
 
 ### Legacy / generated inventory
 

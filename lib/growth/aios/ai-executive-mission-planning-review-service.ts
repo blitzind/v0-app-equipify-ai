@@ -56,6 +56,12 @@ import {
   summarizeFutureExecutionHandoffContract,
 } from "@/lib/growth/aios/growth/growth-lead-research-future-execution-handoff-types"
 import { resolveFutureExecutionHandoffInfrastructure } from "@/lib/growth/aios/growth/growth-lead-research-future-execution-handoff-service"
+import {
+  auditWorkflowBoundary,
+  buildPlanExecutionBoundaryStatus,
+  summarizePlanBoundaryStatus,
+} from "@/lib/growth/aios/growth/growth-lead-research-execution-boundary-audit-types"
+import type { GrowthLeadResearchCanonicalWorkflowType } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
 import { buildAiOsPilotLeadResearchHref } from "@/lib/growth/aios/ai-os-public-routes"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import type { AiExecutiveMissionPlanningLeadResearchExecutionPlanSummary } from "@/lib/growth/aios/ai-executive-mission-planning-review-types"
@@ -157,6 +163,9 @@ async function listLeadResearchExecutionPlansForMission(
     let auditTrailSummary = null
     let handoffState = null
     let handoffSummary = null
+    let boundaryClassification = null
+    let boundarySummary = null
+    let boundaryWarnings: string[] = []
 
     if (approvalStatus === "approved_for_future_execution") {
       readinessState = resolveApprovedPlanReadinessState({
@@ -198,6 +207,14 @@ async function listLeadResearchExecutionPlansForMission(
       })
       handoffState = handoffContract.handoffState
       handoffSummary = summarizeFutureExecutionHandoffContract(handoffContract)
+      const workflowReport = auditWorkflowBoundary(
+        snapshot.executionPlan.workflowType as GrowthLeadResearchCanonicalWorkflowType,
+        handoffInfrastructure,
+      )
+      const planBoundary = buildPlanExecutionBoundaryStatus({ handoff: handoffContract, workflowReport })
+      boundaryClassification = planBoundary.classification
+      boundarySummary = summarizePlanBoundaryStatus(planBoundary)
+      boundaryWarnings = planBoundary.boundaryWarnings
     }
 
     plans.push({
@@ -213,6 +230,9 @@ async function listLeadResearchExecutionPlansForMission(
       auditTrailSummary,
       handoffState,
       handoffSummary,
+      boundaryClassification,
+      boundarySummary,
+      boundaryWarnings,
       reason:
         snapshot.nextBestAction?.reason ??
         snapshot.opportunityAssessment?.summary ??

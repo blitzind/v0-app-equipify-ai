@@ -603,5 +603,23 @@ export function buildAiOsDailyBriefingCertFixture(): AiOsDailyBriefingSource {
     executionPlanReviewQueue: [],
     approvedPlanReadinessQueue: [],
     futureExecutionHandoffContracts: [],
+    executionBoundaryAudit: {
+      readOnly: true,
+      qaMarker: "growth-aios-growth-2a-execution-boundary-audit-v1",
+      generatedAt: "2026-06-25T12:00:00.000Z",
+      workflowReports: [],
+      systemSummary: {
+        workflowsAudited: 0,
+        futureExecutionAllowedCount: 0,
+        outboundRiskWorkflows: [],
+        coreRiskWorkflows: [],
+        planningOnlyWorkflows: [],
+        notAllowedWorkflows: [],
+        missingGlobalGuardrails: [],
+        systemRiskLevel: "low",
+        headline: "Fixture — no boundary audit data",
+      },
+      planBoundaries: [],
+    },
   }
 }

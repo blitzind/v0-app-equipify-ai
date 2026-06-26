@@ -11,6 +11,7 @@ import type { GrowthLeadResearchExecutionPlan } from "@/lib/growth/aios/growth/g
 import type { GrowthLeadResearchExecutionPlanApprovalStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-types"
 import type { GrowthLeadResearchApprovedPlanReadinessState } from "@/lib/growth/aios/growth/growth-lead-research-approved-plan-readiness-types"
 import type { GrowthLeadResearchFutureExecutionHandoffState } from "@/lib/growth/aios/growth/growth-lead-research-future-execution-handoff-types"
+import type { GrowthLeadResearchExecutionBoundaryClassification } from "@/lib/growth/aios/growth/growth-lead-research-execution-boundary-audit-types"
 
 export const GROWTH_AIOS_3E_PHASE = "GE-AIOS-3E" as const
 
@@ -59,6 +60,9 @@ export type AiExecutiveMissionPlanningLeadResearchExecutionPlanSummary = {
   auditTrailSummary: string | null
   handoffState: GrowthLeadResearchFutureExecutionHandoffState | null
   handoffSummary: string | null
+  boundaryClassification: GrowthLeadResearchExecutionBoundaryClassification | null
+  boundarySummary: string | null
+  boundaryWarnings: string[]
   reason: string
   createdAt: string
   reviewUpdatedAt: string | null

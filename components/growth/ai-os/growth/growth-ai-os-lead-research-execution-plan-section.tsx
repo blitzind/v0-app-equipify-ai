@@ -7,6 +7,7 @@ import { GROWTH_LEAD_RESEARCH_EXECUTION_PLAN_QA_MARKER } from "@/lib/growth/aios
 import type { GrowthLeadResearchExecutionPlanApprovalStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-types"
 import type { GrowthLeadResearchApprovedPlanReadinessState } from "@/lib/growth/aios/growth/growth-lead-research-approved-plan-readiness-types"
 import type { GrowthLeadResearchFutureExecutionHandoffState } from "@/lib/growth/aios/growth/growth-lead-research-future-execution-handoff-types"
+import type { GrowthLeadResearchExecutionBoundaryClassification } from "@/lib/growth/aios/growth/growth-lead-research-execution-boundary-audit-types"
 import { cn } from "@/lib/utils"
 
 function readinessBadgeVariant(readiness: GrowthLeadResearchExecutionPlan["executionReadiness"]) {
@@ -28,6 +29,9 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   auditTrailSummary,
   handoffState,
   handoffSummary,
+  boundaryClassification,
+  boundarySummary,
+  boundaryWarnings = [],
 }: {
   plan: GrowthLeadResearchExecutionPlan
   title?: string
@@ -40,6 +44,9 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   auditTrailSummary?: string | null
   handoffState?: GrowthLeadResearchFutureExecutionHandoffState | null
   handoffSummary?: string | null
+  boundaryClassification?: GrowthLeadResearchExecutionBoundaryClassification | null
+  boundarySummary?: string | null
+  boundaryWarnings?: string[]
 }) {
   return (
     <Card data-qa-marker={GROWTH_LEAD_RESEARCH_EXECUTION_PLAN_QA_MARKER} data-qa-section="execution-plan">
@@ -83,6 +90,17 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
           <p className="text-sm text-muted-foreground">
             <span className="font-medium text-foreground">Handoff ({handoffState.replaceAll("_", " ")}):</span>{" "}
             {handoffSummary}
+          </p>
+        ) : null}
+        {boundaryClassification ? (
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Boundary ({boundaryClassification.replaceAll("_", " ")}):</span>{" "}
+            {boundarySummary}
+          </p>
+        ) : null}
+        {boundaryWarnings.length > 0 ? (
+          <p className="text-sm text-amber-700">
+            Boundary warning: {boundaryWarnings[0]}
           </p>
         ) : null}
 

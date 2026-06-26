@@ -54,6 +54,7 @@ For each GE-AI-2X phase, maintain one entry with:
 | GE-AIOS-GROWTH-1D | Execution Plan Approval Queue | Complete (local cert) |
 | GE-AIOS-GROWTH-1E | Approved Plan Readiness & Audit Trail | Complete (local cert) |
 | GE-AIOS-GROWTH-1F | Future Execution Handoff Contract | Complete (local cert) |
+| GE-AIOS-GROWTH-2A | Execution Runtime Boundary Audit | Complete (local cert) |
 | GE-AI-2D | Memory Facade (ledger) | Complete via GE-AIOS-2F |
 | GE-AI-2A | Decision Record Foundation (ledger) | Complete via GE-AIOS-2D |
 | GE-AI-2B | Event Bus Unification | Partial (foundation in GE-AIOS-2B) |
@@ -1031,6 +1032,33 @@ Pending — read-only, feature-flagged, no migrations
 ### Production certification
 
 Pending — read-only, feature-flagged, no migrations
+
+---
+
+## GE-AIOS-GROWTH-2A — Execution Runtime Boundary Audit
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-2A (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-1F Future Execution Handoff Contract |
+
+### Scope delivered
+
+- Deterministic boundary classification for all 8 canonical workflow types
+- Static workflow boundary catalog (services, routes, providers, guardrails, risks)
+- Read-only boundary audit service with system risk summary
+- Command Center Execution Boundary Audit section
+- Mission Planning Review boundary warnings on approved plans
+- Execution Boundary Matrix reference doc
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-2a-execution-boundary-audit`
+
+### Production certification
+
+Pending — audit-only, no migrations, no provider calls from audit path
 
 ---
 

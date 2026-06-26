@@ -12,6 +12,7 @@ import { GrowthAiOsGrowthLeadResearchWorkflowSection } from "@/components/growth
 import { GrowthAiOsExecutionPlanReviewSection } from "@/components/growth/ai-os/command-center/growth-ai-os-execution-plan-review-section"
 import { GrowthAiOsApprovedPlanReadinessSection } from "@/components/growth/ai-os/command-center/growth-ai-os-approved-plan-readiness-section"
 import { GrowthAiOsFutureExecutionHandoffSection } from "@/components/growth/ai-os/command-center/growth-ai-os-future-execution-handoff-section"
+import { GrowthAiOsExecutionBoundaryAuditSection } from "@/components/growth/ai-os/command-center/growth-ai-os-execution-boundary-audit-section"
 import type { AiOsCommandCenterReadModel } from "@/lib/growth/aios/ai-os-command-center-types"
 import { GROWTH_AI_OS_COMMAND_CENTER_QA_MARKER } from "@/lib/growth/aios/ai-os-command-center-types"
 import { buildAiOsPilotLeadResearchHref } from "@/lib/growth/aios/ai-os-public-routes"
@@ -102,6 +103,8 @@ export function GrowthAiOsCommandCenterPanel() {
       <GrowthAiOsApprovedPlanReadinessSection approvedPlans={model.approvedPlanReadinessQueue} />
 
       <GrowthAiOsFutureExecutionHandoffSection handoffContracts={model.futureExecutionHandoffContracts} />
+
+      <GrowthAiOsExecutionBoundaryAuditSection audit={model.executionBoundaryAudit} />
 
       <SectionCard
         title=" Executive Summary"
