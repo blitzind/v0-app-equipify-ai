@@ -48,6 +48,12 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   dryRunSummary,
   dryRunBlockedReasons = [],
   latestDryRunStatus,
+  pilotEligible,
+  pilotSummary,
+  pilotBlockedReasons = [],
+  pilotEnabled,
+  runtimeEnabled,
+  dryRunRequired,
 }: {
   plan: GrowthLeadResearchExecutionPlan
   title?: string
@@ -75,6 +81,12 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   dryRunSummary?: string | null
   dryRunBlockedReasons?: string[]
   latestDryRunStatus?: GrowthLeadResearchExecutionDryRunStatus | null
+  pilotEligible?: boolean
+  pilotSummary?: string | null
+  pilotBlockedReasons?: string[]
+  pilotEnabled?: boolean
+  runtimeEnabled?: boolean
+  dryRunRequired?: boolean
 }) {
   return (
     <Card data-qa-marker={GROWTH_LEAD_RESEARCH_EXECUTION_PLAN_QA_MARKER} data-qa-section="execution-plan">
@@ -216,6 +228,36 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
             {dryRunBlockedReasons.length > 0 ? (
               <p className="text-amber-700">
                 Blocked: {dryRunBlockedReasons.slice(0, compact ? 2 : 5).join(" · ")}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        {pilotEligible != null || pilotSummary ? (
+          <div className="space-y-1 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={pilotEligible ? "secondary" : "outline"}>
+                Runtime pilot · {pilotEligible ? "eligible" : "not eligible"}
+              </Badge>
+              {pilotEnabled != null ? (
+                <Badge variant={pilotEnabled ? "secondary" : "outline"}>
+                  Pilot {pilotEnabled ? "enabled" : "disabled"}
+                </Badge>
+              ) : null}
+              {runtimeEnabled != null ? (
+                <Badge variant={runtimeEnabled ? "secondary" : "outline"}>
+                  Runtime {runtimeEnabled ? "enabled" : "disabled"}
+                </Badge>
+              ) : null}
+              {dryRunRequired ? <Badge variant="outline">Dry-run required before enqueue</Badge> : null}
+            </div>
+            {pilotSummary ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Pilot:</span> {pilotSummary}
+              </p>
+            ) : null}
+            {pilotBlockedReasons.length > 0 ? (
+              <p className="text-amber-700">
+                Blocked: {pilotBlockedReasons.slice(0, compact ? 2 : 5).join(" · ")}
               </p>
             ) : null}
           </div>

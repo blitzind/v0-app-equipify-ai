@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useCallback, useState } from "react"
-import { Cpu, FlaskConical, Pause, Play, Square, Loader2 } from "lucide-react"
+import { Cpu, FlaskConical, Pause, Play, Square, Loader2, Rocket } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,6 +19,10 @@ import {
   type GrowthLeadResearchExecutionRuntimeSummaryItem,
   type GrowthLeadResearchExecutionState,
 } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-types"
+import {
+  GROWTH_LEAD_RESEARCH_EXECUTION_RUNTIME_PILOT_QA_MARKER,
+  type GrowthLeadResearchExecutionRuntimePilotPlanItem,
+} from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-pilot-types"
 
 function stateBadgeVariant(state: GrowthLeadResearchExecutionState) {
   if (state === "completed") return "secondary" as const
@@ -145,8 +149,12 @@ export function GrowthAiOsExecutionRuntimeSection({
 }) {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [dryRunLoadingPlanId, setDryRunLoadingPlanId] = useState<string | null>(null)
+  const [enqueueLoadingPlanId, setEnqueueLoadingPlanId] = useState<string | null>(null)
   const [latestDryRunReport, setLatestDryRunReport] = useState<GrowthLeadResearchExecutionDryRunReport | null>(null)
   const [dryRunError, setDryRunError] = useState<string | null>(null)
+  const [enqueueError, setEnqueueError] = useState<string | null>(null)
+
+  const effectiveRuntimeEnabled = executionRuntime.pilotSummary.effectiveRuntimeEnabled
 
   const runAction = useCallback(
     async (executionId: string, action: "pause" | "resume" | "cancel") => {
@@ -201,6 +209,39 @@ export function GrowthAiOsExecutionRuntimeSection({
     }
   }, [])
 
+  const runEnqueue = useCallback(
+    async (plan: GrowthLeadResearchExecutionRuntimePilotPlanItem) => {
+      setEnqueueLoadingPlanId(plan.planId)
+      setEnqueueError(null)
+      try {
+        const response = await fetch("/api/platform/growth/ai-os/execution-runtime/enqueue", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            planId: plan.planId,
+            leadId: plan.leadId,
+            companyName: plan.companyName,
+            executionPlan: plan.executionPlan,
+            approvalState: plan.approvalState,
+            confidence: plan.confidence,
+            runtimeEnabled: executionRuntime.pilotSummary.runtimeEnabled,
+            pilotEnabled: executionRuntime.pilotSummary.pilotEnabled,
+          }),
+        })
+        const body = (await response.json()) as { ok?: boolean; message?: string; error?: string }
+        if (!response.ok || !body.ok) {
+          throw new Error(body.message ?? body.error ?? "Enqueue failed.")
+        }
+        onRefresh?.()
+      } catch (error) {
+        setEnqueueError(error instanceof Error ? error.message : "Enqueue failed.")
+      } finally {
+        setEnqueueLoadingPlanId(null)
+      }
+    },
+    [executionRuntime.pilotSummary.pilotEnabled, executionRuntime.pilotSummary.runtimeEnabled, onRefresh],
+  )
+
   return (
     <Card
       data-qa-marker={GROWTH_LEAD_RESEARCH_EXECUTION_RUNTIME_QA_MARKER}
@@ -222,6 +263,78 @@ export function GrowthAiOsExecutionRuntimeSection({
             Runtime {executionRuntime.runtimeEnabled ? "enabled" : "disabled"} · Supported states:{" "}
             {GROWTH_LEAD_RESEARCH_EXECUTION_STATES.join(", ")}
           </p>
+        </div>
+
+        <div
+          className="rounded-lg border border-dashed border-emerald-200 bg-emerald-50/40 p-3 text-sm"
+          data-qa-marker={GROWTH_LEAD_RESEARCH_EXECUTION_RUNTIME_PILOT_QA_MARKER}
+          data-qa-section="execution-runtime-pilot"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <Rocket className="size-4 text-emerald-700" />
+            <p className="font-medium">Runtime Pilot — research_company only</p>
+            <Badge variant={executionRuntime.pilotSummary.pilotEnabled ? "secondary" : "outline"}>
+              Pilot {executionRuntime.pilotSummary.pilotEnabled ? "enabled" : "disabled"}
+            </Badge>
+            <Badge variant={effectiveRuntimeEnabled ? "secondary" : "outline"}>
+              Effective runtime {effectiveRuntimeEnabled ? "on" : "off"}
+            </Badge>
+          </div>
+          <p className="mt-2 text-muted-foreground">{executionRuntime.pilotSummary.headline}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{executionRuntime.pilotRule}</p>
+
+          {executionRuntime.pilotEligiblePlans.length === 0 ? (
+            <p className="mt-3 text-muted-foreground">No research_company plans eligible for enqueue.</p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Eligible plans</p>
+              {executionRuntime.pilotEligiblePlans.map((plan) => {
+                const loading = enqueueLoadingPlanId === plan.planId
+                return (
+                  <div key={plan.planId} className="rounded-md border border-border/60 bg-background/80 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="font-medium">{plan.companyName ?? plan.leadId}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {plan.workflowType.replaceAll("_", " ")} · {plan.planId}
+                        </p>
+                        {plan.latestDryRunStatus ? (
+                          <p className="text-xs text-muted-foreground">
+                            Dry-run · {plan.latestDryRunStatus.replaceAll("_", " ")}
+                          </p>
+                        ) : null}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={loading || !effectiveRuntimeEnabled}
+                        onClick={() => void runEnqueue(plan)}
+                      >
+                        {loading ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
+                        Enqueue
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {executionRuntime.pilotBlockedPlans.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Blocked plans</p>
+              {executionRuntime.pilotBlockedPlans.slice(0, 8).map((plan) => (
+                <div key={plan.planId} className="rounded-md border border-border/60 bg-background/60 p-3">
+                  <p className="font-medium">{plan.companyName ?? plan.leadId}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {plan.workflowType.replaceAll("_", " ")} · {plan.blockReason ?? "Blocked"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {enqueueError ? <p className="mt-2 text-sm text-destructive">{enqueueError}</p> : null}
         </div>
 
         <div
@@ -302,45 +415,65 @@ export function GrowthAiOsExecutionRuntimeSection({
         <ExecutionGroup
           title="Queued"
           items={executionRuntime.queuedExecutions}
-          runtimeEnabled={executionRuntime.runtimeEnabled}
+          runtimeEnabled={effectiveRuntimeEnabled}
           onAction={runAction}
           actionLoading={actionLoading}
         />
         <ExecutionGroup
           title="Active"
           items={executionRuntime.activeExecutions}
-          runtimeEnabled={executionRuntime.runtimeEnabled}
+          runtimeEnabled={effectiveRuntimeEnabled}
           onAction={runAction}
           actionLoading={actionLoading}
         />
         <ExecutionGroup
           title="Paused"
           items={executionRuntime.pausedExecutions}
-          runtimeEnabled={executionRuntime.runtimeEnabled}
+          runtimeEnabled={effectiveRuntimeEnabled}
           onAction={runAction}
           actionLoading={actionLoading}
         />
         <ExecutionGroup
           title="Completed"
           items={executionRuntime.completedExecutions}
-          runtimeEnabled={executionRuntime.runtimeEnabled}
+          runtimeEnabled={effectiveRuntimeEnabled}
           onAction={runAction}
           actionLoading={actionLoading}
         />
         <ExecutionGroup
           title="Failed"
           items={executionRuntime.failedExecutions}
-          runtimeEnabled={executionRuntime.runtimeEnabled}
+          runtimeEnabled={effectiveRuntimeEnabled}
           onAction={runAction}
           actionLoading={actionLoading}
         />
         <ExecutionGroup
           title="Cancelled"
           items={executionRuntime.cancelledExecutions}
-          runtimeEnabled={executionRuntime.runtimeEnabled}
+          runtimeEnabled={effectiveRuntimeEnabled}
           onAction={runAction}
           actionLoading={actionLoading}
         />
+
+        {executionRuntime.executionAuditSummaries.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Lifecycle event history
+            </p>
+            {executionRuntime.executionAuditSummaries.map((summary) => (
+              <div key={summary.executionId} className="rounded-lg border border-border/70 p-3 text-sm">
+                <p className="font-medium">{summary.executionId}</p>
+                <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                  {summary.entries.slice(-6).map((entry) => (
+                    <li key={entry.auditId}>
+                      {entry.eventType.replaceAll("_", " ")} · {entry.nextState ?? entry.previousState ?? "—"}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         {executionRuntime.queuedExecutions.length === 0 &&
         executionRuntime.activeExecutions.length === 0 &&

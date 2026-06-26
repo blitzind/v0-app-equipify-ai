@@ -80,6 +80,12 @@ export function GrowthAiOsExecutPlanningReviewDashboard({
               dryRunSummary={entry.dryRunSummary}
               dryRunBlockedReasons={entry.dryRunBlockedReasons}
               latestDryRunStatus={entry.latestDryRunStatus}
+              pilotEligible={entry.pilotEligible}
+              pilotSummary={entry.pilotSummary}
+              pilotBlockedReasons={entry.pilotBlockedReasons}
+              pilotEnabled={entry.pilotEnabled}
+              runtimeEnabled={entry.runtimeEnabled}
+              dryRunRequired={entry.dryRunRequired}
               compact
               title={`Planning Review · ${entry.companyName ?? entry.leadId.slice(0, 8)}`}
               description="Lead research execution plan — read-only, no Work Order execution."

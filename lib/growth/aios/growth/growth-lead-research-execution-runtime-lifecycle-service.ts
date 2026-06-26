@@ -33,6 +33,10 @@ import {
 } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-types"
 import { buildFutureExecutionHandoffContract } from "@/lib/growth/aios/growth/growth-lead-research-future-execution-handoff-types"
 import { resolveFutureExecutionHandoffInfrastructure } from "@/lib/growth/aios/growth/growth-lead-research-future-execution-handoff-service"
+import {
+  GROWTH_LEAD_RESEARCH_EXECUTION_RUNTIME_PILOT_DEFAULT_ENABLED,
+  resolveExecutionRuntimePilotEnabledFromEnv,
+} from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-pilot-types"
 import type { GrowthLeadResearchExecutionPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
 import type { GrowthLeadResearchExecutionPlanApprovalStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-types"
 
@@ -133,6 +137,17 @@ async function transitionRecord(
     now: input.now,
   })
   return persistRecord(store, updated)
+}
+
+export async function resolveExecutionRuntimePilotEnabled(
+  admin: SupabaseClient,
+  input: { organizationId: string; override?: boolean },
+): Promise<boolean> {
+  void admin
+  void input.organizationId
+  if (input.override != null) return input.override
+  if (GROWTH_LEAD_RESEARCH_EXECUTION_RUNTIME_PILOT_DEFAULT_ENABLED) return true
+  return resolveExecutionRuntimePilotEnabledFromEnv()
 }
 
 export async function resolveExecutionRuntimeEnabled(

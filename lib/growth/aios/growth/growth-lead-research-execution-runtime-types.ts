@@ -2,6 +2,11 @@
 
 import type { GrowthLeadResearchExecutionPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
 import type { GrowthLeadResearchExecutionPlanApprovalStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-types"
+import type {
+  GrowthLeadResearchExecutionRuntimePilotPlanItem,
+  GrowthLeadResearchExecutionRuntimePilotSummary,
+  GrowthLeadResearchExecutionRuntimeAuditSummary,
+} from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-pilot-types"
 import type { GrowthLeadResearchApprovedPlanReadinessState } from "@/lib/growth/aios/growth/growth-lead-research-approved-plan-readiness-types"
 import type { GrowthLeadResearchExecutionBoundaryClassification } from "@/lib/growth/aios/growth/growth-lead-research-execution-boundary-audit-types"
 import type { GrowthLeadResearchFutureExecutionHandoffState } from "@/lib/growth/aios/growth/growth-lead-research-future-execution-handoff-types"
@@ -60,6 +65,10 @@ export const GROWTH_LEAD_RESEARCH_EXECUTION_RUNTIME_BLOCK_CODES = [
   "invalid_transition",
   "execution_not_found",
   "execution_terminal",
+  "pilot_disabled",
+  "pilot_workflow_not_allowed",
+  "dry_run_required",
+  "dry_run_not_passed",
 ] as const
 
 export type GrowthLeadResearchExecutionRuntimeBlockCode =
@@ -197,7 +206,12 @@ export type GrowthLeadResearchExecutionRuntimeReadModel = {
   runtimeEnabled: boolean
   runtimeRule: typeof GROWTH_LEAD_RESEARCH_EXECUTION_RUNTIME_RULE
   dryRunRule: string
+  pilotSummary: GrowthLeadResearchExecutionRuntimePilotSummary
+  pilotRule: string
+  pilotEligiblePlans: GrowthLeadResearchExecutionRuntimePilotPlanItem[]
+  pilotBlockedPlans: GrowthLeadResearchExecutionRuntimePilotPlanItem[]
   dryRunEligiblePlans: GrowthLeadResearchExecutionRuntimeDryRunEligiblePlan[]
+  executionAuditSummaries: GrowthLeadResearchExecutionRuntimeAuditSummary[]
   systemSummary: GrowthLeadResearchExecutionRuntimeSystemSummary
   queuedExecutions: GrowthLeadResearchExecutionRuntimeSummaryItem[]
   activeExecutions: GrowthLeadResearchExecutionRuntimeSummaryItem[]

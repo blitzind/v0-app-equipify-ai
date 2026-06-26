@@ -79,6 +79,12 @@ export type AiExecutiveMissionPlanningLeadResearchExecutionPlanSummary = {
   dryRunSummary: string | null
   dryRunBlockedReasons: string[]
   latestDryRunStatus: GrowthLeadResearchExecutionDryRunStatus | null
+  pilotEligible: boolean
+  pilotSummary: string | null
+  pilotBlockedReasons: string[]
+  pilotEnabled: boolean
+  runtimeEnabled: boolean
+  dryRunRequired: boolean
   reason: string
   createdAt: string
   reviewUpdatedAt: string | null

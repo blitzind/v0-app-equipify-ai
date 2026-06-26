@@ -59,6 +59,7 @@ For each GE-AI-2X phase, maintain one entry with:
 | GE-AIOS-GROWTH-2C | Execution Simulation Engine | Complete (local cert) |
 | GE-AIOS-GROWTH-3A | Execution Runtime Foundation | Complete (local cert) |
 | GE-AIOS-GROWTH-3B | Internal Workflow Dry Run Harness | Complete (local cert) |
+| GE-AIOS-GROWTH-3C | Execution Runtime Pilot (`research_company`) | Complete (local cert) |
 | GE-AI-2D | Memory Facade (ledger) | Complete via GE-AIOS-2F |
 | GE-AI-2A | Decision Record Foundation (ledger) | Complete via GE-AIOS-2D |
 | GE-AI-2B | Event Bus Unification | Partial (foundation in GE-AIOS-2B) |
@@ -1175,6 +1176,36 @@ Pending — no outbound, no provider calls, no Core mutations from runtime path
 ### Production certification
 
 Pending — dry-run is non-persistent; real runtime remains disabled by default
+
+---
+
+## GE-AIOS-GROWTH-3C — Execution Runtime Pilot
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-3C (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-3A, GE-AIOS-GROWTH-3B |
+
+### Scope delivered
+
+- Pilot allowlist: `research_company` only; disabled by default via `GROWTH_AIOS_GROWTH_EXECUTION_RUNTIME_PILOT_ENABLED`
+- Effective runtime = global runtime ∧ pilot flag
+- Enqueue gate: dry-run pass required before real execution
+- Pilot validation service + Command Center eligible/blocked plan queues
+- Enqueue API with pilot gate; lifecycle persistence via existing AI OS events
+- Mission Planning Review pilot eligibility fields
+- Pause / resume / cancel unchanged from 3A
+- Zero provider/outbound/Core/Work Order side effects
+- No migrations, no new event types
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-3c-runtime-pilot`
+
+### Production certification
+
+Pending — requires explicit pilot + runtime flags; `research_company` only
 
 ---
 

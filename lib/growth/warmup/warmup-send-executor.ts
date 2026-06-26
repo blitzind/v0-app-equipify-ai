@@ -64,7 +64,6 @@ import { getSenderAccount } from "@/lib/growth/sender/sender-repository"
 import { getMailboxConnectionBySender } from "@/lib/growth/mailboxes/mailbox-repository"
 import {
   computeWarmupRecipientPoolHealth,
-  type WarmupRecipientPoolHealth,
 } from "@/lib/growth/warmup/warmup-recipient-pool-health"
 
 export const GROWTH_WARMUP_EXECUTOR_1D_QA_MARKER = "growth-warmup-executor-1d-v1" as const
@@ -74,7 +73,7 @@ export { GROWTH_WARMUP_FAIRNESS_1P_QA_MARKER, WARMUP_EXECUTOR_RECIPIENT_DEDUP_PO
 
 export { MAX_SENDS_PER_PROFILE_PER_RUN } from "@/lib/growth/warmup/warmup-executor-diagnostics"
 
-async function buildRecipientPoolSummary(
+export async function buildRecipientPoolSummary(
   admin: SupabaseClient,
   recipients: Awaited<ReturnType<typeof listWarmupRecipients>>,
   input?: {
@@ -390,6 +389,8 @@ async function executeWarmupSendForProfile(
       template,
       status: "skipped",
       skipReason: preSend.reason,
+      skipCode: "pre_send_blocked",
+      selectionContext: selection.metadata,
     })
     return base
   }

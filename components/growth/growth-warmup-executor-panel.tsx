@@ -30,6 +30,7 @@ import {
   type GrowthWarmupProfileExecutorStats,
   type GrowthWarmupRecipient,
   type WarmupExecutorProfileDiagnostic,
+  type WarmupExecutorRecipientPoolSummary,
 } from "@/lib/growth/warmup/warmup-executor-types"
 import {
   fetchWarmupExecutorJson,
@@ -60,6 +61,7 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
   const [recipients, setRecipients] = useState<GrowthWarmupRecipient[]>([])
   const [schemaReady, setSchemaReady] = useState(false)
   const [executorStats, setExecutorStats] = useState<GrowthWarmupProfileExecutorStats[]>([])
+  const [recipientPoolSummary, setRecipientPoolSummary] = useState<WarmupExecutorRecipientPoolSummary | null>(null)
   const [preview, setPreview] = useState<GrowthWarmupExecutorRunResult | null>(null)
   const [lastRunBreakdown, setLastRunBreakdown] = useState<WarmupExecutorManualRunBreakdown | null>(null)
   const [executorBuildMarker, setExecutorBuildMarker] = useState<string | null>(null)
@@ -86,10 +88,12 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
       }
       const dashboardPayload = (await dashboardRes.json()) as {
         executor_stats?: GrowthWarmupProfileExecutorStats[]
+        recipient_pool_summary?: WarmupExecutorRecipientPoolSummary
       }
       setRecipients(recipientsPayload.recipients ?? [])
       setSchemaReady(Boolean(recipientsPayload.schema_ready))
       setExecutorStats(dashboardPayload.executor_stats ?? [])
+      setRecipientPoolSummary(dashboardPayload.recipient_pool_summary ?? null)
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Could not load warmup executor.")
     } finally {
@@ -288,10 +292,45 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
         {schemaReady ? (
           <p className="mb-3 rounded-md border border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground">
             <span className="font-medium text-foreground">Recipient pool</span>
-            {" · "}
-            {recipients.filter((row) => row.active && row.approved).length} approved recipient(s) available
-            {" · "}
-            {profiles.filter((row) => row.status === "warming").length} warming sender(s)
+            {recipientPoolSummary ? (
+              <>
+                {" · "}
+                Approved recipients: {recipientPoolSummary.activeApprovedRecipients}
+                {" · "}
+                Recipients still available globally: {recipientPoolSummary.availableNow}
+                {recipientPoolSummary.healthTier ? (
+                  <>
+                    {" · "}
+                    Pool health:{" "}
+                    <GrowthBadge
+                      label={recipientPoolSummary.healthTier}
+                      tone={
+                        recipientPoolSummary.healthTier === "healthy"
+                          ? "healthy"
+                          : recipientPoolSummary.healthTier === "warning"
+                            ? "attention"
+                            : "critical"
+                      }
+                    />
+                  </>
+                ) : null}
+                {recipientPoolSummary.message ? (
+                  <span className="mt-1 block">{recipientPoolSummary.message}</span>
+                ) : null}
+                {recipientPoolSummary.recommendations && recipientPoolSummary.recommendations.length > 0 ? (
+                  <span className="mt-1 block text-amber-800">
+                    Recommendations: {recipientPoolSummary.recommendations.join(" · ")}
+                  </span>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {" · "}
+                {recipients.filter((row) => row.active && row.approved).length} approved recipient(s) available
+                {" · "}
+                {profiles.filter((row) => row.status === "warming").length} warming sender(s)
+              </>
+            )}
             {preview?.runSummary?.poolPressureMessage ?? preview?.recipientPoolSummary?.poolPressureMessage ? (
               <>
                 {" · "}
@@ -414,8 +453,19 @@ export function GrowthWarmupExecutorPanel({ profiles }: GrowthWarmupExecutorPane
                 <p className="text-xs text-muted-foreground">
                   Last executor run: {formatDate(stat.lastExecutorRunAt)} · Active recipients:{" "}
                   {stat.recipientPoolActive}
+                  {stat.recipientsAvailableForSender != null ? (
+                    <> · Recipients available for this sender: {stat.recipientsAvailableForSender}</>
+                  ) : null}
+                  {stat.recipientPoolHealthTier ? (
+                    <> · Pool health: {stat.recipientPoolHealthTier.replaceAll("_", " ")}</>
+                  ) : null}
                   {stat.throttleReason ? ` · Throttle: ${stat.throttleReason}` : ""}
                 </p>
+                {stat.recipientsAvailableForSender === 0 && stat.recipientPoolHealthMessage ? (
+                  <p className="mt-1 text-xs text-amber-800">
+                    Reason: Per-sender dedup exhausted. {stat.recipientPoolHealthMessage}
+                  </p>
+                ) : null}
                 {stat.nextAction ? (
                   <p className="mt-1 text-xs text-muted-foreground">Next: {stat.nextAction}</p>
                 ) : null}

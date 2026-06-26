@@ -524,7 +524,7 @@ async function runTests(): Promise<void> {
   })
   assert.equal(blockedForSameSender.ok, false)
   if (!blockedForSameSender.ok) {
-    assert.equal(blockedForSameSender.code, "recipient_daily_cap")
+    assert.equal(blockedForSameSender.code, "per_sender_dedup_exhausted")
   }
   const allowedForDifferentSender = await selectWarmupRecipientForSend(createWarmupExecutorMockAdmin(dedupDb), {
     recipients: [recipient],

@@ -24,6 +24,7 @@ import type {
 } from "@/lib/growth/aios/ai-executive-mission-planning-review-types"
 import { findExecutionRuntimeRecordForPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-service"
 import { buildDryRunEligibilityForPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-dry-run-service"
+import { buildPilotEligibilityForPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-runtime-pilot-service"
 import { listAiWorkOrders } from "@/lib/growth/aios/ai-work-order-repository"
 import {
   isAiWorkOrderActiveStatus,
@@ -188,6 +189,12 @@ async function listLeadResearchExecutionPlansForMission(
     let dryRunSummary = null
     let dryRunBlockedReasons: string[] = []
     let latestDryRunStatus = null
+    let pilotEligible = false
+    let pilotSummary = null
+    let pilotBlockedReasons: string[] = []
+    let pilotEnabled = false
+    let runtimeEnabled = false
+    let dryRunRequired = true
 
     if (approvalStatus === "approved_for_future_execution") {
       readinessState = resolveApprovedPlanReadinessState({
@@ -282,6 +289,20 @@ async function listLeadResearchExecutionPlansForMission(
     dryRunBlockedReasons = dryRunEligibility.dryRunBlockedReasons
     latestDryRunStatus = dryRunEligibility.latestDryRunStatus
 
+    const pilotEligibility = await buildPilotEligibilityForPlan(admin, {
+      organizationId: input.organizationId,
+      planId,
+      executionPlan: snapshot.executionPlan,
+      approvalState: approvalStatus,
+      confidence,
+    })
+    pilotEligible = pilotEligibility.pilotEligible
+    pilotSummary = pilotEligibility.pilotSummary
+    pilotBlockedReasons = pilotEligibility.pilotBlockedReasons
+    pilotEnabled = pilotEligibility.pilotEnabled
+    runtimeEnabled = pilotEligibility.runtimeEnabled
+    dryRunRequired = pilotEligibility.dryRunRequired
+
     plans.push({
       leadId,
       companyName: lead?.companyName ?? null,
@@ -310,6 +331,12 @@ async function listLeadResearchExecutionPlansForMission(
       dryRunSummary,
       dryRunBlockedReasons,
       latestDryRunStatus,
+      pilotEligible,
+      pilotSummary,
+      pilotBlockedReasons,
+      pilotEnabled,
+      runtimeEnabled,
+      dryRunRequired,
       reason:
         snapshot.nextBestAction?.reason ??
         snapshot.opportunityAssessment?.summary ??

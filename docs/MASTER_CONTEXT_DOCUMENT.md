@@ -16,7 +16,7 @@
 =================================================
 
 **Document role:** Living engineering state — current phase, production status, rules, certifications, risks, and priorities.  
-**Last updated:** 2026-06-25 (GE-AIOS-GROWTH-3B Internal Workflow Dry Run)  
+**Last updated:** 2026-06-25 (GE-AIOS-GROWTH-3C Execution Runtime Pilot)  
 **Regeneration:** `pnpm update:master-context` (inventory scan + this document's manual sections)  
 **Admin UI:** `/admin/master-context`
 
@@ -46,7 +46,7 @@
 |-------|--------|
 | **Architecture phase** | GE-AI-1X — **Complete** (Constitution v1.0 frozen) |
 | **Documentation phase** | GE-DOC-1 — **Complete** |
-| **Current phase** | **GE-AIOS-GROWTH-3B** — Internal Workflow Dry Run Harness (**certified locally**, not committed) |
+| **Current phase** | **GE-AIOS-GROWTH-3C** — Execution Runtime Pilot (`research_company` only) (**certified locally**, not committed) |
 | **Next phase** | GE-AI-2F — Meta-Recommender |
 
 **Transition:** Official move from Architecture Phase (GE-AI-1X) to Engineering Phase (GE-AI-2X).
@@ -235,8 +235,12 @@ Full list: `lib/admin/master-context.manual.after.md` § Known Limitations.
 | GE-AIOS-GROWTH-2C | Execution Simulation Engine | Complete (local cert) |
 | GE-AIOS-GROWTH-3A | Execution Runtime Foundation | Complete (local cert) |
 | GE-AIOS-GROWTH-3B | Internal Workflow Dry Run Harness | Complete (local cert) |
+| GE-AIOS-GROWTH-3C | Execution Runtime Pilot (`research_company`) | Complete (local cert) |
 
 ### Current phase
+
+**GE-AIOS-GROWTH-3C — Execution Runtime Pilot**
+Single-workflow runtime pilot for `research_company` only. Requires global runtime + pilot flags and dry-run pass before enqueue. Persists lifecycle via existing AI OS events. No outbound/providers/Core/Work Orders. Status: **Complete (local cert)**.
 
 **GE-AIOS-GROWTH-3B — Internal Workflow Dry Run Harness**  
 Deterministic dry-run for internal workflows on top of 3A runtime gates and steps. No persistence, no events, no outbound/providers/Core/Work Orders. Status: **Complete (local cert)**.
@@ -353,6 +357,7 @@ GE-AUTO-1A through 2I implemented locally; GE-AUTO-3 not started. See manual bef
 | GE-AIOS-GROWTH-2C Execution Simulation Engine | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-GROWTH-3A Execution Runtime Foundation | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-GROWTH-3B Internal Workflow Dry Run | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-3C Execution Runtime Pilot | **PASS (local)** | 2026-06-25 |
 | GE-AI-2A+ implementation (production) | Pending | — |
 
 Outbound operational readiness: `docs/GROWTH_OUTBOUND_OPERATIONAL_READINESS.md`
@@ -636,6 +641,9 @@ Full list: `lib/admin/master-context.manual.after.md` § Current Priorities.
 | [GE-AIOS-GROWTH-3A Infrastructure Audit](./GE-AIOS-GROWTH-3A_INFRASTRUCTURE_AUDIT.md) | Execution Runtime audit |
 | [GE-AIOS-GROWTH-3B Certification](./GE-AIOS-GROWTH-3B_CERTIFICATION.md) | Internal workflow dry-run cert |
 | [GE-AIOS-GROWTH-3B Infrastructure Audit](./GE-AIOS-GROWTH-3B_INFRASTRUCTURE_AUDIT.md) | Dry-run infrastructure audit |
+| [GE-AIOS-GROWTH-3C Certification](./GE-AIOS-GROWTH-3C_CERTIFICATION.md) | Runtime pilot cert |
+| [GE-AIOS-GROWTH-3C Runtime Pilot](./GE-AIOS-GROWTH-3C_RUNTIME_PILOT.md) | Runtime pilot architecture |
+| [GE-AIOS-GROWTH-3C Infrastructure Audit](./GE-AIOS-GROWTH-3C_INFRASTRUCTURE_AUDIT.md) | Runtime pilot audit |
 | [GE-AIOS-GROWTH Internal Workflow Dry Run](./GE-AIOS-GROWTH_INTERNAL_WORKFLOW_DRY_RUN.md) | Dry-run operator guide |
 | [GE-AIOS-GROWTH Execution Simulation](./GE-AIOS-GROWTH_EXECUTION_SIMULATION.md) | Execution simulation reference |
 

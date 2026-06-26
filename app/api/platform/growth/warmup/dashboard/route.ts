@@ -2,9 +2,8 @@ import { NextResponse } from "next/server"
 import { requireGrowthCommunicationsSettingsAccess } from "@/lib/growth/settings/growth-workspace-settings-api-access"
 import { fetchWarmupDashboard, listWarmupEvents, listWarmupProfiles } from "@/lib/growth/warmup/warmup-repository"
 import { listWarmupTimelineEvents } from "@/lib/growth/warmup/warmup-events"
-import { buildWarmupExecutorDashboardStats } from "@/lib/growth/warmup/warmup-send-executor"
+import { buildWarmupExecutorDashboardStats, buildRecipientPoolSummary } from "@/lib/growth/warmup/warmup-send-executor"
 import { listWarmupRecipients } from "@/lib/growth/warmup/warmup-recipient-repository"
-import { buildRecipientPoolSummary } from "@/lib/growth/warmup/warmup-send-executor"
 import { isGrowthWarmupFoundationSchemaReady } from "@/lib/growth/warmup/warmup-schema-health"
 import { GROWTH_WARMUP_PRIVACY_NOTE } from "@/lib/growth/warmup/warmup-types"
 
@@ -25,13 +24,18 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [dashboard, events, timeline, profiles] = await Promise.all([
+    const [dashboard, events, timeline, profiles, approvedRecipients] = await Promise.all([
       fetchWarmupDashboard(access.admin),
       listWarmupEvents(access.admin, { limit: 30, unresolved_only: true }),
       listWarmupTimelineEvents(access.admin, { limit: 20 }),
       listWarmupProfiles(access.admin),
+      listWarmupRecipients(access.admin, { activeOnly: true, approvedOnly: true }),
     ])
 
+    const warmingSenderCount = profiles.filter((profile) => profile.status === "warming").length
+    const recipientPoolSummary = await buildRecipientPoolSummary(access.admin, approvedRecipients, {
+      warmingSenderCount,
+    })
     const executor_stats = await buildWarmupExecutorDashboardStats(access.admin, profiles).catch(() => [])
 
     return NextResponse.json({
@@ -40,6 +44,7 @@ export async function GET(request: Request) {
       events,
       timeline,
       executor_stats,
+      recipient_pool_summary: recipientPoolSummary,
       privacy_note: GROWTH_WARMUP_PRIVACY_NOTE,
     })
   } catch (error) {
