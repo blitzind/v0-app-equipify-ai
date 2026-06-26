@@ -9,7 +9,7 @@ export const runtime = "nodejs"
 
 const UploadUrlSchema = z.object({
   title: z.string().max(500).optional(),
-  library_kind: z.enum(["image", "logo", "avatar"]).optional(),
+  library_kind: z.enum(["image", "logo", "team", "hero", "avatar"]).optional(),
   mime_type: z.string().max(200),
   file_size_bytes: z.number().int().positive(),
   alt_text: z.string().max(500).nullable().optional(),

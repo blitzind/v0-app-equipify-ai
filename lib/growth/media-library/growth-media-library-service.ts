@@ -64,7 +64,7 @@ export async function listGrowthMediaLibraryAssets(
   admin: SupabaseClient,
   input: {
     organizationId: string
-    libraryKind?: GrowthMediaLibraryKind
+    libraryKind?: GrowthMediaLibraryKind | "avatar"
     includeArchived?: boolean
     search?: string
     limit?: number
@@ -72,22 +72,29 @@ export async function listGrowthMediaLibraryAssets(
     origin?: string | null
   },
 ): Promise<{ items: GrowthMediaLibraryAsset[]; total: number }> {
-  const tag =
-    input.libraryKind ? GROWTH_MEDIA_LIBRARY_KIND_TAGS[input.libraryKind] : GROWTH_MEDIA_LIBRARY_TAG
+  const filterKind = input.libraryKind === "avatar" ? "team" : input.libraryKind
+  const tag = filterKind ? GROWTH_MEDIA_LIBRARY_KIND_TAGS[filterKind] : GROWTH_MEDIA_LIBRARY_TAG
 
   const result = await listMediaAssets(admin, {
     organizationId: input.organizationId,
     assetType: "image",
-    tag,
+    tag: filterKind === "team" ? GROWTH_MEDIA_LIBRARY_TAG : tag,
     search: input.search,
-    limit: input.limit,
+    limit: filterKind === "team" ? Math.min(input.limit ?? 100, 200) : input.limit,
     offset: input.offset,
     excludeArchived: !input.includeArchived,
   })
 
+  let items = result.items.map((asset) => mapGrowthMediaLibraryAsset(asset, input.origin))
+  if (filterKind === "team") {
+    items = items.filter((asset) => asset.libraryKind === "team")
+  } else if (filterKind) {
+    items = items.filter((asset) => asset.libraryKind === filterKind)
+  }
+
   return {
-    items: result.items.map((asset) => mapGrowthMediaLibraryAsset(asset, input.origin)),
-    total: result.total,
+    items,
+    total: filterKind ? items.length : result.total,
   }
 }
 
@@ -97,7 +104,7 @@ export async function createGrowthMediaLibraryUploadSession(
     organizationId: string
     createdBy: string
     title?: string
-    libraryKind?: GrowthMediaLibraryKind
+    libraryKind?: GrowthMediaLibraryKind | "avatar"
     mimeType: string
     fileSizeBytes: number
     altText?: string | null
@@ -114,7 +121,9 @@ export async function createGrowthMediaLibraryUploadSession(
   }
 
   const libraryKind = input.libraryKind ?? "image"
-  const tags = [GROWTH_MEDIA_LIBRARY_TAG, growthMediaLibraryKindTag(libraryKind)]
+  const normalizedKind: GrowthMediaLibraryKind =
+    libraryKind === "avatar" ? "team" : libraryKind
+  const tags = [GROWTH_MEDIA_LIBRARY_TAG, growthMediaLibraryKindTag(normalizedKind)]
   const metadata: Record<string, unknown> = {}
   if (input.altText?.trim()) metadata.alt_text = input.altText.trim()
 

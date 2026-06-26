@@ -75,9 +75,9 @@ function testApiRoutesAndComponents() {
 
   const picker = readSource("components/growth/media-library/growth-media-picker.tsx")
   assert.match(picker, /GrowthMediaPicker/)
-  assert.match(picker, /Select from library/)
+  assert.match(picker, /Choose from library/)
   assert.match(picker, /allowManualUrl/)
-  assert.match(picker, /Paste manual URL/)
+  assert.match(picker, /Paste URL \(Advanced\)/)
 
   const panel = readSource("components/growth/media-library/growth-media-library-panel.tsx")
   assert.match(panel, /GrowthMediaLibraryPanel/)

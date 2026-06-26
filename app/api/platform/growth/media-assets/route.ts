@@ -16,6 +16,7 @@ import { listGrowthMediaLibraryAssets } from "@/lib/growth/media-library/growth-
 import {
   GROWTH_MEDIA_LIBRARY_KIND_TAGS,
   GROWTH_MEDIA_LIBRARY_QA_MARKER,
+  type GrowthMediaLibraryKind,
 } from "@/lib/growth/media-library/growth-media-library-types"
 import { z } from "zod"
 
@@ -58,8 +59,11 @@ export async function GET(request: Request) {
   const library = url.searchParams.get("library") === "1"
   const libraryKindParam = url.searchParams.get("library_kind")
   const libraryKind =
-    libraryKindParam && libraryKindParam in GROWTH_MEDIA_LIBRARY_KIND_TAGS
-      ? (libraryKindParam as "image" | "logo" | "avatar")
+    libraryKindParam &&
+    (libraryKindParam in GROWTH_MEDIA_LIBRARY_KIND_TAGS ||
+      libraryKindParam === "team" ||
+      libraryKindParam === "hero")
+      ? (libraryKindParam as GrowthMediaLibraryKind | "avatar")
       : undefined
 
   try {
