@@ -19,6 +19,7 @@ import type { GrowthAgentMemoryPlanContext } from "@/lib/growth/aios/growth/grow
 import type { GrowthMissionPlanContext } from "@/lib/growth/aios/growth/growth-mission-framework-types"
 import type { GrowthMissionPriorityPlanContext } from "@/lib/growth/aios/growth/growth-mission-priority-types"
 import type { GrowthSchedulerReadinessPlanContext } from "@/lib/growth/aios/growth/growth-scheduler-readiness-types"
+import type { GrowthAutonomousExecutionPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-types"
 import type { GrowthAutonomousPlanningPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-planning-pilot-types"
 import type { GrowthAutonomousQualificationPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-types"
 import type { GrowthAutonomousResearchPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-types"
@@ -74,6 +75,7 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   autonomousResearchPilotContext,
   autonomousQualificationPilotContext,
   autonomousPlanningPilotContext,
+  autonomousExecutionPilotContext,
 }: {
   plan: GrowthLeadResearchExecutionPlan
   title?: string
@@ -117,6 +119,7 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   autonomousResearchPilotContext?: GrowthAutonomousResearchPilotPlanContext | null
   autonomousQualificationPilotContext?: GrowthAutonomousQualificationPilotPlanContext | null
   autonomousPlanningPilotContext?: GrowthAutonomousPlanningPilotPlanContext | null
+  autonomousExecutionPilotContext?: GrowthAutonomousExecutionPilotPlanContext | null
 }) {
   return (
     <Card data-qa-marker={GROWTH_LEAD_RESEARCH_EXECUTION_PLAN_QA_MARKER} data-qa-section="execution-plan">
@@ -606,6 +609,52 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
             <p className="text-muted-foreground">
               <span className="font-medium text-foreground">Wake:</span>{" "}
               {autonomousPlanningPilotContext.wakeRecommendation}
+            </p>
+          </div>
+        ) : null}
+
+        {autonomousExecutionPilotContext ? (
+          <div className="space-y-1 text-sm" data-qa-section="autonomous-execution-pilot-context">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={autonomousExecutionPilotContext.executionEligible ? "secondary" : "outline"}>
+                Execution · {autonomousExecutionPilotContext.executionEligible ? "eligible" : "blocked"}
+              </Badge>
+              <Badge variant="outline">
+                Owner · {autonomousExecutionPilotContext.executionAgentOwner.replaceAll("_", " ")}
+              </Badge>
+              {autonomousExecutionPilotContext.dryRunStatus ? (
+                <Badge variant="secondary">
+                  Dry-run · {autonomousExecutionPilotContext.dryRunStatus.replaceAll("_", " ")}
+                </Badge>
+              ) : (
+                <Badge variant="outline">Dry-run required</Badge>
+              )}
+              {autonomousExecutionPilotContext.runtimeState ? (
+                <Badge variant="secondary">
+                  Runtime · {autonomousExecutionPilotContext.runtimeState.replaceAll("_", " ")}
+                </Badge>
+              ) : null}
+              {autonomousExecutionPilotContext.latestExecutionResult ? (
+                <Badge variant="outline">
+                  Result · {autonomousExecutionPilotContext.latestExecutionResult}
+                </Badge>
+              ) : null}
+            </div>
+            {autonomousExecutionPilotContext.blockedReason ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Blocked:</span>{" "}
+                {autonomousExecutionPilotContext.blockedReason}
+              </p>
+            ) : null}
+            {autonomousExecutionPilotContext.revenueOperatorHandoff ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Revenue Operator:</span>{" "}
+                {autonomousExecutionPilotContext.revenueOperatorHandoff.replaceAll("_", " ")}
+              </p>
+            ) : null}
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Wake:</span>{" "}
+              {autonomousExecutionPilotContext.wakeRecommendation}
             </p>
           </div>
         ) : null}

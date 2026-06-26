@@ -99,6 +99,7 @@ const PILOT_WAKE_ALLOWED_AGENTS = new Set<GrowthAgentKind>([
   "research_agent",
   "qualification_agent",
   "planning_agent",
+  "execution_agent",
 ])
 
 export function buildAgentWakeRules(): GrowthSchedulerWakeRule[] {

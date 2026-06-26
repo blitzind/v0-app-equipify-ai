@@ -1,5 +1,6 @@
 /** GE-AIOS-CONSOLIDATION-1B — AI Operations dashboard synthesizer (client-safe). */
 
+import { buildOperationsExecutionAgentStatus } from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-engine"
 import type { AiOsCommandCenterReadModel } from "@/lib/growth/aios/ai-os-command-center-types"
 import type { GrowthAiOsAutonomyPolicyReadModel } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-types"
 import { GROWTH_AI_OS_AUTONOMY_CONTROL_PLANE_PATH } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-types"
@@ -144,7 +145,8 @@ function buildExecutiveOverview(
     activeAutonomousRuns:
       commandCenter.autonomousResearchPilot.telemetry.activeRuns +
       commandCenter.autonomousQualificationPilot.telemetry.activeRuns +
-      commandCenter.autonomousPlanningPilot.telemetry.activeRuns,
+      commandCenter.autonomousPlanningPilot.telemetry.activeRuns +
+      commandCenter.autonomousExecutionPilot.telemetry.activeRuns,
     priorityWorkLabel: priorityWork ?? null,
     needsAttentionCount: commandCenter.needsAttention.length,
     approvalBacklogCount: approvalBacklog,
@@ -235,6 +237,16 @@ function buildActiveWork(commandCenter: AiOsCommandCenterReadModel): AiOsOperati
       title: "Autonomous planning pilot",
       summary: `${commandCenter.autonomousPlanningPilot.telemetry.plansGenerated} plans · ${commandCenter.autonomousPlanningPilot.telemetry.blockedPlanning} blocked · ${commandCenter.autonomousPlanningPilot.controlState}`,
       href: `${GROWTH_AI_OS_PUBLIC_BASE_PATH}#autonomous-planning-pilot`,
+    })
+  }
+
+  if (commandCenter.autonomousExecutionPilot.enabled) {
+    items.push({
+      id: "autonomous-execution-pilot",
+      category: "autonomous_execution",
+      title: "Execution Agent",
+      summary: `${commandCenter.autonomousExecutionPilot.telemetry.eligiblePlans} eligible · ${commandCenter.autonomousExecutionPilot.telemetry.activeExecutions} active · ${commandCenter.autonomousExecutionPilot.controlState}`,
+      href: GROWTH_AI_OS_AUTONOMY_CONTROL_PLANE_PATH,
     })
   }
 
@@ -344,6 +356,17 @@ function buildActivityTimeline(commandCenter: AiOsCommandCenterReadModel): AiOsO
     })
   }
 
+  for (const run of commandCenter.autonomousExecutionPilot.recentRuns) {
+    items.push({
+      id: `ae-${run.runId}`,
+      source: "autonomous_execution",
+      title: `Execution run · ${run.outcome}`,
+      summary: run.blockReason ?? run.skipReason ?? `${run.workflowType ?? "research_company"} · ${run.companyName ?? run.leadId}`,
+      occurredAt: run.completedAt,
+      href: `${GROWTH_AI_OS_PUBLIC_BASE_PATH}/pilot/lead-research/${run.leadId}`,
+    })
+  }
+
   for (const runtime of commandCenter.executionRuntime.activeExecutions.slice(0, 6)) {
     items.push({
       id: `rt-${runtime.executionId}`,
@@ -404,19 +427,23 @@ function buildHealthSummary(commandCenter: AiOsCommandCenterReadModel): AiOsOper
   const budgetHour =
     commandCenter.autonomousResearchPilot.telemetry.budgetConsumptionHour +
     commandCenter.autonomousQualificationPilot.telemetry.budgetConsumptionHour +
-    commandCenter.autonomousPlanningPilot.telemetry.budgetConsumptionHour
+    commandCenter.autonomousPlanningPilot.telemetry.budgetConsumptionHour +
+    commandCenter.autonomousExecutionPilot.telemetry.budgetConsumptionHour
   const budgetDay =
     commandCenter.autonomousResearchPilot.telemetry.budgetConsumptionDay +
     commandCenter.autonomousQualificationPilot.telemetry.budgetConsumptionDay +
-    commandCenter.autonomousPlanningPilot.telemetry.budgetConsumptionDay
+    commandCenter.autonomousPlanningPilot.telemetry.budgetConsumptionDay +
+    commandCenter.autonomousExecutionPilot.telemetry.budgetConsumptionDay
   const budgetMaxHour =
     commandCenter.autonomousResearchPilot.budgetLimits.maxRunsPerHour +
     commandCenter.autonomousQualificationPilot.budgetLimits.maxRunsPerHour +
-    commandCenter.autonomousPlanningPilot.budgetLimits.maxRunsPerHour
+    commandCenter.autonomousPlanningPilot.budgetLimits.maxRunsPerHour +
+    commandCenter.autonomousExecutionPilot.budgetLimits.maxRunsPerHour
   const budgetMaxDay =
     commandCenter.autonomousResearchPilot.budgetLimits.maxRunsPerDay +
     commandCenter.autonomousQualificationPilot.budgetLimits.maxRunsPerDay +
-    commandCenter.autonomousPlanningPilot.budgetLimits.maxRunsPerDay
+    commandCenter.autonomousPlanningPilot.budgetLimits.maxRunsPerDay +
+    commandCenter.autonomousExecutionPilot.budgetLimits.maxRunsPerDay
 
   return {
     overallStatus,
@@ -600,12 +627,18 @@ export function synthesizeAiOsOperationsDashboard(
   supplement: AiOsOperationsDashboardSupplement = { automationApprovalCount: 0 },
   policy?: GrowthAiOsAutonomyPolicyReadModel,
 ): AiOsOperationsDashboardReadModel {
+  const configureHref = policy?.controlPlaneHref ?? GROWTH_AI_OS_AUTONOMY_CONTROL_PLANE_PATH
+
   return {
     readOnly: true,
     qaMarker: GROWTH_AI_OS_OPERATIONS_DASHBOARD_QA_MARKER,
     generatedAt: commandCenter.generatedAt,
     executiveOverview: buildExecutiveOverview(commandCenter, policy),
     autonomyState: buildAutonomyStateSummary(policy),
+    executionAgentStatus: buildOperationsExecutionAgentStatus({
+      pilot: commandCenter.autonomousExecutionPilot,
+      configureHref,
+    }),
     activeWork: buildActiveWork(commandCenter),
     activityTimeline: buildActivityTimeline(commandCenter),
     healthSummary: buildHealthSummary(commandCenter),

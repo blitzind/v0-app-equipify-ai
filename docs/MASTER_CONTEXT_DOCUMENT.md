@@ -16,7 +16,7 @@
 =================================================
 
 **Document role:** Living engineering state — current phase, production status, rules, certifications, risks, and priorities.  
-**Last updated:** 2026-06-25 (GE-AIOS-GROWTH-5D Autonomous Planning Agent Pilot)  
+**Last updated:** 2026-06-25 (GE-AIOS-GROWTH-5E Internal Execution Agent Pilot)  
 **Regeneration:** `pnpm update:master-context` (inventory scan + this document's manual sections)  
 **Admin UI:** `/admin/master-context`
 
@@ -46,7 +46,7 @@
 |-------|--------|
 | **Architecture phase** | GE-AI-1X — **Complete** (Constitution v1.0 frozen) |
 | **Documentation phase** | GE-DOC-1 — **Complete** |
-| **Current phase** | **GE-AIOS-GROWTH-5D** — Autonomous Planning Agent Pilot (**certified locally**, not committed) |
+| **Current phase** | **GE-AIOS-GROWTH-5E** — Internal Execution Agent Pilot (**certified locally**, not committed) |
 | **Next phase** | GE-AI-2F — Meta-Recommender |
 
 **Transition:** Official move from Architecture Phase (GE-AI-1X) to Engineering Phase (GE-AI-2X).
@@ -246,6 +246,7 @@ Full list: `lib/admin/master-context.manual.after.md` § Known Limitations.
 | GE-AIOS-GROWTH-5B | Autonomous Research Agent Pilot | Complete (local cert) |
 | GE-AIOS-GROWTH-5C | Autonomous Qualification Agent Pilot | Complete (local cert) |
 | GE-AIOS-GROWTH-5D | Autonomous Planning Agent Pilot | Complete (local cert) |
+| GE-AIOS-GROWTH-5E | Internal Execution Agent Pilot | Complete (local cert) |
 | GE-AIOS-CONSOLIDATION-1B | Growth OS Information Architecture (AI Operations dashboard) | Complete (local cert) |
 | GE-AIOS-CONSOLIDATION-1C | Growth Autonomy Control Plane (AI policy engine) | Complete (local cert) |
 | GE-AIOS-CONSOLIDATION-1E | Policy Evaluation Unification | Complete (local cert) |
@@ -266,6 +267,10 @@ Growth Autonomy (`/growth/settings/autonomy`) is the canonical AI control plane 
 Operator-first AI Operations dashboard at `/growth/os` — consolidates Command Center read models into executive overview, active work, activity, health, approvals, mission priorities, and objectives widgets. Engineering phase sections (1A–5B) preserved behind diagnostics toggle. Read-only — no backend behavior changes. Status: **Complete (local cert)**.
 
 ### Previous phase
+
+**GE-AIOS-GROWTH-5E — Internal Execution Agent Pilot**
+
+Fourth controlled autonomous agent. Wakes for approved `research_company` plans after dry-run and full runtime gates. Enqueues via existing 3A–3C runtime only. Policy-gated through Growth Autonomy; no outbound, Work Orders, or Core mutations. Budget 5/hr · 25/day.
 
 **GE-AIOS-GROWTH-5D — Autonomous Planning Agent Pilot**
 
@@ -442,6 +447,7 @@ GE-AUTO-1A through 2I implemented locally; GE-AUTO-3 not started. See manual bef
 | GE-AIOS-GROWTH-5B Autonomous Research Agent Pilot | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-GROWTH-5C Autonomous Qualification Agent Pilot | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-GROWTH-5D Autonomous Planning Agent Pilot | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-5E Internal Execution Agent Pilot | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-CONSOLIDATION-1B AI Operations Information Architecture | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-CONSOLIDATION-1C Autonomy Control Plane | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-CONSOLIDATION-1E Policy Evaluation Unification | **PASS (local)** | 2026-06-25 |
@@ -761,6 +767,9 @@ Full list: `lib/admin/master-context.manual.after.md` § Current Priorities.
 | [GE-AIOS-GROWTH-5D Certification](./GE-AIOS-GROWTH-5D_CERTIFICATION.md) | Autonomous planning cert |
 | [GE-AIOS-GROWTH-5D Autonomous Planning Agent](./GE-AIOS-GROWTH-5D_AUTONOMOUS_PLANNING_AGENT.md) | Planning pilot architecture |
 | [GE-AIOS-GROWTH-5D Infrastructure Audit](./GE-AIOS-GROWTH-5D_INFRASTRUCTURE_AUDIT.md) | Planning pilot audit |
+| [GE-AIOS-GROWTH-5E Certification](./GE-AIOS-GROWTH-5E_CERTIFICATION.md) | Internal execution cert |
+| [GE-AIOS-GROWTH-5E Internal Execution Agent](./GE-AIOS-GROWTH-5E_INTERNAL_EXECUTION_AGENT.md) | Execution pilot architecture |
+| [GE-AIOS-GROWTH-5E Infrastructure Audit](./GE-AIOS-GROWTH-5E_INFRASTRUCTURE_AUDIT.md) | Execution pilot audit |
 | [GE-AIOS-GROWTH Internal Workflow Dry Run](./GE-AIOS-GROWTH_INTERNAL_WORKFLOW_DRY_RUN.md) | Dry-run operator guide |
 | [GE-AIOS-GROWTH Execution Simulation](./GE-AIOS-GROWTH_EXECUTION_SIMULATION.md) | Execution simulation reference |
 

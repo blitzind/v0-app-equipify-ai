@@ -96,6 +96,7 @@ export function GrowthAiOsExecutPlanningReviewDashboard({
               autonomousResearchPilotContext={entry.autonomousResearchPilotContext}
               autonomousQualificationPilotContext={entry.autonomousQualificationPilotContext}
               autonomousPlanningPilotContext={entry.autonomousPlanningPilotContext}
+              autonomousExecutionPilotContext={entry.autonomousExecutionPilotContext}
               compact
               title={`Planning Review · ${entry.companyName ?? entry.leadId.slice(0, 8)}`}
               description="Lead research execution plan — read-only, no Work Order execution."

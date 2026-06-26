@@ -43,6 +43,7 @@ import { buildGrowthAgentMemoryReadModel } from "@/lib/growth/aios/growth/growth
 import { buildGrowthMissionFrameworkReadModel } from "@/lib/growth/aios/growth/growth-mission-framework-service"
 import { buildGrowthMissionPriorityReadModel } from "@/lib/growth/aios/growth/growth-mission-priority-service"
 import { buildGrowthSchedulerReadinessReadModel } from "@/lib/growth/aios/growth/growth-scheduler-readiness-service"
+import { buildGrowthAutonomousExecutionPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-service"
 import { buildGrowthAutonomousPlanningPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-planning-pilot-service"
 import { buildGrowthAutonomousQualificationPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-service"
 import { buildGrowthAutonomousResearchPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-service"
@@ -61,6 +62,7 @@ import { fetchGrowthAiOsAutonomyPolicy } from "@/lib/growth/autonomy/growth-ai-o
 import {
   buildCommandCenterSafeModeFromPolicy,
   enrichAgentFrameworkWithAutonomyPolicy,
+  enrichAutonomousExecutionPilotWithAutonomyPolicy,
   enrichAutonomousPlanningPilotWithAutonomyPolicy,
   enrichAutonomousQualificationPilotWithAutonomyPolicy,
   enrichAutonomousResearchPilotWithAutonomyPolicy,
@@ -478,6 +480,13 @@ export async function fetchAiOsCommandCenterReadModel(
     }),
     autonomyPolicy,
   )
+  const autonomousExecutionPilot = enrichAutonomousExecutionPilotWithAutonomyPolicy(
+    await buildGrowthAutonomousExecutionPilotReadModel(admin, {
+      organizationId: input.organizationId,
+      generatedAt,
+    }),
+    autonomyPolicy,
+  )
 
   const automationApprovalInbox = await listGeV15OrganizationApprovalInbox(admin, {
     organizationId: input.organizationId,
@@ -525,6 +534,7 @@ export async function fetchAiOsCommandCenterReadModel(
     autonomousResearchPilot,
     autonomousQualificationPilot,
     autonomousPlanningPilot,
+    autonomousExecutionPilot,
     safeMode,
   }
 

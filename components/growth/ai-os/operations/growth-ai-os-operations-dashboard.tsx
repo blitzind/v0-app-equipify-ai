@@ -119,6 +119,40 @@ export function GrowthAiOsOperationsDashboard({
         </Link>
       </GrowthAiOsOperationsSectionCard>
 
+      <GrowthAiOsOperationsSectionCard
+        title="Execution Agent"
+        description="Internal research_company runtime only — policy-controlled via Growth Autonomy."
+        icon={<Activity className="size-5 text-violet-600" />}
+        qaSection="operations-execution-agent"
+      >
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <GrowthAiOsKpiCard
+            label="Status"
+            value={dashboard.executionAgentStatus.enabled ? "Enabled" : dashboard.executionAgentStatus.controlState.replaceAll("_", " ")}
+          />
+          <GrowthAiOsKpiCard label="Eligible plans" value={dashboard.executionAgentStatus.eligiblePlans} />
+          <GrowthAiOsKpiCard label="Queued" value={dashboard.executionAgentStatus.queuedExecutions} />
+          <GrowthAiOsKpiCard label="Active" value={dashboard.executionAgentStatus.activeExecutions} />
+          <GrowthAiOsKpiCard label="Completed" value={dashboard.executionAgentStatus.completedExecutions} />
+          <GrowthAiOsKpiCard label="Failed" value={dashboard.executionAgentStatus.failedExecutions} />
+          <GrowthAiOsKpiCard label="Blocked" value={dashboard.executionAgentStatus.blockedExecutions} />
+          <GrowthAiOsKpiCard label="Budget" value={dashboard.executionAgentStatus.budgetLabel} />
+        </div>
+        {dashboard.executionAgentStatus.latestEventSummary ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Latest: {dashboard.executionAgentStatus.latestEventSummary}
+          </p>
+        ) : (
+          <p className="mt-3 text-sm text-muted-foreground">No execution lifecycle events recorded yet.</p>
+        )}
+        <Link
+          href={dashboard.executionAgentStatus.configureHref}
+          className="mt-3 inline-flex text-sm font-medium text-indigo-600 hover:text-indigo-700"
+        >
+          Configure in Growth Autonomy
+        </Link>
+      </GrowthAiOsOperationsSectionCard>
+
       <div className="grid gap-6 xl:grid-cols-2">
         <GrowthAiOsOperationsSectionCard
           title="Active work"

@@ -59,6 +59,7 @@ export type GrowthAiOsAutonomyPolicyReadModel = {
   researchAutonomyEnabled: boolean
   qualificationAutonomyEnabled: boolean
   planningAutonomyEnabled: boolean
+  executionAutonomyEnabled: boolean
   autonomyEnabled: boolean
   humanApprovalRequired: boolean
   killSwitches: {
@@ -84,6 +85,10 @@ export type GrowthAiOsAutonomyPolicyReadModel = {
     planningRunsPerDay: number
     planningHourlyConsumed: number
     planningDailyConsumed: number
+    executionRunsPerHour: number
+    executionRunsPerDay: number
+    executionHourlyConsumed: number
+    executionDailyConsumed: number
   }
   throttleSummary: string
   cooldownSummary: string
@@ -114,6 +119,7 @@ export type GrowthAiOsAutonomyPolicyIntegrationSummary = {
   researchPilotLabel: string
   qualificationPilotLabel: string
   planningPilotLabel: string
+  executionPilotLabel: string
   activeAutonomousAgentCount: number
   operationsDashboardHref: string
 }

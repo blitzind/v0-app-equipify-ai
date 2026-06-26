@@ -21,6 +21,7 @@ import type {
   GrowthAutonomyCapability,
   GrowthAutonomySettingsSnapshot,
 } from "@/lib/growth/autonomy/growth-autonomy-types"
+import { getAutonomousExecutionPilotOrgState } from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-store"
 import { getAutonomousPlanningPilotOrgState } from "@/lib/growth/aios/growth/growth-autonomous-planning-pilot-store"
 import { getAutonomousQualificationPilotOrgState } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-store"
 import { getAutonomousResearchPilotOrgState } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-store"
@@ -88,9 +89,11 @@ async function buildGrowthAiOsAutonomyPolicyPackage(
   const pilotState = getAutonomousResearchPilotOrgState(input.organizationId, generatedAt)
   const qualificationPilotState = getAutonomousQualificationPilotOrgState(input.organizationId, generatedAt)
   const planningPilotState = getAutonomousPlanningPilotOrgState(input.organizationId, generatedAt)
+  const executionPilotState = getAutonomousExecutionPilotOrgState(input.organizationId, generatedAt)
   const recentRuns = pilotState.runs
   const recentQualificationRuns = qualificationPilotState.runs
   const recentPlanningRuns = planningPilotState.runs
+  const recentExecutionRuns = executionPilotState.runs
   const hourAgo = Date.parse(generatedAt) - 60 * 60 * 1000
   const dayAgo = Date.parse(generatedAt) - 24 * 60 * 60 * 1000
   const researchHourlyConsumed = recentRuns.filter(
@@ -109,6 +112,12 @@ async function buildGrowthAiOsAutonomyPolicyPackage(
     (run) => run.outcome !== "skipped" && Date.parse(run.completedAt) >= hourAgo,
   ).length
   const planningDailyConsumed = recentPlanningRuns.filter(
+    (run) => run.outcome !== "skipped" && Date.parse(run.completedAt) >= dayAgo,
+  ).length
+  const executionHourlyConsumed = recentExecutionRuns.filter(
+    (run) => run.outcome !== "skipped" && Date.parse(run.completedAt) >= hourAgo,
+  ).length
+  const executionDailyConsumed = recentExecutionRuns.filter(
     (run) => run.outcome !== "skipped" && Date.parse(run.completedAt) >= dayAgo,
   ).length
   const [runtimeEnabled, runtimePilotEnabled] = await Promise.all([
@@ -133,6 +142,10 @@ async function buildGrowthAiOsAutonomyPolicyPackage(
     planningPilotTelemetry: {
       budgetConsumptionHour: planningHourlyConsumed,
       budgetConsumptionDay: planningDailyConsumed,
+    },
+    executionPilotTelemetry: {
+      budgetConsumptionHour: executionHourlyConsumed,
+      budgetConsumptionDay: executionDailyConsumed,
     },
     budgetRemaining,
   })

@@ -32,6 +32,7 @@ import { buildGrowthAgentMemoryPlanContext } from "@/lib/growth/aios/growth/grow
 import { buildGrowthMissionPlanContext } from "@/lib/growth/aios/growth/growth-mission-framework-service"
 import { buildGrowthMissionPriorityPlanContext } from "@/lib/growth/aios/growth/growth-mission-priority-service"
 import { buildGrowthSchedulerReadinessPlanContext } from "@/lib/growth/aios/growth/growth-scheduler-readiness-service"
+import { buildGrowthAutonomousExecutionPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-service"
 import { buildGrowthAutonomousPlanningPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-planning-pilot-service"
 import { buildGrowthAutonomousQualificationPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-service"
 import { buildGrowthAutonomousResearchPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-service"
@@ -215,6 +216,7 @@ async function listLeadResearchExecutionPlansForMission(
     let autonomousResearchPilotContext = null
     let autonomousQualificationPilotContext = null
     let autonomousPlanningPilotContext = null
+    let autonomousExecutionPilotContext = null
 
     if (approvalStatus === "approved_for_future_execution") {
       readinessState = resolveApprovedPlanReadinessState({
@@ -404,6 +406,12 @@ async function listLeadResearchExecutionPlansForMission(
       generatedAt: nowIso(),
     })
 
+    autonomousExecutionPilotContext = await buildGrowthAutonomousExecutionPilotPlanContext(admin, {
+      organizationId: input.organizationId,
+      leadId,
+      generatedAt: nowIso(),
+    })
+
     plans.push({
       leadId,
       companyName: lead?.companyName ?? null,
@@ -448,6 +456,7 @@ async function listLeadResearchExecutionPlansForMission(
       autonomousResearchPilotContext,
       autonomousQualificationPilotContext,
       autonomousPlanningPilotContext,
+      autonomousExecutionPilotContext,
       reason:
         snapshot.nextBestAction?.reason ??
         snapshot.opportunityAssessment?.summary ??

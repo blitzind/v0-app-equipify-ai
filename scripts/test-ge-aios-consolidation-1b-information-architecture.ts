@@ -436,7 +436,7 @@ const minimalCommandCenter = {
     schedulerMode: "controlled_agent_wake" as const,
     controlState: "disabled" as const,
     enabled: false,
-    disabledAgentKinds: ["execution_agent", "outreach_agent", "meeting_agent"],
+    disabledAgentKinds: ["outreach_agent", "meeting_agent"],
     budgetLimits: { maxRunsPerHour: 20, maxRunsPerDay: 200, maxRetriesPerLeadPerDay: 3, cooldownAfterFailureMinutes: 30 },
     telemetry: {
       successfulRuns: 0,
@@ -469,7 +469,7 @@ const minimalCommandCenter = {
     schedulerMode: "controlled_agent_wake" as const,
     controlState: "disabled" as const,
     enabled: false,
-    disabledAgentKinds: ["execution_agent", "outreach_agent", "meeting_agent"],
+    disabledAgentKinds: ["outreach_agent", "meeting_agent"],
     budgetLimits: { maxRunsPerHour: 15, maxRunsPerDay: 150, maxRetriesPerLeadPerDay: 2, cooldownAfterFailureMinutes: 30 },
     telemetry: {
       successfulRuns: 0,
@@ -493,6 +493,48 @@ const minimalCommandCenter = {
       pauseRecommendation: null,
       escalationRecommendation: null,
       latestHandoffRecommendation: null,
+    },
+    wakeConditionsSupported: [],
+  },
+  autonomousExecutionPilot: {
+    qaMarker: "growth-aios-growth-5e-autonomous-execution-pilot-v1",
+    generatedAt: new Date().toISOString(),
+    rule: "rule",
+    agentKind: "execution_agent" as const,
+    schedulerMode: "controlled_agent_wake" as const,
+    controlState: "disabled" as const,
+    enabled: false,
+    allowedWorkflow: "research_company" as const,
+    disabledAgentKinds: ["outreach_agent", "meeting_agent"],
+    budgetLimits: {
+      maxRunsPerHour: 5,
+      maxRunsPerDay: 25,
+      maxRetriesPerPlanPerDay: 2,
+      cooldownAfterFailureMinutes: 30,
+    },
+    telemetry: {
+      successfulRuns: 0,
+      failedRuns: 0,
+      skippedRuns: 0,
+      eligiblePlans: 0,
+      queuedExecutions: 0,
+      activeExecutions: 0,
+      completedExecutions: 0,
+      failedExecutions: 0,
+      blockedExecutions: 0,
+      budgetConsumptionHour: 0,
+      budgetConsumptionDay: 0,
+      activeRuns: 0,
+    },
+    latestExecutions: [],
+    recentRuns: [],
+    revenueOperatorSupervision: {
+      approveWakeRecommendation: "",
+      budgetMonitorSummary: "",
+      failureMonitorSummary: "",
+      pauseRecommendation: null,
+      escalationRecommendation: null,
+      latestOutcomeRecommendation: null,
     },
     wakeConditionsSupported: [],
   },
@@ -526,6 +568,8 @@ assert.ok(dashboard.executiveOverview.operatingModeReadOnly)
 assert.equal(dashboard.autonomyState.configureHref, "/growth/settings/autonomy")
 assert.equal(dashboard.approvalSummary.categories.find((c) => c.id === "automation")?.count, 2)
 assert.ok(dashboard.missionPriorities.length <= 10)
+assert.equal(typeof dashboard.executionAgentStatus.budgetLabel, "string")
+assert.equal(dashboard.executionAgentStatus.configureHref, "/growth/settings/autonomy")
 
 for (const file of [
   "lib/growth/aios/ai-os-operations-dashboard-synthesizer.ts",

@@ -40,10 +40,15 @@ import type { GrowthAiOsAutonomyPolicyIntegrationSummary } from "@/lib/growth/au
 import { fetchGrowthAiOsAutonomyPolicy } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-engine-service"
 import {
   buildAutonomyPolicyIntegrationSummary,
+  deriveExecutionPilotControlFromPolicy,
   derivePlanningPilotControlFromPolicy,
   deriveQualificationPilotControlFromPolicy,
   deriveResearchPilotControlFromPolicy,
 } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-synthesizer"
+import {
+  getAutonomousExecutionPilotOrgState,
+  setAutonomousExecutionPilotControlState,
+} from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-store"
 import {
   getAutonomousPlanningPilotOrgState,
   setAutonomousPlanningPilotControlState,
@@ -197,6 +202,23 @@ async function syncAutonomousPlanningPilotFromPolicy(
   const nextControlState = derivePlanningPilotControlFromPolicy(policy, orgState.controlState)
   if (nextControlState !== orgState.controlState) {
     setAutonomousPlanningPilotControlState({
+      organizationId,
+      controlState: nextControlState,
+      now: generatedAt,
+    })
+  }
+}
+
+async function syncAutonomousExecutionPilotFromPolicy(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<void> {
+  const generatedAt = new Date().toISOString()
+  const policy = await fetchGrowthAiOsAutonomyPolicy(admin, { organizationId, generatedAt })
+  const orgState = getAutonomousExecutionPilotOrgState(organizationId, generatedAt)
+  const nextControlState = deriveExecutionPilotControlFromPolicy(policy, orgState.controlState)
+  if (nextControlState !== orgState.controlState) {
+    setAutonomousExecutionPilotControlState({
       organizationId,
       controlState: nextControlState,
       now: generatedAt,
@@ -379,6 +401,7 @@ export async function patchGrowthAutonomySettings(
     await syncAutonomousResearchPilotFromPolicy(admin, input.organizationId)
     await syncAutonomousQualificationPilotFromPolicy(admin, input.organizationId)
     await syncAutonomousPlanningPilotFromPolicy(admin, input.organizationId)
+    await syncAutonomousExecutionPilotFromPolicy(admin, input.organizationId)
     return loadGrowthAutonomySettingsViewModel(admin, input.organizationId)
   }
 
@@ -448,6 +471,7 @@ export async function patchGrowthAutonomySettings(
   await syncAutonomousResearchPilotFromPolicy(admin, input.organizationId)
   await syncAutonomousQualificationPilotFromPolicy(admin, input.organizationId)
   await syncAutonomousPlanningPilotFromPolicy(admin, input.organizationId)
+  await syncAutonomousExecutionPilotFromPolicy(admin, input.organizationId)
 
   return loadGrowthAutonomySettingsViewModel(admin, input.organizationId)
 }

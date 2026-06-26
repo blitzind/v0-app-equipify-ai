@@ -32,7 +32,6 @@ const FRESH_RESEARCH_MS = 7 * 24 * 60 * 60 * 1000
 const RECENT_QUALIFICATION_MS = 24 * 60 * 60 * 1000
 
 export const GROWTH_AUTONOMOUS_QUALIFICATION_DISABLED_AGENT_KINDS = [
-  "execution_agent",
   "outreach_agent",
   "meeting_agent",
 ] as const satisfies readonly GrowthAgentKind[]

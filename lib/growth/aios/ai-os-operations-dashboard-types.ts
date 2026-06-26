@@ -3,6 +3,7 @@
 import type { AiOsDailyBriefing } from "@/lib/growth/aios/ai-os-daily-briefing-types"
 import type { GrowthAgentKind } from "@/lib/growth/aios/growth/growth-agent-framework-types"
 import type { GrowthMissionQueueBucket } from "@/lib/growth/aios/growth/growth-mission-priority-types"
+import type { AiOsOperationsExecutionAgentStatus } from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-types"
 import { GROWTH_AI_OS_AUTONOMY_CONTROL_PLANE_PATH } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-types"
 
 export const GROWTH_AIOS_CONSOLIDATION_1B_PHASE = "GE-AIOS-CONSOLIDATION-1B" as const
@@ -25,6 +26,7 @@ export type AiOsOperationsActivitySource =
   | "autonomous_research"
   | "autonomous_qualification"
   | "autonomous_planning"
+  | "autonomous_execution"
   | "workflow"
   | "revenue_operator"
   | "executive_brain"
@@ -57,7 +59,7 @@ export type AiOsOperationsExecutiveOverview = {
 
 export type AiOsOperationsActiveWorkItem = {
   id: string
-  category: "mission" | "execution_plan" | "autonomous_research" | "autonomous_qualification" | "autonomous_planning" | "waiting_for_human" | "blocked"
+  category: "mission" | "execution_plan" | "autonomous_research" | "autonomous_qualification" | "autonomous_planning" | "autonomous_execution" | "waiting_for_human" | "blocked"
   title: string
   summary: string
   href: string | null
@@ -131,6 +133,7 @@ export type AiOsOperationsDashboardReadModel = {
   generatedAt: string
   executiveOverview: AiOsOperationsExecutiveOverview
   autonomyState: AiOsOperationsAutonomyStateSummary
+  executionAgentStatus: AiOsOperationsExecutionAgentStatus
   activeWork: AiOsOperationsActiveWorkItem[]
   activityTimeline: AiOsOperationsActivityTimelineItem[]
   healthSummary: AiOsOperationsHealthSummary

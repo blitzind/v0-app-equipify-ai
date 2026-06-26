@@ -60,13 +60,22 @@ export async function validateGrowthLeadResearchExecutionPilotEnqueue(
     confidence: number | null
     runtimeOverride?: boolean
     pilotOverride?: boolean
+    /** GE-AIOS-GROWTH-5E — policy-derived flags for autonomous execution (no env/request overrides). */
+    policyDerivedFlags?: { runtimeEnabled: boolean; pilotEnabled: boolean }
   },
 ): Promise<GrowthLeadResearchExecutionRuntimePilotEnqueueValidation> {
-  const flags = await resolveExecutionRuntimeEffectiveEnabled(admin, {
-    organizationId: input.organizationId,
-    runtimeOverride: input.runtimeOverride,
-    pilotOverride: input.pilotOverride,
-  })
+  const flags = input.policyDerivedFlags
+    ? {
+        runtimeEnabled: input.policyDerivedFlags.runtimeEnabled,
+        pilotEnabled: input.policyDerivedFlags.pilotEnabled,
+        effectiveRuntimeEnabled:
+          input.policyDerivedFlags.runtimeEnabled && input.policyDerivedFlags.pilotEnabled,
+      }
+    : await resolveExecutionRuntimeEffectiveEnabled(admin, {
+        organizationId: input.organizationId,
+        runtimeOverride: input.runtimeOverride,
+        pilotOverride: input.pilotOverride,
+      })
 
   const gateValidation = await buildExecutionRuntimeValidation(admin, {
     organizationId: input.organizationId,
@@ -98,6 +107,7 @@ async function buildPilotPlanItem(
     approvalState: GrowthLeadResearchExecutionPlanApprovalStatus
     confidence: number | null
     flags: Awaited<ReturnType<typeof resolveExecutionRuntimeEffectiveEnabled>>
+    policyDerivedFlags?: { runtimeEnabled: boolean; pilotEnabled: boolean }
   },
 ): Promise<GrowthLeadResearchExecutionRuntimePilotPlanItem> {
   const validation = await validateGrowthLeadResearchExecutionPilotEnqueue(admin, {
@@ -107,8 +117,9 @@ async function buildPilotPlanItem(
     executionPlan: input.executionPlan,
     approvalState: input.approvalState,
     confidence: input.confidence,
-    runtimeOverride: input.flags.runtimeEnabled,
-    pilotOverride: input.flags.pilotEnabled,
+    runtimeOverride: input.policyDerivedFlags ? undefined : input.flags.runtimeEnabled,
+    pilotOverride: input.policyDerivedFlags ? undefined : input.flags.pilotEnabled,
+    policyDerivedFlags: input.policyDerivedFlags,
   })
 
   const latestDryRun = getLatestDryRunReportForPlan(input.planId)
@@ -131,17 +142,29 @@ async function buildPilotPlanItem(
 
 export async function buildExecutionRuntimePilotPlanQueues(
   admin: SupabaseClient,
-  input: { organizationId: string; runtimeOverride?: boolean; pilotOverride?: boolean },
+  input: {
+    organizationId: string
+    runtimeOverride?: boolean
+    pilotOverride?: boolean
+    policyDerivedFlags?: { runtimeEnabled: boolean; pilotEnabled: boolean }
+  },
 ): Promise<{
   pilotSummary: ReturnType<typeof buildExecutionRuntimePilotSummary>
   pilotEligiblePlans: GrowthLeadResearchExecutionRuntimePilotPlanItem[]
   pilotBlockedPlans: GrowthLeadResearchExecutionRuntimePilotPlanItem[]
 }> {
-  const flags = await resolveExecutionRuntimeEffectiveEnabled(admin, {
-    organizationId: input.organizationId,
-    runtimeOverride: input.runtimeOverride,
-    pilotOverride: input.pilotOverride,
-  })
+  const flags = input.policyDerivedFlags
+    ? {
+        runtimeEnabled: input.policyDerivedFlags.runtimeEnabled,
+        pilotEnabled: input.policyDerivedFlags.pilotEnabled,
+        effectiveRuntimeEnabled:
+          input.policyDerivedFlags.runtimeEnabled && input.policyDerivedFlags.pilotEnabled,
+      }
+    : await resolveExecutionRuntimeEffectiveEnabled(admin, {
+        organizationId: input.organizationId,
+        runtimeOverride: input.runtimeOverride,
+        pilotOverride: input.pilotOverride,
+      })
   const pilotSummary = buildExecutionRuntimePilotSummary(flags)
 
   const approvedPlans = await buildGrowthLeadResearchApprovedPlanReadinessQueue(admin, {
@@ -188,6 +211,7 @@ export async function buildExecutionRuntimePilotPlanQueues(
       approvalState: item.approvalState,
       confidence: snapshot.opportunityAssessment?.confidence ?? snapshot.qualification?.confidence ?? null,
       flags,
+      policyDerivedFlags: input.policyDerivedFlags,
     })
 
     if (planItem.enqueueAllowed) {

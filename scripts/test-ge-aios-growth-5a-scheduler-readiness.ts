@@ -145,6 +145,7 @@ assert.ok(wakeRules.every((rule) =>
   rule.agentKind === "research_agent" ||
   rule.agentKind === "qualification_agent" ||
   rule.agentKind === "planning_agent" ||
+  rule.agentKind === "execution_agent" ||
   rule.wakeAllowedInPhase === false,
 ))
 console.log("  ✓ Deterministic wake rules — pilot agents gated in later phases")
