@@ -10,8 +10,8 @@ import {
 import { resolveDecisionGateBlockedWorkOrderStatus } from "@/lib/growth/aios/ai-decision-gate-types"
 import {
   fetchAiDecisionEngineRuntime,
-  runAiDecisionEngineForWorkOrder,
-} from "@/lib/growth/aios/ai-decision-engine-service"
+} from "@/lib/growth/aios/ai-decision-engine-repository"
+import { runAiDecisionEngineForWorkOrder } from "@/lib/growth/aios/ai-decision-engine-service"
 import type { AiDecisionExecutionBridgeInput } from "@/lib/growth/aios/ai-decision-execution-bridge-types"
 import {
   hasExecutableDecisionRecords,

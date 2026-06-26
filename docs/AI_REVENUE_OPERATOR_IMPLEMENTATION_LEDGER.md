@@ -43,6 +43,7 @@ For each GE-AI-2X phase, maintain one entry with:
 | GE-AIOS-3D | Executive Mission Planning Tick | Complete (local cert) |
 | GE-AIOS-3E | Mission Planning Review Surface | Complete (local cert) |
 | GE-AIOS-3F | AI OS Stack Certification & Migration Readiness | Complete (local cert) |
+| GE-AIOS-4A | Autonomous Growth Pilot (Lead Research) | Complete (local cert) |
 | GE-AI-2D | Memory Facade (ledger) | Complete via GE-AIOS-2F |
 | GE-AI-2A | Decision Record Foundation (ledger) | Complete via GE-AIOS-2D |
 | GE-AI-2B | Event Bus Unification | Partial (foundation in GE-AIOS-2B) |
@@ -701,6 +702,32 @@ Pending — ready for commit/migration review
 ### Recommendation
 
 **Commit now** (GE-AIOS artifacts only; exclude unrelated working-tree changes)
+
+---
+
+## GE-AIOS-4A — Autonomous Growth Pilot (Lead Research Pipeline)
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-4A (Equipify AI OS) |
+| **Dependencies** | GE-AIOS 2A–3E stack |
+
+### Scope delivered
+
+- Single workflow: prospect created → full AI OS research pipeline
+- Feature-flagged orchestrator on `createGrowthLead`
+- Research agent executor via claim → context assembly → provider gateway → save research
+- Operator observation UI + read API
+- No additional workflows; no Core changes; no outbound
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-4a-lead-research-pilot-foundation`
+
+### Production certification
+
+Pending — requires flag enable + staging smoke
 
 ---
 

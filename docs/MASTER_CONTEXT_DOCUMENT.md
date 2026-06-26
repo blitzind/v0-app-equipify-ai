@@ -16,7 +16,7 @@
 =================================================
 
 **Document role:** Living engineering state — current phase, production status, rules, certifications, risks, and priorities.  
-**Last updated:** 2026-06-25 (GE-AIOS-3F AI OS Stack Certification)  
+**Last updated:** 2026-06-25 (GE-AIOS-4A Lead Research Pilot)  
 **Regeneration:** `pnpm update:master-context` (inventory scan + this document's manual sections)  
 **Admin UI:** `/admin/master-context`
 
@@ -46,7 +46,7 @@
 |-------|--------|
 | **Architecture phase** | GE-AI-1X — **Complete** (Constitution v1.0 frozen) |
 | **Documentation phase** | GE-DOC-1 — **Complete** |
-| **Current phase** | **GE-AIOS-3F** — AI OS Stack Certification & Migration Readiness (**certified locally**, not committed) |
+| **Current phase** | **GE-AIOS-4A** — Autonomous Growth Pilot / Lead Research Pipeline (**certified locally**, not committed) |
 | **Next phase** | GE-AI-2F — Meta-Recommender |
 
 **Transition:** Official move from Architecture Phase (GE-AI-1X) to Engineering Phase (GE-AI-2X).
@@ -218,11 +218,12 @@ Full list: `lib/admin/master-context.manual.after.md` § Known Limitations.
 | GE-AIOS-3D | Executive Mission Planning Tick | Complete (local cert) |
 | GE-AIOS-3E | Mission Planning Review Surface | Complete (local cert) |
 | GE-AIOS-3F | AI OS Stack Certification & Migration Readiness | Complete (local cert) |
+| GE-AIOS-4A | Autonomous Growth Pilot (Lead Research) | Complete (local cert) |
 
 ### Current phase
 
-**GE-AIOS-3F — AI OS Stack Certification & Migration Readiness**  
-Full-stack local certification of GE-AIOS 2A–3E before commit/migration apply. Status: **Complete (local cert)**.
+**GE-AIOS-4A — Autonomous Growth Pilot**  
+Single Lead Research Pipeline wired end-to-end through AI OS infrastructure. Status: **Complete (local cert)**.
 
 ### Next phases (ordered)
 
@@ -269,6 +270,7 @@ GE-AUTO-1A through 2I implemented locally; GE-AUTO-3 not started. See manual bef
 | GE-AIOS-3D Executive Mission Planning Tick | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-3E Mission Planning Review Surface | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-3F AI OS Stack Certification (2A–3E) | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-4A Lead Research Pilot | **PASS (local)** | 2026-06-25 |
 | GE-AI-2A+ implementation (production) | Pending | — |
 
 Outbound operational readiness: `docs/GROWTH_OUTBOUND_OPERATIONAL_READINESS.md`
@@ -418,6 +420,14 @@ Outbound operational readiness: `docs/GROWTH_OUTBOUND_OPERATIONAL_READINESS.md`
 - 9 migrations in strict order; 2E/2I/3B–3E service-layer only
 - Ready for commit/migration review — no autonomous execution exposed
 
+### Lead Research Pilot (GE-AIOS-4A)
+
+- Orchestrator: `lib/growth/aios/pilot/lead-research-pilot-orchestrator.ts`
+- Trigger: `createGrowthLead` → `scheduleLeadResearchPilotForProspect` (feature-flagged)
+- Flow: planning tick → research_company WO → decision prep → agent claim → context → provider → save research
+- Observation: `/growth/ai-os/pilot/lead-research/[leadId]`
+- Flags: `GROWTH_AIOS_LEAD_RESEARCH_PILOT_ENABLED`, optional `GROWTH_AIOS_LEAD_RESEARCH_PILOT_ENABLE_AI_EVIDENCE`
+
 ### Not yet runtime-bound to Constitution
 
 Meta-Recommender supremacy, Priority formula as sole authority.
@@ -499,6 +509,7 @@ Full list: `lib/admin/master-context.manual.after.md` § Current Priorities.
 | [GE-AIOS-3F Migration Readiness](./GE-AIOS-3F_MIGRATION_READINESS.md) | Migration apply checklist |
 | [GE-AIOS-3F File Impact](./GE-AIOS-3F_FILE_IMPACT_SUMMARY.md) | File impact summary |
 | [GE-AIOS-3F Known Risks](./GE-AIOS-3F_KNOWN_RISKS.md) | Risks and deferred items |
+| [GE-AIOS-4A Certification](./GE-AIOS-4A_CERTIFICATION.md) | Lead Research Pilot cert |
 
 ### Legacy / generated inventory
 
