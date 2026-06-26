@@ -2,6 +2,11 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { getGrowthEngineAiOrgId, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { approveExecutiveMissionPlanningReview } from "@/lib/growth/aios/ai-executive-mission-planning-review-service"
+import {
+  aiOsInvalidMissionIdResponse,
+  aiOsPlanningReviewErrorStatus,
+  resolveAiOsMissionIdFromRouteParam,
+} from "@/lib/growth/aios/ai-os-mission-route-response"
 import { GROWTH_AI_EXECUTIVE_MISSION_PLANNING_REVIEW_QA_MARKER } from "@/lib/growth/aios/ai-executive-mission-planning-review-types"
 
 export const runtime = "nodejs"
@@ -21,7 +26,16 @@ export async function POST(request: Request, context: RouteContext) {
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 
-  const { missionId } = await context.params
+  const { missionId: rawMissionId } = await context.params
+  const missionIdResult = resolveAiOsMissionIdFromRouteParam(rawMissionId)
+  if (!missionIdResult.ok) {
+    return aiOsInvalidMissionIdResponse(
+      missionIdResult,
+      GROWTH_AI_EXECUTIVE_MISSION_PLANNING_REVIEW_QA_MARKER,
+      "Could not approve mission planning review.",
+    )
+  }
+
   const organizationId = getGrowthEngineAiOrgId()
 
   let body: z.infer<typeof approveBodySchema>
@@ -43,7 +57,7 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const approval = await approveExecutiveMissionPlanningReview(access.admin, {
       organizationId,
-      missionId,
+      missionId: missionIdResult.missionId,
       reviewId: body.reviewId,
       executiveRuntimeId: body.executiveRuntimeId,
       operatorUserId: access.userId,
@@ -59,12 +73,7 @@ export async function POST(request: Request, context: RouteContext) {
     })
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
-    const status =
-      detail === "growth_objective_not_found"
-        ? 404
-        : detail === "planning_review_id_required"
-          ? 400
-          : 500
+    const status = aiOsPlanningReviewErrorStatus(detail)
     return NextResponse.json(
       {
         ok: false,

@@ -30,8 +30,18 @@ import {
 } from "@/lib/growth/aios/ai-work-order-types"
 import { getGrowthObjective } from "@/lib/growth/objectives/growth-objective-repository"
 import type { GrowthObjective } from "@/lib/growth/objectives/growth-objective-types"
+import {
+  GROWTH_AI_OS_MISSION_ID_INVALID_ERROR,
+  resolveAiOsMissionIdParam,
+} from "@/lib/growth/aios/ai-os-mission-route-params"
 
 const PLANNING_REVIEW_EXECUTIVE_INSTANCE_ID = "ge-aios-planning-review" as const
+
+function assertResolvableAiOsMissionId(missionId: string): string {
+  const resolved = resolveAiOsMissionIdParam(missionId)
+  if (!resolved.ok) throw new Error(GROWTH_AI_OS_MISSION_ID_INVALID_ERROR)
+  return resolved.missionId
+}
 
 function nowIso(): string {
   return new Date().toISOString()
@@ -126,7 +136,8 @@ export async function fetchExecutiveMissionPlanningReviewReadModel(
   admin: SupabaseClient,
   input: { organizationId: string; missionId: string; executiveRuntimeId?: string },
 ): Promise<AiExecutiveMissionPlanningReviewReadModel> {
-  const objective = await getGrowthObjective(admin, input.organizationId, input.missionId)
+  const missionId = assertResolvableAiOsMissionId(input.missionId)
+  const objective = await getGrowthObjective(admin, input.organizationId, missionId)
   if (!objective) throw new Error("growth_objective_not_found")
 
   const { executiveRuntimeId } = await resolveExecutiveRuntimeForPlanningReview(admin, {
@@ -136,7 +147,7 @@ export async function fetchExecutiveMissionPlanningReviewReadModel(
 
   const activeWorkOrders = await listActiveWorkOrdersForMission(admin, {
     organizationId: input.organizationId,
-    missionId: input.missionId,
+    missionId,
   })
 
   return {
@@ -151,9 +162,10 @@ export async function previewExecutiveMissionPlanningReview(
   admin: SupabaseClient,
   input: AiExecutiveMissionPlanningReviewPreviewInput,
 ): Promise<AiExecutiveMissionPlanningReviewPreviewResult> {
+  const missionId = assertResolvableAiOsMissionId(input.missionId)
   const readModel = await fetchExecutiveMissionPlanningReviewReadModel(admin, {
     organizationId: input.organizationId,
-    missionId: input.missionId,
+    missionId,
     executiveRuntimeId: input.executiveRuntimeId,
   })
 
@@ -163,7 +175,7 @@ export async function previewExecutiveMissionPlanningReview(
   await publishReviewEvent(admin, {
     organizationId: input.organizationId,
     eventType: "executive.planning_review_created",
-    missionId: input.missionId,
+    missionId,
     executiveRuntimeId: readModel.executiveRuntimeId,
     operatorUserId: input.operatorUserId,
     payload: {
@@ -176,7 +188,7 @@ export async function previewExecutiveMissionPlanningReview(
   const tickResult = await runExecutiveMissionPlanningTick(admin, {
     organizationId: input.organizationId,
     executiveRuntimeId: readModel.executiveRuntimeId,
-    missionId: input.missionId,
+    missionId,
     mode: "dry_run",
     maxProposals: input.maxProposals,
     source: input.source ?? "ai_executive_mission_planning_review_service",
@@ -206,7 +218,8 @@ export async function approveExecutiveMissionPlanningReview(
 ): Promise<AiExecutiveMissionPlanningReviewApproveResult> {
   if (!input.reviewId.trim()) throw new Error("planning_review_id_required")
 
-  const objective = await getGrowthObjective(admin, input.organizationId, input.missionId)
+  const missionId = assertResolvableAiOsMissionId(input.missionId)
+  const objective = await getGrowthObjective(admin, input.organizationId, missionId)
   if (!objective) throw new Error("growth_objective_not_found")
 
   const approvedAt = nowIso()
@@ -214,7 +227,7 @@ export async function approveExecutiveMissionPlanningReview(
   await publishReviewEvent(admin, {
     organizationId: input.organizationId,
     eventType: "executive.planning_review_approved",
-    missionId: input.missionId,
+    missionId,
     executiveRuntimeId: input.executiveRuntimeId,
     operatorUserId: input.operatorUserId,
     payload: {
@@ -228,7 +241,7 @@ export async function approveExecutiveMissionPlanningReview(
   const tickResult = await runExecutiveMissionPlanningTick(admin, {
     organizationId: input.organizationId,
     executiveRuntimeId: input.executiveRuntimeId,
-    missionId: input.missionId,
+    missionId,
     mode: "create",
     prepareDecision: input.prepareDecision,
     enableAiEvidence: input.enableAiEvidence,
@@ -238,7 +251,7 @@ export async function approveExecutiveMissionPlanningReview(
 
   return {
     reviewId: input.reviewId,
-    missionId: input.missionId,
+    missionId,
     executiveRuntimeId: input.executiveRuntimeId,
     created: tickResult.created,
     createdCount: tickResult.created.length,

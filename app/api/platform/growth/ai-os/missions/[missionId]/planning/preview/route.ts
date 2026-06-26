@@ -2,6 +2,11 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { getGrowthEngineAiOrgId, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { previewExecutiveMissionPlanningReview } from "@/lib/growth/aios/ai-executive-mission-planning-review-service"
+import {
+  aiOsInvalidMissionIdResponse,
+  aiOsPlanningReviewErrorStatus,
+  resolveAiOsMissionIdFromRouteParam,
+} from "@/lib/growth/aios/ai-os-mission-route-response"
 import { GROWTH_AI_EXECUTIVE_MISSION_PLANNING_REVIEW_QA_MARKER } from "@/lib/growth/aios/ai-executive-mission-planning-review-types"
 
 export const runtime = "nodejs"
@@ -18,7 +23,16 @@ export async function POST(request: Request, context: RouteContext) {
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 
-  const { missionId } = await context.params
+  const { missionId: rawMissionId } = await context.params
+  const missionIdResult = resolveAiOsMissionIdFromRouteParam(rawMissionId)
+  if (!missionIdResult.ok) {
+    return aiOsInvalidMissionIdResponse(
+      missionIdResult,
+      GROWTH_AI_EXECUTIVE_MISSION_PLANNING_REVIEW_QA_MARKER,
+      "Could not run mission planning dry-run preview.",
+    )
+  }
+
   const organizationId = getGrowthEngineAiOrgId()
 
   let body: z.infer<typeof previewBodySchema> = {}
@@ -40,7 +54,7 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const preview = await previewExecutiveMissionPlanningReview(access.admin, {
       organizationId,
-      missionId,
+      missionId: missionIdResult.missionId,
       executiveRuntimeId: body.executiveRuntimeId,
       operatorUserId: access.userId,
       maxProposals: body.maxProposals,
@@ -53,7 +67,7 @@ export async function POST(request: Request, context: RouteContext) {
     })
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
-    const status = detail === "growth_objective_not_found" ? 404 : 500
+    const status = aiOsPlanningReviewErrorStatus(detail)
     return NextResponse.json(
       {
         ok: false,

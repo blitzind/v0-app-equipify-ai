@@ -8,6 +8,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import {
+  GROWTH_AI_OS_SAFE_INDEX_HREF,
+  aiOsMissionIdValidationMessage,
+  resolveAiOsMissionIdParam,
+  type AiOsMissionIdValidationFailureReason,
+} from "@/lib/growth/aios/ai-os-mission-route-params"
 import type {
   AiExecutiveMissionPlanningActiveWorkOrderSummary,
   AiExecutiveMissionPlanningReviewApproveResult,
@@ -36,6 +42,38 @@ type ApiApproveResponse = {
   approval?: AiExecutiveMissionPlanningReviewApproveResult
   message?: string
   error?: string
+}
+
+export function GrowthAiOsMissionPlanningInvalidMissionEmptyState({
+  reason,
+  missionId,
+}: {
+  reason: AiOsMissionIdValidationFailureReason
+  missionId?: string
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Mission not available</CardTitle>
+        <CardDescription>{aiOsMissionIdValidationMessage(reason)}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm">
+        {missionId?.trim() ? (
+          <p>
+            <span className="text-muted-foreground">Requested mission id:</span>{" "}
+            <span className="font-mono text-xs">{missionId}</span>
+          </p>
+        ) : null}
+        <p className="text-muted-foreground">
+          Open Mission Planning Review from a Growth objective or Lead Research Pilot observation with a real mission
+          id.
+        </p>
+        <Button type="button" variant="outline" asChild>
+          <Link href={GROWTH_AI_OS_SAFE_INDEX_HREF}>Back to objectives</Link>
+        </Button>
+      </CardContent>
+    </Card>
+  )
 }
 
 function WorkOrderProposalTable({
@@ -113,6 +151,7 @@ function ActiveWorkOrdersTable({ workOrders }: { workOrders: AiExecutiveMissionP
 }
 
 export function GrowthAiOsMissionPlanningReviewPanel({ missionId }: { missionId: string }) {
+  const missionIdResult = resolveAiOsMissionIdParam(missionId)
   const [readModel, setReadModel] = useState<AiExecutiveMissionPlanningReviewReadModel | null>(null)
   const [preview, setPreview] = useState<AiExecutiveMissionPlanningReviewPreviewResult | null>(null)
   const [approval, setApproval] = useState<AiExecutiveMissionPlanningReviewApproveResult | null>(null)
@@ -123,28 +162,41 @@ export function GrowthAiOsMissionPlanningReviewPanel({ missionId }: { missionId:
   const [error, setError] = useState<string | null>(null)
 
   const loadReadModel = useCallback(async () => {
-    const response = await fetch(`/api/platform/growth/ai-os/missions/${missionId}/planning`, { cache: "no-store" })
+    if (!missionIdResult.ok) return
+    const response = await fetch(`/api/platform/growth/ai-os/missions/${missionIdResult.missionId}/planning`, {
+      cache: "no-store",
+    })
     const body = (await response.json()) as ApiReadResponse
     if (!response.ok || !body.ok || !body.review) {
       throw new Error(body.message ?? body.error ?? "Could not load mission planning review.")
     }
     setReadModel(body.review)
-  }, [missionId])
+  }, [missionIdResult])
 
   useEffect(() => {
+    if (!missionIdResult.ok) {
+      setLoading(false)
+      return
+    }
     void loadReadModel()
       .catch((loadError) => {
         setError(loadError instanceof Error ? loadError.message : "Could not load mission planning review.")
       })
       .finally(() => setLoading(false))
-  }, [loadReadModel])
+  }, [loadReadModel, missionIdResult])
+
+  if (!missionIdResult.ok) {
+    return <GrowthAiOsMissionPlanningInvalidMissionEmptyState reason={missionIdResult.reason} missionId={missionId} />
+  }
+
+  const resolvedMissionId = missionIdResult.missionId
 
   async function runPreview() {
     setBusy("preview")
     setError(null)
     setApproval(null)
     try {
-      const response = await fetch(`/api/platform/growth/ai-os/missions/${missionId}/planning/preview`, {
+      const response = await fetch(`/api/platform/growth/ai-os/missions/${resolvedMissionId}/planning/preview`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
@@ -166,7 +218,7 @@ export function GrowthAiOsMissionPlanningReviewPanel({ missionId }: { missionId:
     setBusy("approve")
     setError(null)
     try {
-      const response = await fetch(`/api/platform/growth/ai-os/missions/${missionId}/planning/approve`, {
+      const response = await fetch(`/api/platform/growth/ai-os/missions/${resolvedMissionId}/planning/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -203,7 +255,7 @@ export function GrowthAiOsMissionPlanningReviewPanel({ missionId }: { missionId:
     <div
       className="space-y-6"
       data-qa-marker={GROWTH_AI_EXECUTIVE_MISSION_PLANNING_REVIEW_QA_MARKER}
-      data-mission-id={missionId}
+      data-mission-id={resolvedMissionId}
     >
       <Card>
         <CardHeader>
@@ -221,7 +273,7 @@ export function GrowthAiOsMissionPlanningReviewPanel({ missionId }: { missionId:
           <div className="grid gap-2 sm:grid-cols-2">
             <p>
               <span className="text-muted-foreground">Mission ID:</span>{" "}
-              <span className="font-mono text-xs">{missionId}</span>
+              <span className="font-mono text-xs">{resolvedMissionId}</span>
             </p>
             <p>
               <span className="text-muted-foreground">Objective type:</span> {mission?.objectiveType ?? "—"}

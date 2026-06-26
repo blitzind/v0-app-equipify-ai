@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import type { LeadResearchPilotObservation, LeadResearchPilotStepRecord } from "@/lib/growth/aios/pilot/lead-research-pilot-types"
 import { GROWTH_AI_OS_LEAD_RESEARCH_PILOT_QA_MARKER } from "@/lib/growth/aios/pilot/lead-research-pilot-types"
+import { buildAiOsMissionPlanningHref } from "@/lib/growth/aios/ai-os-mission-route-params"
 
 function stepBadgeVariant(status: LeadResearchPilotStepRecord["status"]) {
   switch (status) {
@@ -74,6 +75,8 @@ export function GrowthAiOsLeadResearchPilotPanel({ leadId }: { leadId: string })
 
   if (!observation) return null
 
+  const missionPlanningHref = buildAiOsMissionPlanningHref(observation.missionId)
+
   return (
     <div className="space-y-6" data-qa-marker={GROWTH_AI_OS_LEAD_RESEARCH_PILOT_QA_MARKER} data-lead-id={leadId}>
       <Card>
@@ -97,11 +100,11 @@ export function GrowthAiOsLeadResearchPilotPanel({ leadId }: { leadId: string })
             <span className="text-muted-foreground">Lead ID:</span>{" "}
             <span className="font-mono text-xs">{leadId}</span>
           </p>
-          {observation.missionId ? (
+          {missionPlanningHref ? (
             <p>
               <span className="text-muted-foreground">Mission:</span>{" "}
-              <Link className="underline" href={`/growth/ai-os/missions/${observation.missionId}/planning`}>
-                {observation.missionId.slice(0, 8)}… planning review
+              <Link className="underline" href={missionPlanningHref}>
+                {observation.missionId!.slice(0, 8)}… planning review
               </Link>
             </p>
           ) : null}

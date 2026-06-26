@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server"
 import { getGrowthEngineAiOrgId, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { fetchExecutiveMissionPlanningReviewReadModel } from "@/lib/growth/aios/ai-executive-mission-planning-review-service"
+import {
+  aiOsInvalidMissionIdResponse,
+  aiOsPlanningReviewErrorStatus,
+  resolveAiOsMissionIdFromRouteParam,
+} from "@/lib/growth/aios/ai-os-mission-route-response"
 import { GROWTH_AI_EXECUTIVE_MISSION_PLANNING_REVIEW_QA_MARKER } from "@/lib/growth/aios/ai-executive-mission-planning-review-types"
 
 export const runtime = "nodejs"
@@ -12,13 +17,22 @@ export async function GET(_request: Request, context: RouteContext) {
   const access = await requireGrowthEnginePlatformAccess()
   if (!access.ok) return access.response
 
-  const { missionId } = await context.params
+  const { missionId: rawMissionId } = await context.params
+  const missionIdResult = resolveAiOsMissionIdFromRouteParam(rawMissionId)
+  if (!missionIdResult.ok) {
+    return aiOsInvalidMissionIdResponse(
+      missionIdResult,
+      GROWTH_AI_EXECUTIVE_MISSION_PLANNING_REVIEW_QA_MARKER,
+      "Could not load mission planning review.",
+    )
+  }
+
   const organizationId = getGrowthEngineAiOrgId()
 
   try {
     const review = await fetchExecutiveMissionPlanningReviewReadModel(access.admin, {
       organizationId,
-      missionId,
+      missionId: missionIdResult.missionId,
     })
     return NextResponse.json({
       ok: true,
@@ -27,7 +41,7 @@ export async function GET(_request: Request, context: RouteContext) {
     })
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
-    const status = detail === "growth_objective_not_found" ? 404 : 500
+    const status = aiOsPlanningReviewErrorStatus(detail)
     return NextResponse.json(
       {
         ok: false,
