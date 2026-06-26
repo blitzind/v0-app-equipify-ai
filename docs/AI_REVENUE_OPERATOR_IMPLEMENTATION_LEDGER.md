@@ -1,0 +1,1168 @@
+# AI Revenue Operator Implementation Ledger
+
+**Purpose:** Track every implementation phase against the Constitution.  
+**Authority:** Constitution v1.0 — [`docs/architecture/AI_REVENUE_OPERATOR_CONSTITUTION_v1.0.md`](./architecture/AI_REVENUE_OPERATOR_CONSTITUTION_v1.0.md)  
+**Living state:** [`docs/MASTER_CONTEXT_DOCUMENT.md`](./MASTER_CONTEXT_DOCUMENT.md)
+
+---
+
+## How to use this ledger
+
+For each GE-AI-2X phase, maintain one entry with:
+
+- Constitutional sections implemented  
+- Files modified  
+- Database changes and migrations  
+- Commits (SHAs or PR links)  
+- Implementation certification status  
+- Production certification status  
+- Rollback notes  
+- Known risks and dependencies  
+
+**Update this ledger before marking a phase complete.**
+
+---
+
+## Phase index
+
+| Phase | Title | Status |
+|-------|-------|--------|
+| GE-AIOS-2A | AI Work Order Foundation | Complete (local cert) |
+| GE-AIOS-2B | AI Event Foundation | Complete (local cert) |
+| GE-AIOS-2C | AI Agent Runtime Foundation | Complete (local cert) |
+| GE-AIOS-2D | Decision Record Foundation | Complete (local cert) |
+| GE-AIOS-2E | Decision Gate for Work Orders | Complete (local cert) |
+| GE-AIOS-2F | Memory Foundation | Complete (local cert) |
+| GE-AIOS-2G | Executive Brain Foundation | Complete (local cert) |
+| GE-AIOS-2H | Decision Engine Foundation | Complete (local cert) |
+| GE-AIOS-2I | Decision Engine Execution Bridge | Complete (local cert) |
+| GE-AIOS-2J | Context Assembly Foundation | Complete (local cert) |
+| GE-AIOS-3A | LLM Provider Abstraction | Complete (local cert) |
+| GE-AIOS-3B | AI Decision Intelligence Bridge | Complete (local cert) |
+| GE-AIOS-3C | Executive Decision Preparation | Complete (local cert) |
+| GE-AIOS-3D | Executive Mission Planning Tick | Complete (local cert) |
+| GE-AIOS-3E | Mission Planning Review Surface | Complete (local cert) |
+| GE-AIOS-3F | AI OS Stack Certification & Migration Readiness | Complete (local cert) |
+| GE-AI-2D | Memory Facade (ledger) | Complete via GE-AIOS-2F |
+| GE-AI-2A | Decision Record Foundation (ledger) | Complete via GE-AIOS-2D |
+| GE-AI-2B | Event Bus Unification | Partial (foundation in GE-AIOS-2B) |
+| GE-AI-2C | Work Order System (remaining) | Partial (DR gate + Executive in 2E/2G) |
+| GE-AI-2E | Priority Engine Binding | Not Started |
+| GE-AI-2F | Meta-Recommender | Not Started |
+| GE-AI-2G | Mission UI & Operator Experience | Not Started |
+| GE-AI-2H | L3 Approval Flow | Not Started |
+| GE-AI-2I | L4 Supervised Outbound | Not Started |
+| GE-AI-2J | Learning Loop | Not Started |
+
+---
+
+## GE-AIOS-2A — AI Work Order Foundation
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-2A (Equipify AI OS Engineering Phase 1) |
+| **Dependencies** | Constitution v1.0, `organization_growth_objectives` |
+
+### Implements (Constitution)
+
+- §9.2 Work Order (GE-AI-1D) — persistence + lifecycle FSM
+- §16.1 Work Order binding schema
+- §17 Invariant 11 — foundation for side-effecting actions (enforcement deferred)
+- §17 Invariant 12 — `decision_record_ids[]` placeholder
+
+### Scope delivered
+
+- `growth.ai_work_orders` + `growth.ai_work_order_events`
+- Types, status machine, repository, service (infrastructure only)
+- Schema health probe
+- No Executive Brain, Decision Engine, Agent Runtime, cron, or API
+
+### Files added
+
+- `supabase/migrations/20271001120000_growth_aios_2a_ai_work_orders.sql`
+- `lib/growth/aios/ai-work-order-types.ts`
+- `lib/growth/aios/ai-work-order-status-machine.ts`
+- `lib/growth/aios/ai-work-order-repository.ts`
+- `lib/growth/aios/ai-work-order-service.ts`
+- `lib/growth/aios/ai-work-order-schema-health.ts`
+- `scripts/test-ge-aios-2a-ai-work-order-foundation.ts`
+- `docs/GE-AIOS-2A_CERTIFICATION.md`
+- `docs/GE-AIOS-2A_INFRASTRUCTURE_AUDIT.md`
+
+### Files modified
+
+- `package.json` (cert script)
+- `docs/MASTER_CONTEXT_DOCUMENT.md`
+- `docs/AI_REVENUE_OPERATOR_IMPLEMENTATION_LEDGER.md`
+
+### Database changes
+
+- `growth.ai_work_orders` — constitutional execution contract
+- `growth.ai_work_order_events` — immutable audit trail
+
+### Migrations
+
+- `20271001120000_growth_aios_2a_ai_work_orders.sql`
+
+### Commits
+
+Not committed (per phase policy)
+
+### Implementation certification
+
+| Field | Value |
+|-------|--------|
+| Status | **PASS (local)** |
+| Report | `docs/GE-AIOS-2A_CERTIFICATION.md` |
+| Command | `pnpm test:ge-aios-2a-ai-work-order-foundation` |
+| Date | 2026-06-25 |
+
+### Production certification
+
+| Field | Value |
+|-------|--------|
+| Status | Pending |
+| Verdict | — |
+| Date | — |
+
+### Rollback notes
+
+Drop `growth.ai_work_order_events`, then `growth.ai_work_orders`. No Core dependencies.
+
+### Known risks
+
+- Domain job queues still parallel until Agent Runtime phase maps Work Order types
+- Decision Record gate not enforced until GE-AI-2A
+- Work order type catalog requires migration to extend
+
+---
+
+## GE-AIOS-2B — AI Event Foundation
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-2B (Equipify AI OS Engineering Phase 2) |
+| **Dependencies** | GE-AIOS-2A, Constitution v1.0 |
+
+### Implements (Constitution)
+
+- §11.5 Event registry — canonical catalog in `ai-event-registry.ts`
+- §17 Invariant 8 — immutable append-only `ai_os_events`
+- §4.2 Event Bus — foundation layer (full unification deferred)
+
+### Scope delivered
+
+- `growth.ai_os_events` — immutable event log (insert/select only)
+- `growth.ai_os_event_subscriptions` — subscriber registry
+- `growth.ai_os_event_deliveries` — per-subscriber pending/consumed/archived
+- `growth.ai_os_event_archive_records` — append-only archive index
+- Publish, subscribe, pull/consume, replay, correction, bridge adapters
+- No Executive Brain, Decision Engine, Memory, or auto-wiring to legacy systems
+
+### Files added
+
+- `supabase/migrations/20271001130000_growth_aios_2b_ai_events.sql`
+- `lib/growth/aios/ai-event-types.ts`
+- `lib/growth/aios/ai-event-registry.ts`
+- `lib/growth/aios/ai-event-repository.ts`
+- `lib/growth/aios/ai-event-service.ts`
+- `lib/growth/aios/ai-event-bridge.ts`
+- `lib/growth/aios/ai-event-subscriber-registry.ts`
+- `lib/growth/aios/ai-event-schema-health.ts`
+- `scripts/test-ge-aios-2b-ai-event-foundation.ts`
+- `docs/GE-AIOS-2B_CERTIFICATION.md`
+- `docs/GE-AIOS-2B_INFRASTRUCTURE_AUDIT.md`
+
+### Files modified
+
+- `package.json`
+- `docs/MASTER_CONTEXT_DOCUMENT.md`
+- `docs/AI_REVENUE_OPERATOR_IMPLEMENTATION_LEDGER.md`
+
+### Migrations
+
+- `20271001130000_growth_aios_2b_ai_events.sql`
+
+### Commits
+
+Not committed (per phase policy)
+
+### Implementation certification
+
+| Field | Value |
+|-------|--------|
+| Status | **PASS (local)** |
+| Report | `docs/GE-AIOS-2B_CERTIFICATION.md` |
+| Command | `pnpm test:ge-aios-2b-ai-event-foundation` |
+| Date | 2026-06-25 |
+
+### Production certification
+
+Pending
+
+### Rollback notes
+
+Drop archive, deliveries, subscriptions, events tables in reverse FK order.
+
+### Known risks
+
+- Legacy event substrates still parallel until bridges are wired in later phases
+- Multi-product orchestration requires `product_namespace` amendment for non-Growth apps
+
+---
+
+## GE-AIOS-2C — AI Agent Runtime Foundation
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-2C (Equipify AI OS Engineering Phase 3) |
+| **Dependencies** | GE-AIOS-2A, GE-AIOS-2B |
+
+### Implements (Constitution)
+
+- §12.1 Agent roster — 16 runtime agents
+- §12.2 Agent lifecycle states — registration `runtime_status`
+- §12.3 Subsystem ownership — default capability map
+- Loose coupling — events only, no direct agent invocation
+
+### Scope delivered
+
+- Agent registry + capability registry
+- Lease manager (claim/release with TTL)
+- Heartbeat + health monitor
+- Work order claim → `executing` via constitutional transitions
+- Fail, escalate, retry hooks
+- Publishes `agent.*` events
+
+### Files added
+
+See `docs/GE-AIOS-2C_CERTIFICATION.md`
+
+### Migrations
+
+- `20271001140000_growth_aios_2c_ai_agent_runtime.sql`
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-2c-ai-agent-runtime-foundation`
+
+### Production certification
+
+Pending
+
+---
+
+## GE-AIOS-2D — Decision Record Foundation
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-2D (Equipify AI OS Engineering Phase 4) |
+| **Dependencies** | GE-AIOS-2A, GE-AIOS-2B |
+
+### Implements (Constitution)
+
+- §7 Decision framework — record infrastructure only
+- §16.2 Decision Record binding schema
+- §17 Invariants 12, 13 — WO linkage + evidence bundle
+
+### Scope delivered
+
+- Immutable `ai_decision_records` + audit events
+- Create, supersede, link to work order, query, audit trail
+- Decision key registry; event publication
+- No Decision Engine, AI reasoning, or provider calls
+
+### Migrations
+
+- `20271001150000_growth_aios_2d_decision_records.sql`
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-2d-decision-record-foundation`
+
+### Production certification
+
+Pending
+
+---
+
+## GE-AIOS-2E — Decision Gate for Work Orders
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-2E (Equipify AI OS Engineering Phase 5) |
+| **Dependencies** | GE-AIOS-2A, GE-AIOS-2B, GE-AIOS-2C, GE-AIOS-2D |
+
+### Implements (Constitution)
+
+- §7 Decision framework — execution gate only
+- §16.2 Decision Record binding validation
+- §17 Invariant 12 — ≥1 Decision Record required before `executing`
+
+### Scope delivered
+
+- Pure validator + gate service
+- Choke point in `transitionAiWorkOrder` for `executing`
+- Events: `decision.gate_passed`, `decision.gate_blocked`
+- Block transitions to `awaiting_decision` / `escalated` per status machine
+- No record creation, AI reasoning, or provider calls
+
+### Migrations
+
+None — reuses GE-AIOS-2A/2D tables
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-2e-decision-gate-foundation`
+
+### Production certification
+
+Pending
+
+---
+
+## GE-AIOS-2F — Memory Foundation
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-2F (Equipify AI OS Engineering Phase 6) |
+| **Dependencies** | GE-AIOS-2A, GE-AIOS-2B, GE-AIOS-2D |
+
+### Implements (Constitution)
+
+- §8 Memory architecture — registry metadata + lifecycle (no retrieval engine)
+- §16.3 Memory System contract — references existing stores
+- §16.1 Work Order binding — `memory_refs[]` linkage
+
+### Scope delivered
+
+- `ai_memory_registry` + audit events
+- 11 constitutional memory types with source bindings
+- Register (idempotent), reference, link to WO/DR, archive, query
+- Schema health probe; event publication
+- No vector search, embeddings, RAG, Learning Engine, or AI reasoning
+
+### Migrations
+
+- `20271001160000_growth_aios_2f_memory_registry.sql`
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-2f-memory-registry-foundation`
+
+### Production certification
+
+Pending
+
+---
+
+## GE-AIOS-2G — Executive Brain Foundation
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-2G (Equipify AI OS Engineering Phase 7) |
+| **Dependencies** | GE-AIOS-2A, GE-AIOS-2B, GE-AIOS-2C, GE-AIOS-2E |
+
+### Implements (Constitution)
+
+- §9 Operating system — orchestration runtime (delegation only)
+- §9.2 Work Order — issues WOs; does not execute
+- §12 Agent architecture — Executive excluded from claim runtime
+
+### Scope delivered
+
+- Executive runtime + mission state + delegation audit
+- Work Order dispatcher + agent assignment coordinator
+- Event subscriptions + observations
+- Heartbeat + health monitor
+- Events: `executive.started`, `executive.delegated`, `executive.monitored`, `executive.escalated`, `executive.completed`
+- No AI reasoning, LLMs, providers, or Work Order claims
+
+### Migrations
+
+- `20271001170000_growth_aios_2g_executive_brain.sql`
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-2g-executive-brain-foundation`
+
+### Production certification
+
+Pending
+
+---
+
+## GE-AIOS-2H — Decision Engine Foundation
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-2H (Equipify AI OS Engineering Phase 8) |
+| **Dependencies** | GE-AIOS-2A, GE-AIOS-2B, GE-AIOS-2D, GE-AIOS-2F |
+
+### Implements (Constitution)
+
+- §7 Decision framework — rule evaluation + Decision Record production
+- §11.6 Degraded mode — org runtime flag + events
+- §13.1–13.2 Decision keys + confidence bands
+- §16.2 Decision Record integration
+
+### Scope delivered
+
+- Decision request model + request audit
+- Evidence collector interface (default rule-based)
+- Confidence, risk, cost calculators (deterministic)
+- Recommendation model + evaluator
+- `runAiDecisionEngineForWorkOrder` → `createAiDecisionRecord`
+- Health + schema probes
+- No LLMs, providers, WO execution, or delegation
+
+### Migrations
+
+- `20271001180000_growth_aios_2h_decision_engine.sql`
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-2h-decision-engine-foundation`
+
+### Production certification
+
+Pending
+
+---
+
+## GE-AIOS-2I — Decision Engine Execution Bridge
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-2I (Equipify AI OS Engineering Phase 9) |
+| **Dependencies** | GE-AIOS-2A, GE-AIOS-2B, GE-AIOS-2D, GE-AIOS-2E, GE-AIOS-2H |
+
+### Implements (Constitution)
+
+- §7 Decision framework — complete WO → engine → DR → gate loop
+- §11.6 Degraded mode — blocks engine invocation when degraded
+- §13.2 Confidence bands — executable DR threshold before execute
+- §16.2 Decision Record integration — reuse create + link path
+
+### Scope delivered
+
+- `prepareAiWorkOrderForExecutionViaDecisionBridge` orchestration service
+- Executable Decision Record helpers (client-safe types)
+- Work Order `executing` transition wired to bridge (replaces direct gate call)
+- Bridge events in AI OS event registry
+- No LLMs, providers, outbound, or Executive Brain changes
+
+### Migrations
+
+None — orchestrates existing 2E/2H infrastructure.
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-2i-decision-execution-bridge-foundation`
+
+### Production certification
+
+Pending
+
+---
+
+## GE-AIOS-2J — Context Assembly Foundation
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-2J (Equipify AI OS Engineering Phase 10) |
+| **Dependencies** | GE-AIOS-2A, GE-AIOS-2B, GE-AIOS-2D, GE-AIOS-2F |
+
+### Implements (Constitution)
+
+- §14 Memory Retrieval Service — read-only multi-subsystem context gathering
+- §16.2 Decision Record integration — decision history in Context Package
+- §17.8 Event foundation — `context.*` events
+
+### Scope delivered
+
+- Context source registry (references existing Growth stores)
+- Context Package model with version + checksum
+- `assembleAiContextForWorkOrder` — read-only assembly pipeline
+- Validation, health, schema probes
+- Immutable package persistence with checksum reuse
+- No LLMs, providers, WO execution, or DR creation
+
+### Migrations
+
+- `20271001190000_growth_aios_2j_context_assembly.sql`
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-2j-context-assembly-foundation`
+
+### Production certification
+
+Pending
+
+---
+
+## GE-AIOS-3A — LLM Provider Abstraction
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-3A (Equipify AI OS Engineering Phase 11) |
+| **Dependencies** | GE-AIOS-2B, GE-AIOS-2J |
+
+### Implements (Constitution)
+
+- Provider governance — single AI OS gateway for LLM requests
+- §14 Context input — Context Package is the only AI input
+- §17.8 Events — `ai.*` provider lifecycle events
+
+### Scope delivered
+
+- AI Provider interface + registry + model capability registry
+- Provider selection, health, failover hooks, response normalization
+- Core adapter bridge (OpenAI, Anthropic, Gemini) — no duplicate clients
+- `invokeAiOsProviderWithContextPackage` orchestration service
+- Decision Engine and Executive Brain remain provider-free
+
+### Migrations
+
+- `20271001200000_growth_aios_3a_provider_adapters.sql`
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-3a-provider-adapters-foundation`
+
+### Production certification
+
+Pending
+
+---
+
+## GE-AIOS-3B — AI Decision Intelligence Bridge
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-3B (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-2H, GE-AIOS-2J, GE-AIOS-3A |
+
+### Scope delivered
+
+- `collectOptionalAiDecisionEvidence` bridge service
+- Wires Context Assembly + Provider Gateway into Decision Engine (opt-in)
+- AI response normalized to `ai_provider.intelligence` evidence (advisory only)
+- Provider failure → rule-only fallback with `decision.ai_evidence_failed`
+- No Work Order execution changes, no outbound, no direct SDK calls
+
+### Migrations
+
+None — orchestrates existing 2J/3A/2H infrastructure.
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-3b-decision-intelligence-bridge-foundation`
+
+### Production certification
+
+Pending
+
+---
+
+## GE-AIOS-3C — Executive Decision Preparation
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-3C (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-2G, GE-AIOS-2H, GE-AIOS-3B |
+
+### Scope delivered
+
+- `prepareDecision` option on `delegateAiExecutiveWorkOrder`
+- `prepareExecutiveDecisionForWorkOrder` service
+- Rule-only default; optional `enableAiEvidence` via 3B
+- Decision Record attached before Agent Runtime claims
+- No claim, no `executing` transition, no outbound
+
+### Migrations
+
+None — orchestrates existing Executive Brain + Decision Engine infrastructure.
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-3c-executive-decision-preparation-foundation`
+
+### Production certification
+
+Pending
+
+---
+
+## GE-AIOS-3D — Executive Mission Planning Tick
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-3D (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-2G, GE-AIOS-3C |
+
+### Scope delivered
+
+- `runExecutiveMissionPlanningTick` on-demand planning service
+- Deterministic stage → Work Order proposals; duplicate prevention
+- `dry_run` and `create` modes
+- Optional `prepareDecision` / `enableAiEvidence` via delegation
+- No claim, no `executing`, no cron wiring
+
+### Migrations
+
+None — orchestrates existing mission + Executive Brain infrastructure.
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-3d-executive-mission-planning-foundation`
+
+### Production certification
+
+Pending
+
+---
+
+## GE-AIOS-3E — Mission Planning Review Surface
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-3E (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-3D |
+
+### Scope delivered
+
+- Read-only GET review model (mission, stage context, active Work Orders)
+- Dry-run preview API wrapping `runExecutiveMissionPlanningTick` (`dry_run` only)
+- Explicit operator approve API for Work Order creation (`create` mode)
+- Minimal internal UI at `/growth/ai-os/missions/[missionId]/planning`
+- Events: `executive.planning_review_created`, `executive.planning_review_approved`
+- Optional `prepareDecision` / `enableAiEvidence` on approve only
+
+### Migrations
+
+None — review surface over existing planning tick infrastructure.
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-3e-executive-mission-planning-review-foundation`
+
+### Production certification
+
+Pending
+
+---
+
+## GE-AIOS-3F — AI OS Stack Certification & Migration Readiness
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-3F (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-2A through GE-AIOS-3E |
+
+### Scope delivered
+
+- Meta certification re-running all 15 phase certs (2A–3E)
+- Migration order validation (9 SQL migrations)
+- Core boundary audit across `lib/growth/aios`
+- Route / UI boundary audit (no execute/outbound from AI OS API)
+- Provider opt-in and Decision Gate bypass checks
+- Migration readiness checklist, file impact summary, known risks
+
+### Migrations
+
+9 migrations — see `docs/GE-AIOS-3F_MIGRATION_READINESS.md`
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-3f-stack-certification-foundation`
+
+### Production certification
+
+Pending — ready for commit/migration review
+
+### Recommendation
+
+**Commit now** (GE-AIOS artifacts only; exclude unrelated working-tree changes)
+
+---
+
+## GE-AI-2A — Decision Record Foundation
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete — foundation delivered in GE-AIOS-2D |
+| **Engineering phase** | GE-AI-2A / GE-AIOS-2D |
+| **Dependencies** | None |
+
+### Implements (Constitution)
+
+- §7, §16.2, §17.12–13 — **done in GE-AIOS-2D**
+
+### Remaining scope (Decision Engine)
+
+- Meta-Recommender integration (GE-AI-2F)
+
+See GE-AIOS-2H entry for engine files; GE-AIOS-2I for execution bridge.
+
+### Implementation certification
+
+Foundation: **PASS (local)** via GE-AIOS-2D
+
+---
+
+## GE-AI-2B — Event Bus Unification
+
+| Field | Value |
+|-------|--------|
+| **Status** | Partial — foundation complete in GE-AIOS-2B |
+| **Dependencies** | GE-AI-2A (decision events) |
+
+### Implements (Constitution)
+
+- §11.5 Event registry — **catalog done (GE-AIOS-2B)**
+- §17 Invariant 8 — **immutable log done (GE-AIOS-2B)**
+- §9 Operating system (interrupt/event precedence) — **not started**
+
+### Remaining scope
+
+- Wire legacy bridges into runtime (realtime, objective router, work orders)
+- Consumer registration for Decision Engine, Executive Brain, Memory, Learning
+- Event precedence / interrupt integration
+
+### Foundation reference
+
+See GE-AIOS-2B entry.
+
+Pending
+
+### Production certification
+
+Pending
+
+### Rollback notes
+
+_TBD_
+
+### Known risks
+
+- Breaking subscribers on event name changes — require compatibility shim period
+
+---
+
+## GE-AI-2C — Work Order System
+
+| Field | Value |
+|-------|--------|
+| **Status** | Partial — foundation complete in GE-AIOS-2A |
+| **Dependencies** | GE-AI-2A, GE-AI-2B |
+
+### Implements (Constitution)
+
+- §9.2 Work Order (GE-AI-1D) — **foundation done (GE-AIOS-2A)**
+- §16.1 Work Order schema — **done (GE-AIOS-2A)**
+- §17 Invariants 11, 12 — **placeholder only**
+- §9.2 Adaptation cooldown (30 min) — **not started**
+
+### Remaining scope
+
+- Executive Brain delegation API  
+- Link to Decision Records; block execute without DR at L1+  
+- Adaptation cooldown enforcement  
+
+### Files modified
+
+See GE-AIOS-2A entry for foundation files.
+
+### Database changes
+
+Foundation tables created in GE-AIOS-2A.
+
+### Migrations
+
+`20271001120000_growth_aios_2a_ai_work_orders.sql` (GE-AIOS-2A)
+
+### Commits
+
+Not committed
+
+### Certifications
+
+Foundation: PASS (local) | Full GE-AI-2C: Pending
+
+### Rollback notes
+
+See GE-AIOS-2A
+
+### Known risks
+
+- Conflict with existing queue/job systems — map, do not replace, until 2F
+
+---
+
+## GE-AI-2D — Memory Facade
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete — registry foundation delivered in GE-AIOS-2F |
+| **Engineering phase** | GE-AI-2D / GE-AIOS-2F |
+| **Dependencies** | GE-AI-2A |
+
+### Implements (Constitution)
+
+- §8 Memory architecture — **registry foundation in GE-AIOS-2F**
+- §14 Memory architecture — retrieval/summarization deferred
+- §17 Invariants 3, dual-write rules — enforcement deferred
+
+### Remaining scope (Retrieval facade)
+
+- Memory Retrieval Service consumption wiring
+- Context budget limits per agent type
+- Ownership enforcement at read time
+
+See GE-AIOS-2F entry for foundation files.
+
+### Implementation certification
+
+Foundation: **PASS (local)** via GE-AIOS-2F
+
+---
+
+## GE-AI-2E — Priority Engine Binding
+
+| Field | Value |
+|-------|--------|
+| **Status** | Not Started |
+| **Dependencies** | GE-AI-2C |
+
+### Implements (Constitution)
+
+- §11.3 Priority formula
+- §17 Invariant 15 (sole global priority authority)
+
+### Scope (expected)
+
+- Bind `execution-priority-engine`, Aiden, realtime scores as input feeders only  
+- Priority Engine writes final Work Order priority  
+
+### Files modified
+
+_TBD_
+
+### Database changes
+
+_TBD_
+
+### Migrations
+
+_TBD_
+
+### Commits
+
+_TBD_
+
+### Certifications
+
+Implementation: Pending | Production: Pending
+
+### Rollback notes
+
+_TBD_
+
+### Known risks
+
+- Starvation of low-revenue missions — monitor in cert
+
+---
+
+## GE-AI-2F — Meta-Recommender
+
+| Field | Value |
+|-------|--------|
+| **Status** | Not Started |
+| **Dependencies** | GE-AI-2A, GE-AI-2C, GE-AI-2E |
+
+### Implements (Constitution)
+
+- §7.4 Meta-Recommender supremacy
+- §11.2 Ownership registry (Decision Engine)
+- §17 Invariants 5, 14
+
+### Scope (expected)
+
+- Decision Engine Meta-Recommender resolves conflicts across legacy recommenders  
+- `next-best-action.ts` becomes presenter only  
+- Deprecate parallel authority paths (feature-flagged)  
+
+### Files modified
+
+_TBD_
+
+### Database changes
+
+_TBD_
+
+### Migrations
+
+_TBD_
+
+### Commits
+
+_TBD_
+
+### Certifications
+
+Implementation: Pending | Production: Pending
+
+### Rollback notes
+
+_TBD_
+
+### Known risks
+
+- Highest integration risk — many callers of legacy NBA/recommendation engines
+
+---
+
+## GE-AI-2G — Mission UI & Operator Experience
+
+| Field | Value |
+|-------|--------|
+| **Status** | Not Started |
+| **Dependencies** | GE-AI-2C, GE-AI-2F |
+
+### Implements (Constitution)
+
+- §6.3 Mission = Objective (operator vocabulary)
+- §12 Agent architecture (visibility)
+- Executive Brain planning surfaces
+
+### Scope (expected)
+
+- Operator Mission creation/monitoring UI  
+- Work Order and Decision Record visibility  
+- Briefing hooks  
+
+### Files modified
+
+_TBD_
+
+### Database changes
+
+_TBD (likely minimal)_
+
+### Migrations
+
+_TBD_
+
+### Commits
+
+_TBD_
+
+### Certifications
+
+Implementation: Pending | Production: Pending
+
+### Rollback notes
+
+_TBD_
+
+### Known risks
+
+- UX confusion between Campaign vs Mission — enforce glossary
+
+---
+
+## GE-AI-2H — L3 Approval Flow
+
+| Field | Value |
+|-------|--------|
+| **Status** | Not Started |
+| **Dependencies** | GE-AI-2A, GE-AI-2C, GE-AI-2F |
+
+### Implements (Constitution)
+
+- §9.5 Approval timeout (4h defer, never auto-approve)
+- §19 Governance (Human Approval FSM)
+- Autonomy Level 3 binding (§11.10)
+
+### Scope (expected)
+
+- Wire Human Approval FSM to Work Orders  
+- `decision.approval_required` / `decision.approval_expired` events  
+- Block L3 execute until approved  
+
+### Files modified
+
+_TBD_
+
+### Database changes
+
+_TBD_
+
+### Migrations
+
+_TBD_
+
+### Commits
+
+_TBD_
+
+### Certifications
+
+Implementation: Pending | Production: Pending
+
+### Rollback notes
+
+_TBD_
+
+### Known risks
+
+- **Gate for any L3+ autonomy enablement in production**
+
+---
+
+## GE-AI-2I — L4 Supervised Outbound
+
+| Field | Value |
+|-------|--------|
+| **Status** | Not Started |
+| **Dependencies** | GE-AI-2H, GE-AI-2F |
+
+### Implements (Constitution)
+
+- §6.4 Autonomy Level 4
+- §11.6 Decision Engine degraded mode
+- Lead Engine wiring (engineering dependency from audit)
+
+### Scope (expected)
+
+- End-to-end: Decision → Work Order → Outreach execution with logging  
+- Lead Engine LLM integration (replace fixture dry-run)  
+- L4 allowlist auto-execute per confidence bands  
+
+### Files modified
+
+_TBD_
+
+### Database changes
+
+_TBD_
+
+### Migrations
+
+_TBD_
+
+### Commits
+
+_TBD_
+
+### Certifications
+
+Implementation: Pending | Production: Pending
+
+### Rollback notes
+
+_TBD_
+
+### Known risks
+
+- **Highest business risk** — requires production cert and budget/compliance gates
+
+---
+
+## GE-AI-2J — Learning Loop
+
+| Field | Value |
+|-------|--------|
+| **Status** | Not Started |
+| **Dependencies** | GE-AI-2A, GE-AI-2D, GE-AI-2I |
+
+### Implements (Constitution)
+
+- §8.3 Memory lifecycle → learning
+- §17 Invariant 9 (learning never blocks execution)
+- Playbook dual-write (Personalization + Learning)
+
+### Scope (expected)
+
+- Async outcome ingestion into org knowledge  
+- Playbook effectiveness updates  
+- Calibration hooks  
+
+### Files modified
+
+_TBD_
+
+### Database changes
+
+_TBD_
+
+### Migrations
+
+_TBD_
+
+### Commits
+
+_TBD_
+
+### Certifications
+
+Implementation: Pending | Production: Pending
+
+### Rollback notes
+
+_TBD_
+
+### Known risks
+
+- Feedback loops affecting live missions — require cooldown and mission scoping
+
+---
+
+## Architecture phase archive (GE-AI-1X)
+
+| Phase | Status | Ledger note |
+|-------|--------|---------------|
+| Autonomy Audit | Complete | Baseline; see Constitution §5 |
+| GE-AI-1A | Complete | Constitution §6 |
+| GE-AI-1B | Complete | Constitution §7 |
+| GE-AI-1C | Complete | Constitution §8, §14 |
+| GE-AI-1D | Complete | Constitution §9, §15 |
+| GE-AI-1E | Complete | Constitution §10 |
+| GE-AI-1F | Complete | Constitution §11, §16–§18 |
+| GE-DOC-1 | Complete | Documentation foundation |
+
+No code implementation ledger entries required for 1X (architecture-only).
+
+---
+
+## Amendment log (constitutional changes)
+
+| ID | Title | Status | Constitution version |
+|----|-------|--------|-------------------|
+| — | Initial ratification (GE-AI-1F) | Ratified | 1.0 |
+| _Future_ | GE-AI-2G-A1 format | — | — |
+
+Amendments documented in `docs/architecture/amendments/` when ratified.
+
+---
+
+*Implementation Ledger — update on every GE-AI-2X phase start, cert, and production deploy.*
