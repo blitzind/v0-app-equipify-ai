@@ -9,6 +9,7 @@ import type { AiWorkOrderStatus, AiWorkOrderType } from "@/lib/growth/aios/ai-wo
 import type { AiExecutivePlanningReport } from "@/lib/growth/aios/ai-executive-planning-report-types"
 import type { GrowthLeadResearchExecutionPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
 import type { GrowthLeadResearchExecutionPlanApprovalStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-types"
+import type { GrowthLeadResearchApprovedPlanReadinessState } from "@/lib/growth/aios/growth/growth-lead-research-approved-plan-readiness-types"
 
 export const GROWTH_AIOS_3E_PHASE = "GE-AIOS-3E" as const
 
@@ -50,6 +51,11 @@ export type AiExecutiveMissionPlanningLeadResearchExecutionPlanSummary = {
   planId: string
   executionPlan: GrowthLeadResearchExecutionPlan
   approvalStatus: GrowthLeadResearchExecutionPlanApprovalStatus
+  readinessState: GrowthLeadResearchApprovedPlanReadinessState | null
+  readinessReason: string | null
+  futureExecutionEligible: boolean | null
+  futureExecutionSummary: string | null
+  auditTrailSummary: string | null
   reason: string
   createdAt: string
   reviewUpdatedAt: string | null

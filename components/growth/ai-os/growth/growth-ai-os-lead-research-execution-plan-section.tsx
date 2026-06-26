@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type { GrowthLeadResearchExecutionPlan } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
 import { GROWTH_LEAD_RESEARCH_EXECUTION_PLAN_QA_MARKER } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan"
 import type { GrowthLeadResearchExecutionPlanApprovalStatus } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-types"
+import type { GrowthLeadResearchApprovedPlanReadinessState } from "@/lib/growth/aios/growth/growth-lead-research-approved-plan-readiness-types"
 import { cn } from "@/lib/utils"
 
 function readinessBadgeVariant(readiness: GrowthLeadResearchExecutionPlan["executionReadiness"]) {
@@ -20,12 +21,20 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   description = "Planning-only workflow map — no Work Orders are created from this surface.",
   compact = false,
   approvalStatus,
+  readinessState,
+  readinessReason,
+  futureExecutionSummary,
+  auditTrailSummary,
 }: {
   plan: GrowthLeadResearchExecutionPlan
   title?: string
   description?: string
   compact?: boolean
   approvalStatus?: GrowthLeadResearchExecutionPlanApprovalStatus
+  readinessState?: GrowthLeadResearchApprovedPlanReadinessState | null
+  readinessReason?: string | null
+  futureExecutionSummary?: string | null
+  auditTrailSummary?: string | null
 }) {
   return (
     <Card data-qa-marker={GROWTH_LEAD_RESEARCH_EXECUTION_PLAN_QA_MARKER} data-qa-section="execution-plan">
@@ -43,7 +52,28 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
           {approvalStatus ? (
             <Badge variant="outline">{approvalStatus.replaceAll("_", " ")}</Badge>
           ) : null}
+          {readinessState ? (
+            <Badge variant={readinessState === "ready_for_future_execution" ? "secondary" : "destructive"}>
+              {readinessState.replaceAll("_", " ")}
+            </Badge>
+          ) : null}
         </div>
+
+        {readinessReason ? (
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Readiness:</span> {readinessReason}
+          </p>
+        ) : null}
+        {futureExecutionSummary ? (
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Future phase:</span> {futureExecutionSummary}
+          </p>
+        ) : null}
+        {auditTrailSummary ? (
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Audit trail:</span> {auditTrailSummary}
+          </p>
+        ) : null}
 
         <div className="grid gap-2 sm:grid-cols-2">
           <p>

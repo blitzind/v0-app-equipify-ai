@@ -42,6 +42,15 @@ import {
   resolveEffectiveExecutionPlanApprovalStatus,
 } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-types"
 import { fetchLatestExecutionPlanReviewForLead } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-service"
+import {
+  buildGrowthLeadResearchExecutionPlanAuditTrail,
+} from "@/lib/growth/aios/growth/growth-lead-research-approved-plan-readiness-service"
+import {
+  resolveApprovedPlanReadinessReason,
+  resolveApprovedPlanReadinessState,
+  resolveFutureExecutionSummary,
+  summarizeExecutionPlanAuditTrail,
+} from "@/lib/growth/aios/growth/growth-lead-research-approved-plan-readiness-types"
 import { buildAiOsPilotLeadResearchHref } from "@/lib/growth/aios/ai-os-public-routes"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import type { AiExecutiveMissionPlanningLeadResearchExecutionPlanSummary } from "@/lib/growth/aios/ai-executive-mission-planning-review-types"
@@ -129,12 +138,51 @@ async function listLeadResearchExecutionPlansForMission(
       review,
       planId,
     })
+    const confidence =
+      snapshot.opportunityAssessment?.confidence ?? snapshot.qualification?.confidence ?? null
+
+    let readinessState = null
+    let readinessReason = null
+    let futureExecutionEligible = null
+    let futureExecutionSummary = null
+    let auditTrailSummary = null
+
+    if (approvalStatus === "approved_for_future_execution") {
+      readinessState = resolveApprovedPlanReadinessState({
+        plan: snapshot.executionPlan,
+        approvalStatus,
+        confidence,
+      })
+      readinessReason = resolveApprovedPlanReadinessReason(readinessState, {
+        plan: snapshot.executionPlan,
+        approvalStatus,
+        confidence,
+      })
+      const futureExecution = resolveFutureExecutionSummary({
+        plan: snapshot.executionPlan,
+        readinessState,
+      })
+      futureExecutionEligible = futureExecution.eligible
+      futureExecutionSummary = futureExecution.summary
+      const auditTrail = await buildGrowthLeadResearchExecutionPlanAuditTrail(admin, {
+        organizationId: input.organizationId,
+        leadId,
+        planId,
+      })
+      auditTrailSummary = summarizeExecutionPlanAuditTrail(auditTrail.entries)
+    }
+
     plans.push({
       leadId,
       companyName: lead?.companyName ?? null,
       planId,
       executionPlan: snapshot.executionPlan,
       approvalStatus,
+      readinessState,
+      readinessReason,
+      futureExecutionEligible,
+      futureExecutionSummary,
+      auditTrailSummary,
       reason:
         snapshot.nextBestAction?.reason ??
         snapshot.opportunityAssessment?.summary ??

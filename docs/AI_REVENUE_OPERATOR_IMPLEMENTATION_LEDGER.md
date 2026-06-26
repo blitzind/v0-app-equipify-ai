@@ -52,6 +52,7 @@ For each GE-AI-2X phase, maintain one entry with:
 | GE-AIOS-GROWTH-1B | Opportunity Assessment & Next Best Action | Complete (local cert) |
 | GE-AIOS-GROWTH-1C | Next Best Action Workflow Planner | Complete (local cert) |
 | GE-AIOS-GROWTH-1D | Execution Plan Approval Queue | Complete (local cert) |
+| GE-AIOS-GROWTH-1E | Approved Plan Readiness & Audit Trail | Complete (local cert) |
 | GE-AI-2D | Memory Facade (ledger) | Complete via GE-AIOS-2F |
 | GE-AI-2A | Decision Record Foundation (ledger) | Complete via GE-AIOS-2D |
 | GE-AI-2B | Event Bus Unification | Partial (foundation in GE-AIOS-2B) |
@@ -977,6 +978,32 @@ Pending — planning-only, feature-flagged, no migrations
 ### Production certification
 
 Pending — planning-only, feature-flagged, no migrations
+
+---
+
+## GE-AIOS-GROWTH-1E — Approved Plan Readiness & Audit Trail
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-1E (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-1D Execution Plan Approval Queue |
+
+### Scope delivered
+
+- Approved plan readiness model with deterministic states
+- Audit trail from workflow assessed + review_changed AI OS events
+- Command Center Approved Plan Readiness section (approved plans, filters, evidence, future eligibility)
+- Mission Planning Review shows readiness state and audit summary for approved plans
+- Blocked states include human-readable reasons
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-1e-approved-plan-readiness`
+
+### Production certification
+
+Pending — read-only, feature-flagged, no migrations
 
 ---
 

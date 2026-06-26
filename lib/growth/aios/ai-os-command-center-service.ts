@@ -27,6 +27,7 @@ import {
 import { resolveLeadResearchPilotConfig } from "@/lib/growth/aios/pilot/lead-research-pilot-config"
 import { buildGrowthLeadResearchWorkflowCommandCenterSummary } from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
 import { buildGrowthLeadResearchExecutionPlanApprovalQueue } from "@/lib/growth/aios/growth/growth-lead-research-execution-plan-review-service"
+import { buildGrowthLeadResearchApprovedPlanReadinessQueue } from "@/lib/growth/aios/growth/growth-lead-research-approved-plan-readiness-service"
 import {
   buildAiOsMissionPlanningHref,
   GROWTH_AI_OS_PUBLIC_BASE_PATH,
@@ -361,6 +362,11 @@ export async function fetchAiOsCommandCenterReadModel(
     limit,
   })
 
+  const approvedPlanReadinessQueue = await buildGrowthLeadResearchApprovedPlanReadinessQueue(admin, {
+    organizationId: input.organizationId,
+    limit,
+  })
+
   const commandCenterBase = {
     readOnly: true as const,
     qaMarker: GROWTH_AI_OS_COMMAND_CENTER_QA_MARKER,
@@ -386,6 +392,7 @@ export async function fetchAiOsCommandCenterReadModel(
     pilotStatus,
     growthLeadResearchWorkflow,
     executionPlanReviewQueue,
+    approvedPlanReadinessQueue,
     safeMode,
   }
 
