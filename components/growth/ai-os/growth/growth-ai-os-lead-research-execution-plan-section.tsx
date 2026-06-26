@@ -19,6 +19,8 @@ import type { GrowthAgentMemoryPlanContext } from "@/lib/growth/aios/growth/grow
 import type { GrowthMissionPlanContext } from "@/lib/growth/aios/growth/growth-mission-framework-types"
 import type { GrowthMissionPriorityPlanContext } from "@/lib/growth/aios/growth/growth-mission-priority-types"
 import type { GrowthSchedulerReadinessPlanContext } from "@/lib/growth/aios/growth/growth-scheduler-readiness-types"
+import type { GrowthAutonomousOutreachPreparationPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
+import type { GrowthAutonomousMeetingPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-meeting-pilot-types"
 import type { GrowthAutonomousExecutionPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-types"
 import type { GrowthAutonomousPlanningPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-planning-pilot-types"
 import type { GrowthAutonomousQualificationPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-types"
@@ -76,6 +78,8 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   autonomousQualificationPilotContext,
   autonomousPlanningPilotContext,
   autonomousExecutionPilotContext,
+  autonomousOutreachPreparationPilotContext,
+  autonomousMeetingPilotContext,
 }: {
   plan: GrowthLeadResearchExecutionPlan
   title?: string
@@ -120,6 +124,8 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
   autonomousQualificationPilotContext?: GrowthAutonomousQualificationPilotPlanContext | null
   autonomousPlanningPilotContext?: GrowthAutonomousPlanningPilotPlanContext | null
   autonomousExecutionPilotContext?: GrowthAutonomousExecutionPilotPlanContext | null
+  autonomousOutreachPreparationPilotContext?: GrowthAutonomousOutreachPreparationPilotPlanContext | null
+  autonomousMeetingPilotContext?: GrowthAutonomousMeetingPilotPlanContext | null
 }) {
   return (
     <Card data-qa-marker={GROWTH_LEAD_RESEARCH_EXECUTION_PLAN_QA_MARKER} data-qa-section="execution-plan">
@@ -655,6 +661,100 @@ export function GrowthAiOsLeadResearchExecutionPlanSection({
             <p className="text-muted-foreground">
               <span className="font-medium text-foreground">Wake:</span>{" "}
               {autonomousExecutionPilotContext.wakeRecommendation}
+            </p>
+          </div>
+        ) : null}
+
+        {autonomousOutreachPreparationPilotContext ? (
+          <div className="space-y-1 text-sm" data-qa-section="autonomous-outreach-preparation-pilot-context">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={autonomousOutreachPreparationPilotContext.outreachReadiness === "ready" ? "secondary" : "outline"}>
+                Outreach · {autonomousOutreachPreparationPilotContext.outreachReadiness.replaceAll("_", " ")}
+              </Badge>
+              <Badge variant="outline">
+                Package · {autonomousOutreachPreparationPilotContext.approvalPackageStatus.replaceAll("_", " ")}
+              </Badge>
+              {autonomousOutreachPreparationPilotContext.personalizationConfidence != null ? (
+                <Badge variant="secondary">
+                  Confidence {autonomousOutreachPreparationPilotContext.personalizationConfidence.toFixed(2)}
+                </Badge>
+              ) : null}
+              {autonomousOutreachPreparationPilotContext.recommendedChannel ? (
+                <Badge variant="outline">
+                  Channel · {autonomousOutreachPreparationPilotContext.recommendedChannel}
+                </Badge>
+              ) : null}
+            </div>
+            {autonomousOutreachPreparationPilotContext.blockedReason ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Blocked:</span>{" "}
+                {autonomousOutreachPreparationPilotContext.blockedReason}
+              </p>
+            ) : null}
+            {autonomousOutreachPreparationPilotContext.preparedAssets.length > 0 ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Prepared assets:</span>{" "}
+                {autonomousOutreachPreparationPilotContext.preparedAssets
+                  .slice(0, 4)
+                  .map((asset) => asset.label)
+                  .join(" · ")}
+              </p>
+            ) : null}
+            {autonomousOutreachPreparationPilotContext.revenueOperatorHandoff ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Revenue Operator:</span>{" "}
+                {autonomousOutreachPreparationPilotContext.revenueOperatorHandoff.replaceAll("_", " ")}
+              </p>
+            ) : null}
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Wake:</span>{" "}
+              {autonomousOutreachPreparationPilotContext.wakeRecommendation}
+            </p>
+          </div>
+        ) : null}
+
+        {autonomousMeetingPilotContext ? (
+          <div className="space-y-1 text-sm" data-qa-section="autonomous-meeting-pilot-context">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={autonomousMeetingPilotContext.meetingReadiness === "ready" ? "secondary" : "outline"}>
+                Meeting · {autonomousMeetingPilotContext.meetingReadiness.replaceAll("_", " ")}
+              </Badge>
+              <Badge variant="outline">
+                Package · {autonomousMeetingPilotContext.preparationPackageStatus.replaceAll("_", " ")}
+              </Badge>
+              {autonomousMeetingPilotContext.meetingConfidence != null ? (
+                <Badge variant="secondary">
+                  Confidence {autonomousMeetingPilotContext.meetingConfidence.toFixed(2)}
+                </Badge>
+              ) : null}
+              {autonomousMeetingPilotContext.recommendedAgenda ? (
+                <Badge variant="outline">Agenda prepared</Badge>
+              ) : null}
+            </div>
+            {autonomousMeetingPilotContext.blockedReason ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Blocked:</span>{" "}
+                {autonomousMeetingPilotContext.blockedReason}
+              </p>
+            ) : null}
+            {autonomousMeetingPilotContext.preparedAssets.length > 0 ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Prepared assets:</span>{" "}
+                {autonomousMeetingPilotContext.preparedAssets
+                  .slice(0, 4)
+                  .map((asset) => asset.label)
+                  .join(" · ")}
+              </p>
+            ) : null}
+            {autonomousMeetingPilotContext.revenueOperatorHandoff ? (
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">Revenue Operator:</span>{" "}
+                {autonomousMeetingPilotContext.revenueOperatorHandoff.replaceAll("_", " ")}
+              </p>
+            ) : null}
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Wake:</span>{" "}
+              {autonomousMeetingPilotContext.wakeRecommendation}
             </p>
           </div>
         ) : null}

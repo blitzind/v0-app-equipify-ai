@@ -146,9 +146,11 @@ assert.ok(wakeRules.every((rule) =>
   rule.agentKind === "qualification_agent" ||
   rule.agentKind === "planning_agent" ||
   rule.agentKind === "execution_agent" ||
+  rule.agentKind === "outreach_agent" ||
+  rule.agentKind === "meeting_agent" ||
   rule.wakeAllowedInPhase === false,
 ))
-console.log("  ✓ Deterministic wake rules — pilot agents gated in later phases")
+console.log("  ✓ Deterministic wake rules — pilot agents through meeting_agent gated in later phases")
 
 const wakeSnapshot = JSON.stringify(wakeRules)
 assert.equal(wakeSnapshot, JSON.stringify(buildAgentWakeRules()), "Wake rules must be deterministic")

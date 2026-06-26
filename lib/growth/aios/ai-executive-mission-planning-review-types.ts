@@ -22,6 +22,8 @@ import type { GrowthAgentMemoryPlanContext } from "@/lib/growth/aios/growth/grow
 import type { GrowthMissionPlanContext } from "@/lib/growth/aios/growth/growth-mission-framework-types"
 import type { GrowthMissionPriorityPlanContext } from "@/lib/growth/aios/growth/growth-mission-priority-types"
 import type { GrowthSchedulerReadinessPlanContext } from "@/lib/growth/aios/growth/growth-scheduler-readiness-types"
+import type { GrowthAutonomousOutreachPreparationPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
+import type { GrowthAutonomousMeetingPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-meeting-pilot-types"
 import type { GrowthAutonomousExecutionPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-types"
 import type { GrowthAutonomousPlanningPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-planning-pilot-types"
 import type { GrowthAutonomousQualificationPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-types"
@@ -106,6 +108,8 @@ export type AiExecutiveMissionPlanningLeadResearchExecutionPlanSummary = {
   autonomousQualificationPilotContext: GrowthAutonomousQualificationPilotPlanContext | null
   autonomousPlanningPilotContext: GrowthAutonomousPlanningPilotPlanContext | null
   autonomousExecutionPilotContext: GrowthAutonomousExecutionPilotPlanContext | null
+  autonomousOutreachPreparationPilotContext: GrowthAutonomousOutreachPreparationPilotPlanContext | null
+  autonomousMeetingPilotContext: GrowthAutonomousMeetingPilotPlanContext | null
   reason: string
   createdAt: string
   reviewUpdatedAt: string | null

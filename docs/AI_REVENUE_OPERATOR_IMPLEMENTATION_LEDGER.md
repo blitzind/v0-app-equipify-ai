@@ -71,6 +71,8 @@ For each GE-AI-2X phase, maintain one entry with:
 | GE-AIOS-GROWTH-5C | Autonomous Qualification Agent Pilot | Complete (local cert) |
 | GE-AIOS-GROWTH-5D | Autonomous Planning Agent Pilot | Complete (local cert) |
 | GE-AIOS-GROWTH-5E | Internal Execution Agent Pilot | Complete (local cert) |
+| GE-AIOS-GROWTH-5F | Autonomous Outreach Preparation Agent | Complete (local cert) |
+| GE-AIOS-GROWTH-5G | Autonomous Meeting Agent | Complete (local cert) |
 | GE-AIOS-CONSOLIDATION-1B | Growth OS Information Architecture (AI Operations dashboard) | Complete (local cert) |
 | GE-AIOS-CONSOLIDATION-1C | Growth Autonomy Control Plane (AI policy engine) | Complete (local cert) |
 | GE-AIOS-CONSOLIDATION-1E | Policy Evaluation Unification | Complete (local cert) |
@@ -1552,6 +1554,68 @@ Pending — planning pilot internal evaluation only; no runtime enqueue or outbo
 ### Production certification
 
 Pending — internal runtime pilot only; no outbound, Work Orders, or Core mutations
+
+---
+
+## GE-AIOS-GROWTH-5F — Autonomous Outreach Preparation Agent
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-5F (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-5E execution pilot, SENDR/personalization stack, Consolidation 1E policy engine |
+
+### Scope delivered
+
+- Outreach Agent autonomous pilot under `controlled_agent_wake` — **preparation only**
+- Wake after successful internal execution with complete shared memory and qualification confidence
+- Draft generation via existing SENDR/personalization/cadence builders — no transport
+- Approval packages with personalization evidence, compliance notes, and human-approval flags
+- Budget enforcement (20/hr, 200/day, 3 retries/lead/day, failure cooldown)
+- Events: `agent.wake`, `growth.outreach.prepared`
+- Revenue Operator outcome handoff on completed/failed runs
+- AI Operations compact status + Mission Planning Review outreach context
+- Policy via `fetchGrowthAiOsAutonomyPolicyEvaluationContext` only
+- Meeting Agent remains disabled; no outbound send, SENDR enrollment, or provider delivery
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-5f-autonomous-outreach-preparation`
+
+### Production certification
+
+Pending — draft-only preparation; no transport, Work Orders, or Core mutations
+
+---
+
+## GE-AIOS-GROWTH-5G — Autonomous Meeting Agent
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-5G (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-5F outreach preparation pilot, meeting intelligence stack, Consolidation 1E policy engine |
+
+### Scope delivered
+
+- Meeting Agent autonomous pilot under `controlled_agent_wake` — **preparation only**
+- Wake after outreach preparation with human approval package, contact data, and confidence threshold
+- Brief assembly via existing `gatherMeetingPrepBundleForMeeting` + `generateAiMeetingPrep` (+ optional persist when meeting exists)
+- Preparation packages: meeting brief, account summary, objections, agenda, follow-up recommendations
+- Budget enforcement (20/hr, 200/day, 3 retries/lead/day, failure cooldown)
+- Events: `agent.wake`, `growth.meeting.prepared`
+- Revenue Operator supervision — no autonomous approval or execution authority
+- AI Operations compact `meetingAgentStatus` + Mission Planning Review `autonomousMeetingPilotContext`
+- Policy via `meetingAutonomyEnabled` and `evaluateMeetingPilotAutonomyPolicyGate` only
+- No meeting booking, calendar writes, invitations, outbound, Work Orders, Opportunities, or Core mutations
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-5g-autonomous-meeting-agent`
+
+### Production certification
+
+Pending — preparation-only; completes Research → Qualification → Planning → Execution → Outreach Preparation → Meeting Preparation chain locally
 
 ---
 

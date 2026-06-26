@@ -170,14 +170,16 @@ for (const kind of GROWTH_AGENT_KINDS) {
     kind === "research_agent" ||
     kind === "qualification_agent" ||
     kind === "planning_agent" ||
-    kind === "execution_agent"
+    kind === "execution_agent" ||
+    kind === "outreach_agent" ||
+    kind === "meeting_agent"
   ) {
     continue
   }
   const rule = schedulerWakeRules.find((row) => row.agentKind === kind)
   assert.equal(rule?.wakeAllowedInPhase, false)
 }
-console.log("  ✓ Research, Qualification, Planning, and Execution agents may wake; Outreach/Meeting remain disabled")
+console.log("  ✓ Research through Meeting agents may wake in pilot phase")
 
 resetAutonomousExecutionPilotOrgState(ORG)
 assert.equal(isExecutionAgentSchedulerActive("disabled"), false)

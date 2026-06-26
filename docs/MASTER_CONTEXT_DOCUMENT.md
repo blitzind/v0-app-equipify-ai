@@ -16,7 +16,7 @@
 =================================================
 
 **Document role:** Living engineering state — current phase, production status, rules, certifications, risks, and priorities.  
-**Last updated:** 2026-06-25 (GE-AIOS-GROWTH-5E Internal Execution Agent Pilot)  
+**Last updated:** 2026-06-25 (GE-AIOS-GROWTH-5G Autonomous Meeting Agent)  
 **Regeneration:** `pnpm update:master-context` (inventory scan + this document's manual sections)  
 **Admin UI:** `/admin/master-context`
 
@@ -46,7 +46,7 @@
 |-------|--------|
 | **Architecture phase** | GE-AI-1X — **Complete** (Constitution v1.0 frozen) |
 | **Documentation phase** | GE-DOC-1 — **Complete** |
-| **Current phase** | **GE-AIOS-GROWTH-5E** — Internal Execution Agent Pilot (**certified locally**, not committed) |
+| **Current phase** | **GE-AIOS-GROWTH-5G** — Autonomous Meeting Agent (**certified locally**, not committed) |
 | **Next phase** | GE-AI-2F — Meta-Recommender |
 
 **Transition:** Official move from Architecture Phase (GE-AI-1X) to Engineering Phase (GE-AI-2X).
@@ -247,26 +247,23 @@ Full list: `lib/admin/master-context.manual.after.md` § Known Limitations.
 | GE-AIOS-GROWTH-5C | Autonomous Qualification Agent Pilot | Complete (local cert) |
 | GE-AIOS-GROWTH-5D | Autonomous Planning Agent Pilot | Complete (local cert) |
 | GE-AIOS-GROWTH-5E | Internal Execution Agent Pilot | Complete (local cert) |
+| GE-AIOS-GROWTH-5F | Autonomous Outreach Preparation Agent | Complete (local cert) |
+| GE-AIOS-GROWTH-5G | Autonomous Meeting Agent | Complete (local cert) |
 | GE-AIOS-CONSOLIDATION-1B | Growth OS Information Architecture (AI Operations dashboard) | Complete (local cert) |
 | GE-AIOS-CONSOLIDATION-1C | Growth Autonomy Control Plane (AI policy engine) | Complete (local cert) |
 | GE-AIOS-CONSOLIDATION-1E | Policy Evaluation Unification | Complete (local cert) |
 
 ### Current phase
 
-**GE-AIOS-CONSOLIDATION-1E — Policy Evaluation Unification**
-All autonomous policy evaluation flows through `fetchGrowthAiOsAutonomyPolicyEvaluationContext`. Legacy evaluators are compatibility wrappers. Scheduler, Command Center, Revenue Operator, Runtime, and Research Agent consume the policy engine. Status: **Complete (local cert)**.
+**GE-AIOS-GROWTH-5G — Autonomous Meeting Agent**
+
+Final pilot agent in the first end-to-end autonomous internal revenue workflow. Wakes after outreach preparation to assemble meeting briefs using existing meeting intelligence — preparation only, no booking, calendar writes, or Core mutations. Policy-gated through Growth Autonomy (`meetingAutonomyEnabled`). Budget 20/hr · 200/day. Status: **Complete (local cert)**.
 
 ### Previous phase
 
-**GE-AIOS-CONSOLIDATION-1C — Growth Autonomy Control Plane**
-Growth Autonomy (`/growth/settings/autonomy`) is the canonical AI control plane — unified read-through policy engine consumed by Agent Framework, Scheduler Readiness, Revenue Operator, Autonomous Research, and Execution Runtime. AI Operations remains read-only with deep links. No duplicate configuration surfaces, no migrations, no new autonomous capabilities. Status: **Complete (local cert)**.
+**GE-AIOS-GROWTH-5F — Autonomous Outreach Preparation Agent**
 
-### Previous phase
-
-**GE-AIOS-CONSOLIDATION-1B — Growth OS Information Architecture Refactor**
-Operator-first AI Operations dashboard at `/growth/os` — consolidates Command Center read models into executive overview, active work, activity, health, approvals, mission priorities, and objectives widgets. Engineering phase sections (1A–5B) preserved behind diagnostics toggle. Read-only — no backend behavior changes. Status: **Complete (local cert)**.
-
-### Previous phase
+Fifth controlled autonomous agent. Wakes after successful internal execution to prepare draft-only outreach assets and approval packages. Reuses existing SENDR/personalization stack without transport. Policy-gated through Growth Autonomy; no outbound send, Work Orders, or Core mutations. Budget 20/hr · 200/day.
 
 **GE-AIOS-GROWTH-5E — Internal Execution Agent Pilot**
 
@@ -448,6 +445,8 @@ GE-AUTO-1A through 2I implemented locally; GE-AUTO-3 not started. See manual bef
 | GE-AIOS-GROWTH-5C Autonomous Qualification Agent Pilot | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-GROWTH-5D Autonomous Planning Agent Pilot | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-GROWTH-5E Internal Execution Agent Pilot | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-5F Autonomous Outreach Preparation Agent | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-GROWTH-5G Autonomous Meeting Agent | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-CONSOLIDATION-1B AI Operations Information Architecture | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-CONSOLIDATION-1C Autonomy Control Plane | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-CONSOLIDATION-1E Policy Evaluation Unification | **PASS (local)** | 2026-06-25 |
@@ -770,6 +769,12 @@ Full list: `lib/admin/master-context.manual.after.md` § Current Priorities.
 | [GE-AIOS-GROWTH-5E Certification](./GE-AIOS-GROWTH-5E_CERTIFICATION.md) | Internal execution cert |
 | [GE-AIOS-GROWTH-5E Internal Execution Agent](./GE-AIOS-GROWTH-5E_INTERNAL_EXECUTION_AGENT.md) | Execution pilot architecture |
 | [GE-AIOS-GROWTH-5E Infrastructure Audit](./GE-AIOS-GROWTH-5E_INFRASTRUCTURE_AUDIT.md) | Execution pilot audit |
+| [GE-AIOS-GROWTH-5F Certification](./GE-AIOS-GROWTH-5F_CERTIFICATION.md) | Outreach preparation cert |
+| [GE-AIOS-GROWTH-5F Autonomous Outreach Preparation](./GE-AIOS-GROWTH-5F_AUTONOMOUS_OUTREACH_PREPARATION.md) | Outreach preparation architecture |
+| [GE-AIOS-GROWTH-5F Infrastructure Audit](./GE-AIOS-GROWTH-5F_INFRASTRUCTURE_AUDIT.md) | Outreach preparation audit |
+| [GE-AIOS-GROWTH-5G Certification](./GE-AIOS-GROWTH-5G_CERTIFICATION.md) | Meeting agent cert |
+| [GE-AIOS-GROWTH-5G Autonomous Meeting Agent](./GE-AIOS-GROWTH-5G_AUTONOMOUS_MEETING_AGENT.md) | Meeting agent architecture |
+| [GE-AIOS-GROWTH-5G Infrastructure Audit](./GE-AIOS-GROWTH-5G_INFRASTRUCTURE_AUDIT.md) | Meeting agent audit |
 | [GE-AIOS-GROWTH Internal Workflow Dry Run](./GE-AIOS-GROWTH_INTERNAL_WORKFLOW_DRY_RUN.md) | Dry-run operator guide |
 | [GE-AIOS-GROWTH Execution Simulation](./GE-AIOS-GROWTH_EXECUTION_SIMULATION.md) | Execution simulation reference |
 

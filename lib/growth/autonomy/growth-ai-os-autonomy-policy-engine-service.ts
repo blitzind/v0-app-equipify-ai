@@ -21,6 +21,8 @@ import type {
   GrowthAutonomyCapability,
   GrowthAutonomySettingsSnapshot,
 } from "@/lib/growth/autonomy/growth-autonomy-types"
+import { getAutonomousOutreachPreparationPilotOrgState } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-store"
+import { getAutonomousMeetingPilotOrgState } from "@/lib/growth/aios/growth/growth-autonomous-meeting-pilot-store"
 import { getAutonomousExecutionPilotOrgState } from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-store"
 import { getAutonomousPlanningPilotOrgState } from "@/lib/growth/aios/growth/growth-autonomous-planning-pilot-store"
 import { getAutonomousQualificationPilotOrgState } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-store"
@@ -90,10 +92,14 @@ async function buildGrowthAiOsAutonomyPolicyPackage(
   const qualificationPilotState = getAutonomousQualificationPilotOrgState(input.organizationId, generatedAt)
   const planningPilotState = getAutonomousPlanningPilotOrgState(input.organizationId, generatedAt)
   const executionPilotState = getAutonomousExecutionPilotOrgState(input.organizationId, generatedAt)
+  const outreachPreparationPilotState = getAutonomousOutreachPreparationPilotOrgState(input.organizationId, generatedAt)
+  const meetingPilotState = getAutonomousMeetingPilotOrgState(input.organizationId, generatedAt)
   const recentRuns = pilotState.runs
   const recentQualificationRuns = qualificationPilotState.runs
   const recentPlanningRuns = planningPilotState.runs
   const recentExecutionRuns = executionPilotState.runs
+  const recentOutreachPreparationRuns = outreachPreparationPilotState.runs
+  const recentMeetingRuns = meetingPilotState.runs
   const hourAgo = Date.parse(generatedAt) - 60 * 60 * 1000
   const dayAgo = Date.parse(generatedAt) - 24 * 60 * 60 * 1000
   const researchHourlyConsumed = recentRuns.filter(
@@ -118,6 +124,18 @@ async function buildGrowthAiOsAutonomyPolicyPackage(
     (run) => run.outcome !== "skipped" && Date.parse(run.completedAt) >= hourAgo,
   ).length
   const executionDailyConsumed = recentExecutionRuns.filter(
+    (run) => run.outcome !== "skipped" && Date.parse(run.completedAt) >= dayAgo,
+  ).length
+  const outreachHourlyConsumed = recentOutreachPreparationRuns.filter(
+    (run) => run.outcome !== "skipped" && Date.parse(run.completedAt) >= hourAgo,
+  ).length
+  const outreachDailyConsumed = recentOutreachPreparationRuns.filter(
+    (run) => run.outcome !== "skipped" && Date.parse(run.completedAt) >= dayAgo,
+  ).length
+  const meetingHourlyConsumed = recentMeetingRuns.filter(
+    (run) => run.outcome !== "skipped" && Date.parse(run.completedAt) >= hourAgo,
+  ).length
+  const meetingDailyConsumed = recentMeetingRuns.filter(
     (run) => run.outcome !== "skipped" && Date.parse(run.completedAt) >= dayAgo,
   ).length
   const [runtimeEnabled, runtimePilotEnabled] = await Promise.all([
@@ -146,6 +164,14 @@ async function buildGrowthAiOsAutonomyPolicyPackage(
     executionPilotTelemetry: {
       budgetConsumptionHour: executionHourlyConsumed,
       budgetConsumptionDay: executionDailyConsumed,
+    },
+    outreachPreparationPilotTelemetry: {
+      budgetConsumptionHour: outreachHourlyConsumed,
+      budgetConsumptionDay: outreachDailyConsumed,
+    },
+    meetingPilotTelemetry: {
+      budgetConsumptionHour: meetingHourlyConsumed,
+      budgetConsumptionDay: meetingDailyConsumed,
     },
     budgetRemaining,
   })

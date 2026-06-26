@@ -34,7 +34,6 @@ const RECENT_PLANNING_MS = 24 * 60 * 60 * 1000
 const STALE_PLAN_MS = 7 * 24 * 60 * 60 * 1000
 
 export const GROWTH_AUTONOMOUS_PLANNING_DISABLED_AGENT_KINDS = [
-  "outreach_agent",
   "meeting_agent",
 ] as const satisfies readonly GrowthAgentKind[]
 

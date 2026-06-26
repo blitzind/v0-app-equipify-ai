@@ -1,6 +1,7 @@
 /** GE-AIOS-CONSOLIDATION-1B — AI Operations dashboard synthesizer (client-safe). */
 
 import { buildOperationsOutreachAgentStatus } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-engine"
+import { buildOperationsMeetingAgentStatus } from "@/lib/growth/aios/growth/growth-autonomous-meeting-pilot-engine"
 import { buildOperationsExecutionAgentStatus } from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-engine"
 import type { AiOsCommandCenterReadModel } from "@/lib/growth/aios/ai-os-command-center-types"
 import type { GrowthAiOsAutonomyPolicyReadModel } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-types"
@@ -30,6 +31,7 @@ import type { GrowthAgentKind } from "@/lib/growth/aios/growth/growth-agent-fram
 import type { GrowthMissionQueueBucket } from "@/lib/growth/aios/growth/growth-mission-priority-types"
 import type { GrowthAutonomousExecutionPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-types"
 import type { GrowthAutonomousOutreachPreparationPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
+import type { GrowthAutonomousMeetingPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-meeting-pilot-types"
 import {
   GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_AGENT,
   GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_ALLOWED_WORKFLOW,
@@ -39,6 +41,52 @@ import {
   GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_SCHEDULER_MODE,
   GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_WAKE_CONDITIONS,
 } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
+import {
+  GROWTH_AUTONOMOUS_MEETING_PILOT_AGENT,
+  GROWTH_AUTONOMOUS_MEETING_PILOT_ALLOWED_WORKFLOW,
+  GROWTH_AUTONOMOUS_MEETING_PILOT_BUDGET,
+  GROWTH_AUTONOMOUS_MEETING_PILOT_QA_MARKER,
+  GROWTH_AUTONOMOUS_MEETING_PILOT_RULE,
+  GROWTH_AUTONOMOUS_MEETING_PILOT_SCHEDULER_MODE,
+  GROWTH_AUTONOMOUS_MEETING_PILOT_WAKE_CONDITIONS,
+} from "@/lib/growth/aios/growth/growth-autonomous-meeting-pilot-types"
+
+const DISABLED_MEETING_PILOT: GrowthAutonomousMeetingPilotReadModel = {
+  qaMarker: GROWTH_AUTONOMOUS_MEETING_PILOT_QA_MARKER,
+  generatedAt: "",
+  rule: GROWTH_AUTONOMOUS_MEETING_PILOT_RULE,
+  agentKind: GROWTH_AUTONOMOUS_MEETING_PILOT_AGENT,
+  schedulerMode: GROWTH_AUTONOMOUS_MEETING_PILOT_SCHEDULER_MODE,
+  controlState: "disabled",
+  enabled: false,
+  preparationModeOnly: true,
+  allowedWorkflow: GROWTH_AUTONOMOUS_MEETING_PILOT_ALLOWED_WORKFLOW,
+  disabledAgentKinds: [],
+  budgetLimits: GROWTH_AUTONOMOUS_MEETING_PILOT_BUDGET,
+  telemetry: {
+    successfulRuns: 0,
+    failedRuns: 0,
+    skippedRuns: 0,
+    eligibleLeads: 0,
+    briefsPrepared: 0,
+    preparationPackagesWaiting: 0,
+    blockedPreparations: 0,
+    budgetConsumptionHour: 0,
+    budgetConsumptionDay: 0,
+    activeRuns: 0,
+  },
+  latestPackages: [],
+  recentRuns: [],
+  revenueOperatorSupervision: {
+    approveWakeRecommendation: "",
+    budgetMonitorSummary: "",
+    failureMonitorSummary: "",
+    pauseRecommendation: null,
+    escalationRecommendation: null,
+    latestOutcomeRecommendation: null,
+  },
+  wakeConditionsSupported: GROWTH_AUTONOMOUS_MEETING_PILOT_WAKE_CONDITIONS,
+}
 
 const DISABLED_OUTREACH_PREPARATION_PILOT: GrowthAutonomousOutreachPreparationPilotReadModel = {
   qaMarker: GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_QA_MARKER,
@@ -100,6 +148,16 @@ function resolveOutreachPreparationPilot(
       autonomousOutreachPreparationPilot?: GrowthAutonomousOutreachPreparationPilotReadModel
     }
   ).autonomousOutreachPreparationPilot ?? commandCenter.autonomousOutreachPreparationPilot ?? null
+}
+
+function resolveMeetingPilot(
+  commandCenter: AiOsCommandCenterReadModel,
+): GrowthAutonomousMeetingPilotReadModel | null {
+  return (
+    commandCenter as AiOsCommandCenterReadModel & {
+      autonomousMeetingPilot?: GrowthAutonomousMeetingPilotReadModel
+    }
+  ).autonomousMeetingPilot ?? commandCenter.autonomousMeetingPilot ?? null
 }
 
 function urgencyFromScore(score: number): AiOsOperationsUrgencyLevel {
@@ -734,6 +792,7 @@ export function synthesizeAiOsOperationsDashboard(
   const configureHref = policy?.controlPlaneHref ?? GROWTH_AI_OS_AUTONOMY_CONTROL_PLANE_PATH
   const executionPilot = resolveExecutionPilot(commandCenter)
   const outreachPilot = resolveOutreachPreparationPilot(commandCenter) ?? DISABLED_OUTREACH_PREPARATION_PILOT
+  const meetingPilot = resolveMeetingPilot(commandCenter) ?? DISABLED_MEETING_PILOT
 
   return {
     readOnly: true,
@@ -747,6 +806,10 @@ export function synthesizeAiOsOperationsDashboard(
     }),
     outreachAgentStatus: buildOperationsOutreachAgentStatus({
       pilot: outreachPilot,
+      configureHref,
+    }),
+    meetingAgentStatus: buildOperationsMeetingAgentStatus({
+      pilot: meetingPilot,
       configureHref,
     }),
     activeWork: buildActiveWork(commandCenter),

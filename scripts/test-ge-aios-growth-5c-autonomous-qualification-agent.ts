@@ -176,14 +176,16 @@ for (const kind of GROWTH_AGENT_KINDS) {
     kind === "research_agent" ||
     kind === "qualification_agent" ||
     kind === "planning_agent" ||
-    kind === "execution_agent"
+    kind === "execution_agent" ||
+    kind === "outreach_agent" ||
+    kind === "meeting_agent"
   ) {
     continue
   }
   const rule = schedulerWakeRules.find((row) => row.agentKind === kind)
   assert.equal(rule?.wakeAllowedInPhase, false)
 }
-console.log("  ✓ Research, Qualification, Planning, and Execution agents may wake; others remain disabled")
+console.log("  ✓ Pilot-phase agents may wake through meeting_agent")
 
 resetAutonomousQualificationPilotOrgState(ORG)
 assert.equal(isQualificationAgentSchedulerActive("disabled"), false)
@@ -243,10 +245,7 @@ const readModel2 = buildAutonomousQualificationPilotReadModel({
   eligibleLeads: 2,
 })
 assert.equal(JSON.stringify(readModel), JSON.stringify(readModel2))
-assert.deepEqual(readModel.disabledAgentKinds, [
-  "outreach_agent",
-  "meeting_agent",
-])
+assert.deepEqual(readModel.disabledAgentKinds, ["meeting_agent"])
 assert.ok(readModel.revenueOperatorSupervision.latestHandoffRecommendation)
 console.log("  ✓ Deterministic read model and Revenue Operator handoff")
 

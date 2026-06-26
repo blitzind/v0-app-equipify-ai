@@ -32,6 +32,8 @@ import { buildGrowthAgentMemoryPlanContext } from "@/lib/growth/aios/growth/grow
 import { buildGrowthMissionPlanContext } from "@/lib/growth/aios/growth/growth-mission-framework-service"
 import { buildGrowthMissionPriorityPlanContext } from "@/lib/growth/aios/growth/growth-mission-priority-service"
 import { buildGrowthSchedulerReadinessPlanContext } from "@/lib/growth/aios/growth/growth-scheduler-readiness-service"
+import { buildGrowthAutonomousOutreachPreparationPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-service"
+import { buildGrowthAutonomousMeetingPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-meeting-pilot-service"
 import { buildGrowthAutonomousExecutionPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-service"
 import { buildGrowthAutonomousPlanningPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-planning-pilot-service"
 import { buildGrowthAutonomousQualificationPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-service"
@@ -217,6 +219,8 @@ async function listLeadResearchExecutionPlansForMission(
     let autonomousQualificationPilotContext = null
     let autonomousPlanningPilotContext = null
     let autonomousExecutionPilotContext = null
+    let autonomousOutreachPreparationPilotContext = null
+    let autonomousMeetingPilotContext = null
 
     if (approvalStatus === "approved_for_future_execution") {
       readinessState = resolveApprovedPlanReadinessState({
@@ -412,6 +416,18 @@ async function listLeadResearchExecutionPlansForMission(
       generatedAt: nowIso(),
     })
 
+    autonomousOutreachPreparationPilotContext = await buildGrowthAutonomousOutreachPreparationPilotPlanContext(admin, {
+      organizationId: input.organizationId,
+      leadId,
+      generatedAt: nowIso(),
+    })
+
+    autonomousMeetingPilotContext = await buildGrowthAutonomousMeetingPilotPlanContext(admin, {
+      organizationId: input.organizationId,
+      leadId,
+      generatedAt: nowIso(),
+    })
+
     plans.push({
       leadId,
       companyName: lead?.companyName ?? null,
@@ -457,6 +473,8 @@ async function listLeadResearchExecutionPlansForMission(
       autonomousQualificationPilotContext,
       autonomousPlanningPilotContext,
       autonomousExecutionPilotContext,
+      autonomousOutreachPreparationPilotContext,
+      autonomousMeetingPilotContext,
       reason:
         snapshot.nextBestAction?.reason ??
         snapshot.opportunityAssessment?.summary ??

@@ -3,6 +3,7 @@
 import Link from "next/link"
 import {
   Activity,
+  CalendarDays,
   CheckCircle2,
   ClipboardList,
   HeartPulse,
@@ -147,6 +148,73 @@ export function GrowthAiOsOperationsDashboard({
         )}
         <Link
           href={dashboard.executionAgentStatus.configureHref}
+          className="mt-3 inline-flex text-sm font-medium text-indigo-600 hover:text-indigo-700"
+        >
+          Configure in Growth Autonomy
+        </Link>
+      </GrowthAiOsOperationsSectionCard>
+
+      <GrowthAiOsOperationsSectionCard
+        title="Outreach Agent"
+        description="Draft-only outreach preparation — human approval required before any send."
+        icon={<ClipboardList className="size-5 text-amber-600" />}
+        qaSection="operations-outreach-agent"
+      >
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <GrowthAiOsKpiCard
+            label="Status"
+            value={dashboard.outreachAgentStatus.enabled ? "Enabled" : dashboard.outreachAgentStatus.controlState.replaceAll("_", " ")}
+          />
+          <GrowthAiOsKpiCard label="Drafts prepared" value={dashboard.outreachAgentStatus.draftsPrepared} />
+          <GrowthAiOsKpiCard label="Awaiting approval" value={dashboard.outreachAgentStatus.approvalPackagesWaiting} />
+          <GrowthAiOsKpiCard label="Blocked" value={dashboard.outreachAgentStatus.blockedPreparations} />
+          <GrowthAiOsKpiCard label="Eligible leads" value={dashboard.outreachAgentStatus.eligibleLeads} />
+          <GrowthAiOsKpiCard label="Budget" value={dashboard.outreachAgentStatus.budgetLabel} />
+        </div>
+        {dashboard.outreachAgentStatus.latestPreparedAssetSummary ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Latest: {dashboard.outreachAgentStatus.latestPreparedAssetSummary}
+          </p>
+        ) : (
+          <p className="mt-3 text-sm text-muted-foreground">No outreach preparation packages recorded yet.</p>
+        )}
+        <Link
+          href={dashboard.outreachAgentStatus.configureHref}
+          className="mt-3 inline-flex text-sm font-medium text-indigo-600 hover:text-indigo-700"
+        >
+          Configure in Growth Autonomy
+        </Link>
+      </GrowthAiOsOperationsSectionCard>
+
+      <GrowthAiOsOperationsSectionCard
+        title="Meeting Agent"
+        description="Meeting preparation only — human sales rep conducts the meeting. No booking or calendar writes."
+        icon={<CalendarDays className="size-5 text-emerald-600" />}
+        qaSection="operations-meeting-agent"
+      >
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <GrowthAiOsKpiCard
+            label="Status"
+            value={dashboard.meetingAgentStatus.enabled ? "Enabled" : dashboard.meetingAgentStatus.controlState.replaceAll("_", " ")}
+          />
+          <GrowthAiOsKpiCard label="Briefs prepared" value={dashboard.meetingAgentStatus.briefsPrepared} />
+          <GrowthAiOsKpiCard label="Awaiting review" value={dashboard.meetingAgentStatus.preparationPackagesWaiting} />
+          <GrowthAiOsKpiCard label="Blocked" value={dashboard.meetingAgentStatus.blockedPreparations} />
+          <GrowthAiOsKpiCard label="Eligible leads" value={dashboard.meetingAgentStatus.eligibleLeads} />
+          <GrowthAiOsKpiCard label="Budget" value={dashboard.meetingAgentStatus.budgetLabel} />
+        </div>
+        {dashboard.meetingAgentStatus.latestPreparedAssetSummary ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Latest: {dashboard.meetingAgentStatus.latestPreparedAssetSummary}
+          </p>
+        ) : (
+          <p className="mt-3 text-sm text-muted-foreground">No meeting preparation packages recorded yet.</p>
+        )}
+        {dashboard.meetingAgentStatus.lastRunSummary ? (
+          <p className="mt-1 text-sm text-muted-foreground">Last run: {dashboard.meetingAgentStatus.lastRunSummary}</p>
+        ) : null}
+        <Link
+          href={dashboard.meetingAgentStatus.configureHref}
           className="mt-3 inline-flex text-sm font-medium text-indigo-600 hover:text-indigo-700"
         >
           Configure in Growth Autonomy

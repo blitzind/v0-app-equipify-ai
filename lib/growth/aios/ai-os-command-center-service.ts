@@ -45,6 +45,8 @@ import { buildGrowthMissionPriorityReadModel } from "@/lib/growth/aios/growth/gr
 import { buildGrowthSchedulerReadinessReadModel } from "@/lib/growth/aios/growth/growth-scheduler-readiness-service"
 import { buildGrowthAutonomousOutreachPreparationPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-service"
 import { buildAutonomousOutreachPreparationPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-engine"
+import { buildGrowthAutonomousMeetingPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-meeting-pilot-service"
+import { buildAutonomousMeetingPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-meeting-pilot-engine"
 import { buildGrowthAutonomousExecutionPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-service"
 import { buildGrowthAutonomousPlanningPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-planning-pilot-service"
 import { buildGrowthAutonomousQualificationPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-service"
@@ -65,6 +67,7 @@ import {
   buildCommandCenterSafeModeFromPolicy,
   enrichAgentFrameworkWithAutonomyPolicy,
   enrichAutonomousOutreachPreparationPilotWithAutonomyPolicy,
+  enrichAutonomousMeetingPilotWithAutonomyPolicy,
   enrichAutonomousExecutionPilotWithAutonomyPolicy,
   enrichAutonomousPlanningPilotWithAutonomyPolicy,
   enrichAutonomousQualificationPilotWithAutonomyPolicy,
@@ -517,6 +520,32 @@ export async function fetchAiOsCommandCenterReadModel(
     )
   }
 
+  let autonomousMeetingPilot
+  try {
+    autonomousMeetingPilot = enrichAutonomousMeetingPilotWithAutonomyPolicy(
+      await buildGrowthAutonomousMeetingPilotReadModel(admin, {
+        organizationId: input.organizationId,
+        generatedAt,
+      }),
+      autonomyPolicy,
+    )
+  } catch (error) {
+    logGrowthEngine("meeting_preparation_read_model_failed", {
+      organizationId: input.organizationId,
+      message: error instanceof Error ? error.message : String(error),
+    })
+    autonomousMeetingPilot = enrichAutonomousMeetingPilotWithAutonomyPolicy(
+      buildAutonomousMeetingPilotReadModel({
+        controlState: "disabled",
+        runs: [],
+        generatedAt,
+        eligibleLeads: 0,
+        activeRuns: 0,
+      }),
+      autonomyPolicy,
+    )
+  }
+
   const automationApprovalInbox = await listGeV15OrganizationApprovalInbox(admin, {
     organizationId: input.organizationId,
     limit: 250,
@@ -565,6 +594,7 @@ export async function fetchAiOsCommandCenterReadModel(
     autonomousPlanningPilot,
     autonomousExecutionPilot,
     autonomousOutreachPreparationPilot,
+    autonomousMeetingPilot,
     safeMode,
   }
 

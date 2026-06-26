@@ -3,6 +3,10 @@
 import type { GrowthAgentKind, GrowthAgentPermissionProfile } from "@/lib/growth/aios/growth/growth-agent-framework-types"
 import { GROWTH_AGENT_KINDS } from "@/lib/growth/aios/growth/growth-agent-framework-types"
 import type { GrowthAgentFrameworkReadModel } from "@/lib/growth/aios/growth/growth-agent-framework-types"
+import type { GrowthAutonomousOutreachPreparationPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
+import { GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_BUDGET } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
+import type { GrowthAutonomousMeetingPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-meeting-pilot-types"
+import { GROWTH_AUTONOMOUS_MEETING_PILOT_BUDGET } from "@/lib/growth/aios/growth/growth-autonomous-meeting-pilot-types"
 import type { GrowthAutonomousExecutionPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-types"
 import { GROWTH_AUTONOMOUS_EXECUTION_PILOT_BUDGET } from "@/lib/growth/aios/growth/growth-autonomous-execution-pilot-types"
 import type { GrowthAutonomousPlanningPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-planning-pilot-types"
@@ -63,6 +67,14 @@ export type GrowthAiOsAutonomyPolicyBuildInput = {
     budgetConsumptionDay: number
   }
   executionPilotTelemetry?: {
+    budgetConsumptionHour: number
+    budgetConsumptionDay: number
+  }
+  outreachPreparationPilotTelemetry?: {
+    budgetConsumptionHour: number
+    budgetConsumptionDay: number
+  }
+  meetingPilotTelemetry?: {
     budgetConsumptionHour: number
     budgetConsumptionDay: number
   }
@@ -249,12 +261,24 @@ function evaluateAgentPolicyState(input: {
     }
   }
 
-  if (input.agentKind === "outreach_agent" && !kill.autonomyOutboundEnabled) {
+  if (input.agentKind === "outreach_agent" && !kill.autonomyGenerationEnabled) {
     return {
       agentKind: input.agentKind,
       enabled: false,
-      disabledReason: "Outbound autonomy disabled by kill switch.",
-      policyEvaluation: "blocked:outbound_kill_switch",
+      disabledReason: "Generation kill switch off — outreach preparation blocked.",
+      policyEvaluation: "blocked:generation_kill_switch",
+      effectivePermissions: ["read_only"],
+      linkedCapability: capability,
+      requiresHumanApproval: true,
+    }
+  }
+
+  if (input.agentKind === "meeting_agent" && !kill.autonomyGenerationEnabled) {
+    return {
+      agentKind: input.agentKind,
+      enabled: false,
+      disabledReason: "Generation kill switch off — meeting preparation blocked.",
+      policyEvaluation: "blocked:generation_kill_switch",
       effectivePermissions: ["read_only"],
       linkedCapability: capability,
       requiresHumanApproval: true,
@@ -329,11 +353,23 @@ export function buildGrowthAiOsAutonomyPolicyReadModel(
   const executionAgentEnabled = agentStates.find((s) => s.agentKind === "execution_agent")?.enabled ?? false
   const executionAutonomyEnabled =
     executionAgentEnabled && input.runtimeEnabled && input.runtimePilotEnabled && autonomyEnabled
+  const outreachAgentEnabled = agentStates.find((s) => s.agentKind === "outreach_agent")?.enabled ?? false
+  const outreachAutonomyEnabled =
+    outreachAgentEnabled && autonomyEnabled && kill.autonomyGenerationEnabled
+  const meetingAgentEnabled = agentStates.find((s) => s.agentKind === "meeting_agent")?.enabled ?? false
+  const meetingAutonomyEnabled =
+    meetingAgentEnabled && autonomyEnabled && kill.autonomyGenerationEnabled
 
   const activeAutonomousAgents = enabledAgents.filter((kind) =>
-    ["research_agent", "qualification_agent", "planning_agent", "execution_agent", "revenue_operator_agent"].includes(
-      kind,
-    ),
+    [
+      "research_agent",
+      "qualification_agent",
+      "planning_agent",
+      "execution_agent",
+      "outreach_agent",
+      "meeting_agent",
+      "revenue_operator_agent",
+    ].includes(kind),
   )
 
   const dailyBudgets = Object.entries(input.budgetRemaining ?? {}).map(([resourceKey, snapshot]) => ({
@@ -360,6 +396,14 @@ export function buildGrowthAiOsAutonomyPolicyReadModel(
     budgetConsumptionHour: 0,
     budgetConsumptionDay: 0,
   }
+  const outreachTelemetry = input.outreachPreparationPilotTelemetry ?? {
+    budgetConsumptionHour: 0,
+    budgetConsumptionDay: 0,
+  }
+  const meetingTelemetry = input.meetingPilotTelemetry ?? {
+    budgetConsumptionHour: 0,
+    budgetConsumptionDay: 0,
+  }
 
   return {
     readOnly: true,
@@ -380,6 +424,8 @@ export function buildGrowthAiOsAutonomyPolicyReadModel(
     qualificationAutonomyEnabled,
     planningAutonomyEnabled,
     executionAutonomyEnabled,
+    outreachAutonomyEnabled,
+    meetingAutonomyEnabled,
     autonomyEnabled,
     humanApprovalRequired: input.settings.masterMode !== "objective",
     killSwitches: kill,
@@ -404,8 +450,16 @@ export function buildGrowthAiOsAutonomyPolicyReadModel(
       executionRunsPerDay: GROWTH_AUTONOMOUS_EXECUTION_PILOT_BUDGET.maxRunsPerDay,
       executionHourlyConsumed: executionTelemetry.budgetConsumptionHour,
       executionDailyConsumed: executionTelemetry.budgetConsumptionDay,
+      outreachRunsPerHour: GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_BUDGET.maxRunsPerHour,
+      outreachRunsPerDay: GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_BUDGET.maxRunsPerDay,
+      outreachHourlyConsumed: outreachTelemetry.budgetConsumptionHour,
+      outreachDailyConsumed: outreachTelemetry.budgetConsumptionDay,
+      meetingRunsPerHour: GROWTH_AUTONOMOUS_MEETING_PILOT_BUDGET.maxRunsPerHour,
+      meetingRunsPerDay: GROWTH_AUTONOMOUS_MEETING_PILOT_BUDGET.maxRunsPerDay,
+      meetingHourlyConsumed: meetingTelemetry.budgetConsumptionHour,
+      meetingDailyConsumed: meetingTelemetry.budgetConsumptionDay,
     },
-    throttleSummary: `${GROWTH_AUTONOMOUS_RESEARCH_PILOT_BUDGET.maxRunsPerHour}/hr · ${GROWTH_AUTONOMOUS_RESEARCH_PILOT_BUDGET.maxRunsPerDay}/day research · ${GROWTH_AUTONOMOUS_QUALIFICATION_PILOT_BUDGET.maxRunsPerHour}/hr · ${GROWTH_AUTONOMOUS_QUALIFICATION_PILOT_BUDGET.maxRunsPerDay}/day qualification · ${GROWTH_AUTONOMOUS_PLANNING_PILOT_BUDGET.maxRunsPerHour}/hr · ${GROWTH_AUTONOMOUS_PLANNING_PILOT_BUDGET.maxRunsPerDay}/day planning · ${GROWTH_AUTONOMOUS_EXECUTION_PILOT_BUDGET.maxRunsPerHour}/hr · ${GROWTH_AUTONOMOUS_EXECUTION_PILOT_BUDGET.maxRunsPerDay}/day execution`,
+    throttleSummary: `${GROWTH_AUTONOMOUS_RESEARCH_PILOT_BUDGET.maxRunsPerHour}/hr · ${GROWTH_AUTONOMOUS_RESEARCH_PILOT_BUDGET.maxRunsPerDay}/day research · ${GROWTH_AUTONOMOUS_QUALIFICATION_PILOT_BUDGET.maxRunsPerHour}/hr · ${GROWTH_AUTONOMOUS_QUALIFICATION_PILOT_BUDGET.maxRunsPerDay}/day qualification · ${GROWTH_AUTONOMOUS_PLANNING_PILOT_BUDGET.maxRunsPerHour}/hr · ${GROWTH_AUTONOMOUS_PLANNING_PILOT_BUDGET.maxRunsPerDay}/day planning · ${GROWTH_AUTONOMOUS_EXECUTION_PILOT_BUDGET.maxRunsPerHour}/hr · ${GROWTH_AUTONOMOUS_EXECUTION_PILOT_BUDGET.maxRunsPerDay}/day execution · ${GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_BUDGET.maxRunsPerHour}/hr · ${GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_BUDGET.maxRunsPerDay}/day outreach prep`,
     cooldownSummary: "Scheduler cooldown rules derived from 5A readiness plan (inactive in this phase).",
     approvalSummary: input.settings.masterMode === "objective"
       ? "Objective mode — conditional approvals apply."
@@ -776,6 +830,142 @@ export function enrichAutonomousExecutionPilotWithAutonomyPolicy(
   }
 }
 
+export function evaluateOutreachPreparationPilotAutonomyPolicyGate(
+  context: GrowthAiOsAutonomyPolicyEvaluationContext,
+): GrowthAiOsAutonomyPolicyRuntimeGate {
+  const { policy } = context
+
+  if (policy.emergencyStopActive) {
+    return {
+      allowed: false,
+      blockReason: "Emergency stop active — configure in Growth Autonomy.",
+      policyKey: "emergency_stop",
+    }
+  }
+
+  if (!policy.autonomyEnabled) {
+    return {
+      allowed: false,
+      blockReason: "Autonomy disabled by platform policy.",
+      policyKey: "autonomy_disabled",
+    }
+  }
+
+  if (!policy.outreachAutonomyEnabled) {
+    return {
+      allowed: false,
+      blockReason:
+        "Outreach preparation autonomy disabled — enable email execution capability and generation in Growth Autonomy.",
+      policyKey: "outreach_autonomy_disabled",
+    }
+  }
+
+  const outreachAgent = policy.agentStates.find((state) => state.agentKind === "outreach_agent")
+  if (outreachAgent && !outreachAgent.enabled) {
+    return {
+      allowed: false,
+      blockReason: outreachAgent.disabledReason ?? "Outreach agent blocked by policy.",
+      policyKey: outreachAgent.policyEvaluation,
+    }
+  }
+
+  return { allowed: true, blockReason: null, policyKey: null }
+}
+
+export function deriveOutreachPreparationPilotControlFromPolicy(
+  policy: GrowthAiOsAutonomyPolicyReadModel,
+  storedControlState: GrowthAutonomousOutreachPreparationPilotReadModel["controlState"],
+): GrowthAutonomousOutreachPreparationPilotReadModel["controlState"] {
+  if (!policy.outreachAutonomyEnabled || policy.emergencyStopActive) return "disabled"
+  if (storedControlState === "paused") return "paused"
+  return "active"
+}
+
+export function enrichAutonomousOutreachPreparationPilotWithAutonomyPolicy(
+  pilot: GrowthAutonomousOutreachPreparationPilotReadModel,
+  policy: GrowthAiOsAutonomyPolicyReadModel,
+): GrowthAutonomousOutreachPreparationPilotReadModel {
+  const effectiveControlState = deriveOutreachPreparationPilotControlFromPolicy(policy, pilot.controlState)
+  const enabled = effectiveControlState === "active"
+
+  return {
+    ...pilot,
+    controlState: effectiveControlState,
+    enabled,
+    policyDerived: true,
+    configureHref: policy.controlPlaneHref,
+    autonomyPolicySource: policy.qaMarker,
+  }
+}
+
+export function evaluateMeetingPilotAutonomyPolicyGate(
+  context: GrowthAiOsAutonomyPolicyEvaluationContext,
+): GrowthAiOsAutonomyPolicyRuntimeGate {
+  const { policy } = context
+
+  if (policy.emergencyStopActive) {
+    return {
+      allowed: false,
+      blockReason: "Emergency stop active — configure in Growth Autonomy.",
+      policyKey: "emergency_stop",
+    }
+  }
+
+  if (!policy.autonomyEnabled) {
+    return {
+      allowed: false,
+      blockReason: "Autonomy disabled by platform policy.",
+      policyKey: "autonomy_disabled",
+    }
+  }
+
+  if (!policy.meetingAutonomyEnabled) {
+    return {
+      allowed: false,
+      blockReason:
+        "Meeting preparation autonomy disabled — enable task creation capability and generation in Growth Autonomy.",
+      policyKey: "meeting_autonomy_disabled",
+    }
+  }
+
+  const meetingAgent = policy.agentStates.find((state) => state.agentKind === "meeting_agent")
+  if (meetingAgent && !meetingAgent.enabled) {
+    return {
+      allowed: false,
+      blockReason: meetingAgent.disabledReason ?? "Meeting agent blocked by policy.",
+      policyKey: meetingAgent.policyEvaluation,
+    }
+  }
+
+  return { allowed: true, blockReason: null, policyKey: null }
+}
+
+export function deriveMeetingPilotControlFromPolicy(
+  policy: GrowthAiOsAutonomyPolicyReadModel,
+  storedControlState: GrowthAutonomousMeetingPilotReadModel["controlState"],
+): GrowthAutonomousMeetingPilotReadModel["controlState"] {
+  if (!policy.meetingAutonomyEnabled || policy.emergencyStopActive) return "disabled"
+  if (storedControlState === "paused") return "paused"
+  return "active"
+}
+
+export function enrichAutonomousMeetingPilotWithAutonomyPolicy(
+  pilot: GrowthAutonomousMeetingPilotReadModel,
+  policy: GrowthAiOsAutonomyPolicyReadModel,
+): GrowthAutonomousMeetingPilotReadModel {
+  const effectiveControlState = deriveMeetingPilotControlFromPolicy(policy, pilot.controlState)
+  const enabled = effectiveControlState === "active"
+
+  return {
+    ...pilot,
+    controlState: effectiveControlState,
+    enabled,
+    policyDerived: true,
+    configureHref: policy.controlPlaneHref,
+    autonomyPolicySource: policy.qaMarker,
+  }
+}
+
 export function evaluateResearchPilotAutonomyPolicyGate(
   policy: GrowthAiOsAutonomyPolicyReadModel,
 ): GrowthAiOsAutonomyPolicyRuntimeGate {
@@ -831,6 +1021,12 @@ export function buildAutonomyPolicyIntegrationSummary(
     executionPilotLabel: policy.executionAutonomyEnabled
       ? "Execution autonomy allowed"
       : "Execution autonomy blocked",
+    outreachPilotLabel: policy.outreachAutonomyEnabled
+      ? "Outreach preparation allowed"
+      : "Outreach preparation blocked",
+    meetingPilotLabel: policy.meetingAutonomyEnabled
+      ? "Meeting preparation allowed"
+      : "Meeting preparation blocked",
     activeAutonomousAgentCount: policy.activeAutonomousAgents.length,
     operationsDashboardHref: "/growth/os",
   }

@@ -41,10 +41,20 @@ import { fetchGrowthAiOsAutonomyPolicy } from "@/lib/growth/autonomy/growth-ai-o
 import {
   buildAutonomyPolicyIntegrationSummary,
   deriveExecutionPilotControlFromPolicy,
+  deriveOutreachPreparationPilotControlFromPolicy,
+  deriveMeetingPilotControlFromPolicy,
   derivePlanningPilotControlFromPolicy,
   deriveQualificationPilotControlFromPolicy,
   deriveResearchPilotControlFromPolicy,
 } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-synthesizer"
+import {
+  getAutonomousOutreachPreparationPilotOrgState,
+  setAutonomousOutreachPreparationPilotControlState,
+} from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-store"
+import {
+  getAutonomousMeetingPilotOrgState,
+  setAutonomousMeetingPilotControlState,
+} from "@/lib/growth/aios/growth/growth-autonomous-meeting-pilot-store"
 import {
   getAutonomousExecutionPilotOrgState,
   setAutonomousExecutionPilotControlState,
@@ -219,6 +229,40 @@ async function syncAutonomousExecutionPilotFromPolicy(
   const nextControlState = deriveExecutionPilotControlFromPolicy(policy, orgState.controlState)
   if (nextControlState !== orgState.controlState) {
     setAutonomousExecutionPilotControlState({
+      organizationId,
+      controlState: nextControlState,
+      now: generatedAt,
+    })
+  }
+}
+
+async function syncAutonomousOutreachPreparationPilotFromPolicy(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<void> {
+  const generatedAt = new Date().toISOString()
+  const policy = await fetchGrowthAiOsAutonomyPolicy(admin, { organizationId, generatedAt })
+  const orgState = getAutonomousOutreachPreparationPilotOrgState(organizationId, generatedAt)
+  const nextControlState = deriveOutreachPreparationPilotControlFromPolicy(policy, orgState.controlState)
+  if (nextControlState !== orgState.controlState) {
+    setAutonomousOutreachPreparationPilotControlState({
+      organizationId,
+      controlState: nextControlState,
+      now: generatedAt,
+    })
+  }
+}
+
+async function syncAutonomousMeetingPilotFromPolicy(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<void> {
+  const generatedAt = new Date().toISOString()
+  const policy = await fetchGrowthAiOsAutonomyPolicy(admin, { organizationId, generatedAt })
+  const orgState = getAutonomousMeetingPilotOrgState(organizationId, generatedAt)
+  const nextControlState = deriveMeetingPilotControlFromPolicy(policy, orgState.controlState)
+  if (nextControlState !== orgState.controlState) {
+    setAutonomousMeetingPilotControlState({
       organizationId,
       controlState: nextControlState,
       now: generatedAt,
@@ -402,6 +446,8 @@ export async function patchGrowthAutonomySettings(
     await syncAutonomousQualificationPilotFromPolicy(admin, input.organizationId)
     await syncAutonomousPlanningPilotFromPolicy(admin, input.organizationId)
     await syncAutonomousExecutionPilotFromPolicy(admin, input.organizationId)
+    await syncAutonomousOutreachPreparationPilotFromPolicy(admin, input.organizationId)
+    await syncAutonomousMeetingPilotFromPolicy(admin, input.organizationId)
     return loadGrowthAutonomySettingsViewModel(admin, input.organizationId)
   }
 
@@ -472,6 +518,8 @@ export async function patchGrowthAutonomySettings(
   await syncAutonomousQualificationPilotFromPolicy(admin, input.organizationId)
   await syncAutonomousPlanningPilotFromPolicy(admin, input.organizationId)
   await syncAutonomousExecutionPilotFromPolicy(admin, input.organizationId)
+  await syncAutonomousOutreachPreparationPilotFromPolicy(admin, input.organizationId)
+  await syncAutonomousMeetingPilotFromPolicy(admin, input.organizationId)
 
   return loadGrowthAutonomySettingsViewModel(admin, input.organizationId)
 }

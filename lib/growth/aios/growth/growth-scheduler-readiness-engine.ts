@@ -62,7 +62,7 @@ const AGENT_WAKE_MODES: Record<GrowthAgentKind, GrowthSchedulerMode[]> = {
   qualification_agent: ["priority_queue_preview", "manual_review", "controlled_agent_wake"],
   planning_agent: ["priority_queue_preview", "manual_review", "controlled_agent_wake"],
   execution_agent: ["manual_review", "controlled_agent_wake"],
-  outreach_agent: ["manual_review"],
+  outreach_agent: ["manual_review", "controlled_agent_wake"],
   meeting_agent: ["priority_queue_preview", "manual_review", "controlled_agent_wake"],
   revenue_operator_agent: ["priority_queue_preview", "manual_review", "controlled_agent_wake", "autonomous"],
 }
@@ -72,7 +72,7 @@ const AGENT_COOLDOWN: Record<GrowthAgentKind, { cooldownMinutes: number; maxRuns
   qualification_agent: { cooldownMinutes: 20, maxRuns: 5, periodHours: 1 },
   planning_agent: { cooldownMinutes: 30, maxRuns: 4, periodHours: 1 },
   execution_agent: { cooldownMinutes: 60, maxRuns: 2, periodHours: 24 },
-  outreach_agent: { cooldownMinutes: 120, maxRuns: 0, periodHours: 24 },
+  outreach_agent: { cooldownMinutes: 30, maxRuns: 20, periodHours: 1 },
   meeting_agent: { cooldownMinutes: 45, maxRuns: 3, periodHours: 24 },
   revenue_operator_agent: { cooldownMinutes: 10, maxRuns: 8, periodHours: 1 },
 }
@@ -100,6 +100,8 @@ const PILOT_WAKE_ALLOWED_AGENTS = new Set<GrowthAgentKind>([
   "qualification_agent",
   "planning_agent",
   "execution_agent",
+  "outreach_agent",
+  "meeting_agent",
 ])
 
 export function buildAgentWakeRules(): GrowthSchedulerWakeRule[] {
@@ -116,7 +118,9 @@ export function buildAgentWakeRules(): GrowthSchedulerWakeRule[] {
         ? ["approval", "readiness", "handoff", "preflight", "boundary", "dry_run", "runtime_pilot"]
         : agentKind === "outreach_agent"
           ? ["approval", "readiness", "operator_approval"]
-          : ["approval", "readiness", "handoff", "preflight", "boundary"],
+          : agentKind === "meeting_agent"
+            ? ["approval", "readiness", "operator_approval"]
+            : ["approval", "readiness", "handoff", "preflight", "boundary"],
       cooldownMinutes: timing.cooldownMinutes,
       maxRunsPerPeriod: timing.maxRuns,
       periodHours: timing.periodHours,
