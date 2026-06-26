@@ -141,10 +141,16 @@ console.log("  ✓ Scheduler inactive with valid activation status")
 
 const wakeRules = buildAgentWakeRules()
 assert.equal(wakeRules.length, GROWTH_AGENT_KINDS.length)
-assert.ok(wakeRules.every((rule) => rule.wakeAllowedInPhase === false))
+assert.ok(wakeRules.every((rule) =>
+  rule.agentKind === "research_agent" ||
+  rule.agentKind === "qualification_agent" ||
+  rule.agentKind === "planning_agent" ||
+  rule.wakeAllowedInPhase === false,
+))
+console.log("  ✓ Deterministic wake rules — pilot agents gated in later phases")
+
 const wakeSnapshot = JSON.stringify(wakeRules)
 assert.equal(wakeSnapshot, JSON.stringify(buildAgentWakeRules()), "Wake rules must be deterministic")
-console.log("  ✓ Deterministic wake rules — no wake in 5A")
 
 const queueSnapshot = buildSchedulerPriorityQueueSnapshot(missionPriority)
 assert.equal(queueSnapshot.prioritySource, "GE-AIOS-GROWTH-4F")

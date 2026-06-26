@@ -172,11 +172,11 @@ assert.ok(researchWake)
 assert.ok(qualificationWake!.allowedSchedulerModes.includes("controlled_agent_wake"))
 assert.ok(researchWake!.allowedSchedulerModes.includes("controlled_agent_wake"))
 for (const kind of GROWTH_AGENT_KINDS) {
-  if (kind === "research_agent" || kind === "qualification_agent") continue
+  if (kind === "research_agent" || kind === "qualification_agent" || kind === "planning_agent") continue
   const rule = schedulerWakeRules.find((row) => row.agentKind === kind)
   assert.equal(rule?.wakeAllowedInPhase, false)
 }
-console.log("  ✓ Research and Qualification agents may wake; others remain disabled")
+console.log("  ✓ Research, Qualification, and Planning agents may wake; others remain disabled")
 
 resetAutonomousQualificationPilotOrgState(ORG)
 assert.equal(isQualificationAgentSchedulerActive("disabled"), false)
@@ -237,7 +237,6 @@ const readModel2 = buildAutonomousQualificationPilotReadModel({
 })
 assert.equal(JSON.stringify(readModel), JSON.stringify(readModel2))
 assert.deepEqual(readModel.disabledAgentKinds, [
-  "planning_agent",
   "execution_agent",
   "outreach_agent",
   "meeting_agent",

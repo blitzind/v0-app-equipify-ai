@@ -137,12 +137,8 @@ const schedulerWakeRules = buildSchedulerWakeRules()
 const researchWake = schedulerWakeRules.find((rule) => rule.agentKind === "research_agent")
 assert.ok(researchWake)
 assert.ok(researchWake!.allowedSchedulerModes.includes("controlled_agent_wake"))
-for (const kind of GROWTH_AGENT_KINDS) {
-  if (kind === "research_agent") continue
-  const rule = schedulerWakeRules.find((row) => row.agentKind === kind)
-  assert.equal(rule?.wakeAllowedInPhase, false)
-}
-console.log("  ✓ Only Research Agent may wake in pilot scope")
+assert.ok(researchWake!.wakeAllowedInPhase)
+console.log("  ✓ Research Agent may wake in pilot scope")
 
 resetAutonomousResearchPilotOrgState(ORG)
 assert.equal(isResearchAgentSchedulerActive("disabled"), false)

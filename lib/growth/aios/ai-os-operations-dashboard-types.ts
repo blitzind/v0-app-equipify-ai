@@ -24,6 +24,7 @@ export type AiOsOperationsActivitySource =
   | "runtime"
   | "autonomous_research"
   | "autonomous_qualification"
+  | "autonomous_planning"
   | "workflow"
   | "revenue_operator"
   | "executive_brain"
@@ -56,7 +57,7 @@ export type AiOsOperationsExecutiveOverview = {
 
 export type AiOsOperationsActiveWorkItem = {
   id: string
-  category: "mission" | "execution_plan" | "autonomous_research" | "autonomous_qualification" | "waiting_for_human" | "blocked"
+  category: "mission" | "execution_plan" | "autonomous_research" | "autonomous_qualification" | "autonomous_planning" | "waiting_for_human" | "blocked"
   title: string
   summary: string
   href: string | null

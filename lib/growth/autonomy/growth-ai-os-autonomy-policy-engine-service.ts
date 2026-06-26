@@ -21,6 +21,7 @@ import type {
   GrowthAutonomyCapability,
   GrowthAutonomySettingsSnapshot,
 } from "@/lib/growth/autonomy/growth-autonomy-types"
+import { getAutonomousPlanningPilotOrgState } from "@/lib/growth/aios/growth/growth-autonomous-planning-pilot-store"
 import { getAutonomousQualificationPilotOrgState } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-store"
 import { getAutonomousResearchPilotOrgState } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-store"
 import {
@@ -86,8 +87,10 @@ async function buildGrowthAiOsAutonomyPolicyPackage(
   const budgetRemaining = await buildBudgetRemaining(admin, input.organizationId)
   const pilotState = getAutonomousResearchPilotOrgState(input.organizationId, generatedAt)
   const qualificationPilotState = getAutonomousQualificationPilotOrgState(input.organizationId, generatedAt)
+  const planningPilotState = getAutonomousPlanningPilotOrgState(input.organizationId, generatedAt)
   const recentRuns = pilotState.runs
   const recentQualificationRuns = qualificationPilotState.runs
+  const recentPlanningRuns = planningPilotState.runs
   const hourAgo = Date.parse(generatedAt) - 60 * 60 * 1000
   const dayAgo = Date.parse(generatedAt) - 24 * 60 * 60 * 1000
   const researchHourlyConsumed = recentRuns.filter(
@@ -100,6 +103,12 @@ async function buildGrowthAiOsAutonomyPolicyPackage(
     (run) => run.outcome !== "skipped" && Date.parse(run.completedAt) >= hourAgo,
   ).length
   const qualificationDailyConsumed = recentQualificationRuns.filter(
+    (run) => run.outcome !== "skipped" && Date.parse(run.completedAt) >= dayAgo,
+  ).length
+  const planningHourlyConsumed = recentPlanningRuns.filter(
+    (run) => run.outcome !== "skipped" && Date.parse(run.completedAt) >= hourAgo,
+  ).length
+  const planningDailyConsumed = recentPlanningRuns.filter(
     (run) => run.outcome !== "skipped" && Date.parse(run.completedAt) >= dayAgo,
   ).length
   const [runtimeEnabled, runtimePilotEnabled] = await Promise.all([
@@ -120,6 +129,10 @@ async function buildGrowthAiOsAutonomyPolicyPackage(
     qualificationPilotTelemetry: {
       budgetConsumptionHour: qualificationHourlyConsumed,
       budgetConsumptionDay: qualificationDailyConsumed,
+    },
+    planningPilotTelemetry: {
+      budgetConsumptionHour: planningHourlyConsumed,
+      budgetConsumptionDay: planningDailyConsumed,
     },
     budgetRemaining,
   })

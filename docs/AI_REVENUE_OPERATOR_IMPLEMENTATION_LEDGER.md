@@ -69,6 +69,7 @@ For each GE-AI-2X phase, maintain one entry with:
 | GE-AIOS-GROWTH-5A | Scheduler Readiness & Activation Plan | Complete (local cert) |
 | GE-AIOS-GROWTH-5B | Autonomous Research Agent Pilot | Complete (local cert) |
 | GE-AIOS-GROWTH-5C | Autonomous Qualification Agent Pilot | Complete (local cert) |
+| GE-AIOS-GROWTH-5D | Autonomous Planning Agent Pilot | Complete (local cert) |
 | GE-AIOS-CONSOLIDATION-1B | Growth OS Information Architecture (AI Operations dashboard) | Complete (local cert) |
 | GE-AIOS-CONSOLIDATION-1C | Growth Autonomy Control Plane (AI policy engine) | Complete (local cert) |
 | GE-AIOS-CONSOLIDATION-1E | Policy Evaluation Unification | Complete (local cert) |
@@ -1489,6 +1490,36 @@ Pending — pilot scoped to Research Agent internal refresh only
 ### Production certification
 
 Pending — qualification pilot internal evaluation only; no execution side effects
+
+---
+
+## GE-AIOS-GROWTH-5D — Autonomous Planning Agent Pilot
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification) |
+| **Engineering phase** | GE-AIOS-GROWTH-5D (Equipify AI OS) |
+| **Dependencies** | GE-AIOS-GROWTH-5C qualification pilot, Consolidation 1E policy engine, GE-AIOS-GROWTH-1C execution planning |
+
+### Scope delivered
+
+- Planning Agent autonomous pilot under `controlled_agent_wake`
+- Wake after successful qualification with policy + memory + mission priority gates
+- Budget enforcement (15/hr, 150/day, 2 retries/lead/day, failure cooldown)
+- Wraps `planGrowthLeadResearchExecution` (deterministic planning only)
+- Events: `agent.wake`, `growth.workflow.status_changed`, `growth.execution_plan.generated`
+- Revenue Operator handoff recommendations on completed runs
+- Command Center + AI Operations + Mission Planning Review read-only surfaces
+- Policy via `fetchGrowthAiOsAutonomyPolicyEvaluationContext` only
+- Execution, Outreach, Meeting agents remain disabled
+
+### Implementation certification
+
+**PASS (local)** — `pnpm test:ge-aios-growth-5d-autonomous-planning-agent`
+
+### Production certification
+
+Pending — planning pilot internal evaluation only; no runtime enqueue or outbound
 
 ---
 

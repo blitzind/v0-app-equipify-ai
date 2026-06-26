@@ -60,7 +60,7 @@ const AGENT_MISSION_MAP: Record<GrowthAgentKind, GrowthMissionType[]> = {
 const AGENT_WAKE_MODES: Record<GrowthAgentKind, GrowthSchedulerMode[]> = {
   research_agent: ["priority_queue_preview", "manual_review", "controlled_agent_wake"],
   qualification_agent: ["priority_queue_preview", "manual_review", "controlled_agent_wake"],
-  planning_agent: ["priority_queue_preview", "manual_review"],
+  planning_agent: ["priority_queue_preview", "manual_review", "controlled_agent_wake"],
   execution_agent: ["manual_review", "controlled_agent_wake"],
   outreach_agent: ["manual_review"],
   meeting_agent: ["priority_queue_preview", "manual_review", "controlled_agent_wake"],
@@ -95,6 +95,12 @@ export function buildSchedulerThrottleRules(): GrowthSchedulerThrottleRules {
   return { ...DEFAULT_THROTTLE_RULES }
 }
 
+const PILOT_WAKE_ALLOWED_AGENTS = new Set<GrowthAgentKind>([
+  "research_agent",
+  "qualification_agent",
+  "planning_agent",
+])
+
 export function buildAgentWakeRules(): GrowthSchedulerWakeRule[] {
   return GROWTH_AGENT_KINDS.map((agentKind) => {
     const definition = getGrowthAgentDefinition(agentKind)
@@ -115,7 +121,7 @@ export function buildAgentWakeRules(): GrowthSchedulerWakeRule[] {
       periodHours: timing.periodHours,
       budgetCeilingTokens: definition?.budgetProfile.dailyTokenCap ?? null,
       blockedCapabilities: definition?.blockedCapabilities ?? ["direct_execution"],
-      wakeAllowedInPhase: false,
+      wakeAllowedInPhase: PILOT_WAKE_ALLOWED_AGENTS.has(agentKind),
     }
   })
 }

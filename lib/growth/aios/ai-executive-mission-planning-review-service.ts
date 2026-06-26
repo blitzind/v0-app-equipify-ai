@@ -32,6 +32,7 @@ import { buildGrowthAgentMemoryPlanContext } from "@/lib/growth/aios/growth/grow
 import { buildGrowthMissionPlanContext } from "@/lib/growth/aios/growth/growth-mission-framework-service"
 import { buildGrowthMissionPriorityPlanContext } from "@/lib/growth/aios/growth/growth-mission-priority-service"
 import { buildGrowthSchedulerReadinessPlanContext } from "@/lib/growth/aios/growth/growth-scheduler-readiness-service"
+import { buildGrowthAutonomousPlanningPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-planning-pilot-service"
 import { buildGrowthAutonomousQualificationPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-service"
 import { buildGrowthAutonomousResearchPilotPlanContext } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-service"
 import { listAiWorkOrders } from "@/lib/growth/aios/ai-work-order-repository"
@@ -213,6 +214,7 @@ async function listLeadResearchExecutionPlansForMission(
     let schedulerReadinessContext = null
     let autonomousResearchPilotContext = null
     let autonomousQualificationPilotContext = null
+    let autonomousPlanningPilotContext = null
 
     if (approvalStatus === "approved_for_future_execution") {
       readinessState = resolveApprovedPlanReadinessState({
@@ -396,6 +398,12 @@ async function listLeadResearchExecutionPlansForMission(
       generatedAt: nowIso(),
     })
 
+    autonomousPlanningPilotContext = await buildGrowthAutonomousPlanningPilotPlanContext(admin, {
+      organizationId: input.organizationId,
+      leadId,
+      generatedAt: nowIso(),
+    })
+
     plans.push({
       leadId,
       companyName: lead?.companyName ?? null,
@@ -439,6 +447,7 @@ async function listLeadResearchExecutionPlansForMission(
       schedulerReadinessContext,
       autonomousResearchPilotContext,
       autonomousQualificationPilotContext,
+      autonomousPlanningPilotContext,
       reason:
         snapshot.nextBestAction?.reason ??
         snapshot.opportunityAssessment?.summary ??

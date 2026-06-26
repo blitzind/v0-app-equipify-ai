@@ -40,9 +40,14 @@ import type { GrowthAiOsAutonomyPolicyIntegrationSummary } from "@/lib/growth/au
 import { fetchGrowthAiOsAutonomyPolicy } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-engine-service"
 import {
   buildAutonomyPolicyIntegrationSummary,
+  derivePlanningPilotControlFromPolicy,
   deriveQualificationPilotControlFromPolicy,
   deriveResearchPilotControlFromPolicy,
 } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-synthesizer"
+import {
+  getAutonomousPlanningPilotOrgState,
+  setAutonomousPlanningPilotControlState,
+} from "@/lib/growth/aios/growth/growth-autonomous-planning-pilot-store"
 import {
   getAutonomousQualificationPilotOrgState,
   setAutonomousQualificationPilotControlState,
@@ -179,6 +184,23 @@ async function buildStatusSummary(
     emergencyStopAvailable: true,
     enabledCapabilities,
     remainingBudgets,
+  }
+}
+
+async function syncAutonomousPlanningPilotFromPolicy(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<void> {
+  const generatedAt = new Date().toISOString()
+  const policy = await fetchGrowthAiOsAutonomyPolicy(admin, { organizationId, generatedAt })
+  const orgState = getAutonomousPlanningPilotOrgState(organizationId, generatedAt)
+  const nextControlState = derivePlanningPilotControlFromPolicy(policy, orgState.controlState)
+  if (nextControlState !== orgState.controlState) {
+    setAutonomousPlanningPilotControlState({
+      organizationId,
+      controlState: nextControlState,
+      now: generatedAt,
+    })
   }
 }
 
@@ -356,6 +378,7 @@ export async function patchGrowthAutonomySettings(
     })
     await syncAutonomousResearchPilotFromPolicy(admin, input.organizationId)
     await syncAutonomousQualificationPilotFromPolicy(admin, input.organizationId)
+    await syncAutonomousPlanningPilotFromPolicy(admin, input.organizationId)
     return loadGrowthAutonomySettingsViewModel(admin, input.organizationId)
   }
 
@@ -424,6 +447,7 @@ export async function patchGrowthAutonomySettings(
 
   await syncAutonomousResearchPilotFromPolicy(admin, input.organizationId)
   await syncAutonomousQualificationPilotFromPolicy(admin, input.organizationId)
+  await syncAutonomousPlanningPilotFromPolicy(admin, input.organizationId)
 
   return loadGrowthAutonomySettingsViewModel(admin, input.organizationId)
 }
