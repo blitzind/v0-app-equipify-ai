@@ -74,6 +74,8 @@ import {
   enrichAutonomousResearchPilotWithAutonomyPolicy,
   enrichRevenueOperatorWithAutonomyPolicy,
 } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-synthesizer"
+import { synthesizeAiOsDailyBriefing } from "@/lib/growth/aios/ai-os-daily-briefing-synthesizer"
+import { synthesizeAiOsOperationsDashboard } from "@/lib/growth/aios/ai-os-operations-dashboard-synthesizer"
 import { listGeV15OrganizationApprovalInbox } from "@/lib/growth/automation-runtime/ge-v1-5-automation-runtime-approval-inbox"
 import { logGrowthEngine } from "@/lib/growth/growth-engine-session"
 
