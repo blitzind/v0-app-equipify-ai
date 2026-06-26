@@ -25,6 +25,8 @@ export {
   GROWTH_PROSPECT_SEARCH_STAGED_SEARCH_QA_MARKER,
 } from "@/lib/growth/prospect-search/prospect-search-staged-lifecycle"
 
+export { GROWTH_PROSPECT_SEARCH_AI_ICP_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-ai-icp-config"
+
 export const PROSPECT_SEARCH_HERO_PLACEHOLDERS = [
   "medical equipment service companies California",
   "hvac companies 20-100 employees",
