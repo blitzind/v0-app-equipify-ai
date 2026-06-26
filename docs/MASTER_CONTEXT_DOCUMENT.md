@@ -16,7 +16,7 @@
 =================================================
 
 **Document role:** Living engineering state — current phase, production status, rules, certifications, risks, and priorities.  
-**Last updated:** 2026-06-25 (GE-AIOS-GROWTH-5G Autonomous Meeting Agent)  
+**Last updated:** 2026-06-25 (PROD-REGRESSION-6 Command Center import stability)  
 **Regeneration:** `pnpm update:master-context` (inventory scan + this document's manual sections)  
 **Admin UI:** `/admin/master-context`
 
@@ -45,8 +45,9 @@
 | Field | Value |
 |-------|--------|
 | **Architecture phase** | GE-AI-1X — **Complete** (Constitution v1.0 frozen) |
+| **Architecture consolidation** | **GE-AIOS-ARCH-1A** — AI Revenue & Service OS layer model (**complete**, docs only) |
 | **Documentation phase** | GE-DOC-1 — **Complete** |
-| **Current phase** | **GE-AIOS-GROWTH-5G** — Autonomous Meeting Agent (**certified locally**, not committed) |
+| **Current phase** | **PROD-REGRESSION-6** — Command Center import stability (**fixed locally**, not committed) |
 | **Next phase** | GE-AI-2F — Meta-Recommender |
 
 **Transition:** Official move from Architecture Phase (GE-AI-1X) to Engineering Phase (GE-AI-2X).
@@ -136,6 +137,7 @@ Every implementation phase must reference:
 - One decision owner per key; Meta-Recommender is authoritative for conflicts.
 - Executive Brain never sends outbound.
 - Work Orders require Decision Records before execution (L1+).
+- **Canonical layer model (GE-AIOS-ARCH-1A):** Revenue Director → Workflow Agents → Intelligence Engines → Communication Engine → Business Platforms → Core Memory Graph. See [`GE-AIOS-ARCH-1A_AI_REVENUE_SERVICE_OS_ARCHITECTURE.md`](./GE-AIOS-ARCH-1A_AI_REVENUE_SERVICE_OS_ARCHITECTURE.md).
 
 Full rules: Constitution §3, §16, §17.
 
@@ -170,6 +172,7 @@ Full rules: Constitution §3, §16, §17.
 
 ### AI Revenue Operator / Growth Engine
 
+- **PROD-REGRESSION-6 (fixed locally):** Command center API 500 — missing `synthesizeAiOsDailyBriefing` / `synthesizeAiOsOperationsDashboard` imports in `ai-os-command-center-service.ts`. Cert: `pnpm test:prod-regression-6-command-center-import-stability`.
 - 10+ parallel recommendation engines — unify in GE-AI-2F.
 - Multiple event substrates — unify in GE-AI-2B.
 - Lead Engine orchestrator: no LLM/outbound wiring.
@@ -375,6 +378,7 @@ Canonical `growth_lead_research` workflow with status, qualification, and Comman
 
 | Phase | Title |
 |-------|-------|
+| GE-AIOS-ARCH-1A | AI Revenue & Service OS Architecture Consolidation | **Complete (docs only)** |
 | GE-AI-2A | Decision Record Foundation | Complete via GE-AIOS-2D |
 | GE-AI-2B | Event Bus Unification | Partial (foundation in GE-AIOS-2B) |
 | GE-AI-2C | Work Order System (remaining) | Partial (DR gate + Executive delegation in 2E/2G) |
@@ -450,6 +454,8 @@ GE-AUTO-1A through 2I implemented locally; GE-AUTO-3 not started. See manual bef
 | GE-AIOS-CONSOLIDATION-1B AI Operations Information Architecture | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-CONSOLIDATION-1C Autonomy Control Plane | **PASS (local)** | 2026-06-25 |
 | GE-AIOS-CONSOLIDATION-1E Policy Evaluation Unification | **PASS (local)** | 2026-06-25 |
+| GE-AIOS-ARCH-1A AI Revenue & Service OS Architecture Consolidation | **Complete (docs only)** | 2026-06-25 |
+| PROD-REGRESSION-6 Command Center import stability | **PASS (local)** | 2026-06-25 |
 | GE-AI-2A+ implementation (production) | Pending | — |
 
 Outbound operational readiness: `docs/GROWTH_OUTBOUND_OPERATIONAL_READINESS.md`
@@ -775,6 +781,8 @@ Full list: `lib/admin/master-context.manual.after.md` § Current Priorities.
 | [GE-AIOS-GROWTH-5G Certification](./GE-AIOS-GROWTH-5G_CERTIFICATION.md) | Meeting agent cert |
 | [GE-AIOS-GROWTH-5G Autonomous Meeting Agent](./GE-AIOS-GROWTH-5G_AUTONOMOUS_MEETING_AGENT.md) | Meeting agent architecture |
 | [GE-AIOS-GROWTH-5G Infrastructure Audit](./GE-AIOS-GROWTH-5G_INFRASTRUCTURE_AUDIT.md) | Meeting agent audit |
+| [GE-AIOS-ARCH-1A AI Revenue & Service OS Architecture](./GE-AIOS-ARCH-1A_AI_REVENUE_SERVICE_OS_ARCHITECTURE.md) | Canonical layer model, module mapping, Memory Graph design |
+| [PROD-REGRESSION-6 Command Center import stability](./PROD-REGRESSION-6_COMMAND_CENTER_IMPORT_STABILITY.md) | Production 500 root cause + import stability cert |
 | [GE-AIOS-GROWTH Internal Workflow Dry Run](./GE-AIOS-GROWTH_INTERNAL_WORKFLOW_DRY_RUN.md) | Dry-run operator guide |
 | [GE-AIOS-GROWTH Execution Simulation](./GE-AIOS-GROWTH_EXECUTION_SIMULATION.md) | Execution simulation reference |
 

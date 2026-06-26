@@ -66,6 +66,7 @@ assert.ok(route.includes("fetchAiOsCommandCenterReadModel"))
 assert.ok(route.includes('export async function GET(request: Request)'))
 assert.ok(route.includes("requireGrowthEnginePlatformAccess(request)"))
 assert.equal(route.includes("POST"), false)
+assert.ok(route.includes("growth_engine_ai_org_not_configured"))
 
 const panel = readSource("components/growth/ai-os/command-center/growth-ai-os-command-center-panel.tsx")
 const diagnostics = readSource(

@@ -11,6 +11,17 @@ export async function GET(request: Request) {
   if (!access.ok) return access.response
 
   const organizationId = getGrowthEngineAiOrgId()
+  if (!organizationId) {
+    return NextResponse.json(
+      {
+        ok: false,
+        qaMarker: GROWTH_AI_OS_COMMAND_CENTER_QA_MARKER,
+        error: "growth_engine_ai_org_not_configured",
+        message: "Growth Engine AI organization is not configured for this deployment.",
+      },
+      { status: 503 },
+    )
+  }
 
   try {
     const commandCenter = await fetchAiOsCommandCenterReadModel(access.admin, { organizationId })

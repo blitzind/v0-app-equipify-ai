@@ -76,6 +76,8 @@ For each GE-AI-2X phase, maintain one entry with:
 | GE-AIOS-CONSOLIDATION-1B | Growth OS Information Architecture (AI Operations dashboard) | Complete (local cert) |
 | GE-AIOS-CONSOLIDATION-1C | Growth Autonomy Control Plane (AI policy engine) | Complete (local cert) |
 | GE-AIOS-CONSOLIDATION-1E | Policy Evaluation Unification | Complete (local cert) |
+| GE-AIOS-ARCH-1A | AI Revenue & Service OS Architecture Consolidation | Complete (docs only) |
+| PROD-REGRESSION-6 | Command Center import stability | Complete (local cert, not committed) |
 | GE-AI-2D | Memory Facade (ledger) | Complete via GE-AIOS-2F |
 | GE-AI-2A | Decision Record Foundation (ledger) | Complete via GE-AIOS-2D |
 | GE-AI-2B | Event Bus Unification | Partial (foundation in GE-AIOS-2B) |
@@ -2130,6 +2132,143 @@ _TBD_
 
 ---
 
+## GE-AIOS-ARCH-1A — AI Revenue & Service OS Architecture Consolidation
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (architecture documentation only — no code) |
+| **Engineering phase** | GE-AIOS-ARCH-1A |
+| **Dependencies** | Constitution v1.0, GE-AIOS-GROWTH-4A through 5G, CONSOLIDATION-1B/1C/1E |
+
+### Implements (Constitution)
+
+- §3 System architecture — canonical layer model
+- §5 Agent organization — Workflow Agent independence verified
+- §8 Memory architecture — Core Memory Graph design (extends GE-AIOS-2F)
+- §11 Communication — Communication Engine vs transport separation
+- §14 Intelligence — Intelligence Engine inventory
+- §16–§17 Invariants — Growth/Core isolation, human approval boundaries
+
+### Scope delivered
+
+- Canonical six-layer architecture (Revenue Director through Core Memory Graph)
+- Module mapping matrix (~80 primary systems → layers)
+- Workflow Agent verification (5B–5G + Revenue Operator)
+- Intelligence Engine inventory (12 engines)
+- Communication audit (10 channels; transport interface design only)
+- Business Platform grouping (7 platforms)
+- Core Memory Graph entity model (design only)
+- Closed-loop learning pipeline design (GE-AI-2J precursor)
+- Revenue Director responsibility definition (not built)
+- Duplicate analysis, technical debt, implementation order, risk analysis
+
+### Files added
+
+- `docs/GE-AIOS-ARCH-1A_AI_REVENUE_SERVICE_OS_ARCHITECTURE.md`
+
+### Files modified
+
+- `docs/MASTER_CONTEXT_DOCUMENT.md`
+- `docs/AI_REVENUE_OPERATOR_IMPLEMENTATION_LEDGER.md`
+
+### Database changes
+
+None
+
+### Migrations
+
+None
+
+### Commits
+
+Not committed (per phase policy)
+
+### Implementation certification
+
+| Field | Value |
+|-------|--------|
+| Status | **Complete (documentation review)** |
+| Report | `docs/GE-AIOS-ARCH-1A_AI_REVENUE_SERVICE_OS_ARCHITECTURE.md` |
+
+### Production certification
+
+N/A — architecture-only phase
+
+### Rollback notes
+
+Remove architecture doc; revert Master Context / Ledger references
+
+### Known risks
+
+- Architecture doc may drift from codebase if not updated after major phases — refresh at each GE-AI-2X milestone
+- GS-4D and 4A legacy pilot marked for deprecation — requires explicit follow-up phase before removal
+
+---
+
+## PROD-REGRESSION-6 — Command Center Import Stability
+
+| Field | Value |
+|-------|--------|
+| **Status** | Complete (local certification, not committed) |
+| **Type** | Production regression fix |
+| **Dependencies** | GE-AIOS-5C, CONSOLIDATION-1B, PROD-REGRESSION-5 auth fix |
+
+### Root cause
+
+Missing imports for `synthesizeAiOsDailyBriefing` and `synthesizeAiOsOperationsDashboard` in `ai-os-command-center-service.ts` caused `ReferenceError` at end of read model build → API 500.
+
+### Scope delivered
+
+- Synthesizer imports added to command-center service
+- Command-center API org-id guard (503 when `GROWTH_ENGINE_AI_ORG_ID` unset)
+- Import stability certification script
+- 5C cert extended with import + org guard assertions
+
+### Files modified
+
+- `lib/growth/aios/ai-os-command-center-service.ts`
+- `app/api/platform/growth/ai-os/command-center/route.ts`
+- `scripts/test-prod-regression-6-command-center-import-stability.ts` (added)
+- `scripts/test-ge-aios-5c-command-center-read-model-foundation.ts`
+- `package.json`
+- `docs/PROD-REGRESSION-6_COMMAND_CENTER_IMPORT_STABILITY.md` (added)
+- `docs/MASTER_CONTEXT_DOCUMENT.md`
+- `docs/AI_REVENUE_OPERATOR_IMPLEMENTATION_LEDGER.md`
+
+### Database changes
+
+None
+
+### Migrations
+
+None
+
+### Commits
+
+Not committed (per phase policy)
+
+### Implementation certification
+
+| Field | Value |
+|-------|--------|
+| Status | **PASS (local)** |
+| Report | `docs/PROD-REGRESSION-6_COMMAND_CENTER_IMPORT_STABILITY.md` |
+| Command | `pnpm test:prod-regression-6-command-center-import-stability` |
+
+### Production certification
+
+Pending deploy after commit to `main`
+
+### Rollback notes
+
+Revert synthesizer imports and org guard on command-center route
+
+### Known risks
+
+- Requires commit + auto-deploy to resolve production 500
+
+---
+
 ## Architecture phase archive (GE-AI-1X)
 
 | Phase | Status | Ledger note |
@@ -2141,6 +2280,7 @@ _TBD_
 | GE-AI-1D | Complete | Constitution §9, §15 |
 | GE-AI-1E | Complete | Constitution §10 |
 | GE-AI-1F | Complete | Constitution §11, §16–§18 |
+| GE-AIOS-ARCH-1A | Complete | Layer consolidation; extends 1X into canonical OS model |
 | GE-DOC-1 | Complete | Documentation foundation |
 
 No code implementation ledger entries required for 1X (architecture-only).
