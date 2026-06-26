@@ -88,6 +88,15 @@ export async function middleware(request: NextRequest) {
         },
       })
     }
+    if (isGrowthApiPath(pathname)) {
+      const requestHeaders = new Headers(request.headers)
+      requestHeaders.set("x-growth-api-pathname", pathname)
+      return NextResponse.next({
+        request: {
+          headers: requestHeaders,
+        },
+      })
+    }
     return NextResponse.next()
   }
 
