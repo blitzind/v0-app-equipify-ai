@@ -15,6 +15,10 @@ import {
 } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-engine"
 import type { GrowthAutonomousOutreachApprovalPackage } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
 import { GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_ALLOWED_WORKFLOW } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
+import {
+  requestGrowthCommunicationPlan,
+  resolveCommunicationPlanRecommendedChannel,
+} from "@/lib/growth/aios/communication/growth-communication-engine-service"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { runOutreachPersonalizationGeneration } from "@/lib/growth/outreach/personalization/run-outreach-personalization"
 import { runSmsPersonalizationForLead } from "@/lib/growth/sms/personalization/run-sms-personalization"
@@ -98,6 +102,21 @@ export async function buildAutonomousOutreachApprovalPackage(
 
   const packageId = `outreach-prep:${input.leadId}:${input.generatedAt}`
 
+  const communicationPlan = requestGrowthCommunicationPlan({
+    organizationId: input.organizationId,
+    subject: { type: "lead", id: input.leadId },
+    goal: "qualify",
+    context: {
+      emailReady: true,
+      smsReady: true,
+      senderReady: true,
+      engagementScore: confidence,
+      metaRecommendationType:
+        input.snapshot.nextBestAction?.action?.includes("sms") ? "sms" : "email",
+    },
+    generatedAt: input.generatedAt,
+  })
+
   return {
     packageId,
     leadId: input.leadId,
@@ -116,8 +135,9 @@ export async function buildAutonomousOutreachApprovalPackage(
       "Draft-only — no transport execution in GE-AIOS-GROWTH-5F.",
       "LinkedIn and SMS require manual send from operator workspace.",
       "SENDR enrollment blocked until explicit human approval.",
+      `Communication plan ${communicationPlan.id} — read-only channel strategy.`,
     ],
-    recommendedChannel: "email",
+    recommendedChannel: resolveCommunicationPlanRecommendedChannel(communicationPlan),
     recommendedSequence: input.snapshot.executionPlan?.estimatedSteps?.[0]?.label ?? "email_first_multichannel",
     expectedOutcome:
       input.snapshot.executionPlan?.expectedOutcome ??

@@ -39,6 +39,14 @@ export function GrowthAiOsRevenueOperatorSection({
           </p>
         </div>
 
+        {revenueOperator.metaRecommenderBinding ? (
+          <p className="text-xs text-muted-foreground">{revenueOperator.metaRecommenderBinding.summary}</p>
+        ) : null}
+
+        {revenueOperator.priorityEngineBinding ? (
+          <p className="text-xs text-muted-foreground">{revenueOperator.priorityEngineBinding.summary}</p>
+        ) : null}
+
         {revenueOperator.orchestrations.length === 0 ? (
           <p className="text-sm text-muted-foreground">No orchestration evaluations yet.</p>
         ) : (
@@ -79,6 +87,13 @@ export function GrowthAiOsRevenueOperatorSection({
                   <p className="mt-2 text-xs text-muted-foreground">
                     Handoff preview: {row.handoffPreview.sourceAgent.replaceAll("_", " ")} →{" "}
                     {row.handoffPreview.destinationAgent.replaceAll("_", " ")} — {row.handoffPreview.reason}
+                  </p>
+                ) : null}
+                {row.priorityBinding?.bindingId ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Priority binding: rank {row.priorityBinding.priorityRank ?? "—"} · score{" "}
+                    {row.priorityBinding.priorityScore ?? "—"} ·{" "}
+                    {row.priorityBinding.recommendedNextStep?.replaceAll("_", " ") ?? "—"}
                   </p>
                 ) : null}
               </div>

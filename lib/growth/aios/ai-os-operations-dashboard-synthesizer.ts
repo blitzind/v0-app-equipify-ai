@@ -781,6 +781,20 @@ function buildEngineeringDiagnostics(
       detail: "Future execution handoff",
       count: commandCenter.futureExecutionHandoffContracts.length,
     },
+    {
+      id: "event-bus",
+      label: "AI Event Bus",
+      statusLabel: `${commandCenter.eventBusHealth.recentEventCount} recent events`,
+      detail: `${commandCenter.eventBusHealth.registeredSubscribers} subscribers · ${commandCenter.eventBusHealth.droppedEvents} dropped`,
+      count: commandCenter.eventBusHealth.recentEventCount,
+    },
+    {
+      id: "bounded-autonomous-outbound",
+      label: "Bounded Autonomous Outbound",
+      statusLabel: `${commandCenter.boundedAutonomousOutbound.summary.activeScopes} active scopes`,
+      detail: `${commandCenter.boundedAutonomousOutbound.summary.actionsExecutedToday} actions today · ${commandCenter.boundedAutonomousOutbound.summary.actionsBlockedToday} blocked`,
+      count: commandCenter.boundedAutonomousOutbound.summary.actionsExecutedToday,
+    },
   ]
 }
 

@@ -16,8 +16,24 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { GrowthAiOsKpiCard } from "@/components/growth/ai-os/executive-planning-review/growth-ai-os-executive-planning-ux-utils"
 import { GrowthAiOsDailyBriefingSection } from "@/components/growth/ai-os/command-center/growth-ai-os-daily-briefing-section"
+import { GrowthAiOsRevenueDirectorSection } from "@/components/growth/ai-os/command-center/growth-ai-os-revenue-director-section"
+import { GrowthAiOsCommunicationEngineSection } from "@/components/growth/ai-os/command-center/growth-ai-os-communication-engine-section"
+import { GrowthAiOsMetaRecommenderSection } from "@/components/growth/ai-os/command-center/growth-ai-os-meta-recommender-section"
+import { GrowthAiOsBoundedAutonomousOutboundSection } from "@/components/growth/ai-os/command-center/growth-ai-os-bounded-autonomous-outbound-section"
+import { GrowthAiOsHumanApprovalCenterSection } from "@/components/growth/ai-os/command-center/growth-ai-os-human-approval-center-section"
+import { GrowthAiOsClosedLoopLearningSection } from "@/components/growth/ai-os/command-center/growth-ai-os-closed-loop-learning-section"
+import { GrowthAiOsAdaptiveCalibrationSection } from "@/components/growth/ai-os/command-center/growth-ai-os-adaptive-calibration-section"
+import { GrowthAiOsPriorityBindingSection } from "@/components/growth/ai-os/command-center/growth-ai-os-priority-binding-section"
 import { GrowthAiOsOperationsSectionCard } from "@/components/growth/ai-os/operations/growth-ai-os-operations-section-card"
 import type { AiOsOperationsDashboardReadModel } from "@/lib/growth/aios/ai-os-operations-dashboard-types"
+import type { GrowthRevenueDirectorReadModel } from "@/lib/growth/aios/revenue-director/growth-revenue-director-types"
+import type { GrowthCommunicationEngineReadModel } from "@/lib/growth/aios/communication/growth-communication-engine-types"
+import type { GrowthMetaRecommenderReadModel } from "@/lib/growth/aios/recommendations/growth-meta-recommender-types"
+import type { GrowthBoundedAutonomousOutboundReadModel } from "@/lib/growth/aios/outbound/growth-autonomous-outbound-scope-types"
+import type { GrowthHumanApprovalCenterReadModel } from "@/lib/growth/aios/approvals/growth-human-approval-center-types"
+import type { GrowthPriorityEngineBindingReadModel } from "@/lib/growth/aios/priority/growth-priority-engine-binding-types"
+import type { GrowthClosedLoopLearningReadModel } from "@/lib/growth/aios/learning/growth-closed-loop-learning-types"
+import type { GrowthAdaptiveCalibrationReadModel } from "@/lib/growth/aios/learning/growth-adaptive-calibration-types"
 import {
   GROWTH_AI_OS_OPERATIONS_DASHBOARD_QA_MARKER,
   type AiOsOperationsHealthStatus,
@@ -43,8 +59,26 @@ function categoryLabel(category: string) {
 
 export function GrowthAiOsOperationsDashboard({
   dashboard,
+  metaRecommender,
+  communicationEngine,
+  revenueDirector,
+  priorityBinding,
+  humanApprovalCenter,
+  boundedAutonomousOutbound,
+  closedLoopLearning,
+  adaptiveCalibration,
+  calibrationApply,
 }: {
   dashboard: AiOsOperationsDashboardReadModel
+  metaRecommender?: GrowthMetaRecommenderReadModel
+  communicationEngine?: GrowthCommunicationEngineReadModel
+  revenueDirector?: GrowthRevenueDirectorReadModel
+  priorityBinding?: GrowthPriorityEngineBindingReadModel
+  humanApprovalCenter?: GrowthHumanApprovalCenterReadModel
+  boundedAutonomousOutbound?: GrowthBoundedAutonomousOutboundReadModel
+  closedLoopLearning?: GrowthClosedLoopLearningReadModel
+  adaptiveCalibration?: GrowthAdaptiveCalibrationReadModel
+  calibrationApply?: import("@/lib/growth/aios/learning/growth-adaptive-calibration-apply-types").GrowthCalibrationApplyReadModel
 }) {
   const overview = dashboard.executiveOverview
 
@@ -429,6 +463,40 @@ export function GrowthAiOsOperationsDashboard({
           ))}
         </div>
       </GrowthAiOsOperationsSectionCard>
+
+      {metaRecommender ? <GrowthAiOsMetaRecommenderSection metaRecommender={metaRecommender} /> : null}
+
+      {communicationEngine ? (
+        <GrowthAiOsCommunicationEngineSection communicationEngine={communicationEngine} compact />
+      ) : null}
+
+      {revenueDirector ? (
+        <GrowthAiOsRevenueDirectorSection revenueDirector={revenueDirector} compact />
+      ) : null}
+
+      {priorityBinding ? <GrowthAiOsPriorityBindingSection priorityBinding={priorityBinding} /> : null}
+
+      {humanApprovalCenter ? (
+        <GrowthAiOsHumanApprovalCenterSection humanApprovalCenter={humanApprovalCenter} compact />
+      ) : null}
+
+      {boundedAutonomousOutbound ? (
+        <GrowthAiOsBoundedAutonomousOutboundSection
+          boundedAutonomousOutbound={boundedAutonomousOutbound}
+          compact
+        />
+      ) : null}
+
+      {closedLoopLearning ? (
+        <GrowthAiOsClosedLoopLearningSection closedLoopLearning={closedLoopLearning} />
+      ) : null}
+
+      {adaptiveCalibration ? (
+        <GrowthAiOsAdaptiveCalibrationSection
+          adaptiveCalibration={adaptiveCalibration}
+          calibrationApply={calibrationApply}
+        />
+      ) : null}
 
       <GrowthAiOsDailyBriefingSection briefing={dashboard.dailyBriefing} />
     </div>

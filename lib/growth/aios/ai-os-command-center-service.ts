@@ -76,6 +76,43 @@ import {
 } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-synthesizer"
 import { synthesizeAiOsDailyBriefing } from "@/lib/growth/aios/ai-os-daily-briefing-synthesizer"
 import { synthesizeAiOsOperationsDashboard } from "@/lib/growth/aios/ai-os-operations-dashboard-synthesizer"
+import { buildGrowthMetaRecommenderReadModel } from "@/lib/growth/aios/recommendations/growth-meta-recommender-service"
+import { buildGrowthPriorityEngineBindingReadModel } from "@/lib/growth/aios/priority/growth-priority-engine-binding-service"
+import { buildOrchestrationPriorityBindingMap } from "@/lib/growth/aios/priority/growth-priority-engine-binding-engine"
+import { fetchGrowthHumanApprovalCenterReadModel } from "@/lib/growth/aios/approvals/growth-human-approval-center-service"
+import {
+  ensureGrowthAiEventBusForOrganization,
+  fetchGrowthAiEventBusHealthReadModel,
+} from "@/lib/growth/aios/event-bus/growth-ai-event-bus-service"
+import { fetchBoundedAutonomousOutboundReadModel } from "@/lib/growth/aios/outbound/growth-autonomous-outbound-scope-service"
+import {
+  buildGrowthCommunicationEngineReadModel,
+  publishCommunicationPlanGeneratedEvent,
+} from "@/lib/growth/aios/communication/growth-communication-engine-service"
+import {
+  buildGrowthRevenueDirectorReadModel,
+  publishRevenueDirectorSnapshotGeneratedEvent,
+} from "@/lib/growth/aios/revenue-director/growth-revenue-director-service"
+import {
+  enrichRevenueDirectorWithDecisionLedger,
+  syncRevenueDirectorDecisionLedger,
+} from "@/lib/growth/aios/revenue-director/growth-revenue-director-decision-service"
+import {
+  buildGrowthClosedLoopLearningReadModel,
+  enrichCommunicationEngineWithLearningInsights,
+  enrichRevenueDirectorWithLearningInsights,
+  fetchGrowthClosedLoopLearningReadModel,
+} from "@/lib/growth/aios/learning/growth-closed-loop-learning-service"
+import {
+  enrichRevenueDirectorWithAdaptiveCalibration,
+  fetchGrowthAdaptiveCalibrationReadModel,
+  syncAdaptiveCalibrationProposalsFromInsights,
+} from "@/lib/growth/aios/learning/growth-adaptive-calibration-service"
+import {
+  enrichRevenueDirectorWithCalibrationApply,
+  fetchGrowthCalibrationApplyReadModel,
+} from "@/lib/growth/aios/learning/growth-adaptive-calibration-apply-service"
+import type { GrowthCalibrationActiveConfig } from "@/lib/growth/aios/learning/growth-adaptive-calibration-apply-types"
 import { listGeV15OrganizationApprovalInbox } from "@/lib/growth/automation-runtime/ge-v1-5-automation-runtime-approval-inbox"
 import { logGrowthEngine } from "@/lib/growth/growth-engine-session"
 
@@ -600,16 +637,239 @@ export async function fetchAiOsCommandCenterReadModel(
     safeMode,
   }
 
-  const withDailyBriefing = {
-    ...commandCenterBase,
-    dailyBriefing: synthesizeAiOsDailyBriefing(commandCenterBase),
+  const closedLoopLearning = await fetchGrowthClosedLoopLearningReadModel(admin, {
+    organizationId: input.organizationId,
+    generatedAt: commandCenterBase.generatedAt,
+  })
+
+  let adaptiveCalibration = await fetchGrowthAdaptiveCalibrationReadModel(admin, {
+    organizationId: input.organizationId,
+    generatedAt: commandCenterBase.generatedAt,
+  })
+  try {
+    await syncAdaptiveCalibrationProposalsFromInsights(admin, {
+      organizationId: input.organizationId,
+      generatedAt: commandCenterBase.generatedAt,
+      insights: closedLoopLearning.insights,
+    })
+    adaptiveCalibration = await fetchGrowthAdaptiveCalibrationReadModel(admin, {
+      organizationId: input.organizationId,
+      generatedAt: commandCenterBase.generatedAt,
+    })
+  } catch {
+    // Non-blocking — schema may be missing locally.
   }
 
-  return {
+  const readyToApplyProposalIds = adaptiveCalibration.proposals
+    .filter((row) => row.status === "approved")
+    .map((row) => row.id)
+
+  const calibrationApply = await fetchGrowthCalibrationApplyReadModel(admin, {
+    organizationId: input.organizationId,
+    generatedAt: commandCenterBase.generatedAt,
+    readyToApplyCount: readyToApplyProposalIds.length,
+  })
+
+  const calibrationActiveConfigs: GrowthCalibrationActiveConfig[] = calibrationApply.activeVersions
+
+  const metaRecommender = buildGrowthMetaRecommenderReadModel({
+    organizationId: input.organizationId,
+    generatedAt: commandCenterBase.generatedAt,
+    commandCenter: commandCenterBase,
+    autonomyPolicy,
+    calibrationActiveConfigs,
+  })
+
+  const withMetaRecommenderBase = {
+    ...commandCenterBase,
+    metaRecommender,
+  }
+
+  const priorityBinding = buildGrowthPriorityEngineBindingReadModel({
+    organizationId: input.organizationId,
+    generatedAt: commandCenterBase.generatedAt,
+    objectives,
+    commandCenter: {
+      activeMissions,
+      approvalWorkOrders,
+      missionPriority,
+      metaRecommender,
+      revenueOperator: commandCenterBase.revenueOperator,
+    },
+    autonomyPolicy,
+    calibrationActiveConfigs,
+  })
+
+  const orchestrationBindingMap = buildOrchestrationPriorityBindingMap({
+    bindings: priorityBinding.bindings,
+    orchestrations: commandCenterBase.revenueOperator.orchestrations,
+  })
+
+  const revenueOperatorWithBindings = {
+    ...commandCenterBase.revenueOperator,
+    metaRecommenderBinding: metaRecommender.revenueOperatorBinding,
+    priorityEngineBinding: priorityBinding.revenueOperatorBinding,
+    orchestrations: commandCenterBase.revenueOperator.orchestrations.map((row) => ({
+      ...row,
+      priorityBinding: orchestrationBindingMap.get(row.orchestrationId) ?? undefined,
+    })),
+  }
+
+  const withMetaRecommender = {
+    ...withMetaRecommenderBase,
+    revenueOperator: revenueOperatorWithBindings,
+    priorityBinding,
+  }
+
+  const humanApprovalCenter = await fetchGrowthHumanApprovalCenterReadModel(admin, {
+    organizationId: input.organizationId,
+    generatedAt: commandCenterBase.generatedAt,
+    adaptiveCalibrationProposals: adaptiveCalibration.proposals,
+    commandCenter: {
+      approvalWorkOrders,
+      executionPlanReviewQueue,
+      needsAttention,
+      metaRecommender,
+      priorityBinding,
+      revenueOperator: revenueOperatorWithBindings,
+      autonomousOutreachPreparationPilot,
+      autonomousMeetingPilot,
+    },
+  })
+
+  const withHumanApprovalCenter = {
+    ...withMetaRecommender,
+    humanApprovalCenter,
+  }
+
+  try {
+    await ensureGrowthAiEventBusForOrganization(admin, { organizationId: input.organizationId })
+  } catch {
+    // Subscription registration failure must not block read model.
+  }
+
+  const eventBusHealth = await fetchGrowthAiEventBusHealthReadModel(admin, {
+    organizationId: input.organizationId,
+    generatedAt: commandCenterBase.generatedAt,
+  })
+
+  const boundedAutonomousOutbound = await fetchBoundedAutonomousOutboundReadModel(admin, {
+    organizationId: input.organizationId,
+    generatedAt: commandCenterBase.generatedAt,
+  })
+
+  const communicationEngineBase = buildGrowthCommunicationEngineReadModel({
+    organizationId: input.organizationId,
+    generatedAt: commandCenterBase.generatedAt,
+    boundedAutonomousOutbound,
+    autonomyPolicy,
+    calibrationActiveConfigs,
+    outreachLeadIds:
+      autonomousOutreachPreparationPilot?.recentRuns
+        ?.map((run) => run.leadId)
+        .filter((leadId): leadId is string => Boolean(leadId)) ?? [],
+  })
+
+  const topCommunicationPlan = communicationEngineBase.plans[0]
+  if (topCommunicationPlan) {
+    await publishCommunicationPlanGeneratedEvent(admin, {
+      organizationId: input.organizationId,
+      plan: topCommunicationPlan,
+      generatedAt: commandCenterBase.generatedAt,
+    })
+  }
+
+  const communicationEngine = enrichCommunicationEngineWithLearningInsights({
+    communicationEngine: communicationEngineBase,
+    learning: closedLoopLearning,
+  })
+
+  const withEventBusHealth = {
+    ...withHumanApprovalCenter,
+    eventBusHealth,
+    boundedAutonomousOutbound,
+    communicationEngine,
+  }
+
+  const withDailyBriefing = {
+    ...withEventBusHealth,
+    dailyBriefing: synthesizeAiOsDailyBriefing(withEventBusHealth),
+  }
+
+  const withOperationsDashboard = {
     ...withDailyBriefing,
     autonomyPolicy,
     operationsDashboard: synthesizeAiOsOperationsDashboard(withDailyBriefing, {
       automationApprovalCount: automationApprovalInbox.length,
     }, autonomyPolicy),
+  }
+
+  const revenueDirectorBase = buildGrowthRevenueDirectorReadModel({
+    organizationId: input.organizationId,
+    commandCenter: withOperationsDashboard,
+  })
+
+  let revenueDirectorDecisionLedger
+  let revenueDirector = revenueDirectorBase
+  try {
+    revenueDirectorDecisionLedger = await syncRevenueDirectorDecisionLedger(admin, {
+      organizationId: input.organizationId,
+      revenueDirector: revenueDirectorBase,
+      generatedAt: commandCenterBase.generatedAt,
+    })
+    revenueDirector = enrichRevenueDirectorWithDecisionLedger({
+      organizationId: input.organizationId,
+      revenueDirector: revenueDirectorBase,
+      ledger: revenueDirectorDecisionLedger,
+    })
+    revenueDirector = enrichRevenueDirectorWithLearningInsights({
+      revenueDirector,
+      learning: closedLoopLearning,
+    })
+    revenueDirector = enrichRevenueDirectorWithAdaptiveCalibration({
+      revenueDirector,
+      calibration: adaptiveCalibration,
+    })
+    revenueDirector = enrichRevenueDirectorWithCalibrationApply({
+      revenueDirector,
+      applyReadModel: calibrationApply,
+      readyToApplyProposalIds,
+    })
+  } catch {
+    const { synthesizeEmptyDecisionLedgerReadModel } = await import(
+      "@/lib/growth/aios/revenue-director/growth-revenue-director-decision-helpers"
+    )
+    revenueDirectorDecisionLedger = synthesizeEmptyDecisionLedgerReadModel({
+      generatedAt: commandCenterBase.generatedAt,
+      schemaReady: false,
+    })
+    revenueDirector = enrichRevenueDirectorWithLearningInsights({
+      revenueDirector: revenueDirectorBase,
+      learning: closedLoopLearning,
+    })
+    revenueDirector = enrichRevenueDirectorWithAdaptiveCalibration({
+      revenueDirector,
+      calibration: adaptiveCalibration,
+    })
+    revenueDirector = enrichRevenueDirectorWithCalibrationApply({
+      revenueDirector,
+      applyReadModel: calibrationApply,
+      readyToApplyProposalIds,
+    })
+  }
+
+  await publishRevenueDirectorSnapshotGeneratedEvent(admin, {
+    organizationId: input.organizationId,
+    revenueDirector,
+    generatedAt: commandCenterBase.generatedAt,
+  })
+
+  return {
+    ...withOperationsDashboard,
+    revenueDirector,
+    revenueDirectorDecisionLedger,
+    closedLoopLearning,
+    adaptiveCalibration,
+    calibrationApply,
   }
 }

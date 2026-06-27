@@ -296,6 +296,11 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     segment: "os",
     breadcrumbLabel: "AI Operations",
   }),
+  workspace("workspace-human-approval-center", "os/approvals", "Human Approval Center", "intelligence", "workspace", {
+    migrated: true,
+    segment: "os",
+    breadcrumbLabel: "Approvals",
+  }),
 
   workspace("workspace-leads", "leads", "Leads", "workspace", "dual-route", {
     migrated: true,

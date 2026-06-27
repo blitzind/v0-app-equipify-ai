@@ -31,7 +31,7 @@ import type {
 export async function publishAiOsEvent(
   admin: SupabaseClient,
   input: AiOsEventPublishInput,
-): Promise<{ event: AiOsEvent; deliveriesCreated: number; handlersInvoked: string[] }> {
+): Promise<{ event: AiOsEvent; deliveriesCreated: number; handlersInvoked: string[]; handlerFailures: string[] }> {
   const registry = lookupAiEventRegistryEntry(input.eventType)
   const category = input.category ?? registry?.category
   if (!category) throw new Error("ai_event_category_required")
@@ -64,19 +64,21 @@ export async function publishAiOsEvent(
     })),
   )
 
-  const handlersInvoked = await invokeRegisteredAiOsEventHandlers(event)
+  const { invoked: handlersInvoked, failures: handlerFailures } =
+    await invokeRegisteredAiOsEventHandlers(event)
 
   return {
     event,
     deliveriesCreated: deliveries.length,
     handlersInvoked,
+    handlerFailures,
   }
 }
 
 export async function publishAiOsEventCorrection(
   admin: SupabaseClient,
   input: AiOsEventPublishInput & { causationId: string; originalEventId: string },
-): Promise<{ event: AiOsEvent; deliveriesCreated: number; handlersInvoked: string[] }> {
+): Promise<{ event: AiOsEvent; deliveriesCreated: number; handlersInvoked: string[]; handlerFailures: string[] }> {
   const original = await fetchAiOsEventById(admin, {
     organizationId: input.organizationId,
     eventId: input.originalEventId,

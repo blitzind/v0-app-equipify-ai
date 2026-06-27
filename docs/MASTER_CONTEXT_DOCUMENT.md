@@ -16,7 +16,7 @@
 =================================================
 
 **Document role:** Living engineering state — current phase, production status, rules, certifications, risks, and priorities.  
-**Last updated:** 2026-06-25 (PROD-REGRESSION-6 Command Center import stability)  
+**Last updated:** 2026-06-25 (GE-AI-SHIP-0 Local Release Bundle Audit)  
 **Regeneration:** `pnpm update:master-context` (inventory scan + this document's manual sections)  
 **Admin UI:** `/admin/master-context`
 
@@ -47,8 +47,8 @@
 | **Architecture phase** | GE-AI-1X — **Complete** (Constitution v1.0 frozen) |
 | **Architecture consolidation** | **GE-AIOS-ARCH-1A** — AI Revenue & Service OS layer model (**complete**, docs only) |
 | **Documentation phase** | GE-DOC-1 — **Complete** |
-| **Current phase** | **PROD-REGRESSION-6** — Command Center import stability (**fixed locally**, not committed) |
-| **Next phase** | GE-AI-2F — Meta-Recommender |
+| **Current phase** | **GE-AI-SHIP-0** — Local Release Bundle Audit (**complete locally**, not committed) |
+| **Next phase** | Split release bundles (B1→B4) per [`GE-AI-SHIP-0`](./GE-AI-SHIP-0_LOCAL_RELEASE_BUNDLE_AUDIT.md) — commit + migration + cert per bundle |
 
 **Transition:** Official move from Architecture Phase (GE-AI-1X) to Engineering Phase (GE-AI-2X).
 
@@ -380,14 +380,19 @@ Canonical `growth_lead_research` workflow with status, qualification, and Comman
 |-------|-------|
 | GE-AIOS-ARCH-1A | AI Revenue & Service OS Architecture Consolidation | **Complete (docs only)** |
 | GE-AI-2A | Decision Record Foundation | Complete via GE-AIOS-2D |
-| GE-AI-2B | Event Bus Unification | Partial (foundation in GE-AIOS-2B) |
+| GE-AI-2B | Event Bus Unification | Complete (local cert, not committed) |
 | GE-AI-2C | Work Order System (remaining) | Partial (DR gate + Executive delegation in 2E/2G) |
 | GE-AI-2D | Memory Facade | Complete via GE-AIOS-2F |
-| GE-AI-2E | Priority Engine Binding |
-| GE-AI-2F | Meta-Recommender |
+| GE-AI-2E | Priority Engine Binding | Complete (local cert, not committed) |
+| GE-AI-2F | Meta-Recommender | Complete (local cert, not committed) |
 | GE-AI-2G | Mission UI & Operator Experience |
-| GE-AI-2H | L3 Approval Flow |
-| GE-AI-2I | L4 Supervised Outbound |
+| GE-AI-2H | L3 Approval Flow | Complete (local cert, not committed) |
+| GE-AI-2I | L4 Bounded Autonomous Outbound | Complete (local cert, not committed) |
+| GE-AI-2I-PROD-1 | Persistent Autonomous Outbound Scopes | Complete (local cert, not committed) |
+| GE-AI-2I-PROD-2 | Autonomous Outbound Integration Certification | Complete (local cert, not committed) |
+| GE-AI-2I-PROD-3 | Gated Operator Activation Surface | Complete (local cert, not committed) |
+| GE-AI-2K | Communication Engine Foundation | Complete (local cert, not committed) |
+| GE-AI-3A | Revenue Director Foundation | Complete (local cert, not committed) |
 | GE-AI-2J | Learning Loop |
 
 Detail per phase: Implementation Ledger.
@@ -645,10 +650,10 @@ Meta-Recommender supremacy, Priority formula as sole authority.
 
 ### AI Revenue Operator (engineering)
 
-1. GE-AI-2F Meta-Recommender / Decision Engine binding  
+1. GE-AI-2I L4 Supervised Outbound (after commit bundle validation)  
 2. Wire legacy NBA → Decision Record creation (presenter only)  
 3. Bridge legacy objective runtime → AI OS Executive Brain tick  
-4. Do not enable L3+ send until approval flow certified  
+4. Do not enable L3+ send until approval flow certified in production  
 
 ### Core product (platform)
 
@@ -783,6 +788,7 @@ Full list: `lib/admin/master-context.manual.after.md` § Current Priorities.
 | [GE-AIOS-GROWTH-5G Infrastructure Audit](./GE-AIOS-GROWTH-5G_INFRASTRUCTURE_AUDIT.md) | Meeting agent audit |
 | [GE-AIOS-ARCH-1A AI Revenue & Service OS Architecture](./GE-AIOS-ARCH-1A_AI_REVENUE_SERVICE_OS_ARCHITECTURE.md) | Canonical layer model, module mapping, Memory Graph design |
 | [PROD-REGRESSION-6 Command Center import stability](./PROD-REGRESSION-6_COMMAND_CENTER_IMPORT_STABILITY.md) | Production 500 root cause + import stability cert |
+| [GE-AI-SHIP-0 Local Release Bundle Audit](./GE-AI-SHIP-0_LOCAL_RELEASE_BUNDLE_AUDIT.md) | Pre-ship audit: migrations, safety, test matrix, rollout/rollback/pilot |
 | [GE-AIOS-GROWTH Internal Workflow Dry Run](./GE-AIOS-GROWTH_INTERNAL_WORKFLOW_DRY_RUN.md) | Dry-run operator guide |
 | [GE-AIOS-GROWTH Execution Simulation](./GE-AIOS-GROWTH_EXECUTION_SIMULATION.md) | Execution simulation reference |
 

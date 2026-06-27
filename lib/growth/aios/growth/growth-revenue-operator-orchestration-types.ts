@@ -10,6 +10,8 @@ import type {
   GrowthAgentKind,
   GrowthAgentRequiredGate,
 } from "@/lib/growth/aios/growth/growth-agent-framework-types"
+import type { GrowthMetaRecommenderRevenueOperatorBinding } from "@/lib/growth/aios/recommendations/growth-meta-recommender-types"
+import type { GrowthPriorityEngineRevenueOperatorBinding } from "@/lib/growth/aios/priority/growth-priority-engine-binding-types"
 import type { GrowthAiOsRevenueOperatorPolicyAwareness } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-types"
 
 export const GROWTH_AIOS_GROWTH_4B_PHASE = "GE-AIOS-GROWTH-4B" as const
@@ -107,6 +109,14 @@ export type RevenueOperatorOrchestrationRecord = {
   /** Policy engine block keys when recommended agent is policy-blocked (GE-AIOS-CONSOLIDATION-1E). */
   policyEvaluationKeys?: string[]
   policyBlockReasons?: string[]
+  /** GE-AI-2E — read-only priority binding projection for this lead. */
+  priorityBinding?: {
+    bindingId: string | null
+    priorityRank: number | null
+    priorityScore: number | null
+    status: string | null
+    recommendedNextStep: string | null
+  }
 }
 
 export type RevenueOperatorOrchestrationPlanContext = {
@@ -132,6 +142,8 @@ export type RevenueOperatorReadModel = {
     executionReady: number
   }
   orchestrations: RevenueOperatorOrchestrationRecord[]
+  metaRecommenderBinding?: GrowthMetaRecommenderRevenueOperatorBinding
+  priorityEngineBinding?: GrowthPriorityEngineRevenueOperatorBinding
   autonomyPolicyAwareness?: GrowthAiOsRevenueOperatorPolicyAwareness
   autonomyPolicySource?: string
 }

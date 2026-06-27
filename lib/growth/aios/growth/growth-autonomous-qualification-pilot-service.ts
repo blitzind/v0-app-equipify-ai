@@ -392,3 +392,103 @@ export async function buildGrowthAutonomousQualificationPilotPlanContext(
     generatedAt,
   })
 }
+
+export async function runAutonomousQualificationManualEvaluation(
+  admin: SupabaseClient,
+  input: { organizationId: string; leadId: string; generatedAt?: string },
+): Promise<GrowthAutonomousQualificationPilotReadModel> {
+  const generatedAt = input.generatedAt ?? nowIso()
+  const orgState = getAutonomousQualificationPilotOrgState(input.organizationId, generatedAt)
+  const evaluationContext = await fetchGrowthAiOsAutonomyPolicyEvaluationContext(admin, {
+    organizationId: input.organizationId,
+    generatedAt,
+  })
+  const policyGate = evaluateQualificationPilotAutonomyPolicyGate(evaluationContext)
+  const effectiveControlState = deriveQualificationPilotControlFromPolicy(
+    evaluationContext.policy,
+    orgState.controlState,
+  )
+
+  if (!policyGate.allowed || !isQualificationAgentSchedulerActive(effectiveControlState)) {
+    appendAutonomousQualificationRun({
+      organizationId: input.organizationId,
+      now: generatedAt,
+      run: buildAutonomousQualificationRunRecord({
+        leadId: input.leadId,
+        companyName: null,
+        wakeCondition: "manual_qualification_request",
+        generatedAt,
+        outcome: "skipped",
+        skipReason: policyGate.blockReason ?? "Pilot not active under current autonomy policy.",
+      }),
+    })
+  } else {
+    const budget = enforceQualificationAgentBudget({
+      runs: orgState.runs,
+      generatedAt,
+      leadId: input.leadId,
+    })
+    if (!budget.allowed) {
+      appendAutonomousQualificationRun({
+        organizationId: input.organizationId,
+        now: generatedAt,
+        run: buildAutonomousQualificationRunRecord({
+          leadId: input.leadId,
+          companyName: null,
+          wakeCondition: "manual_qualification_request",
+          generatedAt,
+          outcome: "skipped",
+          skipReason: budget.skipReason,
+        }),
+      })
+    } else {
+      const snapshot = await fetchLatestGrowthLeadResearchWorkflowSnapshot(admin, {
+        organizationId: input.organizationId,
+        leadId: input.leadId,
+      })
+      try {
+        await executeAutonomousQualificationEvaluation(admin, {
+          organizationId: input.organizationId,
+          leadId: input.leadId,
+          companyName: snapshot?.companyName ?? null,
+          wakeCondition: "manual_qualification_request",
+          generatedAt,
+        })
+        appendAutonomousQualificationRun({
+          organizationId: input.organizationId,
+          now: generatedAt,
+          run: buildAutonomousQualificationRunRecord({
+            leadId: input.leadId,
+            companyName: snapshot?.companyName ?? null,
+            wakeCondition: "manual_qualification_request",
+            generatedAt,
+            outcome: "completed",
+          }),
+        })
+      } catch {
+        appendAutonomousQualificationRun({
+          organizationId: input.organizationId,
+          now: generatedAt,
+          run: buildAutonomousQualificationRunRecord({
+            leadId: input.leadId,
+            companyName: snapshot?.companyName ?? null,
+            wakeCondition: "manual_qualification_request",
+            generatedAt,
+            outcome: "failed",
+          }),
+        })
+      }
+    }
+  }
+
+  const finalState = getAutonomousQualificationPilotOrgState(input.organizationId, generatedAt)
+  return enrichAutonomousQualificationPilotWithAutonomyPolicy(
+    buildAutonomousQualificationPilotReadModel({
+      controlState: effectiveControlState,
+      runs: finalState.runs,
+      generatedAt,
+      activeRuns: 0,
+    }),
+    evaluationContext.policy,
+  )
+}

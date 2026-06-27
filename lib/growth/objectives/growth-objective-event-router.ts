@@ -98,6 +98,20 @@ export async function routeGrowthObjectiveSourceEvent(
     dedupe_persisted: receipt.persisted,
   })
 
+  if (signalsIngested > 0) {
+    try {
+      const { bridgeObjectiveSourceToEventBus } = await import(
+        "@/lib/growth/aios/event-bus/growth-ai-event-bus-service"
+      )
+      await bridgeObjectiveSourceToEventBus(admin, {
+        event,
+        legacyEventId: idempotencyKey,
+      })
+    } catch {
+      // Bridge failure must not block objective routing.
+    }
+  }
+
   return {
     qa_marker: GROWTH_OBJECTIVE_EVENT_ROUTER_QA_MARKER,
     ok: true,

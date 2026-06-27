@@ -148,6 +148,24 @@ export async function publishGrowthRealtimeEvent(
     operator_id: input.operator_id,
   })
 
+  try {
+    const signalRowId = (data as { id?: string } | null)?.id
+    if (signalRowId) {
+      const { bridgeRealtimeEnvelopeToEventBus } = await import(
+        "@/lib/growth/aios/event-bus/growth-ai-event-bus-service"
+      )
+      await bridgeRealtimeEnvelopeToEventBus(admin, {
+        organizationId: organization_id,
+        legacyEventId: signalRowId,
+        logicalEventType: `realtime.${input.event_type}`,
+        leadId: input.lead_id ?? null,
+        payload: envelopePayload,
+      })
+    }
+  } catch {
+    // Bridge failure must not block realtime UI bus.
+  }
+
   return { ok: true, event: normalized }
 }
 

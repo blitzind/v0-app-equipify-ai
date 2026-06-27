@@ -83,6 +83,14 @@ export async function createAiWorkOrder(
       priority: workOrder.priority,
     },
   })
+  try {
+    const { bridgeAiWorkOrderAuditToEventBus } = await import(
+      "@/lib/growth/aios/event-bus/growth-ai-event-bus-service"
+    )
+    await bridgeAiWorkOrderAuditToEventBus(admin, { workOrder, workOrderEvent: event })
+  } catch {
+    // Bridge failure must not block work order lifecycle.
+  }
   return { workOrder, event }
 }
 
@@ -149,6 +157,15 @@ export async function transitionAiWorkOrder(
     },
   })
 
+  try {
+    const { bridgeAiWorkOrderAuditToEventBus } = await import(
+      "@/lib/growth/aios/event-bus/growth-ai-event-bus-service"
+    )
+    await bridgeAiWorkOrderAuditToEventBus(admin, { workOrder, workOrderEvent: event })
+  } catch {
+    // Bridge failure must not block work order lifecycle.
+  }
+
   return { workOrder, event }
 }
 
@@ -214,6 +231,15 @@ export async function retryAiWorkOrder(
     },
   })
 
+  try {
+    const { bridgeAiWorkOrderAuditToEventBus } = await import(
+      "@/lib/growth/aios/event-bus/growth-ai-event-bus-service"
+    )
+    await bridgeAiWorkOrderAuditToEventBus(admin, { workOrder, workOrderEvent: event })
+  } catch {
+    // Bridge failure must not block work order lifecycle.
+  }
+
   return { workOrder, event }
 }
 
@@ -249,6 +275,15 @@ export async function archiveAiWorkOrder(
     description: input.reason ?? "",
     metadata: {},
   })
+
+  try {
+    const { bridgeAiWorkOrderAuditToEventBus } = await import(
+      "@/lib/growth/aios/event-bus/growth-ai-event-bus-service"
+    )
+    await bridgeAiWorkOrderAuditToEventBus(admin, { workOrder, workOrderEvent: event })
+  } catch {
+    // Bridge failure must not block work order lifecycle.
+  }
 
   return { workOrder, event }
 }

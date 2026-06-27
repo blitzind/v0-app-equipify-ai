@@ -414,3 +414,103 @@ export async function buildGrowthAutonomousOutreachPreparationPilotPlanContext(
     generatedAt,
   })
 }
+
+export async function runAutonomousOutreachPreparationManualRequest(
+  admin: SupabaseClient,
+  input: { organizationId: string; leadId: string; generatedAt?: string },
+): Promise<GrowthAutonomousOutreachPreparationPilotReadModel> {
+  const generatedAt = input.generatedAt ?? nowIso()
+  const orgState = getAutonomousOutreachPreparationPilotOrgState(input.organizationId, generatedAt)
+  const evaluationContext = await fetchGrowthAiOsAutonomyPolicyEvaluationContext(admin, {
+    organizationId: input.organizationId,
+    generatedAt,
+  })
+  const policyGate = evaluateOutreachPreparationPilotAutonomyPolicyGate(evaluationContext)
+  const effectiveControlState = deriveOutreachPreparationPilotControlFromPolicy(
+    evaluationContext.policy,
+    orgState.controlState,
+  )
+
+  if (!policyGate.allowed || !isOutreachPreparationAgentSchedulerActive(effectiveControlState)) {
+    appendAutonomousOutreachPreparationRun({
+      organizationId: input.organizationId,
+      now: generatedAt,
+      run: buildAutonomousOutreachPreparationRunRecord({
+        leadId: input.leadId,
+        companyName: null,
+        wakeCondition: "manual_outreach_preparation_request",
+        generatedAt,
+        outcome: "skipped",
+        skipReason: policyGate.blockReason ?? "Pilot not active under current autonomy policy.",
+      }),
+    })
+  } else {
+    const budget = enforceOutreachPreparationAgentBudget({
+      runs: orgState.runs,
+      generatedAt,
+      leadId: input.leadId,
+    })
+    if (!budget.allowed) {
+      appendAutonomousOutreachPreparationRun({
+        organizationId: input.organizationId,
+        now: generatedAt,
+        run: buildAutonomousOutreachPreparationRunRecord({
+          leadId: input.leadId,
+          companyName: null,
+          wakeCondition: "manual_outreach_preparation_request",
+          generatedAt,
+          outcome: "skipped",
+          skipReason: budget.skipReason,
+        }),
+      })
+    } else {
+      const snapshot = await fetchLatestGrowthLeadResearchWorkflowSnapshot(admin, {
+        organizationId: input.organizationId,
+        leadId: input.leadId,
+      })
+      try {
+        await executeAutonomousOutreachPreparation(admin, {
+          organizationId: input.organizationId,
+          leadId: input.leadId,
+          companyName: snapshot?.companyName ?? null,
+          wakeCondition: "manual_outreach_preparation_request",
+          generatedAt,
+        })
+        appendAutonomousOutreachPreparationRun({
+          organizationId: input.organizationId,
+          now: generatedAt,
+          run: buildAutonomousOutreachPreparationRunRecord({
+            leadId: input.leadId,
+            companyName: snapshot?.companyName ?? null,
+            wakeCondition: "manual_outreach_preparation_request",
+            generatedAt,
+            outcome: "completed",
+          }),
+        })
+      } catch {
+        appendAutonomousOutreachPreparationRun({
+          organizationId: input.organizationId,
+          now: generatedAt,
+          run: buildAutonomousOutreachPreparationRunRecord({
+            leadId: input.leadId,
+            companyName: snapshot?.companyName ?? null,
+            wakeCondition: "manual_outreach_preparation_request",
+            generatedAt,
+            outcome: "failed",
+          }),
+        })
+      }
+    }
+  }
+
+  const finalState = getAutonomousOutreachPreparationPilotOrgState(input.organizationId, generatedAt)
+  return enrichAutonomousOutreachPreparationPilotWithAutonomyPolicy(
+    buildAutonomousOutreachPreparationPilotReadModel({
+      controlState: effectiveControlState,
+      runs: finalState.runs,
+      generatedAt,
+      activeRuns: 0,
+    }),
+    evaluationContext.policy,
+  )
+}

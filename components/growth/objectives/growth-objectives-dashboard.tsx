@@ -11,10 +11,12 @@ import { computeObjectiveDashboardProgress, computeObjectiveStageDurationMs, isO
 import { summarizeObjectiveExecutionContext, summarizeObjectiveMaterializationHealth } from "@/lib/growth/objectives/growth-objective-execution-context"
 import { buildObjectiveSignalSnapshot } from "@/lib/growth/objectives/growth-objective-signal-handler"
 import type { GrowthObjective } from "@/lib/growth/objectives/growth-objective-types"
+import type { GrowthPriorityBindingObjectiveContext } from "@/lib/growth/aios/priority/growth-priority-engine-binding-types"
 
 export function GrowthObjectivesDashboard() {
   const [dashboard, setDashboard] = useState<GrowthObjectiveDashboardModel | null>(null)
   const [selected, setSelected] = useState<GrowthObjective | null>(null)
+  const [priorityContext, setPriorityContext] = useState<GrowthPriorityBindingObjectiveContext | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [title, setTitle] = useState("Book 20 demos with medical equipment companies")
@@ -36,6 +38,28 @@ export function GrowthObjectivesDashboard() {
       setError(loadError instanceof Error ? loadError.message : "Could not load objectives.")
     })
   }, [load])
+
+  useEffect(() => {
+    if (!selected?.id) {
+      setPriorityContext(null)
+      return
+    }
+    void fetch(`/api/growth/workspace/objectives/priority-binding?objectiveId=${selected.id}`, {
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        const body = (await response.json()) as {
+          ok?: boolean
+          objectiveContext?: GrowthPriorityBindingObjectiveContext | null
+        }
+        if (response.ok && body.ok) {
+          setPriorityContext(body.objectiveContext ?? null)
+        } else {
+          setPriorityContext(null)
+        }
+      })
+      .catch(() => setPriorityContext(null))
+  }, [selected?.id])
 
   async function createObjective() {
     setSaving(true)
@@ -210,6 +234,30 @@ export function GrowthObjectivesDashboard() {
                       </p>
                     )
                   })()}
+                </div>
+              ) : null}
+
+              {priorityContext?.topBinding ? (
+                <div
+                  className="rounded-md border border-indigo-200 bg-indigo-50/40 px-3 py-3 text-sm"
+                  data-qa-section="objective-priority-binding"
+                >
+                  <p className="font-medium">Priority binding (read-only)</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{priorityContext.topBinding.summary}</p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    <Badge variant="secondary">
+                      Next: {priorityContext.topBinding.recommendedNextStep.replaceAll("_", " ")}
+                    </Badge>
+                    <Badge variant="outline">{priorityContext.topBinding.status.replaceAll("_", " ")}</Badge>
+                    {priorityContext.topBinding.blockers.some((blocker) => blocker.type === "approval") ? (
+                      <Badge variant="destructive">Approval required</Badge>
+                    ) : null}
+                  </div>
+                  {priorityContext.topBinding.route ? (
+                    <a href={priorityContext.topBinding.route} className="mt-2 inline-block text-xs font-medium text-primary hover:underline">
+                      Review in workspace
+                    </a>
+                  ) : null}
                 </div>
               ) : null}
 

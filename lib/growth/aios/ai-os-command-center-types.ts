@@ -25,6 +25,17 @@ import type { GrowthAutonomousQualificationPilotReadModel } from "@/lib/growth/a
 import type { GrowthAutonomousResearchPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-types"
 import type { AiOsOperationsDashboardReadModel } from "@/lib/growth/aios/ai-os-operations-dashboard-types"
 import type { GrowthAiOsAutonomyPolicyReadModel } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-types"
+import type { GrowthClosedLoopLearningReadModel } from "@/lib/growth/aios/learning/growth-closed-loop-learning-types"
+import type { GrowthAdaptiveCalibrationReadModel } from "@/lib/growth/aios/learning/growth-adaptive-calibration-types"
+import type { GrowthCalibrationApplyReadModel } from "@/lib/growth/aios/learning/growth-adaptive-calibration-apply-types"
+import type { GrowthMetaRecommenderReadModel } from "@/lib/growth/aios/recommendations/growth-meta-recommender-types"
+import type { GrowthPriorityEngineBindingReadModel } from "@/lib/growth/aios/priority/growth-priority-engine-binding-types"
+import type { GrowthHumanApprovalCenterReadModel } from "@/lib/growth/aios/approvals/growth-human-approval-center-types"
+import type { GrowthAiEventBusHealthReadModel } from "@/lib/growth/aios/event-bus/growth-ai-event-bus-types"
+import type { GrowthBoundedAutonomousOutboundReadModel } from "@/lib/growth/aios/outbound/growth-autonomous-outbound-scope-types"
+import type { GrowthCommunicationEngineReadModel } from "@/lib/growth/aios/communication/growth-communication-engine-types"
+import type { GrowthRevenueDirectorReadModel } from "@/lib/growth/aios/revenue-director/growth-revenue-director-types"
+import type { GrowthRevenueDirectorDecisionLedgerReadModel } from "@/lib/growth/aios/revenue-director/growth-revenue-director-decision-types"
 import type { GrowthObjectiveStageId } from "@/lib/growth/objectives/growth-objective-types"
 import type { AiWorkOrderStatus, AiWorkOrderType } from "@/lib/growth/aios/ai-work-order-types"
 
@@ -211,6 +222,17 @@ export type AiOsCommandCenterReadModel = {
   autonomousOutreachPreparationPilot: GrowthAutonomousOutreachPreparationPilotReadModel
   autonomousMeetingPilot: GrowthAutonomousMeetingPilotReadModel
   safeMode: AiOsCommandCenterSafeMode
+  metaRecommender: GrowthMetaRecommenderReadModel
+  priorityBinding: GrowthPriorityEngineBindingReadModel
+  humanApprovalCenter: GrowthHumanApprovalCenterReadModel
+  eventBusHealth: GrowthAiEventBusHealthReadModel
+  boundedAutonomousOutbound: GrowthBoundedAutonomousOutboundReadModel
+  communicationEngine: GrowthCommunicationEngineReadModel
+  revenueDirector: GrowthRevenueDirectorReadModel
+  revenueDirectorDecisionLedger: GrowthRevenueDirectorDecisionLedgerReadModel
+  closedLoopLearning: GrowthClosedLoopLearningReadModel
+  adaptiveCalibration: GrowthAdaptiveCalibrationReadModel
+  calibrationApply: GrowthCalibrationApplyReadModel
   dailyBriefing: AiOsDailyBriefing
   operationsDashboard: AiOsOperationsDashboardReadModel
   autonomyPolicy: GrowthAiOsAutonomyPolicyReadModel

@@ -211,17 +211,34 @@ export function mapAiOsEventTypeToAgentEventType(aiOsEventType: string): GrowthA
   switch (aiOsEventType) {
     case "growth.workflow.status_changed":
       return "research_completed"
+    case "growth.qualification.completed":
+      return "qualification_completed"
+    case "growth.execution_plan.generated":
+      return "execution_plan_created"
+    case "growth.execution.enqueued":
+      return "readiness_changed"
+    case "growth.outreach.prepared":
+      return "human_review_requested"
+    case "growth.meeting.prepared":
+      return "meeting_booked"
     case "growth.execution_plan.review_changed":
       return "execution_plan_approved"
     case "growth.execution_runtime.lifecycle_changed":
       return "runtime_completed"
     case "growth.execution_runtime.step_completed":
       return "runtime_completed"
+    case "work_order.created":
+      return "human_review_requested"
+    case "work_order.status_changed":
+      return "readiness_changed"
+    case "decision.approval_required":
+      return "human_review_requested"
     case "agent.wake":
       return "manual_operator_request"
     case "executive.tick":
       return "daily_review"
     default:
+      if (aiOsEventType.startsWith("mission.signal.")) return "opportunity_changed"
       return null
   }
 }

@@ -30,13 +30,20 @@ export function listRegisteredAiOsEventHandlers(): string[] {
   return [...handlers.keys()]
 }
 
-export async function invokeRegisteredAiOsEventHandlers(event: AiOsEvent): Promise<string[]> {
+export async function invokeRegisteredAiOsEventHandlers(
+  event: AiOsEvent,
+): Promise<{ invoked: string[]; failures: string[] }> {
   const invoked: string[] = []
+  const failures: string[] = []
   for (const entry of handlers.values()) {
-    await entry.handler(event)
-    invoked.push(entry.subscriberId)
+    try {
+      await entry.handler(event)
+      invoked.push(entry.subscriberId)
+    } catch (error) {
+      failures.push(entry.subscriberId)
+    }
   }
-  return invoked
+  return { invoked, failures }
 }
 
 export function clearAiOsEventHandlersForTests(): void {

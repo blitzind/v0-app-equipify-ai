@@ -73,7 +73,18 @@ export function GrowthAiOsCommandCenterPanel() {
         </div>
       </div>
 
-      <GrowthAiOsOperationsDashboard dashboard={model.operationsDashboard} />
+      <GrowthAiOsOperationsDashboard
+        dashboard={model.operationsDashboard}
+        metaRecommender={model.metaRecommender}
+        communicationEngine={model.communicationEngine}
+        revenueDirector={model.revenueDirector}
+        priorityBinding={model.priorityBinding}
+        humanApprovalCenter={model.humanApprovalCenter}
+        boundedAutonomousOutbound={model.boundedAutonomousOutbound}
+        closedLoopLearning={model.closedLoopLearning}
+        adaptiveCalibration={model.adaptiveCalibration}
+        calibrationApply={model.calibrationApply}
+      />
 
       {showEngineeringDiagnostics ? (
         <GrowthAiOsCommandCenterDiagnosticsSections model={model} onRefresh={() => void load()} />

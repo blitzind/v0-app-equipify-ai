@@ -80,14 +80,15 @@ For each GE-AI-2X phase, maintain one entry with:
 | PROD-REGRESSION-6 | Command Center import stability | Complete (local cert, not committed) |
 | GE-AI-2D | Memory Facade (ledger) | Complete via GE-AIOS-2F |
 | GE-AI-2A | Decision Record Foundation (ledger) | Complete via GE-AIOS-2D |
-| GE-AI-2B | Event Bus Unification | Partial (foundation in GE-AIOS-2B) |
+| GE-AI-2B | Event Bus Unification | Complete (local cert, not committed) |
 | GE-AI-2C | Work Order System (remaining) | Partial (DR gate + Executive in 2E/2G) |
-| GE-AI-2E | Priority Engine Binding | Not Started |
-| GE-AI-2F | Meta-Recommender | Not Started |
+| GE-AI-2E | Priority Engine Binding | Complete (local cert, not committed) |
+| GE-AI-2F | Meta-Recommender | Complete (local cert, not committed) |
 | GE-AI-2G | Mission UI & Operator Experience | Not Started |
-| GE-AI-2H | L3 Approval Flow | Not Started |
-| GE-AI-2I | L4 Supervised Outbound | Not Started |
+| GE-AI-2H | L3 Approval Flow | Complete (local cert, not committed) |
+| GE-AI-2I | L4 Bounded Autonomous Outbound | Complete (local cert, not committed) |
 | GE-AI-2J | Learning Loop | Not Started |
+| GE-AI-SHIP-0 | Local Release Bundle Audit | Complete (audit only, not committed) |
 
 ---
 
@@ -1727,38 +1728,47 @@ Foundation: **PASS (local)** via GE-AIOS-2D
 
 | Field | Value |
 |-------|--------|
-| **Status** | Partial — foundation complete in GE-AIOS-2B |
-| **Dependencies** | GE-AI-2A (decision events) |
+| **Status** | **Complete locally** — GE-AI-2B completion layer on GE-AIOS-2B substrate |
+| **Dependencies** | GE-AIOS-2B (foundation), GE-AI-2E/2F/2H (observer subscribers) |
+| **Doc** | [`docs/GE-AI-2B_EVENT_BUS_COMPLETION.md`](./GE-AI-2B_EVENT_BUS_COMPLETION.md) |
 
 ### Implements (Constitution)
 
-- §11.5 Event registry — **catalog done (GE-AIOS-2B)**
-- §17 Invariant 8 — **immutable log done (GE-AIOS-2B)**
-- §9 Operating system (interrupt/event precedence) — **not started**
+- §11.5 Event registry — **extended with pilot + bridge types**
+- §17 Invariant 8 — **immutable log unchanged**
+- Loose-coupling rule — **bridges wired for work orders, objectives, realtime**
+- §9 Operating system (interrupt/event precedence) — **deferred**
+
+### Delivered
+
+- `GrowthAiEvent` canonical envelope over `AiOsEvent`
+- Legacy bridge runtime wiring (work orders, objective router, realtime)
+- Observer subscribers for meta-recommender, priority binding, approval center, AI ops, revenue operator
+- Isolated subscriber failures on publish
+- Command center `eventBusHealth` + AI Operations engineering diagnostic
+- Extended agent event mapping for workflow lifecycle events
 
 ### Remaining scope
 
-- Wire legacy bridges into runtime (realtime, objective router, work orders)
-- Consumer registration for Decision Engine, Executive Brain, Memory, Learning
 - Event precedence / interrupt integration
+- Incremental event-driven read-model projection (2F/2E/2H still pull-based)
+- Sequence execution + lead timeline bridges
 
-### Foundation reference
+### Implementation certification
 
-See GE-AIOS-2B entry.
-
-Pending
+**PASS (local)** via `pnpm test:ge-ai-2b-event-bus-completion`
 
 ### Production certification
 
-Pending
+Pending (batched commit)
 
 ### Rollback notes
 
-_TBD_
+Remove `lib/growth/aios/event-bus/` and bridge calls; substrate unchanged.
 
 ### Known risks
 
-- Breaking subscribers on event name changes — require compatibility shim period
+- Dual-write bridges may produce duplicate logical events if replay keys collide — mitigated via `replayKey` on bridges
 
 ---
 
@@ -1844,46 +1854,58 @@ Foundation: **PASS (local)** via GE-AIOS-2F
 
 | Field | Value |
 |-------|--------|
-| **Status** | Not Started |
-| **Dependencies** | GE-AI-2C |
+| **Status** | Complete (local certification, not committed) |
+| **Dependencies** | GE-AI-2F (Meta-Recommender), GE-AIOS-GROWTH-4F (Mission Priority) |
+| **Certification** | `pnpm test:ge-ai-2e-priority-engine-binding` |
+| **Documentation** | [`docs/GE-AI-2E_PRIORITY_ENGINE_BINDING.md`](./GE-AI-2E_PRIORITY_ENGINE_BINDING.md) |
 
 ### Implements (Constitution)
 
-- §11.3 Priority formula
-- §17 Invariant 15 (sole global priority authority)
+- §11.3 Priority formula (4F sole authority — binding consumes, does not duplicate)
+- §17 Invariant 15 (sole global priority authority preserved)
 
-### Scope (expected)
+### Scope delivered
 
-- Bind `execution-priority-engine`, Aiden, realtime scores as input feeders only  
-- Priority Engine writes final Work Order priority  
+- Read-only `GrowthPriorityBinding` projection from mission priority + meta-recommender + objectives
+- Command Center `priorityBinding` read model + top-5 UI section
+- Revenue Operator `priorityEngineBinding` + per-orchestration binding
+- Growth Objectives dashboard read-only priority card via workspace API
+- GET `/api/platform/growth/ai-os/priority-bindings` (read-only)
+- Isolated source failure handling; no scheduler activation; no Core mutations
 
 ### Files modified
 
-_TBD_
+| File | Change |
+| ---- | ------ |
+| `lib/growth/aios/priority/growth-priority-engine-binding-types.ts` | Canonical types |
+| `lib/growth/aios/priority/growth-priority-engine-binding-engine.ts` | Collectors + ranking |
+| `lib/growth/aios/priority/growth-priority-engine-binding-service.ts` | Server wrapper |
+| `lib/growth/aios/ai-os-command-center-types.ts` | `priorityBinding` field |
+| `lib/growth/aios/ai-os-command-center-service.ts` | Synthesis wiring |
+| `lib/growth/aios/growth/growth-revenue-operator-orchestration-types.ts` | RO binding fields |
+| `app/api/platform/growth/ai-os/priority-bindings/route.ts` | GET route |
+| `app/api/growth/workspace/objectives/priority-binding/route.ts` | Workspace GET route |
+| `components/growth/ai-os/command-center/growth-ai-os-priority-binding-section.tsx` | AI Ops UI |
+| `components/growth/objectives/growth-objectives-dashboard.tsx` | Objective binding card |
+| `scripts/test-ge-ai-2e-priority-engine-binding.ts` | Certification |
 
 ### Database changes
 
-_TBD_
-
-### Migrations
-
-_TBD_
-
-### Commits
-
-_TBD_
+None.
 
 ### Certifications
 
-Implementation: Pending | Production: Pending
-
-### Rollback notes
-
-_TBD_
+Implementation: **PASS** (`pnpm test:ge-ai-2e-priority-engine-binding`) | Production: Pending deploy
 
 ### Known risks
 
-- Starvation of low-revenue missions — monitor in cert
+- Objective runtime scheduler not yet reordered by binding
+- Work Order priority column not persisted from binding
+- Dual mission taxonomy (objective UUID vs lead missionId)
+
+### Unblocks
+
+**GE-AI-2H L3 Human Approval Center** — bindings expose `needs_approval` status with evidence for unified approval surface.
 
 ---
 
@@ -1891,48 +1913,74 @@ _TBD_
 
 | Field | Value |
 |-------|--------|
-| **Status** | Not Started |
-| **Dependencies** | GE-AI-2A, GE-AI-2C, GE-AI-2E |
+| **Status** | Complete (local certification, not committed) |
+| **Dependencies** | PROD-REGRESSION-6 (command center read path), GE-AIOS-CONSOLIDATION-1E (autonomy policy) |
+| **Certification** | `pnpm test:ge-ai-2f-meta-recommender` |
+| **Documentation** | [`docs/GE-AI-2F_META_RECOMMENDER_FOUNDATION.md`](./GE-AI-2F_META_RECOMMENDER_FOUNDATION.md) |
 
 ### Implements (Constitution)
 
-- §7.4 Meta-Recommender supremacy
-- §11.2 Ownership registry (Decision Engine)
-- §17 Invariants 5, 14
+- §7.4 Meta-Recommender supremacy (foundation — read-only coordination layer)
+- §11.2 Ownership registry (Decision Engine path)
+- §17 Invariants 5, 14 (read-only; no outbound execution)
 
-### Scope (expected)
+### Scope delivered
 
-- Decision Engine Meta-Recommender resolves conflicts across legacy recommenders  
-- `next-best-action.ts` becomes presenter only  
-- Deprecate parallel authority paths (feature-flagged)  
+- Read-only Meta-Recommender normalizes 7 Command Center signal sources into `GrowthMetaRecommendation`
+- Deterministic ranking: `impact * 0.35 + urgency * 0.25 + confidence * 0.25 - effort * 0.15`
+- AI Operations command-center read model includes `metaRecommender` (top 5 UI section)
+- Revenue Operator read-only `metaRecommenderBinding` on orchestration read model
+- GET `/api/platform/growth/ai-os/recommendations` (read-only)
+- Isolated source failure handling; no Core mutations; no outbound execution
 
 ### Files modified
 
-_TBD_
+| File | Change |
+| ---- | ------ |
+| `lib/growth/aios/recommendations/growth-meta-recommender-types.ts` | Canonical types |
+| `lib/growth/aios/recommendations/growth-meta-recommender-engine.ts` | Collectors + ranking |
+| `lib/growth/aios/recommendations/growth-meta-recommender-service.ts` | Server wrapper |
+| `lib/growth/aios/ai-os-command-center-types.ts` | `metaRecommender` field |
+| `lib/growth/aios/ai-os-command-center-service.ts` | Synthesis wiring |
+| `lib/growth/aios/growth/growth-revenue-operator-orchestration-types.ts` | `metaRecommenderBinding` |
+| `app/api/platform/growth/ai-os/recommendations/route.ts` | GET route |
+| `components/growth/ai-os/command-center/growth-ai-os-meta-recommender-section.tsx` | Read-only UI |
+| `components/growth/ai-os/operations/growth-ai-os-operations-dashboard.tsx` | Section mount |
+| `components/growth/ai-os/command-center/growth-ai-os-command-center-panel.tsx` | Prop pass-through |
+| `components/growth/ai-os/command-center/growth-ai-os-revenue-operator-section.tsx` | Binding summary |
+| `scripts/test-ge-ai-2f-meta-recommender.ts` | Certification |
+| `scripts/test-ge-aios-5c-command-center-read-model-foundation.ts` | Regression assert |
+| `package.json` | `test:ge-ai-2f-meta-recommender` script |
 
 ### Database changes
 
-_TBD_
+None.
 
 ### Migrations
 
-_TBD_
+None.
 
 ### Commits
 
-_TBD_
+Not committed (per phase rules).
 
 ### Certifications
 
-Implementation: Pending | Production: Pending
+Implementation: **PASS** (`pnpm test:ge-ai-2f-meta-recommender`) | Production: Pending deploy
 
 ### Rollback notes
 
-_TBD_
+Remove `metaRecommender` from command center service/types and delete `lib/growth/aios/recommendations/*` + recommendations route.
 
 ### Known risks
 
-- Highest integration risk — many callers of legacy NBA/recommendation engines
+- Phase 1 reads Command Center aggregates only — standalone lead NBA/scoring engines not yet direct channels
+- No persistent recommendation cache
+- Full legacy NBA presenter-only migration deferred
+
+### Unblocks
+
+**GE-AI-2E Priority Engine Binding** — Meta-Recommender foundation provides read-only coordination layer for priority binding.
 
 ---
 
@@ -1985,101 +2033,422 @@ _TBD_
 
 ---
 
-## GE-AI-2H — L3 Approval Flow
+## GE-AI-2H — L3 Human Approval Center
 
 | Field | Value |
 |-------|--------|
-| **Status** | Not Started |
-| **Dependencies** | GE-AI-2A, GE-AI-2C, GE-AI-2F |
+| **Status** | Complete (local certification, not committed) |
+| **Dependencies** | GE-AI-2E, GE-AI-2F, existing approval queues |
+| **Certification** | `pnpm test:ge-ai-2h-human-approval-center` |
+| **Documentation** | [`docs/GE-AI-2H_HUMAN_APPROVAL_CENTER.md`](./GE-AI-2H_HUMAN_APPROVAL_CENTER.md) |
 
 ### Implements (Constitution)
 
-- §9.5 Approval timeout (4h defer, never auto-approve)
-- §19 Governance (Human Approval FSM)
-- Autonomy Level 3 binding (§11.10)
+- §9.5 Approval timeout awareness (read-only surfacing)
+- §19 Governance (Human Approval FSM visibility)
+- Autonomy Level 3 binding visibility (§11.10) — no L3 execute in this phase
 
-### Scope (expected)
+### Scope delivered
 
-- Wire Human Approval FSM to Work Orders  
-- `decision.approval_required` / `decision.approval_expired` events  
-- Block L3 execute until approved  
+- Read-only `GrowthHumanApprovalItem` aggregation from 13 source collectors
+- SMS first-class parity with email (GeV15, sequence jobs, automation flow, human execution)
+- Command Center `humanApprovalCenter` + AI Operations summary section
+- Full workspace page `/growth/os/approvals` with channel filters
+- GET `/api/platform/growth/ai-os/approvals` only — no approve/reject/send mutations
+- Existing approval enforcement services remain authoritative
 
 ### Files modified
 
-_TBD_
-
-### Database changes
-
-_TBD_
-
-### Migrations
-
-_TBD_
-
-### Commits
-
-_TBD_
+| File | Change |
+| ---- | ------ |
+| `lib/growth/aios/approvals/growth-human-approval-center-types.ts` | Canonical types |
+| `lib/growth/aios/approvals/growth-human-approval-center-engine.ts` | Collectors + ranking |
+| `lib/growth/aios/approvals/growth-human-approval-center-service.ts` | Server fetch |
+| `lib/growth/aios/ai-os-command-center-types.ts` | `humanApprovalCenter` field |
+| `lib/growth/aios/ai-os-command-center-service.ts` | Wiring |
+| `app/api/platform/growth/ai-os/approvals/route.ts` | GET API |
+| `app/(growth)/growth/os/approvals/page.tsx` | Workspace page |
+| `components/growth/ai-os/approvals/growth-human-approval-center-panel.tsx` | Full panel |
+| `components/growth/ai-os/command-center/growth-ai-os-human-approval-center-section.tsx` | AI Ops summary |
+| `scripts/test-ge-ai-2h-human-approval-center.ts` | Certification |
 
 ### Certifications
 
-Implementation: Pending | Production: Pending
-
-### Rollback notes
-
-_TBD_
+Implementation: **PASS** (`pnpm test:ge-ai-2h-human-approval-center`) | Production: Pending deploy
 
 ### Known risks
 
-- **Gate for any L3+ autonomy enablement in production**
+- Approve/reject mutations deferred — operators must use existing surfaces via routes
+- Not all Apollo/voice-drop campaign queues federated yet
+- **Gate for L3+ autonomy enablement** — inbox complete but execution wiring remains GE-AI-2I
+
+### Unblocks
+
+**GE-AI-2I L4 Supervised Outbound** — operators can review unified approval backlog before supervised send phase.
 
 ---
 
-## GE-AI-2I — L4 Supervised Outbound
+## GE-AI-2I — L4 Bounded Autonomous Outbound
 
 | Field | Value |
 |-------|--------|
-| **Status** | Not Started |
-| **Dependencies** | GE-AI-2H, GE-AI-2F |
+| **Status** | **Complete locally** |
+| **Dependencies** | GE-AI-2H, GE-AI-2B, GE-AI-2F, Growth Autonomy policy engine |
+| **Doc** | [`docs/GE-AI-2I_BOUNDED_AUTONOMOUS_OUTBOUND.md`](./GE-AI-2I_BOUNDED_AUTONOMOUS_OUTBOUND.md) |
 
 ### Implements (Constitution)
 
-- §6.4 Autonomy Level 4
-- §11.6 Decision Engine degraded mode
-- Lead Engine wiring (engineering dependency from audit)
+- §6.4 Autonomy Level 4 — **bounded scope executor**
+- Human approves scope; autonomous execution inside limits only
+- Growth Autonomy remains single policy engine
 
-### Scope (expected)
+### Delivered
 
-- End-to-end: Decision → Work Order → Outreach execution with logging  
-- Lead Engine LLM integration (replace fixture dry-run)  
-- L4 allowlist auto-execute per confidence bands  
+- `GrowthAutonomousOutboundScope` canonical model
+- Gate matrix engine (approval, autonomy, audience, channel, caps, quiet hours, suppression, stop conditions)
+- Orchestrator delegating to existing sequence runtime (email/SMS/voice drop)
+- AI Voice blocked unless explicit scope approval; LinkedIn manual tasks only
+- Event bus lifecycle events (10 types)
+- Human Approval Center scope collector; AI Operations read-only diagnostic
+- Persistent scope repository (GE-AI-2I-PROD-1); in-memory store test-only
 
-### Files modified
+### Remaining scope
 
-_TBD_
+- Production migration apply + live DB integration cert
+- GeV1.5 automation path integration into bounded executor
+- Reply intelligence auto-trigger for stop conditions
 
-### Database changes
+### Implementation certification
 
-_TBD_
+**PASS (local)** via `pnpm test:ge-ai-2i-bounded-autonomous-outbound`
 
-### Migrations
+### Production certification
 
-_TBD_
-
-### Commits
-
-_TBD_
-
-### Certifications
-
-Implementation: Pending | Production: Pending
+Pending (batched commit)
 
 ### Rollback notes
 
-_TBD_
+Remove `lib/growth/aios/outbound/` persistence layer and command center integrations; sequence runtime unchanged. In-memory store available for test doubles only.
 
-### Known risks
+---
 
-- **Highest business risk** — requires production cert and budget/compliance gates
+## GE-AI-2I-PROD-1 — Persistent Autonomous Outbound Scopes
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** |
+| **Dependencies** | GE-AI-2I, GE-AI-2B, Growth Autonomy |
+| **Doc** | [`docs/GE-AI-2I-PROD-1_PERSISTENT_AUTONOMOUS_OUTBOUND_SCOPES.md`](./GE-AI-2I-PROD-1_PERSISTENT_AUTONOMOUS_OUTBOUND_SCOPES.md) |
+| **Migration** | `20271001210000_growth_ai_2i_prod_1_autonomous_outbound_scopes.sql` |
+
+### Delivered
+
+- PostgreSQL persistence for scopes, actions, events (service-role RLS)
+- Repository with idempotent action ledger
+- Schema health probe
+- Activation validation service (human approval + Growth Autonomy + expiration)
+- Orchestrator/service wired to repository; in-memory store test-only
+- AI Operations + Approval Center read persistent scopes
+
+### Remaining scope
+
+- Production migration apply + live DB integration cert
+- GeV1.5 automation path integration
+- Reply intelligence auto-trigger for stop conditions
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-2i-prod-1-persistent-autonomous-outbound-scopes`
+
+### Production certification
+
+Pending migration apply + GE-AI-2I-PROD-2 integration hardening
+
+---
+
+## GE-AI-2I-PROD-2 — Autonomous Outbound Integration Certification
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** |
+| **Dependencies** | GE-AI-2I-PROD-1 |
+| **Doc** | [`docs/GE-AI-2I-PROD-2_AUTONOMOUS_OUTBOUND_INTEGRATION_CERTIFICATION.md`](./GE-AI-2I-PROD-2_AUTONOMOUS_OUTBOUND_INTEGRATION_CERTIFICATION.md) |
+
+### Delivered
+
+- Production-like integration cert with in-memory repository harness
+- 29-point gate/lifecycle/activation verification matrix
+- Sequence approval alignment audit (recommend Option A: dual approval)
+- Migration readiness checklist (no production apply)
+- Read-only activation eligibility indicators in Command Center
+- `evaluateAutonomousOutboundActivationEligibility` client-safe helper
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-2i-prod-2-autonomous-outbound-integration`
+
+### Production certification
+
+Integration certified locally — release bundle prep ready; live migration + smoke pending
+
+---
+
+## GE-AI-2I-PROD-3 — Gated Operator Activation Surface
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** |
+| **Dependencies** | GE-AI-2I-PROD-2 |
+| **Doc** | [`docs/GE-AI-2I-PROD-3_GATED_OPERATOR_ACTIVATION.md`](./GE-AI-2I-PROD-3_GATED_OPERATOR_ACTIVATION.md) |
+
+### Delivered
+
+- POST activation route with `requireGrowthOperatorAccess`
+- `submitOperatorAutonomousOutboundScopeActivation` service (schema fail-closed, no send)
+- Human Approval Center activation control + confirmation modal + dual-approval warning
+- Option C provenance design (audit-only)
+- Live DB smoke harness (dry-run default)
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-2i-prod-3-gated-operator-activation`
+
+---
+
+## GE-AI-2K — Communication Engine Foundation
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** |
+| **Dependencies** | GE-AI-2B, GE-AI-2F, GE-AI-2E, GE-AI-2H, GE-AI-2I (read-only consumption) |
+| **Doc** | [`docs/GE-AI-2K_COMMUNICATION_ENGINE_FOUNDATION.md`](./GE-AI-2K_COMMUNICATION_ENGINE_FOUNDATION.md) |
+
+### Delivered
+
+- Canonical `GrowthCommunicationPlan` model and deterministic ranking engine
+- Read-only service + GET `/api/platform/growth/ai-os/communication-plan`
+- AI Operations visibility (strategy, channel mix, blocked channels, confidence)
+- Bounded outbound scope rows include `communicationPlanSummary`
+- Outreach Preparation consumes plan for `recommendedChannel` (no send change)
+- Human Approval Center plan context on outbound scope items
+- Event bus: `growth.communication.plan_generated`
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-2k-communication-engine`
+
+### Revenue Director
+
+Partially unblocks Revenue Director Foundation — unified channel planning layer in place; persistent orchestration and live context feeds remain.
+
+---
+
+## GE-AI-3A — Revenue Director Foundation
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** |
+| **Dependencies** | GE-AI-2K, GE-AI-2F, GE-AI-2E, GE-AI-2H, GE-AI-2B, Command Center read model |
+| **Doc** | [`docs/GE-AI-3A_REVENUE_DIRECTOR_FOUNDATION.md`](./GE-AI-3A_REVENUE_DIRECTOR_FOUNDATION.md) |
+
+### Delivered
+
+- Executive orchestration read model from Command Center snapshot only (no direct subsystem reads)
+- Advisory workflow request model (9 request types, all `advisory: true`)
+- Objective health, KPIs, bottlenecks, risks, escalations, resource allocation
+- Event bus subscriber `revenue_director_observer` + `growth.revenue_director.snapshot_generated`
+- AI Operations Revenue Director section + GET API
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-3a-revenue-director-foundation`
+
+### Active orchestration
+
+Advisory foundation complete — decision ledger added in GE-AI-3B.
+
+---
+
+## GE-AI-3B — Revenue Director Decision Ledger
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** |
+| **Dependencies** | GE-AI-3A, GE-AI-2B event bus, Command Center |
+| **Doc** | [`docs/GE-AI-3B_REVENUE_DIRECTOR_DECISION_LEDGER.md`](./GE-AI-3B_REVENUE_DIRECTOR_DECISION_LEDGER.md) |
+
+### Delivered
+
+- Persistent tables: `revenue_director_decisions`, `revenue_director_workflow_requests`, `revenue_director_decision_events`
+- Idempotent workflow request deduplication via `rev-dir-req:{orgId}:{advisoryRequestId}`
+- Operator-gated accept/cancel (no dispatch, no outbound)
+- Command Center ledger read model + Revenue Director ledger status enrichment
+- 7 lifecycle event bus types
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-3b-revenue-director-decision-ledger`
+
+### GE-AI-3C Active Orchestration
+
+**Unblocked** — durable ledger, idempotency keys, lifecycle events, and operator accept path ready for dispatch wiring.
+
+---
+
+## GE-AI-3C — Revenue Director Active Orchestration
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** |
+| **Dependencies** | GE-AI-3B, GE-AI-3A, Workflow Agent pilots, Communication Engine |
+| **Doc** | [`docs/GE-AI-3C_REVENUE_DIRECTOR_ACTIVE_ORCHESTRATION.md`](./GE-AI-3C_REVENUE_DIRECTOR_ACTIVE_ORCHESTRATION.md) |
+
+### Delivered
+
+- Gated dispatch service with Growth Autonomy + status guards
+- Adapters for research, qualification, communication plan, outreach prep, approval route
+- Operator POST dispatch route (no transport, no bulk)
+- UI dispatch button + confirmation modal
+- Dispatch lifecycle event bus types
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-3c-revenue-director-active-orchestration`
+
+### GE-AI-3D Closed-Loop Learning
+
+**Partially unblocked** — dispatch events and references ready; async completion correlation + GE-AI-2J learning loop still required.
+
+---
+
+## GE-AI-3C-PROD-1 — Dispatch Completion Correlation
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** |
+| **Dependencies** | GE-AI-3C, GE-AI-3B, GE-AI-2B Event Bus |
+| **Doc** | [`docs/GE-AI-3C-PROD-1_DISPATCH_COMPLETION_CORRELATION.md`](./GE-AI-3C-PROD-1_DISPATCH_COMPLETION_CORRELATION.md) |
+
+### Delivered
+
+- Event-driven correlation subscriber (no polling)
+- Research/qualification/outreach/communication plan completion mapping
+- Ledger status updates + decision event audit trail
+- Read-only UI: awaiting completion, stale, result reference, failure reason
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-3c-prod-1-dispatch-completion-correlation`
+
+### GE-AI-3D Closed-Loop Learning
+
+**Largely unblocked** — full dispatch→completion loop is event-driven with evidence preservation.
+
+---
+
+## GE-AI-3D — Closed-Loop Learning Foundation
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** |
+| **Dependencies** | GE-AI-3C-PROD-1, GE-AI-2B Event Bus, GE-AI-3A/3B/3C Revenue Director |
+| **Doc** | [`docs/GE-AI-3D_CLOSED_LOOP_LEARNING_FOUNDATION.md`](./GE-AI-3D_CLOSED_LOOP_LEARNING_FOUNDATION.md) |
+
+### Delivered
+
+- `GrowthLearningOutcome` normalization from Event Bus sources
+- `GrowthLearningInsight` advisory synthesis (channel, approval friction, outbound risk, objective progress)
+- `learning_observer` subscriber + `growth.learning.outcome_observed` / `insight_generated` events
+- Revenue Director + Communication Engine read-only advisory enrichment
+- AI Operations closed-loop learning section (no apply controls)
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-3d-closed-loop-learning-foundation`
+
+### Controlled adaptive learning
+
+**Partially unblocked** — outcome + insight foundation ready; operator-gated calibration and durable store deferred.
+
+---
+
+## GE-AI-3D-PROD-1 — Durable Closed-Loop Learning Store
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** |
+| **Dependencies** | GE-AI-3D, GE-AI-2B Event Bus |
+| **Doc** | [`docs/GE-AI-3D-PROD-1_DURABLE_CLOSED_LOOP_LEARNING_STORE.md`](./GE-AI-3D-PROD-1_DURABLE_CLOSED_LOOP_LEARNING_STORE.md) |
+
+### Delivered
+
+- Migration: `closed_loop_learning_outcomes`, `insights`, `events`
+- Repository with idempotent upsert + append-only audit
+- Schema health probe with graceful empty read model
+- Production service path uses repository; in-memory test doubles only
+- Command Center reads persistent state; UI shows store mode + schema health
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-3d-prod-1-durable-closed-loop-learning-store`
+
+### Controlled adaptive calibration
+
+**Largely unblocked** — durable store enables operator-reviewed calibration; automatic changes remain out of scope.
+
+---
+
+## GE-AI-3D-PROD-2 — Operator-Gated Adaptive Calibration
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** |
+| **Dependencies** | GE-AI-3D-PROD-1, GE-AI-3D, GE-AI-2H Human Approval Center |
+| **Doc** | [`docs/GE-AI-3D-PROD-2_OPERATOR_GATED_ADAPTIVE_CALIBRATION.md`](./GE-AI-3D-PROD-2_OPERATOR_GATED_ADAPTIVE_CALIBRATION.md) |
+
+### Delivered
+
+- Migration: `adaptive_calibration_proposals`, `adaptive_calibration_events`
+- Proposal engine from durable learning insights with guardrails
+- Operator approve/reject API (no apply route)
+- Human Approval Center `adaptive_calibration` review items
+- AI Operations read-only calibration section
+- Revenue Director `calibrationAdvisory` context
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-3d-prod-2-operator-gated-adaptive-calibration`
+
+### Controlled apply
+
+**Not unblocked** — approval records operator intent only; per-system apply adapters deferred.
+
+---
+
+## GE-AI-3D-PROD-3 — Controlled Adaptive Calibration Apply
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** |
+| **Dependencies** | GE-AI-3D-PROD-2, GE-AI-3D-PROD-1, GE-AI-2H |
+| **Doc** | [`docs/GE-AI-3D-PROD-3_CONTROLLED_ADAPTIVE_CALIBRATION_APPLY.md`](./GE-AI-3D-PROD-3_CONTROLLED_ADAPTIVE_CALIBRATION_APPLY.md) |
+
+### Delivered
+
+- Versioned configuration apply with before/after snapshots
+- Rollback service with immutable audit versions
+- Apply + rollback operator API routes
+- Human Approval Center "Ready to Apply" items (approval ≠ apply)
+- Ranking engine overlay (communication, meta-recommender, priority)
+- Revenue Director calibration version advisory (read-only)
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-3d-prod-3-controlled-adaptive-calibration-apply`
+
+### Autonomous optimization production-ready
+
+**No** — controlled apply only; no unsupervised autonomous tuning or production migration deploy.
 
 ---
 
@@ -2266,6 +2635,45 @@ Revert synthesizer imports and org guard on command-center route
 ### Known risks
 
 - Requires commit + auto-deploy to resolve production 500
+
+---
+
+## GE-AI-SHIP-0 — Local Release Bundle Audit
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete (audit only)** — no commit, push, deploy, or production migration |
+| **Dependencies** | All phases listed in bundle (ARCH-1A through 3D-PROD-3) |
+| **Doc** | [`docs/GE-AI-SHIP-0_LOCAL_RELEASE_BUNDLE_AUDIT.md`](./GE-AI-SHIP-0_LOCAL_RELEASE_BUNDLE_AUDIT.md) |
+
+### Delivered
+
+- Full git/file audit (23 modified + ~90 untracked)
+- Migration audit (5 new Growth-schema migrations, ordered)
+- Runtime/env audit (no new required prod env vars; no `.env.local`)
+- API route audit (32 routes; operator RBAC on mutations)
+- UI audit (AI Operations read-only; gated HAC/dispatch/activate)
+- Autonomous safety audit (all ship-blocking controls verified statically)
+- Pre-release test matrix with cert chain guidance
+- Release recommendation: **B — split into B1–B4 bundles**
+- Rollout, rollback, and tiny live pilot plans
+
+### Certification (this phase)
+
+**PASS (local, static):**
+- `pnpm test:ge-ai-3d-prod-3-controlled-adaptive-calibration-apply`
+- `pnpm test:ge-ai-3d-prod-2-operator-gated-adaptive-calibration`
+- `pnpm test:prod-regression-6-command-center-import-stability`
+
+**Deferred** (nested regression / live DB): 3D-PROD-1, 3C-PROD-1, 2I-PROD-3
+
+### Production certification
+
+**Not started** — awaiting split commit + migration apply per bundle.
+
+### Rollback notes
+
+See SHIP-0 doc §10 — git revert, manual migration rollback, calibration rollback API, autonomy kill switches.
 
 ---
 
