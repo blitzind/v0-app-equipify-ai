@@ -478,7 +478,7 @@ export function GuidedIcpBuilder({
 
         <AccordionItem value="engine-intelligence" className="border-border/60 px-2">
           <AccordionTrigger className="py-3 text-sm hover:no-underline">
-            Verified intelligence (Growth Engine)
+            Verified intelligence (AI OS)
           </AccordionTrigger>
           <AccordionContent className="pb-3">
             <ProspectSearchEngineIntelligenceFiltersCard filters={filters} onChange={onChange} />

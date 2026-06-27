@@ -58,7 +58,7 @@ export function resolveProspectSearchCanonicalResearchContext(
     !schema_ready && engine?.schema_health?.warning_message
       ? engine.schema_health.warning_message
       : !schema_ready
-        ? "Growth Engine intelligence schema is not ready — apply migrations before queuing jobs."
+        ? "AI OS intelligence schema is not ready — apply migrations before queuing jobs."
         : null
 
   return {
@@ -376,7 +376,7 @@ export function formatGrowthEngineEnqueueMessage(input: {
     case "active_job_exists":
       return "Discovery already queued or running for this target."
     case "schema_not_ready":
-      return "Growth Engine runtime schema is not ready — apply migrations first."
+      return "AI OS runtime schema is not ready — apply migrations first."
     case "has_verified_intelligence":
     case "skip_verified_intelligence":
       return "Verified company intelligence already present."

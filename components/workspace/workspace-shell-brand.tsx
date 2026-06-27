@@ -4,6 +4,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { BrandLogo, BrandMark } from "@/components/brand-logo"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-registry"
+import { AI_OS_WORKSPACE_LABEL } from "@/lib/workspace/ai-os-workspace-branding"
 
 type WorkspaceShellBrandProps = {
   collapsed?: boolean
@@ -21,7 +22,7 @@ export function WorkspaceShellBrand({
   className,
 }: WorkspaceShellBrandProps) {
   const showCollapsedMark = collapsed && !forceExpanded
-  const ariaLabel = homeHref === "/" ? "Equipify — Home" : "Equipify — Growth Engine"
+  const ariaLabel = homeHref === "/" ? "Equipify — Home" : `Equipify — ${AI_OS_WORKSPACE_LABEL}`
 
   return (
     <div

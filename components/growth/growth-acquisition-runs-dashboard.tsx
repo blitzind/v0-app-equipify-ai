@@ -140,7 +140,7 @@ export function GrowthAcquisitionRunsDashboard() {
       {!schemaReady ? (
         <GrowthEngineCard title="Schema not ready">
           <p className="text-sm text-muted-foreground">
-            Real-world discovery schema is not ready. Apply Growth Engine migrations before starting acquisition runs.
+            Real-world discovery schema is not ready. Apply AI OS migrations before starting acquisition runs.
           </p>
         </GrowthEngineCard>
       ) : null}

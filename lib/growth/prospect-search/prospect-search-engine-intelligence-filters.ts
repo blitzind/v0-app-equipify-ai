@@ -161,7 +161,7 @@ export function buildProspectSearchEngineIntelligenceSummary(
   const headline =
     parts.length > 0
       ? `Growth Engine: ${parts.join(" · ")}`
-      : "Growth Engine: canonical company linked — no verified intelligence yet"
+      : "AI OS: canonical company linked — no verified intelligence yet"
 
   return {
     headline,

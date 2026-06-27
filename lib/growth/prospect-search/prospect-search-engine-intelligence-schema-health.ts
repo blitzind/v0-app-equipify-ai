@@ -46,7 +46,7 @@ export async function probeProspectSearchEngineIntelligenceSchema(
     await Promise.all([
       probeGrowthSchemaObjects(admin, {
         cacheKey: "growth:prospect-search-engine-intelligence",
-        featureLabel: "Growth Engine intelligence (Prospect Search)",
+        featureLabel: "AI OS intelligence (Prospect Search)",
         objects: [...GROWTH_PROSPECT_SEARCH_ENGINE_INTELLIGENCE_SCHEMA_OBJECTS],
       }),
       isGrowthCanonicalPersonSchemaReady(admin).catch(() => false),
@@ -73,6 +73,6 @@ export async function probeProspectSearchEngineIntelligenceSchema(
       objectProbe.ready || subsystemReady
         ? null
         : merged.warning_message ??
-          "Growth Engine intelligence schema is unavailable — canonical companies, verified channels, or intelligence tables were not detected.",
+          "AI OS intelligence schema is unavailable — canonical companies, verified channels, or intelligence tables were not detected.",
   }
 }

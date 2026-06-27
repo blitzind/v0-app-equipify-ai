@@ -71,8 +71,8 @@ export const WORKSPACE_SIDEBAR_NAV_ICON = "w-[17px] h-[17px]" as const
 export const WORKSPACE_SIDEBAR_GROUP_HEADER =
   "text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40" as const
 
-/** Growth sidebar secondary label under active organization name. */
-export const WORKSPACE_SIDEBAR_GROWTH_ENGINE_LABEL = "Growth Engine" as const
+/** Growth sidebar secondary label under active organization name (customer-facing: AI OS). */
+export const WORKSPACE_SIDEBAR_GROWTH_ENGINE_LABEL = "AI OS" as const
 
 /** Matches Core plan badge accent for Scale tier (`planBadgeFromWorkspace`). */
 export const WORKSPACE_SIDEBAR_SCALE_ACCENT_COLOR = "var(--plan-scale-accent)" as const

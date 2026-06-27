@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { GrowthAiOsCommandCenterDiagnosticsSections } from "@/components/growth/ai-os/command-center/growth-ai-os-command-center-diagnostics-sections"
-import { GrowthAiOsOperationsDashboard } from "@/components/growth/ai-os/operations/growth-ai-os-operations-dashboard"
+import { GrowthAiOsOperatorDashboard } from "@/components/growth/ai-os/operator-experience/growth-ai-os-operator-dashboard"
+import { GrowthAiOsOperatorEngineeringDisclosure } from "@/components/growth/ai-os/operator-experience/growth-ai-os-operator-engineering-disclosure"
 import type { AiOsCommandCenterReadModel } from "@/lib/growth/aios/ai-os-command-center-types"
 import { GROWTH_AI_OS_COMMAND_CENTER_QA_MARKER } from "@/lib/growth/aios/ai-os-command-center-types"
 
@@ -58,7 +58,7 @@ export function GrowthAiOsCommandCenterPanel() {
         <div>
           <p className="text-sm font-medium">Show Engineering Diagnostics</p>
           <p className="text-xs text-muted-foreground">
-            Off by default — reveals full AI OS phase sections (1A–5B) for engineering review.
+            Off by default — reveals legacy operations console and full AI OS phase sections.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -73,21 +73,10 @@ export function GrowthAiOsCommandCenterPanel() {
         </div>
       </div>
 
-      <GrowthAiOsOperationsDashboard
-        dashboard={model.operationsDashboard}
-        metaRecommender={model.metaRecommender}
-        communicationEngine={model.communicationEngine}
-        revenueDirector={model.revenueDirector}
-        priorityBinding={model.priorityBinding}
-        humanApprovalCenter={model.humanApprovalCenter}
-        boundedAutonomousOutbound={model.boundedAutonomousOutbound}
-        closedLoopLearning={model.closedLoopLearning}
-        adaptiveCalibration={model.adaptiveCalibration}
-        calibrationApply={model.calibrationApply}
-      />
+      <GrowthAiOsOperatorDashboard model={model} />
 
       {showEngineeringDiagnostics ? (
-        <GrowthAiOsCommandCenterDiagnosticsSections model={model} onRefresh={() => void load()} />
+        <GrowthAiOsOperatorEngineeringDisclosure model={model} onRefresh={() => void load()} />
       ) : null}
 
       <div className="flex flex-wrap gap-3 text-sm">

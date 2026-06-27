@@ -98,7 +98,7 @@ export function ProspectSearchWorkspaceBulkExecutionCard({
         {PROSPECT_SEARCH_WORKSPACE_BULK_EXECUTION_TITLE}
       </h4>
       <p className="mt-1 text-[11px] text-muted-foreground">
-        Operator-approved bulk enqueue via existing Growth Engine job APIs. Preview-eligible
+        Operator-approved bulk enqueue via existing AI OS job APIs. Preview-eligible
         accounts only; blocked accounts are skipped.
       </p>
 

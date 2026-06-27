@@ -1,10 +1,11 @@
-import { Rocket } from "lucide-react"
+import { Bot } from "lucide-react"
+import { AI_OS_WORKSPACE_LABEL } from "@/lib/workspace/ai-os-workspace-branding"
 
 export const GROWTH_BRAND = {
-  name: "Growth Engine",
-  shortName: "Growth",
+  name: AI_OS_WORKSPACE_LABEL,
+  shortName: AI_OS_WORKSPACE_LABEL,
   workspaceLabel: "Workspace",
-  icon: Rocket,
+  icon: Bot,
   accent: "blue",
   sidebarBackground: "#0F172A",
   activeBackground: "#13233F",

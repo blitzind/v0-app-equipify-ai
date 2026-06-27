@@ -16,7 +16,7 @@
 =================================================
 
 **Document role:** Living engineering state — current phase, production status, rules, certifications, risks, and priorities.  
-**Last updated:** 2026-06-25 (GE-AI-SHIP-0 Local Release Bundle Audit)  
+**Last updated:** 2026-06-25 (GE-AI-UX-3B AI Teammate Server Identity)  
 **Regeneration:** `pnpm update:master-context` (inventory scan + this document's manual sections)  
 **Admin UI:** `/admin/master-context`
 
@@ -47,8 +47,8 @@
 | **Architecture phase** | GE-AI-1X — **Complete** (Constitution v1.0 frozen) |
 | **Architecture consolidation** | **GE-AIOS-ARCH-1A** — AI Revenue & Service OS layer model (**complete**, docs only) |
 | **Documentation phase** | GE-DOC-1 — **Complete** |
-| **Current phase** | **GE-AI-SHIP-0** — Local Release Bundle Audit (**complete locally**, not committed) |
-| **Next phase** | Split release bundles (B1→B4) per [`GE-AI-SHIP-0`](./GE-AI-SHIP-0_LOCAL_RELEASE_BUNDLE_AUDIT.md) — commit + migration + cert per bundle |
+| **Current phase** | **GE-AI-UX-3B** — AI Teammate Server Identity (**complete locally**, not committed) |
+| **Next phase** | **GE-AI-UX-2B** — Navigation & route-level terminology; split release bundles (B1→B4) per [`GE-AI-SHIP-0`](./GE-AI-SHIP-0_LOCAL_RELEASE_BUNDLE_AUDIT.md) |
 
 **Transition:** Official move from Architecture Phase (GE-AI-1X) to Engineering Phase (GE-AI-2X).
 
@@ -58,7 +58,9 @@ Implementation tracking: [`docs/AI_REVENUE_OPERATOR_IMPLEMENTATION_LEDGER.md`](.
 
 ## 2. Current production status
 
-### Growth Engine / AI Revenue Operator
+### Growth Engine / AI Revenue Operator / AI OS
+
+Operator workspace branding uses **AI OS** (GE-AI-UX-1B). **Home** at `/growth` is Equipify's **autonomous AI Growth Operator** experience (GE-AI-ARCH-2C) — Ava helps sell Equipify through Revenue Missions, Growth Initiatives, and Customer Growth Opportunities (Equipify accounts only). Built on executive experience phases UX-1A–UX-7A, Revenue Operator (GE-AI-8A), Growth Operator (GE-AI-9A), and Customer Growth (GE-AI-9B). Customer Delivery Intelligence (GE-AI-9C) is preserved for future vision but **hidden from v1 Home**.
 
 | Area | Status |
 |------|--------|
@@ -789,6 +791,19 @@ Full list: `lib/admin/master-context.manual.after.md` § Current Priorities.
 | [GE-AIOS-ARCH-1A AI Revenue & Service OS Architecture](./GE-AIOS-ARCH-1A_AI_REVENUE_SERVICE_OS_ARCHITECTURE.md) | Canonical layer model, module mapping, Memory Graph design |
 | [PROD-REGRESSION-6 Command Center import stability](./PROD-REGRESSION-6_COMMAND_CENTER_IMPORT_STABILITY.md) | Production 500 root cause + import stability cert |
 | [GE-AI-SHIP-0 Local Release Bundle Audit](./GE-AI-SHIP-0_LOCAL_RELEASE_BUNDLE_AUDIT.md) | Pre-ship audit: migrations, safety, test matrix, rollout/rollback/pilot |
+| [GE-AI-UX-1A Operator Experience Redesign](./GE-AI-UX-1A_OPERATOR_EXPERIENCE_REDESIGN.md) | Executive dashboard UX — operator-first AI Operations layout |
+| [GE-AI-UX-2A Outcome-First Unified Experience](./GE-AI-UX-2A_OUTCOME_FIRST_UNIFIED_EXPERIENCE.md) | Outcome-first Home + AI Operations — hide engine names from default UI |
+| [GE-AI-UX-3A AI Teammate Identity Foundation](./GE-AI-UX-3A_AI_TEAMMATE_IDENTITY_FOUNDATION.md) | Named AI teammate (Ava) — onboarding, profile, personalized narrative |
+| [GE-AI-UX-4A AI Employee Experience](./GE-AI-UX-4A_AI_EMPLOYEE_EXPERIENCE.md) | Active AI employee check-in — status, working on, completed, review, journal timeline |
+| [GE-AI-UX-5A Proactive AI Initiative](./GE-AI-UX-5A_PROACTIVE_AI_INITIATIVE.md) | Proactive observations, evidence-backed recommendations, business awareness |
+| [GE-AI-UX-6A AI Ownership & Accountability](./GE-AI-UX-6A_AI_OWNERSHIP_ACCOUNTABILITY.md) | My Priorities, Waiting On You, weekly goals, win/risk, executive recommendation |
+| [GE-AI-UX-7A AI Relationship & Continuity](./GE-AI-UX-7A_AI_RELATIONSHIP_CONTINUITY.md) | Since we last met, what changed, recommendation continuity, milestones, daily briefing |
+| [GE-AI-8A Autonomous Revenue Operator](./GE-AI-8A_AUTONOMOUS_REVENUE_OPERATOR.md) | Revenue missions, mission timeline, forecast, planned actions, operator controls |
+| [GE-AI-9A Autonomous Marketing Operator](./GE-AI-9A_AUTONOMOUS_MARKETING_OPERATOR.md) | Marketing missions, campaign performance, content preparing, audience intelligence |
+| [GE-AI-9B Autonomous Customer Success Operator](./GE-AI-9B_AUTONOMOUS_CUSTOMER_SUCCESS_OPERATOR.md) | CS missions, customer health, expansion, renewals, wins, contribution |
+| [GE-AI-9C Autonomous Service Operator](./GE-AI-9C_AUTONOMOUS_SERVICE_OPERATOR.md) | Delivery intelligence (future vision — hidden in v1) |
+| [GE-AI-ARCH-2C AI OS v1 Product Alignment](./GE-AI-ARCH-2C_AI_OS_V1_PRODUCT_ALIGNMENT.md) | v1 product story, terminology, deferred features |
+| [GE-AI-UX-3B AI Teammate Server Identity](./GE-AI-UX-3B_AI_TEAMMATE_SERVER_IDENTITY.md) | Org-scoped server persistence for teammate name + user onboarding |
 | [GE-AIOS-GROWTH Internal Workflow Dry Run](./GE-AIOS-GROWTH_INTERNAL_WORKFLOW_DRY_RUN.md) | Dry-run operator guide |
 | [GE-AIOS-GROWTH Execution Simulation](./GE-AIOS-GROWTH_EXECUTION_SIMULATION.md) | Execution simulation reference |
 

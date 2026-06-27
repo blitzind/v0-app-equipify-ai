@@ -20,9 +20,9 @@ export const GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS = [
   "meetings",
   "settings",
   "runbook",
-  "ai-operations",
   "activity",
   "engagement",
+  "ai-operations",
 ] as const
 
 /** Nav ids removed from workspace sidebar — routes remain in registry, Cmd+K, and direct URLs. */
@@ -49,7 +49,7 @@ export const GROWTH_WORKSPACE_SIDEBAR_HIDDEN_NAV_IDS = [
 ] as const
 
 /** Workspace sidebar group ids after GE-v1-2 operator IA cleanup. */
-export const GROWTH_WORKSPACE_SIDEBAR_GROUP_IDS = ["workspace", "intelligence"] as const
+export const GROWTH_WORKSPACE_SIDEBAR_GROUP_IDS = ["workspace", "intelligence", "advanced"] as const
 
 /** Registry route ids that must never appear in the workspace sidebar manifest. */
 export const GROWTH_WORKSPACE_SIDEBAR_FORBIDDEN_REGISTRY_ROUTE_IDS = [

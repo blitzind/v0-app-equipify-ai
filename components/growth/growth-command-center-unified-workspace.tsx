@@ -111,7 +111,7 @@ export function GrowthCommandCenterUnifiedWorkspace({
     <div className="space-y-4" data-qa-marker={COMMAND_CENTER_UNIFICATION_QA_MARKER}>
       <GrowthEngineCard title={title} icon={<LayoutDashboard className="h-4 w-4" />}>
         <p className="mb-3 text-xs text-muted-foreground">
-          Read-only aggregation across all Growth Engine subsystems. Visibility and operator workflow optimization only —
+          Read-only aggregation across all AI OS subsystems. Visibility and operator workflow optimization only —
           no send, launch, enroll, or autonomous execution.
         </p>
 

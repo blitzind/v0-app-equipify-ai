@@ -2,7 +2,7 @@
 
 import type { AidenDailyBriefing } from "@/lib/growth/aiden/aiden-daily-briefing"
 
-export const GROWTH_WORKSPACE_DASHBOARD_QA_MARKER = "growth-workspace-dashboard-v3" as const
+export const GROWTH_WORKSPACE_DASHBOARD_QA_MARKER = "growth-workspace-dashboard-v4" as const
 
 export type GrowthWorkspaceDashboardMetricLink = {
   label: string

@@ -90,7 +90,7 @@ export function ProspectSearchActionableResearchActions({
     >
       <div className="flex items-center gap-1.5 text-xs font-semibold text-sky-950">
         <Sparkles className="size-3.5" />
-        Growth Engine research (operator-triggered)
+        AI OS research (operator-triggered)
       </div>
       <p className="mt-1 text-[10px] text-muted-foreground">
         Queues existing discovery/intelligence jobs — does not run automatically from search filters.

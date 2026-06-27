@@ -11,7 +11,7 @@ import {
   BookOpen,
   Bot,
   Inbox,
-  LayoutDashboard,
+  Home,
   Phone,
   Settings,
   Sparkles,
@@ -28,11 +28,15 @@ import {
   getGrowthRouteMetadataById,
 } from "@/lib/growth/navigation/growth-route-metadata"
 import {
+  AI_OS_ADVANCED_NAV_GROUP_LABEL,
+  AI_OS_HOME_NAV_LABEL,
+} from "@/lib/workspace/ai-os-workspace-branding"
+import {
   GROWTH_ADMIN_BASE_PATH,
   GROWTH_WORKSPACE_BASE_PATH,
 } from "@/lib/growth/navigation/growth-route-metadata-types"
 
-export const GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER = "growth-workspace-shell-nav-v7" as const
+export const GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER = "growth-workspace-shell-nav-v8" as const
 
 /** Back-compat QA marker used by shell components. */
 export const GROWTH_SHELL_NAV_QA_MARKER = GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER
@@ -76,7 +80,7 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
     id: "workspace",
     label: "Workspace",
     items: [
-      { id: "dashboard", label: "Dashboard", registryRouteId: "workspace-dashboard", icon: LayoutDashboard, workspaceRoute: true },
+      { id: "dashboard", label: AI_OS_HOME_NAV_LABEL, registryRouteId: "workspace-dashboard", icon: Home, workspaceRoute: true },
       { id: "leads", label: "Leads", registryRouteId: "workspace-leads", icon: Target, workspaceRoute: true },
       { id: "audiences", label: "Audiences", registryRouteId: "workspace-audiences", icon: Users, workspaceRoute: true },
       { id: "personalized-videos", label: "Personalized Videos", registryRouteId: "workspace-personalized-videos", icon: Sparkles, workspaceRoute: true },
@@ -93,9 +97,15 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
     id: "intelligence",
     label: "Intelligence",
     items: [
-      { id: "ai-operations", label: "AI Operations", registryRouteId: "workspace-ai-operations", icon: Bot, workspaceRoute: true },
       { id: "activity", label: "Activity", registryRouteId: "workspace-activity", icon: Activity, workspaceRoute: true },
       { id: "engagement", label: "Engagement", registryRouteId: "workspace-engagement", icon: Activity, workspaceRoute: true },
+    ],
+  },
+  {
+    id: "advanced",
+    label: AI_OS_ADVANCED_NAV_GROUP_LABEL,
+    items: [
+      { id: "ai-operations", label: "AI Operations", registryRouteId: "workspace-ai-operations", icon: Bot, workspaceRoute: true },
     ],
   },
 ]

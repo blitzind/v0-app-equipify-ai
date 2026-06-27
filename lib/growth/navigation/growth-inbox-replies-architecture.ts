@@ -41,7 +41,7 @@ export const GROWTH_INBOX_OPERATOR_ROUTES: GrowthInboxRepliesRouteSurface[] = [
     migrationStatus: "dual-route",
     sidebarVisible: true,
     cmdKLabel: "Inbox",
-    breadcrumbTrail: ["Growth", "Inbox"],
+    breadcrumbTrail: ["AI OS", "Inbox"],
     purpose:
       "Primary unified operator inbox — thread queue, conversation column, action center, email/SMS channels, reply classification, and operator inbox aggregation.",
   },
@@ -54,7 +54,7 @@ export const GROWTH_INBOX_OPERATOR_ROUTES: GrowthInboxRepliesRouteSurface[] = [
     migrationStatus: "dual-route",
     sidebarVisible: false,
     cmdKLabel: "Reply Workflow",
-    breadcrumbTrail: ["Growth", "Inbox", "Reply Workflow"],
+    breadcrumbTrail: ["AI OS", "Inbox", "Reply Workflow"],
     purpose:
       "Reply-generated workflow actions — mark interested, create call/follow-up tasks, opportunity drafts, sequence exits. Child of Inbox, not a separate sidebar destination.",
   },
@@ -67,7 +67,7 @@ export const GROWTH_INBOX_OPERATOR_ROUTES: GrowthInboxRepliesRouteSurface[] = [
     migrationStatus: "workspace",
     sidebarVisible: false,
     cmdKLabel: "Inbox Operations",
-    breadcrumbTrail: ["Growth", "Inbox", "Operations"],
+    breadcrumbTrail: ["AI OS", "Inbox", "Operations"],
     purpose:
       "Campaign builder, agent orchestration, event bus, and inbox diagnostics — planning surfaces kept out of the operator queue.",
   },
@@ -83,7 +83,7 @@ export const GROWTH_REPLIES_OPERATOR_ROUTES: GrowthInboxRepliesRouteSurface[] = 
     migrationStatus: "admin-only",
     sidebarVisible: false,
     cmdKLabel: "Reply Inbox",
-    breadcrumbTrail: ["Growth"],
+    breadcrumbTrail: ["AI OS"],
     purpose:
       "Reply intelligence v2 dashboard — evidence-backed classification, sales execution views, copilot assist, conversation timeline. Admin-only; workspace breadcrumb resolver does not traverse admin paths.",
   },
@@ -96,7 +96,7 @@ export const GROWTH_REPLIES_OPERATOR_ROUTES: GrowthInboxRepliesRouteSurface[] = 
     migrationStatus: "dual-route",
     sidebarVisible: false,
     cmdKLabel: "Reply Workflow",
-    breadcrumbTrail: ["Growth", "Inbox", "Reply Workflow"],
+    breadcrumbTrail: ["AI OS", "Inbox", "Reply Workflow"],
     purpose: "Admin fallback for workflow actions — workspace canonical path is /growth/inbox/workflow.",
   },
   {
@@ -108,7 +108,7 @@ export const GROWTH_REPLIES_OPERATOR_ROUTES: GrowthInboxRepliesRouteSurface[] = 
     migrationStatus: "admin-only",
     sidebarVisible: false,
     cmdKLabel: "Reply Drafts",
-    breadcrumbTrail: ["Growth", "Reply Drafts"],
+    breadcrumbTrail: ["AI OS", "Reply Drafts"],
     purpose: "Copilot reply draft review — admin-only content surface, reachable via Cmd+K.",
   },
 ]

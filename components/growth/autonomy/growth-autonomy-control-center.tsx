@@ -207,7 +207,7 @@ export function GrowthAutonomyControlCenter() {
       <section className="space-y-4">
         <SectionHeading
           title="Operating mode"
-          description="Choose how independently Growth Engine can act on your behalf."
+          description="Choose how independently AI OS can act on your behalf."
         />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
           {viewModel.masterModes.map((mode) => {
@@ -331,7 +331,7 @@ export function GrowthAutonomyControlCenter() {
       <section className="space-y-4">
         <SectionHeading
           title="Human approval"
-          description="Autonomous approval is disabled. Growth Engine can prepare work, but approval rules decide whether a person must review before anything goes out."
+          description="Autonomous approval is disabled. AI OS can prepare work, but approval rules decide whether a person must review before anything goes out."
         />
         <Card>
           <CardContent className="grid gap-3 pt-6 md:grid-cols-2">
@@ -363,7 +363,7 @@ export function GrowthAutonomyControlCenter() {
       <section className="space-y-4">
         <SectionHeading
           title="Test without sending"
-          description="Shadow mode lets Growth Engine decide what it would do, without actually sending or launching anything."
+          description="Shadow mode lets AI OS decide what it would do, without actually sending or launching anything."
         />
         <Card>
           <CardContent className="space-y-4 pt-6">

@@ -7,7 +7,7 @@ export const GROWTH_PROSPECT_SEARCH_AI_ICP_QA_MARKER = "growth-prospect-search-a
 export const PROSPECT_SEARCH_AI_FIRST_HERO = {
   headline: "Find your next best accounts",
   supportingCopy:
-    "Describe who you want to sell to, or let Growth Engine recommend the next market to search.",
+    "Describe who you want to sell to, or let AI OS recommend the next market to search.",
   recommendCta: "Recommend my next search",
   manualCta: "Search manually",
 } as const
@@ -16,7 +16,7 @@ export const PROSPECT_SEARCH_EXTERNAL_DISCOVERY_COPY =
   "Discover new companies from public business listings and directories. Review candidates before adding them to your pipeline." as const
 
 export const PROSPECT_SEARCH_INTERNAL_DISCOVERY_COPY =
-  "Search observable Growth Engine and CRM records. Review matches before taking action." as const
+  "Search observable AI OS and CRM records. Review matches before taking action." as const
 
 export type ProspectSearchAiIcpProfile = {
   companyLabel: string

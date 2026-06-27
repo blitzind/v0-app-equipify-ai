@@ -137,7 +137,7 @@ export function GeV15AutomationRuntimeApprovalPanel({
           Autonomy-prepared approvals
         </CardTitle>
         <CardDescription>
-          Review drafts prepared by Growth Engine. Edit, approve, then execute — every send requires operator action.
+          Review drafts prepared by AI OS. Edit, approve, then execute — every send requires operator action.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">

@@ -14,7 +14,7 @@ export const GROWTH_ENGINE_SETTINGS_QA_MARKER = "growth-engine-settings-v1" as c
 const COMING_SOON_SECTIONS = [
   {
     id: "defaults",
-    title: "Growth Engine defaults",
+    title: "AI OS defaults",
     description: "Org-wide defaults for prospecting, sequencing, and workspace behavior.",
     icon: SlidersHorizontal,
   },
@@ -51,7 +51,7 @@ export function GrowthEngineSettingsPanel() {
       data-qa-marker={GROWTH_ENGINE_SETTINGS_QA_MARKER}
     >
       <p className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground dark:border-[#25324C]">
-        Global Growth Engine settings live here. Channel, calendar, voice, and Copilot connection settings are under{" "}
+        Global AI OS settings live here. Channel, calendar, voice, and Copilot connection settings are under{" "}
         <span className="font-medium text-foreground">Communications</span> in Settings.
       </p>
 

@@ -14,6 +14,7 @@ export const GROWTH_WORKSPACE_SETTINGS_PERSISTED_SECTION_IDS = [
   "personal-preferences",
   "sidebar-preferences",
   "default-views",
+  "ai-teammate",
 ] as const
 
 export type GrowthWorkspaceSettingsPersistedSectionId =
@@ -42,6 +43,7 @@ export type GrowthOperatorWorkspacePreferencesRecord = {
   inboxDefaultFilter: GrowthInboxThreadQueueView
   callsDefaultView: GrowthWorkspaceCallsDefaultView
   opportunitiesDefaultTab: GrowthWorkspaceOpportunitiesDefaultTab
+  aiTeammateOnboardingCompleted: boolean
   createdAt: string
   updatedAt: string
 }
@@ -57,6 +59,7 @@ export type GrowthOperatorWorkspacePreferencesUpsertInput = {
   inboxDefaultFilter?: GrowthInboxThreadQueueView
   callsDefaultView?: GrowthWorkspaceCallsDefaultView
   opportunitiesDefaultTab?: GrowthWorkspaceOpportunitiesDefaultTab
+  aiTeammateOnboardingCompleted?: boolean
 }
 
 export type GrowthWorkspaceSettingsProfile = {
@@ -111,4 +114,5 @@ export const DEFAULT_GROWTH_OPERATOR_WORKSPACE_PREFERENCES: Omit<
   inboxDefaultFilter: "all",
   callsDefaultView: "workspace",
   opportunitiesDefaultTab: "overview",
+  aiTeammateOnboardingCompleted: false,
 }

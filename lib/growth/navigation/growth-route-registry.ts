@@ -1,6 +1,9 @@
 /** Growth workspace route migration registry — backed by canonical route metadata. */
 
 import {
+  AI_OS_BREADCRUMB_ROOT_LABEL,
+} from "@/lib/workspace/ai-os-workspace-branding"
+import {
   findGrowthRouteMetadataByPathname,
   findGrowthRouteMetadataBySegment,
   GROWTH_ADMIN_BASE_PATH,
@@ -55,10 +58,10 @@ export function resolveGrowthBreadcrumbs(
 ): GrowthBreadcrumbCrumb[] {
   const entry = findGrowthRouteMetadataByPathname(pathname)
   if (!entry) {
-    return [{ label: "Growth", href: GROWTH_WORKSPACE_BASE_PATH }]
+    return [{ label: AI_OS_BREADCRUMB_ROOT_LABEL, href: GROWTH_WORKSPACE_BASE_PATH }]
   }
 
-  const crumbs: GrowthBreadcrumbCrumb[] = [{ label: "Growth", href: GROWTH_WORKSPACE_BASE_PATH }]
+  const crumbs: GrowthBreadcrumbCrumb[] = [{ label: AI_OS_BREADCRUMB_ROOT_LABEL, href: GROWTH_WORKSPACE_BASE_PATH }]
   if (entry.path === GROWTH_WORKSPACE_BASE_PATH) return crumbs
 
   const segment = entry.segment ?? ""

@@ -39,7 +39,7 @@ export function WorkspaceSettingsGrowthEngineSectionPage({ sectionId }: { sectio
         phaseLabel="Phase 3"
         phaseDescription={
           classification?.reason ??
-          "Remaining Growth Engine settings migrate in Phase 3 — no new implementations in GE-SET-5."
+          "Remaining AI OS settings migrate in Phase 3 — no new implementations in GE-SET-5."
         }
       />
     )

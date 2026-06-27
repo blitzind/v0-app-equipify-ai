@@ -74,7 +74,7 @@ function runAudit(): void {
   console.log(`\n=== Growth workspace sidebar IA audit (${GROWTH_WORKSPACE_SIDEBAR_IA_QA_MARKER}) ===\n`)
   console.log(`  shell nav qa marker: ${GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER}`)
 
-  assert.equal(GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER, "growth-workspace-shell-nav-v7")
+  assert.equal(GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER, "growth-workspace-shell-nav-v8")
 
   assert.deepEqual(
     GROWTH_SHELL_NAV_GROUPS.map((group) => group.id),
@@ -172,9 +172,11 @@ function runAudit(): void {
   const intelligenceItems = GROWTH_WORKSPACE_SHELL_NAV_MANIFEST.find((group) => group.id === "intelligence")?.items ?? []
   assert.deepEqual(
     intelligenceItems.map((item) => item.id),
-    ["ai-operations", "activity", "engagement"],
+    ["activity", "engagement"],
   )
-  console.log("  ✓ Mission Planning Review route + deep-link IA (not duplicated in Intelligence sidebar)")
+  const advancedItems = GROWTH_WORKSPACE_SHELL_NAV_MANIFEST.find((group) => group.id === "advanced")?.items ?? []
+  assert.deepEqual(advancedItems.map((item) => item.id), ["ai-operations"])
+  console.log("  ✓ Mission Planning Review route + AI Operations under Advanced (not Intelligence)")
 
   console.log("\nGrowth workspace sidebar IA audit PASS\n")
   console.log(

@@ -14,7 +14,7 @@ import type {
 } from "@/lib/growth/settings/growth-workspace-settings-types"
 
 const SELECT =
-  "id, user_id, timezone, default_landing_page, compact_mode, reduced_motion, sidebar_collapsed, favorite_destinations, last_visited_route, inbox_default_filter, calls_default_view, opportunities_default_tab, created_at, updated_at"
+  "id, user_id, timezone, default_landing_page, compact_mode, reduced_motion, sidebar_collapsed, favorite_destinations, last_visited_route, inbox_default_filter, calls_default_view, opportunities_default_tab, ai_teammate_onboarding_completed, created_at, updated_at"
 
 type PreferencesRow = {
   id: string
@@ -29,6 +29,7 @@ type PreferencesRow = {
   inbox_default_filter: string
   calls_default_view: string
   opportunities_default_tab: string
+  ai_teammate_onboarding_completed: boolean
   created_at: string
   updated_at: string
 }
@@ -51,6 +52,7 @@ function mapRow(row: PreferencesRow): GrowthOperatorWorkspacePreferencesRecord {
     inboxDefaultFilter: row.inbox_default_filter as GrowthInboxThreadQueueView,
     callsDefaultView: row.calls_default_view as GrowthWorkspaceCallsDefaultView,
     opportunitiesDefaultTab: row.opportunities_default_tab as GrowthWorkspaceOpportunitiesDefaultTab,
+    aiTeammateOnboardingCompleted: row.ai_teammate_onboarding_completed ?? false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -81,6 +83,7 @@ export function resolveEffectiveWorkspacePreferences(
     inboxDefaultFilter: record.inboxDefaultFilter,
     callsDefaultView: record.callsDefaultView,
     opportunitiesDefaultTab: record.opportunitiesDefaultTab,
+    aiTeammateOnboardingCompleted: record.aiTeammateOnboardingCompleted,
   }
 }
 
@@ -107,6 +110,8 @@ export async function upsertWorkspacePreferencesForUser(
     inbox_default_filter: input.inboxDefaultFilter ?? effective.inboxDefaultFilter,
     calls_default_view: input.callsDefaultView ?? effective.callsDefaultView,
     opportunities_default_tab: input.opportunitiesDefaultTab ?? effective.opportunitiesDefaultTab,
+    ai_teammate_onboarding_completed:
+      input.aiTeammateOnboardingCompleted ?? effective.aiTeammateOnboardingCompleted,
   }
 
   const { data, error } = await preferencesTable(admin)

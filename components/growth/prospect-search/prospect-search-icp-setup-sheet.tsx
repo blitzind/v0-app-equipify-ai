@@ -93,7 +93,7 @@ export function ProspectSearchIcpSetupSheet({
         <SheetHeader>
           <SheetTitle>{mode === "set" ? "Set your ICP" : "Refine your ICP"}</SheetTitle>
           <SheetDescription>
-            Describe who you sell to. Growth Engine will turn this into search suggestions. Saved locally
+            Describe who you sell to. AI OS will turn this into search suggestions. Saved locally
             for now — org-wide ICP storage is coming soon.
           </SheetDescription>
         </SheetHeader>

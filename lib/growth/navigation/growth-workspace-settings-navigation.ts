@@ -194,6 +194,13 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
     label: "AI",
     items: [
       {
+        id: "ai-teammate",
+        label: "AI Teammate",
+        description: "Name and identity for your AI Revenue Operator inside AI OS.",
+        segment: "ai-teammate",
+        icon: Sparkles,
+      },
+      {
         id: "ai-preferences",
         label: "AI Preferences",
         description: "Aiden guidance, copilot tone, and AI assist defaults for operators.",

@@ -89,6 +89,21 @@ For each GE-AI-2X phase, maintain one entry with:
 | GE-AI-2I | L4 Bounded Autonomous Outbound | Complete (local cert, not committed) |
 | GE-AI-2J | Learning Loop | Not Started |
 | GE-AI-SHIP-0 | Local Release Bundle Audit | Complete (audit only, not committed) |
+| GE-AI-UX-1A | Operator Experience Redesign | Complete (local cert, not committed) |
+| GE-AI-UX-1B | AI OS Branding & Workspace Architecture | Complete (local cert, not committed) |
+| GE-AI-UX-1C | AI Executive Briefing Experience | Complete (local cert, not committed) |
+| GE-AI-UX-2A | Outcome-First Unified Experience | Complete (local cert, not committed) |
+| GE-AI-UX-3A | AI Teammate Identity Foundation | Complete (local cert, not committed) |
+| GE-AI-UX-3B | AI Teammate Server Identity | Complete (local cert, not committed) |
+| GE-AI-UX-4A | AI Employee Experience | Complete (local cert, not committed) |
+| GE-AI-UX-5A | Proactive AI Initiative | Complete (local cert, not committed) |
+| GE-AI-UX-6A | AI Ownership & Accountability | Complete (local cert, not committed) |
+| GE-AI-UX-7A | AI Relationship & Continuity | Complete (local cert, not committed) |
+| GE-AI-8A | Autonomous Revenue Operator | Complete (local cert, not committed) |
+| GE-AI-9A | Autonomous Marketing Operator | Complete (local cert, not committed) |
+| GE-AI-9B | Autonomous Customer Success Operator | Complete (local cert, not committed) |
+| GE-AI-9C | Autonomous Service Operator (future vision) | Complete locally — hidden in v1 Home |
+| GE-AI-ARCH-2C | AI OS v1 Product Alignment | Complete (local cert, not committed) |
 
 ---
 
@@ -2674,6 +2689,411 @@ Revert synthesizer imports and org guard on command-center route
 ### Rollback notes
 
 See SHIP-0 doc §10 — git revert, manual migration rollback, calibration rollback API, autonomy kill switches.
+
+---
+
+## GE-AI-UX-1A — Operator Experience Redesign
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** (UX-only, not committed) |
+| **Dependencies** | GE-AIOS-CONSOLIDATION-1B, GE-AI-3A–3D read models, PROD-REGRESSION-6 |
+| **Doc** | [`docs/GE-AI-UX-1A_OPERATOR_EXPERIENCE_REDESIGN.md`](./GE-AI-UX-1A_OPERATOR_EXPERIENCE_REDESIGN.md) |
+
+### Delivered
+
+- Operator-first executive dashboard at `/growth/os`
+- Executive Brief, Needs Attention, AI Working, Business Snapshot, AI Timeline
+- Operator Revenue Director / HAC / Communication presentation
+- Human-readable event translation layer
+- Progressive disclosure for legacy console + engineering diagnostics
+- Screenshot mockup: `docs/screenshots/ge-ai-ux-1a-operator-dashboard-mockup.png`
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-ux-1a-operator-experience-redesign`
+
+### Production certification
+
+Not started — ships with next AI OS bundle commit.
+
+---
+
+## GE-AI-UX-1B — AI OS Branding & Workspace Architecture
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** (UX-only, not committed) |
+| **Dependencies** | GE-AI-UX-1A (AI Operations at `/growth/os`), growth workspace shell nav v8 |
+| **Doc** | [`docs/GE-AI-UX-1B_AI_OS_BRANDING_WORKSPACE_ARCHITECTURE.md`](./GE-AI-UX-1B_AI_OS_BRANDING_WORKSPACE_ARCHITECTURE.md) |
+
+### Delivered
+
+- **AI OS** replaces Growth Engine in operator chrome (switcher, sidebar, breadcrumbs)
+- Workspace switcher: `{Plan} \| AI OS` via existing plan resolution
+- **Home** landing at `/growth`; **AI Operations** under **Advanced** nav group
+- Customer-facing string audit across prospect search, automation, settings, autonomy UI
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-ux-1b-ai-os-branding-workspace-architecture`
+
+### Production certification
+
+Not started — ships with next AI OS bundle commit.
+
+---
+
+## GE-AI-UX-1C — AI Executive Briefing Experience
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** (UX-only, not committed) |
+| **Dependencies** | GE-AI-UX-1B (Home landing), workspace dashboard read models |
+| **Doc** | [`docs/GE-AI-UX-1C_AI_EXECUTIVE_BRIEFING_EXPERIENCE.md`](./GE-AI-UX-1C_AI_EXECUTIVE_BRIEFING_EXPERIENCE.md) |
+
+### Delivered
+
+- Narrative-first Executive Brief on `/growth`
+- Deterministic home briefing synthesizer + narrative formatter
+- Recommendation card, approval summary, grouped AI activity, timeline
+- Reduced business snapshot; legacy tools collapsed below fold
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-ux-1c-ai-executive-briefing-experience`
+
+### Production certification
+
+Not started — ships with next AI OS bundle commit.
+
+---
+
+## GE-AI-UX-2A — Outcome-First Unified Experience
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** (UX-only, not committed) |
+| **Dependencies** | GE-AI-UX-1A (AI Operations), GE-AI-UX-1C (Home briefing) |
+| **Doc** | [`docs/GE-AI-UX-2A_OUTCOME_FIRST_UNIFIED_EXPERIENCE.md`](./GE-AI-UX-2A_OUTCOME_FIRST_UNIFIED_EXPERIENCE.md) |
+
+### Delivered
+
+- Outcome-first Home and AI Operations copy — completed work before exceptions
+- Hidden engine labels (Revenue Director, Communication Engine, Meta-Recommender, Priority Engine) from default chrome
+- **Exceptions**, **Exceptions & Approvals**, **Top Business Move**, **Recommended Outreach**, **AI Improvements**, **Work AI Is Handling**
+- Shared terminology module; approval outcome buckets; UX-2B nav recommendation documented
+- Engineering diagnostics preserved under Advanced disclosure
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-ux-2a-outcome-first-unified-experience`
+
+### Production certification
+
+Not started — ships with next AI OS bundle commit.
+
+---
+
+## GE-AI-UX-3A — AI Teammate Identity & Personalization Foundation
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** (UX-only, not committed) |
+| **Dependencies** | GE-AI-UX-2A (outcome-first copy), GE-AI-UX-1B (AI OS branding) |
+| **Doc** | [`docs/GE-AI-UX-3A_AI_TEAMMATE_IDENTITY_FOUNDATION.md`](./GE-AI-UX-3A_AI_TEAMMATE_IDENTITY_FOUNDATION.md) |
+
+### Delivered
+
+- Named AI teammate identity layer — default **Ava**, role **Your AI Revenue Operator**
+- localStorage name personalization + onboarding dialog
+- AI profile component (topbar compact + Home/Operations brief)
+- Home and AI Operations narrative uses teammate name and pronouns
+- Settings → AI Teammate with read-only role and future-ready placeholders
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-ux-3a-ai-teammate-identity-foundation`
+
+### Production certification
+
+Not started — ships with next AI OS bundle commit.
+
+---
+
+## GE-AI-UX-3B — AI Teammate Server Identity
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** (settings persistence, not committed) |
+| **Dependencies** | GE-AI-UX-3A (teammate UX), Phase 8B workspace settings |
+| **Doc** | [`docs/GE-AI-UX-3B_AI_TEAMMATE_SERVER_IDENTITY.md`](./GE-AI-UX-3B_AI_TEAMMATE_SERVER_IDENTITY.md) |
+| **Migration** | `20270829120000_growth_organization_ai_teammate_identity_3b.sql` (local only — not applied to production) |
+
+### Delivered
+
+- `growth.organization_ai_teammate_identity` — org-scoped teammate name
+- `operator_workspace_preferences.ai_teammate_onboarding_completed` — per-user onboarding
+- GET/PATCH `/api/growth/workspace/settings/ai-teammate`
+- Provider server-first hydration with localStorage optimistic cache
+- Settings save success/error states
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-ux-3b-ai-teammate-server-identity`
+
+### Production certification
+
+Not started — requires migration apply + bundle commit.
+
+---
+
+## GE-AI-UX-4A — AI Employee Experience
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** (UX-only, not committed) |
+| **Dependencies** | GE-AI-UX-3A/3B (teammate identity), GE-AI-UX-2A (outcome-first copy) |
+| **Doc** | [`docs/GE-AI-UX-4A_AI_EMPLOYEE_EXPERIENCE.md`](./GE-AI-UX-4A_AI_EMPLOYEE_EXPERIENCE.md) |
+
+### Delivered
+
+- Home **Ava check-in** — first-person “While you were away I:” with focus and review lines
+- **Completed Today** and **What I'm Working On** sections separated from each other
+- **Needs Your Review** with natural approval groups (ready to send, activate, decision, blocked)
+- First-person **Timeline** work journal; no engine names in default UI
+- **Everything I Accomplished** expandable work summary by category
+- Persistent **AI status** in topbar via `AiEmployeeStatusProvider` (Home + AI Operations)
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-ux-4a-ai-employee-experience`
+
+### Production certification
+
+Not started — ships with next AI OS bundle commit.
+
+---
+
+## GE-AI-UX-5A — Proactive AI Initiative
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** (UX-only, not committed) |
+| **Dependencies** | GE-AI-UX-4A (employee experience), GE-AI-UX-2A (outcome-first copy) |
+| **Doc** | [`docs/GE-AI-UX-5A_PROACTIVE_AI_INITIATIVE.md`](./GE-AI-UX-5A_PROACTIVE_AI_INITIATIVE.md) |
+
+### Delivered
+
+- Home opening **"Here's what I found since your last visit."** with insight bullets from read models
+- **Things I Noticed** — first-person observations with evidence
+- **What I'm Watching** — active monitoring from queue/inbox/campaign signals
+- **What I Recommend** — because-style headlines, confidence labels, priority wording, evidence arrays
+- **Business awareness** — This Week, This Month, Current Objective, Top Win, Biggest Risk
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-ux-5a-proactive-ai-initiative`
+
+### Production certification
+
+Not started — ships with next AI OS bundle commit.
+
+---
+
+## GE-AI-UX-6A — AI Ownership & Accountability
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** (UX-only, not committed) |
+| **Dependencies** | GE-AI-UX-5A (proactive initiative), GE-AI-UX-4A (employee experience) |
+| **Doc** | [`docs/GE-AI-UX-6A_AI_OWNERSHIP_ACCOUNTABILITY.md`](./GE-AI-UX-6A_AI_OWNERSHIP_ACCOUNTABILITY.md) |
+
+### Delivered
+
+- **My Priorities** replaces Working On — progress, why, next step, waiting on me/you
+- **What I Accomplished** replaces Completed Today — narrative outcomes by business area
+- **Waiting On You** — primary operator action list (max 5)
+- **My Goals This Week** — progress bars from existing objectives/metrics
+- **My Biggest Win** and **Biggest Risk** featured cards with evidence
+- **Today's workload** visualization (Research, Outreach, Monitoring, Learning)
+- **Here's my recommendation.** — closing sentence grounded in read models
+- Ownership language throughout (`I'm responsible for…`, `I'm monitoring…`)
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-ux-6a-ai-ownership-accountability`
+
+### Production certification
+
+Not started — ships with next AI OS bundle commit.
+
+---
+
+## GE-AI-UX-7A — AI Relationship & Continuity
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** (UX-only, not committed) |
+| **Dependencies** | GE-AI-UX-6A (ownership), GE-AI-UX-5A (proactive initiative) |
+| **Doc** | [`docs/GE-AI-UX-7A_AI_RELATIONSHIP_CONTINUITY.md`](./GE-AI-UX-7A_AI_RELATIONSHIP_CONTINUITY.md) |
+
+### Delivered
+
+- **Since we last checked in…** contextual home opening when session context exists (recent views / continue items)
+- **Since We Last Met** — Completed / Changed / Improved / Escalated / Waiting from timeline and read models
+- **What Changed** — delta-only highlights (meetings, pipeline, replies, cooled opportunities)
+- **Recommendation Continuity** — previous vs current stance with evidence
+- **Our Progress** (expandable) — Last 7 days / 30 days / This quarter aggregates
+- **Milestones** — threshold celebrations from existing metrics
+- **Trust & Confidence** — confidence increase/decrease explanations
+- **Daily Briefing** — morning / afternoon / evening from `generatedAt` (no scheduler)
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-ux-7a-ai-relationship-continuity`
+
+### Production certification
+
+Not started — ships with next AI OS bundle commit.
+
+---
+
+## GE-AI-8A — Autonomous Revenue Operator
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** (UX-only, not committed) |
+| **Dependencies** | GE-AI-UX-7A (continuity), GE-AI-3A (Revenue Director), GE-AIOS-GROWTH-4E (Mission Framework) |
+| **Doc** | [`docs/GE-AI-8A_AUTONOMOUS_REVENUE_OPERATOR.md`](./GE-AI-8A_AUTONOMOUS_REVENUE_OPERATOR.md) |
+
+### Delivered
+
+- **My Active Revenue Missions** — max 3, progress, stage, blocker, next action, operator controls
+- **Operator summary** — "I'm driving N active revenue missions."
+- **Mission Health** — healthy / waiting / blocked / needs review / completed
+- **Revenue Mission Timeline** — stage progression narrative
+- **Next Planned Actions** — from existing plans (no scheduler)
+- **Revenue Forecast** — monthly goal, projected attainment, risk, confidence
+- Revenue Director snapshot path reuses `missionFramework` without duplicate orchestration
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-8a-autonomous-revenue-operator`
+
+### Production certification
+
+Not started — ships with next AI OS bundle commit.
+
+---
+
+## GE-AI-9A — Autonomous Marketing Operator
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** (UX-only, not committed) |
+| **Dependencies** | GE-AI-8A (revenue operator), GE-AI-3A (Revenue Director) |
+| **Doc** | [`docs/GE-AI-9A_AUTONOMOUS_MARKETING_OPERATOR.md`](./GE-AI-9A_AUTONOMOUS_MARKETING_OPERATOR.md) |
+
+### Delivered
+
+- **My Marketing Missions** — max 3, campaign, goal, stage, impact, blockers, milestones
+- **Campaign Performance** — human-language insights (no raw analytics tables)
+- **Content I'm Preparing** — email, landing, SMS, LinkedIn, ad creative from drafts
+- **Audience Intelligence** — segment insights with evidence
+- **Marketing Contribution** — pipeline influenced, ROI, leads, meetings, revenue
+- Marketing operator voice in check-in alongside revenue missions
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-9a-autonomous-marketing-operator`
+
+### Production certification
+
+Not started — ships with next AI OS bundle commit.
+
+---
+
+## GE-AI-9B — Autonomous Customer Success Operator
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** (UX-only, not committed) |
+| **Dependencies** | GE-AI-9A (marketing operator), GE-AI-8A (revenue operator), GE-AI-3A (Revenue Director) |
+| **Doc** | [`docs/GE-AI-9B_AUTONOMOUS_CUSTOMER_SUCCESS_OPERATOR.md`](./GE-AI-9B_AUTONOMOUS_CUSTOMER_SUCCESS_OPERATOR.md) |
+
+### Delivered
+
+- **My Customer Success Missions** — max 3, customer, health, renewal, progress, blocker, expected value
+- **Customer Health** — human-language narratives with evidence
+- **Expansion Opportunities** — upgrade/Enterprise recommendations with evidence
+- **Renewals I'm Monitoring** — risk, action, days remaining, owner
+- **Customer Wins** — milestone celebration cards
+- **Customer Success Contribution** — retention, expansion, renewal pipeline, LTV
+- Customer success operator voice in check-in
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-9b-autonomous-customer-success-operator`
+
+### Production certification
+
+Not started — ships with next AI OS bundle commit.
+
+---
+
+## GE-AI-9C — Autonomous Service Operator
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** (UX-only, not committed) |
+| **Dependencies** | GE-AI-9B (customer success operator), GE-AI-9A (marketing operator), GE-AI-8A (revenue operator), GE-AI-3A (Revenue Director) |
+| **Doc** | [`docs/GE-AI-9C_AUTONOMOUS_SERVICE_OPERATOR.md`](./GE-AI-9C_AUTONOMOUS_SERVICE_OPERATOR.md) |
+
+### Delivered
+
+- **My Service Missions** — max 3, customer, work order, stage, technician, progress, blocker, ETA, expected value
+- **Service Health** — human-language schedule and SLA narratives with evidence
+- **Technician Awareness** — capacity, completions, parts/wait signals from read models
+- **Customer Follow-ups** — post-service follow-up and review readiness (presentation only)
+- **Operational Insights** — completion, repeat visits, travel, emergency impact with evidence
+- **Service Contribution** — work orders completed, first-time fix rate, utilization, satisfaction, reviews, revenue influenced
+- Service operator voice in check-in
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-9c-autonomous-service-operator`
+
+### Production certification
+
+Not started — ships with next AI OS bundle commit.
+
+---
+
+## GE-AI-ARCH-2C — AI OS v1 Product Alignment
+
+| Field | Value |
+|-------|--------|
+| **Status** | **Complete locally** (presentation/docs only, not committed) |
+| **Dependencies** | GE-AI-8A through GE-AI-9C UX layers |
+| **Doc** | [`docs/GE-AI-ARCH-2C_AI_OS_V1_PRODUCT_ALIGNMENT.md`](./GE-AI-ARCH-2C_AI_OS_V1_PRODUCT_ALIGNMENT.md) |
+
+### Delivered
+
+- Locked v1 product story: AI OS helps Equipify sell Equipify
+- Terminology: Growth Initiatives, Customer Growth Opportunities, Equipify's AI Growth Operator
+- Service Operator hidden from default Home (`GROWTH_HOME_SERVICE_OPERATOR_VISIBLE=false`)
+- Ava narrative reframed (I found / I prepared / I recommend — no COO language)
+- Delivery intelligence synthesizer copy updated for future vision
+- Updated Master Context and roadmap
+
+### Implementation certification
+
+**PASS (local)** via `pnpm test:ge-ai-arch-2c-ai-os-v1-product-alignment`
+
+### Production certification
+
+Pending first AI OS v1 commit bundle.
 
 ---
 

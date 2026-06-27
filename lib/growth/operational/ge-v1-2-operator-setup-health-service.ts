@@ -145,7 +145,7 @@ export async function buildGrowthOperatorSetupHealth(
     },
     {
       id: "growth-engine",
-      label: "Growth Engine",
+      label: "AI OS",
       value: engineEnabled ? "Enabled" : "Disabled",
       status: engineEnabled ? "ok" : "error",
       href: GROWTH_OPERATOR_SETUP_HEALTH_PATHS.settings,

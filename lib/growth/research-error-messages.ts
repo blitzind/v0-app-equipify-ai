@@ -12,7 +12,7 @@ export function growthLeadResearchErrorMessage(input: {
     case "not_configured":
       return "AI research is not configured. Set OPENAI_API_KEY and enable AI providers."
     case "feature_disabled":
-      return "Growth Engine is disabled on this deployment."
+      return "AI OS is disabled on this deployment."
     case "forbidden":
       return "Platform admin access is required."
     case "not_found":

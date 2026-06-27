@@ -17,6 +17,7 @@ import {
   type ProspectSearchAiIcpProfile,
   type ProspectSearchAiSearchSuggestion,
 } from "@/lib/growth/prospect-search/prospect-search-ai-icp-config"
+import { AI_OS_WORKSPACE_LABEL } from "@/lib/workspace/ai-os-workspace-branding"
 import type { GrowthProspectSearchDiscoveryMode } from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
 
@@ -153,7 +154,7 @@ export function ProspectSearchAiFirstWorkspace({
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-        <GrowthEngineCard title="Growth Engine ICP" icon={<Target className="size-4 text-violet-600" />}>
+        <GrowthEngineCard title={`${AI_OS_WORKSPACE_LABEL} ICP`} icon={<Target className="size-4 text-violet-600" />}>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {profile.companyLabel || "Your company"}
           </p>

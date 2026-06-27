@@ -77,6 +77,7 @@ const EXPLICIT_KEEP = new Set<string>([
   "operator_notification_preferences",
   "operator_notification_push_subscriptions",
   "operator_workspace_preferences",
+  "organization_ai_teammate_identity",
   "opportunity_pipeline_settings",
   "outreach_settings",
   "provider_connection_settings",

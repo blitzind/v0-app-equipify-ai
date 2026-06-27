@@ -84,7 +84,7 @@ function degradedCopy(failureReason: GrowthOutboundOperationsFailureReason): {
         title: "Outbound operations setup incomplete",
         message: "Required Growth outbound tables or migrations are not ready on this Supabase project.",
         actions: [
-          "Apply pending Growth Engine migrations",
+          "Apply pending AI OS migrations",
           "Reload PostgREST schema cache",
           "Retry after migrations complete",
         ],

@@ -42,5 +42,5 @@ export function buildCapacityProtectionRecommendation(input: {
     return "Capacity strained — prioritize protected opportunities and defer new outreach."
   }
 
-  return "Capacity healthy — team can absorb recommended Growth Engine actions."
+  return "Capacity healthy — team can absorb recommended AI OS actions."
 }

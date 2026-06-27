@@ -10,7 +10,7 @@ export default function GrowthAiOsCommandCenterPage() {
     <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
         title="AI Operations"
-        description="Operator dashboard for AI activity, priorities, approvals, and health — read-only."
+        description="Advanced engineering and diagnostics workspace — operator dashboard, approvals context, and full AI OS read models."
         icon={LayoutDashboard}
         iconClassName="bg-indigo-50 text-indigo-600"
       />

@@ -21,6 +21,7 @@ import {
   GrowthSidebarNavContent,
 } from "@/components/growth/shell/growth-sidebar-nav-content"
 import { GROWTH_SHELL_NAV_QA_MARKER } from "@/components/growth/shell/growth-shell-navigation"
+import { AI_OS_WORKSPACE_LABEL } from "@/lib/workspace/ai-os-workspace-branding"
 
 export function GrowthSidebar() {
   const [collapsed, setCollapsedState] = useState(false)
@@ -54,7 +55,7 @@ export function GrowthSidebar() {
         collapsed ? WORKSPACE_SIDEBAR_WIDTH_COLLAPSED : WORKSPACE_SIDEBAR_WIDTH_EXPANDED,
       )}
       data-qa-marker={GROWTH_WORKSPACE_SHELL_QA_MARKER}
-      aria-label="Growth Engine navigation"
+      aria-label={`${AI_OS_WORKSPACE_LABEL} navigation`}
     >
       <WorkspaceShellBrand collapsed={collapsed} homeHref={GROWTH_WORKSPACE_BASE_PATH} />
       <WorkspaceSidebarOrganizationCard collapsed={collapsed} {...WORKSPACE_SIDEBAR_GROWTH_ORGANIZATION_PROPS} />

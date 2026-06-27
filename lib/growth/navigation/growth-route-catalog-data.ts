@@ -133,7 +133,7 @@ function workspaceSettingsSection(
 export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   admin("admin-root", "", "Growth Root Redirect", "workspace", "admin-only", {
     deprecated: true,
-    breadcrumbLabel: "Growth",
+    breadcrumbLabel: "AI OS",
   }),
   admin("admin-leads-redirect", "leads", "Leads Legacy Redirect", "workspace", "admin-only", {
     deprecated: true,
@@ -144,10 +144,10 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     workspacePath: `${WORKSPACE}/calls`,
   }),
 
-  workspace("workspace-dashboard", "", "Dashboard", "workspace", "workspace", {
+  workspace("workspace-dashboard", "", "Home", "workspace", "workspace", {
     migrated: true,
     segment: "",
-    breadcrumbLabel: "Dashboard",
+    breadcrumbLabel: "Home",
   }),
   workspaceDual("workspace-share-pages", "share-pages", "Share Pages", "content", {
     breadcrumbLabel: "Share Pages",
@@ -741,7 +741,7 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   admin("admin-settings", "settings", "Settings Root", "settings", "admin-only", { deprecated: true }),
   admin("admin-settings-growth", "settings/growth", "Growth Settings", "settings", "dual-route", {
     workspacePath: `${WORKSPACE}/settings`,
-    breadcrumbLabel: "Growth",
+    breadcrumbLabel: "AI OS",
   }),
   admin("admin-settings-communications", "settings/communications", "Communication Settings", "settings", "dual-route", {
     workspacePath: `${WORKSPACE}/settings/connected-mailboxes`,

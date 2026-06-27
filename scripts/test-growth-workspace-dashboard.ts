@@ -59,13 +59,11 @@ function runAudit(): void {
   console.log("  ✓ /growth page remains thin workspace shell (header + body)")
 
   const bodySource = readSource("components/growth/workspace/growth-workspace-dashboard-body.tsx")
-  assert.match(bodySource, /data-section="welcome"/)
-  assert.match(bodySource, /GrowthOperatorBriefingOperationalSummary/)
-  assert.match(bodySource, /GrowthOperatorBriefingPriorities/)
+  assert.match(bodySource, /GrowthHomeExecutiveBriefingDashboard/)
+  assert.match(bodySource, /data-qa-marker=\{GROWTH_WORKSPACE_DASHBOARD_QA_MARKER\}/)
   assert.match(bodySource, /data-section="recent-activity"/)
   assert.match(bodySource, /data-section="continue-working"/)
-  assert.match(bodySource, /data-qa-marker=\{GROWTH_WORKSPACE_DASHBOARD_QA_MARKER\}/)
-  console.log("  ✓ dashboard sections render with stable section markers")
+  console.log("  ✓ dashboard uses executive briefing with collapsible secondary tools")
 
   const hookSource = readSource("components/growth/workspace/use-growth-workspace-dashboard.ts")
   assert.match(hookSource, /Promise\.all\(/)

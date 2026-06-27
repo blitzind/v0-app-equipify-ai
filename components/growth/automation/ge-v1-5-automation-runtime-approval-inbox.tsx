@@ -83,7 +83,7 @@ export function GeV15AutomationRuntimeApprovalInbox({
             Prepared follow-ups awaiting review
           </CardTitle>
           <CardDescription>
-            Growth Engine prepared these channel follow-ups. Review, edit, approve, and execute — no autonomous
+            AI OS prepared these channel follow-ups. Review, edit, approve, and execute — no autonomous
             sending.
           </CardDescription>
         </CardHeader>

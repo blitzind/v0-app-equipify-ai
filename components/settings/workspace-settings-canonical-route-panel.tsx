@@ -53,7 +53,7 @@ export function WorkspaceSettingsCanonicalRoutePanel({
       <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
         <p className="text-sm text-muted-foreground">
           {section.label} are managed in one canonical editor under{" "}
-          <span className="font-medium text-foreground">General → Growth Operator</span>. This Growth Engine
+          <span className="font-medium text-foreground">General → Growth Operator</span>. This AI OS
           entry deep-links there to avoid duplicate configuration surfaces.
         </p>
         <p className="mt-3 text-sm text-muted-foreground">

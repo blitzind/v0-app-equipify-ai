@@ -4,6 +4,7 @@
  * Navigation and shell architecture only — no persistence, APIs, or auth changes.
  */
 
+import { AI_OS_WORKSPACE_LABEL } from "@/lib/workspace/ai-os-workspace-branding"
 import type { LucideIcon } from "lucide-react"
 import {
   Activity,
@@ -679,7 +680,7 @@ export const WORKSPACE_SETTINGS_DATA_ADMIN_GROUPS: WorkspaceSettingsNavGroup[] =
       {
         id: "deliverability-operations",
         label: "Deliverability Operations",
-        description: "Monitor deliverability diagnostics, sender health, and support workflows for Growth Engine.",
+        description: "Monitor deliverability diagnostics, sender health, and support workflows for AI OS.",
         href: dataAdminHref("deliverability-operations"),
         icon: Server,
         existingConfigHref: `${ADMIN_GROWTH_PROVIDERS}/deliverability-ops`,
@@ -688,7 +689,7 @@ export const WORKSPACE_SETTINGS_DATA_ADMIN_GROUPS: WorkspaceSettingsNavGroup[] =
       {
         id: "growth-diagnostics",
         label: "Growth Diagnostics",
-        description: "Internal Growth Engine diagnostics and certification surfaces.",
+        description: "Internal AI OS diagnostics and certification surfaces.",
         href: dataAdminHref("growth-diagnostics"),
         icon: Activity,
         existingConfigHref: `${ADMIN_GROWTH_SETTINGS}/provider-health`,
@@ -751,7 +752,7 @@ export function buildWorkspaceSettingsRootCategories(args: {
   if (args.ctx.growthEngineNavVisible) {
     categories.push({
       id: "growth_engine",
-      label: "Growth Engine",
+      label: AI_OS_WORKSPACE_LABEL,
       groups: WORKSPACE_SETTINGS_GROWTH_ENGINE_GROUPS.map((group) =>
         filterWorkspaceSettingsGroup(group, args.ctx),
       ).filter((group): group is WorkspaceSettingsNavGroup => group !== null),

@@ -5,12 +5,15 @@ import { useMemo } from "react"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-registry"
-import { getOrganizationPlanDisplay } from "@/lib/billing/get-organization-plan-display"
+import {
+  AI_OS_WORKSPACE_LABEL,
+  getSubscriptionPlanShortDisplay,
+} from "@/lib/workspace/ai-os-workspace-branding"
 import { useTenant } from "@/lib/tenant-store"
 
-const GROWTH_WORKSPACE = {
-  id: "growth",
-  label: "Growth Engine",
+const AI_OS_WORKSPACE = {
+  id: "ai-os",
+  label: AI_OS_WORKSPACE_LABEL,
   href: GROWTH_WORKSPACE_BASE_PATH,
 } as const
 
@@ -21,12 +24,12 @@ type WorkspaceSwitcherProps = {
 
 export function WorkspaceSwitcher({ compact = false, className }: WorkspaceSwitcherProps) {
   const pathname = usePathname()
-  const growthActive = pathname === GROWTH_WORKSPACE_BASE_PATH || pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/`)
+  const aiOsActive = pathname === GROWTH_WORKSPACE_BASE_PATH || pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/`)
   const { workspace } = useTenant()
 
-  const coreWorkspaceLabel = useMemo(
+  const planLabel = useMemo(
     () =>
-      getOrganizationPlanDisplay({
+      getSubscriptionPlanShortDisplay({
         planId: workspace.planId,
         tenantSubscription: workspace.organizationSubscription,
       }),
@@ -35,10 +38,10 @@ export function WorkspaceSwitcher({ compact = false, className }: WorkspaceSwitc
 
   const workspaces = useMemo(
     () => [
-      { id: "core" as const, label: coreWorkspaceLabel, href: "/" as const },
-      GROWTH_WORKSPACE,
+      { id: "plan" as const, label: planLabel, href: "/" as const },
+      AI_OS_WORKSPACE,
     ],
-    [coreWorkspaceLabel],
+    [planLabel],
   )
 
   return (
@@ -52,7 +55,7 @@ export function WorkspaceSwitcher({ compact = false, className }: WorkspaceSwitc
       data-qa-marker="workspace-switcher-v1"
     >
       {workspaces.map((workspaceItem) => {
-        const active = workspaceItem.id === "growth" ? growthActive : !growthActive
+        const active = workspaceItem.id === "ai-os" ? aiOsActive : !aiOsActive
         return (
           <Link
             key={workspaceItem.id}

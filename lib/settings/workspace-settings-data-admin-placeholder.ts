@@ -14,7 +14,7 @@ export const WORKSPACE_SETTINGS_DATA_ADMIN_PLACEHOLDER_OVERRIDES: Partial<
   "deliverability-operations": {
     title: "Deliverability Operations",
     description:
-      "Monitor sender health, deliverability diagnostics, and operational workflows for Growth Engine communications.",
+      "Monitor sender health, deliverability diagnostics, and operational workflows for AI OS communications.",
   },
 }
 

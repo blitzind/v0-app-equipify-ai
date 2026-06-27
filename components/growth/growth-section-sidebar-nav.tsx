@@ -93,6 +93,7 @@ import { GROWTH_NAVIGATION_POLISH_QA_MARKER } from "@/lib/growth/navigation/grow
 import { isGrowthNavigationInputTarget } from "@/lib/growth/navigation/growth-navigation-input-guard"
 import { APP_Z_GROWTH_NAV_FLYOUT } from "@/lib/layout/app-z-layers"
 import { cn } from "@/lib/utils"
+import { AI_OS_WORKSPACE_LABEL } from "@/lib/workspace/ai-os-workspace-branding"
 import { hasActionableGrowthSidebarHealth } from "@/lib/growth/operator-ux/operator-attention-utils"
 
 export const GROWTH_SIDEBAR_NAV_QA_MARKER = "growth-sidebar-nav-v2" as const
@@ -1208,7 +1209,7 @@ class GrowthSidebarNavErrorBoundary extends Component<{ children: ReactNode }, {
   render() {
     if (this.state.hasError) {
       return (
-        <nav aria-label="Growth Engine" className="hidden w-60 shrink-0 lg:block">
+        <nav aria-label={`${AI_OS_WORKSPACE_LABEL} navigation`} className="hidden w-60 shrink-0 lg:block">
           <div className="sticky top-6 rounded-2xl border border-border bg-card p-3 text-xs text-muted-foreground shadow-sm">
             Growth navigation unavailable. Refresh to retry.
           </div>
@@ -1252,7 +1253,7 @@ function GrowthSectionSidebarNavInner() {
   return (
     <TooltipProvider delayDuration={200}>
       <nav
-        aria-label="Growth Engine"
+        aria-label={`${AI_OS_WORKSPACE_LABEL} navigation`}
         data-qa-marker={GROWTH_SIDEBAR_NAV_QA_MARKER}
         data-flyout-marker={GROWTH_SIDEBAR_FLYOUT_QA_MARKER}
         data-navigation-ia-marker={GROWTH_NAVIGATION_IA_QA_MARKER}
@@ -1264,7 +1265,7 @@ function GrowthSectionSidebarNavInner() {
         <div className="sticky top-6 flex flex-col overflow-visible rounded-2xl border border-border bg-card p-3 shadow-sm dark:border-border/80 dark:bg-card/95">
           <div className={cn("mb-2 flex items-center gap-1", collapsed ? "justify-center" : "justify-between")}>
             {!collapsed ? (
-              <p className="px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Growth Engine</p>
+              <p className="px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{AI_OS_WORKSPACE_LABEL}</p>
             ) : null}
             <Button
               type="button"
@@ -1302,7 +1303,7 @@ function GrowthSectionSidebarNavInner() {
       </nav>
 
       <nav
-        aria-label="Growth Engine"
+        aria-label={`${AI_OS_WORKSPACE_LABEL} navigation`}
         data-qa-marker={GROWTH_SIDEBAR_NAV_QA_MARKER}
         data-flyout-marker={GROWTH_SIDEBAR_FLYOUT_QA_MARKER}
         data-navigation-ia-marker={GROWTH_NAVIGATION_IA_QA_MARKER}

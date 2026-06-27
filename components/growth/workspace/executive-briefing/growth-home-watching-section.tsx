@@ -1,0 +1,51 @@
+"use client"
+
+import Link from "next/link"
+import type { GrowthHomeWatchingItem } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
+import { AI_PROACTIVE_WATCHING_TITLE } from "@/lib/workspace/ai-proactive-initiative"
+
+type Props = {
+  items: GrowthHomeWatchingItem[]
+}
+
+export function GrowthHomeWatchingSection({ items }: Props) {
+  if (items.length === 0) return null
+
+  return (
+    <section data-qa-section="home-what-im-watching" className="space-y-4">
+      <div>
+        <h2 className="text-xl font-semibold tracking-tight">{AI_PROACTIVE_WATCHING_TITLE}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Active monitoring from your current queue.</p>
+      </div>
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {items.map((item) => {
+          const inner = (
+            <span className="flex items-start gap-3 text-sm leading-relaxed text-foreground">
+              <span className="mt-2 size-1.5 shrink-0 rounded-full bg-sky-500" aria-hidden />
+              {item.label}
+            </span>
+          )
+
+          if (item.href) {
+            return (
+              <li key={item.id}>
+                <Link
+                  href={item.href}
+                  className="block rounded-lg border border-border/60 bg-card p-3 transition-colors hover:border-primary/25 hover:bg-muted/20"
+                >
+                  {inner}
+                </Link>
+              </li>
+            )
+          }
+
+          return (
+            <li key={item.id} className="rounded-lg border border-border/60 bg-card p-3">
+              {inner}
+            </li>
+          )
+        })}
+      </ul>
+    </section>
+  )
+}

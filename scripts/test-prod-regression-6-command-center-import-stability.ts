@@ -145,9 +145,10 @@ console.log("  ✓ legacy /growth/ai-os paths map to canonical /growth/os")
 
 const panel = readSource("components/growth/ai-os/command-center/growth-ai-os-command-center-panel.tsx")
 assert.ok(panel.includes("/api/platform/growth/ai-os/command-center"))
+assert.ok(panel.includes("GrowthAiOsOperatorDashboard"))
 assert.equal(panel.includes('method: "POST"'), false)
 assert.equal(panel.includes("transitionAiWorkOrder"), false)
-console.log("  ✓ AI Operations panel remains read-only (fetch GET only)")
+console.log("  ✓ AI Operations panel remains read-only (operator dashboard, GET only)")
 
 // ── 11. No GS-4D agent-orchestration in AI OS server path ──────────────────
 

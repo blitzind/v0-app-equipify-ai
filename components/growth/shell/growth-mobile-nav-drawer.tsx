@@ -11,6 +11,7 @@ import {
   WorkspaceSidebarOrganizationCard,
 } from "@/components/workspace/workspace-sidebar-organization-card"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-registry"
+import { AI_OS_WORKSPACE_LABEL } from "@/lib/workspace/ai-os-workspace-branding"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 
 type GrowthMobileNavDrawerProps = {
@@ -27,12 +28,12 @@ export function GrowthMobileNavDrawer({ open, onOpenChange }: GrowthMobileNavDra
         side="left"
         id="mobile-sidebar-nav"
         role="navigation"
-        aria-label="Growth Engine navigation"
+        aria-label={`${AI_OS_WORKSPACE_LABEL} navigation`}
         className="flex w-[min(85vw,280px)] flex-col border-r border-sidebar-border bg-[#0F172A] p-0 text-sidebar-foreground"
         data-qa-marker={GROWTH_WORKSPACE_SHELL_MOBILE_QA_MARKER}
         aria-describedby={undefined}
       >
-        <SheetTitle className="sr-only">Growth Engine navigation</SheetTitle>
+        <SheetTitle className="sr-only">{AI_OS_WORKSPACE_LABEL} navigation</SheetTitle>
         <div className="relative shrink-0">
           <WorkspaceShellBrand forceExpanded homeHref={GROWTH_WORKSPACE_BASE_PATH} />
           <button

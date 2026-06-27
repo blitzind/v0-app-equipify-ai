@@ -210,7 +210,7 @@ export async function prepareGeV15OutboundAction(
         leadId: input.leadId,
         ownerUserId: input.ownerUserId ?? null,
         title: `Prepared ${prepared.channel ?? "outbound"} for review`,
-        body: `Growth Engine prepared ${input.spec.title.toLowerCase()}. Review before sending.`,
+        body: `AI OS prepared ${input.spec.title.toLowerCase()}. Review before sending.`,
         metadata: {
           playbook_id: input.playbookId,
           trigger: input.trigger,

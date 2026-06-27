@@ -35,6 +35,7 @@ import {
   WORKSPACE_SIDEBAR_WIDTH_COLLAPSED,
   WORKSPACE_SIDEBAR_WIDTH_EXPANDED,
 } from "@/lib/workspace/workspace-shell-tokens"
+import { AI_OS_SIDEBAR_WORKSPACE_INDICATOR_LABEL } from "@/lib/workspace/ai-os-workspace-branding"
 import { WorkspaceShellBrand } from "@/components/workspace/workspace-shell-brand"
 import {
   WorkspaceSidebarOrganizationCard,
@@ -639,7 +640,9 @@ function SidebarBody({
           <div className="px-4 py-3 flex items-center gap-2.5">
             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: "var(--status-success)" }} />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-sidebar-foreground/50 leading-tight truncate">Workspace Active</p>
+              <p className="text-xs font-medium text-sidebar-foreground/50 leading-tight truncate">
+                {AI_OS_SIDEBAR_WORKSPACE_INDICATOR_LABEL}
+              </p>
               <p className="text-[11px] text-sidebar-foreground/30 leading-tight mt-0.5">Version 1.0</p>
             </div>
           </div>

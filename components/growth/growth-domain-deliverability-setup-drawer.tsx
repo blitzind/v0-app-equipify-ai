@@ -254,7 +254,7 @@ export function GrowthDomainDeliverabilitySetupDrawer({
         <SheetHeader className="shrink-0 space-y-2 border-b border-border/60 px-6 py-5 pr-14">
           <SheetTitle className="text-lg">DNS setup — {titleDomain}</SheetTitle>
           <SheetDescription className="leading-relaxed">
-            Publish MX, SPF, DKIM, and DMARC without leaving Growth Engine. Each record contributes 25
+            Publish MX, SPF, DKIM, and DMARC without leaving AI OS. Each record contributes 25
             points toward deliverability.
           </SheetDescription>
         </SheetHeader>

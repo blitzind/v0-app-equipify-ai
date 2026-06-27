@@ -25,7 +25,7 @@ export const PROSPECT_SEARCH_LEGACY_PANEL_HELPER =
   "Shown only when Growth Engine intelligence is not linked yet, or for operator comparison. Prefer the Growth Engine panel above for verified company, committee, and channel data." as const
 
 export const PROSPECT_SEARCH_ENGINE_INTELLIGENCE_PANEL_TITLE =
-  "Growth Engine intelligence (verified 7.2–7.7)" as const
+  "AI OS intelligence (verified 7.2–7.7)" as const
 
 export const PROSPECT_SEARCH_ENGINE_FILTER_SECTION_LABEL = "Verified intelligence" as const
 

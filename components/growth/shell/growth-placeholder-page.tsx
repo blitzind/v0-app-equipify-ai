@@ -30,7 +30,7 @@ export function GrowthPlaceholderPage({
         </span>
         <h2 className="mt-3 text-base font-semibold">Coming soon</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          This workspace section is part of the Growth Engine navigation plan. Existing admin functionality remains
+          This workspace section is part of the AI OS navigation plan. Existing admin functionality remains
           available under `/admin/growth/*` until this route is fully migrated.
         </p>
       </section>

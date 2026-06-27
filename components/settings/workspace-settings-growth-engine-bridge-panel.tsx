@@ -62,22 +62,22 @@ export function WorkspaceSettingsGrowthEngineBridgePanel({
           </span>
           <ArrowRight className="size-3.5 shrink-0" aria-hidden />
           <span className="rounded-md border border-emerald-200 bg-background px-2 py-1 text-xs font-medium text-emerald-900">
-            Destination: Growth Engine Settings
+            Destination: AI OS Settings
           </span>
         </div>
       </section>
 
       <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
         <p className="text-sm font-medium text-foreground">
-          This setting now lives in the Growth Engine workspace.
+          This setting now lives in the AI OS workspace.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          Opening it will switch you from Workspace Settings to Growth Engine Settings.
+          Opening it will switch you from Workspace Settings to AI OS settings.
         </p>
         <p className="mt-3 text-sm text-muted-foreground">{bridgeDescription}</p>
         <p className="mt-3 text-sm text-muted-foreground">
-          You are currently in Equipify Scale workspace settings. Mailboxes, DNS, warmup, sender pools,
-          and reputation are managed in the Growth Engine workspace because they belong to outbound sales
+          You are currently in workspace settings. Mailboxes, DNS, warmup, sender pools,
+          and reputation are managed in the AI OS workspace because they belong to outbound sales
           operations.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -89,7 +89,7 @@ export function WorkspaceSettingsGrowthEngineBridgePanel({
           </Button>
           <Button asChild variant="outline">
             <Link href={growthSettingsHref}>
-              Open in Growth Engine
+              Open in AI OS
               <ExternalLink className="ml-2 size-3.5" />
             </Link>
           </Button>

@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, type ComponentPropsWithoutRef, type ReactNode } from "react"
+import { AiTeammateIdentityProvider } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
+import { AiEmployeeStatusProvider } from "@/components/growth/ai-teammate/ai-employee-status-provider"
+import { GrowthAiTeammateOnboardingDialog } from "@/components/growth/ai-teammate/growth-ai-teammate-onboarding-dialog"
 import { GrowthWorkspaceShellPreferencesProvider, useGrowthWorkspaceShellPreferences } from "@/components/growth/settings/growth-workspace-shell-preferences-context"
 import { GrowthBreadcrumbProvider } from "@/components/growth/shell/growth-breadcrumb-context"
 import { GrowthBreadcrumbs } from "@/components/growth/shell/growth-breadcrumbs"
@@ -85,7 +88,12 @@ function GrowthWorkspaceShellInner({ children }: GrowthWorkspaceShellProps) {
 export function GrowthWorkspaceShell({ children }: GrowthWorkspaceShellProps) {
   return (
     <GrowthWorkspaceShellPreferencesProvider>
-      <GrowthWorkspaceShellInner>{children}</GrowthWorkspaceShellInner>
+      <AiTeammateIdentityProvider>
+        <AiEmployeeStatusProvider>
+          <GrowthWorkspaceShellInner>{children}</GrowthWorkspaceShellInner>
+          <GrowthAiTeammateOnboardingDialog />
+        </AiEmployeeStatusProvider>
+      </AiTeammateIdentityProvider>
     </GrowthWorkspaceShellPreferencesProvider>
   )
 }

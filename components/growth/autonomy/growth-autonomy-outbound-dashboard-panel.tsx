@@ -59,7 +59,7 @@ export function GrowthAutonomyOutboundDashboardPanel() {
           <Activity className="h-4 w-4 text-violet-600" />
           <CardTitle className="text-base">Today&apos;s activity</CardTitle>
         </div>
-        <CardDescription>Operational summary for autonomous Growth Engine actions.</CardDescription>
+        <CardDescription>Operational summary for autonomous AI OS actions.</CardDescription>
       </CardHeader>
       <CardContent className="grid grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] gap-3">
         <Stat label="AI actions today" value={String(dashboard.autonomousSendsToday + draftsPrepared)} />

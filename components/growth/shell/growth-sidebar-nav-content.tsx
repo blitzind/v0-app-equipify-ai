@@ -27,7 +27,9 @@ import {
   WORKSPACE_SIDEBAR_GROUP_HEADER,
   WORKSPACE_SIDEBAR_NAV_ICON,
   WORKSPACE_SIDEBAR_NAV_ROW,
+  WORKSPACE_SIDEBAR_GROWTH_ENGINE_LABEL,
 } from "@/lib/workspace/workspace-shell-tokens"
+import { AI_OS_SIDEBAR_WORKSPACE_INDICATOR_LABEL } from "@/lib/workspace/ai-os-workspace-branding"
 
 type GrowthSidebarNavContentProps = {
   onNavigate?: () => void
@@ -88,7 +90,7 @@ export function GrowthSidebarNavContent({
         collapsed ? "flex flex-col items-stretch px-0" : "px-3",
         className,
       )}
-      aria-label="Growth Engine navigation"
+      aria-label="AI OS navigation"
     >
       {GROWTH_SHELL_NAV_GROUPS.map((group, groupIndex) => {
         const groupCollapsed = collapsedGroups.has(group.id)
@@ -198,9 +200,11 @@ export function GrowthSidebarFooter({
           <span className="w-2 h-2 rounded-full shrink-0" style={{ background: "var(--status-success)" }} />
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-sidebar-foreground/50 leading-tight truncate">
-              Workspace Active
+              {AI_OS_SIDEBAR_WORKSPACE_INDICATOR_LABEL}
             </p>
-            <p className="text-[11px] text-sidebar-foreground/30 leading-tight mt-0.5">Growth Engine</p>
+            <p className="text-[11px] text-sidebar-foreground/30 leading-tight mt-0.5">
+              {WORKSPACE_SIDEBAR_GROWTH_ENGINE_LABEL}
+            </p>
           </div>
         </div>
       ) : null}

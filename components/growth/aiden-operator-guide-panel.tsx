@@ -91,7 +91,7 @@ export function AidenOperatorGuidePanel({
       <AidenRevenueJourneyTrackerPanel embedded />
 
       <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 px-4 py-3 dark:border-indigo-900/40 dark:bg-indigo-950/30">
-        <p className="text-sm font-medium text-foreground">Aiden — your Growth Engine operator coach</p>
+        <p className="text-sm font-medium text-foreground">Aiden — your AI OS operator coach</p>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
           Plainspoken guidance only. Nothing here sends email or changes data. Follow the steps; approve manually.{" "}
           <Link href="/admin/growth/aiden" className="font-medium text-indigo-600 hover:underline">

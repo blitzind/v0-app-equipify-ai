@@ -155,7 +155,7 @@ export function GrowthCommandNavigationPalette() {
       open={open}
       onOpenChange={setOpen}
       title="Growth navigation"
-      description="Jump to Growth Engine destinations and quick actions"
+      description="Jump to AI OS destinations and quick actions"
       data-qa-marker={GROWTH_NAVIGATION_IA_QA_MARKER}
       data-navigation-polish-marker={GROWTH_NAVIGATION_POLISH_QA_MARKER}
       commandProps={{ shouldFilter: false }}

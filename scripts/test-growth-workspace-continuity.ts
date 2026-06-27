@@ -191,7 +191,7 @@ function runAudit(): void {
   for (const entry of GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.filter((row) => !row.placeholder)) {
     const crumbs = resolveGrowthBreadcrumbs(entry.path)
     assert.ok(crumbs.length >= 1, `breadcrumb missing for ${entry.path}`)
-    assert.equal(crumbs[0]?.label, "Growth")
+    assert.equal(crumbs[0]?.label, "AI OS")
 
     if (entry.segment?.startsWith("leads/") || entry.segment?.startsWith("calls/") || entry.segment?.startsWith("inbox/") || entry.segment?.startsWith("opportunities/")) {
       assert.ok(crumbs.length >= 2, `hierarchical breadcrumb expected for ${entry.path}`)
@@ -202,33 +202,33 @@ function runAudit(): void {
   const inboxWorkflowCrumbs = resolveGrowthBreadcrumbs("/growth/inbox/workflow")
   assert.deepEqual(
     inboxWorkflowCrumbs.map((crumb) => crumb.label),
-    ["Growth", "Inbox", "Reply Workflow"],
+    ["AI OS", "Inbox", "Reply Workflow"],
   )
-  console.log("  ✓ inbox/workflow breadcrumbs: Growth → Inbox → Reply Workflow")
+  console.log("  ✓ inbox/workflow breadcrumbs: AI OS → Inbox → Reply Workflow")
 
   const inboxOperationsCrumbs = resolveGrowthBreadcrumbs("/growth/inbox/operations")
   assert.deepEqual(
     inboxOperationsCrumbs.map((crumb) => crumb.label),
-    ["Growth", "Inbox", "Operations"],
+    ["AI OS", "Inbox", "Operations"],
   )
-  console.log("  ✓ inbox/operations breadcrumbs: Growth → Inbox → Operations")
+  console.log("  ✓ inbox/operations breadcrumbs: AI OS → Inbox → Operations")
 
   const pipelineCrumbs = resolveGrowthBreadcrumbs("/growth/opportunities/pipeline")
   assert.deepEqual(
     pipelineCrumbs.map((crumb) => crumb.label),
-    ["Growth", "Opportunities", "Pipeline"],
+    ["AI OS", "Opportunities", "Pipeline"],
   )
-  console.log("  ✓ opportunities/pipeline breadcrumbs: Growth → Opportunities → Pipeline")
+  console.log("  ✓ opportunities/pipeline breadcrumbs: AI OS → Opportunities → Pipeline")
 
   const settingsProfileCrumbs = resolveGrowthBreadcrumbs("/growth/settings/profile")
-  assert.deepEqual(settingsProfileCrumbs.map((crumb) => crumb.label), ["Growth", "Settings", "Profile"])
-  console.log("  ✓ settings/profile breadcrumbs: Growth → Settings → Profile")
+  assert.deepEqual(settingsProfileCrumbs.map((crumb) => crumb.label), ["AI OS", "Settings", "Profile"])
+  console.log("  ✓ settings/profile breadcrumbs: AI OS → Settings → Profile")
 
   const conversationsCrumbs = resolveGrowthBreadcrumbs("/growth/conversations")
-  assert.deepEqual(conversationsCrumbs.map((crumb) => crumb.label), ["Growth", "Conversations"])
+  assert.deepEqual(conversationsCrumbs.map((crumb) => crumb.label), ["AI OS", "Conversations"])
   const relationshipsCrumbs = resolveGrowthBreadcrumbs("/growth/relationships")
-  assert.deepEqual(relationshipsCrumbs.map((crumb) => crumb.label), ["Growth", "Relationships"])
-  console.log("  ✓ intelligence breadcrumbs: Growth → Conversations / Relationships")
+  assert.deepEqual(relationshipsCrumbs.map((crumb) => crumb.label), ["AI OS", "Relationships"])
+  console.log("  ✓ intelligence breadcrumbs: AI OS → Conversations / Relationships")
 
   for (const { adminHref, workspaceSegment } of CMD_K_MIGRATED_RESOLUTIONS) {
     const resolved = resolveGrowthCommandPaletteHref("/growth/inbox", adminHref)
