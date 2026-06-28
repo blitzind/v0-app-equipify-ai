@@ -13,6 +13,7 @@ import { verifyEmailWithZeroBounce } from "@/lib/growth/contact-verification/pro
 import { verifyEmailAddressHeuristic } from "@/lib/growth/contact-verification/verify-email-heuristic"
 import { assertEmailSendAllowed } from "@/lib/growth/outbound/suppression-repository"
 import { isValidGrowthEmailFormat } from "@/lib/growth/import/email-format"
+import { shadowCompareNativeEmailVerification } from "@/lib/growth/contact-verification/native-email-verification-shadow"
 
 export function isEmailVerificationProviderConfigured(): boolean {
   if (isEmailVerificationDisabled()) return false
@@ -20,6 +21,36 @@ export function isEmailVerificationProviderConfigured(): boolean {
 }
 
 export async function verifyEmailWithProvider(
+  email: string | null | undefined,
+  options?: {
+    admin?: SupabaseClient
+    leadId?: string | null
+  },
+): Promise<EmailVerificationProviderResult | null> {
+  const result = await verifyEmailWithProviderCore(email, options)
+  await emitNativeEmailVerificationShadow(result)
+  return result
+}
+
+async function emitNativeEmailVerificationShadow(
+  result: EmailVerificationProviderResult | null,
+): Promise<void> {
+  if (!result) return
+  await shadowCompareNativeEmailVerification({
+    email: result.email,
+    legacyStatus: result.email_status,
+    legacyConfidence: result.confidence,
+    legacyProvider: result.provider_name,
+    context: {
+      provider_status: result.provider_status,
+      provider_sub_status: result.provider_sub_status,
+      verified_by_provider: result.verified_by_provider,
+      blocked_by_suppression: result.blocked_by_suppression,
+    },
+  }).catch(() => undefined)
+}
+
+async function verifyEmailWithProviderCore(
   email: string | null | undefined,
   options?: {
     admin?: SupabaseClient

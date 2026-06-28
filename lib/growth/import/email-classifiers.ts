@@ -15,6 +15,23 @@ export function isDisposableEmailDomain(domain: string | null | undefined): bool
   return DISPOSABLE_EMAIL_DOMAINS.has(normalized)
 }
 
+export const FREE_EMAIL_DOMAINS = new Set([
+  "gmail.com",
+  "yahoo.com",
+  "outlook.com",
+  "hotmail.com",
+  "icloud.com",
+  "aol.com",
+  "proton.me",
+  "protonmail.com",
+])
+
+export function isFreeEmailDomain(domain: string | null | undefined): boolean {
+  const normalized = domain?.trim().toLowerCase()
+  if (!normalized) return false
+  return FREE_EMAIL_DOMAINS.has(normalized)
+}
+
 /** Verification / prospect-search role local-parts (not website channel taxonomy). */
 const ROLE_EMAIL_LOCAL_PARTS = new Set([
   "info",

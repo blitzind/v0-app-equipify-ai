@@ -2,7 +2,7 @@
 
 import { baseConfidenceForSource } from "@/lib/growth/email-discovery/email-discovery-confidence"
 import type { GrowthEmailDiscoverySource } from "@/lib/growth/email-discovery/email-discovery-types"
-import { isDisposableEmailDomain, isRoleEmailLocalPart } from "@/lib/growth/import/email-classifiers"
+import { isDisposableEmailDomain, isFreeEmailDomain, isRoleEmailLocalPart } from "@/lib/growth/import/email-classifiers"
 import { isValidGrowthEmailFormat } from "@/lib/growth/import/email-format"
 import { normalizeEmail, parseEmailDomain, parseEmailLocalPart } from "@/lib/growth/import/normalize"
 import {
@@ -46,20 +46,6 @@ const GROWTH_EMAIL_DISCOVERY_SOURCE_SET = new Set<string>([
   "unknown",
 ])
 
-const COMMON_FREE_EMAIL_DOMAINS = new Set([
-  "gmail.com",
-  "googlemail.com",
-  "yahoo.com",
-  "yahoo.co.uk",
-  "outlook.com",
-  "hotmail.com",
-  "live.com",
-  "icloud.com",
-  "aol.com",
-  "protonmail.com",
-  "proton.me",
-])
-
 function extractTld(domain: string): string | null {
   const parts = domain.split(".").filter(Boolean)
   if (parts.length < 2) return null
@@ -68,7 +54,7 @@ function extractTld(domain: string): string | null {
 
 function classifyDomainType(domain: string | null): "business" | "free" | "unknown" {
   if (!domain) return "unknown"
-  if (COMMON_FREE_EMAIL_DOMAINS.has(domain)) return "free"
+  if (isFreeEmailDomain(domain)) return "free"
   return "business"
 }
 
