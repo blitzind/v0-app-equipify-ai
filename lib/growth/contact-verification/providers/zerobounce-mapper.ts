@@ -1,6 +1,7 @@
 /** Map ZeroBounce API statuses → company_contacts.email_status. Client-safe. */
 
 import type { GrowthCompanyContactEmailStatus } from "@/lib/growth/contact-discovery/company-contact-types"
+import { shadowCompareZeroBounceConfidence } from "@/lib/growth/contact-verification/confidence-signals-shadow"
 
 export type ZeroBounceValidateResponse = {
   address?: string
@@ -34,20 +35,34 @@ export function mapZeroBounceStatusToEmailStatus(input: {
 }
 
 export function confidenceForZeroBounceStatus(status: GrowthCompanyContactEmailStatus): number {
+  let score: number
   switch (status) {
     case "verified":
-      return 0.95
+      score = 0.95
+      break
     case "invalid":
-      return 0.92
+      score = 0.92
+      break
     case "blocked":
-      return 0.98
+      score = 0.98
+      break
     case "risky":
-      return 0.7
+      score = 0.7
+      break
     case "unknown":
-      return 0.45
+      score = 0.45
+      break
     default:
-      return 0.4
+      score = 0.4
   }
+
+  shadowCompareZeroBounceConfidence({
+    email_status: status,
+    legacy_confidence: score,
+    integration: "confidenceForZeroBounceStatus",
+  })
+
+  return score
 }
 
 export function reasonsForZeroBounceResult(raw: ZeroBounceValidateResponse): string[] {

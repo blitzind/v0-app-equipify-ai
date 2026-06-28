@@ -5,43 +5,66 @@ import type {
   GrowthEmailDiscoverySource,
   GrowthEmailDiscoveryVerificationStatus,
 } from "@/lib/growth/email-discovery/email-discovery-types"
+import { shadowCompareEmailDiscoveryConfidence } from "@/lib/growth/contact-verification/confidence-signals-shadow"
 
 export function confidenceTierForEmailDiscovery(input: {
   source: GrowthEmailDiscoverySource
   verification_status: GrowthEmailDiscoveryVerificationStatus
   base_confidence: number
 }): GrowthEmailDiscoveryConfidenceTier {
+  let tier: GrowthEmailDiscoveryConfidenceTier
   if (input.source === "website") {
-    return "direct_evidence"
+    tier = "direct_evidence"
+  } else if (input.source === "staging_contact") {
+    tier = input.base_confidence >= 0.75 ? "direct_evidence" : "provider_evidence"
+  } else if (input.source === "pdl") {
+    tier = "provider_evidence"
+  } else if (input.source === "pattern") {
+    tier = input.verification_status === "verified" ? "pattern_verified" : "pattern_unverified"
+  } else {
+    tier = "low"
   }
-  if (input.source === "staging_contact") {
-    return input.base_confidence >= 0.75 ? "direct_evidence" : "provider_evidence"
-  }
-  if (input.source === "pdl") {
-    return "provider_evidence"
-  }
-  if (input.source === "pattern") {
-    if (input.verification_status === "verified") return "pattern_verified"
-    return "pattern_unverified"
-  }
-  return "low"
+
+  shadowCompareEmailDiscoveryConfidence({
+    source: input.source,
+    verification_status: input.verification_status,
+    legacy_confidence: input.base_confidence,
+    integration: "confidenceTierForEmailDiscovery",
+  })
+
+  return tier
 }
 
 export function baseConfidenceForSource(source: GrowthEmailDiscoverySource): number {
+  let score: number
   switch (source) {
     case "website":
-      return 0.88
+      score = 0.88
+      break
     case "staging_contact":
-      return 0.8
+      score = 0.8
+      break
     case "pdl":
-      return 0.82
+      score = 0.82
+      break
     case "pattern":
-      return 0.35
+      score = 0.35
+      break
     case "manual":
-      return 0.7
+      score = 0.7
+      break
     default:
-      return 0.2
+      score = 0.2
   }
+
+  shadowCompareEmailDiscoveryConfidence({
+    source,
+    verification_status: "unverified",
+    legacy_confidence: score,
+    integration: "baseConfidenceForSource",
+  })
+
+  return score
 }
 
 export function canPromoteEmailDiscoveryCandidate(input: {

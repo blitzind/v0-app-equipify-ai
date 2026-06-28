@@ -11,6 +11,7 @@ import {
   baseConfidenceForSource,
   confidenceTierForEmailDiscovery,
 } from "@/lib/growth/email-discovery/email-discovery-confidence"
+import { shadowCompareNativeLegacyConfidenceDrift } from "@/lib/growth/contact-verification/confidence-signals-shadow"
 import type { GrowthEmailDiscoveryDraftCandidate } from "@/lib/growth/email-discovery/email-discovery-types"
 
 export type EmailDiscoveryPersonContext = {
@@ -43,6 +44,13 @@ function draftFromEmail(input: {
     source: input.source,
     verification_status: "unverified",
     base_confidence: base,
+  })
+
+  shadowCompareNativeLegacyConfidenceDrift({
+    integration: "draftFromEmail",
+    legacy_score: base,
+    email: input.email,
+    discoverySource: input.source,
   })
 
   return {

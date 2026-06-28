@@ -1041,6 +1041,7 @@
     "check:growth-extension-package": "tsx scripts/check-growth-extension-package.ts",
     "test:growth-browser-extension-install": "tsx scripts/test-growth-browser-extension-install.ts",
     "test:growth-email-verification-provider": "tsx scripts/test-growth-email-verification-provider.ts",
+    "test:growth-email-confidence-signals": "tsx scripts/test-growth-email-confidence-signals.ts",
     "test:growth-verification-enrichment": "tsx scripts/test-growth-verification-enrichment.ts",
     "test:growth-native-dialer": "tsx scripts/test-growth-native-dialer.ts",
     "test:growth-native-dialer-schema-health": "tsx scripts/test-growth-native-dialer-schema-health.ts",

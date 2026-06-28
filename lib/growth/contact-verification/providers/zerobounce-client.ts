@@ -14,6 +14,7 @@ import {
   type ZeroBounceValidateResponse,
 } from "@/lib/growth/contact-verification/providers/zerobounce-mapper"
 import type { EmailVerificationProviderResult } from "@/lib/growth/contact-verification/email-verification-types"
+import { shadowCompareNativeLegacyConfidenceDrift } from "@/lib/growth/contact-verification/confidence-signals-shadow"
 
 export async function verifyEmailWithZeroBounce(
   email: string,
@@ -60,11 +61,19 @@ export async function verifyEmailWithZeroBounce(
     status: providerStatus,
     sub_status: raw.sub_status,
   })
+  const legacy_confidence = confidenceForZeroBounceStatus(email_status)
+
+  shadowCompareNativeLegacyConfidenceDrift({
+    integration: "verifyEmailWithZeroBounce",
+    legacy_score: legacy_confidence,
+    email: normalized,
+    providerStatus,
+  })
 
   return {
     email: normalized,
     email_status,
-    confidence: confidenceForZeroBounceStatus(email_status),
+    confidence: legacy_confidence,
     reasons: reasonsForZeroBounceResult(raw),
     provider_name: "zerobounce",
     provider_status: providerStatus,

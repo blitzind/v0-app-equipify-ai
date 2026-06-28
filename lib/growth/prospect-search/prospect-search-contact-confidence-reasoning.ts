@@ -10,6 +10,7 @@ import {
   type ProspectSearchEmailVerificationDepth,
   type ProspectSearchPhoneVerificationDepth,
 } from "@/lib/growth/prospect-search/prospect-search-contact-verification-depth"
+import { shadowCompareProspectSearchVerificationDepth } from "@/lib/growth/contact-verification/confidence-signals-shadow"
 
 export type ProspectSearchContactConfidenceReasoning = {
   confidence_score: number
@@ -149,11 +150,21 @@ export function buildProspectSearchContactConfidenceReasoning(input: {
   if (top_reasons[0]) parts.push(top_reasons[0].toLowerCase())
   if (freshness === "fresh") parts.push("checked recently")
 
-  return {
+  const result = {
     confidence_score,
     confidence_label,
     summary: parts.join(", ") + ".",
     top_reasons: top_reasons.slice(0, 5),
     risk_notes: risk_notes.slice(0, 4),
   }
+
+  shadowCompareProspectSearchVerificationDepth({
+    email_verification_depth: input.email_verification_depth,
+    legacy_confidence_score: result.confidence_score,
+    email: input.email,
+    email_present: Boolean(input.email?.trim()),
+    integration: "buildProspectSearchContactConfidenceReasoning",
+  })
+
+  return result
 }

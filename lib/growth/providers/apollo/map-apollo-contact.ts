@@ -22,6 +22,7 @@ import type {
   ApolloRedactedRawFieldDiagnostics,
   ApolloSearchDiagnostics,
 } from "@/lib/growth/providers/apollo/apollo-types"
+import { shadowCompareApolloEmailConfidence } from "@/lib/growth/contact-verification/confidence-signals-shadow"
 
 export type ApolloRedactedRejectionSample = ApolloRedactedRawFieldDiagnostics & {
   raw_first_name_present: boolean
@@ -241,6 +242,14 @@ export function mapApolloPersonToContactDiscoveryRaw(
   }
 
   const confidence = resolveConfidence(person, hasPii)
+
+  shadowCompareApolloEmailConfidence({
+    person,
+    context: input,
+    legacy_confidence: confidence,
+    integration: "mapApolloPersonToContactDiscoveryRaw",
+    email: email ?? rawEmail,
+  })
 
   return {
     full_name,
