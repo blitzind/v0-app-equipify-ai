@@ -10,6 +10,22 @@ export function normalizeEmail(value: string | null | undefined): string | null 
   return trimmed
 }
 
+export function parseEmailDomain(email: string): string | null {
+  const normalized = normalizeEmail(email)
+  if (!normalized) return null
+  const at = normalized.lastIndexOf("@")
+  if (at <= 0 || at === normalized.length - 1) return null
+  return normalized.slice(at + 1)
+}
+
+export function parseEmailLocalPart(email: string): string | null {
+  const normalized = normalizeEmail(email)
+  if (!normalized) return null
+  const at = normalized.lastIndexOf("@")
+  if (at <= 0 || at === normalized.length - 1) return null
+  return normalized.slice(0, at)
+}
+
 export function normalizePhone(value: string | null | undefined): string | null {
   const digits = (value ?? "").replace(/\D/g, "")
   if (digits.length < 10) return null

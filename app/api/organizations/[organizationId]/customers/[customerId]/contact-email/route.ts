@@ -5,6 +5,7 @@ import { sendEmail } from "@/lib/email/resend"
 import { buildCustomerStaffMessageEmailContent } from "@/lib/email/templates"
 import { requireAnyOrgPermission } from "@/lib/api/require-org-permission"
 import { logCommunicationEvent } from "@/lib/notifications/log-event"
+import { normalizeEmail as normalizeCanonicalEmail } from "@/lib/growth/import/normalize"
 
 export const runtime = "nodejs"
 
@@ -20,7 +21,7 @@ function logCustomerContactEmail(payload: Record<string, unknown>) {
 }
 
 function normalizeEmail(e: string): string {
-  return e.trim().toLowerCase()
+  return normalizeCanonicalEmail(e) ?? e.trim().toLowerCase()
 }
 
 /**

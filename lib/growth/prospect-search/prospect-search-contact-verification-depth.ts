@@ -1,12 +1,16 @@
 /** Conservative contact verification depth — evidence-backed, no SMTP probing. Client-safe. */
 
+import { isDisposableEmailDomain, isRoleEmailLocalPart } from "@/lib/growth/import/email-classifiers"
+import { isValidGrowthEmailFormat } from "@/lib/growth/import/email-format"
+import { parseEmailDomain, parseEmailLocalPart } from "@/lib/growth/import/normalize"
+
 export const GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER =
   "growth-contact-verification-depth-v1" as const
 
 export const PROSPECT_SEARCH_EMAIL_VERIFICATION_DEPTHS = [
   "published_on_website",
-  "mx_valid",
-  "domain_accepts_mail",
+  "mx_valid", // reserved — not assigned by classifier today; future MX probe
+  "domain_accepts_mail", // reserved — not assigned by classifier today; future SMTP/catch-all
   "role_email",
   "personal_email",
   "unverifiable",
@@ -31,44 +35,6 @@ export const PROSPECT_SEARCH_PHONE_VERIFICATION_DEPTHS = [
 
 export type ProspectSearchPhoneVerificationDepth =
   (typeof PROSPECT_SEARCH_PHONE_VERIFICATION_DEPTHS)[number]
-
-const DISPOSABLE_DOMAINS = new Set([
-  "mailinator.com",
-  "guerrillamail.com",
-  "tempmail.com",
-  "throwaway.email",
-  "yopmail.com",
-  "10minutemail.com",
-])
-
-const ROLE_LOCAL_PARTS = new Set([
-  "info",
-  "contact",
-  "sales",
-  "support",
-  "hello",
-  "admin",
-  "office",
-  "service",
-  "dispatch",
-  "billing",
-  "hr",
-  "careers",
-  "help",
-  "team",
-])
-
-const EMAIL_FORMAT_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-function emailDomain(email: string): string | null {
-  const parts = email.trim().toLowerCase().split("@")
-  return parts.length === 2 ? parts[1]! : null
-}
-
-function emailLocalPart(email: string): string | null {
-  const parts = email.trim().toLowerCase().split("@")
-  return parts.length === 2 ? parts[0]! : null
-}
 
 function normalizePhoneDigits(phone: string): string {
   return phone.replace(/\D/g, "")
@@ -117,20 +83,20 @@ export function classifyProspectSearchEmailVerificationDepth(input: {
 }): ProspectSearchEmailVerificationDepth {
   const email = input.email?.trim()
   if (!email) return "unverifiable"
-  if (!EMAIL_FORMAT_RE.test(email)) return "invalid_format"
+  if (!isValidGrowthEmailFormat(email)) return "invalid_format"
 
-  const domain = emailDomain(email)
-  if (domain && DISPOSABLE_DOMAINS.has(domain)) return "disposable_domain"
+  const domain = parseEmailDomain(email)
+  if (domain && isDisposableEmailDomain(domain)) return "disposable_domain"
 
-  const local = emailLocalPart(email)
+  const local = parseEmailLocalPart(email)
   const onWebsite = hasWebsiteEvidence(input)
 
   if (onWebsite) {
-    if (local && ROLE_LOCAL_PARTS.has(local)) return "role_email"
+    if (local && isRoleEmailLocalPart(local)) return "role_email"
     return "published_on_website"
   }
 
-  if (local && ROLE_LOCAL_PARTS.has(local)) return "role_email"
+  if (local && isRoleEmailLocalPart(local)) return "role_email"
   if (local && local.includes(".")) return "personal_email"
 
   const status = (input.email_status ?? "").toLowerCase()
@@ -185,12 +151,9 @@ export function formatPhoneVerificationDepthLabel(depth: ProspectSearchPhoneVeri
 }
 
 export function emailDepthImpliesVerified(depth: ProspectSearchEmailVerificationDepth): boolean {
-  return (
-    depth === "published_on_website" ||
-    depth === "mx_valid" ||
-    depth === "domain_accepts_mail" ||
-    depth === "personal_email"
-  )
+  // mx_valid and domain_accepts_mail remain in the union for future MX/SMTP work but are
+  // never assigned by classifyProspectSearchEmailVerificationDepth() today — do not treat as verified.
+  return depth === "published_on_website" || depth === "personal_email"
 }
 
 export function phoneDepthImpliesCallable(depth: ProspectSearchPhoneVerificationDepth): boolean {

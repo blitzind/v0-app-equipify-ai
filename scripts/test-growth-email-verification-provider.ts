@@ -62,8 +62,11 @@ const acquisitionSource = fs.readFileSync(
 assert.match(acquisitionSource, /not_provider_verified/)
 assert.match(acquisitionSource, /email_blocked/)
 
+const GROWTH_COMPANY_CONTACTS_EMAIL_BLOCKED_MIGRATION =
+  "20270621121000_growth_engine_company_contacts_email_blocked.sql" as const
+
 const migration = fs.readFileSync(
-  path.join(process.cwd(), "supabase/migrations/20270529140000_growth_engine_company_contacts_email_blocked.sql"),
+  path.join(process.cwd(), `supabase/migrations/${GROWTH_COMPANY_CONTACTS_EMAIL_BLOCKED_MIGRATION}`),
   "utf8",
 )
 assert.match(migration, /blocked/)

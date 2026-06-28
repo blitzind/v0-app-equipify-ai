@@ -3864,6 +3864,7 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
     await import("../lib/growth/prospect-search/prospect-search-contact-freshness")
   const {
     classifyProspectSearchEmailVerificationDepth,
+    emailDepthImpliesVerified,
     GROWTH_CONTACT_VERIFICATION_DEPTH_QA_MARKER,
   } = await import("../lib/growth/prospect-search/prospect-search-contact-verification-depth")
   const { buildProspectSearchContactConfidenceReasoning } = await import(
@@ -3892,6 +3893,15 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
     }),
     "role_email",
   )
+
+  assert.equal(emailDepthImpliesVerified("published_on_website"), true)
+  assert.equal(emailDepthImpliesVerified("personal_email"), true)
+  assert.equal(emailDepthImpliesVerified("mx_valid"), false)
+  assert.equal(emailDepthImpliesVerified("domain_accepts_mail"), false)
+  assert.equal(emailDepthImpliesVerified("verification_needed"), false)
+  assert.equal(emailDepthImpliesVerified("role_email"), false)
+  assert.equal(emailDepthImpliesVerified("disposable_domain"), false)
+  assert.equal(emailDepthImpliesVerified("invalid_format"), false)
 
   const reasoning = buildProspectSearchContactConfidenceReasoning({
     confidence: 0.82,

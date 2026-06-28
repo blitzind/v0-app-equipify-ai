@@ -4,15 +4,9 @@ import "server-only"
 
 import { promises as dns } from "node:dns"
 import type { GrowthCompanyContactEmailStatus } from "@/lib/growth/contact-discovery/company-contact-types"
-
-const DISPOSABLE_DOMAINS = new Set([
-  "mailinator.com",
-  "guerrillamail.com",
-  "tempmail.com",
-  "10minutemail.com",
-  "yopmail.com",
-  "throwaway.email",
-])
+import { isDisposableEmailDomain } from "@/lib/growth/import/email-classifiers"
+import { isValidGrowthEmailFormat } from "@/lib/growth/import/email-format"
+import { parseEmailDomain } from "@/lib/growth/import/normalize"
 
 export type HeuristicEmailVerificationResult = {
   email: string
@@ -24,8 +18,6 @@ export type HeuristicEmailVerificationResult = {
   reasons: string[]
 }
 
-const EMAIL_FORMAT = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i
-
 export async function verifyEmailAddressHeuristic(
   email: string | null | undefined,
 ): Promise<HeuristicEmailVerificationResult | null> {
@@ -33,7 +25,7 @@ export async function verifyEmailAddressHeuristic(
   if (!normalized) return null
 
   const reasons: string[] = []
-  const valid_format = EMAIL_FORMAT.test(normalized)
+  const valid_format = isValidGrowthEmailFormat(normalized)
   if (!valid_format) {
     return {
       email: normalized,
@@ -46,8 +38,8 @@ export async function verifyEmailAddressHeuristic(
     }
   }
 
-  const domain = normalized.split("@")[1] ?? ""
-  const disposable = DISPOSABLE_DOMAINS.has(domain)
+  const domain = parseEmailDomain(normalized) ?? ""
+  const disposable = isDisposableEmailDomain(domain)
   if (disposable) {
     reasons.push("Disposable domain detected")
   }

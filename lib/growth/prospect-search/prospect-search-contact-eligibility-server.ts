@@ -2,6 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import { normalizeEmail } from "@/lib/growth/import/normalize"
 import { loadProspectSearchSuppressionLookup } from "@/lib/growth/prospect-search/prospect-search-suppression-overlays"
 import { normalizePhoneNumber } from "@/lib/voice/phone-normalization"
 
@@ -9,11 +10,6 @@ export type ProspectSearchContactEligibilityHints = {
   phone_on_dnc: boolean | null
   email_suppressed: boolean
   contact_suppressed: boolean
-}
-
-function normalizeEmail(value: string | null | undefined): string | null {
-  const trimmed = value?.trim().toLowerCase()
-  return trimmed || null
 }
 
 export async function loadPhoneDncLookup(

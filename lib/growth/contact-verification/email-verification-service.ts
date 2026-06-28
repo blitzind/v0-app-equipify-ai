@@ -12,8 +12,7 @@ import {
 import { verifyEmailWithZeroBounce } from "@/lib/growth/contact-verification/providers/zerobounce-client"
 import { verifyEmailAddressHeuristic } from "@/lib/growth/contact-verification/verify-email-heuristic"
 import { assertEmailSendAllowed } from "@/lib/growth/outbound/suppression-repository"
-
-const EMAIL_FORMAT = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i
+import { isValidGrowthEmailFormat } from "@/lib/growth/import/email-format"
 
 export function isEmailVerificationProviderConfigured(): boolean {
   if (isEmailVerificationDisabled()) return false
@@ -30,7 +29,7 @@ export async function verifyEmailWithProvider(
   const normalized = (email ?? "").trim().toLowerCase()
   if (!normalized) return null
 
-  if (!EMAIL_FORMAT.test(normalized)) {
+  if (!isValidGrowthEmailFormat(normalized)) {
     return {
       email: normalized,
       email_status: "invalid",

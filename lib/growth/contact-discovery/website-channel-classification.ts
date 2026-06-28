@@ -4,14 +4,8 @@ import type {
   WebsiteEmailClassification,
   WebsitePhoneClassification,
 } from "@/lib/growth/contact-discovery/website-extraction-acquisition-types"
-
-const DISPOSABLE_DOMAINS = new Set([
-  "mailinator.com",
-  "guerrillamail.com",
-  "tempmail.com",
-  "yopmail.com",
-  "10minutemail.com",
-])
+import { isDisposableEmailDomain } from "@/lib/growth/import/email-classifiers"
+import { parseEmailDomain, parseEmailLocalPart } from "@/lib/growth/import/normalize"
 
 const ROLE_LOCAL = new Set([
   "info",
@@ -33,14 +27,6 @@ const SALES_LOCAL = new Set(["sales", "quotes", "quote", "estimates", "estimate"
 const DISPATCH_LOCAL = new Set(["dispatch", "scheduling", "schedule", "routing"])
 const BILLING_LOCAL = new Set(["billing", "accounts", "accounting", "ap", "ar", "invoices"])
 
-function emailLocal(email: string): string {
-  return email.split("@")[0]?.toLowerCase() ?? ""
-}
-
-function emailDomain(email: string): string {
-  return email.split("@")[1]?.toLowerCase() ?? ""
-}
-
 function phoneDigits(phone: string): string {
   const d = phone.replace(/\D/g, "")
   return d.length === 11 && d.startsWith("1") ? d.slice(1) : d
@@ -58,11 +44,11 @@ export function classifyWebsiteEmail(input: {
     return { classification: "unknown", confidence: 0, evidence: [] }
   }
 
-  const local = emailLocal(email)
-  const domain = emailDomain(email)
+  const local = parseEmailLocalPart(email) ?? ""
+  const domain = parseEmailDomain(email) ?? ""
   const evidence: string[] = []
 
-  if (DISPOSABLE_DOMAINS.has(domain)) {
+  if (isDisposableEmailDomain(domain)) {
     return { classification: "invalid_disposable", confidence: 0.92, evidence: ["Disposable domain"] }
   }
 

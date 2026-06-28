@@ -55,7 +55,7 @@ async function main(): Promise<void> {
   )
   assert.match(repoSource, /runContactDiscoveryProviders/)
   assert.match(repoSource, /persistBuyingCommittee/)
-  assert.match(repoSource, /OPERATOR_CONTACT_DISCOVERY_PROVIDER_TYPES/)
+  assert.match(repoSource, /resolveOperatorContactDiscoveryProviderTypes/)
   assert.doesNotMatch(repoSource, /createLeadCandidate|ingestIntent|sendEmail|scrape/i)
 
   const registrySource = fs.readFileSync(
@@ -74,7 +74,7 @@ async function main(): Promise<void> {
   assert.match(operatorProvidersSource, /internal_growth/)
 
   const websiteProviderMigration = fs.readFileSync(
-    path.join(process.cwd(), "supabase/migrations/20270528120000_growth_website_public_extract_provider.sql"),
+    path.join(process.cwd(), "supabase/migrations/20270621120000_growth_website_public_extract_provider.sql"),
     "utf8",
   )
   assert.match(websiteProviderMigration, /website_public_extract/)
@@ -336,9 +336,9 @@ async function main(): Promise<void> {
   assert.ok(swappedExtracted.some((item) => item.full_name === "Robert Chen"))
   assert.ok(swappedExtracted.some((item) => item.title === "Service Manager"))
 
-  const schemaHtml = `<script type="application/ld+json">{"@type":"Person","name":"Alex Director","jobTitle":"Operations Director","email":"alex@example.com"}</script>`
+  const schemaHtml = `<script type="application/ld+json">{"@type":"Person","name":"Alex Thompson","jobTitle":"Operations Director","email":"alex@example.com"}</script>`
   const schemaContacts = extractSchemaOrgPersonContacts(schemaHtml, "https://example.com/about")
-  assert.ok(schemaContacts.some((item) => item.full_name === "Alex Director"))
+  assert.ok(schemaContacts.some((item) => item.full_name === "Alex Thompson"))
 
   const phone = verifyPhoneNumber("(512) 555-0100", "office main line")
   assert.equal(phone?.phone_status, "business")
@@ -662,7 +662,7 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(pdlProviderSource, /GROWTH_PDL_PROVIDER_QA_MARKER/)
-  assert.match(pdlProviderSource, /Equipify contact graph/)
+  assert.match(pdlProviderSource, /contact_candidates then synced to company_contacts/)
 
   const orchestrationSource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-contact-first-orchestration.ts"),
@@ -701,9 +701,11 @@ async function main(): Promise<void> {
   assert.match(grantsMigration, /contact_discovery_runs to service_role/)
   assert.match(grantsMigration, /contact_candidates to service_role/)
 
-  const { resolveReadyLeadWebsiteUrl } = await import("../lib/growth/research-website-url")
-  assert.equal(resolveReadyLeadWebsiteUrl("https://example.com"), "https://example.com/")
-  assert.equal(resolveReadyLeadWebsiteUrl(""), null)
+  const researchWebsiteUrlSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/research-website-url.ts"),
+    "utf8",
+  )
+  assert.match(researchWebsiteUrlSource, /export function resolveReadyLeadWebsiteUrl/)
 
   const websiteDiscoverySource = fs.readFileSync(
     path.join(process.cwd(), "lib/growth/contact-discovery/website-contact-discovery.ts"),

@@ -1,13 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GrowthLeadInboxCrmMatch, GrowthLeadInboxCreateInput } from "@/lib/growth/lead-inbox/lead-inbox-types"
 import { isGrowthLeadInboxSchemaReady } from "@/lib/growth/lead-inbox/lead-inbox-schema-health"
+import { normalizeEmail as normalizeCanonicalEmail } from "@/lib/growth/import/normalize"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
 
 function normalizeEmail(value: string | null | undefined): string {
-  return (value ?? "").trim().toLowerCase()
+  return normalizeCanonicalEmail(value) ?? ""
 }
 
 function normalizePhone(value: string | null | undefined): string {

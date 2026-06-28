@@ -1,14 +1,10 @@
 /** Cross-provider contact merge for Prospect Search intelligence. Client-safe. */
 
+import { normalizeEmail } from "@/lib/growth/import/normalize"
 import type { ProspectSearchContactIntelligenceInputContact } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence"
 
 function normalizeName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ")
-}
-
-function normalizeEmail(email: string | null | undefined): string | null {
-  const trimmed = email?.trim().toLowerCase()
-  return trimmed || null
 }
 
 function normalizePhone(phone: string | null | undefined): string | null {

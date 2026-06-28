@@ -67,10 +67,16 @@ const acquisitionDetailSource = fs.readFileSync(
 )
 assert.match(acquisitionDetailSource, /GrowthManualContactFormDialog/)
 
-const crmSource = fs.readFileSync(
+const crmPageSource = fs.readFileSync(
   path.join(process.cwd(), "app/(admin)/admin/growth/leads/crm/page.tsx"),
   "utf8",
 )
-assert.match(crmSource, /GrowthManualContactFormDialog/)
+assert.match(crmPageSource, /GrowthLeadsCrmWorkspace/)
+
+const crmWorkspaceSource = fs.readFileSync(
+  path.join(process.cwd(), "components/growth/leads/growth-leads-crm-workspace.tsx"),
+  "utf8",
+)
+assert.match(crmWorkspaceSource, /GrowthManualContactFormDialog/)
 
 console.log("growth-manual-contact-entry checks passed")

@@ -1,9 +1,10 @@
+import { isValidGrowthEmailFormat } from "@/lib/growth/import/email-format"
 import { normalizePhone, normalizeWebsiteUrl } from "@/lib/growth/import/normalize"
 
 export function validateLeadContactEmail(value: string | null | undefined): string | null {
   const trimmed = value?.trim() ?? ""
   if (!trimmed) return null
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+  if (!isValidGrowthEmailFormat(trimmed)) {
     throw new Error("invalid_email")
   }
   return trimmed.toLowerCase()

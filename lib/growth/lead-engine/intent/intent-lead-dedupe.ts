@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto"
 import type { GrowthIntentAggregatedSession } from "@/lib/growth/lead-engine/intent/intent-session-aggregator"
 import type { GrowthIntentLeadCandidateIdentity } from "@/lib/growth/lead-engine/intent/intent-candidate-types"
+import { normalizeEmail as normalizeCanonicalEmail } from "@/lib/growth/import/normalize"
 
 export type GrowthIntentDedupeSource = {
   email?: string | null
@@ -21,7 +22,7 @@ export type GrowthIntentDedupeResult = {
 }
 
 function normalizeEmail(value: string | null | undefined): string {
-  return (value ?? "").trim().toLowerCase()
+  return normalizeCanonicalEmail(value) ?? ""
 }
 
 function normalizePhone(value: string | null | undefined): string {
