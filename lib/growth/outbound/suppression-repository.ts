@@ -3,6 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GrowthQaDeliverabilityBypassSnapshot } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass-types"
 import { normalizeEmail } from "@/lib/growth/import/normalize"
+import { mirrorLegacySuppressionToCompliance } from "@/lib/growth/compliance/suppression-dual-write"
 import type { GrowthSuppressionEntry, GrowthSuppressionReason, GrowthSuppressionSource } from "@/lib/growth/outbound/types"
 
 type SuppressionDbRow = {
@@ -67,8 +68,19 @@ export async function upsertGrowthSuppressionEntry(
   const normalized = normalizeEmail(input.email)
   if (!normalized) throw new Error("invalid_email")
 
+  const mirrorInput = {
+    email: normalized,
+    reason: input.reason,
+    source: input.source,
+    leadId: input.leadId ?? null,
+    contactId: input.contactId ?? null,
+  }
+
   const { data: existing } = await suppressionTable(admin).select(SELECT).eq("email", normalized).maybeSingle()
-  if (existing) return mapRow(existing as SuppressionDbRow)
+  if (existing) {
+    await mirrorLegacySuppressionToCompliance(admin, mirrorInput)
+    return mapRow(existing as SuppressionDbRow)
+  }
 
   const { data, error } = await suppressionTable(admin)
     .insert({
@@ -84,6 +96,8 @@ export async function upsertGrowthSuppressionEntry(
     .single()
 
   if (error) throw new Error(error.message)
+
+  await mirrorLegacySuppressionToCompliance(admin, mirrorInput)
   return mapRow(data as SuppressionDbRow)
 }
 

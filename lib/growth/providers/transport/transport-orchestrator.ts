@@ -31,6 +31,7 @@ import { listDeliveryRoutes } from "@/lib/growth/providers/provider-repository"
 import { resolveTransportSenderWithPool } from "@/lib/growth/sender-pools/sender-pool-rotation-service"
 import type { GrowthSenderRotationFallbackCandidate } from "@/lib/growth/sender-pools/sender-pool-types"
 import { recordNativeWarmupSend } from "@/lib/growth/warmup/warmup-execution"
+import { shadowLogOutboundSend } from "@/lib/growth/contact-verification/email-learning-shadow"
 import { resolveGrowthActorForDb } from "@/lib/growth/actor-user-id"
 
 export class TransportHumanApprovalRequiredError extends Error {
@@ -343,6 +344,15 @@ async function executeAttemptOnRoute(
         deliveryAttemptId: attempt.id,
       }).catch(() => undefined)
     }
+    shadowLogOutboundSend({
+      email: input.message.to,
+      provider: input.provider_family,
+      sequenceId: input.sequence_enrollment_id,
+      contactId: input.lead_id,
+      sentAt: sent.sent_at,
+      deliveryAttemptId: sent.id,
+      context: { route_id: input.route_id },
+    })
     return { ok: true, attempt: sent, provider_message_id: sendResult.provider_message_id }
   }
 

@@ -12,6 +12,7 @@ import {
 import { emitGrowthLeadStatusChangedTimeline } from "@/lib/growth/timeline-emitter"
 import type { GrowthLeadStatus } from "@/lib/growth/types"
 import { maybeBridgeApolloPipelineToMeetingIntelligenceForLead } from "@/lib/growth/apollo/apollo-meeting-bridge"
+import { shadowLogReplyIntelligence } from "@/lib/growth/contact-verification/email-learning-shadow"
 
 async function resolveDmPhone(
   admin: SupabaseClient,
@@ -130,6 +131,19 @@ export async function finalizeIngestedReplyIntelligence(
     campaignId: input.campaignId,
     ingestionEventId: input.ingestionEventId,
   })
+
+  if (input.senderEmail) {
+    shadowLogReplyIntelligence({
+      email: input.senderEmail,
+      intent: intelligence.intent,
+      classification: input.outboundReply.classification,
+      contactId: input.outboundReply.contactId,
+      campaignId: input.campaignId,
+      receivedAt: input.outboundReply.receivedAt,
+      replyId: input.outboundReply.id,
+      context: { lead_id: input.leadId },
+    })
+  }
 
   const { buildReplyLeadSignalEvents } = await import(
     "@/lib/growth/signal-intelligence/lead-signal-producers"

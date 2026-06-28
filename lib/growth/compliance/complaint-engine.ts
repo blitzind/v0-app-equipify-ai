@@ -10,6 +10,7 @@ import { applyDeliverySuppression } from "@/lib/growth/compliance/suppression-en
 import { buildSenderReputationSnapshot } from "@/lib/growth/compliance/sender-reputation"
 import { getDeliveryAttempt } from "@/lib/growth/providers/transport/transport-repository"
 import { recordExperimentMetricFromDeliveryAttempt } from "@/lib/growth/experiments/experiment-metrics"
+import { shadowLogComplianceComplaint } from "@/lib/growth/contact-verification/email-learning-shadow"
 
 function complaintsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("email_complaints")
@@ -82,6 +83,15 @@ export async function recordEmailComplaint(
     deliveryAttemptId: attempt.id,
     metric: "complaints",
   }).catch(() => undefined)
+
+  if (recipientEmail) {
+    shadowLogComplianceComplaint({
+      email: recipientEmail,
+      occurredAt,
+      leadId: attempt.lead_id,
+      context: { delivery_attempt_id: attempt.id },
+    })
+  }
 
   return { recorded: true }
 }

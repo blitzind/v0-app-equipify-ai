@@ -20,6 +20,7 @@ import { buildSenderReputationSnapshot } from "@/lib/growth/compliance/sender-re
 import { applyDeliverySuppression } from "@/lib/growth/compliance/suppression-engine"
 import { dispatchSequenceWakeForDeliveryAttempt } from "@/lib/growth/sequences/conditions/sequence-event-wake-engine"
 import { getDeliveryAttempt } from "@/lib/growth/providers/transport/transport-repository"
+import { shadowLogComplianceBounce } from "@/lib/growth/contact-verification/email-learning-shadow"
 
 type BounceRow = {
   id: string
@@ -237,6 +238,16 @@ export async function recordEmailBounce(
     deliveryAttemptId: attempt.id,
     metric: "bounces",
   }).catch(() => undefined)
+
+  if (recipientEmail) {
+    shadowLogComplianceBounce({
+      email: recipientEmail,
+      bounceType: classification.bounceType,
+      occurredAt,
+      leadId: attempt.lead_id,
+      context: { delivery_attempt_id: attempt.id },
+    })
+  }
 
   return { recorded: true, classification }
 }

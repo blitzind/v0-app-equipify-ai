@@ -23,6 +23,12 @@ import { DEV_FALLBACK_CREDENTIAL_PEPPER, isUsingDevFallbackCredentialPepper } fr
 /** Handlers registered in telemetry; Vercel schedule is added at deploy time. */
 const CRON_ROUTES_PENDING_VERCEL_SCHEDULE = [] as const satisfies readonly GrowthCronRouteId[]
 
+/**
+ * Growth crons scheduled in vercel.json but certified under runtime guardrails (GS-RG-1),
+ * not the operational send-plane telemetry registry.
+ */
+const GROWTH_CRON_ROUTES_CERTIFIED_OUTSIDE_SEND_PLANE_REGISTRY = ["growth-event-retention"] as const
+
 async function main(): Promise<void> {
   assert.equal(GROWTH_CRON_TELEMETRY_QA_MARKER, "growth-operational-send-plane-v1")
   assert.equal(GROWTH_INFRASTRUCTURE_READINESS_QA_MARKER, "growth-internal-outbound-ops-v1")
@@ -69,11 +75,28 @@ async function main(): Promise<void> {
 
   for (const apiPath of vercelCronPaths) {
     if (!apiPath.startsWith("/api/cron/growth-")) continue
+    const routeId = apiPath.replace("/api/cron/", "")
+    if (
+      (GROWTH_CRON_ROUTES_CERTIFIED_OUTSIDE_SEND_PLANE_REGISTRY as readonly string[]).includes(routeId)
+    ) {
+      assert.ok(
+        fs.existsSync(path.join(process.cwd(), `app/api/cron/${routeId}/route.ts`)),
+        `missing cron route file for ${routeId}`,
+      )
+      continue
+    }
     assert.ok(
-      GROWTH_CRON_ROUTE_IDS.some((routeId) => growthCronApiPath(routeId) === apiPath),
+      GROWTH_CRON_ROUTE_IDS.some((registeredRouteId) => growthCronApiPath(registeredRouteId) === apiPath),
       `vercel cron ${apiPath} must be registered in GROWTH_CRON_ROUTE_IDS`,
     )
   }
+
+  const eventRetentionRoute = fs.readFileSync(
+    path.join(process.cwd(), "app/api/cron/growth-event-retention/route.ts"),
+    "utf8",
+  )
+  assert.match(eventRetentionRoute, /runAllEventRetentionBatches/)
+  assert.match(eventRetentionRoute, /runGrowthCronJob/)
 
   const migration = fs.readFileSync(
     path.join(process.cwd(), `supabase/migrations/${GROWTH_CRON_EXECUTION_TELEMETRY_MIGRATION}`),
@@ -162,6 +185,18 @@ async function main(): Promise<void> {
   )
   assert.match(outboundUi, /GROWTH_OUTBOUND_CRON_HEALTH_V2_QA_MARKER/)
   assert.match(outboundUi, /GROWTH_OUTBOUND_SETUP_AWARE_ALERTS_QA_MARKER/)
+
+  const preSendOrder = preSend.indexOf("evaluatePreSendSuppression")
+  const outboundSuppressionOrder = preSend.indexOf("isEmailSuppressed")
+  assert.ok(preSendOrder >= 0 && outboundSuppressionOrder > preSendOrder, "pre-send must check compliance before outbound suppression")
+  assert.doesNotMatch(preSend, /suppression-dual-write/)
+
+  const dualWriteSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/compliance/suppression-dual-write.ts"),
+    "utf8",
+  )
+  assert.match(dualWriteSource, /mirrorLegacySuppressionToCompliance/)
+  assert.doesNotMatch(dualWriteSource, /suppression_entries/)
 
   console.log("growth operational send plane tests passed")
 }

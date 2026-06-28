@@ -29,10 +29,32 @@ import {
 import { hashWebhookPayload, sanitizeProviderWebhookPayload } from "@/lib/growth/webhooks/webhook-sanitizer"
 import { verifyProviderWebhookSignature } from "@/lib/growth/webhooks/webhook-signature"
 import type { GrowthWebhookIngestResult } from "@/lib/growth/webhooks/webhook-types"
+import { shadowLogProviderWebhook } from "@/lib/growth/contact-verification/email-learning-shadow"
 
 function recipientFromAttempt(metadata: Record<string, unknown>, fallback?: string | null): string | null {
   if (fallback) return fallback
   return typeof metadata.to === "string" ? metadata.to : null
+}
+
+function maybeShadowLogProviderWebhook(input: {
+  email: string | null | undefined
+  normalizedEventType: string
+  providerFamily: string
+  leadId?: string | null
+  occurredAt: string
+  providerEventId?: string | null
+  deliveryAttemptId?: string | null
+}): void {
+  if (!input.email) return
+  shadowLogProviderWebhook({
+    email: input.email,
+    normalizedEventType: input.normalizedEventType,
+    provider: input.providerFamily,
+    contactId: input.leadId,
+    occurredAt: input.occurredAt,
+    providerEventId: input.providerEventId,
+    context: { delivery_attempt_id: input.deliveryAttemptId ?? null },
+  })
 }
 
 async function routeNormalizedWebhookEvent(
@@ -50,6 +72,7 @@ async function routeNormalizedWebhookEvent(
     payloadHash: string
     occurredAt: string
     attemptMetadata?: Record<string, unknown>
+    providerEventId?: string | null
   },
 ): Promise<{ ok: boolean; error?: string }> {
   const email = recipientFromAttempt(input.attemptMetadata ?? {}, input.recipientEmail)
@@ -80,6 +103,15 @@ async function routeNormalizedWebhookEvent(
         deliveryAttemptId: input.deliveryAttemptId,
         occurredAt: input.occurredAt,
       })
+      maybeShadowLogProviderWebhook({
+        email,
+        normalizedEventType: input.normalizedEventType,
+        providerFamily: input.providerFamily,
+        leadId: input.leadId,
+        occurredAt: input.occurredAt,
+        providerEventId: input.providerEventId,
+        deliveryAttemptId: input.deliveryAttemptId,
+      })
       return { ok: true }
     }
     case "bounced": {
@@ -96,6 +128,15 @@ async function routeNormalizedWebhookEvent(
         recipientEmail: email,
         occurredAt: input.occurredAt,
       })
+      maybeShadowLogProviderWebhook({
+        email,
+        normalizedEventType: input.normalizedEventType,
+        providerFamily: input.providerFamily,
+        leadId: input.leadId,
+        occurredAt: input.occurredAt,
+        providerEventId: input.providerEventId,
+        deliveryAttemptId: input.deliveryAttemptId,
+      })
       return { ok: true }
     }
     case "complained": {
@@ -110,6 +151,15 @@ async function routeNormalizedWebhookEvent(
         providerReason: input.providerReason,
         recipientEmail: email,
         occurredAt: input.occurredAt,
+      })
+      maybeShadowLogProviderWebhook({
+        email,
+        normalizedEventType: input.normalizedEventType,
+        providerFamily: input.providerFamily,
+        leadId: input.leadId,
+        occurredAt: input.occurredAt,
+        providerEventId: input.providerEventId,
+        deliveryAttemptId: input.deliveryAttemptId,
       })
       return { ok: true }
     }
@@ -128,12 +178,30 @@ async function routeNormalizedWebhookEvent(
           occurredAt: input.occurredAt,
         })
       }
+      maybeShadowLogProviderWebhook({
+        email,
+        normalizedEventType: input.normalizedEventType,
+        providerFamily: input.providerFamily,
+        leadId: input.leadId,
+        occurredAt: input.occurredAt,
+        providerEventId: input.providerEventId,
+        deliveryAttemptId: input.deliveryAttemptId,
+      })
       return { ok: true }
     }
     case "opened": {
       await recordEmailOpen(admin, {
         deliveryAttemptId: input.deliveryAttemptId,
         openedAt: input.occurredAt,
+      })
+      maybeShadowLogProviderWebhook({
+        email,
+        normalizedEventType: input.normalizedEventType,
+        providerFamily: input.providerFamily,
+        leadId: input.leadId,
+        occurredAt: input.occurredAt,
+        providerEventId: input.providerEventId,
+        deliveryAttemptId: input.deliveryAttemptId,
       })
       return { ok: true }
     }
@@ -143,6 +211,15 @@ async function routeNormalizedWebhookEvent(
         destinationUrl: input.destinationUrl ?? "https://provider-reported.local/click",
         trackingToken: `provider-webhook:${input.payloadHash.slice(0, 24)}`,
         clickedAt: input.occurredAt,
+      })
+      maybeShadowLogProviderWebhook({
+        email,
+        normalizedEventType: input.normalizedEventType,
+        providerFamily: input.providerFamily,
+        leadId: input.leadId,
+        occurredAt: input.occurredAt,
+        providerEventId: input.providerEventId,
+        deliveryAttemptId: input.deliveryAttemptId,
       })
       return { ok: true }
     }
@@ -289,6 +366,7 @@ export async function ingestProviderWebhook(
       payloadHash,
       occurredAt,
       attemptMetadata: attempt?.metadata,
+      providerEventId: event.id,
     })
 
     await updateProviderDeliveryEventProcessing(admin, event.id, {

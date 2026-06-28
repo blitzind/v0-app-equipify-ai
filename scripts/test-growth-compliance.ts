@@ -116,7 +116,7 @@ async function main(): Promise<void> {
     path.join(process.cwd(), "lib/growth/providers/transport/transport-orchestrator.ts"),
     "utf8",
   )
-  assert.match(orchestrator, /assertPreSendSuppressionAllowed/)
+  assert.match(orchestrator, /assertPreSendAllowed/)
   assert.match(orchestrator, /Delivery blocked by compliance/)
 
   for (const route of [
@@ -173,6 +173,28 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(complianceRepo, /recordPerformanceEngagementFromDeliveryAttempt/)
+
+  const dualWriteSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/compliance/suppression-dual-write.ts"),
+    "utf8",
+  )
+  assert.match(dualWriteSource, /mirrorLegacySuppressionToCompliance/)
+  assert.match(dualWriteSource, /GROWTH_SUPPRESSION_DUAL_WRITE/)
+  assert.doesNotMatch(dualWriteSource, /suppression_entries/)
+
+  const suppressionRepo = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/outbound/suppression-repository.ts"),
+    "utf8",
+  )
+  assert.match(suppressionRepo, /mirrorLegacySuppressionToCompliance/)
+
+  const preSend = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/compliance/pre-send-assertion.ts"),
+    "utf8",
+  )
+  assert.match(preSend, /evaluatePreSendSuppression/)
+  assert.match(preSend, /isEmailSuppressed/)
+  assert.doesNotMatch(preSend, /suppression-dual-write/)
 
   console.log("growth-compliance-suppression-v1: all checks passed")
 }

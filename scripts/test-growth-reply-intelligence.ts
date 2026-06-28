@@ -85,7 +85,13 @@ const processEvent = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/outbound/process-event.ts"),
   "utf8",
 )
-assert.match(processEvent, /processReplyIntelligence/)
+assert.match(processEvent, /finalizeIngestedReplyIntelligence/)
+
+const finalizeBridge = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/replies/finalize-ingested-reply-intelligence.ts"),
+  "utf8",
+)
+assert.match(finalizeBridge, /processReplyIntelligence/)
 
 const inboxRepo = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/outbound/reply-repository.ts"),

@@ -9,6 +9,7 @@ import {
   recordUnsubscribeDetectedTimelineEvent,
 } from "@/lib/growth/compliance/compliance-events"
 import { recordExperimentMetricFromDeliveryAttempt } from "@/lib/growth/experiments/experiment-metrics"
+import { shadowLogComplianceUnsubscribe } from "@/lib/growth/contact-verification/email-learning-shadow"
 
 function suppressionsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("delivery_suppressions")
@@ -100,6 +101,17 @@ export async function registerUnsubscribe(
       metric: "unsubscribes",
     }).catch(() => undefined)
   }
+
+  shadowLogComplianceUnsubscribe({
+    email: input.email,
+    occurredAt,
+    leadId: input.leadId,
+    context: {
+      delivery_attempt_id: input.deliveryAttemptId ?? null,
+      scope,
+      source: input.source ?? "manual",
+    },
+  })
 
   return { ok: true, emailHash }
 }
