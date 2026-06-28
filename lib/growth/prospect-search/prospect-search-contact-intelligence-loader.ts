@@ -53,6 +53,7 @@ import { parseWebsiteExtractionDiagnosticsFromMetadata } from "@/lib/growth/cont
 import { resolveProspectSearchContactEligibilityHints } from "@/lib/growth/prospect-search/prospect-search-contact-eligibility-server"
 import { finalizeProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-result-finalize"
 import { normalizePhoneNumber } from "@/lib/voice/phone-normalization"
+import { shadowLogAccountOutreachStrategyFromProspectSearch } from "@/lib/growth/contact-verification/account-outreach-strategy-shadow"
 
 function isPipelineRun(value: unknown): value is GrowthLeadEnginePipelineRun {
   if (!value || typeof value !== "object") return false
@@ -423,6 +424,18 @@ export async function loadProspectSearchContactIntelligenceBatch(
             graphOverlay,
           )
         }
+
+        shadowLogAccountOutreachStrategyFromProspectSearch({
+          companyName: company.company_name,
+          website: company.website ?? null,
+          intelligence,
+          context: {
+            surface: "prospect_search_contact_intelligence_loader",
+            source_type: company.source_type,
+            growth_lead_id_present: Boolean(company.growth_lead_id),
+            contact_count: intelligence.contacts.length,
+          },
+        })
 
         map.set(key, intelligence)
       } catch {
