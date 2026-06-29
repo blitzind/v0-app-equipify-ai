@@ -8,6 +8,9 @@ export const GROWTH_WORKSPACE_SETTINGS_QA_MARKER = "growth-workspace-settings-pe
 export const GROWTH_WORKSPACE_SETTINGS_MIGRATION =
   "20270828120000_growth_operator_workspace_preferences_8b.sql" as const
 
+export const GROWTH_WORKSPACE_SETTINGS_AI_TEAMMATE_ONBOARDING_MIGRATION =
+  "20270630120000_growth_operator_workspace_ai_teammate_onboarding_prod_hotfix.sql" as const
+
 export const GROWTH_WORKSPACE_SETTINGS_PERSISTED_SECTION_IDS = [
   "profile",
   "notifications",

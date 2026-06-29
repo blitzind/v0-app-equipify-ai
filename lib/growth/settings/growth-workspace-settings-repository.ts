@@ -7,14 +7,20 @@ import {
   type GrowthOperatorWorkspacePreferencesRecord,
   type GrowthOperatorWorkspacePreferencesUpsertInput,
 } from "@/lib/growth/settings/growth-workspace-settings-types"
+import {
+  GROWTH_OPERATOR_WORKSPACE_AI_TEAMMATE_ONBOARDING_COLUMN,
+  isGrowthOperatorWorkspaceMissingColumnError,
+} from "@/lib/growth/settings/growth-workspace-settings-column-compat"
 import type { GrowthInboxThreadQueueView } from "@/lib/growth/inbox/inbox-thread-queue-filters"
 import type {
   GrowthWorkspaceCallsDefaultView,
   GrowthWorkspaceOpportunitiesDefaultTab,
 } from "@/lib/growth/settings/growth-workspace-settings-types"
 
-const SELECT =
-  "id, user_id, timezone, default_landing_page, compact_mode, reduced_motion, sidebar_collapsed, favorite_destinations, last_visited_route, inbox_default_filter, calls_default_view, opportunities_default_tab, ai_teammate_onboarding_completed, created_at, updated_at"
+const SELECT_WITHOUT_AI_TEAMMATE_ONBOARDING =
+  "id, user_id, timezone, default_landing_page, compact_mode, reduced_motion, sidebar_collapsed, favorite_destinations, last_visited_route, inbox_default_filter, calls_default_view, opportunities_default_tab, created_at, updated_at"
+
+const SELECT_WITH_AI_TEAMMATE_ONBOARDING = `${SELECT_WITHOUT_AI_TEAMMATE_ONBOARDING}, ${GROWTH_OPERATOR_WORKSPACE_AI_TEAMMATE_ONBOARDING_COLUMN}`
 
 type PreferencesRow = {
   id: string
@@ -29,7 +35,7 @@ type PreferencesRow = {
   inbox_default_filter: string
   calls_default_view: string
   opportunities_default_tab: string
-  ai_teammate_onboarding_completed: boolean
+  ai_teammate_onboarding_completed?: boolean
   created_at: string
   updated_at: string
 }
@@ -58,14 +64,66 @@ function mapRow(row: PreferencesRow): GrowthOperatorWorkspacePreferencesRecord {
   }
 }
 
+let aiTeammateOnboardingColumnAvailable: boolean | null = null
+
+export async function probeGrowthOperatorWorkspaceAiTeammateOnboardingColumn(
+  admin: SupabaseClient,
+): Promise<boolean> {
+  if (aiTeammateOnboardingColumnAvailable !== null) return aiTeammateOnboardingColumnAvailable
+
+  const { error } = await preferencesTable(admin)
+    .select(GROWTH_OPERATOR_WORKSPACE_AI_TEAMMATE_ONBOARDING_COLUMN)
+    .limit(0)
+
+  if (!error) {
+    aiTeammateOnboardingColumnAvailable = true
+    return true
+  }
+
+  if (isGrowthOperatorWorkspaceMissingColumnError(error)) {
+    aiTeammateOnboardingColumnAvailable = false
+    return false
+  }
+
+  aiTeammateOnboardingColumnAvailable = true
+  return true
+}
+
+async function selectWorkspacePreferencesForUser(
+  admin: SupabaseClient,
+  userId: string,
+): Promise<{ data: PreferencesRow | null; error: { message: string; code?: string } | null }> {
+  const includeAiTeammate = await probeGrowthOperatorWorkspaceAiTeammateOnboardingColumn(admin)
+  const select = includeAiTeammate ? SELECT_WITH_AI_TEAMMATE_ONBOARDING : SELECT_WITHOUT_AI_TEAMMATE_ONBOARDING
+  const { data, error } = await preferencesTable(admin).select(select).eq("user_id", userId).maybeSingle()
+
+  if (!error) {
+    return { data: data as PreferencesRow | null, error: null }
+  }
+
+  if (includeAiTeammate && isGrowthOperatorWorkspaceMissingColumnError(error)) {
+    aiTeammateOnboardingColumnAvailable = false
+    const fallback = await preferencesTable(admin)
+      .select(SELECT_WITHOUT_AI_TEAMMATE_ONBOARDING)
+      .eq("user_id", userId)
+      .maybeSingle()
+    return {
+      data: fallback.data as PreferencesRow | null,
+      error: fallback.error ? { message: fallback.error.message, code: fallback.error.code } : null,
+    }
+  }
+
+  return { data: null, error: { message: error.message, code: error.code } }
+}
+
 export async function getWorkspacePreferencesForUser(
   admin: SupabaseClient,
   userId: string,
 ): Promise<GrowthOperatorWorkspacePreferencesRecord | null> {
-  const { data, error } = await preferencesTable(admin).select(SELECT).eq("user_id", userId).maybeSingle()
+  const { data, error } = await selectWorkspacePreferencesForUser(admin, userId)
   if (error) throw new Error(error.message)
   if (!data) return null
-  return mapRow(data as PreferencesRow)
+  return mapRow(data)
 }
 
 export function resolveEffectiveWorkspacePreferences(
@@ -95,7 +153,9 @@ export async function upsertWorkspacePreferencesForUser(
   const existing = await getWorkspacePreferencesForUser(admin, userId)
   const effective = resolveEffectiveWorkspacePreferences(existing)
 
-  const payload = {
+  const includeAiTeammate = await probeGrowthOperatorWorkspaceAiTeammateOnboardingColumn(admin)
+
+  const payload: Record<string, unknown> = {
     user_id: userId,
     timezone: input.timezone ?? effective.timezone,
     default_landing_page: input.defaultLandingPage ?? effective.defaultLandingPage,
@@ -110,13 +170,18 @@ export async function upsertWorkspacePreferencesForUser(
     inbox_default_filter: input.inboxDefaultFilter ?? effective.inboxDefaultFilter,
     calls_default_view: input.callsDefaultView ?? effective.callsDefaultView,
     opportunities_default_tab: input.opportunitiesDefaultTab ?? effective.opportunitiesDefaultTab,
-    ai_teammate_onboarding_completed:
-      input.aiTeammateOnboardingCompleted ?? effective.aiTeammateOnboardingCompleted,
   }
+
+  if (includeAiTeammate) {
+    payload.ai_teammate_onboarding_completed =
+      input.aiTeammateOnboardingCompleted ?? effective.aiTeammateOnboardingCompleted
+  }
+
+  const select = includeAiTeammate ? SELECT_WITH_AI_TEAMMATE_ONBOARDING : SELECT_WITHOUT_AI_TEAMMATE_ONBOARDING
 
   const { data, error } = await preferencesTable(admin)
     .upsert(payload, { onConflict: "user_id" })
-    .select(SELECT)
+    .select(select)
     .single()
 
   if (error) throw new Error(error.message)

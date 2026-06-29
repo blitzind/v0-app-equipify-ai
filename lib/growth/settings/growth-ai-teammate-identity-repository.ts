@@ -2,6 +2,11 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { GE_AI_UX_3B_QA_MARKER } from "@/lib/growth/settings/growth-ai-teammate-identity-types"
+import {
+  GROWTH_OPERATOR_WORKSPACE_AI_TEAMMATE_ONBOARDING_COLUMN,
+  isGrowthOperatorWorkspaceMissingColumnError,
+  isGrowthOrganizationAiTeammateIdentityTableMissingError,
+} from "@/lib/growth/settings/growth-workspace-settings-column-compat"
 
 const ORG_SELECT =
   "organization_id, teammate_name, updated_by_user_id, qa_marker, created_at, updated_at"
@@ -48,7 +53,10 @@ export async function getOrganizationAiTeammateIdentity(
     .eq("organization_id", organizationId)
     .maybeSingle()
 
-  if (error) throw new Error(error.message)
+  if (error) {
+    if (isGrowthOrganizationAiTeammateIdentityTableMissingError(error)) return null
+    throw new Error(error.message)
+  }
   if (!data) return null
   return mapOrgRow(data as OrgIdentityRow)
 }
@@ -74,7 +82,14 @@ export async function upsertOrganizationAiTeammateIdentity(
     .select(ORG_SELECT)
     .single()
 
-  if (error) throw new Error(error.message)
+  if (error) {
+    if (isGrowthOrganizationAiTeammateIdentityTableMissingError(error)) {
+      throw new Error(
+        "AI teammate identity table is not ready. Apply migration 20270630120000_growth_operator_workspace_ai_teammate_onboarding_prod_hotfix.sql.",
+      )
+    }
+    throw new Error(error.message)
+  }
   return mapOrgRow(data as OrgIdentityRow)
 }
 
@@ -85,10 +100,13 @@ export async function getAiTeammateOnboardingCompletedForUser(
   const { data, error } = await admin
     .schema("growth")
     .from("operator_workspace_preferences")
-    .select("ai_teammate_onboarding_completed")
+    .select(GROWTH_OPERATOR_WORKSPACE_AI_TEAMMATE_ONBOARDING_COLUMN)
     .eq("user_id", userId)
     .maybeSingle()
 
-  if (error) throw new Error(error.message)
+  if (error) {
+    if (isGrowthOperatorWorkspaceMissingColumnError(error)) return false
+    throw new Error(error.message)
+  }
   return Boolean(data?.ai_teammate_onboarding_completed)
 }
