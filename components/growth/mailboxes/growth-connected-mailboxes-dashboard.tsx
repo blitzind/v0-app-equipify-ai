@@ -46,14 +46,10 @@ import {
   GROWTH_COMMUNICATIONS_MAILBOXES_ONBOARD_PATH,
   GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
   growthCommunicationsWarmupHref,
+  isGrowthCommunicationsSettingsPath,
 } from "@/lib/growth/navigation/growth-communications-settings-navigation"
 import { resolveConnectedMailboxWarmupDisplay } from "@/lib/growth/mailboxes/connected-mailbox-warmup-label"
 import type { GrowthMailboxConnectionSummary } from "@/lib/growth/mailboxes/mailbox-types"
-import {
-  GROWTH_COMMUNICATIONS_MAILBOXES_ONBOARD_PATH,
-  GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
-  isGrowthCommunicationsSettingsPath,
-} from "@/lib/growth/navigation/growth-communications-settings-navigation"
 
 type MailboxValidationFeedback = {
   ok: boolean
