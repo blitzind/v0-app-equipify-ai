@@ -26,8 +26,19 @@ function main(): void {
   assert.match(sectionPage, /growth-engine-settings-hard-isolation-v1/)
   assert.match(sectionPage, /SECTION PAGE RENDERED/)
   assert.match(sectionPage, /WORKSPACE_SETTINGS_GROWTH_ENGINE_CONNECTED_MAILBOXES_SECTION_ID/)
+  assert.match(sectionPage, /WORKSPACE_SETTINGS_GROWTH_ENGINE_SENDING_DOMAINS_SECTION_ID/)
+  assert.match(sectionPage, /WORKSPACE_SETTINGS_GROWTH_ENGINE_DNS_VERIFICATION_SECTION_ID/)
   assert.match(sectionPage, /WorkspaceSettingsGrowthEngineConnectedMailboxesSection/)
+  assert.match(sectionPage, /WorkspaceSettingsGrowthEngineSendingDomainsSection/)
+  assert.match(sectionPage, /WorkspaceSettingsGrowthEngineDnsVerificationSection/)
   assert.match(serverPage, /sectionId=\{sectionId\}/)
+
+  const sendingDomainsSection = readSource(
+    "components/settings/workspace-settings-growth-engine-sending-domains-section.tsx",
+  )
+  const dnsVerificationSection = readSource(
+    "components/settings/workspace-settings-growth-engine-dns-verification-section.tsx",
+  )
 
   assert.match(connectedSection, /GrowthConnectedMailboxesDashboard/)
   assert.match(connectedSection, /\[connected-mailboxes-mount\]/)
@@ -37,6 +48,16 @@ function main(): void {
   assert.doesNotMatch(connectedSection, /WorkspaceSettingsGrowthEngineLiftedPanelHost/)
   assert.doesNotMatch(connectedSection, /getWorkspaceSettingsGrowthEngineLiftedPanel/)
   assert.doesNotMatch(connectedSection, /loadLiftedPanel/)
+
+  assert.match(sendingDomainsSection, /GrowthSenderInfrastructureDashboard/)
+  assert.match(sendingDomainsSection, /\[sending-domains-runtime\]/)
+  assert.match(sendingDomainsSection, /GrowthAdminWidgetErrorBoundary/)
+  assert.doesNotMatch(sendingDomainsSection, /loadLiftedPanel/)
+
+  assert.match(dnsVerificationSection, /GrowthDeliverabilityDashboard/)
+  assert.match(dnsVerificationSection, /\[dns-verification-runtime\]/)
+  assert.match(dnsVerificationSection, /GrowthAdminWidgetErrorBoundary/)
+  assert.doesNotMatch(dnsVerificationSection, /loadLiftedPanel/)
 
   assert.doesNotMatch(sectionPage, /WorkspaceSettingsGrowthEngineLiftedPanelHost/)
   assert.doesNotMatch(sectionPage, /WorkspaceSettingsGrowthEngineIsolationPlaceholder/)

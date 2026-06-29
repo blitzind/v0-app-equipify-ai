@@ -1,13 +1,21 @@
 "use client"
 
 import { WorkspaceSettingsGrowthEngineConnectedMailboxesSection } from "@/components/settings/workspace-settings-growth-engine-connected-mailboxes-section"
+import { WorkspaceSettingsGrowthEngineDnsVerificationSection } from "@/components/settings/workspace-settings-growth-engine-dns-verification-section"
+import { WorkspaceSettingsGrowthEngineSendingDomainsSection } from "@/components/settings/workspace-settings-growth-engine-sending-domains-section"
 
-/** PROD-HOTFIX — hard route isolation for non-connected-mailboxes sections. */
+/** PROD-HOTFIX — hard route isolation for sections without a direct panel restore. */
 export const GROWTH_ENGINE_SETTINGS_HARD_ISOLATION_QA_MARKER =
   "growth-engine-settings-hard-isolation-v1" as const
 
 export const WORKSPACE_SETTINGS_GROWTH_ENGINE_CONNECTED_MAILBOXES_SECTION_ID =
   "connected-mailboxes" as const
+
+export const WORKSPACE_SETTINGS_GROWTH_ENGINE_SENDING_DOMAINS_SECTION_ID =
+  "sending-domains" as const
+
+export const WORKSPACE_SETTINGS_GROWTH_ENGINE_DNS_VERIFICATION_SECTION_ID =
+  "dns-verification" as const
 
 type WorkspaceSettingsGrowthEngineSectionPageProps = {
   sectionId: string
@@ -32,14 +40,23 @@ function WorkspaceSettingsGrowthEngineHardIsolationMarker() {
   )
 }
 
+function WorkspaceSettingsGrowthEngineRestoredSection({ sectionId }: { sectionId: string }) {
+  switch (sectionId) {
+    case WORKSPACE_SETTINGS_GROWTH_ENGINE_CONNECTED_MAILBOXES_SECTION_ID:
+      return <WorkspaceSettingsGrowthEngineConnectedMailboxesSection />
+    case WORKSPACE_SETTINGS_GROWTH_ENGINE_SENDING_DOMAINS_SECTION_ID:
+      return <WorkspaceSettingsGrowthEngineSendingDomainsSection />
+    case WORKSPACE_SETTINGS_GROWTH_ENGINE_DNS_VERIFICATION_SECTION_ID:
+      return <WorkspaceSettingsGrowthEngineDnsVerificationSection />
+    default:
+      return <WorkspaceSettingsGrowthEngineHardIsolationMarker />
+  }
+}
+
 export default function WorkspaceSettingsGrowthEngineSectionPage({
   sectionId,
 }: WorkspaceSettingsGrowthEngineSectionPageProps) {
-  if (sectionId === WORKSPACE_SETTINGS_GROWTH_ENGINE_CONNECTED_MAILBOXES_SECTION_ID) {
-    return <WorkspaceSettingsGrowthEngineConnectedMailboxesSection />
-  }
-
-  return <WorkspaceSettingsGrowthEngineHardIsolationMarker />
+  return <WorkspaceSettingsGrowthEngineRestoredSection sectionId={sectionId} />
 }
 
 export { WorkspaceSettingsGrowthEngineSectionPage }

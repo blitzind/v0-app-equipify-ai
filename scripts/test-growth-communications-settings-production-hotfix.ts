@@ -137,6 +137,14 @@ async function main(): Promise<void> {
       readSource("components/settings/workspace-settings-growth-engine-connected-mailboxes-section.tsx"),
       /GrowthConnectedMailboxesDashboard/,
     )
+    assert.match(
+      readSource("components/settings/workspace-settings-growth-engine-sending-domains-section.tsx"),
+      /GrowthSenderInfrastructureDashboard/,
+    )
+    assert.match(
+      readSource("components/settings/workspace-settings-growth-engine-dns-verification-section.tsx"),
+      /GrowthDeliverabilityDashboard/,
+    )
   } else {
     assert.match(sectionPage, /WorkspaceSettingsGrowthEngineLiftedPanelHost/)
     assert.match(sectionPage, /workspace-settings-growth-engine-lifted-panel-host/)
