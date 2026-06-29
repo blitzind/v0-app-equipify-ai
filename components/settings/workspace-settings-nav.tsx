@@ -10,11 +10,17 @@ import { useOrgPermissions } from "@/lib/org-permissions-context"
 import { useTenant } from "@/lib/tenant-store"
 import { cn } from "@/lib/utils"
 import {
-  NAV_ICON_INACTIVE_CARD,
+  SETTINGS_NAV_ACTIVE_ROW,
+  SETTINGS_NAV_GROUP_LABEL,
+  SETTINGS_NAV_GROUPS,
+  SETTINGS_NAV_LIST,
+  SETTINGS_NAV_SIDEBAR_CONTAINER,
+  SETTINGS_NAV_SUBGROUP_LABEL,
+  settingsNavIconClassName,
+} from "@/lib/settings/settings-nav-chrome"
+import {
   NAV_PRIMARY_ROW_MOTION,
-  NAV_ROW_ACTIVE_SIDEBAR,
   NAV_ROW_INACTIVE_HOVER_CARD,
-  NAV_SIDEBAR_ACTIVE_INDICATOR,
 } from "@/lib/navigation-chrome"
 import {
   WORKSPACE_SETTINGS_NAV_QA_MARKER,
@@ -28,6 +34,7 @@ import {
   isDataAdministrationSettingsNavVisible,
   isGrowthEngineSettingsNavVisible,
 } from "@/lib/settings/workspace-settings-visibility"
+import { SettingsNavItemLink } from "@/components/settings/settings-nav-item-link"
 
 function resolveSettingsNavPermissions(args: {
   role: OrgMemberRole | null
@@ -84,31 +91,31 @@ export function WorkspaceSettingsNav({ variant }: WorkspaceSettingsNavProps) {
     const active = isWorkspaceSettingsNavItemActive(pathname, item)
     const Icon = item.icon
 
+    if (variant === "desktop") {
+      return (
+        <SettingsNavItemLink
+          key={item.href}
+          href={item.href}
+          label={item.label}
+          icon={Icon}
+          active={active}
+        />
+      )
+    }
+
     return (
       <Link
         key={item.href}
         href={item.href}
+        aria-current={active ? "page" : undefined}
         className={cn(
-          variant === "mobile"
-            ? "group flex items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium shrink-0 min-h-[44px]"
-            : "group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm",
+          "group flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium min-h-[44px]",
           NAV_PRIMARY_ROW_MOTION,
-          variant === "mobile"
-            ? active
-              ? "bg-primary/10 text-primary"
-              : NAV_ROW_INACTIVE_HOVER_CARD
-            : active
-              ? cn(NAV_ROW_ACTIVE_SIDEBAR, "font-medium")
-              : NAV_ROW_INACTIVE_HOVER_CARD,
+          active ? SETTINGS_NAV_ACTIVE_ROW : NAV_ROW_INACTIVE_HOVER_CARD,
         )}
       >
-        {variant === "desktop" && active ? (
-          <span
-            className={cn("absolute inset-y-1 left-0 w-0.5 rounded-full", NAV_SIDEBAR_ACTIVE_INDICATOR)}
-          />
-        ) : null}
-        <Icon size={iconSize} className={active ? "text-primary" : NAV_ICON_INACTIVE_CARD} />
-        <span className={variant === "desktop" ? "truncate" : undefined}>{item.label}</span>
+        <Icon size={iconSize} className={settingsNavIconClassName(active)} />
+        <span>{item.label}</span>
       </Link>
     )
   }
@@ -132,27 +139,29 @@ export function WorkspaceSettingsNav({ variant }: WorkspaceSettingsNavProps) {
 
   return (
     <nav
-      className="hidden md:flex w-56 shrink-0 flex-col gap-4 sticky top-4 self-start"
+      className={cn("hidden md:flex flex-col", SETTINGS_NAV_SIDEBAR_CONTAINER)}
       aria-label="Settings navigation"
       data-qa-marker={WORKSPACE_SETTINGS_NAV_QA_MARKER}
       data-workspace-settings-nav-variant="desktop"
       data-workspace-settings-plan-label={planCategoryLabel}
     >
-      {rootCategories.map((category) => (
-        <div key={category.id} className="space-y-2">
-          <p className="px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {category.label}
-          </p>
-          {category.groups.map((group) => (
-            <div key={group.id} className="space-y-0.5">
-              {category.groups.length > 1 || category.id !== "general" ? (
-                <p className="px-2 pt-1 text-[11px] font-medium text-muted-foreground/80">{group.label}</p>
-              ) : null}
-              {group.items.map((item) => renderNavItem(item, 15))}
-            </div>
-          ))}
-        </div>
-      ))}
+      <div className={SETTINGS_NAV_GROUPS}>
+        {rootCategories.map((category) => (
+          <div key={category.id}>
+            <p className={SETTINGS_NAV_GROUP_LABEL}>{category.label}</p>
+            {category.groups.map((group) => (
+              <div key={group.id}>
+                {category.groups.length > 1 || category.id !== "general" ? (
+                  <p className={SETTINGS_NAV_SUBGROUP_LABEL}>{group.label}</p>
+                ) : null}
+                <div className={SETTINGS_NAV_LIST}>
+                  {group.items.map((item) => renderNavItem(item, 15))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
     </nav>
   )
 }

@@ -1,7 +1,6 @@
 "use client"
 
 import type { ReactNode } from "react"
-import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Settings2 } from "lucide-react"
 import {
@@ -18,17 +17,16 @@ import {
   GROWTH_WORKSPACE_SETTINGS_SHELL_SIDEBAR,
 } from "@/lib/growth/settings/growth-workspace-settings-shell-tokens"
 import { GrowthSettingsShellWidthEnforcer } from "@/components/growth/settings/growth-settings-shell-width-enforcer"
-import { cn } from "@/lib/utils"
-import { NAV_PRIMARY_ROW_MOTION, NAV_ROW_INACTIVE_HOVER_CARD, NAV_SIDEBAR_ACTIVE_INDICATOR } from "@/lib/navigation-chrome"
+import { SettingsNavItemLink } from "@/components/settings/settings-nav-item-link"
+import {
+  SETTINGS_NAV_GROUP_LABEL,
+  SETTINGS_NAV_GROUPS,
+  SETTINGS_NAV_LIST,
+} from "@/lib/settings/settings-nav-chrome"
 
 type GrowthSettingsShellProps = {
   children: ReactNode
 }
-
-const GROWTH_SETTINGS_NAV_ACTIVE_ROW =
-  "border border-primary/40 bg-muted/90 font-semibold text-foreground shadow-sm dark:border-primary/55 dark:bg-muted/70"
-
-const GROWTH_SETTINGS_NAV_ACTIVE_ICON = "text-primary dark:text-primary"
 
 export function GrowthSettingsShell({ children }: GrowthSettingsShellProps) {
   const pathname = usePathname() ?? ""
@@ -64,36 +62,21 @@ export function GrowthSettingsShell({ children }: GrowthSettingsShellProps) {
           aria-label="Growth settings sections"
           className={GROWTH_WORKSPACE_SETTINGS_SHELL_SIDEBAR}
         >
-          <div className="space-y-4">
+          <div className={SETTINGS_NAV_GROUPS}>
             {GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS.map((group) => (
               <div key={group.id}>
-                <p className="px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
-                <ul className="mt-1 space-y-0.5">
+                <p className={SETTINGS_NAV_GROUP_LABEL}>{group.label}</p>
+                <ul className={SETTINGS_NAV_LIST}>
                   {group.items.map((item) => {
                     const active = isGrowthWorkspaceSettingsNavItemActive(pathname, item)
                     return (
                       <li key={item.id}>
-                        <Link
+                        <SettingsNavItemLink
                           href={item.href}
-                          aria-current={active ? "page" : undefined}
-                          className={cn(
-                            "relative flex items-center gap-2 rounded-lg px-2 py-2 pl-3 text-sm transition-colors",
-                            NAV_PRIMARY_ROW_MOTION,
-                            active ? GROWTH_SETTINGS_NAV_ACTIVE_ROW : cn("text-muted-foreground", NAV_ROW_INACTIVE_HOVER_CARD),
-                          )}
-                        >
-                          {active ? (
-                            <span
-                              aria-hidden
-                              className="absolute inset-y-1.5 left-0 w-1 rounded-full"
-                              style={{ backgroundColor: NAV_SIDEBAR_ACTIVE_INDICATOR }}
-                            />
-                          ) : null}
-                          <item.icon
-                            className={cn("size-4 shrink-0", active ? GROWTH_SETTINGS_NAV_ACTIVE_ICON : "text-muted-foreground")}
-                          />
-                          <span className="truncate">{item.label}</span>
-                        </Link>
+                          label={item.label}
+                          icon={item.icon}
+                          active={active}
+                        />
                       </li>
                     )
                   })}
