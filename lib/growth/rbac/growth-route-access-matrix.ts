@@ -229,6 +229,7 @@ const GROWTH_PLATFORM_ADMIN_API_RULES: GrowthRouteAccessRule[] = [
   { id: "api-observability", pattern: /^\/api\/platform\/growth\/runtime\/observability(?:\/|$)/, minimumRole: "platform_admin", label: "Runtime Observability API" },
   { id: "api-provider-health", pattern: /^\/api\/platform\/growth\/prospect-search\/provider-health(?:\/|$)/, minimumRole: "platform_admin", label: "Provider Health API" },
   { id: "api-sequences-scheduler", pattern: /^\/api\/platform\/growth\/sequences\/scheduler(?:\/|$)/, minimumRole: "platform_admin", label: "Sequence Scheduler API" },
+  { id: "api-growth-reset-test-data", pattern: /^\/api\/platform\/growth\/reset\/test-data(?:\/|$)/, minimumRole: "platform_admin", label: "Growth Test Data Reset API" },
 ]
 
 const GROWTH_MANAGER_API_RULES: GrowthRouteAccessRule[] = [

@@ -1,0 +1,7677 @@
+{
+  "qa_marker": "growth-ops-test-data-reset-7b-v1",
+  "generated_at": "2026-06-29T05:02:54.157Z",
+  "mode": "dry_run",
+  "table_count": 468,
+  "summary": {
+    "keep_tables": 102,
+    "delete_tables": 353,
+    "manual_review_tables": 13,
+    "total_rows": 155945,
+    "preserved_rows": 1735,
+    "delete_rows": 154210
+  },
+  "golden_fixtures": {
+    "qa_marker": "growth-ops-test-data-reset-7b-v1",
+    "organization_ids": [
+      "5876176a-61ec-4532-ad99-0c31482d5a91"
+    ],
+    "lead_ids": [
+      "14200833-2752-4379-bca2-b25347007871"
+    ],
+    "company_ids": [
+      "dd3ede39-5676-463c-b530-9226669a1800"
+    ],
+    "contact_ids": [],
+    "person_ids": [
+      "19762700-cd84-4588-ae6d-8ede8d5ca8ae"
+    ],
+    "opportunity_ids": [],
+    "meeting_ids": [],
+    "generation_ids": [],
+    "sequence_enrollment_ids": [],
+    "inbox_thread_ids": [],
+    "call_session_ids": [],
+    "timeline_lead_ids": [
+      "14200833-2752-4379-bca2-b25347007871"
+    ],
+    "resolution_notes": [
+      "matched slug precision-biomedical-demo",
+      "matched name Precision Biomedical Services"
+    ],
+    "missing_requirements": [
+      "golden opportunity",
+      "golden meeting",
+      "golden personalization generation",
+      "golden sequence enrollment",
+      "golden inbox thread",
+      "golden call session"
+    ]
+  },
+  "dependency_graph": {
+    "ai_meeting_preparations": [
+      "meetings",
+      "leads"
+    ],
+    "apollo_enrollment_automation_runs": [
+      "sequence_enrollments",
+      "leads"
+    ],
+    "apollo_enrollment_candidates": [
+      "sequence_enrollments",
+      "leads"
+    ],
+    "apollo_primary_contact_enrollment_drafts": [
+      "sequence_enrollments",
+      "leads"
+    ],
+    "apollo_primary_contact_enrollment_handoffs": [
+      "sequence_enrollments",
+      "leads"
+    ],
+    "apollo_primary_contact_enrollment_queue": [
+      "sequence_enrollments",
+      "leads"
+    ],
+    "apollo_replacement_benchmark_snapshots": [
+      "leads"
+    ],
+    "buying_momentum_snapshots": [
+      "leads"
+    ],
+    "campaign_reply_learning_snapshots": [
+      "leads"
+    ],
+    "campaign_revenue_attribution_snapshots": [
+      "leads"
+    ],
+    "channel_effectiveness_snapshots": [
+      "leads"
+    ],
+    "channel_performance_snapshots": [
+      "leads"
+    ],
+    "company_confidence_scores": [
+      "companies"
+    ],
+    "company_contact_identity_reviews": [
+      "companies"
+    ],
+    "company_contact_refresh_queue": [
+      "companies"
+    ],
+    "company_contacts": [
+      "companies"
+    ],
+    "company_domains": [
+      "companies"
+    ],
+    "company_enrichments": [
+      "companies"
+    ],
+    "company_evidence_sources": [
+      "companies"
+    ],
+    "company_growth_signal_refresh_queue": [
+      "companies"
+    ],
+    "company_growth_signal_scores": [
+      "companies"
+    ],
+    "company_growth_signals": [
+      "companies"
+    ],
+    "company_identification_matches": [
+      "companies"
+    ],
+    "company_intelligence_evidence": [
+      "companies"
+    ],
+    "company_intelligence_jobs": [
+      "companies"
+    ],
+    "company_intelligence_runs": [
+      "companies"
+    ],
+    "company_intelligence_snapshots": [
+      "companies",
+      "leads"
+    ],
+    "company_merge_events": [
+      "companies"
+    ],
+    "company_profiles": [
+      "companies"
+    ],
+    "company_relationships": [
+      "companies"
+    ],
+    "company_signal_runs": [
+      "companies"
+    ],
+    "company_signals": [
+      "companies"
+    ],
+    "company_source_lineage": [
+      "companies"
+    ],
+    "contact_discovery_runs": [
+      "leads",
+      "companies"
+    ],
+    "deliverability_ops_snapshots": [
+      "leads"
+    ],
+    "deliverability_snapshots": [
+      "leads"
+    ],
+    "deliverability_trend_snapshots": [
+      "leads"
+    ],
+    "discovery_candidates": [
+      "leads",
+      "companies"
+    ],
+    "discovery_outcome_patterns": [
+      "leads",
+      "companies"
+    ],
+    "discovery_refresh_queue": [
+      "leads",
+      "companies"
+    ],
+    "discovery_runs": [
+      "leads",
+      "companies"
+    ],
+    "discovery_sources": [
+      "leads",
+      "companies"
+    ],
+    "discovery_statistics": [
+      "leads",
+      "companies"
+    ],
+    "domain_health_snapshots": [
+      "leads"
+    ],
+    "email_discovery_candidates": [
+      "leads",
+      "companies"
+    ],
+    "email_discovery_evidence": [
+      "leads",
+      "companies"
+    ],
+    "email_discovery_jobs": [
+      "leads",
+      "companies"
+    ],
+    "email_discovery_runs": [
+      "leads",
+      "companies"
+    ],
+    "external_company_candidates": [
+      "companies"
+    ],
+    "external_company_discovery_runs": [
+      "companies",
+      "leads"
+    ],
+    "growth_audience_enrollment_preview_members": [
+      "sequence_enrollments",
+      "leads"
+    ],
+    "growth_audience_enrollment_previews": [
+      "sequence_enrollments",
+      "leads"
+    ],
+    "growth_audience_enrollment_runs": [
+      "sequence_enrollments",
+      "leads"
+    ],
+    "growth_audience_lead_creation_runs": [
+      "leads"
+    ],
+    "growth_audience_snapshot_diffs": [
+      "leads"
+    ],
+    "growth_audience_snapshots": [
+      "leads"
+    ],
+    "inbox_assignment_rules": [
+      "inbox_threads",
+      "leads"
+    ],
+    "inbox_assignment_settings": [
+      "inbox_threads",
+      "leads"
+    ],
+    "inbox_lifecycle_events": [
+      "inbox_threads",
+      "leads"
+    ],
+    "inbox_messages": [
+      "inbox_threads",
+      "leads"
+    ],
+    "inbox_provider_message_map": [
+      "inbox_threads",
+      "leads"
+    ],
+    "inbox_reply_draft_events": [
+      "inbox_threads",
+      "leads"
+    ],
+    "inbox_reply_drafts": [
+      "inbox_threads",
+      "leads"
+    ],
+    "inbox_sync_runs": [
+      "inbox_threads",
+      "leads"
+    ],
+    "inbox_thread_links": [
+      "inbox_threads",
+      "leads"
+    ],
+    "inbox_thread_owner_history": [
+      "inbox_threads",
+      "leads"
+    ],
+    "inbox_threads": [
+      "inbox_threads",
+      "leads"
+    ],
+    "lead_call_events": [
+      "leads"
+    ],
+    "lead_call_sessions": [
+      "leads"
+    ],
+    "lead_decision_makers": [
+      "leads"
+    ],
+    "lead_import_batch_events": [
+      "leads",
+      "companies"
+    ],
+    "lead_import_batch_rows": [
+      "leads",
+      "companies"
+    ],
+    "lead_import_batches": [
+      "leads",
+      "companies"
+    ],
+    "lead_import_mapping_profiles": [
+      "leads",
+      "companies"
+    ],
+    "lead_inbox": [
+      "inbox_threads",
+      "leads"
+    ],
+    "lead_memory_events": [
+      "leads"
+    ],
+    "lead_memory_profiles": [
+      "leads"
+    ],
+    "lead_objection_memory": [
+      "leads"
+    ],
+    "lead_preference_memory": [
+      "leads"
+    ],
+    "lead_research_notes": [
+      "leads"
+    ],
+    "lead_research_runs": [
+      "leads"
+    ],
+    "lead_timeline_events": [
+      "leads"
+    ],
+    "leads": [
+      "leads"
+    ],
+    "mailbox_health_snapshots": [
+      "leads"
+    ],
+    "mailbox_reputation_snapshots": [
+      "leads"
+    ],
+    "meeting_candidate_runs": [
+      "meetings",
+      "leads"
+    ],
+    "meeting_candidates": [
+      "meetings",
+      "leads"
+    ],
+    "meeting_conversion_events": [
+      "meetings",
+      "leads"
+    ],
+    "meeting_outcome_intelligence_scores": [
+      "meetings",
+      "leads"
+    ],
+    "meetings": [
+      "meetings",
+      "leads"
+    ],
+    "operational_analytics_snapshots": [
+      "leads"
+    ],
+    "opportunity_approval_runs": [
+      "opportunities",
+      "leads"
+    ],
+    "opportunity_draft_runs": [
+      "opportunities",
+      "leads"
+    ],
+    "opportunity_drafts": [
+      "opportunities",
+      "leads"
+    ],
+    "opportunity_pipeline_settings": [
+      "opportunities",
+      "leads"
+    ],
+    "opportunity_recommendations": [
+      "opportunities",
+      "leads"
+    ],
+    "opportunity_signal_timeline_events": [
+      "opportunities",
+      "leads"
+    ],
+    "opportunity_signals": [
+      "opportunities",
+      "leads"
+    ],
+    "opportunity_stage_history": [
+      "opportunities",
+      "leads"
+    ],
+    "person_company_roles": [
+      "companies",
+      "persons"
+    ],
+    "person_emails": [
+      "persons"
+    ],
+    "person_merge_events": [
+      "persons"
+    ],
+    "person_phones": [
+      "persons"
+    ],
+    "person_profiles": [
+      "persons"
+    ],
+    "person_source_lineage": [
+      "persons"
+    ],
+    "personalization_evidence": [
+      "personalization_generations",
+      "leads",
+      "persons"
+    ],
+    "personalization_feedback": [
+      "personalization_generations",
+      "leads",
+      "persons"
+    ],
+    "personalization_generations": [
+      "personalization_generations",
+      "leads",
+      "persons"
+    ],
+    "personalization_performance_snapshots": [
+      "personalization_generations",
+      "leads",
+      "persons"
+    ],
+    "personalization_profiles": [
+      "personalization_generations",
+      "leads",
+      "persons"
+    ],
+    "personalization_risk_events": [
+      "personalization_generations",
+      "leads",
+      "persons"
+    ],
+    "persons": [
+      "persons"
+    ],
+    "phone_discovery_candidates": [
+      "leads",
+      "companies"
+    ],
+    "phone_discovery_evidence": [
+      "leads",
+      "companies"
+    ],
+    "phone_discovery_jobs": [
+      "leads",
+      "companies"
+    ],
+    "phone_discovery_runs": [
+      "leads",
+      "companies"
+    ],
+    "provider_route_performance_snapshots": [
+      "leads"
+    ],
+    "real_world_company_candidates": [
+      "companies"
+    ],
+    "real_world_discovery_runs": [
+      "leads",
+      "companies"
+    ],
+    "relationship_summary_snapshots": [
+      "leads"
+    ],
+    "revenue_forecast_snapshots": [
+      "leads"
+    ],
+    "sales_execution_insight_snapshots": [
+      "leads"
+    ],
+    "sender_performance_snapshots": [
+      "leads"
+    ],
+    "sender_pool_performance_snapshots": [
+      "leads"
+    ],
+    "sender_reputation_snapshots": [
+      "leads"
+    ],
+    "sequence_enrollment_channel_events": [
+      "sequence_enrollments",
+      "leads"
+    ],
+    "sequence_enrollment_step_waits": [
+      "sequence_enrollments",
+      "leads"
+    ],
+    "sequence_enrollment_steps": [
+      "sequence_enrollments",
+      "leads"
+    ],
+    "sequence_enrollments": [
+      "sequence_enrollments",
+      "leads"
+    ],
+    "sequence_performance_snapshots": [
+      "leads"
+    ],
+    "sequence_template_enrollments": [
+      "sequence_enrollments",
+      "leads"
+    ],
+    "social_profile_discovery_candidates": [
+      "leads",
+      "companies"
+    ],
+    "social_profile_discovery_evidence": [
+      "leads",
+      "companies"
+    ],
+    "social_profile_discovery_jobs": [
+      "leads",
+      "companies"
+    ],
+    "social_profile_discovery_runs": [
+      "leads",
+      "companies"
+    ],
+    "throughput_snapshots": [
+      "leads"
+    ],
+    "website_intent_correlation_snapshots": [
+      "leads"
+    ]
+  },
+  "tables": [
+    {
+      "table": "account_playbook_members",
+      "classification": "KEEP",
+      "row_count": 12,
+      "preserved_count": 12,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "account_playbook_runs",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 257,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "account_playbooks",
+      "classification": "KEEP",
+      "row_count": 12,
+      "preserved_count": 12,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "adaptive_calibration_events",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 903,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "adaptive_calibration_proposals",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 904,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_context_assembly_runtime",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 905,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_context_packages",
+      "classification": "DELETE",
+      "row_count": 5,
+      "preserved_count": 0,
+      "delete_count": 5,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 906,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_copilot_effectiveness",
+      "classification": "DELETE",
+      "row_count": 68,
+      "preserved_count": 0,
+      "delete_count": 68,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 180,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_copilot_generation_playbook_rules",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_copilot_generations",
+      "classification": "DELETE",
+      "row_count": 43,
+      "preserved_count": 0,
+      "delete_count": 43,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 179,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_copilot_playbook_approved_rules",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_copilot_playbook_draft_rules",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_copilot_playbook_effectiveness",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_copilot_playbook_extractions",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_copilot_playbook_rule_attributions",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_copilot_playbook_rule_categories",
+      "classification": "KEEP",
+      "row_count": 9,
+      "preserved_count": 9,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_copilot_playbook_rule_versions",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_copilot_playbook_sources",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_copilot_rules",
+      "classification": "KEEP",
+      "row_count": 4,
+      "preserved_count": 4,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_decision_engine_requests",
+      "classification": "DELETE",
+      "row_count": 6,
+      "preserved_count": 0,
+      "delete_count": 6,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 919,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_decision_engine_runtime",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 920,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_decision_record_audit_events",
+      "classification": "DELETE",
+      "row_count": 17,
+      "preserved_count": 0,
+      "delete_count": 17,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 921,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_decision_records",
+      "classification": "DELETE",
+      "row_count": 6,
+      "preserved_count": 0,
+      "delete_count": 6,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 922,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_executive_brain_runtime",
+      "classification": "DELETE",
+      "row_count": 2,
+      "preserved_count": 0,
+      "delete_count": 2,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 923,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_executive_delegations",
+      "classification": "DELETE",
+      "row_count": 6,
+      "preserved_count": 0,
+      "delete_count": 6,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 924,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_executive_event_observations",
+      "classification": "DELETE",
+      "row_count": 11,
+      "preserved_count": 0,
+      "delete_count": 11,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 925,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_executive_heartbeat_events",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 926,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_executive_mission_state",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 927,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_meeting_preparations",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "meetings",
+        "leads"
+      ],
+      "reset_order": 182,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_memory_registry",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 929,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_memory_registry_events",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 930,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_os_agent_capabilities",
+      "classification": "DELETE",
+      "row_count": 2,
+      "preserved_count": 0,
+      "delete_count": 2,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 931,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_os_agent_heartbeat_events",
+      "classification": "DELETE",
+      "row_count": 7,
+      "preserved_count": 0,
+      "delete_count": 7,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 932,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_os_agent_leases",
+      "classification": "DELETE",
+      "row_count": 5,
+      "preserved_count": 0,
+      "delete_count": 5,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 933,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_os_agent_registrations",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 934,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_os_event_archive_records",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 935,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_os_event_deliveries",
+      "classification": "DELETE",
+      "row_count": 185,
+      "preserved_count": 0,
+      "delete_count": 185,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 936,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_os_event_subscriptions",
+      "classification": "DELETE",
+      "row_count": 13,
+      "preserved_count": 0,
+      "delete_count": 13,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 937,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_os_events",
+      "classification": "DELETE",
+      "row_count": 240,
+      "preserved_count": 0,
+      "delete_count": 240,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 938,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_provider_requests",
+      "classification": "DELETE",
+      "row_count": 5,
+      "preserved_count": 0,
+      "delete_count": 5,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 939,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_provider_runtime",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 940,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_work_order_events",
+      "classification": "DELETE",
+      "row_count": 27,
+      "preserved_count": 0,
+      "delete_count": 27,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 941,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "ai_work_orders",
+      "classification": "DELETE",
+      "row_count": 6,
+      "preserved_count": 0,
+      "delete_count": 6,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 942,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "apollo_enrollment_automation_runs",
+      "classification": "DELETE",
+      "row_count": 39,
+      "preserved_count": 0,
+      "delete_count": 39,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "sequence_enrollments",
+        "leads"
+      ],
+      "reset_order": 261,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "apollo_enrollment_candidates",
+      "classification": "DELETE",
+      "row_count": 12,
+      "preserved_count": 0,
+      "delete_count": 12,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "sequence_enrollments",
+        "leads"
+      ],
+      "reset_order": 262,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "apollo_multichannel_orchestration_runs",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 263,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "apollo_multichannel_sequence_candidates",
+      "classification": "DELETE",
+      "row_count": 12,
+      "preserved_count": 0,
+      "delete_count": 12,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 264,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "apollo_pilot_cohort_companies",
+      "classification": "MANUAL_REVIEW",
+      "row_count": 11,
+      "preserved_count": 11,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": "Manual review — not auto-deleted."
+    },
+    {
+      "table": "apollo_pilot_cohorts",
+      "classification": "MANUAL_REVIEW",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": "Manual review — not auto-deleted."
+    },
+    {
+      "table": "apollo_primary_contact_enrollment_drafts",
+      "classification": "DELETE",
+      "row_count": 5,
+      "preserved_count": 0,
+      "delete_count": 5,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "sequence_enrollments",
+        "leads"
+      ],
+      "reset_order": 265,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "apollo_primary_contact_enrollment_handoffs",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "sequence_enrollments",
+        "leads"
+      ],
+      "reset_order": 266,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "apollo_primary_contact_enrollment_queue",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "sequence_enrollments",
+        "leads"
+      ],
+      "reset_order": 267,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "apollo_primary_contact_operator_reviews",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 268,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "apollo_replacement_benchmark_cohorts",
+      "classification": "MANUAL_REVIEW",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": "Manual review — not auto-deleted."
+    },
+    {
+      "table": "apollo_replacement_benchmark_snapshots",
+      "classification": "MANUAL_REVIEW",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": "Manual review — not auto-deleted."
+    },
+    {
+      "table": "apollo_sequence_execution_automation_runs",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 269,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "apollo_sequence_execution_candidates",
+      "classification": "DELETE",
+      "row_count": 12,
+      "preserved_count": 0,
+      "delete_count": 12,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 270,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "apollo_voice_drop_automation_runs",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 271,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "apollo_voice_drop_candidates",
+      "classification": "DELETE",
+      "row_count": 12,
+      "preserved_count": 0,
+      "delete_count": 12,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 272,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "assignment_runs",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 258,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "assignment_settings",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "attribution_paths",
+      "classification": "DELETE",
+      "row_count": 21,
+      "preserved_count": 0,
+      "delete_count": 21,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 242,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "attribution_touches",
+      "classification": "DELETE",
+      "row_count": 32,
+      "preserved_count": 0,
+      "delete_count": 32,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 243,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "automation_edges",
+      "classification": "KEEP",
+      "row_count": 12,
+      "preserved_count": 12,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "automation_flow_versions",
+      "classification": "KEEP",
+      "row_count": 4,
+      "preserved_count": 4,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "automation_flows",
+      "classification": "KEEP",
+      "row_count": 2,
+      "preserved_count": 2,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "automation_nodes",
+      "classification": "KEEP",
+      "row_count": 16,
+      "preserved_count": 16,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "automation_validation_results",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 260,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "autonomous_outbound_scope_actions",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 968,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "autonomous_outbound_scope_events",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 969,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "autonomous_outbound_scopes",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 970,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "booking_attribution_events",
+      "classification": "DELETE",
+      "row_count": 13,
+      "preserved_count": 0,
+      "delete_count": 13,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 83,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "booking_intent_signals",
+      "classification": "DELETE",
+      "row_count": 12,
+      "preserved_count": 0,
+      "delete_count": 12,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 84,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "booking_page_bookings",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 86,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "booking_pages",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "booking_recommendations",
+      "classification": "DELETE",
+      "row_count": 13,
+      "preserved_count": 0,
+      "delete_count": 13,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 85,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "buying_committee_evidence",
+      "classification": "DELETE",
+      "row_count": 680,
+      "preserved_count": 0,
+      "delete_count": 680,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 169,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "buying_committee_intelligence_members",
+      "classification": "DELETE",
+      "row_count": 3,
+      "preserved_count": 0,
+      "delete_count": 3,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 170,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "buying_committee_jobs",
+      "classification": "DELETE",
+      "row_count": 123,
+      "preserved_count": 0,
+      "delete_count": 123,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 174,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "buying_committee_maps",
+      "classification": "DELETE",
+      "row_count": 3,
+      "preserved_count": 0,
+      "delete_count": 3,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 172,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "buying_committee_members",
+      "classification": "DELETE",
+      "row_count": 395,
+      "preserved_count": 0,
+      "delete_count": 395,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 171,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "buying_committee_runs",
+      "classification": "DELETE",
+      "row_count": 409,
+      "preserved_count": 0,
+      "delete_count": 409,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 173,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "buying_committee_signals",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 175,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "buying_committees",
+      "classification": "DELETE",
+      "row_count": 409,
+      "preserved_count": 0,
+      "delete_count": 409,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 983,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "buying_momentum_snapshots",
+      "classification": "DELETE",
+      "row_count": 3,
+      "preserved_count": 0,
+      "delete_count": 3,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 254,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "buying_stage_assessments",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "buying_stage_assessments",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [],
+      "reset_order": 176,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "cadence_tasks",
+      "classification": "DELETE",
+      "row_count": 7,
+      "preserved_count": 0,
+      "delete_count": 7,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 90,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "calendar_provider_connections",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "calendar_routing_rules",
+      "classification": "KEEP",
+      "row_count": 3,
+      "preserved_count": 3,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "calendar_sync_runs",
+      "classification": "DELETE",
+      "row_count": 2,
+      "preserved_count": 0,
+      "delete_count": 2,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 287,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "calibration_active_config",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 990,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "calibration_config_events",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 991,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "calibration_config_versions",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 992,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "call_brief_effectiveness",
+      "classification": "DELETE",
+      "row_count": 8,
+      "preserved_count": 0,
+      "delete_count": 8,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 76,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "call_copilot_sessions",
+      "classification": "DELETE",
+      "row_count": 2,
+      "preserved_count": 0,
+      "delete_count": 2,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 75,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "call_intelligence_scorecards",
+      "classification": "DELETE",
+      "row_count": 78,
+      "preserved_count": 0,
+      "delete_count": 78,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 77,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "campaign_engagement_metrics",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "campaign_engagement_metrics",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [],
+      "reset_order": 199,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "campaign_launch_checks",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "campaign_launch_checks",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [],
+      "reset_order": 200,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "campaign_reply_learning_snapshots",
+      "classification": "DELETE",
+      "row_count": 3,
+      "preserved_count": 0,
+      "delete_count": 3,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 201,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "campaign_revenue_attribution_snapshots",
+      "classification": "DELETE",
+      "row_count": 3,
+      "preserved_count": 0,
+      "delete_count": 3,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 202,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "channel_effectiveness_snapshots",
+      "classification": "DELETE",
+      "row_count": 5,
+      "preserved_count": 0,
+      "delete_count": 5,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 203,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "channel_performance_snapshots",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 204,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "channel_routing_rules",
+      "classification": "KEEP",
+      "row_count": 6,
+      "preserved_count": 6,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "closed_loop_learning_events",
+      "classification": "DELETE",
+      "row_count": 12,
+      "preserved_count": 0,
+      "delete_count": 12,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1003,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "closed_loop_learning_insights",
+      "classification": "DELETE",
+      "row_count": 8,
+      "preserved_count": 0,
+      "delete_count": 8,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1004,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "closed_loop_learning_outcomes",
+      "classification": "DELETE",
+      "row_count": 4,
+      "preserved_count": 0,
+      "delete_count": 4,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1005,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "committee_relationship_context",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 198,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "communication_settings",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "companies",
+      "classification": "DELETE",
+      "row_count": 521,
+      "preserved_count": 1,
+      "delete_count": 520,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 136,
+      "golden_fixture": true,
+      "notes": "Golden fixture rows preserved by entity allowlist."
+    },
+    {
+      "table": "company_confidence_scores",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 134,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "company_contact_identity_reviews",
+      "classification": "DELETE",
+      "row_count": 48,
+      "preserved_count": 0,
+      "delete_count": 48,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 109,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "company_contact_refresh_queue",
+      "classification": "DELETE",
+      "row_count": 271,
+      "preserved_count": 0,
+      "delete_count": 271,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 110,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "company_contacts",
+      "classification": "DELETE",
+      "row_count": 290,
+      "preserved_count": 0,
+      "delete_count": 290,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 111,
+      "golden_fixture": false,
+      "notes": "Golden fixture rows preserved by entity allowlist."
+    },
+    {
+      "table": "company_domains",
+      "classification": "DELETE",
+      "row_count": 460,
+      "preserved_count": 1,
+      "delete_count": 459,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 131,
+      "golden_fixture": true,
+      "notes": null
+    },
+    {
+      "table": "company_enrichments",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "company_enrichments",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 130,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "company_evidence_sources",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 129,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "company_growth_signal_refresh_queue",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 128,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "company_growth_signal_scores",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 127,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "company_growth_signals",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 126,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "company_identification_matches",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "company_identification_matches",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 125,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "company_intelligence_evidence",
+      "classification": "DELETE",
+      "row_count": 2386,
+      "preserved_count": 0,
+      "delete_count": 2386,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 123,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "company_intelligence_jobs",
+      "classification": "DELETE",
+      "row_count": 127,
+      "preserved_count": 0,
+      "delete_count": 127,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 167,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "company_intelligence_runs",
+      "classification": "DELETE",
+      "row_count": 192,
+      "preserved_count": 0,
+      "delete_count": 192,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 168,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "company_intelligence_snapshots",
+      "classification": "DELETE",
+      "row_count": 84,
+      "preserved_count": 0,
+      "delete_count": 84,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies",
+        "leads"
+      ],
+      "reset_order": 124,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "company_merge_events",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 121,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "company_profiles",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 135,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "company_relationships",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 122,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "company_signal_runs",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "company_signal_runs",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 133,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "company_signals",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "company_signals",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 132,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "company_source_lineage",
+      "classification": "DELETE",
+      "row_count": 3068,
+      "preserved_count": 0,
+      "delete_count": 3068,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 1029,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "contact_candidates",
+      "classification": "DELETE",
+      "row_count": 240,
+      "preserved_count": 0,
+      "delete_count": 240,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 112,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "contact_discovery_runs",
+      "classification": "DELETE",
+      "row_count": 445,
+      "preserved_count": 0,
+      "delete_count": 445,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 273,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "contact_verifications",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "contact_verifications",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [],
+      "reset_order": 113,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "content_approval_events",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 293,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "content_snippet_versions",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "content_snippets",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "content_template_versions",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "content_templates",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "content_variable_registry",
+      "classification": "KEEP",
+      "row_count": 9,
+      "preserved_count": 9,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "conversation_timeline_events",
+      "classification": "DELETE",
+      "row_count": 7,
+      "preserved_count": 0,
+      "delete_count": 7,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 34,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "copilot_settings",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "crm_intelligence_events",
+      "classification": "DELETE",
+      "row_count": 40,
+      "preserved_count": 0,
+      "delete_count": 40,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 256,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "cron_execution_runs",
+      "classification": "DELETE",
+      "row_count": 42407,
+      "preserved_count": 0,
+      "delete_count": 42407,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 286,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "customer_lifecycle_settings",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "customer_onboarding_tasks",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 92,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "customer_profiles",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1045,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "deal_intelligence_scores",
+      "classification": "DELETE",
+      "row_count": 6,
+      "preserved_count": 0,
+      "delete_count": 6,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 255,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "deliverability_domain_reputation_history",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 214,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "deliverability_events",
+      "classification": "DELETE",
+      "row_count": 33,
+      "preserved_count": 0,
+      "delete_count": 33,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 215,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "deliverability_governance_events",
+      "classification": "DELETE",
+      "row_count": 24,
+      "preserved_count": 0,
+      "delete_count": 24,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 216,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "deliverability_ops_snapshots",
+      "classification": "DELETE",
+      "row_count": 6,
+      "preserved_count": 0,
+      "delete_count": 6,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 209,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "deliverability_protection_events",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "deliverability_protection_events",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [],
+      "reset_order": 213,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "deliverability_recommendations",
+      "classification": "DELETE",
+      "row_count": 4,
+      "preserved_count": 0,
+      "delete_count": 4,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 210,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "deliverability_remediation_tasks",
+      "classification": "DELETE",
+      "row_count": 5,
+      "preserved_count": 0,
+      "delete_count": 5,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 212,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "deliverability_risk_events",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 211,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "deliverability_snapshots",
+      "classification": "DELETE",
+      "row_count": 3,
+      "preserved_count": 0,
+      "delete_count": 3,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 217,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "deliverability_trend_snapshots",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "deliverability_trend_snapshots",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 208,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "delivery_attempts",
+      "classification": "DELETE",
+      "row_count": 155,
+      "preserved_count": 0,
+      "delete_count": 155,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 18,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "delivery_event_timeline",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "delivery_event_timeline",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [],
+      "reset_order": 19,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "delivery_events",
+      "classification": "DELETE",
+      "row_count": 318,
+      "preserved_count": 0,
+      "delete_count": 318,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 17,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "delivery_providers",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "delivery_routes",
+      "classification": "KEEP",
+      "row_count": 7,
+      "preserved_count": 7,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "delivery_suppressions",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "demo_assistant_sessions",
+      "classification": "DELETE",
+      "row_count": 2,
+      "preserved_count": 0,
+      "delete_count": 2,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1063,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "discovery_candidates",
+      "classification": "DELETE",
+      "row_count": 825,
+      "preserved_count": 0,
+      "delete_count": 825,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 144,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "discovery_outcome_patterns",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 147,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "discovery_refresh_queue",
+      "classification": "DELETE",
+      "row_count": 101,
+      "preserved_count": 0,
+      "delete_count": 101,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 148,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "discovery_runs",
+      "classification": "DELETE",
+      "row_count": 407,
+      "preserved_count": 0,
+      "delete_count": 407,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 145,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "discovery_sources",
+      "classification": "DELETE",
+      "row_count": 8,
+      "preserved_count": 0,
+      "delete_count": 8,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 146,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "discovery_statistics",
+      "classification": "DELETE",
+      "row_count": 232,
+      "preserved_count": 0,
+      "delete_count": 232,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 149,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "dogfood_issues",
+      "classification": "MANUAL_REVIEW",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": "Manual review — not auto-deleted."
+    },
+    {
+      "table": "dogfood_validation_runs",
+      "classification": "MANUAL_REVIEW",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": "Manual review — not auto-deleted."
+    },
+    {
+      "table": "domain_dns_checks",
+      "classification": "DELETE",
+      "row_count": 227,
+      "preserved_count": 0,
+      "delete_count": 227,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1072,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "domain_health_snapshots",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "domain_health_snapshots",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 218,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "email_bounces",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 290,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "email_clicks",
+      "classification": "DELETE",
+      "row_count": 5,
+      "preserved_count": 0,
+      "delete_count": 5,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 14,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "email_complaints",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 291,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "email_discovery_candidates",
+      "classification": "DELETE",
+      "row_count": 3672,
+      "preserved_count": 0,
+      "delete_count": 3672,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 156,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "email_discovery_evidence",
+      "classification": "DELETE",
+      "row_count": 7344,
+      "preserved_count": 0,
+      "delete_count": 7344,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 155,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "email_discovery_jobs",
+      "classification": "DELETE",
+      "row_count": 537,
+      "preserved_count": 0,
+      "delete_count": 537,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 158,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "email_discovery_runs",
+      "classification": "DELETE",
+      "row_count": 544,
+      "preserved_count": 0,
+      "delete_count": 544,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 157,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "email_opens",
+      "classification": "DELETE",
+      "row_count": 226,
+      "preserved_count": 0,
+      "delete_count": 226,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 13,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "email_provider_connections",
+      "classification": "KEEP",
+      "row_count": 15,
+      "preserved_count": 15,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "engagement_scores",
+      "classification": "DELETE",
+      "row_count": 13,
+      "preserved_count": 0,
+      "delete_count": 13,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 15,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "enrichment_runs",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "enrichment_runs",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [],
+      "reset_order": 154,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "execution_sprints",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "execution_sprints",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [],
+      "reset_order": 259,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "external_company_candidates",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 150,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "external_company_discovery_runs",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies",
+        "leads"
+      ],
+      "reset_order": 151,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "governance_activity_exports",
+      "classification": "MANUAL_REVIEW",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": "Manual review — not auto-deleted."
+    },
+    {
+      "table": "governance_approval_audit",
+      "classification": "MANUAL_REVIEW",
+      "row_count": 401,
+      "preserved_count": 401,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": "Manual review — not auto-deleted."
+    },
+    {
+      "table": "governance_compliance_exports",
+      "classification": "MANUAL_REVIEW",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": "Manual review — not auto-deleted."
+    },
+    {
+      "table": "governance_policies",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "governance_policy_events",
+      "classification": "MANUAL_REVIEW",
+      "row_count": 401,
+      "preserved_count": 401,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": "Manual review — not auto-deleted."
+    },
+    {
+      "table": "governance_policy_rules",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "governance_retention_policies",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_audience_enrollment_preview_members",
+      "classification": "DELETE",
+      "row_count": 1124,
+      "preserved_count": 0,
+      "delete_count": 1124,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "sequence_enrollments",
+        "leads"
+      ],
+      "reset_order": 189,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_audience_enrollment_previews",
+      "classification": "DELETE",
+      "row_count": 14,
+      "preserved_count": 0,
+      "delete_count": 14,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "sequence_enrollments",
+        "leads"
+      ],
+      "reset_order": 190,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_audience_enrollment_runs",
+      "classification": "DELETE",
+      "row_count": 9,
+      "preserved_count": 0,
+      "delete_count": 9,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "sequence_enrollments",
+        "leads"
+      ],
+      "reset_order": 191,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_audience_lead_creation_runs",
+      "classification": "DELETE",
+      "row_count": 3,
+      "preserved_count": 0,
+      "delete_count": 3,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 188,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_audience_member_diffs",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 185,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_audience_members",
+      "classification": "KEEP",
+      "row_count": 162,
+      "preserved_count": 162,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_audience_refresh_runs",
+      "classification": "DELETE",
+      "row_count": 4,
+      "preserved_count": 0,
+      "delete_count": 4,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 187,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_audience_snapshot_diffs",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 184,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_audience_snapshots",
+      "classification": "DELETE",
+      "row_count": 4,
+      "preserved_count": 0,
+      "delete_count": 4,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 186,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_audiences",
+      "classification": "KEEP",
+      "row_count": 3,
+      "preserved_count": 3,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_booking_assets",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_booking_events",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 11,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_conversation_agent_versions",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_conversation_agents",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_engagement_event_rollups",
+      "classification": "DELETE",
+      "row_count": 20,
+      "preserved_count": 0,
+      "delete_count": 20,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_engagement_events",
+      "classification": "DELETE",
+      "row_count": 79,
+      "preserved_count": 0,
+      "delete_count": 79,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 0,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_event_retention_config",
+      "classification": "KEEP",
+      "row_count": 5,
+      "preserved_count": 5,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_landing_page_publications",
+      "classification": "KEEP",
+      "row_count": 15,
+      "preserved_count": 15,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_landing_page_sections",
+      "classification": "KEEP",
+      "row_count": 19,
+      "preserved_count": 19,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_landing_pages",
+      "classification": "KEEP",
+      "row_count": 11,
+      "preserved_count": 11,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_media_asset_access_logs",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 12,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_media_asset_versions",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_media_assets",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_sendr_launch_runs",
+      "classification": "DELETE",
+      "row_count": 13,
+      "preserved_count": 0,
+      "delete_count": 13,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 192,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_sendr_sequence_page_links",
+      "classification": "KEEP",
+      "row_count": 4,
+      "preserved_count": 4,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_video_asset_events",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 10,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "growth_video_assets",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "human_execution_approvals",
+      "classification": "MANUAL_REVIEW",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": "Manual review — not auto-deleted."
+    },
+    {
+      "table": "human_execution_plan_steps",
+      "classification": "MANUAL_REVIEW",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": "Manual review — not auto-deleted."
+    },
+    {
+      "table": "human_execution_plans",
+      "classification": "MANUAL_REVIEW",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": "Manual review — not auto-deleted."
+    },
+    {
+      "table": "inbox_assignment_rules",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "inbox_threads",
+        "leads"
+      ],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "inbox_assignment_settings",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "inbox_threads",
+        "leads"
+      ],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "inbox_lifecycle_events",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "inbox_lifecycle_events",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [
+        "inbox_threads",
+        "leads"
+      ],
+      "reset_order": 43,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "inbox_messages",
+      "classification": "DELETE",
+      "row_count": 47,
+      "preserved_count": 0,
+      "delete_count": 47,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "inbox_threads",
+        "leads"
+      ],
+      "reset_order": 44,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "inbox_provider_message_map",
+      "classification": "DELETE",
+      "row_count": 20,
+      "preserved_count": 0,
+      "delete_count": 20,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "inbox_threads",
+        "leads"
+      ],
+      "reset_order": 47,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "inbox_reply_draft_events",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "inbox_threads",
+        "leads"
+      ],
+      "reset_order": 45,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "inbox_reply_drafts",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "inbox_threads",
+        "leads"
+      ],
+      "reset_order": 46,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "inbox_sync_runs",
+      "classification": "DELETE",
+      "row_count": 4784,
+      "preserved_count": 0,
+      "delete_count": 4784,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "inbox_threads",
+        "leads"
+      ],
+      "reset_order": 50,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "inbox_thread_links",
+      "classification": "DELETE",
+      "row_count": 20,
+      "preserved_count": 0,
+      "delete_count": 20,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "inbox_threads",
+        "leads"
+      ],
+      "reset_order": 48,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "inbox_thread_owner_history",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "inbox_threads",
+        "leads"
+      ],
+      "reset_order": 49,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "inbox_threads",
+      "classification": "DELETE",
+      "row_count": 10,
+      "preserved_count": 0,
+      "delete_count": 10,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "inbox_threads",
+        "leads"
+      ],
+      "reset_order": 51,
+      "golden_fixture": false,
+      "notes": "Golden fixture rows preserved by entity allowlist."
+    },
+    {
+      "table": "infrastructure_fit_assessments",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "infrastructure_fit_assessments",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [],
+      "reset_order": 1136,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "intent_conversion_events",
+      "classification": "DELETE",
+      "row_count": 6,
+      "preserved_count": 0,
+      "delete_count": 6,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 244,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "intent_identified_contacts",
+      "classification": "DELETE",
+      "row_count": 6,
+      "preserved_count": 0,
+      "delete_count": 6,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 245,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "intent_pageview_events",
+      "classification": "DELETE",
+      "row_count": 1297,
+      "preserved_count": 0,
+      "delete_count": 1297,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 246,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "intent_pixel_sites",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 248,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "intent_visitor_sessions",
+      "classification": "DELETE",
+      "row_count": 1607,
+      "preserved_count": 0,
+      "delete_count": 1607,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 247,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "internal_outbound_audit_events",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 292,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "lead_call_events",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 78,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "lead_call_sessions",
+      "classification": "DELETE",
+      "row_count": 15,
+      "preserved_count": 0,
+      "delete_count": 15,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 79,
+      "golden_fixture": false,
+      "notes": "Golden fixture rows preserved by entity allowlist."
+    },
+    {
+      "table": "lead_decision_makers",
+      "classification": "DELETE",
+      "row_count": 16,
+      "preserved_count": 0,
+      "delete_count": 16,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 101,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "lead_import_batch_events",
+      "classification": "DELETE",
+      "row_count": 7,
+      "preserved_count": 0,
+      "delete_count": 7,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 138,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "lead_import_batch_rows",
+      "classification": "DELETE",
+      "row_count": 5,
+      "preserved_count": 1,
+      "delete_count": 4,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 139,
+      "golden_fixture": true,
+      "notes": null
+    },
+    {
+      "table": "lead_import_batches",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 140,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "lead_import_mapping_profiles",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 141,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "lead_inbox",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "inbox_threads",
+        "leads"
+      ],
+      "reset_order": 108,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "lead_memory_events",
+      "classification": "DELETE",
+      "row_count": 13,
+      "preserved_count": 0,
+      "delete_count": 13,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 102,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "lead_memory_profiles",
+      "classification": "DELETE",
+      "row_count": 8,
+      "preserved_count": 0,
+      "delete_count": 8,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 103,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "lead_objection_memory",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 104,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "lead_preference_memory",
+      "classification": "DELETE",
+      "row_count": 10,
+      "preserved_count": 0,
+      "delete_count": 10,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 105,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "lead_research_notes",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 106,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "lead_research_runs",
+      "classification": "DELETE",
+      "row_count": 7,
+      "preserved_count": 0,
+      "delete_count": 7,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 107,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "lead_timeline_events",
+      "classification": "DELETE",
+      "row_count": 2682,
+      "preserved_count": 4,
+      "delete_count": 2678,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 35,
+      "golden_fixture": true,
+      "notes": "Golden fixture rows preserved by entity allowlist."
+    },
+    {
+      "table": "leads",
+      "classification": "DELETE",
+      "row_count": 60,
+      "preserved_count": 1,
+      "delete_count": 59,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 137,
+      "golden_fixture": true,
+      "notes": "Golden fixture rows preserved by entity allowlist."
+    },
+    {
+      "table": "live_guidance_events",
+      "classification": "DELETE",
+      "row_count": 38,
+      "preserved_count": 0,
+      "delete_count": 38,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 80,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "mailbox_connection_events",
+      "classification": "DELETE",
+      "row_count": 13,
+      "preserved_count": 0,
+      "delete_count": 13,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 221,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "mailbox_connections",
+      "classification": "KEEP",
+      "row_count": 8,
+      "preserved_count": 8,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "mailbox_health_snapshots",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "mailbox_health_snapshots",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 219,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "mailbox_reputation_snapshots",
+      "classification": "DELETE",
+      "row_count": 61,
+      "preserved_count": 0,
+      "delete_count": 61,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 220,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "mailbox_send_policies",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "maintenance_tasks",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "maintenance_tasks",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [],
+      "reset_order": 91,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "market_coverage_scores",
+      "classification": "DELETE",
+      "row_count": 5,
+      "preserved_count": 0,
+      "delete_count": 5,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 249,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "market_health_refresh_queue",
+      "classification": "DELETE",
+      "row_count": 5,
+      "preserved_count": 0,
+      "delete_count": 5,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 250,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "media_asset_event_rollups",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 9,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "media_asset_events",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 8,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "media_asset_relationships",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1170,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "media_assets",
+      "classification": "DELETE",
+      "row_count": 16,
+      "preserved_count": 0,
+      "delete_count": 16,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1171,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "media_generation_runs",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 183,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "meeting_candidate_runs",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "meetings",
+        "leads"
+      ],
+      "reset_order": 89,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "meeting_candidates",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "meetings",
+        "leads"
+      ],
+      "reset_order": 88,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "meeting_conversion_events",
+      "classification": "DELETE",
+      "row_count": 26,
+      "preserved_count": 0,
+      "delete_count": 26,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "meetings",
+        "leads"
+      ],
+      "reset_order": 81,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "meeting_outcome_intelligence_scores",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "meeting_outcome_intelligence_scores",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [
+        "meetings",
+        "leads"
+      ],
+      "reset_order": 82,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "meetings",
+      "classification": "DELETE",
+      "row_count": 19,
+      "preserved_count": 0,
+      "delete_count": 19,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "meetings",
+        "leads"
+      ],
+      "reset_order": 87,
+      "golden_fixture": false,
+      "notes": "Golden fixture rows preserved by entity allowlist."
+    },
+    {
+      "table": "message_events",
+      "classification": "DELETE",
+      "row_count": 5,
+      "preserved_count": 0,
+      "delete_count": 5,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 16,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "multi_channel_activity_timeline_events",
+      "classification": "DELETE",
+      "row_count": 17,
+      "preserved_count": 0,
+      "delete_count": 17,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 33,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "native_call_workspace_sessions",
+      "classification": "DELETE",
+      "row_count": 111,
+      "preserved_count": 0,
+      "delete_count": 111,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 70,
+      "golden_fixture": false,
+      "notes": "Golden fixture rows preserved by entity allowlist."
+    },
+    {
+      "table": "native_call_wrapups",
+      "classification": "DELETE",
+      "row_count": 74,
+      "preserved_count": 0,
+      "delete_count": 74,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 69,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "native_dialer_queue_items",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 288,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "native_dialer_settings",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "notifications",
+      "classification": "DELETE",
+      "row_count": 245,
+      "preserved_count": 0,
+      "delete_count": 245,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 30,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "objective_source_event_receipts",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1185,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "operational_alerts",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "operational_alerts",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [],
+      "reset_order": 194,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "operational_analytics_snapshots",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "operational_analytics_snapshots",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 193,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "operator_assist_preferences",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "operator_notification_preferences",
+      "classification": "KEEP",
+      "row_count": 2,
+      "preserved_count": 2,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "operator_notification_push_deliveries",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 31,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "operator_notification_push_subscriptions",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "operator_notifications",
+      "classification": "DELETE",
+      "row_count": 4957,
+      "preserved_count": 0,
+      "delete_count": 4957,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 29,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "operator_workspace_preferences",
+      "classification": "KEEP",
+      "row_count": 2,
+      "preserved_count": 2,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "opportunities",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 100,
+      "golden_fixture": false,
+      "notes": "Golden fixture rows preserved by entity allowlist."
+    },
+    {
+      "table": "opportunity_approval_runs",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "opportunities",
+        "leads"
+      ],
+      "reset_order": 93,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "opportunity_draft_runs",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "opportunities",
+        "leads"
+      ],
+      "reset_order": 94,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "opportunity_drafts",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "opportunities",
+        "leads"
+      ],
+      "reset_order": 95,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "opportunity_pipeline_settings",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "opportunities",
+        "leads"
+      ],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "opportunity_recommendations",
+      "classification": "DELETE",
+      "row_count": 25,
+      "preserved_count": 0,
+      "delete_count": 25,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "opportunities",
+        "leads"
+      ],
+      "reset_order": 98,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "opportunity_signal_timeline_events",
+      "classification": "DELETE",
+      "row_count": 2,
+      "preserved_count": 0,
+      "delete_count": 2,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "opportunities",
+        "leads"
+      ],
+      "reset_order": 97,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "opportunity_signals",
+      "classification": "DELETE",
+      "row_count": 19,
+      "preserved_count": 0,
+      "delete_count": 19,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "opportunities",
+        "leads"
+      ],
+      "reset_order": 99,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "opportunity_stage_history",
+      "classification": "DELETE",
+      "row_count": 2,
+      "preserved_count": 0,
+      "delete_count": 2,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "opportunities",
+        "leads"
+      ],
+      "reset_order": 96,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "organization_ai_teammate_identity",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "organization_autonomy_settings",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "organization_growth_objectives",
+      "classification": "DELETE",
+      "row_count": 10,
+      "preserved_count": 0,
+      "delete_count": 10,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1205,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "outbound_campaigns",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1206,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "outbound_contacts",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1207,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "outbound_messages",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 25,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "outbound_replies",
+      "classification": "DELETE",
+      "row_count": 5,
+      "preserved_count": 0,
+      "delete_count": 5,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 26,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "outbound_scheduler_decisions",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "outbound_scheduler_decisions",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [],
+      "reset_order": 206,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "outreach_performance_attributions",
+      "classification": "DELETE",
+      "row_count": 23,
+      "preserved_count": 0,
+      "delete_count": 23,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 205,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "outreach_queue",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 28,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "outreach_queue_events",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 27,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "outreach_settings",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "performance_intelligence_events",
+      "classification": "DELETE",
+      "row_count": 8,
+      "preserved_count": 0,
+      "delete_count": 8,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 241,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "person_company_roles",
+      "classification": "DELETE",
+      "row_count": 200,
+      "preserved_count": 0,
+      "delete_count": 200,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies",
+        "persons"
+      ],
+      "reset_order": 115,
+      "golden_fixture": false,
+      "notes": "Golden fixture rows preserved by entity allowlist."
+    },
+    {
+      "table": "person_emails",
+      "classification": "DELETE",
+      "row_count": 48,
+      "preserved_count": 0,
+      "delete_count": 48,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "persons"
+      ],
+      "reset_order": 119,
+      "golden_fixture": false,
+      "notes": "Golden fixture rows preserved by entity allowlist."
+    },
+    {
+      "table": "person_merge_events",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "persons"
+      ],
+      "reset_order": 114,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "person_phones",
+      "classification": "DELETE",
+      "row_count": 36,
+      "preserved_count": 0,
+      "delete_count": 36,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "persons"
+      ],
+      "reset_order": 118,
+      "golden_fixture": false,
+      "notes": "Golden fixture rows preserved by entity allowlist."
+    },
+    {
+      "table": "person_profiles",
+      "classification": "DELETE",
+      "row_count": 118,
+      "preserved_count": 0,
+      "delete_count": 118,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "persons"
+      ],
+      "reset_order": 117,
+      "golden_fixture": false,
+      "notes": "Golden fixture rows preserved by entity allowlist."
+    },
+    {
+      "table": "person_source_lineage",
+      "classification": "DELETE",
+      "row_count": 369,
+      "preserved_count": 0,
+      "delete_count": 369,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "persons"
+      ],
+      "reset_order": 116,
+      "golden_fixture": false,
+      "notes": "Golden fixture rows preserved by entity allowlist."
+    },
+    {
+      "table": "personalization_evidence",
+      "classification": "DELETE",
+      "row_count": 363,
+      "preserved_count": 0,
+      "delete_count": 363,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "personalization_generations",
+        "leads",
+        "persons"
+      ],
+      "reset_order": 63,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "personalization_feedback",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "personalization_generations",
+        "leads",
+        "persons"
+      ],
+      "reset_order": 64,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "personalization_generations",
+      "classification": "DELETE",
+      "row_count": 202,
+      "preserved_count": 0,
+      "delete_count": 202,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "personalization_generations",
+        "leads",
+        "persons"
+      ],
+      "reset_order": 67,
+      "golden_fixture": false,
+      "notes": "Golden fixture rows preserved by entity allowlist."
+    },
+    {
+      "table": "personalization_performance_snapshots",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "personalization_generations",
+        "leads",
+        "persons"
+      ],
+      "reset_order": 66,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "personalization_profiles",
+      "classification": "DELETE",
+      "row_count": 11,
+      "preserved_count": 0,
+      "delete_count": 11,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "personalization_generations",
+        "leads",
+        "persons"
+      ],
+      "reset_order": 68,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "personalization_risk_events",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "personalization_generations",
+        "leads",
+        "persons"
+      ],
+      "reset_order": 65,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "persons",
+      "classification": "DELETE",
+      "row_count": 1177,
+      "preserved_count": 1,
+      "delete_count": 1176,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "persons"
+      ],
+      "reset_order": 120,
+      "golden_fixture": true,
+      "notes": "Golden fixture rows preserved by entity allowlist."
+    },
+    {
+      "table": "phone_discovery_candidates",
+      "classification": "DELETE",
+      "row_count": 115,
+      "preserved_count": 0,
+      "delete_count": 115,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 160,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "phone_discovery_evidence",
+      "classification": "DELETE",
+      "row_count": 230,
+      "preserved_count": 0,
+      "delete_count": 230,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 159,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "phone_discovery_jobs",
+      "classification": "DELETE",
+      "row_count": 544,
+      "preserved_count": 0,
+      "delete_count": 544,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 162,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "phone_discovery_runs",
+      "classification": "DELETE",
+      "row_count": 583,
+      "preserved_count": 0,
+      "delete_count": 583,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 161,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "platform_timeline_events",
+      "classification": "DELETE",
+      "row_count": 17687,
+      "preserved_count": 0,
+      "delete_count": 17687,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 32,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "prospect_search_index",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 143,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "prospect_search_list_members",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 142,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "prospect_search_lists",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "prospect_search_saved_searches",
+      "classification": "KEEP",
+      "row_count": 6,
+      "preserved_count": 6,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "provider_capability_history",
+      "classification": "DELETE",
+      "row_count": 3,
+      "preserved_count": 0,
+      "delete_count": 3,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 275,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "provider_connection_checks",
+      "classification": "DELETE",
+      "row_count": 2,
+      "preserved_count": 0,
+      "delete_count": 2,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 277,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "provider_connection_settings",
+      "classification": "KEEP",
+      "row_count": 2,
+      "preserved_count": 2,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "provider_delivery_events",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 20,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "provider_oauth_states",
+      "classification": "DELETE",
+      "row_count": 20,
+      "preserved_count": 0,
+      "delete_count": 20,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 278,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "provider_query_cache",
+      "classification": "DELETE",
+      "row_count": 156,
+      "preserved_count": 0,
+      "delete_count": 156,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 274,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "provider_rate_limits",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 276,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "provider_route_performance_snapshots",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 228,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "provider_secret_audit_events",
+      "classification": "DELETE",
+      "row_count": 33,
+      "preserved_count": 0,
+      "delete_count": 33,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 279,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "provider_setup_readiness",
+      "classification": "DELETE",
+      "row_count": 216,
+      "preserved_count": 0,
+      "delete_count": 216,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 280,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "provider_webhook_endpoints",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "provider_webhooks",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 281,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "real_world_company_candidates",
+      "classification": "DELETE",
+      "row_count": 28169,
+      "preserved_count": 0,
+      "delete_count": 28169,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "companies"
+      ],
+      "reset_order": 152,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "real_world_discovery_runs",
+      "classification": "DELETE",
+      "row_count": 578,
+      "preserved_count": 0,
+      "delete_count": 578,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 153,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "realtime_call_session_insights",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 72,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "realtime_call_session_timeline_events",
+      "classification": "DELETE",
+      "row_count": 261,
+      "preserved_count": 0,
+      "delete_count": 261,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 73,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "realtime_call_sessions",
+      "classification": "DELETE",
+      "row_count": 103,
+      "preserved_count": 0,
+      "delete_count": 103,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 74,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "realtime_call_transcript_events",
+      "classification": "DELETE",
+      "row_count": 23,
+      "preserved_count": 0,
+      "delete_count": 23,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 71,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "realtime_provider_connections",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "realtime_provider_lifecycle_events",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 282,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "relationship_context",
+      "classification": "DELETE",
+      "row_count": 8,
+      "preserved_count": 0,
+      "delete_count": 8,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 197,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "relationship_summary_snapshots",
+      "classification": "DELETE",
+      "row_count": 19,
+      "preserved_count": 0,
+      "delete_count": 19,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 196,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "rep_roster",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "reply_ingestion_events",
+      "classification": "DELETE",
+      "row_count": 23,
+      "preserved_count": 0,
+      "delete_count": 23,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 41,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "reply_intelligence_events",
+      "classification": "DELETE",
+      "row_count": 4156,
+      "preserved_count": 0,
+      "delete_count": 4156,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 40,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "reply_workflow_actions",
+      "classification": "DELETE",
+      "row_count": 7,
+      "preserved_count": 0,
+      "delete_count": 7,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 42,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "research_runs",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 178,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "revenue_attribution_events",
+      "classification": "DELETE",
+      "row_count": 8,
+      "preserved_count": 0,
+      "delete_count": 8,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 238,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "revenue_director_decision_events",
+      "classification": "DELETE",
+      "row_count": 18,
+      "preserved_count": 0,
+      "delete_count": 18,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1266,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "revenue_director_decisions",
+      "classification": "DELETE",
+      "row_count": 4,
+      "preserved_count": 0,
+      "delete_count": 4,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1267,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "revenue_director_workflow_requests",
+      "classification": "DELETE",
+      "row_count": 6,
+      "preserved_count": 0,
+      "delete_count": 6,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1268,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "revenue_forecast_movements",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 239,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "revenue_forecast_settings",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "revenue_forecast_snapshots",
+      "classification": "DELETE",
+      "row_count": 2,
+      "preserved_count": 0,
+      "delete_count": 2,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 240,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "runtime_budgets",
+      "classification": "KEEP",
+      "row_count": 62,
+      "preserved_count": 62,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "runtime_cascade_budgets",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "runtime_guardrail_audit_log",
+      "classification": "DELETE",
+      "row_count": 205,
+      "preserved_count": 0,
+      "delete_count": 205,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 283,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "runtime_guardrail_settings",
+      "classification": "KEEP",
+      "row_count": 26,
+      "preserved_count": 26,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "runtime_health_counters",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 285,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "runtime_retention_batch_state",
+      "classification": "KEEP",
+      "row_count": 5,
+      "preserved_count": 5,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "runtime_search_audit_log",
+      "classification": "DELETE",
+      "row_count": 157,
+      "preserved_count": 0,
+      "delete_count": 157,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 284,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "runtime_user_budgets",
+      "classification": "KEEP",
+      "row_count": 19,
+      "preserved_count": 19,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "runtime_wake_batch_state",
+      "classification": "KEEP",
+      "row_count": 2,
+      "preserved_count": 2,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sales_execution_insight_snapshots",
+      "classification": "DELETE",
+      "row_count": 3,
+      "preserved_count": 0,
+      "delete_count": 3,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 195,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "search_intent_signals",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "search_intent_signals",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [],
+      "reset_order": 177,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sender_accounts",
+      "classification": "KEEP",
+      "row_count": 7,
+      "preserved_count": 7,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sender_domains",
+      "classification": "KEEP",
+      "row_count": 4,
+      "preserved_count": 4,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sender_fatigue_events",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 224,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sender_health_events",
+      "classification": "DELETE",
+      "row_count": 7,
+      "preserved_count": 0,
+      "delete_count": 7,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 222,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sender_performance_snapshots",
+      "classification": "DELETE",
+      "row_count": 7,
+      "preserved_count": 0,
+      "delete_count": 7,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 226,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sender_pool_members",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sender_pool_performance_snapshots",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 227,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sender_pools",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sender_profiles",
+      "classification": "DELETE",
+      "row_count": 6,
+      "preserved_count": 0,
+      "delete_count": 6,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1291,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sender_reputation_snapshots",
+      "classification": "DELETE",
+      "row_count": 57,
+      "preserved_count": 0,
+      "delete_count": 57,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 223,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sender_rotation_decisions",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 225,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_branch_decisions",
+      "classification": "DELETE",
+      "row_count": 85,
+      "preserved_count": 0,
+      "delete_count": 85,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 56,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_channel_task_events",
+      "classification": "DELETE",
+      "row_count": 5,
+      "preserved_count": 0,
+      "delete_count": 5,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 60,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_channel_tasks",
+      "classification": "DELETE",
+      "row_count": 5,
+      "preserved_count": 0,
+      "delete_count": 5,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 61,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_enrollment_channel_events",
+      "classification": "DELETE",
+      "row_count": 547,
+      "preserved_count": 0,
+      "delete_count": 547,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "sequence_enrollments",
+        "leads"
+      ],
+      "reset_order": 57,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_enrollment_step_waits",
+      "classification": "DELETE",
+      "row_count": 82,
+      "preserved_count": 0,
+      "delete_count": 82,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "sequence_enrollments",
+        "leads"
+      ],
+      "reset_order": 58,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_enrollment_steps",
+      "classification": "DELETE",
+      "row_count": 122,
+      "preserved_count": 0,
+      "delete_count": 122,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "sequence_enrollments",
+        "leads"
+      ],
+      "reset_order": 59,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_enrollments",
+      "classification": "DELETE",
+      "row_count": 56,
+      "preserved_count": 0,
+      "delete_count": 56,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "sequence_enrollments",
+        "leads"
+      ],
+      "reset_order": 62,
+      "golden_fixture": false,
+      "notes": "Golden fixture rows preserved by entity allowlist."
+    },
+    {
+      "table": "sequence_execution_diagnostics",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "sequence_execution_diagnostics",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [],
+      "reset_order": 55,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_execution_events",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 54,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_execution_job_events",
+      "classification": "DELETE",
+      "row_count": 105,
+      "preserved_count": 0,
+      "delete_count": 105,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 52,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_execution_jobs",
+      "classification": "DELETE",
+      "row_count": 44,
+      "preserved_count": 0,
+      "delete_count": 44,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 53,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_experiment_assignments",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 235,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_experiment_events",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 233,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_experiment_results",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 234,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_experiment_variants",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 237,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_experiments",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 236,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_pattern_outcomes",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 230,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_pattern_step_conditions",
+      "classification": "KEEP",
+      "row_count": 14,
+      "preserved_count": 14,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_pattern_step_edges",
+      "classification": "KEEP",
+      "row_count": 62,
+      "preserved_count": 62,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_pattern_steps",
+      "classification": "KEEP",
+      "row_count": 103,
+      "preserved_count": 103,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_patterns",
+      "classification": "KEEP",
+      "row_count": 33,
+      "preserved_count": 33,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_pause_candidates",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 232,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_performance_snapshots",
+      "classification": "DELETE",
+      "row_count": 25,
+      "preserved_count": 0,
+      "delete_count": 25,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 229,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_scheduler_runs",
+      "classification": "DELETE",
+      "row_count": 3582,
+      "preserved_count": 0,
+      "delete_count": 3582,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 231,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_template_enrollments",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "sequence_enrollments",
+        "leads"
+      ],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_template_steps",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_templates",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sequence_video_attachments",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1321,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "share_page_events",
+      "classification": "DELETE",
+      "row_count": 43,
+      "preserved_count": 0,
+      "delete_count": 43,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 2,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "share_page_template_versions",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "share_page_templates",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "share_page_views",
+      "classification": "DELETE",
+      "row_count": 15,
+      "preserved_count": 0,
+      "delete_count": 15,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 3,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "share_pages",
+      "classification": "KEEP",
+      "row_count": 15,
+      "preserved_count": 15,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "signal_events",
+      "classification": "DELETE",
+      "row_count": 6380,
+      "preserved_count": 0,
+      "delete_count": 6380,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 36,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "signal_ingestion_queue",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 39,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "signal_providers",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "signal_raw_payloads",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 38,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "signal_sources",
+      "classification": "DELETE",
+      "row_count": 39,
+      "preserved_count": 0,
+      "delete_count": 39,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1331,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "signal_targets",
+      "classification": "DELETE",
+      "row_count": 32,
+      "preserved_count": 0,
+      "delete_count": 32,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1332,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "signal_trigger_rules",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "signal_watchlist_matches",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 37,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "signal_watchlists",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "signals",
+      "classification": "DELETE",
+      "row_count": 39,
+      "preserved_count": 0,
+      "delete_count": 39,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1336,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sms_conversations",
+      "classification": "DELETE",
+      "row_count": 3,
+      "preserved_count": 0,
+      "delete_count": 3,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 24,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sms_delivery_attempts",
+      "classification": "DELETE",
+      "row_count": 4,
+      "preserved_count": 0,
+      "delete_count": 4,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 22,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sms_messages",
+      "classification": "DELETE",
+      "row_count": 6,
+      "preserved_count": 0,
+      "delete_count": 6,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 21,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sms_provider_events",
+      "classification": "DELETE",
+      "row_count": 12,
+      "preserved_count": 0,
+      "delete_count": 12,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 23,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "sms_workspace_settings",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "social_profile_discovery_candidates",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 164,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "social_profile_discovery_evidence",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 163,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "social_profile_discovery_jobs",
+      "classification": "DELETE",
+      "row_count": 307,
+      "preserved_count": 0,
+      "delete_count": 307,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 166,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "social_profile_discovery_runs",
+      "classification": "DELETE",
+      "row_count": 329,
+      "preserved_count": 0,
+      "delete_count": 329,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads",
+        "companies"
+      ],
+      "reset_order": 165,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "suppression_entries",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "territories",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "territory_companies",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 252,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "territory_refresh_queue",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 253,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "territory_scores",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 251,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "throughput_snapshots",
+      "classification": "DELETE",
+      "row_count": null,
+      "preserved_count": null,
+      "delete_count": null,
+      "count_status": "count_unavailable",
+      "count_error": {
+        "table": "throughput_snapshots",
+        "classification": "DELETE",
+        "operation": "count",
+        "code": null,
+        "message": "Unknown count error",
+        "details": null,
+        "hint": null
+      },
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 207,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "unsubscribe_registry",
+      "classification": "KEEP",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "user_communication_preferences",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "video_assets",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "video_engagement_summaries",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 5,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "video_page_events",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 6,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "video_page_rollups",
+      "classification": "DELETE",
+      "row_count": 1,
+      "preserved_count": 0,
+      "delete_count": 1,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 7,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "video_pages",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "video_templates",
+      "classification": "KEEP",
+      "row_count": 1,
+      "preserved_count": 1,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "video_views",
+      "classification": "DELETE",
+      "row_count": 0,
+      "preserved_count": 0,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 4,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "warmup_events",
+      "classification": "DELETE",
+      "row_count": 164,
+      "preserved_count": 0,
+      "delete_count": 164,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 289,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "warmup_profiles",
+      "classification": "KEEP",
+      "row_count": 6,
+      "preserved_count": 6,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "warmup_recipients",
+      "classification": "DELETE",
+      "row_count": 4,
+      "preserved_count": 0,
+      "delete_count": 4,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1363,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "warmup_schedule",
+      "classification": "KEEP",
+      "row_count": 180,
+      "preserved_count": 180,
+      "delete_count": 0,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": null,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "warmup_send_attempts",
+      "classification": "DELETE",
+      "row_count": 282,
+      "preserved_count": 0,
+      "delete_count": 282,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1365,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "warmup_send_runs",
+      "classification": "DELETE",
+      "row_count": 66,
+      "preserved_count": 0,
+      "delete_count": 66,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [],
+      "reset_order": 1366,
+      "golden_fixture": false,
+      "notes": null
+    },
+    {
+      "table": "website_intent_correlation_snapshots",
+      "classification": "DELETE",
+      "row_count": 3,
+      "preserved_count": 0,
+      "delete_count": 3,
+      "count_status": "ok",
+      "count_error": null,
+      "dependencies": [
+        "leads"
+      ],
+      "reset_order": 1367,
+      "golden_fixture": false,
+      "notes": null
+    }
+  ],
+  "manual_review_items": [
+    "apollo_pilot_cohort_companies",
+    "apollo_pilot_cohorts",
+    "apollo_replacement_benchmark_cohorts",
+    "apollo_replacement_benchmark_snapshots",
+    "dogfood_issues",
+    "dogfood_validation_runs",
+    "governance_activity_exports",
+    "governance_approval_audit",
+    "governance_compliance_exports",
+    "governance_policy_events",
+    "human_execution_approvals",
+    "human_execution_plan_steps",
+    "human_execution_plans"
+  ],
+  "count_unavailable_tables": [
+    "buying_stage_assessments",
+    "campaign_engagement_metrics",
+    "campaign_launch_checks",
+    "company_enrichments",
+    "company_identification_matches",
+    "company_signal_runs",
+    "company_signals",
+    "contact_verifications",
+    "deliverability_protection_events",
+    "deliverability_trend_snapshots",
+    "delivery_event_timeline",
+    "domain_health_snapshots",
+    "enrichment_runs",
+    "execution_sprints",
+    "inbox_lifecycle_events",
+    "infrastructure_fit_assessments",
+    "mailbox_health_snapshots",
+    "maintenance_tasks",
+    "meeting_outcome_intelligence_scores",
+    "operational_alerts",
+    "operational_analytics_snapshots",
+    "outbound_scheduler_decisions",
+    "search_intent_signals",
+    "sequence_execution_diagnostics",
+    "throughput_snapshots"
+  ],
+  "count_errors": [
+    {
+      "table": "buying_stage_assessments",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "campaign_engagement_metrics",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "campaign_launch_checks",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "company_enrichments",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "company_identification_matches",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "company_signal_runs",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "company_signals",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "contact_verifications",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "deliverability_protection_events",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "deliverability_trend_snapshots",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "delivery_event_timeline",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "domain_health_snapshots",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "enrichment_runs",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "execution_sprints",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "inbox_lifecycle_events",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "infrastructure_fit_assessments",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "mailbox_health_snapshots",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "maintenance_tasks",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "meeting_outcome_intelligence_scores",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "operational_alerts",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "operational_analytics_snapshots",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "outbound_scheduler_decisions",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "search_intent_signals",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "sequence_execution_diagnostics",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "throughput_snapshots",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    }
+  ],
+  "blocking_count_errors": [
+    {
+      "table": "buying_stage_assessments",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "campaign_engagement_metrics",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "campaign_launch_checks",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "company_enrichments",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "company_identification_matches",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "company_signal_runs",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "company_signals",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "contact_verifications",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "deliverability_protection_events",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "deliverability_trend_snapshots",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "delivery_event_timeline",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "domain_health_snapshots",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "enrichment_runs",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "execution_sprints",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "inbox_lifecycle_events",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "infrastructure_fit_assessments",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "mailbox_health_snapshots",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "maintenance_tasks",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "meeting_outcome_intelligence_scores",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "operational_alerts",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "operational_analytics_snapshots",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "outbound_scheduler_decisions",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "search_intent_signals",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "sequence_execution_diagnostics",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    },
+    {
+      "table": "throughput_snapshots",
+      "classification": "DELETE",
+      "operation": "count",
+      "code": null,
+      "message": "Unknown count error",
+      "details": null,
+      "hint": null
+    }
+  ],
+  "delete_preflight": null
+}

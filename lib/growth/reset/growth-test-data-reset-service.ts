@@ -24,13 +24,37 @@ import {
   getOrderedDeleteTables,
   type GrowthResetTableCatalogEntry,
 } from "./growth-test-data-reset-table-inventory"
+import {
+  assertGrowthResetDeletePreflightSafe,
+  buildGrowthResetDeletePreflight,
+  deleteGrowthTableRowsWithStrategy,
+  extractGrowthTablePrimaryKeysFromMigrations,
+  resolveGrowthResetDeleteStrategy,
+  type GrowthResetDeletePreflightReport,
+} from "./growth-test-data-reset-delete-strategy"
+import {
+  countGrowthResetFilteredRows,
+  countGrowthResetTableRows,
+  type GrowthResetCountContext,
+  type GrowthResetCountError,
+} from "./growth-test-data-reset-count"
+
+export { GrowthResetDeletePreflightError } from "./growth-test-data-reset-delete-strategy"
+export type {
+  GrowthResetDeleteBlock,
+  GrowthResetDeletePlanEntry,
+  GrowthResetDeletePreflightReport,
+} from "./growth-test-data-reset-delete-strategy"
+export type { GrowthResetCountError } from "./growth-test-data-reset-count"
 
 export type GrowthResetTableAuditRow = {
   table: string
   classification: GrowthResetTableCatalogEntry["classification"]
-  row_count: number
-  preserved_count: number
-  delete_count: number
+  row_count: number | null
+  preserved_count: number | null
+  delete_count: number | null
+  count_status: "ok" | "count_unavailable"
+  count_error: GrowthResetCountError | null
   dependencies: string[]
   reset_order: number | null
   golden_fixture: boolean
@@ -54,6 +78,10 @@ export type GrowthResetAuditReport = {
   dependency_graph: Record<string, string[]>
   tables: GrowthResetTableAuditRow[]
   manual_review_items: string[]
+  count_unavailable_tables: string[]
+  count_errors: GrowthResetCountError[]
+  blocking_count_errors: GrowthResetCountError[]
+  delete_preflight: GrowthResetDeletePreflightReport | null
 }
 
 export type GrowthResetVerificationCheck = {
@@ -86,131 +114,94 @@ export type GrowthResetRunResult = {
   audit_after: GrowthResetAuditReport | null
   summary: GrowthResetSummary
   deleted_by_table: Record<string, number>
+  delete_preflight: GrowthResetDeletePreflightReport | null
 }
 
 const BATCH_SIZE = 100
-const DELETE_PAGE_SIZE = 500
 
-async function deleteRowsByIds(
-  admin: SupabaseClient,
-  table: string,
-  ids: string[],
-): Promise<number> {
-  if (ids.length === 0) return 0
-  let deleted = 0
-  for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-    const batch = ids.slice(i, i + BATCH_SIZE)
-    const { count, error } = await admin
-      .schema("growth")
-      .from(table)
-      .delete({ count: "exact" })
-      .in("id", batch)
-    if (error) throw new Error(`${table} delete batch: ${error.message}`)
-    deleted += count ?? batch.length
-  }
-  return deleted
-}
+export class GrowthResetDryRunCountError extends Error {
+  readonly blocking_count_errors: GrowthResetCountError[]
+  readonly count_unavailable_tables: string[]
+  readonly count_errors: GrowthResetCountError[]
 
-async function deleteExceptPreservedIds(
-  admin: SupabaseClient,
-  table: string,
-  preservedIds: string[],
-): Promise<number> {
-  let deleted = 0
-  let offset = 0
-
-  while (true) {
-    const { data, error } = await admin
-      .schema("growth")
-      .from(table)
-      .select("id")
-      .range(offset, offset + DELETE_PAGE_SIZE - 1)
-    if (error) throw new Error(`${table} scan ids: ${error.message}`)
-    const rows = data ?? []
-    if (rows.length === 0) break
-
-    const deleteIds = rows
-      .map((row) => (typeof row.id === "string" ? row.id : ""))
-      .filter((id) => id && !preservedIds.includes(id))
-
-    deleted += await deleteRowsByIds(admin, table, deleteIds)
-
-    if (rows.length < DELETE_PAGE_SIZE) break
-    offset += DELETE_PAGE_SIZE
+  constructor(input: {
+    blocking_count_errors: GrowthResetCountError[]
+    count_unavailable_tables: string[]
+    count_errors: GrowthResetCountError[]
+  }) {
+    const primary = input.blocking_count_errors[0]
+    super(
+      primary
+        ? `DELETE table count failed for ${primary.table}: ${primary.message}`
+        : "Growth reset dry-run count phase failed.",
+    )
+    this.name = "GrowthResetDryRunCountError"
+    this.blocking_count_errors = input.blocking_count_errors
+    this.count_unavailable_tables = input.count_unavailable_tables
+    this.count_errors = input.count_errors
   }
 
-  return deleted
-}
-
-async function deleteExceptPreservedFk(
-  admin: SupabaseClient,
-  table: string,
-  fkColumn: string,
-  preservedFkValues: string[],
-): Promise<number> {
-  let deleted = 0
-  let offset = 0
-  const preserved = new Set(preservedFkValues)
-
-  while (true) {
-    const { data, error } = await admin
-      .schema("growth")
-      .from(table)
-      .select(`id, ${fkColumn}`)
-      .range(offset, offset + DELETE_PAGE_SIZE - 1)
-    if (error) {
-      if (/column .* does not exist/i.test(error.message)) return 0
-      throw new Error(`${table} scan fk ids: ${error.message}`)
+  toJSON(): Record<string, unknown> {
+    return {
+      error: "growth_reset_count_phase_failed",
+      qa_marker: GROWTH_TEST_DATA_RESET_QA_MARKER,
+      blocking_count_errors: this.blocking_count_errors,
+      count_unavailable_tables: this.count_unavailable_tables,
+      count_errors: this.count_errors,
     }
-    const rows = data ?? []
-    if (rows.length === 0) break
-
-    const deleteIds = rows
-      .filter((row) => {
-        const fk = row[fkColumn]
-        if (typeof fk !== "string" || !fk) return true
-        return !preserved.has(fk)
-      })
-      .map((row) => (typeof row.id === "string" ? row.id : ""))
-      .filter(Boolean)
-
-    deleted += await deleteRowsByIds(admin, table, deleteIds)
-
-    if (rows.length < DELETE_PAGE_SIZE) break
-    offset += DELETE_PAGE_SIZE
   }
-
-  return deleted
 }
 
-async function countAllRows(admin: SupabaseClient, table: string): Promise<number> {
-  const { count, error } = await admin
-    .schema("growth")
-    .from(table)
-    .select("id", { count: "exact", head: true })
-  if (error) {
-    if (/does not exist|Could not find/i.test(error.message)) return 0
-    throw new Error(`${table} count: ${error.message}`)
+function logGrowthResetCountFailure(error: GrowthResetCountError): void {
+  console.warn(JSON.stringify({ qa_marker: GROWTH_TEST_DATA_RESET_QA_MARKER, ...error }))
+}
+
+function unavailableAuditRow(
+  entry: GrowthResetTableCatalogEntry,
+  countError: GrowthResetCountError,
+  notes: string | null = entry.notes,
+): GrowthResetTableAuditRow {
+  logGrowthResetCountFailure(countError)
+  return {
+    table: entry.table,
+    classification: entry.classification,
+    row_count: null,
+    preserved_count: null,
+    delete_count: null,
+    count_status: "count_unavailable",
+    count_error: countError,
+    dependencies: entry.dependencies,
+    reset_order: entry.reset_order,
+    golden_fixture: false,
+    notes,
   }
-  return count ?? 0
 }
 
 async function countPreservedByIds(
   admin: SupabaseClient,
   table: string,
+  classification: GrowthResetTableCatalogEntry["classification"],
   ids: string[],
-): Promise<number> {
+  countContext?: GrowthResetCountContext,
+): Promise<number | { error: GrowthResetCountError }> {
   if (ids.length === 0) return 0
+
   let total = 0
   for (let i = 0; i < ids.length; i += BATCH_SIZE) {
     const batch = ids.slice(i, i + BATCH_SIZE)
-    const { count, error } = await admin
-      .schema("growth")
-      .from(table)
-      .select("id", { count: "exact", head: true })
-      .in("id", batch)
-    if (error) throw new Error(`${table} preserved id count: ${error.message}`)
-    total += count ?? 0
+    const result = await countGrowthResetFilteredRows(
+      admin,
+      {
+        table,
+        classification,
+        operation: "preserved_id_count",
+        filterDescription: `id.in.(${batch.length})`,
+        applyFilters: (query) => query.in("id", batch),
+      },
+      countContext,
+    )
+    if (!result.ok) return { error: result.error }
+    total += result.count
   }
   return total
 }
@@ -218,23 +209,29 @@ async function countPreservedByIds(
 async function countPreservedByFk(
   admin: SupabaseClient,
   table: string,
+  classification: GrowthResetTableCatalogEntry["classification"],
   fkColumn: string,
   fkValues: string[],
-): Promise<number> {
+  countContext?: GrowthResetCountContext,
+): Promise<number | { error: GrowthResetCountError }> {
   if (fkValues.length === 0) return 0
+
   let total = 0
   for (let i = 0; i < fkValues.length; i += BATCH_SIZE) {
     const batch = fkValues.slice(i, i + BATCH_SIZE)
-    const { count, error } = await admin
-      .schema("growth")
-      .from(table)
-      .select("id", { count: "exact", head: true })
-      .in(fkColumn, batch)
-    if (error) {
-      if (/column .* does not exist/i.test(error.message)) return 0
-      throw new Error(`${table} preserved fk count: ${error.message}`)
-    }
-    total += count ?? 0
+    const result = await countGrowthResetFilteredRows(
+      admin,
+      {
+        table,
+        classification,
+        operation: "preserved_fk_count",
+        filterDescription: `${fkColumn}.in.(${batch.length})`,
+        applyFilters: (query) => query.in(fkColumn, batch),
+      },
+      countContext,
+    )
+    if (!result.ok) return { error: result.error }
+    total += result.count
   }
   return total
 }
@@ -243,8 +240,30 @@ async function auditTableRow(
   admin: SupabaseClient,
   entry: GrowthResetTableCatalogEntry,
   fixtures: GrowthResetGoldenFixtures,
+  countContext?: GrowthResetCountContext,
 ): Promise<GrowthResetTableAuditRow> {
-  const row_count = await countAllRows(admin, entry.table)
+  const rowCountResult = await countGrowthResetTableRows(
+    admin,
+    entry.table,
+    entry.classification,
+    "count",
+    countContext,
+  )
+  if (!rowCountResult.ok) {
+    if (entry.classification === "KEEP" || entry.classification === "MANUAL_REVIEW") {
+      return unavailableAuditRow(
+        entry,
+        rowCountResult.error,
+        entry.classification === "MANUAL_REVIEW"
+          ? "Manual review — not auto-deleted."
+          : entry.notes,
+      )
+    }
+    logGrowthResetCountFailure(rowCountResult.error)
+    return unavailableAuditRow(entry, rowCountResult.error)
+  }
+
+  const row_count = rowCountResult.count
 
   if (entry.classification === "KEEP") {
     return {
@@ -253,6 +272,8 @@ async function auditTableRow(
       row_count,
       preserved_count: row_count,
       delete_count: 0,
+      count_status: "ok",
+      count_error: null,
       dependencies: entry.dependencies,
       reset_order: entry.reset_order,
       golden_fixture: false,
@@ -267,6 +288,8 @@ async function auditTableRow(
       row_count,
       preserved_count: row_count,
       delete_count: 0,
+      count_status: "ok",
+      count_error: null,
       dependencies: entry.dependencies,
       reset_order: entry.reset_order,
       golden_fixture: false,
@@ -278,12 +301,47 @@ async function auditTableRow(
   let preserved_count = 0
 
   if (preservedIds.length > 0) {
-    preserved_count = await countPreservedByIds(admin, entry.table, preservedIds)
+    const preservedResult = await countPreservedByIds(
+      admin,
+      entry.table,
+      entry.classification,
+      preservedIds,
+      countContext,
+    )
+    if (typeof preservedResult !== "number") {
+      logGrowthResetCountFailure(preservedResult.error)
+      return unavailableAuditRow(entry, preservedResult.error)
+    }
+    preserved_count = preservedResult
   } else if (entry.delete_fk_column) {
     const fkValues = getGoldenPreservedFkValues(entry.delete_fk_column, fixtures)
-    preserved_count = await countPreservedByFk(admin, entry.table, entry.delete_fk_column, fkValues)
+    const preservedResult = await countPreservedByFk(
+      admin,
+      entry.table,
+      entry.classification,
+      entry.delete_fk_column,
+      fkValues,
+      countContext,
+    )
+    if (typeof preservedResult !== "number") {
+      logGrowthResetCountFailure(preservedResult.error)
+      return unavailableAuditRow(entry, preservedResult.error)
+    }
+    preserved_count = preservedResult
   } else if (entry.golden_entity === "timeline") {
-    preserved_count = await countPreservedByFk(admin, entry.table, "lead_id", fixtures.timeline_lead_ids)
+    const preservedResult = await countPreservedByFk(
+      admin,
+      entry.table,
+      entry.classification,
+      "lead_id",
+      fixtures.timeline_lead_ids,
+      countContext,
+    )
+    if (typeof preservedResult !== "number") {
+      logGrowthResetCountFailure(preservedResult.error)
+      return unavailableAuditRow(entry, preservedResult.error)
+    }
+    preserved_count = preservedResult
   }
 
   return {
@@ -292,6 +350,8 @@ async function auditTableRow(
     row_count,
     preserved_count,
     delete_count: Math.max(0, row_count - preserved_count),
+    count_status: "ok",
+    count_error: null,
     dependencies: entry.dependencies,
     reset_order: entry.reset_order,
     golden_fixture: preserved_count > 0,
@@ -299,9 +359,43 @@ async function auditTableRow(
   }
 }
 
+function sumNullableCounts(rows: GrowthResetTableAuditRow[], key: "row_count" | "preserved_count" | "delete_count"): number {
+  return rows.reduce((sum, row) => sum + (row[key] ?? 0), 0)
+}
+
+function collectCountErrorsFromAudit(tables: GrowthResetTableAuditRow[]): {
+  count_errors: GrowthResetCountError[]
+  count_unavailable_tables: string[]
+  blocking_count_errors: GrowthResetCountError[]
+} {
+  const count_errors = tables
+    .map((row) => row.count_error)
+    .filter((error): error is GrowthResetCountError => error !== null)
+  const count_unavailable_tables = tables
+    .filter((row) => row.count_status === "count_unavailable")
+    .map((row) => row.table)
+  const blocking_count_errors = count_errors.filter((error) => error.classification === "DELETE")
+  return { count_errors, count_unavailable_tables, blocking_count_errors }
+}
+
+export function assertGrowthResetCountPhaseSafe(
+  audit: Pick<GrowthResetAuditReport, "blocking_count_errors" | "count_unavailable_tables" | "count_errors">,
+): { ok: true } | { ok: false; error: GrowthResetDryRunCountError } {
+  if (audit.blocking_count_errors.length === 0) return { ok: true }
+  return {
+    ok: false,
+    error: new GrowthResetDryRunCountError({
+      blocking_count_errors: audit.blocking_count_errors,
+      count_unavailable_tables: audit.count_unavailable_tables,
+      count_errors: audit.count_errors,
+    }),
+  }
+}
+
 export async function auditGrowthTestData(
   admin: SupabaseClient,
   mode: GrowthResetAuditReport["mode"],
+  countContext?: GrowthResetCountContext,
 ): Promise<GrowthResetAuditReport> {
   const catalog = buildGrowthResetTableCatalog()
   const fixtures = await resolveGrowthResetGoldenFixtures(admin)
@@ -309,15 +403,18 @@ export async function auditGrowthTestData(
 
   const tables: GrowthResetTableAuditRow[] = []
   for (const entry of catalog) {
-    tables.push(await auditTableRow(admin, entry, fixtures))
+    tables.push(await auditTableRow(admin, entry, fixtures, countContext))
   }
+
+  const { count_errors, count_unavailable_tables, blocking_count_errors } =
+    collectCountErrorsFromAudit(tables)
 
   const keep_tables = tables.filter((t) => t.classification === "KEEP").length
   const delete_tables = tables.filter((t) => t.classification === "DELETE").length
   const manual_review_tables = tables.filter((t) => t.classification === "MANUAL_REVIEW").length
-  const total_rows = tables.reduce((sum, row) => sum + row.row_count, 0)
-  const preserved_rows = tables.reduce((sum, row) => sum + row.preserved_count, 0)
-  const delete_rows = tables.reduce((sum, row) => sum + row.delete_count, 0)
+  const total_rows = sumNullableCounts(tables, "row_count")
+  const preserved_rows = sumNullableCounts(tables, "preserved_count")
+  const delete_rows = sumNullableCounts(tables, "delete_count")
 
   return {
     qa_marker: GROWTH_TEST_DATA_RESET_QA_MARKER,
@@ -338,6 +435,10 @@ export async function auditGrowthTestData(
     manual_review_items: tables
       .filter((t) => t.classification === "MANUAL_REVIEW")
       .map((t) => t.table),
+    count_unavailable_tables,
+    count_errors,
+    blocking_count_errors,
+    delete_preflight: null,
   }
 }
 
@@ -345,37 +446,29 @@ async function deleteTableRows(
   admin: SupabaseClient,
   entry: GrowthResetTableCatalogEntry,
   fixtures: GrowthResetGoldenFixtures,
+  primaryKeys: Record<string, string[]>,
 ): Promise<number> {
+  const strategy = resolveGrowthResetDeleteStrategy(entry, primaryKeys)
   const preservedIds = getGoldenPreservedIdsForTable(entry.table, fixtures)
+  const preservedFkValues = entry.delete_fk_column
+    ? getGoldenPreservedFkValues(entry.delete_fk_column, fixtures)
+    : entry.golden_entity === "timeline"
+      ? fixtures.timeline_lead_ids
+      : []
 
-  if (preservedIds.length > 0) {
-    return deleteExceptPreservedIds(admin, entry.table, preservedIds)
-  }
+  return deleteGrowthTableRowsWithStrategy(admin, entry, strategy, {
+    preservedIds,
+    preservedFkValues,
+  })
+}
 
-  if (entry.delete_fk_column) {
-    const fkValues = getGoldenPreservedFkValues(entry.delete_fk_column, fixtures)
-    if (fkValues.length > 0) {
-      return deleteExceptPreservedFk(admin, entry.table, entry.delete_fk_column, fkValues)
-    }
-  }
-
-  let deleted = 0
-  let offset = 0
-  while (true) {
-    const { data, error } = await admin
-      .schema("growth")
-      .from(entry.table)
-      .select("id")
-      .range(offset, offset + DELETE_PAGE_SIZE - 1)
-    if (error) throw new Error(`${entry.table} delete scan: ${error.message}`)
-    const rows = data ?? []
-    if (rows.length === 0) break
-    const ids = rows.map((row) => (typeof row.id === "string" ? row.id : "")).filter(Boolean)
-    deleted += await deleteRowsByIds(admin, entry.table, ids)
-    if (rows.length < DELETE_PAGE_SIZE) break
-    offset += DELETE_PAGE_SIZE
-  }
-  return deleted
+async function runDeletePreflight(
+  admin: SupabaseClient,
+  cwd: string,
+): Promise<GrowthResetDeletePreflightReport> {
+  const catalog = buildGrowthResetTableCatalog(cwd)
+  const primaryKeys = extractGrowthTablePrimaryKeysFromMigrations(cwd)
+  return buildGrowthResetDeletePreflight(admin, catalog, primaryKeys)
 }
 
 export async function verifyGrowthResetIntegrity(
@@ -509,7 +602,7 @@ function buildSummary(input: {
     mode: input.mode,
     tables_preserved: after.tables.filter((t) => t.classification === "KEEP").map((t) => t.table),
     tables_cleared: after.tables
-      .filter((t) => t.classification === "DELETE" && t.row_count === 0)
+      .filter((t) => t.classification === "DELETE" && t.count_status === "ok" && t.row_count === 0)
       .map((t) => t.table),
     golden_fixtures_retained: after.golden_fixtures,
     rows_removed,
@@ -539,9 +632,22 @@ export function assertGrowthResetConfirmAllowed(): { ok: true } | { ok: false; m
 
 export async function runGrowthTestDataReset(
   admin: SupabaseClient,
-  options: { mode: "dry_run" | "confirm" | "report"; cwd?: string },
+  options: {
+    mode: "dry_run" | "confirm" | "report"
+    cwd?: string
+    countContext?: GrowthResetCountContext
+    /** When false, skip writing tmp/growth-reset-report-*.json (serverless admin route). Default true. */
+    persistReports?: boolean
+  },
 ): Promise<GrowthResetRunResult> {
   const cwd = options.cwd ?? process.cwd()
+  const countContext = options.countContext
+  const persistReports = options.persistReports !== false
+
+  const persistReport = (relativePath: string, payload: unknown) => {
+    if (!persistReports) return
+    writeJson(relativePath, payload, cwd)
+  }
 
   if (options.mode === "report") {
     const beforePath = join(cwd, REPORT_PATHS.before)
@@ -552,7 +658,7 @@ export async function runGrowthTestDataReset(
       const summary = JSON.parse(readFileSync(summaryPath, "utf8")) as GrowthResetSummary
       const audit_before = existsSync(beforePath)
         ? (JSON.parse(readFileSync(beforePath, "utf8")) as GrowthResetAuditReport)
-        : await auditGrowthTestData(admin, "report")
+        : await auditGrowthTestData(admin, "report", countContext)
       const audit_after = existsSync(afterPath)
         ? (JSON.parse(readFileSync(afterPath, "utf8")) as GrowthResetAuditReport)
         : null
@@ -561,10 +667,11 @@ export async function runGrowthTestDataReset(
         audit_after,
         summary,
         deleted_by_table: {},
+        delete_preflight: audit_before.delete_preflight,
       }
     }
 
-    const audit_before = await auditGrowthTestData(admin, "report")
+    const audit_before = await auditGrowthTestData(admin, "report", countContext)
     const verification = await verifyGrowthResetIntegrity(admin, audit_before.golden_fixtures)
     const summary = buildSummary({
       mode: "report",
@@ -573,12 +680,26 @@ export async function runGrowthTestDataReset(
       verification,
       deleted_by_table: {},
     })
-    writeJson(REPORT_PATHS.summary, summary, cwd)
-    return { audit_before, audit_after: null, summary, deleted_by_table: {} }
+    persistReport(REPORT_PATHS.summary, summary)
+    return { audit_before, audit_after: null, summary, deleted_by_table: {}, delete_preflight: audit_before.delete_preflight }
   }
 
-  const audit_before = await auditGrowthTestData(admin, options.mode)
-  writeJson(REPORT_PATHS.before, audit_before, cwd)
+  const audit_before = await auditGrowthTestData(admin, options.mode, countContext)
+  persistReport(REPORT_PATHS.before, audit_before)
+
+  const countGate = assertGrowthResetCountPhaseSafe(audit_before)
+  if (!countGate.ok) {
+    throw countGate.error
+  }
+
+  const delete_preflight = await runDeletePreflight(admin, cwd)
+  audit_before.delete_preflight = delete_preflight
+  persistReport(REPORT_PATHS.before, audit_before)
+
+  const deleteGate = assertGrowthResetDeletePreflightSafe(delete_preflight)
+  if (!deleteGate.ok) {
+    throw deleteGate.error
+  }
 
   if (options.mode === "dry_run") {
     const verification = await verifyGrowthResetIntegrity(admin, audit_before.golden_fixtures)
@@ -589,8 +710,8 @@ export async function runGrowthTestDataReset(
       verification,
       deleted_by_table: {},
     })
-    writeJson(REPORT_PATHS.summary, summary, cwd)
-    return { audit_before, audit_after: null, summary, deleted_by_table: {} }
+    persistReport(REPORT_PATHS.summary, summary)
+    return { audit_before, audit_after: null, summary, deleted_by_table: {}, delete_preflight }
   }
 
   const gate = assertGrowthResetConfirmAllowed()
@@ -601,14 +722,16 @@ export async function runGrowthTestDataReset(
   const catalog = buildGrowthResetTableCatalog(cwd)
   const deleteTables = getOrderedDeleteTables(catalog)
   const fixtures = audit_before.golden_fixtures
+  const primaryKeys = extractGrowthTablePrimaryKeysFromMigrations(cwd)
   const deleted_by_table: Record<string, number> = {}
 
   for (const entry of deleteTables) {
-    deleted_by_table[entry.table] = await deleteTableRows(admin, entry, fixtures)
+    deleted_by_table[entry.table] = await deleteTableRows(admin, entry, fixtures, primaryKeys)
   }
 
-  const audit_after = await auditGrowthTestData(admin, "confirm")
-  writeJson(REPORT_PATHS.after, audit_after, cwd)
+  const audit_after = await auditGrowthTestData(admin, "confirm", countContext)
+  audit_after.delete_preflight = delete_preflight
+  persistReport(REPORT_PATHS.after, audit_after)
 
   const verification = await verifyGrowthResetIntegrity(admin, audit_after.golden_fixtures)
   const summary = buildSummary({
@@ -618,9 +741,9 @@ export async function runGrowthTestDataReset(
     verification,
     deleted_by_table,
   })
-  writeJson(REPORT_PATHS.summary, summary, cwd)
+  persistReport(REPORT_PATHS.summary, summary)
 
-  return { audit_before, audit_after, summary, deleted_by_table }
+  return { audit_before, audit_after, summary, deleted_by_table, delete_preflight }
 }
 
 export function formatGrowthResetReportSummary(result: GrowthResetRunResult): Record<string, unknown> {
@@ -629,6 +752,10 @@ export function formatGrowthResetReportSummary(result: GrowthResetRunResult): Re
     mode: result.summary.mode,
     table_inventory: result.audit_before.table_count,
     classifications: result.audit_before.summary,
+    count_unavailable_tables: result.audit_before.count_unavailable_tables,
+    count_errors: result.audit_before.count_errors,
+    blocking_count_errors: result.audit_before.blocking_count_errors,
+    delete_preflight: result.delete_preflight,
     golden_fixtures: result.summary.golden_fixtures_retained,
     rows_removed: result.summary.rows_removed,
     rows_remaining: result.summary.rows_remaining,

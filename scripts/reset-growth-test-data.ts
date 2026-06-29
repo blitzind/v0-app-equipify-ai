@@ -29,6 +29,8 @@ import {
 } from "../lib/growth/reset/growth-test-data-reset-table-inventory"
 import {
   formatGrowthResetReportSummary,
+  GrowthResetDeletePreflightError,
+  GrowthResetDryRunCountError,
   runGrowthTestDataReset,
 } from "../lib/growth/reset/growth-test-data-reset-service"
 
@@ -115,7 +117,12 @@ async function main(): Promise<void> {
     auth: { persistSession: false },
   })
 
-  const result = await runGrowthTestDataReset(admin, { mode })
+  const countContext = {
+    projectRef: config.projectRef,
+    accessToken: process.env.SUPABASE_ACCESS_TOKEN?.trim() || null,
+  }
+
+  const result = await runGrowthTestDataReset(admin, { mode, countContext })
   const payload = formatGrowthResetReportSummary(result)
 
   console.log(JSON.stringify(payload, null, 2))
@@ -126,6 +133,14 @@ async function main(): Promise<void> {
 }
 
 main().catch((e) => {
+  if (e instanceof GrowthResetDryRunCountError) {
+    console.error(JSON.stringify(e.toJSON(), null, 2))
+    process.exit(1)
+  }
+  if (e instanceof GrowthResetDeletePreflightError) {
+    console.error(JSON.stringify(e.toJSON(), null, 2))
+    process.exit(1)
+  }
   console.error(e instanceof Error ? e.message : e)
   process.exit(1)
 })

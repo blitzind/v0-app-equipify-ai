@@ -3,6 +3,8 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { canonicalNormalizedCompanyName } from "@/lib/growth/canonical-companies/canonical-company-normalize"
+import { normalizeWebsiteDomain } from "@/lib/growth/import/normalize"
 import {
   GROWTH_TEST_DATA_RESET_QA_MARKER,
   parseCsvEnvIds,
@@ -156,6 +158,57 @@ async function pickRelatedIds(
   ).slice(0, limit)
 }
 
+/** Canonical growth.companies columns (7.2A) — there is no `name` column. */
+const GROWTH_COMPANY_LOOKUP_SELECT =
+  "id, display_name, normalized_name, legal_name, primary_domain, website, created_at"
+
+const GROWTH_COMPANY_LOOKUP_SELECT_MINIMAL = "id, created_at"
+
+type GrowthCompanyLookupRow = {
+  id?: string
+  display_name?: string | null
+  normalized_name?: string | null
+  legal_name?: string | null
+  primary_domain?: string | null
+  website?: string | null
+  created_at?: string | null
+}
+
+function companyIdsFromLookupRows(rows: GrowthCompanyLookupRow[] | null | undefined): string[] {
+  return unique(
+    (rows ?? []).map((row) => (typeof row.id === "string" ? row.id : "")).filter(Boolean),
+  ).slice(0, 1)
+}
+
+function isMissingColumnError(message: string): boolean {
+  return /column .* does not exist/i.test(message)
+}
+
+async function queryGrowthCompanies(
+  admin: SupabaseClient,
+  applyFilter: (
+    query: ReturnType<ReturnType<SupabaseClient["schema"]>["from"]>,
+  ) => ReturnType<ReturnType<SupabaseClient["schema"]>["from"]>,
+  errorLabel: string,
+): Promise<string[]> {
+  const fullQuery = applyFilter(
+    admin.schema("growth").from("companies").select(GROWTH_COMPANY_LOOKUP_SELECT),
+  )
+  const full = await fullQuery.order("created_at", { ascending: true }).limit(1)
+  if (!full.error) return companyIdsFromLookupRows(full.data as GrowthCompanyLookupRow[])
+
+  if (!isMissingColumnError(full.error.message)) {
+    throw new Error(`${errorLabel}: ${full.error.message}`)
+  }
+
+  const minimalQuery = applyFilter(
+    admin.schema("growth").from("companies").select(GROWTH_COMPANY_LOOKUP_SELECT_MINIMAL),
+  )
+  const minimal = await minimalQuery.order("created_at", { ascending: true }).limit(1)
+  if (minimal.error) throw new Error(`${errorLabel}: ${minimal.error.message}`)
+  return companyIdsFromLookupRows(minimal.data as GrowthCompanyLookupRow[])
+}
+
 async function pickCompanyIds(
   admin: SupabaseClient,
   leadIds: string[],
@@ -167,7 +220,7 @@ async function pickCompanyIds(
   const { data: leadRows, error: leadErr } = await admin
     .schema("growth")
     .from("leads")
-    .select("id, company_name")
+    .select("id, company_name, website")
     .in("id", leadIds)
   if (leadErr) throw new Error(`leads company_name lookup: ${leadErr.message}`)
 
@@ -176,34 +229,122 @@ async function pickCompanyIds(
       .map((row) => (typeof row.company_name === "string" ? row.company_name.trim() : ""))
       .filter(Boolean),
   )
-  if (names.length === 0) return []
+  const normalizedNames = unique(
+    names
+      .map((name) => canonicalNormalizedCompanyName(name))
+      .filter((name): name is string => Boolean(name)),
+  )
+  const domains = unique(
+    (leadRows ?? [])
+      .map((row) =>
+        normalizeWebsiteDomain(typeof row.website === "string" ? row.website : null),
+      )
+      .filter((domain): domain is string => Boolean(domain)),
+  )
 
-  const { data: companies, error: companyErr } = await admin
-    .schema("growth")
-    .from("companies")
-    .select("id, name, created_at")
-    .in("name", names)
-    .order("created_at", { ascending: true })
-    .limit(1)
-  if (companyErr) throw new Error(`companies lookup: ${companyErr.message}`)
+  if (normalizedNames.length > 0) {
+    const byNormalized = await queryGrowthCompanies(
+      admin,
+      (query) => query.in("normalized_name", normalizedNames),
+      "companies normalized_name lookup",
+    )
+    if (byNormalized.length > 0) return byNormalized
+  }
 
-  const ids = (companies ?? [])
-    .map((row) => (typeof row.id === "string" ? row.id : ""))
-    .filter(Boolean)
-  if (ids.length > 0) return unique(ids).slice(0, 1)
+  for (const name of names) {
+    const byDisplay = await queryGrowthCompanies(
+      admin,
+      (query) => query.ilike("display_name", `%${name}%`),
+      "companies display_name lookup",
+    )
+    if (byDisplay.length > 0) return byDisplay
+  }
 
-  const { data: fuzzy, error: fuzzyErr } = await admin
-    .schema("growth")
-    .from("companies")
-    .select("id, name, created_at")
-    .ilike("name", "%Precision Biomedical%")
-    .order("created_at", { ascending: true })
-    .limit(1)
-  if (fuzzyErr) throw new Error(`companies fuzzy lookup: ${fuzzyErr.message}`)
+  const byFuzzy = await queryGrowthCompanies(
+    admin,
+    (query) => query.ilike("display_name", `%${PRECISION_BIOMEDICAL_ORG_NAME}%`),
+    "companies display_name fuzzy lookup",
+  )
+  if (byFuzzy.length > 0) return byFuzzy
 
-  return unique(
-    (fuzzy ?? []).map((row) => (typeof row.id === "string" ? row.id : "")).filter(Boolean),
-  ).slice(0, 1)
+  if (domains.length > 0) {
+    const byDomain = await queryGrowthCompanies(
+      admin,
+      (query) => query.in("primary_domain", domains),
+      "companies primary_domain lookup",
+    )
+    if (byDomain.length > 0) return byDomain
+  }
+
+  return []
+}
+
+/** growth.company_contacts columns — person linkage is `canonical_person_id`, not `person_id`. */
+const GROWTH_COMPANY_CONTACT_LOOKUP_SELECT =
+  "id, company_id, canonical_person_id, growth_lead_id, full_name, email, title, created_at"
+
+const GROWTH_COMPANY_CONTACT_LOOKUP_SELECT_MINIMAL = "id, company_id, created_at"
+
+type GrowthCompanyContactLookupRow = {
+  id?: string
+  company_id?: string | null
+  canonical_person_id?: string | null
+  growth_lead_id?: string | null
+  full_name?: string | null
+  email?: string | null
+  title?: string | null
+  created_at?: string | null
+}
+
+function personIdsFromCompanyContactRow(
+  row: GrowthCompanyContactLookupRow | null | undefined,
+): string[] {
+  const canonicalPersonId =
+    typeof row?.canonical_person_id === "string" && row.canonical_person_id
+      ? row.canonical_person_id
+      : null
+  return canonicalPersonId ? [canonicalPersonId] : []
+}
+
+function warnGrowthResetSchemaFallback(label: string, detail: string): void {
+  console.warn(
+    JSON.stringify({
+      qa_marker: GROWTH_TEST_DATA_RESET_QA_MARKER,
+      warning: "growth_reset_schema_fallback",
+      label,
+      detail,
+    }),
+  )
+}
+
+async function queryGrowthCompanyContacts(
+  admin: SupabaseClient,
+  applyFilter: (
+    query: ReturnType<ReturnType<SupabaseClient["schema"]>["from"]>,
+  ) => ReturnType<ReturnType<SupabaseClient["schema"]>["from"]>,
+  errorLabel: string,
+): Promise<GrowthCompanyContactLookupRow[]> {
+  const fullQuery = applyFilter(
+    admin.schema("growth").from("company_contacts").select(GROWTH_COMPANY_CONTACT_LOOKUP_SELECT),
+  )
+  const full = await fullQuery.order("created_at", { ascending: true }).limit(1)
+  if (!full.error) return (full.data as GrowthCompanyContactLookupRow[]) ?? []
+
+  if (!isMissingColumnError(full.error.message)) {
+    throw new Error(`${errorLabel}: ${full.error.message}`)
+  }
+
+  warnGrowthResetSchemaFallback(
+    errorLabel,
+    `optional company_contacts columns missing; falling back to ${GROWTH_COMPANY_CONTACT_LOOKUP_SELECT_MINIMAL}`,
+  )
+
+  const minimalQuery = applyFilter(
+    admin.schema("growth").from("company_contacts").select(GROWTH_COMPANY_CONTACT_LOOKUP_SELECT_MINIMAL),
+  )
+  const minimal = await minimalQuery.order("created_at", { ascending: true }).limit(1)
+  if (minimal.error) throw new Error(`${errorLabel}: ${minimal.error.message}`)
+  return (minimal.data as GrowthCompanyContactLookupRow[]) ?? []
 }
 
 async function pickContactAndPersonIds(
@@ -221,19 +362,47 @@ async function pickContactAndPersonIds(
   }
 
   if (companyIds.length > 0) {
-    const { data: contacts, error } = await admin
+    const contacts = await queryGrowthCompanyContacts(
+      admin,
+      (query) => query.in("company_id", companyIds),
+      "company_contacts company_id lookup",
+    )
+    const contact = contacts[0]
+    if (contact && typeof contact.id === "string") {
+      return {
+        contact_ids: [contact.id],
+        person_ids: personIdsFromCompanyContactRow(contact),
+      }
+    }
+  }
+
+  if (leadIds.length > 0) {
+    const byLead = await queryGrowthCompanyContacts(
+      admin,
+      (query) => query.in("growth_lead_id", leadIds),
+      "company_contacts growth_lead_id lookup",
+    )
+    const contact = byLead[0]
+    if (contact && typeof contact.id === "string") {
+      return {
+        contact_ids: [contact.id],
+        person_ids: personIdsFromCompanyContactRow(contact),
+      }
+    }
+  }
+
+  if (companyIds.length > 0) {
+    const { data: roles, error } = await admin
       .schema("growth")
-      .from("company_contacts")
-      .select("id, person_id, company_id, created_at")
+      .from("person_company_roles")
+      .select("person_id, company_id, created_at")
       .in("company_id", companyIds)
       .order("created_at", { ascending: true })
-      .limit(1)
-    if (error) throw new Error(`company_contacts lookup: ${error.message}`)
-    const contact = contacts?.[0]
-    if (contact && typeof contact.id === "string") {
-      const personId =
-        typeof contact.person_id === "string" && contact.person_id ? [contact.person_id] : []
-      return { contact_ids: [contact.id], person_ids: personId }
+      .limit(5)
+    if (error) throw new Error(`person_company_roles lookup: ${error.message}`)
+    const personId = roles?.find((row) => typeof row.person_id === "string")?.person_id
+    if (typeof personId === "string") {
+      return { contact_ids: [], person_ids: [personId] }
     }
   }
 
