@@ -11,6 +11,10 @@ import {
   WORKSPACE_SETTINGS_GROWTH_ENGINE_DYNAMIC_PANEL_QA_MARKER,
   type WorkspaceSettingsGrowthEngineDynamicPanelModule,
 } from "@/lib/settings/workspace-settings-growth-engine-dynamic-panel"
+import {
+  traceWorkspaceSettingsGrowthEnginePanel,
+  wrapWorkspaceSettingsGrowthEnginePanelForRenderTrace,
+} from "@/lib/settings/workspace-settings-growth-engine-panel-trace"
 import type { WorkspaceSettingsGrowthEngineLiftedSectionId } from "@/lib/settings/workspace-settings-growth-engine-lift"
 
 export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANEL_ERROR_BOUNDARY_QA_MARKER =
@@ -29,22 +33,65 @@ function loadLiftedPanel(
   label: string,
   exportName: string,
   loader: () => Promise<WorkspaceSettingsGrowthEngineDynamicPanelModule>,
+  options?: { ssr?: boolean },
 ): ComponentType {
   return dynamic(
     async () => {
+      traceWorkspaceSettingsGrowthEnginePanel("loadLiftedPanel_dynamic_import_start", {
+        sectionId,
+        exportName,
+        label,
+      })
       try {
         const module = await loader()
-        const component =
+        traceWorkspaceSettingsGrowthEnginePanel("loadLiftedPanel_dynamic_import_resolved", {
+          sectionId,
+          exportName,
+          moduleKeys: Object.keys(module ?? {}),
+          defaultType: typeof module?.default,
+          namedExportType: typeof module?.[exportName],
+        })
+
+        const resolved =
           resolveWorkspaceSettingsGrowthEngineDynamicExport(sectionId, exportName, module) ??
           createWorkspaceSettingsGrowthEnginePanelFallback(label, sectionId)
 
-        return { default: component }
+        const chosenExport =
+          typeof module?.default === "function"
+            ? "default"
+            : typeof module?.[exportName] === "function"
+              ? exportName
+              : "fallback"
+
+        traceWorkspaceSettingsGrowthEnginePanel("loadLiftedPanel_chosen_export", {
+          sectionId,
+          exportName,
+          chosenExport,
+          resolvedName: resolved.displayName ?? resolved.name ?? "anonymous",
+        })
+
+        const traced = wrapWorkspaceSettingsGrowthEnginePanelForRenderTrace(sectionId, exportName, resolved)
+
+        traceWorkspaceSettingsGrowthEnginePanel("loadLiftedPanel_returning_component", {
+          sectionId,
+          exportName,
+          tracedName: traced.displayName ?? traced.name ?? "anonymous",
+        })
+
+        return { default: traced }
       } catch (error) {
         logWorkspaceSettingsGrowthEnginePanelDiagnostic(sectionId, {
           event: "dynamic_import_failed",
           exportName,
           errorName: error instanceof Error ? error.name : "unknown",
           errorMessage: error instanceof Error ? error.message : String(error),
+        })
+        traceWorkspaceSettingsGrowthEnginePanel("loadLiftedPanel_dynamic_import_failed", {
+          sectionId,
+          exportName,
+          errorName: error instanceof Error ? error.name : "unknown",
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : null,
         })
         return {
           default: createWorkspaceSettingsGrowthEnginePanelFallback(
@@ -55,7 +102,10 @@ function loadLiftedPanel(
         }
       }
     },
-    { loading: () => <LiftedPanelFallback label={label} /> },
+    {
+      loading: () => <LiftedPanelFallback label={label} />,
+      ssr: options?.ssr ?? false,
+    },
   )
 }
 
@@ -63,6 +113,7 @@ function withLiftedPanelSuspense(label: string, Panel: ComponentType, suspense =
   if (!suspense) return Panel
 
   function LiftedPanelWithSuspense() {
+    traceWorkspaceSettingsGrowthEnginePanel("lifted_panel_suspense_before_render", { label })
     return (
       <Suspense fallback={<LiftedPanelFallback label={label} />}>
         <Panel />
@@ -78,6 +129,7 @@ const GrowthConnectedMailboxesDashboard = loadLiftedPanel(
   "Connected mailboxes",
   "GrowthConnectedMailboxesDashboard",
   () => import("@/components/growth/mailboxes/growth-connected-mailboxes-dashboard"),
+  { ssr: false },
 )
 
 const GrowthWarmupDashboardPanel = loadLiftedPanel(
@@ -85,6 +137,7 @@ const GrowthWarmupDashboardPanel = loadLiftedPanel(
   "Warmup",
   "GrowthWarmupDashboardPanel",
   () => import("@/components/growth/growth-warmup-dashboard"),
+  { ssr: false },
 )
 
 const GrowthProvidersDashboard = loadLiftedPanel(
@@ -221,6 +274,9 @@ const GrowthEmailSignaturesPanel = loadLiftedPanel(
 )
 
 function LiftedConnectedMailboxesPanel() {
+  traceWorkspaceSettingsGrowthEnginePanel("LiftedConnectedMailboxesPanel_before_render", {
+    sectionId: "connected-mailboxes",
+  })
   return (
     <GrowthAdminWidgetErrorBoundary
       label="Connected mailboxes"

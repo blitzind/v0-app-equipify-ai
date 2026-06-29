@@ -28,7 +28,12 @@ export class GrowthAdminWidgetErrorBoundary extends React.Component<Props, State
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
-    console.error(`[${this.props.qaMarker}] ${this.props.label} render failed`, error, info.componentStack)
+    console.error(`[${this.props.qaMarker}] ${this.props.label} render failed`, {
+      errorName: error.name,
+      errorMessage: error.message,
+      errorStack: error.stack,
+      reactComponentStack: info.componentStack,
+    })
   }
 
   private handleRetry = (): void => {

@@ -49,6 +49,7 @@ import {
 } from "@/lib/growth/navigation/growth-communications-settings-navigation"
 import { resolveConnectedMailboxWarmupDisplay } from "@/lib/growth/mailboxes/connected-mailbox-warmup-label"
 import type { GrowthMailboxConnectionSummary } from "@/lib/growth/mailboxes/mailbox-types"
+import { traceWorkspaceSettingsGrowthEnginePanel } from "@/lib/settings/workspace-settings-growth-engine-panel-trace"
 
 type MailboxValidationFeedback = {
   ok: boolean
@@ -191,7 +192,18 @@ export function GrowthConnectedMailboxesDashboard({
 }: {
   oauthReturnTo?: string
 } = {}) {
+  traceWorkspaceSettingsGrowthEnginePanel("GrowthConnectedMailboxesDashboard_render_start", {
+    sectionId: "connected-mailboxes",
+    oauthReturnTo,
+  })
+
+  traceWorkspaceSettingsGrowthEnginePanel("GrowthConnectedMailboxesDashboard_before_useSearchParams", {
+    sectionId: "connected-mailboxes",
+  })
   const searchParams = useSearchParams()
+  traceWorkspaceSettingsGrowthEnginePanel("GrowthConnectedMailboxesDashboard_after_useSearchParams", {
+    sectionId: "connected-mailboxes",
+  })
   const navPaths = useConnectedMailboxesNavPaths(oauthReturnTo)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
