@@ -31,6 +31,7 @@ import {
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
 import {
   GROWTH_COMMUNICATIONS_SETTINGS_PATH,
+  isGrowthCommunicationsSettingsNavItemActive,
   isGrowthCommunicationsSettingsPath,
 } from "@/lib/growth/navigation/growth-communications-settings-navigation"
 import {
@@ -42,7 +43,7 @@ import {
   GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
 } from "@/lib/growth/navigation/growth-workspace-core-settings-links"
 
-export const GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER = "growth-workspace-settings-nav-1a-v1" as const
+export const GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER = "growth-workspace-settings-nav-ge-comms-nav-1a-v1" as const
 
 export const GROWTH_WORKSPACE_SETTINGS_DEFAULT_SECTION_ID = "profile" as const
 
@@ -135,7 +136,7 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
         description: "Overview of mailboxes, DNS, warmup, pools, and reputation settings.",
         segment: "communications",
         icon: Truck,
-        href: growthEngineCustomerSettingsHref("connected-mailboxes"),
+        href: GROWTH_COMMUNICATIONS_SETTINGS_PATH,
       },
       {
         id: "mailboxes",
@@ -290,13 +291,20 @@ export function getGrowthWorkspaceSettingsSectionById(id: string): GrowthSetting
   return null
 }
 
+const GROWTH_COMMUNICATIONS_SETTINGS_NAV_ITEM_IDS = new Set([
+  "communications",
+  "mailboxes",
+  "sending-domains",
+  "deliverability",
+  "warmup",
+  "sender-pools",
+  "reputation",
+])
+
 export function isGrowthWorkspaceSettingsNavItemActive(pathname: string, item: GrowthSettingsNavItem): boolean {
-  if (item.id === "communications") {
-    return pathname === growthEngineCustomerSettingsHref("connected-mailboxes")
-  }
-  if (item.id === "mailboxes") {
-    const mailboxesHref = growthEngineCustomerSettingsHref("connected-mailboxes")
-    return pathname === mailboxesHref || pathname.startsWith(`${mailboxesHref}/`) || isGrowthCommunicationsSettingsPath(pathname)
+  if (GROWTH_COMMUNICATIONS_SETTINGS_NAV_ITEM_IDS.has(item.id)) {
+    if (!isGrowthCommunicationsSettingsPath(pathname)) return false
+    return isGrowthCommunicationsSettingsNavItemActive(pathname, item.id)
   }
   if (item.id === "advanced") {
     return pathname === GROWTH_WORKSPACE_SETTINGS_ADVANCED_PATH
@@ -305,9 +313,6 @@ export function isGrowthWorkspaceSettingsNavItemActive(pathname: string, item: G
     return pathname === GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH
   }
   if (item.href.startsWith(GROWTH_ENGINE_CUSTOMER_SETTINGS_BASE)) {
-    return pathname === item.href || pathname.startsWith(`${item.href}/`)
-  }
-  if (isGrowthCommunicationsSettingsPath(pathname) && item.href.startsWith(GROWTH_COMMUNICATIONS_SETTINGS_PATH)) {
     return pathname === item.href || pathname.startsWith(`${item.href}/`)
   }
   return pathname === item.href || pathname.startsWith(`${item.href}/`)

@@ -68,7 +68,7 @@ function main(): void {
 
   const communicationsSection = getGrowthWorkspaceSettingsSectionById("communications")
   assert.ok(communicationsSection)
-  assert.equal(communicationsSection!.href, "/growth/settings/communications/connected-mailboxes")
+  assert.equal(communicationsSection!.href, GROWTH_COMMUNICATIONS_SETTINGS_PATH)
 
   const mailboxesNav = getGrowthWorkspaceSettingsSectionById("mailboxes")
   assert.ok(mailboxesNav)

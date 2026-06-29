@@ -19,14 +19,19 @@ import {
 } from "@/lib/growth/settings/growth-workspace-settings-shell-tokens"
 import { GrowthSettingsShellWidthEnforcer } from "@/components/growth/settings/growth-settings-shell-width-enforcer"
 import { cn } from "@/lib/utils"
-import { NAV_ROW_ACTIVE_SIDEBAR, NAV_SIDEBAR_ACTIVE_INDICATOR } from "@/lib/navigation-chrome"
+import { NAV_PRIMARY_ROW_MOTION, NAV_ROW_INACTIVE_HOVER_CARD, NAV_SIDEBAR_ACTIVE_INDICATOR } from "@/lib/navigation-chrome"
 
 type GrowthSettingsShellProps = {
   children: ReactNode
 }
 
+const GROWTH_SETTINGS_NAV_ACTIVE_ROW =
+  "border border-primary/40 bg-muted/90 font-semibold text-foreground shadow-sm dark:border-primary/55 dark:bg-muted/70"
+
+const GROWTH_SETTINGS_NAV_ACTIVE_ICON = "text-primary dark:text-primary"
+
 export function GrowthSettingsShell({ children }: GrowthSettingsShellProps) {
-  const pathname = usePathname()
+  const pathname = usePathname() ?? ""
 
   return (
     <div
@@ -42,7 +47,7 @@ export function GrowthSettingsShell({ children }: GrowthSettingsShellProps) {
         data-growth-settings-header
       >
         <div className="flex items-start gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 dark:bg-muted dark:text-foreground">
             <Settings2 size={17} />
           </span>
           <div className="min-w-0">
@@ -70,15 +75,23 @@ export function GrowthSettingsShell({ children }: GrowthSettingsShellProps) {
                       <li key={item.id}>
                         <Link
                           href={item.href}
+                          aria-current={active ? "page" : undefined}
                           className={cn(
-                            "relative flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors",
-                            active ? NAV_ROW_ACTIVE_SIDEBAR : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                            "relative flex items-center gap-2 rounded-lg px-2 py-2 pl-3 text-sm transition-colors",
+                            NAV_PRIMARY_ROW_MOTION,
+                            active ? GROWTH_SETTINGS_NAV_ACTIVE_ROW : cn("text-muted-foreground", NAV_ROW_INACTIVE_HOVER_CARD),
                           )}
                         >
                           {active ? (
-                            <span className={cn("absolute inset-y-1 left-0 w-0.5 rounded-full", NAV_SIDEBAR_ACTIVE_INDICATOR)} />
+                            <span
+                              aria-hidden
+                              className="absolute inset-y-1.5 left-0 w-1 rounded-full"
+                              style={{ backgroundColor: NAV_SIDEBAR_ACTIVE_INDICATOR }}
+                            />
                           ) : null}
-                          <item.icon className="size-4 shrink-0" />
+                          <item.icon
+                            className={cn("size-4 shrink-0", active ? GROWTH_SETTINGS_NAV_ACTIVE_ICON : "text-muted-foreground")}
+                          />
                           <span className="truncate">{item.label}</span>
                         </Link>
                       </li>

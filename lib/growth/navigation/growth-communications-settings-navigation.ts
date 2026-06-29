@@ -9,6 +9,17 @@ import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route
 
 export const GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER = "growth-communications-settings-8k-v2" as const
 
+export const GROWTH_COMMUNICATIONS_SETTINGS_NAV_QA_MARKER = "growth-communications-settings-nav-1a-v1" as const
+
+export type GrowthCommunicationsSettingsNavItemId =
+  | "communications"
+  | "mailboxes"
+  | "sending-domains"
+  | "deliverability"
+  | "warmup"
+  | "sender-pools"
+  | "reputation"
+
 export const GROWTH_COMMUNICATIONS_SETTINGS_PATH =
   `${GROWTH_WORKSPACE_BASE_PATH}/settings/communications` as const
 
@@ -121,6 +132,46 @@ export const GROWTH_COMMUNICATIONS_SETTINGS_CARDS: GrowthCommunicationsSettingsC
 
 export function isGrowthCommunicationsSettingsPath(pathname: string): boolean {
   return pathname === GROWTH_COMMUNICATIONS_SETTINGS_PATH || pathname.startsWith(`${GROWTH_COMMUNICATIONS_SETTINGS_PATH}/`)
+}
+
+function normalizeGrowthCommunicationsSettingsPathname(pathname: string): string {
+  return pathname.split("?")[0]?.split("#")[0] ?? ""
+}
+
+const GROWTH_COMMUNICATIONS_SETTINGS_NAV_PATHS: Record<
+  Exclude<GrowthCommunicationsSettingsNavItemId, "communications">,
+  readonly string[]
+> = {
+  mailboxes: [GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH, GROWTH_COMMUNICATIONS_MAILBOXES_LEGACY_PATH],
+  "sending-domains": [GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH],
+  deliverability: [GROWTH_COMMUNICATIONS_DNS_VERIFICATION_PATH, GROWTH_COMMUNICATIONS_DELIVERABILITY_LEGACY_PATH],
+  warmup: [GROWTH_COMMUNICATIONS_WARMUP_PATH],
+  "sender-pools": [GROWTH_COMMUNICATIONS_SENDER_POOLS_PATH],
+  reputation: [GROWTH_COMMUNICATIONS_SENDING_LIMITS_PATH, GROWTH_COMMUNICATIONS_REPUTATION_LEGACY_PATH],
+}
+
+export function resolveGrowthCommunicationsSettingsActiveNavItemId(
+  pathname: string,
+): GrowthCommunicationsSettingsNavItemId | null {
+  const normalized = normalizeGrowthCommunicationsSettingsPathname(pathname)
+  if (!isGrowthCommunicationsSettingsPath(normalized)) return null
+  if (normalized === GROWTH_COMMUNICATIONS_SETTINGS_PATH) return "communications"
+
+  for (const [itemId, prefixes] of Object.entries(GROWTH_COMMUNICATIONS_SETTINGS_NAV_PATHS) as Array<
+    [Exclude<GrowthCommunicationsSettingsNavItemId, "communications">, readonly string[]]
+  >) {
+    for (const prefix of prefixes) {
+      if (normalized === prefix || normalized.startsWith(`${prefix}/`)) {
+        return itemId
+      }
+    }
+  }
+
+  return null
+}
+
+export function isGrowthCommunicationsSettingsNavItemActive(pathname: string, itemId: string): boolean {
+  return resolveGrowthCommunicationsSettingsActiveNavItemId(pathname) === itemId
 }
 
 export function growthCommunicationsWarmupHref(senderId?: string): string {

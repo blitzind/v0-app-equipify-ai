@@ -1004,6 +1004,7 @@
     "test:growth-mailbox-status-recompute-7c": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-growth-mailbox-status-recompute-7c.ts",
     "test:growth-delivery-settings-7d": "tsx scripts/test-growth-delivery-settings-7d.ts",
     "test:growth-communications-settings-8c": "tsx scripts/test-growth-communications-settings-8c.ts",
+    "test:growth-communications-nav-1a": "tsx scripts/test-growth-communications-nav-1a.ts",
     "test:growth-communications-settings-8d": "tsx scripts/test-growth-communications-settings-8d.ts",
     "test:growth-settings-hotfix-8h": "tsx scripts/test-growth-settings-hotfix-8h.ts",
     "test:growth-settings-production-hotfix": "tsx scripts/test-growth-settings-production-hotfix.ts",
