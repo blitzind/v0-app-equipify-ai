@@ -56,7 +56,8 @@ function main(): void {
 
   assert.match(dnsVerificationSection, /GrowthDeliverabilityDashboard/)
   assert.match(dnsVerificationSection, /\[dns-verification-runtime\]/)
-  assert.match(dnsVerificationSection, /GrowthAdminWidgetErrorBoundary/)
+  assert.match(dnsVerificationSection, /\[dns-verification-panel-error\]/)
+  assert.match(dnsVerificationSection, /DnsVerificationPanelErrorBoundary/)
   assert.doesNotMatch(dnsVerificationSection, /loadLiftedPanel/)
 
   assert.doesNotMatch(sectionPage, /WorkspaceSettingsGrowthEngineLiftedPanelHost/)

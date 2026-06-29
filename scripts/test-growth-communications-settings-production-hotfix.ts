@@ -160,6 +160,10 @@ async function main(): Promise<void> {
   const reputationShim = readSource("components/growth/growth-reputation-protection-dashboard.tsx")
   assert.match(reputationShim, /^"use client"/m)
 
+  const deliverabilityDashboard = readSource("components/growth/growth-deliverability-dashboard.tsx")
+  assert.match(deliverabilityDashboard, /hasActionableDnsSetupStatus/)
+  assert.match(deliverabilityDashboard, /operator-attention-utils/)
+
   const supabaseClient = readSource("lib/supabase/client.ts")
   assert.doesNotMatch(supabaseClient, /^if \(!supabaseAnonKey\)/m)
   assert.match(supabaseClient, /export function createBrowserSupabaseClient/)

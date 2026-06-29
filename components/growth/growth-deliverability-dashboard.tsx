@@ -31,6 +31,7 @@ import {
   GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH,
   GROWTH_COMMUNICATIONS_WARMUP_PATH,
 } from "@/lib/growth/navigation/growth-communications-settings-navigation"
+import { hasActionableDnsSetupStatus } from "@/lib/growth/operator-ux/operator-attention-utils"
 
 const TIER_TONE: Record<string, "healthy" | "attention" | "critical" | "neutral" | "blocked"> = {
   healthy: "healthy",
