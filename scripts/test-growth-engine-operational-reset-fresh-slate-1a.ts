@@ -9,9 +9,14 @@ import path from "node:path"
 import {
   GROWTH_ENGINE_OPERATIONAL_RESET_ORG_ID_ENV,
   GROWTH_ENGINE_OPERATIONAL_RESET_QA_MARKER,
+  GROWTH_HOME_STALE_DATA_DIAGNOSTIC_QA_MARKER,
   PRECISION_BIOMEDICAL_AI_OS_ORG_ID,
   REPORT_PATHS,
 } from "../lib/growth/reset/growth-engine-operational-reset-constants"
+import {
+  GROWTH_HOME_STALE_DATA_SOURCES,
+  listGrowthHomeStaleDataSourceTables,
+} from "../lib/growth/reset/growth-home-stale-data-source-map"
 import {
   GROWTH_ENGINE_OPERATIONAL_RESET_PRESERVED_TABLES,
   getGrowthEngineOperationalResetTableEntries,
@@ -43,6 +48,26 @@ function runStructureCertification(): void {
   assert.ok(deleteTables.has("lead_research_runs"), "must clear lead_research_runs")
   assert.ok(deleteTables.has("operator_notifications"), "must clear operator_notifications")
   assert.ok(deleteTables.has("operational_alerts"), "must clear operational_alerts")
+  assert.ok(deleteTables.has("inbox_threads"), "must clear inbox_threads (Home replies waiting)")
+  assert.ok(deleteTables.has("outbound_replies"), "must clear outbound_replies")
+  assert.ok(deleteTables.has("lead_inbox"), "must clear lead_inbox (Home qualified prospects)")
+  assert.ok(deleteTables.has("opportunities"), "must clear opportunities")
+  assert.ok(deleteTables.has("cadence_tasks"), "must clear cadence_tasks (call-ready leads)")
+  assert.ok(deleteTables.has("leads"), "must clear leads (daily work queue inputs)")
+
+  const homeSourceTables = listGrowthHomeStaleDataSourceTables()
+  const preservedSet = new Set<string>(GROWTH_ENGINE_OPERATIONAL_RESET_PRESERVED_TABLES)
+  const uncovered = homeSourceTables.filter(
+    (table) => !deleteTables.has(table) && !preservedSet.has(table),
+  )
+  assert.equal(
+    uncovered.length,
+    0,
+    `Home source tables must be in reset inventory: ${uncovered.join(", ")}`,
+  )
+  assert.ok(GROWTH_HOME_STALE_DATA_SOURCES.length >= 10)
+
+  assert.equal(GROWTH_HOME_STALE_DATA_DIAGNOSTIC_QA_MARKER, "growth-home-stale-data-diagnostic-fresh-slate-1b-v1")
 
   assert.equal(deleteTables.has("mailbox_connections"), false)
   assert.equal(deleteTables.has("sender_domains"), false)
@@ -113,7 +138,16 @@ function runStructureCertification(): void {
   console.log("  ✓ command center / approvals / runtime tables included")
   console.log("  ✓ dependency-safe delete order")
   console.log("  ✓ dry-run formatter documents affected rows")
+  console.log("  ✓ Home stale source tables covered by reset inventory")
   console.log("  ✓ reset script supports --execute flag")
+
+  const diagnosticSource = fs.readFileSync(
+    path.join(process.cwd(), "scripts/diagnose-growth-home-stale-data-sources.ts"),
+    "utf8",
+  )
+  assert.match(diagnosticSource, /GROWTH_HOME_STALE_DATA_SOURCES/)
+  assert.match(diagnosticSource, /derived_home_signals/)
+  console.log("  ✓ Home stale data diagnostic script present")
 }
 
 runStructureCertification()

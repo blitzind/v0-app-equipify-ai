@@ -108,8 +108,8 @@ const ENTRIES: GrowthEngineOperationalResetTableEntry[] = [
 
   // --- Outreach / sequence runtime (child event tables cascade from parents) ---
   { table: "sequence_execution_diagnostics", category: "outreach_sequence_runtime", scope: "single_tenant", delete_order: 60, notes: "Blocked job diagnostics" },
-  { table: "sequence_execution_jobs", category: "outreach_sequence_runtime", scope: "lead_id", delete_order: 61, notes: "Blocked / pending approval jobs" },
-  { table: "outreach_queue", category: "outreach_sequence_runtime", scope: "lead_id", delete_order: 62, notes: "Outreach drafts awaiting approval" },
+  { table: "sequence_execution_jobs", category: "outreach_sequence_runtime", scope: "single_tenant", delete_order: 61, notes: "Blocked / pending approval jobs — Home Ava status" },
+  { table: "outreach_queue", category: "outreach_sequence_runtime", scope: "single_tenant", delete_order: 62, notes: "Outreach drafts awaiting approval" },
   { table: "sequence_channel_task_events", category: "outreach_sequence_runtime", scope: "lead_id", delete_order: 63, notes: null },
   { table: "sequence_channel_tasks", category: "outreach_sequence_runtime", scope: "lead_id", delete_order: 64, notes: null },
   { table: "sequence_enrollment_channel_events", category: "outreach_sequence_runtime", scope: "lead_id", delete_order: 65, notes: null },
@@ -187,6 +187,55 @@ const ENTRIES: GrowthEngineOperationalResetTableEntry[] = [
   { table: "sender_reputation_snapshots", category: "deliverability_ops_snapshots", scope: "single_tenant", delete_order: 175, notes: null },
   { table: "sender_performance_snapshots", category: "deliverability_ops_snapshots", scope: "single_tenant", delete_order: 176, notes: null },
   { table: "warmup_events", category: "deliverability_ops_snapshots", scope: "single_tenant", delete_order: 177, notes: "Warmup send history — warmup_profiles/schedule preserved" },
+
+  // --- GE-AVA-FRESH-SLATE-1B: Home inbox / conversation runtime ---
+  { table: "reply_workflow_actions", category: "home_inbox_conversations", scope: "single_tenant", delete_order: 180, notes: null },
+  { table: "reply_intelligence_events", category: "home_inbox_conversations", scope: "single_tenant", delete_order: 181, notes: null },
+  { table: "reply_ingestion_events", category: "home_inbox_conversations", scope: "single_tenant", delete_order: 182, notes: null },
+  { table: "outbound_replies", category: "home_inbox_conversations", scope: "single_tenant", delete_order: 183, notes: "Home replies waiting metric" },
+  { table: "email_opens", category: "home_inbox_conversations", scope: "single_tenant", delete_order: 184, notes: null },
+  { table: "email_clicks", category: "home_inbox_conversations", scope: "single_tenant", delete_order: 185, notes: null },
+  { table: "delivery_events", category: "home_inbox_conversations", scope: "single_tenant", delete_order: 186, notes: null },
+  { table: "delivery_attempts", category: "home_inbox_conversations", scope: "single_tenant", delete_order: 187, notes: null },
+  { table: "outbound_messages", category: "home_inbox_conversations", scope: "single_tenant", delete_order: 188, notes: null },
+  { table: "inbox_provider_message_map", category: "home_inbox_conversations", scope: "single_tenant", delete_order: 189, notes: null },
+  { table: "inbox_messages", category: "home_inbox_conversations", scope: "single_tenant", delete_order: 190, notes: null },
+  { table: "inbox_thread_links", category: "home_inbox_conversations", scope: "single_tenant", delete_order: 191, notes: null },
+  { table: "inbox_thread_owner_history", category: "home_inbox_conversations", scope: "single_tenant", delete_order: 192, notes: null },
+  { table: "inbox_lifecycle_events", category: "home_inbox_conversations", scope: "single_tenant", delete_order: 193, notes: null },
+  { table: "inbox_sync_runs", category: "home_inbox_conversations", scope: "single_tenant", delete_order: 194, notes: null },
+  { table: "inbox_threads", category: "home_inbox_conversations", scope: "single_tenant", delete_order: 195, notes: "Inbox reply counts + positive interest" },
+
+  // --- Home pipeline / meetings / cadence ---
+  { table: "opportunity_stage_history", category: "home_pipeline_meetings", scope: "single_tenant", delete_order: 200, notes: null },
+  { table: "opportunity_signals", category: "home_pipeline_meetings", scope: "single_tenant", delete_order: 201, notes: null },
+  { table: "opportunity_recommendations", category: "home_pipeline_meetings", scope: "single_tenant", delete_order: 202, notes: null },
+  { table: "opportunity_draft_runs", category: "home_pipeline_meetings", scope: "single_tenant", delete_order: 203, notes: null },
+  { table: "opportunity_approval_runs", category: "home_pipeline_meetings", scope: "single_tenant", delete_order: 204, notes: null },
+  { table: "opportunity_drafts", category: "home_pipeline_meetings", scope: "single_tenant", delete_order: 205, notes: "Aiden opportunities_pending" },
+  { table: "opportunities", category: "home_pipeline_meetings", scope: "single_tenant", delete_order: 206, notes: "Home opportunities created metric" },
+  { table: "meeting_candidate_runs", category: "home_pipeline_meetings", scope: "single_tenant", delete_order: 207, notes: null },
+  { table: "meeting_candidates", category: "home_pipeline_meetings", scope: "single_tenant", delete_order: 208, notes: null },
+  { table: "booking_page_bookings", category: "home_pipeline_meetings", scope: "single_tenant", delete_order: 209, notes: null },
+  { table: "meetings", category: "home_pipeline_meetings", scope: "single_tenant", delete_order: 210, notes: "Meetings today / this week in briefing" },
+  { table: "cadence_tasks", category: "home_pipeline_meetings", scope: "single_tenant", delete_order: 211, notes: "Call-ready leads metric" },
+
+  // --- Home entity runtime (lead inbox + lead graph — clears daily work queue inputs) ---
+  { table: "lead_timeline_events", category: "home_entity_runtime", scope: "single_tenant", delete_order: 220, notes: "Activity timeline noise" },
+  { table: "platform_timeline_events", category: "home_entity_runtime", scope: "single_tenant", delete_order: 221, notes: null },
+  { table: "lead_memory_events", category: "home_entity_runtime", scope: "single_tenant", delete_order: 222, notes: null },
+  { table: "lead_memory_profiles", category: "home_entity_runtime", scope: "single_tenant", delete_order: 223, notes: "IRE / daily queue inputs" },
+  { table: "lead_decision_makers", category: "home_entity_runtime", scope: "single_tenant", delete_order: 224, notes: null },
+  { table: "engagement_scores", category: "home_entity_runtime", scope: "single_tenant", delete_order: 225, notes: "Hot companies / engagement score" },
+  { table: "buying_momentum_snapshots", category: "home_entity_runtime", scope: "single_tenant", delete_order: 226, notes: null },
+  { table: "deal_intelligence_scores", category: "home_entity_runtime", scope: "single_tenant", delete_order: 227, notes: null },
+  { table: "personalization_profiles", category: "home_entity_runtime", scope: "single_tenant", delete_order: 228, notes: null },
+  { table: "company_enrichments", category: "home_entity_runtime", scope: "single_tenant", delete_order: 229, notes: "IRE / daily queue enrichment inputs" },
+  { table: "growth_engagement_events", category: "home_entity_runtime", scope: "single_tenant", delete_order: 230, notes: "Hot companies engagement feed" },
+  { table: "signal_events", category: "home_entity_runtime", scope: "single_tenant", delete_order: 231, notes: "Buying signal feed for Home intelligence" },
+  { table: "apollo_pilot_cohort_companies", category: "home_entity_runtime", scope: "single_tenant", delete_order: 232, notes: "Apollo pilot revenue snapshot — cohort defs preserved" },
+  { table: "lead_inbox", category: "home_entity_runtime", scope: "single_tenant", delete_order: 233, notes: "Lead operator inbox — qualified prospects / needs action" },
+  { table: "leads", category: "home_entity_runtime", scope: "single_tenant", delete_order: 234, notes: "Clears daily work queue lead candidates (single-tenant Growth workspace)" },
 ]
 
 export function getGrowthEngineOperationalResetTableEntries(): GrowthEngineOperationalResetTableEntry[] {
