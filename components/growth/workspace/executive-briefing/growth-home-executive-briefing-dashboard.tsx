@@ -23,6 +23,7 @@ import { GrowthHomeCustomerHealthSection } from "@/components/growth/workspace/e
 import { GrowthHomeExpansionOpportunitiesSection } from "@/components/growth/workspace/executive-briefing/growth-home-expansion-opportunities-section"
 import { GrowthHomeRenewalsMonitoringSection } from "@/components/growth/workspace/executive-briefing/growth-home-renewals-monitoring-section"
 import { GrowthHomeCustomerWinsSection } from "@/components/growth/workspace/executive-briefing/growth-home-customer-wins-section"
+import { GrowthHomeCustomerGrowthEmptySection } from "@/components/growth/workspace/executive-briefing/growth-home-customer-growth-empty-section"
 import { GrowthHomeTimelineSection } from "@/components/growth/workspace/executive-briefing/growth-home-timeline-section"
 import { GrowthHomeExecutiveRecommendationSection } from "@/components/growth/workspace/executive-briefing/growth-home-executive-recommendation-section"
 import { GrowthHomeInitiativeRecommendationsSection } from "@/components/growth/workspace/executive-briefing/growth-home-initiative-recommendations-section"
@@ -65,6 +66,12 @@ export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, c
 
   const lastUpdateLabel = formatRelativeTime(briefing.generatedAt)
   const { aiOsUx } = briefing
+  const hasCustomerGrowthContent =
+    briefing.customerSuccessMissions.length > 0 ||
+    briefing.customerHealth.length > 0 ||
+    briefing.expansionOpportunities.length > 0 ||
+    briefing.renewalsMonitoring.length > 0 ||
+    briefing.customerWins.length > 0
 
   return (
     <div className="space-y-10" data-qa-marker={GROWTH_HOME_EXECUTIVE_BRIEFING_QA_MARKER}>
@@ -99,10 +106,16 @@ export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, c
           </p>
         </div>
         <GrowthHomeCustomerSuccessMissionsSection missions={briefing.customerSuccessMissions} />
-        <GrowthHomeCustomerHealthSection items={briefing.customerHealth} />
-        <GrowthHomeExpansionOpportunitiesSection items={briefing.expansionOpportunities} />
-        <GrowthHomeRenewalsMonitoringSection items={briefing.renewalsMonitoring} />
-        <GrowthHomeCustomerWinsSection wins={briefing.customerWins} />
+        {hasCustomerGrowthContent ? (
+          <>
+            <GrowthHomeCustomerHealthSection items={briefing.customerHealth} />
+            <GrowthHomeExpansionOpportunitiesSection items={briefing.expansionOpportunities} />
+            <GrowthHomeRenewalsMonitoringSection items={briefing.renewalsMonitoring} />
+            <GrowthHomeCustomerWinsSection wins={briefing.customerWins} />
+          </>
+        ) : (
+          <GrowthHomeCustomerGrowthEmptySection />
+        )}
       </section>
 
       <GrowthHomeTimelineSection periods={briefing.timeline} />
