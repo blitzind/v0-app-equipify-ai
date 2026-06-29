@@ -71,8 +71,10 @@ async function main(): Promise<void> {
   const adminPageSource = readSource("app/(admin)/admin/growth/infrastructure/mailboxes/page.tsx")
   assert.match(adminPageSource, /GrowthConnectedMailboxesDashboard/)
 
-  const liftedPanelsSource = readSource("components/settings/workspace-settings-growth-engine-lifted-panels.tsx")
-  assert.match(liftedPanelsSource, /GrowthConnectedMailboxesDashboard/)
+  const connectedMailboxesPage = readSource(
+    "app/(growth)/growth/settings/communications/connected-mailboxes/page.tsx",
+  )
+  assert.match(connectedMailboxesPage, /GrowthConnectedMailboxesDashboard/)
 
   const healthy = baseRow()
   assert.ok(healthy.connectionStatus === "connected" && healthy.healthScore >= 80)

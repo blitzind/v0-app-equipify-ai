@@ -1008,7 +1008,6 @@
     "test:growth-settings-hotfix-8h": "tsx scripts/test-growth-settings-hotfix-8h.ts",
     "test:growth-settings-production-hotfix": "tsx scripts/test-growth-settings-production-hotfix.ts",
     "test:growth-communications-settings-production-hotfix": "tsx scripts/test-growth-communications-settings-production-hotfix.ts",
-    "test:growth-engine-settings-isolation-placeholder": "tsx scripts/test-growth-engine-settings-isolation-placeholder.ts",
     "test:growth-settings-post-mount-hotfix": "tsx scripts/test-growth-settings-post-mount-hotfix.ts",
     "test:ge-auto-settings-hotfix-1": "tsx scripts/test-ge-auto-settings-hotfix-1.ts",
     "test:ge-auto-ui-1": "tsx scripts/test-ge-auto-ui-1.ts",

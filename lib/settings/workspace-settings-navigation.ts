@@ -45,6 +45,7 @@ import {
 } from "lucide-react"
 import type { OrgPermissions } from "@/lib/permissions/model"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
+import { growthEngineCustomerSettingsHref } from "@/lib/growth/navigation/growth-workspace-settings-canonical"
 import { WORKSPACE_SETTINGS_GROWTH_OPERATOR_SECTIONS } from "@/lib/settings/workspace-settings-growth-operator"
 
 export const WORKSPACE_SETTINGS_NAV_QA_MARKER = "workspace-settings-nav-ge-set-2-v1" as const
@@ -91,7 +92,7 @@ const ADMIN_GROWTH_INFRA = `${ADMIN_GROWTH}/infrastructure`
 const ADMIN_GROWTH_PROVIDERS = `${ADMIN_GROWTH}/providers`
 
 function growthEngineHref(segment: string): string {
-  return `${WORKSPACE_SETTINGS_GROWTH_ENGINE_BASE}/${segment}`
+  return growthEngineCustomerSettingsHref(segment)
 }
 
 function dataAdminHref(segment: string): string {

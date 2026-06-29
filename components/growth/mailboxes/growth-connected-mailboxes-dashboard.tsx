@@ -49,7 +49,11 @@ import {
 } from "@/lib/growth/navigation/growth-communications-settings-navigation"
 import { resolveConnectedMailboxWarmupDisplay } from "@/lib/growth/mailboxes/connected-mailbox-warmup-label"
 import type { GrowthMailboxConnectionSummary } from "@/lib/growth/mailboxes/mailbox-types"
-import { traceWorkspaceSettingsGrowthEnginePanel } from "@/lib/settings/workspace-settings-growth-engine-panel-trace"
+import {
+  GROWTH_COMMUNICATIONS_MAILBOXES_ONBOARD_PATH,
+  GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
+  isGrowthCommunicationsSettingsPath,
+} from "@/lib/growth/navigation/growth-communications-settings-navigation"
 
 type MailboxValidationFeedback = {
   ok: boolean
@@ -135,7 +139,7 @@ function validationSuggestedNextStep(
 
 function useConnectedMailboxesNavPaths(oauthReturnTo?: string) {
   const pathname = usePathname() ?? ""
-  const isWorkspaceSettings = pathname.startsWith("/settings/growth-engine")
+  const isGrowthCommunicationsSettings = isGrowthCommunicationsSettingsPath(pathname)
   const isGrowthWorkspace = isGrowthWorkspacePathname(pathname)
 
   const workspaceCommPaths = {
@@ -160,7 +164,7 @@ function useConnectedMailboxesNavPaths(oauthReturnTo?: string) {
     }
   }
 
-  if (isWorkspaceSettings) {
+  if (isGrowthCommunicationsSettings) {
     return {
       returnTo: pathname || GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
       senderHref: GROWTH_WORKSPACE_SENDER_SETUP_PATH,
@@ -192,18 +196,7 @@ export function GrowthConnectedMailboxesDashboard({
 }: {
   oauthReturnTo?: string
 } = {}) {
-  traceWorkspaceSettingsGrowthEnginePanel("GrowthConnectedMailboxesDashboard_render_start", {
-    sectionId: "connected-mailboxes",
-    oauthReturnTo,
-  })
-
-  traceWorkspaceSettingsGrowthEnginePanel("GrowthConnectedMailboxesDashboard_before_useSearchParams", {
-    sectionId: "connected-mailboxes",
-  })
   const searchParams = useSearchParams()
-  traceWorkspaceSettingsGrowthEnginePanel("GrowthConnectedMailboxesDashboard_after_useSearchParams", {
-    sectionId: "connected-mailboxes",
-  })
   const navPaths = useConnectedMailboxesNavPaths(oauthReturnTo)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

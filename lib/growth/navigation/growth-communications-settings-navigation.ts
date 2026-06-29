@@ -1,29 +1,28 @@
 /**
- * Growth workspace Communications settings routes (GS-GROWTH-SETTINGS-8C, 8K compatibility).
- * Customer canonical paths: `/settings/growth-engine/*` via growth-workspace-settings-canonical.
+ * Growth workspace Communications settings routes.
+ * Canonical customer paths: `/growth/settings/communications/*`.
  */
 
 import type { LucideIcon } from "lucide-react"
 import { Flame, Globe, Mailbox, ShieldAlert, ShieldCheck, Users } from "lucide-react"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
-import { growthEngineCustomerSettingsHref } from "@/lib/growth/navigation/growth-workspace-settings-canonical"
 
-export const GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER = "growth-communications-settings-8k-v1" as const
+export const GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER = "growth-communications-settings-8k-v2" as const
 
 export const GROWTH_COMMUNICATIONS_SETTINGS_PATH =
   `${GROWTH_WORKSPACE_BASE_PATH}/settings/communications` as const
 
-export const GROWTH_COMMUNICATIONS_MAILBOXES_PATH =
-  `${GROWTH_COMMUNICATIONS_SETTINGS_PATH}/mailboxes` as const
+export const GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH =
+  `${GROWTH_COMMUNICATIONS_SETTINGS_PATH}/connected-mailboxes` as const
 
 export const GROWTH_COMMUNICATIONS_MAILBOXES_ONBOARD_PATH =
-  `${GROWTH_COMMUNICATIONS_MAILBOXES_PATH}/onboard` as const
+  `${GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH}/onboard` as const
 
 export const GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH =
   `${GROWTH_COMMUNICATIONS_SETTINGS_PATH}/sending-domains` as const
 
-export const GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH =
-  `${GROWTH_COMMUNICATIONS_SETTINGS_PATH}/deliverability` as const
+export const GROWTH_COMMUNICATIONS_DNS_VERIFICATION_PATH =
+  `${GROWTH_COMMUNICATIONS_SETTINGS_PATH}/dns-verification` as const
 
 export const GROWTH_COMMUNICATIONS_WARMUP_PATH =
   `${GROWTH_COMMUNICATIONS_SETTINGS_PATH}/warmup` as const
@@ -31,14 +30,33 @@ export const GROWTH_COMMUNICATIONS_WARMUP_PATH =
 export const GROWTH_COMMUNICATIONS_SENDER_POOLS_PATH =
   `${GROWTH_COMMUNICATIONS_SETTINGS_PATH}/sender-pools` as const
 
-export const GROWTH_COMMUNICATIONS_REPUTATION_PATH =
+export const GROWTH_COMMUNICATIONS_SENDING_LIMITS_PATH =
+  `${GROWTH_COMMUNICATIONS_SETTINGS_PATH}/sending-limits` as const
+
+/** Legacy slug compatibility paths — redirect to canonical routes. */
+export const GROWTH_COMMUNICATIONS_MAILBOXES_LEGACY_PATH =
+  `${GROWTH_COMMUNICATIONS_SETTINGS_PATH}/mailboxes` as const
+
+export const GROWTH_COMMUNICATIONS_DELIVERABILITY_LEGACY_PATH =
+  `${GROWTH_COMMUNICATIONS_SETTINGS_PATH}/deliverability` as const
+
+export const GROWTH_COMMUNICATIONS_REPUTATION_LEGACY_PATH =
   `${GROWTH_COMMUNICATIONS_SETTINGS_PATH}/reputation` as const
 
-/** Canonical operator mailbox hub (replaces legacy delivery anchor). */
+/** @deprecated Use GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH */
+export const GROWTH_COMMUNICATIONS_MAILBOXES_PATH = GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH
+
+/** @deprecated Use GROWTH_COMMUNICATIONS_DNS_VERIFICATION_PATH */
+export const GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH = GROWTH_COMMUNICATIONS_DNS_VERIFICATION_PATH
+
+/** @deprecated Use GROWTH_COMMUNICATIONS_SENDING_LIMITS_PATH */
+export const GROWTH_COMMUNICATIONS_REPUTATION_PATH = GROWTH_COMMUNICATIONS_SENDING_LIMITS_PATH
+
+/** Canonical operator mailbox hub anchor. */
 export const GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_ANCHOR = "#connected-mailboxes" as const
 
 export const GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_HREF =
-  `${GROWTH_COMMUNICATIONS_MAILBOXES_PATH}${GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_ANCHOR}` as const
+  `${GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH}${GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_ANCHOR}` as const
 
 export type GrowthCommunicationsSettingsCard = {
   id: string
@@ -54,7 +72,7 @@ export const GROWTH_COMMUNICATIONS_SETTINGS_CARDS: GrowthCommunicationsSettingsC
     id: "mailboxes",
     title: "Mailboxes",
     description: "Connect Gmail or Microsoft mailboxes for outbound and inbox tracking.",
-    href: growthEngineCustomerSettingsHref("connected-mailboxes"),
+    href: GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH,
     icon: Mailbox,
     adminFallbackHref: "/admin/growth/infrastructure/mailboxes",
   },
@@ -62,7 +80,7 @@ export const GROWTH_COMMUNICATIONS_SETTINGS_CARDS: GrowthCommunicationsSettingsC
     id: "sending-domains",
     title: "Sending Domains",
     description: "Add domains used for outbound email.",
-    href: growthEngineCustomerSettingsHref("sending-domains"),
+    href: GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH,
     icon: Globe,
     adminFallbackHref: "/admin/growth/infrastructure",
   },
@@ -70,7 +88,7 @@ export const GROWTH_COMMUNICATIONS_SETTINGS_CARDS: GrowthCommunicationsSettingsC
     id: "deliverability",
     title: "Deliverability & DNS",
     description: "Verify SPF, DKIM, DMARC, MX, and domain health.",
-    href: growthEngineCustomerSettingsHref("dns-verification"),
+    href: GROWTH_COMMUNICATIONS_DNS_VERIFICATION_PATH,
     icon: ShieldCheck,
     adminFallbackHref: "/admin/growth/infrastructure/deliverability",
   },
@@ -79,7 +97,7 @@ export const GROWTH_COMMUNICATIONS_SETTINGS_CARDS: GrowthCommunicationsSettingsC
     title: "Warmup",
     description:
       "Ramp sending safely using native sequence sends, caps, pre-send guards, and reputation tracking.",
-    href: growthEngineCustomerSettingsHref("warmup"),
+    href: GROWTH_COMMUNICATIONS_WARMUP_PATH,
     icon: Flame,
     adminFallbackHref: "/admin/growth/infrastructure/warmup",
   },
@@ -87,7 +105,7 @@ export const GROWTH_COMMUNICATIONS_SETTINGS_CARDS: GrowthCommunicationsSettingsC
     id: "sender-pools",
     title: "Sender Pools",
     description: "Group senders for campaign rotation and limits.",
-    href: growthEngineCustomerSettingsHref("sender-pools"),
+    href: GROWTH_COMMUNICATIONS_SENDER_POOLS_PATH,
     icon: Users,
     adminFallbackHref: "/admin/growth/providers/sender-pools",
   },
@@ -95,7 +113,7 @@ export const GROWTH_COMMUNICATIONS_SETTINGS_CARDS: GrowthCommunicationsSettingsC
     id: "reputation",
     title: "Reputation",
     description: "Monitor bounce rate, reply rate, complaints, warmup score, and sender/domain risk.",
-    href: growthEngineCustomerSettingsHref("sending-limits"),
+    href: GROWTH_COMMUNICATIONS_SENDING_LIMITS_PATH,
     icon: ShieldAlert,
     adminFallbackHref: "/admin/growth/deliverability",
   },
@@ -106,7 +124,20 @@ export function isGrowthCommunicationsSettingsPath(pathname: string): boolean {
 }
 
 export function growthCommunicationsWarmupHref(senderId?: string): string {
-  const base = growthEngineCustomerSettingsHref("warmup")
-  if (!senderId) return base
-  return `${base}?sender=${encodeURIComponent(senderId)}`
+  if (!senderId) return GROWTH_COMMUNICATIONS_WARMUP_PATH
+  return `${GROWTH_COMMUNICATIONS_WARMUP_PATH}?sender=${encodeURIComponent(senderId)}`
+}
+
+export function resolveGrowthCommunicationsLegacyRedirect(pathname: string): string | null {
+  const normalized = pathname.split("?")[0]?.split("#")[0] ?? ""
+  if (normalized === GROWTH_COMMUNICATIONS_MAILBOXES_LEGACY_PATH || normalized.startsWith(`${GROWTH_COMMUNICATIONS_MAILBOXES_LEGACY_PATH}/`)) {
+    return normalized.replace(GROWTH_COMMUNICATIONS_MAILBOXES_LEGACY_PATH, GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH)
+  }
+  if (normalized === GROWTH_COMMUNICATIONS_DELIVERABILITY_LEGACY_PATH) {
+    return GROWTH_COMMUNICATIONS_DNS_VERIFICATION_PATH
+  }
+  if (normalized === GROWTH_COMMUNICATIONS_REPUTATION_LEGACY_PATH) {
+    return GROWTH_COMMUNICATIONS_SENDING_LIMITS_PATH
+  }
+  return null
 }

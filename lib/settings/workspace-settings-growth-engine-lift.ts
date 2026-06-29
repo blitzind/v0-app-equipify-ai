@@ -125,8 +125,8 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_SECTION_CLASSIFICATION: Record<
   GrowthEngineSectionClassification
 > = {
   "connected-mailboxes": {
-    kind: "lifted",
-    reason: "Connected mailboxes dashboard in Workspace Settings (8K canonical).",
+    kind: "canonical",
+    reason: "Connected mailboxes dashboard in Growth workspace communications settings.",
   },
   gmail: {
     kind: "lifted",
@@ -141,28 +141,28 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_SECTION_CLASSIFICATION: Record<
     reason: "Communication preferences panel lifted in GE-SET-4.",
   },
   "sending-domains": {
-    kind: "lifted",
-    reason: "Sender infrastructure dashboard in Workspace Settings (8K canonical).",
+    kind: "canonical",
+    reason: "Sender infrastructure dashboard in Growth workspace communications settings.",
   },
   "dns-verification": {
-    kind: "lifted",
-    reason: "Deliverability DNS dashboard in Workspace Settings (8K canonical).",
+    kind: "canonical",
+    reason: "Deliverability DNS dashboard in Growth workspace communications settings.",
   },
   warmup: {
-    kind: "lifted",
-    reason: "Warmup dashboard in Workspace Settings (8K canonical).",
+    kind: "canonical",
+    reason: "Warmup dashboard in Growth workspace communications settings.",
   },
   "sending-limits": {
-    kind: "lifted",
-    reason: "Reputation protection console in Workspace Settings (8K canonical).",
+    kind: "canonical",
+    reason: "Reputation protection console in Growth workspace communications settings.",
   },
   "sender-pools": {
-    kind: "lifted",
-    reason: "Sender pools dashboard in Workspace Settings (8K canonical).",
+    kind: "canonical",
+    reason: "Sender pools dashboard in Growth workspace communications settings.",
   },
   "mailbox-health": {
-    kind: "lifted",
-    reason: "Deliverability dashboard in Workspace Settings (8K canonical).",
+    kind: "canonical",
+    reason: "Deliverability dashboard in Growth workspace communications settings.",
   },
   "calling-providers": {
     kind: "lifted",

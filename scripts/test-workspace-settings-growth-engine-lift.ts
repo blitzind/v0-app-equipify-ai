@@ -38,40 +38,30 @@ function runAudit(): void {
   console.log("  ✓ 28 sections registered as lifted panels in Workspace Settings shell")
 
   assert.equal(GROWTH_ENGINE_CUSTOMER_SETTINGS_SECTION_IDS.length, 16)
-  console.log("  ✓ 16 customer settings sections canonical under /settings/growth-engine (8K)")
+  console.log("  ✓ 16 customer settings sections resolve to Growth workspace settings hrefs")
 
-  const liftSrc = readFileSync("components/settings/workspace-settings-growth-engine-lifted-panels.tsx", "utf8")
-  for (const sectionId of lifted) {
-    assert.equal(resolveGrowthEngineSectionLiftKind(sectionId), "lifted")
-    const expectedPanel = WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANEL_EXPORTS[sectionId]
-    assert.ok(expectedPanel, `missing panel export for ${sectionId}`)
-    assert.match(liftSrc, new RegExp(expectedPanel))
+  for (const sectionId of ["connected-mailboxes", "warmup", "sender-pools", "dns-verification", "sending-limits"]) {
+    assert.equal(resolveGrowthEngineSectionLiftKind(sectionId), "canonical")
+    assert.ok(growthEngineCustomerSettingsHref(sectionId).startsWith("/growth/settings/communications/"))
   }
-  console.log("  ✓ lifted sections map to existing panel components (no fake panels)")
+  console.log("  ✓ communications sections are canonical under /growth/settings/communications/*")
 
   for (const sectionId of GE_SET_5_LIFTED_CUSTOMER_SECTIONS) {
-    assert.equal(resolveGrowthEngineSectionLiftKind(sectionId), "lifted", `${sectionId} should be lifted in 8K`)
+    assert.equal(resolveGrowthEngineSectionLiftKind(sectionId), "lifted", `${sectionId} should remain lifted metadata`)
   }
-  console.log("  ✓ compliance/AI customer sections lifted in Workspace Settings shell")
-
-  assert.match(liftSrc, /GrowthComplianceDashboardPanel/)
-  assert.match(liftSrc, /GrowthAiCopilotSettingsPanel/)
-  assert.match(liftSrc, /GrowthSettingsNotificationsPanel/)
-  assert.doesNotMatch(liftSrc, /GrowthMediaAiVoicePanel/)
-  assert.doesNotMatch(liftSrc, /GrowthEngineSettingsPanel/)
-  console.log("  ✓ customer panels lifted in Workspace Settings; scaffolds excluded")
+  console.log("  ✓ compliance/AI customer sections retain lifted metadata")
 
   assert.equal(resolveGrowthEngineSectionLiftKind("notification-preferences"), "lifted")
   assert.equal(
     growthEngineCustomerSettingsHref("notification-preferences"),
-    "/settings/growth-engine/notification-preferences",
+    "/growth/settings/notifications",
   )
-  const sectionPageSrc = readFileSync(
-    "components/settings/workspace-settings-growth-engine-section-page.tsx",
+  const growthEnginePageSrc = readFileSync(
+    "app/(dashboard)/settings/growth-engine/[sectionId]/page.tsx",
     "utf8",
   )
-  assert.doesNotMatch(sectionPageSrc, /WorkspaceSettingsGrowthEngineBridgePanel/)
-  console.log("  ✓ notification-preferences renders panel in Workspace Settings (8K canonical)")
+  assert.match(growthEnginePageSrc, /redirect\(/)
+  console.log("  ✓ legacy /settings/growth-engine/* routes redirect to Growth settings")
 
   assert.equal(resolveGrowthEngineSectionLiftKind("email-signatures"), "lifted")
   assert.equal(resolveGrowthEngineSectionLiftKind("elevenlabs"), "operational_only")

@@ -1,68 +1,61 @@
 /**
- * PROD-HOTFIX — Communications settings production page load certification.
+ * Growth Communications settings certification — canonical Growth workspace routes.
  * Run: pnpm test:growth-communications-settings-production-hotfix
  */
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
 import { growthEngineCustomerSettingsHref } from "../lib/growth/navigation/growth-workspace-settings-canonical"
-import {
-  createWorkspaceSettingsGrowthEnginePanelFallback,
-  resolveWorkspaceSettingsGrowthEngineDynamicExport,
-  WORKSPACE_SETTINGS_GROWTH_ENGINE_DYNAMIC_PANEL_QA_MARKER,
-} from "../lib/settings/workspace-settings-growth-engine-dynamic-panel"
 
 export const GROWTH_COMMUNICATIONS_SETTINGS_PRODUCTION_HOTFIX_QA_MARKER =
-  "growth-communications-settings-production-hotfix-v1" as const
+  "growth-communications-settings-production-hotfix-v2" as const
 
 const COMMUNICATIONS_SECTIONS = [
   {
     sectionId: "connected-mailboxes",
-    panelExport: "LiftedConnectedMailboxesPanel",
     panelModule: "components/growth/mailboxes/growth-connected-mailboxes-dashboard.tsx",
     panelExportName: "GrowthConnectedMailboxesDashboard",
-    route: "/settings/growth-engine/connected-mailboxes",
-    growthRoute: "/growth/settings/communications/mailboxes",
-  },
-  {
-    sectionId: "sending-limits",
-    panelExport: "LiftedSendingLimitsPanel",
-    panelModule: "components/growth/deliverability/deliverability-protection-console.tsx",
-    panelExportName: "GrowthDeliverabilityProtectionConsole",
-    route: "/settings/growth-engine/sending-limits",
-    growthRoute: "/growth/settings/communications/reputation",
-  },
-  {
-    sectionId: "sender-pools",
-    panelExport: "LiftedSenderPoolsPanel",
-    panelModule: "components/growth/growth-sender-pools-dashboard.tsx",
-    panelExportName: "GrowthSenderPoolsDashboardView",
-    route: "/settings/growth-engine/sender-pools",
-    growthRoute: "/growth/settings/communications/sender-pools",
-  },
-  {
-    sectionId: "warmup",
-    panelExport: "LiftedWarmupPanel",
-    panelModule: "components/growth/growth-warmup-dashboard.tsx",
-    panelExportName: "GrowthWarmupDashboardPanel",
-    route: "/settings/growth-engine/warmup",
-    growthRoute: "/growth/settings/communications/warmup",
-  },
-  {
-    sectionId: "dns-verification",
-    panelExport: "LiftedDnsVerificationPanel",
-    panelModule: "components/growth/growth-deliverability-dashboard.tsx",
-    panelExportName: "GrowthDeliverabilityDashboard",
-    route: "/settings/growth-engine/dns-verification",
-    growthRoute: "/growth/settings/communications/deliverability",
+    route: "/growth/settings/communications/connected-mailboxes",
+    legacyRoute: "/growth/settings/communications/mailboxes",
+    page: "app/(growth)/growth/settings/communications/connected-mailboxes/page.tsx",
   },
   {
     sectionId: "sending-domains",
-    panelExport: "LiftedSendingDomainsPanel",
     panelModule: "components/growth/growth-sender-infrastructure-dashboard.tsx",
     panelExportName: "GrowthSenderInfrastructureDashboard",
-    route: "/settings/growth-engine/sending-domains",
-    growthRoute: "/growth/settings/communications/sending-domains",
+    route: "/growth/settings/communications/sending-domains",
+    page: "app/(growth)/growth/settings/communications/sending-domains/page.tsx",
+  },
+  {
+    sectionId: "dns-verification",
+    panelModule: "components/growth/growth-deliverability-dashboard.tsx",
+    panelExportName: "GrowthDeliverabilityDashboard",
+    route: "/growth/settings/communications/dns-verification",
+    legacyRoute: "/growth/settings/communications/deliverability",
+    page: "app/(growth)/growth/settings/communications/dns-verification/page.tsx",
+  },
+  {
+    sectionId: "warmup",
+    panelModule: "components/growth/growth-warmup-dashboard.tsx",
+    panelExportName: "GrowthWarmupDashboardPanel",
+    route: "/growth/settings/communications/warmup",
+    page: "app/(growth)/growth/settings/communications/warmup/page.tsx",
+  },
+  {
+    sectionId: "sender-pools",
+    panelModule: "components/growth/growth-sender-pools-dashboard.tsx",
+    panelExportName: "GrowthSenderPoolsDashboardView",
+    route: "/growth/settings/communications/sender-pools",
+    page: "app/(growth)/growth/settings/communications/sender-pools/page.tsx",
+  },
+  {
+    sectionId: "sending-limits",
+    panelModule: "components/growth/growth-reputation-protection-dashboard.tsx",
+    panelExportName: "GrowthReputationProtectionDashboardView",
+    route: "/growth/settings/communications/sending-limits",
+    legacyRoute: "/growth/settings/communications/reputation",
+    page: "app/(growth)/growth/settings/communications/sending-limits/page.tsx",
+    panelExportPattern: /GrowthReputationProtectionDashboardView/,
   },
 ] as const
 
@@ -97,105 +90,44 @@ async function assertImportSafeWithoutSupabaseEnv(modulePath: string): Promise<v
   }
 }
 
-async function assertDynamicExportResolvable(
-  sectionId: string,
-  panelModule: string,
-  exportName: string,
-): Promise<void> {
-  const module = await import(`../${panelModule}`)
-  const resolved = resolveWorkspaceSettingsGrowthEngineDynamicExport(sectionId, exportName, module)
-  assert.equal(typeof resolved, "function", `expected function export for ${sectionId} (${exportName})`)
-}
-
 async function main(): Promise<void> {
   assert.equal(
     GROWTH_COMMUNICATIONS_SETTINGS_PRODUCTION_HOTFIX_QA_MARKER,
-    "growth-communications-settings-production-hotfix-v1",
-  )
-  assert.equal(
-    WORKSPACE_SETTINGS_GROWTH_ENGINE_DYNAMIC_PANEL_QA_MARKER,
-    "workspace-settings-growth-engine-dynamic-panel-v2",
+    "growth-communications-settings-production-hotfix-v2",
   )
 
-  const liftedPanels = readSource("components/settings/workspace-settings-growth-engine-lifted-panels.tsx")
-  const sectionPage = readSource("components/settings/workspace-settings-growth-engine-section-page.tsx")
-  const panelHost = readSource("components/settings/workspace-settings-growth-engine-lifted-panel-host.tsx")
-  const dynamicPanel = readSource("lib/settings/workspace-settings-growth-engine-dynamic-panel.tsx")
-
-  assert.match(liftedPanels, /loadLiftedPanel\(/)
-  assert.match(liftedPanels, /WORKSPACE_SETTINGS_GROWTH_ENGINE_DYNAMIC_PANEL_QA_MARKER/)
-  assert.match(liftedPanels, /resolveWorkspaceSettingsGrowthEngineDynamicExport/)
-  assert.match(liftedPanels, /createWorkspaceSettingsGrowthEnginePanelFallback/)
-  assert.doesNotMatch(liftedPanels, /^import \{ GrowthDeliverabilityDashboard \}/m)
-  assert.doesNotMatch(liftedPanels, /^import \{ GrowthConnectedMailboxesDashboard \}/m)
-
-  if (sectionPage.includes("growth-engine-settings-hard-isolation-v1")) {
-    assert.match(sectionPage, /SECTION PAGE RENDERED/)
-    assert.match(sectionPage, /data-growth-engine-settings-hard-isolation="v1"/)
-    assert.match(sectionPage, /WorkspaceSettingsGrowthEngineConnectedMailboxesSection/)
-    assert.match(
-      readSource("components/settings/workspace-settings-growth-engine-connected-mailboxes-section.tsx"),
-      /GrowthConnectedMailboxesDashboard/,
-    )
-    assert.match(
-      readSource("components/settings/workspace-settings-growth-engine-sending-domains-section.tsx"),
-      /GrowthSenderInfrastructureDashboard/,
-    )
-    assert.match(
-      readSource("components/settings/workspace-settings-growth-engine-dns-verification-section.tsx"),
-      /GrowthDeliverabilityDashboard/,
-    )
-    assert.match(
-      readSource("components/settings/workspace-settings-growth-engine-warmup-section.tsx"),
-      /GrowthWarmupDashboardPanel/,
-    )
-    assert.match(
-      readSource("components/settings/workspace-settings-growth-engine-sender-pools-section.tsx"),
-      /GrowthSenderPoolsDashboardView/,
-    )
-  } else {
-    assert.match(sectionPage, /WorkspaceSettingsGrowthEngineLiftedPanelHost/)
-    assert.match(sectionPage, /workspace-settings-growth-engine-lifted-panel-host/)
-    assert.doesNotMatch(sectionPage, /workspace-settings-growth-engine-lifted-panels/)
-  }
-
-  assert.match(panelHost, /GrowthAdminWidgetErrorBoundary/)
-  assert.match(panelHost, /getWorkspaceSettingsGrowthEngineLiftedPanel/)
-
-  assert.match(dynamicPanel, /resolveWorkspaceSettingsGrowthEngineDynamicExport/)
-  assert.match(dynamicPanel, /createWorkspaceSettingsGrowthEnginePanelFallback/)
-
-  const reputationShim = readSource("components/growth/growth-reputation-protection-dashboard.tsx")
-  assert.match(reputationShim, /^"use client"/m)
+  const growthEngineRedirectPage = readSource("app/(dashboard)/settings/growth-engine/[sectionId]/page.tsx")
+  assert.match(growthEngineRedirectPage, /redirect\(/)
+  assert.match(growthEngineRedirectPage, /growthEngineCustomerSettingsHref/)
+  assert.doesNotMatch(growthEngineRedirectPage, /WorkspaceSettingsGrowthEngineSectionPage/)
 
   const deliverabilityDashboard = readSource("components/growth/growth-deliverability-dashboard.tsx")
   assert.match(deliverabilityDashboard, /hasActionableDnsSetupStatus/)
   assert.match(deliverabilityDashboard, /operator-attention-utils/)
 
-  const supabaseClient = readSource("lib/supabase/client.ts")
-  assert.doesNotMatch(supabaseClient, /^if \(!supabaseAnonKey\)/m)
-  assert.match(supabaseClient, /export function createBrowserSupabaseClient/)
-
-  const invalidFallback = createWorkspaceSettingsGrowthEnginePanelFallback("Test panel", "connected-mailboxes")
-  assert.equal(typeof invalidFallback, "function")
-  assert.equal(resolveWorkspaceSettingsGrowthEngineDynamicExport("warmup", "Missing", {}), null)
-
   for (const section of COMMUNICATIONS_SECTIONS) {
-    assert.match(liftedPanels, new RegExp(section.panelExport))
     assert.equal(growthEngineCustomerSettingsHref(section.sectionId), section.route)
-    const growthPagePath = `app/(growth)${section.growthRoute}/page.tsx`
-    assert.ok(fs.existsSync(growthPagePath), `missing growth communications page ${growthPagePath}`)
+    assert.ok(fs.existsSync(section.page), `missing canonical page ${section.page}`)
+
+    const pageSource = readSource(section.page)
+    assert.match(pageSource, /GrowthCommunicationsSettingsSection/)
+    assert.match(pageSource, new RegExp(section.panelExportName))
 
     const panelSource = readSource(section.panelModule)
-    assert.match(panelSource, new RegExp(`export default ${section.panelExportName}`))
+    const exportPattern =
+      "panelExportPattern" in section && section.panelExportPattern
+        ? section.panelExportPattern
+        : new RegExp(`export default ${section.panelExportName}`)
+    assert.match(panelSource, exportPattern)
 
     await assertImportSafeWithoutSupabaseEnv(`../${section.panelModule}`)
-    await assertDynamicExportResolvable(section.sectionId, section.panelModule, section.panelExportName)
-  }
 
-  await assertImportSafeWithoutSupabaseEnv(
-    "../components/settings/workspace-settings-growth-engine-lifted-panels.tsx",
-  )
+    if ("legacyRoute" in section && section.legacyRoute) {
+      const legacyPagePath = `app/(growth)${section.legacyRoute}/page.tsx`
+      assert.ok(fs.existsSync(legacyPagePath), `missing legacy redirect page ${legacyPagePath}`)
+      assert.match(readSource(legacyPagePath), /redirect\(/)
+    }
+  }
 
   console.log("growth-communications-settings-production-hotfix: ok")
 }

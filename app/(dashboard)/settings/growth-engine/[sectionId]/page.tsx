@@ -1,14 +1,14 @@
-import { notFound } from "next/navigation"
-import { WorkspaceSettingsGrowthEngineSectionPage } from "@/components/settings/workspace-settings-growth-engine-section-page"
+import { redirect } from "next/navigation"
+import { growthEngineCustomerSettingsHref } from "@/lib/growth/navigation/growth-workspace-settings-canonical"
 import { getWorkspaceSettingsGrowthEngineSection } from "@/lib/settings/workspace-settings-navigation"
 
 type PageProps = {
   params: Promise<{ sectionId: string }>
 }
 
-export default async function GrowthEngineSettingsSectionPage({ params }: PageProps) {
+export default async function GrowthEngineSettingsSectionRedirectPage({ params }: PageProps) {
   const { sectionId } = await params
-  if (!getWorkspaceSettingsGrowthEngineSection(sectionId)) notFound()
+  if (!getWorkspaceSettingsGrowthEngineSection(sectionId)) redirect("/growth/settings")
 
-  return <WorkspaceSettingsGrowthEngineSectionPage sectionId={sectionId} />
+  redirect(growthEngineCustomerSettingsHref(sectionId))
 }

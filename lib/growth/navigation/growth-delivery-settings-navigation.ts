@@ -1,6 +1,6 @@
 /**
  * Growth workspace delivery / mailbox setup routes (GS-GROWTH-MAIL-7D, GS-GROWTH-SETTINGS-8K).
- * Client-safe path constants — customer canonical paths use Workspace Settings.
+ * Client-safe path constants — customer canonical paths use Growth workspace settings.
  */
 
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"

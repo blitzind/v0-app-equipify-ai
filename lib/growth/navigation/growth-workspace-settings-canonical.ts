@@ -1,17 +1,25 @@
 /**
- * Growth Engine customer settings canonical routes (GS-GROWTH-SETTINGS-8K).
+ * Growth Engine customer settings canonical routes.
  *
- * Canonical customer settings shell: `/settings/growth-engine/*` (Workspace Settings).
- * Compatibility routes under `/growth/settings/*` remain for deep links and Growth workspace shell.
+ * Canonical customer settings shell: `/growth/settings/*`.
+ * Legacy `/settings/growth-engine/*` routes redirect here.
  */
 
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
+import {
+  GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH,
+  GROWTH_COMMUNICATIONS_DNS_VERIFICATION_PATH,
+  GROWTH_COMMUNICATIONS_SENDER_POOLS_PATH,
+  GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH,
+  GROWTH_COMMUNICATIONS_SENDING_LIMITS_PATH,
+  GROWTH_COMMUNICATIONS_WARMUP_PATH,
+} from "@/lib/growth/navigation/growth-communications-settings-navigation"
 import { GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH } from "@/lib/growth/navigation/growth-workspace-core-settings-links"
 
 export const GROWTH_WORKSPACE_SETTINGS_CANONICAL_QA_MARKER =
-  "growth-workspace-settings-canonical-8k-v1" as const
+  "growth-workspace-settings-canonical-9a-v1" as const
 
-/** Canonical customer Growth Engine settings base (Workspace Settings shell). */
+/** Legacy Workspace Settings entry point — redirects to Growth settings. */
 export const GROWTH_ENGINE_CUSTOMER_SETTINGS_BASE = "/settings/growth-engine" as const
 
 const GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE =
@@ -20,8 +28,9 @@ const GROWTH_SETTINGS_NOTIFICATIONS_PATH = `${GROWTH_WORKSPACE_BASE_PATH}/settin
 const GROWTH_SETTINGS_AI_PREFERENCES_PATH = `${GROWTH_WORKSPACE_BASE_PATH}/settings/ai-preferences` as const
 const GROWTH_SETTINGS_CALENDAR_PREFERENCES_PATH =
   `${GROWTH_WORKSPACE_BASE_PATH}/settings/calendar-preferences` as const
+const GROWTH_SETTINGS_HUB_PATH = `${GROWTH_WORKSPACE_BASE_PATH}/settings` as const
 
-/** Lifted customer settings sections rendered in Workspace Settings (not bridge). */
+/** Lifted customer settings sections rendered in Growth workspace settings. */
 export const GROWTH_ENGINE_CUSTOMER_SETTINGS_SECTION_IDS = [
   "connected-mailboxes",
   "sending-domains",
@@ -44,39 +53,60 @@ export const GROWTH_ENGINE_CUSTOMER_SETTINGS_SECTION_IDS = [
 export type GrowthEngineCustomerSettingsSectionId =
   (typeof GROWTH_ENGINE_CUSTOMER_SETTINGS_SECTION_IDS)[number]
 
+/** Canonical Growth workspace settings hrefs keyed by growth-engine section id. */
+export const GROWTH_ENGINE_GROWTH_SETTINGS_HREFS: Record<string, string> = {
+  "connected-mailboxes": GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH,
+  "sending-domains": GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH,
+  "dns-verification": GROWTH_COMMUNICATIONS_DNS_VERIFICATION_PATH,
+  warmup: GROWTH_COMMUNICATIONS_WARMUP_PATH,
+  "sending-limits": GROWTH_COMMUNICATIONS_SENDING_LIMITS_PATH,
+  "sender-pools": GROWTH_COMMUNICATIONS_SENDER_POOLS_PATH,
+  "mailbox-health": GROWTH_COMMUNICATIONS_DNS_VERIFICATION_PATH,
+  gmail: `${GROWTH_WORKSPACE_BASE_PATH}/settings/gmail`,
+  "microsoft-365": `${GROWTH_WORKSPACE_BASE_PATH}/settings/microsoft-365`,
+  "email-signatures": `${GROWTH_WORKSPACE_BASE_PATH}/settings/signatures`,
+  "inbox-routing": GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE,
+  "notification-preferences": GROWTH_SETTINGS_NOTIFICATIONS_PATH,
+  "copilot-preferences": GROWTH_SETTINGS_AI_PREFERENCES_PATH,
+  "meeting-preferences": GROWTH_SETTINGS_CALENDAR_PREFERENCES_PATH,
+  "unsubscribe-settings": GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
+  "suppression-lists": GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
+  "compliance-rules": GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
+  "calling-providers": `${GROWTH_WORKSPACE_BASE_PATH}/settings/calling-preferences`,
+  "phone-numbers": `${GROWTH_WORKSPACE_BASE_PATH}/settings/calling-preferences`,
+  "dialer-settings": `${GROWTH_WORKSPACE_BASE_PATH}/settings/calling-preferences`,
+  "call-routing": `${GROWTH_WORKSPACE_BASE_PATH}/settings/calling-preferences`,
+  voicemail: `${GROWTH_WORKSPACE_BASE_PATH}/settings/calling-preferences`,
+  "calendar-providers": `${GROWTH_WORKSPACE_BASE_PATH}/settings/calendar`,
+  "booking-pages": `${GROWTH_WORKSPACE_BASE_PATH}/settings/calendar`,
+  openai: `${GROWTH_WORKSPACE_BASE_PATH}/settings/ai-preferences`,
+  "share-page-branding": `${GROWTH_WORKSPACE_BASE_PATH}/settings/advanced`,
+  "media-library": `${GROWTH_WORKSPACE_BASE_PATH}/settings/advanced`,
+  "booking-branding": `${GROWTH_WORKSPACE_BASE_PATH}/settings/calendar`,
+  "media-defaults": `${GROWTH_WORKSPACE_BASE_PATH}/settings/advanced`,
+  "automation-defaults": `${GROWTH_WORKSPACE_BASE_PATH}/settings/autonomy`,
+  "command-center-preferences": `${GROWTH_WORKSPACE_BASE_PATH}/settings/command-center-preferences`,
+  elevenlabs: `${GROWTH_WORKSPACE_BASE_PATH}/settings/advanced`,
+  retell: `${GROWTH_WORKSPACE_BASE_PATH}/settings/advanced`,
+  "media-ai-providers": `${GROWTH_WORKSPACE_BASE_PATH}/settings/advanced`,
+}
+
 export function growthEngineCustomerSettingsHref(sectionId: string): string {
-  return `${GROWTH_ENGINE_CUSTOMER_SETTINGS_BASE}/${sectionId}`
+  return GROWTH_ENGINE_GROWTH_SETTINGS_HREFS[sectionId] ?? GROWTH_SETTINGS_HUB_PATH
 }
 
 export function isGrowthEngineCustomerSettingsSection(sectionId: string): boolean {
   return (GROWTH_ENGINE_CUSTOMER_SETTINGS_SECTION_IDS as readonly string[]).includes(sectionId)
 }
 
-/** Compatibility — Growth workspace shell paths (Option A: keep working, do not prefer in new nav). */
-export const GROWTH_ENGINE_LEGACY_GROWTH_WORKSPACE_HREFS: Record<string, string> = {
-  "connected-mailboxes": `${GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE}/mailboxes`,
-  "sending-domains": `${GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE}/sending-domains`,
-  "dns-verification": `${GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE}/deliverability`,
-  warmup: `${GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE}/warmup`,
-  "sending-limits": `${GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE}/reputation`,
-  "sender-pools": `${GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE}/sender-pools`,
-  "mailbox-health": `${GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE}/deliverability`,
-  "notification-preferences": GROWTH_SETTINGS_NOTIFICATIONS_PATH,
-  "copilot-preferences": GROWTH_SETTINGS_AI_PREFERENCES_PATH,
-  "unsubscribe-settings": GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
-  "suppression-lists": GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
-  "compliance-rules": GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
-  "meeting-preferences": GROWTH_SETTINGS_CALENDAR_PREFERENCES_PATH,
-  gmail: `${GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE}/mailboxes`,
-  "microsoft-365": `${GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE}/mailboxes`,
-  "email-signatures": `${GROWTH_WORKSPACE_BASE_PATH}/settings/signatures`,
-}
-
-/** @deprecated 8K — customer canonical is `/settings/growth-engine/*`. */
-export const GROWTH_ENGINE_SECTION_BRIDGE_HREFS = GROWTH_ENGINE_LEGACY_GROWTH_WORKSPACE_HREFS
+/** @deprecated Use growthEngineCustomerSettingsHref */
+export const GROWTH_ENGINE_LEGACY_GROWTH_WORKSPACE_HREFS = GROWTH_ENGINE_GROWTH_SETTINGS_HREFS
 
 /** @deprecated */
-export const GROWTH_ENGINE_SECTION_CANONICAL_REDIRECTS = GROWTH_ENGINE_LEGACY_GROWTH_WORKSPACE_HREFS
+export const GROWTH_ENGINE_SECTION_BRIDGE_HREFS = GROWTH_ENGINE_GROWTH_SETTINGS_HREFS
+
+/** @deprecated */
+export const GROWTH_ENGINE_SECTION_CANONICAL_REDIRECTS = GROWTH_ENGINE_GROWTH_SETTINGS_HREFS
 
 /** @deprecated */
 export const GROWTH_ENGINE_SETTINGS_BRIDGE_SECTION_IDS = [...GROWTH_ENGINE_CUSTOMER_SETTINGS_SECTION_IDS]
@@ -99,13 +129,16 @@ const GROWTH_ENGINE_SECTION_ADMIN_FALLBACK_HREFS: Record<string, string> = {
   "meeting-preferences": "/admin/growth/settings/communications",
 }
 
-/** Growth workspace compatibility path → Workspace Settings growth-engine section. */
+/** Growth workspace compatibility path → growth-engine section id. */
 export const GROWTH_SETTINGS_PATH_TO_BRIDGE_SECTION_ID: Record<string, string> = {
+  [GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH]: "connected-mailboxes",
   [`${GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE}/mailboxes`]: "connected-mailboxes",
   [`${GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE}/sending-domains`]: "sending-domains",
+  [GROWTH_COMMUNICATIONS_DNS_VERIFICATION_PATH]: "dns-verification",
   [`${GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE}/deliverability`]: "dns-verification",
-  [`${GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE}/warmup`]: "warmup",
-  [`${GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE}/sender-pools`]: "sender-pools",
+  [GROWTH_COMMUNICATIONS_WARMUP_PATH]: "warmup",
+  [GROWTH_COMMUNICATIONS_SENDER_POOLS_PATH]: "sender-pools",
+  [GROWTH_COMMUNICATIONS_SENDING_LIMITS_PATH]: "sending-limits",
   [`${GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE}/reputation`]: "sending-limits",
   [GROWTH_SETTINGS_NOTIFICATIONS_PATH]: "notification-preferences",
   [GROWTH_SETTINGS_AI_PREFERENCES_PATH]: "copilot-preferences",
@@ -113,7 +146,7 @@ export const GROWTH_SETTINGS_PATH_TO_BRIDGE_SECTION_ID: Record<string, string> =
   [GROWTH_SETTINGS_CALENDAR_PREFERENCES_PATH]: "meeting-preferences",
 }
 
-/** @deprecated 8K — bridged sections render lifted panels in Workspace Settings. */
+/** @deprecated 8K — bridged sections render in Growth workspace settings. */
 export function isGrowthEngineSettingsBridgeSection(sectionId: string): boolean {
   return false
 }
@@ -127,7 +160,7 @@ export function resolveGrowthEngineSettingsBridgeHref(sectionId: string): string
 
 /** @deprecated */
 export function resolveGrowthEngineSettingsCanonicalRedirect(sectionId: string): string | null {
-  return GROWTH_ENGINE_LEGACY_GROWTH_WORKSPACE_HREFS[sectionId] ?? null
+  return GROWTH_ENGINE_GROWTH_SETTINGS_HREFS[sectionId] ?? null
 }
 
 export function getGrowthEngineSettingsAdminFallbackHref(sectionId: string): string | null {
@@ -135,11 +168,5 @@ export function getGrowthEngineSettingsAdminFallbackHref(sectionId: string): str
 }
 
 export function resolveWorkspaceSettingsBridgeHrefFromGrowthPath(pathname: string): string {
-  const normalized = pathname.split("?")[0]?.split("#")[0] ?? ""
-  for (const [growthPath, sectionId] of Object.entries(GROWTH_SETTINGS_PATH_TO_BRIDGE_SECTION_ID)) {
-    if (normalized === growthPath || normalized.startsWith(`${growthPath}/`)) {
-      return growthEngineCustomerSettingsHref(sectionId)
-    }
-  }
-  return GROWTH_ENGINE_CUSTOMER_SETTINGS_BASE
+  return GROWTH_SETTINGS_HUB_PATH
 }

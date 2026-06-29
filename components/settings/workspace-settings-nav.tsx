@@ -24,7 +24,6 @@ import {
   type WorkspaceSettingsNavContext,
   type WorkspaceSettingsNavItem,
 } from "@/lib/settings/workspace-settings-navigation"
-import { traceWorkspaceSettingsNavigation } from "@/lib/settings/workspace-settings-nav-trace"
 import {
   isDataAdministrationSettingsNavVisible,
   isGrowthEngineSettingsNavVisible,
@@ -38,10 +37,6 @@ function resolveSettingsNavPermissions(args: {
   return getOrgPermissionsForRole(args.role)
 }
 
-function shouldTraceWorkspaceSettingsNav(pathname: string): boolean {
-  return pathname.startsWith("/settings/growth-engine")
-}
-
 type WorkspaceSettingsNavProps = {
   variant: "mobile" | "desktop"
 }
@@ -51,7 +46,6 @@ export function WorkspaceSettingsNav({ variant }: WorkspaceSettingsNavProps) {
   const { role, status } = useOrgPermissions()
   const { isPlatformAdmin } = useAdmin()
   const { workspace } = useTenant()
-  const traceNav = shouldTraceWorkspaceSettingsNav(pathname)
 
   const navPermissions = resolveSettingsNavPermissions({ role, status })
 
@@ -73,47 +67,17 @@ export function WorkspaceSettingsNav({ variant }: WorkspaceSettingsNavProps) {
     [navPermissions, isPlatformAdmin],
   )
 
-  const rootCategories = useMemo(() => {
-    if (traceNav) {
-      traceWorkspaceSettingsNavigation("build_root_categories_before", {
-        variant,
-        pathname,
-        isPlatformAdmin,
-        growthEngineNavVisible: navContext.growthEngineNavVisible,
-      })
-    }
-
-    const categories = buildWorkspaceSettingsRootCategories({
-      planCategoryLabel,
-      ctx: navContext,
-    })
-
-    if (traceNav) {
-      traceWorkspaceSettingsNavigation("build_root_categories_after", {
-        variant,
-        categoryCount: categories.length,
-        categoryIds: categories.map((category) => category.id),
-        itemCount: categories.reduce(
-          (sum, category) => sum + category.groups.reduce((gSum, group) => gSum + group.items.length, 0),
-          0,
-        ),
-      })
-    }
-
-    return categories
-  }, [planCategoryLabel, navContext, traceNav, variant, pathname, isPlatformAdmin])
+  const rootCategories = useMemo(
+    () =>
+      buildWorkspaceSettingsRootCategories({
+        planCategoryLabel,
+        ctx: navContext,
+      }),
+    [planCategoryLabel, navContext],
+  )
 
   const renderNavItem = (item: WorkspaceSettingsNavItem, iconSize: number) => {
     if (!isRenderableWorkspaceSettingsNavItem(item)) {
-      if (traceNav) {
-        traceWorkspaceSettingsNavigation("skip_invalid_nav_item", {
-          variant,
-          itemId: item?.id ?? null,
-          href: item?.href ?? null,
-          label: item?.label ?? null,
-          hasIcon: Boolean(item?.icon),
-        })
-      }
       return null
     }
 
@@ -150,23 +114,9 @@ export function WorkspaceSettingsNav({ variant }: WorkspaceSettingsNavProps) {
   }
 
   if (variant === "mobile") {
-    if (traceNav) {
-      traceWorkspaceSettingsNavigation("mobile_flat_items_before", {
-        categoryCount: rootCategories.length,
-      })
-    }
-
     const flatItems = rootCategories.flatMap((category) =>
       category.groups.flatMap((group) => group.items),
     )
-
-    if (traceNav) {
-      traceWorkspaceSettingsNavigation("mobile_flat_items_after", {
-        itemCount: flatItems.length,
-        hrefs: flatItems.map((item) => item.href),
-        labels: flatItems.map((item) => item.label),
-      })
-    }
 
     return (
       <nav
@@ -178,13 +128,6 @@ export function WorkspaceSettingsNav({ variant }: WorkspaceSettingsNavProps) {
         {flatItems.map((item) => renderNavItem(item, 14))}
       </nav>
     )
-  }
-
-  if (traceNav) {
-    traceWorkspaceSettingsNavigation("desktop_categories_before_render", {
-      categoryCount: rootCategories.length,
-      categoryIds: rootCategories.map((category) => category.id),
-    })
   }
 
   return (
@@ -200,26 +143,14 @@ export function WorkspaceSettingsNav({ variant }: WorkspaceSettingsNavProps) {
           <p className="px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {category.label}
           </p>
-          {category.groups.map((group) => {
-            if (traceNav) {
-              traceWorkspaceSettingsNavigation("desktop_group_before_render", {
-                categoryId: category.id,
-                groupId: group.id,
-                itemCount: group.items.length,
-                itemHrefs: group.items.map((item) => item.href),
-                itemLabels: group.items.map((item) => item.label),
-              })
-            }
-
-            return (
-              <div key={group.id} className="space-y-0.5">
-                {category.groups.length > 1 || category.id !== "general" ? (
-                  <p className="px-2 pt-1 text-[11px] font-medium text-muted-foreground/80">{group.label}</p>
-                ) : null}
-                {group.items.map((item) => renderNavItem(item, 15))}
-              </div>
-            )
-          })}
+          {category.groups.map((group) => (
+            <div key={group.id} className="space-y-0.5">
+              {category.groups.length > 1 || category.id !== "general" ? (
+                <p className="px-2 pt-1 text-[11px] font-medium text-muted-foreground/80">{group.label}</p>
+              ) : null}
+              {group.items.map((item) => renderNavItem(item, 15))}
+            </div>
+          ))}
         </div>
       ))}
     </nav>

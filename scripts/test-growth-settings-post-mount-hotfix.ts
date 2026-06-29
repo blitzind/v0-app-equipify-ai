@@ -1,5 +1,5 @@
 /**
- * PROD-HOTFIX — growth settings post-mount crash (null pathname in nav active lookup).
+ * Growth settings post-mount nav guards certification.
  * Run: pnpm test:growth-settings-post-mount-hotfix
  */
 import assert from "node:assert/strict"
@@ -12,36 +12,34 @@ import {
 } from "../lib/settings/workspace-settings-navigation"
 import { WORKSPACE_SETTINGS_GROWTH_OPERATOR_SECTIONS } from "../lib/settings/workspace-settings-growth-operator"
 import { GROWTH_WORKSPACE_SETTINGS_PERSISTED_SECTION_IDS } from "../lib/growth/settings/growth-workspace-settings-types"
+import { growthEngineCustomerSettingsHref } from "../lib/growth/navigation/growth-workspace-settings-canonical"
 
 export const GROWTH_SETTINGS_POST_MOUNT_HOTFIX_QA_MARKER =
-  "growth-settings-post-mount-hotfix-v2" as const
+  "growth-settings-post-mount-hotfix-v3" as const
 
 function readSource(relativePath: string): string {
   return fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
 }
 
 function main(): void {
-  assert.equal(GROWTH_SETTINGS_POST_MOUNT_HOTFIX_QA_MARKER, "growth-settings-post-mount-hotfix-v2")
+  assert.equal(GROWTH_SETTINGS_POST_MOUNT_HOTFIX_QA_MARKER, "growth-settings-post-mount-hotfix-v3")
 
   const navSrc = readSource("components/settings/workspace-settings-nav.tsx")
   const navigationSrc = readSource("lib/settings/workspace-settings-navigation.ts")
   const settingsLayout = readSource("app/(dashboard)/settings/layout.tsx")
-  const observerSrc = readSource("lib/settings/growth-settings-post-mount-observer.tsx")
   const growthOperatorSrc = readSource("lib/settings/workspace-settings-growth-operator.ts")
   const errorBoundarySrc = readSource("components/settings/workspace-settings-nav-error-boundary.tsx")
-  const runtimeObserverSrc = readSource("components/settings/workspace-settings-nav-runtime-observer.tsx")
 
   assert.match(navSrc, /const pathname = usePathname\(\) \?\? ""/)
   assert.match(navSrc, /isRenderableWorkspaceSettingsNavItem/)
   assert.match(navigationSrc, /if \(!pathname \|\| !item\.href\) return false/)
   assert.match(navigationSrc, /isRenderableWorkspaceSettingsNavItem/)
-  assert.match(settingsLayout, /GrowthSettingsPostMountObserver/)
+  assert.match(navigationSrc, /growthEngineCustomerSettingsHref/)
   assert.match(settingsLayout, /WorkspaceSettingsNavShell/)
-  assert.match(settingsLayout, /WorkspaceSettingsNavRuntimeObserver/)
-  assert.match(observerSrc, /\[growth-settings-post-mount-error\]/)
+  assert.doesNotMatch(settingsLayout, /GrowthSettingsPostMountObserver/)
+  assert.doesNotMatch(settingsLayout, /WorkspaceSettingsNavRuntimeObserver/)
   assert.match(errorBoundarySrc, /\[workspace-settings-nav-error\]/)
   assert.match(errorBoundarySrc, /growthCategoryLoaded/)
-  assert.match(runtimeObserverSrc, /\[workspace-settings-nav-runtime\]/)
   assert.match(growthOperatorSrc, /"ai-teammate":/)
   assert.match(growthOperatorSrc, /Sparkles/)
 
@@ -53,11 +51,14 @@ function main(): void {
     assert.ok(section.icon, `missing icon for ${id}`)
   }
 
+  const connectedMailboxesHref = growthEngineCustomerSettingsHref("connected-mailboxes")
+  assert.equal(connectedMailboxesHref, "/growth/settings/communications/connected-mailboxes")
+
   const item: WorkspaceSettingsNavItem = {
     id: "connected-mailboxes",
     label: "Connected Mailboxes",
     description: "test",
-    href: "/settings/growth-engine/connected-mailboxes",
+    href: connectedMailboxesHref,
     icon: undefined as unknown as WorkspaceSettingsNavItem["icon"],
   }
 
@@ -65,12 +66,9 @@ function main(): void {
   assert.equal(isWorkspaceSettingsNavItemActive(null, item), false)
   assert.equal(isWorkspaceSettingsNavItemActive(undefined, item), false)
   assert.equal(isWorkspaceSettingsNavItemActive("", item), false)
+  assert.equal(isWorkspaceSettingsNavItemActive(connectedMailboxesHref, item), true)
   assert.equal(
-    isWorkspaceSettingsNavItemActive("/settings/growth-engine/connected-mailboxes", item),
-    true,
-  )
-  assert.equal(
-    isWorkspaceSettingsNavItemActive("/settings/growth-engine/connected-mailboxes", {
+    isWorkspaceSettingsNavItemActive(connectedMailboxesHref, {
       ...item,
       href: "",
     }),

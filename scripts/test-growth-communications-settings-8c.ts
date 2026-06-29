@@ -6,7 +6,7 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
 import {
-  GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
+  GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH,
   GROWTH_COMMUNICATIONS_SETTINGS_PATH,
   GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER,
 } from "../lib/growth/navigation/growth-communications-settings-navigation"
@@ -26,27 +26,36 @@ function readSource(relativePath: string): string {
 }
 
 function main(): void {
-  assert.equal(GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER, "growth-communications-settings-8k-v1")
+  assert.equal(GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER, "growth-communications-settings-8k-v2")
   assert.equal(GROWTH_DELIVERY_SETTINGS_QA_MARKER, "growth-delivery-settings-8k-v1")
   assert.equal(GROWTH_DELIVERY_SETTINGS_PATH, GROWTH_COMMUNICATIONS_SETTINGS_PATH)
-  assert.equal(GROWTH_WORKSPACE_MAILBOXES_PATH, "/settings/growth-engine/connected-mailboxes")
+  assert.equal(GROWTH_WORKSPACE_MAILBOXES_PATH, "/growth/settings/communications/connected-mailboxes")
+  assert.equal(GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH, GROWTH_WORKSPACE_MAILBOXES_PATH)
 
   const routes = [
     "app/(growth)/growth/settings/communications/page.tsx",
-    "app/(growth)/growth/settings/communications/mailboxes/page.tsx",
+    "app/(growth)/growth/settings/communications/connected-mailboxes/page.tsx",
     "app/(growth)/growth/settings/communications/sending-domains/page.tsx",
-    "app/(growth)/growth/settings/communications/deliverability/page.tsx",
+    "app/(growth)/growth/settings/communications/dns-verification/page.tsx",
     "app/(growth)/growth/settings/communications/warmup/page.tsx",
     "app/(growth)/growth/settings/communications/sender-pools/page.tsx",
+    "app/(growth)/growth/settings/communications/sending-limits/page.tsx",
+    "app/(growth)/growth/settings/communications/mailboxes/page.tsx",
+    "app/(growth)/growth/settings/communications/deliverability/page.tsx",
     "app/(growth)/growth/settings/communications/reputation/page.tsx",
   ]
   for (const route of routes) {
     assert.ok(fs.existsSync(route), `missing route ${route}`)
   }
 
-  const mailboxesPage = readSource("app/(growth)/growth/settings/communications/mailboxes/page.tsx")
-  assert.match(mailboxesPage, /GrowthConnectedMailboxesDashboard/)
-  assert.match(mailboxesPage, /GrowthCommunicationsSettingsSection/)
+  const connectedMailboxesPage = readSource(
+    "app/(growth)/growth/settings/communications/connected-mailboxes/page.tsx",
+  )
+  assert.match(connectedMailboxesPage, /GrowthConnectedMailboxesDashboard/)
+  assert.match(connectedMailboxesPage, /GrowthCommunicationsSettingsSection/)
+
+  const legacyMailboxesPage = readSource("app/(growth)/growth/settings/communications/mailboxes/page.tsx")
+  assert.match(legacyMailboxesPage, /redirect\(/)
 
   const connectedDashboard = readSource("components/growth/mailboxes/growth-connected-mailboxes-dashboard.tsx")
   assert.match(connectedDashboard, /validation_message/)
@@ -59,15 +68,15 @@ function main(): void {
 
   const communicationsSection = getGrowthWorkspaceSettingsSectionById("communications")
   assert.ok(communicationsSection)
-  assert.equal(communicationsSection!.href, "/settings/growth-engine/connected-mailboxes")
+  assert.equal(communicationsSection!.href, "/growth/settings/communications/connected-mailboxes")
 
   const mailboxesNav = getGrowthWorkspaceSettingsSectionById("mailboxes")
   assert.ok(mailboxesNav)
-  assert.equal(mailboxesNav!.href, "/settings/growth-engine/connected-mailboxes")
+  assert.equal(mailboxesNav!.href, "/growth/settings/communications/connected-mailboxes")
 
   const communications = GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS.find((group) => group.id === "communications")
   assert.ok(communications?.items.some((item) => item.id === "deliverability"))
-  assert.equal(GROWTH_WORKSPACE_DNS_VERIFICATION_PATH, "/settings/growth-engine/dns-verification")
+  assert.equal(GROWTH_WORKSPACE_DNS_VERIFICATION_PATH, "/growth/settings/communications/dns-verification")
 
   const deliveryRedirect = readSource("app/(growth)/growth/settings/delivery/page.tsx")
   assert.match(deliveryRedirect, /redirect/)

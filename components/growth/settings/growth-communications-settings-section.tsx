@@ -2,7 +2,6 @@
 
 import type { ElementType, ReactNode } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
 import { ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
@@ -10,7 +9,7 @@ import {
   GROWTH_COMMUNICATIONS_SETTINGS_PATH,
   GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER,
 } from "@/lib/growth/navigation/growth-communications-settings-navigation"
-import { resolveWorkspaceSettingsBridgeHrefFromGrowthPath } from "@/lib/growth/navigation/growth-workspace-settings-canonical"
+import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
 
 type GrowthCommunicationsSettingsSectionProps = {
   title: string
@@ -21,6 +20,8 @@ type GrowthCommunicationsSettingsSectionProps = {
   children: ReactNode
 }
 
+const GROWTH_SETTINGS_HUB_PATH = `${GROWTH_WORKSPACE_BASE_PATH}/settings`
+
 export function GrowthCommunicationsSettingsSection({
   title,
   description,
@@ -29,9 +30,6 @@ export function GrowthCommunicationsSettingsSection({
   adminFallbackHref,
   children,
 }: GrowthCommunicationsSettingsSectionProps) {
-  const pathname = usePathname()
-  const workspaceSettingsBridgeHref = resolveWorkspaceSettingsBridgeHrefFromGrowthPath(pathname)
-
   return (
     <div className="space-y-6" data-growth-communications-settings={GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER}>
       <GrowthWorkspacePageHeader
@@ -45,7 +43,7 @@ export function GrowthCommunicationsSettingsSection({
               <Link href={GROWTH_COMMUNICATIONS_SETTINGS_PATH}>All communications</Link>
             </Button>
             <Button type="button" variant="ghost" size="sm" asChild>
-              <Link href={workspaceSettingsBridgeHref}>Back to Workspace Settings</Link>
+              <Link href={GROWTH_SETTINGS_HUB_PATH}>Growth settings</Link>
             </Button>
             {adminFallbackHref ? (
               <Button type="button" variant="ghost" size="sm" asChild>
