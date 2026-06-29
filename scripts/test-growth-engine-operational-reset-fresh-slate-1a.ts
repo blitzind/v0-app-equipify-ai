@@ -100,9 +100,12 @@ function runStructureCertification(): void {
     scope_summary: {
       org_scoped_tables: 10,
       lead_scoped_tables: 10,
-      single_tenant_tables: 5,
+      parent_scoped_tables: 5,
+      workspace_disposable_tables: 5,
       resolved_lead_ids: 3,
-      single_tenant_attribution: "test",
+      resolved_thread_ids: 2,
+      resolved_job_ids: 1,
+      resolved_opportunity_ids: 0,
     },
     preserved_tables: [{ table: "mailbox_connections", row_count: 2 }],
     tables: [
@@ -158,9 +161,19 @@ function runStructureCertification(): void {
     "utf8",
   )
   assert.match(serviceSource, /attemptDeleteScopedRows/)
+  assert.match(serviceSource, /resolveScopedQuery/)
   assert.match(serviceSource, /deleteInventoryTable/)
   assert.match(serviceSource, /status: "failed"/)
+  assert.doesNotMatch(serviceSource, /single_tenant/)
   assert.doesNotMatch(serviceSource, /throw new Error\(`\$\{entry\.table\}/)
+
+  for (const entry of entries) {
+    assert.notEqual(
+      entry.scope,
+      "single_tenant" as string,
+      `table ${entry.table} must not use deprecated single_tenant scope`,
+    )
+  }
 
   const scriptSource = fs.readFileSync(
     path.join(process.cwd(), "scripts/reset-growth-engine-operational-data.ts"),

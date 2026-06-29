@@ -17,8 +17,6 @@ import {
   type GrowthEngineOperationalResetTableEntry,
 } from "./growth-engine-operational-reset-table-inventory"
 
-const LEAD_ID_BATCH = 200
-
 export type GrowthEngineOperationalResetTableAuditRow = {
   table: string
   category: GrowthEngineOperationalResetCategory
@@ -39,9 +37,12 @@ export type GrowthEngineOperationalResetAuditReport = {
   scope_summary: {
     org_scoped_tables: number
     lead_scoped_tables: number
-    single_tenant_tables: number
+    parent_scoped_tables: number
+    workspace_disposable_tables: number
     resolved_lead_ids: number
-    single_tenant_attribution: string
+    resolved_thread_ids: number
+    resolved_job_ids: number
+    resolved_opportunity_ids: number
   }
   preserved_tables: Array<{ table: string; row_count: number | null }>
   tables: GrowthEngineOperationalResetTableAuditRow[]
@@ -96,7 +97,165 @@ export type GrowthEngineOperationalResetRunResult = {
 type ResetScopeContext = {
   organizationId: string
   leadIds: string[]
-  singleTenantAttribution: string
+  threadIds: string[]
+  jobIds: string[]
+  opportunityIds: string[]
+}
+
+const ID_BATCH = 200
+
+function defaultScopeColumn(entry: GrowthEngineOperationalResetTableEntry): string {
+  if (entry.scope_column) return entry.scope_column
+  switch (entry.scope) {
+    case "organization_id":
+      return "organization_id"
+    case "org_id":
+      return "org_id"
+    case "lead_id":
+      return "lead_id"
+    case "lead_pk":
+      return "id"
+    case "thread_id":
+      return "thread_id"
+    case "job_id":
+      return "job_id"
+    case "opportunity_id":
+      return "opportunity_id"
+    default:
+      return "id"
+  }
+}
+
+function scopeFilterDescription(entry: GrowthEngineOperationalResetTableEntry, ctx: ResetScopeContext): string {
+  const column = defaultScopeColumn(entry)
+  switch (entry.scope) {
+    case "organization_id":
+      return `${column} = ${ctx.organizationId}`
+    case "org_id":
+      return `${column} = ${ctx.organizationId}`
+    case "lead_id":
+      return ctx.leadIds.length > 0
+        ? `${column} IN (${ctx.leadIds.length} lead id(s))`
+        : `${column} IN (none — skipped)`
+    case "lead_pk":
+      return ctx.leadIds.length > 0
+        ? `id IN (${ctx.leadIds.length} lead id(s))`
+        : "id IN (none — skipped)"
+    case "thread_id":
+      return ctx.threadIds.length > 0
+        ? `${column} IN (${ctx.threadIds.length} thread id(s))`
+        : `${column} IN (none — skipped)`
+    case "job_id":
+      return ctx.jobIds.length > 0
+        ? `${column} IN (${ctx.jobIds.length} job id(s))`
+        : `${column} IN (none — skipped)`
+    case "opportunity_id":
+      return ctx.opportunityIds.length > 0
+        ? `${column} IN (${ctx.opportunityIds.length} opportunity id(s))`
+        : `${column} IN (none — skipped)`
+    case "workspace_disposable":
+      return "id IS NOT NULL (workspace disposable runtime row)"
+    case "lead_inbox_queue":
+      return "id IS NOT NULL (lead_inbox queue row)"
+    default:
+      return "unknown"
+  }
+}
+
+type ScopedQueryResult =
+  | { ok: true; mode: "eq"; column: string; value: string }
+  | { ok: true; mode: "in"; column: string; values: string[] }
+  | { ok: true; mode: "not_null"; column: string }
+  | { ok: false; reason: string }
+
+function resolveScopedQuery(
+  entry: GrowthEngineOperationalResetTableEntry,
+  ctx: ResetScopeContext,
+): ScopedQueryResult {
+  const column = defaultScopeColumn(entry)
+  switch (entry.scope) {
+    case "organization_id":
+      return { ok: true, mode: "eq", column, value: ctx.organizationId }
+    case "org_id":
+      return { ok: true, mode: "eq", column, value: ctx.organizationId }
+    case "lead_id":
+    case "lead_pk":
+      if (ctx.leadIds.length === 0) return { ok: false, reason: "no_lead_ids_resolved" }
+      return { ok: true, mode: "in", column, values: ctx.leadIds }
+    case "thread_id":
+      if (ctx.threadIds.length === 0) return { ok: false, reason: "no_thread_ids_resolved" }
+      return { ok: true, mode: "in", column, values: ctx.threadIds }
+    case "job_id":
+      if (ctx.jobIds.length === 0) return { ok: false, reason: "no_job_ids_resolved" }
+      return { ok: true, mode: "in", column, values: ctx.jobIds }
+    case "opportunity_id":
+      if (ctx.opportunityIds.length === 0) return { ok: false, reason: "no_opportunity_ids_resolved" }
+      return { ok: true, mode: "in", column, values: ctx.opportunityIds }
+    case "workspace_disposable":
+    case "lead_inbox_queue":
+      return { ok: true, mode: "not_null", column: "id" }
+    default:
+      return { ok: false, reason: `unsupported_scope:${entry.scope}` }
+  }
+}
+
+function applyScopedQuery<T extends { eq: Function; in: Function; not: Function }>(
+  query: T,
+  scoped: Extract<ScopedQueryResult, { ok: true }>,
+): T {
+  if (scoped.mode === "eq") {
+    return query.eq(scoped.column, scoped.value) as T
+  }
+  if (scoped.mode === "not_null") {
+    return query.not(scoped.column, "is", null) as T
+  }
+  return query.in(scoped.column, scoped.values) as T
+}
+
+async function countWithScopedInBatches(
+  admin: SupabaseClient,
+  entry: GrowthEngineOperationalResetTableEntry,
+  scoped: Extract<ScopedQueryResult, { ok: true; mode: "in" }>,
+): Promise<{ count: number | null; status: GrowthEngineOperationalResetTableAuditRow["count_status"]; error: string | null }> {
+  let total = 0
+  for (let i = 0; i < scoped.values.length; i += ID_BATCH) {
+    const batch = scoped.values.slice(i, i + ID_BATCH)
+    const { count, error } = await admin
+      .schema("growth")
+      .from(entry.table)
+      .select("id", { count: "exact", head: true })
+      .in(scoped.column, batch)
+    if (error) {
+      const message = error.message ?? String(error)
+      if (isMissingRelation(message)) {
+        return { count: null, status: "table_missing", error: message }
+      }
+      return { count: null, status: "count_unavailable", error: message }
+    }
+    total += count ?? 0
+  }
+  return { count: total, status: "ok", error: null }
+}
+
+async function deleteWithScopedInBatches(
+  admin: SupabaseClient,
+  entry: GrowthEngineOperationalResetTableEntry,
+  scoped: Extract<ScopedQueryResult, { ok: true; mode: "in" }>,
+): Promise<{ rows_deleted: number; error: string | null }> {
+  let deleted = 0
+  for (let i = 0; i < scoped.values.length; i += ID_BATCH) {
+    const batch = scoped.values.slice(i, i + ID_BATCH)
+    const { count, error } = await admin
+      .schema("growth")
+      .from(entry.table)
+      .delete({ count: "exact" })
+      .in(scoped.column, batch)
+    if (error && !isMissingRelation(error.message ?? "")) {
+      return { rows_deleted: deleted, error: error.message ?? String(error) }
+    }
+    deleted += count ?? 0
+  }
+  return { rows_deleted: deleted, error: null }
 }
 
 function isMissingRelation(message: string): boolean {
@@ -107,53 +266,22 @@ function isPermissionDenied(message: string): boolean {
   return /permission denied/i.test(message)
 }
 
-function scopeFilterDescription(entry: GrowthEngineOperationalResetTableEntry, ctx: ResetScopeContext): string {
-  switch (entry.scope) {
-    case "organization_id":
-      return `organization_id = ${ctx.organizationId}`
-    case "org_id":
-      return `org_id = ${ctx.organizationId}`
-    case "lead_id":
-      return ctx.leadIds.length > 0
-        ? `lead_id IN (${ctx.leadIds.length} org lead id(s))`
-        : "lead_id IN (all growth leads — single-tenant fallback)"
-    case "single_tenant":
-      return `all rows (${ctx.singleTenantAttribution})`
-    default:
-      return "unknown"
-  }
-}
-
-function applyScopeFilter<T extends { eq: Function; in: Function }>(
-  query: T,
-  entry: GrowthEngineOperationalResetTableEntry,
-  ctx: ResetScopeContext,
-): T {
-  switch (entry.scope) {
-    case "organization_id":
-      return query.eq("organization_id", ctx.organizationId) as T
-    case "org_id":
-      return query.eq("org_id", ctx.organizationId) as T
-    case "lead_id":
-      if (ctx.leadIds.length > 0) {
-        return query.in("lead_id", ctx.leadIds) as T
-      }
-      return query as T
-    case "single_tenant":
-      return query as T
-    default:
-      return query as T
-  }
-}
-
 async function countScopedRows(
   admin: SupabaseClient,
   entry: GrowthEngineOperationalResetTableEntry,
   ctx: ResetScopeContext,
 ): Promise<{ count: number | null; status: GrowthEngineOperationalResetTableAuditRow["count_status"]; error: string | null }> {
-  let query = admin.schema("growth").from(entry.table).select("id", { count: "exact", head: true })
-  query = applyScopeFilter(query, entry, ctx)
+  const scoped = resolveScopedQuery(entry, ctx)
+  if (!scoped.ok) {
+    return { count: 0, status: "ok", error: null }
+  }
 
+  if (scoped.mode === "in") {
+    return countWithScopedInBatches(admin, entry, scoped)
+  }
+
+  let query = admin.schema("growth").from(entry.table).select("id", { count: "exact", head: true })
+  query = applyScopedQuery(query, scoped)
   const { count, error } = await query
   if (error) {
     const message = error.message ?? String(error)
@@ -169,39 +297,19 @@ async function attemptDeleteScopedRows(
   admin: SupabaseClient,
   entry: GrowthEngineOperationalResetTableEntry,
   ctx: ResetScopeContext,
-): Promise<{ rows_deleted: number; error: string | null }> {
+): Promise<{ rows_deleted: number; error: string | null; skipped?: boolean; skip_reason?: string }> {
   try {
-    if (entry.scope === "lead_id" && ctx.leadIds.length === 0) {
-      const { count, error } = await admin
-        .schema("growth")
-        .from(entry.table)
-        .delete({ count: "exact" })
-        .neq("id", "00000000-0000-0000-0000-000000000000")
-      if (error && !isMissingRelation(error.message ?? "")) {
-        return { rows_deleted: 0, error: error.message ?? String(error) }
-      }
-      return { rows_deleted: count ?? 0, error: null }
+    const scoped = resolveScopedQuery(entry, ctx)
+    if (!scoped.ok) {
+      return { rows_deleted: 0, error: null, skipped: true, skip_reason: scoped.reason }
     }
 
-    if (entry.scope === "lead_id" && ctx.leadIds.length > 0) {
-      let deleted = 0
-      for (let i = 0; i < ctx.leadIds.length; i += LEAD_ID_BATCH) {
-        const batch = ctx.leadIds.slice(i, i + LEAD_ID_BATCH)
-        const { count, error } = await admin
-          .schema("growth")
-          .from(entry.table)
-          .delete({ count: "exact" })
-          .in("lead_id", batch)
-        if (error && !isMissingRelation(error.message ?? "")) {
-          return { rows_deleted: deleted, error: error.message ?? String(error) }
-        }
-        deleted += count ?? 0
-      }
-      return { rows_deleted: deleted, error: null }
+    if (scoped.mode === "in") {
+      return deleteWithScopedInBatches(admin, entry, scoped)
     }
 
     let query = admin.schema("growth").from(entry.table).delete({ count: "exact" })
-    query = applyScopeFilter(query, entry, ctx)
+    query = applyScopedQuery(query, scoped)
     const { count, error } = await query
     if (error && !isMissingRelation(error.message ?? "")) {
       return { rows_deleted: 0, error: error.message ?? String(error) }
@@ -213,6 +321,37 @@ async function attemptDeleteScopedRows(
       error: error instanceof Error ? error.message : String(error),
     }
   }
+}
+
+async function fetchIdsInBatches(
+  admin: SupabaseClient,
+  input: {
+    table: string
+    column: string
+    filterColumn: string
+    filterValues: string[]
+    selectColumn?: string
+  },
+): Promise<string[]> {
+  const ids = new Set<string>()
+  const selectColumn = input.selectColumn ?? input.column
+  for (let i = 0; i < input.filterValues.length; i += ID_BATCH) {
+    const batch = input.filterValues.slice(i, i + ID_BATCH)
+    const { data, error } = await admin
+      .schema("growth")
+      .from(input.table)
+      .select(selectColumn)
+      .in(input.filterColumn, batch)
+      .limit(10000)
+    if (error && !isMissingRelation(error.message ?? "")) {
+      throw new Error(`${input.table}_lookup_failed: ${error.message}`)
+    }
+    for (const row of data ?? []) {
+      const value = (row as Record<string, unknown>)[selectColumn]
+      if (value) ids.add(String(value))
+    }
+  }
+  return [...ids]
 }
 
 async function resolveOrgLeadIds(admin: SupabaseClient, organizationId: string): Promise<string[]> {
@@ -249,6 +388,44 @@ async function resolveOrgLeadIds(admin: SupabaseClient, organizationId: string):
   }
 
   return [...leadIds]
+}
+
+async function resolveResetScopeContext(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<ResetScopeContext> {
+  const leadIds = await resolveOrgLeadIds(admin, organizationId)
+  const [threadIds, jobIds, opportunityIds] = await Promise.all([
+    leadIds.length > 0
+      ? fetchIdsInBatches(admin, {
+          table: "inbox_threads",
+          column: "id",
+          filterColumn: "lead_id",
+          filterValues: leadIds,
+          selectColumn: "id",
+        })
+      : Promise.resolve([]),
+    leadIds.length > 0
+      ? fetchIdsInBatches(admin, {
+          table: "sequence_execution_jobs",
+          column: "id",
+          filterColumn: "lead_id",
+          filterValues: leadIds,
+          selectColumn: "id",
+        })
+      : Promise.resolve([]),
+    leadIds.length > 0
+      ? fetchIdsInBatches(admin, {
+          table: "opportunities",
+          column: "id",
+          filterColumn: "lead_id",
+          filterValues: leadIds,
+          selectColumn: "id",
+        })
+      : Promise.resolve([]),
+  ])
+
+  return { organizationId, leadIds, threadIds, jobIds, opportunityIds }
 }
 
 async function verifyTargetOrganization(
@@ -322,10 +499,20 @@ async function buildAuditReport(
     organization_name: input.organizationName,
     scope_summary: {
       org_scoped_tables: entries.filter((entry) => entry.scope === "organization_id" || entry.scope === "org_id").length,
-      lead_scoped_tables: entries.filter((entry) => entry.scope === "lead_id").length,
-      single_tenant_tables: entries.filter((entry) => entry.scope === "single_tenant").length,
+      lead_scoped_tables: entries.filter(
+        (entry) => entry.scope === "lead_id" || entry.scope === "lead_pk",
+      ).length,
+      parent_scoped_tables: entries.filter(
+        (entry) =>
+          entry.scope === "thread_id" || entry.scope === "job_id" || entry.scope === "opportunity_id",
+      ).length,
+      workspace_disposable_tables: entries.filter(
+        (entry) => entry.scope === "workspace_disposable" || entry.scope === "lead_inbox_queue",
+      ).length,
       resolved_lead_ids: input.ctx.leadIds.length,
-      single_tenant_attribution: input.ctx.singleTenantAttribution,
+      resolved_thread_ids: input.ctx.threadIds.length,
+      resolved_job_ids: input.ctx.jobIds.length,
+      resolved_opportunity_ids: input.ctx.opportunityIds.length,
     },
     preserved_tables,
     tables,
@@ -398,6 +585,18 @@ async function deleteInventoryTable(
   const afterCount = await countScopedRows(admin, entry, ctx)
   const rows_after = afterCount.status === "ok" ? afterCount.count : null
 
+  if (attempt.skipped) {
+    return {
+      table: entry.table,
+      rows_before,
+      delete_attempted: false,
+      rows_deleted: 0,
+      rows_after,
+      status: "skipped",
+      error: attempt.skip_reason ?? "scope_unresolved",
+    }
+  }
+
   if (attempt.error) {
     return {
       table: entry.table,
@@ -460,84 +659,72 @@ export async function verifyGrowthEngineOperationalReset(
   const operationalChecks: Array<{
     id: string
     table: string
-    scope: GrowthEngineOperationalResetTableEntry["scope"]
     label: string
   }> = [
-    { id: "no_ai_work_orders", table: "ai_work_orders", scope: "organization_id", label: "AI work orders cleared" },
+    { id: "no_ai_work_orders", table: "ai_work_orders", label: "AI work orders cleared" },
     {
       id: "no_pending_human_approvals",
       table: "human_execution_approvals",
-      scope: "organization_id",
       label: "Human execution approvals cleared",
     },
     {
       id: "no_outreach_queue_drafts",
       table: "outreach_queue",
-      scope: "single_tenant",
       label: "Outreach queue cleared",
     },
     {
       id: "no_sequence_execution_jobs",
       table: "sequence_execution_jobs",
-      scope: "single_tenant",
       label: "Sequence execution jobs cleared",
     },
     {
       id: "no_inbox_threads",
       table: "inbox_threads",
-      scope: "single_tenant",
       label: "Inbox threads cleared",
     },
     {
       id: "no_outbound_replies",
       table: "outbound_replies",
-      scope: "single_tenant",
       label: "Outbound replies cleared",
     },
     {
       id: "no_lead_inbox",
       table: "lead_inbox",
-      scope: "single_tenant",
       label: "Lead inbox cleared",
     },
     {
       id: "no_opportunities",
       table: "opportunities",
-      scope: "single_tenant",
       label: "Opportunities cleared",
     },
     {
       id: "no_leads",
       table: "leads",
-      scope: "single_tenant",
       label: "Growth leads cleared (daily queue inputs)",
+    },
+    {
+      id: "no_cadence_tasks",
+      table: "cadence_tasks",
+      label: "Cadence tasks cleared",
     },
     {
       id: "no_operator_notifications",
       table: "operator_notifications",
-      scope: "organization_id",
       label: "Operator notifications cleared",
     },
     {
       id: "no_operational_alerts",
       table: "operational_alerts",
-      scope: "single_tenant",
       label: "Operational alerts cleared",
     },
     {
       id: "no_lead_research_runs",
       table: "lead_research_runs",
-      scope: "lead_id",
       label: "Lead research runs cleared",
     },
   ]
 
-  const leadIds = await resolveOrgLeadIds(admin, organizationId)
-  const ctx: ResetScopeContext = {
-    organizationId,
-    leadIds,
-    singleTenantAttribution: `Precision Biomedical AI OS (${organizationId})`,
-  }
+  const ctx = await resolveResetScopeContext(admin, organizationId)
 
   for (const check of operationalChecks) {
     const entry = getGrowthEngineOperationalResetTableEntries().find((row) => row.table === check.table)
@@ -595,13 +782,7 @@ export async function runGrowthEngineOperationalReset(
   const strict = input.strict === true
   const organizationId = input.organizationId?.trim() || PRECISION_BIOMEDICAL_AI_OS_ORG_ID
   const { name: organizationName } = await verifyTargetOrganization(admin, organizationId)
-  const leadIds = await resolveOrgLeadIds(admin, organizationId)
-
-  const ctx: ResetScopeContext = {
-    organizationId,
-    leadIds,
-    singleTenantAttribution: `single-tenant Growth Engine workspace for ${organizationName ?? organizationId}`,
-  }
+  const ctx = await resolveResetScopeContext(admin, organizationId)
 
   const audit_before = await buildAuditReport(admin, {
     mode: input.execute ? "execute" : "dry_run",
@@ -705,6 +886,9 @@ export function formatGrowthEngineOperationalResetDryRun(audit: GrowthEngineOper
     `Organization: ${audit.organization_name ?? audit.organization_id} (${audit.organization_id})`,
     `Mode: ${audit.mode}`,
     `Resolved lead ids: ${audit.scope_summary.resolved_lead_ids}`,
+    `Resolved thread ids: ${audit.scope_summary.resolved_thread_ids}`,
+    `Resolved job ids: ${audit.scope_summary.resolved_job_ids}`,
+    `Resolved opportunity ids: ${audit.scope_summary.resolved_opportunity_ids}`,
     `Tables with rows to clear: ${audit.summary.tables_with_rows}`,
     `Total rows to clear: ${audit.summary.total_rows_to_clear}`,
     "",
