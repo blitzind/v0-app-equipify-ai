@@ -1,5 +1,5 @@
-import { GrowthSettingsSectionPage } from "@/components/growth/settings/growth-settings-section-page"
+import { GrowthSettingsCallingPreferencesPage } from "@/components/growth/settings/growth-settings-calling-preferences-page"
 
 export default function Page() {
-  return <GrowthSettingsSectionPage sectionId="calling-preferences" />
+  return <GrowthSettingsCallingPreferencesPage />
 }

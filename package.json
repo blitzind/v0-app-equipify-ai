@@ -427,6 +427,8 @@
     "test:growth-home-fresh-slate-1h": "tsx scripts/test-growth-home-fresh-slate-1h.ts",
     "test:settings-nav-style-alignment-1a": "tsx scripts/test-settings-nav-style-alignment-1a.ts",
     "test:settings-menu-audit-1a": "tsx scripts/test-settings-menu-audit-1a.ts",
+    "test:settings-menu-completeness-audit-1b": "tsx scripts/test-settings-menu-completeness-audit-1b.ts",
+    "test:growth-settings-wiring-1a": "tsx scripts/test-growth-settings-wiring-1a.ts",
     "test:growth-home-debug-source-fresh-slate-1c": "tsx scripts/test-growth-home-debug-source-fresh-slate-1c.ts",
     "test:growth-email-discovery-7.3a": "tsx scripts/test-growth-email-discovery-7.3a.ts",
     "test:growth-email-discovery-7.3b": "tsx scripts/test-growth-email-discovery-7.3b.ts",

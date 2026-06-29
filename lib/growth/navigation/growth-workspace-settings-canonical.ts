@@ -28,6 +28,8 @@ const GROWTH_SETTINGS_NOTIFICATIONS_PATH = `${GROWTH_WORKSPACE_BASE_PATH}/settin
 const GROWTH_SETTINGS_AI_PREFERENCES_PATH = `${GROWTH_WORKSPACE_BASE_PATH}/settings/ai-preferences` as const
 const GROWTH_SETTINGS_CALENDAR_PREFERENCES_PATH =
   `${GROWTH_WORKSPACE_BASE_PATH}/settings/calendar-preferences` as const
+const GROWTH_SETTINGS_SIDEBAR_PREFERENCES_PATH =
+  `${GROWTH_WORKSPACE_BASE_PATH}/settings/sidebar-preferences` as const
 const GROWTH_SETTINGS_HUB_PATH = `${GROWTH_WORKSPACE_BASE_PATH}/settings` as const
 
 /** Lifted customer settings sections rendered in Growth workspace settings. */
@@ -62,8 +64,8 @@ export const GROWTH_ENGINE_GROWTH_SETTINGS_HREFS: Record<string, string> = {
   "sending-limits": GROWTH_COMMUNICATIONS_SENDING_LIMITS_PATH,
   "sender-pools": GROWTH_COMMUNICATIONS_SENDER_POOLS_PATH,
   "mailbox-health": GROWTH_COMMUNICATIONS_DNS_VERIFICATION_PATH,
-  gmail: `${GROWTH_WORKSPACE_BASE_PATH}/settings/gmail`,
-  "microsoft-365": `${GROWTH_WORKSPACE_BASE_PATH}/settings/microsoft-365`,
+  gmail: GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH,
+  "microsoft-365": GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH,
   "email-signatures": `${GROWTH_WORKSPACE_BASE_PATH}/settings/signatures`,
   "inbox-routing": GROWTH_SETTINGS_LEGACY_COMMUNICATIONS_BASE,
   "notification-preferences": GROWTH_SETTINGS_NOTIFICATIONS_PATH,
@@ -85,7 +87,7 @@ export const GROWTH_ENGINE_GROWTH_SETTINGS_HREFS: Record<string, string> = {
   "booking-branding": `${GROWTH_WORKSPACE_BASE_PATH}/settings/calendar`,
   "media-defaults": `${GROWTH_WORKSPACE_BASE_PATH}/settings/advanced`,
   "automation-defaults": `${GROWTH_WORKSPACE_BASE_PATH}/settings/autonomy`,
-  "command-center-preferences": `${GROWTH_WORKSPACE_BASE_PATH}/settings/command-center-preferences`,
+  "command-center-preferences": GROWTH_SETTINGS_SIDEBAR_PREFERENCES_PATH,
   elevenlabs: `${GROWTH_WORKSPACE_BASE_PATH}/settings/advanced`,
   retell: `${GROWTH_WORKSPACE_BASE_PATH}/settings/advanced`,
   "media-ai-providers": `${GROWTH_WORKSPACE_BASE_PATH}/settings/advanced`,

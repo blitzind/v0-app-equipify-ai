@@ -148,7 +148,7 @@ function main(): void {
   console.log("  ✓ legacy /settings/growth-engine/* redirects to canonical Growth settings")
 
   const callingPreferencesPage = read("app/(growth)/growth/settings/calling-preferences/page.tsx")
-  assert.match(callingPreferencesPage, /sectionId="calling-preferences"/)
+  assert.match(callingPreferencesPage, /GrowthSettingsCallingPreferencesPage/)
   console.log("  ✓ calling-preferences Growth settings page registered")
 
   console.log("\nSETTINGS-MENU-AUDIT-1A verification PASS\n")

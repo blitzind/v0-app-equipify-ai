@@ -72,7 +72,15 @@ function costSummary(edit: { monthlyCostEstimate: string; seatCount: string; not
   return parts.length > 0 ? parts.join(" · ") : "No cost metadata"
 }
 
-export function GrowthCommunicationSettingsPanel() {
+export type GrowthCommunicationSettingsPanelMode = "operator" | "admin"
+
+export type GrowthCommunicationSettingsPanelProps = {
+  /** Operator mode exposes user dial preferences only — platform defaults stay in Platform Admin. */
+  mode?: GrowthCommunicationSettingsPanelMode
+}
+
+export function GrowthCommunicationSettingsPanel({ mode = "admin" }: GrowthCommunicationSettingsPanelProps) {
+  const isOperatorMode = mode === "operator"
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -109,18 +117,26 @@ export function GrowthCommunicationSettingsPanel() {
     setError(null)
     setSuccess(null)
     try {
-      const [prefsRes, providersRes] = await Promise.all([
-        fetch("/api/platform/growth/communication-preferences", { cache: "no-store" }),
-        fetch("/api/platform/growth/outbound/providers", { cache: "no-store" }),
-      ])
+      const prefsRes = await fetch("/api/platform/growth/communication-preferences", { cache: "no-store" })
       const prefs = (await prefsRes.json().catch(() => ({}))) as PreferencesPayload
-      const providerData = (await providersRes.json().catch(() => ({}))) as ProvidersPayload
 
       if (!prefsRes.ok || !prefs.ok || !prefs.platform || !prefs.resolved) {
         throw new Error("Could not load communication preferences.")
       }
-      if (!providersRes.ok || !providerData.ok) {
-        throw new Error("Could not load provider comparison.")
+
+      let providerData: ProvidersPayload = { ok: true, providers: [], connections: [] }
+      if (!isOperatorMode) {
+        const providersRes = await fetch("/api/platform/growth/outbound/providers", { cache: "no-store" })
+        providerData = (await providersRes.json().catch(() => ({}))) as ProvidersPayload
+        if (!providersRes.ok || !providerData.ok) {
+          throw new Error("Could not load provider comparison.")
+        }
+      } else {
+        const providersRes = await fetch("/api/platform/growth/outbound/providers", { cache: "no-store" })
+        const connectionsPayload = (await providersRes.json().catch(() => ({}))) as ProvidersPayload
+        if (providersRes.ok && connectionsPayload.ok) {
+          providerData = { ok: true, providers: [], connections: connectionsPayload.connections ?? [] }
+        }
       }
 
       setPlatform(prefs.platform)
@@ -155,13 +171,47 @@ export function GrowthCommunicationSettingsPanel() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [isOperatorMode])
 
   useEffect(() => {
     void load()
   }, [load])
 
+  async function saveOperatorPreferences() {
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const userRes = await fetch("/api/platform/growth/communication-preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          callDialMode: userDialMode ? (userDialMode as GrowthCallDialMode) : null,
+          customUrlTemplate: userTemplate.trim() || null,
+          showAlternateDialers: userShowAlternates === "" ? null : userShowAlternates === "true",
+          preferredEmailConnectionId: userEmailConnectionId || null,
+        }),
+      })
+      const userData = (await userRes.json().catch(() => ({}))) as PreferencesPayload & { message?: string }
+      if (!userRes.ok || !userData.ok) {
+        throw new Error(userData.message ?? "Could not save call preferences.")
+      }
+
+      setSuccess("Call preferences saved.")
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save call preferences.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function saveSettings() {
+    if (isOperatorMode) {
+      await saveOperatorPreferences()
+      return
+    }
+
     setSaving(true)
     setError(null)
     setSuccess(null)
@@ -243,7 +293,7 @@ export function GrowthCommunicationSettingsPanel() {
       ) : null}
 
       <GrowthSettingsCard
-        title="Call Channel Preferences"
+        title={isOperatorMode ? "Dial preferences" : "Call Channel Preferences"}
         icon={<Phone className="size-4" />}
         headerAside={
           resolved ? (
@@ -253,10 +303,13 @@ export function GrowthCommunicationSettingsPanel() {
       >
         <div className={GROWTH_SETTINGS_INNER_GAP}>
           <p className="text-xs text-muted-foreground">
-            Fallback chain: your preferences → platform defaults → tel. Platform-admin internal only.
+            {isOperatorMode
+              ? "Your dial mode and call sheet behavior. Platform defaults apply when overrides are blank."
+              : "Fallback chain: your preferences → platform defaults → tel. Platform-admin internal only."}
           </p>
 
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className={cn("grid gap-3", isOperatorMode ? "max-w-xl" : "lg:grid-cols-2")}>
+            {!isOperatorMode ? (
             <div className="space-y-2.5 rounded-lg border border-border/70 p-3 dark:border-[#25324C]">
               <h4 className="text-sm font-medium">Platform Defaults</h4>
               <div className={GROWTH_SETTINGS_FORM_GAP}>
@@ -315,9 +368,10 @@ export function GrowthCommunicationSettingsPanel() {
                 </select>
               </div>
             </div>
+            ) : null}
 
             <div className="space-y-2.5 rounded-lg border border-border/70 p-3 dark:border-[#25324C]">
-              <h4 className="text-sm font-medium">Your Overrides</h4>
+              <h4 className="text-sm font-medium">{isOperatorMode ? "Your preferences" : "Your Overrides"}</h4>
               <div className={GROWTH_SETTINGS_FORM_GAP}>
                 <Label htmlFor="user-dial-mode" className="text-xs">
                   Dial mode override
@@ -397,6 +451,8 @@ export function GrowthCommunicationSettingsPanel() {
         </div>
       </GrowthSettingsCard>
 
+      {!isOperatorMode ? (
+      <>
       <GrowthSettingsCard
         title="Email Provider Comparison"
         icon={<Mail className="size-4" />}
@@ -488,11 +544,13 @@ export function GrowthCommunicationSettingsPanel() {
           </Accordion>
         )}
       </GrowthSettingsCard>
+      </>
+      ) : null}
 
       <div className="flex justify-end">
         <Button size="sm" disabled={saving} onClick={() => void saveSettings()}>
           {saving ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Save className="mr-2 size-4" />}
-          Save Settings
+          {isOperatorMode ? "Save dial preferences" : "Save Settings"}
         </Button>
       </div>
     </div>

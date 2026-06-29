@@ -1,5 +1,7 @@
-import { GrowthSettingsSectionPage } from "@/components/growth/settings/growth-settings-section-page"
+import { redirect } from "next/navigation"
+import { GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH } from "@/lib/growth/navigation/growth-communications-settings-navigation"
 
-export default function Page() {
-  return <GrowthSettingsSectionPage sectionId="microsoft-365" />
+/** Legacy alias — connected mailboxes is the canonical Microsoft 365 mailbox surface. */
+export default function GrowthSettingsMicrosoft365RedirectPage() {
+  redirect(GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH)
 }

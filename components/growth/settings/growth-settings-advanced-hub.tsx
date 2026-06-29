@@ -2,15 +2,16 @@
 
 import Link from "next/link"
 import { ArrowRight, Chrome, Command, Mail, Phone, Signature, Calendar } from "lucide-react"
+import { GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH } from "@/lib/growth/navigation/growth-communications-settings-navigation"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 
 const ADVANCED_CARDS = [
   {
-    id: "command-center-preferences",
+    id: "sidebar-preferences",
     title: "Command Center Preferences",
-    description: "Cmd+K shortcuts, pinned destinations, and command palette ordering.",
-    href: `${GROWTH_WORKSPACE_BASE_PATH}/settings/command-center-preferences`,
+    description: "Favorite destinations and sidebar defaults for Cmd+K and workspace navigation.",
+    href: `${GROWTH_WORKSPACE_BASE_PATH}/settings/sidebar-preferences`,
     icon: Command,
   },
   {
@@ -45,7 +46,7 @@ const ADVANCED_CARDS = [
     id: "gmail",
     title: "Gmail",
     description: "Connect Gmail mailboxes for outbound and inbox tracking.",
-    href: `${GROWTH_WORKSPACE_BASE_PATH}/settings/gmail`,
+    href: GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH,
     icon: Mail,
   },
 ] as const

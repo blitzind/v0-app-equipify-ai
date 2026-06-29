@@ -1,5 +1,5 @@
-import { GrowthSettingsSectionPage } from "@/components/growth/settings/growth-settings-section-page"
+import { GrowthSettingsBrowserNotificationsPage } from "@/components/growth/settings/growth-settings-browser-notifications-page"
 
 export default function Page() {
-  return <GrowthSettingsSectionPage sectionId="browser-notifications" />
+  return <GrowthSettingsBrowserNotificationsPage />
 }

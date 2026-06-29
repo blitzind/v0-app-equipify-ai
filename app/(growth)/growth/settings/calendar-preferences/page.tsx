@@ -1,5 +1,5 @@
-import { GrowthSettingsSectionPage } from "@/components/growth/settings/growth-settings-section-page"
+import { GrowthSettingsCalendarPreferencesPage } from "@/components/growth/settings/growth-settings-calendar-preferences-page"
 
 export default function Page() {
-  return <GrowthSettingsSectionPage sectionId="calendar-preferences" />
+  return <GrowthSettingsCalendarPreferencesPage />
 }

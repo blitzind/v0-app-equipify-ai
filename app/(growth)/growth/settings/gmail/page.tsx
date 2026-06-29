@@ -1,5 +1,7 @@
-import { GrowthSettingsSectionPage } from "@/components/growth/settings/growth-settings-section-page"
+import { redirect } from "next/navigation"
+import { GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH } from "@/lib/growth/navigation/growth-communications-settings-navigation"
 
-export default function Page() {
-  return <GrowthSettingsSectionPage sectionId="gmail" />
+/** Legacy alias — connected mailboxes is the canonical Gmail settings surface. */
+export default function GrowthSettingsGmailRedirectPage() {
+  redirect(GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH)
 }
