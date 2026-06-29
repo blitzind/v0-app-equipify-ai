@@ -31,6 +31,7 @@ import {
   formatGrowthResetReportSummary,
   GrowthResetDeletePreflightError,
   GrowthResetDryRunCountError,
+  GrowthResetFkMappingPhaseError,
   runGrowthTestDataReset,
 } from "../lib/growth/reset/growth-test-data-reset-service"
 
@@ -138,6 +139,10 @@ main().catch((e) => {
     process.exit(1)
   }
   if (e instanceof GrowthResetDeletePreflightError) {
+    console.error(JSON.stringify(e.toJSON(), null, 2))
+    process.exit(1)
+  }
+  if (e instanceof GrowthResetFkMappingPhaseError) {
     console.error(JSON.stringify(e.toJSON(), null, 2))
     process.exit(1)
   }

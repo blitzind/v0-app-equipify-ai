@@ -5,6 +5,7 @@ import {
   formatGrowthResetReportSummary,
   GrowthResetDeletePreflightError,
   GrowthResetDryRunCountError,
+  GrowthResetFkMappingPhaseError,
   runGrowthTestDataReset,
   type GrowthResetRunResult,
 } from "./growth-test-data-reset-service"
@@ -68,6 +69,13 @@ export async function runGrowthTestDataResetFromAdminRuntime(
       return {
         ok: false,
         error: "growth_reset_delete_preflight_failed",
+        details: error.toJSON(),
+      }
+    }
+    if (error instanceof GrowthResetFkMappingPhaseError) {
+      return {
+        ok: false,
+        error: "growth_reset_fk_mapping_validation_failed",
         details: error.toJSON(),
       }
     }

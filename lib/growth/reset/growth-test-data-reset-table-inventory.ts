@@ -8,6 +8,11 @@ import type {
   GrowthResetGoldenEntityKey,
   GrowthResetTableClassification,
 } from "./growth-test-data-reset-constants"
+import {
+  GROWTH_RESET_DELETE_FK_BY_TABLE,
+  GROWTH_RESET_DELETE_FK_SKIP_NOTES,
+  resolveGrowthResetDeleteFkColumn,
+} from "./growth-test-data-reset-fk-mapping"
 
 export type GrowthResetTableCatalogEntry = {
   table: string
@@ -157,38 +162,31 @@ const GOLDEN_ENTITY_TABLES: Record<string, GrowthResetGoldenEntityKey> = {
   lead_timeline_events: "timeline",
 }
 
-const DELETE_FK_BY_TABLE: Record<string, string> = {
-  lead_timeline_events: "lead_id",
-  lead_call_events: "lead_id",
-  lead_call_sessions: "lead_id",
-  lead_decision_makers: "lead_id",
-  lead_memory_events: "lead_id",
-  lead_memory_profiles: "lead_id",
-  lead_objection_memory: "lead_id",
-  lead_preference_memory: "lead_id",
-  lead_research_notes: "lead_id",
-  lead_research_runs: "lead_id",
-  lead_import_batch_rows: "lead_id",
-  inbox_messages: "thread_id",
-  inbox_thread_links: "thread_id",
-  inbox_thread_owner_history: "thread_id",
-  inbox_reply_drafts: "thread_id",
-  personalization_evidence: "generation_id",
-  personalization_feedback: "generation_id",
-  personalization_risk_events: "generation_id",
-  sequence_enrollment_steps: "enrollment_id",
-  sequence_enrollment_step_waits: "enrollment_id",
-  sequence_enrollment_channel_events: "enrollment_id",
-  opportunity_stage_history: "opportunity_id",
-  opportunity_signals: "opportunity_id",
-  opportunity_recommendations: "opportunity_id",
-  meeting_outcome_intelligence_scores: "meeting_id",
-  company_contacts: "company_id",
-  company_domains: "company_id",
-  company_enrichments: "company_id",
-  company_evidence_sources: "company_id",
-  company_signals: "company_id",
-  company_profiles: "company_id",
+const DELETE_FK_BY_TABLE: Record<string, string> = Object.fromEntries(
+  Object.entries(GROWTH_RESET_DELETE_FK_BY_TABLE).map(([table, mapping]) => [table, mapping.column]),
+)
+
+function inferDependencies(table: string): string[] {
+  const deps: string[] = []
+  const fk = DELETE_FK_BY_TABLE[table]
+  if (fk === "lead_id") deps.push("leads")
+  if (fk === "company_id") deps.push("companies")
+  if (fk === "opportunity_id") deps.push("opportunities")
+  if (fk === "meeting_id") deps.push("meetings")
+  if (fk === "thread_id" || fk === "inbox_thread_id") deps.push("inbox_threads")
+  if (fk === "enrollment_id") deps.push("sequence_enrollments")
+  if (fk === "generation_id") deps.push("personalization_generations")
+  if (table.includes("enrollment")) deps.push("sequence_enrollments", "leads")
+  if (table.includes("personalization")) deps.push("personalization_generations", "leads")
+  if (table.includes("inbox")) deps.push("inbox_threads", "leads")
+  if (table.includes("meeting")) deps.push("meetings", "leads")
+  if (table.includes("opportunity")) deps.push("opportunities", "leads")
+  if (table.includes("company")) deps.push("companies")
+  if (table.includes("lead")) deps.push("leads")
+  if (table.includes("person")) deps.push("persons")
+  if (table.includes("discovery") || table.includes("import")) deps.push("leads", "companies")
+  if (table.includes("analytics") || table.includes("snapshot")) deps.push("leads")
+  return [...new Set(deps)]
 }
 
 /** Dependency-safe deletion order (children before parents). */
@@ -498,29 +496,6 @@ const KEEP_PREFIXES = [
 
 const KEEP_SUFFIXES = ["_settings", "_rules", "_preferences"] as const
 
-function inferDependencies(table: string): string[] {
-  const deps: string[] = []
-  const fk = DELETE_FK_BY_TABLE[table]
-  if (fk === "lead_id") deps.push("leads")
-  if (fk === "company_id") deps.push("companies")
-  if (fk === "opportunity_id") deps.push("opportunities")
-  if (fk === "meeting_id") deps.push("meetings")
-  if (fk === "thread_id") deps.push("inbox_threads")
-  if (fk === "enrollment_id") deps.push("sequence_enrollments")
-  if (fk === "generation_id") deps.push("personalization_generations")
-  if (table.includes("enrollment")) deps.push("sequence_enrollments", "leads")
-  if (table.includes("personalization")) deps.push("personalization_generations", "leads")
-  if (table.includes("inbox")) deps.push("inbox_threads", "leads")
-  if (table.includes("meeting")) deps.push("meetings", "leads")
-  if (table.includes("opportunity")) deps.push("opportunities", "leads")
-  if (table.includes("company")) deps.push("companies")
-  if (table.includes("lead")) deps.push("leads")
-  if (table.includes("person")) deps.push("persons")
-  if (table.includes("discovery") || table.includes("import")) deps.push("leads", "companies")
-  if (table.includes("analytics") || table.includes("snapshot")) deps.push("leads")
-  return [...new Set(deps)]
-}
-
 function classifyTable(table: string): GrowthResetTableClassification {
   if (EXPLICIT_KEEP.has(table)) return "KEEP"
   if (EXPLICIT_MANUAL_REVIEW.has(table)) return "MANUAL_REVIEW"
@@ -569,8 +544,14 @@ export function buildGrowthResetTableCatalog(cwd = process.cwd()): GrowthResetTa
       reset_order,
       dependencies: inferDependencies(table),
       golden_entity,
-      delete_fk_column: DELETE_FK_BY_TABLE[table] ?? (golden_entity === "lead" ? "lead_id" : null),
-      notes: golden_entity ? "Golden fixture rows preserved by entity allowlist." : null,
+      delete_fk_column: resolveGrowthResetDeleteFkColumn({
+        table,
+        classification,
+        golden_entity,
+      }),
+      notes:
+        GROWTH_RESET_DELETE_FK_SKIP_NOTES[table] ??
+        (golden_entity ? "Golden fixture rows preserved by entity allowlist." : null),
     }
   })
 }

@@ -41,6 +41,30 @@ export type GrowthResetGoldenFixtures = {
   missing_requirements: string[]
 }
 
+/** DELETE tables preserved by golden row id allowlist (not FK exclusion). */
+export const GROWTH_RESET_GOLDEN_ID_PRESERVED_TABLES = new Set([
+  "leads",
+  "companies",
+  "company_contacts",
+  "persons",
+  "person_emails",
+  "person_phones",
+  "person_profiles",
+  "person_company_roles",
+  "person_source_lineage",
+  "opportunities",
+  "meetings",
+  "personalization_generations",
+  "sequence_enrollments",
+  "inbox_threads",
+  "lead_call_sessions",
+  "native_call_workspace_sessions",
+])
+
+export function isGrowthResetGoldenIdPreservedTable(table: string): boolean {
+  return GROWTH_RESET_GOLDEN_ID_PRESERVED_TABLES.has(table)
+}
+
 function unique(ids: string[]): string[] {
   return [...new Set(ids.filter(Boolean))]
 }
@@ -635,6 +659,7 @@ export function getGoldenPreservedFkValues(
     case "meeting_id":
       return fixtures.meeting_ids
     case "thread_id":
+    case "inbox_thread_id":
       return fixtures.inbox_thread_ids
     case "enrollment_id":
       return fixtures.sequence_enrollment_ids

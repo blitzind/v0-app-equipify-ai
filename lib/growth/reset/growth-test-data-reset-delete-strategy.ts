@@ -6,6 +6,11 @@ import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GrowthResetTableCatalogEntry } from "./growth-test-data-reset-table-inventory"
+import {
+  sanitizeGrowthResetPreservedFkValues,
+  sanitizeGrowthResetPreservedIds,
+} from "./growth-test-data-reset-preserved-ids"
+import { probeGrowthResetDeleteFkColumn } from "./growth-test-data-reset-fk-mapping"
 
 /** Tables whose primary key is not discoverable via `id` alone (migration-confirmed). */
 export const GROWTH_RESET_EXPLICIT_PRIMARY_KEYS: Record<string, string[]> = {
@@ -33,7 +38,7 @@ export type GrowthResetDeleteStrategy = {
 export type GrowthResetDeleteBlock = {
   table: string
   classification: "DELETE"
-  reason: "delete_key_unavailable"
+  reason: "delete_key_unavailable" | "delete_fk_column_missing"
   primary_key_columns: string[]
   message: string | null
   code: string | null
@@ -262,6 +267,37 @@ export async function buildGrowthResetDeletePreflight(
       continue
     }
 
+    if (entry.delete_fk_column) {
+      const fkProbe = await probeGrowthResetDeleteFkColumn(
+        admin,
+        entry.table,
+        entry.delete_fk_column,
+      )
+      if (!fkProbe.ok) {
+        const block: GrowthResetDeleteBlock = {
+          table: entry.table,
+          classification: "DELETE",
+          reason: "delete_fk_column_missing",
+          primary_key_columns: strategy.primary_key_columns,
+          message: fkProbe.message,
+          code: fkProbe.code,
+          details: null,
+          hint: null,
+        }
+        blocked_delete_tables.push(block)
+        delete_plan.push({
+          table: entry.table,
+          classification: entry.classification,
+          status: "blocked",
+          strategy: strategy.kind,
+          primary_key_columns: strategy.primary_key_columns,
+          preserve_fk_column: strategy.preserve_fk_column,
+          reason: block.message,
+        })
+        continue
+      }
+    }
+
     const probe = await probeDeleteStrategyColumns(admin, strategy)
     if (!probe.ok) {
       blocked_delete_tables.push(probe.error)
@@ -370,12 +406,19 @@ export async function deleteGrowthTableRowsWithStrategy(
 
   const pageSize = options.pageSize ?? 500
   const fkColumn = strategy.preserve_fk_column
-  const preservedFkSet = new Set(options.preservedFkValues)
+  const preservedIds = sanitizeGrowthResetPreservedIds(
+    `preserved_id_${entry.table}`,
+    options.preservedIds,
+  ).valid
+  const preservedFkValues = fkColumn
+    ? sanitizeGrowthResetPreservedFkValues(fkColumn, options.preservedFkValues).valid
+    : []
+  const preservedFkSet = new Set(preservedFkValues)
   const selectColumns = [
     ...new Set([
       ...strategy.primary_key_columns,
       ...(fkColumn ? [fkColumn] : []),
-      ...(options.preservedIds.length > 0 ? ["id"] : []),
+      ...(preservedIds.length > 0 ? ["id"] : []),
     ]),
   ].join(", ")
 
@@ -392,7 +435,7 @@ export async function deleteGrowthTableRowsWithStrategy(
     if (rows.length === 0) break
 
     for (const row of rows) {
-      if (rowMatchesPreservedFilters(row, options.preservedIds, fkColumn, preservedFkSet)) {
+      if (rowMatchesPreservedFilters(row, preservedIds, fkColumn, preservedFkSet)) {
         continue
       }
 

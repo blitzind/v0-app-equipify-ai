@@ -13,16 +13,33 @@ import {
   extractGrowthTablesFromMigrations,
   getOrderedDeleteTables,
 } from "../lib/growth/reset/growth-test-data-reset-table-inventory"
-import { assertGrowthResetConfirmAllowed, assertGrowthResetCountPhaseSafe } from "../lib/growth/reset/growth-test-data-reset-service"
+import {
+  assertGrowthResetConfirmAllowed,
+  assertGrowthResetAuditFkMappingPhaseSafe,
+  assertGrowthResetCountPhaseSafe,
+} from "../lib/growth/reset/growth-test-data-reset-service"
 import {
   assertGrowthResetDeletePreflightSafe,
   extractGrowthTablePrimaryKeysFromMigrations,
   resolveGrowthResetDeleteStrategy,
 } from "../lib/growth/reset/growth-test-data-reset-delete-strategy"
 import {
+  assertGrowthResetFkMappingPhaseSafe,
+  GROWTH_RESET_DELETE_FK_BY_TABLE,
+  GROWTH_RESET_DELETE_FK_SKIP_NOTES,
+  validateGrowthResetFkMappingsFromMigrations,
+} from "../lib/growth/reset/growth-test-data-reset-fk-mapping"
+import {
   describeGrowthResetCountQuery,
   formatGrowthResetCountFailureForTest,
 } from "../lib/growth/reset/growth-test-data-reset-count"
+import {
+  describeGrowthResetPreservedFkFilter,
+  isGrowthResetPreservedUuid,
+  mergeGrowthResetAuditNotes,
+  sanitizeGrowthResetPreservedFkValues,
+  sanitizeGrowthResetPreservedIds,
+} from "../lib/growth/reset/growth-test-data-reset-preserved-ids"
 import {
   assertGrowthResetAdminConfirmAllowed,
   assertGrowthResetAdminDryRunAllowed,
@@ -115,9 +132,11 @@ assert.equal(manualStrategy.kind, "skip_manual_review")
 
 const leadEntry = catalog.find((entry) => entry.table === "leads")
 assert.ok(leadEntry)
+assert.equal(leadEntry!.delete_fk_column, null, "leads preserved by golden id allowlist, not lead_id FK")
 const leadStrategy = resolveGrowthResetDeleteStrategy(leadEntry!, primaryKeys)
-assert.equal(leadStrategy.kind, "delete_by_fk_exclusion")
+assert.equal(leadStrategy.kind, "delete_by_uuid_id")
 assert.deepEqual(leadStrategy.primary_key_columns, ["id"])
+assert.equal(leadStrategy.preserve_fk_column, null)
 
 const rollupEntry = catalog.find((entry) => entry.table === "growth_engagement_event_rollups")
 assert.ok(rollupEntry)
@@ -336,6 +355,154 @@ assert.equal(
   false,
 )
 
+const validUuid = "4162e008-27b0-4c0f-82dc-ccaeee9a624d"
+assert.equal(isGrowthResetPreservedUuid(validUuid), true)
+assert.equal(isGrowthResetPreservedUuid("1"), false)
+assert.equal(isGrowthResetPreservedUuid("not-a-uuid"), false)
+
+const emptyCompanyFk = sanitizeGrowthResetPreservedFkValues("company_id", [])
+assert.deepEqual(emptyCompanyFk.valid, [])
+assert.deepEqual(emptyCompanyFk.warnings, [])
+
+const invalidOnlyCompanyFk = sanitizeGrowthResetPreservedFkValues("company_id", ["1"])
+assert.deepEqual(invalidOnlyCompanyFk.valid, [])
+assert.deepEqual(invalidOnlyCompanyFk.invalid, ["1"])
+assert.deepEqual(invalidOnlyCompanyFk.warnings, ["preserved_fk_company_id_skipped_no_valid_ids"])
+
+const invalidOnlyLeadFk = sanitizeGrowthResetPreservedFkValues("lead_id", ["1"])
+assert.deepEqual(invalidOnlyLeadFk.valid, [])
+assert.deepEqual(invalidOnlyLeadFk.warnings, ["preserved_fk_lead_id_skipped_no_valid_ids"])
+
+const mixedLeadFk = sanitizeGrowthResetPreservedFkValues("lead_id", [validUuid, "1", validUuid])
+assert.deepEqual(mixedLeadFk.valid, [validUuid])
+assert.deepEqual(mixedLeadFk.invalid, ["1"])
+assert.deepEqual(mixedLeadFk.warnings, ["preserved_fk_lead_id_invalid_ids_ignored:1"])
+
+const preservedIdSanitize = sanitizeGrowthResetPreservedIds("preserved_id_leads", [validUuid, "1"])
+assert.deepEqual(preservedIdSanitize.valid, [validUuid])
+assert.deepEqual(preservedIdSanitize.warnings, ["preserved_id_leads_invalid_ids_ignored:1"])
+
+assert.equal(
+  describeGrowthResetPreservedFkFilter("company_id", 2),
+  "company_id.in(2 uuid)",
+)
+assert.equal(
+  mergeGrowthResetAuditNotes(null, ["preserved_fk_company_id_skipped_no_valid_ids"]),
+  "preserved_fk_company_id_skipped_no_valid_ids",
+)
+
+const deleteStrategySource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/reset/growth-test-data-reset-delete-strategy.ts"),
+  "utf8",
+)
+assert.match(deleteStrategySource, /sanitizeGrowthResetPreservedFkValues/)
+assert.match(deleteStrategySource, /sanitizeGrowthResetPreservedIds/)
+
+const resetServiceSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/reset/growth-test-data-reset-service.ts"),
+  "utf8",
+)
+assert.match(resetServiceSource, /sanitizeGrowthResetPreservedFkValues/)
+assert.doesNotMatch(resetServiceSource, /\.in\.\(\$\{batch\.length\}\)/)
+assert.match(resetServiceSource, /fk_mapping_validation/)
+assert.match(resetServiceSource, /assertGrowthResetAuditFkMappingPhaseSafe/)
+
+const companyEnrichments = catalog.find((entry) => entry.table === "company_enrichments")
+assert.ok(companyEnrichments)
+assert.equal(companyEnrichments!.delete_fk_column, null)
+assert.match(companyEnrichments!.notes ?? "", /company_candidate_id/)
+
+const companySignals = catalog.find((entry) => entry.table === "company_signals")
+assert.ok(companySignals)
+assert.equal(companySignals!.delete_fk_column, null)
+
+const inboxThreadLinks = catalog.find((entry) => entry.table === "inbox_thread_links")
+assert.ok(inboxThreadLinks)
+assert.equal(inboxThreadLinks!.delete_fk_column, "inbox_thread_id")
+
+const opportunitySignals = catalog.find((entry) => entry.table === "opportunity_signals")
+assert.ok(opportunitySignals)
+assert.equal(opportunitySignals!.delete_fk_column, "lead_id")
+
+const opportunityRecommendations = catalog.find((entry) => entry.table === "opportunity_recommendations")
+assert.ok(opportunityRecommendations)
+assert.equal(opportunityRecommendations!.delete_fk_column, "lead_id")
+
+const fkMigrationValidation = validateGrowthResetFkMappingsFromMigrations(catalog)
+assert.equal(fkMigrationValidation.missing.length, 0, `unexpected missing FK mappings: ${JSON.stringify(fkMigrationValidation.missing.map((e) => e.table))}`)
+
+const skippedCompanyEnrichments = fkMigrationValidation.skipped.find((e) => e.table === "company_enrichments")
+assert.ok(skippedCompanyEnrichments)
+assert.match(skippedCompanyEnrichments!.reason ?? "", /company_candidate_id/)
+
+const validatedInboxThreadLinks = fkMigrationValidation.validated.find((e) => e.table === "inbox_thread_links")
+assert.ok(validatedInboxThreadLinks)
+assert.equal(validatedInboxThreadLinks!.delete_fk_column, "inbox_thread_id")
+
+const validatedOpportunitySignals = fkMigrationValidation.validated.find((e) => e.table === "opportunity_signals")
+assert.ok(validatedOpportunitySignals)
+assert.equal(validatedOpportunitySignals!.delete_fk_column, "lead_id")
+
+const noDirectFkTable = catalog.find((entry) => entry.classification === "DELETE" && !entry.delete_fk_column && !GROWTH_RESET_DELETE_FK_SKIP_NOTES[entry.table] && !GROWTH_RESET_DELETE_FK_BY_TABLE[entry.table])
+assert.ok(noDirectFkTable, "expected at least one DELETE table without direct golden FK")
+const skippedNoDirectFk = fkMigrationValidation.skipped.find((e) => e.table === noDirectFkTable!.table)
+assert.ok(skippedNoDirectFk)
+assert.match(skippedNoDirectFk!.reason ?? "", /No direct golden FK/)
+
+const safeFkGate = assertGrowthResetFkMappingPhaseSafe(fkMigrationValidation)
+assert.equal(safeFkGate.ok, true)
+
+const missingFkGate = assertGrowthResetFkMappingPhaseSafe({
+  validated: [],
+  missing: [
+    {
+      table: "broken_table",
+      delete_fk_column: "company_id",
+      status: "missing",
+      reason: "delete_fk_column_missing",
+      golden_fk_source: "company_ids",
+      code: "migration_column_missing",
+      message: "Column growth.broken_table.company_id not found in migrations.",
+    },
+  ],
+  skipped: [],
+})
+assert.equal(missingFkGate.ok, false)
+if (!missingFkGate.ok) {
+  assert.equal(missingFkGate.error.name, "GrowthResetFkMappingPhaseError")
+  assert.match(missingFkGate.error.message, /broken_table/)
+}
+
+const auditFkGate = assertGrowthResetAuditFkMappingPhaseSafe({ fk_mapping_validation: fkMigrationValidation })
+assert.equal(auditFkGate.ok, true)
+
+const blockedFkPreflight = assertGrowthResetDeletePreflightSafe({
+  deletable_tables: [],
+  skipped_tables: [],
+  blocked_delete_tables: [
+    {
+      table: "inbox_thread_links",
+      classification: "DELETE",
+      reason: "delete_fk_column_missing",
+      primary_key_columns: ["id"],
+      message: "Column growth.inbox_thread_links.thread_id is not selectable via PostgREST.",
+      code: "delete_fk_column_missing",
+      details: null,
+      hint: null,
+    },
+  ],
+  delete_plan: [],
+})
+assert.equal(blockedFkPreflight.ok, false)
+
+const fkMappingSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/reset/growth-test-data-reset-fk-mapping.ts"),
+  "utf8",
+)
+assert.match(fkMappingSource, /probeGrowthResetDeleteFkColumn/)
+assert.equal(GROWTH_RESET_DELETE_FK_BY_TABLE.company_enrichments, undefined)
+assert.ok(GROWTH_RESET_DELETE_FK_SKIP_NOTES.company_enrichments)
+
 console.log(
   JSON.stringify(
     {
@@ -345,6 +512,11 @@ console.log(
       keep: keep.length,
       delete: del.length,
       manual_review: manual.length,
+      fk_mapping_validation: {
+        validated: fkMigrationValidation.validated.length,
+        missing: fkMigrationValidation.missing.length,
+        skipped: fkMigrationValidation.skipped.length,
+      },
     },
     null,
     2,
