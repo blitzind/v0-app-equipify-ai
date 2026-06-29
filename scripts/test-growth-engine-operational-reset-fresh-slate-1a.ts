@@ -22,6 +22,7 @@ import {
   getGrowthEngineOperationalResetTableEntries,
 } from "../lib/growth/reset/growth-engine-operational-reset-table-inventory"
 import { formatGrowthEngineOperationalResetDryRun } from "../lib/growth/reset/growth-engine-operational-reset-service"
+import { extractSupabaseProjectRefFromUrl } from "../lib/growth/reset/growth-test-data-reset-credentials"
 
 function runStructureCertification(): void {
   console.log(`\n=== ${GROWTH_ENGINE_OPERATIONAL_RESET_QA_MARKER} (structure) ===\n`)
@@ -128,6 +129,13 @@ function runStructureCertification(): void {
   assert.match(scriptSource, /--execute/)
   assert.match(scriptSource, /runGrowthEngineOperationalReset/)
   assert.match(scriptSource, /PRECISION_BIOMEDICAL_AI_OS_ORG_ID/)
+  assert.match(scriptSource, /logOperationalResetSafetyConfirmation/)
+  assert.match(scriptSource, /allowPrompt = argv.includes\("--prompt"\)/)
+  assert.doesNotMatch(scriptSource, /--no-prompt/)
+  assert.equal(
+    extractSupabaseProjectRefFromUrl("https://byyfylkklbxcdofaspye.supabase.co"),
+    "byyfylkklbxcdofaspye",
+  )
 
   assert.equal(REPORT_PATHS.before, "tmp/growth-engine-operational-reset-before.json")
   assert.equal(REPORT_PATHS.after, "tmp/growth-engine-operational-reset-after.json")

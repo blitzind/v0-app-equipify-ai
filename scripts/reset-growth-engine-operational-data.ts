@@ -5,9 +5,10 @@
  *   pnpm tsx scripts/reset-growth-engine-operational-data.ts --execute
  *
  * Credentials (shell env at runtime — export production vars before --execute):
- *   1) NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
- *   2) SUPABASE_PROJECT_REF + SUPABASE_ACCESS_TOKEN
- *   3) Interactive prompt (TTY)
+ *   NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
+ *   Project ref is derived from NEXT_PUBLIC_SUPABASE_URL automatically.
+ *
+ * Non-interactive by default. Pass --prompt to allow interactive credential entry.
  */
 import { createClient } from "@supabase/supabase-js"
 import { formatGrowthProductionTargetBanner } from "../lib/growth/canonical-companies/load-growth-production-supabase-env"
@@ -18,15 +19,44 @@ import {
 } from "../lib/growth/reset/growth-engine-operational-reset-constants"
 import {
   GROWTH_RESET_CREDENTIALS_HELP,
+  describeGrowthResetShellEnvGap,
   resolveGrowthResetSupabaseConfig,
 } from "../lib/growth/reset/growth-test-data-reset-credentials"
 import {
   formatGrowthEngineOperationalResetDryRun,
   runGrowthEngineOperationalReset,
 } from "../lib/growth/reset/growth-engine-operational-reset-service"
+import { getGrowthEngineOperationalResetTableEntries } from "../lib/growth/reset/growth-engine-operational-reset-table-inventory"
 
 function wantsHelp(argv: string[]): boolean {
   return argv.includes("--help") || argv.includes("-h")
+}
+
+function logOperationalResetSafetyConfirmation(input: {
+  projectRef: string | null
+  supabaseUrlHost: string
+  organizationId: string
+  execute: boolean
+  credentialSource: string
+}): void {
+  const inventory = getGrowthEngineOperationalResetTableEntries()
+  console.error(
+    JSON.stringify(
+      {
+        qa_marker: GROWTH_ENGINE_OPERATIONAL_RESET_QA_MARKER,
+        confirmation: "growth_operational_reset_target",
+        supabase_project_ref: input.projectRef,
+        supabase_url_host: input.supabaseUrlHost,
+        organization_id: input.organizationId,
+        execute: input.execute,
+        credential_source: input.credentialSource,
+        tables_in_inventory: inventory.length,
+        inventory_tables: inventory.map((entry) => entry.table),
+      },
+      null,
+      2,
+    ),
+  )
 }
 
 async function main(): Promise<void> {
@@ -42,19 +72,19 @@ GE-AVA-FRESH-SLATE-1A operational reset:
 Flags:
   --execute           Apply deletes (default is dry-run)
   --org-id <uuid>     Override target org (default: ${PRECISION_BIOMEDICAL_AI_OS_ORG_ID})
-  --no-prompt         Do not prompt for credentials interactively
+  --prompt            Allow interactive credential prompt (default is non-interactive)
   --local             Allow localhost Supabase URLs
 
 Env:
   ${GROWTH_ENGINE_OPERATIONAL_RESET_ORG_ID_ENV}  Optional org override
-  NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY  Production Supabase target
+  NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY  Required for non-interactive runs
 `)
     return
   }
 
   const execute = argv.includes("--execute")
   const allowLocal = argv.includes("--local")
-  const allowPrompt = !argv.includes("--no-prompt")
+  const allowPrompt = argv.includes("--prompt")
 
   const orgFlagIndex = argv.indexOf("--org-id")
   const organizationId =
@@ -67,9 +97,23 @@ Env:
     config = await resolveGrowthResetSupabaseConfig({ allowLocal, allowPrompt })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    console.error(JSON.stringify({ error: "growth_operational_reset_supabase_config", message }))
+    console.error(
+      JSON.stringify({
+        error: "growth_operational_reset_supabase_config",
+        message,
+        shell_env_hint: describeGrowthResetShellEnvGap(),
+      }),
+    )
     process.exit(1)
   }
+
+  logOperationalResetSafetyConfirmation({
+    projectRef: config.projectRef,
+    supabaseUrlHost: config.urlHost,
+    organizationId,
+    execute,
+    credentialSource: config.credentialSource,
+  })
 
   console.error(
     JSON.stringify(formatGrowthProductionTargetBanner(config, execute ? "apply" : "dry_run")),

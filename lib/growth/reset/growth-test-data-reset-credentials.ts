@@ -81,6 +81,18 @@ function urlFromProjectRef(ref: string): string {
   return `https://${ref}.supabase.co`
 }
 
+function normalizeEnvValue(value: string | undefined): string {
+  if (!value) return ""
+  let normalized = value.trim()
+  if (
+    (normalized.startsWith('"') && normalized.endsWith('"')) ||
+    (normalized.startsWith("'") && normalized.endsWith("'"))
+  ) {
+    normalized = normalized.slice(1, -1).trim()
+  }
+  return normalized.replace(/\\+$/g, "")
+}
+
 function extractProjectRef(url: string): string | null {
   try {
     const host = new URL(url).hostname
@@ -89,6 +101,10 @@ function extractProjectRef(url: string): string | null {
   } catch {
     return null
   }
+}
+
+export function extractSupabaseProjectRefFromUrl(url: string): string | null {
+  return extractProjectRef(url)
 }
 
 function readLinkedProjectRef(cwd: string): string | null {
@@ -113,12 +129,45 @@ function readLinkedProjectRef(cwd: string): string | null {
 function pickShellEnv(): { url: string; serviceRoleKey: string } | null {
   const env = process.env as Record<string, string | undefined>
   const url =
-    [env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_URL].find(
-      (value) => value && isUsableSupabaseUrl(value),
-    ) ?? ""
-  const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY?.trim() ?? ""
-  if (!url || !isUsableServiceRoleKey(serviceRoleKey)) return null
+    [
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.SUPABASE_URL,
+      env.PRODUCTION_NEXT_PUBLIC_SUPABASE_URL,
+      env.PRODUCTION_SUPABASE_URL,
+    ]
+      .map(normalizeEnvValue)
+      .find((value) => value && isUsableSupabaseUrl(value)) ?? ""
+  const serviceRoleKey =
+    [env.SUPABASE_SERVICE_ROLE_KEY, env.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY]
+      .map(normalizeEnvValue)
+      .find((value) => value && isUsableServiceRoleKey(value)) ?? ""
+  if (!url || !serviceRoleKey) return null
   return { url, serviceRoleKey }
+}
+
+export function describeGrowthResetShellEnvGap(): string {
+  const env = process.env as Record<string, string | undefined>
+  const url =
+    [
+      env.NEXT_PUBLIC_SUPABASE_URL,
+      env.SUPABASE_URL,
+      env.PRODUCTION_NEXT_PUBLIC_SUPABASE_URL,
+      env.PRODUCTION_SUPABASE_URL,
+    ]
+      .map(normalizeEnvValue)
+      .find((value) => value && isUsableSupabaseUrl(value)) ?? ""
+  const serviceRoleKey =
+    [env.SUPABASE_SERVICE_ROLE_KEY, env.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY]
+      .map(normalizeEnvValue)
+      .find((value) => value && isUsableServiceRoleKey(value)) ?? ""
+
+  if (url && !serviceRoleKey) {
+    return "NEXT_PUBLIC_SUPABASE_URL is set but SUPABASE_SERVICE_ROLE_KEY is missing or invalid (expected eyJ… or sb_secret_…)."
+  }
+  if (serviceRoleKey && !url) {
+    return "SUPABASE_SERVICE_ROLE_KEY is set but NEXT_PUBLIC_SUPABASE_URL is missing or invalid."
+  }
+  return "Missing NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in shell env."
 }
 
 export function pickServiceRoleFromApiKeys(keys: SupabaseApiKeyRecord[]): string | null {
@@ -269,7 +318,12 @@ function validateConfig(input: {
   }
 
   const urlRef = extractProjectRef(url)
-  if (linkedProjectRef && urlRef && linkedProjectRef !== urlRef) {
+  if (
+    linkedProjectRef &&
+    urlRef &&
+    linkedProjectRef !== urlRef &&
+    credentialSource !== "shell_env"
+  ) {
     throw new Error(
       `Supabase URL project ref (${urlRef}) does not match linked project ref (${linkedProjectRef}). Aborting.`,
     )
@@ -354,5 +408,7 @@ export async function resolveGrowthResetSupabaseConfig(
     })
   }
 
-  throw new Error(GROWTH_RESET_CREDENTIALS_ERROR)
+  throw new Error(
+    allowPrompt ? GROWTH_RESET_CREDENTIALS_ERROR : describeGrowthResetShellEnvGap(),
+  )
 }
