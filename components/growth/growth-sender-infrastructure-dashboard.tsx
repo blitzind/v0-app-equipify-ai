@@ -116,17 +116,11 @@ export function GrowthSenderInfrastructureDashboard() {
       if (!dashboardRes.ok || !dashboardData.ok || !dashboardData.dashboard) {
         throw new Error(dashboardData.message ?? "Could not load sender infrastructure dashboard.")
       }
-      if (!sendersRes.ok || !sendersData.ok || !sendersData.senders) {
-        throw new Error(sendersData.message ?? "Could not load sender accounts.")
-      }
-      if (!domainsRes.ok || !domainsData.ok || !domainsData.domains) {
-        throw new Error(domainsData.message ?? "Could not load sender domains.")
-      }
 
       setDashboard(dashboardData.dashboard)
       setHealthEvents(dashboardData.healthEvents ?? [])
-      setSenders(sendersData.senders)
-      setDomains(domainsData.domains)
+      setSenders(sendersRes.ok && sendersData.ok ? sendersData.senders ?? [] : [])
+      setDomains(domainsRes.ok && domainsData.ok ? domainsData.domains ?? [] : [])
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed.")
     } finally {

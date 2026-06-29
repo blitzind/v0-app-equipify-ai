@@ -2,8 +2,12 @@
 
 import { Suspense, type ComponentType } from "react"
 import dynamic from "next/dynamic"
+import { GrowthAdminWidgetErrorBoundary } from "@/components/growth/growth-admin-widget-error-boundary"
 import { growthEngineCustomerSettingsHref } from "@/lib/growth/navigation/growth-workspace-settings-canonical"
 import type { WorkspaceSettingsGrowthEngineLiftedSectionId } from "@/lib/settings/workspace-settings-growth-engine-lift"
+
+export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANEL_ERROR_BOUNDARY_QA_MARKER =
+  "workspace-settings-growth-engine-lifted-panel-error-boundary-v1" as const
 
 function LiftedPanelFallback({ label }: { label: string }) {
   return (
@@ -20,12 +24,34 @@ function dynamicLiftedPanel(
   return dynamic(loader, { loading: () => <LiftedPanelFallback label={label} /> })
 }
 
-const GrowthConnectedMailboxesDashboard = dynamic(
-  () =>
-    import("@/components/growth/mailboxes/growth-connected-mailboxes-dashboard").then(
-      (module) => module.GrowthConnectedMailboxesDashboard,
-    ),
-  { loading: () => <LiftedPanelFallback label="connected mailboxes" /> },
+function withLiftedPanelShell(
+  label: string,
+  Panel: ComponentType,
+  options?: { suspense?: boolean },
+): ComponentType {
+  function LiftedPanelShell() {
+    const panel = <Panel />
+    const content = options?.suspense
+      ? <Suspense fallback={<LiftedPanelFallback label={label} />}>{panel}</Suspense>
+      : panel
+
+    return (
+      <GrowthAdminWidgetErrorBoundary
+        label={label}
+        qaMarker={WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANEL_ERROR_BOUNDARY_QA_MARKER}
+      >
+        {content}
+      </GrowthAdminWidgetErrorBoundary>
+    )
+  }
+
+  return LiftedPanelShell
+}
+
+const GrowthConnectedMailboxesDashboard = dynamicLiftedPanel("connected mailboxes", () =>
+  import("@/components/growth/mailboxes/growth-connected-mailboxes-dashboard").then((module) => ({
+    default: module.GrowthConnectedMailboxesDashboard,
+  })),
 )
 
 const GrowthWarmupDashboardPanel = dynamicLiftedPanel("warmup", () =>
@@ -59,8 +85,8 @@ const GrowthDeliverabilityDashboard = dynamicLiftedPanel("DNS verification", () 
 )
 
 const GrowthReputationProtectionDashboardView = dynamicLiftedPanel("sending limits", () =>
-  import("@/components/growth/growth-reputation-protection-dashboard").then((module) => ({
-    default: module.GrowthReputationProtectionDashboardView,
+  import("@/components/growth/deliverability/deliverability-protection-console").then((module) => ({
+    default: module.GrowthDeliverabilityProtectionConsole,
   })),
 )
 
@@ -150,21 +176,24 @@ const GrowthEmailSignaturesPanel = dynamicLiftedPanel("email signatures", () =>
 
 function LiftedConnectedMailboxesPanel() {
   return (
-    <Suspense fallback={<LiftedPanelFallback label="connected mailboxes" />}>
-      <GrowthConnectedMailboxesDashboard
-        oauthReturnTo={growthEngineCustomerSettingsHref("connected-mailboxes")}
-      />
-    </Suspense>
+    <GrowthAdminWidgetErrorBoundary
+      label="Connected mailboxes"
+      qaMarker={WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANEL_ERROR_BOUNDARY_QA_MARKER}
+    >
+      <Suspense fallback={<LiftedPanelFallback label="connected mailboxes" />}>
+        <GrowthConnectedMailboxesDashboard
+          oauthReturnTo={growthEngineCustomerSettingsHref("connected-mailboxes")}
+        />
+      </Suspense>
+    </GrowthAdminWidgetErrorBoundary>
   )
 }
 
-function LiftedWarmupPanel() {
-  return (
-    <Suspense fallback={<LiftedPanelFallback label="warmup" />}>
-      <GrowthWarmupDashboardPanel />
-    </Suspense>
-  )
-}
+const LiftedWarmupPanel = withLiftedPanelShell("Warmup", GrowthWarmupDashboardPanel, { suspense: true })
+const LiftedSendingDomainsPanel = withLiftedPanelShell("Sending domains", GrowthSenderInfrastructureDashboard)
+const LiftedDnsVerificationPanel = withLiftedPanelShell("DNS verification", GrowthDeliverabilityDashboard)
+const LiftedSendingLimitsPanel = withLiftedPanelShell("Sending limits", GrowthReputationProtectionDashboardView)
+const LiftedSenderPoolsPanel = withLiftedPanelShell("Sender pools", GrowthSenderPoolsDashboardView)
 
 export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANELS: Record<
   WorkspaceSettingsGrowthEngineLiftedSectionId,
@@ -174,12 +203,12 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANELS: Record<
   gmail: GrowthProvidersDashboard,
   "microsoft-365": GrowthProvidersDashboard,
   "inbox-routing": GrowthCommunicationSettingsPanel,
-  "sending-domains": GrowthSenderInfrastructureDashboard,
-  "dns-verification": GrowthDeliverabilityDashboard,
+  "sending-domains": LiftedSendingDomainsPanel,
+  "dns-verification": LiftedDnsVerificationPanel,
   warmup: LiftedWarmupPanel,
-  "sending-limits": GrowthReputationProtectionDashboardView,
-  "sender-pools": GrowthSenderPoolsDashboardView,
-  "mailbox-health": GrowthDeliverabilityDashboard,
+  "sending-limits": LiftedSendingLimitsPanel,
+  "sender-pools": LiftedSenderPoolsPanel,
+  "mailbox-health": LiftedDnsVerificationPanel,
   "calling-providers": GrowthRealtimeProvidersDashboard,
   "phone-numbers": GrowthVoiceInfrastructureSettingsPanel,
   "dialer-settings": GrowthNativeDialerSettingsPanel,
