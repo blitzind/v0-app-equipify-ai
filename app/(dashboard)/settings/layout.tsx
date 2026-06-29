@@ -1,7 +1,7 @@
 "use client"
 
-import { WorkspaceSettingsNav } from "@/components/settings/workspace-settings-nav"
-import { WorkspaceSettingsNavErrorBoundary } from "@/components/settings/workspace-settings-nav-error-boundary"
+import { WorkspaceSettingsNavShell } from "@/components/settings/workspace-settings-nav-shell"
+import { WorkspaceSettingsNavRuntimeObserver } from "@/components/settings/workspace-settings-nav-runtime-observer"
 import { WorkspaceSettingsShellInstrumentation } from "@/components/settings/workspace-settings-shell-instrumentation"
 import { GrowthSettingsPostMountObserver } from "@/lib/settings/growth-settings-post-mount-observer"
 import {
@@ -19,16 +19,13 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       data-workspace-settings-layout-root
     >
       <GrowthSettingsPostMountObserver />
+      <WorkspaceSettingsNavRuntimeObserver />
       <WorkspaceSettingsShellInstrumentation />
 
-      <WorkspaceSettingsNavErrorBoundary variant="mobile">
-        <WorkspaceSettingsNav variant="mobile" />
-      </WorkspaceSettingsNavErrorBoundary>
+      <WorkspaceSettingsNavShell variant="mobile" />
 
       <div className={WORKSPACE_SETTINGS_SHELL_BODY} data-workspace-settings-body>
-        <WorkspaceSettingsNavErrorBoundary variant="desktop">
-          <WorkspaceSettingsNav variant="desktop" />
-        </WorkspaceSettingsNavErrorBoundary>
+        <WorkspaceSettingsNavShell variant="desktop" />
 
         <div className={WORKSPACE_SETTINGS_SHELL_CONTENT} data-workspace-settings-content>
           {children}

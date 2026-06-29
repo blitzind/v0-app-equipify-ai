@@ -712,7 +712,12 @@ export function filterWorkspaceSettingsNavItem(
   item: WorkspaceSettingsNavItem,
   ctx: WorkspaceSettingsNavContext,
 ): boolean {
+  if (!isRenderableWorkspaceSettingsNavItem(item)) return false
   return !item.visible || item.visible(ctx)
+}
+
+export function isRenderableWorkspaceSettingsNavItem(item: WorkspaceSettingsNavItem): boolean {
+  return Boolean(item?.id && item.href && item.label && item.icon)
 }
 
 export function filterWorkspaceSettingsGroup(
@@ -800,7 +805,7 @@ export function isWorkspaceSettingsNavItemActive(
   pathname: string | null | undefined,
   item: WorkspaceSettingsNavItem,
 ): boolean {
-  if (!pathname) return false
+  if (!pathname || !item.href) return false
   return pathname === item.href || pathname.startsWith(`${item.href}/`)
 }
 

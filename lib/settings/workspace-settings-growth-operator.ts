@@ -5,7 +5,7 @@
  */
 
 import type { LucideIcon } from "lucide-react"
-import { Bell, Eye, PanelLeft, SlidersHorizontal, User } from "lucide-react"
+import { Bell, Eye, PanelLeft, SlidersHorizontal, Sparkles, User } from "lucide-react"
 import type { GrowthWorkspaceSettingsPersistedSectionId } from "@/lib/growth/settings/growth-workspace-settings-types"
 import { GROWTH_WORKSPACE_SETTINGS_PERSISTED_SECTION_IDS } from "@/lib/growth/settings/growth-workspace-settings-types"
 
@@ -52,6 +52,11 @@ const GROWTH_OPERATOR_SECTION_META: Record<
     description: "Landing views and default filters when opening Growth destinations.",
     icon: Eye,
   },
+  "ai-teammate": {
+    label: "AI Teammate",
+    description: "Name and identity for your AI Revenue Operator inside AI OS.",
+    icon: Sparkles,
+  },
 }
 
 function growthOperatorHref(sectionId: GrowthWorkspaceSettingsPersistedSectionId): string {
@@ -59,11 +64,16 @@ function growthOperatorHref(sectionId: GrowthWorkspaceSettingsPersistedSectionId
 }
 
 export const WORKSPACE_SETTINGS_GROWTH_OPERATOR_SECTIONS: WorkspaceSettingsGrowthOperatorSection[] =
-  GROWTH_WORKSPACE_SETTINGS_PERSISTED_SECTION_IDS.map((id) => ({
-    id,
-    href: growthOperatorHref(id),
-    ...GROWTH_OPERATOR_SECTION_META[id],
-  }))
+  GROWTH_WORKSPACE_SETTINGS_PERSISTED_SECTION_IDS.flatMap((id) => {
+    const meta = GROWTH_OPERATOR_SECTION_META[id]
+    if (!meta) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("[workspace-settings-nav-trace] missing_growth_operator_section_meta", { id })
+      }
+      return []
+    }
+    return [{ id, href: growthOperatorHref(id), ...meta }]
+  })
 
 export function listWorkspaceSettingsGrowthOperatorSectionIds(): GrowthWorkspaceSettingsPersistedSectionId[] {
   return [...GROWTH_WORKSPACE_SETTINGS_PERSISTED_SECTION_IDS]
@@ -76,8 +86,9 @@ export function getWorkspaceSettingsGrowthOperatorSection(
 }
 
 export function isWorkspaceSettingsGrowthOperatorSectionActive(
-  pathname: string,
+  pathname: string | null | undefined,
   section: WorkspaceSettingsGrowthOperatorSection,
 ): boolean {
+  if (!pathname || !section.href) return false
   return pathname === section.href || pathname.startsWith(`${section.href}/`)
 }

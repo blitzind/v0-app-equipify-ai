@@ -17,6 +17,7 @@ import {
 } from "../lib/settings/workspace-settings-navigation"
 import { isGrowthEngineSettingsNavVisible } from "../lib/settings/workspace-settings-visibility"
 import { getOrgPermissionsForRole } from "../lib/permissions/model"
+import { WORKSPACE_SETTINGS_GROWTH_OPERATOR_SECTIONS } from "../lib/settings/workspace-settings-growth-operator"
 
 process.env.NEXT_PUBLIC_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://example.supabase.co"
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY =
@@ -38,6 +39,10 @@ function mockNavTree() {
     .flatMap((c) => c.groups.flatMap((g) => g.items))
   assert.ok(growthItems.length > 0, "expected growth nav items")
   console.log("growth nav items:", growthItems.length)
+
+  const aiTeammate = WORKSPACE_SETTINGS_GROWTH_OPERATOR_SECTIONS.find((section) => section.id === "ai-teammate")
+  assert.ok(aiTeammate?.label === "AI Teammate")
+  assert.ok(aiTeammate?.icon)
 }
 
 function renderNav() {
@@ -48,6 +53,7 @@ function renderNav() {
           <OrgPermissionsProvider>
             <TenantProvider>
               <WorkspaceSettingsNav variant="desktop" />
+              <WorkspaceSettingsNav variant="mobile" />
             </TenantProvider>
           </OrgPermissionsProvider>
         </BillingAccessProvider>

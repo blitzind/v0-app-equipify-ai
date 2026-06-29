@@ -8,6 +8,9 @@ export const WORKSPACE_SETTINGS_NAV_ERROR_BOUNDARY_QA_MARKER =
 type Props = {
   children: React.ReactNode
   variant: "mobile" | "desktop"
+  pathname: string
+  isPlatformAdmin: boolean
+  growthCategoryLoaded: boolean
 }
 
 type State = {
@@ -22,12 +25,15 @@ export class WorkspaceSettingsNavErrorBoundary extends React.Component<Props, St
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error("[growth-settings-post-mount-error]", {
-      kind: "react_render",
-      message: error.message,
-      stack: error.stack,
+    console.error("[workspace-settings-nav-error]", {
+      error,
+      message: error?.message,
+      stack: error?.stack,
       componentStack: info.componentStack,
-      surface: `WorkspaceSettingsNav:${this.props.variant}`,
+      pathname: this.props.pathname,
+      isPlatformAdmin: this.props.isPlatformAdmin,
+      growthCategoryLoaded: this.props.growthCategoryLoaded,
+      variant: this.props.variant,
     })
   }
 
