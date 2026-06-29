@@ -796,7 +796,11 @@ export function getWorkspaceSettingsDataAdminSection(sectionId: string): Workspa
   return null
 }
 
-export function isWorkspaceSettingsNavItemActive(pathname: string, item: WorkspaceSettingsNavItem): boolean {
+export function isWorkspaceSettingsNavItemActive(
+  pathname: string | null | undefined,
+  item: WorkspaceSettingsNavItem,
+): boolean {
+  if (!pathname) return false
   return pathname === item.href || pathname.startsWith(`${item.href}/`)
 }
 

@@ -19,6 +19,7 @@ import { QuoteInvoiceProvider } from "@/lib/quote-invoice-store"
 import { PurchaseOrderProvider } from "@/lib/purchase-order-store"
 import { EquipmentTypeProvider } from "@/lib/equipment-type-store"
 import { ArchivedDashboardGate } from "@/components/archived-dashboard-gate"
+import { DashboardGrowthSettingsShellInstrumentation } from "@/components/dashboard-growth-settings-shell-instrumentation"
 import { DashboardWorkspaceShell } from "@/components/dashboard-workspace-shell"
 import { FirstRunWelcomeGate } from "@/components/first-run/first-run-welcome-gate"
 import { ScreenshotModeGate } from "@/components/screenshot-mode-gate"
@@ -98,6 +99,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <EquipmentTypeProvider>
                       <SidebarContext.Provider value={{ mobileOpen, setMobileOpen }}>
                         <div className="flex flex-col h-dvh overflow-hidden bg-background">
+                          <DashboardGrowthSettingsShellInstrumentation />
                           <ImpersonationBanner />
                           <BillingWarningBanner />
                           <div className="flex flex-1 min-h-0 overflow-hidden">

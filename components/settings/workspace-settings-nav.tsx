@@ -40,7 +40,7 @@ type WorkspaceSettingsNavProps = {
 }
 
 export function WorkspaceSettingsNav({ variant }: WorkspaceSettingsNavProps) {
-  const pathname = usePathname()
+  const pathname = usePathname() ?? ""
   const { role, status } = useOrgPermissions()
   const { isPlatformAdmin } = useAdmin()
   const { workspace } = useTenant()
