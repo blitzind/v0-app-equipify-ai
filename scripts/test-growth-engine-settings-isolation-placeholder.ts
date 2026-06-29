@@ -28,9 +28,13 @@ function main(): void {
   assert.match(sectionPage, /WORKSPACE_SETTINGS_GROWTH_ENGINE_CONNECTED_MAILBOXES_SECTION_ID/)
   assert.match(sectionPage, /WORKSPACE_SETTINGS_GROWTH_ENGINE_SENDING_DOMAINS_SECTION_ID/)
   assert.match(sectionPage, /WORKSPACE_SETTINGS_GROWTH_ENGINE_DNS_VERIFICATION_SECTION_ID/)
+  assert.match(sectionPage, /WORKSPACE_SETTINGS_GROWTH_ENGINE_WARMUP_SECTION_ID/)
+  assert.match(sectionPage, /WORKSPACE_SETTINGS_GROWTH_ENGINE_SENDER_POOLS_SECTION_ID/)
   assert.match(sectionPage, /WorkspaceSettingsGrowthEngineConnectedMailboxesSection/)
   assert.match(sectionPage, /WorkspaceSettingsGrowthEngineSendingDomainsSection/)
   assert.match(sectionPage, /WorkspaceSettingsGrowthEngineDnsVerificationSection/)
+  assert.match(sectionPage, /WorkspaceSettingsGrowthEngineWarmupSection/)
+  assert.match(sectionPage, /WorkspaceSettingsGrowthEngineSenderPoolsSection/)
   assert.match(serverPage, /sectionId=\{sectionId\}/)
 
   const sendingDomainsSection = readSource(
@@ -38,6 +42,10 @@ function main(): void {
   )
   const dnsVerificationSection = readSource(
     "components/settings/workspace-settings-growth-engine-dns-verification-section.tsx",
+  )
+  const warmupSection = readSource("components/settings/workspace-settings-growth-engine-warmup-section.tsx")
+  const senderPoolsSection = readSource(
+    "components/settings/workspace-settings-growth-engine-sender-pools-section.tsx",
   )
 
   assert.match(connectedSection, /GrowthConnectedMailboxesDashboard/)
@@ -59,6 +67,17 @@ function main(): void {
   assert.match(dnsVerificationSection, /\[dns-verification-panel-error\]/)
   assert.match(dnsVerificationSection, /DnsVerificationPanelErrorBoundary/)
   assert.doesNotMatch(dnsVerificationSection, /loadLiftedPanel/)
+
+  assert.match(warmupSection, /GrowthWarmupDashboardPanel/)
+  assert.match(warmupSection, /\[warmup-runtime\]/)
+  assert.match(warmupSection, /\[warmup-panel-error\]/)
+  assert.match(warmupSection, /Suspense/)
+  assert.doesNotMatch(warmupSection, /loadLiftedPanel/)
+
+  assert.match(senderPoolsSection, /GrowthSenderPoolsDashboardView/)
+  assert.match(senderPoolsSection, /\[sender-pools-runtime\]/)
+  assert.match(senderPoolsSection, /\[sender-pools-panel-error\]/)
+  assert.doesNotMatch(senderPoolsSection, /loadLiftedPanel/)
 
   assert.doesNotMatch(sectionPage, /WorkspaceSettingsGrowthEngineLiftedPanelHost/)
   assert.doesNotMatch(sectionPage, /WorkspaceSettingsGrowthEngineIsolationPlaceholder/)

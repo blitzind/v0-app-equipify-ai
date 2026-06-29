@@ -2,7 +2,9 @@
 
 import { WorkspaceSettingsGrowthEngineConnectedMailboxesSection } from "@/components/settings/workspace-settings-growth-engine-connected-mailboxes-section"
 import { WorkspaceSettingsGrowthEngineDnsVerificationSection } from "@/components/settings/workspace-settings-growth-engine-dns-verification-section"
+import { WorkspaceSettingsGrowthEngineSenderPoolsSection } from "@/components/settings/workspace-settings-growth-engine-sender-pools-section"
 import { WorkspaceSettingsGrowthEngineSendingDomainsSection } from "@/components/settings/workspace-settings-growth-engine-sending-domains-section"
+import { WorkspaceSettingsGrowthEngineWarmupSection } from "@/components/settings/workspace-settings-growth-engine-warmup-section"
 
 /** PROD-HOTFIX — hard route isolation for sections without a direct panel restore. */
 export const GROWTH_ENGINE_SETTINGS_HARD_ISOLATION_QA_MARKER =
@@ -16,6 +18,10 @@ export const WORKSPACE_SETTINGS_GROWTH_ENGINE_SENDING_DOMAINS_SECTION_ID =
 
 export const WORKSPACE_SETTINGS_GROWTH_ENGINE_DNS_VERIFICATION_SECTION_ID =
   "dns-verification" as const
+
+export const WORKSPACE_SETTINGS_GROWTH_ENGINE_WARMUP_SECTION_ID = "warmup" as const
+
+export const WORKSPACE_SETTINGS_GROWTH_ENGINE_SENDER_POOLS_SECTION_ID = "sender-pools" as const
 
 type WorkspaceSettingsGrowthEngineSectionPageProps = {
   sectionId: string
@@ -48,6 +54,10 @@ function WorkspaceSettingsGrowthEngineRestoredSection({ sectionId }: { sectionId
       return <WorkspaceSettingsGrowthEngineSendingDomainsSection />
     case WORKSPACE_SETTINGS_GROWTH_ENGINE_DNS_VERIFICATION_SECTION_ID:
       return <WorkspaceSettingsGrowthEngineDnsVerificationSection />
+    case WORKSPACE_SETTINGS_GROWTH_ENGINE_WARMUP_SECTION_ID:
+      return <WorkspaceSettingsGrowthEngineWarmupSection />
+    case WORKSPACE_SETTINGS_GROWTH_ENGINE_SENDER_POOLS_SECTION_ID:
+      return <WorkspaceSettingsGrowthEngineSenderPoolsSection />
     default:
       return <WorkspaceSettingsGrowthEngineHardIsolationMarker />
   }

@@ -145,6 +145,14 @@ async function main(): Promise<void> {
       readSource("components/settings/workspace-settings-growth-engine-dns-verification-section.tsx"),
       /GrowthDeliverabilityDashboard/,
     )
+    assert.match(
+      readSource("components/settings/workspace-settings-growth-engine-warmup-section.tsx"),
+      /GrowthWarmupDashboardPanel/,
+    )
+    assert.match(
+      readSource("components/settings/workspace-settings-growth-engine-sender-pools-section.tsx"),
+      /GrowthSenderPoolsDashboardView/,
+    )
   } else {
     assert.match(sectionPage, /WorkspaceSettingsGrowthEngineLiftedPanelHost/)
     assert.match(sectionPage, /workspace-settings-growth-engine-lifted-panel-host/)
