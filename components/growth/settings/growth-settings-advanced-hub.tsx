@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight, Chrome, Command, Mail, Phone, Signature, Calendar } from "lucide-react"
+import { ArrowRight, Chrome, Command, Mail, Phone, Calendar } from "lucide-react"
 import { GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH } from "@/lib/growth/navigation/growth-communications-settings-navigation"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
@@ -27,13 +27,6 @@ const ADVANCED_CARDS = [
     description: "Dialer defaults, call disposition behavior, and live-call preferences.",
     href: `${GROWTH_WORKSPACE_BASE_PATH}/settings/calling-preferences`,
     icon: Phone,
-  },
-  {
-    id: "signatures",
-    title: "Signatures",
-    description: "Email signatures and sender identity used in operator outreach.",
-    href: `${GROWTH_WORKSPACE_BASE_PATH}/settings/signatures`,
-    icon: Signature,
   },
   {
     id: "calendar-preferences",

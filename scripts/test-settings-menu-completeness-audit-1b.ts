@@ -51,6 +51,7 @@ const GROWTH_CANONICAL_SECTION_IDS = [
   "warmup",
   "sender-pools",
   "reputation",
+  "signatures",
   "calling-preferences",
   "calendar-preferences",
   "calendar",

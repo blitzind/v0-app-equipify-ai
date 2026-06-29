@@ -150,6 +150,14 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
         adminFallbackLabel: "Communications settings (admin)",
       },
       {
+        id: "signatures",
+        label: "Email Signatures",
+        description: "Email signatures and sender identity used in operator outreach.",
+        segment: "signatures",
+        icon: Signature,
+        href: growthEngineCustomerSettingsHref("email-signatures"),
+      },
+      {
         id: "sending-domains",
         label: "Sending Domains",
         description: "Add domains used for outbound email.",
@@ -328,13 +336,6 @@ const GROWTH_WORKSPACE_SETTINGS_PAGE_ONLY_SECTIONS: GrowthSettingsNavItem[] = [
     description: "Desktop notification permissions for live operator signals.",
     href: resolveSettingsHref("browser-notifications"),
     icon: Chrome,
-  },
-  {
-    id: "signatures",
-    label: "Signatures",
-    description: "Email signatures and sender identity used in operator outreach.",
-    href: resolveSettingsHref("signatures"),
-    icon: Signature,
   },
   {
     id: "gmail",
