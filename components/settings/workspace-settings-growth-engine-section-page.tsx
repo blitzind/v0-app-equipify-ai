@@ -10,30 +10,16 @@ import {
   resolveGrowthEngineSectionLiftKind,
   WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFT_QA_MARKER,
 } from "@/lib/settings/workspace-settings-growth-engine-lift"
-import { traceWorkspaceSettingsGrowthEnginePanel } from "@/lib/settings/workspace-settings-growth-engine-panel-trace"
+import {
+  GROWTH_ENGINE_SETTINGS_ISOLATION_PLACEHOLDER_ACTIVE,
+  WorkspaceSettingsGrowthEngineIsolationPlaceholder,
+} from "@/lib/settings/workspace-settings-growth-engine-isolation-placeholder"
 
 const WorkspaceSettingsGrowthEngineLiftedPanelHost = dynamic(
-  async () => {
-    traceWorkspaceSettingsGrowthEnginePanel("section_page_dynamic_host_import_start")
-    try {
-      const module = await import("@/components/settings/workspace-settings-growth-engine-lifted-panel-host")
-      traceWorkspaceSettingsGrowthEnginePanel("section_page_dynamic_host_import_resolved", {
-        moduleKeys: Object.keys(module ?? {}),
-        hostType: typeof module.WorkspaceSettingsGrowthEngineLiftedPanelHost,
-      })
-      if (typeof module.WorkspaceSettingsGrowthEngineLiftedPanelHost !== "function") {
-        throw new Error("WorkspaceSettingsGrowthEngineLiftedPanelHost export is not a function")
-      }
-      return { default: module.WorkspaceSettingsGrowthEngineLiftedPanelHost }
-    } catch (error) {
-      traceWorkspaceSettingsGrowthEnginePanel("section_page_dynamic_host_import_failed", {
-        errorName: error instanceof Error ? error.name : "unknown",
-        errorMessage: error instanceof Error ? error.message : String(error),
-        errorStack: error instanceof Error ? error.stack : null,
-      })
-      throw error
-    }
-  },
+  () =>
+    import("@/components/settings/workspace-settings-growth-engine-lifted-panel-host").then((module) => ({
+      default: module.WorkspaceSettingsGrowthEngineLiftedPanelHost,
+    })),
   {
     loading: () => (
       <div className="rounded-xl border border-border bg-card p-8 text-sm text-muted-foreground">
@@ -45,18 +31,28 @@ const WorkspaceSettingsGrowthEngineLiftedPanelHost = dynamic(
 )
 
 export function WorkspaceSettingsGrowthEngineSectionPage({ sectionId }: { sectionId: string }) {
-  traceWorkspaceSettingsGrowthEnginePanel("section_page_entering", { sectionId })
-
   const section = getWorkspaceSettingsGrowthEngineSection(sectionId)
   if (!section) notFound()
 
   const liftKind = resolveGrowthEngineSectionLiftKind(sectionId)
   const classification = getGrowthEngineSectionClassification(sectionId)
 
-  traceWorkspaceSettingsGrowthEnginePanel("section_page_lift_kind", { sectionId, liftKind })
-
   if (liftKind === "lifted") {
-    traceWorkspaceSettingsGrowthEnginePanel("section_page_before_host_render", { sectionId })
+    if (GROWTH_ENGINE_SETTINGS_ISOLATION_PLACEHOLDER_ACTIVE) {
+      return (
+        <div
+          className="flex w-full min-w-0 max-w-none flex-col gap-6"
+          data-qa-marker={WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFT_QA_MARKER}
+          data-workspace-settings-growth-engine-section={sectionId}
+        >
+          <WorkspaceSettingsGrowthEngineIsolationPlaceholder
+            sectionId={sectionId}
+            sectionLabel={section.label}
+          />
+        </div>
+      )
+    }
+
     return (
       <div
         className="flex w-full min-w-0 max-w-none flex-col gap-6"

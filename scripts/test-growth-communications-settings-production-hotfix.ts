@@ -11,6 +11,7 @@ import {
   resolveWorkspaceSettingsGrowthEngineDynamicExport,
   WORKSPACE_SETTINGS_GROWTH_ENGINE_DYNAMIC_PANEL_QA_MARKER,
 } from "../lib/settings/workspace-settings-growth-engine-dynamic-panel"
+import { GROWTH_ENGINE_SETTINGS_ISOLATION_PLACEHOLDER_ACTIVE } from "../lib/settings/workspace-settings-growth-engine-isolation-placeholder"
 
 export const GROWTH_COMMUNICATIONS_SETTINGS_PRODUCTION_HOTFIX_QA_MARKER =
   "growth-communications-settings-production-hotfix-v1" as const
@@ -129,9 +130,14 @@ async function main(): Promise<void> {
   assert.doesNotMatch(liftedPanels, /^import \{ GrowthDeliverabilityDashboard \}/m)
   assert.doesNotMatch(liftedPanels, /^import \{ GrowthConnectedMailboxesDashboard \}/m)
 
-  assert.match(sectionPage, /WorkspaceSettingsGrowthEngineLiftedPanelHost/)
-  assert.match(sectionPage, /workspace-settings-growth-engine-lifted-panel-host/)
-  assert.doesNotMatch(sectionPage, /workspace-settings-growth-engine-lifted-panels/)
+  if (GROWTH_ENGINE_SETTINGS_ISOLATION_PLACEHOLDER_ACTIVE) {
+    assert.match(sectionPage, /WorkspaceSettingsGrowthEngineIsolationPlaceholder/)
+    assert.match(sectionPage, /GROWTH_ENGINE_SETTINGS_ISOLATION_PLACEHOLDER_ACTIVE/)
+  } else {
+    assert.match(sectionPage, /WorkspaceSettingsGrowthEngineLiftedPanelHost/)
+    assert.match(sectionPage, /workspace-settings-growth-engine-lifted-panel-host/)
+    assert.doesNotMatch(sectionPage, /workspace-settings-growth-engine-lifted-panels/)
+  }
 
   assert.match(panelHost, /GrowthAdminWidgetErrorBoundary/)
   assert.match(panelHost, /getWorkspaceSettingsGrowthEngineLiftedPanel/)
