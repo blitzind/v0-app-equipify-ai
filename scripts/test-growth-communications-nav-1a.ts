@@ -58,9 +58,12 @@ function main(): void {
   assert.match(navSource, /isGrowthCommunicationsSettingsNavItemActive/)
 
   const shellSource = readSource("components/growth/settings/growth-settings-shell.tsx")
-  assert.match(shellSource, /font-semibold text-foreground/)
-  assert.match(shellSource, /border-primary/)
-  assert.match(shellSource, /aria-current=\{active \? "page" : undefined\}/)
+  const navChromeSource = readSource("lib/settings/settings-nav-chrome.ts")
+  const navItemLinkSource = readSource("components/settings/settings-nav-item-link.tsx")
+  assert.match(shellSource, /SettingsNavItemLink/)
+  assert.match(navChromeSource, /font-semibold text-foreground/)
+  assert.match(navChromeSource, /border-primary/)
+  assert.match(navItemLinkSource, /aria-current=\{active \? "page" : undefined\}/)
   assert.doesNotMatch(shellSource, /NAV_ROW_ACTIVE_SIDEBAR/)
 
   assert.equal(communicationsItem("communications").href, GROWTH_COMMUNICATIONS_SETTINGS_PATH)

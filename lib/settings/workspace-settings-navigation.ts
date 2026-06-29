@@ -4,7 +4,6 @@
  * Navigation and shell architecture only — no persistence, APIs, or auth changes.
  */
 
-import { AI_OS_WORKSPACE_LABEL } from "@/lib/workspace/ai-os-workspace-branding"
 import type { LucideIcon } from "lucide-react"
 import {
   Activity,
@@ -46,9 +45,8 @@ import {
 import type { OrgPermissions } from "@/lib/permissions/model"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
 import { growthEngineCustomerSettingsHref } from "@/lib/growth/navigation/growth-workspace-settings-canonical"
-import { WORKSPACE_SETTINGS_GROWTH_OPERATOR_SECTIONS } from "@/lib/settings/workspace-settings-growth-operator"
 
-export const WORKSPACE_SETTINGS_NAV_QA_MARKER = "workspace-settings-nav-ge-set-2-v1" as const
+export const WORKSPACE_SETTINGS_NAV_QA_MARKER = "workspace-settings-nav-settings-menu-audit-1a-v1" as const
 
 export const WORKSPACE_SETTINGS_GROWTH_ENGINE_BASE = "/settings/growth-engine" as const
 export const WORKSPACE_SETTINGS_DATA_ADMIN_BASE = "/settings/data-administration" as const
@@ -170,19 +168,6 @@ export const WORKSPACE_SETTINGS_GENERAL_GROUPS: WorkspaceSettingsNavGroup[] = [
         visible: (ctx) => ctx.permissions.canViewOperationalReports || ctx.permissions.canManageSecuritySettings,
       },
     ],
-  },
-  {
-    id: "general-growth-operator",
-    label: "Growth Operator",
-    rootCategory: "general",
-    items: WORKSPACE_SETTINGS_GROWTH_OPERATOR_SECTIONS.map((section) => ({
-      id: section.id,
-      label: section.label,
-      description: section.description,
-      href: section.href,
-      icon: section.icon,
-      visible: (ctx: WorkspaceSettingsNavContext) => ctx.growthEngineNavVisible,
-    })),
   },
 ]
 
@@ -754,16 +739,6 @@ export function buildWorkspaceSettingsRootCategories(args: {
         .filter((group): group is WorkspaceSettingsNavGroup => group !== null),
     },
   ]
-
-  if (args.ctx.growthEngineNavVisible) {
-    categories.push({
-      id: "growth_engine",
-      label: AI_OS_WORKSPACE_LABEL,
-      groups: WORKSPACE_SETTINGS_GROWTH_ENGINE_GROUPS.map((group) =>
-        filterWorkspaceSettingsGroup(group, args.ctx),
-      ).filter((group): group is WorkspaceSettingsNavGroup => group !== null),
-    })
-  }
 
   if (args.ctx.dataAdministrationNavVisible) {
     categories.push({

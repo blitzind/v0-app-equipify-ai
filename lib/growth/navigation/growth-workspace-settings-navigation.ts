@@ -6,6 +6,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   Bell,
   Bot,
+  Calendar,
   Chrome,
   Command,
   Eye,
@@ -43,7 +44,7 @@ import {
   GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
 } from "@/lib/growth/navigation/growth-workspace-core-settings-links"
 
-export const GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER = "growth-workspace-settings-nav-ge-comms-nav-1a-v1" as const
+export const GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER = "growth-workspace-settings-nav-settings-menu-audit-1a-v1" as const
 
 export const GROWTH_WORKSPACE_SETTINGS_DEFAULT_SECTION_ID = "profile" as const
 
@@ -191,6 +192,39 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
     ],
   },
   {
+    id: "voice-calling",
+    label: "Voice & Calling",
+    items: [
+      {
+        id: "calling-preferences",
+        label: "Calling Preferences",
+        description: "Dialer defaults, call disposition behavior, and live-call preferences.",
+        segment: "calling-preferences",
+        icon: Phone,
+      },
+    ],
+  },
+  {
+    id: "meetings",
+    label: "Meetings",
+    items: [
+      {
+        id: "calendar-preferences",
+        label: "Calendar Preferences",
+        description: "Meeting booking defaults, availability, and calendar routing rules.",
+        segment: "calendar-preferences",
+        icon: Calendar,
+      },
+      {
+        id: "calendar",
+        label: "Calendar & Booking",
+        description: "Calendar providers, booking pages, and scheduling integrations.",
+        segment: "calendar",
+        icon: Calendar,
+      },
+    ],
+  },
+  {
     id: "ai",
     label: "AI",
     items: [
@@ -279,6 +313,63 @@ export function buildGrowthWorkspaceSettingsNavGroups(): GrowthSettingsNavGroup[
 export const GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS: GrowthSettingsNavGroup[] =
   buildGrowthWorkspaceSettingsNavGroups()
 
+/** Page routes reachable via Advanced hub or legacy growth-engine redirects (not top-level nav). */
+const GROWTH_WORKSPACE_SETTINGS_PAGE_ONLY_SECTIONS: GrowthSettingsNavItem[] = [
+  {
+    id: "command-center-preferences",
+    label: "Command Center Preferences",
+    description: "Cmd+K shortcuts, pinned destinations, and command palette ordering.",
+    href: resolveSettingsHref("command-center-preferences"),
+    icon: Command,
+  },
+  {
+    id: "browser-notifications",
+    label: "Browser Notifications",
+    description: "Desktop notification permissions for live operator signals.",
+    href: resolveSettingsHref("browser-notifications"),
+    icon: Chrome,
+  },
+  {
+    id: "signatures",
+    label: "Signatures",
+    description: "Email signatures and sender identity used in operator outreach.",
+    href: resolveSettingsHref("signatures"),
+    icon: Signature,
+  },
+  {
+    id: "gmail",
+    label: "Gmail",
+    description: "Connect Gmail mailboxes for outbound and inbox tracking.",
+    href: resolveSettingsHref("gmail"),
+    icon: Mail,
+  },
+  {
+    id: "microsoft-365",
+    label: "Microsoft 365",
+    description: "Microsoft mailbox and calendar connection preferences.",
+    href: resolveSettingsHref("microsoft-365"),
+    icon: Mail,
+  },
+  {
+    id: "delivery",
+    label: "Delivery",
+    description: "Outbound delivery routing and send pipeline preferences.",
+    href: resolveSettingsHref("delivery"),
+    icon: Truck,
+  },
+  {
+    id: "connected-mailboxes",
+    label: "Connected Mailboxes",
+    description: "Legacy mailbox settings route.",
+    href: resolveSettingsHref("connected-mailboxes"),
+    icon: Mailbox,
+  },
+]
+
+export function listGrowthWorkspaceSettingsPageOnlySectionIds(): string[] {
+  return GROWTH_WORKSPACE_SETTINGS_PAGE_ONLY_SECTIONS.map((section) => section.id)
+}
+
 export function listGrowthWorkspaceSettingsSectionIds(): string[] {
   return GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS.flatMap((group) => group.items.map((item) => item.id))
 }
@@ -288,7 +379,7 @@ export function getGrowthWorkspaceSettingsSectionById(id: string): GrowthSetting
     const item = group.items.find((entry) => entry.id === id)
     if (item) return item
   }
-  return null
+  return GROWTH_WORKSPACE_SETTINGS_PAGE_ONLY_SECTIONS.find((section) => section.id === id) ?? null
 }
 
 const GROWTH_COMMUNICATIONS_SETTINGS_NAV_ITEM_IDS = new Set([

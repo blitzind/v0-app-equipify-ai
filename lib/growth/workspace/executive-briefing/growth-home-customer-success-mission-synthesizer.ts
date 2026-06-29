@@ -17,6 +17,12 @@ import type {
   GrowthHomeCsMission,
   GrowthHomeCsRenewalMonitoring,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
+import {
+  deriveLiveGrowthHomeCustomerAccountNames,
+  hasLiveGrowthHomeRuntimeActivity,
+  inferLiveCustomerNameFromText,
+  isGrowthHomeDemoCustomerAccountName,
+} from "@/lib/growth/workspace/executive-briefing/growth-home-runtime-activity"
 
 /** Revenue Director coordinates — Home never duplicates Customer Success engines. */
 export const GROWTH_HOME_CS_MISSION_ORCHESTRATION_RULE = GROWTH_REVENUE_DIRECTOR_RUNTIME_RULE
@@ -41,12 +47,7 @@ function metricHref(dashboard: GrowthWorkspaceDashboardViewModel, sectionId: str
 }
 
 function inferCustomerName(text: string, fallback: string): string {
-  const lower = text.toLowerCase()
-  if (lower.includes("biomedical") || lower.includes("precision")) return "Precision Biomedical"
-  if (lower.includes("acme") || lower.includes("manufactur")) return "Acme Manufacturing"
-  if (lower.includes("boat") || lower.includes("king")) return "King of Boat Care"
-  if (lower.includes("health")) return "Healthcare account portfolio"
-  return fallback
+  return inferLiveCustomerNameFromText(text) ?? fallback
 }
 
 function deriveCsStage(input: {
@@ -73,6 +74,10 @@ function deriveHealthLabel(engagementScore: number, relationshipAlerts: number):
 
 export function buildCustomerSuccessMissions(input: GrowthHomeCustomerSuccessMissionInput): GrowthHomeCsMission[] {
   const { dashboard, revenueDirectorSnapshot } = input
+  if (!hasLiveGrowthHomeRuntimeActivity(dashboard)) {
+    return []
+  }
+
   const briefing = dashboard.briefing
   const missions: GrowthHomeCsMission[] = []
 
@@ -84,61 +89,62 @@ export function buildCustomerSuccessMissions(input: GrowthHomeCustomerSuccessMis
   const weightedPipeline = metricValue(dashboard, "pipeline-snapshot", "Weighted pipeline")
   const stage = deriveCsStage({ engagementScore, relationshipAlerts, closeCandidates, opportunitiesPending, meetingRequests })
 
-  const customers = [
-    { name: "Acme Manufacturing", baseProgress: Math.min(90, engagementScore + 10) },
-    { name: inferCustomerName(briefing?.priorities[0]?.title ?? "", "Precision Biomedical"), baseProgress: 72 },
-    { name: "King of Boat Care", baseProgress: closeCandidates > 0 ? 85 : 58 },
-  ]
+  const liveCustomers = deriveLiveGrowthHomeCustomerAccountNames(dashboard)
 
-  for (let index = 0; index < customers.length && missions.length < CS_MISSION_LIMIT; index += 1) {
-    const customer = customers[index]!
-    const health = deriveHealthLabel(engagementScore - index * 8, index === 2 ? relationshipAlerts : 0)
+  for (let index = 0; index < liveCustomers.length && missions.length < CS_MISSION_LIMIT; index += 1) {
+    const customer = liveCustomers[index]!
+    if (isGrowthHomeDemoCustomerAccountName(customer)) continue
+
+    const health = deriveHealthLabel(engagementScore - index * 8, index === liveCustomers.length - 1 ? relationshipAlerts : 0)
     const renewalStatus =
       opportunitiesPending > 0 && index === 0
         ? "Renewal in progress"
-        : relationshipAlerts > 0 && index === 2
+        : relationshipAlerts > 0 && index === liveCustomers.length - 1
           ? "At risk before renewal"
           : "On track"
 
     missions.push({
       id: `cs-mission-${index}`,
-      customer: customer.name,
+      customer,
       currentHealth: health,
       renewalStatus,
-      progressPercent: Math.max(20, Math.min(95, customer.baseProgress)),
-      currentStage: index === 2 && closeCandidates > 0 ? "Expansion Opportunity" : stage,
+      progressPercent: Math.max(20, Math.min(95, Math.min(90, engagementScore + 10 - index * 8))),
+      currentStage: closeCandidates > 0 && index === liveCustomers.length - 1 ? "Expansion Opportunity" : stage,
       nextMilestone:
-        index === 2 && closeCandidates > 0
+        closeCandidates > 0 && index === liveCustomers.length - 1
           ? "Schedule expansion discussion"
           : opportunitiesPending > 0
             ? "Confirm renewal timeline"
             : "Reach first value milestone",
       blocker:
-        relationshipAlerts > 0 && index === 2
+        relationshipAlerts > 0 && index === liveCustomers.length - 1
           ? "Reduced activity this week"
           : null,
       expectedValue: formatHomeCurrency(Math.round(weightedPipeline / (index + 3))),
       reviewHref: index === 0 ? RELATIONSHIPS_HREF : metricHref(dashboard, "pipeline-snapshot", "Open opportunities"),
-      health: relationshipAlerts > 0 && index === 2 ? "blocked" : engagementScore >= 60 ? "healthy" : "waiting",
+      health: relationshipAlerts > 0 && index === liveCustomers.length - 1 ? "blocked" : engagementScore >= 60 ? "healthy" : "waiting",
     })
   }
 
   if (revenueDirectorSnapshot && missions.length < CS_MISSION_LIMIT) {
     const attention = revenueDirectorSnapshot.needsAttention[0]
     if (attention) {
-      missions.push({
-        id: `cs-rd-${attention.id}`,
-        customer: inferCustomerName(attention.title, "Priority account"),
-        currentHealth: "Monitored by Revenue Director",
-        renewalStatus: "Under review",
-        progressPercent: 55,
-        currentStage: "Health Monitoring",
-        nextMilestone: sanitizeHomeNarrative(attention.title),
-        blocker: attention.severity === "high" ? sanitizeHomeNarrative(attention.summary) : null,
-        expectedValue: formatHomeCurrency(Math.round(weightedPipeline * 0.15)),
-        reviewHref: attention.href ?? RELATIONSHIPS_HREF,
-        health: attention.severity === "high" ? "needs_review" : "waiting",
-      })
+      const customer = inferCustomerName(attention.title, "Priority account")
+      if (!isGrowthHomeDemoCustomerAccountName(customer)) {
+        missions.push({
+          id: `cs-rd-${attention.id}`,
+          customer,
+          currentHealth: "Monitored by Revenue Director",
+          renewalStatus: "Under review",
+          progressPercent: 55,
+          currentStage: "Health Monitoring",
+          nextMilestone: sanitizeHomeNarrative(attention.title),
+          blocker: attention.severity === "high" ? sanitizeHomeNarrative(attention.summary) : null,
+          expectedValue: formatHomeCurrency(Math.round(weightedPipeline * 0.15)),
+          reviewHref: attention.href ?? RELATIONSHIPS_HREF,
+          health: attention.severity === "high" ? "needs_review" : "waiting",
+        })
+      }
     }
   }
 
@@ -149,43 +155,29 @@ export function buildCustomerHealth(
   input: GrowthHomeCustomerSuccessMissionInput,
   missions: GrowthHomeCsMission[],
 ): GrowthHomeCsCustomerHealthItem[] {
+  if (!hasLiveGrowthHomeRuntimeActivity(input.dashboard) || missions.length === 0) {
+    return []
+  }
+
   const { dashboard } = input
   const briefing = dashboard.briefing
   const items: GrowthHomeCsCustomerHealthItem[] = []
   const relationshipAlerts = metricValue(dashboard, "intelligence", "Relationship alerts")
+  const engagementScore = metricValue(dashboard, "intelligence", "Engagement score")
+  const closeCandidates = metricValue(dashboard, "pipeline-snapshot", "Close candidates")
 
   for (const mission of missions) {
-    if (mission.customer.includes("Acme")) {
-      items.push({
-        id: "health-acme",
-        summary: "Acme Manufacturing is highly engaged.",
-        evidence: `${mission.currentHealth} · engagement score ${metricValue(dashboard, "intelligence", "Engagement score")}.`,
-      })
-    }
-    if (mission.customer.includes("Biomedical") || mission.customer.includes("Precision")) {
-      items.push({
-        id: "health-biomedical",
-        summary:
-          relationshipAlerts > 0
-            ? "Precision Biomedical has reduced activity this week."
-            : "Precision Biomedical is maintaining steady adoption.",
-        evidence: sanitizeHomeNarrative(briefing?.section_summaries.inbox ?? "Inbox and engagement read models."),
-      })
-    }
-    if (mission.customer.includes("Boat") || mission.blocker) {
-      items.push({
-        id: "health-boat",
-        summary: "King of Boat Care is ready for an expansion discussion.",
-        evidence: `${metricValue(dashboard, "pipeline-snapshot", "Close candidates")} close ${pluralize(metricValue(dashboard, "pipeline-snapshot", "Close candidates"), "candidate", "candidates")} in pipeline.`,
-      })
-    }
-  }
+    if (isGrowthHomeDemoCustomerAccountName(mission.customer)) continue
 
-  if (items.length === 0 && missions.length > 0) {
     items.push({
-      id: "health-default",
-      summary: `${missions[0]!.customer} is ${missions[0]!.currentHealth.toLowerCase()}.`,
-      evidence: "Relationship and engagement read models.",
+      id: `health-${mission.id}`,
+      summary: `${mission.customer} is ${mission.currentHealth.toLowerCase()}.`,
+      evidence:
+        mission.blocker != null
+          ? sanitizeHomeNarrative(mission.blocker)
+          : relationshipAlerts > 0
+            ? `${relationshipAlerts} relationship ${pluralize(relationshipAlerts, "alert", "alerts")} · engagement score ${engagementScore}.`
+            : `${closeCandidates} close ${pluralize(closeCandidates, "candidate", "candidates")} · ${sanitizeHomeNarrative(briefing?.section_summaries.inbox ?? "Inbox and engagement read models.")}`,
     })
   }
 
@@ -193,6 +185,10 @@ export function buildCustomerHealth(
 }
 
 export function buildExpansionOpportunities(input: GrowthHomeCustomerSuccessMissionInput): GrowthHomeCsExpansionOpportunity[] {
+  if (!hasLiveGrowthHomeRuntimeActivity(input.dashboard)) {
+    return []
+  }
+
   const { dashboard } = input
   const items: GrowthHomeCsExpansionOpportunity[] = []
   const closeCandidates = metricValue(dashboard, "pipeline-snapshot", "Close candidates")
@@ -239,6 +235,10 @@ export function buildExpansionOpportunities(input: GrowthHomeCustomerSuccessMiss
 }
 
 export function buildRenewalsMonitoring(input: GrowthHomeCustomerSuccessMissionInput): GrowthHomeCsRenewalMonitoring[] {
+  if (!hasLiveGrowthHomeRuntimeActivity(input.dashboard)) {
+    return []
+  }
+
   const { dashboard } = input
   const briefing = dashboard.briefing
   const items: GrowthHomeCsRenewalMonitoring[] = []
@@ -246,11 +246,13 @@ export function buildRenewalsMonitoring(input: GrowthHomeCustomerSuccessMissionI
   const opportunitiesPending = briefing?.meetings.opportunities_pending ?? metricValue(dashboard, "my-queue", "Opportunities needing follow-up")
   const relationshipAlerts = metricValue(dashboard, "intelligence", "Relationship alerts")
   const repliesNeedingAttention = briefing?.summary.replies_needing_attention ?? 0
+  const closeCandidates = metricValue(dashboard, "pipeline-snapshot", "Close candidates")
+  const liveCustomers = deriveLiveGrowthHomeCustomerAccountNames(dashboard)
 
-  if (opportunitiesPending > 0) {
+  if (opportunitiesPending > 0 && liveCustomers[0]) {
     items.push({
-      id: "renewal-acme",
-      customer: "Acme Manufacturing",
+      id: "renewal-primary",
+      customer: liveCustomers[0],
       riskLevel: relationshipAlerts > 0 ? "Medium" : "Low",
       recommendedAction: "Confirm renewal timeline and stakeholder alignment.",
       daysRemaining: 45,
@@ -259,10 +261,10 @@ export function buildRenewalsMonitoring(input: GrowthHomeCustomerSuccessMissionI
     })
   }
 
-  if (relationshipAlerts > 0 || repliesNeedingAttention > 0) {
+  if ((relationshipAlerts > 0 || repliesNeedingAttention > 0) && liveCustomers[1]) {
     items.push({
-      id: "renewal-biomedical",
-      customer: "Precision Biomedical",
+      id: "renewal-attention",
+      customer: liveCustomers[1],
       riskLevel: "Medium",
       recommendedAction: "Re-engage decision-makers before renewal window closes.",
       daysRemaining: 28,
@@ -271,11 +273,10 @@ export function buildRenewalsMonitoring(input: GrowthHomeCustomerSuccessMissionI
     })
   }
 
-  const closeCandidates = metricValue(dashboard, "pipeline-snapshot", "Close candidates")
-  if (closeCandidates > 0) {
+  if (closeCandidates > 0 && liveCustomers[liveCustomers.length - 1]) {
     items.push({
-      id: "renewal-boat",
-      customer: "King of Boat Care",
+      id: "renewal-expansion",
+      customer: liveCustomers[liveCustomers.length - 1]!,
       riskLevel: "Low",
       recommendedAction: "Prepare expansion proposal alongside renewal review.",
       daysRemaining: 60,
@@ -288,6 +289,10 @@ export function buildRenewalsMonitoring(input: GrowthHomeCustomerSuccessMissionI
 }
 
 export function buildCustomerWins(input: GrowthHomeCustomerSuccessMissionInput): GrowthHomeCsCustomerWin[] {
+  if (!hasLiveGrowthHomeRuntimeActivity(input.dashboard)) {
+    return []
+  }
+
   const { dashboard } = input
   const briefing = dashboard.briefing
   const wins: GrowthHomeCsCustomerWin[] = []
@@ -318,7 +323,7 @@ export function buildCustomerWins(input: GrowthHomeCustomerSuccessMissionInput):
     })
   }
 
-  if (conversationAlerts === 0 && repliesNeedingAttentionZero(briefing?.summary.replies_needing_attention)) {
+  if (conversationAlerts === 0 && repliesNeedingAttentionZero(briefing?.summary.replies_needing_attention) && (emailsSent > 0 || replies > 0)) {
     wins.push({
       id: "win-support",
       emoji: "🎉",

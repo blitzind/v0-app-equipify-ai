@@ -6,6 +6,7 @@
 
 import type { LucideIcon } from "lucide-react"
 import { Bell, Eye, PanelLeft, SlidersHorizontal, Sparkles, User } from "lucide-react"
+import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
 import type { GrowthWorkspaceSettingsPersistedSectionId } from "@/lib/growth/settings/growth-workspace-settings-types"
 import { GROWTH_WORKSPACE_SETTINGS_PERSISTED_SECTION_IDS } from "@/lib/growth/settings/growth-workspace-settings-types"
 
@@ -59,7 +60,11 @@ const GROWTH_OPERATOR_SECTION_META: Record<
   },
 }
 
-function growthOperatorHref(sectionId: GrowthWorkspaceSettingsPersistedSectionId): string {
+function growthOperatorCanonicalHref(sectionId: GrowthWorkspaceSettingsPersistedSectionId): string {
+  return `${GROWTH_WORKSPACE_BASE_PATH}/settings/${sectionId}`
+}
+
+function growthOperatorLegacyHref(sectionId: GrowthWorkspaceSettingsPersistedSectionId): string {
   return `${WORKSPACE_SETTINGS_GROWTH_OPERATOR_BASE}/${sectionId}`
 }
 
@@ -72,8 +77,15 @@ export const WORKSPACE_SETTINGS_GROWTH_OPERATOR_SECTIONS: WorkspaceSettingsGrowt
       }
       return []
     }
-    return [{ id, href: growthOperatorHref(id), ...meta }]
+    return [{ id, href: growthOperatorCanonicalHref(id), ...meta }]
   })
+
+/** Legacy /settings/growth-operator/* route for redirects. */
+export function workspaceSettingsGrowthOperatorLegacyHref(
+  sectionId: GrowthWorkspaceSettingsPersistedSectionId,
+): string {
+  return growthOperatorLegacyHref(sectionId)
+}
 
 export function listWorkspaceSettingsGrowthOperatorSectionIds(): GrowthWorkspaceSettingsPersistedSectionId[] {
   return [...GROWTH_WORKSPACE_SETTINGS_PERSISTED_SECTION_IDS]

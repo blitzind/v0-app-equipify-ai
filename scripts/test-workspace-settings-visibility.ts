@@ -8,7 +8,6 @@ import { readFileSync } from "node:fs"
 import { getOrgPermissionsForRole } from "../lib/permissions/model"
 import { getOrganizationPlanDisplay } from "../lib/billing/get-organization-plan-display"
 import {
-  WORKSPACE_SETTINGS_GENERAL_GROUPS,
   buildWorkspaceSettingsRootCategories,
 } from "../lib/settings/workspace-settings-navigation"
 import {
@@ -86,20 +85,14 @@ function runAudit(): void {
 
     for (const layoutPath of GROWTH_ENGINE_ROUTE_GROUPS) {
       const layoutSrc = readFileSync(layoutPath, "utf8")
+      if (layoutPath.includes("growth-operator")) {
+        assert.doesNotMatch(layoutSrc, /requireWorkspaceSettingsPlatformAdminAccess/)
+        continue
+      }
       assert.match(layoutSrc, /requireWorkspaceSettingsPlatformAdminAccess/)
       assert.doesNotMatch(layoutSrc, /redirect\(/)
     }
-    console.log("  ✓ direct route protection layouts exist for Growth Engine, Operator, and Data & Administration")
-
-    const growthOperatorManifest = WORKSPACE_SETTINGS_GENERAL_GROUPS.find(
-      (group) => group.id === "general-growth-operator",
-    )
-    assert.ok(growthOperatorManifest)
-    assert.equal(
-      growthOperatorManifest.items.every((item) => item.visible?.({ growthEngineNavVisible: false, dataAdministrationNavVisible: false, permissions: getOrgPermissionsForRole("owner") }) === false),
-      true,
-    )
-    console.log("  ✓ Growth Operator nav items hidden when growthEngineNavVisible is false")
+    console.log("  ✓ Growth Engine + Data & Administration routes remain platform-admin gated; growth-operator redirects openly")
 
     const dataAdminSectionPageSrc = readFileSync("components/settings/workspace-settings-section-page.tsx", "utf8")
     assert.match(dataAdminSectionPageSrc, /variant="admin"/)

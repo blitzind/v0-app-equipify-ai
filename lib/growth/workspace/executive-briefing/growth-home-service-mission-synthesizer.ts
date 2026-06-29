@@ -17,6 +17,11 @@ import type {
   GrowthHomeServiceOperationalInsight,
   GrowthHomeTechnicianAwarenessItem,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
+import {
+  deriveLiveGrowthHomeCustomerAccountNames,
+  hasLiveGrowthHomeRuntimeActivity,
+  isGrowthHomeDemoCustomerAccountName,
+} from "@/lib/growth/workspace/executive-briefing/growth-home-runtime-activity"
 
 /** Revenue Director coordinates — Home never duplicates scheduling or dispatch engines. */
 export const GROWTH_HOME_SERVICE_MISSION_ORCHESTRATION_RULE = GROWTH_REVENUE_DIRECTOR_RUNTIME_RULE
@@ -66,11 +71,15 @@ function deriveServiceStage(input: {
 }
 
 export function countTotalServiceMissions(dashboard: GrowthWorkspaceDashboardViewModel): number {
-  return Math.max(deriveTotalServiceMissionCount(dashboard), 1)
+  return deriveTotalServiceMissionCount(dashboard)
 }
 
 export function buildServiceMissions(input: GrowthHomeServiceMissionInput): GrowthHomeServiceMission[] {
   const { dashboard, revenueDirectorSnapshot } = input
+  if (!hasLiveGrowthHomeRuntimeActivity(dashboard)) {
+    return []
+  }
+
   const briefing = dashboard.briefing
   const missions: GrowthHomeServiceMission[] = []
 
@@ -81,21 +90,18 @@ export function buildServiceMissions(input: GrowthHomeServiceMissionInput): Grow
   const runningJobs = briefing?.approval_queue.running_jobs ?? 0
   const repliesNeedingAttention = briefing?.summary.replies_needing_attention ?? 0
   const stage = deriveServiceStage({ callsToday, meetingsToday, repliesNeedingAttention, blockedJobs, runningJobs })
+  const liveCustomers = deriveLiveGrowthHomeCustomerAccountNames(dashboard)
 
-  const customers = [
-    { customer: "Acme Manufacturing", workOrder: "ONB-1042", technician: "Ava · Onboarding", progress: 75 },
-    { customer: "Precision Biomedical", workOrder: "ONB-1048", technician: "Ava · Adoption", progress: 55 },
-    { customer: "King of Boat Care", workOrder: "ONB-1051", technician: "Ava · Customer Growth", progress: blockedJobs > 0 ? 40 : 85 },
-  ]
+  for (let index = 0; index < liveCustomers.length && missions.length < SERVICE_MISSION_LIMIT; index += 1) {
+    const customer = liveCustomers[index]!
+    if (isGrowthHomeDemoCustomerAccountName(customer)) continue
 
-  for (let index = 0; index < customers.length && missions.length < SERVICE_MISSION_LIMIT; index += 1) {
-    const row = customers[index]!
     const missionStage =
-      index === 0 && callsToday > 0
+      callsToday > 0 && index === 0
         ? "Implementation"
-        : index === 1 && meetingsToday > 0
+        : meetingsToday > 0 && index === 1
           ? "Onboarding"
-          : index === 2 && repliesNeedingAttention > 0
+          : repliesNeedingAttention > 0 && index === liveCustomers.length - 1
             ? "Adoption"
             : stage === "In Progress"
               ? "Implementation"
@@ -107,21 +113,21 @@ export function buildServiceMissions(input: GrowthHomeServiceMissionInput): Grow
 
     missions.push({
       id: `service-mission-${index}`,
-      customer: row.customer,
-      workOrder: row.workOrder,
+      customer,
+      workOrder: `ONB-${1040 + index}`,
       currentStage: missionStage,
-      technician: row.technician,
-      progressPercent: Math.max(20, Math.min(95, row.progress)),
+      technician: index === 0 ? "Ava · Onboarding" : index === 1 ? "Ava · Adoption" : "Ava · Customer Growth",
+      progressPercent: Math.max(20, Math.min(95, blockedJobs > 0 && index === liveCustomers.length - 1 ? 40 : 55 + index * 10)),
       blocker:
-        blockedJobs > 0 && index === 2
+        blockedJobs > 0 && index === liveCustomers.length - 1
           ? "Awaiting kickoff confirmation"
-          : repliesNeedingAttention > 0 && index === 2
+          : repliesNeedingAttention > 0 && index === liveCustomers.length - 1
             ? "Account hasn't completed onboarding survey"
             : null,
       eta: missionStage === "Implementation" ? "This week" : missionStage === "Onboarding" ? "Today" : "Next week",
       expectedValue: formatHomeCurrency(Math.round(1200 + index * 850)),
       reviewHref: index === 1 ? MEETINGS_HREF : metricHref(dashboard, "my-queue", "Call-ready leads"),
-      health: blockedJobs > 0 && index === 2 ? "blocked" : missionStage === "In Progress" ? "healthy" : "waiting",
+      health: blockedJobs > 0 && index === liveCustomers.length - 1 ? "blocked" : missionStage === "In Progress" ? "healthy" : "waiting",
     })
   }
 
@@ -164,6 +170,10 @@ export function buildServiceMissions(input: GrowthHomeServiceMissionInput): Grow
 }
 
 export function buildServiceHealth(input: GrowthHomeServiceMissionInput): GrowthHomeServiceHealthItem[] {
+  if (!hasLiveGrowthHomeRuntimeActivity(input.dashboard)) {
+    return []
+  }
+
   const { dashboard } = input
   const briefing = dashboard.briefing
   const items: GrowthHomeServiceHealthItem[] = []

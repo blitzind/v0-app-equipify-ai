@@ -1442,6 +1442,105 @@ export function buildGrowthHomeExecutiveBriefingCertDashboard(): GrowthWorkspace
   }
 }
 
+export function buildGrowthHomeExecutiveBriefingFreshSlateDashboard(): GrowthWorkspaceDashboardViewModel {
+  const zeroMetrics = (labels: string[]) => labels.map((label) => ({ label, value: 0, href: "/growth" }))
+
+  return {
+    qaMarker: "growth-workspace-dashboard-v4",
+    generatedAt: new Date("2026-06-29T12:00:00.000Z").toISOString(),
+    sections: [
+      {
+        id: "my-queue" as const,
+        title: "My Queue",
+        metrics: zeroMetrics([
+          "Leads needing action",
+          "Call-ready leads",
+          "Inbox requiring replies",
+          "Opportunities needing follow-up",
+        ]),
+      },
+      {
+        id: "activity" as const,
+        title: "Activity",
+        metrics: zeroMetrics(["Emails sent today", "Replies today", "Calls today", "Meetings today"]),
+      },
+      {
+        id: "pipeline-snapshot" as const,
+        title: "Pipeline Snapshot",
+        metrics: zeroMetrics(["Open opportunities", "Forecast value", "Weighted pipeline", "Close candidates"]),
+      },
+      {
+        id: "campaign-snapshot" as const,
+        title: "Campaign Snapshot",
+        metrics: zeroMetrics(["Active campaigns", "Enrollments", "Executions today", "Approval queue"]),
+      },
+      {
+        id: "intelligence" as const,
+        title: "Intelligence",
+        metrics: zeroMetrics(["Engagement score", "Hot companies", "Relationship alerts", "Conversation alerts"]),
+      },
+      { id: "quick-actions" as const, title: "Quick Actions", metrics: [] },
+    ],
+    quickActions: [],
+    operatorActionCards: [],
+    welcome: {
+      greeting: "Good morning",
+      operatorName: "Michael",
+      recommendedAction: null,
+      todaysFocus: null,
+    },
+    briefing: {
+      qa_marker: AIDEN_DAILY_BRIEFING_QA_MARKER,
+      greeting: "Good morning",
+      operator_name: "Michael",
+      generated_at: new Date("2026-06-29T12:00:00.000Z").toISOString(),
+      summary: {
+        mailbox_label: "Healthy",
+        pending_approvals: 0,
+        replies_needing_attention: 0,
+        meetings_today: 0,
+        blocked_jobs: 0,
+        drafts_awaiting_review: 0,
+        recommended_action: null,
+      },
+      inbox: {
+        new_replies: 0,
+        replies_needing_attention: 0,
+        positive_interest: 0,
+        meeting_requests: 0,
+        objections: 0,
+        unsubscribes: 0,
+      },
+      mailbox: { healthy_mailboxes: 2, expired_mailboxes: 0, warnings: 0 },
+      approval_queue: { pending_drafts: 0, pending_jobs: 0, blocked_jobs: 0, running_jobs: 0 },
+      meetings: { meetings_today: 0, meetings_this_week: 0, opportunities_pending: 0 },
+      revenue: { emails_sent: 0, replies: 0, meetings: 0, opportunities: 0, revenue: 0 },
+      priorities: [],
+      section_summaries: {
+        inbox: "No replies waiting.",
+        mailbox: "Mailboxes healthy.",
+        approval_queue: "No approvals pending.",
+        meetings: "No meetings scheduled.",
+        revenue: "No pipeline activity yet.",
+      },
+    },
+    operatorName: "Michael",
+    recommendedAction: null,
+    leadInboxHighlights: [],
+    dailyRevenueWorkQueueEnabled: false,
+    dailyRevenueWorkQueue: null,
+    dailyRevenueWorkQueueDisplay: null,
+  }
+}
+
+export function buildGrowthHomeExecutiveBriefingFreshSlateFixture(): GrowthHomeExecutiveBriefingViewModel {
+  return synthesizeGrowthHomeExecutiveBriefing({
+    dashboard: buildGrowthHomeExecutiveBriefingFreshSlateDashboard(),
+    recentViews: [],
+    continueItems: [],
+  })
+}
+
 export function buildGrowthHomeExecutiveBriefingCertFixture(): GrowthHomeExecutiveBriefingViewModel {
   return synthesizeGrowthHomeExecutiveBriefing({
     dashboard: buildGrowthHomeExecutiveBriefingCertDashboard(),

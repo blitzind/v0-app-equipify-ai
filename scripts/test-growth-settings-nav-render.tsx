@@ -17,7 +17,7 @@ import {
 } from "../lib/settings/workspace-settings-navigation"
 import { isGrowthEngineSettingsNavVisible } from "../lib/settings/workspace-settings-visibility"
 import { getOrgPermissionsForRole } from "../lib/permissions/model"
-import { WORKSPACE_SETTINGS_GROWTH_OPERATOR_SECTIONS } from "../lib/settings/workspace-settings-growth-operator"
+import { GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS } from "../lib/growth/navigation/growth-workspace-settings-navigation"
 
 process.env.NEXT_PUBLIC_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://example.supabase.co"
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY =
@@ -33,14 +33,14 @@ function mockNavTree() {
     planCategoryLabel: "Pro",
     ctx,
   })
-  assert.ok(categories.some((c) => c.id === "growth_engine"), "expected growth_engine category")
-  const growthItems = categories
-    .filter((c) => c.id === "growth_engine")
-    .flatMap((c) => c.groups.flatMap((g) => g.items))
-  assert.ok(growthItems.length > 0, "expected growth nav items")
-  console.log("growth nav items:", growthItems.length)
+  assert.equal(categories.some((c) => c.id === "growth_engine"), false, "Core nav must not include growth_engine")
+  const coreHrefs = categories.flatMap((c) => c.groups.flatMap((g) => g.items.map((item) => item.href)))
+  assert.ok(coreHrefs.every((href) => href.startsWith("/settings/")))
+  console.log("core nav items:", coreHrefs.length)
 
-  const aiTeammate = WORKSPACE_SETTINGS_GROWTH_OPERATOR_SECTIONS.find((section) => section.id === "ai-teammate")
+  const aiTeammate = GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS.flatMap((group) => group.items).find(
+    (section) => section.id === "ai-teammate",
+  )
   assert.ok(aiTeammate?.label === "AI Teammate")
   assert.ok(aiTeammate?.icon)
 }

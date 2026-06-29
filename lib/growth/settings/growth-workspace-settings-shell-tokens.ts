@@ -9,6 +9,8 @@ export {
   WORKSPACE_SETTINGS_SHELL_BODY as GROWTH_WORKSPACE_SETTINGS_SHELL_BODY,
 } from "@/lib/settings/workspace-settings-shell-tokens"
 
+import { SETTINGS_NAV_SIDEBAR_CONTAINER } from "@/lib/settings/settings-nav-chrome"
+
 /** Growth settings content column — no Core mobile bottom-nav pb-24 reserve. */
 export const GROWTH_WORKSPACE_SETTINGS_SHELL_CONTENT = "flex-1 min-w-0 w-full pb-6" as const
 
@@ -20,8 +22,7 @@ export const GROWTH_WORKSPACE_SETTINGS_SHELL_HEADER =
   "w-full min-w-0 max-w-none rounded-2xl border border-border bg-card p-5 shadow-sm" as const
 
 /** Desktop nav width matches Core `WORKSPACE_SETTINGS_SHELL_SIDEBAR_DESKTOP` (w-56). */
-export const GROWTH_WORKSPACE_SETTINGS_SHELL_SIDEBAR =
-  "w-full shrink-0 rounded-xl border border-border bg-card p-3 shadow-sm md:sticky md:top-4 md:w-56 md:self-start" as const
+export const GROWTH_WORKSPACE_SETTINGS_SHELL_SIDEBAR = SETTINGS_NAV_SIDEBAR_CONTAINER
 
 export function assertGrowthWorkspaceSettingsMainInnerHasNoMaxWidth(classes: string): void {
   if (/\bmax-w-/.test(classes) && !/\bmax-w-none\b/.test(classes)) {

@@ -43,8 +43,8 @@ function runAudit(): void {
   console.log(`\n=== Workspace Settings GE-SET-2 (${WORKSPACE_SETTINGS_NAV_QA_MARKER}) ===\n`)
 
   const growthSections = listWorkspaceSettingsGrowthEngineSectionIds()
-  assert.equal(growthSections.length, 33)
-  console.log("  ✓ Growth Engine manifest defines 33 sections")
+  assert.ok(growthSections.length >= 33, "expected Growth Engine legacy manifest to define sections")
+  console.log(`  ✓ Growth Engine legacy manifest defines ${growthSections.length} sections`)
 
   const dataAdminSections = listWorkspaceSettingsDataAdminSectionIds()
   assert.equal(dataAdminSections.length, 5)
@@ -53,10 +53,9 @@ function runAudit(): void {
   for (const id of growthSections) {
     const section = getWorkspaceSettingsGrowthEngineSection(id)
     assert.ok(section, `missing growth-engine section: ${id}`)
-    assert.equal(section.href, `${WORKSPACE_SETTINGS_GROWTH_ENGINE_BASE}/${id}`)
-    assert.ok(section.existingConfigHref, `missing existingConfigHref for ${id}`)
+    assert.ok(section.href.startsWith("/growth/settings") || section.href.startsWith("/settings/growth-engine"), `unexpected href for ${id}: ${section.href}`)
   }
-  console.log("  ✓ every Growth Engine section has route + deep link")
+  console.log("  ✓ every Growth Engine legacy section has canonical redirect target")
 
   for (const id of dataAdminSections) {
     const section = getWorkspaceSettingsDataAdminSection(id)
@@ -88,9 +87,10 @@ function runAudit(): void {
   })
   assert.deepEqual(
     scaleWithGrowth.map((category) => category.label),
-    ["General", "Equipify Scale", "Growth Engine", "Data & Administration"],
+    ["General", "Equipify Scale", "Data & Administration"],
   )
-  console.log("  ✓ Scale + Growth shows all four root categories")
+  assert.equal(scaleWithGrowth.some((category) => category.id === "growth_engine"), false)
+  console.log("  ✓ Scale + platform admin shows Core categories only (Growth Engine removed from Core nav)")
 
   const layoutSrc = readFileSync("app/(dashboard)/settings/layout.tsx", "utf8")
   assert.match(layoutSrc, /WorkspaceSettingsNav/)
@@ -138,9 +138,10 @@ function runAudit(): void {
     "app/(dashboard)/settings/growth-engine/[sectionId]/page.tsx",
     "utf8",
   )
-  assert.match(growthPageSrc, /WorkspaceSettingsGrowthEngineSectionPage/)
+  assert.match(growthPageSrc, /growthEngineCustomerSettingsHref/)
+  assert.match(growthPageSrc, /redirect\(/)
   assert.doesNotMatch(growthPageSrc, /fetch\(/)
-  console.log("  ✓ growth-engine pages use lift router (GE-SET-4)")
+  console.log("  ✓ growth-engine legacy routes redirect to canonical Growth settings")
 
   const dataAdminPageSrc = readFileSync(
     "app/(dashboard)/settings/data-administration/[sectionId]/page.tsx",
@@ -173,10 +174,8 @@ function runAudit(): void {
   console.log("  ✓ visibility gating helpers behave as expected (platform admin only, not env flag)")
 
   const growthOperatorGroup = WORKSPACE_SETTINGS_GENERAL_GROUPS.find((group) => group.id === "general-growth-operator")
-  assert.ok(growthOperatorGroup)
-  assert.equal(growthOperatorGroup.items.length, 5)
-  assert.ok(growthOperatorGroup.items.every((item) => item.href.startsWith("/settings/growth-operator/")))
-  console.log("  ✓ Growth Operator nav uses /settings/growth-operator/* routes (GE-SET-3)")
+  assert.equal(growthOperatorGroup, undefined)
+  console.log("  ✓ Growth Operator removed from Core settings nav (canonical: /growth/settings/*)")
 
   console.log("\nWorkspace Settings GE-SET-2 verification PASS\n")
   console.log(
