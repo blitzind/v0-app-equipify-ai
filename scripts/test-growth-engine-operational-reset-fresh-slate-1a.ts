@@ -21,7 +21,11 @@ import {
   GROWTH_ENGINE_OPERATIONAL_RESET_PRESERVED_TABLES,
   getGrowthEngineOperationalResetTableEntries,
 } from "../lib/growth/reset/growth-engine-operational-reset-table-inventory"
-import { formatGrowthEngineOperationalResetDryRun } from "../lib/growth/reset/growth-engine-operational-reset-service"
+import {
+  formatGrowthEngineOperationalResetDryRun,
+  formatGrowthEngineOperationalResetExecutionReport,
+  type GrowthEngineOperationalResetTableDeleteResult,
+} from "../lib/growth/reset/growth-engine-operational-reset-service"
 import { extractSupabaseProjectRefFromUrl } from "../lib/growth/reset/growth-test-data-reset-credentials"
 
 function runStructureCertification(): void {
@@ -122,6 +126,42 @@ function runStructureCertification(): void {
   assert.match(dryRunSample, /No rows deleted/)
   assert.match(dryRunSample, /growth\.ai_work_orders: 4 row\(s\)/)
 
+  const failedResult: GrowthEngineOperationalResetTableDeleteResult = {
+    table: "ai_decision_record_audit_events",
+    rows_before: 12,
+    delete_attempted: true,
+    rows_deleted: 0,
+    rows_after: 12,
+    status: "failed",
+    error: "permission denied for table ai_decision_record_audit_events",
+  }
+  const executionReport = formatGrowthEngineOperationalResetExecutionReport({
+    table_results: [failedResult],
+    execution_summary: {
+      total_rows_before: 12,
+      total_rows_deleted: 0,
+      total_rows_remaining: 12,
+      failed_tables: ["ai_decision_record_audit_events"],
+      skipped_tables: [],
+      top_remaining_tables: [{ table: "ai_decision_record_audit_events", rows_remaining: 12 }],
+      strict_mode: false,
+      completed_with_warnings: true,
+    },
+  })
+  assert.match(executionReport, /status=failed/)
+  assert.match(executionReport, /permission denied/)
+  assert.match(executionReport, /total_rows_remaining: 12/)
+  assert.match(executionReport, /ai_decision_record_audit_events/)
+
+  const serviceSource = fs.readFileSync(
+    path.join(process.cwd(), "lib/growth/reset/growth-engine-operational-reset-service.ts"),
+    "utf8",
+  )
+  assert.match(serviceSource, /attemptDeleteScopedRows/)
+  assert.match(serviceSource, /deleteInventoryTable/)
+  assert.match(serviceSource, /status: "failed"/)
+  assert.doesNotMatch(serviceSource, /throw new Error\(`\$\{entry\.table\}/)
+
   const scriptSource = fs.readFileSync(
     path.join(process.cwd(), "scripts/reset-growth-engine-operational-data.ts"),
     "utf8",
@@ -131,6 +171,8 @@ function runStructureCertification(): void {
   assert.match(scriptSource, /PRECISION_BIOMEDICAL_AI_OS_ORG_ID/)
   assert.match(scriptSource, /logOperationalResetSafetyConfirmation/)
   assert.match(scriptSource, /allowPrompt = argv.includes\("--prompt"\)/)
+  assert.match(scriptSource, /--strict/)
+  assert.match(scriptSource, /formatGrowthEngineOperationalResetExecutionReport/)
   assert.doesNotMatch(scriptSource, /--no-prompt/)
   assert.equal(
     extractSupabaseProjectRefFromUrl("https://byyfylkklbxcdofaspye.supabase.co"),
@@ -148,6 +190,7 @@ function runStructureCertification(): void {
   console.log("  ✓ dry-run formatter documents affected rows")
   console.log("  ✓ Home stale source tables covered by reset inventory")
   console.log("  ✓ reset script supports --execute flag")
+  console.log("  ✓ per-table delete failures continue with warnings (--strict to fail)")
 
   const diagnosticSource = fs.readFileSync(
     path.join(process.cwd(), "scripts/diagnose-growth-home-stale-data-sources.ts"),

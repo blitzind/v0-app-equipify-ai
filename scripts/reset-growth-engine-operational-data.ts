@@ -24,6 +24,7 @@ import {
 } from "../lib/growth/reset/growth-test-data-reset-credentials"
 import {
   formatGrowthEngineOperationalResetDryRun,
+  formatGrowthEngineOperationalResetExecutionReport,
   runGrowthEngineOperationalReset,
 } from "../lib/growth/reset/growth-engine-operational-reset-service"
 import { getGrowthEngineOperationalResetTableEntries } from "../lib/growth/reset/growth-engine-operational-reset-table-inventory"
@@ -71,6 +72,7 @@ GE-AVA-FRESH-SLATE-1A operational reset:
 
 Flags:
   --execute           Apply deletes (default is dry-run)
+  --strict            Exit non-zero if any table delete fails (default completes with warnings)
   --org-id <uuid>     Override target org (default: ${PRECISION_BIOMEDICAL_AI_OS_ORG_ID})
   --prompt            Allow interactive credential prompt (default is non-interactive)
   --local             Allow localhost Supabase URLs
@@ -83,6 +85,7 @@ Env:
   }
 
   const execute = argv.includes("--execute")
+  const strict = argv.includes("--strict")
   const allowLocal = argv.includes("--local")
   const allowPrompt = argv.includes("--prompt")
 
@@ -126,11 +129,18 @@ Env:
   const result = await runGrowthEngineOperationalReset(admin, {
     organizationId,
     execute,
+    strict,
   })
 
   console.log(formatGrowthEngineOperationalResetDryRun(result.audit_before))
 
-  if (result.audit_after) {
+  if (result.audit_after && result.execution_summary) {
+    console.log(
+      formatGrowthEngineOperationalResetExecutionReport({
+        table_results: result.table_results,
+        execution_summary: result.execution_summary,
+      }),
+    )
     console.log("Post-reset summary:")
     console.log(
       JSON.stringify(
@@ -139,6 +149,8 @@ Env:
           organization_id: organizationId,
           rows_removed: Object.values(result.deleted_by_table).reduce((sum, count) => sum + count, 0),
           deleted_by_table: result.deleted_by_table,
+          execution_summary: result.execution_summary,
+          table_results: result.table_results,
           verification: result.verification,
         },
         null,
@@ -147,8 +159,26 @@ Env:
     )
   }
 
-  if (execute && !result.verification.ok) {
+  if (execute && strict && (result.execution_summary?.failed_tables.length ?? 0) > 0) {
     process.exitCode = 2
+  } else if (execute && strict && !result.verification.ok) {
+    process.exitCode = 2
+  } else if (execute && (result.execution_summary?.failed_tables.length ?? 0) > 0) {
+    console.error(
+      JSON.stringify({
+        warning: "growth_operational_reset_completed_with_failures",
+        failed_tables: result.execution_summary?.failed_tables ?? [],
+        message:
+          "Reset completed with warnings. Re-run with --strict to fail on table errors, or grant service role DELETE on failed tables.",
+      }),
+    )
+  } else if (execute && !result.verification.ok) {
+    console.error(
+      JSON.stringify({
+        warning: "growth_operational_reset_verification_incomplete",
+        verification: result.verification,
+      }),
+    )
   }
 }
 

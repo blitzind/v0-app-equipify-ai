@@ -58,10 +58,35 @@ export type GrowthEngineOperationalResetVerificationCheck = {
   detail: string
 }
 
+export type GrowthEngineOperationalResetTableDeleteStatus = "deleted" | "skipped" | "failed"
+
+export type GrowthEngineOperationalResetTableDeleteResult = {
+  table: string
+  rows_before: number | null
+  delete_attempted: boolean
+  rows_deleted: number
+  rows_after: number | null
+  status: GrowthEngineOperationalResetTableDeleteStatus
+  error: string | null
+}
+
+export type GrowthEngineOperationalResetExecutionSummary = {
+  total_rows_before: number
+  total_rows_deleted: number
+  total_rows_remaining: number
+  failed_tables: string[]
+  skipped_tables: string[]
+  top_remaining_tables: Array<{ table: string; rows_remaining: number }>
+  strict_mode: boolean
+  completed_with_warnings: boolean
+}
+
 export type GrowthEngineOperationalResetRunResult = {
   audit_before: GrowthEngineOperationalResetAuditReport
   audit_after: GrowthEngineOperationalResetAuditReport | null
   deleted_by_table: Record<string, number>
+  table_results: GrowthEngineOperationalResetTableDeleteResult[]
+  execution_summary: GrowthEngineOperationalResetExecutionSummary | null
   verification: {
     ok: boolean
     checks: GrowthEngineOperationalResetVerificationCheck[]
@@ -76,6 +101,10 @@ type ResetScopeContext = {
 
 function isMissingRelation(message: string): boolean {
   return /does not exist|Could not find|relation .* does not exist|PGRST205/i.test(message)
+}
+
+function isPermissionDenied(message: string): boolean {
+  return /permission denied/i.test(message)
 }
 
 function scopeFilterDescription(entry: GrowthEngineOperationalResetTableEntry, ctx: ResetScopeContext): string {
@@ -136,47 +165,54 @@ async function countScopedRows(
   return { count: count ?? 0, status: "ok", error: null }
 }
 
-async function deleteScopedRows(
+async function attemptDeleteScopedRows(
   admin: SupabaseClient,
   entry: GrowthEngineOperationalResetTableEntry,
   ctx: ResetScopeContext,
-): Promise<number> {
-  if (entry.scope === "lead_id" && ctx.leadIds.length === 0) {
-    const { count, error } = await admin
-      .schema("growth")
-      .from(entry.table)
-      .delete({ count: "exact" })
-      .neq("id", "00000000-0000-0000-0000-000000000000")
-    if (error && !isMissingRelation(error.message ?? "")) {
-      throw new Error(`${entry.table}: ${error.message}`)
-    }
-    return count ?? 0
-  }
-
-  if (entry.scope === "lead_id" && ctx.leadIds.length > 0) {
-    let deleted = 0
-    for (let i = 0; i < ctx.leadIds.length; i += LEAD_ID_BATCH) {
-      const batch = ctx.leadIds.slice(i, i + LEAD_ID_BATCH)
+): Promise<{ rows_deleted: number; error: string | null }> {
+  try {
+    if (entry.scope === "lead_id" && ctx.leadIds.length === 0) {
       const { count, error } = await admin
         .schema("growth")
         .from(entry.table)
         .delete({ count: "exact" })
-        .in("lead_id", batch)
+        .neq("id", "00000000-0000-0000-0000-000000000000")
       if (error && !isMissingRelation(error.message ?? "")) {
-        throw new Error(`${entry.table}: ${error.message}`)
+        return { rows_deleted: 0, error: error.message ?? String(error) }
       }
-      deleted += count ?? 0
+      return { rows_deleted: count ?? 0, error: null }
     }
-    return deleted
-  }
 
-  let query = admin.schema("growth").from(entry.table).delete({ count: "exact" })
-  query = applyScopeFilter(query, entry, ctx)
-  const { count, error } = await query
-  if (error && !isMissingRelation(error.message ?? "")) {
-    throw new Error(`${entry.table}: ${error.message}`)
+    if (entry.scope === "lead_id" && ctx.leadIds.length > 0) {
+      let deleted = 0
+      for (let i = 0; i < ctx.leadIds.length; i += LEAD_ID_BATCH) {
+        const batch = ctx.leadIds.slice(i, i + LEAD_ID_BATCH)
+        const { count, error } = await admin
+          .schema("growth")
+          .from(entry.table)
+          .delete({ count: "exact" })
+          .in("lead_id", batch)
+        if (error && !isMissingRelation(error.message ?? "")) {
+          return { rows_deleted: deleted, error: error.message ?? String(error) }
+        }
+        deleted += count ?? 0
+      }
+      return { rows_deleted: deleted, error: null }
+    }
+
+    let query = admin.schema("growth").from(entry.table).delete({ count: "exact" })
+    query = applyScopeFilter(query, entry, ctx)
+    const { count, error } = await query
+    if (error && !isMissingRelation(error.message ?? "")) {
+      return { rows_deleted: 0, error: error.message ?? String(error) }
+    }
+    return { rows_deleted: count ?? 0, error: null }
+  } catch (error) {
+    return {
+      rows_deleted: 0,
+      error: error instanceof Error ? error.message : String(error),
+    }
   }
-  return count ?? 0
 }
 
 async function resolveOrgLeadIds(admin: SupabaseClient, organizationId: string): Promise<string[]> {
@@ -301,7 +337,10 @@ async function buildAuditReport(
   }
 }
 
-async function resetObjectiveCounters(admin: SupabaseClient, organizationId: string): Promise<void> {
+async function resetObjectiveCounters(
+  admin: SupabaseClient,
+  organizationId: string,
+): Promise<{ ok: boolean; error: string | null }> {
   const { error } = await admin
     .schema("growth")
     .from("organization_growth_objectives")
@@ -309,7 +348,105 @@ async function resetObjectiveCounters(admin: SupabaseClient, organizationId: str
     .eq("organization_id", organizationId)
 
   if (error && !isMissingRelation(error.message ?? "")) {
-    throw new Error(`organization_growth_objectives counter reset: ${error.message}`)
+    return { ok: false, error: error.message ?? String(error) }
+  }
+  return { ok: true, error: null }
+}
+
+function rowsBeforeFromAudit(
+  audit: GrowthEngineOperationalResetAuditReport,
+  table: string,
+): { rows_before: number | null; count_status: GrowthEngineOperationalResetTableAuditRow["count_status"] } {
+  const row = audit.tables.find((entry) => entry.table === table)
+  if (!row) return { rows_before: null, count_status: "count_unavailable" }
+  return { rows_before: row.row_count, count_status: row.count_status }
+}
+
+async function deleteInventoryTable(
+  admin: SupabaseClient,
+  entry: GrowthEngineOperationalResetTableEntry,
+  ctx: ResetScopeContext,
+  auditBefore: GrowthEngineOperationalResetAuditReport,
+): Promise<GrowthEngineOperationalResetTableDeleteResult> {
+  const { rows_before, count_status } = rowsBeforeFromAudit(auditBefore, entry.table)
+
+  if (count_status === "table_missing") {
+    return {
+      table: entry.table,
+      rows_before,
+      delete_attempted: false,
+      rows_deleted: 0,
+      rows_after: null,
+      status: "skipped",
+      error: "table_missing",
+    }
+  }
+
+  if (count_status === "ok" && (rows_before ?? 0) === 0) {
+    return {
+      table: entry.table,
+      rows_before: 0,
+      delete_attempted: false,
+      rows_deleted: 0,
+      rows_after: 0,
+      status: "skipped",
+      error: null,
+    }
+  }
+
+  const attempt = await attemptDeleteScopedRows(admin, entry, ctx)
+  const afterCount = await countScopedRows(admin, entry, ctx)
+  const rows_after = afterCount.status === "ok" ? afterCount.count : null
+
+  if (attempt.error) {
+    return {
+      table: entry.table,
+      rows_before,
+      delete_attempted: true,
+      rows_deleted: attempt.rows_deleted,
+      rows_after,
+      status: "failed",
+      error: isPermissionDenied(attempt.error)
+        ? attempt.error
+        : attempt.error,
+    }
+  }
+
+  return {
+    table: entry.table,
+    rows_before,
+    delete_attempted: true,
+    rows_deleted: attempt.rows_deleted,
+    rows_after,
+    status: "deleted",
+    error: null,
+  }
+}
+
+function buildExecutionSummary(input: {
+  table_results: GrowthEngineOperationalResetTableDeleteResult[]
+  strict: boolean
+}): GrowthEngineOperationalResetExecutionSummary {
+  const total_rows_before = input.table_results.reduce((sum, row) => sum + (row.rows_before ?? 0), 0)
+  const total_rows_deleted = input.table_results.reduce((sum, row) => sum + row.rows_deleted, 0)
+  const total_rows_remaining = input.table_results.reduce((sum, row) => sum + (row.rows_after ?? 0), 0)
+  const failed_tables = input.table_results.filter((row) => row.status === "failed").map((row) => row.table)
+  const skipped_tables = input.table_results.filter((row) => row.status === "skipped").map((row) => row.table)
+  const top_remaining_tables = input.table_results
+    .filter((row) => (row.rows_after ?? 0) > 0)
+    .sort((a, b) => (b.rows_after ?? 0) - (a.rows_after ?? 0))
+    .slice(0, 15)
+    .map((row) => ({ table: row.table, rows_remaining: row.rows_after ?? 0 }))
+
+  return {
+    total_rows_before,
+    total_rows_deleted,
+    total_rows_remaining,
+    failed_tables,
+    skipped_tables,
+    top_remaining_tables,
+    strict_mode: input.strict,
+    completed_with_warnings: failed_tables.length > 0 && !input.strict,
   }
 }
 
@@ -452,8 +589,10 @@ export async function runGrowthEngineOperationalReset(
     organizationId?: string
     execute: boolean
     persistReports?: boolean
+    strict?: boolean
   },
 ): Promise<GrowthEngineOperationalResetRunResult> {
+  const strict = input.strict === true
   const organizationId = input.organizationId?.trim() || PRECISION_BIOMEDICAL_AI_OS_ORG_ID
   const { name: organizationName } = await verifyTargetOrganization(admin, organizationId)
   const leadIds = await resolveOrgLeadIds(admin, organizationId)
@@ -480,6 +619,8 @@ export async function runGrowthEngineOperationalReset(
       audit_before,
       audit_after: null,
       deleted_by_table: {},
+      table_results: [],
+      execution_summary: null,
       verification: {
         ok: true,
         checks: [
@@ -493,12 +634,29 @@ export async function runGrowthEngineOperationalReset(
     }
   }
 
+  const table_results: GrowthEngineOperationalResetTableDeleteResult[] = []
   const deleted_by_table: Record<string, number> = {}
+
   for (const entry of getGrowthEngineOperationalResetTableEntries()) {
-    deleted_by_table[entry.table] = await deleteScopedRows(admin, entry, ctx)
+    const result = await deleteInventoryTable(admin, entry, ctx, audit_before)
+    table_results.push(result)
+    deleted_by_table[entry.table] = result.rows_deleted
   }
 
-  await resetObjectiveCounters(admin, organizationId)
+  const counterReset = await resetObjectiveCounters(admin, organizationId)
+  if (!counterReset.ok) {
+    table_results.push({
+      table: "organization_growth_objectives",
+      rows_before: null,
+      delete_attempted: true,
+      rows_deleted: 0,
+      rows_after: null,
+      status: "failed",
+      error: counterReset.error,
+    })
+  }
+
+  const execution_summary = buildExecutionSummary({ table_results, strict })
 
   const audit_after = await buildAuditReport(admin, {
     mode: "execute",
@@ -522,6 +680,8 @@ export async function runGrowthEngineOperationalReset(
     organization_id: organizationId,
     rows_removed: Object.values(deleted_by_table).reduce((sum, count) => sum + count, 0),
     deleted_by_table,
+    table_results,
+    execution_summary,
     verification,
   }
   if (input.persistReports !== false) {
@@ -532,6 +692,8 @@ export async function runGrowthEngineOperationalReset(
     audit_before,
     audit_after,
     deleted_by_table,
+    table_results,
+    execution_summary,
     verification,
   }
 }
@@ -571,6 +733,71 @@ export function formatGrowthEngineOperationalResetDryRun(audit: GrowthEngineOper
 
   if (audit.mode === "dry_run") {
     lines.push("", "No rows deleted. Re-run with --execute to apply.")
+  }
+
+  lines.push("")
+  return lines.join("\n")
+}
+
+export function formatGrowthEngineOperationalResetTableResult(
+  result: GrowthEngineOperationalResetTableDeleteResult,
+): string {
+  const parts = [
+    `growth.${result.table}`,
+    `status=${result.status}`,
+    `rows_before=${result.rows_before ?? "n/a"}`,
+    `delete_attempted=${result.delete_attempted}`,
+    `rows_deleted=${result.rows_deleted}`,
+    `rows_after=${result.rows_after ?? "n/a"}`,
+  ]
+  if (result.error) parts.push(`error=${result.error}`)
+  return `  - ${parts.join(" | ")}`
+}
+
+export function formatGrowthEngineOperationalResetExecutionReport(input: {
+  table_results: GrowthEngineOperationalResetTableDeleteResult[]
+  execution_summary: GrowthEngineOperationalResetExecutionSummary
+}): string {
+  const { execution_summary: summary } = input
+  const lines: string[] = [
+    "",
+    "=== Growth operational reset execution report ===",
+    "",
+    "Per-table results:",
+  ]
+
+  for (const result of input.table_results) {
+    lines.push(formatGrowthEngineOperationalResetTableResult(result))
+  }
+
+  lines.push(
+    "",
+    "Execution totals:",
+    `  total_rows_before: ${summary.total_rows_before}`,
+    `  total_rows_deleted: ${summary.total_rows_deleted}`,
+    `  total_rows_remaining: ${summary.total_rows_remaining}`,
+    `  failed_tables (${summary.failed_tables.length}): ${
+      summary.failed_tables.length > 0 ? summary.failed_tables.join(", ") : "(none)"
+    }`,
+    `  strict_mode: ${summary.strict_mode}`,
+    `  completed_with_warnings: ${summary.completed_with_warnings}`,
+    "",
+    "Top remaining tables by row count:",
+  )
+
+  if (summary.top_remaining_tables.length === 0) {
+    lines.push("  (none)")
+  } else {
+    for (const row of summary.top_remaining_tables) {
+      lines.push(`  - growth.${row.table}: ${row.rows_remaining} row(s)`)
+    }
+  }
+
+  if (summary.failed_tables.length > 0) {
+    lines.push(
+      "",
+      "Permission or delete failures did not abort the reset. Remaining Home rows may come from failed tables or tables outside inventory.",
+    )
   }
 
   lines.push("")
