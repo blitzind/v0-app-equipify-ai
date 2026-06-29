@@ -10,5 +10,5 @@ export default async function GrowthEngineSettingsSectionPage({ params }: PagePr
   const { sectionId } = await params
   if (!getWorkspaceSettingsGrowthEngineSection(sectionId)) notFound()
 
-  return <WorkspaceSettingsGrowthEngineSectionPage sectionId={sectionId} />
+  return <WorkspaceSettingsGrowthEngineSectionPage />
 }
