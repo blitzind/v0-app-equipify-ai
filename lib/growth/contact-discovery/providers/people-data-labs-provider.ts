@@ -7,8 +7,7 @@ import type {
 } from "@/lib/growth/contact-discovery/contact-discovery-provider-types"
 import { mapPdlPeopleToContactDiscoveryRaw } from "@/lib/growth/providers/pdl/pdl-person-mapper"
 import {
-  isPdlApiConfigured,
-  isPdlDiscoveryDisabled,
+  isPdlProviderConfigured,
   searchPdlPeopleByCompany,
 } from "@/lib/growth/providers/pdl/pdl-client"
 import { GROWTH_PDL_PROVIDER_QA_MARKER } from "@/lib/growth/providers/pdl/pdl-types"
@@ -21,7 +20,7 @@ export function createPeopleDataLabsContactDiscoveryProvider(
   return {
     provider_name: "people_data_labs",
     provider_type: "future_people_data_labs",
-    isConfigured: () => isPdlApiConfigured() && !isPdlDiscoveryDisabled(),
+    isConfigured: () => isPdlProviderConfigured(),
     discover: async (input: GrowthContactDiscoveryProviderQuery) => {
       const domain = input.domain?.trim() || null
       const companyName = input.company_name.trim()

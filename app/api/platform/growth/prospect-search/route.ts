@@ -210,6 +210,7 @@ export async function POST(request: Request) {
   const actionResult = await executeProspectSearchAction(access.admin, {
     action: action as GrowthProspectSearchResultAction,
     userId: access.userId,
+    userEmail: access.userEmail,
     query: typeof body.query === "string" ? body.query : "",
     filters:
       body.filters && typeof body.filters === "object"

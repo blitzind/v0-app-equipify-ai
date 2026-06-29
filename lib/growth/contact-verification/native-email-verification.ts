@@ -1,6 +1,7 @@
 /**
- * GE-EI-IMP-5A — AI OS native email verification engine (diagnostic foundation).
- * Deterministic syntax/domain/DNS checks only. No SMTP probing. Not default runtime path.
+ * GE-EI-IMP-5A / GE-VERIFY-1A — AI OS native email verification engine.
+ * Deterministic syntax/domain/DNS checks. No SMTP probing. Authoritative when
+ * GROWTH_NATIVE_VERIFICATION_AUTHORITATIVE=true.
  */
 
 import {

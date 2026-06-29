@@ -55,3 +55,59 @@ export type PdlPersonSearchResult = {
   query_summary: string
   error?: string | null
 }
+
+export type PdlCompanyRecord = {
+  id?: string | null
+  name?: string | null
+  website?: string | null
+  industry?: string | null
+  size?: string | null
+  employee_count?: number | null
+  inferred_revenue?: string | null
+  location?: {
+    name?: string | null
+    locality?: string | null
+    region?: string | null
+    country?: string | null
+  } | null
+  linkedin_url?: string | null
+  tags?: string[] | null
+  tech?: string[] | null
+  summary?: string | null
+}
+
+export type PdlCompanyEnrichInput = {
+  domain?: string | null
+  company_name?: string | null
+  website?: string | null
+}
+
+export type PdlCompanyEnrichResult = {
+  qa_marker: typeof GROWTH_PDL_PROVIDER_QA_MARKER
+  status: "success" | "skipped" | "failed"
+  message: string
+  company: PdlCompanyRecord | null
+  sandbox: boolean
+  query_summary: string
+  error?: string | null
+}
+
+export type PdlPersonEnrichInput = {
+  email?: string | null
+  phone?: string | null
+  linkedin_url?: string | null
+  name?: string | null
+  company?: string | null
+  domain?: string | null
+}
+
+export type PdlPersonEnrichResult = {
+  qa_marker: typeof GROWTH_PDL_PROVIDER_QA_MARKER
+  status: "success" | "skipped" | "failed"
+  message: string
+  person: PdlPersonRecord | null
+  sandbox: boolean
+  query_summary: string
+  likelihood: number | null
+  error?: string | null
+}

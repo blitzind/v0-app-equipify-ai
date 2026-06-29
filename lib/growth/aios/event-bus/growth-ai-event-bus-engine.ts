@@ -74,6 +74,8 @@ export const GROWTH_AI_EVENT_BUS_SUBSCRIBER_DEFINITIONS: readonly GrowthAiEventB
       "decision.",
       "agent.",
       "mission.signal",
+      "revenue.",
+      "daily_work_queue.",
     ],
   },
   {

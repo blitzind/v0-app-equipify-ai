@@ -21,6 +21,11 @@ import {
   getApolloRunGuardrailSnapshot,
   resetApolloRunGuardrails,
 } from "@/lib/growth/providers/apollo/apollo-run-guardrails"
+import {
+  beginPdlRunGuardrails,
+  getPdlRunGuardrailSnapshot,
+  resetPdlRunGuardrails,
+} from "@/lib/growth/providers/pdl/pdl-run-guardrails"
 import { isDiscoveryProviderRuntimeEnabled } from "@/lib/growth/prospect-search/prospect-search-discovery-provider-controls"
 import { isApolloDiscoveryDisabled } from "@/lib/growth/providers/apollo/apollo-config"
 import { isPdlDiscoveryDisabled } from "@/lib/growth/providers/pdl/pdl-config"
@@ -165,6 +170,7 @@ export async function executeProspectDiscoveryStage(
         break
       }
       beginApolloRunGuardrails()
+      beginPdlRunGuardrails()
       try {
         const maxCompanies = input.certification_mode ? 2 : Math.min(5, ctx.budget.max_companies)
         for (const company of ctx.companies.slice(0, maxCompanies)) {
@@ -181,8 +187,11 @@ export async function executeProspectDiscoveryStage(
         const snapshot = getApolloRunGuardrailSnapshot()
         credits_delta = snapshot?.credits_estimate ?? 0
         ctx.budget.apollo_credits_consumed += credits_delta
+        const pdlSnapshot = getPdlRunGuardrailSnapshot()
+        ctx.budget.pdl_lookups_consumed += pdlSnapshot?.lookups ?? 0
       } finally {
         resetApolloRunGuardrails()
+        resetPdlRunGuardrails()
       }
       message = `Discovered ${contacts_delta} contacts across selected companies.`
       break

@@ -166,6 +166,21 @@ export async function processSmsInboundReply(
     deduped: ingestion.deduped,
   })
 
+  if (input.conversation.leadId) {
+    const { emitSmsRevenueOutcome } = await import(
+      "@/lib/growth/revenue-outcomes/revenue-outcome-runtime-bridge"
+    )
+    emitSmsRevenueOutcome(admin, {
+      leadId: input.conversation.leadId,
+      outcome: "replied",
+      executionId: `sms:reply:${input.providerMessageId}`,
+      runtime: "sms_inbound_webhook",
+      occurredAt: input.messageTimestamp,
+      sequenceId: sequenceEnrollmentId,
+      metadata: { provider_message_id: input.providerMessageId },
+    })
+  }
+
   return {
     inboxMessageId,
     ingestionEventId: ingestion.ingestionEventId,

@@ -9,6 +9,16 @@ import { GROWTH_LEAD_RESEARCH_WORKFLOW_STATUS_EVENT } from "@/lib/growth/aios/gr
 import {
   GROWTH_AUTONOMOUS_OUTBOUND_EVENT_TYPES,
 } from "@/lib/growth/aios/outbound/growth-autonomous-outbound-scope-types"
+import { GROWTH_DAILY_WORK_QUEUE_LEARNING_EVENT } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-types"
+import {
+  mapRevenueOutcomeToLearning,
+  resolveRevenueOutcomeLearningChannel,
+} from "@/lib/growth/revenue-outcomes/revenue-outcome-learning-map"
+import {
+  GROWTH_REVENUE_OUTCOME_EVENT,
+  type RevenueOutcomeChannel,
+  type RevenueOutcomeResult,
+} from "@/lib/growth/revenue-outcomes/revenue-outcome-types"
 import { GROWTH_REVENUE_DIRECTOR_DISPATCH_CORRELATION_EVENT_TYPES } from "@/lib/growth/aios/revenue-director/growth-revenue-director-dispatch-correlation-types"
 import type {
   GrowthLearningChannel,
@@ -93,6 +103,74 @@ function baseOutcome(
 
 export function normalizeLearningOutcomeFromEvent(event: AiOsEvent): GrowthLearningOutcome | null {
   const payload = event.payload ?? {}
+
+  if (event.eventType === GROWTH_REVENUE_OUTCOME_EVENT) {
+    const channel = String(payload.channel ?? "email") as RevenueOutcomeChannel
+    const outcome = String(payload.outcome ?? "completed") as RevenueOutcomeResult
+    const mapped = mapRevenueOutcomeToLearning({ channel, outcome })
+    const learningChannel = resolveRevenueOutcomeLearningChannel(channel)
+    return baseOutcome(event, {
+      source: mapped.source,
+      outcomeType: mapped.outcomeType,
+      signalStrength: mapped.signalStrength,
+      confidence:
+        typeof payload.confidence === "number"
+          ? payload.confidence > 1
+            ? payload.confidence / 100
+            : payload.confidence
+          : 0.82,
+      related: {
+        campaignId: typeof payload.campaign_id === "string" ? payload.campaign_id : undefined,
+        sequenceId: typeof payload.sequence_id === "string" ? payload.sequence_id : undefined,
+        taskKey: typeof payload.execution_id === "string" ? payload.execution_id : undefined,
+      },
+      dimensions: learningChannel ? { channel: learningChannel } : {},
+      evidence: [
+        { source: "revenue_outcome", label: "runtime", value: String(payload.runtime ?? "") },
+        { source: "revenue_outcome", label: "action", value: String(payload.action ?? "") },
+        { source: "revenue_outcome", label: "outcome", value: outcome },
+      ],
+    })
+  }
+
+  if (event.eventType === GROWTH_DAILY_WORK_QUEUE_LEARNING_EVENT) {
+    const channel = channelFromPayload(payload)
+    const outcomeTypeRaw = String(payload.outcome_type ?? "")
+    const outcomeRaw = String(payload.outcome ?? "completed")
+    const outcomeType: GrowthLearningOutcomeType =
+      outcomeTypeRaw === "meeting_booked"
+        ? "meeting_booked"
+        : outcomeTypeRaw === "disqualified"
+          ? "rejected"
+          : outcomeRaw === "failed"
+            ? "failed"
+            : outcomeRaw === "skipped"
+              ? "cancelled"
+              : "completed"
+    const sourceMap: Record<string, GrowthLearningOutcomeSource> = {
+      email: "email",
+      call: "call",
+      sms: "sms",
+      voice_drop: "voice_drop",
+      video: "video",
+      linkedin_manual: "email",
+    }
+    const source = channel ? (sourceMap[channel] ?? "workflow_agent") : "workflow_agent"
+    return baseOutcome(event, {
+      source,
+      outcomeType,
+      signalStrength: outcomeType === "meeting_booked" ? 0.9 : 0.78,
+      confidence: typeof payload.confidence === "number" ? payload.confidence / 100 : 0.82,
+      related: {
+        taskKey: typeof payload.task_key === "string" ? payload.task_key : undefined,
+      },
+      dimensions: channel ? { channel } : {},
+      evidence: [
+        { source: "daily_work_queue", label: "action", value: String(payload.action ?? "") },
+        { source: "daily_work_queue", label: "priority", value: String(payload.priority ?? "") },
+      ],
+    })
+  }
 
   if (event.eventType === GROWTH_REVENUE_DIRECTOR_DISPATCH_CORRELATION_EVENT_TYPES.completed) {
     return baseOutcome(event, {
@@ -309,6 +387,8 @@ export function normalizeLearningOutcomeFromEvent(event: AiOsEvent): GrowthLearn
 }
 
 export const GROWTH_LEARNING_RELEVANT_EVENT_TYPES = [
+  GROWTH_REVENUE_OUTCOME_EVENT,
+  GROWTH_DAILY_WORK_QUEUE_LEARNING_EVENT,
   GROWTH_REVENUE_DIRECTOR_DISPATCH_CORRELATION_EVENT_TYPES.completed,
   GROWTH_REVENUE_DIRECTOR_DISPATCH_CORRELATION_EVENT_TYPES.failed,
   GROWTH_LEAD_RESEARCH_WORKFLOW_STATUS_EVENT,

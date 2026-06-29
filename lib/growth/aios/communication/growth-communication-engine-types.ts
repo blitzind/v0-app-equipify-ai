@@ -210,6 +210,8 @@ export type GrowthCommunicationEngineContext = {
     policy: number
     signal: number
   }
+  /** SDR-1A — plan for human-approved execution; skip autonomy-outbound channel blocks. */
+  humanApprovalPlanningMode?: boolean
 }
 
 export type GrowthCommunicationEngineReadModel = {

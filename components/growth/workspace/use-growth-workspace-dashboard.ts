@@ -1,8 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import type { AidenDailyBriefing } from "@/lib/growth/aiden/aiden-daily-briefing"
-import type { GrowthCadenceCommandSummary } from "@/lib/growth/cadence/cadence-types"
+import type { DailyRevenueWorkQueue } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-types"
+import type { DailyRevenueWorkQueueDisplaySummary } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-view"
 import type { GrowthOpportunityPipelineDashboard } from "@/lib/growth/opportunity-pipeline/pipeline-types"
 import {
   buildGrowthWorkspaceDashboardViewModel,
@@ -10,7 +10,7 @@ import {
 } from "@/lib/growth/workspace/growth-workspace-dashboard-mapper"
 import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
 
-const WORKSPACE_DASHBOARD_FETCH_BATCH_MARKER = "growth-workspace-dashboard-fetch-batch-v1" as const
+const WORKSPACE_DASHBOARD_FETCH_BATCH_MARKER = "growth-workspace-dashboard-fetch-batch-v2" as const
 
 async function fetchJson<T>(url: string): Promise<T | null> {
   try {
@@ -37,6 +37,7 @@ export async function loadGrowthWorkspaceDashboardSources(): Promise<GrowthWorks
     conversationPayload,
     relationshipPayload,
     callsPayload,
+    dailyQueuePayload,
   ] = await Promise.all([
     fetchJson<{ ok?: boolean; briefing?: AidenDailyBriefing }>("/api/platform/growth/aiden/briefing"),
     fetchJson<{ ok?: boolean; sections?: GrowthWorkspaceDashboardSourcePayload["leadInboxSections"] }>(
@@ -72,6 +73,12 @@ export async function loadGrowthWorkspaceDashboardSources(): Promise<GrowthWorks
     fetchJson<{ ok?: boolean; workspaceDashboard?: { stats?: { callsToday?: number } } | null }>(
       "/api/platform/growth/calls/dashboard",
     ),
+    fetchJson<{
+      ok?: boolean
+      enabled?: boolean
+      queue?: DailyRevenueWorkQueue | null
+      display?: DailyRevenueWorkQueueDisplaySummary | null
+    }>("/api/platform/growth/daily-revenue-work-queue"),
   ])
 
   return {
@@ -86,6 +93,11 @@ export async function loadGrowthWorkspaceDashboardSources(): Promise<GrowthWorks
     conversationDashboard: conversationPayload?.ok ? (conversationPayload.dashboard ?? null) : null,
     relationshipDashboard: relationshipPayload?.ok ? (relationshipPayload.dashboard ?? null) : null,
     callsDashboard: callsPayload?.ok ? { workspaceDashboard: callsPayload.workspaceDashboard ?? null } : null,
+    dailyRevenueWorkQueueEnabled: dailyQueuePayload?.ok === true && dailyQueuePayload.enabled === true,
+    dailyRevenueWorkQueue:
+      dailyQueuePayload?.ok && dailyQueuePayload.enabled ? (dailyQueuePayload.queue ?? null) : null,
+    dailyRevenueWorkQueueDisplay:
+      dailyQueuePayload?.ok && dailyQueuePayload.enabled ? (dailyQueuePayload.display ?? null) : null,
   }
 }
 
@@ -114,6 +126,9 @@ export function useGrowthWorkspaceDashboard() {
         conversationDashboard: null,
         relationshipDashboard: null,
         callsDashboard: null,
+        dailyRevenueWorkQueueEnabled: false,
+        dailyRevenueWorkQueue: null,
+        dailyRevenueWorkQueueDisplay: null,
       }))
     } finally {
       setLoading(false)

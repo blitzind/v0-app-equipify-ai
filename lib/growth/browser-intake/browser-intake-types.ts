@@ -1,6 +1,6 @@
 /** Browser extension Growth intake — client-safe types. */
 
-import type { NormalizedImportRow } from "@/lib/growth/import/types"
+import type { UnifiedRevenueWorkflowResult } from "@/lib/growth/revenue-workflow/unified-lead-intake-types"
 import {
   normalizeEmail,
   normalizeLinkedIn,
@@ -102,6 +102,7 @@ export type GrowthBrowserIntakeResultBase = {
   capture_type?: "company_only" | "contact"
   email_status?: string | null
   verified_by_provider?: boolean
+  workflow?: UnifiedRevenueWorkflowResult | null
 }
 
 export type GrowthBrowserIntakeResult =

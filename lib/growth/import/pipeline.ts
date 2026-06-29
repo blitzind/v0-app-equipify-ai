@@ -39,6 +39,11 @@ import {
   emitGrowthLeadImportCreatedTimeline,
   emitGrowthLeadImportUpdatedTimeline,
 } from "@/lib/growth/timeline-emitter"
+import {
+  importRowToIntakeContact,
+  runUnifiedRevenueWorkflowAfterIntake,
+  workflowResultNeedsReview,
+} from "@/lib/growth/revenue-workflow/unified-revenue-workflow-intake-runner"
 
 type Actor = { userId: string; email: string }
 
@@ -272,6 +277,8 @@ export async function runGrowthImportCommit(
   let duplicate = 0
   let error = 0
   let estimatedCallReadyLeads = 0
+  let workflowPrepared = 0
+  let needsReview = 0
   const normalizedRows: NormalizedImportRow[] = []
   const commitPreviews: ImportRowPreview[] = []
 
@@ -391,6 +398,27 @@ export async function runGrowthImportCommit(
             estimatedCallReadyLeads++
           }
 
+          const workflowRun = await runUnifiedRevenueWorkflowAfterIntake({
+            admin,
+            actor: input.actor,
+            source: "csv_import",
+            leadId: lead.id,
+            company: {
+              name: normalized.companyName,
+              website: normalized.website,
+            },
+            contact: importRowToIntakeContact(normalized),
+            metadata: {
+              externalRef,
+              batchId,
+              rowIndex,
+            },
+          })
+          if (workflowRun.workflow) {
+            workflowPrepared++
+            if (workflowResultNeedsReview(workflowRun.workflow)) needsReview++
+          }
+
           await upsertGrowthImportBatchRowOutcome(admin, batchId, {
             rowIndex,
             status: "updated",
@@ -451,6 +479,27 @@ export async function runGrowthImportCommit(
           estimatedCallReadyLeads++
         }
 
+        const workflowRun = await runUnifiedRevenueWorkflowAfterIntake({
+          admin,
+          actor: input.actor,
+          source: "csv_import",
+          leadId: lead.id,
+          company: {
+            name: normalized.companyName,
+            website: normalized.website,
+          },
+          contact: importRowToIntakeContact(normalized),
+          metadata: {
+            externalRef,
+            batchId,
+            rowIndex,
+          },
+        })
+        if (workflowRun.workflow) {
+          workflowPrepared++
+          if (workflowResultNeedsReview(workflowRun.workflow)) needsReview++
+        }
+
         await upsertGrowthImportBatchRowOutcome(admin, batchId, {
           rowIndex,
           status: "imported",
@@ -473,6 +522,8 @@ export async function runGrowthImportCommit(
       error,
       previews: commitPreviews,
       estimatedCallReadyLeads,
+      workflowPrepared,
+      needsReview,
     })
 
     const finalStatus = error > 0 && imported + updated === 0 ? "failed" : error > 0 ? "partial" : "completed"

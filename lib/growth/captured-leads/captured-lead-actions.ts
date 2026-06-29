@@ -20,6 +20,7 @@ import { fetchGrowthLeadById, updateGrowthLeadFromImportMerge } from "@/lib/grow
 import { nativeCallWorkspaceHref } from "@/lib/growth/native-dialer/native-dialer-navigation"
 import { seedNativeDialerQueueFromCallQueue } from "@/lib/growth/native-dialer/native-dialer-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
+import { scheduleUnifiedRevenueWorkflowLifecycleReEvaluation } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lifecycle-runner"
 import { createGrowthSequenceEnrollmentDraft } from "@/lib/growth/sequence-enrollment/sequence-enrollment-orchestrator"
 
 function asString(value: unknown): string {
@@ -110,6 +111,13 @@ export async function runCapturedLeadAction(
 
     await patchLeadMetadata(admin, lead.id, buildEmailVerificationMetadata(verification))
     await recomputeGrowthLeadWorkflowSignals(admin, lead.id)
+
+    void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+      admin,
+      leadId: lead.id,
+      event: "operator_verify_email",
+      actor: { userId: input.actorUserId, email: input.actorEmail },
+    })
 
     logGrowthEngine("captured_lead_email_verified", {
       leadId: lead.id,

@@ -290,6 +290,7 @@ export function buildMeetingPrepObjectives(input: {
   research: GrowthResearchRunPublicView | null
   openRisks: MeetingPrepOpenRisk[]
   accountPlaybookContext?: MeetingPrepAccountPlaybookContext | null
+  nativeMeetingPrepObjective?: MeetingPrepObjective | null
 }): MeetingPrepObjective[] {
   const objectives: MeetingPrepObjective[] = []
   const stage = (input.buyingStage.stage ?? "").toLowerCase()
@@ -374,6 +375,10 @@ export function buildMeetingPrepObjectives(input: {
 
   if (input.accountPlaybookContext?.accountLevelObjective) {
     objectives.unshift(input.accountPlaybookContext.accountLevelObjective)
+  }
+
+  if (input.nativeMeetingPrepObjective) {
+    objectives.unshift(input.nativeMeetingPrepObjective)
   }
 
   return objectives
@@ -513,6 +518,7 @@ export function assembleMeetingPrepBundle(input: {
     research: input.research,
     openRisks,
     accountPlaybookContext: input.accountPlaybookContext,
+    nativeMeetingPrepObjective: input.contactIntelligence?.native_meeting_prep_objective ?? null,
   })
   const readiness = computeMeetingPrepReadiness({
     lead: input.lead,

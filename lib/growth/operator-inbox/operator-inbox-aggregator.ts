@@ -22,6 +22,12 @@ import {
   filterOperatorInboxItems,
   rankOperatorInboxItems,
 } from "@/lib/growth/operator-inbox/operator-inbox-priority"
+import type { DailyRevenueWorkQueue } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-types"
+import {
+  isHumanApprovalInterruptSource,
+  isReplyInterruptSource,
+  rankItemsWithDailyWorkQueue,
+} from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-integration"
 
 function mapPriority(value: string, confidence = 0): OperatorInboxPriority {
   if (value === "urgent" || value === "critical") return "urgent"
@@ -213,6 +219,7 @@ export function aggregateOperatorInboxQueue(input: {
   recommendedActions?: Array<{ recommendation: GrowthInboxOrchestratedRecommendation; leadId: string | null }>
   filter?: import("@/lib/growth/operator-inbox/operator-inbox-types").OperatorInboxFilter
   limit?: number
+  dailyRevenueWorkQueue?: DailyRevenueWorkQueue | null
 }): OperatorInboxQueueResponse {
   const merged: OperatorInboxItem[] = [
     ...(input.signals ?? []).map(normalizeSignalFeedItem),
@@ -226,7 +233,18 @@ export function aggregateOperatorInboxQueue(input: {
   ]
 
   const filtered = filterOperatorInboxItems(merged, input.filter ?? "all")
-  const ranked = rankOperatorInboxItems(filtered)
+  const ranked = input.dailyRevenueWorkQueue
+    ? rankItemsWithDailyWorkQueue({
+        items: filtered,
+        queue: input.dailyRevenueWorkQueue,
+        resolveLeadId: (item) => item.lead_id,
+        resolveInterrupt: (item) =>
+          isReplyInterruptSource(item.source) ||
+          isHumanApprovalInterruptSource(item.source) ||
+          item.priority === "urgent",
+        fallbackCompare: (left, right) => rankOperatorInboxItems([left, right])[0] === left ? -1 : 1,
+      })
+    : rankOperatorInboxItems(filtered)
   const limit = Math.min(Math.max(input.limit ?? 40, 1), 100)
   const items = ranked.slice(0, limit)
 

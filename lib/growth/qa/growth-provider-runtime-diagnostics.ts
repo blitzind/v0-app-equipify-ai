@@ -11,7 +11,9 @@ import {
 import {
   getPdlApiKey,
   isPdlApiConfigured,
+  isPdlContactDiscoveryEnabled,
   isPdlDiscoveryDisabled,
+  isPdlProviderConfigured,
   isPdlSandboxEnabled,
   resolvePdlSandboxEnvConfig,
 } from "@/lib/growth/providers/pdl/pdl-config"
@@ -53,6 +55,8 @@ export type GrowthProviderRuntimeDiagnosticsSnapshot = {
     pdl_sandbox_enabled: boolean
     pdl_sandbox_env_raw: string | null
     pdl_sandbox_env_explicit: boolean
+    pdl_contact_discovery_enabled: boolean
+    isPdlProviderConfigured: boolean
   }
   production_safe: boolean
 }
@@ -120,6 +124,8 @@ export function buildGrowthProviderRuntimeDiagnosticsSnapshot(
       pdl_sandbox_enabled: pdlSandboxEnv.env_sandbox_enabled,
       pdl_sandbox_env_raw: pdlSandboxEnv.env_raw,
       pdl_sandbox_env_explicit: pdlSandboxEnv.env_explicit,
+      pdl_contact_discovery_enabled: isPdlContactDiscoveryEnabled(env),
+      isPdlProviderConfigured: isPdlProviderConfigured(env),
     },
     production_safe:
       isZeroBounce &&

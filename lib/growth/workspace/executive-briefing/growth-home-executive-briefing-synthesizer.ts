@@ -124,7 +124,13 @@ import {
   countTotalServiceMissions,
   type GrowthHomeServiceMissionInput,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-service-mission-synthesizer"
+import { buildAiOsUxViewModel } from "@/lib/growth/workspace/executive-briefing/growth-home-ai-os-ux-synthesizer"
+import {
+  hasCanonicalDailyWorkQueue,
+  pickTopCanonicalQueueActionItem,
+} from "@/lib/growth/workspace/executive-briefing/growth-home-canonical-queue-mapper"
 import { AIDEN_DAILY_BRIEFING_QA_MARKER } from "@/lib/growth/aiden/aiden-daily-briefing"
+import { GROWTH_DAILY_REVENUE_WORK_QUEUE_QA_MARKER } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-types"
 
 const ATTENTION_LIMIT = 5
 const BUSINESS_SNAPSHOT_LIMIT = 6
@@ -395,6 +401,33 @@ function buildRecommendations(dashboard: GrowthWorkspaceDashboardViewModel): {
   primary: GrowthHomeRecommendation | null
   additional: GrowthHomeRecommendation[]
 } {
+  if (
+    hasCanonicalDailyWorkQueue(dashboard) &&
+    dashboard.dailyRevenueWorkQueue &&
+    dashboard.dailyRevenueWorkQueueDisplay
+  ) {
+    const top = pickTopCanonicalQueueActionItem(
+      dashboard.dailyRevenueWorkQueue,
+      dashboard.dailyRevenueWorkQueueDisplay,
+    )
+    if (top) {
+      return {
+        primary: {
+          id: `rec-queue-${top.leadId}`,
+          headline: `Start with ${top.companyName}`,
+          whyItMatters: top.reasoning || `${top.actionLabel} is the highest-ranked item in today's revenue queue.`,
+          expectedImpact: `${top.actionLabel} via ${top.channelLabel}`,
+          estimatedRevenue: null,
+          timeRequired: "About 10 minutes",
+          primaryCtaLabel: top.requiresHumanApproval ? "Review and approve" : "Take action",
+          primaryCtaHref: top.href,
+          dismissible: true,
+        },
+        additional: [],
+      }
+    }
+  }
+
   const recommendations: GrowthHomeRecommendation[] = []
   const briefing = dashboard.briefing
   const weightedPipeline = metricValue(dashboard, "pipeline-snapshot", "Weighted pipeline")
@@ -1145,6 +1178,13 @@ export function synthesizeGrowthHomeExecutiveBriefing(
     initiativeRecommendations,
     waitingOnYouResult.items,
   )
+  const aiOsUx = buildAiOsUxViewModel({
+    dashboard,
+    executiveBrief,
+    waitingOnYou: waitingOnYouResult.items,
+    waitingOnYouOverflow: waitingOnYouResult.overflowCount,
+    needsReview,
+  })
   const sinceWeLastMet = buildSinceWeLastMet(continuityInput)
   const whatChanged = buildWhatChanged(continuityInput)
   const recommendationContinuity = buildRecommendationContinuity(continuityInput)
@@ -1214,6 +1254,7 @@ export function synthesizeGrowthHomeExecutiveBriefing(
     serviceFollowUps,
     operationalInsights,
     serviceContribution,
+    aiOsUx,
   }
 }
 
@@ -1333,6 +1374,71 @@ export function buildGrowthHomeExecutiveBriefingCertDashboard(): GrowthWorkspace
     },
     operatorName: "Michael",
     recommendedAction: "Approve the Precision Biomedical campaign.",
+    leadInboxHighlights: [],
+    dailyRevenueWorkQueueEnabled: true,
+    dailyRevenueWorkQueue: {
+      version: 1,
+      qa_marker: GROWTH_DAILY_REVENUE_WORK_QUEUE_QA_MARKER,
+      generatedAt: new Date("2026-06-25T09:00:00.000Z").toISOString(),
+      totalAccounts: 2,
+      estimatedWorkloadMinutes: 45,
+      suggestedDailyCapacity: 35,
+      channelAllocation: { email: 1 },
+      critical: [
+        {
+          leadId: "lead-precision-biomedical",
+          companyId: "lead-precision-biomedical",
+          priority: "critical",
+          action: "send_email",
+          communicationStrategy: {
+            primaryChannel: "email",
+            recommendedAction: "send_email",
+            confidence: 88,
+            requiresHumanApproval: true,
+          },
+          recommendedChannel: "email",
+          estimatedMinutes: 10,
+          confidence: 88,
+          requiresHumanApproval: true,
+          dueAt: null,
+          reasoning: ["Precision Biomedical is sequence-ready and awaiting approval."],
+          sortScore: 100,
+          taskKey: "lead-precision-biomedical:send_email",
+        },
+      ],
+      high: [],
+      medium: [],
+      low: [],
+      waiting: [],
+      blocked: [],
+      completed: [],
+    },
+    dailyRevenueWorkQueueDisplay: {
+      qa_marker: GROWTH_DAILY_REVENUE_WORK_QUEUE_QA_MARKER,
+      generated_at: new Date("2026-06-25T09:00:00.000Z").toISOString(),
+      total_accounts: 2,
+      actionable_count: 1,
+      waiting_count: 0,
+      blocked_count: 0,
+      estimated_workload_minutes: 45,
+      suggested_daily_capacity: 35,
+      channel_summary: "1 Email",
+      bucket_counts: { critical: 1, high: 0, medium: 0, waiting: 0, blocked: 0 },
+      top_items: [
+        {
+          lead_id: "lead-precision-biomedical",
+          company_id: "lead-precision-biomedical",
+          company_name: "Precision Biomedical",
+          priority: "critical",
+          action_label: "Send email",
+          channel_label: "Email",
+          confidence: 88,
+          reasoning: "Precision Biomedical is sequence-ready and awaiting approval.",
+          estimated_minutes: 10,
+          requires_human_approval: true,
+        },
+      ],
+    },
   }
 }
 

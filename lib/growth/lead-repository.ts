@@ -619,6 +619,12 @@ export async function updateGrowthLead(
     throw new Error("empty_patch")
   }
 
+  let previousStatus: GrowthLead["status"] | undefined
+  if (input.status !== undefined) {
+    const existing = await fetchGrowthLeadById(admin, leadId)
+    previousStatus = existing?.status
+  }
+
   const select = leadSelectFor(await isGrowthLeadArchiveSchemaReady(admin))
   const { data, error } = await growthLeadsTable(admin)
     .update(patch)
@@ -654,6 +660,17 @@ export async function updateGrowthLead(
       source: "lead",
       event: "lead.status",
     })
+
+    if (previousStatus && previousStatus !== lead.status) {
+      void import("@/lib/growth/revenue-outcomes/revenue-outcome-runtime-bridge").then(
+        ({ emitLeadLifecycleRevenueOutcomeIfNeeded }) =>
+          emitLeadLifecycleRevenueOutcomeIfNeeded(admin, {
+            leadId: lead.id,
+            previousStatus,
+            nextStatus: lead.status,
+          }),
+      )
+    }
   }
 
   return lead

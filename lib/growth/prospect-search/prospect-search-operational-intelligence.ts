@@ -1,5 +1,8 @@
 /** Operational intelligence orchestrator — emergence, sequence readiness, alerts. Client-safe. */
 
+import type { NativeRevenueDecisionAuthoritativeBundle } from "@/lib/growth/contact-verification/native-revenue-decision-adapter"
+import { resolveAuthoritativeSequenceReadiness } from "@/lib/growth/contact-verification/native-revenue-decision-adapter"
+
 import type { ProspectSearchAccountContactStrategy } from "@/lib/growth/prospect-search/prospect-search-account-contact-strategy"
 import type { ProspectSearchCompanyContactCoverageIntelligence } from "@/lib/growth/prospect-search/prospect-search-company-contact-coverage-intelligence"
 import type { ProspectSearchRelationshipIntelligenceBundle } from "@/lib/growth/prospect-search/prospect-search-relationship-intelligence"
@@ -11,7 +14,6 @@ import {
   type ProspectSearchOpportunityEmergence,
 } from "@/lib/growth/prospect-search/prospect-search-opportunity-emergence"
 import {
-  resolveAccountSequenceReadiness,
   resolveSequenceReadinessQueueBoost,
   type ProspectSearchSequenceReadiness,
 } from "@/lib/growth/prospect-search/prospect-search-sequence-readiness"
@@ -33,6 +35,7 @@ export function buildProspectSearchOperationalIntelligence(input: {
   accountStrategy: ProspectSearchAccountContactStrategy
   relationshipBundle: ProspectSearchRelationshipIntelligenceBundle
   territory_score?: number | null
+  nativeDecisionBundle?: NativeRevenueDecisionAuthoritativeBundle | null
 }): ProspectSearchOperationalIntelligenceBundle {
   const opportunity_emergence = detectProspectSearchOpportunityEmergence({
     company: input.company,
@@ -44,14 +47,17 @@ export function buildProspectSearchOperationalIntelligence(input: {
     territory_score: input.territory_score,
   })
 
-  const sequence_readiness = resolveAccountSequenceReadiness({
-    company: input.company,
-    peopleRows: input.peopleRows,
-    coverage: input.coverage,
-    accountStrategy: input.accountStrategy,
-    relationshipMemory: input.relationshipBundle.relationship_memory,
-    accountProgression: input.relationshipBundle.account_progression,
-    opportunityEmergence: opportunity_emergence,
+  const sequence_readiness = resolveAuthoritativeSequenceReadiness({
+    legacyInput: {
+      company: input.company,
+      peopleRows: input.peopleRows,
+      coverage: input.coverage,
+      accountStrategy: input.accountStrategy,
+      relationshipMemory: input.relationshipBundle.relationship_memory,
+      accountProgression: input.relationshipBundle.account_progression,
+      opportunityEmergence: opportunity_emergence,
+    },
+    nativeBundle: input.nativeDecisionBundle,
   })
 
   const operating_alerts = buildProspectSearchOperatingAlerts({

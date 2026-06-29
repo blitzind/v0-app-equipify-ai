@@ -54,6 +54,10 @@ import { resolveProspectSearchContactEligibilityHints } from "@/lib/growth/prosp
 import { finalizeProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-result-finalize"
 import { normalizePhoneNumber } from "@/lib/voice/phone-normalization"
 import { shadowLogAccountOutreachStrategyFromProspectSearch } from "@/lib/growth/contact-verification/account-outreach-strategy-shadow"
+import {
+  applyNativeRevenueDecisionToContactIntelligence,
+  resolveNativeRevenueDecisionAuthoritativeBundle,
+} from "@/lib/growth/contact-verification/native-revenue-decision-adapter"
 
 function isPipelineRun(value: unknown): value is GrowthLeadEnginePipelineRun {
   if (!value || typeof value !== "object") return false
@@ -436,6 +440,19 @@ export async function loadProspectSearchContactIntelligenceBatch(
             contact_count: intelligence.contacts.length,
           },
         })
+
+        const nativeBundle = await resolveNativeRevenueDecisionAuthoritativeBundle({
+          buildInput: {
+            companyId: company.id,
+            companyName: company.company_name,
+            website: company.website ?? null,
+            intelligence,
+            isSuppressed: company.is_suppressed,
+          },
+        })
+        if (nativeBundle) {
+          intelligence = applyNativeRevenueDecisionToContactIntelligence(intelligence, nativeBundle)
+        }
 
         map.set(key, intelligence)
       } catch {

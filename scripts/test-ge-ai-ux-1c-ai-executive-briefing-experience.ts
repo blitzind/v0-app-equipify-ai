@@ -108,11 +108,13 @@ const dashboardLayout = readSource("components/growth/workspace/executive-briefi
 function jsxOrder1c(source: string, earlier: string, later: string) {
   assert.ok(source.indexOf(`<${earlier}`) < source.indexOf(`<${later}`))
 }
-jsxOrder1c(dashboardLayout, "GrowthHomeCheckInSection", "GrowthHomeWaitingOnYouSection")
-jsxOrder1c(dashboardLayout, "GrowthHomeWaitingOnYouSection", "GrowthHomeMyPrioritiesSection")
-jsxOrder1c(dashboardLayout, "GrowthHomeMyPrioritiesSection", "GrowthHomeAccomplishmentsSection")
-jsxOrder1c(dashboardLayout, "GrowthHomeMyPrioritiesSection", "GrowthHomeBusinessSnapshotSection")
-jsxOrder1c(dashboardLayout, "GrowthHomeBusinessSnapshotSection", "GrowthHomeTimelineSection")
+jsxOrder1c(dashboardLayout, "GrowthHomeExecutiveBriefingHeroSection", "GrowthHomeAiOsWaitingOnYouSection")
+jsxOrder1c(dashboardLayout, "GrowthHomeAiOsWaitingOnYouSection", "GrowthHomeAvaLiveStatusSection")
+jsxOrder1c(dashboardLayout, "GrowthHomeAvaLiveStatusSection", "GrowthHomeDailyWorkQueueSection")
+jsxOrder1c(dashboardLayout, "GrowthHomeDailyWorkQueueSection", "GrowthHomeActiveRevenueMissionsSection")
+jsxOrder1c(dashboardLayout, "GrowthHomeTimelineSection", "GrowthHomeExecutiveRecommendationSection")
+jsxOrder1c(dashboardLayout, "GrowthHomeExecutiveRecommendationSection", "Collapsible")
+jsxOrder1c(dashboardLayout, "CollapsibleContent", "GrowthHomeBusinessSnapshotSection")
 console.log("  ✓ visual hierarchy order enforced in layout component")
 
 console.log(`[GE-AI-UX-1C] PASS — ${GE_AI_UX_1C_QA_MARKER}`)

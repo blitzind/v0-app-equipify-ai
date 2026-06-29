@@ -3,6 +3,7 @@ import { z } from "zod"
 import { logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { createManualGrowthContact } from "@/lib/growth/manual-entry/create-manual-growth-contact"
 import { GROWTH_MANUAL_CONTACT_ENTRY_QA_MARKER } from "@/lib/growth/manual-entry/manual-contact-entry-types"
+import { runUnifiedRevenueWorkflowAfterIntake } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-intake-runner"
 
 export const runtime = "nodejs"
 
@@ -72,11 +73,37 @@ export async function POST(request: Request) {
             ? 409
             : 500
 
+    let workflow = null
+    if (result.status === "created" || result.status === "linked_duplicate") {
+      const workflowRun = await runUnifiedRevenueWorkflowAfterIntake({
+        admin: access.admin,
+        actor: { userId: access.userId, email: access.userEmail },
+        source: "manual",
+        leadId: result.lead_id!,
+        company: {
+          name: body.company_name,
+          website: body.website,
+        },
+        contact: {
+          name: body.contact_name,
+          title: body.title,
+          email,
+          phone: body.phone,
+          linkedinUrl: body.linkedin_url,
+        },
+        metadata: {
+          acquisitionRunId: body.acquisition_run_id,
+        },
+      })
+      workflow = workflowRun.workflow
+    }
+
     return NextResponse.json(
       {
         ok: result.status === "created" || result.status === "linked_duplicate",
         qa_marker: GROWTH_MANUAL_CONTACT_ENTRY_QA_MARKER,
         result,
+        workflow,
       },
       { status: statusCode },
     )

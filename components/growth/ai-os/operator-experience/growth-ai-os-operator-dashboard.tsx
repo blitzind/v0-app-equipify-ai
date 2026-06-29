@@ -17,6 +17,7 @@ import { GrowthAiOsOperatorRevenueDirectorCard } from "@/components/growth/ai-os
 import { GrowthAiOsOperatorApprovalsSummary } from "@/components/growth/ai-os/operator-experience/growth-ai-os-operator-approvals-summary"
 import { GrowthAiOsOperatorCommunicationCard } from "@/components/growth/ai-os/operator-experience/growth-ai-os-operator-communication-card"
 import { GrowthAiOsOperatorAiImprovementsSection } from "@/components/growth/ai-os/operator-experience/growth-ai-os-operator-ai-improvements-section"
+import { GrowthAiOsDailyWorkQueueSection } from "@/components/growth/ai-os/operator-experience/growth-ai-os-daily-work-queue-section"
 
 type Props = {
   model: AiOsCommandCenterReadModel
@@ -72,6 +73,11 @@ export function GrowthAiOsOperatorDashboard({ model }: Props) {
   return (
     <div className="space-y-12" data-qa-marker={GROWTH_AI_OS_OPERATOR_EXPERIENCE_QA_MARKER}>
       <GrowthAiOsExecutiveBriefSection brief={view.executiveBrief} lastUpdateLabel={lastUpdateLabel} />
+
+      <GrowthAiOsDailyWorkQueueSection
+        queue={model.dailyRevenueWorkQueue}
+        display={model.dailyRevenueWorkQueueDisplay}
+      />
 
       <GrowthAiOsOperatorRevenueDirectorCard
         recommendation={view.revenueRecommendation}

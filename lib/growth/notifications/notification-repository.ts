@@ -10,6 +10,9 @@ import type {
   GrowthNotificationType,
 } from "@/lib/growth/notifications/notification-types"
 import { GROWTH_NOTIFICATIONS_QA_MARKER } from "@/lib/growth/notifications/notification-types"
+import { fetchDailyRevenueWorkQueue } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-resolver"
+import { boostNotificationPriorityWithDailyWorkQueue } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-integration"
+import { isDailyRevenueWorkQueueEnabled } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-feature"
 
 type NotificationRow = {
   id: string
@@ -264,8 +267,30 @@ export async function listGrowthAttentionFeed(
   if (error) throw new Error(error.message)
 
   const total = count ?? 0
+  let items = ((data ?? []) as NotificationRow[]).map(mapRow)
+
+  if (isDailyRevenueWorkQueueEnabled()) {
+    const dailyQueue = (await fetchDailyRevenueWorkQueue(admin, { limit: 100 })).queue
+    if (dailyQueue) {
+      items = [...items].sort((left, right) => {
+        const leftScore = boostNotificationPriorityWithDailyWorkQueue({
+          leadId: left.leadId,
+          basePriorityScore: left.priorityScore,
+          queue: dailyQueue,
+        })
+        const rightScore = boostNotificationPriorityWithDailyWorkQueue({
+          leadId: right.leadId,
+          basePriorityScore: right.priorityScore,
+          queue: dailyQueue,
+        })
+        if (rightScore !== leftScore) return rightScore - leftScore
+        return right.createdAt.localeCompare(left.createdAt)
+      })
+    }
+  }
+
   return {
-    items: ((data ?? []) as NotificationRow[]).map(mapRow),
+    items,
     total,
     hasMore: offset + limit < total,
   }

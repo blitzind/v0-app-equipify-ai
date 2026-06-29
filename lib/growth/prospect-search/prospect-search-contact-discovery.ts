@@ -1,6 +1,6 @@
 /** Prospect Search contact discovery UX — coverage, people rows, provider honesty. Client-safe. */
 
-import { formatWebsiteExtractEvidenceLabel } from "@/lib/growth/contact-discovery/website-extract-mapper"
+import { isNativeRevenueDecisionEngineEnabledClient } from "@/lib/growth/contact-verification/native-revenue-decision-feature"
 import {
   resolveContactOutreachEligibilityBundle,
   type ProspectSearchContactEligibilityState,
@@ -664,6 +664,10 @@ export function attachProspectSearchCompanyCoverageIntelligence(
   peopleRows: GrowthProspectSearchPeopleResultRow[],
   options?: {
     territoryPrioritization?: ProspectSearchTerritoryOpportunityScore[]
+    nativeDecisionByCompanyId?: Map<
+      string,
+      import("@/lib/growth/contact-verification/native-revenue-decision-adapter").NativeRevenueDecisionAuthoritativeBundle
+    >
   },
 ): GrowthProspectSearchCompanyResult[] {
   const rowsByCompany = new Map<string, GrowthProspectSearchPeopleResultRow[]>()
@@ -821,6 +825,8 @@ export function attachProspectSearchCompanyCoverageIntelligence(
         (t) => resolveCompanyTerritoryOpportunityBoost(company, [t]) > 0,
       )?.territory_score ?? null
 
+    const nativeDecisionBundle = options?.nativeDecisionByCompanyId?.get(company.id) ?? null
+
     const operationalBundle = buildProspectSearchOperationalIntelligence({
       company,
       peopleRows: contacts,
@@ -828,6 +834,7 @@ export function attachProspectSearchCompanyCoverageIntelligence(
       accountStrategy,
       relationshipBundle,
       territory_score: territoryScore,
+      nativeDecisionBundle,
     })
 
     let finalStrategy = applyOperationalIntelligenceQueueBoost(
@@ -846,6 +853,7 @@ export function attachProspectSearchCompanyCoverageIntelligence(
       contactInfluences: [...influenceByContact.values()],
       territory_score: territoryScore,
       in_active_queue: company.in_lead_inbox ?? false,
+      nativeDecisionBundle,
     })
 
     finalStrategy = applyOperatorAssistIntelligenceQueueBoost(finalStrategy, operatorAssistBundle)
@@ -913,6 +921,28 @@ export function attachProspectSearchCompanyCoverageIntelligence(
     const intelligence = company.contact_intelligence
     if (!intelligence) return company
 
+    const preserveNativeFromServer =
+      isNativeRevenueDecisionEngineEnabledClient() &&
+      intelligence.native_revenue_decision != null &&
+      nativeDecisionBundle == null
+
+    const authoritativeSequenceReadiness = preserveNativeFromServer && intelligence.sequence_readiness
+      ? intelligence.sequence_readiness
+      : operationalBundle.sequence_readiness
+    const authoritativeOperatorAssist = preserveNativeFromServer && intelligence.operator_assist
+      ? intelligence.operator_assist
+      : operatorAssistBundle
+    const authoritativeOutreachRecommendation = preserveNativeFromServer &&
+      intelligence.outreach_recommendation
+      ? intelligence.outreach_recommendation
+      : operatorAssistBundle.operator_recommendations.top_recommendation
+          ?.recommended_operator_action ??
+        operationalBundle.opportunity_emergence.recommended_next_action ??
+        finalStrategy.strategy_summary ??
+        coverage.ranking_summary ??
+        intelligence.outreach_recommendation ??
+        coverage.coverage_label
+
     return {
       ...company,
       contact_intelligence: {
@@ -926,18 +956,23 @@ export function attachProspectSearchCompanyCoverageIntelligence(
         account_timeline: relationshipBundle.account_timeline,
         account_progression: relationshipBundle.account_progression,
         opportunity_emergence: operationalBundle.opportunity_emergence,
-        sequence_readiness: operationalBundle.sequence_readiness,
+        sequence_readiness: authoritativeSequenceReadiness,
         operating_alerts: operationalBundle.operating_alerts,
-        operator_assist: operatorAssistBundle,
-        command_overlays: operatorAssistBundle.command_overlays,
-        outreach_recommendation:
-          operatorAssistBundle.operator_recommendations.top_recommendation
-            ?.recommended_operator_action ??
-          operationalBundle.opportunity_emergence.recommended_next_action ??
-          finalStrategy.strategy_summary ??
-          coverage.ranking_summary ??
-          intelligence.outreach_recommendation ??
-          coverage.coverage_label,
+        operator_assist: authoritativeOperatorAssist,
+        command_overlays: authoritativeOperatorAssist.command_overlays,
+        outreach_recommendation: authoritativeOutreachRecommendation,
+        native_revenue_decision:
+          nativeDecisionBundle?.display_summary ??
+          intelligence.native_revenue_decision ??
+          null,
+        native_meeting_prep_objective:
+          nativeDecisionBundle?.meeting_prep_objective ??
+          intelligence.native_meeting_prep_objective ??
+          null,
+        native_relationship_recommendation:
+          nativeDecisionBundle?.relationship_recommendation ??
+          intelligence.native_relationship_recommendation ??
+          null,
         primary_contact_id:
           finalStrategy.primary_contact?.contact_id ??
           coverage.primary_recommended_contact_id ??

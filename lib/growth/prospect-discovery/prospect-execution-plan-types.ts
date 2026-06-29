@@ -111,6 +111,7 @@ export type ProspectProviderEnvSnapshot = {
   apollo_enabled: boolean
   apollo_disabled: boolean
   pdl_configured: boolean
+  pdl_enabled: boolean
   pdl_disabled: boolean
   google_places_enabled: boolean
   serp_enabled: boolean

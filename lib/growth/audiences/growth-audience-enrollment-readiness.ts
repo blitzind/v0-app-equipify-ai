@@ -6,12 +6,18 @@ import type { GrowthAudienceMember } from "@/lib/growth/audiences/growth-audienc
 import type { GrowthAudienceEnrollmentPreviewCategory } from "@/lib/growth/audiences/growth-audience-config"
 import { fetchGrowthSequenceEnrollmentForLeadAndPattern } from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
 import { runSequenceEnrollmentPreflight } from "@/lib/growth/sequence-enrollment/sequence-enrollment-preflight"
+import { fetchDailyRevenueWorkQueue } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-resolver"
+import { buildEnrollmentPreviewQueueReason } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-integration"
+import { evaluateAutonomousExecutionGuardrailsForLead } from "@/lib/growth/autonomous-execution-guardrails/autonomous-execution-guardrail-resolver"
+import { summarizeAutonomousExecutionGuardrailDecision } from "@/lib/growth/autonomous-execution-guardrails/autonomous-execution-guardrail-engine"
 
 export type AudienceMemberEnrollmentClassification = {
   category: GrowthAudienceEnrollmentPreviewCategory
   reason: string
   leadId: string | null
   displayLabel: string
+  queueReason?: string | null
+  guardrailReason?: string | null
 }
 
 function memberDisplayLabel(member: GrowthAudienceMember): string {
@@ -135,9 +141,37 @@ export async function classifyAudienceMemberEnrollmentReadiness(
     }
   }
 
+  const dailyQueue = (await fetchDailyRevenueWorkQueue(admin, { limit: 100 })).queue
+  const queueReason = buildEnrollmentPreviewQueueReason({
+    queue: dailyQueue,
+    leadId: lead.id,
+    scheduledToday: dailyQueue
+      ? Boolean(
+          [...dailyQueue.critical, ...dailyQueue.high, ...dailyQueue.medium, ...dailyQueue.low].find(
+            (item) => item.leadId === lead.id,
+          ),
+        )
+      : false,
+  })
+
+  const guardrail = await evaluateAutonomousExecutionGuardrailsForLead(admin, {
+    leadId: lead.id,
+    correlationId: `enrollment_preview:${lead.id}`,
+    recordAudit: true,
+  })
+  const guardrailReason = guardrail.decision
+    ? summarizeAutonomousExecutionGuardrailDecision(guardrail.decision)
+    : null
+
   return {
     category: "eligible",
-    reason: "Eligible for operator-confirmed enrollment.",
+    reason: queueReason
+      ? `Eligible for operator-confirmed enrollment. ${queueReason}${guardrailReason ? ` · Guardrails: ${guardrailReason}` : ""}`
+      : guardrailReason
+        ? `Eligible for operator-confirmed enrollment. Guardrails: ${guardrailReason}`
+        : "Eligible for operator-confirmed enrollment.",
+    queueReason,
+    guardrailReason,
     leadId: lead.id,
     displayLabel: lead.companyName ?? displayLabel,
   }

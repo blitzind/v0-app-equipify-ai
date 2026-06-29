@@ -1,23 +1,21 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import type { GrowthCompanyContactEmailStatus } from "@/lib/growth/contact-discovery/company-contact-types"
 import type { EmailVerificationProviderResult } from "@/lib/growth/contact-verification/email-verification-types"
-import { verifyEmailWithFixture } from "@/lib/growth/contact-verification/providers/fixture-email-verification"
-import {
-  isEmailVerificationDisabled,
-  isEmailVerificationFixtureEnabled,
-  isZeroBounceConfigured,
-} from "@/lib/growth/contact-verification/providers/zerobounce-config"
-import { verifyEmailWithZeroBounce } from "@/lib/growth/contact-verification/providers/zerobounce-client"
 import { verifyEmailAddressHeuristic } from "@/lib/growth/contact-verification/verify-email-heuristic"
-import { assertEmailSendAllowed } from "@/lib/growth/outbound/suppression-repository"
-import { isValidGrowthEmailFormat } from "@/lib/growth/import/email-format"
-import { shadowCompareNativeEmailVerification } from "@/lib/growth/contact-verification/native-email-verification-shadow"
+import { isEmailVerificationDisabled } from "@/lib/growth/contact-verification/providers/zerobounce-config"
+import {
+  isNativeVerificationAuthoritative,
+  isNativeVerificationDnsEnabled,
+} from "@/lib/growth/contact-verification/native-verification-feature"
+import {
+  isNativeVerificationServiceConfigured,
+  verifyEmailWithNativeEngine,
+} from "@/lib/growth/contact-verification/native-verification-authoritative-service"
 
 export function isEmailVerificationProviderConfigured(): boolean {
   if (isEmailVerificationDisabled()) return false
-  return isZeroBounceConfigured() || isEmailVerificationFixtureEnabled()
+  return isNativeVerificationServiceConfigured() || isNativeVerificationDnsEnabled()
 }
 
 export async function verifyEmailWithProvider(
@@ -27,83 +25,15 @@ export async function verifyEmailWithProvider(
     leadId?: string | null
   },
 ): Promise<EmailVerificationProviderResult | null> {
-  const result = await verifyEmailWithProviderCore(email, options)
-  await emitNativeEmailVerificationShadow(result)
-  return result
-}
-
-async function emitNativeEmailVerificationShadow(
-  result: EmailVerificationProviderResult | null,
-): Promise<void> {
-  if (!result) return
-  await shadowCompareNativeEmailVerification({
-    email: result.email,
-    legacyStatus: result.email_status,
-    legacyConfidence: result.confidence,
-    legacyProvider: result.provider_name,
-    context: {
-      provider_status: result.provider_status,
-      provider_sub_status: result.provider_sub_status,
-      verified_by_provider: result.verified_by_provider,
-      blocked_by_suppression: result.blocked_by_suppression,
-    },
-  }).catch(() => undefined)
-}
-
-async function verifyEmailWithProviderCore(
-  email: string | null | undefined,
-  options?: {
-    admin?: SupabaseClient
-    leadId?: string | null
-  },
-): Promise<EmailVerificationProviderResult | null> {
-  const normalized = (email ?? "").trim().toLowerCase()
-  if (!normalized) return null
-
-  if (!isValidGrowthEmailFormat(normalized)) {
-    return {
-      email: normalized,
-      email_status: "invalid",
-      confidence: 0,
-      reasons: ["Invalid email format"],
-      provider_name: null,
-      provider_status: "invalid_format",
-      provider_sub_status: null,
-      verified_by_provider: false,
-      blocked_by_suppression: false,
-    }
-  }
-
-  if (options?.admin) {
-    const suppression = await assertEmailSendAllowed(options.admin, normalized, {
-      leadId: options.leadId,
-    })
-    if (!suppression.allowed) {
-      return {
-        email: normalized,
-        email_status: "blocked",
-        confidence: 0.98,
-        reasons: [`Suppression blocked: ${suppression.reason ?? "suppressed"}`],
-        provider_name: null,
-        provider_status: "suppressed",
-        provider_sub_status: suppression.blockLayer ?? null,
-        verified_by_provider: false,
-        blocked_by_suppression: true,
-      }
-    }
-  }
-
   if (isEmailVerificationDisabled()) {
-    return await heuristicAsProviderResult(normalized)
+    return heuristicAsProviderResult((email ?? "").trim().toLowerCase())
   }
 
-  const zerobounce = await verifyEmailWithZeroBounce(normalized)
-  if (zerobounce) return zerobounce
+  if (isNativeVerificationAuthoritative() || isNativeVerificationDnsEnabled()) {
+    return verifyEmailWithNativeEngine(email, options)
+  }
 
-  const fixture = await verifyEmailWithFixture(normalized)
-  if (fixture) return fixture
-
-  return await heuristicAsProviderResult(normalized)
+  return verifyEmailWithNativeEngine(email, { ...options, skipDns: true })
 }
 
 async function heuristicAsProviderResult(email: string): Promise<EmailVerificationProviderResult> {
@@ -121,17 +51,17 @@ async function heuristicAsProviderResult(email: string): Promise<EmailVerificati
       blocked_by_suppression: false,
     }
   }
-  const email_status: GrowthCompanyContactEmailStatus =
+  const email_status =
     heuristic.email_status === "verified" ? "discovered" : heuristic.email_status
 
   return {
     email,
     email_status,
     confidence: heuristic.confidence,
-    reasons: [...heuristic.reasons, "Heuristic verification only — provider not configured"],
+    reasons: [...heuristic.reasons, "Heuristic verification only — native authoritative mode off"],
     provider_name: "heuristic",
     provider_status: heuristic.email_status,
-    provider_sub_status: "no_provider_configured",
+    provider_sub_status: "native_authoritative_disabled",
     verified_by_provider: false,
     blocked_by_suppression: false,
     raw_payload: {
@@ -152,6 +82,7 @@ export function buildEmailVerificationMetadata(result: EmailVerificationProvider
       blocked_by_suppression: result.blocked_by_suppression,
       verified_at: new Date().toISOString(),
       reasons: result.reasons,
+      authoritative_engine: result.provider_name === "native" ? "native-email-verification-v1" : null,
       ...(result.raw_payload ? { raw_payload: result.raw_payload } : {}),
     },
   }

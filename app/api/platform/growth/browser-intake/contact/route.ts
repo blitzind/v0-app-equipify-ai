@@ -99,6 +99,7 @@ export async function POST(request: Request) {
         ok: result.status === "created" || result.status === "updated",
         qa_marker: GROWTH_BROWSER_INTAKE_QA_MARKER,
         result,
+        workflow: "workflow" in result ? result.workflow : null,
       },
       { status: statusCode },
     )

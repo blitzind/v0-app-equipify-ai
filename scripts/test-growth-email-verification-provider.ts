@@ -41,8 +41,14 @@ const serviceSource = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/contact-verification/email-verification-service.ts"),
   "utf8",
 )
-assert.match(serviceSource, /verifyEmailWithZeroBounce/)
-assert.match(serviceSource, /assertEmailSendAllowed/)
+assert.match(serviceSource, /verifyEmailWithNativeEngine/)
+assert.doesNotMatch(serviceSource, /verifyEmailWithZeroBounce/)
+
+const authoritativeSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/contact-verification/native-verification-authoritative-service.ts"),
+  "utf8",
+)
+assert.match(authoritativeSource, /assertEmailSendAllowed/)
 
 const zbUrl = resolveZeroBounceValidateUrl("test@example.com", "test-key")
 assert.match(zbUrl, /^https:\/\/api(-us|-eu)?\.zerobounce\.net\/v2\/validate/)

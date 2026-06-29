@@ -26,7 +26,9 @@ import {
 import { auditVerifiedChannelsCertEnv } from "@/lib/growth/qa/verified-channels-cert-env-bootstrap"
 import {
   isPdlApiConfigured,
+  isPdlContactDiscoveryEnabled,
   isPdlDiscoveryDisabled,
+  isPdlProviderConfigured,
   isPdlSandboxEnabled,
 } from "@/lib/growth/providers/pdl/pdl-config"
 
@@ -40,6 +42,7 @@ export const PDL_RUNTIME_VALIDATION_PROBE_COMPANY = {
 
 function buildEnvironmentRow(input: {
   pdl_configured: boolean
+  pdl_enabled?: boolean
   sandbox: boolean
   pdl_discovery_disabled: boolean
   winning_key: "PEOPLE_DATA_LABS_API_KEY" | "PDL_API_KEY" | null
@@ -49,10 +52,15 @@ function buildEnvironmentRow(input: {
   search_status: string | null
   search_message: string | null
 }): PdlRuntimeValidationEnvironmentRow {
+  const pdl_enabled = input.pdl_enabled ?? isPdlContactDiscoveryEnabled()
   return {
     pdl_configured: input.pdl_configured,
     sandbox: input.sandbox,
-    production_ready: input.pdl_configured && !input.sandbox && !input.pdl_discovery_disabled,
+    production_ready:
+      input.pdl_configured &&
+      pdl_enabled &&
+      !input.sandbox &&
+      !input.pdl_discovery_disabled,
     search_executable: input.search_executable,
     records_returned: input.records_returned,
     contacts_returned: input.contacts_returned,
@@ -120,7 +128,8 @@ export async function runPdlRuntimeValidationAudit(input: {
 
   const local_sandbox = isPdlSandboxEnabled()
   const local_configured =
-    local_diagnostics.loaders.isPdlApiConfigured && !local_diagnostics.loaders.pdl_discovery_disabled
+    isPdlProviderConfigured() ||
+    (local_diagnostics.loaders.isPdlApiConfigured && !local_diagnostics.loaders.pdl_discovery_disabled)
 
   let local_search: Awaited<ReturnType<typeof runGrowthPdlTestLookup>> | null = null
   if (local_configured) {
@@ -137,6 +146,7 @@ export async function runPdlRuntimeValidationAudit(input: {
 
   const local = buildEnvironmentRow({
     pdl_configured: local_configured,
+    pdl_enabled: local_diagnostics.loaders.pdl_contact_discovery_enabled,
     sandbox: local_sandbox,
     pdl_discovery_disabled: local_diagnostics.loaders.pdl_discovery_disabled,
     winning_key: local_diagnostics.loaders.pdl_winning_key,
@@ -161,8 +171,9 @@ export async function runPdlRuntimeValidationAudit(input: {
 
   if (deployed_probe.ok) {
     const runtime_configured =
-      deployed_probe.diagnostics.loaders.isPdlApiConfigured &&
-      !deployed_probe.diagnostics.loaders.pdl_discovery_disabled
+      deployed_probe.diagnostics.loaders.isPdlProviderConfigured ||
+      (deployed_probe.diagnostics.loaders.isPdlApiConfigured &&
+        !deployed_probe.diagnostics.loaders.pdl_discovery_disabled)
 
     if (runtime_configured) {
       runtime_search = await runDeployedPdlTestLookup({
@@ -187,6 +198,7 @@ export async function runPdlRuntimeValidationAudit(input: {
 
     runtime = buildEnvironmentRow({
       pdl_configured: runtime_configured,
+      pdl_enabled: deployed_probe.diagnostics.loaders.pdl_contact_discovery_enabled,
       sandbox: runtime_sandbox,
       pdl_discovery_disabled: deployed_probe.diagnostics.loaders.pdl_discovery_disabled,
       winning_key: deployed_probe.diagnostics.loaders.pdl_winning_key,

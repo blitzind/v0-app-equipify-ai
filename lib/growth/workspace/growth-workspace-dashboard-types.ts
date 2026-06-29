@@ -1,6 +1,8 @@
 /** Growth workspace operator home dashboard (Phase 6A) — client-safe types. */
 
 import type { AidenDailyBriefing } from "@/lib/growth/aiden/aiden-daily-briefing"
+import type { DailyRevenueWorkQueue } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-types"
+import type { DailyRevenueWorkQueueDisplaySummary } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-view"
 
 export const GROWTH_WORKSPACE_DASHBOARD_QA_MARKER = "growth-workspace-dashboard-v4" as const
 
@@ -46,6 +48,15 @@ export type GrowthWorkspaceDashboardActionCard = {
   href: string
 }
 
+export type GrowthWorkspaceDashboardLeadInboxHighlight = {
+  id: string
+  companyName: string
+  actionLabel: string
+  priority: "critical" | "high" | "medium" | "low"
+  href: string
+  confidence: number | null
+}
+
 export type GrowthWorkspaceDashboardViewModel = {
   qaMarker: typeof GROWTH_WORKSPACE_DASHBOARD_QA_MARKER
   generatedAt: string
@@ -57,4 +68,10 @@ export type GrowthWorkspaceDashboardViewModel = {
   briefing: AidenDailyBriefing | null
   operatorName?: string | null
   recommendedAction?: string | null
+  /** Top lead-inbox rows from the existing batched fetch — presentation only. */
+  leadInboxHighlights: GrowthWorkspaceDashboardLeadInboxHighlight[]
+  /** GE-AIOS-UX-1B — canonical daily revenue work queue from batched fetch. */
+  dailyRevenueWorkQueueEnabled: boolean
+  dailyRevenueWorkQueue: DailyRevenueWorkQueue | null
+  dailyRevenueWorkQueueDisplay: DailyRevenueWorkQueueDisplaySummary | null
 }

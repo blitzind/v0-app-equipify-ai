@@ -228,6 +228,17 @@ export async function confirmGrowthSequenceEnrollment(
     }
   })()
 
+  const { emitCampaignRevenueOutcome } = await import(
+    "@/lib/growth/revenue-outcomes/revenue-outcome-runtime-bridge"
+  )
+  emitCampaignRevenueOutcome(admin, {
+    leadId: input.leadId,
+    outcome: "enrolled",
+    enrollmentId: enrollment.id,
+    sequenceId: enrollment.sequencePatternId,
+    occurredAt: now,
+  })
+
   return {
     ...updated,
     steps,
@@ -519,6 +530,16 @@ export async function advanceGrowthSequenceEnrollmentAfterStep(
         leadId: step.leadId,
         enrollmentId: enrollment.id,
       })
+      const { emitCampaignRevenueOutcome } = await import(
+        "@/lib/growth/revenue-outcomes/revenue-outcome-runtime-bridge"
+      )
+      emitCampaignRevenueOutcome(admin, {
+        leadId: step.leadId,
+        outcome: "completed",
+        enrollmentId: enrollment.id,
+        sequenceId: enrollment.sequencePatternId,
+        occurredAt: now,
+      })
       return
     }
   }
@@ -567,6 +588,17 @@ export async function advanceGrowthSequenceEnrollmentAfterStep(
     await emitGrowthLeadSequenceEnrollmentCompletedTimeline(admin, {
       leadId: step.leadId,
       enrollmentId: enrollment.id,
+    })
+
+    const { emitCampaignRevenueOutcome: emitCampaignCompleted } = await import(
+      "@/lib/growth/revenue-outcomes/revenue-outcome-runtime-bridge"
+    )
+    emitCampaignCompleted(admin, {
+      leadId: step.leadId,
+      outcome: "completed",
+      enrollmentId: enrollment.id,
+      sequenceId: enrollment.sequencePatternId,
+      occurredAt: now,
     })
 
     void (async () => {

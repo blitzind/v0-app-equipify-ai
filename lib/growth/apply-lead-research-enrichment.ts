@@ -9,6 +9,7 @@ import {
 } from "@/lib/growth/decision-maker-repository"
 import type { GrowthDecisionMakerCandidate } from "@/lib/growth/decision-maker-types"
 import { fetchGrowthLeadById, updateGrowthLead } from "@/lib/growth/lead-repository"
+import { scheduleUnifiedRevenueWorkflowLifecycleReEvaluation } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lifecycle-runner"
 import type { GrowthLeadResearchResult } from "@/lib/growth/research-types"
 import type { GrowthLead } from "@/lib/growth/types"
 
@@ -79,6 +80,13 @@ export async function applyGrowthLeadResearchEnrichment(
   logGrowthEngine("research_enrichment_applied", {
     leadId: input.lead.id,
     candidateCount: candidates.length,
+  })
+
+  void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+    admin,
+    leadId: input.lead.id,
+    event: "enrichment_completed",
+    actor: { userId: input.createdBy ?? null, email: null },
   })
 
   return fetchGrowthLeadById(admin, input.lead.id)

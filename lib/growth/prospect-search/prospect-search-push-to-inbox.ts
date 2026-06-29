@@ -23,6 +23,8 @@ import type {
   GrowthProspectSearchFilters,
 } from "@/lib/growth/prospect-search/prospect-search-types"
 import { GROWTH_PROSPECT_SEARCH_SOURCE_TYPES } from "@/lib/growth/prospect-search/prospect-search-types"
+import { runUnifiedRevenueWorkflowAfterIntake } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-intake-runner"
+import type { UnifiedRevenueWorkflowResult } from "@/lib/growth/revenue-workflow/unified-lead-intake-types"
 
 export {
   GROWTH_PROSPECT_SEARCH_BULK_PUSH_QA_MARKER,
@@ -37,10 +39,13 @@ export async function pushProspectSearchCompanyToLeadInbox(
   admin: SupabaseClient,
   company: GrowthProspectSearchCompanyResult,
   query: string,
+  actor?: { userId: string | null; email?: string | null },
 ): Promise<{
   outcome: GrowthProspectSearchPushOutcome
   message: string
   lead_inbox_id?: string | null
+  growth_lead_id?: string | null
+  workflow?: UnifiedRevenueWorkflowResult | null
 }> {
   if (!company.company_name?.trim()) {
     return {
@@ -148,10 +153,30 @@ export async function pushProspectSearchCompanyToLeadInbox(
     }
   }
 
+  const growthLeadId = company.growth_lead_id ?? null
+  const workflowRun = await runUnifiedRevenueWorkflowAfterIntake({
+    admin,
+    actor,
+    source: "saved_search",
+    leadId: growthLeadId,
+    company: {
+      name: company.company_name,
+      website: company.website,
+      companyId: company.id,
+    },
+    metadata: {
+      leadInboxId: result.row.id,
+      searchQuery: query,
+      identityUncertain: !growthLeadId,
+    },
+  })
+
   return {
     outcome: "pushed",
     message: "Added to Lead Inbox for human review.",
     lead_inbox_id: result.row.id,
+    growth_lead_id: workflowRun.workflow?.leadId ?? growthLeadId,
+    workflow: workflowRun.workflow,
   }
 }
 

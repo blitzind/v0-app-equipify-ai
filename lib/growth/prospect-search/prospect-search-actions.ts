@@ -138,6 +138,7 @@ export async function executeProspectSearchAction(
   input: {
     action: GrowthProspectSearchResultAction
     userId?: string | null
+    userEmail?: string | null
     query?: string
     filters?: GrowthProspectSearchFilters
     discovery_mode?: GrowthProspectSearchDiscoveryMode
@@ -522,7 +523,10 @@ export async function executeProspectSearchAction(
       return { ok: false, action, message: "Select a company row to push to Lead Inbox." }
     }
 
-    const pushResult = await pushProspectSearchCompanyToLeadInbox(admin, company, input.query ?? "")
+    const pushResult = await pushProspectSearchCompanyToLeadInbox(admin, company, input.query ?? "", {
+      userId: input.userId ?? null,
+      email: input.userEmail ?? null,
+    })
 
     if (pushResult.outcome === "already_exists") {
       return {
@@ -560,8 +564,10 @@ export async function executeProspectSearchAction(
       message: pushResult.message,
       push_outcome: pushResult.outcome,
       lead_inbox_id: pushResult.lead_inbox_id ?? null,
+      growth_lead_id: pushResult.growth_lead_id ?? null,
+      workflow: pushResult.workflow ?? null,
       workspace_url: pushResult.lead_inbox_id
-        ? `/admin/growth/leads/${pushResult.lead_inbox_id}`
+        ? `/admin/growth/leads/${pushResult.growth_lead_id ?? pushResult.lead_inbox_id}`
         : null,
     }
   }

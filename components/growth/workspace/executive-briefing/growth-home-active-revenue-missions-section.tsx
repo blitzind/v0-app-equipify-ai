@@ -21,7 +21,7 @@ export function GrowthHomeActiveRevenueMissionsSection({ missions }: Props) {
       <div>
         <h2 className="text-xl font-semibold tracking-tight">{AI_REVENUE_ACTIVE_MISSIONS_TITLE}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Revenue Director orchestrates existing workflow stages — no duplicate engines.
+          Active missions with today&apos;s objective, progress, and what I need from you.
         </p>
       </div>
       <div className="space-y-4">
@@ -51,16 +51,24 @@ export function GrowthHomeActiveRevenueMissionsSection({ missions }: Props) {
                 <p className="font-medium">{mission.currentStage}</p>
               </div>
               <div>
-                <p className="text-muted-foreground">Estimated completion</p>
-                <p className="font-medium">{mission.estimatedCompletion}</p>
+                <p className="text-muted-foreground">Today&apos;s objective</p>
+                <p className="font-medium">{mission.nextAction}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Current result</p>
+                <p className="font-medium">{mission.metrics[0]?.value ?? "In progress"}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Next milestone</p>
                 <p className="font-medium">{mission.nextMilestone}</p>
               </div>
               <div>
-                <p className="text-muted-foreground">Next action</p>
-                <p className="font-medium">{mission.nextAction}</p>
+                <p className="text-muted-foreground">ETA</p>
+                <p className="font-medium">{mission.estimatedCompletion}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Expected business impact</p>
+                <p className="font-medium">{mission.metrics[1]?.value ?? mission.objective}</p>
               </div>
             </div>
 
@@ -81,7 +89,7 @@ export function GrowthHomeActiveRevenueMissionsSection({ missions }: Props) {
             </dl>
 
             <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
-              {mission.controls.map((control) => (
+              {mission.controls.slice(0, 1).map((control) => (
                 <Button
                   key={`${mission.id}-${control.kind}`}
                   asChild

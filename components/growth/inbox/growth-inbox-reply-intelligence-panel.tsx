@@ -18,6 +18,8 @@ import {
   type GrowthReplyIntent,
   type GrowthReplyNextAction,
 } from "@/lib/growth/reply-intelligence/reply-intent-types"
+import { isCommunicationStrategyEnabledClient } from "@/lib/growth/contact-verification/communication-strategy-feature"
+import type { CommunicationStrategyDisplaySummary } from "@/lib/growth/contact-verification/communication-strategy-view"
 
 export const GROWTH_INBOX_REPLY_INTELLIGENCE_PANEL_QA_MARKER = "growth-inbox-reply-intelligence-panel-v2" as const
 
@@ -34,6 +36,8 @@ export function GrowthInboxReplyIntelligencePanel({ leadId, compact = false }: G
   const [leadReply, setLeadReply] = useState<InboxReplyItem | null>(null)
   const [timeline, setTimeline] = useState<GrowthConversationTimelineEntry[]>([])
   const [copilot, setCopilot] = useState<GrowthReplyCopilotAssist | null>(null)
+  const [communicationStrategy, setCommunicationStrategy] =
+    useState<CommunicationStrategyDisplaySummary | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
 
   const workflowPath = growthFeaturePath(pathname, "inbox/workflow")
@@ -43,10 +47,16 @@ export function GrowthInboxReplyIntelligencePanel({ leadId, compact = false }: G
     setDetailLoading(true)
     try {
       const params = new URLSearchParams({ view: "needs_action", limit: "50", leadId: activeLeadId })
-      const [timelineRes, copilotRes, inboxRes] = await Promise.all([
+      const strategyEnabled = isCommunicationStrategyEnabledClient()
+      const [timelineRes, copilotRes, inboxRes, strategyRes] = await Promise.all([
         fetch(`/api/platform/growth/replies/timeline?leadId=${activeLeadId}`, { cache: "no-store" }),
         fetch(`/api/platform/growth/replies/copilot?leadId=${activeLeadId}`, { cache: "no-store" }),
         fetch(`/api/platform/growth/replies/inbox?${params.toString()}`, { cache: "no-store" }),
+        strategyEnabled
+          ? fetch(`/api/platform/growth/leads/${encodeURIComponent(activeLeadId)}/communication-strategy`, {
+              cache: "no-store",
+            })
+          : Promise.resolve(null),
       ])
 
       const timelineData = (await timelineRes.json().catch(() => ({}))) as {
@@ -76,6 +86,18 @@ export function GrowthInboxReplyIntelligencePanel({ leadId, compact = false }: G
 
       const items = inboxData.feed?.items ?? []
       setLeadReply(items.find((item) => item.leadId === activeLeadId) ?? items[0] ?? null)
+
+      if (strategyRes) {
+        const strategyData = (await strategyRes.json().catch(() => ({}))) as {
+          ok?: boolean
+          communication_strategy?: CommunicationStrategyDisplaySummary | null
+        }
+        setCommunicationStrategy(
+          strategyRes.ok && strategyData.ok ? strategyData.communication_strategy ?? null : null,
+        )
+      } else {
+        setCommunicationStrategy(null)
+      }
     } finally {
       setDetailLoading(false)
     }
@@ -173,6 +195,23 @@ export function GrowthInboxReplyIntelligencePanel({ leadId, compact = false }: G
               <p className="text-sm text-muted-foreground">No reply intelligence feed item for this lead yet.</p>
             )}
           </GrowthEngineCard>
+
+          {communicationStrategy ? (
+            <GrowthEngineCard title="Communication strategy" icon={<Bot className="size-4" />}>
+              <div className="space-y-2 text-sm">
+                <p className="font-medium">{communicationStrategy.recommended_action_label}</p>
+                <p className="text-muted-foreground">
+                  Primary channel: {communicationStrategy.primary_channel_label}
+                  {communicationStrategy.fallback_channels.length > 0
+                    ? ` · Then: ${communicationStrategy.fallback_channels.slice(0, 2).join(", ")}`
+                    : ""}
+                </p>
+                {communicationStrategy.reasoning[0] ? (
+                  <p className="text-xs text-muted-foreground">{communicationStrategy.reasoning[0]}</p>
+                ) : null}
+              </div>
+            </GrowthEngineCard>
+          ) : null}
 
           <GrowthEngineCard title="AI reply copilot" icon={<Bot className="size-4" />}>
             {detailLoading ? (

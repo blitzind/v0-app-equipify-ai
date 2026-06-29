@@ -38,6 +38,9 @@ import {
 import { isProtectedGrowthOpportunityFromLead } from "@/lib/growth/operational-capacity-score"
 import { sortCallQueueByRevenueWorkflow } from "@/lib/growth/revenue-workflow/call-queue-prioritization"
 import type { GrowthLead } from "@/lib/growth/types"
+import { fetchDailyRevenueWorkQueue } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-resolver"
+import { isDailyRevenueWorkQueueEnabled } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-feature"
+import { sortCallQueueRowsByDailyWorkQueue } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-integration"
 
 const CAPACITY_FILTERS = new Set<GrowthCallQueueFilter>([
   "capacity_risk",
@@ -207,6 +210,14 @@ export async function listGrowthCallQueue(
       })),
     )
     enriched.splice(0, enriched.length, ...sorted)
+  }
+
+  if (isDailyRevenueWorkQueueEnabled()) {
+    const dailyQueue = (await fetchDailyRevenueWorkQueue(admin, { limit: 200 })).queue
+    if (dailyQueue) {
+      const queueSorted = sortCallQueueRowsByDailyWorkQueue(enriched, dailyQueue)
+      enriched.splice(0, enriched.length, ...queueSorted)
+    }
   }
 
   const offset = Math.max(input.offset ?? 0, 0)

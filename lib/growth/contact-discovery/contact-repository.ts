@@ -23,6 +23,7 @@ import {
 } from "@/lib/growth/contact-discovery/contact-normalizer"
 import { buildContactDiscoveryProviderOutcomes } from "@/lib/growth/contact-discovery/contact-discovery-provider-outcomes"
 import { probeGrowthContactDiscoverySchema } from "@/lib/growth/contact-discovery/contact-schema-health"
+import { scheduleUnifiedRevenueWorkflowLifecycleReEvaluationForCompanyCandidate } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lifecycle-runner"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -418,6 +419,16 @@ export async function runContactDiscoveryForCompany(
     contact_count: allContacts.length,
     provider_outcomes,
   })
+
+  if (stored.length > 0 || allContacts.length > 0) {
+    void scheduleUnifiedRevenueWorkflowLifecycleReEvaluationForCompanyCandidate({
+      admin,
+      companyCandidateId: ctx.company_candidate_id,
+      event: stored.length > 0 ? "better_contact_discovered" : "operator_discover_contacts",
+      actor: { userId: input.created_by ?? null, email: null },
+    })
+  }
+
   return {
     qa_marker: GROWTH_CONTACT_DISCOVERY_QA_MARKER,
     schema_ready: true,

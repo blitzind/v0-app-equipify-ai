@@ -5,6 +5,7 @@ import type { GrowthCompanyContactEmailStatus } from "@/lib/growth/contact-disco
 export const GROWTH_EMAIL_VERIFICATION_QA_MARKER = "growth-email-verification-v1" as const
 
 export const GROWTH_EMAIL_VERIFICATION_PROVIDER_NAMES = [
+  "native",
   "zerobounce",
   "fixture",
   "heuristic",

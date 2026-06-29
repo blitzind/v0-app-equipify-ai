@@ -130,6 +130,7 @@ export const AI_EVENT_REGISTRY: readonly AiEventRegistryEntry[] = [
   { eventType: "growth.revenue_director.workflow_request_correlation_completed", category: "executive", eventVersion: 1, schemaVersion: "1.0", description: "Revenue Director dispatch correlation completed ledger update" },
   { eventType: "growth.revenue_director.workflow_request_correlation_failed", category: "executive", eventVersion: 1, schemaVersion: "1.0", description: "Revenue Director dispatch correlation failed ledger update" },
   { eventType: "growth.learning.outcome_observed", category: "learning", eventVersion: 1, schemaVersion: "1.0", description: "Closed-loop learning normalized an outcome (advisory only)" },
+  { eventType: "revenue.outcome.recorded", category: "learning", eventVersion: 1, schemaVersion: "1.0", description: "Canonical revenue execution outcome for closed-loop learning" },
   { eventType: "growth.learning.insight_generated", category: "learning", eventVersion: 1, schemaVersion: "1.0", description: "Closed-loop learning generated advisory insight (non-mutating)" },
   { eventType: "growth.adaptive_calibration.proposal_created", category: "learning", eventVersion: 1, schemaVersion: "1.0", description: "Adaptive calibration proposal created from learning insight (no auto-apply)" },
   { eventType: "growth.adaptive_calibration.proposal_approved", category: "learning", eventVersion: 1, schemaVersion: "1.0", description: "Operator approved adaptive calibration proposal (no apply)" },

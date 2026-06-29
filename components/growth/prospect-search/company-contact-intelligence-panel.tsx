@@ -5,6 +5,12 @@ import { Badge } from "@/components/ui/badge"
 import type { GrowthProspectSearchContactIntelligence } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-types"
 import { GROWTH_CONTACT_RANKING_QA_MARKER, GROWTH_REVENUE_PERSONA_INTELLIGENCE_QA_MARKER } from "@/lib/growth/prospect-search/prospect-search-contact-discovery"
 import { ProspectSearchAccountStrategyPanel } from "@/components/growth/prospect-search/prospect-search-account-strategy-panel"
+import { ProspectSearchAccountOutreachStrategyPanel } from "@/components/growth/prospect-search/prospect-search-account-outreach-strategy-panel"
+import { ProspectSearchAcquisitionCandidatePanel } from "@/components/growth/prospect-search/prospect-search-acquisition-candidate-panel"
+import { ProspectSearchQualificationPanel } from "@/components/growth/prospect-search/prospect-search-qualification-panel"
+import { ProspectSearchSequenceRecommendationPanel } from "@/components/growth/prospect-search/prospect-search-sequence-recommendation-panel"
+import { ProspectSearchNextBestActionPanel } from "@/components/growth/prospect-search/prospect-search-next-best-action-panel"
+import { ProspectSearchRevenueExecutionPlanPanel } from "@/components/growth/prospect-search/prospect-search-revenue-execution-plan-panel"
 import { ProspectSearchOrgIntelligencePanel } from "@/components/growth/prospect-search/prospect-search-org-intelligence-panel"
 import { ProspectSearchRelationshipIntelligencePanel } from "@/components/growth/prospect-search/prospect-search-relationship-intelligence-panel"
 import { ProspectSearchAccountTimelinePanel } from "@/components/growth/prospect-search/prospect-search-account-timeline-panel"
@@ -18,12 +24,14 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-engine-intelligence-ux"
 
 export function CompanyContactIntelligencePanel({
+  companyId,
   companyName,
   company,
   intelligence,
   onResearchAction,
   onResearchComplete,
 }: {
+  companyId: string
   companyName: string
   company?: import("@/lib/growth/prospect-search/prospect-search-types").GrowthProspectSearchCompanyResult | null
   intelligence: GrowthProspectSearchContactIntelligence | null | undefined
@@ -74,6 +82,77 @@ export function CompanyContactIntelligencePanel({
             onResearchAction={onResearchAction}
           />
         </div>
+      ) : null}
+
+      {intelligence.has_contacts ? (
+        <div className="mt-3">
+          <ProspectSearchAccountOutreachStrategyPanel
+            companyName={companyName}
+            website={company?.website ?? null}
+            intelligence={intelligence}
+          />
+        </div>
+      ) : null}
+
+      {intelligence.has_contacts ? (
+        <ProspectSearchAcquisitionCandidatePanel
+          companyId={companyId}
+          companyName={companyName}
+          website={company?.website ?? null}
+          intelligence={intelligence}
+        />
+      ) : null}
+
+      {intelligence.has_contacts ? (
+        <ProspectSearchQualificationPanel
+          companyId={companyId}
+          companyName={companyName}
+          website={company?.website ?? null}
+          industry={company?.industry ?? null}
+          companyMatchConfidence={company?.company_match_confidence ?? null}
+          isSuppressed={company?.is_suppressed}
+          suppressionReason={company?.suppression_reason ?? null}
+          intelligence={intelligence}
+        />
+      ) : null}
+
+      {intelligence.has_contacts ? (
+        <ProspectSearchSequenceRecommendationPanel
+          companyId={companyId}
+          companyName={companyName}
+          website={company?.website ?? null}
+          industry={company?.industry ?? null}
+          companyMatchConfidence={company?.company_match_confidence ?? null}
+          isSuppressed={company?.is_suppressed}
+          suppressionReason={company?.suppression_reason ?? null}
+          intelligence={intelligence}
+        />
+      ) : null}
+
+      {intelligence.has_contacts ? (
+        <ProspectSearchNextBestActionPanel
+          companyId={companyId}
+          companyName={companyName}
+          website={company?.website ?? null}
+          industry={company?.industry ?? null}
+          companyMatchConfidence={company?.company_match_confidence ?? null}
+          isSuppressed={company?.is_suppressed}
+          suppressionReason={company?.suppression_reason ?? null}
+          intelligence={intelligence}
+        />
+      ) : null}
+
+      {intelligence.has_contacts ? (
+        <ProspectSearchRevenueExecutionPlanPanel
+          companyId={companyId}
+          companyName={companyName}
+          website={company?.website ?? null}
+          industry={company?.industry ?? null}
+          companyMatchConfidence={company?.company_match_confidence ?? null}
+          isSuppressed={company?.is_suppressed}
+          suppressionReason={company?.suppression_reason ?? null}
+          intelligence={intelligence}
+        />
       ) : null}
 
       {intelligence.org_intelligence ? (

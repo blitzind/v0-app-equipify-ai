@@ -29,6 +29,7 @@ import type {
   UpdateGrowthMeetingInput,
 } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 import { recomputeMeetingOutcomeForMeeting } from "@/lib/growth/meeting-outcome-intelligence/meeting-outcome-intelligence-service"
+import { scheduleUnifiedRevenueWorkflowLifecycleReEvaluation } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lifecycle-runner"
 import { maybeGenerateOpportunityDraftForMeeting } from "@/lib/growth/meeting-intelligence/opportunity-draft-service"
 import { fetchGrowthMeetingLocationPlatformContext } from "@/lib/growth/meeting-location/meeting-location-settings-server"
 import {
@@ -163,6 +164,21 @@ export async function createGrowthMeeting(
         occurredAt: now,
       }),
     )
+    const { emitMeetingRevenueOutcome } = await import(
+      "@/lib/growth/revenue-outcomes/revenue-outcome-runtime-bridge"
+    )
+    emitMeetingRevenueOutcome(admin, {
+      leadId: input.leadId,
+      meetingId: meeting.id,
+      outcome: "booked",
+      occurredAt: now,
+    })
+    void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+      admin,
+      leadId: input.leadId,
+      event: "meeting_booked",
+      actor: { userId: input.actor?.userId ?? null, email: input.actor?.email ?? null },
+    })
   }
 
   return { ok: true, meeting }
@@ -259,6 +275,21 @@ export async function updateGrowthMeeting(
         occurredAt: now,
       }),
     )
+    const { emitMeetingRevenueOutcome } = await import(
+      "@/lib/growth/revenue-outcomes/revenue-outcome-runtime-bridge"
+    )
+    emitMeetingRevenueOutcome(admin, {
+      leadId: meeting.leadId,
+      meetingId: meeting.id,
+      outcome: "booked",
+      occurredAt: now,
+    })
+    void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+      admin,
+      leadId: meeting.leadId,
+      event: "meeting_booked",
+      actor: { userId: input.actor?.userId ?? null, email: input.actor?.email ?? null },
+    })
   }
 
   if (input.status === "completed" && existing.status !== "completed") {
@@ -281,6 +312,21 @@ export async function updateGrowthMeeting(
         occurredAt: now,
       }),
     )
+    const { emitMeetingRevenueOutcome } = await import(
+      "@/lib/growth/revenue-outcomes/revenue-outcome-runtime-bridge"
+    )
+    emitMeetingRevenueOutcome(admin, {
+      leadId: meeting.leadId,
+      meetingId: meeting.id,
+      outcome: "completed",
+      occurredAt: now,
+    })
+    void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+      admin,
+      leadId: meeting.leadId,
+      event: "meeting_completed",
+      actor: { userId: input.actor?.userId ?? null, email: input.actor?.email ?? null },
+    })
   }
 
   if (input.status === "no_show" && existing.status !== "no_show") {
@@ -310,10 +356,34 @@ export async function updateGrowthMeeting(
         occurredAt: now,
       }),
     )
+    const { emitMeetingRevenueOutcome } = await import(
+      "@/lib/growth/revenue-outcomes/revenue-outcome-runtime-bridge"
+    )
+    emitMeetingRevenueOutcome(admin, {
+      leadId: meeting.leadId,
+      meetingId: meeting.id,
+      outcome: "no_show",
+      occurredAt: now,
+    })
   }
 
   if (input.status === "canceled" && existing.status !== "canceled") {
     await emitMeetingCanceledTimeline(admin, { meeting, actorUserId: input.actor?.userId ?? null })
+    const { emitMeetingRevenueOutcome } = await import(
+      "@/lib/growth/revenue-outcomes/revenue-outcome-runtime-bridge"
+    )
+    emitMeetingRevenueOutcome(admin, {
+      leadId: meeting.leadId,
+      meetingId: meeting.id,
+      outcome: "cancelled",
+      occurredAt: now,
+    })
+    void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+      admin,
+      leadId: meeting.leadId,
+      event: "meeting_cancelled",
+      actor: { userId: input.actor?.userId ?? null, email: input.actor?.email ?? null },
+    })
   }
 
   if (input.outcome && input.outcome.trim()) {

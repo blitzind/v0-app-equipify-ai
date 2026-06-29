@@ -57,6 +57,8 @@ type GrowthLeadCommandCenterProps = {
   onLeadSaved?: (lead: GrowthLead) => void
   onAddDecisionMaker?: () => void
   onTimelineRefresh?: () => void
+  nativeDecision?: import("@/lib/growth/contact-verification/native-revenue-decision-adapter").NativeRevenueDecisionDisplaySummary | null
+  nativeCommunicationStrategy?: import("@/lib/growth/contact-verification/communication-strategy-view").CommunicationStrategyDisplaySummary | null
 }
 
 function formatSource(lead: GrowthLead): string {
@@ -83,6 +85,8 @@ export function GrowthLeadCommandCenter({
   onLeadUpdated,
   onAddDecisionMaker,
   onTimelineRefresh,
+  nativeDecision,
+  nativeCommunicationStrategy,
 }: GrowthLeadCommandCenterProps) {
   const [primaryDmName, setPrimaryDmName] = useState<string | null>(null)
   const [touchSaving, setTouchSaving] = useState(false)
@@ -293,7 +297,11 @@ export function GrowthLeadCommandCenter({
             </p>
           ) : null}
 
-          <GrowthNextBestActionBanner lead={lead} />
+          <GrowthNextBestActionBanner
+            lead={lead}
+            nativeDecision={nativeDecision}
+            nativeCommunicationStrategy={nativeCommunicationStrategy}
+          />
 
           {actionError ? (
             <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">

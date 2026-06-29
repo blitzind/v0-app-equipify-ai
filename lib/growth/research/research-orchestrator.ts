@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { getGrowthEngineAiOrgId, logGrowthEngine } from "@/lib/growth/access"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
+import { scheduleUnifiedRevenueWorkflowLifecycleReEvaluation } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lifecycle-runner"
 import { buildCompanySignals } from "@/lib/growth/research/company-signal-builder"
 import { classifyProspectIndustry } from "@/lib/growth/research/industry-classifier"
 import { detectProspectPainSignals } from "@/lib/growth/research/pain-signal-detector"
@@ -214,6 +215,19 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
 
     await markLeadProspectResearchCompleted(input.admin, lead.id, run)
     await recomputeGrowthLeadWorkflowSignals(input.admin, lead.id)
+
+    void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+      admin: input.admin,
+      leadId: lead.id,
+      event: "website_analysis_completed",
+      actor: { userId: input.createdBy ?? null, email: null },
+    })
+    void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+      admin: input.admin,
+      leadId: lead.id,
+      event: "operator_rerun_research",
+      actor: { userId: input.createdBy ?? null, email: null },
+    })
 
     logGrowthEngine("prospect_research_completed", {
       leadId: lead.id,

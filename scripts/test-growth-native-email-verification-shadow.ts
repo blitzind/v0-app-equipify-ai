@@ -205,11 +205,10 @@ async function main(): Promise<void> {
   console.log("  ✓ Context email values stripped from logs")
 
   const serviceSource = readSource("lib/growth/contact-verification/email-verification-service.ts")
-  assert.match(serviceSource, /shadowCompareNativeEmailVerification\(/)
-  assert.match(serviceSource, /await emitNativeEmailVerificationShadow\(result\)/)
-  assert.match(serviceSource, /return result/)
-  assert.doesNotMatch(serviceSource, /verifyEmailNatively\(/)
-  console.log("  ✓ Service wiring exists; native engine not inlined in service")
+  assert.match(serviceSource, /verifyEmailWithNativeEngine/)
+  assert.doesNotMatch(serviceSource, /verifyEmailWithZeroBounce/)
+  assert.doesNotMatch(serviceSource, /shadowCompareNativeEmailVerification\(/)
+  console.log("  ✓ Service routes through native authoritative engine (no legacy provider chain)")
 
   const shadowSource = readSource("lib/growth/contact-verification/native-email-verification-shadow.ts")
   assert.doesNotMatch(shadowSource, /raw_payload/)

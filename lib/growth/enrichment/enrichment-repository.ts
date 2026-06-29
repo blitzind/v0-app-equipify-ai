@@ -17,6 +17,7 @@ import {
 import { mergeCompanyEnrichments } from "@/lib/growth/enrichment/company-enrichment-engine"
 import { mergeContactVerifications } from "@/lib/growth/enrichment/contact-verification-engine"
 import { channelStatusLabel } from "@/lib/growth/enrichment/verification-confidence"
+import { scheduleUnifiedRevenueWorkflowLifecycleReEvaluationForCompanyCandidate } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lifecycle-runner"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -242,10 +243,22 @@ export async function runVerificationEnrichment(
     }
   }
 
-  return loadVerificationEnrichmentSnapshot(admin, {
+  const snapshot = await loadVerificationEnrichmentSnapshot(admin, {
     contact_candidate_id: contactId,
     company_candidate_id: companyCtx?.company_candidate_id ?? companyId,
   })
+
+  const linkedCompanyId = companyCtx?.company_candidate_id ?? companyId
+  if (linkedCompanyId && (snapshot.contact_verifications.length > 0 || snapshot.company_enrichments.length > 0)) {
+    void scheduleUnifiedRevenueWorkflowLifecycleReEvaluationForCompanyCandidate({
+      admin,
+      companyCandidateId: linkedCompanyId,
+      event: "operator_rerun_verification",
+      actor: { userId: input.created_by ?? null, email: null },
+    })
+  }
+
+  return snapshot
 }
 
 export async function loadVerificationEnrichmentSnapshot(

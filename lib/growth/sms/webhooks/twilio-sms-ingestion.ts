@@ -301,12 +301,34 @@ export async function ingestTwilioSmsStatusWebhook(
         event: "sms.delivered",
         occurredAt: now,
       })
+      const { emitSmsRevenueOutcome } = await import(
+        "@/lib/growth/revenue-outcomes/revenue-outcome-runtime-bridge"
+      )
+      emitSmsRevenueOutcome(admin, {
+        leadId: attempt.leadId,
+        outcome: "delivered",
+        executionId: `sms:${providerMessageId}:delivered`,
+        runtime: "sms_status_webhook",
+        occurredAt: now,
+        metadata: { delivery_attempt_id: attempt.id },
+      })
     } else if (normalizedStatus === "undelivered" || normalizedStatus === "failed") {
       dispatchSequenceWakeForSmsAttempt(admin, {
         leadId: attempt.leadId,
         smsDeliveryAttemptId: attempt.id,
         event: "sms.failed",
         occurredAt: now,
+      })
+      const { emitSmsRevenueOutcome } = await import(
+        "@/lib/growth/revenue-outcomes/revenue-outcome-runtime-bridge"
+      )
+      emitSmsRevenueOutcome(admin, {
+        leadId: attempt.leadId,
+        outcome: "failed",
+        executionId: `sms:${providerMessageId}:failed`,
+        runtime: "sms_status_webhook",
+        occurredAt: now,
+        metadata: { delivery_attempt_id: attempt.id },
       })
     }
   }

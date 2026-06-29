@@ -1,5 +1,6 @@
 /** Bulk contact acquisition — types and constants. Client-safe. */
 
+import type { UnifiedRevenueWorkflowResult } from "@/lib/growth/revenue-workflow/unified-lead-intake-types"
 import type { GrowthContactDiscoveryProviderOutcome } from "@/lib/growth/contact-discovery/contact-discovery-provider-outcomes"
 import type { GrowthRealWorldDiscoverySearchInputs } from "@/lib/growth/real-world-discovery/real-world-discovery-query-builder"
 
@@ -194,8 +195,20 @@ export const GROWTH_BULK_ACQUISITION_ARTIFACT_VIEWS = [
 ] as const satisfies readonly GrowthBulkAcquisitionArtifactView[]
 
 export type PromoteVerifiedContactOutcome =
-  | { status: "created"; leadId: string; decisionMakerId: string; companyContactId: string }
-  | { status: "linked_duplicate"; leadId: string; companyContactId: string; rule: string }
+  | {
+      status: "created"
+      leadId: string
+      decisionMakerId: string
+      companyContactId: string
+      workflow?: UnifiedRevenueWorkflowResult | null
+    }
+  | {
+      status: "linked_duplicate"
+      leadId: string
+      companyContactId: string
+      rule: string
+      workflow?: UnifiedRevenueWorkflowResult | null
+    }
   | { status: "suppressed"; companyContactId: string; reason: string }
   | { status: "skipped"; companyContactId: string; reason: string }
   | { status: "error"; companyContactId: string; message: string }

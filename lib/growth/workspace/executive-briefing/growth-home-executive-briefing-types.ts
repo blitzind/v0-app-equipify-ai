@@ -261,7 +261,116 @@ export type GrowthHomeExecutiveRecommendation = {
   headline: string
   sentence: string
   evidence: string[]
+  expectedResults?: string[]
   href: string | null
+  confidencePercent?: number | null
+  confidenceLabel?: string | null
+}
+
+/** GE-AIOS-UX-1A — Executive AI operator home presentation (read-model only). */
+export const GROWTH_HOME_AI_OS_UX_QA_MARKER = "growth-ge-aios-ux-1a-ai-os-home-experience-v1" as const
+
+export type GrowthHomeExecutiveBriefingHeroMetric = {
+  label: string
+  value: string
+  confidencePercent?: number | null
+  confidenceLabel?: string | null
+}
+
+export type GrowthHomeExecutiveBriefingHero = {
+  greeting: string
+  introLine: string
+  revenueToday: GrowthHomeExecutiveBriefingHeroMetric[]
+  biggestOpportunity: string | null
+  biggestRisk: string | null
+  expectedOutcomeToday: string | null
+  overallConfidencePercent: number | null
+  overallConfidenceLabel: string | null
+}
+
+export type GrowthHomeAvaLiveStatusItem = {
+  id: string
+  verb: string
+  label: string
+  detail?: string | null
+}
+
+export type GrowthHomeAvaLiveStatus = {
+  items: GrowthHomeAvaLiveStatusItem[]
+  learningLabel: string | null
+  runtimeNote: string | null
+}
+
+export type GrowthHomeDailyWorkQueueItem = {
+  id: string
+  priority: "critical" | "high" | "medium" | "low"
+  companyName: string
+  actionLabel: string
+  channelLabel?: string | null
+  reason?: string | null
+  estimatedMinutes?: number | null
+  requiresHumanApproval?: boolean
+  href: string | null
+  confidencePercent: number | null
+  confidenceLabel: string | null
+}
+
+export type GrowthHomeDailyWorkQueueBuckets = {
+  critical: number
+  high: number
+  medium: number
+  waiting: number
+  blocked: number
+}
+
+export type GrowthHomeThroughputMetric = {
+  id: string
+  label: string
+  value: string
+  href: string | null
+}
+
+export type GrowthHomeMailboxDomainHealth = {
+  mailboxPool: {
+    healthy: number
+    warming: number
+    paused: number
+    warning: number
+    expired: number
+  }
+  domainHealth: {
+    spf: string | null
+    dkim: string | null
+    dmarc: string | null
+    mx: string | null
+    warmupPercent: number | null
+    dailyUtilization: string | null
+  }
+  summary: string | null
+  href: string | null
+}
+
+export type GrowthHomeAutonomousReadiness = {
+  mode: string
+  executionReadinessPercent: number | null
+  executionReadinessLabel: string | null
+  guardrails: string
+  killSwitch: string
+}
+
+export type GrowthHomeAiOsUxViewModel = {
+  qaMarker: typeof GROWTH_HOME_AI_OS_UX_QA_MARKER
+  hero: GrowthHomeExecutiveBriefingHero
+  waitingOnYou: GrowthHomeWaitingOnYouItem[]
+  waitingOnYouOverflow: number
+  approveItemsHref: string | null
+  approveItemsCount: number
+  liveStatus: GrowthHomeAvaLiveStatus | null
+  dailyWorkQueueBuckets: GrowthHomeDailyWorkQueueBuckets | null
+  dailyWorkQueue: GrowthHomeDailyWorkQueueItem[]
+  throughput: GrowthHomeThroughputMetric[]
+  mailboxDomainHealth: GrowthHomeMailboxDomainHealth | null
+  autonomousReadiness: GrowthHomeAutonomousReadiness | null
 }
 
 export type GrowthHomeExecutiveBriefingViewModel = {
@@ -336,6 +445,8 @@ export type GrowthHomeExecutiveBriefingViewModel = {
   serviceFollowUps: GrowthHomeServiceFollowUp[]
   operationalInsights: GrowthHomeServiceOperationalInsight[]
   serviceContribution: GrowthHomeServiceContribution | null
+  /** GE-AIOS-UX-1A — AI OS home operator experience */
+  aiOsUx: GrowthHomeAiOsUxViewModel
 }
 
 export type GrowthHomeRevenueMission = {

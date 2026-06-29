@@ -625,7 +625,7 @@ async function main(): Promise<void> {
     isPdlSandboxEnabled,
   } = await import("../lib/growth/providers/pdl/index")
   assert.equal(GROWTH_PDL_PROVIDER_QA_MARKER, "growth-pdl-provider-v1")
-  assert.equal(isPdlSandboxEnabled(), true)
+  assert.equal(isPdlSandboxEnabled(), false)
 
   const query = buildPdlPersonSearchQuery({
     company_name: "Acme Medical Service",

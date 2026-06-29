@@ -804,12 +804,16 @@ export async function collectAllCompanyIntelligenceFindings(
   ctx: CompanyIntelligenceContext,
 ): Promise<{ drafts: GrowthCompanyIntelligenceDraftFinding[]; messages: string[] }> {
   const messages: string[] = []
+  const { collectPdlCompanyIntelligenceFindings } = await import(
+    "@/lib/growth/providers/pdl/pdl-company-intelligence-source"
+  )
   const results = await Promise.all([
     Promise.resolve(collectCanonicalCompanyIntelligenceFindings(ctx)),
     collectStagingCompanyIntelligenceFindings(admin, ctx),
     collectCanonicalSocialIntelligenceFindings(admin, ctx),
     collectCanonicalSnapshotIntelligenceFindings(admin, ctx),
     collectWebsiteCompanyIntelligenceFindings(ctx),
+    collectPdlCompanyIntelligenceFindings(ctx),
   ])
 
   const canonical = results[0] as GrowthCompanyIntelligenceDraftFinding[]
@@ -817,8 +821,9 @@ export async function collectAllCompanyIntelligenceFindings(
   const social = results[2] as GrowthCompanyIntelligenceDraftFinding[]
   const snapshots = results[3] as GrowthCompanyIntelligenceDraftFinding[]
   const website = results[4] as { drafts: GrowthCompanyIntelligenceDraftFinding[]; messages: string[] }
+  const pdl = results[5] as { drafts: GrowthCompanyIntelligenceDraftFinding[]; messages: string[] }
 
-  messages.push(...staging.messages, ...website.messages)
+  messages.push(...staging.messages, ...website.messages, ...pdl.messages)
 
   return {
     drafts: dedupeFindings([
@@ -827,6 +832,7 @@ export async function collectAllCompanyIntelligenceFindings(
       ...social,
       ...snapshots,
       ...website.drafts,
+      ...pdl.drafts,
     ]),
     messages,
   }

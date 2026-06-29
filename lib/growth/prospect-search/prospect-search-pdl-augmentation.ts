@@ -3,7 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createPeopleDataLabsContactDiscoveryProvider } from "@/lib/growth/contact-discovery/providers/people-data-labs-provider"
 import { persistProviderContactsAndSync } from "@/lib/growth/providers/pdl/pdl-contact-persistence"
-import { isPdlApiConfigured, isPdlDiscoveryDisabled } from "@/lib/growth/providers/pdl/pdl-config"
+import { isPdlProviderConfigured } from "@/lib/growth/providers/pdl/pdl-config"
 import { GROWTH_PDL_PROVIDER_QA_MARKER } from "@/lib/growth/providers/pdl/pdl-types"
 import { applyProspectSearchContactIntelligenceOverlay } from "@/lib/growth/prospect-search/prospect-search-contact-intelligence-loader"
 import type {
@@ -60,12 +60,10 @@ export async function augmentProspectSearchCompaniesWithPdl(
     companies: input.companies,
   }
 
-  if (!isPdlApiConfigured() || isPdlDiscoveryDisabled()) {
+  if (!isPdlProviderConfigured()) {
     return {
       ...base,
-      skipped_reason: isPdlDiscoveryDisabled()
-        ? "PDL disabled via GROWTH_DISCOVERY_DISABLE_PDL"
-        : "PEOPLE_DATA_LABS_API_KEY not configured",
+      skipped_reason: "GROWTH_CONTACT_DISCOVERY_PDL_ENABLED not true or PDL not configured",
     }
   }
 

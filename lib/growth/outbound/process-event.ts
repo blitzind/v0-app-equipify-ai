@@ -23,6 +23,7 @@ import { ingestGrowthReplyFromWebhook } from "@/lib/growth/replies/reply-ingesti
 import { insertGrowthOutboundReply } from "@/lib/growth/outbound/reply-repository"
 import { resolveOutboundLeadByEmail } from "@/lib/growth/outbound/resolve-lead-by-email"
 import { upsertGrowthSuppressionEntry } from "@/lib/growth/outbound/suppression-repository"
+import { scheduleUnifiedRevenueWorkflowLifecycleReEvaluation } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lifecycle-runner"
 import {
   emitGrowthLeadEmailEventTimeline,
   emitGrowthLeadEmailSuppressedTimeline,
@@ -197,6 +198,11 @@ export async function processOutboundEvent(
       reason: "unsubscribe",
       messageEventId: messageEvent.id,
     })
+    void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+      admin,
+      leadId: resolved.leadId,
+      event: "suppression_added",
+    })
   }
 
   if (event.eventType === "bounced" && event.bounceType === "hard") {
@@ -215,6 +221,11 @@ export async function processOutboundEvent(
       reason: "bounce_hard",
       messageEventId: messageEvent.id,
     })
+    void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+      admin,
+      leadId: resolved.leadId,
+      event: "suppression_added",
+    })
   }
 
   if (event.eventType === "spam_complaint") {
@@ -232,6 +243,11 @@ export async function processOutboundEvent(
       email: event.email,
       reason: "spam_complaint",
       messageEventId: messageEvent.id,
+    })
+    void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+      admin,
+      leadId: resolved.leadId,
+      event: "suppression_added",
     })
   }
 
@@ -312,6 +328,25 @@ export async function processOutboundEvent(
     .eq("id", connection.id)
 
   await recomputeGrowthLeadWorkflowSignals(admin, resolved.leadId)
+
+  const { emitEmailRevenueOutcomeFromWebhook, emitSuppressionRevenueOutcome } = await import(
+    "@/lib/growth/revenue-outcomes/revenue-outcome-runtime-bridge"
+  )
+  emitEmailRevenueOutcomeFromWebhook(admin, {
+    leadId: resolved.leadId,
+    event,
+    messageEventId: messageEvent.id,
+    campaignId,
+  })
+
+  if ((event.eventType === "bounced" && event.bounceType === "hard") || event.eventType === "spam_complaint") {
+    emitSuppressionRevenueOutcome(admin, {
+      leadId: resolved.leadId,
+      reason: event.eventType === "bounced" ? "bounce_hard" : event.eventType,
+      executionId: `suppression:${messageEvent.id}`,
+      occurredAt: event.occurredAt,
+    })
+  }
 
   logGrowthEngine("outbound_event_processed", {
     leadId: resolved.leadId,

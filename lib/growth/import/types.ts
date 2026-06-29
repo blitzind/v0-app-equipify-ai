@@ -224,4 +224,6 @@ export type ImportPipelineSummary = {
   importQualityScore: number
   avgContactabilityScore: number
   estimatedCallReadyLeads: number
+  workflowPrepared?: number
+  needsReview?: number
 }

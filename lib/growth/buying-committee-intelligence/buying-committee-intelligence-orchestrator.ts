@@ -24,6 +24,7 @@ import {
   type GrowthBuyingCommitteeIntelligenceRole,
   type GrowthBuyingCommitteeIntelligenceRunResult,
 } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-types"
+import { scheduleUnifiedRevenueWorkflowLifecycleReEvaluationForCanonicalCompany } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lifecycle-runner"
 
 export { BuyingCommitteeIntelligencePreflightError }
 
@@ -119,6 +120,15 @@ export async function runBuyingCommitteeIntelligenceForCanonicalCompany(
       coverage,
       metadata: { assignments: summaries },
     })
+
+    if (promoted_count > 0 || verified_count > 0) {
+      void scheduleUnifiedRevenueWorkflowLifecycleReEvaluationForCanonicalCompany({
+        admin,
+        canonicalCompanyId: input.company_id,
+        event: "operator_refresh_buying_committee",
+        actor: { userId: input.created_by ?? null, email: null },
+      })
+    }
 
     return {
       run_id,

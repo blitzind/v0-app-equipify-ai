@@ -33,6 +33,8 @@ import { GrowthPersonalizationEmbeddedPanel } from "@/components/growth/personal
 import { GrowthCallCopilot } from "@/components/growth/growth-call-copilot"
 import { GrowthRealtimeCallIntelligence } from "@/components/growth/growth-realtime-call-intelligence"
 import { GrowthLeadCommandCenter } from "@/components/growth/growth-lead-command-center"
+import { GrowthLeadDailyWorkQueuePanel } from "@/components/growth/growth-lead-daily-work-queue-panel"
+import { GrowthLeadAutonomousExecutionGuardrailPanel } from "@/components/growth/growth-lead-autonomous-execution-guardrail-panel"
 import { GrowthLeadMeetingIntelligence } from "@/components/growth/growth-lead-meeting-intelligence"
 import { GrowthLeadCadencePanel } from "@/components/growth/growth-lead-cadence-panel"
 import { GrowthLeadExecutionReadiness } from "@/components/growth/growth-lead-execution-readiness"
@@ -45,6 +47,8 @@ import type { GrowthLeadResearchRun } from "@/lib/growth/research-types"
 import type { GrowthLead } from "@/lib/growth/types"
 import { GrowthCallWorkflowProvider } from "@/components/growth/growth-call-workflow-context"
 import { applyGrowthCommandLeadFocusExpand, scrollGrowthCommandLeadFocusSection } from "@/lib/growth/command/command-lead-focus"
+import type { CommunicationStrategyDisplaySummary } from "@/lib/growth/contact-verification/communication-strategy-view"
+import type { NativeRevenueDecisionDisplaySummary } from "@/lib/growth/contact-verification/native-revenue-decision-adapter"
 
 type GrowthLeadDrawerProps = {
   lead: GrowthLead | null
@@ -61,6 +65,48 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLe
   const [latestResearchRun, setLatestResearchRun] = useState<GrowthLeadResearchRun | null>(null)
   const [openAddDmForm, setOpenAddDmForm] = useState(false)
   const [timelineRefreshToken, setTimelineRefreshToken] = useState(0)
+  const [nativeDecision, setNativeDecision] = useState<NativeRevenueDecisionDisplaySummary | null>(null)
+  const [nativeCommunicationStrategy, setNativeCommunicationStrategy] =
+    useState<CommunicationStrategyDisplaySummary | null>(null)
+  const [nativeRelationshipRecommendation, setNativeRelationshipRecommendation] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!open || !lead) {
+      setNativeDecision(null)
+      setNativeCommunicationStrategy(null)
+      setNativeRelationshipRecommendation(null)
+      return
+    }
+
+    let cancelled = false
+    void fetch(`/api/platform/growth/leads/${encodeURIComponent(lead.id)}/communication-strategy`, {
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        const payload = (await response.json()) as {
+          ok?: boolean
+          enabled?: boolean
+          display_summary?: NativeRevenueDecisionDisplaySummary | null
+          communication_strategy?: CommunicationStrategyDisplaySummary | null
+          relationship_recommendation?: string | null
+        }
+        if (cancelled || !response.ok || !payload.ok || !payload.enabled) return
+        setNativeDecision(payload.display_summary ?? null)
+        setNativeCommunicationStrategy(payload.communication_strategy ?? null)
+        setNativeRelationshipRecommendation(payload.relationship_recommendation ?? null)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setNativeDecision(null)
+          setNativeCommunicationStrategy(null)
+          setNativeRelationshipRecommendation(null)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [open, lead?.id])
 
   useEffect(() => {
     if (!open || !drawerFocus || !lead) return
@@ -99,7 +145,13 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLe
             onLeadSaved={onLeadSaved}
             onAddDecisionMaker={handleAddDecisionMaker}
             onTimelineRefresh={() => setTimelineRefreshToken((token) => token + 1)}
+            nativeDecision={nativeDecision}
+            nativeCommunicationStrategy={nativeCommunicationStrategy}
           />
+
+          <GrowthLeadDailyWorkQueuePanel lead={activeLead} />
+
+          <GrowthLeadAutonomousExecutionGuardrailPanel lead={activeLead} />
 
           <GrowthReplyWorkflowActionsPanel leadId={activeLead.id} compact showSequenceExit />
 
@@ -135,7 +187,10 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLe
 
           <GrowthLeadMultichannelTimelinePanel lead={activeLead} />
 
-          <GrowthRelationshipIntelligence lead={activeLead} />
+          <GrowthRelationshipIntelligence
+            lead={activeLead}
+            nativeRelationshipRecommendation={nativeRelationshipRecommendation}
+          />
 
           <GrowthConversationIntelligence lead={activeLead} />
 

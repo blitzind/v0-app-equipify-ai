@@ -22,6 +22,10 @@ import {
 } from "@/lib/growth/workspace/executive-briefing/growth-home-narrative-formatter"
 import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
 import {
+  hasCanonicalDailyWorkQueue,
+  pickTopCanonicalQueueActionItem,
+} from "@/lib/growth/workspace/executive-briefing/growth-home-canonical-queue-mapper"
+import {
   AI_OWNERSHIP_ACCOMPLISHMENT_GROUPS,
   AI_OWNERSHIP_WAITING_ON_YOU_LIMIT,
   ownershipPhrase,
@@ -487,6 +491,33 @@ export function buildExecutiveRecommendation(
   initiativeRecommendations: GrowthHomeInitiativeRecommendation[],
   waitingOnYou: GrowthHomeWaitingOnYouItem[],
 ): GrowthHomeExecutiveRecommendation | null {
+  if (
+    hasCanonicalDailyWorkQueue(dashboard) &&
+    dashboard.dailyRevenueWorkQueue &&
+    dashboard.dailyRevenueWorkQueueDisplay
+  ) {
+    const top = pickTopCanonicalQueueActionItem(
+      dashboard.dailyRevenueWorkQueue,
+      dashboard.dailyRevenueWorkQueueDisplay,
+    )
+    if (top) {
+      const blocked = dashboard.dailyRevenueWorkQueueDisplay.blocked_count
+      const waiting = dashboard.dailyRevenueWorkQueueDisplay.waiting_count
+      return {
+        headline: "Here's my recommendation.",
+        sentence: top.requiresHumanApproval
+          ? `I recommend approving ${top.actionLabel.toLowerCase()} for ${top.companyName} before I continue.`
+          : `Based on today's revenue queue, I recommend ${top.actionLabel.toLowerCase()} for ${top.companyName} via ${top.channelLabel}.`,
+        evidence: [
+          top.reasoning,
+          blocked > 0 ? `${blocked} blocked ${pluralize(blocked, "item", "items")} need review.` : "",
+          waiting > 0 ? `${waiting} ${pluralize(waiting, "item", "items")} waiting on you.` : "",
+        ].filter(Boolean),
+        href: top.href,
+      }
+    }
+  }
+
   const weightedPipeline = metricValue(dashboard, "pipeline-snapshot", "Weighted pipeline")
   const pendingApprovals = dashboard.briefing?.summary.pending_approvals ?? 0
   const primary = initiativeRecommendations[0]
@@ -495,11 +526,33 @@ export function buildExecutiveRecommendation(
     const pipelineEstimate = weightedPipeline > 0
       ? formatHomeCurrency(Math.round(weightedPipeline * 0.35))
       : "additional qualified pipeline"
+    const replyCount = dashboard.briefing?.revenue.replies ?? metricValue(dashboard, "activity", "Replies today")
+    const meetingEstimate = Math.max(
+      0,
+      Math.round((dashboard.briefing?.meetings.meetings_this_week ?? 0) + replyCount * 0.4),
+    )
+    const conversationEstimate = Math.max(replyCount, Math.round(pendingApprovals * 0.5))
+    const confidence = deriveInitiativeConfidence({
+      impactScore: weightedPipeline > 0 ? 88 : 72,
+      hasMetricEvidence: weightedPipeline > 0,
+      priorityRank: 1,
+    })
     return {
       headline: "Here's my recommendation.",
-      sentence: `If you approve the ${pendingApprovals} ${pluralize(pendingApprovals, "item", "items")} waiting for review, I expect to generate another ${pipelineEstimate} of qualified pipeline this week.`,
+      sentence: `Based on today's activity, I recommend approving the ${pendingApprovals} prepared outreach ${pluralize(pendingApprovals, "item", "items")}.`,
       evidence: waitingOnYou.slice(0, 3).map((item) => item.detail),
+      expectedResults: [
+        conversationEstimate > 0
+          ? `${conversationEstimate} additional ${pluralize(conversationEstimate, "conversation", "conversations")}`
+          : null,
+        meetingEstimate > 0
+          ? `${meetingEstimate} ${pluralize(meetingEstimate, "meeting", "meetings")}`
+          : null,
+        weightedPipeline > 0 ? `approximately ${pipelineEstimate} influenced pipeline` : null,
+      ].filter((row): row is string => Boolean(row)),
       href: waitingOnYou[0]?.href ?? null,
+      confidencePercent: confidence === "high" ? 92 : confidence === "medium" ? 82 : 71,
+      confidenceLabel: initiativeConfidenceLabel(confidence),
     }
   }
 

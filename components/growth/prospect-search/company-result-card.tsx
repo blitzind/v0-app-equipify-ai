@@ -245,6 +245,7 @@ export function CompanyResultCard({
       {selected ? (
         <>
           <CompanyContactIntelligencePanel
+            companyId={row.id}
             companyName={row.company_name}
             company={row}
             intelligence={row.contact_intelligence}

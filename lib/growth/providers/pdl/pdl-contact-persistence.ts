@@ -18,6 +18,7 @@ import {
   normalizeContactCandidate,
 } from "@/lib/growth/contact-discovery/contact-normalizer"
 import { GROWTH_PDL_PROVIDER_QA_MARKER } from "@/lib/growth/providers/pdl/pdl-types"
+import { recordPdlProviderPersistedContacts } from "@/lib/growth/providers/pdl/pdl-provider-diagnostics"
 
 function providerContactToCompanyRow(input: {
   company_id: string
@@ -248,5 +249,6 @@ export async function persistPdlContactsToCandidates(
   )
 
   if (error) throw new Error(error.message)
+  recordPdlProviderPersistedContacts({ contacts_persisted: toInsert.length })
   return toInsert.length
 }

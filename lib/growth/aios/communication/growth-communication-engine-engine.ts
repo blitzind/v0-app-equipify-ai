@@ -91,7 +91,10 @@ function isChannelPolicyBlocked(
   if (context.emergencyStopActive) {
     return { blocked: true, reason: "Emergency stop active." }
   }
-  if (context.autonomyOutboundEnabled === false || context.autonomyEnabled === false) {
+  if (
+    !context.humanApprovalPlanningMode &&
+    (context.autonomyOutboundEnabled === false || context.autonomyEnabled === false)
+  ) {
     if (OUTBOUND_ELIGIBLE_CHANNELS.has(channel)) {
       return { blocked: true, reason: "Growth Autonomy outbound disabled." }
     }

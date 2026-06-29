@@ -115,6 +115,7 @@ import {
 import type { GrowthCalibrationActiveConfig } from "@/lib/growth/aios/learning/growth-adaptive-calibration-apply-types"
 import { listGeV15OrganizationApprovalInbox } from "@/lib/growth/automation-runtime/ge-v1-5-automation-runtime-approval-inbox"
 import { logGrowthEngine } from "@/lib/growth/growth-engine-session"
+import { fetchDailyRevenueWorkQueue } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-resolver"
 
 const DEFAULT_LIMIT = 12
 
@@ -864,6 +865,8 @@ export async function fetchAiOsCommandCenterReadModel(
     generatedAt: commandCenterBase.generatedAt,
   })
 
+  const dailyWorkQueueBundle = await fetchDailyRevenueWorkQueue(admin, { limit: 100 })
+
   return {
     ...withOperationsDashboard,
     revenueDirector,
@@ -871,5 +874,7 @@ export async function fetchAiOsCommandCenterReadModel(
     closedLoopLearning,
     adaptiveCalibration,
     calibrationApply,
+    dailyRevenueWorkQueue: dailyWorkQueueBundle.queue,
+    dailyRevenueWorkQueueDisplay: dailyWorkQueueBundle.display,
   }
 }

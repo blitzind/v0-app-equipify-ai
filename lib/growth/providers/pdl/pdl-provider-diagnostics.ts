@@ -30,6 +30,9 @@ export type PdlProviderRuntimeDiagnostics = {
   contacts_returned_today: number
   contacts_persisted_today: number
   rate_limited_today: number
+  person_enrich_successes_today: number
+  company_enrich_successes_today: number
+  last_api_error_category: string | null
 }
 
 type MutableDiagnostics = PdlProviderRuntimeDiagnostics & {
@@ -67,6 +70,9 @@ function createEmptyDiagnostics(): MutableDiagnostics {
     contacts_returned_today: 0,
     contacts_persisted_today: 0,
     rate_limited_today: 0,
+    person_enrich_successes_today: 0,
+    company_enrich_successes_today: 0,
+    last_api_error_category: null,
     day_key: utcDayKey(),
   }
 }
@@ -142,11 +148,13 @@ export function recordPdlProviderFailed(input: {
   sandbox?: boolean | null
   latency_ms?: number
   rate_limited?: boolean
+  api_error_category?: string | null
 }): void {
   runtime.last_status = "failed"
   runtime.last_failure_at = new Date().toISOString()
   runtime.last_failure_reason = input.reason
   runtime.last_latency_ms = input.latency_ms ?? null
+  runtime.last_api_error_category = input.api_error_category ?? null
   runtime.failures_today += 1
   if (input.rate_limited) runtime.rate_limited_today += 1
   if (input.query_summary) runtime.last_query_summary = input.query_summary
@@ -186,6 +194,40 @@ export function recordPdlProviderPersistedContacts(input: {
   runtime.contacts_persisted_today += input.contacts_persisted
   logPdlProviderEvent("persisted_contacts", {
     contacts_persisted: input.contacts_persisted,
+  })
+}
+
+export function recordPdlProviderPersonEnriched(input: {
+  query_summary?: string | null
+  sandbox?: boolean | null
+  latency_ms?: number
+  likelihood?: number | null
+}): void {
+  runtime.last_status = "success"
+  runtime.last_success_at = new Date().toISOString()
+  runtime.last_latency_ms = input.latency_ms ?? null
+  runtime.person_enrich_successes_today += 1
+  if (input.query_summary) runtime.last_query_summary = input.query_summary
+  if (input.sandbox != null) runtime.last_sandbox = input.sandbox
+  logPdlProviderEvent("person_enriched", {
+    likelihood: input.likelihood ?? null,
+    latency_ms: input.latency_ms ?? null,
+  })
+}
+
+export function recordPdlProviderCompanyEnriched(input: {
+  query_summary?: string | null
+  sandbox?: boolean | null
+  latency_ms?: number
+}): void {
+  runtime.last_status = "success"
+  runtime.last_success_at = new Date().toISOString()
+  runtime.last_latency_ms = input.latency_ms ?? null
+  runtime.company_enrich_successes_today += 1
+  if (input.query_summary) runtime.last_query_summary = input.query_summary
+  if (input.sandbox != null) runtime.last_sandbox = input.sandbox
+  logPdlProviderEvent("company_enriched", {
+    latency_ms: input.latency_ms ?? null,
   })
 }
 

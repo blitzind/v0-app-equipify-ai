@@ -1,5 +1,8 @@
 /** Operator-assist intelligence orchestrator — recommendations, research, refresh, overlays. Client-safe. */
 
+import type { NativeRevenueDecisionAuthoritativeBundle } from "@/lib/growth/contact-verification/native-revenue-decision-adapter"
+import { resolveAuthoritativeOperatorRecommendations } from "@/lib/growth/contact-verification/native-revenue-decision-adapter"
+
 import type { ProspectSearchAccountContactStrategy } from "@/lib/growth/prospect-search/prospect-search-account-contact-strategy"
 import type { ProspectSearchCompanyContactCoverageIntelligence } from "@/lib/growth/prospect-search/prospect-search-company-contact-coverage-intelligence"
 import type { ProspectSearchContactInfluenceResult } from "@/lib/growth/prospect-search/prospect-search-contact-influence"
@@ -45,24 +48,29 @@ export function buildProspectSearchOperatorAssistIntelligence(input: {
   contactInfluences?: ProspectSearchContactInfluenceResult[]
   territory_score?: number | null
   in_active_queue?: boolean
+  nativeDecisionBundle?: NativeRevenueDecisionAuthoritativeBundle | null
 }): ProspectSearchOperatorAssistBundle {
   const { company, peopleRows, coverage, accountStrategy, relationshipBundle, operationalBundle } =
     input
 
-  const operator_recommendations = buildProspectSearchOperatorRecommendations({
-    company,
-    peopleRows,
-    coverage,
-    accountStrategy,
-    relationshipMemory: relationshipBundle.relationship_memory,
-    accountProgression: relationshipBundle.account_progression,
-    opportunityEmergence: operationalBundle.opportunity_emergence,
-    sequenceReadiness: operationalBundle.sequence_readiness,
-    orgIntelligence: input.orgIntelligence,
-    operatingAlerts: operationalBundle.operating_alerts,
-    contactInfluences: input.contactInfluences,
-    territory_score: input.territory_score,
-    queue_priority_score: accountStrategy.queue_priority_score,
+  const operator_recommendations = resolveAuthoritativeOperatorRecommendations({
+    nativeBundle: input.nativeDecisionBundle,
+    legacyBuilder: () =>
+      buildProspectSearchOperatorRecommendations({
+        company,
+        peopleRows,
+        coverage,
+        accountStrategy,
+        relationshipMemory: relationshipBundle.relationship_memory,
+        accountProgression: relationshipBundle.account_progression,
+        opportunityEmergence: operationalBundle.opportunity_emergence,
+        sequenceReadiness: operationalBundle.sequence_readiness,
+        orgIntelligence: input.orgIntelligence,
+        operatingAlerts: operationalBundle.operating_alerts,
+        contactInfluences: input.contactInfluences,
+        territory_score: input.territory_score,
+        queue_priority_score: accountStrategy.queue_priority_score,
+      }),
   })
 
   const research_gaps = buildProspectResearchGaps({

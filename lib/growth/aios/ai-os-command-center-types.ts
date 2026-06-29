@@ -23,7 +23,12 @@ import type { GrowthAutonomousExecutionPilotReadModel } from "@/lib/growth/aios/
 import type { GrowthAutonomousPlanningPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-planning-pilot-types"
 import type { GrowthAutonomousQualificationPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-types"
 import type { GrowthAutonomousResearchPilotReadModel } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-types"
-import type { AiOsOperationsDashboardReadModel } from "@/lib/growth/aios/ai-os-operations-dashboard-types"
+import type {
+  DailyRevenueWorkQueue,
+  WorkQueueDisposition,
+  WorkQueueItem,
+} from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-types"
+import type { DailyRevenueWorkQueueDisplaySummary } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-view"
 import type { GrowthAiOsAutonomyPolicyReadModel } from "@/lib/growth/autonomy/growth-ai-os-autonomy-policy-types"
 import type { GrowthClosedLoopLearningReadModel } from "@/lib/growth/aios/learning/growth-closed-loop-learning-types"
 import type { GrowthAdaptiveCalibrationReadModel } from "@/lib/growth/aios/learning/growth-adaptive-calibration-types"
@@ -234,6 +239,8 @@ export type AiOsCommandCenterReadModel = {
   adaptiveCalibration: GrowthAdaptiveCalibrationReadModel
   calibrationApply: GrowthCalibrationApplyReadModel
   dailyBriefing: AiOsDailyBriefing
+  dailyRevenueWorkQueue: DailyRevenueWorkQueue | null
+  dailyRevenueWorkQueueDisplay: DailyRevenueWorkQueueDisplaySummary | null
   operationsDashboard: AiOsOperationsDashboardReadModel
   autonomyPolicy: GrowthAiOsAutonomyPolicyReadModel
 }

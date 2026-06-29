@@ -1148,7 +1148,21 @@ export async function saveNativeCallWrapup(
     () => undefined,
   )
 
-  return mapWrapupRow(data as WrapupRow)
+  const wrapup = mapWrapupRow(data as WrapupRow)
+  const { emitCallRevenueOutcomeFromWrapup } = await import(
+    "@/lib/growth/revenue-outcomes/revenue-outcome-runtime-bridge"
+  )
+  if (wrapup.leadId) {
+    emitCallRevenueOutcomeFromWrapup(admin, {
+      leadId: wrapup.leadId,
+      sessionId: input.sessionId,
+      wrapupId: wrapup.id,
+      outcome: input.wrapup.outcome,
+      occurredAt: now,
+    })
+  }
+
+  return wrapup
 }
 
 export async function fetchNativeCallWrapupBySessionId(

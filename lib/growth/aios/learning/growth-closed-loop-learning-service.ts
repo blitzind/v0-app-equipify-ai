@@ -40,6 +40,7 @@ import {
 import type { GrowthCommunicationEngineReadModel } from "@/lib/growth/aios/communication/growth-communication-engine-types"
 import type { GrowthRevenueDirectorReadModel } from "@/lib/growth/aios/revenue-director/growth-revenue-director-types"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
+import { scheduleUnifiedRevenueWorkflowLifecycleReEvaluation } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lifecycle-runner"
 
 /** Test-only in-memory store — production paths use repository. */
 const outcomeStore = new Map<string, GrowthLearningOutcome[]>()
@@ -386,6 +387,22 @@ export async function observeClosedLoopLearningEvent(
       generatedAt: new Date().toISOString(),
       outcomes,
     })
+
+    if (persisted.subject.type === "lead" && admin) {
+      const revenueOutcomeTypes = new Set([
+        "converted",
+        "approved",
+        "meeting_booked",
+        "positive_intent",
+      ])
+      void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+        admin,
+        leadId: persisted.subject.id,
+        event: revenueOutcomeTypes.has(persisted.outcomeType)
+          ? "revenue_outcome_recorded"
+          : "learning_observation_added",
+      })
+    }
 
     return { observed: true, outcome: persisted }
   } catch {

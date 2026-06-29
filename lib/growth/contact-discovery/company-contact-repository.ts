@@ -18,6 +18,7 @@ import {
   discoverWebsiteContacts,
 } from "@/lib/growth/contact-discovery/website-contact-discovery"
 import { verifyCompanyContact } from "@/lib/growth/contact-verification/verify-contact"
+import { scheduleUnifiedRevenueWorkflowLifecycleReEvaluation } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lifecycle-runner"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -306,7 +307,28 @@ export async function refreshCompanyContactVerification(
     .select("*")
     .single()
   if (updateError || !updated) return null
-  return rowToCompanyContact(updated as Record<string, unknown>)
+  const refreshed = rowToCompanyContact(updated as Record<string, unknown>)
+  if (refreshed.growth_lead_id) {
+    const emailVerified =
+      refreshed.email_status === "verified" && contact.email_status !== "verified"
+    const phoneVerified =
+      refreshed.phone_status === "verified" && contact.phone_status !== "verified"
+    if (emailVerified) {
+      void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+        admin,
+        leadId: refreshed.growth_lead_id,
+        event: "email_verified",
+      })
+    }
+    if (phoneVerified) {
+      void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+        admin,
+        leadId: refreshed.growth_lead_id,
+        event: "phone_verified",
+      })
+    }
+  }
+  return refreshed
 }
 
 export async function updateCompanyContactStatus(

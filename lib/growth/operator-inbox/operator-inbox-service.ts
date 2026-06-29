@@ -20,6 +20,7 @@ import { listReplyWorkflowActions } from "@/lib/growth/reply-intelligence/workfl
 import { applySignalFeedAction } from "@/lib/growth/signal-intelligence/signal-feed-repository"
 import { loadGrowthSignalFeed } from "@/lib/growth/signal-intelligence/signal-feed-repository"
 import { isGrowthSignalFoundationSchemaReady } from "@/lib/growth/signals/signal-schema-health"
+import { fetchDailyRevenueWorkQueue } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-resolver"
 
 export const OPERATOR_INBOX_QUEUE_MODES = ["compact", "full"] as const
 export type OperatorInboxQueueMode = (typeof OPERATOR_INBOX_QUEUE_MODES)[number]
@@ -80,6 +81,7 @@ export async function fetchOperatorInboxQueue(
       : inboxThreads,
     filter: input?.filter,
     limit: input?.limit,
+    dailyRevenueWorkQueue: (await fetchDailyRevenueWorkQueue(admin, { limit: 100 })).queue,
   })
 }
 

@@ -32,10 +32,63 @@ import { assertEmailSendAllowed } from "@/lib/growth/outbound/suppression-reposi
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import { emitGrowthLeadCreatedTimeline } from "@/lib/growth/timeline-emitter"
 import { buildDefaultCapturedLeadReviewMetadata } from "@/lib/growth/captured-leads/captured-lead-actions"
+import type { NormalizedImportRow } from "@/lib/growth/import/types"
+import {
+  resolveBrowserIntakeLeadSource,
+  runUnifiedRevenueWorkflowAfterIntake,
+} from "@/lib/growth/revenue-workflow/unified-revenue-workflow-intake-runner"
+import type { UnifiedRevenueWorkflowResult } from "@/lib/growth/revenue-workflow/unified-lead-intake-types"
 import type { GrowthLead } from "@/lib/growth/types"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
+}
+
+async function runBrowserIntakeUnifiedWorkflow(
+  admin: SupabaseClient,
+  input: {
+    leadId: string
+    contactInput: GrowthBrowserIntakeServiceInput
+    normalized: NormalizedImportRow
+    sourcePlatform: ReturnType<typeof normalizeBrowserIntakeSourcePlatform>
+    captureType: "company_only" | "contact"
+    externalRef: string
+  },
+): Promise<UnifiedRevenueWorkflowResult | null> {
+  const email = asString(input.contactInput.email).toLowerCase() || null
+  const identityUncertain =
+    input.sourcePlatform === "linkedin" &&
+    (input.captureType === "company_only" || !email || !asString(input.contactInput.contact_name))
+
+  const { workflow } = await runUnifiedRevenueWorkflowAfterIntake({
+    admin,
+    actor: {
+      userId: input.contactInput.created_by ?? null,
+      email: input.contactInput.actor_email ?? null,
+    },
+    source: resolveBrowserIntakeLeadSource(input.sourcePlatform),
+    leadId: input.leadId,
+    company: {
+      name: input.normalized.companyName,
+      website: input.normalized.website,
+    },
+    contact: {
+      name: input.normalized.contactName ?? resolveBrowserIntakeContactName(input.contactInput),
+      title: input.normalized.title,
+      email,
+      phone: input.normalized.phone,
+      linkedinUrl: input.normalized.linkedinUrl,
+    },
+    metadata: {
+      externalRef: input.externalRef,
+      sourceUrl: input.contactInput.source_url,
+      sourcePlatform: input.sourcePlatform,
+      captureMethod: input.contactInput.capture_method,
+      identityUncertain,
+    },
+  })
+
+  return workflow
 }
 
 function buildBrowserIntakeCaptureMeta(
@@ -405,6 +458,15 @@ export async function createBrowserIntakeContact(
       captureType,
     })
 
+    const workflow = await runBrowserIntakeUnifiedWorkflow(admin, {
+      leadId: lead.id,
+      contactInput: input,
+      normalized,
+      sourcePlatform,
+      captureType,
+      externalRef,
+    })
+
     return {
       status: "updated",
       lead_id: lead.id,
@@ -417,6 +479,7 @@ export async function createBrowserIntakeContact(
       capture_type: captureType,
       email_status: emailVerification.emailStatus,
       verified_by_provider: emailVerification.verifiedByProvider,
+      workflow,
     }
   }
 
@@ -473,6 +536,15 @@ export async function createBrowserIntakeContact(
       captureType,
     })
 
+    const workflow = await runBrowserIntakeUnifiedWorkflow(admin, {
+      leadId: lead.id,
+      contactInput: input,
+      normalized,
+      sourcePlatform,
+      captureType,
+      externalRef,
+    })
+
     return {
       status: "updated",
       lead_id: lead.id,
@@ -485,6 +557,7 @@ export async function createBrowserIntakeContact(
       capture_type: captureType,
       email_status: emailVerification.emailStatus,
       verified_by_provider: emailVerification.verifiedByProvider,
+      workflow,
     }
   }
 
@@ -557,6 +630,15 @@ export async function createBrowserIntakeContact(
       contactDiscoveryQueued: finalized.contactDiscoveryQueued,
     })
 
+    const workflow = await runBrowserIntakeUnifiedWorkflow(admin, {
+      leadId: lead.id,
+      contactInput: input,
+      normalized,
+      sourcePlatform,
+      captureType,
+      externalRef,
+    })
+
     return {
       status: "created",
       lead_id: lead.id,
@@ -567,6 +649,7 @@ export async function createBrowserIntakeContact(
       capture_type: captureType,
       email_status: emailVerification.emailStatus,
       verified_by_provider: emailVerification.verifiedByProvider,
+      workflow,
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "create_failed"

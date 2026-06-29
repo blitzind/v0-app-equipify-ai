@@ -29,6 +29,9 @@ export function GrowthAiOsHumanApprovalCenterSection({ humanApprovalCenter, comp
           <h3 className="text-sm font-semibold">Human Approval Center</h3>
           <p className="text-xs text-muted-foreground">
             Unified read-only inbox — review and route to existing approval surfaces. No send or approve here.
+            {process.env.NEXT_PUBLIC_GROWTH_AUTONOMOUS_EXECUTION_GUARDRAILS === "true"
+              ? " Guardrail preview available on lead detail."
+              : ""}
           </p>
         </div>
         <Badge variant="outline" className="text-xs">

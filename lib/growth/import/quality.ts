@@ -49,6 +49,8 @@ export function computeImportPipelineSummary(input: {
     contactabilityScore?: number
   }>
   estimatedCallReadyLeads?: number
+  workflowPrepared?: number
+  needsReview?: number
 }): ImportPipelineSummary {
   const fill = computeImportFillMetrics(input.rows)
   const total = input.rows.length || 1
@@ -73,6 +75,8 @@ export function computeImportPipelineSummary(input: {
     estimatedCallReadyLeads:
       input.estimatedCallReadyLeads ??
       (input.previews ? countEstimatedCallReadyLeads(input.previews) : 0),
+    workflowPrepared: input.workflowPrepared,
+    needsReview: input.needsReview,
   }
 }
 

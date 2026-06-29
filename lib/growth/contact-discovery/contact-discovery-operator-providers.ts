@@ -9,16 +9,22 @@ import {
   isApolloMockEnabled,
   isApolloProviderConfigured,
 } from "@/lib/growth/providers/apollo/apollo-config"
+import {
+  isPdlProviderConfigured,
+} from "@/lib/growth/providers/pdl/pdl-config"
 
 function isApolloChainAvailable(env: NodeJS.ProcessEnv): boolean {
   return isApolloApiConfigured(env) || isApolloMockEnabled(env) || isApolloProviderConfigured(env)
 }
 
-/** Internal sources first, public website second, PDL augmentation third. Apollo is opt-in. */
+function isPdlChainAvailable(env: NodeJS.ProcessEnv): boolean {
+  return isPdlProviderConfigured(env)
+}
+
+/** Internal sources first, public website second. PDL and Apollo are opt-in. */
 export const OPERATOR_CONTACT_DISCOVERY_PROVIDER_TYPES_BASE = [
   "internal_growth",
   "website_public_extract",
-  "future_people_data_labs",
 ] as const satisfies readonly GrowthContactDiscoveryProviderType[]
 
 /** Apollo-Primary-1 — internal first, Apollo as primary external source, then website/PDL. */
@@ -48,6 +54,9 @@ export function resolveOperatorContactDiscoveryProviderTypes(
   const types: GrowthContactDiscoveryProviderType[] = [
     ...OPERATOR_CONTACT_DISCOVERY_PROVIDER_TYPES_BASE,
   ]
+  if (isPdlChainAvailable(env)) {
+    types.push("future_people_data_labs")
+  }
   if (apolloConfigured) {
     types.push("future_apollo")
   }

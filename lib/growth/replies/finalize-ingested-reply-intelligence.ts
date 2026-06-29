@@ -13,6 +13,7 @@ import { emitGrowthLeadStatusChangedTimeline } from "@/lib/growth/timeline-emitt
 import type { GrowthLeadStatus } from "@/lib/growth/types"
 import { maybeBridgeApolloPipelineToMeetingIntelligenceForLead } from "@/lib/growth/apollo/apollo-meeting-bridge"
 import { shadowLogReplyIntelligence } from "@/lib/growth/contact-verification/email-learning-shadow"
+import { scheduleUnifiedRevenueWorkflowLifecycleReEvaluation } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lifecycle-runner"
 
 async function resolveDmPhone(
   admin: SupabaseClient,
@@ -186,4 +187,26 @@ export async function finalizeIngestedReplyIntelligence(
     lead_id: input.leadId,
     outbound_reply_id: input.outboundReply.id,
   })
+
+  const positiveIntents = new Set([
+    "positive_interest",
+    "meeting_request",
+    "demo_request",
+    "pricing_question",
+    "referral",
+    "needs_more_information",
+  ])
+  const negativeIntents = new Set(["not_interested", "objection", "unsubscribe", "angry_complaint"])
+  const replyEvent = positiveIntents.has(intelligence.intent)
+    ? ("positive_reply" as const)
+    : negativeIntents.has(intelligence.intent)
+      ? ("negative_reply" as const)
+      : null
+  if (replyEvent) {
+    void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+      admin,
+      leadId: input.leadId,
+      event: replyEvent,
+    })
+  }
 }

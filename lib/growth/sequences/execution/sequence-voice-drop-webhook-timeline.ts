@@ -73,6 +73,16 @@ export async function maybeEmitSequenceVoiceDropWebhookTimeline(
       deliveryAttemptId: input.attempt.id,
       summary: "Voice drop delivery finalized via Twilio status callback.",
     })
+    const { emitVoiceDropRevenueOutcome } = await import(
+      "@/lib/growth/revenue-outcomes/revenue-outcome-runtime-bridge"
+    )
+    emitVoiceDropRevenueOutcome(admin, {
+      leadId: linkage.leadId,
+      outcome: "delivered",
+      deliveryAttemptId: input.attempt.id,
+      enrollmentId: linkage.enrollmentId,
+      campaignId: linkage.campaignId,
+    })
     return
   }
 
@@ -87,6 +97,16 @@ export async function maybeEmitSequenceVoiceDropWebhookTimeline(
       recipientId: input.attempt.recipientId,
       deliveryAttemptId: input.attempt.id,
       summary: input.plan.attemptPatch.failureReason ?? "Voice drop delivery failed.",
+    })
+    const { emitVoiceDropRevenueOutcome } = await import(
+      "@/lib/growth/revenue-outcomes/revenue-outcome-runtime-bridge"
+    )
+    emitVoiceDropRevenueOutcome(admin, {
+      leadId: linkage.leadId,
+      outcome: "failed",
+      deliveryAttemptId: input.attempt.id,
+      enrollmentId: linkage.enrollmentId,
+      campaignId: linkage.campaignId,
     })
   }
 }

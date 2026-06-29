@@ -11,6 +11,12 @@ import type { NormalizedImportRow } from "@/lib/growth/import/types"
 import { createGrowthLead } from "@/lib/growth/lead-repository"
 import { assertEmailSendAllowed } from "@/lib/growth/outbound/suppression-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
+import {
+  importRowToIntakeContact,
+  resolveAcquisitionContactIntakeSource,
+  runUnifiedRevenueWorkflowAfterIntake,
+} from "@/lib/growth/revenue-workflow/unified-revenue-workflow-intake-runner"
+import type { UnifiedRevenueWorkflowResult } from "@/lib/growth/revenue-workflow/unified-lead-intake-types"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -143,6 +149,44 @@ async function linkCompanyContactToLead(
     .eq("id", input.companyContactId)
 }
 
+async function runAcquisitionPromotionWorkflow(
+  admin: SupabaseClient,
+  input: {
+    contact: GrowthCompanyContact
+    company: CompanyCandidateRow
+    leadId: string
+    acquisitionRunId?: string | null
+    createdBy?: string | null
+  },
+): Promise<UnifiedRevenueWorkflowResult | null> {
+  const normalized = companyContactToImportRow(input.contact, input.company)
+  const source = resolveAcquisitionContactIntakeSource(input.contact, {
+    acquisitionRunId: input.acquisitionRunId,
+  })
+
+  const { workflow } = await runUnifiedRevenueWorkflowAfterIntake({
+    admin,
+    actor: { userId: input.createdBy ?? null, email: null },
+    source,
+    leadId: input.leadId,
+    company: {
+      name: input.company.company_name,
+      website: input.company.website,
+      domain: input.company.domain,
+      companyId: input.company.id,
+    },
+    contact: importRowToIntakeContact(normalized),
+    metadata: {
+      externalRef: normalized.externalRef,
+      acquisitionRunId: input.acquisitionRunId,
+      companyCandidateId: input.contact.company_id,
+      contactId: input.contact.id,
+    },
+  })
+
+  return workflow
+}
+
 export async function promoteVerifiedContactToGrowthLead(
   admin: SupabaseClient,
   input: {
@@ -213,11 +257,19 @@ export async function promoteVerifiedContactToGrowthLead(
       leadId: dedupe.leadId,
       rule: dedupe.rule,
     })
+    const workflow = await runAcquisitionPromotionWorkflow(admin, {
+      contact,
+      company,
+      leadId: dedupe.leadId,
+      acquisitionRunId: input.acquisitionRunId,
+      createdBy: input.createdBy,
+    })
     return {
       status: "linked_duplicate",
       companyContactId: contact.id,
       leadId: dedupe.leadId,
       rule: dedupe.rule,
+      workflow,
     }
   }
 
@@ -281,11 +333,20 @@ export async function promoteVerifiedContactToGrowthLead(
       decisionMakerId: decisionMaker.id,
     })
 
+    const workflow = await runAcquisitionPromotionWorkflow(admin, {
+      contact,
+      company,
+      leadId: lead.id,
+      acquisitionRunId: input.acquisitionRunId,
+      createdBy: input.createdBy,
+    })
+
     return {
       status: "created",
       leadId: lead.id,
       decisionMakerId: decisionMaker.id,
       companyContactId: contact.id,
+      workflow,
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "promote_failed"

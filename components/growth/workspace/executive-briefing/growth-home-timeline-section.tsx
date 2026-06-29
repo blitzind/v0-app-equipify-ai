@@ -8,8 +8,8 @@ export function GrowthHomeTimelineSection({ periods }: { periods: GrowthHomeTime
   return (
     <section data-qa-section="home-timeline" className="space-y-4">
       <div>
-        <h2 className="text-xl font-semibold tracking-tight">Timeline</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Recent work in first-person narrative.</p>
+        <h2 className="text-xl font-semibold tracking-tight">What I accomplished</h2>
+        <p className="mt-1 text-sm text-muted-foreground">A running narrative of my work — not a dashboard export.</p>
       </div>
       <div className="space-y-6">
         {periods.map((period) => (

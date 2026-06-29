@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { runUnifiedRevenueWorkflowAfterIntake } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-intake-runner"
 import { recordGrowthLeadInitialAssignment } from "@/lib/growth/assignment/assign-lead"
 import { fetchGrowthRepByUserId, syncGrowthRepRosterFromPlatformAdmins } from "@/lib/growth/assignment/rep-roster-repository"
 import { createGrowthLead, isGrowthLeadArchiveSchemaReady, listGrowthLeads } from "@/lib/growth/lead-repository"
@@ -162,7 +163,29 @@ export async function POST(request: Request) {
       actorEmail: access.userEmail,
     })
 
-    return NextResponse.json({ ok: true, lead: enrichedLead }, { status: 201 })
+    const workflowRun = await runUnifiedRevenueWorkflowAfterIntake({
+      admin: access.admin,
+      actor: { userId: access.userId, email: access.userEmail },
+      source: "manual",
+      leadId: lead.id,
+      company: {
+        name: lead.companyName,
+        website: lead.website,
+      },
+      contact: {
+        name: lead.contactName,
+        email: lead.contactEmail,
+        phone: lead.contactPhone,
+      },
+      metadata: {
+        externalRef: lead.externalRef,
+      },
+    })
+
+    return NextResponse.json(
+      { ok: true, lead: enrichedLead, workflow: workflowRun.workflow },
+      { status: 201 },
+    )
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     if (message === "company_name_required") {

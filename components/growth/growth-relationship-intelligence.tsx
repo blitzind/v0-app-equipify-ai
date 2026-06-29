@@ -2,12 +2,13 @@
 
 import { ArrowDownRight, ArrowRight, ArrowUpRight, Handshake } from "lucide-react"
 import { GrowthBadge, GrowthActionRequiredBadge, GrowthCollapsibleEngineCard, formatRelativeTime } from "@/components/growth/growth-ui-utils"
-import { growthLeadRelationshipActionRequired } from "@/lib/growth/growth-lead-drawer-badges"
+import { isNativeRevenueDecisionEngineEnabledClient } from "@/lib/growth/contact-verification/native-revenue-decision-feature"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthRelationshipIntelligenceProps = {
   lead: GrowthLead
+  nativeRelationshipRecommendation?: string | null
 }
 
 function trendIcon(trend: GrowthLead["relationshipTrend"]) {
@@ -36,7 +37,10 @@ function attentionTone(
   return "neutral"
 }
 
-export function GrowthRelationshipIntelligence({ lead }: GrowthRelationshipIntelligenceProps) {
+export function GrowthRelationshipIntelligence({
+  lead,
+  nativeRelationshipRecommendation,
+}: GrowthRelationshipIntelligenceProps) {
   const collapsedSummary = [
     lead.relationshipStrengthScore != null ? `${lead.relationshipStrengthScore}` : null,
     lead.relationshipStrengthTier ?? null,
@@ -78,6 +82,15 @@ export function GrowthRelationshipIntelligence({ lead }: GrowthRelationshipIntel
               label={lead.relationshipOwnerAttentionLevel}
               tone={attentionTone(lead.relationshipOwnerAttentionLevel)}
             />
+          </div>
+        ) : null}
+
+        {isNativeRevenueDecisionEngineEnabledClient() && nativeRelationshipRecommendation ? (
+          <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Native recommendation
+            </p>
+            <p className="mt-1 text-foreground">{nativeRelationshipRecommendation}</p>
           </div>
         ) : null}
 

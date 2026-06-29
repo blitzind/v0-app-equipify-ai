@@ -116,6 +116,10 @@ export type GrowthProspectSearchContactIntelligence = {
   operating_alerts?: import("@/lib/growth/prospect-search/prospect-search-revenue-operating-alerts").ProspectSearchOperatingAlertsSnapshot | null
   operator_assist?: import("@/lib/growth/prospect-search/prospect-search-operator-assist-intelligence").ProspectSearchOperatorAssistBundle | null
   command_overlays?: import("@/lib/growth/prospect-search/prospect-search-command-overlays").ProspectSearchCommandOverlaysSnapshot | null
+  native_revenue_decision?: import("@/lib/growth/contact-verification/native-revenue-decision-adapter").NativeRevenueDecisionDisplaySummary | null
+  native_communication_strategy?: import("@/lib/growth/contact-verification/communication-strategy-view").CommunicationStrategyDisplaySummary | null
+  native_meeting_prep_objective?: import("@/lib/growth/meeting-intelligence/meeting-prep-types").MeetingPrepObjective | null
+  native_relationship_recommendation?: string | null
   website_extraction_diagnostics?: import("@/lib/growth/contact-discovery/website-extraction-acquisition-types").WebsiteExtractionDiagnosticsSnapshot | null
   contact_identities?: import("@/lib/growth/prospect-search/prospect-search-contact-identity-types").ProspectSearchContactIdentityResolution[]
   /** Growth Engine 7.2–7.7 intelligence overlay (Phase 7.PS-A). */

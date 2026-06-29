@@ -5,6 +5,7 @@ import { fetchGrowthLeadById, updateGrowthLead, archiveGrowthLeads } from "@/lib
 import { mapGrowthLeadArchiveApiError } from "@/lib/growth/lead-archive-api-errors"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
+import { scheduleUnifiedRevenueWorkflowLifecycleReEvaluation } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lifecycle-runner"
 import {
   emitGrowthLeadNotesUpdatedTimeline,
   emitGrowthLeadOverrideChangedTimeline,
@@ -187,6 +188,22 @@ export async function PATCH(
       body.callPriorityOverride !== undefined
     ) {
       lead = (await recomputeGrowthLeadWorkflowSignals(access.admin, leadId)) ?? lead
+    }
+
+    if (body.status !== undefined && body.status !== existing.status) {
+      void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+        admin: access.admin,
+        leadId,
+        event: "lead_status_promoted",
+        actor: { userId: access.userId, email: access.userEmail },
+      })
+    } else if (body.score !== undefined && body.score !== existing.score) {
+      void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({
+        admin: access.admin,
+        leadId,
+        event: "qualification_updated",
+        actor: { userId: access.userId, email: access.userEmail },
+      })
     }
 
     logGrowthEngine("lead_update_success", {

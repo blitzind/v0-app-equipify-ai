@@ -1,3 +1,5 @@
+import type { DailyRevenueWorkQueue } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-types"
+import type { DailyRevenueWorkQueueDisplaySummary } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-view"
 import type { AidenDailyBriefing } from "@/lib/growth/aiden/aiden-daily-briefing"
 import type { GrowthCadenceCommandSummary } from "@/lib/growth/cadence/cadence-types"
 import type { GrowthOpportunityPipelineDashboard } from "@/lib/growth/opportunity-pipeline/pipeline-types"
@@ -7,6 +9,7 @@ import {
   GROWTH_WORKSPACE_DASHBOARD_QA_MARKER,
   type GrowthWorkspaceDashboardViewModel,
 } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
+import { buildLeadInboxHighlightsFromSections } from "@/lib/growth/workspace/executive-briefing/growth-home-ai-os-ux-synthesizer"
 
 type LeadInboxSection = { id: string; items: unknown[] }
 
@@ -56,6 +59,9 @@ export type GrowthWorkspaceDashboardSourcePayload = {
   conversationDashboard: ConversationDashboard | null
   relationshipDashboard: RelationshipDashboard | null
   callsDashboard: CallsDashboardResponse | null
+  dailyRevenueWorkQueueEnabled?: boolean
+  dailyRevenueWorkQueue?: DailyRevenueWorkQueue | null
+  dailyRevenueWorkQueueDisplay?: DailyRevenueWorkQueueDisplaySummary | null
 }
 
 function countInboxSections(sections: LeadInboxSection[], ids: string[]): number {
@@ -303,6 +309,10 @@ export function buildGrowthWorkspaceDashboardViewModel(
       shortcut,
     })),
     operatorActionCards,
+    leadInboxHighlights: buildLeadInboxHighlightsFromSections(input.leadInboxSections),
+    dailyRevenueWorkQueueEnabled: input.dailyRevenueWorkQueueEnabled === true,
+    dailyRevenueWorkQueue: input.dailyRevenueWorkQueue ?? null,
+    dailyRevenueWorkQueueDisplay: input.dailyRevenueWorkQueueDisplay ?? null,
     sections: [
       {
         id: "my-queue",

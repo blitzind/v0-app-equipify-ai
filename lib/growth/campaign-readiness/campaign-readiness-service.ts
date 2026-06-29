@@ -192,7 +192,7 @@ async function buildEngineInput(
     return itemLeadId === lead_id || !lead_id
   }).length
 
-  const sequence_readiness = null
+  const sequence_readiness = contactIntel?.sequence_readiness ?? null
 
   const complianceEnabled =
     process.env.GROWTH_COMPLIANCE_ORCHESTRATION_ENABLED === "true" ||

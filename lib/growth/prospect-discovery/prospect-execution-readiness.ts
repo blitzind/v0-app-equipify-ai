@@ -49,12 +49,14 @@ function providerEnvStatus(
     case "pdl_search":
       return {
         configured: env.pdl_configured,
-        enabled: !env.pdl_disabled && env.pdl_configured,
+        enabled: env.pdl_enabled && !env.pdl_disabled && env.pdl_configured,
         blocker: env.pdl_disabled
           ? "GROWTH_DISCOVERY_DISABLE_PDL"
-          : !env.pdl_configured
-            ? "PDL_API_KEY_missing"
-            : null,
+          : !env.pdl_enabled
+            ? "GROWTH_CONTACT_DISCOVERY_PDL_ENABLED_not_true"
+            : !env.pdl_configured
+              ? "PDL_API_KEY_missing"
+              : null,
       }
     default:
       return { configured: true, enabled: true, blocker: null }
@@ -178,12 +180,14 @@ export function resolveProspectProviderEnvSnapshot(
   const apolloKey = env.APOLLO_API_KEY?.trim() || env.GROWTH_APOLLO_API_KEY?.trim() || ""
   const apolloEnabledRaw = env.GROWTH_CONTACT_DISCOVERY_APOLLO_ENABLED?.trim().toLowerCase() ?? ""
   const pdlKey = env.PEOPLE_DATA_LABS_API_KEY?.trim() || env.PDL_API_KEY?.trim() || ""
+  const pdlEnabledRaw = env.GROWTH_CONTACT_DISCOVERY_PDL_ENABLED?.trim().toLowerCase() ?? ""
 
   return {
     apollo_configured: Boolean(apolloKey) || env.GROWTH_APOLLO_USE_MOCK === "1",
     apollo_enabled: apolloEnabledRaw === "1" || apolloEnabledRaw === "true" || apolloEnabledRaw === "yes",
     apollo_disabled: env.GROWTH_DISCOVERY_DISABLE_APOLLO === "1",
-    pdl_configured: Boolean(pdlKey),
+    pdl_configured: Boolean(pdlKey) || env.GROWTH_PDL_USE_MOCK === "1",
+    pdl_enabled: pdlEnabledRaw === "1" || pdlEnabledRaw === "true" || pdlEnabledRaw === "yes",
     pdl_disabled: env.GROWTH_DISCOVERY_DISABLE_PDL === "1",
     google_places_enabled: env.GROWTH_DISCOVERY_DISABLE_GOOGLE_PLACES !== "1",
     serp_enabled: env.GROWTH_DISCOVERY_DISABLE_SERP !== "1",

@@ -31,6 +31,7 @@ import type {
   GrowthAiOsOperatorExecutiveBrief,
   GrowthAiOsOperatorExperienceViewModel,
   GrowthAiOsOperatorHealthTone,
+  GrowthAiOsOperatorRevenueRecommendation,
   GrowthAiOsOperatorSystemStatus,
   GrowthAiOsOperatorWorkingItem,
 } from "@/lib/growth/aios/operator-experience/growth-ai-os-operator-experience-types"
@@ -58,6 +59,7 @@ export type GrowthAiOsOperatorExperienceInput = {
   adaptiveCalibration?: GrowthAdaptiveCalibrationReadModel
   closedLoopLearning?: GrowthClosedLoopLearningReadModel
   teammate?: AiTeammatePresentation
+  nativeRevenueDecisionRecommendation?: GrowthAiOsOperatorRevenueRecommendation | null
 }
 
 function greetingForHour(hour: number): string {
@@ -499,7 +501,7 @@ export function synthesizeGrowthAiOsOperatorExperience(
       ? revenueDirector.workflowRequests[0]
       : null
 
-  const revenueRecommendation = topRequest
+  const revenueRecommendationFromDirector = topRequest
     ? {
         id: topRequest.id,
         headline: topRequest.title,
@@ -513,6 +515,9 @@ export function synthesizeGrowthAiOsOperatorExperience(
         workflowRequestId: topRequest.ledgerRequestId ?? topRequest.id,
       }
     : null
+
+  const revenueRecommendation =
+    input.nativeRevenueDecisionRecommendation ?? revenueRecommendationFromDirector
 
   const hac = input.humanApprovalCenter
   const approvalSummary =
