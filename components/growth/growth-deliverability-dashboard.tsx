@@ -456,3 +456,5 @@ export function GrowthDeliverabilityDashboard() {
     </div>
   )
 }
+
+export default GrowthDeliverabilityDashboard

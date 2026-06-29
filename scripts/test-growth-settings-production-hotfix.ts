@@ -42,7 +42,8 @@ function main(): void {
   assert.match(migration, /grant select, insert, update, delete on table growth.organization_ai_teammate_identity to service_role/)
 
   const liftedPanels = readSource("components/settings/workspace-settings-growth-engine-lifted-panels.tsx")
-  assert.match(liftedPanels, /dynamic\(/)
+  assert.match(liftedPanels, /loadLiftedPanel\(/)
+  assert.match(liftedPanels, /WORKSPACE_SETTINGS_GROWTH_ENGINE_DYNAMIC_PANEL_QA_MARKER/)
   assert.doesNotMatch(liftedPanels, /^import \{ GrowthDeliverabilityDashboard \}/m)
   assert.match(liftedPanels, /LiftedWarmupPanel/)
   assert.match(liftedPanels, /Suspense/)

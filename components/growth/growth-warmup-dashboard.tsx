@@ -556,3 +556,5 @@ export function GrowthWarmupDashboardPanel() {
     </div>
   )
 }
+
+export default GrowthWarmupDashboardPanel

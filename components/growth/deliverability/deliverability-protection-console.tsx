@@ -481,3 +481,5 @@ export function GrowthDeliverabilityProtectionConsole() {
     </div>
   )
 }
+
+export default GrowthDeliverabilityProtectionConsole

@@ -31,7 +31,7 @@ function main(): void {
 
   const sectionPage = readSource("components/settings/workspace-settings-growth-engine-section-page.tsx")
   assert.match(sectionPage, /liftKind === "lifted"/)
-  assert.match(sectionPage, /getWorkspaceSettingsGrowthEngineLiftedPanel/)
+  assert.match(sectionPage, /WorkspaceSettingsGrowthEngineLiftedPanelHost/)
   assert.doesNotMatch(sectionPage, /WorkspaceSettingsGrowthEngineBridgePanel/)
   assert.match(sectionPage, /max-w-none/)
 

@@ -6,6 +6,11 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
 import { growthEngineCustomerSettingsHref } from "../lib/growth/navigation/growth-workspace-settings-canonical"
+import {
+  createWorkspaceSettingsGrowthEnginePanelFallback,
+  resolveWorkspaceSettingsGrowthEngineDynamicExport,
+  WORKSPACE_SETTINGS_GROWTH_ENGINE_DYNAMIC_PANEL_QA_MARKER,
+} from "../lib/settings/workspace-settings-growth-engine-dynamic-panel"
 
 export const GROWTH_COMMUNICATIONS_SETTINGS_PRODUCTION_HOTFIX_QA_MARKER =
   "growth-communications-settings-production-hotfix-v1" as const
@@ -92,25 +97,47 @@ async function assertImportSafeWithoutSupabaseEnv(modulePath: string): Promise<v
   }
 }
 
+async function assertDynamicExportResolvable(
+  sectionId: string,
+  panelModule: string,
+  exportName: string,
+): Promise<void> {
+  const module = await import(`../${panelModule}`)
+  const resolved = resolveWorkspaceSettingsGrowthEngineDynamicExport(sectionId, exportName, module)
+  assert.equal(typeof resolved, "function", `expected function export for ${sectionId} (${exportName})`)
+}
+
 async function main(): Promise<void> {
   assert.equal(
     GROWTH_COMMUNICATIONS_SETTINGS_PRODUCTION_HOTFIX_QA_MARKER,
     "growth-communications-settings-production-hotfix-v1",
   )
+  assert.equal(
+    WORKSPACE_SETTINGS_GROWTH_ENGINE_DYNAMIC_PANEL_QA_MARKER,
+    "workspace-settings-growth-engine-dynamic-panel-v2",
+  )
 
   const liftedPanels = readSource("components/settings/workspace-settings-growth-engine-lifted-panels.tsx")
-  assert.match(liftedPanels, /dynamic\(/)
-  assert.match(liftedPanels, /GrowthAdminWidgetErrorBoundary/)
-  assert.match(liftedPanels, /WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANEL_ERROR_BOUNDARY_QA_MARKER/)
-  assert.match(
-    liftedPanels,
-    /import\("@\/components\/growth\/deliverability\/deliverability-protection-console"\)/,
-  )
+  const sectionPage = readSource("components/settings/workspace-settings-growth-engine-section-page.tsx")
+  const panelHost = readSource("components/settings/workspace-settings-growth-engine-lifted-panel-host.tsx")
+  const dynamicPanel = readSource("lib/settings/workspace-settings-growth-engine-dynamic-panel.tsx")
+
+  assert.match(liftedPanels, /loadLiftedPanel\(/)
+  assert.match(liftedPanels, /WORKSPACE_SETTINGS_GROWTH_ENGINE_DYNAMIC_PANEL_QA_MARKER/)
+  assert.match(liftedPanels, /resolveWorkspaceSettingsGrowthEngineDynamicExport/)
+  assert.match(liftedPanels, /createWorkspaceSettingsGrowthEnginePanelFallback/)
   assert.doesNotMatch(liftedPanels, /^import \{ GrowthDeliverabilityDashboard \}/m)
   assert.doesNotMatch(liftedPanels, /^import \{ GrowthConnectedMailboxesDashboard \}/m)
-  assert.doesNotMatch(liftedPanels, /^import \{ GrowthSenderInfrastructureDashboard \}/m)
-  assert.doesNotMatch(liftedPanels, /^import \{ GrowthSenderPoolsDashboardView \}/m)
-  assert.doesNotMatch(liftedPanels, /^import \{ GrowthReputationProtectionDashboardView \}/m)
+
+  assert.match(sectionPage, /WorkspaceSettingsGrowthEngineLiftedPanelHost/)
+  assert.match(sectionPage, /workspace-settings-growth-engine-lifted-panel-host/)
+  assert.doesNotMatch(sectionPage, /workspace-settings-growth-engine-lifted-panels/)
+
+  assert.match(panelHost, /GrowthAdminWidgetErrorBoundary/)
+  assert.match(panelHost, /getWorkspaceSettingsGrowthEngineLiftedPanel/)
+
+  assert.match(dynamicPanel, /resolveWorkspaceSettingsGrowthEngineDynamicExport/)
+  assert.match(dynamicPanel, /createWorkspaceSettingsGrowthEnginePanelFallback/)
 
   const reputationShim = readSource("components/growth/growth-reputation-protection-dashboard.tsx")
   assert.match(reputationShim, /^"use client"/m)
@@ -119,13 +146,21 @@ async function main(): Promise<void> {
   assert.doesNotMatch(supabaseClient, /^if \(!supabaseAnonKey\)/m)
   assert.match(supabaseClient, /export function createBrowserSupabaseClient/)
 
+  const invalidFallback = createWorkspaceSettingsGrowthEnginePanelFallback("Test panel", "connected-mailboxes")
+  assert.equal(typeof invalidFallback, "function")
+  assert.equal(resolveWorkspaceSettingsGrowthEngineDynamicExport("warmup", "Missing", {}), null)
+
   for (const section of COMMUNICATIONS_SECTIONS) {
     assert.match(liftedPanels, new RegExp(section.panelExport))
     assert.equal(growthEngineCustomerSettingsHref(section.sectionId), section.route)
     const growthPagePath = `app/(growth)${section.growthRoute}/page.tsx`
     assert.ok(fs.existsSync(growthPagePath), `missing growth communications page ${growthPagePath}`)
 
+    const panelSource = readSource(section.panelModule)
+    assert.match(panelSource, new RegExp(`export default ${section.panelExportName}`))
+
     await assertImportSafeWithoutSupabaseEnv(`../${section.panelModule}`)
+    await assertDynamicExportResolvable(section.sectionId, section.panelModule, section.panelExportName)
   }
 
   await assertImportSafeWithoutSupabaseEnv(

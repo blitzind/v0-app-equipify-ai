@@ -423,3 +423,5 @@ export function GrowthSenderInfrastructureDashboard() {
     </div>
   )
 }
+
+export default GrowthSenderInfrastructureDashboard

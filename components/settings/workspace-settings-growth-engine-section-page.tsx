@@ -1,7 +1,7 @@
 "use client"
 
 import { notFound } from "next/navigation"
-import { getWorkspaceSettingsGrowthEngineLiftedPanel } from "@/components/settings/workspace-settings-growth-engine-lifted-panels"
+import dynamic from "next/dynamic"
 import { WorkspaceSettingsPhasePlaceholder } from "@/components/settings/workspace-settings-phase-placeholder"
 import { getWorkspaceSettingsGrowthEngineSection } from "@/lib/settings/workspace-settings-navigation"
 import {
@@ -11,6 +11,20 @@ import {
   WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFT_QA_MARKER,
 } from "@/lib/settings/workspace-settings-growth-engine-lift"
 
+const WorkspaceSettingsGrowthEngineLiftedPanelHost = dynamic(
+  () =>
+    import("@/components/settings/workspace-settings-growth-engine-lifted-panel-host").then((module) => ({
+      default: module.WorkspaceSettingsGrowthEngineLiftedPanelHost,
+    })),
+  {
+    loading: () => (
+      <div className="rounded-xl border border-border bg-card p-8 text-sm text-muted-foreground">
+        Loading Growth Engine settings…
+      </div>
+    ),
+  },
+)
+
 export function WorkspaceSettingsGrowthEngineSectionPage({ sectionId }: { sectionId: string }) {
   const section = getWorkspaceSettingsGrowthEngineSection(sectionId)
   if (!section) notFound()
@@ -19,14 +33,13 @@ export function WorkspaceSettingsGrowthEngineSectionPage({ sectionId }: { sectio
   const classification = getGrowthEngineSectionClassification(sectionId)
 
   if (liftKind === "lifted") {
-    const Panel = getWorkspaceSettingsGrowthEngineLiftedPanel(sectionId)
-    if (!Panel) notFound()
     return (
       <div
         className="flex w-full min-w-0 max-w-none flex-col gap-6"
         data-qa-marker={WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFT_QA_MARKER}
+        data-workspace-settings-growth-engine-section={sectionId}
       >
-        <Panel />
+        <WorkspaceSettingsGrowthEngineLiftedPanelHost sectionId={sectionId} />
       </div>
     )
   }

@@ -856,3 +856,5 @@ export function GrowthConnectedMailboxesDashboard({
     </div>
   )
 }
+
+export default GrowthConnectedMailboxesDashboard

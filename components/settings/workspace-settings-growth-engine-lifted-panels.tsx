@@ -4,6 +4,13 @@ import { Suspense, type ComponentType } from "react"
 import dynamic from "next/dynamic"
 import { GrowthAdminWidgetErrorBoundary } from "@/components/growth/growth-admin-widget-error-boundary"
 import { growthEngineCustomerSettingsHref } from "@/lib/growth/navigation/growth-workspace-settings-canonical"
+import {
+  createWorkspaceSettingsGrowthEnginePanelFallback,
+  logWorkspaceSettingsGrowthEnginePanelDiagnostic,
+  resolveWorkspaceSettingsGrowthEngineDynamicExport,
+  WORKSPACE_SETTINGS_GROWTH_ENGINE_DYNAMIC_PANEL_QA_MARKER,
+  type WorkspaceSettingsGrowthEngineDynamicPanelModule,
+} from "@/lib/settings/workspace-settings-growth-engine-dynamic-panel"
 import type { WorkspaceSettingsGrowthEngineLiftedSectionId } from "@/lib/settings/workspace-settings-growth-engine-lift"
 
 export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANEL_ERROR_BOUNDARY_QA_MARKER =
@@ -17,161 +24,200 @@ function LiftedPanelFallback({ label }: { label: string }) {
   )
 }
 
-function dynamicLiftedPanel(
+function loadLiftedPanel(
+  sectionId: WorkspaceSettingsGrowthEngineLiftedSectionId,
   label: string,
-  loader: () => Promise<{ default: ComponentType }>,
+  exportName: string,
+  loader: () => Promise<WorkspaceSettingsGrowthEngineDynamicPanelModule>,
 ): ComponentType {
-  return dynamic(loader, { loading: () => <LiftedPanelFallback label={label} /> })
+  return dynamic(
+    async () => {
+      try {
+        const module = await loader()
+        const component =
+          resolveWorkspaceSettingsGrowthEngineDynamicExport(sectionId, exportName, module) ??
+          createWorkspaceSettingsGrowthEnginePanelFallback(label, sectionId)
+
+        return { default: component }
+      } catch (error) {
+        logWorkspaceSettingsGrowthEnginePanelDiagnostic(sectionId, {
+          event: "dynamic_import_failed",
+          exportName,
+          errorName: error instanceof Error ? error.name : "unknown",
+          errorMessage: error instanceof Error ? error.message : String(error),
+        })
+        return {
+          default: createWorkspaceSettingsGrowthEnginePanelFallback(
+            label,
+            sectionId,
+            error instanceof Error ? error.message : "Panel chunk failed to load.",
+          ),
+        }
+      }
+    },
+    { loading: () => <LiftedPanelFallback label={label} /> },
+  )
 }
 
-function withLiftedPanelShell(
-  label: string,
-  Panel: ComponentType,
-  options?: { suspense?: boolean },
-): ComponentType {
-  function LiftedPanelShell() {
-    const panel = <Panel />
-    const content = options?.suspense
-      ? <Suspense fallback={<LiftedPanelFallback label={label} />}>{panel}</Suspense>
-      : panel
+function withLiftedPanelSuspense(label: string, Panel: ComponentType, suspense = false): ComponentType {
+  if (!suspense) return Panel
 
+  function LiftedPanelWithSuspense() {
     return (
-      <GrowthAdminWidgetErrorBoundary
-        label={label}
-        qaMarker={WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANEL_ERROR_BOUNDARY_QA_MARKER}
-      >
-        {content}
-      </GrowthAdminWidgetErrorBoundary>
+      <Suspense fallback={<LiftedPanelFallback label={label} />}>
+        <Panel />
+      </Suspense>
     )
   }
 
-  return LiftedPanelShell
+  return LiftedPanelWithSuspense
 }
 
-const GrowthConnectedMailboxesDashboard = dynamicLiftedPanel("connected mailboxes", () =>
-  import("@/components/growth/mailboxes/growth-connected-mailboxes-dashboard").then((module) => ({
-    default: module.GrowthConnectedMailboxesDashboard,
-  })),
+const GrowthConnectedMailboxesDashboard = loadLiftedPanel(
+  "connected-mailboxes",
+  "Connected mailboxes",
+  "GrowthConnectedMailboxesDashboard",
+  () => import("@/components/growth/mailboxes/growth-connected-mailboxes-dashboard"),
 )
 
-const GrowthWarmupDashboardPanel = dynamicLiftedPanel("warmup", () =>
-  import("@/components/growth/growth-warmup-dashboard").then((module) => ({
-    default: module.GrowthWarmupDashboardPanel,
-  })),
+const GrowthWarmupDashboardPanel = loadLiftedPanel(
+  "warmup",
+  "Warmup",
+  "GrowthWarmupDashboardPanel",
+  () => import("@/components/growth/growth-warmup-dashboard"),
 )
 
-const GrowthProvidersDashboard = dynamicLiftedPanel("provider connections", () =>
-  import("@/components/growth/growth-providers-dashboard").then((module) => ({
-    default: module.GrowthProvidersDashboard,
-  })),
+const GrowthProvidersDashboard = loadLiftedPanel(
+  "gmail",
+  "Provider connections",
+  "GrowthProvidersDashboard",
+  () => import("@/components/growth/growth-providers-dashboard"),
 )
 
-const GrowthCommunicationSettingsPanel = dynamicLiftedPanel("communication preferences", () =>
-  import("@/components/growth/growth-communication-settings").then((module) => ({
-    default: module.GrowthCommunicationSettingsPanel,
-  })),
+const GrowthCommunicationSettingsPanel = loadLiftedPanel(
+  "inbox-routing",
+  "Communication preferences",
+  "GrowthCommunicationSettingsPanel",
+  () => import("@/components/growth/growth-communication-settings"),
 )
 
-const GrowthSenderInfrastructureDashboard = dynamicLiftedPanel("sending domains", () =>
-  import("@/components/growth/growth-sender-infrastructure-dashboard").then((module) => ({
-    default: module.GrowthSenderInfrastructureDashboard,
-  })),
+const GrowthSenderInfrastructureDashboard = loadLiftedPanel(
+  "sending-domains",
+  "Sending domains",
+  "GrowthSenderInfrastructureDashboard",
+  () => import("@/components/growth/growth-sender-infrastructure-dashboard"),
 )
 
-const GrowthDeliverabilityDashboard = dynamicLiftedPanel("DNS verification", () =>
-  import("@/components/growth/growth-deliverability-dashboard").then((module) => ({
-    default: module.GrowthDeliverabilityDashboard,
-  })),
+const GrowthDeliverabilityDashboard = loadLiftedPanel(
+  "dns-verification",
+  "DNS verification",
+  "GrowthDeliverabilityDashboard",
+  () => import("@/components/growth/growth-deliverability-dashboard"),
 )
 
-const GrowthReputationProtectionDashboardView = dynamicLiftedPanel("sending limits", () =>
-  import("@/components/growth/deliverability/deliverability-protection-console").then((module) => ({
-    default: module.GrowthDeliverabilityProtectionConsole,
-  })),
+const GrowthReputationProtectionDashboardView = loadLiftedPanel(
+  "sending-limits",
+  "Sending limits",
+  "GrowthDeliverabilityProtectionConsole",
+  () => import("@/components/growth/deliverability/deliverability-protection-console"),
 )
 
-const GrowthSenderPoolsDashboardView = dynamicLiftedPanel("sender pools", () =>
-  import("@/components/growth/growth-sender-pools-dashboard").then((module) => ({
-    default: module.GrowthSenderPoolsDashboardView,
-  })),
+const GrowthSenderPoolsDashboardView = loadLiftedPanel(
+  "sender-pools",
+  "Sender pools",
+  "GrowthSenderPoolsDashboardView",
+  () => import("@/components/growth/growth-sender-pools-dashboard"),
 )
 
-const GrowthRealtimeProvidersDashboard = dynamicLiftedPanel("calling providers", () =>
-  import("@/components/growth/growth-realtime-providers-dashboard").then((module) => ({
-    default: module.GrowthRealtimeProvidersDashboard,
-  })),
+const GrowthRealtimeProvidersDashboard = loadLiftedPanel(
+  "calling-providers",
+  "Calling providers",
+  "GrowthRealtimeProvidersDashboard",
+  () => import("@/components/growth/growth-realtime-providers-dashboard"),
 )
 
-const GrowthVoiceInfrastructureSettingsPanel = dynamicLiftedPanel("voice infrastructure", () =>
-  import("@/components/growth/growth-voice-infrastructure-settings-panel").then((module) => ({
-    default: module.GrowthVoiceInfrastructureSettingsPanel,
-  })),
+const GrowthVoiceInfrastructureSettingsPanel = loadLiftedPanel(
+  "phone-numbers",
+  "Voice infrastructure",
+  "GrowthVoiceInfrastructureSettingsPanel",
+  () => import("@/components/growth/growth-voice-infrastructure-settings-panel"),
 )
 
-const GrowthNativeDialerSettingsPanel = dynamicLiftedPanel("dialer settings", () =>
-  import("@/components/growth/growth-native-dialer-settings-panel").then((module) => ({
-    default: module.GrowthNativeDialerSettingsPanel,
-  })),
+const GrowthNativeDialerSettingsPanel = loadLiftedPanel(
+  "dialer-settings",
+  "Dialer settings",
+  "GrowthNativeDialerSettingsPanel",
+  () => import("@/components/growth/growth-native-dialer-settings-panel"),
 )
 
-const GrowthGoogleCalendarSettingsPanel = dynamicLiftedPanel("calendar providers", () =>
-  import("@/components/growth/growth-google-calendar-settings-panel").then((module) => ({
-    default: module.GrowthGoogleCalendarSettingsPanel,
-  })),
+const GrowthGoogleCalendarSettingsPanel = loadLiftedPanel(
+  "calendar-providers",
+  "Calendar providers",
+  "GrowthGoogleCalendarSettingsPanel",
+  () => import("@/components/growth/growth-google-calendar-settings-panel"),
 )
 
-const GrowthBookingPagesPanel = dynamicLiftedPanel("booking pages", () =>
-  import("@/components/growth/growth-booking-pages-panel").then((module) => ({
-    default: module.GrowthBookingPagesPanel,
-  })),
+const GrowthBookingPagesPanel = loadLiftedPanel(
+  "booking-pages",
+  "Booking pages",
+  "GrowthBookingPagesPanel",
+  () => import("@/components/growth/growth-booking-pages-panel"),
 )
 
-const GrowthMeetingLocationSettingsPanel = dynamicLiftedPanel("meeting preferences", () =>
-  import("@/components/growth/growth-meeting-location-settings-panel").then((module) => ({
-    default: module.GrowthMeetingLocationSettingsPanel,
-  })),
+const GrowthMeetingLocationSettingsPanel = loadLiftedPanel(
+  "meeting-preferences",
+  "Meeting preferences",
+  "GrowthMeetingLocationSettingsPanel",
+  () => import("@/components/growth/growth-meeting-location-settings-panel"),
 )
 
-const GrowthSettingsNotificationsPanel = dynamicLiftedPanel("notification preferences", () =>
-  import("@/components/growth/settings/growth-settings-notifications-panel").then((module) => ({
-    default: module.GrowthSettingsNotificationsPanel,
-  })),
+const GrowthSettingsNotificationsPanel = loadLiftedPanel(
+  "notification-preferences",
+  "Notification preferences",
+  "GrowthSettingsNotificationsPanel",
+  () => import("@/components/growth/settings/growth-settings-notifications-panel"),
 )
 
-const GrowthComplianceDashboardPanel = dynamicLiftedPanel("compliance settings", () =>
-  import("@/components/growth/growth-compliance-dashboard").then((module) => ({
-    default: module.GrowthComplianceDashboardPanel,
-  })),
+const GrowthComplianceDashboardPanel = loadLiftedPanel(
+  "unsubscribe-settings",
+  "Compliance settings",
+  "GrowthComplianceDashboardPanel",
+  () => import("@/components/growth/growth-compliance-dashboard"),
 )
 
-const GrowthAiCopilotSettingsPanel = dynamicLiftedPanel("copilot preferences", () =>
-  import("@/components/growth/growth-ai-copilot-settings").then((module) => ({
-    default: module.GrowthAiCopilotSettingsPanel,
-  })),
+const GrowthAiCopilotSettingsPanel = loadLiftedPanel(
+  "copilot-preferences",
+  "Copilot preferences",
+  "GrowthAiCopilotSettingsPanel",
+  () => import("@/components/growth/growth-ai-copilot-settings"),
 )
 
-const GrowthSharePagesDashboard = dynamicLiftedPanel("share page branding", () =>
-  import("@/components/growth/share-pages/growth-share-pages-admin-panel").then((module) => ({
-    default: module.GrowthSharePagesDashboard,
-  })),
+const GrowthSharePagesDashboard = loadLiftedPanel(
+  "share-page-branding",
+  "Share page branding",
+  "GrowthSharePagesDashboard",
+  () => import("@/components/growth/share-pages/growth-share-pages-admin-panel"),
 )
 
-const GrowthMediaLibraryPanel = dynamicLiftedPanel("media library", () =>
-  import("@/components/growth/media-library/growth-media-library-panel").then((module) => ({
-    default: module.GrowthMediaLibraryPanel,
-  })),
+const GrowthMediaLibraryPanel = loadLiftedPanel(
+  "media-library",
+  "Media library",
+  "GrowthMediaLibraryPanel",
+  () => import("@/components/growth/media-library/growth-media-library-panel"),
 )
 
-const GrowthContentLibraryDashboardView = dynamicLiftedPanel("media defaults", () =>
-  import("@/components/growth/growth-content-library-dashboard").then((module) => ({
-    default: module.GrowthContentLibraryDashboardView,
-  })),
+const GrowthContentLibraryDashboardView = loadLiftedPanel(
+  "media-defaults",
+  "Media defaults",
+  "GrowthContentLibraryDashboardView",
+  () => import("@/components/growth/growth-content-library-dashboard"),
 )
 
-const GrowthEmailSignaturesPanel = dynamicLiftedPanel("email signatures", () =>
-  import("@/components/growth/signatures/growth-email-signatures-panel").then((module) => ({
-    default: module.GrowthEmailSignaturesPanel,
-  })),
+const GrowthEmailSignaturesPanel = loadLiftedPanel(
+  "email-signatures",
+  "Email signatures",
+  "GrowthEmailSignaturesPanel",
+  () => import("@/components/growth/signatures/growth-email-signatures-panel"),
 )
 
 function LiftedConnectedMailboxesPanel() {
@@ -189,11 +235,11 @@ function LiftedConnectedMailboxesPanel() {
   )
 }
 
-const LiftedWarmupPanel = withLiftedPanelShell("Warmup", GrowthWarmupDashboardPanel, { suspense: true })
-const LiftedSendingDomainsPanel = withLiftedPanelShell("Sending domains", GrowthSenderInfrastructureDashboard)
-const LiftedDnsVerificationPanel = withLiftedPanelShell("DNS verification", GrowthDeliverabilityDashboard)
-const LiftedSendingLimitsPanel = withLiftedPanelShell("Sending limits", GrowthReputationProtectionDashboardView)
-const LiftedSenderPoolsPanel = withLiftedPanelShell("Sender pools", GrowthSenderPoolsDashboardView)
+const LiftedWarmupPanel = withLiftedPanelSuspense("Warmup", GrowthWarmupDashboardPanel, true)
+const LiftedSendingDomainsPanel = GrowthSenderInfrastructureDashboard
+const LiftedDnsVerificationPanel = GrowthDeliverabilityDashboard
+const LiftedSendingLimitsPanel = GrowthReputationProtectionDashboardView
+const LiftedSenderPoolsPanel = GrowthSenderPoolsDashboardView
 
 export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANELS: Record<
   WorkspaceSettingsGrowthEngineLiftedSectionId,
@@ -238,3 +284,6 @@ export function getWorkspaceSettingsGrowthEngineLiftedPanel(
     sectionId as WorkspaceSettingsGrowthEngineLiftedSectionId
   ]
 }
+
+export const WORKSPACE_SETTINGS_GROWTH_ENGINE_LIFTED_PANELS_BUILD_MARKER =
+  WORKSPACE_SETTINGS_GROWTH_ENGINE_DYNAMIC_PANEL_QA_MARKER

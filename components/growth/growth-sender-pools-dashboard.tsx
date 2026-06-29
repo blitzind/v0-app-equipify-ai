@@ -497,3 +497,5 @@ export function GrowthSenderPoolsDashboardView() {
     </div>
   )
 }
+
+export default GrowthSenderPoolsDashboardView
