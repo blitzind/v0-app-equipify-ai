@@ -31,8 +31,15 @@ grant select, insert, update, delete on table growth.organization_ai_teammate_id
 alter table growth.organization_ai_teammate_identity enable row level security;
 alter table growth.organization_ai_teammate_identity force row level security;
 
+drop policy if exists growth_organization_ai_teammate_identity_service_role
+  on growth.organization_ai_teammate_identity;
+
 create policy growth_organization_ai_teammate_identity_service_role
-  on growth.organization_ai_teammate_identity for all to service_role using (true) with check (true);
+  on growth.organization_ai_teammate_identity
+  for all
+  to service_role
+  using (true)
+  with check (true);
 
 alter table growth.operator_workspace_preferences
   add column if not exists ai_teammate_onboarding_completed boolean not null default false;
