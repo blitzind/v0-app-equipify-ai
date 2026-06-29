@@ -8,10 +8,9 @@ import { GrowthCommunicationsSettingsSection } from "@/components/growth/setting
 export default function GrowthCommunicationsWarmupPage() {
   return (
     <GrowthCommunicationsSettingsSection
-      title="Mailbox Warmup"
+      title="Warmup"
       description="Native warmup uses approved sequence sends, progression schedules, daily caps, pre-send guards, and reputation tracking."
       icon={Flame}
-      iconClassName="bg-orange-50 text-orange-700"
       adminFallbackHref="/admin/growth/infrastructure/warmup"
     >
       <Suspense

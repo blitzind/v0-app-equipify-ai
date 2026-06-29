@@ -53,9 +53,8 @@ export function GrowthSettingsDefaultViewsPanel() {
     <div className={GROWTH_SETTINGS_SECTION_GAP}>
       <GrowthWorkspacePageHeader
         title="Default Views"
-        description="Landing views and default filters when opening Growth destinations."
+        description="Default landing views and filters when opening Growth destinations."
         icon={Eye}
-        iconClassName="bg-emerald-50 text-emerald-700"
       />
 
       {loading ? <GrowthSettingsSectionLoadingState /> : null}

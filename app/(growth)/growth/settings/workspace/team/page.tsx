@@ -8,7 +8,6 @@ export default function GrowthSettingsWorkspaceTeamPage() {
       title="Team"
       description="Manage users, invites, roles, and permissions for your workspace."
       icon={Users}
-      iconClassName="bg-violet-50 text-violet-700"
       externalHref={GROWTH_CORE_SETTINGS_TEAM_PATH}
       externalLabel="Open Team settings"
       cardDescription="Manage users, invites, roles, and permissions."

@@ -39,18 +39,17 @@ export function GrowthSettingsSectionPlaceholder({
         <span className="mx-auto flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
           <Construction className="size-5" />
         </span>
-        <h2 className="mt-3 text-base font-semibold">Coming in Phase 7D+</h2>
+        <h2 className="mt-3 text-base font-semibold">Settings unavailable</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          {section.label} preferences will be managed here. No persistence is wired in Phase 7C — this route
-          establishes navigation, breadcrumbs, and Cmd+K discoverability only.
+          {section.label} is not available in Growth settings yet.
         </p>
         {section.adminFallbackHref ? (
           <p className="mt-3 text-sm text-muted-foreground">
-            Until migration completes, use{" "}
+            Use{" "}
             <Link href={section.adminFallbackHref} className="font-medium text-primary underline-offset-4 hover:underline">
               {section.adminFallbackLabel ?? "Platform Admin settings"}
-            </Link>
-            .
+            </Link>{" "}
+            for this configuration.
           </p>
         ) : null}
       </section>

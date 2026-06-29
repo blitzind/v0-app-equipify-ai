@@ -50,9 +50,8 @@ export function GrowthSettingsPersonalPreferencesPanel() {
     <div className={GROWTH_SETTINGS_SECTION_GAP}>
       <GrowthWorkspacePageHeader
         title="Personal Preferences"
-        description="Personal defaults that follow you across Growth workspaces."
+        description="Personal defaults that follow you across Growth."
         icon={SlidersHorizontal}
-        iconClassName="bg-slate-100 text-slate-600"
       />
 
       {loading ? <GrowthSettingsSectionLoadingState /> : null}
@@ -73,7 +72,7 @@ export function GrowthSettingsPersonalPreferencesPanel() {
             <div className={GROWTH_SETTINGS_FORM_GAP}>
               <GrowthSettingsField
                 label="Default landing page"
-                description="Where you land when opening the Growth workspace."
+                description="Where you land when opening Growth."
               >
                 <Select
                   value={value.defaultLandingPage}

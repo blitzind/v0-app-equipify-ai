@@ -39,12 +39,9 @@ import {
   growthEngineCustomerSettingsHref,
   GROWTH_ENGINE_CUSTOMER_SETTINGS_BASE,
 } from "@/lib/growth/navigation/growth-workspace-settings-canonical"
-import {
-  GROWTH_WORKSPACE_SETTINGS_ADVANCED_PATH,
-  GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
-} from "@/lib/growth/navigation/growth-workspace-core-settings-links"
+import { GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH } from "@/lib/growth/navigation/growth-workspace-core-settings-links"
 
-export const GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER = "growth-workspace-settings-nav-settings-menu-audit-1a-v1" as const
+export const GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER = "growth-workspace-settings-nav-ux-polish-1a-v1" as const
 
 export const GROWTH_WORKSPACE_SETTINGS_DEFAULT_SECTION_ID = "profile" as const
 
@@ -91,21 +88,28 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
       {
         id: "profile",
         label: "Profile",
-        description: "Operator identity and display preferences for the Growth workspace.",
+        description: "Your name, title, timezone, and avatar shown across Growth.",
         segment: "profile",
         icon: User,
       },
       {
         id: "notifications",
         label: "Notifications",
-        description: "Outreach, inbox, campaign, and operator activity alerts.",
+        description: "Outreach, inbox, campaign, and activity alerts.",
         segment: "notifications",
         icon: Bell,
       },
       {
+        id: "browser-notifications",
+        label: "Browser Notifications",
+        description: "Allow desktop notifications for live alerts in this browser.",
+        segment: "browser-notifications",
+        icon: Chrome,
+      },
+      {
         id: "personal-preferences",
         label: "Personal Preferences",
-        description: "Personal defaults that follow you across Growth workspaces.",
+        description: "Personal defaults that follow you across Growth.",
         segment: "personal-preferences",
         icon: SlidersHorizontal,
         adminFallbackSuffix: "growth",
@@ -114,14 +118,14 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
       {
         id: "sidebar-preferences",
         label: "Sidebar Preferences",
-        description: "Collapse behavior and section defaults for the Growth sidebar.",
+        description: "Sidebar collapse behavior and resume routing.",
         segment: "sidebar-preferences",
         icon: PanelLeft,
       },
       {
         id: "default-views",
         label: "Default Views",
-        description: "Landing views and default filters when opening Growth destinations.",
+        description: "Default landing views and filters when opening Growth destinations.",
         segment: "default-views",
         icon: Eye,
       },
@@ -152,7 +156,7 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
       {
         id: "signatures",
         label: "Email Signatures",
-        description: "Email signatures and sender identity used in operator outreach.",
+        description: "Email signatures and sender identity for outreach.",
         segment: "signatures",
         icon: Signature,
         href: growthEngineCustomerSettingsHref("email-signatures"),
@@ -219,14 +223,14 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
       {
         id: "calendar-preferences",
         label: "Calendar Preferences",
-        description: "Meeting booking defaults, availability, and calendar routing rules.",
+        description: "Default meeting location, calendar connection, and booking behavior.",
         segment: "calendar-preferences",
         icon: Calendar,
       },
       {
         id: "calendar",
         label: "Calendar & Booking",
-        description: "Calendar providers, booking pages, and scheduling integrations.",
+        description: "Connect calendars, manage booking pages, and scheduling links.",
         segment: "calendar",
         icon: Calendar,
       },
@@ -239,14 +243,14 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
       {
         id: "ai-teammate",
         label: "AI Teammate",
-        description: "Name and identity for your AI Revenue Operator inside AI OS.",
+        description: "Name and identity for your AI Teammate.",
         segment: "ai-teammate",
         icon: Sparkles,
       },
       {
         id: "ai-preferences",
         label: "AI Preferences",
-        description: "Aiden guidance, copilot tone, and AI assist defaults for operators.",
+        description: "Aiden guidance, copilot tone, and AI assist defaults.",
         segment: "ai-preferences",
         icon: Bot,
         adminFallbackSuffix: "communications",
@@ -258,6 +262,13 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
         description: "Graduated autonomy levels, capability toggles, budgets, and kill switches.",
         segment: "autonomy",
         icon: Gauge,
+      },
+      {
+        id: "command-center-preferences",
+        label: "Command Center Preferences",
+        description: "Pinned destinations and shortcuts for Cmd+K navigation.",
+        segment: "command-center-preferences",
+        icon: Command,
       },
     ],
   },
@@ -274,20 +285,6 @@ const GROWTH_WORKSPACE_SETTINGS_NAV_MANIFEST: GrowthSettingsNavManifestGroup[] =
         href: GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH,
         adminFallbackSuffix: "communications",
         adminFallbackLabel: "Communications settings (admin)",
-      },
-    ],
-  },
-  {
-    id: "advanced",
-    label: "Advanced",
-    items: [
-      {
-        id: "advanced",
-        label: "Advanced",
-        description: "Command center, browser notifications, and settings still migrating into Growth.",
-        segment: "advanced",
-        icon: Command,
-        href: GROWTH_WORKSPACE_SETTINGS_ADVANCED_PATH,
       },
     ],
   },
@@ -321,22 +318,8 @@ export function buildGrowthWorkspaceSettingsNavGroups(): GrowthSettingsNavGroup[
 export const GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS: GrowthSettingsNavGroup[] =
   buildGrowthWorkspaceSettingsNavGroups()
 
-/** Page routes reachable via Advanced hub or legacy growth-engine redirects (not top-level nav). */
+/** Legacy alias routes (redirects only — not top-level nav). */
 const GROWTH_WORKSPACE_SETTINGS_PAGE_ONLY_SECTIONS: GrowthSettingsNavItem[] = [
-  {
-    id: "command-center-preferences",
-    label: "Command Center Preferences",
-    description: "Cmd+K shortcuts, pinned destinations, and command palette ordering.",
-    href: resolveSettingsHref("command-center-preferences"),
-    icon: Command,
-  },
-  {
-    id: "browser-notifications",
-    label: "Browser Notifications",
-    description: "Desktop notification permissions for live operator signals.",
-    href: resolveSettingsHref("browser-notifications"),
-    icon: Chrome,
-  },
   {
     id: "gmail",
     label: "Gmail",
@@ -361,7 +344,7 @@ const GROWTH_WORKSPACE_SETTINGS_PAGE_ONLY_SECTIONS: GrowthSettingsNavItem[] = [
   {
     id: "connected-mailboxes",
     label: "Connected Mailboxes",
-    description: "Legacy mailbox settings route.",
+    description: "Redirect to Connected Mailboxes.",
     href: resolveSettingsHref("connected-mailboxes"),
     icon: Mailbox,
   },
@@ -397,9 +380,6 @@ export function isGrowthWorkspaceSettingsNavItemActive(pathname: string, item: G
   if (GROWTH_COMMUNICATIONS_SETTINGS_NAV_ITEM_IDS.has(item.id)) {
     if (!isGrowthCommunicationsSettingsPath(pathname)) return false
     return isGrowthCommunicationsSettingsNavItemActive(pathname, item.id)
-  }
-  if (item.id === "advanced") {
-    return pathname === GROWTH_WORKSPACE_SETTINGS_ADVANCED_PATH
   }
   if (item.id === "compliance") {
     return pathname === GROWTH_WORKSPACE_SETTINGS_COMPLIANCE_PATH

@@ -4,6 +4,9 @@ import type { ElementType, ReactNode } from "react"
 import Link from "next/link"
 import { ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  GROWTH_SETTINGS_SECTION_GAP,
+} from "@/components/growth/growth-settings-ui"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 import {
   GROWTH_COMMUNICATIONS_SETTINGS_PATH,
@@ -15,8 +18,8 @@ type GrowthCommunicationsSettingsSectionProps = {
   title: string
   description: string
   icon?: ElementType
-  iconClassName?: string
   adminFallbackHref?: string
+  adminFallbackLabel?: string
   children: ReactNode
 }
 
@@ -26,29 +29,28 @@ export function GrowthCommunicationsSettingsSection({
   title,
   description,
   icon,
-  iconClassName,
   adminFallbackHref,
+  adminFallbackLabel = "Platform admin",
   children,
 }: GrowthCommunicationsSettingsSectionProps) {
   return (
-    <div className="space-y-6" data-growth-communications-settings={GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER}>
+    <div className={GROWTH_SETTINGS_SECTION_GAP} data-growth-communications-settings={GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER}>
       <GrowthWorkspacePageHeader
         title={title}
         description={description}
         icon={icon}
-        iconClassName={iconClassName}
         actions={
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" asChild>
               <Link href={GROWTH_COMMUNICATIONS_SETTINGS_PATH}>All communications</Link>
             </Button>
             <Button type="button" variant="ghost" size="sm" asChild>
-              <Link href={GROWTH_SETTINGS_HUB_PATH}>Growth settings</Link>
+              <Link href={GROWTH_SETTINGS_HUB_PATH}>All settings</Link>
             </Button>
             {adminFallbackHref ? (
               <Button type="button" variant="ghost" size="sm" asChild>
                 <Link href={adminFallbackHref}>
-                  Admin fallback
+                  {adminFallbackLabel}
                   <ExternalLink className="ml-1.5 size-3.5" />
                 </Link>
               </Button>

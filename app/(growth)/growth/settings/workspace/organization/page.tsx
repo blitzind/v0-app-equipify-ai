@@ -8,7 +8,6 @@ export default function GrowthSettingsWorkspaceOrganizationPage() {
       title="Organization"
       description="Configure workspace profile, branding, and organization details."
       icon={Building2}
-      iconClassName="bg-blue-50 text-blue-700"
       externalHref={GROWTH_CORE_SETTINGS_ORGANIZATION_PATH}
       externalLabel="Open Organization settings"
       cardDescription="Configure workspace profile, branding, and organization details."

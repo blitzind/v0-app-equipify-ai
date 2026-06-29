@@ -4,6 +4,7 @@ import type { ElementType } from "react"
 import Link from "next/link"
 import { ArrowRight, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { GROWTH_SETTINGS_PAGE_HEADER_ICON } from "@/components/growth/growth-settings-ui"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 
 type GrowthSettingsCoreLinkPageProps = {
@@ -20,7 +21,7 @@ export function GrowthSettingsCoreLinkPage({
   title,
   description,
   icon,
-  iconClassName = "bg-slate-100 text-slate-600",
+  iconClassName = GROWTH_SETTINGS_PAGE_HEADER_ICON,
   externalHref,
   externalLabel = "Open workspace settings",
   cardDescription,
@@ -37,8 +38,7 @@ export function GrowthSettingsCoreLinkPage({
       <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
         <p className="text-sm text-muted-foreground">{cardDescription}</p>
         <p className="mt-3 text-sm text-muted-foreground">
-          These settings are managed in your main workspace settings. You will leave the Growth workspace shell to
-          configure them — no duplicate forms or APIs are introduced here.
+          These settings are managed in your main workspace. You will leave Growth to configure them.
         </p>
         <Button type="button" className="mt-4" asChild>
           <Link href={externalHref}>
@@ -70,7 +70,7 @@ export function GrowthSettingsCoreLinkHub({
   title,
   description,
   icon,
-  iconClassName = "bg-slate-100 text-slate-600",
+  iconClassName = GROWTH_SETTINGS_PAGE_HEADER_ICON,
   cards,
 }: GrowthSettingsCoreLinkHubProps) {
   return (
@@ -106,8 +106,8 @@ export function GrowthSettingsCoreLinkHub({
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Team, organization, billing, and integrations use your existing workspace settings — open any card above for a
-        direct link to the canonical workspace page.
+        Team, organization, billing, and integrations use your existing workspace settings — open any card above to
+        continue.
       </p>
     </div>
   )

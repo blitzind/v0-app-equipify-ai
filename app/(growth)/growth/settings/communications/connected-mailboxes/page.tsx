@@ -21,7 +21,6 @@ export default function GrowthCommunicationsConnectedMailboxesPage() {
       title="Connected Mailboxes"
       description="Connect Gmail, validate OAuth health, start warmup, and run human-approved test sends."
       icon={Mailbox}
-      iconClassName="bg-violet-50 text-violet-700"
       adminFallbackHref="/admin/growth/infrastructure/mailboxes"
     >
       <div id={GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_ANCHOR.slice(1)} className="space-y-6">

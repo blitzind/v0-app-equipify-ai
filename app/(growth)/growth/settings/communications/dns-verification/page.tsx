@@ -10,7 +10,6 @@ export default function GrowthCommunicationsDnsVerificationPage() {
       title="Deliverability & DNS"
       description="SPF, DKIM, DMARC, and MX validation with clear next steps for each sending domain."
       icon={ShieldCheck}
-      iconClassName="bg-emerald-50 text-emerald-700"
       adminFallbackHref="/admin/growth/infrastructure/deliverability"
     >
       <GrowthDeliverabilityDashboard />

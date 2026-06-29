@@ -28,8 +28,8 @@ const GROWTH_SETTINGS_NOTIFICATIONS_PATH = `${GROWTH_WORKSPACE_BASE_PATH}/settin
 const GROWTH_SETTINGS_AI_PREFERENCES_PATH = `${GROWTH_WORKSPACE_BASE_PATH}/settings/ai-preferences` as const
 const GROWTH_SETTINGS_CALENDAR_PREFERENCES_PATH =
   `${GROWTH_WORKSPACE_BASE_PATH}/settings/calendar-preferences` as const
-const GROWTH_SETTINGS_SIDEBAR_PREFERENCES_PATH =
-  `${GROWTH_WORKSPACE_BASE_PATH}/settings/sidebar-preferences` as const
+const GROWTH_SETTINGS_COMMAND_CENTER_PREFERENCES_PATH =
+  `${GROWTH_WORKSPACE_BASE_PATH}/settings/command-center-preferences` as const
 const GROWTH_SETTINGS_HUB_PATH = `${GROWTH_WORKSPACE_BASE_PATH}/settings` as const
 
 /** Lifted customer settings sections rendered in Growth workspace settings. */
@@ -82,15 +82,15 @@ export const GROWTH_ENGINE_GROWTH_SETTINGS_HREFS: Record<string, string> = {
   "calendar-providers": `${GROWTH_WORKSPACE_BASE_PATH}/settings/calendar`,
   "booking-pages": `${GROWTH_WORKSPACE_BASE_PATH}/settings/calendar`,
   openai: `${GROWTH_WORKSPACE_BASE_PATH}/settings/ai-preferences`,
-  "share-page-branding": `${GROWTH_WORKSPACE_BASE_PATH}/settings/advanced`,
-  "media-library": `${GROWTH_WORKSPACE_BASE_PATH}/settings/advanced`,
+  "share-page-branding": GROWTH_SETTINGS_HUB_PATH,
+  "media-library": GROWTH_SETTINGS_HUB_PATH,
   "booking-branding": `${GROWTH_WORKSPACE_BASE_PATH}/settings/calendar`,
-  "media-defaults": `${GROWTH_WORKSPACE_BASE_PATH}/settings/advanced`,
+  "media-defaults": GROWTH_SETTINGS_HUB_PATH,
   "automation-defaults": `${GROWTH_WORKSPACE_BASE_PATH}/settings/autonomy`,
-  "command-center-preferences": GROWTH_SETTINGS_SIDEBAR_PREFERENCES_PATH,
-  elevenlabs: `${GROWTH_WORKSPACE_BASE_PATH}/settings/advanced`,
-  retell: `${GROWTH_WORKSPACE_BASE_PATH}/settings/advanced`,
-  "media-ai-providers": `${GROWTH_WORKSPACE_BASE_PATH}/settings/advanced`,
+  "command-center-preferences": GROWTH_SETTINGS_COMMAND_CENTER_PREFERENCES_PATH,
+  elevenlabs: `${GROWTH_WORKSPACE_BASE_PATH}/settings/ai-preferences`,
+  retell: `${GROWTH_WORKSPACE_BASE_PATH}/settings/ai-preferences`,
+  "media-ai-providers": `${GROWTH_WORKSPACE_BASE_PATH}/settings/ai-preferences`,
 }
 
 export function growthEngineCustomerSettingsHref(sectionId: string): string {

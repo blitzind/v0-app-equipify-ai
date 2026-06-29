@@ -26,9 +26,8 @@ export function GrowthSettingsCalendarPreferencesPage() {
     >
       <GrowthWorkspacePageHeader
         title="Calendar Preferences"
-        description="Default meeting location, calendar connection, and booking behavior for operator outreach."
+        description="Default meeting location, calendar connection, and booking behavior."
         icon={CalendarClock}
-        iconClassName="bg-emerald-50 text-emerald-700"
         actions={
           <Button type="button" variant="outline" size="sm" asChild>
             <Link href={`${GROWTH_WORKSPACE_BASE_PATH}/settings/calendar`}>

@@ -10,7 +10,6 @@ export default function GrowthCommunicationsSenderPoolsPage() {
       title="Sender Pools"
       description="Configure rotation pools, member eligibility, and operational pause rules."
       icon={Users}
-      iconClassName="bg-indigo-50 text-indigo-700"
       adminFallbackHref="/admin/growth/providers/sender-pools"
     >
       <GrowthSenderPoolsDashboardView />

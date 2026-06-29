@@ -21,7 +21,6 @@ export function GrowthSettingsCalendarPage() {
         title="Calendar & Booking"
         description="Connect Google Calendar, manage booking pages, availability, and scheduling links."
         icon={Calendar}
-        iconClassName="bg-emerald-50 text-emerald-700"
       />
       <Suspense fallback={<CalendarPanelsFallback />}>
         <GrowthGoogleCalendarSettingsPanel />

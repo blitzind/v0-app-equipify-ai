@@ -8,7 +8,6 @@ export default function GrowthSettingsWorkspaceHubPage() {
       title="Workspace"
       description="Team, organization, billing, and integrations use your existing workspace settings — open any card for a direct link."
       icon={Building2}
-      iconClassName="bg-blue-50 text-blue-700"
       cards={GROWTH_CORE_SETTINGS_LINK_CARDS}
     />
   )

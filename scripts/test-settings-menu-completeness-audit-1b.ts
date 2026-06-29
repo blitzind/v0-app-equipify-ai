@@ -41,6 +41,7 @@ const CORE_GROWTH_ONLY_LABELS = [
 const GROWTH_CANONICAL_SECTION_IDS = [
   "profile",
   "notifications",
+  "browser-notifications",
   "personal-preferences",
   "sidebar-preferences",
   "default-views",
@@ -58,8 +59,8 @@ const GROWTH_CANONICAL_SECTION_IDS = [
   "ai-teammate",
   "ai-preferences",
   "autonomy",
+  "command-center-preferences",
   "compliance",
-  "advanced",
 ] as const
 
 const ADMIN_FALLBACK_NAV_HREFS = [
@@ -130,12 +131,13 @@ function classifyGrowthPagePlaceholder(sectionId: string, pageSrc: string): bool
   if (sectionId === "autonomy" && pageSrc.includes("GrowthAutonomyControlCenter")) return false
   if (sectionId === "compliance" && pageSrc.includes("GrowthComplianceDashboardPanel")) return false
   if (sectionId === "communications" && pageSrc.includes("GrowthCommunicationsSettingsHub")) return false
-  if (sectionId === "advanced" && pageSrc.includes("GrowthSettingsAdvancedHub")) return false
   if (sectionId === "signatures" && pageSrc.includes("GrowthEmailSignaturesPanel")) return false
   if (sectionId === "calling-preferences" && pageSrc.includes("GrowthSettingsCallingPreferencesPage")) return false
   if (sectionId === "calendar-preferences" && pageSrc.includes("GrowthSettingsCalendarPreferencesPage")) return false
   if (sectionId === "calendar" && pageSrc.includes("GrowthSettingsCalendarPage")) return false
   if (sectionId === "browser-notifications" && pageSrc.includes("GrowthSettingsBrowserNotificationsPage")) return false
+  if (sectionId === "command-center-preferences" && pageSrc.includes("GrowthSettingsCommandCenterPreferencesPage"))
+    return false
   if (pageSrc.includes("redirect(")) return false
   if (pageSrc.includes("GrowthCommunicationsSettingsSection")) return false
   if (pageSrc.includes("GrowthSettingsSectionPlaceholder")) return true
@@ -227,7 +229,7 @@ function collectPlaceholderInventory() {
     if (!classifyGrowthPagePlaceholder(sectionId, src)) continue
     placeholders.push({
       route,
-      menuOwner: "Growth (Advanced hub / legacy alias, not top-level nav)",
+      menuOwner: "Growth (legacy alias, not top-level nav)",
       evidence: "GrowthSettingsSectionPage → GrowthSettingsSectionPlaceholder",
       location: `app/(growth)/growth/settings/${sectionId}/page.tsx`,
     })

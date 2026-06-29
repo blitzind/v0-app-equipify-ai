@@ -16,9 +16,9 @@ export function GrowthSettingsBrowserNotificationsPage() {
     >
       <GrowthWorkspacePageHeader
         title="Browser Notifications"
-        description="Enable desktop push notifications for live operator signals in this browser."
+        description="Enable desktop push notifications for live alerts in this browser."
         icon={Chrome}
-        iconClassName="bg-slate-100 text-slate-600"
+        iconClassName="bg-slate-100 text-slate-600 dark:bg-muted dark:text-foreground"
       />
       <GrowthNotificationPushSubscribe />
     </div>

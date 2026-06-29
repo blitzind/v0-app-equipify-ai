@@ -53,6 +53,16 @@ export function GrowthSettingsSectionForm({
   )
 }
 
+export function GrowthSettingsSaveStatus({ saving }: { saving: boolean }) {
+  if (!saving) return null
+  return (
+    <p className="flex items-center gap-2 text-xs text-muted-foreground" role="status" aria-live="polite">
+      <Loader2 className="size-3.5 animate-spin" aria-hidden />
+      Saving…
+    </p>
+  )
+}
+
 export function GrowthSettingsField({
   label,
   description,

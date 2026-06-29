@@ -8,7 +8,6 @@ export default function GrowthSettingsWorkspaceIntegrationsPage() {
       title="Integrations"
       description="Connect and manage third-party services and platform integrations."
       icon={Plug}
-      iconClassName="bg-amber-50 text-amber-800"
       externalHref={GROWTH_CORE_SETTINGS_INTEGRATIONS_PATH}
       externalLabel="Open Integrations settings"
       cardDescription="Connect and manage third-party services and platform integrations."

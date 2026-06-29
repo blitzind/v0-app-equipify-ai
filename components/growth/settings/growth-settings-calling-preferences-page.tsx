@@ -22,13 +22,12 @@ export function GrowthSettingsCallingPreferencesPage() {
     >
       <GrowthWorkspacePageHeader
         title="Calling Preferences"
-        description="Dialer defaults, native dialer providers, live coaching, and operator assist preferences."
+        description="Dialer defaults, native dialer providers, live coaching, and assist preferences."
         icon={Phone}
-        iconClassName="bg-sky-50 text-sky-700"
         actions={
           <Button type="button" variant="outline" size="sm" asChild>
             <Link href="/admin/growth/settings/communications">
-              Voice infrastructure (admin)
+              Platform admin
               <ExternalLink className="ml-1.5 size-3.5" />
             </Link>
           </Button>

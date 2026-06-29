@@ -8,7 +8,6 @@ export default function GrowthSettingsWorkspaceBillingPage() {
       title="Billing"
       description="Manage subscriptions, payment methods, invoices, and usage."
       icon={CreditCard}
-      iconClassName="bg-emerald-50 text-emerald-700"
       externalHref={GROWTH_CORE_SETTINGS_BILLING_PATH}
       externalLabel="Open Billing settings"
       cardDescription="Manage subscriptions, payment methods, invoices, and usage."

@@ -46,12 +46,17 @@ const WIRED_ROUTES: Array<{
     pageComponent: "GrowthSettingsCallingPreferencesPage",
     qaMarker: "growth-settings-calling-preferences-wiring-1a-v1",
   },
+  {
+    segment: "command-center-preferences",
+    pageComponent: "GrowthSettingsCommandCenterPreferencesPage",
+    qaMarker: "growth-settings-command-center-preferences-ia-1b-v1",
+  },
 ]
 
 const REDIRECT_ROUTES: Array<{ segment: string; targetPattern: RegExp }> = [
   { segment: "gmail", targetPattern: /GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH/ },
   { segment: "microsoft-365", targetPattern: /GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH/ },
-  { segment: "command-center-preferences", targetPattern: /sidebar-preferences/ },
+  { segment: "advanced", targetPattern: /\/settings[`'"]/ },
 ]
 
 function read(relativePath: string): string {
@@ -137,17 +142,17 @@ function main(): void {
   )
   assert.equal(
     growthEngineCustomerSettingsHref("command-center-preferences"),
-    "/growth/settings/sidebar-preferences",
-    "command-center-preferences canonical href must target sidebar preferences",
+    "/growth/settings/command-center-preferences",
+    "command-center-preferences canonical href must target Command Center Preferences",
   )
-  console.log("  ✓ legacy growth-engine canonical hrefs updated for redirects")
+  console.log("  ✓ legacy growth-engine canonical hrefs updated for IA destinations")
 
-  const advancedHub = read("components/growth/settings/growth-settings-advanced-hub.tsx")
-  assert.match(advancedHub, /settings\/sidebar-preferences/)
-  assert.match(advancedHub, /GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH/)
-  assert.doesNotMatch(advancedHub, /settings\/command-center-preferences/)
-  assert.doesNotMatch(advancedHub, /settings\/gmail/)
-  console.log("  ✓ Advanced hub links point at wired/redirect targets")
+  assert.equal(
+    fs.existsSync(path.join(ROOT, "components/growth/settings/growth-settings-advanced-hub.tsx")),
+    false,
+    "Advanced hub must be removed after IA 1B",
+  )
+  console.log("  ✓ Advanced migration hub removed")
 
   console.log("\nGROWTH-SETTINGS-WIRING-1A verification PASS\n")
   console.log(

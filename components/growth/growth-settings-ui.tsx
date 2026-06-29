@@ -26,6 +26,13 @@ import { cn } from "@/lib/utils"
 
 export const GROWTH_SETTINGS_UI_QA_MARKER = "growth-settings-ui-v2"
 
+export const GROWTH_SETTINGS_UX_POLISH_QA_MARKER = "growth-settings-ux-polish-1a-v1" as const
+
+/** Shared page header icon treatment for every Growth settings surface. */
+export const GROWTH_SETTINGS_PAGE_HEADER_ICON =
+  "bg-sky-50 text-sky-600 dark:bg-sky-950/60 dark:text-sky-300" as const
+
+/** Standard vertical rhythm between page header, cards, and form sections. */
 export const GROWTH_SETTINGS_SECTION_GAP = "space-y-4"
 export const GROWTH_SETTINGS_INNER_GAP = "space-y-3"
 export const GROWTH_SETTINGS_FORM_GAP = "space-y-1.5"

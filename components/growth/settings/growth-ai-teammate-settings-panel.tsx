@@ -4,6 +4,10 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Bot, ExternalLink } from "lucide-react"
 import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
+import {
+  GrowthSettingsCard,
+  GROWTH_SETTINGS_SECTION_GAP,
+} from "@/components/growth/growth-settings-ui"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,6 +22,12 @@ import {
   normalizeAiTeammateName,
 } from "@/lib/workspace/ai-teammate-identity"
 import { GrowthAiTeammateProfile } from "@/components/growth/ai-teammate/growth-ai-teammate-profile"
+
+const UPCOMING_IDENTITY_OPTIONS = [
+  { label: "Communication style", description: "Tone and phrasing preferences for AI-assisted outreach." },
+  { label: "Avatar", description: "Visual identity shown alongside your AI Teammate." },
+  { label: "Voice and working hours", description: "Availability and voice preferences for AI-assisted calls." },
+] as const
 
 export function GrowthAiTeammateSettingsPanel() {
   const { teammate, setTeammateName, openOnboarding, loading, saving, error, serverPersisted } =
@@ -49,12 +59,11 @@ export function GrowthAiTeammateSettingsPanel() {
   const displayError = localError ?? error
 
   return (
-    <div className="space-y-6" data-qa-section="ai-teammate-settings">
+    <div className={GROWTH_SETTINGS_SECTION_GAP} data-qa-section="ai-teammate-settings">
       <GrowthWorkspacePageHeader
         title="AI Teammate"
-        description="Your named AI teammate inside AI OS — identity and presentation only. Capabilities do not change when you rename."
+        description="Name and identity for your AI Teammate. Capabilities do not change when you rename."
         icon={Bot}
-        iconClassName="bg-indigo-50 text-indigo-700"
         actions={
           <Button type="button" variant="outline" size="sm" onClick={openOnboarding}>
             Replay introduction
@@ -62,9 +71,9 @@ export function GrowthAiTeammateSettingsPanel() {
         }
       />
 
-      <GrowthAiTeammateProfile teammate={teammate} statusLabel="Working" activityLabel="Available across AI OS" />
+      <GrowthAiTeammateProfile teammate={teammate} statusLabel="Working" activityLabel="Available across Growth" />
 
-      <section className="rounded-xl border border-border/70 bg-card p-6 shadow-sm space-y-6">
+      <GrowthSettingsCard title="Identity">
         {loading ? <p className="text-sm text-muted-foreground">Loading teammate identity…</p> : null}
 
         <div className="space-y-2">
@@ -91,14 +100,14 @@ export function GrowthAiTeammateSettingsPanel() {
           </div>
           {displayError ? <p className="text-sm text-destructive">{displayError}</p> : null}
           {saved ? (
-            <p className="text-sm text-emerald-700">
+            <p className="text-sm text-emerald-700" role="status" aria-live="polite">
               Saved — Home and AI Operations will use {teammate.name}.
               {serverPersisted ? " Synced to your organization." : null}
             </p>
           ) : null}
           {!serverPersisted && !loading ? (
             <p className="text-sm text-muted-foreground">
-              Using local fallback until server identity is saved for your organization.
+              Identity will sync to your organization after the first successful save.
             </p>
           ) : null}
           <p className="text-sm text-muted-foreground">
@@ -106,34 +115,32 @@ export function GrowthAiTeammateSettingsPanel() {
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1 rounded-lg border border-border/60 bg-muted/20 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Role</p>
-            <p className="font-medium">{AI_TEAMMATE_DEFAULT_ROLE}</p>
-            <p className="text-xs text-muted-foreground">System-controlled · expands to business operator over time</p>
-          </div>
-          <div className="space-y-1 rounded-lg border border-dashed border-border/60 bg-muted/10 p-4 opacity-80">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Communication style</p>
-            <p className="text-sm text-muted-foreground">Coming soon</p>
-          </div>
-          <div className="space-y-1 rounded-lg border border-dashed border-border/60 bg-muted/10 p-4 opacity-80">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Avatar</p>
-            <p className="text-sm text-muted-foreground">Coming soon</p>
-          </div>
-          <div className="space-y-1 rounded-lg border border-dashed border-border/60 bg-muted/10 p-4 opacity-80">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Voice · Working hours</p>
-            <p className="text-sm text-muted-foreground">Coming soon</p>
-          </div>
+        <div className="mt-4 space-y-1 rounded-lg border border-border/60 bg-muted/20 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Role</p>
+          <p className="font-medium">{AI_TEAMMATE_DEFAULT_ROLE}</p>
+          <p className="text-xs text-muted-foreground">Managed by Equipify</p>
         </div>
-      </section>
+      </GrowthSettingsCard>
+
+      <GrowthSettingsCard title="Additional identity options">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {UPCOMING_IDENTITY_OPTIONS.map((option) => (
+            <div key={option.label} className="rounded-lg border border-border/70 bg-muted/20 px-4 py-3">
+              <p className="text-sm font-medium text-foreground">{option.label}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{option.description}</p>
+              <p className="mt-2 text-xs text-muted-foreground">Not available yet</p>
+            </div>
+          ))}
+        </div>
+      </GrowthSettingsCard>
 
       <p className="text-sm text-muted-foreground">
-        Platform branding remains{" "}
+        Copilot tone and autonomy controls live in{" "}
         <Link href="/growth/settings/ai-preferences" className="font-medium text-primary underline-offset-4 hover:underline">
-          AI OS Settings
+          AI Preferences
           <ExternalLink className="ml-1 inline size-3.5" />
-        </Link>{" "}
-        for copilot and autonomy controls.
+        </Link>
+        .
       </p>
     </div>
   )

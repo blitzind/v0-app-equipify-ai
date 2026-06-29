@@ -15,7 +15,6 @@ export default function GrowthCommunicationsConnectedMailboxesOnboardPage() {
       title="Mailbox Onboarding"
       description="Guided setup to register a sender, connect Gmail, validate, configure warmup, and assign a pool."
       icon={MailPlus}
-      iconClassName="bg-violet-50 text-violet-700"
       adminFallbackHref="/admin/growth/infrastructure/mailboxes/onboard"
     >
       <Suspense

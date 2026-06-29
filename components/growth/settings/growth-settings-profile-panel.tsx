@@ -63,9 +63,8 @@ export function GrowthSettingsProfilePanel() {
     <div className={GROWTH_SETTINGS_SECTION_GAP}>
       <GrowthWorkspacePageHeader
         title="Profile"
-        description="Operator identity and display preferences for the Growth workspace."
+        description="Your name, title, timezone, and avatar shown across Growth."
         icon={User}
-        iconClassName="bg-slate-100 text-slate-600"
       />
 
       {loading ? <GrowthSettingsSectionLoadingState /> : null}
@@ -84,7 +83,7 @@ export function GrowthSettingsProfilePanel() {
         >
           <GrowthSettingsCard title="Operator identity">
             <div className={GROWTH_SETTINGS_FORM_GAP}>
-              <GrowthSettingsField label="Display name" description="Shown across Growth workspace surfaces.">
+              <GrowthSettingsField label="Display name" description="Shown across Growth surfaces.">
                 <Input
                   value={draft.displayName}
                   onChange={(event) => setDraft((current) => ({ ...current, displayName: event.target.value }))}

@@ -1,6 +1,7 @@
 import type { ElementType, ReactNode } from "react"
 import { cn } from "@/lib/utils"
 import { PAGE_STANDARD_PAGE_TITLE } from "@/lib/page-hero-tokens"
+import { GROWTH_SETTINGS_PAGE_HEADER_ICON } from "@/components/growth/growth-settings-ui"
 
 type GrowthWorkspacePageHeaderProps = {
   title: string
@@ -15,7 +16,7 @@ export function GrowthWorkspacePageHeader({
   title,
   description,
   icon: Icon,
-  iconClassName,
+  iconClassName = GROWTH_SETTINGS_PAGE_HEADER_ICON,
   actions,
   className,
 }: GrowthWorkspacePageHeaderProps) {
@@ -26,7 +27,7 @@ export function GrowthWorkspacePageHeader({
           {Icon ? (
             <span
               className={cn(
-                "flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-600",
+                "flex size-9 shrink-0 items-center justify-center rounded-full",
                 iconClassName,
               )}
             >

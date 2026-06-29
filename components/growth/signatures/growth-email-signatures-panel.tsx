@@ -22,8 +22,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GROWTH_SETTINGS_SECTION_GAP } from "@/components/growth/growth-settings-ui"
 import {
-  GROWTH_SENDER_PROFILES_QA_MARKER,
   GROWTH_SENDER_PROFILE_SIGNATURE_STATUS_LABELS,
   GROWTH_SIGNATURE_PRIVACY_NOTE,
   GROWTH_SIGNATURE_TEMPLATE_LABELS,
@@ -367,11 +367,9 @@ export function GrowthEmailSignaturesPanel() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={GROWTH_SETTINGS_SECTION_GAP}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">
-          {GROWTH_SENDER_PROFILES_QA_MARKER} · {GROWTH_SIGNATURE_PRIVACY_NOTE}
-        </p>
+        <p className="text-sm text-muted-foreground">{GROWTH_SIGNATURE_PRIVACY_NOTE}</p>
         <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={Boolean(actionLoading)}>
           <RefreshCw className="mr-1.5 size-3.5" />
           Refresh

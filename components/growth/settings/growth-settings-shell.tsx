@@ -51,7 +51,7 @@ export function GrowthSettingsShell({ children }: GrowthSettingsShellProps) {
           <div className="min-w-0">
             <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Operator-facing Growth preferences — mailboxes, DNS, warmup, and outbound readiness live under Communications.
+              Manage your profile, communications, meetings, voice, AI, and compliance preferences in Growth.
             </p>
           </div>
         </div>
