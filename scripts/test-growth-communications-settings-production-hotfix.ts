@@ -132,6 +132,11 @@ async function main(): Promise<void> {
   if (sectionPage.includes("growth-engine-settings-hard-isolation-v1")) {
     assert.match(sectionPage, /SECTION PAGE RENDERED/)
     assert.match(sectionPage, /data-growth-engine-settings-hard-isolation="v1"/)
+    assert.match(sectionPage, /WorkspaceSettingsGrowthEngineConnectedMailboxesSection/)
+    assert.match(
+      readSource("components/settings/workspace-settings-growth-engine-connected-mailboxes-section.tsx"),
+      /GrowthConnectedMailboxesDashboard/,
+    )
   } else {
     assert.match(sectionPage, /WorkspaceSettingsGrowthEngineLiftedPanelHost/)
     assert.match(sectionPage, /workspace-settings-growth-engine-lifted-panel-host/)
