@@ -336,14 +336,44 @@ export async function verifyGrowthEngineOperationalReset(
     {
       id: "no_outreach_queue_drafts",
       table: "outreach_queue",
-      scope: "lead_id",
+      scope: "single_tenant",
       label: "Outreach queue cleared",
     },
     {
       id: "no_sequence_execution_jobs",
       table: "sequence_execution_jobs",
-      scope: "lead_id",
+      scope: "single_tenant",
       label: "Sequence execution jobs cleared",
+    },
+    {
+      id: "no_inbox_threads",
+      table: "inbox_threads",
+      scope: "single_tenant",
+      label: "Inbox threads cleared",
+    },
+    {
+      id: "no_outbound_replies",
+      table: "outbound_replies",
+      scope: "single_tenant",
+      label: "Outbound replies cleared",
+    },
+    {
+      id: "no_lead_inbox",
+      table: "lead_inbox",
+      scope: "single_tenant",
+      label: "Lead inbox cleared",
+    },
+    {
+      id: "no_opportunities",
+      table: "opportunities",
+      scope: "single_tenant",
+      label: "Opportunities cleared",
+    },
+    {
+      id: "no_leads",
+      table: "leads",
+      scope: "single_tenant",
+      label: "Growth leads cleared (daily queue inputs)",
     },
     {
       id: "no_operator_notifications",

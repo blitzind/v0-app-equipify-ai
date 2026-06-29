@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import {
+  growthHomeNoStoreJson,
+} from "@/lib/growth/home/growth-home-no-store-response"
 import { createGrowthOpportunity } from "@/lib/growth/opportunity-pipeline/mutate-opportunity"
 import { evaluateGrowthOpportunityPipelineSignals } from "@/lib/growth/opportunity-pipeline/mutate-opportunity"
 import { fetchGrowthOpportunityPipelineDashboard } from "@/lib/growth/opportunity-pipeline/pipeline-dashboard-repository"
@@ -18,6 +21,7 @@ import {
 } from "@/lib/growth/opportunity-pipeline/pipeline-schema-health"
 
 export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
 const createSchema = z.object({
   leadId: z.string().uuid(),
@@ -79,7 +83,7 @@ export async function GET(request: Request) {
     const schemaProbe = await probeGrowthOpportunityPipelineSchema(access.admin)
     const schemaReady = isGrowthOpportunityPipelineSchemaReady(schemaProbe)
     if (!schemaReady) {
-      return NextResponse.json({
+      return growthHomeNoStoreJson({
         ok: true,
         meta: { schemaReady: false, setupMessage: GROWTH_OPPORTUNITY_PIPELINE_SETUP_MESSAGE },
         feed: { items: [], total: 0, hasMore: false },
@@ -103,7 +107,7 @@ export async function GET(request: Request) {
       fetchGrowthOpportunityPipelineDashboard(access.admin, ownerUserId ?? access.userId),
     ])
 
-    return NextResponse.json({
+    return growthHomeNoStoreJson({
       ok: true,
       meta: { schemaReady: true },
       feed,
@@ -115,7 +119,7 @@ export async function GET(request: Request) {
       rawMessage.includes("schema cache") || rawMessage.includes("could not find")
         ? GROWTH_OPPORTUNITY_PIPELINE_SETUP_MESSAGE
         : "Could not load opportunity pipeline."
-    return NextResponse.json({ error: "fetch_failed", message }, { status: 500 })
+    return growthHomeNoStoreJson({ error: "fetch_failed", message }, { status: 500 })
   }
 }
 

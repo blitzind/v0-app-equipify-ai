@@ -21,6 +21,7 @@ import {
   type GrowthWorkspaceRecentView,
 } from "@/lib/growth/workspace/growth-workspace-activity-memory"
 import { useGrowthWorkspaceDashboard } from "@/components/growth/workspace/use-growth-workspace-dashboard"
+import { GrowthHomeDebugFooter } from "@/components/growth/workspace/growth-home-debug-footer"
 import { useGrowthWorkspaceQuickActionShortcuts } from "@/components/growth/workspace/use-growth-workspace-quick-action-shortcuts"
 import { GrowthHomeExecutiveBriefingDashboard } from "@/components/growth/workspace/executive-briefing/growth-home-executive-briefing-dashboard"
 import { Button } from "@/components/ui/button"
@@ -186,6 +187,7 @@ export function GrowthWorkspaceDashboardBody() {
         continueItems={continueItems}
         everythingElse={everythingElse}
       />
+      <GrowthHomeDebugFooter />
     </div>
   )
 }

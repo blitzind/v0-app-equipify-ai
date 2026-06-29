@@ -3,13 +3,11 @@
  *
  *   pnpm tsx scripts/reset-growth-engine-operational-data.ts
  *   pnpm tsx scripts/reset-growth-engine-operational-data.ts --execute
- *   pnpm tsx scripts/reset-growth-engine-operational-data.ts --production-env --execute
  *
- * Credentials (default shell env / linked ref; use --production-env for Vercel production env files):
+ * Credentials (shell env at runtime — export production vars before --execute):
  *   1) NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
  *   2) SUPABASE_PROJECT_REF + SUPABASE_ACCESS_TOKEN
  *   3) Interactive prompt (TTY)
- *   --production-env reads .env.production.local / production env files (same as Vercel app target)
  */
 import { createClient } from "@supabase/supabase-js"
 import { formatGrowthProductionTargetBanner } from "../lib/growth/canonical-companies/load-growth-production-supabase-env"
@@ -18,8 +16,10 @@ import {
   GROWTH_ENGINE_OPERATIONAL_RESET_QA_MARKER,
   PRECISION_BIOMEDICAL_AI_OS_ORG_ID,
 } from "../lib/growth/reset/growth-engine-operational-reset-constants"
-import { resolveGrowthResetSupabaseConfigWithProductionFlag } from "../lib/growth/reset/growth-reset-env-comparison"
-import { GROWTH_RESET_CREDENTIALS_HELP } from "../lib/growth/reset/growth-test-data-reset-credentials"
+import {
+  GROWTH_RESET_CREDENTIALS_HELP,
+  resolveGrowthResetSupabaseConfig,
+} from "../lib/growth/reset/growth-test-data-reset-credentials"
 import {
   formatGrowthEngineOperationalResetDryRun,
   runGrowthEngineOperationalReset,
@@ -44,10 +44,10 @@ Flags:
   --org-id <uuid>     Override target org (default: ${PRECISION_BIOMEDICAL_AI_OS_ORG_ID})
   --no-prompt         Do not prompt for credentials interactively
   --local             Allow localhost Supabase URLs
-  --production-env    Resolve Supabase from production env files (align with Vercel runtime)
 
 Env:
   ${GROWTH_ENGINE_OPERATIONAL_RESET_ORG_ID_ENV}  Optional org override
+  NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY  Production Supabase target
 `)
     return
   }
@@ -63,16 +63,8 @@ Env:
     PRECISION_BIOMEDICAL_AI_OS_ORG_ID
 
   let config
-  let envComparison = null
-  let usedProductionEnv = false
   try {
-    const resolved = await resolveGrowthResetSupabaseConfigWithProductionFlag(argv, {
-      allowLocal,
-      allowPrompt,
-    })
-    config = resolved.config
-    envComparison = resolved.comparison
-    usedProductionEnv = resolved.usedProductionEnv
+    config = await resolveGrowthResetSupabaseConfig({ allowLocal, allowPrompt })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     console.error(JSON.stringify({ error: "growth_operational_reset_supabase_config", message }))
@@ -80,16 +72,8 @@ Env:
   }
 
   console.error(
-    JSON.stringify({
-      ...formatGrowthProductionTargetBanner(config, execute ? "apply" : "dry_run"),
-      used_production_env: usedProductionEnv,
-      env_comparison: envComparison,
-    }),
+    JSON.stringify(formatGrowthProductionTargetBanner(config, execute ? "apply" : "dry_run")),
   )
-
-  if (envComparison?.warning) {
-    console.error(JSON.stringify({ warning: "growth_reset_env_mismatch", message: envComparison.warning }))
-  }
 
   const admin = createClient(config.url, config.serviceRoleKey, {
     auth: { persistSession: false },

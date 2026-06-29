@@ -39,6 +39,16 @@ function runStructureCertification(): void {
   assert.ok(GROWTH_HOME_NO_STORE_CACHE_CONTROL.includes("no-store"))
 
   assert.equal(GROWTH_HOME_WORKSPACE_API_ROUTES.length, 12)
+
+  for (const routePath of [
+    "lib/growth/home/growth-home-debug-source.ts",
+    "lib/growth/home/growth-home-no-store-response.ts",
+    "lib/growth/home/growth-home-supabase-runtime-env.ts",
+    "lib/growth/home/growth-home-workspace-api-contract.ts",
+  ]) {
+    assert.ok(fs.existsSync(path.join(ROOT, routePath)), `missing production module: ${routePath}`)
+  }
+
   const routeIds = new Set(GROWTH_HOME_WORKSPACE_API_ROUTES.map((route) => route.id))
   assert.ok(routeIds.has("aiden_briefing"))
   assert.ok(routeIds.has("daily_revenue_work_queue"))
@@ -56,11 +66,14 @@ function runStructureCertification(): void {
   assert.match(debugRoute, /buildGrowthHomeDebugSourceReport/)
   assert.match(debugRoute, /isGrowthHomeProductionRuntime/)
   assert.match(debugRoute, /growthHomeNoStoreJson/)
+  assert.doesNotMatch(debugRoute, /GROWTH_HOME_DEBUG_SOURCE_ENABLED/)
 
   const resetScript = read("scripts/reset-growth-engine-operational-data.ts")
-  assert.match(resetScript, /--production-env/)
-  assert.match(resetScript, /resolveGrowthResetSupabaseConfigWithProductionFlag/)
-  assert.match(resetScript, /env_comparison/)
+  assert.match(resetScript, /--execute/)
+  assert.match(resetScript, /resolveGrowthResetSupabaseConfig/)
+  assert.match(resetScript, /runGrowthEngineOperationalReset/)
+  assert.doesNotMatch(resetScript, /--production-env/)
+  assert.doesNotMatch(resetScript, /growth-reset-env-comparison/)
 
   const homeApiRoutes = [
     "app/api/platform/growth/aiden/briefing/route.ts",
@@ -79,7 +92,7 @@ function runStructureCertification(): void {
 
   for (const routePath of homeApiRoutes) {
     const source = read(routePath)
-    assert.match(source, /export const dynamic = growthHomeRouteDynamic/, `${routePath} must force dynamic`)
+    assert.match(source, /export const dynamic = "force-dynamic"/, `${routePath} must force dynamic`)
     assert.match(source, /growthHomeNoStoreJson/, `${routePath} must use no-store JSON helper`)
   }
 

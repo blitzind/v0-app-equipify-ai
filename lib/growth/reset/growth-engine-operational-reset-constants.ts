@@ -5,6 +5,12 @@
 export const GROWTH_ENGINE_OPERATIONAL_RESET_QA_MARKER =
   "growth-engine-operational-reset-fresh-slate-1a-v1" as const
 
+export const GROWTH_HOME_STALE_DATA_DIAGNOSTIC_QA_MARKER =
+  "growth-home-stale-data-diagnostic-fresh-slate-1b-v1" as const
+
+export const GROWTH_HOME_DEBUG_SOURCE_QA_MARKER =
+  "growth-home-debug-source-fresh-slate-1c-v1" as const
+
 /** Precision Biomedical AI OS workspace — default target org. */
 export const PRECISION_BIOMEDICAL_AI_OS_ORG_ID = "5876176a-61ec-4532-ad99-0c31482d5a91" as const
 
@@ -27,6 +33,9 @@ export type GrowthEngineOperationalResetCategory =
   | "inbox_intelligence"
   | "automation_runs"
   | "deliverability_ops_snapshots"
+  | "home_entity_runtime"
+  | "home_inbox_conversations"
+  | "home_pipeline_meetings"
 
 export type GrowthEngineOperationalResetScopeKind =
   | "organization_id"

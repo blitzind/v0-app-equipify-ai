@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import {
+  growthHomeNoStoreJson,
+} from "@/lib/growth/home/growth-home-no-store-response"
 import { fetchGrowthOpportunityDashboard } from "@/lib/growth/opportunity-dashboard-repository"
 import { fetchGrowthOpportunityIntelligenceDashboard } from "@/lib/growth/opportunity-intelligence/dashboard"
 import { isGrowthOpportunityIntelligenceSchemaReady } from "@/lib/growth/opportunity-intelligence/schema-health"
 import { GROWTH_OPPORTUNITY_INTELLIGENCE_PRIVACY_NOTE } from "@/lib/growth/opportunity-intelligence/opportunity-types"
 
 export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
 export async function GET(request: Request) {
   const access = await requireGrowthEnginePlatformAccess()
@@ -21,7 +25,7 @@ export async function GET(request: Request) {
       ? await fetchGrowthOpportunityIntelligenceDashboard(access.admin, { leadId: leadId ?? undefined })
       : null
 
-    return NextResponse.json({
+    return growthHomeNoStoreJson({
       ok: true,
       dashboard: readiness,
       intelligence,
@@ -29,6 +33,6 @@ export async function GET(request: Request) {
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "fetch_failed", message }, { status: 500 })
+    return growthHomeNoStoreJson({ error: "fetch_failed", message }, { status: 500 })
   }
 }

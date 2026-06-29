@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import {
+  growthHomeNoStoreJson,
+} from "@/lib/growth/home/growth-home-no-store-response"
 import { fetchSequenceExecutionFoundationDashboard } from "@/lib/growth/sequences/sequence-repository"
 import { listSequenceExecutionEvents } from "@/lib/growth/sequences/sequence-events"
 import { isGrowthSequenceExecutionSchemaReady } from "@/lib/growth/sequences/sequence-schema-health"
@@ -10,6 +13,7 @@ import { fetchPatternEnrollmentStats } from "@/lib/growth/sequence-enrollment/pa
 import { GROWTH_ENROLLMENT_PLANES_DOC } from "@/lib/growth/sequence-enrollment/enrollment-planes-doc"
 
 export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
 export async function GET() {
   const access = await requireGrowthEnginePlatformAccess()
@@ -33,7 +37,7 @@ export async function GET() {
       fetchPatternEnrollmentStats(access.admin),
     ])
     const attributionRates = trackingReady ? await fetchAttributionRates(access.admin) : null
-    return NextResponse.json({
+    return growthHomeNoStoreJson({
       ok: true,
       ...overview,
       events,
@@ -43,7 +47,7 @@ export async function GET() {
       enrollment_planes: GROWTH_ENROLLMENT_PLANES_DOC,
     })
   } catch {
-    return NextResponse.json(
+    return growthHomeNoStoreJson(
       { error: "sequence_dashboard_failed", message: "Could not load sequence execution dashboard." },
       { status: 500 },
     )

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import {
+  growthHomeNoStoreJson,
+} from "@/lib/growth/home/growth-home-no-store-response"
 import { loadLeadInbox } from "@/lib/growth/lead-inbox/lead-inbox-repository"
 import { buildLeadInboxDashboardSections } from "@/lib/growth/lead-operator-workspace/lead-inbox-dashboard"
 import {
@@ -9,6 +12,7 @@ import {
 } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 
 export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
 export async function GET(request: Request) {
   const access = await requireGrowthEnginePlatformAccess()
@@ -25,7 +29,7 @@ export async function GET(request: Request) {
   const result = await loadLeadInbox(access.admin, { limit: 100 })
   const sections = buildLeadInboxDashboardSections(result.items, sort)
 
-  return NextResponse.json({
+  return growthHomeNoStoreJson({
     ok: true,
     qa_marker: GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER,
     sort,

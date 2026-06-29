@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import {
+  growthHomeNoStoreJson,
+} from "@/lib/growth/home/growth-home-no-store-response"
 import { fetchGrowthRelationshipDashboard } from "@/lib/growth/relationship-dashboard-repository"
 
 export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
 export async function GET() {
   const access = await requireGrowthEnginePlatformAccess()
@@ -10,9 +14,9 @@ export async function GET() {
 
   try {
     const dashboard = await fetchGrowthRelationshipDashboard(access.admin)
-    return NextResponse.json({ ok: true, dashboard })
+    return growthHomeNoStoreJson({ ok: true, dashboard })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ error: "fetch_failed", message }, { status: 500 })
+    return growthHomeNoStoreJson({ error: "fetch_failed", message }, { status: 500 })
   }
 }

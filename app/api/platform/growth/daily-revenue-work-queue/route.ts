@@ -4,8 +4,12 @@ import {
   fetchDailyRevenueWorkQueue,
   fetchDailyRevenueWorkQueueLeadStatus,
 } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-resolver"
+import {
+  growthHomeNoStoreJson,
+} from "@/lib/growth/home/growth-home-no-store-response"
 
 export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
 export async function GET(request: Request) {
   const access = await requireGrowthEnginePlatformAccess()
@@ -14,7 +18,7 @@ export async function GET(request: Request) {
   const leadId = new URL(request.url).searchParams.get("leadId")?.trim()
   if (leadId) {
     const leadStatus = await fetchDailyRevenueWorkQueueLeadStatus(access.admin, leadId)
-    return NextResponse.json({
+    return growthHomeNoStoreJson({
       ok: true,
       enabled: leadStatus.enabled,
       lead_status: leadStatus.lead_status,
@@ -23,7 +27,7 @@ export async function GET(request: Request) {
 
   const result = await fetchDailyRevenueWorkQueue(access.admin, { limit: 100 })
 
-  return NextResponse.json({
+  return growthHomeNoStoreJson({
     ok: true,
     enabled: result.enabled,
     queue: result.queue,

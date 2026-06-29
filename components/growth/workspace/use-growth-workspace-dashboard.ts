@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useState } from "react"
 import type { DailyRevenueWorkQueue } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-types"
 import type { DailyRevenueWorkQueueDisplaySummary } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-view"
+import {
+  GROWTH_HOME_DEBUG_SOURCE_API_PATH,
+  GROWTH_HOME_WORKSPACE_API_ROUTES,
+  GROWTH_HOME_WORKSPACE_DASHBOARD_FETCH_BATCH_MARKER,
+} from "@/lib/growth/home/growth-home-workspace-api-contract"
 import type { GrowthOpportunityPipelineDashboard } from "@/lib/growth/opportunity-pipeline/pipeline-types"
 import {
   buildGrowthWorkspaceDashboardViewModel,
@@ -10,76 +15,115 @@ import {
 } from "@/lib/growth/workspace/growth-workspace-dashboard-mapper"
 import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
 
-const WORKSPACE_DASHBOARD_FETCH_BATCH_MARKER = "growth-workspace-dashboard-fetch-batch-v2" as const
-
-async function fetchJson<T>(url: string): Promise<T | null> {
+async function fetchJson<T>(url: string): Promise<{ data: T | null; cacheControl: string | null }> {
   try {
     const res = await fetch(url, { cache: "no-store" })
     const data = (await res.json().catch(() => ({}))) as T
-    if (!res.ok) return null
-    return data
+    if (!res.ok) return { data: null, cacheControl: res.headers.get("cache-control") }
+    return { data, cacheControl: res.headers.get("cache-control") }
   } catch {
-    return null
+    return { data: null, cacheControl: null }
   }
 }
 
 /** Single batched load — one Promise.all, no duplicate endpoint fetches. */
 export async function loadGrowthWorkspaceDashboardSources(): Promise<GrowthWorkspaceDashboardSourcePayload> {
   const [
-    briefingPayload,
-    leadInboxPayload,
-    cadencePayload,
-    pipelinePayload,
-    opportunityPayload,
-    sequencePayload,
-    executionPayload,
-    engagementPayload,
-    conversationPayload,
-    relationshipPayload,
-    callsPayload,
-    dailyQueuePayload,
+    briefingResult,
+    leadInboxResult,
+    cadenceResult,
+    pipelineResult,
+    opportunityResult,
+    sequenceResult,
+    executionResult,
+    engagementResult,
+    conversationResult,
+    relationshipResult,
+    callsResult,
+    dailyQueueResult,
   ] = await Promise.all([
-    fetchJson<{ ok?: boolean; briefing?: AidenDailyBriefing }>("/api/platform/growth/aiden/briefing"),
+    fetchJson<{ ok?: boolean; briefing?: AidenDailyBriefing }>(
+      GROWTH_HOME_WORKSPACE_API_ROUTES.find((route) => route.id === "aiden_briefing")!.path,
+    ),
     fetchJson<{ ok?: boolean; sections?: GrowthWorkspaceDashboardSourcePayload["leadInboxSections"] }>(
-      "/api/platform/growth/lead-inbox?sort=priority",
+      GROWTH_HOME_WORKSPACE_API_ROUTES.find((route) => route.id === "lead_inbox")!.path,
     ),
     fetchJson<{ ok?: boolean; summary?: GrowthCadenceCommandSummary | null }>(
-      "/api/platform/growth/cadence/command-summary",
+      GROWTH_HOME_WORKSPACE_API_ROUTES.find((route) => route.id === "cadence_command_summary")!.path,
     ),
     fetchJson<{ ok?: boolean; dashboard?: GrowthOpportunityPipelineDashboard | null }>(
-      "/api/platform/growth/opportunities/pipeline?view=all_pipeline&limit=1",
+      GROWTH_HOME_WORKSPACE_API_ROUTES.find((route) => route.id === "opportunities_pipeline")!.path,
     ),
     fetchJson<{ ok?: boolean; dashboard?: GrowthWorkspaceDashboardSourcePayload["opportunityReadiness"] }>(
-      "/api/platform/growth/opportunities/dashboard",
+      GROWTH_HOME_WORKSPACE_API_ROUTES.find((route) => route.id === "opportunities_dashboard")!.path,
     ),
     fetchJson<{
       ok?: boolean
       dashboard?: { active_count?: number }
       templates?: Array<{ status?: string }>
       enrollments?: unknown[]
-    }>("/api/platform/growth/sequences/dashboard"),
+    }>(GROWTH_HOME_WORKSPACE_API_ROUTES.find((route) => route.id === "sequences_dashboard")!.path),
     fetchJson<{ ok?: boolean; dashboard?: GrowthWorkspaceDashboardSourcePayload["sequenceExecution"] }>(
-      "/api/platform/growth/sequences/execution/dashboard",
+      GROWTH_HOME_WORKSPACE_API_ROUTES.find((route) => route.id === "sequence_execution_dashboard")!.path,
     ),
     fetchJson<{ ok?: boolean; workspace?: GrowthWorkspaceDashboardSourcePayload["engagementWorkspace"] }>(
-      "/api/platform/growth/engagement-dashboard/command-center?dateRange=last_7_days&limit=1",
+      GROWTH_HOME_WORKSPACE_API_ROUTES.find((route) => route.id === "engagement_command_center")!.path,
     ),
     fetchJson<{ ok?: boolean; dashboard?: GrowthWorkspaceDashboardSourcePayload["conversationDashboard"] }>(
-      "/api/platform/growth/conversations/dashboard",
+      GROWTH_HOME_WORKSPACE_API_ROUTES.find((route) => route.id === "conversations_dashboard")!.path,
     ),
     fetchJson<{ ok?: boolean; dashboard?: GrowthWorkspaceDashboardSourcePayload["relationshipDashboard"] }>(
-      "/api/platform/growth/relationships/dashboard",
+      GROWTH_HOME_WORKSPACE_API_ROUTES.find((route) => route.id === "relationships_dashboard")!.path,
     ),
     fetchJson<{ ok?: boolean; workspaceDashboard?: { stats?: { callsToday?: number } } | null }>(
-      "/api/platform/growth/calls/dashboard",
+      GROWTH_HOME_WORKSPACE_API_ROUTES.find((route) => route.id === "calls_dashboard")!.path,
     ),
     fetchJson<{
       ok?: boolean
       enabled?: boolean
       queue?: DailyRevenueWorkQueue | null
       display?: DailyRevenueWorkQueueDisplaySummary | null
-    }>("/api/platform/growth/daily-revenue-work-queue"),
+    }>(GROWTH_HOME_WORKSPACE_API_ROUTES.find((route) => route.id === "daily_revenue_work_queue")!.path),
   ])
+
+  const briefingPayload = briefingResult.data
+  const leadInboxPayload = leadInboxResult.data
+  const cadencePayload = cadenceResult.data
+  const pipelinePayload = pipelineResult.data
+  const opportunityPayload = opportunityResult.data
+  const sequencePayload = sequenceResult.data
+  const executionPayload = executionResult.data
+  const engagementPayload = engagementResult.data
+  const conversationPayload = conversationResult.data
+  const relationshipPayload = relationshipResult.data
+  const callsPayload = callsResult.data
+  const dailyQueuePayload = dailyQueueResult.data
+
+  if (typeof window !== "undefined") {
+    console.info("[growth/home/dashboard-fetch]", {
+      batch: GROWTH_HOME_WORKSPACE_DASHBOARD_FETCH_BATCH_MARKER,
+      fetched_at: new Date().toISOString(),
+      cache_headers: Object.fromEntries(
+        GROWTH_HOME_WORKSPACE_API_ROUTES.map((route, index) => {
+          const results = [
+            briefingResult,
+            leadInboxResult,
+            cadenceResult,
+            pipelineResult,
+            opportunityResult,
+            sequenceResult,
+            executionResult,
+            engagementResult,
+            conversationResult,
+            relationshipResult,
+            callsResult,
+            dailyQueueResult,
+          ]
+          return [route.id, results[index]?.cacheControl ?? null]
+        }),
+      ),
+    })
+  }
 
   return {
     briefing: briefingPayload?.ok && briefingPayload.briefing ? briefingPayload.briefing : null,
@@ -144,6 +188,7 @@ export function useGrowthWorkspaceDashboard() {
     loading,
     error,
     reload,
-    fetchBatchMarker: WORKSPACE_DASHBOARD_FETCH_BATCH_MARKER,
+    fetchBatchMarker: GROWTH_HOME_WORKSPACE_DASHBOARD_FETCH_BATCH_MARKER,
+    debugSourcePath: GROWTH_HOME_DEBUG_SOURCE_API_PATH,
   }
 }

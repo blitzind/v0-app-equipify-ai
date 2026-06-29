@@ -3,19 +3,15 @@ import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { buildGrowthHomeDebugSourceReport } from "@/lib/growth/home/growth-home-debug-source"
 import {
   growthHomeNoStoreJson,
-  growthHomeRouteDynamic,
 } from "@/lib/growth/home/growth-home-no-store-response"
 import { isGrowthHomeProductionRuntime } from "@/lib/growth/home/growth-home-supabase-runtime-env"
 
 export const runtime = "nodejs"
-export const dynamic = growthHomeRouteDynamic
+export const dynamic = "force-dynamic"
 
 /** Production-only runtime source proof for /growth Home (GE-AVA-FRESH-SLATE-1C). */
 export async function GET(request: Request) {
-  const isProduction = isGrowthHomeProductionRuntime()
-  const debugEnabled = process.env.GROWTH_HOME_DEBUG_SOURCE_ENABLED === "true"
-
-  if (!isProduction && !debugEnabled) {
+  if (!isGrowthHomeProductionRuntime()) {
     return NextResponse.json(
       { error: "not_available", message: "Home debug source is only available in production." },
       { status: 404 },
