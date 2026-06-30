@@ -1,5 +1,6 @@
 "use client"
 
+import { formatGrowthAutomationFlowStatusLabel } from "@/lib/growth/automation/growth-automation-operator-copy"
 import { cn } from "@/lib/utils"
 
 type Props = {
@@ -20,7 +21,7 @@ export function GrowthAutomationPublishStatusBadge({ status, readiness, classNam
 
   return (
     <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide", tone, className)}>
-      {status}
+      {formatGrowthAutomationFlowStatusLabel(status)}
       {readiness ? ` · ${readiness}` : ""}
     </span>
   )

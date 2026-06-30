@@ -12,7 +12,7 @@ export function GrowthAutomationCompiledArtifactPreview({ compile, loading }: Pr
     return <p className="text-sm text-muted-foreground">Compiling preview…</p>
   }
   if (!compile) {
-    return <p className="text-sm text-muted-foreground">Run compile preview to inspect SR-3 draft artifacts.</p>
+    return <p className="text-sm text-muted-foreground">Run preview to see how this automation will behave.</p>
   }
 
   return (

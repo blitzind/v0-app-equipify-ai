@@ -16,14 +16,14 @@ export const GROWTH_VIDEOS_HUB_MANIFEST: GrowthWorkspaceHubManifest = {
   id: "videos",
   title: "Videos",
   description:
-    "Recording studio foundation — library, capture modes, templates, analytics, and settings for personalized video pages.",
+    "Record, manage, and publish personalized video for outreach — library, templates, analytics, and settings.",
   icon: Video,
   iconClassName: "bg-violet-50 text-violet-600",
   overview: [
-    { id: "library", label: "Library", hint: "Open video library" },
-    { id: "record", label: "Record", hint: "Open recording studio" },
-    { id: "templates", label: "Templates", hint: "Open templates" },
-    { id: "views", label: "Views (7d)", hint: "Open analytics" },
+    { id: "library", label: "Library", hint: "Open video library", emptyValue: "Record your first video" },
+    { id: "record", label: "Record", hint: "Open recording studio", emptyValue: "Start recording" },
+    { id: "templates", label: "Templates", hint: "Open templates", emptyValue: "No templates" },
+    { id: "views", label: "Views (7d)", hint: "Open analytics", emptyValue: "No views yet" },
   ],
   quickActions: [
     {
@@ -50,7 +50,7 @@ export const GROWTH_VIDEOS_HUB_MANIFEST: GrowthWorkspaceHubManifest = {
     {
       id: "upload",
       label: "Upload video",
-      description: "Upload placeholder — recording studio foundation only.",
+      description: "Upload an existing video file to your library.",
       href: `${BASE}/library`,
       icon: Upload,
       variant: "outline",
@@ -85,17 +85,17 @@ export const GROWTH_VIDEOS_HUB_MANIFEST: GrowthWorkspaceHubManifest = {
           href: `${BASE}/library`,
         },
       ],
-      emptyHint: "Record or upload videos to populate the library.",
+      emptyHint: "Record or upload your first video to get started.",
     },
     {
       id: "recording",
       title: "Recording Studio",
-      description: "Capture modes are scaffolded — implementation arrives in a later phase.",
+      description: "Record with webcam, screen share, or picture-in-picture.",
       drilldowns: [
         {
           id: "record",
           label: "Open recording studio",
-          description: "Webcam, screen, and PiP recording placeholders.",
+          description: "Webcam, screen, and picture-in-picture recording.",
           href: `${BASE}/record`,
         },
       ],
@@ -103,7 +103,7 @@ export const GROWTH_VIDEOS_HUB_MANIFEST: GrowthWorkspaceHubManifest = {
     {
       id: "templates",
       title: "Templates",
-      description: "Template library for future personalized video pages.",
+      description: "Reusable layouts for personalized video pages.",
       drilldowns: [
         {
           id: "templates",

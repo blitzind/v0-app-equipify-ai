@@ -7,7 +7,7 @@ import { Archive, ArrowLeft, Eye, Loader2, Pencil, Search, Trash2, Upload } from
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
-import { GrowthEngineHonestEmptyState } from "@/components/growth/growth-engine-honest-empty-state"
+import { GrowthVideoLibraryFirstRun } from "@/components/growth/videos/growth-video-library-first-run"
 import { GrowthEnginePanelResilience } from "@/components/growth/growth-engine-panel-resilience"
 import { GrowthVideoWorkspaceShell } from "@/components/growth/videos/growth-video-workspace-shell"
 import { GrowthVideoUploadModal } from "@/components/growth/videos/growth-video-upload-modal"
@@ -105,6 +105,8 @@ export function GrowthVideoLibraryPanel() {
     void load({ status: filter, search })
   }
 
+  const isLibraryEmpty = !loading && items.length === 0 && !search.trim() && !filter
+
   return (
     <GrowthVideoWorkspaceShell
       title="Video Library"
@@ -124,6 +126,10 @@ export function GrowthVideoLibraryPanel() {
           </Button>
         </div>
       ) : null}
+      {isLibraryEmpty ? (
+        <GrowthVideoLibraryFirstRun pathname={pathname} onUpload={() => setUploadOpen(true)} />
+      ) : (
+        <>
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -165,11 +171,9 @@ export function GrowthVideoLibraryPanel() {
         onRetry={() => void load({ status: filter, search })}
       >
         {filtered.length === 0 ? (
-          <GrowthEngineHonestEmptyState
-            kind="no_data"
-            title="No videos yet"
-            message="Upload a video to populate your library."
-          />
+          <p className="text-sm text-muted-foreground">
+            No videos match your search. Try a different term or upload a new video.
+          </p>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((asset) => (
@@ -241,6 +245,8 @@ export function GrowthVideoLibraryPanel() {
           </div>
         )}
       </GrowthEnginePanelResilience>
+        </>
+      )}
 
       <GrowthVideoUploadModal
         open={uploadOpen}

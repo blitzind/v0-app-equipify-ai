@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import type { AiOsExecutPlanningReport } from "@/lib/growth/aios/ai-executive-planning-report-types"
 import type { AiOsExecutWorkOrderProposal } from "@/lib/growth/aios/ai-executive-mission-planning-types"
+import { GROWTH_AVA_RECOMMENDS_DOING_NEXT_HINT } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import {
   formatUsd,
   GrowthAiOsConfidenceGauge,
@@ -78,7 +79,7 @@ export function GrowthAiOsExecutSummarySection({
           <GrowthAiOsKpiCard
             label="Primary recommended action"
             value={<span className="text-base leading-snug">{primaryAction}</span>}
-            hint="What AI recommends doing next"
+            hint={GROWTH_AVA_RECOMMENDS_DOING_NEXT_HINT}
             className="sm:col-span-2 xl:col-span-4"
           />
         </div>

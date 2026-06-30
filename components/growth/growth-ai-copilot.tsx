@@ -19,6 +19,7 @@ import type {
   GrowthAiCopilotGenerationType,
 } from "@/lib/growth/ai-copilot-types"
 import type { GrowthOutreachQueueItem } from "@/lib/growth/outreach/outreach-queue-types"
+import { GROWTH_AVA_PANEL_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import type { GrowthLead } from "@/lib/growth/types"
 import type { GrowthSenderProfilesDashboardPayload } from "@/lib/growth/signatures/signature-types"
 
@@ -241,7 +242,7 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
   return (
     <GrowthCollapsibleEngineCard
       id="growth-ai-copilot"
-      title="AI Copilot"
+      title={GROWTH_AVA_PANEL_TITLE}
       icon={<Bot className="size-4" />}
       headerAside={<span className="text-xs text-muted-foreground">{collapsedSummary}</span>}
       defaultOpen={false}

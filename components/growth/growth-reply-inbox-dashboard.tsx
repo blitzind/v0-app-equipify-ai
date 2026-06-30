@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import type { GrowthOutboundReply } from "@/lib/growth/outbound/types"
 import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
+import { GROWTH_AVA_REPLY_ASSIST_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import {
   GROWTH_REPLY_INBOX_VIEWS,
   GROWTH_REPLY_INTELLIGENCE_V2_QA_MARKER,
@@ -281,7 +282,7 @@ export function GrowthReplyInboxDashboard() {
           </div>
 
           <div data-qa-marker={GROWTH_REPLY_INTELLIGENCE_V2_QA_MARKER}>
-            <GrowthEngineCard title="AI reply copilot" icon={<Bot className="size-4" />}>
+            <GrowthEngineCard title={GROWTH_AVA_REPLY_ASSIST_TITLE} icon={<Bot className="size-4" />}>
               {!copilot ? (
                 <p className="text-sm text-muted-foreground">Select a reply to load copilot assist.</p>
               ) : (

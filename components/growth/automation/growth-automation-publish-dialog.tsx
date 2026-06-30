@@ -35,14 +35,14 @@ export function GrowthAutomationPublishDialog({ readiness, loading, onConfirm }:
         <AlertDialogHeader>
           <AlertDialogTitle>Publish automation flow version?</AlertDialogTitle>
           <AlertDialogDescription>
-            S5-F stores compile/simulation metadata and marks the version published. No SR-3 runtime
-            artifacts are written and automation execution remains disabled.
+            Saves preview results and marks this version published. Nothing runs automatically until you
+            activate the automation and any required approvals are complete.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="space-y-2 text-xs text-muted-foreground">
-          {GROWTH_AUTOMATION_PUBLISH_SAFETY_FLAGS.publish_metadata_only ? <p>Publish metadata only</p> : null}
+          {GROWTH_AUTOMATION_PUBLISH_SAFETY_FLAGS.publish_metadata_only ? <p>Human review may be required</p> : null}
           {GROWTH_AUTOMATION_PUBLISH_SAFETY_FLAGS.runtime_publish_enabled === false ? (
-            <p>Runtime publish disabled</p>
+            <p>Go-live publish is paused in this workspace</p>
           ) : null}
           {readiness?.requiresHumanReview ? <p>Human review required for action nodes</p> : null}
         </div>

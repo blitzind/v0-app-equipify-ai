@@ -45,6 +45,10 @@ const SIDEBAR_ACTIVE_STATE_CASES: Array<{ pathname: string; activeNavId: string 
   { pathname: "/growth/runbook", activeNavId: "runbook" },
   { pathname: "/growth/activity", activeNavId: "activity" },
   { pathname: "/growth/engagement", activeNavId: "engagement" },
+  { pathname: "/growth/conversations", activeNavId: "conversations" },
+  { pathname: "/growth/opportunities", activeNavId: "opportunities" },
+  { pathname: "/growth/opportunities/pipeline", activeNavId: "opportunities" },
+  { pathname: "/growth/relationships", activeNavId: "relationships" },
   { pathname: "/growth/os", activeNavId: "ai-operations" },
   {
     pathname: "/growth/os/missions/d702724e-6565-4db7-a2f0-d686fea7623a/planning",
@@ -74,7 +78,7 @@ function runAudit(): void {
   console.log(`\n=== Growth workspace sidebar IA audit (${GROWTH_WORKSPACE_SIDEBAR_IA_QA_MARKER}) ===\n`)
   console.log(`  shell nav qa marker: ${GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER}`)
 
-  assert.equal(GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER, "growth-workspace-shell-nav-v8")
+  assert.equal(GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER, "growth-workspace-shell-nav-v9")
 
   assert.deepEqual(
     GROWTH_SHELL_NAV_GROUPS.map((group) => group.id),
@@ -169,6 +173,8 @@ function runAudit(): void {
     "utf8",
   )
   assert.match(operationsDashboard, /Mission Planning Review/)
+  const revenueItems = GROWTH_WORKSPACE_SHELL_NAV_MANIFEST.find((group) => group.id === "revenue")?.items ?? []
+  assert.deepEqual(revenueItems.map((item) => item.id), ["conversations", "opportunities", "relationships"])
   const intelligenceItems = GROWTH_WORKSPACE_SHELL_NAV_MANIFEST.find((group) => group.id === "intelligence")?.items ?? []
   assert.deepEqual(
     intelligenceItems.map((item) => item.id),
@@ -176,7 +182,7 @@ function runAudit(): void {
   )
   const advancedItems = GROWTH_WORKSPACE_SHELL_NAV_MANIFEST.find((group) => group.id === "advanced")?.items ?? []
   assert.deepEqual(advancedItems.map((item) => item.id), ["ai-operations"])
-  console.log("  ✓ Mission Planning Review route + AI Operations under Advanced (not Intelligence)")
+  console.log("  ✓ Mission Planning Review route + Revenue modules in sidebar + AI Operations under Advanced")
 
   console.log("\nGrowth workspace sidebar IA audit PASS\n")
   console.log(

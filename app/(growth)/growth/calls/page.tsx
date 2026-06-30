@@ -4,5 +4,5 @@ import { GrowthWorkspaceHubPage } from "@/components/growth/hubs/growth-workspac
 import { GROWTH_CALLS_HUB_MANIFEST } from "@/lib/growth/hubs/growth-calls-hub-manifest"
 
 export default function GrowthCallsPage() {
-  return <GrowthWorkspaceHubPage manifest={GROWTH_CALLS_HUB_MANIFEST} />
+  return <GrowthWorkspaceHubPage manifest={GROWTH_CALLS_HUB_MANIFEST} actionFirst />
 }

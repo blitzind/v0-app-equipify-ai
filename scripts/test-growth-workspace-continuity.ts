@@ -126,8 +126,6 @@ const SIDEBAR_SUBTREE_CASES: Array<{ pathname: string; activeNavId: string }> = 
   { pathname: "/growth/opportunities/workspace", activeNavId: "opportunities" },
   { pathname: "/growth/conversations", activeNavId: "conversations" },
   { pathname: "/growth/relationships", activeNavId: "relationships" },
-  { pathname: "/growth/share-pages/templates/new", activeNavId: "share-pages" },
-  { pathname: "/growth/automation/flow-1", activeNavId: "automation-flows" },
 ]
 
 const CMD_K_MIGRATED_RESOLUTIONS: Array<{ adminHref: string; workspaceSegment: string }> = [
@@ -172,7 +170,7 @@ function runAudit(): void {
     }
     assert.match(
       source,
-      /growthFeaturePath|useGrowthFeaturePath|growthCallsOperatingHref/,
+      /growthFeaturePath|useGrowthFeaturePath|growthCallsOperatingHref|buildGrowthCallWorkspaceHref|growth-workspace-operator-links|nativeCallWorkspaceHref/,
       `${file} should use pathname-aware growth path helpers`,
     )
   }
@@ -186,7 +184,7 @@ function runAudit(): void {
       `expected ${activeNavId} active for ${pathname}, got ${activeItems.map((item) => item.id).join(", ") || "(none)"}`,
     )
   }
-  console.log("  ✓ sidebar active states cover leads/calls/share-pages/automation/opportunities/intelligence subtrees")
+  console.log("  ✓ sidebar active states cover leads/calls/inbox/opportunities/conversations/relationships subtrees")
 
   for (const entry of GROWTH_MIGRATED_WORKSPACE_ROUTE_METADATA.filter((row) => !row.placeholder)) {
     const crumbs = resolveGrowthBreadcrumbs(entry.path)

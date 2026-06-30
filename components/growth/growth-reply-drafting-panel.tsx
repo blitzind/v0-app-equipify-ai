@@ -14,6 +14,7 @@ import {
   type GrowthReplyDraftView,
   replyDraftStatusLabel,
 } from "@/lib/growth/replies/reply-draft-types"
+import { GROWTH_AVA_EMPTY_REPLY_DRAFTS } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 
 const RISK_TONE: Record<string, "healthy" | "attention" | "critical" | "blocked" | "neutral"> = {
   low: "healthy",
@@ -353,7 +354,7 @@ export function GrowthReplyDraftingPanel({ threadId, disabled, embedded = false 
     }
     return (
       <GrowthEngineCard title="Reply Drafting">
-        <p className="text-sm text-muted-foreground">Select a thread to generate AI reply drafts.</p>
+        <p className="text-sm text-muted-foreground">{GROWTH_AVA_EMPTY_REPLY_DRAFTS}</p>
       </GrowthEngineCard>
     )
   }

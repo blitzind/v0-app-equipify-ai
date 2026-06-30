@@ -73,7 +73,7 @@ export function GrowthAutomationRuntimeExecutionPanel({
         const data = (await res.json()) as ExecutionResponse
         if (data.execution) {
           setExecution(data.execution)
-          setMessage(`Runtime status: ${data.execution.status}`)
+          setMessage(`Status: ${data.execution.status.replace(/_/g, " ")}`)
         } else {
           setMessage("Advance request failed.")
         }
@@ -88,7 +88,7 @@ export function GrowthAutomationRuntimeExecutionPanel({
   if (!enrollmentId) {
     return (
       <div className="rounded-xl border border-dashed border-border p-4 text-xs text-muted-foreground">
-        Select an enrollment to inspect runtime execution.
+        Select an enrollment to review its progress.
       </div>
     )
   }
@@ -100,8 +100,8 @@ export function GrowthAutomationRuntimeExecutionPanel({
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium">Runtime execution</h3>
-          <p className="text-xs text-muted-foreground">SR-3 progression · no sends · no auto-approval</p>
+          <h3 className="text-sm font-medium">Enrollment progress</h3>
+          <p className="text-xs text-muted-foreground">Step-by-step progress · requires approval before sends</p>
         </div>
         {execution ? <GrowthAutomationRuntimeExecutionStatusBadge status={execution.status} /> : null}
       </div>

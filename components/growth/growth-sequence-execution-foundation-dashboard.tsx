@@ -261,7 +261,7 @@ export function GrowthSequenceExecutionFoundationDashboard({
       <GrowthEngineCard title="Pattern Enrollments (Outbound)">
         <p className="mb-3 text-sm text-muted-foreground">
           Bulk enroll, scheduler, and standalone transport use pattern enrollments in{" "}
-          <span className="font-medium">growth.sequence_enrollments</span>. Template enrollments below are the legacy
+          <span className="font-medium">growth.sequence_enrollments</span>. Template enrollments below use the
           foundation workspace ({GROWTH_ENROLLMENT_PLANES_DOC.template.tables.join(", ")}).
         </p>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

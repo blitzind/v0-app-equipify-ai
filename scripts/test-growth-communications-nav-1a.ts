@@ -89,6 +89,12 @@ function main(): void {
     assertOnlyActive(pathname, expectedId)
   }
 
+  const signaturesItem = communicationsItem("signatures")
+  assert.equal(signaturesItem.href, "/growth/settings/signatures")
+  assert.equal(signaturesItem.label, "Email Signatures")
+  assert.equal(isGrowthWorkspaceSettingsNavItemActive("/growth/settings/signatures", signaturesItem), true)
+  assertOnlyActive("/growth/settings/signatures", "signatures")
+
   console.log("growth-communications-nav-1a: ok")
 }
 

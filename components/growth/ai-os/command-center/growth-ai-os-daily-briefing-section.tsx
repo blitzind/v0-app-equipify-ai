@@ -10,6 +10,7 @@ import type {
   AiOsDailyBriefingUrgencyLevel,
 } from "@/lib/growth/aios/ai-os-daily-briefing-types"
 import { GROWTH_AI_OS_DAILY_BRIEFING_QA_MARKER } from "@/lib/growth/aios/ai-os-daily-briefing-types"
+import { GROWTH_AVA_EMPTY_RECOMMENDATIONS } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { cn } from "@/lib/utils"
 
 function urgencyBadgeVariant(urgency: AiOsDailyBriefingUrgencyLevel) {
@@ -211,7 +212,7 @@ export function GrowthAiOsDailyBriefingSection({ briefing }: { briefing: AiOsDai
         </CardHeader>
         <CardContent className="space-y-3">
           {briefing.recommendedNextActions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No recommendations at this time.</p>
+            <p className="text-sm text-muted-foreground">{GROWTH_AVA_EMPTY_RECOMMENDATIONS}</p>
           ) : (
             briefing.recommendedNextActions.map((item) => <BriefingActionCard key={item.id} item={item} />)
           )}

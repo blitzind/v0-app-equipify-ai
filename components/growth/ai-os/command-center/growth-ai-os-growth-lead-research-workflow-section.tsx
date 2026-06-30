@@ -8,6 +8,7 @@ import { GrowthAiOsKpiCard } from "@/components/growth/ai-os/executive-planning-
 import type { AiOsCommandCenterGrowthLeadResearchWorkflow } from "@/lib/growth/aios/ai-os-command-center-types"
 import { GROWTH_LEAD_RESEARCH_WORKFLOW_QA_MARKER } from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
 import { GROWTH_LEAD_RESEARCH_OPPORTUNITY_ASSESSMENT_QA_MARKER } from "@/lib/growth/aios/growth/growth-lead-research-opportunity-assessment"
+import { GROWTH_AVA_EMPTY_RECOMMENDATIONS } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { cn } from "@/lib/utils"
 
 function statusBadgeVariant(status: string) {
@@ -230,7 +231,7 @@ export function GrowthAiOsGrowthLeadResearchWorkflowSection({
           </CardHeader>
           <CardContent className="space-y-3">
             {workflow.recommendedNextActions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No recommendations yet.</p>
+              <p className="text-sm text-muted-foreground">{GROWTH_AVA_EMPTY_RECOMMENDATIONS}</p>
             ) : (
               workflow.recommendedNextActions.map((item) => (
                 <div key={item.leadId} className="rounded-lg border border-border/70 p-3">

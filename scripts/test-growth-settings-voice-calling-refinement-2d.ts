@@ -103,14 +103,14 @@ function main(): void {
   assert.doesNotMatch(callingPage, /GrowthVoiceInfrastructureSettingsPanel/)
   assert.match(callingPage, /title="Connection status"/)
   assert.match(callingPage, /title="Dialer"/)
-  assert.match(callingPage, /title="AI assistance"/)
+  assert.match(callingPage, /GROWTH_AVA_CALL_ASSISTANCE_TITLE/)
   assert.match(callingPage, /GROWTH_SETTINGS_SECTION_GAP/)
   assert.match(callingPage, /GrowthWorkspacePageHeader/)
   console.log("  ✓ Calling Preferences composed with readiness, connection status, and operator panels")
 
   const readiness = read("components/growth/settings/growth-calling-preferences-readiness-summary.tsx")
   assert.match(readiness, /Calling ready/)
-  assert.match(readiness, /AI call assistance/)
+  assert.match(readiness, /GROWTH_AVA_CALL_ASSISTANCE_TITLE/)
   assert.match(readiness, /Live coaching/)
   console.log("  ✓ Readiness summary surfaces calling status at a glance")
 
@@ -132,9 +132,9 @@ function main(): void {
   console.log("  ✓ Live coaching supports operator mode without infrastructure controls")
 
   const assist = read("components/growth/growth-operator-assist-preferences.tsx")
-  assert.match(assist, /AI call assistance/)
+  assert.match(assist, /GROWTH_AVA_CALL_ASSISTANCE_TITLE/)
   assert.match(assist, /operator-assist\/preferences/)
-  console.log("  ✓ AI call assistance grouped with production-friendly labels")
+  console.log("  ✓ Call assistance from Ava grouped with production-friendly labels")
 
   for (const file of CALLING_PANEL_FILES) {
     const src = read(file)

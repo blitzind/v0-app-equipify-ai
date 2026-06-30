@@ -450,8 +450,8 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
 
         {showAiHandoffSections || aiCopilot || aiReceptionist || missedCallRecovery ? (
           <GrowthCallWorkspaceCollapsiblePanel
-            title="AI tools"
-            summary="Copilot, receptionist, recovery"
+            title="Assist from Ava"
+            summary="Call assist, receptionist, recovery"
             defaultOpen={false}
             qaAction="live-coaching-ai-tools-toggle"
           >

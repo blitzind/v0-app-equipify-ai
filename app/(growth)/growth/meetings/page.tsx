@@ -9,7 +9,7 @@ export default function GrowthMeetingsPage() {
   return (
     <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
-        title="Meeting Intelligence"
+        title="Meetings"
         description="Track booked meetings, outcomes, no-shows, and follow-ups — connect Google Calendar in Settings for human-confirmed sync."
         icon={CalendarClock}
         iconClassName="bg-indigo-50 text-indigo-600"

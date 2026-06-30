@@ -30,6 +30,20 @@ import type {
   GrowthOpportunityPipelineDashboard,
   GrowthOpportunityPipelineView,
 } from "@/lib/growth/opportunity-pipeline/pipeline-types"
+import {
+  GROWTH_OPPORTUNITIES_AVA_RECOMMENDS_TITLE,
+  GROWTH_OPPORTUNITIES_DEALS_NEEDING_ATTENTION_TITLE,
+  GROWTH_OPPORTUNITIES_IMPORT_PROSPECTS_CTA,
+  GROWTH_OPPORTUNITIES_PIPELINE_EMPTY_MESSAGE,
+  GROWTH_OPPORTUNITIES_PIPELINE_EMPTY_TITLE,
+  GROWTH_OPPORTUNITIES_PIPELINE_HEALTH_TITLE,
+  GROWTH_OPPORTUNITIES_PIPELINE_VALUE_TITLE,
+  GROWTH_OPPORTUNITIES_QUALIFY_LEADS_CTA,
+  GROWTH_OPPORTUNITIES_RECENTLY_CHANGED_TITLE,
+  GROWTH_WORKSPACE_OPERATOR_SIMPLIFICATION_1E_QA_MARKER,
+} from "@/lib/growth/workspace/growth-workspace-operator-simplification-1e"
+import { GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER } from "@/lib/growth/workspace/growth-workspace-action-first-1f"
+import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
 import { cn } from "@/lib/utils"
 
 const VIEW_LABELS: Record<GrowthOpportunityPipelineView, string> = {
@@ -372,20 +386,92 @@ export function GrowthOpportunityPipelineDashboard() {
   }
 
   return (
-    <div className="space-y-6" data-growth-ops-url-state={GROWTH_OPS_URL_STATE_7A1_QA_MARKER}>
-      <GrowthEngineCard title="Opportunity Operating Dashboard">
+    <div className="space-y-6" data-growth-ops-url-state={GROWTH_OPS_URL_STATE_7A1_QA_MARKER} data-qa-marker={GROWTH_WORKSPACE_OPERATOR_SIMPLIFICATION_1E_QA_MARKER} data-growth-action-first-order="actions-before-metrics" data-qa-marker-action-first={GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER}>
+      <GrowthEngineCard title={GROWTH_OPPORTUNITIES_PIPELINE_HEALTH_TITLE}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm text-muted-foreground">
-              Deterministic pipeline, forecast, and deal execution — human-controlled stage movement only.
-            </p>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            What needs your attention first — then review full pipeline analytics below.
+          </p>
           <Button size="sm" variant="outline" onClick={() => void load(view, true)}>
             <RefreshCw className="mr-2 size-4" />
             Refresh
           </Button>
         </div>
 
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatTile
+            label={GROWTH_OPPORTUNITIES_DEALS_NEEDING_ATTENTION_TITLE}
+            value={dashboard?.dealsNeedingAction ?? 0}
+          />
+          <StatTile label={GROWTH_OPPORTUNITIES_PIPELINE_VALUE_TITLE} value={formatCurrency(dashboard?.openPipeline ?? 0)} />
+          <StatTile label="Weighted pipeline" value={formatCurrency(dashboard?.weightedPipeline ?? 0)} />
+          <StatTile label={GROWTH_OPPORTUNITIES_RECENTLY_CHANGED_TITLE} value={dashboard?.staleOpportunityCount ?? 0} />
+        </div>
+
+        {(dashboard?.dealsNeedingAction ?? 0) > 0 ? (
+          <div className="mt-4 rounded-lg border border-indigo-200/60 bg-indigo-50/40 p-3 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+            <p className="text-sm font-medium">{GROWTH_OPPORTUNITIES_AVA_RECOMMENDS_TITLE}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Review deals needing action in the pipeline list below — Ava surfaces risk and stale follow-ups for you to decide.
+            </p>
+          </div>
+        ) : null}
+      </GrowthEngineCard>
+
+      <div className="flex flex-wrap gap-2">
+        {(Object.keys(VIEW_LABELS) as GrowthOpportunityPipelineView[]).map((key) => (
+          <Button key={key} size="sm" variant={view === key ? "default" : "outline"} onClick={() => setView(key)}>
+            {VIEW_LABELS[key]}
+          </Button>
+        ))}
+      </div>
+
+      {setupMessage ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
+          <p className="font-medium">Pipeline setup required</p>
+          <p className="mt-1">Your pipeline is not ready yet. Ask Platform Admin to finish workspace setup.</p>
+        </div>
+      ) : null}
+
+      {error ? <p className="text-sm text-muted-foreground">{error}</p> : null}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <GrowthEngineCard title="Pipeline">
+          <div className="space-y-2">
+            {items.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border p-6 text-center">
+                <p className="text-sm font-medium">{GROWTH_OPPORTUNITIES_PIPELINE_EMPTY_TITLE}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{GROWTH_OPPORTUNITIES_PIPELINE_EMPTY_MESSAGE}</p>
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                  <Button size="sm" asChild>
+                    <Link href={`${GROWTH_WORKSPACE_BASE_PATH}/prospect-search`}>
+                      {GROWTH_OPPORTUNITIES_IMPORT_PROSPECTS_CTA}
+                    </Link>
+                  </Button>
+                  <Button size="sm" variant="outline" asChild>
+                    <Link href={`${GROWTH_WORKSPACE_BASE_PATH}/leads`}>{GROWTH_OPPORTUNITIES_QUALIFY_LEADS_CTA}</Link>
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              items.map((item) => (
+                <OpportunityRow
+                  key={item.id}
+                  item={item}
+                  selected={selectedId === item.id}
+                  onSelect={() => selectOpportunity(item.id)}
+                />
+              ))
+            )}
+          </div>
+        </GrowthEngineCard>
+
+        <GrowthEngineCard title="Opportunity detail">
+          <OpportunityDetailPanel detail={detail} loading={detailLoading} onStageChange={handleStageChange} />
+        </GrowthEngineCard>
+      </div>
+
+      <GrowthEngineCard title="Pipeline analytics">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
           <StatTile label="Open pipeline" value={formatCurrency(dashboard?.openPipeline ?? 0)} />
           <StatTile label="Weighted pipeline" value={formatCurrency(dashboard?.weightedPipeline ?? 0)} />
@@ -407,46 +493,6 @@ export function GrowthOpportunityPipelineDashboard() {
           </div>
         ) : null}
       </GrowthEngineCard>
-
-      <div className="flex flex-wrap gap-2">
-        {(Object.keys(VIEW_LABELS) as GrowthOpportunityPipelineView[]).map((key) => (
-          <Button key={key} size="sm" variant={view === key ? "default" : "outline"} onClick={() => setView(key)}>
-            {VIEW_LABELS[key]}
-          </Button>
-        ))}
-      </div>
-
-      {setupMessage ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
-          <p className="font-medium">Pipeline setup required</p>
-          <p className="mt-1">{setupMessage}</p>
-        </div>
-      ) : null}
-
-      {error ? <p className="text-sm text-muted-foreground">{error}</p> : null}
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <GrowthEngineCard title="Pipeline">
-          <div className="space-y-2">
-            {items.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No opportunities in this view.</p>
-            ) : (
-              items.map((item) => (
-                <OpportunityRow
-                  key={item.id}
-                  item={item}
-                  selected={selectedId === item.id}
-                  onSelect={() => selectOpportunity(item.id)}
-                />
-              ))
-            )}
-          </div>
-        </GrowthEngineCard>
-
-        <GrowthEngineCard title="Opportunity detail">
-          <OpportunityDetailPanel detail={detail} loading={detailLoading} onStageChange={handleStageChange} />
-        </GrowthEngineCard>
-      </div>
     </div>
   )
 }

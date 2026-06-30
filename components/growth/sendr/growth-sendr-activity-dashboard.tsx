@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { GROWTH_AVA_EMPTY_RECOMMENDATIONS } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import {
   GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL,
@@ -287,7 +288,7 @@ export function GrowthSendrActivityDashboard() {
 
       <GrowthEngineCard title="Follow-up recommendations" icon={<Activity className="size-4" />}>
         {prospects.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No recommendations in this range.</p>
+          <p className="text-sm text-muted-foreground">{GROWTH_AVA_EMPTY_RECOMMENDATIONS}</p>
         ) : (
           <div className="space-y-2 text-sm">
             {prospects.flatMap((prospect) =>

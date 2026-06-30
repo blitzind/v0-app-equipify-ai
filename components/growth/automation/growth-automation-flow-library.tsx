@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { GrowthAutomationFlowCard } from "@/components/growth/automation/growth-automation-flow-card"
 import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
+import { formatGrowthAutomationFlowStatusLabel } from "@/lib/growth/automation/growth-automation-operator-copy"
 import {
   GROWTH_AUTOMATION_BUILDER_QA_MARKER,
   GROWTH_AUTOMATION_FLOW_STATUSES,
@@ -101,7 +102,7 @@ export function GrowthAutomationFlowLibrary() {
             <option value="">All statuses</option>
             {GROWTH_AUTOMATION_FLOW_STATUSES.map((status) => (
               <option key={status} value={status}>
-                {status}
+                {formatGrowthAutomationFlowStatusLabel(status)}
               </option>
             ))}
           </select>
@@ -126,7 +127,9 @@ export function GrowthAutomationFlowLibrary() {
             Loading flows…
           </div>
         ) : items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No automation flows yet.</p>
+          <p className="text-sm text-muted-foreground">
+            No automations yet. Create your first flow to automate follow-ups and outreach steps.
+          </p>
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
             {items.map((flow) => (

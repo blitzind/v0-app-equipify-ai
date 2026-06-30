@@ -701,7 +701,7 @@ export function GrowthSendrPageDetail({ pageId }: { pageId: string }) {
                     />
                   )}
                   <details className="rounded-xl border border-slate-200/80 p-4 dark:border-slate-800">
-                    <summary className="cursor-pointer text-sm font-medium">Legacy metadata URL (optional)</summary>
+                    <summary className="cursor-pointer text-sm font-medium">External metadata URL (optional)</summary>
                     <div className="mt-4 space-y-3">
                       <div className="space-y-2">
                         <Label>Source URL</Label>

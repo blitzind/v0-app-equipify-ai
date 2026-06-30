@@ -145,7 +145,7 @@ export function GrowthAutomationPublishPanel({ flowId, versionId, onPublished }:
         <div>
           <h3 className="text-sm font-medium">Publish gate</h3>
           <p className="text-xs text-muted-foreground">
-            Metadata-only publish · runtime reconciliation preview (S5-G)
+            Review validation and preview results before publishing to your workspace.
           </p>
         </div>
         <GrowthAutomationPublishStatusBadge
@@ -155,15 +155,15 @@ export function GrowthAutomationPublishPanel({ flowId, versionId, onPublished }:
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2 text-[10px] uppercase tracking-wide text-muted-foreground">
-        {GROWTH_AUTOMATION_PUBLISH_SAFETY_FLAGS.publish_metadata_only ? <span>metadata only</span> : null}
+        {GROWTH_AUTOMATION_PUBLISH_SAFETY_FLAGS.publish_metadata_only ? <span>review required</span> : null}
         {GROWTH_AUTOMATION_PUBLISH_SAFETY_FLAGS.sr3_artifact_writes_enabled === false ? (
-          <span>no SR-3 writes</span>
+          <span>requires approval</span>
         ) : null}
         {GROWTH_AUTOMATION_PUBLISH_SAFETY_FLAGS.runtime_publish_enabled === false ? (
-          <span>runtime disabled</span>
+          <span>publish paused</span>
         ) : null}
         {GROWTH_AUTOMATION_RUNTIME_RECONCILIATION_SAFETY_FLAGS.reconciliation_preview_only ? (
-          <span>reconciliation preview</span>
+          <span>preview changes</span>
         ) : null}
       </div>
 
@@ -214,7 +214,7 @@ export function GrowthAutomationPublishPanel({ flowId, versionId, onPublished }:
 
       {reconciliation ? (
         <div className="mt-4 space-y-3 rounded-md border border-border/70 p-3">
-          <p className="text-xs font-medium">Runtime reconciliation</p>
+          <p className="text-xs font-medium">Change summary</p>
           <GrowthAutomationRuntimeDiffSummary diff={reconciliation.diff} />
           <GrowthAutomationRuntimeCleanupPlan items={reconciliation.cleanupPlan} />
           <GrowthAutomationRuntimeRollbackPlan items={reconciliation.rollbackPlan} />

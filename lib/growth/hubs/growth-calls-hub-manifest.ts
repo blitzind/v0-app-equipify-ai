@@ -9,14 +9,14 @@ export const GROWTH_CALLS_HUB_MANIFEST: GrowthWorkspaceHubManifest = {
   id: "calls",
   title: "Calls",
   description:
-    "Call operations hub — queue, live sessions, coaching, and the unified call workspace without provider setup.",
+    "Call operations hub — queue, live sessions, coaching, and the unified call workspace.",
   icon: Phone,
   iconClassName: "bg-sky-50 text-sky-600",
   overview: [
-    { id: "queue-today", label: "Queue today", hint: "Open call queue" },
-    { id: "live-now", label: "Live now", hint: "Open live calls" },
-    { id: "completed-today", label: "Completed today", hint: "Open call workspace" },
-    { id: "coaching-open", label: "Coaching open", hint: "Open live coaching" },
+    { id: "queue-today", label: "Queue today", hint: "Open call queue", emptyValue: "Open queue to begin" },
+    { id: "live-now", label: "Live now", hint: "Open live calls", emptyValue: "No live calls" },
+    { id: "completed-today", label: "Completed today", hint: "Open call workspace", emptyValue: "No calls yet" },
+    { id: "coaching-open", label: "Coaching open", hint: "Open live coaching", emptyValue: "No coaching sessions" },
   ],
   quickActions: [
     {

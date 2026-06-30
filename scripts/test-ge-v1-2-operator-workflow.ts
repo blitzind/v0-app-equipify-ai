@@ -34,8 +34,8 @@ function readSource(relativePath: string): string {
 function main(): void {
   console.log("\n=== GE-v1-2 Operator Workflow & Analytics Certification ===\n")
 
-  assert.equal(GROWTH_WORKSPACE_SIDEBAR_IA_QA_MARKER, "growth-workspace-sidebar-ia-v3")
-  assert.equal(GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER, "growth-workspace-shell-nav-v7")
+  assert.equal(GROWTH_WORKSPACE_SIDEBAR_IA_QA_MARKER, "growth-workspace-sidebar-ia-v4")
+  assert.equal(GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER, "growth-workspace-shell-nav-v9")
   assert.equal(GROWTH_WORKSPACE_DASHBOARD_QA_MARKER, "growth-workspace-dashboard-v4")
   assert.equal(GE_V1_2_OPERATOR_SETUP_HEALTH_QA_MARKER, "ge-v1-2-operator-setup-health-v1")
   assert.equal(GE_V1_2_UNIFIED_ENGAGEMENT_READ_QA_MARKER, "ge-v1-2-unified-engagement-read-v1")

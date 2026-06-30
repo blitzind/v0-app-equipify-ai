@@ -21,6 +21,7 @@ import {
   resolveGrowthCallCopilotEnabled,
 } from "@/lib/growth/call-copilot-settings"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
+import { GROWTH_AVA_CALL_ASSIST_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthCallCopilotProps = {
@@ -322,7 +323,7 @@ export function GrowthCallCopilot({ lead }: GrowthCallCopilotProps) {
   return (
     <GrowthCollapsibleEngineCard
       id="growth-call-copilot"
-      title="Call Copilot"
+      title={GROWTH_AVA_CALL_ASSIST_TITLE}
       icon={<Phone className="size-4" />}
       headerAside={collapsedSummary}
       defaultOpen={callWorkflow.callWorkflowActive}

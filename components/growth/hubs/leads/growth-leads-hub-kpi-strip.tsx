@@ -20,7 +20,8 @@ export function GrowthLeadsHubKpiStrip() {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {GROWTH_LEADS_HUB_KPI_CARDS.map((metric) => {
             const value = metrics[metric.metricKey]
-            const displayValue = value != null ? value.toLocaleString() : "—"
+            const displayValue =
+              value != null ? value.toLocaleString() : loading ? "…" : metric.emptyValue
             return (
               <Link
                 key={metric.id}

@@ -6,25 +6,25 @@
 export const GE_AI_UX_2A_QA_MARKER = "ge-ai-ux-2a-outcome-first-unified-experience-v1" as const
 
 export const AI_OS_OUTCOME_FIRST_HOME_INTRO =
-  "Since your last visit, AI handled most of the work." as const
+  "Since your last visit, Ava handled most of the work." as const
 
 export const AI_OS_EXCEPTIONS_SECTION_TITLE = "Exceptions" as const
 export const AI_OS_EXCEPTIONS_SECTION_SUBTITLE =
-  "AI completed everything else — these items need your judgment." as const
+  "Ava completed everything else — these items need your judgment." as const
 
 export const AI_OS_APPROVALS_SECTION_TITLE = "Exceptions & Approvals" as const
 export const AI_OS_APPROVALS_SECTION_SUBTITLE =
-  "Review the few items AI cannot safely complete alone." as const
+  "Review the few items Ava cannot safely complete alone." as const
 
 export const AI_OS_TOP_BUSINESS_MOVE_TITLE = "Top Business Move" as const
 export const AI_OS_RECOMMENDED_NEXT_OUTCOME_TITLE = "Recommended Next Outcome" as const
 
 export const AI_OS_OUTREACH_PLAN_TITLE = "Recommended Outreach" as const
-export const AI_OS_AI_WORK_IN_PROGRESS_TITLE = "Work AI Is Handling" as const
-export const AI_OS_AI_IMPROVEMENTS_TITLE = "AI Improvements" as const
+export const AI_OS_AI_WORK_IN_PROGRESS_TITLE = "Work Ava Is Handling" as const
+export const AI_OS_AI_IMPROVEMENTS_TITLE = "Improvements from Ava" as const
 
 export const AI_OS_HOME_PRIMARY_CTA = "Review Exceptions" as const
-export const AI_OS_HOME_SECONDARY_CTA = "View AI Work Summary" as const
+export const AI_OS_HOME_SECONDARY_CTA = "View Ava's Work Summary" as const
 
 /** Outcome buckets for approval grouping (default operator UI). */
 export const AI_OS_APPROVAL_OUTCOME_BUCKETS = {

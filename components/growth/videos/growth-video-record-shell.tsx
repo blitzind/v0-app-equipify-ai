@@ -5,10 +5,16 @@ import { useSearchParams } from "next/navigation"
 import { ArrowLeft, Monitor, Video, Webcam } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthVideoWorkspaceShell } from "@/components/growth/videos/growth-video-workspace-shell"
+import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
+import { usePathname } from "next/navigation"
 import {
   buildGrowthVideoLibraryHref,
   parseSendrVideoReturnContext,
 } from "@/lib/growth/sendr/growth-sendr-video-return-flow"
+import {
+  GROWTH_VIDEOS_FIRST_RUN_UPLOAD_CTA,
+  GROWTH_WORKSPACE_OPERATOR_SIMPLIFICATION_1E_QA_MARKER,
+} from "@/lib/growth/workspace/growth-workspace-operator-simplification-1e"
 
 const RECORDING_MODES = [
   {
@@ -32,13 +38,18 @@ const RECORDING_MODES = [
 ] as const
 
 export function GrowthVideoRecordShell() {
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const returnContext = parseSendrVideoReturnContext(searchParams)
+  const libraryUploadHref = returnContext
+    ? buildGrowthVideoLibraryHref(returnContext, { openUpload: true })
+    : `${growthFeaturePath(pathname, "videos/library")}?upload=1`
 
   return (
+    <div data-qa-marker={GROWTH_WORKSPACE_OPERATOR_SIMPLIFICATION_1E_QA_MARKER}>
     <GrowthVideoWorkspaceShell
       title="Recording Studio"
-      description="Choose a capture mode. When recording completes, you will return to your Personalized Video Page."
+      description="Choose a capture mode, or upload an existing clip to your library."
     >
       {returnContext ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 p-3 text-sm">
@@ -74,8 +85,8 @@ export function GrowthVideoRecordShell() {
                 <p className="text-sm font-semibold">{mode.title}</p>
               </div>
               <p className="mb-4 text-xs text-muted-foreground">{mode.description}</p>
-              <Button size="sm" disabled className="w-full">
-                Start recording
+              <Button size="sm" className="w-full" asChild>
+                <Link href={libraryUploadHref}>{GROWTH_VIDEOS_FIRST_RUN_UPLOAD_CTA}</Link>
               </Button>
             </div>
           )
@@ -89,18 +100,13 @@ export function GrowthVideoRecordShell() {
             <p className="text-xs text-muted-foreground">Upload existing files without recording.</p>
           </div>
           <Button size="sm" variant="outline" asChild>
-            <Link
-              href={
-                returnContext
-                  ? buildGrowthVideoLibraryHref(returnContext, { openUpload: true })
-                  : "/growth/videos/library?upload=1"
-              }
-            >
+            <Link href={libraryUploadHref}>
               Upload video
             </Link>
           </Button>
         </div>
       </div>
     </GrowthVideoWorkspaceShell>
+    </div>
   )
 }

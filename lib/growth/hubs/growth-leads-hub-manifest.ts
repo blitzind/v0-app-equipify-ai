@@ -28,6 +28,7 @@ export const GROWTH_LEADS_HUB_MANIFEST: GrowthWorkspaceHubManifest = {
     id: card.id,
     label: card.label,
     hint: card.helper,
+    emptyValue: card.emptyValue,
   })),
   quickActions: launcherActions
     .filter((action) => action.icon)

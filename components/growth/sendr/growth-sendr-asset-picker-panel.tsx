@@ -228,7 +228,7 @@ export function GrowthSendrAssetPickerPanel({
             </p>
             {(videoLibrary?.legacyMetadataCount ?? 0) > 0 ? (
               <p className="text-xs text-muted-foreground">
-                Legacy URL-only metadata rows are hidden here. Re-upload through Growth Video Library
+                URL-only metadata rows are hidden here. Re-upload through Growth Video Library
                 for signed playback on Personalized Video pages.
               </p>
             ) : null}
@@ -264,7 +264,7 @@ export function GrowthSendrAssetPickerPanel({
               <div className="flex shrink-0 items-center gap-1">
                 <Badge variant="outline">{item.status}</Badge>
                 {item.metadata.source === "sendr_metadata" ? (
-                  <Badge variant="secondary">Legacy</Badge>
+                  <Badge variant="secondary">Archived</Badge>
                 ) : null}
                 {item.assetKind === "video" ? (
                   <Button

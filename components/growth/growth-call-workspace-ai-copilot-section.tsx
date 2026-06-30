@@ -9,6 +9,7 @@ import type {
   VoiceAiCopilotWorkspaceSnapshot,
 } from "@/lib/voice/ai-copilot/types"
 import { VOICE_AI_COPILOT_QA_MARKER, VOICE_DEEP_COPILOT_QA_MARKER } from "@/lib/voice/ai-copilot/types"
+import { GROWTH_AVA_PANEL_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { cn } from "@/lib/utils"
 
 function formatSuggestionType(type: string): string {
@@ -211,9 +212,9 @@ export function GrowthCallWorkspaceAiCopilotSection({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Bot className="size-4 text-violet-700 dark:text-violet-300" />
-          <p className="text-sm font-semibold">AI Copilot</p>
+          <p className="text-sm font-semibold">{GROWTH_AVA_PANEL_TITLE}</p>
           <GrowthBadge label="Suggestion-only" tone="neutral" />
-          <GrowthBadge label="AI does not act automatically" tone="attention" />
+          <GrowthBadge label="Ava does not act automatically" tone="attention" />
         </div>
         <Button
           type="button"
@@ -337,7 +338,7 @@ export function GrowthCallWorkspaceAiCopilotSection({
       {suggestions.length === 0 ? (
         <div className="rounded-lg border border-dashed border-violet-200/70 px-4 py-6 text-center dark:border-violet-900/40">
           <Bot className="mx-auto mb-2 size-6 text-muted-foreground" />
-          <p className="text-sm font-medium">No AI copilot suggestions yet</p>
+          <p className="text-sm font-medium">No suggestions from Ava yet</p>
           <p className="mt-1 text-xs text-muted-foreground">
             Generate evidence-backed drafts from operator assist, intelligence, and transcript context.
           </p>
@@ -364,7 +365,7 @@ export function GrowthCallWorkspaceAiCopilotSection({
 
       <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
         {aiCopilot?.message ??
-          "AI copilot drafts are operator-reviewed only. Nothing is sent, booked, transferred, or saved automatically."}
+          "Ava's drafts are operator-reviewed only. Nothing is sent, booked, transferred, or saved automatically."}
       </p>
     </section>
   )

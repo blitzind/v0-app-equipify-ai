@@ -44,7 +44,7 @@ export function GrowthAiCopilotReadinessSection() {
     >
       <p className="flex items-center gap-2 text-sm font-medium">
         <Bot className="size-4" />
-        Deep Copilot Readiness
+        Ava readiness
       </p>
       <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm">
         <div className="flex flex-wrap gap-2">

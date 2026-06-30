@@ -1,15 +1,16 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useSearchParams } from "next/navigation"
 import { ArrowLeft, FileText } from "lucide-react"
 import { GrowthSharePageOperatorWorkspace } from "@/components/growth/share-pages/growth-share-page-operator-workspace"
+import { GrowthSharePagesWorkspaceProspectGate } from "@/components/growth/share-pages/growth-share-pages-workspace-prospect-gate"
 import { GrowthSharePagesWorkspaceTabs } from "@/components/growth/share-pages/growth-share-pages-workspace-tabs"
 import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 import { Button } from "@/components/ui/button"
 import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import { resolveGrowthLeadIdFromSearchParams } from "@/lib/growth/navigation/growth-workspace-operator-links"
+import { usePathname, useSearchParams } from "next/navigation"
 
 export default function GrowthSharePagesWorkspacePage() {
   const pathname = usePathname()
@@ -20,8 +21,8 @@ export default function GrowthSharePagesWorkspacePage() {
   return (
     <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
-        title="Share Page Operator Workspace"
-        description="Review personalized share pages, approve drafts, publish passively, and inspect engagement — no sends, enrollments, or automation execution."
+        title="Share Pages Workspace"
+        description="Review personalized share pages for a prospect — preview drafts, publish passively, and inspect engagement."
         icon={FileText}
         iconClassName="bg-emerald-50 text-emerald-600"
         actions={
@@ -39,10 +40,7 @@ export default function GrowthSharePagesWorkspacePage() {
       {leadId ? (
         <GrowthSharePageOperatorWorkspace leadId={leadId} initialPageId={pageId} />
       ) : (
-        <div className="rounded-lg border p-4 text-sm text-muted-foreground">
-          Open this workspace with <code>?leadId=</code> and optional <code>?page_id=</code> to review share pages
-          for a lead.
-        </div>
+        <GrowthSharePagesWorkspaceProspectGate />
       )}
     </GrowthWorkspacePageContent>
   )

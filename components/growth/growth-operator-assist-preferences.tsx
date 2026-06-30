@@ -8,6 +8,7 @@ import {
   GrowthSettingsCard,
   GrowthSettingsToggleRow,
 } from "@/components/growth/growth-settings-ui"
+import { GROWTH_AVA_CALL_ASSISTANCE_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import {
   DEFAULT_OPERATOR_ASSIST_PREFERENCES,
   VOICE_UNIFIED_OPERATOR_ASSIST_QA_MARKER,
@@ -44,7 +45,7 @@ export function GrowthOperatorAssistPreferencesPanel() {
         message?: string
       }
       if (!res.ok || !data.ok || !data.preferences) {
-        throw new Error(data.message ?? "Could not load AI call assistance settings.")
+        throw new Error(data.message ?? "Could not load call assistance settings from Ava.")
       }
       setPreferences(data.preferences)
     } catch (e) {
@@ -87,14 +88,14 @@ export function GrowthOperatorAssistPreferencesPanel() {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" />
-        Loading AI call assistance…
+        Loading call assistance from Ava…
       </div>
     )
   }
 
   return (
     <div data-voice-unified-operator-assist-qa-marker={VOICE_UNIFIED_OPERATOR_ASSIST_QA_MARKER}>
-      <GrowthSettingsCard title="AI call assistance" icon={<Sparkles className="size-4" />}>
+      <GrowthSettingsCard title={GROWTH_AVA_CALL_ASSISTANCE_TITLE} icon={<Sparkles className="size-4" />}>
         <p className="mb-4 text-sm text-muted-foreground">
           Control real-time suggestions, objections, and buying signals during live calls.
         </p>

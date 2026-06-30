@@ -14,6 +14,7 @@ import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-work
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { GROWTH_AVA_SETTINGS_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import {
   AI_TEAMMATE_DEFAULT_NAME,
   AI_TEAMMATE_DEFAULT_ROLE,
@@ -93,8 +94,8 @@ export function GrowthAiTeammateSettingsPanel() {
       data-growth-settings-ai-refinement={GROWTH_SETTINGS_AI_REFINEMENT_2F_QA_MARKER}
     >
       <GrowthWorkspacePageHeader
-        title="AI Teammate"
-        description="How your AI teammate works for you — personality, communication, and guidance."
+        title={GROWTH_AVA_SETTINGS_TITLE}
+        description="How Ava works for you — personality, communication, and guidance."
         icon={Bot}
         actions={
           <Button type="button" variant="outline" size="sm" onClick={openOnboarding}>

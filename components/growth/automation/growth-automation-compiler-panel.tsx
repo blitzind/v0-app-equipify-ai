@@ -18,30 +18,28 @@ export function GrowthAutomationCompilerPanel({ flowId, compile, loading, onComp
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium">SR-3 compile preview</h3>
+          <h3 className="text-sm font-medium">Automation preview</h3>
           <p className="text-xs text-muted-foreground">
-            Preview-only compiler · no pattern writes · no runtime activation
+            Preview how this flow will run — no changes go live until you publish.
           </p>
         </div>
         <Button size="sm" variant="outline" disabled={loading} onClick={onCompile}>
           {loading ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-          Compile preview
+          Preview automation
         </Button>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2 text-[10px] uppercase tracking-wide text-muted-foreground">
         {GROWTH_AUTOMATION_COMPILER_SAFETY_FLAGS.compile_preview_only ? <span>preview only</span> : null}
         {GROWTH_AUTOMATION_COMPILER_SAFETY_FLAGS.no_sequence_pattern_writes ? (
-          <span>no pattern writes</span>
+          <span>draft only</span>
         ) : null}
-        {GROWTH_AUTOMATION_COMPILER_SAFETY_FLAGS.no_sequence_execution ? <span>no execution</span> : null}
+        {GROWTH_AUTOMATION_COMPILER_SAFETY_FLAGS.no_sequence_execution ? <span>requires approval</span> : null}
       </div>
 
       <div className="mt-4">
         <GrowthAutomationCompiledArtifactPreview compile={compile} loading={loading} />
       </div>
-
-      <p className="mt-3 text-[10px] text-muted-foreground">Flow {flowId.slice(0, 8)}… · publish not available in S5-D</p>
     </div>
   )
 }

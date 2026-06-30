@@ -13,19 +13,19 @@ export const PROSPECT_SEARCH_ENGINE_INTELLIGENCE_FILTER_NOTE =
   "Verified channel and committee filters use Growth Engine 7.2–7.7 intelligence already linked to a canonical company. They apply after search loads — results may be fewer than the index estimate." as const
 
 export const PROSPECT_SEARCH_LEGACY_COMPANY_SIGNALS_TITLE =
-  "Legacy company signals (pre–7.6)" as const
+  "Previous company signals" as const
 
 export const PROSPECT_SEARCH_LEGACY_CONTACT_DISCOVERY_COMMITTEE_TITLE =
-  "Contact-discovery committee hints (legacy)" as const
+  "Contact discovery hints" as const
 
 export const PROSPECT_SEARCH_LEGACY_BUYING_COMMITTEE_PANEL_TITLE =
-  "Legacy buying committee discovery (contact-discovery)" as const
+  "Buying committee discovery" as const
 
 export const PROSPECT_SEARCH_LEGACY_PANEL_HELPER =
-  "Shown only when Growth Engine intelligence is not linked yet, or for operator comparison. Prefer the Growth Engine panel above for verified company, committee, and channel data." as const
+  "Shown when verified Growth Engine intelligence is not linked yet, or for side-by-side comparison. Prefer the verified intelligence panel above for company, committee, and channel data." as const
 
 export const PROSPECT_SEARCH_ENGINE_INTELLIGENCE_PANEL_TITLE =
-  "AI OS intelligence (verified 7.2–7.7)" as const
+  "Verified intelligence" as const
 
 export const PROSPECT_SEARCH_ENGINE_FILTER_SECTION_LABEL = "Verified intelligence" as const
 

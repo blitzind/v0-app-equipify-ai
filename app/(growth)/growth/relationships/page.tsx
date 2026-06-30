@@ -9,7 +9,7 @@ export default function GrowthRelationshipsPage() {
   return (
     <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
-        title="Relationship Intelligence"
+        title="Relationships"
         description="Meaningful touch depth, relationship strength tiers, executive attention signals, and queue prioritization — read-only intelligence, no send."
         icon={Handshake}
         iconClassName="bg-sky-50 text-sky-600"

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { GrowthPersonalizationDraftBodyPreview } from "@/components/growth/personalization/growth-personalization-draft-body-preview"
+import { GROWTH_AVA_DRAFT_PREVIEW_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import type { GrowthPersonalizationOriginalAiDraftSnapshot } from "@/lib/growth/personalization/growth-personalization-stack-b-metadata"
 import {
   personalizationStatusLabel,
@@ -104,7 +105,7 @@ export function GrowthPersonalizationDraftEditor({
 
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">AI Draft Preview</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{GROWTH_AVA_DRAFT_PREVIEW_TITLE}</p>
             {hasEdits ? (
               <span className="text-xs text-violet-700">Original preserved below edits</span>
             ) : null}
@@ -151,7 +152,7 @@ export function GrowthPersonalizationDraftEditor({
                 disabled={disabled || !hasEdits}
               >
                 <RotateCcw className="mr-1 size-3" />
-                Reset to AI Draft
+                Reset to Ava&apos;s draft
               </Button>
             ) : null}
           </div>

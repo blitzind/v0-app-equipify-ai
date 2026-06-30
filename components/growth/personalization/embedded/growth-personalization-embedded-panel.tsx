@@ -10,17 +10,21 @@ import { GROWTH_PERSONALIZATION_EMBEDDED_QA_MARKER } from "@/lib/growth/personal
 import { useGrowthLeadPersonalization } from "@/lib/growth/personalization/embedded/use-growth-lead-personalization"
 import { GrowthPersonalizationSummaryCard } from "@/components/growth/personalization/embedded/growth-personalization-summary-card"
 import { buildGrowthSharePageWorkspaceHref, growthWorkspaceInboxHref, growthWorkspaceInboxWorkflowHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
+import {
+  GROWTH_AVA_FOLLOW_UP_TITLE,
+  GROWTH_AVA_PERSONALIZATION_TITLE,
+} from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { Button } from "@/components/ui/button"
 
 const SURFACE_TITLES: Record<GrowthPersonalizationEmbeddedSurface, string> = {
-  lead: "AI Personalization",
-  inbox: "Suggested Personalized Follow-Up",
-  call: "Generate Follow-Up Package",
-  opportunity: "Personalized Follow-Up",
-  meeting: "Meeting Personalization",
-  conversation: "AI Follow-Up",
-  sendr: "Prospect Personalization",
-  share: "Share Page Personalization",
+  lead: GROWTH_AVA_PERSONALIZATION_TITLE,
+  inbox: "Suggested follow-up from Ava",
+  call: "Follow-up package from Ava",
+  opportunity: "Personalized follow-up from Ava",
+  meeting: "Meeting personalization from Ava",
+  conversation: GROWTH_AVA_FOLLOW_UP_TITLE,
+  sendr: "Prospect personalization from Ava",
+  share: "Share page personalization from Ava",
 }
 
 type Props = {

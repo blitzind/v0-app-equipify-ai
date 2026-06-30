@@ -9,8 +9,8 @@ export default function GrowthLeadsCrmPage() {
   return (
     <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
-        title="CRM Growth Leads"
-        description="Legacy CRM lead records — separate from the Revenue Queue workspace."
+        title="Lead Records"
+        description="Existing lead records — separate from the Revenue Queue workspace."
         icon={Target}
         iconClassName="bg-emerald-50 text-emerald-600"
       />

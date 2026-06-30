@@ -77,7 +77,7 @@ export function GrowthOutreachPersonalizationPreview({ audit, generatedSubject, 
           <GrowthBadge label="Sequence guidance applied" tone="healthy" />
         ) : null}
         {audit.refinedByAi ? (
-          <GrowthBadge label="AI refined" tone="healthy" />
+          <GrowthBadge label="Refined by Ava" tone="healthy" />
         ) : (
           <GrowthBadge label="Draft preview" tone="neutral" />
         )}

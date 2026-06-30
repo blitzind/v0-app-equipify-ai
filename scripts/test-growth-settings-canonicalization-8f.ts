@@ -27,7 +27,7 @@ function readSource(relativePath: string): string {
 
 function main(): void {
   assert.equal(GROWTH_WORKSPACE_SETTINGS_CANONICAL_QA_MARKER, "growth-workspace-settings-canonical-8k-v1")
-  assert.equal(GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER, "growth-workspace-settings-nav-1a-v1")
+  assert.equal(GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER, "growth-workspace-settings-nav-ux-polish-1a-v1")
 
   const workspaceGroup = GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS.find((group) => group.id === "workspace")
   assert.equal(workspaceGroup, undefined, "duplicate workspace group removed from Growth settings nav")
@@ -36,7 +36,7 @@ function main(): void {
   assert.ok(complianceGroup?.items.some((item) => item.id === "compliance"))
 
   const advancedGroup = GROWTH_WORKSPACE_SETTINGS_NAV_GROUPS.find((group) => group.id === "advanced")
-  assert.ok(advancedGroup?.items.some((item) => item.id === "advanced"))
+  assert.equal(advancedGroup, undefined, "Advanced group removed from Growth settings nav")
 
   const workspaceRoutes = [
     "app/(growth)/growth/settings/workspace/page.tsx",

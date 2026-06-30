@@ -23,6 +23,16 @@ import {
   type GrowthMeetingStatus,
 } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 import type { GrowthCalendarEventIntelligence } from "@/lib/growth/meeting-intelligence/calendar-event-intelligence-types"
+import {
+  GROWTH_ACTION_FIRST_AVA_RECOMMENDS,
+  GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE,
+  GROWTH_ACTION_FIRST_AVA_IDLE,
+  GROWTH_ACTION_FIRST_MEETINGS_FOLLOW_UP,
+  GROWTH_ACTION_FIRST_MEETINGS_PREP,
+  GROWTH_ACTION_FIRST_MEETINGS_TODAY,
+  GROWTH_ACTION_FIRST_SUPPORTING_METRICS,
+  GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER,
+} from "@/lib/growth/workspace/growth-workspace-action-first-1f"
 import { cn } from "@/lib/utils"
 import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import {
@@ -212,7 +222,13 @@ export function GrowthMeetingIntelligenceDashboard() {
   }
 
   return (
-    <div className="space-y-6" data-qa-marker="growth-calendar-intelligence-dashboard-v1" data-growth-ops-url-state={GROWTH_OPS_URL_STATE_7A1_QA_MARKER}>
+    <div
+      className="space-y-6"
+      data-qa-marker="growth-calendar-intelligence-dashboard-v1"
+      data-growth-ops-url-state={GROWTH_OPS_URL_STATE_7A1_QA_MARKER}
+      data-growth-action-first-order="actions-before-metrics"
+      data-qa-marker-action-first={GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
           {GROWTH_MEETING_INBOX_VIEWS.map((option) => (
@@ -298,15 +314,58 @@ export function GrowthMeetingIntelligenceDashboard() {
               ) : null}
             </div>
           ) : null}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <StatTile icon={<CalendarClock className="size-3.5" />} label="Upcoming" value={dashboard.upcomingCount} />
-            <StatTile label="Meeting requests" value={dashboard.meetingRequestCount} />
-            <StatTile label="Outcomes missing" value={dashboard.outcomesMissingCount} />
-            <StatTile label="No-shows" value={dashboard.noShowCount} />
-            <StatTile label="Follow-ups due" value={dashboard.followUpsDueCount} />
-            <StatTile label="Starting soon" value={dashboard.startingSoonCount} />
-            <StatTile label="Completed today" value={dashboard.completedTodayCount} />
-          </div>
+          <GrowthEngineCard title={GROWTH_ACTION_FIRST_AVA_RECOMMENDS} data-section="meetings-action-first">
+            {dashboard.upcomingCount === 0 &&
+            dashboard.startingSoonCount === 0 &&
+            dashboard.followUpsDueCount === 0 &&
+            dashboard.outcomesMissingCount === 0 ? (
+              <>
+                <p className="text-sm font-medium">{GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{GROWTH_ACTION_FIRST_AVA_IDLE}</p>
+              </>
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {dashboard.upcomingCount > 0 ? (
+                  <li className="rounded-lg border border-border px-3 py-2">
+                    <p className="font-medium">
+                      {GROWTH_ACTION_FIRST_MEETINGS_TODAY} · {dashboard.upcomingCount}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Review prep and join links before each call.</p>
+                  </li>
+                ) : null}
+                {dashboard.startingSoonCount > 0 ? (
+                  <li className="rounded-lg border border-border px-3 py-2">
+                    <p className="font-medium">
+                      {GROWTH_ACTION_FIRST_MEETINGS_PREP} · {dashboard.startingSoonCount}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Meetings starting soon — confirm agenda and stakeholders.</p>
+                  </li>
+                ) : null}
+                {dashboard.followUpsDueCount > 0 || dashboard.outcomesMissingCount > 0 ? (
+                  <li className="rounded-lg border border-border px-3 py-2">
+                    <p className="font-medium">
+                      {GROWTH_ACTION_FIRST_MEETINGS_FOLLOW_UP} ·{" "}
+                      {dashboard.followUpsDueCount + dashboard.outcomesMissingCount}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Log outcomes and send follow-ups so Ava can keep deals moving.
+                    </p>
+                  </li>
+                ) : null}
+              </ul>
+            )}
+          </GrowthEngineCard>
+          <GrowthEngineCard title={GROWTH_ACTION_FIRST_SUPPORTING_METRICS} data-section="supporting-metrics">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <StatTile icon={<CalendarClock className="size-3.5" />} label="Upcoming" value={dashboard.upcomingCount} />
+              <StatTile label="Meeting requests" value={dashboard.meetingRequestCount} />
+              <StatTile label="Outcomes missing" value={dashboard.outcomesMissingCount} />
+              <StatTile label="No-shows" value={dashboard.noShowCount} />
+              <StatTile label="Follow-ups due" value={dashboard.followUpsDueCount} />
+              <StatTile label="Starting soon" value={dashboard.startingSoonCount} />
+              <StatTile label="Completed today" value={dashboard.completedTodayCount} />
+            </div>
+          </GrowthEngineCard>
         </>
       ) : null}
 

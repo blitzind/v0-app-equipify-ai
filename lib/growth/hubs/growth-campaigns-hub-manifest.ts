@@ -13,9 +13,9 @@ export const GROWTH_CAMPAIGNS_HUB_MANIFEST: GrowthWorkspaceHubManifest = {
   icon: Layers,
   iconClassName: "bg-violet-50 text-violet-700",
   overview: [
-    { id: "sequence-execution", label: "Sequence Execution", hint: "Approve and monitor outbound steps" },
-    { id: "booking-intelligence", label: "Booking Intelligence", hint: "Meeting intent and booking routing" },
-    { id: "campaign-health", label: "Campaign Health", hint: "Running, attention, and stalled signals" },
+    { id: "sequence-execution", label: "Sequence Execution", hint: "Approve and monitor outbound steps", emptyValue: "No sequences running" },
+    { id: "booking-intelligence", label: "Booking Intelligence", hint: "Meeting intent and booking routing", emptyValue: "No booking activity" },
+    { id: "campaign-health", label: "Campaign Health", hint: "Running, attention, and stalled signals", emptyValue: "No campaigns yet" },
   ],
   quickActions: GROWTH_CAMPAIGNS_HUB_QUICK_LINKS.map((link) => ({
     id: link.id,

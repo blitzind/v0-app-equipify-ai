@@ -52,6 +52,7 @@ export type GrowthLeadsHubKpiCard = {
   helper: string
   href: string
   metricKey: keyof import("@/lib/growth/hubs/growth-leads-hub-metrics-client").GrowthLeadsHubMetricsSnapshot
+  emptyValue: string
 }
 
 export const GROWTH_LEADS_HUB_PIPELINE_METRICS: GrowthLeadsHubPipelineMetric[] = [
@@ -165,6 +166,7 @@ export const GROWTH_LEADS_HUB_KPI_CARDS: GrowthLeadsHubKpiCard[] = [
     helper: "Accounts awaiting research",
     href: GROWTH_LEADS_HUB_RESEARCH_HREF,
     metricKey: "queueDepth",
+    emptyValue: "Import prospects to begin",
   },
   {
     id: "captured-today",
@@ -172,6 +174,7 @@ export const GROWTH_LEADS_HUB_KPI_CARDS: GrowthLeadsHubKpiCard[] = [
     helper: "New prospects imported",
     href: `${BASE}/leads/captured`,
     metricKey: "capturedToday",
+    emptyValue: "No activity yet",
   },
   {
     id: "ready-to-call",
@@ -179,6 +182,7 @@ export const GROWTH_LEADS_HUB_KPI_CARDS: GrowthLeadsHubKpiCard[] = [
     helper: "Leads requiring follow-up",
     href: `${BASE}/leads/queue`,
     metricKey: "readyToCall",
+    emptyValue: "No call queue yet",
   },
   {
     id: "research-runs",
@@ -186,6 +190,7 @@ export const GROWTH_LEADS_HUB_KPI_CARDS: GrowthLeadsHubKpiCard[] = [
     helper: "Enrichment jobs completed",
     href: `${BASE}/leads/lead-engine`,
     metricKey: "researchRuns",
+    emptyValue: "No research runs yet",
   },
 ]
 
@@ -279,7 +284,7 @@ export const GROWTH_LEADS_HUB_RECENT_WORK_EMPTY =
   "No recent activity yet.\nYour recent searches and lead activity will appear here."
 
 export const GROWTH_LEADS_HUB_RECOMMENDATIONS_EMPTY =
-  "No recommended actions right now. Run a saved search or review your revenue queue to generate new work."
+  "Ava doesn't have any recommendations yet. Run a saved search or review your revenue queue to generate new work."
 
 export const GROWTH_LEADS_HUB_SAVED_SEARCHES_EMPTY =
   "No favorite saved searches yet. Star a search in Prospect Search to pin it here."
@@ -345,7 +350,7 @@ export function growthLeadsHubRevenueQueueCardDetails(
         tertiary: `${(metrics.needsReviewCount ?? 0).toLocaleString()} awaiting review`,
       }
     default:
-      return { primary: "— accounts", secondary: "— high priority", tertiary: "— overdue" }
+      return { primary: "0 accounts", secondary: "0 high priority", tertiary: "0 overdue" }
   }
 }
 

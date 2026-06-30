@@ -20,6 +20,7 @@ import { GrowthLeadsHubActivityTimeline } from "@/components/growth/hubs/leads/g
 import { GrowthLeadsHubHeaderActions } from "@/components/growth/hubs/leads/growth-leads-hub-header-actions"
 import { GROWTH_LEADS_HUB_UX_QA_MARKER } from "@/lib/growth/hubs/growth-leads-hub-config"
 import { GROWTH_WORKSPACE_HUB_QA_MARKER } from "@/lib/growth/hubs/growth-workspace-hub-types"
+import { GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER } from "@/lib/growth/workspace/growth-workspace-action-first-1f"
 
 export function GrowthLeadsHubPage() {
   return (
@@ -27,6 +28,8 @@ export function GrowthLeadsHubPage() {
       data-qa-marker={GROWTH_WORKSPACE_HUB_QA_MARKER}
       data-growth-leads-hub-ux={GROWTH_LEADS_HUB_UX_QA_MARKER}
       data-growth-workspace-hub="leads"
+      data-growth-action-first-order="actions-before-metrics"
+      data-qa-marker-action-first={GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER}
     >
       <GrowthWorkspacePageHeader
         title="Leads"
@@ -37,13 +40,13 @@ export function GrowthLeadsHubPage() {
       />
 
       <div className="space-y-5">
-        <GrowthLeadsHubTodaysBriefing />
-        <GrowthLeadsHubResumeSession />
-        <GrowthLeadsHubRevenueQueueSummary />
-        <GrowthLeadsHubOperatorHealth />
         <GrowthLeadsHubRecommendations />
-        <GrowthLeadsHubSearch />
+        <GrowthLeadsHubTodaysBriefing />
+        <GrowthLeadsHubRevenueQueueSummary />
+        <GrowthLeadsHubResumeSession />
+        <GrowthLeadsHubOperatorHealth />
         <GrowthLeadsHubPrimaryActions />
+        <GrowthLeadsHubSearch />
         <GrowthLeadsHubKpiStrip />
         <GrowthLeadsHubOperatorLauncher />
         <GrowthLeadsHubFavoriteSavedSearches />

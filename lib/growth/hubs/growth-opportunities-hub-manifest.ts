@@ -12,16 +12,16 @@ export const GROWTH_OPPORTUNITIES_HUB_MANIFEST: GrowthWorkspaceHubManifest = {
   icon: Target,
   iconClassName: "bg-violet-50 text-violet-600",
   overview: [
-    { id: "open-pipeline", label: "Open pipeline", hint: "Open pipeline" },
-    { id: "priority-accounts", label: "Priority accounts", hint: "Open workspace" },
-    { id: "readiness-hot", label: "Readiness hot", hint: "Open workspace" },
-    { id: "follow-ups-due", label: "Follow-ups due", hint: "Open pipeline" },
+    { id: "open-pipeline", label: "Open pipeline", hint: "Open pipeline", emptyValue: "Qualify leads to begin" },
+    { id: "priority-accounts", label: "Priority accounts", hint: "Open workspace", emptyValue: "No priority accounts" },
+    { id: "readiness-hot", label: "Readiness hot", hint: "Open workspace", emptyValue: "No hot leads" },
+    { id: "follow-ups-due", label: "Follow-ups due", hint: "Open pipeline", emptyValue: "No follow-ups due" },
   ],
   quickActions: [
     {
       id: "pipeline",
       label: "Pipeline",
-      description: "Pipeline tab — stages, forecast, and human-controlled close workflows.",
+      description: "Pipeline tab — stages, forecast, and deals needing your attention.",
       href: `${BASE}/opportunities/pipeline`,
       icon: Kanban,
     },
@@ -107,7 +107,7 @@ export const GROWTH_OPPORTUNITIES_HUB_MANIFEST: GrowthWorkspaceHubManifest = {
           href: `${BASE}/opportunities/workspace`,
         },
       ],
-      emptyHint: "Priority account rollups surface in the opportunity workspace.",
+      emptyHint: "Import prospects or qualify leads to begin building your pipeline.",
     },
     {
       id: "next-best-actions",

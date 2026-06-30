@@ -25,5 +25,5 @@ export default function GrowthOpportunitiesPage() {
     return null
   }
 
-  return <GrowthWorkspaceHubPage manifest={GROWTH_OPPORTUNITIES_HUB_MANIFEST} embedded />
+  return <GrowthWorkspaceHubPage manifest={GROWTH_OPPORTUNITIES_HUB_MANIFEST} embedded actionFirst />
 }

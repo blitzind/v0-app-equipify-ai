@@ -15,6 +15,7 @@ import {
   GROWTH_AUTOMATION_RUNTIME_PUBLISHER_SAFETY_FLAGS,
   type GrowthAutomationRuntimeStatusResult,
 } from "@/lib/growth/automation/growth-automation-runtime-publisher-types"
+import { formatGrowthAutomationFlowStatusLabel } from "@/lib/growth/automation/growth-automation-operator-copy"
 import type { GrowthAutomationRuntimeHealthSummary } from "@/lib/growth/automation/growth-automation-observability-types"
 
 type Props = {
@@ -60,9 +61,9 @@ export function GrowthAutomationRuntimeStatusPanel({ flowId, onChanged }: Props)
       const res = await fetch(`/api/platform/growth/automation/${flowId}/runtime-publish`, { method: "POST" })
       const data = (await res.json()) as { ok?: boolean; publish?: { ok?: boolean } }
       if (!res.ok || !data.publish?.ok) {
-        setMessage("Runtime publish blocked — resolve reconciliation gates first.")
+        setMessage("Publish blocked — resolve validation or preview issues first.")
       } else {
-        setMessage("SR-3 artifacts published (execution still disabled).")
+        setMessage("Automation published. Approval may still be required before it runs automatically.")
       }
       await load()
       onChanged?.()
@@ -80,7 +81,7 @@ export function GrowthAutomationRuntimeStatusPanel({ flowId, onChanged }: Props)
       if (!res.ok || !data.activation?.ok) {
         setMessage("Activation blocked.")
       } else {
-        setMessage("Runtime pattern activated (no sequence execution).")
+        setMessage("Automation activated. It will run automatically once approved.")
       }
       await load()
       onChanged?.()
@@ -98,7 +99,7 @@ export function GrowthAutomationRuntimeStatusPanel({ flowId, onChanged }: Props)
       if (!res.ok || !data.pause?.ok) {
         setMessage("Pause failed.")
       } else {
-        setMessage("Runtime pattern paused.")
+        setMessage("Automation paused.")
       }
       await load()
       onChanged?.()
@@ -111,7 +112,7 @@ export function GrowthAutomationRuntimeStatusPanel({ flowId, onChanged }: Props)
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" />
-        Loading runtime status…
+        Loading automation status…
       </div>
     )
   }
@@ -120,13 +121,13 @@ export function GrowthAutomationRuntimeStatusPanel({ flowId, onChanged }: Props)
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium">Runtime status</h3>
+          <h3 className="text-sm font-medium">Automation status</h3>
           <p className="text-xs text-muted-foreground">
-            SR-3 artifact linkage · activation gate · no execution
+            Publish, activate, and pause — human approval required before automatic runs.
           </p>
         </div>
         <span className="rounded-md border border-border px-2 py-1 text-[10px] uppercase tracking-wide">
-          {status?.effectiveFlowStatus ?? "draft"}
+          {formatGrowthAutomationFlowStatusLabel(status?.effectiveFlowStatus ?? "draft")}
         </span>
       </div>
 
@@ -158,8 +159,8 @@ export function GrowthAutomationRuntimeStatusPanel({ flowId, onChanged }: Props)
         />
         <span className="text-muted-foreground">
           {status?.metadata?.activationStatus === "active"
-            ? "Active runtime accepts entrants"
-            : "Activate runtime before enrolling leads"}
+            ? "Active — accepts new enrollments"
+            : "Activate this automation before enrolling leads"}
         </span>
       </div>
 
@@ -169,7 +170,7 @@ export function GrowthAutomationRuntimeStatusPanel({ flowId, onChanged }: Props)
 
       {analyticsCounts ? (
         <div className="mt-4">
-          <p className="mb-2 text-xs font-medium">Runtime analytics snapshot</p>
+          <p className="mb-2 text-xs font-medium">Performance snapshot</p>
           <GrowthAutomationRuntimeMetricsGrid counts={analyticsCounts} />
         </div>
       ) : null}
@@ -203,7 +204,7 @@ export function GrowthAutomationRuntimeStatusPanel({ flowId, onChanged }: Props)
           onClick={() => void publishRuntime()}
         >
           {busy ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}
-          Publish runtime
+          Publish automation
         </Button>
         <GrowthAutomationRuntimeActivationDialog
           readiness={status?.activationReadiness ?? null}

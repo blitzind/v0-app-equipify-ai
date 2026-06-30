@@ -114,10 +114,10 @@ export function GrowthEngagementDashboard() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
           <StatTile icon={<Activity className="size-3.5" />} label="Average engagement" value={dashboard.averageEngagement} />
-          <StatTile label="Open rate" value={rates ? formatRate(rates.openRate) : "—"} />
-          <StatTile label="Click rate" value={rates ? formatRate(rates.clickRate) : "—"} />
-          <StatTile label="Reply rate" value={rates ? formatRate(rates.replyRate) : "—"} />
-          <StatTile label="Meeting rate" value={rates ? formatRate(rates.meetingRate) : "—"} />
+          <StatTile label="Open rate" value={rates ? formatRate(rates.openRate) : "No activity yet"} />
+          <StatTile label="Click rate" value={rates ? formatRate(rates.clickRate) : "No activity yet"} />
+          <StatTile label="Reply rate" value={rates ? formatRate(rates.replyRate) : "No activity yet"} />
+          <StatTile label="Meeting rate" value={rates ? formatRate(rates.meetingRate) : "No activity yet"} />
           <StatTile label="Hot leads" value={dashboard.hotLeads.length} />
           <StatTile label="Engaged leads" value={dashboard.engagedLeads.length} />
           <StatTile label="No activity >30d" value={dashboard.noActivity30d.length} />

@@ -62,7 +62,7 @@ export function GrowthAutomationObservabilityPanel({
         <div>
           <h3 className="flex items-center gap-2 text-sm font-medium">
             <Radar className="size-4" />
-            Runtime observability
+            Activity overview
           </h3>
           <p className="text-xs text-muted-foreground">
             Read-only visibility · safe management controls · no sends

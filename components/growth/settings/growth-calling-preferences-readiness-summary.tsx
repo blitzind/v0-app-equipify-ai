@@ -13,6 +13,7 @@ import {
 } from "@/lib/growth/native-dialer/native-dialer-types"
 import type { GrowthLiveCoachingSettings } from "@/lib/growth/realtime/providers/provider-types"
 import type { OperatorAssistPreferencesPublicView } from "@/lib/growth/operator-assist/types"
+import { GROWTH_AVA_CALL_ASSISTANCE_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import type { VoiceBrowserCallingReadinessSnapshot } from "@/lib/voice/browser-calling/types"
 
 type ReadinessSnapshot = {
@@ -108,7 +109,7 @@ export function GrowthCallingPreferencesReadinessSummary() {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <StatTile label="Calling ready" value={snapshot.callingReady ? "Ready" : "Not ready"} />
           <StatTile label="Provider" value={snapshot.providerLabel} />
-          <StatTile label="AI call assistance" value={snapshot.aiAssistLabel} />
+          <StatTile label={GROWTH_AVA_CALL_ASSISTANCE_TITLE} value={snapshot.aiAssistLabel} />
           <StatTile label="Live coaching" value={snapshot.liveCoachingLabel} />
         </div>
       ) : null}

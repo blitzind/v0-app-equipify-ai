@@ -80,7 +80,7 @@ function SavedSearchCard({
           <p className="mt-1 text-sm text-muted-foreground">
             {saved.workflow.resultCount != null
               ? `${saved.workflow.resultCount.toLocaleString()} results`
-              : "— results"}
+              : "No results yet"}
           </p>
           {deltaLabel ? <p className="mt-0.5 text-xs font-medium text-primary">{deltaLabel}</p> : null}
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -312,7 +312,7 @@ export function GrowthLeadsHubAllSavedSearches() {
                       {formatSavedSearchRefreshedAt(saved.workflow.lastRefreshedAt)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 tabular-nums text-muted-foreground">
-                      {saved.workflow.resultCount != null ? saved.workflow.resultCount.toLocaleString() : "—"}
+                      {saved.workflow.resultCount != null ? saved.workflow.resultCount.toLocaleString() : "No results yet"}
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex justify-end">

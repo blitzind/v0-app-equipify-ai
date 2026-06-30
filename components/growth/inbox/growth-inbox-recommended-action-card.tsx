@@ -8,6 +8,7 @@ import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbo
 import { orchestrateGrowthInboxRecommendations } from "@/lib/growth/inbox/inbox-recommendation-orchestrator"
 import { shouldDeferGrowthInboxTier3Hydration } from "@/lib/growth/inbox/growth-inbox-minimal-runtime-contract"
 import { GROWTH_ON_DEMAND_DEFERRED_COPY } from "@/lib/growth/inbox/growth-inbox-fetch-audit"
+import { GROWTH_AVA_REPLY_SOURCE_LABEL } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 
 const SOURCE_LABELS = {
   workflow_action: "Workflow Action",
@@ -17,7 +18,7 @@ const SOURCE_LABELS = {
   booking_recommendation: "Booking",
   opportunity_recommendation: "Opportunity",
   revenue_readiness: "Revenue Readiness",
-  reply_copilot: "Reply Copilot",
+  reply_copilot: GROWTH_AVA_REPLY_SOURCE_LABEL,
   next_best_action: "Next Best Action",
 } as const
 

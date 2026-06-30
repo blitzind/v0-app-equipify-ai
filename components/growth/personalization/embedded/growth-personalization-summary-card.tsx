@@ -8,6 +8,7 @@ import { GROWTH_PERSONALIZATION_EMBEDDED_QA_MARKER } from "@/lib/growth/personal
 import { GrowthPersonalizationActions } from "@/components/growth/personalization/embedded/growth-personalization-actions"
 import { GrowthPersonalizationPreviewCard } from "@/components/growth/personalization/embedded/growth-personalization-preview-card"
 import { GrowthPersonalizationStageCard } from "@/components/growth/personalization/embedded/growth-personalization-stage-card"
+import { GROWTH_AVA_PERSONALIZATION_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { personalizationStatusLabel } from "@/lib/growth/personalization/personalization-types"
 
 function SummarySkeleton() {
@@ -53,7 +54,7 @@ export function GrowthPersonalizationSummaryCard({
   showApprove = false,
   showEdit = false,
   compact = false,
-  title = "AI Personalization",
+  title = GROWTH_AVA_PERSONALIZATION_TITLE,
 }: Props) {
   if (loading && !summary) {
     return <SummarySkeleton />

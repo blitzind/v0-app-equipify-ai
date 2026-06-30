@@ -5,7 +5,16 @@ import { Handshake, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import type { GrowthRelationshipTrendWindow } from "@/lib/growth/relationship-types"
-import type { GrowthLead } from "@/lib/growth/types"
+import {
+  GROWTH_ACTION_FIRST_AVA_RECOMMENDS,
+  GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE,
+  GROWTH_ACTION_FIRST_AVA_IDLE,
+  GROWTH_ACTION_FIRST_RELATIONSHIPS_AT_RISK,
+  GROWTH_ACTION_FIRST_RELATIONSHIPS_COMMITTEE,
+  GROWTH_ACTION_FIRST_RELATIONSHIPS_ENGAGEMENT,
+  GROWTH_ACTION_FIRST_SUPPORTING_METRICS,
+  GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER,
+} from "@/lib/growth/workspace/growth-workspace-action-first-1f"
 
 type DashboardPayload = {
   averageRelationshipStrength: number
@@ -126,18 +135,60 @@ export function GrowthRelationshipDashboard() {
   const trend = dashboard.trend[trendWindow] ?? []
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatTile icon={<Handshake className="size-3.5" />} label="Average relationship strength" value={dashboard.averageRelationshipStrength} />
-          <StatTile label="Trusted relationships" value={dashboard.tierCounts.trusted ?? 0} />
-          <StatTile label="Strategic relationships" value={dashboard.tierCounts.strategic ?? 0} />
-          <StatTile label="Meaningful touches (7d)" value={dashboard.touchedLast7d} />
-        </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
-          {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-          Refresh
-        </Button>
+    <div
+      className="space-y-6"
+      data-growth-action-first-order="actions-before-metrics"
+      data-qa-marker-action-first={GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER}
+    >
+      <GrowthEngineCard title={GROWTH_ACTION_FIRST_AVA_RECOMMENDS} data-section="relationships-action-first">
+        {dashboard.executiveAttentionRequired.length === 0 &&
+        dashboard.relationshipCooling.length === 0 ? (
+          <>
+            <p className="text-sm font-medium">{GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{GROWTH_ACTION_FIRST_AVA_IDLE}</p>
+          </>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {dashboard.executiveAttentionRequired.length > 0 ? (
+              <li className="rounded-lg border border-border px-3 py-2">
+                <p className="font-medium">
+                  Executive attention required · {dashboard.executiveAttentionRequired.length}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Strategic accounts need your direct engagement before momentum fades.
+                </p>
+              </li>
+            ) : null}
+            {dashboard.relationshipCooling.length > 0 ? (
+              <li className="rounded-lg border border-border px-3 py-2">
+                <p className="font-medium">
+                  {GROWTH_ACTION_FIRST_RELATIONSHIPS_AT_RISK} · {dashboard.relationshipCooling.length}
+                </p>
+                <p className="text-xs text-muted-foreground">Re-engage before these relationships go cold.</p>
+              </li>
+            ) : null}
+          </ul>
+        )}
+      </GrowthEngineCard>
+
+      <LeadBucket
+        title="Executive Attention Required"
+        leads={dashboard.executiveAttentionRequired}
+        showAttention
+        showTrend
+      />
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <LeadBucket
+          title={GROWTH_ACTION_FIRST_RELATIONSHIPS_AT_RISK}
+          leads={dashboard.relationshipCooling}
+          showTrend
+        />
+        <LeadBucket title={GROWTH_ACTION_FIRST_RELATIONSHIPS_ENGAGEMENT} leads={dashboard.recentlyImproving} showTrend />
+        <LeadBucket title={GROWTH_ACTION_FIRST_RELATIONSHIPS_COMMITTEE} leads={dashboard.strategicRelationships} />
+        <LeadBucket title="Trusted relationships" leads={dashboard.trustedRelationships} />
+        <LeadBucket title="Fastest growing relationships" leads={dashboard.fastestGrowing} showTrend />
+        <LeadBucket title="Top touched leads (30d)" leads={dashboard.topTouchedLeads} />
       </div>
 
       <GrowthEngineCard title="Relationship trend">
@@ -177,21 +228,20 @@ export function GrowthRelationshipDashboard() {
         </div>
       </GrowthEngineCard>
 
-      <LeadBucket
-        title="Executive Attention Required"
-        leads={dashboard.executiveAttentionRequired}
-        showAttention
-        showTrend
-      />
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <LeadBucket title="Trusted relationships" leads={dashboard.trustedRelationships} />
-        <LeadBucket title="Strategic relationships" leads={dashboard.strategicRelationships} />
-        <LeadBucket title="Relationship cooling" leads={dashboard.relationshipCooling} showTrend />
-        <LeadBucket title="Fastest growing relationships" leads={dashboard.fastestGrowing} showTrend />
-        <LeadBucket title="Top touched leads (30d)" leads={dashboard.topTouchedLeads} />
-        <LeadBucket title="Recently improving" leads={dashboard.recentlyImproving} showTrend />
-      </div>
+      <GrowthEngineCard title={GROWTH_ACTION_FIRST_SUPPORTING_METRICS} data-section="supporting-metrics">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatTile icon={<Handshake className="size-3.5" />} label="Average relationship strength" value={dashboard.averageRelationshipStrength} />
+            <StatTile label="Trusted relationships" value={dashboard.tierCounts.trusted ?? 0} />
+            <StatTile label="Strategic relationships" value={dashboard.tierCounts.strategic ?? 0} />
+            <StatTile label="Meaningful touches (7d)" value={dashboard.touchedLast7d} />
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            Refresh
+          </Button>
+        </div>
+      </GrowthEngineCard>
     </div>
   )
 }

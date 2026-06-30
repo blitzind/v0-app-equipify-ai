@@ -122,7 +122,7 @@ function main(): void {
   console.log("  ✓ Command Center Preferences with readiness and embedded panel")
 
   const readiness = read("components/growth/settings/growth-ai-settings-readiness-summary.tsx")
-  assert.match(readiness, /AI ready/)
+  assert.match(readiness, /GROWTH_AVA_STATUS_READY/)
   assert.match(readiness, /Autonomy/)
   assert.match(readiness, /\/api\/platform\/growth\/copilot\/settings/)
   assert.match(readiness, /\/api\/growth\/workspace\/settings\/autonomy/)

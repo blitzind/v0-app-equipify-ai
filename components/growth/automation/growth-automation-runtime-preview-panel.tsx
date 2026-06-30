@@ -39,12 +39,12 @@ export function GrowthAutomationRuntimePreviewPanel({ flowId, versionId, compact
       if (data.reconciliation) {
         setReconciliation(data.reconciliation)
         if (data.reconciliation.status === "blocked") {
-          setMessage("Runtime preview blocked — resolve errors before publish.")
+          setMessage("Preview blocked — resolve errors before publish.")
         } else if (data.reconciliation.status === "failed") {
-          setMessage("Runtime preview failed — check validation, compile, or simulation.")
+          setMessage("Preview failed — check validation or test results.")
         }
       } else {
-        setMessage("Could not load runtime preview.")
+        setMessage("Could not load publish preview.")
       }
     } finally {
       setLoading(false)
@@ -62,15 +62,15 @@ export function GrowthAutomationRuntimePreviewPanel({ flowId, versionId, compact
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium">Runtime artifact preview</h3>
+          <h3 className="text-sm font-medium">Publish preview</h3>
           <p className="text-xs text-muted-foreground">
-            SR-3 reconciliation preview · no writes · no activation
+            Compare draft changes before publishing · requires approval to go live
           </p>
         </div>
         {!compact ? (
           <Button size="sm" variant="outline" disabled={loading} onClick={() => void loadPreview()}>
             {loading ? <Loader2 className="size-4 animate-spin" /> : <Eye className="size-4" />}
-            Preview runtime
+            Preview changes
           </Button>
         ) : null}
       </div>
@@ -80,13 +80,13 @@ export function GrowthAutomationRuntimePreviewPanel({ flowId, versionId, compact
           <span>preview only</span>
         ) : null}
         {GROWTH_AUTOMATION_RUNTIME_RECONCILIATION_SAFETY_FLAGS.sr3_artifact_writes_enabled === false ? (
-          <span>no SR-3 writes</span>
+          <span>requires approval</span>
         ) : null}
         {GROWTH_AUTOMATION_RUNTIME_RECONCILIATION_SAFETY_FLAGS.runtime_publish_enabled === false ? (
-          <span>runtime disabled</span>
+          <span>publish paused</span>
         ) : null}
         {GROWTH_AUTOMATION_RUNTIME_RECONCILIATION_SAFETY_FLAGS.no_sequence_execution ? (
-          <span>no execution</span>
+          <span>manual review</span>
         ) : null}
       </div>
 

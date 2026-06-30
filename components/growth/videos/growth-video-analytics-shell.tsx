@@ -77,12 +77,14 @@ export function GrowthVideoAnalyticsShell() {
               <StatTile label="Unique visitors" value={overview.uniqueVisitors} hint="Distinct sessions/visitors" />
               <StatTile
                 label="Average watch %"
-                value={overview.averageWatchPercent != null ? `${overview.averageWatchPercent}%` : "—"}
+                value={
+                  overview.averageWatchPercent != null ? `${overview.averageWatchPercent}%` : "No views yet"
+                }
                 hint="Highest percent watched per session"
               />
               <StatTile label="CTA clicks" value={overview.ctaClicks} />
               <StatTile label="Calendar clicks" value={overview.calendarClicks} />
-              <StatTile label="Meetings booked" value="—" hint="Placeholder — booking bridge not wired" />
+              <StatTile label="Meetings booked" value="No bookings yet" hint="Connect calendar in Settings to track bookings" />
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">

@@ -27,15 +27,15 @@ export function GrowthAutomationRuntimeActivationDialog({ readiness, loading, on
       <DialogTrigger asChild>
         <Button size="sm" variant="default" disabled={!canActivate || loading}>
           {loading ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
-          Activate runtime
+          Activate automation
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Activate SR-3 runtime pattern</DialogTitle>
+          <DialogTitle>Activate this automation?</DialogTitle>
           <DialogDescription>
-            Marks the compiled pattern active for future enrollment wiring. Sequence execution, sends,
-            notifications, and provider calls remain disabled.
+            Makes this automation eligible to enroll leads and run automatically after approval. Outreach
+            sends still require human review where configured.
           </DialogDescription>
         </DialogHeader>
         {readiness?.blockedReasons.length ? (

@@ -35,10 +35,7 @@ import {
   GROWTH_NATIVE_DIALER_QA_MARKER,
   GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER,
 } from "@/lib/growth/native-dialer/native-dialer-types"
-import {
-  GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER,
-  type CallWorkspaceCoachingMode,
-} from "@/lib/growth/native-dialer/call-workspace-coaching-types"
+import { GROWTH_CALLS_SETUP_OPERATOR_MESSAGE } from "@/lib/growth/workspace/growth-workspace-operator-simplification-1e"
 import {
   beginGoogleVoiceBridgeDialFlow,
   GOOGLE_VOICE_BRIDGE_COPY_BLOCKED_TOAST,
@@ -1880,7 +1877,9 @@ export function GrowthCallWorkspace({ hidePageHeader = false }: { hidePageHeader
   }
 
   if (setupMessage) {
-    return <p className="text-sm text-muted-foreground">{setupMessage}</p>
+    const operatorSetupMessage =
+      /migration|schema|sql|supabase|probe/i.test(setupMessage) ? GROWTH_CALLS_SETUP_OPERATOR_MESSAGE : setupMessage
+    return <p className="text-sm text-muted-foreground">{operatorSetupMessage}</p>
   }
 
   return (

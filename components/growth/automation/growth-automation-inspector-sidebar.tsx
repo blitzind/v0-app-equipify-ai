@@ -71,7 +71,7 @@ export function GrowthAutomationInspectorSidebar({
               Test
             </TabsTrigger>
             <TabsTrigger value="runtime" className="px-1.5 py-1.5 text-xs">
-              Runtime
+              Publish
             </TabsTrigger>
             <TabsTrigger value="monitor" className="px-1.5 py-1.5 text-xs">
               Monitor
@@ -138,7 +138,7 @@ export function GrowthAutomationInspectorSidebar({
 
       <div className="shrink-0 border-t border-dashed border-border px-3 py-2 text-[11px] text-muted-foreground">
         <Copy className="mb-0.5 inline size-3" /> Cmd/Ctrl+C/V · Delete removes selection ·{" "}
-        {GROWTH_AUTOMATION_API_SAFETY_FLAGS.read_only_runtime ? "read-only runtime" : ""}
+        {GROWTH_AUTOMATION_API_SAFETY_FLAGS.read_only_runtime ? "view only when live" : ""}
       </div>
     </div>
   )

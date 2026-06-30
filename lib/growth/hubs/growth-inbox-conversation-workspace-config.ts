@@ -119,7 +119,7 @@ export const GROWTH_INBOX_CONVERSATION_ROUTE_INVENTORY: GrowthInboxConversationR
   },
   {
     source: "/growth/inbox",
-    action: "Reply Copilot",
+    action: "Reply with Ava",
     currentRoute: "in-panel intelligence sidebar",
     workspaceRoute: "in-panel intelligence sidebar",
     status: "in_panel",

@@ -19,6 +19,10 @@ import {
   type GrowthReplyNextAction,
 } from "@/lib/growth/reply-intelligence/reply-intent-types"
 import { isCommunicationStrategyEnabledClient } from "@/lib/growth/contact-verification/communication-strategy-feature"
+import {
+  GROWTH_AVA_EMPTY_ASSIST_UNAVAILABLE,
+  GROWTH_AVA_REPLY_ASSIST_TITLE,
+} from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import type { CommunicationStrategyDisplaySummary } from "@/lib/growth/contact-verification/communication-strategy-view"
 
 export const GROWTH_INBOX_REPLY_INTELLIGENCE_PANEL_QA_MARKER = "growth-inbox-reply-intelligence-panel-v2" as const
@@ -213,11 +217,11 @@ export function GrowthInboxReplyIntelligencePanel({ leadId, compact = false }: G
             </GrowthEngineCard>
           ) : null}
 
-          <GrowthEngineCard title="AI reply copilot" icon={<Bot className="size-4" />}>
+          <GrowthEngineCard title={GROWTH_AVA_REPLY_ASSIST_TITLE} icon={<Bot className="size-4" />}>
             {detailLoading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" />
-                Loading copilot…
+                Loading Ava…
               </div>
             ) : copilot ? (
               <div className="space-y-2 text-sm">
@@ -229,7 +233,7 @@ export function GrowthInboxReplyIntelligencePanel({ leadId, compact = false }: G
                 <p className="rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">{copilot.suggestedReplyDraft}</p>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Copilot assist unavailable for this thread.</p>
+              <p className="text-sm text-muted-foreground">{GROWTH_AVA_EMPTY_ASSIST_UNAVAILABLE}</p>
             )}
           </GrowthEngineCard>
 

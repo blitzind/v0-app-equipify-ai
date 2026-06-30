@@ -683,7 +683,7 @@ export function GrowthCallWorkspaceCenterPanel({
               <WorkspaceMetricCard label="Recording" value="N/A" tone="neutral" />
             )}
             <WorkspaceMetricCard label="Call Time" value={callTimeLabel} />
-            <WorkspaceMetricCard label="Provider" value={providerLabel} />
+            <WorkspaceMetricCard label="Connection" value={providerLabel} />
           </div>
         </div>
       ) : null}

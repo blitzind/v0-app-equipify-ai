@@ -13,6 +13,7 @@ export const GROWTH_INBOX_HUB_MANIFEST: GrowthWorkspaceHubManifest = {
     id: card.id,
     label: card.label,
     hint: card.helper,
+    emptyValue: "Connect a mailbox",
   })),
   quickActions: [
     {

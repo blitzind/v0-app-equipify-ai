@@ -66,7 +66,7 @@ export function GrowthAutomationAnalyticsPanel({ flowId }: Props) {
         <div>
           <h3 className="flex items-center gap-2 text-sm font-medium">
             <BarChart3 className="size-4" />
-            Runtime analytics + audit
+            Performance & history
           </h3>
           <p className="text-xs text-muted-foreground">
             Read-only observability · analytics + immutable audit trail · no sends
@@ -93,7 +93,7 @@ export function GrowthAutomationAnalyticsPanel({ flowId }: Props) {
         <div className="mt-4 space-y-4">
           <GrowthAutomationRuntimeHealthCard health={analytics?.runtimeHealth ?? null} />
           <div>
-            <p className="mb-2 text-xs font-medium">Runtime counts</p>
+            <p className="mb-2 text-xs font-medium">Activity counts</p>
             <GrowthAutomationRuntimeMetricsGrid counts={analytics?.counts ?? null} />
           </div>
           {analytics?.completionStats ? (

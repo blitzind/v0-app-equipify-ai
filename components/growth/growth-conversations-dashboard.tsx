@@ -18,6 +18,17 @@ import {
   shouldShowGrowthConversationsMissingContextMessage,
 } from "@/lib/growth/navigation/growth-conversations-deep-link"
 import type { GrowthLead } from "@/lib/growth/types"
+import {
+  GROWTH_ACTION_FIRST_AVA_NOTICED,
+  GROWTH_ACTION_FIRST_AVA_RECOMMENDS,
+  GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE,
+  GROWTH_ACTION_FIRST_AVA_IDLE,
+  GROWTH_ACTION_FIRST_CONVERSATIONS_HEALTH,
+  GROWTH_ACTION_FIRST_CONVERSATIONS_NEEDS_RESPONSE,
+  GROWTH_ACTION_FIRST_CONVERSATIONS_NEEDS_REVIEW,
+  GROWTH_ACTION_FIRST_SUPPORTING_METRICS,
+  GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER,
+} from "@/lib/growth/workspace/growth-workspace-action-first-1f"
 
 export const GROWTH_CONVERSATIONS_DASHBOARD_QA_MARKER = "growth-conversations-dashboard-v2" as const
 
@@ -170,7 +181,12 @@ export function GrowthConversationsDashboard() {
   if (!dashboard) return null
 
   return (
-    <div className="space-y-6" data-qa-marker={GROWTH_CONVERSATIONS_DASHBOARD_QA_MARKER}>
+    <div
+      className="space-y-6"
+      data-qa-marker={GROWTH_CONVERSATIONS_DASHBOARD_QA_MARKER}
+      data-growth-action-first-order="actions-before-metrics"
+      data-qa-marker-action-first={GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER}
+    >
       {focusedLead ? (
         <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground">
           <p className="font-medium">
@@ -189,24 +205,58 @@ export function GrowthConversationsDashboard() {
         </div>
       ) : null}
 
-      <div className="flex items-center justify-between gap-3">
-        <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatTile label="Avg conversation health" value={dashboard.averageHealth} />
-          <StatTile label="Strong buying intent" value={dashboard.buyingIntent.length} />
-          <StatTile label="High urgency" value={dashboard.urgencyTrends.length} />
-          <StatTile label="At conversation risk" value={dashboard.conversationRisk.length} />
-        </div>
-        <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
-          <RefreshCw className={`mr-2 size-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
-      </div>
+      <GrowthEngineCard title={GROWTH_ACTION_FIRST_AVA_RECOMMENDS} data-section="conversations-action-first">
+        {dashboard.conversationRisk.length === 0 &&
+        dashboard.urgencyTrends.length === 0 &&
+        dashboard.buyingIntent.length === 0 ? (
+          <>
+            <p className="text-sm font-medium">{GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{GROWTH_ACTION_FIRST_AVA_IDLE}</p>
+          </>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {dashboard.conversationRisk.length > 0 ? (
+              <li className="rounded-lg border border-border px-3 py-2">
+                <p className="font-medium">
+                  {GROWTH_ACTION_FIRST_CONVERSATIONS_NEEDS_RESPONSE} · {dashboard.conversationRisk.length}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {GROWTH_ACTION_FIRST_AVA_NOTICED} momentum slowing — respond before deals stall.
+                </p>
+              </li>
+            ) : null}
+            {dashboard.urgencyTrends.length > 0 ? (
+              <li className="rounded-lg border border-border px-3 py-2">
+                <p className="font-medium">
+                  {GROWTH_ACTION_FIRST_CONVERSATIONS_NEEDS_REVIEW} · {dashboard.urgencyTrends.length}
+                </p>
+                <p className="text-xs text-muted-foreground">High-urgency threads need your judgment on next steps.</p>
+              </li>
+            ) : null}
+            {dashboard.buyingIntent.length > 0 ? (
+              <li className="rounded-lg border border-border px-3 py-2">
+                <p className="font-medium">Strong buying intent · {dashboard.buyingIntent.length}</p>
+                <p className="text-xs text-muted-foreground">
+                  {GROWTH_ACTION_FIRST_AVA_RECOMMENDS} advancing these conversations while intent is high.
+                </p>
+              </li>
+            ) : null}
+          </ul>
+        )}
+      </GrowthEngineCard>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <LeadBucket
-          title="Health leaders"
-          leads={dashboard.strongHealth}
-          metricKey="conversationHealthScore"
+          title={GROWTH_ACTION_FIRST_CONVERSATIONS_NEEDS_RESPONSE}
+          leads={dashboard.conversationRisk}
+          metricKey="conversationMomentum"
+          focusedLeadId={focusedLeadId}
+          registerFocusedLeadRef={registerFocusedLeadRef}
+        />
+        <LeadBucket
+          title={GROWTH_ACTION_FIRST_CONVERSATIONS_NEEDS_REVIEW}
+          leads={dashboard.urgencyTrends}
+          metricKey="conversationUrgencyLevel"
           focusedLeadId={focusedLeadId}
           registerFocusedLeadRef={registerFocusedLeadRef}
         />
@@ -214,6 +264,13 @@ export function GrowthConversationsDashboard() {
           title="Buying intent"
           leads={dashboard.buyingIntent}
           metricKey="conversationBuyingIntent"
+          focusedLeadId={focusedLeadId}
+          registerFocusedLeadRef={registerFocusedLeadRef}
+        />
+        <LeadBucket
+          title="Health leaders"
+          leads={dashboard.strongHealth}
+          metricKey="conversationHealthScore"
           focusedLeadId={focusedLeadId}
           registerFocusedLeadRef={registerFocusedLeadRef}
         />
@@ -231,21 +288,22 @@ export function GrowthConversationsDashboard() {
           focusedLeadId={focusedLeadId}
           registerFocusedLeadRef={registerFocusedLeadRef}
         />
-        <LeadBucket
-          title="Urgency trends"
-          leads={dashboard.urgencyTrends}
-          metricKey="conversationUrgencyLevel"
-          focusedLeadId={focusedLeadId}
-          registerFocusedLeadRef={registerFocusedLeadRef}
-        />
-        <LeadBucket
-          title="Conversation risk"
-          leads={dashboard.conversationRisk}
-          metricKey="conversationMomentum"
-          focusedLeadId={focusedLeadId}
-          registerFocusedLeadRef={registerFocusedLeadRef}
-        />
       </div>
+
+      <GrowthEngineCard title={GROWTH_ACTION_FIRST_CONVERSATIONS_HEALTH} data-section="supporting-metrics">
+        <div className="flex items-center justify-between gap-3">
+          <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatTile label="Avg conversation health" value={dashboard.averageHealth} />
+            <StatTile label="Strong buying intent" value={dashboard.buyingIntent.length} />
+            <StatTile label="High urgency" value={dashboard.urgencyTrends.length} />
+            <StatTile label="At conversation risk" value={dashboard.conversationRisk.length} />
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+            <RefreshCw className={`mr-2 size-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
+      </GrowthEngineCard>
 
       <GrowthEngineCard title="Top objections" icon={<MessageSquare className="size-4" />}>
         {dashboard.topObjections.length === 0 ? (

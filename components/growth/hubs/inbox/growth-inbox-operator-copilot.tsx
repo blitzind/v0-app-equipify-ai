@@ -12,6 +12,7 @@ import {
 } from "@/lib/growth/hubs/growth-workspace-hub-paths"
 import { growthWorkspaceInboxWorkflowHref, growthWorkspaceLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
+import { GROWTH_AVA_EMPTY_THREAD_GUIDANCE, GROWTH_AVA_REPLY_ASSIST_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { cn } from "@/lib/utils"
 
 const SEVERITY_STYLES = {
@@ -75,7 +76,7 @@ export function GrowthInboxOperatorCopilot() {
     return (
       <div className="flex h-full items-center gap-2 p-4 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" aria-hidden />
-        Loading operator copilot…
+        Loading Ava…
       </div>
     )
   }
@@ -83,7 +84,7 @@ export function GrowthInboxOperatorCopilot() {
   if (!recommendation) {
     return (
       <div className="flex h-full items-center p-4 text-sm text-muted-foreground">
-        Select a thread to see operator guidance.
+        {GROWTH_AVA_EMPTY_THREAD_GUIDANCE}
       </div>
     )
   }
@@ -95,7 +96,7 @@ export function GrowthInboxOperatorCopilot() {
   return (
     <section aria-labelledby="inbox-operator-copilot-heading" className="flex h-full flex-col p-3" data-section="operator-copilot">
       <h2 id="inbox-operator-copilot-heading" className="mb-3 text-sm font-semibold text-foreground">
-        Operator Copilot
+        {GROWTH_AVA_REPLY_ASSIST_TITLE}
       </h2>
       <div
         className={cn(

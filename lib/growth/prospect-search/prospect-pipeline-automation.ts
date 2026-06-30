@@ -482,7 +482,7 @@ export function buildProspectWorkflowLauncherActions(input: {
     }),
     action({
       id: "open_conversation_intelligence",
-      label: "Open Conversation Intelligence",
+      label: "Open Conversations",
       group: "relationship_expansion",
       enabled: !suppressed && hasLead,
       disabled_reason: suppressed ? "Suppressed account." : !hasLead ? needsLeadReason : null,
@@ -492,7 +492,7 @@ export function buildProspectWorkflowLauncherActions(input: {
     }),
     action({
       id: "open_copilot",
-      label: "Open AI Copilot",
+      label: "Open Ava",
       group: "relationship_expansion",
       enabled: !suppressed && preflight.can_draft,
       disabled_reason: null,

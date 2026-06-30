@@ -10,7 +10,7 @@ import {
   GROWTH_SETTINGS_AI_REFINEMENT_2F_QA_MARKER,
   GROWTH_SETTINGS_SECTION_GAP,
 } from "@/components/growth/growth-settings-ui"
-import { Button } from "@/components/ui/button"
+import { GROWTH_AVA_PREFERENCES_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 
 export const GROWTH_SETTINGS_AI_PREFERENCES_PAGE_QA_MARKER = "growth-settings-ai-preferences-wiring-1a-v1" as const
 
@@ -47,8 +47,8 @@ export function GrowthSettingsAiPreferencesPage() {
       data-growth-settings-ai-refinement={GROWTH_SETTINGS_AI_REFINEMENT_2F_QA_MARKER}
     >
       <GrowthWorkspacePageHeader
-        title="AI Preferences"
-        description="Response style, draft preferences, memory, and learning for your AI teammate."
+        title={GROWTH_AVA_PREFERENCES_TITLE}
+        description="Response style, draft preferences, memory, and learning for Ava."
         icon={Bot}
         actions={
           <Button type="button" variant="outline" size="sm" asChild>
@@ -64,7 +64,7 @@ export function GrowthSettingsAiPreferencesPage() {
 
       <AiPreferencesSection
         title="Assist preferences"
-        description="How your AI teammate drafts, remembers, and learns from your playbook."
+        description="How Ava drafts, remembers, and learns from your playbook."
       >
         <GrowthAiCopilotSettingsPanel variant="operator" />
       </AiPreferencesSection>

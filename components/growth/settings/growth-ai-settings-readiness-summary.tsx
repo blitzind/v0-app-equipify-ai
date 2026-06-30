@@ -14,12 +14,21 @@ import { resolveGrowthAutonomyOutboundStatusLabel } from "@/lib/growth/autonomy/
 import { GROWTH_WORKSPACE_SETTINGS_LANDING_PAGE_OPTIONS } from "@/lib/growth/settings/growth-workspace-settings-options"
 import type { GrowthWorkspaceSettingsSidebarPreferences } from "@/lib/growth/settings/growth-workspace-settings-types"
 import { AI_TEAMMATE_DEFAULT_NAME } from "@/lib/workspace/ai-teammate-identity"
+import {
+  GROWTH_AVA_PREFERENCES_TITLE,
+  GROWTH_AVA_STATUS_ENABLED,
+  GROWTH_AVA_STATUS_INACTIVE,
+  GROWTH_AVA_STATUS_LEARNING,
+  GROWTH_AVA_STATUS_READY,
+  GROWTH_AVA_STATUS_UNAVAILABLE,
+  GROWTH_AVA_TEAMMATE_LABEL,
+} from "@/lib/growth/workspace/growth-workspace-ava-identity"
 
 export type GrowthAiReadinessScope = "teammate" | "preferences" | "autonomy" | "command-center"
 
 const READINESS_CARD_TITLES: Record<GrowthAiReadinessScope, string> = {
   teammate: "How Ava works for you",
-  preferences: "AI readiness",
+  preferences: GROWTH_AVA_PREFERENCES_TITLE,
   autonomy: "Autonomy at a glance",
   "command-center": "Command Center at a glance",
 }
@@ -105,10 +114,10 @@ export function GrowthAiSettingsReadinessSummary({ scope }: { scope: GrowthAiRea
       case "teammate":
         return (
           <>
-            <StatTile label="AI teammate" value={teammateName} />
+            <StatTile label={GROWTH_AVA_TEAMMATE_LABEL} value={teammateName} />
             <StatTile
-              label="AI assist"
-              value={copilot?.aiCopilotEnabled ? "Enabled" : "Inactive"}
+              label="Assist from Ava"
+              value={copilot?.aiCopilotEnabled ? GROWTH_AVA_STATUS_ENABLED : GROWTH_AVA_STATUS_INACTIVE}
             />
             <StatTile label="Autonomy" value={autonomyMode} />
             <StatTile
@@ -121,8 +130,8 @@ export function GrowthAiSettingsReadinessSummary({ scope }: { scope: GrowthAiRea
         return (
           <>
             <StatTile
-              label="AI ready"
-              value={copilot?.aiCopilotEnabled ? "Enabled" : "Inactive"}
+              label={GROWTH_AVA_STATUS_READY}
+              value={copilot?.aiCopilotEnabled ? GROWTH_AVA_STATUS_ENABLED : GROWTH_AVA_STATUS_UNAVAILABLE}
             />
             <StatTile label="Response style" value={reasoningLabel} />
             <StatTile
@@ -131,7 +140,7 @@ export function GrowthAiSettingsReadinessSummary({ scope }: { scope: GrowthAiRea
             />
             <StatTile
               label="Learning"
-              value={copilot?.aiCopilotPlaybookEnabled ? "Enabled" : "Disabled"}
+              value={copilot?.aiCopilotPlaybookEnabled ? GROWTH_AVA_STATUS_LEARNING : GROWTH_AVA_STATUS_INACTIVE}
             />
           </>
         )

@@ -15,7 +15,7 @@ export const CALL_WORKSPACE_COACHING_LINK_FAILED_COPY =
   "Live Coaching could not link to this call. Transcript guidance is unavailable until coaching connects." as const
 
 export const CALL_WORKSPACE_MEDIA_STREAM_RESTART_FAILED_COPY =
-  "Live transcript stream did not restart after answer. Retry media stream or check voice infrastructure logs." as const
+  "Live transcript stream did not restart after answer. Retry transcript or contact Platform Admin if this persists." as const
 
 export const CALL_WORKSPACE_ANSWER_RECONCILE_FAILED_COPY =
   "Your call connected, but workspace sync is still catching up. Coaching data may be delayed." as const

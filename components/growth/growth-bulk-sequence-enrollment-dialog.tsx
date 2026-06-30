@@ -396,7 +396,7 @@ export function GrowthBulkSequenceEnrollmentDialog({
                   </p>
                   {resultUi.variant === "success" ? (
                     <p className="mt-1 opacity-90">
-                      Pattern enrollments live in the outbound execution plane — not the legacy template table on the
+                      Pattern enrollments live in the outbound execution plane — not the template table on the
                       foundation dashboard.
                     </p>
                   ) : null}

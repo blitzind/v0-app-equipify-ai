@@ -146,7 +146,7 @@ export function GrowthAiCopilotSettingsPanel({
   return (
     <div className={GROWTH_SETTINGS_SECTION_GAP}>
       <GrowthSettingsCard
-        title={isOperator ? "Response style" : "AI Copilot Governance"}
+        title={isOperator ? "Response style" : "Copilot governance"}
         icon={isOperator ? <Sparkles className="size-4" /> : <Shield className="size-4" />}
         headerAside={
           isOperator ? (
@@ -241,7 +241,7 @@ export function GrowthAiCopilotSettingsPanel({
         </GrowthSettingsCard>
       ) : null}
 
-      <GrowthSettingsCard title={isOperator ? "Call assistance" : "Call Copilot"} icon={<PhoneCall className="size-4" />}>
+      <GrowthSettingsCard title={isOperator ? "Call assistance" : "Call assist"} icon={<PhoneCall className="size-4" />}>
         <div className={GROWTH_SETTINGS_INNER_GAP}>
           <p className="text-sm text-muted-foreground">
             {isOperator
@@ -252,12 +252,12 @@ export function GrowthAiCopilotSettingsPanel({
             <p className="rounded-md border border-amber-200 bg-amber-50/60 px-2.5 py-1.5 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
               {isOperator
                 ? "Turn on AI assist above before using call assistance."
-                : "Enable AI Copilot above before using Call Copilot."}
+                : "Enable Ava above before using call assistance."}
             </p>
           ) : null}
           <div className="space-y-2">
             <GrowthSettingsToggleRow
-              label={isOperator ? "Call assistance enabled" : "Call Copilot enabled"}
+              label={isOperator ? "Call assistance enabled" : "Call assist enabled"}
               checked={settings.callCopilotEnabled}
               disabled={!settings.aiCopilotEnabled}
               onCheckedChange={(checked) => setSettings({ ...settings, callCopilotEnabled: checked })}

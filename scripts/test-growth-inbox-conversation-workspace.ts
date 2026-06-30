@@ -73,7 +73,7 @@ function runAudit(mode: "local" | "production"): void {
     "Book Meeting",
     "Assign",
     "Archive",
-    "Reply Copilot",
+    "Reply with Ava",
     "Opportunity Recommendations",
     "Booking Recommendations",
     "Revenue Command Center",

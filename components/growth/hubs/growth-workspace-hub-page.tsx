@@ -4,25 +4,43 @@ import Link from "next/link"
 import { ArrowRight, Clock3 } from "lucide-react"
 import { GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
+import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
 import { Button } from "@/components/ui/button"
 import type { GrowthWorkspaceHubManifest } from "@/lib/growth/hubs/growth-workspace-hub-types"
-import { GROWTH_WORKSPACE_HUB_QA_MARKER } from "@/lib/growth/hubs/growth-workspace-hub-types"
+import {
+  GROWTH_WORKSPACE_HUB_METRIC_EMPTY_DEFAULT,
+  GROWTH_WORKSPACE_HUB_QA_MARKER,
+} from "@/lib/growth/hubs/growth-workspace-hub-types"
 import { readGrowthWorkspaceRecentViews } from "@/lib/growth/workspace/growth-workspace-activity-memory"
 import { cn } from "@/lib/utils"
-import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
+import {
+  GROWTH_ACTION_FIRST_SUPPORTING_METRICS,
+  GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER,
+} from "@/lib/growth/workspace/growth-workspace-action-first-1f"
 
 type GrowthWorkspaceHubPageProps = {
   manifest: GrowthWorkspaceHubManifest
   /** When true, render hub sections only — parent shell supplies page chrome. */
   embedded?: boolean
+  /** When true, quick actions and drill-downs render before overview KPI metrics. */
+  actionFirst?: boolean
 }
 
-function HubOverviewSection({ manifest }: GrowthWorkspaceHubPageProps) {
+function HubOverviewSection({
+  manifest,
+  metricsTitle = "Overview",
+  sectionId = "overview",
+}: GrowthWorkspaceHubPageProps & { metricsTitle?: string; sectionId?: string }) {
   return (
-    <GrowthEngineCard title="Overview" data-section="overview">
+    <GrowthEngineCard title={metricsTitle} data-section={sectionId}>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {manifest.overview.map((metric) => (
-          <StatTile key={metric.id} label={metric.label} value="—" hint={metric.hint} />
+          <StatTile
+            key={metric.id}
+            label={metric.label}
+            value={metric.emptyValue ?? GROWTH_WORKSPACE_HUB_METRIC_EMPTY_DEFAULT}
+            hint={metric.hint}
+          />
         ))}
       </div>
       <p className="mt-3 text-sm text-muted-foreground">
@@ -91,7 +109,8 @@ function HubDrilldownSection({
         </div>
       ) : (
         <p className="rounded-lg border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
-          {section.emptyHint ?? "No drill-down destinations configured for this section yet."}
+          {section.emptyHint ??
+            "Nothing to show here yet — use the quick actions above to get started in this area."}
         </p>
       )}
     </GrowthEngineCard>
@@ -133,34 +152,54 @@ function HubRecentActivitySection({ manifest }: GrowthWorkspaceHubPageProps) {
   )
 }
 
-function HubBody({ manifest }: GrowthWorkspaceHubPageProps) {
+function HubBody({ manifest, actionFirst = false }: GrowthWorkspaceHubPageProps) {
+  const sectionNodes = manifest.sections
+    .filter((section) => section.id !== "quick-actions" && section.id !== "overview")
+    .map((section) =>
+      section.id === "recent-activity" ? (
+        <HubRecentActivitySection key={section.id} manifest={manifest} />
+      ) : (
+        <HubDrilldownSection key={section.id} section={section} />
+      ),
+    )
+
+  if (actionFirst) {
+    return (
+      <div
+        className="space-y-6"
+        data-growth-workspace-hub={manifest.id}
+        data-growth-action-first-order="actions-before-metrics"
+        data-qa-marker={GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER}
+      >
+        <HubQuickActionsSection manifest={manifest} />
+        {sectionNodes}
+        <HubOverviewSection
+          manifest={manifest}
+          metricsTitle={GROWTH_ACTION_FIRST_SUPPORTING_METRICS}
+          sectionId="supporting-metrics"
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6" data-growth-workspace-hub={manifest.id}>
       <HubOverviewSection manifest={manifest} />
       <HubQuickActionsSection manifest={manifest} />
-
-      {manifest.sections
-        .filter((section) => section.id !== "quick-actions" && section.id !== "overview")
-        .map((section) =>
-          section.id === "recent-activity" ? (
-            <HubRecentActivitySection key={section.id} manifest={manifest} />
-          ) : (
-            <HubDrilldownSection key={section.id} section={section} />
-          ),
-        )}
+      {sectionNodes}
     </div>
   )
 }
 
-export function GrowthWorkspaceHubBody({ manifest }: GrowthWorkspaceHubPageProps) {
-  return <HubBody manifest={manifest} />
+export function GrowthWorkspaceHubBody({ manifest, actionFirst }: GrowthWorkspaceHubPageProps) {
+  return <HubBody manifest={manifest} actionFirst={actionFirst} />
 }
 
-export function GrowthWorkspaceHubPage({ manifest, embedded = false }: GrowthWorkspaceHubPageProps) {
+export function GrowthWorkspaceHubPage({ manifest, embedded = false, actionFirst = false }: GrowthWorkspaceHubPageProps) {
   if (embedded) {
     return (
       <div data-qa-marker={GROWTH_WORKSPACE_HUB_QA_MARKER} data-growth-workspace-hub={manifest.id}>
-        <HubBody manifest={manifest} />
+        <HubBody manifest={manifest} actionFirst={actionFirst} />
       </div>
     )
   }
@@ -187,7 +226,7 @@ export function GrowthWorkspaceHubPage({ manifest, embedded = false }: GrowthWor
         }
       />
 
-      <HubBody manifest={manifest} />
+      <HubBody manifest={manifest} actionFirst={actionFirst} />
     </GrowthWorkspacePageContent>
   )
 }

@@ -41,7 +41,7 @@ function allNavHrefs(): string[] {
 function main(): void {
   console.log(`\n=== GS-NAV-CLEANUP-1A (${GROWTH_NAV_CLEANUP_1A_QA_MARKER}) ===\n`)
 
-  assert.equal(GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER, "growth-workspace-settings-nav-1a-v1")
+  assert.equal(GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER, "growth-workspace-settings-nav-ux-polish-1a-v1")
   console.log("  ✓ Nav QA marker updated for 1A")
 
   assert.equal(

@@ -3,6 +3,7 @@
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import { SignalExplanationCard } from "@/components/growth/signals/signal-explanation-card"
 import { GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER, SIGNAL_COPILOT_CLIENT_DISCLAIMER } from "@/lib/growth/signals/ai/signal-copilot-client-types"
+import { GROWTH_AVA_INSIGHT_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { cn } from "@/lib/utils"
 
 export function CompanySignalAiInsightPanel({
@@ -52,7 +53,7 @@ export function CompanySignalAiInsightPanel({
 
   return (
     <details className={cn("mt-2", className)} data-qa-marker={GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER}>
-      <summary className="cursor-pointer text-[11px] font-medium text-violet-800">AI Insight</summary>
+      <summary className="cursor-pointer text-[11px] font-medium text-violet-800">{GROWTH_AVA_INSIGHT_TITLE}</summary>
       <SignalExplanationCard
         className="mt-2"
         companyName={row.company_name}

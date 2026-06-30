@@ -14,7 +14,7 @@ const EVENT_KIND_LABELS: Record<string, string> = {
   reply_workflow_routed: "Workflow Action Created",
   reply_workflow_action: "Workflow Action Created",
   reply_suppression_applied: "Outreach Suppressed",
-  reply_copilot_assisted: "Reply Copilot",
+  reply_copilot_assisted: "Reply with Ava",
   reply_ingested: "Reply Ingested",
   reply_draft_generated: "Draft Generated",
   reply_draft_approved: "Draft Approved",

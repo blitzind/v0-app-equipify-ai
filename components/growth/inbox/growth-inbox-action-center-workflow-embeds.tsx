@@ -11,7 +11,7 @@ import { GrowthInboxActionCenterOpportunityEmbed } from "@/components/growth/inb
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
 import { useGrowthInboxSharedData } from "@/components/growth/inbox/growth-inbox-shared-data-provider"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
-import { shouldDeferGrowthInboxTier3Hydration } from "@/lib/growth/inbox/growth-inbox-minimal-runtime-contract"
+import { GROWTH_AVA_REPLY_ASSIST_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import {
   Collapsible,
   CollapsibleContent,
@@ -165,7 +165,7 @@ export function GrowthInboxActionCenterWorkflowEmbeds() {
         )}
       </WorkflowGroup>
 
-      <WorkflowGroup title="Reply Copilot" count={copilot ? 1 : 0}>
+      <WorkflowGroup title={GROWTH_AVA_REPLY_ASSIST_TITLE} count={copilot ? 1 : 0}>
         <GrowthInboxActionCenterCopilotEmbed />
       </WorkflowGroup>
 

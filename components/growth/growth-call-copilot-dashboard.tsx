@@ -11,7 +11,17 @@ import {
   GROWTH_CALL_COPILOT_COMMITMENT_SIGNAL_LABELS,
 } from "@/lib/growth/call-copilot-types"
 import { commandLeadFocusHref } from "@/lib/growth/command/command-action-catalog"
-import { logGrowthCallsRuntimeIssue } from "@/lib/growth/navigation/growth-workspace-consolidation"
+import {
+  GROWTH_ACTION_FIRST_AVA_RECOMMENDS,
+  GROWTH_ACTION_FIRST_CALLS_OUTCOME,
+  GROWTH_ACTION_FIRST_CALLS_READINESS,
+  GROWTH_ACTION_FIRST_CALLS_WHO,
+  GROWTH_ACTION_FIRST_CALLS_WHY,
+  GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE,
+  GROWTH_ACTION_FIRST_AVA_IDLE,
+  GROWTH_ACTION_FIRST_SUPPORTING_METRICS,
+  GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER,
+} from "@/lib/growth/workspace/growth-workspace-action-first-1f"
 
 function normalizeDashboard(raw: GrowthCallCopilotDashboard | null | undefined): GrowthCallCopilotDashboard | null {
   if (!raw || typeof raw !== "object") return null
@@ -91,15 +101,45 @@ export function GrowthCallCopilotDashboard({ embedded = false }: { embedded?: bo
   }
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label="Active sessions" value={dashboard.stats.activeCount} />
-        <StatTile label="Completed (7d)" value={dashboard.stats.completed7d} />
-        <StatTile label="High risk active" value={dashboard.stats.highRiskActive} />
-        <StatTile label="Avg outcome confidence" value={dashboard.stats.avgOutcomeConfidence} />
-      </div>
+    <div
+      className="space-y-6"
+      data-growth-action-first-order="actions-before-metrics"
+      data-qa-marker-action-first={GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER}
+    >
+      <GrowthEngineCard title={GROWTH_ACTION_FIRST_AVA_RECOMMENDS} data-section="calls-action-first">
+        {dashboard.followUpNeeded.length === 0 && dashboard.stats.highRiskActive === 0 ? (
+          <>
+            <p className="text-sm font-medium">{GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{GROWTH_ACTION_FIRST_AVA_IDLE}</p>
+          </>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {dashboard.followUpNeeded.length > 0 ? (
+              <li className="rounded-lg border border-border px-3 py-2">
+                <p className="font-medium">
+                  {GROWTH_ACTION_FIRST_CALLS_WHO} · {dashboard.followUpNeeded.length}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {GROWTH_ACTION_FIRST_CALLS_WHY}: follow-up dispositions are waiting on you.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {GROWTH_ACTION_FIRST_CALLS_OUTCOME}: close the loop so Ava can update pipeline state.
+                </p>
+              </li>
+            ) : null}
+            {dashboard.stats.highRiskActive > 0 ? (
+              <li className="rounded-lg border border-border px-3 py-2">
+                <p className="font-medium">
+                  {GROWTH_ACTION_FIRST_CALLS_READINESS} · {dashboard.stats.highRiskActive}
+                </p>
+                <p className="text-xs text-muted-foreground">High-risk active sessions need operator review now.</p>
+              </li>
+            ) : null}
+          </ul>
+        )}
+      </GrowthEngineCard>
 
-      <GrowthEngineCard title={embedded ? "Active call sessions" : "Active Call Copilot Sessions"}>
+      <GrowthEngineCard title={embedded ? "Active call sessions" : "Active call assist sessions"}>
         {dashboard.activeSessions.length === 0 ? (
           <p className="text-sm text-muted-foreground">No active sessions.</p>
         ) : (
@@ -239,6 +279,15 @@ export function GrowthCallCopilotDashboard({ embedded = false }: { embedded?: bo
             ))}
           </ul>
         )}
+      </GrowthEngineCard>
+
+      <GrowthEngineCard title={GROWTH_ACTION_FIRST_SUPPORTING_METRICS} data-section="supporting-metrics">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatTile label="Active sessions" value={dashboard.stats.activeCount} />
+          <StatTile label="Completed (7d)" value={dashboard.stats.completed7d} />
+          <StatTile label="High risk active" value={dashboard.stats.highRiskActive} />
+          <StatTile label="Avg outcome confidence" value={dashboard.stats.avgOutcomeConfidence} />
+        </div>
       </GrowthEngineCard>
     </div>
   )

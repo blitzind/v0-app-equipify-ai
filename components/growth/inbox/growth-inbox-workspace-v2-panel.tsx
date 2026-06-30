@@ -13,6 +13,7 @@ import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-
 import { GrowthInboxCompactPanelState } from "@/components/growth/inbox/growth-inbox-compact-panel-state"
 import { GrowthInboxTier1RefreshBridge } from "@/components/growth/inbox/growth-inbox-tier1-refresh-bridge"
 import { GrowthInboxTier1PollCoordinatorProvider } from "@/components/growth/inbox/growth-inbox-tier1-poll-coordinator"
+import { GrowthInboxActionFirstStrip } from "@/components/growth/inbox/growth-inbox-action-first-strip"
 import { GrowthInboxResumeWorkHero } from "@/components/growth/hubs/inbox/growth-inbox-resume-work-hero"
 import { GrowthInboxPrimaryWorkspace } from "@/components/growth/hubs/inbox/growth-inbox-primary-workspace"
 import { GrowthInboxIntelligenceSidebar } from "@/components/growth/inbox/growth-inbox-intelligence-sidebar"
@@ -67,6 +68,7 @@ export function GrowthInboxWorkspaceV2Panel() {
           <GrowthInboxQueueProvider>
             <GrowthInboxQueueUrlSync />
             <GrowthInboxThreadUrlSync />
+            <GrowthInboxActionFirstStrip />
             <GrowthInboxResumeWorkHero />
             <GrowthInboxLeadContextProvider
               leadId={selectedThread?.lead_id ?? null}

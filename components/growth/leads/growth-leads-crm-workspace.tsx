@@ -314,9 +314,9 @@ export function GrowthLeadsCrmWorkspace({ showPageHeader = true }: { showPageHea
                   <Target size={17} />
                 </span>
                 <div>
-                  <h1 className={PAGE_STANDARD_PAGE_TITLE}>CRM Growth Leads</h1>
+                  <h1 className={PAGE_STANDARD_PAGE_TITLE}>Lead Records</h1>
                   <p className="text-sm text-muted-foreground">
-                    Legacy CRM lead records — separate from the intent Lead Inbox workspace.
+                    Existing lead records — separate from the intent Lead Inbox workspace.
                   </p>
                 </div>
               </div>

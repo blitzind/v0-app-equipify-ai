@@ -284,7 +284,7 @@ export function GrowthCallWorkspaceIntelligenceRail({
             />
             <IntelligenceRow
               icon={Briefcase}
-              label="Execution Readiness"
+              label="Call readiness"
               value={executionReadinessLabel(leadContext.executionReadinessScore)}
               badgeTone={
                 leadContext.executionReadinessScore != null && leadContext.executionReadinessScore >= 70

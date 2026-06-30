@@ -19,6 +19,7 @@ import {
 } from "@/lib/growth/hubs/growth-inbox-conversation-workspace-config"
 import { shouldDeferGrowthInboxTier3Hydration } from "@/lib/growth/inbox/growth-inbox-minimal-runtime-contract"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { GROWTH_AVA_PANEL_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { cn } from "@/lib/utils"
 
 export const GROWTH_INBOX_INTELLIGENCE_SIDEBAR_QA_MARKER = "growth-inbox-intelligence-sidebar-v2" as const
@@ -114,7 +115,7 @@ export function GrowthInboxIntelligenceSidebar() {
           ) : null}
         </SidebarCard>
 
-        <SidebarCard title="AI Assistant" sectionId="inbox-sidebar-ai-assistant">
+        <SidebarCard title={GROWTH_AVA_PANEL_TITLE} sectionId="inbox-sidebar-ai-assistant">
           {deferTier3 ? (
             <GrowthOnDemandFeature
               feature="opportunityRecommendations"

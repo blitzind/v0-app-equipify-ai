@@ -245,7 +245,7 @@ export function GrowthCallActionSheet({
 
   async function startCallCopilot() {
     if (!workflow) {
-      setError("Open the lead drawer to start Call Copilot.")
+      setError("Open the lead drawer to start call assistance from Ava.")
       return
     }
     setBusy(true)
@@ -254,7 +254,7 @@ export function GrowthCallActionSheet({
       await workflow.runStartCallCopilot()
       onOpenChange(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not start Call Copilot.")
+      setError(e instanceof Error ? e.message : "Could not start call assistance from Ava.")
     } finally {
       setBusy(false)
     }
@@ -376,7 +376,7 @@ export function GrowthCallActionSheet({
                         ) : (
                           <Sparkles className="mr-2 h-4 w-4 shrink-0" />
                         )}
-                        Start Call Copilot
+                        Start call assistance
                       </Button>
                     </div>
 

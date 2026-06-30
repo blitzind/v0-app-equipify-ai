@@ -6,6 +6,7 @@ import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teamma
 import { useAiEmployeeStatus } from "@/components/growth/ai-teammate/ai-employee-status-provider"
 import { synthesizeGrowthHomeExecutiveBriefing } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-synthesizer"
 import { GROWTH_HOME_EXECUTIVE_BRIEFING_QA_MARKER } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
+import { GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER } from "@/lib/growth/workspace/growth-workspace-action-first-1f"
 import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
 import type { GrowthWorkspaceRecentView, GrowthWorkspaceContinueItem } from "@/lib/growth/workspace/growth-workspace-activity-memory"
 import { formatRelativeTime } from "@/lib/notifications/format-relative"
@@ -74,7 +75,12 @@ export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, c
     briefing.customerWins.length > 0
 
   return (
-    <div className="space-y-10" data-qa-marker={GROWTH_HOME_EXECUTIVE_BRIEFING_QA_MARKER}>
+    <div
+      className="space-y-10"
+      data-qa-marker={GROWTH_HOME_EXECUTIVE_BRIEFING_QA_MARKER}
+      data-growth-action-first-order="actions-before-metrics"
+      data-qa-marker-action-first={GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER}
+    >
       <GrowthHomeExecutiveBriefingHeroSection
         hero={aiOsUx.hero}
         statusLabel={briefing.checkIn.status.label}
@@ -82,21 +88,22 @@ export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, c
         lastUpdateLabel={lastUpdateLabel}
       />
 
+      <GrowthHomeExecutiveRecommendationSection recommendation={briefing.executiveRecommendation} />
+
+      <GrowthHomeRecommendationCard
+        recommendation={briefing.recommendation}
+        additionalRecommendations={briefing.additionalRecommendations}
+      />
+
       <GrowthHomeAiOsWaitingOnYouSection aiOsUx={aiOsUx} />
 
-      <GrowthHomeAvaLiveStatusSection status={aiOsUx.liveStatus} />
-
       <GrowthHomeDailyWorkQueueSection items={aiOsUx.dailyWorkQueue} buckets={aiOsUx.dailyWorkQueueBuckets} />
+
+      <GrowthHomeAvaLiveStatusSection status={aiOsUx.liveStatus} />
 
       <GrowthHomeActiveRevenueMissionsSection missions={briefing.activeRevenueMissions} />
 
       <GrowthHomeMarketingMissionsSection missions={briefing.marketingMissions} />
-
-      <GrowthHomeThroughputSection metrics={aiOsUx.throughput} />
-
-      <GrowthHomeMailboxDomainHealthSection health={aiOsUx.mailboxDomainHealth} />
-
-      <GrowthHomeAutonomousReadinessSection readiness={aiOsUx.autonomousReadiness} />
 
       <section data-qa-section="home-customer-growth" className="space-y-8 rounded-2xl border border-violet-100 bg-violet-50/20 p-6 dark:border-violet-900/30 dark:bg-violet-950/10">
         <div>
@@ -120,7 +127,11 @@ export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, c
 
       <GrowthHomeTimelineSection periods={briefing.timeline} />
 
-      <GrowthHomeExecutiveRecommendationSection recommendation={briefing.executiveRecommendation} />
+      <GrowthHomeThroughputSection metrics={aiOsUx.throughput} />
+
+      <GrowthHomeMailboxDomainHealthSection health={aiOsUx.mailboxDomainHealth} />
+
+      <GrowthHomeAutonomousReadinessSection readiness={aiOsUx.autonomousReadiness} />
 
       <Collapsible open={secondaryOpen} onOpenChange={setSecondaryOpen}>
         <CollapsibleTrigger asChild>
@@ -138,10 +149,6 @@ export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, c
           <GrowthHomeInitiativeRecommendationsSection recommendations={briefing.initiativeRecommendations} />
           <GrowthHomeNeedsReviewSection needsReview={briefing.needsReview} />
           <GrowthHomeWorkSummarySection categories={briefing.workSummary} />
-          <GrowthHomeRecommendationCard
-            recommendation={briefing.recommendation}
-            additionalRecommendations={briefing.additionalRecommendations}
-          />
           {everythingElse}
         </CollapsibleContent>
       </Collapsible>

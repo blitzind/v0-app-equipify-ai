@@ -10,6 +10,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { AI_OS_TOP_BUSINESS_MOVE_TITLE } from "@/lib/workspace/ai-os-outcome-first-terminology"
+import { GROWTH_AVA_RECOMMENDS_NEXT_COPY } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import type { GrowthHomeRecommendation } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 
 type Props = {
@@ -74,7 +75,7 @@ export function GrowthHomeRecommendationCard({ recommendation, additionalRecomme
     <section data-qa-section="home-recommendation" className="space-y-4">
       <div>
         <h2 className="text-xl font-semibold tracking-tight">{AI_OS_TOP_BUSINESS_MOVE_TITLE}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">The highest-impact move AI recommends next.</p>
+        <p className="mt-1 text-sm text-muted-foreground">{GROWTH_AVA_RECOMMENDS_NEXT_COPY}</p>
       </div>
 
       <RecommendationArticle recommendation={recommendation} featured />

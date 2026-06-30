@@ -2,10 +2,15 @@ import type { LucideIcon } from "lucide-react"
 
 export const GROWTH_WORKSPACE_HUB_QA_MARKER = "growth-workspace-hub-v1" as const
 
+/** Default overview metric copy when live counts are not wired yet. */
+export const GROWTH_WORKSPACE_HUB_METRIC_EMPTY_DEFAULT = "No activity yet" as const
+
 export type GrowthWorkspaceHubOverviewMetric = {
   id: string
   label: string
   hint: string
+  /** Customer-safe placeholder when the metric has no live count yet. */
+  emptyValue?: string
 }
 
 export type GrowthWorkspaceHubQuickAction = {

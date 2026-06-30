@@ -12,6 +12,7 @@ import {
   type GrowthOpportunitySignal,
   type GrowthSequencePauseCandidate,
 } from "@/lib/growth/opportunity-intelligence/opportunity-types"
+import { GROWTH_AVA_EMPTY_RECOMMENDATIONS } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 
 type GrowthInboxOpportunityIntelligencePanelProps = {
   leadId: string | null
@@ -102,7 +103,7 @@ export function GrowthInboxOpportunityIntelligencePanel({
             Loading recommendations…
           </div>
         ) : recommendations.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No recommendations for this thread yet.</p>
+          <p className="text-sm text-muted-foreground">{GROWTH_AVA_EMPTY_RECOMMENDATIONS}</p>
         ) : (
           <div className="space-y-3">
             {recommendations.map((recommendation) => (

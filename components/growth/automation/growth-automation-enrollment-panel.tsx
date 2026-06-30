@@ -90,11 +90,11 @@ export function GrowthAutomationEnrollmentPanel({ flowId, runtimeActive, onChang
       })
       const data = (await res.json()) as EnrollResponse
       if (!res.ok || !data.enrollment) {
-        setMessage("Enrollment blocked — activate runtime or resolve duplicate protection.")
+        setMessage("Enrollment blocked — activate this automation or resolve duplicate protection.")
       } else if (data.enrollment.status === "duplicate") {
-        setMessage("Duplicate enrollment blocked for this lead and runtime pattern.")
+        setMessage("This lead is already enrolled in this automation.")
       } else if (data.enrollment.status === "enrolled") {
-        setMessage("Lead enrolled into SR-3 draft enrollment (no execution).")
+        setMessage("Lead enrolled. Runs automatically once approved.")
         setLeadId("")
       } else {
         setMessage(`Enrollment status: ${data.enrollment.status}`)
@@ -138,9 +138,9 @@ export function GrowthAutomationEnrollmentPanel({ flowId, runtimeActive, onChang
     <div className="rounded-xl border border-border bg-card p-4" data-qa-marker={GROWTH_AUTOMATION_ENROLLMENT_QA_MARKER}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium">Runtime enrollments</h3>
+          <h3 className="text-sm font-medium">Enrollments</h3>
           <p className="text-xs text-muted-foreground">
-            SR-3 entrants only · duplicate protection · no execution
+            Add leads to this automation · duplicate protection · requires approval to run
           </p>
         </div>
         <div className="text-right text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -190,7 +190,7 @@ export function GrowthAutomationEnrollmentPanel({ flowId, runtimeActive, onChang
             Enroll lead
           </Button>
           {!runtimeActive ? (
-            <p className="text-xs text-muted-foreground">Publish and activate runtime before enrolling leads.</p>
+            <p className="text-xs text-muted-foreground">Publish and activate this automation before enrolling leads.</p>
           ) : null}
         </div>
       </div>

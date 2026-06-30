@@ -59,7 +59,7 @@ function runAudit(): void {
 
   assert.equal(GROWTH_WORKSPACE_SETTINGS_QA_MARKER, "growth-workspace-settings-persistence-8b-v1")
   assert.equal(GROWTH_WORKSPACE_SETTINGS_MIGRATION, "20270828120000_growth_operator_workspace_preferences_8b.sql")
-  assert.equal(GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER, "growth-workspace-settings-nav-1a-v1")
+  assert.equal(GROWTH_WORKSPACE_SETTINGS_NAV_QA_MARKER, "growth-workspace-settings-nav-ux-polish-1a-v1")
   console.log("  ✓ QA markers + migration id")
 
   for (const relativePath of MODULE_PATHS) {
@@ -123,13 +123,14 @@ function runAudit(): void {
   const placeholderSections = listGrowthWorkspaceSettingsSectionIds().filter(
     (id) => !isGrowthWorkspaceSettingsPersistedSection(id),
   )
-  assert.equal(placeholderSections.length, 15)
+  assert.equal(placeholderSections.length, 17)
   const communicationsSection = fs.readFileSync(
     path.join(process.cwd(), "components/growth/settings/growth-settings-section-placeholder.tsx"),
     "utf8",
   )
   assert.match(communicationsSection, /adminFallbackHref/)
-  console.log("  ✓ fifteen non-persisted nav sections (communications, workspace links, compliance, AI, advanced)")
+  assert.doesNotMatch(communicationsSection, /Phase 7/)
+  console.log("  ✓ seventeen non-persisted nav sections (communications, workspace links, compliance, AI)")
 
   const settingsCmdK = resolveGrowthCommandPaletteHref(
     `${GROWTH_WORKSPACE_BASE_PATH}/inbox`,

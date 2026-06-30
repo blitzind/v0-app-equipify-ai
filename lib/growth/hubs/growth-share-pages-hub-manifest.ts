@@ -9,14 +9,14 @@ export const GROWTH_SHARE_PAGES_HUB_MANIFEST: GrowthWorkspaceHubManifest = {
   id: "share-pages",
   title: "Share Pages",
   description:
-    "Content hub for personalized share pages — create, template, attach media, and review performance without restoring sidebar drill-downs.",
+    "Create and manage personalized share pages for prospects — templates, media, and engagement in one place.",
   icon: FileText,
   iconClassName: "bg-emerald-50 text-emerald-600",
   overview: [
-    { id: "published", label: "Published", hint: "Manage share pages" },
-    { id: "drafts", label: "Drafts", hint: "Manage share pages" },
-    { id: "templates", label: "Templates", hint: "Open templates" },
-    { id: "cta-clicks", label: "CTA clicks (7d)", hint: "Manage share pages" },
+    { id: "published", label: "Published", hint: "Manage share pages", emptyValue: "Create your first page" },
+    { id: "drafts", label: "Drafts", hint: "Manage share pages", emptyValue: "No drafts" },
+    { id: "templates", label: "Templates", hint: "Open templates", emptyValue: "No templates" },
+    { id: "cta-clicks", label: "CTA clicks (7d)", hint: "Manage share pages", emptyValue: "No clicks yet" },
   ],
   quickActions: [
     {
@@ -29,7 +29,7 @@ export const GROWTH_SHARE_PAGES_HUB_MANIFEST: GrowthWorkspaceHubManifest = {
     {
       id: "templates",
       label: "Templates",
-      description: "Reusable share page templates (sidebar drill-down).",
+      description: "Reusable share page templates.",
       href: `${BASE}/share-pages/templates`,
       icon: LayoutTemplate,
     },
@@ -43,7 +43,7 @@ export const GROWTH_SHARE_PAGES_HUB_MANIFEST: GrowthWorkspaceHubManifest = {
     {
       id: "workspace",
       label: "Workspace",
-      description: "Operator review workspace for share pages.",
+      description: "Review share pages for a specific prospect.",
       href: `${BASE}/share-pages/workspace`,
       icon: Sparkles,
     },
@@ -69,12 +69,12 @@ export const GROWTH_SHARE_PAGES_HUB_MANIFEST: GrowthWorkspaceHubManifest = {
           href: GROWTH_SHARE_PAGES_HUB_MANAGE_HREF,
         },
       ],
-      emptyHint: "Recent pages surface in the share page manager after you open records.",
+      emptyHint: "Create a share page from Manage or choose a prospect in Workspace.",
     },
     {
       id: "templates",
       title: "Templates",
-      description: "Template library drill-down — not restored to the primary sidebar.",
+      description: "Reusable layouts — browse, edit, and publish templates.",
       drilldowns: [
         {
           id: "templates",

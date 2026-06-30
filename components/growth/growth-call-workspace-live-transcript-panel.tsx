@@ -69,7 +69,7 @@ export function GrowthCallWorkspaceLiveTranscriptPanel({
         {segments.length === 0 ? (
           <p className="text-xs text-muted-foreground">
             {status === "unavailable"
-              ? "Transcript infrastructure unavailable until a media stream session starts."
+              ? "Live transcript will appear once your call connects."
               : "Waiting for transcript segments… partial gaps are normal during reconnects."}
           </p>
         ) : (

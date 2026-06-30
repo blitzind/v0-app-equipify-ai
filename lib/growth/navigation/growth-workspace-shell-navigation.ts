@@ -10,8 +10,10 @@ import {
   Activity,
   BookOpen,
   Bot,
+  Handshake,
   Inbox,
   Home,
+  MessageSquare,
   Phone,
   Settings,
   Sparkles,
@@ -36,7 +38,7 @@ import {
   GROWTH_WORKSPACE_BASE_PATH,
 } from "@/lib/growth/navigation/growth-route-metadata-types"
 
-export const GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER = "growth-workspace-shell-nav-v8" as const
+export const GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER = "growth-workspace-shell-nav-v9" as const
 
 /** Back-compat QA marker used by shell components. */
 export const GROWTH_SHELL_NAV_QA_MARKER = GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER
@@ -91,6 +93,33 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
       { id: "meetings", label: "Meetings", registryRouteId: "workspace-meetings", icon: Users, workspaceRoute: true },
       { id: "settings", label: "Settings", registryRouteId: "workspace-settings", icon: Settings, workspaceRoute: true },
       { id: "runbook", label: "Runbook", registryRouteId: "workspace-runbook", icon: BookOpen, workspaceRoute: true },
+    ],
+  },
+  {
+    id: "revenue",
+    label: "Revenue",
+    items: [
+      {
+        id: "conversations",
+        label: "Conversations",
+        registryRouteId: "workspace-conversations",
+        icon: MessageSquare,
+        workspaceRoute: true,
+      },
+      {
+        id: "opportunities",
+        label: "Opportunities",
+        registryRouteId: "workspace-opportunities",
+        icon: Target,
+        workspaceRoute: true,
+      },
+      {
+        id: "relationships",
+        label: "Relationships",
+        registryRouteId: "workspace-relationships",
+        icon: Handshake,
+        workspaceRoute: true,
+      },
     ],
   },
   {
@@ -197,6 +226,12 @@ export function isGrowthShellNavItemActive(pathname: string, item: GrowthShellNa
     return true
   }
   if (item.id === "engagement" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/engagement`)) {
+    return true
+  }
+  if (item.id === "conversations" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/conversations`)) {
+    return true
+  }
+  if (item.id === "relationships" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/relationships`)) {
     return true
   }
   if (item.id === "audiences" && pathname.startsWith(`${GROWTH_WORKSPACE_BASE_PATH}/audiences`)) {

@@ -10,7 +10,7 @@ export default function GrowthAutomationPage() {
     <GrowthWorkspacePageContent>
       <GrowthWorkspacePageHeader
         title="Automation Flows"
-        description="Draft automation graphs for future SR-3 compilation. No execution in S5-B."
+        description="Design and manage automation flows for your outreach workflows."
         icon={GitBranch}
         iconClassName="bg-sky-50 text-sky-600"
       />
