@@ -622,6 +622,7 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
   admin("admin-imports-batch", "imports/[batchId]", "Import Batch Detail", "workspace", "admin-only", {
     dynamic: true,
   }),
+  admin("admin-lead-sources", "lead-sources", "Lead Sources", "workspace", "admin-only"),
   admin("admin-acquisition", "acquisition", "Acquisition Runs", "workspace", "admin-only"),
   admin("admin-acquisition-run", "acquisition/[runId]", "Acquisition Run Detail", "workspace", "admin-only", {
     dynamic: true,

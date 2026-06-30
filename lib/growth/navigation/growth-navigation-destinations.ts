@@ -480,6 +480,12 @@ export const GROWTH_NAV_QUICK_ACTIONS_SECONDARY: GrowthNavigationQuickAction[] =
     keywords: ["csv", "upload", "imports"],
   },
   {
+    id: "lead-sources",
+    label: "Lead Sources",
+    href: "/admin/growth/lead-sources",
+    keywords: ["datamoon", "audience", "provider import"],
+  },
+  {
     id: "acquisition-runs",
     label: "Acquisition Runs",
     href: "/admin/growth/acquisition",
@@ -626,6 +632,12 @@ export const GROWTH_NAV_GROUP_DEFS: GrowthNavGroupDef[] = [
         label: "Imports",
         consoleKey: "imports",
         match: prefixMatch("/admin/growth/imports"),
+      },
+      {
+        id: "lead-sources",
+        href: "/admin/growth/lead-sources",
+        label: "Lead Sources",
+        match: prefixMatch("/admin/growth/lead-sources"),
       },
       {
         id: "acquisition-runs",

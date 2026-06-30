@@ -213,7 +213,10 @@ export async function buildAudience(
     body: {
       type: input.type,
       filters: input.filters,
+      ...(input.name ? { name: input.name } : {}),
+      ...(input.website_id ? { website_id: input.website_id } : {}),
       ...(input.topic_ids ? { topic_ids: input.topic_ids } : {}),
+      ...(input.limit != null ? { limit: input.limit } : {}),
       ...(input.record_limit != null ? { record_limit: input.record_limit } : {}),
     },
     fetchImpl: options?.fetchImpl,
@@ -272,8 +275,18 @@ export async function fetchAudience(
       {
         id: normalizedId,
         status: "completed",
-        records: [],
-        record_count: 0,
+        records: [
+          {
+            first_name: "Dry",
+            last_name: "Run",
+            business_email: "dry.run@example.com",
+            personal_phone: "5550001234",
+            linkedin_url: "https://linkedin.com/in/dry-run",
+            personal_city: "Austin",
+            personal_state: "tx",
+          },
+        ],
+        record_count: 1,
         dry_run: true,
       },
       started,

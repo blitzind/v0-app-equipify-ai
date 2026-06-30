@@ -217,6 +217,7 @@ const GROWTH_PLATFORM_ADMIN_API_RULES: GrowthRouteAccessRule[] = [
   { id: "api-suppression", pattern: /^\/api\/platform\/growth\/suppression(?:\/|$)/, minimumRole: "platform_admin", label: "Suppression API" },
   { id: "api-operations-outbound", pattern: /^\/api\/platform\/growth\/operations(?:\/|$)/, minimumRole: "platform_admin", label: "Outbound Operations API" },
   { id: "api-import-batches", pattern: /^\/api\/platform\/growth\/import-batches(?:\/|$)/, minimumRole: "platform_admin", label: "Import Batches API" },
+  { id: "api-lead-sources", pattern: /^\/api\/platform\/growth\/lead-sources(?:\/|$)/, minimumRole: "platform_admin", label: "Lead Sources API" },
   { id: "api-acquisition", pattern: /^\/api\/platform\/growth\/acquisition(?:\/|$)/, minimumRole: "platform_admin", label: "Acquisition API" },
   { id: "api-apollo", pattern: /^\/api\/platform\/growth\/apollo(?:\/|$)/, minimumRole: "platform_admin", label: "Apollo Pilot API" },
   { id: "api-realtime-providers", pattern: /^\/api\/platform\/growth\/realtime\/providers(?:\/|$)/, minimumRole: "platform_admin", label: "Realtime Providers API" },

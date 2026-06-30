@@ -44,6 +44,9 @@ export type DatamoonBuildAudienceInput = {
   filters: DatamoonAudienceFilter[]
   topic_ids?: string[]
   record_limit?: number
+  name?: string
+  website_id?: string
+  limit?: number
 }
 
 export type DatamoonAudienceBuildResponse = {
