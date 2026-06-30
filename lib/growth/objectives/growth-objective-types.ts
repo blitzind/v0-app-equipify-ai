@@ -395,3 +395,17 @@ export type GrowthObjectiveOrchestrationResult = {
   reason: string | null
   requiresApproval: boolean
 }
+
+/** Client-safe dashboard payload shape returned by objectives API routes. */
+export type GrowthObjectiveDashboardModel = {
+  qa_marker: typeof GROWTH_OBJECTIVE_QA_MARKER
+  runtime_qa_marker: typeof GROWTH_OBJECTIVE_RUNTIME_QA_MARKER
+  objectives: GrowthObjective[]
+  activeCount: number
+  pausedCount: number
+  runningCount: number
+  totalTarget: number
+  totalProgress: number
+  emergencyStopActive: boolean
+  objectiveModeEnabled: boolean
+}

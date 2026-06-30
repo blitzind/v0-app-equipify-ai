@@ -26,7 +26,6 @@ import { GrowthHomeRenewalsMonitoringSection } from "@/components/growth/workspa
 import { GrowthHomeCustomerWinsSection } from "@/components/growth/workspace/executive-briefing/growth-home-customer-wins-section"
 import { GrowthHomeCustomerGrowthEmptySection } from "@/components/growth/workspace/executive-briefing/growth-home-customer-growth-empty-section"
 import { GrowthHomeTimelineSection } from "@/components/growth/workspace/executive-briefing/growth-home-timeline-section"
-import { GrowthHomeExecutiveRecommendationSection } from "@/components/growth/workspace/executive-briefing/growth-home-executive-recommendation-section"
 import { GrowthHomeInitiativeRecommendationsSection } from "@/components/growth/workspace/executive-briefing/growth-home-initiative-recommendations-section"
 import { GrowthHomeNeedsReviewSection } from "@/components/growth/workspace/executive-briefing/growth-home-needs-review-section"
 import { GrowthHomeWorkSummarySection } from "@/components/growth/workspace/executive-briefing/growth-home-work-summary-section"
@@ -86,13 +85,8 @@ export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, c
         statusLabel={briefing.checkIn.status.label}
         activityLabel={briefing.checkIn.status.activityLabel}
         lastUpdateLabel={lastUpdateLabel}
-      />
-
-      <GrowthHomeExecutiveRecommendationSection recommendation={briefing.executiveRecommendation} />
-
-      <GrowthHomeRecommendationCard
+        executiveRecommendation={briefing.executiveRecommendation}
         recommendation={briefing.recommendation}
-        additionalRecommendations={briefing.additionalRecommendations}
       />
 
       <GrowthHomeAiOsWaitingOnYouSection aiOsUx={aiOsUx} />
@@ -149,6 +143,10 @@ export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, c
           <GrowthHomeInitiativeRecommendationsSection recommendations={briefing.initiativeRecommendations} />
           <GrowthHomeNeedsReviewSection needsReview={briefing.needsReview} />
           <GrowthHomeWorkSummarySection categories={briefing.workSummary} />
+          <GrowthHomeRecommendationCard
+            recommendation={null}
+            additionalRecommendations={briefing.additionalRecommendations}
+          />
           {everythingElse}
         </CollapsibleContent>
       </Collapsible>

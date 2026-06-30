@@ -3,7 +3,12 @@
 import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import type { GrowthHomeAiOsUxViewModel } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
-import { AI_OWNERSHIP_WAITING_ON_YOU_TITLE } from "@/lib/workspace/ai-ownership-accountability"
+import {
+  GROWTH_HOME_AVA_IDLE,
+  GROWTH_HOME_CAUGHT_UP_TITLE,
+  GROWTH_HOME_NEEDS_YOUR_ATTENTION,
+  GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER,
+} from "@/lib/growth/workspace/executive-briefing/growth-home-experience-2b"
 import { Button } from "@/components/ui/button"
 
 type Props = {
@@ -12,44 +17,52 @@ type Props = {
 
 export function GrowthHomeAiOsWaitingOnYouSection({ aiOsUx }: Props) {
   const { waitingOnYou, waitingOnYouOverflow, approveItemsHref, approveItemsCount } = aiOsUx
-  if (waitingOnYou.length === 0 && approveItemsCount <= 0) return null
+  const hasItems = waitingOnYou.length > 0 || approveItemsCount > 0
 
   return (
-    <section data-qa-section="home-waiting-on-you" className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <section
+      data-qa-section="home-needs-your-attention"
+      data-home-experience-2b={GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER}
+      className="space-y-3"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">{AI_OWNERSHIP_WAITING_ON_YOU_TITLE}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Approvals, blocked items, and urgent replies that need you before I can continue.
+          <h2 className="text-lg font-semibold tracking-tight">{GROWTH_HOME_NEEDS_YOUR_ATTENTION}</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {hasItems
+              ? "Items Ava prepared that need your decision before work continues."
+              : "Nothing blocking Ava right now."}
           </p>
         </div>
         {approveItemsHref && approveItemsCount > 0 ? (
-          <Button asChild size="lg">
+          <Button asChild size="sm">
             <Link href={approveItemsHref}>
-              Approve Items
+              Review items
               <ArrowRight className="ml-2 size-4" />
             </Link>
           </Button>
         ) : null}
       </div>
 
-      {waitingOnYou.length > 0 ? (
-        <div className="space-y-3">
+      {!hasItems ? (
+        <div className="rounded-lg bg-muted/25 px-4 py-3 dark:bg-muted/15">
+          <p className="text-sm font-medium">{GROWTH_HOME_CAUGHT_UP_TITLE}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{GROWTH_HOME_AVA_IDLE}</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
           {waitingOnYou.map((item) => (
-            <article
-              key={item.id}
-              className="rounded-xl border border-amber-200/80 bg-amber-50/50 p-4 dark:border-amber-900/40 dark:bg-amber-950/20"
-            >
-              <p className="font-medium text-foreground">{item.label}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>
+            <article key={item.id} className="rounded-lg bg-amber-500/8 px-3 py-2.5 dark:bg-amber-500/10">
+              <p className="text-sm font-medium text-foreground">{item.label}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{item.detail}</p>
             </article>
           ))}
         </div>
-      ) : null}
+      )}
 
       {waitingOnYouOverflow > 0 ? (
-        <p className="text-sm text-muted-foreground">
-          {waitingOnYouOverflow} additional items collapsed in additional tools below.
+        <p className="text-xs text-muted-foreground">
+          {waitingOnYouOverflow} more in additional tools below.
         </p>
       ) : null}
     </section>

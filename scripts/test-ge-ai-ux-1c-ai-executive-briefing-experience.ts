@@ -109,12 +109,16 @@ function jsxOrder1c(source: string, earlier: string, later: string) {
   assert.ok(source.indexOf(`<${earlier}`) < source.indexOf(`<${later}`))
 }
 jsxOrder1c(dashboardLayout, "GrowthHomeExecutiveBriefingHeroSection", "GrowthHomeAiOsWaitingOnYouSection")
-jsxOrder1c(dashboardLayout, "GrowthHomeAiOsWaitingOnYouSection", "GrowthHomeAvaLiveStatusSection")
-jsxOrder1c(dashboardLayout, "GrowthHomeAvaLiveStatusSection", "GrowthHomeDailyWorkQueueSection")
-jsxOrder1c(dashboardLayout, "GrowthHomeDailyWorkQueueSection", "GrowthHomeActiveRevenueMissionsSection")
-jsxOrder1c(dashboardLayout, "GrowthHomeTimelineSection", "GrowthHomeExecutiveRecommendationSection")
-jsxOrder1c(dashboardLayout, "GrowthHomeExecutiveRecommendationSection", "Collapsible")
+jsxOrder1c(dashboardLayout, "GrowthHomeAiOsWaitingOnYouSection", "GrowthHomeDailyWorkQueueSection")
+jsxOrder1c(dashboardLayout, "GrowthHomeDailyWorkQueueSection", "GrowthHomeAvaLiveStatusSection")
+jsxOrder1c(dashboardLayout, "GrowthHomeAvaLiveStatusSection", "GrowthHomeActiveRevenueMissionsSection")
+jsxOrder1c(dashboardLayout, "GrowthHomeTimelineSection", "GrowthHomeThroughputSection")
 jsxOrder1c(dashboardLayout, "CollapsibleContent", "GrowthHomeBusinessSnapshotSection")
+
+const heroLayout = readSource("components/growth/workspace/executive-briefing/growth-home-executive-briefing-hero-section.tsx")
+const heroMain = heroLayout.slice(heroLayout.indexOf("export function GrowthHomeExecutiveBriefingHeroSection"))
+assert.ok(heroMain.indexOf('data-section="home-today-at-a-glance"') >= 0 || heroMain.indexOf('data-section="home-hero-ava-recommends"') >= 0)
+assert.ok(heroMain.indexOf('data-section="home-hero-ava-recommends"') < heroMain.indexOf('data-section="home-executive-kpis"'))
 console.log("  ✓ visual hierarchy order enforced in layout component")
 
 console.log(`[GE-AI-UX-1C] PASS — ${GE_AI_UX_1C_QA_MARKER}`)

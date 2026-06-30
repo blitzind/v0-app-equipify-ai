@@ -270,6 +270,20 @@ export type GrowthHomeExecutiveRecommendation = {
 /** GE-AIOS-UX-1A — Executive AI operator home presentation (read-model only). */
 export const GROWTH_HOME_AI_OS_UX_QA_MARKER = "growth-ge-aios-ux-1a-ai-os-home-experience-v1" as const
 
+export type GrowthHomeExecutiveKpiCard = {
+  id: string
+  title: string
+  value: string
+  status: string
+}
+
+export type GrowthHomeExecutiveActionCard = {
+  title: string
+  detail: string
+  ctaLabel: string
+  ctaHref: string
+}
+
 export type GrowthHomeExecutiveBriefingHeroMetric = {
   label: string
   value: string
@@ -280,9 +294,13 @@ export type GrowthHomeExecutiveBriefingHeroMetric = {
 export type GrowthHomeExecutiveBriefingHero = {
   greeting: string
   introLine: string
+  todayAtAGlance: string[]
   revenueToday: GrowthHomeExecutiveBriefingHeroMetric[]
+  executiveKpis: GrowthHomeExecutiveKpiCard[]
   biggestOpportunity: string | null
   biggestRisk: string | null
+  opportunityAction: GrowthHomeExecutiveActionCard | null
+  riskAction: GrowthHomeExecutiveActionCard | null
   expectedOutcomeToday: string | null
   overallConfidencePercent: number | null
   overallConfidenceLabel: string | null

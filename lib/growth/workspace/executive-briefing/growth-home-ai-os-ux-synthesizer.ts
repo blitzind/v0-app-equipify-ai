@@ -24,6 +24,12 @@ import type {
 } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 import { GROWTH_HOME_AI_OS_UX_QA_MARKER } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 import {
+  GROWTH_HOME_KPI_AVA_CONFIDENCE,
+  GROWTH_HOME_KPI_COMPLETED_FOR_YOU,
+  GROWTH_HOME_KPI_NEEDS_APPROVAL,
+  GROWTH_HOME_KPI_PIPELINE_IMPACT,
+} from "@/lib/growth/workspace/executive-briefing/growth-home-experience-2b"
+import {
   formatHomeCurrency,
   pluralize,
   sanitizeHomeNarrative,
@@ -194,14 +200,117 @@ export function buildExecutiveBriefingHero(
             "",
     ) || null
 
+  const tasksCompleted = Math.max(
+    executiveBrief.completedOutcomes.length,
+    metricValue(dashboard, "activity", "Emails sent today") +
+      metricValue(dashboard, "activity", "Replies today") +
+      metricValue(dashboard, "intelligence", "Hot companies"),
+  )
+
+  const companiesReviewed = Math.max(
+    metricValue(dashboard, "intelligence", "Hot companies"),
+    metricValue(dashboard, "my-queue", "Leads needing action"),
+    metricValue(dashboard, "my-queue", "Call-ready leads"),
+  )
+  const draftsPrepared = Math.max(
+    briefing?.approval_queue.pending_drafts ?? 0,
+    metricValue(dashboard, "campaign-snapshot", "Approval queue"),
+    metricValue(dashboard, "campaign-snapshot", "Active campaigns"),
+  )
+
+  const todayAtAGlance = [
+    companiesReviewed > 0
+      ? `Reviewed ${companiesReviewed} ${pluralize(companiesReviewed, "company", "companies")}`
+      : null,
+    draftsPrepared > 0
+      ? `Prepared ${draftsPrepared} ${pluralize(draftsPrepared, "outreach draft", "outreach drafts")}`
+      : null,
+    approvalBlockedCount > 0
+      ? `Waiting on ${approvalBlockedCount} ${pluralize(approvalBlockedCount, "approval", "approvals")}`
+      : tasksCompleted > 0
+        ? `Completed ${tasksCompleted} ${pluralize(tasksCompleted, "task", "tasks")} for you`
+        : null,
+  ].filter((line): line is string => line != null).slice(0, 3)
+
+  const executiveKpis = [
+    confidence.confidencePercent != null
+      ? {
+          id: "confidence",
+          title: GROWTH_HOME_KPI_AVA_CONFIDENCE,
+          value: `${confidence.confidencePercent}%`,
+          status: confidence.confidenceLabel ?? "High confidence",
+        }
+      : null,
+    tasksCompleted > 0
+      ? {
+          id: "tasks-completed",
+          title: GROWTH_HOME_KPI_COMPLETED_FOR_YOU,
+          value: String(tasksCompleted),
+          status: "Handled automatically",
+        }
+      : null,
+    approvalBlockedCount > 0
+      ? {
+          id: "needs-approval",
+          title: GROWTH_HOME_KPI_NEEDS_APPROVAL,
+          value: String(approvalBlockedCount),
+          status: "Awaiting review",
+        }
+      : null,
+    pipelineInfluence > 0
+      ? {
+          id: "revenue-influenced",
+          title: GROWTH_HOME_KPI_PIPELINE_IMPACT,
+          value: formatHomeCurrency(pipelineInfluence),
+          status: "Estimated pipeline impact",
+        }
+      : null,
+  ].filter((row): row is NonNullable<typeof row> => row != null)
+
+  const opportunityAction =
+    biggestOpportunity != null
+      ? {
+          title: biggestOpportunity,
+          detail:
+            executiveBrief.biggestWin?.detail ??
+            (topQueueAction?.reason ? sanitizeHomeNarrative(topQueueAction.reason) : expectedOutcomeToday) ??
+            "Act on the highest-impact opportunity in your queue.",
+          ctaLabel: "Review now",
+          ctaHref:
+            topQueueAction?.href ??
+            executiveBrief.primaryCta.href ??
+            metricHref(dashboard, "my-queue", "Leads needing action"),
+        }
+      : null
+
+  const riskAction =
+    biggestRisk != null
+      ? {
+          title: biggestRisk,
+          detail:
+            executiveBrief.biggestRisk?.detail ??
+            sanitizeHomeNarrative(briefing?.section_summaries.mailbox ?? briefing?.section_summaries.inbox ?? "") ??
+            "Resolve before it slows outbound or follow-up.",
+          ctaLabel: "Resolve",
+          ctaHref:
+            (briefing?.mailbox.warnings ?? 0) > 0 || (briefing?.mailbox.expired_mailboxes ?? 0) > 0
+              ? "/growth/settings/communications/mailboxes"
+              : executiveBrief.secondaryCta.href,
+        }
+      : null
+
   return {
     greeting: executiveBrief.greeting,
     introLine: queueEnabled
       ? "Here's my prioritized workday from the canonical revenue queue."
       : "Here's what I've been working on.",
+    todayAtAGlance,
     revenueToday,
+    executiveKpis,
     biggestOpportunity,
     biggestRisk,
+    opportunityAction,
+    riskAction,
     expectedOutcomeToday,
     overallConfidencePercent: confidence.confidencePercent,
     overallConfidenceLabel: confidence.confidenceLabel,

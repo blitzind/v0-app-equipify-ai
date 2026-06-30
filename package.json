@@ -444,6 +444,8 @@
     "test:growth-workspace-ava-identity-1d": "tsx scripts/test-growth-workspace-ava-identity-1d.ts",
     "test:growth-workspace-operator-simplification-1e": "tsx scripts/test-growth-workspace-operator-simplification-1e.ts",
     "test:growth-workspace-action-first-1f": "tsx scripts/test-growth-workspace-action-first-1f.ts",
+    "test:growth-workspace-dashboard-refinement-2a": "tsx scripts/test-growth-workspace-dashboard-refinement-2a.ts",
+    "test:growth-workspace-home-experience-2b": "tsx scripts/test-growth-workspace-home-experience-2b.ts",
     "test:growth-home-debug-source-fresh-slate-1c": "tsx scripts/test-growth-home-debug-source-fresh-slate-1c.ts",
     "test:growth-email-discovery-7.3a": "tsx scripts/test-growth-email-discovery-7.3a.ts",
     "test:growth-email-discovery-7.3b": "tsx scripts/test-growth-email-discovery-7.3b.ts",

@@ -28,22 +28,12 @@ import {
   GROWTH_OBJECTIVE_RUNTIME_QA_MARKER,
   type GrowthObjective,
   type GrowthObjectiveCreateInput,
+  type GrowthObjectiveDashboardModel,
   type GrowthObjectiveInboundSignal,
   type GrowthObjectiveSignalSnapshot,
 } from "@/lib/growth/objectives/growth-objective-types"
 
-export type GrowthObjectiveDashboardModel = {
-  qa_marker: typeof GROWTH_OBJECTIVE_QA_MARKER
-  runtime_qa_marker: typeof GROWTH_OBJECTIVE_RUNTIME_QA_MARKER
-  objectives: GrowthObjective[]
-  activeCount: number
-  pausedCount: number
-  runningCount: number
-  totalTarget: number
-  totalProgress: number
-  emergencyStopActive: boolean
-  objectiveModeEnabled: boolean
-}
+export type { GrowthObjectiveDashboardModel } from "@/lib/growth/objectives/growth-objective-types"
 
 export type GrowthObjectiveExecutionSummary = ReturnType<typeof summarizeObjectiveExecutionContext>
 

@@ -69,16 +69,19 @@ function RecommendationArticle({ recommendation, featured }: { recommendation: G
 export function GrowthHomeRecommendationCard({ recommendation, additionalRecommendations }: Props) {
   const [expanded, setExpanded] = useState(false)
 
-  if (!recommendation) return null
+  if (!recommendation && additionalRecommendations.length === 0) return null
 
   return (
     <section data-qa-section="home-recommendation" className="space-y-4">
-      <div>
-        <h2 className="text-xl font-semibold tracking-tight">{AI_OS_TOP_BUSINESS_MOVE_TITLE}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{GROWTH_AVA_RECOMMENDS_NEXT_COPY}</p>
-      </div>
-
-      <RecommendationArticle recommendation={recommendation} featured />
+      {recommendation ? (
+        <>
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight">{AI_OS_TOP_BUSINESS_MOVE_TITLE}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{GROWTH_AVA_RECOMMENDS_NEXT_COPY}</p>
+          </div>
+          <RecommendationArticle recommendation={recommendation} featured />
+        </>
+      ) : null}
 
       {additionalRecommendations.length > 0 ? (
         <Collapsible open={expanded} onOpenChange={setExpanded}>
