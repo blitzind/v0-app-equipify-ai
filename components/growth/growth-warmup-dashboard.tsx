@@ -24,18 +24,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import {
+  GROWTH_SETTINGS_COMMUNICATIONS_REFINEMENT_2C_QA_MARKER,
+  GROWTH_SETTINGS_SECTION_GAP,
+} from "@/components/growth/growth-settings-ui"
 import { warmupHealthTierLabel } from "@/lib/growth/warmup/warmup-health"
 import type {
   GrowthWarmupDashboard,
   GrowthWarmupEvent,
   GrowthWarmupProfile,
 } from "@/lib/growth/warmup/warmup-types"
-import {
-  GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH,
-  GROWTH_COMMUNICATIONS_MAILBOXES_PATH,
-  GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH,
-} from "@/lib/growth/navigation/growth-communications-settings-navigation"
-import { GROWTH_WARMUP_PRIVACY_NOTE } from "@/lib/growth/warmup/warmup-types"
 import type { GrowthSenderAccount } from "@/lib/growth/sender/sender-types"
 import { GrowthWarmupExecutorPanel } from "@/components/growth/growth-warmup-executor-panel"
 
@@ -233,27 +231,20 @@ export function GrowthWarmupDashboardPanel() {
   }
 
   return (
-    <div className="space-y-6">
+    <div
+      className={GROWTH_SETTINGS_SECTION_GAP}
+      data-growth-settings-communications-refinement={GROWTH_SETTINGS_COMMUNICATIONS_REFINEMENT_2C_QA_MARKER}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">
-          Native warmup uses approved sequence sends, progression schedules, automated daily caps, pre-send guards, and
-          reputation tracking. {GROWTH_WARMUP_PRIVACY_NOTE}
+        <p className="text-sm text-muted-foreground">
+          {dashboard
+            ? `${dashboard.healthy_count} healthy · ${dashboard.paused_count} paused · avg score ${dashboard.average_warmup_score}%`
+            : "Ramp sending safely with native sequence sends, daily caps, and reputation tracking."}
         </p>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" asChild>
-            <Link href={GROWTH_COMMUNICATIONS_MAILBOXES_PATH}>Mailboxes</Link>
-          </Button>
-          <Button type="button" variant="outline" size="sm" asChild>
-            <Link href={GROWTH_COMMUNICATIONS_DELIVERABILITY_PATH}>Deliverability</Link>
-          </Button>
-          <Button type="button" variant="outline" size="sm" asChild>
-            <Link href={GROWTH_COMMUNICATIONS_SENDING_DOMAINS_PATH}>Sending domains</Link>
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={Boolean(actionLoading)}>
-            <RefreshCw className="mr-1.5 size-3.5" />
-            Refresh
-          </Button>
-        </div>
+        <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={Boolean(actionLoading)}>
+          <RefreshCw className="mr-1.5 size-3.5" />
+          Refresh
+        </Button>
       </div>
 
       {error ? (
@@ -296,8 +287,8 @@ export function GrowthWarmupDashboardPanel() {
 
       <GrowthEngineCard title="Warmup mismatch warnings">
         <p className="text-sm text-muted-foreground">
-          When send volume exceeds warmup stage limits, Deliverability Ops surfaces warmup mismatch risks. Review advisory
-          recommendations before increasing outbound volume.
+          When send volume exceeds warmup stage limits, review advisory recommendations before increasing outbound
+          volume.
         </p>
         <Button asChild variant="outline" size="sm" className="mt-3">
           <Link href="/admin/growth/providers/deliverability-ops">Review in Deliverability Ops</Link>

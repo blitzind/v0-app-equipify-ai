@@ -44,10 +44,10 @@ import type { GrowthEmailProviderConnection } from "@/lib/growth/outbound/types"
 import { cn } from "@/lib/utils"
 
 const DIAL_MODE_LABELS: Record<GrowthCallDialMode, string> = {
-  tel: "Browser tel: link",
+  tel: "Phone app",
   facetime: "FaceTime audio",
-  google_voice: "Google Voice (web)",
-  custom_url_template: "Custom URL template",
+  google_voice: "Google Voice",
+  custom_url_template: "Custom link",
 }
 
 type ProvidersPayload = {
@@ -77,10 +77,16 @@ export type GrowthCommunicationSettingsPanelMode = "operator" | "admin"
 export type GrowthCommunicationSettingsPanelProps = {
   /** Operator mode exposes user dial preferences only — platform defaults stay in Platform Admin. */
   mode?: GrowthCommunicationSettingsPanelMode
+  /** Calling Preferences page uses operator-focused copy and hides non-dialer fields. */
+  variant?: "default" | "calling-preferences"
 }
 
-export function GrowthCommunicationSettingsPanel({ mode = "admin" }: GrowthCommunicationSettingsPanelProps) {
+export function GrowthCommunicationSettingsPanel({
+  mode = "admin",
+  variant = "default",
+}: GrowthCommunicationSettingsPanelProps) {
   const isOperatorMode = mode === "operator"
+  const isCallingPreferences = isOperatorMode && variant === "calling-preferences"
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -287,25 +293,33 @@ export function GrowthCommunicationSettingsPanel({ mode = "admin" }: GrowthCommu
         </div>
       ) : null}
       {success ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200">
+        <div
+          className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200"
+          aria-live="polite"
+        >
           {success}
         </div>
       ) : null}
 
       <GrowthSettingsCard
-        title={isOperatorMode ? "Dial preferences" : "Call Channel Preferences"}
+        title={isCallingPreferences ? "Dialer" : isOperatorMode ? "Dial preferences" : "Call Channel Preferences"}
         icon={<Phone className="size-4" />}
         headerAside={
           resolved ? (
-            <GrowthSettingsBadge label={`Active: ${DIAL_MODE_LABELS[resolved.callDialMode]}`} tone="neutral" />
+            <GrowthSettingsBadge
+              label={isCallingPreferences ? DIAL_MODE_LABELS[resolved.callDialMode] : `Active: ${DIAL_MODE_LABELS[resolved.callDialMode]}`}
+              tone="neutral"
+            />
           ) : null
         }
       >
         <div className={GROWTH_SETTINGS_INNER_GAP}>
-          <p className="text-xs text-muted-foreground">
-            {isOperatorMode
-              ? "Your dial mode and call sheet behavior. Platform defaults apply when overrides are blank."
-              : "Fallback chain: your preferences → platform defaults → tel. Platform-admin internal only."}
+          <p className="text-sm text-muted-foreground">
+            {isCallingPreferences
+              ? "Choose how outbound calls open from records. Workspace defaults apply when you leave an override blank."
+              : isOperatorMode
+                ? "Your dial mode and call sheet behavior. Workspace defaults apply when overrides are blank."
+                : "Fallback chain: your preferences → platform defaults → tel. Platform-admin internal only."}
           </p>
 
           <div className={cn("grid gap-3", isOperatorMode ? "max-w-xl" : "lg:grid-cols-2")}>
@@ -371,10 +385,10 @@ export function GrowthCommunicationSettingsPanel({ mode = "admin" }: GrowthCommu
             ) : null}
 
             <div className="space-y-2.5 rounded-lg border border-border/70 p-3 dark:border-[#25324C]">
-              <h4 className="text-sm font-medium">{isOperatorMode ? "Your preferences" : "Your Overrides"}</h4>
+              <h4 className="text-sm font-medium">{isCallingPreferences ? "Your dialer settings" : "Your preferences"}</h4>
               <div className={GROWTH_SETTINGS_FORM_GAP}>
                 <Label htmlFor="user-dial-mode" className="text-xs">
-                  Dial mode override
+                  {isCallingPreferences ? "Default call method" : "Dial mode override"}
                 </Label>
                 <select
                   id="user-dial-mode"
@@ -382,7 +396,7 @@ export function GrowthCommunicationSettingsPanel({ mode = "admin" }: GrowthCommu
                   value={userDialMode}
                   onChange={(event) => setUserDialMode(event.target.value)}
                 >
-                  <option value="">Use platform default</option>
+                  <option value="">{isCallingPreferences ? "Use workspace default" : "Use platform default"}</option>
                   {GROWTH_CALL_DIAL_MODES.map((mode) => (
                     <option key={mode} value={mode}>
                       {DIAL_MODE_LABELS[mode]}
@@ -392,19 +406,19 @@ export function GrowthCommunicationSettingsPanel({ mode = "admin" }: GrowthCommu
               </div>
               <div className={GROWTH_SETTINGS_FORM_GAP}>
                 <Label htmlFor="user-template" className="text-xs">
-                  Custom URL template override
+                  Custom call link
                 </Label>
                 <Input
                   id="user-template"
                   className="h-9"
-                  placeholder="Leave blank to inherit platform template"
+                  placeholder="Leave blank to use the workspace template"
                   value={userTemplate}
                   onChange={(event) => setUserTemplate(event.target.value)}
                 />
               </div>
               <div className={GROWTH_SETTINGS_FORM_GAP}>
                 <Label htmlFor="user-show-alternates" className="text-xs">
-                  Alternate dialers override
+                  Alternate dialers
                 </Label>
                 <select
                   id="user-show-alternates"
@@ -412,11 +426,12 @@ export function GrowthCommunicationSettingsPanel({ mode = "admin" }: GrowthCommu
                   value={userShowAlternates}
                   onChange={(event) => setUserShowAlternates(event.target.value)}
                 >
-                  <option value="">Use platform default</option>
+                  <option value="">Use workspace default</option>
                   <option value="true">Show alternates</option>
                   <option value="false">Hide alternates</option>
                 </select>
               </div>
+              {!isCallingPreferences ? (
               <div className={GROWTH_SETTINGS_FORM_GAP}>
                 <Label htmlFor="user-email-connection" className="text-xs">
                   Preferred email connection
@@ -435,19 +450,15 @@ export function GrowthCommunicationSettingsPanel({ mode = "admin" }: GrowthCommu
                   ))}
                 </select>
               </div>
+              ) : null}
             </div>
           </div>
 
-          {previewHref ? (
+          {!isCallingPreferences && previewHref ? (
             <p className="text-[11px] text-muted-foreground">
               Preview (555-123-4567): <code className="rounded bg-muted px-1 py-0.5">{previewHref}</code>
             </p>
           ) : null}
-
-          <p className="text-[11px] text-muted-foreground">
-            Suppression is honored on email outreach. Calls are manual dial only — no auto-dial, recording, or copilot
-            in this slice.
-          </p>
         </div>
       </GrowthSettingsCard>
 
@@ -550,7 +561,7 @@ export function GrowthCommunicationSettingsPanel({ mode = "admin" }: GrowthCommu
       <div className="flex justify-end">
         <Button size="sm" disabled={saving} onClick={() => void saveSettings()}>
           {saving ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Save className="mr-2 size-4" />}
-          {isOperatorMode ? "Save dial preferences" : "Save Settings"}
+          {isCallingPreferences ? "Save dialer settings" : isOperatorMode ? "Save dial preferences" : "Save Settings"}
         </Button>
       </div>
     </div>

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
+  GROWTH_SETTINGS_COMMUNICATIONS_REFINEMENT_2C_QA_MARKER,
   GROWTH_SETTINGS_SECTION_GAP,
 } from "@/components/growth/growth-settings-ui"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
@@ -34,7 +35,11 @@ export function GrowthCommunicationsSettingsSection({
   children,
 }: GrowthCommunicationsSettingsSectionProps) {
   return (
-    <div className={GROWTH_SETTINGS_SECTION_GAP} data-growth-communications-settings={GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER}>
+    <div
+      className={GROWTH_SETTINGS_SECTION_GAP}
+      data-growth-communications-settings={GROWTH_COMMUNICATIONS_SETTINGS_QA_MARKER}
+      data-growth-settings-communications-refinement={GROWTH_SETTINGS_COMMUNICATIONS_REFINEMENT_2C_QA_MARKER}
+    >
       <GrowthWorkspacePageHeader
         title={title}
         description={description}

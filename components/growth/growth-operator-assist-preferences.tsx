@@ -16,11 +16,11 @@ import {
 } from "@/lib/growth/operator-assist/types"
 
 const CATEGORY_LABELS: Record<UnifiedOperatorAssistCategory, string> = {
-  objection: "Objections",
+  objection: "Objection handling",
   buying_signal: "Buying signals",
   risk: "Risk alerts",
-  guidance: "Operator guidance",
-  coaching: "Live coaching",
+  guidance: "Call guidance",
+  coaching: "Coaching prompts",
   interruption: "Interruptions",
   conversation: "Conversation signals",
 }
@@ -44,7 +44,7 @@ export function GrowthOperatorAssistPreferencesPanel() {
         message?: string
       }
       if (!res.ok || !data.ok || !data.preferences) {
-        throw new Error(data.message ?? "Could not load operator assist preferences.")
+        throw new Error(data.message ?? "Could not load AI call assistance settings.")
       }
       setPreferences(data.preferences)
     } catch (e) {
@@ -87,30 +87,30 @@ export function GrowthOperatorAssistPreferencesPanel() {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" />
-        Loading operator assist preferences…
+        Loading AI call assistance…
       </div>
     )
   }
 
   return (
     <div data-voice-unified-operator-assist-qa-marker={VOICE_UNIFIED_OPERATOR_ASSIST_QA_MARKER}>
-      <GrowthSettingsCard title="Operator assist preferences" icon={<Sparkles className="size-4" />}>
+      <GrowthSettingsCard title="AI call assistance" icon={<Sparkles className="size-4" />}>
         <p className="mb-4 text-sm text-muted-foreground">
-          Per-operator controls for the unified assist feed during calls. Org-level coaching settings remain separate.
+          Control real-time suggestions, objections, and buying signals during live calls.
         </p>
         <div className={GROWTH_SETTINGS_FORM_GAP}>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <div className={GROWTH_SETTINGS_INNER_GAP}>
           <GrowthSettingsToggleRow
-            label="Quiet mode"
-            description="Hide low-priority assist cards during calls."
+            label="Focus mode"
+            description="Hide lower-priority assist cards while you are on a call."
             checked={preferences.quietMode}
             disabled={saving}
             onCheckedChange={(checked) => void save({ quietMode: checked })}
           />
           <div className="space-y-2">
             <label className="text-sm font-medium" htmlFor="operator-assist-min-priority">
-              Minimum priority threshold
+              Minimum alert priority
             </label>
             <select
               id="operator-assist-min-priority"
@@ -131,7 +131,7 @@ export function GrowthOperatorAssistPreferencesPanel() {
             </select>
           </div>
           <div className="space-y-2">
-            <p className="text-sm font-medium">Assist card categories</p>
+            <p className="text-sm font-medium">Suggestion categories</p>
             {(Object.keys(CATEGORY_LABELS) as UnifiedOperatorAssistCategory[]).map((category) => (
               <GrowthSettingsToggleRow
                 key={category}

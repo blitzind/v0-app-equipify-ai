@@ -10,12 +10,12 @@ export function GrowthVideoLibraryShell() {
   return (
     <GrowthVideoWorkspaceShell
       title="Video Library"
-      description="Browse recorded and uploaded assets. Search, filters, and uploads arrive in a later phase."
+      description="Browse recorded and uploaded video assets for personalized outreach."
     >
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Search videos (placeholder)" disabled />
+          <Input className="pl-9" placeholder="Search videos" disabled />
         </div>
         <Button variant="outline" size="sm" disabled>
           <Upload className="mr-1 h-4 w-4" />
@@ -35,7 +35,7 @@ export function GrowthVideoLibraryShell() {
         <GrowthEngineHonestEmptyState
           kind="no_data"
           title="No videos yet"
-          message="Record or upload a video to populate your library. Foundation shell only — capture arrives in a later phase."
+          message="Record or upload a video to populate your library. Your recorded assets appear here once capture is enabled for your workspace."
         />
       </div>
     </GrowthVideoWorkspaceShell>

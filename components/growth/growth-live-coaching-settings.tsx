@@ -21,7 +21,10 @@ import {
 import { LIVE_COACHING_QA_PROOF_MARKER } from "@/lib/growth/realtime/live-coaching/live-coaching-production-proof"
 import type { GrowthLiveCoachingSettings, RealtimeProviderConnection } from "@/lib/growth/realtime/providers/provider-types"
 
-export function GrowthLiveCoachingSettingsPanel() {
+export type GrowthLiveCoachingSettingsPanelMode = "operator" | "admin"
+
+export function GrowthLiveCoachingSettingsPanel({ mode = "admin" }: { mode?: GrowthLiveCoachingSettingsPanelMode }) {
+  const isOperatorMode = mode === "operator"
   const [settings, setSettings] = useState<GrowthLiveCoachingSettings | null>(null)
   const [connections, setConnections] = useState<RealtimeProviderConnection[]>([])
   const [keywordsDraft, setKeywordsDraft] = useState("")
@@ -157,9 +160,16 @@ export function GrowthLiveCoachingSettingsPanel() {
       {error ? <p className="mb-2 text-xs text-destructive">{error}</p> : null}
 
       <div className={GROWTH_SETTINGS_INNER_GAP}>
+        {isOperatorMode ? (
+          <p className="text-sm text-muted-foreground">
+            {settings.activeProviderConnectionId
+              ? "Live coaching is connected for your workspace."
+              : "Live coaching awaits workspace setup. Transcript connection is managed by Platform admin."}
+          </p>
+        ) : (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-medium text-foreground">Provider Comparison</span>
+            <span className="text-xs font-medium text-foreground">Provider comparison</span>
             {recommendation.connectionId ? (
               <Button
                 type="button"
@@ -169,7 +179,7 @@ export function GrowthLiveCoachingSettingsPanel() {
                 disabled={saving || settings.activeProviderConnectionId === recommendation.connectionId}
                 onClick={() => void save({ activeProviderConnectionId: recommendation.connectionId })}
               >
-                Use Recommended
+                Use recommended
               </Button>
             ) : null}
           </div>
@@ -178,10 +188,13 @@ export function GrowthLiveCoachingSettingsPanel() {
           ) : null}
           <GrowthLiveCoachingProviderComparisonTable rows={comparisonRows} compact />
         </div>
+        )}
 
+        {!isOperatorMode ? (
+        <>
         <div className="grid gap-2.5 lg:grid-cols-2">
           <label className={GROWTH_SETTINGS_FORM_GAP}>
-            <span className="text-xs font-medium">Active Transcript Provider</span>
+            <span className="text-xs font-medium">Active transcript provider</span>
             <select
               className="h-9 w-full rounded-md border border-border bg-background px-2.5 text-sm"
               value={settings.activeProviderConnectionId ?? ""}
@@ -202,7 +215,7 @@ export function GrowthLiveCoachingSettingsPanel() {
           </label>
 
           <label className={GROWTH_SETTINGS_FORM_GAP}>
-            <span className="text-xs font-medium">Custom Keywords (comma-separated)</span>
+            <span className="text-xs font-medium">Custom keywords (comma-separated)</span>
             <Input
               className="h-9"
               value={keywordsDraft}
@@ -258,7 +271,7 @@ export function GrowthLiveCoachingSettingsPanel() {
                 onClick={() => void testActiveProvider()}
               >
                 {testing ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : null}
-                Test Connection
+                Test connection
               </Button>
               {testMessage ? <span className="text-[11px] text-muted-foreground">{testMessage}</span> : null}
             </div>
@@ -272,16 +285,38 @@ export function GrowthLiveCoachingSettingsPanel() {
             browser mic when connected.
           </p>
         )}
+        </>
+        ) : (
+          <label className={GROWTH_SETTINGS_FORM_GAP}>
+            <span className="text-xs font-medium">Custom keywords (comma-separated)</span>
+            <Input
+              className="h-9"
+              value={keywordsDraft}
+              onChange={(event) => setKeywordsDraft(event.target.value)}
+              onBlur={() =>
+                void save({
+                  customKeywords: keywordsDraft
+                    .split(",")
+                    .map((entry) => entry.trim())
+                    .filter(Boolean),
+                })
+              }
+              disabled={saving}
+            />
+          </label>
+        )}
 
         <div className="grid gap-2 sm:grid-cols-2">
           <GrowthSettingsToggleRow
-            label="Enable speaker separation"
+            label="Speaker separation"
+            description="Separate rep and prospect lines in live transcripts."
             checked={settings.speakerSeparationEnabled}
             onCheckedChange={(checked) => void save({ speakerSeparationEnabled: checked })}
             disabled={saving}
           />
           <GrowthSettingsToggleRow
-            label="Enable keyword events"
+            label="Keyword alerts"
+            description="Surface coaching cards when tracked keywords appear."
             checked={settings.keywordEventsEnabled}
             onCheckedChange={(checked) => void save({ keywordEventsEnabled: checked })}
             disabled={saving}

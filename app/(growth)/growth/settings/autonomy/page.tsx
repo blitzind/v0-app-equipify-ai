@@ -1,7 +1,5 @@
-"use client"
+import { GrowthSettingsAutonomyPage } from "@/components/growth/settings/growth-settings-autonomy-page"
 
-import { GrowthAutonomyControlCenter } from "@/components/growth/autonomy/growth-autonomy-control-center"
-
-export default function GrowthAutonomySettingsPage() {
-  return <GrowthAutonomyControlCenter />
+export default function GrowthAutonomySettingsRoutePage() {
+  return <GrowthSettingsAutonomyPage />
 }

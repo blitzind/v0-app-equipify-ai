@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import Link from "next/link"
 import { Loader2, Plus, RefreshCw, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,6 +23,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import {
+  GROWTH_SETTINGS_COMMUNICATIONS_REFINEMENT_2C_QA_MARKER,
+  GROWTH_SETTINGS_SECTION_GAP,
+} from "@/components/growth/growth-settings-ui"
 import { GrowthDomainDeliverabilityDomainsTable } from "@/components/growth/growth-domain-deliverability-domains-table"
 import type {
   GrowthSenderAccount,
@@ -208,23 +211,19 @@ export function GrowthSenderInfrastructureDashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div
+      className={GROWTH_SETTINGS_SECTION_GAP}
+      data-qa={GROWTH_SENDER_INFRASTRUCTURE_QA_MARKER}
+      data-growth-settings-communications-refinement={GROWTH_SETTINGS_COMMUNICATIONS_REFINEMENT_2C_QA_MARKER}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">
-          {GROWTH_SENDER_INFRASTRUCTURE_QA_MARKER} · Infrastructure only — no outbound sending, OAuth, or DNS execution.
+        <p className="text-sm text-muted-foreground">
+          {senderMetrics.connected} connected · {senderMetrics.healthy} healthy · {domains.length} sending domains
         </p>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/admin/growth/infrastructure/mailboxes">Mailbox Connections</Link>
-          </Button>
-          <Button type="button" variant="outline" size="sm" asChild>
-            <Link href="/admin/growth/infrastructure/deliverability">Deliverability</Link>
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={Boolean(actionLoading)}>
-            <RefreshCw className="mr-1.5 size-3.5" />
-            Refresh
-          </Button>
-        </div>
+        <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={Boolean(actionLoading)}>
+          <RefreshCw className="mr-1.5 size-3.5" />
+          Refresh
+        </Button>
       </div>
 
       {error ? (

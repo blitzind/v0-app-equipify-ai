@@ -1,15 +1,18 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { Loader2, User } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { User } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   GrowthSettingsCard,
   GROWTH_SETTINGS_FORM_GAP,
+  GROWTH_SETTINGS_GENERAL_REFINEMENT_2B_QA_MARKER,
   GROWTH_SETTINGS_SECTION_GAP,
 } from "@/components/growth/growth-settings-ui"
 import {
   GrowthSettingsField,
+  GrowthSettingsSaveStatus,
   GrowthSettingsSectionErrorState,
   GrowthSettingsSectionForm,
   GrowthSettingsSectionLoadingState,
@@ -17,7 +20,10 @@ import {
 import { GrowthMediaPicker } from "@/components/growth/media-library/growth-media-picker"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
 import { useGrowthWorkspaceSettingsResource } from "@/hooks/growth/use-growth-workspace-settings-resource"
-import { GROWTH_WORKSPACE_SETTINGS_TIMEZONE_OPTIONS } from "@/lib/growth/settings/growth-workspace-settings-options"
+import {
+  GROWTH_WORKSPACE_SETTINGS_TIMEZONE_OPTIONS,
+  resolveGrowthWorkspaceTimezoneLabel,
+} from "@/lib/growth/settings/growth-workspace-settings-options"
 import type { GrowthWorkspaceSettingsProfile } from "@/lib/growth/settings/growth-workspace-settings-types"
 import {
   Select,
@@ -38,6 +44,14 @@ const INITIAL: GrowthWorkspaceSettingsProfile = {
   email: "",
 }
 
+function profileInitials(displayName: string, email: string): string {
+  const source = displayName.trim() || email.trim()
+  if (!source) return "?"
+  const parts = source.split(/\s+/).filter(Boolean)
+  if (parts.length >= 2) return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase()
+  return source.slice(0, 2).toUpperCase()
+}
+
 export function GrowthSettingsProfilePanel() {
   const selectValue = useCallback(
     (data: { profile?: GrowthWorkspaceSettingsProfile }) => data.profile ?? null,
@@ -54,16 +68,27 @@ export function GrowthSettingsProfilePanel() {
     setDraft(value)
   }, [value])
 
+  const timezoneLabel = useMemo(
+    () => resolveGrowthWorkspaceTimezoneLabel(draft.timezone),
+    [draft.timezone],
+  )
+
+  const displayName = draft.displayName.trim() || "Your name"
+  const jobTitle = draft.jobTitle.trim()
+
   async function commitField<K extends keyof GrowthWorkspaceSettingsProfile>(field: K) {
     if (draft[field] === value[field]) return
     await patch({ [field]: draft[field] } as Partial<GrowthWorkspaceSettingsProfile>)
   }
 
   return (
-    <div className={GROWTH_SETTINGS_SECTION_GAP}>
+    <div
+      className={GROWTH_SETTINGS_SECTION_GAP}
+      data-qa-marker={GROWTH_SETTINGS_GENERAL_REFINEMENT_2B_QA_MARKER}
+    >
       <GrowthWorkspacePageHeader
         title="Profile"
-        description="Your name, title, timezone, and avatar shown across Growth."
+        description="How you appear across Growth."
         icon={User}
       />
 
@@ -71,43 +96,64 @@ export function GrowthSettingsProfilePanel() {
       {!loading && error ? <GrowthSettingsSectionErrorState message={error} onRetry={() => void refresh()} /> : null}
 
       {!loading && !error ? (
-        <GrowthSettingsSectionForm
-          footer={
-            saving ? (
-              <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" />
-                Saving…
-              </p>
-            ) : null
-          }
-        >
-          <GrowthSettingsCard title="Operator identity">
+        <GrowthSettingsSectionForm footer={<GrowthSettingsSaveStatus saving={saving} />}>
+          <GrowthSettingsCard title="Identity">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+              <Avatar className="size-16 shrink-0 ring-2 ring-border/60">
+                {draft.avatarUrl ? <AvatarImage src={draft.avatarUrl} alt={displayName} /> : null}
+                <AvatarFallback className="bg-muted text-base font-semibold text-foreground">
+                  {profileInitials(draft.displayName, draft.email)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className="text-lg font-semibold tracking-tight text-foreground">{displayName}</p>
+                <p className="text-sm text-muted-foreground">
+                  {jobTitle || "Add a job title below"}
+                </p>
+                {draft.email ? (
+                  <p className="truncate text-sm text-muted-foreground">{draft.email}</p>
+                ) : null}
+                <p className="text-xs text-muted-foreground">
+                  {timezoneLabel.friendly}
+                  <span className="mx-1 text-muted-foreground/50">·</span>
+                  {timezoneLabel.iana}
+                </p>
+              </div>
+            </div>
+          </GrowthSettingsCard>
+
+          <GrowthSettingsCard title="Details">
             <div className={GROWTH_SETTINGS_FORM_GAP}>
-              <GrowthSettingsField label="Display name" description="Shown across Growth surfaces.">
+              <GrowthSettingsField label="Display name">
                 <Input
                   value={draft.displayName}
                   onChange={(event) => setDraft((current) => ({ ...current, displayName: event.target.value }))}
                   onBlur={() => void commitField("displayName")}
                   disabled={saving}
                   maxLength={200}
+                  placeholder="Your name"
                 />
               </GrowthSettingsField>
 
-              <GrowthSettingsField label="Job title" description="Stored on your organization membership.">
+              <GrowthSettingsField
+                label="Job title"
+                description="Optional — shown on your profile and in collaboration surfaces."
+              >
                 <Input
                   value={draft.jobTitle}
                   onChange={(event) => setDraft((current) => ({ ...current, jobTitle: event.target.value }))}
                   onBlur={() => void commitField("jobTitle")}
                   disabled={saving}
                   maxLength={200}
+                  placeholder="e.g. Owner, Account Executive"
                 />
               </GrowthSettingsField>
 
-              <GrowthSettingsField label="Email" description="Managed by your account — read only here.">
-                <Input value={draft.email} disabled readOnly />
+              <GrowthSettingsField label="Email" description="Managed by your account.">
+                <Input value={draft.email || "Not available"} disabled readOnly className="bg-muted/40" />
               </GrowthSettingsField>
 
-              <GrowthSettingsField label="Timezone" description="Used for quiet hours and scheduling context.">
+              <GrowthSettingsField label="Timezone" description="Used for quiet hours and scheduling.">
                 <Select
                   value={draft.timezone}
                   onValueChange={(next) => {
@@ -120,18 +166,24 @@ export function GrowthSettingsProfilePanel() {
                     <SelectValue placeholder="Select timezone" />
                   </SelectTrigger>
                   <SelectContent>
-                    {GROWTH_WORKSPACE_SETTINGS_TIMEZONE_OPTIONS.map((timezone) => (
-                      <SelectItem key={timezone} value={timezone}>
-                        {timezone}
-                      </SelectItem>
-                    ))}
+                    {GROWTH_WORKSPACE_SETTINGS_TIMEZONE_OPTIONS.map((timezone) => {
+                      const option = resolveGrowthWorkspaceTimezoneLabel(timezone)
+                      return (
+                        <SelectItem key={timezone} value={timezone}>
+                          <span className="flex flex-col items-start gap-0.5">
+                            <span>{option.friendly}</span>
+                            <span className="text-xs text-muted-foreground">{option.iana}</span>
+                          </span>
+                        </SelectItem>
+                      )
+                    })}
                   </SelectContent>
                 </Select>
               </GrowthSettingsField>
 
               <GrowthSettingsField
-                label="Team photo"
-                description="Headshot stored in the Growth media library and reused across surfaces."
+                label="Photo"
+                description="Optional — stored in your media library."
               >
                 <GrowthMediaPicker
                   value={draft.avatarUrl}

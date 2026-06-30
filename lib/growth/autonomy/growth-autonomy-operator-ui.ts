@@ -14,7 +14,7 @@ export const GE_AUTO_UI_2_QA_MARKER = "ge-auto-ui-2-v1" as const
 export const GROWTH_AUTONOMY_CONTROL_CENTER_TITLE = "Growth Autonomy" as const
 
 export const GROWTH_AUTONOMY_CONTROL_CENTER_SUBTITLE =
-  "Control how much AI OS can do on its own while keeping approvals and safety limits in place." as const
+  "Control how much your AI teammate can do on their own while keeping approvals and safety limits in place." as const
 
 export const GROWTH_AUTONOMY_BUDGET_OPERATOR_LABELS: Record<GrowthAutonomyBudgetKey, string> = {
   autonomous_research_runs: "Prospect research runs",
@@ -83,7 +83,7 @@ export const GROWTH_AUTONOMY_OPERATING_MODE_OPERATOR_COPY: Record<
   manual: {
     title: "Manual",
     description: "Everything requires you.",
-    safetyNote: "Safest default — AI OS only assists when you ask.",
+    safetyNote: "Safest default — your AI teammate only assists when you ask.",
   },
   assisted: {
     title: "Assisted",
@@ -111,7 +111,7 @@ export const GROWTH_AUTONOMY_KILL_SWITCH_OPERATOR_LABELS: Record<
   "autonomyEnabled" | "autonomyOutboundEnabled" | "autonomyGenerationEnabled" | "autonomyObjectiveModeEnabled",
   string
 > = {
-  autonomyEnabled: "Allow AI OS to act autonomously",
+  autonomyEnabled: "Allow your AI teammate to act autonomously",
   autonomyOutboundEnabled: "Allow autonomous outbound send",
   autonomyGenerationEnabled: "Allow autonomous content generation",
   autonomyObjectiveModeEnabled: "Allow objective-driven autonomy",

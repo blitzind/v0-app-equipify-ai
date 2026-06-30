@@ -1,17 +1,17 @@
+"use client"
+
 import { Signature } from "lucide-react"
 import { GrowthEmailSignaturesPanel } from "@/components/growth/signatures/growth-email-signatures-panel"
-import { GROWTH_SETTINGS_SECTION_GAP } from "@/components/growth/growth-settings-ui"
-import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
+import { GrowthCommunicationsSettingsSection } from "@/components/growth/settings/growth-communications-settings-section"
 
 export default function Page() {
   return (
-    <div className={GROWTH_SETTINGS_SECTION_GAP}>
-      <GrowthWorkspacePageHeader
-        title="Email Signatures"
-        description="Sender profiles, signature templates, and mailbox assignments for outreach."
-        icon={Signature}
-      />
+    <GrowthCommunicationsSettingsSection
+      title="Email Signatures"
+      description="Sender profiles, signature templates, and mailbox assignments for outreach."
+      icon={Signature}
+    >
       <GrowthEmailSignaturesPanel />
-    </div>
+    </GrowthCommunicationsSettingsSection>
   )
 }

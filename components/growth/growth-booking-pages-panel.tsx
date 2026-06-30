@@ -92,7 +92,12 @@ function effectiveBookingProvider(
   return legacyBookingLocationToProvider(locationType)
 }
 
-export function GrowthBookingPagesPanel() {
+export function GrowthBookingPagesPanel({
+  variant = "default",
+}: {
+  variant?: "default" | "operator"
+}) {
+  const isOperator = variant === "operator"
   const [pages, setPages] = useState<GrowthBookingPageListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -254,12 +259,14 @@ export function GrowthBookingPagesPanel() {
 
   return (
     <GrowthSettingsCard
-      title="Booking Pages"
+      title={isOperator ? "Booking pages" : "Booking Pages"}
       icon={<Link2 className="size-4" />}
     >
       <div className={GROWTH_SETTINGS_INNER_GAP}>
-        <p className="text-xs text-muted-foreground">
-          Calendly-style public booking links. Enabled pages only are visible at `/book/[slug]`.
+        <p className="text-sm text-muted-foreground">
+          {isOperator
+            ? "Share a public link so prospects can book time on your calendar. Published pages are live at /book/your-slug."
+            : "Public booking links for your calendar. Enabled pages only are visible at `/book/[slug]`."}
         </p>
 
         {loading ? (
@@ -287,7 +294,10 @@ export function GrowthBookingPagesPanel() {
                 </Button>
               </div>
               {pages.length === 0 ? (
-                <p className="px-1 py-2 text-[11px] text-muted-foreground">No booking pages yet.</p>
+                <div className="rounded-lg border border-dashed border-border/70 px-2 py-3 text-center">
+                  <p className="text-[11px] text-muted-foreground">No booking pages yet.</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Create one to start accepting meetings.</p>
+                </div>
               ) : (
                 pages.map((page) => (
                   <button
@@ -300,7 +310,7 @@ export function GrowthBookingPagesPanel() {
                   >
                     <span className="font-medium">{page.name}</span>
                     <span className="text-muted-foreground">
-                      /book/{page.slug} · {page.enabled ? "Public" : "Disabled"}
+                      /book/{page.slug} · {page.enabled ? (isOperator ? "Published" : "Public") : "Draft"}
                     </span>
                   </button>
                 ))
@@ -312,7 +322,7 @@ export function GrowthBookingPagesPanel() {
                 <>
                   <div className="flex flex-wrap items-center gap-2">
                     <GrowthSettingsBadge
-                      label={editor.enabled ? "Public link active" : "Disabled"}
+                      label={editor.enabled ? (isOperator ? "Published" : "Public link active") : "Draft"}
                       tone={editor.enabled ? "healthy" : "neutral"}
                     />
                     <GrowthSettingsBadge label={`${selected.recentBookingsCount} bookings`} tone="neutral" />
@@ -344,7 +354,7 @@ export function GrowthBookingPagesPanel() {
                   <p className="text-[11px] text-muted-foreground break-all">{selected.bookingLink}</p>
 
                   <GrowthSettingsToggleRow
-                    label="Enable public booking page"
+                    label={isOperator ? "Publish booking page" : "Enable public booking page"}
                     checked={editor.enabled}
                     onCheckedChange={(enabled) => setEditor({ ...editor, enabled })}
                     disabled={saving}
@@ -514,7 +524,13 @@ export function GrowthBookingPagesPanel() {
 
                   <div className="space-y-2 rounded-md border border-border/70 p-2.5 dark:border-[#25324C]">
                     <p className="text-xs font-medium">Meeting location</p>
-                    <p className="text-[11px] text-muted-foreground">{GROWTH_MEETING_LOCATION_HELPER_COPY}</p>
+                    {!isOperator ? (
+                      <p className="text-[11px] text-muted-foreground">{GROWTH_MEETING_LOCATION_HELPER_COPY}</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Override the workspace default for this booking page only.
+                      </p>
+                    )}
                     <div className={GROWTH_SETTINGS_FORM_GAP}>
                       <Label className="text-xs">Meeting provider override</Label>
                       <select
@@ -586,7 +602,13 @@ export function GrowthBookingPagesPanel() {
                 </>
               ) : (
                 <>
-                  <p className="text-xs font-medium">Create Booking Page</p>
+                  <div className="rounded-xl border border-dashed border-border px-4 py-4">
+                    <p className="text-sm font-medium">Create a booking page</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Set up your first public scheduling link with availability, duration, and confirmation settings.
+                    </p>
+                  </div>
+                  <p className="text-xs font-medium">New booking page</p>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <div className={GROWTH_SETTINGS_FORM_GAP}>
                       <Label className="text-xs">Internal name</Label>
@@ -610,13 +632,13 @@ export function GrowthBookingPagesPanel() {
                     </div>
                   </div>
                   <GrowthSettingsToggleRow
-                    label="Enable after create"
+                    label={isOperator ? "Publish after creating" : "Enable after create"}
                     checked={form.enabled}
                     onCheckedChange={(enabled) => setForm({ ...form, enabled })}
                   />
                   <Button type="button" size="sm" disabled={saving || !form.name.trim()} onClick={() => void createPage()}>
                     {saving ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Plus className="mr-2 size-4" />}
-                    Create Booking Page
+                    {isOperator ? "Create booking page" : "Create Booking Page"}
                   </Button>
                 </>
               )}
@@ -624,7 +646,11 @@ export function GrowthBookingPagesPanel() {
           </div>
         )}
 
-        {message ? <p className="text-xs text-muted-foreground">{message}</p> : null}
+        {message ? (
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            {message}
+          </p>
+        ) : null}
       </div>
     </GrowthSettingsCard>
   )

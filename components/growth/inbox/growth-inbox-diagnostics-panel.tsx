@@ -169,11 +169,11 @@ function GrowthInboxDiagnosticsPanelInner({
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" disabled>
             Archive provider thread
-            <GrowthBadge label="Coming Soon" tone="neutral" className="ml-2" />
+            <GrowthBadge label="Platform admin" tone="neutral" className="ml-2" />
           </Button>
           <Button type="button" variant="outline" size="sm" disabled>
             Mark read/unread provider thread
-            <GrowthBadge label="Coming Soon" tone="neutral" className="ml-2" />
+            <GrowthBadge label="Platform admin" tone="neutral" className="ml-2" />
           </Button>
         </div>
       </GrowthEngineCard>

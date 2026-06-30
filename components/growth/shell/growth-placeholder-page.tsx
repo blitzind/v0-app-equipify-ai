@@ -28,10 +28,10 @@ export function GrowthPlaceholderPage({
         <span className="mx-auto flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
           <Construction className="size-5" />
         </span>
-        <h2 className="mt-3 text-base font-semibold">Coming soon</h2>
+        <h2 className="mt-3 text-base font-semibold">Currently unavailable</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          This workspace section is part of the AI OS navigation plan. Existing admin functionality remains
-          available under `/admin/growth/*` until this route is fully migrated.
+          This workspace section is not enabled for your organization yet. Contact your administrator or use Platform
+          admin for full configuration.
         </p>
       </section>
     </GrowthWorkspacePageContent>

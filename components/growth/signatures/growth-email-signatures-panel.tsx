@@ -22,7 +22,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
-import { GROWTH_SETTINGS_SECTION_GAP } from "@/components/growth/growth-settings-ui"
+import {
+  GROWTH_SETTINGS_COMMUNICATIONS_REFINEMENT_2C_QA_MARKER,
+  GROWTH_SETTINGS_SECTION_GAP,
+} from "@/components/growth/growth-settings-ui"
 import {
   GROWTH_SENDER_PROFILE_SIGNATURE_STATUS_LABELS,
   GROWTH_SIGNATURE_PRIVACY_NOTE,
@@ -367,7 +370,10 @@ export function GrowthEmailSignaturesPanel() {
   }
 
   return (
-    <div className={GROWTH_SETTINGS_SECTION_GAP}>
+    <div
+      className={GROWTH_SETTINGS_SECTION_GAP}
+      data-growth-settings-communications-refinement={GROWTH_SETTINGS_COMMUNICATIONS_REFINEMENT_2C_QA_MARKER}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">{GROWTH_SIGNATURE_PRIVACY_NOTE}</p>
         <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={Boolean(actionLoading)}>
@@ -381,6 +387,13 @@ export function GrowthEmailSignaturesPanel() {
       ) : null}
 
       <GrowthEngineCard title="Sender Profiles">
+        {(dashboard?.profiles ?? []).length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              No sender profiles yet. Create one from an unassigned mailbox below.
+            </p>
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
@@ -394,14 +407,7 @@ export function GrowthEmailSignaturesPanel() {
               </tr>
             </thead>
             <tbody>
-              {(dashboard?.profiles ?? []).length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-2 py-6 text-muted-foreground">
-                    No sender profiles yet. Create one from an unassigned mailbox below.
-                  </td>
-                </tr>
-              ) : (
-                dashboard?.profiles.map((row) => (
+              {dashboard?.profiles.map((row) => (
                   <tr key={row.profile.id} className="border-b border-border/60">
                     <td className="px-2 py-3">
                       <div className="font-medium">{row.profile.display_name}</div>
@@ -446,11 +452,11 @@ export function GrowthEmailSignaturesPanel() {
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
+                ))}
             </tbody>
           </table>
         </div>
+        )}
       </GrowthEngineCard>
 
       {(dashboard?.unassignedSenders ?? []).length > 0 ? (

@@ -5,6 +5,9 @@ import Link from "next/link"
 import { AlertTriangle, Loader2, RefreshCw, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, StatTile } from "@/components/growth/growth-ui-utils"
+import {
+  GROWTH_SETTINGS_COMMUNICATIONS_REFINEMENT_2C_QA_MARKER,
+} from "@/components/growth/growth-settings-ui"
 import { GrowthOperatorDiagnosticsDisclosure } from "@/components/growth/growth-operator-diagnostics-disclosure"
 import {
   DeliverabilityModuleShell,
@@ -384,11 +387,19 @@ export function GrowthDeliverabilityProtectionConsole() {
       data-qa-marker={GROWTH_DELIVERABILITY_OPS_V2_QA_MARKER}
       data-reputation-qa={GROWTH_DELIVERABILITY_REPUTATION_PROTECTION_QA_MARKER}
       data-degraded-mode={degraded ? GROWTH_DELIVERABILITY_DEGRADED_MODE_QA_MARKER : undefined}
+      data-growth-settings-communications-refinement={GROWTH_SETTINGS_COMMUNICATIONS_REFINEMENT_2C_QA_MARKER}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-3xl space-y-1">
+          <p className="text-sm font-medium text-foreground">
+            {alerts.length > 0
+              ? `${alerts.length} active alert${alerts.length === 1 ? "" : "s"} need attention`
+              : "Reputation health looks stable"}
+          </p>
           <p className="text-sm text-muted-foreground">
-            Operational deliverability console — modules load independently; empty telemetry is normal during setup.
+            {degraded
+              ? "Some modules failed to load — working sections remain active below."
+              : "Modules load independently; empty telemetry is normal during setup."}
           </p>
           {setupInProgress ? (
             <p
@@ -398,15 +409,10 @@ export function GrowthDeliverabilityProtectionConsole() {
               {DELIVERABILITY_SETUP_ONBOARDING_MESSAGE}
             </p>
           ) : null}
-          {degraded ? (
-            <p className="text-xs text-amber-800" data-qa={GROWTH_DELIVERABILITY_DEGRADED_MODE_QA_MARKER}>
-              Degraded mode: one or more modules failed to load. Working sections remain active below.
-            </p>
-          ) : null}
         </div>
         <Button type="button" variant="outline" size="sm" onClick={() => void loadHeader()} disabled={loading}>
           {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-          Refresh alerts
+          Refresh
         </Button>
       </div>
 

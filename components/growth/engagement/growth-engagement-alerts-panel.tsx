@@ -11,7 +11,6 @@ import {
 } from "@/components/growth/engagement/growth-engagement-watchlists-panel"
 import type { GrowthEngagementDashboardDateRangePreset } from "@/lib/growth/engagement/growth-engagement-dashboard-types"
 import {
-  GROWTH_ENGAGEMENT_ALERT_QA_MARKER,
   type GrowthEngagementAlert,
   type GrowthEngagementAlertSeverity,
   type GrowthEngagementAlertType,
@@ -89,7 +88,6 @@ export function GrowthEngagementAlertsPanel({
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <GrowthBadge label="Read-only feed" tone="neutral" />
-          <span className="text-xs text-muted-foreground">{GROWTH_ENGAGEMENT_ALERT_QA_MARKER}</span>
           <span className="text-xs text-muted-foreground">{total} matching alerts · {dateRange}</span>
         </div>
 

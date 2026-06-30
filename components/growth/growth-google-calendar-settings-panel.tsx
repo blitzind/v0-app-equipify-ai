@@ -11,6 +11,9 @@ import {
 } from "@/components/growth/growth-settings-ui"
 import type { GrowthCalendarConflictMeeting, GrowthCalendarSyncStatusPanel } from "@/lib/growth/calendar/calendar-sync-types"
 import type { GrowthCalendarConnectionSummary } from "@/lib/growth/calendar/google-calendar-types"
+import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
+
+const GROWTH_CALENDAR_SETTINGS_RETURN_TO = `${GROWTH_WORKSPACE_BASE_PATH}/settings/calendar`
 
 function syncHealthTone(health: string | null): "healthy" | "attention" | "neutral" {
   if (health === "healthy") return "healthy"
@@ -31,7 +34,12 @@ type SyncPayload = {
   conflicts?: GrowthCalendarConflictMeeting[]
 }
 
-export function GrowthGoogleCalendarSettingsPanel() {
+export function GrowthGoogleCalendarSettingsPanel({
+  variant = "default",
+}: {
+  variant?: "default" | "operator"
+}) {
+  const isOperator = variant === "operator"
   const searchParams = useSearchParams()
   const [summary, setSummary] = useState<GrowthCalendarConnectionSummary | null>(null)
   const [syncStatus, setSyncStatus] = useState<GrowthCalendarSyncStatusPanel | null>(null)
@@ -138,8 +146,10 @@ export function GrowthGoogleCalendarSettingsPanel() {
   return (
     <GrowthSettingsCard title="Google Calendar" icon={<CalendarClock className="size-4" />}>
       <div className={GROWTH_SETTINGS_INNER_GAP}>
-        <p className="text-xs text-muted-foreground">
-          Connect Google (Workspace or personal) for human-confirmed meeting sync and manual pull sync.
+        <p className="text-sm text-muted-foreground">
+          {isOperator
+            ? "Connect Google Calendar to sync confirmed meetings and avoid double-booking."
+            : "Connect Google (Workspace or personal) for human-confirmed meeting sync and manual pull sync."}
         </p>
 
         {loading ? (
@@ -187,7 +197,7 @@ export function GrowthGoogleCalendarSettingsPanel() {
                       onClick={() => void forceSync()}
                     >
                       {syncing ? <Loader2 className="mr-1 size-3 animate-spin" /> : <RefreshCw className="mr-1 size-3" />}
-                      Force Sync
+                      {isOperator ? "Sync now" : "Force Sync"}
                     </Button>
                     <Button
                       type="button"
@@ -223,14 +233,30 @@ export function GrowthGoogleCalendarSettingsPanel() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-wrap items-center gap-2">
-                {summary?.configured ? (
-                  <Button asChild size="sm" className="h-7 px-2.5 text-xs" disabled={working}>
-                    <a href="/api/platform/growth/calendar/authorize?returnTo=/admin/growth/settings/communications">
-                      Connect Google Calendar
-                    </a>
-                  </Button>
-                ) : null}
+              <div className="rounded-xl border border-dashed border-border px-4 py-4">
+                {!summary?.configured ? (
+                  <>
+                    <p className="text-sm font-medium">Calendar connection unavailable</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Google Calendar OAuth is managed by Platform admin. Ask your administrator to enable calendar
+                      integration for this workspace.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium">Connect Google Calendar</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Link your Google account to sync meetings after you confirm them in Growth.
+                    </p>
+                    <Button asChild size="sm" className="mt-3" disabled={working}>
+                      <a
+                        href={`/api/platform/growth/calendar/authorize?returnTo=${encodeURIComponent(GROWTH_CALENDAR_SETTINGS_RETURN_TO)}`}
+                      >
+                        Connect Google Calendar
+                      </a>
+                    </Button>
+                  </>
+                )}
               </div>
             )}
 
@@ -282,6 +308,7 @@ export function GrowthGoogleCalendarSettingsPanel() {
               </div>
             ) : null}
 
+            {!isOperator ? (
             <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2 dark:border-[#25324C]">
               <GrowthSettingsBadge label="Human-triggered sync" tone="neutral" />
               {summary?.connected ? (
@@ -294,10 +321,22 @@ export function GrowthGoogleCalendarSettingsPanel() {
                 </>
               ) : null}
             </div>
+            ) : summary?.connected ? (
+              <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2 dark:border-[#25324C]">
+                <GrowthSettingsBadge
+                  label={`Sync ${summary.syncHealth ?? "status unknown"}`}
+                  tone={syncHealthTone(summary.syncHealth)}
+                />
+              </div>
+            ) : null}
           </>
         )}
 
-        {message ? <p className="text-xs text-muted-foreground">{message}</p> : null}
+        {message ? (
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            {message}
+          </p>
+        ) : null}
       </div>
     </GrowthSettingsCard>
   )

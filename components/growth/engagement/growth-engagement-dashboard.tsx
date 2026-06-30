@@ -18,7 +18,6 @@ import { GrowthEngagementWatchlistsPanel } from "@/components/growth/engagement/
 import { GrowthEngagementTimelinePanel } from "@/components/growth/engagement/growth-engagement-timeline-panel"
 import {
   GROWTH_ENGAGEMENT_DASHBOARD_DEFAULT_DATE_RANGE,
-  GROWTH_ENGAGEMENT_DASHBOARD_QA_MARKER,
   type GrowthEngagementDashboardDateRangePreset,
   type GrowthEngagementDashboardHighIntentResponse,
   type GrowthEngagementDashboardOverviewResponse,
@@ -164,7 +163,6 @@ export function GrowthEngagementDashboardPanel() {
 
       <div className="flex flex-wrap items-center gap-2">
         <GrowthBadge label="Read-only" tone="neutral" />
-        <span className="text-xs text-muted-foreground">{GROWTH_ENGAGEMENT_DASHBOARD_QA_MARKER}</span>
       </div>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}

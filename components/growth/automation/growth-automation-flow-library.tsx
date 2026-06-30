@@ -83,7 +83,7 @@ export function GrowthAutomationFlowLibrary() {
   return (
     <div className="space-y-6" data-qa-marker={GROWTH_AUTOMATION_BUILDER_QA_MARKER}>
       <p className="text-sm text-muted-foreground">
-        Draft automation graphs with metadata-only publish gates. No SR-3 runtime activation in S5-F.
+        Create and manage automation flows. Published flows require approval before they run in your workspace.
       </p>
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">

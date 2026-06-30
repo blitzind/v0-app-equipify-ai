@@ -82,11 +82,11 @@ function GrowthSharePageHeroMediaPlaceholder({ model }: { model: GrowthSharePage
           <MediaSlot
             icon={ImageIcon}
             label="Hero image"
-            detail={model.heroMediaUrl ?? model.heroMediaThumbnailUrl ?? "Coming soon"}
+            detail={model.heroMediaUrl ?? model.heroMediaThumbnailUrl ?? "Not added yet"}
           />
         ) : null}
         {model.heroMediaType === "video" || model.videoAssetId ? (
-          <MediaSlot icon={Video} label="Personalized video" detail={model.videoAssetId ?? model.heroMediaUrl ?? "Coming soon"} />
+          <MediaSlot icon={Video} label="Personalized video" detail={model.videoAssetId ?? model.heroMediaUrl ?? "Not added yet"} />
         ) : null}
         {model.voiceAssetId ? (
           <MediaSlot icon={Mic} label="Voice message" detail={model.voiceAssetId} />

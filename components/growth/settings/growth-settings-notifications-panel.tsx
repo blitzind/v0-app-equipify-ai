@@ -2,13 +2,16 @@
 
 import { useCallback } from "react"
 import Link from "next/link"
-import { Bell, Loader2 } from "lucide-react"
+import { Bell } from "lucide-react"
 import {
   GrowthSettingsCard,
   GrowthSettingsToggleRow,
+  GROWTH_SETTINGS_GENERAL_REFINEMENT_2B_QA_MARKER,
   GROWTH_SETTINGS_SECTION_GAP,
 } from "@/components/growth/growth-settings-ui"
 import {
+  GrowthSettingsField,
+  GrowthSettingsSaveStatus,
   GrowthSettingsSectionErrorState,
   GrowthSettingsSectionForm,
   GrowthSettingsSectionLoadingState,
@@ -20,6 +23,7 @@ import {
   GROWTH_OPERATOR_NOTIFICATION_EVENTS,
   GROWTH_OPERATOR_NOTIFICATION_EVENT_TO_GROUP,
   type GrowthOperatorNotificationEvent,
+  type GrowthOperatorNotificationEventGroup,
 } from "@/lib/growth/notifications/growth-notification-events"
 import type { GrowthWorkspaceSettingsNotificationPreferences } from "@/lib/growth/settings/growth-workspace-settings-types"
 import { DEFAULT_GROWTH_OPERATOR_NOTIFICATION_EFFECTIVE_PREFERENCES } from "@/lib/growth/notifications/growth-notification-preferences-types"
@@ -35,11 +39,55 @@ import { GROWTH_OPERATOR_NOTIFICATION_SEVERITIES } from "@/lib/growth/notificati
 
 const ENDPOINT = "/api/growth/workspace/settings/notifications"
 
-function groupEventsByCategory(): Record<string, GrowthOperatorNotificationEvent[]> {
-  const grouped: Record<string, GrowthOperatorNotificationEvent[]> = {}
-  for (const group of GROWTH_OPERATOR_NOTIFICATION_EVENT_GROUPS) {
-    grouped[group] = []
-  }
+const NOTIFICATION_EVENT_LABELS: Record<GrowthOperatorNotificationEvent, string> = {
+  lead_hot: "Hot lead detected",
+  engagement_spike: "Engagement spike",
+  share_page_viewed: "Share page viewed",
+  share_page_engaged: "Share page engaged",
+  share_page_cta_clicked: "Share page CTA clicked",
+  share_page_booking_started: "Share page booking started",
+  share_page_booking_completed: "Share page booking completed",
+  reply_received: "Reply received",
+  reply_positive_interest: "Positive interest reply",
+  reply_meeting_requested: "Meeting requested",
+  reply_competitor_detected: "Competitor mentioned",
+  sequence_wait_started: "Sequence wait started",
+  sequence_wait_resolved: "Sequence wait resolved",
+  sequence_wait_timeout: "Sequence wait timed out",
+  sequence_branch_evaluated: "Sequence branch evaluated",
+  sequence_advancement_blocked: "Sequence advancement blocked",
+  sms_reply_received: "SMS reply received",
+  voice_drop_failed: "Voicemail drop failed",
+  thread_sla_at_risk: "Inbox SLA at risk",
+  thread_sla_overdue: "Inbox SLA overdue",
+}
+
+const NOTIFICATION_GROUP_META: Record<
+  GrowthOperatorNotificationEventGroup,
+  { title: string; description: string }
+> = {
+  lead: { title: "Leads", description: "Pipeline and engagement signals." },
+  share_page: { title: "Share Pages", description: "Visitor activity on shared pages." },
+  reply: { title: "Replies", description: "Inbound reply classifications." },
+  sequence: { title: "Campaigns", description: "Sequence progression and waits." },
+  messaging: { title: "Calls & messaging", description: "SMS and voice delivery events." },
+  inbox: { title: "Inbox", description: "Thread SLA and queue alerts." },
+}
+
+const NOTIFICATION_GROUP_ORDER: GrowthOperatorNotificationEventGroup[] = [
+  "lead",
+  "inbox",
+  "reply",
+  "messaging",
+  "sequence",
+  "share_page",
+]
+
+function groupEventsByCategory(): Record<GrowthOperatorNotificationEventGroup, GrowthOperatorNotificationEvent[]> {
+  const grouped = Object.fromEntries(
+    GROWTH_OPERATOR_NOTIFICATION_EVENT_GROUPS.map((group) => [group, [] as GrowthOperatorNotificationEvent[]]),
+  ) as Record<GrowthOperatorNotificationEventGroup, GrowthOperatorNotificationEvent[]>
+
   for (const event of GROWTH_OPERATOR_NOTIFICATION_EVENTS) {
     grouped[GROWTH_OPERATOR_NOTIFICATION_EVENT_TO_GROUP[event]].push(event)
   }
@@ -47,6 +95,10 @@ function groupEventsByCategory(): Record<string, GrowthOperatorNotificationEvent
 }
 
 const GROUPED_EVENTS = groupEventsByCategory()
+
+function formatSeverityLabel(severity: string): string {
+  return severity.charAt(0).toUpperCase() + severity.slice(1)
+}
 
 export function GrowthSettingsNotificationsPanel() {
   const selectValue = useCallback(
@@ -71,44 +123,34 @@ export function GrowthSettingsNotificationsPanel() {
   }
 
   return (
-    <div className={GROWTH_SETTINGS_SECTION_GAP}>
+    <div
+      className={GROWTH_SETTINGS_SECTION_GAP}
+      data-qa-marker={GROWTH_SETTINGS_GENERAL_REFINEMENT_2B_QA_MARKER}
+    >
       <GrowthWorkspacePageHeader
         title="Notifications"
-        description="Outreach, inbox, campaign, and activity alerts."
+        description="Choose how and when Growth alerts you."
         icon={Bell}
       />
 
-      <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-        <p className="font-medium text-foreground">Growth notifications</p>
-        <p className="mt-1">
-          Configure outreach, inbox, campaign, and activity alerts here. For equipment, work orders, and digest
-          alerts, use{" "}
-          <Link href={GROWTH_CORE_SETTINGS_WORKSPACE_NOTIFICATIONS_PATH} className="font-medium text-primary underline-offset-4 hover:underline">
-            Workspace notifications
-          </Link>
-          .
-        </p>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Equipment, work orders, and digest alerts live in{" "}
+        <Link href={GROWTH_CORE_SETTINGS_WORKSPACE_NOTIFICATIONS_PATH} className="font-medium text-primary underline-offset-4 hover:underline">
+          Workspace notifications
+        </Link>
+        .
+      </p>
 
       {loading ? <GrowthSettingsSectionLoadingState /> : null}
       {!loading && error ? <GrowthSettingsSectionErrorState message={error} onRetry={() => void refresh()} /> : null}
 
       {!loading && !error ? (
-        <GrowthSettingsSectionForm
-          footer={
-            saving ? (
-              <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" />
-                Saving…
-              </p>
-            ) : null
-          }
-        >
-          <GrowthSettingsCard title="Delivery channels">
+        <GrowthSettingsSectionForm footer={<GrowthSettingsSaveStatus saving={saving} />}>
+          <GrowthSettingsCard title="Delivery">
             <div className="space-y-2">
               <GrowthSettingsToggleRow
                 label="Browser notifications"
-                description="Desktop push for live operator signals."
+                description="Desktop push for live alerts."
                 checked={value.browserPushEnabled}
                 disabled={saving}
                 onCheckedChange={(checked) => void savePatch({ browserPushEnabled: checked })}
@@ -120,21 +162,14 @@ export function GrowthSettingsNotificationsPanel() {
                 disabled={saving}
                 onCheckedChange={(checked) => void savePatch({ emailNotificationsEnabled: checked })}
               />
-            </div>
-          </GrowthSettingsCard>
-
-          <GrowthSettingsCard title="Inbox notification preferences">
-            <div className="space-y-3">
               <GrowthSettingsToggleRow
-                label="In-app inbox notifications"
+                label="In-app notifications"
                 description="Notification center and inbox alerts."
                 checked={value.inAppEnabled}
                 disabled={saving}
                 onCheckedChange={(checked) => void savePatch({ inAppEnabled: checked })}
               />
-
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium">Minimum severity</p>
+              <GrowthSettingsField label="Minimum severity" description="Only show alerts at or above this level.">
                 <Select
                   value={value.minimumSeverity}
                   onValueChange={(next) =>
@@ -150,31 +185,36 @@ export function GrowthSettingsNotificationsPanel() {
                   <SelectContent>
                     {GROWTH_OPERATOR_NOTIFICATION_SEVERITIES.map((severity) => (
                       <SelectItem key={severity} value={severity}>
-                        {severity}
+                        {formatSeverityLabel(severity)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              {Object.entries(GROUPED_EVENTS).map(([group, events]) =>
-                events.length === 0 ? null : (
-                  <div key={group} className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</p>
-                    {events.map((event) => (
-                      <GrowthSettingsToggleRow
-                        key={event}
-                        label={event.replaceAll("_", " ")}
-                        checked={!value.disabledEventTypes.includes(event)}
-                        disabled={saving}
-                        onCheckedChange={() => toggleDisabledEvent(event)}
-                      />
-                    ))}
-                  </div>
-                ),
-              )}
+              </GrowthSettingsField>
             </div>
           </GrowthSettingsCard>
+
+          {NOTIFICATION_GROUP_ORDER.map((group) => {
+            const events = GROUPED_EVENTS[group]
+            if (events.length === 0) return null
+            const meta = NOTIFICATION_GROUP_META[group]
+            return (
+              <GrowthSettingsCard key={group} title={meta.title}>
+                <p className="mb-3 text-xs text-muted-foreground">{meta.description}</p>
+                <div className="space-y-2">
+                  {events.map((event) => (
+                    <GrowthSettingsToggleRow
+                      key={event}
+                      label={NOTIFICATION_EVENT_LABELS[event]}
+                      checked={!value.disabledEventTypes.includes(event)}
+                      disabled={saving}
+                      onCheckedChange={() => toggleDisabledEvent(event)}
+                    />
+                  ))}
+                </div>
+              </GrowthSettingsCard>
+            )
+          })}
         </GrowthSettingsSectionForm>
       ) : null}
     </div>

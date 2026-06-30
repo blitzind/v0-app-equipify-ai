@@ -28,6 +28,24 @@ export const GROWTH_SETTINGS_UI_QA_MARKER = "growth-settings-ui-v2"
 
 export const GROWTH_SETTINGS_UX_POLISH_QA_MARKER = "growth-settings-ux-polish-1a-v1" as const
 
+export const GROWTH_SETTINGS_GENERAL_REFINEMENT_2B_QA_MARKER =
+  "growth-settings-general-refinement-2b-v1" as const
+
+export const GROWTH_SETTINGS_COMMUNICATIONS_REFINEMENT_2C_QA_MARKER =
+  "growth-settings-communications-refinement-2c-v1" as const
+
+export const GROWTH_SETTINGS_VOICE_CALLING_REFINEMENT_2D_QA_MARKER =
+  "growth-settings-voice-calling-refinement-2d-v1" as const
+
+export const GROWTH_SETTINGS_MEETINGS_REFINEMENT_2E_QA_MARKER =
+  "growth-settings-meetings-refinement-2e-v1" as const
+
+export const GROWTH_SETTINGS_AI_REFINEMENT_2F_QA_MARKER =
+  "growth-settings-ai-refinement-2f-v1" as const
+
+export const GROWTH_SETTINGS_COMPLIANCE_REFINEMENT_2G_QA_MARKER =
+  "growth-settings-compliance-refinement-2g-v1" as const
+
 /** Shared page header icon treatment for every Growth settings surface. */
 export const GROWTH_SETTINGS_PAGE_HEADER_ICON =
   "bg-sky-50 text-sky-600 dark:bg-sky-950/60 dark:text-sky-300" as const

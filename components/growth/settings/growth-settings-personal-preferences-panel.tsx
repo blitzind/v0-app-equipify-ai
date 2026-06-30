@@ -1,15 +1,17 @@
 "use client"
 
 import { useCallback } from "react"
-import { Loader2, SlidersHorizontal } from "lucide-react"
+import { SlidersHorizontal } from "lucide-react"
 import {
   GrowthSettingsCard,
   GrowthSettingsToggleRow,
   GROWTH_SETTINGS_FORM_GAP,
+  GROWTH_SETTINGS_GENERAL_REFINEMENT_2B_QA_MARKER,
   GROWTH_SETTINGS_SECTION_GAP,
 } from "@/components/growth/growth-settings-ui"
 import {
   GrowthSettingsField,
+  GrowthSettingsSaveStatus,
   GrowthSettingsSectionErrorState,
   GrowthSettingsSectionForm,
   GrowthSettingsSectionLoadingState,
@@ -47,10 +49,13 @@ export function GrowthSettingsPersonalPreferencesPanel() {
   })
 
   return (
-    <div className={GROWTH_SETTINGS_SECTION_GAP}>
+    <div
+      className={GROWTH_SETTINGS_SECTION_GAP}
+      data-qa-marker={GROWTH_SETTINGS_GENERAL_REFINEMENT_2B_QA_MARKER}
+    >
       <GrowthWorkspacePageHeader
         title="Personal Preferences"
-        description="Personal defaults that follow you across Growth."
+        description="Defaults that follow you across Growth."
         icon={SlidersHorizontal}
       />
 
@@ -58,56 +63,48 @@ export function GrowthSettingsPersonalPreferencesPanel() {
       {!loading && error ? <GrowthSettingsSectionErrorState message={error} onRetry={() => void refresh()} /> : null}
 
       {!loading && !error ? (
-        <GrowthSettingsSectionForm
-          footer={
-            saving ? (
-              <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" />
-                Saving…
-              </p>
-            ) : null
-          }
-        >
-          <GrowthSettingsCard title="Workspace defaults">
+        <GrowthSettingsSectionForm footer={<GrowthSettingsSaveStatus saving={saving} />}>
+          <GrowthSettingsCard title="Appearance">
             <div className={GROWTH_SETTINGS_FORM_GAP}>
-              <GrowthSettingsField
-                label="Default landing page"
-                description="Where you land when opening Growth."
-              >
-                <Select
-                  value={value.defaultLandingPage}
-                  onValueChange={(next) => void patch({ defaultLandingPage: next })}
-                  disabled={saving}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {GROWTH_WORKSPACE_SETTINGS_LANDING_PAGE_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </GrowthSettingsField>
-
               <GrowthSettingsToggleRow
                 label="Compact mode"
-                description="Prefer denser spacing in operator surfaces."
+                description="Use denser spacing in lists and panels."
                 checked={value.compactMode}
                 disabled={saving}
                 onCheckedChange={(checked) => void patch({ compactMode: checked })}
               />
-
               <GrowthSettingsToggleRow
                 label="Reduced motion"
-                description="Minimize non-essential animations in the workspace."
+                description="Minimize non-essential animations."
                 checked={value.reducedMotion}
                 disabled={saving}
                 onCheckedChange={(checked) => void patch({ reducedMotion: checked })}
               />
             </div>
+          </GrowthSettingsCard>
+
+          <GrowthSettingsCard title="Startup">
+            <GrowthSettingsField
+              label="Default landing page"
+              description="Where Growth opens when you sign in."
+            >
+              <Select
+                value={value.defaultLandingPage}
+                onValueChange={(next) => void patch({ defaultLandingPage: next })}
+                disabled={saving}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {GROWTH_WORKSPACE_SETTINGS_LANDING_PAGE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </GrowthSettingsField>
           </GrowthSettingsCard>
         </GrowthSettingsSectionForm>
       ) : null}

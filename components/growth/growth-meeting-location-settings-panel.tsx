@@ -21,7 +21,12 @@ import {
   buildMeetingLocationProviderReadiness,
 } from "@/lib/growth/meeting-location/meeting-location-provider-types"
 
-export function GrowthMeetingLocationSettingsPanel() {
+export function GrowthMeetingLocationSettingsPanel({
+  variant = "default",
+}: {
+  variant?: "default" | "operator"
+}) {
+  const isOperator = variant === "operator"
   const [settings, setSettings] = useState<GrowthPlatformCommunicationSettings | null>(null)
   const [readiness, setReadiness] = useState<GrowthMeetingLocationProviderReadiness[]>([])
   const [loading, setLoading] = useState(true)
@@ -92,14 +97,18 @@ export function GrowthMeetingLocationSettingsPanel() {
 
   return (
     <GrowthSettingsCard
-      title="Meeting Location Providers"
+      title={isOperator ? "Meeting location" : "Meeting Location Providers"}
       icon={<MapPin className="size-4" />}
     >
       <div className={GROWTH_SETTINGS_INNER_GAP}>
-        <p className="text-xs text-muted-foreground">{GROWTH_MEETING_LOCATION_HELPER_COPY}</p>
+        <p className="text-sm text-muted-foreground">
+          {isOperator
+            ? "Choose the default video or phone option for scheduled meetings. Google Meet requires a connected calendar."
+            : GROWTH_MEETING_LOCATION_HELPER_COPY}
+        </p>
 
         <div className={GROWTH_SETTINGS_FORM_GAP}>
-          <Label className="text-xs">Default Meeting Provider</Label>
+          <Label className="text-xs">{isOperator ? "Default meeting location" : "Default Meeting Provider"}</Label>
           <select
             className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm"
             value={settings.defaultMeetingProvider}
@@ -117,7 +126,7 @@ export function GrowthMeetingLocationSettingsPanel() {
         </div>
 
         <GrowthSettingsToggleRow
-          label="Auto-create meeting link when scheduled"
+          label={isOperator ? "Automatically add video link" : "Auto-create meeting link when scheduled"}
           checked={settings.autoCreateMeetingLink}
           onCheckedChange={(checked) => void save({ autoCreateMeetingLink: checked })}
           disabled={saving}
@@ -144,7 +153,11 @@ export function GrowthMeetingLocationSettingsPanel() {
           ))}
         </div>
 
-        {message ? <p className="text-xs text-muted-foreground">{message}</p> : null}
+        {message ? (
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            {message}
+          </p>
+        ) : null}
       </div>
     </GrowthSettingsCard>
   )

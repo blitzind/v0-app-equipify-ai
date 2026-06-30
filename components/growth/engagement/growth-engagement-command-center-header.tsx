@@ -4,7 +4,6 @@ import { Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import {
-  GROWTH_ENGAGEMENT_COMMAND_CENTER_QA_MARKER,
   type GrowthEngagementCommandCenterSourceAvailability,
 } from "@/lib/growth/engagement/growth-engagement-command-center-types"
 import type { GrowthEngagementDashboardDateRangePreset } from "@/lib/growth/engagement/growth-engagement-dashboard-types"
@@ -47,7 +46,6 @@ export function GrowthEngagementCommandCenterHeader({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <GrowthBadge label="Read-only" tone="neutral" />
-          <span className="text-xs text-muted-foreground">{GROWTH_ENGAGEMENT_COMMAND_CENTER_QA_MARKER}</span>
         </div>
       </div>
 

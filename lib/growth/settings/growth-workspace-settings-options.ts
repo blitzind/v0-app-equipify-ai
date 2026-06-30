@@ -21,6 +21,33 @@ export const GROWTH_WORKSPACE_SETTINGS_TIMEZONE_OPTIONS = [
   "Australia/Sydney",
 ] as const
 
+export type GrowthWorkspaceTimezoneOption = (typeof GROWTH_WORKSPACE_SETTINGS_TIMEZONE_OPTIONS)[number]
+
+/** Friendly labels for timezone selects (display only — values stay IANA). */
+export const GROWTH_WORKSPACE_SETTINGS_TIMEZONE_LABELS: Record<
+  GrowthWorkspaceTimezoneOption,
+  { friendly: string; iana: string }
+> = {
+  UTC: { friendly: "Coordinated Universal Time", iana: "UTC" },
+  "America/New_York": { friendly: "Eastern Time", iana: "America/New_York" },
+  "America/Chicago": { friendly: "Central Time", iana: "America/Chicago" },
+  "America/Denver": { friendly: "Mountain Time", iana: "America/Denver" },
+  "America/Los_Angeles": { friendly: "Pacific Time", iana: "America/Los_Angeles" },
+  "Europe/London": { friendly: "United Kingdom", iana: "Europe/London" },
+  "Europe/Berlin": { friendly: "Central European Time", iana: "Europe/Berlin" },
+  "Asia/Tokyo": { friendly: "Japan Standard Time", iana: "Asia/Tokyo" },
+  "Australia/Sydney": { friendly: "Australian Eastern Time", iana: "Australia/Sydney" },
+}
+
+export function resolveGrowthWorkspaceTimezoneLabel(timezone: string): {
+  friendly: string
+  iana: string
+} {
+  const known = GROWTH_WORKSPACE_SETTINGS_TIMEZONE_LABELS[timezone as GrowthWorkspaceTimezoneOption]
+  if (known) return known
+  return { friendly: timezone.replaceAll("_", " "), iana: timezone }
+}
+
 export const GROWTH_WORKSPACE_SETTINGS_LANDING_PAGE_OPTIONS = [
   { value: `${GROWTH_WORKSPACE_BASE_PATH}/inbox`, label: "Inbox" },
   { value: `${GROWTH_WORKSPACE_BASE_PATH}/dashboard`, label: "Dashboard" },

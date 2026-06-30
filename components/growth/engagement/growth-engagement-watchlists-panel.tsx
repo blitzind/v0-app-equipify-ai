@@ -13,7 +13,6 @@ import {
   type GrowthEngagementAlertType,
 } from "@/lib/growth/engagement/growth-engagement-alert-types"
 import {
-  GROWTH_ENGAGEMENT_WATCHLIST_QA_MARKER,
   type GrowthEngagementWatchlist,
 } from "@/lib/growth/engagement/growth-engagement-watchlist-types"
 
@@ -66,7 +65,6 @@ export function GrowthEngagementWatchlistsPanel({
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <GrowthBadge label="Predefined only" tone="neutral" />
-          <span className="text-xs text-muted-foreground">{GROWTH_ENGAGEMENT_WATCHLIST_QA_MARKER}</span>
         </div>
         <p className="text-sm text-muted-foreground">Date range: {dateRange}</p>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}

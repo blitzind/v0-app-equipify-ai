@@ -8,7 +8,6 @@ import { GrowthEngagementReportCard } from "@/components/growth/engagement/growt
 import { GrowthEngagementReportTable } from "@/components/growth/engagement/growth-engagement-report-table"
 import type { GrowthEngagementDashboardDateRangePreset } from "@/lib/growth/engagement/growth-engagement-dashboard-types"
 import {
-  GROWTH_ENGAGEMENT_REPORT_QA_MARKER,
   type GrowthEngagementReport,
   type GrowthEngagementReportCatalogEntry,
   type GrowthEngagementReportType,
@@ -105,7 +104,6 @@ export function GrowthEngagementReportsPanel({
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <GrowthBadge label="Read-only export" tone="neutral" />
-          <span className="text-xs text-muted-foreground">{GROWTH_ENGAGEMENT_REPORT_QA_MARKER}</span>
         </div>
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}

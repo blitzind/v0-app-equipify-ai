@@ -42,7 +42,6 @@ import {
   GROWTH_AUTONOMY_OUTBOUND_LOCKED_MESSAGE,
   resolveGrowthAutonomyOutboundStatusLabel,
 } from "@/lib/growth/autonomy/growth-autonomy-operator-ui"
-import { GROWTH_AUTONOMY_QA_MARKER } from "@/lib/growth/autonomy/growth-autonomy-types"
 import type { GrowthAutonomyMasterMode } from "@/lib/growth/autonomy/growth-autonomy-types"
 import { cn } from "@/lib/utils"
 
@@ -57,7 +56,12 @@ const ENDPOINT = "/api/growth/workspace/settings/autonomy"
 type CapabilityRow = GrowthAutonomySettingsViewModel["capabilities"][number]
 type ChannelRow = GrowthAutonomySettingsViewModel["channels"][number]
 
-export function GrowthAutonomyControlCenter() {
+export function GrowthAutonomyControlCenter({
+  variant = "default",
+}: {
+  variant?: "default" | "operator"
+}) {
+  const isOperator = variant === "operator"
   const [viewModel, setViewModel] = useState<GrowthAutonomySettingsViewModel | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -113,8 +117,8 @@ export function GrowthAutonomyControlCenter() {
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Loading autonomy control center…
+        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+        {isOperator ? "Loading autonomy settings…" : "Loading autonomy control center…"}
       </div>
     )
   }
@@ -144,10 +148,21 @@ export function GrowthAutonomyControlCenter() {
                 <Bot className="size-5" />
               </span>
               <div className="min-w-0">
-                <CardTitle className="text-2xl">{GROWTH_AUTONOMY_CONTROL_CENTER_TITLE}</CardTitle>
-                <CardDescription className="mt-1 text-sm">
-                  {GROWTH_AUTONOMY_CONTROL_CENTER_SUBTITLE}
-                </CardDescription>
+                {!isOperator ? (
+                  <>
+                    <CardTitle className="text-2xl">{GROWTH_AUTONOMY_CONTROL_CENTER_TITLE}</CardTitle>
+                    <CardDescription className="mt-1 text-sm">
+                      {GROWTH_AUTONOMY_CONTROL_CENTER_SUBTITLE}
+                    </CardDescription>
+                  </>
+                ) : (
+                  <>
+                    <CardTitle className="text-lg">Approval and safety</CardTitle>
+                    <CardDescription className="mt-1 text-sm">
+                      Quick actions and current operating status for your AI teammate.
+                    </CardDescription>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -161,14 +176,14 @@ export function GrowthAutonomyControlCenter() {
               </Button>
               <Button type="button" variant="outline" size="sm" asChild>
                 <Link href="/growth/objectives">
-                  <Target className="mr-2 h-4 w-4" />
+                  <Target className="mr-2 h-4 w-4" aria-hidden />
                   View objectives
                 </Link>
               </Button>
               <Button type="button" variant="outline" size="sm" asChild>
                 <Link href="/growth/activity">
-                  <ClipboardList className="mr-2 h-4 w-4" />
-                  View approval queue
+                  <ClipboardList className="mr-2 h-4 w-4" aria-hidden />
+                  {isOperator ? "Approval queue" : "View approval queue"}
                 </Link>
               </Button>
             </div>
@@ -200,14 +215,23 @@ export function GrowthAutonomyControlCenter() {
 
       <GrowthAutonomyOutboundDashboardPanel />
 
-      <GrowthAutonomyAiOsIntegrationPanel integration={viewModel.aiOsIntegration} />
+      {!isOperator ? <GrowthAutonomyAiOsIntegrationPanel integration={viewModel.aiOsIntegration} /> : null}
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? (
+        <p className="text-sm text-destructive" role="alert" aria-live="polite">
+          {error}
+        </p>
+      ) : null}
 
-      <section className="space-y-4">
+      <section className="space-y-4" aria-labelledby="autonomy-operating-mode-heading">
         <SectionHeading
+          id="autonomy-operating-mode-heading"
           title="Operating mode"
-          description="Choose how independently AI OS can act on your behalf."
+          description={
+            isOperator
+              ? "Choose how independently your AI teammate can act on your behalf."
+              : "Choose how independently AI OS can act on your behalf."
+          }
         />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
           {viewModel.masterModes.map((mode) => {
@@ -235,9 +259,10 @@ export function GrowthAutonomyControlCenter() {
         </div>
       </section>
 
-      <section className="space-y-4">
+      <section className="space-y-4" aria-labelledby="autonomy-capabilities-heading">
         <SectionHeading
-          title="What AI can do"
+          id="autonomy-capabilities-heading"
+          title="What your AI teammate can do"
           description="Turn capabilities on or off within your selected operating mode."
         />
         <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-4">
@@ -328,11 +353,44 @@ export function GrowthAutonomyControlCenter() {
         </div>
       </section>
 
-      <section className="space-y-4">
+      <section className="space-y-4" aria-labelledby="autonomy-human-approval-heading">
         <SectionHeading
+          id="autonomy-human-approval-heading"
           title="Human approval"
-          description="Autonomous approval is disabled. AI OS can prepare work, but approval rules decide whether a person must review before anything goes out."
+          description={
+            isOperator
+              ? "What runs automatically, what waits for you, and what never sends without explicit permission."
+              : "Autonomous approval is disabled. AI OS can prepare work, but approval rules decide whether a person must review before anything goes out."
+          }
         />
+        {isOperator ? (
+          <div className="grid gap-3 md:grid-cols-3">
+            <HumanApprovalSummaryCard
+              title="Runs automatically"
+              tone="ready"
+              items={GROWTH_AUTONOMY_APPROVAL_OPERATOR_ROWS.filter((row) => row.category === "internal").map(
+                (row) => row.label,
+              )}
+              footnote="Within daily safety limits."
+            />
+            <HumanApprovalSummaryCard
+              title="Needs your approval"
+              tone="attention"
+              items={GROWTH_AUTONOMY_APPROVAL_OPERATOR_ROWS.filter(
+                (row) => row.category === "approval_required",
+              ).map((row) => row.label)}
+              footnote="Review before anything launches."
+            />
+            <HumanApprovalSummaryCard
+              title="Never automatic"
+              tone="neutral"
+              items={GROWTH_AUTONOMY_APPROVAL_OPERATOR_ROWS.filter(
+                (row) => row.category === "outbound_locked",
+              ).map((row) => row.label)}
+              footnote="Send stays off until you enable outbound autonomy."
+            />
+          </div>
+        ) : null}
         <Card>
           <CardContent className="grid gap-3 pt-6 md:grid-cols-2">
             {GROWTH_AUTONOMY_APPROVAL_OPERATOR_ROWS.map((row) => (
@@ -360,10 +418,15 @@ export function GrowthAutonomyControlCenter() {
         </Card>
       </section>
 
-      <section className="space-y-4">
+      <section className="space-y-4" aria-labelledby="autonomy-shadow-mode-heading">
         <SectionHeading
+          id="autonomy-shadow-mode-heading"
           title="Test without sending"
-          description="Shadow mode lets AI OS decide what it would do, without actually sending or launching anything."
+          description={
+            isOperator
+              ? "Practice mode lets your AI teammate decide what it would do, without sending or launching anything."
+              : "Shadow mode lets AI OS decide what it would do, without actually sending or launching anything."
+          }
         />
         <Card>
           <CardContent className="space-y-4 pt-6">
@@ -427,17 +490,55 @@ export function GrowthAutonomyControlCenter() {
         </AccordionItem>
       </Accordion>
 
-      <p className="text-[10px] text-muted-foreground/70">
-        {GROWTH_AUTONOMY_QA_MARKER} · {GE_AUTO_UI_2_QA_MARKER}
-      </p>
     </div>
   )
 }
 
-function SectionHeading({ title, description }: { title: string; description: string }) {
+function HumanApprovalSummaryCard({
+  title,
+  tone,
+  items,
+  footnote,
+}: {
+  title: string
+  tone: "ready" | "attention" | "neutral"
+  items: string[]
+  footnote: string
+}) {
+  const toneClass =
+    tone === "ready"
+      ? "border-emerald-200/70 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20"
+      : tone === "attention"
+        ? "border-amber-200/70 bg-amber-50/40 dark:border-amber-900/40 dark:bg-amber-950/20"
+        : "border-border/70 bg-muted/20"
+
+  return (
+    <div className={cn("rounded-xl border p-4", toneClass)}>
+      <p className="text-sm font-semibold">{title}</p>
+      <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+        {items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+      <p className="mt-3 text-xs text-muted-foreground">{footnote}</p>
+    </div>
+  )
+}
+
+function SectionHeading({
+  id,
+  title,
+  description,
+}: {
+  id?: string
+  title: string
+  description: string
+}) {
   return (
     <div>
-      <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+      <h2 id={id} className="text-lg font-semibold tracking-tight">
+        {title}
+      </h2>
       <p className="mt-1 text-sm text-muted-foreground">{description}</p>
     </div>
   )

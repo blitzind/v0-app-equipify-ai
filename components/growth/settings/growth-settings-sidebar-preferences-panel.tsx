@@ -1,16 +1,18 @@
 "use client"
 
-import { useCallback } from "react"
-import { Loader2, PanelLeft } from "lucide-react"
+import { useCallback, useMemo } from "react"
+import { PanelLeft } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import {
   GrowthSettingsCard,
   GrowthSettingsToggleRow,
   GROWTH_SETTINGS_FORM_GAP,
+  GROWTH_SETTINGS_GENERAL_REFINEMENT_2B_QA_MARKER,
   GROWTH_SETTINGS_SECTION_GAP,
 } from "@/components/growth/growth-settings-ui"
 import {
   GrowthSettingsField,
+  GrowthSettingsSaveStatus,
   GrowthSettingsSectionErrorState,
   GrowthSettingsSectionForm,
   GrowthSettingsSectionLoadingState,
@@ -32,10 +34,18 @@ const INITIAL: GrowthWorkspaceSettingsSidebarPreferences = {
 
 export type GrowthSettingsSidebarPreferencesPanelVariant = "sidebar" | "command-center"
 
+function resolveRouteLabel(route: string | null | undefined): string {
+  if (!route) return "No saved route"
+  const match = GROWTH_WORKSPACE_SETTINGS_LANDING_PAGE_OPTIONS.find((option) => option.value === route)
+  return match?.label ?? route
+}
+
 export function GrowthSettingsSidebarPreferencesPanel({
   variant = "sidebar",
+  embedded = false,
 }: {
   variant?: GrowthSettingsSidebarPreferencesPanelVariant
+  embedded?: boolean
 }) {
   const selectValue = useCallback(
     (data: { preferences?: GrowthWorkspaceSettingsSidebarPreferences }) => data.preferences ?? null,
@@ -47,6 +57,11 @@ export function GrowthSettingsSidebarPreferencesPanel({
     selectValue,
   })
 
+  const lastVisitedLabel = useMemo(
+    () => resolveRouteLabel(value.lastVisitedRoute),
+    [value.lastVisitedRoute],
+  )
+
   function toggleFavorite(href: string) {
     const favorites = new Set(value.favoriteDestinations)
     if (favorites.has(href)) favorites.delete(href)
@@ -55,52 +70,55 @@ export function GrowthSettingsSidebarPreferencesPanel({
   }
 
   return (
-    <div className={GROWTH_SETTINGS_SECTION_GAP}>
-      <GrowthWorkspacePageHeader
-        title={variant === "command-center" ? "Command Center Preferences" : "Sidebar Preferences"}
-        description={
-          variant === "command-center"
-            ? "Pin destinations for Cmd+K and quick navigation in Growth."
-            : "Sidebar collapse behavior and resume routing."
-        }
-        icon={PanelLeft}
-      />
+    <div
+      className={embedded ? undefined : GROWTH_SETTINGS_SECTION_GAP}
+      data-qa-marker={variant === "sidebar" && !embedded ? GROWTH_SETTINGS_GENERAL_REFINEMENT_2B_QA_MARKER : undefined}
+    >
+      {!embedded ? (
+        <GrowthWorkspacePageHeader
+          title={variant === "command-center" ? "Command Center Preferences" : "Sidebar Preferences"}
+          description={
+            variant === "command-center"
+              ? "Pin destinations for Cmd+K and quick navigation in Growth."
+              : "Sidebar layout and resume behavior."
+          }
+          icon={PanelLeft}
+        />
+      ) : null}
 
       {loading ? <GrowthSettingsSectionLoadingState /> : null}
       {!loading && error ? <GrowthSettingsSectionErrorState message={error} onRetry={() => void refresh()} /> : null}
 
       {!loading && !error ? (
-        <GrowthSettingsSectionForm
-          footer={
-            saving ? (
-              <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" />
-                Saving…
-              </p>
-            ) : null
-          }
-        >
+        <GrowthSettingsSectionForm footer={<GrowthSettingsSaveStatus saving={saving} />}>
           {variant === "sidebar" ? (
-            <GrowthSettingsCard title="Sidebar behavior">
+            <GrowthSettingsCard title="Layout">
               <div className={GROWTH_SETTINGS_FORM_GAP}>
                 <GrowthSettingsToggleRow
-                  label="Collapse sidebar by default"
-                  description="Start with the workspace sidebar collapsed."
+                  label="Start with sidebar collapsed"
+                  description="Open Growth with a collapsed sidebar."
                   checked={value.sidebarCollapsed}
                   disabled={saving}
                   onCheckedChange={(checked) => void patch({ sidebarCollapsed: checked })}
                 />
 
                 <GrowthSettingsField
-                  label="Last visited route"
-                  description="Resume where you left off in Growth."
+                  label="Resume route"
+                  description="Return to your last destination when you reopen Growth."
                 >
-                  <div className="flex gap-2">
-                    <Input value={value.lastVisitedRoute ?? ""} readOnly disabled placeholder="Not set yet" />
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <Input
+                      value={lastVisitedLabel}
+                      readOnly
+                      disabled
+                      className="bg-muted/40"
+                      aria-readonly
+                    />
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
+                      className="shrink-0"
                       disabled={saving || !value.lastVisitedRoute}
                       onClick={() => void patch({ lastVisitedRoute: null })}
                     >
@@ -113,20 +131,41 @@ export function GrowthSettingsSidebarPreferencesPanel({
           ) : null}
 
           {variant === "command-center" ? (
-            <GrowthSettingsCard title="Favorite destinations">
-              <div className="space-y-2">
-                {GROWTH_WORKSPACE_SETTINGS_LANDING_PAGE_OPTIONS.map((option) => (
-                  <GrowthSettingsToggleRow
-                    key={option.value}
-                    label={option.label}
-                    description={option.value}
-                    checked={value.favoriteDestinations.includes(option.value)}
-                    disabled={saving}
-                    onCheckedChange={() => toggleFavorite(option.value)}
+            <>
+              <GrowthSettingsCard title="Favorite destinations">
+                <p className="mb-3 text-sm text-muted-foreground">
+                  Pin pages you open often — they appear at the top of Cmd+K search results.
+                </p>
+                <div className="space-y-2">
+                  {GROWTH_WORKSPACE_SETTINGS_LANDING_PAGE_OPTIONS.map((option) => (
+                    <GrowthSettingsToggleRow
+                      key={option.value}
+                      label={option.label}
+                      description={embedded ? undefined : option.value}
+                      checked={value.favoriteDestinations.includes(option.value)}
+                      disabled={saving}
+                      onCheckedChange={() => toggleFavorite(option.value)}
+                    />
+                  ))}
+                </div>
+              </GrowthSettingsCard>
+
+              <GrowthSettingsCard title="Startup experience">
+                <GrowthSettingsField
+                  label="Where you left off"
+                  description="Growth opens to your last visited page when you return."
+                >
+                  <Input
+                    value={lastVisitedLabel}
+                    readOnly
+                    disabled
+                    className="bg-muted/40"
+                    aria-readonly
+                    aria-label="Last visited destination"
                   />
-                ))}
-              </div>
-            </GrowthSettingsCard>
+                </GrowthSettingsField>
+              </GrowthSettingsCard>
+            </>
           ) : null}
         </GrowthSettingsSectionForm>
       ) : null}

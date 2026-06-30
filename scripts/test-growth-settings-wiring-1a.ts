@@ -105,9 +105,10 @@ function main(): void {
   const callingComponent = read("components/growth/settings/growth-settings-calling-preferences-page.tsx")
   assert.match(callingComponent, /GrowthCommunicationSettingsPanel/)
   assert.match(callingComponent, /mode="operator"/)
-  assert.match(callingComponent, /GrowthNativeDialerSettingsPanel/)
+  assert.match(callingComponent, /GrowthCallingPreferencesReadinessSummary/)
   assert.match(callingComponent, /GrowthLiveCoachingSettingsPanel/)
   assert.match(callingComponent, /GrowthOperatorAssistPreferencesPanel/)
+  assert.doesNotMatch(callingComponent, /GrowthNativeDialerSettingsPanel/)
   assert.doesNotMatch(callingComponent, /GrowthVoiceInfrastructureSettingsPanel/)
   console.log("  ✓ Calling Preferences composes operator panels without voice infrastructure")
 

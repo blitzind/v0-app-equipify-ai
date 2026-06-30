@@ -23,7 +23,7 @@ export default function GrowthCommunicationsConnectedMailboxesPage() {
       icon={Mailbox}
       adminFallbackHref="/admin/growth/infrastructure/mailboxes"
     >
-      <div id={GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_ANCHOR.slice(1)} className="space-y-6">
+      <div id={GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_ANCHOR.slice(1)}>
         <Suspense fallback={<div className="text-sm text-muted-foreground">Loading connected mailboxes…</div>}>
           <ConnectedMailboxesPanel />
         </Suspense>

@@ -25,8 +25,9 @@ function HubOverviewSection({ manifest }: GrowthWorkspaceHubPageProps) {
           <StatTile key={metric.id} label={metric.label} value="—" hint={metric.hint} />
         ))}
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">
-        Snapshot metrics activate in a later phase. Use quick actions and drill-downs below to start work now.
+      <p className="mt-3 text-sm text-muted-foreground">
+        Overview metrics populate as your workspace activity grows. Use quick actions and drill-downs below to get
+        started.
       </p>
     </GrowthEngineCard>
   )

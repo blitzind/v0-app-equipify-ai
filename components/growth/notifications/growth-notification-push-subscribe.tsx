@@ -1,8 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { BellOff, BellRing, Loader2 } from "lucide-react"
+import { BellOff, BellRing, Loader2, MonitorSmartphone } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  GrowthSettingsCard,
+  GROWTH_SETTINGS_GENERAL_REFINEMENT_2B_QA_MARKER,
+} from "@/components/growth/growth-settings-ui"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { GROWTH_OPERATOR_NOTIFICATION_PUSH_SERVICE_WORKER_PATH } from "@/lib/growth/notifications/growth-notification-push-types"
 
@@ -31,6 +35,32 @@ function isBrowserPushSupported(): boolean {
   return typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window
 }
 
+function summarizeBrowserName(userAgent: string): string {
+  if (/Edg\//.test(userAgent)) return "Microsoft Edge"
+  if (/Chrome\//.test(userAgent)) return "Google Chrome"
+  if (/Firefox\//.test(userAgent)) return "Mozilla Firefox"
+  if (/Safari\//.test(userAgent) && !/Chrome\//.test(userAgent)) return "Safari"
+  return "This browser"
+}
+
+function permissionLabel(permission: NotificationPermission | "unsupported"): string {
+  if (permission === "unsupported") return "Not supported"
+  if (permission === "granted") return "Allowed"
+  if (permission === "denied") return "Blocked"
+  return "Not requested"
+}
+
+type StatusRowProps = { label: string; value: string; valueClassName?: string }
+
+function StatusRow({ label, value, valueClassName }: StatusRowProps) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-border/60 py-2.5 last:border-b-0 dark:border-[#25324C]">
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className={`text-right text-sm font-medium text-foreground ${valueClassName ?? ""}`}>{value}</dd>
+    </div>
+  )
+}
+
 export function GrowthNotificationPushSubscribe() {
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState(false)
@@ -40,6 +70,7 @@ export function GrowthNotificationPushSubscribe() {
   const [subscriptionCount, setSubscriptionCount] = useState(0)
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default")
   const [vapidPublicKey, setVapidPublicKey] = useState<string | null>(null)
+  const [browserName, setBrowserName] = useState("This browser")
 
   const refreshStatus = useCallback(async () => {
     setLoading(true)
@@ -48,6 +79,7 @@ export function GrowthNotificationPushSubscribe() {
       const browserSupported = isBrowserPushSupported()
       setSupported(browserSupported)
       setPermission(browserSupported ? Notification.permission : "unsupported")
+      setBrowserName(typeof navigator !== "undefined" ? summarizeBrowserName(navigator.userAgent) : "This browser")
 
       const res = await fetch("/api/platform/growth/notifications/push/status", { cache: "no-store" })
       const data = (await res.json().catch(() => ({}))) as PushStatusResponse
@@ -141,27 +173,47 @@ export function GrowthNotificationPushSubscribe() {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="font-medium">Browser push</p>
-          <p className="text-sm text-muted-foreground">
-            Deliver persisted operator notifications to this browser. Permission is requested only when you click
-            enable.
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <GrowthBadge
-              label={enabled ? "Enabled" : "Disabled"}
-              tone={enabled ? "high" : "neutral"}
-            />
-            {permission !== "unsupported" ? (
-              <GrowthBadge label={`Permission: ${permission}`} tone="neutral" />
-            ) : null}
-            <GrowthBadge label={`Devices: ${subscriptionCount}`} tone="neutral" />
-          </div>
-        </div>
+    <GrowthSettingsCard
+      title="Browser status"
+      icon={<MonitorSmartphone className="size-4" aria-hidden />}
+    >
+      <div data-qa-marker={GROWTH_SETTINGS_GENERAL_REFINEMENT_2B_QA_MARKER}>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Receive live Growth alerts on this device. Permission is requested only when you enable notifications.
+        </p>
 
-        <div className="flex flex-wrap gap-2">
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+            Loading browser status…
+          </div>
+        ) : (
+          <>
+            <dl className="rounded-lg border border-border/70 bg-muted/20 px-3 dark:border-[#25324C]">
+              <StatusRow label="Status" value={enabled ? "Enabled" : "Disabled"} />
+              <StatusRow label="Permission" value={permissionLabel(permission)} />
+              <StatusRow label="Current browser" value={browserName} />
+              <StatusRow
+                label="Device registration"
+                value={subscriptionCount === 0 ? "None" : `${subscriptionCount} registered`}
+              />
+            </dl>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <GrowthBadge label={enabled ? "Receiving alerts" : "Not receiving alerts"} tone={enabled ? "high" : "neutral"} />
+              {!supported ? (
+                <GrowthBadge label="Unsupported browser" tone="attention" />
+              ) : null}
+            </div>
+          </>
+        )}
+
+        {!supported && !loading ? (
+          <p className="mt-3 text-sm text-muted-foreground">Browser push is not supported in this browser.</p>
+        ) : null}
+        {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
+
+        <div className="mt-5 flex flex-wrap gap-2 border-t border-border/60 pt-4 dark:border-[#25324C]">
           {loading ? (
             <Button size="sm" variant="outline" disabled>
               <Loader2 className="mr-2 size-4 animate-spin" />
@@ -170,21 +222,16 @@ export function GrowthNotificationPushSubscribe() {
           ) : enabled ? (
             <Button size="sm" variant="outline" disabled={acting || !supported} onClick={() => void disableBrowserPush()}>
               {acting ? <Loader2 className="mr-2 size-4 animate-spin" /> : <BellOff className="mr-2 size-4" />}
-              Disable browser push
+              Disable notifications
             </Button>
           ) : (
             <Button size="sm" disabled={acting || !supported || !vapidPublicKey} onClick={() => void enableBrowserPush()}>
               {acting ? <Loader2 className="mr-2 size-4 animate-spin" /> : <BellRing className="mr-2 size-4" />}
-              Enable browser push
+              Enable notifications
             </Button>
           )}
         </div>
       </div>
-
-      {!supported ? (
-        <p className="mt-3 text-sm text-muted-foreground">Browser push is not supported in this browser.</p>
-      ) : null}
-      {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
-    </div>
+    </GrowthSettingsCard>
   )
 }

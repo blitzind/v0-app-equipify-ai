@@ -6,6 +6,10 @@ import { Loader2, Plus, RefreshCw, Shuffle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import {
+  GROWTH_SETTINGS_COMMUNICATIONS_REFINEMENT_2C_QA_MARKER,
+  GROWTH_SETTINGS_SECTION_GAP,
+} from "@/components/growth/growth-settings-ui"
 import { GrowthSenderPoolManagementPanel } from "@/components/growth/sender-pools/growth-sender-pool-management-panel"
 import {
   GrowthSenderPoolSimulationCard,
@@ -241,12 +245,13 @@ export function GrowthSenderPoolsDashboardView() {
   }
 
   return (
-    <div className="space-y-6">
+    <div
+      className={GROWTH_SETTINGS_SECTION_GAP}
+      data-qa={GROWTH_SENDER_POOL_INTELLIGENCE_QA_MARKER}
+      data-growth-settings-communications-refinement={GROWTH_SETTINGS_COMMUNICATIONS_REFINEMENT_2C_QA_MARKER}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs text-muted-foreground">{GROWTH_SENDER_POOL_INTELLIGENCE_QA_MARKER}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{GROWTH_SENDER_POOL_INTELLIGENCE_PRIVACY_NOTE}</p>
-        </div>
+        <p className="text-sm text-muted-foreground">{GROWTH_SENDER_POOL_INTELLIGENCE_PRIVACY_NOTE}</p>
         <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
           {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
           Refresh

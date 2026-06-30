@@ -7,7 +7,7 @@ import { GrowthCommunicationsSettingsSection } from "@/components/growth/setting
 export default function GrowthCommunicationsSendingLimitsPage() {
   return (
     <GrowthCommunicationsSettingsSection
-      title="Reputation & Protection"
+      title="Reputation"
       description="Monitor bounce, reply, and complaint signals with reputation protection and send throttles."
       icon={ShieldAlert}
       adminFallbackHref="/admin/growth/deliverability"

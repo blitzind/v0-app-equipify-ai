@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { usePathname, useSearchParams } from "next/navigation"
-import { ExternalLink, Loader2, Plug, RefreshCw, Send } from "lucide-react"
+import { Loader2, Plug, RefreshCw, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -23,6 +23,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import {
+  GROWTH_SETTINGS_COMMUNICATIONS_REFINEMENT_2C_QA_MARKER,
+  GROWTH_SETTINGS_SECTION_GAP,
+} from "@/components/growth/growth-settings-ui"
 import {
   GROWTH_CONNECTED_MAILBOXES_QA_MARKER,
   type GrowthConnectedMailboxFilter,
@@ -50,6 +54,7 @@ import {
 } from "@/lib/growth/navigation/growth-communications-settings-navigation"
 import { resolveConnectedMailboxWarmupDisplay } from "@/lib/growth/mailboxes/connected-mailbox-warmup-label"
 import type { GrowthMailboxConnectionSummary } from "@/lib/growth/mailboxes/mailbox-types"
+import { cn } from "@/lib/utils"
 
 type MailboxValidationFeedback = {
   ok: boolean
@@ -109,6 +114,20 @@ function isPausedRow(row: GrowthConnectedMailboxRow): boolean {
 
 function isUnhealthyRow(row: GrowthConnectedMailboxRow): boolean {
   return !isHealthyRow(row)
+}
+
+function mailboxHealthAccent(row: GrowthConnectedMailboxRow): string {
+  if (isHealthyRow(row)) return "border-emerald-200/90 bg-emerald-50/30 dark:border-emerald-900/50 dark:bg-emerald-950/20"
+  if (row.connectionStatus !== "connected" || row.healthTier === "critical") {
+    return "border-rose-200/90 bg-rose-50/20 dark:border-rose-900/50 dark:bg-rose-950/20"
+  }
+  return "border-amber-200/90 bg-amber-50/20 dark:border-amber-900/50 dark:bg-amber-950/20"
+}
+
+function providerLabel(family: string): string {
+  if (family === "google") return "Google"
+  if (family === "microsoft") return "Microsoft"
+  return family
 }
 
 function validationSuggestedNextStep(
@@ -432,21 +451,20 @@ export function GrowthConnectedMailboxesDashboard({
   const summary = dashboard?.summary
 
   return (
-    <div className="space-y-6">
+    <div
+      className={GROWTH_SETTINGS_SECTION_GAP}
+      data-qa={GROWTH_CONNECTED_MAILBOXES_QA_MARKER}
+      data-growth-settings-communications-refinement={GROWTH_SETTINGS_COMMUNICATIONS_REFINEMENT_2C_QA_MARKER}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">
-          {GROWTH_CONNECTED_MAILBOXES_QA_MARKER} · Operational view across senders, Gmail connections, pools, warmup,
-          and daily caps.
+        <p className="text-sm text-muted-foreground">
+          {summary
+            ? `${summary.connectedMailboxes} connected · ${summary.healthyMailboxes} healthy · ${summary.disconnectedMailboxes} disconnected`
+            : "Manage Gmail connections, warmup, and daily send limits per mailbox."}
         </p>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" asChild>
+          <Button type="button" size="sm" asChild>
             <Link href={navPaths.onboardHref}>Onboard mailbox</Link>
-          </Button>
-          <Button type="button" variant="outline" size="sm" asChild>
-            <Link href={navPaths.senderHref}>Sender infrastructure</Link>
-          </Button>
-          <Button type="button" variant="outline" size="sm" asChild>
-            <Link href={navPaths.poolHref}>Sender pools</Link>
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={Boolean(actionLoading)}>
             <RefreshCw className="mr-1.5 size-3.5" />
@@ -483,15 +501,15 @@ export function GrowthConnectedMailboxesDashboard({
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">{error}</div>
       ) : null}
 
-      <GrowthEngineCard title="Mailbox KPIs">
+      <GrowthEngineCard title="Overview">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <StatTile label="Connected" value={String(summary?.connectedMailboxes ?? 0)} />
-          <StatTile label="Disconnected" value={String(summary?.disconnectedMailboxes ?? 0)} />
-          <StatTile label="Warming" value={String(summary?.warmingMailboxes ?? 0)} />
           <StatTile label="Healthy" value={String(summary?.healthyMailboxes ?? 0)} />
-          <StatTile label="Paused" value={String(summary?.pausedMailboxes ?? 0)} />
-          <StatTile label="Daily capacity" value={String(summary?.dailyCapacity ?? 0)} />
-          <StatTile label="Daily used" value={String(summary?.dailyUsed ?? 0)} />
+          <StatTile label="Disconnected" value={String(summary?.disconnectedMailboxes ?? 0)} />
+          <StatTile
+            label="Daily volume"
+            value={`${summary?.dailyUsed ?? 0} / ${summary?.dailyCapacity ?? 0}`}
+          />
         </div>
       </GrowthEngineCard>
 
@@ -549,265 +567,205 @@ export function GrowthConnectedMailboxesDashboard({
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-2 py-2">Sender</th>
-                <th className="px-2 py-2">Email</th>
-                <th className="px-2 py-2">Domain</th>
-                <th className="px-2 py-2">Connection</th>
-                <th className="px-2 py-2">Health</th>
-                <th className="px-2 py-2">Warmup</th>
-                <th className="px-2 py-2">Signature</th>
-                <th className="px-2 py-2">Pool</th>
-                <th className="px-2 py-2">Daily cap</th>
-                <th className="px-2 py-2">Daily used</th>
-                <th className="px-2 py-2">Last validation</th>
-                <th className="px-2 py-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRows.length === 0 ? (
-                <tr>
-                  <td colSpan={12} className="px-2 py-6 text-muted-foreground">
-                    No mailboxes match the current filters.
-                  </td>
-                </tr>
-              ) : (
-                filteredRows.map((row) => {
-                  const primaryPool = row.poolMemberships[0]
-                  const googleOAuth = row.providerFamily === "google"
-                  const oauthLabel = row.mailboxTokenConfigured ? "Reconnect Gmail" : "Connect Gmail"
-                  const senderPaused = row.senderStatus === "disabled"
-                  const warmupDisplay = resolveConnectedMailboxWarmupDisplay(row)
-                  const validation = validationFeedback[row.senderId]
-                  return (
-                    <tr key={row.senderId} className="border-b border-border/60">
-                      <td className="px-2 py-3">
-                        <div className="font-medium">{row.senderDisplayName}</div>
-                        <GrowthBadge label={row.senderStatus} tone={STATUS_TONE[row.senderStatus] ?? "neutral"} />
-                      </td>
-                      <td className="px-2 py-3 font-medium">{row.email}</td>
-                      <td className="px-2 py-3">{row.domain}</td>
-                      <td className="px-2 py-3">
-                        <div className="flex flex-col gap-1">
-                          <GrowthBadge
-                            label={row.connectionStatus}
-                            tone={STATUS_TONE[row.connectionStatus] ?? "neutral"}
-                          />
-                          {row.needsReconnect ? <GrowthBadge label="Reconnect required" tone="attention" /> : null}
-                        </div>
-                      </td>
-                      <td className="px-2 py-3">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <GrowthBadge label={row.healthTier} tone={STATUS_TONE[row.healthTier] ?? "neutral"} />
-                          <span className="text-xs text-muted-foreground">{row.healthScore}%</span>
-                        </div>
-                      </td>
-                      <td className="px-2 py-3">
-                        <GrowthBadge label={warmupDisplay.label} tone={warmupDisplay.tone} />
-                      </td>
-                      <td className="px-2 py-3">
-                        <div className="flex flex-col gap-1">
-                          <GrowthBadge
-                            label={
-                              row.signatureStatus === "configured"
-                                ? "Configured"
-                                : row.signatureStatus === "inherited"
-                                  ? "Inherited"
-                                  : "Missing"
-                            }
-                            tone={
-                              row.signatureStatus === "configured"
-                                ? "healthy"
-                                : row.signatureStatus === "inherited"
-                                  ? "medium"
-                                  : "attention"
-                            }
-                          />
-                          {row.signatureStatus === "missing" ? (
-                            <Button type="button" size="sm" variant="link" className="h-auto p-0 text-xs" asChild>
-                              <Link href={growthEngineCustomerSettingsHref("email-signatures")}>
-                                Configure Signature
-                              </Link>
-                            </Button>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="px-2 py-3">
-                        {row.poolMemberships.length === 0 ? (
-                          <span className="text-muted-foreground">—</span>
+        {filteredRows.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+            <p>No mailboxes match the current filters.</p>
+            <Button type="button" size="sm" className="mt-3" asChild>
+              <Link href={navPaths.onboardHref}>Onboard a mailbox</Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {filteredRows.map((row) => {
+              const primaryPool = row.poolMemberships[0]
+              const googleOAuth = row.providerFamily === "google"
+              const oauthLabel = row.mailboxTokenConfigured ? "Reconnect Gmail" : "Connect Gmail"
+              const senderPaused = row.senderStatus === "disabled"
+              const warmupDisplay = resolveConnectedMailboxWarmupDisplay(row)
+              const validation = validationFeedback[row.senderId]
+              return (
+                <article
+                  key={row.senderId}
+                  className={cn("rounded-xl border p-4 shadow-sm", mailboxHealthAccent(row))}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold tracking-tight">{row.email}</p>
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        {row.senderDisplayName} · {row.domain}
+                      </p>
+                    </div>
+                    <GrowthBadge label={providerLabel(row.providerFamily)} tone="neutral" />
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    <GrowthBadge label={row.senderStatus} tone={STATUS_TONE[row.senderStatus] ?? "neutral"} />
+                    <GrowthBadge
+                      label={row.connectionStatus}
+                      tone={STATUS_TONE[row.connectionStatus] ?? "neutral"}
+                    />
+                    {row.needsReconnect ? <GrowthBadge label="Reconnect required" tone="attention" /> : null}
+                    <GrowthBadge label={row.healthTier} tone={STATUS_TONE[row.healthTier] ?? "neutral"} />
+                    <span className="self-center text-xs text-muted-foreground">{row.healthScore}% health</span>
+                    <GrowthBadge label={warmupDisplay.label} tone={warmupDisplay.tone} />
+                  </div>
+
+                  <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4">
+                    <div>
+                      <dt className="text-muted-foreground">Daily cap</dt>
+                      <dd className="font-medium">{row.dailyCap}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Daily used</dt>
+                      <dd className="font-medium">{row.dailyUsed}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Pool</dt>
+                      <dd className="font-medium">{primaryPool?.poolName ?? "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Signature</dt>
+                      <dd className="font-medium">
+                        {row.signatureStatus === "configured"
+                          ? "Configured"
+                          : row.signatureStatus === "inherited"
+                            ? "Inherited"
+                            : "Missing"}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  {validation ? (
+                    <div
+                      className={cn(
+                        "mt-3 rounded-md border px-2 py-1.5 text-xs",
+                        validation.ok
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                          : "border-rose-200 bg-rose-50 text-rose-900",
+                      )}
+                    >
+                      <p>{validation.message}</p>
+                      {validation.suggestedNextStep ? (
+                        <p className="mt-1 font-medium">{validation.suggestedNextStep}</p>
+                      ) : null}
+                    </div>
+                  ) : row.lastValidationAt ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Last validated {formatDate(row.lastValidationAt)}
+                    </p>
+                  ) : null}
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {googleOAuth ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={row.needsReconnect ? "default" : "outline"}
+                        disabled={Boolean(actionLoading) || senderPaused}
+                        onClick={() => void runAction(`oauth-${row.senderId}`, () => startGoogleOAuth(row))}
+                      >
+                        {actionLoading === `oauth-${row.senderId}` ? (
+                          <Loader2 className="mr-1 size-3.5 animate-spin" />
                         ) : (
-                          <div className="space-y-1">
-                            {row.poolMemberships.map((entry) => (
-                              <div key={entry.memberId} className="flex flex-wrap items-center gap-1">
-                                <span className="text-xs">{entry.poolName}</span>
-                                <GrowthBadge
-                                  label={entry.memberStatus}
-                                  tone={STATUS_TONE[entry.memberStatus] ?? "neutral"}
-                                />
-                              </div>
-                            ))}
-                          </div>
+                          <Plug className="mr-1 size-3.5" />
                         )}
-                      </td>
-                      <td className="px-2 py-3">{row.dailyCap}</td>
-                      <td className="px-2 py-3">{row.dailyUsed}</td>
-                      <td className="px-2 py-3">
-                        <div className="space-y-1">
-                          <span>{formatDate(validation?.lastValidationAt ?? row.lastValidationAt)}</span>
-                          {validation ? (
-                            <div
-                              className={
-                                validation.ok
-                                  ? "rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-900"
-                                  : "rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-900"
-                              }
-                            >
-                              <p>{validation.message}</p>
-                              <p className="mt-0.5 text-[11px] opacity-90">
-                                Status: {validation.status} · Health: {validation.healthTier}
-                              </p>
-                              {validation.suggestedNextStep ? (
-                                <p className="mt-1 font-medium">{validation.suggestedNextStep}</p>
-                              ) : null}
-                            </div>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="px-2 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {googleOAuth ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant={row.needsReconnect ? "default" : "outline"}
-                              disabled={Boolean(actionLoading) || senderPaused}
-                              onClick={() => void runAction(`oauth-${row.senderId}`, () => startGoogleOAuth(row))}
-                            >
-                              {actionLoading === `oauth-${row.senderId}` ? (
-                                <Loader2 className="mr-1 size-3.5 animate-spin" />
-                              ) : (
-                                <Plug className="mr-1 size-3.5" />
-                              )}
-                              {oauthLabel}
-                            </Button>
-                          ) : null}
-                          {row.mailboxId ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              disabled={Boolean(actionLoading)}
-                              onClick={() => void runAction(`validate-${row.senderId}`, () => validateMailbox(row))}
-                            >
-                              Validate
-                            </Button>
-                          ) : null}
-                          {warmupDisplay.canStart ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              disabled={Boolean(actionLoading) || row.connectionStatus !== "connected"}
-                              onClick={() =>
-                                void runAction(`warmup-start-${row.senderId}`, async () => {
-                                  setWarmupNotice(null)
-                                  await startWarmup(row)
-                                })
-                              }
-                            >
-                              Start Warmup
-                            </Button>
-                          ) : (
-                            <Button type="button" size="sm" variant="outline" asChild>
-                              <Link href={growthCommunicationsWarmupHref(row.senderId)}>View Warmup</Link>
-                            </Button>
-                          )}
-                          <Button type="button" size="sm" variant="ghost" asChild>
-                            <Link href={navPaths.deliverabilityHref}>DNS</Link>
-                          </Button>
-                          <Button type="button" size="sm" variant="ghost" asChild>
-                            <Link href={navPaths.reputationHref}>Reputation</Link>
-                          </Button>
-                          {senderPaused ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              disabled={Boolean(actionLoading)}
-                              onClick={() => void runAction(`resume-${row.senderId}`, () => resumeSender(row))}
-                            >
-                              Resume
-                            </Button>
-                          ) : (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              disabled={Boolean(actionLoading)}
-                              onClick={() => void runAction(`pause-${row.senderId}`, () => pauseSender(row))}
-                            >
-                              Pause
-                            </Button>
-                          )}
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={
-                              Boolean(actionLoading) ||
-                              !row.deliveryRouteEnabled ||
-                              row.providerFamily !== "google"
-                            }
-                            onClick={() => {
-                              setTestSendRow(row)
-                              setTestSendTo("")
-                              setTestSendApproval(false)
-                            }}
-                          >
-                            <Send className="mr-1 size-3.5" />
-                            Test send
-                          </Button>
-                          {primaryPool ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              disabled={Boolean(actionLoading)}
-                              onClick={() =>
-                                void runAction(`remove-pool-${row.senderId}`, () =>
-                                  removeFromPool(primaryPool.poolId, primaryPool.memberId),
-                                )
-                              }
-                            >
-                              Remove from pool
-                            </Button>
-                          ) : null}
-                          <Button type="button" size="sm" variant="ghost" asChild>
-                            <Link href={navPaths.senderHref}>
-                              <ExternalLink className="mr-1 size-3.5" />
-                              Open sender
-                            </Link>
-                          </Button>
-                          {primaryPool ? (
-                            <Button type="button" size="sm" variant="ghost" asChild>
-                              <Link href={`${navPaths.poolHref}?pool=${primaryPool.poolId}`}>
-                                <ExternalLink className="mr-1 size-3.5" />
-                                Open pool
-                              </Link>
-                            </Button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                        {oauthLabel}
+                      </Button>
+                    ) : null}
+                    {row.mailboxId ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={Boolean(actionLoading)}
+                        onClick={() => void runAction(`validate-${row.senderId}`, () => validateMailbox(row))}
+                      >
+                        Validate
+                      </Button>
+                    ) : null}
+                    {warmupDisplay.canStart ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={Boolean(actionLoading) || row.connectionStatus !== "connected"}
+                        onClick={() =>
+                          void runAction(`warmup-start-${row.senderId}`, async () => {
+                            setWarmupNotice(null)
+                            await startWarmup(row)
+                          })
+                        }
+                      >
+                        Start warmup
+                      </Button>
+                    ) : (
+                      <Button type="button" size="sm" variant="outline" asChild>
+                        <Link href={growthCommunicationsWarmupHref(row.senderId)}>View warmup</Link>
+                      </Button>
+                    )}
+                    {row.signatureStatus === "missing" ? (
+                      <Button type="button" size="sm" variant="outline" asChild>
+                        <Link href={growthEngineCustomerSettingsHref("email-signatures")}>Add signature</Link>
+                      </Button>
+                    ) : null}
+                    {senderPaused ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={Boolean(actionLoading)}
+                        onClick={() => void runAction(`resume-${row.senderId}`, () => resumeSender(row))}
+                      >
+                        Resume
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={Boolean(actionLoading)}
+                        onClick={() => void runAction(`pause-${row.senderId}`, () => pauseSender(row))}
+                      >
+                        Pause
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={
+                        Boolean(actionLoading) || !row.deliveryRouteEnabled || row.providerFamily !== "google"
+                      }
+                      onClick={() => {
+                        setTestSendRow(row)
+                        setTestSendTo("")
+                        setTestSendApproval(false)
+                      }}
+                    >
+                      <Send className="mr-1 size-3.5" />
+                      Test send
+                    </Button>
+                    {primaryPool ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={Boolean(actionLoading)}
+                        onClick={() =>
+                          void runAction(`remove-pool-${row.senderId}`, () =>
+                            removeFromPool(primaryPool.poolId, primaryPool.memberId),
+                          )
+                        }
+                      >
+                        Remove from pool
+                      </Button>
+                    ) : null}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        )}
       </GrowthEngineCard>
 
       <Dialog open={Boolean(testSendRow)} onOpenChange={(open) => !open && setTestSendRow(null)}>

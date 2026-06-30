@@ -7,7 +7,6 @@ import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-uti
 import { GrowthEngagementTimelineItem } from "@/components/growth/engagement/growth-engagement-timeline-item"
 import {
   GROWTH_ENGAGEMENT_TIMELINE_EVENT_TYPES,
-  GROWTH_ENGAGEMENT_TIMELINE_QA_MARKER,
   type GrowthEngagementTimelineEvent,
   type GrowthEngagementTimelineEventType,
   type GrowthEngagementTimelineResponse,
@@ -95,7 +94,6 @@ export function GrowthEngagementTimelinePanel({
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <GrowthBadge label="Read-only timeline" tone="neutral" />
-          <span className="text-xs text-muted-foreground">{GROWTH_ENGAGEMENT_TIMELINE_QA_MARKER}</span>
         </div>
 
         <div className="flex flex-wrap gap-2">

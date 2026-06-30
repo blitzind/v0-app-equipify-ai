@@ -81,8 +81,8 @@ export type GrowthCommunicationsSettingsCard = {
 export const GROWTH_COMMUNICATIONS_SETTINGS_CARDS: GrowthCommunicationsSettingsCard[] = [
   {
     id: "mailboxes",
-    title: "Mailboxes",
-    description: "Connect Gmail or Microsoft mailboxes for outbound and inbox tracking.",
+    title: "Connected Mailboxes",
+    description: "Connect Gmail or Microsoft, validate OAuth health, and manage send limits.",
     href: GROWTH_COMMUNICATIONS_CONNECTED_MAILBOXES_PATH,
     icon: Mailbox,
     adminFallbackHref: "/admin/growth/infrastructure/mailboxes",

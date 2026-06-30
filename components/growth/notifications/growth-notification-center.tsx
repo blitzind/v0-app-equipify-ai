@@ -12,8 +12,6 @@ import {
 import { GrowthNotificationList } from "@/components/growth/notifications/growth-notification-list"
 import type { GrowthOperatorNotificationCenterListItem } from "@/lib/growth/notifications/growth-notification-center-utils"
 import type { GrowthOperatorNotificationUnreadCounts } from "@/lib/growth/notifications/growth-notification-persistence-types"
-import { GROWTH_OPERATOR_NOTIFICATION_CENTER_QA_MARKER } from "@/lib/growth/notifications/growth-notification-persistence-types"
-
 const PAGE_SIZE = 25
 
 function buildListParams(filters: GrowthNotificationCenterFilters, offset: number): URLSearchParams {
@@ -161,9 +159,8 @@ export function GrowthNotificationCenter() {
           </span>
           <div>
             <p className="text-sm text-muted-foreground">
-              Growth operator notification center — read and acknowledge persisted SN-2 events.
+              Stay on top of approvals, alerts, and activity across your Growth workspace.
             </p>
-            <p className="text-xs text-muted-foreground">{GROWTH_OPERATOR_NOTIFICATION_CENTER_QA_MARKER}</p>
           </div>
         </div>
         <Button

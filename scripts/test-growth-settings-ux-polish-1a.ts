@@ -36,15 +36,15 @@ const PRIMARY_SETTINGS_PAGES: Array<{ segment: string; headerPattern: RegExp }> 
   { segment: "sidebar-preferences", headerPattern: /GrowthSettingsSectionPage|GrowthSettingsSidebarPreferencesPanel/ },
   { segment: "default-views", headerPattern: /GrowthSettingsSectionPage|GrowthSettingsDefaultViewsPanel/ },
   { segment: "communications", headerPattern: /GrowthCommunicationsSettingsHub/ },
-  { segment: "signatures", headerPattern: /GrowthWorkspacePageHeader/ },
+  { segment: "signatures", headerPattern: /GrowthCommunicationsSettingsSection/ },
   { segment: "calling-preferences", headerPattern: /GrowthSettingsCallingPreferencesPage/ },
   { segment: "calendar-preferences", headerPattern: /GrowthSettingsCalendarPreferencesPage/ },
   { segment: "calendar", headerPattern: /GrowthSettingsCalendarPage/ },
   { segment: "ai-teammate", headerPattern: /GrowthAiTeammateSettingsPanel/ },
-  { segment: "ai-preferences", headerPattern: /GrowthWorkspacePageHeader/ },
-  { segment: "autonomy", headerPattern: /GrowthAutonomyControlCenter/ },
+  { segment: "ai-preferences", headerPattern: /GrowthSettingsAiPreferencesPage/ },
+  { segment: "autonomy", headerPattern: /GrowthSettingsAutonomyPage/ },
   { segment: "command-center-preferences", headerPattern: /GrowthSettingsCommandCenterPreferencesPage/ },
-  { segment: "compliance", headerPattern: /GrowthWorkspacePageHeader/ },
+  { segment: "compliance", headerPattern: /GrowthSettingsCompliancePage/ },
   { segment: "communications/connected-mailboxes", headerPattern: /GrowthCommunicationsSettingsSection/ },
   { segment: "communications/warmup", headerPattern: /GrowthCommunicationsSettingsSection/ },
 ]
@@ -138,6 +138,14 @@ function main(): void {
   }
   console.log("  ✓ Primary settings pages render wired surfaces")
 
+  const aiPreferencesPage = read("components/growth/settings/growth-settings-ai-preferences-page.tsx")
+  assert.match(aiPreferencesPage, /GrowthWorkspacePageHeader/)
+  const autonomyPage = read("components/growth/settings/growth-settings-autonomy-page.tsx")
+  assert.match(autonomyPage, /GrowthWorkspacePageHeader/)
+  const compliancePage = read("components/growth/settings/growth-settings-compliance-page.tsx")
+  assert.match(compliancePage, /GrowthWorkspacePageHeader/)
+  console.log("  ✓ Refactored settings page shells use shared header")
+
   const header = read("components/growth/shell/growth-workspace-page-header.tsx")
   assert.match(header, /GROWTH_SETTINGS_PAGE_HEADER_ICON/)
   assert.match(header, /rounded-2xl border border-border bg-card p-5 shadow-sm/)
@@ -175,7 +183,7 @@ function main(): void {
   console.log("  ✓ No placeholder or migration copy in Growth settings surfaces")
 
   const aiTeammate = read("components/growth/settings/growth-ai-teammate-settings-panel.tsx")
-  assert.match(aiTeammate, /Not available yet/)
+  assert.match(aiTeammate, /Currently unavailable/)
   assert.match(aiTeammate, /GrowthSettingsCard/)
   assert.doesNotMatch(aiTeammate, /Coming soon/i)
   console.log("  ✓ AI Teammate uses production-quality unavailable messaging")
