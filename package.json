@@ -639,6 +639,7 @@
     "test:growth-pdl-production-integration-ge-providers-1a": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-pdl-production-integration-ge-providers-1a.ts",
     "test:growth-datamoon-lead-source-provider-ge-datamoon-1a": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-datamoon-lead-source-provider-ge-datamoon-1a.ts",
     "test:growth-datamoon-audience-import-ge-datamoon-1b": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-datamoon-audience-import-ge-datamoon-1b.ts",
+    "test:growth-datamoon-unified-intake-parity-ge-datamoon-1c": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-datamoon-unified-intake-parity-ge-datamoon-1c.ts",
     "test:growth-pdl-runtime-coverage-audit-7-ps-it": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-pdl-runtime-coverage-audit-7-ps-it.ts",
     "test:growth-canonical-company-staging-linkage-cert-7-ps-hm-link": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-canonical-company-staging-linkage-cert-7-ps-hm-link.ts",
     "test:growth-human-identity-naming-channel-cert-7-ps-hn": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-human-identity-naming-channel-cert-7-ps-hn.ts",

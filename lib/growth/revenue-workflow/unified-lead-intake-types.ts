@@ -16,6 +16,7 @@ export const LEAD_INTAKE_SOURCES = [
   "pdl",
   "manual",
   "csv_import",
+  "datamoon",
   "linkedin_capture",
   "browser_intake",
   "saved_search",

@@ -172,11 +172,12 @@ async function main() {
   assert.equal(dedupe!.rule, "email")
   checks.push("dedupe_email_match")
 
-  // No outreach side effects in import service
+  // Unified intake wired; no outreach side effects in import service
   const serviceSource = read("lib/growth/lead-sources/datamoon/datamoon-audience-import-service.ts")
   assert.doesNotMatch(serviceSource, /executeOutreach|bulkEnroll|sequencePattern|createCampaign|sendOutbound/i)
-  assert.doesNotMatch(serviceSource, /runUnifiedRevenueWorkflowAfterIntake/)
-  checks.push("no_outreach_side_effects")
+  assert.match(serviceSource, /runUnifiedRevenueWorkflowAfterIntake/)
+  assert.match(serviceSource, /buildDatamoonUnifiedIntakePayload/)
+  checks.push("unified_intake_wired_no_outreach")
 
   const importRoute = read("app/api/platform/growth/lead-sources/datamoon/runs/[runId]/import/route.ts")
   assert.match(importRoute, /import_all_previewed/)

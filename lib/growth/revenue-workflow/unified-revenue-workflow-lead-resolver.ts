@@ -30,6 +30,7 @@ function mapIntakeSourceToLeadSourceKind(source: NormalizedLeadIntake["source"])
     case "csv_import":
     case "apollo":
     case "pdl":
+    case "datamoon":
       return "import"
     case "linkedin_capture":
     case "browser_intake":

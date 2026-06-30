@@ -2,6 +2,10 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
+import {
+  buildDatamoonUnifiedIntakePayload,
+  formatDatamoonUnifiedIntakeRecordMessage,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-intake"
 import { findDatamoonAudienceDedupeMatch } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-dedupe"
 import {
   isDatamoonRecordImportable,
@@ -26,6 +30,7 @@ import {
 import { validateDatamoonAudienceImportRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-validation"
 import { createGrowthLead } from "@/lib/growth/lead-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
+import { runUnifiedRevenueWorkflowAfterIntake } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-intake-runner"
 import {
   buildAudience,
   fetchAudience,
@@ -311,6 +316,7 @@ export async function importDatamoonAudiencePreviewRecords(
   let skipped = 0
   let errors = 0
   const leadIds: string[] = []
+  const unifiedIntakeWarnings: Array<{ record_id: string; skip_reason: string }> = []
 
   for (const record of records) {
     const normalized = record.normalized
@@ -371,10 +377,39 @@ export async function importDatamoonAudiencePreviewRecords(
       })
 
       await recomputeGrowthLeadWorkflowSignals(admin, lead.id)
+
+      const intakePayload = buildDatamoonUnifiedIntakePayload({
+        run,
+        record,
+        leadId: lead.id,
+      })
+      const workflowRun = await runUnifiedRevenueWorkflowAfterIntake({
+        admin,
+        actor: input.actor,
+        ...intakePayload,
+      })
+
+      if (workflowRun.skipped) {
+        const skipReason =
+          typeof workflowRun.skipReason === "string" && workflowRun.skipReason.trim()
+            ? workflowRun.skipReason.trim().slice(0, 200)
+            : "workflow_skipped"
+        unifiedIntakeWarnings.push({ record_id: record.id, skip_reason: skipReason })
+        logGrowthEngine("datamoon_unified_intake_skipped", {
+          runId,
+          leadId: lead.id,
+          recordId: record.id,
+          skipReason,
+        })
+      }
+
       await updateDatamoonAudienceImportRecord(admin, record.id, {
         status: "imported",
         leadId: lead.id,
-        message: "Imported into growth.leads.",
+        message: formatDatamoonUnifiedIntakeRecordMessage({
+          skipped: workflowRun.skipped,
+          skipReason: workflowRun.skipReason,
+        }),
       })
       imported += 1
       leadIds.push(lead.id)
@@ -390,6 +425,14 @@ export async function importDatamoonAudiencePreviewRecords(
   const remainingPreview = await listDatamoonAudienceImportRecords(admin, runId, { status: "preview" })
   const finalStatus = remainingPreview.length === 0 ? "imported" : "imported_partial"
 
+  const providerMetadataPatch =
+    unifiedIntakeWarnings.length > 0
+      ? (sanitizeDatamoonProviderMetadata({
+          ...run.providerMetadata,
+          unified_intake_warnings: unifiedIntakeWarnings,
+        }) as Record<string, unknown>)
+      : undefined
+
   const updatedRun = await updateDatamoonAudienceImportRun(admin, runId, {
     status: finalStatus,
     importedCount: run.importedCount + imported,
@@ -397,6 +440,7 @@ export async function importDatamoonAudiencePreviewRecords(
     skippedCount: run.skippedCount + skipped,
     errorCount: run.errorCount + errors,
     importedAt: new Date().toISOString(),
+    ...(providerMetadataPatch ? { providerMetadata: providerMetadataPatch } : {}),
   })
 
   logGrowthEngine("datamoon_audience_import_committed", {

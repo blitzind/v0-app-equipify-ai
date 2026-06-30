@@ -86,7 +86,7 @@ async function main(): Promise<void> {
   console.log("\n=== GE-LAUNCH-1A Unified Revenue Workflow Certification ===\n")
 
   assert.equal(GROWTH_UNIFIED_REVENUE_WORKFLOW_QA_MARKER, "unified-revenue-workflow-v1")
-  assert.equal(LEAD_INTAKE_SOURCES.length, 8)
+  assert.equal(LEAD_INTAKE_SOURCES.length, 9)
   console.log("  ✓ Canonical QA marker + intake sources")
 
   const orchestratorSource = readSource("lib/growth/revenue-workflow/unified-revenue-workflow-orchestrator.ts")
