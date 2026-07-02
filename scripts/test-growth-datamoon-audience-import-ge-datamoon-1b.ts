@@ -260,7 +260,33 @@ async function main() {
   const dryRunId = resolveDatamoonBuildAudienceId({ buildStatus: "dry_run", data: {} })
   assert.equal(dryRunId.audienceId, "dry-run-audience-id")
   assert.equal(dryRunId.missingProviderAudienceId, false)
+
+  assert.equal(extractDatamoonProviderAudienceId({ message: "ok", data: { id: "nested-string-1" } }), "nested-string-1")
+  assert.equal(extractDatamoonProviderAudienceId({ message: "ok", data: { id: 7788 } }), "7788")
+  assert.equal(
+    extractDatamoonProviderAudienceId({ message: "ok", data: { audience_id: "nested-alias-1" } }),
+    "nested-alias-1",
+  )
+  assert.equal(
+    extractDatamoonProviderAudienceId({ message: "ok", data: { data: { id: "double-wrap-1" } } }),
+    "double-wrap-1",
+  )
+
+  const nestedMissing = resolveDatamoonBuildAudienceId({
+    buildStatus: "success",
+    data: { message: "ok", data: { status: "in_progress" } },
+  })
+  assert.equal(nestedMissing.audienceId, null)
+  assert.equal(nestedMissing.missingProviderAudienceId, true)
+
+  assert.deepEqual(summarizeDatamoonBuildResponseKeys({ message: "ok", data: { id: 1, status: "in_progress" } }), [
+    "message",
+    "data",
+    "data.id",
+    "data.status",
+  ])
   checks.push("provider_audience_id_extraction")
+  checks.push("nested_provider_audience_id_extraction")
 
   await withEnvAsync(
     {
@@ -278,7 +304,7 @@ async function main() {
     async () => {
       const { admin, getRun } = createMockDatamoonImportRunsAdmin()
       const fetchImpl = async () =>
-        new Response(JSON.stringify({ status: "in_progress", record_count: 0 }), {
+        new Response(JSON.stringify({ message: "Audience created", data: { status: "in_progress", record_count: 0 } }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
@@ -309,12 +335,65 @@ async function main() {
       assert.equal(run!.status, "failed")
       assert.equal(run!.error_message, "missing_provider_audience_id")
       assert.equal(run!.provider_metadata.error_category, "missing_provider_audience_id")
-      assert.deepEqual(run!.provider_metadata.build_response_keys, ["status", "record_count"])
+      assert.deepEqual(run!.provider_metadata.build_response_keys, [
+        "message",
+        "data",
+        "data.status",
+        "data.record_count",
+      ])
       assert.equal(run!.datamoon_audience_id, null)
       assert.notEqual(run!.status, "pending_build")
     },
   )
   checks.push("missing_provider_audience_id_no_throw")
+
+  await withEnvAsync(
+    {
+      DATAMOON_PROVIDER_ENABLED: "true",
+      DATAMOON_DRY_RUN_ONLY: "false",
+      DATAMOON_DEFAULT_MODE: "module",
+      DATAMOON_AUDIENCE_MODULE_API_KEY: "module-key",
+      NEXT_PUBLIC_SUPABASE_URL:
+        process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://example.supabase.co",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY:
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "test-anon-key",
+      SUPABASE_SERVICE_ROLE_KEY:
+        process.env.SUPABASE_SERVICE_ROLE_KEY ?? "test-service-role-key",
+    },
+    async () => {
+      const { admin, getRun } = createMockDatamoonImportRunsAdmin("mock-run-nested-id")
+      const fetchImpl = async () =>
+        new Response(JSON.stringify({ message: "Audience created", data: { id: 424242, status: "in_progress" } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+
+      const { startDatamoonAudienceImportRun } = await import(
+        "../lib/growth/lead-sources/datamoon/datamoon-audience-import-service"
+      )
+
+      const result = await startDatamoonAudienceImportRun(
+        admin as never,
+        {
+          run_name: "Nested ID regression",
+          audience_type: "advanced_search",
+          filters: [{ field: "job_title", operator: "contains", value: "CEO" }],
+          limit: 1,
+          provider_mode: "module",
+        },
+        { userId: "user-1" },
+        { env: process.env, fetchImpl },
+      )
+
+      assert.equal(result.ok, true)
+      if (!result.ok) throw new Error("expected nested module build success")
+      assert.equal(result.run.datamoonAudienceId, "424242")
+      const run = getRun("mock-run-nested-id")
+      assert.equal(run?.status, "building")
+      assert.equal(run?.datamoon_audience_id, "424242")
+    },
+  )
+  checks.push("nested_module_build_id_persisted")
 
   // ext field normalization
   const normalized = normalizeDatamoonAudienceRecord(

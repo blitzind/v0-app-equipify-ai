@@ -1,4 +1,4 @@
-/** GE-DATAMOON-BUILD-ID-FIX-1 — Extract Datamoon provider audience IDs from build responses. Client-safe. */
+/** GE-DATAMOON-BUILD-ID-FIX-1 / NESTED-BUILD-ID-FIX-1 — Extract Datamoon provider audience IDs from build responses. Client-safe. */
 
 const DATAMOON_PROVIDER_AUDIENCE_ID_KEYS = [
   "id",
@@ -6,6 +6,8 @@ const DATAMOON_PROVIDER_AUDIENCE_ID_KEYS = [
   "audienceId",
   "audienceID",
 ] as const
+
+const DATAMOON_BUILD_RESPONSE_KEY_SUMMARY_LIMIT = 20
 
 function coerceDatamoonProviderAudienceId(value: unknown): string | null {
   if (value == null) return null
@@ -20,9 +22,11 @@ function coerceDatamoonProviderAudienceId(value: unknown): string | null {
   return null
 }
 
-export function extractDatamoonProviderAudienceId(data: unknown): string | null {
-  if (!data || typeof data !== "object" || Array.isArray(data)) return null
-  const record = data as Record<string, unknown>
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
+}
+
+function extractDatamoonProviderAudienceIdFromRecord(record: Record<string, unknown>): string | null {
   for (const key of DATAMOON_PROVIDER_AUDIENCE_ID_KEYS) {
     const extracted = coerceDatamoonProviderAudienceId(record[key])
     if (extracted) return extracted
@@ -30,9 +34,51 @@ export function extractDatamoonProviderAudienceId(data: unknown): string | null 
   return null
 }
 
+export function extractDatamoonProviderAudienceId(data: unknown): string | null {
+  if (!isPlainObject(data)) return null
+
+  const topLevel = extractDatamoonProviderAudienceIdFromRecord(data)
+  if (topLevel) return topLevel
+
+  const nested = data.data
+  if (isPlainObject(nested)) {
+    const nestedId = extractDatamoonProviderAudienceIdFromRecord(nested)
+    if (nestedId) return nestedId
+
+    const doubleNested = nested.data
+    if (isPlainObject(doubleNested)) {
+      const doubleNestedId = extractDatamoonProviderAudienceIdFromRecord(doubleNested)
+      if (doubleNestedId) return doubleNestedId
+    }
+  }
+
+  return null
+}
+
+function appendSummarizedKeys(keys: string[], prefix: string, record: Record<string, unknown>) {
+  for (const key of Object.keys(record)) {
+    if (keys.length >= DATAMOON_BUILD_RESPONSE_KEY_SUMMARY_LIMIT) return
+    keys.push(prefix ? `${prefix}.${key}` : key)
+  }
+}
+
 export function summarizeDatamoonBuildResponseKeys(data: unknown): string[] {
-  if (!data || typeof data !== "object" || Array.isArray(data)) return []
-  return Object.keys(data as Record<string, unknown>).slice(0, 20)
+  if (!isPlainObject(data)) return []
+
+  const keys: string[] = []
+  appendSummarizedKeys(keys, "", data)
+
+  const nested = data.data
+  if (isPlainObject(nested)) {
+    appendSummarizedKeys(keys, "data", nested)
+
+    const doubleNested = nested.data
+    if (isPlainObject(doubleNested)) {
+      appendSummarizedKeys(keys, "data.data", doubleNested)
+    }
+  }
+
+  return keys.slice(0, DATAMOON_BUILD_RESPONSE_KEY_SUMMARY_LIMIT)
 }
 
 export function resolveDatamoonBuildAudienceId(input: {
