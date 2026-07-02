@@ -7,8 +7,8 @@ import {
   formatDatamoonUnifiedIntakeRecordMessage,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-intake"
 import {
-  extractDatamoonProviderAudienceId,
   resolveDatamoonBuildAudienceId,
+  summarizeDatamoonBuildResponseKeys,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-build-id"
 import { findDatamoonAudienceDedupeMatch } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-dedupe"
 import {
@@ -61,6 +61,21 @@ function resolveCompanyName(normalized: ReturnType<typeof normalizeDatamoonAudie
   return "Unknown Company"
 }
 
+async function failDatamoonAudienceImportRun(
+  admin: SupabaseClient,
+  runId: string,
+  input: {
+    errorMessage: string
+    providerMetadata: Record<string, unknown>
+  },
+): Promise<DatamoonAudienceImportRun | null> {
+  return updateDatamoonAudienceImportRun(admin, runId, {
+    status: "failed",
+    errorMessage: input.errorMessage,
+    providerMetadata: sanitizeDatamoonProviderMetadata(input.providerMetadata) as Record<string, unknown>,
+  })
+}
+
 export async function startDatamoonAudienceImportRun(
   admin: SupabaseClient,
   input: DatamoonAudienceImportRequest,
@@ -95,71 +110,81 @@ export async function startDatamoonAudienceImportRun(
 
   if (!run) return { ok: false, error: "run_create_failed" }
 
-  const build = await buildAudience(
-    {
-      type: input.audience_type,
-      filters: input.filters,
-      topic_ids: input.topic_ids,
-      name: input.name,
-      website_id: input.website_id,
-      record_limit: input.limit,
-    },
-    { env, audienceMode: providerMode, fetchImpl: options?.fetchImpl },
-  )
+  try {
+    const build = await buildAudience(
+      {
+        type: input.audience_type,
+        filters: input.filters,
+        topic_ids: input.topic_ids,
+        name: input.name,
+        website_id: input.website_id,
+        record_limit: input.limit,
+      },
+      { env, audienceMode: providerMode, fetchImpl: options?.fetchImpl },
+    )
 
-  if (build.status === "skipped" || build.status === "failed") {
-    await updateDatamoonAudienceImportRun(admin, run.id, {
-      status: "failed",
-      errorMessage: build.message,
-      providerMetadata: sanitizeDatamoonProviderMetadata({
-        build_status: build.status,
-        error_category: build.error_category,
-        validation_errors: build.validation_errors,
-      }) as Record<string, unknown>,
+    if (build.status === "skipped" || build.status === "failed") {
+      await failDatamoonAudienceImportRun(admin, run.id, {
+        errorMessage: build.message,
+        providerMetadata: {
+          build_status: build.status,
+          error_category: build.error_category,
+          validation_errors: build.validation_errors,
+        },
+      })
+      return { ok: false, error: build.message, issues: build.validation_errors ?? undefined }
+    }
+
+    const { audienceId, missingProviderAudienceId } = resolveDatamoonBuildAudienceId({
+      buildStatus: build.status,
+      data: build.data,
     })
-    return { ok: false, error: build.message, issues: build.validation_errors ?? undefined }
-  }
 
-  const { audienceId, missingProviderAudienceId } = resolveDatamoonBuildAudienceId({
-    buildStatus: build.status,
-    data: build.data,
-  })
+    if (missingProviderAudienceId) {
+      await failDatamoonAudienceImportRun(admin, run.id, {
+        errorMessage: "missing_provider_audience_id",
+        providerMetadata: {
+          build_status: build.status,
+          build_message: build.message,
+          error_category: "missing_provider_audience_id",
+          build_response_keys: summarizeDatamoonBuildResponseKeys(build.data),
+        },
+      })
+      return { ok: false, error: "missing_provider_audience_id" }
+    }
 
-  if (missingProviderAudienceId) {
-    await updateDatamoonAudienceImportRun(admin, run.id, {
-      status: "failed",
-      errorMessage: "missing_provider_audience_id",
+    const updated = await updateDatamoonAudienceImportRun(admin, run.id, {
+      datamoonAudienceId: audienceId,
+      status: "building",
+      loadingCount: typeof build.data?.record_count === "number" ? build.data.record_count : 0,
       providerMetadata: sanitizeDatamoonProviderMetadata({
+        qa_marker: GROWTH_DATAMOON_AUDIENCE_IMPORT_QA_MARKER,
         build_status: build.status,
         build_message: build.message,
-        error_category: "missing_provider_audience_id",
-        build_response_keys: summarizeDatamoonBuildResponseKeys(build.data),
+        dry_run: build.dry_run,
+        audience_mode: build.audience_mode,
+        provider_audience_id: audienceId,
       }) as Record<string, unknown>,
     })
-    return { ok: false, error: "missing_provider_audience_id" }
+
+    logGrowthEngine("datamoon_audience_import_build_started", {
+      runId: run.id,
+      audienceId,
+      dryRun: build.dry_run,
+    })
+
+    return { ok: true, run: updated ?? run }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "datamoon_import_run_failed"
+    const sanitizedMessage = message.trim().slice(0, 200) || "datamoon_import_run_failed"
+    await failDatamoonAudienceImportRun(admin, run.id, {
+      errorMessage: sanitizedMessage,
+      providerMetadata: {
+        error_category: "unexpected_error",
+      },
+    }).catch(() => undefined)
+    return { ok: false, error: sanitizedMessage }
   }
-
-  const updated = await updateDatamoonAudienceImportRun(admin, run.id, {
-    datamoonAudienceId: audienceId,
-    status: build.status === "dry_run" ? "building" : "building",
-    loadingCount: typeof build.data?.record_count === "number" ? build.data.record_count : 0,
-    providerMetadata: sanitizeDatamoonProviderMetadata({
-      qa_marker: GROWTH_DATAMOON_AUDIENCE_IMPORT_QA_MARKER,
-      build_status: build.status,
-      build_message: build.message,
-      dry_run: build.dry_run,
-      audience_mode: build.audience_mode,
-      provider_audience_id: audienceId,
-    }) as Record<string, unknown>,
-  })
-
-  logGrowthEngine("datamoon_audience_import_build_started", {
-    runId: run.id,
-    audienceId,
-    dryRun: build.dry_run,
-  })
-
-  return { ok: true, run: updated ?? run }
 }
 
 export async function pollDatamoonAudienceImportRun(

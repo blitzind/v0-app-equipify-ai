@@ -49,6 +49,134 @@ function withEnv<T>(env: Record<string, string | undefined>, fn: () => T): T {
   }
 }
 
+async function withEnvAsync<T>(
+  env: Record<string, string | undefined>,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const keys = new Set([...Object.keys(env), ...Object.keys(process.env)])
+  const prior = new Map<string, string | undefined>()
+  for (const key of keys) prior.set(key, process.env[key])
+  for (const [key, value] of Object.entries(env)) {
+    if (value === undefined) delete process.env[key]
+    else process.env[key] = value
+  }
+  try {
+    return await fn()
+  } finally {
+    for (const [key, value] of prior.entries()) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
+}
+
+type MockRunRow = {
+  id: string
+  run_name: string
+  datamoon_audience_id: string | null
+  provider_mode: string
+  audience_type: string
+  filters: unknown[]
+  topic_ids: string[]
+  requested_limit: number | null
+  audience_name: string | null
+  website_id: string | null
+  status: string
+  record_count: number
+  loading_count: number
+  preview_count: number
+  imported_count: number
+  duplicate_count: number
+  skipped_count: number
+  error_count: number
+  provider_metadata: Record<string, unknown>
+  error_message: string | null
+  dry_run: boolean
+  created_by: string | null
+  last_polled_at: string | null
+  completed_at: string | null
+  imported_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+function createMockDatamoonImportRunsAdmin(runId = "mock-run-id") {
+  const store: Record<string, MockRunRow> = {}
+
+  const runsTable = {
+    insert: (row: Record<string, unknown>) => ({
+      select: () => ({
+        single: async () => {
+          const now = new Date().toISOString()
+          const record: MockRunRow = {
+            id: runId,
+            run_name: String(row.run_name ?? ""),
+            datamoon_audience_id: null,
+            provider_mode: String(row.provider_mode ?? "module"),
+            audience_type: String(row.audience_type ?? "advanced_search"),
+            filters: Array.isArray(row.filters) ? row.filters : [],
+            topic_ids: Array.isArray(row.topic_ids) ? row.topic_ids.map(String) : [],
+            requested_limit: typeof row.requested_limit === "number" ? row.requested_limit : null,
+            audience_name: typeof row.audience_name === "string" ? row.audience_name : null,
+            website_id: typeof row.website_id === "string" ? row.website_id : null,
+            status: String(row.status ?? "pending_build"),
+            record_count: 0,
+            loading_count: 0,
+            preview_count: 0,
+            imported_count: 0,
+            duplicate_count: 0,
+            skipped_count: 0,
+            error_count: 0,
+            provider_metadata:
+              row.provider_metadata && typeof row.provider_metadata === "object"
+                ? (row.provider_metadata as Record<string, unknown>)
+                : {},
+            error_message: null,
+            dry_run: Boolean(row.dry_run),
+            created_by: typeof row.created_by === "string" ? row.created_by : null,
+            last_polled_at: null,
+            completed_at: null,
+            imported_at: null,
+            created_at: now,
+            updated_at: now,
+          }
+          store[runId] = record
+          return { data: record, error: null }
+        },
+      }),
+    }),
+    update: (row: Record<string, unknown>) => ({
+      eq: (_column: string, id: string) => ({
+        select: () => ({
+          maybeSingle: async () => {
+            const existing = store[id]
+            if (!existing) return { data: null, error: null }
+            store[id] = {
+              ...existing,
+              ...row,
+              updated_at: new Date().toISOString(),
+            } as MockRunRow
+            return { data: store[id], error: null }
+          },
+        }),
+      }),
+    }),
+  }
+
+  const admin = {
+    schema: () => ({
+      from: (table: string) => {
+        if (table !== "datamoon_audience_import_runs") {
+          throw new Error(`unexpected table ${table}`)
+        }
+        return runsTable
+      },
+    }),
+  }
+
+  return { admin, getRun: (id: string) => store[id] }
+}
+
 async function main() {
   const checks: string[] = []
 
@@ -134,6 +262,60 @@ async function main() {
   assert.equal(dryRunId.missingProviderAudienceId, false)
   checks.push("provider_audience_id_extraction")
 
+  await withEnvAsync(
+    {
+      DATAMOON_PROVIDER_ENABLED: "true",
+      DATAMOON_DRY_RUN_ONLY: "false",
+      DATAMOON_DEFAULT_MODE: "module",
+      DATAMOON_AUDIENCE_MODULE_API_KEY: "module-key",
+      NEXT_PUBLIC_SUPABASE_URL:
+        process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://example.supabase.co",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY:
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "test-anon-key",
+      SUPABASE_SERVICE_ROLE_KEY:
+        process.env.SUPABASE_SERVICE_ROLE_KEY ?? "test-service-role-key",
+    },
+    async () => {
+      const { admin, getRun } = createMockDatamoonImportRunsAdmin()
+      const fetchImpl = async () =>
+        new Response(JSON.stringify({ status: "in_progress", record_count: 0 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+
+      const { startDatamoonAudienceImportRun } = await import(
+        "../lib/growth/lead-sources/datamoon/datamoon-audience-import-service"
+      )
+
+      const result = await startDatamoonAudienceImportRun(
+        admin as never,
+        {
+          run_name: "Missing ID regression",
+          audience_type: "advanced_search",
+          filters: [{ field: "job_title", operator: "contains", value: "CEO" }],
+          limit: 1,
+          provider_mode: "module",
+        },
+        { userId: "user-1" },
+        { env: process.env, fetchImpl },
+      )
+
+      assert.equal(result.ok, false)
+      if (result.ok) throw new Error("expected missing_provider_audience_id failure")
+      assert.equal(result.error, "missing_provider_audience_id")
+
+      const run = getRun("mock-run-id")
+      assert.ok(run)
+      assert.equal(run!.status, "failed")
+      assert.equal(run!.error_message, "missing_provider_audience_id")
+      assert.equal(run!.provider_metadata.error_category, "missing_provider_audience_id")
+      assert.deepEqual(run!.provider_metadata.build_response_keys, ["status", "record_count"])
+      assert.equal(run!.datamoon_audience_id, null)
+      assert.notEqual(run!.status, "pending_build")
+    },
+  )
+  checks.push("missing_provider_audience_id_no_throw")
+
   // ext field normalization
   const normalized = normalizeDatamoonAudienceRecord(
     {
@@ -217,6 +399,7 @@ async function main() {
   assert.match(serviceSource, /buildDatamoonUnifiedIntakePayload/)
   assert.match(serviceSource, /record_limit: input\.limit/)
   assert.match(serviceSource, /resolveDatamoonBuildAudienceId/)
+  assert.match(serviceSource, /summarizeDatamoonBuildResponseKeys/)
   assert.match(serviceSource, /missing_provider_audience_id/)
   checks.push("unified_intake_wired_no_outreach")
 

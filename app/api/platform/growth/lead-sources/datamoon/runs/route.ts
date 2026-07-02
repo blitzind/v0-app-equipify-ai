@@ -73,9 +73,10 @@ export async function POST(request: Request) {
   )
 
   if (!result.ok) {
+    const status = result.error === "validation_failed" ? 422 : 400
     return NextResponse.json(
       { ok: false, error: result.error, issues: result.issues ?? null },
-      { status: result.error === "validation_failed" ? 422 : 400 },
+      { status },
     )
   }
 
