@@ -6,6 +6,10 @@ import {
   buildDatamoonUnifiedIntakePayload,
   formatDatamoonUnifiedIntakeRecordMessage,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-intake"
+import {
+  extractDatamoonProviderAudienceId,
+  resolveDatamoonBuildAudienceId,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-build-id"
 import { findDatamoonAudienceDedupeMatch } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-dedupe"
 import {
   isDatamoonRecordImportable,
@@ -116,12 +120,24 @@ export async function startDatamoonAudienceImportRun(
     return { ok: false, error: build.message, issues: build.validation_errors ?? undefined }
   }
 
-  const audienceId =
-    typeof build.data?.id === "string"
-      ? build.data.id
-      : build.status === "dry_run"
-        ? String(build.data?.id ?? "dry-run-audience-id")
-        : null
+  const { audienceId, missingProviderAudienceId } = resolveDatamoonBuildAudienceId({
+    buildStatus: build.status,
+    data: build.data,
+  })
+
+  if (missingProviderAudienceId) {
+    await updateDatamoonAudienceImportRun(admin, run.id, {
+      status: "failed",
+      errorMessage: "missing_provider_audience_id",
+      providerMetadata: sanitizeDatamoonProviderMetadata({
+        build_status: build.status,
+        build_message: build.message,
+        error_category: "missing_provider_audience_id",
+        build_response_keys: summarizeDatamoonBuildResponseKeys(build.data),
+      }) as Record<string, unknown>,
+    })
+    return { ok: false, error: "missing_provider_audience_id" }
+  }
 
   const updated = await updateDatamoonAudienceImportRun(admin, run.id, {
     datamoonAudienceId: audienceId,
@@ -133,6 +149,7 @@ export async function startDatamoonAudienceImportRun(
       build_message: build.message,
       dry_run: build.dry_run,
       audience_mode: build.audience_mode,
+      provider_audience_id: audienceId,
     }) as Record<string, unknown>,
   })
 

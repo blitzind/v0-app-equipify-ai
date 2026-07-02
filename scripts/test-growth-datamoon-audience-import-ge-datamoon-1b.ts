@@ -6,6 +6,11 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
 import { listGrowthLeadSourceRegistry } from "../lib/growth/lead-sources/lead-source-registry"
+import {
+  extractDatamoonProviderAudienceId,
+  resolveDatamoonBuildAudienceId,
+  summarizeDatamoonBuildResponseKeys,
+} from "../lib/growth/lead-sources/datamoon/datamoon-audience-import-build-id"
 import { findDatamoonAudienceDedupeMatch } from "../lib/growth/lead-sources/datamoon/datamoon-audience-import-dedupe"
 import {
   filterDatamoonRecordToExtFields,
@@ -105,6 +110,30 @@ async function main() {
   assert.equal(limitOk.ok, true)
   checks.push("ui_api_limit_validation")
 
+  assert.equal(extractDatamoonProviderAudienceId({ id: "aud-string-1" }), "aud-string-1")
+  assert.equal(extractDatamoonProviderAudienceId({ id: 4242 }), "4242")
+  assert.equal(extractDatamoonProviderAudienceId({ audience_id: "aud-alias-1" }), "aud-alias-1")
+  assert.equal(extractDatamoonProviderAudienceId({ audienceId: 9001 }), "9001")
+  assert.equal(extractDatamoonProviderAudienceId({ audienceID: "aud-camel-1" }), "aud-camel-1")
+  assert.equal(extractDatamoonProviderAudienceId({ status: "in_progress" }), null)
+  assert.equal(extractDatamoonProviderAudienceId({ id: { nested: true } }), null)
+
+  const missingId = resolveDatamoonBuildAudienceId({
+    buildStatus: "success",
+    data: { status: "in_progress" },
+  })
+  assert.equal(missingId.audienceId, null)
+  assert.equal(missingId.missingProviderAudienceId, true)
+  assert.deepEqual(summarizeDatamoonBuildResponseKeys({ status: "in_progress", record_count: 0 }), [
+    "status",
+    "record_count",
+  ])
+
+  const dryRunId = resolveDatamoonBuildAudienceId({ buildStatus: "dry_run", data: {} })
+  assert.equal(dryRunId.audienceId, "dry-run-audience-id")
+  assert.equal(dryRunId.missingProviderAudienceId, false)
+  checks.push("provider_audience_id_extraction")
+
   // ext field normalization
   const normalized = normalizeDatamoonAudienceRecord(
     {
@@ -187,6 +216,8 @@ async function main() {
   assert.match(serviceSource, /runUnifiedRevenueWorkflowAfterIntake/)
   assert.match(serviceSource, /buildDatamoonUnifiedIntakePayload/)
   assert.match(serviceSource, /record_limit: input\.limit/)
+  assert.match(serviceSource, /resolveDatamoonBuildAudienceId/)
+  assert.match(serviceSource, /missing_provider_audience_id/)
   checks.push("unified_intake_wired_no_outreach")
 
   const clientSource = read("lib/growth/providers/datamoon/datamoon-client.ts")
