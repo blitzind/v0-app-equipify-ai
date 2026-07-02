@@ -217,6 +217,45 @@ async function main() {
     },
   )
 
+  // Audience build body uses record_limit only (GE-DATAMOON-API-BODY-FIX-1)
+  for (const mode of ["ext", "module"] as const) {
+    const envKey =
+      mode === "module" ? "DATAMOON_AUDIENCE_MODULE_API_KEY" : "DATAMOON_AUDIENCE_EXT_API_KEY"
+    await withEnv(
+      {
+        DATAMOON_PROVIDER_ENABLED: "true",
+        DATAMOON_DRY_RUN_ONLY: "false",
+        DATAMOON_DEFAULT_MODE: mode,
+        [envKey]: `${mode}-audience-key`,
+      },
+      async () => {
+        const { fetchImpl, calls } = createMockFetch([
+          { status: 200, body: { id: "aud-body-check", status: "in_progress" } },
+        ])
+
+        const build = await client.buildAudience(
+          {
+            type: "advanced_search",
+            filters: [{ field: "job_title", operator: "contains", value: "CEO" }],
+            limit: 25,
+          },
+          { env: process.env, fetchImpl, audienceMode: mode },
+        )
+        assert.equal(build.status, "success")
+        assert.equal(calls.length, 1)
+        assert.match(
+          calls[0].url,
+          mode === "module" ? /\/api\/v2\/m\/audiences\/build$/ : /\/api\/v2\/ext\/audiences\/build$/,
+        )
+
+        const body = JSON.parse(calls[0].body ?? "{}") as Record<string, unknown>
+        assert.equal(body.record_limit, 25)
+        assert.equal("limit" in body, false)
+      },
+    )
+  }
+  checks.push("audience_build_record_limit_body_ext_module")
+
   // 422 validation handling
   await withEnv(
     {

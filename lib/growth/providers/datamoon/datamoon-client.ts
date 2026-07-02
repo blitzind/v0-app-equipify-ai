@@ -170,6 +170,12 @@ function failedFromHttp<T>(
   })
 }
 
+function resolveAudienceBuildRecordLimit(input: DatamoonBuildAudienceInput): number | undefined {
+  if (input.record_limit != null) return input.record_limit
+  if (input.limit != null) return input.limit
+  return undefined
+}
+
 export async function buildAudience(
   input: DatamoonBuildAudienceInput,
   options?: DatamoonClientOptions,
@@ -205,6 +211,7 @@ export async function buildAudience(
   const env = resolveEnv(options)
   const apiKey = getDatamoonAudienceApiKey(env, preflight.audienceMode)!
   const baseUrl = resolveDatamoonAudienceBaseUrl(preflight.audienceMode)
+  const recordLimit = resolveAudienceBuildRecordLimit(input)
   const http = await fetchDatamoonJson<DatamoonAudienceBuildResponse>({
     url: `${baseUrl}/audiences/build`,
     method: "POST",
@@ -216,8 +223,7 @@ export async function buildAudience(
       ...(input.name ? { name: input.name } : {}),
       ...(input.website_id ? { website_id: input.website_id } : {}),
       ...(input.topic_ids ? { topic_ids: input.topic_ids } : {}),
-      ...(input.limit != null ? { limit: input.limit } : {}),
-      ...(input.record_limit != null ? { record_limit: input.record_limit } : {}),
+      ...(recordLimit != null ? { record_limit: recordLimit } : {}),
     },
     fetchImpl: options?.fetchImpl,
   })

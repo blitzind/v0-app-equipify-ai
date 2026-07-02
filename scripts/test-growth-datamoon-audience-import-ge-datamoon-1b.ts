@@ -96,6 +96,15 @@ async function main() {
   assert.equal(advancedOk.ok, true)
   checks.push("advanced_search_validation")
 
+  const limitOk = validateDatamoonAudienceImportRequest({
+    run_name: "Limit test",
+    audience_type: "advanced_search",
+    filters: [],
+    limit: 1,
+  })
+  assert.equal(limitOk.ok, true)
+  checks.push("ui_api_limit_validation")
+
   // ext field normalization
   const normalized = normalizeDatamoonAudienceRecord(
     {
@@ -177,7 +186,13 @@ async function main() {
   assert.doesNotMatch(serviceSource, /executeOutreach|bulkEnroll|sequencePattern|createCampaign|sendOutbound/i)
   assert.match(serviceSource, /runUnifiedRevenueWorkflowAfterIntake/)
   assert.match(serviceSource, /buildDatamoonUnifiedIntakePayload/)
+  assert.match(serviceSource, /record_limit: input\.limit/)
   checks.push("unified_intake_wired_no_outreach")
+
+  const clientSource = read("lib/growth/providers/datamoon/datamoon-client.ts")
+  assert.match(clientSource, /record_limit: recordLimit/)
+  assert.doesNotMatch(clientSource, /\{ limit: input\.limit \}/)
+  checks.push("audience_build_record_limit_only")
 
   const importRoute = read("app/api/platform/growth/lead-sources/datamoon/runs/[runId]/import/route.ts")
   assert.match(importRoute, /import_all_previewed/)

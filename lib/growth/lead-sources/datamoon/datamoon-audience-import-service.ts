@@ -98,7 +98,6 @@ export async function startDatamoonAudienceImportRun(
       topic_ids: input.topic_ids,
       name: input.name,
       website_id: input.website_id,
-      limit: input.limit,
       record_limit: input.limit,
     },
     { env, audienceMode: providerMode, fetchImpl: options?.fetchImpl },
