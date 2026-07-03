@@ -1,9 +1,10 @@
-/** GE-AIOS-BUSINESS-PROFILE-1A — Deterministic Business Profile draft generator (client-safe). */
+/** GE-AIOS-BUSINESS-PROFILE-1A/1B — Deterministic Business Profile draft generator (client-safe). */
 
 import {
   BUSINESS_PROFILE_DRAFT_LABEL,
   type BusinessProfileDraft,
   type BusinessProfileDraftContent,
+  type BusinessProfileDraftSource,
   type BusinessProfileInput,
 } from "@/lib/growth/business-profile/business-profile-types"
 
@@ -13,6 +14,11 @@ export type BusinessProfileDraftGeneratorOptions = {
   mode?: BusinessProfileDraftGeneratorMode
   /** Optional AI hook — when unavailable, deterministic fallback is used. */
   generateWithAi?: (input: BusinessProfileInput) => Promise<BusinessProfileDraftContent | null>
+}
+
+export type BuildDeterministicProfileOptions = {
+  websiteContextSummary?: string | null
+  draftSource?: BusinessProfileDraftSource
 }
 
 function trim(value: string | null | undefined): string {
@@ -34,10 +40,14 @@ function hostnameFromWebsite(website: string): string {
   }
 }
 
-function buildDeterministicProfileContent(input: BusinessProfileInput): BusinessProfileDraftContent {
+export function buildDeterministicProfileContent(
+  input: BusinessProfileInput,
+  options: BuildDeterministicProfileOptions = {},
+): BusinessProfileDraftContent {
   const companyName = trim(input.companyName)
   const website = normalizeWebsite(input.website)
   const host = hostnameFromWebsite(website)
+  const notes = trim(input.notes)
   const whatTheySell = trim(input.whatTheySell)
   const whoTheySellTo = trim(input.whoTheySellTo)
   const geography = trim(input.geography) || "United States"
@@ -45,7 +55,9 @@ function buildDeterministicProfileContent(input: BusinessProfileInput): Business
 
   const productsServices = whatTheySell
     ? [whatTheySell]
-    : [`Products and services offered by ${companyName}`]
+    : options.websiteContextSummary
+      ? [`Products and services inferred from ${companyName} website`]
+      : [`Products and services offered by ${companyName}`]
 
   const targetIndustries = whoTheySellTo
     ? [whoTheySellTo, "Related service industries"]
@@ -59,18 +71,28 @@ function buildDeterministicProfileContent(input: BusinessProfileInput): Business
     `Drafted from company name, website (${host || "website"}), and operator inputs.`,
     "Review industries, personas, and messaging before approval.",
   ]
+  if (options.websiteContextSummary) {
+    assumptions.unshift("Used summarized homepage context where available.")
+  }
+  if (notes) {
+    assumptions.push(`Operator notes considered: ${notes.slice(0, 160)}${notes.length > 160 ? "…" : ""}`)
+  }
+
   const missingInformation: string[] = []
 
   if (!whatTheySell) missingInformation.push("What you sell (products/services detail)")
   if (!whoTheySellTo) missingInformation.push("Who you sell to (ideal customer description)")
   if (!trim(input.geography)) missingInformation.push("Primary geography confirmation")
   if (!averageDealSize) missingInformation.push("Typical deal size or contract value")
+  if (!options.websiteContextSummary) missingInformation.push("Website context confirmation")
 
   let confidence = 0.62
   if (whatTheySell) confidence += 0.1
   if (whoTheySellTo) confidence += 0.1
   if (averageDealSize) confidence += 0.08
   if (host) confidence += 0.05
+  if (options.websiteContextSummary) confidence += 0.08
+  if (notes) confidence += 0.04
   confidence = Math.min(confidence, 0.92)
 
   return {
@@ -79,7 +101,9 @@ function buildDeterministicProfileContent(input: BusinessProfileInput): Business
       website,
       shortDescription: whatTheySell
         ? `${companyName} provides ${whatTheySell.toLowerCase()} for ${whoTheySellTo || "target customers"}.`
-        : `${companyName} is a growth-stage company serving business customers (${host || "website"}).`,
+        : options.websiteContextSummary
+          ? `${companyName} serves business customers; homepage context was summarized for this draft.`
+          : `${companyName} is a growth-stage company serving business customers (${host || "website"}).`,
       productsServices,
       businessModel: whoTheySellTo
         ? `B2B sales to ${whoTheySellTo.toLowerCase()}`
@@ -130,6 +154,8 @@ function buildDeterministicProfileContent(input: BusinessProfileInput): Business
       assumptions,
       missingInformation,
     },
+    draftSource: options.draftSource ?? "deterministic",
+    websiteContextSummary: options.websiteContextSummary ?? null,
   }
 }
 
@@ -140,6 +166,7 @@ export async function draftBusinessProfileFromCompanyInput(
   const normalizedInput: BusinessProfileInput = {
     companyName: trim(input.companyName),
     website: normalizeWebsite(input.website),
+    notes: trim(input.notes) || null,
     whatTheySell: trim(input.whatTheySell) || null,
     whoTheySellTo: trim(input.whoTheySellTo) || null,
     geography: trim(input.geography) || null,
@@ -150,7 +177,9 @@ export async function draftBusinessProfileFromCompanyInput(
   const mode = options.mode ?? "deterministic"
 
   if (mode === "ai" && options.generateWithAi) {
-    profile = (await options.generateWithAi(normalizedInput)) ?? buildDeterministicProfileContent(normalizedInput)
+    profile =
+      (await options.generateWithAi(normalizedInput)) ??
+      buildDeterministicProfileContent(normalizedInput, { draftSource: "ai_fallback" })
   } else {
     profile = buildDeterministicProfileContent(normalizedInput)
   }

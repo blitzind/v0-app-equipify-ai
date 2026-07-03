@@ -46,6 +46,8 @@ const ProfileContentSchema: z.ZodType<BusinessProfileDraftContent> = z.object({
     assumptions: z.array(z.string()),
     missingInformation: z.array(z.string()),
   }),
+  draftSource: z.enum(["deterministic", "ai_assisted", "ai_fallback"]).optional(),
+  websiteContextSummary: z.string().nullable().optional(),
 })
 
 const BodySchema = z.object({

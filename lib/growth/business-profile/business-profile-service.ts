@@ -2,7 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { GROWTH_AIOS_BUSINESS_PROFILE_SCHEMA_MIGRATION } from "@/lib/growth/business-profile/business-profile-types"
-import { draftBusinessProfileFromCompanyInput } from "@/lib/growth/business-profile/business-profile-draft-generator"
+import { draftBusinessProfileWithAiAssistance } from "@/lib/growth/business-profile/business-profile-ai-draft-service"
 import type {
   BusinessProfileDraftContent,
   BusinessProfileInput,
@@ -58,7 +58,9 @@ export async function createBusinessProfileDraftForOrganization(
     )
   }
 
-  const draft = await draftBusinessProfileFromCompanyInput(input.companyInput)
+  const draft = await draftBusinessProfileWithAiAssistance(input.companyInput, {
+    organizationId: input.organizationId,
+  })
   const record = await insertBusinessProfileDraft(admin, {
     organizationId: input.organizationId,
     companyName: draft.input.companyName,

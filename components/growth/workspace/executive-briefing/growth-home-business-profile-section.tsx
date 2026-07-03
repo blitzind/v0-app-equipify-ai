@@ -11,6 +11,7 @@ import {
   BUSINESS_PROFILE_APPROVED_LABEL,
   BUSINESS_PROFILE_DRAFT_LABEL,
   GROWTH_AIOS_BUSINESS_PROFILE_1A_QA_MARKER,
+  GROWTH_AIOS_BUSINESS_PROFILE_1B_QA_MARKER,
   type BusinessProfileDraftContent,
   type BusinessProfileRecord,
 } from "@/lib/growth/business-profile"
@@ -18,6 +19,7 @@ import {
   GROWTH_BUSINESS_PROFILE_API_PATH,
   GROWTH_BUSINESS_PROFILE_APPROVE_LABEL,
   GROWTH_BUSINESS_PROFILE_DRAFT_LABEL,
+  GROWTH_BUSINESS_PROFILE_DRAFTING_MESSAGE,
   GROWTH_BUSINESS_PROFILE_REJECT_LABEL,
   GROWTH_BUSINESS_PROFILE_SECTION_TITLE,
   GROWTH_BUSINESS_PROFILE_UPDATE_LABEL,
@@ -76,6 +78,7 @@ export function GrowthHomeBusinessProfileSection() {
   const [whoTheySellTo, setWhoTheySellTo] = useState("")
   const [geography, setGeography] = useState("")
   const [averageDealSize, setAverageDealSize] = useState("")
+  const [notes, setNotes] = useState("")
 
   const [editableProfile, setEditableProfile] = useState<BusinessProfileDraftContent | null>(null)
 
@@ -129,6 +132,7 @@ export function GrowthHomeBusinessProfileSection() {
         body: JSON.stringify({
           companyName,
           website,
+          notes: notes || null,
           whatTheySell: whatTheySell || null,
           whoTheySellTo: whoTheySellTo || null,
           geography: geography || null,
@@ -224,6 +228,7 @@ export function GrowthHomeBusinessProfileSection() {
     setWhoTheySellTo(activeApproved?.input.whoTheySellTo ?? "")
     setGeography(activeApproved?.input.geography ?? "")
     setAverageDealSize(activeApproved?.input.averageDealSize ?? "")
+    setNotes(activeApproved?.input.notes ?? "")
     resolveView(activeApproved, latestDraft, true)
   }
 
@@ -234,7 +239,8 @@ export function GrowthHomeBusinessProfileSection() {
   return (
     <section
       data-qa-section="home-business-profile"
-      data-qa-marker={GROWTH_AIOS_BUSINESS_PROFILE_1A_QA_MARKER}
+      data-qa-marker={GROWTH_AIOS_BUSINESS_PROFILE_1B_QA_MARKER}
+      data-qa-marker-foundation={GROWTH_AIOS_BUSINESS_PROFILE_1A_QA_MARKER}
       data-business-profile-state={view}
       className="space-y-4 rounded-2xl border border-sky-100 bg-sky-50/30 p-6 dark:border-sky-900/30 dark:bg-sky-950/10"
     >
@@ -260,7 +266,17 @@ export function GrowthHomeBusinessProfileSection() {
         </div>
       ) : null}
 
-      {view === "create" ? (
+      {busy === "draft" ? (
+        <div
+          className="flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50/80 p-4 text-sm text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100"
+          data-business-profile-panel="drafting"
+        >
+          <Loader2 className="size-4 animate-spin" />
+          {GROWTH_BUSINESS_PROFILE_DRAFTING_MESSAGE}
+        </div>
+      ) : null}
+
+      {view === "create" && busy !== "draft" ? (
         <div className="space-y-4" data-business-profile-panel="no-profile">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
@@ -315,6 +331,16 @@ export function GrowthHomeBusinessProfileSection() {
                 value={averageDealSize}
                 onChange={(e) => setAverageDealSize(e.target.value)}
                 placeholder="$5k–$25k annual"
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="bp-notes">Notes for Ava (optional)</Label>
+              <Textarea
+                id="bp-notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Anything else Ava should know about your business or ideal customers."
+                rows={3}
               />
             </div>
           </div>
@@ -455,16 +481,30 @@ export function GrowthHomeBusinessProfileSection() {
             </div>
           </ProfileSectionEditor>
 
-          <ProfileSectionEditor title="Confidence">
-            <p className="text-sm text-muted-foreground">
-              Confidence score: {Math.round(editableProfile.confidence.score * 100)}%
-            </p>
-            {editableProfile.confidence.missingInformation.length > 0 ? (
-              <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+          <ProfileSectionEditor title="Ava's assumptions">
+            <ul className="list-disc space-y-1 pl-5 text-sm">
+              {editableProfile.confidence.assumptions.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </ProfileSectionEditor>
+
+          {editableProfile.confidence.missingInformation.length > 0 ? (
+            <ProfileSectionEditor title="Ava wants you to confirm">
+              <ul className="list-disc space-y-1 pl-5 text-sm text-amber-900 dark:text-amber-100">
                 {editableProfile.confidence.missingInformation.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
+            </ProfileSectionEditor>
+          ) : null}
+
+          <ProfileSectionEditor title="Confidence">
+            <p className="text-sm text-muted-foreground">
+              Confidence score: {Math.round(editableProfile.confidence.score * 100)}%
+            </p>
+            {editableProfile.draftSource ? (
+              <p className="text-xs text-muted-foreground">Draft source: {editableProfile.draftSource}</p>
             ) : null}
           </ProfileSectionEditor>
 

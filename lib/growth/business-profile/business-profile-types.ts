@@ -1,6 +1,7 @@
-/** GE-AIOS-BUSINESS-PROFILE-1A — AI OS Business Profile types (client-safe). */
+/** GE-AIOS-BUSINESS-PROFILE-1A/1B — AI OS Business Profile types (client-safe). */
 
 export const GROWTH_AIOS_BUSINESS_PROFILE_1A_QA_MARKER = "ge-aios-business-profile-1a-v1" as const
+export const GROWTH_AIOS_BUSINESS_PROFILE_1B_QA_MARKER = "ge-aios-business-profile-1b-v1" as const
 
 export const GROWTH_AIOS_BUSINESS_PROFILE_SCHEMA_MIGRATION =
   "20271001270000_growth_organization_business_profile_ge_aios_business_profile_1a.sql" as const
@@ -14,9 +15,13 @@ export const BUSINESS_PROFILE_DRAFT_LABEL =
 export const BUSINESS_PROFILE_APPROVED_LABEL =
   "Approved — Ava can use this to guide lead discovery and recommendations." as const
 
+export const BUSINESS_PROFILE_DRAFT_SOURCES = ["deterministic", "ai_assisted", "ai_fallback"] as const
+export type BusinessProfileDraftSource = (typeof BUSINESS_PROFILE_DRAFT_SOURCES)[number]
+
 export type BusinessProfileInput = {
   companyName: string
   website: string
+  notes?: string | null
   whatTheySell?: string | null
   whoTheySellTo?: string | null
   geography?: string | null
@@ -67,6 +72,8 @@ export type BusinessProfileDraftContent = {
   problemsAndTriggers: BusinessProfileProblemsSection
   salesAndMarketing: BusinessProfileSalesMarketingSection
   confidence: BusinessProfileConfidenceSection
+  draftSource?: BusinessProfileDraftSource
+  websiteContextSummary?: string | null
 }
 
 export type BusinessProfileDraft = {

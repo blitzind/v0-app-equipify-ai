@@ -120,7 +120,7 @@ async function main(): Promise<void> {
   )
   assert.equal(GROWTH_BUSINESS_PROFILE_API_PATH, "/api/platform/growth/business-profile")
   assert.equal(GROWTH_BUSINESS_PROFILE_SECTION_TITLE, "Teach Ava About Your Business")
-  assert.equal(GROWTH_BUSINESS_PROFILE_DRAFT_LABEL, "Draft Business Profile")
+  assert.equal(GROWTH_BUSINESS_PROFILE_DRAFT_LABEL, "Ask Ava to Draft My Business Profile")
 
   const draft = await draftBusinessProfileFromCompanyInput({
     companyName: "Acme Service Co.",
@@ -180,10 +180,16 @@ async function main(): Promise<void> {
   assert.match(repository, /getActiveApprovedBusinessProfile/)
 
   const service = readSource("lib/growth/business-profile/business-profile-service.ts")
-  assert.match(service, /draftBusinessProfileFromCompanyInput/)
+  assert.match(service, /draftBusinessProfileWithAiAssistance/)
   assert.match(service, /approveBusinessProfileForOrganization/)
   assert.match(service, /rejectBusinessProfileForOrganization/)
   assertNoForbiddenProviderCalls(service, "business-profile-service")
+
+  const generator = readSource("lib/growth/business-profile/business-profile-draft-generator.ts")
+  assert.match(generator, /buildDeterministicProfileContent/)
+  assert.match(generator, /draftBusinessProfileFromCompanyInput/)
+  assert.match(generator, /generateWithAi/)
+  assertNoForbiddenProviderCalls(generator, "draft-generator")
 
   const routes = [
     "app/api/platform/growth/business-profile/route.ts",
@@ -218,11 +224,6 @@ async function main(): Promise<void> {
     "components/growth/workspace/executive-briefing/growth-home-executive-briefing-dashboard.tsx",
   )
   assert.match(dashboard, /GrowthHomeBusinessProfileSection/)
-
-  const generator = readSource("lib/growth/business-profile/business-profile-draft-generator.ts")
-  assert.match(generator, /buildDeterministicProfileContent/)
-  assert.match(generator, /generateWithAi/)
-  assertNoForbiddenProviderCalls(generator, "draft-generator")
 
   for (const relativePath of ALLOWED_PATH_PREFIXES) {
     assert.ok(fs.existsSync(path.join(process.cwd(), relativePath)), `Expected file: ${relativePath}`)

@@ -556,6 +556,24 @@ export const AI_TASK_REGISTRY: Record<AiTaskId, AiTaskDefinition> = {
     cacheable: true,
     cacheTtlSeconds: 3600,
   },
+  growth_business_profile_draft: {
+    id: "growth_business_profile_draft",
+    label: "Growth Engine Business Profile draft generation",
+    requiredPlan: "growth",
+    costTier: "medium",
+    modelTier: "balanced",
+    primaryModel: { provider: "openai", model: "gpt-4o-mini" },
+    fallbackModel: { provider: "anthropic", model: "claude-3-5-haiku-20241022" },
+    escalationModel: { provider: "openai", model: "gpt-4o" },
+    temperature: 0.25,
+    maxOutputTokens: 4096,
+    structuredMode: "json_object",
+    timeoutMs: 60_000,
+    maxRetries: 2,
+    confidenceThreshold: null,
+    cacheable: true,
+    cacheTtlSeconds: 3600,
+  },
 }
 
 export function getTaskDefinition(id: AiTaskId): AiTaskDefinition {

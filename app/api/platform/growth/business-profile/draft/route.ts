@@ -3,6 +3,7 @@ import { z } from "zod"
 import { getGrowthEngineAiOrgId, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import {
   GROWTH_AIOS_BUSINESS_PROFILE_1A_QA_MARKER,
+  GROWTH_AIOS_BUSINESS_PROFILE_1B_QA_MARKER,
   type GrowthBusinessProfileApiResponse,
 } from "@/lib/growth/business-profile/business-profile-api-contract"
 import { createBusinessProfileDraftForOrganization } from "@/lib/growth/business-profile/business-profile-service"
@@ -14,6 +15,7 @@ export const dynamic = "force-dynamic"
 const BodySchema = z.object({
   companyName: z.string().trim().min(1).max(256),
   website: z.string().trim().min(3).max(2048),
+  notes: z.string().trim().max(2000).optional().nullable(),
   whatTheySell: z.string().trim().max(2000).optional().nullable(),
   whoTheySellTo: z.string().trim().max(2000).optional().nullable(),
   geography: z.string().trim().max(500).optional().nullable(),
@@ -57,7 +59,7 @@ export async function POST(request: Request) {
 
     const response: GrowthBusinessProfileApiResponse = {
       ok: true,
-      qa_marker: GROWTH_AIOS_BUSINESS_PROFILE_1A_QA_MARKER,
+      qa_marker: GROWTH_AIOS_BUSINESS_PROFILE_1B_QA_MARKER,
       schemaReady: true,
       profile,
       latestDraft: profile,

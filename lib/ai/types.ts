@@ -35,6 +35,7 @@ export type AiTaskId =
   | "growth_reply_draft_generation"
   | "growth_copilot_playbook_extraction"
   | "growth_video_script_generation"
+  | "growth_business_profile_draft"
 
 export type AiProviderId = "openai" | "anthropic" | "google" | "mock"
 

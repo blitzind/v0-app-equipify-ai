@@ -702,6 +702,7 @@
     "test:ge-ava-home-execution-1a-safe-actions": "tsx scripts/test-ge-ava-home-execution-1a-safe-actions.ts",
     "test:ge-ava-datamoon-sourcing-workbench-1a": "tsx scripts/test-ge-ava-datamoon-sourcing-workbench-1a.ts",
     "test:ge-aios-business-profile-1a": "tsx scripts/test-ge-aios-business-profile-1a.ts",
+    "test:ge-aios-business-profile-1b": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-business-profile-1b.ts",
     "test:growth-booking-intelligence": "tsx scripts/test-growth-booking-intelligence.ts",
     "test:growth-lead-memory": "tsx scripts/test-growth-lead-memory.ts",
     "test:growth-crm-lead-drawer-apollo-draft": "tsx scripts/test-growth-crm-lead-drawer-apollo-draft.ts",
