@@ -296,3 +296,43 @@ export async function updateDatamoonAudienceImportRecord(
   if (patch.message !== undefined) row.message = patch.message
   await recordsTable(admin).update(row).eq("id", recordId)
 }
+
+export type DatamoonRecentImportedLeadRow = {
+  recordId: string
+  runId: string
+  leadId: string
+  companyName: string | null
+  importedAt: string
+}
+
+export async function listRecentDatamoonImportedLeads(
+  admin: SupabaseClient,
+  limit = 12,
+): Promise<DatamoonRecentImportedLeadRow[]> {
+  const { data, error } = await recordsTable(admin)
+    .select("id, run_id, lead_id, normalized_payload, updated_at")
+    .eq("status", "imported")
+    .not("lead_id", "is", null)
+    .order("updated_at", { ascending: false })
+    .limit(limit)
+
+  if (error || !data) return []
+
+  return (data as Array<Record<string, unknown>>)
+    .map((row) => {
+      const leadId = typeof row.lead_id === "string" ? row.lead_id : null
+      if (!leadId) return null
+      const normalized =
+        row.normalized_payload && typeof row.normalized_payload === "object"
+          ? (row.normalized_payload as DatamoonNormalizedLeadRecord)
+          : null
+      return {
+        recordId: String(row.id),
+        runId: String(row.run_id),
+        leadId,
+        companyName: normalized?.company_name?.trim() || normalized?.contact_name?.trim() || null,
+        importedAt: String(row.updated_at ?? ""),
+      }
+    })
+    .filter((row): row is DatamoonRecentImportedLeadRow => row != null)
+}

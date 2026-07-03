@@ -697,6 +697,8 @@
     "test:growth-revenue-intelligence-v1": "tsx scripts/test-growth-revenue-intelligence-v1.ts",
     "test:growth-multichannel-revenue-intelligence-v1": "tsx scripts/test-growth-multichannel-revenue-intelligence-v1.ts",
     "test:growth-opportunity-intelligence": "tsx scripts/test-growth-opportunity-intelligence.ts",
+    "test:ge-opportunity-intelligence-1a-foundation": "tsx scripts/test-ge-opportunity-intelligence-1a-foundation.ts",
+    "test:ge-ava-home-opportunity-intelligence-1a-foundation": "tsx scripts/test-ge-ava-home-opportunity-intelligence-1a-foundation.ts",
     "test:growth-booking-intelligence": "tsx scripts/test-growth-booking-intelligence.ts",
     "test:growth-lead-memory": "tsx scripts/test-growth-lead-memory.ts",
     "test:growth-crm-lead-drawer-apollo-draft": "tsx scripts/test-growth-crm-lead-drawer-apollo-draft.ts",
