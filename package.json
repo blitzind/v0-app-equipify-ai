@@ -699,6 +699,8 @@
     "test:growth-opportunity-intelligence": "tsx scripts/test-growth-opportunity-intelligence.ts",
     "test:ge-opportunity-intelligence-1a-foundation": "tsx scripts/test-ge-opportunity-intelligence-1a-foundation.ts",
     "test:ge-ava-home-opportunity-intelligence-1a-foundation": "tsx scripts/test-ge-ava-home-opportunity-intelligence-1a-foundation.ts",
+    "test:ge-ava-home-execution-1a-safe-actions": "tsx scripts/test-ge-ava-home-execution-1a-safe-actions.ts",
+    "test:ge-ava-datamoon-sourcing-workbench-1a": "tsx scripts/test-ge-ava-datamoon-sourcing-workbench-1a.ts",
     "test:growth-booking-intelligence": "tsx scripts/test-growth-booking-intelligence.ts",
     "test:growth-lead-memory": "tsx scripts/test-growth-lead-memory.ts",
     "test:growth-crm-lead-drawer-apollo-draft": "tsx scripts/test-growth-crm-lead-drawer-apollo-draft.ts",

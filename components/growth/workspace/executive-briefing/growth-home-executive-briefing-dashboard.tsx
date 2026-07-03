@@ -13,6 +13,7 @@ import { formatRelativeTime } from "@/lib/notifications/format-relative"
 import { GrowthHomeExecutiveBriefingHeroSection } from "@/components/growth/workspace/executive-briefing/growth-home-executive-briefing-hero-section"
 import { GrowthHomeAiOsWaitingOnYouSection } from "@/components/growth/workspace/executive-briefing/growth-home-ai-os-waiting-on-you-section"
 import { GrowthHomeAvaOpportunityIntelligenceSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-opportunity-intelligence-section"
+import { GrowthHomeDatamoonSourcingWorkbenchSection } from "@/components/growth/workspace/executive-briefing/growth-home-datamoon-sourcing-workbench-section"
 import { GrowthHomeAvaLiveStatusSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-live-status-section"
 import { GrowthHomeDailyWorkQueueSection } from "@/components/growth/workspace/executive-briefing/growth-home-daily-work-queue-section"
 import { GrowthHomeActiveRevenueMissionsSection } from "@/components/growth/workspace/executive-briefing/growth-home-active-revenue-missions-section"
@@ -97,6 +98,8 @@ export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, c
       <GrowthHomeAvaLiveStatusSection status={aiOsUx.liveStatus} />
 
       <GrowthHomeAvaOpportunityIntelligenceSection dailyWorkQueue={aiOsUx.dailyWorkQueue} />
+
+      <GrowthHomeDatamoonSourcingWorkbenchSection />
 
       <GrowthHomeActiveRevenueMissionsSection missions={briefing.activeRevenueMissions} />
 
