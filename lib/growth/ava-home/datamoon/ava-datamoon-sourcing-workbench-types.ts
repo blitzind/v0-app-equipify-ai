@@ -73,11 +73,40 @@ export type AvaDatamoonSourcingDraftResult = {
   explanation: string
   confidence: number
   assumptions: string[]
+  overrides: string[]
+  businessProfileUsed: boolean
+  businessProfileStatus: "approved" | "missing"
   editable: true
   requiresApproval: true
 }
 
 export type AvaDatamoonSourcingWorkbenchMode = "ava_draft" | "manual_search"
+
+export function createMinimalAvaDatamoonAudienceDraft(
+  overrides?: Partial<AvaDatamoonAudienceDraft>,
+): AvaDatamoonAudienceDraft {
+  return {
+    audienceName: "Lead discovery search",
+    audienceType: "advanced_search",
+    providerMode: "module",
+    recordLimit: 100,
+    lookbackDays: 7,
+    intentLevels: ["high", "medium"],
+    geography: { country: "US", state: null, city: null },
+    topics: [],
+    customTopic: null,
+    jobTitles: [],
+    customJobTitle: null,
+    companySize: "smb",
+    revenueRange: null,
+    includeBusinessEmail: true,
+    includePhone: true,
+    includeLinkedIn: true,
+    excludeDuplicates: true,
+    onlyNewSinceLastRefresh: true,
+    ...overrides,
+  }
+}
 
 export function createDefaultAvaDatamoonAudienceDraft(
   overrides?: Partial<AvaDatamoonAudienceDraft>,

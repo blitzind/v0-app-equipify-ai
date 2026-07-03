@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { getGrowthEngineAiOrgId, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import {
   isRecognizedAvaDatamoonSourcingCommand,
   parseAvaDatamoonSourcingCommand,
 } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-command-parser"
 import {
+  GROWTH_AIOS_BUSINESS_PROFILE_1C_QA_MARKER,
   GROWTH_AVA_DATAMOON_SOURCING_WORKBENCH_1A_QA_MARKER,
   type GrowthHomeDatamoonSourcingDraftApiResponse,
 } from "@/lib/growth/ava-home/datamoon/growth-home-datamoon-sourcing-api-contract"
+import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/business-profile-repository"
+import { projectApprovedBusinessProfileToLeadDiscovery } from "@/lib/growth/business-profile/business-profile-lead-discovery-projection"
 import { GROWTH_HOME_NO_STORE_CACHE_CONTROL } from "@/lib/growth/home/growth-home-workspace-api-contract"
 
 export const runtime = "nodejs"
@@ -18,7 +21,7 @@ const BodySchema = z.object({
 })
 
 export async function POST(request: Request) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const access = await requireGrowthEnginePlatformAccess(request)
   if (!access.ok) return access.response
 
   const parsed = BodySchema.safeParse(await request.json().catch(() => null))
@@ -40,18 +43,30 @@ export async function POST(request: Request) {
     )
   }
 
-  const draft = parseAvaDatamoonSourcingCommand(parsed.data.command)
+  const organizationId = getGrowthEngineAiOrgId()
+  let profileProjection = null
+  if (organizationId) {
+    const approved = await getActiveApprovedBusinessProfile(access.admin, organizationId)
+    if (approved) {
+      profileProjection = projectApprovedBusinessProfileToLeadDiscovery(approved.profile, approved.companyName)
+    }
+  }
+
+  const draft = parseAvaDatamoonSourcingCommand(parsed.data.command, { profileProjection })
 
   const response: GrowthHomeDatamoonSourcingDraftApiResponse = {
     ok: true,
     readOnly: true,
-    qa_marker: GROWTH_AVA_DATAMOON_SOURCING_WORKBENCH_1A_QA_MARKER,
+    qa_marker: GROWTH_AIOS_BUSINESS_PROFILE_1C_QA_MARKER,
     draft,
+    businessProfileUsed: draft.businessProfileUsed,
+    businessProfileStatus: draft.businessProfileStatus,
   }
 
   return NextResponse.json(response, {
     headers: {
       "Cache-Control": GROWTH_HOME_NO_STORE_CACHE_CONTROL,
+      "X-Growth-QA-Marker-Foundation": GROWTH_AVA_DATAMOON_SOURCING_WORKBENCH_1A_QA_MARKER,
     },
   })
 }

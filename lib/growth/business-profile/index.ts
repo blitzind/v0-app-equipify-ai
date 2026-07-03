@@ -39,6 +39,14 @@ export {
 } from "@/lib/growth/business-profile/business-profile-website-context-utils"
 
 export {
+  GROWTH_AIOS_BUSINESS_PROFILE_1C_QA_MARKER,
+  projectApprovedBusinessProfileToLeadDiscovery,
+  extractCommandTopicPhrase,
+  parseUsStateFromCommand,
+  type BusinessProfileLeadDiscoveryProjection,
+} from "@/lib/growth/business-profile/business-profile-lead-discovery-projection"
+
+export {
   businessProfileAiDraftModelSchema,
   type BusinessProfileAiDraftModel,
 } from "@/lib/growth/business-profile/business-profile-ai-draft-schema"

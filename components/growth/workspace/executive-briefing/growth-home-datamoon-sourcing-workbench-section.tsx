@@ -19,6 +19,12 @@ import {
   GROWTH_HOME_BUILD_AUDIENCE_LABEL,
   GROWTH_HOME_DATAMOON_RUNS_API_PATH,
   GROWTH_HOME_DATAMOON_SOURCING_DRAFT_API_PATH,
+  GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL,
+  GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_STARTED_COPY,
+  GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_MISSING_COPY,
+  GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL,
+  GROWTH_HOME_DATAMOON_CONTINUE_MANUALLY_LABEL,
+  GROWTH_HOME_BUSINESS_PROFILE_SECTION_SELECTOR,
   GROWTH_HOME_IMPORT_RECOMMENDED_LABEL,
   GROWTH_HOME_IMPORT_SELECTED_LABEL,
   GROWTH_HOME_REFRESH_SAVED_SEARCH_LABEL,
@@ -58,6 +64,9 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
   const [draft, setDraft] = useState<AvaDatamoonAudienceDraft>(() => createDefaultAvaDatamoonAudienceDraft())
   const [explanation, setExplanation] = useState<string | null>(null)
   const [assumptions, setAssumptions] = useState<string[]>([])
+  const [overrides, setOverrides] = useState<string[]>([])
+  const [businessProfileUsed, setBusinessProfileUsed] = useState(false)
+  const [businessProfileStatus, setBusinessProfileStatus] = useState<"approved" | "missing" | null>(null)
   const [buildConfirmed, setBuildConfirmed] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -103,6 +112,9 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
       setDraft(payload.draft.audienceDraft)
       setExplanation(payload.draft.explanation)
       setAssumptions(payload.draft.assumptions)
+      setOverrides(payload.draft.overrides ?? [])
+      setBusinessProfileUsed(payload.draft.businessProfileUsed)
+      setBusinessProfileStatus(payload.draft.businessProfileStatus)
       setBuildConfirmed(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not draft audience.")
@@ -199,12 +211,26 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
     setDraft(createDefaultAvaDatamoonAudienceDraft())
     setExplanation(null)
     setAssumptions([])
+    setOverrides([])
+    setBusinessProfileUsed(false)
+    setBusinessProfileStatus(null)
     setBuildConfirmed(false)
     setActiveRun(null)
     setRecords([])
     setSelectedIds(new Set())
     setRejectedIds(new Set())
     setError(null)
+  }
+
+  function handleContinueManually() {
+    setMode("manual_search")
+    setError(null)
+  }
+
+  function handleCreateBusinessProfile() {
+    setOpen(false)
+    const section = document.querySelector(GROWTH_HOME_BUSINESS_PROFILE_SECTION_SELECTOR)
+    section?.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
   function toggleRecord(id: string) {
@@ -288,6 +314,21 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
 
             {mode === "ava_draft" ? (
               <div className="space-y-3 rounded-lg border border-border/70 p-3">
+                {businessProfileUsed ? (
+                  <GrowthBadge tone="healthy">{GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL}</GrowthBadge>
+                ) : businessProfileStatus === "missing" ? (
+                  <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50/80 p-3 text-sm dark:border-amber-900/40 dark:bg-amber-950/20">
+                    <p>{GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_MISSING_COPY}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" size="sm" onClick={handleCreateBusinessProfile}>
+                        {GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL}
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={handleContinueManually}>
+                        {GROWTH_HOME_DATAMOON_CONTINUE_MANUALLY_LABEL}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <Sparkles className="size-4 text-primary" />
                   Ask Ava in plain language
@@ -304,6 +345,16 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
                 </Button>
                 {explanation ? (
                   <p className="rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">{explanation}</p>
+                ) : null}
+                {businessProfileUsed ? (
+                  <p className="text-xs text-muted-foreground">{GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_STARTED_COPY}</p>
+                ) : null}
+                {overrides.length > 0 ? (
+                  <ul className="list-disc pl-5 text-xs text-muted-foreground">
+                    {overrides.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
                 ) : null}
                 {assumptions.length > 0 ? (
                   <ul className="list-disc pl-5 text-xs text-muted-foreground">
