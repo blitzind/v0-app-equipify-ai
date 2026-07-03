@@ -12,6 +12,7 @@ import {
   type GrowthObjectiveStatus,
   type GrowthObjectiveType,
 } from "@/lib/growth/objectives/growth-objective-types"
+import { planGrowthObjective } from "@/lib/growth/objectives/growth-objective-planner"
 import { probeRuntimeTable } from "@/lib/growth/runtime-guardrails/growth-runtime-schema-probe"
 
 const memoryStore = new Map<string, GrowthObjective[]>()
@@ -104,6 +105,10 @@ function mapRow(row: Record<string, unknown>): GrowthObjective {
   }
 }
 
+function resolveObjectivePlanForPersistence(objective: GrowthObjective): GrowthObjectiveExecutionPlan {
+  return objective.plan ?? planGrowthObjective(objective)
+}
+
 function buildDefaultObjective(organizationId: string, input: GrowthObjectiveCreateInput): GrowthObjective {
   const now = new Date().toISOString()
   return {
@@ -181,6 +186,7 @@ export async function insertGrowthObjective(
   input: GrowthObjectiveCreateInput,
 ): Promise<GrowthObjective> {
   const objective = buildDefaultObjective(organizationId, input)
+  objective.plan = resolveObjectivePlanForPersistence(objective)
   const probe = await probeRuntimeTable(admin, "organization_growth_objectives")
 
   if (probe.missing) {
@@ -237,6 +243,12 @@ export async function updateGrowthObjective(
     id: current.id,
     organizationId,
     updatedAt: new Date().toISOString(),
+    plan: resolveObjectivePlanForPersistence({
+      ...current,
+      ...patch,
+      id: current.id,
+      organizationId,
+    }),
   }
 
   const probe = await probeRuntimeTable(admin, "organization_growth_objectives")
