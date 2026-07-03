@@ -10,6 +10,10 @@ import {
   resolveDatamoonBuildAudienceId,
   summarizeDatamoonBuildResponseKeys,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-build-id"
+import {
+  resolveDatamoonFetchPayload,
+  summarizeDatamoonFetchResponseKeys,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-fetch-payload"
 import { findDatamoonAudienceDedupeMatch } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-dedupe"
 import {
   isDatamoonRecordImportable,
@@ -221,10 +225,9 @@ export async function pollDatamoonAudienceImportRun(
     return { ok: false, error: fetchResult.message, ...(failed ? {} : {}) }
   }
 
-  const providerStatus = String(fetchResult.data?.status ?? "in_progress")
-  const rawRecords = Array.isArray(fetchResult.data?.records) ? fetchResult.data.records : []
-  const recordCount =
-    typeof fetchResult.data?.record_count === "number" ? fetchResult.data.record_count : rawRecords.length
+  const fetchPayload = resolveDatamoonFetchPayload(fetchResult.data)
+  const fetchResponseKeys = summarizeDatamoonFetchResponseKeys(fetchResult.data)
+  const { providerStatus, records: rawRecords, recordCount } = fetchPayload
 
   if (providerStatus !== "completed" && fetchResult.status !== "dry_run") {
     const building = await updateDatamoonAudienceImportRun(admin, runId, {
@@ -232,10 +235,11 @@ export async function pollDatamoonAudienceImportRun(
       loadingCount: recordCount,
       recordCount,
       lastPolledAt: now,
-      providerMetadata: {
+      providerMetadata: sanitizeDatamoonProviderMetadata({
         ...existing.providerMetadata,
         poll_status: providerStatus,
-      },
+        fetch_response_keys: fetchResponseKeys,
+      }) as Record<string, unknown>,
     })
     return { ok: true, run: building ?? existing, records: [] }
   }
@@ -306,11 +310,12 @@ export async function pollDatamoonAudienceImportRun(
     skippedCount,
     lastPolledAt: now,
     completedAt: now,
-    providerMetadata: {
+    providerMetadata: sanitizeDatamoonProviderMetadata({
       ...existing.providerMetadata,
       poll_status: providerStatus,
       fetch_status: fetchResult.status,
-    },
+      fetch_response_keys: fetchResponseKeys,
+    }) as Record<string, unknown>,
   })
 
   const records = await listDatamoonAudienceImportRecords(admin, runId)

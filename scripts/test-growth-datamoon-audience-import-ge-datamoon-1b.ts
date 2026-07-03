@@ -11,6 +11,10 @@ import {
   resolveDatamoonBuildAudienceId,
   summarizeDatamoonBuildResponseKeys,
 } from "../lib/growth/lead-sources/datamoon/datamoon-audience-import-build-id"
+import {
+  resolveDatamoonFetchPayload,
+  summarizeDatamoonFetchResponseKeys,
+} from "../lib/growth/lead-sources/datamoon/datamoon-audience-import-fetch-payload"
 import { findDatamoonAudienceDedupeMatch } from "../lib/growth/lead-sources/datamoon/datamoon-audience-import-dedupe"
 import {
   filterDatamoonRecordToExtFields,
@@ -177,6 +181,136 @@ function createMockDatamoonImportRunsAdmin(runId = "mock-run-id") {
   return { admin, getRun: (id: string) => store[id] }
 }
 
+function createMockDatamoonPollAdmin(runId = "mock-poll-run") {
+  const now = new Date().toISOString()
+  const runStore: Record<string, MockRunRow> = {
+    [runId]: {
+      id: runId,
+      run_name: "Poll nested fetch",
+      datamoon_audience_id: "4538",
+      provider_mode: "module",
+      audience_type: "advanced_search",
+      filters: [],
+      topic_ids: [],
+      requested_limit: 1,
+      audience_name: null,
+      website_id: null,
+      status: "building",
+      record_count: 0,
+      loading_count: 0,
+      preview_count: 0,
+      imported_count: 0,
+      duplicate_count: 0,
+      skipped_count: 0,
+      error_count: 0,
+      provider_metadata: { provider_audience_id: "4538" },
+      error_message: null,
+      dry_run: false,
+      created_by: "user-1",
+      last_polled_at: null,
+      completed_at: null,
+      imported_at: null,
+      created_at: now,
+      updated_at: now,
+    },
+  }
+  const recordStore: Record<string, Array<Record<string, unknown>>> = { [runId]: [] }
+
+  const admin = {
+    schema: () => ({
+      from: (table: string) => {
+        if (table === "datamoon_audience_import_runs") {
+          return {
+            select: () => ({
+              eq: (_column: string, id: string) => ({
+                maybeSingle: async () => ({ data: runStore[id] ?? null, error: null }),
+              }),
+            }),
+            update: (row: Record<string, unknown>) => ({
+              eq: (_column: string, id: string) => ({
+                select: () => ({
+                  maybeSingle: async () => {
+                    runStore[id] = {
+                      ...runStore[id],
+                      ...row,
+                      updated_at: new Date().toISOString(),
+                    } as MockRunRow
+                    return { data: runStore[id], error: null }
+                  },
+                }),
+              }),
+            }),
+          }
+        }
+        if (table === "datamoon_audience_import_records") {
+          return {
+            delete: () => ({
+              eq: async (_column: string, id: string) => {
+                recordStore[id] = []
+                return { error: null }
+              },
+            }),
+            insert: async (rows: Array<Record<string, unknown>>) => {
+              const mapped = rows.map((row, index) => ({
+                id: `record-${String(row.record_index ?? index)}`,
+                run_id: row.run_id,
+                record_index: row.record_index,
+                status: row.status,
+                normalized_payload: row.normalized_payload,
+                provider_record: row.provider_record,
+                dedupe_rule: row.dedupe_rule ?? null,
+                dedupe_key: row.dedupe_key ?? null,
+                matched_lead_id: row.matched_lead_id ?? null,
+                lead_id: null,
+                message: row.message ?? null,
+                created_at: now,
+                updated_at: now,
+              }))
+              recordStore[String(rows[0]?.run_id ?? runId)] = mapped
+              return { error: null }
+            },
+            select: () => ({
+              eq: (_column: string, id: string) => ({
+                order: () => ({
+                  eq: () => ({
+                    limit: async () => ({ data: recordStore[id] ?? [], error: null }),
+                  }),
+                  limit: async () => ({ data: recordStore[id] ?? [], error: null }),
+                  then(onFulfilled: (value: unknown) => unknown) {
+                    return Promise.resolve({ data: recordStore[id] ?? [], error: null }).then(onFulfilled)
+                  },
+                }),
+              }),
+            }),
+          }
+        }
+        if (table === "leads") {
+          const empty = async () => ({ data: [] as unknown[], error: null })
+          return {
+            select: () => ({
+              ilike: () => ({
+                limit: empty,
+              }),
+              contains: () => ({
+                limit: empty,
+              }),
+              not: () => ({
+                limit: empty,
+              }),
+              eq: () => ({
+                limit: empty,
+              }),
+            }),
+          }
+        }
+        throw new Error(`unexpected table ${table}`)
+      },
+    }),
+  }
+
+  return { admin, getRun: (id: string) => runStore[id], getRecords: (id: string) => recordStore[id] ?? [] }
+}
+
 async function main() {
   const checks: string[] = []
 
@@ -288,6 +422,57 @@ async function main() {
   checks.push("provider_audience_id_extraction")
   checks.push("nested_provider_audience_id_extraction")
 
+  const topLevelFetch = resolveDatamoonFetchPayload({
+    status: "completed",
+    record_count: 1,
+    records: [{ first_name: "A", business_email: "a@example.com" }],
+  })
+  assert.equal(topLevelFetch.providerStatus, "completed")
+  assert.equal(topLevelFetch.recordCount, 1)
+  assert.equal(topLevelFetch.records.length, 1)
+
+  const nestedFetch = resolveDatamoonFetchPayload({
+    message: "ok",
+    data: {
+      status: "completed",
+      record_count: 2,
+      records: [{ business_email: "nested@example.com" }],
+    },
+  })
+  assert.equal(nestedFetch.providerStatus, "completed")
+  assert.equal(nestedFetch.recordCount, 2)
+  assert.equal(nestedFetch.records.length, 1)
+
+  const doubleWrappedFetch = resolveDatamoonFetchPayload({
+    message: "ok",
+    data: {
+      data: {
+        status: "completed",
+        record_count: 1,
+        records: [{ business_email: "double@example.com" }],
+      },
+    },
+  })
+  assert.equal(doubleWrappedFetch.providerStatus, "completed")
+  assert.equal(doubleWrappedFetch.records.length, 1)
+
+  const nestedInProgress = resolveDatamoonFetchPayload({
+    status: "in_progress",
+    data: { status: "completed", records: [{ business_email: "ignored@example.com" }] },
+  })
+  assert.equal(nestedInProgress.providerStatus, "in_progress")
+  assert.equal(nestedInProgress.records.length, 1)
+
+  assert.deepEqual(
+    summarizeDatamoonFetchResponseKeys({
+      status: "completed",
+      message: "ok",
+      data: { status: "completed", record_count: 1, records: [] },
+    }),
+    ["status", "message", "data", "data.status", "data.record_count", "data.records"],
+  )
+  checks.push("nested_fetch_payload_extraction")
+
   await withEnvAsync(
     {
       DATAMOON_PROVIDER_ENABLED: "true",
@@ -395,6 +580,72 @@ async function main() {
   )
   checks.push("nested_module_build_id_persisted")
 
+  await withEnvAsync(
+    {
+      DATAMOON_PROVIDER_ENABLED: "true",
+      DATAMOON_DRY_RUN_ONLY: "false",
+      DATAMOON_DEFAULT_MODE: "module",
+      DATAMOON_AUDIENCE_MODULE_API_KEY: "module-key",
+      NEXT_PUBLIC_SUPABASE_URL:
+        process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://example.supabase.co",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY:
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "test-anon-key",
+      SUPABASE_SERVICE_ROLE_KEY:
+        process.env.SUPABASE_SERVICE_ROLE_KEY ?? "test-service-role-key",
+    },
+    async () => {
+      const { admin, getRun, getRecords } = createMockDatamoonPollAdmin("mock-poll-nested-run")
+      const fetchImpl = async (url: string | URL | Request) => {
+        const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url
+        if (href.includes("/audiences/fetch/")) {
+          return new Response(
+            JSON.stringify({
+              message: "ok",
+              data: {
+                status: "completed",
+                record_count: 1,
+                records: [
+                  {
+                    first_name: "Cert",
+                    last_name: "Lead",
+                    business_email: "cert.lead@example.com",
+                    personal_phone: "5550001111",
+                  },
+                ],
+              },
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          )
+        }
+        throw new Error(`unexpected_fetch_url:${href}`)
+      }
+
+      const { pollDatamoonAudienceImportRun } = await import(
+        "../lib/growth/lead-sources/datamoon/datamoon-audience-import-fetch-payload"
+      ).then(() => import("../lib/growth/lead-sources/datamoon/datamoon-audience-import-service"))
+
+      const result = await pollDatamoonAudienceImportRun(admin as never, "mock-poll-nested-run", {
+        env: process.env,
+        fetchImpl,
+      })
+
+      assert.equal(result.ok, true)
+      if (!result.ok) throw new Error("expected nested fetch poll success")
+      assert.equal(result.run.status, "completed")
+      assert.equal(result.run.previewCount, 1)
+      assert.equal(result.records.length, 1)
+      assert.equal(result.records[0]?.normalized.email, "cert.lead@example.com")
+
+      const run = getRun("mock-poll-nested-run")
+      assert.ok(Array.isArray(run?.provider_metadata.fetch_response_keys))
+      assert.ok(run!.provider_metadata.fetch_response_keys.includes("data.records"))
+      assert.ok(run!.provider_metadata.fetch_response_keys.includes("data.status"))
+      assert.equal(JSON.stringify(run?.provider_metadata).includes("cert.lead@example.com"), false)
+      assert.equal(getRecords("mock-poll-nested-run").length, 1)
+    },
+  )
+  checks.push("nested_fetch_poll_preview_persisted")
+
   // ext field normalization
   const normalized = normalizeDatamoonAudienceRecord(
     {
@@ -478,6 +729,9 @@ async function main() {
   assert.match(serviceSource, /buildDatamoonUnifiedIntakePayload/)
   assert.match(serviceSource, /record_limit: input\.limit/)
   assert.match(serviceSource, /resolveDatamoonBuildAudienceId/)
+  assert.match(serviceSource, /resolveDatamoonFetchPayload/)
+  assert.match(serviceSource, /summarizeDatamoonFetchResponseKeys/)
+  assert.match(serviceSource, /fetch_response_keys/)
   assert.match(serviceSource, /summarizeDatamoonBuildResponseKeys/)
   assert.match(serviceSource, /missing_provider_audience_id/)
   checks.push("unified_intake_wired_no_outreach")
