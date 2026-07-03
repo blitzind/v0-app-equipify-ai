@@ -1,4 +1,4 @@
-/** GE-DATAMOON-NESTED-FETCH-RECORDS-FIX-1 — Extract Datamoon fetch payload from nested module envelopes. Client-safe. */
+/** GE-DATAMOON-NESTED-FETCH-RECORDS-FIX-1 / PAGINATED-FETCH-ROWS-FIX-1 — Extract Datamoon fetch payload from nested/paginated envelopes. Client-safe. */
 
 import { summarizeDatamoonBuildResponseKeys } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-build-id"
 
@@ -12,6 +12,11 @@ function readProviderStatus(value: unknown): string | null {
   if (typeof value !== "string") return null
   const trimmed = value.trim()
   return trimmed.length > 0 ? trimmed : null
+}
+
+function readFiniteInt(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null
+  return Math.trunc(value)
 }
 
 function resolveNestedLayers(data: Record<string, unknown>): Record<string, unknown>[] {
@@ -36,6 +41,44 @@ function resolveFirstMatchingValue<T>(
   return null
 }
 
+function resolveFetchRecords(data: Record<string, unknown>): unknown[] {
+  const layers = resolveNestedLayers(data)
+  const fromRecordsKey = resolveFirstMatchingValue(layers, (layer) =>
+    Array.isArray(layer.records) ? layer.records : null,
+  )
+  if (fromRecordsKey) return fromRecordsKey
+
+  const pagination = data.data
+  if (isPlainObject(pagination)) {
+    if (Array.isArray(pagination.data)) return pagination.data
+
+    const inner = pagination.data
+    if (isPlainObject(inner) && Array.isArray(inner.records)) return inner.records
+  }
+
+  return []
+}
+
+function resolveFetchRecordCount(data: Record<string, unknown>, records: unknown[]): number {
+  const layers = resolveNestedLayers(data)
+  const fromRecordCount = resolveFirstMatchingValue(layers, (layer) => readFiniteInt(layer.record_count))
+  if (fromRecordCount != null) return fromRecordCount
+
+  const pagination = data.data
+  if (isPlainObject(pagination)) {
+    const paginationTotal = readFiniteInt(pagination.total)
+    if (paginationTotal != null) return paginationTotal
+  }
+
+  const counts = data.counts
+  if (isPlainObject(counts)) {
+    const countsTotal = readFiniteInt(counts.total)
+    if (countsTotal != null) return countsTotal
+  }
+
+  return records.length
+}
+
 export function resolveDatamoonFetchPayload(data: unknown): {
   providerStatus: string
   records: unknown[]
@@ -48,14 +91,8 @@ export function resolveDatamoonFetchPayload(data: unknown): {
   const layers = resolveNestedLayers(data)
   const providerStatus =
     resolveFirstMatchingValue(layers, (layer) => readProviderStatus(layer.status)) ?? "in_progress"
-  const records =
-    resolveFirstMatchingValue(layers, (layer) => (Array.isArray(layer.records) ? layer.records : null)) ?? []
-  const recordCount =
-    resolveFirstMatchingValue(layers, (layer) =>
-      typeof layer.record_count === "number" && Number.isFinite(layer.record_count)
-        ? Math.trunc(layer.record_count)
-        : null,
-    ) ?? records.length
+  const records = resolveFetchRecords(data)
+  const recordCount = resolveFetchRecordCount(data, records)
 
   return { providerStatus, records, recordCount }
 }

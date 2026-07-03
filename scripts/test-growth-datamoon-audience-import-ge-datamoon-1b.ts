@@ -471,7 +471,46 @@ async function main() {
     }),
     ["status", "message", "data", "data.status", "data.record_count", "data.records"],
   )
+
+  const paginatedFetch = resolveDatamoonFetchPayload({
+    status: "completed",
+    counts: { total: 5 },
+    data: {
+      current_page: 1,
+      total: 3,
+      per_page: 1,
+      data: [{ first_name: "Page", business_email: "page@example.com" }],
+    },
+  })
+  assert.equal(paginatedFetch.providerStatus, "completed")
+  assert.equal(paginatedFetch.records.length, 1)
+  assert.equal(paginatedFetch.recordCount, 3)
+
+  const countsTotalFetch = resolveDatamoonFetchPayload({
+    status: "completed",
+    counts: { total: 2 },
+    data: {
+      current_page: 1,
+      data: [{ business_email: "counts@example.com" }],
+    },
+  })
+  assert.equal(countsTotalFetch.recordCount, 2)
+  assert.equal(countsTotalFetch.records.length, 1)
+
+  const paginatedKeys = summarizeDatamoonFetchResponseKeys({
+    status: "completed",
+    counts: { total: 1 },
+    data: {
+      current_page: 1,
+      total: 1,
+      data: [{ business_email: "secret@example.com", first_name: "Secret" }],
+    },
+  })
+  assert.ok(paginatedKeys.includes("data.data"))
+  assert.ok(paginatedKeys.includes("data.total"))
+  assert.equal(JSON.stringify(paginatedKeys).includes("secret@example.com"), false)
   checks.push("nested_fetch_payload_extraction")
+  checks.push("paginated_fetch_payload_extraction")
 
   await withEnvAsync(
     {
@@ -645,6 +684,75 @@ async function main() {
     },
   )
   checks.push("nested_fetch_poll_preview_persisted")
+
+  await withEnvAsync(
+    {
+      DATAMOON_PROVIDER_ENABLED: "true",
+      DATAMOON_DRY_RUN_ONLY: "false",
+      DATAMOON_DEFAULT_MODE: "module",
+      DATAMOON_AUDIENCE_MODULE_API_KEY: "module-key",
+      NEXT_PUBLIC_SUPABASE_URL:
+        process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://example.supabase.co",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY:
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "test-anon-key",
+      SUPABASE_SERVICE_ROLE_KEY:
+        process.env.SUPABASE_SERVICE_ROLE_KEY ?? "test-service-role-key",
+    },
+    async () => {
+      const { admin, getRun, getRecords } = createMockDatamoonPollAdmin("mock-poll-paginated-run")
+      const fetchImpl = async (url: string | URL | Request) => {
+        const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url
+        if (href.includes("/audiences/fetch/")) {
+          return new Response(
+            JSON.stringify({
+              status: "completed",
+              topics: [],
+              counts: { total: 1 },
+              data: {
+                current_page: 1,
+                total: 1,
+                per_page: 1,
+                data: [
+                  {
+                    first_name: "Paginated",
+                    last_name: "Lead",
+                    business_email: "paginated.lead@example.com",
+                    personal_phone: "5550002222",
+                  },
+                ],
+              },
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          )
+        }
+        throw new Error(`unexpected_fetch_url:${href}`)
+      }
+
+      const { pollDatamoonAudienceImportRun } = await import(
+        "../lib/growth/lead-sources/datamoon/datamoon-audience-import-fetch-payload"
+      ).then(() => import("../lib/growth/lead-sources/datamoon/datamoon-audience-import-service"))
+
+      const result = await pollDatamoonAudienceImportRun(admin as never, "mock-poll-paginated-run", {
+        env: process.env,
+        fetchImpl,
+      })
+
+      assert.equal(result.ok, true)
+      if (!result.ok) throw new Error("expected paginated fetch poll success")
+      assert.equal(result.run.status, "completed")
+      assert.equal(result.run.previewCount, 1)
+      assert.equal(result.run.recordCount, 1)
+      assert.equal(result.records.length, 1)
+      assert.equal(result.records[0]?.normalized.email, "paginated.lead@example.com")
+
+      const run = getRun("mock-poll-paginated-run")
+      assert.ok(run!.provider_metadata.fetch_response_keys.includes("data.data"))
+      assert.ok(run!.provider_metadata.fetch_response_keys.includes("data.total"))
+      assert.equal(JSON.stringify(run?.provider_metadata).includes("paginated.lead@example.com"), false)
+      assert.equal(getRecords("mock-poll-paginated-run").length, 1)
+    },
+  )
+  checks.push("paginated_fetch_poll_preview_persisted")
 
   // ext field normalization
   const normalized = normalizeDatamoonAudienceRecord(
