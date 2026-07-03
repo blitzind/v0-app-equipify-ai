@@ -15,6 +15,7 @@ import { GrowthHomeAiOsWaitingOnYouSection } from "@/components/growth/workspace
 import { GrowthHomeAvaOpportunityIntelligenceSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-opportunity-intelligence-section"
 import { GrowthHomeDatamoonSourcingWorkbenchSection } from "@/components/growth/workspace/executive-briefing/growth-home-datamoon-sourcing-workbench-section"
 import { GrowthHomeAvaLiveStatusSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-live-status-section"
+import { GrowthHomeBusinessProfileSection } from "@/components/growth/workspace/executive-briefing/growth-home-business-profile-section"
 import { GrowthHomeDailyWorkQueueSection } from "@/components/growth/workspace/executive-briefing/growth-home-daily-work-queue-section"
 import { GrowthHomeActiveRevenueMissionsSection } from "@/components/growth/workspace/executive-briefing/growth-home-active-revenue-missions-section"
 import { GrowthHomeMarketingMissionsSection } from "@/components/growth/workspace/executive-briefing/growth-home-marketing-missions-section"
@@ -96,6 +97,8 @@ export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, c
       <GrowthHomeDailyWorkQueueSection items={aiOsUx.dailyWorkQueue} buckets={aiOsUx.dailyWorkQueueBuckets} />
 
       <GrowthHomeAvaLiveStatusSection status={aiOsUx.liveStatus} />
+
+      <GrowthHomeBusinessProfileSection />
 
       <GrowthHomeAvaOpportunityIntelligenceSection dailyWorkQueue={aiOsUx.dailyWorkQueue} />
 
