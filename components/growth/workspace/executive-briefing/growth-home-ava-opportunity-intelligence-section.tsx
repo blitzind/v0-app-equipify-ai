@@ -9,6 +9,7 @@ import {
   GROWTH_AVA_HOME_OPPORTUNITY_INTELLIGENCE_1A_QA_MARKER,
   GROWTH_HOME_AVA_ANALYZE_LEAD_LABEL,
   GROWTH_HOME_AVA_REVIEW_DATAMOON_LABEL,
+  GROWTH_HOME_RECENT_IMPORTS_SECTION_LABEL,
   GROWTH_HOME_AVA_SHOW_INTELLIGENCE_LABEL,
   GROWTH_HOME_DATAMOON_RECENT_IMPORTS_API_PATH,
   type GrowthHomeDatamoonRecentImportsApiResponse,
@@ -16,6 +17,7 @@ import {
   growthHomeOpportunityIntelligenceHref,
 } from "@/lib/growth/opportunity-intelligence/growth-home-opportunity-intelligence-api-contract"
 import { GrowthHomeOpportunityIntelligencePanel } from "@/components/growth/workspace/executive-briefing/growth-home-opportunity-intelligence-panel"
+import { GrowthHomeAvaSafeExecutionPanel } from "@/components/growth/workspace/executive-briefing/growth-home-ava-safe-execution-panel"
 
 type Props = {
   dailyWorkQueue: GrowthHomeDailyWorkQueueItem[]
@@ -163,7 +165,7 @@ export function GrowthHomeAvaOpportunityIntelligenceSection({ dailyWorkQueue }: 
             {(mode === "datamoon" || !suggestedLeadId) && datamoonLeads.length > 0 ? (
               <div className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Recent Datamoon imports
+                  {GROWTH_HOME_RECENT_IMPORTS_SECTION_LABEL}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {datamoonLeads.map((lead) => (
@@ -191,10 +193,20 @@ export function GrowthHomeAvaOpportunityIntelligenceSection({ dailyWorkQueue }: 
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
             {response?.viewModel ? (
-              <GrowthHomeOpportunityIntelligencePanel
-                viewModel={response.viewModel}
-                researchStatus={response.researchStatus}
-              />
+              <>
+                {selectedLeadId ? (
+                  <GrowthHomeAvaSafeExecutionPanel
+                    leadId={selectedLeadId}
+                    onIntelligenceRefreshed={(payload) => {
+                      if (payload.viewModel) setResponse(payload)
+                    }}
+                  />
+                ) : null}
+                <GrowthHomeOpportunityIntelligencePanel
+                  viewModel={response.viewModel}
+                  researchStatus={response.researchStatus}
+                />
+              </>
             ) : null}
           </div>
         </SheetContent>

@@ -24,7 +24,7 @@ async function main(): Promise<void> {
 
   assert.equal(GROWTH_AVA_HOME_OPPORTUNITY_INTELLIGENCE_1A_QA_MARKER, "ge-ava-home-opportunity-intelligence-1a-v1")
   assert.equal(GROWTH_HOME_AVA_ANALYZE_LEAD_LABEL, "Analyze this lead")
-  assert.equal(GROWTH_HOME_AVA_REVIEW_DATAMOON_LABEL, "Review Datamoon imports")
+  assert.equal(GROWTH_HOME_AVA_REVIEW_DATAMOON_LABEL, "Review Recent Imports")
   assert.equal(GROWTH_HOME_AVA_SHOW_INTELLIGENCE_LABEL, "Show opportunity intelligence")
 
   assert.equal(

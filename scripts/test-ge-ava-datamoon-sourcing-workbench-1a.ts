@@ -75,6 +75,7 @@ async function main(): Promise<void> {
   const workbenchSource = readSource(
     "components/growth/workspace/executive-briefing/growth-home-datamoon-sourcing-workbench-section.tsx",
   )
+  assert.match(workbenchSource, /home-find-leads/)
   assert.match(workbenchSource, /ava_draft/)
   assert.match(workbenchSource, /manual_search/)
   assert.match(workbenchSource, /GROWTH_HOME_AVA_ASK_DRAFT_LABEL/)
@@ -107,8 +108,8 @@ async function main(): Promise<void> {
   )
   assert.match(dashboardSource, /GrowthHomeDatamoonSourcingWorkbenchSection/)
 
-  assert.equal(GROWTH_HOME_AVA_ASK_DRAFT_LABEL, "Ask Ava to Draft")
-  assert.equal(GROWTH_HOME_BUILD_AUDIENCE_LABEL, "Build Audience")
+  assert.equal(GROWTH_HOME_AVA_ASK_DRAFT_LABEL, "Ask Ava")
+  assert.equal(GROWTH_HOME_BUILD_AUDIENCE_LABEL, "Search for Leads")
 
   console.log(`[${PHASE}] PASS — Datamoon sourcing workbench certified (local)`)
 }

@@ -1,10 +1,15 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Loader2, SatelliteDish, Sparkles } from "lucide-react"
+import { ChevronDown, Loader2, Search, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { DatamoonSourcingWorkbenchForm } from "@/components/growth/lead-sources/datamoon/datamoon-sourcing-workbench-form"
 import { buildDatamoonImportRequestFromAudienceDraft } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder"
@@ -14,7 +19,13 @@ import {
   type AvaDatamoonSourcingWorkbenchMode,
 } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-workbench-types"
 import {
+  GROWTH_AIOS_GROWTH_UX_RENAME_1A_QA_MARKER,
   GROWTH_AVA_DATAMOON_SOURCING_WORKBENCH_1A_QA_MARKER,
+  GROWTH_HOME_ADVANCED_PROVIDER_DETAILS_LABEL,
+  GROWTH_HOME_ADVANCED_SEARCH_SECTION_LABEL,
+  GROWTH_HOME_ADVANCED_SEARCH_TAB_LABEL,
+  GROWTH_HOME_ASK_AVA_PLACEHOLDER,
+  GROWTH_HOME_ASK_AVA_TAB_LABEL,
   GROWTH_HOME_AVA_ASK_DRAFT_LABEL,
   GROWTH_HOME_BUILD_AUDIENCE_LABEL,
   GROWTH_HOME_DATAMOON_RUNS_API_PATH,
@@ -25,14 +36,27 @@ import {
   GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL,
   GROWTH_HOME_DATAMOON_CONTINUE_MANUALLY_LABEL,
   GROWTH_HOME_BUSINESS_PROFILE_SECTION_SELECTOR,
+  GROWTH_HOME_DISCOVERY_SOURCE_DATAMOON_LABEL,
+  GROWTH_HOME_FIND_LEADS_CARD_MISSING_PROFILE_COPY,
+  GROWTH_HOME_FIND_LEADS_CTA,
+  GROWTH_HOME_FIND_LEADS_DRAWER_DESCRIPTION,
+  GROWTH_HOME_FIND_LEADS_EXAMPLES,
+  GROWTH_HOME_FIND_LEADS_SECONDARY_COPY,
+  GROWTH_HOME_FIND_LEADS_SUBTITLE,
+  GROWTH_HOME_FIND_LEADS_TITLE,
   GROWTH_HOME_IMPORT_RECOMMENDED_LABEL,
   GROWTH_HOME_IMPORT_SELECTED_LABEL,
+  GROWTH_HOME_POWERED_BY_DATAMOON_LABEL,
   GROWTH_HOME_REFRESH_SAVED_SEARCH_LABEL,
   GROWTH_HOME_REJECT_SELECTED_LABEL,
   GROWTH_HOME_RESET_SEARCH_LABEL,
   GROWTH_HOME_SAVE_SEARCH_LABEL,
   type GrowthHomeDatamoonSourcingDraftApiResponse,
 } from "@/lib/growth/ava-home/datamoon/growth-home-datamoon-sourcing-api-contract"
+import {
+  GROWTH_BUSINESS_PROFILE_API_PATH,
+  type GrowthBusinessProfileApiResponse,
+} from "@/lib/growth/business-profile/business-profile-api-contract"
 import type {
   DatamoonAudienceImportRecord,
   DatamoonAudienceImportRun,
@@ -57,16 +81,16 @@ function runStatusTone(status: DatamoonAudienceImportRun["status"]) {
 
 export function GrowthHomeDatamoonSourcingWorkbenchSection() {
   const [open, setOpen] = useState(false)
+  const [providerDetailsOpen, setProviderDetailsOpen] = useState(false)
   const [mode, setMode] = useState<AvaDatamoonSourcingWorkbenchMode>("ava_draft")
-  const [command, setCommand] = useState(
-    "Find U.S.-based SMB service companies showing medium or high intent around equipment maintenance software in the last 7 days.",
-  )
+  const [command, setCommand] = useState(GROWTH_HOME_FIND_LEADS_EXAMPLES[0])
   const [draft, setDraft] = useState<AvaDatamoonAudienceDraft>(() => createDefaultAvaDatamoonAudienceDraft())
   const [explanation, setExplanation] = useState<string | null>(null)
   const [assumptions, setAssumptions] = useState<string[]>([])
   const [overrides, setOverrides] = useState<string[]>([])
   const [businessProfileUsed, setBusinessProfileUsed] = useState(false)
   const [businessProfileStatus, setBusinessProfileStatus] = useState<"approved" | "missing" | null>(null)
+  const [hasApprovedBusinessProfile, setHasApprovedBusinessProfile] = useState(false)
   const [buildConfirmed, setBuildConfirmed] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -86,6 +110,14 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
     [previewRecords],
   )
 
+  const loadBusinessProfileState = useCallback(async () => {
+    const res = await fetch(GROWTH_BUSINESS_PROFILE_API_PATH, { cache: "no-store" })
+    const payload = (await res.json()) as GrowthBusinessProfileApiResponse
+    if (res.ok && payload.ok) {
+      setHasApprovedBusinessProfile(Boolean(payload.activeApproved))
+    }
+  }, [])
+
   const loadDiagnostics = useCallback(async () => {
     const res = await fetch(GROWTH_HOME_DATAMOON_RUNS_API_PATH, { cache: "no-store" })
     const data = (await res.json()) as { diagnostics?: DatamoonProviderDiagnostics }
@@ -93,8 +125,15 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
   }, [])
 
   useEffect(() => {
-    if (open) void loadDiagnostics().catch(() => undefined)
-  }, [open, loadDiagnostics])
+    void loadBusinessProfileState().catch(() => undefined)
+  }, [loadBusinessProfileState])
+
+  useEffect(() => {
+    if (open) {
+      void loadDiagnostics().catch(() => undefined)
+      void loadBusinessProfileState().catch(() => undefined)
+    }
+  }, [open, loadDiagnostics, loadBusinessProfileState])
 
   async function handleAskAvaDraft() {
     setBusy("draft")
@@ -107,7 +146,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
       })
       const payload = (await res.json()) as GrowthHomeDatamoonSourcingDraftApiResponse
       if (!res.ok || !payload.ok || !payload.draft) {
-        throw new Error(payload.message ?? "Could not draft audience from command.")
+        throw new Error(payload.message ?? "Could not draft lead search from command.")
       }
       setDraft(payload.draft.audienceDraft)
       setExplanation(payload.draft.explanation)
@@ -115,9 +154,10 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
       setOverrides(payload.draft.overrides ?? [])
       setBusinessProfileUsed(payload.draft.businessProfileUsed)
       setBusinessProfileStatus(payload.draft.businessProfileStatus)
+      setHasApprovedBusinessProfile(payload.draft.businessProfileUsed)
       setBuildConfirmed(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not draft audience.")
+      setError(e instanceof Error ? e.message : "Could not draft lead search.")
     } finally {
       setBusy(null)
     }
@@ -125,7 +165,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
 
   async function handleBuildAudience() {
     if (!buildConfirmed) {
-      setError("Confirm human review before building the Datamoon audience.")
+      setError("Confirm human review before searching for leads.")
       return
     }
     setBusy("build")
@@ -145,14 +185,14 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
       }
       if (!res.ok || !data.ok || !data.run) {
         const issueText = data.issues?.map((issue) => issue.message).join(" ")
-        throw new Error(issueText || data.error || "Build audience failed.")
+        throw new Error(issueText || data.error || "Search for leads failed.")
       }
       setActiveRun(data.run)
       setRecords([])
       setSelectedIds(new Set())
       setRejectedIds(new Set())
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Build audience failed.")
+      setError(e instanceof Error ? e.message : "Search for leads failed.")
     } finally {
       setBusy(null)
     }
@@ -258,33 +298,37 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
   return (
     <>
       <section
-        data-qa-section="home-datamoon-sourcing-workbench"
-        data-qa-marker={GROWTH_AVA_DATAMOON_SOURCING_WORKBENCH_1A_QA_MARKER}
+        data-qa-section="home-find-leads"
+        data-qa-section-legacy="home-datamoon-sourcing-workbench"
+        data-qa-marker={GROWTH_AIOS_GROWTH_UX_RENAME_1A_QA_MARKER}
+        data-qa-marker-foundation={GROWTH_AVA_DATAMOON_SOURCING_WORKBENCH_1A_QA_MARKER}
         className="rounded-2xl border border-border/70 bg-card p-5 space-y-4"
       >
         <div className="flex items-start gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-700">
-            <SatelliteDish className="size-5" aria-hidden />
+            <Search className="size-5" aria-hidden />
           </span>
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">Datamoon Sourcing Workbench</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Ask Ava to draft an audience or configure manually — build and import only after human confirmation.
-            </p>
+          <div className="space-y-2">
+            <h2 className="text-lg font-semibold tracking-tight">{GROWTH_HOME_FIND_LEADS_TITLE}</h2>
+            <p className="text-sm text-muted-foreground">{GROWTH_HOME_FIND_LEADS_SUBTITLE}</p>
+            <p className="text-sm text-muted-foreground">{GROWTH_HOME_FIND_LEADS_SECONDARY_COPY}</p>
+            {hasApprovedBusinessProfile ? (
+              <GrowthBadge tone="healthy">{GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL}</GrowthBadge>
+            ) : (
+              <p className="text-sm text-amber-900 dark:text-amber-100">{GROWTH_HOME_FIND_LEADS_CARD_MISSING_PROFILE_COPY}</p>
+            )}
           </div>
         </div>
         <Button type="button" size="sm" onClick={() => setOpen(true)}>
-          Open Sourcing Workbench
+          {GROWTH_HOME_FIND_LEADS_CTA}
         </Button>
       </section>
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
           <SheetHeader>
-            <SheetTitle>Datamoon Sourcing Workbench</SheetTitle>
-            <SheetDescription>
-              Draft, edit, build, preview, and import Datamoon records — no auto-import or outbound.
-            </SheetDescription>
+            <SheetTitle>{GROWTH_HOME_FIND_LEADS_TITLE}</SheetTitle>
+            <SheetDescription>{GROWTH_HOME_FIND_LEADS_DRAWER_DESCRIPTION}</SheetDescription>
           </SheetHeader>
 
           <div className="mt-4 space-y-4">
@@ -295,7 +339,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
                 variant={mode === "ava_draft" ? "default" : "outline"}
                 onClick={() => setMode("ava_draft")}
               >
-                Ava Draft
+                {GROWTH_HOME_ASK_AVA_TAB_LABEL}
               </Button>
               <Button
                 type="button"
@@ -303,13 +347,8 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
                 variant={mode === "manual_search" ? "default" : "outline"}
                 onClick={() => setMode("manual_search")}
               >
-                Manual Search
+                {GROWTH_HOME_ADVANCED_SEARCH_TAB_LABEL}
               </Button>
-              {diagnostics ? (
-                <GrowthBadge tone={diagnostics.configured ? "healthy" : "attention"}>
-                  {diagnostics.enabled ? (diagnostics.dryRunOnly ? "Dry run" : "Live") : "Disabled"}
-                </GrowthBadge>
-              ) : null}
             </div>
 
             {mode === "ava_draft" ? (
@@ -331,14 +370,30 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
                 ) : null}
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <Sparkles className="size-4 text-primary" />
-                  Ask Ava in plain language
+                  {GROWTH_HOME_ASK_AVA_TAB_LABEL}
                 </div>
                 <Textarea
                   value={command}
                   onChange={(e) => setCommand(e.target.value)}
                   rows={3}
-                  placeholder="Find equipment maintenance software buyers in the US..."
+                  placeholder={GROWTH_HOME_ASK_AVA_PLACEHOLDER}
                 />
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Examples</p>
+                  <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">
+                    {GROWTH_HOME_FIND_LEADS_EXAMPLES.map((example) => (
+                      <li key={example}>
+                        <button
+                          type="button"
+                          className="text-left hover:text-foreground hover:underline"
+                          onClick={() => setCommand(example)}
+                        >
+                          {example}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
                 <Button type="button" size="sm" disabled={busy !== null} onClick={() => void handleAskAvaDraft()}>
                   {busy === "draft" ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
                   {GROWTH_HOME_AVA_ASK_DRAFT_LABEL}
@@ -364,9 +419,29 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
                   </ul>
                 ) : null}
               </div>
-            ) : null}
+            ) : (
+              <p className="text-sm font-medium">{GROWTH_HOME_ADVANCED_SEARCH_SECTION_LABEL}</p>
+            )}
 
             <DatamoonSourcingWorkbenchForm draft={draft} onChange={setDraft} />
+
+            <Collapsible open={providerDetailsOpen} onOpenChange={setProviderDetailsOpen}>
+              <CollapsibleTrigger asChild>
+                <Button type="button" variant="ghost" size="sm" className="gap-2 px-0 text-muted-foreground hover:text-foreground">
+                  <ChevronDown className={`size-4 transition-transform ${providerDetailsOpen ? "rotate-180" : ""}`} />
+                  {GROWTH_HOME_ADVANCED_PROVIDER_DETAILS_LABEL}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-2 pt-2 text-sm text-muted-foreground">
+                <p>{GROWTH_HOME_DISCOVERY_SOURCE_DATAMOON_LABEL}</p>
+                <p>{GROWTH_HOME_POWERED_BY_DATAMOON_LABEL}</p>
+                {diagnostics ? (
+                  <GrowthBadge tone={diagnostics.configured ? "healthy" : "attention"}>
+                    {diagnostics.enabled ? (diagnostics.dryRunOnly ? "Dry run" : "Live") : "Disabled"}
+                  </GrowthBadge>
+                ) : null}
+              </CollapsibleContent>
+            </Collapsible>
 
             <label className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50/80 p-3 text-sm dark:border-amber-900/40 dark:bg-amber-950/20">
               <input
@@ -375,8 +450,8 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
                 onChange={(e) => setBuildConfirmed(e.target.checked)}
               />
               <span>
-                I have reviewed this audience search and approve building the Datamoon audience. Import still requires
-                a separate explicit action.
+                I have reviewed this lead search and approve searching for leads. Import still requires a separate
+                explicit action — no auto-import.
               </span>
             </label>
 

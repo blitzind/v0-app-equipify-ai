@@ -12,7 +12,8 @@ export const GROWTH_HOME_DATAMOON_RECENT_IMPORTS_API_PATH =
   "/api/platform/growth/lead-sources/datamoon/recent-imports" as const
 
 export const GROWTH_HOME_AVA_ANALYZE_LEAD_LABEL = "Analyze this lead" as const
-export const GROWTH_HOME_AVA_REVIEW_DATAMOON_LABEL = "Review Datamoon imports" as const
+export const GROWTH_HOME_AVA_REVIEW_DATAMOON_LABEL = "Review Recent Imports" as const
+export const GROWTH_HOME_RECENT_IMPORTS_SECTION_LABEL = "Recent imports" as const
 export const GROWTH_HOME_AVA_SHOW_INTELLIGENCE_LABEL = "Show opportunity intelligence" as const
 
 export type GrowthHomeOpportunityIntelligenceResearchStatus = {
