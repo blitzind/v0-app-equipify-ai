@@ -209,6 +209,8 @@ export type GrowthObjectiveExecutionContext = {
   version: 1
   stages: Partial<Record<GrowthObjectiveStageId, GrowthObjectiveStageExecutionContext>>
   recoveredAt: string | null
+  /** GE-AVA-MISSION-RUNTIME-1A — persistent mission loop state (presentation orchestration). */
+  missionRuntime?: import("@/lib/growth/mission-center/growth-mission-runtime-types").GrowthObjectiveMissionRuntimeState | null
 }
 
 export type GrowthObjectiveEventSubscription = {

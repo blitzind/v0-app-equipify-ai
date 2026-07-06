@@ -38,6 +38,7 @@ export function normalizeObjectiveExecutionContext(
     version: 1,
     stages: raw.stages ?? {},
     recoveredAt: raw.recoveredAt ?? null,
+    missionRuntime: raw.missionRuntime ?? null,
   }
 }
 

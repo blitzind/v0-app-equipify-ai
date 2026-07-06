@@ -15,6 +15,7 @@ import {
   retryGrowthObjectiveStage,
   tickGrowthObjectiveRuntime,
 } from "@/lib/growth/objectives/growth-objective-runtime-service"
+import { runGrowthMissionRuntimeOrchestration } from "@/lib/growth/mission-center/growth-mission-runtime-orchestrator"
 import { buildObjectiveSignalSnapshot } from "@/lib/growth/objectives/growth-objective-signal-handler"
 import {
   GROWTH_OBJECTIVE_RUNTIME_SCHEDULER_QA_MARKER,
@@ -107,6 +108,7 @@ export type GrowthObjectiveRuntimeSchedulerResult = {
   retriesAttempted: number
   stalledDetected: number
   recommendationsRefreshed: number
+  missionOrchestrationsAttempted: number
   failures: number
   skippedReason: string | null
 }
@@ -126,6 +128,7 @@ export async function runGrowthObjectiveRuntimeScheduler(
       retriesAttempted: 0,
       stalledDetected: 0,
       recommendationsRefreshed: 0,
+      missionOrchestrationsAttempted: 0,
       failures: 0,
       skippedReason: "Objective runtime scheduler disabled by kill switch.",
     }
@@ -137,6 +140,7 @@ export async function runGrowthObjectiveRuntimeScheduler(
   let retriesAttempted = 0
   let stalledDetected = 0
   let recommendationsRefreshed = 0
+  let missionOrchestrationsAttempted = 0
   let failures = 0
 
   for (const objective of objectives) {
@@ -167,6 +171,14 @@ export async function runGrowthObjectiveRuntimeScheduler(
         await autoContinueGrowthObjectiveRuntime(admin, objective.organizationId, objective.id, input)
       }
 
+      const launchComplete =
+        objective.runtime?.stageStates.launch?.state === "completed" ||
+        ["monitor", "adapt", "book"].includes(objective.runtime?.currentStageId ?? "")
+      if (launchComplete) {
+        await runGrowthMissionRuntimeOrchestration(admin, objective.organizationId, objective.id, input)
+        missionOrchestrationsAttempted += 1
+      }
+
       await persistObjectiveSchedulerTouch(admin, objective, {
         stalled,
         retried,
@@ -192,6 +204,7 @@ export async function runGrowthObjectiveRuntimeScheduler(
     ticks_attempted: ticksAttempted,
     retries_attempted: retriesAttempted,
     stalled_detected: stalledDetected,
+    mission_orchestrations_attempted: missionOrchestrationsAttempted,
     failures,
     runtime_ms: Date.now() - startedAt,
   })
@@ -204,6 +217,7 @@ export async function runGrowthObjectiveRuntimeScheduler(
     retriesAttempted,
     stalledDetected,
     recommendationsRefreshed,
+    missionOrchestrationsAttempted,
     failures,
     skippedReason: null,
   }
