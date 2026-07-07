@@ -6,9 +6,12 @@ export function GrowthHomeTimelineSection({ periods }: { periods: GrowthHomeTime
   if (periods.every((period) => period.items.length === 0)) return null
 
   return (
-    <section data-qa-section="home-timeline" className="space-y-4">
+    <section
+      data-qa-section="home-timeline"
+      className="rounded-2xl border border-border/70 bg-card p-6 space-y-5"
+    >
       <div>
-        <h2 className="text-xl font-semibold tracking-tight">What I accomplished</h2>
+        <h2 className="text-lg font-semibold tracking-tight">What I accomplished</h2>
         <p className="mt-1 text-sm text-muted-foreground">A running narrative of my work — not a dashboard export.</p>
       </div>
       <div className="space-y-6">

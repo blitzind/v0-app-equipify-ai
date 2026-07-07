@@ -14,9 +14,12 @@ export function GrowthHomeMarketingMissionsSection({ missions }: Props) {
   if (missions.length === 0) return null
 
   return (
-    <section data-qa-section="home-marketing-missions" className="space-y-4">
+    <section
+      data-qa-section="home-marketing-missions"
+      className="rounded-2xl border border-border/70 bg-card p-6 space-y-5"
+    >
       <div>
-        <h2 className="text-xl font-semibold tracking-tight">{AI_GROWTH_INITIATIVES_TITLE}</h2>
+        <h2 className="text-lg font-semibold tracking-tight">{AI_GROWTH_INITIATIVES_TITLE}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Campaigns and channels that help sell Equipify — SEO, ads, content, ICP, and landing pages.
         </p>

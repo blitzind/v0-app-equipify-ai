@@ -13,10 +13,12 @@ export function GrowthHomeAutonomousReadinessSection({
   return (
     <section
       data-qa-section="home-autonomous-readiness"
-      className="rounded-2xl border border-border/70 bg-card p-5"
+      className="rounded-2xl border border-border/70 bg-card p-6 space-y-5"
     >
-      <h2 className="text-lg font-semibold tracking-tight">Autonomous readiness</h2>
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight">Autonomous readiness</h2>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Mode</p>
           <p className="mt-1 font-medium">{readiness.mode}</p>

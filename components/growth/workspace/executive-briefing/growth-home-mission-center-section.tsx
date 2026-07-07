@@ -95,7 +95,10 @@ export function GrowthHomeMissionCenterSection({ dashboard }: Props) {
 
   if (loading && !sources) {
     return (
-      <section data-qa-section="home-mission-center" className="flex items-center gap-2 text-sm text-muted-foreground">
+      <section
+        data-qa-section="home-mission-center"
+        className="flex items-center gap-2 rounded-2xl border border-border/70 bg-card p-6 text-sm text-muted-foreground"
+      >
         <Loader2 className="size-4 animate-spin" aria-hidden />
         Loading Ava&apos;s missions…
       </section>
@@ -109,10 +112,10 @@ export function GrowthHomeMissionCenterSection({ dashboard }: Props) {
       <section
         data-qa-section="home-mission-center"
         data-qa-marker={GROWTH_AVA_MISSION_CENTER_1A_QA_MARKER}
-        className="space-y-5"
+        className="rounded-2xl border border-border/70 bg-card p-6 space-y-5"
       >
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">{GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_TITLE}</h2>
+          <h2 className="text-lg font-semibold tracking-tight">{GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_TITLE}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             One place to see what Ava is working on — research, leads, approvals, and next steps.
           </p>

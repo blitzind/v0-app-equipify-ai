@@ -108,21 +108,24 @@ export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, c
 
       <GrowthHomeMarketingMissionsSection missions={briefing.marketingMissions} />
 
-      <section data-qa-section="home-customer-growth" className="space-y-8 rounded-2xl border border-violet-100 bg-violet-50/20 p-6 dark:border-violet-900/30 dark:bg-violet-950/10">
+      <section
+        data-qa-section="home-customer-growth"
+        className="rounded-2xl border border-border/70 bg-card p-6 space-y-5"
+      >
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Customer Growth</h2>
+          <h2 className="text-lg font-semibold tracking-tight">Customer Growth</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Expansion, renewals, and account health — separate from revenue outreach.
           </p>
         </div>
         <GrowthHomeCustomerSuccessMissionsSection missions={briefing.customerSuccessMissions} />
         {hasCustomerGrowthContent ? (
-          <>
+          <div className="space-y-5">
             <GrowthHomeCustomerHealthSection items={briefing.customerHealth} />
             <GrowthHomeExpansionOpportunitiesSection items={briefing.expansionOpportunities} />
             <GrowthHomeRenewalsMonitoringSection items={briefing.renewalsMonitoring} />
             <GrowthHomeCustomerWinsSection wins={briefing.customerWins} />
-          </>
+          </div>
         ) : (
           <GrowthHomeCustomerGrowthEmptySection />
         )}

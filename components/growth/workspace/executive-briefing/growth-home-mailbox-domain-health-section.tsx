@@ -31,9 +31,12 @@ export function GrowthHomeMailboxDomainHealthSection({
   ].filter((row): row is { label: string; value: string } => row != null)
 
   return (
-    <section data-qa-section="home-mailbox-domain-health" className="space-y-4">
+    <section
+      data-qa-section="home-mailbox-domain-health"
+      className="rounded-2xl border border-border/70 bg-card p-6 space-y-5"
+    >
       <div>
-        <h2 className="text-xl font-semibold tracking-tight">Mailbox & domain health</h2>
+        <h2 className="text-lg font-semibold tracking-tight">Mailbox & domain health</h2>
         {health.summary ? <p className="mt-1 text-sm text-muted-foreground">{health.summary}</p> : null}
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
