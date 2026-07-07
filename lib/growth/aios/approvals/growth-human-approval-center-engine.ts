@@ -373,6 +373,9 @@ export function collectOutreachPackageApprovalItems(input: GrowthHumanApprovalCe
   for (const run of input.outreachPreparationRuns) {
     const pkg = run.approvalPackage
     if (!pkg?.pendingHumanApproval) continue
+    if (pkg.packageApprovalDecision === "approved" || pkg.packageApprovalDecision === "rejected") {
+      continue
+    }
     const hasSms = pkg.generatedAssets.some((asset) => asset.channel === "sms")
     const hasEmail = pkg.generatedAssets.some((asset) => asset.channel === "email")
     items.push({
@@ -397,7 +400,7 @@ export function collectOutreachPackageApprovalItems(input: GrowthHumanApprovalCe
         enforcementSource: "autonomous_outreach_preparation_pilot",
         blockedReason: "Transport blocked — draft only until human approval.",
       },
-      route: `/growth/os/pilot/lead-research/${pkg.leadId}`,
+      route: `/growth/os/pilot/lead-research/${pkg.leadId}?packageId=${encodeURIComponent(pkg.packageId)}`,
       createdAt: pkg.preparedAt,
     })
   }

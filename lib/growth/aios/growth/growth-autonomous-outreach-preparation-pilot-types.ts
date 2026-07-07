@@ -72,6 +72,9 @@ export type GrowthAutonomousOutreachApprovalPackage = {
   expectedOutcome: string
   pendingHumanApproval: true
   transportBlocked: true
+  /** GE-AVA-AUTONOMY-EXECUTION-REQUEST-1 — set after operator package approval */
+  packageApprovalDecision?: "approved" | "rejected" | null
+  executionRequestId?: string | null
 }
 
 export type GrowthAutonomousOutreachPreparationRunRecord = {
