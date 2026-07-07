@@ -716,6 +716,8 @@
     "test:ge-ava-mission-runtime-1b-find-leads-binding": "tsx scripts/test-ge-ava-mission-runtime-1b-find-leads-binding.ts",
     "test:ge-ava-autonomy-launch-run-1": "tsx scripts/test-ge-ava-autonomy-launch-run-1.ts",
     "test:ge-ava-launch-validation-debug-1": "tsx scripts/test-ge-ava-launch-validation-debug-1.ts",
+    "test:ge-ava-search-validation-2": "tsx scripts/test-ge-ava-search-validation-2.ts",
+    "test:ge-ava-search-validation-fix-1": "tsx scripts/test-ge-ava-search-validation-fix-1.ts",
     "test:ge-ava-autonomy-completion-run-1": "tsx scripts/test-ge-ava-autonomy-completion-run-1.ts",
     "test:ge-ava-autonomy-execution-request-1": "tsx scripts/test-ge-ava-autonomy-execution-request-1.ts",
     "test:ge-ava-operator-workspace-1": "tsx scripts/test-ge-ava-operator-workspace-1.ts",

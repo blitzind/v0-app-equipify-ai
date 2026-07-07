@@ -54,6 +54,7 @@ export {
   GROWTH_AVA_LAUNCH_RUN_DESCRIPTION,
   GROWTH_AVA_LAUNCH_RUN_SUCCESS_COPY,
   GROWTH_AVA_LAUNCH_VALIDATION_DEBUG_1_QA_MARKER,
+  GROWTH_AVA_SEARCH_VALIDATION_2_QA_MARKER,
   GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR,
   GROWTH_AVA_LAUNCH_CANT_START_HEADING,
   buildMissionAvaLaunchRunApiPath,
@@ -63,6 +64,15 @@ export {
   buildGrowthMissionAvaLaunchValidationFailureBody,
   isGrowthMissionAvaLaunchValidationFailureError,
 } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-api-contract"
+export {
+  GROWTH_AVA_SEARCH_VALIDATION_2_QA_MARKER as GROWTH_AVA_LAUNCH_SEARCH_VALIDATION_TRACE_QA_MARKER,
+  AVA_LAUNCH_VALIDATOR_DATAMOON_IMPORT,
+  AVA_LAUNCH_VALIDATOR_LAUNCH_BODY_SCHEMA,
+  AVA_LAUNCH_VALIDATOR_EVALUATE_PREFLIGHT,
+  AVA_LAUNCH_VALIDATOR_LAUNCH_SERVICE,
+  buildDatamoonImportValidationTraceError,
+  buildGrowthAvaLaunchSearchValidationTrace,
+} from "@/lib/growth/mission-center/growth-ava-launch-search-validation-trace"
 export type {
   GrowthMissionAvaLaunchRunRequest,
   GrowthMissionAvaLaunchRunResponse,

@@ -7,6 +7,8 @@ export const GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER = "ge-ava-autonomy-launc
 
 export const GROWTH_AVA_LAUNCH_VALIDATION_DEBUG_1_QA_MARKER = "ge-ava-launch-validation-debug-1-v1" as const
 
+export const GROWTH_AVA_SEARCH_VALIDATION_2_QA_MARKER = "ge-ava-search-validation-2-v1" as const
+
 export const GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR = "Validation failed" as const
 
 export const GROWTH_AVA_LAUNCH_CANT_START_HEADING = "Ava can't start yet." as const
@@ -16,6 +18,10 @@ export type GrowthAvaLaunchValidationError = {
   message: string
   field: string
   severity: "error"
+  validator?: string
+  expected?: string
+  actual?: unknown
+  rawIssue?: unknown
 }
 
 const AVA_LAUNCH_VALIDATION_ERROR_MESSAGES: Record<string, string> = {
@@ -28,12 +34,18 @@ const AVA_LAUNCH_VALIDATION_ERROR_MESSAGES: Record<string, string> = {
   mission_not_active: "Mission is not active.",
   mission_blocked: "Mission is blocked.",
   no_approved_lead_search: "No approved search attached to this mission.",
-  validation_failed: "Lead search request is invalid.",
   datamoon_provider_disabled: "Datamoon provider is disabled.",
   growth_autonomy_disabled: "Growth autonomy is disabled.",
+  topic_ids_required: "B2B/B2C audiences require at least one topic.",
+  run_name_required: "Run name is required.",
+  invalid_audience_type: "Audience type is invalid.",
+  invalid_limit: "Record limit is out of range.",
+  invalid_provider_mode: "Provider mode is invalid.",
 }
 
 export function resolveGrowthAvaLaunchValidationMessage(error: GrowthAvaLaunchValidationError): string {
+  if (error.validator || error.rawIssue) return error.message
+  if (error.code === "validation_failed") return error.message
   return AVA_LAUNCH_VALIDATION_ERROR_MESSAGES[error.code] ?? error.message
 }
 
@@ -60,6 +72,8 @@ export function ensureGrowthAvaLaunchValidationErrors(
       message,
       field: "launch",
       severity: "error",
+      validator: "unknown",
+      rawIssue: { fallbackMessage: message },
     },
   ]
 }
@@ -76,6 +90,7 @@ export function buildGrowthMissionAvaLaunchValidationFailureBody(input: {
   ok: false
   qa_marker: typeof GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER
   validation_debug_qa_marker: typeof GROWTH_AVA_LAUNCH_VALIDATION_DEBUG_1_QA_MARKER
+  search_validation_trace_qa_marker?: typeof GROWTH_AVA_SEARCH_VALIDATION_2_QA_MARKER
   error: typeof GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR
   validationErrors: GrowthAvaLaunchValidationError[]
   runId?: string | null
@@ -88,6 +103,7 @@ export function buildGrowthMissionAvaLaunchValidationFailureBody(input: {
     ok: false
     qa_marker: typeof GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER
     validation_debug_qa_marker: typeof GROWTH_AVA_LAUNCH_VALIDATION_DEBUG_1_QA_MARKER
+    search_validation_trace_qa_marker: typeof GROWTH_AVA_SEARCH_VALIDATION_2_QA_MARKER
     error: typeof GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR
     validationErrors: GrowthAvaLaunchValidationError[]
     runId?: string | null
@@ -95,6 +111,7 @@ export function buildGrowthMissionAvaLaunchValidationFailureBody(input: {
     ok: false,
     qa_marker: GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER,
     validation_debug_qa_marker: GROWTH_AVA_LAUNCH_VALIDATION_DEBUG_1_QA_MARKER,
+    search_validation_trace_qa_marker: GROWTH_AVA_SEARCH_VALIDATION_2_QA_MARKER,
     error: GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR,
     validationErrors,
   }
@@ -167,6 +184,7 @@ export type GrowthMissionAvaLaunchRunResponse =
       ok: false
       qa_marker: typeof GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER
       validation_debug_qa_marker?: typeof GROWTH_AVA_LAUNCH_VALIDATION_DEBUG_1_QA_MARKER
+      search_validation_trace_qa_marker?: typeof GROWTH_AVA_SEARCH_VALIDATION_2_QA_MARKER
       error: string
       validationErrors?: GrowthAvaLaunchValidationError[]
       runId?: string | null

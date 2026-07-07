@@ -94,12 +94,16 @@ export function buildDatamoonImportRequestFromAudienceDraft(
   draft: AvaDatamoonAudienceDraft,
 ): DatamoonAudienceImportRequest {
   const topics = resolvedTopics(draft)
+  const draftAudienceType = draft.audienceType
+  const requiresTopicIds = draftAudienceType === "b2b" || draftAudienceType === "b2c"
+  const audienceType =
+    requiresTopicIds && topics.length === 0 ? "advanced_search" : draftAudienceType
   return {
     run_name: draft.audienceName.trim() || "Datamoon audience run",
-    audience_type: draft.audienceType,
+    audience_type: audienceType,
     provider_mode: draft.providerMode,
     filters: buildDatamoonFiltersFromAudienceDraft(draft),
-    topic_ids: draft.audienceType === "b2b" ? topics.slice(0, 5) : undefined,
+    topic_ids: audienceType === "b2b" ? topics.slice(0, 5) : undefined,
     limit: draft.recordLimit,
     name: draft.audienceName.trim() || undefined,
   }

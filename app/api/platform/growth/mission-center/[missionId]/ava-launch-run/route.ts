@@ -7,8 +7,10 @@ import {
   buildGrowthMissionAvaLaunchValidationFailureBody,
 } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-api-contract"
 import {
+  buildSearchValidationTraceFromDraft,
   evaluateGrowthAvaLaunchValidation,
   isAvaLaunchValidationFailureError,
+  logGrowthAvaLaunchSearchValidationTrace,
   logGrowthAvaLaunchValidationResult,
   mapServiceErrorToAvaLaunchValidationErrors,
   mapZodIssuesToAvaLaunchValidationErrors,
@@ -16,12 +18,14 @@ import {
   shouldBlockGrowthAvaLaunchValidation,
 } from "@/lib/growth/mission-center/growth-ava-launch-validation-diagnostics"
 import { runGrowthMissionAvaLaunchRun } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-service"
+import { buildDatamoonImportRequestFromAudienceDraft } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder"
 import {
   AVA_DATAMOON_AUDIENCE_TYPES,
   AVA_DATAMOON_COMPANY_SIZES,
   AVA_DATAMOON_INTENT_LEVELS,
   AVA_DATAMOON_LOOKBACK_DAYS,
   AVA_DATAMOON_PROVIDER_MODES,
+  type AvaDatamoonAudienceDraft,
 } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-workbench-types"
 
 export const runtime = "nodejs"
@@ -84,6 +88,14 @@ function resolveBlockingValidationStatus(
   return 400
 }
 
+function readAudienceDraftFromBody(body: unknown): AvaDatamoonAudienceDraft | null {
+  if (!body || typeof body !== "object") return null
+  const record = body as Record<string, unknown>
+  const draft = record.audienceDraft
+  if (!draft || typeof draft !== "object") return null
+  return draft as AvaDatamoonAudienceDraft
+}
+
 /** GE-AVA-AUTONOMY-LAUNCH-RUN-1 — One-shot Ava launch: profile gate → bind → Datamoon → import → research visibility → HAC stop. */
 export async function POST(request: Request, context: RouteContext) {
   const access = await requireGrowthEnginePlatformAccess(request)
@@ -105,11 +117,31 @@ export async function POST(request: Request, context: RouteContext) {
     )
   }
 
-  const parsedBody = launchBodySchema.safeParse(await request.json())
+  const trimmedMissionId = missionId.trim()
+  let rawBody: unknown
+  try {
+    rawBody = await request.json()
+  } catch {
+    return NextResponse.json(
+      { ok: false, qa_marker: GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER, error: "invalid_json" },
+      { status: 400 },
+    )
+  }
+
+  const parsedBody = launchBodySchema.safeParse(rawBody)
   if (!parsedBody.success) {
-    const validationErrors = mapZodIssuesToAvaLaunchValidationErrors(parsedBody.error.issues)
+    const validationErrors = mapZodIssuesToAvaLaunchValidationErrors(parsedBody.error.issues, {
+      requestBody: rawBody,
+    })
+    const draft = readAudienceDraftFromBody(rawBody)
+    const searchTrace = draft
+      ? buildSearchValidationTraceFromDraft({ missionId: trimmedMissionId, audienceDraft: draft })
+      : null
+    if (searchTrace) {
+      logGrowthAvaLaunchSearchValidationTrace(searchTrace, validationErrors)
+    }
     logGrowthAvaLaunchValidationResult({
-      missionId: missionId.trim(),
+      missionId: trimmedMissionId,
       evaluation: {
         qa_marker: GROWTH_AVA_LAUNCH_VALIDATION_DEBUG_1_QA_MARKER,
         checks: validationErrors.map((entry) => ({
@@ -119,6 +151,31 @@ export async function POST(request: Request, context: RouteContext) {
         })),
         validationErrors,
         status: 400,
+        searchTrace:
+          searchTrace ??
+          buildSearchValidationTraceFromDraft({
+            missionId: trimmedMissionId,
+            audienceDraft: {
+              audienceName: "",
+              audienceType: "advanced_search",
+              providerMode: "module",
+              recordLimit: 0,
+              lookbackDays: 7,
+              intentLevels: [],
+              geography: { country: "", state: null, city: null },
+              topics: [],
+              customTopic: null,
+              jobTitles: [],
+              customJobTitle: null,
+              companySize: "smb",
+              revenueRange: null,
+              includeBusinessEmail: true,
+              includePhone: true,
+              includeLinkedIn: true,
+              excludeDuplicates: true,
+              onlyNewSinceLastRefresh: true,
+            },
+          }),
       },
       outcome: "blocked",
     })
@@ -129,7 +186,6 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const body = parsedBody.data
-  const trimmedMissionId = missionId.trim()
   const validation = await evaluateGrowthAvaLaunchValidation(access.admin, {
     organizationId,
     missionId: trimmedMissionId,
@@ -160,6 +216,7 @@ export async function POST(request: Request, context: RouteContext) {
     })
   }
 
+  const providerRequest = buildDatamoonImportRequestFromAudienceDraft(body.audienceDraft)
   const result = await runGrowthMissionAvaLaunchRun(access.admin, {
     organizationId,
     missionId: trimmedMissionId,
@@ -175,7 +232,10 @@ export async function POST(request: Request, context: RouteContext) {
     if (isAvaLaunchValidationFailureError(result.error)) {
       const mergedValidationErrors = mergeAvaLaunchValidationErrors(
         validation.validationErrors,
-        mapServiceErrorToAvaLaunchValidationErrors(result.error),
+        mapServiceErrorToAvaLaunchValidationErrors(result.error, {
+          audienceDraft: body.audienceDraft,
+          providerRequest,
+        }),
       )
       logGrowthAvaLaunchValidationResult({
         missionId: trimmedMissionId,
