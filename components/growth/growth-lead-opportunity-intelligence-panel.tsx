@@ -72,8 +72,8 @@ export function GrowthLeadOpportunityIntelligencePanel({ lead }: GrowthLeadOppor
     }
   }
 
-  const signalCount = dashboard?.opportunitySignals.length ?? 0
-  const actionCount = dashboard?.recommendedActions.length ?? 0
+  const signalCount = dashboard?.opportunitySignals?.length ?? 0
+  const actionCount = dashboard?.recommendedActions?.length ?? 0
   const collapsedSummary = loading ? "Loading…" : `${signalCount} signals · ${actionCount} actions`
 
   return (

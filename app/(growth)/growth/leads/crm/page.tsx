@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { Target } from "lucide-react"
 import { GrowthLeadsCrmWorkspace } from "@/components/growth/leads/growth-leads-crm-workspace"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
@@ -15,7 +16,13 @@ export default function GrowthLeadsCrmPage() {
         iconClassName="bg-emerald-50 text-emerald-600"
       />
 
-      <GrowthLeadsCrmWorkspace showPageHeader={false} />
+      <Suspense
+        fallback={
+          <p className="text-sm text-muted-foreground">Loading lead records…</p>
+        }
+      >
+        <GrowthLeadsCrmWorkspace showPageHeader={false} />
+      </Suspense>
     </GrowthWorkspacePageContent>
   )
 }

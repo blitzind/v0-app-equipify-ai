@@ -62,9 +62,12 @@ type GrowthLeadCommandCenterProps = {
 }
 
 function formatSource(lead: GrowthLead): string {
-  const channel = lead.sourceChannel ?? lead.sourceKind.replace(/_/g, " ")
+  const channel =
+    lead.sourceChannel ??
+    lead.sourceKind?.replace(/_/g, " ") ??
+    (lead.sourceVendor ? `${lead.sourceVendor} import` : "Unknown source")
   const parts = [channel, lead.sourceCampaign, lead.sourceVendor].filter(Boolean)
-  return parts.join(" · ")
+  return parts.join(" · ") || "Unknown source"
 }
 
 function addDays(days: number): string {
@@ -250,7 +253,7 @@ export function GrowthLeadCommandCenter({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <GrowthBadge label={lead.status.replace(/_/g, " ")} tone="status" />
+            <GrowthBadge label={lead.status?.replace(/_/g, " ") ?? "unknown"} tone="status" />
             {lead.workflowHealth ? (
               <GrowthBadge
                 label={lead.workflowHealth.replace(/_/g, " ")}

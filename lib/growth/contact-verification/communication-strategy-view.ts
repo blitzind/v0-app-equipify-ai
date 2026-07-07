@@ -44,10 +44,11 @@ export function formatCommunicationStrategyActionLabel(action: string): string {
 export function adaptCommunicationStrategyToDisplaySummary(
   strategy: CommunicationStrategy,
 ): CommunicationStrategyDisplaySummary {
-  const nextStep = strategy.escalationPlan[0]
+  const escalationPlan = strategy.escalationPlan ?? []
+  const nextStep = escalationPlan[0]
   const escalationSummary =
-    strategy.escalationPlan.length > 0
-      ? strategy.escalationPlan
+    escalationPlan.length > 0
+      ? escalationPlan
           .slice(0, 4)
           .map((step) => `${formatCommunicationStrategyChannelLabel(step.channel)} (${step.trigger})`)
           .join(" → ")
@@ -59,9 +60,9 @@ export function adaptCommunicationStrategyToDisplaySummary(
     primary_channel_label: formatCommunicationStrategyChannelLabel(strategy.primaryChannel),
     recommended_action: strategy.recommendedAction,
     recommended_action_label: formatCommunicationStrategyActionLabel(strategy.recommendedAction),
-    fallback_channels: strategy.fallbackChannels.map(formatCommunicationStrategyChannelLabel),
+    fallback_channels: (strategy.fallbackChannels ?? []).map(formatCommunicationStrategyChannelLabel),
     confidence: strategy.confidence,
-    reasoning: strategy.reasoning.slice(0, 5),
+    reasoning: (strategy.reasoning ?? []).slice(0, 5),
     escalation_summary: escalationSummary,
     requires_human_approval: strategy.requiresHumanApproval,
     source: "communication_strategy_engine",

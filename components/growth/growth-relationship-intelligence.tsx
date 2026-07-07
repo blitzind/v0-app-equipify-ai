@@ -98,11 +98,11 @@ export function GrowthRelationshipIntelligence({
           <p className="text-sm text-foreground">{lead.relationshipSummary}</p>
         ) : null}
 
-        {lead.relationshipTopSignals.length > 0 ? (
+        {lead.relationshipTopSignals?.length ? (
           <div>
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Top signals</p>
             <ul className="space-y-1.5">
-              {lead.relationshipTopSignals.map((signal, index) => (
+              {(lead.relationshipTopSignals ?? []).map((signal, index) => (
                 <li key={`${signal.kind}-${signal.occurredAt}-${index}`} className="flex justify-between gap-3 text-sm">
                   <span>{signal.label}</span>
                   <span className="tabular-nums text-muted-foreground">

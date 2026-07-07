@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { useAdmin } from "@/lib/admin-store"
 import {
   PlatformAdminPageShell,
@@ -22,7 +23,9 @@ export default function AdminGrowthLeadsCrmPage() {
       <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8">
         <PlatformAdminTabNav activeKey="growth_leads" />
         <GrowthSectionLayout>
-          <GrowthLeadsCrmWorkspace />
+          <Suspense fallback={<p className="text-sm text-muted-foreground">Loading lead records…</p>}>
+            <GrowthLeadsCrmWorkspace />
+          </Suspense>
         </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>

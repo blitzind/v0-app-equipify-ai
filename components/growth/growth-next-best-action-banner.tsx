@@ -45,19 +45,23 @@ export function GrowthNextBestActionBanner({
   const useNative = isNativeRevenueDecisionEngineEnabledClient() && nativeDecision != null
 
   const action = useNative || useStrategy ? null : lead.nextBestAction
+  const strategyReasoning = nativeCommunicationStrategy?.reasoning
+  const strategyFallbackChannels = nativeCommunicationStrategy?.fallback_channels
+  const nativeReasons = nativeDecision?.reasons
+
   const label = useStrategy
-    ? nativeCommunicationStrategy.recommended_action_label
+    ? nativeCommunicationStrategy?.recommended_action_label ?? "Review outreach strategy"
     : useNative
-      ? nativeDecision.action_label
+      ? nativeDecision?.action_label ?? "Review next action"
       : action
         ? GROWTH_NEXT_BEST_ACTION_LABELS[action]
         : "No next action computed yet"
   const reason = useStrategy
-    ? nativeCommunicationStrategy.reasoning[0] ??
-      `${nativeCommunicationStrategy.primary_channel_label} · ${nativeCommunicationStrategy.confidence}% confidence`
+    ? strategyReasoning?.[0] ??
+      `${nativeCommunicationStrategy?.primary_channel_label ?? "Channel"} · ${nativeCommunicationStrategy?.confidence ?? 0}% confidence`
     : useNative
-      ? nativeDecision.reasons[0] ??
-        `Native engine · ${nativeDecision.execution_readiness} · ${nativeDecision.recommended_delay_label}`
+      ? nativeReasons?.[0] ??
+        `Native engine · ${nativeDecision?.execution_readiness ?? "pending"} · ${nativeDecision?.recommended_delay_label ?? "—"}`
       : lead.nextBestActionReason ?? "Run research or refresh workflow signals."
 
   return (
@@ -69,15 +73,15 @@ export function GrowthNextBestActionBanner({
       <p className="mt-1 text-sm opacity-90">{reason}</p>
       {useStrategy ? (
         <p className="mt-2 text-xs opacity-75">
-          Primary channel: {nativeCommunicationStrategy.primary_channel_label}
-          {nativeCommunicationStrategy.fallback_channels.length > 0
-            ? ` · Then: ${nativeCommunicationStrategy.fallback_channels.slice(0, 3).join(", ")}`
+          Primary channel: {nativeCommunicationStrategy?.primary_channel_label ?? "—"}
+          {(strategyFallbackChannels?.length ?? 0) > 0
+            ? ` · Then: ${strategyFallbackChannels?.slice(0, 3).join(", ")}`
             : ""}
-          {nativeCommunicationStrategy.requires_human_approval ? " · Requires approval" : ""}
+          {nativeCommunicationStrategy?.requires_human_approval ? " · Requires approval" : ""}
         </p>
       ) : useNative ? (
         <p className="mt-2 text-xs opacity-75">
-          Native decision · {nativeDecision.priority} priority · {nativeDecision.confidence}% confidence
+          Native decision · {nativeDecision?.priority ?? "—"} priority · {nativeDecision?.confidence ?? 0}% confidence
         </p>
       ) : lead.decisionMakerStatus ? (
         <p className="mt-2 text-xs opacity-75">

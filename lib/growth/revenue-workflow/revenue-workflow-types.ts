@@ -112,5 +112,9 @@ export function readRevenueReadinessFromLeadMetadata(
   if (!raw || typeof raw !== "object") return null
   const snapshot = raw as Partial<GrowthRevenueReadinessSnapshot>
   if (typeof snapshot.score !== "number" || !snapshot.tier) return null
-  return snapshot as GrowthRevenueReadinessSnapshot
+  return {
+    ...(snapshot as GrowthRevenueReadinessSnapshot),
+    topPositiveSignals: Array.isArray(snapshot.topPositiveSignals) ? snapshot.topPositiveSignals : [],
+    topRisks: Array.isArray(snapshot.topRisks) ? snapshot.topRisks : [],
+  }
 }
