@@ -22,7 +22,8 @@ async function main(): Promise<void> {
   console.log(`[${PHASE}] Empty-topic b2b draft coercion certification`)
 
   const builder = readSource("lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder.ts")
-  assert.match(builder, /requiresTopicIds && topics\.length === 0 \? "advanced_search"/)
+  assert.match(builder, /resolveDatamoonAudienceTypeForImport/)
+  assert.match(builder, /normalizeDatamoonImportRequestAudience/)
 
   const emptyTopicB2bDraft = createMinimalAvaDatamoonAudienceDraft({
     audienceType: "b2b",

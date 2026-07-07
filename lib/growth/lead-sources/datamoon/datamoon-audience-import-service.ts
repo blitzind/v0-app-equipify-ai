@@ -36,6 +36,7 @@ import {
   type DatamoonAudienceImportRun,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import { validateDatamoonAudienceImportRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-validation"
+import { normalizeDatamoonImportRequestAudience } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder"
 import { createGrowthLead } from "@/lib/growth/lead-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import { runUnifiedRevenueWorkflowAfterIntake } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-intake-runner"
@@ -86,7 +87,8 @@ export async function startDatamoonAudienceImportRun(
   actor: Actor,
   options?: ServiceOptions,
 ): Promise<{ ok: true; run: DatamoonAudienceImportRun } | { ok: false; error: string; issues?: unknown }> {
-  const validation = validateDatamoonAudienceImportRequest(input)
+  const normalizedInput = normalizeDatamoonImportRequestAudience(input)
+  const validation = validateDatamoonAudienceImportRequest(normalizedInput)
   if (!validation.ok) {
     return { ok: false, error: "validation_failed", issues: validation.issues }
   }
@@ -96,18 +98,18 @@ export async function startDatamoonAudienceImportRun(
     return { ok: false, error: "datamoon_provider_disabled" }
   }
 
-  const providerMode = input.provider_mode ?? resolveDatamoonAudienceMode(env)
+  const providerMode = normalizedInput.provider_mode ?? resolveDatamoonAudienceMode(env)
   const dryRun = isDatamoonDryRunOnly(env)
 
   const run = await createDatamoonAudienceImportRun(admin, {
-    runName: input.run_name.trim(),
+    runName: normalizedInput.run_name.trim(),
     providerMode,
-    audienceType: input.audience_type,
-    filters: input.filters,
-    topicIds: input.topic_ids ?? [],
-    requestedLimit: input.limit ?? null,
-    audienceName: input.name?.trim() ?? null,
-    websiteId: input.website_id?.trim() ?? null,
+    audienceType: normalizedInput.audience_type,
+    filters: normalizedInput.filters,
+    topicIds: normalizedInput.topic_ids ?? [],
+    requestedLimit: normalizedInput.limit ?? null,
+    audienceName: normalizedInput.name?.trim() ?? null,
+    websiteId: normalizedInput.website_id?.trim() ?? null,
     dryRun,
     createdBy: actor.userId,
   })
@@ -117,12 +119,12 @@ export async function startDatamoonAudienceImportRun(
   try {
     const build = await buildAudience(
       {
-        type: input.audience_type,
-        filters: input.filters,
-        topic_ids: input.topic_ids,
-        name: input.name,
-        website_id: input.website_id,
-        record_limit: input.limit,
+        type: normalizedInput.audience_type,
+        filters: normalizedInput.filters,
+        topic_ids: normalizedInput.topic_ids,
+        name: normalizedInput.name,
+        website_id: normalizedInput.website_id,
+        record_limit: normalizedInput.limit,
       },
       { env, audienceMode: providerMode, fetchImpl: options?.fetchImpl },
     )

@@ -5,6 +5,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
 import type { DatamoonAudienceImportRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
+import { normalizeDatamoonImportRequestAudience } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder"
 import {
   parseIntentLevelsFromDatamoonRequest,
   parseLookbackDaysFromDatamoonRequest,
@@ -50,15 +51,15 @@ function finalizeDatamoonRequestForBinding(
   keepMonitoring: boolean,
 ): DatamoonAudienceImportRequest {
   if (!keepMonitoring || requestHasOnlyNewSinceLastRefresh(request)) {
-    return request
+    return normalizeDatamoonImportRequestAudience(request)
   }
-  return {
+  return normalizeDatamoonImportRequestAudience({
     ...request,
     filters: [
       ...request.filters,
       { field: "only_new_since_last_refresh", operator: "=", value: "true" },
     ],
-  }
+  })
 }
 
 function buildDatamoonBindingMetadata(

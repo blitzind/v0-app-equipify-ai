@@ -2,6 +2,7 @@
 
 import type { DatamoonAudienceFilter } from "@/lib/growth/providers/datamoon"
 import type { DatamoonAudienceImportRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
+import { DATAMOON_MAX_TOPIC_IDS } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import type { AvaDatamoonAudienceDraft } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-workbench-types"
 
 function companySizeFilter(size: AvaDatamoonAudienceDraft["companySize"]): DatamoonAudienceFilter | null {
@@ -19,11 +20,58 @@ function companySizeFilter(size: AvaDatamoonAudienceDraft["companySize"]): Datam
   }
 }
 
+export function normalizeDatamoonTopicIds(values: readonly string[]): string[] {
+  const seen = new Set<string>()
+  const normalized: string[] = []
+  for (const value of values) {
+    const trimmed = value.trim()
+    if (!trimmed || seen.has(trimmed)) continue
+    seen.add(trimmed)
+    normalized.push(trimmed)
+  }
+  return normalized.slice(0, DATAMOON_MAX_TOPIC_IDS)
+}
+
+function isTopicIdAudienceType(audienceType: string): audienceType is "b2b" | "b2c" {
+  return audienceType === "b2b" || audienceType === "b2c"
+}
+
+export function resolveDatamoonAudienceTypeForImport(
+  draftAudienceType: string,
+  topicIds: readonly string[],
+): DatamoonAudienceImportRequest["audience_type"] {
+  if (isTopicIdAudienceType(draftAudienceType) && topicIds.length === 0) {
+    return "advanced_search"
+  }
+  if (draftAudienceType === "advanced_search" || isTopicIdAudienceType(draftAudienceType)) {
+    return draftAudienceType
+  }
+  return "advanced_search"
+}
+
+export function normalizeDatamoonImportRequestAudience(
+  request: DatamoonAudienceImportRequest,
+): DatamoonAudienceImportRequest {
+  const topicIds = normalizeDatamoonTopicIds(request.topic_ids ?? [])
+  const audienceType = resolveDatamoonAudienceTypeForImport(request.audience_type, topicIds)
+  const resolvedTopicIds = isTopicIdAudienceType(audienceType) ? topicIds : undefined
+
+  return {
+    ...request,
+    audience_type: audienceType,
+    topic_ids: resolvedTopicIds && resolvedTopicIds.length > 0 ? resolvedTopicIds : undefined,
+  }
+}
+
+export function datamoonImportRequestRequiresTopicIds(request: DatamoonAudienceImportRequest): boolean {
+  return isTopicIdAudienceType(request.audience_type) && normalizeDatamoonTopicIds(request.topic_ids ?? []).length === 0
+}
+
 function resolvedTopics(draft: AvaDatamoonAudienceDraft): string[] {
-  const topics = [...draft.topics]
+  const topics = normalizeDatamoonTopicIds(draft.topics)
   const custom = draft.customTopic?.trim()
   if (custom && !topics.includes(custom)) topics.push(custom)
-  return topics
+  return normalizeDatamoonTopicIds(topics)
 }
 
 function resolvedJobTitles(draft: AvaDatamoonAudienceDraft): string[] {
@@ -93,18 +141,16 @@ export function buildDatamoonFiltersFromAudienceDraft(draft: AvaDatamoonAudience
 export function buildDatamoonImportRequestFromAudienceDraft(
   draft: AvaDatamoonAudienceDraft,
 ): DatamoonAudienceImportRequest {
-  const topics = resolvedTopics(draft)
-  const draftAudienceType = draft.audienceType
-  const requiresTopicIds = draftAudienceType === "b2b" || draftAudienceType === "b2c"
-  const audienceType =
-    requiresTopicIds && topics.length === 0 ? "advanced_search" : draftAudienceType
-  return {
+  const topicIds = resolvedTopics(draft)
+  const audienceType = resolveDatamoonAudienceTypeForImport(draft.audienceType, topicIds)
+  const request: DatamoonAudienceImportRequest = {
     run_name: draft.audienceName.trim() || "Datamoon audience run",
     audience_type: audienceType,
     provider_mode: draft.providerMode,
     filters: buildDatamoonFiltersFromAudienceDraft(draft),
-    topic_ids: audienceType === "b2b" ? topics.slice(0, 5) : undefined,
+    topic_ids: isTopicIdAudienceType(audienceType) ? topicIds : undefined,
     limit: draft.recordLimit,
     name: draft.audienceName.trim() || undefined,
   }
+  return normalizeDatamoonImportRequestAudience(request)
 }
