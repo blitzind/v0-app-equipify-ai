@@ -9,6 +9,7 @@ import { GrowthMissionCenterDetailDrawer } from "@/components/growth/mission-cen
 import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
 import {
   GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_TITLE,
+  GROWTH_MISSION_CENTER_EMPTY_STATE_COPY,
   GROWTH_MISSION_CENTER_API_PATH,
   GROWTH_MISSION_CENTER_HEALTH_LABELS,
   GROWTH_AVA_MISSION_CENTER_1A_QA_MARKER,
@@ -26,6 +27,7 @@ type Props = {
 export function GrowthHomeMissionCenterSection({ dashboard }: Props) {
   const [sources, setSources] = useState<GrowthMissionCenterSourcesPayload | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [selectedMission, setSelectedMission] = useState<GrowthMissionCenterCard | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
@@ -34,9 +36,16 @@ export function GrowthHomeMissionCenterSection({ dashboard }: Props) {
     try {
       const res = await fetch(GROWTH_MISSION_CENTER_API_PATH, { cache: "no-store" })
       const payload = (await res.json()) as GrowthMissionCenterSourcesPayload
-      if (res.ok && payload.ok) setSources(payload)
+      if (res.ok && payload.ok) {
+        setSources(payload)
+        setLoadFailed(false)
+      } else {
+        setSources(null)
+        setLoadFailed(true)
+      }
     } catch {
       setSources(null)
+      setLoadFailed(true)
     } finally {
       setLoading(false)
     }
@@ -93,7 +102,7 @@ export function GrowthHomeMissionCenterSection({ dashboard }: Props) {
     )
   }
 
-  if (missionCenter.activeMissions.length === 0) return null
+  const hasActiveMissions = missionCenter.activeMissions.length > 0
 
   return (
     <>
@@ -110,6 +119,20 @@ export function GrowthHomeMissionCenterSection({ dashboard }: Props) {
         </div>
 
         <div className="space-y-4">
+          {!hasActiveMissions ? (
+            <div
+              data-qa-section="home-mission-center-empty"
+              className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-5 text-sm"
+            >
+              <p className="font-medium text-foreground">No active missions yet</p>
+              <p className="mt-1 text-muted-foreground">{GROWTH_MISSION_CENTER_EMPTY_STATE_COPY}</p>
+              {loadFailed ? (
+                <Button type="button" size="sm" variant="outline" className="mt-3" onClick={() => void loadSources()}>
+                  Retry loading missions
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
           {missionCenter.activeMissions.map((mission) => (
             <article
               key={mission.id}

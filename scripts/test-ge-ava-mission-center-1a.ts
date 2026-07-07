@@ -138,6 +138,8 @@ async function main(): Promise<void> {
     "components/growth/workspace/executive-briefing/growth-home-mission-center-section.tsx",
   )
   assert.match(homeSection, /data-qa-section="home-mission-center"/)
+  assert.match(homeSection, /data-qa-section="home-mission-center-empty"/)
+  assert.doesNotMatch(homeSection, /activeMissions\.length === 0\) return null/)
   assert.match(homeSection, /synthesizeGrowthMissionCenter/)
   assert.match(homeSection, /GrowthMissionCenterDetailDrawer/)
   assert.doesNotMatch(homeSection, /handleBuildAudience|import_all_previewed|sendEmail/)

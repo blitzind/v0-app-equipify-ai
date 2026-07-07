@@ -24,8 +24,10 @@ import {
   GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER,
   resolveAvaTeammateStatusLine,
   resolveHomeContextualIntroLine,
+  extractFirstNameFromGreeting,
   resolveHomeDayPart,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-experience-2b"
+import { greetingForHour } from "@/lib/growth/workspace/executive-briefing/growth-home-narrative-formatter"
 import { GROWTH_WORKSPACE_DASHBOARD_REFINEMENT_2A_QA_MARKER } from "@/lib/growth/workspace/executive-briefing/growth-home-dashboard-refinement-2a"
 import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 import { cn } from "@/lib/utils"
@@ -150,6 +152,12 @@ export function GrowthHomeExecutiveBriefingHeroSection({
     return resolveHomeContextualIntroLine(resolveHomeDayPart(new Date().getHours()))
   }, [])
 
+  const displayGreeting = useMemo(() => {
+    const firstName = extractFirstNameFromGreeting(hero.greeting)
+    const base = greetingForHour(new Date().getHours())
+    return firstName ? `${base}, ${firstName}.` : `${base}.`
+  }, [hero.greeting])
+
   const avaStatusLine = resolveAvaTeammateStatusLine(statusLabel ?? "Working", activityLabel)
   const glanceLines =
     hero.todayAtAGlance.length > 0
@@ -180,7 +188,7 @@ export function GrowthHomeExecutiveBriefingHeroSection({
       <p className="text-sm text-muted-foreground">{avaStatusLine}</p>
 
       <div className="space-y-0.5">
-        <h1 className="text-[1.35rem] font-semibold tracking-tight text-foreground sm:text-2xl">{hero.greeting}</h1>
+        <h1 className="text-[1.35rem] font-semibold tracking-tight text-foreground sm:text-2xl">{displayGreeting}</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">{contextualIntro}</p>
       </div>
 
