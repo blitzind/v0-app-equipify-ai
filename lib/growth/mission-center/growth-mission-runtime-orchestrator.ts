@@ -511,6 +511,10 @@ export async function bindMissionDatamoonImportRequest(
   organizationId: string,
   objectiveId: string,
   request: DatamoonAudienceImportRequest,
+  options?: {
+    lastRunId?: string | null
+    metadata?: Partial<GrowthMissionRuntimeDatamoonBinding>
+  },
 ): Promise<GrowthObjective | null> {
   const objective = await getGrowthObjective(admin, organizationId, objectiveId)
   if (!objective) return null
@@ -528,11 +532,17 @@ export async function bindMissionDatamoonImportRequest(
         ...runtime,
         approved: true,
         approvedAt: runtime.approvedAt ?? new Date().toISOString(),
+        lifecycleState: runtime.lifecycleState === "planning" ? "monitoring" : runtime.lifecycleState,
+        activityLabel:
+          runtime.lifecycleState === "planning"
+            ? missionLifecycleActivityLabel("monitoring", runtime.counters)
+            : runtime.activityLabel,
         datamoon: {
-          lastRunId: null,
+          lastRunId: options?.lastRunId ?? runtime.datamoon?.lastRunId ?? null,
           importRequestJson: JSON.stringify(request),
-          lastPollAt: null,
-          lastImportedCount: 0,
+          lastPollAt: runtime.datamoon?.lastPollAt ?? null,
+          lastImportedCount: runtime.datamoon?.lastImportedCount ?? 0,
+          ...options?.metadata,
         },
       },
     },

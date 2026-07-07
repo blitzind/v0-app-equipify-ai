@@ -37,6 +37,7 @@ import {
   GROWTH_AVA_MISSION_RUNTIME_1A_QA_MARKER,
   missionLifecycleStatusLabel,
 } from "@/lib/growth/mission-center/growth-mission-runtime-types"
+import { formatMissionFindLeadsMonitoringStatus } from "@/lib/growth/mission-center/growth-mission-find-leads-binding-display"
 
 const ACTIVE_MISSION_LIMIT = 3
 const APPROVALS_HREF = `${GROWTH_AI_OS_PUBLIC_BASE_PATH}/approvals`
@@ -120,6 +121,12 @@ function mapObjectiveToCard(
     objective.executionContext?.missionRuntime?.qa_marker === GROWTH_AVA_MISSION_RUNTIME_1A_QA_MARKER
       ? objective.executionContext.missionRuntime
       : null
+  const findLeadsBinding = missionRuntime?.datamoon?.importRequestJson ? missionRuntime.datamoon : null
+  const bindingActivity = findLeadsBinding?.keepMonitoring
+    ? missionRuntime?.lifecycleState === "finding_leads"
+      ? missionRuntime.activityLabel
+      : formatMissionFindLeadsMonitoringStatus(findLeadsBinding)
+    : null
 
   return {
     id: objective.id,
@@ -134,6 +141,7 @@ function mapObjectiveToCard(
     ownerLabel: "Ava",
     presentationStage,
     currentActivity:
+      bindingActivity ??
       missionRuntime?.activityLabel ??
       avaActivityForPresentationStage(presentationStage, {
         companyCount: researchArtifactCount > 0 ? researchArtifactCount : undefined,

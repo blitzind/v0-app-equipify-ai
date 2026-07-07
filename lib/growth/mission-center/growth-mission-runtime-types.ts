@@ -38,6 +38,17 @@ export type GrowthMissionRuntimeDatamoonBinding = {
   importRequestJson: string | null
   lastPollAt: string | null
   lastImportedCount: number
+  /** GE-AVA-MISSION-RUNTIME-1B — Find Leads attachment metadata */
+  provider?: "datamoon_audience"
+  source?: "find_leads"
+  searchSummary?: string | null
+  audienceName?: string | null
+  lookbackDays?: number | null
+  intentLevels?: string[]
+  onlyNewSinceLastRefresh?: boolean
+  refreshCadence?: "daily" | "weekly"
+  boundAt?: string | null
+  keepMonitoring?: boolean
 }
 
 export type GrowthMissionRuntimeEvent = {

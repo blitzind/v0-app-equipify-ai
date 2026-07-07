@@ -1,58 +1,83 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { ChevronDown, Loader2, Search, Sparkles } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Check, ChevronDown, Loader2, Search, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+import { Label } from "@/components/ui/label"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { DatamoonSourcingWorkbenchForm } from "@/components/growth/lead-sources/datamoon/datamoon-sourcing-workbench-form"
+import { GrowthHomeFindLeadsMissionBindingCard } from "@/components/growth/workspace/executive-briefing/growth-home-find-leads-mission-binding-card"
 import { buildDatamoonImportRequestFromAudienceDraft } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder"
 import {
+  AVA_DATAMOON_PROVIDER_MODES,
   createDefaultAvaDatamoonAudienceDraft,
   type AvaDatamoonAudienceDraft,
   type AvaDatamoonSourcingWorkbenchMode,
 } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-workbench-types"
 import {
+  GROWTH_AIOS_FIND_LEADS_UX_2A_QA_MARKER,
   GROWTH_AIOS_GROWTH_UX_RENAME_1A_QA_MARKER,
   GROWTH_AVA_DATAMOON_SOURCING_WORKBENCH_1A_QA_MARKER,
   GROWTH_HOME_ADVANCED_PROVIDER_DETAILS_LABEL,
-  GROWTH_HOME_ADVANCED_SEARCH_SECTION_LABEL,
   GROWTH_HOME_ADVANCED_SEARCH_TAB_LABEL,
-  GROWTH_HOME_ASK_AVA_PLACEHOLDER,
-  GROWTH_HOME_ASK_AVA_TAB_LABEL,
   GROWTH_HOME_AVA_ASK_DRAFT_LABEL,
   GROWTH_HOME_BUILD_AUDIENCE_LABEL,
   GROWTH_HOME_DATAMOON_RUNS_API_PATH,
   GROWTH_HOME_DATAMOON_SOURCING_DRAFT_API_PATH,
   GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL,
-  GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_STARTED_COPY,
   GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_MISSING_COPY,
   GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL,
   GROWTH_HOME_DATAMOON_CONTINUE_MANUALLY_LABEL,
   GROWTH_HOME_BUSINESS_PROFILE_SECTION_SELECTOR,
   GROWTH_HOME_DISCOVERY_SOURCE_DATAMOON_LABEL,
-  GROWTH_HOME_FIND_LEADS_CARD_MISSING_PROFILE_COPY,
+  GROWTH_HOME_FIND_LEADS_APPROVAL_COPY,
+  GROWTH_HOME_FIND_LEADS_ASSUMPTIONS_TITLE,
+  GROWTH_HOME_FIND_LEADS_CARD_APPROVED_COPY,
+  GROWTH_HOME_FIND_LEADS_CARD_CONTINUE_MANUAL_LABEL,
+  GROWTH_HOME_FIND_LEADS_CARD_MISSING_COPY,
   GROWTH_HOME_FIND_LEADS_CTA,
   GROWTH_HOME_FIND_LEADS_DRAWER_DESCRIPTION,
-  GROWTH_HOME_FIND_LEADS_EXAMPLES,
-  GROWTH_HOME_FIND_LEADS_SECONDARY_COPY,
-  GROWTH_HOME_FIND_LEADS_SUBTITLE,
+  GROWTH_HOME_FIND_LEADS_EDIT_SEARCH_LABEL,
+  GROWTH_HOME_FIND_LEADS_HERO_PLACEHOLDER,
+  GROWTH_HOME_FIND_LEADS_HERO_SUBTITLE,
+  GROWTH_HOME_FIND_LEADS_HERO_TITLE,
+  GROWTH_HOME_FIND_LEADS_LOOKS_GOOD_LABEL,
+  GROWTH_HOME_FIND_LEADS_MISSION_BINDING_ATTACHED_COPY,
+  GROWTH_HOME_FIND_LEADS_PLAN_LOOKING_FOR_LABEL,
+  GROWTH_HOME_FIND_LEADS_PLAN_TITLE,
+  GROWTH_HOME_FIND_LEADS_PLAN_USING_LABEL,
+  GROWTH_HOME_FIND_LEADS_RESULTS_AVA_RECOMMENDS_COPY,
+  GROWTH_HOME_FIND_LEADS_RESULTS_AVA_RECOMMENDS_TITLE,
+  GROWTH_HOME_FIND_LEADS_REVIEW_ALL_LABEL,
+  GROWTH_HOME_FIND_LEADS_UNSURE_TITLE,
   GROWTH_HOME_FIND_LEADS_TITLE,
+  GROWTH_HOME_ASK_AVA_TAB_LABEL,
   GROWTH_HOME_IMPORT_RECOMMENDED_LABEL,
   GROWTH_HOME_IMPORT_SELECTED_LABEL,
   GROWTH_HOME_POWERED_BY_DATAMOON_LABEL,
+  GROWTH_HOME_PROVIDER_MODE_LABEL,
   GROWTH_HOME_REFRESH_SAVED_SEARCH_LABEL,
   GROWTH_HOME_REJECT_SELECTED_LABEL,
   GROWTH_HOME_RESET_SEARCH_LABEL,
   GROWTH_HOME_SAVE_SEARCH_LABEL,
   type GrowthHomeDatamoonSourcingDraftApiResponse,
 } from "@/lib/growth/ava-home/datamoon/growth-home-datamoon-sourcing-api-contract"
+import {
+  buildMissionBindFindLeadsApiPath,
+  GROWTH_MISSION_CENTER_API_PATH,
+  type GrowthMissionBindFindLeadsResponse,
+  type GrowthMissionCenterSourcesPayload,
+} from "@/lib/growth/mission-center/growth-mission-center-api-contract"
+import { selectDefaultFindLeadsMissionId } from "@/lib/growth/mission-center/growth-mission-find-leads-binding-display"
 import {
   GROWTH_BUSINESS_PROFILE_API_PATH,
   type GrowthBusinessProfileApiResponse,
@@ -62,6 +87,11 @@ import type {
   DatamoonAudienceImportRun,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import type { DatamoonProviderDiagnostics } from "@/lib/growth/providers/datamoon"
+
+type GuidedWorkflowStep = "prompt" | "plan" | "ready" | "configure"
+
+const UNSURE_ASSUMPTION_PATTERN =
+  /not prefilled|confirm|missing|wasn't sure|no approved|need a business profile/i
 
 function runStatusTone(status: DatamoonAudienceImportRun["status"]) {
   switch (status) {
@@ -79,11 +109,30 @@ function runStatusTone(status: DatamoonAudienceImportRun["status"]) {
   }
 }
 
+function formatGeography(draft: AvaDatamoonAudienceDraft): string {
+  const parts = [draft.geography.country, draft.geography.state, draft.geography.city].filter(Boolean)
+  return parts.length > 0 ? parts.join(", ") : "Not specified"
+}
+
+function formatList(values: string[], custom: string | null): string {
+  const items = [...values]
+  if (custom?.trim()) items.push(custom.trim())
+  return items.length > 0 ? items.join(", ") : "Not specified"
+}
+
+function splitAssumptions(assumptions: string[], overrides: string[]) {
+  const unsureFromAssumptions = assumptions.filter((item) => UNSURE_ASSUMPTION_PATTERN.test(item))
+  const confidentAssumptions = assumptions.filter((item) => !UNSURE_ASSUMPTION_PATTERN.test(item))
+  const unsureItems = [...new Set([...overrides, ...unsureFromAssumptions])]
+  return { confidentAssumptions, unsureItems }
+}
+
 export function GrowthHomeDatamoonSourcingWorkbenchSection() {
   const [open, setOpen] = useState(false)
   const [providerDetailsOpen, setProviderDetailsOpen] = useState(false)
   const [mode, setMode] = useState<AvaDatamoonSourcingWorkbenchMode>("ava_draft")
-  const [command, setCommand] = useState(GROWTH_HOME_FIND_LEADS_EXAMPLES[0])
+  const [workflowStep, setWorkflowStep] = useState<GuidedWorkflowStep>("prompt")
+  const [command, setCommand] = useState("")
   const [draft, setDraft] = useState<AvaDatamoonAudienceDraft>(() => createDefaultAvaDatamoonAudienceDraft())
   const [explanation, setExplanation] = useState<string | null>(null)
   const [assumptions, setAssumptions] = useState<string[]>([])
@@ -99,6 +148,11 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
   const [records, setRecords] = useState<DatamoonAudienceImportRecord[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set())
+  const [missionOptions, setMissionOptions] = useState<Array<{ id: string; title: string }>>([])
+  const [selectedMissionId, setSelectedMissionId] = useState<string | null>(null)
+  const [keepMonitoring, setKeepMonitoring] = useState(true)
+  const [missionBindingMessage, setMissionBindingMessage] = useState<string | null>(null)
+  const resultsTableRef = useRef<HTMLDivElement>(null)
 
   const previewRecords = useMemo(
     () => records.filter((record) => record.status === "preview" && !rejectedIds.has(record.id)),
@@ -109,6 +163,36 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
     () => previewRecords.filter((record) => record.status === "preview"),
     [previewRecords],
   )
+
+  const { confidentAssumptions, unsureItems } = useMemo(
+    () => splitAssumptions(assumptions, overrides),
+    [assumptions, overrides],
+  )
+
+  const showAdvancedForm =
+    mode === "manual_search" || workflowStep === "configure" || (workflowStep === "ready" && mode === "manual_search")
+
+  const showPlanReview = mode === "ava_draft" && workflowStep === "plan"
+  const showHero = mode === "ava_draft" && workflowStep === "prompt"
+  const showConfigureActions =
+    mode === "manual_search" || workflowStep === "configure" || workflowStep === "ready"
+
+  const planGenerated = workflowStep !== "prompt"
+
+  const loadMissionOptions = useCallback(async () => {
+    const res = await fetch(GROWTH_MISSION_CENTER_API_PATH, { cache: "no-store" })
+    const payload = (await res.json()) as GrowthMissionCenterSourcesPayload
+    if (!res.ok || !payload.ok) {
+      setMissionOptions([])
+      return
+    }
+    const objectives = payload.objectiveDashboard?.objectives ?? []
+    const active = objectives
+      .filter((entry) => entry.status === "active" && entry.runtime?.running)
+      .map((entry) => ({ id: entry.id, title: entry.title }))
+    setMissionOptions(active)
+    setSelectedMissionId((current) => current ?? selectDefaultFindLeadsMissionId(objectives))
+  }, [])
 
   const loadBusinessProfileState = useCallback(async () => {
     const res = await fetch(GROWTH_BUSINESS_PROFILE_API_PATH, { cache: "no-store" })
@@ -132,8 +216,9 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
     if (open) {
       void loadDiagnostics().catch(() => undefined)
       void loadBusinessProfileState().catch(() => undefined)
+      void loadMissionOptions().catch(() => undefined)
     }
-  }, [open, loadDiagnostics, loadBusinessProfileState])
+  }, [open, loadDiagnostics, loadBusinessProfileState, loadMissionOptions])
 
   async function handleAskAvaDraft() {
     setBusy("draft")
@@ -156,11 +241,39 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
       setBusinessProfileStatus(payload.draft.businessProfileStatus)
       setHasApprovedBusinessProfile(payload.draft.businessProfileUsed)
       setBuildConfirmed(false)
+      setWorkflowStep("plan")
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not draft lead search.")
     } finally {
       setBusy(null)
     }
+  }
+
+  async function bindSearchToMission(request: ReturnType<typeof buildDatamoonImportRequestFromAudienceDraft>, runId: string) {
+    if (!selectedMissionId || !keepMonitoring) return
+    const searchSummary =
+      command.trim() ||
+      explanation?.trim() ||
+      draft.audienceName.trim() ||
+      "Find Leads search"
+    const res = await fetch(buildMissionBindFindLeadsApiPath(selectedMissionId), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        datamoonRequest: request,
+        searchSummary,
+        source: "find_leads",
+        approvedByUser: true,
+        keepMonitoring: true,
+        lastRunId: runId,
+        refreshCadence: "daily",
+      }),
+    })
+    const payload = (await res.json()) as GrowthMissionBindFindLeadsResponse
+    if (!res.ok || !payload.ok) {
+      throw new Error(payload.error ?? "Could not attach search to mission.")
+    }
+    setMissionBindingMessage(GROWTH_HOME_FIND_LEADS_MISSION_BINDING_ATTACHED_COPY)
   }
 
   async function handleBuildAudience() {
@@ -170,6 +283,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
     }
     setBusy("build")
     setError(null)
+    setMissionBindingMessage(null)
     try {
       const request = buildDatamoonImportRequestFromAudienceDraft(draft)
       const res = await fetch(GROWTH_HOME_DATAMOON_RUNS_API_PATH, {
@@ -191,6 +305,9 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
       setRecords([])
       setSelectedIds(new Set())
       setRejectedIds(new Set())
+      if (selectedMissionId && keepMonitoring) {
+        await bindSearchToMission(request, data.run.id)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Search for leads failed.")
     } finally {
@@ -249,21 +366,37 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
 
   function handleReset() {
     setDraft(createDefaultAvaDatamoonAudienceDraft())
+    setCommand("")
     setExplanation(null)
     setAssumptions([])
     setOverrides([])
     setBusinessProfileUsed(false)
     setBusinessProfileStatus(null)
     setBuildConfirmed(false)
+    setWorkflowStep("prompt")
+    setMode("ava_draft")
     setActiveRun(null)
     setRecords([])
     setSelectedIds(new Set())
     setRejectedIds(new Set())
+    setMissionBindingMessage(null)
     setError(null)
+  }
+
+  function handleOpenDrawer(manual = false) {
+    if (manual) {
+      setMode("manual_search")
+      setWorkflowStep("configure")
+    } else {
+      setMode("ava_draft")
+      if (!planGenerated) setWorkflowStep("prompt")
+    }
+    setOpen(true)
   }
 
   function handleContinueManually() {
     setMode("manual_search")
+    setWorkflowStep("configure")
     setError(null)
   }
 
@@ -271,6 +404,17 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
     setOpen(false)
     const section = document.querySelector(GROWTH_HOME_BUSINESS_PROFILE_SECTION_SELECTOR)
     section?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
+
+  function handleModeChange(nextMode: AvaDatamoonSourcingWorkbenchMode) {
+    setMode(nextMode)
+    if (nextMode === "manual_search") {
+      setWorkflowStep("configure")
+    } else if (!planGenerated) {
+      setWorkflowStep("prompt")
+    } else if (workflowStep === "configure") {
+      setWorkflowStep("plan")
+    }
   }
 
   function toggleRecord(id: string) {
@@ -295,49 +439,72 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
     setSelectedIds(new Set(recommendedRecords.map((record) => record.id)))
   }
 
+  function handleReviewAllLeads() {
+    setSelectedIds(new Set(previewRecords.map((record) => record.id)))
+    resultsTableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
+
+  const totalResults = previewRecords.length
+  const highIntentIncluded = draft.intentLevels.includes("high")
+  const mediumIntentIncluded = draft.intentLevels.includes("medium")
+
   return (
     <>
       <section
         data-qa-section="home-find-leads"
         data-qa-section-legacy="home-datamoon-sourcing-workbench"
-        data-qa-marker={GROWTH_AIOS_GROWTH_UX_RENAME_1A_QA_MARKER}
+        data-qa-marker={GROWTH_AIOS_FIND_LEADS_UX_2A_QA_MARKER}
+        data-qa-marker-rename={GROWTH_AIOS_GROWTH_UX_RENAME_1A_QA_MARKER}
         data-qa-marker-foundation={GROWTH_AVA_DATAMOON_SOURCING_WORKBENCH_1A_QA_MARKER}
-        className="rounded-2xl border border-border/70 bg-card p-5 space-y-4"
+        className="rounded-2xl border border-border/70 bg-card p-6 space-y-5"
       >
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-4">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-700">
             <Search className="size-5" aria-hidden />
           </span>
-          <div className="space-y-2">
+          <div className="space-y-3">
             <h2 className="text-lg font-semibold tracking-tight">{GROWTH_HOME_FIND_LEADS_TITLE}</h2>
-            <p className="text-sm text-muted-foreground">{GROWTH_HOME_FIND_LEADS_SUBTITLE}</p>
-            <p className="text-sm text-muted-foreground">{GROWTH_HOME_FIND_LEADS_SECONDARY_COPY}</p>
             {hasApprovedBusinessProfile ? (
-              <GrowthBadge tone="healthy">{GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL}</GrowthBadge>
+              <>
+                <p className="text-sm text-muted-foreground">{GROWTH_HOME_FIND_LEADS_CARD_APPROVED_COPY}</p>
+                <GrowthBadge tone="healthy">{GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL}</GrowthBadge>
+              </>
             ) : (
-              <p className="text-sm text-amber-900 dark:text-amber-100">{GROWTH_HOME_FIND_LEADS_CARD_MISSING_PROFILE_COPY}</p>
+              <>
+                <p className="text-sm text-muted-foreground">{GROWTH_HOME_FIND_LEADS_CARD_MISSING_COPY}</p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button type="button" size="sm" onClick={handleCreateBusinessProfile}>
+                    {GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL}
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => handleOpenDrawer(true)}>
+                    {GROWTH_HOME_FIND_LEADS_CARD_CONTINUE_MANUAL_LABEL}
+                  </Button>
+                </div>
+              </>
             )}
           </div>
         </div>
-        <Button type="button" size="sm" onClick={() => setOpen(true)}>
-          {GROWTH_HOME_FIND_LEADS_CTA}
-        </Button>
+        {hasApprovedBusinessProfile ? (
+          <Button type="button" size="sm" onClick={() => handleOpenDrawer(false)}>
+            {GROWTH_HOME_FIND_LEADS_CTA}
+          </Button>
+        ) : null}
       </section>
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
-          <SheetHeader>
+          <SheetHeader className="space-y-2 pb-2">
             <SheetTitle>{GROWTH_HOME_FIND_LEADS_TITLE}</SheetTitle>
             <SheetDescription>{GROWTH_HOME_FIND_LEADS_DRAWER_DESCRIPTION}</SheetDescription>
           </SheetHeader>
 
-          <div className="mt-4 space-y-4">
+          <div className="mt-6 space-y-8">
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
                 size="sm"
                 variant={mode === "ava_draft" ? "default" : "outline"}
-                onClick={() => setMode("ava_draft")}
+                onClick={() => handleModeChange("ava_draft")}
               >
                 {GROWTH_HOME_ASK_AVA_TAB_LABEL}
               </Button>
@@ -345,199 +512,357 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
                 type="button"
                 size="sm"
                 variant={mode === "manual_search" ? "default" : "outline"}
-                onClick={() => setMode("manual_search")}
+                onClick={() => handleModeChange("manual_search")}
               >
                 {GROWTH_HOME_ADVANCED_SEARCH_TAB_LABEL}
               </Button>
             </div>
 
-            {mode === "ava_draft" ? (
-              <div className="space-y-3 rounded-lg border border-border/70 p-3">
-                {businessProfileUsed ? (
-                  <GrowthBadge tone="healthy">{GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL}</GrowthBadge>
-                ) : businessProfileStatus === "missing" ? (
-                  <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50/80 p-3 text-sm dark:border-amber-900/40 dark:bg-amber-950/20">
-                    <p>{GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_MISSING_COPY}</p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button type="button" size="sm" onClick={handleCreateBusinessProfile}>
-                        {GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL}
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={handleContinueManually}>
-                        {GROWTH_HOME_DATAMOON_CONTINUE_MANUALLY_LABEL}
-                      </Button>
+            {showHero ? (
+              <Card className="gap-5 border-primary/20 bg-gradient-to-b from-primary/5 to-transparent py-6 shadow-none">
+                <CardHeader className="space-y-2 px-6">
+                  <div className="flex items-center gap-2 text-primary">
+                    <Sparkles className="size-5" aria-hidden />
+                    <span className="text-sm font-medium">{GROWTH_HOME_ASK_AVA_TAB_LABEL}</span>
+                  </div>
+                  <CardTitle className="text-xl">{GROWTH_HOME_FIND_LEADS_HERO_TITLE}</CardTitle>
+                  <p className="text-sm text-muted-foreground">{GROWTH_HOME_FIND_LEADS_HERO_SUBTITLE}</p>
+                </CardHeader>
+                <CardContent className="space-y-4 px-6">
+                  {businessProfileStatus === "missing" ? (
+                    <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50/80 p-4 text-sm dark:border-amber-900/40 dark:bg-amber-950/20">
+                      <p>{GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_MISSING_COPY}</p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" size="sm" onClick={handleCreateBusinessProfile}>
+                          {GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL}
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" onClick={handleContinueManually}>
+                          {GROWTH_HOME_DATAMOON_CONTINUE_MANUALLY_LABEL}
+                        </Button>
+                      </div>
                     </div>
+                  ) : null}
+                  <Textarea
+                    value={command}
+                    onChange={(e) => setCommand(e.target.value)}
+                    rows={6}
+                    placeholder={GROWTH_HOME_FIND_LEADS_HERO_PLACEHOLDER}
+                    className="min-h-[140px] resize-y text-sm"
+                  />
+                  <Button
+                    type="button"
+                    disabled={busy !== null || !command.trim()}
+                    onClick={() => void handleAskAvaDraft()}
+                  >
+                    {busy === "draft" ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                    {GROWTH_HOME_AVA_ASK_DRAFT_LABEL}
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : null}
+
+            {showPlanReview ? (
+              <div className="space-y-5">
+                <div>
+                  <h3 className="text-lg font-semibold">{GROWTH_HOME_FIND_LEADS_PLAN_TITLE}</h3>
+                  {explanation ? (
+                    <p className="mt-2 text-sm text-muted-foreground">{explanation}</p>
+                  ) : null}
+                </div>
+
+                <Card className="gap-4 py-5 shadow-none">
+                  <CardContent className="space-y-4 px-5">
+                    <div>
+                      <p className="text-sm font-medium">{GROWTH_HOME_FIND_LEADS_PLAN_USING_LABEL}</p>
+                      <div className="mt-2 flex items-center gap-2 text-sm">
+                        {businessProfileUsed ? (
+                          <>
+                            <Check className="size-4 text-emerald-600" aria-hidden />
+                            <span>{GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL}</span>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">Manual search configuration</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium">{GROWTH_HOME_FIND_LEADS_PLAN_LOOKING_FOR_LABEL}</p>
+                      <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
+                        <li>• Industries: {formatList(draft.topics, null)}</li>
+                        <li>• Geography: {formatGeography(draft)}</li>
+                        <li>• Company size: {draft.companySize}</li>
+                        <li>• Decision makers: {formatList(draft.jobTitles, draft.customJobTitle)}</li>
+                        <li>• Intent level: {draft.intentLevels.join(", ") || "Not specified"}</li>
+                        <li>• Lookback: {draft.lookbackDays} days</li>
+                      </ul>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {confidentAssumptions.length > 0 ? (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold">{GROWTH_HOME_FIND_LEADS_ASSUMPTIONS_TITLE}</h4>
+                    <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                      {confidentAssumptions.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
                   </div>
                 ) : null}
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <Sparkles className="size-4 text-primary" />
-                  {GROWTH_HOME_ASK_AVA_TAB_LABEL}
-                </div>
-                <Textarea
-                  value={command}
-                  onChange={(e) => setCommand(e.target.value)}
-                  rows={3}
-                  placeholder={GROWTH_HOME_ASK_AVA_PLACEHOLDER}
-                />
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">Examples</p>
-                  <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">
-                    {GROWTH_HOME_FIND_LEADS_EXAMPLES.map((example) => (
-                      <li key={example}>
-                        <button
-                          type="button"
-                          className="text-left hover:text-foreground hover:underline"
-                          onClick={() => setCommand(example)}
-                        >
-                          {example}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <Button type="button" size="sm" disabled={busy !== null} onClick={() => void handleAskAvaDraft()}>
-                  {busy === "draft" ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
-                  {GROWTH_HOME_AVA_ASK_DRAFT_LABEL}
-                </Button>
-                {explanation ? (
-                  <p className="rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">{explanation}</p>
+
+                {unsureItems.length > 0 ? (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold">{GROWTH_HOME_FIND_LEADS_UNSURE_TITLE}</h4>
+                    <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                      {unsureItems.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
                 ) : null}
-                {businessProfileUsed ? (
-                  <p className="text-xs text-muted-foreground">{GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_STARTED_COPY}</p>
-                ) : null}
-                {overrides.length > 0 ? (
-                  <ul className="list-disc pl-5 text-xs text-muted-foreground">
-                    {overrides.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                ) : null}
-                {assumptions.length > 0 ? (
-                  <ul className="list-disc pl-5 text-xs text-muted-foreground">
-                    {assumptions.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-            ) : (
-              <p className="text-sm font-medium">{GROWTH_HOME_ADVANCED_SEARCH_SECTION_LABEL}</p>
-            )}
 
-            <DatamoonSourcingWorkbenchForm draft={draft} onChange={setDraft} />
-
-            <Collapsible open={providerDetailsOpen} onOpenChange={setProviderDetailsOpen}>
-              <CollapsibleTrigger asChild>
-                <Button type="button" variant="ghost" size="sm" className="gap-2 px-0 text-muted-foreground hover:text-foreground">
-                  <ChevronDown className={`size-4 transition-transform ${providerDetailsOpen ? "rotate-180" : ""}`} />
-                  {GROWTH_HOME_ADVANCED_PROVIDER_DETAILS_LABEL}
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-2 pt-2 text-sm text-muted-foreground">
-                <p>{GROWTH_HOME_DISCOVERY_SOURCE_DATAMOON_LABEL}</p>
-                <p>{GROWTH_HOME_POWERED_BY_DATAMOON_LABEL}</p>
-                {diagnostics ? (
-                  <GrowthBadge tone={diagnostics.configured ? "healthy" : "attention"}>
-                    {diagnostics.enabled ? (diagnostics.dryRunOnly ? "Dry run" : "Live") : "Disabled"}
-                  </GrowthBadge>
-                ) : null}
-              </CollapsibleContent>
-            </Collapsible>
-
-            <label className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50/80 p-3 text-sm dark:border-amber-900/40 dark:bg-amber-950/20">
-              <input
-                type="checkbox"
-                checked={buildConfirmed}
-                onChange={(e) => setBuildConfirmed(e.target.checked)}
-              />
-              <span>
-                I have reviewed this lead search and approve searching for leads. Import still requires a separate
-                explicit action — no auto-import.
-              </span>
-            </label>
-
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" size="sm" disabled={busy !== null} onClick={() => void handleBuildAudience()}>
-                {busy === "build" ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
-                {GROWTH_HOME_BUILD_AUDIENCE_LABEL}
-              </Button>
-              <Button type="button" size="sm" variant="outline" disabled title="Saved search persistence coming soon">
-                {GROWTH_HOME_SAVE_SEARCH_LABEL} (coming soon)
-              </Button>
-              <Button type="button" size="sm" variant="outline" disabled title="Saved search persistence coming soon">
-                {GROWTH_HOME_REFRESH_SAVED_SEARCH_LABEL}
-              </Button>
-              <Button type="button" size="sm" variant="ghost" onClick={handleReset}>
-                {GROWTH_HOME_RESET_SEARCH_LABEL}
-              </Button>
-            </div>
-
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
-
-            {activeRun ? (
-              <div className="space-y-3 rounded-lg border border-border/70 p-3 text-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium">Run status</span>
-                  <GrowthBadge tone={runStatusTone(activeRun.status)}>{activeRun.status}</GrowthBadge>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-4">
-                  <div>Preview: {activeRun.previewCount}</div>
-                  <div>Duplicates: {activeRun.duplicateCount}</div>
-                  <div>New: {Math.max(activeRun.previewCount - activeRun.duplicateCount, 0)}</div>
-                  <div>Imported: {activeRun.importedCount}</div>
-                </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" size="sm" variant="secondary" disabled={busy !== null} onClick={() => void handlePoll()}>
-                    {busy === "poll" ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
-                    Poll / Refresh Preview
+                  <Button type="button" onClick={() => setWorkflowStep("ready")}>
+                    {GROWTH_HOME_FIND_LEADS_LOOKS_GOOD_LABEL}
                   </Button>
-                  <Button type="button" size="sm" variant="outline" onClick={handleImportRecommended}>
-                    {GROWTH_HOME_IMPORT_RECOMMENDED_LABEL}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={selectedIds.size === 0 || busy !== null}
-                    onClick={() => void handleImport(false)}
-                  >
-                    {GROWTH_HOME_IMPORT_SELECTED_LABEL}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    disabled={selectedIds.size === 0}
-                    onClick={handleRejectSelected}
-                  >
-                    {GROWTH_HOME_REJECT_SELECTED_LABEL}
+                  <Button type="button" variant="outline" onClick={() => setWorkflowStep("configure")}>
+                    {GROWTH_HOME_FIND_LEADS_EDIT_SEARCH_LABEL}
                   </Button>
                 </div>
               </div>
             ) : null}
 
+            {showAdvancedForm ? (
+              <>
+                {mode === "manual_search" || workflowStep === "configure" ? (
+                  <Separator className="my-2" />
+                ) : null}
+                <DatamoonSourcingWorkbenchForm draft={draft} onChange={setDraft} layout="grouped" />
+              </>
+            ) : null}
+
+            {showConfigureActions ? (
+              <>
+                <Separator />
+
+                <Collapsible open={providerDetailsOpen} onOpenChange={setProviderDetailsOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="gap-2 px-0 text-muted-foreground hover:text-foreground"
+                    >
+                      <ChevronDown
+                        className={`size-4 transition-transform ${providerDetailsOpen ? "rotate-180" : ""}`}
+                      />
+                      {GROWTH_HOME_ADVANCED_PROVIDER_DETAILS_LABEL}
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-4 pt-3">
+                    <p className="text-sm text-muted-foreground">{GROWTH_HOME_DISCOVERY_SOURCE_DATAMOON_LABEL}</p>
+                    <p className="text-sm text-muted-foreground">{GROWTH_HOME_POWERED_BY_DATAMOON_LABEL}</p>
+                    <div className="space-y-2">
+                      <Label htmlFor="dm-provider-mode-drawer">{GROWTH_HOME_PROVIDER_MODE_LABEL}</Label>
+                      <select
+                        id="dm-provider-mode-drawer"
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        value={draft.providerMode}
+                        onChange={(e) =>
+                          setDraft({
+                            ...draft,
+                            providerMode: e.target.value as AvaDatamoonAudienceDraft["providerMode"],
+                          })
+                        }
+                      >
+                        {AVA_DATAMOON_PROVIDER_MODES.map((providerMode) => (
+                          <option key={providerMode} value={providerMode}>
+                            {providerMode === "module" ? "module (default)" : providerMode}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {diagnostics ? (
+                      <GrowthBadge tone={diagnostics.configured ? "healthy" : "attention"}>
+                        {diagnostics.enabled ? (diagnostics.dryRunOnly ? "Dry run" : "Live") : "Disabled"}
+                      </GrowthBadge>
+                    ) : null}
+                  </CollapsibleContent>
+                </Collapsible>
+
+                <Card className="border-amber-200/80 bg-amber-50/50 py-5 shadow-none dark:border-amber-900/40 dark:bg-amber-950/20">
+                  <CardContent className="px-5">
+                    <label className="flex items-start gap-3 text-sm">
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={buildConfirmed}
+                        onChange={(e) => setBuildConfirmed(e.target.checked)}
+                      />
+                      <span>{GROWTH_HOME_FIND_LEADS_APPROVAL_COPY}</span>
+                    </label>
+                    <p className="mt-2 pl-6 text-xs text-muted-foreground">
+                      Import still requires a separate explicit action — no auto-import.
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <GrowthHomeFindLeadsMissionBindingCard
+                  missions={missionOptions}
+                  selectedMissionId={selectedMissionId}
+                  onSelectedMissionIdChange={setSelectedMissionId}
+                  keepMonitoring={keepMonitoring}
+                  onKeepMonitoringChange={setKeepMonitoring}
+                  disabled={busy !== null}
+                />
+
+                {missionBindingMessage ? (
+                  <p className="text-sm text-emerald-700 dark:text-emerald-300">{missionBindingMessage}</p>
+                ) : null}
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    disabled={busy !== null || !buildConfirmed}
+                    onClick={() => void handleBuildAudience()}
+                  >
+                    {busy === "build" ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                    {GROWTH_HOME_BUILD_AUDIENCE_LABEL}
+                  </Button>
+                  <Button type="button" variant="outline" disabled title="Saved search persistence coming soon">
+                    {GROWTH_HOME_SAVE_SEARCH_LABEL} (coming soon)
+                  </Button>
+                  <Button type="button" variant="outline" disabled title="Saved search persistence coming soon">
+                    {GROWTH_HOME_REFRESH_SAVED_SEARCH_LABEL}
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={handleReset}>
+                    {GROWTH_HOME_RESET_SEARCH_LABEL}
+                  </Button>
+                </div>
+              </>
+            ) : null}
+
+            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+            {activeRun ? (
+              <div className="space-y-6">
+                <Separator />
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">Run status</span>
+                    <GrowthBadge tone={runStatusTone(activeRun.status)}>{activeRun.status}</GrowthBadge>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <Card className="gap-2 py-4 shadow-none">
+                      <CardHeader className="px-4 pb-0">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">High Intent</CardTitle>
+                      </CardHeader>
+                      <CardContent className="px-4">
+                        <p className="text-2xl font-semibold">
+                          {highIntentIncluded ? totalResults : "—"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {highIntentIncluded ? "Included in search" : "Not included"}
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card className="gap-2 py-4 shadow-none">
+                      <CardHeader className="px-4 pb-0">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Medium Intent</CardTitle>
+                      </CardHeader>
+                      <CardContent className="px-4">
+                        <p className="text-2xl font-semibold">
+                          {mediumIntentIncluded ? totalResults : "—"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {mediumIntentIncluded ? "Included in search" : "Not included"}
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card className="gap-2 py-4 shadow-none">
+                      <CardHeader className="px-4 pb-0">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Total Results</CardTitle>
+                      </CardHeader>
+                      <CardContent className="px-4">
+                        <p className="text-2xl font-semibold">{totalResults}</p>
+                        <p className="text-xs text-muted-foreground">Preview leads ready to review</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  <Button type="button" size="sm" variant="secondary" disabled={busy !== null} onClick={() => void handlePoll()}>
+                    {busy === "poll" ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                    Poll / Refresh Preview
+                  </Button>
+                </div>
+
+                {previewRecords.length > 0 ? (
+                  <div className="space-y-4 rounded-xl border border-border/70 p-5">
+                    <div>
+                      <h3 className="text-base font-semibold">{GROWTH_HOME_FIND_LEADS_RESULTS_AVA_RECOMMENDS_TITLE}</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {GROWTH_HOME_FIND_LEADS_RESULTS_AVA_RECOMMENDS_COPY}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        disabled={busy !== null || recommendedRecords.length === 0}
+                        onClick={() => void handleImportRecommended()}
+                      >
+                        {busy === "import-all" ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                        {GROWTH_HOME_IMPORT_RECOMMENDED_LABEL}
+                      </Button>
+                      <Button type="button" variant="outline" onClick={handleReviewAllLeads}>
+                        {GROWTH_HOME_FIND_LEADS_REVIEW_ALL_LABEL}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={selectedIds.size === 0 || busy !== null}
+                        onClick={() => void handleImport(false)}
+                      >
+                        {busy === "import-selected" ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                        {GROWTH_HOME_IMPORT_SELECTED_LABEL}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={selectedIds.size === 0}
+                        onClick={handleRejectSelected}
+                      >
+                        {GROWTH_HOME_REJECT_SELECTED_LABEL}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             {previewRecords.length > 0 ? (
-              <div className="overflow-x-auto rounded-lg border border-border/70">
+              <div ref={resultsTableRef} className="overflow-x-auto rounded-lg border border-border/70">
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="border-b text-left">
-                      <th className="px-2 py-2">Select</th>
-                      <th className="px-2 py-2">Name</th>
-                      <th className="px-2 py-2">Email</th>
-                      <th className="px-2 py-2">Status</th>
+                      <th className="px-3 py-3">Select</th>
+                      <th className="px-3 py-3">Name</th>
+                      <th className="px-3 py-3">Email</th>
+                      <th className="px-3 py-3">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {previewRecords.map((record) => (
                       <tr key={record.id} className="border-b">
-                        <td className="px-2 py-2">
+                        <td className="px-3 py-3">
                           <input
                             type="checkbox"
                             checked={selectedIds.has(record.id)}
                             onChange={() => toggleRecord(record.id)}
                           />
                         </td>
-                        <td className="px-2 py-2">{record.normalized.contact_name ?? "—"}</td>
-                        <td className="px-2 py-2">{record.normalized.email ?? "—"}</td>
-                        <td className="px-2 py-2">{record.status}</td>
+                        <td className="px-3 py-3">{record.normalized.contact_name ?? "—"}</td>
+                        <td className="px-3 py-3">{record.normalized.email ?? "—"}</td>
+                        <td className="px-3 py-3">{record.status}</td>
                       </tr>
                     ))}
                   </tbody>
