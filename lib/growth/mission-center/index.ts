@@ -50,3 +50,5 @@ export type {
   GrowthMissionLifecycleState,
   GrowthObjectiveMissionRuntimeState,
 } from "@/lib/growth/mission-center/growth-mission-runtime-types"
+
+export { GROWTH_MISSION_CENTER_HEALTH_LABELS } from "@/lib/growth/mission-center/growth-mission-center-health"
