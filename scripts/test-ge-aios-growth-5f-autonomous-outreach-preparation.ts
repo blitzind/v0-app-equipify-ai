@@ -131,6 +131,11 @@ const draftSource = readSource("lib/growth/aios/growth/growth-autonomous-outreac
 assert.match(serviceSource, /fetchGrowthAiOsAutonomyPolicyEvaluationContext/)
 assert.match(serviceSource, /evaluateOutreachPreparationPilotAutonomyPolicyGate/)
 assert.match(serviceSource, /GROWTH_AUTONOMOUS_OUTREACH_PREPARED_EVENT/)
+assert.match(
+  serviceSource,
+  /manual_outreach_preparation_request[\s\S]*?const decision = await executeAutonomousOutreachPreparation[\s\S]*?approvalPackage: decision\.approvalPackage/,
+)
+console.log("  ✓ Manual outreach preparation request persists approvalPackage on completed runs")
 assert.match(draftSource, /runOutreachPersonalizationGeneration/)
 assert.match(draftSource, /runSmsPersonalizationForLead/)
 assert.match(draftSource, /buildCadenceLinkedInDraft/)

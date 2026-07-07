@@ -1,5 +1,5 @@
 /**
- * GE-AVA-PERSISTENCE-1 — Outreach preparation pilot durable storage certification.
+ * GE-AVA-PERSISTENCE-1 / GE-AVA-PERSISTENCE-1B — Outreach preparation pilot durable storage certification.
  * Run: pnpm test:ge-ava-persistence-1
  */
 import assert from "node:assert/strict"
@@ -62,6 +62,13 @@ async function main(): Promise<void> {
   )
   assert.match(pilotService, /await getAutonomousOutreachPreparationPilotOrgState/)
   assert.match(pilotService, /await appendAutonomousOutreachPreparationRun/)
+  assert.match(
+    pilotService,
+    /manual_outreach_preparation_request[\s\S]*?const decision = await executeAutonomousOutreachPreparation[\s\S]*?approvalPackage: decision\.approvalPackage/,
+  )
+  assert.match(pilotService, /approvalPackage: decision\.approvalPackage/)
+  assert.match(pilotService, /confidence: decision\.confidence/)
+  assert.match(pilotService, /revenueOperatorHandoff: decision\.revenueOperatorHandoff/)
 
   const types = readSource("lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types.ts")
   assert.match(types, /GrowthAutonomousOutreachApprovalPackage/)

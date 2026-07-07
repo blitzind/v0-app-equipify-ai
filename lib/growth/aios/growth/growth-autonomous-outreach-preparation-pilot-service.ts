@@ -487,7 +487,7 @@ export async function runAutonomousOutreachPreparationManualRequest(
         leadId: input.leadId,
       })
       try {
-        await executeAutonomousOutreachPreparation(admin, {
+        const decision = await executeAutonomousOutreachPreparation(admin, {
           organizationId: input.organizationId,
           leadId: input.leadId,
           companyName: snapshot?.companyName ?? null,
@@ -504,6 +504,9 @@ export async function runAutonomousOutreachPreparationManualRequest(
             wakeCondition: "manual_outreach_preparation_request",
             generatedAt,
             outcome: "completed",
+            approvalPackage: decision.approvalPackage,
+            confidence: decision.confidence,
+            revenueOperatorHandoff: decision.revenueOperatorHandoff,
           }),
         })
       } catch {
