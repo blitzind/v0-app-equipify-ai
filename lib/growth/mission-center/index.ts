@@ -53,12 +53,18 @@ export {
   GROWTH_AVA_LAUNCH_RUN_TITLE,
   GROWTH_AVA_LAUNCH_RUN_DESCRIPTION,
   GROWTH_AVA_LAUNCH_RUN_SUCCESS_COPY,
+  GROWTH_AVA_LAUNCH_VALIDATION_DEBUG_1_QA_MARKER,
+  GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR,
+  GROWTH_AVA_LAUNCH_CANT_START_HEADING,
   buildMissionAvaLaunchRunApiPath,
+  formatGrowthAvaLaunchValidationErrorsForUi,
+  resolveGrowthAvaLaunchValidationMessage,
 } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-api-contract"
 export type {
   GrowthMissionAvaLaunchRunRequest,
   GrowthMissionAvaLaunchRunResponse,
   GrowthMissionAvaLaunchRunResult,
+  GrowthAvaLaunchValidationError,
 } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-api-contract"
 export type {
   GrowthMissionLifecycleState,
