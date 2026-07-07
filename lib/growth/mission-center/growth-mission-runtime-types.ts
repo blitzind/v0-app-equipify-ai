@@ -143,3 +143,28 @@ export function missionLifecycleActivityLabel(
       return "Monitoring audience"
   }
 }
+
+const GROWTH_MISSION_RUNTIME_MAX_EVENTS = 20 as const
+
+function stableMissionRuntimeEventId(parts: string[]): string {
+  return `mre-${parts.join("-").slice(0, 80)}`
+}
+
+export function appendEvent(
+  runtime: GrowthObjectiveMissionRuntimeState,
+  summary: string,
+  lifecycleState: GrowthMissionLifecycleState,
+): GrowthObjectiveMissionRuntimeState {
+  const event: GrowthMissionRuntimeEvent = {
+    id: stableMissionRuntimeEventId([summary, new Date().toISOString()]),
+    at: new Date().toISOString(),
+    summary,
+    lifecycleState,
+  }
+  return {
+    ...runtime,
+    lifecycleState,
+    activityLabel: missionLifecycleActivityLabel(lifecycleState, runtime.counters),
+    events: [event, ...runtime.events].slice(0, GROWTH_MISSION_RUNTIME_MAX_EVENTS),
+  }
+}
