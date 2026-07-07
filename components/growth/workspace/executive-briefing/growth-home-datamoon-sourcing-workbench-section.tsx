@@ -75,9 +75,11 @@ import {
 import {
   buildMissionAvaLaunchRunApiPath,
   buildMissionBindFindLeadsApiPath,
+  formatGrowthAvaLaunchValidationErrorsForUi,
   GROWTH_AVA_LAUNCH_RUN_SUCCESS_COPY,
   GROWTH_AVA_LAUNCH_RUN_TITLE,
   GROWTH_MISSION_CENTER_API_PATH,
+  type GrowthAvaLaunchValidationError,
   type GrowthMissionAvaLaunchRunResponse,
   type GrowthMissionBindFindLeadsResponse,
   type GrowthMissionCenterSourcesPayload,
@@ -113,6 +115,16 @@ function runStatusTone(status: DatamoonAudienceImportRun["status"]) {
     default:
       return "attention" as const
   }
+}
+
+function formatAvaLaunchFailureMessage(payload: {
+  error?: string
+  validationErrors?: GrowthAvaLaunchValidationError[]
+}): string {
+  if (payload.validationErrors && payload.validationErrors.length > 0) {
+    return formatGrowthAvaLaunchValidationErrorsForUi(payload.validationErrors)
+  }
+  return payload.error ?? "Ava launch run failed."
 }
 
 function formatGeography(draft: AvaDatamoonAudienceDraft): string {
@@ -314,9 +326,12 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
           refreshCadence: "daily",
         }),
       })
-      const payload = (await res.json()) as GrowthMissionAvaLaunchRunResponse & { error?: string }
+      const payload = (await res.json()) as GrowthMissionAvaLaunchRunResponse & {
+        error?: string
+        validationErrors?: GrowthAvaLaunchValidationError[]
+      }
       if (!res.ok || !payload.ok) {
-        throw new Error(("error" in payload && payload.error) || "Ava launch run failed.")
+        throw new Error(formatAvaLaunchFailureMessage(payload))
       }
       const { result } = payload
       const runRes = await fetch(`${GROWTH_HOME_DATAMOON_RUNS_API_PATH}/${result.runId}`, {
@@ -843,7 +858,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
               </>
             ) : null}
 
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            {error ? <p className="whitespace-pre-line text-sm text-destructive">{error}</p> : null}
 
             {activeRun ? (
               <div className="space-y-6">
