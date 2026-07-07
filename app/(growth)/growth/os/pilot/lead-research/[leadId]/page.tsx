@@ -1,6 +1,7 @@
 "use client"
 
 import { use } from "react"
+import { useSearchParams } from "next/navigation"
 import { FlaskConical } from "lucide-react"
 import { GrowthAiOsLeadResearchPilotPanel } from "@/components/growth/ai-os/growth-ai-os-lead-research-pilot-panel"
 import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-workspace-page-content"
@@ -12,6 +13,8 @@ type PageProps = {
 
 export default function GrowthAiOsLeadResearchPilotPage({ params }: PageProps) {
   const { leadId } = use(params)
+  const searchParams = useSearchParams()
+  const packageId = searchParams.get("packageId")
 
   return (
     <GrowthWorkspacePageContent>
@@ -21,7 +24,7 @@ export default function GrowthAiOsLeadResearchPilotPage({ params }: PageProps) {
         icon={FlaskConical}
         iconClassName="bg-emerald-50 text-emerald-600"
       />
-      <GrowthAiOsLeadResearchPilotPanel leadId={leadId} />
+      <GrowthAiOsLeadResearchPilotPanel leadId={leadId} packageId={packageId} />
     </GrowthWorkspacePageContent>
   )
 }

@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type { LeadResearchPilotObservation, LeadResearchPilotStepRecord } from "@/lib/growth/aios/pilot/lead-research-pilot-types"
 import { GROWTH_AI_OS_LEAD_RESEARCH_PILOT_QA_MARKER } from "@/lib/growth/aios/pilot/lead-research-pilot-types"
 import { GrowthAiOsLeadResearchExecutionPlanSection } from "@/components/growth/ai-os/growth/growth-ai-os-lead-research-execution-plan-section"
+import { GrowthAvaOperatorApprovalWorkspace } from "@/components/growth/ai-os/growth-ava-operator-approval-workspace"
 import { buildAiOsMissionPlanningHref } from "@/lib/growth/aios/ai-os-mission-route-params"
 
 function stepBadgeVariant(status: LeadResearchPilotStepRecord["status"]) {
@@ -25,7 +26,13 @@ function stepBadgeVariant(status: LeadResearchPilotStepRecord["status"]) {
   }
 }
 
-export function GrowthAiOsLeadResearchPilotPanel({ leadId }: { leadId: string }) {
+export function GrowthAiOsLeadResearchPilotPanel({
+  leadId,
+  packageId,
+}: {
+  leadId: string
+  packageId?: string | null
+}) {
   const [observation, setObservation] = useState<LeadResearchPilotObservation | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -80,6 +87,10 @@ export function GrowthAiOsLeadResearchPilotPanel({ leadId }: { leadId: string })
 
   return (
     <div className="space-y-6" data-qa-marker={GROWTH_AI_OS_LEAD_RESEARCH_PILOT_QA_MARKER} data-lead-id={leadId}>
+      {packageId ? (
+        <GrowthAvaOperatorApprovalWorkspace leadId={leadId} packageId={packageId} observation={observation} />
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex flex-wrap items-center gap-2">
