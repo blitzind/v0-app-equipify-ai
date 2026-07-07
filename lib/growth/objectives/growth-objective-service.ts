@@ -22,7 +22,7 @@ import {
   stopGrowthObjectiveRuntime,
 } from "@/lib/growth/objectives/growth-objective-runtime-service"
 import { rebuildGrowthObjectiveExecutionContext } from "@/lib/growth/objectives/growth-objective-materialization-service"
-import { summarizeObjectiveExecutionContext } from "@/lib/growth/objectives/growth-objective-execution-context"
+import { summarizeObjectiveExecutionContext, normalizeGrowthObjectiveForRead } from "@/lib/growth/objectives/growth-objective-execution-context"
 import {
   GROWTH_OBJECTIVE_QA_MARKER,
   GROWTH_OBJECTIVE_RUNTIME_QA_MARKER,
@@ -38,14 +38,16 @@ export type { GrowthObjectiveDashboardModel } from "@/lib/growth/objectives/grow
 export type GrowthObjectiveExecutionSummary = ReturnType<typeof summarizeObjectiveExecutionContext>
 
 function hydrateObjectivePlanForRead(objective: GrowthObjective): GrowthObjective {
-  if (objective.plan) return objective
-  if (objective.status === "draft" || objective.status === "planning" || objective.status === "archived") {
-    return objective
+  let hydrated = objective
+  if (!objective.plan) {
+    if (objective.status !== "draft" && objective.status !== "planning" && objective.status !== "archived") {
+      hydrated = {
+        ...objective,
+        plan: planGrowthObjective(objective),
+      }
+    }
   }
-  return {
-    ...objective,
-    plan: planGrowthObjective(objective),
-  }
+  return normalizeGrowthObjectiveForRead(hydrated)
 }
 
 export async function loadGrowthObjectiveDashboard(

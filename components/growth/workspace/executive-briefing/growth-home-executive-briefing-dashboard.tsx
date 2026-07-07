@@ -23,6 +23,7 @@ import { formatRelativeTime } from "@/lib/notifications/format-relative"
 import { GrowthHomeExecutiveBriefingHeroSection } from "@/components/growth/workspace/executive-briefing/growth-home-executive-briefing-hero-section"
 import { GrowthHomeExecutiveSnapshotSection } from "@/components/growth/workspace/executive-briefing/growth-home-executive-snapshot-section"
 import { GrowthHomeAiOsWaitingOnYouSection } from "@/components/growth/workspace/executive-briefing/growth-home-ai-os-waiting-on-you-section"
+import { GrowthHomeStartAvaSetupSection } from "@/components/growth/workspace/executive-briefing/growth-home-start-ava-setup-section"
 import { GrowthHomeGrowthStrategySection } from "@/components/growth/workspace/executive-briefing/growth-home-growth-strategy-section"
 import { GrowthHomeAvaLiveStatusSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-live-status-section"
 import { GrowthHomeDailyWorkQueueSection } from "@/components/growth/workspace/executive-briefing/growth-home-daily-work-queue-section"
@@ -132,6 +133,8 @@ export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, c
       <GrowthHomeExecutiveSnapshotSection kpis={executiveSnapshot} />
 
       <GrowthHomeAiOsWaitingOnYouSection aiOsUx={aiOsUx} />
+
+      <GrowthHomeStartAvaSetupSection dashboard={dashboard} />
 
       <div ref={missionCenterRef}>
         <GrowthHomeMissionCenterSection dashboard={dashboard} />

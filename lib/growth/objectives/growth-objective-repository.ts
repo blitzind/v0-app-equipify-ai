@@ -11,8 +11,10 @@ import {
   type GrowthObjectiveExecutionPlan,
   type GrowthObjectiveStatus,
   type GrowthObjectiveType,
+  type GrowthObjectiveStageId,
 } from "@/lib/growth/objectives/growth-objective-types"
 import { planGrowthObjective } from "@/lib/growth/objectives/growth-objective-planner"
+import { normalizeObjectiveExecutionContext } from "@/lib/growth/objectives/growth-objective-execution-context"
 import { probeRuntimeTable } from "@/lib/growth/runtime-guardrails/growth-runtime-schema-probe"
 
 const memoryStore = new Map<string, GrowthObjective[]>()
@@ -49,7 +51,14 @@ function normalizeRuntimeState(value: unknown): GrowthObjective["runtime"] {
   if (!runtime?.currentStageId || !runtime.stageStates || Object.keys(runtime.stageStates).length === 0) {
     return null
   }
-  return runtime
+  const stageStates = { ...runtime.stageStates }
+  for (const stageId of Object.keys(stageStates) as GrowthObjectiveStageId[]) {
+    const state = stageStates[stageId]
+    if (state && !Array.isArray(state.blockers)) {
+      stageStates[stageId] = { ...state, blockers: [] }
+    }
+  }
+  return { ...runtime, stageStates }
 }
 
 export function normalizeGrowthObjectiveExecutionPlan(
@@ -66,7 +75,13 @@ export function normalizeGrowthObjectiveExecutionPlan(
   ) {
     return null
   }
-  return plan as GrowthObjectiveExecutionPlan
+  return {
+    ...(plan as GrowthObjectiveExecutionPlan),
+    stages: plan.stages.map((stage) => ({
+      ...stage,
+      recommendations: Array.isArray(stage.recommendations) ? stage.recommendations : [],
+    })),
+  }
 }
 
 function mapRow(row: Record<string, unknown>): GrowthObjective {
@@ -97,7 +112,10 @@ function mapRow(row: Record<string, unknown>): GrowthObjective {
       ? (row.recommendations as GrowthObjective["recommendations"])
       : [],
     eventSubscriptions: (row.event_subscriptions as GrowthObjective["eventSubscriptions"]) ?? null,
-    executionContext: (row.execution_context as GrowthObjective["executionContext"]) ?? null,
+    executionContext:
+      row.execution_context != null && typeof row.execution_context === "object"
+        ? normalizeObjectiveExecutionContext(row.execution_context)
+        : null,
     emergencyStopActive: Boolean(row.emergency_stop_active),
     qa_marker: GROWTH_OBJECTIVE_QA_MARKER,
     createdAt: String(row.created_at ?? new Date().toISOString()),

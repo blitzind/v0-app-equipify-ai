@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { GrowthObjectiveDashboardModel } from "@/lib/growth/objectives/growth-objective-types"
 import { computeObjectiveDashboardProgress, computeObjectiveStageDurationMs, isObjectiveRuntimeStalled } from "@/lib/growth/objectives/growth-objective-stage-state-machine"
-import { summarizeObjectiveExecutionContext, summarizeObjectiveMaterializationHealth } from "@/lib/growth/objectives/growth-objective-execution-context"
+import { summarizeObjectiveExecutionContext, summarizeObjectiveMaterializationHealth, normalizeGrowthObjectiveForRead } from "@/lib/growth/objectives/growth-objective-execution-context"
 import { buildObjectiveSignalSnapshot } from "@/lib/growth/objectives/growth-objective-signal-handler"
 import type { GrowthObjective } from "@/lib/growth/objectives/growth-objective-types"
 import type { GrowthPriorityBindingObjectiveContext } from "@/lib/growth/aios/priority/growth-priority-engine-binding-types"
@@ -29,7 +29,9 @@ export function GrowthObjectivesDashboard() {
       throw new Error(body.error ?? "Could not load objectives.")
     }
     setDashboard(body.dashboard)
-    setSelected(body.dashboard.objectives[0] ?? null)
+    setSelected(
+      body.dashboard.objectives[0] ? normalizeGrowthObjectiveForRead(body.dashboard.objectives[0]) : null,
+    )
     setError(null)
   }, [])
 
@@ -112,7 +114,7 @@ export function GrowthObjectivesDashboard() {
       const body = await response.json()
       if (!response.ok || !body.ok) throw new Error(body.error ?? "Action failed.")
       await load()
-      if (body.objective) setSelected(body.objective)
+      if (body.objective) setSelected(normalizeGrowthObjectiveForRead(body.objective))
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "Action failed.")
     } finally {
@@ -175,7 +177,7 @@ export function GrowthObjectivesDashboard() {
                   key={objective.id}
                   type="button"
                   className="w-full rounded-md border p-3 text-left hover:bg-muted/40"
-                  onClick={() => setSelected(objective)}
+                  onClick={() => setSelected(normalizeGrowthObjectiveForRead(objective))}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium">{objective.title}</p>
@@ -222,7 +224,7 @@ export function GrowthObjectivesDashboard() {
                 ) : null}
               </div>
 
-              {selected.recentSignals.length > 0 ? (
+              {(selected.recentSignals?.length ?? 0) > 0 ? (
                 <div className="rounded-md border px-3 py-2 text-xs text-muted-foreground">
                   {(() => {
                     const snapshot = buildObjectiveSignalSnapshot(selected.recentSignals)
@@ -318,7 +320,7 @@ export function GrowthObjectivesDashboard() {
                     <p className="text-sm font-medium mb-2">Runtime recovery</p>
                     <div className="text-xs text-muted-foreground rounded-md border px-3 py-2 space-y-1">
                       <p>Recovered at: {formatDate(selected.executionContext.recoveredAt)}</p>
-                      <p>Subscriptions: {selected.eventSubscriptions?.items.length ?? 0}</p>
+                      <p>Subscriptions: {selected.eventSubscriptions?.items?.length ?? 0}</p>
                       <p>Runtime running: {selected.runtime?.running ? "yes" : "no"}</p>
                     </div>
                   </div>
@@ -339,7 +341,7 @@ export function GrowthObjectivesDashboard() {
                 </div>
               ) : null}
 
-              {selected.recommendations.length > 0 ? (
+              {(selected.recommendations?.length ?? 0) > 0 ? (
                 <div>
                   <p className="text-sm font-medium mb-2">Adaptive recommendations</p>
                   <ul className="space-y-2 text-sm">
@@ -352,7 +354,7 @@ export function GrowthObjectivesDashboard() {
                 </div>
               ) : null}
 
-              {selected.recentSignals.length > 0 ? (
+              {(selected.recentSignals?.length ?? 0) > 0 ? (
                 <div>
                   <p className="text-sm font-medium mb-2">Recent signals</p>
                   <ul className="space-y-1 text-xs text-muted-foreground">
@@ -365,7 +367,7 @@ export function GrowthObjectivesDashboard() {
                 </div>
               ) : null}
 
-              {selected.executionHistory.length > 0 ? (
+              {(selected.executionHistory?.length ?? 0) > 0 ? (
                 <div>
                   <p className="text-sm font-medium mb-2">Execution history</p>
                   <ul className="space-y-1 text-xs text-muted-foreground max-h-32 overflow-y-auto">

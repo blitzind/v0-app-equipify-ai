@@ -711,6 +711,7 @@
     "test:ge-mailbox-health-consistency-1": "tsx scripts/test-ge-mailbox-health-consistency-1.ts",
     "test:ge-growth-home-decision-queue-dedup-1": "tsx scripts/test-ge-growth-home-decision-queue-dedup-1.ts",
     "test:ge-ava-mission-center-1a": "tsx scripts/test-ge-ava-mission-center-1a.ts",
+    "test:ge-ava-launch-mission-setup-1a": "tsx scripts/test-ge-ava-launch-mission-setup-1a.ts",
     "test:ge-ava-mission-runtime-1a": "tsx scripts/test-ge-ava-mission-runtime-1a.ts",
     "test:ge-ava-mission-runtime-1b-find-leads-binding": "tsx scripts/test-ge-ava-mission-runtime-1b-find-leads-binding.ts",
     "test:growth-booking-intelligence": "tsx scripts/test-growth-booking-intelligence.ts",

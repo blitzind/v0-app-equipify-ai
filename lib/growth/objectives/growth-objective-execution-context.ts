@@ -5,6 +5,7 @@ import {
   type GrowthObjective,
   type GrowthObjectiveExecutionContext,
   type GrowthObjectiveMaterializedArtifact,
+  type GrowthObjectiveRuntimeState,
   type GrowthObjectiveStageId,
 } from "@/lib/growth/objectives/growth-objective-types"
 
@@ -33,10 +34,21 @@ export function normalizeObjectiveExecutionContext(
     return createEmptyObjectiveExecutionContext()
   }
   const raw = value as GrowthObjectiveExecutionContext
+  const rawStages = raw.stages && typeof raw.stages === "object" ? raw.stages : {}
+  const stages: GrowthObjectiveExecutionContext["stages"] = {}
+  for (const [stageId, stage] of Object.entries(rawStages)) {
+    if (!stage || typeof stage !== "object") continue
+    stages[stageId as GrowthObjectiveStageId] = {
+      materializedAt: stage.materializedAt ?? null,
+      completedAt: stage.completedAt ?? null,
+      artifacts: Array.isArray(stage.artifacts) ? stage.artifacts : [],
+      blockers: Array.isArray(stage.blockers) ? stage.blockers : [],
+    }
+  }
   return {
     qa_marker: GROWTH_OBJECTIVE_EXECUTION_CONTEXT_QA_MARKER,
     version: 1,
-    stages: raw.stages ?? {},
+    stages,
     recoveredAt: raw.recoveredAt ?? null,
     missionRuntime: raw.missionRuntime ?? null,
   }
@@ -47,10 +59,14 @@ export function listObjectiveArtifacts(
   stageId?: GrowthObjectiveStageId,
 ): GrowthObjectiveMaterializedArtifact[] {
   if (!context) return []
+  const stages = context.stages ?? {}
   if (stageId) {
-    return context.stages[stageId]?.artifacts ?? []
+    const artifacts = stages[stageId]?.artifacts
+    return Array.isArray(artifacts) ? artifacts : []
   }
-  return Object.values(context.stages).flatMap((stage) => stage?.artifacts ?? [])
+  return Object.values(stages).flatMap((stage) =>
+    Array.isArray(stage?.artifacts) ? stage.artifacts : [],
+  )
 }
 
 export function countObjectiveArtifactsByType(
@@ -73,13 +89,58 @@ export function findObjectiveArtifact(
   )
 }
 
+export function normalizeGrowthObjectiveForRead(objective: GrowthObjective): GrowthObjective {
+  const runtime = objective.runtime
+  let normalizedRuntime: GrowthObjectiveRuntimeState | null = runtime ?? null
+  if (runtime?.stageStates) {
+    const stageStates = { ...runtime.stageStates }
+    for (const stageId of Object.keys(stageStates) as GrowthObjectiveStageId[]) {
+      const state = stageStates[stageId]
+      if (state && !Array.isArray(state.blockers)) {
+        stageStates[stageId] = { ...state, blockers: [] }
+      }
+    }
+    normalizedRuntime = { ...runtime, stageStates }
+  }
+
+  return {
+    ...objective,
+    title: objective.title?.trim() ? objective.title : "Untitled objective",
+    executionHistory: Array.isArray(objective.executionHistory) ? objective.executionHistory : [],
+    recentSignals: Array.isArray(objective.recentSignals) ? objective.recentSignals : [],
+    recommendations: Array.isArray(objective.recommendations) ? objective.recommendations : [],
+    executionContext: objective.executionContext
+      ? normalizeObjectiveExecutionContext(objective.executionContext)
+      : null,
+    runtime: normalizedRuntime,
+    eventSubscriptions: objective.eventSubscriptions
+      ? {
+          ...objective.eventSubscriptions,
+          items: Array.isArray(objective.eventSubscriptions.items)
+            ? objective.eventSubscriptions.items
+            : [],
+        }
+      : null,
+    plan: objective.plan
+      ? {
+          ...objective.plan,
+          stages: (objective.plan.stages ?? []).map((stage) => ({
+            ...stage,
+            recommendations: Array.isArray(stage.recommendations) ? stage.recommendations : [],
+          })),
+        }
+      : objective.plan,
+  }
+}
+
 export function mergeObjectiveStageArtifacts(
   context: GrowthObjectiveExecutionContext,
   stageId: GrowthObjectiveStageId,
   artifacts: GrowthObjectiveMaterializedArtifact[],
   input?: { blockers?: string[]; completed?: boolean },
 ): GrowthObjectiveExecutionContext {
-  const existing = context.stages[stageId]?.artifacts ?? []
+  const stages = context.stages ?? {}
+  const existing = stages[stageId]?.artifacts ?? []
   const byKey = new Map(existing.map((artifact) => [`${artifact.resourceType}:${artifact.resourceKey}`, artifact]))
   for (const artifact of artifacts) {
     byKey.set(`${artifact.resourceType}:${artifact.resourceKey}`, artifact)
@@ -88,12 +149,12 @@ export function mergeObjectiveStageArtifacts(
   return {
     ...context,
     stages: {
-      ...context.stages,
+      ...stages,
       [stageId]: {
-        materializedAt: context.stages[stageId]?.materializedAt ?? now,
-        completedAt: input?.completed ? now : (context.stages[stageId]?.completedAt ?? null),
+        materializedAt: stages[stageId]?.materializedAt ?? now,
+        completedAt: input?.completed ? now : (stages[stageId]?.completedAt ?? null),
         artifacts: [...byKey.values()],
-        blockers: input?.blockers ?? context.stages[stageId]?.blockers ?? [],
+        blockers: input?.blockers ?? stages[stageId]?.blockers ?? [],
       },
     },
   }
