@@ -41,10 +41,12 @@ function main(): void {
   console.log("  ✓ Refinement surfaces present")
 
   const heroSource = read("components/growth/workspace/executive-briefing/growth-home-executive-briefing-hero-section.tsx")
-  assert.match(heroSource, /data-section="home-executive-kpis"/)
+  const snapshotSource = read("components/growth/workspace/executive-briefing/growth-home-executive-snapshot-section.tsx")
   assert.match(heroSource, /data-section="home-hero-ava-recommends"/)
+  assert.match(snapshotSource, /data-section="home-executive-kpis"/)
   assert.match(heroSource, /GROWTH_HOME_AVA_RECOMMENDS|GROWTH_HOME_HERO_AVA_RECOMMENDS/)
   assert.doesNotMatch(heroSource, /bg-gradient-to-br from-indigo-50/)
+  assert.doesNotMatch(heroSource, /bg-indigo-600/)
   assert.match(heroSource, /backdrop-blur/)
   console.log("  ✓ Executive hero uses compact premium layout with embedded Ava recommendation")
 

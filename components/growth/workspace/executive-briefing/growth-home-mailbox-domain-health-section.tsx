@@ -1,12 +1,16 @@
 "use client"
 
 import Link from "next/link"
+import { Mail, ShieldCheck } from "lucide-react"
 import type { GrowthHomeMailboxDomainHealth } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
+import { cn } from "@/lib/utils"
 
 export function GrowthHomeMailboxDomainHealthSection({
   health,
+  embedded = false,
 }: {
   health: GrowthHomeMailboxDomainHealth | null
+  embedded?: boolean
 }) {
   if (!health) return null
 
@@ -22,53 +26,38 @@ export function GrowthHomeMailboxDomainHealthSection({
     health.domainHealth.dkim ? { label: "DKIM", value: health.domainHealth.dkim } : null,
     health.domainHealth.dmarc ? { label: "DMARC", value: health.domainHealth.dmarc } : null,
     health.domainHealth.mx ? { label: "MX", value: health.domainHealth.mx } : null,
-    health.domainHealth.warmupPercent != null
-      ? { label: "Warmup", value: `${health.domainHealth.warmupPercent}%` }
-      : null,
-    health.domainHealth.dailyUtilization
-      ? { label: "Daily utilization", value: health.domainHealth.dailyUtilization }
-      : null,
   ].filter((row): row is { label: string; value: string } => row != null)
 
   return (
     <section
       data-qa-section="home-mailbox-domain-health"
-      className="rounded-2xl border border-border/70 bg-card p-6 space-y-5"
+      className={cn(
+        embedded
+          ? "h-full rounded-xl border border-border/70 bg-card p-4 space-y-3"
+          : "rounded-2xl border border-border/70 bg-card p-5 space-y-4 sm:p-6",
+      )}
     >
-      <div>
-        <h3 className="text-base font-semibold tracking-tight">Mailbox & domain health</h3>
-        {health.summary ? <p className="mt-1 text-sm text-muted-foreground">{health.summary}</p> : null}
+      <div className="flex items-center gap-2">
+        <Mail className="size-4 text-muted-foreground" aria-hidden />
+        <h3 className="text-base font-semibold tracking-tight">Mailbox Health</h3>
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        {poolRows.length > 0 ? (
-          <div className="rounded-xl border border-border/70 bg-card p-4 space-y-3">
-            <p className="text-sm font-semibold text-foreground">Mailbox Pool</p>
-            <div className="grid grid-cols-2 gap-3">
-              {poolRows.map((row) => (
-                <div key={row.label} className="rounded-lg bg-muted/20 px-3 py-2">
-                  <p className="text-xs text-muted-foreground">{row.label}</p>
-                  <p className="text-lg font-semibold tabular-nums">{row.value}</p>
-                </div>
-              ))}
-            </div>
+      {health.summary ? <p className="text-sm text-muted-foreground line-clamp-2">{health.summary}</p> : null}
+      <div className="grid grid-cols-2 gap-2">
+        {poolRows.map((row) => (
+          <div key={row.label} className="rounded-lg bg-muted/20 px-2.5 py-2">
+            <p className="text-[11px] text-muted-foreground">{row.label}</p>
+            <p className="text-lg font-semibold tabular-nums">{row.value}</p>
           </div>
-        ) : null}
-        {domainRows.length > 0 ? (
-          <div className="rounded-xl border border-border/70 bg-card p-4 space-y-3">
-            <p className="text-sm font-semibold text-foreground">Domain Health</p>
-            <div className="grid grid-cols-2 gap-3">
-              {domainRows.map((row) => (
-                <div key={row.label} className="rounded-lg bg-muted/20 px-3 py-2">
-                  <p className="text-xs text-muted-foreground">{row.label}</p>
-                  <p className="text-sm font-medium">{row.value}</p>
-                </div>
-              ))}
-            </div>
+        ))}
+        {domainRows.slice(0, 2).map((row) => (
+          <div key={row.label} className="rounded-lg bg-muted/20 px-2.5 py-2">
+            <p className="text-[11px] text-muted-foreground">{row.label}</p>
+            <p className="text-sm font-medium">{row.value}</p>
           </div>
-        ) : null}
+        ))}
       </div>
       {health.href ? (
-        <Link href={health.href} className="text-sm font-medium text-indigo-700 hover:underline dark:text-indigo-300">
+        <Link href={health.href} className="text-sm font-medium text-primary hover:underline">
           Review mailbox settings
         </Link>
       ) : null}

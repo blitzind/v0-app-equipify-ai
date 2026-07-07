@@ -22,6 +22,7 @@ import {
 } from "@/lib/growth/workspace/executive-briefing/growth-home-premium-ux-1a"
 import { GrowthHomeOpportunityIntelligencePanel } from "@/components/growth/workspace/executive-briefing/growth-home-opportunity-intelligence-panel"
 import { GrowthHomeAvaSafeExecutionPanel } from "@/components/growth/workspace/executive-briefing/growth-home-ava-safe-execution-panel"
+import { cn } from "@/lib/utils"
 
 type Props = {
   dailyWorkQueue: GrowthHomeDailyWorkQueueItem[]
@@ -29,7 +30,10 @@ type Props = {
 
 type PanelMode = "analyze" | "datamoon" | "show"
 
-export function GrowthHomeAvaOpportunityIntelligenceSection({ dailyWorkQueue }: Props) {
+export function GrowthHomeAvaOpportunityIntelligenceSection({
+  dailyWorkQueue,
+  embedded = false,
+}: Props & { embedded?: boolean }) {
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<PanelMode>("show")
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
@@ -124,8 +128,13 @@ export function GrowthHomeAvaOpportunityIntelligenceSection({ dailyWorkQueue }: 
       <section
         data-qa-section="home-ava-opportunity-intelligence"
         data-qa-marker={GROWTH_AVA_HOME_OPPORTUNITY_INTELLIGENCE_1A_QA_MARKER}
-        className="rounded-2xl border border-border/70 bg-card p-5 space-y-4"
+        className={cn(
+          embedded
+            ? "rounded-xl border border-border/60 bg-background/80 p-4 space-y-3"
+            : "rounded-2xl border border-border/70 bg-card p-5 space-y-4",
+        )}
       >
+        {!embedded ? (
         <div className="flex items-start gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <Sparkles className="size-5" aria-hidden />
@@ -135,6 +144,9 @@ export function GrowthHomeAvaOpportunityIntelligenceSection({ dailyWorkQueue }: 
             <p className="mt-1 text-sm text-muted-foreground">{GROWTH_HOME_OPPORTUNITY_BRIEF_SUBTITLE}</p>
           </div>
         </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">{GROWTH_HOME_OPPORTUNITY_BRIEF_SUBTITLE}</p>
+        )}
 
         <div className="flex flex-wrap gap-2">
           <Button type="button" size="sm" variant="default" onClick={() => void openPanel("analyze")}>

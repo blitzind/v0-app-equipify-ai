@@ -1,15 +1,16 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, CheckCircle2 } from "lucide-react"
 import type { GrowthHomeAiOsUxViewModel } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 import {
-  GROWTH_HOME_AVA_IDLE,
-  GROWTH_HOME_CAUGHT_UP_TITLE,
   GROWTH_HOME_NEEDS_YOUR_ATTENTION,
   GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-experience-2b"
-import { GROWTH_HOME_NEEDS_YOUR_DECISION_SUBTITLE } from "@/lib/growth/workspace/executive-briefing/growth-home-premium-ux-1a"
+import {
+  GROWTH_HOME_NEEDS_YOUR_DECISION_SUBTITLE,
+} from "@/lib/growth/workspace/executive-briefing/growth-home-premium-ux-1a"
+import { GROWTH_HOME_NOTHING_REQUIRES_APPROVAL } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-2a"
 import { Button } from "@/components/ui/button"
 
 type Props = {
@@ -24,13 +25,13 @@ export function GrowthHomeAiOsWaitingOnYouSection({ aiOsUx }: Props) {
     <section
       data-qa-section="home-needs-your-attention"
       data-home-experience-2b={GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER}
-      className="space-y-3"
+      className="rounded-2xl border border-border/70 bg-card p-4 space-y-3 sm:p-5"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">{GROWTH_HOME_NEEDS_YOUR_ATTENTION}</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            {hasItems ? GROWTH_HOME_NEEDS_YOUR_DECISION_SUBTITLE : "Nothing blocking Ava right now."}
+            {hasItems ? GROWTH_HOME_NEEDS_YOUR_DECISION_SUBTITLE : GROWTH_HOME_NOTHING_REQUIRES_APPROVAL}
           </p>
         </div>
         {approveItemsHref && approveItemsCount > 0 ? (
@@ -44,14 +45,14 @@ export function GrowthHomeAiOsWaitingOnYouSection({ aiOsUx }: Props) {
       </div>
 
       {!hasItems ? (
-        <div className="rounded-lg bg-muted/25 px-4 py-3 dark:bg-muted/15">
-          <p className="text-sm font-medium">{GROWTH_HOME_CAUGHT_UP_TITLE}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{GROWTH_HOME_AVA_IDLE}</p>
+        <div className="flex items-center gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/50 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+          <CheckCircle2 className="size-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+          <p className="text-sm font-medium text-foreground">{GROWTH_HOME_NOTHING_REQUIRES_APPROVAL}</p>
         </div>
       ) : (
         <div className="space-y-2">
           {waitingOnYou.map((item) => (
-            <article key={item.id} className="rounded-lg bg-amber-500/8 px-3 py-2.5 dark:bg-amber-500/10">
+            <article key={item.id} className="rounded-lg border border-amber-200/80 bg-amber-50/50 px-3 py-2.5 dark:border-amber-900/40 dark:bg-amber-950/20">
               <p className="text-sm font-medium text-foreground">{item.label}</p>
               <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{item.detail}</p>
             </article>

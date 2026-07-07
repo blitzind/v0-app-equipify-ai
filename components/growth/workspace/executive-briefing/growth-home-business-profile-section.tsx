@@ -26,6 +26,7 @@ import {
   type GrowthBusinessProfileApiResponse,
 } from "@/lib/growth/business-profile/business-profile-api-contract"
 import { GROWTH_HOME_GROWTH_PROFILE_SECTION_SUBTITLE } from "@/lib/growth/workspace/executive-briefing/growth-home-premium-ux-1a"
+import { cn } from "@/lib/utils"
 
 type ViewState = "loading" | "create" | "draft" | "approved"
 
@@ -65,7 +66,7 @@ function ProfileSectionEditor({
   )
 }
 
-export function GrowthHomeBusinessProfileSection() {
+export function GrowthHomeBusinessProfileSection({ embedded = false }: { embedded?: boolean }) {
   const [view, setView] = useState<ViewState>("loading")
   const [activeApproved, setActiveApproved] = useState<BusinessProfileRecord | null>(null)
   const [latestDraft, setLatestDraft] = useState<BusinessProfileRecord | null>(null)
@@ -243,8 +244,14 @@ export function GrowthHomeBusinessProfileSection() {
       data-qa-marker={GROWTH_AIOS_BUSINESS_PROFILE_1B_QA_MARKER}
       data-qa-marker-foundation={GROWTH_AIOS_BUSINESS_PROFILE_1A_QA_MARKER}
       data-business-profile-state={view}
-      className="space-y-4 rounded-2xl border border-sky-100 bg-sky-50/30 p-6 dark:border-sky-900/30 dark:bg-sky-950/10"
+      className={cn(
+        "space-y-4",
+        embedded
+          ? "rounded-xl border border-border/60 bg-background/80 p-4"
+          : "rounded-2xl border border-sky-100 bg-sky-50/30 p-6 dark:border-sky-900/30 dark:bg-sky-950/10",
+      )}
     >
+      {!embedded ? (
       <div className="flex items-start gap-3">
         <div className="rounded-xl bg-sky-100 p-2 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200">
           <Building2 className="size-5" />
@@ -254,6 +261,7 @@ export function GrowthHomeBusinessProfileSection() {
           <p className="mt-1 text-sm text-muted-foreground">{GROWTH_HOME_GROWTH_PROFILE_SECTION_SUBTITLE}</p>
         </div>
       </div>
+      ) : null}
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 

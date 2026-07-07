@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Check, Loader2 } from "lucide-react"
+import { Check, Clock3, Loader2, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthHomeProgressBar } from "@/components/growth/workspace/executive-briefing/growth-home-progress-bar"
 import { GrowthMissionCenterDetailDrawer } from "@/components/growth/mission-center/growth-mission-center-detail-drawer"
@@ -15,6 +15,7 @@ import {
   GROWTH_MISSION_CENTER_HEALTH_LABELS,
   GROWTH_AVA_MISSION_CENTER_1A_QA_MARKER,
   buildMissionCenterDetailView,
+  presentationStageLabel,
   synthesizeGrowthMissionCenter,
   type GrowthMissionCenterCard,
   type GrowthMissionCenterSourcesPayload,
@@ -113,7 +114,7 @@ export function GrowthHomeMissionCenterSection({ dashboard }: Props) {
       <section
         data-qa-section="home-mission-center"
         data-qa-marker={GROWTH_AVA_MISSION_CENTER_1A_QA_MARKER}
-        className="rounded-2xl border border-border/70 bg-card p-6 space-y-5"
+        className="rounded-2xl border border-border/70 bg-card p-5 space-y-4 sm:p-6"
       >
         <div>
           <h2 className="text-lg font-semibold tracking-tight">{GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_TITLE}</h2>
@@ -138,45 +139,46 @@ export function GrowthHomeMissionCenterSection({ dashboard }: Props) {
           {missionCenter.activeMissions.map((mission) => (
             <article
               key={mission.id}
-              className="rounded-2xl border border-border/60 bg-card p-5 space-y-4"
+              className="rounded-xl border border-border/60 bg-background/80 p-4 space-y-3"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-lg font-semibold">{mission.name}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{mission.currentActivity}</p>
+                <div className="min-w-0 space-y-1">
+                  <p className="text-base font-semibold">{mission.name}</p>
+                  <p className="text-sm text-muted-foreground">{mission.currentActivity}</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide">
-                    {GROWTH_MISSION_CENTER_HEALTH_LABELS[mission.health]}
-                  </span>
-                  <span className="text-xs text-muted-foreground capitalize">{mission.statusLabel}</span>
-                </div>
+                <span className="rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide">
+                  {GROWTH_MISSION_CENTER_HEALTH_LABELS[mission.health]}
+                </span>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Progress</span>
-                  <span className="font-medium">{mission.progressPercent}%</span>
-                </div>
-                <GrowthHomeProgressBar percent={mission.progressPercent} />
-              </div>
+              <GrowthHomeProgressBar percent={mission.progressPercent} />
 
-              {mission.completedToday.length > 0 ? (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Completed today</p>
-                  <ul className="space-y-1 text-sm text-muted-foreground">
-                    {mission.completedToday.map((item) => (
-                      <li key={item} className="flex items-center gap-2">
-                        <Check className="size-4 shrink-0 text-emerald-600" aria-hidden />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
+              <div className="grid gap-2 text-sm sm:grid-cols-3">
+                <div className="flex items-start gap-2 rounded-lg bg-muted/20 px-2.5 py-2">
+                  <Clock3 className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">ETA</p>
+                    <p className="font-medium">{mission.confidence || "On track"}</p>
+                  </div>
                 </div>
-              ) : null}
+                <div className="flex items-start gap-2 rounded-lg bg-muted/20 px-2.5 py-2">
+                  <Target className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Next milestone</p>
+                    <p className="font-medium line-clamp-2">{mission.recommendedNextAction}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2 rounded-lg bg-muted/20 px-2.5 py-2">
+                  <Check className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Stage</p>
+                    <p className="font-medium">{presentationStageLabel(mission.presentationStage)}</p>
+                  </div>
+                </div>
+              </div>
 
               {mission.waitingOn ? (
-                <p className="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-sm dark:border-amber-900/40 dark:bg-amber-950/20">
+                <p className="rounded-lg border border-amber-200/80 bg-amber-50/60 px-3 py-2 text-sm dark:border-amber-900/40 dark:bg-amber-950/20">
                   <span className="font-medium">Waiting on · </span>
                   {mission.waitingOn}
                 </p>
@@ -190,12 +192,12 @@ export function GrowthHomeMissionCenterSection({ dashboard }: Props) {
                 </div>
               ) : null}
 
-              <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
+              <div className="flex flex-wrap gap-2 border-t border-border/50 pt-3">
                 <Button type="button" size="sm" onClick={() => openMission(mission)}>
-                  View Details
+                  View Mission
                 </Button>
                 {missionCenter.pendingApprovalCount > 0 ? (
-                  <Button asChild size="sm" variant="default">
+                  <Button asChild size="sm" variant="secondary">
                     <Link href={missionCenter.approvalsHref}>Review Approvals</Link>
                   </Button>
                 ) : null}

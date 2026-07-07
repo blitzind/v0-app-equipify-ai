@@ -58,9 +58,7 @@ async function main(): Promise<void> {
   const hero = indexOfMount(dashboard, "GrowthHomeExecutiveBriefingHeroSection", "Hero")
   const needs = indexOfMount(dashboard, "GrowthHomeAiOsWaitingOnYouSection", "Needs Your Decision")
   const mission = indexOfMount(dashboard, "GrowthHomeMissionCenterSection", "Mission Center")
-  const profile = indexOfMount(dashboard, "GrowthHomeBusinessProfileSection", "Growth Profile")
-  const findLeads = indexOfMount(dashboard, "GrowthHomeDatamoonSourcingWorkbenchSection", "Find Leads")
-  const opportunity = indexOfMount(dashboard, "GrowthHomeAvaOpportunityIntelligenceSection", "Opportunity Brief")
+  const growthStrategy = indexOfMount(dashboard, "GrowthHomeGrowthStrategySection", "Growth Strategy")
   const initiatives = indexOfMount(dashboard, "GrowthHomeMarketingMissionsSection", "Growth Initiatives")
   const customer = indexOfComponent(dashboard, 'data-qa-section="home-customer-growth"', "Customer Growth")
   const timeline = indexOfMount(dashboard, "GrowthHomeTimelineSection", "What Ava Accomplished")
@@ -68,10 +66,8 @@ async function main(): Promise<void> {
 
   assert.ok(needs > hero, "Needs Your Decision must follow hero")
   assert.ok(mission > needs, "Mission Center must follow Needs Your Decision")
-  assert.ok(profile > mission, "Growth Profile must follow Mission Center")
-  assert.ok(findLeads > profile, "Find Leads must follow Growth Profile")
-  assert.ok(opportunity > findLeads, "Opportunity Brief must follow Find Leads")
-  assert.ok(initiatives > opportunity, "Growth Initiatives must follow Opportunity Brief")
+  assert.ok(growthStrategy > mission, "Growth Strategy must follow Mission Center")
+  assert.ok(initiatives > growthStrategy, "Growth Initiatives must follow Growth Strategy")
   assert.ok(customer > initiatives, "Customer Growth must follow Growth Initiatives")
   assert.ok(timeline > customer, "What Ava Accomplished must follow Customer Growth")
   assert.ok(operational > timeline, "Operational Readiness must follow What Ava Accomplished")
@@ -81,6 +77,13 @@ async function main(): Promise<void> {
   )
   assert.match(opportunitySection, /GROWTH_HOME_OPPORTUNITY_BRIEF_TITLE/)
   assert.doesNotMatch(opportunitySection, /<h2[^>]*>Opportunity intelligence<\/h2>/)
+
+  const growthStrategySection = readSource(
+    "components/growth/workspace/executive-briefing/growth-home-growth-strategy-section.tsx",
+  )
+  assert.match(growthStrategySection, /GrowthHomeBusinessProfileSection/)
+  assert.match(growthStrategySection, /GrowthHomeDatamoonSourcingWorkbenchSection/)
+  assert.match(growthStrategySection, /GrowthHomeAvaOpportunityIntelligenceSection/)
 
   const findLeadsSection = readSource(
     "components/growth/workspace/executive-briefing/growth-home-datamoon-sourcing-workbench-section.tsx",

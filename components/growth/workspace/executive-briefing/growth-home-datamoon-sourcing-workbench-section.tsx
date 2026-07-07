@@ -88,6 +88,7 @@ import type {
   DatamoonAudienceImportRun,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import type { DatamoonProviderDiagnostics } from "@/lib/growth/providers/datamoon"
+import { cn } from "@/lib/utils"
 
 type GuidedWorkflowStep = "prompt" | "plan" | "ready" | "configure"
 
@@ -128,7 +129,7 @@ function splitAssumptions(assumptions: string[], overrides: string[]) {
   return { confidentAssumptions, unsureItems }
 }
 
-export function GrowthHomeDatamoonSourcingWorkbenchSection() {
+export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }: { embedded?: boolean }) {
   const [open, setOpen] = useState(false)
   const [providerDetailsOpen, setProviderDetailsOpen] = useState(false)
   const [mode, setMode] = useState<AvaDatamoonSourcingWorkbenchMode>("ava_draft")
@@ -457,8 +458,14 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
         data-qa-marker={GROWTH_AIOS_FIND_LEADS_UX_2A_QA_MARKER}
         data-qa-marker-rename={GROWTH_AIOS_GROWTH_UX_RENAME_1A_QA_MARKER}
         data-qa-marker-foundation={GROWTH_AVA_DATAMOON_SOURCING_WORKBENCH_1A_QA_MARKER}
-        className="rounded-2xl border border-border/70 bg-card p-6 space-y-5"
+        className={cn(
+          "space-y-4",
+          embedded
+            ? "rounded-xl border border-border/60 bg-background/80 p-4"
+            : "rounded-2xl border border-border/70 bg-card p-6 space-y-5",
+        )}
       >
+        {!embedded ? (
         <div className="flex items-start gap-4">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-700">
             <Search className="size-5" aria-hidden />
@@ -486,6 +493,16 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
             )}
           </div>
         </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">{GROWTH_HOME_FIND_LEADS_SUBTITLE}</p>
+            {hasApprovedBusinessProfile ? (
+              <GrowthBadge tone="healthy">{GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL}</GrowthBadge>
+            ) : (
+              <p className="text-sm text-muted-foreground">{GROWTH_HOME_FIND_LEADS_CARD_MISSING_COPY}</p>
+            )}
+          </div>
+        )}
         {hasApprovedBusinessProfile ? (
           <Button type="button" size="sm" onClick={() => handleOpenDrawer(false)}>
             {GROWTH_HOME_FIND_LEADS_CTA}
