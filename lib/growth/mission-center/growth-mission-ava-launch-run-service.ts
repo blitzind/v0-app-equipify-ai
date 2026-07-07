@@ -20,6 +20,7 @@ import {
   GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER,
   type GrowthMissionAvaLaunchRunResult,
 } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-api-contract"
+import { registerAvaAutonomyCompletionPendingLeads } from "@/lib/growth/mission-center/growth-ava-autonomy-completion-service"
 import { getGrowthObjective } from "@/lib/growth/objectives/growth-objective-repository"
 
 export type RunGrowthMissionAvaLaunchRunInput = {
@@ -193,6 +194,14 @@ export async function runGrowthMissionAvaLaunchRun(
       const message = error instanceof Error ? error.message : "datamoon_import_failed"
       return { ok: false, error: message, status: 500, runId: started.run.id }
     }
+  }
+
+  if (leadIds.length > 0) {
+    await registerAvaAutonomyCompletionPendingLeads(admin, {
+      organizationId: input.organizationId,
+      missionId: input.missionId,
+      leadIds,
+    })
   }
 
   const [research, humanApprovalCenter] = await Promise.all([

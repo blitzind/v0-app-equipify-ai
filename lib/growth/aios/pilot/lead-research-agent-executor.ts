@@ -41,6 +41,7 @@ import { qualifyGrowthLeadResearch } from "@/lib/growth/aios/growth/growth-lead-
 import { assessGrowthLeadResearchOpportunity } from "@/lib/growth/aios/growth/growth-lead-research-opportunity-assessment"
 import type { GrowthLeadResearchIntelligenceOutput } from "@/lib/growth/aios/growth/growth-lead-research-opportunity-assessment"
 import type { GrowthLeadResearchQualificationOutput } from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
+import { scheduleAvaAutonomyCompletionForLead } from "@/lib/growth/mission-center/growth-ava-autonomy-completion-service"
 
 function normalizeResearchProviderPayload(raw: unknown): unknown {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw
@@ -390,6 +391,11 @@ export async function executeResearchCompanyWorkOrderViaAiOs(
     })
 
     workflowTerminalStatus = "assessed"
+
+    scheduleAvaAutonomyCompletionForLead(admin, {
+      organizationId: input.organizationId,
+      leadId: input.leadId,
+    })
   }
 
   const completed = await transitionAiWorkOrder(admin, {

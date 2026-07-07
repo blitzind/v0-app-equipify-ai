@@ -1,5 +1,7 @@
 /** GE-AVA-MISSION-RUNTIME-1A — Persistent mission execution state (client-safe). */
 
+import type { GrowthMissionRuntimeAvaAutonomyCompletionState } from "@/lib/growth/mission-center/growth-ava-autonomy-completion-types"
+
 export const GROWTH_AVA_MISSION_RUNTIME_1A_QA_MARKER = "ge-ava-mission-runtime-1a-v1" as const
 
 export const GROWTH_MISSION_RUNTIME_RULE =
@@ -69,6 +71,8 @@ export type GrowthObjectiveMissionRuntimeState = {
   audience: GrowthMissionRuntimeAudienceBinding | null
   datamoon: GrowthMissionRuntimeDatamoonBinding | null
   events: GrowthMissionRuntimeEvent[]
+  /** GE-AVA-AUTONOMY-COMPLETION-RUN-1 — Async post-import completion orchestration state */
+  avaAutonomyCompletion?: GrowthMissionRuntimeAvaAutonomyCompletionState | null
 }
 
 export function createDefaultMissionRuntimeState(

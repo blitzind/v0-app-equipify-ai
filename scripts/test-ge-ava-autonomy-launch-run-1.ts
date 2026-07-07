@@ -38,6 +38,7 @@ async function main(): Promise<void> {
   assert.match(service, /bindFindLeadsSearchToMission/)
   assert.match(service, /pollDatamoonAudienceImportRun/)
   assert.match(service, /importDatamoonAudiencePreviewRecords/)
+  assert.match(service, /registerAvaAutonomyCompletionPendingLeads/)
   assert.match(service, /fetchLatestGrowthLeadResearchWorkflowSnapshot/)
   assert.match(service, /fetchAiOsCommandCenterReadModel/)
   assert.match(service, /stoppedAt: "human_approval"/)
