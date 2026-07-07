@@ -16,7 +16,7 @@ export function GrowthHomeAutonomousReadinessSection({
       className="rounded-2xl border border-border/70 bg-card p-6 space-y-5"
     >
       <div>
-        <h2 className="text-lg font-semibold tracking-tight">Autonomous readiness</h2>
+        <h3 className="text-base font-semibold tracking-tight">Autonomous readiness</h3>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>

@@ -16,7 +16,7 @@ export const GROWTH_BUSINESS_PROFILE_DRAFTING_MESSAGE =
 export const GROWTH_BUSINESS_PROFILE_APPROVE_LABEL = "Approve" as const
 export const GROWTH_BUSINESS_PROFILE_REJECT_LABEL = "Reject" as const
 export const GROWTH_BUSINESS_PROFILE_UPDATE_LABEL = "Update Business Profile" as const
-export const GROWTH_BUSINESS_PROFILE_SECTION_TITLE = "Teach Ava About Your Business" as const
+export const GROWTH_BUSINESS_PROFILE_SECTION_TITLE = "Growth Profile" as const
 
 export type GrowthBusinessProfileApiResponse = {
   ok: boolean

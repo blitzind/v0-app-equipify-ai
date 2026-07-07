@@ -36,7 +36,7 @@ export function GrowthHomeMailboxDomainHealthSection({
       className="rounded-2xl border border-border/70 bg-card p-6 space-y-5"
     >
       <div>
-        <h2 className="text-lg font-semibold tracking-tight">Mailbox & domain health</h2>
+        <h3 className="text-base font-semibold tracking-tight">Mailbox & domain health</h3>
         {health.summary ? <p className="mt-1 text-sm text-muted-foreground">{health.summary}</p> : null}
       </div>
       <div className="grid gap-4 lg:grid-cols-2">

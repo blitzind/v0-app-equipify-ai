@@ -60,6 +60,7 @@ import {
   GROWTH_HOME_FIND_LEADS_REVIEW_ALL_LABEL,
   GROWTH_HOME_FIND_LEADS_UNSURE_TITLE,
   GROWTH_HOME_FIND_LEADS_TITLE,
+  GROWTH_HOME_FIND_LEADS_SUBTITLE,
   GROWTH_HOME_ASK_AVA_TAB_LABEL,
   GROWTH_HOME_IMPORT_RECOMMENDED_LABEL,
   GROWTH_HOME_IMPORT_SELECTED_LABEL,
@@ -464,6 +465,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection() {
           </span>
           <div className="space-y-3">
             <h2 className="text-lg font-semibold tracking-tight">{GROWTH_HOME_FIND_LEADS_TITLE}</h2>
+            <p className="text-sm text-muted-foreground">{GROWTH_HOME_FIND_LEADS_SUBTITLE}</p>
             {hasApprovedBusinessProfile ? (
               <>
                 <p className="text-sm text-muted-foreground">{GROWTH_HOME_FIND_LEADS_CARD_APPROVED_COPY}</p>

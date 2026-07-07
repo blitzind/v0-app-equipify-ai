@@ -13,6 +13,9 @@ export const GROWTH_MISSION_CENTER_RULE =
 
 export const GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_TITLE = "Ava's Active Missions" as const
 
+export const GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_SUBTITLE =
+  "Track the revenue missions Ava is running for you." as const
+
 export const GROWTH_MISSION_CENTER_EMPTY_STATE_COPY =
   "When Ava has an active revenue mission — research, leads, or outreach — it will appear here." as const
 

@@ -9,6 +9,7 @@ import {
   GROWTH_HOME_NEEDS_YOUR_ATTENTION,
   GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-experience-2b"
+import { GROWTH_HOME_NEEDS_YOUR_DECISION_SUBTITLE } from "@/lib/growth/workspace/executive-briefing/growth-home-premium-ux-1a"
 import { Button } from "@/components/ui/button"
 
 type Props = {
@@ -29,9 +30,7 @@ export function GrowthHomeAiOsWaitingOnYouSection({ aiOsUx }: Props) {
         <div>
           <h2 className="text-lg font-semibold tracking-tight">{GROWTH_HOME_NEEDS_YOUR_ATTENTION}</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            {hasItems
-              ? "Items Ava prepared that need your decision before work continues."
-              : "Nothing blocking Ava right now."}
+            {hasItems ? GROWTH_HOME_NEEDS_YOUR_DECISION_SUBTITLE : "Nothing blocking Ava right now."}
           </p>
         </div>
         {approveItemsHref && approveItemsCount > 0 ? (

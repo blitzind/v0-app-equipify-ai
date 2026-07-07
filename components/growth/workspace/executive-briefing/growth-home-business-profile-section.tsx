@@ -25,6 +25,7 @@ import {
   GROWTH_BUSINESS_PROFILE_UPDATE_LABEL,
   type GrowthBusinessProfileApiResponse,
 } from "@/lib/growth/business-profile/business-profile-api-contract"
+import { GROWTH_HOME_GROWTH_PROFILE_SECTION_SUBTITLE } from "@/lib/growth/workspace/executive-briefing/growth-home-premium-ux-1a"
 
 type ViewState = "loading" | "create" | "draft" | "approved"
 
@@ -249,11 +250,8 @@ export function GrowthHomeBusinessProfileSection() {
           <Building2 className="size-5" />
         </div>
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">{GROWTH_BUSINESS_PROFILE_SECTION_TITLE}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Share a few details and Ava will draft your Business Profile. Review and approve before Ava uses it for
-            lead discovery and recommendations.
-          </p>
+          <h2 className="text-lg font-semibold tracking-tight">{GROWTH_BUSINESS_PROFILE_SECTION_TITLE}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{GROWTH_HOME_GROWTH_PROFILE_SECTION_SUBTITLE}</p>
         </div>
       </div>
 

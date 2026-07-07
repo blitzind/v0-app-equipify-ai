@@ -1,6 +1,10 @@
 "use client"
 
 import type { GrowthHomeTimelinePeriod } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
+import {
+  GROWTH_HOME_AVA_ACCOMPLISHED_SUBTITLE,
+  GROWTH_HOME_AVA_ACCOMPLISHED_TITLE,
+} from "@/lib/growth/workspace/executive-briefing/growth-home-premium-ux-1a"
 
 export function GrowthHomeTimelineSection({ periods }: { periods: GrowthHomeTimelinePeriod[] }) {
   if (periods.every((period) => period.items.length === 0)) return null
@@ -11,8 +15,8 @@ export function GrowthHomeTimelineSection({ periods }: { periods: GrowthHomeTime
       className="rounded-2xl border border-border/70 bg-card p-6 space-y-5"
     >
       <div>
-        <h2 className="text-lg font-semibold tracking-tight">What I accomplished</h2>
-        <p className="mt-1 text-sm text-muted-foreground">A running narrative of my work — not a dashboard export.</p>
+        <h2 className="text-lg font-semibold tracking-tight">{GROWTH_HOME_AVA_ACCOMPLISHED_TITLE}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{GROWTH_HOME_AVA_ACCOMPLISHED_SUBTITLE}</p>
       </div>
       <div className="space-y-6">
         {periods.map((period) => (

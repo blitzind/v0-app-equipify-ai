@@ -3,6 +3,7 @@
 import Link from "next/link"
 import type { GrowthHomeMarketingMission } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 import { AI_GROWTH_INITIATIVES_TITLE } from "@/lib/workspace/ai-autonomous-marketing-operator"
+import { GROWTH_HOME_GROWTH_INITIATIVES_SUBTITLE } from "@/lib/growth/workspace/executive-briefing/growth-home-premium-ux-1a"
 import { GrowthHomeProgressBar } from "@/components/growth/workspace/executive-briefing/growth-home-progress-bar"
 import { Button } from "@/components/ui/button"
 
@@ -20,9 +21,7 @@ export function GrowthHomeMarketingMissionsSection({ missions }: Props) {
     >
       <div>
         <h2 className="text-lg font-semibold tracking-tight">{AI_GROWTH_INITIATIVES_TITLE}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Campaigns and channels that help sell Equipify — SEO, ads, content, ICP, and landing pages.
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">{GROWTH_HOME_GROWTH_INITIATIVES_SUBTITLE}</p>
       </div>
       <div className="space-y-4">
         {missions.map((mission) => (

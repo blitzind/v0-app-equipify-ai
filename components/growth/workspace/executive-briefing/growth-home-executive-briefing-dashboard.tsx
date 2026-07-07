@@ -7,6 +7,12 @@ import { useAiEmployeeStatus } from "@/components/growth/ai-teammate/ai-employee
 import { synthesizeGrowthHomeExecutiveBriefing } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-synthesizer"
 import { GROWTH_HOME_EXECUTIVE_BRIEFING_QA_MARKER } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 import { GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER } from "@/lib/growth/workspace/growth-workspace-action-first-1f"
+import {
+  GROWTH_AIOS_HOME_PREMIUM_UX_1A_QA_MARKER,
+  GROWTH_HOME_CUSTOMER_GROWTH_SUBTITLE,
+  GROWTH_HOME_OPERATIONAL_READINESS_SUBTITLE,
+  GROWTH_HOME_OPERATIONAL_READINESS_TITLE,
+} from "@/lib/growth/workspace/executive-briefing/growth-home-premium-ux-1a"
 import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
 import type { GrowthWorkspaceRecentView, GrowthWorkspaceContinueItem } from "@/lib/growth/workspace/growth-workspace-activity-memory"
 import { formatRelativeTime } from "@/lib/notifications/format-relative"
@@ -80,6 +86,7 @@ export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, c
     <div
       className="space-y-10"
       data-qa-marker={GROWTH_HOME_EXECUTIVE_BRIEFING_QA_MARKER}
+      data-qa-marker-premium-ux={GROWTH_AIOS_HOME_PREMIUM_UX_1A_QA_MARKER}
       data-growth-action-first-order="actions-before-metrics"
       data-qa-marker-action-first={GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER}
     >
@@ -94,17 +101,13 @@ export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, c
 
       <GrowthHomeAiOsWaitingOnYouSection aiOsUx={aiOsUx} />
 
-      <GrowthHomeDailyWorkQueueSection items={aiOsUx.dailyWorkQueue} buckets={aiOsUx.dailyWorkQueueBuckets} />
-
-      <GrowthHomeAvaLiveStatusSection status={aiOsUx.liveStatus} />
+      <GrowthHomeMissionCenterSection dashboard={dashboard} />
 
       <GrowthHomeBusinessProfileSection />
 
-      <GrowthHomeMissionCenterSection dashboard={dashboard} />
+      <GrowthHomeDatamoonSourcingWorkbenchSection />
 
       <GrowthHomeAvaOpportunityIntelligenceSection dailyWorkQueue={aiOsUx.dailyWorkQueue} />
-
-      <GrowthHomeDatamoonSourcingWorkbenchSection />
 
       <GrowthHomeMarketingMissionsSection missions={briefing.marketingMissions} />
 
@@ -114,9 +117,7 @@ export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, c
       >
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Customer Growth</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Expansion, renewals, and account health — separate from revenue outreach.
-          </p>
+          <p className="mt-1 text-sm text-muted-foreground">{GROWTH_HOME_CUSTOMER_GROWTH_SUBTITLE}</p>
         </div>
         <GrowthHomeCustomerSuccessMissionsSection missions={briefing.customerSuccessMissions} />
         {hasCustomerGrowthContent ? (
@@ -133,11 +134,16 @@ export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, c
 
       <GrowthHomeTimelineSection periods={briefing.timeline} />
 
-      <GrowthHomeThroughputSection metrics={aiOsUx.throughput} />
-
-      <GrowthHomeMailboxDomainHealthSection health={aiOsUx.mailboxDomainHealth} />
-
-      <GrowthHomeAutonomousReadinessSection readiness={aiOsUx.autonomousReadiness} />
+      <section data-qa-section="home-operational-readiness" className="space-y-5">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">{GROWTH_HOME_OPERATIONAL_READINESS_TITLE}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{GROWTH_HOME_OPERATIONAL_READINESS_SUBTITLE}</p>
+        </div>
+        <div className="space-y-5">
+          <GrowthHomeMailboxDomainHealthSection health={aiOsUx.mailboxDomainHealth} />
+          <GrowthHomeAutonomousReadinessSection readiness={aiOsUx.autonomousReadiness} />
+        </div>
+      </section>
 
       <Collapsible open={secondaryOpen} onOpenChange={setSecondaryOpen}>
         <CollapsibleTrigger asChild>
@@ -147,6 +153,9 @@ export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, c
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-6 pt-4" data-qa-section="home-everything-else">
+          <GrowthHomeDailyWorkQueueSection items={aiOsUx.dailyWorkQueue} buckets={aiOsUx.dailyWorkQueueBuckets} />
+          <GrowthHomeAvaLiveStatusSection status={aiOsUx.liveStatus} />
+          <GrowthHomeThroughputSection metrics={aiOsUx.throughput} />
           <GrowthHomeCheckInSection checkIn={briefing.checkIn} lastUpdateLabel={lastUpdateLabel} />
           <GrowthHomeMissionHealthSection items={briefing.missionHealth} />
           <GrowthHomeRevenueForecastSection forecast={briefing.revenueForecast} />

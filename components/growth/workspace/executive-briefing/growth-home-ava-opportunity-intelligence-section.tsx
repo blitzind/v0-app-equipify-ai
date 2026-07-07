@@ -16,6 +16,10 @@ import {
   type GrowthHomeOpportunityIntelligenceApiResponse,
   growthHomeOpportunityIntelligenceHref,
 } from "@/lib/growth/opportunity-intelligence/growth-home-opportunity-intelligence-api-contract"
+import {
+  GROWTH_HOME_OPPORTUNITY_BRIEF_SUBTITLE,
+  GROWTH_HOME_OPPORTUNITY_BRIEF_TITLE,
+} from "@/lib/growth/workspace/executive-briefing/growth-home-premium-ux-1a"
 import { GrowthHomeOpportunityIntelligencePanel } from "@/components/growth/workspace/executive-briefing/growth-home-opportunity-intelligence-panel"
 import { GrowthHomeAvaSafeExecutionPanel } from "@/components/growth/workspace/executive-briefing/growth-home-ava-safe-execution-panel"
 
@@ -127,10 +131,8 @@ export function GrowthHomeAvaOpportunityIntelligenceSection({ dailyWorkQueue }: 
             <Sparkles className="size-5" aria-hidden />
           </span>
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Opportunity intelligence</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Ava can surface canonical qualification, readiness, and assessment — read-only, no outbound.
-            </p>
+            <h2 className="text-lg font-semibold tracking-tight">{GROWTH_HOME_OPPORTUNITY_BRIEF_TITLE}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{GROWTH_HOME_OPPORTUNITY_BRIEF_SUBTITLE}</p>
           </div>
         </div>
 

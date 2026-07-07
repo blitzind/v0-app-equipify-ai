@@ -9,6 +9,7 @@ import { GrowthMissionCenterDetailDrawer } from "@/components/growth/mission-cen
 import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
 import {
   GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_TITLE,
+  GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_SUBTITLE,
   GROWTH_MISSION_CENTER_EMPTY_STATE_COPY,
   GROWTH_MISSION_CENTER_API_PATH,
   GROWTH_MISSION_CENTER_HEALTH_LABELS,
@@ -116,9 +117,7 @@ export function GrowthHomeMissionCenterSection({ dashboard }: Props) {
       >
         <div>
           <h2 className="text-lg font-semibold tracking-tight">{GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_TITLE}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            One place to see what Ava is working on — research, leads, approvals, and next steps.
-          </p>
+          <p className="mt-1 text-sm text-muted-foreground">{GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_SUBTITLE}</p>
         </div>
 
         <div className="space-y-4">

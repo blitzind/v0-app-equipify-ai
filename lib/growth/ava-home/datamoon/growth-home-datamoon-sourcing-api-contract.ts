@@ -12,21 +12,22 @@ export const GROWTH_AVA_MISSION_RUNTIME_1B_FIND_LEADS_BINDING_QA_MARKER =
   "ge-ava-mission-runtime-1b-v1" as const
 
 export const GROWTH_HOME_FIND_LEADS_TITLE = "Find Leads" as const
-export const GROWTH_HOME_FIND_LEADS_SUBTITLE = "Tell Ava what kinds of companies you want to find." as const
+export const GROWTH_HOME_FIND_LEADS_SUBTITLE =
+  "Ask Ava to find companies that match your Growth Profile." as const
 export const GROWTH_HOME_FIND_LEADS_CTA = "Find Leads" as const
 export const GROWTH_HOME_FIND_LEADS_CARD_APPROVED_COPY =
-  "Your Business Profile is ready. Tell Ava who you'd like to find—or let her recommend the best opportunities." as const
+  "Your Growth Profile is ready. Tell Ava who you'd like to find—or let her recommend the best opportunities." as const
 export const GROWTH_HOME_FIND_LEADS_CARD_MISSING_COPY =
   "Ava can automatically find companies that match your ideal customer once she understands your business." as const
 export const GROWTH_HOME_FIND_LEADS_CARD_CONTINUE_MANUAL_LABEL = "Continue with Manual Search" as const
 /** @deprecated Use GROWTH_HOME_FIND_LEADS_CARD_MISSING_COPY — kept for test compatibility */
 export const GROWTH_HOME_FIND_LEADS_CARD_MISSING_PROFILE_COPY = GROWTH_HOME_FIND_LEADS_CARD_MISSING_COPY
 export const GROWTH_HOME_FIND_LEADS_SECONDARY_COPY =
-  "Ava will draft a search from your Business Profile. You can edit everything before she searches." as const
+  "Ava will draft a search from your Growth Profile. You can edit everything before she searches." as const
 
 export const GROWTH_HOME_FIND_LEADS_HERO_TITLE = "Who would you like me to find?" as const
 export const GROWTH_HOME_FIND_LEADS_HERO_SUBTITLE =
-  "Tell Ava about the kinds of companies you're looking for. She'll prepare the search using your approved Business Profile." as const
+  "Tell Ava about the kinds of companies you're looking for. She'll prepare the search using your approved Growth Profile." as const
 export const GROWTH_HOME_FIND_LEADS_HERO_PLACEHOLDER =
   "Examples:\n• Find roofing companies in Florida showing buying intent\n• Find HVAC companies with 10–100 employees\n• Find manufacturers replacing legacy ERP\n• Find medical equipment service companies" as const
 
@@ -74,7 +75,7 @@ export const GROWTH_HOME_FIND_LEADS_EXAMPLES = [
   "Find companies hiring service technicians",
 ] as const
 
-export const GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL = "Using approved Business Profile" as const
+export const GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL = "Using approved Growth Profile" as const
 export const GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_STARTED_COPY =
   "I started with your approved Business Profile and adjusted the search based on your request." as const
 export const GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_MISSING_COPY =
