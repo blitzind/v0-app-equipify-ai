@@ -76,9 +76,12 @@ import {
   buildMissionAvaLaunchRunApiPath,
   buildMissionBindFindLeadsApiPath,
   formatGrowthAvaLaunchValidationErrorsForUi,
+  GROWTH_AVA_LAUNCH_CANT_START_HEADING,
   GROWTH_AVA_LAUNCH_RUN_SUCCESS_COPY,
   GROWTH_AVA_LAUNCH_RUN_TITLE,
+  GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR,
   GROWTH_MISSION_CENTER_API_PATH,
+  isGrowthMissionAvaLaunchValidationFailureError,
   type GrowthAvaLaunchValidationError,
   type GrowthMissionAvaLaunchRunResponse,
   type GrowthMissionBindFindLeadsResponse,
@@ -123,6 +126,9 @@ function formatAvaLaunchFailureMessage(payload: {
 }): string {
   if (payload.validationErrors && payload.validationErrors.length > 0) {
     return formatGrowthAvaLaunchValidationErrorsForUi(payload.validationErrors)
+  }
+  if (payload.error && isGrowthMissionAvaLaunchValidationFailureError(payload.error)) {
+    return `${GROWTH_AVA_LAUNCH_CANT_START_HEADING}\n\n• ${GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR}`
   }
   return payload.error ?? "Ava launch run failed."
 }

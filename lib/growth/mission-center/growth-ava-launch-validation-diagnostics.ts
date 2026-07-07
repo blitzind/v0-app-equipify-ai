@@ -63,6 +63,25 @@ export function isGrowthAvaLaunchPreflightValidationErrorCode(error: string): bo
   return PREFLIGHT_VALIDATION_ERROR_CODES.has(error)
 }
 
+export function isAvaLaunchValidationFailureError(error: string): boolean {
+  if (error === GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR) return true
+  return isGrowthAvaLaunchPreflightValidationErrorCode(error)
+}
+
+export function mergeAvaLaunchValidationErrors(
+  ...groups: GrowthAvaLaunchValidationError[][]
+): GrowthAvaLaunchValidationError[] {
+  const merged: GrowthAvaLaunchValidationError[] = []
+  for (const group of groups) {
+    for (const entry of group) {
+      if (!merged.some((existing) => existing.code === entry.code && existing.field === entry.field)) {
+        merged.push(entry)
+      }
+    }
+  }
+  return merged
+}
+
 function errorEntry(
   code: string,
   message: string,
@@ -328,6 +347,7 @@ export function mapServiceErrorToAvaLaunchValidationErrors(error: string): Growt
     case "datamoon_provider_disabled":
       return [errorEntry("datamoon_provider_disabled", "Datamoon provider is disabled.", "datamoonProvider")]
     case "validation_failed":
+    case GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR:
       return [errorEntry("validation_failed", "Lead search request is invalid.", "audienceDraft")]
     default:
       return [errorEntry(error, error.replaceAll("_", " "), "launch")]

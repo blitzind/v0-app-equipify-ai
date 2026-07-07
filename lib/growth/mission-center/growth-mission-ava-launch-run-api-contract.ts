@@ -48,6 +48,62 @@ export function formatGrowthAvaLaunchValidationErrorsForUi(
   return [GROWTH_AVA_LAUNCH_CANT_START_HEADING, "", ...bullets].join("\n")
 }
 
+export function ensureGrowthAvaLaunchValidationErrors(
+  validationErrors: GrowthAvaLaunchValidationError[],
+  fallbackMessage?: string,
+): GrowthAvaLaunchValidationError[] {
+  if (validationErrors.length > 0) return validationErrors
+  const message = fallbackMessage?.trim() || "Launch validation failed."
+  return [
+    {
+      code: "validation_failed",
+      message,
+      field: "launch",
+      severity: "error",
+    },
+  ]
+}
+
+export function isGrowthMissionAvaLaunchValidationFailureError(error: string): boolean {
+  return error === GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR || error === "validation_failed"
+}
+
+export function buildGrowthMissionAvaLaunchValidationFailureBody(input: {
+  validationErrors: GrowthAvaLaunchValidationError[]
+  fallbackMessage?: string
+  runId?: string | null
+}): {
+  ok: false
+  qa_marker: typeof GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER
+  validation_debug_qa_marker: typeof GROWTH_AVA_LAUNCH_VALIDATION_DEBUG_1_QA_MARKER
+  error: typeof GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR
+  validationErrors: GrowthAvaLaunchValidationError[]
+  runId?: string | null
+} {
+  const validationErrors = ensureGrowthAvaLaunchValidationErrors(
+    input.validationErrors,
+    input.fallbackMessage,
+  )
+  const body: {
+    ok: false
+    qa_marker: typeof GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER
+    validation_debug_qa_marker: typeof GROWTH_AVA_LAUNCH_VALIDATION_DEBUG_1_QA_MARKER
+    error: typeof GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR
+    validationErrors: GrowthAvaLaunchValidationError[]
+    runId?: string | null
+  } = {
+    ok: false,
+    qa_marker: GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER,
+    validation_debug_qa_marker: GROWTH_AVA_LAUNCH_VALIDATION_DEBUG_1_QA_MARKER,
+    error: GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR,
+    validationErrors,
+  }
+  if (input.runId !== undefined) {
+    body.runId = input.runId
+  }
+  return body
+}
+
 export const GROWTH_AVA_LAUNCH_RUN_TITLE = "Run Ava" as const
 export const GROWTH_AVA_LAUNCH_RUN_DESCRIPTION =
   "Find leads from your approved search, import them, start research, and surface items for human approval — no outbound send." as const
@@ -110,6 +166,7 @@ export type GrowthMissionAvaLaunchRunResponse =
   | {
       ok: false
       qa_marker: typeof GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER
+      validation_debug_qa_marker?: typeof GROWTH_AVA_LAUNCH_VALIDATION_DEBUG_1_QA_MARKER
       error: string
       validationErrors?: GrowthAvaLaunchValidationError[]
       runId?: string | null

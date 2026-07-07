@@ -4,14 +4,15 @@ import { getGrowthEngineAiOrgId, requireGrowthEnginePlatformAccess } from "@/lib
 import {
   GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER,
   GROWTH_AVA_LAUNCH_VALIDATION_DEBUG_1_QA_MARKER,
-  GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR,
+  buildGrowthMissionAvaLaunchValidationFailureBody,
 } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-api-contract"
 import {
   evaluateGrowthAvaLaunchValidation,
-  isGrowthAvaLaunchPreflightValidationErrorCode,
+  isAvaLaunchValidationFailureError,
   logGrowthAvaLaunchValidationResult,
   mapServiceErrorToAvaLaunchValidationErrors,
   mapZodIssuesToAvaLaunchValidationErrors,
+  mergeAvaLaunchValidationErrors,
   shouldBlockGrowthAvaLaunchValidation,
 } from "@/lib/growth/mission-center/growth-ava-launch-validation-diagnostics"
 import { runGrowthMissionAvaLaunchRun } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-service"
@@ -122,12 +123,7 @@ export async function POST(request: Request, context: RouteContext) {
       outcome: "blocked",
     })
     return NextResponse.json(
-      {
-        ok: false,
-        qa_marker: GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER,
-        error: GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR,
-        validationErrors,
-      },
+      buildGrowthMissionAvaLaunchValidationFailureBody({ validationErrors }),
       { status: 400 },
     )
   }
@@ -149,12 +145,9 @@ export async function POST(request: Request, context: RouteContext) {
       outcome: "blocked",
     })
     return NextResponse.json(
-      {
-        ok: false,
-        qa_marker: GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER,
-        error: GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR,
+      buildGrowthMissionAvaLaunchValidationFailureBody({
         validationErrors: validation.validationErrors,
-      },
+      }),
       { status: resolveBlockingValidationStatus(validation.validationErrors) },
     )
   }
@@ -179,14 +172,11 @@ export async function POST(request: Request, context: RouteContext) {
   })
 
   if (!result.ok) {
-    if (isGrowthAvaLaunchPreflightValidationErrorCode(result.error)) {
-      const serviceValidationErrors = mapServiceErrorToAvaLaunchValidationErrors(result.error)
-      const mergedValidationErrors = [
-        ...validation.validationErrors,
-        ...serviceValidationErrors.filter(
-          (entry) => !validation.validationErrors.some((existing) => existing.code === entry.code),
-        ),
-      ]
+    if (isAvaLaunchValidationFailureError(result.error)) {
+      const mergedValidationErrors = mergeAvaLaunchValidationErrors(
+        validation.validationErrors,
+        mapServiceErrorToAvaLaunchValidationErrors(result.error),
+      )
       logGrowthAvaLaunchValidationResult({
         missionId: trimmedMissionId,
         evaluation: {
@@ -196,13 +186,11 @@ export async function POST(request: Request, context: RouteContext) {
         outcome: "blocked",
       })
       return NextResponse.json(
-        {
-          ok: false,
-          qa_marker: GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER,
-          error: GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR,
+        buildGrowthMissionAvaLaunchValidationFailureBody({
           validationErrors: mergedValidationErrors,
+          fallbackMessage: result.error,
           runId: result.runId ?? null,
-        },
+        }),
         { status: result.status },
       )
     }
