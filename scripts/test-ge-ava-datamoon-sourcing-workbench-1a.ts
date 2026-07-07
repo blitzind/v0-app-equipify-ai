@@ -108,7 +108,7 @@ async function main(): Promise<void> {
   )
   assert.match(dashboardSource, /GrowthHomeDatamoonSourcingWorkbenchSection/)
 
-  assert.equal(GROWTH_HOME_AVA_ASK_DRAFT_LABEL, "Ask Ava")
+  assert.equal(GROWTH_HOME_AVA_ASK_DRAFT_LABEL, "Generate Search")
   assert.equal(GROWTH_HOME_BUILD_AUDIENCE_LABEL, "Search for Leads")
 
   console.log(`[${PHASE}] PASS — Datamoon sourcing workbench certified (local)`)

@@ -33,7 +33,7 @@ async function main(): Promise<void> {
   assert.equal(GROWTH_HOME_FIND_LEADS_CTA, "Find Leads")
   assert.equal(GROWTH_HOME_ASK_AVA_TAB_LABEL, "Ask Ava")
   assert.equal(GROWTH_HOME_ADVANCED_SEARCH_TAB_LABEL, "Advanced Search")
-  assert.equal(GROWTH_HOME_AVA_ASK_DRAFT_LABEL, "Ask Ava")
+  assert.equal(GROWTH_HOME_AVA_ASK_DRAFT_LABEL, "Generate Search")
   assert.equal(GROWTH_HOME_BUILD_AUDIENCE_LABEL, "Search for Leads")
   assert.equal(GROWTH_HOME_IMPORT_RECOMMENDED_LABEL, "Import Ava's Recommendations")
   assert.equal(GROWTH_HOME_IMPORT_SELECTED_LABEL, "Import Selected Leads")

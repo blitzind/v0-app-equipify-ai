@@ -140,6 +140,10 @@ export const AI_EVENT_REGISTRY: readonly AiEventRegistryEntry[] = [
   { eventType: "growth.adaptive_calibration.calibration_applied", category: "learning", eventVersion: 1, schemaVersion: "1.0", description: "Approved calibration applied to configuration overlay" },
   { eventType: "growth.adaptive_calibration.calibration_rolled_back", category: "learning", eventVersion: 1, schemaVersion: "1.0", description: "Calibration configuration rolled back to prior version" },
   { eventType: "growth.adaptive_calibration.calibration_apply_failed", category: "learning", eventVersion: 1, schemaVersion: "1.0", description: "Calibration apply blocked by validation or guardrails" },
+  { eventType: "growth.ava_home.execute_requested", category: "system", eventVersion: 1, schemaVersion: "1.0", description: "Ava Home safe execution requested for lead" },
+  { eventType: "growth.ava_home.execute_completed", category: "system", eventVersion: 1, schemaVersion: "1.0", description: "Ava Home safe execution completed" },
+  { eventType: "growth.ava_home.execute_skipped", category: "system", eventVersion: 1, schemaVersion: "1.0", description: "Ava Home safe execution skipped (already running or disabled)" },
+  { eventType: "growth.ava_home.execute_failed", category: "system", eventVersion: 1, schemaVersion: "1.0", description: "Ava Home safe execution failed" },
   { eventType: "ai_os.event.correction", category: "system", eventVersion: 1, schemaVersion: "1.0", description: "Corrective event superseding prior emission" },
 ] as const
 
