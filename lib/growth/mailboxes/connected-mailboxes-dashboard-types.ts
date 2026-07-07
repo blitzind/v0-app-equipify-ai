@@ -18,6 +18,9 @@ export type GrowthConnectedMailboxRow = {
   connectionStatus: string
   healthTier: string
   healthScore: number
+  canonicalHealthState: "healthy" | "warning" | "unhealthy" | "disconnected"
+  canonicalHealthLabel: string
+  warningReasons: string[]
   warmupStatus: string | null
   warmupProfileId: string | null
   poolMemberships: GrowthConnectedMailboxPoolMembership[]
@@ -39,6 +42,8 @@ export type GrowthConnectedMailboxesSummary = {
   disconnectedMailboxes: number
   warmingMailboxes: number
   healthyMailboxes: number
+  warningMailboxes: number
+  unhealthyMailboxes: number
   pausedMailboxes: number
   dailyCapacity: number
   dailyUsed: number

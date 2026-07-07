@@ -240,6 +240,8 @@ export type GrowthHomeWaitingOnYouItem = {
   label: string
   detail: string
   href: string
+  severity?: number
+  category?: string
 }
 
 export type GrowthHomeFeaturedOutcome = {

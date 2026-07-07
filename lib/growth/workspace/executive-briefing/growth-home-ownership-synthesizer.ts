@@ -33,6 +33,10 @@ import {
   progressPercent,
 } from "@/lib/workspace/ai-ownership-accountability"
 import {
+  finalizeGrowthHomeDecisionQueue,
+  inferDecisionQueueCategory,
+} from "@/lib/growth/workspace/executive-briefing/growth-home-decision-queue-dedup"
+import {
   deriveInitiativeConfidence,
   initiativeConfidenceLabel,
 } from "@/lib/workspace/ai-proactive-initiative"
@@ -292,6 +296,8 @@ export function buildWaitingOnYou(
   _approvalSummary: GrowthHomeApprovalSummary | null,
 ): { items: GrowthHomeWaitingOnYouItem[]; overflowCount: number } {
   const items: GrowthHomeWaitingOnYouItem[] = []
+  const mailboxWarnings = dashboard.briefing?.mailbox.warnings ?? 0
+  const expiredMailboxes = dashboard.briefing?.mailbox.expired_mailboxes ?? 0
 
   for (const group of needsReview.groups) {
     items.push({
@@ -299,49 +305,35 @@ export function buildWaitingOnYou(
       label: `${group.label} (${group.count})`,
       detail: `${group.count} ${pluralize(group.count, "item", "items")} need your decision.`,
       href: needsReview.reviewHref,
-    })
-  }
-
-  for (const card of dashboard.operatorActionCards) {
-    items.push({
-      id: `waiting-card-${card.id}`,
-      label: sanitizeHomeNarrative(card.title),
-      detail: sanitizeHomeNarrative(card.description),
-      href: card.href,
+      severity: 85,
+      category: "approval",
     })
   }
 
   for (const item of needsReview.attentionItems) {
+    const category = inferDecisionQueueCategory({
+      label: item.headline,
+      href: item.ctaHref,
+    })
+    if (
+      category === "mailbox" &&
+      mailboxWarnings === 0 &&
+      expiredMailboxes === 0
+    ) {
+      continue
+    }
+
     items.push({
       id: `waiting-attention-${item.id}`,
       label: item.headline,
       detail: item.summary,
       href: item.ctaHref,
+      severity: item.impactScore,
+      category,
     })
   }
 
-  for (const priority of dashboard.briefing?.priorities?.slice(0, 2) ?? []) {
-    if (/approve|review|choose|decision/i.test(priority.title)) {
-      items.push({
-        id: `waiting-priority-${priority.priority}`,
-        label: sanitizeHomeNarrative(priority.title),
-        detail: sanitizeHomeNarrative(priority.detail),
-        href: priority.href,
-      })
-    }
-  }
-
-  const deduped = new Map<string, GrowthHomeWaitingOnYouItem>()
-  for (const item of items) {
-    if (!deduped.has(item.id)) deduped.set(item.id, item)
-  }
-
-  const all = [...deduped.values()]
-
-  return {
-    items: all.slice(0, AI_OWNERSHIP_WAITING_ON_YOU_LIMIT),
-    overflowCount: Math.max(0, all.length - AI_OWNERSHIP_WAITING_ON_YOU_LIMIT),
-  }
+  return finalizeGrowthHomeDecisionQueue(items, { limit: AI_OWNERSHIP_WAITING_ON_YOU_LIMIT })
 }
 
 export function buildBiggestWin(

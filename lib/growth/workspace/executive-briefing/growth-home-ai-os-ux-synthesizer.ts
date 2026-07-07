@@ -9,6 +9,7 @@ import {
   mapCanonicalQueueToWaitingOnYou,
   pickTopCanonicalQueueActionItem,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-canonical-queue-mapper"
+import { finalizeGrowthHomeDecisionQueue } from "@/lib/growth/workspace/executive-briefing/growth-home-decision-queue-dedup"
 import type {
   GrowthHomeAiOsUxViewModel,
   GrowthHomeAutonomousReadiness,
@@ -543,18 +544,18 @@ export function buildAutonomousReadiness(
 export function buildWaitingOnYouFromDashboard(
   dashboard: GrowthWorkspaceDashboardViewModel,
   fallback: GrowthHomeWaitingOnYouItem[],
-): GrowthHomeWaitingOnYouItem[] {
-  if (
+): { items: GrowthHomeWaitingOnYouItem[]; overflowCount: number } {
+  const raw =
     hasCanonicalDailyWorkQueue(dashboard) &&
     dashboard.dailyRevenueWorkQueue &&
     dashboard.dailyRevenueWorkQueueDisplay
-  ) {
-    return mapCanonicalQueueToWaitingOnYou(
-      dashboard.dailyRevenueWorkQueue,
-      dashboard.dailyRevenueWorkQueueDisplay,
-    )
-  }
-  return fallback
+      ? mapCanonicalQueueToWaitingOnYou(
+          dashboard.dailyRevenueWorkQueue,
+          dashboard.dailyRevenueWorkQueueDisplay,
+        )
+      : fallback
+
+  return finalizeGrowthHomeDecisionQueue(raw, { limit: 5 })
 }
 
 export function buildAiOsUxViewModel(input: {
@@ -564,23 +565,23 @@ export function buildAiOsUxViewModel(input: {
   waitingOnYouOverflow: number
   needsReview: GrowthHomeNeedsReview
 }): GrowthHomeAiOsUxViewModel {
-  const waitingOnYou = buildWaitingOnYouFromDashboard(input.dashboard, input.waitingOnYou)
+  const waitingOnYouResult = buildWaitingOnYouFromDashboard(input.dashboard, input.waitingOnYou)
   const queueEnabled = hasCanonicalDailyWorkQueue(input.dashboard)
   const approveItemsCount = queueEnabled
     ? (input.dashboard.dailyRevenueWorkQueueDisplay?.blocked_count ?? 0) +
       (input.dashboard.dailyRevenueWorkQueueDisplay?.waiting_count ?? 0) +
-      waitingOnYou.filter((item) => /approve/i.test(item.label)).length
+      waitingOnYouResult.items.filter((item) => /approve/i.test(item.label)).length
     : Math.max(
         input.dashboard.briefing?.summary.pending_approvals ?? 0,
         input.needsReview.totalCount,
-        waitingOnYou.length,
+        waitingOnYouResult.items.length,
       )
 
   return {
     qaMarker: GROWTH_HOME_AI_OS_UX_QA_MARKER,
     hero: buildExecutiveBriefingHero(input.dashboard, input.executiveBrief),
-    waitingOnYou,
-    waitingOnYouOverflow: Math.max(0, waitingOnYou.length - 5),
+    waitingOnYou: waitingOnYouResult.items,
+    waitingOnYouOverflow: waitingOnYouResult.overflowCount,
     approveItemsHref:
       waitingOnYou[0]?.href ??
       input.needsReview.reviewHref ??

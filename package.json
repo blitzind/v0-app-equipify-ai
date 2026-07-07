@@ -708,6 +708,8 @@
     "test:ge-aios-find-leads-ux-2a": "tsx scripts/test-ge-aios-find-leads-ux-2a.ts",
     "test:ge-aios-home-premium-ux-1a": "tsx scripts/test-ge-aios-home-premium-ux-1a.ts",
     "test:ge-growth-home-executive-briefing-2a": "tsx scripts/test-ge-growth-home-executive-briefing-2a.ts",
+    "test:ge-mailbox-health-consistency-1": "tsx scripts/test-ge-mailbox-health-consistency-1.ts",
+    "test:ge-growth-home-decision-queue-dedup-1": "tsx scripts/test-ge-growth-home-decision-queue-dedup-1.ts",
     "test:ge-ava-mission-center-1a": "tsx scripts/test-ge-ava-mission-center-1a.ts",
     "test:ge-ava-mission-runtime-1a": "tsx scripts/test-ge-ava-mission-runtime-1a.ts",
     "test:ge-ava-mission-runtime-1b-find-leads-binding": "tsx scripts/test-ge-ava-mission-runtime-1b-find-leads-binding.ts",

@@ -15,7 +15,7 @@ export const GROWTH_HOME_EXECUTIVE_SNAPSHOT_TITLE = "Executive Snapshot" as cons
 export const GROWTH_HOME_TODAYS_FOCUS_TITLE = "Today's focus" as const
 export const GROWTH_HOME_REVIEW_TODAYS_WORK_LABEL = "Review Today's Work" as const
 export const GROWTH_HOME_VIEW_MISSION_CENTER_LABEL = "View Mission Center" as const
-export const GROWTH_HOME_NOTHING_REQUIRES_APPROVAL = "Nothing requires your approval." as const
+export { GROWTH_HOME_DECISION_QUEUE_EMPTY_MESSAGE as GROWTH_HOME_NOTHING_REQUIRES_APPROVAL } from "@/lib/growth/workspace/executive-briefing/growth-home-decision-queue-dedup"
 export const GROWTH_HOME_GROWTH_STRATEGY_TITLE = "Growth Strategy" as const
 
 export type GrowthHomeExecutiveSnapshotKpi = {

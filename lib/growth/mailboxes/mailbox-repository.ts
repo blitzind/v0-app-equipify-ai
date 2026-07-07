@@ -2,6 +2,10 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import {
+  aggregateMailboxCanonicalHealth,
+  mailboxCanonicalHealthFromConnection,
+} from "@/lib/growth/mailboxes/mailbox-canonical-health"
+import {
   appendMailboxTimelineEvent,
   createMailboxConnectionEvent,
 } from "@/lib/growth/mailboxes/mailbox-events"
@@ -459,11 +463,19 @@ export async function validateMailboxConnection(
 export async function fetchMailboxHealthDashboard(admin: SupabaseClient): Promise<GrowthMailboxHealthDashboard> {
   const mailboxes = await listMailboxConnections(admin)
   const connected_count = mailboxes.filter((m) => m.status === "connected").length
-  const warning_count = mailboxes.filter(
-    (m) => m.status === "warning" || m.health_tier === "warning" || m.health_tier === "degraded",
-  ).length
   const expired_count = mailboxes.filter((m) => m.status === "expired").length
   const failed_validation_count = mailboxes.filter((m) => m.validation_failure_count > 3).length
+  const canonical = aggregateMailboxCanonicalHealth(
+    mailboxes.map((mailbox) => ({
+      connectionStatus: mailbox.status,
+      healthTier: mailbox.health_tier,
+      healthScore: mailbox.connection_health,
+      tokenExpiresAt: mailbox.token_expires_at,
+      tokenConfigured: mailbox.token_configured,
+      validationFailureCount: mailbox.validation_failure_count,
+      lastValidationAt: mailbox.last_validation_at,
+    })),
+  )
   const average_connection_health =
     mailboxes.length > 0
       ? Math.round(mailboxes.reduce((sum, m) => sum + m.connection_health, 0) / mailboxes.length)
@@ -472,7 +484,8 @@ export async function fetchMailboxHealthDashboard(admin: SupabaseClient): Promis
   return {
     qa_marker: GROWTH_MAILBOX_CONNECTION_QA_MARKER,
     connected_count,
-    warning_count,
+    healthy_count: canonical.healthyCount,
+    warning_count: canonical.warningCount,
     expired_count,
     failed_validation_count,
     average_connection_health,

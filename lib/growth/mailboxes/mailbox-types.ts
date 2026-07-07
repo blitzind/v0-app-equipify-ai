@@ -69,6 +69,7 @@ export type GrowthMailboxConnectionEvent = {
 export type GrowthMailboxHealthDashboard = {
   qa_marker: typeof GROWTH_MAILBOX_CONNECTION_QA_MARKER
   connected_count: number
+  healthy_count: number
   warning_count: number
   expired_count: number
   failed_validation_count: number

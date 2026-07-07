@@ -22,13 +22,16 @@ function baseRow(overrides: Partial<GrowthConnectedMailboxRow> = {}): GrowthConn
     domain: "example.com",
     connectionStatus: "connected",
     healthTier: "healthy",
-    healthScore: 90,
+    healthScore: 95,
+    canonicalHealthState: "healthy",
+    canonicalHealthLabel: "Healthy",
+    warningReasons: [],
     warmupStatus: "active",
     warmupProfileId: null,
     poolMemberships: [],
     dailyCap: 50,
     dailyUsed: 5,
-    lastValidationAt: null,
+    lastValidationAt: new Date().toISOString(),
     mailboxId: "m1",
     mailboxTokenConfigured: true,
     senderStatus: "connected",
@@ -36,7 +39,7 @@ function baseRow(overrides: Partial<GrowthConnectedMailboxRow> = {}): GrowthConn
     providerFamily: "google",
     needsReconnect: false,
     operationalPaused: false,
-    signatureStatus: "missing",
+    signatureStatus: "configured",
     ...overrides,
   }
 }
@@ -62,7 +65,7 @@ async function main(): Promise<void> {
   assert.match(uiSource, /Connect Gmail/)
   assert.match(uiSource, /Reconnect Gmail/)
   assert.match(uiSource, /Remove from pool/)
-  assert.match(uiSource, /Start Warmup/)
+  assert.match(uiSource, /Start warmup/)
   assert.match(uiSource, /\/api\/platform\/growth\/warmup\/start/)
 
   const warmupLabelSource = readSource("lib/growth/mailboxes/connected-mailbox-warmup-label.ts")
@@ -77,14 +80,20 @@ async function main(): Promise<void> {
   assert.match(connectedMailboxesPage, /GrowthConnectedMailboxesDashboard/)
 
   const healthy = baseRow()
-  assert.ok(healthy.connectionStatus === "connected" && healthy.healthScore >= 80)
+  assert.equal(healthy.canonicalHealthState, "healthy")
 
-  const disconnected = baseRow({ connectionStatus: "error", healthTier: "critical", healthScore: 20 })
+  const disconnected = baseRow({ connectionStatus: "error", healthTier: "critical", healthScore: 20, canonicalHealthState: "unhealthy", canonicalHealthLabel: "Unhealthy", warningReasons: ["Mailbox connection error"] })
   assert.notEqual(disconnected.connectionStatus, "connected")
+
+  assert.match(readModelSource, /classifyMailboxCanonicalHealth/)
+  assert.match(readModelSource, /canonicalHealthState/)
+  assert.match(uiSource, /warningReasons/)
+  assert.match(uiSource, /canonicalHealthLabel/)
+  assert.match(uiSource, /warningMailboxes/)
 
   assert.match(readModelSource, /signatureStatus/)
   assert.match(readModelSource, /listSenderProfiles/)
-  assert.match(uiSource, /Configure Signature/)
+  assert.match(uiSource, /Add signature/)
   assert.match(uiSource, /email-signatures/)
   assert.match(uiSource, /signatureStatus/)
 

@@ -12,7 +12,7 @@ import {
 import { listApolloPilotCohorts, loadApolloPilotCohortAnalytics } from "@/lib/growth/apollo/apollo-pilot-route"
 import { buildReplyIntelligenceSummary, buildInboxDashboard } from "@/lib/growth/inbox/inbox-dashboard"
 import { listInboxThreads } from "@/lib/growth/inbox/thread-repository"
-import { fetchMailboxHealthDashboard } from "@/lib/growth/mailboxes/mailbox-repository"
+import { buildConnectedMailboxesDashboard } from "@/lib/growth/mailboxes/connected-mailboxes-dashboard"
 import { listGrowthMeetingsForDashboardScan } from "@/lib/growth/meeting-intelligence/meeting-repository"
 import { fetchGrowthReplyInboxDashboard } from "@/lib/growth/reply-intelligence/reply-inbox-dashboard-repository"
 import { listSequenceExecutionJobs } from "@/lib/growth/sequences/execution/sequence-job-repository"
@@ -90,7 +90,7 @@ export async function fetchAidenDailyBriefing(
   const weekEnd = endOfWeekIso()
 
   const [
-    mailboxHealth,
+    connectedMailboxes,
     replyDashboard,
     executionJobs,
     inboxThreads,
@@ -98,13 +98,22 @@ export async function fetchAidenDailyBriefing(
     opportunityDraftsPending,
     revenue,
   ] = await Promise.all([
-    fetchMailboxHealthDashboard(admin).catch(() => ({
-      connected_count: 0,
-      warning_count: 0,
-      expired_count: 0,
-      failed_validation_count: 0,
-      average_connection_health: 0,
+    buildConnectedMailboxesDashboard(admin).catch(() => ({
       qa_marker: "fallback",
+      summary: {
+        connectedMailboxes: 0,
+        disconnectedMailboxes: 0,
+        warmingMailboxes: 0,
+        healthyMailboxes: 0,
+        warningMailboxes: 0,
+        unhealthyMailboxes: 0,
+        pausedMailboxes: 0,
+        dailyCapacity: 0,
+        dailyUsed: 0,
+      },
+      rows: [],
+      domains: [],
+      pools: [],
     })),
     fetchGrowthReplyInboxDashboard(admin).catch(() => null),
     listSequenceExecutionJobs(admin, { limit: 200 }).catch(() => []),
@@ -142,11 +151,13 @@ export async function fetchAidenDailyBriefing(
     (m) => m.startAt && m.startAt >= weekStart && m.startAt < weekEnd && m.status === "scheduled",
   ).length
 
+  const expiredMailboxes = connectedMailboxes.rows.filter((row) => row.connectionStatus === "expired").length
+
   const signals: AidenBriefingSignals = {
     mailbox: {
-      healthy_mailboxes: mailboxHealth.connected_count ?? 0,
-      expired_mailboxes: mailboxHealth.expired_count ?? 0,
-      warnings: (mailboxHealth.warning_count ?? 0) + (mailboxHealth.failed_validation_count ?? 0),
+      healthy_mailboxes: connectedMailboxes.summary.healthyMailboxes,
+      expired_mailboxes: expiredMailboxes,
+      warnings: connectedMailboxes.summary.warningMailboxes,
     },
     inbox: {
       new_replies:

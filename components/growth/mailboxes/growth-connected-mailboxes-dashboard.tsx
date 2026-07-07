@@ -54,6 +54,8 @@ import {
 } from "@/lib/growth/navigation/growth-communications-settings-navigation"
 import { resolveConnectedMailboxWarmupDisplay } from "@/lib/growth/mailboxes/connected-mailbox-warmup-label"
 import type { GrowthMailboxConnectionSummary } from "@/lib/growth/mailboxes/mailbox-types"
+import type { GrowthMailboxCanonicalHealthState } from "@/lib/growth/mailboxes/mailbox-canonical-health"
+import { resolveMailboxCardHealthDisplay } from "@/lib/growth/mailboxes/mailbox-canonical-health"
 import { cn } from "@/lib/utils"
 
 type MailboxValidationFeedback = {
@@ -94,7 +96,7 @@ function formatDate(value: string | null): string {
 }
 
 function isHealthyRow(row: GrowthConnectedMailboxRow): boolean {
-  return row.connectionStatus === "connected" && (row.healthTier === "healthy" || row.healthScore >= 80)
+  return row.canonicalHealthState === "healthy"
 }
 
 function isWarmingRow(row: GrowthConnectedMailboxRow): boolean {
@@ -116,9 +118,19 @@ function isUnhealthyRow(row: GrowthConnectedMailboxRow): boolean {
   return !isHealthyRow(row)
 }
 
+function canonicalHealthTone(state: GrowthMailboxCanonicalHealthState): "healthy" | "attention" | "critical" | "neutral" {
+  if (state === "healthy") return "healthy"
+  if (state === "warning") return "attention"
+  if (state === "unhealthy") return "critical"
+  return "neutral"
+}
+
 function mailboxHealthAccent(row: GrowthConnectedMailboxRow): string {
-  if (isHealthyRow(row)) return "border-emerald-200/90 bg-emerald-50/30 dark:border-emerald-900/50 dark:bg-emerald-950/20"
-  if (row.connectionStatus !== "connected" || row.healthTier === "critical") {
+  const { state } = resolveMailboxCardHealthDisplay(row)
+  if (state === "healthy") {
+    return "border-emerald-200/90 bg-emerald-50/30 dark:border-emerald-900/50 dark:bg-emerald-950/20"
+  }
+  if (state === "unhealthy" || state === "disconnected") {
     return "border-rose-200/90 bg-rose-50/20 dark:border-rose-900/50 dark:bg-rose-950/20"
   }
   return "border-amber-200/90 bg-amber-50/20 dark:border-amber-900/50 dark:bg-amber-950/20"
@@ -459,7 +471,7 @@ export function GrowthConnectedMailboxesDashboard({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           {summary
-            ? `${summary.connectedMailboxes} connected · ${summary.healthyMailboxes} healthy · ${summary.disconnectedMailboxes} disconnected`
+            ? `${summary.connectedMailboxes} connected · ${summary.healthyMailboxes} healthy · ${summary.warningMailboxes} warning · ${summary.disconnectedMailboxes} disconnected`
             : "Manage Gmail connections, warmup, and daily send limits per mailbox."}
         </p>
         <div className="flex flex-wrap gap-2">
@@ -502,9 +514,10 @@ export function GrowthConnectedMailboxesDashboard({
       ) : null}
 
       <GrowthEngineCard title="Overview">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <StatTile label="Connected" value={String(summary?.connectedMailboxes ?? 0)} />
           <StatTile label="Healthy" value={String(summary?.healthyMailboxes ?? 0)} />
+          <StatTile label="Warning" value={String(summary?.warningMailboxes ?? 0)} />
           <StatTile label="Disconnected" value={String(summary?.disconnectedMailboxes ?? 0)} />
           <StatTile
             label="Daily volume"
@@ -582,6 +595,7 @@ export function GrowthConnectedMailboxesDashboard({
               const oauthLabel = row.mailboxTokenConfigured ? "Reconnect Gmail" : "Connect Gmail"
               const senderPaused = row.senderStatus === "disabled"
               const warmupDisplay = resolveConnectedMailboxWarmupDisplay(row)
+              const cardHealth = resolveMailboxCardHealthDisplay(row)
               const validation = validationFeedback[row.senderId]
               return (
                 <article
@@ -599,16 +613,26 @@ export function GrowthConnectedMailboxesDashboard({
                   </div>
 
                   <div className="mt-3 flex flex-wrap gap-1.5">
-                    <GrowthBadge label={row.senderStatus} tone={STATUS_TONE[row.senderStatus] ?? "neutral"} />
                     <GrowthBadge
-                      label={row.connectionStatus}
-                      tone={STATUS_TONE[row.connectionStatus] ?? "neutral"}
+                      label={cardHealth.label}
+                      tone={canonicalHealthTone(cardHealth.state)}
                     />
+                    <GrowthBadge label={row.senderStatus} tone={STATUS_TONE[row.senderStatus] ?? "neutral"} />
                     {row.needsReconnect ? <GrowthBadge label="Reconnect required" tone="attention" /> : null}
-                    <GrowthBadge label={row.healthTier} tone={STATUS_TONE[row.healthTier] ?? "neutral"} />
                     <span className="self-center text-xs text-muted-foreground">{row.healthScore}% health</span>
                     <GrowthBadge label={warmupDisplay.label} tone={warmupDisplay.tone} />
                   </div>
+
+                  {row.warningReasons.length > 0 ? (
+                    <div className="mt-3 rounded-md border border-amber-200/80 bg-amber-50/60 px-2.5 py-2 text-xs text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100">
+                      <p className="font-medium">Warning</p>
+                      <ul className="mt-1 space-y-0.5">
+                        {row.warningReasons.map((reason) => (
+                          <li key={reason}>{reason}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
 
                   <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4">
                     <div>

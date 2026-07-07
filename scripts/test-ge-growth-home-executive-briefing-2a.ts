@@ -31,7 +31,7 @@ async function main(): Promise<void> {
   assert.equal(GROWTH_HOME_EXECUTIVE_SNAPSHOT_TITLE, "Executive Snapshot")
   assert.equal(GROWTH_HOME_REVIEW_TODAYS_WORK_LABEL, "Review Today's Work")
   assert.equal(GROWTH_HOME_VIEW_MISSION_CENTER_LABEL, "View Mission Center")
-  assert.equal(GROWTH_HOME_NOTHING_REQUIRES_APPROVAL, "Nothing requires your approval.")
+  assert.equal(GROWTH_HOME_NOTHING_REQUIRES_APPROVAL, "Nothing requires your approval right now.")
 
   const snapshot = buildExecutiveSnapshotKpis({
     hero: {

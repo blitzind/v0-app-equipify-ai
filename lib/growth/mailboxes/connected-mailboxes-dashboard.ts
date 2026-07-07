@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { classifyMailboxCanonicalHealth } from "@/lib/growth/mailboxes/mailbox-canonical-health"
 import { listMailboxConnections } from "@/lib/growth/mailboxes/mailbox-repository"
 import {
   GROWTH_CONNECTED_MAILBOXES_QA_MARKER,
@@ -20,7 +21,7 @@ function isDisconnectedMailbox(status: string | null | undefined): boolean {
 }
 
 function isHealthyRow(row: GrowthConnectedMailboxRow): boolean {
-  return row.connectionStatus === "connected" && (row.healthTier === "healthy" || row.healthScore >= 80)
+  return row.canonicalHealthState === "healthy"
 }
 
 function isWarmingRow(row: GrowthConnectedMailboxRow): boolean {
@@ -43,6 +44,8 @@ function buildSummary(rows: GrowthConnectedMailboxRow[]): GrowthConnectedMailbox
   let disconnectedMailboxes = 0
   let warmingMailboxes = 0
   let healthyMailboxes = 0
+  let warningMailboxes = 0
+  let unhealthyMailboxes = 0
   let pausedMailboxes = 0
   let dailyCapacity = 0
   let dailyUsed = 0
@@ -54,6 +57,10 @@ function buildSummary(rows: GrowthConnectedMailboxRow[]): GrowthConnectedMailbox
     else disconnectedMailboxes += 1
     if (isWarmingRow(row)) warmingMailboxes += 1
     if (isHealthyRow(row)) healthyMailboxes += 1
+    if (row.canonicalHealthState === "warning") warningMailboxes += 1
+    if (row.canonicalHealthState === "unhealthy" || row.canonicalHealthState === "disconnected") {
+      unhealthyMailboxes += 1
+    }
     if (isPausedRow(row)) pausedMailboxes += 1
   }
 
@@ -62,6 +69,8 @@ function buildSummary(rows: GrowthConnectedMailboxRow[]): GrowthConnectedMailbox
     disconnectedMailboxes,
     warmingMailboxes,
     healthyMailboxes,
+    warningMailboxes,
+    unhealthyMailboxes,
     pausedMailboxes,
     dailyCapacity,
     dailyUsed,
@@ -151,6 +160,20 @@ export async function buildConnectedMailboxesDashboard(
         isDisconnectedMailbox(mailbox.status) ||
         mailbox.status === "warning")
 
+    const canonicalHealth = classifyMailboxCanonicalHealth({
+      connectionStatus,
+      healthTier: mailbox?.health_tier ?? sender.health_status,
+      healthScore: mailbox?.connection_health ?? sender.sender_score,
+      tokenExpiresAt: mailbox?.token_expires_at ?? null,
+      tokenConfigured: mailbox?.token_configured ?? false,
+      validationFailureCount: mailbox?.validation_failure_count ?? 0,
+      needsReconnect,
+      signatureStatus: resolveMailboxSignatureStatus(sender.id, mailbox?.id ?? null),
+      lastValidationAt: mailbox?.last_validation_at ?? null,
+      dailyCap: sender.daily_send_limit,
+      operationalPaused,
+    })
+
     return {
       senderId: sender.id,
       senderDisplayName: sender.display_name,
@@ -159,6 +182,9 @@ export async function buildConnectedMailboxesDashboard(
       connectionStatus,
       healthTier: mailbox?.health_tier ?? sender.health_status,
       healthScore: mailbox?.connection_health ?? sender.sender_score,
+      canonicalHealthState: canonicalHealth.state,
+      canonicalHealthLabel: canonicalHealth.primaryLabel,
+      warningReasons: canonicalHealth.warningReasons,
       warmupStatus: warmup?.status ?? (sender.warmup_enabled ? "warming" : null),
       warmupProfileId: warmup?.id ?? null,
       poolMemberships,
