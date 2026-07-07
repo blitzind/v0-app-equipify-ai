@@ -23,10 +23,6 @@ import {
   summarizePreparedAssetsForPackage,
 } from "../lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-engine"
 import {
-  resetAutonomousOutreachPreparationPilotOrgState,
-  setAutonomousOutreachPreparationPilotControlState,
-} from "../lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-store"
-import {
   GROWTH_AUTONOMOUS_OUTREACH_PREPARED_EVENT,
   GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_AGENT,
   GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_BUDGET,
@@ -209,7 +205,6 @@ for (const kind of GROWTH_AGENT_KINDS) {
 }
 console.log("  ✓ Outreach and Meeting Agent may wake in pilot phase")
 
-resetAutonomousOutreachPreparationPilotOrgState(ORG)
 assert.equal(isOutreachPreparationAgentSchedulerActive("disabled"), false)
 assert.equal(isOutreachPreparationAgentSchedulerActive("active"), true)
 
@@ -345,8 +340,6 @@ assert.equal(
   false,
 )
 console.log("  ✓ Policy engine gate blocks disabled email_execution capability")
-
-setAutonomousOutreachPreparationPilotControlState({ organizationId: ORG, controlState: "active", now: GENERATED_AT })
 
 console.log("[GE-AIOS-GROWTH-5F] Running 5E regression…")
 const regression5e = spawnSync("pnpm", ["test:ge-aios-growth-5e-internal-execution-agent"], {

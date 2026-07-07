@@ -49,6 +49,13 @@ async function main(): Promise<void> {
   const pilotStore = readSource("lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-store.ts")
   assert.match(pilotStore, /findAutonomousOutreachPreparationRunByPackageId/)
   assert.match(pilotStore, /markAutonomousOutreachPackageApprovalDecision/)
+  assert.doesNotMatch(pilotStore, /orgStateById|new Map/)
+
+  const pilotRepository = readSource(
+    "lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-repository.ts",
+  )
+  assert.match(pilotRepository, /findOutreachPreparationRunByPackageId/)
+  assert.match(pilotRepository, /markOutreachPreparationPackageApprovalDecision/)
 
   console.log(`[${PHASE}] passed`)
 }

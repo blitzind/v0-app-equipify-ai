@@ -242,10 +242,11 @@ async function syncAutonomousOutreachPreparationPilotFromPolicy(
 ): Promise<void> {
   const generatedAt = new Date().toISOString()
   const policy = await fetchGrowthAiOsAutonomyPolicy(admin, { organizationId, generatedAt })
-  const orgState = getAutonomousOutreachPreparationPilotOrgState(organizationId, generatedAt)
+  const orgState = await getAutonomousOutreachPreparationPilotOrgState(admin, organizationId, generatedAt)
   const nextControlState = deriveOutreachPreparationPilotControlFromPolicy(policy, orgState.controlState)
   if (nextControlState !== orgState.controlState) {
-    setAutonomousOutreachPreparationPilotControlState({
+    await setAutonomousOutreachPreparationPilotControlState({
+      admin,
       organizationId,
       controlState: nextControlState,
       now: generatedAt,

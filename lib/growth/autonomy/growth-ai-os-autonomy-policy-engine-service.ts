@@ -92,7 +92,11 @@ async function buildGrowthAiOsAutonomyPolicyPackage(
   const qualificationPilotState = getAutonomousQualificationPilotOrgState(input.organizationId, generatedAt)
   const planningPilotState = getAutonomousPlanningPilotOrgState(input.organizationId, generatedAt)
   const executionPilotState = getAutonomousExecutionPilotOrgState(input.organizationId, generatedAt)
-  const outreachPreparationPilotState = getAutonomousOutreachPreparationPilotOrgState(input.organizationId, generatedAt)
+  const outreachPreparationPilotState = await getAutonomousOutreachPreparationPilotOrgState(
+    admin,
+    input.organizationId,
+    generatedAt,
+  )
   const meetingPilotState = getAutonomousMeetingPilotOrgState(input.organizationId, generatedAt)
   const recentRuns = pilotState.runs
   const recentQualificationRuns = qualificationPilotState.runs

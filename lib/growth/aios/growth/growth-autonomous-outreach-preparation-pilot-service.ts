@@ -168,14 +168,20 @@ async function executeAutonomousOutreachPreparation(
 }
 
 export async function applyGrowthAutonomousOutreachPreparationPilotControl(input: {
+  admin: SupabaseClient
   organizationId: string
   action: "pause" | "resume" | "disable"
   generatedAt?: string
 }): Promise<GrowthAutonomousOutreachPreparationPilotControlState> {
   const generatedAt = input.generatedAt ?? nowIso()
-  const state = getAutonomousOutreachPreparationPilotOrgState(input.organizationId, generatedAt)
+  const state = await getAutonomousOutreachPreparationPilotOrgState(
+    input.admin,
+    input.organizationId,
+    generatedAt,
+  )
   const next = applyOutreachPreparationPilotControlTransition({ current: state.controlState, action: input.action })
-  setAutonomousOutreachPreparationPilotControlState({
+  await setAutonomousOutreachPreparationPilotControlState({
+    admin: input.admin,
     organizationId: input.organizationId,
     controlState: next,
     now: generatedAt,
@@ -188,7 +194,7 @@ export async function runAutonomousOutreachPreparationPilotCycle(
   input: { organizationId: string; generatedAt?: string; maxRuns?: number },
 ): Promise<GrowthAutonomousOutreachPreparationPilotReadModel> {
   const generatedAt = input.generatedAt ?? nowIso()
-  const orgState = getAutonomousOutreachPreparationPilotOrgState(input.organizationId, generatedAt)
+  const orgState = await getAutonomousOutreachPreparationPilotOrgState(admin, input.organizationId, generatedAt)
   const evaluationContext = await fetchGrowthAiOsAutonomyPolicyEvaluationContext(admin, {
     organizationId: input.organizationId,
     generatedAt,
@@ -236,6 +242,9 @@ export async function runAutonomousOutreachPreparationPilotCycle(
     for (const candidate of candidates) {
       const snapshot = snapshotsByLeadId.get(candidate.leadId) ?? null
       const ranked = missionPriority.rankedMissions.find((row) => row.leadId === candidate.leadId)
+      let pilotRuns = (
+        await getAutonomousOutreachPreparationPilotOrgState(admin, input.organizationId, generatedAt)
+      ).runs
       if (
         ranked &&
         isRevenueOperatorOutreachPreparationBlocked({
@@ -243,7 +252,8 @@ export async function runAutonomousOutreachPreparationPilotCycle(
           blockers: ranked.blockers,
         })
       ) {
-        appendAutonomousOutreachPreparationRun({
+        await appendAutonomousOutreachPreparationRun({
+          admin,
           organizationId: input.organizationId,
           now: generatedAt,
           run: buildAutonomousOutreachPreparationRunRecord({
@@ -268,20 +278,24 @@ export async function runAutonomousOutreachPreparationPilotCycle(
 
       const wakeCondition = evaluateOutreachPreparationWakeCondition({
         leadId: candidate.leadId,
-        runs: getAutonomousOutreachPreparationPilotOrgState(input.organizationId, generatedAt).runs,
+        runs: pilotRuns,
         generatedAt,
         gateReadiness,
       })
 
       if (!wakeCondition) continue
 
+      pilotRuns = (
+        await getAutonomousOutreachPreparationPilotOrgState(admin, input.organizationId, generatedAt)
+      ).runs
       const budget = enforceOutreachPreparationAgentBudget({
-        runs: getAutonomousOutreachPreparationPilotOrgState(input.organizationId, generatedAt).runs,
+        runs: pilotRuns,
         generatedAt,
         leadId: candidate.leadId,
       })
       if (!budget.allowed) {
-        appendAutonomousOutreachPreparationRun({
+        await appendAutonomousOutreachPreparationRun({
+          admin,
           organizationId: input.organizationId,
           now: generatedAt,
           run: buildAutonomousOutreachPreparationRunRecord({
@@ -308,7 +322,8 @@ export async function runAutonomousOutreachPreparationPilotCycle(
           wakeCondition,
           generatedAt,
         })
-        appendAutonomousOutreachPreparationRun({
+        await appendAutonomousOutreachPreparationRun({
+          admin,
           organizationId: input.organizationId,
           now: generatedAt,
           run: buildAutonomousOutreachPreparationRunRecord({
@@ -323,7 +338,8 @@ export async function runAutonomousOutreachPreparationPilotCycle(
           }),
         })
       } catch (error) {
-        appendAutonomousOutreachPreparationRun({
+        await appendAutonomousOutreachPreparationRun({
+          admin,
           organizationId: input.organizationId,
           now: generatedAt,
           run: buildAutonomousOutreachPreparationRunRecord({
@@ -340,7 +356,7 @@ export async function runAutonomousOutreachPreparationPilotCycle(
     }
   }
 
-  const finalState = getAutonomousOutreachPreparationPilotOrgState(input.organizationId, generatedAt)
+  const finalState = await getAutonomousOutreachPreparationPilotOrgState(admin, input.organizationId, generatedAt)
 
   return enrichAutonomousOutreachPreparationPilotWithAutonomyPolicy(
     buildAutonomousOutreachPreparationPilotReadModel({
@@ -363,7 +379,7 @@ export async function buildGrowthAutonomousOutreachPreparationPilotReadModel(
   }
 
   const generatedAt = input.generatedAt ?? nowIso()
-  const orgState = getAutonomousOutreachPreparationPilotOrgState(input.organizationId, generatedAt)
+  const orgState = await getAutonomousOutreachPreparationPilotOrgState(admin, input.organizationId, generatedAt)
   const evaluationContext = await fetchGrowthAiOsAutonomyPolicyEvaluationContext(admin, {
     organizationId: input.organizationId,
     generatedAt,
@@ -390,7 +406,7 @@ export async function buildGrowthAutonomousOutreachPreparationPilotPlanContext(
   input: { organizationId: string; leadId: string; generatedAt?: string },
 ): Promise<GrowthAutonomousOutreachPreparationPilotPlanContext> {
   const generatedAt = input.generatedAt ?? nowIso()
-  const orgState = getAutonomousOutreachPreparationPilotOrgState(input.organizationId, generatedAt)
+  const orgState = await getAutonomousOutreachPreparationPilotOrgState(admin, input.organizationId, generatedAt)
   const evaluationContext = await fetchGrowthAiOsAutonomyPolicyEvaluationContext(admin, {
     organizationId: input.organizationId,
     generatedAt,
@@ -420,7 +436,7 @@ export async function runAutonomousOutreachPreparationManualRequest(
   input: { organizationId: string; leadId: string; generatedAt?: string },
 ): Promise<GrowthAutonomousOutreachPreparationPilotReadModel> {
   const generatedAt = input.generatedAt ?? nowIso()
-  const orgState = getAutonomousOutreachPreparationPilotOrgState(input.organizationId, generatedAt)
+  const orgState = await getAutonomousOutreachPreparationPilotOrgState(admin, input.organizationId, generatedAt)
   const evaluationContext = await fetchGrowthAiOsAutonomyPolicyEvaluationContext(admin, {
     organizationId: input.organizationId,
     generatedAt,
@@ -432,7 +448,8 @@ export async function runAutonomousOutreachPreparationManualRequest(
   )
 
   if (!policyGate.allowed || !isOutreachPreparationAgentSchedulerActive(effectiveControlState)) {
-    appendAutonomousOutreachPreparationRun({
+    await appendAutonomousOutreachPreparationRun({
+      admin,
       organizationId: input.organizationId,
       now: generatedAt,
       run: buildAutonomousOutreachPreparationRunRecord({
@@ -451,7 +468,8 @@ export async function runAutonomousOutreachPreparationManualRequest(
       leadId: input.leadId,
     })
     if (!budget.allowed) {
-      appendAutonomousOutreachPreparationRun({
+      await appendAutonomousOutreachPreparationRun({
+        admin,
         organizationId: input.organizationId,
         now: generatedAt,
         run: buildAutonomousOutreachPreparationRunRecord({
@@ -476,7 +494,8 @@ export async function runAutonomousOutreachPreparationManualRequest(
           wakeCondition: "manual_outreach_preparation_request",
           generatedAt,
         })
-        appendAutonomousOutreachPreparationRun({
+        await appendAutonomousOutreachPreparationRun({
+          admin,
           organizationId: input.organizationId,
           now: generatedAt,
           run: buildAutonomousOutreachPreparationRunRecord({
@@ -488,7 +507,8 @@ export async function runAutonomousOutreachPreparationManualRequest(
           }),
         })
       } catch {
-        appendAutonomousOutreachPreparationRun({
+        await appendAutonomousOutreachPreparationRun({
+          admin,
           organizationId: input.organizationId,
           now: generatedAt,
           run: buildAutonomousOutreachPreparationRunRecord({
@@ -503,7 +523,7 @@ export async function runAutonomousOutreachPreparationManualRequest(
     }
   }
 
-  const finalState = getAutonomousOutreachPreparationPilotOrgState(input.organizationId, generatedAt)
+  const finalState = await getAutonomousOutreachPreparationPilotOrgState(admin, input.organizationId, generatedAt)
   return enrichAutonomousOutreachPreparationPilotWithAutonomyPolicy(
     buildAutonomousOutreachPreparationPilotReadModel({
       controlState: effectiveControlState,

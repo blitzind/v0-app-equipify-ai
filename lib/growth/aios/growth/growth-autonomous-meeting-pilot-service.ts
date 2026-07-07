@@ -221,7 +221,9 @@ export async function runAutonomousMeetingPilotCycle(
   const policyGate = evaluateMeetingPilotAutonomyPolicyGate(evaluationContext)
   const effectiveControlState = deriveMeetingPilotControlFromPolicy(policy, orgState.controlState)
   const executionRuns = getAutonomousExecutionPilotOrgState(input.organizationId, generatedAt).runs
-  const outreachRuns = getAutonomousOutreachPreparationPilotOrgState(input.organizationId, generatedAt).runs
+  const outreachRuns = (
+    await getAutonomousOutreachPreparationPilotOrgState(admin, input.organizationId, generatedAt)
+  ).runs
 
   let eligibleLeads = 0
 
@@ -396,7 +398,9 @@ export async function buildGrowthAutonomousMeetingPilotReadModel(
     organizationId: input.organizationId,
     generatedAt,
   })
-  const outreachRuns = getAutonomousOutreachPreparationPilotOrgState(input.organizationId, generatedAt).runs
+  const outreachRuns = (
+    await getAutonomousOutreachPreparationPilotOrgState(admin, input.organizationId, generatedAt)
+  ).runs
   const eligibleLeads = new Set(
     outreachRuns
       .filter((run) => run.outcome === "completed" && run.approvalPackage?.pendingHumanApproval)
@@ -434,7 +438,9 @@ export async function buildGrowthAutonomousMeetingPilotPlanContext(
     leadId: input.leadId,
   })
   const executionRuns = getAutonomousExecutionPilotOrgState(input.organizationId, generatedAt).runs
-  const outreachRuns = getAutonomousOutreachPreparationPilotOrgState(input.organizationId, generatedAt).runs
+  const outreachRuns = (
+    await getAutonomousOutreachPreparationPilotOrgState(admin, input.organizationId, generatedAt)
+  ).runs
   const hasContactData = await resolveLeadContactData(admin, input.leadId)
 
   return buildAutonomousMeetingPilotPlanContext({

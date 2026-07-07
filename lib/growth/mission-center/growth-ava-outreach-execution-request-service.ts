@@ -133,7 +133,11 @@ export async function submitAvaOutreachPackageApprovalAction(
     throw new Error("ava_outreach_execution_request_disabled")
   }
 
-  const run = findAutonomousOutreachPreparationRunByPackageId(input.organizationId, input.packageId)
+  const run = await findAutonomousOutreachPreparationRunByPackageId(
+    admin,
+    input.organizationId,
+    input.packageId,
+  )
   const pkg = run?.approvalPackage
   if (!run || !pkg) {
     throw new Error("outreach_package_not_found")
@@ -171,7 +175,8 @@ export async function submitAvaOutreachPackageApprovalAction(
   }).catch(() => undefined)
 
   if (input.decision === "reject") {
-    markAutonomousOutreachPackageApprovalDecision({
+    await markAutonomousOutreachPackageApprovalDecision({
+      admin,
       organizationId: input.organizationId,
       packageId: input.packageId,
       decision: "rejected",
@@ -214,7 +219,8 @@ export async function submitAvaOutreachPackageApprovalAction(
 
   await persistExecutionRequest(admin, executionRequest)
 
-  markAutonomousOutreachPackageApprovalDecision({
+  await markAutonomousOutreachPackageApprovalDecision({
+    admin,
     organizationId: input.organizationId,
     packageId: input.packageId,
     decision: "approved",
