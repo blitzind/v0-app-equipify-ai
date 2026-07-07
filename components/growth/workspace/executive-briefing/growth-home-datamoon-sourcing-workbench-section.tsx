@@ -73,11 +73,15 @@ import {
   type GrowthHomeDatamoonSourcingDraftApiResponse,
 } from "@/lib/growth/ava-home/datamoon/growth-home-datamoon-sourcing-api-contract"
 import {
+  buildMissionAvaLaunchRunApiPath,
   buildMissionBindFindLeadsApiPath,
+  GROWTH_AVA_LAUNCH_RUN_SUCCESS_COPY,
+  GROWTH_AVA_LAUNCH_RUN_TITLE,
   GROWTH_MISSION_CENTER_API_PATH,
+  type GrowthMissionAvaLaunchRunResponse,
   type GrowthMissionBindFindLeadsResponse,
   type GrowthMissionCenterSourcesPayload,
-} from "@/lib/growth/mission-center/growth-mission-center-api-contract"
+} from "@/lib/growth/mission-center"
 import { selectDefaultFindLeadsMissionId } from "@/lib/growth/mission-center/growth-mission-find-leads-binding-display"
 import {
   GROWTH_BUSINESS_PROFILE_API_PATH,
@@ -154,6 +158,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
   const [selectedMissionId, setSelectedMissionId] = useState<string | null>(null)
   const [keepMonitoring, setKeepMonitoring] = useState(true)
   const [missionBindingMessage, setMissionBindingMessage] = useState<string | null>(null)
+  const [launchRunMessage, setLaunchRunMessage] = useState<string | null>(null)
   const resultsTableRef = useRef<HTMLDivElement>(null)
 
   const previewRecords = useMemo(
@@ -276,6 +281,70 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
       throw new Error(payload.error ?? "Could not attach search to mission.")
     }
     setMissionBindingMessage(GROWTH_HOME_FIND_LEADS_MISSION_BINDING_ATTACHED_COPY)
+  }
+
+  async function handleRunAvaLaunch() {
+    if (!buildConfirmed) {
+      setError("Confirm human review before running Ava.")
+      return
+    }
+    if (!selectedMissionId) {
+      setError("Select a mission before running Ava.")
+      return
+    }
+
+    setBusy("ava-launch")
+    setError(null)
+    setMissionBindingMessage(null)
+    setLaunchRunMessage(null)
+    try {
+      const searchSummary =
+        command.trim() ||
+        explanation?.trim() ||
+        draft.audienceName.trim() ||
+        "Find Leads search"
+      const res = await fetch(buildMissionAvaLaunchRunApiPath(selectedMissionId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          audienceDraft: draft,
+          searchSummary,
+          approvedByUser: true,
+          keepMonitoring,
+          refreshCadence: "daily",
+        }),
+      })
+      const payload = (await res.json()) as GrowthMissionAvaLaunchRunResponse & { error?: string }
+      if (!res.ok || !payload.ok) {
+        throw new Error(("error" in payload && payload.error) || "Ava launch run failed.")
+      }
+      const { result } = payload
+      const runRes = await fetch(`${GROWTH_HOME_DATAMOON_RUNS_API_PATH}/${result.runId}`, {
+        cache: "no-store",
+      })
+      const runPayload = (await runRes.json()) as {
+        ok?: boolean
+        run?: DatamoonAudienceImportRun
+        records?: DatamoonAudienceImportRecord[]
+      }
+      if (runRes.ok && runPayload.ok && runPayload.run) {
+        setActiveRun(runPayload.run)
+        setRecords(runPayload.records ?? [])
+        setSelectedIds(new Set())
+        setRejectedIds(new Set())
+      }
+
+      setMissionBindingMessage(GROWTH_HOME_FIND_LEADS_MISSION_BINDING_ATTACHED_COPY)
+      const imported = result.import.imported
+      const pending = result.humanApprovalCenter.totalPending
+      setLaunchRunMessage(
+        `${GROWTH_AVA_LAUNCH_RUN_SUCCESS_COPY} Imported ${imported} lead${imported === 1 ? "" : "s"}. ${pending} pending approval${pending === 1 ? "" : "s"} in Human Approval Center.`,
+      )
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ava launch run failed.")
+    } finally {
+      setBusy(null)
+    }
   }
 
   async function handleBuildAudience() {
@@ -740,7 +809,19 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
                   <p className="text-sm text-emerald-700 dark:text-emerald-300">{missionBindingMessage}</p>
                 ) : null}
 
+                {launchRunMessage ? (
+                  <p className="text-sm text-indigo-800 dark:text-indigo-200">{launchRunMessage}</p>
+                ) : null}
+
                 <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    disabled={busy !== null || !buildConfirmed || !selectedMissionId}
+                    onClick={() => void handleRunAvaLaunch()}
+                  >
+                    {busy === "ava-launch" ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Sparkles className="mr-2 size-4" />}
+                    {GROWTH_AVA_LAUNCH_RUN_TITLE}
+                  </Button>
                   <Button
                     type="button"
                     disabled={busy !== null || !buildConfirmed}

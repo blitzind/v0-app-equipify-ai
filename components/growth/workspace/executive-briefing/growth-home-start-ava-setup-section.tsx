@@ -24,6 +24,7 @@ import {
   GROWTH_HOME_FIND_LEADS_SECTION_SELECTOR,
   GROWTH_HOME_MAILBOX_READINESS_SECTION_SELECTOR,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-launch-mission-setup-1a"
+import { GROWTH_AVA_LAUNCH_RUN_TITLE } from "@/lib/growth/mission-center"
 import {
   synthesizeGrowthHomeLaunchMissionSetup,
   type GrowthHomeLaunchMissionSetupStep,
@@ -213,6 +214,14 @@ export function GrowthHomeStartAvaSetupSection({ dashboard, onSetupProgress }: P
         <p className="rounded-lg border border-emerald-200/70 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-900">
           {setup.completionCopy}
         </p>
+      ) : null}
+
+      {setup.setupComplete ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" disabled={actionBusy} onClick={() => scrollTo(GROWTH_HOME_FIND_LEADS_SECTION_SELECTOR)}>
+            {GROWTH_AVA_LAUNCH_RUN_TITLE} in Find Leads
+          </Button>
+        </div>
       ) : null}
 
       {actionError ? <p className="text-sm text-destructive">{actionError}</p> : null}
