@@ -4,18 +4,23 @@ import { createServerClient } from "@supabase/ssr"
 import { createClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+function requireSupabasePublicEnv(): { supabaseUrl: string; supabaseAnonKey: string } {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-if (!supabaseUrl) {
-  throw new Error("Missing environment variable: NEXT_PUBLIC_SUPABASE_URL")
-}
+  if (!supabaseUrl) {
+    throw new Error("Missing environment variable: NEXT_PUBLIC_SUPABASE_URL")
+  }
 
-if (!supabaseAnonKey) {
-  throw new Error("Missing environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY")
+  if (!supabaseAnonKey) {
+    throw new Error("Missing environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY")
+  }
+
+  return { supabaseUrl, supabaseAnonKey }
 }
 
 export async function createServerSupabaseClient() {
+  const { supabaseUrl, supabaseAnonKey } = requireSupabasePublicEnv()
   const cookieStore = await cookies()
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -47,6 +52,7 @@ export function getBearerAccessToken(request: Request): string | null {
 
 /** User-scoped client for route handlers when the session is not in cookies yet. */
 export function createSupabaseClientWithAccessToken(accessToken: string) {
+  const { supabaseUrl, supabaseAnonKey } = requireSupabasePublicEnv()
   return createClient(supabaseUrl, supabaseAnonKey, {
     global: {
       headers: {
