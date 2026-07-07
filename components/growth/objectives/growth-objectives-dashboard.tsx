@@ -278,7 +278,7 @@ export function GrowthObjectivesDashboard() {
                         {durationMs != null ? (
                           <p className="text-xs text-muted-foreground mt-1">Stage duration: {formatDuration(durationMs)}</p>
                         ) : null}
-                        {runtimeStage?.blockers.length ? (
+                        {runtimeStage?.blockers?.length ? (
                           <p className="text-xs text-amber-700 mt-1">
                             Blockers: {runtimeStage.blockers.join("; ")}
                           </p>

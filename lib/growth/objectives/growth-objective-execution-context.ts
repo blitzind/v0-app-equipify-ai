@@ -284,7 +284,7 @@ export function summarizeObjectiveMaterializationHealth(
       complete += 1
       continue
     }
-    if (stage.blockers.length > 0) {
+    if ((stage.blockers?.length ?? 0) > 0) {
       retrying += 1
       continue
     }

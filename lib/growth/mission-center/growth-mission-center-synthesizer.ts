@@ -149,7 +149,7 @@ function mapObjectiveToCard(
     waitingOn,
     recommendedNextAction:
       objective.recommendations[0]?.recommendation ??
-      objective.plan?.stages.find((s) => s.id === objective.runtime?.currentStageId)?.recommendations[0] ??
+      objective.plan?.stages.find((s) => s.id === objective.runtime?.currentStageId)?.recommendations?.[0] ??
       (businessProfileApproved ? "Review mission progress" : "Create Business Profile"),
     confidence,
     health,

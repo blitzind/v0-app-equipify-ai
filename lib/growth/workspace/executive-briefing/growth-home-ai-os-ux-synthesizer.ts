@@ -583,7 +583,7 @@ export function buildAiOsUxViewModel(input: {
     waitingOnYou: waitingOnYouResult.items,
     waitingOnYouOverflow: waitingOnYouResult.overflowCount,
     approveItemsHref:
-      waitingOnYou[0]?.href ??
+      waitingOnYouResult.items[0]?.href ??
       input.needsReview.reviewHref ??
       `${GROWTH_WORKSPACE_BASE_PATH}/campaigns/sequences`,
     approveItemsCount,
