@@ -15,12 +15,26 @@ import {
   pollDatamoonAudienceImportRun,
   startDatamoonAudienceImportRun,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-service"
+import { validateDatamoonAudienceImportRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-validation"
 import { bindFindLeadsSearchToMission } from "@/lib/growth/mission-center/growth-mission-find-leads-binding-service"
 import {
   GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER,
   type GrowthMissionAvaLaunchRunResult,
 } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-api-contract"
 import { registerAvaAutonomyCompletionPendingLeads } from "@/lib/growth/mission-center/growth-ava-autonomy-completion-service"
+import {
+  AVA_LAUNCH_STAGE,
+  logAvaLaunchStage,
+  resolveExceptionTrace,
+  returnAvaLaunchFailure,
+} from "@/lib/growth/mission-center/growth-mission-ava-launch-run-trace"
+import {
+  beginAvaLaunchRuntimeObjectTraceSession,
+  endAvaLaunchRuntimeObjectTraceSession,
+  logAvaRuntimeObjectConstruction,
+  logAvaRuntimeTrace,
+} from "@/lib/growth/mission-center/growth-mission-ava-launch-runtime-object-trace"
+import { GROWTH_AVA_MISSION_RUNTIME_1A_QA_MARKER } from "@/lib/growth/mission-center/growth-mission-runtime-types"
 import { getGrowthObjective } from "@/lib/growth/objectives/growth-objective-repository"
 
 export type RunGrowthMissionAvaLaunchRunInput = {
@@ -52,6 +66,20 @@ function resolveSearchSummary(input: RunGrowthMissionAvaLaunchRunInput): string 
   const audienceName = input.audienceDraft.audienceName.trim()
   if (audienceName) return audienceName
   return "Find Leads search"
+}
+
+function resolveBoundSearchLookup(objective: Awaited<ReturnType<typeof getGrowthObjective>>): {
+  hasBoundSearch: boolean
+  importRequestJsonLength: number
+} {
+  const runtime = objective?.executionContext?.missionRuntime
+  const importRequestJson = runtime?.datamoon?.importRequestJson ?? null
+  const hasBoundSearch =
+    runtime?.qa_marker === GROWTH_AVA_MISSION_RUNTIME_1A_QA_MARKER && Boolean(importRequestJson?.trim())
+  return {
+    hasBoundSearch,
+    importRequestJsonLength: importRequestJson?.length ?? 0,
+  }
 }
 
 async function resolveLeadResearchStatuses(
@@ -113,34 +141,195 @@ export async function runGrowthMissionAvaLaunchRun(
   admin: SupabaseClient,
   input: RunGrowthMissionAvaLaunchRunInput,
 ): Promise<RunGrowthMissionAvaLaunchRunSuccess | RunGrowthMissionAvaLaunchRunFailure> {
+  beginAvaLaunchRuntimeObjectTraceSession({
+    missionId: input.missionId,
+    organizationId: input.organizationId,
+  })
+
+  try {
+    logAvaRuntimeObjectConstruction({
+      label: "input.audienceDraft",
+      object: input.audienceDraft,
+      constructedBy: {
+        file: "app/api/platform/growth/mission-center/[missionId]/ava-launch-run/route.ts",
+        function: "POST → runGrowthMissionAvaLaunchRun(input.audienceDraft)",
+      },
+      stage: AVA_LAUNCH_STAGE.audience_draft,
+    })
+
+  logAvaLaunchStage(AVA_LAUNCH_STAGE.audience_draft, {
+    missionId: input.missionId,
+    organizationId: input.organizationId,
+    approvedByUser: input.approvedByUser,
+    audienceDraft: input.audienceDraft,
+    searchSummary: input.searchSummary,
+  })
+
   if (!input.approvedByUser) {
-    return { ok: false, error: "approved_by_user_required", status: 400 }
+    return returnAvaLaunchFailure(
+      { ok: false, error: "approved_by_user_required", status: 400 },
+      {
+        stage: AVA_LAUNCH_STAGE.audience_draft,
+        code: "approved_by_user_required",
+        message: "approved_by_user_required",
+        original: { approvedByUser: input.approvedByUser },
+        payload: { approvedByUser: input.approvedByUser },
+      },
+    )
   }
 
   const profileState = await fetchBusinessProfileWorkspaceState(admin, input.organizationId)
   if (!profileState.schemaReady) {
-    return { ok: false, error: "growth_profile_schema_not_ready", status: 503 }
+    return returnAvaLaunchFailure(
+      { ok: false, error: "growth_profile_schema_not_ready", status: 503 },
+      {
+        stage: AVA_LAUNCH_STAGE.audience_draft,
+        code: "growth_profile_schema_not_ready",
+        message: "growth_profile_schema_not_ready",
+        original: profileState,
+        payload: { schemaReady: profileState.schemaReady },
+      },
+    )
   }
   if (!profileState.activeApproved) {
-    return { ok: false, error: "growth_profile_not_approved", status: 412 }
+    return returnAvaLaunchFailure(
+      { ok: false, error: "growth_profile_not_approved", status: 412 },
+      {
+        stage: AVA_LAUNCH_STAGE.audience_draft,
+        code: "growth_profile_not_approved",
+        message: "growth_profile_not_approved",
+        original: profileState,
+        payload: { activeApproved: profileState.activeApproved },
+      },
+    )
   }
+
+  logAvaLaunchStage(AVA_LAUNCH_STAGE.mission_lookup, {
+    missionId: input.missionId,
+    organizationId: input.organizationId,
+  })
 
   const objective = await getGrowthObjective(admin, input.organizationId, input.missionId)
   if (!objective) {
-    return { ok: false, error: "mission_not_found", status: 404 }
+    return returnAvaLaunchFailure(
+      { ok: false, error: "mission_not_found", status: 404 },
+      {
+        stage: AVA_LAUNCH_STAGE.mission_lookup,
+        code: "mission_not_found",
+        message: "mission_not_found",
+        original: null,
+        payload: { missionId: input.missionId, organizationId: input.organizationId },
+      },
+    )
   }
   if (objective.organizationId !== input.organizationId) {
-    return { ok: false, error: "mission_org_mismatch", status: 403 }
+    return returnAvaLaunchFailure(
+      { ok: false, error: "mission_org_mismatch", status: 403 },
+      {
+        stage: AVA_LAUNCH_STAGE.mission_lookup,
+        code: "mission_org_mismatch",
+        message: "mission_org_mismatch",
+        original: {
+          missionOrganizationId: objective.organizationId,
+          requestOrganizationId: input.organizationId,
+        },
+        payload: {
+          missionId: input.missionId,
+          missionOrganizationId: objective.organizationId,
+          requestOrganizationId: input.organizationId,
+        },
+      },
+    )
   }
 
+  logAvaLaunchStage(AVA_LAUNCH_STAGE.bound_search_lookup, {
+    missionId: input.missionId,
+    ...resolveBoundSearchLookup(objective),
+  })
+
+  logAvaLaunchStage(AVA_LAUNCH_STAGE.provider_request, {
+    missionId: input.missionId,
+    audienceDraft: input.audienceDraft,
+  })
+
   const datamoonRequest = buildDatamoonImportRequestFromAudienceDraft(input.audienceDraft)
+  logAvaRuntimeObjectConstruction({
+    label: "datamoonRequest",
+    object: datamoonRequest,
+    constructedBy: {
+      file: "lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder.ts",
+      function: "buildDatamoonImportRequestFromAudienceDraft",
+    },
+    sourceLabel: "input.audienceDraft",
+    sourceObject: input.audienceDraft,
+    stage: AVA_LAUNCH_STAGE.provider_request,
+  })
   const searchSummary = resolveSearchSummary(input)
   const keepMonitoring = input.keepMonitoring ?? true
 
+  logAvaRuntimeTrace({
+    stage: AVA_LAUNCH_STAGE.datamoon_validation,
+    function: "validateDatamoonAudienceImportRequest",
+    file: "lib/growth/lead-sources/datamoon/datamoon-audience-import-validation.ts",
+    object: datamoonRequest,
+    label: "datamoonRequest.preLaunchServiceValidation",
+    constructedBy: {
+      file: "lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder.ts",
+      function: "buildDatamoonImportRequestFromAudienceDraft",
+    },
+  })
+  const datamoonValidation = validateDatamoonAudienceImportRequest(datamoonRequest)
+  logAvaLaunchStage(AVA_LAUNCH_STAGE.datamoon_validation, {
+    missionId: input.missionId,
+    providerRequest: datamoonRequest,
+    datamoonValidation,
+  })
+
+  logAvaLaunchStage(AVA_LAUNCH_STAGE.provider_launch, {
+    missionId: input.missionId,
+    providerRequest: datamoonRequest,
+  })
+
+  logAvaRuntimeTrace({
+    stage: AVA_LAUNCH_STAGE.provider_launch,
+    function: "startDatamoonAudienceImportRun",
+    file: "lib/growth/lead-sources/datamoon/datamoon-audience-import-service.ts",
+    object: datamoonRequest,
+    label: "datamoonRequest.startDatamoonAudienceImportRun.input",
+    constructedBy: {
+      file: "lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder.ts",
+      function: "buildDatamoonImportRequestFromAudienceDraft",
+    },
+  })
+
   const started = await startDatamoonAudienceImportRun(admin, datamoonRequest, input.actor)
   if (!started.ok) {
-    return { ok: false, error: started.error, status: started.error === "datamoon_provider_disabled" ? 503 : 400 }
+    const failureStage =
+      started.error === "validation_failed" ? AVA_LAUNCH_STAGE.datamoon_validation : AVA_LAUNCH_STAGE.provider_launch
+    return returnAvaLaunchFailure(
+      {
+        ok: false,
+        error: started.error,
+        status: started.error === "datamoon_provider_disabled" ? 503 : 400,
+      },
+      {
+        stage: failureStage,
+        code: started.error,
+        message: started.error,
+        original: started,
+        cause: started.error === "validation_failed" ? started.issues ?? started : started,
+        payload: datamoonRequest,
+      },
+    )
   }
+
+  logAvaLaunchStage(AVA_LAUNCH_STAGE.bind_results, {
+    missionId: input.missionId,
+    runId: started.run.id,
+    datamoonRequest,
+    searchSummary,
+    keepMonitoring,
+  })
 
   const bound = await bindFindLeadsSearchToMission(admin, {
     organizationId: input.organizationId,
@@ -154,23 +343,59 @@ export async function runGrowthMissionAvaLaunchRun(
     refreshCadence: input.refreshCadence ?? "daily",
   })
   if (!bound.ok) {
-    return { ok: false, error: bound.error, status: bound.status, runId: started.run.id }
+    return returnAvaLaunchFailure(
+      { ok: false, error: bound.error, status: bound.status, runId: started.run.id },
+      {
+        stage: AVA_LAUNCH_STAGE.bind_results,
+        code: bound.error,
+        message: bound.error,
+        original: bound,
+        payload: {
+          missionId: input.missionId,
+          runId: started.run.id,
+          datamoonRequest,
+          searchSummary,
+        },
+      },
+    )
   }
 
   const polled = await pollDatamoonAudienceImportRun(admin, started.run.id)
   if (!polled.ok) {
-    return { ok: false, error: polled.error, status: 400, runId: started.run.id }
+    return returnAvaLaunchFailure(
+      { ok: false, error: polled.error, status: 400, runId: started.run.id },
+      {
+        stage: AVA_LAUNCH_STAGE.provider_launch,
+        code: polled.error,
+        message: polled.error,
+        original: polled,
+        payload: { runId: started.run.id },
+      },
+    )
   }
 
   const previewCount = polled.run.previewCount ?? 0
   const runReady = polled.run.status === "completed" || polled.run.status === "imported_partial"
   if (!runReady) {
-    return {
-      ok: false,
-      error: "datamoon_poll_incomplete",
-      status: 409,
-      runId: started.run.id,
-    }
+    return returnAvaLaunchFailure(
+      {
+        ok: false,
+        error: "datamoon_poll_incomplete",
+        status: 409,
+        runId: started.run.id,
+      },
+      {
+        stage: AVA_LAUNCH_STAGE.provider_launch,
+        code: "datamoon_poll_incomplete",
+        message: "datamoon_poll_incomplete",
+        original: polled.run,
+        payload: {
+          runId: started.run.id,
+          status: polled.run.status,
+          previewCount,
+        },
+      },
+    )
   }
 
   let imported = 0
@@ -191,12 +416,33 @@ export async function runGrowthMissionAvaLaunchRun(
       errors = importResult.errors
       leadIds = importResult.leadIds
     } catch (error) {
-      const message = error instanceof Error ? error.message : "datamoon_import_failed"
-      return { ok: false, error: message, status: 500, runId: started.run.id }
+      const exceptionTrace = resolveExceptionTrace(error)
+      return returnAvaLaunchFailure(
+        {
+          ok: false,
+          error: exceptionTrace.message,
+          status: 500,
+          runId: started.run.id,
+        },
+        {
+          stage: AVA_LAUNCH_STAGE.provider_launch,
+          code: exceptionTrace.message,
+          message: exceptionTrace.message,
+          original: exceptionTrace.original,
+          cause: exceptionTrace.cause,
+          stack: exceptionTrace.stack,
+          payload: { runId: started.run.id, previewCount },
+        },
+      )
     }
   }
 
   if (leadIds.length > 0) {
+    logAvaLaunchStage(AVA_LAUNCH_STAGE.autonomy_start, {
+      missionId: input.missionId,
+      runId: started.run.id,
+      leadIds,
+    })
     await registerAvaAutonomyCompletionPendingLeads(admin, {
       organizationId: input.organizationId,
       missionId: input.missionId,
@@ -237,5 +483,8 @@ export async function runGrowthMissionAvaLaunchRun(
       humanApprovalCenter,
       stoppedAt: "human_approval",
     },
+  }
+  } finally {
+    endAvaLaunchRuntimeObjectTraceSession()
   }
 }

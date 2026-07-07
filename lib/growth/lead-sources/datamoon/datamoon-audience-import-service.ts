@@ -37,6 +37,7 @@ import {
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import { validateDatamoonAudienceImportRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-validation"
 import { normalizeDatamoonImportRequestAudience } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder"
+import { logAvaRuntimeTrace } from "@/lib/growth/mission-center/growth-mission-ava-launch-runtime-object-trace"
 import { createGrowthLead } from "@/lib/growth/lead-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import { runUnifiedRevenueWorkflowAfterIntake } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-intake-runner"
@@ -87,9 +88,50 @@ export async function startDatamoonAudienceImportRun(
   actor: Actor,
   options?: ServiceOptions,
 ): Promise<{ ok: true; run: DatamoonAudienceImportRun } | { ok: false; error: string; issues?: unknown }> {
+  logAvaRuntimeTrace({
+    stage: "datamoon_import_service",
+    function: "startDatamoonAudienceImportRun.input",
+    file: "lib/growth/lead-sources/datamoon/datamoon-audience-import-service.ts",
+    object: input,
+    label: "datamoonRequest.startDatamoon.preNormalize",
+    constructedBy: {
+      file: "lib/growth/mission-center/growth-mission-ava-launch-run-service.ts",
+      function: "runGrowthMissionAvaLaunchRun → startDatamoonAudienceImportRun",
+    },
+  })
+
   const normalizedInput = normalizeDatamoonImportRequestAudience(input)
+
+  logAvaRuntimeTrace({
+    stage: "datamoon_import_service",
+    function: "validateDatamoonAudienceImportRequest",
+    file: "lib/growth/lead-sources/datamoon/datamoon-audience-import-validation.ts",
+    object: normalizedInput,
+    label: "datamoonRequest.startDatamoon.preValidation",
+    constructedBy: {
+      file: "lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder.ts",
+      function: "normalizeDatamoonImportRequestAudience",
+    },
+    priorObject: input,
+  })
+
   const validation = validateDatamoonAudienceImportRequest(normalizedInput)
   if (!validation.ok) {
+    logAvaRuntimeTrace({
+      stage: "datamoon_import_service",
+      function: "validateDatamoonAudienceImportRequest.result",
+      file: "lib/growth/lead-sources/datamoon/datamoon-audience-import-validation.ts",
+      object: {
+        validatedObject: normalizedInput,
+        validation,
+      },
+      label: "datamoonRequest.startDatamoon.validationFailed",
+      constructedBy: {
+        file: "lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder.ts",
+        function: "normalizeDatamoonImportRequestAudience",
+      },
+      priorObject: input,
+    })
     return { ok: false, error: "validation_failed", issues: validation.issues }
   }
 
