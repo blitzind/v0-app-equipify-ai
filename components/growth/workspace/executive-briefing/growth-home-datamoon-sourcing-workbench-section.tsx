@@ -335,7 +335,14 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
       const payload = (await res.json()) as GrowthMissionAvaLaunchRunResponse & {
         error?: string
         validationErrors?: GrowthAvaLaunchValidationError[]
+        routeVersion?: string
       }
+      console.log("GE-AVA-LIVE-ROUTE-VERIFY-1 ava-launch-run response.status", res.status)
+      console.log(
+        'GE-AVA-LIVE-ROUTE-VERIFY-1 ava-launch-run response.headers["X-Ava-Launch-Route-Version"]',
+        res.headers.get("X-Ava-Launch-Route-Version"),
+      )
+      console.log("GE-AVA-LIVE-ROUTE-VERIFY-1 ava-launch-run response JSON body", payload)
       if (!res.ok || !payload.ok) {
         throw new Error(formatAvaLaunchFailureMessage(payload))
       }

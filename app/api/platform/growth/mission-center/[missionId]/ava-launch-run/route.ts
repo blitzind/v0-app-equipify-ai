@@ -31,6 +31,23 @@ import {
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
+const AVA_LAUNCH_ROUTE_VERSION = "ge-ava-live-route-verify-1" as const
+const AVA_LAUNCH_ROUTE_VERSION_HEADER = "X-Ava-Launch-Route-Version"
+
+function avaLaunchRouteResponse(body: Record<string, unknown>, init?: ResponseInit): NextResponse {
+  const headers = new Headers(init?.headers)
+  headers.set(AVA_LAUNCH_ROUTE_VERSION_HEADER, AVA_LAUNCH_ROUTE_VERSION)
+  return NextResponse.json(
+    { ...body, routeVersion: AVA_LAUNCH_ROUTE_VERSION },
+    { ...init, headers },
+  )
+}
+
+function tagAvaLaunchRouteAccessResponse(response: Response): Response {
+  response.headers.set(AVA_LAUNCH_ROUTE_VERSION_HEADER, AVA_LAUNCH_ROUTE_VERSION)
+  return response
+}
+
 const audienceDraftSchema = z.object({
   audienceName: z.string().trim().min(1),
   audienceType: z.enum(AVA_DATAMOON_AUDIENCE_TYPES),
@@ -98,20 +115,25 @@ function readAudienceDraftFromBody(body: unknown): AvaDatamoonAudienceDraft | nu
 
 /** GE-AVA-AUTONOMY-LAUNCH-RUN-1 — One-shot Ava launch: profile gate → bind → Datamoon → import → research visibility → HAC stop. */
 export async function POST(request: Request, context: RouteContext) {
+  const { missionId } = await context.params
+  console.log("AVA_LAUNCH_ROUTE_ENTERED", {
+    routeVersion: AVA_LAUNCH_ROUTE_VERSION,
+    missionId: missionId?.trim() ?? null,
+  })
+
   const access = await requireGrowthEnginePlatformAccess(request)
-  if (!access.ok) return access.response
+  if (!access.ok) return tagAvaLaunchRouteAccessResponse(access.response)
 
   const organizationId = getGrowthEngineAiOrgId()
   if (!organizationId) {
-    return NextResponse.json(
+    return avaLaunchRouteResponse(
       { ok: false, qa_marker: GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER, error: "organization_not_configured" },
       { status: 503 },
     )
   }
 
-  const { missionId } = await context.params
   if (!missionId?.trim()) {
-    return NextResponse.json(
+    return avaLaunchRouteResponse(
       { ok: false, qa_marker: GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER, error: "mission_id_required" },
       { status: 400 },
     )
@@ -122,7 +144,7 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     rawBody = await request.json()
   } catch {
-    return NextResponse.json(
+    return avaLaunchRouteResponse(
       { ok: false, qa_marker: GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER, error: "invalid_json" },
       { status: 400 },
     )
@@ -179,10 +201,9 @@ export async function POST(request: Request, context: RouteContext) {
       },
       outcome: "blocked",
     })
-    return NextResponse.json(
-      buildGrowthMissionAvaLaunchValidationFailureBody({ validationErrors }),
-      { status: 400 },
-    )
+    return avaLaunchRouteResponse(buildGrowthMissionAvaLaunchValidationFailureBody({ validationErrors }), {
+      status: 400,
+    })
   }
 
   const body = parsedBody.data
@@ -200,7 +221,7 @@ export async function POST(request: Request, context: RouteContext) {
       evaluation: validation,
       outcome: "blocked",
     })
-    return NextResponse.json(
+    return avaLaunchRouteResponse(
       buildGrowthMissionAvaLaunchValidationFailureBody({
         validationErrors: validation.validationErrors,
       }),
@@ -245,7 +266,7 @@ export async function POST(request: Request, context: RouteContext) {
         },
         outcome: "blocked",
       })
-      return NextResponse.json(
+      return avaLaunchRouteResponse(
         buildGrowthMissionAvaLaunchValidationFailureBody({
           validationErrors: mergedValidationErrors,
           fallbackMessage: result.error,
@@ -255,7 +276,7 @@ export async function POST(request: Request, context: RouteContext) {
       )
     }
 
-    return NextResponse.json(
+    return avaLaunchRouteResponse(
       {
         ok: false,
         qa_marker: GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER,
@@ -266,7 +287,7 @@ export async function POST(request: Request, context: RouteContext) {
     )
   }
 
-  return NextResponse.json({
+  return avaLaunchRouteResponse({
     ok: true,
     qa_marker: GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER,
     result: result.result,
