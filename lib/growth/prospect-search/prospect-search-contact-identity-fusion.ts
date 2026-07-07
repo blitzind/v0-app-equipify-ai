@@ -349,7 +349,9 @@ export function resolveProspectSearchContactIdentities(input: {
   resolutions: ProspectSearchContactIdentityResolution[]
   resolutions_by_contact_id: Map<string, ProspectSearchContactIdentityResolution>
 } {
-  const contacts = input.contacts.filter((contact) => contact.full_name.trim().length > 0)
+  const contacts = input.contacts.filter(
+    (contact) => (contact.full_name ?? "").trim().length > 0,
+  )
   if (contacts.length === 0) {
     return {
       qa_marker: GROWTH_EVIDENCE_FUSION_QA_MARKER,

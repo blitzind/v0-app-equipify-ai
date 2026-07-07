@@ -5,7 +5,7 @@ export const GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER =
 
 export const GROWTH_HOME_TODAY_AT_A_GLANCE = "Today at a glance" as const
 export const GROWTH_HOME_AVA_RECOMMENDS = "Ava recommends" as const
-export const GROWTH_HOME_NEEDS_YOUR_ATTENTION = "Needs your attention" as const
+export const GROWTH_HOME_NEEDS_YOUR_ATTENTION = "Needs Your Decision" as const
 export const GROWTH_HOME_CAUGHT_UP_TITLE = "You're all caught up." as const
 export const GROWTH_HOME_AVA_IDLE =
   "Ava doesn't need anything from you right now." as const

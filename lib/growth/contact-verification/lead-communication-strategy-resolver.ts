@@ -33,7 +33,7 @@ function buildLeadContactIntelligence(lead: GrowthLead): GrowthProspectSearchCon
     contacts: [
       {
         id: lead.primaryDecisionMakerId ?? lead.id,
-        name: name ?? "Primary contact",
+        full_name: name ?? "Primary contact",
         title: null,
         confidence: lead.engagementScore ?? 70,
         source_evidence: [{ claim: "Lead record", evidence: "growth_lead", source: "lead" }],

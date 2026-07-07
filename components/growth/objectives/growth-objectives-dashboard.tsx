@@ -246,10 +246,12 @@ export function GrowthObjectivesDashboard() {
                   <p className="mt-1 text-xs text-muted-foreground">{priorityContext.topBinding.summary}</p>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
                     <Badge variant="secondary">
-                      Next: {priorityContext.topBinding.recommendedNextStep.replaceAll("_", " ")}
+                      Next: {(priorityContext.topBinding.recommendedNextStep ?? "unknown").replaceAll("_", " ")}
                     </Badge>
-                    <Badge variant="outline">{priorityContext.topBinding.status.replaceAll("_", " ")}</Badge>
-                    {priorityContext.topBinding.blockers.some((blocker) => blocker.type === "approval") ? (
+                    <Badge variant="outline">
+                      {(priorityContext.topBinding.status ?? "unknown").replaceAll("_", " ")}
+                    </Badge>
+                    {priorityContext.topBinding.blockers?.some((blocker) => blocker.type === "approval") ? (
                       <Badge variant="destructive">Approval required</Badge>
                     ) : null}
                   </div>
@@ -283,9 +285,9 @@ export function GrowthObjectivesDashboard() {
                             Blockers: {runtimeStage.blockers.join("; ")}
                           </p>
                         ) : null}
-                        {stage.recommendations.length > 0 ? (
+                        {(stage.recommendations?.length ?? 0) > 0 ? (
                           <p className="text-xs text-muted-foreground mt-1">
-                            {stage.recommendations[0]}
+                            {stage.recommendations?.[0]}
                           </p>
                         ) : null}
                       </div>

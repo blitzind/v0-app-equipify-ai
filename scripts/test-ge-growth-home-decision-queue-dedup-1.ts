@@ -384,6 +384,10 @@ async function main(): Promise<void> {
     assert.ok(!fs.existsSync(path.join(process.cwd(), corePath)), `Equipify Core path must not exist: ${corePath}`)
   }
 
+  const aiOsSource = readSource("lib/growth/workspace/executive-briefing/growth-home-ai-os-ux-synthesizer.ts")
+  assert.match(aiOsSource, /waitingOnYouResult\.items\[0\]\?\.href/)
+  assert.doesNotMatch(aiOsSource, /^\s*waitingOnYou\[0\]/m)
+
   console.log(`[${PHASE}] Needs Your Decision queue checks passed`)
 }
 

@@ -47,7 +47,7 @@ async function main(): Promise<void> {
   )
   assert.equal(
     GROWTH_HOME_FIND_LEADS_CARD_APPROVED_COPY,
-    "Your Business Profile is ready. Tell Ava who you'd like to find—or let her recommend the best opportunities.",
+    "Your Growth Profile is ready. Tell Ava who you'd like to find—or let her recommend the best opportunities.",
   )
   assert.equal(GROWTH_HOME_FIND_LEADS_CARD_CONTINUE_MANUAL_LABEL, "Continue with Manual Search")
 

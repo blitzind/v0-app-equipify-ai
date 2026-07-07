@@ -119,7 +119,7 @@ async function main(): Promise<void> {
     "20271001270000_growth_organization_business_profile_ge_aios_business_profile_1a.sql",
   )
   assert.equal(GROWTH_BUSINESS_PROFILE_API_PATH, "/api/platform/growth/business-profile")
-  assert.equal(GROWTH_BUSINESS_PROFILE_SECTION_TITLE, "Teach Ava About Your Business")
+  assert.equal(GROWTH_BUSINESS_PROFILE_SECTION_TITLE, "Growth Profile")
   assert.equal(GROWTH_BUSINESS_PROFILE_DRAFT_LABEL, "Ask Ava to Draft My Business Profile")
 
   const draft = await draftBusinessProfileFromCompanyInput({

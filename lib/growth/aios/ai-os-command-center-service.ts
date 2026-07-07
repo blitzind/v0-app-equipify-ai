@@ -865,7 +865,13 @@ export async function fetchAiOsCommandCenterReadModel(
     generatedAt: commandCenterBase.generatedAt,
   })
 
-  const dailyWorkQueueBundle = await fetchDailyRevenueWorkQueue(admin, { limit: 100 })
+  const dailyWorkQueueBundle = await fetchDailyRevenueWorkQueue(admin, { limit: 100 }).catch((error) => {
+    logGrowthEngine("daily_revenue_work_queue_read_model_failed", {
+      organizationId: input.organizationId,
+      message: error instanceof Error ? error.message : String(error),
+    })
+    return { enabled: false, queue: null, display: null }
+  })
 
   return {
     ...withOperationsDashboard,

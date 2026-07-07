@@ -12,11 +12,11 @@ type Bucket = {
 
 function bucketRows(queue: NonNullable<AiOsCommandCenterReadModel["dailyRevenueWorkQueue"]>): Bucket[] {
   return [
-    { label: "Critical", count: queue.critical.length, tone: "text-rose-700" },
-    { label: "High", count: queue.high.length, tone: "text-amber-700" },
-    { label: "Medium", count: queue.medium.length, tone: "text-indigo-700" },
-    { label: "Waiting", count: queue.waiting.length, tone: "text-muted-foreground" },
-    { label: "Blocked", count: queue.blocked.length, tone: "text-muted-foreground" },
+    { label: "Critical", count: queue.critical?.length ?? 0, tone: "text-rose-700" },
+    { label: "High", count: queue.high?.length ?? 0, tone: "text-amber-700" },
+    { label: "Medium", count: queue.medium?.length ?? 0, tone: "text-indigo-700" },
+    { label: "Waiting", count: queue.waiting?.length ?? 0, tone: "text-muted-foreground" },
+    { label: "Blocked", count: queue.blocked?.length ?? 0, tone: "text-muted-foreground" },
   ]
 }
 
@@ -30,7 +30,7 @@ export function GrowthAiOsDailyWorkQueueSection({
   if (!isDailyRevenueWorkQueueEnabledClient() || !queue || !display) return null
 
   const buckets = bucketRows(queue)
-  const topItems = display.top_items.slice(0, 6)
+  const topItems = (display.top_items ?? []).slice(0, 6)
 
   return (
     <section

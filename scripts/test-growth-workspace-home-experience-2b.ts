@@ -38,7 +38,7 @@ function main(): void {
 
   assert.equal(GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER, "growth-workspace-home-experience-2b-v1")
   assert.equal(GROWTH_HOME_TODAY_AT_A_GLANCE, "Today at a glance")
-  assert.equal(GROWTH_HOME_NEEDS_YOUR_ATTENTION, "Needs your attention")
+  assert.equal(GROWTH_HOME_NEEDS_YOUR_ATTENTION, "Needs Your Decision")
   assert.match(resolveAvaTeammateStatusLine("Waiting for approval"), /waiting for your approval/i)
   assert.equal(resolveHomeContextualIntroLine("morning"), "Here's what changed overnight.")
   assert.equal(resolveHomeDayPart(14), "afternoon")
