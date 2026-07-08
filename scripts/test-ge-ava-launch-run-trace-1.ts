@@ -28,9 +28,9 @@ const SERVICE_FAILURES: Array<{ code: string; stage: string }> = [
   { code: "mission_org_mismatch", stage: AVA_LAUNCH_STAGE.mission_lookup },
   { code: "started.error", stage: AVA_LAUNCH_STAGE.provider_launch },
   { code: "bound.error", stage: AVA_LAUNCH_STAGE.bind_results },
-  { code: "polled.error", stage: AVA_LAUNCH_STAGE.provider_launch },
-  { code: "datamoon_poll_incomplete", stage: AVA_LAUNCH_STAGE.provider_launch },
-  { code: "exceptionTrace.message", stage: AVA_LAUNCH_STAGE.provider_launch },
+  { code: "pollWait.error", stage: AVA_LAUNCH_STAGE.provider_launch },
+  { code: "datamoon_poll_pending", stage: AVA_LAUNCH_STAGE.provider_launch },
+  { code: "exception.message", stage: AVA_LAUNCH_STAGE.provider_launch },
 ]
 
 async function main(): Promise<void> {
@@ -58,11 +58,19 @@ async function main(): Promise<void> {
   assert.match(service, /AVA_LAUNCH_STAGE\.bind_results/)
   assert.match(service, /AVA_LAUNCH_STAGE\.autonomy_start/)
   assert.match(service, /started\.issues/)
-  assert.match(service, /resolveExceptionTrace/)
+  assert.match(service, /serializeAvaLaunchRunException/)
 
   for (const failure of SERVICE_FAILURES) {
     if (failure.code === "started.error") {
       assert.match(service, /started\.error === "validation_failed"/)
+      continue
+    }
+    if (failure.code === "pollWait.error") {
+      assert.match(service, /pollWait\.error/)
+      continue
+    }
+    if (failure.code === "datamoon_poll_pending") {
+      assert.match(service, /pollWait\.error === "datamoon_poll_pending"/)
       continue
     }
     assert.match(service, new RegExp(`code: "${failure.code.replace(/\./g, "\\.")}"|code: ${failure.code.replace(/\./g, "\\.")}`))
@@ -75,9 +83,9 @@ async function main(): Promise<void> {
   assert.match(service, /error: "mission_org_mismatch"/)
   assert.match(service, /error: started\.error/)
   assert.match(service, /error: bound\.error/)
-  assert.match(service, /error: polled\.error/)
-  assert.match(service, /error: "datamoon_poll_incomplete"/)
-  assert.match(service, /error: exceptionTrace\.message/)
+  assert.match(service, /error: pollWait\.error/)
+  assert.match(service, /pollWait\.error === "datamoon_poll_pending" \? 409 : 400/)
+  assert.match(service, /error: exception\.message/)
 
   const failureReturns = service.match(/returnAvaLaunchFailure\(/g) ?? []
   assert.equal(failureReturns.length, 10, "expected 10 traced failure returns in launch service")

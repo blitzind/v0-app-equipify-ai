@@ -301,6 +301,7 @@ export async function POST(request: Request, context: RouteContext) {
         ...(result.exception ? { exception: result.exception } : {}),
         ...(result.sourceFailure ? { sourceFailure: result.sourceFailure } : {}),
         ...(result.issues !== undefined ? { issues: result.issues } : {}),
+        ...(result.message ? { message: result.message } : {}),
       },
       { status: result.status },
     )

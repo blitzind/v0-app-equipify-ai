@@ -12,8 +12,8 @@ import { fetchBusinessProfileWorkspaceState } from "@/lib/growth/business-profil
 import { logGrowthEngine } from "@/lib/growth/access"
 import {
   importDatamoonAudiencePreviewRecords,
-  pollDatamoonAudienceImportRun,
   startDatamoonAudienceImportRun,
+  waitForDatamoonAudienceImportRunPollCompletion,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-service"
 import { validateDatamoonAudienceImportRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-validation"
 import { bindFindLeadsSearchToMission } from "@/lib/growth/mission-center/growth-mission-find-leads-binding-service"
@@ -64,6 +64,7 @@ export type RunGrowthMissionAvaLaunchRunFailure = {
   error: string
   status: number
   runId?: string | null
+  message?: string
   exception?: import("@/lib/growth/mission-center/growth-mission-ava-launch-run-exception-transparency").AvaLaunchSerializedException
   sourceFailure?: Record<string, unknown>
   issues?: unknown
@@ -404,46 +405,33 @@ export async function runGrowthMissionAvaLaunchRun(
     )
   }
 
-  const polled = await pollDatamoonAudienceImportRun(admin, started.run.id)
-  if (!polled.ok) {
-    return returnAvaLaunchFailure(
-      mergeAvaLaunchRunServiceFailure(
-        { ok: false, error: polled.error, status: 400, runId: started.run.id },
-        polled,
-      ),
-      {
-        stage: AVA_LAUNCH_STAGE.provider_launch,
-        code: polled.error,
-        message: polled.error,
-        original: polled,
-        payload: { runId: started.run.id },
-      },
-    )
-  }
-
-  const previewCount = polled.run.previewCount ?? 0
-  const runReady = polled.run.status === "completed" || polled.run.status === "imported_partial"
-  if (!runReady) {
+  const pollWait = await waitForDatamoonAudienceImportRunPollCompletion(admin, started.run.id)
+  if (!pollWait.ok) {
     return returnAvaLaunchFailure(
       {
         ok: false,
-        error: "datamoon_poll_incomplete",
-        status: 409,
-        runId: started.run.id,
+        error: pollWait.error,
+        status: pollWait.error === "datamoon_poll_pending" ? 409 : 400,
+        runId: pollWait.runId,
+        message: pollWait.message,
       },
       {
         stage: AVA_LAUNCH_STAGE.provider_launch,
-        code: "datamoon_poll_incomplete",
-        message: "datamoon_poll_incomplete",
-        original: polled.run,
+        code: pollWait.error,
+        message: pollWait.message,
+        original: pollWait.run ?? pollWait,
         payload: {
-          runId: started.run.id,
-          status: polled.run.status,
-          previewCount,
+          runId: pollWait.runId,
+          attempts: pollWait.attempts,
+          status: pollWait.run?.status ?? null,
+          previewCount: pollWait.run?.previewCount ?? 0,
         },
       },
     )
   }
+
+  const polled = pollWait.polled
+  const previewCount = polled.run.previewCount ?? 0
 
   let imported = 0
   let duplicates = 0

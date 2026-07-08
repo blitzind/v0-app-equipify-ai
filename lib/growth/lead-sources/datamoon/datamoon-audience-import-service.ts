@@ -37,6 +37,14 @@ import {
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import { validateDatamoonAudienceImportRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-validation"
 import { resolveDatamoonProviderFiltersForImport } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-filter-mapping"
+import {
+  classifyDatamoonAudiencePollRunStatus,
+  DATAMOON_AUDIENCE_POLL_WAIT_INTERVAL_MS,
+  DATAMOON_AUDIENCE_POLL_WAIT_MAX_MS,
+  isDatamoonAudienceImportRunImportReady,
+  resolveDatamoonAudiencePollWaitTimeoutError,
+  sleepForDatamoonAudiencePollWait,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-audience-poll-wait"
 import { normalizeDatamoonImportRequestAudience } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder"
 import { logAvaRuntimeTrace } from "@/lib/growth/mission-center/growth-mission-ava-launch-runtime-object-trace"
 import { createGrowthLead } from "@/lib/growth/lead-repository"
@@ -366,6 +374,80 @@ export async function pollDatamoonAudienceImportRun(
 
   const records = await listDatamoonAudienceImportRecords(admin, runId)
   return { ok: true, run: completed ?? existing, records }
+}
+
+type DatamoonAudiencePollWaitOptions = ServiceOptions & {
+  intervalMs?: number
+  maxWaitMs?: number
+  sleep?: (ms: number) => Promise<void>
+}
+
+export async function waitForDatamoonAudienceImportRunPollCompletion(
+  admin: SupabaseClient,
+  runId: string,
+  options?: DatamoonAudiencePollWaitOptions,
+): Promise<
+  | { ok: true; polled: { ok: true; run: DatamoonAudienceImportRun; records: DatamoonAudienceImportRecord[] }; attempts: number }
+  | {
+      ok: false
+      error: string
+      message: string
+      runId: string
+      run?: DatamoonAudienceImportRun
+      attempts: number
+    }
+> {
+  const intervalMs = options?.intervalMs ?? DATAMOON_AUDIENCE_POLL_WAIT_INTERVAL_MS
+  const maxWaitMs = options?.maxWaitMs ?? DATAMOON_AUDIENCE_POLL_WAIT_MAX_MS
+  const sleep = options?.sleep ?? sleepForDatamoonAudiencePollWait
+  const startedAt = Date.now()
+  let attempts = 0
+  let lastPolled:
+    | { ok: true; run: DatamoonAudienceImportRun; records: DatamoonAudienceImportRecord[] }
+    | null = null
+
+  while (true) {
+    attempts += 1
+    const polled = await pollDatamoonAudienceImportRun(admin, runId, options)
+    if (!polled.ok) {
+      return {
+        ok: false,
+        error: polled.error,
+        message: polled.error,
+        runId,
+        attempts,
+      }
+    }
+
+    lastPolled = polled
+    if (isDatamoonAudienceImportRunImportReady(polled.run.status)) {
+      return { ok: true, polled, attempts }
+    }
+
+    const elapsedMs = Date.now() - startedAt
+    const phase = classifyDatamoonAudiencePollRunStatus(polled.run.status)
+    if (phase === "building" && elapsedMs < maxWaitMs) {
+      logGrowthEngine("datamoon_audience_import_poll_waiting", {
+        runId,
+        attempts,
+        elapsedMs,
+        runStatus: polled.run.status,
+        previewCount: polled.run.previewCount ?? 0,
+      })
+      await sleep(intervalMs)
+      continue
+    }
+
+    const timeout = resolveDatamoonAudiencePollWaitTimeoutError({ runStatus: polled.run.status })
+    return {
+      ok: false,
+      error: timeout.error,
+      message: timeout.message,
+      runId,
+      run: polled.run,
+      attempts,
+    }
+  }
 }
 
 export async function importDatamoonAudiencePreviewRecords(
