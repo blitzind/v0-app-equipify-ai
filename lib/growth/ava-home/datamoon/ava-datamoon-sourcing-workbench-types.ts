@@ -111,25 +111,6 @@ export function createMinimalAvaDatamoonAudienceDraft(
 export function createDefaultAvaDatamoonAudienceDraft(
   overrides?: Partial<AvaDatamoonAudienceDraft>,
 ): AvaDatamoonAudienceDraft {
-  return {
-    audienceName: "Datamoon audience run",
-    audienceType: "advanced_search",
-    providerMode: "module",
-    recordLimit: 100,
-    lookbackDays: 7,
-    intentLevels: ["high", "medium"],
-    geography: { country: "US", state: null, city: null },
-    topics: ["equipment maintenance software"],
-    customTopic: null,
-    jobTitles: ["owner", "CEO", "operations manager", "service manager"],
-    customJobTitle: null,
-    companySize: "smb",
-    revenueRange: null,
-    includeBusinessEmail: true,
-    includePhone: true,
-    includeLinkedIn: true,
-    excludeDuplicates: true,
-    onlyNewSinceLastRefresh: true,
-    ...overrides,
-  }
+  // GE-AIOS-7C — no Equipify-internal prefills; callers hydrate from Growth Profile.
+  return createMinimalAvaDatamoonAudienceDraft(overrides)
 }

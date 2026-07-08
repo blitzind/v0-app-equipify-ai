@@ -18,6 +18,11 @@ import { DatamoonSourcingWorkbenchForm } from "@/components/growth/lead-sources/
 import { GrowthHomeFindLeadsMissionBindingCard } from "@/components/growth/workspace/executive-briefing/growth-home-find-leads-mission-binding-card"
 import { buildDatamoonImportRequestFromAudienceDraft } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder"
 import {
+  buildAvaLedLeadDiscoveryContext,
+  GROWTH_AIOS_FIND_LEADS_7C_QA_MARKER,
+  type AvaLedLeadDiscoveryContext,
+} from "@/lib/growth/ava-home/datamoon/ava-datamoon-lead-discovery-defaults"
+import {
   AVA_DATAMOON_PROVIDER_MODES,
   createDefaultAvaDatamoonAudienceDraft,
   type AvaDatamoonAudienceDraft,
@@ -35,7 +40,12 @@ import {
   GROWTH_HOME_DATAMOON_SOURCING_DRAFT_API_PATH,
   GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL,
   GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_MISSING_COPY,
+  GROWTH_HOME_DATAMOON_PROFILE_INCOMPLETE_COPY,
   GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL,
+  GROWTH_HOME_AVA_LED_SEARCH_EXPLAIN_TITLE,
+  GROWTH_HOME_AVA_LED_SEARCH_TITLE,
+  GROWTH_HOME_REFINE_SEARCH_LABEL,
+  GROWTH_HOME_START_LEAD_SEARCH_LABEL,
   GROWTH_HOME_DATAMOON_CONTINUE_MANUALLY_LABEL,
   GROWTH_HOME_BUSINESS_PROFILE_SECTION_SELECTOR,
   GROWTH_HOME_DISCOVERY_SOURCE_DATAMOON_LABEL,
@@ -97,6 +107,7 @@ import {
   GROWTH_BUSINESS_PROFILE_API_PATH,
   type GrowthBusinessProfileApiResponse,
 } from "@/lib/growth/business-profile/business-profile-api-contract"
+import type { BusinessProfileDraftContent } from "@/lib/growth/business-profile/business-profile-types"
 import type {
   DatamoonAudienceImportRecord,
   DatamoonAudienceImportRun,
@@ -169,6 +180,10 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
   const [businessProfileUsed, setBusinessProfileUsed] = useState(false)
   const [businessProfileStatus, setBusinessProfileStatus] = useState<"approved" | "missing" | null>(null)
   const [hasApprovedBusinessProfile, setHasApprovedBusinessProfile] = useState(false)
+  const [activeProfile, setActiveProfile] = useState<BusinessProfileDraftContent | null>(null)
+  const [profileCompanyName, setProfileCompanyName] = useState<string | null>(null)
+  const [avaLedContext, setAvaLedContext] = useState<AvaLedLeadDiscoveryContext | null>(null)
+  const [refineOpen, setRefineOpen] = useState(false)
   const [buildConfirmed, setBuildConfirmed] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -224,14 +239,42 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
       .map((entry) => ({ id: entry.id, title: entry.title }))
     setMissionOptions(active)
     setSelectedMissionId((current) => current ?? selectDefaultFindLeadsMissionId(objectives))
+    return active
   }, [])
+
+  const hydrateLeadDiscoveryContext = useCallback(
+    (profile: BusinessProfileDraftContent | null, companyName: string | null, missionTitle: string | null) => {
+      const context = buildAvaLedLeadDiscoveryContext({
+        profile,
+        companyName,
+        missionTitle,
+      })
+      setAvaLedContext(context)
+      setDraft(context.draft)
+      setExplanation(context.narrative)
+      setAssumptions(context.assumptions)
+      setBusinessProfileUsed(context.businessProfileUsed)
+      setBusinessProfileStatus(profile ? "approved" : "missing")
+    },
+    [],
+  )
 
   const loadBusinessProfileState = useCallback(async () => {
     const res = await fetch(GROWTH_BUSINESS_PROFILE_API_PATH, { cache: "no-store" })
     const payload = (await res.json()) as GrowthBusinessProfileApiResponse
     if (res.ok && payload.ok) {
-      setHasApprovedBusinessProfile(Boolean(payload.activeApproved))
+      const approved = payload.activeApproved
+      setHasApprovedBusinessProfile(Boolean(approved))
+      const profile = approved?.profile ?? null
+      const companyName = approved?.input.companyName ?? null
+      setActiveProfile(profile)
+      setProfileCompanyName(companyName)
+      return { profile, companyName }
     }
+    setHasApprovedBusinessProfile(false)
+    setActiveProfile(null)
+    setProfileCompanyName(null)
+    return { profile: null, companyName: null }
   }, [])
 
   const loadDiagnostics = useCallback(async () => {
@@ -251,6 +294,30 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
       void loadMissionOptions().catch(() => undefined)
     }
   }, [open, loadDiagnostics, loadBusinessProfileState, loadMissionOptions])
+
+  useEffect(() => {
+    if (!open) return
+    const missionTitle = missionOptions.find((entry) => entry.id === selectedMissionId)?.title ?? null
+    hydrateLeadDiscoveryContext(activeProfile, profileCompanyName, missionTitle)
+  }, [open, activeProfile, profileCompanyName, missionOptions, selectedMissionId, hydrateLeadDiscoveryContext])
+
+  async function handleStartAvaLedSearch() {
+    if (!avaLedContext) return
+    if (!avaLedContext.profileReady) {
+      setError(
+        `${GROWTH_HOME_DATAMOON_PROFILE_INCOMPLETE_COPY} Missing: ${avaLedContext.missingProfileFields.join(", ")}.`,
+      )
+      return
+    }
+    setDraft(avaLedContext.draft)
+    setExplanation(avaLedContext.narrative)
+    setAssumptions(avaLedContext.assumptions)
+    setBusinessProfileUsed(true)
+    setBusinessProfileStatus("approved")
+    setBuildConfirmed(false)
+    setWorkflowStep("plan")
+    setError(null)
+  }
 
   async function handleAskAvaDraft() {
     setBusy("draft")
@@ -395,6 +462,12 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
       setError("Confirm human review before searching for leads.")
       return
     }
+    if (mode === "ava_draft" && avaLedContext && !avaLedContext.profileReady) {
+      setError(
+        `${GROWTH_HOME_DATAMOON_PROFILE_INCOMPLETE_COPY} Missing: ${avaLedContext.missingProfileFields.join(", ")}.`,
+      )
+      return
+    }
     setBusy("build")
     setError(null)
     setMissionBindingMessage(null)
@@ -479,16 +552,14 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
   }
 
   function handleReset() {
-    setDraft(createDefaultAvaDatamoonAudienceDraft())
+    const missionTitle = missionOptions.find((entry) => entry.id === selectedMissionId)?.title ?? null
+    hydrateLeadDiscoveryContext(activeProfile, profileCompanyName, missionTitle)
     setCommand("")
-    setExplanation(null)
-    setAssumptions([])
     setOverrides([])
-    setBusinessProfileUsed(false)
-    setBusinessProfileStatus(null)
     setBuildConfirmed(false)
     setWorkflowStep("prompt")
     setMode("ava_draft")
+    setRefineOpen(false)
     setActiveRun(null)
     setRecords([])
     setSelectedIds(new Set())
@@ -571,6 +642,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
         data-qa-section="home-find-leads"
         data-qa-section-legacy="home-datamoon-sourcing-workbench"
         data-qa-marker={GROWTH_AIOS_FIND_LEADS_UX_2A_QA_MARKER}
+        data-qa-marker-7c={GROWTH_AIOS_FIND_LEADS_7C_QA_MARKER}
         data-qa-marker-rename={GROWTH_AIOS_GROWTH_UX_RENAME_1A_QA_MARKER}
         data-qa-marker-foundation={GROWTH_AVA_DATAMOON_SOURCING_WORKBENCH_1A_QA_MARKER}
         className={cn(
@@ -663,7 +735,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
                   <p className="text-sm text-muted-foreground">{GROWTH_HOME_FIND_LEADS_HERO_SUBTITLE}</p>
                 </CardHeader>
                 <CardContent className="space-y-4 px-6">
-                  {businessProfileStatus === "missing" ? (
+                  {!hasApprovedBusinessProfile ? (
                     <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50/80 p-5 text-sm dark:border-amber-900/40 dark:bg-amber-950/20">
                       <p>{GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_MISSING_COPY}</p>
                       <div className="flex flex-wrap gap-2">
@@ -675,22 +747,75 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
                         </Button>
                       </div>
                     </div>
+                  ) : avaLedContext && !avaLedContext.profileReady ? (
+                    <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50/80 p-5 text-sm dark:border-amber-900/40 dark:bg-amber-950/20">
+                      <p>{GROWTH_HOME_DATAMOON_PROFILE_INCOMPLETE_COPY}</p>
+                      <p className="text-muted-foreground">
+                        Missing: {avaLedContext.missingProfileFields.join(", ")}
+                      </p>
+                      <Button type="button" size="sm" onClick={handleCreateBusinessProfile}>
+                        {GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL}
+                      </Button>
+                    </div>
+                  ) : avaLedContext ? (
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-sm font-medium">{GROWTH_HOME_AVA_LED_SEARCH_TITLE}</p>
+                        <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-foreground">
+                          {avaLedContext.narrative}
+                        </p>
+                      </div>
+                      <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-4">
+                        <p className="text-sm font-medium">{GROWTH_HOME_AVA_LED_SEARCH_EXPLAIN_TITLE}</p>
+                        <ul className="space-y-2 text-sm text-muted-foreground">
+                          {avaLedContext.explainability.map((line) => (
+                            <li key={line.id}>
+                              <span className="font-medium text-foreground">{line.label}:</span> {line.detail}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <Button
+                        type="button"
+                        disabled={busy !== null}
+                        onClick={() => void handleStartAvaLedSearch()}
+                      >
+                        {GROWTH_HOME_START_LEAD_SEARCH_LABEL}
+                      </Button>
+                    </div>
                   ) : null}
-                  <Textarea
-                    value={command}
-                    onChange={(e) => setCommand(e.target.value)}
-                    rows={6}
-                    placeholder={GROWTH_HOME_FIND_LEADS_HERO_PLACEHOLDER}
-                    className="min-h-[140px] resize-y text-sm"
-                  />
-                  <Button
-                    type="button"
-                    disabled={busy !== null || !command.trim()}
-                    onClick={() => void handleAskAvaDraft()}
-                  >
-                    {busy === "draft" ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                    {GROWTH_HOME_AVA_ASK_DRAFT_LABEL}
-                  </Button>
+
+                  {hasApprovedBusinessProfile ? (
+                    <Collapsible open={refineOpen} onOpenChange={setRefineOpen}>
+                      <CollapsibleTrigger asChild>
+                        <Button type="button" variant="ghost" size="sm" className="gap-2 px-0">
+                          <ChevronDown
+                            className={cn("size-4 transition-transform", refineOpen ? "rotate-180" : "")}
+                            aria-hidden
+                          />
+                          {GROWTH_HOME_REFINE_SEARCH_LABEL}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-3 pt-3">
+                        <Textarea
+                          value={command}
+                          onChange={(e) => setCommand(e.target.value)}
+                          rows={5}
+                          placeholder={GROWTH_HOME_FIND_LEADS_HERO_PLACEHOLDER}
+                          className="min-h-[120px] resize-y text-sm"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={busy !== null || !command.trim()}
+                          onClick={() => void handleAskAvaDraft()}
+                        >
+                          {busy === "draft" ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                          {GROWTH_HOME_AVA_ASK_DRAFT_LABEL}
+                        </Button>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ) : null}
                 </CardContent>
               </Card>
             ) : null}
@@ -772,7 +897,13 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
                 {mode === "manual_search" || workflowStep === "configure" ? (
                   <Separator className="my-2" />
                 ) : null}
-                <DatamoonSourcingWorkbenchForm draft={draft} onChange={setDraft} layout="grouped" />
+                <DatamoonSourcingWorkbenchForm
+                  draft={draft}
+                  onChange={setDraft}
+                  layout="grouped"
+                  topicPresets={avaLedContext?.topicPresets ?? []}
+                  jobTitlePresets={avaLedContext?.jobTitlePresets ?? []}
+                />
               </>
             ) : null}
 

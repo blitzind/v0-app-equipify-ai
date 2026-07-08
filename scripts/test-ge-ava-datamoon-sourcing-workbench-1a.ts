@@ -56,14 +56,17 @@ async function main(): Promise<void> {
   assert.equal(isRecognizedAvaDatamoonSourcingCommand("Find buyers in Texas"), true)
 
   const manualDraft = createDefaultAvaDatamoonAudienceDraft({ audienceName: "Manual audience" })
+  assert.equal(manualDraft.topics.length, 0)
+  assert.equal(manualDraft.topics.includes("equipment maintenance software"), false)
   const manualRequest = buildDatamoonImportRequestFromAudienceDraft(manualDraft)
   assert.equal(manualRequest.run_name, "Manual audience")
   assert.ok(Array.isArray(manualRequest.filters))
-  assert.ok(manualRequest.filters.some((filter) => filter.field === "country"))
+  assert.ok(manualRequest.filters.some((filter) => filter.field === "contact_country"))
 
   const avaRequest = buildDatamoonImportRequestFromAudienceDraft(equipmentDraft.audienceDraft)
-  assert.equal(avaRequest.audience_type, equipmentDraft.audienceDraft.audienceType)
-  assert.ok(avaRequest.filters.some((filter) => filter.field === "topic"))
+  assert.equal(avaRequest.audience_type, "b2b")
+  assert.ok(avaRequest.workbench_context?.topics?.includes("equipment maintenance software"))
+  assert.equal(avaRequest.filters.some((filter) => filter.field === "topic"), false)
 
   const draftRoute = readSource("app/api/platform/growth/ava/datamoon-sourcing/draft/route.ts")
   assert.match(draftRoute, /parseAvaDatamoonSourcingCommand/)
@@ -103,10 +106,10 @@ async function main(): Promise<void> {
   assert.match(formSource, /Job titles/)
   assert.match(formSource, /Include business email/)
 
-  const dashboardSource = readSource(
-    "components/growth/workspace/executive-briefing/growth-home-executive-briefing-dashboard.tsx",
+  const strategySource = readSource(
+    "components/growth/workspace/executive-briefing/growth-home-growth-strategy-section.tsx",
   )
-  assert.match(dashboardSource, /GrowthHomeDatamoonSourcingWorkbenchSection/)
+  assert.match(strategySource, /GrowthHomeDatamoonSourcingWorkbenchSection/)
 
   assert.equal(GROWTH_HOME_AVA_ASK_DRAFT_LABEL, "Generate Search")
   assert.equal(GROWTH_HOME_BUILD_AUDIENCE_LABEL, "Search for Leads")

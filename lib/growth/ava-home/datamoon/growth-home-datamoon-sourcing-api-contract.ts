@@ -8,6 +8,7 @@ export { GROWTH_AVA_DATAMOON_SOURCING_WORKBENCH_1A_QA_MARKER, GROWTH_AIOS_BUSINE
 
 export const GROWTH_AIOS_GROWTH_UX_RENAME_1A_QA_MARKER = "ge-aios-growth-ux-rename-1a-v1" as const
 export const GROWTH_AIOS_FIND_LEADS_UX_2A_QA_MARKER = "ge-aios-find-leads-ux-2a-v1" as const
+export { GROWTH_AIOS_FIND_LEADS_7C_QA_MARKER } from "@/lib/growth/ava-home/datamoon/ava-datamoon-lead-discovery-defaults"
 export const GROWTH_AVA_MISSION_RUNTIME_1B_FIND_LEADS_BINDING_QA_MARKER =
   "ge-ava-mission-runtime-1b-v1" as const
 
@@ -40,7 +41,11 @@ export const GROWTH_HOME_FIND_LEADS_LOOKS_GOOD_LABEL = "Looks Good" as const
 export const GROWTH_HOME_FIND_LEADS_EDIT_SEARCH_LABEL = "Edit Search" as const
 
 export const GROWTH_HOME_FIND_LEADS_DRAWER_DESCRIPTION =
-  "Ask Ava to draft a lead search, or use Advanced Search to configure it yourself." as const
+  "Ava prepares the search from your Growth Profile. Advanced Search is available if you want to edit manually." as const
+export const GROWTH_HOME_AVA_LED_SEARCH_TITLE = "Here's how I'll search" as const
+export const GROWTH_HOME_AVA_LED_SEARCH_EXPLAIN_TITLE = "Why I'm searching this way" as const
+export const GROWTH_HOME_START_LEAD_SEARCH_LABEL = "Start Lead Search" as const
+export const GROWTH_HOME_REFINE_SEARCH_LABEL = "Refine with a command" as const
 export const GROWTH_HOME_ASK_AVA_TAB_LABEL = "Ask Ava" as const
 export const GROWTH_HOME_ADVANCED_SEARCH_TAB_LABEL = "Advanced Search" as const
 export const GROWTH_HOME_ASK_AVA_PLACEHOLDER = "Tell Ava what kind of customers to find..." as const
@@ -79,8 +84,10 @@ export const GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL = "Using approved
 export const GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_STARTED_COPY =
   "I started with your approved Business Profile and adjusted the search based on your request." as const
 export const GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_MISSING_COPY =
-  "Ava needs a Business Profile to make better recommendations." as const
-export const GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL = "Create Business Profile" as const
+  "Ava needs a Growth Profile before she can search accurately." as const
+export const GROWTH_HOME_DATAMOON_PROFILE_INCOMPLETE_COPY =
+  "Ava needs a few more Growth Profile details before she can run an accurate search." as const
+export const GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL = "Update Growth Profile" as const
 export const GROWTH_HOME_DATAMOON_CONTINUE_MANUALLY_LABEL = "Continue Manually" as const
 export const GROWTH_HOME_BUSINESS_PROFILE_SECTION_SELECTOR = '[data-qa-section="home-business-profile"]' as const
 

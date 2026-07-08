@@ -796,6 +796,7 @@
     "test:ge-ai-ux-1c-ai-executive-briefing-experience": "tsx scripts/test-ge-ai-ux-1c-ai-executive-briefing-experience.ts",
     "test:ge-aios-ux-1a-ai-os-home-experience": "tsx scripts/test-ge-aios-ux-1a-ai-os-home-experience.ts",
     "test:ge-aios-7a-ava-home-experience": "tsx scripts/test-ge-aios-7a-ava-home-experience.ts",
+    "test:ge-aios-7c-ava-led-lead-discovery": "tsx scripts/test-ge-aios-7c-ava-led-lead-discovery.ts",
     "test:ge-aios-ux-1b-home-queue-integration": "tsx scripts/test-ge-aios-ux-1b-home-queue-integration.ts",
     "test:ge-ai-ux-2a-outcome-first-unified-experience": "tsx scripts/test-ge-ai-ux-2a-outcome-first-unified-experience.ts",
     "test:ge-ai-ux-3a-ai-teammate-identity-foundation": "tsx scripts/test-ge-ai-ux-3a-ai-teammate-identity-foundation.ts",

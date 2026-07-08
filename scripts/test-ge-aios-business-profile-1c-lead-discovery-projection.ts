@@ -128,7 +128,11 @@ async function main(): Promise<void> {
   assert.match(ui, /GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL/)
   assert.match(ui, /GROWTH_HOME_DATAMOON_CONTINUE_MANUALLY_LABEL/)
   assert.equal(GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL, "Using approved Growth Profile")
-  assert.equal(GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL, "Create Business Profile")
+  assert.equal(GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL, "Update Growth Profile")
+  assert.equal(
+    GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_MISSING_COPY,
+    "Ava needs a Growth Profile before she can search accurately.",
+  )
 
   const serviceSource = readSource("lib/growth/business-profile/business-profile-lead-discovery-projection.ts")
   assert.match(serviceSource, /targetIndustries/)

@@ -8,9 +8,7 @@ import {
   AVA_DATAMOON_AUDIENCE_TYPES,
   AVA_DATAMOON_COMPANY_SIZES,
   AVA_DATAMOON_INTENT_LEVELS,
-  AVA_DATAMOON_JOB_TITLE_PRESETS,
   AVA_DATAMOON_LOOKBACK_DAYS,
-  AVA_DATAMOON_TOPIC_PRESETS,
   type AvaDatamoonAudienceDraft,
 } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-workbench-types"
 
@@ -22,6 +20,10 @@ type Props = {
   draft: AvaDatamoonAudienceDraft
   onChange: (draft: AvaDatamoonAudienceDraft) => void
   layout?: "compact" | "grouped"
+  /** GE-AIOS-7C — profile-derived industry/topic options (replaces static Equipify presets). */
+  topicPresets?: string[]
+  /** GE-AIOS-7C — profile-derived buyer role options. */
+  jobTitlePresets?: string[]
 }
 
 function FormSection({
@@ -51,8 +53,21 @@ function FormSection({
   )
 }
 
-export function DatamoonSourcingWorkbenchForm({ draft, onChange, layout = "grouped" }: Props) {
+export function DatamoonSourcingWorkbenchForm({
+  draft,
+  onChange,
+  layout = "grouped",
+  topicPresets = [],
+  jobTitlePresets = [],
+}: Props) {
   const grouped = layout === "grouped"
+
+  const industryOptions = Array.from(
+    new Set([...topicPresets, ...draft.topics].map((v) => v.trim()).filter(Boolean)),
+  )
+  const titleOptions = Array.from(
+    new Set([...jobTitlePresets, ...draft.jobTitles].map((v) => v.trim().toLowerCase()).filter(Boolean)),
+  )
 
   function patch(partial: Partial<AvaDatamoonAudienceDraft>) {
     onChange({ ...draft, ...partial })
@@ -139,18 +154,24 @@ export function DatamoonSourcingWorkbenchForm({ draft, onChange, layout = "group
       <FormSection title="Company Profile" grouped={grouped}>
         <div className="space-y-2">
           <Label>Industries</Label>
-          <div className="flex flex-wrap gap-2">
-            {AVA_DATAMOON_TOPIC_PRESETS.map((topic) => (
-              <label key={topic} className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm">
-                <input
-                  type="checkbox"
-                  checked={draft.topics.includes(topic)}
-                  onChange={() => patch({ topics: toggleListValue(draft.topics, topic) })}
-                />
-                {topic}
-              </label>
-            ))}
-          </div>
+          {industryOptions.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {industryOptions.map((topic) => (
+                <label key={topic} className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={draft.topics.includes(topic)}
+                    onChange={() => patch({ topics: toggleListValue(draft.topics, topic) })}
+                  />
+                  {topic}
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Add industries in your Growth Profile, or enter topics below.
+            </p>
+          )}
         </div>
         <div className="space-y-2">
           <Label htmlFor="dm-custom-topic">Topics & keywords</Label>
@@ -166,18 +187,24 @@ export function DatamoonSourcingWorkbenchForm({ draft, onChange, layout = "group
       <FormSection title="Decision Makers" grouped={grouped}>
         <div className="space-y-2">
           <Label>Job titles</Label>
-          <div className="flex flex-wrap gap-2">
-            {AVA_DATAMOON_JOB_TITLE_PRESETS.map((title) => (
-              <label key={title} className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm">
-                <input
-                  type="checkbox"
-                  checked={draft.jobTitles.includes(title)}
-                  onChange={() => patch({ jobTitles: toggleListValue(draft.jobTitles, title) })}
-                />
-                {title}
-              </label>
-            ))}
-          </div>
+          {titleOptions.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {titleOptions.map((title) => (
+                <label key={title} className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={draft.jobTitles.includes(title)}
+                    onChange={() => patch({ jobTitles: toggleListValue(draft.jobTitles, title) })}
+                  />
+                  {title}
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Add buyer personas in your Growth Profile, or enter a custom title below.
+            </p>
+          )}
         </div>
         <div className="space-y-2">
           <Label htmlFor="dm-custom-job-title">Buyer personas</Label>

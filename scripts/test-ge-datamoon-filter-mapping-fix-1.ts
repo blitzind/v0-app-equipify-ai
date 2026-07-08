@@ -43,16 +43,21 @@ async function main(): Promise<void> {
   assert.equal(GROWTH_DATAMOON_FILTER_MAPPING_FIX_1_QA_MARKER, "ge-datamoon-filter-mapping-fix-1-v1")
 
   const defaultDraft = createDefaultAvaDatamoonAudienceDraft()
+  const populatedDraft = createMinimalAvaDatamoonAudienceDraft({
+    topics: ["equipment maintenance software"],
+    jobTitles: ["owner", "CEO"],
+  })
   const minimalDraft = createMinimalAvaDatamoonAudienceDraft()
-  const workbenchFilters = buildDatamoonWorkbenchFiltersFromAudienceDraft(defaultDraft)
+  const workbenchFilters = buildDatamoonWorkbenchFiltersFromAudienceDraft(populatedDraft)
   const providerRequest = buildDatamoonImportRequestFromAudienceDraft(defaultDraft)
+  const populatedProviderRequest = buildDatamoonImportRequestFromAudienceDraft(populatedDraft)
   const minimalProviderRequest = buildDatamoonImportRequestFromAudienceDraft(minimalDraft)
 
   assert.ok(workbenchFilters.length >= 11, "workbench draft still emits internal filters")
   assert.equal(workbenchFilters.filter((filter) => filter.field === "job_title").length, 1)
   assert.equal(workbenchFilters.find((filter) => filter.field === "job_title")?.operator, "in")
   for (const field of WORKBENCH_ONLY_FIELDS) {
-    if (field === "revenue_range" && !defaultDraft.revenueRange?.trim()) continue
+    if (field === "revenue_range" && !populatedDraft.revenueRange?.trim()) continue
     assert.ok(
       workbenchFilters.some((filter) => filter.field === field),
       `expected internal workbench filter ${field}`,
@@ -73,16 +78,24 @@ async function main(): Promise<void> {
   }
 
   assert.ok(providerRequest.filters.some((filter) => filter.field === "contact_country"))
-  assert.ok(providerRequest.filters.some((filter) => filter.field === "job_title"))
-  assert.equal(providerRequest.filters.filter((filter) => filter.field === "job_title").length, 1)
-  assert.equal(providerRequest.filters.find((filter) => filter.field === "job_title")?.operator, "in")
+  assert.equal(providerRequest.filters.some((filter) => filter.field === "job_title"), false)
   assert.equal(providerRequest.filters.some((filter) => filter.field === "country"), false)
   assert.equal(providerRequest.filters.some((filter) => filter.field === "topic"), false)
   assert.equal(providerRequest.filters.some((filter) => filter.field === "lookback_days"), false)
 
+  assert.ok(populatedProviderRequest.filters.some((filter) => filter.field === "contact_country"))
+  assert.ok(populatedProviderRequest.filters.some((filter) => filter.field === "job_title"))
+  assert.equal(populatedProviderRequest.filters.filter((filter) => filter.field === "job_title").length, 1)
+  assert.equal(populatedProviderRequest.filters.find((filter) => filter.field === "job_title")?.operator, "in")
+
   assert.equal(providerRequest.workbench_context?.lookbackDays, 7)
   assert.deepEqual(providerRequest.workbench_context?.intentLevels, ["high", "medium"])
-  assert.ok(providerRequest.workbench_context?.topics?.includes("equipment maintenance software"))
+  assert.equal(providerRequest.workbench_context?.topics?.length ?? 0, 0)
+  const explicitTopicsDraft = createMinimalAvaDatamoonAudienceDraft({
+    topics: ["equipment maintenance software"],
+  })
+  const explicitTopicsRequest = buildDatamoonImportRequestFromAudienceDraft(explicitTopicsDraft)
+  assert.ok(explicitTopicsRequest.workbench_context?.topics?.includes("equipment maintenance software"))
   assert.equal(providerRequest.workbench_context?.includeBusinessEmail, true)
   assert.equal(providerRequest.workbench_context?.onlyNewSinceLastRefresh, true)
   assert.ok(providerRequest.workbench_context?.omittedWorkbenchFilterFields?.includes("lookback_days"))
@@ -148,10 +161,10 @@ async function main(): Promise<void> {
   assert.deepEqual(DATAMOON_WORKBENCH_TO_PROVIDER_FILTER_FIELD_MAP.city, "personal_city")
   assert.deepEqual(DATAMOON_WORKBENCH_TO_PROVIDER_FILTER_FIELD_MAP.job_title, "job_title")
 
-  const providerFilterFields = buildDatamoonFiltersFromAudienceDraft(defaultDraft).map((filter) => filter.field)
+  const providerFilterFields = buildDatamoonFiltersFromAudienceDraft(populatedDraft).map((filter) => filter.field)
   assert.deepEqual(
     new Set(providerFilterFields),
-    new Set(providerRequest.filters.map((filter) => filter.field)),
+    new Set(populatedProviderRequest.filters.map((filter) => filter.field)),
   )
 
   console.log(`[${PHASE}] supported allowlist`, DATAMOON_PROVIDER_SUPPORTED_FILTER_FIELDS)
