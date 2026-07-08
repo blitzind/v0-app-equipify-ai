@@ -87,6 +87,8 @@ export function buildGrowthMissionAvaLaunchValidationFailureBody(input: {
   validationErrors: GrowthAvaLaunchValidationError[]
   fallbackMessage?: string
   runId?: string | null
+  sourceFailure?: Record<string, unknown>
+  issues?: unknown
 }): {
   ok: false
   qa_marker: typeof GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER
@@ -95,6 +97,8 @@ export function buildGrowthMissionAvaLaunchValidationFailureBody(input: {
   error: typeof GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR
   validationErrors: GrowthAvaLaunchValidationError[]
   runId?: string | null
+  sourceFailure?: Record<string, unknown>
+  issues?: unknown
 } {
   const validationErrors = ensureGrowthAvaLaunchValidationErrors(
     input.validationErrors,
@@ -108,6 +112,8 @@ export function buildGrowthMissionAvaLaunchValidationFailureBody(input: {
     error: typeof GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR
     validationErrors: GrowthAvaLaunchValidationError[]
     runId?: string | null
+    sourceFailure?: Record<string, unknown>
+    issues?: unknown
   } = {
     ok: false,
     qa_marker: GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER,
@@ -118,6 +124,12 @@ export function buildGrowthMissionAvaLaunchValidationFailureBody(input: {
   }
   if (input.runId !== undefined) {
     body.runId = input.runId
+  }
+  if (input.sourceFailure !== undefined) {
+    body.sourceFailure = input.sourceFailure
+  }
+  if (input.issues !== undefined) {
+    body.issues = input.issues
   }
   return body
 }
@@ -230,5 +242,7 @@ export type GrowthMissionAvaLaunchRunResponse =
       error: string
       validationErrors?: GrowthAvaLaunchValidationError[]
       exception?: AvaLaunchSerializedException
+      sourceFailure?: Record<string, unknown>
+      issues?: unknown
       runId?: string | null
     }

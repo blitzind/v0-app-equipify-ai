@@ -17,6 +17,7 @@ import {
   AVA_LAUNCH_VALIDATOR_LAUNCH_SERVICE,
   buildDatamoonImportValidationTraceError,
   buildGrowthAvaLaunchSearchValidationTrace,
+  mapPropagatedAvaLaunchIssuesToValidationErrors,
   type GrowthAvaLaunchSearchValidationTrace,
 } from "@/lib/growth/mission-center/growth-ava-launch-search-validation-trace"
 import {
@@ -532,8 +533,19 @@ export function mapServiceErrorToAvaLaunchValidationErrors(
   context?: {
     audienceDraft?: AvaDatamoonAudienceDraft
     providerRequest?: DatamoonAudienceImportRequest
+    sourceFailure?: Record<string, unknown>
+    issues?: unknown
   },
 ): GrowthAvaLaunchValidationError[] {
+  const propagatedIssues = context?.issues ?? context?.sourceFailure?.issues
+  const propagatedValidationErrors = mapPropagatedAvaLaunchIssuesToValidationErrors(propagatedIssues, {
+    audienceDraft: context?.audienceDraft,
+    providerRequest: context?.providerRequest,
+  })
+  if (propagatedValidationErrors && propagatedValidationErrors.length > 0) {
+    return propagatedValidationErrors
+  }
+
   if (error === "validation_failed" && context?.providerRequest && context?.audienceDraft) {
     const datamoonValidation = validateDatamoonAudienceImportRequest(context.providerRequest)
     if (!datamoonValidation.ok) {

@@ -33,6 +33,7 @@ import {
   serializeAvaLaunchRunException,
   shouldThrowAvaLaunchRootCauseTestException,
 } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-exception-transparency"
+import { mergeAvaLaunchRunServiceFailure } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-downstream-failure"
 import {
   beginAvaLaunchRuntimeObjectTraceSession,
   endAvaLaunchRuntimeObjectTraceSession,
@@ -64,6 +65,8 @@ export type RunGrowthMissionAvaLaunchRunFailure = {
   status: number
   runId?: string | null
   exception?: import("@/lib/growth/mission-center/growth-mission-ava-launch-run-exception-transparency").AvaLaunchSerializedException
+  sourceFailure?: Record<string, unknown>
+  issues?: unknown
 }
 
 function returnAvaLaunchUnexpectedExceptionFailure(
@@ -342,11 +345,14 @@ export async function runGrowthMissionAvaLaunchRun(
     const failureStage =
       started.error === "validation_failed" ? AVA_LAUNCH_STAGE.datamoon_validation : AVA_LAUNCH_STAGE.provider_launch
     return returnAvaLaunchFailure(
-      {
-        ok: false,
-        error: started.error,
-        status: started.error === "datamoon_provider_disabled" ? 503 : 400,
-      },
+      mergeAvaLaunchRunServiceFailure(
+        {
+          ok: false,
+          error: started.error,
+          status: started.error === "datamoon_provider_disabled" ? 503 : 400,
+        },
+        started,
+      ),
       {
         stage: failureStage,
         code: started.error,
@@ -379,7 +385,10 @@ export async function runGrowthMissionAvaLaunchRun(
   })
   if (!bound.ok) {
     return returnAvaLaunchFailure(
-      { ok: false, error: bound.error, status: bound.status, runId: started.run.id },
+      mergeAvaLaunchRunServiceFailure(
+        { ok: false, error: bound.error, status: bound.status, runId: started.run.id },
+        bound,
+      ),
       {
         stage: AVA_LAUNCH_STAGE.bind_results,
         code: bound.error,
@@ -398,7 +407,10 @@ export async function runGrowthMissionAvaLaunchRun(
   const polled = await pollDatamoonAudienceImportRun(admin, started.run.id)
   if (!polled.ok) {
     return returnAvaLaunchFailure(
-      { ok: false, error: polled.error, status: 400, runId: started.run.id },
+      mergeAvaLaunchRunServiceFailure(
+        { ok: false, error: polled.error, status: 400, runId: started.run.id },
+        polled,
+      ),
       {
         stage: AVA_LAUNCH_STAGE.provider_launch,
         code: polled.error,

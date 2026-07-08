@@ -268,6 +268,8 @@ export async function POST(request: Request, context: RouteContext) {
         mapServiceErrorToAvaLaunchValidationErrors(result.error, {
           audienceDraft: body.audienceDraft,
           providerRequest,
+          sourceFailure: result.sourceFailure,
+          issues: result.issues,
         }),
       )
       logGrowthAvaLaunchValidationResult({
@@ -283,6 +285,8 @@ export async function POST(request: Request, context: RouteContext) {
           validationErrors: mergedValidationErrors,
           fallbackMessage: result.error,
           runId: result.runId ?? null,
+          sourceFailure: result.sourceFailure,
+          issues: result.issues,
         }),
         { status: result.status },
       )
@@ -295,6 +299,8 @@ export async function POST(request: Request, context: RouteContext) {
         error: result.error,
         runId: result.runId ?? null,
         ...(result.exception ? { exception: result.exception } : {}),
+        ...(result.sourceFailure ? { sourceFailure: result.sourceFailure } : {}),
+        ...(result.issues !== undefined ? { issues: result.issues } : {}),
       },
       { status: result.status },
     )

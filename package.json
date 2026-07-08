@@ -722,6 +722,7 @@
     "test:ge-ava-launch-run-trace-1": "tsx scripts/test-ge-ava-launch-run-trace-1.ts",
     "test:ge-ava-runtime-object-trace-1": "tsx scripts/test-ge-ava-runtime-object-trace-1.ts",
     "test:ge-ava-launch-rootcause-1": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-ava-launch-rootcause-1.ts",
+    "test:ge-ava-launch-downstream-failure-1": "tsx scripts/test-ge-ava-launch-downstream-failure-1.ts",
     "test:ge-ava-autonomy-completion-run-1": "tsx scripts/test-ge-ava-autonomy-completion-run-1.ts",
     "test:ge-ava-autonomy-execution-request-1": "tsx scripts/test-ge-ava-autonomy-execution-request-1.ts",
     "test:ge-ava-operator-workspace-1": "tsx scripts/test-ge-ava-operator-workspace-1.ts",
