@@ -643,6 +643,7 @@
     "test:ge-datamoon-filter-mapping-fix-1": "tsx scripts/test-ge-datamoon-filter-mapping-fix-1.ts",
     "test:ge-datamoon-raw-fetch-audit-2": "tsx scripts/test-ge-datamoon-raw-fetch-audit-2.ts",
     "test:ge-datamoon-zero-results-response-trace-1": "tsx scripts/test-ge-datamoon-zero-results-response-trace-1.ts",
+    "test:ge-datamoon-b2b-topic-resolution-1": "tsx scripts/test-ge-datamoon-b2b-topic-resolution-1.ts",
     "test:ge-ava-datamoon-poll-completion-1": "tsx scripts/test-ge-ava-datamoon-poll-completion-1.ts",
     "test:ge-ava-launch-result-semantics-1": "tsx scripts/test-ge-ava-launch-result-semantics-1.ts",
     "test:ge-ava-launch-result-semantics-1b": "tsx scripts/test-ge-ava-launch-result-semantics-1b.ts",

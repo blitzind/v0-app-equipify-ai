@@ -87,10 +87,16 @@ async function main(): Promise<void> {
     assert.equal(isDatamoonProviderSupportedFilterField(filter.field), true)
     assert.equal((WORKBENCH_ONLY_FIELDS as readonly string[]).includes(filter.field), false)
   }
-  assert.equal(minimalProviderRequest.audience_type, "advanced_search")
+  assert.equal(minimalProviderRequest.audience_type, "b2b")
+  assert.equal(minimalProviderRequest.topic_ids, undefined)
   assert.equal(minimalProviderRequest.filters.some((filter) => filter.field === "contact_country"), true)
 
-  const localValidation = validateDatamoonAudienceImportRequest(minimalProviderRequest)
+  const manualAdvancedProviderRequest = buildDatamoonImportRequestFromAudienceDraft(
+    createMinimalAvaDatamoonAudienceDraft({ topics: [], customTopic: null, intentLevels: [] }),
+  )
+  assert.equal(manualAdvancedProviderRequest.audience_type, "advanced_search")
+
+  const localValidation = validateDatamoonAudienceImportRequest(manualAdvancedProviderRequest)
   assert.equal(localValidation.ok, true, JSON.stringify(localValidation))
 
   const emptyAdvancedValidation = validateDatamoonAudienceImportRequest({

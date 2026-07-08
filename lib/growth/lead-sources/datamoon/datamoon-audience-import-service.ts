@@ -46,6 +46,7 @@ import {
   resolveDatamoonAudiencePollWaitTimeoutError,
   sleepForDatamoonAudiencePollWait,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-poll-wait"
+import { prepareDatamoonAudienceImportRequestForBuild } from "@/lib/growth/lead-sources/datamoon/datamoon-b2b-audience-import-prepare"
 import { normalizeDatamoonImportRequestAudience } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder"
 import { logAvaRuntimeTrace } from "@/lib/growth/mission-center/growth-mission-ava-launch-runtime-object-trace"
 import { createGrowthLead } from "@/lib/growth/lead-repository"
@@ -114,10 +115,10 @@ export async function startDatamoonAudienceImportRun(
 
   logAvaRuntimeTrace({
     stage: "datamoon_import_service",
-    function: "validateDatamoonAudienceImportRequest",
-    file: "lib/growth/lead-sources/datamoon/datamoon-audience-import-validation.ts",
+    function: "prepareDatamoonAudienceImportRequestForBuild",
+    file: "lib/growth/lead-sources/datamoon/datamoon-b2b-audience-import-prepare.ts",
     object: normalizedInput,
-    label: "datamoonRequest.startDatamoon.preValidation",
+    label: "datamoonRequest.startDatamoon.prePrepare",
     constructedBy: {
       file: "lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder.ts",
       function: "normalizeDatamoonImportRequestAudience",
@@ -125,22 +126,54 @@ export async function startDatamoonAudienceImportRun(
     priorObject: input,
   })
 
-  const validation = validateDatamoonAudienceImportRequest(normalizedInput)
+  const prepared = await prepareDatamoonAudienceImportRequestForBuild(normalizedInput, options)
+  if (!prepared.ok) {
+    logAvaRuntimeTrace({
+      stage: "datamoon_import_service",
+      function: "prepareDatamoonAudienceImportRequestForBuild.result",
+      file: "lib/growth/lead-sources/datamoon/datamoon-b2b-audience-import-prepare.ts",
+      object: prepared,
+      label: "datamoonRequest.startDatamoon.prepareFailed",
+      constructedBy: {
+        file: "lib/growth/lead-sources/datamoon/datamoon-b2b-audience-import-prepare.ts",
+        function: "prepareDatamoonAudienceImportRequestForBuild",
+      },
+      priorObject: normalizedInput,
+    })
+    return { ok: false, error: prepared.error, issues: prepared.issues }
+  }
+
+  const providerInput = prepared.request
+
+  logAvaRuntimeTrace({
+    stage: "datamoon_import_service",
+    function: "validateDatamoonAudienceImportRequest",
+    file: "lib/growth/lead-sources/datamoon/datamoon-audience-import-validation.ts",
+    object: providerInput,
+    label: "datamoonRequest.startDatamoon.preValidation",
+    constructedBy: {
+      file: "lib/growth/lead-sources/datamoon/datamoon-b2b-audience-import-prepare.ts",
+      function: "prepareDatamoonAudienceImportRequestForBuild",
+    },
+    priorObject: normalizedInput,
+  })
+
+  const validation = validateDatamoonAudienceImportRequest(providerInput)
   if (!validation.ok) {
     logAvaRuntimeTrace({
       stage: "datamoon_import_service",
       function: "validateDatamoonAudienceImportRequest.result",
       file: "lib/growth/lead-sources/datamoon/datamoon-audience-import-validation.ts",
       object: {
-        validatedObject: normalizedInput,
+        validatedObject: providerInput,
         validation,
       },
       label: "datamoonRequest.startDatamoon.validationFailed",
       constructedBy: {
-        file: "lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder.ts",
-        function: "normalizeDatamoonImportRequestAudience",
+        file: "lib/growth/lead-sources/datamoon/datamoon-b2b-audience-import-prepare.ts",
+        function: "prepareDatamoonAudienceImportRequestForBuild",
       },
-      priorObject: input,
+      priorObject: normalizedInput,
     })
     return { ok: false, error: "validation_failed", issues: validation.issues }
   }
@@ -150,18 +183,18 @@ export async function startDatamoonAudienceImportRun(
     return { ok: false, error: "datamoon_provider_disabled" }
   }
 
-  const providerMode = normalizedInput.provider_mode ?? resolveDatamoonAudienceMode(env)
+  const providerMode = providerInput.provider_mode ?? resolveDatamoonAudienceMode(env)
   const dryRun = isDatamoonDryRunOnly(env)
 
   const run = await createDatamoonAudienceImportRun(admin, {
-    runName: normalizedInput.run_name.trim(),
+    runName: providerInput.run_name.trim(),
     providerMode,
-    audienceType: normalizedInput.audience_type,
-    filters: normalizedInput.filters,
-    topicIds: normalizedInput.topic_ids ?? [],
-    requestedLimit: normalizedInput.limit ?? null,
-    audienceName: normalizedInput.name?.trim() ?? null,
-    websiteId: normalizedInput.website_id?.trim() ?? null,
+    audienceType: providerInput.audience_type,
+    filters: providerInput.filters,
+    topicIds: providerInput.topic_ids ?? [],
+    requestedLimit: providerInput.limit ?? null,
+    audienceName: providerInput.name?.trim() ?? null,
+    websiteId: providerInput.website_id?.trim() ?? null,
     dryRun,
     createdBy: actor.userId,
   })
@@ -169,15 +202,15 @@ export async function startDatamoonAudienceImportRun(
   if (!run) return { ok: false, error: "run_create_failed" }
 
   try {
-    const providerFilters = resolveDatamoonProviderFiltersForImport(normalizedInput)
+    const providerFilters = resolveDatamoonProviderFiltersForImport(providerInput)
     const build = await buildAudience(
       {
-        type: normalizedInput.audience_type,
+        type: providerInput.audience_type,
         filters: providerFilters,
-        topic_ids: normalizedInput.topic_ids,
-        name: normalizedInput.name,
-        website_id: normalizedInput.website_id,
-        record_limit: normalizedInput.limit,
+        topic_ids: providerInput.topic_ids,
+        name: providerInput.name,
+        website_id: providerInput.website_id,
+        record_limit: providerInput.limit,
       },
       { env, audienceMode: providerMode, fetchImpl: options?.fetchImpl },
     )

@@ -2,6 +2,7 @@
 
 import type { DatamoonAudienceFilter } from "@/lib/growth/providers/datamoon"
 import type { DatamoonAudienceImportRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
+import { isDatamoonNumericTopicId } from "@/lib/growth/lead-sources/datamoon/datamoon-b2b-topic-resolution-types"
 import { DATAMOON_MAX_TOPIC_IDS } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import {
   buildDatamoonAudienceImportWorkbenchContextFromDraft,
@@ -40,35 +41,56 @@ function isTopicIdAudienceType(audienceType: string): audienceType is "b2b" | "b
   return audienceType === "b2b" || audienceType === "b2c"
 }
 
+export function datamoonImportRequestIntendsB2bAudience(input: {
+  audience_type?: string
+  workbench_context?: DatamoonAudienceImportRequest["workbench_context"]
+}): boolean {
+  const topicQueries = normalizeDatamoonTopicIds(input.workbench_context?.topics ?? [])
+  const intentLevels = input.workbench_context?.intentLevels ?? []
+  return topicQueries.length > 0 || intentLevels.length > 0
+}
+
 export function resolveDatamoonAudienceTypeForImport(
   draftAudienceType: string,
-  topicIds: readonly string[],
+  topicQueries: readonly string[],
+  intentLevels: readonly string[] = [],
 ): DatamoonAudienceImportRequest["audience_type"] {
-  if (isTopicIdAudienceType(draftAudienceType) && topicIds.length === 0) {
-    return "advanced_search"
+  if (topicQueries.length > 0 || intentLevels.length > 0) {
+    return "b2b"
   }
-  if (draftAudienceType === "advanced_search" || isTopicIdAudienceType(draftAudienceType)) {
-    return draftAudienceType
-  }
+  if (draftAudienceType === "b2c") return "b2c"
   return "advanced_search"
+}
+
+function resolveExistingNumericTopicIds(topicIds: readonly string[]): string[] {
+  return normalizeDatamoonTopicIds(topicIds).filter(isDatamoonNumericTopicId)
 }
 
 export function normalizeDatamoonImportRequestAudience(
   request: DatamoonAudienceImportRequest,
 ): DatamoonAudienceImportRequest {
-  const topicIds = normalizeDatamoonTopicIds(request.topic_ids ?? [])
-  const audienceType = resolveDatamoonAudienceTypeForImport(request.audience_type, topicIds)
-  const resolvedTopicIds = isTopicIdAudienceType(audienceType) ? topicIds : undefined
+  const topicQueries = normalizeDatamoonTopicIds(request.workbench_context?.topics ?? [])
+  const intentLevels = request.workbench_context?.intentLevels ?? []
+  const audienceType = resolveDatamoonAudienceTypeForImport(
+    request.audience_type,
+    topicQueries,
+    intentLevels,
+  )
+  const existingNumericTopicIds = resolveExistingNumericTopicIds(request.topic_ids ?? [])
   const mappedFilters = mapDatamoonFiltersToProviderFilters(request.filters)
 
   return {
     ...request,
     audience_type: audienceType,
-    topic_ids: resolvedTopicIds && resolvedTopicIds.length > 0 ? resolvedTopicIds : undefined,
+    topic_ids:
+      isTopicIdAudienceType(audienceType) && existingNumericTopicIds.length > 0
+        ? existingNumericTopicIds
+        : undefined,
     filters: mappedFilters.providerFilters,
     workbench_context: request.workbench_context
       ? {
           ...request.workbench_context,
+          topics: topicQueries,
           omittedWorkbenchFilterFields: [
             ...new Set([
               ...(request.workbench_context.omittedWorkbenchFilterFields ?? []),
@@ -83,7 +105,11 @@ export function normalizeDatamoonImportRequestAudience(
 }
 
 export function datamoonImportRequestRequiresTopicIds(request: DatamoonAudienceImportRequest): boolean {
-  return isTopicIdAudienceType(request.audience_type) && normalizeDatamoonTopicIds(request.topic_ids ?? []).length === 0
+  if (!isTopicIdAudienceType(request.audience_type)) return false
+  const numericTopicIds = resolveExistingNumericTopicIds(request.topic_ids ?? [])
+  if (numericTopicIds.length > 0) return false
+  const pendingQueries = normalizeDatamoonTopicIds(request.workbench_context?.topics ?? [])
+  return pendingQueries.length === 0
 }
 
 function resolvedTopics(draft: AvaDatamoonAudienceDraft): string[] {
@@ -168,8 +194,12 @@ export function buildDatamoonFiltersFromAudienceDraft(draft: AvaDatamoonAudience
 export function buildDatamoonImportRequestFromAudienceDraft(
   draft: AvaDatamoonAudienceDraft,
 ): DatamoonAudienceImportRequest {
-  const topicIds = resolvedTopics(draft)
-  const audienceType = resolveDatamoonAudienceTypeForImport(draft.audienceType, topicIds)
+  const topicQueries = resolvedTopics(draft)
+  const audienceType = resolveDatamoonAudienceTypeForImport(
+    draft.audienceType,
+    topicQueries,
+    draft.intentLevels,
+  )
   const workbenchFilters = buildDatamoonWorkbenchFiltersFromAudienceDraft(draft)
   const mappedFilters = mapDatamoonFiltersToProviderFilters(workbenchFilters)
   const request: DatamoonAudienceImportRequest = {
@@ -177,11 +207,10 @@ export function buildDatamoonImportRequestFromAudienceDraft(
     audience_type: audienceType,
     provider_mode: draft.providerMode,
     filters: mappedFilters.providerFilters,
-    topic_ids: isTopicIdAudienceType(audienceType) ? topicIds : undefined,
     limit: draft.recordLimit,
     name: draft.audienceName.trim() || undefined,
     workbench_context: buildDatamoonAudienceImportWorkbenchContextFromDraft(draft, {
-      topics: topicIds,
+      topics: topicQueries,
       omittedWorkbenchFilterFields: mappedFilters.omittedWorkbenchFilterFields,
     }),
   }

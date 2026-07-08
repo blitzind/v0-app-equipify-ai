@@ -2,6 +2,7 @@
 
 import type { DatamoonAudienceFilter } from "@/lib/growth/providers/datamoon"
 import { DATAMOON_EXT_OUTPUT_FIELDS } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
+import type { DatamoonResolvedB2bTopic } from "@/lib/growth/lead-sources/datamoon/datamoon-b2b-topic-resolution-types"
 import type { AvaDatamoonAudienceDraft } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-workbench-types"
 
 export const GROWTH_DATAMOON_FILTER_MAPPING_FIX_1_QA_MARKER =
@@ -24,10 +25,13 @@ export const DATAMOON_PROVIDER_GEOGRAPHY_FILTER_FIELDS = [
   "personal_city",
 ] as const
 
+export const DATAMOON_PROVIDER_B2B_INTENT_FILTER_FIELDS = ["score_category", "event_date"] as const
+
 export const DATAMOON_PROVIDER_SUPPORTED_FILTER_FIELDS = [
   ...DATAMOON_PROVIDER_GEOGRAPHY_FILTER_FIELDS,
   ...DATAMOON_PROVIDER_FILTER_FIELDS_FROM_CERT_EXAMPLES,
   ...DATAMOON_PROVIDER_FILTER_FIELDS_FROM_422_FIXTURE,
+  ...DATAMOON_PROVIDER_B2B_INTENT_FILTER_FIELDS,
 ] as const
 
 export type DatamoonProviderSupportedFilterField = (typeof DATAMOON_PROVIDER_SUPPORTED_FILTER_FIELDS)[number]
@@ -46,6 +50,7 @@ export type DatamoonAudienceImportWorkbenchContext = {
   lookbackDays?: number
   intentLevels?: string[]
   topics?: string[]
+  resolvedB2bTopics?: DatamoonResolvedB2bTopic[]
   companySize?: string
   revenueRange?: string | null
   includeBusinessEmail?: boolean
@@ -54,6 +59,34 @@ export type DatamoonAudienceImportWorkbenchContext = {
   excludeDuplicates?: boolean
   onlyNewSinceLastRefresh?: boolean
   omittedWorkbenchFilterFields?: string[]
+}
+
+export const DATAMOON_B2B_EVENT_DATE_MAX_LOOKBACK_DAYS = 14 as const
+
+export function resolveDatamoonB2bEventDateFromLookbackDays(lookbackDays: number): string {
+  const capped = Math.min(Math.max(Math.trunc(lookbackDays), 1), DATAMOON_B2B_EVENT_DATE_MAX_LOOKBACK_DAYS)
+  const date = new Date()
+  date.setUTCDate(date.getUTCDate() - capped)
+  return date.toISOString().slice(0, 10)
+}
+
+export function appendDatamoonB2bIntentFiltersFromWorkbenchContext(
+  filters: readonly DatamoonAudienceFilter[],
+  context?: DatamoonAudienceImportWorkbenchContext,
+): DatamoonAudienceFilter[] {
+  const output = [...filters]
+  const intentLevels = context?.intentLevels?.filter((level) => level.trim().length > 0) ?? []
+  if (intentLevels.length > 0) {
+    output.push({ field: "score_category", operator: "in", value: intentLevels })
+  }
+  if (context?.lookbackDays != null && context.lookbackDays > 0) {
+    output.push({
+      field: "event_date",
+      operator: ">=",
+      value: resolveDatamoonB2bEventDateFromLookbackDays(context.lookbackDays),
+    })
+  }
+  return output
 }
 
 export type MapDatamoonFiltersToProviderFiltersResult = {

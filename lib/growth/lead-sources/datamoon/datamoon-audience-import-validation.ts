@@ -6,6 +6,11 @@ import {
   type DatamoonAudienceImportValidationIssue,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import {
+  GROWTH_DATAMOON_B2B_TOPIC_RESOLUTION_NO_MATCH_ERROR,
+  isDatamoonNumericTopicId,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-b2b-topic-resolution-types"
+import { normalizeDatamoonTopicIds } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder"
+import {
   formatDatamoonProviderFilterFieldAllowlistMessage,
   isDatamoonProviderSupportedFilterField,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-filter-mapping"
@@ -50,12 +55,29 @@ export function validateDatamoonAudienceImportRequest(
     })
   }
 
+  for (const [index, topicId] of topicIds.entries()) {
+    if (!isDatamoonNumericTopicId(topicId)) {
+      issues.push({
+        code: "invalid_topic_id",
+        field: `topic_ids.${index}`,
+        message: "topic_ids must be numeric Datamoon catalog IDs.",
+      })
+    }
+  }
+
   if ((input.audience_type === "b2b" || input.audience_type === "b2c") && topicIds.length === 0) {
-    issues.push({
-      code: "topic_ids_required",
-      field: "topic_ids",
-      message: "b2b and b2c audiences require at least one topic_id.",
-    })
+    const pendingTopics = normalizeDatamoonTopicIds(input.workbench_context?.topics ?? [])
+    if (pendingTopics.length === 0) {
+      const intentOnlyB2b =
+        input.audience_type === "b2b" && (input.workbench_context?.intentLevels?.length ?? 0) > 0
+      issues.push({
+        code: intentOnlyB2b ? "datamoon_b2b_topics_unresolved" : "topic_ids_required",
+        field: "topic_ids",
+        message: intentOnlyB2b
+          ? GROWTH_DATAMOON_B2B_TOPIC_RESOLUTION_NO_MATCH_ERROR
+          : "b2b and b2c audiences require at least one topic_id.",
+      })
+    }
   }
 
   if (input.limit != null && (!Number.isFinite(input.limit) || input.limit < 1 || input.limit > 1_000_000)) {

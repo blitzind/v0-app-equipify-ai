@@ -13,6 +13,7 @@ import {
 } from "../lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder"
 import { createMinimalAvaDatamoonAudienceDraft } from "../lib/growth/ava-home/datamoon/ava-datamoon-sourcing-workbench-types"
 import type { DatamoonAudienceImportRequest } from "../lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
+import { GROWTH_DATAMOON_B2B_TOPIC_RESOLUTION_NO_MATCH_ERROR } from "../lib/growth/lead-sources/datamoon/datamoon-b2b-topic-resolution-types"
 import { validateDatamoonAudienceImportRequest } from "../lib/growth/lead-sources/datamoon/datamoon-audience-import-validation"
 
 const PHASE = "GE-AVA-SEARCH-VALIDATION-FIX-2" as const
@@ -91,10 +92,13 @@ async function main(): Promise<void> {
   assert.equal(preFixValidation.issues[0]?.code, "topic_ids_required")
 
   const providerRequest = buildDatamoonImportRequestFromAudienceDraft(PRODUCTION_FAILURE_AUDIENCE_DRAFT)
-  assert.equal(providerRequest.audience_type, "advanced_search")
+  assert.equal(providerRequest.audience_type, "b2b")
   assert.equal(providerRequest.topic_ids, undefined)
-  assertNoEmptyTopicIdAudience(providerRequest)
-  assert.equal(validateDatamoonAudienceImportRequest(providerRequest).ok, true)
+  assert.equal(datamoonImportRequestRequiresTopicIds(providerRequest), true)
+  const providerValidation = validateDatamoonAudienceImportRequest(providerRequest)
+  assert.equal(providerValidation.ok, false)
+  assert.equal(providerValidation.issues[0]?.code, "datamoon_b2b_topics_unresolved")
+  assert.equal(providerValidation.issues[0]?.message, GROWTH_DATAMOON_B2B_TOPIC_RESOLUTION_NO_MATCH_ERROR)
 
   const normalizedRawFailure = normalizeDatamoonImportRequestAudience(PRODUCTION_FAILURE_PROVIDER_REQUEST)
   assert.equal(normalizedRawFailure.audience_type, "advanced_search")
@@ -105,6 +109,7 @@ async function main(): Promise<void> {
     audienceType: "b2b",
     topics: ["", "   "],
     customTopic: "   ",
+    intentLevels: [],
   })
   const whitespaceRequest = buildDatamoonImportRequestFromAudienceDraft(whitespaceOnlyDraft)
   assert.equal(whitespaceRequest.audience_type, "advanced_search")
@@ -118,18 +123,19 @@ async function main(): Promise<void> {
     topic_ids: [],
     limit: 100,
   })
-  assert.equal(b2cWithoutTopics.audience_type, "advanced_search")
+  assert.equal(b2cWithoutTopics.audience_type, "b2c")
   assert.equal(b2cWithoutTopics.topic_ids, undefined)
+  assert.equal(validateDatamoonAudienceImportRequest(b2cWithoutTopics).ok, false)
 
   const b2cWithTopics = normalizeDatamoonImportRequestAudience({
     run_name: "Lead discovery search",
     audience_type: "b2c",
     filters: providerRequest.filters,
-    topic_ids: ["hvac services"],
+    topic_ids: ["12345"],
     limit: 100,
   })
   assert.equal(b2cWithTopics.audience_type, "b2c")
-  assert.deepEqual(b2cWithTopics.topic_ids, ["hvac services"])
+  assert.deepEqual(b2cWithTopics.topic_ids, ["12345"])
 
   assert.deepEqual(normalizeDatamoonTopicIds([" topic-a ", "topic-a", ""]), ["topic-a"])
 
