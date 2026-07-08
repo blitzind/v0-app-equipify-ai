@@ -5,6 +5,7 @@ import {
   GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER,
   GROWTH_AVA_LAUNCH_VALIDATION_DEBUG_1_QA_MARKER,
   buildGrowthMissionAvaLaunchValidationFailureBody,
+  buildGrowthMissionAvaLaunchExceptionFailureBody,
 } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-api-contract"
 import {
   buildSearchValidationTraceFromDraft,
@@ -250,6 +251,17 @@ export async function POST(request: Request, context: RouteContext) {
   })
 
   if (!result.ok) {
+    if (result.exception) {
+      return avaLaunchRouteResponse(
+        buildGrowthMissionAvaLaunchExceptionFailureBody({
+          error: result.error,
+          exception: result.exception,
+          runId: result.runId ?? null,
+        }),
+        { status: result.status },
+      )
+    }
+
     if (isAvaLaunchValidationFailureError(result.error)) {
       const mergedValidationErrors = mergeAvaLaunchValidationErrors(
         validation.validationErrors,
@@ -282,6 +294,7 @@ export async function POST(request: Request, context: RouteContext) {
         qa_marker: GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER,
         error: result.error,
         runId: result.runId ?? null,
+        ...(result.exception ? { exception: result.exception } : {}),
       },
       { status: result.status },
     )

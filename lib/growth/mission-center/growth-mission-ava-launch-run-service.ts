@@ -25,9 +25,14 @@ import { registerAvaAutonomyCompletionPendingLeads } from "@/lib/growth/mission-
 import {
   AVA_LAUNCH_STAGE,
   logAvaLaunchStage,
-  resolveExceptionTrace,
   returnAvaLaunchFailure,
 } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-trace"
+import {
+  buildAvaLaunchRootCauseTestException,
+  buildAvaLaunchUnexpectedExceptionFailure,
+  serializeAvaLaunchRunException,
+  shouldThrowAvaLaunchRootCauseTestException,
+} from "@/lib/growth/mission-center/growth-mission-ava-launch-run-exception-transparency"
 import {
   beginAvaLaunchRuntimeObjectTraceSession,
   endAvaLaunchRuntimeObjectTraceSession,
@@ -58,6 +63,32 @@ export type RunGrowthMissionAvaLaunchRunFailure = {
   error: string
   status: number
   runId?: string | null
+  exception?: import("@/lib/growth/mission-center/growth-mission-ava-launch-run-exception-transparency").AvaLaunchSerializedException
+}
+
+function returnAvaLaunchUnexpectedExceptionFailure(
+  error: unknown,
+  trace: {
+    stage: (typeof AVA_LAUNCH_STAGE)[keyof typeof AVA_LAUNCH_STAGE]
+    payload?: unknown
+    runId?: string | null
+  },
+): RunGrowthMissionAvaLaunchRunFailure {
+  const failure = buildAvaLaunchUnexpectedExceptionFailure(error, {
+    status: 500,
+    runId: trace.runId ?? null,
+  })
+  const exception = failure.exception!
+  returnAvaLaunchFailure(failure, {
+    stage: trace.stage,
+    code: "validation_failed",
+    message: exception.message,
+    original: error,
+    cause: exception.cause,
+    stack: exception.stack,
+    payload: trace.payload,
+  })
+  return failure
 }
 
 function resolveSearchSummary(input: RunGrowthMissionAvaLaunchRunInput): string {
@@ -147,6 +178,10 @@ export async function runGrowthMissionAvaLaunchRun(
   })
 
   try {
+    if (shouldThrowAvaLaunchRootCauseTestException()) {
+      throw buildAvaLaunchRootCauseTestException()
+    }
+
     logAvaRuntimeObjectConstruction({
       label: "input.audienceDraft",
       object: input.audienceDraft,
@@ -416,21 +451,22 @@ export async function runGrowthMissionAvaLaunchRun(
       errors = importResult.errors
       leadIds = importResult.leadIds
     } catch (error) {
-      const exceptionTrace = resolveExceptionTrace(error)
+      const exception = serializeAvaLaunchRunException(error)
       return returnAvaLaunchFailure(
         {
           ok: false,
-          error: exceptionTrace.message,
+          error: exception.message,
           status: 500,
           runId: started.run.id,
+          exception,
         },
         {
           stage: AVA_LAUNCH_STAGE.provider_launch,
-          code: exceptionTrace.message,
-          message: exceptionTrace.message,
-          original: exceptionTrace.original,
-          cause: exceptionTrace.cause,
-          stack: exceptionTrace.stack,
+          code: exception.message,
+          message: exception.message,
+          original: error,
+          cause: exception.cause,
+          stack: exception.stack,
           payload: { runId: started.run.id, previewCount },
         },
       )
@@ -484,6 +520,10 @@ export async function runGrowthMissionAvaLaunchRun(
       stoppedAt: "human_approval",
     },
   }
+  } catch (error) {
+    return returnAvaLaunchUnexpectedExceptionFailure(error, {
+      stage: AVA_LAUNCH_STAGE.provider_launch,
+    })
   } finally {
     endAvaLaunchRuntimeObjectTraceSession()
   }

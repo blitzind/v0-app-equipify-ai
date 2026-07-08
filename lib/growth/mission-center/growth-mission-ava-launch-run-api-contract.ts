@@ -2,6 +2,7 @@
 
 import type { AvaDatamoonAudienceDraft } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-workbench-types"
 import type { MissionFindLeadsBindingSummary } from "@/lib/growth/mission-center/growth-mission-find-leads-binding-service"
+import type { AvaLaunchSerializedException } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-exception-transparency"
 
 export const GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER = "ge-ava-autonomy-launch-run-1-v1" as const
 
@@ -121,6 +122,47 @@ export function buildGrowthMissionAvaLaunchValidationFailureBody(input: {
   return body
 }
 
+export function buildGrowthMissionAvaLaunchExceptionFailureBody(input: {
+  error: string
+  exception: AvaLaunchSerializedException
+  runId?: string | null
+}): {
+  ok: false
+  qa_marker: typeof GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER
+  error: string
+  exception: AvaLaunchSerializedException
+  validationErrors: GrowthAvaLaunchValidationError[]
+  runId?: string | null
+} {
+  const body: {
+    ok: false
+    qa_marker: typeof GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER
+    error: string
+    exception: AvaLaunchSerializedException
+    validationErrors: GrowthAvaLaunchValidationError[]
+    runId?: string | null
+  } = {
+    ok: false,
+    qa_marker: GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER,
+    error: input.error,
+    exception: input.exception,
+    validationErrors: [
+      {
+        code: "validation_failed",
+        message: input.exception.message,
+        field: "launch",
+        severity: "error",
+        validator: "runGrowthMissionAvaLaunchRun",
+        rawIssue: { exception: input.exception },
+      },
+    ],
+  }
+  if (input.runId !== undefined) {
+    body.runId = input.runId
+  }
+  return body
+}
+
 export const GROWTH_AVA_LAUNCH_RUN_TITLE = "Run Ava" as const
 export const GROWTH_AVA_LAUNCH_RUN_DESCRIPTION =
   "Find leads from your approved search, import them, start research, and surface items for human approval — no outbound send." as const
@@ -187,5 +229,6 @@ export type GrowthMissionAvaLaunchRunResponse =
       search_validation_trace_qa_marker?: typeof GROWTH_AVA_SEARCH_VALIDATION_2_QA_MARKER
       error: string
       validationErrors?: GrowthAvaLaunchValidationError[]
+      exception?: AvaLaunchSerializedException
       runId?: string | null
     }
