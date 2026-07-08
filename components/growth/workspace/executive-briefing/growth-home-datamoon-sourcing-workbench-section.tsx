@@ -88,6 +88,10 @@ import {
   type GrowthMissionCenterSourcesPayload,
 } from "@/lib/growth/mission-center"
 import { buildAvaLaunchRunSuccessMessage } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-result-semantics"
+import {
+  GROWTH_HOME_FIND_LEADS_ZERO_PREVIEW_DEBUG_TITLE,
+  type GrowthMissionAvaLaunchZeroPreviewDebug,
+} from "@/lib/growth/mission-center/growth-mission-ava-launch-zero-preview-debug"
 import { selectDefaultFindLeadsMissionId } from "@/lib/growth/mission-center/growth-mission-find-leads-binding-display"
 import {
   GROWTH_BUSINESS_PROFILE_API_PATH,
@@ -178,6 +182,8 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
   const [keepMonitoring, setKeepMonitoring] = useState(true)
   const [missionBindingMessage, setMissionBindingMessage] = useState<string | null>(null)
   const [launchRunMessage, setLaunchRunMessage] = useState<string | null>(null)
+  const [zeroPreviewDebug, setZeroPreviewDebug] = useState<GrowthMissionAvaLaunchZeroPreviewDebug | null>(null)
+  const [zeroPreviewDebugOpen, setZeroPreviewDebugOpen] = useState(false)
   const resultsTableRef = useRef<HTMLDivElement>(null)
 
   const previewRecords = useMemo(
@@ -316,6 +322,8 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
     setError(null)
     setMissionBindingMessage(null)
     setLaunchRunMessage(null)
+    setZeroPreviewDebug(null)
+    setZeroPreviewDebugOpen(false)
     try {
       const searchSummary =
         command.trim() ||
@@ -373,6 +381,8 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
           stoppedAt: result.stoppedAt,
         })}`,
       )
+      setZeroPreviewDebug(result.importedLeadCount === 0 ? (result.zeroPreviewDebug ?? null) : null)
+      setZeroPreviewDebugOpen(result.importedLeadCount === 0 && Boolean(result.zeroPreviewDebug))
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ava launch run failed.")
     } finally {
@@ -484,6 +494,9 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
     setSelectedIds(new Set())
     setRejectedIds(new Set())
     setMissionBindingMessage(null)
+    setLaunchRunMessage(null)
+    setZeroPreviewDebug(null)
+    setZeroPreviewDebugOpen(false)
     setError(null)
   }
 
@@ -844,6 +857,24 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
 
                 {launchRunMessage ? (
                   <p className="text-sm text-indigo-800 dark:text-indigo-200">{launchRunMessage}</p>
+                ) : null}
+
+                {zeroPreviewDebug ? (
+                  <Collapsible open={zeroPreviewDebugOpen} onOpenChange={setZeroPreviewDebugOpen}>
+                    <CollapsibleTrigger asChild>
+                      <Button type="button" variant="outline" size="sm" className="w-full justify-between">
+                        {GROWTH_HOME_FIND_LEADS_ZERO_PREVIEW_DEBUG_TITLE}
+                        <ChevronDown
+                          className={cn("size-4 transition-transform", zeroPreviewDebugOpen && "rotate-180")}
+                        />
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-3">
+                      <pre className="max-h-80 overflow-auto rounded-md border bg-muted/40 p-3 text-xs leading-relaxed">
+                        {JSON.stringify(zeroPreviewDebug, null, 2)}
+                      </pre>
+                    </CollapsibleContent>
+                  </Collapsible>
                 ) : null}
 
                 <div className="flex flex-wrap gap-2">

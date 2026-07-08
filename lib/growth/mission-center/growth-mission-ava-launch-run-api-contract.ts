@@ -4,6 +4,7 @@ import type { AvaDatamoonAudienceDraft } from "@/lib/growth/ava-home/datamoon/av
 import type { MissionFindLeadsBindingSummary } from "@/lib/growth/mission-center/growth-mission-find-leads-binding-service"
 import type { AvaLaunchSerializedException } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-exception-transparency"
 import type { GrowthMissionAvaLaunchRunStoppedAt } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-result-semantics"
+import type { GrowthMissionAvaLaunchZeroPreviewDebug } from "@/lib/growth/mission-center/growth-mission-ava-launch-zero-preview-debug"
 import { GROWTH_AVA_LAUNCH_RESULT_SEMANTICS_1_QA_MARKER } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-result-semantics"
 
 export const GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER = "ge-ava-autonomy-launch-run-1-v1" as const
@@ -239,6 +240,8 @@ export type GrowthMissionAvaLaunchRunResult = {
   researchPendingCount: number
   stoppedAt: GrowthMissionAvaLaunchRunStoppedAt
   resultSemanticsQaMarker: typeof GROWTH_AVA_LAUNCH_RESULT_SEMANTICS_1_QA_MARKER
+  /** GE-DATAMOON-ZERO-RESULTS-RESPONSE-TRACE-1 — Present when preview/import counts are zero. */
+  zeroPreviewDebug?: GrowthMissionAvaLaunchZeroPreviewDebug
 }
 
 export type GrowthMissionAvaLaunchRunResponse =

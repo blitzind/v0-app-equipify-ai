@@ -26,6 +26,7 @@ import {
   buildAvaLaunchRunResultSemantics,
   filterOrgHumanApprovalPendingItems,
 } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-result-semantics"
+import { buildGrowthMissionAvaLaunchZeroPreviewDebug } from "@/lib/growth/mission-center/growth-mission-ava-launch-zero-preview-debug"
 import { registerAvaAutonomyCompletionPendingLeads } from "@/lib/growth/mission-center/growth-ava-autonomy-completion-service"
 import {
   AVA_LAUNCH_STAGE,
@@ -501,6 +502,15 @@ export async function runGrowthMissionAvaLaunchRun(
     runCreatedApprovalCount: humanApprovalCenter.runRelatedPending,
   })
 
+  const zeroPreviewDebug =
+    previewCount === 0
+      ? buildGrowthMissionAvaLaunchZeroPreviewDebug({
+          run: polled.run,
+          records: polled.records,
+          importRequest: datamoonRequest,
+        })
+      : undefined
+
   logGrowthEngine("growth_mission_ava_launch_run_completed", {
     qa_marker: GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER,
     mission_id: input.missionId,
@@ -535,6 +545,7 @@ export async function runGrowthMissionAvaLaunchRun(
       researchPendingCount: resultSemantics.researchPendingCount,
       stoppedAt: resultSemantics.stoppedAt,
       resultSemanticsQaMarker: resultSemantics.qa_marker,
+      ...(zeroPreviewDebug ? { zeroPreviewDebug } : {}),
     },
   }
   } catch (error) {
