@@ -641,6 +641,7 @@
     "test:growth-datamoon-audience-import-ge-datamoon-1b": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-datamoon-audience-import-ge-datamoon-1b.ts",
     "test:growth-datamoon-unified-intake-parity-ge-datamoon-1c": "NODE_OPTIONS='--require ./scripts/shim-server-only.cjs' tsx scripts/test-growth-datamoon-unified-intake-parity-ge-datamoon-1c.ts",
     "test:ge-datamoon-filter-mapping-fix-1": "tsx scripts/test-ge-datamoon-filter-mapping-fix-1.ts",
+    "test:ge-datamoon-raw-fetch-audit-2": "tsx scripts/test-ge-datamoon-raw-fetch-audit-2.ts",
     "test:ge-ava-datamoon-poll-completion-1": "tsx scripts/test-ge-ava-datamoon-poll-completion-1.ts",
     "test:ge-ava-launch-result-semantics-1": "tsx scripts/test-ge-ava-launch-result-semantics-1.ts",
     "test:ge-ava-launch-result-semantics-1b": "tsx scripts/test-ge-ava-launch-result-semantics-1b.ts",

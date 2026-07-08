@@ -1,4 +1,6 @@
-/** GE-DATAMOON-RAW-FETCH-AUDIT-1 — Temporary first-completed fetch diagnostics (server-only). */
+/** GE-DATAMOON-RAW-FETCH-AUDIT-1/2 — Temporary completed-poll fetch diagnostics (server-only). */
+
+// TODO(ge-datamoon-raw-fetch-audit): Remove this temporary audit after zero-preview investigation.
 
 import "server-only"
 
@@ -13,6 +15,11 @@ import type { DatamoonAudienceMode } from "@/lib/growth/providers/datamoon/datam
 
 export const GROWTH_DATAMOON_RAW_FETCH_AUDIT_1_QA_MARKER =
   "ge-datamoon-raw-fetch-audit-1-v1" as const
+
+export const GROWTH_DATAMOON_RAW_FETCH_AUDIT_2_QA_MARKER =
+  "ge-datamoon-raw-fetch-audit-2-v1" as const
+
+export const GROWTH_DATAMOON_RAW_FETCH_AUDIT_2_REASON = "completed_poll_audit" as const
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value)
@@ -66,13 +73,10 @@ function resolveImportableReason(normalized: ReturnType<typeof normalizeDatamoon
   return `Missing importable identity (${missing.join(", ") || "unknown"}).`
 }
 
-export function shouldLogDatamoonRawFetchAudit(existingStatus: string): boolean {
-  return existingStatus !== "completed" && existingStatus !== "imported" && existingStatus !== "imported_partial"
-}
-
 export function logDatamoonRawFetchAudit(input: {
   runId: string
   datamoonAudienceId: string
+  existingStatus: string
   providerMode: DatamoonAudienceMode
   fetchClientStatus: string
   rawResponse: unknown
@@ -102,7 +106,9 @@ export function logDatamoonRawFetchAudit(input: {
   const importableReason = firstNormalized ? resolveImportableReason(firstNormalized) : null
 
   logGrowthEngine("datamoon_raw_fetch_audit_1", {
-    qa_marker: GROWTH_DATAMOON_RAW_FETCH_AUDIT_1_QA_MARKER,
+    qa_marker: GROWTH_DATAMOON_RAW_FETCH_AUDIT_2_QA_MARKER,
+    reason: GROWTH_DATAMOON_RAW_FETCH_AUDIT_2_REASON,
+    existing_status: input.existingStatus,
     run_id: input.runId,
     datamoon_audience_id: input.datamoonAudienceId,
     provider_mode: input.providerMode,
