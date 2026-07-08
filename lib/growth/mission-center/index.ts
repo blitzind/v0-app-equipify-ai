@@ -72,6 +72,7 @@ export {
   AVA_LAUNCH_VALIDATOR_LAUNCH_SERVICE,
   buildDatamoonImportValidationTraceError,
   buildGrowthAvaLaunchSearchValidationTrace,
+  mapPropagatedAvaLaunchIssuesToValidationErrors,
 } from "@/lib/growth/mission-center/growth-ava-launch-search-validation-trace"
 export type {
   GrowthMissionAvaLaunchRunRequest,

@@ -203,3 +203,61 @@ export function buildDatamoonImportValidationTraceError(
     rawIssue: issue,
   }
 }
+
+function isDatamoonAudienceImportValidationIssue(
+  value: unknown,
+): value is DatamoonAudienceImportValidationIssue {
+  return (
+    Boolean(value) &&
+    typeof value === "object" &&
+    "code" in value &&
+    "message" in value &&
+    typeof (value as DatamoonAudienceImportValidationIssue).code === "string" &&
+    typeof (value as DatamoonAudienceImportValidationIssue).message === "string"
+  )
+}
+
+export function mapPropagatedAvaLaunchIssuesToValidationErrors(
+  issues: unknown,
+  input?: {
+    audienceDraft?: AvaDatamoonAudienceDraft
+    providerRequest?: DatamoonAudienceImportRequest
+  },
+): GrowthAvaLaunchValidationError[] | null {
+  if (Array.isArray(issues) && issues.length > 0) {
+    if (issues.every(isDatamoonAudienceImportValidationIssue)) {
+      if (input?.audienceDraft && input?.providerRequest) {
+        return issues.map((issue) =>
+          buildDatamoonImportValidationTraceError(issue, input.audienceDraft!, input.providerRequest!),
+        )
+      }
+      return issues.map((issue) => ({
+        code: issue.code,
+        message: issue.message,
+        field: issue.field ?? "audienceDraft",
+        severity: "error" as const,
+        validator: AVA_LAUNCH_VALIDATOR_LAUNCH_SERVICE,
+        rawIssue: issue,
+      }))
+    }
+  }
+
+  if (issues && typeof issues === "object" && !Array.isArray(issues)) {
+    const mapped = Object.entries(issues as Record<string, unknown>).flatMap(([field, messages]) => {
+      if (!Array.isArray(messages)) return []
+      return messages
+        .filter((message): message is string => typeof message === "string" && message.trim().length > 0)
+        .map((message) => ({
+          code: "validation_failed",
+          message,
+          field,
+          severity: "error" as const,
+          validator: AVA_LAUNCH_VALIDATOR_LAUNCH_SERVICE,
+          rawIssue: { field, message, providerValidationErrors: issues },
+        }))
+    })
+    return mapped.length > 0 ? mapped : null
+  }
+
+  return null
+}
