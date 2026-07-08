@@ -119,7 +119,7 @@ async function main(): Promise<void> {
   assert.ok(context.draft.jobTitles.some((title) => /vp operations|fleet director/i.test(title)))
   assert.match(context.narrative, /Growth Profile/)
   assert.match(context.narrative, /Expand Midwest carrier pipeline/)
-  assert.ok(context.explainability.some((line) => line.source === "growth_profile"))
+  assert.ok(context.explainability.some((line) => line.source === "approved_business_profile"))
   assert.ok(context.explainability.some((line) => line.source === "mission"))
   assert.ok(context.topicPresets.some((topic) => /regional trucking/i.test(topic)))
   assert.ok(context.jobTitlePresets.some((title) => /vp operations/i.test(title)))

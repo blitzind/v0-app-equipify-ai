@@ -21,6 +21,7 @@ import {
   buildAvaLedLeadDiscoveryContext,
   GROWTH_AIOS_FIND_LEADS_7C_QA_MARKER,
   type AvaLedLeadDiscoveryContext,
+  type BusinessIntelligenceLeadDiscoverySignals,
 } from "@/lib/growth/ava-home/datamoon/ava-datamoon-lead-discovery-defaults"
 import {
   AVA_DATAMOON_PROVIDER_MODES,
@@ -107,6 +108,10 @@ import {
   GROWTH_BUSINESS_PROFILE_API_PATH,
   type GrowthBusinessProfileApiResponse,
 } from "@/lib/growth/business-profile/business-profile-api-contract"
+import {
+  GROWTH_BUSINESS_INTELLIGENCE_LEAD_DISCOVERY_API_PATH,
+  type GrowthBusinessIntelligenceLeadDiscoveryContextApiResponse,
+} from "@/lib/growth/business-intelligence/business-intelligence-api-contract"
 import type { BusinessProfileDraftContent } from "@/lib/growth/business-profile/business-profile-types"
 import type {
   DatamoonAudienceImportRecord,
@@ -243,11 +248,17 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
   }, [])
 
   const hydrateLeadDiscoveryContext = useCallback(
-    (profile: BusinessProfileDraftContent | null, companyName: string | null, missionTitle: string | null) => {
+    (
+      profile: BusinessProfileDraftContent | null,
+      companyName: string | null,
+      missionTitle: string | null,
+      businessIntelligenceSignals?: BusinessIntelligenceLeadDiscoverySignals | null,
+    ) => {
       const context = buildAvaLedLeadDiscoveryContext({
         profile,
         companyName,
         missionTitle,
+        businessIntelligenceSignals,
       })
       setAvaLedContext(context)
       setDraft(context.draft)
@@ -258,6 +269,15 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
     },
     [],
   )
+
+  const loadBusinessIntelligenceLeadDiscoverySignals = useCallback(async () => {
+    const res = await fetch(GROWTH_BUSINESS_INTELLIGENCE_LEAD_DISCOVERY_API_PATH, { cache: "no-store" })
+    const payload = (await res.json()) as GrowthBusinessIntelligenceLeadDiscoveryContextApiResponse
+    if (res.ok && payload.ok) {
+      return payload.signals ?? null
+    }
+    return null
+  }, [])
 
   const loadBusinessProfileState = useCallback(async () => {
     const res = await fetch(GROWTH_BUSINESS_PROFILE_API_PATH, { cache: "no-store" })
@@ -298,8 +318,19 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
   useEffect(() => {
     if (!open) return
     const missionTitle = missionOptions.find((entry) => entry.id === selectedMissionId)?.title ?? null
-    hydrateLeadDiscoveryContext(activeProfile, profileCompanyName, missionTitle)
-  }, [open, activeProfile, profileCompanyName, missionOptions, selectedMissionId, hydrateLeadDiscoveryContext])
+    void (async () => {
+      const biSignals = await loadBusinessIntelligenceLeadDiscoverySignals().catch(() => null)
+      hydrateLeadDiscoveryContext(activeProfile, profileCompanyName, missionTitle, biSignals)
+    })()
+  }, [
+    open,
+    activeProfile,
+    profileCompanyName,
+    missionOptions,
+    selectedMissionId,
+    hydrateLeadDiscoveryContext,
+    loadBusinessIntelligenceLeadDiscoverySignals,
+  ])
 
   async function handleStartAvaLedSearch() {
     if (!avaLedContext) return
@@ -553,7 +584,10 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
 
   function handleReset() {
     const missionTitle = missionOptions.find((entry) => entry.id === selectedMissionId)?.title ?? null
-    hydrateLeadDiscoveryContext(activeProfile, profileCompanyName, missionTitle)
+    void (async () => {
+      const biSignals = await loadBusinessIntelligenceLeadDiscoverySignals().catch(() => null)
+      hydrateLeadDiscoveryContext(activeProfile, profileCompanyName, missionTitle, biSignals)
+    })()
     setCommand("")
     setOverrides([])
     setBuildConfirmed(false)

@@ -2,6 +2,7 @@
 
 import { ArrowDown, Building2, Search, Send, Sparkles } from "lucide-react"
 import { GrowthHomeBusinessProfileSection } from "@/components/growth/workspace/executive-briefing/growth-home-business-profile-section"
+import { GrowthHomeBusinessIntelligenceSection } from "@/components/growth/workspace/executive-briefing/growth-home-business-intelligence-section"
 import { GrowthHomeDatamoonSourcingWorkbenchSection } from "@/components/growth/workspace/executive-briefing/growth-home-datamoon-sourcing-workbench-section"
 import { GrowthHomeAvaOpportunityIntelligenceSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-opportunity-intelligence-section"
 import type { GrowthHomeDailyWorkQueueItem } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
@@ -59,6 +60,7 @@ export function GrowthHomeGrowthStrategySection({ dailyWorkQueue, onPrepareOutre
             <p className="text-sm font-medium">Understand My Business</p>
           </div>
           <GrowthHomeBusinessProfileSection embedded />
+          <GrowthHomeBusinessIntelligenceSection embedded />
         </div>
 
         <div data-workflow-step="find" className="space-y-3 pt-3">

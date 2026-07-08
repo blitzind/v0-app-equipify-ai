@@ -14,6 +14,20 @@ import {
   createMinimalAvaDatamoonAudienceDraft,
   type AvaDatamoonAudienceDraft,
 } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-workbench-types"
+import { enrichLeadDiscoveryContextWithBusinessIntelligence } from "@/lib/growth/business-intelligence/business-intelligence-lead-discovery-context"
+import type {
+  BusinessIntelligenceLeadDiscoveryContextSlice,
+  BusinessIntelligenceLeadDiscoverySignals,
+  LeadDiscoveryExplainabilityLine,
+  LeadDiscoveryExplainabilitySource,
+} from "@/lib/growth/business-intelligence/business-intelligence-lead-discovery-context-types"
+
+export type {
+  LeadDiscoveryExplainabilityLine,
+  LeadDiscoveryExplainabilitySource,
+  BusinessIntelligenceLeadDiscoverySignals,
+  BusinessIntelligenceLeadDiscoveryContextSlice,
+}
 
 export const GROWTH_AIOS_FIND_LEADS_7C_QA_MARKER = "ge-aios-find-leads-7c-v1" as const
 
@@ -27,13 +41,6 @@ export const EQUIPIFY_INTERNAL_TOPIC_PRESETS = [
 ] as const
 
 export const GENERIC_JOB_TITLE_FALLBACKS = ["owner", "operations manager", "general manager"] as const
-
-export type LeadDiscoveryExplainabilityLine = {
-  id: string
-  label: string
-  detail: string
-  source: "growth_profile" | "mission" | "generic_fallback"
-}
 
 export type LeadDiscoveryProfileReadiness = {
   ready: boolean
@@ -52,6 +59,7 @@ export type AvaLedLeadDiscoveryContext = {
   profileReady: boolean
   missingProfileFields: string[]
   businessProfileUsed: boolean
+  businessIntelligence?: BusinessIntelligenceLeadDiscoveryContextSlice
 }
 
 export function assessLeadDiscoveryProfileReadiness(
@@ -161,7 +169,7 @@ export function buildLeadDiscoveryExplainability(input: {
         id: "industries",
         label: "Industries & topics",
         detail: "These come from your Growth Profile target industries and keywords.",
-        source: "growth_profile",
+        source: "approved_business_profile",
       })
     }
     if (input.projection.buyerPersonas.length > 0 || input.projection.jobTitles.length > 0) {
@@ -169,7 +177,7 @@ export function buildLeadDiscoveryExplainability(input: {
         id: "buyer-roles",
         label: "Buyer roles",
         detail: "These job titles come from your Growth Profile buyer personas.",
-        source: "growth_profile",
+        source: "approved_business_profile",
       })
     }
     if (input.projection.geography.country) {
@@ -177,7 +185,7 @@ export function buildLeadDiscoveryExplainability(input: {
         id: "geography",
         label: "Geography",
         detail: "Geography comes from your Growth Profile ideal customer geography.",
-        source: "growth_profile",
+        source: "approved_business_profile",
       })
     }
     if (input.projection.companySize) {
@@ -185,7 +193,7 @@ export function buildLeadDiscoveryExplainability(input: {
         id: "company-size",
         label: "Company size",
         detail: "Company size comes from your Growth Profile company size ranges.",
-        source: "growth_profile",
+        source: "approved_business_profile",
       })
     }
   }
@@ -204,7 +212,7 @@ export function buildLeadDiscoveryExplainability(input: {
       id: "fallback",
       label: "Conservative defaults",
       detail: "Using generic search defaults until your Growth Profile is complete.",
-      source: "generic_fallback",
+      source: "fallback",
     })
   }
 
@@ -215,6 +223,7 @@ export function buildAvaLedLeadDiscoveryContext(input: {
   profile: BusinessProfileDraftContent | null
   companyName?: string | null
   missionTitle?: string | null
+  businessIntelligenceSignals?: BusinessIntelligenceLeadDiscoverySignals | null
 }): AvaLedLeadDiscoveryContext {
   const readiness = assessLeadDiscoveryProfileReadiness(input.profile)
   const projection = input.profile
@@ -237,7 +246,7 @@ export function buildAvaLedLeadDiscoveryContext(input: {
     "Conservative record limit and intent filters for first-pass review.",
   ].filter((line): line is string => Boolean(line))
 
-  return {
+  const base: AvaLedLeadDiscoveryContext = {
     qaMarker: GROWTH_AIOS_FIND_LEADS_7C_QA_MARKER,
     draft,
     narrative: buildAvaLedSearchNarrative({ draft, missionTitle: input.missionTitle }),
@@ -250,6 +259,8 @@ export function buildAvaLedLeadDiscoveryContext(input: {
     missingProfileFields: readiness.missingFields,
     businessProfileUsed: projection != null,
   }
+
+  return enrichLeadDiscoveryContextWithBusinessIntelligence(base, input.businessIntelligenceSignals)
 }
 
 export function draftUsesEquipifyInternalDefaults(draft: AvaDatamoonAudienceDraft): boolean {
