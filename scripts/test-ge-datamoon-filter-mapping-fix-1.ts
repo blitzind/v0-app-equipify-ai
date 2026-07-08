@@ -48,7 +48,9 @@ async function main(): Promise<void> {
   const providerRequest = buildDatamoonImportRequestFromAudienceDraft(defaultDraft)
   const minimalProviderRequest = buildDatamoonImportRequestFromAudienceDraft(minimalDraft)
 
-  assert.ok(workbenchFilters.length >= 14, "workbench draft still emits internal filters")
+  assert.ok(workbenchFilters.length >= 11, "workbench draft still emits internal filters")
+  assert.equal(workbenchFilters.filter((filter) => filter.field === "job_title").length, 1)
+  assert.equal(workbenchFilters.find((filter) => filter.field === "job_title")?.operator, "in")
   for (const field of WORKBENCH_ONLY_FIELDS) {
     if (field === "revenue_range" && !defaultDraft.revenueRange?.trim()) continue
     assert.ok(
@@ -72,6 +74,8 @@ async function main(): Promise<void> {
 
   assert.ok(providerRequest.filters.some((filter) => filter.field === "contact_country"))
   assert.ok(providerRequest.filters.some((filter) => filter.field === "job_title"))
+  assert.equal(providerRequest.filters.filter((filter) => filter.field === "job_title").length, 1)
+  assert.equal(providerRequest.filters.find((filter) => filter.field === "job_title")?.operator, "in")
   assert.equal(providerRequest.filters.some((filter) => filter.field === "country"), false)
   assert.equal(providerRequest.filters.some((filter) => filter.field === "topic"), false)
   assert.equal(providerRequest.filters.some((filter) => filter.field === "lookback_days"), false)
@@ -121,6 +125,13 @@ async function main(): Promise<void> {
   ])
   assert.deepEqual(mapped.providerFilters, [{ field: "contact_country", operator: "=", value: "US" }])
   assert.deepEqual(mapped.omittedWorkbenchFilterFields, ["lookback_days"])
+
+  const consolidatedJobTitles = mapDatamoonFiltersToProviderFilters([
+    { field: "job_title", operator: "contains", value: "owner" },
+    { field: "job_title", operator: "contains", value: "CEO" },
+  ])
+  assert.equal(consolidatedJobTitles.providerFilters.length, 1)
+  assert.equal(consolidatedJobTitles.providerFilters[0]?.operator, "in")
 
   const mismatchMessage = formatDatamoonAllowedFieldsMismatchMessage({
     validationErrors: {

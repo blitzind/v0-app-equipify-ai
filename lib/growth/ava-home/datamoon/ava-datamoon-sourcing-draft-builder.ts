@@ -156,8 +156,9 @@ export function buildDatamoonWorkbenchFiltersFromAudienceDraft(
     filters.push({ field: "topic", operator: "contains", value: topic })
   }
 
-  for (const title of resolvedJobTitles(draft)) {
-    filters.push({ field: "job_title", operator: "contains", value: title })
+  const jobTitles = resolvedJobTitles(draft)
+  if (jobTitles.length > 0) {
+    filters.push({ field: "job_title", operator: "in", value: jobTitles })
   }
 
   const sizeFilter = companySizeFilter(draft.companySize)

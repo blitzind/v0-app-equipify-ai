@@ -46,9 +46,20 @@ function mockTopicSearchFetch() {
     "medical equipment service": [
       { topic_id: "4690", label: "Medical Equipment", match_score: 80.7, match_method: "semantic" },
       { topic_id: "29077", label: "Medical Equipment Management Plan", match_score: 81.1, match_method: "semantic" },
+      { topic_id: "48172", label: "Industrial Equipment Maintenance", match_score: 77.4, match_method: "semantic" },
+    ],
+    "medical equipment": [{ topic_id: "4690", label: "Medical Equipment", match_score: 95, match_method: "semantic" }],
+    "industrial equipment maintenance": [
+      { topic_id: "48172", label: "Industrial Equipment Maintenance", match_score: 94, match_method: "semantic" },
     ],
     "equipment maintenance software": [
       { topic_id: "22005", label: "Equipment Maintenance Software", match_score: 94.5, match_method: "semantic" },
+    ],
+    "field service management": [
+      { topic_id: "1897", label: "Field Service Management", match_score: 93, match_method: "semantic" },
+    ],
+    "maintenance repair overhaul": [
+      { topic_id: "927", label: "Maintenance, Repair and Overhaul (MRO)", match_score: 90, match_method: "semantic" },
     ],
   }
 
@@ -130,6 +141,7 @@ async function main(): Promise<void> {
   assert.equal(medicalPrepared.ok, true)
   if (!medicalPrepared.ok) throw new Error("expected medical topic prepare success")
   assert.equal(medicalPrepared.request.audience_type, "b2b")
+  assert.ok((medicalPrepared.request.topic_ids?.length ?? 0) >= 2)
   assert.ok(medicalPrepared.request.topic_ids?.includes("4690"))
   assert.ok(
     medicalPrepared.request.workbench_context?.resolvedB2bTopics?.some((topic) =>
@@ -156,7 +168,9 @@ async function main(): Promise<void> {
   )
   assert.equal(softwarePrepared.ok, true)
   if (!softwarePrepared.ok) throw new Error("expected software topic prepare success")
-  assert.deepEqual(softwarePrepared.request.topic_ids, ["22005"])
+  assert.ok((softwarePrepared.request.topic_ids?.length ?? 0) >= 2)
+  assert.ok(softwarePrepared.request.topic_ids?.includes("22005"))
+  assert.ok(softwarePrepared.request.topic_ids?.includes("4690"))
 
   const unresolved = await prepareDatamoonAudienceImportRequestForBuild(
     buildDatamoonImportRequestFromAudienceDraft(

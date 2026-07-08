@@ -72,6 +72,7 @@ export async function prepareDatamoonAudienceImportRequestForBuild(
       workbench_context: {
         ...input.workbench_context,
         topics: topicQueries,
+        broadenedTopicSearchQueries: resolution.broadenedTopicSearchQueries,
         resolvedB2bTopics: resolution.matches,
         omittedWorkbenchFilterFields: [
           ...new Set([

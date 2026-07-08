@@ -6,6 +6,7 @@ import type {
   DatamoonAudienceImportRecordStatus,
   DatamoonAudienceImportRun,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
+import type { DatamoonResolvedB2bTopic } from "@/lib/growth/lead-sources/datamoon/datamoon-b2b-topic-resolution-types"
 
 export const GROWTH_DATAMOON_ZERO_RESULTS_RESPONSE_TRACE_1_QA_MARKER =
   "ge-datamoon-zero-results-response-trace-1-v1" as const
@@ -38,6 +39,8 @@ export type GrowthMissionAvaLaunchZeroPreviewDebug = {
   filters: DatamoonAudienceImportRequest["filters"]
   topic_ids: string[]
   audience_type: DatamoonAudienceImportRequest["audience_type"]
+  broadenedTopicSearchQueries: string[]
+  resolvedB2bTopics: DatamoonResolvedB2bTopic[]
   omittedWorkbenchFilterFields: string[]
   childRecordStatusCounts: Record<DatamoonAudienceImportRecordStatus, number>
   childRecordSamples: GrowthMissionAvaLaunchZeroPreviewDebugChildRecordSample[]
@@ -116,6 +119,8 @@ export function buildGrowthMissionAvaLaunchZeroPreviewDebug(input: {
     filters: input.importRequest.filters,
     topic_ids: input.importRequest.topic_ids ?? input.run.topicIds,
     audience_type: input.importRequest.audience_type,
+    broadenedTopicSearchQueries: input.importRequest.workbench_context?.broadenedTopicSearchQueries ?? [],
+    resolvedB2bTopics: input.importRequest.workbench_context?.resolvedB2bTopics ?? [],
     omittedWorkbenchFilterFields: input.importRequest.workbench_context?.omittedWorkbenchFilterFields ?? [],
     childRecordStatusCounts: countChildRecordStatuses(input.records),
     childRecordSamples: input.records.slice(0, 3).map((record) => ({

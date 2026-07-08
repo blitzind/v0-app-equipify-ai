@@ -130,6 +130,8 @@ function main(): void {
   assert.equal(zeroPreviewDebug.preview_count, 0)
   assert.equal(zeroPreviewDebug.skipped_count, 3)
   assert.deepEqual(zeroPreviewDebug.omittedWorkbenchFilterFields, ["lookback_days", "intent_level"])
+  assert.deepEqual(zeroPreviewDebug.broadenedTopicSearchQueries, [])
+  assert.deepEqual(zeroPreviewDebug.resolvedB2bTopics, [])
   assert.equal(zeroPreviewDebug.childRecordStatusCounts.skipped, 1)
   assert.equal(zeroPreviewDebug.childRecordSamples.length, 1)
   assert.equal(zeroPreviewDebug.childRecordSamples[0]?.status, "skipped")

@@ -50,6 +50,7 @@ export type DatamoonAudienceImportWorkbenchContext = {
   lookbackDays?: number
   intentLevels?: string[]
   topics?: string[]
+  broadenedTopicSearchQueries?: string[]
   resolvedB2bTopics?: DatamoonResolvedB2bTopic[]
   companySize?: string
   revenueRange?: string | null
@@ -116,6 +117,51 @@ export function mapDatamoonWorkbenchFilterToProviderFilter(
   return { ...filter, field: mappedField }
 }
 
+function readFilterStringValues(value: DatamoonAudienceFilter["value"]): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .filter((entry): entry is string => typeof entry === "string")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0)
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? [trimmed] : []
+  }
+  return []
+}
+
+/** Repeated same-field filters are ANDed by Datamoon — merge job_title to one OR-compatible `in` filter. */
+export function consolidateDatamoonProviderFiltersForOrSemantics(
+  filters: readonly DatamoonAudienceFilter[],
+): DatamoonAudienceFilter[] {
+  const output: DatamoonAudienceFilter[] = []
+  const jobTitleValues: string[] = []
+
+  for (const filter of filters) {
+    if (
+      filter.field === "job_title" &&
+      (filter.operator === "contains" || filter.operator === "in" || filter.operator === "=")
+    ) {
+      for (const value of readFilterStringValues(filter.value)) {
+        if (!jobTitleValues.includes(value)) jobTitleValues.push(value)
+      }
+      continue
+    }
+    output.push(filter)
+  }
+
+  if (jobTitleValues.length > 0) {
+    output.push({
+      field: "job_title",
+      operator: "in",
+      value: jobTitleValues,
+    })
+  }
+
+  return output
+}
+
 export function mapDatamoonFiltersToProviderFilters(
   filters: readonly DatamoonAudienceFilter[],
 ): MapDatamoonFiltersToProviderFiltersResult {
@@ -133,7 +179,10 @@ export function mapDatamoonFiltersToProviderFilters(
     }
   }
 
-  return { providerFilters, omittedWorkbenchFilterFields }
+  return {
+    providerFilters: consolidateDatamoonProviderFiltersForOrSemantics(providerFilters),
+    omittedWorkbenchFilterFields,
+  }
 }
 
 export function resolveDatamoonProviderFiltersForImport(
