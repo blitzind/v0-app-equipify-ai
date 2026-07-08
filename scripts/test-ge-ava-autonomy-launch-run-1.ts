@@ -41,7 +41,8 @@ async function main(): Promise<void> {
   assert.match(service, /registerAvaAutonomyCompletionPendingLeads/)
   assert.match(service, /fetchLatestGrowthLeadResearchWorkflowSnapshot/)
   assert.match(service, /fetchAiOsCommandCenterReadModel/)
-  assert.match(service, /stoppedAt: "human_approval"/)
+  assert.match(service, /buildAvaLaunchRunResultSemantics/)
+  assert.match(service, /stoppedAt: resultSemantics\.stoppedAt/)
   assert.doesNotMatch(service, /sendEmail|enrollSequence|launchCampaign|outboundExecution/i)
   assert.doesNotMatch(service, /growth-objective-runtime-scheduler|cron/i)
 
@@ -50,6 +51,7 @@ async function main(): Promise<void> {
   )
   assert.match(workbench, /buildMissionAvaLaunchRunApiPath/)
   assert.match(workbench, /handleRunAvaLaunch/)
+  assert.match(workbench, /buildAvaLaunchRunSuccessMessage/)
   assert.match(workbench, /GROWTH_AVA_LAUNCH_RUN_TITLE/)
 
   const setup = readSource(

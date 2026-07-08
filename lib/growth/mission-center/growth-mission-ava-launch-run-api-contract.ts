@@ -3,6 +3,8 @@
 import type { AvaDatamoonAudienceDraft } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-workbench-types"
 import type { MissionFindLeadsBindingSummary } from "@/lib/growth/mission-center/growth-mission-find-leads-binding-service"
 import type { AvaLaunchSerializedException } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-exception-transparency"
+import type { GrowthMissionAvaLaunchRunStoppedAt } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-result-semantics"
+import { GROWTH_AVA_LAUNCH_RESULT_SEMANTICS_1_QA_MARKER } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-result-semantics"
 
 export const GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER = "ge-ava-autonomy-launch-run-1-v1" as const
 
@@ -178,8 +180,9 @@ export function buildGrowthMissionAvaLaunchExceptionFailureBody(input: {
 export const GROWTH_AVA_LAUNCH_RUN_TITLE = "Run Ava" as const
 export const GROWTH_AVA_LAUNCH_RUN_DESCRIPTION =
   "Find leads from your approved search, import them, start research, and surface items for human approval — no outbound send." as const
-export const GROWTH_AVA_LAUNCH_RUN_SUCCESS_COPY =
-  "Ava launch run complete. Review imported leads and pending approvals before outreach." as const
+export const GROWTH_AVA_LAUNCH_RUN_SUCCESS_COPY = "Ava launch run complete." as const
+
+export type { GrowthMissionAvaLaunchRunStoppedAt } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-result-semantics"
 
 export function buildMissionAvaLaunchRunApiPath(missionId: string): string {
   return `/api/platform/growth/mission-center/${encodeURIComponent(missionId)}/ava-launch-run`
@@ -200,7 +203,8 @@ export type GrowthMissionAvaLaunchRunLeadResearchStatus = {
 }
 
 export type GrowthMissionAvaLaunchRunHumanApprovalSummary = {
-  totalPending: number
+  orgHumanApprovalPendingTotal: number
+  runRelatedPending: number
   topItems: Array<{
     id: string
     title: string
@@ -229,7 +233,12 @@ export type GrowthMissionAvaLaunchRunResult = {
     leads: GrowthMissionAvaLaunchRunLeadResearchStatus[]
   }
   humanApprovalCenter: GrowthMissionAvaLaunchRunHumanApprovalSummary
-  stoppedAt: "human_approval"
+  importedLeadCount: number
+  runCreatedApprovalCount: number
+  orgHumanApprovalPendingTotal: number
+  researchPendingCount: number
+  stoppedAt: GrowthMissionAvaLaunchRunStoppedAt
+  resultSemanticsQaMarker: typeof GROWTH_AVA_LAUNCH_RESULT_SEMANTICS_1_QA_MARKER
 }
 
 export type GrowthMissionAvaLaunchRunResponse =

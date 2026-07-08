@@ -357,7 +357,7 @@ export function AiOpsCommandCenterDrawer({
         >
           {!rec ? null : (
             <>
-              <SheetHeader className="px-4 py-4 border-b border-border space-y-2 shrink-0">
+              <SheetHeader className="border-b border-border shrink-0 px-6 py-5 space-y-2">
                 <SheetTitle className="text-left text-base leading-snug pr-8">{rec.title}</SheetTitle>
                 <div className="flex flex-wrap gap-1.5">
                   <Badge variant="outline" className="text-[10px]">
@@ -380,10 +380,10 @@ export function AiOpsCommandCenterDrawer({
               </SheetHeader>
 
               <ScrollArea className="flex-1 min-h-0">
-                <div className="px-4 py-4 space-y-6">
+                <div className="px-6 py-6 space-y-6">
                   {rec.commandScoreBreakdown?.length ? (
-                    <section className="rounded-lg border border-border bg-muted/20 px-3 py-2">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">
+                    <section className="rounded-lg border border-border bg-muted/20 px-5 py-4">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-3">
                         Priority score (explainable)
                       </p>
                       <ul className="space-y-1 text-[11px]">
@@ -398,7 +398,7 @@ export function AiOpsCommandCenterDrawer({
                   ) : null}
 
                   {canCommand ? (
-                    <section className="space-y-2">
+                    <section className="space-y-2.5">
                       <Label className="text-xs font-semibold">Lifecycle</Label>
                       <div className="flex flex-wrap items-center gap-2">
                         <Select
@@ -494,7 +494,7 @@ export function AiOpsCommandCenterDrawer({
                   </section>
 
                   {canCommand && actionHints.length > 0 ? (
-                    <section className="space-y-3 border-t border-border pt-4">
+                    <section className="space-y-3 border-t border-border pt-6">
                       <div>
                         <p className="text-xs font-semibold text-foreground">Operational actions</p>
                         <p className="text-[10px] text-muted-foreground mt-1 leading-snug">
@@ -550,7 +550,7 @@ export function AiOpsCommandCenterDrawer({
                     </section>
                   ) : null}
 
-                  <section className="space-y-2 border-t border-border pt-4">
+                  <section className="space-y-3 border-t border-border pt-6">
                     <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
                       Operational timeline
                     </p>

@@ -87,6 +87,7 @@ import {
   type GrowthMissionBindFindLeadsResponse,
   type GrowthMissionCenterSourcesPayload,
 } from "@/lib/growth/mission-center"
+import { buildAvaLaunchRunSuccessMessage } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-result-semantics"
 import { selectDefaultFindLeadsMissionId } from "@/lib/growth/mission-center/growth-mission-find-leads-binding-display"
 import {
   GROWTH_BUSINESS_PROFILE_API_PATH,
@@ -363,10 +364,14 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
       }
 
       setMissionBindingMessage(GROWTH_HOME_FIND_LEADS_MISSION_BINDING_ATTACHED_COPY)
-      const imported = result.import.imported
-      const pending = result.humanApprovalCenter.totalPending
       setLaunchRunMessage(
-        `${GROWTH_AVA_LAUNCH_RUN_SUCCESS_COPY} Imported ${imported} lead${imported === 1 ? "" : "s"}. ${pending} pending approval${pending === 1 ? "" : "s"} in Human Approval Center.`,
+        `${GROWTH_AVA_LAUNCH_RUN_SUCCESS_COPY} ${buildAvaLaunchRunSuccessMessage({
+          importedLeadCount: result.importedLeadCount,
+          runCreatedApprovalCount: result.runCreatedApprovalCount,
+          orgHumanApprovalPendingTotal: result.orgHumanApprovalPendingTotal,
+          researchPendingCount: result.researchPendingCount,
+          stoppedAt: result.stoppedAt,
+        })}`,
       )
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ava launch run failed.")
@@ -609,12 +614,12 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
-          <SheetHeader className="space-y-2 pb-2">
+          <SheetHeader className="space-y-2">
             <SheetTitle>{GROWTH_HOME_FIND_LEADS_TITLE}</SheetTitle>
             <SheetDescription>{GROWTH_HOME_FIND_LEADS_DRAWER_DESCRIPTION}</SheetDescription>
           </SheetHeader>
 
-          <div className="mt-6 space-y-8">
+          <div className="space-y-6">
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
@@ -646,7 +651,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
                 </CardHeader>
                 <CardContent className="space-y-4 px-6">
                   {businessProfileStatus === "missing" ? (
-                    <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50/80 p-4 text-sm dark:border-amber-900/40 dark:bg-amber-950/20">
+                    <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50/80 p-5 text-sm dark:border-amber-900/40 dark:bg-amber-950/20">
                       <p>{GROWTH_HOME_DATAMOON_BUSINESS_PROFILE_MISSING_COPY}</p>
                       <div className="flex flex-wrap gap-2">
                         <Button type="button" size="sm" onClick={handleCreateBusinessProfile}>

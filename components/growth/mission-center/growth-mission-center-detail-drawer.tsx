@@ -55,7 +55,7 @@ export function GrowthMissionCenterDetailDrawer({ open, onOpenChange, mission, s
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
-        <SheetHeader className="space-y-2 pb-4">
+        <SheetHeader>
           <SheetTitle>{mission.name}</SheetTitle>
           <SheetDescription>{mission.currentActivity}</SheetDescription>
         </SheetHeader>
@@ -181,7 +181,7 @@ export function GrowthMissionCenterDetailDrawer({ open, onOpenChange, mission, s
             </>
           ) : null}
 
-          <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
+          <div className="flex flex-wrap gap-3 border-t border-border/60 pt-6">
             {mission.controls.map((control) => (
               <Button
                 key={`${mission.id}-${control.kind}`}

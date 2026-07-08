@@ -23,7 +23,7 @@ export const DRAWER_PANEL_SURFACE =
  * Muted light canvas; dark nested field area #0B111E.
  */
 export const DRAWER_INNER_SCROLL_CANVAS =
-  "-mx-5 -my-5 min-h-full bg-muted/20 px-5 py-5 space-y-5 dark:bg-[#0B111E]"
+  "-mx-6 -my-6 min-h-full bg-muted/20 px-6 py-6 space-y-6 dark:bg-[#0B111E]"
 
 /** Sticky footers on dialog/modal content (e.g. Create WO). */
 export const DRAWER_DIALOG_FOOTER_SURFACE =
@@ -60,6 +60,24 @@ export const DRAWER_DESCENDANT_LIST_HOVER =
 export const DRAWER_BACKDROP_Z = "z-[100]"
 /** Sliding panel above backdrop. */
 export const DRAWER_PANEL_Z = "z-[101]"
+
+/**
+ * GE-AVA-LAUNCH-RESULT-SEMANTICS-1B — canonical drawer / sheet spacing rhythm.
+ * Prefer these tokens in shared primitives; individual drawers may compose on top.
+ */
+export const DRAWER_SHELL_PAD_X = "px-6"
+export const DRAWER_SHELL_PAD_Y = "py-6"
+export const DRAWER_SHELL_GAP = "gap-6"
+export const DRAWER_SHELL_CONTENT_CLASS = "px-6 py-6 gap-6"
+export const DRAWER_SHELL_HEADER_CLASS = "flex flex-col gap-2"
+export const DRAWER_SHELL_BODY_CLASS = "space-y-6"
+export const DRAWER_SHELL_FOOTER_CLASS = "mt-auto flex flex-col gap-3 pt-4"
+export const DRAWER_SECTION_STACK_CLASS = "space-y-4"
+export const DRAWER_LABEL_CONTROL_GAP_CLASS = "space-y-2.5"
+export const DRAWER_INFO_PANEL_PAD_CLASS = "p-5"
+export const DRAWER_DIVIDER_STACK_CLASS = "my-6"
+export const DRAWER_CLOSE_BUTTON_CLASS = "top-5 right-5"
+export const DRAWER_VALIDATION_STACK_CLASS = "space-y-2"
 
 /**
  * Hand-rolled `fixed inset-0` modals opened while a `DetailDrawer` is open must use this (or higher),
@@ -204,8 +222,8 @@ export function DetailDrawer({
   return (
     <DrawerViewport open={open} onClose={onClose} width={width} transitionMs={transitionMs} ariaLabel={title}>
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border dark:border-[#25324C] shrink-0">
-        <div className="flex flex-col gap-1 min-w-0">
+      <div className={cn("flex items-start justify-between gap-4 border-b border-border dark:border-[#25324C] shrink-0", DRAWER_SHELL_PAD_X, "py-5")}>
+        <div className="flex flex-col gap-2 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-base font-semibold text-foreground leading-tight truncate">{title}</h2>
             {badge}
@@ -222,7 +240,7 @@ export function DetailDrawer({
       </div>
 
       {actions && (
-        <div className="flex items-center gap-2 px-5 py-3 border-b border-border dark:border-[#25324C] shrink-0 flex-wrap [&_button]:min-h-11 [&_button]:touch-manipulation lg:[&_button]:min-h-9">
+        <div className={cn("flex items-center gap-3 border-b border-border dark:border-[#25324C] shrink-0 flex-wrap [&_button]:min-h-11 [&_button]:touch-manipulation lg:[&_button]:min-h-9", DRAWER_SHELL_PAD_X, "py-4")}>
           {actions}
         </div>
       )}
@@ -231,7 +249,7 @@ export function DetailDrawer({
         className={
           noScroll
             ? "flex flex-col flex-1 min-h-0 overflow-hidden"
-            : "flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-5 py-5 space-y-5"
+            : cn("flex-1 min-h-0 overflow-y-auto overflow-x-hidden", DRAWER_SHELL_PAD_X, DRAWER_SHELL_PAD_Y, DRAWER_SHELL_BODY_CLASS)
         }
       >
         {children}
@@ -254,7 +272,7 @@ export function DrawerSection({
   action?: React.ReactNode
 }) {
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn(DRAWER_SECTION_STACK_CLASS, className)}>
       <div className="flex items-center justify-between">
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
         {action && <div>{action}</div>}
@@ -266,7 +284,7 @@ export function DrawerSection({
 
 export function DrawerRow({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("flex items-start justify-between gap-4 py-1.5 border-b border-border/50 dark:border-[#25324C]/50 last:border-0", className)}>
+    <div className={cn("flex items-start justify-between gap-4 py-2 border-b border-border/50 dark:border-[#25324C]/50 last:border-0", className)}>
       <span className="text-xs text-muted-foreground shrink-0 pt-0.5">{label}</span>
       <span className="text-xs font-medium text-foreground text-right">{value}</span>
     </div>

@@ -21,6 +21,11 @@ import {
   GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER,
   type GrowthMissionAvaLaunchRunResult,
 } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-api-contract"
+import {
+  buildAvaLaunchRunHumanApprovalSummary,
+  buildAvaLaunchRunResultSemantics,
+  filterOrgHumanApprovalPendingItems,
+} from "@/lib/growth/mission-center/growth-mission-ava-launch-run-result-semantics"
 import { registerAvaAutonomyCompletionPendingLeads } from "@/lib/growth/mission-center/growth-ava-autonomy-completion-service"
 import {
   AVA_LAUNCH_STAGE,
@@ -145,22 +150,21 @@ async function resolveHumanApprovalSummary(
 ): Promise<GrowthMissionAvaLaunchRunResult["humanApprovalCenter"]> {
   const commandCenter = await fetchAiOsCommandCenterReadModel(admin, { organizationId })
   const importedSet = new Set(importedLeadIds)
-  const pendingItems = commandCenter.humanApprovalCenter.items.filter(
-    (item) => item.status === "pending" || item.status === "needs_review" || item.status === "blocked",
-  )
+  const orgPendingItems = filterOrgHumanApprovalPendingItems(commandCenter.humanApprovalCenter.items)
   const relatedItems =
     importedSet.size > 0
-      ? pendingItems.filter(
+      ? orgPendingItems.filter(
           (item) =>
             item.subjectType === "lead" &&
             typeof item.subjectId === "string" &&
             importedSet.has(item.subjectId),
         )
       : []
-  const topSource = relatedItems.length > 0 ? relatedItems : pendingItems
+  const topSource = relatedItems.length > 0 ? relatedItems : orgPendingItems
 
-  return {
-    totalPending: pendingItems.length,
+  return buildAvaLaunchRunHumanApprovalSummary({
+    orgPendingItems,
+    importedLeadIds,
     topItems: topSource.slice(0, 10).map((item) => ({
       id: item.id,
       title: item.title,
@@ -168,8 +172,7 @@ async function resolveHumanApprovalSummary(
       href: item.route ?? null,
       leadId: item.subjectType === "lead" ? (item.subjectId ?? null) : null,
     })),
-    approvalsHref: "/growth/os/approvals",
-  }
+  })
 }
 
 export async function runGrowthMissionAvaLaunchRun(
@@ -491,13 +494,22 @@ export async function runGrowthMissionAvaLaunchRun(
     resolveHumanApprovalSummary(admin, input.organizationId, leadIds),
   ])
 
+  const resultSemantics = buildAvaLaunchRunResultSemantics({
+    importedLeadIds: leadIds,
+    researchLeads: research.leads,
+    orgHumanApprovalPendingTotal: humanApprovalCenter.orgHumanApprovalPendingTotal,
+    runCreatedApprovalCount: humanApprovalCenter.runRelatedPending,
+  })
+
   logGrowthEngine("growth_mission_ava_launch_run_completed", {
     qa_marker: GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER,
     mission_id: input.missionId,
     run_id: started.run.id,
     imported,
     preview_count: previewCount,
-    pending_approvals: humanApprovalCenter.totalPending,
+    run_created_approvals: resultSemantics.runCreatedApprovalCount,
+    org_pending_approvals: resultSemantics.orgHumanApprovalPendingTotal,
+    stopped_at: resultSemantics.stoppedAt,
   })
 
   return {
@@ -517,7 +529,12 @@ export async function runGrowthMissionAvaLaunchRun(
       },
       research,
       humanApprovalCenter,
-      stoppedAt: "human_approval",
+      importedLeadCount: resultSemantics.importedLeadCount,
+      runCreatedApprovalCount: resultSemantics.runCreatedApprovalCount,
+      orgHumanApprovalPendingTotal: resultSemantics.orgHumanApprovalPendingTotal,
+      researchPendingCount: resultSemantics.researchPendingCount,
+      stoppedAt: resultSemantics.stoppedAt,
+      resultSemanticsQaMarker: resultSemantics.qa_marker,
     },
   }
   } catch (error) {

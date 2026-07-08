@@ -177,10 +177,10 @@ export function IntentSignalsSetupDrawer({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pb-6">
+        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto">
           <section
             className={cn(
-              "rounded-xl border px-4 py-3 text-sm",
+              "rounded-xl border px-5 py-4 text-sm",
               schemaReadyResolved
                 ? "border-emerald-200 bg-emerald-50 text-emerald-900"
                 : "border-amber-200 bg-amber-50 text-amber-900",

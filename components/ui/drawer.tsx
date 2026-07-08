@@ -7,6 +7,10 @@ import {
   DRAWER_DESCENDANT_FIELD_OVERRIDES,
   DRAWER_DESCENDANT_LIST_HOVER,
   DRAWER_PANEL_SURFACE,
+  DRAWER_SHELL_FOOTER_CLASS,
+  DRAWER_SHELL_HEADER_CLASS,
+  DRAWER_SHELL_PAD_X,
+  DRAWER_SHELL_PAD_Y,
 } from '@/components/detail-drawer'
 import { useWorkspacePortalContainer } from '@/hooks/use-workspace-portal-container'
 import { cn } from '@/lib/utils'
@@ -94,7 +98,10 @@ function DrawerHeader({ className, ...props }: React.ComponentProps<'div'>) {
     <div
       data-slot="drawer-header"
       className={cn(
-        'flex flex-col gap-0.5 p-4 group-data-[vaul-drawer-direction=bottom]/drawer-content:text-center group-data-[vaul-drawer-direction=top]/drawer-content:text-center md:gap-1.5 md:text-left',
+        DRAWER_SHELL_HEADER_CLASS,
+        DRAWER_SHELL_PAD_X,
+        'pt-6 pb-2',
+        'group-data-[vaul-drawer-direction=bottom]/drawer-content:text-center group-data-[vaul-drawer-direction=top]/drawer-content:text-center md:text-left',
         className,
       )}
       {...props}
@@ -106,7 +113,7 @@ function DrawerFooter({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="drawer-footer"
-      className={cn('mt-auto flex flex-col gap-2 p-4', className)}
+      className={cn(DRAWER_SHELL_FOOTER_CLASS, DRAWER_SHELL_PAD_X, DRAWER_SHELL_PAD_Y, className)}
       {...props}
     />
   )
