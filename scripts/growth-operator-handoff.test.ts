@@ -23,7 +23,7 @@ import {
 import {
   buildOperatorHandoffPackage,
   GROWTH_OPERATOR_HANDOFF_METADATA_KEY,
-  loadOperatorHandoffFromRevenueQueue,
+  loadOperatorHandoffFromGrowthLead,
 } from "../lib/growth/operator-handoff/operator-handoff-repository"
 import {
   GROWTH_OPERATOR_HANDOFF_MOTIONS,
@@ -31,7 +31,7 @@ import {
   GROWTH_OPERATOR_HANDOFF_QA_MARKER,
 } from "../lib/growth/operator-handoff/operator-handoff-types"
 import type { GrowthOperatorHandoffInput } from "../lib/growth/operator-handoff/operator-handoff-types"
-import type { RevenueQueueRow } from "../lib/growth/lead-inbox/lead-inbox-types"
+import type { GrowthLead } from "../lib/growth/types"
 
 assert.equal(GROWTH_OPERATOR_HANDOFF_QA_MARKER, "growth-operator-handoff-v1")
 assert.equal(GROWTH_OPERATOR_HANDOFF_OUTPUT_JSON_KEYS.length, 18)
@@ -227,45 +227,13 @@ if (!parsed.ok) throw new Error("expected parsed handoff")
 const pkg = buildOperatorHandoffPackage(upstreamInput, parsed.output)
 assert.equal(pkg.qa_marker, GROWTH_OPERATOR_HANDOFF_QA_MARKER)
 
-const inboxRow: RevenueQueueRow = {
-  id: "inbox-1",
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-  site_key: "s",
-  candidate_type: "high_intent",
-  candidate_priority: "normal",
-  intent_score: 80,
-  intent_grade: "A",
-  candidate_confidence: 0.8,
-  pipeline_entry: "company_discovery",
-  pipeline_status: "not_started",
-  company_name: "Precision Biomedical",
-  domain: "precisionbiomed.example",
-  contact_name: null,
-  email: null,
-  phone: null,
-  linkedin_url: null,
-  dedupe_hash: "hash",
-  candidate_reasoning: [],
-  candidate_evidence: [{ claim: "c", evidence: "e", source: "s" }],
-  candidate_attribution: [{ source: "s", section: "x", signal: "y", evidence: "e", confidence: 0.5 }],
-  session_count: 1,
-  visit_count: 1,
-  utm_source: "",
-  utm_medium: "",
-  utm_campaign: "",
-  owner_id: null,
-  status: "new",
-  human_review_required: true,
-  lead_engine_run_id: null,
-  intent_session_id: "sess",
-  visitor_key: "visitor",
-  existing_account_match: { matched: false, source: null, ids: [], evidence: "" },
-  existing_lead_match: { matched: false, source: null, ids: [], evidence: "" },
+const lead = {
+  id: "lead-1",
+  companyName: "Precision Biomedical",
   metadata: { [GROWTH_OPERATOR_HANDOFF_METADATA_KEY]: pkg },
-}
+} as GrowthLead
 
-const loaded = loadOperatorHandoffFromRevenueQueue(inboxRow)
+const loaded = loadOperatorHandoffFromGrowthLead(lead)
 assert.ok(loaded)
 assert.equal(loaded?.handoff.recommended_motion, "call_first")
 
@@ -273,7 +241,7 @@ const repoSource = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/operator-handoff/operator-handoff-repository.ts"),
   "utf8",
 )
-assert.match(repoSource, /loadOperatorHandoffFromRevenueQueue/)
+assert.match(repoSource, /loadOperatorHandoffFromGrowthLead/)
 assert.match(repoSource, /GROWTH_OPERATOR_HANDOFF_METADATA_KEY/)
 assert.doesNotMatch(repoSource, /saveOperatorHandoffToLeadInbox/)
 assert.doesNotMatch(repoSource, /\.from\(["']lead_inbox["']\)/)

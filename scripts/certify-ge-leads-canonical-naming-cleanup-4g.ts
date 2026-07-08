@@ -46,7 +46,10 @@ function runStaticChecks(): Record<string, boolean> {
   const card = readSource("components/growth/lead-operator/growth-lead-inbox-card.tsx")
   const searchIntentRepo = readSource("lib/growth/search-intent/search-intent-repository.ts")
   const operatorHandoffRepo = readSource("lib/growth/operator-handoff/operator-handoff-repository.ts")
-  const cardView = readSource("lib/growth/lead-operator-workspace/lead-inbox-card-view.ts")
+  const cardProjection = readSource("lib/growth/revenue-queue/revenue-queue-card-projection.ts")
+  const workspaceFromLead = readSource(
+    "lib/growth/lead-operator-workspace/lead-operator-workspace-from-lead.ts",
+  )
 
   return {
     revenue_queue_row_canonical: /export type RevenueQueueRow = \{/.test(types),
@@ -61,10 +64,20 @@ function runStaticChecks(): Record<string, boolean> {
     load_search_intent_for_revenue_queue: /loadSearchIntentSignalsForRevenueQueue/.test(
       searchIntentRepo,
     ),
-    load_operator_handoff_for_revenue_queue: /loadOperatorHandoffFromRevenueQueue/.test(
+    load_operator_handoff_from_growth_lead: /loadOperatorHandoffFromGrowthLead/.test(
       operatorHandoffRepo,
     ),
-    build_revenue_queue_card_view: /export function buildRevenueQueueCardView/.test(cardView),
+    build_revenue_queue_card_projection_from_lead: /export function buildRevenueQueueCardProjectionFromLead/.test(
+      cardProjection,
+    ),
+    lead_native_operator_workspace_builder:
+      /export async function buildLeadOperatorWorkspacePayloadFromGrowthLead/.test(workspaceFromLead),
+    no_row_based_workspace_builder: !fs.existsSync(
+      path.join(process.cwd(), "lib/growth/lead-operator-workspace/lead-operator-workspace-builder.ts"),
+    ),
+    no_row_based_card_view: !fs.existsSync(
+      path.join(process.cwd(), "lib/growth/lead-operator-workspace/lead-inbox-card-view.ts"),
+    ),
     api_path_unchanged_compatibility: /\/api\/platform\/growth\/lead-inbox/.test(dashboard),
     list_route_still_lead_inbox: fs.existsSync(
       path.join(process.cwd(), "app/api/platform/growth/lead-inbox/route.ts"),
