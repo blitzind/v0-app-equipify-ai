@@ -76,6 +76,7 @@ export async function loadGrowthWorkspaceDashboardSources(): Promise<GrowthWorks
 
 export function useGrowthWorkspaceDashboard() {
   const [dashboard, setDashboard] = useState<GrowthWorkspaceDashboardViewModel | null>(null)
+  const [avaConsole, setAvaConsole] = useState<GrowthHomeWorkspaceSummaryPayload["avaConsole"] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -88,8 +89,10 @@ export function useGrowthWorkspaceDashboard() {
     if (!payload) {
       setError(errorMessage)
       setDashboard(buildGrowthWorkspaceDashboardViewModel(EMPTY_SOURCES))
+      setAvaConsole(null)
     } else {
       setDashboard(payload.dashboard ?? buildGrowthWorkspaceDashboardViewModel(payload.sources))
+      setAvaConsole(payload.avaConsole ?? null)
     }
     setLoading(false)
   }, [])
@@ -100,6 +103,7 @@ export function useGrowthWorkspaceDashboard() {
 
   return {
     dashboard,
+    avaConsole,
     loading,
     error,
     reload,

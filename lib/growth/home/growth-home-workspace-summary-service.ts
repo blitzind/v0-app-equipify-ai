@@ -47,6 +47,7 @@ import type {
   GrowthHomeWorkspaceSummaryRevenueQueue,
 } from "@/lib/growth/home/growth-home-workspace-summary-types"
 import { GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER } from "@/lib/growth/home/growth-home-workspace-summary-types"
+import { fetchLatestAvaResearchLoopSummary } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-service"
 
 const HOME_LEAD_POOL_LIMIT = 100
 
@@ -63,6 +64,7 @@ function buildAvaConsoleSections(input: {
   briefing: Awaited<ReturnType<typeof fetchAidenDailyBriefing>> | null
   sources: GrowthWorkspaceDashboardSourcePayload
   kpis: GrowthHomeWorkspaceSummaryKpis
+  researchLoopSummary: Awaited<ReturnType<typeof fetchLatestAvaResearchLoopSummary>> | null
 }): GrowthHomeAvaConsoleSections {
   const greeting = input.briefing?.greeting ?? "Welcome back"
   const overnightParts: string[] = []
@@ -93,6 +95,7 @@ function buildAvaConsoleSections(input: {
         : null,
     waitingForApproval: pendingApprovals > 0 ? `${pendingApprovals} item(s) waiting for your approval` : null,
     suggestedNextAction: input.briefing?.summary.recommended_action ?? null,
+    researchLoopSummary: input.researchLoopSummary,
   }
 }
 
@@ -248,7 +251,16 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     newReplies: briefing?.inbox?.new_replies ?? 0,
   }
 
-  const avaConsole = buildAvaConsoleSections({ briefing, sources, kpis })
+  const avaResearchLoopSummary = organizationId
+    ? await fetchLatestAvaResearchLoopSummary(input.admin, organizationId).catch(() => null)
+    : null
+
+  const avaConsole = buildAvaConsoleSections({
+    briefing,
+    sources,
+    kpis,
+    researchLoopSummary: avaResearchLoopSummary,
+  })
 
   const optimization: GrowthHomeWorkspaceSummaryOptimization = {
     listGrowthLeadsCalls: 1,

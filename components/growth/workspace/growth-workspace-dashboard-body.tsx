@@ -136,7 +136,7 @@ function DashboardSectionSkeleton() {
 }
 
 export function GrowthWorkspaceDashboardBody() {
-  const { dashboard, loading, error, reload } = useGrowthWorkspaceDashboard()
+  const { dashboard, avaConsole, loading, error, reload } = useGrowthWorkspaceDashboard()
   const recentViews = useMemo(() => readGrowthWorkspaceRecentViews(), [dashboard?.generatedAt])
   const continueItems = useMemo(() => readGrowthWorkspaceContinueItems(), [dashboard?.generatedAt])
 
@@ -183,9 +183,11 @@ export function GrowthWorkspaceDashboardBody() {
     <div data-qa-marker={GROWTH_WORKSPACE_DASHBOARD_QA_MARKER}>
       <GrowthHomeExecutiveBriefingDashboard
         dashboard={dashboard}
+        avaConsole={avaConsole}
         recentViews={recentViews}
         continueItems={continueItems}
         everythingElse={everythingElse}
+        onResearchLoopCompleted={() => void reload()}
       />
       <GrowthHomeDebugFooter />
     </div>

@@ -48,7 +48,8 @@ import { GrowthHomeMissionHealthSection } from "@/components/growth/workspace/ex
 import { GrowthHomeRevenueForecastSection } from "@/components/growth/workspace/executive-briefing/growth-home-revenue-forecast-section"
 import { GrowthHomeBusinessSnapshotSection } from "@/components/growth/workspace/executive-briefing/growth-home-business-snapshot-section"
 import { GrowthHomeDailyBriefingSection } from "@/components/growth/workspace/executive-briefing/growth-home-daily-briefing-section"
-import { Button } from "@/components/ui/button"
+import { GrowthHomeAvaResearchQueuePanel } from "@/components/growth/workspace/executive-briefing/growth-home-ava-research-queue-panel"
+import type { GrowthHomeWorkspaceSummaryPayload } from "@/lib/growth/home/growth-home-workspace-summary-types"
 import {
   Collapsible,
   CollapsibleContent,
@@ -57,12 +58,21 @@ import {
 
 type Props = {
   dashboard: GrowthWorkspaceDashboardViewModel
+  avaConsole: GrowthHomeWorkspaceSummaryPayload["avaConsole"] | null
   recentViews: GrowthWorkspaceRecentView[]
   continueItems: GrowthWorkspaceContinueItem[]
   everythingElse: React.ReactNode
+  onResearchLoopCompleted?: () => void
 }
 
-export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, continueItems, everythingElse }: Props) {
+export function GrowthHomeExecutiveBriefingDashboard({
+  dashboard,
+  avaConsole,
+  recentViews,
+  continueItems,
+  everythingElse,
+  onResearchLoopCompleted,
+}: Props) {
   const [secondaryOpen, setSecondaryOpen] = useState(false)
   const { teammate } = useAiTeammateIdentity()
   const { setStatus } = useAiEmployeeStatus()
@@ -133,6 +143,11 @@ export function GrowthHomeExecutiveBriefingDashboard({ dashboard, recentViews, c
       <GrowthHomeExecutiveSnapshotSection kpis={executiveSnapshot} />
 
       <GrowthHomeAiOsWaitingOnYouSection aiOsUx={aiOsUx} />
+
+      <GrowthHomeAvaResearchQueuePanel
+        researchLoopSummary={avaConsole?.researchLoopSummary ?? null}
+        onCompleted={onResearchLoopCompleted}
+      />
 
       <GrowthHomeStartAvaSetupSection dashboard={dashboard} />
 

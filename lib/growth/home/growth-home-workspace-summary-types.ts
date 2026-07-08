@@ -8,6 +8,7 @@ import type { DailyRevenueWorkQueue } from "@/lib/growth/daily-work-queue/daily-
 import type { DailyRevenueWorkQueueDisplaySummary } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-view"
 import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
 import type { GrowthWorkspaceDashboardSourcePayload } from "@/lib/growth/workspace/growth-workspace-dashboard-mapper"
+import type { GrowthAvaResearchLoopSummary } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-types"
 
 export const GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER = "ge-simplify-1b-home-workspace-summary-v1" as const
 
@@ -59,6 +60,8 @@ export type GrowthHomeAvaConsoleSections = {
   highPriorityOpportunities: string | null
   waitingForApproval: string | null
   suggestedNextAction: string | null
+  /** Latest Ava Research Orchestrator batch summary (GE-AIOS-6B). */
+  researchLoopSummary: GrowthAvaResearchLoopSummary | null
 }
 
 export type GrowthHomeWorkspaceSummaryOptimization = {
