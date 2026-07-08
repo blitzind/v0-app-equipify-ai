@@ -1,7 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ChevronDown } from "lucide-react"
+import { useEffect, useMemo } from "react"
 import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { useAiEmployeeStatus } from "@/components/growth/ai-teammate/ai-employee-status-provider"
 import { synthesizeGrowthHomeExecutiveBriefing } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-synthesizer"
@@ -17,10 +16,12 @@ import {
   GROWTH_HOME_EXECUTIVE_BRIEFING_2A_QA_MARKER,
   buildExecutiveSnapshotKpis,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-2a"
+import { buildAvaHomeHero } from "@/lib/growth/workspace/executive-briefing/growth-home-ava-hero-7a"
 import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
 import type { GrowthWorkspaceRecentView, GrowthWorkspaceContinueItem } from "@/lib/growth/workspace/growth-workspace-activity-memory"
 import { formatRelativeTime } from "@/lib/notifications/format-relative"
-import { GrowthHomeExecutiveBriefingHeroSection } from "@/components/growth/workspace/executive-briefing/growth-home-executive-briefing-hero-section"
+import { GrowthHomeAvaHeroSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-hero-section"
+import { GrowthHomeCollapsibleSection } from "@/components/growth/workspace/executive-briefing/growth-home-collapsible-section"
 import { GrowthHomeExecutiveSnapshotSection } from "@/components/growth/workspace/executive-briefing/growth-home-executive-snapshot-section"
 import { GrowthHomeAiOsWaitingOnYouSection } from "@/components/growth/workspace/executive-briefing/growth-home-ai-os-waiting-on-you-section"
 import { GrowthHomeStartAvaSetupSection } from "@/components/growth/workspace/executive-briefing/growth-home-start-ava-setup-section"
@@ -50,12 +51,15 @@ import { GrowthHomeBusinessSnapshotSection } from "@/components/growth/workspace
 import { GrowthHomeDailyBriefingSection } from "@/components/growth/workspace/executive-briefing/growth-home-daily-briefing-section"
 import { GrowthHomeAvaResearchQueuePanel } from "@/components/growth/workspace/executive-briefing/growth-home-ava-research-queue-panel"
 import type { GrowthHomeWorkspaceSummaryPayload } from "@/lib/growth/home/growth-home-workspace-summary-types"
-import { Button } from "@/components/ui/button"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+
+function metricValueFromDashboard(
+  dashboard: GrowthWorkspaceDashboardViewModel,
+  sectionId: string,
+  label: string,
+): number {
+  const section = dashboard.sections.find((row) => row.id === sectionId)
+  return section?.metrics.find((metric) => metric.label === label)?.value ?? 0
+}
 
 type Props = {
   dashboard: GrowthWorkspaceDashboardViewModel
@@ -74,12 +78,8 @@ export function GrowthHomeExecutiveBriefingDashboard({
   everythingElse,
   onResearchLoopCompleted,
 }: Props) {
-  const [secondaryOpen, setSecondaryOpen] = useState(false)
   const { teammate } = useAiTeammateIdentity()
   const { setStatus } = useAiEmployeeStatus()
-  const missionCenterRef = useRef<HTMLDivElement>(null)
-  const marketingMissionsRef = useRef<HTMLDivElement>(null)
-  const dailyWorkRef = useRef<HTMLDivElement>(null)
 
   const briefing = useMemo(
     () => synthesizeGrowthHomeExecutiveBriefing({ dashboard, recentViews, continueItems, teammate }),
@@ -97,6 +97,21 @@ export function GrowthHomeExecutiveBriefingDashboard({
     () => buildExecutiveSnapshotKpis({ hero: aiOsUx.hero, aiOsUx, dashboard }),
     [aiOsUx, dashboard],
   )
+
+  const avaHero = useMemo(
+    () =>
+      buildAvaHomeHero({
+        greeting: aiOsUx.hero.greeting,
+        hour: new Date().getHours(),
+        employeeStatus: briefing.employeeStatus,
+        aiOsUx,
+        researchLoopSummary: avaConsole?.researchLoopSummary ?? null,
+        accomplishments: briefing.accomplishments,
+        repliesWaiting: metricValueFromDashboard(dashboard, "my-queue", "Inbox requiring replies"),
+      }),
+    [aiOsUx, briefing.employeeStatus, briefing.accomplishments, avaConsole?.researchLoopSummary, dashboard],
+  )
+
   const hasCustomerGrowthContent =
     briefing.customerSuccessMissions.length > 0 ||
     briefing.customerHealth.length > 0 ||
@@ -104,46 +119,20 @@ export function GrowthHomeExecutiveBriefingDashboard({
     briefing.renewalsMonitoring.length > 0 ||
     briefing.customerWins.length > 0
 
-  const handleReviewTodaysWork = useCallback(() => {
-    setSecondaryOpen(true)
-    requestAnimationFrame(() => {
-      dailyWorkRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-    })
-  }, [])
-
-  const handleViewMissionCenter = useCallback(() => {
-    missionCenterRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-  }, [])
-
-  const handlePrepareOutreach = useCallback(() => {
-    marketingMissionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-  }, [])
-
   return (
     <div
-      className="space-y-8"
+      className="space-y-6"
       data-qa-marker={GROWTH_HOME_EXECUTIVE_BRIEFING_QA_MARKER}
       data-qa-marker-premium-ux={GROWTH_AIOS_HOME_PREMIUM_UX_1A_QA_MARKER}
       data-qa-marker-briefing-2a={GROWTH_HOME_EXECUTIVE_BRIEFING_2A_QA_MARKER}
       data-growth-action-first-order="actions-before-metrics"
       data-qa-marker-action-first={GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER}
     >
-      <GrowthHomeExecutiveBriefingHeroSection
-        hero={aiOsUx.hero}
-        aiOsUx={aiOsUx}
-        marketingMissionCount={briefing.marketingMissions.length}
-        statusLabel={briefing.checkIn.status.label}
-        activityLabel={briefing.checkIn.status.activityLabel}
-        lastUpdateLabel={lastUpdateLabel}
-        executiveRecommendation={briefing.executiveRecommendation}
-        recommendation={briefing.recommendation}
-        onReviewTodaysWork={handleReviewTodaysWork}
-        onViewMissionCenter={handleViewMissionCenter}
-      />
-
-      <GrowthHomeExecutiveSnapshotSection kpis={executiveSnapshot} />
+      <GrowthHomeAvaHeroSection hero={avaHero} lastUpdateLabel={lastUpdateLabel} />
 
       <GrowthHomeAiOsWaitingOnYouSection aiOsUx={aiOsUx} />
+
+      <GrowthHomeExecutiveSnapshotSection kpis={executiveSnapshot} />
 
       <GrowthHomeAvaResearchQueuePanel
         researchLoopSummary={avaConsole?.researchLoopSummary ?? null}
@@ -152,64 +141,71 @@ export function GrowthHomeExecutiveBriefingDashboard({
 
       <GrowthHomeStartAvaSetupSection dashboard={dashboard} />
 
-      <div ref={missionCenterRef}>
-        <GrowthHomeMissionCenterSection dashboard={dashboard} />
-      </div>
-
-      <GrowthHomeGrowthStrategySection
-        dailyWorkQueue={aiOsUx.dailyWorkQueue}
-        onPrepareOutreach={handlePrepareOutreach}
-      />
-
-      <div ref={marketingMissionsRef}>
-        <GrowthHomeMarketingMissionsSection missions={briefing.marketingMissions} />
-      </div>
-
-      <section
-        data-qa-section="home-customer-growth"
-        className="rounded-2xl border border-border/70 bg-card p-5 space-y-4 sm:p-6"
+      <GrowthHomeCollapsibleSection
+        sectionId="research-growth-strategy"
+        title="Research & Growth Strategy"
+        subtitle="Missions I'm running and the outreach I'm preparing."
+        defaultOpen
       >
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">Customer Growth</h2>
-          <p className="mt-0.5 text-sm leading-snug text-muted-foreground">{GROWTH_HOME_CUSTOMER_GROWTH_SUBTITLE}</p>
-        </div>
-        <GrowthHomeCustomerSuccessMissionsSection missions={briefing.customerSuccessMissions} />
-        {hasCustomerGrowthContent ? (
-          <div className="space-y-4">
-            <GrowthHomeCustomerHealthSection items={briefing.customerHealth} />
-            <GrowthHomeExpansionOpportunitiesSection items={briefing.expansionOpportunities} />
-            <GrowthHomeRenewalsMonitoringSection items={briefing.renewalsMonitoring} />
-            <GrowthHomeCustomerWinsSection wins={briefing.customerWins} />
-          </div>
-        ) : (
-          <GrowthHomeCustomerGrowthEmptySection />
-        )}
-      </section>
+        <GrowthHomeMissionCenterSection dashboard={dashboard} />
+        <GrowthHomeGrowthStrategySection dailyWorkQueue={aiOsUx.dailyWorkQueue} />
+        <GrowthHomeMarketingMissionsSection missions={briefing.marketingMissions} />
+      </GrowthHomeCollapsibleSection>
 
-      <GrowthHomeTimelineSection periods={briefing.timeline} />
-
-      <section data-qa-section="home-operational-readiness" className="space-y-3">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">{GROWTH_HOME_OPERATIONAL_READINESS_TITLE}</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">{GROWTH_HOME_OPERATIONAL_READINESS_SUBTITLE}</p>
+      <GrowthHomeCollapsibleSection
+        sectionId="customer-growth"
+        title="Customer Growth"
+        subtitle={GROWTH_HOME_CUSTOMER_GROWTH_SUBTITLE}
+      >
+        <div data-qa-section="home-customer-growth" className="space-y-4">
+          <GrowthHomeCustomerSuccessMissionsSection missions={briefing.customerSuccessMissions} />
+          {hasCustomerGrowthContent ? (
+            <div className="space-y-4">
+              <GrowthHomeCustomerHealthSection items={briefing.customerHealth} />
+              <GrowthHomeExpansionOpportunitiesSection items={briefing.expansionOpportunities} />
+              <GrowthHomeRenewalsMonitoringSection items={briefing.renewalsMonitoring} />
+              <GrowthHomeCustomerWinsSection wins={briefing.customerWins} />
+            </div>
+          ) : (
+            <GrowthHomeCustomerGrowthEmptySection />
+          )}
         </div>
-        <div className="grid gap-4 lg:grid-cols-2">
+      </GrowthHomeCollapsibleSection>
+
+      <GrowthHomeCollapsibleSection
+        sectionId="initiatives"
+        title="Initiatives"
+        subtitle="Recommendations I've prepared for you to consider."
+      >
+        <GrowthHomeInitiativeRecommendationsSection recommendations={briefing.initiativeRecommendations} />
+      </GrowthHomeCollapsibleSection>
+
+      <GrowthHomeCollapsibleSection
+        sectionId="ava-accomplished"
+        title="What I've accomplished"
+        subtitle="A timeline of the work I've completed."
+      >
+        <GrowthHomeTimelineSection periods={briefing.timeline} />
+      </GrowthHomeCollapsibleSection>
+
+      <GrowthHomeCollapsibleSection
+        sectionId="operational-readiness"
+        title={GROWTH_HOME_OPERATIONAL_READINESS_TITLE}
+        subtitle={GROWTH_HOME_OPERATIONAL_READINESS_SUBTITLE}
+      >
+        <div data-qa-section="home-operational-readiness" className="grid gap-4 lg:grid-cols-2">
           <GrowthHomeMailboxDomainHealthSection health={aiOsUx.mailboxDomainHealth} embedded />
           <GrowthHomeAutonomousReadinessSection readiness={aiOsUx.autonomousReadiness} embedded />
         </div>
-      </section>
+      </GrowthHomeCollapsibleSection>
 
-      <Collapsible open={secondaryOpen} onOpenChange={setSecondaryOpen}>
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" className="gap-2 px-0 text-muted-foreground hover:text-foreground">
-            <ChevronDown className={`size-4 transition-transform ${secondaryOpen ? "rotate-180" : ""}`} />
-            {secondaryOpen ? "Hide additional tools" : "Show additional tools"}
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-5 pt-3" data-qa-section="home-everything-else">
-          <div ref={dailyWorkRef}>
-            <GrowthHomeDailyWorkQueueSection items={aiOsUx.dailyWorkQueue} buckets={aiOsUx.dailyWorkQueueBuckets} />
-          </div>
+      <GrowthHomeCollapsibleSection
+        sectionId="ai-activity"
+        title="AI Activity"
+        subtitle="Detailed activity, throughput, and diagnostics."
+      >
+        <div data-qa-section="home-everything-else" className="space-y-5">
+          <GrowthHomeDailyWorkQueueSection items={aiOsUx.dailyWorkQueue} buckets={aiOsUx.dailyWorkQueueBuckets} />
           <GrowthHomeAvaLiveStatusSection status={aiOsUx.liveStatus} />
           <GrowthHomeThroughputSection metrics={aiOsUx.throughput} />
           <GrowthHomeCheckInSection checkIn={briefing.checkIn} lastUpdateLabel={lastUpdateLabel} />
@@ -217,7 +213,6 @@ export function GrowthHomeExecutiveBriefingDashboard({
           <GrowthHomeRevenueForecastSection forecast={briefing.revenueForecast} />
           <GrowthHomeDailyBriefingSection briefing={briefing.dailyBriefing} />
           <GrowthHomeBusinessSnapshotSection metrics={briefing.businessSnapshot} />
-          <GrowthHomeInitiativeRecommendationsSection recommendations={briefing.initiativeRecommendations} />
           <GrowthHomeNeedsReviewSection needsReview={briefing.needsReview} />
           <GrowthHomeWorkSummarySection categories={briefing.workSummary} />
           <GrowthHomeRecommendationCard
@@ -225,8 +220,8 @@ export function GrowthHomeExecutiveBriefingDashboard({
             additionalRecommendations={briefing.additionalRecommendations}
           />
           {everythingElse}
-        </CollapsibleContent>
-      </Collapsible>
+        </div>
+      </GrowthHomeCollapsibleSection>
     </div>
   )
 }

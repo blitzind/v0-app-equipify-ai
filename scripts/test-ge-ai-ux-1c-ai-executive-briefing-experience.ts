@@ -108,19 +108,19 @@ const dashboardLayout = readSource("components/growth/workspace/executive-briefi
 function jsxOrder1c(source: string, earlier: string, later: string) {
   assert.ok(source.indexOf(`<${earlier}`) < source.indexOf(`<${later}`))
 }
-jsxOrder1c(dashboardLayout, "GrowthHomeExecutiveBriefingHeroSection", "GrowthHomeExecutiveSnapshotSection")
-jsxOrder1c(dashboardLayout, "GrowthHomeExecutiveSnapshotSection", "GrowthHomeAiOsWaitingOnYouSection")
+// GE-AIOS-7A — Hero → Needs Your Decision → Revenue Queue summary, then collapsible groups.
+jsxOrder1c(dashboardLayout, "GrowthHomeAvaHeroSection", "GrowthHomeAiOsWaitingOnYouSection")
+jsxOrder1c(dashboardLayout, "GrowthHomeAiOsWaitingOnYouSection", "GrowthHomeExecutiveSnapshotSection")
 jsxOrder1c(dashboardLayout, "GrowthHomeAiOsWaitingOnYouSection", "GrowthHomeMissionCenterSection")
 jsxOrder1c(dashboardLayout, "GrowthHomeMissionCenterSection", "GrowthHomeGrowthStrategySection")
 jsxOrder1c(dashboardLayout, "GrowthHomeGrowthStrategySection", "GrowthHomeMarketingMissionsSection")
-jsxOrder1c(dashboardLayout, "GrowthHomeTimelineSection", "Collapsible")
-jsxOrder1c(dashboardLayout, "CollapsibleContent", "GrowthHomeDailyWorkQueueSection")
-jsxOrder1c(dashboardLayout, "CollapsibleContent", "GrowthHomeBusinessSnapshotSection")
+jsxOrder1c(dashboardLayout, "GrowthHomeCollapsibleSection", "GrowthHomeDailyWorkQueueSection")
+jsxOrder1c(dashboardLayout, "GrowthHomeCollapsibleSection", "GrowthHomeBusinessSnapshotSection")
 
-const heroLayout = readSource("components/growth/workspace/executive-briefing/growth-home-executive-briefing-hero-section.tsx")
-const heroMain = heroLayout.slice(heroLayout.indexOf("export function GrowthHomeExecutiveBriefingHeroSection"))
-assert.ok(heroMain.includes('data-section="home-hero-ava-recommends"'))
+const heroLayout = readSource("components/growth/workspace/executive-briefing/growth-home-ava-hero-section.tsx")
+const heroMain = heroLayout.slice(heroLayout.indexOf("export function GrowthHomeAvaHeroSection"))
+assert.ok(heroMain.includes('data-qa-section="home-ava-hero"'))
 assert.doesNotMatch(heroMain, /data-section="home-executive-kpis"/)
-console.log("  ✓ visual hierarchy order enforced in layout component")
+console.log("  ✓ visual hierarchy order enforced in unified Ava hero")
 
 console.log(`[GE-AI-UX-1C] PASS — ${GE_AI_UX_1C_QA_MARKER}`)

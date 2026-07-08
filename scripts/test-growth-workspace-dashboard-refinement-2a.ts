@@ -40,29 +40,33 @@ function main(): void {
   }
   console.log("  ✓ Refinement surfaces present")
 
-  const heroSource = read("components/growth/workspace/executive-briefing/growth-home-executive-briefing-hero-section.tsx")
+  const heroSource = read("components/growth/workspace/executive-briefing/growth-home-ava-hero-section.tsx")
   const snapshotSource = read("components/growth/workspace/executive-briefing/growth-home-executive-snapshot-section.tsx")
-  assert.match(heroSource, /data-section="home-hero-ava-recommends"/)
+  assert.match(heroSource, /data-qa-section="home-ava-hero"/)
   assert.match(snapshotSource, /data-section="home-executive-kpis"/)
-  assert.match(heroSource, /GROWTH_HOME_AVA_RECOMMENDS|GROWTH_HOME_HERO_AVA_RECOMMENDS/)
+  assert.match(heroSource, /GROWTH_HOME_AVA_ONE_THING_TITLE/)
   assert.doesNotMatch(heroSource, /bg-gradient-to-br from-indigo-50/)
   assert.doesNotMatch(heroSource, /bg-indigo-600/)
   assert.match(heroSource, /backdrop-blur/)
-  console.log("  ✓ Executive hero uses compact premium layout with embedded Ava recommendation")
+  console.log("  ✓ Unified Ava hero uses compact premium layout with single-decision surface")
 
   const dashboardSource = read("components/growth/workspace/executive-briefing/growth-home-executive-briefing-dashboard.tsx")
-  assert.match(dashboardSource, /executiveRecommendation=\{briefing\.executiveRecommendation\}/)
+  // GE-AIOS-7A — unified Ava hero renders first, above Needs Your Decision.
   assert.ok(
-    dashboardSource.indexOf("<GrowthHomeExecutiveBriefingHeroSection") <
+    dashboardSource.indexOf("<GrowthHomeAvaHeroSection") >= 0,
+    "Unified Ava hero must be mounted",
+  )
+  assert.ok(
+    dashboardSource.indexOf("<GrowthHomeAvaHeroSection") <
       dashboardSource.indexOf("<GrowthHomeAiOsWaitingOnYouSection"),
     "Hero must render before waiting-on-you section",
   )
   assert.ok(
-    dashboardSource.indexOf("executiveRecommendation=") <
+    dashboardSource.indexOf("<GrowthHomeAiOsWaitingOnYouSection") <
       dashboardSource.indexOf("<GrowthHomeThroughputSection"),
-    "Recommendation props must be wired before throughput metrics",
+    "Needs Your Decision must render before supporting metrics",
   )
-  console.log("  ✓ Dashboard keeps recommendation above supporting metrics")
+  console.log("  ✓ Dashboard keeps the single decision above supporting metrics")
 
   const synthesizerSource = read("lib/growth/workspace/executive-briefing/growth-home-ai-os-ux-synthesizer.ts")
   assert.match(synthesizerSource, /executiveKpis/)

@@ -6,12 +6,10 @@ import type {
   GrowthHomeExecutiveBriefingHero,
   GrowthHomeTimelinePeriod,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
-import { formatHomeCurrency } from "@/lib/growth/workspace/executive-briefing/growth-home-narrative-formatter"
-
 export const GROWTH_HOME_EXECUTIVE_BRIEFING_2A_QA_MARKER = "ge-growth-home-executive-briefing-2a-v1" as const
 
 export const GROWTH_HOME_AVA_OPERATOR_TAGLINE = "Equipify's AI Growth Operator" as const
-export const GROWTH_HOME_EXECUTIVE_SNAPSHOT_TITLE = "Executive Snapshot" as const
+export const GROWTH_HOME_EXECUTIVE_SNAPSHOT_TITLE = "Where things stand" as const
 export const GROWTH_HOME_TODAYS_FOCUS_TITLE = "Today's focus" as const
 export const GROWTH_HOME_REVIEW_TODAYS_WORK_LABEL = "Review Today's Work" as const
 export const GROWTH_HOME_VIEW_MISSION_CENTER_LABEL = "View Mission Center" as const
@@ -42,39 +40,41 @@ export function resolveAvaStatusBadgeLabel(statusLabel: string): string {
   return "Working"
 }
 
+/**
+ * GE-AIOS-7A — Revenue Queue summary strip.
+ * Reduced from five mixed KPIs to the four operator-relevant signals:
+ * Revenue Queue, Needs Review, Replies Waiting, Today's Focus.
+ * Reuses existing dashboard read models — no new data sources.
+ */
 export function buildExecutiveSnapshotKpis(input: {
   hero: GrowthHomeExecutiveBriefingHero
   aiOsUx: GrowthHomeAiOsUxViewModel
   dashboard: GrowthWorkspaceDashboardViewModel
 }): GrowthHomeExecutiveSnapshotKpi[] {
-  const { hero, aiOsUx, dashboard } = input
+  const { aiOsUx, dashboard } = input
   const briefing = dashboard.briefing
 
-  const companiesFound = Math.max(
-    metricValue(dashboard, "intelligence", "Hot companies"),
+  const revenueQueue = Math.max(
     metricValue(dashboard, "my-queue", "Leads needing action"),
     metricValue(dashboard, "my-queue", "Call-ready leads"),
   )
-  const qualified = Math.max(
-    metricValue(dashboard, "my-queue", "Call-ready leads"),
-    metricValue(dashboard, "intelligence", "Hot companies"),
-  )
-  const outreachDrafts = Math.max(
+  const needsReview = Math.max(
+    aiOsUx.approveItemsCount,
+    aiOsUx.waitingOnYou.length,
     briefing?.approval_queue.pending_drafts ?? 0,
     metricValue(dashboard, "campaign-snapshot", "Approval queue"),
   )
-  const waitingOnYou = Math.max(aiOsUx.approveItemsCount, aiOsUx.waitingOnYou.length)
-  const pipelineKpi = hero.executiveKpis.find((kpi) => kpi.id === "revenue-influenced")
-  const pipelineValue =
-    pipelineKpi?.value ??
-    (hero.expectedOutcomeToday ? hero.expectedOutcomeToday : formatHomeCurrency(0)).replace("$0", "—")
+  const repliesWaiting = Math.max(
+    metricValue(dashboard, "my-queue", "Inbox requiring replies"),
+    metricValue(dashboard, "activity", "Replies today"),
+  )
+  const todaysFocus = aiOsUx.dailyWorkQueue.length
 
   return [
-    { id: "companies-found", label: "Companies Found", value: String(companiesFound) },
-    { id: "qualified", label: "Qualified", value: String(qualified) },
-    { id: "outreach-drafts", label: "Outreach Drafts Ready", value: String(outreachDrafts) },
-    { id: "waiting-on-you", label: "Waiting On You", value: String(waitingOnYou) },
-    { id: "estimated-pipeline", label: "Estimated Pipeline", value: pipelineValue === "$0" ? "—" : pipelineValue },
+    { id: "revenue-queue", label: "Revenue Queue", value: String(revenueQueue) },
+    { id: "needs-review", label: "Needs Review", value: String(needsReview) },
+    { id: "replies-waiting", label: "Replies Waiting", value: String(repliesWaiting) },
+    { id: "todays-focus", label: "Today's Focus", value: String(todaysFocus) },
   ]
 }
 

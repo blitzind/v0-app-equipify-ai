@@ -26,7 +26,7 @@ export const GROWTH_HOME_PIPELINE_HEALTHY = "Pipeline looks healthy." as const
 
 export const GROWTH_HOME_EXPERIENCE_2B_SURFACES = [
   "lib/growth/workspace/executive-briefing/growth-home-experience-2b.ts",
-  "components/growth/workspace/executive-briefing/growth-home-executive-briefing-hero-section.tsx",
+  "components/growth/workspace/executive-briefing/growth-home-ava-hero-section.tsx",
   "components/growth/workspace/executive-briefing/growth-home-ai-os-waiting-on-you-section.tsx",
   "lib/growth/workspace/executive-briefing/growth-home-ai-os-ux-synthesizer.ts",
 ] as const

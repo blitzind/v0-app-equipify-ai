@@ -39,7 +39,7 @@ export const GROWTH_HOME_STALE_DATA_SOURCES: GrowthHomeStaleDataSource[] = [
   {
     id: "qualified_prospects_ready",
     ui_label: "Qualified prospects ready",
-    ui_component: "GrowthHomeExecutiveBriefingHeroSection → buildExecutiveBriefingHero",
+    ui_component: "GrowthHomeAvaHeroSection → buildAvaHomeHero",
     api_route: "/api/platform/growth/lead-inbox + /api/platform/growth/cadence/command-summary",
     service: "growth-workspace-dashboard-mapper.ts (my-queue metrics)",
     kind: "api_aggregate",

@@ -13,7 +13,7 @@ export const GROWTH_HOME_HERO_RISK_LABEL = "Biggest risk" as const
 
 export const GROWTH_DASHBOARD_REFINEMENT_2A_SURFACES = [
   "lib/growth/workspace/executive-briefing/growth-home-dashboard-refinement-2a.ts",
-  "components/growth/workspace/executive-briefing/growth-home-executive-briefing-hero-section.tsx",
+  "components/growth/workspace/executive-briefing/growth-home-ava-hero-section.tsx",
   "components/growth/workspace/executive-briefing/growth-home-executive-briefing-dashboard.tsx",
   "components/growth/objectives/growth-objectives-dashboard.tsx",
   "lib/growth/objectives/growth-objective-types.ts",

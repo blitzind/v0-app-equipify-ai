@@ -60,7 +60,7 @@ function main(): void {
 
   assertOrderBefore(
     "components/growth/workspace/executive-briefing/growth-home-executive-briefing-dashboard.tsx",
-    "executiveRecommendation=",
+    "GrowthHomeAiOsWaitingOnYouSection",
     "GrowthHomeThroughputSection",
     "dashboard",
   )

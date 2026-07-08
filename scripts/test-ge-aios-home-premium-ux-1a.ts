@@ -55,7 +55,7 @@ async function main(): Promise<void> {
   assert.match(dashboard, /GROWTH_AIOS_HOME_PREMIUM_UX_1A_QA_MARKER/)
   assert.match(dashboard, /data-qa-section="home-operational-readiness"/)
 
-  const hero = indexOfMount(dashboard, "GrowthHomeExecutiveBriefingHeroSection", "Hero")
+  const hero = indexOfMount(dashboard, "GrowthHomeAvaHeroSection", "Hero")
   const needs = indexOfMount(dashboard, "GrowthHomeAiOsWaitingOnYouSection", "Needs Your Decision")
   const mission = indexOfMount(dashboard, "GrowthHomeMissionCenterSection", "Mission Center")
   const growthStrategy = indexOfMount(dashboard, "GrowthHomeGrowthStrategySection", "Growth Strategy")

@@ -28,7 +28,7 @@ async function main(): Promise<void> {
   console.log(`[${PHASE}] Executive briefing presentation certification`)
 
   assert.equal(GROWTH_HOME_EXECUTIVE_BRIEFING_2A_QA_MARKER, "ge-growth-home-executive-briefing-2a-v1")
-  assert.equal(GROWTH_HOME_EXECUTIVE_SNAPSHOT_TITLE, "Executive Snapshot")
+  assert.equal(GROWTH_HOME_EXECUTIVE_SNAPSHOT_TITLE, "Where things stand")
   assert.equal(GROWTH_HOME_REVIEW_TODAYS_WORK_LABEL, "Review Today's Work")
   assert.equal(GROWTH_HOME_VIEW_MISSION_CENTER_LABEL, "View Mission Center")
   assert.equal(GROWTH_HOME_NOTHING_REQUIRES_APPROVAL, "Nothing requires your approval right now.")
@@ -86,9 +86,14 @@ async function main(): Promise<void> {
     },
   })
 
-  assert.equal(snapshot.length, 5)
-  assert.equal(snapshot[0]?.label, "Companies Found")
-  assert.equal(snapshot[0]?.value, "18")
+  // GE-AIOS-7A — Revenue Queue summary strip: four operator-relevant KPIs.
+  assert.equal(snapshot.length, 4)
+  assert.equal(snapshot[0]?.label, "Revenue Queue")
+  assert.equal(snapshot[0]?.value, "4")
+  assert.equal(snapshot[1]?.label, "Needs Review")
+  assert.equal(snapshot[1]?.value, "2")
+  assert.equal(snapshot[2]?.label, "Replies Waiting")
+  assert.equal(snapshot[3]?.label, "Today's Focus")
 
   const dashboard = readSource(
     "components/growth/workspace/executive-briefing/growth-home-executive-briefing-dashboard.tsx",
@@ -97,16 +102,21 @@ async function main(): Promise<void> {
   assert.match(dashboard, /GrowthHomeExecutiveSnapshotSection/)
   assert.match(dashboard, /GrowthHomeGrowthStrategySection/)
 
-  const hero = indexOfMount(dashboard, "GrowthHomeExecutiveBriefingHeroSection")
-  const snapshotMount = indexOfMount(dashboard, "GrowthHomeExecutiveSnapshotSection")
+  // GE-AIOS-7A — Hero → Needs Your Decision → Revenue Queue summary.
+  const hero = indexOfMount(dashboard, "GrowthHomeAvaHeroSection")
   const needs = indexOfMount(dashboard, "GrowthHomeAiOsWaitingOnYouSection")
-  assert.ok(snapshotMount > hero)
-  assert.ok(needs > snapshotMount)
+  const snapshotMount = indexOfMount(dashboard, "GrowthHomeExecutiveSnapshotSection")
+  assert.ok(needs > hero)
+  assert.ok(snapshotMount > needs)
+
+  const heroBuilder = readSource(
+    "lib/growth/workspace/executive-briefing/growth-home-ava-hero-7a.ts",
+  )
+  assert.match(heroBuilder, /greetingForHour\(/)
 
   const heroSource = readSource(
-    "components/growth/workspace/executive-briefing/growth-home-executive-briefing-hero-section.tsx",
+    "components/growth/workspace/executive-briefing/growth-home-ava-hero-section.tsx",
   )
-  assert.match(heroSource, /greetingForHour\(new Date\(\)\.getHours\(\)\)/)
   assert.doesNotMatch(heroSource, /bg-indigo-600/)
 
   const waiting = readSource(
