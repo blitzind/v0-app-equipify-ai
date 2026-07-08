@@ -18,7 +18,7 @@ const BodySchema = z
   .optional()
 
 export async function POST(request: Request) {
-  const access = await requireGrowthEnginePlatformAccess()
+  const access = await requireGrowthEnginePlatformAccess(request)
   if (!access.ok) return access.response
 
   const organizationId = getGrowthEngineAiOrgId()
