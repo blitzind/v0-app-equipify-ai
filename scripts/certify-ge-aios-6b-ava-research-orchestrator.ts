@@ -9,6 +9,7 @@ import path from "node:path"
 import { bootstrapGrowthOperatorNotificationsCertEnv } from "@/lib/growth/notifications/growth-notification-cert-bootstrap"
 import {
   buildAvaResearchLoopNarrative,
+  resolveAvaQualificationOrchestratorOutcome,
   selectRevenueQueueResearchCandidates,
 } from "../lib/growth/ava-home/growth-ava-research-orchestrator-service"
 import {
@@ -33,6 +34,8 @@ function runStaticCert(): void {
   const orchestrator = read("lib/growth/ava-home/growth-ava-research-orchestrator-service.ts")
   assert.match(orchestrator, /runProspectResearch/)
   assert.match(orchestrator, /runAutonomousQualificationManualEvaluation/)
+  assert.match(orchestrator, /resolveAvaQualificationOrchestratorOutcome/)
+  assert.match(orchestrator, /fetchLatestGrowthLeadResearchWorkflowSnapshot/)
   assert.match(orchestrator, /recomputeGrowthLeadWorkflowSignals/)
   assert.match(orchestrator, /buildRevenueQueueDashboardSectionsFromLeads/)
   assert.doesNotMatch(orchestrator, /runAutonomousOutreachPreparation/)
@@ -68,6 +71,38 @@ function runStaticCert(): void {
   assert.match(narrative, /3 have verified buying signals/)
   assert.match(narrative, /2 appear ready for outreach review/)
   assert.match(narrative, /Please review/)
+
+  const assessedDespiteMissingPilot = resolveAvaQualificationOrchestratorOutcome({
+    workflowStatus: "assessed",
+    policyGate: { allowed: false, blockReason: "Qualification autonomy disabled.", policyKey: "qualification_autonomy_disabled" },
+    pilotRun: null,
+  })
+  assert.equal(assessedDespiteMissingPilot.qualificationStatus, "completed")
+  assert.equal(assessedDespiteMissingPilot.qualificationSkipReason, null)
+
+  const policyBlocked = resolveAvaQualificationOrchestratorOutcome({
+    workflowStatus: "research_complete",
+    policyGate: {
+      allowed: false,
+      blockReason: "Qualification autonomy disabled — enable enrichment capability in Growth Autonomy.",
+      policyKey: "qualification_autonomy_disabled",
+    },
+    pilotRun: null,
+  })
+  assert.equal(policyBlocked.qualificationStatus, "blocked")
+  assert.match(policyBlocked.qualificationSkipReason ?? "", /Qualification autonomy disabled/)
+
+  const completedNarrative = buildAvaResearchLoopNarrative({
+    companiesReviewed: 1,
+    researchCompleted: 1,
+    researchFailed: 0,
+    buyingSignalsVerified: 1,
+    readyForOutreachReview: 1,
+    qualificationCompleted: 1,
+    qualificationSkipped: 0,
+    qualificationFailed: 0,
+  })
+  assert.match(completedNarrative, /Qualification completed\./)
 
   const selected = selectRevenueQueueResearchCandidates(
     [

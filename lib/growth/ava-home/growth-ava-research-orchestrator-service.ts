@@ -11,7 +11,10 @@ import {
   fetchLatestGrowthLeadResearchWorkflowSnapshot,
   publishGrowthLeadResearchWorkflowStatus,
 } from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
-import type { GrowthLeadResearchEvidenceSummary } from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
+import type {
+  GrowthLeadResearchEvidenceSummary,
+  GrowthLeadResearchWorkflowStatus,
+} from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
 import {
   fetchGrowthAiOsAutonomyPolicy,
   fetchGrowthAiOsAutonomyPolicyEvaluationContext,
@@ -84,9 +87,7 @@ export function buildAvaResearchLoopNarrative(input: {
   }
 
   if (input.qualificationCompleted > 0) {
-    lines.push(
-      `${input.qualificationCompleted} ${pluralize(input.qualificationCompleted, "lead was", "leads were")} qualified.`,
-    )
+    lines.push("Qualification completed.")
   } else if (input.qualificationSkipped > 0) {
     lines.push(GROWTH_AVA_QUALIFICATION_WAITING_MESSAGE)
   } else if (input.qualificationFailed > 0) {
@@ -109,21 +110,83 @@ export function buildAvaResearchLoopNarrative(input: {
   return lines.join("\n")
 }
 
-function mapQualificationOrchestratorStatus(input: {
-  runOutcome: "completed" | "failed" | "skipped"
-  runQualificationStatus: "qualified" | "blocked" | "failed" | "skipped" | null
-  policyGateAllowed: boolean
-}): GrowthAvaQualificationOrchestratorStatus {
-  if (input.runOutcome === "completed" && input.runQualificationStatus === "qualified") {
-    return "completed"
+/**
+ * GE-AIOS-6E — Resolve qualification outcome from durable workflow snapshot.
+ * Workflow events are canonical; the 5C in-memory pilot store supplements skip reasons only.
+ */
+export function resolveAvaQualificationOrchestratorOutcome(input: {
+  workflowStatus: GrowthLeadResearchWorkflowStatus | null
+  policyGate: { allowed: boolean; blockReason: string | null; policyKey: string | null }
+  pilotRun?: {
+    outcome: "completed" | "failed" | "skipped"
+    qualificationStatus: "qualified" | "blocked" | "failed" | "skipped" | null
+    skipReason: string | null
+  } | null
+}): {
+  qualificationStatus: GrowthAvaQualificationOrchestratorStatus
+  qualificationSkipReason: string | null
+  qualificationPolicyGate: string | null
+} {
+  const workflow = input.workflowStatus
+  const policyKey = input.policyGate.policyKey
+
+  if (workflow === "qualified" || workflow === "assessed") {
+    return {
+      qualificationStatus: "completed",
+      qualificationSkipReason: null,
+      qualificationPolicyGate: policyKey,
+    }
   }
-  if (input.runOutcome === "failed" || input.runQualificationStatus === "failed") {
-    return "failed"
+
+  if (workflow === "failed") {
+    return {
+      qualificationStatus: "failed",
+      qualificationSkipReason: input.pilotRun?.skipReason ?? "Qualification workflow failed.",
+      qualificationPolicyGate: policyKey,
+    }
   }
-  if (input.runQualificationStatus === "blocked" || !input.policyGateAllowed) {
-    return "blocked"
+
+  if (workflow === "blocked") {
+    return {
+      qualificationStatus: "blocked",
+      qualificationSkipReason: input.pilotRun?.skipReason ?? "Qualification workflow blocked.",
+      qualificationPolicyGate: policyKey,
+    }
   }
-  return "skipped"
+
+  if (!input.policyGate.allowed) {
+    return {
+      qualificationStatus: "blocked",
+      qualificationSkipReason: input.policyGate.blockReason,
+      qualificationPolicyGate: policyKey,
+    }
+  }
+
+  if (input.pilotRun?.outcome === "failed" || input.pilotRun?.qualificationStatus === "failed") {
+    return {
+      qualificationStatus: "failed",
+      qualificationSkipReason: input.pilotRun.skipReason,
+      qualificationPolicyGate: policyKey,
+    }
+  }
+
+  if (input.pilotRun?.qualificationStatus === "blocked") {
+    return {
+      qualificationStatus: "blocked",
+      qualificationSkipReason: input.pilotRun.skipReason,
+      qualificationPolicyGate: policyKey,
+    }
+  }
+
+  return {
+    qualificationStatus: "skipped",
+    qualificationSkipReason:
+      input.pilotRun?.skipReason ??
+      (workflow === "research_complete"
+        ? "Qualification did not advance beyond research_complete."
+        : "Qualification agent did not record a run."),
+    qualificationPolicyGate: policyKey,
+  }
 }
 
 async function runQualificationSpecialistForLead(
@@ -150,32 +213,24 @@ async function runQualificationSpecialistForLead(
     generatedAt: input.generatedAt,
   })
 
+  const workflowSnapshot = await fetchLatestGrowthLeadResearchWorkflowSnapshot(admin, {
+    organizationId: input.organizationId,
+    leadId: input.leadId,
+  })
+
   const latestRun = qualificationReadModel.recentRuns.find((run) => run.leadId === input.leadId) ?? null
 
-  if (!latestRun) {
-    if (!policyGate.allowed) {
-      return {
-        qualificationStatus: "blocked",
-        qualificationSkipReason: policyGate.blockReason,
-        qualificationPolicyGate: policyGate.policyKey,
-      }
-    }
-    return {
-      qualificationStatus: "skipped",
-      qualificationSkipReason: "Qualification agent did not record a run.",
-      qualificationPolicyGate: policyGate.policyKey,
-    }
-  }
-
-  return {
-    qualificationStatus: mapQualificationOrchestratorStatus({
-      runOutcome: latestRun.outcome,
-      runQualificationStatus: latestRun.qualificationStatus,
-      policyGateAllowed: policyGate.allowed,
-    }),
-    qualificationSkipReason: latestRun.outcome === "completed" ? null : latestRun.skipReason,
-    qualificationPolicyGate: policyGate.policyKey,
-  }
+  return resolveAvaQualificationOrchestratorOutcome({
+    workflowStatus: workflowSnapshot?.workflowStatus ?? null,
+    policyGate,
+    pilotRun: latestRun
+      ? {
+          outcome: latestRun.outcome,
+          qualificationStatus: latestRun.qualificationStatus,
+          skipReason: latestRun.skipReason,
+        }
+      : null,
+  })
 }
 
 export function selectRevenueQueueResearchCandidates(

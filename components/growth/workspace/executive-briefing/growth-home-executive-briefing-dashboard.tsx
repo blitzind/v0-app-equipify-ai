@@ -50,6 +50,7 @@ import { GrowthHomeBusinessSnapshotSection } from "@/components/growth/workspace
 import { GrowthHomeDailyBriefingSection } from "@/components/growth/workspace/executive-briefing/growth-home-daily-briefing-section"
 import { GrowthHomeAvaResearchQueuePanel } from "@/components/growth/workspace/executive-briefing/growth-home-ava-research-queue-panel"
 import type { GrowthHomeWorkspaceSummaryPayload } from "@/lib/growth/home/growth-home-workspace-summary-types"
+import { Button } from "@/components/ui/button"
 import {
   Collapsible,
   CollapsibleContent,
