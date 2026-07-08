@@ -172,6 +172,7 @@ async function loadIntentActivity(
   return { history, identified }
 }
 
+/** @deprecated Use buildLeadOperatorWorkspacePayloadFromGrowthLead (GE-SIMPLIFY-1F). */
 export async function buildLeadOperatorWorkspacePayload(
   admin: SupabaseClient,
   row: RevenueQueueRow,

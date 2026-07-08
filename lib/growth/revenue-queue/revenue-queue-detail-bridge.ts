@@ -6,9 +6,8 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
-import { buildLeadOperatorWorkspacePayload } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-builder"
+import { buildLeadOperatorWorkspacePayloadFromGrowthLead } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-from-lead"
 import type { GrowthLeadOperatorWorkspacePayload } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
-import { buildPseudoInboxRowFromGrowthLead } from "@/lib/growth/revenue-queue/revenue-queue-section-projection"
 
 export const GROWTH_REVENUE_QUEUE_DETAIL_BRIDGE_QA_MARKER =
   "growth-revenue-queue-detail-bridge-v1" as const
@@ -34,9 +33,8 @@ export async function loadRevenueQueueOperatorWorkspace(
   const lead = await fetchGrowthLeadById(admin, leadId)
   if (!lead) return null
 
-  const pseudoRow = buildPseudoInboxRowFromGrowthLead(lead)
   return {
-    workspace: await buildLeadOperatorWorkspacePayload(admin, pseudoRow),
+    workspace: await buildLeadOperatorWorkspacePayloadFromGrowthLead(admin, lead),
     resolution: {
       source: "canonical_lead",
       growth_lead_id: lead.id,

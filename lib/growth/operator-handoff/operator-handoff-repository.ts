@@ -1,5 +1,6 @@
 import type { RevenueQueueRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
 import type { GrowthOperatorHandoffInput } from "@/lib/growth/operator-handoff/operator-handoff-types"
+import type { GrowthLead } from "@/lib/growth/types"
 import {
   GROWTH_OPERATOR_HANDOFF_QA_MARKER,
   type GrowthOperatorHandoffOutput,
@@ -27,6 +28,15 @@ export function buildOperatorHandoffPackage(
     generated_at: generatedAt,
     handoff,
   }
+}
+
+/** Read operator handoff from canonical growth.leads metadata (GE-SIMPLIFY-1F). */
+export function loadOperatorHandoffFromGrowthLead(
+  lead: GrowthLead,
+): GrowthOperatorHandoffPackage | null {
+  const stored = lead.metadata[GROWTH_OPERATOR_HANDOFF_METADATA_KEY]
+  if (!isHandoffPackage(stored)) return null
+  return stored
 }
 
 /** Read operator handoff from pseudo inbox row / growth.leads metadata (GE-LEADS-CANONICAL-4E). */
