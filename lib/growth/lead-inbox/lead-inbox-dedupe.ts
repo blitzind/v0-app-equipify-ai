@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GrowthLeadInboxCrmMatch, GrowthLeadInboxCreateInput } from "@/lib/growth/lead-inbox/lead-inbox-types"
-import { isGrowthLeadInboxSchemaReady } from "@/lib/growth/lead-inbox/lead-inbox-schema-health"
 import { normalizeEmail as normalizeCanonicalEmail } from "@/lib/growth/import/normalize"
 
 function asString(value: unknown): string {
@@ -30,7 +29,29 @@ export type GrowthLeadInboxDedupeCheckInput = {
 export type GrowthLeadInboxDedupeResult = {
   is_duplicate: boolean
   reasons: string[]
+  /** @deprecated Legacy inbox id — always null after GE-LEADS-CANONICAL-4B. */
   existing_inbox_id: string | null
+  existing_growth_lead_id: string | null
+}
+
+async function findActiveGrowthLeadById(
+  admin: SupabaseClient,
+  leadId: string,
+): Promise<string | null> {
+  try {
+    const { data } = await admin
+      .schema("growth")
+      .from("leads")
+      .select("id, archived_at")
+      .eq("id", leadId)
+      .maybeSingle()
+    if (!data) return null
+    const row = data as Record<string, unknown>
+    if (row.archived_at) return null
+    return asString(row.id) || null
+  } catch {
+    return null
+  }
 }
 
 export async function checkLeadInboxDuplicate(
@@ -38,38 +59,54 @@ export async function checkLeadInboxDuplicate(
   input: GrowthLeadInboxDedupeCheckInput,
 ): Promise<GrowthLeadInboxDedupeResult> {
   const reasons: string[] = []
-  let existing_inbox_id: string | null = null
+  let existing_growth_lead_id: string | null = null
 
-  if (!(await isGrowthLeadInboxSchemaReady(admin))) {
-    return { is_duplicate: false, reasons: ["schema_not_ready"], existing_inbox_id: null }
-  }
+  const externalRef = `lead_inbox:${input.dedupe_hash}`
 
   try {
-    const { data: byHash } = await admin
+    const { data: byExternalRef } = await admin
       .schema("growth")
-      .from("lead_inbox")
-      .select("id, status")
-      .eq("dedupe_hash", input.dedupe_hash)
+      .from("leads")
+      .select("id, archived_at")
+      .eq("external_ref", externalRef)
       .maybeSingle()
-
-    if (byHash) {
-      existing_inbox_id = asString((byHash as Record<string, unknown>).id)
-      reasons.push("dedupe_hash")
+    if (byExternalRef && !(byExternalRef as Record<string, unknown>).archived_at) {
+      existing_growth_lead_id = asString((byExternalRef as Record<string, unknown>).id)
+      reasons.push("external_ref")
     }
   } catch {
     // fault isolated
   }
 
-  if (!existing_inbox_id && input.intent_session_id) {
+  if (!existing_growth_lead_id) {
     try {
-      const { data: bySession } = await admin
+      const { data: byHashMeta } = await admin
         .schema("growth")
-        .from("lead_inbox")
-        .select("id")
-        .eq("intent_session_id", input.intent_session_id)
+        .from("leads")
+        .select("id, archived_at, metadata")
+        .contains("metadata", { leadInboxDedupeHash: input.dedupe_hash })
+        .limit(1)
         .maybeSingle()
-      if (bySession) {
-        existing_inbox_id = asString((bySession as Record<string, unknown>).id)
+      if (byHashMeta && !(byHashMeta as Record<string, unknown>).archived_at) {
+        existing_growth_lead_id = asString((byHashMeta as Record<string, unknown>).id)
+        reasons.push("dedupe_hash")
+      }
+    } catch {
+      // fault isolated — metadata contains may be unavailable on older schemas
+    }
+  }
+
+  if (!existing_growth_lead_id && input.intent_session_id) {
+    try {
+      const { data } = await admin
+        .schema("growth")
+        .from("leads")
+        .select("id, archived_at, metadata")
+        .contains("metadata", { intent_session_id: input.intent_session_id })
+        .limit(1)
+        .maybeSingle()
+      if (data && !(data as Record<string, unknown>).archived_at) {
+        existing_growth_lead_id = asString((data as Record<string, unknown>).id)
         reasons.push("intent_session_id")
       }
     } catch {
@@ -78,20 +115,17 @@ export async function checkLeadInboxDuplicate(
   }
 
   const email = normalizeEmail(input.email)
-  if (!existing_inbox_id && email) {
+  if (!existing_growth_lead_id && email) {
     try {
       const { data } = await admin
         .schema("growth")
-        .from("lead_inbox")
-        .select("id, status")
-        .eq("email", email)
+        .from("leads")
+        .select("id, archived_at")
+        .eq("contact_email", email)
         .limit(5)
-      const active = ((data ?? []) as Record<string, unknown>[]).find((row) => {
-        const status = asString(row.status)
-        return status !== "archived" && status !== "disqualified"
-      })
+      const active = ((data ?? []) as Record<string, unknown>[]).find((row) => !row.archived_at)
       if (active) {
-        existing_inbox_id = asString(active.id)
+        existing_growth_lead_id = asString(active.id)
         reasons.push("email")
       }
     } catch {
@@ -100,18 +134,17 @@ export async function checkLeadInboxDuplicate(
   }
 
   const domain = normalizeDomain(input.domain)
-  if (!existing_inbox_id && domain) {
+  if (!existing_growth_lead_id && domain) {
     try {
       const { data } = await admin
         .schema("growth")
-        .from("lead_inbox")
-        .select("id")
-        .eq("domain", domain)
-        .eq("status", "new")
-        .limit(1)
-        .maybeSingle()
-      if (data) {
-        existing_inbox_id = asString((data as Record<string, unknown>).id)
+        .from("leads")
+        .select("id, archived_at, website")
+        .ilike("website", `%${domain}%`)
+        .limit(5)
+      const active = ((data ?? []) as Record<string, unknown>[]).find((row) => !row.archived_at)
+      if (active) {
+        existing_growth_lead_id = asString(active.id)
         reasons.push("domain")
       }
     } catch {
@@ -122,7 +155,8 @@ export async function checkLeadInboxDuplicate(
   return {
     is_duplicate: reasons.length > 0,
     reasons,
-    existing_inbox_id,
+    existing_inbox_id: null,
+    existing_growth_lead_id,
   }
 }
 

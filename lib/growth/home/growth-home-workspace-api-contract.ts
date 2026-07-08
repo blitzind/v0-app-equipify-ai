@@ -15,9 +15,9 @@ export type GrowthHomeWorkspaceApiRoute = {
 export const GROWTH_HOME_WORKSPACE_API_ROUTES: GrowthHomeWorkspaceApiRoute[] = [
   { id: "aiden_briefing", path: "/api/platform/growth/aiden/briefing", label: "Aiden daily briefing" },
   {
-    id: "lead_inbox",
+    id: "revenue_queue",
     path: "/api/platform/growth/lead-inbox?sort=priority",
-    label: "Lead operator inbox sections",
+    label: "Revenue Queue sections",
   },
   {
     id: "cadence_command_summary",

@@ -82,8 +82,6 @@ function mapSignalRow(row: Record<string, unknown>): GrowthSignalRow {
     evidence_summary: asString(row.evidence_summary),
     workflow_state: asString(row.workflow_state) as GrowthSignalWorkflowState,
     suppression_state: asString(row.suppression_state) as GrowthSignalRow["suppression_state"],
-    processed_to_lead_inbox: row.processed_to_lead_inbox === true,
-    lead_inbox_id: asNullableString(row.lead_inbox_id),
     created_at: asString(row.created_at),
     updated_at: asString(row.updated_at),
     metadata: parseMetadata(row.metadata),
@@ -277,7 +275,7 @@ export async function loadGrowthSignals(
     .schema("growth")
     .from("signals")
     .select(
-      "id, organization_id, signal_type, provider_key, provider_event_id, dedupe_hash, confidence, signal_score, urgency, routing_priority, occurred_at, detected_at, expires_at, company_id, company_name, domain, contact_id, contact_display_label, title, previous_title, seniority, geography, industry, category, evidence_summary, workflow_state, suppression_state, processed_to_lead_inbox, lead_inbox_id, created_at, updated_at, metadata",
+      "id, organization_id, signal_type, provider_key, provider_event_id, dedupe_hash, confidence, signal_score, urgency, routing_priority, occurred_at, detected_at, expires_at, company_id, company_name, domain, contact_id, contact_display_label, title, previous_title, seniority, geography, industry, category, evidence_summary, workflow_state, suppression_state, created_at, updated_at, metadata",
       { count: "exact" },
     )
     .order("occurred_at", { ascending: false })
@@ -361,7 +359,7 @@ export async function loadGrowthSignalById(
     .schema("growth")
     .from("signals")
     .select(
-      "id, organization_id, signal_type, provider_key, provider_event_id, dedupe_hash, confidence, signal_score, urgency, routing_priority, occurred_at, detected_at, expires_at, company_id, company_name, domain, contact_id, contact_display_label, title, previous_title, seniority, geography, industry, category, evidence_summary, workflow_state, suppression_state, processed_to_lead_inbox, lead_inbox_id, created_at, updated_at, metadata",
+      "id, organization_id, signal_type, provider_key, provider_event_id, dedupe_hash, confidence, signal_score, urgency, routing_priority, occurred_at, detected_at, expires_at, company_id, company_name, domain, contact_id, contact_display_label, title, previous_title, seniority, geography, industry, category, evidence_summary, workflow_state, suppression_state, created_at, updated_at, metadata",
     )
     .eq("id", signalId)
     .maybeSingle()
@@ -746,7 +744,7 @@ export async function syncDerivedHiringSignals(
     .schema("growth")
     .from("signals")
     .select(
-      "id, organization_id, signal_type, provider_key, provider_event_id, dedupe_hash, confidence, signal_score, urgency, routing_priority, occurred_at, detected_at, expires_at, company_id, company_name, domain, contact_id, contact_display_label, title, previous_title, seniority, geography, industry, category, evidence_summary, workflow_state, suppression_state, processed_to_lead_inbox, lead_inbox_id, created_at, updated_at, metadata",
+      "id, organization_id, signal_type, provider_key, provider_event_id, dedupe_hash, confidence, signal_score, urgency, routing_priority, occurred_at, detected_at, expires_at, company_id, company_name, domain, contact_id, contact_display_label, title, previous_title, seniority, geography, industry, category, evidence_summary, workflow_state, suppression_state, created_at, updated_at, metadata",
     )
     .eq("signal_type", "job_posting")
     .gte("occurred_at", cutoff)

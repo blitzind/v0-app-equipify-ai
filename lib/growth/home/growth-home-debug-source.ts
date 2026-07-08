@@ -14,8 +14,7 @@ import {
   GROWTH_HOME_WORKSPACE_DASHBOARD_FETCH_BATCH_MARKER,
 } from "@/lib/growth/home/growth-home-workspace-api-contract"
 import { resolveGrowthHomeSupabaseRuntimeEnv } from "@/lib/growth/home/growth-home-supabase-runtime-env"
-import { loadLeadInbox } from "@/lib/growth/lead-inbox/lead-inbox-repository"
-import { buildLeadInboxDashboardSections } from "@/lib/growth/lead-operator-workspace/lead-inbox-dashboard"
+import { loadRevenueQueueDashboardPayload } from "@/lib/growth/revenue-queue/revenue-queue-api-bridge"
 import { fetchGrowthOpportunityPipelineDashboard } from "@/lib/growth/opportunity-pipeline/pipeline-dashboard-repository"
 import { listGrowthHomeStaleDataSourceTables } from "@/lib/growth/reset/growth-home-stale-data-source-map"
 import {
@@ -60,12 +59,13 @@ function summarizeBriefingPayload(briefing: Awaited<ReturnType<typeof fetchAiden
   }
 }
 
-function summarizeLeadInboxPayload(
-  sections: ReturnType<typeof buildLeadInboxDashboardSections>,
+function summarizeRevenueQueuePayload(
+  sections: Awaited<ReturnType<typeof loadRevenueQueueDashboardPayload>>["sections"],
   total: number,
 ) {
   return {
     total,
+    queue_source: "canonical" as const,
     section_counts: sections.map((section) => ({
       id: section.id,
       count: section.items.length,
@@ -139,7 +139,7 @@ async function sampleStaleMetricRows(admin: SupabaseClient): Promise<Record<stri
   const [
     pendingApprovalJobs,
     blockedJobs,
-    leadInboxRows,
+    revenueQueueLeadRows,
     openThreads,
     unansweredReplies,
     opportunities,
@@ -159,8 +159,9 @@ async function sampleStaleMetricRows(admin: SupabaseClient): Promise<Record<stri
       .limit(20),
     admin
       .schema("growth")
-      .from("lead_inbox")
-      .select("id, lead_id, priority, status, updated_at")
+      .from("leads")
+      .select("id, status, score, updated_at")
+      .is("archived_at", null)
       .limit(20),
     admin
       .schema("growth")
@@ -186,7 +187,7 @@ async function sampleStaleMetricRows(admin: SupabaseClient): Promise<Record<stri
   return {
     ready_to_activate_pending_approval_jobs: pendingApprovalJobs.data ?? [],
     blocked_sequence_execution_jobs: blockedJobs.data ?? [],
-    lead_inbox: leadInboxRows.data ?? [],
+    revenue_queue_leads: revenueQueueLeadRows.data ?? [],
     inbox_threads_open: openThreads.data ?? [],
     outbound_replies_unanswered: unansweredReplies.data ?? [],
     opportunities: opportunities.data ?? [],
@@ -206,12 +207,16 @@ export async function buildGrowthHomeDebugSourceReport(input: {
   const homeTables = listGrowthHomeStaleDataSourceTables()
   const tableCounts = await Promise.all(homeTables.map((table) => countTable(input.admin, table)))
 
-  const [briefing, leadInboxResult, dailyQueue, pipelineDashboard] = await Promise.all([
+  const [briefing, revenueQueue, dailyQueue, pipelineDashboard] = await Promise.all([
     fetchAidenDailyBriefing(input.admin, {
       operatorEmail: input.operatorEmail,
       actorUserId: input.actorUserId,
     }).catch(() => null),
-    loadLeadInbox(input.admin, { limit: 100 }).catch(() => ({ items: [], total: 0 })),
+    loadRevenueQueueDashboardPayload(input.admin, { sort: "priority", limit: 100 }).catch(() => ({
+      sections: [],
+      total: 0,
+      queue_source: "canonical" as const,
+    })),
     fetchDailyRevenueWorkQueue(input.admin, { limit: 100 }).catch(() => ({
       enabled: false,
       queue: null,
@@ -220,7 +225,7 @@ export async function buildGrowthHomeDebugSourceReport(input: {
     fetchGrowthOpportunityPipelineDashboard(input.admin, input.actorUserId).catch(() => null),
   ])
 
-  const leadInboxSections = buildLeadInboxDashboardSections(leadInboxResult.items, "priority")
+  const leadInboxSections = revenueQueue.sections
 
   const sources: GrowthWorkspaceDashboardSourcePayload = {
     briefing,
@@ -306,7 +311,7 @@ export async function buildGrowthHomeDebugSourceReport(input: {
     table_count_total: totalDbRows,
     api_payloads: {
       aiden_briefing: summarizeBriefingPayload(briefing),
-      lead_inbox: summarizeLeadInboxPayload(leadInboxSections, leadInboxResult.total),
+      revenue_queue: summarizeRevenueQueuePayload(revenueQueue.sections, revenueQueue.total),
       daily_revenue_work_queue: summarizeDailyQueuePayload(dailyQueue),
       opportunities_pipeline: summarizePipelinePayload(pipelineDashboard),
     },

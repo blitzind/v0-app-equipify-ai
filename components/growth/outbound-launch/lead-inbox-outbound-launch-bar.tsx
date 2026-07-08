@@ -10,7 +10,7 @@ import {
   GROWTH_OUTBOUND_LAUNCH_MOTION_QA_MARKER,
   runOutboundLaunchPreflight,
 } from "@/lib/growth/outbound-launch/outbound-launch-motion"
-import type { GrowthLeadInboxRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
+import type { RevenueQueueRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
 
 export function LeadInboxOutboundLaunchBar({
   row,
@@ -18,14 +18,17 @@ export function LeadInboxOutboundLaunchBar({
   decisionMakerConfidence,
 }: {
   row: Pick<
-    GrowthLeadInboxRow,
+    RevenueQueueRow,
     "id" | "company_name" | "email" | "status" | "existing_lead_match" | "existing_account_match" | "metadata"
   >
   buyingStage?: string | null
   decisionMakerConfidence?: number | null
 }) {
   const qualifyInboxPath = useGrowthFeaturePath(`leads/${row.id}`)
-  const growthLeadId = row.existing_lead_match.matched ? row.existing_lead_match.ids[0] ?? null : null
+  const growthLeadId =
+    (typeof row.metadata?.growth_lead_id === "string" ? row.metadata.growth_lead_id : null) ??
+    (row.existing_lead_match.matched ? row.existing_lead_match.ids[0] ?? null : null) ??
+    row.id
   const companyLike = {
     is_suppressed: false,
     suppression_reason: null,
@@ -35,8 +38,7 @@ export function LeadInboxOutboundLaunchBar({
     contact_intelligence: null,
     committee_completion: null,
     growth_lead_id: growthLeadId,
-    lead_inbox_id: row.id,
-    in_lead_inbox: true,
+    in_revenue_queue: true,
     buying_stage: buyingStage ?? null,
     lead_engine_score: null,
     lead_score: null,
@@ -47,7 +49,7 @@ export function LeadInboxOutboundLaunchBar({
     contact_email: row.email,
   })
   const launchUrls = buildOutboundLaunchUrls({
-    company: { growth_lead_id: growthLeadId, lead_inbox_id: row.id, company_name: row.company_name, id: row.id },
+    company: { growth_lead_id: growthLeadId, company_name: row.company_name, id: row.id },
   })
   const chain = buildOutboundApprovalChain({ currentStepId: "draft", blocked: !preflight.can_launch })
 

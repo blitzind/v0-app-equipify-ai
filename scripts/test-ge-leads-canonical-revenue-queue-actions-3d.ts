@@ -17,7 +17,7 @@ function read(relPath: string): string {
 function main(): void {
   assert.equal(parseRevenueQueueApiSource(null), "canonical", "default API source must be canonical")
   assert.equal(parseRevenueQueueApiSource(undefined), "canonical")
-  assert.equal(parseRevenueQueueApiSource("legacy"), "legacy")
+  assert.equal(parseRevenueQueueApiSource("legacy"), "canonical", "legacy source param forced to canonical")
   assert.equal(parseRevenueQueueApiSource("canonical"), "canonical")
 
   const actionsRoute = read("app/api/platform/growth/lead-inbox/[leadId]/actions/route.ts")
@@ -27,24 +27,18 @@ function main(): void {
 
   const actionBridge = read("lib/growth/revenue-queue/revenue-queue-action-bridge.ts")
   assert.match(actionBridge, /resolveRevenueQueueActionTarget/)
-  assert.match(actionBridge, /fetchGrowthLeadById[\s\S]*?fetchLeadInboxById/, "canonical resolution first")
+  assert.match(actionBridge, /fetchGrowthLeadById/)
+  assert.doesNotMatch(actionBridge, /fetchLeadInboxById/)
   assert.match(actionBridge, /applyCanonicalLeadAction/)
   assert.match(actionBridge, /updateGrowthLead/)
   assert.match(actionBridge, /archiveGrowthLeads/)
   assert.match(actionBridge, /recomputeGrowthLeadWorkflowSignals/)
-  assert.doesNotMatch(
-    actionBridge,
-    /async function applyCanonicalLeadAction[\s\S]*?claimLead\(/,
-    "canonical path must not call inbox claimLead",
-  )
+  assert.doesNotMatch(actionBridge, /applyLegacyInboxAction/)
   assert.equal(GROWTH_REVENUE_QUEUE_ACTION_BRIDGE_QA_MARKER, "growth-revenue-queue-action-bridge-v1")
 
   const detailBridge = read("lib/growth/revenue-queue/revenue-queue-detail-bridge.ts")
-  assert.match(
-    detailBridge,
-    /fetchGrowthLeadById[\s\S]*?fetchLeadInboxById/,
-    "detail bridge prefers canonical id",
-  )
+  assert.match(detailBridge, /fetchGrowthLeadById/)
+  assert.doesNotMatch(detailBridge, /fetchLeadInboxById/)
 
   const dashboard = read("components/growth/lead-operator/growth-lead-inbox-dashboard.tsx")
   assert.doesNotMatch(dashboard, /source=legacy/)

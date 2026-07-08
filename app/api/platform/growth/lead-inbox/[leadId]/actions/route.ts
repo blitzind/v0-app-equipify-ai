@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import {
-  GROWTH_LEAD_INBOX_ACTIONS,
+  GROWTH_REVENUE_QUEUE_ACTIONS,
   GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER,
-  type GrowthLeadInboxAction,
+  type RevenueQueueAction,
 } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import {
   executeRevenueQueueAction,
@@ -14,10 +14,10 @@ export const runtime = "nodejs"
 
 type RouteContext = { params: Promise<{ leadId: string }> }
 
-function parseAction(body: Record<string, unknown>): GrowthLeadInboxAction | null {
+function parseAction(body: Record<string, unknown>): RevenueQueueAction | null {
   const action = typeof body.action === "string" ? body.action.trim() : ""
-  return GROWTH_LEAD_INBOX_ACTIONS.includes(action as GrowthLeadInboxAction)
-    ? (action as GrowthLeadInboxAction)
+  return GROWTH_REVENUE_QUEUE_ACTIONS.includes(action as RevenueQueueAction)
+    ? (action as RevenueQueueAction)
     : null
 }
 

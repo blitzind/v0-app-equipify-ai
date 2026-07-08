@@ -6,7 +6,7 @@ import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-se
 import { cn } from "@/lib/utils"
 
 const STATUS_STYLES: Record<string, string> = {
-  "In Lead Inbox": "border-sky-200 bg-sky-50 text-sky-900",
+  "In Revenue Queue": "border-sky-200 bg-sky-50 text-sky-900",
   "Existing Customer": "border-emerald-200 bg-emerald-50 text-emerald-900",
   "Existing Prospect": "border-teal-200 bg-teal-50 text-teal-900",
   Suppressed: "border-red-200 bg-red-50 text-red-900",
@@ -22,7 +22,7 @@ export function inferProspectSearchStatusBadges(
     const reason = formatSuppressionReason(row.suppression_reason)
     badges.push(reason ? `Suppressed (${reason})` : "Suppressed")
   }
-  if (row.in_lead_inbox) badges.push("In Lead Inbox")
+  if (row.in_revenue_queue) badges.push("In Revenue Queue")
   else if (row.already_pushed) badges.push("Already Pushed")
   if (row.existing_customer) badges.push("Existing Customer")
   if (row.existing_prospect) badges.push("Existing Prospect")

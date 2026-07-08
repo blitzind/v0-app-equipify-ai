@@ -211,7 +211,6 @@ function materializedRowPayload(row: ProspectSearchMaterializedIndexRow): Record
     existing_account_status: row.existing_account_status,
     is_customer: row.is_customer,
     is_prospect: row.is_prospect,
-    is_in_lead_inbox: row.is_in_lead_inbox,
     is_suppressed: row.is_suppressed,
     suppression_reason_safe: row.suppression_reason_safe,
     suppression_scope_safe: row.suppression_scope_safe,

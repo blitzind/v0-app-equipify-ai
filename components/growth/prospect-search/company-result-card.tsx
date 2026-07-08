@@ -366,7 +366,7 @@ export function CompanyResultCard({
         </Button>
         <Button size="sm" onClick={() => onAction("push_to_lead_inbox")} disabled={row.is_suppressed}>
           <Inbox className="mr-1 size-3.5" />
-          {row.is_suppressed ? "Suppressed" : "Push To Lead Inbox"}
+          {row.is_suppressed ? "Suppressed" : "Add to Revenue Queue"}
         </Button>
       </div>
     </article>

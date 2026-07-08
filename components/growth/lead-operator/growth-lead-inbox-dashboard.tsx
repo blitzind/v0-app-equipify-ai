@@ -5,27 +5,27 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Loader2, RefreshCw, Workflow } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { GrowthLeadInboxCard } from "@/components/growth/lead-operator/growth-lead-inbox-card"
+import { GrowthRevenueQueueCard } from "@/components/growth/lead-operator/growth-lead-inbox-card"
 import { RevenueKpiStrip } from "@/components/growth/revenue-intelligence/revenue-kpi-strip"
 import {
-  GROWTH_LEAD_INBOX_SORT_MODES,
-  type GrowthLeadInboxDashboardSectionPayload,
-  type GrowthLeadInboxSortMode,
+  GROWTH_REVENUE_QUEUE_SORT_MODES,
+  type RevenueQueueDashboardSectionPayload,
+  type RevenueQueueSortMode,
 } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import { cn } from "@/lib/utils"
 import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 
-const SORT_LABELS: Record<GrowthLeadInboxSortMode, string> = {
+const SORT_LABELS: Record<RevenueQueueSortMode, string> = {
   priority: "Priority",
   intent: "Intent",
   confidence: "Confidence",
   recent_activity: "Recent activity",
 }
 
-export function GrowthLeadInboxDashboard() {
+export function GrowthRevenueQueueDashboard() {
   const pathname = usePathname()
-  const [sort, setSort] = useState<GrowthLeadInboxSortMode>("priority")
-  const [sections, setSections] = useState<GrowthLeadInboxDashboardSectionPayload[]>([])
+  const [sort, setSort] = useState<RevenueQueueSortMode>("priority")
+  const [sections, setSections] = useState<RevenueQueueDashboardSectionPayload[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -39,18 +39,18 @@ export function GrowthLeadInboxDashboard() {
       const res = await fetch(`/api/platform/growth/lead-inbox?sort=${sort}`, { cache: "no-store" })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
-        sections?: GrowthLeadInboxDashboardSectionPayload[]
+        sections?: RevenueQueueDashboardSectionPayload[]
         total?: number
         message?: string
         error?: string
       }
       if (!res.ok || !data.ok) {
-        throw new Error(data.message ?? data.error ?? "Could not load lead inbox.")
+        throw new Error(data.message ?? data.error ?? "Could not load Revenue Queue.")
       }
       setSections(data.sections ?? [])
       setTotal(data.total ?? 0)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load lead inbox.")
+      setError(e instanceof Error ? e.message : "Could not load Revenue Queue.")
     } finally {
       setLoading(false)
     }
@@ -91,7 +91,7 @@ export function GrowthLeadInboxDashboard() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {GROWTH_LEAD_INBOX_SORT_MODES.map((mode) => (
+        {GROWTH_REVENUE_QUEUE_SORT_MODES.map((mode) => (
           <Button
             key={mode}
             size="sm"
@@ -138,7 +138,7 @@ export function GrowthLeadInboxDashboard() {
                   )}
                 >
                   {section.items.map((card) => (
-                    <GrowthLeadInboxCard key={card.id} card={card} />
+                    <GrowthRevenueQueueCard key={card.id} card={card} />
                   ))}
                 </div>
               )}
@@ -149,3 +149,6 @@ export function GrowthLeadInboxDashboard() {
     </div>
   )
 }
+
+/** @deprecated Use GrowthRevenueQueueDashboard (GE-LEADS-CANONICAL-4G). */
+export const GrowthLeadInboxDashboard = GrowthRevenueQueueDashboard

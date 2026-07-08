@@ -10,11 +10,11 @@ import { EvidenceStrengthCard } from "@/components/growth/revenue-intelligence/e
 import { LeadHealthIndicator } from "@/components/growth/revenue-intelligence/lead-health-indicator"
 import { LeadScoreVisual } from "@/components/growth/revenue-intelligence/lead-score-visual"
 import { formatLabel, priorityTone } from "@/lib/growth/revenue-intelligence/revenue-intelligence-ux"
-import type { GrowthLeadInboxCardView } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
+import type { RevenueQueueCardView } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import { cn } from "@/lib/utils"
 import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 
-export function GrowthLeadInboxCard({ card }: { card: GrowthLeadInboxCardView }) {
+export function GrowthRevenueQueueCard({ card }: { card: RevenueQueueCardView }) {
   const pathname = usePathname()
   const priority = priorityTone(card.candidate_priority)
 
@@ -119,3 +119,6 @@ export function GrowthLeadInboxCard({ card }: { card: GrowthLeadInboxCardView })
     </Link>
   )
 }
+
+/** @deprecated Use GrowthRevenueQueueCard (GE-LEADS-CANONICAL-4G). */
+export const GrowthLeadInboxCard = GrowthRevenueQueueCard

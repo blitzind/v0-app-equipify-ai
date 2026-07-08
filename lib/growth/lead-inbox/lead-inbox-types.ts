@@ -1,4 +1,4 @@
-/** Growth Engine — Lead Inbox + Candidate Queue types (Prompt 16). Client-safe where noted. */
+/** Growth Engine — Revenue Queue row shape (pseudo inbox adapter). Client-safe where noted. */
 
 import type {
   GrowthIntentLeadCandidateAttribution,
@@ -9,6 +9,8 @@ import type {
 } from "@/lib/growth/lead-engine/intent/intent-candidate-types"
 
 export const GROWTH_LEAD_INBOX_QA_MARKER = "growth-lead-inbox-v1" as const
+/** Canonical QA marker alias (GE-LEADS-CANONICAL-4G). */
+export const GROWTH_REVENUE_QUEUE_QA_MARKER = GROWTH_LEAD_INBOX_QA_MARKER
 
 export const GROWTH_LEAD_INBOX_STATUSES = [
   "new",
@@ -42,7 +44,7 @@ export type GrowthLeadInboxCrmMatch = {
   evidence: string
 }
 
-export type GrowthLeadInboxRow = {
+export type RevenueQueueRow = {
   id: string
   created_at: string
   updated_at: string
@@ -79,6 +81,9 @@ export type GrowthLeadInboxRow = {
   existing_lead_match: GrowthLeadInboxCrmMatch
   metadata: Record<string, unknown>
 }
+
+/** @deprecated Use RevenueQueueRow (GE-LEADS-CANONICAL-4G). */
+export type GrowthLeadInboxRow = RevenueQueueRow
 
 export type GrowthLeadInboxCreateInput = {
   site_key: string
@@ -124,14 +129,14 @@ export type GrowthLeadInboxLoadFilters = {
 
 export type GrowthLeadInboxLoadResult = {
   qa_marker: typeof GROWTH_LEAD_INBOX_QA_MARKER
-  items: GrowthLeadInboxRow[]
+  items: RevenueQueueRow[]
   total: number
 }
 
 export type GrowthLeadInboxCreateResult = {
   qa_marker: typeof GROWTH_LEAD_INBOX_QA_MARKER
   ok: boolean
-  row: GrowthLeadInboxRow | null
+  row: RevenueQueueRow | null
   duplicate: boolean
   reason: string
   errors: string[]

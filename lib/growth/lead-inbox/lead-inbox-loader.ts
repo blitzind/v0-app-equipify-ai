@@ -6,15 +6,10 @@ import {
   validateInboxPiiPolicy,
 } from "@/lib/growth/lead-inbox/lead-inbox-dedupe"
 import { createLeadCandidate } from "@/lib/growth/lead-inbox/lead-inbox-repository"
+import { updateGrowthLead } from "@/lib/growth/lead-repository"
 import { persistBuyingStageAssessment } from "@/lib/growth/buying-stage/buying-stage-repository"
-import {
-  linkCompanyMatchesToLeadInbox,
-  persistCompanyIdentificationMatches,
-} from "@/lib/growth/company-identification/company-identification-repository"
-import {
-  linkSearchIntentSignalsToLeadInbox,
-  persistSearchIntentSignals,
-} from "@/lib/growth/search-intent/search-intent-repository"
+import { persistCompanyIdentificationMatches } from "@/lib/growth/company-identification/company-identification-repository"
+import { persistSearchIntentSignals } from "@/lib/growth/search-intent/search-intent-repository"
 import type {
   GrowthLeadInboxCreateInput,
   GrowthLeadInboxCreateResult,
@@ -180,51 +175,50 @@ export async function ingestIntentCandidateToLeadInbox(
   }
 
   const result = await createLeadCandidate(admin, input)
-  let topCompanyIdentificationId: string | null = null
-  if (result.ok && result.row && candidate.company_identification_matches.length > 0) {
+  const growthLeadId = result.growth_lead_id ?? null
+
+  if (result.ok && growthLeadId && candidate.company_identification_matches.length > 0) {
     const idInput = {
       site_key: options.site_key,
       visitor_key: candidate.visitor_key,
       session_key: candidate.session_key,
       intent_session_id: candidate.session_id,
-      lead_inbox_id: result.row!.id,
+      growth_lead_id: growthLeadId,
     }
-    const persistedCompany = await persistCompanyIdentificationMatches(
+    await persistCompanyIdentificationMatches(
       admin,
-      candidate.company_identification_matches.map((m) => ({ ...m, lead_inbox_id: result.row!.id })),
+      candidate.company_identification_matches,
       idInput,
     )
-    if (persistedCompany.ok && persistedCompany.rows.length > 0) {
-      topCompanyIdentificationId = persistedCompany.rows[0]?.id ?? null
-      await linkCompanyMatchesToLeadInbox(
-        admin,
-        result.row.id,
-        persistedCompany.rows.map((r) => r.id),
-      )
-    }
   }
-  if (result.ok && result.row && candidate.search_intent_signals.length > 0) {
-    const persisted = await persistSearchIntentSignals(
+  if (result.ok && growthLeadId && candidate.search_intent_signals.length > 0) {
+    await persistSearchIntentSignals(
       admin,
       candidate.search_intent_signals.map((signal) => ({
         ...signal,
-        lead_inbox_id: result.row!.id,
+        growth_lead_id: growthLeadId,
       })),
     )
-    if (persisted.ok && persisted.rows.length > 0) {
-      await linkSearchIntentSignalsToLeadInbox(
-        admin,
-        result.row.id,
-        persisted.rows.map((r) => r.id),
-      )
-    }
   }
-  if (result.ok && result.row && candidate.buying_stage_assessment) {
+  if (result.ok && growthLeadId && candidate.buying_stage_assessment) {
     await persistBuyingStageAssessment(admin, candidate.buying_stage_assessment, {
-      lead_inbox_id: result.row.id,
+      growth_lead_id: growthLeadId,
       intent_session_id: candidate.session_id,
-      company_identification_id: topCompanyIdentificationId,
+      company_identification_id: null,
     })
   }
+
+  if (result.ok && growthLeadId) {
+    await updateGrowthLead(admin, growthLeadId, {
+      metadata: {
+        ...(input.metadata ?? {}),
+        search_intent_summary: candidate.search_intent_summary,
+        company_identification_summary: candidate.company_identification_summary,
+        buying_stage_summary: candidate.buying_stage_summary,
+        intent_pixel_intake: true,
+      },
+    }).catch(() => undefined)
+  }
+
   return result
 }

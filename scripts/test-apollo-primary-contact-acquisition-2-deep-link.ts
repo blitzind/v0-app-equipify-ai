@@ -104,7 +104,6 @@ const deepLinkCompany = {
   verification_status: "external_unverified",
   signals: ["Operator-linked staging company for Apollo acquisition review."],
   search_intent_category: null,
-  lead_inbox_id: null,
   growth_lead_id: null,
   prospect_id: null,
   customer_id: null,

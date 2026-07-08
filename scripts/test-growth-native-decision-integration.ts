@@ -169,7 +169,7 @@ const LEGACY_SEQUENCE_INPUT = {
     company_match_confidence: 0.9,
     lead_engine_score: 78,
     lead_score: 78,
-    in_lead_inbox: false,
+    in_revenue_queue: false,
     existing_customer: false,
     reachable_human: { score: 80 },
   },

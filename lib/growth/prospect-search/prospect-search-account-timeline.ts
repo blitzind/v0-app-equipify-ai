@@ -214,17 +214,17 @@ export function buildProspectSearchAccountTimeline(input: {
     })
   }
 
-  if (input.company.in_lead_inbox) {
+  if (input.company.in_revenue_queue) {
     events.push({
       id: "company:inbox",
       kind: "pipeline_transition",
-      label: "In Lead Inbox",
-      detail: "Account linked to Lead Inbox — operator relationship context available",
+      label: "In Revenue Queue",
+      detail: "Account linked to Revenue Queue — operator relationship context available",
       occurred_at: null,
       contact_id: null,
       contact_name: null,
       source: "lead_inbox",
-      evidence: ["Lead Inbox record exists"],
+      evidence: ["Revenue Queue record exists"],
       filter_group: "relationship",
     })
   }

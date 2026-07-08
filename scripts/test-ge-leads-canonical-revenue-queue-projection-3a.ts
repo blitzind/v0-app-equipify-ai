@@ -45,25 +45,26 @@ const certSource = fs.readFileSync(
   "utf8",
 )
 assert.match(certSource, /certifyRevenueQueueProjectionParity/)
-assert.match(certSource, /buildLeadInboxCardView/)
 assert.match(certSource, /buildRevenueQueueLeadProjection/)
+assert.doesNotMatch(certSource, /loadLeadInbox/)
 
 const routeSource = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/lead-inbox/route.ts"),
   "utf8",
 )
 assert.match(routeSource, /loadRevenueQueueDashboardPayload/)
-assert.match(routeSource, /parseRevenueQueueApiSource/)
 assert.match(routeSource, /queue_source/)
-assert.doesNotMatch(routeSource, /source=canonical/)
+assert.doesNotMatch(routeSource, /source=legacy/)
+assert.doesNotMatch(routeSource, /parseRevenueQueueApiSource/)
 
 const bridgeSource = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/revenue-queue/revenue-queue-api-bridge.ts"),
   "utf8",
 )
-assert.match(bridgeSource, /loadCanonicalRevenueQueueDashboardPayload/)
-assert.match(bridgeSource, /loadLegacyRevenueQueueDashboardPayload/)
+assert.match(bridgeSource, /loadRevenueQueueDashboardPayload/)
 assert.match(bridgeSource, /listGrowthLeads/)
+assert.doesNotMatch(bridgeSource, /loadLegacyRevenueQueueDashboardPayload/)
+assert.doesNotMatch(bridgeSource, /loadLeadInbox\(/)
 
 const dashboardSource = fs.readFileSync(
   path.join(process.cwd(), "components/growth/lead-operator/growth-lead-inbox-dashboard.tsx"),
@@ -73,7 +74,7 @@ assert.match(dashboardSource, /\/api\/platform\/growth\/lead-inbox\?sort=/)
 assert.doesNotMatch(dashboardSource, /source=legacy/)
 
 assert.ok(REVENUE_QUEUE_FIELD_COMPATIBILITY.length >= 10)
-assert.ok(REVENUE_QUEUE_MISSING_PROJECTION_DEPENDENCIES.length >= 4)
+assert.ok(REVENUE_QUEUE_MISSING_PROJECTION_DEPENDENCIES.length >= 1)
 assert.ok(REVENUE_QUEUE_CARD_PARITY_FIELDS.length >= 10)
 
 for (const status of GROWTH_LEAD_STATUSES) {

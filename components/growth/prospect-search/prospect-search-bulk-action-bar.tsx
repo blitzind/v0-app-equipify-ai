@@ -65,7 +65,7 @@ export function ProspectSearchBulkActionBar({
         {externalCount > 0 ? (
           <p className="text-xs text-amber-900">
             {externalCount} external {externalCount === 1 ? "row may" : "rows may"} already exist in
-            Lead Inbox — duplicates will be reported clearly.
+            Revenue Queue — duplicates will be reported clearly.
           </p>
         ) : null}
       </div>
@@ -88,7 +88,7 @@ export function ProspectSearchBulkActionBar({
         ) : null}
         <Button size="sm" onClick={onPush} disabled={busy}>
           <Inbox className="mr-1 size-3.5" />
-          {pushing ? "Pushing…" : "Push selected to Lead Inbox"}
+          {pushing ? "Adding…" : "Add selected to Revenue Queue"}
         </Button>
       </div>
     </div>
@@ -119,7 +119,7 @@ export function ProspectSearchBulkPushSummary({
           href={workspaceUrl}
           className="mt-2 inline-flex text-sm font-medium underline underline-offset-2"
         >
-          View Lead Inbox
+          View Revenue Queue
         </Link>
       ) : null}
     </div>
@@ -135,7 +135,7 @@ function summarizeSourceTypes(companies: GrowthProspectSearchCompanyResult[]): s
 
   const labels: Record<string, string> = {
     growth_lead: "Growth leads",
-    lead_inbox: "Lead Inbox",
+    lead_inbox: "Revenue Queue",
     crm_prospect: "CRM prospects",
     crm_customer: "CRM customers",
     external_discovered: "External discovery",

@@ -10,7 +10,7 @@ import type { GrowthLeadEngineLeadScoreOutput } from "@/lib/growth/lead-engine/l
 import type { GrowthLeadEngineOutreachPersonalizationOutput } from "@/lib/growth/lead-engine/outreach-personalization-types"
 import type { GrowthLeadEngineRevenueExecutionOutput } from "@/lib/growth/lead-engine/revenue-execution-types"
 import type { GrowthLeadEngineVerificationTriageOutput } from "@/lib/growth/lead-engine/verification-triage-types"
-import type { GrowthLeadInboxRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
+import type { RevenueQueueRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
 import type { GrowthIntentPixelVisitHistory } from "@/lib/growth/intent-pixel/intent-pixel-types"
 
 export const GROWTH_OPERATOR_HANDOFF_QA_MARKER = "growth-operator-handoff-v1" as const
@@ -84,7 +84,7 @@ export type GrowthOperatorHandoffAttribution = {
 
 /** Upstream Lead Engine + inbox + intent — no outbound execution. */
 export type GrowthOperatorHandoffInput = {
-  leadInbox?: GrowthLeadInboxRow | null
+  leadInbox?: RevenueQueueRow | null
   icpTargeting: GrowthLeadEngineIcpTargetingOutput | string
   companyDiscovery: GrowthLeadEngineCompanyDiscoveryOutput | string
   decisionMakerHypothesis: GrowthLeadEngineDecisionMakerHypothesisOutput | string
@@ -142,7 +142,7 @@ export const GROWTH_OPERATOR_HANDOFF_OUTPUT_JSON_KEYS = [
 
 export type GrowthOperatorHandoffPackage = {
   qa_marker: typeof GROWTH_OPERATOR_HANDOFF_QA_MARKER
-  lead_inbox_id: string | null
+  growth_lead_id: string | null
   generated_at: string
   handoff: GrowthOperatorHandoffOutput
 }

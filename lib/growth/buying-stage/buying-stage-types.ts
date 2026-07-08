@@ -56,7 +56,7 @@ export type GrowthBuyingStageInput = {
   visitor_key: string
   session_key: string
   intent_session_id?: string | null
-  lead_inbox_id?: string | null
+  growth_lead_id?: string | null
   company_identification_id?: string | null
   intent_score: number
   session_count: number
@@ -110,7 +110,7 @@ export type GrowthBuyingStageAssessmentRow = {
   id: string
   created_at: string
   updated_at: string
-  lead_inbox_id: string | null
+  growth_lead_id: string | null
   intent_session_id: string | null
   company_identification_id: string | null
   detected_stage: GrowthBuyingStage

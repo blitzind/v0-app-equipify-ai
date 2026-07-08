@@ -1,38 +1,19 @@
 /**
- * GE-LEADS-CANONICAL-3D — Revenue Queue actions on growth.leads (canonical-first resolution).
+ * GE-LEADS-CANONICAL-4D — Revenue Queue actions on growth.leads (canonical-only).
  */
 
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { runLeadEnginePipeline } from "@/lib/growth/lead-engine/orchestrator/lead-engine-orchestrator"
-import {
-  archiveLead,
-  assignLeadOwner,
-  claimLead,
-  fetchLeadInboxById,
-  markDuplicate,
-  promoteToPipeline,
-  saveLeadInboxMetadataPatch,
-} from "@/lib/growth/lead-inbox/lead-inbox-repository"
-import type { GrowthLeadInboxRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
-import {
-  buildDeterministicOperatorHandoffFromPipeline,
-} from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-builder"
 import {
   GROWTH_LEAD_ENGINE_RUN_METADATA_KEY,
-  type GrowthLeadInboxAction,
+  type RevenueQueueAction,
 } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
-import { buildOperatorHandoffInputFromRow } from "@/lib/growth/lead-operator-workspace/lead-inbox-card-view"
 import {
   archiveGrowthLeads,
   fetchGrowthLeadById,
   updateGrowthLead,
 } from "@/lib/growth/lead-repository"
-import {
-  buildOperatorHandoffPackage,
-  saveOperatorHandoffToLeadInbox,
-} from "@/lib/growth/operator-handoff/operator-handoff-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import { loadRevenueQueueOperatorWorkspace } from "@/lib/growth/revenue-queue/revenue-queue-detail-bridge"
 import type { GrowthLead, GrowthLeadStatus } from "@/lib/growth/types"
@@ -40,9 +21,11 @@ import type { GrowthLead, GrowthLeadStatus } from "@/lib/growth/types"
 export const GROWTH_REVENUE_QUEUE_ACTION_BRIDGE_QA_MARKER =
   "growth-revenue-queue-action-bridge-v1" as const
 
-export type RevenueQueueActionTarget =
-  | { source: "canonical_lead"; growth_lead_id: string; inbox_id: null }
-  | { source: "legacy_inbox"; growth_lead_id: string | null; inbox_id: string }
+export type RevenueQueueActionTarget = {
+  source: "canonical_lead"
+  growth_lead_id: string
+  inbox_id: null
+}
 
 export type RevenueQueueActionResult =
   | {
@@ -58,7 +41,7 @@ export type RevenueQueueActionResult =
 
 function appendRevenueQueueActionMetadata(
   lead: GrowthLead,
-  action: GrowthLeadInboxAction,
+  action: RevenueQueueAction,
   actorUserId: string | null,
   extra?: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -92,91 +75,19 @@ function nextStatusAfterClaim(status: GrowthLeadStatus): GrowthLeadStatus {
   return status
 }
 
-/** Prefer canonical growth.leads id; fall back to legacy inbox id. */
 export async function resolveRevenueQueueActionTarget(
   admin: SupabaseClient,
   leadId: string,
 ): Promise<RevenueQueueActionTarget | null> {
   const lead = await fetchGrowthLeadById(admin, leadId)
-  if (lead) {
-    return { source: "canonical_lead", growth_lead_id: lead.id, inbox_id: null }
-  }
-
-  const inbox = await fetchLeadInboxById(admin, leadId)
-  if (!inbox) return null
-
-  const growthLeadId =
-    typeof inbox.metadata?.growth_lead_id === "string" ? inbox.metadata.growth_lead_id.trim() : null
-
-  return {
-    source: "legacy_inbox",
-    growth_lead_id: growthLeadId || null,
-    inbox_id: inbox.id,
-  }
-}
-
-async function applyLegacyInboxAction(
-  admin: SupabaseClient,
-  inboxId: string,
-  action: GrowthLeadInboxAction,
-  input: { ownerId: string | null; reason?: string },
-): Promise<GrowthLeadInboxRow | null> {
-  const existing = await fetchLeadInboxById(admin, inboxId)
-  if (!existing) return null
-
-  if (action === "claim") {
-    if (!input.ownerId) return null
-    return claimLead(admin, inboxId, input.ownerId)
-  }
-  if (action === "assign_owner") {
-    if (!input.ownerId) return null
-    return assignLeadOwner(admin, inboxId, input.ownerId)
-  }
-  if (action === "approve") {
-    return promoteToPipeline(admin, inboxId, { status: "approved" })
-  }
-  if (action === "archive") {
-    return archiveLead(admin, inboxId)
-  }
-  if (action === "mark_duplicate") {
-    return markDuplicate(admin, inboxId, input.reason)
-  }
-  if (action === "run_lead_engine") {
-    await promoteToPipeline(admin, inboxId, { status: "running_pipeline" })
-    const run = runLeadEnginePipeline({
-      companyName: existing.company_name || "Unknown Company",
-      domain: existing.domain ?? "",
-      industry: "",
-      location: "",
-      notes: existing.candidate_reasoning.join(" ") || "Lead inbox candidate context.",
-    })
-    const handoffOutput = buildDeterministicOperatorHandoffFromPipeline(existing, run)
-    const handoffPkg = buildOperatorHandoffPackage(
-      buildOperatorHandoffInputFromRow(existing),
-      handoffOutput,
-    )
-    await saveOperatorHandoffToLeadInbox(admin, inboxId, handoffPkg)
-    const updated = await saveLeadInboxMetadataPatch(admin, inboxId, {
-      [GROWTH_LEAD_ENGINE_RUN_METADATA_KEY]: run,
-      lead_engine_last_run_at: new Date().toISOString(),
-      lead_engine_note: "Fixture pipeline — human review required before outreach.",
-    })
-    return (
-      (await promoteToPipeline(admin, inboxId, {
-        status: "pipeline_complete",
-        lead_engine_run_id: null,
-      })) ??
-      updated ??
-      existing
-    )
-  }
-  return null
+  if (!lead) return null
+  return { source: "canonical_lead", growth_lead_id: lead.id, inbox_id: null }
 }
 
 async function applyCanonicalLeadAction(
   admin: SupabaseClient,
   leadId: string,
-  action: GrowthLeadInboxAction,
+  action: RevenueQueueAction,
   input: { ownerId: string | null; actorUserId: string | null; reason?: string },
 ): Promise<GrowthLead | null> {
   const existing = await fetchGrowthLeadById(admin, leadId)
@@ -251,6 +162,7 @@ async function applyCanonicalLeadAction(
         intelligence_refresh_completed_at: new Date().toISOString(),
         intelligence_refresh_note:
           "Canonical workflow intelligence recompute — no legacy inbox fixture pipeline.",
+        [GROWTH_LEAD_ENGINE_RUN_METADATA_KEY]: refreshed.metadata[GROWTH_LEAD_ENGINE_RUN_METADATA_KEY],
       }),
     })
   }
@@ -262,7 +174,7 @@ export async function executeRevenueQueueAction(
   admin: SupabaseClient,
   input: {
     leadId: string
-    action: GrowthLeadInboxAction
+    action: RevenueQueueAction
     ownerId: string | null
     actorUserId: string | null
     reason?: string
@@ -273,35 +185,20 @@ export async function executeRevenueQueueAction(
     return { ok: false, code: "not_found", message: "Lead not found.", status: 404 }
   }
 
-  if (target.source === "canonical_lead") {
-    const updated = await applyCanonicalLeadAction(admin, target.growth_lead_id, input.action, {
-      ownerId: input.ownerId,
-      actorUserId: input.actorUserId,
-      reason: input.reason,
-    })
-    if (!updated) {
-      return {
-        ok: false,
-        code: input.action === "assign_owner" || input.action === "claim" ? "validation_error" : "action_failed",
-        message:
-          input.action === "assign_owner" || input.action === "claim"
-            ? "ownerId is required."
-            : `Could not apply ${input.action}.`,
-        status: input.action === "assign_owner" || input.action === "claim" ? 400 : 409,
-      }
-    }
-  } else {
-    const updated = await applyLegacyInboxAction(admin, target.inbox_id, input.action, {
-      ownerId: input.ownerId,
-      reason: input.reason,
-    })
-    if (!updated) {
-      return {
-        ok: false,
-        code: "action_failed",
-        message: `Could not apply ${input.action}.`,
-        status: 409,
-      }
+  const updated = await applyCanonicalLeadAction(admin, target.growth_lead_id, input.action, {
+    ownerId: input.ownerId,
+    actorUserId: input.actorUserId,
+    reason: input.reason,
+  })
+  if (!updated) {
+    return {
+      ok: false,
+      code: input.action === "assign_owner" || input.action === "claim" ? "validation_error" : "action_failed",
+      message:
+        input.action === "assign_owner" || input.action === "claim"
+          ? "ownerId is required."
+          : `Could not apply ${input.action}.`,
+      status: input.action === "assign_owner" || input.action === "claim" ? 400 : 409,
     }
   }
 

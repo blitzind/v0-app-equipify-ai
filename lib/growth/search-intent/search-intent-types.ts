@@ -55,7 +55,7 @@ export type GrowthSearchIntentCaptureInput = {
   site_key: string
   visitor_key: string
   session_key: string
-  lead_inbox_id?: string | null
+  growth_lead_id?: string | null
   company_domain?: string | null
   company_name?: string | null
   landing_page?: string | null
@@ -95,7 +95,7 @@ export type GrowthSearchIntentSignalRow = {
   site_key: string
   visitor_key: string
   session_key: string
-  lead_inbox_id: string | null
+  growth_lead_id: string | null
   company_domain: string | null
   company_name: string | null
   keyword: string

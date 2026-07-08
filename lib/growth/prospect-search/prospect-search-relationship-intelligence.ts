@@ -47,7 +47,7 @@ export function buildProspectSearchRelationshipIntelligence(input: {
   const relationship_memory = computeRelationshipStrength({
     company_name: input.company.company_name,
     growth_lead_id: input.company.growth_lead_id,
-    in_lead_inbox: input.company.in_lead_inbox,
+    in_revenue_queue: input.company.in_revenue_queue,
     existing_customer: input.company.existing_customer,
     existing_prospect: input.company.existing_prospect,
     is_suppressed: input.company.is_suppressed,

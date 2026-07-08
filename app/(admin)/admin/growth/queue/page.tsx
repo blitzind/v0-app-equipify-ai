@@ -2,7 +2,7 @@
 
 import { ListOrdered } from "lucide-react"
 import { useAdmin } from "@/lib/admin-store"
-import { GrowthLeadInboxDashboard } from "@/components/growth/lead-operator/growth-lead-inbox-dashboard"
+import { GrowthRevenueQueueDashboard } from "@/components/growth/lead-operator/growth-lead-inbox-dashboard"
 import { GrowthSectionLayout } from "@/components/growth/growth-section-layout"
 import {
   PlatformAdminPageShell,
@@ -43,7 +43,7 @@ export default function AdminGrowthRevenueQueuePage() {
         </section>
 
         <GrowthSectionLayout>
-          <GrowthLeadInboxDashboard />
+          <GrowthRevenueQueueDashboard />
         </GrowthSectionLayout>
       </div>
     </PlatformAdminPageShell>

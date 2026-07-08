@@ -172,7 +172,7 @@ export function CompanyContactsPanel({
                     className="h-7 text-[10px]"
                     onClick={() => onPushToInbox(contact)}
                   >
-                    Push to lead inbox
+                    Push to Revenue Queue
                   </Button>
                 ) : null}
               </div>

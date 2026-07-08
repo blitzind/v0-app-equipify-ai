@@ -128,4 +128,4 @@ export type GrowthVerificationEnrichmentUiSummary = {
 }
 
 export const GROWTH_VERIFICATION_ENRICHMENT_PRIVACY_NOTE =
-  "Verification and enrichment are evidence-backed only — no guessed emails, no fabricated LinkedIn or phones, and no automatic Lead Inbox or outreach."
+  "Verification and enrichment are evidence-backed only — no guessed emails, no fabricated LinkedIn or phones, and no automatic Revenue Queue or outreach."

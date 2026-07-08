@@ -134,7 +134,7 @@ function buildRecommendationForType(
   allTypes: ProspectRecommendationType[],
 ): ProspectRecommendation {
   const now = new Date().toISOString()
-  const lead_id = company.growth_lead_id ?? company.lead_inbox_id ?? null
+  const lead_id = company.growth_lead_id ?? null
   const impact = estimateRevenueImpact(company, priorityResult.score)
   const scoreInput = buildProspectPriorityScoreInputFromCompany(company, input.search_industry_hint)
 

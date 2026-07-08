@@ -192,7 +192,7 @@ export async function refreshMarketCoverageScore(
 
   const total = input.companies.length
   const researched = input.companies.filter((c) => (c.lead_engine_score ?? 0) > 0 || c.company_signal_summary).length
-  const contacted = input.companies.filter((c) => c.in_lead_inbox || c.existing_prospect).length
+  const contacted = input.companies.filter((c) => c.in_revenue_queue || c.existing_prospect).length
   const pipeline = input.companies.filter((c) => c.existing_prospect && !c.existing_customer).length
   const customers = input.companies.filter((c) => c.existing_customer).length
   const signalDensity =

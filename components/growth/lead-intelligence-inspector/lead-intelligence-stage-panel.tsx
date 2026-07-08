@@ -181,11 +181,11 @@ function HumanApprovalActions() {
         Operator review checkpoint
       </p>
       <p className="mt-1 text-sm text-muted-foreground">
-        Decisions are recorded in Lead Inbox — no autonomous approval or outreach.
+        Decisions are recorded in Revenue Queue — no autonomous approval or outreach.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button asChild size="sm" variant="default">
-          <Link href={leadsPath}>Approve in Lead Inbox</Link>
+          <Link href={leadsPath}>Approve in Revenue Queue</Link>
         </Button>
         <Button asChild size="sm" variant="outline">
           <Link href={leadsPath}>Hold / request research</Link>

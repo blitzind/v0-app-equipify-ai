@@ -96,7 +96,6 @@ function stagingRowToCompanyResult(
       `Loaded from ${staging.source_table} — no live provider search was run.`,
     ],
     search_intent_category: null,
-    lead_inbox_id: null,
     growth_lead_id: null,
     prospect_id: null,
     customer_id: null,

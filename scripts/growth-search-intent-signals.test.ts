@@ -46,7 +46,12 @@ const migration = fs.readFileSync(
 )
 assert.match(migration, /growth\.search_intent_signals/)
 assert.match(migration, /intent_category/)
-assert.match(migration, /lead_inbox_id/)
+const dropMigration = fs.readFileSync(
+  path.join(process.cwd(), "supabase/migrations/20270936120000_growth_engine_drop_legacy_lead_inbox_4f.sql"),
+  "utf8",
+)
+assert.match(dropMigration, /drop column if exists lead_inbox_id/)
+assert.match(dropMigration, /drop table if exists growth\.lead_inbox/)
 assert.match(migration, /source_attribution/)
 
 const repoSource = fs.readFileSync(

@@ -78,17 +78,17 @@ async function loadIntentOverlays(admin: SupabaseClient): Promise<Map<string, In
     const { data } = await admin
       .schema("growth")
       .from("search_intent_signals")
-      .select("lead_inbox_id, intent_category, intent_score, visitor_key")
-      .not("lead_inbox_id", "is", null)
+      .select("growth_lead_id, intent_category, intent_score, visitor_key")
+      .not("growth_lead_id", "is", null)
       .order("created_at", { ascending: false })
       .limit(200)
     const seen = new Set<string>()
     for (const row of data ?? []) {
       const r = row as Record<string, unknown>
-      const inboxId = asString(r.lead_inbox_id)
-      if (!inboxId || seen.has(inboxId)) continue
-      seen.add(inboxId)
-      map.set(inboxId, {
+      const leadKey = asString(r.growth_lead_id)
+      if (!leadKey || seen.has(leadKey)) continue
+      seen.add(leadKey)
+      map.set(leadKey, {
         intent_score: typeof r.intent_score === "number" ? r.intent_score : undefined,
         search_intent_category: asString(r.intent_category) || null,
         returning_visitor: Boolean(r.visitor_key),
@@ -106,17 +106,17 @@ async function loadCompanyMatchOverlays(admin: SupabaseClient): Promise<Map<stri
     const { data } = await admin
       .schema("growth")
       .from("company_identification_matches")
-      .select("lead_inbox_id, match_confidence")
-      .not("lead_inbox_id", "is", null)
+      .select("growth_lead_id, match_confidence")
+      .not("growth_lead_id", "is", null)
       .order("created_at", { ascending: false })
       .limit(200)
     const seen = new Set<string>()
     for (const row of data ?? []) {
       const r = row as Record<string, unknown>
-      const inboxId = asString(r.lead_inbox_id)
-      if (!inboxId || seen.has(inboxId)) continue
-      seen.add(inboxId)
-      map.set(inboxId, {
+      const leadKey = asString(r.growth_lead_id)
+      if (!leadKey || seen.has(leadKey)) continue
+      seen.add(leadKey)
+      map.set(leadKey, {
         company_match_confidence:
           typeof r.match_confidence === "number" ? r.match_confidence : undefined,
       })
@@ -133,17 +133,19 @@ async function loadBuyingStageOverlays(admin: SupabaseClient): Promise<Map<strin
     const { data } = await admin
       .schema("growth")
       .from("buying_stage_assessments")
-      .select("lead_inbox_id, detected_stage, stage_confidence, stage_reasoning, evidence, updated_at, created_at")
-      .not("lead_inbox_id", "is", null)
+      .select(
+        "growth_lead_id, detected_stage, stage_confidence, stage_reasoning, evidence, updated_at, created_at",
+      )
+      .not("growth_lead_id", "is", null)
       .order("created_at", { ascending: false })
       .limit(200)
     const seen = new Set<string>()
     for (const row of data ?? []) {
       const r = row as Record<string, unknown>
-      const inboxId = asString(r.lead_inbox_id)
-      if (!inboxId || seen.has(inboxId)) continue
-      seen.add(inboxId)
-      map.set(inboxId, buyingStageOverlayFromAssessmentRow(r))
+      const leadKey = asString(r.growth_lead_id)
+      if (!leadKey || seen.has(leadKey)) continue
+      seen.add(leadKey)
+      map.set(leadKey, buyingStageOverlayFromAssessmentRow(r))
     }
   } catch {
     /* optional */
@@ -259,7 +261,7 @@ function applyInternalSignalHydration(
 }
 
 const INDEX_SAFETY_DEFAULTS = {
-  in_lead_inbox: false,
+  in_revenue_queue: false,
   existing_customer: false,
   existing_prospect: false,
   already_pushed: false,
@@ -269,7 +271,7 @@ const INDEX_SAFETY_DEFAULTS = {
   suppressed_at: null,
 } satisfies Pick<
   GrowthProspectSearchIndexCompany,
-  | "in_lead_inbox"
+  | "in_revenue_queue"
   | "existing_customer"
   | "existing_prospect"
   | "already_pushed"
@@ -388,6 +390,14 @@ export async function buildProspectSearchIndex(
         service_area: enrichment.service_area,
       })
 
+      const intentOverlay = intentOverlays.get(id)
+      const matchOverlay = matchOverlays.get(id)
+      const buyingOverlay = buyingOverlays.get(id)
+      const overlaySignals = [...signals]
+      if (intentOverlay?.search_intent_category) {
+        overlaySignals.unshift(`Search intent: ${intentOverlay.search_intent_category}`)
+      }
+
       upsertCompany(
         applyProspectSearchQualificationToIndexRow(
           {
@@ -395,25 +405,24 @@ export async function buildProspectSearchIndex(
             source_type: "growth_lead",
             company_name: asString(r.company_name) || "Unknown",
             ...enrichment,
-            intent_score: null,
-            buying_stage: null,
-            buying_stage_confidence: null,
-            buying_stage_reason: null,
-            buying_stage_last_assessed_at: null,
+            intent_score: intentOverlay?.intent_score ?? null,
+            buying_stage: buyingOverlay?.buying_stage ?? null,
+            buying_stage_confidence: buyingOverlay?.buying_stage_confidence ?? null,
+            buying_stage_reason: buyingOverlay?.buying_stage_reason ?? null,
+            buying_stage_last_assessed_at: buyingOverlay?.buying_stage_last_assessed_at ?? null,
             lead_score: typeof r.score === "number" ? r.score : null,
             lead_engine_score: null,
             lead_engine_score_label: null,
             lead_engine_score_explanation: null,
             lead_engine_last_run_at: null,
-            company_match_confidence: null,
+            company_match_confidence: matchOverlay?.company_match_confidence ?? null,
             decision_maker_count: asString(r.decision_maker_status) === "identified" ? 1 : 0,
             verification_status: "unverified",
             priority: null,
-            signals,
-            search_intent_category: null,
-            returning_visitor: false,
+            signals: [...new Set(overlaySignals)].slice(0, 6),
+            search_intent_category: intentOverlay?.search_intent_category ?? null,
+            returning_visitor: intentOverlay?.returning_visitor ?? false,
             existing_account: false,
-            lead_inbox_id: null,
             growth_lead_id: id,
             prospect_id: null,
             customer_id: null,
@@ -432,114 +441,7 @@ export async function buildProspectSearchIndex(
   }
   }
 
-  // growth.lead_inbox
-  if (!sourceTypeFilter || sourceTypeFilter === "lead_inbox") {
-  try {
-    const inboxRows = materialized
-      ? await fetchAllRows(async (offset, limit) => {
-          let inboxQuery = admin
-            .schema("growth")
-            .from("lead_inbox")
-            .select(
-              "id, company_name, domain, intent_score, candidate_priority, status, metadata, existing_account_match, updated_at",
-            )
-            .order("updated_at", { ascending: false })
-            .range(offset, offset + limit - 1)
-          if (sourceIdFilter) inboxQuery = inboxQuery.eq("id", sourceIdFilter)
-          const { data } = await inboxQuery
-          return (data ?? []) as Record<string, unknown>[]
-        })
-      : await (async () => {
-          let inboxQuery = admin
-            .schema("growth")
-            .from("lead_inbox")
-            .select(
-              "id, company_name, domain, intent_score, candidate_priority, status, metadata, existing_account_match, updated_at",
-            )
-            .order("updated_at", { ascending: false })
-            .limit(hasQuery ? 60 : 40)
-          if (hasQuery) inboxQuery = inboxQuery.ilike("company_name", pattern)
-          const { data } = await inboxQuery
-          return (data ?? []) as Record<string, unknown>[]
-        })()
-
-    for (const raw of inboxRows) {
-      const r = raw as Record<string, unknown>
-      const id = asString(r.id)
-      if (!id) continue
-      const meta =
-        r.metadata && typeof r.metadata === "object"
-          ? (r.metadata as Record<string, unknown>)
-          : {}
-      const buying = meta.buying_stage_summary as Record<string, unknown> | undefined
-      const intentOverlay = intentOverlays.get(id)
-      const matchOverlay = matchOverlays.get(id)
-      const buyingOverlay = buyingOverlays.get(id)
-      const accountMatch =
-        r.existing_account_match && typeof r.existing_account_match === "object"
-          ? (r.existing_account_match as { matched?: boolean })
-          : null
-      const enrichment = mapLeadInboxIndexEnrichment({ raw: r })
-      const existing_account = accountMatch?.matched === true
-      const signals = buildProspectSearchIndexSignals({
-        source_type: "lead_inbox",
-        crm_detected: enrichment.crm_detected,
-        field_service_software: enrichment.field_service_software,
-        website_platform: enrichment.website_platform,
-        service_area: enrichment.service_area,
-        existing_account,
-      })
-      if (intentOverlay?.search_intent_category) {
-        signals.unshift(`Search intent: ${intentOverlay.search_intent_category}`)
-      }
-
-      upsertCompany(
-        applyProspectSearchQualificationToIndexRow(
-          {
-            id,
-            source_type: "lead_inbox",
-            company_name: asString(r.company_name) || "Unknown",
-            ...enrichment,
-            intent_score:
-              typeof r.intent_score === "number"
-                ? r.intent_score
-                : (intentOverlay?.intent_score ?? null),
-            buying_stage:
-              (typeof buying?.detected_stage === "string" ? buying.detected_stage : null) ??
-              buyingOverlay?.buying_stage ??
-              null,
-            buying_stage_confidence: buyingOverlay?.buying_stage_confidence ?? null,
-            buying_stage_reason: buyingOverlay?.buying_stage_reason ?? null,
-            buying_stage_last_assessed_at: buyingOverlay?.buying_stage_last_assessed_at ?? null,
-            lead_score: typeof r.intent_score === "number" ? r.intent_score : null,
-            lead_engine_score: null,
-            lead_engine_score_label: null,
-            lead_engine_score_explanation: null,
-            lead_engine_last_run_at: null,
-            company_match_confidence: matchOverlay?.company_match_confidence ?? null,
-            decision_maker_count: 0,
-            verification_status: "candidate",
-            priority: asString(r.candidate_priority) || null,
-            signals: [...new Set(signals)].slice(0, 6),
-            search_intent_category: intentOverlay?.search_intent_category ?? null,
-            returning_visitor: intentOverlay?.returning_visitor ?? false,
-            existing_account,
-            lead_inbox_id: id,
-            growth_lead_id: null,
-            prospect_id: null,
-            customer_id: null,
-          },
-          {
-            metadata: meta,
-            buyingOverlay: buyingOverlay ?? null,
-          },
-        ),
-      )
-    }
-  } catch {
-    /* optional */
-  }
-  }
+  // growth.lead_inbox — retired from index loader (GE-LEADS-CANONICAL-4B); use growth.leads above.
 
   const orgId = getGrowthEngineAiOrgId()
   if (orgId) {
@@ -604,7 +506,6 @@ export async function buildProspectSearchIndex(
           search_intent_category: null,
           returning_visitor: false,
           existing_account: false,
-          lead_inbox_id: null,
           growth_lead_id: null,
           prospect_id: id,
           customer_id: null,
@@ -680,7 +581,6 @@ export async function buildProspectSearchIndex(
           search_intent_category: null,
           returning_visitor: false,
           existing_account: true,
-          lead_inbox_id: null,
           growth_lead_id: null,
           prospect_id: null,
           customer_id: id,

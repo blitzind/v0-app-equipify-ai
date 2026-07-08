@@ -93,7 +93,7 @@ async function createLeadFromAudienceMember(
     candidate_attribution: [
       {
         source: "growth.audiences",
-        section: "inbox_bridge",
+        section: "revenue_queue",
         signal: "create_lead",
         evidence: `Member ${member.id} (${sourceType}).`,
         confidence: member.fitScore ?? 0.5,

@@ -236,7 +236,7 @@ const ENTRIES: GrowthEngineOperationalResetTableEntry[] = [
   { table: "growth_engagement_events", category: "home_entity_runtime", scope: "organization_id", delete_order: 230, notes: "Hot companies engagement feed" },
   { table: "signal_events", category: "home_entity_runtime", scope: "organization_id", delete_order: 231, notes: "Buying signal feed for Home intelligence" },
   { table: "apollo_pilot_cohort_companies", category: "home_entity_runtime", scope: "workspace_disposable", delete_order: 232, notes: "Apollo pilot revenue snapshot — cohort defs preserved" },
-  { table: "lead_inbox", category: "home_entity_runtime", scope: "lead_inbox_queue", delete_order: 233, notes: "Lead operator inbox — qualified prospects / needs action" },
+  { table: "lead_inbox", category: "home_entity_runtime", scope: "lead_inbox_queue", delete_order: 233, notes: "Legacy table (deprecated) — canonical Revenue Queue uses growth.leads; safe to drop after GE-LEADS-CANONICAL-4E+ schema cutover" },
   { table: "leads", category: "home_entity_runtime", scope: "lead_pk", delete_order: 234, notes: "Clears daily work queue lead candidates (single-tenant Growth workspace)" },
 ]
 

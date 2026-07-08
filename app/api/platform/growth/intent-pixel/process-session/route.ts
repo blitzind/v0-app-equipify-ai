@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     site_key,
     session_id,
     ok: result.ok,
-    lead_inbox_id: result.lead_inbox_id,
+    growth_lead_id: result.growth_lead_id,
     userId: access.userId,
   })
 

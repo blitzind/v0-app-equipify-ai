@@ -7,27 +7,45 @@ export const GROWTH_PROSPECT_SEARCH_STATUS_QA_MARKER =
   "growth-prospect-search-status-v1" as const
 
 export type ProspectSearchCompanyStatusFlags = {
-  in_lead_inbox: boolean
+  /** Canonical Revenue Queue membership (growth.leads). */
+  in_revenue_queue: boolean
   existing_customer: boolean
   existing_prospect: boolean
   already_pushed: boolean
+}
+
+function readGrowthLeadId(
+  row: Pick<
+    GrowthProspectSearchCompanyResult | GrowthProspectSearchIndexCompany,
+    "source_type" | "signals"
+  > & { growth_lead_id?: string | null; id?: string },
+): string | null {
+  if (typeof row.growth_lead_id === "string" && row.growth_lead_id.trim()) {
+    return row.growth_lead_id.trim()
+  }
+  if (row.source_type === "growth_lead") {
+    return typeof (row as { id?: string }).id === "string" ? (row as { id: string }).id : null
+  }
+  return null
 }
 
 export function deriveProspectSearchCompanyStatus(
   row: Pick<
     GrowthProspectSearchCompanyResult | GrowthProspectSearchIndexCompany,
     | "source_type"
-    | "lead_inbox_id"
+    | "growth_lead_id"
     | "customer_id"
     | "prospect_id"
     | "existing_account"
     | "signals"
+    | "id"
   >,
 ): ProspectSearchCompanyStatusFlags {
-  const in_lead_inbox =
-    row.source_type === "lead_inbox" ||
-    Boolean(row.lead_inbox_id) ||
-    row.signals.some((signal) => /lead inbox/i.test(signal))
+  const growthLeadId = readGrowthLeadId(row)
+  const in_revenue_queue =
+    Boolean(growthLeadId) ||
+    row.source_type === "growth_lead" ||
+    row.signals.some((signal) => /revenue queue|growth\.leads/i.test(signal))
 
   const existing_customer =
     row.source_type === "crm_customer" ||
@@ -39,10 +57,12 @@ export function deriveProspectSearchCompanyStatus(
     Boolean(row.prospect_id) ||
     row.signals.some((signal) => /existing crm prospect/i.test(signal))
 
-  const already_pushed = in_lead_inbox || row.signals.some((signal) => /existing lead inbox/i.test(signal))
+  const already_pushed =
+    in_revenue_queue ||
+    row.signals.some((signal) => /revenue queue|existing lead inbox|already in/i.test(signal))
 
   return {
-    in_lead_inbox,
+    in_revenue_queue,
     existing_customer,
     existing_prospect,
     already_pushed,

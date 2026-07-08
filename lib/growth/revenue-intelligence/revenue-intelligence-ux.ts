@@ -1,6 +1,6 @@
 /** Revenue Intelligence UX helpers (Prompt 22). Client-safe display only — no scoring changes. */
 
-import type { GrowthLeadInboxCardView } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
+import type { RevenueQueueCardView } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 
 export const GROWTH_REVENUE_INTELLIGENCE_UX_QA_MARKER = "growth-revenue-intelligence-ux-v1" as const
 
@@ -36,7 +36,7 @@ export function deriveEvidenceStrength(params: {
 }
 
 export function deriveLeadHealth(card: Pick<
-  GrowthLeadInboxCardView,
+  RevenueQueueCardView,
   | "human_review_required"
   | "candidate_priority"
   | "verification_state"
@@ -92,7 +92,7 @@ export function evidenceStrengthTone(strength: RevenueEvidenceStrength): string 
   return "text-muted-foreground"
 }
 
-export function computeDashboardKpis(cards: GrowthLeadInboxCardView[]): {
+export function computeDashboardKpis(cards: RevenueQueueCardView[]): {
   newLeads: number
   purchaseReady: number
   highIntentVisitors: number

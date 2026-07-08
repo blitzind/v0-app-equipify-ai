@@ -520,7 +520,7 @@ export async function executeProspectSearchAction(
   if (action === "push_to_lead_inbox") {
     const company = input.company
     if (!company) {
-      return { ok: false, action, message: "Select a company row to push to Lead Inbox." }
+      return { ok: false, action, message: "Select a company row to add to Revenue Queue." }
     }
 
     const pushResult = await pushProspectSearchCompanyToLeadInbox(admin, company, input.query ?? "", {
@@ -534,7 +534,7 @@ export async function executeProspectSearchAction(
         action,
         message: pushResult.message,
         push_outcome: pushResult.outcome,
-        lead_inbox_id: null,
+        growth_lead_id: pushResult.growth_lead_id ?? null,
       }
     }
 
@@ -544,7 +544,6 @@ export async function executeProspectSearchAction(
         action,
         message: pushResult.message,
         push_outcome: pushResult.outcome,
-        lead_inbox_id: null,
       }
     }
 
@@ -554,7 +553,6 @@ export async function executeProspectSearchAction(
         action,
         message: pushResult.message,
         push_outcome: pushResult.outcome,
-        lead_inbox_id: null,
       }
     }
 
@@ -563,11 +561,10 @@ export async function executeProspectSearchAction(
       action,
       message: pushResult.message,
       push_outcome: pushResult.outcome,
-      lead_inbox_id: pushResult.lead_inbox_id ?? null,
       growth_lead_id: pushResult.growth_lead_id ?? null,
       workflow: pushResult.workflow ?? null,
-      workspace_url: pushResult.lead_inbox_id
-        ? `/admin/growth/leads/${pushResult.growth_lead_id ?? pushResult.lead_inbox_id}`
+      workspace_url: pushResult.growth_lead_id
+        ? `/admin/growth/leads/${pushResult.growth_lead_id}`
         : null,
     }
   }
@@ -607,7 +604,7 @@ export async function executeProspectSearchAction(
       return { ok: true, action, message: "Workflow continuity skipped — missing context." }
     }
 
-    const leadId = company.growth_lead_id ?? company.lead_inbox_id
+    const leadId = company.growth_lead_id
     if (!leadId) {
       return { ok: true, action, message: "Workflow continuity skipped — no lead record yet." }
     }
@@ -650,7 +647,7 @@ export async function executeProspectSearchAction(
       workflowContext,
     )
 
-    const leadId = company.growth_lead_id ?? company.lead_inbox_id
+    const leadId = company.growth_lead_id
     if (leadId) {
       const payload = buildProspectWorkflowTimelinePayload({
         company,
@@ -677,20 +674,11 @@ export async function executeProspectSearchAction(
 
   if (action === "open_workspace") {
     const company = input.company
-    if (company?.lead_inbox_id) {
-      return {
-        ok: true,
-        action,
-        message: "Opening Lead Inbox operator workspace.",
-        lead_inbox_id: company.lead_inbox_id,
-        workspace_url: `/admin/growth/leads/${company.lead_inbox_id}`,
-      }
-    }
     if (company?.growth_lead_id) {
       return {
         ok: true,
         action,
-        message: "Opening Growth lead workspace.",
+        message: "Opening Revenue Queue workspace.",
         growth_lead_id: company.growth_lead_id,
         workspace_url: `/admin/growth/leads/${company.growth_lead_id}`,
       }

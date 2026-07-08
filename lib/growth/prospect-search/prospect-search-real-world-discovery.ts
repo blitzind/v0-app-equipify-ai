@@ -38,7 +38,6 @@ function realWorldCandidateToCompanyResult(
   if (row.existing_customer_match) signals.push("Existing CRM customer match")
   if (row.existing_prospect_match) signals.push("Existing CRM prospect match")
   if (row.existing_growth_lead_match) signals.push("Existing Growth lead match")
-  if (row.metadata.existing_lead_inbox_match) signals.push("Existing Lead Inbox match")
   if (row.rating != null) signals.push(`Rating ${row.rating}`)
   if (row.category) signals.push(row.category)
   for (const ev of row.evidence.slice(0, 2)) {
@@ -83,10 +82,6 @@ function realWorldCandidateToCompanyResult(
     verification_status: "external_unverified",
     signals,
     search_intent_category: null,
-    lead_inbox_id:
-      typeof row.metadata.matched_lead_inbox_id === "string"
-        ? row.metadata.matched_lead_inbox_id
-        : null,
     growth_lead_id:
       typeof row.metadata.matched_growth_lead_id === "string"
         ? row.metadata.matched_growth_lead_id

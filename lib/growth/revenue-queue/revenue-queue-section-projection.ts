@@ -1,12 +1,12 @@
 /** GE-LEADS-CANONICAL-3A — Section bucketing for canonical Revenue Queue (client-safe). */
 
-import type { GrowthLeadInboxRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
+import type { RevenueQueueRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
 import { resolveInboxDashboardSection } from "@/lib/growth/lead-operator-workspace/lead-inbox-dashboard"
 import type {
-  GrowthLeadInboxCardView,
-  GrowthLeadInboxDashboardSection,
-  GrowthLeadInboxDashboardSectionPayload,
-  GrowthLeadInboxSortMode,
+  RevenueQueueCardView,
+  RevenueQueueDashboardSection,
+  RevenueQueueDashboardSectionPayload,
+  RevenueQueueSortMode,
 } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import { buildRevenueQueueCardProjectionFromLead } from "@/lib/growth/revenue-queue/revenue-queue-card-projection"
 import {
@@ -20,7 +20,7 @@ import {
 } from "@/lib/growth/revenue-queue/revenue-queue-inbox-display-map"
 import type { GrowthLead } from "@/lib/growth/types"
 
-const SECTION_LABELS: Record<GrowthLeadInboxDashboardSection, string> = {
+const SECTION_LABELS: Record<RevenueQueueDashboardSection, string> = {
   high_priority: "High Priority",
   needs_review: "Needs Review",
   enrichment_needed: "Enrichment Needed",
@@ -30,7 +30,7 @@ const SECTION_LABELS: Record<GrowthLeadInboxDashboardSection, string> = {
 }
 
 /** Reuse legacy section resolver by synthesizing inbox row shape from canonical lead. */
-export function buildPseudoInboxRowFromGrowthLead(lead: GrowthLead): GrowthLeadInboxRow {
+export function buildPseudoInboxRowFromGrowthLead(lead: GrowthLead): RevenueQueueRow {
   const queueStatus = mapLeadStatusToInboxQueueStatus(lead.status)
   const intentScore = deriveIntentScoreFromLead(lead)
   const candidateConfidence = deriveCandidateConfidenceFromLead(lead)
@@ -40,12 +40,12 @@ export function buildPseudoInboxRowFromGrowthLead(lead: GrowthLead): GrowthLeadI
     updated_at: lead.updatedAt,
     site_key: lead.sourceDetail ?? lead.sourceKind,
     candidate_type: "identified",
-    candidate_priority: mapResearchPriorityToInboxPriority(lead.researchPriority) as GrowthLeadInboxRow["candidate_priority"],
+    candidate_priority: mapResearchPriorityToInboxPriority(lead.researchPriority) as RevenueQueueRow["candidate_priority"],
     intent_score: intentScore,
     intent_grade: typeof lead.metadata.intent_grade === "string" ? lead.metadata.intent_grade : "F",
     candidate_confidence: candidateConfidence,
     pipeline_entry: "icp_targeting",
-    pipeline_status: mapWorkflowHealthToPipelineStatus(lead.workflowHealth, queueStatus) as GrowthLeadInboxRow["pipeline_status"],
+    pipeline_status: mapWorkflowHealthToPipelineStatus(lead.workflowHealth, queueStatus) as RevenueQueueRow["pipeline_status"],
     company_name: lead.companyName,
     domain: domainFromWebsite(lead.website),
     contact_name: lead.contactName,
@@ -55,7 +55,7 @@ export function buildPseudoInboxRowFromGrowthLead(lead: GrowthLead): GrowthLeadI
     dedupe_hash: lead.externalRef ?? lead.id,
     candidate_reasoning: lead.notes?.trim() ? [lead.notes.trim()] : [],
     candidate_evidence: Array.isArray(lead.metadata.candidate_evidence)
-      ? (lead.metadata.candidate_evidence as GrowthLeadInboxRow["candidate_evidence"])
+      ? (lead.metadata.candidate_evidence as RevenueQueueRow["candidate_evidence"])
       : [],
     candidate_attribution: lead.sourceChannel
       ? [
@@ -100,14 +100,14 @@ export function buildPseudoInboxRowFromGrowthLead(lead: GrowthLead): GrowthLeadI
   }
 }
 
-export function resolveRevenueQueueSectionFromLead(lead: GrowthLead): GrowthLeadInboxDashboardSection {
+export function resolveRevenueQueueSectionFromLead(lead: GrowthLead): RevenueQueueDashboardSection {
   return resolveInboxDashboardSection(buildPseudoInboxRowFromGrowthLead(lead))
 }
 
 function compareBySortMode(
-  a: GrowthLeadInboxCardView,
-  b: GrowthLeadInboxCardView,
-  mode: GrowthLeadInboxSortMode,
+  a: RevenueQueueCardView,
+  b: RevenueQueueCardView,
+  mode: RevenueQueueSortMode,
 ): number {
   if (mode === "intent") {
     const delta = b.intent_score - a.intent_score
@@ -132,10 +132,10 @@ function compareBySortMode(
 /** Build dashboard sections from canonical leads using legacy section + sort semantics. */
 export function buildRevenueQueueDashboardSectionsFromLeads(
   leads: GrowthLead[],
-  sort: GrowthLeadInboxSortMode = "priority",
-): GrowthLeadInboxDashboardSectionPayload[] {
-  const buckets = new Map<GrowthLeadInboxDashboardSection, GrowthLeadInboxCardView[]>()
-  const sectionOrder: GrowthLeadInboxDashboardSection[] = [
+  sort: RevenueQueueSortMode = "priority",
+): RevenueQueueDashboardSectionPayload[] {
+  const buckets = new Map<RevenueQueueDashboardSection, RevenueQueueCardView[]>()
+  const sectionOrder: RevenueQueueDashboardSection[] = [
     "high_priority",
     "needs_review",
     "enrichment_needed",

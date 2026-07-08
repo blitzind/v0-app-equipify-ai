@@ -66,7 +66,7 @@ type InfluenceContactInput = {
   source_page_url?: string | null
   source_label?: string | null
   is_recommended_contact?: boolean
-  in_lead_inbox?: boolean
+  in_revenue_queue?: boolean
   existing_prospect?: boolean
   relationship_strength_score?: number
   relationship_status?: string
@@ -132,7 +132,7 @@ export function computeContactInfluenceScore(input: {
     score += 0.05
     influence_reasons.push("Account primary recommended contact")
   }
-  if (contact.in_lead_inbox || contact.existing_prospect) {
+  if (contact.in_revenue_queue || contact.existing_prospect) {
     score += 0.04
     influence_reasons.push("Existing relationship in CRM or inbox")
   }

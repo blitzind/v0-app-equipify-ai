@@ -8,7 +8,6 @@ import {
   extractKeywordsFromContentPath,
   inferSourceNameFromReferrer,
   isEmptyKeyword,
-  isOrganicSearchReferrer,
   isPaidSearchMedium,
   normalizeKeyword,
 } from "@/lib/growth/search-intent/search-intent-keywords"
@@ -53,7 +52,7 @@ function mapRow(row: Record<string, unknown>): GrowthSearchIntentSignalRow {
     site_key: asString(row.site_key),
     visitor_key: asString(row.visitor_key),
     session_key: asString(row.session_key),
-    lead_inbox_id: asString(row.lead_inbox_id) || null,
+    growth_lead_id: asString(row.growth_lead_id) || null,
     company_domain: asString(row.company_domain) || null,
     company_name: asString(row.company_name) || null,
     keyword: asString(row.keyword),
@@ -105,7 +104,7 @@ function dedupeCaptureInputs(inputs: GrowthSearchIntentCaptureInput[]): GrowthSe
 export function buildSearchIntentCaptureInputsFromAggregate(
   aggregated: GrowthIntentAggregatedSession,
   options?: {
-    lead_inbox_id?: string | null
+    growth_lead_id?: string | null
     company_name?: string | null
     company_domain?: string | null
   },
@@ -117,7 +116,7 @@ export function buildSearchIntentCaptureInputsFromAggregate(
     site_key: aggregated.site_key,
     visitor_key: session.visitor_key,
     session_key: session.session_key,
-    lead_inbox_id: options?.lead_inbox_id ?? null,
+    growth_lead_id: options?.growth_lead_id ?? null,
     company_domain: options?.company_domain ?? aggregated.domain,
     company_name: options?.company_name ?? null,
     landing_page: session.first_landing_url || session.last_page_url,
@@ -206,7 +205,7 @@ export function buildSearchIntentCaptureInputsFromAggregate(
 export function captureSearchIntentFromAggregatedSession(
   aggregated: GrowthIntentAggregatedSession,
   options?: {
-    lead_inbox_id?: string | null
+    growth_lead_id?: string | null
     company_name?: string | null
     company_domain?: string | null
   },
@@ -244,7 +243,7 @@ export async function persistSearchIntentSignals(
     site_key: signal.site_key,
     visitor_key: signal.visitor_key,
     session_key: signal.session_key,
-    lead_inbox_id: signal.lead_inbox_id,
+    growth_lead_id: signal.growth_lead_id ?? null,
     company_domain: signal.company_domain,
     company_name: signal.company_name,
     keyword: signal.keyword,
@@ -299,9 +298,9 @@ export async function persistSearchIntentSignals(
   }
 }
 
-export async function loadSearchIntentSignalsForLeadInbox(
+export async function loadSearchIntentSignalsForRevenueQueue(
   admin: SupabaseClient,
-  leadInboxId: string,
+  leadId: string,
   limit = 20,
 ): Promise<GrowthSearchIntentSignalRow[]> {
   if (!(await isGrowthSearchIntentSchemaReady(admin))) return []
@@ -310,13 +309,16 @@ export async function loadSearchIntentSignalsForLeadInbox(
     .schema("growth")
     .from("search_intent_signals")
     .select("*")
-    .eq("lead_inbox_id", leadInboxId)
+    .eq("growth_lead_id", leadId)
     .order("intent_score", { ascending: false })
     .limit(limit)
 
   if (error || !data) return []
   return (data as Record<string, unknown>[]).map(mapRow)
 }
+
+/** @deprecated Use loadSearchIntentSignalsForRevenueQueue (GE-LEADS-CANONICAL-4G). */
+export const loadSearchIntentSignalsForLeadInbox = loadSearchIntentSignalsForRevenueQueue
 
 export async function loadSearchIntentSignalsForVisitor(
   admin: SupabaseClient,
@@ -339,9 +341,9 @@ export async function loadSearchIntentSignalsForVisitor(
   return (data as Record<string, unknown>[]).map(mapRow)
 }
 
-export async function linkSearchIntentSignalsToLeadInbox(
+export async function linkSearchIntentSignalsToGrowthLead(
   admin: SupabaseClient,
-  leadInboxId: string,
+  leadId: string,
   signalIds: string[],
 ): Promise<void> {
   if (signalIds.length === 0) return
@@ -350,6 +352,18 @@ export async function linkSearchIntentSignalsToLeadInbox(
   await admin
     .schema("growth")
     .from("search_intent_signals")
-    .update({ lead_inbox_id: leadInboxId, updated_at: new Date().toISOString() })
+    .update({
+      growth_lead_id: leadId,
+      updated_at: new Date().toISOString(),
+    })
     .in("id", signalIds)
+}
+
+/** @deprecated Use linkSearchIntentSignalsToGrowthLead */
+export async function linkSearchIntentSignalsToLeadInbox(
+  admin: SupabaseClient,
+  leadId: string,
+  signalIds: string[],
+): Promise<void> {
+  return linkSearchIntentSignalsToGrowthLead(admin, leadId, signalIds)
 }

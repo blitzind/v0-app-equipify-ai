@@ -159,7 +159,7 @@ function normalizeProspectSearchCompanyShell(
   },
 ): GrowthProspectSearchCompanyResult {
   return {
-    in_lead_inbox: false,
+    in_revenue_queue: false,
     existing_customer: false,
     existing_prospect: false,
     already_pushed: false,
@@ -184,7 +184,6 @@ function normalizeProspectSearchCompanyShell(
     verification_status: null,
     signals: [],
     search_intent_category: null,
-    lead_inbox_id: null,
     growth_lead_id: null,
     prospect_id: null,
     customer_id: null,

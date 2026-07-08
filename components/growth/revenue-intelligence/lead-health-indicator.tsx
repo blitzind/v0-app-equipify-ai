@@ -6,7 +6,7 @@ import {
   formatLabel,
   type RevenueLeadHealth,
 } from "@/lib/growth/revenue-intelligence/revenue-intelligence-ux"
-import type { GrowthLeadInboxCardView } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
+import type { RevenueQueueCardView } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import { cn } from "@/lib/utils"
 
 const HEALTH_CONFIG: Record<
@@ -24,7 +24,7 @@ export function LeadHealthIndicator({
   className,
 }: {
   card: Pick<
-    GrowthLeadInboxCardView,
+    RevenueQueueCardView,
     | "human_review_required"
     | "candidate_priority"
     | "verification_state"

@@ -285,8 +285,6 @@ const hiringMetrics = buildCommandCenterHiringMetrics({
       evidence_summary: "hire aggregate",
       workflow_state: "new",
       suppression_state: "active",
-      processed_to_lead_inbox: false,
-      lead_inbox_id: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       metadata: {
@@ -352,8 +350,6 @@ const momentumSummary = buildCommandCenterSignalMomentumSummary({
       evidence_summary: "Regional expansion",
       workflow_state: "new",
       suppression_state: "active",
-      processed_to_lead_inbox: false,
-      lead_inbox_id: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       metadata: {},

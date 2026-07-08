@@ -409,7 +409,7 @@ function buildContactResearchSummary(
     recommendedAction:
       contacts.length > 0
         ? "Review contacts and send to verification triage."
-        : "Request enrichment or add manual contacts in Lead Inbox.",
+        : "Request enrichment or add manual contacts in Revenue Queue.",
     evidenceCount: countStageEvidenceItems(stage),
     signalChips: chips,
     operatorGuidance: "Operator actions: review contacts, request enrichment, send to verification.",
@@ -467,7 +467,7 @@ function buildVerificationSummary(
           : "Blocked — resolve verification issues before continuing.",
     evidenceCount: countStageEvidenceItems(stage),
     signalChips: chips,
-    operatorGuidance: "Operator may override with documented reason in Lead Inbox.",
+    operatorGuidance: "Operator may override with documented reason in Revenue Queue.",
   }
 }
 
@@ -552,7 +552,7 @@ function buildOutreachPersonalizationSummary(
     confidenceBand: resolveConfidenceBand(conf),
     confidenceReasoning: [String(root.evidence_summary ?? "Derived from account brief evidence")],
     risksAndMissingData: root.human_review_required ? ["Human review required — do not auto-send"] : stage.warnings,
-    recommendedAction: "Review messaging drafts in Lead Inbox before any outbound execution.",
+    recommendedAction: "Review messaging drafts in Revenue Queue before any outbound execution.",
     evidenceCount: countStageEvidenceItems(stage),
     signalChips: chips,
     operatorGuidance: "Draft only — no autonomous outreach or campaign creation.",
@@ -667,7 +667,7 @@ function buildHumanApprovalSummary(
     confidenceBand: resolveConfidenceBand(conf),
     confidenceReasoning: asArray(root.approval_reason_codes).filter((v): v is string => typeof v === "string"),
     risksAndMissingData: risks.length ? risks : stage.warnings,
-    recommendedAction: "Operator checklist: approve, hold, request more research, or reject in Lead Inbox.",
+    recommendedAction: "Operator checklist: approve, hold, request more research, or reject in Revenue Queue.",
     evidenceCount: countStageEvidenceItems(stage),
     signalChips: chips,
     operatorGuidance: "No autonomous approval — operator must explicitly decide.",
@@ -724,7 +724,7 @@ function buildRevenueExecutionSummary(
       : stage.warnings,
     recommendedAction:
       typeof root.recommended_handoff === "string"
-        ? `${root.recommended_handoff.replace(/_/g, " ")} — assign owner in Lead Inbox`
+        ? `${root.recommended_handoff.replace(/_/g, " ")} — assign owner in Revenue Queue`
         : "Review sequence readiness and launch manually from Growth Engine.",
     evidenceCount: countStageEvidenceItems(stage),
     signalChips: chips,

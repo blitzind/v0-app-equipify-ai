@@ -18,7 +18,6 @@ export type GrowthLeadEngineSandboxHandoffInput = GrowthLeadEngineSandboxInput &
   sourceType?: string | null
   sourceId?: string | null
   growthLeadId?: string | null
-  leadInboxId?: string | null
   prospectId?: string | null
   customerId?: string | null
   contactHandoff?: ProspectSearchLeadEngineContactHandoffContext | null
@@ -103,7 +102,6 @@ export function buildProspectSearchLeadEngineHandoffUrl(
   params.set("sourceType", company.source_type)
   params.set("sourceId", company.id)
   if (company.growth_lead_id) params.set("growthLeadId", company.growth_lead_id)
-  if (company.lead_inbox_id) params.set("leadInboxId", company.lead_inbox_id)
   if (company.prospect_id) params.set("prospectId", company.prospect_id)
   if (company.customer_id) params.set("customerId", company.customer_id)
   if (input.contactHandoff) {
@@ -165,7 +163,6 @@ export function parseProspectSearchLeadEngineHandoffParams(
     sourceType: trimParam(searchParams.get("sourceType")),
     sourceId: trimParam(searchParams.get("sourceId")),
     growthLeadId: trimParam(searchParams.get("growthLeadId")),
-    leadInboxId: trimParam(searchParams.get("leadInboxId")),
     prospectId: trimParam(searchParams.get("prospectId")),
     customerId: trimParam(searchParams.get("customerId")),
     contactHandoff: decodeContactHandoffContext(searchParams.get("contactHandoff")),

@@ -40,6 +40,7 @@ export const GROWTH_PROSPECT_SEARCH_QA_MARKER = "growth-prospect-search-v1" as c
 
 export const GROWTH_PROSPECT_SEARCH_SOURCE_TYPES = [
   "growth_lead",
+  /** Legacy materialized index rows only — live loader uses growth_lead. */
   "lead_inbox",
   "crm_prospect",
   "crm_customer",
@@ -250,7 +251,7 @@ export type GrowthProspectSearchIndexCompany = {
   search_intent_category: string | null
   returning_visitor: boolean
   existing_account: boolean
-  in_lead_inbox: boolean
+  in_revenue_queue: boolean
   existing_customer: boolean
   existing_prospect: boolean
   already_pushed: boolean
@@ -258,7 +259,6 @@ export type GrowthProspectSearchIndexCompany = {
   suppression_reason: string | null
   suppression_scope: string | null
   suppressed_at: string | null
-  lead_inbox_id: string | null
   growth_lead_id: string | null
   prospect_id: string | null
   customer_id: string | null
@@ -317,7 +317,6 @@ export type GrowthProspectSearchCompanyResult = GrowthSignalAiInsightClientField
   verification_status: string
   signals: string[]
   search_intent_category: string | null
-  lead_inbox_id: string | null
   growth_lead_id: string | null
   prospect_id: string | null
   customer_id: string | null
@@ -333,7 +332,7 @@ export type GrowthProspectSearchCompanyResult = GrowthSignalAiInsightClientField
   website_platform?: string | null
   field_service_software?: string | null
   existing_account?: boolean
-  in_lead_inbox?: boolean
+  in_revenue_queue?: boolean
   existing_customer?: boolean
   existing_prospect?: boolean
   already_pushed?: boolean
@@ -598,7 +597,6 @@ export type GrowthProspectSearchActionResult = {
   ok: boolean
   action: GrowthProspectSearchResultAction
   message: string
-  lead_inbox_id?: string | null
   growth_lead_id?: string | null
   list_id?: string | null
   saved_search_id?: string | null

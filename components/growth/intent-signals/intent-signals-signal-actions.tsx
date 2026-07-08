@@ -120,7 +120,7 @@ export function IntentSignalsSignalActions({
 
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
       <p className="text-xs text-muted-foreground">
-        Push to Lead Inbox is not enabled in this milestone — manual review only.
+        Push to Revenue Queue is not enabled in this milestone — manual review only.
       </p>
     </div>
   )

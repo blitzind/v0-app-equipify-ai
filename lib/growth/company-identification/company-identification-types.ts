@@ -45,7 +45,7 @@ export type GrowthCompanyIdentificationInput = {
   visitor_key: string
   session_key: string
   intent_session_id?: string | null
-  lead_inbox_id?: string | null
+  growth_lead_id?: string | null
   email?: string | null
   phone?: string | null
   company_name?: string | null
@@ -103,7 +103,7 @@ export type GrowthCompanyIdentificationMatchRow = {
   site_key: string
   visitor_key: string
   session_key: string
-  lead_inbox_id: string | null
+  growth_lead_id: string | null
   intent_session_id: string | null
   company_name: string
   company_domain: string | null

@@ -43,8 +43,8 @@ export const GROWTH_HOME_STALE_DATA_SOURCES: GrowthHomeStaleDataSource[] = [
     api_route: "/api/platform/growth/lead-inbox + /api/platform/growth/cadence/command-summary",
     service: "growth-workspace-dashboard-mapper.ts (my-queue metrics)",
     kind: "api_aggregate",
-    tables: ["lead_inbox", "leads", "cadence_tasks"],
-    notes: "Call-ready leads + Leads needing action from lead-inbox sections and cadence",
+    tables: ["leads", "cadence_tasks"],
+    notes: "Call-ready leads + Leads needing action from canonical Revenue Queue (growth.leads) and cadence",
   },
   {
     id: "replies_waiting",

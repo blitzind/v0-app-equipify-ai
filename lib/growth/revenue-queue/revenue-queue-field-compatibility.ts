@@ -125,7 +125,7 @@ export const REVENUE_QUEUE_FIELD_COMPATIBILITY: RevenueQueueFieldCompatibilityEn
     category: "B",
     legacy_source: "lead_inbox.metadata summaries",
     canonical_source: "growth.leads.metadata summaries (when copied at intake)",
-    migration_note: "Sibling tables still keyed by lead_inbox_id — see missing deps.",
+    migration_note: "Intelligence tables keyed by growth_lead_id after GE-LEADS-CANONICAL-4F.",
   },
   {
     field: "session_count / visit_count",
@@ -161,33 +161,13 @@ export const REVENUE_QUEUE_FIELD_COMPATIBILITY: RevenueQueueFieldCompatibilityEn
 export const REVENUE_QUEUE_MISSING_PROJECTION_DEPENDENCIES = [
   {
     field: "session_count / visit_count (intent pixel)",
-    blocker: "Intent pixel visit history resolves via lead_inbox site_key + visitor_key",
+    blocker: "Intent pixel visit history resolves via intake metadata site_key + visitor_key",
     smallest_migration: "Add growth_lead_id to intent session/store tables OR copy counts into leads.metadata at intake.",
   },
   {
-    field: "buying_stage_assessments table rows",
-    blocker: "growth.buying_stage_assessments.lead_inbox_id FK — no growth_lead_id column",
-    smallest_migration: "Add nullable growth_lead_id + backfill from inbox metadata.growth_lead_id.",
-  },
-  {
-    field: "search_intent_signals table rows",
-    blocker: "growth.search_intent_signals.lead_inbox_id FK",
-    smallest_migration: "Add nullable growth_lead_id + resolver retarget.",
-  },
-  {
-    field: "company_identification_matches table rows",
-    blocker: "Matches linked via lead_inbox_id in workspace builder",
-    smallest_migration: "Add growth_lead_id FK or resolve via canonical company_id on lead.",
-  },
-  {
     field: "inbox workflow actions (claim/approve/archive)",
-    blocker: "POST /lead-inbox/[id]/actions mutates lead_inbox.status",
+    blocker: "Legacy POST /lead-inbox/[id]/actions mutates lead_inbox.status",
     smallest_migration: "Dual-write actions to growth.leads status + metadata queue_state during transition.",
-  },
-  {
-    field: "card navigation id",
-    blocker: "Dashboard links to /leads/{inbox_id} today",
-    smallest_migration: "Flip href to growth_lead_id after cert passes; interim dual-route support.",
   },
 ] as const
 

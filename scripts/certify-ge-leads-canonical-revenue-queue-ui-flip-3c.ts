@@ -1,5 +1,6 @@
 /**
  * GE-LEADS-CANONICAL-3C — Certify Revenue Queue UI flip + detail bridge.
+ * Superseded by 4D/4E — canonical-only; legacy loader removed.
  *
  * Run:
  *   node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-ge-leads-canonical-revenue-queue-ui-flip-3c.ts
@@ -8,12 +9,12 @@ import fs from "node:fs"
 import path from "node:path"
 import { bootstrapGrowthOperatorNotificationsCertEnv } from "@/lib/growth/notifications/growth-notification-cert-bootstrap"
 import {
-  GROWTH_LEAD_INBOX_DASHBOARD_SECTIONS,
+  GROWTH_REVENUE_QUEUE_DASHBOARD_SECTIONS,
   GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER,
 } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import {
   loadCanonicalRevenueQueueDashboardPayload,
-  loadLegacyRevenueQueueDashboardPayload,
+  loadRevenueQueueDashboardPayload,
   parseRevenueQueueApiSource,
 } from "@/lib/growth/revenue-queue/revenue-queue-api-bridge"
 import {
@@ -33,8 +34,8 @@ function assertDashboardContract(payload: {
   if (!Array.isArray(payload.sections)) errors.push("sections must be array")
   if (typeof payload.total !== "number") errors.push("total must be number")
   if (!Array.isArray(payload.sections)) return errors
-  if (payload.sections.length !== GROWTH_LEAD_INBOX_DASHBOARD_SECTIONS.length) {
-    errors.push(`expected ${GROWTH_LEAD_INBOX_DASHBOARD_SECTIONS.length} sections`)
+  if (payload.sections.length !== GROWTH_REVENUE_QUEUE_DASHBOARD_SECTIONS.length) {
+    errors.push(`expected ${GROWTH_REVENUE_QUEUE_DASHBOARD_SECTIONS.length} sections`)
   }
   return errors
 }
@@ -72,8 +73,8 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
-  const [legacy, canonical] = await Promise.all([
-    loadLegacyRevenueQueueDashboardPayload(boot.admin, "priority", 200),
+  const [defaultQueue, canonical] = await Promise.all([
+    loadRevenueQueueDashboardPayload(boot.admin, { sort: "priority", limit: 200 }),
     loadCanonicalRevenueQueueDashboardPayload(boot.admin, "priority", 200),
   ])
 
@@ -98,7 +99,7 @@ async function main(): Promise<void> {
         supabase_host: new URL(boot.url).host,
         static_checks: staticChecks,
         queue: {
-          legacy_total: legacy.total,
+          default_total: defaultQueue.total,
           canonical_total: canonical.total,
           canonical_card_count: canonical.sections.reduce((sum, s) => sum + s.items.length, 0),
           contract_errors: canonicalContractErrors,
@@ -116,14 +117,14 @@ async function main(): Promise<void> {
         action_route_audit: {
           uses_action_bridge: staticChecks.actions_use_canonical_bridge,
           canonical_path_mutates_growth_leads: true,
-          legacy_inbox_path_retained_for_inbox_ids: true,
+          legacy_inbox_path_removed: true,
         },
         certification: {
           dashboard_uses_canonical_queue: staticChecks.dashboard_uses_default_canonical,
           queue_cards_from_growth_leads: canonical.total > 0 && canonicalContractErrors.length === 0,
           detail_accepts_canonical_lead_id:
             detailResult?.resolution.source === "canonical_lead" && detailResult.workspace != null,
-          legacy_api_still_available: parseRevenueQueueApiSource("legacy") === "legacy" && legacy.total === 0,
+          legacy_source_maps_to_canonical: parseRevenueQueueApiSource("legacy") === "canonical",
           no_duplicate_ui: staticChecks.no_duplicate_dashboard_component,
           no_writes: true,
           no_commit: true,

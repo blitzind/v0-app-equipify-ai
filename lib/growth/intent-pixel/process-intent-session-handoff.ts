@@ -10,7 +10,6 @@ export type ProcessIntentSessionHandoffResult = {
   qa_marker: typeof GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER
   ok: boolean
   session_id: string
-  lead_inbox_id: string | null
   growth_lead_id: string | null
   lead_status: string | null
   lead_created: boolean | null
@@ -27,7 +26,6 @@ export async function processIntentSessionToLeadInbox(
     qa_marker: GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER,
     ok: false,
     session_id: sessionId,
-    lead_inbox_id: null,
     growth_lead_id: null,
     lead_status: null,
     lead_created: null,
@@ -43,7 +41,7 @@ export async function processIntentSessionToLeadInbox(
   if (!bridge.lead_candidate) {
     return {
       ...base,
-      message: bridge.errors[0] ?? "Session not eligible for Lead Inbox.",
+      message: bridge.errors[0] ?? "Session not eligible for Revenue Queue.",
     }
   }
 
@@ -67,17 +65,18 @@ export async function processIntentSessionToLeadInbox(
       growth_lead_id: ingest.growth_lead_id ?? null,
       lead_status: ingest.lead_status ?? null,
       lead_created: ingest.lead_created ?? false,
-      message: ingest.reason ?? "Duplicate inbox entry.",
+      message: ingest.reason ?? "Duplicate Revenue Queue entry.",
     }
   }
 
-  if (!ingest.ok || !ingest.row) {
+  if (!ingest.ok || !ingest.growth_lead_id) {
     return {
       ...base,
+      duplicate: ingest.duplicate,
       growth_lead_id: ingest.growth_lead_id ?? null,
       lead_status: ingest.lead_status ?? null,
       lead_created: ingest.lead_created ?? null,
-      message: ingest.reason ?? "Lead Inbox ingest failed.",
+      message: ingest.reason ?? "Revenue Queue intake failed.",
     }
   }
 
@@ -85,11 +84,10 @@ export async function processIntentSessionToLeadInbox(
     qa_marker: GROWTH_LIVE_VISITOR_MONITOR_QA_MARKER,
     ok: true,
     session_id: sessionId,
-    lead_inbox_id: ingest.row.id,
-    growth_lead_id: ingest.growth_lead_id ?? null,
+    growth_lead_id: ingest.growth_lead_id,
     lead_status: ingest.lead_status ?? null,
     lead_created: ingest.lead_created ?? null,
-    message: "Added to Lead Inbox for human review. Lead Engine not auto-run.",
+    message: "Added to Revenue Queue for human review. Lead Engine not auto-run.",
     duplicate: false,
   }
 }

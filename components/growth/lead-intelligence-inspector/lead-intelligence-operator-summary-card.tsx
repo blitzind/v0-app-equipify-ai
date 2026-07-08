@@ -129,7 +129,7 @@ export function LeadIntelligenceOperatorSummaryCard({ run }: { run: GrowthLeadEn
       <div className="mt-4 flex flex-wrap gap-2">
         <Button asChild size="sm">
           <Link href={leadsPath}>
-            Open Lead Inbox
+            Open Revenue Queue
             <ArrowRight className="ml-1.5 size-3.5" />
           </Link>
         </Button>

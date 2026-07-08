@@ -269,7 +269,7 @@ async function main(): Promise<void> {
       company_signal_summary: null,
       existing_customer: false,
       existing_prospect: false,
-      in_lead_inbox: false,
+      in_revenue_queue: false,
       is_suppressed: false,
       suppression_reason: null,
     },

@@ -1,11 +1,11 @@
 /** GE-LEADS-CANONICAL-3A — Build inbox-shaped card view from growth.leads (client-safe). */
 
 import type { GrowthLeadEnginePipelineRun } from "@/lib/growth/lead-engine/orchestrator/lead-engine-run-types"
-import type { GrowthLeadInboxRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
+import type { RevenueQueueRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
 import { extractLeadEngineOutputsFromRun } from "@/lib/growth/lead-operator-workspace/lead-engine-run-extract"
 import {
   GROWTH_LEAD_ENGINE_RUN_METADATA_KEY,
-  type GrowthLeadInboxCardView,
+  type RevenueQueueCardView,
 } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import { GROWTH_OPERATOR_HANDOFF_METADATA_KEY } from "@/lib/growth/operator-handoff/operator-handoff-repository"
 import type { GrowthOperatorHandoffOutput } from "@/lib/growth/operator-handoff/operator-handoff-types"
@@ -50,7 +50,7 @@ function isOperatorHandoff(value: unknown): value is { handoff: GrowthOperatorHa
   return row.handoff != null && typeof row.handoff === "object"
 }
 
-function buildPseudoInboxRowForHints(lead: GrowthLead, queueStatus: string): GrowthLeadInboxRow {
+function buildPseudoInboxRowForHints(lead: GrowthLead, queueStatus: string): RevenueQueueRow {
   const intentScore = deriveIntentScoreFromLead(lead)
   return {
     id: lead.id,
@@ -58,12 +58,12 @@ function buildPseudoInboxRowForHints(lead: GrowthLead, queueStatus: string): Gro
     updated_at: lead.updatedAt,
     site_key: lead.sourceDetail ?? lead.sourceKind,
     candidate_type: "identified",
-    candidate_priority: mapResearchPriorityToInboxPriority(lead.researchPriority) as GrowthLeadInboxRow["candidate_priority"],
+    candidate_priority: mapResearchPriorityToInboxPriority(lead.researchPriority) as RevenueQueueRow["candidate_priority"],
     intent_score: intentScore,
     intent_grade: "F",
     candidate_confidence: deriveCandidateConfidenceFromLead(lead),
     pipeline_entry: "icp_targeting",
-    pipeline_status: mapWorkflowHealthToPipelineStatus(lead.workflowHealth, mapLeadStatusToInboxQueueStatus(lead.status)) as GrowthLeadInboxRow["pipeline_status"],
+    pipeline_status: mapWorkflowHealthToPipelineStatus(lead.workflowHealth, mapLeadStatusToInboxQueueStatus(lead.status)) as RevenueQueueRow["pipeline_status"],
     company_name: lead.companyName,
     domain: domainFromWebsite(lead.website),
     contact_name: lead.contactName,
@@ -82,7 +82,7 @@ function buildPseudoInboxRowForHints(lead: GrowthLead, queueStatus: string): Gro
     utm_medium: "",
     utm_campaign: lead.sourceCampaign ?? "",
     owner_id: lead.assignedTo,
-    status: queueStatus as GrowthLeadInboxRow["status"],
+    status: queueStatus as RevenueQueueRow["status"],
     human_review_required: deriveHumanReviewRequiredFromLead(lead, mapLeadStatusToInboxQueueStatus(lead.status)),
     lead_engine_run_id: lead.latestResearchRunId,
     intent_session_id: typeof lead.metadata.intent_session_id === "string" ? lead.metadata.intent_session_id : "",
@@ -118,7 +118,7 @@ export function buildOperatorHandoffInputFromGrowthLead(lead: GrowthLead): Growt
   }
 }
 
-export function buildRevenueQueueCardProjectionFromLead(lead: GrowthLead): GrowthLeadInboxCardView {
+export function buildRevenueQueueCardProjectionFromLead(lead: GrowthLead): RevenueQueueCardView {
   const queueStatus = mapLeadStatusToInboxQueueStatus(lead.status)
   const pipelineStatus = mapWorkflowHealthToPipelineStatus(lead.workflowHealth, queueStatus)
   const handoffPkg = lead.metadata[GROWTH_OPERATOR_HANDOFF_METADATA_KEY]

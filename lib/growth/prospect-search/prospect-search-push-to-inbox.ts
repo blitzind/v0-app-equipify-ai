@@ -35,18 +35,22 @@ export {
   type ProspectSearchSelectionRef,
 } from "@/lib/growth/prospect-search/prospect-search-push-metadata"
 
+/** Push result — canonical Revenue Queue id is growth_lead_id. */
+export type ProspectSearchPushResult = {
+  outcome: GrowthProspectSearchPushOutcome
+  message: string
+  growth_lead_id?: string | null
+  lead_status?: string | null
+  lead_created?: boolean | null
+  workflow?: UnifiedRevenueWorkflowResult | null
+}
+
 export async function pushProspectSearchCompanyToLeadInbox(
   admin: SupabaseClient,
   company: GrowthProspectSearchCompanyResult,
   query: string,
   actor?: { userId: string | null; email?: string | null },
-): Promise<{
-  outcome: GrowthProspectSearchPushOutcome
-  message: string
-  lead_inbox_id?: string | null
-  growth_lead_id?: string | null
-  workflow?: UnifiedRevenueWorkflowResult | null
-}> {
+): Promise<ProspectSearchPushResult> {
   if (!company.company_name?.trim()) {
     return {
       outcome: "skipped_invalid",
@@ -57,7 +61,7 @@ export async function pushProspectSearchCompanyToLeadInbox(
   if (company.is_suppressed) {
     return {
       outcome: "suppressed",
-      message: "Suppressed from outreach — not pushed to Lead Inbox.",
+      message: "Suppressed from outreach — not added to Revenue Queue.",
     }
   }
 
@@ -127,7 +131,7 @@ export async function pushProspectSearchCompanyToLeadInbox(
       {
         source: "growth.prospect_search",
         section: "result_action",
-        signal: "push_to_lead_inbox",
+        signal: "push_to_revenue_queue",
         evidence: `Pushed from ${company.source_type} record ${company.id}.`,
         confidence: company.confidence,
       },
@@ -151,21 +155,22 @@ export async function pushProspectSearchCompanyToLeadInbox(
   if (result.duplicate) {
     return {
       outcome: "already_exists",
-      message: "Already in Lead Inbox.",
-      lead_inbox_id: null,
+      message: "Already in Revenue Queue.",
       growth_lead_id: result.growth_lead_id ?? company.growth_lead_id ?? null,
+      lead_status: result.lead_status ?? null,
+      lead_created: result.lead_created ?? false,
     }
   }
 
-  if (!result.ok || !result.row) {
+  if (!result.ok || !result.growth_lead_id) {
     return {
       outcome: "failed",
-      message: result.reason ?? "Lead Inbox create failed.",
+      message: result.reason ?? "Could not add to Revenue Queue.",
       growth_lead_id: result.growth_lead_id ?? null,
     }
   }
 
-  const growthLeadId = result.growth_lead_id ?? company.growth_lead_id ?? null
+  const growthLeadId = result.growth_lead_id
   const workflowRun = await runUnifiedRevenueWorkflowAfterIntake({
     admin,
     actor,
@@ -177,16 +182,14 @@ export async function pushProspectSearchCompanyToLeadInbox(
       companyId: company.id,
     },
     metadata: {
-      leadInboxId: result.row.id,
       searchQuery: query,
-      identityUncertain: !growthLeadId,
+      identityUncertain: false,
     },
   })
 
   return {
     outcome: "pushed",
-    message: "Added to Lead Inbox for human review.",
-    lead_inbox_id: result.row.id,
+    message: "Added to Revenue Queue for human review.",
     growth_lead_id: workflowRun.workflow?.leadId ?? growthLeadId,
     lead_status: result.lead_status ?? null,
     lead_created: result.lead_created ?? null,
@@ -228,7 +231,7 @@ export async function executeBulkPushToLeadInbox(
     return {
       ok: false,
       action: "bulk_push_to_lead_inbox",
-      message: "Select at least one company to push to Lead Inbox.",
+      message: "Select at least one company to add to Revenue Queue.",
       selected_total: 0,
       pushed: 0,
       already_exists: 0,
@@ -286,7 +289,7 @@ export async function executeBulkPushToLeadInbox(
       company_name: company.company_name,
       source_type: company.source_type,
       message: pushResult.message,
-      lead_inbox_id: pushResult.lead_inbox_id ?? null,
+      growth_lead_id: pushResult.growth_lead_id ?? null,
     })
 
     switch (pushResult.outcome) {

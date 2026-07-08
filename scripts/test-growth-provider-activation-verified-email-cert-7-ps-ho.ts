@@ -81,7 +81,7 @@ function shellFromTarget(
     company_match_confidence: null,
     growth_signal_score: null,
     decision_maker_coverage: null,
-    in_lead_inbox: false,
+    in_revenue_queue: false,
     existing_prospect: false,
     existing_customer: false,
     already_pushed: false,

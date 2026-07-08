@@ -143,4 +143,4 @@ export type GrowthContactDiscoverySnapshot = {
 }
 
 export const GROWTH_CONTACT_DISCOVERY_PRIVACY_NOTE =
-  "Contact candidates are infrastructure-only — no guessed emails, no fabricated LinkedIn or phones, no auto verification, and no automatic Lead Inbox creation."
+  "Contact candidates are infrastructure-only — no guessed emails, no fabricated LinkedIn or phones, no auto verification, and no automatic Revenue Queue creation."

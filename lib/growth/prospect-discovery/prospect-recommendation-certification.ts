@@ -61,7 +61,6 @@ function sampleHighSignalCompany(): GrowthProspectSearchCompanyResult {
     verification_status: "verified",
     signals: ["Hiring Surge", "Funding Event", "Pricing Page Visit", "Strong Fit"],
     search_intent_category: "biomedical",
-    lead_inbox_id: null,
     growth_lead_id: "7bf7a767-ef0f-4441-af6e-d0f3ffa81d56",
     prospect_id: null,
     customer_id: null,

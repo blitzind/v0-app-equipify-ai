@@ -1,6 +1,6 @@
 "use client"
 
-import type { GrowthLeadInboxCardView } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
+import type { RevenueQueueCardView } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import { computeDashboardKpis } from "@/lib/growth/revenue-intelligence/revenue-intelligence-ux"
 import { cn } from "@/lib/utils"
 
@@ -26,7 +26,7 @@ function KpiCell({
   )
 }
 
-export function RevenueKpiStrip({ cards }: { cards: GrowthLeadInboxCardView[] }) {
+export function RevenueKpiStrip({ cards }: { cards: RevenueQueueCardView[] }) {
   const kpi = computeDashboardKpis(cards)
 
   return (

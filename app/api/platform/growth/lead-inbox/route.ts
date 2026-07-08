@@ -4,14 +4,13 @@ import {
   growthHomeNoStoreJson,
 } from "@/lib/growth/home/growth-home-no-store-response"
 import {
-  GROWTH_LEAD_INBOX_SORT_MODES,
+  GROWTH_REVENUE_QUEUE_SORT_MODES,
   GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER,
-  type GrowthLeadInboxSortMode,
+  type RevenueQueueSortMode,
 } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import {
   GROWTH_REVENUE_QUEUE_API_BRIDGE_QA_MARKER,
   loadRevenueQueueDashboardPayload,
-  parseRevenueQueueApiSource,
 } from "@/lib/growth/revenue-queue/revenue-queue-api-bridge"
 
 export const runtime = "nodejs"
@@ -23,16 +22,13 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url)
   const sortParam = url.searchParams.get("sort") ?? "priority"
-  const sort: GrowthLeadInboxSortMode = GROWTH_LEAD_INBOX_SORT_MODES.includes(
-    sortParam as GrowthLeadInboxSortMode,
+  const sort: RevenueQueueSortMode = GROWTH_REVENUE_QUEUE_SORT_MODES.includes(
+    sortParam as RevenueQueueSortMode,
   )
-    ? (sortParam as GrowthLeadInboxSortMode)
+    ? (sortParam as RevenueQueueSortMode)
     : "priority"
-  const source = parseRevenueQueueApiSource(url.searchParams.get("source"))
-
   const dashboard = await loadRevenueQueueDashboardPayload(access.admin, {
     sort,
-    source,
     limit: 100,
   })
 

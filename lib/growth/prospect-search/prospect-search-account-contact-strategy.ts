@@ -398,7 +398,7 @@ export function buildProspectSearchAccountContactStrategy(input: {
   company_suppressed?: boolean
   company_match_confidence?: number | null
   lead_engine_score?: number | null
-  in_lead_inbox?: boolean
+  in_revenue_queue?: boolean
   existing_customer?: boolean
   contacts: StrategyContactInput[]
   coverage?: ProspectSearchCompanyContactCoverageIntelligence | null
@@ -529,7 +529,7 @@ export function buildProspectSearchAccountContactStrategy(input: {
   if (primary) queue_priority_score += primary.outreach_rank_score * 20
   if (coverage) queue_priority_score += coverage.outreach_readiness_score * 0.15
   if (input.lead_engine_score != null && input.lead_engine_score >= 70) queue_priority_score += 8
-  if (input.in_lead_inbox) queue_priority_score += 4
+  if (input.in_revenue_queue) queue_priority_score += 4
   if (input.company_match_confidence != null && input.company_match_confidence >= 0.7) {
     queue_priority_score += 5
   }

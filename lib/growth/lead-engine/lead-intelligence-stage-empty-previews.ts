@@ -110,7 +110,7 @@ export const LEAD_INTELLIGENCE_STAGE_EMPTY_PREVIEWS: Record<
       "Blockers, escalation flags, and compliance notes",
     ],
     whyItMatters: "Human gate before any revenue execution — no autonomous approval.",
-    executionTrigger: "Runs after lead score; operator must approve, hold, or reject in Lead Inbox.",
+    executionTrigger: "Runs after lead score; operator must approve, hold, or reject in Revenue Queue.",
   },
   revenue_execution: {
     purpose:

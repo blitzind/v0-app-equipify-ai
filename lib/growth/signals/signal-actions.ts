@@ -52,8 +52,6 @@ function mapSignalRow(row: Record<string, unknown>): GrowthSignalRow {
     evidence_summary: asString(row.evidence_summary),
     workflow_state: asString(row.workflow_state) as GrowthSignalRow["workflow_state"],
     suppression_state: asString(row.suppression_state) as GrowthSignalRow["suppression_state"],
-    processed_to_lead_inbox: row.processed_to_lead_inbox === true,
-    lead_inbox_id: typeof row.lead_inbox_id === "string" ? row.lead_inbox_id : null,
     created_at: asString(row.created_at),
     updated_at: asString(row.updated_at),
     metadata: row.metadata && typeof row.metadata === "object" ? (row.metadata as Record<string, unknown>) : {},
@@ -190,7 +188,7 @@ export async function applyGrowthSignalAction(
     .update(patch)
     .eq("id", signalId)
     .select(
-      "id, organization_id, signal_type, provider_key, provider_event_id, dedupe_hash, confidence, signal_score, urgency, routing_priority, occurred_at, detected_at, expires_at, company_id, company_name, domain, contact_id, contact_display_label, title, previous_title, seniority, geography, industry, category, evidence_summary, workflow_state, suppression_state, processed_to_lead_inbox, lead_inbox_id, created_at, updated_at, metadata",
+      "id, organization_id, signal_type, provider_key, provider_event_id, dedupe_hash, confidence, signal_score, urgency, routing_priority, occurred_at, detected_at, expires_at, company_id, company_name, domain, contact_id, contact_display_label, title, previous_title, seniority, geography, industry, category, evidence_summary, workflow_state, suppression_state, created_at, updated_at, metadata",
     )
     .maybeSingle()
 
@@ -233,7 +231,7 @@ async function loadSignalForAction(admin: SupabaseClient, signalId: string): Pro
     .schema("growth")
     .from("signals")
     .select(
-      "id, organization_id, signal_type, provider_key, provider_event_id, dedupe_hash, confidence, signal_score, urgency, routing_priority, occurred_at, detected_at, expires_at, company_id, company_name, domain, contact_id, contact_display_label, title, previous_title, seniority, geography, industry, category, evidence_summary, workflow_state, suppression_state, processed_to_lead_inbox, lead_inbox_id, created_at, updated_at, metadata",
+      "id, organization_id, signal_type, provider_key, provider_event_id, dedupe_hash, confidence, signal_score, urgency, routing_priority, occurred_at, detected_at, expires_at, company_id, company_name, domain, contact_id, contact_display_label, title, previous_title, seniority, geography, industry, category, evidence_summary, workflow_state, suppression_state, created_at, updated_at, metadata",
     )
     .eq("id", signalId)
     .maybeSingle()

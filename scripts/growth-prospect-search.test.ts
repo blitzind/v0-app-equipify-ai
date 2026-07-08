@@ -110,7 +110,9 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(indexSource, /growth\.leads/)
-  assert.match(indexSource, /growth\.lead_inbox/)
+  assert.match(indexSource, /GE-LEADS-CANONICAL-4B/)
+  assert.match(indexSource, /growth_lead_id/)
+  assert.doesNotMatch(indexSource, /\.from\(["']lead_inbox["']\)/)
   assert.match(indexSource, /search_intent_signals/)
   assert.doesNotMatch(indexSource, /scrape|outbound|apollo\.io/)
   assert.match(indexSource, /hydrateInternalCompanySignals/)
@@ -355,7 +357,6 @@ async function main(): Promise<void> {
         search_intent_category: null,
         returning_visitor: false,
         existing_account: false,
-        lead_inbox_id: null,
         growth_lead_id: "1",
         prospect_id: null,
         customer_id: null,
@@ -445,7 +446,6 @@ async function main(): Promise<void> {
         search_intent_category: null,
         returning_visitor: false,
         existing_account: false,
-        lead_inbox_id: null,
         growth_lead_id: "1",
         prospect_id: null,
         customer_id: null,
@@ -682,7 +682,6 @@ async function main(): Promise<void> {
       search_intent_category: "pricing",
       returning_visitor: true,
       existing_account: false,
-      lead_inbox_id: "inbox-1",
       growth_lead_id: null,
       prospect_id: null,
       customer_id: null,
@@ -722,7 +721,6 @@ async function main(): Promise<void> {
       verification_status: "crm_prospect",
       signals: [],
       search_intent_category: null,
-      lead_inbox_id: null,
       growth_lead_id: null,
       prospect_id: "crm-1",
       customer_id: null,
@@ -779,7 +777,6 @@ async function main(): Promise<void> {
     search_intent_category: null,
     returning_visitor: false,
     existing_account: false,
-    lead_inbox_id: null,
     growth_lead_id: "1",
     prospect_id: null,
     customer_id: null,
@@ -809,7 +806,7 @@ async function main(): Promise<void> {
     path.join(process.cwd(), "lib/growth/prospect-search/prospect-search-push-to-inbox.ts"),
     "utf8",
   )
-  assert.match(pushSource, /Already in Lead Inbox/)
+  assert.match(pushSource, /Already in Revenue Queue/)
   assert.match(pushSource, /resolveProspectSearchCompaniesForPush/)
   assert.match(pushSource, /createLeadCandidate/)
   assert.match(pushSource, /not autonomous/)
@@ -841,8 +838,8 @@ async function main(): Promise<void> {
     "utf8",
   )
   assert.match(bulkBarSource, /growth-prospect-search-bulk-action-bar/)
-  assert.match(bulkBarSource, /Push selected to Lead Inbox/)
-  assert.match(bulkBarSource, /View Lead Inbox/)
+  assert.match(bulkBarSource, /Add selected to Revenue Queue/)
+  assert.match(bulkBarSource, /View Revenue Queue/)
 
   assert.equal(GROWTH_PROSPECT_SEARCH_BULK_PUSH_QA_MARKER, "growth-prospect-search-bulk-push-v1")
   assert.equal(
@@ -857,7 +854,7 @@ async function main(): Promise<void> {
       skipped_invalid: 1,
       failed: 0,
     }),
-    "12 selected · 8 added to Lead Inbox · 3 already existed · 1 skipped because source was incomplete",
+    "12 selected · 8 added to Revenue Queue · 3 already existed · 1 skipped because source was incomplete",
   )
 
   const pushMetadata = buildProspectSearchPushMetadata(
@@ -887,7 +884,6 @@ async function main(): Promise<void> {
       verification_status: "unverified",
       signals: ["CRM indicators"],
       search_intent_category: "pricing",
-      lead_inbox_id: null,
       growth_lead_id: "lead-1",
       prospect_id: null,
       customer_id: null,
@@ -956,7 +952,7 @@ async function main(): Promise<void> {
       },
       existing_customer: false,
       existing_prospect: false,
-      in_lead_inbox: false,
+      in_revenue_queue: false,
       is_suppressed: false,
       suppression_reason: null,
       source_type: "growth_lead",
@@ -995,7 +991,7 @@ async function main(): Promise<void> {
       company_signal_summary: null,
       existing_customer: false,
       existing_prospect: false,
-      in_lead_inbox: false,
+      in_revenue_queue: false,
       is_suppressed: false,
       suppression_reason: null,
       source_type: "crm_prospect",
@@ -1004,14 +1000,15 @@ async function main(): Promise<void> {
   assert.ok(sparseExplained.confidence_explanation_items.some((item) => /limited/i.test(item)))
 
   const status = deriveProspectSearchCompanyStatus({
-    source_type: "lead_inbox",
-    lead_inbox_id: "inbox-1",
+    source_type: "growth_lead",
+    growth_lead_id: "lead-1",
     customer_id: null,
     prospect_id: null,
     existing_account: false,
     signals: [],
+    id: "lead-1",
   })
-  assert.equal(status.in_lead_inbox, true)
+  assert.equal(status.in_revenue_queue, true)
   assert.equal(status.already_pushed, true)
 
   const finalized = finalizeProspectSearchCompanyResult({
@@ -1040,7 +1037,6 @@ async function main(): Promise<void> {
     verification_status: "existing_account",
     signals: [],
     search_intent_category: null,
-    lead_inbox_id: null,
     growth_lead_id: null,
     prospect_id: null,
     customer_id: "cust-1",
@@ -1051,7 +1047,7 @@ async function main(): Promise<void> {
     suppression_reason: "unsubscribe",
     suppression_scope: "domain",
     suppressed_at: null,
-    in_lead_inbox: false,
+    in_revenue_queue: false,
     existing_customer: true,
     existing_prospect: false,
     already_pushed: false,
@@ -1098,7 +1094,7 @@ async function main(): Promise<void> {
         search_intent_category: null,
         returning_visitor: false,
         existing_account: false,
-        in_lead_inbox: false,
+        in_revenue_queue: false,
         existing_customer: false,
         existing_prospect: false,
         already_pushed: false,
@@ -1106,7 +1102,6 @@ async function main(): Promise<void> {
         suppression_reason: null,
         suppression_scope: null,
         suppressed_at: null,
-        lead_inbox_id: null,
         growth_lead_id: "1",
         prospect_id: null,
         customer_id: null,
@@ -1147,7 +1142,7 @@ async function main(): Promise<void> {
         search_intent_category: null,
         returning_visitor: false,
         existing_account: false,
-        in_lead_inbox: false,
+        in_revenue_queue: false,
         existing_customer: false,
         existing_prospect: false,
         already_pushed: false,
@@ -1155,7 +1150,6 @@ async function main(): Promise<void> {
         suppression_reason: "unsubscribe",
         suppression_scope: "email",
         suppressed_at: "2026-05-01T00:00:00.000Z",
-        lead_inbox_id: null,
         growth_lead_id: "2",
         prospect_id: null,
         customer_id: null,
@@ -1284,7 +1278,7 @@ async function main(): Promise<void> {
     search_intent_category: "pricing",
     returning_visitor: false,
     existing_account: false,
-    in_lead_inbox: false,
+    in_revenue_queue: false,
     existing_customer: false,
     existing_prospect: false,
     already_pushed: false,
@@ -1292,7 +1286,6 @@ async function main(): Promise<void> {
     suppression_reason: null,
     suppression_scope: null,
     suppressed_at: null,
-    lead_inbox_id: null,
     growth_lead_id: "lead-1",
     prospect_id: null,
     customer_id: null,
@@ -1495,7 +1488,7 @@ async function main(): Promise<void> {
         search_intent_category: null,
         returning_visitor: false,
         existing_account: false,
-        in_lead_inbox: false,
+        in_revenue_queue: false,
         existing_customer: false,
         existing_prospect: false,
         already_pushed: false,
@@ -1503,7 +1496,6 @@ async function main(): Promise<void> {
         suppression_reason: null,
         suppression_scope: null,
         suppressed_at: null,
-        lead_inbox_id: null,
         growth_lead_id: "1",
         prospect_id: null,
         customer_id: null,
@@ -1549,7 +1541,7 @@ async function main(): Promise<void> {
         search_intent_category: null,
         returning_visitor: false,
         existing_account: false,
-        in_lead_inbox: false,
+        in_revenue_queue: false,
         existing_customer: false,
         existing_prospect: false,
         already_pushed: false,
@@ -1557,7 +1549,6 @@ async function main(): Promise<void> {
         suppression_reason: null,
         suppression_scope: null,
         suppressed_at: null,
-        lead_inbox_id: null,
         growth_lead_id: "2",
         prospect_id: null,
         customer_id: null,
@@ -1620,7 +1611,7 @@ async function main(): Promise<void> {
       company_signal_summary: null,
       existing_customer: false,
       existing_prospect: false,
-      in_lead_inbox: false,
+      in_revenue_queue: false,
       is_suppressed: false,
       suppression_reason: null,
       source_type: "growth_lead",
@@ -1917,7 +1908,7 @@ async function main(): Promise<void> {
       company_signal_summary: null,
       existing_customer: false,
       existing_prospect: false,
-      in_lead_inbox: false,
+      in_revenue_queue: false,
       is_suppressed: false,
       suppression_reason: null,
       source_type: "growth_lead",
@@ -1973,7 +1964,7 @@ async function main(): Promise<void> {
       company_signal_summary: null,
       existing_customer: false,
       existing_prospect: false,
-      in_lead_inbox: false,
+      in_revenue_queue: false,
       is_suppressed: false,
       suppression_reason: null,
     },
@@ -2057,7 +2048,6 @@ async function main(): Promise<void> {
     verification_status: "unverified",
     signals: [],
     search_intent_category: null,
-    lead_inbox_id: null,
     growth_lead_id: null,
     prospect_id: null,
     customer_id: null,
@@ -2234,7 +2224,6 @@ async function main(): Promise<void> {
     verification_status: "external_unverified" as const,
     signals: [],
     search_intent_category: null,
-    lead_inbox_id: null,
     growth_lead_id: null,
     prospect_id: null,
     customer_id: null,
@@ -2876,7 +2865,6 @@ async function testProspectPipelineAutomation(): Promise<void> {
     verification_status: "verified",
     signals: ["Reply received last week"],
     search_intent_category: null,
-    lead_inbox_id: "inbox-1",
     growth_lead_id: "lead-1",
     prospect_id: null,
     customer_id: null,
@@ -2884,7 +2872,7 @@ async function testProspectPipelineAutomation(): Promise<void> {
     match_reasoning: ["Industry match"],
     crm_detected: null,
     field_service_software: null,
-    in_lead_inbox: true,
+    in_revenue_queue: true,
     existing_customer: false,
     existing_prospect: false,
     already_pushed: true,
@@ -2929,7 +2917,6 @@ async function testProspectPipelineAutomation(): Promise<void> {
     is_suppressed: true,
     suppression_reason: "Do not contact",
     growth_lead_id: null,
-    lead_inbox_id: null,
   }
   const suppressedRec = deriveProspectPipelineRecommendation(
     suppressed,
@@ -2971,7 +2958,7 @@ async function testProspectPipelineAutomation(): Promise<void> {
   assert.ok(sequenceLaunch?.launch_url?.includes("leadId=lead-1"))
 
   const noLead = buildProspectWorkflowLauncherActions({
-    company: { ...baseCompany, growth_lead_id: null, lead_inbox_id: null, in_lead_inbox: false },
+    company: { ...baseCompany, growth_lead_id: null, in_revenue_queue: false },
   }).find((action) => action.id === "open_copilot")
   assert.equal(noLead?.enabled, false)
 
@@ -3004,7 +2991,7 @@ async function testProspectPipelineAutomation(): Promise<void> {
   assert.equal(draftAction?.enabled, true)
   assert.ok(draftAction?.launch_url?.includes("/admin/growth/copilot"))
   assert.ok(draftAction?.launch_url?.includes("leadId=lead-1"))
-  assert.doesNotMatch(draftAction?.launch_url ?? "", /lead_inbox_id|inbox-1/)
+  assert.doesNotMatch(draftAction?.launch_url ?? "", /inbox-1/)
 }
 
 async function testProspectOutboundLaunchMotion(): Promise<void> {
@@ -3024,7 +3011,6 @@ async function testProspectOutboundLaunchMotion(): Promise<void> {
   const company = {
     id: "co-1",
     growth_lead_id: "lead-1",
-    lead_inbox_id: "inbox-1",
     company_name: "Acme",
     is_suppressed: false,
     suppression_reason: null,
@@ -3033,7 +3019,7 @@ async function testProspectOutboundLaunchMotion(): Promise<void> {
     decision_maker_coverage: 50,
     contact_intelligence: null,
     committee_completion: null,
-    in_lead_inbox: true,
+    in_revenue_queue: true,
     buying_stage: "consideration",
     lead_engine_score: 55,
     lead_score: 55,
@@ -3054,7 +3040,7 @@ async function testProspectOutboundLaunchMotion(): Promise<void> {
     company: { ...company, growth_lead_id: null },
   })
   assert.equal(inboxOnly.can_launch, false)
-  assert.match(inboxOnly.checks.find((c) => c.id === "crm_lead")?.detail ?? "", /CRM lead/i)
+  assert.match(inboxOnly.checks.find((c) => c.id === "crm_lead")?.detail ?? "", /Revenue Queue/i)
 
   const urls = buildOutboundLaunchUrls({ company })
   assert.ok(urls.generate_draft?.includes("leadId=lead-1"))
@@ -3582,12 +3568,11 @@ async function testBase64UrlRuntimeFix(): Promise<void> {
       lead_engine_last_run_at: null,
       decision_maker_coverage: null,
       growth_lead_id: null,
-      lead_inbox_id: null,
       prospect_id: null,
       customer_id: null,
       is_suppressed: false,
       suppression_reason: null,
-      in_lead_inbox: false,
+      in_revenue_queue: false,
       already_pushed: false,
       existing_customer: false,
       existing_prospect: false,
@@ -4443,7 +4428,7 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   const memory = computeRelationshipStrength({
     company_name: "Acme HVAC",
     growth_lead_id: "lead-1",
-    in_lead_inbox: true,
+    in_revenue_queue: true,
     timeline_events: [
       {
         kind: "email_reply",
@@ -4479,7 +4464,7 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
       id: "co1",
       company_name: "Acme",
       source_type: "discover_candidate",
-      in_lead_inbox: true,
+      in_revenue_queue: true,
       is_suppressed: false,
     } as never,
     peopleRows: [
@@ -4576,7 +4561,7 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
       id: "co1",
       company_name: "Acme",
       source_type: "discover_candidate",
-      in_lead_inbox: true,
+      in_revenue_queue: true,
       is_suppressed: false,
     } as never,
     peopleRows: [
@@ -4869,7 +4854,7 @@ async function testProspectSearchContactDiscovery(): Promise<void> {
   assert.ok(overlays.overlays.length >= 1)
 
   const assistBundle = buildProspectSearchOperatorAssistIntelligence({
-    company: { id: "co1", company_name: "Acme", is_suppressed: false, in_lead_inbox: true } as never,
+    company: { id: "co1", company_name: "Acme", is_suppressed: false, in_revenue_queue: true } as never,
     peopleRows: [
       {
         contact_id: "c1",

@@ -1,7 +1,7 @@
 /** GE-AIOS-UX-1A / GE-AIOS-UX-1B — AI OS home operator experience synthesizer (client-safe, read-model only). */
 
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-workspace-base-path"
-import type { GrowthLeadInboxRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
+import type { RevenueQueueRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
 import { sortLeadInboxQueue } from "@/lib/growth/lead-inbox/lead-inbox-priority"
 import {
   hasCanonicalDailyWorkQueue,
@@ -319,7 +319,7 @@ export function buildExecutiveBriefingHero(
 }
 
 function mapInboxPriority(
-  priority: GrowthLeadInboxRow["candidate_priority"],
+  priority: RevenueQueueRow["candidate_priority"],
 ): GrowthHomeDailyWorkQueueItem["priority"] {
   if (priority === "urgent") return "critical"
   if (priority === "high") return "high"
@@ -599,13 +599,13 @@ export function buildAiOsUxViewModel(input: {
 export function buildLeadInboxHighlightsFromSections(
   sections: Array<{ id: string; items: unknown[] }>,
 ): GrowthWorkspaceDashboardViewModel["leadInboxHighlights"] {
-  const rows: GrowthLeadInboxRow[] = []
+  const rows: RevenueQueueRow[] = []
   for (const section of sections) {
     for (const item of section.items) {
       if (!item || typeof item !== "object") continue
-      const row = item as Partial<GrowthLeadInboxRow>
+      const row = item as Partial<RevenueQueueRow>
       if (!row.id || !row.company_name) continue
-      rows.push(item as GrowthLeadInboxRow)
+      rows.push(item as RevenueQueueRow)
     }
   }
 
@@ -621,7 +621,7 @@ export function buildLeadInboxHighlightsFromSections(
             ? "Research in progress"
             : row.candidate_reasoning[0] ?? "Review candidate",
       priority: mapInboxPriority(row.candidate_priority),
-      href: `/growth/lead-inbox?candidate=${encodeURIComponent(row.id)}`,
+      href: `/admin/growth/leads/${encodeURIComponent(row.id)}`,
       confidence: row.candidate_confidence > 1 ? row.candidate_confidence : row.candidate_confidence * 100,
     }))
 }

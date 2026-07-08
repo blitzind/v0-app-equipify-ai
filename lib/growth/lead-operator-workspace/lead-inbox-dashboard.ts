@@ -1,15 +1,15 @@
 import { compareLeadInboxPriority } from "@/lib/growth/lead-inbox/lead-inbox-priority"
-import type { GrowthLeadInboxRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
+import type { RevenueQueueRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
 import {
-  GROWTH_LEAD_INBOX_DASHBOARD_SECTIONS,
-  type GrowthLeadInboxCardView,
-  type GrowthLeadInboxDashboardSection,
-  type GrowthLeadInboxDashboardSectionPayload,
-  type GrowthLeadInboxSortMode,
+  GROWTH_REVENUE_QUEUE_DASHBOARD_SECTIONS,
+  type RevenueQueueCardView,
+  type RevenueQueueDashboardSection,
+  type RevenueQueueDashboardSectionPayload,
+  type RevenueQueueSortMode,
 } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
-import { buildLeadInboxCardView } from "@/lib/growth/lead-operator-workspace/lead-inbox-card-view"
+import { buildRevenueQueueCardView } from "@/lib/growth/lead-operator-workspace/lead-inbox-card-view"
 
-const SECTION_LABELS: Record<GrowthLeadInboxDashboardSection, string> = {
+const SECTION_LABELS: Record<RevenueQueueDashboardSection, string> = {
   high_priority: "High Priority",
   needs_review: "Needs Review",
   enrichment_needed: "Enrichment Needed",
@@ -18,7 +18,7 @@ const SECTION_LABELS: Record<GrowthLeadInboxDashboardSection, string> = {
   archived: "Archived",
 }
 
-export function resolveInboxDashboardSection(row: GrowthLeadInboxRow): GrowthLeadInboxDashboardSection {
+export function resolveInboxDashboardSection(row: RevenueQueueRow): RevenueQueueDashboardSection {
   if (row.status === "archived" || row.status === "disqualified" || row.status === "duplicate") {
     return "archived"
   }
@@ -47,9 +47,9 @@ export function resolveInboxDashboardSection(row: GrowthLeadInboxRow): GrowthLea
 }
 
 function compareBySortMode(
-  a: GrowthLeadInboxCardView,
-  b: GrowthLeadInboxCardView,
-  mode: GrowthLeadInboxSortMode,
+  a: RevenueQueueCardView,
+  b: RevenueQueueCardView,
+  mode: RevenueQueueSortMode,
 ): number {
   if (mode === "intent") {
     const delta = b.intent_score - a.intent_score
@@ -72,11 +72,11 @@ function compareBySortMode(
 }
 
 export function buildLeadInboxDashboardSections(
-  rows: GrowthLeadInboxRow[],
-  sort: GrowthLeadInboxSortMode = "priority",
-): GrowthLeadInboxDashboardSectionPayload[] {
-  const buckets = new Map<GrowthLeadInboxDashboardSection, GrowthLeadInboxCardView[]>()
-  for (const section of GROWTH_LEAD_INBOX_DASHBOARD_SECTIONS) {
+  rows: RevenueQueueRow[],
+  sort: RevenueQueueSortMode = "priority",
+): RevenueQueueDashboardSectionPayload[] {
+  const buckets = new Map<RevenueQueueDashboardSection, RevenueQueueCardView[]>()
+  for (const section of GROWTH_REVENUE_QUEUE_DASHBOARD_SECTIONS) {
     buckets.set(section, [])
   }
 
@@ -84,11 +84,11 @@ export function buildLeadInboxDashboardSections(
 
   for (const row of sortedRows) {
     const section = resolveInboxDashboardSection(row)
-    const card = buildLeadInboxCardView(row)
+    const card = buildRevenueQueueCardView(row)
     buckets.get(section)!.push(card)
   }
 
-  return GROWTH_LEAD_INBOX_DASHBOARD_SECTIONS.map((id) => {
+  return GROWTH_REVENUE_QUEUE_DASHBOARD_SECTIONS.map((id) => {
     const items = [...(buckets.get(id) ?? [])].sort((a, b) => compareBySortMode(a, b, sort))
     return { id, label: SECTION_LABELS[id], items }
   })

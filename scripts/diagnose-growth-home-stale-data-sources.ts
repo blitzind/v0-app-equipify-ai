@@ -84,7 +84,6 @@ async function main(): Promise<void> {
     jobsRes,
     threadsRes,
     repliesRes,
-    leadInboxRes,
     opportunitiesRes,
     leadsRes,
     cadenceRes,
@@ -100,7 +99,6 @@ async function main(): Promise<void> {
       .from("outbound_replies")
       .select("id", { count: "exact", head: true })
       .eq("unanswered", true),
-    admin.schema("growth").from("lead_inbox").select("id", { count: "exact", head: true }),
     admin.schema("growth").from("opportunities").select("id", { count: "exact", head: true }),
     admin.schema("growth").from("leads").select("id", { count: "exact", head: true }),
     admin
@@ -125,7 +123,7 @@ async function main(): Promise<void> {
         sequence_execution_jobs: jobCounts,
         inbox_threads_open_or_needs_review: threadsRes.count ?? 0,
         outbound_replies_unanswered: repliesRes.count ?? 0,
-        lead_inbox_rows: leadInboxRes.count ?? 0,
+        legacy_lead_inbox_table: "dropped (GE-LEADS-CANONICAL-4F)",
         opportunities_rows: opportunitiesRes.count ?? 0,
         leads_rows: leadsRes.count ?? 0,
         cadence_tasks_open: cadenceRes.count ?? 0,
@@ -133,7 +131,7 @@ async function main(): Promise<void> {
           pending_approvals_estimate: jobCounts.draft + jobCounts.pending_approval,
           blocked_jobs_estimate: jobCounts.blocked,
           qualified_prospects_estimate:
-            (leadInboxRes.count ?? 0) + (cadenceRes.count ?? 0),
+            (leadsRes.count ?? 0) + (cadenceRes.count ?? 0),
           replies_waiting_estimate: threadsRes.count ?? 0,
         },
       },

@@ -42,7 +42,6 @@ export type GrowthProspectWorkflowContext = {
   source_type: GrowthProspectSearchCompanyResult["source_type"]
   source_id: string
   growth_lead_id: string | null
-  lead_inbox_id: string | null
   prospect_id: string | null
   customer_id: string | null
   qualification: {
@@ -60,7 +59,7 @@ export type GrowthProspectWorkflowContext = {
   outreach_state: {
     is_suppressed: boolean
     suppression_reason: string | null
-    in_lead_inbox: boolean
+    in_revenue_queue: boolean
     already_pushed: boolean
     existing_customer: boolean
     existing_prospect: boolean
@@ -102,12 +101,11 @@ export function buildGrowthWorkflowContext(input: {
     | "lead_engine_last_run_at"
     | "decision_maker_coverage"
     | "growth_lead_id"
-    | "lead_inbox_id"
     | "prospect_id"
     | "customer_id"
     | "is_suppressed"
     | "suppression_reason"
-    | "in_lead_inbox"
+    | "in_revenue_queue"
     | "already_pushed"
     | "existing_customer"
     | "existing_prospect"
@@ -144,7 +142,6 @@ export function buildGrowthWorkflowContext(input: {
     source_type: company.source_type,
     source_id: company.id,
     growth_lead_id: company.growth_lead_id,
-    lead_inbox_id: company.lead_inbox_id,
     prospect_id: company.prospect_id,
     customer_id: company.customer_id,
     qualification: {
@@ -162,7 +159,7 @@ export function buildGrowthWorkflowContext(input: {
     outreach_state: {
       is_suppressed: company.is_suppressed === true,
       suppression_reason: company.suppression_reason,
-      in_lead_inbox: company.in_lead_inbox === true,
+      in_revenue_queue: company.in_revenue_queue === true,
       already_pushed: company.already_pushed === true,
       existing_customer: company.existing_customer === true,
       existing_prospect: company.existing_prospect === true,

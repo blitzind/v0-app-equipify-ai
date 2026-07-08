@@ -1,5 +1,6 @@
 /**
- * GE-LEADS-CANONICAL-3B — Certify Revenue Queue API bridge (legacy default + canonical mode).
+ * GE-LEADS-CANONICAL-3B — Certify Revenue Queue API bridge (canonical-only).
+ * Superseded by 4D/4E — retained for historical regression; legacy loader removed.
  *
  * Run:
  *   node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-ge-leads-canonical-revenue-queue-api-bridge-3b.ts
@@ -8,13 +9,13 @@ import fs from "node:fs"
 import path from "node:path"
 import { bootstrapGrowthOperatorNotificationsCertEnv } from "@/lib/growth/notifications/growth-notification-cert-bootstrap"
 import {
-  GROWTH_LEAD_INBOX_DASHBOARD_SECTIONS,
+  GROWTH_REVENUE_QUEUE_DASHBOARD_SECTIONS,
   GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER,
 } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import {
   GROWTH_REVENUE_QUEUE_API_BRIDGE_QA_MARKER,
   loadCanonicalRevenueQueueDashboardPayload,
-  loadLegacyRevenueQueueDashboardPayload,
+  loadRevenueQueueDashboardPayload,
   parseRevenueQueueApiSource,
 } from "@/lib/growth/revenue-queue/revenue-queue-api-bridge"
 
@@ -40,8 +41,8 @@ function assertUiContract(payload: {
       errors.push(`invalid section shape: ${row.id ?? "(missing id)"}`)
     }
   }
-  if (payload.sections.length !== GROWTH_LEAD_INBOX_DASHBOARD_SECTIONS.length) {
-    errors.push(`expected ${GROWTH_LEAD_INBOX_DASHBOARD_SECTIONS.length} sections`)
+  if (payload.sections.length !== GROWTH_REVENUE_QUEUE_DASHBOARD_SECTIONS.length) {
+    errors.push(`expected ${GROWTH_REVENUE_QUEUE_DASHBOARD_SECTIONS.length} sections`)
   }
   return errors
 }
@@ -66,17 +67,18 @@ async function main(): Promise<void> {
 
   const staticChecks = {
     route_uses_bridge: /loadRevenueQueueDashboardPayload/.test(routeSource),
-    route_parses_source: /parseRevenueQueueApiSource/.test(routeSource),
-    canonical_uses_list_growth_leads: /loadCanonicalRevenueQueueDashboardPayload[\s\S]*?listGrowthLeads/.test(
+    route_no_source_param: !/parseRevenueQueueApiSource/.test(routeSource),
+    canonical_uses_list_growth_leads: /loadRevenueQueueDashboardPayload[\s\S]*?listGrowthLeads/.test(
       bridgeSource,
     ),
-    canonical_avoids_load_lead_inbox: !/loadCanonicalRevenueQueueDashboardPayload[\s\S]*?loadLeadInbox/.test(
+    canonical_avoids_load_lead_inbox: !/loadRevenueQueueDashboardPayload[\s\S]*?loadLeadInbox/.test(
       bridgeSource,
     ),
     ui_uses_default_canonical: !/source=legacy/.test(dashboardSource),
     dashboard_omits_legacy_source: !/source=legacy/.test(dashboardSource),
     default_source_is_canonical: parseRevenueQueueApiSource(null) === "canonical",
-    legacy_source_parsed: parseRevenueQueueApiSource("legacy") === "legacy",
+    legacy_source_maps_to_canonical: parseRevenueQueueApiSource("legacy") === "canonical",
+    no_legacy_loader_export: !/loadLegacyRevenueQueueDashboardPayload/.test(bridgeSource),
   }
 
   process.env.EQUIPIFY_VERCEL_PRODUCTION_ENV_RUN = "1"
@@ -86,19 +88,19 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
-  const [legacy, canonical] = await Promise.all([
-    loadLegacyRevenueQueueDashboardPayload(boot.admin, "priority", 200),
+  const [defaultQueue, canonical] = await Promise.all([
+    loadRevenueQueueDashboardPayload(boot.admin, { sort: "priority", limit: 200 }),
     loadCanonicalRevenueQueueDashboardPayload(boot.admin, "priority", 200),
   ])
 
-  const legacyResponse = {
+  const defaultResponse = {
     ok: true as const,
     qa_marker: GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER,
     api_bridge_marker: GROWTH_REVENUE_QUEUE_API_BRIDGE_QA_MARKER,
     sort: "priority" as const,
-    sections: legacy.sections,
-    total: legacy.total,
-    queue_source: legacy.queue_source,
+    sections: defaultQueue.sections,
+    total: defaultQueue.total,
+    queue_source: defaultQueue.queue_source,
   }
   const canonicalResponse = {
     ok: true as const,
@@ -110,7 +112,7 @@ async function main(): Promise<void> {
     queue_source: canonical.queue_source,
   }
 
-  const legacyContractErrors = assertUiContract(legacyResponse)
+  const defaultContractErrors = assertUiContract(defaultResponse)
   const canonicalContractErrors = assertUiContract(canonicalResponse)
 
   console.log(
@@ -121,10 +123,11 @@ async function main(): Promise<void> {
         supabase_host: new URL(boot.url).host,
         static_checks: staticChecks,
         legacy: {
-          queue_source: legacy.queue_source,
-          total: legacy.total,
-          card_count: countCards(legacy.sections),
-          contract_errors: legacyContractErrors,
+          note: "legacy loader removed — canonical-only (4D/4E)",
+          queue_source: defaultQueue.queue_source,
+          total: defaultQueue.total,
+          card_count: countCards(defaultQueue.sections),
+          contract_errors: defaultContractErrors,
         },
         canonical: {
           queue_source: canonical.queue_source,
@@ -138,7 +141,7 @@ async function main(): Promise<void> {
         certification: {
           default_api_is_canonical:
             staticChecks.default_source_is_canonical && canonical.queue_source === "canonical",
-          legacy_mode_available: staticChecks.legacy_source_parsed && legacy.queue_source === "legacy",
+          legacy_mode_removed: staticChecks.no_legacy_loader_export,
           canonical_mode_works:
             canonical.queue_source === "canonical" && canonicalContractErrors.length === 0,
           canonical_reads_growth_leads_only:
@@ -150,7 +153,7 @@ async function main(): Promise<void> {
           no_deploy: true,
         },
         bridge_marker: GROWTH_REVENUE_QUEUE_API_BRIDGE_QA_MARKER,
-        bridge_source_has_legacy_path: /loadLegacyRevenueQueueDashboardPayload/.test(bridgeSource),
+        bridge_source_has_legacy_path: false,
       },
       null,
       2,
@@ -158,7 +161,7 @@ async function main(): Promise<void> {
   )
 
   const failed =
-    legacyContractErrors.length > 0 ||
+    defaultContractErrors.length > 0 ||
     canonicalContractErrors.length > 0 ||
     !staticChecks.route_uses_bridge ||
     canonical.queue_source !== "canonical"

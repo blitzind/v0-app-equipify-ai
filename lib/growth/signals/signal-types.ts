@@ -187,8 +187,6 @@ export type GrowthSignalRow = {
   evidence_summary: string
   workflow_state: GrowthSignalWorkflowState
   suppression_state: GrowthSignalSuppressionState
-  processed_to_lead_inbox: boolean
-  lead_inbox_id: string | null
   created_at: string
   updated_at: string
   metadata: Record<string, unknown>
@@ -239,6 +237,9 @@ export type GrowthSignalScoringResult = {
   routing_priority: number
   scoring_metadata: Record<string, unknown>
 }
+
+export const GROWTH_SIGNAL_ROW_SELECT =
+  "id, organization_id, signal_type, provider_key, provider_event_id, dedupe_hash, confidence, signal_score, urgency, routing_priority, occurred_at, detected_at, expires_at, company_id, company_name, domain, contact_id, contact_display_label, title, previous_title, seniority, geography, industry, category, evidence_summary, workflow_state, suppression_state, created_at, updated_at, metadata" as const
 
 export const GROWTH_SIGNAL_INTERNAL_FIELD_NAMES = [
   "raw_payload_ref",

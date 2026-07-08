@@ -78,4 +78,4 @@ export type GrowthExternalCompanyDiscoveryRun = {
 }
 
 export const GROWTH_EXTERNAL_DISCOVERY_PRIVACY_NOTE =
-  "External discovery candidates are not leads until an operator pushes to Lead Inbox. No fabricated data, no email guessing, no person enrichment, and no autonomous outreach."
+  "External discovery candidates are not leads until an operator pushes to Revenue Queue. No fabricated data, no email guessing, no person enrichment, and no autonomous outreach."

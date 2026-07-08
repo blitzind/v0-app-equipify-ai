@@ -249,7 +249,7 @@ export function GrowthIntentPixelAdmin({
       }
       setLastHandoff(data.result)
       setMessage(
-        `Processed ${data.result.bridged_count} session(s): ${data.result.ingested_count} added to Lead Inbox, ${data.result.duplicate_count} duplicate(s), ${data.result.skipped_count} skipped.`,
+        `Processed ${data.result.bridged_count} session(s): ${data.result.ingested_count} added to Revenue Queue, ${data.result.duplicate_count} duplicate(s), ${data.result.skipped_count} skipped.`,
       )
       await loadAll(selectedKey)
     } finally {

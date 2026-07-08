@@ -1,5 +1,6 @@
 /**
  * GE-LEADS-CANONICAL-3D — Certify canonical Revenue Queue actions + default API flip.
+ * Superseded by 4D/4E — canonical-only; legacy inbox mutations removed.
  *
  * Read-only production checks for list/detail/resolution; no action POST mutations.
  *
@@ -10,7 +11,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { bootstrapGrowthOperatorNotificationsCertEnv } from "@/lib/growth/notifications/growth-notification-cert-bootstrap"
 import {
-  GROWTH_LEAD_INBOX_DASHBOARD_SECTIONS,
+  GROWTH_REVENUE_QUEUE_DASHBOARD_SECTIONS,
   GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER,
 } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import {
@@ -20,7 +21,6 @@ import {
 import {
   GROWTH_REVENUE_QUEUE_API_BRIDGE_QA_MARKER,
   loadCanonicalRevenueQueueDashboardPayload,
-  loadLegacyRevenueQueueDashboardPayload,
   loadRevenueQueueDashboardPayload,
   parseRevenueQueueApiSource,
 } from "@/lib/growth/revenue-queue/revenue-queue-api-bridge"
@@ -38,8 +38,8 @@ function assertDashboardContract(payload: {
   if (!Array.isArray(payload.sections)) errors.push("sections must be array")
   if (typeof payload.total !== "number") errors.push("total must be number")
   if (!Array.isArray(payload.sections)) return errors
-  if (payload.sections.length !== GROWTH_LEAD_INBOX_DASHBOARD_SECTIONS.length) {
-    errors.push(`expected ${GROWTH_LEAD_INBOX_DASHBOARD_SECTIONS.length} sections`)
+  if (payload.sections.length !== GROWTH_REVENUE_QUEUE_DASHBOARD_SECTIONS.length) {
+    errors.push(`expected ${GROWTH_REVENUE_QUEUE_DASHBOARD_SECTIONS.length} sections`)
   }
   return errors
 }
@@ -68,7 +68,7 @@ async function main(): Promise<void> {
 
   const staticChecks = {
     default_source_is_canonical: parseRevenueQueueApiSource(null) === "canonical",
-    legacy_source_available: parseRevenueQueueApiSource("legacy") === "legacy",
+    legacy_source_maps_to_canonical: parseRevenueQueueApiSource("legacy") === "canonical",
     dashboard_uses_default_api: /\/api\/platform\/growth\/lead-inbox\?sort=/.test(dashboardSource),
     dashboard_avoids_legacy_source: !/source=legacy/.test(dashboardSource),
     hub_metrics_uses_default_api: /\/api\/platform\/growth\/lead-inbox\?sort=priority/.test(hubMetricsSource),
@@ -78,9 +78,8 @@ async function main(): Promise<void> {
     actions_route_uses_bridge: /executeRevenueQueueAction/.test(actionsRouteSource),
     actions_route_avoids_inbox_fetch: !/fetchLeadInboxById/.test(actionsRouteSource),
     canonical_action_prefers_growth_leads:
-      /resolveRevenueQueueActionTarget[\s\S]*?fetchGrowthLeadById[\s\S]*?fetchLeadInboxById/.test(
-        actionBridgeSource,
-      ),
+      /resolveRevenueQueueActionTarget[\s\S]*?fetchGrowthLeadById/.test(actionBridgeSource) &&
+      !/fetchLeadInboxById/.test(actionBridgeSource),
     canonical_apply_avoids_inbox_mutations:
       /async function applyCanonicalLeadAction[\s\S]*?updateGrowthLead/.test(actionBridgeSource) &&
       !/async function applyCanonicalLeadAction[\s\S]*?claimLead\(/.test(actionBridgeSource),
@@ -94,7 +93,7 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
-  const [defaultPayload, legacyPayload, explicitCanonical] = await Promise.all([
+  const [defaultPayload, legacyMappedPayload, explicitCanonical] = await Promise.all([
     loadRevenueQueueDashboardPayload(boot.admin, { sort: "priority", source: "canonical", limit: 200 }),
     loadRevenueQueueDashboardPayload(boot.admin, { sort: "priority", source: "legacy", limit: 200 }),
     loadCanonicalRevenueQueueDashboardPayload(boot.admin, "priority", 200),
@@ -130,8 +129,8 @@ async function main(): Promise<void> {
         queue: {
           default_total: defaultPayload.total,
           default_queue_source: defaultPayload.queue_source,
-          legacy_total: legacyPayload.total,
-          legacy_queue_source: legacyPayload.queue_source,
+          legacy_total: legacyMappedPayload.total,
+          legacy_queue_source: legacyMappedPayload.queue_source,
           explicit_canonical_total: explicitCanonical.total,
           counts_align: countsAlign,
           contract_errors: defaultContractErrors,
@@ -167,8 +166,9 @@ async function main(): Promise<void> {
             actionTarget?.source === "canonical_lead" && detailResult?.resolution.source === "canonical_lead",
           canonical_actions_do_not_mutate_lead_inbox:
             staticChecks.canonical_apply_avoids_inbox_mutations && staticChecks.actions_route_avoids_inbox_fetch,
-          legacy_source_remains_available:
-            staticChecks.legacy_source_available && legacyPayload.queue_source === "legacy",
+          legacy_source_maps_to_canonical:
+            staticChecks.legacy_source_maps_to_canonical &&
+            legacyMappedPayload.queue_source === "canonical",
           no_duplicate_ui: staticChecks.no_duplicate_dashboard_component,
           no_writes: true,
           no_commit: true,

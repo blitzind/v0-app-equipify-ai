@@ -1,6 +1,6 @@
 /** GE-LEADS-CANONICAL-3A — Canonical Revenue Queue projection types (client-safe). */
 
-import type { GrowthLeadInboxCardView } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
+import type { RevenueQueueCardView } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import type { GrowthLeadSourceKind, GrowthLeadStatus } from "@/lib/growth/types"
 
 export const GROWTH_REVENUE_QUEUE_PROJECTION_QA_MARKER =
@@ -60,7 +60,7 @@ export type RevenueQueueLeadProjection = {
   created_at: string
   updated_at: string
   human_review_required: boolean
-  evidence_strength: GrowthLeadInboxCardView["evidence_strength"]
+  evidence_strength: RevenueQueueCardView["evidence_strength"]
   evidence_count: number
   intent_indicators: string[]
   is_purchase_ready: boolean
@@ -68,7 +68,7 @@ export type RevenueQueueLeadProjection = {
   is_returning_account: boolean
   needs_review: boolean
   /** Legacy card-shaped slice for dashboard parity certification. */
-  card_view: GrowthLeadInboxCardView
+  card_view: RevenueQueueCardView
   /** Fields that could not be populated from growth.leads alone. */
   missing_projection_fields: string[]
 }

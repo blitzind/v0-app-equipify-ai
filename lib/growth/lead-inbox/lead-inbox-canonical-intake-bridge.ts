@@ -1,5 +1,5 @@
 /**
- * GE-LEADS-CANONICAL-2A — Resolve or create growth.leads before legacy lead_inbox writes.
+ * GE-LEADS-CANONICAL-4E — Canonical intake bridge (growth.leads only; no lead_inbox writes).
  */
 
 import "server-only"
@@ -9,13 +9,13 @@ import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { normalizeLeadIntakeSource } from "@/lib/growth/revenue-workflow/normalize-lead-intake-source"
 import { resolveUnifiedLeadFromIntake } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lead-resolver"
 import type { LeadIntakeSource } from "@/lib/growth/revenue-workflow/unified-lead-intake-types"
-import type {
-  GrowthLeadInboxCreateInput,
-  GrowthLeadInboxCrmMatch,
-} from "@/lib/growth/lead-inbox/lead-inbox-types"
+import type { GrowthLeadInboxCreateInput } from "@/lib/growth/lead-inbox/lead-inbox-types"
 
 export const GROWTH_LEAD_INBOX_CANONICAL_BRIDGE_QA_MARKER =
   "growth-lead-inbox-canonical-bridge-v1" as const
+
+export const GROWTH_LEAD_INBOX_CANONICAL_INTAKE_CUTOVER_QA_MARKER =
+  "growth-lead-inbox-canonical-intake-cutover-v1" as const
 
 export const GROWTH_LEAD_INBOX_METADATA_GROWTH_LEAD_ID = "growth_lead_id" as const
 
@@ -124,77 +124,14 @@ export async function resolveCanonicalLeadForInboxInput(
   }
 }
 
-function parseCrmMatch(value: unknown): GrowthLeadInboxCrmMatch {
-  const row = value && typeof value === "object" ? (value as Record<string, unknown>) : {}
-  return {
-    matched: row.matched === true,
-    source: asString(row.source) || null,
-    ids: Array.isArray(row.ids) ? row.ids.filter((id): id is string => typeof id === "string") : [],
-    evidence: asString(row.evidence),
-  }
-}
-
-async function loadDuplicateInboxContext(
-  admin: SupabaseClient,
-  existingInboxId: string,
-): Promise<{
-  metadata: Record<string, unknown>
-  existing_lead_match: GrowthLeadInboxCrmMatch
-  existing_account_match: GrowthLeadInboxCrmMatch
-} | null> {
-  try {
-    const { data } = await admin
-      .schema("growth")
-      .from("lead_inbox")
-      .select("metadata, existing_lead_match, existing_account_match")
-      .eq("id", existingInboxId)
-      .maybeSingle()
-    if (!data) return null
-    const row = data as Record<string, unknown>
-    return {
-      metadata:
-        row.metadata && typeof row.metadata === "object"
-          ? (row.metadata as Record<string, unknown>)
-          : {},
-      existing_lead_match: parseCrmMatch(row.existing_lead_match),
-      existing_account_match: parseCrmMatch(row.existing_account_match),
-    }
-  } catch {
-    return null
-  }
-}
-
+/** @deprecated Legacy inbox rows retired (GE-LEADS-CANONICAL-4E) — resolves via canonical intake only. */
 export async function resolveCanonicalLeadForDuplicateInbox(
   admin: SupabaseClient,
   input: GrowthLeadInboxCreateInput,
-  existingInboxId: string,
+  _existingInboxId: string,
   actor?: { userId: string | null; email?: string | null },
 ): Promise<CanonicalInboxIntakeBridgeResult | null> {
-  const existingRow = await loadDuplicateInboxContext(admin, existingInboxId)
-  if (existingRow) {
-    const fromMetadata = readPresetGrowthLeadId(existingRow.metadata)
-    if (fromMetadata) {
-      const resolved = await resolveFromExistingLeadId(admin, fromMetadata, "inbox_metadata")
-      if (resolved) return resolved
-    }
-
-    const matchedLeadId = existingRow.existing_lead_match?.ids?.[0]
-    if (matchedLeadId) {
-      const resolved = await resolveFromExistingLeadId(admin, matchedLeadId, "inbox_crm_lead_match")
-      if (resolved) return resolved
-    }
-  }
-
-  const bridge = await resolveCanonicalLeadForInboxInput(
-    admin,
-    {
-      ...input,
-      existing_lead_match: existingRow?.existing_lead_match ?? input.existing_lead_match,
-      existing_account_match: existingRow?.existing_account_match ?? input.existing_account_match,
-    },
-    actor,
-  )
-
+  const bridge = await resolveCanonicalLeadForInboxInput(admin, input, actor)
   if ("error" in bridge) return null
   return bridge
 }
@@ -207,8 +144,43 @@ export function mergeCanonicalLeadIntoInboxMetadata(
     ...(metadata ?? {}),
     [GROWTH_LEAD_INBOX_METADATA_GROWTH_LEAD_ID]: canonical.growth_lead_id,
     canonical_intake_bridge: GROWTH_LEAD_INBOX_CANONICAL_BRIDGE_QA_MARKER,
+    canonical_intake_cutover: GROWTH_LEAD_INBOX_CANONICAL_INTAKE_CUTOVER_QA_MARKER,
     canonical_lead_created: canonical.lead_created,
     canonical_lead_status: canonical.lead_status,
     ...(canonical.dedupe_rule ? { canonical_dedupe_rule: canonical.dedupe_rule } : {}),
   }
+}
+
+/** Persist intake context on growth.leads (GE-LEADS-CANONICAL-4B). */
+export function buildCanonicalIntakeLeadMetadata(
+  input: GrowthLeadInboxCreateInput,
+  canonical: CanonicalInboxIntakeBridgeResult,
+): Record<string, unknown> {
+  return mergeCanonicalLeadIntoInboxMetadata(
+    {
+      ...(input.metadata ?? {}),
+      leadInboxDedupeHash: input.dedupe_hash,
+      intake_site_key: input.site_key,
+      intent_session_id: input.intent_session_id,
+      visitor_key: input.visitor_key,
+      session_count: input.session_count,
+      visit_count: input.visit_count,
+      utm_source: input.utm_source ?? "",
+      utm_medium: input.utm_medium ?? "",
+      utm_campaign: input.utm_campaign ?? "",
+      candidate_type: input.candidate_type,
+      candidate_priority: input.candidate_priority,
+      intent_score: input.intent_score,
+      intent_grade: input.intent_grade,
+      candidate_confidence: input.candidate_confidence,
+      pipeline_entry: input.pipeline_entry,
+      candidate_reasoning: input.candidate_reasoning,
+      candidate_evidence: input.candidate_evidence,
+      candidate_attribution: input.candidate_attribution,
+      existing_account_match: input.existing_account_match,
+      existing_lead_match: input.existing_lead_match,
+      revenue_queue_source: "canonical",
+    },
+    canonical,
+  )
 }

@@ -18,7 +18,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const detail = await loadRevenueQueueOperatorWorkspace(access.admin, leadId)
   if (!detail) {
     return NextResponse.json(
-      { ok: false, error: "not_found", message: "Lead inbox candidate not found." },
+      { ok: false, error: "not_found", message: "Revenue Queue lead not found." },
       { status: 404 },
     )
   }

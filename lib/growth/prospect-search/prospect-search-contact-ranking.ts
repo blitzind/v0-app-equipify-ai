@@ -36,7 +36,7 @@ export type ProspectSearchContactRankingInput = {
   company_match_confidence?: number | null
   company_suppressed?: boolean
   phone_on_dnc?: boolean | null
-  in_lead_inbox?: boolean
+  in_revenue_queue?: boolean
   existing_customer?: boolean
   existing_prospect?: boolean
   lead_engine_score?: number | null
@@ -245,9 +245,9 @@ export function rankProspectSearchContactsForOutreach(
     ranking_reasons.push("High Lead Engine company score")
   }
 
-  if (input.in_lead_inbox) {
+  if (input.in_revenue_queue) {
     score += 0.03
-    ranking_reasons.push("Existing Lead Inbox relationship")
+    ranking_reasons.push("Existing Revenue Queue relationship")
   }
   if (input.existing_customer) {
     ranking_risks.push("Existing customer — coordinate account expansion carefully")

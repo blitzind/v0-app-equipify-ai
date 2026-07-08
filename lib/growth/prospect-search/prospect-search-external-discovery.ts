@@ -46,7 +46,6 @@ function externalCandidateToCompanyResult(
     verification_status: "external_unverified",
     signals,
     search_intent_category: null,
-    lead_inbox_id: null,
     growth_lead_id:
       typeof row.metadata.matched_growth_lead_id === "string"
         ? row.metadata.matched_growth_lead_id

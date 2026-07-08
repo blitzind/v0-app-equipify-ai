@@ -1,11 +1,11 @@
 import type { GrowthLeadEnginePipelineRun } from "@/lib/growth/lead-engine/orchestrator/lead-engine-run-types"
-import type { GrowthLeadInboxRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
-import { loadOperatorHandoffFromLeadInbox } from "@/lib/growth/operator-handoff/operator-handoff-repository"
+import type { RevenueQueueRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
+import { loadOperatorHandoffFromRevenueQueue } from "@/lib/growth/operator-handoff/operator-handoff-repository"
 import { computeOperatorHandoffPriorityHints } from "@/lib/growth/operator-handoff/operator-handoff-priority"
 import type { GrowthOperatorHandoffInput } from "@/lib/growth/operator-handoff/operator-handoff-types"
 import {
   GROWTH_LEAD_ENGINE_RUN_METADATA_KEY,
-  type GrowthLeadInboxCardView,
+  type RevenueQueueCardView,
 } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import { extractLeadEngineOutputsFromRun } from "@/lib/growth/lead-operator-workspace/lead-engine-run-extract"
 import {
@@ -30,7 +30,7 @@ function isPipelineRun(value: unknown): value is GrowthLeadEnginePipelineRun {
   return Array.isArray(row.stage_results) && typeof row.run_id === "string"
 }
 
-export function buildOperatorHandoffInputFromRow(row: GrowthLeadInboxRow): GrowthOperatorHandoffInput {
+export function buildOperatorHandoffInputFromRow(row: RevenueQueueRow): GrowthOperatorHandoffInput {
   const run = row.metadata[GROWTH_LEAD_ENGINE_RUN_METADATA_KEY]
   const outputs = isPipelineRun(run) ? extractLeadEngineOutputsFromRun(run) : {}
   return {
@@ -49,8 +49,8 @@ export function buildOperatorHandoffInputFromRow(row: GrowthLeadInboxRow): Growt
   }
 }
 
-export function buildLeadInboxCardView(row: GrowthLeadInboxRow): GrowthLeadInboxCardView {
-  const handoffPkg = loadOperatorHandoffFromLeadInbox(row)
+export function buildRevenueQueueCardView(row: RevenueQueueRow): RevenueQueueCardView {
+  const handoffPkg = loadOperatorHandoffFromRevenueQueue(row)
   const handoff = handoffPkg?.handoff ?? null
   const hints = computeOperatorHandoffPriorityHints(buildOperatorHandoffInputFromRow(row))
   const run = row.metadata[GROWTH_LEAD_ENGINE_RUN_METADATA_KEY]
@@ -178,3 +178,6 @@ export function buildLeadInboxCardView(row: GrowthLeadInboxRow): GrowthLeadInbox
     needs_review: needsReview,
   }
 }
+
+/** @deprecated Use buildRevenueQueueCardView (GE-LEADS-CANONICAL-4G). */
+export const buildLeadInboxCardView = buildRevenueQueueCardView

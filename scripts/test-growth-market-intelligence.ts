@@ -59,7 +59,6 @@ function sampleCompany(partial: Partial<GrowthProspectSearchCompanyResult>): Gro
     verification_status: partial.verification_status ?? "unverified",
     signals: partial.signals ?? [],
     search_intent_category: partial.search_intent_category ?? null,
-    lead_inbox_id: partial.lead_inbox_id ?? null,
     growth_lead_id: partial.growth_lead_id ?? null,
     prospect_id: partial.prospect_id ?? null,
     customer_id: partial.customer_id ?? null,

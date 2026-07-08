@@ -1,5 +1,6 @@
 /** Prospect Search contact discovery UX — coverage, people rows, provider honesty. Client-safe. */
 
+import { formatWebsiteExtractEvidenceLabel } from "@/lib/growth/contact-discovery/website-extract-mapper"
 import { isNativeRevenueDecisionEngineEnabledClient } from "@/lib/growth/contact-verification/native-revenue-decision-feature"
 import {
   resolveContactOutreachEligibilityBundle,
@@ -574,7 +575,7 @@ export function enrichProspectSearchPeopleRowsWithRanking(
       company_id: row.company_id,
       confidence_score: row.confidence,
       persona: row.persona,
-      in_lead_inbox: row.company.in_lead_inbox,
+      in_revenue_queue: row.company.in_revenue_queue,
       existing_customer: row.company.existing_customer,
       existing_prospect: row.company.existing_prospect,
       lead_engine_score: row.company.lead_engine_score ?? row.company.lead_score,
@@ -768,7 +769,7 @@ export function attachProspectSearchCompanyCoverageIntelligence(
             source_page_url: row.source_page_url,
             source_label: row.source_label,
             is_recommended_contact: row.is_recommended_contact,
-            in_lead_inbox: company.in_lead_inbox,
+            in_revenue_queue: company.in_revenue_queue,
             existing_prospect: company.existing_prospect,
             relationship_strength_score: memory?.relationship_strength_score,
             relationship_status: memory?.relationship_status,
@@ -810,7 +811,7 @@ export function attachProspectSearchCompanyCoverageIntelligence(
       company_suppressed: company.is_suppressed,
       company_match_confidence: company.company_match_confidence,
       lead_engine_score: company.lead_engine_score ?? company.lead_score,
-      in_lead_inbox: company.in_lead_inbox,
+      in_revenue_queue: company.in_revenue_queue,
       existing_customer: company.existing_customer,
       contacts: strategyContacts,
       coverage,
@@ -852,7 +853,7 @@ export function attachProspectSearchCompanyCoverageIntelligence(
       orgIntelligence: org_intelligence,
       contactInfluences: [...influenceByContact.values()],
       territory_score: territoryScore,
-      in_active_queue: company.in_lead_inbox ?? false,
+      in_active_queue: company.in_revenue_queue ?? false,
       nativeDecisionBundle,
     })
 

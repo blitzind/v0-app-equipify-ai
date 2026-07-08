@@ -117,13 +117,13 @@ export function WebsiteVisitorsTab({
                 Process recent intent
               </Button>
               <p className="text-xs text-muted-foreground">
-                Runs Intent → Lead Bridge on recent sessions and creates Lead Inbox rows when eligible.
+                Runs Intent → Lead Bridge on recent sessions and adds eligible sessions to Revenue Queue.
               </p>
-              {lastHandoff && lastHandoff.inbox_ids.length > 0 ? (
+              {lastHandoff && lastHandoff.growth_lead_ids.length > 0 ? (
                 <p className="w-full text-xs text-muted-foreground">
-                  Latest handoff: {lastHandoff.ingested_count} inbox row(s). Review at{" "}
-                  <a href="/admin/growth/leads" className="font-medium text-violet-700 underline">
-                    Lead Inbox
+                  Latest handoff: {lastHandoff.ingested_count} lead(s). Review in{" "}
+                  <a href="/admin/growth/leads/queue" className="font-medium text-violet-700 underline">
+                    Revenue Queue
                   </a>
                   .
                 </p>

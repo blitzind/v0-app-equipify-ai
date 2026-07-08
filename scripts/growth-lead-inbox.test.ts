@@ -16,7 +16,7 @@ import {
 } from "../lib/growth/lead-inbox/lead-inbox-priority"
 import { validateInboxPiiPolicy } from "../lib/growth/lead-inbox/lead-inbox-dedupe"
 import { GROWTH_LEAD_INBOX_QA_MARKER } from "../lib/growth/lead-inbox/lead-inbox-types"
-import type { GrowthLeadInboxCreateInput, GrowthLeadInboxRow } from "../lib/growth/lead-inbox/lead-inbox-types"
+import type { GrowthLeadInboxCreateInput, RevenueQueueRow } from "../lib/growth/lead-inbox/lead-inbox-types"
 
 assert.equal(GROWTH_LEAD_INBOX_QA_MARKER, "growth-lead-inbox-v1")
 
@@ -37,22 +37,27 @@ const repoSource = fs.readFileSync(
 assert.match(repoSource, /createLeadCandidate/)
 assert.match(repoSource, /resolveCanonicalLeadForInboxInput/)
 assert.match(repoSource, /growth_lead_id/)
-assert.doesNotMatch(repoSource, /new.*LeadCreationService/i)
+assert.match(repoSource, /GROWTH_LEAD_INBOX_CANONICAL_INTAKE_CUTOVER_QA_MARKER/)
+const createLeadCandidateSource = repoSource.slice(
+  repoSource.indexOf("export async function createLeadCandidate"),
+)
+assert.doesNotMatch(createLeadCandidateSource, /\.from\(["']lead_inbox["']\)[\s\S]*?\.insert\(/)
+assert.doesNotMatch(createLeadCandidateSource, /\.insert\([\s\S]*?lead_inbox/)
+assert.doesNotMatch(repoSource, /export async function loadLeadInbox/)
+assert.doesNotMatch(repoSource, /export async function claimLead/)
+assert.doesNotMatch(repoSource, /export async function archiveLead/)
+assert.doesNotMatch(repoSource, /export async function markDuplicate/)
+assert.doesNotMatch(repoSource, /export async function promoteToPipeline/)
+assert.doesNotMatch(repoSource, /auto.?outreach|sendEmail|executePipeline/)
 
 const bridgeSource = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/lead-inbox/lead-inbox-canonical-intake-bridge.ts"),
   "utf8",
 )
 assert.match(bridgeSource, /resolveUnifiedLeadFromIntake/)
-assert.match(bridgeSource, /GROWTH_LEAD_INBOX_CANONICAL_BRIDGE_QA_MARKER/)
-assert.match(repoSource, /loadLeadInbox/)
-assert.match(repoSource, /claimLead/)
-assert.match(repoSource, /archiveLead/)
-assert.match(repoSource, /markDuplicate/)
-assert.match(repoSource, /promoteToPipeline/)
-assert.doesNotMatch(repoSource, /auto.?outreach|sendEmail|executePipeline/)
-
-// Status transitions
+assert.match(bridgeSource, /GROWTH_LEAD_INBOX_CANONICAL_INTAKE_CUTOVER_QA_MARKER/)
+assert.doesNotMatch(bridgeSource, /\.from\(["']lead_inbox["']\)/)
+assert.doesNotMatch(repoSource, /new.*LeadCreationService/i)
 assert.equal(canTransitionLeadInboxStatus("new", "reviewing"), true)
 assert.equal(canTransitionLeadInboxStatus("new", "pipeline_complete"), false)
 assert.equal(canTransitionLeadInboxStatus("approved", "running_pipeline"), true)
@@ -65,9 +70,10 @@ const loaderSource = fs.readFileSync(
 )
 assert.match(loaderSource, /intentCandidateToInboxInput/)
 assert.match(loaderSource, /createLeadCandidate/)
+assert.match(loaderSource, /growth_lead_id: growthLeadId/)
 
 // Priority sort
-const urgent: GrowthLeadInboxRow = {
+const urgent: RevenueQueueRow = {
   id: "1",
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
@@ -104,7 +110,7 @@ const urgent: GrowthLeadInboxRow = {
   existing_lead_match: { matched: false, source: null, ids: [], evidence: "" },
   metadata: {},
 }
-const low: GrowthLeadInboxRow = {
+const low: RevenueQueueRow = {
   ...urgent,
   id: "2",
   candidate_priority: "low",

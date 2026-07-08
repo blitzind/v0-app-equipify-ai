@@ -2,14 +2,14 @@
 
 import type { GrowthLeadEnginePipelineRun } from "@/lib/growth/lead-engine/orchestrator/lead-engine-run-types"
 import type { GrowthIntentPixelVisitHistory } from "@/lib/growth/intent-pixel/intent-pixel-types"
-import type { GrowthLeadInboxRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
+import type { RevenueQueueRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
 import type { GrowthOperatorHandoffOutput } from "@/lib/growth/operator-handoff/operator-handoff-types"
 import type { GrowthOperatorHandoffPriorityHints } from "@/lib/growth/operator-handoff/operator-handoff-priority"
 
 export const GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER =
   "growth-lead-operator-workspace-v1" as const
 
-export const GROWTH_LEAD_INBOX_DASHBOARD_SECTIONS = [
+export const GROWTH_REVENUE_QUEUE_DASHBOARD_SECTIONS = [
   "high_priority",
   "needs_review",
   "enrichment_needed",
@@ -18,19 +18,31 @@ export const GROWTH_LEAD_INBOX_DASHBOARD_SECTIONS = [
   "archived",
 ] as const
 
-export type GrowthLeadInboxDashboardSection =
-  (typeof GROWTH_LEAD_INBOX_DASHBOARD_SECTIONS)[number]
+/** @deprecated Use GROWTH_REVENUE_QUEUE_DASHBOARD_SECTIONS */
+export const GROWTH_LEAD_INBOX_DASHBOARD_SECTIONS = GROWTH_REVENUE_QUEUE_DASHBOARD_SECTIONS
 
-export const GROWTH_LEAD_INBOX_SORT_MODES = [
+export type RevenueQueueDashboardSection =
+  (typeof GROWTH_REVENUE_QUEUE_DASHBOARD_SECTIONS)[number]
+
+/** @deprecated Use RevenueQueueDashboardSection */
+export type GrowthLeadInboxDashboardSection = RevenueQueueDashboardSection
+
+export const GROWTH_REVENUE_QUEUE_SORT_MODES = [
   "priority",
   "intent",
   "confidence",
   "recent_activity",
 ] as const
 
-export type GrowthLeadInboxSortMode = (typeof GROWTH_LEAD_INBOX_SORT_MODES)[number]
+/** @deprecated Use GROWTH_REVENUE_QUEUE_SORT_MODES */
+export const GROWTH_LEAD_INBOX_SORT_MODES = GROWTH_REVENUE_QUEUE_SORT_MODES
 
-export type GrowthLeadInboxCardView = {
+export type RevenueQueueSortMode = (typeof GROWTH_REVENUE_QUEUE_SORT_MODES)[number]
+
+/** @deprecated Use RevenueQueueSortMode */
+export type GrowthLeadInboxSortMode = RevenueQueueSortMode
+
+export type RevenueQueueCardView = {
   id: string
   company_name: string
   domain: string | null
@@ -70,18 +82,27 @@ export type GrowthLeadInboxCardView = {
   needs_review: boolean
 }
 
-export type GrowthLeadInboxDashboardSectionPayload = {
-  id: GrowthLeadInboxDashboardSection
+/** @deprecated Use RevenueQueueCardView (GE-LEADS-CANONICAL-4G). */
+export type GrowthLeadInboxCardView = RevenueQueueCardView
+
+export type RevenueQueueDashboardSectionPayload = {
+  id: RevenueQueueDashboardSection
   label: string
-  items: GrowthLeadInboxCardView[]
+  items: RevenueQueueCardView[]
 }
 
-export type GrowthLeadInboxDashboardPayload = {
+/** @deprecated Use RevenueQueueDashboardSectionPayload */
+export type GrowthLeadInboxDashboardSectionPayload = RevenueQueueDashboardSectionPayload
+
+export type RevenueQueueDashboardPayload = {
   qa_marker: typeof GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER
-  sort: GrowthLeadInboxSortMode
-  sections: GrowthLeadInboxDashboardSectionPayload[]
+  sort: RevenueQueueSortMode
+  sections: RevenueQueueDashboardSectionPayload[]
   total: number
 }
+
+/** @deprecated Use RevenueQueueDashboardPayload */
+export type GrowthLeadInboxDashboardPayload = RevenueQueueDashboardPayload
 
 export type GrowthLeadOperatorEvidenceCard = {
   claim: string
@@ -148,8 +169,8 @@ export type GrowthLeadOperatorBuyingStageSummary = {
   is_candidate_assessment: boolean
 }
 
-export type GrowthLeadInboxRowPublic = Omit<
-  GrowthLeadInboxRow,
+export type RevenueQueueRowPublic = Omit<
+  RevenueQueueRow,
   "email" | "phone" | "contact_name" | "linkedin_url"
 > & {
   email: string | null
@@ -159,10 +180,13 @@ export type GrowthLeadInboxRowPublic = Omit<
   contact_identified: boolean
 }
 
+/** @deprecated Use RevenueQueueRowPublic */
+export type GrowthLeadInboxRowPublic = RevenueQueueRowPublic
+
 export type GrowthLeadOperatorWorkspacePayload = {
   qa_marker: typeof GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER
-  row: GrowthLeadInboxRowPublic
-  card: GrowthLeadInboxCardView
+  row: RevenueQueueRowPublic
+  card: RevenueQueueCardView
   operator_handoff: GrowthOperatorHandoffOutput | null
   guidance_hints: GrowthOperatorHandoffPriorityHints
   lead_engine_run: GrowthLeadEnginePipelineRun | null
@@ -180,7 +204,7 @@ export type GrowthLeadOperatorWorkspacePayload = {
 
 export const GROWTH_LEAD_ENGINE_RUN_METADATA_KEY = "lead_engine_run" as const
 
-export const GROWTH_LEAD_INBOX_ACTIONS = [
+export const GROWTH_REVENUE_QUEUE_ACTIONS = [
   "claim",
   "assign_owner",
   "approve",
@@ -189,4 +213,10 @@ export const GROWTH_LEAD_INBOX_ACTIONS = [
   "run_lead_engine",
 ] as const
 
-export type GrowthLeadInboxAction = (typeof GROWTH_LEAD_INBOX_ACTIONS)[number]
+/** @deprecated Use GROWTH_REVENUE_QUEUE_ACTIONS */
+export const GROWTH_LEAD_INBOX_ACTIONS = GROWTH_REVENUE_QUEUE_ACTIONS
+
+export type RevenueQueueAction = (typeof GROWTH_REVENUE_QUEUE_ACTIONS)[number]
+
+/** @deprecated Use RevenueQueueAction */
+export type GrowthLeadInboxAction = RevenueQueueAction

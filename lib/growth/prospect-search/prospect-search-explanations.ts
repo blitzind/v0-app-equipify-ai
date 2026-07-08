@@ -70,7 +70,7 @@ export function buildProspectSearchExplanations(input: {
     | "company_signal_summary"
     | "existing_customer"
     | "existing_prospect"
-    | "in_lead_inbox"
+    | "in_revenue_queue"
     | "is_suppressed"
     | "suppression_reason"
     | "source_type"
@@ -197,7 +197,7 @@ export function buildProspectSearchExplanations(input: {
 
   if (row.existing_customer) confidenceItems.push("Existing CRM customer — treat as account expansion.")
   if (row.existing_prospect) confidenceItems.push("Existing CRM prospect — avoid duplicate prospecting.")
-  if (row.in_lead_inbox) confidenceItems.push("Already in Lead Inbox — review queue before re-pushing.")
+  if (row.in_revenue_queue) confidenceItems.push("Already in Revenue Queue — review before re-adding.")
   if (row.is_suppressed) {
     confidenceItems.push(
       row.suppression_reason
@@ -236,20 +236,20 @@ export function buildProspectSearchExplanations(input: {
     recommended = "Do not push — company or contact is suppressed from outreach."
   } else if (contactIntel?.outreach_recommendation) {
     recommended = contactIntel.outreach_recommendation
-  } else if (row.in_lead_inbox) {
-    recommended = "Open Lead Inbox workspace to review before additional action."
+  } else if (row.in_revenue_queue) {
+    recommended = "Open Revenue Queue workspace to review before additional action."
   } else if (row.existing_customer) {
     recommended = "Treat as existing account — coordinate with customer success, not cold outreach."
   } else if (row.buying_stage?.includes("purchase")) {
-    recommended = "High priority — review in Lead Inbox or run Lead Engine enrichment."
+    recommended = "High priority — review in Revenue Queue or run Lead Engine enrichment."
   } else if (row.lead_engine_score != null && row.lead_engine_score >= 60) {
-    recommended = "Run Lead Engine or push to Lead Inbox for operator review."
+    recommended = "Run Lead Engine or add to Revenue Queue for operator review."
   } else if (row.intent_score != null && row.intent_score >= 12) {
-    recommended = "Intent signal present — push to Lead Inbox for human review."
+    recommended = "Intent signal present — add to Revenue Queue for human review."
   } else if (row.rank_score >= 0.5) {
-    recommended = "Strong search match — add to list or push to Lead Inbox when qualified."
+    recommended = "Strong search match — add to list or Revenue Queue when qualified."
   } else {
-    recommended = "Review enrichment signals before pushing to Lead Inbox."
+    recommended = "Review enrichment signals before adding to Revenue Queue."
   }
 
   return {

@@ -72,7 +72,6 @@ export type SavedSearchBatchLaunchRow = {
   company_id: string
   company_name: string
   growth_lead_id: string | null
-  lead_inbox_id: string | null
   preflight: OutboundLaunchPreflightSummary
   recommended_action: string | null
   launch_urls: OutboundLaunchUrls
@@ -141,22 +140,15 @@ export const OUTBOUND_APPROVAL_CHAIN_STEPS: Array<Omit<OutboundApprovalChainStep
 ]
 
 export function resolveOutboundLaunchGrowthLeadId(
-  company: Pick<GrowthProspectSearchCompanyResult, "growth_lead_id" | "lead_inbox_id">,
+  company: Pick<GrowthProspectSearchCompanyResult, "growth_lead_id">,
 ): { growth_lead_id: string | null; inbox_only: boolean; reason: string | null } {
   if (company.growth_lead_id?.trim()) {
     return { growth_lead_id: company.growth_lead_id.trim(), inbox_only: false, reason: null }
   }
-  if (company.lead_inbox_id?.trim()) {
-    return {
-      growth_lead_id: null,
-      inbox_only: true,
-      reason: "Lead Inbox candidate only — approve and open CRM lead workspace before outbound execution.",
-    }
-  }
   return {
     growth_lead_id: null,
     inbox_only: false,
-    reason: "No lead workspace — push to Lead Inbox or create CRM lead first.",
+    reason: "No lead workspace — push to Revenue Queue first.",
   }
 }
 
@@ -178,8 +170,7 @@ export function runOutboundLaunchPreflight(input: {
     | "contact_intelligence"
     | "committee_completion"
     | "growth_lead_id"
-    | "lead_inbox_id"
-    | "in_lead_inbox"
+    | "in_revenue_queue"
     | "buying_stage"
     | "lead_engine_score"
     | "lead_score"
@@ -276,7 +267,7 @@ export function runOutboundLaunchPreflight(input: {
 export function buildOutboundLaunchUrls(input: {
   company: Pick<
     GrowthProspectSearchCompanyResult,
-    "growth_lead_id" | "lead_inbox_id" | "company_name" | "id"
+    "growth_lead_id" | "company_name" | "id"
   >
   workflowContext?: GrowthWorkflowContextHandoff | null
 }): OutboundLaunchUrls {
@@ -285,7 +276,6 @@ export function buildOutboundLaunchUrls(input: {
     url && input.workflowContext ? appendWorkflowContextToUrl(url, input.workflowContext) : url
 
   const growthLeadId = lead.growth_lead_id
-  const inboxId = input.company.lead_inbox_id?.trim() || null
 
   return {
     generate_draft: growthLeadId
@@ -304,7 +294,7 @@ export function buildOutboundLaunchUrls(input: {
       ? withContext(`/admin/growth/copilot?leadId=${encodeURIComponent(growthLeadId)}`)
       : null,
     lead_drawer: growthLeadId ? buildGrowthLeadHref(growthLeadId) : null,
-    lead_inbox_workspace: inboxId ? buildGrowthLeadHref(inboxId) : null,
+    lead_inbox_workspace: growthLeadId ? buildGrowthLeadHref(growthLeadId) : null,
   }
 }
 
@@ -348,7 +338,6 @@ export function buildSavedSearchBatchLaunchPreview(input: {
       company_id: company.id,
       company_name: company.company_name,
       growth_lead_id: preflight.growth_lead_id,
-      lead_inbox_id: company.lead_inbox_id,
       preflight,
       recommended_action: company.recommended_next_action ?? null,
       launch_urls: buildOutboundLaunchUrls({ company, workflowContext }),

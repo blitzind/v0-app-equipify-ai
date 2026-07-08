@@ -9,13 +9,11 @@ export type RealWorldCompanyInternalMatches = {
   existing_customer_match: boolean
   existing_prospect_match: boolean
   existing_growth_lead_match: boolean
-  existing_lead_inbox_match: boolean
   existing_external_candidate_match: boolean
   existing_real_world_candidate_match: boolean
   matched_customer_id: string | null
   matched_prospect_id: string | null
   matched_growth_lead_id: string | null
-  matched_lead_inbox_id: string | null
   matched_external_candidate_id: string | null
   matched_real_world_candidate_id: string | null
 }
@@ -66,13 +64,11 @@ export async function resolveRealWorldCompanyInternalMatches(
     existing_customer_match: false,
     existing_prospect_match: false,
     existing_growth_lead_match: false,
-    existing_lead_inbox_match: false,
     existing_external_candidate_match: false,
     existing_real_world_candidate_match: false,
     matched_customer_id: null,
     matched_prospect_id: null,
     matched_growth_lead_id: null,
-    matched_lead_inbox_id: null,
     matched_external_candidate_id: null,
     matched_real_world_candidate_id: null,
   }
@@ -143,22 +139,6 @@ export async function resolveRealWorldCompanyInternalMatches(
       ...empty,
       existing_growth_lead_match: true,
       matched_growth_lead_id: leadHit.id,
-    }
-  }
-
-  const inboxHit = await matchGrowthTable(
-    admin,
-    "lead_inbox",
-    "id, company_name, website",
-    candidate,
-    "company_name",
-    "website",
-  )
-  if (inboxHit) {
-    return {
-      ...empty,
-      existing_lead_inbox_match: true,
-      matched_lead_inbox_id: inboxHit.id,
     }
   }
 

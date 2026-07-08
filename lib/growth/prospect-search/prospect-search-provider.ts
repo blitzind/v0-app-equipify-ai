@@ -38,7 +38,7 @@ export function createInternalProspectSearchProvider(): {
       qa_marker: GROWTH_PROSPECT_SEARCH_PROVIDER_QA_MARKER,
       provider_slot: "internal_observable_index",
       status: "success",
-      message: `Uses ${GROWTH_PROSPECT_SEARCH_QA_MARKER} index from lead inbox, growth leads, CRM prospects/customers, and intent overlays — no outbound enrichment.`,
+      message: `Uses ${GROWTH_PROSPECT_SEARCH_QA_MARKER} index from Revenue Queue, growth leads, CRM prospects/customers, and intent overlays — no outbound enrichment.`,
       request_id: randomUUID(),
       evidence: [
         "growth.leads",

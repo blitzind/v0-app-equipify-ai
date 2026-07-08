@@ -1,5 +1,5 @@
 import type {
-  GrowthLeadInboxRow,
+  RevenueQueueRow,
   GrowthLeadInboxStatus,
 } from "@/lib/growth/lead-inbox/lead-inbox-types"
 
@@ -10,7 +10,7 @@ function growthSignalScoreFromMetadata(metadata: Record<string, unknown>): numbe
   return typeof score === "number" ? score : 0
 }
 
-const PRIORITY_RANK: Record<GrowthLeadInboxRow["candidate_priority"], number> = {
+const PRIORITY_RANK: Record<RevenueQueueRow["candidate_priority"], number> = {
   urgent: 0,
   high: 1,
   normal: 2,
@@ -25,7 +25,7 @@ const ACTIVE_STATUSES = new Set<GrowthLeadInboxStatus>([
   "running_pipeline",
 ])
 
-export function compareLeadInboxPriority(a: GrowthLeadInboxRow, b: GrowthLeadInboxRow): number {
+export function compareLeadInboxPriority(a: RevenueQueueRow, b: RevenueQueueRow): number {
   const priorityDelta = PRIORITY_RANK[a.candidate_priority] - PRIORITY_RANK[b.candidate_priority]
   if (priorityDelta !== 0) return priorityDelta
 
@@ -42,15 +42,15 @@ export function compareLeadInboxPriority(a: GrowthLeadInboxRow, b: GrowthLeadInb
   return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
 }
 
-export function sortLeadInboxQueue(items: GrowthLeadInboxRow[]): GrowthLeadInboxRow[] {
+export function sortLeadInboxQueue(items: RevenueQueueRow[]): RevenueQueueRow[] {
   return [...items].sort(compareLeadInboxPriority)
 }
 
-export function filterActiveLeadInboxItems(items: GrowthLeadInboxRow[]): GrowthLeadInboxRow[] {
+export function filterActiveLeadInboxItems(items: RevenueQueueRow[]): RevenueQueueRow[] {
   return items.filter((item) => ACTIVE_STATUSES.has(item.status))
 }
 
-export function inboxPriorityLabel(priority: GrowthLeadInboxRow["candidate_priority"]): string {
+export function inboxPriorityLabel(priority: RevenueQueueRow["candidate_priority"]): string {
   if (priority === "urgent") return "Urgent"
   if (priority === "high") return "High"
   if (priority === "normal") return "Normal"

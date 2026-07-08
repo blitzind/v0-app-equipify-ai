@@ -44,7 +44,7 @@ function mapRow(row: Record<string, unknown>): GrowthCompanyIdentificationMatchR
     site_key: asString(row.site_key),
     visitor_key: asString(row.visitor_key),
     session_key: asString(row.session_key),
-    lead_inbox_id: asString(row.lead_inbox_id) || null,
+    growth_lead_id: asString(row.growth_lead_id) || null,
     intent_session_id: asString(row.intent_session_id) || null,
     company_name: asString(row.company_name),
     company_domain: asString(row.company_domain) || null,
@@ -71,7 +71,7 @@ export function buildCompanyIdentificationInputFromAggregate(
   aggregated: GrowthIntentAggregatedSession,
   identity: GrowthIntentLeadCandidateIdentity,
   options?: {
-    lead_inbox_id?: string | null
+    growth_lead_id?: string | null
     intent_session_id?: string | null
   },
 ): GrowthCompanyIdentificationInput {
@@ -83,7 +83,7 @@ export function buildCompanyIdentificationInputFromAggregate(
     visitor_key: session.visitor_key,
     session_key: session.session_key,
     intent_session_id: options?.intent_session_id ?? session.id,
-    lead_inbox_id: options?.lead_inbox_id ?? null,
+    growth_lead_id: options?.growth_lead_id ?? null,
     email: identity.email,
     phone: identity.phone,
     company_name: identity.company_name,
@@ -129,11 +129,11 @@ export async function identifyCompanyFromAggregatedSession(
   identity: GrowthIntentLeadCandidateIdentity,
   options?: {
     admin?: SupabaseClient | null
-    lead_inbox_id?: string | null
+    growth_lead_id?: string | null
   },
 ): Promise<GrowthCompanyIdentificationResult & { contribution: ReturnType<typeof computeCompanyIdentificationScoreContribution> }> {
   const input = buildCompanyIdentificationInputFromAggregate(aggregated, identity, {
-    lead_inbox_id: options?.lead_inbox_id,
+    growth_lead_id: options?.growth_lead_id,
     intent_session_id: aggregated.primary_session.id,
   })
   const result = await identifyCompanyCandidates(input, options?.admin)
@@ -146,7 +146,7 @@ export async function persistCompanyIdentificationMatches(
   matches: GrowthCompanyIdentificationMatchCandidate[],
   context: Pick<
     GrowthCompanyIdentificationInput,
-    "site_key" | "visitor_key" | "session_key" | "lead_inbox_id" | "intent_session_id"
+    "site_key" | "visitor_key" | "session_key" | "growth_lead_id" | "intent_session_id"
   >,
 ): Promise<{ ok: boolean; rows: GrowthCompanyIdentificationMatchRow[]; reason: string | null }> {
   if (matches.length === 0) return { ok: true, rows: [], reason: null }
@@ -158,7 +158,7 @@ export async function persistCompanyIdentificationMatches(
     site_key: context.site_key,
     visitor_key: context.visitor_key,
     session_key: context.session_key,
-    lead_inbox_id: context.lead_inbox_id,
+    growth_lead_id: context.growth_lead_id ?? null,
     intent_session_id: context.intent_session_id,
     company_name: match.company_name,
     company_domain: match.company_domain,
@@ -195,9 +195,9 @@ export async function persistCompanyIdentificationMatches(
   }
 }
 
-export async function loadCompanyIdentificationMatchesForLeadInbox(
+export async function loadCompanyIdentificationMatchesForRevenueQueue(
   admin: SupabaseClient,
-  leadInboxId: string,
+  leadId: string,
   limit = 10,
 ): Promise<GrowthCompanyIdentificationMatchRow[]> {
   if (!(await isGrowthCompanyIdentificationSchemaReady(admin))) return []
@@ -206,7 +206,7 @@ export async function loadCompanyIdentificationMatchesForLeadInbox(
     .schema("growth")
     .from("company_identification_matches")
     .select("*")
-    .eq("lead_inbox_id", leadInboxId)
+    .eq("growth_lead_id", leadId)
     .order("match_score", { ascending: false })
     .limit(limit)
 
@@ -214,9 +214,13 @@ export async function loadCompanyIdentificationMatchesForLeadInbox(
   return (data as Record<string, unknown>[]).map(mapRow)
 }
 
-export async function linkCompanyMatchesToLeadInbox(
+/** @deprecated Use loadCompanyIdentificationMatchesForRevenueQueue (GE-LEADS-CANONICAL-4G). */
+export const loadCompanyIdentificationMatchesForLeadInbox =
+  loadCompanyIdentificationMatchesForRevenueQueue
+
+export async function linkCompanyMatchesToGrowthLead(
   admin: SupabaseClient,
-  leadInboxId: string,
+  leadId: string,
   matchIds: string[],
 ): Promise<void> {
   if (matchIds.length === 0) return
@@ -225,6 +229,18 @@ export async function linkCompanyMatchesToLeadInbox(
   await admin
     .schema("growth")
     .from("company_identification_matches")
-    .update({ lead_inbox_id: leadInboxId, updated_at: new Date().toISOString() })
+    .update({
+      growth_lead_id: leadId,
+      updated_at: new Date().toISOString(),
+    })
     .in("id", matchIds)
+}
+
+/** @deprecated Use linkCompanyMatchesToGrowthLead */
+export async function linkCompanyMatchesToLeadInbox(
+  admin: SupabaseClient,
+  leadId: string,
+  matchIds: string[],
+): Promise<void> {
+  return linkCompanyMatchesToGrowthLead(admin, leadId, matchIds)
 }

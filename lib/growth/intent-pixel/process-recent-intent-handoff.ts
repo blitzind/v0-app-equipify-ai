@@ -25,6 +25,7 @@ export async function processRecentIntentToLeadInbox(
     duplicate_count: 0,
     skipped_count: 0,
     inbox_ids: [],
+    growth_lead_ids: [],
     errors: [],
   }
 
@@ -40,7 +41,7 @@ export async function processRecentIntentToLeadInbox(
   let ingested_count = 0
   let duplicate_count = 0
   let skipped_count = 0
-  const inbox_ids: string[] = []
+  const growth_lead_ids: string[] = []
 
   for (const candidate of batch.candidates) {
     if (!candidate.lead_engine_eligible) {
@@ -56,17 +57,18 @@ export async function processRecentIntentToLeadInbox(
 
     if (ingest.duplicate) {
       duplicate_count += 1
+      if (ingest.growth_lead_id) growth_lead_ids.push(ingest.growth_lead_id)
       continue
     }
 
-    if (!ingest.ok || !ingest.row) {
+    if (!ingest.ok || !ingest.growth_lead_id) {
       skipped_count += 1
       if (ingest.reason) errors.push(ingest.reason)
       continue
     }
 
     ingested_count += 1
-    inbox_ids.push(ingest.row.id)
+    growth_lead_ids.push(ingest.growth_lead_id)
   }
 
   return {
@@ -78,7 +80,8 @@ export async function processRecentIntentToLeadInbox(
     ingested_count,
     duplicate_count,
     skipped_count,
-    inbox_ids,
+    inbox_ids: [],
+    growth_lead_ids,
     errors,
   }
 }

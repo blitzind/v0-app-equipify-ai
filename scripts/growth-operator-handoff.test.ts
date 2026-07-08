@@ -23,7 +23,7 @@ import {
 import {
   buildOperatorHandoffPackage,
   GROWTH_OPERATOR_HANDOFF_METADATA_KEY,
-  loadOperatorHandoffFromLeadInbox,
+  loadOperatorHandoffFromRevenueQueue,
 } from "../lib/growth/operator-handoff/operator-handoff-repository"
 import {
   GROWTH_OPERATOR_HANDOFF_MOTIONS,
@@ -31,7 +31,7 @@ import {
   GROWTH_OPERATOR_HANDOFF_QA_MARKER,
 } from "../lib/growth/operator-handoff/operator-handoff-types"
 import type { GrowthOperatorHandoffInput } from "../lib/growth/operator-handoff/operator-handoff-types"
-import type { GrowthLeadInboxRow } from "../lib/growth/lead-inbox/lead-inbox-types"
+import type { RevenueQueueRow } from "../lib/growth/lead-inbox/lead-inbox-types"
 
 assert.equal(GROWTH_OPERATOR_HANDOFF_QA_MARKER, "growth-operator-handoff-v1")
 assert.equal(GROWTH_OPERATOR_HANDOFF_OUTPUT_JSON_KEYS.length, 18)
@@ -81,7 +81,7 @@ const upstreamInput: GrowthOperatorHandoffInput = {
 }
 
 const userPrompt = buildGrowthOperatorHandoffUserPrompt(upstreamInput)
-assert.match(userPrompt, /Lead Inbox/)
+assert.match(userPrompt, /Revenue Queue/)
 assert.match(userPrompt, /Intent History/)
 assert.match(userPrompt, /Return JSON only/)
 
@@ -227,7 +227,7 @@ if (!parsed.ok) throw new Error("expected parsed handoff")
 const pkg = buildOperatorHandoffPackage(upstreamInput, parsed.output)
 assert.equal(pkg.qa_marker, GROWTH_OPERATOR_HANDOFF_QA_MARKER)
 
-const inboxRow: GrowthLeadInboxRow = {
+const inboxRow: RevenueQueueRow = {
   id: "inbox-1",
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
@@ -265,7 +265,7 @@ const inboxRow: GrowthLeadInboxRow = {
   metadata: { [GROWTH_OPERATOR_HANDOFF_METADATA_KEY]: pkg },
 }
 
-const loaded = loadOperatorHandoffFromLeadInbox(inboxRow)
+const loaded = loadOperatorHandoffFromRevenueQueue(inboxRow)
 assert.ok(loaded)
 assert.equal(loaded?.handoff.recommended_motion, "call_first")
 
@@ -273,8 +273,10 @@ const repoSource = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/operator-handoff/operator-handoff-repository.ts"),
   "utf8",
 )
-assert.match(repoSource, /saveOperatorHandoffToLeadInbox/)
+assert.match(repoSource, /loadOperatorHandoffFromRevenueQueue/)
 assert.match(repoSource, /GROWTH_OPERATOR_HANDOFF_METADATA_KEY/)
+assert.doesNotMatch(repoSource, /saveOperatorHandoffToLeadInbox/)
+assert.doesNotMatch(repoSource, /\.from\(["']lead_inbox["']\)/)
 assert.doesNotMatch(repoSource, /sendEmail|auto.?outreach|executePipeline/)
 
 const parserSource = fs.readFileSync(

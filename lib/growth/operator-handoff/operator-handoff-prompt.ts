@@ -98,7 +98,7 @@ Return JSON only with this exact shape:
 export function buildGrowthOperatorHandoffUserPrompt(input: GrowthOperatorHandoffInput): string {
   return `Produce an operator handoff package from these upstream outputs.
 
-Lead Inbox:
+Revenue Queue:
 ${formatUpstreamJsonBlock(input.leadInbox)}
 
 ICP Targeting:
@@ -140,7 +140,7 @@ Return JSON only.`
 export function buildGrowthOperatorHandoffTemplateUserPrompt(): string {
   return `Produce an operator handoff package from these upstream outputs.
 
-Lead Inbox:
+Revenue Queue:
 ${GROWTH_OPERATOR_HANDOFF_TEMPLATE_PLACEHOLDERS.lead_inbox_json}
 
 ICP Targeting:

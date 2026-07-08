@@ -10,7 +10,7 @@ import type { GrowthLeadEngineLeadScoreOutput } from "@/lib/growth/lead-engine/l
 import type { GrowthLeadEngineHumanApprovalOutput } from "@/lib/growth/lead-engine/human-approval-types"
 import type { GrowthLeadEngineRevenueExecutionOutput } from "@/lib/growth/lead-engine/revenue-execution-types"
 import type { GrowthLeadEngineVerificationTriageOutput } from "@/lib/growth/lead-engine/verification-triage-types"
-import type { GrowthLeadInboxRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
+import type { RevenueQueueRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
 
 export type GrowthOperatorHandoffPriorityHints = {
   lead_priority: GrowthOperatorHandoffLeadPriority

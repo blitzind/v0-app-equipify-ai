@@ -1,6 +1,6 @@
 /** Leads operator home metrics — existing platform APIs only (UX-AUDIT-4). Client-safe. */
 
-import type { GrowthLeadInboxDashboardSectionPayload } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
+import type { RevenueQueueDashboardSectionPayload } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import type { GrowthMeeting } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 
 export const GROWTH_LEADS_HUB_METRICS_QA_MARKER = "growth-leads-hub-metrics-v3" as const
@@ -21,7 +21,7 @@ export type GrowthLeadsHubMetricsSnapshot = {
   enrichmentNeededCount: number | null
 }
 
-function sectionCount(sections: GrowthLeadInboxDashboardSectionPayload[], id: string): number {
+function sectionCount(sections: RevenueQueueDashboardSectionPayload[], id: string): number {
   return sections.find((section) => section.id === id)?.items.length ?? 0
 }
 
@@ -55,7 +55,7 @@ export async function fetchGrowthLeadsHubMetrics(signal?: AbortSignal): Promise<
     const data = (await inboxResult.value.json().catch(() => ({}))) as {
       ok?: boolean
       total?: number
-      sections?: GrowthLeadInboxDashboardSectionPayload[]
+      sections?: RevenueQueueDashboardSectionPayload[]
     }
     if (inboxResult.value.ok && data.ok !== false) {
       const sections = data.sections ?? []

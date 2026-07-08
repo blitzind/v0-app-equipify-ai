@@ -690,7 +690,7 @@ export async function verifyGrowthEngineOperationalReset(
     {
       id: "no_lead_inbox",
       table: "lead_inbox",
-      label: "Lead inbox cleared",
+      label: "Legacy lead_inbox cleared (deprecated — Revenue Queue is growth.leads)",
     },
     {
       id: "no_opportunities",

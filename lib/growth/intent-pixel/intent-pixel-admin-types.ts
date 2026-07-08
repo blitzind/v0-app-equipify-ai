@@ -58,7 +58,9 @@ export type GrowthIntentPixelProcessRecentResult = {
   ingested_count: number
   duplicate_count: number
   skipped_count: number
+  /** @deprecated Always empty after GE-LEADS-CANONICAL-4B — use growth_lead_ids. */
   inbox_ids: string[]
+  growth_lead_ids: string[]
   errors: string[]
 }
 

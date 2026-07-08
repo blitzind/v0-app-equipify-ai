@@ -1,5 +1,6 @@
 /**
  * GE-LEADS-CANONICAL-3E — Post-deploy production smoke (read-only + controlled action mutations).
+ * Superseded by 4D/4E for inbox write checks — legacy loader removed.
  *
  * Run after Vercel Production deploy:
  *   node -r ./scripts/server-only-shim.cjs --import tsx scripts/certify-ge-leads-canonical-revenue-queue-smoke-3e.ts
@@ -13,7 +14,6 @@ import {
   executeRevenueQueueAction,
 } from "@/lib/growth/revenue-queue/revenue-queue-action-bridge"
 import {
-  loadLegacyRevenueQueueDashboardPayload,
   loadRevenueQueueDashboardPayload,
   parseRevenueQueueApiSource,
 } from "@/lib/growth/revenue-queue/revenue-queue-api-bridge"
@@ -28,13 +28,9 @@ async function resolveSmokeActorUserId(admin: SupabaseClient): Promise<string> {
   return data.id
 }
 
-async function countLeadInboxRows(admin: SupabaseClient): Promise<number> {
-  const { count, error } = await admin
-    .schema("growth")
-    .from("lead_inbox")
-    .select("id", { count: "exact", head: true })
-  if (error) throw new Error(error.message)
-  return count ?? 0
+async function verifyLeadInboxTableDropped(admin: SupabaseClient): Promise<boolean> {
+  const { error } = await admin.schema("growth").from("lead_inbox").select("id").limit(1)
+  return Boolean(error?.message?.includes("does not exist") || error?.code === "PGRST205")
 }
 
 async function resolveDisposableLeadId(
@@ -61,11 +57,10 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
-  const inboxBefore = await countLeadInboxRows(boot.admin)
+  const leadInboxDropped = await verifyLeadInboxTableDropped(boot.admin)
 
-  const [defaultQueue, legacyQueue] = await Promise.all([
+  const [defaultQueue] = await Promise.all([
     loadRevenueQueueDashboardPayload(boot.admin, { sort: "priority", source: "canonical", limit: 200 }),
-    loadLegacyRevenueQueueDashboardPayload(boot.admin, "priority", 200),
   ])
 
   const sampleLeadId = defaultQueue.sections.flatMap((s) => s.items)[0]?.id ?? null
@@ -90,7 +85,7 @@ async function main(): Promise<void> {
     if (!result.ok) break
   }
 
-  const inboxAfter = await countLeadInboxRows(boot.admin)
+  const inboxStillDropped = await verifyLeadInboxTableDropped(boot.admin)
 
   const actionsRouteSource = fs.readFileSync(
     path.join(process.cwd(), "app/api/platform/growth/lead-inbox/[leadId]/actions/route.ts"),
@@ -107,7 +102,8 @@ async function main(): Promise<void> {
         queue: {
           default_total: defaultQueue.total,
           default_queue_source: defaultQueue.queue_source,
-          legacy_total: legacyQueue.total,
+          legacy_total: 0,
+          legacy_note: "loadLegacyRevenueQueueDashboardPayload removed (4D/4E)",
           card_count: defaultQueue.sections.reduce((sum, s) => sum + s.items.length, 0),
         },
         detail: sampleLeadId
@@ -117,10 +113,9 @@ async function main(): Promise<void> {
               resolution: detail?.resolution ?? null,
             }
           : null,
-        lead_inbox_writes: {
-          rows_before: inboxBefore,
-          rows_after: inboxAfter,
-          unchanged: inboxBefore === inboxAfter,
+        lead_inbox_table: {
+          dropped_before: leadInboxDropped,
+          dropped_after_actions: inboxStillDropped,
         },
         controlled_action_smoke: {
           disposable_lead_id: disposableLeadId,
@@ -132,11 +127,11 @@ async function main(): Promise<void> {
           default_api_is_canonical:
             parseRevenueQueueApiSource(null) === "canonical" && defaultQueue.queue_source === "canonical",
           canonical_cards_loaded: defaultQueue.total >= 23,
-          legacy_returns_zero: legacyQueue.total === 0,
+          legacy_returns_zero: leadInboxDropped,
           detail_resolves_canonical: detail?.resolution.source === "canonical_lead",
           hub_sidebar_use_default_api: true,
           canonical_actions_non_404: Object.values(actionResults).every((row) => row.ok),
-          no_lead_inbox_writes: inboxBefore === inboxAfter,
+          lead_inbox_table_dropped: leadInboxDropped && inboxStillDropped,
           actions_route_deployed_bridge: /executeRevenueQueueAction/.test(actionsRouteSource),
         },
       },
@@ -148,10 +143,10 @@ async function main(): Promise<void> {
   const failed =
     defaultQueue.queue_source !== "canonical" ||
     defaultQueue.total < 23 ||
-    legacyQueue.total !== 0 ||
+    !leadInboxDropped ||
     !detail ||
     detail.resolution.source !== "canonical_lead" ||
-    inboxBefore !== inboxAfter ||
+    !inboxStillDropped ||
     !Object.values(actionResults).every((row) => row.ok)
 
   if (failed) process.exit(1)

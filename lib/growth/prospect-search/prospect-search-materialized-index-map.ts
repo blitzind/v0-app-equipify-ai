@@ -49,7 +49,6 @@ export type ProspectSearchMaterializedIndexRow = {
   existing_account_status: string
   is_customer: boolean
   is_prospect: boolean
-  is_in_lead_inbox: boolean
   is_suppressed: boolean
   suppression_reason_safe: string | null
   suppression_scope_safe: string | null
@@ -91,9 +90,17 @@ function parseEmployeeCount(value: string | null | undefined): number | null {
 function existingAccountStatus(row: GrowthProspectSearchIndexCompany): string {
   if (row.existing_customer) return "customer"
   if (row.existing_prospect) return "prospect"
-  if (row.in_lead_inbox) return "lead_inbox"
+  if (row.in_revenue_queue) return "lead_inbox"
   if (row.existing_account) return "existing"
   return "none"
+}
+
+function deriveMaterializedInLeadInbox(
+  row: ProspectSearchMaterializedIndexRow,
+  meta: Record<string, unknown>,
+): boolean {
+  if (row.source_type === "growth_lead") return true
+  return Boolean(asString(meta.growth_lead_id))
 }
 
 export function indexCompanyToMaterializedRow(
@@ -161,7 +168,6 @@ export function indexCompanyToMaterializedRow(
     existing_account_status: existingAccountStatus(row),
     is_customer: row.existing_customer,
     is_prospect: row.existing_prospect,
-    is_in_lead_inbox: row.in_lead_inbox,
     is_suppressed: row.is_suppressed,
     suppression_reason_safe: row.suppression_reason,
     suppression_scope_safe: row.suppression_scope,
@@ -181,7 +187,6 @@ export function indexCompanyToMaterializedRow(
       existing_account: row.existing_account,
       already_pushed: row.already_pushed,
       suppressed_at: row.suppressed_at,
-      lead_inbox_id: row.lead_inbox_id,
       growth_lead_id: row.growth_lead_id,
       prospect_id: row.prospect_id,
       customer_id: row.customer_id,
@@ -246,7 +251,7 @@ export function materializedRowToIndexCompany(
     search_intent_category: asString(meta.search_intent_category) || null,
     returning_visitor: meta.returning_visitor === true,
     existing_account: meta.existing_account === true || row.existing_account_status !== "none",
-    in_lead_inbox: row.is_in_lead_inbox,
+    in_revenue_queue: deriveMaterializedInLeadInbox(row, meta),
     existing_customer: row.is_customer,
     existing_prospect: row.is_prospect,
     already_pushed: meta.already_pushed === true,
@@ -254,8 +259,8 @@ export function materializedRowToIndexCompany(
     suppression_reason: row.suppression_reason_safe,
     suppression_scope: row.suppression_scope_safe,
     suppressed_at: asString(meta.suppressed_at) || null,
-    lead_inbox_id: asString(meta.lead_inbox_id) || null,
-    growth_lead_id: asString(meta.growth_lead_id) || null,
+    growth_lead_id:
+      asString(meta.growth_lead_id) || (row.source_type === "growth_lead" ? row.source_id : null),
     prospect_id: asString(meta.prospect_id) || null,
     customer_id: asString(meta.customer_id) || null,
     company_signal_summary: row.company_signal_summary ?? null,

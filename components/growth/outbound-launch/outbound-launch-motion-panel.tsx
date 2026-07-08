@@ -187,7 +187,7 @@ export function OutboundLaunchMotionPanel({
         </p>
       ) : launchUrls.lead_inbox_workspace ? (
         <p className="mt-2 text-[10px] text-muted-foreground">
-          Open Lead Inbox workspace to qualify before outbound: {launchUrls.lead_inbox_workspace}
+          Open Revenue Queue workspace to qualify before outbound: {launchUrls.lead_inbox_workspace}
         </p>
       ) : null}
     </div>

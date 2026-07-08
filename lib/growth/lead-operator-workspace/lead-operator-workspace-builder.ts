@@ -2,22 +2,22 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GrowthLeadEnginePipelineRun } from "@/lib/growth/lead-engine/orchestrator/lead-engine-run-types"
 import { fetchIntentPixelSite, fetchVisitHistory } from "@/lib/growth/intent-pixel/intent-pixel-repository"
 import type { GrowthIntentPixelVisitHistory } from "@/lib/growth/intent-pixel/intent-pixel-types"
-import type { GrowthLeadInboxRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
-import { loadOperatorHandoffFromLeadInbox } from "@/lib/growth/operator-handoff/operator-handoff-repository"
+import type { RevenueQueueRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
+import { loadOperatorHandoffFromRevenueQueue } from "@/lib/growth/operator-handoff/operator-handoff-repository"
 import { computeOperatorHandoffPriorityHints } from "@/lib/growth/operator-handoff/operator-handoff-priority"
 import type { GrowthOperatorHandoffOutput } from "@/lib/growth/operator-handoff/operator-handoff-types"
 import {
-  buildLeadInboxCardView,
+  buildRevenueQueueCardView,
   buildOperatorHandoffInputFromRow,
 } from "@/lib/growth/lead-operator-workspace/lead-inbox-card-view"
 import { extractLeadEngineOutputsFromRun } from "@/lib/growth/lead-operator-workspace/lead-engine-run-extract"
-import { loadBuyingStageAssessmentsForLeadInbox } from "@/lib/growth/buying-stage/buying-stage-repository"
-import { loadCompanyIdentificationMatchesForLeadInbox } from "@/lib/growth/company-identification/company-identification-repository"
-import { loadSearchIntentSignalsForLeadInbox } from "@/lib/growth/search-intent/search-intent-repository"
+import { loadBuyingStageAssessmentsForRevenueQueue } from "@/lib/growth/buying-stage/buying-stage-repository"
+import { loadCompanyIdentificationMatchesForRevenueQueue } from "@/lib/growth/company-identification/company-identification-repository"
+import { loadSearchIntentSignalsForRevenueQueue } from "@/lib/growth/search-intent/search-intent-repository"
 import {
   GROWTH_LEAD_ENGINE_RUN_METADATA_KEY,
   GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER,
-  type GrowthLeadInboxRowPublic,
+  type RevenueQueueRowPublic,
   type GrowthLeadOperatorAttributionCard,
   type GrowthLeadOperatorEvidenceCard,
   type GrowthLeadOperatorHistoryEntry,
@@ -47,9 +47,9 @@ function asEvidenceCards(
 }
 
 export function sanitizeLeadInboxRowForPublic(
-  row: GrowthLeadInboxRow,
+  row: RevenueQueueRow,
   intentIdentified: boolean,
-): GrowthLeadInboxRowPublic {
+): RevenueQueueRowPublic {
   const contactIdentified =
     intentIdentified ||
     Boolean(row.contact_name?.trim()) ||
@@ -66,7 +66,7 @@ export function sanitizeLeadInboxRowForPublic(
 }
 
 function buildOverview(
-  row: GrowthLeadInboxRow,
+  row: RevenueQueueRow,
   outputs: ReturnType<typeof extractLeadEngineOutputsFromRun>,
   handoff: GrowthOperatorHandoffOutput | null,
 ): GrowthLeadOperatorOverview {
@@ -80,7 +80,7 @@ function buildOverview(
     executive_summary:
       handoff?.handoff_summary ||
       brief?.company_summary ||
-      `${row.company_name} entered the growth lead inbox with intent grade ${row.intent_grade}.`,
+      `${row.company_name} entered the Revenue Queue with intent grade ${row.intent_grade}.`,
     pain_points: asEvidenceCards(brief?.pain_points ?? []),
     buying_signals: asEvidenceCards(brief?.buying_signals ?? []),
     growth_signals: asEvidenceCards(brief?.growth_signals ?? []),
@@ -109,7 +109,7 @@ function buildOverview(
   }
 }
 
-function buildHistory(row: GrowthLeadInboxRow): GrowthLeadOperatorHistoryEntry[] {
+function buildHistory(row: RevenueQueueRow): GrowthLeadOperatorHistoryEntry[] {
   const entries: GrowthLeadOperatorHistoryEntry[] = [
     {
       at: row.created_at,
@@ -126,7 +126,7 @@ function buildHistory(row: GrowthLeadInboxRow): GrowthLeadOperatorHistoryEntry[]
     })
   }
 
-  const handoffPkg = loadOperatorHandoffFromLeadInbox(row)
+  const handoffPkg = loadOperatorHandoffFromRevenueQueue(row)
   if (handoffPkg) {
     entries.push({
       at: handoffPkg.generated_at,
@@ -160,7 +160,7 @@ function buildHistory(row: GrowthLeadInboxRow): GrowthLeadOperatorHistoryEntry[]
 
 async function loadIntentActivity(
   admin: SupabaseClient,
-  row: GrowthLeadInboxRow,
+  row: RevenueQueueRow,
 ): Promise<{ history: GrowthIntentPixelVisitHistory | null; identified: boolean }> {
   if (!row.site_key || !row.visitor_key) return { history: null, identified: false }
 
@@ -174,10 +174,10 @@ async function loadIntentActivity(
 
 export async function buildLeadOperatorWorkspacePayload(
   admin: SupabaseClient,
-  row: GrowthLeadInboxRow,
+  row: RevenueQueueRow,
 ): Promise<GrowthLeadOperatorWorkspacePayload> {
   const { history: intentActivity, identified } = await loadIntentActivity(admin, row)
-  const handoffPkg = loadOperatorHandoffFromLeadInbox(row)
+  const handoffPkg = loadOperatorHandoffFromRevenueQueue(row)
   const handoff = handoffPkg?.handoff ?? null
   const hints = computeOperatorHandoffPriorityHints(buildOperatorHandoffInputFromRow(row))
 
@@ -204,9 +204,9 @@ export async function buildLeadOperatorWorkspacePayload(
     ...(handoff?.operator_attribution ?? []),
   ]
 
-  const searchSignals = await loadSearchIntentSignalsForLeadInbox(admin, row.id, 12)
-  const buyingStageRows = await loadBuyingStageAssessmentsForLeadInbox(admin, row.id, 3)
-  const companyMatches = await loadCompanyIdentificationMatchesForLeadInbox(admin, row.id, 5)
+  const searchSignals = await loadSearchIntentSignalsForRevenueQueue(admin, row.id, 12)
+  const buyingStageRows = await loadBuyingStageAssessmentsForRevenueQueue(admin, row.id, 3)
+  const companyMatches = await loadCompanyIdentificationMatchesForRevenueQueue(admin, row.id, 5)
   const topCompany = companyMatches[0] ?? null
   const company_match: GrowthLeadOperatorCompanyMatchSummary | null = topCompany
     ? {
@@ -293,7 +293,7 @@ export async function buildLeadOperatorWorkspacePayload(
   return {
     qa_marker: GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER,
     row: sanitizeLeadInboxRowForPublic(row, identified),
-    card: buildLeadInboxCardView(row),
+    card: buildRevenueQueueCardView(row),
     operator_handoff: handoff,
     guidance_hints: hints,
     lead_engine_run,
@@ -311,7 +311,7 @@ export async function buildLeadOperatorWorkspacePayload(
 }
 
 export function buildDeterministicOperatorHandoffFromPipeline(
-  row: GrowthLeadInboxRow,
+  row: RevenueQueueRow,
   run: GrowthLeadEnginePipelineRun,
 ): GrowthOperatorHandoffOutput {
   const input = buildOperatorHandoffInputFromRow({ ...row, metadata: { ...row.metadata, lead_engine_run: run } })

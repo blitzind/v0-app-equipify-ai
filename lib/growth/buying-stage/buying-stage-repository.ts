@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GrowthCompanyIdentificationResult } from "@/lib/growth/company-identification/company-identification-types"
 import type { GrowthIntentAggregatedSession } from "@/lib/growth/lead-engine/intent/intent-session-aggregator"
-import type { GrowthIntentLeadCandidateIdentity } from "@/lib/growth/lead-engine/intent/intent-candidate-types"
 import { assessBuyingStage } from "@/lib/growth/buying-stage/buying-stage-engine"
 import { computeBuyingStageScoreContribution } from "@/lib/growth/buying-stage/buying-stage-score"
 import { isGrowthBuyingStageSchemaReady } from "@/lib/growth/buying-stage/buying-stage-schema-health"
@@ -68,7 +67,7 @@ function mapRow(row: Record<string, unknown>): GrowthBuyingStageAssessmentRow {
     id: asString(row.id),
     created_at: asString(row.created_at),
     updated_at: asString(row.updated_at),
-    lead_inbox_id: asString(row.lead_inbox_id) || null,
+    growth_lead_id: asString(row.growth_lead_id) || null,
     intent_session_id: asString(row.intent_session_id) || null,
     company_identification_id: asString(row.company_identification_id) || null,
     detected_stage: asString(row.detected_stage) as GrowthBuyingStageAssessmentRow["detected_stage"],
@@ -95,7 +94,7 @@ export function buildBuyingStageInputFromAggregate(
     companyIdentification?: GrowthCompanyIdentificationResult | null
     existing_customer_ids?: string[]
     existing_lead_ids?: string[]
-    lead_inbox_id?: string | null
+    growth_lead_id?: string | null
     company_identification_id?: string | null
     operator_activity_count?: number
   },
@@ -108,7 +107,7 @@ export function buildBuyingStageInputFromAggregate(
     visitor_key: session.visitor_key,
     session_key: session.session_key,
     intent_session_id: session.id,
-    lead_inbox_id: options.lead_inbox_id ?? null,
+    growth_lead_id: options.growth_lead_id ?? null,
     company_identification_id: options.company_identification_id ?? null,
     intent_score: options.intent_score,
     session_count: aggregated.visit_history.session_count,
@@ -143,7 +142,7 @@ export function assessBuyingStageFromAggregatedSession(
     companyIdentification?: GrowthCompanyIdentificationResult | null
     existing_customer_ids?: string[]
     existing_lead_ids?: string[]
-    lead_inbox_id?: string | null
+    growth_lead_id?: string | null
     company_identification_id?: string | null
     operator_activity_count?: number
   },
@@ -160,7 +159,7 @@ export async function persistBuyingStageAssessment(
   admin: SupabaseClient,
   assessment: GrowthBuyingStageAssessmentCandidate,
   context: {
-    lead_inbox_id?: string | null
+    growth_lead_id?: string | null
     intent_session_id?: string | null
     company_identification_id?: string | null
   },
@@ -170,7 +169,7 @@ export async function persistBuyingStageAssessment(
   }
 
   const payload = {
-    lead_inbox_id: context.lead_inbox_id ?? null,
+    growth_lead_id: context.growth_lead_id ?? null,
     intent_session_id: context.intent_session_id ?? null,
     company_identification_id: context.company_identification_id ?? null,
     detected_stage: assessment.detected_stage,
@@ -203,9 +202,9 @@ export async function persistBuyingStageAssessment(
   return { ok: true, row: mapRow(data as Record<string, unknown>), reason: null }
 }
 
-export async function loadBuyingStageAssessmentsForLeadInbox(
+export async function loadBuyingStageAssessmentsForRevenueQueue(
   admin: SupabaseClient,
-  leadInboxId: string,
+  leadId: string,
   limit = 5,
 ): Promise<GrowthBuyingStageAssessmentRow[]> {
   if (!(await isGrowthBuyingStageSchemaReady(admin))) return []
@@ -214,7 +213,7 @@ export async function loadBuyingStageAssessmentsForLeadInbox(
     .schema("growth")
     .from("buying_stage_assessments")
     .select("*")
-    .eq("lead_inbox_id", leadInboxId)
+    .eq("growth_lead_id", leadId)
     .order("stage_score", { ascending: false })
     .limit(limit)
 
@@ -222,9 +221,12 @@ export async function loadBuyingStageAssessmentsForLeadInbox(
   return data.map((row) => mapRow(row as Record<string, unknown>))
 }
 
-export async function linkBuyingStageAssessmentToLeadInbox(
+/** @deprecated Use loadBuyingStageAssessmentsForRevenueQueue (GE-LEADS-CANONICAL-4G). */
+export const loadBuyingStageAssessmentsForLeadInbox = loadBuyingStageAssessmentsForRevenueQueue
+
+export async function linkBuyingStageAssessmentToGrowthLead(
   admin: SupabaseClient,
-  leadInboxId: string,
+  leadId: string,
   assessmentId: string,
 ): Promise<{ ok: boolean; reason: string | null }> {
   if (!(await isGrowthBuyingStageSchemaReady(admin))) {
@@ -234,9 +236,21 @@ export async function linkBuyingStageAssessmentToLeadInbox(
   const { error } = await admin
     .schema("growth")
     .from("buying_stage_assessments")
-    .update({ lead_inbox_id: leadInboxId, updated_at: new Date().toISOString() })
+    .update({
+      growth_lead_id: leadId,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", assessmentId)
-    .is("lead_inbox_id", null)
+    .is("growth_lead_id", null)
 
   return { ok: !error, reason: error?.message ?? null }
+}
+
+/** @deprecated Use linkBuyingStageAssessmentToGrowthLead */
+export async function linkBuyingStageAssessmentToLeadInbox(
+  admin: SupabaseClient,
+  leadId: string,
+  assessmentId: string,
+): Promise<{ ok: boolean; reason: string | null }> {
+  return linkBuyingStageAssessmentToGrowthLead(admin, leadId, assessmentId)
 }

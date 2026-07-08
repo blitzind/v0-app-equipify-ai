@@ -325,7 +325,7 @@ export function collectBuyingStageSignals(input: GrowthBuyingStageInput): Growth
     pushSignal(signals, {
       signal_type: "operator_activity",
       label: "Operator workspace activity",
-      evidence: `${input.operator_activity_count} operator action(s) on lead inbox record.`,
+      evidence: `${input.operator_activity_count} operator action(s) on Revenue Queue record.`,
       source_attribution: [
         attr(
           "growth.lead_inbox",

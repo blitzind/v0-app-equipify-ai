@@ -316,7 +316,7 @@ export function GrowthLeadsCrmWorkspace({ showPageHeader = true }: { showPageHea
                 <div>
                   <h1 className={PAGE_STANDARD_PAGE_TITLE}>Lead Records</h1>
                   <p className="text-sm text-muted-foreground">
-                    Existing lead records — separate from the intent Lead Inbox workspace.
+                    Existing lead records — separate from the Revenue Queue workspace.
                   </p>
                 </div>
               </div>

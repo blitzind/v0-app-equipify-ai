@@ -74,8 +74,8 @@ function clampConfidence(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)))
 }
 
-function hasLeadRecord(company: Pick<GrowthProspectSearchCompanyResult, "growth_lead_id" | "lead_inbox_id">): boolean {
-  return Boolean(company.growth_lead_id || company.lead_inbox_id)
+function hasLeadRecord(company: Pick<GrowthProspectSearchCompanyResult, "growth_lead_id">): boolean {
+  return Boolean(company.growth_lead_id)
 }
 
 function dmCoverageScore(company: Pick<GrowthProspectSearchCompanyResult, "decision_maker_coverage" | "contact_intelligence">): number {
@@ -95,7 +95,7 @@ export function deriveProspectSequenceBridge(
     | "crm_detected"
     | "signals"
     | "growth_signal_recommended_action"
-    | "in_lead_inbox"
+    | "in_revenue_queue"
     | "already_pushed"
     | "lead_engine_last_run_at"
   >,
@@ -162,9 +162,8 @@ export function deriveProspectPipelineRecommendation(
     | "lead_score"
     | "lead_engine_last_run_at"
     | "buying_stage"
-    | "in_lead_inbox"
+    | "in_revenue_queue"
     | "growth_lead_id"
-    | "lead_inbox_id"
     | "recommended_next_step_reason"
     | "growth_signal_recommended_action"
     | "existing_customer"
@@ -229,11 +228,11 @@ export function deriveProspectPipelineRecommendation(
     }
   }
 
-  if (!hasLeadRecord(company) && !company.in_lead_inbox) {
+  if (!hasLeadRecord(company) && !company.in_revenue_queue) {
     return {
-      recommended_next_action: "Push To Lead Inbox",
+      recommended_next_action: "Add to Revenue Queue",
       recommended_next_action_reason: "No lead record yet — create operator workspace continuity.",
-      recommended_workflow_path: "Push to inbox → Run Lead Engine → Outreach draft",
+      recommended_workflow_path: "Add to queue → Run Lead Engine → Outreach draft",
     }
   }
 
@@ -375,7 +374,7 @@ export function buildProspectWorkflowLauncherActions(input: {
     ? appendWorkflowContextToUrl(`/admin/growth/calls/live?leadId=${preflight.growth_lead_id}`, context)
     : null
 
-  const needsLeadReason = "Push to Lead Inbox or open an existing CRM lead workspace first."
+  const needsLeadReason = "Add to Revenue Queue or open an existing CRM lead workspace first."
   const sequenceConfidence = company.recommended_sequence_confidence ?? 0
 
   return [
@@ -502,13 +501,13 @@ export function buildProspectWorkflowLauncherActions(input: {
     }),
     action({
       id: "push_to_lead_inbox",
-      label: "Push To Lead Inbox",
+      label: "Add to Revenue Queue",
       group: "qualification",
-      enabled: !suppressed && !company.in_lead_inbox,
+      enabled: !suppressed && !company.in_revenue_queue,
       disabled_reason: suppressed
         ? "Suppressed account."
-        : company.in_lead_inbox
-          ? "Already in Lead Inbox."
+        : company.in_revenue_queue
+          ? "Already in Revenue Queue."
           : null,
       launch_url: null,
       server_action: "push_to_lead_inbox",

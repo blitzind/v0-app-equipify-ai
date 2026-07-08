@@ -92,7 +92,7 @@ export function buildProspectSearchOperatorAssistIntelligence(input: {
     opportunityEmergence: operationalBundle.opportunity_emergence,
     sequenceReadiness: operationalBundle.sequence_readiness,
     territory_score: input.territory_score,
-    in_active_queue: input.in_active_queue ?? company.in_lead_inbox ?? false,
+    in_active_queue: input.in_active_queue ?? company.in_revenue_queue ?? false,
   })
 
   const command_overlays = resolveProspectSearchCommandOverlays({

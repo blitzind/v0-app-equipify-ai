@@ -118,7 +118,7 @@ export function computeTerritoryOpportunityScore(input: {
     const tier = strategy?.account_outreach_readiness
     if (isOutreachReady(tier)) outreach_ready += 1
     if (tier === "ready") high_priority += 1
-    if (company.in_lead_inbox || company.existing_prospect) relationshipHits += 1
+    if (company.in_revenue_queue || company.existing_prospect) relationshipHits += 1
     if (company.is_suppressed || tier === "blocked") blockedOrSuppressed += 1
 
     const seq = company.contact_intelligence?.sequence_readiness?.readiness_state

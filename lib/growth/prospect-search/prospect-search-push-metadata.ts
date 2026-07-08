@@ -28,7 +28,7 @@ export type GrowthProspectSearchPushItemResult = {
   company_name: string
   source_type: GrowthProspectSearchSourceType
   message: string
-  lead_inbox_id?: string | null
+  growth_lead_id?: string | null
 }
 
 export type GrowthProspectSearchBulkPushResult = {
@@ -336,7 +336,7 @@ export function formatBulkPushSummary(input: {
   failed: number
 }): string {
   const parts = [`${input.selected_total} selected`]
-  if (input.pushed > 0) parts.push(`${input.pushed} added to Lead Inbox`)
+  if (input.pushed > 0) parts.push(`${input.pushed} added to Revenue Queue`)
   if (input.already_exists > 0) parts.push(`${input.already_exists} already existed`)
   if ((input.suppressed ?? 0) > 0) {
     parts.push(

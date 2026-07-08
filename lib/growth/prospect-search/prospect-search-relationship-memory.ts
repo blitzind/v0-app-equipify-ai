@@ -58,7 +58,7 @@ export type ProspectSearchRelationshipMemorySnapshot = {
 export type ProspectSearchRelationshipMemoryInput = {
   company_name: string
   growth_lead_id?: string | null
-  in_lead_inbox?: boolean
+  in_revenue_queue?: boolean
   existing_customer?: boolean
   existing_prospect?: boolean
   is_suppressed?: boolean
@@ -181,12 +181,12 @@ export function computeRelationshipStrength(
     risks.push("Outreach blocked by compliance — resolve suppression before contact")
   }
 
-  if (input.in_lead_inbox) {
+  if (input.in_revenue_queue) {
     score += 8
-    strength_reasons.push("Account present in Lead Inbox — prior operator engagement")
+    strength_reasons.push("Account present in Revenue Queue — prior operator engagement")
     evidence.push({
       source: "lead_inbox",
-      label: "Lead Inbox record",
+      label: "Revenue Queue record",
       occurred_at: null,
       detail: "Known inbox relationship — not fabricated history",
     })
@@ -267,7 +267,7 @@ export function computeRelationshipStrength(
   } else if (prior_reply_count > 0 || (input.lead_touch?.connected_call_count ?? 0) > 0) {
     relationship_status = "engaged"
   } else if (
-    input.in_lead_inbox ||
+    input.in_revenue_queue ||
     input.existing_prospect ||
     positiveEvents > 0 ||
     trend === "improving"
@@ -277,7 +277,7 @@ export function computeRelationshipStrength(
     relationship_status = "stalled"
   } else if (trend === "declining" || negativeEvents >= 2) {
     relationship_status = "disengaged"
-  } else if (queue_action_count > 0 || input.in_lead_inbox) {
+  } else if (queue_action_count > 0 || input.in_revenue_queue) {
     relationship_status = "warming"
   }
 

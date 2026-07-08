@@ -19,7 +19,7 @@ import type {
 } from "@/lib/growth/prospect-search/prospect-search-types"
 
 const EXTERNAL_SAFETY_DEFAULTS = {
-  in_lead_inbox: false,
+  in_revenue_queue: false,
   existing_customer: false,
   existing_prospect: false,
   already_pushed: false,

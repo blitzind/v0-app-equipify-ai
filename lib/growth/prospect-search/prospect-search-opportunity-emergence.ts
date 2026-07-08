@@ -175,7 +175,7 @@ export function detectProspectSearchOpportunityEmergence(input: {
     score += 6
     emergence_reasons.push("Expansion opportunity — existing customer account")
   }
-  if (company.in_lead_inbox) {
+  if (company.in_revenue_queue) {
     score += 4
   }
   if (territory_score != null && territory_score >= 70) {

@@ -29,7 +29,7 @@ export function HighIntentQueuePanel({
       })
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean
-        result?: { message?: string; lead_inbox_id?: string | null }
+        result?: { message?: string; growth_lead_id?: string | null }
       }
       setMessage(data.result?.message ?? (res.ok ? "Processed." : "Could not process session."))
       if (res.ok && data.ok) onProcessed?.()
@@ -46,7 +46,7 @@ export function HighIntentQueuePanel({
           <div>
             <h2 className="text-lg font-semibold">High intent queue</h2>
             <p className="text-sm text-muted-foreground">
-              Live candidates from recent sessions. Process to Lead Inbox for human review — no Lead Engine auto-run.
+              Live candidates from recent sessions. Add to Revenue Queue for human review — no Lead Engine auto-run.
             </p>
           </div>
         </div>
@@ -95,8 +95,8 @@ export function HighIntentQueuePanel({
                 onClick={() => void processSession(item.session_id)}
                 title={
                   item.lead_engine_eligible
-                    ? "Add to Lead Inbox"
-                    : "Session not eligible for Lead Inbox handoff"
+                    ? "Add to Revenue Queue"
+                    : "Session not eligible for Revenue Queue handoff"
                 }
               >
                 {processingId === item.session_id ? (
@@ -104,7 +104,7 @@ export function HighIntentQueuePanel({
                 ) : (
                   <Inbox className="mr-2 size-4" />
                 )}
-                Process to Lead Inbox
+                Add to Revenue Queue
               </Button>
             </li>
           ))
