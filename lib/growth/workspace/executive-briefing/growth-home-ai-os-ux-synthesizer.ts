@@ -2,7 +2,7 @@
 
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-workspace-base-path"
 import type { RevenueQueueRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
-import { sortLeadInboxQueue } from "@/lib/growth/lead-inbox/lead-inbox-priority"
+import type { RevenueQueueCardView } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import {
   hasCanonicalDailyWorkQueue,
   mapCanonicalQueueDisplayToHomeItems,
@@ -596,32 +596,43 @@ export function buildAiOsUxViewModel(input: {
   }
 }
 
+function compareRevenueQueueCardHighlightPriority(a: RevenueQueueCardView, b: RevenueQueueCardView): number {
+  const priorityRank: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 }
+  const priorityDelta =
+    (priorityRank[a.candidate_priority] ?? 2) - (priorityRank[b.candidate_priority] ?? 2)
+  if (priorityDelta !== 0) return priorityDelta
+  const scoreDelta = (b.lead_score ?? b.intent_score) - (a.lead_score ?? a.intent_score)
+  if (scoreDelta !== 0) return scoreDelta
+  return new Date(b.last_activity_at).getTime() - new Date(a.last_activity_at).getTime()
+}
+
 export function buildLeadInboxHighlightsFromSections(
   sections: Array<{ id: string; items: unknown[] }>,
 ): GrowthWorkspaceDashboardViewModel["leadInboxHighlights"] {
-  const rows: RevenueQueueRow[] = []
+  const cards: RevenueQueueCardView[] = []
   for (const section of sections) {
     for (const item of section.items) {
       if (!item || typeof item !== "object") continue
-      const row = item as Partial<RevenueQueueRow>
-      if (!row.id || !row.company_name) continue
-      rows.push(item as RevenueQueueRow)
+      const card = item as Partial<RevenueQueueCardView>
+      if (!card.id || !card.company_name) continue
+      cards.push(item as RevenueQueueCardView)
     }
   }
 
-  return sortLeadInboxQueue(rows)
+  return [...cards]
+    .sort(compareRevenueQueueCardHighlightPriority)
     .slice(0, 8)
-    .map((row) => ({
-      id: row.id,
-      companyName: row.company_name,
+    .map((card) => ({
+      id: card.id,
+      companyName: card.company_name,
       actionLabel:
-        row.human_review_required
+        card.human_review_required
           ? "Human review"
-          : row.pipeline_status === "running"
+          : card.pipeline_status === "running"
             ? "Research in progress"
-            : row.candidate_reasoning[0] ?? "Review candidate",
-      priority: mapInboxPriority(row.candidate_priority),
-      href: `/admin/growth/leads/${encodeURIComponent(row.id)}`,
-      confidence: row.candidate_confidence > 1 ? row.candidate_confidence : row.candidate_confidence * 100,
+            : card.intent_indicators[0] ?? card.recommended_motion ?? "Review candidate",
+      priority: mapInboxPriority(card.candidate_priority as RevenueQueueRow["candidate_priority"]),
+      href: `/admin/growth/leads/${encodeURIComponent(card.id)}`,
+      confidence: card.candidate_confidence > 1 ? card.candidate_confidence : card.candidate_confidence * 100,
     }))
 }

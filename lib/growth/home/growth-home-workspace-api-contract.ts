@@ -1,9 +1,13 @@
 /**
- * GE-AVA-FRESH-SLATE-1C — APIs batched by useGrowthWorkspaceDashboard.
+ * GE-AVA-FRESH-SLATE-1C — Home workspace API contract.
+ * GE-SIMPLIFY-1B — Primary read model is workspace-summary (single request).
  */
 
 export const GROWTH_HOME_WORKSPACE_DASHBOARD_FETCH_BATCH_MARKER =
-  "growth-workspace-dashboard-fetch-batch-v2" as const
+  "growth-workspace-dashboard-fetch-batch-v3" as const
+
+export const GROWTH_HOME_WORKSPACE_SUMMARY_API_PATH =
+  "/api/platform/growth/home/workspace-summary" as const
 
 export type GrowthHomeWorkspaceApiRoute = {
   id: string
@@ -11,7 +15,7 @@ export type GrowthHomeWorkspaceApiRoute = {
   label: string
 }
 
-/** Must stay in sync with components/growth/workspace/use-growth-workspace-dashboard.ts */
+/** @deprecated Individual routes — Home dashboard loads GROWTH_HOME_WORKSPACE_SUMMARY_API_PATH instead. */
 export const GROWTH_HOME_WORKSPACE_API_ROUTES: GrowthHomeWorkspaceApiRoute[] = [
   { id: "aiden_briefing", path: "/api/platform/growth/aiden/briefing", label: "Aiden daily briefing" },
   {

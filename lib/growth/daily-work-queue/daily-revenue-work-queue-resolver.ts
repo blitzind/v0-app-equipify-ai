@@ -108,6 +108,33 @@ export async function resolveDailyRevenueWorkQueueForLeads(input: {
   })
 }
 
+export async function fetchDailyRevenueWorkQueueFromLeads(
+  admin: SupabaseClient,
+  leads: GrowthLead[],
+  input?: { capacityLimits?: DailyRevenueWorkQueueCapacityLimits },
+): Promise<{
+  enabled: boolean
+  queue: DailyRevenueWorkQueue | null
+  display: ReturnType<typeof adaptDailyRevenueWorkQueueToDisplaySummary> | null
+}> {
+  if (!isDailyRevenueWorkQueueEnabled()) {
+    return { enabled: false, queue: null, display: null }
+  }
+
+  const queue = await resolveDailyRevenueWorkQueueForLeads({
+    admin,
+    leads,
+    capacityLimits: input?.capacityLimits,
+  })
+  const leadCompanyNames = Object.fromEntries(leads.map((lead) => [lead.id, lead.companyName]))
+
+  return {
+    enabled: true,
+    queue,
+    display: queue ? adaptDailyRevenueWorkQueueToDisplaySummary(queue, { leadCompanyNames }) : null,
+  }
+}
+
 export async function fetchDailyRevenueWorkQueue(
   admin: SupabaseClient,
   input?: { limit?: number; capacityLimits?: DailyRevenueWorkQueueCapacityLimits },
@@ -121,18 +148,9 @@ export async function fetchDailyRevenueWorkQueue(
   }
 
   const leads = await listGrowthLeads(admin, { limit: input?.limit ?? 100 })
-  const queue = await resolveDailyRevenueWorkQueueForLeads({
-    admin,
-    leads,
+  return fetchDailyRevenueWorkQueueFromLeads(admin, leads, {
     capacityLimits: input?.capacityLimits,
   })
-  const leadCompanyNames = Object.fromEntries(leads.map((lead) => [lead.id, lead.companyName]))
-
-  return {
-    enabled: true,
-    queue,
-    display: queue ? adaptDailyRevenueWorkQueueToDisplaySummary(queue, { leadCompanyNames }) : null,
-  }
 }
 
 export async function fetchDailyRevenueWorkQueueLeadStatus(

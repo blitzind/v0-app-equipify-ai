@@ -3,7 +3,8 @@ import type {
   GrowthLeadInboxStatus,
 } from "@/lib/growth/lead-inbox/lead-inbox-types"
 
-function growthSignalScoreFromMetadata(metadata: Record<string, unknown>): number {
+function growthSignalScoreFromMetadata(metadata: Record<string, unknown> | undefined | null): number {
+  if (!metadata || typeof metadata !== "object") return 0
   const growthSignals = metadata.growth_signals
   if (!growthSignals || typeof growthSignals !== "object") return 0
   const score = (growthSignals as Record<string, unknown>).growth_signal_score

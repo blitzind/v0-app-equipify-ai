@@ -34,7 +34,7 @@ function runStructureCertification(): void {
 
   assert.equal(GROWTH_HOME_DEBUG_SOURCE_QA_MARKER, "growth-home-debug-source-fresh-slate-1c-v1")
   assert.equal(GROWTH_HOME_DEBUG_SOURCE_API_PATH, "/api/platform/growth/home/debug-source")
-  assert.equal(GROWTH_HOME_WORKSPACE_DASHBOARD_FETCH_BATCH_MARKER, "growth-workspace-dashboard-fetch-batch-v2")
+  assert.equal(GROWTH_HOME_WORKSPACE_DASHBOARD_FETCH_BATCH_MARKER, "growth-workspace-dashboard-fetch-batch-v3")
   assert.equal(growthHomeRouteDynamic, "force-dynamic")
   assert.ok(GROWTH_HOME_NO_STORE_CACHE_CONTROL.includes("no-store"))
 
@@ -51,13 +51,17 @@ function runStructureCertification(): void {
 
   const routeIds = new Set(GROWTH_HOME_WORKSPACE_API_ROUTES.map((route) => route.id))
   assert.ok(routeIds.has("aiden_briefing"))
+  assert.ok(routeIds.has("revenue_queue"))
   assert.ok(routeIds.has("daily_revenue_work_queue"))
   assert.ok(routeIds.has("opportunities_pipeline"))
 
+  assert.ok(fs.existsSync(path.join(ROOT, "app/api/platform/growth/home/workspace-summary/route.ts")))
+
   const dashboardHook = read("components/growth/workspace/use-growth-workspace-dashboard.ts")
-  assert.match(dashboardHook, /GROWTH_HOME_WORKSPACE_API_ROUTES/)
+  assert.match(dashboardHook, /GROWTH_HOME_WORKSPACE_SUMMARY_API_PATH/)
   assert.match(dashboardHook, /cache: "no-store"/)
   assert.match(dashboardHook, /\[growth\/home\/dashboard-fetch\]/)
+  assert.doesNotMatch(dashboardHook, /route\.id === "lead_inbox"/)
 
   const dashboardBody = read("components/growth/workspace/growth-workspace-dashboard-body.tsx")
   assert.match(dashboardBody, /GrowthHomeDebugFooter/)
