@@ -30,6 +30,10 @@ import {
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-repository"
 import { sanitizeDatamoonProviderMetadata, sanitizeDatamoonProviderRecord } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-sanitizer"
 import {
+  logDatamoonRawFetchAudit,
+  shouldLogDatamoonRawFetchAudit,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-audience-raw-fetch-audit"
+import {
   GROWTH_DATAMOON_AUDIENCE_IMPORT_QA_MARKER,
   type DatamoonAudienceImportRecord,
   type DatamoonAudienceImportRequest,
@@ -355,11 +359,30 @@ export async function pollDatamoonAudienceImportRun(
 
   await replaceDatamoonAudienceImportRecords(admin, runId, previewRecords)
 
+  const previewCount = previewRecords.filter((row) => row.status === "preview").length
+
+  if (shouldLogDatamoonRawFetchAudit(existing.status)) {
+    logDatamoonRawFetchAudit({
+      runId,
+      datamoonAudienceId: existing.datamoonAudienceId,
+      providerMode: existing.providerMode,
+      fetchClientStatus: fetchResult.status,
+      rawResponse: fetchResult.data,
+      providerStatus,
+      recordCount,
+      rawRecordsLength: rawRecords.length,
+      firstRawRecord: rawRecords[0] ?? null,
+      previewCount,
+      skippedCount,
+      duplicateCount,
+    })
+  }
+
   const completed = await updateDatamoonAudienceImportRun(admin, runId, {
     status: "completed",
     recordCount,
     loadingCount: 0,
-    previewCount: previewRecords.filter((row) => row.status === "preview").length,
+    previewCount,
     duplicateCount,
     skippedCount,
     lastPolledAt: now,
