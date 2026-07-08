@@ -136,13 +136,24 @@ export async function pushProspectSearchCompanyToLeadInbox(
     visit_count: 0,
     intent_session_id: `prospect-search-${company.id}`,
     visitor_key: `prospect-search-${dedupe_hash}`,
+    existing_lead_match: company.growth_lead_id
+      ? {
+          matched: true,
+          source: "growth.leads",
+          ids: [company.growth_lead_id],
+          evidence: "Prospect search index growth_lead_id.",
+        }
+      : undefined,
     metadata: buildProspectSearchPushMetadata(company, query),
+    actor,
   })
 
   if (result.duplicate) {
     return {
       outcome: "already_exists",
       message: "Already in Lead Inbox.",
+      lead_inbox_id: null,
+      growth_lead_id: result.growth_lead_id ?? company.growth_lead_id ?? null,
     }
   }
 
@@ -150,10 +161,11 @@ export async function pushProspectSearchCompanyToLeadInbox(
     return {
       outcome: "failed",
       message: result.reason ?? "Lead Inbox create failed.",
+      growth_lead_id: result.growth_lead_id ?? null,
     }
   }
 
-  const growthLeadId = company.growth_lead_id ?? null
+  const growthLeadId = result.growth_lead_id ?? company.growth_lead_id ?? null
   const workflowRun = await runUnifiedRevenueWorkflowAfterIntake({
     admin,
     actor,
@@ -176,6 +188,8 @@ export async function pushProspectSearchCompanyToLeadInbox(
     message: "Added to Lead Inbox for human review.",
     lead_inbox_id: result.row.id,
     growth_lead_id: workflowRun.workflow?.leadId ?? growthLeadId,
+    lead_status: result.lead_status ?? null,
+    lead_created: result.lead_created ?? null,
     workflow: workflowRun.workflow,
   }
 }

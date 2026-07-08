@@ -168,13 +168,13 @@ export async function ingestIntentCandidateToLeadInbox(
     domain: input.domain,
   })
 
-  if (dedupe.is_duplicate || options.force_duplicate_status) {
+  if (options.force_duplicate_status && !dedupe.is_duplicate) {
     return {
       qa_marker: GROWTH_LEAD_INBOX_QA_MARKER,
       ok: false,
       row: null,
       duplicate: true,
-      reason: `Duplicate inbox candidate (${dedupe.reasons.join(", ")}).`,
+      reason: "Forced duplicate status — inbox ingest skipped.",
       errors: [],
     }
   }

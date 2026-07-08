@@ -109,11 +109,15 @@ export type GrowthBrowserIntakeResult =
   | ({
       status: "created"
       lead_id: string
+      lead_status: string
+      lead_created: true
       decision_maker_id: string | null
     } & GrowthBrowserIntakeResultBase)
   | ({
       status: "updated"
       lead_id: string
+      lead_status: string
+      lead_created: false
       decision_maker_id: string | null
       rule: string
       confidence: number

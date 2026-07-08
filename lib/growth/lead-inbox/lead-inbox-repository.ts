@@ -6,8 +6,15 @@ import {
 } from "@/lib/growth/lead-inbox/lead-inbox-status-engine"
 import {
   checkLeadInboxDuplicate,
+  resolveLeadInboxCrmMatches,
   validateInboxPiiPolicy,
 } from "@/lib/growth/lead-inbox/lead-inbox-dedupe"
+import {
+  mergeCanonicalLeadIntoInboxMetadata,
+  resolveCanonicalLeadForDuplicateInbox,
+  resolveCanonicalLeadForInboxInput,
+} from "@/lib/growth/lead-inbox/lead-inbox-canonical-intake-bridge"
+import { logGrowthEngine } from "@/lib/growth/access"
 import { sortLeadInboxQueue } from "@/lib/growth/lead-inbox/lead-inbox-priority"
 import { isGrowthLeadInboxSchemaReady, GROWTH_LEAD_INBOX_SCHEMA_SETUP_MESSAGE } from "@/lib/growth/lead-inbox/lead-inbox-schema-health"
 import {
@@ -36,6 +43,30 @@ function parseCrmMatch(value: unknown): GrowthLeadInboxCrmMatch {
     source: asString(row.source) || null,
     ids: Array.isArray(row.ids) ? row.ids.filter((id): id is string => typeof id === "string") : [],
     evidence: asString(row.evidence),
+  }
+}
+
+async function loadDuplicateInboxContextForBackfill(
+  admin: SupabaseClient,
+  inboxId: string,
+): Promise<{ metadata?: Record<string, unknown> } | null> {
+  try {
+    const { data } = await admin
+      .schema("growth")
+      .from("lead_inbox")
+      .select("metadata")
+      .eq("id", inboxId)
+      .maybeSingle()
+    if (!data) return null
+    const row = data as Record<string, unknown>
+    return {
+      metadata:
+        row.metadata && typeof row.metadata === "object"
+          ? (row.metadata as Record<string, unknown>)
+          : {},
+    }
+  } catch {
+    return null
   }
 }
 
@@ -126,7 +157,17 @@ export async function createLeadCandidate(
   }
 
   const pii = validateInboxPiiPolicy(input)
-  const sanitized = pii.sanitized
+  let sanitized = pii.sanitized
+  const actor = input.actor
+
+  if (!sanitized.existing_lead_match && !sanitized.existing_account_match) {
+    const crm = await resolveLeadInboxCrmMatches(admin, sanitized)
+    sanitized = {
+      ...sanitized,
+      existing_account_match: crm.existing_account_match,
+      existing_lead_match: crm.existing_lead_match,
+    }
+  }
 
   const dedupe = await checkLeadInboxDuplicate(admin, {
     dedupe_hash: sanitized.dedupe_hash,
@@ -137,6 +178,27 @@ export async function createLeadCandidate(
   })
 
   if (dedupe.is_duplicate) {
+    const canonical =
+      dedupe.existing_inbox_id != null
+        ? await resolveCanonicalLeadForDuplicateInbox(admin, sanitized, dedupe.existing_inbox_id, actor)
+        : null
+
+    if (dedupe.existing_inbox_id && canonical) {
+      try {
+        const existingRow = await loadDuplicateInboxContextForBackfill(admin, dedupe.existing_inbox_id)
+        await admin
+          .schema("growth")
+          .from("lead_inbox")
+          .update({
+            metadata: mergeCanonicalLeadIntoInboxMetadata(existingRow?.metadata, canonical),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", dedupe.existing_inbox_id)
+      } catch {
+        // fault isolated — duplicate response still returns canonical id
+      }
+    }
+
     return {
       qa_marker: GROWTH_LEAD_INBOX_QA_MARKER,
       ok: false,
@@ -144,8 +206,38 @@ export async function createLeadCandidate(
       duplicate: true,
       reason: `Duplicate prevented (${dedupe.reasons.join(", ")}).`,
       errors: [],
+      growth_lead_id: canonical?.growth_lead_id ?? null,
+      lead_status: canonical?.lead_status ?? null,
+      lead_created: canonical ? false : null,
     }
   }
+
+  const canonical = await resolveCanonicalLeadForInboxInput(admin, sanitized, actor)
+  if ("error" in canonical) {
+    return {
+      qa_marker: GROWTH_LEAD_INBOX_QA_MARKER,
+      ok: false,
+      row: null,
+      duplicate: false,
+      reason: canonical.error,
+      errors: [canonical.error],
+      growth_lead_id: null,
+      lead_status: null,
+      lead_created: null,
+    }
+  }
+
+  sanitized = {
+    ...sanitized,
+    metadata: mergeCanonicalLeadIntoInboxMetadata(sanitized.metadata, canonical),
+  }
+
+  logGrowthEngine("lead_inbox_canonical_intake_linked", {
+    growthLeadId: canonical.growth_lead_id,
+    leadCreated: canonical.lead_created,
+    dedupeRule: canonical.dedupe_rule,
+    siteKey: sanitized.site_key,
+  })
 
   const initialStatus: GrowthLeadInboxStatus =
     sanitized.existing_account_match?.matched || sanitized.existing_lead_match?.matched
@@ -221,6 +313,9 @@ export async function createLeadCandidate(
       duplicate: false,
       reason: "Lead inbox candidate created.",
       errors: [],
+      growth_lead_id: canonical.growth_lead_id,
+      lead_status: canonical.lead_status,
+      lead_created: canonical.lead_created,
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)

@@ -116,9 +116,36 @@ async function createLeadFromAudienceMember(
     },
   })
 
-  if (result.duplicate) return "skipped"
+  if (result.duplicate) {
+    if (result.growth_lead_id) {
+      await linkAudienceMemberToCanonicalLead(admin, member.id, result.growth_lead_id)
+    }
+    return "skipped"
+  }
   if (!result.ok) return "failed"
+
+  if (result.growth_lead_id) {
+    await linkAudienceMemberToCanonicalLead(admin, member.id, result.growth_lead_id)
+  }
+
   return "created"
+}
+
+async function linkAudienceMemberToCanonicalLead(
+  admin: SupabaseClient,
+  memberId: string,
+  growthLeadId: string,
+): Promise<void> {
+  try {
+    await admin
+      .schema("growth")
+      .from("growth_audience_members")
+      .update({ lead_id: growthLeadId, updated_at: new Date().toISOString() })
+      .eq("id", memberId)
+      .is("lead_id", null)
+  } catch {
+    // fault isolated — canonical lead still exists
+  }
 }
 
 function buildLeadCreationProgress(

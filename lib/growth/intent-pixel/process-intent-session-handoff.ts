@@ -11,6 +11,9 @@ export type ProcessIntentSessionHandoffResult = {
   ok: boolean
   session_id: string
   lead_inbox_id: string | null
+  growth_lead_id: string | null
+  lead_status: string | null
+  lead_created: boolean | null
   message: string
   duplicate: boolean
 }
@@ -25,6 +28,9 @@ export async function processIntentSessionToLeadInbox(
     ok: false,
     session_id: sessionId,
     lead_inbox_id: null,
+    growth_lead_id: null,
+    lead_status: null,
+    lead_created: null,
     message: "",
     duplicate: false,
   }
@@ -58,12 +64,21 @@ export async function processIntentSessionToLeadInbox(
     return {
       ...base,
       duplicate: true,
+      growth_lead_id: ingest.growth_lead_id ?? null,
+      lead_status: ingest.lead_status ?? null,
+      lead_created: ingest.lead_created ?? false,
       message: ingest.reason ?? "Duplicate inbox entry.",
     }
   }
 
   if (!ingest.ok || !ingest.row) {
-    return { ...base, message: ingest.reason ?? "Lead Inbox ingest failed." }
+    return {
+      ...base,
+      growth_lead_id: ingest.growth_lead_id ?? null,
+      lead_status: ingest.lead_status ?? null,
+      lead_created: ingest.lead_created ?? null,
+      message: ingest.reason ?? "Lead Inbox ingest failed.",
+    }
   }
 
   return {
@@ -71,6 +86,9 @@ export async function processIntentSessionToLeadInbox(
     ok: true,
     session_id: sessionId,
     lead_inbox_id: ingest.row.id,
+    growth_lead_id: ingest.growth_lead_id ?? null,
+    lead_status: ingest.lead_status ?? null,
+    lead_created: ingest.lead_created ?? null,
     message: "Added to Lead Inbox for human review. Lead Engine not auto-run.",
     duplicate: false,
   }

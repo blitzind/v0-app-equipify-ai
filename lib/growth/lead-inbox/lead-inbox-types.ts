@@ -109,6 +109,8 @@ export type GrowthLeadInboxCreateInput = {
   existing_lead_match?: GrowthLeadInboxCrmMatch
   human_review_required?: boolean
   metadata?: Record<string, unknown>
+  /** Optional actor for canonical growth.leads resolution (GE-LEADS-CANONICAL-2A). */
+  actor?: { userId: string | null; email?: string | null }
 }
 
 export type GrowthLeadInboxLoadFilters = {
@@ -133,4 +135,8 @@ export type GrowthLeadInboxCreateResult = {
   duplicate: boolean
   reason: string
   errors: string[]
+  /** Canonical growth.leads id — present whenever resolution succeeded (GE-LEADS-CANONICAL-2A). */
+  growth_lead_id?: string | null
+  lead_status?: string | null
+  lead_created?: boolean | null
 }

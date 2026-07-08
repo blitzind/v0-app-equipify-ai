@@ -29,6 +29,8 @@ export type GrowthManualContactEntryResult =
   | {
       status: "created"
       lead_id: string
+      lead_status: string
+      lead_created: true
       decision_maker_id: string
       email_status: string | null
       verified_by_provider: boolean
@@ -37,6 +39,8 @@ export type GrowthManualContactEntryResult =
   | {
       status: "linked_duplicate"
       lead_id: string
+      lead_status: string
+      lead_created: false
       rule: string
       confidence: number
       warnings: GrowthManualContactEntryWarning[]

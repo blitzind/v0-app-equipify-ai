@@ -5,7 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { createGrowthLeadDecisionMaker } from "@/lib/growth/decision-maker-repository"
 import { findImportDedupeMatch, proposeImportRowAction } from "@/lib/growth/import/dedupe"
-import { createGrowthLead } from "@/lib/growth/lead-repository"
+import { createGrowthLead, fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import {
   buildEmailVerificationMetadata,
   verifyEmailWithProvider,
@@ -83,9 +83,12 @@ export async function createManualGrowthContact(
       rule: dedupe.rule,
       confidence: dedupe.confidence,
     })
+    const existingLead = await fetchGrowthLeadById(admin, dedupe.leadId)
     return {
       status: "linked_duplicate",
       lead_id: dedupe.leadId,
+      lead_status: existingLead?.status ?? "unknown",
+      lead_created: false,
       rule: dedupe.rule,
       confidence: dedupe.confidence,
       warnings,
@@ -198,6 +201,8 @@ export async function createManualGrowthContact(
     return {
       status: "created",
       lead_id: lead.id,
+      lead_status: lead.status,
+      lead_created: true,
       decision_maker_id: decisionMaker.id,
       email_status: emailStatus,
       verified_by_provider: verifiedByProvider,

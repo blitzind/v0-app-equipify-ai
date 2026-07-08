@@ -470,6 +470,8 @@ export async function createBrowserIntakeContact(
     return {
       status: "updated",
       lead_id: lead.id,
+      lead_status: lead.status,
+      lead_created: false,
       decision_maker_id: finalized.decisionMakerId,
       rule: "explicit_target",
       confidence: 1,
@@ -548,6 +550,8 @@ export async function createBrowserIntakeContact(
     return {
       status: "updated",
       lead_id: lead.id,
+      lead_status: lead.status,
+      lead_created: false,
       decision_maker_id: finalized.decisionMakerId,
       rule: dedupe.rule,
       confidence: dedupe.confidence,
@@ -642,6 +646,8 @@ export async function createBrowserIntakeContact(
     return {
       status: "created",
       lead_id: lead.id,
+      lead_status: lead.status,
+      lead_created: true,
       decision_maker_id: finalized.decisionMakerId,
       warnings: [...warnings, ...finalized.warnings],
       contact_discovery_queued: finalized.contactDiscoveryQueued,
