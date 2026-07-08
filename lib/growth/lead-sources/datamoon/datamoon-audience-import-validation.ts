@@ -5,6 +5,10 @@ import {
   type DatamoonAudienceImportRequest,
   type DatamoonAudienceImportValidationIssue,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
+import {
+  formatDatamoonProviderFilterFieldAllowlistMessage,
+  isDatamoonProviderSupportedFilterField,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-audience-filter-mapping"
 
 export function validateDatamoonAudienceImportRequest(
   input: DatamoonAudienceImportRequest,
@@ -25,6 +29,16 @@ export function validateDatamoonAudienceImportRequest(
 
   if (!Array.isArray(input.filters)) {
     issues.push({ code: "filters_required", field: "filters", message: "Filters must be an array." })
+  } else {
+    input.filters.forEach((filter, index) => {
+      if (!isDatamoonProviderSupportedFilterField(filter.field)) {
+        issues.push({
+          code: "unsupported_provider_filter_field",
+          field: `filters.${index}.field`,
+          message: `Datamoon filter field '${filter.field}' is not supported. Supported provider filter fields: ${formatDatamoonProviderFilterFieldAllowlistMessage()}.`,
+        })
+      }
+    })
   }
 
   const topicIds = input.topic_ids ?? []

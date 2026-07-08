@@ -50,15 +50,16 @@ function finalizeDatamoonRequestForBinding(
   request: DatamoonAudienceImportRequest,
   keepMonitoring: boolean,
 ): DatamoonAudienceImportRequest {
-  if (!keepMonitoring || requestHasOnlyNewSinceLastRefresh(request)) {
-    return normalizeDatamoonImportRequestAudience(request)
+  const normalized = normalizeDatamoonImportRequestAudience(request)
+  if (!keepMonitoring || requestHasOnlyNewSinceLastRefresh(normalized)) {
+    return normalized
   }
   return normalizeDatamoonImportRequestAudience({
-    ...request,
-    filters: [
-      ...request.filters,
-      { field: "only_new_since_last_refresh", operator: "=", value: "true" },
-    ],
+    ...normalized,
+    workbench_context: {
+      ...normalized.workbench_context,
+      onlyNewSinceLastRefresh: true,
+    },
   })
 }
 

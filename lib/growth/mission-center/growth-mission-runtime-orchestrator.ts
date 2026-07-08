@@ -274,11 +274,15 @@ async function orchestrateDatamoonMonitoring(
     return runtime
   }
 
-  const filters = [...(request.filters ?? [])]
-  if (!filters.some((f) => f.field === "only_new_since_last_refresh")) {
-    filters.push({ field: "only_new_since_last_refresh", operator: "=", value: "true" })
-  }
-  const refreshRequest: DatamoonAudienceImportRequest = { ...request, filters }
+  const refreshRequest: DatamoonAudienceImportRequest = requestHasOnlyNewSinceLastRefresh(request)
+    ? request
+    : {
+        ...request,
+        workbench_context: {
+          ...request.workbench_context,
+          onlyNewSinceLastRefresh: true,
+        },
+      }
 
   const started = await startDatamoonAudienceImportRun(admin, refreshRequest, actor)
   if (!started.ok) return runtime

@@ -36,6 +36,7 @@ import {
   type DatamoonAudienceImportRun,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import { validateDatamoonAudienceImportRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-validation"
+import { resolveDatamoonProviderFiltersForImport } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-filter-mapping"
 import { normalizeDatamoonImportRequestAudience } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-draft-builder"
 import { logAvaRuntimeTrace } from "@/lib/growth/mission-center/growth-mission-ava-launch-runtime-object-trace"
 import { createGrowthLead } from "@/lib/growth/lead-repository"
@@ -159,10 +160,11 @@ export async function startDatamoonAudienceImportRun(
   if (!run) return { ok: false, error: "run_create_failed" }
 
   try {
+    const providerFilters = resolveDatamoonProviderFiltersForImport(normalizedInput)
     const build = await buildAudience(
       {
         type: normalizedInput.audience_type,
-        filters: normalizedInput.filters,
+        filters: providerFilters,
         topic_ids: normalizedInput.topic_ids,
         name: normalizedInput.name,
         website_id: normalizedInput.website_id,

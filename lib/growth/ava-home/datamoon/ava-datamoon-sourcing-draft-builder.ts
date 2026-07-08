@@ -3,6 +3,10 @@
 import type { DatamoonAudienceFilter } from "@/lib/growth/providers/datamoon"
 import type { DatamoonAudienceImportRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import { DATAMOON_MAX_TOPIC_IDS } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
+import {
+  buildDatamoonAudienceImportWorkbenchContextFromDraft,
+  mapDatamoonFiltersToProviderFilters,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-audience-filter-mapping"
 import type { AvaDatamoonAudienceDraft } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-workbench-types"
 
 function companySizeFilter(size: AvaDatamoonAudienceDraft["companySize"]): DatamoonAudienceFilter | null {
@@ -55,11 +59,26 @@ export function normalizeDatamoonImportRequestAudience(
   const topicIds = normalizeDatamoonTopicIds(request.topic_ids ?? [])
   const audienceType = resolveDatamoonAudienceTypeForImport(request.audience_type, topicIds)
   const resolvedTopicIds = isTopicIdAudienceType(audienceType) ? topicIds : undefined
+  const mappedFilters = mapDatamoonFiltersToProviderFilters(request.filters)
 
   return {
     ...request,
     audience_type: audienceType,
     topic_ids: resolvedTopicIds && resolvedTopicIds.length > 0 ? resolvedTopicIds : undefined,
+    filters: mappedFilters.providerFilters,
+    workbench_context: request.workbench_context
+      ? {
+          ...request.workbench_context,
+          omittedWorkbenchFilterFields: [
+            ...new Set([
+              ...(request.workbench_context.omittedWorkbenchFilterFields ?? []),
+              ...mappedFilters.omittedWorkbenchFilterFields,
+            ]),
+          ],
+        }
+      : mappedFilters.omittedWorkbenchFilterFields.length > 0
+        ? { omittedWorkbenchFilterFields: mappedFilters.omittedWorkbenchFilterFields }
+        : undefined,
   }
 }
 
@@ -81,7 +100,10 @@ function resolvedJobTitles(draft: AvaDatamoonAudienceDraft): string[] {
   return titles
 }
 
-export function buildDatamoonFiltersFromAudienceDraft(draft: AvaDatamoonAudienceDraft): DatamoonAudienceFilter[] {
+/** Internal workbench filter vocabulary — not sent to Datamoon directly. */
+export function buildDatamoonWorkbenchFiltersFromAudienceDraft(
+  draft: AvaDatamoonAudienceDraft,
+): DatamoonAudienceFilter[] {
   const filters: DatamoonAudienceFilter[] = []
 
   if (draft.geography.country.trim()) {
@@ -138,19 +160,30 @@ export function buildDatamoonFiltersFromAudienceDraft(draft: AvaDatamoonAudience
   return filters
 }
 
+/** Provider-safe filters for Datamoon audience build. */
+export function buildDatamoonFiltersFromAudienceDraft(draft: AvaDatamoonAudienceDraft): DatamoonAudienceFilter[] {
+  return mapDatamoonFiltersToProviderFilters(buildDatamoonWorkbenchFiltersFromAudienceDraft(draft)).providerFilters
+}
+
 export function buildDatamoonImportRequestFromAudienceDraft(
   draft: AvaDatamoonAudienceDraft,
 ): DatamoonAudienceImportRequest {
   const topicIds = resolvedTopics(draft)
   const audienceType = resolveDatamoonAudienceTypeForImport(draft.audienceType, topicIds)
+  const workbenchFilters = buildDatamoonWorkbenchFiltersFromAudienceDraft(draft)
+  const mappedFilters = mapDatamoonFiltersToProviderFilters(workbenchFilters)
   const request: DatamoonAudienceImportRequest = {
     run_name: draft.audienceName.trim() || "Datamoon audience run",
     audience_type: audienceType,
     provider_mode: draft.providerMode,
-    filters: buildDatamoonFiltersFromAudienceDraft(draft),
+    filters: mappedFilters.providerFilters,
     topic_ids: isTopicIdAudienceType(audienceType) ? topicIds : undefined,
     limit: draft.recordLimit,
     name: draft.audienceName.trim() || undefined,
+    workbench_context: buildDatamoonAudienceImportWorkbenchContextFromDraft(draft, {
+      topics: topicIds,
+      omittedWorkbenchFilterFields: mappedFilters.omittedWorkbenchFilterFields,
+    }),
   }
   return normalizeDatamoonImportRequestAudience(request)
 }
