@@ -9,8 +9,10 @@ import {
 } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import { GROWTH_OPERATOR_HANDOFF_METADATA_KEY } from "@/lib/growth/operator-handoff/operator-handoff-repository"
 import type { GrowthOperatorHandoffOutput } from "@/lib/growth/operator-handoff/operator-handoff-types"
-import { computeOperatorHandoffPriorityHints } from "@/lib/growth/operator-handoff/operator-handoff-priority"
-import type { GrowthOperatorHandoffInput } from "@/lib/growth/operator-handoff/operator-handoff-types"
+import {
+  computeOperatorHandoffPriorityHints,
+  type GrowthOperatorHandoffPriorityHints,
+} from "@/lib/growth/operator-handoff/operator-handoff-priority"
 import {
   deriveCandidateConfidenceFromLead,
   deriveHumanReviewRequiredFromLead,
@@ -50,60 +52,24 @@ function isOperatorHandoff(value: unknown): value is { handoff: GrowthOperatorHa
   return row.handoff != null && typeof row.handoff === "object"
 }
 
-function buildPseudoInboxRowForHints(lead: GrowthLead, queueStatus: string): RevenueQueueRow {
-  const intentScore = deriveIntentScoreFromLead(lead)
-  return {
-    id: lead.id,
-    created_at: lead.createdAt,
-    updated_at: lead.updatedAt,
-    site_key: lead.sourceDetail ?? lead.sourceKind,
-    candidate_type: "identified",
-    candidate_priority: mapResearchPriorityToInboxPriority(lead.researchPriority) as RevenueQueueRow["candidate_priority"],
-    intent_score: intentScore,
-    intent_grade: "F",
-    candidate_confidence: deriveCandidateConfidenceFromLead(lead),
-    pipeline_entry: "icp_targeting",
-    pipeline_status: mapWorkflowHealthToPipelineStatus(lead.workflowHealth, mapLeadStatusToInboxQueueStatus(lead.status)) as RevenueQueueRow["pipeline_status"],
-    company_name: lead.companyName,
-    domain: domainFromWebsite(lead.website),
-    contact_name: lead.contactName,
-    email: lead.contactEmail,
-    phone: lead.contactPhone,
-    linkedin_url: null,
-    dedupe_hash: lead.externalRef ?? lead.id,
-    candidate_reasoning: lead.notes ? [lead.notes] : [],
-    candidate_evidence: [],
-    candidate_attribution: lead.sourceChannel
-      ? [{ source: lead.sourceChannel, section: "canonical", signal: lead.sourceKind, evidence: lead.sourceDetail ?? "", confidence: 0.5 }]
-      : [],
-    session_count: typeof lead.metadata.intent_session_count === "number" ? lead.metadata.intent_session_count : 0,
-    visit_count: typeof lead.metadata.intent_visit_count === "number" ? lead.metadata.intent_visit_count : 0,
-    utm_source: lead.sourceChannel ?? "",
-    utm_medium: "",
-    utm_campaign: lead.sourceCampaign ?? "",
-    owner_id: lead.assignedTo,
-    status: queueStatus as RevenueQueueRow["status"],
-    human_review_required: deriveHumanReviewRequiredFromLead(lead, mapLeadStatusToInboxQueueStatus(lead.status)),
-    lead_engine_run_id: lead.latestResearchRunId,
-    intent_session_id: typeof lead.metadata.intent_session_id === "string" ? lead.metadata.intent_session_id : "",
-    visitor_key: typeof lead.metadata.visitor_key === "string" ? lead.metadata.visitor_key : "",
-    existing_account_match: {
-      matched: Boolean(lead.promotedOrganizationId),
-      source: lead.promotedOrganizationId ? "growth.leads" : null,
-      ids: lead.promotedOrganizationId ? [lead.promotedOrganizationId] : [],
-      evidence: "",
-    },
-    existing_lead_match: { matched: false, source: null, ids: [], evidence: "" },
+/**
+ * Priority hints derived directly from the canonical lead — no pseudo inbox row.
+ * `computeOperatorHandoffPriorityHints` only reads `intent_score`, `candidate_priority`,
+ * and `metadata.buying_stage_summary` off `leadInbox`, so we hand it that minimal context.
+ */
+function computeRevenueQueueCardPriorityHints(
+  lead: GrowthLead,
+  outputs: ReturnType<typeof extractLeadEngineOutputsFromRun>,
+): GrowthOperatorHandoffPriorityHints {
+  const hintContext = {
+    intent_score: deriveIntentScoreFromLead(lead),
+    candidate_priority: mapResearchPriorityToInboxPriority(
+      lead.researchPriority,
+    ) as RevenueQueueRow["candidate_priority"],
     metadata: lead.metadata,
-  }
-}
-
-export function buildOperatorHandoffInputFromGrowthLead(lead: GrowthLead): GrowthOperatorHandoffInput {
-  const run = lead.metadata[GROWTH_LEAD_ENGINE_RUN_METADATA_KEY]
-  const outputs = isPipelineRun(run) ? extractLeadEngineOutputsFromRun(run) : {}
-  const queueStatus = mapLeadStatusToInboxQueueStatus(lead.status)
-  return {
-    leadInbox: buildPseudoInboxRowForHints(lead, queueStatus),
+  } as RevenueQueueRow
+  return computeOperatorHandoffPriorityHints({
+    leadInbox: hintContext,
     icpTargeting: outputs.icpTargeting ?? "",
     companyDiscovery: outputs.companyDiscovery ?? "",
     decisionMakerHypothesis: outputs.decisionMakerHypothesis ?? "",
@@ -115,7 +81,7 @@ export function buildOperatorHandoffInputFromGrowthLead(lead: GrowthLead): Growt
     humanApproval: outputs.humanApproval ?? "",
     revenueExecution: outputs.revenueExecution ?? "",
     intentHistory: null,
-  }
+  })
 }
 
 export function buildRevenueQueueCardProjectionFromLead(lead: GrowthLead): RevenueQueueCardView {
@@ -123,9 +89,9 @@ export function buildRevenueQueueCardProjectionFromLead(lead: GrowthLead): Reven
   const pipelineStatus = mapWorkflowHealthToPipelineStatus(lead.workflowHealth, queueStatus)
   const handoffPkg = lead.metadata[GROWTH_OPERATOR_HANDOFF_METADATA_KEY]
   const handoff = isOperatorHandoff(handoffPkg) ? handoffPkg.handoff : null
-  const hints = computeOperatorHandoffPriorityHints(buildOperatorHandoffInputFromGrowthLead(lead))
   const run = lead.metadata[GROWTH_LEAD_ENGINE_RUN_METADATA_KEY]
   const outputs = isPipelineRun(run) ? extractLeadEngineOutputsFromRun(run) : {}
+  const hints = computeRevenueQueueCardPriorityHints(lead, outputs)
   const verification =
     outputs.verificationTriage && typeof outputs.verificationTriage === "object"
       ? outputs.verificationTriage.disposition

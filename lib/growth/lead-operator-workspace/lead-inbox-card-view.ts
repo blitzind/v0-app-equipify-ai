@@ -178,6 +178,3 @@ export function buildRevenueQueueCardView(row: RevenueQueueRow): RevenueQueueCar
     needs_review: needsReview,
   }
 }
-
-/** @deprecated Use buildRevenueQueueCardView (GE-LEADS-CANONICAL-4G). */
-export const buildLeadInboxCardView = buildRevenueQueueCardView

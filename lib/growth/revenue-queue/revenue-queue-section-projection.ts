@@ -1,7 +1,6 @@
 /** GE-LEADS-CANONICAL-3A — Section bucketing for canonical Revenue Queue (client-safe). */
 
 import type { RevenueQueueRow } from "@/lib/growth/lead-inbox/lead-inbox-types"
-import { resolveInboxDashboardSection } from "@/lib/growth/lead-operator-workspace/lead-inbox-dashboard"
 import type {
   RevenueQueueCardView,
   RevenueQueueDashboardSection,
@@ -100,8 +99,39 @@ export function buildPseudoInboxRowFromGrowthLead(lead: GrowthLead): RevenueQueu
   }
 }
 
-export function resolveRevenueQueueSectionFromLead(lead: GrowthLead): RevenueQueueDashboardSection {
-  return resolveInboxDashboardSection(buildPseudoInboxRowFromGrowthLead(lead))
+/**
+ * Bucket a canonical Revenue Queue card into a dashboard section.
+ * Mirrors the retired inbox section resolver but reads the card directly —
+ * no pseudo inbox row is constructed for bucketing.
+ */
+export function resolveRevenueQueueSectionFromCard(
+  card: RevenueQueueCardView,
+): RevenueQueueDashboardSection {
+  if (card.status === "archived" || card.status === "disqualified" || card.status === "duplicate") {
+    return "archived"
+  }
+  if (card.status === "running_pipeline" || card.pipeline_status === "running") {
+    return "pipeline_running"
+  }
+  if (card.status === "approved") return "approved"
+  if (card.status === "enriching") return "enrichment_needed"
+
+  if (card.human_review_required && (card.status === "new" || card.status === "reviewing")) {
+    return "needs_review"
+  }
+
+  if (
+    card.candidate_priority === "urgent" ||
+    card.candidate_priority === "high" ||
+    card.intent_score >= 75
+  ) {
+    return "high_priority"
+  }
+
+  if (card.status === "new" || card.status === "reviewing") return "needs_review"
+  if (card.status === "pipeline_complete") return "approved"
+
+  return "needs_review"
 }
 
 function compareBySortMode(
@@ -146,8 +176,9 @@ export function buildRevenueQueueDashboardSectionsFromLeads(
   for (const section of sectionOrder) buckets.set(section, [])
 
   for (const lead of leads) {
-    const section = resolveRevenueQueueSectionFromLead(lead)
-    buckets.get(section)!.push(buildRevenueQueueCardProjectionFromLead(lead))
+    const card = buildRevenueQueueCardProjectionFromLead(lead)
+    const section = resolveRevenueQueueSectionFromCard(card)
+    buckets.get(section)!.push(card)
   }
 
   return sectionOrder.map((id) => {
