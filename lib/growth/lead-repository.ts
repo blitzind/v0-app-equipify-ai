@@ -14,6 +14,18 @@ import type {
   ListGrowthLeadsInput,
   UpdateGrowthLeadInput,
 } from "@/lib/growth/types"
+import {
+  buildGrowthHomeLeadPoolSummary,
+  parseGrowthHomeLeadPoolCursor,
+  type GrowthHomeLeadPoolSummary,
+} from "@/lib/growth/home/growth-home-lead-pool-pagination"
+import { bindIntakeRelationshipGraph } from "@/lib/growth/relationship/bind-intake-relationship-graph"
+import { buildIntakeBindingInputFromCreateLead } from "@/lib/growth/relationship/infer-intake-binding-source"
+import {
+  clampRelationshipBatchLimit,
+  GROWTH_HOME_LEAD_POOL_BATCH_LIMIT,
+  GROWTH_RELATIONSHIP_MAX_BATCH_LIMIT,
+} from "@/lib/growth/relationship/relationship-scale-limits"
 
 const LEAD_ARCHIVE_SELECT = "archived_at, archived_by, archive_reason"
 
@@ -426,7 +438,7 @@ export async function listGrowthLeads(
   admin: SupabaseClient,
   input: ListGrowthLeadsInput = {},
 ): Promise<GrowthLead[]> {
-  const limit = Math.min(Math.max(input.limit ?? 100, 1), 200)
+  const limit = clampRelationshipBatchLimit(input.limit, 100)
   const offset = Math.max(input.offset ?? 0, 0)
   const archiveReady = await isGrowthLeadArchiveSchemaReady(admin)
   const select = leadSelectFor(archiveReady)
@@ -474,6 +486,108 @@ export async function listGrowthLeads(
   return ((data ?? []) as GrowthLeadDbRow[]).map(mapGrowthLeadRow)
 }
 
+async function estimateActiveGrowthLeadCount(
+  admin: SupabaseClient,
+  archiveReady: boolean,
+): Promise<{ count: number | null; degraded: boolean }> {
+  try {
+    let query = growthLeadsTable(admin).select("*", { count: "estimated", head: true })
+    if (archiveReady) {
+      query = query.is("archived_at", null)
+    } else {
+      query = query.neq("status", "archived")
+    }
+    const { count, error } = await query
+    if (error) {
+      logGrowthEngine("home_lead_pool_count_failed", {
+        table: "growth.leads",
+        action: "count",
+        code: error.code ?? null,
+        message: error.message,
+      })
+      return { count: null, degraded: true }
+    }
+    return { count: count ?? null, degraded: false }
+  } catch (error) {
+    logGrowthEngine("home_lead_pool_count_failed", {
+      table: "growth.leads",
+      action: "count",
+      message: error instanceof Error ? error.message : "unknown",
+    })
+    return { count: null, degraded: true }
+  }
+}
+
+export type FetchGrowthHomeLeadPoolPageResult = {
+  leads: GrowthLead[]
+  leadPool: GrowthHomeLeadPoolSummary
+}
+
+/** GE-AIOS-15F — Keyset-paginated Home lead pool (single bounded page + count estimate). */
+export async function fetchGrowthHomeLeadPoolPage(
+  admin: SupabaseClient,
+  input?: { cursor?: string | null; limit?: number },
+): Promise<FetchGrowthHomeLeadPoolPageResult> {
+  const pageLimit = clampRelationshipBatchLimit(input?.limit, GROWTH_HOME_LEAD_POOL_BATCH_LIMIT)
+  const archiveReady = await isGrowthLeadArchiveSchemaReady(admin)
+  const select = leadSelectFor(archiveReady)
+  const parsedCursor = parseGrowthHomeLeadPoolCursor(input?.cursor)
+
+  let query = growthLeadsTable(admin)
+    .select(select)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+
+  if (archiveReady) {
+    query = query.is("archived_at", null)
+  } else {
+    query = query.neq("status", "archived")
+  }
+
+  if (parsedCursor) {
+    query = query.or(
+      `created_at.lt.${parsedCursor.ca},and(created_at.eq.${parsedCursor.ca},id.lt.${parsedCursor.id})`,
+    )
+  }
+
+  const fetchLimit = Math.min(pageLimit + 1, GROWTH_RELATIONSHIP_MAX_BATCH_LIMIT + 1)
+  const [{ data, error }, countResult] = await Promise.all([
+    query.limit(fetchLimit),
+    estimateActiveGrowthLeadCount(admin, archiveReady),
+  ])
+
+  if (error) {
+    logGrowthEngine("home_lead_pool_page_failed", {
+      table: "growth.leads",
+      action: "select",
+      code: error.code ?? null,
+      message: error.message,
+    })
+    throw new Error(error.message)
+  }
+
+  const rows = (data ?? []) as GrowthLeadDbRow[]
+  const fetchedHasMore = rows.length > pageLimit
+  const pageRows = fetchedHasMore ? rows.slice(0, pageLimit) : rows
+  const leads = pageRows.map(mapGrowthLeadRow)
+
+  const leadPool = buildGrowthHomeLeadPoolSummary({
+    visibleLeads: leads.map((lead) => ({ id: lead.id, createdAt: lead.createdAt })),
+    totalEstimatedCount: countResult.count,
+    pageLimit,
+    relationshipSnapshotCount: 0,
+    degraded: countResult.degraded,
+    fetchedHasMore,
+  })
+
+  return { leads, leadPool }
+}
+
+/** @internal cert hook */
+export function __growthHomeLeadPoolUsesKeysetPagination(): boolean {
+  return typeof parseGrowthHomeLeadPoolCursor === "function"
+}
+
 export async function fetchGrowthLeadById(admin: SupabaseClient, leadId: string): Promise<GrowthLead | null> {
   const archiveReady = await isGrowthLeadArchiveSchemaReady(admin)
   const select = leadSelectFor(archiveReady)
@@ -502,6 +616,9 @@ export async function createGrowthLead(
     throw new Error("company_name_required")
   }
 
+  const bindingPlan = buildIntakeBindingInputFromCreateLead(input)
+  const metadata = input.metadata ?? {}
+
   const row = {
     source_kind: input.sourceKind ?? "manual",
     source_detail: trimOrNull(input.sourceDetail),
@@ -519,7 +636,7 @@ export async function createGrowthLead(
     status: input.status ?? "new",
     score: input.score ?? null,
     notes: trimOrNull(input.notes),
-    metadata: input.metadata ?? {},
+    metadata,
     research_priority: input.researchPriority ?? "normal",
     source_channel: trimOrNull(input.sourceChannel),
     source_campaign: trimOrNull(input.sourceCampaign),
@@ -550,13 +667,35 @@ export async function createGrowthLead(
     throw new Error(error.message)
   }
 
-  const lead = mapGrowthLeadRow(data as GrowthLeadDbRow)
+  let lead = mapGrowthLeadRow(data as GrowthLeadDbRow)
   logGrowthEngine("lead_created", {
     leadId: lead.id,
     status: lead.status,
     sourceKind: lead.sourceKind,
     companyName: lead.companyName,
   })
+
+  if (bindingPlan) {
+    try {
+      const binding = await bindIntakeRelationshipGraph(admin, {
+        source: bindingPlan.source,
+        ...bindingPlan.bindInput,
+        lead_id: lead.id,
+        existing_metadata: lead.metadata ?? metadata,
+      })
+      const updated = await updateGrowthLead(admin, lead.id, { metadata: binding.metadata })
+      if (updated) {
+        lead = updated
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "intake_graph_binding_failed"
+      logGrowthEngine("lead_create_intake_graph_binding_failed", {
+        leadId: lead.id,
+        source: bindingPlan.source,
+        message,
+      })
+    }
+  }
 
   const { scheduleLeadResearchPilotForProspect } = await import(
     "@/lib/growth/aios/pilot/lead-research-pilot-orchestrator"

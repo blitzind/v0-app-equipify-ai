@@ -48,6 +48,7 @@ export function nextBestActionToWorkItem(action: NextBestAction, timestamp: stri
     href: action.href,
     company_name: action.company_name,
     decision_source_id: action.source_id,
+    relationship_graph: action.relationship_graph ?? null,
   }
 }
 

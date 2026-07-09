@@ -12,10 +12,13 @@ export async function GET(request: Request) {
   if (!access.ok) return access.response
 
   try {
+    const url = new URL(request.url)
+    const leadPoolCursor = url.searchParams.get("cursor")
     const summary = await buildGrowthHomeWorkspaceSummary({
       admin: access.admin,
       operatorEmail: access.userEmail,
       actorUserId: access.userId,
+      leadPoolCursor,
     })
     return growthHomeNoStoreJson(summary)
   } catch (error) {

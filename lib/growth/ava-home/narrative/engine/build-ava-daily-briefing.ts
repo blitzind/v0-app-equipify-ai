@@ -17,6 +17,8 @@ import {
   buildSinceYesterdayLines,
 } from "@/lib/growth/ava-home/narrative/context/ava-narrative-snapshot-memory"
 import type { AvaNarrativeMetricsSnapshot } from "@/lib/growth/ava-home/narrative/narrative-types"
+import { buildRelationshipContextClause } from "@/lib/growth/relationship/relationship-narrative-copy"
+import { buildSalesWorkloadScaleAcknowledgment } from "@/lib/growth/home/growth-home-lead-pool-pagination"
 import { runWorkManager } from "@/lib/growth/work-manager/manager/run-work-manager"
 import {
   buildTodayPrioritiesFromWorkPlan,
@@ -70,7 +72,7 @@ export type BuildAvaDailyBriefingInput = {
   hour: number
   workspaceSummary: Pick<
     GrowthHomeWorkspaceSummaryPayload,
-    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard"
+    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard" | "leadPool"
   >
   accomplishments: GrowthHomeAccomplishmentGroup[]
   waitingOnYou: GrowthHomeWaitingOnYouItem[]
@@ -81,6 +83,7 @@ export type BuildAvaDailyBriefingInput = {
   persistedMemoryStore?: AvaOrganizationalMemoryStore | null
   organizationId?: string
   generatedAt?: string
+  leadSnapshotsById?: import("@/lib/growth/relationship/relationship-lead-snapshot-types").RelationshipLeadSnapshotMap
 }
 
 function findFact(context: AvaNarrativeContext, factId: string) {
@@ -141,11 +144,16 @@ function buildStoryBlockFromWorkItem(
 ): AvaStoryBlock | null {
   const item = workResult.all_work_items.find((row) => row.decision_source_id === factId || row.id === factId)
   if (!item) return null
+
+  const relationshipLine = buildRelationshipContextClause(item.relationship_graph, item.company_name)
+  const baseText = item.title.trim().endsWith(".") ? item.title.trim() : `${item.title.trim()}.`
+  const text = relationshipLine ?? baseText
+
   return {
     id: `work:${item.id}`,
     kind,
     priority: item.decision_score,
-    text: item.title.trim().endsWith(".") ? item.title.trim() : `${item.title.trim()}.`,
+    text,
     href: item.href,
   }
 }
@@ -164,6 +172,23 @@ function mergeBriefingStoryBlocks(...groups: AvaStoryBlock[][]): AvaStoryBlock[]
   }
 
   return merged
+}
+
+function appendScaleStoryBlock(
+  blocks: AvaStoryBlock[],
+  leadPool: BuildAvaDailyBriefingInput["workspaceSummary"]["leadPool"] | undefined,
+): AvaStoryBlock[] {
+  const line = leadPool ? buildSalesWorkloadScaleAcknowledgment(leadPool) : null
+  if (!line) return blocks
+  const scaleBlock: AvaStoryBlock = {
+    id: "scale:lead_pool",
+    kind: "mission",
+    priority: 70,
+    text: line.endsWith(".") ? line : `${line}.`,
+    href: null,
+  }
+  if (blocks.some((row) => row.id === scaleBlock.id)) return blocks
+  return [...blocks, scaleBlock]
 }
 
 function buildNarrativeStoryBlocks(
@@ -262,6 +287,7 @@ export function buildAvaDailyBriefing(input: BuildAvaDailyBriefingInput): AvaDai
     accomplishments: input.accomplishments,
     timeline: input.timeline,
     generatedAt,
+    leadSnapshotsById: input.leadSnapshotsById,
     memorySummary,
   })
   const currentSnapshot = buildAvaNarrativeMetricsSnapshotFromContext(context)
@@ -273,7 +299,10 @@ export function buildAvaDailyBriefing(input: BuildAvaDailyBriefingInput): AvaDai
     sinceYesterday: since_yesterday,
     previousMemory: input.operatingRhythmMemory ?? null,
   })
-  const story_blocks = buildNarrativeStoryBlocks(context, workResult, operatingRhythm, input.hour, memorySummary)
+  const story_blocks = appendScaleStoryBlock(
+    buildNarrativeStoryBlocks(context, workResult, operatingRhythm, input.hour, memorySummary),
+    input.workspaceSummary.leadPool,
+  )
   const wins = buildAccomplishmentStories(context)
   const risks = context.risks.map((fact) => buildRiskStory(fact)).filter(Boolean) as AvaStoryBlock[]
   const waiting_on_user = [
@@ -287,10 +316,16 @@ export function buildAvaDailyBriefing(input: BuildAvaDailyBriefingInput): AvaDai
     .slice(0, 2)
     .join(" ")
 
+  const scaleLine = input.workspaceSummary.leadPool
+    ? buildSalesWorkloadScaleAcknowledgment(input.workspaceSummary.leadPool)
+    : null
+  const baseSummary =
+    memorySummaryLine || rhythmSummary || buildWorkManagerSummary(workResult) || buildSummary(story_blocks)
+
   return {
     qaMarker: GROWTH_AVA_NARRATIVE_ENGINE_QA_MARKER,
     title: input.greeting,
-    summary: memorySummaryLine || rhythmSummary || buildWorkManagerSummary(workResult) || buildSummary(story_blocks),
+    summary: scaleLine ? `${baseSummary} ${scaleLine}`.trim() : baseSummary,
     story_blocks,
     top_priority: story_blocks[0] ?? null,
     waiting_on_user,

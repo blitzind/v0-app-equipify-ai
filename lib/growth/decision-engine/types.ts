@@ -42,6 +42,7 @@ export type DecisionCandidate = {
   hotCompany?: boolean
   readyForOutreach?: boolean
   qualificationComplete?: boolean
+  relationship_graph?: import("@/lib/growth/relationship/relationship-graph-types").AvaRelationshipGraphContext | null
 }
 
 export type DecisionContext = {
@@ -58,6 +59,7 @@ export type DecisionContext = {
   }
   evidenceConfidence: number | null
   memorySummary?: import("@/lib/growth/memory/types").AvaMemorySummary | null
+  leadSnapshotsById?: import("@/lib/growth/relationship/relationship-lead-snapshot-types").RelationshipLeadSnapshotMap
 }
 
 export type DecisionScoreBreakdown = {
@@ -91,6 +93,7 @@ export type NextBestAction = {
   href: string | null
   company_name: string | null
   source_id: string
+  relationship_graph?: import("@/lib/growth/relationship/relationship-graph-types").AvaRelationshipGraphContext | null
 }
 
 export type DecisionEngineResult = {

@@ -1,7 +1,9 @@
 "use client"
 
-import { Users } from "lucide-react"
+import Link from "next/link"
+import { ArrowRight, CheckCircle2, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { GROWTH_HOME_RUNTIME_INTEGRATION_16X_QA_MARKER } from "@/lib/growth/home/growth-home-runtime-presenter"
 import {
   AVA_SPECIALIST_MY_TEAM_TITLE,
   GROWTH_SPECIALIST_ORCHESTRATOR_QA_MARKER,
@@ -19,6 +21,7 @@ export function GrowthHomeAvaSpecialistTeamSection({ specialistOrchestrator }: P
     <section
       data-qa-section="home-ava-specialist-team"
       data-qa-marker-14a={GROWTH_SPECIALIST_ORCHESTRATOR_QA_MARKER}
+      data-qa-marker-16x={GROWTH_HOME_RUNTIME_INTEGRATION_16X_QA_MARKER}
       className="rounded-2xl border border-border/70 bg-card/60 p-5 shadow-sm"
     >
       <div className="mb-4 flex items-center gap-2">
@@ -34,11 +37,20 @@ export function GrowthHomeAvaSpecialistTeamSection({ specialistOrchestrator }: P
             className={cn(
               "rounded-lg border border-border/60 px-3 py-2.5",
               member.active_count > 0 && !member.is_stub && "bg-indigo-50/40 dark:bg-indigo-950/15",
-              member.is_stub && member.active_count > 0 && "bg-muted/30",
+              member.is_stub && "bg-muted/20",
             )}
           >
-            <p className="text-sm font-medium text-foreground">{member.specialist_name}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{member.status_label}</p>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">{member.specialist_name}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{member.status_label}</p>
+              </div>
+              {member.active_count > 0 && !member.is_stub ? (
+                <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200">
+                  {member.active_count} active
+                </span>
+              ) : null}
+            </div>
           </li>
         ))}
       </ul>

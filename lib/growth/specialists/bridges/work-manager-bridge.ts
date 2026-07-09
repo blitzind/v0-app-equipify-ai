@@ -2,11 +2,7 @@
 
 import { getSpecialistById } from "@/lib/growth/specialists/registry/specialist-registry"
 import { routeWorkItem } from "@/lib/growth/specialists/router/route-work-item"
-import type {
-  AvaSpecialistContribution,
-  AvaSpecialistTeamStatus,
-  AvaWorkItemWithSpecialist,
-} from "@/lib/growth/specialists/types"
+import { buildStubSpecialistStatusLabel } from "@/lib/growth/home/growth-home-runtime-presenter"
 import type { AvaWorkItem, AvaWorkManagerResult } from "@/lib/growth/work-manager/types"
 
 export function assignSpecialistsToWorkItems(workItems: AvaWorkItem[]): AvaWorkItemWithSpecialist[] {
@@ -17,6 +13,13 @@ export function assignSpecialistsToWorkItems(workItems: AvaWorkItem[]): AvaWorkI
       assigned_specialist: route.specialist_id,
       specialist_confidence: route.confidence,
       routing_reason: route.reason,
+      relationship_graph: item.relationship_graph
+        ? {
+            ...item.relationship_graph,
+            assigned_specialist: route.specialist_id,
+            decision_score: item.decision_score,
+          }
+        : null,
     }
   })
 }
@@ -49,23 +52,30 @@ export function buildSpecialistTeamStatus(items: AvaWorkItemWithSpecialist[]): A
     const assigned = items.filter((row) => row.assigned_specialist === specialist.definition.id)
     const active = assigned.filter((row) => row.status === "working" || row.status === "ready" || row.status === "planned")
 
-    let status_label = "No active work"
-    if (specialist.definition.stub && active.length > 0) {
-      status_label = "Waiting for future implementation"
-    } else if (specialist.definition.id === "sales" && active.some((row) => row.type === "research")) {
-      status_label = "Researching companies"
-    } else if (specialist.definition.id === "sales" && active.some((row) => row.type === "outreach")) {
-      status_label = "Preparing outreach"
-    } else if (specialist.definition.id === "sales" && active.length > 0) {
-      status_label = "Working sales pipeline"
-    } else if (specialist.definition.id === "customer_success" && active.length > 0) {
-      status_label = "Monitoring customers"
-    } else if (specialist.definition.id === "marketing" && active.length > 0) {
-      status_label = "Identifying campaign opportunities"
-    } else if (specialist.definition.id === "finance" && active.length > 0) {
-      status_label = "Reviewing invoices and payments"
-    } else if (specialist.definition.id === "service" && active.length > 0) {
-      status_label = "Reviewing schedules and work orders"
+    let status_label = specialist.definition.stub
+      ? buildStubSpecialistStatusLabel({
+          specialistId: specialist.definition.id,
+          activeCount: active.length,
+          fallbackLabel: "Preparing work for when this capability is enabled",
+        })
+      : "No active work yet"
+
+    if (!specialist.definition.stub) {
+      if (specialist.definition.id === "sales" && active.some((row) => row.type === "research")) {
+        status_label = "Researching companies"
+      } else if (specialist.definition.id === "sales" && active.some((row) => row.type === "outreach")) {
+        status_label = "Preparing outreach"
+      } else if (specialist.definition.id === "sales" && active.length > 0) {
+        status_label = "Working sales pipeline"
+      } else if (specialist.definition.id === "customer_success" && active.length > 0) {
+        status_label = "Monitoring customers"
+      } else if (specialist.definition.id === "marketing" && active.length > 0) {
+        status_label = "Identifying campaign opportunities"
+      } else if (specialist.definition.id === "finance" && active.length > 0) {
+        status_label = "Reviewing invoices and payments"
+      } else if (specialist.definition.id === "service" && active.length > 0) {
+        status_label = "Reviewing schedules and work orders"
+      }
     }
 
     return {

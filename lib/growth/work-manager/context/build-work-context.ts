@@ -12,13 +12,14 @@ import type { DecisionEngineResult } from "@/lib/growth/decision-engine/types"
 export type BuildWorkContextInput = {
   workspaceSummary: Pick<
     GrowthHomeWorkspaceSummaryPayload,
-    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard"
+    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard" | "leadPool"
   >
   waitingOnYou: GrowthHomeWaitingOnYouItem[]
   dailyWorkQueue: GrowthHomeDailyWorkQueueItem[]
   accomplishments: GrowthHomeAccomplishmentGroup[]
   timeline: GrowthHomeTimelinePeriod[]
   generatedAt?: string
+  leadSnapshotsById?: import("@/lib/growth/relationship/relationship-lead-snapshot-types").RelationshipLeadSnapshotMap
 }
 
 export type WorkContext = BuildWorkContextInput & {

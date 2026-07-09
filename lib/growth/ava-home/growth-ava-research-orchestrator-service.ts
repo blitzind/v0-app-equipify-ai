@@ -41,7 +41,7 @@ import { runProspectResearch } from "@/lib/growth/research/research-orchestrator
 import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
 import type { GrowthLead } from "@/lib/growth/types"
 
-const HOME_LEAD_POOL_LIMIT = 100
+import { GROWTH_HOME_LEAD_POOL_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 
 const OUTREACH_READY_ACTIONS = new Set([
   "call_prospect",
@@ -523,7 +523,7 @@ export async function runAvaResearchQueueOrchestrator(
   }
 
   const leads = await listGrowthLeads(admin, {
-    limit: HOME_LEAD_POOL_LIMIT,
+    limit: GROWTH_HOME_LEAD_POOL_BATCH_LIMIT,
     includeArchived: false,
   })
 

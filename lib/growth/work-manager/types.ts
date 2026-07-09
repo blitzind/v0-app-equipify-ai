@@ -55,6 +55,7 @@ export type AvaWorkItem = {
   assigned_specialist?: import("@/lib/growth/specialists/types").AvaSpecialistId | null
   specialist_confidence?: number | null
   routing_reason?: string | null
+  relationship_graph?: import("@/lib/growth/relationship/relationship-graph-types").AvaRelationshipGraphContext | null
 }
 
 export type AvaWorkPlanEntry = {

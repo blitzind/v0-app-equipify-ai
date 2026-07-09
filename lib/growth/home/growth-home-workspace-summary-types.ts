@@ -9,6 +9,8 @@ import type { DailyRevenueWorkQueueDisplaySummary } from "@/lib/growth/daily-wor
 import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
 import type { GrowthWorkspaceDashboardSourcePayload } from "@/lib/growth/workspace/growth-workspace-dashboard-mapper"
 import type { GrowthAvaResearchLoopSummary } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-types"
+import type { RelationshipLeadSnapshotMap } from "@/lib/growth/relationship/relationship-lead-snapshot-types"
+import type { GrowthHomeLeadPoolSummary } from "@/lib/growth/home/growth-home-lead-pool-pagination"
 
 export const GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER = "ge-simplify-1b-home-workspace-summary-v1" as const
 
@@ -71,6 +73,21 @@ export type GrowthHomeWorkspaceSummaryOptimization = {
   durationMs: number
 }
 
+export const GROWTH_HOME_RELATIONSHIP_SNAPSHOT_15E_QA_MARKER =
+  "ge-aios-15e-server-relationship-snapshots-v1" as const
+
+export type GrowthHomeRelationshipSnapshotEnrichment = {
+  qaMarker: typeof GROWTH_HOME_RELATIONSHIP_SNAPSHOT_15E_QA_MARKER
+  byLeadId: RelationshipLeadSnapshotMap
+  meta: {
+    attempted: number
+    enriched: number
+    degraded: boolean
+    warning: string | null
+    queryCount: number
+  }
+}
+
 export type GrowthHomeWorkspaceSummaryPayload = {
   ok: true
   qaMarker: typeof GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER
@@ -91,4 +108,8 @@ export type GrowthHomeWorkspaceSummaryPayload = {
   avaConsole: GrowthHomeAvaConsoleSections
   briefing: AidenDailyBriefing | null
   optimization: GrowthHomeWorkspaceSummaryOptimization
+  /** GE-AIOS-15E — bounded relationship snapshots for Home lead pool */
+  relationshipSnapshots: GrowthHomeRelationshipSnapshotEnrichment
+  /** GE-AIOS-15F — lead pool pagination + scale metadata */
+  leadPool: GrowthHomeLeadPoolSummary
 }

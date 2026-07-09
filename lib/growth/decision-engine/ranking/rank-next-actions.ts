@@ -90,6 +90,13 @@ export function rankNextActions(
         href: candidate.href,
         company_name: candidate.companyName ?? null,
         source_id: candidate.id,
+        relationship_graph: candidate.relationship_graph
+          ? {
+              ...candidate.relationship_graph,
+              decision_score: scored.overall,
+              next_best_action_id: candidate.id,
+            }
+          : null,
       } satisfies NextBestAction
     })
     .sort((left, right) => {

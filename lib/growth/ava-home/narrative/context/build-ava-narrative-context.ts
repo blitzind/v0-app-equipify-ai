@@ -12,7 +12,7 @@ import type { AvaNarrativeContext, AvaNarrativeFact } from "@/lib/growth/ava-hom
 export type BuildAvaNarrativeContextInput = {
   workspaceSummary: Pick<
     GrowthHomeWorkspaceSummaryPayload,
-    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard"
+    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard" | "leadPool"
   >
   accomplishments: GrowthHomeAccomplishmentGroup[]
   waitingOnYou: GrowthHomeWaitingOnYouItem[]
@@ -236,6 +236,22 @@ export function buildAvaNarrativeContext(input: BuildAvaNarrativeContextInput): 
       fact({
         kind: "mission",
         label: avaConsole.suggestedNextAction,
+      }),
+    )
+  }
+
+  const leadPool = workspaceSummary.leadPool
+  if (leadPool?.has_more) {
+    missionsRunning.push(
+      fact({
+        id: "scale:lead_pool",
+        kind: "mission",
+        label: "pipeline_beyond_page",
+        detail:
+          leadPool.total_estimated_count != null && leadPool.total_estimated_count > leadPool.visible_count
+            ? `${leadPool.visible_count} visible of ~${leadPool.total_estimated_count} relationships`
+            : `${leadPool.visible_count} visible; more relationships beyond this page`,
+        count: leadPool.total_estimated_count ?? leadPool.visible_count,
       }),
     )
   }

@@ -1,7 +1,8 @@
-/** GE-AIOS-14A — Sales Specialist (active revenue growth work). */
+/** GE-AIOS-14A / GE-AIOS-15B — Sales Specialist (active revenue growth work). */
 
 import type { AvaWorkItem } from "@/lib/growth/work-manager/types"
 import type { AvaSpecialistDefinition } from "@/lib/growth/specialists/types"
+import { buildSalesSpecialistRelationshipSuffix } from "@/lib/growth/relationship/relationship-narrative-copy"
 
 export const SALES_SPECIALIST: AvaSpecialistDefinition = {
   id: "sales",
@@ -44,12 +45,27 @@ export function salesSpecialistEstimateConfidence(item: AvaWorkItem): number {
 }
 
 export function salesSpecialistSummarizeContribution(item: AvaWorkItem): string {
+  const graph = item.relationship_graph
+  const relationshipLabel = buildSalesSpecialistRelationshipSuffix(graph)
+
   const action = item.title.replace(/\.$/, "").toLowerCase()
-  if (item.type === "research") return `Researching companies — ${action}.`
-  if (item.type === "qualification") return `Qualifying opportunities — ${action}.`
-  if (item.type === "outreach") return `Preparing outreach — ${action}.`
-  if (item.type === "meeting") return `Preparing meetings — ${action}.`
-  if (item.type === "reply") return `Following up on replies — ${action}.`
-  if (item.type === "approval") return `Waiting on outreach approval — ${action}.`
-  return `Continuing sales work — ${action}.`
+  if (item.type === "research") {
+    return graph && !graph.latest_conversation_thread_id && !graph.latest_reply_at
+      ? `Researching ${item.company_name ?? "companies"} — no conversation yet${relationshipLabel}.`
+      : `Researching companies — ${action}${relationshipLabel}.`
+  }
+  if (item.type === "qualification") return `Qualifying opportunities — ${action}${relationshipLabel}.`
+  if (item.type === "outreach") {
+    return graph?.waiting_on_operator
+      ? `Waiting on outreach approval — ${action}${relationshipLabel}.`
+      : `Preparing outreach — ${action}${relationshipLabel}.`
+  }
+  if (item.type === "meeting") return `Preparing meetings — ${action}${relationshipLabel}.`
+  if (item.type === "reply") {
+    return graph?.waiting_on_customer
+      ? `Following up — ${action}; waiting on customer${relationshipLabel}.`
+      : `Following up on replies — ${action}${relationshipLabel}.`
+  }
+  if (item.type === "approval") return `Waiting on outreach approval — ${action}${relationshipLabel}.`
+  return `Continuing sales work — ${action}${relationshipLabel}.`
 }

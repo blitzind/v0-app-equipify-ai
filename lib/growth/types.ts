@@ -296,6 +296,8 @@ export type CreateGrowthLeadInput = {
   sourceVendor?: string | null
   assignedTo?: string | null
   createdBy?: string | null
+  /** GE-AIOS-15C — canonical relationship graph binding at intake */
+  intakeBindingSource?: import("@/lib/growth/relationship/intake-relationship-graph-binding").IntakeRelationshipBindingSource
 }
 
 export type UpdateGrowthLeadInput = {

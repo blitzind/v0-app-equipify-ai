@@ -13,11 +13,17 @@ import {
 } from "@/lib/growth/ava-home/narrative/context/build-ava-narrative-context"
 import type { AvaNarrativeContext } from "@/lib/growth/ava-home/narrative/narrative-types"
 import type { DecisionCandidate, DecisionContext } from "@/lib/growth/decision-engine/types"
+import { attachRelationshipGraphToCandidate } from "@/lib/growth/relationship/resolve-relationship-graph-from-candidate"
+import {
+  parseLeadIdFromHref,
+  parseLeadIdFromSourceId,
+} from "@/lib/growth/relationship/parse-relationship-graph-refs"
+import type { RelationshipLeadSnapshotMap } from "@/lib/growth/relationship/relationship-lead-snapshot-types"
 
 export type BuildDecisionContextInput = {
   workspaceSummary: Pick<
     GrowthHomeWorkspaceSummaryPayload,
-    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard"
+    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard" | "leadPool"
   >
   waitingOnYou: GrowthHomeWaitingOnYouItem[]
   dailyWorkQueue: GrowthHomeDailyWorkQueueItem[]
@@ -25,6 +31,7 @@ export type BuildDecisionContextInput = {
   timeline: GrowthHomeTimelinePeriod[]
   narrativeContext?: AvaNarrativeContext
   memorySummary?: import("@/lib/growth/memory/types").AvaMemorySummary | null
+  leadSnapshotsById?: RelationshipLeadSnapshotMap
 }
 
 function inferActionKind(actionLabel: string): DecisionCandidate["kind"] {
@@ -100,7 +107,7 @@ function buildResearchCandidates(input: BuildDecisionContextInput): DecisionCand
             ? `Continue qualification — ${row.companyName}`
             : `Research company — ${row.companyName}`,
         detail: row.skipReason ?? null,
-        href: null,
+        href: `/growth/leads/${row.leadId}`,
         companyName: row.companyName,
         source: "research_loop" as const,
         confidencePercent: qualified ? 85 : row.hasBuyingSignals ? 72 : 58,
@@ -112,6 +119,28 @@ function buildResearchCandidates(input: BuildDecisionContextInput): DecisionCand
         requiresHumanApproval: ready,
       }
     })
+}
+
+function buildScaleAwarenessCandidates(input: BuildDecisionContextInput): DecisionCandidate[] {
+  const pool = input.workspaceSummary.leadPool
+  if (!pool?.has_more) return []
+
+  const total =
+    pool.total_estimated_count != null && pool.total_estimated_count > pool.visible_count
+      ? `~${pool.total_estimated_count} relationships tracked`
+      : "additional relationships beyond this page"
+
+  return [
+    {
+      id: "scale:lead_pool",
+      kind: "continue_mission",
+      title: "Continue pipeline planning across full book",
+      detail: `Showing ${pool.visible_count} on this page; ${total}.`,
+      href: null,
+      source: "mission",
+      queuePriority: "medium",
+    },
+  ]
 }
 
 function buildMissionCandidates(input: BuildDecisionContextInput): DecisionCandidate[] {
@@ -217,7 +246,7 @@ export function buildDecisionContext(input: BuildDecisionContextInput): Decision
   const approvals = input.waitingOnYou.map(candidateFromWaiting)
   const opportunities = input.dailyWorkQueue.map(candidateFromQueueItem)
   const research = buildResearchCandidates(input)
-  const missions = buildMissionCandidates(input)
+  const missions = [...buildMissionCandidates(input), ...buildScaleAwarenessCandidates(input)]
   const inbox = buildInboxCandidates(input)
   const meetings = buildMeetingCandidates(input)
   const businessCandidates = buildBusinessClarificationCandidate(narrative.businessUnderstanding)
@@ -232,6 +261,7 @@ export function buildDecisionContext(input: BuildDecisionContextInput): Decision
     businessUnderstanding: narrative.businessUnderstanding,
     evidenceConfidence: narrative.businessUnderstanding.hasBusinessResearch ? 78 : null,
     memorySummary: input.memorySummary ?? null,
+    leadSnapshotsById: input.leadSnapshotsById ?? {},
   }
 }
 
@@ -265,5 +295,24 @@ export function flattenDecisionCandidates(context: DecisionContext): DecisionCan
     })
   }
 
-  return unique
+  return unique.map((candidate) => {
+    const leadId =
+      parseLeadIdFromSourceId(candidate.id) ?? parseLeadIdFromHref(candidate.href) ?? null
+    const snapshot = leadId ? context.leadSnapshotsById?.[leadId] ?? null : null
+    const withGraph = attachRelationshipGraphToCandidate(candidate, { snapshot })
+    if (!withGraph.relationship_graph) return withGraph
+    return {
+      ...withGraph,
+      relationship_graph: {
+        ...withGraph.relationship_graph,
+        memory_context_available:
+          withGraph.relationship_graph.memory_context_available ||
+          Boolean(context.memorySummary) ||
+          Boolean(snapshot?.memory_context_available),
+        business_intelligence_context_available:
+          withGraph.relationship_graph.business_intelligence_context_available ||
+          context.businessUnderstanding.hasBusinessResearch,
+      },
+    }
+  })
 }

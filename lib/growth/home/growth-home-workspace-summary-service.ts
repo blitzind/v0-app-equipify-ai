@@ -1,6 +1,6 @@
 /**
  * GE-SIMPLIFY-1B — Server aggregator for Home / AI OS workspace summary.
- * Reuses existing loaders; shares a single listGrowthLeads() for queue projections.
+ * Reuses existing loaders; shares a single keyset lead pool fetch for queue projections.
  */
 import "server-only"
 
@@ -26,7 +26,7 @@ import {
   buildGrowthWorkspaceDashboardViewModel,
   type GrowthWorkspaceDashboardSourcePayload,
 } from "@/lib/growth/workspace/growth-workspace-dashboard-mapper"
-import { listGrowthLeads } from "@/lib/growth/lead-repository"
+import { fetchGrowthHomeLeadPoolPage } from "@/lib/growth/lead-repository"
 import { fetchGrowthNativeCallWorkspaceDashboard } from "@/lib/growth/native-dialer/native-dialer-service"
 import { probeGrowthNativeDialerSchemaHealth } from "@/lib/growth/native-dialer/native-dialer-schema-health"
 import { fetchGrowthOpportunityDashboard } from "@/lib/growth/opportunity-dashboard-repository"
@@ -48,8 +48,9 @@ import type {
 } from "@/lib/growth/home/growth-home-workspace-summary-types"
 import { GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER } from "@/lib/growth/home/growth-home-workspace-summary-types"
 import { fetchLatestAvaResearchLoopSummary } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-service"
+import { enrichRelationshipLeadSnapshotsBatch } from "@/lib/growth/relationship/enrich-relationship-lead-snapshots-batch"
 
-const HOME_LEAD_POOL_LIMIT = 100
+import { GROWTH_HOME_LEAD_POOL_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 
 function countInboxSections(
   sections: GrowthWorkspaceDashboardSourcePayload["leadInboxSections"],
@@ -126,19 +127,21 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   admin: SupabaseClient
   operatorEmail: string
   actorUserId: string
+  leadPoolCursor?: string | null
 }): Promise<GrowthHomeWorkspaceSummaryPayload> {
   const startedAt = Date.now()
   const generatedAt = new Date().toISOString()
   const organizationId = getGrowthEngineAiOrgId()
 
-  const leads = await listGrowthLeads(input.admin, {
-    limit: HOME_LEAD_POOL_LIMIT,
-    includeArchived: false,
+  const leadPoolPage = await fetchGrowthHomeLeadPoolPage(input.admin, {
+    cursor: input.leadPoolCursor ?? null,
+    limit: GROWTH_HOME_LEAD_POOL_BATCH_LIMIT,
   })
+  const leads = leadPoolPage.leads
 
   const revenueQueueSections = buildRevenueQueueDashboardSectionsFromLeads(leads, "priority")
   const revenueQueue: GrowthHomeWorkspaceSummaryRevenueQueue = {
-    total: leads.length,
+    total: leadPoolPage.leadPool.total_estimated_count ?? leads.length,
     queueSource: "canonical",
     sectionCounts: revenueQueueSections.map((section) => ({
       id: section.id,
@@ -262,6 +265,15 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     researchLoopSummary: avaResearchLoopSummary,
   })
 
+  const relationshipSnapshots = await enrichRelationshipLeadSnapshotsBatch(input.admin, leads)
+
+  const snapshotCount = relationshipSnapshots.meta.enriched
+  const leadPool = {
+    ...leadPoolPage.leadPool,
+    relationship_snapshot_count: snapshotCount,
+    degraded: leadPoolPage.leadPool.degraded || relationshipSnapshots.meta.degraded,
+  }
+
   const optimization: GrowthHomeWorkspaceSummaryOptimization = {
     listGrowthLeadsCalls: 1,
     duplicateLeadListEliminated: 1,
@@ -285,6 +297,8 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     avaConsole,
     briefing,
     optimization,
+    relationshipSnapshots,
+    leadPool,
   }
 }
 
