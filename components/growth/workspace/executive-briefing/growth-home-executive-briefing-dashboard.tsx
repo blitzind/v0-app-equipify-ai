@@ -271,6 +271,8 @@ export function GrowthHomeExecutiveBriefingDashboard({
           relationshipSnapshotCount={relationshipSnapshotCount}
         />
 
+        <GrowthHomeStartAvaSetupSection dashboard={dashboard} placement="primary" />
+
         <GrowthHomeAvaWorkSection
           workManager={avaHero.workManager ?? null}
           leadPool={workspaceSummary?.leadPool ?? null}
@@ -356,7 +358,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
         subtitle={GROWTH_HOME_SETUP_DIAGNOSTICS_SUBTITLE}
       >
         <div data-qa-section="home-setup-diagnostics" className="space-y-5">
-          <GrowthHomeStartAvaSetupSection dashboard={dashboard} />
+          <GrowthHomeStartAvaSetupSection dashboard={dashboard} placement="secondary" />
 
           <GrowthHomeCollapsibleSection
             sectionId="operational-readiness"

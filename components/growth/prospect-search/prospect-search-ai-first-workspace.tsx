@@ -7,7 +7,6 @@ import { GrowthEngineCard } from "@/components/growth/growth-ui-utils"
 import { DiscoveryModeToggle } from "@/components/growth/prospect-search/discovery-mode-toggle"
 import { SearchRecommendations } from "@/components/growth/prospect-search/search-recommendations"
 import {
-  EQUIPIFY_DEFAULT_AI_ICP_PROFILE,
   GROWTH_PROSPECT_SEARCH_AI_ICP_QA_MARKER,
   PROSPECT_SEARCH_AI_FIRST_HERO,
   PROSPECT_SEARCH_AI_SEARCH_SUGGESTIONS,
@@ -17,6 +16,7 @@ import {
   type ProspectSearchAiIcpProfile,
   type ProspectSearchAiSearchSuggestion,
 } from "@/lib/growth/prospect-search/prospect-search-ai-icp-config"
+import { resolveProspectSearchAiIcpProfile } from "@/lib/growth/prospect-search/map-business-profile-to-prospect-search-icp"
 import { AI_OS_WORKSPACE_LABEL } from "@/lib/workspace/ai-os-workspace-branding"
 import type { GrowthProspectSearchDiscoveryMode } from "@/lib/growth/prospect-search/prospect-search-types"
 import { cn } from "@/lib/utils"
@@ -80,7 +80,13 @@ export function ProspectSearchAiFirstWorkspace({
   highlightedSuggestionId,
 }: ProspectSearchAiFirstWorkspaceProps) {
   const suggestionsRef = useRef<HTMLDivElement>(null)
-  const profile = useMemo(() => icpProfile ?? readStoredIcpDraft() ?? EQUIPIFY_DEFAULT_AI_ICP_PROFILE, [icpProfile])
+  const profile = useMemo(
+    () =>
+      resolveProspectSearchAiIcpProfile({
+        storedDraft: icpProfile ?? readStoredIcpDraft(),
+      }),
+    [icpProfile],
+  )
 
   return (
     <div

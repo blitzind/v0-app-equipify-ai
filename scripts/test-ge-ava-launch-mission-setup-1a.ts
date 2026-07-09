@@ -68,11 +68,17 @@ function baseObjective(overrides: Partial<GrowthObjective> = {}): GrowthObjectiv
   }
 }
 
+const readyStartupDefaults = {
+  aiTeammateOnboardingCompleted: true,
+  autonomyGuardrailsConfigured: true,
+  connectedMailboxes: 1,
+} as const
+
 async function main(): Promise<void> {
   console.log(`[${PHASE}] Start Ava guided launch certification`)
 
   assert.equal(GROWTH_AVA_LAUNCH_MISSION_SETUP_1A_QA_MARKER, "ge-ava-launch-mission-setup-1a-v1")
-  assert.equal(GROWTH_AVA_LAUNCH_MISSION_SETUP_TITLE, "Start Ava")
+  assert.equal(GROWTH_AVA_LAUNCH_MISSION_SETUP_TITLE, "Get Ava Ready")
   assert.match(GROWTH_AVA_LAUNCH_MISSION_SETUP_RULE, /no new runtime engine/)
 
   const missingProfile = synthesizeGrowthHomeLaunchMissionSetup({
@@ -81,8 +87,9 @@ async function main(): Promise<void> {
     objectives: [],
     mailboxWarnings: 0,
     expiredMailboxes: 0,
+    ...readyStartupDefaults,
   })
-  assert.equal(missingProfile.steps[0]?.status, "blocked")
+  assert.equal(missingProfile.steps[1]?.status, "blocked")
   assert.equal(missingProfile.setupComplete, false)
   assert.equal(missingProfile.currentStepId, "growth_profile")
   assert.equal(shouldShowStartAvaSetupCard({
@@ -91,6 +98,7 @@ async function main(): Promise<void> {
     objectives: [],
     mailboxWarnings: 0,
     expiredMailboxes: 0,
+    ...readyStartupDefaults,
   }), true)
   console.log("  ✓ missing Growth Profile blocks setup")
 
@@ -100,10 +108,11 @@ async function main(): Promise<void> {
     objectives: [],
     mailboxWarnings: 0,
     expiredMailboxes: 0,
+    ...readyStartupDefaults,
   })
-  assert.equal(approvedProfile.steps[0]?.status, "complete")
-  assert.equal(approvedProfile.steps[1]?.actionKind, "create_mission")
-  assert.equal(approvedProfile.currentStepId, "mission")
+  assert.equal(approvedProfile.steps[1]?.status, "complete")
+  assert.equal(approvedProfile.steps[2]?.actionKind, "create_mission")
+  assert.equal(approvedProfile.currentStepId, "lead_source")
   console.log("  ✓ approved Growth Profile advances setup")
 
   const withMission = synthesizeGrowthHomeLaunchMissionSetup({
@@ -112,9 +121,10 @@ async function main(): Promise<void> {
     objectives: [baseObjective()],
     mailboxWarnings: 0,
     expiredMailboxes: 0,
+    ...readyStartupDefaults,
   })
-  assert.equal(withMission.steps[1]?.status, "complete")
-  assert.equal(withMission.currentStepId, "lead_search")
+  assert.equal(withMission.steps[2]?.status, "pending")
+  assert.equal(withMission.currentStepId, "lead_source")
   assert.equal(resolveAcquisitionMission([baseObjective()])?.id, "mission-1")
   console.log("  ✓ missing lead search prompts Find Leads")
 
@@ -127,6 +137,7 @@ async function main(): Promise<void> {
     ],
     mailboxWarnings: 0,
     expiredMailboxes: 0,
+    ...readyStartupDefaults,
   })
   assert.equal(reusedMission.acquisitionMissionId, "existing-mission")
   console.log("  ✓ existing mission is reused")
@@ -155,6 +166,7 @@ async function main(): Promise<void> {
     ],
     mailboxWarnings: 0,
     expiredMailboxes: 0,
+    ...readyStartupDefaults,
   })
   assert.equal(boundSearch.steps[2]?.status, "complete")
   assert.equal(
@@ -202,6 +214,7 @@ async function main(): Promise<void> {
     ],
     mailboxWarnings: 0,
     expiredMailboxes: 0,
+    ...readyStartupDefaults,
   }), true)
   console.log("  ✓ bound lead search advances setup")
 
@@ -212,6 +225,7 @@ async function main(): Promise<void> {
     mailboxWarnings: 2,
     expiredMailboxes: 0,
     mailboxSummary: "2 mailboxes need attention",
+    ...readyStartupDefaults,
   })
   assert.equal(mailboxWarnings.steps[3]?.status, "warning")
   assert.match(mailboxWarnings.steps[3]?.summary ?? "", /2 mailboxes need attention|mailbox warning/i)
@@ -222,6 +236,7 @@ async function main(): Promise<void> {
     objectives: [baseObjective()],
     mailboxWarnings: 1,
     expiredMailboxes: 1,
+    ...readyStartupDefaults,
   })
   assert.equal(mailboxBlocked.steps[3]?.status, "blocked")
   assert.equal(mailboxBlocked.steps[3]?.blocksLaunch, true)
@@ -241,8 +256,8 @@ async function main(): Promise<void> {
   )
   assert.match(dashboard, /GrowthHomeStartAvaSetupSection/)
   assert.ok(
-    dashboard.indexOf("GrowthHomeStartAvaSetupSection") < dashboard.indexOf("GrowthHomeMissionCenterSection"),
-    "Start Ava card must appear before Mission Center",
+    dashboard.indexOf('placement="primary"') < dashboard.indexOf("<GrowthHomeAvaWorkSection"),
+    "Get Ava Ready must appear above Today's Work when promoted",
   )
   console.log("  ✓ Growth Home mounts Start Ava setup card")
 

@@ -25,6 +25,14 @@ export async function POST(request: Request) {
         objectives_scanned: result.objectivesScanned,
         stalled_detected: result.stalledDetected,
         recommendations_refreshed: result.recommendationsRefreshed,
+        autonomous_sales_loop: result.autonomousSalesLoop
+          ? {
+              organizations_attempted: result.autonomousSalesLoop.organizations_attempted,
+              organizations_executed: result.autonomousSalesLoop.organizations_executed,
+              total_outcomes_completed: result.autonomousSalesLoop.total_outcomes_completed,
+              skipped_reason: result.autonomousSalesLoop.skipped_reason,
+            }
+          : null,
       },
     }),
   )

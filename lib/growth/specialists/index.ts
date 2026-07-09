@@ -76,3 +76,20 @@ export {
   buildCompletedWorkNarrativeLines,
   SALES_SPECIALIST_MEMORY_SOURCE,
 } from "@/lib/growth/specialists/execution/sales-specialist-memory-bridge"
+
+export {
+  GROWTH_AUTONOMOUS_SALES_LOOP_QA_MARKER,
+  AUTONOMOUS_SALES_LOOP_DEFAULT_MAX_ITERATIONS,
+  AUTONOMOUS_SALES_LOOP_DEFAULT_DAILY_BUDGET_MINUTES,
+  type AutonomousSalesLoopResult,
+  type AutonomousSalesSchedulerTickResult,
+  type AutonomousSalesLoopSelectedWorkItem,
+  type ContinueOperatingRhythmExecutionResult,
+} from "@/lib/growth/specialists/execution/autonomous-sales-loop-types"
+
+export {
+  GE_AIOS_18B_AUTONOMOUS_SALES_LOOP_OBSERVABILITY_QA_MARKER,
+  AUTONOMOUS_SALES_LOOP_OBSERVABILITY_EVENTS,
+} from "@/lib/growth/specialists/execution/autonomous-sales-loop-observability"
+
+export { extractLeadIdFromWorkItem } from "@/lib/growth/specialists/execution/extract-lead-id-from-work-item"

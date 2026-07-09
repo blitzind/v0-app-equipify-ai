@@ -16,6 +16,7 @@ import {
   tickGrowthObjectiveRuntime,
 } from "@/lib/growth/objectives/growth-objective-runtime-service"
 import { runGrowthMissionRuntimeOrchestration } from "@/lib/growth/mission-center/growth-mission-runtime-orchestrator"
+import { tickAutonomousSalesLoopForScheduler } from "@/lib/growth/specialists/execution/run-autonomous-sales-loop"
 import { buildObjectiveSignalSnapshot } from "@/lib/growth/objectives/growth-objective-signal-handler"
 import {
   GROWTH_OBJECTIVE_RUNTIME_SCHEDULER_QA_MARKER,
@@ -111,6 +112,8 @@ export type GrowthObjectiveRuntimeSchedulerResult = {
   missionOrchestrationsAttempted: number
   failures: number
   skippedReason: string | null
+  /** GE-AIOS-18A — Canonical autonomous sales loop tick (no duplicate scheduler). */
+  autonomousSalesLoop: import("@/lib/growth/specialists/execution/autonomous-sales-loop-types").AutonomousSalesSchedulerTickResult | null
 }
 
 export async function runGrowthObjectiveRuntimeScheduler(
@@ -119,10 +122,22 @@ export async function runGrowthObjectiveRuntimeScheduler(
 ): Promise<GrowthObjectiveRuntimeSchedulerResult> {
   const startedAt = Date.now()
   const killSwitches = await getRuntimeKillSwitchStates(admin)
+  const allObjectives = await listActiveRunningGrowthObjectives(admin)
+  const schedulerOrganizationIds = [...new Set(allObjectives.map((row) => row.organizationId))]
+
+  const autonomousSalesLoop = killSwitches.autonomy_enabled
+    ? await tickAutonomousSalesLoopForScheduler(admin, {
+        organizationIds: schedulerOrganizationIds,
+        startedAt,
+        maxRuntimeMs: 20_000,
+        maxOrganizations: MAX_ORGS_PER_TICK,
+      })
+    : null
+
   if (!killSwitches.autonomy_enabled || !killSwitches.autonomy_objective_mode_enabled) {
     return {
       qa_marker: GROWTH_OBJECTIVE_RUNTIME_SCHEDULER_QA_MARKER,
-      objectivesScanned: 0,
+      objectivesScanned: allObjectives.length,
       objectivesSelected: 0,
       ticksAttempted: 0,
       retriesAttempted: 0,
@@ -131,10 +146,9 @@ export async function runGrowthObjectiveRuntimeScheduler(
       missionOrchestrationsAttempted: 0,
       failures: 0,
       skippedReason: "Objective runtime scheduler disabled by kill switch.",
+      autonomousSalesLoop,
     }
   }
-
-  const allObjectives = await listActiveRunningGrowthObjectives(admin)
   const objectives = selectSchedulerObjectives(allObjectives)
   let ticksAttempted = 0
   let retriesAttempted = 0
@@ -207,6 +221,15 @@ export async function runGrowthObjectiveRuntimeScheduler(
     mission_orchestrations_attempted: missionOrchestrationsAttempted,
     failures,
     runtime_ms: Date.now() - startedAt,
+    autonomous_sales_loop: autonomousSalesLoop
+      ? {
+          organizations_attempted: autonomousSalesLoop.organizations_attempted,
+          organizations_executed: autonomousSalesLoop.organizations_executed,
+          total_outcomes_completed: autonomousSalesLoop.total_outcomes_completed,
+          total_iterations: autonomousSalesLoop.total_iterations,
+          skipped_reason: autonomousSalesLoop.skipped_reason,
+        }
+      : null,
   })
 
   return {
@@ -220,6 +243,7 @@ export async function runGrowthObjectiveRuntimeScheduler(
     missionOrchestrationsAttempted,
     failures,
     skippedReason: null,
+    autonomousSalesLoop,
   }
 }
 

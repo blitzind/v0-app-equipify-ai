@@ -36,6 +36,7 @@ function main(): void {
   )
   assert.deepEqual(GROWTH_HOME_CANONICAL_SURFACE_SECTION_IDS, [
     "ava-hero",
+    "get-ava-ready",
     "ava-work",
     "ava-operating-rhythm",
     "ava-memory",
@@ -72,7 +73,8 @@ function main(): void {
   const advancedIndex = dashboard.indexOf('sectionId="advanced-operations"')
   const setupIndex = dashboard.indexOf('sectionId="setup-diagnostics"')
   const researchPanelIndex = indexOfComponent(dashboard, "GrowthHomeAvaResearchQueuePanel")
-  const startAvaIndex = indexOfComponent(dashboard, "GrowthHomeStartAvaSetupSection")
+  const startAvaIndex = dashboard.indexOf('placement="primary"')
+  const secondaryStartAvaIndex = dashboard.indexOf('placement="secondary"')
 
   assert.ok(heroIndex < workIndex)
   assert.ok(workIndex < rhythmIndex)
@@ -83,7 +85,9 @@ function main(): void {
   assert.ok(snapshotIndex < advancedIndex)
   assert.ok(advancedIndex < setupIndex)
   assert.ok(researchPanelIndex > advancedIndex)
-  assert.ok(startAvaIndex > setupIndex)
+  assert.ok(startAvaIndex >= 0)
+  assert.ok(startAvaIndex < workIndex)
+  assert.ok(secondaryStartAvaIndex > setupIndex)
 
   assert.doesNotMatch(dashboard, /fetch\(/)
   assert.match(hook, /GROWTH_HOME_WORKSPACE_SUMMARY_API_PATH/)

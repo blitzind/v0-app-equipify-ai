@@ -29,6 +29,12 @@ export type GrowthHomeSurfaceSectionAudit = {
 /** Authoritative section audit for `/growth` Home (presentation order). */
 export const GROWTH_HOME_SURFACE_SECTION_AUDIT: GrowthHomeSurfaceSectionAudit[] = [
   { id: "ava-hero", label: "Daily activity report", kind: "canonical_home", primary: true },
+  {
+    id: "get-ava-ready",
+    label: "Get Ava Ready",
+    kind: "setup_onboarding",
+    primary: true,
+  },
   { id: "ava-work", label: "Today's Work", kind: "canonical_home", primary: true },
   { id: "ava-operating-rhythm", label: "Today's Progress", kind: "canonical_home", primary: true },
   { id: "ava-memory", label: "What I've Learned", kind: "canonical_home", primary: true },
@@ -40,7 +46,7 @@ export const GROWTH_HOME_SURFACE_SECTION_AUDIT: GrowthHomeSurfaceSectionAudit[] 
   { id: "customer-growth", label: "Customer Growth", kind: "legacy_dashboard", primary: false },
   { id: "initiatives", label: "Initiatives", kind: "legacy_dashboard", primary: false },
   { id: "ava-accomplished", label: "What I've accomplished", kind: "legacy_dashboard", primary: false },
-  { id: "start-ava-setup", label: "Start Ava", kind: "setup_onboarding", primary: false },
+  { id: "start-ava-setup", label: "Get Ava Ready (legacy)", kind: "setup_onboarding", primary: false },
   { id: "operational-readiness", label: "Operational Readiness", kind: "operational_tool", primary: false },
   { id: "ai-activity", label: "AI Activity", kind: "diagnostic_debug", primary: false },
   { id: "debug-footer", label: "Home debug footer", kind: "diagnostic_debug", primary: false },

@@ -1,5 +1,6 @@
-/** GE-AVA-LAUNCH-MISSION-SETUP-1A — Start Ava setup read model (client-safe, no side effects). */
+/** GE-AVA-LAUNCH-MISSION-SETUP-1A / GE-AIOS-18D — Get Ava Ready setup read model (client-safe). */
 
+import { areStartupAutonomyGuardrailsConfigured, computeStartupProgressPercent } from "@/lib/growth/home/growth-home-canonical-startup-experience-18d"
 import type { GrowthObjective } from "@/lib/growth/objectives/growth-objective-types"
 import { GROWTH_AVA_MISSION_RUNTIME_1A_QA_MARKER } from "@/lib/growth/mission-center/growth-mission-runtime-types"
 import { selectDefaultFindLeadsMissionId } from "@/lib/growth/mission-center/growth-mission-find-leads-binding-display"
@@ -24,6 +25,11 @@ export type GrowthHomeLaunchMissionSetupActionKind =
   | "create_mission"
   | "scroll_find_leads"
   | "scroll_mailbox"
+  | "open_ai_teammate"
+  | "open_autonomy_settings"
+  | "open_mailbox_wizard"
+  | "open_calendar_settings"
+  | "open_booking_settings"
   | "none"
 
 export type GrowthHomeLaunchMissionSetupStep = {
@@ -33,6 +39,7 @@ export type GrowthHomeLaunchMissionSetupStep = {
   summary: string
   blocksLaunch: boolean
   actionKind: GrowthHomeLaunchMissionSetupActionKind
+  href?: string | null
 }
 
 export type GrowthHomeLaunchMissionSetupViewModel = {
@@ -40,11 +47,15 @@ export type GrowthHomeLaunchMissionSetupViewModel = {
   readOnly: true
   showCard: boolean
   setupComplete: boolean
+  readyForLaunch: boolean
   readyForMonitoring: boolean
   completionCopy: string | null
   currentStepId: GrowthHomeLaunchMissionSetupStepId | null
   acquisitionMissionId: string | null
   steps: GrowthHomeLaunchMissionSetupStep[]
+  progressPercent: number
+  completedStepCount: number
+  totalStepCount: number
 }
 
 export type GrowthHomeLaunchMissionSetupInput = {
@@ -54,6 +65,11 @@ export type GrowthHomeLaunchMissionSetupInput = {
   mailboxWarnings: number
   expiredMailboxes: number
   mailboxSummary?: string | null
+  connectedMailboxes?: number
+  aiTeammateOnboardingCompleted?: boolean
+  autonomyGuardrailsConfigured?: boolean
+  calendarConnected?: boolean
+  bookingPagesCount?: number
 }
 
 export function selectActiveAcquisitionObjectives(objectives: GrowthObjective[]): GrowthObjective[] {
@@ -110,13 +126,38 @@ export function synthesizeGrowthHomeLaunchMissionSetup(
   const leadSearchBound = hasLeadSearchBound(acquisitionMission)
   const mailboxBlocksLaunch = input.expiredMailboxes > 0
   const mailboxHasWarnings = input.mailboxWarnings > 0 || input.expiredMailboxes > 0
+  const hasConnectedMailbox = (input.connectedMailboxes ?? 0) > 0
+  const autonomyConfigured =
+    input.autonomyGuardrailsConfigured ??
+    areStartupAutonomyGuardrailsConfigured({ approvalPolicies: {} })
+  const calendarReady =
+    input.calendarConnected === true || (input.bookingPagesCount ?? 0) > 0
+
+  const meetAvaStep: GrowthHomeLaunchMissionSetupStep = input.aiTeammateOnboardingCompleted
+    ? {
+        id: "meet_ava",
+        label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.meet_ava,
+        status: "complete",
+        summary: "You've met Ava and set her identity.",
+        blocksLaunch: false,
+        actionKind: "none",
+      }
+    : {
+        id: "meet_ava",
+        label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.meet_ava,
+        status: "pending",
+        summary: "Introduce yourself and name your AI teammate.",
+        blocksLaunch: true,
+        actionKind: "open_ai_teammate",
+        href: "/growth/settings/ai-teammate",
+      }
 
   const growthProfileStep: GrowthHomeLaunchMissionSetupStep = input.businessProfileApproved
     ? {
         id: "growth_profile",
         label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.growth_profile,
         status: "complete",
-        summary: "Growth Profile approved.",
+        summary: "Growth Profile approved — ICP, products, and competitors are set.",
         blocksLaunch: false,
         actionKind: "none",
       }
@@ -126,50 +167,37 @@ export function synthesizeGrowthHomeLaunchMissionSetup(
         status: input.hasBusinessProfileDraft ? "pending" : "blocked",
         summary: input.hasBusinessProfileDraft
           ? "Review and approve your Growth Profile."
-          : "Create and approve your Growth Profile.",
+          : "Draft and approve your Growth Profile and ICP.",
         blocksLaunch: true,
         actionKind: "scroll_profile",
       }
 
-  const missionStep: GrowthHomeLaunchMissionSetupStep = hasMission
-    ? {
-        id: "mission",
-        label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.mission,
-        status: "complete",
-        summary: acquisitionMission?.title ?? GROWTH_AVA_LAUNCH_MISSION_DEFAULT_TITLE,
-        blocksLaunch: false,
-        actionKind: "none",
-      }
-    : {
-        id: "mission",
-        label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.mission,
-        status: input.businessProfileApproved ? "pending" : "blocked",
-        summary: input.businessProfileApproved
-          ? `Create the "${GROWTH_AVA_LAUNCH_MISSION_DEFAULT_TITLE}" mission.`
-          : "Approve Growth Profile before creating a mission.",
-        blocksLaunch: true,
-        actionKind: input.businessProfileApproved ? "create_mission" : "scroll_profile",
-      }
-
-  const leadSearchStep: GrowthHomeLaunchMissionSetupStep = leadSearchBound
-    ? {
-        id: "lead_search",
-        label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.lead_search,
-        status: "complete",
-        summary: "Find Leads search is bound to your mission.",
-        blocksLaunch: false,
-        actionKind: "none",
-      }
-    : {
-        id: "lead_search",
-        label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.lead_search,
-        status: hasMission && input.businessProfileApproved ? "pending" : "blocked",
-        summary: hasMission
-          ? "Bind a Find Leads search to your mission."
-          : "Create a mission before binding lead search.",
-        blocksLaunch: true,
-        actionKind: hasMission && input.businessProfileApproved ? "scroll_find_leads" : "none",
-      }
+  const leadSourceStep: GrowthHomeLaunchMissionSetupStep =
+    hasMission && leadSearchBound
+      ? {
+          id: "lead_source",
+          label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.lead_source,
+          status: "complete",
+          summary: acquisitionMission?.title ?? GROWTH_AVA_LAUNCH_MISSION_DEFAULT_TITLE,
+          blocksLaunch: false,
+          actionKind: "none",
+        }
+      : {
+          id: "lead_source",
+          label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.lead_source,
+          status: !input.businessProfileApproved ? "blocked" : !hasMission ? "pending" : "pending",
+          summary: !input.businessProfileApproved
+            ? "Approve Growth Profile before creating a mission."
+            : !hasMission
+              ? `Create the "${GROWTH_AVA_LAUNCH_MISSION_DEFAULT_TITLE}" mission.`
+              : "Bind a Find Leads search to your mission.",
+          blocksLaunch: true,
+          actionKind: !input.businessProfileApproved
+            ? "scroll_profile"
+            : !hasMission
+              ? "create_mission"
+              : "scroll_find_leads",
+        }
 
   const mailboxStep: GrowthHomeLaunchMissionSetupStep = mailboxBlocksLaunch
     ? {
@@ -180,62 +208,152 @@ export function synthesizeGrowthHomeLaunchMissionSetup(
           input.mailboxSummary?.trim() ||
           `${input.expiredMailboxes} mailbox connection(s) need reconnection before launch.`,
         blocksLaunch: true,
-        actionKind: "scroll_mailbox",
+        actionKind: hasConnectedMailbox ? "scroll_mailbox" : "open_mailbox_wizard",
+        href: hasConnectedMailbox
+          ? "/growth/settings/communications/connected-mailboxes"
+          : "/growth/settings/communications/connected-mailboxes/onboard",
       }
-    : mailboxHasWarnings
+    : !hasConnectedMailbox
       ? {
           id: "mailbox_readiness",
           label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.mailbox_readiness,
-          status: "warning",
-          summary:
-            input.mailboxSummary?.trim() ||
-            `${input.mailboxWarnings} mailbox warning(s) — review before outbound, but setup can continue.`,
-          blocksLaunch: false,
-          actionKind: "scroll_mailbox",
+          status: "pending",
+          summary: "Connect a mailbox so Ava can prepare outreach under your approval guardrails.",
+          blocksLaunch: true,
+          actionKind: "open_mailbox_wizard",
+          href: "/growth/settings/communications/connected-mailboxes/onboard",
         }
-      : {
-          id: "mailbox_readiness",
-          label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.mailbox_readiness,
-          status: "complete",
-          summary: "Mailboxes look ready.",
-          blocksLaunch: false,
-          actionKind: "none",
-        }
+      : mailboxHasWarnings
+        ? {
+            id: "mailbox_readiness",
+            label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.mailbox_readiness,
+            status: "warning",
+            summary:
+              input.mailboxSummary?.trim() ||
+              `${input.mailboxWarnings} mailbox warning(s) — review before outbound.`,
+            blocksLaunch: false,
+            actionKind: "scroll_mailbox",
+          }
+        : {
+            id: "mailbox_readiness",
+            label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.mailbox_readiness,
+            status: "complete",
+            summary: "Mailboxes look ready.",
+            blocksLaunch: false,
+            actionKind: "none",
+          }
 
-  const approvalStep: GrowthHomeLaunchMissionSetupStep = {
-    id: "approval_guardrails",
-    label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.approval_guardrails,
-    status: "complete",
-    summary: "Human approval is required before Ava sends outbound.",
-    blocksLaunch: false,
-    actionKind: "none",
-  }
+  const approvalStep: GrowthHomeLaunchMissionSetupStep = autonomyConfigured
+    ? {
+        id: "approval_guardrails",
+        label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.approval_guardrails,
+        status: "complete",
+        summary: "Outbound requires your approval — autonomy guardrails are configured.",
+        blocksLaunch: false,
+        actionKind: "none",
+      }
+    : {
+        id: "approval_guardrails",
+        label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.approval_guardrails,
+        status: "pending",
+        summary: "Review autonomy settings so Ava cannot send outbound without approval.",
+        blocksLaunch: true,
+        actionKind: "open_autonomy_settings",
+        href: "/growth/settings/autonomy",
+      }
 
-  const steps = [growthProfileStep, missionStep, leadSearchStep, mailboxStep, approvalStep]
-  const blockingSteps = steps.filter((step) => step.blocksLaunch && step.status !== "complete")
-  const setupComplete =
+  const calendarStep: GrowthHomeLaunchMissionSetupStep = calendarReady
+    ? {
+        id: "calendar_booking",
+        label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.calendar_booking,
+        status: "complete",
+        summary:
+          input.calendarConnected && (input.bookingPagesCount ?? 0) > 0
+            ? "Calendar and booking pages are ready."
+            : input.calendarConnected
+              ? "Calendar connected."
+              : "Booking page published.",
+        blocksLaunch: false,
+        actionKind: "none",
+      }
+    : {
+        id: "calendar_booking",
+        label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.calendar_booking,
+        status: "warning",
+        summary: "Connect calendar or publish a booking page for meeting CTAs.",
+        blocksLaunch: false,
+        actionKind: input.calendarConnected ? "open_booking_settings" : "open_calendar_settings",
+        href: input.calendarConnected ? "/growth/settings/booking" : "/growth/settings/calendar",
+      }
+
+  const coreLaunchReady =
+    input.aiTeammateOnboardingCompleted === true &&
     input.businessProfileApproved &&
     hasMission &&
     leadSearchBound &&
-    !mailboxBlocksLaunch
+    hasConnectedMailbox &&
+    !mailboxBlocksLaunch &&
+    autonomyConfigured
+
+  const launchStep: GrowthHomeLaunchMissionSetupStep = coreLaunchReady
+    ? {
+        id: "launch_ava",
+        label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.launch_ava,
+        status: "complete",
+        summary: "Ava is ready to work continuously under your guardrails.",
+        blocksLaunch: false,
+        actionKind: "none",
+      }
+    : {
+        id: "launch_ava",
+        label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.launch_ava,
+        status: "blocked",
+        summary: "Complete the steps above to launch Ava.",
+        blocksLaunch: false,
+        actionKind: "none",
+      }
+
+  const steps = [
+    meetAvaStep,
+    growthProfileStep,
+    leadSourceStep,
+    mailboxStep,
+    approvalStep,
+    calendarStep,
+    launchStep,
+  ]
+
+  const completedStepCount = steps.filter((step) => step.status === "complete").length
+  const totalStepCount = steps.length
+  const progressPercent = computeStartupProgressPercent({
+    completedSteps: completedStepCount,
+    totalSteps: totalStepCount,
+  })
+
+  const blockingSteps = steps.filter((step) => step.blocksLaunch && step.status !== "complete")
+  const setupComplete = coreLaunchReady
+  const readyForLaunch = setupComplete
   const readyForMonitoring = setupComplete
   const currentStepId =
     blockingSteps[0]?.id ??
     steps.find((step) => step.status === "pending" || step.status === "warning")?.id ??
     null
 
-  const hasRealActiveMission = selectActiveAcquisitionObjectives(input.objectives).length > 0
-  const showCard = !hasRealActiveMission || !setupComplete
+  const showCard = !setupComplete
 
   return {
     qaMarker: GROWTH_AVA_LAUNCH_MISSION_SETUP_1A_QA_MARKER,
     readOnly: true,
     showCard,
     setupComplete,
+    readyForLaunch,
     readyForMonitoring,
-    completionCopy: readyForMonitoring ? GROWTH_AVA_LAUNCH_MISSION_SETUP_COMPLETE_COPY : null,
+    completionCopy: readyForLaunch ? GROWTH_AVA_LAUNCH_MISSION_SETUP_COMPLETE_COPY : null,
     currentStepId,
     acquisitionMissionId: acquisitionMission?.id ?? null,
     steps,
+    progressPercent,
+    completedStepCount,
+    totalStepCount,
   }
 }

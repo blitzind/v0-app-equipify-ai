@@ -84,6 +84,11 @@ import {
   type ProspectSearchAiIcpProfile,
   type ProspectSearchAiSearchSuggestion,
 } from "@/lib/growth/prospect-search/prospect-search-ai-icp-config"
+import {
+  GROWTH_BUSINESS_PROFILE_API_PATH,
+  type GrowthBusinessProfileApiResponse,
+} from "@/lib/growth/business-profile/business-profile-api-contract"
+import { resolveProspectSearchAiIcpProfile } from "@/lib/growth/prospect-search/map-business-profile-to-prospect-search-icp"
 import { GROWTH_PROSPECT_PIPELINE_AUTOMATION_QA_MARKER } from "@/lib/growth/prospect-search/prospect-pipeline-automation"
 import type { GrowthProspectWorkflowContinuityEventKind } from "@/lib/growth/prospect-search/prospect-pipeline-automation"
 import { ProspectWorkflowLauncher } from "@/components/growth/prospect-search/prospect-workflow-launcher"
@@ -633,6 +638,31 @@ function ProspectSearchShellInner() {
       setPlaceholderIndex((i) => i + 1)
     }, 4500)
     return () => window.clearInterval(t)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadApprovedBusinessProfileIcp() {
+      try {
+        const response = await fetch(GROWTH_BUSINESS_PROFILE_API_PATH, { cache: "no-store" })
+        const payload = (await response.json()) as GrowthBusinessProfileApiResponse
+        if (cancelled || !response.ok || !payload.ok || !payload.activeApproved?.profile) return
+        setIcpProfile(
+          resolveProspectSearchAiIcpProfile({
+            approvedProfileContent: payload.activeApproved.profile,
+            companyName: payload.activeApproved.companyName,
+          }),
+        )
+      } catch {
+        // Keep local draft / default fallback when profile is unavailable.
+      }
+    }
+
+    void loadApprovedBusinessProfileIcp()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
