@@ -1,26 +1,46 @@
 /**
- * GE-AIOS-7A — Unified Ava home hero (client-safe presentation builder).
+ * GE-AIOS-7A / GE-AIOS-14B — Unified Ava home hero (client-safe presentation builder).
  *
- * Presentation-only: deterministically composes the four operator questions
- * (what Ava accomplished, what she's doing now, what she needs, what's next)
- * from existing Home Workspace Summary read models. No new backend logic,
- * no new API calls, no LLMs.
+ * When workspace summary inputs are present, composes the canonical AI OS stack:
+ * Memory → Decision → Work Manager → Specialist → Operating Rhythm → Narrative.
+ * Without workspace summary, falls back to lightweight 7A presentation helpers.
  */
 
+import { buildAvaDailyBriefing } from "@/lib/growth/ava-home/narrative/engine/build-ava-daily-briefing"
+import { buildRelationshipLeadSnapshotsFromResearchLoop, mergeRelationshipLeadSnapshotMaps } from "@/lib/growth/relationship/project-relationship-graph-enrichment"
+import {
+  AVA_NARRATIVE_ALL_NORMAL_LINE,
+  GROWTH_AVA_NARRATIVE_ENGINE_QA_MARKER,
+  type AvaDailyBriefing,
+  type AvaNarrativeMetricsSnapshot,
+  type AvaStoryBlock,
+} from "@/lib/growth/ava-home/narrative/narrative-types"
+import type { GrowthHomeWorkspaceSummaryPayload } from "@/lib/growth/home/growth-home-workspace-summary-types"
+import type { GrowthAvaResearchLoopSummary } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-types"
+import type { AvaMemorySummary, AvaOrganizationalMemoryStore } from "@/lib/growth/memory/types"
+import type { AvaOperatingRhythm, AvaOperatingRhythmMemory } from "@/lib/growth/operating-rhythm/types"
+import type { AvaSpecialistOrchestratorResult } from "@/lib/growth/specialists/types"
+import { buildPrimaryDecisionFromWorkManager } from "@/lib/growth/work-manager/home/build-primary-decision-work"
+import type { AvaWorkManagerResult } from "@/lib/growth/work-manager/types"
 import type {
   GrowthHomeAccomplishmentGroup,
   GrowthHomeAiEmployeeStatus,
   GrowthHomeAiOsUxViewModel,
+  GrowthHomeDailyWorkQueueItem,
+  GrowthHomeTimelinePeriod,
+  GrowthHomeWaitingOnYouItem,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
-import type { GrowthAvaResearchLoopSummary } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-types"
 import { extractFirstNameFromGreeting } from "@/lib/growth/workspace/executive-briefing/growth-home-experience-2b"
 import { greetingForHour } from "@/lib/growth/workspace/executive-briefing/growth-home-narrative-formatter"
 
 export const GROWTH_HOME_AVA_HERO_7A_QA_MARKER = "growth-ge-aios-7a-ava-home-experience-v1" as const
 
-export const GROWTH_HOME_AVA_ALL_NORMAL_LINE = "Everything else is running normally." as const
+export const GROWTH_HOME_AVA_ALL_NORMAL_LINE = AVA_NARRATIVE_ALL_NORMAL_LINE
+/** @deprecated GE-AIOS-14B — narrative engine replaces activity pills */
 export const GROWTH_HOME_AVA_ONE_THING_TITLE = "I only need one thing from you" as const
+/** @deprecated GE-AIOS-14B — narrative engine replaces activity pills */
 export const GROWTH_HOME_AVA_CURRENTLY_TITLE = "Ava is currently" as const
+/** @deprecated GE-AIOS-14B — narrative engine replaces since-last-visit list */
 export const GROWTH_HOME_AVA_SINCE_LAST_VISIT_TITLE = "Since your last visit" as const
 
 export type GrowthHomeAvaHeroActivity = { id: string; label: string }
@@ -43,6 +63,37 @@ export type GrowthHomeAvaHeroViewModel = {
   additionalDecisionCount: number
   reviewAllHref: string | null
   allNormalLine: string
+  dailyBriefing?: AvaDailyBriefing
+  storyBlocks: AvaStoryBlock[]
+  briefingNarrative: string[]
+  workManager?: AvaWorkManagerResult
+  operatingRhythm?: AvaOperatingRhythm
+  memorySummary?: AvaMemorySummary
+  specialistOrchestrator?: AvaSpecialistOrchestratorResult | null
+}
+
+export type BuildAvaHomeHeroInput = {
+  greeting: string
+  hour: number
+  employeeStatus: GrowthHomeAiEmployeeStatus
+  aiOsUx: GrowthHomeAiOsUxViewModel
+  researchLoopSummary: GrowthAvaResearchLoopSummary | null
+  accomplishments: GrowthHomeAccomplishmentGroup[]
+  repliesWaiting: number
+  workspaceSummary?: Pick<
+    GrowthHomeWorkspaceSummaryPayload,
+    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard" | "relationshipSnapshots" | "leadPool"
+  >
+  waitingOnYou?: GrowthHomeWaitingOnYouItem[]
+  dailyWorkQueue?: GrowthHomeDailyWorkQueueItem[]
+  timeline?: GrowthHomeTimelinePeriod[]
+  previousSnapshot?: AvaNarrativeMetricsSnapshot | null
+  operatingRhythmMemory?: AvaOperatingRhythmMemory | null
+  persistedMemoryStore?: AvaOrganizationalMemoryStore | null
+  organizationId?: string
+  generatedAt?: string
+  /** GE-AIOS-15E — explicit server snapshots (override research-loop projections) */
+  relationshipSnapshotsById?: import("@/lib/growth/relationship/relationship-lead-snapshot-types").RelationshipLeadSnapshotMap
 }
 
 function pluralize(count: number, singular: string, plural: string): string {
@@ -162,39 +213,101 @@ export function buildAvaPrimaryDecision(aiOsUx: GrowthHomeAiOsUxViewModel): {
   return { primaryDecision, additionalDecisionCount, reviewAllHref: aiOsUx.approveItemsHref }
 }
 
-export function buildAvaHomeHero(input: {
-  greeting: string
-  hour: number
-  employeeStatus: GrowthHomeAiEmployeeStatus
-  aiOsUx: GrowthHomeAiOsUxViewModel
-  researchLoopSummary: GrowthAvaResearchLoopSummary | null
-  accomplishments: GrowthHomeAccomplishmentGroup[]
-  repliesWaiting: number
-}): GrowthHomeAvaHeroViewModel {
+function mapPrimaryDecision(result: {
+  primaryDecision: GrowthHomeAvaHeroDecision | null
+  additionalDecisionCount: number
+  reviewAllHref: string | null
+}) {
+  return result
+}
+
+export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHeroViewModel {
   const firstName = extractFirstNameFromGreeting(input.greeting)
   const base = greetingForHour(input.hour)
   const greeting = firstName ? `${base}, ${firstName}.` : `${base}.`
 
-  const { primaryDecision, additionalDecisionCount, reviewAllHref } = buildAvaPrimaryDecision(input.aiOsUx)
+  const legacyActivities = buildAvaCurrentActivities({
+    employeeStatus: input.employeeStatus,
+    aiOsUx: input.aiOsUx,
+    researchLoopSummary: input.researchLoopSummary,
+    repliesWaiting: input.repliesWaiting,
+  })
+  const legacySinceLastVisit = buildAvaSinceLastVisit({
+    researchLoopSummary: input.researchLoopSummary,
+    accomplishments: input.accomplishments,
+  })
+
+  if (!input.workspaceSummary) {
+    const legacyDecision = buildAvaPrimaryDecision(input.aiOsUx)
+    return {
+      qaMarker: GROWTH_HOME_AVA_HERO_7A_QA_MARKER,
+      greeting,
+      statusLabel: input.employeeStatus.label,
+      statusKind: input.employeeStatus.kind,
+      currentActivities: legacyActivities,
+      sinceLastVisit: legacySinceLastVisit,
+      primaryDecision: legacyDecision.primaryDecision,
+      additionalDecisionCount: legacyDecision.additionalDecisionCount,
+      reviewAllHref: legacyDecision.reviewAllHref,
+      allNormalLine: GROWTH_HOME_AVA_ALL_NORMAL_LINE,
+      storyBlocks: [],
+      briefingNarrative: [],
+    }
+  }
+
+  const researchSnapshots = buildRelationshipLeadSnapshotsFromResearchLoop(input.researchLoopSummary)
+  const serverSnapshots =
+    input.relationshipSnapshotsById ?? input.workspaceSummary?.relationshipSnapshots?.byLeadId ?? {}
+  const leadSnapshotsById = mergeRelationshipLeadSnapshotMaps(researchSnapshots, serverSnapshots)
+
+  const dailyBriefing = buildAvaDailyBriefing({
+    greeting,
+    hour: input.hour,
+    workspaceSummary: input.workspaceSummary,
+    accomplishments: input.accomplishments,
+    waitingOnYou: input.waitingOnYou ?? input.aiOsUx.waitingOnYou,
+    dailyWorkQueue: input.dailyWorkQueue ?? input.aiOsUx.dailyWorkQueue,
+    timeline: input.timeline ?? [],
+    previousSnapshot: input.previousSnapshot ?? null,
+    operatingRhythmMemory: input.operatingRhythmMemory ?? null,
+    persistedMemoryStore: input.persistedMemoryStore ?? null,
+    organizationId: input.organizationId,
+    generatedAt: input.generatedAt,
+    leadSnapshotsById,
+  })
+
+  assertDailyBriefing(dailyBriefing)
+
+  const workManager = dailyBriefing.work_manager_result
+  const decision = workManager
+    ? mapPrimaryDecision(buildPrimaryDecisionFromWorkManager(workManager, input.aiOsUx))
+    : buildAvaPrimaryDecision(input.aiOsUx)
+
+  const storyBlocks = dailyBriefing.story_blocks ?? []
 
   return {
     qaMarker: GROWTH_HOME_AVA_HERO_7A_QA_MARKER,
     greeting,
     statusLabel: input.employeeStatus.label,
     statusKind: input.employeeStatus.kind,
-    currentActivities: buildAvaCurrentActivities({
-      employeeStatus: input.employeeStatus,
-      aiOsUx: input.aiOsUx,
-      researchLoopSummary: input.researchLoopSummary,
-      repliesWaiting: input.repliesWaiting,
-    }),
-    sinceLastVisit: buildAvaSinceLastVisit({
-      researchLoopSummary: input.researchLoopSummary,
-      accomplishments: input.accomplishments,
-    }),
-    primaryDecision,
-    additionalDecisionCount,
-    reviewAllHref,
+    currentActivities: legacyActivities,
+    sinceLastVisit: legacySinceLastVisit,
+    primaryDecision: decision.primaryDecision,
+    additionalDecisionCount: decision.additionalDecisionCount,
+    reviewAllHref: decision.reviewAllHref,
     allNormalLine: GROWTH_HOME_AVA_ALL_NORMAL_LINE,
+    dailyBriefing,
+    storyBlocks,
+    briefingNarrative: storyBlocks.map((block) => block.text),
+    workManager,
+    operatingRhythm: dailyBriefing.operating_rhythm_result,
+    memorySummary: dailyBriefing.memory_result,
+    specialistOrchestrator: dailyBriefing.specialist_orchestrator_result ?? null,
+  }
+}
+
+function assertDailyBriefing(briefing: AvaDailyBriefing): void {
+  if (briefing.qaMarker !== GROWTH_AVA_NARRATIVE_ENGINE_QA_MARKER) {
+    throw new Error("Invalid Ava daily briefing marker")
   }
 }

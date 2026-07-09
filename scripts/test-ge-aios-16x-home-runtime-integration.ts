@@ -16,6 +16,10 @@ import {
 import { GROWTH_HOME_WORKSPACE_SUMMARY_API_PATH } from "../lib/growth/home/growth-home-workspace-summary-types"
 import { GROWTH_RELATIONSHIP_LEAD_SNAPSHOT_QA_MARKER } from "../lib/growth/relationship/relationship-lead-snapshot-types"
 import { buildStubSpecialistStatusLabel } from "../lib/growth/home/growth-home-runtime-presenter"
+import {
+  normalizeGrowthHomeAvaHeroViewModel,
+  normalizeGrowthHomeWorkspaceSummaryPayload,
+} from "../lib/growth/home/growth-home-runtime-safe-defaults"
 import type { AvaWorkItem } from "../lib/growth/work-manager/types"
 
 const PHASE = "GE-AIOS-16X" as const
@@ -41,6 +45,8 @@ function main(): void {
   assert.match(dashboard, /GrowthHomeAiOsWaitingOnYouSection/)
   assert.match(dashboard, /leadPool=\{workspaceSummary\?\.leadPool/)
   assert.match(dashboard, /relationshipSnapshotsById=\{workspaceSummary\?\.relationshipSnapshots/)
+  assert.match(dashboard, /normalizeGrowthHomeAvaHeroViewModel/)
+  assert.match(dashboard, /normalizeGrowthHomeAiOsUxViewModel/)
   assert.doesNotMatch(dashboard, /GrowthHomeDailyWorkQueueSection/)
   assert.doesNotMatch(dashboard, /GrowthHomeDailyBriefingSection/)
   assert.doesNotMatch(dashboard, /fetch\(/)
@@ -59,6 +65,7 @@ function main(): void {
   assert.match(hook, /GROWTH_HOME_WORKSPACE_SUMMARY_API_PATH/)
   assert.equal(GROWTH_HOME_WORKSPACE_SUMMARY_API_PATH, "/api/platform/growth/home/workspace-summary")
   assert.doesNotMatch(hook, /Promise\.all\(\[.*workspace-summary/)
+  assert.match(hook, /normalizeGrowthHomeWorkspaceSummaryPayload/)
 
   const heroUi = readSource("components/growth/workspace/executive-briefing/growth-home-ava-hero-section.tsx")
   assert.match(heroUi, /buildHomeRelationshipScaleLine/)
@@ -169,6 +176,26 @@ function main(): void {
     fallbackLabel: "unused",
   })
   assert.match(stubLabel, /marketing|No active work yet/i)
+
+  const partialSummary = normalizeGrowthHomeWorkspaceSummaryPayload({ ok: true } as never)
+  assert.ok(partialSummary.leadPool)
+  assert.ok(partialSummary.relationshipSnapshots)
+
+  const partialHero = normalizeGrowthHomeAvaHeroViewModel({
+    qaMarker: "growth-ge-aios-7a-ava-home-experience-v1",
+    greeting: "Good morning.",
+    statusLabel: "Working",
+    statusKind: "working",
+    currentActivities: [],
+    sinceLastVisit: [],
+    primaryDecision: null,
+    additionalDecisionCount: 0,
+    reviewAllHref: null,
+    allNormalLine: "All normal.",
+    storyBlocks: undefined as never,
+    briefingNarrative: undefined as never,
+  })
+  partialHero.storyBlocks.filter(() => true)
 
   const migrationDir = path.join(process.cwd(), "supabase/migrations")
   const newMigrations = fs.readdirSync(migrationDir).filter((name) => name.includes("16x"))

@@ -10,6 +10,7 @@ import {
   GROWTH_HOME_RUNTIME_INTEGRATION_16X_QA_MARKER,
   type HomeWorkItemPresentation,
 } from "@/lib/growth/home/growth-home-runtime-presenter"
+import { normalizeAvaWorkManagerResult } from "@/lib/growth/home/growth-home-runtime-safe-defaults"
 import {
   AVA_WORK_MANAGER_BLOCKED_TITLE,
   AVA_WORK_MANAGER_COMPLETED_TODAY_TITLE,
@@ -90,17 +91,18 @@ function WorkItemList({
 }
 
 export function GrowthHomeAvaWorkSection({ workManager, leadPool = null }: Props) {
-  if (!workManager || workManager.work_plan.length === 0) return null
+  const safeWorkManager = normalizeAvaWorkManagerResult(workManager)
+  if (!safeWorkManager || safeWorkManager.work_plan.length === 0) return null
 
   const scaleLine = buildHomeRelationshipScaleLine(leadPool)
-  const upNextItems = workManager.work_plan
-    .filter((entry) => entry.status === "ready" && entry.work_item_id !== workManager.active_work?.id)
+  const upNextItems = safeWorkManager.work_plan
+    .filter((entry) => entry.status === "ready" && entry.work_item_id !== safeWorkManager.active_work?.id)
     .slice(0, 3)
-    .map((entry) => workManager.all_work_items.find((row) => row.id === entry.work_item_id))
+    .map((entry) => safeWorkManager.all_work_items.find((row) => row.id === entry.work_item_id))
     .filter((row): row is AvaWorkItem => Boolean(row))
 
-  const activePresentation = workManager.active_work
-    ? buildHomeWorkItemPresentation(workManager.active_work)
+  const activePresentation = safeWorkManager.active_work
+    ? buildHomeWorkItemPresentation(safeWorkManager.active_work)
     : null
 
   return (
@@ -141,18 +143,18 @@ export function GrowthHomeAvaWorkSection({ workManager, leadPool = null }: Props
             {AVA_WORK_MANAGER_WAITING_ON_YOU_TITLE}
           </p>
           <WorkItemList
-            items={workManager.operator_queue.slice(0, 4)}
+            items={safeWorkManager.operator_queue.slice(0, 4)}
             emptyLabel="Nothing waiting on you."
           />
         </div>
 
-        {workManager.blocked.length > 0 ? (
+        {safeWorkManager.blocked.length > 0 ? (
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
               {AVA_WORK_MANAGER_BLOCKED_TITLE}
             </p>
             <ul className="space-y-2">
-              {workManager.blocked.slice(0, 3).map((item) => (
+              {safeWorkManager.blocked.slice(0, 3).map((item) => (
                 <li
                   key={item.id}
                   className="flex items-start gap-2 rounded-lg border border-amber-200/60 bg-amber-50/20 px-1 py-1 dark:border-amber-900/40 dark:bg-amber-950/10"
@@ -167,13 +169,13 @@ export function GrowthHomeAvaWorkSection({ workManager, leadPool = null }: Props
           </div>
         ) : null}
 
-        {workManager.completed_today.length > 0 ? (
+        {safeWorkManager.completed_today.length > 0 ? (
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {AVA_WORK_MANAGER_COMPLETED_TODAY_TITLE}
             </p>
             <ul className="space-y-1.5">
-              {workManager.completed_today.slice(0, 4).map((item) => (
+              {safeWorkManager.completed_today.slice(0, 4).map((item) => (
                 <li key={item.id} className="flex items-start gap-2 text-sm text-foreground">
                   <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden />
                   <span>{buildHomeWorkItemPresentation(item).companyName ?? item.title}</span>

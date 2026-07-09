@@ -94,7 +94,8 @@ function main(): void {
   assert.doesNotMatch(heroSource, /fetch\(/)
 
   const heroUi = readSource("components/growth/workspace/executive-briefing/growth-home-ava-hero-section.tsx")
-  assert.match(heroUi, /hero\.storyBlocks\.filter/)
+  assert.match(heroUi, /storyBlocks\.filter/)
+  assert.match(heroUi, /hero\.storyBlocks \?\? \[\]/)
   assert.doesNotMatch(heroUi, /GROWTH_HOME_AVA_CURRENTLY_TITLE/)
   assert.doesNotMatch(heroUi, /briefingNarrative\.map/)
 

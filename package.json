@@ -817,6 +817,7 @@
     "test:ge-aios-15e-server-relationship-snapshots": "tsx scripts/test-ge-aios-15e-server-relationship-snapshots.ts",
     "test:ge-aios-15f-sales-workload-scaling-pagination": "tsx scripts/test-ge-aios-15f-sales-workload-scaling-pagination.ts",
     "test:ge-aios-16x-home-runtime-integration": "tsx scripts/test-ge-aios-16x-home-runtime-integration.ts",
+    "test:ge-aios-hotfix-16x-home-runtime-undefined-arrays": "tsx scripts/test-ge-aios-hotfix-16x-home-runtime-undefined-arrays.ts",
     "test:ge-aios-7c-ava-led-lead-discovery": "tsx scripts/test-ge-aios-7c-ava-led-lead-discovery.ts",
     "test:ge-aios-ux-1b-home-queue-integration": "tsx scripts/test-ge-aios-ux-1b-home-queue-integration.ts",
     "test:ge-ai-ux-2a-outcome-first-unified-experience": "tsx scripts/test-ge-ai-ux-2a-outcome-first-unified-experience.ts",

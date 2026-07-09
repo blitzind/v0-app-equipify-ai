@@ -281,8 +281,8 @@ function extractCompanyFromWaitingLabel(label: string): string | null {
 }
 
 export function enrichGrowthHomeWaitingOnYouItems(
-  items: GrowthHomeWaitingOnYouItem[],
+  items: GrowthHomeWaitingOnYouItem[] | null | undefined,
   snapshotsById?: RelationshipLeadSnapshotMap,
 ): GrowthHomeWaitingOnYouItem[] {
-  return items.map((item) => enrichGrowthHomeWaitingOnYouItem(item, snapshotsById))
+  return (items ?? []).map((item) => enrichGrowthHomeWaitingOnYouItem(item, snapshotsById))
 }

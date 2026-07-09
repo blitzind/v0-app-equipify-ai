@@ -32,6 +32,10 @@ import {
   buildExecutiveSnapshotKpis,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-2a"
 import { buildAvaHomeHero } from "@/lib/growth/workspace/executive-briefing/growth-home-ava-hero-7a"
+import {
+  normalizeGrowthHomeAvaHeroViewModel,
+  normalizeGrowthHomeAiOsUxViewModel,
+} from "@/lib/growth/home/growth-home-runtime-safe-defaults"
 import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
 import type { GrowthWorkspaceRecentView, GrowthWorkspaceContinueItem } from "@/lib/growth/workspace/growth-workspace-activity-memory"
 import { formatRelativeTime } from "@/lib/notifications/format-relative"
@@ -131,7 +135,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
   }, [briefing.employeeStatus, setStatus])
 
   const lastUpdateLabel = formatRelativeTime(briefing.generatedAt)
-  const { aiOsUx } = briefing
+  const aiOsUx = useMemo(() => normalizeGrowthHomeAiOsUxViewModel(briefing.aiOsUx), [briefing.aiOsUx])
 
   const previousSnapshot = useMemo(() => readAvaNarrativeMetricsSnapshot(), [dashboard.generatedAt])
   const persistedMemoryStore = useMemo(() => readOrganizationalMemoryStore(), [dashboard.generatedAt])
@@ -144,23 +148,25 @@ export function GrowthHomeExecutiveBriefingDashboard({
 
   const avaHero = useMemo(
     () =>
-      buildAvaHomeHero({
-        greeting: aiOsUx.hero.greeting,
-        hour: new Date().getHours(),
-        employeeStatus: briefing.employeeStatus,
-        aiOsUx,
-        researchLoopSummary: avaConsole?.researchLoopSummary ?? null,
-        accomplishments: briefing.accomplishments,
-        repliesWaiting: metricValueFromDashboard(dashboard, "my-queue", "Inbox requiring replies"),
-        workspaceSummary: engineWorkspaceSummary,
-        waitingOnYou: aiOsUx.waitingOnYou,
-        dailyWorkQueue: aiOsUx.dailyWorkQueue,
-        timeline: briefing.timeline,
-        previousSnapshot,
-        operatingRhythmMemory,
-        persistedMemoryStore,
-        generatedAt: workspaceSummary?.generatedAt ?? dashboard.generatedAt,
-      }),
+      normalizeGrowthHomeAvaHeroViewModel(
+        buildAvaHomeHero({
+          greeting: aiOsUx.hero.greeting,
+          hour: new Date().getHours(),
+          employeeStatus: briefing.employeeStatus,
+          aiOsUx,
+          researchLoopSummary: avaConsole?.researchLoopSummary ?? null,
+          accomplishments: briefing.accomplishments,
+          repliesWaiting: metricValueFromDashboard(dashboard, "my-queue", "Inbox requiring replies"),
+          workspaceSummary: engineWorkspaceSummary,
+          waitingOnYou: aiOsUx.waitingOnYou,
+          dailyWorkQueue: aiOsUx.dailyWorkQueue,
+          timeline: briefing.timeline,
+          previousSnapshot,
+          operatingRhythmMemory,
+          persistedMemoryStore,
+          generatedAt: workspaceSummary?.generatedAt ?? dashboard.generatedAt,
+        }),
+      ),
     [
       aiOsUx,
       briefing.employeeStatus,
@@ -189,8 +195,8 @@ export function GrowthHomeExecutiveBriefingDashboard({
         buildOperatingRhythmMemory({
           rhythm: avaHero.operatingRhythm,
           workResult: avaHero.workManager,
-          risks: dailyBriefing.risks.map((row) => row.text),
-          wins: dailyBriefing.wins.map((row) => row.text),
+          risks: (dailyBriefing.risks ?? []).map((row) => row.text),
+          wins: (dailyBriefing.wins ?? []).map((row) => row.text),
         }),
       )
     }

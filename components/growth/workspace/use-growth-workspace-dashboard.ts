@@ -6,6 +6,9 @@ import {
   GROWTH_HOME_WORKSPACE_DASHBOARD_FETCH_BATCH_MARKER,
   GROWTH_HOME_WORKSPACE_SUMMARY_API_PATH,
 } from "@/lib/growth/home/growth-home-workspace-api-contract"
+import {
+  normalizeGrowthHomeWorkspaceSummaryPayload,
+} from "@/lib/growth/home/growth-home-runtime-safe-defaults"
 import type { GrowthHomeWorkspaceSummaryPayload } from "@/lib/growth/home/growth-home-workspace-summary-types"
 import {
   buildGrowthWorkspaceDashboardViewModel,
@@ -44,7 +47,7 @@ async function fetchGrowthHomeWorkspaceSummary(): Promise<{
           : "Could not load workspace dashboard."
       return { payload: null, errorMessage: message }
     }
-    return { payload: payload as GrowthHomeWorkspaceSummaryPayload, errorMessage: null }
+    return { payload: normalizeGrowthHomeWorkspaceSummaryPayload(payload), errorMessage: null }
   } catch (error) {
     return {
       payload: null,
@@ -76,6 +79,7 @@ export async function loadGrowthWorkspaceDashboardSources(): Promise<GrowthWorks
 
 export function useGrowthWorkspaceDashboard() {
   const [dashboard, setDashboard] = useState<GrowthWorkspaceDashboardViewModel | null>(null)
+  const [workspaceSummary, setWorkspaceSummary] = useState<GrowthHomeWorkspaceSummaryPayload | null>(null)
   const [avaConsole, setAvaConsole] = useState<GrowthHomeWorkspaceSummaryPayload["avaConsole"] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -89,9 +93,11 @@ export function useGrowthWorkspaceDashboard() {
     if (!payload) {
       setError(errorMessage)
       setDashboard(buildGrowthWorkspaceDashboardViewModel(EMPTY_SOURCES))
+      setWorkspaceSummary(null)
       setAvaConsole(null)
     } else {
       setDashboard(payload.dashboard ?? buildGrowthWorkspaceDashboardViewModel(payload.sources))
+      setWorkspaceSummary(payload)
       setAvaConsole(payload.avaConsole ?? null)
     }
     setLoading(false)
@@ -103,6 +109,7 @@ export function useGrowthWorkspaceDashboard() {
 
   return {
     dashboard,
+    workspaceSummary,
     avaConsole,
     loading,
     error,

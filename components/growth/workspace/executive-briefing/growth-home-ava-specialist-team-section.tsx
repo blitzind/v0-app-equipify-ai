@@ -4,6 +4,7 @@ import Link from "next/link"
 import { ArrowRight, CheckCircle2, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { GROWTH_HOME_RUNTIME_INTEGRATION_16X_QA_MARKER } from "@/lib/growth/home/growth-home-runtime-presenter"
+import { normalizeAvaSpecialistOrchestratorResult } from "@/lib/growth/home/growth-home-runtime-safe-defaults"
 import {
   AVA_SPECIALIST_MY_TEAM_TITLE,
   GROWTH_SPECIALIST_ORCHESTRATOR_QA_MARKER,
@@ -15,7 +16,8 @@ type Props = {
 }
 
 export function GrowthHomeAvaSpecialistTeamSection({ specialistOrchestrator }: Props) {
-  if (!specialistOrchestrator || specialistOrchestrator.team_status.length === 0) return null
+  const orchestrator = normalizeAvaSpecialistOrchestratorResult(specialistOrchestrator)
+  if (!orchestrator || orchestrator.team_status.length === 0) return null
 
   return (
     <section
@@ -31,7 +33,7 @@ export function GrowthHomeAvaSpecialistTeamSection({ specialistOrchestrator }: P
         </h2>
       </div>
       <ul className="grid gap-2 sm:grid-cols-2">
-        {specialistOrchestrator.team_status.map((member) => (
+        {orchestrator.team_status.map((member) => (
           <li
             key={member.specialist_id}
             className={cn(

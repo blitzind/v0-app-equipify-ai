@@ -56,8 +56,9 @@ export function GrowthHomeAvaHeroSection({
     waitingCount: Math.max(hero.additionalDecisionCount, pendingApprovals),
   })
   const briefingSummary = hero.dailyBriefing?.summary?.trim() ?? null
+  const storyBlocks = hero.storyBlocks ?? []
   const introSet = new Set(introLines.map((line) => line.trim()))
-  const supplementalBlocks = hero.storyBlocks.filter((block) => !introSet.has(block.text.trim()))
+  const supplementalBlocks = storyBlocks.filter((block) => !introSet.has(block.text.trim()))
   const narrativeLines =
     introLines.length > 0
       ? introLines

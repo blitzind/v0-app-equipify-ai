@@ -34,7 +34,8 @@ function statusSuffix(status: AvaOperatingPhaseEntry["status"]): string {
 }
 
 export function GrowthHomeAvaOperatingRhythmSection({ operatingRhythm }: Props) {
-  if (!operatingRhythm || operatingRhythm.phase_timeline.length === 0) return null
+  const phaseTimeline = operatingRhythm?.phase_timeline ?? []
+  if (!operatingRhythm || phaseTimeline.length === 0) return null
 
   return (
     <section
@@ -46,7 +47,7 @@ export function GrowthHomeAvaOperatingRhythmSection({ operatingRhythm }: Props) 
         {AVA_OPERATING_RHYTHM_TODAY_PROGRESS_TITLE}
       </h2>
       <ul className="space-y-2">
-        {operatingRhythm.phase_timeline.map((phase) => (
+        {phaseTimeline.map((phase) => (
           <li
             key={phase.id}
             className={cn(
