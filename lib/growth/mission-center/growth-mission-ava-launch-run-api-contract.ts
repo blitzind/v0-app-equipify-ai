@@ -1,7 +1,7 @@
 /** GE-AVA-AUTONOMY-LAUNCH-RUN-1 — Ava launch run API contract (client-safe). */
 
 import type { AvaDatamoonAudienceDraft } from "@/lib/growth/ava-home/datamoon/ava-datamoon-sourcing-workbench-types"
-import type { MissionFindLeadsBindingSummary } from "@/lib/growth/mission-center/growth-mission-find-leads-binding-service"
+import type { MissionFindLeadsBindingSummary } from "@/lib/growth/mission-center/growth-mission-find-leads-binding-display"
 import type { AvaLaunchSerializedException } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-exception-transparency"
 import type { GrowthMissionAvaLaunchRunStoppedAt } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-result-semantics"
 import type { GrowthMissionAvaLaunchZeroPreviewDebug } from "@/lib/growth/mission-center/growth-mission-ava-launch-zero-preview-debug"

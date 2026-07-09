@@ -67,3 +67,18 @@ export function buildLeadDiscoveryAdvancedItems(binding: GrowthMissionRuntimeDat
   if (binding.onlyNewSinceLastRefresh) items.push("Only new since last refresh")
   return items
 }
+
+export type MissionFindLeadsBindingSummary = {
+  qa_marker: typeof GROWTH_AVA_MISSION_RUNTIME_1B_QA_MARKER
+  missionId: string
+  searchAttached: boolean
+  audienceName: string | null
+  searchSummary: string
+  provider: "datamoon_audience"
+  keepMonitoring: boolean
+  refreshCadence: "daily" | "weekly"
+  lastRunId: string | null
+  onlyNewSinceLastRefresh: boolean
+  monitoringStatus: string
+  activityLabel: string
+}

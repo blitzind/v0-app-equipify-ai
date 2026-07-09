@@ -28,7 +28,7 @@ export type GrowthMissionBindFindLeadsRequest = {
 export type GrowthMissionBindFindLeadsResponse = {
   ok: boolean
   qa_marker?: typeof import("@/lib/growth/mission-center/growth-mission-find-leads-binding-display").GROWTH_AVA_MISSION_RUNTIME_1B_QA_MARKER
-  binding?: import("@/lib/growth/mission-center/growth-mission-find-leads-binding-service").MissionFindLeadsBindingSummary
+  binding?: import("@/lib/growth/mission-center/growth-mission-find-leads-binding-display").MissionFindLeadsBindingSummary
   error?: string
 }
 

@@ -256,6 +256,19 @@ function main(): void {
   assert.equal(GROWTH_HOME_STARTUP_API_PATHS.autonomy, "/api/growth/workspace/settings/autonomy")
   assert.equal(GROWTH_HOME_STARTUP_API_PATHS.aiTeammate, "/api/growth/workspace/settings/ai-teammate")
 
+  const specialistsBarrel = readSource("lib/growth/specialists/index.ts")
+  const specialistTeamSection = readSource(
+    "components/growth/workspace/executive-briefing/growth-home-ava-specialist-team-section.tsx",
+  )
+  const icpMapper = readSource("lib/growth/prospect-search/map-business-profile-to-prospect-search-icp.ts")
+  assert.doesNotMatch(specialistsBarrel, /autonomous-sales-loop-observability/)
+  assert.doesNotMatch(specialistsBarrel, /growth-access-resolution/)
+  assert.doesNotMatch(specialistTeamSection, /from "@\/lib\/growth\/specialists"/)
+  assert.doesNotMatch(setupComponent, /from "@\/lib\/growth\/mission-center"/)
+  assert.doesNotMatch(icpMapper, /next\/headers|server-only|growth-access-resolution/)
+  assert.doesNotMatch(prospectShell, /growth-access-resolution|next\/headers/)
+  console.log("  ✓ client bundles avoid server-only RBAC and observability imports")
+
   console.log(`[${PHASE}] PASS — ${GROWTH_HOME_CANONICAL_STARTUP_EXPERIENCE_18D_QA_MARKER}`)
 }
 

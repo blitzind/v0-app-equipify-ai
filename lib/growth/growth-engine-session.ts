@@ -1,6 +1,6 @@
 import "server-only"
 
-import { z } from "zod"
+import { logGrowthEngine as logGrowthEngineEvent } from "@/lib/growth/growth-engine-log"
 import {
   classifyGrowthEngineBearerAuthError,
   getGrowthEngineBearerTokenMetadata,
@@ -26,14 +26,7 @@ export function getGrowthEngineAiOrgId(): string | null {
 }
 
 export function logGrowthEngine(event: string, details: Record<string, unknown>): void {
-  console.info(
-    JSON.stringify({
-      source: "growth-engine",
-      event,
-      ts: new Date().toISOString(),
-      ...details,
-    }),
-  )
+  logGrowthEngineEvent(event, details)
 }
 
 export type GrowthEnginePlatformUserResolution = {

@@ -13,9 +13,9 @@ import {
 import { GROWTH_HOME_BUSINESS_PROFILE_SECTION_SELECTOR } from "@/lib/growth/ava-home/datamoon/growth-home-datamoon-sourcing-api-contract"
 import {
   GROWTH_MISSION_CENTER_API_PATH,
-  type GrowthMissionCenterSourcesPayload,
-} from "@/lib/growth/mission-center"
-import type { GrowthAutonomyApprovalPolicies } from "@/lib/growth/autonomy/growth-autonomy-types"
+} from "@/lib/growth/mission-center/growth-mission-center-api-contract"
+import type { GrowthMissionCenterSourcesPayload } from "@/lib/growth/mission-center/growth-mission-center-types"
+import { GROWTH_AVA_LAUNCH_RUN_TITLE } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-api-contract"
 import {
   GROWTH_HOME_CANONICAL_STARTUP_EXPERIENCE_18D_QA_MARKER,
   GROWTH_HOME_GET_AVA_READY_LAUNCH_CTA,
@@ -34,7 +34,7 @@ import {
   GROWTH_HOME_FIND_LEADS_SECTION_SELECTOR,
   GROWTH_HOME_MAILBOX_READINESS_SECTION_SELECTOR,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-launch-mission-setup-1a"
-import { GROWTH_AVA_LAUNCH_RUN_TITLE } from "@/lib/growth/mission-center"
+import type { GrowthAutonomyApprovalPolicies } from "@/lib/growth/autonomy/growth-autonomy-types"
 import {
   synthesizeGrowthHomeLaunchMissionSetup,
   type GrowthHomeLaunchMissionSetupStep,

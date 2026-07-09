@@ -2,7 +2,7 @@
 
 import "server-only"
 
-import { logGrowthEngine } from "@/lib/growth/access"
+import { logGrowthEngine } from "@/lib/growth/growth-engine-log"
 import { GROWTH_AUTONOMOUS_SALES_LOOP_QA_MARKER } from "@/lib/growth/specialists/execution/autonomous-sales-loop-types"
 
 export const GE_AIOS_18B_AUTONOMOUS_SALES_LOOP_OBSERVABILITY_QA_MARKER =

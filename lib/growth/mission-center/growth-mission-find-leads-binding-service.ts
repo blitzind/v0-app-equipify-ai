@@ -11,6 +11,7 @@ import {
   parseLookbackDaysFromDatamoonRequest,
   requestHasOnlyNewSinceLastRefresh,
   GROWTH_AVA_MISSION_RUNTIME_1B_QA_MARKER,
+  type MissionFindLeadsBindingSummary,
 } from "@/lib/growth/mission-center/growth-mission-find-leads-binding-display"
 import {
   missionLifecycleActivityLabel,
@@ -18,6 +19,8 @@ import {
 } from "@/lib/growth/mission-center/growth-mission-runtime-types"
 import { bindMissionDatamoonImportRequest } from "@/lib/growth/mission-center/growth-mission-runtime-orchestrator"
 import { getGrowthObjective } from "@/lib/growth/objectives/growth-objective-repository"
+
+export type { MissionFindLeadsBindingSummary } from "@/lib/growth/mission-center/growth-mission-find-leads-binding-display"
 
 export type BindFindLeadsToMissionInput = {
   organizationId: string
@@ -29,21 +32,6 @@ export type BindFindLeadsToMissionInput = {
   keepMonitoring?: boolean
   lastRunId?: string | null
   refreshCadence?: "daily" | "weekly"
-}
-
-export type MissionFindLeadsBindingSummary = {
-  qa_marker: typeof GROWTH_AVA_MISSION_RUNTIME_1B_QA_MARKER
-  missionId: string
-  searchAttached: boolean
-  audienceName: string | null
-  searchSummary: string
-  provider: "datamoon_audience"
-  keepMonitoring: boolean
-  refreshCadence: "daily" | "weekly"
-  lastRunId: string | null
-  onlyNewSinceLastRefresh: boolean
-  monitoringStatus: string
-  activityLabel: string
 }
 
 function finalizeDatamoonRequestForBinding(

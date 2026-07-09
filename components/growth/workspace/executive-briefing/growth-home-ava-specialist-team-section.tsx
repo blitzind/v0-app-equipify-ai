@@ -11,7 +11,7 @@ import {
   AVA_SPECIALIST_MY_TEAM_TITLE,
   GROWTH_SPECIALIST_ORCHESTRATOR_QA_MARKER,
   type AvaSpecialistOrchestratorResult,
-} from "@/lib/growth/specialists"
+} from "@/lib/growth/specialists/types"
 
 type Props = {
   specialistOrchestrator: AvaSpecialistOrchestratorResult | null
