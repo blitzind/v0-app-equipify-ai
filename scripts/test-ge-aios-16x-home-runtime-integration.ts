@@ -88,6 +88,8 @@ function main(): void {
   )
   assert.match(waitingUi, /AVA_HOME_WAITING_ON_YOU_TITLE/)
   assert.match(waitingUi, /enrichGrowthHomeWaitingOnYouItems/)
+  assert.match(waitingUi, /GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER/)
+  assert.doesNotMatch(waitingUi, /GROWTH_HOME_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER/)
   assert.match(waitingUi, /item\.href/)
   assert.doesNotMatch(waitingUi, /Needs Your Decision/)
 

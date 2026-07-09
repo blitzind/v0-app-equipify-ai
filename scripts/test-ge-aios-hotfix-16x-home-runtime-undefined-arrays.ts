@@ -27,6 +27,28 @@ function readSource(relativePath: string): string {
   return fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
 }
 
+/** Ensure every GROWTH_*_QA_MARKER used in a Home client component is imported in that file. */
+function assertHomeClientQaMarkerImports(relativePath: string): void {
+  const source = readSource(relativePath)
+  const markerPattern = /GROWTH_[A-Z0-9_]*_QA_MARKER/g
+  const importBlocks = source.match(/^import[\s\S]*?from\s+["'][^"']+["']\s*\n/gm) ?? []
+  const importSource = importBlocks.join("\n")
+  const body = source.replace(/^import[\s\S]*?from\s+["'][^"']+["']\s*\n/gm, "")
+
+  const used = new Set<string>()
+  for (const match of body.matchAll(markerPattern)) {
+    used.add(match[0])
+  }
+
+  for (const marker of used) {
+    assert.match(
+      importSource,
+      new RegExp(`\\b${marker}\\b`),
+      `${relativePath} uses ${marker} but does not import it`,
+    )
+  }
+}
+
 function baseAiOsUx(overrides: Partial<GrowthHomeAiOsUxViewModel> = {}): GrowthHomeAiOsUxViewModel {
   return {
     qaMarker: "growth-ge-aios-ux-1a-ai-os-home-experience-v1",
@@ -256,6 +278,25 @@ function main(): void {
     "components/growth/workspace/executive-briefing/growth-home-ai-os-waiting-on-you-section.tsx",
   )
   assert.match(waitingUi, /enrichGrowthHomeWaitingOnYouItems/)
+  assert.match(waitingUi, /GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER/)
+  assert.doesNotMatch(waitingUi, /GROWTH_HOME_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER/)
+  assert.match(
+    waitingUi,
+    /data-home-experience-2b=\{GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER\}/,
+  )
+
+  const homeClientComponents = [
+    "components/growth/workspace/executive-briefing/growth-home-ai-os-waiting-on-you-section.tsx",
+    "components/growth/workspace/executive-briefing/growth-home-ava-hero-section.tsx",
+    "components/growth/workspace/executive-briefing/growth-home-ava-work-section.tsx",
+    "components/growth/workspace/executive-briefing/growth-home-ava-specialist-team-section.tsx",
+    "components/growth/workspace/executive-briefing/growth-home-ava-operating-rhythm-section.tsx",
+    "components/growth/workspace/executive-briefing/growth-home-ava-memory-section.tsx",
+    "components/growth/workspace/executive-briefing/growth-home-executive-briefing-dashboard.tsx",
+  ]
+  for (const componentPath of homeClientComponents) {
+    assertHomeClientQaMarkerImports(componentPath)
+  }
 
   const presenter = readSource("lib/growth/home/growth-home-runtime-presenter.ts")
   assert.match(presenter, /items \?\? \[\]/)

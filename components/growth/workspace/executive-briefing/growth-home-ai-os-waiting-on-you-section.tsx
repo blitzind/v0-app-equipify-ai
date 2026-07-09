@@ -9,7 +9,7 @@ import {
 } from "@/lib/growth/home/growth-home-runtime-presenter"
 import type { GrowthHomeAiOsUxViewModel } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 import {
-  GROWTH_HOME_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER,
+  GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-experience-2b"
 import { GROWTH_HOME_NOTHING_REQUIRES_APPROVAL } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-2a"
 import { Button } from "@/components/ui/button"
