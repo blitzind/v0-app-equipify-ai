@@ -60,7 +60,7 @@ export function GrowthHomeAvaResearchQueuePanel({ researchLoopSummary, onComplet
       <div className="flex items-start gap-3">
         <Sparkles className="mt-0.5 size-5 text-indigo-600" aria-hidden />
         <div className="min-w-0 flex-1 space-y-1">
-          <h2 className="text-lg font-semibold tracking-tight">Ava Research Loop</h2>
+          <h2 className="text-lg font-semibold tracking-tight">Research loop</h2>
           <p className="text-sm text-muted-foreground">{GROWTH_AVA_RESEARCH_QUEUE_SAFETY_DISCLAIMER}</p>
         </div>
       </div>

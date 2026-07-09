@@ -29,7 +29,9 @@ export { handoffBetweenSpecialists }
 export function runSpecialistOrchestrator(input: RunSpecialistOrchestratorInput): AvaSpecialistOrchestratorResult {
   const routed_work_items = assignSpecialistsToWorkItems(input.workItems)
   const assignments = buildSpecialistContributions(routed_work_items)
-  const team_status = buildSpecialistTeamStatus(routed_work_items)
+  const team_status = buildSpecialistTeamStatus(routed_work_items, {
+    workManagerResult: input.workManagerResult ?? null,
+  })
 
   return {
     qaMarker: GROWTH_SPECIALIST_ORCHESTRATOR_QA_MARKER,

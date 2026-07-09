@@ -16,6 +16,7 @@ import {
   tickGrowthObjectiveRuntime,
 } from "@/lib/growth/objectives/growth-objective-runtime-service"
 import { runGrowthMissionRuntimeOrchestration } from "@/lib/growth/mission-center/growth-mission-runtime-orchestrator"
+import { isMissionRuntimeOrchestrationReady } from "@/lib/growth/mission-center/growth-mission-runtime-orchestration-readiness"
 import { tickAutonomousSalesLoopForScheduler } from "@/lib/growth/specialists/execution/run-autonomous-sales-loop"
 import { buildObjectiveSignalSnapshot } from "@/lib/growth/objectives/growth-objective-signal-handler"
 import {
@@ -185,10 +186,7 @@ export async function runGrowthObjectiveRuntimeScheduler(
         await autoContinueGrowthObjectiveRuntime(admin, objective.organizationId, objective.id, input)
       }
 
-      const launchComplete =
-        objective.runtime?.stageStates.launch?.state === "completed" ||
-        ["monitor", "adapt", "book"].includes(objective.runtime?.currentStageId ?? "")
-      if (launchComplete) {
+      if (isMissionRuntimeOrchestrationReady(objective)) {
         await runGrowthMissionRuntimeOrchestration(admin, objective.organizationId, objective.id, input)
         missionOrchestrationsAttempted += 1
       }

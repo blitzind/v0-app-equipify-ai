@@ -88,7 +88,7 @@ assert.equal(switcher.includes("Equipify Scale"), false, "switcher must not hard
 assert.equal(switcher.includes("Growth Engine"), false, "switcher must not reference Growth Engine")
 console.log("  ✓ workspace switcher: Plan | AI OS")
 
-assert.equal(GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER, "growth-workspace-shell-nav-v9")
+assert.equal(GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER, "growth-workspace-shell-nav-v11")
 const homeNav = GROWTH_SHELL_NAV_GROUPS.flatMap((g) => g.items).find((i) => i.id === "dashboard")
 assert.equal(homeNav?.label, "Home")
 const advancedGroup = GROWTH_SHELL_NAV_GROUPS.find((g) => g.id === "advanced")

@@ -17,7 +17,7 @@ import {
   missionLifecycleActivityLabel,
   type GrowthMissionRuntimeDatamoonBinding,
 } from "@/lib/growth/mission-center/growth-mission-runtime-types"
-import { bindMissionDatamoonImportRequest } from "@/lib/growth/mission-center/growth-mission-runtime-orchestrator"
+import { bindMissionDatamoonImportRequest, runGrowthMissionRuntimeOrchestration } from "@/lib/growth/mission-center/growth-mission-runtime-orchestrator"
 import { getGrowthObjective } from "@/lib/growth/objectives/growth-objective-repository"
 
 export type { MissionFindLeadsBindingSummary } from "@/lib/growth/mission-center/growth-mission-find-leads-binding-display"
@@ -138,6 +138,16 @@ export async function bindFindLeadsSearchToMission(
     keep_monitoring: keepMonitoring,
     last_run_id: input.lastRunId ?? null,
   })
+
+  if (
+    updated.status === "active" &&
+    updated.runtime?.running &&
+    !updated.emergencyStopActive
+  ) {
+    await runGrowthMissionRuntimeOrchestration(admin, input.organizationId, input.missionId).catch(
+      () => undefined,
+    )
+  }
 
   return { ok: true, binding }
 }

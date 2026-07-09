@@ -14,7 +14,7 @@ export function GrowthHomeTrustSection({ items }: Props) {
     <section data-qa-section="home-trust-explanations" className="space-y-4">
       <div>
         <h2 className="text-xl font-semibold tracking-tight">{AI_CONTINUITY_TRUST_TITLE}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">When confidence shifts, Ava explains the evidence.</p>
+        <p className="mt-1 text-sm text-muted-foreground">When confidence shifts, I explain the evidence.</p>
       </div>
       <div className="space-y-3">
         {items.map((item) => (

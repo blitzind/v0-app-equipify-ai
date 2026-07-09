@@ -2,6 +2,7 @@
 
 import { getSpecialistById } from "@/lib/growth/specialists/registry/specialist-registry"
 import { routeWorkItem } from "@/lib/growth/specialists/router/route-work-item"
+import { buildLivingSpecialistIdleLabel } from "@/lib/growth/home/growth-home-living-experience-18e"
 import { buildStubSpecialistStatusLabel } from "@/lib/growth/home/growth-home-runtime-presenter"
 import type { AvaWorkItem, AvaWorkManagerResult } from "@/lib/growth/work-manager/types"
 
@@ -39,7 +40,10 @@ export function buildSpecialistContributions(items: AvaWorkItemWithSpecialist[])
   })
 }
 
-export function buildSpecialistTeamStatus(items: AvaWorkItemWithSpecialist[]): AvaSpecialistTeamStatus[] {
+export function buildSpecialistTeamStatus(
+  items: AvaWorkItemWithSpecialist[],
+  options?: { workManagerResult?: AvaWorkManagerResult | null },
+): AvaSpecialistTeamStatus[] {
   const definitions = [
     getSpecialistById("sales"),
     getSpecialistById("marketing"),
@@ -65,6 +69,13 @@ export function buildSpecialistTeamStatus(items: AvaWorkItemWithSpecialist[]): A
         status_label = "Researching companies"
       } else if (specialist.definition.id === "sales" && active.some((row) => row.type === "outreach")) {
         status_label = "Preparing outreach"
+      } else if (
+        specialist.definition.id === "sales" &&
+        active.some((row) => row.type === "approval" || row.status === "blocked")
+      ) {
+        status_label = "Waiting for your approval"
+      } else if (specialist.definition.id === "sales" && active.some((row) => row.type === "reply")) {
+        status_label = "Following up on replies"
       } else if (specialist.definition.id === "sales" && active.length > 0) {
         status_label = "Working sales pipeline"
       } else if (specialist.definition.id === "customer_success" && active.length > 0) {
@@ -75,6 +86,22 @@ export function buildSpecialistTeamStatus(items: AvaWorkItemWithSpecialist[]): A
         status_label = "Reviewing invoices and payments"
       } else if (specialist.definition.id === "service" && active.length > 0) {
         status_label = "Reviewing schedules and work orders"
+      } else if (active.length === 0) {
+        const approvalWaiting = Boolean(
+          options?.workManagerResult?.operator_queue.some((row) => row.type === "approval"),
+        )
+        const hasResearchWork = items.some(
+          (row) =>
+            row.assigned_specialist === specialist.definition.id &&
+            (row.type === "research" || row.status === "ready" || row.status === "planned"),
+        )
+        status_label = buildLivingSpecialistIdleLabel({
+          specialistId: specialist.definition.id,
+          activeCount: 0,
+          isStub: false,
+          hasApprovalWaiting: specialist.definition.id === "sales" && approvalWaiting,
+          hasResearchWork: specialist.definition.id === "sales" && hasResearchWork,
+        })
       }
     }
 

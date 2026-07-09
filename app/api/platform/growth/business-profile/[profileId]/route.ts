@@ -7,6 +7,7 @@ import {
   type GrowthBusinessProfileApiResponse,
 } from "@/lib/growth/business-profile/business-profile-api-contract"
 import { updateBusinessProfileDraftForOrganization } from "@/lib/growth/business-profile/business-profile-service"
+import { BusinessStrategyContentSchema } from "@/lib/growth/training/growth-business-strategy-schema"
 import { GROWTH_HOME_NO_STORE_CACHE_CONTROL } from "@/lib/growth/home/growth-home-workspace-api-contract"
 
 export const runtime = "nodejs"
@@ -46,6 +47,7 @@ const ProfileContentSchema: z.ZodType<BusinessProfileDraftContent> = z.object({
     assumptions: z.array(z.string()),
     missingInformation: z.array(z.string()),
   }),
+  businessStrategy: BusinessStrategyContentSchema.optional(),
   draftSource: z.enum(["deterministic", "ai_assisted", "ai_fallback"]).optional(),
   websiteContextSummary: z.string().nullable().optional(),
 })

@@ -53,7 +53,7 @@ export type BuildAvaDailyBriefingInput = {
   hour: number
   workspaceSummary: Pick<
     GrowthHomeWorkspaceSummaryPayload,
-    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard" | "leadPool"
+    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard" | "leadPool" | "missionDiscovery"
   >
   accomplishments: GrowthHomeAccomplishmentGroup[]
   waitingOnYou: GrowthHomeWaitingOnYouItem[]
@@ -150,7 +150,11 @@ export function buildAvaDailyBriefing(input: BuildAvaDailyBriefingInput): AvaDai
     salesDailySummary: input.salesOutcomes?.dailySummary ?? null,
     workResult,
     operatingRhythm,
+    specialistOrchestrator: workResult.specialist_orchestrator_result ?? null,
     hour: input.hour,
+    repliesToday: context.metrics.repliesToday,
+    setupIncomplete: context.businessUnderstanding.profileIncomplete,
+    missionDiscovery: input.workspaceSummary.missionDiscovery ?? null,
   })
   const story_blocks = appendScaleStoryBlock(
     dailyActivityLinesToStoryBlocks(daily_activity_narrative),

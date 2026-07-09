@@ -205,7 +205,7 @@ function main(): void {
     workResult,
     salesDailySummary: dailySummary,
   })
-  assert.ok(waitingLines.some((line) => /waiting for your approval/i.test(line)))
+  assert.ok(waitingLines.some((line) => /need your approval/i.test(line)))
 
   const operatingRhythm = runOperatingRhythm({
     hour: 20,

@@ -5,11 +5,15 @@
  * Config, control-plane, reporting, and admin routes stay in Platform Admin / Cmd+K.
  */
 
-export const GROWTH_WORKSPACE_SIDEBAR_IA_QA_MARKER = "growth-workspace-sidebar-ia-v4" as const
+export const GROWTH_WORKSPACE_SIDEBAR_IA_QA_MARKER = "growth-workspace-sidebar-ia-v7" as const
 
 /** Operator-facing nav ids visible in the Growth workspace sidebar (GE-v1-2 daily workflow). */
 export const GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS = [
   "dashboard",
+  "operations",
+  "training",
+  "about-ai",
+  "approvals",
   "leads",
   "audiences",
   "personalized-videos",
@@ -19,7 +23,6 @@ export const GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS = [
   "calls",
   "meetings",
   "settings",
-  "runbook",
   "conversations",
   "opportunities",
   "relationships",
@@ -30,7 +33,6 @@ export const GROWTH_WORKSPACE_SIDEBAR_OPERATOR_NAV_IDS = [
 
 /** Nav ids removed from workspace sidebar — routes remain in registry, Cmd+K, and direct URLs. */
 export const GROWTH_WORKSPACE_SIDEBAR_HIDDEN_NAV_IDS = [
-  "approvals",
   "runtime",
   "analytics",
   "reports",

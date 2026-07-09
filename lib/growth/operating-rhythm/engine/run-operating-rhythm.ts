@@ -10,7 +10,21 @@ export function startMorningPlanning(): { started: false; reason: "planning_only
   return { started: false, reason: "planning_only" }
 }
 
-export function continueCurrentPhase(): { continued: false; reason: "planning_only" } {
+export type ContinueCurrentPhaseResult =
+  | { continued: false; reason: "planning_only" | "autonomy_not_enabled" | "no_executable_work" }
+  | {
+      continued: true
+      reason: "sales_loop_executed"
+      qa_marker?: string
+      iterations: number
+      outcomes_completed: number
+    }
+
+/** GE-AIOS-18A — Server loop supplies loopResult; client remains planning-only. */
+export function continueCurrentPhase(input?: {
+  loopResult?: ContinueCurrentPhaseResult | null
+}): ContinueCurrentPhaseResult {
+  if (input?.loopResult?.continued) return input.loopResult
   return { continued: false, reason: "planning_only" }
 }
 

@@ -12,7 +12,7 @@ import type { DecisionEngineResult } from "@/lib/growth/decision-engine/types"
 export type BuildWorkContextInput = {
   workspaceSummary: Pick<
     GrowthHomeWorkspaceSummaryPayload,
-    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard" | "leadPool"
+    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard" | "leadPool" | "missionDiscovery"
   >
   waitingOnYou: GrowthHomeWaitingOnYouItem[]
   dailyWorkQueue: GrowthHomeDailyWorkQueueItem[]

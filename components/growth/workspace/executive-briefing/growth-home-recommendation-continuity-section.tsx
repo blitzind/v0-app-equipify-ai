@@ -14,7 +14,7 @@ export function GrowthHomeRecommendationContinuitySection({ items }: Props) {
     <section data-qa-section="home-recommendation-continuity" className="space-y-4">
       <div>
         <h2 className="text-xl font-semibold tracking-tight">{AI_CONTINUITY_RECOMMENDATION_CONTINUITY_TITLE}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">When recommendations shift, Ava explains why with evidence.</p>
+        <p className="mt-1 text-sm text-muted-foreground">When recommendations shift, I explain why with evidence.</p>
       </div>
       <div className="space-y-4">
         {items.map((item) => (

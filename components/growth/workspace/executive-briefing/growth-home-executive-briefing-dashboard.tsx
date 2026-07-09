@@ -39,6 +39,7 @@ import {
   GROWTH_HOME_SETUP_DIAGNOSTICS_TITLE,
   GROWTH_HOME_SURFACE_CONSOLIDATION_17F_QA_MARKER,
 } from "@/lib/growth/home/growth-home-surface-consolidation-17f"
+import { GROWTH_HOME_CLEANUP_19C_2G_QA_MARKER } from "@/lib/growth/home/growth-home-cleanup-19c-2g"
 import {
   normalizeGrowthHomeAvaHeroViewModel,
   normalizeGrowthHomeAiOsUxViewModel,
@@ -50,12 +51,14 @@ import { GrowthHomeAvaHeroSection } from "@/components/growth/workspace/executiv
 import { GrowthHomeAvaWorkSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-work-section"
 import { GrowthHomeAvaOperatingRhythmSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-operating-rhythm-section"
 import { GrowthHomeAvaMemorySection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-memory-section"
-import { GrowthHomeAvaSpecialistTeamSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-specialist-team-section"
+import { GrowthHomeBriefingCrossLinks } from "@/components/growth/workspace/executive-briefing/growth-home-briefing-cross-links"
+import { GrowthHomeTrainingSetupCta } from "@/components/growth/workspace/executive-briefing/growth-home-training-setup-cta"
+import { GrowthHomeLaunchCompleteBanner } from "@/components/growth/workspace/executive-briefing/growth-home-launch-complete-banner"
+import { GrowthHomeFirstWeekGuide } from "@/components/growth/workspace/executive-briefing/growth-home-first-week-guide"
 import { GrowthHomeCollapsibleSection } from "@/components/growth/workspace/executive-briefing/growth-home-collapsible-section"
 import { GrowthHomeExecutiveSnapshotSection } from "@/components/growth/workspace/executive-briefing/growth-home-executive-snapshot-section"
 import { GrowthHomeAiOsWaitingOnYouSection } from "@/components/growth/workspace/executive-briefing/growth-home-ai-os-waiting-on-you-section"
 import { GrowthHomeStartAvaSetupSection } from "@/components/growth/workspace/executive-briefing/growth-home-start-ava-setup-section"
-import { GrowthHomeGrowthStrategySection } from "@/components/growth/workspace/executive-briefing/growth-home-growth-strategy-section"
 import { GrowthHomeAvaLiveStatusSection } from "@/components/growth/workspace/executive-briefing/growth-home-ava-live-status-section"
 import { GrowthHomeMissionCenterSection } from "@/components/growth/workspace/executive-briefing/growth-home-mission-center-section"
 import { GrowthHomeMarketingMissionsSection } from "@/components/growth/workspace/executive-briefing/growth-home-marketing-missions-section"
@@ -78,6 +81,7 @@ import { GrowthHomeMissionHealthSection } from "@/components/growth/workspace/ex
 import { GrowthHomeRevenueForecastSection } from "@/components/growth/workspace/executive-briefing/growth-home-revenue-forecast-section"
 import { GrowthHomeBusinessSnapshotSection } from "@/components/growth/workspace/executive-briefing/growth-home-business-snapshot-section"
 import { GrowthHomeAvaResearchQueuePanel } from "@/components/growth/workspace/executive-briefing/growth-home-ava-research-queue-panel"
+import { useAdmin } from "@/lib/admin-store"
 
 function metricValueFromDashboard(
   dashboard: GrowthWorkspaceDashboardViewModel,
@@ -101,12 +105,13 @@ function buildEngineWorkspaceSummary(
     dashboard: payload.dashboard,
     relationshipSnapshots: payload.relationshipSnapshots,
     leadPool: payload.leadPool,
+    missionDiscovery: payload.missionDiscovery ?? null,
   }
 }
 
 type BuildAvaHomeHeroEngineSummary = Pick<
   GrowthHomeWorkspaceSummaryPayload,
-  "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard" | "relationshipSnapshots" | "leadPool"
+  "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard" | "relationshipSnapshots" | "leadPool" | "missionDiscovery"
 >
 
 type Props = {
@@ -129,11 +134,20 @@ export function GrowthHomeExecutiveBriefingDashboard({
   onResearchLoopCompleted,
 }: Props) {
   const { teammate } = useAiTeammateIdentity()
+  const { sessionIdentity } = useAdmin()
   const { setStatus } = useAiEmployeeStatus()
+  const operatorDisplayName = sessionIdentity?.displayName ?? null
 
   const briefing = useMemo(
-    () => synthesizeGrowthHomeExecutiveBriefing({ dashboard, recentViews, continueItems, teammate }),
-    [dashboard, recentViews, continueItems, teammate],
+    () =>
+      synthesizeGrowthHomeExecutiveBriefing({
+        dashboard,
+        recentViews,
+        continueItems,
+        teammate,
+        operatorDisplayName,
+      }),
+    [dashboard, recentViews, continueItems, teammate, operatorDisplayName],
   )
 
   useEffect(() => {
@@ -180,6 +194,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
           generatedAt: workspaceSummary?.generatedAt ?? dashboard.generatedAt,
           salesOutcomes: workspaceSummary?.salesOutcomes ?? null,
           organizationalKnowledge: workspaceSummary?.organizationalKnowledge?.store.items ?? null,
+          operatorDisplayName,
         }),
       ),
     [
@@ -195,6 +210,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
       persistedMemoryStore,
       workspaceSummary?.generatedAt,
       workspaceSummary?.organizationalKnowledge,
+      operatorDisplayName,
     ],
   )
 
@@ -250,6 +266,12 @@ export function GrowthHomeExecutiveBriefingDashboard({
     briefing.renewalsMonitoring.length > 0 ||
     briefing.customerWins.length > 0
 
+  const setupIncomplete = avaHero.dailyActivityNarrative?.focus === "setup"
+  const setupMessage =
+    avaHero.dailyActivityNarrative?.working_next[0] ??
+    avaHero.dailyActivityNarrative?.waiting_on_you[0] ??
+    null
+
   return (
     <div
       className="space-y-6"
@@ -258,6 +280,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
       data-qa-marker-briefing-2a={GROWTH_HOME_EXECUTIVE_BRIEFING_2A_QA_MARKER}
       data-qa-marker-narrative-10a={GROWTH_AVA_NARRATIVE_ENGINE_QA_MARKER}
       data-qa-marker-17f={GROWTH_HOME_SURFACE_CONSOLIDATION_17F_QA_MARKER}
+      data-qa-marker-19c-2g={GROWTH_HOME_CLEANUP_19C_2G_QA_MARKER}
       data-growth-action-first-order="actions-before-metrics"
       data-qa-marker-action-first={GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER}
     >
@@ -271,18 +294,32 @@ export function GrowthHomeExecutiveBriefingDashboard({
           relationshipSnapshotCount={relationshipSnapshotCount}
         />
 
-        <GrowthHomeStartAvaSetupSection dashboard={dashboard} placement="primary" />
+        <GrowthHomeTrainingSetupCta setupIncomplete={setupIncomplete} setupMessage={setupMessage} />
+
+        <GrowthHomeLaunchCompleteBanner setupIncomplete={setupIncomplete} />
+
+        <GrowthHomeBriefingCrossLinks
+          pendingApprovals={workspaceSummary?.operatorTasks.pendingApprovals ?? 0}
+        />
+
+        <GrowthHomeFirstWeekGuide
+          setupIncomplete={setupIncomplete}
+          waitingOnYou={aiOsUx.waitingOnYou}
+          workManager={avaHero.workManager ?? null}
+          pendingApprovals={workspaceSummary?.operatorTasks.pendingApprovals ?? 0}
+          emailsSentToday={workspaceSummary?.kpis.emailsSentToday ?? 0}
+          outreachPreparedToday={workspaceSummary?.salesOutcomes?.outreach_prepared ?? 0}
+          organizationalKnowledgeCount={
+            workspaceSummary?.organizationalKnowledge?.store.items.filter((row) => row.active && !row.superseded_by)
+              .length ?? 0
+          }
+          learnedTodayCount={avaHero.dailyActivityNarrative?.learned_today.length ?? 0}
+        />
 
         <GrowthHomeAvaWorkSection
           workManager={avaHero.workManager ?? null}
           leadPool={workspaceSummary?.leadPool ?? null}
         />
-
-        <GrowthHomeAvaOperatingRhythmSection operatingRhythm={avaHero.operatingRhythm ?? null} />
-
-        <GrowthHomeAvaMemorySection memorySummary={avaHero.memorySummary ?? null} />
-
-        <GrowthHomeAvaSpecialistTeamSection specialistOrchestrator={avaHero.specialistOrchestrator ?? null} />
 
         <GrowthHomeAiOsWaitingOnYouSection
           aiOsUx={aiOsUx}
@@ -290,7 +327,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
           waitingCompanyByLeadId={waitingCompanyByLeadId}
         />
 
-        <GrowthHomeExecutiveSnapshotSection kpis={executiveSnapshot} />
+        <GrowthHomeAvaMemorySection memorySummary={avaHero.memorySummary ?? null} />
       </div>
 
       <GrowthHomeCollapsibleSection
@@ -299,6 +336,10 @@ export function GrowthHomeExecutiveBriefingDashboard({
         subtitle={GROWTH_HOME_ADVANCED_OPERATIONS_SUBTITLE}
       >
         <div data-qa-section="home-advanced-operations" className="space-y-5">
+          <GrowthHomeExecutiveSnapshotSection kpis={executiveSnapshot} />
+
+          <GrowthHomeAvaOperatingRhythmSection operatingRhythm={avaHero.operatingRhythm ?? null} />
+
           <GrowthHomeAvaResearchQueuePanel
             researchLoopSummary={avaConsole?.researchLoopSummary ?? null}
             onCompleted={onResearchLoopCompleted}
@@ -306,11 +347,10 @@ export function GrowthHomeExecutiveBriefingDashboard({
 
           <GrowthHomeCollapsibleSection
             sectionId="research-growth-strategy"
-            title="Research & Growth Strategy"
-            subtitle="Missions I'm running and the outreach I'm preparing."
+            title="Missions & outreach"
+            subtitle="Active missions and campaign work I'm running."
           >
             <GrowthHomeMissionCenterSection dashboard={dashboard} />
-            <GrowthHomeGrowthStrategySection dailyWorkQueue={aiOsUx.dailyWorkQueue} />
             <GrowthHomeMarketingMissionsSection missions={briefing.marketingMissions} />
           </GrowthHomeCollapsibleSection>
 

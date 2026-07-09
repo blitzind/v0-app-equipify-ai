@@ -138,7 +138,7 @@ export function synthesizeGrowthHomeLaunchMissionSetup(
         id: "meet_ava",
         label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.meet_ava,
         status: "complete",
-        summary: "You've met Ava and set her identity.",
+        summary: "We've met — I know who I'm working for.",
         blocksLaunch: false,
         actionKind: "none",
       }
@@ -146,7 +146,7 @@ export function synthesizeGrowthHomeLaunchMissionSetup(
         id: "meet_ava",
         label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.meet_ava,
         status: "pending",
-        summary: "Introduce yourself and name your AI teammate.",
+        summary: "I need to meet you and learn how you'd like me to introduce myself.",
         blocksLaunch: true,
         actionKind: "open_ai_teammate",
         href: "/growth/settings/ai-teammate",
@@ -157,7 +157,7 @@ export function synthesizeGrowthHomeLaunchMissionSetup(
         id: "growth_profile",
         label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.growth_profile,
         status: "complete",
-        summary: "Growth Profile approved — ICP, products, and competitors are set.",
+        summary: "I know your ideal customer profile, products, and competitors.",
         blocksLaunch: false,
         actionKind: "none",
       }
@@ -166,8 +166,8 @@ export function synthesizeGrowthHomeLaunchMissionSetup(
         label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.growth_profile,
         status: input.hasBusinessProfileDraft ? "pending" : "blocked",
         summary: input.hasBusinessProfileDraft
-          ? "Review and approve your Growth Profile."
-          : "Draft and approve your Growth Profile and ICP.",
+          ? "I need you to approve your Growth Profile before I can research the right companies."
+          : "I need your Growth Profile and ideal customer profile before I can find companies to research.",
         blocksLaunch: true,
         actionKind: "scroll_profile",
       }
@@ -187,10 +187,10 @@ export function synthesizeGrowthHomeLaunchMissionSetup(
           label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.lead_source,
           status: !input.businessProfileApproved ? "blocked" : !hasMission ? "pending" : "pending",
           summary: !input.businessProfileApproved
-            ? "Approve Growth Profile before creating a mission."
+            ? "I need your Growth Profile approved before I can set up a lead source."
             : !hasMission
-              ? `Create the "${GROWTH_AVA_LAUNCH_MISSION_DEFAULT_TITLE}" mission.`
-              : "Bind a Find Leads search to your mission.",
+              ? `I need the "${GROWTH_AVA_LAUNCH_MISSION_DEFAULT_TITLE}" mission before I can find companies.`
+              : "I need a lead search connected before I can begin researching companies.",
           blocksLaunch: true,
           actionKind: !input.businessProfileApproved
             ? "scroll_profile"
@@ -206,7 +206,7 @@ export function synthesizeGrowthHomeLaunchMissionSetup(
         status: "blocked",
         summary:
           input.mailboxSummary?.trim() ||
-          `${input.expiredMailboxes} mailbox connection(s) need reconnection before launch.`,
+          `I need ${input.expiredMailboxes} mailbox ${input.expiredMailboxes === 1 ? "connection" : "connections"} reconnected before I can prepare outreach.`,
         blocksLaunch: true,
         actionKind: hasConnectedMailbox ? "scroll_mailbox" : "open_mailbox_wizard",
         href: hasConnectedMailbox
@@ -218,7 +218,7 @@ export function synthesizeGrowthHomeLaunchMissionSetup(
           id: "mailbox_readiness",
           label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.mailbox_readiness,
           status: "pending",
-          summary: "Connect a mailbox so Ava can prepare outreach under your approval guardrails.",
+          summary: "I need an email account before I can prepare outreach.",
           blocksLaunch: true,
           actionKind: "open_mailbox_wizard",
           href: "/growth/settings/communications/connected-mailboxes/onboard",
@@ -230,7 +230,7 @@ export function synthesizeGrowthHomeLaunchMissionSetup(
             status: "warning",
             summary:
               input.mailboxSummary?.trim() ||
-              `${input.mailboxWarnings} mailbox warning(s) — review before outbound.`,
+              `I found ${input.mailboxWarnings} mailbox ${input.mailboxWarnings === 1 ? "issue" : "issues"} — please review before I send outreach.`,
             blocksLaunch: false,
             actionKind: "scroll_mailbox",
           }
@@ -238,7 +238,7 @@ export function synthesizeGrowthHomeLaunchMissionSetup(
             id: "mailbox_readiness",
             label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.mailbox_readiness,
             status: "complete",
-            summary: "Mailboxes look ready.",
+            summary: "My email account is ready for outreach.",
             blocksLaunch: false,
             actionKind: "none",
           }
@@ -248,7 +248,7 @@ export function synthesizeGrowthHomeLaunchMissionSetup(
         id: "approval_guardrails",
         label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.approval_guardrails,
         status: "complete",
-        summary: "Outbound requires your approval — autonomy guardrails are configured.",
+        summary: "I won't send outreach without your approval — my guardrails are set.",
         blocksLaunch: false,
         actionKind: "none",
       }
@@ -256,7 +256,7 @@ export function synthesizeGrowthHomeLaunchMissionSetup(
         id: "approval_guardrails",
         label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.approval_guardrails,
         status: "pending",
-        summary: "Review autonomy settings so Ava cannot send outbound without approval.",
+        summary: "I need your approval on how I should work before I can run autonomously.",
         blocksLaunch: true,
         actionKind: "open_autonomy_settings",
         href: "/growth/settings/autonomy",
@@ -269,10 +269,10 @@ export function synthesizeGrowthHomeLaunchMissionSetup(
         status: "complete",
         summary:
           input.calendarConnected && (input.bookingPagesCount ?? 0) > 0
-            ? "Calendar and booking pages are ready."
+            ? "I can offer meeting times when prospects are ready."
             : input.calendarConnected
-              ? "Calendar connected."
-              : "Booking page published.",
+              ? "My calendar is connected for scheduling."
+              : "I have a booking page ready for meeting requests.",
         blocksLaunch: false,
         actionKind: "none",
       }
@@ -280,7 +280,7 @@ export function synthesizeGrowthHomeLaunchMissionSetup(
         id: "calendar_booking",
         label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.calendar_booking,
         status: "warning",
-        summary: "Connect calendar or publish a booking page for meeting CTAs.",
+        summary: "Connect a calendar or publish a booking page so I can offer meeting times in outreach.",
         blocksLaunch: false,
         actionKind: input.calendarConnected ? "open_booking_settings" : "open_calendar_settings",
         href: input.calendarConnected ? "/growth/settings/booking" : "/growth/settings/calendar",
@@ -300,7 +300,7 @@ export function synthesizeGrowthHomeLaunchMissionSetup(
         id: "launch_ava",
         label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.launch_ava,
         status: "complete",
-        summary: "Ava is ready to work continuously under your guardrails.",
+        summary: "I'm ready to research companies and prepare outreach for your review.",
         blocksLaunch: false,
         actionKind: "none",
       }
@@ -308,7 +308,7 @@ export function synthesizeGrowthHomeLaunchMissionSetup(
         id: "launch_ava",
         label: GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS.launch_ava,
         status: "blocked",
-        summary: "Complete the steps above to launch Ava.",
+        summary: "Complete the steps above and I'll start working for you.",
         blocksLaunch: false,
         actionKind: "none",
       }

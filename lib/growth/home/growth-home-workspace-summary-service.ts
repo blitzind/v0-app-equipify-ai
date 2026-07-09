@@ -5,7 +5,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { fetchGrowthHomeSalesOutcomes } from "@/lib/growth/home/growth-home-sales-outcomes-loader"
+import { buildGrowthHomeSalesOutcomes } from "@/lib/growth/home/growth-home-sales-outcomes-loader"
 import { buildGrowthHomeOrganizationMemory } from "@/lib/growth/memory/storage/organization-memory-repository"
 import { buildGrowthHomeOrganizationalKnowledge } from "@/lib/growth/memory/knowledge/organization-knowledge-repository"
 import { GROWTH_ORGANIZATIONAL_KNOWLEDGE_QA_MARKER } from "@/lib/growth/memory/knowledge/organization-knowledge-types"
@@ -54,6 +54,7 @@ import type {
 import { GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER } from "@/lib/growth/home/growth-home-workspace-summary-types"
 import { fetchLatestAvaResearchLoopSummary } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-service"
 import { enrichRelationshipLeadSnapshotsBatch } from "@/lib/growth/relationship/enrich-relationship-lead-snapshots-batch"
+import { loadGrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-loader"
 
 import { GROWTH_HOME_LEAD_POOL_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 
@@ -379,6 +380,13 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     degraded: leadPoolPage.leadPool.degraded || relationshipSnapshots.meta.degraded,
   }
 
+  const missionDiscovery = organizationId
+    ? await loadGrowthHomeMissionDiscoverySnapshot(input.admin, {
+        organizationId,
+        leadPool,
+      }).catch(() => null)
+    : null
+
   const optimization: GrowthHomeWorkspaceSummaryOptimization = {
     listGrowthLeadsCalls: 1,
     duplicateLeadListEliminated: 1,
@@ -407,6 +415,7 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     optimization,
     relationshipSnapshots,
     leadPool,
+    missionDiscovery,
   }
 }
 

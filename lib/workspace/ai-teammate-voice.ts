@@ -85,3 +85,21 @@ export function teammateImprovementsSubtitle(teammate: AiTeammatePresentation): 
 export function defaultTeammatePresentation(): AiTeammatePresentation {
   return resolveAiTeammatePresentation(AI_TEAMMATE_DEFAULT_NAME)
 }
+
+/** GE-AIOS-19C-2F — first-person introduction for About Your AI (dynamic name). */
+export function buildTeammateAboutIntroduction(teammate: AiTeammatePresentation): string {
+  return `Hi, I'm ${teammate.name}.\n\nI help your business find opportunities, prepare outreach, keep your pipeline organized, and continuously learn how your company operates.`
+}
+
+/** GE-AIOS-19C-2A — first-person possessive for customer surfaces. */
+export function teammatePossessive(teammate: AiTeammatePresentation): string {
+  return teammate.subjectPronoun === "I" ? "my" : `${teammate.name}'s`
+}
+
+export function teammateHomePageDescription(teammate: AiTeammatePresentation): string {
+  return `${teammatePossessive(teammate)} daily briefing — what I'm working on, what I've learned, and what I need from you.`
+}
+
+export function teammateOperationsPageDescription(teammate: AiTeammatePresentation): string {
+  return `What I'm doing, why I chose it, and what comes next.`
+}

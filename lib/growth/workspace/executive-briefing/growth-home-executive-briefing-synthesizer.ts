@@ -142,6 +142,7 @@ export type GrowthHomeExecutiveBriefingInput = {
   continueItems?: GrowthWorkspaceContinueItem[]
   revenueDirectorSnapshot?: GrowthRevenueDirectorCommandCenterSnapshot
   teammate?: AiTeammatePresentation
+  operatorDisplayName?: string | null
 }
 
 function metricValue(dashboard: GrowthWorkspaceDashboardViewModel, sectionId: string, label: string): number {
@@ -244,10 +245,15 @@ function buildExecutiveBrief(
   dashboard: GrowthWorkspaceDashboardViewModel,
   teammate: AiTeammatePresentation,
   exceptionCount: number,
+  operatorDisplayName?: string | null,
 ): GrowthHomeExecutiveBrief {
   const briefing = dashboard.briefing
   const hour = new Date(dashboard.generatedAt).getHours()
-  const operatorName = dashboard.welcome.operatorName ?? briefing?.operator_name ?? null
+  const operatorName =
+    dashboard.welcome.operatorName ??
+    briefing?.operator_name ??
+    operatorDisplayName?.trim().split(/\s+/)[0] ??
+    null
   const greetingBase = briefing?.greeting ?? greetingForHour(hour)
   const greeting =
     operatorName && !greetingBase.includes(operatorName)
@@ -1129,7 +1135,12 @@ export function synthesizeGrowthHomeExecutiveBriefing(
   const revenueForecast = buildRevenueForecast(revenueMissionInput, activeRevenueMissions)
 
   const exceptions = buildExceptions(dashboard)
-  const executiveBrief = buildExecutiveBrief(dashboard, teammate, exceptions.length)
+  const executiveBrief = buildExecutiveBrief(
+    dashboard,
+    teammate,
+    exceptions.length,
+    input.operatorDisplayName,
+  )
   const approvalSummary = buildApprovalSummary(dashboard)
   const aiActivity = buildAiActivity(dashboard, teammate)
   const employeeStatus = deriveEmployeeStatus(dashboard)

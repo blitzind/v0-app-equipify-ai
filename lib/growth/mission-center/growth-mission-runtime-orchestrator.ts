@@ -36,6 +36,7 @@ import {
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-service"
 import type { GrowthAudienceSnapshotProgress } from "@/lib/growth/audiences/growth-audience-types"
 import type { DatamoonAudienceImportRequest } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
+import { isMissionRuntimeOrchestrationReady } from "@/lib/growth/mission-center/growth-mission-runtime-orchestration-readiness"
 
 const MONITOR_LOOP_STAGES: GrowthObjectiveStageId[] = ["monitor", "adapt", "book"]
 const MAX_EVENTS = 20
@@ -77,8 +78,7 @@ function appendEvent(
 }
 
 function isLaunchComplete(objective: GrowthObjective): boolean {
-  const launch = objective.runtime?.stageStates.launch
-  return launch?.state === "completed" || MONITOR_LOOP_STAGES.includes(objective.runtime?.currentStageId ?? "discover")
+  return isMissionRuntimeOrchestrationReady(objective)
 }
 
 function resolveMissionRuntime(objective: GrowthObjective): GrowthObjectiveMissionRuntimeState {
@@ -274,15 +274,20 @@ async function orchestrateDatamoonMonitoring(
     return runtime
   }
 
-  const refreshRequest: DatamoonAudienceImportRequest = requestHasOnlyNewSinceLastRefresh(request)
+  const isFirstDiscoveryRun =
+    (runtime.counters.recordsImported ?? 0) === 0 && !binding.lastRunId?.trim()
+
+  const refreshRequest: DatamoonAudienceImportRequest = isFirstDiscoveryRun
     ? request
-    : {
-        ...request,
-        workbench_context: {
-          ...request.workbench_context,
-          onlyNewSinceLastRefresh: true,
-        },
-      }
+    : requestHasOnlyNewSinceLastRefresh(request)
+      ? request
+      : {
+          ...request,
+          workbench_context: {
+            ...request.workbench_context,
+            onlyNewSinceLastRefresh: true,
+          },
+        }
 
   const started = await startDatamoonAudienceImportRun(admin, refreshRequest, actor)
   if (!started.ok) return runtime

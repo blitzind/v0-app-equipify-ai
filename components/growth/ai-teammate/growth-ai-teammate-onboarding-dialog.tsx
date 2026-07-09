@@ -22,8 +22,7 @@ import {
   isValidAiTeammateName,
   normalizeAiTeammateName,
 } from "@/lib/workspace/ai-teammate-identity"
-import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-workspace-base-path"
-import { AI_OS_WORKSPACE_LABEL } from "@/lib/workspace/ai-os-workspace-branding"
+import { GROWTH_TRAINING_WORKSPACE_ROUTE } from "@/lib/growth/training/growth-training-workspace-types"
 
 type Step = "welcome" | "meet" | "rename" | "role" | "begin"
 
@@ -68,14 +67,14 @@ export function GrowthAiTeammateOnboardingDialog() {
         {step === "welcome" ? (
           <>
             <DialogHeader>
-              <DialogTitle>Welcome to {AI_OS_WORKSPACE_LABEL}</DialogTitle>
+              <DialogTitle>Welcome to Equipify Sales</DialogTitle>
               <DialogDescription>
-                Equipify {AI_OS_WORKSPACE_LABEL} runs revenue work in the background. You review exceptions — not tools.
+                Your AI sales teammate researches accounts, prepares outreach, and brings you drafts to approve — you stay in control.
               </DialogDescription>
             </DialogHeader>
             <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 dark:border-indigo-900/40 dark:bg-indigo-950/20">
               <p className="text-sm text-muted-foreground">
-                Next, meet the AI teammate who represents every capability inside {AI_OS_WORKSPACE_LABEL}.
+                Next, meet the AI teammate who will handle day-to-day sales work while you review and approve.
               </p>
             </div>
           </>
@@ -144,7 +143,7 @@ export function GrowthAiTeammateOnboardingDialog() {
             <DialogHeader>
               <DialogTitle>{normalizeAiTeammateName(draftName)}&apos;s role</DialogTitle>
               <DialogDescription>
-                {normalizeAiTeammateName(draftName)} is your AI teammate — not a chatbot. {normalizeAiTeammateName(draftName)} represents prospecting, outreach, meetings, learning, and every autonomous capability inside {AI_OS_WORKSPACE_LABEL}.
+                {normalizeAiTeammateName(draftName)} is your AI teammate — not a chatbot. {normalizeAiTeammateName(draftName)} handles prospecting, outreach preparation, meetings, and learning on your behalf.
               </DialogDescription>
             </DialogHeader>
             <ul className="space-y-2 text-sm text-muted-foreground">
@@ -154,11 +153,11 @@ export function GrowthAiTeammateOnboardingDialog() {
               </li>
               <li className="flex items-start gap-2">
                 <Sparkles className="mt-0.5 size-4 shrink-0 text-indigo-600" aria-hidden />
-                Books meetings and advances opportunities — then brings you only the exceptions.
+                Brings you drafts in Approvals — nothing sends until you approve.
               </li>
               <li className="flex items-start gap-2">
                 <Sparkles className="mt-0.5 size-4 shrink-0 text-indigo-600" aria-hidden />
-                Engineering systems stay invisible unless you open Advanced.
+                Learns your business from Training and improves over time.
               </li>
             </ul>
             <p className="text-sm font-medium text-foreground">Role · {AI_TEAMMATE_DEFAULT_ROLE}</p>
@@ -168,9 +167,9 @@ export function GrowthAiTeammateOnboardingDialog() {
         {step === "begin" ? (
           <>
             <DialogHeader>
-              <DialogTitle>Begin your first objective</DialogTitle>
+              <DialogTitle>You&apos;re ready to begin</DialogTitle>
               <DialogDescription>
-                {normalizeAiTeammateName(draftName)} is ready. Review what {normalizeAiTeammateName(draftName)} handled on Home, then clear any exceptions waiting on you.
+                Teach {normalizeAiTeammateName(draftName)} about your business in Training, then check Home for daily updates and Approvals when drafts are ready.
               </DialogDescription>
             </DialogHeader>
             <div className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">
@@ -190,7 +189,7 @@ export function GrowthAiTeammateOnboardingDialog() {
           <div className="flex gap-2">
             {step === "begin" ? (
               <Button type="button" variant="outline" asChild>
-                <Link href={`${GROWTH_WORKSPACE_BASE_PATH}/objectives`}>View objectives</Link>
+                <Link href={GROWTH_TRAINING_WORKSPACE_ROUTE}>Open Training</Link>
               </Button>
             ) : null}
             <Button type="button" onClick={advance}>

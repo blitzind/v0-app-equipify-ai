@@ -34,6 +34,11 @@ import { growthFeaturePath } from "../lib/growth/navigation/growth-workspace-bas
 
 const SIDEBAR_ACTIVE_STATE_CASES: Array<{ pathname: string; activeNavId: string }> = [
   { pathname: "/growth", activeNavId: "dashboard" },
+  { pathname: "/growth/operations", activeNavId: "operations" },
+  { pathname: "/growth/training", activeNavId: "training" },
+  { pathname: "/growth/training/company-profile", activeNavId: "training" },
+  { pathname: "/growth/ava", activeNavId: "about-ai" },
+  { pathname: "/growth/os/approvals", activeNavId: "approvals" },
   { pathname: "/growth/leads", activeNavId: "leads" },
   { pathname: "/growth/audiences", activeNavId: "audiences" },
   { pathname: "/growth/videos/personalized", activeNavId: "personalized-videos" },
@@ -42,7 +47,6 @@ const SIDEBAR_ACTIVE_STATE_CASES: Array<{ pathname: string; activeNavId: string 
   { pathname: "/growth/calls", activeNavId: "calls" },
   { pathname: "/growth/meetings", activeNavId: "meetings" },
   { pathname: "/growth/settings", activeNavId: "settings" },
-  { pathname: "/growth/runbook", activeNavId: "runbook" },
   { pathname: "/growth/activity", activeNavId: "activity" },
   { pathname: "/growth/engagement", activeNavId: "engagement" },
   { pathname: "/growth/conversations", activeNavId: "conversations" },
@@ -78,7 +82,7 @@ function runAudit(): void {
   console.log(`\n=== Growth workspace sidebar IA audit (${GROWTH_WORKSPACE_SIDEBAR_IA_QA_MARKER}) ===\n`)
   console.log(`  shell nav qa marker: ${GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER}`)
 
-  assert.equal(GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER, "growth-workspace-shell-nav-v9")
+  assert.equal(GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER, "growth-workspace-shell-nav-v11")
 
   assert.deepEqual(
     GROWTH_SHELL_NAV_GROUPS.map((group) => group.id),

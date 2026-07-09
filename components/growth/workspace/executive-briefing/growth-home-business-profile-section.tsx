@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import {
   BUSINESS_PROFILE_APPROVED_LABEL,
   BUSINESS_PROFILE_DRAFT_LABEL,
@@ -67,6 +68,7 @@ function ProfileSectionEditor({
 }
 
 export function GrowthHomeBusinessProfileSection({ embedded = false }: { embedded?: boolean }) {
+  const { teammate } = useAiTeammateIdentity()
   const [view, setView] = useState<ViewState>("loading")
   const [activeApproved, setActiveApproved] = useState<BusinessProfileRecord | null>(null)
   const [latestDraft, setLatestDraft] = useState<BusinessProfileRecord | null>(null)
@@ -340,12 +342,12 @@ export function GrowthHomeBusinessProfileSection({ embedded = false }: { embedde
               />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="bp-notes">Notes for Ava (optional)</Label>
+              <Label htmlFor="bp-notes">Notes for {teammate.name} (optional)</Label>
               <Textarea
                 id="bp-notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Anything else Ava should know about your business or ideal customers."
+                placeholder={`Anything else ${teammate.name} should know about your business or ideal customers.`}
                 rows={3}
               />
             </div>
@@ -361,7 +363,7 @@ export function GrowthHomeBusinessProfileSection({ embedded = false }: { embedde
         <div className="space-y-4" data-business-profile-panel="draft">
           <GrowthBadge tone="attention">{BUSINESS_PROFILE_DRAFT_LABEL}</GrowthBadge>
           <p className="text-sm text-muted-foreground">
-            Ava proposed this Business Profile from your inputs. Edit any section, then approve or reject.
+            I proposed this Business Profile from your inputs. Edit any section, then approve or reject.
           </p>
 
           <ProfileSectionEditor title="Company">
@@ -487,7 +489,7 @@ export function GrowthHomeBusinessProfileSection({ embedded = false }: { embedde
             </div>
           </ProfileSectionEditor>
 
-          <ProfileSectionEditor title="Ava's assumptions">
+          <ProfileSectionEditor title="My assumptions">
             <ul className="list-disc space-y-1 pl-5 text-sm">
               {editableProfile.confidence.assumptions.map((item) => (
                 <li key={item}>{item}</li>
@@ -496,7 +498,7 @@ export function GrowthHomeBusinessProfileSection({ embedded = false }: { embedde
           </ProfileSectionEditor>
 
           {editableProfile.confidence.missingInformation.length > 0 ? (
-            <ProfileSectionEditor title="Ava wants you to confirm">
+            <ProfileSectionEditor title="I want you to confirm">
               <ul className="list-disc space-y-1 pl-5 text-sm text-amber-900 dark:text-amber-100">
                 {editableProfile.confidence.missingInformation.map((item) => (
                   <li key={item}>{item}</li>

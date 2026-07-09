@@ -77,9 +77,9 @@ assert.equal(route.includes("PUT"), false)
 
 const panel = readSource("components/growth/ai-os/approvals/growth-human-approval-center-panel.tsx")
 assert.equal(panel.includes('method: "POST"'), false)
-assert.equal(panel.includes("Approve"), false)
-assert.equal(panel.includes("Reject"), false)
-assert.ok(panel.includes("SMS pending"))
+assert.ok(panel.includes("action.approveLabel"))
+assert.ok(panel.includes("action.rejectLabel"))
+assert.ok(panel.includes("Text drafts"))
 
 const section = readSource("components/growth/ai-os/command-center/growth-ai-os-human-approval-center-section.tsx")
 assert.equal(section.includes("Approve"), false)

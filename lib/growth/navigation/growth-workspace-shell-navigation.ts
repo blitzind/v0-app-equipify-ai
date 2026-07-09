@@ -8,14 +8,15 @@
 import type { LucideIcon } from "lucide-react"
 import {
   Activity,
-  BookOpen,
   Bot,
+  GraduationCap,
   Handshake,
   Inbox,
   Home,
   MessageSquare,
   Phone,
   Settings,
+  ShieldCheck,
   Sparkles,
   Target,
   Users,
@@ -38,7 +39,7 @@ import {
   GROWTH_WORKSPACE_BASE_PATH,
 } from "@/lib/growth/navigation/growth-route-metadata-types"
 
-export const GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER = "growth-workspace-shell-nav-v9" as const
+export const GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER = "growth-workspace-shell-nav-v11" as const
 
 /** Back-compat QA marker used by shell components. */
 export const GROWTH_SHELL_NAV_QA_MARKER = GROWTH_WORKSPACE_SHELL_NAV_QA_MARKER
@@ -83,6 +84,10 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
     label: "Workspace",
     items: [
       { id: "dashboard", label: AI_OS_HOME_NAV_LABEL, registryRouteId: "workspace-dashboard", icon: Home, workspaceRoute: true },
+      { id: "operations", label: "Operations", registryRouteId: "workspace-sales-operations-center", icon: Bot, workspaceRoute: true },
+      { id: "training", label: "Training", registryRouteId: "workspace-training", icon: GraduationCap, workspaceRoute: true },
+      { id: "about-ai", label: "About Your AI", registryRouteId: "workspace-ava-about", icon: Bot, workspaceRoute: true },
+      { id: "approvals", label: "Approvals", registryRouteId: "workspace-human-approval-center", icon: ShieldCheck, workspaceRoute: true },
       { id: "leads", label: "Leads", registryRouteId: "workspace-leads", icon: Target, workspaceRoute: true },
       { id: "audiences", label: "Audiences", registryRouteId: "workspace-audiences", icon: Users, workspaceRoute: true },
       { id: "personalized-videos", label: "Personalized Videos", registryRouteId: "workspace-personalized-videos", icon: Sparkles, workspaceRoute: true },
@@ -92,7 +97,6 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
       { id: "calls", label: "Calls", registryRouteId: "workspace-calls", icon: Phone, workspaceRoute: true },
       { id: "meetings", label: "Meetings", registryRouteId: "workspace-meetings", icon: Users, workspaceRoute: true },
       { id: "settings", label: "Settings", registryRouteId: "workspace-settings", icon: Settings, workspaceRoute: true },
-      { id: "runbook", label: "Runbook", registryRouteId: "workspace-runbook", icon: BookOpen, workspaceRoute: true },
     ],
   },
   {

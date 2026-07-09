@@ -73,8 +73,9 @@ export const GROWTH_AVA_DAILY_ACTIVITY_NARRATIVE_QA_MARKER =
 
 export type AvaDailyActivitySection =
   | "completed_today"
-  | "learned_today"
+  | "working_now"
   | "waiting_on_you"
+  | "learned_today"
   | "working_next"
 
 export type AvaDailyActivityLine = {
@@ -83,13 +84,27 @@ export type AvaDailyActivityLine = {
   href?: string | null
 }
 
+export type NarrativeIntelligenceFocus =
+  | "approvals"
+  | "research"
+  | "outreach"
+  | "follow_up"
+  | "setup"
+  | "discovery"
+  | "idle"
+
 export type AvaDailyActivityNarrative = {
   qaMarker: typeof GROWTH_AVA_DAILY_ACTIVITY_NARRATIVE_QA_MARKER
   lines: AvaDailyActivityLine[]
   completed_today: string[]
+  working_now: string[]
   learned_today: string[]
   waiting_on_you: string[]
   working_next: string[]
+  /** GE-AIOS-18F — Context-aware section display order for Home briefing */
+  section_order: AvaDailyActivitySection[]
+  /** GE-AIOS-18F — Primary narrative focus for opening line + ordering */
+  focus: NarrativeIntelligenceFocus
   summary: string
 }
 

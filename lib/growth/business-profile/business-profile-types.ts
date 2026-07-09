@@ -1,4 +1,6 @@
-/** GE-AIOS-BUSINESS-PROFILE-1A/1B — AI OS Business Profile types (client-safe). */
+/** GE-AIOS-BUSINESS-PROFILE-1A/1B / GE-AIOS-19C-2E — AI OS Business Profile types (client-safe). */
+
+import type { BusinessStrategyContent } from "@/lib/growth/training/growth-business-strategy-types"
 
 export const GROWTH_AIOS_BUSINESS_PROFILE_1A_QA_MARKER = "ge-aios-business-profile-1a-v1" as const
 export const GROWTH_AIOS_BUSINESS_PROFILE_1B_QA_MARKER = "ge-aios-business-profile-1b-v1" as const
@@ -71,6 +73,8 @@ export type BusinessProfileDraftContent = {
   idealCustomers: BusinessProfileIdealCustomersSection
   problemsAndTriggers: BusinessProfileProblemsSection
   salesAndMarketing: BusinessProfileSalesMarketingSection
+  /** GE-AIOS-19C-2E — operator-authored philosophy (optional until taught). */
+  businessStrategy?: BusinessStrategyContent
   confidence: BusinessProfileConfidenceSection
   draftSource?: BusinessProfileDraftSource
   websiteContextSummary?: string | null

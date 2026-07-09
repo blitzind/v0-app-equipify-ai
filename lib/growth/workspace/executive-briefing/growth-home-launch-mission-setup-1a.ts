@@ -5,19 +5,24 @@ import {
   GROWTH_HOME_GET_AVA_READY_DESCRIPTION,
   GROWTH_HOME_GET_AVA_READY_TITLE,
 } from "@/lib/growth/home/growth-home-canonical-startup-experience-18d"
+import {
+  HOME_LIVING_GET_AVA_READY_COMPLETE_COPY,
+  HOME_LIVING_GET_AVA_READY_DESCRIPTION,
+  HOME_LIVING_GET_AVA_READY_TITLE,
+} from "@/lib/growth/home/growth-home-living-experience-18e"
 
 export const GROWTH_AVA_LAUNCH_MISSION_SETUP_1A_QA_MARKER = "ge-ava-launch-mission-setup-1a-v1" as const
 
 export const GROWTH_AVA_LAUNCH_MISSION_SETUP_RULE =
   "Start Ava setup reuses Growth Profile, Mission Center, Find Leads binding, mailbox onboarding, autonomy settings, setup health, and Human Approval guardrails — no new runtime engine or scheduler." as const
 
-export const GROWTH_AVA_LAUNCH_MISSION_SETUP_TITLE = GROWTH_HOME_GET_AVA_READY_TITLE
+export const GROWTH_AVA_LAUNCH_MISSION_SETUP_TITLE = HOME_LIVING_GET_AVA_READY_TITLE
 
-export const GROWTH_AVA_LAUNCH_MISSION_SETUP_DESCRIPTION = GROWTH_HOME_GET_AVA_READY_DESCRIPTION
+export const GROWTH_AVA_LAUNCH_MISSION_SETUP_DESCRIPTION = HOME_LIVING_GET_AVA_READY_DESCRIPTION
 
 export const GROWTH_AVA_LAUNCH_MISSION_SETUP_CTA = "Continue setup" as const
 
-export const GROWTH_AVA_LAUNCH_MISSION_SETUP_COMPLETE_COPY = GROWTH_HOME_GET_AVA_READY_COMPLETE_COPY
+export const GROWTH_AVA_LAUNCH_MISSION_SETUP_COMPLETE_COPY = HOME_LIVING_GET_AVA_READY_COMPLETE_COPY
 
 export const GROWTH_AVA_LAUNCH_MISSION_DEFAULT_TITLE = "Acquire New Customers" as const
 

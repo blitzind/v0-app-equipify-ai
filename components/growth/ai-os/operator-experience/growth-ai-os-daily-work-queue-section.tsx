@@ -39,7 +39,7 @@ export function GrowthAiOsDailyWorkQueueSection({
     >
       <div>
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Ava daily work queue
+          My daily work queue
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">{display.channel_summary}</p>
       </div>

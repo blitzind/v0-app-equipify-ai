@@ -68,16 +68,23 @@ export function GrowthHomeAvaOperatingRhythmSection({ operatingRhythm }: Props) 
           >
             <div className="flex min-w-0 items-center gap-2.5">
               <PhaseIcon status={phase.status} />
-              <span
-                className={cn(
-                  "truncate",
-                  phase.status === "completed" && "text-foreground",
-                  phase.status === "active" && "font-medium text-foreground",
-                  phase.status === "pending" && "text-muted-foreground",
-                )}
-              >
-                {phase.label}
-              </span>
+              <div className="min-w-0">
+                <span
+                  className={cn(
+                    "block truncate",
+                    phase.status === "completed" && "text-foreground",
+                    phase.status === "active" && "font-medium text-foreground",
+                    phase.status === "pending" && "text-muted-foreground",
+                  )}
+                >
+                  {phase.label}
+                </span>
+                {phase.summary?.trim() ? (
+                  <span className="mt-0.5 block text-xs text-muted-foreground line-clamp-2">
+                    {phase.summary}
+                  </span>
+                ) : null}
+              </div>
             </div>
             <span
               className={cn(

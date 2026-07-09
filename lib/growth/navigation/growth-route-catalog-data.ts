@@ -149,6 +149,41 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     segment: "",
     breadcrumbLabel: "Home",
   }),
+  workspace("workspace-sales-operations-center", "operations", "Sales Operations Center", "workspace", "workspace", {
+    migrated: true,
+    segment: "operations",
+    breadcrumbLabel: "Operations",
+  }),
+  workspace("workspace-training", "training", "Training", "workspace", "workspace", {
+    migrated: true,
+    segment: "training",
+    breadcrumbLabel: "Training",
+  }),
+  workspace("workspace-training-company-profile", "training/company-profile", "Company Profile", "workspace", "workspace", {
+    migrated: true,
+    segment: "training/company-profile",
+    breadcrumbLabel: "Company Profile",
+  }),
+  workspace("workspace-training-business-strategy", "training/business-strategy", "Business Strategy", "workspace", "workspace", {
+    migrated: true,
+    segment: "training/business-strategy",
+    breadcrumbLabel: "Business Strategy",
+  }),
+  workspace("workspace-training-runbook", "training/runbook", "Runbook", "workspace", "workspace", {
+    migrated: true,
+    segment: "training/runbook",
+    breadcrumbLabel: "Runbook",
+  }),
+  workspace("workspace-training-learned", "training/learned", "What I've Learned", "workspace", "workspace", {
+    migrated: true,
+    segment: "training/learned",
+    breadcrumbLabel: "What I've Learned",
+  }),
+  workspace("workspace-ava-about", "ava", "About Your AI", "workspace", "workspace", {
+    migrated: true,
+    segment: "ava",
+    breadcrumbLabel: "About Your AI",
+  }),
   workspaceDual("workspace-share-pages", "share-pages", "Share Pages", "content", {
     breadcrumbLabel: "Share Pages",
   }),
@@ -296,7 +331,7 @@ export const GROWTH_ROUTE_CATALOG_INPUTS: GrowthRouteCatalogInput[] = [
     segment: "os",
     breadcrumbLabel: "AI Operations",
   }),
-  workspace("workspace-human-approval-center", "os/approvals", "Human Approval Center", "intelligence", "workspace", {
+  workspace("workspace-human-approval-center", "os/approvals", "Approvals", "intelligence", "workspace", {
     migrated: true,
     segment: "os",
     breadcrumbLabel: "Approvals",

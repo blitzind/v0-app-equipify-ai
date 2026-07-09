@@ -19,11 +19,15 @@ import {
   parseLeadIdFromSourceId,
 } from "@/lib/growth/relationship/parse-relationship-graph-refs"
 import type { RelationshipLeadSnapshotMap } from "@/lib/growth/relationship/relationship-lead-snapshot-types"
+import {
+  discoveryActionLabel,
+} from "@/lib/growth/mission-center/growth-autonomous-lead-discovery-18g"
+import type { GrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
 
 export type BuildDecisionContextInput = {
   workspaceSummary: Pick<
     GrowthHomeWorkspaceSummaryPayload,
-    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard" | "leadPool"
+    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard" | "leadPool" | "missionDiscovery"
   >
   waitingOnYou: GrowthHomeWaitingOnYouItem[]
   dailyWorkQueue: GrowthHomeDailyWorkQueueItem[]
@@ -208,6 +212,76 @@ function buildMeetingCandidates(input: BuildDecisionContextInput): DecisionCandi
   ]
 }
 
+function buildLeadDiscoveryCandidates(
+  missionDiscovery: GrowthHomeMissionDiscoverySnapshot | null | undefined,
+): DecisionCandidate[] {
+  if (!missionDiscovery?.startupDiscoveryReady) return []
+
+  const target =
+    missionDiscovery.audienceName?.trim() || missionDiscovery.searchSummary?.trim() || null
+  const targetSuffix = target ? ` — ${target}` : ""
+
+  switch (missionDiscovery.discoveryAction) {
+    case "run_prospect_search":
+      return [
+        {
+          id: "discovery:prospect_search",
+          kind: "continue_mission",
+          title: `${discoveryActionLabel("run_prospect_search")}${targetSuffix}`,
+          detail: missionDiscovery.pipelineLow
+            ? "Pipeline nearly exhausted — run Find Leads search."
+            : "No companies imported yet — run Find Leads search.",
+          href: null,
+          source: "mission",
+          queuePriority: "critical",
+        },
+      ]
+    case "refresh_audience":
+      return [
+        {
+          id: "discovery:refresh_audience",
+          kind: "continue_mission",
+          title: `${discoveryActionLabel("refresh_audience")}${targetSuffix}`,
+          detail: missionDiscovery.pipelineLow
+            ? "Audience nearly exhausted — refresh Datamoon import."
+            : "Refresh audience for new matching companies.",
+          href: null,
+          source: "mission",
+          queuePriority: "high",
+        },
+      ]
+    case "begin_research":
+      return [
+        {
+          id: "discovery:begin_research",
+          kind: "research_company",
+          title: `${discoveryActionLabel("begin_research")}${targetSuffix}`,
+          detail:
+            missionDiscovery.counters.researchingCount > 0
+              ? `${missionDiscovery.counters.researchingCount} companies ready to research.`
+              : "Continue researching discovered companies.",
+          href: null,
+          source: "mission",
+          queuePriority: "high",
+        },
+      ]
+    case "monitoring":
+      return [
+        {
+          id: "discovery:monitor_audience",
+          kind: "continue_mission",
+          title: `${discoveryActionLabel("monitoring")}${targetSuffix}`,
+          detail: "Continuous audience monitoring for new matching companies.",
+          href: null,
+          source: "mission",
+          queuePriority: "medium",
+        },
+      ]
+    default:
+      return []
+  }
+}
+
 function buildBusinessClarificationCandidate(
   businessUnderstanding: AvaNarrativeContext["businessUnderstanding"],
 ): DecisionCandidate[] {
@@ -246,7 +320,11 @@ export function buildDecisionContext(input: BuildDecisionContextInput): Decision
   const approvals = input.waitingOnYou.map(candidateFromWaiting)
   const opportunities = input.dailyWorkQueue.map(candidateFromQueueItem)
   const research = buildResearchCandidates(input)
-  const missions = [...buildMissionCandidates(input), ...buildScaleAwarenessCandidates(input)]
+  const missions = [
+    ...buildMissionCandidates(input),
+    ...buildScaleAwarenessCandidates(input),
+    ...buildLeadDiscoveryCandidates(input.workspaceSummary.missionDiscovery),
+  ]
   const inbox = buildInboxCandidates(input)
   const meetings = buildMeetingCandidates(input)
   const businessCandidates = buildBusinessClarificationCandidate(narrative.businessUnderstanding)

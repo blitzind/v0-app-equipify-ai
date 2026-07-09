@@ -151,7 +151,7 @@ function formatAvaLaunchFailureMessage(payload: {
   if (payload.error && isGrowthMissionAvaLaunchValidationFailureError(payload.error)) {
     return `${GROWTH_AVA_LAUNCH_CANT_START_HEADING}\n\n• ${GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR}`
   }
-  return payload.error ?? "Ava launch run failed."
+  return payload.error ?? "Launch run failed."
 }
 
 function formatGeography(draft: AvaDatamoonAudienceDraft): string {
@@ -408,11 +408,11 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
 
   async function handleRunAvaLaunch() {
     if (!buildConfirmed) {
-      setError("Confirm human review before running Ava.")
+      setError("Confirm human review before I run the search.")
       return
     }
     if (!selectedMissionId) {
-      setError("Select a mission before running Ava.")
+      setError("Select a mission before I can run.")
       return
     }
 
@@ -482,7 +482,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
       setZeroPreviewDebug(result.importedLeadCount === 0 ? (result.zeroPreviewDebug ?? null) : null)
       setZeroPreviewDebugOpen(result.importedLeadCount === 0 && Boolean(result.zeroPreviewDebug))
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ava launch run failed.")
+      setError(e instanceof Error ? e.message : "Launch run failed.")
     } finally {
       setBusy(null)
     }

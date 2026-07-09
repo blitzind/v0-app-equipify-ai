@@ -9,12 +9,16 @@ import {
 } from "@/lib/growth/home/growth-home-runtime-presenter"
 import type { GrowthHomeAiOsUxViewModel } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 import {
+  formatLivingWaitingSummary,
+  GROWTH_HOME_LIVING_EXPERIENCE_18E_QA_MARKER,
+  HOME_LIVING_WAITING_EMPTY_MESSAGE,
+} from "@/lib/growth/home/growth-home-living-experience-18e"
+import {
   GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-experience-2b"
-import { GROWTH_HOME_NOTHING_REQUIRES_APPROVAL } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-2a"
 import { Button } from "@/components/ui/button"
 
-export const AVA_HOME_WAITING_ON_YOU_TITLE = "Waiting on you" as const
+export const AVA_HOME_WAITING_ON_YOU_TITLE = "What I need from you" as const
 
 type Props = {
   aiOsUx: GrowthHomeAiOsUxViewModel
@@ -35,10 +39,17 @@ export function GrowthHomeAiOsWaitingOnYouSection({
   const { waitingOnYouOverflow, approveItemsHref, approveItemsCount } = aiOsUx
   const hasItems = waitingOnYou.length > 0 || approveItemsCount > 0
 
+  const replyCount = waitingOnYou.filter((item) => /reply/i.test(item.label)).length
+  const waitingSummary = formatLivingWaitingSummary({
+    approvalCount: approveItemsCount,
+    replyCount,
+  })
+
   return (
     <section
       data-qa-section="home-needs-your-attention"
       data-home-experience-2b={GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER}
+      data-qa-marker-18e={GROWTH_HOME_LIVING_EXPERIENCE_18E_QA_MARKER}
       data-qa-marker-16x={GROWTH_HOME_RUNTIME_INTEGRATION_16X_QA_MARKER}
       className="rounded-2xl border border-border/70 bg-card p-4 space-y-3 sm:p-5"
     >
@@ -46,15 +57,13 @@ export function GrowthHomeAiOsWaitingOnYouSection({
         <div>
           <h2 className="text-lg font-semibold tracking-tight">{AVA_HOME_WAITING_ON_YOU_TITLE}</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            {hasItems
-              ? "These decisions are blocking me from continuing."
-              : GROWTH_HOME_NOTHING_REQUIRES_APPROVAL}
+            {hasItems ? waitingSummary : HOME_LIVING_WAITING_EMPTY_MESSAGE}
           </p>
         </div>
         {approveItemsHref && approveItemsCount > 0 ? (
           <Button asChild size="sm">
             <Link href={approveItemsHref}>
-              Review items
+              Open Approvals
               <ArrowRight className="ml-2 size-4" />
             </Link>
           </Button>
@@ -64,7 +73,7 @@ export function GrowthHomeAiOsWaitingOnYouSection({
       {!hasItems ? (
         <div className="flex items-center gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/50 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
           <CheckCircle2 className="size-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-          <p className="text-sm font-medium text-foreground">{GROWTH_HOME_NOTHING_REQUIRES_APPROVAL}</p>
+          <p className="text-sm font-medium text-foreground">{HOME_LIVING_WAITING_EMPTY_MESSAGE}</p>
         </div>
       ) : (
         <div className="space-y-2">

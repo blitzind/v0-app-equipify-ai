@@ -288,6 +288,114 @@ function collectApprovedProfileRawItems(profile: BusinessProfileRecord): Evidenc
     values: content.salesAndMarketing.qualificationCriteria,
   })
 
+  if (content.businessStrategy) {
+    const strategy = content.businessStrategy
+
+    pushRawItem(items, {
+      profile,
+      section: "businessStrategy",
+      field: "mission",
+      fact_key: "business_strategy.mission",
+      category: "messaging",
+      value_text: strategy.companyWide.mission,
+    })
+
+    pushRawItem(items, {
+      profile,
+      section: "businessStrategy",
+      field: "pricingPhilosophy",
+      fact_key: "business_strategy.pricing_philosophy",
+      category: "messaging",
+      value_text: strategy.positioning.pricingPhilosophy,
+    })
+
+    pushRawItem(items, {
+      profile,
+      section: "businessStrategy",
+      field: "elevatorPitch",
+      fact_key: "business_strategy.elevator_pitch",
+      category: "messaging",
+      value_text: strategy.messaging.elevatorPitch,
+    })
+
+    pushRawItem(items, {
+      profile,
+      section: "businessStrategy",
+      field: "tone",
+      fact_key: "business_strategy.tone",
+      category: "messaging",
+      value_text: strategy.messaging.tone,
+    })
+
+    pushArrayItems(items, {
+      profile,
+      factKeyPrefix: "business_strategy.competitive_advantages",
+      category: "messaging",
+      section: "businessStrategy",
+      field: "competitiveAdvantages",
+      values: strategy.positioning.competitiveAdvantages,
+    })
+
+    pushArrayItems(items, {
+      profile,
+      factKeyPrefix: "business_strategy.words_to_avoid",
+      category: "messaging",
+      section: "businessStrategy",
+      field: "wordsToAvoid",
+      values: strategy.messaging.wordsToAvoid,
+    })
+
+    pushArrayItems(items, {
+      profile,
+      factKeyPrefix: "business_strategy.never_say",
+      category: "messaging",
+      section: "businessStrategy",
+      field: "neverSay",
+      values: strategy.messaging.neverSay,
+    })
+
+    pushArrayItems(items, {
+      profile,
+      factKeyPrefix: "business_strategy.qualification_standards",
+      category: "sales_marketing",
+      section: "businessStrategy",
+      field: "qualificationStandards",
+      values: strategy.salesPhilosophy.qualificationStandards,
+    })
+
+    for (const item of strategy.objections.items) {
+      if (!item.objection.trim() && !item.preferredResponse.trim()) continue
+      pushRawItem(items, {
+        profile,
+        section: "businessStrategy",
+        field: "objection",
+        fact_key: `business_strategy.objection.${normalizeArrayFactSuffix(item.objection || "response")}`,
+        category: "messaging",
+        value_text: item.preferredResponse.trim()
+          ? `${item.objection.trim()}: ${item.preferredResponse.trim()}`
+          : item.objection.trim(),
+        value_json: { objection: item.objection, preferredResponse: item.preferredResponse },
+      })
+    }
+
+    for (const domain of [
+      { key: "sales_and_relationships", values: strategy.salesAndRelationships.principles },
+      { key: "marketing_and_brand", values: strategy.marketingAndBrand.principles },
+      { key: "customer_experience", values: strategy.customerExperience.principles },
+      { key: "service_standards", values: strategy.serviceStandards.principles },
+      { key: "financial_guidelines", values: strategy.financialGuidelines.principles },
+    ]) {
+      pushArrayItems(items, {
+        profile,
+        factKeyPrefix: `business_strategy.${domain.key}`,
+        category: "messaging",
+        section: "businessStrategy",
+        field: domain.key,
+        values: domain.values,
+      })
+    }
+  }
+
   return items
 }
 

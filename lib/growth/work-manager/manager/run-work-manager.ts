@@ -15,11 +15,33 @@ export type RunWorkManagerInput = BuildWorkContextInput & {
   memorySummary?: AvaMemorySummary | null
 }
 
-/** Future autonomy hook — NOT implemented in 11A. */
-export function executeReadyWorkItems(_result: AvaWorkManagerResult): {
-  executed: false
-  reason: "autonomy_not_enabled"
-} {
+export type ExecuteReadyWorkItemsResult =
+  | {
+      executed: false
+      reason:
+        | "autonomy_not_enabled"
+        | "no_executable_work"
+        | "daily_budget_exhausted"
+        | "max_iterations_reached"
+        | "autonomy_disabled"
+        | "context_unavailable"
+    }
+  | {
+      executed: true
+      reason: "loop_completed"
+      iterations: number
+      outcomes_completed: number
+      qa_marker?: string
+    }
+
+/** GE-AIOS-18A — Client-safe passthrough; server loop supplies loopResult. */
+export function executeReadyWorkItems(
+  _result: AvaWorkManagerResult,
+  options?: {
+    loopResult?: ExecuteReadyWorkItemsResult | null
+  },
+): ExecuteReadyWorkItemsResult {
+  if (options?.loopResult) return options.loopResult
   return { executed: false, reason: "autonomy_not_enabled" }
 }
 

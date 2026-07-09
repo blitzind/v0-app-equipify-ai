@@ -30,8 +30,9 @@ import type {
   GrowthHomeTimelinePeriod,
   GrowthHomeWaitingOnYouItem,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
-import { extractFirstNameFromGreeting } from "@/lib/growth/workspace/executive-briefing/growth-home-experience-2b"
-import { greetingForHour } from "@/lib/growth/workspace/executive-briefing/growth-home-narrative-formatter"
+import {
+  buildPersonalizedHomeGreeting,
+} from "@/lib/growth/home/growth-home-living-experience-18e"
 
 export const GROWTH_HOME_AVA_HERO_7A_QA_MARKER = "growth-ge-aios-7a-ava-home-experience-v1" as const
 
@@ -71,6 +72,8 @@ export type GrowthHomeAvaHeroViewModel = {
   operatingRhythm?: AvaOperatingRhythm
   memorySummary?: AvaMemorySummary
   specialistOrchestrator?: AvaSpecialistOrchestratorResult | null
+  /** GE-AIOS-18G — Active discovery target for opening line */
+  discoveryNarrativeTarget?: string | null
 }
 
 export type BuildAvaHomeHeroInput = {
@@ -83,7 +86,7 @@ export type BuildAvaHomeHeroInput = {
   repliesWaiting: number
   workspaceSummary?: Pick<
     GrowthHomeWorkspaceSummaryPayload,
-    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard" | "relationshipSnapshots" | "leadPool"
+    "kpis" | "meetings" | "inbox" | "operatorTasks" | "avaConsole" | "dashboard" | "relationshipSnapshots" | "leadPool" | "missionDiscovery"
   >
   waitingOnYou?: GrowthHomeWaitingOnYouItem[]
   dailyWorkQueue?: GrowthHomeDailyWorkQueueItem[]
@@ -97,6 +100,7 @@ export type BuildAvaHomeHeroInput = {
   relationshipSnapshotsById?: import("@/lib/growth/relationship/relationship-lead-snapshot-types").RelationshipLeadSnapshotMap
   salesOutcomes?: import("@/lib/growth/specialists/execution/sales-outcome-types").GrowthHomeSalesOutcomesPayload | null
   organizationalKnowledge?: import("@/lib/growth/memory/knowledge/organization-knowledge-types").OrganizationalKnowledgeItem[] | null
+  operatorDisplayName?: string | null
 }
 
 function pluralize(count: number, singular: string, plural: string): string {
@@ -225,9 +229,11 @@ function mapPrimaryDecision(result: {
 }
 
 export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHeroViewModel {
-  const firstName = extractFirstNameFromGreeting(input.greeting)
-  const base = greetingForHour(input.hour)
-  const greeting = firstName ? `${base}, ${firstName}.` : `${base}.`
+  const greeting = buildPersonalizedHomeGreeting({
+    hour: input.hour,
+    greeting: input.greeting,
+    operatorDisplayName: input.operatorDisplayName,
+  })
 
   const legacyActivities = buildAvaCurrentActivities({
     employeeStatus: input.employeeStatus,
@@ -290,6 +296,10 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
 
   const storyBlocks = dailyBriefing.story_blocks ?? []
   const dailyActivityNarrative = dailyBriefing.daily_activity_narrative ?? null
+  const discoveryNarrativeTarget =
+    input.workspaceSummary.missionDiscovery?.audienceName?.trim() ||
+    input.workspaceSummary.missionDiscovery?.searchSummary?.trim() ||
+    null
 
   return {
     qaMarker: GROWTH_HOME_AVA_HERO_7A_QA_MARKER,
@@ -310,6 +320,7 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
     operatingRhythm: dailyBriefing.operating_rhythm_result,
     memorySummary: dailyBriefing.memory_result,
     specialistOrchestrator: dailyBriefing.specialist_orchestrator_result ?? null,
+    discoveryNarrativeTarget,
   }
 }
 

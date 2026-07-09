@@ -201,7 +201,7 @@ export function GrowthHomeStartAvaSetupSection({
         body: JSON.stringify({
           title: GROWTH_AVA_LAUNCH_MISSION_DEFAULT_TITLE,
           description:
-            "Default acquisition mission created from Get Ava Ready — Ava monitors lead search and prepares recommendations under approval guardrails.",
+            "Default acquisition mission created from Get me ready — I monitor lead search and prepare recommendations under approval guardrails.",
           objectiveType: GROWTH_AVA_LAUNCH_MISSION_DEFAULT_OBJECTIVE_TYPE,
           targetValue: GROWTH_AVA_LAUNCH_MISSION_DEFAULT_TARGET,
           autoStart: true,
@@ -265,7 +265,7 @@ export function GrowthHomeStartAvaSetupSection({
         className="flex items-center gap-2 rounded-2xl border border-border/70 bg-card p-6 text-sm text-muted-foreground"
       >
         <Loader2 className="size-4 animate-spin" aria-hidden />
-        Checking Ava launch readiness…
+        Checking if I&apos;m ready to launch…
       </section>
     )
   }

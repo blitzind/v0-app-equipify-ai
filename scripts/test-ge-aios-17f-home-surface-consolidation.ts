@@ -36,13 +36,11 @@ function main(): void {
   )
   assert.deepEqual(GROWTH_HOME_CANONICAL_SURFACE_SECTION_IDS, [
     "ava-hero",
-    "get-ava-ready",
+    "training-setup-cta",
+    "briefing-cross-links",
     "ava-work",
-    "ava-operating-rhythm",
-    "ava-memory",
-    "ava-specialist-team",
     "waiting-on-you",
-    "executive-snapshot",
+    "ava-memory",
   ])
 
   const dashboard = readSource(
@@ -64,30 +62,30 @@ function main(): void {
   assert.doesNotMatch(dashboard, /sectionId="research-growth-strategy"[\s\S]*defaultOpen/)
 
   const heroIndex = indexOfComponent(dashboard, "GrowthHomeAvaHeroSection")
+  const trainingCtaIndex = indexOfComponent(dashboard, "GrowthHomeTrainingSetupCta")
+  const crossLinksIndex = indexOfComponent(dashboard, "GrowthHomeBriefingCrossLinks")
   const workIndex = indexOfComponent(dashboard, "GrowthHomeAvaWorkSection")
-  const rhythmIndex = indexOfComponent(dashboard, "GrowthHomeAvaOperatingRhythmSection")
-  const memoryIndex = indexOfComponent(dashboard, "GrowthHomeAvaMemorySection")
-  const teamIndex = indexOfComponent(dashboard, "GrowthHomeAvaSpecialistTeamSection")
   const waitingIndex = indexOfComponent(dashboard, "GrowthHomeAiOsWaitingOnYouSection")
+  const memoryIndex = indexOfComponent(dashboard, "GrowthHomeAvaMemorySection")
+  const rhythmIndex = indexOfComponent(dashboard, "GrowthHomeAvaOperatingRhythmSection")
   const snapshotIndex = indexOfComponent(dashboard, "GrowthHomeExecutiveSnapshotSection")
   const advancedIndex = dashboard.indexOf('sectionId="advanced-operations"')
   const setupIndex = dashboard.indexOf('sectionId="setup-diagnostics"')
   const researchPanelIndex = indexOfComponent(dashboard, "GrowthHomeAvaResearchQueuePanel")
-  const startAvaIndex = dashboard.indexOf('placement="primary"')
   const secondaryStartAvaIndex = dashboard.indexOf('placement="secondary"')
 
-  assert.ok(heroIndex < workIndex)
-  assert.ok(workIndex < rhythmIndex)
-  assert.ok(rhythmIndex < memoryIndex)
-  assert.ok(memoryIndex < teamIndex)
-  assert.ok(teamIndex < waitingIndex)
-  assert.ok(waitingIndex < snapshotIndex)
-  assert.ok(snapshotIndex < advancedIndex)
+  assert.ok(heroIndex < trainingCtaIndex)
+  assert.ok(trainingCtaIndex < crossLinksIndex)
+  assert.ok(crossLinksIndex < workIndex)
+  assert.ok(workIndex < waitingIndex)
+  assert.ok(waitingIndex < memoryIndex)
+  assert.ok(memoryIndex < advancedIndex)
+  assert.ok(rhythmIndex > advancedIndex)
+  assert.ok(snapshotIndex > advancedIndex)
   assert.ok(advancedIndex < setupIndex)
   assert.ok(researchPanelIndex > advancedIndex)
-  assert.ok(startAvaIndex >= 0)
-  assert.ok(startAvaIndex < workIndex)
   assert.ok(secondaryStartAvaIndex > setupIndex)
+  assert.equal(dashboard.indexOf('placement="primary"'), -1)
 
   assert.doesNotMatch(dashboard, /fetch\(/)
   assert.match(hook, /GROWTH_HOME_WORKSPACE_SUMMARY_API_PATH/)
@@ -103,7 +101,7 @@ function main(): void {
   assert.match(aidenGate, /GROWTH_WORKSPACE_BASE_PATH/)
   assert.match(aidenGate, /return null/)
 
-  assert.match(page, /daily operating report/i)
+  assert.match(page, /teammateHomePageDescription/)
   assert.doesNotMatch(page, /pipeline, campaigns, and intelligence/i)
 
   const preservedComponents: Array<{ name: string; source: string }> = [

@@ -4,7 +4,7 @@ import Link from "next/link"
 import { ArrowRight, Bot, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import type { GrowthHomeLeadPoolSummary } from "@/lib/growth/home/growth-home-lead-pool-pagination"
 import {
   buildHomeRelationshipScaleLine,
@@ -21,6 +21,17 @@ import {
   GROWTH_HOME_AVA_HERO_7A_QA_MARKER,
   type GrowthHomeAvaHeroViewModel,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-ava-hero-7a"
+import {
+  buildNarrativeIntelligenceOpeningLine,
+  GROWTH_AVA_NARRATIVE_INTELLIGENCE_18F_QA_MARKER,
+} from "@/lib/growth/ava-home/narrative/engine/growth-home-narrative-intelligence-18f"
+import {
+  GROWTH_HOME_LIVING_EXPERIENCE_18E_QA_MARKER,
+  HOME_LIVING_ALL_CLEAR_WITH_NARRATIVE,
+} from "@/lib/growth/home/growth-home-living-experience-18e"
+import { GROWTH_SALES_OPERATIONS_CENTER_ROUTE } from "@/lib/growth/operations-center/growth-sales-operations-center-types"
+import { GROWTH_AVA_ABOUT_WORKSPACE_ROUTE } from "@/lib/growth/ava-about/growth-ava-about-workspace-types"
+import { GROWTH_TRAINING_WORKSPACE_ROUTE } from "@/lib/growth/training/growth-training-workspace-types"
 
 type Props = {
   hero: GrowthHomeAvaHeroViewModel
@@ -49,18 +60,21 @@ export function GrowthHomeAvaHeroSection({
   pendingApprovals = 0,
   relationshipSnapshotCount = 0,
 }: Props) {
-  const teammate = resolveAiTeammatePresentation()
+  const { teammate } = useAiTeammateIdentity()
   const scaleLine = buildHomeRelationshipScaleLine(leadPool, {
     relationshipSnapshotCount,
     leadsNeedingAction,
   })
   const dailyActivityNarrative = hero.dailyActivityNarrative
+  const sectionOrder = dailyActivityNarrative?.section_order ?? AVA_DAILY_ACTIVITY_SECTION_ORDER
   const sectionGroups = dailyActivityNarrative
-    ? AVA_DAILY_ACTIVITY_SECTION_ORDER.map((section) => ({
-        section,
-        label: AVA_DAILY_ACTIVITY_SECTION_LABELS[section],
-        lines: dailyActivityNarrative.lines.filter((row) => row.section === section),
-      })).filter((group) => group.lines.length > 0)
+    ? sectionOrder
+        .map((section) => ({
+          section,
+          label: AVA_DAILY_ACTIVITY_SECTION_LABELS[section],
+          lines: dailyActivityNarrative.lines.filter((row) => row.section === section),
+        }))
+        .filter((group) => group.lines.length > 0)
     : []
   const dailyActivityLines = dailyActivityNarrative?.lines.map((row) => row.text) ?? []
   const briefingSummary = hero.dailyBriefing?.summary?.trim() ?? null
@@ -73,11 +87,24 @@ export function GrowthHomeAvaHeroSection({
         : storyBlocks.map((block) => block.text)
   const hasStructuredNarrative = sectionGroups.length > 0
   const hasNarrative = hasStructuredNarrative || narrativeLines.length > 0
+  const openingLine = buildNarrativeIntelligenceOpeningLine({
+    focus: dailyActivityNarrative?.focus ?? "idle",
+    hasPrimaryDecision: Boolean(hero.primaryDecision),
+    completedCount: dailyActivityNarrative?.completed_today.length ?? 0,
+    waitingCount: dailyActivityNarrative?.waiting_on_you.filter((line) => !/Nothing needs your approval/i.test(line)).length ?? 0,
+    setupIncomplete: dailyActivityNarrative?.focus === "setup",
+    discoveryTarget: hero.discoveryNarrativeTarget ?? null,
+  })
+  const allClearLine = hasNarrative
+    ? HOME_LIVING_ALL_CLEAR_WITH_NARRATIVE
+    : hero.allNormalLine || AVA_NARRATIVE_ALL_NORMAL_LINE
 
   return (
     <section
       data-qa-section="home-ava-hero"
       data-qa-marker={hero.qaMarker}
+      data-qa-marker-18e={GROWTH_HOME_LIVING_EXPERIENCE_18E_QA_MARKER}
+      data-qa-marker-18f={GROWTH_AVA_NARRATIVE_INTELLIGENCE_18F_QA_MARKER}
       data-qa-marker-narrative={hero.dailyBriefing?.qaMarker ?? GROWTH_AVA_NARRATIVE_ENGINE_QA_MARKER}
       data-qa-marker-daily-activity={hero.dailyActivityNarrative?.qaMarker ?? undefined}
       data-qa-marker-16x={GROWTH_HOME_RUNTIME_INTEGRATION_16X_QA_MARKER}
@@ -109,6 +136,12 @@ export function GrowthHomeAvaHeroSection({
       {scaleLine ? (
         <p className="text-sm leading-relaxed text-muted-foreground" data-qa-field="home-relationship-scale-line">
           {scaleLine}
+        </p>
+      ) : null}
+
+      {openingLine ? (
+        <p className="text-sm leading-relaxed text-foreground" data-qa-field="home-living-opening-line">
+          {openingLine}
         </p>
       ) : null}
 
@@ -152,6 +185,36 @@ export function GrowthHomeAvaHeroSection({
         </div>
       ) : null}
 
+      {hasNarrative ? (
+        <p className="text-xs text-muted-foreground">
+          <Link href={GROWTH_SALES_OPERATIONS_CENTER_ROUTE} className="font-medium text-indigo-700 hover:underline dark:text-indigo-300">
+            Open Operations
+          </Link>
+          {" "}for the full breakdown of why {teammate.name} chose today&apos;s plan.
+          {" "}
+          <Link href={GROWTH_AVA_ABOUT_WORKSPACE_ROUTE} className="font-medium text-indigo-700 hover:underline dark:text-indigo-300">
+            About Your AI
+          </Link>
+          .
+          {dailyActivityNarrative?.focus === "setup" ? (
+            <>
+              {" "}
+              <Link href={GROWTH_TRAINING_WORKSPACE_ROUTE} className="font-medium text-indigo-700 hover:underline dark:text-indigo-300">
+                Continue Training
+              </Link>
+              {" "}to teach me your business.
+            </>
+          ) : null}
+        </p>
+      ) : dailyActivityNarrative?.focus === "setup" ? (
+        <p className="text-xs text-muted-foreground">
+          <Link href={GROWTH_TRAINING_WORKSPACE_ROUTE} className="font-medium text-indigo-700 hover:underline dark:text-indigo-300">
+            Open Training
+          </Link>
+          {" "}to teach {teammate.name} about your business.
+        </p>
+      ) : null}
+
       <div className={cn(hasNarrative && "border-t border-border/50 pt-4")}>
         {hero.primaryDecision ? (
           <div
@@ -191,7 +254,7 @@ export function GrowthHomeAvaHeroSection({
         ) : (
           <div className="flex items-center gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/50 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
             <CheckCircle2 className="size-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-            <p className="text-sm font-medium text-foreground">{hero.allNormalLine || AVA_NARRATIVE_ALL_NORMAL_LINE}</p>
+            <p className="text-sm font-medium text-foreground">{allClearLine}</p>
           </div>
         )}
       </div>

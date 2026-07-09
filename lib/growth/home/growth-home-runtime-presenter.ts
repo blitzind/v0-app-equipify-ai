@@ -26,11 +26,23 @@ export const GROWTH_HOME_RUNTIME_INTEGRATION_16X_QA_MARKER =
 export const GROWTH_HOME_CANONICAL_RUNTIME_CLEANUP_17E_QA_MARKER =
   "ge-aios-17e-home-canonical-runtime-cleanup-v1" as const
 
-export const HOME_RUNTIME_EMPTY_WORK_MESSAGE = "I'm getting today's work organized." as const
-export const HOME_RUNTIME_EMPTY_MEMORY_MESSAGE =
-  "I'll start learning from outcomes as work progresses." as const
-export const HOME_RUNTIME_EMPTY_PROGRESS_MESSAGE =
-  "I'm lining up today's operating rhythm as work comes in." as const
+export const GROWTH_HOME_SINGLE_AI_IDENTITY_19C_2A_QA_MARKER =
+  "ge-aios-19c-2a-single-ai-identity-cleanup-v1" as const
+
+export const GROWTH_HOME_TEAMMATE_HANDLING_SECTION_TITLE = "What I'm handling" as const
+
+export const GROWTH_HOME_TEAMMATE_CAPABILITIES_SECTION_TITLE = "Capabilities I'm using" as const
+
+export const GROWTH_HOME_TEAMMATE_CURRENT_FOCUS_TITLE = "My current focus" as const
+
+import {
+  HOME_LIVING_EMPTY_MEMORY_MESSAGE,
+  HOME_LIVING_EMPTY_PROGRESS_MESSAGE,
+  HOME_LIVING_EMPTY_WORK_MESSAGE,
+} from "@/lib/growth/home/growth-home-living-experience-18e"
+export const HOME_RUNTIME_EMPTY_WORK_MESSAGE = HOME_LIVING_EMPTY_WORK_MESSAGE
+export const HOME_RUNTIME_EMPTY_MEMORY_MESSAGE = HOME_LIVING_EMPTY_MEMORY_MESSAGE
+export const HOME_RUNTIME_EMPTY_PROGRESS_MESSAGE = HOME_LIVING_EMPTY_PROGRESS_MESSAGE
 
 const SPECIALIST_DISPLAY_NAMES: Record<AvaSpecialistId, string> = {
   sales: "Sales Specialist",
@@ -38,6 +50,15 @@ const SPECIALIST_DISPLAY_NAMES: Record<AvaSpecialistId, string> = {
   customer_success: "Customer Success Specialist",
   service: "Service Specialist",
   finance: "Finance Specialist",
+}
+
+/** Customer-facing capability labels — never expose internal specialist role names. */
+const TEAMMATE_CAPABILITY_LABELS: Record<AvaSpecialistId, string> = {
+  sales: "Finding opportunities",
+  marketing: "Campaign strategy",
+  customer_success: "Customer health",
+  service: "Scheduling & service",
+  finance: "Payments & invoices",
 }
 
 const STUB_SPECIALIST_AVAILABILITY: Partial<Record<AvaSpecialistId, string>> = {
@@ -112,6 +133,46 @@ export function buildHomeDefaultOperatingRhythmPhases(hour = new Date().getHours
 
 export function buildHomeDefaultSpecialistTeamStatus(): AvaSpecialistTeamStatus[] {
   return buildSpecialistTeamStatus([])
+}
+
+export type TeammateHandlingRow = {
+  id: string
+  capabilityLabel: string
+  statusLabel: string
+  activeCount: number
+  comingSoon: boolean
+}
+
+export function formatTeammateFirstPersonStatus(statusLabel: string): string {
+  const trimmed = statusLabel.trim()
+  if (!trimmed) return "I'm ready when work enters my queue."
+  if (/^i['']?m /i.test(trimmed)) {
+    return trimmed.endsWith(".") ? trimmed : `${trimmed}.`
+  }
+  const lower = trimmed.charAt(0).toLowerCase() + trimmed.slice(1)
+  return `I'm ${lower}${lower.endsWith(".") ? "" : "."}`
+}
+
+export function buildTeammateHandlingRows(
+  teamStatus: AvaSpecialistTeamStatus[] | null | undefined,
+): TeammateHandlingRow[] {
+  const rows = teamStatus?.length ? teamStatus : buildHomeDefaultSpecialistTeamStatus()
+  return rows.map((member) => ({
+    id: member.specialist_id,
+    capabilityLabel: TEAMMATE_CAPABILITY_LABELS[member.specialist_id],
+    statusLabel: member.is_stub
+      ? "Coming soon — I'll join in when this capability is enabled."
+      : formatTeammateFirstPersonStatus(member.status_label),
+    activeCount: member.active_count,
+    comingSoon: member.is_stub,
+  }))
+}
+
+function sanitizeCustomerFacingReason(reason: string | null | undefined): string | null {
+  const trimmed = asString(reason)
+  if (!trimmed) return null
+  if (/\bspecialist\b/i.test(trimmed)) return null
+  return trimmed
 }
 
 /** @deprecated GE-AIOS-17E — replaced by Ava Daily Activity Narrative on Home hero. */
@@ -209,10 +270,13 @@ export function buildHomeWorkItemPresentation(item: AvaWorkItem): HomeWorkItemPr
     title: item.title,
     href: item.href,
     companyName: asString(item.company_name) || null,
-    specialistLabel: formatAssignedSpecialistLabel(item.assigned_specialist),
+    specialistLabel: null,
     relationshipStage: formatWorkItemRelationshipStage(graph),
     nextAction,
-    whyItMatters: whyParts.find(Boolean) ?? item.routing_reason ?? null,
+    whyItMatters:
+      whyParts.find(Boolean) ??
+      sanitizeCustomerFacingReason(item.routing_reason) ??
+      null,
   }
 }
 

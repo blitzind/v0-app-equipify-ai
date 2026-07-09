@@ -30,7 +30,7 @@ export function GrowthHomeGrowthStrategySection({ dailyWorkQueue, onPrepareOutre
       <div>
         <h2 className="text-lg font-semibold tracking-tight">{GROWTH_HOME_GROWTH_STRATEGY_TITLE}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Ava&apos;s workflow from business context to qualified outreach.
+          My workflow from business context to qualified outreach.
         </p>
       </div>
 
@@ -86,7 +86,7 @@ export function GrowthHomeGrowthStrategySection({ dailyWorkQueue, onPrepareOutre
           </div>
           <div className="rounded-xl border border-border/60 bg-muted/15 px-4 py-3">
             <p className="text-sm text-muted-foreground">
-              Once leads are approved, Ava prepares sequences and drafts for your review.
+              Once leads are approved, I prepare sequences and drafts for your review.
             </p>
             <Button type="button" size="sm" variant="outline" className="mt-3" onClick={onPrepareOutreach}>
               Review outreach readiness

@@ -42,7 +42,12 @@ export {
   buildWorkManagerSummary,
 } from "@/lib/growth/work-manager/bridges/narrative-bridge"
 
-export { runWorkManager, executeReadyWorkItems, type RunWorkManagerInput } from "@/lib/growth/work-manager/manager/run-work-manager"
+export {
+  runWorkManager,
+  executeReadyWorkItems,
+  type RunWorkManagerInput,
+  type ExecuteReadyWorkItemsResult,
+} from "@/lib/growth/work-manager/manager/run-work-manager"
 
 export const AVA_WORK_MANAGER_TODAY_WORK_TITLE = "Today's Work" as const
 export const AVA_WORK_MANAGER_WORKING_NOW_TITLE = "Working now" as const

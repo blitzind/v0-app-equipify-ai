@@ -5,17 +5,20 @@ import type {
   GrowthAutonomyCapability,
 } from "@/lib/growth/autonomy/growth-autonomy-types"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-workspace-base-path"
+import {
+  HOME_LIVING_GET_AVA_READY_COMPLETE_COPY,
+  HOME_LIVING_GET_AVA_READY_DESCRIPTION,
+  HOME_LIVING_GET_AVA_READY_TITLE,
+} from "@/lib/growth/home/growth-home-living-experience-18e"
 
 export const GROWTH_HOME_CANONICAL_STARTUP_EXPERIENCE_18D_QA_MARKER =
   "ge-aios-18d-canonical-startup-experience-v1" as const
 
-export const GROWTH_HOME_GET_AVA_READY_TITLE = "Get Ava Ready" as const
+export const GROWTH_HOME_GET_AVA_READY_TITLE = HOME_LIVING_GET_AVA_READY_TITLE
 
-export const GROWTH_HOME_GET_AVA_READY_DESCRIPTION =
-  "Complete these steps so Ava can research, qualify, and prepare outreach — with your approval before anything sends." as const
+export const GROWTH_HOME_GET_AVA_READY_DESCRIPTION = HOME_LIVING_GET_AVA_READY_DESCRIPTION
 
-export const GROWTH_HOME_GET_AVA_READY_COMPLETE_COPY =
-  "Ava is ready to work. She will keep researching and preparing outreach while you review and approve from Home." as const
+export const GROWTH_HOME_GET_AVA_READY_COMPLETE_COPY = HOME_LIVING_GET_AVA_READY_COMPLETE_COPY
 
 export const GROWTH_HOME_GET_AVA_READY_LAUNCH_CTA = "Continue to Home" as const
 

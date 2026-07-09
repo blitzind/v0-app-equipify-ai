@@ -13,6 +13,7 @@ import type { GrowthWorkspaceDashboardSourcePayload } from "@/lib/growth/workspa
 import type { GrowthAvaResearchLoopSummary } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-types"
 import type { RelationshipLeadSnapshotMap } from "@/lib/growth/relationship/relationship-lead-snapshot-types"
 import type { GrowthHomeLeadPoolSummary } from "@/lib/growth/home/growth-home-lead-pool-pagination"
+import type { GrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
 
 export const GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER = "ge-simplify-1b-home-workspace-summary-v1" as const
 
@@ -121,4 +122,6 @@ export type GrowthHomeWorkspaceSummaryPayload = {
   relationshipSnapshots: GrowthHomeRelationshipSnapshotEnrichment
   /** GE-AIOS-15F — lead pool pagination + scale metadata */
   leadPool: GrowthHomeLeadPoolSummary
+  /** GE-AIOS-18G — Active mission discovery runtime for Home narrative + decisions */
+  missionDiscovery: GrowthHomeMissionDiscoverySnapshot | null
 }

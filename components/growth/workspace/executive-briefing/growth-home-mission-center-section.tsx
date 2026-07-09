@@ -102,7 +102,7 @@ export function GrowthHomeMissionCenterSection({ dashboard }: Props) {
         className="flex items-center gap-2 rounded-2xl border border-border/70 bg-card p-6 text-sm text-muted-foreground"
       >
         <Loader2 className="size-4 animate-spin" aria-hidden />
-        Loading Ava&apos;s missions…
+        Loading my missions…
       </section>
     )
   }

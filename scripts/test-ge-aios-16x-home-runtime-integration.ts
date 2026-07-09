@@ -90,8 +90,9 @@ function main(): void {
   assert.doesNotMatch(memoryUi, /bullets\.length === 0\) return null/)
 
   const teamUi = readSource("components/growth/workspace/executive-briefing/growth-home-ava-specialist-team-section.tsx")
-  assert.match(teamUi, /buildHomeDefaultSpecialistTeamStatus/)
-  assert.doesNotMatch(teamUi, /team_status\.length === 0\) return null/)
+  assert.match(teamUi, /buildTeammateHandlingRows/)
+  assert.match(teamUi, /GROWTH_HOME_TEAMMATE_HANDLING_SECTION_TITLE/)
+  assert.doesNotMatch(teamUi, /specialist_name/)
 
   const waitingUi = readSource(
     "components/growth/workspace/executive-briefing/growth-home-ai-os-waiting-on-you-section.tsx",
@@ -149,7 +150,7 @@ function main(): void {
 
   const presentation = buildHomeWorkItemPresentation(workItem)
   assert.equal(presentation.companyName, "Precision Biomedical")
-  assert.equal(presentation.specialistLabel, "Sales Specialist")
+  assert.equal(presentation.specialistLabel, null)
   assert.ok(presentation.relationshipStage?.includes("qualif"))
 
   const enriched = enrichGrowthHomeWaitingOnYouItem(
@@ -205,7 +206,7 @@ function main(): void {
     statusLabel: "Waiting for approval",
   })
   assert.ok(sparseIntro.length >= 2)
-  assert.ok(sparseIntro.some((line) => /getting today's work organized/i.test(line)))
+  assert.ok(sparseIntro.some((line) => /don't have accounts|getting today/i.test(line)))
   assert.ok(sparseIntro.some((line) => /tracking 7 relationships/i.test(line)))
 
   const stubLabel = buildStubSpecialistStatusLabel({

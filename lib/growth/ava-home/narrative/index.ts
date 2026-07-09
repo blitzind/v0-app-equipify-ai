@@ -6,6 +6,7 @@ export {
   type AvaDailyActivityLine,
   type AvaDailyActivityNarrative,
   type AvaDailyActivitySection,
+  type NarrativeIntelligenceFocus,
   type AvaDailyBriefing,
   type AvaNarrativeContext,
   type AvaNarrativeFact,
@@ -53,11 +54,20 @@ export {
   buildDailyActivityCompletedLines,
   buildDailyActivityLearnedLines,
   buildDailyActivityWaitingLines,
+  buildDailyActivityWorkingNowLines,
   buildDailyActivityWorkingNextLines,
   dailyActivityLinesToStoryBlocks,
   AVA_DAILY_ACTIVITY_SECTION_LABELS,
   AVA_DAILY_ACTIVITY_SECTION_ORDER,
 } from "@/lib/growth/ava-home/narrative/engine/build-ava-daily-activity-narrative"
+
+export {
+  GROWTH_AVA_NARRATIVE_INTELLIGENCE_18F_QA_MARKER,
+  NARRATIVE_INTELLIGENCE_SECTION_LABELS,
+  buildNarrativeIntelligenceOpeningLine,
+  resolveNarrativeIntelligenceFocus,
+  resolveNarrativeIntelligenceSectionOrder,
+} from "@/lib/growth/ava-home/narrative/engine/growth-home-narrative-intelligence-18f"
 
 export { buildAccomplishmentStories, buildTodayFocus, buildTodayPriorities } from "@/lib/growth/ava-home/narrative/stories/accomplishment-story"
 export { buildApprovalStory } from "@/lib/growth/ava-home/narrative/stories/approval-story"

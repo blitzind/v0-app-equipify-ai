@@ -165,7 +165,7 @@ function RecommendationCard({
       </div>
       <p className="mt-2 text-sm">{recommendation.recommendation}</p>
       <div className="mt-2 space-y-1">
-        <p className="text-xs font-medium text-muted-foreground">Why Ava recommended this</p>
+        <p className="text-xs font-medium text-muted-foreground">Why I recommended this</p>
         <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
           {recommendation.reasoning.map((reason) => (
             <li key={reason}>{reason}</li>
@@ -339,7 +339,7 @@ export function GrowthHomeBusinessIntelligencePanel({
       ) : null}
 
       <div className="rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-        Review Ava&apos;s findings before they affect your approved Business Profile or downstream systems.
+        Review my findings before they affect your approved Business Profile or downstream systems.
       </div>
 
       {payload.generated_at ? (
@@ -387,7 +387,7 @@ export function GrowthHomeBusinessIntelligencePanel({
       {reviewProgress ? <ReviewProgressCard progress={reviewProgress} /> : null}
 
       <div className="space-y-3">
-        <p className="text-sm font-semibold">Review Ava&apos;s understanding</p>
+        <p className="text-sm font-semibold">Review my understanding</p>
         {REVIEW_FIELDS.map((item) => (
           <GrowthHomeBusinessIntelligenceReviewField
             key={item.fieldKey}

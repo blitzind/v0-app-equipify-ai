@@ -185,7 +185,7 @@ export function GrowthAvaOperatorApprovalWorkspace({
       <Card data-qa-marker={GROWTH_AVA_OPERATOR_WORKSPACE_1_QA_MARKER}>
         <CardContent className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
-          Loading Ava Approval Workspace…
+          Loading approval workspace…
         </CardContent>
       </Card>
     )
@@ -200,7 +200,7 @@ export function GrowthAvaOperatorApprovalWorkspace({
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
           <ShieldCheck className="size-5 text-indigo-600" aria-hidden />
-          Ava Approval Workspace
+          Approval workspace
         </CardTitle>
         <CardDescription>
           Review research and outreach draft, approve the package, then continue in Sequence Execution for transport
