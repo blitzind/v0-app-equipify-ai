@@ -19,15 +19,18 @@ export const AVA_HOME_WAITING_ON_YOU_TITLE = "Waiting on you" as const
 type Props = {
   aiOsUx: GrowthHomeAiOsUxViewModel
   relationshipSnapshotsById?: RelationshipLeadSnapshotMap
+  waitingCompanyByLeadId?: Record<string, string | null>
 }
 
 export function GrowthHomeAiOsWaitingOnYouSection({
   aiOsUx,
   relationshipSnapshotsById,
+  waitingCompanyByLeadId,
 }: Props) {
   const waitingOnYou = enrichGrowthHomeWaitingOnYouItems(
     aiOsUx.waitingOnYou,
     relationshipSnapshotsById,
+    waitingCompanyByLeadId,
   )
   const { waitingOnYouOverflow, approveItemsHref, approveItemsCount } = aiOsUx
   const hasItems = waitingOnYou.length > 0 || approveItemsCount > 0

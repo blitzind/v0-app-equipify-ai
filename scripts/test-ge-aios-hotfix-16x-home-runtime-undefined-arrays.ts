@@ -271,8 +271,18 @@ function main(): void {
   const workUi = readSource("components/growth/workspace/executive-briefing/growth-home-ava-work-section.tsx")
   assert.match(workUi, /normalizeAvaWorkManagerResult/)
 
+  const rhythmUi = readSource(
+    "components/growth/workspace/executive-briefing/growth-home-ava-operating-rhythm-section.tsx",
+  )
+  assert.match(rhythmUi, /data-qa-section="home-ava-operating-rhythm"/)
+  assert.match(rhythmUi, /buildHomeDefaultOperatingRhythmPhases/)
+
+  const memoryUi = readSource("components/growth/workspace/executive-briefing/growth-home-ava-memory-section.tsx")
+  assert.match(memoryUi, /data-qa-section="home-ava-memory"/)
+  assert.match(memoryUi, /HOME_RUNTIME_EMPTY_MEMORY_MESSAGE/)
+
   const teamUi = readSource("components/growth/workspace/executive-briefing/growth-home-ava-specialist-team-section.tsx")
-  assert.match(teamUi, /normalizeAvaSpecialistOrchestratorResult/)
+  assert.match(teamUi, /buildHomeDefaultSpecialistTeamStatus/)
 
   const waitingUi = readSource(
     "components/growth/workspace/executive-briefing/growth-home-ai-os-waiting-on-you-section.tsx",

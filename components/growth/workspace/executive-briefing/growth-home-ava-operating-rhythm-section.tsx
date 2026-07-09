@@ -3,6 +3,10 @@
 import { CheckCircle2, Circle, PauseCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
+  buildHomeDefaultOperatingRhythmPhases,
+  HOME_RUNTIME_EMPTY_PROGRESS_MESSAGE,
+} from "@/lib/growth/home/growth-home-runtime-presenter"
+import {
   AVA_OPERATING_RHYTHM_TODAY_PROGRESS_TITLE,
   GROWTH_OPERATING_RHYTHM_QA_MARKER,
   type AvaOperatingPhaseEntry,
@@ -34,8 +38,11 @@ function statusSuffix(status: AvaOperatingPhaseEntry["status"]): string {
 }
 
 export function GrowthHomeAvaOperatingRhythmSection({ operatingRhythm }: Props) {
-  const phaseTimeline = operatingRhythm?.phase_timeline ?? []
-  if (!operatingRhythm || phaseTimeline.length === 0) return null
+  const phaseTimeline =
+    operatingRhythm?.phase_timeline?.length
+      ? operatingRhythm.phase_timeline
+      : buildHomeDefaultOperatingRhythmPhases()
+  const usingFallback = !operatingRhythm?.phase_timeline?.length
 
   return (
     <section
@@ -46,6 +53,9 @@ export function GrowthHomeAvaOperatingRhythmSection({ operatingRhythm }: Props) 
       <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         {AVA_OPERATING_RHYTHM_TODAY_PROGRESS_TITLE}
       </h2>
+      {usingFallback ? (
+        <p className="mb-3 text-sm text-muted-foreground">{HOME_RUNTIME_EMPTY_PROGRESS_MESSAGE}</p>
+      ) : null}
       <ul className="space-y-2">
         {phaseTimeline.map((phase) => (
           <li

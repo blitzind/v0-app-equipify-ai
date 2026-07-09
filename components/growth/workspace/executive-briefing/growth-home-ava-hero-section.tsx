@@ -27,6 +27,7 @@ type Props = {
   leadPool?: GrowthHomeLeadPoolSummary | null
   leadsNeedingAction?: number
   pendingApprovals?: number
+  relationshipSnapshotCount?: number
 }
 
 function statusTone(kind: GrowthHomeAvaHeroViewModel["statusKind"]): string {
@@ -45,15 +46,22 @@ export function GrowthHomeAvaHeroSection({
   leadPool = null,
   leadsNeedingAction = 0,
   pendingApprovals = 0,
+  relationshipSnapshotCount = 0,
 }: Props) {
   const teammate = resolveAiTeammatePresentation()
-  const scaleLine = buildHomeRelationshipScaleLine(leadPool)
+  const scaleLine = buildHomeRelationshipScaleLine(leadPool, {
+    relationshipSnapshotCount,
+    leadsNeedingAction,
+  })
   const introLines = buildHomeRuntimeBriefingIntro({
     leadPool,
     leadsNeedingAction,
     pendingApprovals,
     activeWork: hero.workManager?.active_work ?? null,
     waitingCount: Math.max(hero.additionalDecisionCount, pendingApprovals),
+    relationshipSnapshotCount,
+    hasWorkPlan: (hero.workManager?.work_plan.length ?? 0) > 0,
+    statusLabel: hero.statusLabel,
   })
   const briefingSummary = hero.dailyBriefing?.summary?.trim() ?? null
   const storyBlocks = hero.storyBlocks ?? []

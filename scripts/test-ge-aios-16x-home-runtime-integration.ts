@@ -75,13 +75,23 @@ function main(): void {
 
   const workUi = readSource("components/growth/workspace/executive-briefing/growth-home-ava-work-section.tsx")
   assert.match(workUi, /buildHomeWorkItemPresentation/)
-  assert.match(workUi, /relationshipStage/)
-  assert.match(workUi, /specialistLabel/)
-  assert.doesNotMatch(workUi, /Decision Engine|Work Manager/)
+  assert.match(workUi, /HOME_RUNTIME_EMPTY_WORK_MESSAGE/)
+  assert.doesNotMatch(workUi, /work_plan\.length === 0\) return null/)
+
+  const rhythmUi = readSource(
+    "components/growth/workspace/executive-briefing/growth-home-ava-operating-rhythm-section.tsx",
+  )
+  assert.match(rhythmUi, /buildHomeDefaultOperatingRhythmPhases/)
+  assert.match(rhythmUi, /HOME_RUNTIME_EMPTY_PROGRESS_MESSAGE/)
+  assert.doesNotMatch(rhythmUi, /phaseTimeline\.length === 0\) return null/)
+
+  const memoryUi = readSource("components/growth/workspace/executive-briefing/growth-home-ava-memory-section.tsx")
+  assert.match(memoryUi, /HOME_RUNTIME_EMPTY_MEMORY_MESSAGE/)
+  assert.doesNotMatch(memoryUi, /bullets\.length === 0\) return null/)
 
   const teamUi = readSource("components/growth/workspace/executive-briefing/growth-home-ava-specialist-team-section.tsx")
-  assert.match(teamUi, /team_status\.map/)
-  assert.match(teamUi, /status_label/)
+  assert.match(teamUi, /buildHomeDefaultSpecialistTeamStatus/)
+  assert.doesNotMatch(teamUi, /team_status\.length === 0\) return null/)
 
   const waitingUi = readSource(
     "components/growth/workspace/executive-briefing/growth-home-ai-os-waiting-on-you-section.tsx",
@@ -160,7 +170,21 @@ function main(): void {
     },
   )
   assert.doesNotMatch(enriched.label, /account waiting/i)
+  assert.doesNotMatch(enriched.label, /this account waiting/i)
   assert.match(enriched.label, /Precision|review|outreach|qualification/i)
+
+  const genericWaiting = enrichGrowthHomeWaitingOnYouItem(
+    {
+      id: "queue-waiting-1",
+      label: "Account waiting",
+      detail: "Human approval required before I can continue.",
+      href: `/growth/leads/${LEAD_ID}`,
+    },
+    undefined,
+    { [LEAD_ID]: "Precision Biomedical" },
+  )
+  assert.doesNotMatch(genericWaiting.label, /this account/i)
+  assert.match(genericWaiting.label, /Precision Biomedical|Review next step|Review pending/i)
 
   const intro = buildHomeRuntimeBriefingIntro({
     leadPool,
@@ -168,9 +192,21 @@ function main(): void {
     pendingApprovals: 2,
     activeWork: workItem,
     waitingCount: 2,
+    hasWorkPlan: true,
   })
   assert.ok(intro.length >= 2)
-  assert.ok(intro.some((line) => /relationship|pipeline|approval|Precision/i.test(line)))
+  assert.ok(intro.some((line) => /relationship|pipeline|approval|Precision|getting today/i.test(line)))
+
+  const sparseIntro = buildHomeRuntimeBriefingIntro({
+    leadsNeedingAction: 7,
+    pendingApprovals: 7,
+    waitingCount: 7,
+    hasWorkPlan: false,
+    statusLabel: "Waiting for approval",
+  })
+  assert.ok(sparseIntro.length >= 2)
+  assert.ok(sparseIntro.some((line) => /getting today's work organized/i.test(line)))
+  assert.ok(sparseIntro.some((line) => /tracking 7 relationships/i.test(line)))
 
   const stubLabel = buildStubSpecialistStatusLabel({
     specialistId: "marketing",

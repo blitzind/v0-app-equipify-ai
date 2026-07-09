@@ -4,10 +4,10 @@ import Link from "next/link"
 import { ArrowRight, CheckCircle2, CircleDashed, PauseCircle } from "lucide-react"
 import type { GrowthHomeLeadPoolSummary } from "@/lib/growth/home/growth-home-lead-pool-pagination"
 import {
-  buildHomeRuntimeBriefingIntro,
   buildHomeRelationshipScaleLine,
   buildHomeWorkItemPresentation,
   GROWTH_HOME_RUNTIME_INTEGRATION_16X_QA_MARKER,
+  HOME_RUNTIME_EMPTY_WORK_MESSAGE,
   type HomeWorkItemPresentation,
 } from "@/lib/growth/home/growth-home-runtime-presenter"
 import { normalizeAvaWorkManagerResult } from "@/lib/growth/home/growth-home-runtime-safe-defaults"
@@ -92,18 +92,22 @@ function WorkItemList({
 
 export function GrowthHomeAvaWorkSection({ workManager, leadPool = null }: Props) {
   const safeWorkManager = normalizeAvaWorkManagerResult(workManager)
-  if (!safeWorkManager || safeWorkManager.work_plan.length === 0) return null
-
+  const hasWorkPlan = Boolean(safeWorkManager && safeWorkManager.work_plan.length > 0)
   const scaleLine = buildHomeRelationshipScaleLine(leadPool)
-  const upNextItems = safeWorkManager.work_plan
-    .filter((entry) => entry.status === "ready" && entry.work_item_id !== safeWorkManager.active_work?.id)
-    .slice(0, 3)
-    .map((entry) => safeWorkManager.all_work_items.find((row) => row.id === entry.work_item_id))
-    .filter((row): row is AvaWorkItem => Boolean(row))
 
-  const activePresentation = safeWorkManager.active_work
-    ? buildHomeWorkItemPresentation(safeWorkManager.active_work)
-    : null
+  const upNextItems = hasWorkPlan
+    ? safeWorkManager!.work_plan
+        .filter((entry) => entry.status === "ready" && entry.work_item_id !== safeWorkManager!.active_work?.id)
+        .slice(0, 3)
+        .map((entry) => safeWorkManager!.all_work_items.find((row) => row.id === entry.work_item_id))
+        .filter((row): row is AvaWorkItem => Boolean(row))
+    : []
+
+  const activePresentation =
+    safeWorkManager?.active_work != null
+      ? buildHomeWorkItemPresentation(safeWorkManager.active_work)
+      : null
+  const wm = hasWorkPlan ? safeWorkManager! : null
 
   return (
     <section
@@ -119,7 +123,10 @@ export function GrowthHomeAvaWorkSection({ workManager, leadPool = null }: Props
         {scaleLine ? <p className="text-sm text-muted-foreground">{scaleLine}</p> : null}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      {!wm ? (
+        <p className="text-sm text-muted-foreground">{HOME_RUNTIME_EMPTY_WORK_MESSAGE}</p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
         {activePresentation ? (
           <div className="space-y-2 sm:col-span-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-300">
@@ -143,18 +150,18 @@ export function GrowthHomeAvaWorkSection({ workManager, leadPool = null }: Props
             {AVA_WORK_MANAGER_WAITING_ON_YOU_TITLE}
           </p>
           <WorkItemList
-            items={safeWorkManager.operator_queue.slice(0, 4)}
+            items={wm.operator_queue.slice(0, 4)}
             emptyLabel="Nothing waiting on you."
           />
         </div>
 
-        {safeWorkManager.blocked.length > 0 ? (
+        {wm.blocked.length > 0 ? (
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
               {AVA_WORK_MANAGER_BLOCKED_TITLE}
             </p>
             <ul className="space-y-2">
-              {safeWorkManager.blocked.slice(0, 3).map((item) => (
+              {wm.blocked.slice(0, 3).map((item) => (
                 <li
                   key={item.id}
                   className="flex items-start gap-2 rounded-lg border border-amber-200/60 bg-amber-50/20 px-1 py-1 dark:border-amber-900/40 dark:bg-amber-950/10"
@@ -169,13 +176,13 @@ export function GrowthHomeAvaWorkSection({ workManager, leadPool = null }: Props
           </div>
         ) : null}
 
-        {safeWorkManager.completed_today.length > 0 ? (
+        {wm.completed_today.length > 0 ? (
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {AVA_WORK_MANAGER_COMPLETED_TODAY_TITLE}
             </p>
             <ul className="space-y-1.5">
-              {safeWorkManager.completed_today.slice(0, 4).map((item) => (
+              {wm.completed_today.slice(0, 4).map((item) => (
                 <li key={item.id} className="flex items-start gap-2 text-sm text-foreground">
                   <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden />
                   <span>{buildHomeWorkItemPresentation(item).companyName ?? item.title}</span>
@@ -184,7 +191,8 @@ export function GrowthHomeAvaWorkSection({ workManager, leadPool = null }: Props
             </ul>
           </div>
         ) : null}
-      </div>
+        </div>
+      )}
     </section>
   )
 }

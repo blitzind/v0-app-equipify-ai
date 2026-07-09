@@ -207,6 +207,26 @@ export function GrowthHomeExecutiveBriefingDashboard({
     [aiOsUx, dashboard],
   )
 
+  const relationshipSnapshotCount = useMemo(() => {
+    const snapshots = workspaceSummary?.relationshipSnapshots
+    if (!snapshots) return 0
+    const enriched = snapshots.meta?.enriched ?? 0
+    if (enriched > 0) return enriched
+    return Object.keys(snapshots.byLeadId ?? {}).length
+  }, [workspaceSummary?.relationshipSnapshots])
+
+  const waitingCompanyByLeadId = useMemo(() => {
+    const topItems = workspaceSummary?.sources?.dailyRevenueWorkQueueDisplay?.top_items ?? []
+    const map: Record<string, string | null> = {}
+    for (const item of topItems) {
+      const company = item.company_name?.trim()
+      if (item.lead_id && company && company !== "Account") {
+        map[item.lead_id] = company
+      }
+    }
+    return Object.keys(map).length > 0 ? map : undefined
+  }, [workspaceSummary?.sources?.dailyRevenueWorkQueueDisplay?.top_items])
+
   const hasCustomerGrowthContent =
     briefing.customerSuccessMissions.length > 0 ||
     briefing.customerHealth.length > 0 ||
@@ -230,6 +250,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
         leadPool={workspaceSummary?.leadPool ?? null}
         leadsNeedingAction={workspaceSummary?.operatorTasks.leadsNeedingAction ?? 0}
         pendingApprovals={workspaceSummary?.operatorTasks.pendingApprovals ?? 0}
+        relationshipSnapshotCount={relationshipSnapshotCount}
       />
 
       <GrowthHomeAvaWorkSection
@@ -246,6 +267,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
       <GrowthHomeAiOsWaitingOnYouSection
         aiOsUx={aiOsUx}
         relationshipSnapshotsById={workspaceSummary?.relationshipSnapshots?.byLeadId}
+        waitingCompanyByLeadId={waitingCompanyByLeadId}
       />
 
       <GrowthHomeExecutiveSnapshotSection kpis={executiveSnapshot} />
