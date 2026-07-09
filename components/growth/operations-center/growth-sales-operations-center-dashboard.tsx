@@ -27,10 +27,8 @@ import { GROWTH_TRAINING_WORKSPACE_ROUTE } from "@/lib/growth/training/growth-tr
 import { GROWTH_AVA_ABOUT_WORKSPACE_ROUTE } from "@/lib/growth/ava-about/growth-ava-about-workspace-types"
 import { buildRelationshipLeadSnapshotsFromResearchLoop, mergeRelationshipLeadSnapshotMaps } from "@/lib/growth/relationship/project-relationship-graph-enrichment"
 import { readAvaNarrativeMetricsSnapshot } from "@/lib/growth/ava-home/narrative"
-import {
-  readOperatingRhythmMemory,
-  resolvePersistedOrganizationalMemoryStore,
-} from "@/lib/growth/operating-rhythm/bridges/memory-bridge"
+import { readOperatingRhythmMemory } from "@/lib/growth/operating-rhythm/bridges/memory-bridge"
+import { resolvePersistedOrganizationalMemoryStore } from "@/lib/growth/memory/storage/organization-memory-store"
 import { normalizeGrowthHomeAiOsUxViewModel } from "@/lib/growth/home/growth-home-runtime-safe-defaults"
 import {
   buildTeammateHandlingRows,
@@ -41,7 +39,7 @@ import { synthesizeGrowthHomeExecutiveBriefing } from "@/lib/growth/workspace/ex
 import { buildAvaHomeHero } from "@/lib/growth/workspace/executive-briefing/growth-home-ava-hero-7a"
 import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
 import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
-import { useAdmin } from "@/components/admin/use-admin"
+import { useAdmin } from "@/lib/admin-store"
 import type { GrowthHomeWorkspaceSummaryPayload } from "@/lib/growth/home/growth-home-workspace-summary-types"
 import { Skeleton } from "@/components/ui/skeleton"
 

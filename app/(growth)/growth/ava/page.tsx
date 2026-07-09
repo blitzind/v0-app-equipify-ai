@@ -4,7 +4,7 @@ import { GrowthWorkspacePageContent } from "@/components/growth/shell/growth-wor
 import { GrowthAvaAboutDashboard } from "@/components/growth/ava-about/growth-ava-about-dashboard"
 import { useGrowthAvaAboutData } from "@/components/growth/ava-about/use-growth-ava-about-data"
 import { useGrowthWorkspaceDashboard } from "@/components/growth/workspace/use-growth-workspace-dashboard"
-import { useAdmin } from "@/components/admin/use-admin"
+import { useAdmin } from "@/lib/admin-store"
 
 export default function GrowthAvaAboutPage() {
   const { dashboard, workspaceSummary } = useGrowthWorkspaceDashboard()
