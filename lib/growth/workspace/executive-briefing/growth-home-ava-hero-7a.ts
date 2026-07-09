@@ -9,12 +9,12 @@
 import { buildAvaDailyBriefing } from "@/lib/growth/ava-home/narrative/engine/build-ava-daily-briefing"
 import { buildRelationshipLeadSnapshotsFromResearchLoop, mergeRelationshipLeadSnapshotMaps } from "@/lib/growth/relationship/project-relationship-graph-enrichment"
 import {
-  AVA_NARRATIVE_ALL_NORMAL_LINE,
   GROWTH_AVA_NARRATIVE_ENGINE_QA_MARKER,
   type AvaDailyBriefing,
   type AvaNarrativeMetricsSnapshot,
   type AvaStoryBlock,
 } from "@/lib/growth/ava-home/narrative/narrative-types"
+import { AVA_NARRATIVE_ALL_NORMAL_LINE } from "@/lib/growth/ava-home/narrative/copy/narrative-copy"
 import type { GrowthHomeWorkspaceSummaryPayload } from "@/lib/growth/home/growth-home-workspace-summary-types"
 import type { GrowthAvaResearchLoopSummary } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-types"
 import type { AvaMemorySummary, AvaOrganizationalMemoryStore } from "@/lib/growth/memory/types"
