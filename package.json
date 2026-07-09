@@ -822,6 +822,7 @@
     "test:ge-aios-17c-organizational-knowledge": "tsx scripts/test-ge-aios-17c-organizational-knowledge.ts",
     "test:ge-aios-17d-daily-activity-narrative": "tsx scripts/test-ge-aios-17d-daily-activity-narrative.ts",
     "test:ge-aios-17e-home-canonical-runtime-cleanup": "tsx scripts/test-ge-aios-17e-home-canonical-runtime-cleanup.ts",
+    "test:ge-aios-17f-home-surface-consolidation": "tsx scripts/test-ge-aios-17f-home-surface-consolidation.ts",
     "test:ge-aios-hotfix-16x-home-runtime-undefined-arrays": "tsx scripts/test-ge-aios-hotfix-16x-home-runtime-undefined-arrays.ts",
     "test:ge-aios-7c-ava-led-lead-discovery": "tsx scripts/test-ge-aios-7c-ava-led-lead-discovery.ts",
     "test:ge-aios-ux-1b-home-queue-integration": "tsx scripts/test-ge-aios-ux-1b-home-queue-integration.ts",

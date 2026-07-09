@@ -1,7 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { AidenAskLauncher } from "@/components/growth/aiden-ask-launcher"
+import { GrowthAidenAskLauncherGate } from "@/components/growth/growth-aiden-ask-launcher-gate"
 import { GrowthCommandNavigationPalette } from "@/components/growth/growth-command-navigation-palette"
 import { GrowthNavigationProvider } from "@/components/growth/growth-navigation-provider"
 import { GrowthWorkspaceShell } from "@/components/growth/shell/growth-workspace-shell"
@@ -19,7 +19,7 @@ export default function GrowthWorkspaceLayout({ children }: { children: ReactNod
           <GrowthNavigationProvider>
             <GrowthWorkspaceShell>{children}</GrowthWorkspaceShell>
             <GrowthCommandNavigationPalette />
-            <AidenAskLauncher />
+            <GrowthAidenAskLauncherGate />
           </GrowthNavigationProvider>
         </TenantProvider>
       </OrgPermissionsProvider>

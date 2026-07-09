@@ -22,11 +22,15 @@ type DebugSourceSummary = {
   table_count_total?: number
 }
 
+const HOME_DEBUG_FOOTER_ENABLED = process.env.NODE_ENV !== "production"
+
 export function GrowthHomeDebugFooter() {
   const [summary, setSummary] = useState<DebugSourceSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!HOME_DEBUG_FOOTER_ENABLED) return
+
     let cancelled = false
 
     void (async () => {
@@ -53,7 +57,8 @@ export function GrowthHomeDebugFooter() {
     }
   }, [])
 
-  if (error && process.env.NODE_ENV !== "production") return null
+  if (!HOME_DEBUG_FOOTER_ENABLED) return null
+
   if (error) {
     return (
       <footer

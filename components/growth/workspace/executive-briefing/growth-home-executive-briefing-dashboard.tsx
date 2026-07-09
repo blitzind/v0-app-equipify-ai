@@ -33,6 +33,13 @@ import {
 } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-2a"
 import { buildAvaHomeHero } from "@/lib/growth/workspace/executive-briefing/growth-home-ava-hero-7a"
 import {
+  GROWTH_HOME_ADVANCED_OPERATIONS_SUBTITLE,
+  GROWTH_HOME_ADVANCED_OPERATIONS_TITLE,
+  GROWTH_HOME_SETUP_DIAGNOSTICS_SUBTITLE,
+  GROWTH_HOME_SETUP_DIAGNOSTICS_TITLE,
+  GROWTH_HOME_SURFACE_CONSOLIDATION_17F_QA_MARKER,
+} from "@/lib/growth/home/growth-home-surface-consolidation-17f"
+import {
   normalizeGrowthHomeAvaHeroViewModel,
   normalizeGrowthHomeAiOsUxViewModel,
 } from "@/lib/growth/home/growth-home-runtime-safe-defaults"
@@ -250,121 +257,139 @@ export function GrowthHomeExecutiveBriefingDashboard({
       data-qa-marker-premium-ux={GROWTH_AIOS_HOME_PREMIUM_UX_1A_QA_MARKER}
       data-qa-marker-briefing-2a={GROWTH_HOME_EXECUTIVE_BRIEFING_2A_QA_MARKER}
       data-qa-marker-narrative-10a={GROWTH_AVA_NARRATIVE_ENGINE_QA_MARKER}
+      data-qa-marker-17f={GROWTH_HOME_SURFACE_CONSOLIDATION_17F_QA_MARKER}
       data-growth-action-first-order="actions-before-metrics"
       data-qa-marker-action-first={GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER}
     >
-      <GrowthHomeAvaHeroSection
-        hero={avaHero}
-        lastUpdateLabel={lastUpdateLabel}
-        leadPool={workspaceSummary?.leadPool ?? null}
-        leadsNeedingAction={workspaceSummary?.operatorTasks.leadsNeedingAction ?? 0}
-        pendingApprovals={workspaceSummary?.operatorTasks.pendingApprovals ?? 0}
-        relationshipSnapshotCount={relationshipSnapshotCount}
-      />
+      <div data-qa-section="home-canonical-surface" className="space-y-6">
+        <GrowthHomeAvaHeroSection
+          hero={avaHero}
+          lastUpdateLabel={lastUpdateLabel}
+          leadPool={workspaceSummary?.leadPool ?? null}
+          leadsNeedingAction={workspaceSummary?.operatorTasks.leadsNeedingAction ?? 0}
+          pendingApprovals={workspaceSummary?.operatorTasks.pendingApprovals ?? 0}
+          relationshipSnapshotCount={relationshipSnapshotCount}
+        />
 
-      <GrowthHomeAvaWorkSection
-        workManager={avaHero.workManager ?? null}
-        leadPool={workspaceSummary?.leadPool ?? null}
-      />
+        <GrowthHomeAvaWorkSection
+          workManager={avaHero.workManager ?? null}
+          leadPool={workspaceSummary?.leadPool ?? null}
+        />
 
-      <GrowthHomeAvaOperatingRhythmSection operatingRhythm={avaHero.operatingRhythm ?? null} />
+        <GrowthHomeAvaOperatingRhythmSection operatingRhythm={avaHero.operatingRhythm ?? null} />
 
-      <GrowthHomeAvaMemorySection memorySummary={avaHero.memorySummary ?? null} />
+        <GrowthHomeAvaMemorySection memorySummary={avaHero.memorySummary ?? null} />
 
-      <GrowthHomeAvaSpecialistTeamSection specialistOrchestrator={avaHero.specialistOrchestrator ?? null} />
+        <GrowthHomeAvaSpecialistTeamSection specialistOrchestrator={avaHero.specialistOrchestrator ?? null} />
 
-      <GrowthHomeAiOsWaitingOnYouSection
-        aiOsUx={aiOsUx}
-        relationshipSnapshotsById={workspaceSummary?.relationshipSnapshots?.byLeadId}
-        waitingCompanyByLeadId={waitingCompanyByLeadId}
-      />
+        <GrowthHomeAiOsWaitingOnYouSection
+          aiOsUx={aiOsUx}
+          relationshipSnapshotsById={workspaceSummary?.relationshipSnapshots?.byLeadId}
+          waitingCompanyByLeadId={waitingCompanyByLeadId}
+        />
 
-      <GrowthHomeExecutiveSnapshotSection kpis={executiveSnapshot} />
-
-      <GrowthHomeAvaResearchQueuePanel
-        researchLoopSummary={avaConsole?.researchLoopSummary ?? null}
-        onCompleted={onResearchLoopCompleted}
-      />
-
-      <GrowthHomeStartAvaSetupSection dashboard={dashboard} />
+        <GrowthHomeExecutiveSnapshotSection kpis={executiveSnapshot} />
+      </div>
 
       <GrowthHomeCollapsibleSection
-        sectionId="research-growth-strategy"
-        title="Research & Growth Strategy"
-        subtitle="Missions I'm running and the outreach I'm preparing."
-        defaultOpen
+        sectionId="advanced-operations"
+        title={GROWTH_HOME_ADVANCED_OPERATIONS_TITLE}
+        subtitle={GROWTH_HOME_ADVANCED_OPERATIONS_SUBTITLE}
       >
-        <GrowthHomeMissionCenterSection dashboard={dashboard} />
-        <GrowthHomeGrowthStrategySection dailyWorkQueue={aiOsUx.dailyWorkQueue} />
-        <GrowthHomeMarketingMissionsSection missions={briefing.marketingMissions} />
-      </GrowthHomeCollapsibleSection>
-
-      <GrowthHomeCollapsibleSection
-        sectionId="customer-growth"
-        title="Customer Growth"
-        subtitle={GROWTH_HOME_CUSTOMER_GROWTH_SUBTITLE}
-      >
-        <div data-qa-section="home-customer-growth" className="space-y-4">
-          <GrowthHomeCustomerSuccessMissionsSection missions={briefing.customerSuccessMissions} />
-          {hasCustomerGrowthContent ? (
-            <div className="space-y-4">
-              <GrowthHomeCustomerHealthSection items={briefing.customerHealth} />
-              <GrowthHomeExpansionOpportunitiesSection items={briefing.expansionOpportunities} />
-              <GrowthHomeRenewalsMonitoringSection items={briefing.renewalsMonitoring} />
-              <GrowthHomeCustomerWinsSection wins={briefing.customerWins} />
-            </div>
-          ) : (
-            <GrowthHomeCustomerGrowthEmptySection />
-          )}
-        </div>
-      </GrowthHomeCollapsibleSection>
-
-      <GrowthHomeCollapsibleSection
-        sectionId="initiatives"
-        title="Initiatives"
-        subtitle="Recommendations I've prepared for you to consider."
-      >
-        <GrowthHomeInitiativeRecommendationsSection recommendations={briefing.initiativeRecommendations} />
-      </GrowthHomeCollapsibleSection>
-
-      <GrowthHomeCollapsibleSection
-        sectionId="ava-accomplished"
-        title="What I've accomplished"
-        subtitle="A timeline of the work I've completed."
-      >
-        <GrowthHomeTimelineSection periods={briefing.timeline} />
-      </GrowthHomeCollapsibleSection>
-
-      <GrowthHomeCollapsibleSection
-        sectionId="operational-readiness"
-        title={GROWTH_HOME_OPERATIONAL_READINESS_TITLE}
-        subtitle={GROWTH_HOME_OPERATIONAL_READINESS_SUBTITLE}
-      >
-        <div data-qa-section="home-operational-readiness" className="grid gap-4 lg:grid-cols-2">
-          <GrowthHomeMailboxDomainHealthSection health={aiOsUx.mailboxDomainHealth} embedded />
-          <GrowthHomeAutonomousReadinessSection readiness={aiOsUx.autonomousReadiness} embedded />
-        </div>
-      </GrowthHomeCollapsibleSection>
-
-      <GrowthHomeCollapsibleSection
-        sectionId="ai-activity"
-        title="AI Activity"
-        subtitle="Detailed activity, throughput, and diagnostics."
-      >
-        <div data-qa-section="home-everything-else" className="space-y-5">
-          <GrowthHomeAvaLiveStatusSection status={aiOsUx.liveStatus} />
-          <GrowthHomeThroughputSection metrics={aiOsUx.throughput} />
-          <GrowthHomeCheckInSection checkIn={briefing.checkIn} lastUpdateLabel={lastUpdateLabel} />
-          <GrowthHomeMissionHealthSection items={briefing.missionHealth} />
-          <GrowthHomeRevenueForecastSection forecast={briefing.revenueForecast} />
-          <GrowthHomeBusinessSnapshotSection metrics={briefing.businessSnapshot} />
-          <GrowthHomeNeedsReviewSection needsReview={briefing.needsReview} />
-          <GrowthHomeWorkSummarySection categories={briefing.workSummary} />
-          <GrowthHomeRecommendationCard
-            recommendation={null}
-            additionalRecommendations={briefing.additionalRecommendations}
+        <div data-qa-section="home-advanced-operations" className="space-y-5">
+          <GrowthHomeAvaResearchQueuePanel
+            researchLoopSummary={avaConsole?.researchLoopSummary ?? null}
+            onCompleted={onResearchLoopCompleted}
           />
-          {everythingElse}
+
+          <GrowthHomeCollapsibleSection
+            sectionId="research-growth-strategy"
+            title="Research & Growth Strategy"
+            subtitle="Missions I'm running and the outreach I'm preparing."
+          >
+            <GrowthHomeMissionCenterSection dashboard={dashboard} />
+            <GrowthHomeGrowthStrategySection dailyWorkQueue={aiOsUx.dailyWorkQueue} />
+            <GrowthHomeMarketingMissionsSection missions={briefing.marketingMissions} />
+          </GrowthHomeCollapsibleSection>
+
+          <GrowthHomeCollapsibleSection
+            sectionId="customer-growth"
+            title="Customer Growth"
+            subtitle={GROWTH_HOME_CUSTOMER_GROWTH_SUBTITLE}
+          >
+            <div data-qa-section="home-customer-growth" className="space-y-4">
+              <GrowthHomeCustomerSuccessMissionsSection missions={briefing.customerSuccessMissions} />
+              {hasCustomerGrowthContent ? (
+                <div className="space-y-4">
+                  <GrowthHomeCustomerHealthSection items={briefing.customerHealth} />
+                  <GrowthHomeExpansionOpportunitiesSection items={briefing.expansionOpportunities} />
+                  <GrowthHomeRenewalsMonitoringSection items={briefing.renewalsMonitoring} />
+                  <GrowthHomeCustomerWinsSection wins={briefing.customerWins} />
+                </div>
+              ) : (
+                <GrowthHomeCustomerGrowthEmptySection />
+              )}
+            </div>
+          </GrowthHomeCollapsibleSection>
+
+          <GrowthHomeCollapsibleSection
+            sectionId="initiatives"
+            title="Initiatives"
+            subtitle="Recommendations I've prepared for you to consider."
+          >
+            <GrowthHomeInitiativeRecommendationsSection recommendations={briefing.initiativeRecommendations} />
+          </GrowthHomeCollapsibleSection>
+
+          <GrowthHomeCollapsibleSection
+            sectionId="ava-accomplished"
+            title="What I've accomplished"
+            subtitle="A timeline of the work I've completed."
+          >
+            <GrowthHomeTimelineSection periods={briefing.timeline} />
+          </GrowthHomeCollapsibleSection>
+        </div>
+      </GrowthHomeCollapsibleSection>
+
+      <GrowthHomeCollapsibleSection
+        sectionId="setup-diagnostics"
+        title={GROWTH_HOME_SETUP_DIAGNOSTICS_TITLE}
+        subtitle={GROWTH_HOME_SETUP_DIAGNOSTICS_SUBTITLE}
+      >
+        <div data-qa-section="home-setup-diagnostics" className="space-y-5">
+          <GrowthHomeStartAvaSetupSection dashboard={dashboard} />
+
+          <GrowthHomeCollapsibleSection
+            sectionId="operational-readiness"
+            title={GROWTH_HOME_OPERATIONAL_READINESS_TITLE}
+            subtitle={GROWTH_HOME_OPERATIONAL_READINESS_SUBTITLE}
+          >
+            <div data-qa-section="home-operational-readiness" className="grid gap-4 lg:grid-cols-2">
+              <GrowthHomeMailboxDomainHealthSection health={aiOsUx.mailboxDomainHealth} embedded />
+              <GrowthHomeAutonomousReadinessSection readiness={aiOsUx.autonomousReadiness} embedded />
+            </div>
+          </GrowthHomeCollapsibleSection>
+
+          <GrowthHomeCollapsibleSection
+            sectionId="ai-activity"
+            title="AI Activity"
+            subtitle="Detailed activity, throughput, and diagnostics."
+          >
+            <div data-qa-section="home-everything-else" className="space-y-5">
+              <GrowthHomeAvaLiveStatusSection status={aiOsUx.liveStatus} />
+              <GrowthHomeThroughputSection metrics={aiOsUx.throughput} />
+              <GrowthHomeCheckInSection checkIn={briefing.checkIn} lastUpdateLabel={lastUpdateLabel} />
+              <GrowthHomeMissionHealthSection items={briefing.missionHealth} />
+              <GrowthHomeRevenueForecastSection forecast={briefing.revenueForecast} />
+              <GrowthHomeBusinessSnapshotSection metrics={briefing.businessSnapshot} />
+              <GrowthHomeNeedsReviewSection needsReview={briefing.needsReview} />
+              <GrowthHomeWorkSummarySection categories={briefing.workSummary} />
+              <GrowthHomeRecommendationCard
+                recommendation={null}
+                additionalRecommendations={briefing.additionalRecommendations}
+              />
+              {everythingElse}
+            </div>
+          </GrowthHomeCollapsibleSection>
         </div>
       </GrowthHomeCollapsibleSection>
     </div>
