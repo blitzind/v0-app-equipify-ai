@@ -15,6 +15,13 @@ import {
   buildBusinessIntelligenceCorrections,
   buildBusinessIntelligenceMemoryEvents,
 } from "@/lib/growth/memory/bridges/business-intelligence-memory"
+import { extractSalesOutcomeMemoryEvents } from "@/lib/growth/specialists/execution/sales-specialist-memory-bridge"
+import type { SalesOutcome } from "@/lib/growth/specialists/execution/sales-outcome-types"
+import {
+  buildKnowledgeInsightBullets,
+  buildOrganizationalKnowledge,
+} from "@/lib/growth/memory/knowledge/build-organizational-knowledge"
+import type { OrganizationalKnowledgeItem } from "@/lib/growth/memory/knowledge/organization-knowledge-types"
 import {
   buildMemoryStoreFromEvents,
   recordMemoryEvents,
@@ -29,6 +36,7 @@ import {
   summarizeMemoryPeriod,
 } from "@/lib/growth/memory/summaries/summarize-memory-period"
 import { buildOrganizationMemoryTimeline } from "@/lib/growth/memory/timeline/organization-memory-timeline"
+import { mergeOrganizationalMemoryStore } from "@/lib/growth/memory/storage/organization-memory-store"
 import {
   GROWTH_MEMORY_ENGINE_QA_MARKER,
   type AvaMemorySummary,
@@ -49,6 +57,12 @@ export type RunMemoryEngineInput = {
   timeline: GrowthHomeTimelinePeriod[]
   persistedStore?: AvaOrganizationalMemoryStore | null
   adapters?: MemoryEngineAdapterInput
+  salesOutcomes?: SalesOutcome[]
+  salesDailySummary?: import("@/lib/growth/specialists/execution/sales-outcome-types").SalesOutcomeDailySummary | null
+  /** GE-AIOS-17C — Server-hydrated organizational knowledge (canonical when present) */
+  organizationalKnowledge?: OrganizationalKnowledgeItem[] | null
+  /** GE-AIOS-17C — BI report for client-side knowledge rebuild when server payload absent */
+  businessIntelligenceReport?: import("@/lib/growth/business-intelligence/business-intelligence-types").BusinessIntelligenceReport | null
 }
 
 /** Future hooks — NOT implemented in 12A. */
@@ -68,22 +82,11 @@ export function forgetMemory(): { forgotten: false; reason: "deterministic_only"
   return { forgotten: false, reason: "deterministic_only" }
 }
 
-function mergeEvents(
+function mergePersistedStore(
   existing: AvaOrganizationalMemoryStore | null | undefined,
   incoming: AvaOrganizationalMemoryStore,
 ): AvaOrganizationalMemoryStore {
-  const eventIds = new Set((existing?.events ?? []).map((row) => row.id))
-  const mergedEvents = [...(existing?.events ?? [])]
-  for (const event of incoming.events) {
-    if (eventIds.has(event.id)) continue
-    mergedEvents.push(event)
-    eventIds.add(event.id)
-  }
-  return {
-    ...incoming,
-    events: mergedEvents.slice(-500),
-    preferences: incoming.preferences,
-  }
+  return mergeOrganizationalMemoryStore(existing, incoming)
 }
 
 export function runMemoryEngine(input: RunMemoryEngineInput): {
@@ -119,23 +122,25 @@ export function runMemoryEngine(input: RunMemoryEngineInput): {
     narrativeContext,
   })
 
+  const salesOutcomeEvents = extractSalesOutcomeMemoryEvents(input.salesOutcomes ?? [])
+
   const preferences = buildOrganizationPreferences({
     generatedAt: input.generatedAt,
     workspaceSummary: input.workspaceSummary,
     narrativeContext,
-    events: [...recorded.events, ...biEvents],
+    events: [...recorded.events, ...biEvents, ...salesOutcomeEvents],
     existingPreferences: input.persistedStore?.preferences,
   })
 
   const draftStore = buildMemoryStoreFromEvents({
     organizationId,
     generatedAt: input.generatedAt,
-    events: [...recorded.events, ...biEvents],
+    events: [...recorded.events, ...biEvents, ...salesOutcomeEvents],
     preferences,
     existingPreferences: preferences,
   })
 
-  const store = mergeEvents(input.persistedStore, draftStore)
+  const store = mergePersistedStore(input.persistedStore, draftStore)
   const detected_patterns = detectMemoryPatterns(store.events)
   const timeline = buildOrganizationMemoryTimeline({
     events: store.events,
@@ -145,16 +150,30 @@ export function runMemoryEngine(input: RunMemoryEngineInput): {
     narrativeContext,
     generatedAt: input.generatedAt,
   })
+
+  const resolvedKnowledge =
+    input.organizationalKnowledge && input.organizationalKnowledge.length > 0
+      ? input.organizationalKnowledge
+      : buildOrganizationalKnowledge({
+          organizationId,
+          generatedAt: input.generatedAt,
+          report: input.businessIntelligenceReport ?? null,
+          memoryEvents: store.events,
+          salesOutcomes: input.salesOutcomes ?? [],
+        })
+
   const period_summary = summarizeMemoryPeriod({
     events: store.events,
     timeline,
     generatedAt: input.generatedAt,
+    salesDailySummary: input.salesDailySummary ?? null,
   })
   const learned_insights = buildLearnedInsights({
     patterns: detected_patterns,
     preferences: store.preferences,
     events: store.events,
     corrections,
+    organizationalKnowledge: resolvedKnowledge,
   })
 
   const sortedEvents = [...store.events].sort(
@@ -174,6 +193,7 @@ export function runMemoryEngine(input: RunMemoryEngineInput): {
     timeline,
     learned_insights,
     period_summary,
+    organizational_knowledge: resolvedKnowledge,
   }
 
   return { summary, store }

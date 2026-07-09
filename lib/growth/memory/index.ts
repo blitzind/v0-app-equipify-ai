@@ -29,7 +29,32 @@ export {
   readOrganizationalMemoryStore,
   writeOrganizationalMemoryStore,
   mergeOrganizationalMemoryStore,
+  resolvePersistedOrganizationalMemoryStore,
 } from "@/lib/growth/memory/storage/organization-memory-store"
+
+export {
+  GROWTH_SERVER_ORG_MEMORY_QA_MARKER,
+  GROWTH_ORGANIZATION_MEMORY_MAX_EVENTS,
+  type GrowthHomeOrganizationMemoryPayload,
+  type OrganizationMemoryPersistResult,
+} from "@/lib/growth/memory/storage/organization-memory-types"
+
+export {
+  GROWTH_ORGANIZATIONAL_KNOWLEDGE_QA_MARKER,
+  GROWTH_ORGANIZATION_KNOWLEDGE_MAX_ITEMS,
+  type GrowthHomeOrganizationalKnowledgePayload,
+  type OrganizationalKnowledgeItem,
+  type OrganizationalKnowledgeStore,
+} from "@/lib/growth/memory/knowledge/organization-knowledge-types"
+
+export {
+  buildOrganizationalKnowledge,
+  buildKnowledgeFromBusinessIntelligence,
+  buildKnowledgeFromMemoryEvents,
+  buildKnowledgeInsightBullets,
+  buildKnowledgeNarrativeLines,
+  mergeOrganizationalKnowledgeItems,
+} from "@/lib/growth/memory/knowledge/build-organizational-knowledge"
 
 export { recordMemoryEvents, inferIndustry } from "@/lib/growth/memory/events/record-memory-event"
 export { buildOrganizationMemoryTimeline, buildTimelineNarrativeLine } from "@/lib/growth/memory/timeline/organization-memory-timeline"

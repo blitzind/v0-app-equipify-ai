@@ -2,6 +2,10 @@
 
 export {
   GROWTH_AVA_NARRATIVE_ENGINE_QA_MARKER,
+  GROWTH_AVA_DAILY_ACTIVITY_NARRATIVE_QA_MARKER,
+  type AvaDailyActivityLine,
+  type AvaDailyActivityNarrative,
+  type AvaDailyActivitySection,
   type AvaDailyBriefing,
   type AvaNarrativeContext,
   type AvaNarrativeFact,
@@ -43,6 +47,17 @@ export {
   type AvaNarrativeEnhancer,
   type BuildAvaDailyBriefingInput,
 } from "@/lib/growth/ava-home/narrative/engine/build-ava-daily-briefing"
+
+export {
+  buildAvaDailyActivityNarrative,
+  buildDailyActivityCompletedLines,
+  buildDailyActivityLearnedLines,
+  buildDailyActivityWaitingLines,
+  buildDailyActivityWorkingNextLines,
+  dailyActivityLinesToStoryBlocks,
+  AVA_DAILY_ACTIVITY_SECTION_LABELS,
+  AVA_DAILY_ACTIVITY_SECTION_ORDER,
+} from "@/lib/growth/ava-home/narrative/engine/build-ava-daily-activity-narrative"
 
 export { buildAccomplishmentStories, buildTodayFocus, buildTodayPriorities } from "@/lib/growth/ava-home/narrative/stories/accomplishment-story"
 export { buildApprovalStory } from "@/lib/growth/ava-home/narrative/stories/approval-story"

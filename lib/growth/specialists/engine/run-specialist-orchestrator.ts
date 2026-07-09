@@ -1,4 +1,4 @@
-/** GE-AIOS-14A — Canonical Specialist Orchestrator (deterministic, no execution). */
+/** GE-AIOS-14A / GE-AIOS-17A — Canonical Specialist Orchestrator (routing + validation, no execution). */
 
 import {
   applySpecialistRoutingToWorkManagerResult,
@@ -6,6 +6,11 @@ import {
   buildSpecialistContributions,
   buildSpecialistTeamStatus,
 } from "@/lib/growth/specialists/bridges/work-manager-bridge"
+import {
+  completeSpecialistWork as completeSalesSpecialistWork,
+  delegateWorkItem as delegateSalesSpecialistWorkItem,
+  handoffBetweenSpecialists,
+} from "@/lib/growth/specialists/execution/sales-specialist-execution-bridge"
 import {
   GROWTH_SPECIALIST_ORCHESTRATOR_QA_MARKER,
   type AvaSpecialistOrchestratorResult,
@@ -17,18 +22,9 @@ export type RunSpecialistOrchestratorInput = {
   workManagerResult?: AvaWorkManagerResult | null
 }
 
-/** Future hooks — NOT implemented in 14A. */
-export function delegateWorkItem(): { delegated: false; reason: "planning_only" } {
-  return { delegated: false, reason: "planning_only" }
-}
-
-export function completeSpecialistWork(): { completed: false; reason: "planning_only" } {
-  return { completed: false, reason: "planning_only" }
-}
-
-export function handoffBetweenSpecialists(): { handedOff: false; reason: "planning_only" } {
-  return { handedOff: false, reason: "planning_only" }
-}
+export { delegateSalesSpecialistWorkItem as delegateWorkItem }
+export { completeSalesSpecialistWork as completeSpecialistWork }
+export { handoffBetweenSpecialists }
 
 export function runSpecialistOrchestrator(input: RunSpecialistOrchestratorInput): AvaSpecialistOrchestratorResult {
   const routed_work_items = assignSpecialistsToWorkItems(input.workItems)

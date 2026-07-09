@@ -69,7 +69,7 @@ function main(): void {
 
   const heroUi = readSource("components/growth/workspace/executive-briefing/growth-home-ava-hero-section.tsx")
   assert.match(heroUi, /buildHomeRelationshipScaleLine/)
-  assert.match(heroUi, /buildHomeRuntimeBriefingIntro/)
+  assert.match(heroUi, /dailyActivityNarrative/)
   assert.match(heroUi, /data-qa-field="home-relationship-scale-line"/)
   assert.doesNotMatch(heroUi, /Decision Engine|Work Manager|Operating Rhythm|Specialist Orchestrator|Business Intelligence/)
 

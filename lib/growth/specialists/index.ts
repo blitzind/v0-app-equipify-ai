@@ -54,3 +54,25 @@ export { MARKETING_SPECIALIST } from "@/lib/growth/specialists/specialists/marke
 export { CUSTOMER_SUCCESS_SPECIALIST } from "@/lib/growth/specialists/specialists/customer-success-specialist"
 export { SERVICE_SPECIALIST } from "@/lib/growth/specialists/specialists/service-specialist"
 export { FINANCE_SPECIALIST } from "@/lib/growth/specialists/specialists/finance-specialist"
+
+export {
+  GROWTH_SALES_SPECIALIST_EXECUTION_BRIDGE_QA_MARKER,
+  type SalesOutcome,
+  type SalesOutcomeDailySummary,
+  type SalesSpecialistDelegationResult,
+  type SalesSpecialistCompletionResult,
+  type GrowthHomeSalesOutcomesPayload,
+} from "@/lib/growth/specialists/execution/sales-outcome-types"
+
+export {
+  resolveWorkflowAgentForWorkItem,
+  validateSalesOutcome,
+  finalizeSalesSpecialistOutcomes,
+} from "@/lib/growth/specialists/execution/sales-specialist-execution-bridge"
+
+export {
+  buildSalesOutcomeMemoryEvent,
+  buildSalesCompletedWorkPeriodSummary,
+  buildCompletedWorkNarrativeLines,
+  SALES_SPECIALIST_MEMORY_SOURCE,
+} from "@/lib/growth/specialists/execution/sales-specialist-memory-bridge"

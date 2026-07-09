@@ -137,6 +137,7 @@ export async function POST(request: Request) {
       sourceCampaign: body.sourceCampaign,
       sourceVendor: body.sourceVendor,
       createdBy: access.userId,
+      intakeBindingSource: body.sourceKind === "import" ? "discovery_import" : "manual_lead",
     })
 
     await emitGrowthLeadCreatedTimeline(access.admin, {

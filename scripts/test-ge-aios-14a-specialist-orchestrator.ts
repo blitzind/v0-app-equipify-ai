@@ -160,11 +160,12 @@ function main(): void {
     assert.ok(fs.existsSync(path.join(process.cwd(), file)), `${file} must exist`)
   }
 
-  const futureHooks = [delegateWorkItem(), completeSpecialistWork(), handoffBetweenSpecialists()]
-  for (const hook of futureHooks) {
-    assert.equal(Object.values(hook)[0], false)
-    assert.equal(Object.values(hook)[1], "planning_only")
+  const delegation = delegateWorkItem(sampleWorkItem({ type: "research" }))
+  assert.equal(delegation.delegated, true)
+  if (delegation.delegated) {
+    assert.equal(delegation.workflow_agent, "research_agent")
   }
+  assert.equal(handoffBetweenSpecialists().handedOff, false)
 
   const researchRoute = routeWorkItem(sampleWorkItem({ type: "research" }))
   const marketingRoute = routeWorkItem(

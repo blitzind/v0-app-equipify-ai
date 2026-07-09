@@ -114,7 +114,12 @@ jsxOrder1c(dashboardLayout, "GrowthHomeAiOsWaitingOnYouSection", "GrowthHomeExec
 jsxOrder1c(dashboardLayout, "GrowthHomeAiOsWaitingOnYouSection", "GrowthHomeMissionCenterSection")
 jsxOrder1c(dashboardLayout, "GrowthHomeMissionCenterSection", "GrowthHomeGrowthStrategySection")
 jsxOrder1c(dashboardLayout, "GrowthHomeGrowthStrategySection", "GrowthHomeMarketingMissionsSection")
-jsxOrder1c(dashboardLayout, "GrowthHomeCollapsibleSection", "GrowthHomeDailyWorkQueueSection")
+assert.match(dashboardLayout, /GrowthHomeAvaWorkSection/)
+assert.match(dashboardLayout, /GrowthHomeAvaOperatingRhythmSection/)
+assert.match(dashboardLayout, /GrowthHomeAvaMemorySection/)
+assert.match(dashboardLayout, /GrowthHomeAvaSpecialistTeamSection/)
+jsxOrder1c(dashboardLayout, "GrowthHomeAvaHeroSection", "GrowthHomeAvaWorkSection")
+jsxOrder1c(dashboardLayout, "GrowthHomeAvaSpecialistTeamSection", "GrowthHomeExecutiveSnapshotSection")
 jsxOrder1c(dashboardLayout, "GrowthHomeCollapsibleSection", "GrowthHomeBusinessSnapshotSection")
 
 const heroLayout = readSource("components/growth/workspace/executive-briefing/growth-home-ava-hero-section.tsx")

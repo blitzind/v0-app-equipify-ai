@@ -79,18 +79,20 @@ export function mapCanonicalQueueToWaitingOnYou(
   }
 
   for (const item of queue.blocked) {
+    const company = namesByLeadId[item.leadId] ?? "Account"
     push(
       `queue-blocked-${item.taskKey}`,
-      `${namesByLeadId[item.leadId] ?? "Account"} blocked`,
+      company === "Account" ? "Review blocked work" : `Review blocked work for ${company}`,
       item.reasoning[0] ?? "Blocked from continuing until you review.",
       leadHref(item.leadId),
     )
   }
 
   for (const item of queue.waiting) {
+    const company = namesByLeadId[item.leadId] ?? "Account"
     push(
       `queue-waiting-${item.taskKey}`,
-      `${namesByLeadId[item.leadId] ?? "Account"} waiting`,
+      company === "Account" ? "Review waiting work" : `Review next step for ${company}`,
       item.reasoning[0] ?? "Waiting on operator input before I can continue.",
       leadHref(item.leadId),
     )
@@ -98,9 +100,13 @@ export function mapCanonicalQueueToWaitingOnYou(
 
   for (const item of [...queue.critical, ...queue.high, ...queue.medium, ...queue.low]) {
     if (!item.requiresHumanApproval && item.action !== "request_human_review") continue
+    const company = namesByLeadId[item.leadId] ?? "account"
+    const action = item.action.replace(/_/g, " ")
     push(
       `queue-approval-${item.taskKey}`,
-      `Approve ${namesByLeadId[item.leadId] ?? "account"} ${item.action.replace(/_/g, " ")}`,
+      company === "account"
+        ? `Approve ${action}`
+        : `Approve ${action} for ${company}`,
       item.reasoning[0] ?? "Human approval required before I can continue.",
       leadHref(item.leadId),
     )

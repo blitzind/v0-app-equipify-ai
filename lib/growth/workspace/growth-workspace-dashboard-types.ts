@@ -64,7 +64,7 @@ export type GrowthWorkspaceDashboardViewModel = {
   quickActions: GrowthWorkspaceDashboardQuickAction[]
   operatorActionCards: GrowthWorkspaceDashboardActionCard[]
   welcome: GrowthWorkspaceDashboardWelcome
-  /** Aiden briefing already loaded in dashboard batch — reused for operator home parity. */
+  /** @deprecated GE-AIOS-17E — legacy Aiden briefing; Home loads workspace-summary with briefing: null. */
   briefing: AidenDailyBriefing | null
   operatorName?: string | null
   recommendedAction?: string | null

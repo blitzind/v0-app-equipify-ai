@@ -68,10 +68,37 @@ export type AvaPrioritizedStory = {
   factId: string
 }
 
+export const GROWTH_AVA_DAILY_ACTIVITY_NARRATIVE_QA_MARKER =
+  "ge-aios-17d-daily-activity-narrative-v1" as const
+
+export type AvaDailyActivitySection =
+  | "completed_today"
+  | "learned_today"
+  | "waiting_on_you"
+  | "working_next"
+
+export type AvaDailyActivityLine = {
+  section: AvaDailyActivitySection
+  text: string
+  href?: string | null
+}
+
+export type AvaDailyActivityNarrative = {
+  qaMarker: typeof GROWTH_AVA_DAILY_ACTIVITY_NARRATIVE_QA_MARKER
+  lines: AvaDailyActivityLine[]
+  completed_today: string[]
+  learned_today: string[]
+  waiting_on_you: string[]
+  working_next: string[]
+  summary: string
+}
+
 export type AvaDailyBriefing = {
   qaMarker: typeof GROWTH_AVA_NARRATIVE_ENGINE_QA_MARKER
   title: string
   summary: string
+  /** GE-AIOS-17D — Structured daily report sections for Home hero */
+  daily_activity_narrative?: AvaDailyActivityNarrative | null
   story_blocks: AvaStoryBlock[]
   top_priority: AvaStoryBlock | null
   waiting_on_user: AvaStoryBlock[]

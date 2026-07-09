@@ -6,6 +6,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { listGrowthLeads } from "@/lib/growth/lead-repository"
+import { GROWTH_REVENUE_QUEUE_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 import type {
   RevenueQueueDashboardSectionPayload,
   RevenueQueueSortMode,
@@ -35,7 +36,10 @@ export async function loadRevenueQueueDashboardPayload(
   admin: SupabaseClient,
   input: { sort: RevenueQueueSortMode; limit?: number; source?: string | null },
 ): Promise<RevenueQueueApiDashboardPayload> {
-  const leads = await listGrowthLeads(admin, { limit: input.limit ?? 100, includeArchived: false })
+  const leads = await listGrowthLeads(admin, {
+    limit: input.limit ?? GROWTH_REVENUE_QUEUE_BATCH_LIMIT,
+    includeArchived: false,
+  })
   return {
     sections: buildRevenueQueueDashboardSectionsFromLeads(leads, input.sort),
     total: leads.length,
@@ -47,7 +51,7 @@ export async function loadRevenueQueueDashboardPayload(
 export async function loadCanonicalRevenueQueueDashboardPayload(
   admin: SupabaseClient,
   sort: RevenueQueueSortMode,
-  limit = 100,
+  limit = GROWTH_REVENUE_QUEUE_BATCH_LIMIT,
 ): Promise<RevenueQueueApiDashboardPayload> {
   return loadRevenueQueueDashboardPayload(admin, { sort, limit })
 }

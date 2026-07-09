@@ -10,8 +10,8 @@ import {
 } from "@/lib/growth/ava-home/narrative/context/ava-narrative-snapshot-memory"
 import type { GrowthHomeWorkspaceSummaryPayload } from "@/lib/growth/home/growth-home-workspace-summary-types"
 import {
-  readOrganizationalMemoryStore,
   writeOrganizationalMemoryStore,
+  resolvePersistedOrganizationalMemoryStore,
 } from "@/lib/growth/memory/storage/organization-memory-store"
 import {
   buildOperatingRhythmMemory,
@@ -138,7 +138,13 @@ export function GrowthHomeExecutiveBriefingDashboard({
   const aiOsUx = useMemo(() => normalizeGrowthHomeAiOsUxViewModel(briefing.aiOsUx), [briefing.aiOsUx])
 
   const previousSnapshot = useMemo(() => readAvaNarrativeMetricsSnapshot(), [dashboard.generatedAt])
-  const persistedMemoryStore = useMemo(() => readOrganizationalMemoryStore(), [dashboard.generatedAt])
+  const persistedMemoryStore = useMemo(
+    () =>
+      resolvePersistedOrganizationalMemoryStore({
+        serverMemory: workspaceSummary?.organizationalMemory ?? null,
+      }),
+    [workspaceSummary?.organizationalMemory],
+  )
   const operatingRhythmMemory = useMemo(() => readOperatingRhythmMemory(), [dashboard.generatedAt])
 
   const engineWorkspaceSummary = useMemo(
@@ -165,6 +171,8 @@ export function GrowthHomeExecutiveBriefingDashboard({
           operatingRhythmMemory,
           persistedMemoryStore,
           generatedAt: workspaceSummary?.generatedAt ?? dashboard.generatedAt,
+          salesOutcomes: workspaceSummary?.salesOutcomes ?? null,
+          organizationalKnowledge: workspaceSummary?.organizationalKnowledge?.store.items ?? null,
         }),
       ),
     [
@@ -179,6 +187,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
       operatingRhythmMemory,
       persistedMemoryStore,
       workspaceSummary?.generatedAt,
+      workspaceSummary?.organizationalKnowledge,
     ],
   )
 

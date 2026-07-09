@@ -1,7 +1,8 @@
-/** GE-AIOS-12A — Canonical organizational memory persistence (single store). */
+/** GE-AIOS-12A / GE-AIOS-17B — Canonical organizational memory persistence (single store). */
 
 import type { AvaOrganizationalMemoryStore } from "@/lib/growth/memory/types"
 import { AVA_ORGANIZATIONAL_MEMORY_STORAGE_KEY } from "@/lib/growth/memory/types"
+import type { GrowthHomeOrganizationMemoryPayload } from "@/lib/growth/memory/storage/organization-memory-types"
 
 export function readOrganizationalMemoryStore(): AvaOrganizationalMemoryStore | null {
   if (typeof window === "undefined") return null
@@ -50,4 +51,33 @@ export function mergeOrganizationalMemoryStore(
     events: mergedEvents.slice(-500),
     preferences: mergedPreferences.slice(-50),
   }
+}
+
+function resolveCanonicalOrganizationalMemoryStore(input: {
+  serverMemory: GrowthHomeOrganizationMemoryPayload | null | undefined
+  localMemory: AvaOrganizationalMemoryStore | null | undefined
+}): AvaOrganizationalMemoryStore | null {
+  if (input.serverMemory?.store && !input.serverMemory.degraded && input.serverMemory.source === "server") {
+    return input.serverMemory.store
+  }
+  if (input.serverMemory?.store && input.serverMemory.store.events.length > 0) {
+    return input.serverMemory.store
+  }
+  if (input.localMemory) {
+    return input.localMemory
+  }
+  if (input.serverMemory?.store) {
+    return input.serverMemory.store
+  }
+  return null
+}
+
+/** GE-AIOS-17B — Server memory is canonical; localStorage is fallback/cache only. */
+export function resolvePersistedOrganizationalMemoryStore(input: {
+  serverMemory?: GrowthHomeOrganizationMemoryPayload | null
+}): AvaOrganizationalMemoryStore | null {
+  return resolveCanonicalOrganizationalMemoryStore({
+    serverMemory: input.serverMemory ?? null,
+    localMemory: readOrganizationalMemoryStore(),
+  })
 }

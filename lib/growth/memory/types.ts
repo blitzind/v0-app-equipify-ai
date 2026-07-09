@@ -1,4 +1,6 @@
-/** GE-AIOS-12A — Ava Organizational Memory types (client-safe). */
+/** GE-AIOS-12A / GE-AIOS-17C — Ava Organizational Memory types (client-safe). */
+
+import type { OrganizationalKnowledgeItem } from "@/lib/growth/memory/knowledge/organization-knowledge-types"
 
 import type { AvaNarrativeMetricsSnapshot } from "@/lib/growth/ava-home/narrative/narrative-types"
 import type { AvaOperatingRhythmMemory } from "@/lib/growth/operating-rhythm/types"
@@ -47,6 +49,7 @@ export type AvaMemoryEventSource =
   | "narrative_snapshot"
   | "operating_rhythm"
   | "business_intelligence"
+  | "sales_specialist"
   | "pattern_detection"
   | "preference"
 
@@ -110,6 +113,8 @@ export type AvaMemorySummary = {
   timeline: AvaMemoryTimelinePeriod[]
   learned_insights: string[]
   period_summary: string | null
+  /** GE-AIOS-17C — Durable conclusions derived from Evidence → BI → Memory */
+  organizational_knowledge: OrganizationalKnowledgeItem[]
 }
 
 export type MemoryEngineAdapterInput = {

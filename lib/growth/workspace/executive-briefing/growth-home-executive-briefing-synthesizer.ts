@@ -129,7 +129,8 @@ import {
   hasCanonicalDailyWorkQueue,
   pickTopCanonicalQueueActionItem,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-canonical-queue-mapper"
-import { AIDEN_DAILY_BRIEFING_QA_MARKER } from "@/lib/growth/aiden/aiden-daily-briefing"
+/** @deprecated GE-AIOS-17E — legacy Aiden briefing fixture marker; Home runtime uses workspace-summary with briefing: null. */
+const GROWTH_HOME_LEGACY_BRIEFING_FIXTURE_QA_MARKER = "aiden-daily-briefing-fixture-deprecated" as const
 import { GROWTH_DAILY_REVENUE_WORK_QUEUE_QA_MARKER } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-types"
 
 const ATTENTION_LIMIT = 5
@@ -1331,7 +1332,7 @@ export function buildGrowthHomeExecutiveBriefingCertDashboard(): GrowthWorkspace
       todaysFocus: "Clear approvals and respond to hot replies.",
     },
     briefing: {
-      qa_marker: AIDEN_DAILY_BRIEFING_QA_MARKER,
+      qa_marker: GROWTH_HOME_LEGACY_BRIEFING_FIXTURE_QA_MARKER,
       greeting: "Good morning",
       operator_name: "Michael",
       generated_at: new Date("2026-06-25T09:00:00.000Z").toISOString(),
@@ -1490,7 +1491,7 @@ export function buildGrowthHomeExecutiveBriefingFreshSlateDashboard(): GrowthWor
       todaysFocus: null,
     },
     briefing: {
-      qa_marker: AIDEN_DAILY_BRIEFING_QA_MARKER,
+      qa_marker: GROWTH_HOME_LEGACY_BRIEFING_FIXTURE_QA_MARKER,
       greeting: "Good morning",
       operator_name: "Michael",
       generated_at: new Date("2026-06-29T12:00:00.000Z").toISOString(),

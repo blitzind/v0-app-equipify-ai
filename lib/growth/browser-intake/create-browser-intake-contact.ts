@@ -609,6 +609,7 @@ export async function createBrowserIntakeContact(
       country: normalized.country,
       notes: notesParts.filter(Boolean).join("\n"),
       createdBy: input.created_by ?? null,
+      intakeBindingSource: "browser_capture",
       metadata: leadMetadata,
     })
 

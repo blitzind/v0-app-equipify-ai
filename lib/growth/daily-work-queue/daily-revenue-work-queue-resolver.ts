@@ -21,6 +21,9 @@ import type {
 import { adaptDailyRevenueWorkQueueToDisplaySummary } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-view"
 import { resolveLeadDailyWorkQueueStatus } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-integration"
 import { listGrowthLeads } from "@/lib/growth/lead-repository"
+import {
+  GROWTH_DAILY_WORK_QUEUE_LEAD_BATCH_LIMIT,
+} from "@/lib/growth/relationship/relationship-scale-limits"
 import type { GrowthLead } from "@/lib/growth/types"
 
 async function loadSuppressedLeadIds(admin: SupabaseClient): Promise<string[]> {
@@ -147,7 +150,7 @@ export async function fetchDailyRevenueWorkQueue(
     return { enabled: false, queue: null, display: null }
   }
 
-  const leads = await listGrowthLeads(admin, { limit: input?.limit ?? 100 })
+  const leads = await listGrowthLeads(admin, { limit: input?.limit ?? GROWTH_DAILY_WORK_QUEUE_LEAD_BATCH_LIMIT })
   return fetchDailyRevenueWorkQueueFromLeads(admin, leads, {
     capacityLimits: input?.capacityLimits,
   })
@@ -160,7 +163,7 @@ export async function fetchDailyRevenueWorkQueueLeadStatus(
   enabled: boolean
   lead_status: ReturnType<typeof resolveLeadDailyWorkQueueStatus> | null
 }> {
-  const bundle = await fetchDailyRevenueWorkQueue(admin, { limit: 100 })
+  const bundle = await fetchDailyRevenueWorkQueue(admin, { limit: GROWTH_DAILY_WORK_QUEUE_LEAD_BATCH_LIMIT })
   if (!bundle.enabled) return { enabled: false, lead_status: null }
   return {
     enabled: true,

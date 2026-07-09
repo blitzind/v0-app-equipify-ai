@@ -251,6 +251,12 @@ export function buildDecisionContext(input: BuildDecisionContextInput): Decision
   const meetings = buildMeetingCandidates(input)
   const businessCandidates = buildBusinessClarificationCandidate(narrative.businessUnderstanding)
 
+  const biKnowledge = input.memorySummary?.organizational_knowledge?.filter(
+    (row) => row.active && (row.source === "business_intelligence" || row.source === "bi_review"),
+  ) ?? []
+  const knowledgeConfidence =
+    biKnowledge.length > 0 ? Math.max(...biKnowledge.map((row) => row.confidence)) : null
+
   return {
     opportunities: [...opportunities, ...research.filter((row) => row.kind === "prepare_outreach")],
     approvals,
@@ -259,7 +265,12 @@ export function buildDecisionContext(input: BuildDecisionContextInput): Decision
     research: [...research, ...businessCandidates.filter((row) => row.kind !== "continue_mission")],
     meetings,
     businessUnderstanding: narrative.businessUnderstanding,
-    evidenceConfidence: narrative.businessUnderstanding.hasBusinessResearch ? 78 : null,
+    evidenceConfidence:
+      knowledgeConfidence != null
+        ? Math.max(knowledgeConfidence, narrative.businessUnderstanding.hasBusinessResearch ? 78 : 0)
+        : narrative.businessUnderstanding.hasBusinessResearch
+          ? 78
+          : null,
     memorySummary: input.memorySummary ?? null,
     leadSnapshotsById: input.leadSnapshotsById ?? {},
   }
@@ -311,7 +322,12 @@ export function flattenDecisionCandidates(context: DecisionContext): DecisionCan
           Boolean(snapshot?.memory_context_available),
         business_intelligence_context_available:
           withGraph.relationship_graph.business_intelligence_context_available ||
-          context.businessUnderstanding.hasBusinessResearch,
+          context.businessUnderstanding.hasBusinessResearch ||
+          Boolean(
+            context.memorySummary?.organizational_knowledge?.some(
+              (row) => row.active && (row.source === "business_intelligence" || row.source === "bi_review"),
+            ),
+          ),
       },
     }
   })

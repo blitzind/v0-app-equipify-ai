@@ -4,6 +4,12 @@
  */
 
 import { buildGrowthHomeLeadPoolSummary } from "@/lib/growth/home/growth-home-lead-pool-pagination"
+import { GROWTH_SERVER_ORG_MEMORY_QA_MARKER } from "@/lib/growth/memory/storage/organization-memory-types"
+import {
+  GROWTH_ORGANIZATIONAL_KNOWLEDGE_QA_MARKER,
+  emptyOrganizationalKnowledgeStore,
+} from "@/lib/growth/memory/knowledge/organization-knowledge-types"
+import { GROWTH_SALES_SPECIALIST_EXECUTION_BRIDGE_QA_MARKER } from "@/lib/growth/specialists/execution/sales-outcome-types"
 import {
   GROWTH_HOME_RELATIONSHIP_SNAPSHOT_15E_QA_MARKER,
   type GrowthHomeRelationshipSnapshotEnrichment,
@@ -41,6 +47,54 @@ export function emptyGrowthHomeLeadPoolSummary() {
   })
 }
 
+export function emptyGrowthHomeSalesOutcomes(generatedAt: string) {
+  return {
+    qaMarker: GROWTH_SALES_SPECIALIST_EXECUTION_BRIDGE_QA_MARKER,
+    outcomes: [],
+    dailySummary: {
+      qaMarker: GROWTH_SALES_SPECIALIST_EXECUTION_BRIDGE_QA_MARKER,
+      generatedAt,
+      researched: 0,
+      qualified: 0,
+      strong_opportunities: 0,
+      outreach_prepared: 0,
+      meetings_prepared: 0,
+      approvals_pending: 0,
+    },
+  }
+}
+
+export function emptyGrowthHomeOrganizationMemory(input: {
+  organizationId: string
+  generatedAt: string
+}): import("@/lib/growth/memory/storage/organization-memory-types").GrowthHomeOrganizationMemoryPayload {
+  return {
+    qaMarker: GROWTH_SERVER_ORG_MEMORY_QA_MARKER,
+    store: {
+      organizationId: input.organizationId,
+      capturedAt: input.generatedAt,
+      events: [],
+      preferences: [],
+    },
+    source: "empty",
+    degraded: true,
+    warning: "organization_memory_missing",
+  }
+}
+
+export function emptyGrowthHomeOrganizationKnowledge(input: {
+  organizationId: string
+  generatedAt: string
+}): import("@/lib/growth/memory/knowledge/organization-knowledge-types").GrowthHomeOrganizationalKnowledgePayload {
+  return {
+    qaMarker: GROWTH_ORGANIZATIONAL_KNOWLEDGE_QA_MARKER,
+    store: emptyOrganizationalKnowledgeStore(input),
+    source: "empty",
+    degraded: true,
+    warning: "organization_knowledge_missing",
+  }
+}
+
 /** Normalize workspace-summary payload when newer runtime fields are absent (production skew). */
 export function normalizeGrowthHomeWorkspaceSummaryPayload(
   payload: Partial<GrowthHomeWorkspaceSummaryPayload> & { ok?: boolean },
@@ -48,9 +102,19 @@ export function normalizeGrowthHomeWorkspaceSummaryPayload(
   const relationshipSnapshots =
     payload.relationshipSnapshots ?? emptyGrowthHomeRelationshipSnapshots()
   const leadPool = payload.leadPool ?? emptyGrowthHomeLeadPoolSummary()
+  const generatedAt = payload.generatedAt ?? new Date().toISOString()
+  const organizationId = payload.organizationalMemory?.store.organizationId ?? "local-organization"
 
   return {
     ...(payload as GrowthHomeWorkspaceSummaryPayload),
+    briefing: null,
+    salesOutcomes: payload.salesOutcomes ?? emptyGrowthHomeSalesOutcomes(generatedAt),
+    organizationalMemory:
+      payload.organizationalMemory ??
+      emptyGrowthHomeOrganizationMemory({ organizationId, generatedAt }),
+    organizationalKnowledge:
+      payload.organizationalKnowledge ??
+      emptyGrowthHomeOrganizationKnowledge({ organizationId, generatedAt }),
     relationshipSnapshots: {
       ...relationshipSnapshots,
       byLeadId: relationshipSnapshots.byLeadId ?? {},
@@ -103,11 +167,17 @@ export function normalizeGrowthHomeAvaHeroViewModel(
   hero: GrowthHomeAvaHeroViewModel,
 ): GrowthHomeAvaHeroViewModel {
   const storyBlocks = hero.storyBlocks ?? hero.dailyBriefing?.story_blocks ?? []
+  const dailyActivityNarrative =
+    hero.dailyActivityNarrative ?? hero.dailyBriefing?.daily_activity_narrative ?? null
 
   return {
     ...hero,
     storyBlocks,
-    briefingNarrative: hero.briefingNarrative ?? storyBlocks.map((block) => block.text),
+    dailyActivityNarrative,
+    briefingNarrative:
+      hero.briefingNarrative ??
+      dailyActivityNarrative?.lines.map((row) => row.text) ??
+      storyBlocks.map((block) => block.text),
     currentActivities: hero.currentActivities ?? [],
     sinceLastVisit: hero.sinceLastVisit ?? [],
     workManager: normalizeAvaWorkManagerResult(hero.workManager),

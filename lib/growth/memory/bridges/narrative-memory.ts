@@ -1,11 +1,29 @@
-/** GE-AIOS-12A — Memory → Narrative bridge (experience-rich copy). */
+/** GE-AIOS-12A / GE-AIOS-17A / GE-AIOS-17C — Memory → Narrative bridge (experience-rich copy). */
 
 import type { AvaStoryBlock } from "@/lib/growth/ava-home/narrative/narrative-types"
 import type { AvaMemorySummary } from "@/lib/growth/memory/types"
+import { buildKnowledgeNarrativeLines } from "@/lib/growth/memory/knowledge/build-organizational-knowledge"
 import { buildTimelineNarrativeLine } from "@/lib/growth/memory/timeline/organization-memory-timeline"
+import { buildCompletedWorkNarrativeLines } from "@/lib/growth/specialists/execution/sales-specialist-memory-bridge"
+import type { SalesOutcomeDailySummary } from "@/lib/growth/specialists/execution/sales-outcome-types"
 
-export function buildMemoryNarrativeLines(memorySummary: AvaMemorySummary | null | undefined): string[] {
+export function buildMemoryNarrativeLines(
+  memorySummary: AvaMemorySummary | null | undefined,
+  salesDailySummary?: SalesOutcomeDailySummary | null,
+): string[] {
   if (!memorySummary) return []
+
+  const completedWorkLines = buildCompletedWorkNarrativeLines({
+    dailySummary: salesDailySummary ?? null,
+    memoryEvents: memorySummary.recent_events,
+  })
+
+  const learningLines = buildKnowledgeNarrativeLines(memorySummary.organizational_knowledge ?? [])
+  if (completedWorkLines.length > 0) {
+    return [...completedWorkLines, ...learningLines].slice(0, 4)
+  }
+
+  if (learningLines.length > 0) return learningLines
 
   const lines: string[] = []
   if (memorySummary.period_summary) {
@@ -27,8 +45,11 @@ export function buildMemoryNarrativeLines(memorySummary: AvaMemorySummary | null
   return lines.slice(0, 3)
 }
 
-export function buildMemoryStoryBlocks(memorySummary: AvaMemorySummary | null | undefined): AvaStoryBlock[] {
-  return buildMemoryNarrativeLines(memorySummary).map((text, index) => ({
+export function buildMemoryStoryBlocks(
+  memorySummary: AvaMemorySummary | null | undefined,
+  salesDailySummary?: SalesOutcomeDailySummary | null,
+): AvaStoryBlock[] {
+  return buildMemoryNarrativeLines(memorySummary, salesDailySummary).map((text, index) => ({
     id: `memory-narrative:${index}`,
     kind: "general",
     priority: 90 - index,
@@ -39,6 +60,12 @@ export function buildMemoryStoryBlocks(memorySummary: AvaMemorySummary | null | 
 
 export function buildWhatIveLearnedBullets(memorySummary: AvaMemorySummary | null | undefined): string[] {
   if (!memorySummary) return []
+  const fromKnowledge = (memorySummary.organizational_knowledge ?? [])
+    .filter((row) => row.active)
+    .sort((left, right) => right.confidence - left.confidence)
+    .slice(0, 3)
+    .map((row) => row.finding.replace(/\.$/, "") + ".")
+  if (fromKnowledge.length > 0) return fromKnowledge
   return memorySummary.learned_insights.slice(0, 3)
 }
 

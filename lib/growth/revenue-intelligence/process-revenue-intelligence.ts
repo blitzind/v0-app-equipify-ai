@@ -19,6 +19,10 @@ import type { ReplyIntentClassificationV2Result } from "@/lib/growth/reply-intel
 import type { GrowthReplyObjectionEvidence } from "@/lib/growth/reply-intelligence/reply-intent-types"
 import { appendGrowthLeadTimelineEvent } from "@/lib/growth/timeline-repository"
 import { processMultichannelRevenueIntelligence } from "@/lib/growth/revenue-intelligence/process-multichannel-revenue-intelligence"
+import {
+  isLegacyBuyingCommitteeWriteQuarantined,
+  legacyBuyingCommitteeWriteBlockedReason,
+} from "@/lib/growth/relationship/legacy-buying-committee-quarantine"
 
 async function persistOpportunitySignals(
   admin: SupabaseClient,
@@ -133,6 +137,16 @@ async function persistBuyingCommitteeMap(
     bodyPreview: input.bodyPreview,
     signals: input.signals,
   })
+
+  if (isLegacyBuyingCommitteeWriteQuarantined()) {
+    return {
+      ...map,
+      evidence: [
+        ...map.evidence,
+        legacyBuyingCommitteeWriteBlockedReason("buying_committee_maps"),
+      ],
+    }
+  }
 
   const snapshotDate = new Date().toISOString().slice(0, 10)
   const row = {

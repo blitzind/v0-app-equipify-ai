@@ -293,6 +293,7 @@ export async function promoteVerifiedContactToGrowthLead(
       postalCode: normalized.postalCode,
       country: normalized.country,
       createdBy: input.createdBy ?? null,
+      intakeBindingSource: "discovery_import",
       metadata: {
         acquisition: {
           run_id: input.acquisitionRunId ?? null,

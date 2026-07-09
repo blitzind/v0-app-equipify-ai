@@ -24,6 +24,7 @@ import {
   type GrowthCompanyIntelligenceProspectFilter,
 } from "@/lib/growth/company-intelligence/company-intelligence-runtime-types"
 import { loadBuyingCommitteeIntelligenceLeadRollup } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-lead-rollup"
+import { GROWTH_RELATIONSHIP_CALL_QUEUE_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 import {
   matchesBuyingCommitteeIntelligenceProspectFilter,
   type GrowthBuyingCommitteeIntelligenceProspectFilter,
@@ -65,7 +66,7 @@ export async function listGrowthCallQueue(
   },
 ): Promise<GrowthCallQueueRow[]> {
   const leads = await listGrowthLeads(admin, {
-    limit: 200,
+    limit: GROWTH_RELATIONSHIP_CALL_QUEUE_BATCH_LIMIT,
     offset: 0,
     assignedTo: input.assignedTo ?? undefined,
     unassigned: input.unassigned,
@@ -213,7 +214,7 @@ export async function listGrowthCallQueue(
   }
 
   if (isDailyRevenueWorkQueueEnabled()) {
-    const dailyQueue = (await fetchDailyRevenueWorkQueue(admin, { limit: 200 })).queue
+    const dailyQueue = (await fetchDailyRevenueWorkQueue(admin, { limit: GROWTH_RELATIONSHIP_CALL_QUEUE_BATCH_LIMIT })).queue
     if (dailyQueue) {
       const queueSorted = sortCallQueueRowsByDailyWorkQueue(enriched, dailyQueue)
       enriched.splice(0, enriched.length, ...queueSorted)

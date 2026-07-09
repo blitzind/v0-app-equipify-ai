@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
 import { normalizePhone } from "@/lib/growth/import/normalize"
 import type { CallWorkspacePhoneLeadMatch } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
+import { GROWTH_RELATIONSHIP_CALL_QUEUE_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 
 function pickBestMatch(matches: CallWorkspacePhoneLeadMatch[]): CallWorkspacePhoneLeadMatch | null {
   if (matches.length === 0) return null
@@ -20,7 +21,7 @@ async function matchGrowthLeadsByPhone(
     .select("id, contact_phone, company_name, score")
     .not("contact_phone", "is", null)
     .order("score", { ascending: false, nullsFirst: false })
-    .limit(300)
+    .limit(GROWTH_RELATIONSHIP_CALL_QUEUE_BATCH_LIMIT)
   if (error) throw new Error(error.message)
 
   for (const row of data ?? []) {
@@ -45,7 +46,7 @@ async function matchDecisionMakersByPhone(
     .select("id, lead_id, phone, status, confidence, full_name")
     .not("phone", "is", null)
     .order("confidence", { ascending: false })
-    .limit(200)
+    .limit(GROWTH_RELATIONSHIP_CALL_QUEUE_BATCH_LIMIT)
   if (error) return null
 
   for (const row of data ?? []) {
@@ -71,7 +72,7 @@ async function matchProspectPromotedLead(
     .select("id, company_name, contact_phone")
     .eq("organization_id", organizationId)
     .not("contact_phone", "is", null)
-    .limit(200)
+    .limit(GROWTH_RELATIONSHIP_CALL_QUEUE_BATCH_LIMIT)
   if (error) return null
 
   for (const prospect of prospects ?? []) {

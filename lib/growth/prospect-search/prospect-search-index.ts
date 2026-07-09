@@ -23,7 +23,7 @@ import type {
   GrowthProspectSearchIndexPerson,
   GrowthProspectSearchSourceType,
 } from "@/lib/growth/prospect-search/prospect-search-types"
-import { deriveProspectSearchCompanyStatus } from "@/lib/growth/prospect-search/prospect-search-status"
+import { GROWTH_PROSPECT_SEARCH_OVERLAY_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 import {
   applyProspectSearchSuppressionOverlay,
   loadProspectSearchSuppressionLookup,
@@ -81,7 +81,7 @@ async function loadIntentOverlays(admin: SupabaseClient): Promise<Map<string, In
       .select("growth_lead_id, intent_category, intent_score, visitor_key")
       .not("growth_lead_id", "is", null)
       .order("created_at", { ascending: false })
-      .limit(200)
+      .limit(GROWTH_PROSPECT_SEARCH_OVERLAY_BATCH_LIMIT)
     const seen = new Set<string>()
     for (const row of data ?? []) {
       const r = row as Record<string, unknown>
@@ -109,7 +109,7 @@ async function loadCompanyMatchOverlays(admin: SupabaseClient): Promise<Map<stri
       .select("growth_lead_id, match_confidence")
       .not("growth_lead_id", "is", null)
       .order("created_at", { ascending: false })
-      .limit(200)
+      .limit(GROWTH_PROSPECT_SEARCH_OVERLAY_BATCH_LIMIT)
     const seen = new Set<string>()
     for (const row of data ?? []) {
       const r = row as Record<string, unknown>
@@ -138,7 +138,7 @@ async function loadBuyingStageOverlays(admin: SupabaseClient): Promise<Map<strin
       )
       .not("growth_lead_id", "is", null)
       .order("created_at", { ascending: false })
-      .limit(200)
+      .limit(GROWTH_PROSPECT_SEARCH_OVERLAY_BATCH_LIMIT)
     const seen = new Set<string>()
     for (const row of data ?? []) {
       const r = row as Record<string, unknown>

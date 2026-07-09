@@ -266,7 +266,7 @@ function main(): void {
 
   const heroUi = readSource("components/growth/workspace/executive-briefing/growth-home-ava-hero-section.tsx")
   assert.match(heroUi, /hero\.storyBlocks \?\? \[\]/)
-  assert.match(heroUi, /storyBlocks\.filter/)
+  assert.match(heroUi, /dailyActivityNarrative/)
 
   const workUi = readSource("components/growth/workspace/executive-briefing/growth-home-ava-work-section.tsx")
   assert.match(workUi, /normalizeAvaWorkManagerResult/)

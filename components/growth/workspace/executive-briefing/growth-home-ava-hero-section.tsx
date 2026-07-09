@@ -8,12 +8,13 @@ import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-ident
 import type { GrowthHomeLeadPoolSummary } from "@/lib/growth/home/growth-home-lead-pool-pagination"
 import {
   buildHomeRelationshipScaleLine,
-  buildHomeRuntimeBriefingIntro,
   GROWTH_HOME_RUNTIME_INTEGRATION_16X_QA_MARKER,
 } from "@/lib/growth/home/growth-home-runtime-presenter"
 import {
   AVA_NARRATIVE_ALL_NORMAL_LINE,
   AVA_NARRATIVE_PRIORITY_TITLE,
+  AVA_DAILY_ACTIVITY_SECTION_LABELS,
+  AVA_DAILY_ACTIVITY_SECTION_ORDER,
   GROWTH_AVA_NARRATIVE_ENGINE_QA_MARKER,
 } from "@/lib/growth/ava-home/narrative"
 import {
@@ -53,33 +54,32 @@ export function GrowthHomeAvaHeroSection({
     relationshipSnapshotCount,
     leadsNeedingAction,
   })
-  const introLines = buildHomeRuntimeBriefingIntro({
-    leadPool,
-    leadsNeedingAction,
-    pendingApprovals,
-    activeWork: hero.workManager?.active_work ?? null,
-    waitingCount: Math.max(hero.additionalDecisionCount, pendingApprovals),
-    relationshipSnapshotCount,
-    hasWorkPlan: (hero.workManager?.work_plan.length ?? 0) > 0,
-    statusLabel: hero.statusLabel,
-  })
+  const dailyActivityNarrative = hero.dailyActivityNarrative
+  const sectionGroups = dailyActivityNarrative
+    ? AVA_DAILY_ACTIVITY_SECTION_ORDER.map((section) => ({
+        section,
+        label: AVA_DAILY_ACTIVITY_SECTION_LABELS[section],
+        lines: dailyActivityNarrative.lines.filter((row) => row.section === section),
+      })).filter((group) => group.lines.length > 0)
+    : []
+  const dailyActivityLines = dailyActivityNarrative?.lines.map((row) => row.text) ?? []
   const briefingSummary = hero.dailyBriefing?.summary?.trim() ?? null
   const storyBlocks = hero.storyBlocks ?? []
-  const introSet = new Set(introLines.map((line) => line.trim()))
-  const supplementalBlocks = storyBlocks.filter((block) => !introSet.has(block.text.trim()))
   const narrativeLines =
-    introLines.length > 0
-      ? introLines
+    dailyActivityLines.length > 0
+      ? dailyActivityLines
       : briefingSummary
         ? [briefingSummary]
-        : []
-  const hasNarrative = narrativeLines.length > 0 || supplementalBlocks.length > 0
+        : storyBlocks.map((block) => block.text)
+  const hasStructuredNarrative = sectionGroups.length > 0
+  const hasNarrative = hasStructuredNarrative || narrativeLines.length > 0
 
   return (
     <section
       data-qa-section="home-ava-hero"
       data-qa-marker={hero.qaMarker}
       data-qa-marker-narrative={hero.dailyBriefing?.qaMarker ?? GROWTH_AVA_NARRATIVE_ENGINE_QA_MARKER}
+      data-qa-marker-daily-activity={hero.dailyActivityNarrative?.qaMarker ?? undefined}
       data-qa-marker-16x={GROWTH_HOME_RUNTIME_INTEGRATION_16X_QA_MARKER}
       className="space-y-5 rounded-2xl border border-border/50 bg-card/70 p-5 backdrop-blur-sm dark:border-border/40 dark:bg-card/60 sm:p-6"
     >
@@ -114,26 +114,41 @@ export function GrowthHomeAvaHeroSection({
 
       {hasNarrative ? (
         <div className="space-y-3">
-          <ul className="space-y-2.5">
-            {narrativeLines.map((line, index) => (
-              <li key={`intro:${index}`} className="flex items-start gap-3 text-sm leading-relaxed text-foreground">
-                <span className="mt-2 size-1.5 shrink-0 rounded-full bg-indigo-400" aria-hidden />
-                <span>{line}</span>
-              </li>
-            ))}
-            {supplementalBlocks.slice(0, introLines.length > 0 ? 2 : 5).map((block) => (
-              <li key={block.id} className="flex items-start gap-3 text-sm leading-relaxed text-foreground">
-                <span className="mt-2 size-1.5 shrink-0 rounded-full bg-indigo-400" aria-hidden />
-                {block.href ? (
-                  <Link href={block.href} className="hover:text-primary hover:underline">
-                    {block.text}
-                  </Link>
-                ) : (
-                  <span>{block.text}</span>
-                )}
-              </li>
-            ))}
-          </ul>
+          {hasStructuredNarrative ? (
+            <div className="space-y-4">
+              {sectionGroups.map((group) => (
+                <div
+                  key={group.section}
+                  className="space-y-2"
+                  data-qa-section={`daily-activity-${group.section}`}
+                >
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/80">
+                    {group.label}
+                  </p>
+                  <ul className="space-y-2.5">
+                    {group.lines.map((line, index) => (
+                      <li
+                        key={`daily-activity:${group.section}:${index}`}
+                        className="flex items-start gap-3 text-sm leading-relaxed text-foreground"
+                      >
+                        <span className="mt-2 size-1.5 shrink-0 rounded-full bg-indigo-400" aria-hidden />
+                        <span>{line.text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <ul className="space-y-2.5">
+              {narrativeLines.map((line, index) => (
+                <li key={`daily-activity:${index}`} className="flex items-start gap-3 text-sm leading-relaxed text-foreground">
+                  <span className="mt-2 size-1.5 shrink-0 rounded-full bg-indigo-400" aria-hidden />
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       ) : null}
 

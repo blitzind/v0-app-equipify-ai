@@ -23,6 +23,9 @@ import type { GrowthHomeWaitingOnYouItem } from "@/lib/growth/workspace/executiv
 export const GROWTH_HOME_RUNTIME_INTEGRATION_16X_QA_MARKER =
   "ge-aios-16x-home-runtime-integration-v1" as const
 
+export const GROWTH_HOME_CANONICAL_RUNTIME_CLEANUP_17E_QA_MARKER =
+  "ge-aios-17e-home-canonical-runtime-cleanup-v1" as const
+
 export const HOME_RUNTIME_EMPTY_WORK_MESSAGE = "I'm getting today's work organized." as const
 export const HOME_RUNTIME_EMPTY_MEMORY_MESSAGE =
   "I'll start learning from outcomes as work progresses." as const
@@ -111,6 +114,7 @@ export function buildHomeDefaultSpecialistTeamStatus(): AvaSpecialistTeamStatus[
   return buildSpecialistTeamStatus([])
 }
 
+/** @deprecated GE-AIOS-17E — replaced by Ava Daily Activity Narrative on Home hero. */
 export function buildHomeRuntimeBriefingIntro(input: {
   leadPool?: GrowthHomeLeadPoolSummary | null
   leadsNeedingAction?: number

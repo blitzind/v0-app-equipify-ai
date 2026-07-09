@@ -5,7 +5,12 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { fetchAidenDailyBriefing } from "@/lib/growth/aiden/aiden-briefing-repository"
+import { fetchGrowthHomeSalesOutcomes } from "@/lib/growth/home/growth-home-sales-outcomes-loader"
+import { buildGrowthHomeOrganizationMemory } from "@/lib/growth/memory/storage/organization-memory-repository"
+import { buildGrowthHomeOrganizationalKnowledge } from "@/lib/growth/memory/knowledge/organization-knowledge-repository"
+import { GROWTH_ORGANIZATIONAL_KNOWLEDGE_QA_MARKER } from "@/lib/growth/memory/knowledge/organization-knowledge-types"
+import { GROWTH_SALES_SPECIALIST_EXECUTION_BRIDGE_QA_MARKER } from "@/lib/growth/specialists/execution/sales-outcome-types"
+import { greetingForHour } from "@/lib/growth/workspace/executive-briefing/growth-home-narrative-formatter"
 import { fetchGrowthCadenceCommandSummary } from "@/lib/growth/cadence/cadence-dashboard-repository"
 import {
   GROWTH_CADENCE_SCHEMA_SETUP_MESSAGE,
@@ -62,12 +67,14 @@ function countInboxSections(
 }
 
 function buildAvaConsoleSections(input: {
-  briefing: Awaited<ReturnType<typeof fetchAidenDailyBriefing>> | null
   sources: GrowthWorkspaceDashboardSourcePayload
   kpis: GrowthHomeWorkspaceSummaryKpis
   researchLoopSummary: Awaited<ReturnType<typeof fetchLatestAvaResearchLoopSummary>> | null
+  generatedAt: string
+  suggestedNextAction: string | null
 }): GrowthHomeAvaConsoleSections {
-  const greeting = input.briefing?.greeting ?? "Welcome back"
+  const hour = new Date(input.generatedAt).getHours()
+  const greeting = greetingForHour(hour)
   const overnightParts: string[] = []
   if (input.kpis.emailsSentToday > 0) {
     overnightParts.push(`${input.kpis.emailsSentToday} email(s) sent`)
@@ -75,17 +82,14 @@ function buildAvaConsoleSections(input: {
   if (input.kpis.repliesToday > 0) {
     overnightParts.push(`${input.kpis.repliesToday} repl${input.kpis.repliesToday === 1 ? "y" : "ies"} received`)
   }
-  if (input.briefing?.summary.pending_approvals) {
-    overnightParts.push(`${input.briefing.summary.pending_approvals} approval(s) queued`)
+  if (input.kpis.approvalQueueCount > 0) {
+    overnightParts.push(`${input.kpis.approvalQueueCount} approval(s) queued`)
   }
 
   const highPriorityCount = countInboxSections(input.sources.leadInboxSections, ["high_priority"])
   const closeCandidates = input.sources.opportunityReadiness?.executiveCloseCandidates?.length ?? 0
 
-  const pendingApprovals = Math.max(
-    input.kpis.approvalQueueCount,
-    input.briefing?.summary.pending_approvals ?? 0,
-  )
+  const pendingApprovals = input.kpis.approvalQueueCount
 
   return {
     greeting,
@@ -95,7 +99,7 @@ function buildAvaConsoleSections(input: {
         ? `${highPriorityCount} high-priority lead(s)${closeCandidates > 0 ? ` · ${closeCandidates} close candidate(s)` : ""}`
         : null,
     waitingForApproval: pendingApprovals > 0 ? `${pendingApprovals} item(s) waiting for your approval` : null,
-    suggestedNextAction: input.briefing?.summary.recommended_action ?? null,
+    suggestedNextAction: input.suggestedNextAction,
     researchLoopSummary: input.researchLoopSummary,
   }
 }
@@ -159,7 +163,6 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   )
 
   const [
-    briefing,
     cadenceSchemaReady,
     nativeDialerProbe,
     pipelineDashboard,
@@ -170,10 +173,6 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     conversationDashboard,
     relationshipDashboard,
   ] = await Promise.all([
-    fetchAidenDailyBriefing(input.admin, {
-      operatorEmail: input.operatorEmail,
-      actorUserId: input.actorUserId,
-    }).catch(() => null),
     isGrowthCadenceSchemaReady(input.admin).catch(() => false),
     probeGrowthNativeDialerSchemaHealth(input.admin).catch(() => ({ schemaReady: false })),
     fetchGrowthOpportunityPipelineDashboard(input.admin, input.actorUserId).catch(() => null),
@@ -195,7 +194,7 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   ])
 
   const sources: GrowthWorkspaceDashboardSourcePayload = {
-    briefing,
+    briefing: null,
     leadInboxSections: revenueQueueSections,
     cadenceSummary: cadenceSchemaReady ? cadenceSummary : null,
     pipelineDashboard,
@@ -243,27 +242,133 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   }
 
   const meetings: GrowthHomeWorkspaceSummaryMeetings = {
-    today: briefing?.summary.meetings_today ?? briefing?.meetings.meetings_today ?? 0,
-    thisWeek: briefing?.meetings.meetings_this_week ?? 0,
-    scheduled: briefing?.meetings.meetings_today ?? 0,
+    today: sources.cadenceSummary?.callTasksDueCount ?? 0,
+    thisWeek: kpis.openOpportunities,
+    scheduled: sources.cadenceSummary?.callTasksDueCount ?? 0,
   }
 
   const inbox: GrowthHomeWorkspaceSummaryInbox = {
-    repliesNeedingAttention: briefing?.summary.replies_needing_attention ?? 0,
-    threadsOpen: briefing?.inbox?.threads_open ?? 0,
-    newReplies: briefing?.inbox?.new_replies ?? 0,
+    repliesNeedingAttention: Math.max(
+      kpis.repliesToday,
+      sources.conversationDashboard?.conversationRisk?.length ?? 0,
+    ),
+    threadsOpen: sources.conversationDashboard?.conversationRisk?.length ?? 0,
+    newReplies: kpis.repliesToday,
   }
 
   const avaResearchLoopSummary = organizationId
     ? await fetchLatestAvaResearchLoopSummary(input.admin, organizationId).catch(() => null)
     : null
 
+  const suggestedNextAction =
+    dailyWorkQueueBundle.display?.top_items?.[0]?.action_label ??
+    dailyWorkQueueBundle.queue?.items?.[0]?.actionLabel ??
+    null
+
   const avaConsole = buildAvaConsoleSections({
-    briefing,
     sources,
     kpis,
     researchLoopSummary: avaResearchLoopSummary,
+    generatedAt,
+    suggestedNextAction,
   })
+
+  const salesOutcomes = organizationId
+    ? await buildGrowthHomeSalesOutcomes({
+        admin: input.admin,
+        organizationId,
+        generatedAt,
+        researchLoopSummary: avaResearchLoopSummary,
+        pendingApprovals: kpis.approvalQueueCount,
+      }).catch(() => ({
+        qaMarker: GROWTH_SALES_SPECIALIST_EXECUTION_BRIDGE_QA_MARKER,
+        outcomes: [],
+        dailySummary: {
+          qaMarker: GROWTH_SALES_SPECIALIST_EXECUTION_BRIDGE_QA_MARKER,
+          generatedAt,
+          researched: 0,
+          qualified: 0,
+          strong_opportunities: 0,
+          outreach_prepared: 0,
+          meetings_prepared: 0,
+          approvals_pending: kpis.approvalQueueCount,
+        },
+      }))
+    : {
+        qaMarker: GROWTH_SALES_SPECIALIST_EXECUTION_BRIDGE_QA_MARKER,
+        outcomes: [],
+        dailySummary: {
+          qaMarker: GROWTH_SALES_SPECIALIST_EXECUTION_BRIDGE_QA_MARKER,
+          generatedAt,
+          researched: 0,
+          qualified: 0,
+          strong_opportunities: 0,
+          outreach_prepared: 0,
+          meetings_prepared: 0,
+          approvals_pending: 0,
+        },
+      }
+
+  const organizationalMemory = organizationId
+    ? await buildGrowthHomeOrganizationMemory({
+        admin: input.admin,
+        organizationId,
+        generatedAt,
+        salesOutcomes: salesOutcomes.outcomes,
+      }).catch(() => ({
+        qaMarker: "ge-aios-17b-server-organizational-memory-v1" as const,
+        store: {
+          organizationId,
+          capturedAt: generatedAt,
+          events: [],
+          preferences: [],
+        },
+        source: "empty" as const,
+        degraded: true,
+        warning: "organization_memory_unavailable",
+      }))
+    : {
+        qaMarker: "ge-aios-17b-server-organizational-memory-v1" as const,
+        store: {
+          organizationId: "local-organization",
+          capturedAt: generatedAt,
+          events: [],
+          preferences: [],
+        },
+        source: "empty" as const,
+        degraded: true,
+        warning: "organization_id_missing",
+      }
+
+  const organizationalKnowledge = organizationId
+    ? await buildGrowthHomeOrganizationalKnowledge({
+        admin: input.admin,
+        organizationId,
+        generatedAt,
+        memoryEvents: organizationalMemory.store.events,
+        salesOutcomes: salesOutcomes.outcomes,
+      }).catch(() => ({
+        qaMarker: GROWTH_ORGANIZATIONAL_KNOWLEDGE_QA_MARKER,
+        store: {
+          organizationId,
+          capturedAt: generatedAt,
+          items: [],
+        },
+        source: "empty" as const,
+        degraded: true,
+        warning: "organization_knowledge_unavailable",
+      }))
+    : {
+        qaMarker: GROWTH_ORGANIZATIONAL_KNOWLEDGE_QA_MARKER,
+        store: {
+          organizationId: "local-organization",
+          capturedAt: generatedAt,
+          items: [],
+        },
+        source: "empty" as const,
+        degraded: true,
+        warning: "organization_id_missing",
+      }
 
   const relationshipSnapshots = await enrichRelationshipLeadSnapshotsBatch(input.admin, leads)
 
@@ -295,7 +400,10 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     dailyRevenueWorkQueue: dailyWorkQueueBundle,
     kpis,
     avaConsole,
-    briefing,
+    briefing: null,
+    salesOutcomes,
+    organizationalMemory,
+    organizationalKnowledge,
     optimization,
     relationshipSnapshots,
     leadPool,

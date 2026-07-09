@@ -3,7 +3,9 @@
  * Client-safe types for Ava operating console sections (future autonomy).
  */
 
-import type { AidenDailyBriefing } from "@/lib/growth/aiden/aiden-daily-briefing"
+import type { GrowthHomeSalesOutcomesPayload } from "@/lib/growth/specialists/execution/sales-outcome-types"
+import type { GrowthHomeOrganizationMemoryPayload } from "@/lib/growth/memory/storage/organization-memory-types"
+import type { GrowthHomeOrganizationalKnowledgePayload } from "@/lib/growth/memory/knowledge/organization-knowledge-types"
 import type { DailyRevenueWorkQueue } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-types"
 import type { DailyRevenueWorkQueueDisplaySummary } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-view"
 import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
@@ -106,7 +108,14 @@ export type GrowthHomeWorkspaceSummaryPayload = {
   }
   kpis: GrowthHomeWorkspaceSummaryKpis
   avaConsole: GrowthHomeAvaConsoleSections
-  briefing: AidenDailyBriefing | null
+  /** GE-AIOS-17A — Sales Specialist validated workflow outcomes for Memory → Narrative */
+  salesOutcomes: GrowthHomeSalesOutcomesPayload
+  /** GE-AIOS-17B — Durable server-side organizational memory read model */
+  organizationalMemory: GrowthHomeOrganizationMemoryPayload
+  /** GE-AIOS-17C — Durable organizational knowledge (Evidence → BI → Memory conclusions) */
+  organizationalKnowledge: GrowthHomeOrganizationalKnowledgePayload
+  /** @deprecated GE-AIOS-17A — retained for backward compatibility; always null on Home */
+  briefing: null
   optimization: GrowthHomeWorkspaceSummaryOptimization
   /** GE-AIOS-15E — bounded relationship snapshots for Home lead pool */
   relationshipSnapshots: GrowthHomeRelationshipSnapshotEnrichment

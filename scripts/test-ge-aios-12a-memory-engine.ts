@@ -273,7 +273,7 @@ function main(): void {
     "components/growth/workspace/executive-briefing/growth-home-executive-briefing-dashboard.tsx",
   )
   assert.match(dashboardSource, /GrowthHomeAvaMemorySection/)
-  assert.match(dashboardSource, /readOrganizationalMemoryStore/)
+  assert.match(dashboardSource, /resolvePersistedOrganizationalMemoryStore/)
   assert.match(dashboardSource, /writeOrganizationalMemoryStore/)
   assert.match(dashboardSource, /readOperatingRhythmMemory/)
   assert.ok(

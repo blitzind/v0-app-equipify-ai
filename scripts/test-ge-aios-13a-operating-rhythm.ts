@@ -245,7 +245,7 @@ function main(): void {
   const narrativeSource = readSource("lib/growth/ava-home/narrative/engine/build-ava-daily-briefing.ts")
   assert.match(narrativeSource, /runOperatingRhythm/)
   assert.match(narrativeSource, /runWorkManager/)
-  assert.match(narrativeSource, /buildOperatingRhythmStoryBlocks/)
+  assert.match(narrativeSource, /buildAvaDailyActivityNarrative/)
   assert.doesNotMatch(narrativeSource, /runDecisionEngine/)
   assert.doesNotMatch(narrativeSource, /buildWorkManagerStoryBlocks/)
 

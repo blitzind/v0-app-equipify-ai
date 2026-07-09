@@ -586,6 +586,7 @@ export async function importDatamoonAudiencePreviewRecords(
         sourceChannel: "datamoon_audience",
         sourceVendor: "datamoon",
         createdBy: input.actor.userId,
+        intakeBindingSource: "datamoon",
         metadata: {
           datamoon: {
             run_id: run.id,
@@ -596,6 +597,7 @@ export async function importDatamoonAudiencePreviewRecords(
             business_email: normalized.business_email,
             personal_emails: normalized.personal_emails,
             linkedin_url: normalized.linkedin_url,
+            company_domain: normalized.company_domain,
           },
           import: {
             linkedin: normalized.linkedin_url,

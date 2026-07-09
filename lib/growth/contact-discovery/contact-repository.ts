@@ -18,6 +18,10 @@ import {
 } from "@/lib/growth/contact-discovery/contact-discovery-types"
 import { filterNewContacts, findExistingContactDedupeHashes } from "@/lib/growth/contact-discovery/contact-dedupe"
 import {
+  isLegacyBuyingCommitteeWriteQuarantined,
+  legacyBuyingCommitteeWriteBlockedReason,
+} from "@/lib/growth/relationship/legacy-buying-committee-quarantine"
+import {
   dedupeNormalizedContacts,
   normalizeContactCandidate,
 } from "@/lib/growth/contact-discovery/contact-normalizer"
@@ -137,6 +141,25 @@ async function persistBuyingCommittee(
   admin: SupabaseClient,
   assessment: GrowthBuyingCommitteeAssessment,
 ): Promise<GrowthBuyingCommitteeAssessment> {
+  if (isLegacyBuyingCommitteeWriteQuarantined()) {
+    logAcquisitionStep("buying_committee_legacy_write_quarantined", {
+      table: "buying_committees",
+      reason: legacyBuyingCommitteeWriteBlockedReason("buying_committees"),
+      company_id: assessment.committee.company_id,
+    })
+    return {
+      ...assessment,
+      committee: {
+        ...assessment.committee,
+        metadata: {
+          ...(assessment.committee.metadata ?? {}),
+          legacy_write_quarantined: true,
+          canonical_path: "buying_committee_intelligence_members",
+        },
+      },
+    }
+  }
+
   const { data: committeeRow, error: committeeError } = await admin
     .schema("growth")
     .from("buying_committees")

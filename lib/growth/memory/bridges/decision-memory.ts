@@ -1,7 +1,8 @@
-/** GE-AIOS-12A — Memory → Decision Engine bridge (confidence boosts, no duplicate scoring). */
+/** GE-AIOS-12A / GE-AIOS-17C — Memory + Knowledge → Decision Engine bridge. */
 
 import type { DecisionCandidate, DecisionContext } from "@/lib/growth/decision-engine/types"
 import type { AvaMemorySummary } from "@/lib/growth/memory/types"
+import { inferIndustry } from "@/lib/growth/memory/events/record-memory-event"
 import { memoryPatternMatchesCandidate } from "@/lib/growth/memory/patterns/detect-patterns"
 
 export function applyMemoryToDecisionContext(
@@ -44,10 +45,33 @@ export function applyMemoryConfidenceBoost(
   )
   if (carryForward) boost += 5
 
+  const knowledge = memory.organizational_knowledge ?? []
+  const industry = inferIndustry(candidate.companyName ?? candidate.title)
+  for (const item of knowledge) {
+    if (!item.active) continue
+    if (item.category === "industry" && /medical|equipment|hospital|health/i.test(item.finding) && industry === "medical_equipment") {
+      boost += Math.min(12, Math.round(item.confidence / 12))
+    }
+    if (item.category === "persona" && /research|qualif|outreach|prepare/.test(candidate.kind)) {
+      boost += Math.min(8, Math.round(item.confidence / 15))
+    }
+    if (item.category === "messaging" && candidate.kind === "prepare_outreach") {
+      boost += Math.min(10, Math.round(item.confidence / 12))
+    }
+    if (item.category === "timing" && /meeting|reply|review/.test(candidate.kind)) {
+      boost += Math.min(6, Math.round(item.confidence / 18))
+    }
+  }
+
   return boost
 }
 
 export function buildMemoryDecisionReasons(memorySummary: AvaMemorySummary | null | undefined): string[] {
   if (!memorySummary) return []
+  const knowledgeReasons = (memorySummary.organizational_knowledge ?? [])
+    .filter((row) => row.active)
+    .slice(0, 2)
+    .map((row) => row.finding.replace(/\.$/, ""))
+  if (knowledgeReasons.length > 0) return knowledgeReasons
   return memorySummary.detected_patterns.slice(0, 2).map((row) => row.label)
 }

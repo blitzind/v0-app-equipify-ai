@@ -49,6 +49,22 @@ function buildExternalRef(intake: NormalizedLeadIntake): string {
   return `unified_intake:${intake.source}:${randomUUID()}`
 }
 
+function mapIntakeSourceToBindingSource(
+  source: NormalizedLeadIntake["source"],
+): import("@/lib/growth/relationship/intake-relationship-graph-binding").IntakeRelationshipBindingSource {
+  switch (source) {
+    case "datamoon":
+      return "datamoon"
+    case "linkedin_capture":
+    case "browser_intake":
+      return "browser_capture"
+    case "manual":
+      return "manual_lead"
+    default:
+      return "discovery_import"
+  }
+}
+
 export async function resolveUnifiedLeadFromIntake(
   admin: SupabaseClient,
   intake: NormalizedLeadIntake,
@@ -99,6 +115,7 @@ export async function resolveUnifiedLeadFromIntake(
     contactPhone: intake.phone,
     website: intake.website,
     createdBy: actor?.userId ?? null,
+    intakeBindingSource: mapIntakeSourceToBindingSource(intake.source),
     metadata: {
       ...intake.metadata,
       unified_intake_source: intake.source,

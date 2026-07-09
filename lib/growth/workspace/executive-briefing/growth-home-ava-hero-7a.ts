@@ -64,6 +64,7 @@ export type GrowthHomeAvaHeroViewModel = {
   reviewAllHref: string | null
   allNormalLine: string
   dailyBriefing?: AvaDailyBriefing
+  dailyActivityNarrative?: import("@/lib/growth/ava-home/narrative/narrative-types").AvaDailyActivityNarrative | null
   storyBlocks: AvaStoryBlock[]
   briefingNarrative: string[]
   workManager?: AvaWorkManagerResult
@@ -94,6 +95,8 @@ export type BuildAvaHomeHeroInput = {
   generatedAt?: string
   /** GE-AIOS-15E — explicit server snapshots (override research-loop projections) */
   relationshipSnapshotsById?: import("@/lib/growth/relationship/relationship-lead-snapshot-types").RelationshipLeadSnapshotMap
+  salesOutcomes?: import("@/lib/growth/specialists/execution/sales-outcome-types").GrowthHomeSalesOutcomesPayload | null
+  organizationalKnowledge?: import("@/lib/growth/memory/knowledge/organization-knowledge-types").OrganizationalKnowledgeItem[] | null
 }
 
 function pluralize(count: number, singular: string, plural: string): string {
@@ -274,6 +277,8 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
     organizationId: input.organizationId,
     generatedAt: input.generatedAt,
     leadSnapshotsById,
+    salesOutcomes: input.salesOutcomes ?? null,
+    organizationalKnowledge: input.organizationalKnowledge ?? null,
   })
 
   assertDailyBriefing(dailyBriefing)
@@ -284,6 +289,7 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
     : buildAvaPrimaryDecision(input.aiOsUx)
 
   const storyBlocks = dailyBriefing.story_blocks ?? []
+  const dailyActivityNarrative = dailyBriefing.daily_activity_narrative ?? null
 
   return {
     qaMarker: GROWTH_HOME_AVA_HERO_7A_QA_MARKER,
@@ -297,8 +303,9 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
     reviewAllHref: decision.reviewAllHref,
     allNormalLine: GROWTH_HOME_AVA_ALL_NORMAL_LINE,
     dailyBriefing,
+    dailyActivityNarrative,
     storyBlocks,
-    briefingNarrative: storyBlocks.map((block) => block.text),
+    briefingNarrative: dailyActivityNarrative?.lines.map((row) => row.text) ?? storyBlocks.map((block) => block.text),
     workManager,
     operatingRhythm: dailyBriefing.operating_rhythm_result,
     memorySummary: dailyBriefing.memory_result,

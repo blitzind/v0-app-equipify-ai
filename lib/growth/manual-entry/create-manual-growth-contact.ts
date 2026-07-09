@@ -161,6 +161,7 @@ export async function createManualGrowthContact(
       country: normalized.country,
       notes: notesParts.filter(Boolean).join("\n"),
       createdBy: input.created_by ?? null,
+      intakeBindingSource: "manual_lead",
       metadata: leadMetadata,
     })
 

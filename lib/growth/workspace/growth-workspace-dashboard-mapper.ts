@@ -84,14 +84,18 @@ export function buildGrowthWorkspaceDashboardViewModel(
 ): GrowthWorkspaceDashboardViewModel {
   const leadsNeedingAction = countInboxSections(input.leadInboxSections, ["high_priority", "needs_review"])
   const callReadyLeads = input.cadenceSummary?.callTasksDueCount ?? 0
-  const inboxRequiringReplies = input.briefing?.summary.replies_needing_attention ?? 0
+  const inboxRequiringReplies =
+    input.briefing?.summary.replies_needing_attention ??
+    input.conversationDashboard?.conversationRisk?.length ??
+    0
   const opportunitiesRequiringFollowUp =
     input.pipelineDashboard?.dealsNeedingAction ?? input.briefing?.meetings.opportunities_pending ?? 0
 
-  const emailsSentToday = input.briefing?.revenue.emails_sent ?? 0
-  const repliesToday = input.briefing?.revenue.replies ?? 0
+  const emailsSentToday = input.briefing?.revenue.emails_sent ?? input.sequenceExecution?.sent24h ?? 0
+  const repliesToday = input.briefing?.revenue.replies ?? inboxRequiringReplies
   const callsToday = input.callsDashboard?.workspaceDashboard?.stats?.callsToday ?? 0
-  const meetingsToday = input.briefing?.summary.meetings_today ?? 0
+  const meetingsToday =
+    input.briefing?.summary.meetings_today ?? input.cadenceSummary?.callTasksDueCount ?? 0
 
   const openOpportunities = openOpportunityCount(input.pipelineDashboard)
   const forecastValue = input.pipelineDashboard?.forecastTotals.commit.amount ?? 0

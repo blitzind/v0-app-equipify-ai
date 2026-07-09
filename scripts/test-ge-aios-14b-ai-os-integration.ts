@@ -105,7 +105,7 @@ function main(): void {
   assert.match(dashboard, /buildAvaHomeHero/)
   assert.match(dashboard, /readAvaNarrativeMetricsSnapshot/)
   assert.match(dashboard, /writeAvaNarrativeMetricsSnapshot/)
-  assert.match(dashboard, /readOrganizationalMemoryStore/)
+  assert.match(dashboard, /resolvePersistedOrganizationalMemoryStore/)
   assert.match(dashboard, /writeOrganizationalMemoryStore/)
   assert.match(dashboard, /readOperatingRhythmMemory/)
   assert.match(dashboard, /writeOperatingRhythmMemory/)
