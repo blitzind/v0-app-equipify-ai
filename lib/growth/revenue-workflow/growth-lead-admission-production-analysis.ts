@@ -69,6 +69,15 @@ export type GrowthLeadAdmissionProductionAnalysis = {
   samples: Record<string, Array<Record<string, unknown>>>
 }
 
+export type {
+  GrowthLeadAdmissionDeploymentStatus,
+} from "@/lib/growth/revenue-workflow/growth-lead-admission-deployment-messaging"
+export {
+  formatAdmissionDeploymentStatusMessage,
+  formatAdmissionMetadataGateDetail,
+  summarizeGrowthLeadAdmissionDeploymentStatus,
+} from "@/lib/growth/revenue-workflow/growth-lead-admission-deployment-messaging"
+
 function growthLeadsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("leads")
 }
