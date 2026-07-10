@@ -13,6 +13,8 @@ import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/
 import {
   analyzeGrowthLeadAdmissionProductionPool,
   GROWTH_LEAD_ADMISSION_PRODUCTION_ANALYSIS_QA_MARKER,
+  formatAdmissionDeploymentStatusMessage,
+  summarizeGrowthLeadAdmissionDeploymentStatus,
 } from "@/lib/growth/revenue-workflow/growth-lead-admission-production-analysis"
 import { GROWTH_LEAD_ADMISSION_21C_QA_MARKER } from "@/lib/growth/revenue-workflow/growth-lead-admission-types"
 
@@ -62,7 +64,14 @@ async function main(): Promise<void> {
   console.log(`\n--- Production Admission Counts ---`)
   console.log(`Analysis marker: ${GROWTH_LEAD_ADMISSION_PRODUCTION_ANALYSIS_QA_MARKER}`)
   console.log(`Generated at: ${analysis.generatedAt}`)
-  console.log(`21C deployment marker seen in pool: ${analysis.deploymentMarkerPresent}`)
+  const deployStatus = summarizeGrowthLeadAdmissionDeploymentStatus(analysis)
+  console.log(`\n--- 21C Deployment vs Historical Migration ---`)
+  console.log(`  Deployment active (≥1 lead with admission_qa_marker): ${deployStatus.deploymentActive}`)
+  console.log(
+    `  Leads with admission metadata: ${deployStatus.leadsWithAdmissionMetadata}/${deployStatus.totalActiveLeads}`,
+  )
+  console.log(`  Legacy leads missing metadata: ${deployStatus.legacyLeadsMissingMetadata}`)
+  console.log(`  Status: ${formatAdmissionDeploymentStatusMessage(deployStatus)}`)
   console.log(JSON.stringify(analysis.counts, null, 2))
 
   console.log(`\n--- Queue Membership by Evaluated Admission State ---`)
@@ -86,7 +95,11 @@ async function main(): Promise<void> {
   const queueViolations = analysis.counts.invalidRejectedInActiveQueue
 
   console.log(`\n--- Validation Verdict ---`)
-  if (consumerWebsites > 0 || queueViolations > 0) {
+  if (deployStatus.deploymentActive && deployStatus.legacyLeadsMissingMetadata > 0) {
+    console.log(
+      `[${PHASE}] PASS with legacy migration pending — 21C deployment active; ${deployStatus.legacyLeadsMissingMetadata} historical row(s) lack admission metadata (run 21C cleanup dry-run)`,
+    )
+  } else if (consumerWebsites > 0 || queueViolations > 0) {
     console.log(
       `[${PHASE}] WARN — legacy pool needs operator-reviewed cleanup (${consumerWebsites} consumer websites, ${queueViolations} invalid/rejected in active queue, ${driftCount} drift rows)`,
     )

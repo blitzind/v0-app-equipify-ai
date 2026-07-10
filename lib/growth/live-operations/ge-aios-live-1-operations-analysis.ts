@@ -7,7 +7,12 @@ import { fetchAiOsCommandCenterReadModel } from "@/lib/growth/aios/ai-os-command
 import { fetchGrowthHumanApprovalCenterReadModel } from "@/lib/growth/aios/approvals/growth-human-approval-center-service"
 import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/business-profile-repository"
 import { getRuntimeKillSwitchStates } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
-import { analyzeGrowthLeadAdmissionProductionPool } from "@/lib/growth/revenue-workflow/growth-lead-admission-production-analysis"
+import {
+  analyzeGrowthLeadAdmissionProductionPool,
+  formatAdmissionDeploymentStatusMessage,
+  formatAdmissionMetadataGateDetail,
+  summarizeGrowthLeadAdmissionDeploymentStatus,
+} from "@/lib/growth/revenue-workflow/growth-lead-admission-production-analysis"
 import { resolveLeadAdmissionStateFromMetadata } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
 import { GROWTH_COMPANY_EVIDENCE_22_QA_MARKER } from "@/lib/growth/research/company-evidence/company-evidence-types"
 import { GROWTH_CANONICAL_RESEARCH_23_QA_MARKER } from "@/lib/growth/research/growth-canonical-research-types"
@@ -129,9 +134,9 @@ export async function buildLive1DeploymentGates(input: {
   gates.push({
     id: "admission_metadata_writes",
     status: admission.deploymentMarkerPresent ? "pass" : "blocked",
-    detail: admission.deploymentMarkerPresent
-      ? "21C admission metadata present in production pool."
-      : "No 21C admission metadata in pool — deploy 21C before trusting admission gate.",
+    detail: formatAdmissionMetadataGateDetail(admission, {
+      codeDeployedAssumed: input.codeDeployed,
+    }),
   })
 
   const evidence = await analyzeLive1ResearchEvidenceMetrics(input.admin, {
@@ -244,8 +249,15 @@ export async function buildLive1DailyAvaReport(input: {
     .map((row) => row.companyName)
 
   const pipelineRisks: string[] = []
-  if (!admission.deploymentMarkerPresent) {
-    pipelineRisks.push("Admission metadata not yet written in production — deploy 21C before trusting gate.")
+  const admissionDeployStatus = summarizeGrowthLeadAdmissionDeploymentStatus(admission)
+  if (!admissionDeployStatus.deploymentActive) {
+    pipelineRisks.push(
+      formatAdmissionDeploymentStatusMessage(admissionDeployStatus, {
+        codeDeployedAssumed: input.codeDeployed ?? false,
+      }),
+    )
+  } else if (admissionDeployStatus.legacyLeadsMissingMetadata > 0) {
+    pipelineRisks.push(formatAdmissionDeploymentStatusMessage(admissionDeployStatus))
   }
   if (metrics.duplicateActiveResearchRuns > 0) {
     pipelineRisks.push(`${metrics.duplicateActiveResearchRuns} leads have duplicate active research runs.`)

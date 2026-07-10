@@ -16,6 +16,7 @@ import {
 } from "../lib/growth/revenue-workflow/growth-lead-admission-drift"
 import { evaluateGrowthLeadAdmission } from "../lib/growth/revenue-workflow/evaluate-growth-lead-admission"
 import { buildGrowthLeadAdmissionIntakeFromLead } from "../lib/growth/revenue-workflow/growth-lead-admission-lead-input"
+import { formatAdmissionDeploymentStatusMessage } from "../lib/growth/revenue-workflow/growth-lead-admission-deployment-messaging"
 
 const PHASE = "GE-AIOS-21C-4" as const
 
@@ -145,6 +146,24 @@ function main(): void {
   assert.match(analysisModule, /evaluateGrowthLeadAdmission/)
   assert.doesNotMatch(analysisModule, /updateGrowthLead/)
   console.log("  ✓ production analysis is read-only")
+
+  const activeLegacy = formatAdmissionDeploymentStatusMessage({
+    deploymentActive: true,
+    totalActiveLeads: 24,
+    leadsWithAdmissionMetadata: 1,
+    legacyLeadsMissingMetadata: 23,
+  })
+  assert.match(activeLegacy, /21C deployment active/)
+  assert.match(activeLegacy, /historical migration/)
+  const notObserved = formatAdmissionDeploymentStatusMessage({
+    deploymentActive: false,
+    totalActiveLeads: 24,
+    leadsWithAdmissionMetadata: 0,
+    legacyLeadsMissingMetadata: 24,
+  })
+  assert.match(notObserved, /not yet observed/)
+  assert.doesNotMatch(notObserved, /deployment active/)
+  console.log("  ✓ deployment vs legacy migration messaging distinguishes active deploy from missing metadata")
 
   console.log(`[${PHASE}] PASS — Production cleanup certified (local)`)
 }
