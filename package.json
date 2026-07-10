@@ -848,6 +848,8 @@
     "validate:ge-aios-23-runtime-canonicalization-production": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/validate-ge-aios-23-runtime-canonicalization-production.ts",
     "validate:ge-aios-live-1-production-operations": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/validate-ge-aios-live-1-production-operations.ts",
     "report:ge-aios-live-1-daily-ava-operations": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/report-ge-aios-live-1-daily-ava-operations.ts",
+    "profile:ge-aios-hotfix-live-1a-home-pipeline": "node -r ./scripts/server-only-shim.cjs --import tsx scripts/vercel-production-env-run.ts -- node -r ./scripts/server-only-shim.cjs --import tsx scripts/profile-ge-aios-hotfix-live-1a-home-pipeline.ts",
+    "test:ge-aios-hotfix-live-1a-home-pipeline-performance": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-hotfix-live-1a-home-pipeline-performance.ts",
     "test:ge-aios-hotfix-growth-route-access": "tsx scripts/test-ge-aios-hotfix-growth-route-access.ts",
     "test:ge-aios-hotfix-16x-home-runtime-undefined-arrays": "tsx scripts/test-ge-aios-hotfix-16x-home-runtime-undefined-arrays.ts",
     "test:ge-aios-7c-ava-led-lead-discovery": "tsx scripts/test-ge-aios-7c-ava-led-lead-discovery.ts",

@@ -74,6 +74,8 @@ export type GrowthHomeWorkspaceSummaryOptimization = {
   duplicateLeadListEliminated: number
   loaderCount: number
   durationMs: number
+  /** GE-AIOS-HOTFIX-LIVE-1A — per-stage timings for Home pipeline diagnostics. */
+  stageTimingsMs?: Record<string, number>
 }
 
 export const GROWTH_HOME_RELATIONSHIP_SNAPSHOT_15E_QA_MARKER =

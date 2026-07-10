@@ -6,6 +6,12 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { buildGrowthHomeSalesOutcomes } from "@/lib/growth/home/growth-home-sales-outcomes-loader"
+import {
+  GROWTH_HOME_WORKSPACE_LOADER_BUDGET_MS,
+  logGrowthHomePipelineTimings,
+  withGrowthHomeLoaderBudget,
+  type GrowthHomeLoaderTiming,
+} from "@/lib/growth/home/growth-home-workspace-loader-budget"
 import { buildGrowthHomeOrganizationMemory } from "@/lib/growth/memory/storage/organization-memory-repository"
 import { buildGrowthHomeOrganizationalKnowledge } from "@/lib/growth/memory/knowledge/organization-knowledge-repository"
 import { GROWTH_ORGANIZATIONAL_KNOWLEDGE_QA_MARKER } from "@/lib/growth/memory/knowledge/organization-knowledge-types"
@@ -14,7 +20,7 @@ import { greetingForHour } from "@/lib/growth/workspace/executive-briefing/growt
 import { fetchGrowthCadenceCommandSummary } from "@/lib/growth/cadence/cadence-dashboard-repository"
 import {
   GROWTH_CADENCE_SCHEMA_SETUP_MESSAGE,
-  isGrowthCadenceSchemaReady,
+  isGrowthCadenceSchemaReadyWithBudget,
 } from "@/lib/growth/cadence/cadence-schema-health"
 import { fetchGrowthConversationDashboard } from "@/lib/growth/conversation-dashboard-repository"
 import { isDailyRevenueWorkQueueEnabled } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-feature"
@@ -33,7 +39,7 @@ import {
 } from "@/lib/growth/workspace/growth-workspace-dashboard-mapper"
 import { fetchGrowthHomeLeadPoolPage } from "@/lib/growth/lead-repository"
 import { fetchGrowthNativeCallWorkspaceDashboard } from "@/lib/growth/native-dialer/native-dialer-service"
-import { probeGrowthNativeDialerSchemaHealth } from "@/lib/growth/native-dialer/native-dialer-schema-health"
+import { probeGrowthNativeDialerSchemaHealthWithBudget } from "@/lib/growth/native-dialer/native-dialer-schema-health"
 import { fetchGrowthOpportunityDashboard } from "@/lib/growth/opportunity-dashboard-repository"
 import { fetchGrowthOpportunityPipelineDashboard } from "@/lib/growth/opportunity-pipeline/pipeline-dashboard-repository"
 import { fetchGrowthRelationshipDashboard } from "@/lib/growth/relationship-dashboard-repository"
@@ -57,6 +63,16 @@ import { enrichRelationshipLeadSnapshotsBatch } from "@/lib/growth/relationship/
 import { loadGrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-loader"
 
 import { GROWTH_HOME_LEAD_POOL_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
+
+const NATIVE_DIALER_PROBE_FALLBACK = {
+  schemaReady: false,
+  probeUncertain: true,
+  missingTables: [],
+  detectedTables: [],
+  setupMessage: null,
+  qaMarker: "native-dialer-schema-health-v2" as const,
+  schemaProbeVersion: "v2" as const,
+}
 
 function countInboxSections(
   sections: GrowthWorkspaceDashboardSourcePayload["leadInboxSections"],
@@ -137,11 +153,15 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   const startedAt = Date.now()
   const generatedAt = new Date().toISOString()
   const organizationId = getGrowthEngineAiOrgId()
+  const stageTimings: GrowthHomeLoaderTiming[] = []
+  const loaderBudgetMs = GROWTH_HOME_WORKSPACE_LOADER_BUDGET_MS
 
+  const leadPoolStart = Date.now()
   const leadPoolPage = await fetchGrowthHomeLeadPoolPage(input.admin, {
     cursor: input.leadPoolCursor ?? null,
     limit: GROWTH_HOME_LEAD_POOL_BATCH_LIMIT,
   })
+  stageTimings.push({ label: "lead_pool", durationMs: Date.now() - leadPoolStart, timedOut: false })
   const leads = leadPoolPage.leads
 
   const revenueQueueSections = buildRevenueQueueDashboardSectionsFromLeads(leads, "priority")
@@ -155,7 +175,16 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   }
 
   const dailyWorkQueueBundle = isDailyRevenueWorkQueueEnabled()
-    ? await fetchDailyRevenueWorkQueueFromLeads(input.admin, leads)
+    ? await (async () => {
+        const step = await withGrowthHomeLoaderBudget({
+          label: "daily_work_queue",
+          budgetMs: loaderBudgetMs,
+          fn: () => fetchDailyRevenueWorkQueueFromLeads(input.admin, leads),
+          fallback: { enabled: true as const, queue: null, display: null },
+        })
+        stageTimings.push(step.timing)
+        return step.value
+      })()
     : { enabled: false as const, queue: null, display: null }
 
   const engagementFilters = parseEngagementCommandCenterFilters(
@@ -163,6 +192,7 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     new URL("https://growth.local/engagement?dateRange=last_7_days&limit=1").searchParams,
   )
 
+  const parallelStart = Date.now()
   const [
     cadenceSchemaReady,
     nativeDialerProbe,
@@ -174,42 +204,125 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     conversationDashboard,
     relationshipDashboard,
   ] = await Promise.all([
-    isGrowthCadenceSchemaReady(input.admin).catch(() => false),
-    probeGrowthNativeDialerSchemaHealth(input.admin).catch(() => ({ schemaReady: false })),
-    fetchGrowthOpportunityPipelineDashboard(input.admin, input.actorUserId).catch(() => null),
-    fetchGrowthOpportunityDashboard(input.admin).catch(() => null),
-    fetchSequenceExecutionFoundationDashboard(input.admin).catch(() => null),
-    fetchGrowthSequenceSafeExecutionDashboard(input.admin).catch(() => null),
-    getGrowthEngagementCommandCenterHighIntent(input.admin, engagementFilters).catch(() => null),
-    fetchGrowthConversationDashboard(input.admin).catch(() => null),
-    fetchGrowthRelationshipDashboard(input.admin).catch(() => null),
+    withGrowthHomeLoaderBudget({
+      label: "cadence_schema_probe",
+      budgetMs: loaderBudgetMs,
+      fn: () => isGrowthCadenceSchemaReadyWithBudget(input.admin, loaderBudgetMs),
+      fallback: false,
+    }),
+    withGrowthHomeLoaderBudget({
+      label: "native_dialer_schema_probe",
+      budgetMs: loaderBudgetMs,
+      fn: () => probeGrowthNativeDialerSchemaHealthWithBudget(input.admin, loaderBudgetMs),
+      fallback: NATIVE_DIALER_PROBE_FALLBACK,
+    }),
+    withGrowthHomeLoaderBudget({
+      label: "opportunity_pipeline_dashboard",
+      budgetMs: loaderBudgetMs,
+      fn: () => fetchGrowthOpportunityPipelineDashboard(input.admin, input.actorUserId),
+      fallback: null,
+    }),
+    withGrowthHomeLoaderBudget({
+      label: "opportunity_dashboard",
+      budgetMs: loaderBudgetMs,
+      fn: () => fetchGrowthOpportunityDashboard(input.admin),
+      fallback: null,
+    }),
+    withGrowthHomeLoaderBudget({
+      label: "sequence_foundation",
+      budgetMs: loaderBudgetMs,
+      fn: () => fetchSequenceExecutionFoundationDashboard(input.admin),
+      fallback: null,
+    }),
+    withGrowthHomeLoaderBudget({
+      label: "sequence_execution_dashboard",
+      budgetMs: loaderBudgetMs,
+      fn: () => fetchGrowthSequenceSafeExecutionDashboard(input.admin),
+      fallback: null,
+    }),
+    withGrowthHomeLoaderBudget({
+      label: "engagement_command_center",
+      budgetMs: loaderBudgetMs,
+      fn: () => getGrowthEngagementCommandCenterHighIntent(input.admin, engagementFilters),
+      fallback: null,
+    }),
+    withGrowthHomeLoaderBudget({
+      label: "conversation_dashboard",
+      budgetMs: loaderBudgetMs,
+      fn: () => fetchGrowthConversationDashboard(input.admin),
+      fallback: null,
+    }),
+    withGrowthHomeLoaderBudget({
+      label: "relationship_dashboard",
+      budgetMs: loaderBudgetMs,
+      fn: () => fetchGrowthRelationshipDashboard(input.admin),
+      fallback: null,
+    }),
   ])
 
+  for (const step of [
+    cadenceSchemaReady,
+    nativeDialerProbe,
+    pipelineDashboard,
+    opportunityReadiness,
+    sequenceFoundation,
+    sequenceExecution,
+    engagementHighIntent,
+    conversationDashboard,
+    relationshipDashboard,
+  ]) {
+    stageTimings.push(step.timing)
+  }
+  stageTimings.push({
+    label: "parallel_fan_out_wall",
+    durationMs: Date.now() - parallelStart,
+    timedOut: false,
+  })
+
+  const cadenceSchemaReadyValue = cadenceSchemaReady.value
+  const nativeDialerProbeValue = nativeDialerProbe.value
+
   const [cadenceSummary, callsWorkspaceDashboard] = await Promise.all([
-    cadenceSchemaReady
-      ? fetchGrowthCadenceCommandSummary(input.admin).catch(() => null)
+    cadenceSchemaReadyValue
+      ? withGrowthHomeLoaderBudget({
+          label: "cadence_command_summary",
+          budgetMs: loaderBudgetMs,
+          fn: () => fetchGrowthCadenceCommandSummary(input.admin),
+          fallback: null,
+        }).then((step) => {
+          stageTimings.push(step.timing)
+          return step.value
+        })
       : Promise.resolve(null),
-    nativeDialerProbe.schemaReady
-      ? fetchGrowthNativeCallWorkspaceDashboard(input.admin, input.actorUserId).catch(() => null)
+    nativeDialerProbeValue.schemaReady
+      ? withGrowthHomeLoaderBudget({
+          label: "native_call_workspace",
+          budgetMs: loaderBudgetMs,
+          fn: () => fetchGrowthNativeCallWorkspaceDashboard(input.admin, input.actorUserId),
+          fallback: null,
+        }).then((step) => {
+          stageTimings.push(step.timing)
+          return step.value
+        })
       : Promise.resolve(null),
   ])
 
   const sources: GrowthWorkspaceDashboardSourcePayload = {
     briefing: null,
     leadInboxSections: revenueQueueSections,
-    cadenceSummary: cadenceSchemaReady ? cadenceSummary : null,
-    pipelineDashboard,
-    opportunityReadiness,
-    sequenceFoundation,
-    sequenceExecution,
-    engagementWorkspace: engagementHighIntent
+    cadenceSummary: cadenceSchemaReadyValue ? cadenceSummary : null,
+    pipelineDashboard: pipelineDashboard.value,
+    opportunityReadiness: opportunityReadiness.value,
+    sequenceFoundation: sequenceFoundation.value,
+    sequenceExecution: sequenceExecution.value,
+    engagementWorkspace: engagementHighIntent.value
       ? {
-          highIntent: engagementHighIntent.highIntent,
-          alerts: { total: engagementHighIntent.highIntent.cards.length },
+          highIntent: engagementHighIntent.value.highIntent,
+          alerts: { total: engagementHighIntent.value.highIntent.cards.length },
         }
       : null,
-    conversationDashboard,
-    relationshipDashboard,
+    conversationDashboard: conversationDashboard.value,
+    relationshipDashboard: relationshipDashboard.value,
     callsDashboard: callsWorkspaceDashboard
       ? {
           workspaceDashboard: {
@@ -258,7 +371,15 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   }
 
   const avaResearchLoopSummary = organizationId
-    ? await fetchLatestAvaResearchLoopSummary(input.admin, organizationId).catch(() => null)
+    ? await withGrowthHomeLoaderBudget({
+        label: "ava_research_loop_summary",
+        budgetMs: loaderBudgetMs,
+        fn: () => fetchLatestAvaResearchLoopSummary(input.admin, organizationId),
+        fallback: null,
+      }).then((step) => {
+        stageTimings.push(step.timing)
+        return step.value
+      })
     : null
 
   const suggestedNextAction =
@@ -275,26 +396,35 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   })
 
   const salesOutcomes = organizationId
-    ? await buildGrowthHomeSalesOutcomes({
-        admin: input.admin,
-        organizationId,
-        generatedAt,
-        researchLoopSummary: avaResearchLoopSummary,
-        pendingApprovals: kpis.approvalQueueCount,
-      }).catch(() => ({
-        qaMarker: GROWTH_SALES_SPECIALIST_EXECUTION_BRIDGE_QA_MARKER,
-        outcomes: [],
-        dailySummary: {
+    ? await withGrowthHomeLoaderBudget({
+        label: "sales_outcomes",
+        budgetMs: loaderBudgetMs,
+        fn: () =>
+          buildGrowthHomeSalesOutcomes({
+            admin: input.admin,
+            organizationId,
+            generatedAt,
+            researchLoopSummary: avaResearchLoopSummary,
+            pendingApprovals: kpis.approvalQueueCount,
+          }),
+        fallback: {
           qaMarker: GROWTH_SALES_SPECIALIST_EXECUTION_BRIDGE_QA_MARKER,
-          generatedAt,
-          researched: 0,
-          qualified: 0,
-          strong_opportunities: 0,
-          outreach_prepared: 0,
-          meetings_prepared: 0,
-          approvals_pending: kpis.approvalQueueCount,
+          outcomes: [],
+          dailySummary: {
+            qaMarker: GROWTH_SALES_SPECIALIST_EXECUTION_BRIDGE_QA_MARKER,
+            generatedAt,
+            researched: 0,
+            qualified: 0,
+            strong_opportunities: 0,
+            outreach_prepared: 0,
+            meetings_prepared: 0,
+            approvals_pending: kpis.approvalQueueCount,
+          },
         },
-      }))
+      }).then((step) => {
+        stageTimings.push(step.timing)
+        return step.value
+      })
     : {
         qaMarker: GROWTH_SALES_SPECIALIST_EXECUTION_BRIDGE_QA_MARKER,
         outcomes: [],
@@ -311,23 +441,32 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
       }
 
   const organizationalMemory = organizationId
-    ? await buildGrowthHomeOrganizationMemory({
-        admin: input.admin,
-        organizationId,
-        generatedAt,
-        salesOutcomes: salesOutcomes.outcomes,
-      }).catch(() => ({
-        qaMarker: "ge-aios-17b-server-organizational-memory-v1" as const,
-        store: {
-          organizationId,
-          capturedAt: generatedAt,
-          events: [],
-          preferences: [],
+    ? await withGrowthHomeLoaderBudget({
+        label: "organization_memory",
+        budgetMs: loaderBudgetMs,
+        fn: () =>
+          buildGrowthHomeOrganizationMemory({
+            admin: input.admin,
+            organizationId,
+            generatedAt,
+            salesOutcomes: salesOutcomes.outcomes,
+          }),
+        fallback: {
+          qaMarker: "ge-aios-17b-server-organizational-memory-v1" as const,
+          store: {
+            organizationId,
+            capturedAt: generatedAt,
+            events: [],
+            preferences: [],
+          },
+          source: "empty" as const,
+          degraded: true,
+          warning: "organization_memory_unavailable",
         },
-        source: "empty" as const,
-        degraded: true,
-        warning: "organization_memory_unavailable",
-      }))
+      }).then((step) => {
+        stageTimings.push(step.timing)
+        return step.value
+      })
     : {
         qaMarker: "ge-aios-17b-server-organizational-memory-v1" as const,
         store: {
@@ -342,23 +481,32 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
       }
 
   const organizationalKnowledge = organizationId
-    ? await buildGrowthHomeOrganizationalKnowledge({
-        admin: input.admin,
-        organizationId,
-        generatedAt,
-        memoryEvents: organizationalMemory.store.events,
-        salesOutcomes: salesOutcomes.outcomes,
-      }).catch(() => ({
-        qaMarker: GROWTH_ORGANIZATIONAL_KNOWLEDGE_QA_MARKER,
-        store: {
-          organizationId,
-          capturedAt: generatedAt,
-          items: [],
+    ? await withGrowthHomeLoaderBudget({
+        label: "organization_knowledge",
+        budgetMs: loaderBudgetMs,
+        fn: () =>
+          buildGrowthHomeOrganizationalKnowledge({
+            admin: input.admin,
+            organizationId,
+            generatedAt,
+            memoryEvents: organizationalMemory.store.events,
+            salesOutcomes: salesOutcomes.outcomes,
+          }),
+        fallback: {
+          qaMarker: GROWTH_ORGANIZATIONAL_KNOWLEDGE_QA_MARKER,
+          store: {
+            organizationId,
+            capturedAt: generatedAt,
+            items: [],
+          },
+          source: "empty" as const,
+          degraded: true,
+          warning: "organization_knowledge_unavailable",
         },
-        source: "empty" as const,
-        degraded: true,
-        warning: "organization_knowledge_unavailable",
-      }))
+      }).then((step) => {
+        stageTimings.push(step.timing)
+        return step.value
+      })
     : {
         qaMarker: GROWTH_ORGANIZATIONAL_KNOWLEDGE_QA_MARKER,
         store: {
@@ -371,7 +519,24 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
         warning: "organization_id_missing",
       }
 
-  const relationshipSnapshots = await enrichRelationshipLeadSnapshotsBatch(input.admin, leads)
+  const relationshipSnapshotsStep = await withGrowthHomeLoaderBudget({
+    label: "relationship_snapshots",
+    budgetMs: loaderBudgetMs,
+    fn: () => enrichRelationshipLeadSnapshotsBatch(input.admin, leads),
+    fallback: {
+      qaMarker: "ge-aios-15e-server-relationship-snapshots-v1" as const,
+      byLeadId: {},
+      meta: {
+        attempted: leads.length,
+        enriched: 0,
+        degraded: true,
+        warning: "relationship_snapshot_budget_exceeded",
+        queryCount: 0,
+      },
+    },
+  })
+  stageTimings.push(relationshipSnapshotsStep.timing)
+  const relationshipSnapshots = relationshipSnapshotsStep.value
 
   const snapshotCount = relationshipSnapshots.meta.enriched
   const leadPool = {
@@ -381,17 +546,30 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   }
 
   const missionDiscovery = organizationId
-    ? await loadGrowthHomeMissionDiscoverySnapshot(input.admin, {
-        organizationId,
-        leadPool,
-      }).catch(() => null)
+    ? await withGrowthHomeLoaderBudget({
+        label: "mission_discovery",
+        budgetMs: loaderBudgetMs,
+        fn: () =>
+          loadGrowthHomeMissionDiscoverySnapshot(input.admin, {
+            organizationId,
+            leadPool,
+          }),
+        fallback: null,
+      }).then((step) => {
+        stageTimings.push(step.timing)
+        return step.value
+      })
     : null
+
+  const durationMs = Date.now() - startedAt
+  logGrowthHomePipelineTimings({ totalMs: durationMs, timings: stageTimings })
 
   const optimization: GrowthHomeWorkspaceSummaryOptimization = {
     listGrowthLeadsCalls: 1,
     duplicateLeadListEliminated: 1,
     loaderCount: 12,
-    durationMs: Date.now() - startedAt,
+    durationMs,
+    stageTimingsMs: Object.fromEntries(stageTimings.map((row) => [row.label, row.durationMs])),
   }
 
   return {
