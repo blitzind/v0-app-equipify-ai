@@ -7,6 +7,10 @@ import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-
 import { scheduleUnifiedRevenueWorkflowLifecycleReEvaluation } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lifecycle-runner"
 import { collectProspectCompanyEvidence } from "@/lib/growth/research/company-evidence/company-evidence-collector"
 import {
+  GROWTH_COMPANY_EVIDENCE_COLLECTION_QA_MARKER,
+  type GrowthCompanyEvidenceCollectionRecord,
+} from "@/lib/growth/research/company-evidence/company-evidence-types"
+import {
   enrichCompanyIntelligenceFromEvidence,
   mergeEvidenceIntoResearchSummary,
   resolveVerifiedIndustryGuess,
@@ -54,6 +58,20 @@ export type RunProspectResearchInput = {
 export type RunProspectResearchResult =
   | { ok: true; run: GrowthResearchRunPublicView; cached: boolean; lead?: GrowthLead | null }
   | { ok: false; code: string; message: string; run?: GrowthResearchRunPublicView | null }
+
+function buildCompanyEvidenceCollectionRecord(input: {
+  status: GrowthCompanyEvidenceCollectionRecord["status"]
+  reason?: string
+  warnings?: string[]
+}): GrowthCompanyEvidenceCollectionRecord {
+  return {
+    qaMarker: GROWTH_COMPANY_EVIDENCE_COLLECTION_QA_MARKER,
+    status: input.status,
+    reason: input.reason,
+    warnings: input.warnings?.length ? input.warnings.slice(0, 4) : undefined,
+    collectedAt: new Date().toISOString(),
+  }
+}
 
 export async function runProspectResearch(input: RunProspectResearchInput): Promise<RunProspectResearchResult> {
   const organizationId = getGrowthEngineAiOrgId()
@@ -115,7 +133,26 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
     const admissionState = resolveLeadAdmissionStateFromMetadata(lead.metadata)
 
     let companyEvidenceBundle = null as Awaited<ReturnType<typeof collectProspectCompanyEvidence>>["bundle"]
-    if (scrape.fetchStatus === "ok" && lead.website?.trim()) {
+    let companyEvidenceCollection = buildCompanyEvidenceCollectionRecord({
+      status: "skipped",
+      reason: "not_attempted",
+    })
+
+    const canCollectEvidence =
+      Boolean(lead.website?.trim()) &&
+      (scrape.fetchStatus === "ok" || Boolean(scrape.html?.trim()))
+
+    if (!lead.website?.trim()) {
+      companyEvidenceCollection = buildCompanyEvidenceCollectionRecord({
+        status: "skipped",
+        reason: "no_website",
+      })
+    } else if (!canCollectEvidence) {
+      companyEvidenceCollection = buildCompanyEvidenceCollectionRecord({
+        status: "skipped",
+        reason: `website_fetch_${scrape.fetchStatus}`,
+      })
+    } else {
       try {
         const evidenceResult = await collectProspectCompanyEvidence({
           organizationId,
@@ -129,6 +166,18 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
           forceRefresh: rebuild,
         })
         companyEvidenceBundle = evidenceResult.bundle
+        if (companyEvidenceBundle) {
+          companyEvidenceCollection = buildCompanyEvidenceCollectionRecord({
+            status: "collected",
+            warnings: evidenceResult.warnings,
+          })
+        } else {
+          companyEvidenceCollection = buildCompanyEvidenceCollectionRecord({
+            status: "skipped",
+            reason: evidenceResult.warnings[0] ?? "collector_returned_null",
+            warnings: evidenceResult.warnings,
+          })
+        }
         if (evidenceResult.warnings.length > 0) {
           logProspectResearch("company_evidence_warnings", {
             leadId: lead.id,
@@ -137,10 +186,15 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
           })
         }
       } catch (error) {
+        const message = error instanceof Error ? error.message.slice(0, 180) : String(error).slice(0, 180)
+        companyEvidenceCollection = buildCompanyEvidenceCollectionRecord({
+          status: "failed",
+          reason: message,
+        })
         logProspectResearch("company_evidence_failed", {
           leadId: lead.id,
           runId: run.id,
-          message: error instanceof Error ? error.message.slice(0, 180) : String(error).slice(0, 180),
+          message,
         })
       }
     }
@@ -272,6 +326,7 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
         hasSocialLinks: flags.hasSocialLinks,
         hasReviewLinks: flags.hasReviewLinks,
         companyEvidence_v22: companyEvidenceBundle ?? undefined,
+        companyEvidenceCollection_v22: companyEvidenceCollection,
       },
       competitors: companySignals.competitors,
       researchSummary,

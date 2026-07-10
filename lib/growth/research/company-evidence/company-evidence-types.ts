@@ -2,7 +2,20 @@
 
 export const GROWTH_COMPANY_EVIDENCE_22_QA_MARKER = "ge-aios-22-company-evidence-v1" as const
 
+export const GROWTH_COMPANY_EVIDENCE_COLLECTION_QA_MARKER =
+  "ge-aios-22-company-evidence-collection-v1" as const
+
 export const GROWTH_COMPANY_EVIDENCE_PHASE = "GE-AIOS-22" as const
+
+export type GrowthCompanyEvidenceCollectionStatus = "collected" | "skipped" | "failed"
+
+export type GrowthCompanyEvidenceCollectionRecord = {
+  qaMarker: typeof GROWTH_COMPANY_EVIDENCE_COLLECTION_QA_MARKER
+  status: GrowthCompanyEvidenceCollectionStatus
+  reason?: string
+  warnings?: string[]
+  collectedAt: string
+}
 
 export type GrowthCompanyEvidenceField<T = string> = {
   value: T

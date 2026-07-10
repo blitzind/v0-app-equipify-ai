@@ -5,7 +5,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { fetchGrowthLeadById, mergeGrowthLeadMetadata } from "@/lib/growth/lead-repository"
 import { normalizeLeadIntakeSource } from "@/lib/growth/revenue-workflow/normalize-lead-intake-source"
 import { resolveUnifiedLeadFromIntake } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lead-resolver"
 import type { LeadIntakeSource } from "@/lib/growth/revenue-workflow/unified-lead-intake-types"
@@ -155,9 +155,10 @@ export function mergeCanonicalLeadIntoInboxMetadata(
 export function buildCanonicalIntakeLeadMetadata(
   input: GrowthLeadInboxCreateInput,
   canonical: CanonicalInboxIntakeBridgeResult,
+  existingLeadMetadata?: Record<string, unknown> | null,
 ): Record<string, unknown> {
   return mergeCanonicalLeadIntoInboxMetadata(
-    {
+    mergeGrowthLeadMetadata(existingLeadMetadata, {
       ...(input.metadata ?? {}),
       leadInboxDedupeHash: input.dedupe_hash,
       intake_site_key: input.site_key,
@@ -180,7 +181,7 @@ export function buildCanonicalIntakeLeadMetadata(
       existing_account_match: input.existing_account_match,
       existing_lead_match: input.existing_lead_match,
       revenue_queue_source: "canonical",
-    },
+    }),
     canonical,
   )
 }

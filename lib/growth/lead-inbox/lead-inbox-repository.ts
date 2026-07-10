@@ -109,8 +109,13 @@ export async function createLeadCandidate(
   })
 
   try {
+    const existingLead = await fetchGrowthLeadById(admin, canonical.growth_lead_id)
     await updateGrowthLead(admin, canonical.growth_lead_id, {
-      metadata: buildCanonicalIntakeLeadMetadata(sanitized, canonical),
+      metadata: buildCanonicalIntakeLeadMetadata(
+        sanitized,
+        canonical,
+        existingLead?.metadata as Record<string, unknown> | undefined,
+      ),
       externalRef: `lead_inbox:${sanitized.dedupe_hash}`,
     })
   } catch (e) {

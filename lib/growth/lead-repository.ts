@@ -709,6 +709,16 @@ export async function createGrowthLead(
   return lead
 }
 
+/** Merge lead metadata patches without dropping subsystem fields (admission, workflow, research). */
+export function mergeGrowthLeadMetadata(
+  existing: Record<string, unknown> | null | undefined,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  const base =
+    existing && typeof existing === "object" && !Array.isArray(existing) ? { ...existing } : {}
+  return { ...base, ...patch }
+}
+
 export async function updateGrowthLead(
   admin: SupabaseClient,
   leadId: string,

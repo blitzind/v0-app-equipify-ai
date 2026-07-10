@@ -13,7 +13,11 @@ import type {
   GrowthResearchSignals,
 } from "@/lib/growth/research/research-types"
 import type { GrowthCompanyEvidenceBundle } from "@/lib/growth/research/company-evidence/company-evidence-types"
-import { GROWTH_COMPANY_EVIDENCE_22_QA_MARKER } from "@/lib/growth/research/company-evidence/company-evidence-types"
+import {
+  GROWTH_COMPANY_EVIDENCE_22_QA_MARKER,
+  GROWTH_COMPANY_EVIDENCE_COLLECTION_QA_MARKER,
+  type GrowthCompanyEvidenceCollectionRecord,
+} from "@/lib/growth/research/company-evidence/company-evidence-types"
 
 export const PROSPECT_RESEARCH_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
@@ -60,8 +64,30 @@ function leadsTable(admin: SupabaseClient) {
 function mapCompanyEvidence(raw: unknown): GrowthCompanyEvidenceBundle | undefined {
   if (!raw || typeof raw !== "object") return undefined
   const row = raw as Record<string, unknown>
-  if (row.qaMarker !== GROWTH_COMPANY_EVIDENCE_22_QA_MARKER) return undefined
-  return row as unknown as GrowthCompanyEvidenceBundle
+  const qaMarker = row.qaMarker ?? row.qa_marker
+  if (qaMarker !== GROWTH_COMPANY_EVIDENCE_22_QA_MARKER) return undefined
+  return {
+    ...(row as unknown as GrowthCompanyEvidenceBundle),
+    qaMarker: GROWTH_COMPANY_EVIDENCE_22_QA_MARKER,
+  }
+}
+
+function mapCompanyEvidenceCollection(raw: unknown): GrowthCompanyEvidenceCollectionRecord | undefined {
+  if (!raw || typeof raw !== "object") return undefined
+  const row = raw as Record<string, unknown>
+  const qaMarker = row.qaMarker ?? row.qa_marker
+  if (qaMarker !== GROWTH_COMPANY_EVIDENCE_COLLECTION_QA_MARKER) return undefined
+  const status = row.status
+  if (status !== "collected" && status !== "skipped" && status !== "failed") return undefined
+  return {
+    qaMarker: GROWTH_COMPANY_EVIDENCE_COLLECTION_QA_MARKER,
+    status,
+    reason: typeof row.reason === "string" ? row.reason : undefined,
+    warnings: Array.isArray(row.warnings)
+      ? (row.warnings as string[]).filter(Boolean).slice(0, 4)
+      : undefined,
+    collectedAt: typeof row.collectedAt === "string" ? row.collectedAt : typeof row.collected_at === "string" ? row.collected_at : new Date(0).toISOString(),
+  }
 }
 
 function mapSignals(raw: unknown): GrowthResearchSignals {
@@ -89,6 +115,9 @@ function mapSignals(raw: unknown): GrowthResearchSignals {
     companyEvidence_v22:
       mapCompanyEvidence(row.companyEvidence_v22) ??
       mapCompanyEvidence(row.company_evidence_v22),
+    companyEvidenceCollection_v22:
+      mapCompanyEvidenceCollection(row.companyEvidenceCollection_v22) ??
+      mapCompanyEvidenceCollection(row.company_evidence_collection_v22),
   }
 }
 
