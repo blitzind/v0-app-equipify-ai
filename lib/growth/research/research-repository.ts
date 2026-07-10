@@ -18,6 +18,7 @@ import {
   GROWTH_COMPANY_EVIDENCE_COLLECTION_QA_MARKER,
   type GrowthCompanyEvidenceCollectionRecord,
 } from "@/lib/growth/research/company-evidence/company-evidence-types"
+import { normalizeGrowthResearchConfidence } from "@/lib/growth/research/research-confidence"
 
 export const PROSPECT_RESEARCH_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
@@ -145,7 +146,7 @@ export function mapProspectResearchRunRow(row: ResearchRunRow): GrowthResearchRu
     suggestedSequence: row.suggested_sequence,
     suggestedCallOpening: row.suggested_call_opening,
     recommendedNextAction: row.recommended_next_action,
-    researchConfidence: row.research_confidence,
+    researchConfidence: normalizeGrowthResearchConfidence(row.research_confidence),
     completedAt: row.completed_at,
     failedReason: row.failed_reason,
     createdAt: row.created_at,

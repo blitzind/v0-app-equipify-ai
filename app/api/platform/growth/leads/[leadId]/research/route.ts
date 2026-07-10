@@ -4,7 +4,7 @@ import { getGrowthEngineAiOrgId, logGrowthEngine, requireGrowthEnginePlatformAcc
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { loadGrowthLeadResearchBundle } from "@/lib/growth/research-repository"
 import { loadProspectIntelligenceBundle } from "@/lib/growth/research/research-repository"
-import { mapProspectRunToLegacyResearchRun } from "@/lib/growth/research/growth-canonical-research-legacy-adapter"
+import { mapProspectRunToLegacyResearchRun, projectGrowthLeadResearchBundleReadModel } from "@/lib/growth/research/growth-canonical-research-legacy-adapter"
 import { routeCanonicalProspectResearch } from "@/lib/growth/research/growth-canonical-research-route"
 import { GROWTH_CANONICAL_RESEARCH_23_QA_MARKER } from "@/lib/growth/research/growth-canonical-research-types"
 
@@ -36,12 +36,18 @@ export async function GET(
       loadGrowthLeadResearchBundle(access.admin, leadId),
       loadProspectIntelligenceBundle(access.admin, leadId),
     ])
+    const projected = projectGrowthLeadResearchBundleReadModel({
+      legacyRuns: bundle.runs,
+      legacyLatestRun: bundle.latestRun,
+      manualNotes: bundle.manualNotes,
+      prospectIntelligence,
+    })
     return NextResponse.json({
       ok: true,
       leadId,
-      latestRun: bundle.latestRun,
-      runs: bundle.runs,
-      manualNotes: bundle.manualNotes,
+      latestRun: projected.latestRun,
+      runs: projected.runs,
+      manualNotes: projected.manualNotes,
       prospectIntelligence,
       qaMarker: GROWTH_CANONICAL_RESEARCH_23_QA_MARKER,
     })

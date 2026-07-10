@@ -5,6 +5,7 @@ import { AlertTriangle, Brain, Building2, Gauge, Loader2, Phone, Sparkles, Targe
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, StatTile } from "@/components/growth/growth-ui-utils"
 import { GROWTH_AI_RESEARCH_AGENT_QA_MARKER, type GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
+import { normalizeGrowthResearchConfidence } from "@/lib/growth/research/research-confidence"
 import { cn } from "@/lib/utils"
 
 type GrowthProspectIntelligenceCardProps = {
@@ -32,6 +33,8 @@ export function GrowthProspectIntelligenceCard({
   onRebuildResearch,
   compact = false,
 }: GrowthProspectIntelligenceCardProps) {
+  const confidencePercent = run ? normalizeGrowthResearchConfidence(run.researchConfidence) : null
+
   if (loading) {
     return (
       <div className="flex items-center justify-center rounded-xl border border-border/70 bg-muted/10 py-10 text-sm text-muted-foreground dark:border-slate-800">
@@ -90,7 +93,7 @@ export function GrowthProspectIntelligenceCard({
         <>
           <div className={cn("grid gap-3", compact ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4")}>
             <StatTile label="Website maturity" value={`${run.websiteMaturityScore ?? 0}/100`} />
-            <StatTile label="Confidence" value={`${run.researchConfidence ?? 0}%`} />
+            <StatTile label="Confidence" value={confidencePercent != null ? `${confidencePercent}%` : "—"} />
             <StatTile label="Industry" value={run.industryGuess ?? "Unknown"} />
             <StatTile label="Next action" value={run.recommendedNextAction ?? "Manual Review"} />
           </div>

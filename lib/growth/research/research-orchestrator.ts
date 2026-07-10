@@ -44,6 +44,7 @@ import {
   markProspectResearchRunRunning,
 } from "@/lib/growth/research/research-repository"
 import { buildProspectResearchSummary, computeResearchConfidence } from "@/lib/growth/research/research-summary-builder"
+import { normalizeGrowthResearchConfidence } from "@/lib/growth/research/research-confidence"
 import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
 import { detectWebsiteTechnologies } from "@/lib/growth/research/technology-detector"
 import { detectWebsiteFeatureFlags, scoreWebsiteMaturity } from "@/lib/growth/research/website-maturity-score"
@@ -291,16 +292,18 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
     })
 
     const researchConfidence = Math.min(
-      1,
-      computeResearchConfidence({
-        fetchStatus: scrape.fetchStatus,
-        industryConfidence: companyEvidenceBundle
-          ? Math.max(industry.confidence, companyEvidenceBundle.qualityScores.industryConfidence)
-          : industry.confidence,
-        maturityScore: maturity.score,
-        painSignalCount: pain.painSignals.length,
-        technologyCount: tech.technologies.length,
-      }) + (evidenceEnrichment?.evidenceConfidence ?? 0) * 0.15,
+      100,
+      Math.round(
+        computeResearchConfidence({
+          fetchStatus: scrape.fetchStatus,
+          industryConfidence: companyEvidenceBundle
+            ? Math.max(industry.confidence, companyEvidenceBundle.qualityScores.industryConfidence)
+            : industry.confidence,
+          maturityScore: maturity.score,
+          painSignalCount: pain.painSignals.length,
+          technologyCount: tech.technologies.length,
+        }) + (evidenceEnrichment?.evidenceConfidence ?? 0) * 15,
+      ),
     )
 
     run = await finishProspectResearchRun(input.admin, run.id, {
