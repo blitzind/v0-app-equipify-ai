@@ -119,6 +119,38 @@ export function buildProspectSearchActiveFilterChips(
   if (filters.subindustry) {
     chips.push(chip("subindustry", "Industry", filters.subindustry, { subindustry: null }))
   }
+  if (filters.naics_codes?.length) {
+    for (const code of filters.naics_codes) {
+      const next = filters.naics_codes.filter((c) => c !== code)
+      chips.push(chip(`naics-${code}`, "NAICS", `+ ${code}`, { naics_codes: next.length ? next : undefined }))
+    }
+  }
+  if (filters.excluded_naics_codes?.length) {
+    for (const code of filters.excluded_naics_codes) {
+      const next = filters.excluded_naics_codes.filter((c) => c !== code)
+      chips.push(
+        chip(`naics-ex-${code}`, "NAICS", `− ${code}`, {
+          excluded_naics_codes: next.length ? next : undefined,
+        }),
+      )
+    }
+  }
+  if (filters.sic_codes?.length) {
+    for (const code of filters.sic_codes) {
+      const next = filters.sic_codes.filter((c) => c !== code)
+      chips.push(chip(`sic-${code}`, "SIC", `+ ${code}`, { sic_codes: next.length ? next : undefined }))
+    }
+  }
+  if (filters.excluded_sic_codes?.length) {
+    for (const code of filters.excluded_sic_codes) {
+      const next = filters.excluded_sic_codes.filter((c) => c !== code)
+      chips.push(
+        chip(`sic-ex-${code}`, "SIC", `− ${code}`, {
+          excluded_sic_codes: next.length ? next : undefined,
+        }),
+      )
+    }
+  }
   if (filters.location) {
     chips.push(chip("location", "Location", filters.location, { location: null }))
   }

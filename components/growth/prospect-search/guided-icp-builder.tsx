@@ -4,6 +4,7 @@ import { useState, type Dispatch, ReactNode, SetStateAction } from "react"
 import { RecommendedFilters } from "@/components/growth/prospect-search/recommended-filters"
 import { SmartFilterInput } from "@/components/growth/prospect-search/smart-filter-input"
 import { TitleTargetingCard } from "@/components/growth/prospect-search/title-targeting-card"
+import { IndustryCodeFilterCard } from "@/components/growth/prospect-search/industry-code-filter-card"
 import { TerritoryFilterCard } from "@/components/growth/prospect-search/territory-filter-card"
 import { GROWTH_SEARCH_FILTERS_COLLAPSED_DEFAULT_QA_MARKER } from "@/components/growth/prospect-search/prospect-search-ux-constants"
 import {
@@ -234,6 +235,7 @@ export function GuidedIcpBuilder({
               query={filters.industry ?? ""}
               onPick={(v) => onChange((prev) => ({ ...prev, industry: v }))}
             />
+            <IndustryCodeFilterCard filters={filters} onChange={onChange} />
           </AccordionContent>
         </AccordionItem>
 

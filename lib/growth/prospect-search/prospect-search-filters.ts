@@ -27,6 +27,7 @@ import {
   normalizeTerritoryFilter,
   rowMatchesTerritoryFilter,
 } from "@/lib/growth/prospect-search/prospect-search-geo"
+import { rowMatchesProspectSearchIndustryCodeFilters } from "@/lib/growth/prospect-search/prospect-search-industry-code-filters"
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
@@ -147,6 +148,37 @@ export function explainProspectSearchFilterDrop<
       ? filters.keywords.some((kw) => includesFold(blob, kw))
       : filters.keywords.every((kw) => includesFold(blob, kw))
     if (!keywordMatch) return "keywords"
+  }
+  if (
+    filters.naics_codes?.length ||
+    filters.excluded_naics_codes?.length ||
+    filters.sic_codes?.length ||
+    filters.excluded_sic_codes?.length
+  ) {
+    const extended = row as GrowthProspectSearchIndexCompany & {
+      naics_codes?: string[]
+      sic_codes?: string[]
+    }
+    const matches = rowMatchesProspectSearchIndustryCodeFilters({
+      industry: row.industry,
+      subindustry: row.subindustry,
+      keywords: row.keywords,
+      notes: row.notes,
+      company_name: row.company_name,
+      naics_codes: extended.naics_codes,
+      sic_codes: extended.sic_codes,
+      preferredNaics: filters.naics_codes,
+      excludedNaics: filters.excluded_naics_codes,
+      preferredSic: filters.sic_codes,
+      excludedSic: filters.excluded_sic_codes,
+    })
+    if (!matches) {
+      if (options?.external_discovery && !extended.naics_codes?.length && !extended.sic_codes?.length) {
+        // External listings rarely include classification codes — approximate via industry keywords only.
+      } else {
+        return "naics_codes"
+      }
+    }
   }
   if (filters.technologies?.length) {
     if (options?.external_discovery) {
@@ -313,8 +345,14 @@ export function normalizeProspectSearchFilters(
     naics_codes: Array.isArray(raw.naics_codes)
       ? raw.naics_codes.map((k) => asString(k)).filter(Boolean)
       : undefined,
+    excluded_naics_codes: Array.isArray(raw.excluded_naics_codes)
+      ? raw.excluded_naics_codes.map((k) => asString(k)).filter(Boolean)
+      : undefined,
     sic_codes: Array.isArray(raw.sic_codes)
       ? raw.sic_codes.map((k) => asString(k)).filter(Boolean)
+      : undefined,
+    excluded_sic_codes: Array.isArray(raw.excluded_sic_codes)
+      ? raw.excluded_sic_codes.map((k) => asString(k)).filter(Boolean)
       : undefined,
     technologies: Array.isArray(raw.technologies)
       ? raw.technologies.map((k) => asString(k)).filter(Boolean)

@@ -436,6 +436,96 @@ export function GrowthHomeBusinessProfileSection({ embedded = false }: { embedde
                 rows={3}
               />
             </div>
+            <div className="space-y-2">
+              <Label>Disqualifiers (one per line)</Label>
+              <Textarea
+                value={listLines(editableProfile.idealCustomers.disqualifiers)}
+                onChange={(e) =>
+                  updateEditableProfile({
+                    idealCustomers: {
+                      ...editableProfile.idealCustomers,
+                      disqualifiers: parseLines(e.target.value),
+                    },
+                  })
+                }
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Preferred NAICS codes (comma or line separated — search filters only)</Label>
+              <Textarea
+                value={listLines(editableProfile.idealCustomers.preferredNaicsCodes ?? [])}
+                onChange={(e) =>
+                  updateEditableProfile({
+                    idealCustomers: {
+                      ...editableProfile.idealCustomers,
+                      preferredNaicsCodes: parseLines(e.target.value.replace(/,/g, "\n")),
+                    },
+                  })
+                }
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Excluded NAICS codes</Label>
+              <Textarea
+                value={listLines(editableProfile.idealCustomers.excludedNaicsCodes ?? [])}
+                onChange={(e) =>
+                  updateEditableProfile({
+                    idealCustomers: {
+                      ...editableProfile.idealCustomers,
+                      excludedNaicsCodes: parseLines(e.target.value.replace(/,/g, "\n")),
+                    },
+                  })
+                }
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Preferred SIC codes</Label>
+              <Textarea
+                value={listLines(editableProfile.idealCustomers.preferredSicCodes ?? [])}
+                onChange={(e) =>
+                  updateEditableProfile({
+                    idealCustomers: {
+                      ...editableProfile.idealCustomers,
+                      preferredSicCodes: parseLines(e.target.value.replace(/,/g, "\n")),
+                    },
+                  })
+                }
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Excluded SIC codes</Label>
+              <Textarea
+                value={listLines(editableProfile.idealCustomers.excludedSicCodes ?? [])}
+                onChange={(e) =>
+                  updateEditableProfile({
+                    idealCustomers: {
+                      ...editableProfile.idealCustomers,
+                      excludedSicCodes: parseLines(e.target.value.replace(/,/g, "\n")),
+                    },
+                  })
+                }
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Industry code notes</Label>
+              <Textarea
+                value={editableProfile.idealCustomers.industryCodeNotes ?? ""}
+                onChange={(e) =>
+                  updateEditableProfile({
+                    idealCustomers: {
+                      ...editableProfile.idealCustomers,
+                      industryCodeNotes: e.target.value.trim() || null,
+                    },
+                  })
+                }
+                rows={2}
+              />
+            </div>
           </ProfileSectionEditor>
 
           <ProfileSectionEditor title="Problems & Triggers">
@@ -553,6 +643,54 @@ export function GrowthHomeBusinessProfileSection({ embedded = false }: { embedde
                   {activeApproved.profile.idealCustomers.buyerPersonas.join(", ")}
                 </p>
               </div>
+              {(activeApproved.profile.idealCustomers.disqualifiers?.length ?? 0) > 0 ? (
+                <div className="md:col-span-2">
+                  <p className="font-medium">Disqualifiers</p>
+                  <p className="text-muted-foreground">
+                    {activeApproved.profile.idealCustomers.disqualifiers.join(", ")}
+                  </p>
+                </div>
+              ) : null}
+              {(activeApproved.profile.idealCustomers.preferredNaicsCodes?.length ?? 0) > 0 ? (
+                <div>
+                  <p className="font-medium">Preferred NAICS codes</p>
+                  <p className="text-muted-foreground">
+                    {activeApproved.profile.idealCustomers.preferredNaicsCodes.join(", ")}
+                  </p>
+                </div>
+              ) : null}
+              {(activeApproved.profile.idealCustomers.excludedNaicsCodes?.length ?? 0) > 0 ? (
+                <div>
+                  <p className="font-medium">Excluded NAICS codes</p>
+                  <p className="text-muted-foreground">
+                    {activeApproved.profile.idealCustomers.excludedNaicsCodes.join(", ")}
+                  </p>
+                </div>
+              ) : null}
+              {(activeApproved.profile.idealCustomers.preferredSicCodes?.length ?? 0) > 0 ? (
+                <div>
+                  <p className="font-medium">Preferred SIC codes</p>
+                  <p className="text-muted-foreground">
+                    {activeApproved.profile.idealCustomers.preferredSicCodes.join(", ")}
+                  </p>
+                </div>
+              ) : null}
+              {(activeApproved.profile.idealCustomers.excludedSicCodes?.length ?? 0) > 0 ? (
+                <div>
+                  <p className="font-medium">Excluded SIC codes</p>
+                  <p className="text-muted-foreground">
+                    {activeApproved.profile.idealCustomers.excludedSicCodes.join(", ")}
+                  </p>
+                </div>
+              ) : null}
+              {activeApproved.profile.idealCustomers.industryCodeNotes ? (
+                <div className="md:col-span-2">
+                  <p className="font-medium">Industry code notes</p>
+                  <p className="text-muted-foreground">
+                    {activeApproved.profile.idealCustomers.industryCodeNotes}
+                  </p>
+                </div>
+              ) : null}
             </div>
           </div>
           <Button variant="outline" onClick={handleUpdateBusinessProfile}>

@@ -163,7 +163,9 @@ export type GrowthProspectSearchFilters = {
   company_age_years_max?: number | null
   keywords?: string[]
   naics_codes?: string[]
+  excluded_naics_codes?: string[]
   sic_codes?: string[]
+  excluded_sic_codes?: string[]
   technologies?: string[]
   crm_detected?: string | null
   website_platform?: string | null

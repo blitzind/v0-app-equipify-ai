@@ -45,6 +45,12 @@ export type BusinessProfileIdealCustomersSection = {
   geography: string[]
   buyerPersonas: string[]
   disqualifiers: string[]
+  /** GE-AIOS-LIVE-1B — Prospect-search include filters (not admission shortcuts). */
+  preferredNaicsCodes?: string[]
+  excludedNaicsCodes?: string[]
+  preferredSicCodes?: string[]
+  excludedSicCodes?: string[]
+  industryCodeNotes?: string | null
 }
 
 export type BusinessProfileProblemsSection = {
