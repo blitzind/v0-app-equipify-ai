@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { getGrowthEngineAiOrgId, logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { loadGrowthLeadResearchBundle } from "@/lib/growth/research-repository"
 import { loadProspectIntelligenceBundle } from "@/lib/growth/research/research-repository"
-import { runGrowthLeadResearch } from "@/lib/growth/run-lead-research"
+import { mapProspectRunToLegacyResearchRun } from "@/lib/growth/research/growth-canonical-research-legacy-adapter"
+import { routeCanonicalProspectResearch } from "@/lib/growth/research/growth-canonical-research-route"
+import { GROWTH_CANONICAL_RESEARCH_23_QA_MARKER } from "@/lib/growth/research/growth-canonical-research-types"
 
 export const runtime = "nodejs"
 
@@ -41,6 +43,7 @@ export async function GET(
       runs: bundle.runs,
       manualNotes: bundle.manualNotes,
       prospectIntelligence,
+      qaMarker: GROWTH_CANONICAL_RESEARCH_23_QA_MARKER,
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
@@ -48,6 +51,7 @@ export async function GET(
   }
 }
 
+/** @deprecated POST — thin wrapper; canonical execution via executeGrowthLeadProspectResearch (GE-AIOS-23). */
 export async function POST(
   request: Request,
   context: { params: Promise<{ leadId: string }> },
@@ -62,68 +66,71 @@ export async function POST(
 
   const rawBody = await request.json().catch(() => ({}))
   const parsed = PostSchema.safeParse(rawBody)
+  const regenerate = parsed.success ? Boolean(parsed.data.regenerate) : false
+
+  const organizationId = getGrowthEngineAiOrgId()
+  if (!organizationId) {
+    return NextResponse.json(
+      { ok: false, error: "server_config", message: "Prospect research is not configured." },
+      { status: 503 },
+    )
+  }
 
   try {
-    const result = await runGrowthLeadResearch({
-      admin: access.admin,
+    logGrowthEngine("legacy_research_post_delegated", {
       leadId,
-      createdBy: access.userId,
-      actingUserEmail: access.userEmail,
-      regenerate: parsed.success ? parsed.data.regenerate : false,
+      regenerate,
+      qaMarker: GROWTH_CANONICAL_RESEARCH_23_QA_MARKER,
+    })
+
+    const result = await routeCanonicalProspectResearch({
+      admin: access.admin,
+      organizationId,
+      leadId,
+      trigger: "manual",
+      rebuild: regenerate,
+      force: regenerate,
+      runQualification: true,
     })
 
     if (!result.ok) {
       const status =
         result.code === "not_found" ? 404
-        : result.code === "not_configured" || result.code === "server_config" ? 503
+        : result.code === "server_config" || result.outcome === "not_configured" ? 503
+        : result.outcome === "skipped" ? 409
         : 500
-
-      logGrowthEngine("research_api_failed", {
-        leadId,
-        code: result.code,
-        actorEmail: access.userEmail,
-      })
 
       return NextResponse.json(
         {
           ok: false,
           error: result.code,
           message: result.message,
-          run: result.run ?? null,
+          run: result.run ? mapProspectRunToLegacyResearchRun(result.run, { createdBy: access.userId, triggerKind: regenerate ? "regenerate" : "manual" }) : null,
+          qaMarker: GROWTH_CANONICAL_RESEARCH_23_QA_MARKER,
         },
         { status },
       )
     }
 
-    logGrowthEngine("research_api_success", {
-      leadId,
-      runId: result.run.id,
-      cached: result.cached,
-      actorEmail: access.userEmail,
+    const legacyRun = mapProspectRunToLegacyResearchRun(result.run, {
+      createdBy: access.userId,
+      triggerKind: regenerate ? "regenerate" : "manual",
     })
 
     return NextResponse.json({
       ok: true,
-      run: result.run,
-      leadStatus: result.leadStatus,
-      leadScore: result.leadScore,
+      qaMarker: GROWTH_CANONICAL_RESEARCH_23_QA_MARKER,
+      run: legacyRun,
+      leadStatus: result.lead?.status ?? null,
+      leadScore: result.lead?.score ?? null,
       lead: result.lead ?? null,
-      cached: result.cached,
+      cached: result.outcome === "cached" || result.outcome === "active",
+      prospectRun: result.run,
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    logGrowthEngine("research_api_exception", {
-      leadId,
-      message: message.slice(0, 240),
-      actorEmail: access.userEmail,
-    })
     return NextResponse.json(
-      {
-        ok: false,
-        error: "research_failed",
-        message: message.slice(0, 240),
-        run: null,
-      },
+      { ok: false, error: "research_failed", message: message.slice(0, 240), run: null },
       { status: 500 },
     )
   }

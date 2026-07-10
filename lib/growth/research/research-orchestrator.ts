@@ -5,6 +5,14 @@ import { getGrowthEngineAiOrgId, logGrowthEngine } from "@/lib/growth/access"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import { scheduleUnifiedRevenueWorkflowLifecycleReEvaluation } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lifecycle-runner"
+import { collectProspectCompanyEvidence } from "@/lib/growth/research/company-evidence/company-evidence-collector"
+import {
+  enrichCompanyIntelligenceFromEvidence,
+  mergeEvidenceIntoResearchSummary,
+  resolveVerifiedIndustryGuess,
+} from "@/lib/growth/research/company-evidence/company-evidence-intelligence-enrichment"
+import { loadGrowthLeadAdmissionContext } from "@/lib/growth/revenue-workflow/growth-lead-admission-context"
+import { resolveLeadAdmissionStateFromMetadata } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
 import { buildCompanySignals } from "@/lib/growth/research/company-signal-builder"
 import { classifyProspectIndustry } from "@/lib/growth/research/industry-classifier"
 import { detectProspectPainSignals } from "@/lib/growth/research/pain-signal-detector"
@@ -103,6 +111,42 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
 
     const scrape = await scrapeProspectWebsite(lead.website)
 
+    const admissionContext = await loadGrowthLeadAdmissionContext(input.admin, organizationId)
+    const admissionState = resolveLeadAdmissionStateFromMetadata(lead.metadata)
+
+    let companyEvidenceBundle = null as Awaited<ReturnType<typeof collectProspectCompanyEvidence>>["bundle"]
+    if (scrape.fetchStatus === "ok" && lead.website?.trim()) {
+      try {
+        const evidenceResult = await collectProspectCompanyEvidence({
+          organizationId,
+          companyName: lead.companyName,
+          websiteUrl: lead.website,
+          homepageHtml: scrape.html,
+          homepageFetchStatus: scrape.fetchStatus,
+          approvedProfile: admissionContext.approvedProfile,
+          activeMissionTitle: admissionContext.activeMissionTitle,
+          admissionState,
+          forceRefresh: rebuild,
+        })
+        companyEvidenceBundle = evidenceResult.bundle
+        if (evidenceResult.warnings.length > 0) {
+          logProspectResearch("company_evidence_warnings", {
+            leadId: lead.id,
+            runId: run.id,
+            warnings: evidenceResult.warnings.slice(0, 4),
+          })
+        }
+      } catch (error) {
+        logProspectResearch("company_evidence_failed", {
+          leadId: lead.id,
+          runId: run.id,
+          message: error instanceof Error ? error.message.slice(0, 180) : String(error).slice(0, 180),
+        })
+      }
+    }
+
+    const evidenceEnrichment = enrichCompanyIntelligenceFromEvidence(companyEvidenceBundle)
+
     if (await isGrowthCompanyContactsSchemaReady(input.admin)) {
       try {
         await runWebsiteContactDiscoveryForCompany(input.admin, {
@@ -116,6 +160,22 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
     }
 
     const industry = classifyProspectIndustry(lead.companyName, scrape)
+    const industryGuess = resolveVerifiedIndustryGuess(
+      companyEvidenceBundle?.profile ?? {
+        companyDescription: null,
+        industriesServed: null,
+        primaryProducts: null,
+        primaryServices: null,
+        targetCustomers: null,
+        businessModel: null,
+        geographicMarkets: null,
+        estimatedCompanySize: null,
+        differentiators: null,
+        technologySignals: null,
+        hiringSignals: null,
+      },
+      industry.industry,
+    )
     const tech = detectWebsiteTechnologies(scrape.html, scrape.plainText)
     const maturity = scoreWebsiteMaturity(scrape.html, scrape.plainText, scrape)
 
@@ -145,14 +205,17 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
       hasPhone: Boolean(lead.contactPhone?.trim()),
     })
 
-    const researchSummary = buildProspectResearchSummary({
-      companyName: lead.companyName,
-      industry,
-      scrape,
-      maturityScore: maturity.score,
-      painSignals: pain.painSignals,
-      technologies: tech.technologies,
-      recommendedAction: recommendedNextAction,
+    const researchSummary = mergeEvidenceIntoResearchSummary({
+      baseSummary: buildProspectResearchSummary({
+        companyName: lead.companyName,
+        industry: { ...industry, industry: industryGuess ?? industry.industry },
+        scrape,
+        maturityScore: maturity.score,
+        painSignals: pain.painSignals,
+        technologies: tech.technologies,
+        recommendedAction: recommendedNextAction,
+      }),
+      enrichment: evidenceEnrichment,
     })
 
     const suggestedPitchAngle = generateSuggestedPitchAngle({
@@ -173,18 +236,23 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
       painSignals: pain.painSignals,
     })
 
-    const researchConfidence = computeResearchConfidence({
-      fetchStatus: scrape.fetchStatus,
-      industryConfidence: industry.confidence,
-      maturityScore: maturity.score,
-      painSignalCount: pain.painSignals.length,
-      technologyCount: tech.technologies.length,
-    })
+    const researchConfidence = Math.min(
+      1,
+      computeResearchConfidence({
+        fetchStatus: scrape.fetchStatus,
+        industryConfidence: companyEvidenceBundle
+          ? Math.max(industry.confidence, companyEvidenceBundle.qualityScores.industryConfidence)
+          : industry.confidence,
+        maturityScore: maturity.score,
+        painSignalCount: pain.painSignals.length,
+        technologyCount: tech.technologies.length,
+      }) + (evidenceEnrichment?.evidenceConfidence ?? 0) * 0.15,
+    )
 
     run = await finishProspectResearchRun(input.admin, run.id, {
       status: "completed",
       websiteUrl: scrape.url,
-      industryGuess: industry.industry,
+      industryGuess: industryGuess ?? industry.industry,
       employeeSizeGuess: companySignals.employeeSizeGuess,
       revenueSizeGuess: companySignals.revenueSizeGuess,
       websiteMaturityScore: maturity.score,
@@ -203,6 +271,7 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
         hasFinancing: flags.hasFinancing,
         hasSocialLinks: flags.hasSocialLinks,
         hasReviewLinks: flags.hasReviewLinks,
+        companyEvidence_v22: companyEvidenceBundle ?? undefined,
       },
       competitors: companySignals.competitors,
       researchSummary,

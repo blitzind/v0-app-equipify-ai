@@ -11,9 +11,9 @@ import {
   fetchLeadResearchPilotObservation,
 } from "@/lib/growth/aios/pilot/lead-research-pilot-observability"
 import {
-  scheduleLeadResearchPilotForProspect,
-} from "@/lib/growth/aios/pilot/lead-research-pilot-orchestrator"
-import { isLeadResearchPilotEnabled } from "@/lib/growth/aios/pilot/lead-research-pilot-config"
+  scheduleGrowthLeadProspectResearchIfNeeded,
+} from "@/lib/growth/research/growth-lead-research-execution-service"
+import { GROWTH_CANONICAL_RESEARCH_23_QA_MARKER } from "@/lib/growth/research/growth-canonical-research-types"
 import { getGrowthEngineAiOrgId, logGrowthEngine } from "@/lib/growth/access"
 import type {
   GrowthHomeAvaExecuteAction,
@@ -279,23 +279,6 @@ export async function executeGrowthHomeAvaSafeAction(
     }
 
     if (input.action === "start_research") {
-      if (!isLeadResearchPilotEnabled()) {
-        const auditEventId = await publishAvaHomeExecuteAuditEvent(input.admin, {
-          organizationId: input.organizationId,
-          leadId: input.leadId,
-          action: input.action,
-          phase: "skipped",
-          status: "skipped",
-          actorUserId: input.actor?.userId ?? null,
-          reason: "lead_research_pilot_disabled",
-        })
-        return {
-          status: "skipped",
-          skipReason: "lead_research_pilot_disabled",
-          auditEventId,
-        }
-      }
-
       const active = await resolveActiveLeadResearchState(input.admin, {
         organizationId: input.organizationId,
         leadId: input.leadId,
@@ -328,11 +311,11 @@ export async function executeGrowthHomeAvaSafeAction(
         }
       }
 
-      scheduleLeadResearchPilotForProspect(input.admin, {
-        leadId: input.leadId,
+      scheduleGrowthLeadProspectResearchIfNeeded(input.admin, {
         organizationId: input.organizationId,
-        createdBy: input.actor?.userId ?? null,
-        source: "ava_home_dashboard",
+        leadId: input.leadId,
+        trigger: "manual",
+        force: true,
       })
 
       const auditEventId = await publishAvaHomeExecuteAuditEvent(input.admin, {

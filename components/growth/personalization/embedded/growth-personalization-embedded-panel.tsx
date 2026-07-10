@@ -15,6 +15,9 @@ import {
   GROWTH_AVA_PERSONALIZATION_TITLE,
 } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { Button } from "@/components/ui/button"
+import type { GrowthLead } from "@/lib/growth/types"
+import { hasUsableLeadResearch } from "@/lib/growth/research/growth-lead-research-readiness"
+import { enqueueGrowthLeadResearchFromDrawer } from "@/lib/growth/research/growth-lead-research-drawer-client"
 
 const SURFACE_TITLES: Record<GrowthPersonalizationEmbeddedSurface, string> = {
   lead: GROWTH_AVA_PERSONALIZATION_TITLE,
@@ -28,6 +31,7 @@ const SURFACE_TITLES: Record<GrowthPersonalizationEmbeddedSurface, string> = {
 }
 
 type Props = {
+  lead?: GrowthLead | null
   leadId: string | null | undefined
   surface: GrowthPersonalizationEmbeddedSurface
   compact?: boolean
@@ -35,6 +39,7 @@ type Props = {
 }
 
 export function GrowthPersonalizationEmbeddedPanel({
+  lead = null,
   leadId,
   surface,
   compact = false,
@@ -47,6 +52,17 @@ export function GrowthPersonalizationEmbeddedPanel({
   const [packageEmail, setPackageEmail] = useState(true)
   const [packageSms, setPackageSms] = useState(false)
   const [packageShare, setPackageShare] = useState(false)
+
+  const researched = lead ? hasUsableLeadResearch(lead) : true
+
+  async function handleGenerate() {
+    if (!leadId) return
+    if (lead && !researched) {
+      await enqueueGrowthLeadResearchFromDrawer(lead)
+      return
+    }
+    await generate()
+  }
 
   if (!leadId) return null
 
@@ -125,7 +141,7 @@ export function GrowthPersonalizationEmbeddedPanel({
         showPreview={showPreview}
         showApprove={showApprove}
         showEdit={showEdit}
-        onGenerate={() => void generate()}
+        onGenerate={() => void handleGenerate()}
         onRegenerate={() => void regenerate()}
         onApprove={() => void handleApprove()}
         onEdit={() => {

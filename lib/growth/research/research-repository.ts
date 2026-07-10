@@ -1,3 +1,7 @@
+/** GE-AIOS-23 — Canonical prospect research runs (`growth.research_runs`).
+ *  Single owner for website evidence (22), prospect signals, and research cache.
+ *  Entry: executeGrowthLeadProspectResearch → runProspectResearch
+ */
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
@@ -8,6 +12,8 @@ import type {
   GrowthResearchRunPublicView,
   GrowthResearchSignals,
 } from "@/lib/growth/research/research-types"
+import type { GrowthCompanyEvidenceBundle } from "@/lib/growth/research/company-evidence/company-evidence-types"
+import { GROWTH_COMPANY_EVIDENCE_22_QA_MARKER } from "@/lib/growth/research/company-evidence/company-evidence-types"
 
 export const PROSPECT_RESEARCH_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
@@ -51,6 +57,13 @@ function leadsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("leads")
 }
 
+function mapCompanyEvidence(raw: unknown): GrowthCompanyEvidenceBundle | undefined {
+  if (!raw || typeof raw !== "object") return undefined
+  const row = raw as Record<string, unknown>
+  if (row.qaMarker !== GROWTH_COMPANY_EVIDENCE_22_QA_MARKER) return undefined
+  return row as unknown as GrowthCompanyEvidenceBundle
+}
+
 function mapSignals(raw: unknown): GrowthResearchSignals {
   if (!raw || typeof raw !== "object") return { painSignals: [] }
   const row = raw as Record<string, unknown>
@@ -73,6 +86,9 @@ function mapSignals(raw: unknown): GrowthResearchSignals {
     hasFinancing: row.hasFinancing === true || row.has_financing === true,
     hasSocialLinks: row.hasSocialLinks === true || row.has_social_links === true,
     hasReviewLinks: row.hasReviewLinks === true || row.has_review_links === true,
+    companyEvidence_v22:
+      mapCompanyEvidence(row.companyEvidence_v22) ??
+      mapCompanyEvidence(row.company_evidence_v22),
   }
 }
 

@@ -5,6 +5,10 @@ import type {
   DatamoonAudienceImportRun,
   DatamoonNormalizedLeadRecord,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
+import {
+  resolveDatamoonCompanyName,
+  resolveDatamoonCompanyWebsite,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-company-identity"
 import type {
   LeadIntakeSource,
   UnifiedLeadIntakeCompanyInput,
@@ -21,11 +25,7 @@ export type DatamoonUnifiedIntakePayload = {
 }
 
 function resolveCompanyName(normalized: DatamoonNormalizedLeadRecord): string {
-  const explicit = normalized.company_name?.trim()
-  if (explicit) return explicit
-  if (normalized.company_domain) return normalized.company_domain
-  if (normalized.email) return normalized.email.split("@")[1] ?? "Unknown Company"
-  return "Unknown Company"
+  return resolveDatamoonCompanyName(normalized)
 }
 
 export function buildDatamoonUnifiedIntakePayload(input: {
@@ -45,7 +45,7 @@ export function buildDatamoonUnifiedIntakePayload(input: {
     leadId,
     company: {
       name: resolveCompanyName(normalized),
-      website: normalized.company_domain ? `https://${normalized.company_domain}` : null,
+      website: resolveDatamoonCompanyWebsite(normalized),
       domain: normalized.company_domain,
     },
     contact: {

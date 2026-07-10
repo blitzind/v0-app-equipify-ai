@@ -6,12 +6,12 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { runAutonomousMeetingPilotCycle } from "@/lib/growth/aios/growth/growth-autonomous-meeting-pilot-service"
 import { runAutonomousOutreachPreparationManualRequest } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-service"
 import { runAutonomousQualificationManualEvaluation } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-service"
-import { runAutonomousResearchManualRefresh } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-service"
+import { executeGrowthLeadProspectResearch } from "@/lib/growth/research/growth-lead-research-execution-service"
 import {
   mapMeetingRunToSalesOutcome,
   mapOutreachRunToSalesOutcome,
+  mapProspectResearchExecutionToSalesOutcome,
   mapQualificationRunToSalesOutcome,
-  mapResearchRunToSalesOutcome,
 } from "@/lib/growth/specialists/execution/sales-outcome-mappers"
 import type {
   SalesOutcome,
@@ -53,24 +53,36 @@ export async function executeSalesWorkflowAgent(
       if (!leadId) {
         return { executed: false, workflow_agent: workflowAgent, skip_reason: "lead_id_required" }
       }
-      const readModel = await runAutonomousResearchManualRefresh(admin, {
+      const execution = await executeGrowthLeadProspectResearch({
+        admin: input.admin,
         organizationId: input.organizationId,
         leadId,
+        trigger: "sales_loop",
         generatedAt: input.generatedAt,
+        runQualification: true,
       })
-      const latestRun = findLatestRunForLead(readModel.recentRuns, leadId)
-      const outcome = latestRun ? mapResearchRunToSalesOutcome(latestRun) : null
+      const outcome = mapProspectResearchExecutionToSalesOutcome(execution, {
+        workItemId: workItem.id,
+        leadId,
+      })
       if (!outcome) {
         return {
           executed: false,
           workflow_agent: workflowAgent,
-          skip_reason: latestRun?.outcome === "skipped" ? latestRun.skipReason ?? "research_skipped" : "research_not_completed",
+          skip_reason:
+            execution.ok === false
+              ? execution.code === "research_not_needed" || execution.code === "research_fresh"
+                ? "research_skipped"
+                : execution.code
+              : execution.outcome === "active"
+                ? "research_in_progress"
+                : "research_not_completed",
         }
       }
       return {
         executed: true,
         workflow_agent: workflowAgent,
-        outcome: { ...outcome, work_item_id: workItem.id },
+        outcome,
       }
     }
     case "qualification_agent": {

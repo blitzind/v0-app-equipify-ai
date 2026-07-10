@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getGrowthEngineAiOrgId, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { fetchAiOsCommandCenterReadModel } from "@/lib/growth/aios/ai-os-command-center-service"
+import { GROWTH_AI_OS_COMMAND_CENTER_CANONICAL_QA_MARKER } from "@/lib/growth/aios/growth-ai-os-command-center-canonical"
 import { GROWTH_AI_OS_COMMAND_CENTER_QA_MARKER } from "@/lib/growth/aios/ai-os-command-center-types"
 
 export const runtime = "nodejs"
@@ -28,6 +29,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       qaMarker: GROWTH_AI_OS_COMMAND_CENTER_QA_MARKER,
+      canonicalQaMarker: GROWTH_AI_OS_COMMAND_CENTER_CANONICAL_QA_MARKER,
       commandCenter,
     })
   } catch (error) {

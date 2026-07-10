@@ -37,7 +37,7 @@ import { fetchGrowthLeadById, listGrowthLeads } from "@/lib/growth/lead-reposito
 import type { RevenueQueueCardView } from "@/lib/growth/lead-operator-workspace/lead-operator-workspace-types"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import { buildRevenueQueueDashboardSectionsFromLeads } from "@/lib/growth/revenue-queue/revenue-queue-section-projection"
-import { runProspectResearch } from "@/lib/growth/research/research-orchestrator"
+import { executeGrowthLeadProspectResearch } from "@/lib/growth/research/growth-lead-research-execution-service"
 import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
 import type { GrowthLead } from "@/lib/growth/types"
 
@@ -421,10 +421,15 @@ async function processLeadResearch(
     generatedAt: string
   },
 ): Promise<GrowthAvaResearchLoopLeadResult> {
-  const research = await runProspectResearch({
+  const research = await executeGrowthLeadProspectResearch({
     admin,
+    organizationId: input.organizationId,
     leadId: input.leadId,
+    trigger: "ava_queue",
+    generatedAt: input.generatedAt,
     rebuild: false,
+    runQualification: false,
+    force: true,
   })
 
   if (!research.ok) {
@@ -437,11 +442,15 @@ async function processLeadResearch(
     }
   }
 
-  await publishProspectResearchWorkflowBridge(admin, {
-    organizationId: input.organizationId,
-    leadId: input.leadId,
-    run: research.run,
-  })
+  if (research.outcome === "active") {
+    return {
+      leadId: input.leadId,
+      companyName: input.companyName,
+      outcome: "skipped",
+      skipReason: "research_in_progress",
+      qualificationStatus: null,
+    }
+  }
 
   const qualification = await runQualificationSpecialistForLead(admin, {
     organizationId: input.organizationId,

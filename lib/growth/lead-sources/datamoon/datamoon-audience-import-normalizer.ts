@@ -7,6 +7,7 @@ import {
   parseEmailDomain,
   trimOrNull,
 } from "@/lib/growth/import/normalize"
+import { isConsumerEmailDomain } from "@/lib/growth/company-identification/company-identification-normalize"
 import {
   DATAMOON_EXT_OUTPUT_FIELDS,
   type DatamoonExtOutputField,
@@ -72,8 +73,14 @@ export function normalizeDatamoonAudienceRecord(
   const postalCode = pickString(raw, "personal_zip") ?? pickString(raw, "personal_zip4")
   const country = pickString(raw, "contact_country") ?? "US"
 
+  const businessDomain = parseEmailDomain(businessEmail ?? "")
+  const personalDomain = parseEmailDomain(personalEmail ?? "")
   const companyDomain =
-    parseEmailDomain(businessEmail ?? "") ?? parseEmailDomain(personalEmail ?? "")
+    businessDomain && !isConsumerEmailDomain(businessDomain)
+      ? businessDomain
+      : personalDomain && !isConsumerEmailDomain(personalDomain)
+        ? personalDomain
+        : null
 
   const contactName =
     [firstName, lastName].filter(Boolean).join(" ").trim() || null

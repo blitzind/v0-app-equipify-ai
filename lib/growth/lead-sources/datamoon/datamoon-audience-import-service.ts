@@ -1,7 +1,11 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { logGrowthEngine } from "@/lib/growth/access"
+import { getGrowthEngineAiOrgId, logGrowthEngine } from "@/lib/growth/access"
+import {
+  resolveDatamoonCompanyName,
+  resolveDatamoonCompanyWebsite,
+} from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-company-identity"
 import {
   buildDatamoonUnifiedIntakePayload,
   formatDatamoonUnifiedIntakeRecordMessage,
@@ -51,6 +55,12 @@ import { normalizeDatamoonImportRequestAudience } from "@/lib/growth/ava-home/da
 import { logAvaRuntimeTrace } from "@/lib/growth/mission-center/growth-mission-ava-launch-runtime-object-trace"
 import { createGrowthLead } from "@/lib/growth/lead-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
+import {
+  buildLeadAdmissionMetadata,
+  evaluateGrowthLeadAdmission,
+} from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
+import { loadGrowthLeadAdmissionContext } from "@/lib/growth/revenue-workflow/growth-lead-admission-context"
+import { normalizeLeadIntakeSource } from "@/lib/growth/revenue-workflow/normalize-lead-intake-source"
 import { runUnifiedRevenueWorkflowAfterIntake } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-intake-runner"
 import {
   buildAudience,
@@ -71,11 +81,31 @@ type ServiceOptions = {
 }
 
 function resolveCompanyName(normalized: ReturnType<typeof normalizeDatamoonAudienceRecord>): string {
-  const explicit = normalized.company_name?.trim()
-  if (explicit) return explicit
-  if (normalized.company_domain) return normalized.company_domain
-  if (normalized.email) return normalized.email.split("@")[1] ?? "Unknown Company"
-  return "Unknown Company"
+  return resolveDatamoonCompanyName(normalized)
+}
+
+function buildDatamoonAdmissionIntake(
+  normalized: ReturnType<typeof normalizeDatamoonAudienceRecord>,
+  companyName: string,
+) {
+  return normalizeLeadIntakeSource({
+    source: "datamoon",
+    company: {
+      name: companyName,
+      website: resolveDatamoonCompanyWebsite(normalized),
+      domain: normalized.company_domain,
+    },
+    contact: {
+      name: normalized.contact_name,
+      email: normalized.email,
+      phone: normalized.phone,
+      linkedinUrl: normalized.linkedin_url,
+    },
+    metadata: {
+      business_email: normalized.business_email,
+      personal_email: normalized.personal_emails,
+    },
+  })
 }
 
 async function failDatamoonAudienceImportRun(
@@ -345,6 +375,10 @@ export async function pollDatamoonAudienceImportRun(
 
   let duplicateCount = 0
   let skippedCount = 0
+  const organizationId = getGrowthEngineAiOrgId()
+  const admissionContext = organizationId
+    ? await loadGrowthLeadAdmissionContext(admin, organizationId)
+    : { approvedProfile: null, activeMissionTitle: null }
 
   for (let index = 0; index < rawRecords.length; index += 1) {
     const raw = rawRecords[index]
@@ -379,11 +413,34 @@ export async function pollDatamoonAudienceImportRun(
       continue
     }
 
+    const companyName = resolveCompanyName(normalized)
+    const admission = evaluateGrowthLeadAdmission(
+      buildDatamoonAdmissionIntake(normalized, companyName),
+      admissionContext,
+    )
+    if (admission.state === "invalid") {
+      skippedCount += 1
+      previewRecords.push({
+        recordIndex: index,
+        status: "skipped",
+        normalized,
+        providerRecord,
+        message: `Admission invalid — ${admission.reasons.slice(0, 2).join(", ") || "invalid_company_identity"}.`,
+      })
+      continue
+    }
+
     previewRecords.push({
       recordIndex: index,
       status: "preview",
       normalized,
       providerRecord,
+      message:
+        admission.state === "review"
+          ? `Admission review — ${admission.reasons.slice(0, 2).join(", ") || "insufficient_evidence"}.`
+          : admission.state === "rejected"
+            ? `Admission rejected — ${admission.reasons.slice(0, 2).join(", ") || "icp_mismatch"}.`
+            : null,
     })
   }
 
@@ -544,6 +601,10 @@ export async function importDatamoonAudiencePreviewRecords(
   let errors = 0
   const leadIds: string[] = []
   const unifiedIntakeWarnings: Array<{ record_id: string; skip_reason: string }> = []
+  const organizationId = getGrowthEngineAiOrgId()
+  const admissionContext = organizationId
+    ? await loadGrowthLeadAdmissionContext(admin, organizationId)
+    : { approvedProfile: null, activeMissionTitle: null }
 
   for (const record of records) {
     const normalized = record.normalized
@@ -568,21 +629,33 @@ export async function importDatamoonAudiencePreviewRecords(
 
     try {
       const companyName = resolveCompanyName(normalized)
+      const admissionIntake = buildDatamoonAdmissionIntake(normalized, companyName)
+      const admission = evaluateGrowthLeadAdmission(admissionIntake, admissionContext)
+
+      if (!admission.allowLeadCreation || admission.state === "rejected") {
+        skipped += 1
+        await updateDatamoonAudienceImportRecord(admin, record.id, {
+          status: "skipped",
+          message: `Admission blocked — ${admission.state}: ${admission.reasons.slice(0, 2).join(", ") || "icp_mismatch"}.`,
+        })
+        continue
+      }
+
       const lead = await createGrowthLead(admin, {
         sourceKind: "import",
         sourceDetail: `datamoon_audience:${run.id}:${record.recordIndex}`,
         externalRef: `datamoon:${run.datamoonAudienceId}:${record.recordIndex}`,
-        companyName,
+        companyName: admission.sanitized.companyName,
         contactName: normalized.contact_name,
         contactEmail: normalized.email,
         contactPhone: normalized.phone,
-        website: normalized.company_domain ? `https://${normalized.company_domain}` : null,
+        website: admission.sanitized.website,
         addressLine1: normalized.address_line1,
         city: normalized.city,
         state: normalized.state,
         postalCode: normalized.postal_code,
         country: normalized.country,
-        status: "new",
+        status: admission.leadStatus,
         sourceChannel: "datamoon_audience",
         sourceVendor: "datamoon",
         createdBy: input.actor.userId,
@@ -602,6 +675,7 @@ export async function importDatamoonAudiencePreviewRecords(
           import: {
             linkedin: normalized.linkedin_url,
           },
+          ...buildLeadAdmissionMetadata(admission),
         },
       })
 

@@ -119,7 +119,8 @@ async function verifyProductionReadinessAudit(admin: SupabaseClient): Promise<vo
   const executeAgentSource = readSource("lib/growth/specialists/execution/execute-sales-workflow-agent.ts")
   record(
     "approval-guardrail-manual-agents-only",
-    executeAgentSource.includes("runAutonomousResearchManualRefresh") &&
+    executeAgentSource.includes("executeGrowthLeadProspectResearch") &&
+    !executeAgentSource.includes("runAutonomousResearchManualRefresh") &&
       executeAgentSource.includes("runAutonomousOutreachPreparationManualRequest") &&
       !executeAgentSource.match(/sendOutbound|executeOutbound|transportSend/i)
       ? "pass"

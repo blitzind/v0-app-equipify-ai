@@ -143,7 +143,8 @@ function main(): void {
   assert.match(operatingRhythmSource, /sales_loop_executed/, "Operating Rhythm must accept sales loop result")
 
   const executeAgentSource = readSource("lib/growth/specialists/execution/execute-sales-workflow-agent.ts")
-  assert.match(executeAgentSource, /runAutonomousResearchManualRefresh/)
+  assert.match(executeAgentSource, /executeGrowthLeadProspectResearch/)
+  assert.doesNotMatch(executeAgentSource, /runAutonomousResearchManualRefresh/)
   assert.match(executeAgentSource, /runAutonomousQualificationManualEvaluation/)
   assert.match(executeAgentSource, /runAutonomousOutreachPreparationManualRequest/)
   assert.match(executeAgentSource, /runAutonomousMeetingPilotCycle/)

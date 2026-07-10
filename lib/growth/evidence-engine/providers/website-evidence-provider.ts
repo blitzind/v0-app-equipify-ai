@@ -30,7 +30,7 @@ export type WebsiteEvidenceProviderInput = {
   fetchHtml?: (url: string) => Promise<{ status: string; body: string | null }>
 }
 
-function planBusinessWebsiteCrawlUrls(input: {
+export function planBusinessWebsiteCrawlUrls(input: {
   websiteUrl: string
   homepageHtml?: string | null
   sitemapXml?: string | null

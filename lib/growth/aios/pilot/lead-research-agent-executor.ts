@@ -3,19 +3,12 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { applyGrowthLeadResearchEnrichment } from "@/lib/growth/apply-lead-research-enrichment"
-import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
-import { growthLeadResearchInputHash } from "@/lib/growth/research-input-hash"
+import { routeCanonicalProspectResearch } from "@/lib/growth/research/growth-canonical-research-route"
 import {
-  growthLeadResearchModelSchema,
-  mapGrowthLeadResearchModelToResult,
-} from "@/lib/growth/research-schema"
-import {
-  finishGrowthLeadResearchRun,
-  insertGrowthLeadResearchRun,
-} from "@/lib/growth/research-repository"
-import { fetchLeadWebsite } from "@/lib/growth/research-website-fetch"
-import { assembleAiContextForWorkOrder } from "@/lib/growth/aios/ai-context-assembly-service"
+  mapProspectRunToLegacyResearchResult,
+  mapProspectRunToLegacyResearchRun,
+} from "@/lib/growth/research/growth-canonical-research-legacy-adapter"
+import { GROWTH_CANONICAL_RESEARCH_23_QA_MARKER } from "@/lib/growth/research/growth-canonical-research-types"
 import {
   claimAiOsWorkOrder,
   heartbeatAiOsAgentRuntime,
@@ -26,8 +19,7 @@ import {
   fetchAiOsAgentRegistration,
   updateAiOsAgentLease,
 } from "@/lib/growth/aios/ai-agent-runtime-repository"
-import { invokeAiOsProviderWithContextPackage } from "@/lib/growth/aios/ai-provider-service"
-import { LEAD_RESEARCH_PILOT_PROVIDER_PURPOSE } from "@/lib/growth/aios/pilot/lead-research-pilot-types"
+import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { publishLeadResearchPilotStepEvent } from "@/lib/growth/aios/pilot/lead-research-pilot-observability"
 import {
   fetchAiWorkOrderById,
@@ -42,36 +34,6 @@ import { assessGrowthLeadResearchOpportunity } from "@/lib/growth/aios/growth/gr
 import type { GrowthLeadResearchIntelligenceOutput } from "@/lib/growth/aios/growth/growth-lead-research-opportunity-assessment"
 import type { GrowthLeadResearchQualificationOutput } from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
 import { scheduleAvaAutonomyCompletionForLead } from "@/lib/growth/mission-center/growth-ava-autonomy-completion-service"
-
-function normalizeResearchProviderPayload(raw: unknown): unknown {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw
-  const record = { ...(raw as Record<string, unknown>) }
-  if (Array.isArray(record.decision_maker_candidates)) {
-    record.decision_maker_candidates = record.decision_maker_candidates.filter(
-      (candidate) => candidate && typeof candidate === "object" && !Array.isArray(candidate),
-    )
-  }
-  return record
-}
-
-function parseProviderJson(text: string): unknown {
-  const trimmed = text.trim()
-  if (!trimmed) throw new Error("ai_provider_empty_response")
-
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)
-  const candidate = fenced?.[1]?.trim() ?? trimmed
-
-  try {
-    return JSON.parse(candidate)
-  } catch {
-    const start = candidate.indexOf("{")
-    const end = candidate.lastIndexOf("}")
-    if (start >= 0 && end > start) {
-      return JSON.parse(candidate.slice(start, end + 1))
-    }
-    throw new Error("ai_provider_invalid_json")
-  }
-}
 
 async function ensureResearchAgentRegistration(
   admin: SupabaseClient,
@@ -141,7 +103,6 @@ export async function executeResearchCompanyWorkOrderViaAiOs(
   intelligence: GrowthLeadResearchIntelligenceOutput | null
   workflowTerminalStatus: "qualified" | "blocked" | "failed" | "research_complete" | "assessed"
 }> {
-  const startedAt = Date.now()
   let workOrder = await fetchAiWorkOrderById(admin, {
     organizationId: input.organizationId,
     workOrderId: input.workOrderId,
@@ -191,17 +152,46 @@ export async function executeResearchCompanyWorkOrderViaAiOs(
     status: "running",
   })
 
-  const websiteFetch = await fetchLeadWebsite(lead.website)
+  await publishLeadResearchPilotStepEvent(admin, {
+    organizationId: input.organizationId,
+    leadId: input.leadId,
+    missionId: workOrder.missionId,
+    workOrderId: workOrder.id,
+    stepId: "company_research",
+    status: "running",
+    metadata: { qa_marker: GROWTH_CANONICAL_RESEARCH_23_QA_MARKER },
+  })
+
+  const canonical = await routeCanonicalProspectResearch({
+    admin,
+    organizationId: input.organizationId,
+    leadId: input.leadId,
+    trigger: "manual",
+    force: true,
+    runQualification: false,
+  })
+
+  if (!canonical.ok) {
+    throw new Error(canonical.message || canonical.code)
+  }
+
+  const researchRun = mapProspectRunToLegacyResearchRun(canonical.run, {
+    createdBy: input.createdBy ?? null,
+    triggerKind: "manual",
+  })
+  const researchResult = mapProspectRunToLegacyResearchResult(canonical.run)
+
   workOrder = await updateAiWorkOrderRow(admin, {
     organizationId: input.organizationId,
     workOrderId: workOrder.id,
     patch: {
       payload: {
         ...workOrder.payload,
-        website_fetch_status: websiteFetch.status,
-        website_excerpt: websiteFetch.excerpt,
-        website_url: websiteFetch.normalizedUrl,
-        research_output_contract: "growth_lead_research_v3",
+        website_fetch_status: researchRun.websiteFetchStatus,
+        website_excerpt: researchRun.websiteTextExcerpt,
+        website_url: researchRun.websiteUrl,
+        research_output_contract: GROWTH_CANONICAL_RESEARCH_23_QA_MARKER,
+        prospect_research_run_id: canonical.run.id,
       },
     },
   })
@@ -211,69 +201,9 @@ export async function executeResearchCompanyWorkOrderViaAiOs(
     leadId: input.leadId,
     missionId: workOrder.missionId,
     workOrderId: workOrder.id,
-    stepId: "context_assembly",
-    status: "running",
-  })
-
-  const assembly = await assembleAiContextForWorkOrder(admin, {
-    organizationId: input.organizationId,
-    workOrderId: workOrder.id,
-    source: "lead_research_pilot_executor",
-  })
-
-  await publishLeadResearchPilotStepEvent(admin, {
-    organizationId: input.organizationId,
-    leadId: input.leadId,
-    missionId: workOrder.missionId,
-    workOrderId: workOrder.id,
-    stepId: "context_assembly",
-    status: "completed",
-    detail: assembly.contextPackage.id,
-    metadata: { context_package_id: assembly.contextPackage.id, reused: assembly.reused },
-  })
-
-  await publishLeadResearchPilotStepEvent(admin, {
-    organizationId: input.organizationId,
-    leadId: input.leadId,
-    missionId: workOrder.missionId,
-    workOrderId: workOrder.id,
-    stepId: "ai_provider",
-    status: "running",
-  })
-
-  const providerResult = await invokeAiOsProviderWithContextPackage(admin, {
-    organizationId: input.organizationId,
-    contextPackage: assembly.contextPackage,
-    purpose: LEAD_RESEARCH_PILOT_PROVIDER_PURPOSE,
-    source: "lead_research_pilot_executor",
-  })
-
-  await publishLeadResearchPilotStepEvent(admin, {
-    organizationId: input.organizationId,
-    leadId: input.leadId,
-    missionId: workOrder.missionId,
-    workOrderId: workOrder.id,
-    stepId: "ai_provider",
-    status: "completed",
-    detail: providerResult.requestId,
-    metadata: {
-      provider_id: providerResult.response.providerId,
-      model_id: providerResult.response.modelId,
-    },
-  })
-
-  const parsedModel = growthLeadResearchModelSchema.parse(
-    normalizeResearchProviderPayload(parseProviderJson(providerResult.response.text)),
-  )
-  const researchResult = mapGrowthLeadResearchModelToResult(parsedModel)
-
-  await publishLeadResearchPilotStepEvent(admin, {
-    organizationId: input.organizationId,
-    leadId: input.leadId,
-    missionId: workOrder.missionId,
-    workOrderId: workOrder.id,
     stepId: "company_research",
     status: "completed",
+    detail: canonical.run.id,
   })
 
   await publishLeadResearchPilotStepEvent(admin, {
@@ -283,43 +213,6 @@ export async function executeResearchCompanyWorkOrderViaAiOs(
     workOrderId: workOrder.id,
     stepId: "save_research",
     status: "running",
-  })
-
-  const inputHash = growthLeadResearchInputHash({
-    companyName: lead.companyName,
-    website: lead.website,
-    contactName: lead.contactName,
-    regenerate: false,
-  })
-
-  let researchRun = await insertGrowthLeadResearchRun(admin, {
-    lead,
-    triggerKind: "manual",
-    inputHash,
-    websiteUrl: websiteFetch.normalizedUrl,
-    createdBy: input.createdBy ?? null,
-  })
-
-  researchRun =
-    (await finishGrowthLeadResearchRun(admin, researchRun.id, {
-      status: websiteFetch.status === "ok" || websiteFetch.status === "skipped" ? "succeeded" : "partial",
-      result: researchResult,
-      researchConfidence: researchResult.researchConfidence,
-      equipifyFitScore: researchResult.equipifyFitScore,
-      websiteUrl: websiteFetch.normalizedUrl,
-      websiteFetchStatus: websiteFetch.status,
-      websiteTextExcerpt: websiteFetch.excerpt,
-      sourceUrls: researchResult.sourceUrls,
-      modelTask: "ai_os_pilot_research_company",
-      modelProvider: providerResult.response.providerId,
-      modelName: providerResult.response.modelId,
-      durationMs: Date.now() - startedAt,
-    })) ?? researchRun
-
-  await applyGrowthLeadResearchEnrichment(admin, {
-    lead,
-    result: researchResult,
-    createdBy: input.createdBy ?? null,
   })
 
   await publishLeadResearchPilotStepEvent(admin, {
@@ -332,8 +225,7 @@ export async function executeResearchCompanyWorkOrderViaAiOs(
     detail: researchRun.id,
   })
 
-  const runStatus =
-    websiteFetch.status === "ok" || websiteFetch.status === "skipped" ? "succeeded" : "partial"
+  const runStatus = researchRun.status === "succeeded" ? "succeeded" : "partial"
 
   await publishGrowthLeadResearchWorkflowStatus(admin, {
     organizationId: input.organizationId,
@@ -406,8 +298,8 @@ export async function executeResearchCompanyWorkOrderViaAiOs(
     reason: "lead_research_pilot_complete",
     result: {
       research_run_id: researchRun.id,
-      provider_request_id: providerResult.requestId,
-      context_package_id: assembly.contextPackage.id,
+      prospect_research_run_id: canonical.run.id,
+      qa_marker: GROWTH_CANONICAL_RESEARCH_23_QA_MARKER,
     },
   })
   workOrder = completed.workOrder

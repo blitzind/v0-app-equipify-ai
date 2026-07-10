@@ -18,7 +18,8 @@ type GrowthOperationalIntelligenceProps = {
 }
 
 export function GrowthOperationalIntelligence({ lead }: GrowthOperationalIntelligenceProps) {
-  const researchFreshness = researchFreshnessLabel(lead.lastResearchedAt)
+  const researchTimestamp = lead.lastProspectResearchedAt ?? lead.lastResearchedAt
+  const researchFreshness = researchFreshnessLabel(researchTimestamp)
 
   return (
     <GrowthCollapsibleEngineCard

@@ -2,9 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { GrowthPreSendSuppressionResult } from "@/lib/growth/compliance/compliance-types"
-import { evaluatePreSendSuppression } from "@/lib/growth/compliance/suppression-engine"
-import { evaluatePreSendInfrastructureAllowed } from "@/lib/growth/compliance/pre-send-infrastructure-guards"
-import { isEmailSuppressed } from "@/lib/growth/outbound/suppression-repository"
+import { evaluateCanonicalRecipientSuppression } from "@/lib/growth/compliance/growth-canonical-suppression-read"
 import { recordInternalOutboundAuditEvent } from "@/lib/growth/operations/internal-outbound-audit"
 import { GROWTH_INTERNAL_OUTBOUND_OPS_QA_MARKER } from "@/lib/growth/operations/internal-outbound-ops-types"
 import { maybeApplyGrowthQaDeliverabilityInfrastructureBypass } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass"
@@ -33,26 +31,25 @@ export async function evaluatePreSendAllowed(
   admin: SupabaseClient,
   input: GrowthPreSendAssertionInput,
 ): Promise<GrowthPreSendAssertionResult> {
-  const compliance = await evaluatePreSendSuppression(admin, {
+  const suppression = await evaluateCanonicalRecipientSuppression(admin, {
     email: input.email,
     leadId: input.leadId,
     senderAccountId: input.senderAccountId,
   })
 
-  if (!compliance.allowed) {
-    return { ...compliance, blockLayer: "compliance" }
-  }
-
-  if (await isEmailSuppressed(admin, input.email)) {
+  if (suppression.suppressed) {
     return {
       allowed: false,
-      reason: "Recipient is on the outbound suppression list.",
-      blockCode: "suppression",
-      blockLayer: "outbound_suppression",
+      reason: suppression.reason,
+      blockCode: suppression.blockCode,
+      blockLayer: suppression.layer === "compliance" ? "compliance" : "outbound_suppression",
     }
   }
 
   if (input.senderAccountId && !input.skipInfrastructureChecks) {
+    const { evaluatePreSendInfrastructureAllowed } = await import(
+      "@/lib/growth/compliance/pre-send-infrastructure-guards"
+    )
     const infrastructure = await evaluatePreSendInfrastructureAllowed(admin, {
       senderAccountId: input.senderAccountId,
       senderPoolId: input.senderPoolId,

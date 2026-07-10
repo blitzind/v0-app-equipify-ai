@@ -4,6 +4,7 @@ import type { GrowthAutonomousMeetingRunRecord } from "@/lib/growth/aios/growth/
 import type { GrowthAutonomousOutreachPreparationRunRecord } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
 import type { GrowthAutonomousQualificationRunRecord } from "@/lib/growth/aios/growth/growth-autonomous-qualification-pilot-types"
 import type { GrowthAutonomousResearchRunRecord } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-types"
+import type { RunGrowthLeadResearchResult } from "@/lib/growth/research/growth-lead-research-execution-service"
 import type { GrowthAvaResearchLoopLeadResult } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-types"
 import type { SalesOutcome, SalesOutcomeDailySummary } from "@/lib/growth/specialists/execution/sales-outcome-types"
 import { GROWTH_SALES_SPECIALIST_EXECUTION_BRIDGE_QA_MARKER } from "@/lib/growth/specialists/execution/sales-outcome-types"
@@ -33,6 +34,35 @@ export function mapResearchRunToSalesOutcome(run: GrowthAutonomousResearchRunRec
     generated_artifacts: [],
     approval_required: false,
     recommended_next_action: "Continue qualification",
+  })
+}
+
+export function mapProspectResearchExecutionToSalesOutcome(
+  execution: RunGrowthLeadResearchResult,
+  input: { workItemId: string; leadId: string },
+): SalesOutcome | null {
+  if (!execution.ok) return null
+  if (execution.outcome === "active") return null
+  if (execution.run.status !== "completed") return null
+
+  const summary =
+    execution.run.researchSummary?.trim() ||
+    execution.run.suggestedPitchAngle?.trim() ||
+    `Researched company using public website evidence.`
+
+  return baseOutcome({
+    work_item_id: input.workItemId,
+    company_id: input.leadId,
+    person_id: null,
+    relationship_stage: null,
+    outcome_type: "research_completed",
+    confidence: execution.run.researchConfidence ?? 70,
+    completed_by: "research_agent",
+    completed_at: execution.run.completedAt ?? new Date().toISOString(),
+    summary,
+    generated_artifacts: execution.run.signals?.painSignals?.slice(0, 3) ?? [],
+    approval_required: false,
+    recommended_next_action: execution.qualificationRan ? "Prepare outreach" : "Continue qualification",
   })
 }
 

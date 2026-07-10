@@ -151,6 +151,18 @@ export async function buildOutreachContextPacket(
     : null
 
   const websiteFindings = [
+    ...(prospectRun?.signals?.companyEvidence_v22?.profile.industriesServed?.values ?? []).map((entry) =>
+      truncate(`Verified industry: ${entry}`, 100),
+    ),
+    ...(prospectRun?.signals?.companyEvidence_v22?.profile.primaryServices?.values ?? []).map((entry) =>
+      truncate(`Verified service: ${entry}`, 100),
+    ),
+    ...(prospectRun?.signals?.companyEvidence_v22?.profile.primaryProducts?.values ?? []).map((entry) =>
+      truncate(`Verified product: ${entry}`, 100),
+    ),
+    ...(prospectRun?.signals?.companyEvidence_v22?.evidenceSources ?? []).map((entry) =>
+      truncate(`Source: ${entry}`, 120),
+    ),
     prospectRun?.researchSummary ? truncate(prospectRun.researchSummary, 160) : null,
     websiteSummaryRaw,
     ...(research?.serviceAreaClues ?? []).map((entry) => truncate(entry, 80)),

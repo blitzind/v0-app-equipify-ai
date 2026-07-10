@@ -7,7 +7,7 @@ import "server-only"
 
 import { randomUUID } from "node:crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { logGrowthEngine } from "@/lib/growth/access"
+import { getGrowthEngineAiOrgId, logGrowthEngine } from "@/lib/growth/access"
 import { createGrowthLeadDecisionMaker } from "@/lib/growth/decision-maker-repository"
 import { findImportDedupeMatch } from "@/lib/growth/import/dedupe"
 import {
@@ -15,6 +15,11 @@ import {
   fetchGrowthLeadById,
 } from "@/lib/growth/lead-repository"
 import type { GrowthLead, GrowthLeadSourceKind } from "@/lib/growth/types"
+import {
+  buildLeadAdmissionMetadata,
+  evaluateGrowthLeadAdmission,
+} from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
+import { loadGrowthLeadAdmissionContext } from "@/lib/growth/revenue-workflow/growth-lead-admission-context"
 import type { NormalizedLeadIntake } from "@/lib/growth/revenue-workflow/unified-lead-intake-types"
 
 export type UnifiedLeadResolutionResult = {
@@ -101,6 +106,16 @@ export async function resolveUnifiedLeadFromIntake(
     throw new Error("company_name_required")
   }
 
+  const organizationId = getGrowthEngineAiOrgId()
+  const admissionContext = organizationId
+    ? await loadGrowthLeadAdmissionContext(admin, organizationId)
+    : { approvedProfile: null, activeMissionTitle: null }
+  const admission = evaluateGrowthLeadAdmission(intake, admissionContext)
+
+  if (!admission.allowLeadCreation) {
+    throw new Error("invalid_company_identity")
+  }
+
   const sourceKind = mapIntakeSourceToLeadSourceKind(intake.source)
   const externalRef = buildExternalRef(intake)
   const sourceDetail = `${intake.source}:${externalRef}`
@@ -109,20 +124,22 @@ export async function resolveUnifiedLeadFromIntake(
     sourceKind,
     sourceDetail,
     externalRef,
-    companyName: intake.companyName,
+    companyName: admission.sanitized.companyName,
     contactName: intake.contactName,
     contactEmail: intake.email,
     contactPhone: intake.phone,
-    website: intake.website,
+    website: admission.sanitized.website,
     createdBy: actor?.userId ?? null,
+    status: admission.leadStatus,
     intakeBindingSource: mapIntakeSourceToBindingSource(intake.source),
     metadata: {
       ...intake.metadata,
       unified_intake_source: intake.source,
       identity_uncertain: intake.identityUncertain,
-      requires_human_review: intake.requiresHumanReview,
+      requires_human_review: admission.requiresHumanReview,
       linkedin_url: intake.linkedinUrl,
       contact_title: intake.title,
+      ...buildLeadAdmissionMetadata(admission),
     },
   })
 

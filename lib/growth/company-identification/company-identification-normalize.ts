@@ -17,6 +17,20 @@ const CONSUMER_EMAIL_DOMAINS = new Set([
   "gmx.com",
   "yandex.com",
   "zoho.com",
+  "att.net",
+  "sbcglobal.net",
+  "comcast.net",
+  "verizon.net",
+  "bellsouth.net",
+  "charter.net",
+  "roadrunner.com",
+  "earthlink.net",
+  "cox.net",
+  "optonline.net",
+  "frontier.com",
+  "windstream.net",
+  "juno.com",
+  "netzero.net",
 ])
 
 const SEARCH_ENGINE_HOST_FRAGMENTS = [

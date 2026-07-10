@@ -23,7 +23,7 @@ import {
   type GrowthNextBestAction,
   type GrowthNextBestActionResult,
 } from "@/lib/growth/nba-types"
-import { hasUsableResearch } from "@/lib/growth/call-priority"
+import { hasUsableLeadResearchFromRow, hasUsableResearch } from "@/lib/growth/call-priority"
 import {
   mapProspectResearchRecommendationToNba,
   prospectResearchNbaReason,
@@ -141,7 +141,12 @@ export function computeGrowthLeadNextBestAction(input: NextBestActionInput): Gro
   const fit = input.score ?? 0
   const leadPhone = trimPhone(input.contactPhone)
   const dmPhone = trimPhone(input.primaryDecisionMakerPhone)
-  const usable = hasUsableResearch(input.lastResearchedAt, input.latestResearchRunId)
+  const usable = hasUsableLeadResearchFromRow({
+    lastResearchedAt: input.lastResearchedAt,
+    latestResearchRunId: input.latestResearchRunId,
+    lastProspectResearchedAt: input.lastProspectResearchedAt,
+    latestProspectResearchRunId: input.latestProspectResearchRunId,
+  })
   const blockers: string[] = []
 
   if (TERMINAL_STATUSES.has(input.status) || input.callDisposition === "not_a_fit") {
@@ -536,10 +541,10 @@ export function computeGrowthLeadNextBestAction(input: NextBestActionInput): Gro
     return buildResult("wait_for_email_reply", "Outreach sent — waiting for email reply.", [], "medium")
   }
 
-  if (!usable && !input.latestProspectResearchRunId) {
+  if (!usable && !input.latestProspectResearchRunId && !input.latestResearchRunId) {
     return buildResult(
       "run_research",
-      "No usable research on this lead yet.",
+      "Ava is queuing company research automatically.",
       ["Research not completed"],
       "high",
     )

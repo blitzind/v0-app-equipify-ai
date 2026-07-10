@@ -67,6 +67,8 @@ export type GrowthResearchSignals = {
   hasFinancing?: boolean
   hasSocialLinks?: boolean
   hasReviewLinks?: boolean
+  /** GE-AIOS-22 — structured company evidence profile for reuse across AI surfaces. */
+  companyEvidence_v22?: import("@/lib/growth/research/company-evidence/company-evidence-types").GrowthCompanyEvidenceBundle
 }
 
 export type GrowthResearchRunPublicView = {

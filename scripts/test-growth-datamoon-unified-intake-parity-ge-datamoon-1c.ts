@@ -62,7 +62,7 @@ async function main() {
 
   assert.equal(intakePayload.source, "datamoon")
   assert.equal(intakePayload.leadId, "lead-1")
-  assert.equal(intakePayload.company.name, "naval.mil")
+  assert.equal(intakePayload.company.name, "Naval")
   assert.match(intakePayload.company.website ?? "", /naval\.mil/)
   assert.equal(intakePayload.contact.firstName, "Grace")
   assert.equal(intakePayload.contact.lastName, "Hopper")
@@ -131,6 +131,24 @@ async function main() {
   assert.match(configSource, /DATAMOON_DRY_RUN_ONLY/)
   assert.match(configSource, /DATAMOON_PROVIDER_ENABLED/)
   checks.push("dry_run_disabled_safety_preserved")
+
+  const consumerNormalized = normalizeDatamoonAudienceRecord(
+    {
+      first_name: "Kim",
+      last_name: "Pulham",
+      personal_emails: "kpulham@yahoo.com",
+      personal_phone: "555-0100",
+      contact_country: "US",
+    },
+    { providerMode: "ext" },
+  )
+  assert.equal(consumerNormalized.company_domain, null)
+  assert.equal(consumerNormalized.email, "kpulham@yahoo.com")
+  checks.push("consumer_domain_not_used_as_company_website")
+
+  const datamoonService = read("lib/growth/lead-sources/datamoon/datamoon-audience-import-service.ts")
+  assert.match(datamoonService, /evaluateGrowthLeadAdmission/)
+  checks.push("datamoon_import_admission_gate_wired")
 
   console.log(
     JSON.stringify(

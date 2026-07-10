@@ -1,15 +1,23 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { Building2, Globe, MapPin, ShieldCheck, Wrench } from "lucide-react"
+import { Building2, Globe, Loader2, MapPin, ShieldCheck, Wrench } from "lucide-react"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
+import {
+  hasUsableLeadResearch,
+  mapWorkflowStatusToCustomerResearchState,
+  resolveCustomerResearchProgressMessage,
+} from "@/lib/growth/research/growth-lead-research-readiness"
 import type { GrowthLeadResearchRun } from "@/lib/growth/research-types"
+import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthCompanyIntelligenceSnapshotProps = {
   lead: GrowthLead
   latestRun?: GrowthLeadResearchRun | null
+  prospectRun?: GrowthResearchRunPublicView | null
+  researchEnqueueing?: boolean
 }
 
 function IntelCell({
@@ -45,12 +53,35 @@ function websiteFetchTone(status: string) {
   }
 }
 
-export function GrowthCompanyIntelligenceSnapshot({ lead, latestRun }: GrowthCompanyIntelligenceSnapshotProps) {
+export function GrowthCompanyIntelligenceSnapshot({
+  lead,
+  latestRun,
+  prospectRun,
+  researchEnqueueing = false,
+}: GrowthCompanyIntelligenceSnapshotProps) {
   const result = latestRun?.result
   const serviceTerritory = result?.serviceAreaClues?.slice(0, 2).join(" · ") || null
   const equipment = result?.equipmentServiceIndicators?.slice(0, 3).join(" · ") || null
-  const websiteSummary = result?.websiteSummary?.trim() || null
+  const websiteSummary =
+    result?.websiteSummary?.trim() ||
+    prospectRun?.researchSummary?.trim() ||
+    null
+  const companyEvidence = prospectRun?.signals?.companyEvidence_v22
+  const verifiedIndustries = companyEvidence?.profile.industriesServed?.values.slice(0, 3).join(" · ") || null
+  const evidenceConfidence = companyEvidence
+    ? `${Math.round(companyEvidence.qualityScores.overallEvidenceConfidence * 100)}% evidence confidence`
+    : null
   const dmConfidence = lead.decisionMakerStatus?.replace(/_/g, " ") ?? null
+
+  const researchState = mapWorkflowStatusToCustomerResearchState(null, {
+    lastProspectResearchedAt: lead.lastProspectResearchedAt,
+    latestProspectResearchRunId: lead.latestProspectResearchRunId,
+    prospectRunStatus: researchEnqueueing ? "running" : prospectRun?.status ?? null,
+    website: lead.website,
+  })
+  const progressMessage = resolveCustomerResearchProgressMessage(
+    researchEnqueueing ? "researching" : researchState,
+  )
 
   const hasLeadIntel =
     lead.estimatedAnnualRevenue ||
@@ -59,7 +90,25 @@ export function GrowthCompanyIntelligenceSnapshot({ lead, latestRun }: GrowthCom
     lead.crmDetected ||
     lead.fieldServiceStackDetected
 
-  const hasResearchIntel = Boolean(latestRun || serviceTerritory || equipment || websiteSummary)
+  const hasResearchIntel =
+    Boolean(latestRun || prospectRun || serviceTerritory || equipment || websiteSummary) ||
+    hasUsableLeadResearch(lead)
+
+  if (researchEnqueueing || researchState === "researching") {
+    return (
+      <GrowthCollapsibleEngineCard
+        title="Company Intelligence"
+        icon={<Building2 className="size-4" />}
+        defaultOpen
+        persistKey={GROWTH_DRAWER_CARD_KEYS.companyIntelligence}
+      >
+        <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          {progressMessage ?? "Ava is researching this company…"}
+        </div>
+      </GrowthCollapsibleEngineCard>
+    )
+  }
 
   if (!hasLeadIntel && !hasResearchIntel && !lead.website) {
     return (
@@ -70,7 +119,8 @@ export function GrowthCompanyIntelligenceSnapshot({ lead, latestRun }: GrowthCom
         persistKey={GROWTH_DRAWER_CARD_KEYS.companyIntelligence}
       >
         <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
-          Company intelligence will populate after research and enrichment signals refresh.
+          {progressMessage ??
+            "Ava will gather company intelligence automatically once a website is available."}
         </div>
       </GrowthCollapsibleEngineCard>
     )
@@ -94,6 +144,21 @@ export function GrowthCompanyIntelligenceSnapshot({ lead, latestRun }: GrowthCom
           value={lead.fieldServiceStackDetected ?? "—"}
           className="sm:col-span-2 lg:col-span-1"
         />
+        <IntelCell icon={<Building2 className="size-3.5" />} label="Industry" value={prospectRun?.industryGuess ?? "—"} />
+        {verifiedIndustries ? (
+          <IntelCell
+            icon={<ShieldCheck className="size-3.5" />}
+            label="Verified industries"
+            value={verifiedIndustries}
+          />
+        ) : null}
+        {evidenceConfidence ? (
+          <IntelCell
+            icon={<ShieldCheck className="size-3.5" />}
+            label="Evidence quality"
+            value={evidenceConfidence}
+          />
+        ) : null}
         <IntelCell
           icon={<Globe className="size-3.5" />}
           label="Website intelligence"

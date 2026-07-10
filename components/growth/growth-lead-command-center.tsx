@@ -47,12 +47,18 @@ import {
   GROWTH_OPS_CLICK_REDUCTION_7A2_QA_MARKER,
 } from "@/lib/growth/operator-ux/growth-operator-primary-actions-7a2"
 import { buildGrowthPersonalizationHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
+import {
+  hasUsableLeadResearch,
+  resolveCustomerResearchProgressMessage,
+} from "@/lib/growth/research/growth-lead-research-readiness"
+import { resolveDrawerResearchPrimaryAction } from "@/lib/growth/research/growth-lead-research-drawer-client"
 import type { GrowthLeadCallDisposition } from "@/lib/growth/call-types"
 import type { GrowthLead } from "@/lib/growth/types"
 import { cn } from "@/lib/utils"
 
 type GrowthLeadCommandCenterProps = {
   lead: GrowthLead
+  researchEnqueueing?: boolean
   onLeadUpdated?: (patch: Partial<GrowthLead>) => void
   onLeadSaved?: (lead: GrowthLead) => void
   onAddDecisionMaker?: () => void
@@ -85,7 +91,9 @@ function toDateInputValue(iso: string): string {
 
 export function GrowthLeadCommandCenter({
   lead,
+  researchEnqueueing = false,
   onLeadUpdated,
+  onLeadSaved,
   onAddDecisionMaker,
   onTimelineRefresh,
   nativeDecision,
@@ -107,6 +115,15 @@ export function GrowthLeadCommandCenter({
   const website = lead.website?.trim() || null
   const directionsHref = buildGrowthLeadDirectionsHref(lead)
   const personalizationHref = buildGrowthPersonalizationHref(lead.id)
+  const researched = hasUsableLeadResearch(lead)
+  const primaryAction = resolveDrawerResearchPrimaryAction({
+    lead,
+    prospectRunning: researchEnqueueing,
+  })
+  const researchProgressMessage =
+    researchEnqueueing || !researched
+      ? resolveCustomerResearchProgressMessage(researchEnqueueing ? "researching" : "not_started")
+      : null
 
   useEffect(() => {
     let cancelled = false
@@ -318,13 +335,52 @@ export function GrowthLeadCommandCenter({
             </div>
           ) : null}
 
+          {researchProgressMessage ? (
+            <p className="text-xs text-muted-foreground">{researchProgressMessage}</p>
+          ) : null}
+
           <div className="space-y-2">
-            <Button size="lg" className="h-11 w-full justify-start gap-2" asChild>
-              <Link href={personalizationHref}>
-                <Sparkles className="size-4" />
-                Generate Personalization
-              </Link>
-            </Button>
+            {primaryAction.mode === "generate_personalization" || primaryAction.mode === "approve_outreach" ? (
+              <Button size="lg" className="h-11 w-full justify-start gap-2" asChild>
+                <Link href={personalizationHref}>
+                  <Sparkles className="size-4" />
+                  {primaryAction.label}
+                </Link>
+              </Button>
+            ) : (
+              <Button
+                size="lg"
+                className="h-11 w-full justify-start gap-2"
+                variant={primaryAction.mode === "researching" ? "secondary" : "default"}
+                disabled={primaryAction.mode === "researching"}
+                asChild={primaryAction.mode === "review_research"}
+              >
+                {primaryAction.mode === "review_research" ? (
+                  <a href="#growth-lead-research">
+                    <Search className="size-4" />
+                    {primaryAction.label}
+                  </a>
+                ) : (
+                  <>
+                    {researchEnqueueing ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Search className="size-4" />
+                    )}
+                    {primaryAction.label}
+                  </>
+                )}
+              </Button>
+            )}
+
+            {researched ? (
+              <Button size="sm" variant="outline" className="h-9 w-full justify-start gap-2" asChild>
+                <Link href={personalizationHref}>
+                  <Sparkles className="size-4" />
+                  Generate personalization
+                </Link>
+              </Button>
+            ) : null}
 
             <div className="grid grid-cols-3 gap-2">
               {phone ? (

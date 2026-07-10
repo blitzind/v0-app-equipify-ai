@@ -209,6 +209,16 @@ export function hasUsableResearch(lastResearchedAt: string | null, latestResearc
   return Boolean(lastResearchedAt && latestResearchRunId)
 }
 
+export function hasUsableLeadResearchFromRow(row: {
+  lastResearchedAt: string | null
+  latestResearchRunId: string | null
+  lastProspectResearchedAt?: string | null
+  latestProspectResearchRunId?: string | null
+}): boolean {
+  if (hasUsableResearch(row.lastResearchedAt, row.latestResearchRunId)) return true
+  return Boolean(row.lastProspectResearchedAt?.trim() && row.latestProspectResearchRunId?.trim())
+}
+
 export function isNeedsWebsiteResearch(input: {
   website: string | null
   websiteFetchStatus: string | null

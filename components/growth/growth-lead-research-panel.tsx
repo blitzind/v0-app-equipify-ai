@@ -17,8 +17,10 @@ import type { GrowthProspectIntelligenceBundle } from "@/lib/growth/research/res
 
 type GrowthLeadResearchPanelProps = {
   lead: GrowthLead
+  autoQueueResearch?: boolean
   onLeadUpdated?: (patch: Partial<GrowthLead>) => void
   onLatestRunChange?: (run: GrowthLeadResearchRun | null) => void
+  onProspectRunChange?: (run: GrowthProspectIntelligenceBundle["latestRun"]) => void
   id?: string
 }
 
@@ -57,7 +59,14 @@ function pickDisplayRun(bundle: GrowthLeadResearchBundle | null): GrowthLeadRese
   return bundle.runs.find((run) => run.status === "failed" || run.status === "partial") ?? null
 }
 
-export function GrowthLeadResearchPanel({ lead, onLeadUpdated, onLatestRunChange, id }: GrowthLeadResearchPanelProps) {
+export function GrowthLeadResearchPanel({
+  lead,
+  autoQueueResearch = false,
+  onLeadUpdated,
+  onLatestRunChange,
+  onProspectRunChange,
+  id,
+}: GrowthLeadResearchPanelProps) {
   const [bundle, setBundle] = useState<GrowthLeadResearchBundle | null>(null)
   const [prospectIntelligence, setProspectIntelligence] = useState<GrowthProspectIntelligenceBundle | null>(null)
   const [loading, setLoading] = useState(true)
@@ -90,6 +99,7 @@ export function GrowthLeadResearchPanel({ lead, onLeadUpdated, onLatestRunChange
         }
         setBundle(nextBundle)
         setProspectIntelligence(data.prospectIntelligence ?? null)
+        onProspectRunChange?.(data.prospectIntelligence?.latestRun ?? null)
         onLatestRunChange?.(nextBundle.latestRun ?? pickDisplayRun(nextBundle))
         setNotesDraft(data.manualNotes?.body ?? "")
       } catch (e) {
@@ -100,7 +110,7 @@ export function GrowthLeadResearchPanel({ lead, onLeadUpdated, onLatestRunChange
         if (!options?.silent) setLoading(false)
       }
     },
-    [lead.id, onLatestRunChange],
+    [lead.id, onLatestRunChange, onProspectRunChange],
   )
 
   useEffect(() => {

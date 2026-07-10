@@ -10,6 +10,10 @@ import {
   normalizePhone,
   normalizeWebsiteDomain,
 } from "@/lib/growth/import/normalize"
+import {
+  isConsumerEmailDomain,
+  normalizeDomain,
+} from "@/lib/growth/company-identification/company-identification-normalize"
 import type { NormalizedImportRow } from "@/lib/growth/import/types"
 import {
   GROWTH_UNIFIED_REVENUE_WORKFLOW_QA_MARKER,
@@ -123,7 +127,17 @@ export function normalizeLeadIntakeSource(input: UnifiedLeadIntakeRequest): Norm
   }
 
   const website = asString(input.company?.website) || null
-  const domain = domainFromWebsite(website, asString(input.company?.domain) || null)
+  let domain = domainFromWebsite(website, asString(input.company?.domain) || null)
+  let resolvedWebsite = website
+
+  if (domain && isConsumerEmailDomain(domain)) {
+    warnings.push("consumer_domain_not_used_as_company_website")
+    domain = null
+    resolvedWebsite = null
+  }
+  if (companyName && isConsumerEmailDomain(normalizeDomain(companyName))) {
+    warnings.push("company_name_matches_consumer_domain")
+  }
   const industry = asString(input.company?.industry) || null
   const companyId = asString(input.company?.companyId) || null
 
@@ -180,7 +194,7 @@ export function normalizeLeadIntakeSource(input: UnifiedLeadIntakeRequest): Norm
         title,
         email,
         phone,
-        website,
+        website: resolvedWebsite,
         linkedinUrl,
         externalRef,
       })
@@ -190,7 +204,7 @@ export function normalizeLeadIntakeSource(input: UnifiedLeadIntakeRequest): Norm
     qa_marker: GROWTH_UNIFIED_REVENUE_WORKFLOW_QA_MARKER,
     source,
     companyName: companyName || "",
-    website,
+    website: resolvedWebsite,
     domain,
     industry,
     companyId,

@@ -1,3 +1,9 @@
+/** GE-AIOS-23 — Legacy LLM lead research runs (`growth.lead_research_runs`).
+ *  DEPRECATED for writes — canonical execution:
+ *    executeGrowthLeadProspectResearch → runProspectResearch
+ *  Persists to: growth.research_runs via lib/growth/research/research-repository.ts
+ */
+
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"

@@ -212,8 +212,33 @@ function buildMeetingCandidates(input: BuildDecisionContextInput): DecisionCandi
   ]
 }
 
+function buildDailyWorkQueueResearchCandidates(
+  dailyWorkQueue: GrowthHomeDailyWorkQueueItem[],
+): DecisionCandidate[] {
+  return dailyWorkQueue
+    .filter((item) => /research|run_research/i.test(item.actionLabel) && item.href)
+    .slice(0, 5)
+    .map((item) => {
+      const leadId = parseLeadIdFromHref(item.href)
+      return {
+        id: leadId ? `research:queue:${leadId}` : `research:queue:${item.id}`,
+        kind: "research_company" as const,
+        title: item.actionLabel.includes("Research")
+          ? item.actionLabel
+          : `Research company — ${item.companyName}`,
+        detail: item.reason ?? "Revenue queue research priority.",
+        href: item.href,
+        companyName: item.companyName,
+        source: "revenue_queue" as const,
+        queuePriority: item.priority,
+      }
+    })
+    .filter((candidate) => Boolean(candidate.href && parseLeadIdFromHref(candidate.href)))
+}
+
 function buildLeadDiscoveryCandidates(
   missionDiscovery: GrowthHomeMissionDiscoverySnapshot | null | undefined,
+  dailyWorkQueue: GrowthHomeDailyWorkQueueItem[],
 ): DecisionCandidate[] {
   if (!missionDiscovery?.startupDiscoveryReady) return []
 
@@ -250,7 +275,9 @@ function buildLeadDiscoveryCandidates(
           queuePriority: "high",
         },
       ]
-    case "begin_research":
+    case "begin_research": {
+      const queueCandidates = buildDailyWorkQueueResearchCandidates(dailyWorkQueue)
+      if (queueCandidates.length > 0) return queueCandidates
       return [
         {
           id: "discovery:begin_research",
@@ -265,6 +292,7 @@ function buildLeadDiscoveryCandidates(
           queuePriority: "high",
         },
       ]
+    }
     case "monitoring":
       return [
         {
@@ -323,7 +351,7 @@ export function buildDecisionContext(input: BuildDecisionContextInput): Decision
   const missions = [
     ...buildMissionCandidates(input),
     ...buildScaleAwarenessCandidates(input),
-    ...buildLeadDiscoveryCandidates(input.workspaceSummary.missionDiscovery),
+    ...buildLeadDiscoveryCandidates(input.workspaceSummary.missionDiscovery, input.dailyWorkQueue),
   ]
   const inbox = buildInboxCandidates(input)
   const meetings = buildMeetingCandidates(input)

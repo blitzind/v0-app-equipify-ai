@@ -2,7 +2,7 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { normalizeGrowthActorUserIdForDb } from "@/lib/growth/actor-user-id"
-import { logGrowthEngine } from "@/lib/growth/access"
+import { getGrowthEngineAiOrgId, logGrowthEngine } from "@/lib/growth/access"
 import { dispatchSequenceWakeForLeadEvent } from "@/lib/growth/sequences/conditions/sequence-event-wake-engine"
 import { GrowthLeadArchiveSchemaIncompleteError } from "@/lib/growth/lead-archive-api-errors"
 import { probeGrowthLeadArchiveSchema } from "@/lib/growth/lead-archive-schema-health"
@@ -697,13 +697,13 @@ export async function createGrowthLead(
     }
   }
 
-  const { scheduleLeadResearchPilotForProspect } = await import(
-    "@/lib/growth/aios/pilot/lead-research-pilot-orchestrator"
+  const { scheduleGrowthLeadProspectResearchIfNeeded } = await import(
+    "@/lib/growth/research/growth-lead-research-execution-service"
   )
-  scheduleLeadResearchPilotForProspect(admin, {
+  scheduleGrowthLeadProspectResearchIfNeeded(admin, {
     leadId: lead.id,
-    createdBy: input.createdBy ?? null,
-    source: "growth_lead_repository",
+    trigger: "import",
+    organizationId: getGrowthEngineAiOrgId() ?? undefined,
   })
 
   return lead

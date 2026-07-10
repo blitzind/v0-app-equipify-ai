@@ -218,9 +218,9 @@ for (const forbidden of ["runGrowthLeadResearch", "runAiTask", "runProspectResea
 
 const executor = readSource("lib/growth/aios/pilot/lead-research-agent-executor.ts")
 assert.ok(executor.includes("claimAiOsWorkOrder"))
-assert.ok(executor.includes("assembleAiContextForWorkOrder"))
-assert.ok(executor.includes("invokeAiOsProviderWithContextPackage"))
-assert.ok(executor.includes("applyGrowthLeadResearchEnrichment"))
+assert.ok(executor.includes("routeCanonicalProspectResearch"))
+assert.doesNotMatch(executor, /invokeAiOsProviderWithContextPackage/)
+assert.doesNotMatch(executor, /insertGrowthLeadResearchRun/)
 assert.ok(executor.includes('toStatus: "completed"'))
 for (const forbidden of ["runGrowthLeadResearch", "runAiTask", "invokeCoreProviderAdapter"]) {
   assert.equal(executor.includes(forbidden), false, `executor must not reference ${forbidden}`)

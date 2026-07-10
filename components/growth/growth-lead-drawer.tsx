@@ -44,7 +44,10 @@ import { GrowthLeadResearchPanel } from "@/components/growth/growth-lead-researc
 import { GrowthLeadTimelinePanel } from "@/components/growth/growth-lead-timeline-panel"
 import { GrowthOperationalIntelligence } from "@/components/growth/growth-operational-intelligence"
 import type { GrowthLeadResearchRun } from "@/lib/growth/research-types"
+import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
 import type { GrowthLead } from "@/lib/growth/types"
+import { enqueueGrowthLeadResearchFromDrawer } from "@/lib/growth/research/growth-lead-research-drawer-client"
+import { shouldAutoQueueLeadResearch } from "@/lib/growth/research/growth-lead-research-readiness"
 import { GrowthCallWorkflowProvider } from "@/components/growth/growth-call-workflow-context"
 import { applyGrowthCommandLeadFocusExpand, scrollGrowthCommandLeadFocusSection } from "@/lib/growth/command/command-lead-focus"
 import type { CommunicationStrategyDisplaySummary } from "@/lib/growth/contact-verification/communication-strategy-view"
@@ -63,12 +66,30 @@ type GrowthLeadDrawerProps = {
 
 export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLeadSaved, drawerFocus, highlightMeetingId, pendingReplyId }: GrowthLeadDrawerProps) {
   const [latestResearchRun, setLatestResearchRun] = useState<GrowthLeadResearchRun | null>(null)
+  const [latestProspectRun, setLatestProspectRun] = useState<GrowthResearchRunPublicView | null>(null)
   const [openAddDmForm, setOpenAddDmForm] = useState(false)
   const [timelineRefreshToken, setTimelineRefreshToken] = useState(0)
   const [nativeDecision, setNativeDecision] = useState<NativeRevenueDecisionDisplaySummary | null>(null)
   const [nativeCommunicationStrategy, setNativeCommunicationStrategy] =
     useState<CommunicationStrategyDisplaySummary | null>(null)
   const [nativeRelationshipRecommendation, setNativeRelationshipRecommendation] = useState<string | null>(null)
+
+  const [researchEnqueueing, setResearchEnqueueing] = useState(false)
+
+  useEffect(() => {
+    if (!open || !lead) return
+    if (!shouldAutoQueueLeadResearch(lead)) return
+
+    let cancelled = false
+    setResearchEnqueueing(true)
+    void enqueueGrowthLeadResearchFromDrawer(lead).finally(() => {
+      if (!cancelled) setResearchEnqueueing(false)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [open, lead?.id])
 
   useEffect(() => {
     if (!open || !lead) {
@@ -141,6 +162,7 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLe
         <GrowthCallWorkflowProvider>
           <GrowthLeadCommandCenter
             lead={activeLead}
+            researchEnqueueing={researchEnqueueing}
             onLeadUpdated={handleLeadUpdated}
             onLeadSaved={onLeadSaved}
             onAddDecisionMaker={handleAddDecisionMaker}
@@ -223,7 +245,7 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLe
 
           <GrowthCallCopilot lead={activeLead} />
 
-          <GrowthPersonalizationEmbeddedPanel leadId={activeLead.id} surface="lead" compact className="px-1" />
+          <GrowthPersonalizationEmbeddedPanel lead={activeLead} leadId={activeLead.id} surface="lead" compact className="px-1" />
 
           <GrowthRealtimeCallIntelligence lead={activeLead} />
 
@@ -237,11 +259,18 @@ export function GrowthLeadDrawer({ lead, open, onOpenChange, onLeadUpdated, onLe
             onOpenAddFormChange={setOpenAddDmForm}
           />
 
-          <GrowthCompanyIntelligenceSnapshot lead={activeLead} latestRun={latestResearchRun} />
+          <GrowthCompanyIntelligenceSnapshot
+            lead={activeLead}
+            latestRun={latestResearchRun}
+            prospectRun={latestProspectRun}
+            researchEnqueueing={researchEnqueueing}
+          />
 
           <GrowthLeadResearchPanel
-            id="growth-research"
+            id="growth-lead-research"
             lead={activeLead}
+            autoQueueResearch
+            onProspectRunChange={setLatestProspectRun}
             onLeadUpdated={handleLeadUpdated}
             onLatestRunChange={setLatestResearchRun}
           />
