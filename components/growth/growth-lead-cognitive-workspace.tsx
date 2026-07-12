@@ -28,12 +28,12 @@ import {
   GROWTH_AVA_COGNITIVE_SECTION_TITLES,
   GROWTH_AVA_COGNITIVE_WORKSPACE_COMPRESSION_QA_MARKER,
   GROWTH_AVA_COGNITIVE_WORKSPACE_QA_MARKER,
-  GROWTH_AVA_RAW_DOMAIN_IDS,
-  GROWTH_AVA_RAW_DOMAIN_ORDER,
-  GROWTH_AVA_RAW_DOMAIN_PERSIST_KEYS,
-  GROWTH_AVA_RAW_DOMAIN_TITLES,
   type GrowthAvaRawDomainId,
 } from "@/lib/growth/cognitive-workspace/growth-cognitive-workspace-types"
+import {
+  listAvaRawDomainSlots,
+  resolveAvaRawDomainChildren,
+} from "@/lib/growth/cognitive-workspace/growth-cognitive-raw-domain-resolver"
 import type { CommunicationStrategyDisplaySummary } from "@/lib/growth/contact-verification/communication-strategy-types"
 import type { NativeRevenueDecisionDisplaySummary } from "@/lib/growth/contact-verification/native-revenue-decision-adapter"
 import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
@@ -52,7 +52,8 @@ export type GrowthLeadCognitiveWorkspaceProps = {
   rawDomainExpand?: GrowthAvaRawDomainId | null
   rawDomainExpandToken?: number
   humanWorkspaceChildren?: ReactNode
-  rawDomains: GrowthLeadCognitiveRawDomains
+  /** Optional for fail-closed rendering if a caller omits domains. */
+  rawDomains?: GrowthLeadCognitiveRawDomains | null
   researchNotesSlot?: ReactNode
   onLeadUpdated?: (patch: Partial<GrowthLead>) => void
   onTimelineRefresh?: () => void
@@ -68,7 +69,7 @@ export function GrowthLeadCognitiveWorkspace({
   rawDomainExpand = null,
   rawDomainExpandToken = 0,
   humanWorkspaceChildren,
-  rawDomains,
+  rawDomains = null,
   researchNotesSlot,
   onLeadUpdated,
   onTimelineRefresh,
@@ -270,17 +271,17 @@ export function GrowthLeadCognitiveWorkspace({
           <p className="text-xs text-muted-foreground">
             Full subsystem detail for verification. Expand only what you need.
           </p>
-          {GROWTH_AVA_RAW_DOMAIN_ORDER.map((domainId) => {
-            const children = rawDomains[domainId]
+          {listAvaRawDomainSlots().map((slot) => {
+            const children = resolveAvaRawDomainChildren(rawDomains, slot.domainId)
             if (!children) return null
             return (
               <GrowthAvaRawDomain
-                key={domainId}
-                id={GROWTH_AVA_RAW_DOMAIN_IDS[domainId]}
-                title={GROWTH_AVA_RAW_DOMAIN_TITLES[domainId]}
-                persistKey={GROWTH_AVA_RAW_DOMAIN_PERSIST_KEYS[domainId]}
+                key={slot.domainId}
+                id={slot.elementId}
+                title={slot.title}
+                persistKey={slot.persistKey}
                 defaultOpen={false}
-                expandToken={rawDomainExpand === domainId ? rawDomainExpandToken : 0}
+                expandToken={rawDomainExpand === slot.domainId ? rawDomainExpandToken : 0}
               >
                 {children}
               </GrowthAvaRawDomain>

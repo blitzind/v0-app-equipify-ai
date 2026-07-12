@@ -19,6 +19,11 @@ import {
   GROWTH_AVA_RAW_DOMAIN_TITLES,
   GROWTH_AVA_FOCUS_TO_RAW_DOMAIN,
 } from "../lib/growth/cognitive-workspace/growth-cognitive-workspace-types"
+import {
+  listAvaRawDomainSlots,
+  resolveAvaRawDomainChildren,
+  resolveCognitiveDomainFromFocus,
+} from "../lib/growth/cognitive-workspace/growth-cognitive-raw-domain-resolver"
 
 const ROOT = process.cwd()
 
@@ -63,25 +68,35 @@ console.log("  ✓ drawer maps panels into 6 raw domains; handlers preserved")
 
 const workspace = readSource("components/growth/growth-lead-cognitive-workspace.tsx")
 assert.ok(workspace.includes("GROWTH_AVA_COGNITIVE_WORKSPACE_COMPRESSION_QA_MARKER"))
+assert.ok(workspace.includes("listAvaRawDomainSlots"))
+assert.ok(workspace.includes("resolveAvaRawDomainChildren"))
 assert.ok(workspace.includes("GrowthAvaRawDomain"))
 assert.ok(workspace.includes("GrowthAvaOperatorTaskGroup"))
-assert.ok(workspace.includes("What Ava Needs") || workspace.includes('human_workspace'))
+assert.ok(workspace.includes("What Ava Needs") || workspace.includes("human_workspace"))
 assert.ok(workspace.includes("Approvals"))
 assert.ok(workspace.includes("Ownership"))
 assert.ok(workspace.includes("Replies & follow-up"))
-assert.ok(workspace.includes("I'll let you know if I need approval") || workspace.includes("I&apos;ll let you know if I need approval"))
-assert.ok(workspace.includes("GROWTH_AVA_RAW_DOMAIN_ORDER"))
+assert.ok(
+  workspace.includes("I'll let you know if I need approval") ||
+    workspace.includes("I&apos;ll let you know if I need approval"),
+)
 for (const domain of GROWTH_AVA_RAW_DOMAIN_ORDER) {
   assert.ok(GROWTH_AVA_RAW_DOMAIN_IDS[domain])
   assert.ok(GROWTH_AVA_RAW_DOMAIN_TITLES[domain])
 }
 assert.ok(workspace.includes("defaultOpen={false}"))
 assert.ok(workspace.includes("GeV15AutomationRuntimeApprovalPanel"))
-console.log("  ✓ Human Workspace organized by operator tasks; Raw uses domains")
+console.log("  ✓ Human Workspace organized by operator tasks; Raw uses safe domain resolver")
+
+assert.equal(resolveAvaRawDomainChildren(undefined, "research"), null)
+assert.equal(listAvaRawDomainSlots().length, 6)
+assert.equal(resolveCognitiveDomainFromFocus("unknown-value"), null)
+assert.equal(resolveCognitiveDomainFromFocus("research"), "research")
+console.log("  ✓ runtime domain resolution executed (crash path covered)")
 
 const focus = readSource("lib/growth/command/command-lead-focus.ts")
-assert.ok(focus.includes("resolveAvaRawDomainForFocus"))
-assert.ok(focus.includes("GROWTH_AVA_FOCUS_TO_RAW_DOMAIN") || focus.includes("GROWTH_AVA_RAW_DOMAIN_PERSIST_KEYS"))
+assert.ok(focus.includes("resolveAvaRawDomainForFocus") || focus.includes("resolveCognitiveDomainFromFocus"))
+assert.ok(focus.includes("resolveAvaRawDomainPersistKey") || focus.includes("GROWTH_AVA_RAW_DOMAIN_PERSIST_KEYS"))
 assert.equal(GROWTH_AVA_FOCUS_TO_RAW_DOMAIN.research, "research")
 assert.equal(GROWTH_AVA_FOCUS_TO_RAW_DOMAIN.revenue, "revenue")
 assert.equal(GROWTH_AVA_FOCUS_TO_RAW_DOMAIN.meetings, "communication")

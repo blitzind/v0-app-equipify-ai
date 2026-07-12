@@ -861,6 +861,7 @@
     "test:ge-aios-hotfix-live-1c-5d-cookie-auth-isolation": "tsx scripts/test-ge-aios-hotfix-live-1c-5d-cookie-auth-isolation.ts",
     "test:ge-aios-25a-1-ava-cognitive-workspace": "tsx scripts/test-ge-aios-25a-1-ava-cognitive-workspace.ts",
     "test:ge-aios-25a-2-ava-cognitive-workspace-compression": "tsx scripts/test-ge-aios-25a-2-ava-cognitive-workspace-compression.ts",
+    "test:ge-aios-hotfix-25a-2a-cognitive-workspace-runtime": "tsx scripts/test-ge-aios-hotfix-25a-2a-cognitive-workspace-runtime.ts",
     "test:ge-aios-hotfix-growth-route-access": "tsx scripts/test-ge-aios-hotfix-growth-route-access.ts",
     "test:ge-aios-hotfix-16x-home-runtime-undefined-arrays": "tsx scripts/test-ge-aios-hotfix-16x-home-runtime-undefined-arrays.ts",
     "test:ge-aios-7c-ava-led-lead-discovery": "tsx scripts/test-ge-aios-7c-ava-led-lead-discovery.ts",
