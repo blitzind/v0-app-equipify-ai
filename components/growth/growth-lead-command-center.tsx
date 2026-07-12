@@ -65,6 +65,8 @@ type GrowthLeadCommandCenterProps = {
   onTimelineRefresh?: () => void
   nativeDecision?: import("@/lib/growth/contact-verification/native-revenue-decision-adapter").NativeRevenueDecisionDisplaySummary | null
   nativeCommunicationStrategy?: import("@/lib/growth/contact-verification/communication-strategy-view").CommunicationStrategyDisplaySummary | null
+  /** GE-AIOS-25A-1 — actions strip only; assessment/NBA live in cognitive workspace. */
+  cognitiveActionsOnly?: boolean
 }
 
 function formatSource(lead: GrowthLead): string {
@@ -98,6 +100,7 @@ export function GrowthLeadCommandCenter({
   onTimelineRefresh,
   nativeDecision,
   nativeCommunicationStrategy,
+  cognitiveActionsOnly = false,
 }: GrowthLeadCommandCenterProps) {
   const [primaryDmName, setPrimaryDmName] = useState<string | null>(null)
   const [touchSaving, setTouchSaving] = useState(false)
@@ -270,24 +273,28 @@ export function GrowthLeadCommandCenter({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <GrowthBadge label={lead.status?.replace(/_/g, " ") ?? "unknown"} tone="status" />
-            {lead.workflowHealth ? (
-              <GrowthBadge
-                label={lead.workflowHealth.replace(/_/g, " ")}
-                tone={workflowHealthTone(lead.workflowHealth)}
-              />
-            ) : null}
-            {lead.momentumTier ? (
-              <GrowthBadge label={`Momentum ${lead.momentumTier}`} tone={momentumTierTone(lead.momentumTier)} />
-            ) : null}
-            {lead.callPriorityTier ? (
-              <GrowthBadge
-                label={`${lead.callPriorityTier} priority`}
-                tone={priorityTierTone(lead.callPriorityTier)}
-              />
-            ) : null}
-            <GrowthRevenueReadinessBadge lead={lead} />
-            {lead.score != null ? <GrowthBadge label={`Fit ${lead.score}`} tone="medium" /> : null}
+            {cognitiveActionsOnly ? null : (
+              <>
+                <GrowthBadge label={lead.status?.replace(/_/g, " ") ?? "unknown"} tone="status" />
+                {lead.workflowHealth ? (
+                  <GrowthBadge
+                    label={lead.workflowHealth.replace(/_/g, " ")}
+                    tone={workflowHealthTone(lead.workflowHealth)}
+                  />
+                ) : null}
+                {lead.momentumTier ? (
+                  <GrowthBadge label={`Momentum ${lead.momentumTier}`} tone={momentumTierTone(lead.momentumTier)} />
+                ) : null}
+                {lead.callPriorityTier ? (
+                  <GrowthBadge
+                    label={`${lead.callPriorityTier} priority`}
+                    tone={priorityTierTone(lead.callPriorityTier)}
+                  />
+                ) : null}
+                <GrowthRevenueReadinessBadge lead={lead} />
+                {lead.score != null ? <GrowthBadge label={`Fit ${lead.score}`} tone="medium" /> : null}
+              </>
+            )}
             <GrowthBadge label={formatSource(lead)} tone="neutral" className="normal-case" />
           </div>
 
@@ -317,11 +324,13 @@ export function GrowthLeadCommandCenter({
             </p>
           ) : null}
 
-          <GrowthNextBestActionBanner
-            lead={lead}
-            nativeDecision={nativeDecision}
-            nativeCommunicationStrategy={nativeCommunicationStrategy}
-          />
+          {cognitiveActionsOnly ? null : (
+            <GrowthNextBestActionBanner
+              lead={lead}
+              nativeDecision={nativeDecision}
+              nativeCommunicationStrategy={nativeCommunicationStrategy}
+            />
+          )}
 
           {actionError ? (
             <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
@@ -454,25 +463,27 @@ export function GrowthLeadCommandCenter({
             </details>
           </div>
 
-          {lead.nextBestAction ? (
+          {cognitiveActionsOnly || !lead.nextBestAction ? null : (
             <p className="text-xs text-muted-foreground">
               Suggested: {GROWTH_NEXT_BEST_ACTION_LABELS[lead.nextBestAction] ?? lead.nextBestAction.replace(/_/g, " ")}
             </p>
-          ) : null}
+          )}
         </div>
       </GrowthEngineCard>
 
-      <details className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3">
-        <summary className="cursor-pointer text-sm font-medium text-muted-foreground">Ownership &amp; assignment</summary>
-        <div className="mt-3">
-          <GrowthLeadAssignmentPanel
-            lead={lead}
-            compact
-            onLeadUpdated={onLeadUpdated}
-            onTimelineRefresh={onTimelineRefresh}
-          />
-        </div>
-      </details>
+      {cognitiveActionsOnly ? null : (
+        <details className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3">
+          <summary className="cursor-pointer text-sm font-medium text-muted-foreground">Ownership &amp; assignment</summary>
+          <div className="mt-3">
+            <GrowthLeadAssignmentPanel
+              lead={lead}
+              compact
+              onLeadUpdated={onLeadUpdated}
+              onTimelineRefresh={onTimelineRefresh}
+            />
+          </div>
+        </details>
+      )}
 
       <Dialog open={followUpOpen} onOpenChange={(open) => !followUpSaving && setFollowUpOpen(open)}>
         <DialogContent>
