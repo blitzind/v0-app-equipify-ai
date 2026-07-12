@@ -45,3 +45,10 @@ export {
   resolveVerifiedIndustryGuess,
   type GrowthCompanyIntelligenceEvidenceEnrichment,
 } from "@/lib/growth/research/company-evidence/company-evidence-intelligence-enrichment"
+
+export {
+  GROWTH_PROSPECT_KNOWLEDGE_PACK_QA_MARKER,
+  buildProspectKnowledgePack,
+  type ProspectKnowledgePack,
+  type ProspectKnowledgeConclusion,
+} from "@/lib/growth/research/company-evidence/prospect-knowledge-pack"

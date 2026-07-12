@@ -74,19 +74,22 @@ assert.ok(workspace.includes("GrowthAvaRawDomain"))
 assert.ok(workspace.includes("GrowthAvaOperatorTaskGroup"))
 assert.ok(workspace.includes("What Ava Needs") || workspace.includes("human_workspace"))
 assert.ok(workspace.includes("Approvals"))
-assert.ok(workspace.includes("Ownership"))
 assert.ok(workspace.includes("Replies & follow-up"))
 assert.ok(
   workspace.includes("I'll let you know if I need approval") ||
     workspace.includes("I&apos;ll let you know if I need approval"),
 )
+const commandCenter = readSource("components/growth/growth-lead-command-center.tsx")
+assert.ok(commandCenter.includes("Ownership"))
+assert.ok(commandCenter.includes("GrowthLeadAssignmentPanel"))
+assert.ok(commandCenter.includes("cognitiveActionsOnly"))
 for (const domain of GROWTH_AVA_RAW_DOMAIN_ORDER) {
   assert.ok(GROWTH_AVA_RAW_DOMAIN_IDS[domain])
   assert.ok(GROWTH_AVA_RAW_DOMAIN_TITLES[domain])
 }
 assert.ok(workspace.includes("defaultOpen={false}"))
 assert.ok(workspace.includes("GeV15AutomationRuntimeApprovalPanel"))
-console.log("  ✓ Human Workspace organized by operator tasks; Raw uses safe domain resolver")
+console.log("  ✓ Human Workspace organized by operator tasks; ownership elevated; Raw uses safe domain resolver")
 
 assert.equal(resolveAvaRawDomainChildren(undefined, "research"), null)
 assert.equal(listAvaRawDomainSlots().length, 6)
@@ -134,9 +137,9 @@ console.log("  ✓ incomplete research stated plainly")
 
 assert.deepEqual([...GROWTH_AVA_COGNITIVE_SECTION_ORDER].slice(0, 4), [
   "assessment",
-  "why_i_believe",
-  "evidence",
+  "whats_changed",
   "execution_plan",
+  "human_workspace",
 ])
 assert.equal(GROWTH_AVA_COGNITIVE_WORKSPACE_QA_MARKER, "ge-aios-25a-1-ava-cognitive-workspace-v1")
 

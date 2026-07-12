@@ -62,6 +62,23 @@ export type GrowthCompanyEvidenceCrawlState = {
   stopReason: string | null
   websiteCoverage: string[]
   missingInformation: string[]
+  /** GE-AIOS-25C-1 */
+  robots?: {
+    robots_checked: boolean
+    robots_fetch_status: "ok" | "missing" | "error" | "malformed" | "skipped"
+    robots_rules_applied: boolean
+    robots_blocked_url_count: number
+    robots_disallow_count: number
+  }
+  pageSelections?: Array<{
+    url: string
+    pageType: string
+    source: "seed" | "sitemap" | "internal_link"
+    reason: string
+    status: "selected" | "skipped" | "crawled" | "blocked_robots" | "page_cap" | "fetch_failed"
+    skipReason?: string
+  }>
+  skipReasons?: string[]
 }
 
 export type GrowthCompanyEvidenceMissionMatchLabel =

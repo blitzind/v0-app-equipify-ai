@@ -5,10 +5,12 @@
 **Status:** Implementation blueprint — presentation layer only  
 **Effective:** 2026-07-11  
 **Parent:** [`AI_OS_EXECUTIVE_ARCHITECTURE_CONSOLIDATION.md`](./AI_OS_EXECUTIVE_ARCHITECTURE_CONSOLIDATION.md)  
+**Canonical drawer hierarchy:** [`GE-AIOS-25A_AVA_COGNITIVE_WORKSPACE.md`](./GE-AIOS-25A_AVA_COGNITIVE_WORKSPACE.md) (Ava Cognitive Workspace)  
 **Upstream:** Executive Constitution · ARCH-1A–4A · AUDIT-EXEC-1A  
 
 **Non-scope:** Schema, APIs, orchestration, scoring, providers, commits, deployments  
 
+> **Hierarchy authority:** Implement the Lead Drawer section order and semantics from **GE-AIOS-25A**. This IMP-0A-1 document remains the **presentation-only / reuse / regression** implementation contract. Where section names differ, prefer 25A naming.
 ---
 
 ## 1. Mission

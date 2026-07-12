@@ -8,70 +8,56 @@ type Props = {
 }
 
 export function GrowthAvaCurrentAssessmentPanel({ assessment }: Props) {
+  const bullets =
+    assessment.summaryBullets?.length > 0
+      ? assessment.summaryBullets
+      : assessment.briefingParagraphs
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
         <GrowthBadge label={assessment.accountStatus} tone="status" />
         {assessment.matchRating ? <GrowthBadge label={assessment.matchRating} tone="medium" /> : null}
-        {assessment.opportunityLevel ? (
-          <GrowthBadge label={`Opportunity ${assessment.opportunityLevel}`} tone="neutral" />
-        ) : null}
         {assessment.confidence ? (
           <GrowthBadge label={`Confidence ${assessment.confidence.label}`} tone="neutral" />
         ) : null}
       </div>
 
-      <div className="space-y-2 text-sm leading-relaxed text-foreground">
-        {assessment.briefingParagraphs.map((paragraph) => (
-          <p key={paragraph}>{paragraph}</p>
+      <ul className="space-y-1 text-sm text-foreground">
+        {bullets.map((bullet) => (
+          <li key={bullet} className="flex gap-2">
+            <span className="mt-1.5 size-1 shrink-0 rounded-full bg-foreground/70" aria-hidden />
+            <span>{bullet}</span>
+          </li>
         ))}
-      </div>
+      </ul>
 
-      <dl className="grid gap-3 text-sm sm:grid-cols-2">
-        {assessment.conclusion ? (
-          <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current conclusion</dt>
-            <dd className="mt-1">{assessment.conclusion}</dd>
-          </div>
-        ) : null}
-        {assessment.recommendation ? (
-          <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current recommendation</dt>
-            <dd className="mt-1">{assessment.recommendation}</dd>
-          </div>
-        ) : null}
-        {assessment.objective ? (
-          <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current objective</dt>
-            <dd className="mt-1">{assessment.objective}</dd>
-          </div>
-        ) : null}
-        {assessment.confidence ? (
-          <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Confidence</dt>
-            <dd className="mt-1">
-              {assessment.confidence.label}
-              <span className="mt-0.5 block text-xs text-muted-foreground">{assessment.confidence.measures}</span>
-            </dd>
-          </div>
-        ) : null}
-        {assessment.blocker ? (
-          <div className="sm:col-span-2">
-            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current blocker</dt>
-            <dd className="mt-1 text-amber-900 dark:text-amber-200">{assessment.blocker}</dd>
-          </div>
-        ) : null}
-        <div className="sm:col-span-2">
-          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Operator involvement</dt>
-          <dd className="mt-1">{assessment.operatorInvolvementSummary}</dd>
+      <dl className="grid gap-2 border-t border-border/50 pt-3 text-sm sm:grid-cols-3">
+        <div>
+          <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Current focus
+          </dt>
+          <dd className="mt-0.5 font-medium">{assessment.objective ?? "Continue account work"}</dd>
         </div>
-        {assessment.lastUpdatedLabel ? (
-          <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Last updated</dt>
-            <dd className="mt-1">{assessment.lastUpdatedLabel}</dd>
-          </div>
-        ) : null}
+        <div>
+          <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Blocked by
+          </dt>
+          <dd className={`mt-0.5 font-medium ${assessment.blocker ? "text-amber-900 dark:text-amber-200" : ""}`}>
+            {assessment.blocker ?? "Nothing blocking"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Next step
+          </dt>
+          <dd className="mt-0.5 font-medium">{assessment.recommendation ?? "Await next signal"}</dd>
+        </div>
       </dl>
+
+      {assessment.lastUpdatedLabel ? (
+        <p className="text-[11px] text-muted-foreground">Updated {assessment.lastUpdatedLabel}</p>
+      ) : null}
     </div>
   )
 }

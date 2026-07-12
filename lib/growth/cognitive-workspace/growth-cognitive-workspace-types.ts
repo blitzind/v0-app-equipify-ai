@@ -1,4 +1,4 @@
-/** GE-AIOS-25A — Ava Cognitive Workspace (client-safe types). */
+/** GE-AIOS-25A / 25B — Ava Cognitive Workspace (client-safe types). */
 
 export const GROWTH_AVA_COGNITIVE_WORKSPACE_QA_MARKER =
   "ge-aios-25a-1-ava-cognitive-workspace-v1" as const
@@ -6,25 +6,40 @@ export const GROWTH_AVA_COGNITIVE_WORKSPACE_QA_MARKER =
 export const GROWTH_AVA_COGNITIVE_WORKSPACE_COMPRESSION_QA_MARKER =
   "ge-aios-25a-2-ava-cognitive-workspace-compression-v1" as const
 
+export const GROWTH_AVA_COGNITIVE_WORKSPACE_REFINEMENT_QA_MARKER =
+  "ge-aios-25b-ava-cognitive-workspace-refinement-v1" as const
+
 export const GROWTH_AVA_COGNITIVE_WORKSPACE_RULE =
   "presentation-only: compose existing drawer data; no LLM; no new APIs; no schema" as const
 
+/** GE-AIOS-25B — operator-facing hierarchy (notebook tools nested under Raw). */
 export const GROWTH_AVA_COGNITIVE_SECTION_ORDER = [
   "assessment",
+  "whats_changed",
+  "execution_plan",
+  "human_workspace",
   "why_i_believe",
   "evidence",
-  "execution_plan",
-  "research_journal",
-  "operational_state",
-  "activity_timeline",
-  "human_workspace",
   "raw_intelligence",
 ] as const
 
 export type GrowthAvaCognitiveSectionId = (typeof GROWTH_AVA_COGNITIVE_SECTION_ORDER)[number]
 
-export const GROWTH_AVA_COGNITIVE_SECTION_IDS: Record<GrowthAvaCognitiveSectionId, string> = {
+/** Power-user tools nested inside Show Me Everything (not top-level). */
+export const GROWTH_AVA_COGNITIVE_NESTED_TOOL_ORDER = [
+  "research_journal",
+  "operational_state",
+  "activity_timeline",
+] as const
+
+export type GrowthAvaCognitiveNestedToolId = (typeof GROWTH_AVA_COGNITIVE_NESTED_TOOL_ORDER)[number]
+
+export const GROWTH_AVA_COGNITIVE_SECTION_IDS: Record<
+  GrowthAvaCognitiveSectionId | GrowthAvaCognitiveNestedToolId,
+  string
+> = {
   assessment: "ava-cognitive-assessment",
+  whats_changed: "ava-cognitive-whats-changed",
   why_i_believe: "ava-cognitive-why-i-believe",
   evidence: "ava-cognitive-evidence",
   execution_plan: "ava-cognitive-execution-plan",
@@ -35,11 +50,15 @@ export const GROWTH_AVA_COGNITIVE_SECTION_IDS: Record<GrowthAvaCognitiveSectionI
   raw_intelligence: "ava-cognitive-raw-intelligence",
 }
 
-export const GROWTH_AVA_COGNITIVE_SECTION_TITLES: Record<GrowthAvaCognitiveSectionId, string> = {
-  assessment: "Ava's Current Assessment",
+export const GROWTH_AVA_COGNITIVE_SECTION_TITLES: Record<
+  GrowthAvaCognitiveSectionId | GrowthAvaCognitiveNestedToolId,
+  string
+> = {
+  assessment: "Assessment",
+  whats_changed: "What's Changed",
   why_i_believe: "Why I Believe This",
   evidence: "Evidence",
-  execution_plan: "Execution Plan",
+  execution_plan: "Progress",
   research_journal: "Research Journal",
   operational_state: "Operational State",
   activity_timeline: "Activity Timeline",
@@ -140,6 +159,9 @@ export type GrowthAvaConfidenceMeasure = {
 
 export type GrowthAvaCurrentAssessment = {
   accountStatus: GrowthAvaAccountStatusLabel
+  /** Compact executive bullets (GE-AIOS-25B). */
+  summaryBullets: string[]
+  /** Legacy narrative paragraphs retained for certs / expand. */
   briefingParagraphs: string[]
   conclusion: string | null
   recommendation: string | null
@@ -152,6 +174,33 @@ export type GrowthAvaCurrentAssessment = {
   operatorInvolvementSummary: string
   lastUpdatedLabel: string | null
   lastUpdatedAt: string | null
+}
+
+export type GrowthAvaProgressStepStatus = "done" | "current" | "upcoming"
+
+export type GrowthAvaProgressStep = {
+  id: string
+  label: string
+  status: GrowthAvaProgressStepStatus
+}
+
+export type GrowthAvaVisitSnapshot = {
+  confidencePercent: number | null
+  decisionMakerStatus: string | null
+  employeeSizeGuess: string | null
+  researched: boolean
+  recommendation: string | null
+  blocker: string | null
+  evidenceCount: number
+  website: string | null
+  accountStatus: string
+  visitedAt: string
+}
+
+export type GrowthAvaWhatsChanged = {
+  bullets: string[]
+  isFirstVisit: boolean
+  nextResearchLabel: string | null
 }
 
 export type GrowthAvaBelief = {

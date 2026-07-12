@@ -25,6 +25,9 @@ import {
   GROWTH_DAILY_WORK_QUEUE_LEAD_BATCH_LIMIT,
 } from "@/lib/growth/relationship/relationship-scale-limits"
 import type { GrowthLead } from "@/lib/growth/types"
+import { shadowEvaluatePortfolioAllocation } from "@/lib/growth/portfolio-allocation/portfolio-allocation-facade"
+import { evaluateResourceAllocationFacade } from "@/lib/growth/resource-allocation/resource-allocation-facade-engine"
+import { flattenActionableDailyRevenueWorkQueueItems } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-integration"
 
 async function loadSuppressedLeadIds(admin: SupabaseClient): Promise<string[]> {
   try {
@@ -103,12 +106,63 @@ export async function resolveDailyRevenueWorkQueueForLeads(input: {
 
   const suppressionList = await loadSuppressedLeadIds(input.admin)
 
-  return buildDailyRevenueWorkQueue({
+  const queue = buildDailyRevenueWorkQueue({
     generatedAt: input.generatedAt,
     candidates,
     capacityLimits: input.capacityLimits,
     suppressionList,
   })
+
+  // SV1-2 / ARCH-2A — Portfolio Allocation Facade shadow comparison vs Daily Revenue Work Queue.
+  // Existing buildDailyRevenueWorkQueue remains the production selector.
+  try {
+    const actionable = flattenActionableDailyRevenueWorkQueueItems(queue)
+    const slots =
+      input.capacityLimits?.suggestedDailyItemCount ??
+      queue.suggestedDailyCapacity ??
+      35
+    const existingSelected = actionable.slice(0, Math.min(slots, 10)).map((item) => item.leadId)
+    const leadById = new Map(input.leads.map((lead) => [lead.id, lead]))
+
+    await shadowEvaluatePortfolioAllocation(input.admin, {
+      organizationId: organizationId || "unknown",
+      capacityClass: "human_approval",
+      capacitySlotsAvailable: Math.min(slots, 10),
+      existingSelectedLeadIds: existingSelected,
+      candidates: actionable.map((item) => {
+        const lead = leadById.get(item.leadId)
+        const resource = evaluateResourceAllocationFacade({
+          organizationId: organizationId || "unknown",
+          accountId: item.leadId,
+          resourceClass: "other_scarce",
+          signals: {
+            admission: { state: "accepted" },
+            budgetAvailable: true,
+            evidenceConfidence: item.confidence,
+            approvalRequired: item.requiresHumanApproval,
+            approvalGranted: false,
+          },
+        })
+        return {
+          leadId: item.leadId,
+          organizationId: organizationId || "unknown",
+          companyName: lead?.companyName ?? null,
+          investmentState: resource.investment_state,
+          signals: {
+            missionAligned: true,
+            dailyQueueSortScore: item.sortScore,
+            dailyQueuePriority: item.priority,
+            urgencyScore: Math.round(item.confidence * 100),
+            engagementScore: lead?.engagementScore ?? null,
+          },
+        }
+      }),
+    })
+  } catch {
+    // Shadow must never fail queue resolution.
+  }
+
+  return queue
 }
 
 export async function fetchDailyRevenueWorkQueueFromLeads(

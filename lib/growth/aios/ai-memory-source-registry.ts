@@ -58,9 +58,9 @@ export const AI_MEMORY_SOURCE_BINDINGS: readonly AiMemorySourceBinding[] = [
   {
     memoryType: "research",
     ownerAgent: "research",
-    sourceSystem: "lead_research",
-    sourceTable: "growth.lead_research_runs",
-    description: "Prospect research runs and notes",
+    sourceSystem: "prospect_research",
+    sourceTable: "growth.research_runs",
+    description: "Canonical prospect research runs (GE-AIOS-23 / 25C-1)",
   },
   {
     memoryType: "decision",

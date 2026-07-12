@@ -21,6 +21,9 @@ import {
   isResearchAgentSchedulerActive,
   selectResearchWakeCandidates,
 } from "@/lib/growth/aios/growth/growth-autonomous-research-pilot-engine"
+import { shadowEvaluatePortfolioAllocation } from "@/lib/growth/portfolio-allocation/portfolio-allocation-facade"
+import { mapMissionAllocationToPortfolioCandidate } from "@/lib/growth/portfolio-allocation/portfolio-allocation-mappers"
+import { evaluateResourceAllocationFacade } from "@/lib/growth/resource-allocation/resource-allocation-facade-engine"
 import {
   appendAutonomousResearchRun,
   getAutonomousResearchPilotOrgState,
@@ -170,9 +173,41 @@ export async function runAutonomousResearchPilotCycle(
       organizationId: input.organizationId,
       generatedAt,
     })
-    const candidates = selectResearchWakeCandidates({
+    const wakePool = selectResearchWakeCandidates({
       rankedMissions: missionPriority.rankedMissions,
-    }).slice(0, input.maxRuns ?? 3)
+    })
+    const candidates = wakePool.slice(0, input.maxRuns ?? 3)
+
+    // SV1-2 / ARCH-2A — Portfolio Allocation Facade in shadow mode only.
+    // Existing selectResearchWakeCandidates + slice remain the production selector.
+    await shadowEvaluatePortfolioAllocation(admin, {
+      organizationId: input.organizationId,
+      capacityClass: "website_research",
+      capacitySlotsAvailable: input.maxRuns ?? 3,
+      existingSelectedLeadIds: candidates.map((row) => row.leadId),
+      candidates: wakePool.map((row) => {
+        const resource = evaluateResourceAllocationFacade({
+          organizationId: input.organizationId,
+          accountId: row.leadId,
+          resourceClass: "website_research",
+          signals: {
+            admission: {
+              state: row.allocationStatus === "abandon_recommended" ? "rejected" : "accepted",
+            },
+            budgetAvailable: row.allocationStatus !== "blocked",
+            qualificationRecommendation:
+              row.allocationStatus === "abandon_recommended" ? "abandon" : "continue_research",
+            evidenceConfidence: Math.max(0, Math.min(1, (row.priority.confidenceScore ?? 50) / 100)),
+          },
+        })
+        return mapMissionAllocationToPortfolioCandidate({
+          organizationId: input.organizationId,
+          row,
+          investmentState: resource.investment_state,
+          missionAligned: true,
+        })
+      }),
+    }).catch(() => undefined)
 
     for (const candidate of candidates) {
       const budget = enforceResearchAgentBudget({

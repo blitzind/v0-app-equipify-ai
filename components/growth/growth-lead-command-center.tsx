@@ -314,6 +314,20 @@ export function GrowthLeadCommandCenter({
             ) : null}
           </dl>
 
+          {cognitiveActionsOnly ? (
+            <div className="rounded-lg border border-border/60 bg-muted/15 px-3 py-2">
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Ownership
+              </p>
+              <GrowthLeadAssignmentPanel
+                lead={lead}
+                compact
+                onLeadUpdated={onLeadUpdated}
+                onTimelineRefresh={onTimelineRefresh}
+              />
+            </div>
+          ) : null}
+
           {lead.lastHumanTouchAt ? (
             <p className="text-xs text-muted-foreground">Last touch {formatRelativeTime(lead.lastHumanTouchAt)}</p>
           ) : null}

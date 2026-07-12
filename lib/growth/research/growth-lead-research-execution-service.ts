@@ -9,6 +9,8 @@ import type { GrowthLeadResearchEvidenceSummary } from "@/lib/growth/aios/growth
 import { publishGrowthLeadResearchWorkflowStatus } from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
+import { shadowEvaluateResourceAllocation } from "@/lib/growth/resource-allocation/resource-allocation-facade"
+import { buildResourceAllocationSignalsFromLead } from "@/lib/growth/resource-allocation/resource-allocation-signal-builders"
 import {
   GROWTH_LEAD_RESEARCH_READINESS_21A_QA_MARKER,
   isProspectResearchStale,
@@ -154,6 +156,17 @@ export async function executeGrowthLeadProspectResearch(
     return { ok: false, outcome: "not_found", code: "not_found", message: "Lead not found." }
   }
 
+  // SV1-1 / ARCH-1A — Resource Allocation Facade in shadow mode only.
+  // Existing admission / freshness / force gates below remain the production allow/deny path.
+  await shadowEvaluateResourceAllocation(input.admin, {
+    organizationId,
+    accountId: lead.id,
+    accountKind: "lead",
+    resourceClass: "website_research",
+    requestedBy: `research:${input.trigger}`,
+    signals: buildResourceAllocationSignalsFromLead(lead),
+  }).catch(() => undefined)
+
   const rebuild = Boolean(input.rebuild) || input.trigger === "stale_refresh"
   const force = Boolean(input.force)
 
@@ -282,6 +295,23 @@ export async function executeGrowthLeadProspectResearch(
     cached: research.cached,
     qualificationRan,
   })
+
+  // SV1-5A — durable wake on research completion (no research rerun from this callback).
+  if (research.run.status === "completed" && research.run.id) {
+    const { wakeDraftFactoryFromCompletionEvent } = await import(
+      "@/lib/growth/draft-factory/draft-factory-durable-live"
+    )
+    void wakeDraftFactoryFromCompletionEvent(input.admin, {
+      organizationId,
+      leadId: lead.id,
+      wake: {
+        type: research.cached ? "research_completed" : "research_completed",
+        sourceId: String(research.run.id),
+      },
+      portfolioSelected: true,
+      allowGeneration: false,
+    })
+  }
 
   return {
     ok: true,

@@ -32,13 +32,11 @@ assert.ok(GROWTH_AVA_COGNITIVE_WORKSPACE_RULE.includes("no LLM"))
 assert.equal(GROWTH_AVA_COGNITIVE_WORKSPACE_QA_MARKER, "ge-aios-25a-1-ava-cognitive-workspace-v1")
 assert.deepEqual(GROWTH_AVA_COGNITIVE_SECTION_ORDER, [
   "assessment",
+  "whats_changed",
+  "execution_plan",
+  "human_workspace",
   "why_i_believe",
   "evidence",
-  "execution_plan",
-  "research_journal",
-  "operational_state",
-  "activity_timeline",
-  "human_workspace",
   "raw_intelligence",
 ])
 console.log("  ✓ cognitive section order locked")
@@ -46,7 +44,7 @@ console.log("  ✓ cognitive section order locked")
 const drawer = readSource("components/growth/growth-lead-drawer.tsx")
 assert.ok(drawer.includes("GrowthLeadCognitiveWorkspace"))
 assert.ok(drawer.includes("cognitiveActionsOnly"))
-assert.ok(drawer.includes("rawIntelligenceChildren"))
+assert.ok(drawer.includes("rawDomains") || drawer.includes("rawIntelligenceChildren"))
 assert.equal(drawer.includes("openai"), false)
 assert.equal(drawer.includes("generateText"), false)
 assert.equal(drawer.includes("createOpenAI"), false)
@@ -63,10 +61,17 @@ for (const section of GROWTH_AVA_COGNITIVE_SECTION_ORDER) {
     `missing section id ${section}`,
   )
 }
+assert.ok(workspace.includes("GROWTH_AVA_COGNITIVE_SECTION_IDS.research_journal"))
+assert.ok(workspace.includes("GROWTH_AVA_COGNITIVE_SECTION_IDS.operational_state"))
+assert.ok(workspace.includes("GROWTH_AVA_COGNITIVE_SECTION_IDS.activity_timeline"))
 assert.ok(workspace.includes("GROWTH_AVA_COGNITIVE_SECTION_TITLES"))
 assert.ok(workspace.includes("defaultOpen={false}"))
 assert.ok(workspace.includes("GeV15AutomationRuntimeApprovalPanel"))
-assert.ok(workspace.includes("Ava does not need anything from you right now"))
+assert.ok(
+  workspace.includes("Ava does not need anything from you right now") ||
+    workspace.includes("I'll let you know if I need approval") ||
+    workspace.includes("I&apos;ll let you know if I need approval"),
+)
 assert.ok(workspace.includes("GrowthSalesExecutionPlanPanel"))
 assert.ok(workspace.includes("GrowthLeadDailyWorkQueuePanel"))
 console.log("  ✓ workspace mounts cognitive sections, approvals, plan, queue")
@@ -89,7 +94,13 @@ assert.equal(mappers.includes("openai"), false)
 assert.equal(mappers.includes("fetch("), false)
 assert.ok(mappers.includes("buildAvaCurrentAssessment"))
 assert.ok(mappers.includes("buildAvaBeliefs"))
-assert.ok(mappers.includes("I've completed initial research") || mappers.includes("I have not completed usable research"))
+assert.ok(
+  mappers.includes("I researched") ||
+    mappers.includes("I'm still researching") ||
+    mappers.includes("I've completed initial research") ||
+    mappers.includes("I have not completed usable research") ||
+    mappers.includes("I haven't finished usable research"),
+)
 console.log("  ✓ briefing mappers are deterministic (no fetch/LLM)")
 
 const fixture = buildAvaCognitiveWorkspaceCertFixture()
@@ -131,7 +142,7 @@ const assessmentOnly = buildAvaCurrentAssessment({
     opportunityBlockers: [],
   } as never,
 })
-assert.ok(assessmentOnly.briefingParagraphs.some((p) => /not completed usable research/i.test(p)))
+assert.ok(assessmentOnly.briefingParagraphs.some((p) => /not completed usable research|haven.?t finished usable research/i.test(p)))
 assert.equal(assessmentOnly.operatorInvolvementRequired, false)
 console.log("  ✓ incomplete evidence stated plainly")
 

@@ -71,6 +71,15 @@ export type GrowthResearchSignals = {
   companyEvidence_v22?: import("@/lib/growth/research/company-evidence/company-evidence-types").GrowthCompanyEvidenceBundle
   /** GE-AIOS-22 — observable evidence collection outcome when bundle is absent or degraded. */
   companyEvidenceCollection_v22?: import("@/lib/growth/research/company-evidence/company-evidence-types").GrowthCompanyEvidenceCollectionRecord
+  /** GE-AIOS-25C-1 — deterministic prospect knowledge pack (facts / inferences / unknowns). */
+  prospectKnowledgePack_v25c?: import("@/lib/growth/research/company-evidence/prospect-knowledge-pack").ProspectKnowledgePack
+  /** GE-AIOS-25C-1 — optional CI promotion summary from this research run. */
+  companyEvidencePromotion_v25c?: {
+    attempted: number
+    promoted: number
+    skippedReason: string | null
+    rejectedCount: number
+  }
 }
 
 export type GrowthResearchRunPublicView = {

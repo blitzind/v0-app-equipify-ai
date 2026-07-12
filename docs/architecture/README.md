@@ -14,6 +14,7 @@ Permanent architectural documentation for the Growth Engine → AI Revenue Opera
 | **AI OS Organizational Knowledge & Learning (permanent lock)** | [AI_OS_ORGANIZATIONAL_KNOWLEDGE_AND_LEARNING.md](./AI_OS_ORGANIZATIONAL_KNOWLEDGE_AND_LEARNING.md) |
 | **AI OS Executive Architecture Consolidation (no-rebuild blueprint)** | [AI_OS_EXECUTIVE_ARCHITECTURE_CONSOLIDATION.md](./AI_OS_EXECUTIVE_ARCHITECTURE_CONSOLIDATION.md) |
 | **IMP-0A-1 Executive Lead Drawer (presentation blueprint)** | [GE-AIOS-IMP-0A-1_EXECUTIVE_LEAD_DRAWER.md](./GE-AIOS-IMP-0A-1_EXECUTIVE_LEAD_DRAWER.md) |
+| **GE-AIOS-25A Ava Cognitive Workspace (Lead Drawer hierarchy)** | [GE-AIOS-25A_AVA_COGNITIVE_WORKSPACE.md](./GE-AIOS-25A_AVA_COGNITIVE_WORKSPACE.md) |
 | **Living engineering state** | [../MASTER_CONTEXT_DOCUMENT.md](../MASTER_CONTEXT_DOCUMENT.md) |
 | **Implementation ledger** | [../AI_REVENUE_OPERATOR_IMPLEMENTATION_LEDGER.md](../AI_REVENUE_OPERATOR_IMPLEMENTATION_LEDGER.md) |
 | **Documentation foundation (GE-DOC-1)** | [../GE-DOC-1_DOCUMENTATION_FOUNDATION.md](../GE-DOC-1_DOCUMENTATION_FOUNDATION.md) |

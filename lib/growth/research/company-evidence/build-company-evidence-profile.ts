@@ -24,9 +24,19 @@ const SERVICE_FACT_KEYS = new Set([
 
 const INDUSTRY_FACT_KEYS = new Set(["company.industries_served", "company.industries"])
 
-const MARKET_FACT_KEYS = new Set(["company.markets", "company.geography", "company.service_areas"])
+const MARKET_FACT_KEYS = new Set([
+  "company.markets",
+  "company.geography",
+  "company.service_areas",
+  "company.geographic_markets",
+])
 
-const CUSTOMER_FACT_KEYS = new Set(["terminology.buyer", "terminology.customer", "company.ideal_customers"])
+const CUSTOMER_FACT_KEYS = new Set([
+  "terminology.buyer",
+  "terminology.customer",
+  "company.ideal_customers",
+  "company.customers",
+])
 
 const HIRING_FACT_KEYS = new Set(["company.careers", "company.hiring"])
 

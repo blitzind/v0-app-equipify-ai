@@ -6,6 +6,7 @@ import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import { scheduleUnifiedRevenueWorkflowLifecycleReEvaluation } from "@/lib/growth/revenue-workflow/unified-revenue-workflow-lifecycle-runner"
 import { collectProspectCompanyEvidence } from "@/lib/growth/research/company-evidence/company-evidence-collector"
+import { buildProspectKnowledgePack } from "@/lib/growth/research/company-evidence/prospect-knowledge-pack"
 import {
   GROWTH_COMPANY_EVIDENCE_COLLECTION_QA_MARKER,
   type GrowthCompanyEvidenceCollectionRecord,
@@ -15,6 +16,8 @@ import {
   mergeEvidenceIntoResearchSummary,
   resolveVerifiedIndustryGuess,
 } from "@/lib/growth/research/company-evidence/company-evidence-intelligence-enrichment"
+import { promoteCompanyEvidenceToCompanyIntelligence } from "@/lib/growth/company-intelligence/promote-from-company-evidence"
+import { resolveCanonicalCompanyIdForLead } from "@/lib/growth/canonical-persons/canonical-person-repository"
 import { loadGrowthLeadAdmissionContext } from "@/lib/growth/revenue-workflow/growth-lead-admission-context"
 import { resolveLeadAdmissionStateFromMetadata } from "@/lib/growth/revenue-workflow/evaluate-growth-lead-admission"
 import { buildCompanySignals } from "@/lib/growth/research/company-signal-builder"
@@ -306,6 +309,61 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
       ),
     )
 
+    const preliminarySignals = {
+      painSignals: pain.painSignals,
+      maturityBreakdown: maturity.breakdown,
+      hasSsl: flags.hasSsl,
+      hasMobileViewport: flags.hasMobileViewport,
+      hasOnlineBooking: flags.hasOnlineBooking,
+      hasCustomerPortal: flags.hasCustomerPortal,
+      hasChatWidget: flags.hasChatWidget,
+      hasFinancing: flags.hasFinancing,
+      hasSocialLinks: flags.hasSocialLinks,
+      hasReviewLinks: flags.hasReviewLinks,
+    }
+
+    const prospectKnowledgePack = buildProspectKnowledgePack({
+      bundle: companyEvidenceBundle,
+      signals: preliminarySignals,
+      observedAt: companyEvidenceBundle?.collectedAt ?? new Date().toISOString(),
+    })
+
+    let companyEvidencePromotion:
+      | {
+          attempted: number
+          promoted: number
+          skippedReason: string | null
+          rejectedCount: number
+        }
+      | undefined
+
+    try {
+      const canonicalCompanyId = await resolveCanonicalCompanyIdForLead(input.admin, lead.id)
+      const promotion = await promoteCompanyEvidenceToCompanyIntelligence(input.admin, {
+        companyId: canonicalCompanyId,
+        bundle: companyEvidenceBundle,
+      })
+      companyEvidencePromotion = {
+        attempted: promotion.attempted,
+        promoted: promotion.promoted,
+        skippedReason: promotion.skippedReason,
+        rejectedCount: promotion.rejected.length,
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message.slice(0, 120) : "promotion_failed"
+      companyEvidencePromotion = {
+        attempted: 0,
+        promoted: 0,
+        skippedReason: message,
+        rejectedCount: 0,
+      }
+      logProspectResearch("company_evidence_promotion_failed", {
+        leadId: lead.id,
+        runId: run.id,
+        message,
+      })
+    }
+
     run = await finishProspectResearchRun(input.admin, run.id, {
       status: "completed",
       websiteUrl: scrape.url,
@@ -318,18 +376,11 @@ export async function runProspectResearch(input: RunProspectResearchInput): Prom
       technologyScore: tech.score,
       detectedTechnologies: tech.technologies,
       signals: {
-        painSignals: pain.painSignals,
-        maturityBreakdown: maturity.breakdown,
-        hasSsl: flags.hasSsl,
-        hasMobileViewport: flags.hasMobileViewport,
-        hasOnlineBooking: flags.hasOnlineBooking,
-        hasCustomerPortal: flags.hasCustomerPortal,
-        hasChatWidget: flags.hasChatWidget,
-        hasFinancing: flags.hasFinancing,
-        hasSocialLinks: flags.hasSocialLinks,
-        hasReviewLinks: flags.hasReviewLinks,
+        ...preliminarySignals,
         companyEvidence_v22: companyEvidenceBundle ?? undefined,
         companyEvidenceCollection_v22: companyEvidenceCollection,
+        prospectKnowledgePack_v25c: prospectKnowledgePack,
+        companyEvidencePromotion_v25c: companyEvidencePromotion,
       },
       competitors: companySignals.competitors,
       researchSummary,

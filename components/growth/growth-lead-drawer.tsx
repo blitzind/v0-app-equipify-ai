@@ -37,6 +37,8 @@ import { GrowthLeadMeetingOutcomeIntelligence } from "@/components/growth/growth
 import { GrowthLeadCustomerLifecyclePanel } from "@/components/growth/growth-lead-customer-lifecycle-panel"
 import { GrowthLeadResearchPanel } from "@/components/growth/growth-lead-research-panel"
 import { GrowthOperationalIntelligence } from "@/components/growth/growth-operational-intelligence"
+import { GrowthLeadActivityStream } from "@/components/growth/growth-lead-activity-stream"
+import { GrowthLeadMultichannelTimelinePanel } from "@/components/growth/growth-lead-multichannel-timeline-panel"
 import type { GrowthLeadResearchRun } from "@/lib/growth/research-types"
 import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
 import type { GrowthLead } from "@/lib/growth/types"
@@ -45,9 +47,13 @@ import { shouldAutoQueueLeadResearch } from "@/lib/growth/research/growth-lead-r
 import { GrowthCallWorkflowProvider } from "@/components/growth/growth-call-workflow-context"
 import {
   applyGrowthCommandLeadFocusExpand,
+  resolveAvaRawDomainForFocus,
   scrollGrowthCommandLeadFocusSection,
 } from "@/lib/growth/command/command-lead-focus"
-import { GROWTH_AVA_RAW_INTELLIGENCE_FOCUS_TARGETS } from "@/lib/growth/cognitive-workspace/growth-cognitive-workspace-types"
+import {
+  GROWTH_AVA_RAW_INTELLIGENCE_FOCUS_TARGETS,
+  type GrowthAvaRawDomainId,
+} from "@/lib/growth/cognitive-workspace/growth-cognitive-workspace-types"
 import type { CommunicationStrategyDisplaySummary } from "@/lib/growth/contact-verification/communication-strategy-types"
 import type { NativeRevenueDecisionDisplaySummary } from "@/lib/growth/contact-verification/native-revenue-decision-adapter"
 
@@ -77,6 +83,8 @@ export function GrowthLeadDrawer({
   const [openAddDmForm, setOpenAddDmForm] = useState(false)
   const [timelineRefreshToken, setTimelineRefreshToken] = useState(0)
   const [rawExpandToken, setRawExpandToken] = useState(0)
+  const [rawDomainExpand, setRawDomainExpand] = useState<GrowthAvaRawDomainId | null>(null)
+  const [rawDomainExpandToken, setRawDomainExpandToken] = useState(0)
   const [nativeDecision, setNativeDecision] = useState<NativeRevenueDecisionDisplaySummary | null>(null)
   const [nativeCommunicationStrategy, setNativeCommunicationStrategy] =
     useState<CommunicationStrategyDisplaySummary | null>(null)
@@ -148,6 +156,11 @@ export function GrowthLeadDrawer({
       drawerFocus === "research"
     ) {
       setRawExpandToken((token) => token + 1)
+      const domain = resolveAvaRawDomainForFocus(drawerFocus)
+      if (domain) {
+        setRawDomainExpand(domain)
+        setRawDomainExpandToken((token) => token + 1)
+      }
     }
     scrollGrowthCommandLeadFocusSection(drawerFocus)
   }, [open, drawerFocus, lead?.id])
@@ -163,6 +176,8 @@ export function GrowthLeadDrawer({
   function handleAddDecisionMaker() {
     setOpenAddDmForm(true)
     setRawExpandToken((token) => token + 1)
+    setRawDomainExpand("research")
+    setRawDomainExpandToken((token) => token + 1)
     requestAnimationFrame(() => {
       document.getElementById("growth-decision-makers")?.scrollIntoView({ behavior: "smooth", block: "start" })
     })
@@ -206,117 +221,111 @@ export function GrowthLeadDrawer({
             nativeCommunicationStrategy={nativeCommunicationStrategy}
             timelineRefreshToken={timelineRefreshToken}
             rawExpandToken={rawExpandToken}
+            rawDomainExpand={rawDomainExpand}
+            rawDomainExpandToken={rawDomainExpandToken}
             onLeadUpdated={handleLeadUpdated}
             onTimelineRefresh={() => setTimelineRefreshToken((token) => token + 1)}
-            rawIntelligenceChildren={
-              <>
-                <GrowthLeadResearchPanel
-                  id="growth-lead-research"
-                  lead={activeLead}
-                  autoQueueResearch
-                  onProspectRunChange={setLatestProspectRun}
-                  onLeadUpdated={handleLeadUpdated}
-                  onLatestRunChange={setLatestResearchRun}
-                />
-
-                <GrowthCompanyIntelligenceSnapshot
-                  lead={activeLead}
-                  latestRun={latestResearchRun}
-                  prospectRun={latestProspectRun}
-                  researchEnqueueing={researchEnqueueing}
-                />
-
-                <GrowthDecisionMakersPanel
-                  id="growth-decision-makers"
-                  lead={activeLead}
-                  onLeadUpdated={handleLeadUpdated}
-                  openAddForm={openAddDmForm}
-                  onOpenAddFormChange={setOpenAddDmForm}
-                />
-
-                <GrowthLeadAutonomousExecutionGuardrailPanel lead={activeLead} />
-
-                <GrowthExecutiveOperatingIntelligence lead={activeLead} />
-
-                <GrowthOperationalCapacityIntelligence lead={activeLead} />
-
-                <GrowthRevenueForecast lead={activeLead} />
-
-                <GrowthRevenueForecastEvidencePanel leadId={activeLead.id} />
-
-                <GrowthRevenueReadinessPanel lead={activeLead} />
-
-                <GrowthRevenueTimelinePanel leadId={activeLead.id} />
-
-                <GrowthRevenueWorkflowWorkspacePanel leadId={activeLead.id} compact />
-
-                <GrowthVoiceRevenueIntelligencePassiveCard leadId={activeLead.id} />
-
-                <GrowthVoiceRetentionIntelligencePassiveCard leadId={activeLead.id} />
-
-                {hasOpportunitySignals ? <GrowthOpportunityReadiness lead={activeLead} /> : null}
-
-                {hasOpportunitySignals ? (
-                  <GrowthLeadOpportunityIntelligencePanel lead={activeLead} />
-                ) : null}
-
-                <GrowthLeadBookingIntelligencePanel lead={activeLead} />
-
-                <GrowthLeadRelationshipMemoryPanel lead={activeLead} />
-
-                <GrowthRelationshipIntelligence
-                  lead={activeLead}
-                  nativeRelationshipRecommendation={nativeRelationshipRecommendation}
-                />
-
-                <GrowthConversationIntelligence lead={activeLead} />
-
-                <GrowthLeadMeetingIntelligence
-                  lead={activeLead}
-                  highlightMeetingId={highlightMeetingId}
-                  pendingReplyId={pendingReplyId}
-                  onTimelineRefresh={() => setTimelineRefreshToken((token) => token + 1)}
-                />
-
-                <GrowthLeadMeetingOutcomeIntelligence lead={activeLead} />
-
-                <GrowthSequenceIntelligence lead={activeLead} />
-
-                <GrowthLeadCadencePanel
-                  lead={activeLead}
-                  onTimelineRefresh={() => setTimelineRefreshToken((token) => token + 1)}
-                />
-
-                <GrowthLeadExecutionReadiness lead={activeLead} />
-
-                <GrowthLeadCustomerLifecyclePanel
-                  lead={activeLead}
-                  onTimelineRefresh={() => setTimelineRefreshToken((token) => token + 1)}
-                />
-
-                {hasEngagementSignals ? <GrowthLeadEngagement lead={activeLead} /> : null}
-
-                <GrowthLeadCompliance lead={activeLead} />
-
-                <GrowthCallCopilot lead={activeLead} />
-
-                <GrowthPersonalizationEmbeddedPanel
-                  lead={activeLead}
-                  leadId={activeLead.id}
-                  surface="lead"
-                  compact
-                  className="px-1"
-                />
-
-                <GrowthRealtimeCallIntelligence lead={activeLead} />
-
-                <GrowthAiCopilot lead={activeLead} />
-
-                <GrowthOutboundPanel lead={activeLead} />
-
-                <GrowthOperationalIntelligence lead={activeLead} />
-              </>
-            }
+            rawDomains={{
+              research: (
+                <>
+                  <GrowthLeadResearchPanel
+                    id="growth-lead-research"
+                    lead={activeLead}
+                    autoQueueResearch
+                    onProspectRunChange={setLatestProspectRun}
+                    onLeadUpdated={handleLeadUpdated}
+                    onLatestRunChange={setLatestResearchRun}
+                  />
+                  <GrowthCompanyIntelligenceSnapshot
+                    lead={activeLead}
+                    latestRun={latestResearchRun}
+                    prospectRun={latestProspectRun}
+                    researchEnqueueing={researchEnqueueing}
+                  />
+                  <GrowthDecisionMakersPanel
+                    id="growth-decision-makers"
+                    lead={activeLead}
+                    onLeadUpdated={handleLeadUpdated}
+                    openAddForm={openAddDmForm}
+                    onOpenAddFormChange={setOpenAddDmForm}
+                  />
+                </>
+              ),
+              revenue: (
+                <>
+                  {hasOpportunitySignals ? <GrowthOpportunityReadiness lead={activeLead} /> : null}
+                  {hasOpportunitySignals ? (
+                    <GrowthLeadOpportunityIntelligencePanel lead={activeLead} />
+                  ) : null}
+                  <GrowthRevenueReadinessPanel lead={activeLead} />
+                  <GrowthRevenueForecast lead={activeLead} />
+                  <GrowthRevenueForecastEvidencePanel leadId={activeLead.id} />
+                  <GrowthRevenueTimelinePanel leadId={activeLead.id} />
+                  <GrowthRevenueWorkflowWorkspacePanel leadId={activeLead.id} compact />
+                  <GrowthLeadBookingIntelligencePanel lead={activeLead} />
+                  <GrowthLeadExecutionReadiness lead={activeLead} />
+                  <GrowthLeadCustomerLifecyclePanel
+                    lead={activeLead}
+                    onTimelineRefresh={() => setTimelineRefreshToken((token) => token + 1)}
+                  />
+                  <GrowthVoiceRevenueIntelligencePassiveCard leadId={activeLead.id} />
+                  <GrowthVoiceRetentionIntelligencePassiveCard leadId={activeLead.id} />
+                </>
+              ),
+              communication: (
+                <>
+                  <GrowthSequenceIntelligence lead={activeLead} />
+                  <GrowthLeadMeetingIntelligence
+                    lead={activeLead}
+                    highlightMeetingId={highlightMeetingId}
+                    pendingReplyId={pendingReplyId}
+                    onTimelineRefresh={() => setTimelineRefreshToken((token) => token + 1)}
+                  />
+                  <GrowthLeadMeetingOutcomeIntelligence lead={activeLead} />
+                  <GrowthLeadCadencePanel
+                    lead={activeLead}
+                    onTimelineRefresh={() => setTimelineRefreshToken((token) => token + 1)}
+                  />
+                  <GrowthOutboundPanel lead={activeLead} />
+                  <GrowthCallCopilot lead={activeLead} />
+                  <GrowthRealtimeCallIntelligence lead={activeLead} />
+                  <GrowthPersonalizationEmbeddedPanel
+                    lead={activeLead}
+                    leadId={activeLead.id}
+                    surface="lead"
+                    compact
+                    className="px-1"
+                  />
+                  <GrowthLeadMultichannelTimelinePanel lead={activeLead} />
+                </>
+              ),
+              relationship: (
+                <>
+                  <GrowthLeadRelationshipMemoryPanel lead={activeLead} />
+                  <GrowthRelationshipIntelligence
+                    lead={activeLead}
+                    nativeRelationshipRecommendation={nativeRelationshipRecommendation}
+                  />
+                  <GrowthConversationIntelligence lead={activeLead} />
+                  {hasEngagementSignals ? <GrowthLeadEngagement lead={activeLead} /> : null}
+                </>
+              ),
+              operations: (
+                <>
+                  <GrowthOperationalIntelligence lead={activeLead} />
+                  <GrowthOperationalCapacityIntelligence lead={activeLead} />
+                  <GrowthExecutiveOperatingIntelligence lead={activeLead} />
+                  <GrowthLeadAutonomousExecutionGuardrailPanel lead={activeLead} />
+                  <GrowthLeadCompliance lead={activeLead} />
+                </>
+              ),
+              advanced: (
+                <>
+                  <GrowthLeadActivityStream lead={activeLead} />
+                  <GrowthAiCopilot lead={activeLead} />
+                </>
+              ),
+            }}
           />
         </GrowthCallWorkflowProvider>
       </div>

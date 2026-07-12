@@ -101,15 +101,26 @@ function categoryForPageType(pageType: EvidenceEngineBusinessPageType): Evidence
       return "ideal_customers"
     case "pricing":
     case "plans":
+    case "financing":
       return "sales_marketing"
     case "testimonials":
     case "case_studies":
+    case "blog":
+    case "news":
+    case "press":
       return "strategy"
     case "integrations":
     case "certifications":
+    case "careers":
+    case "leadership":
       return "operations"
     case "locations":
     case "contact":
+    case "faq":
+    case "help":
+    case "support":
+    case "warranty":
+    case "resources":
       return "support"
     default:
       return "company"
@@ -129,6 +140,8 @@ function factKeyForPageType(pageType: EvidenceEngineBusinessPageType): string {
     case "pricing":
     case "plans":
       return "company.pricing_plans"
+    case "financing":
+      return "company.financing"
     case "industries":
       return "company.industries_served"
     case "solutions":
@@ -147,6 +160,23 @@ function factKeyForPageType(pageType: EvidenceEngineBusinessPageType): string {
       return "company.geographic_markets"
     case "contact":
       return "company.support_channels"
+    case "faq":
+      return "company.faq"
+    case "help":
+    case "support":
+      return "company.support"
+    case "warranty":
+      return "company.warranty"
+    case "resources":
+      return "company.resources"
+    case "blog":
+    case "news":
+    case "press":
+      return "company.public_updates"
+    case "careers":
+      return "company.careers"
+    case "leadership":
+      return "company.leadership"
     default:
       return "company.description"
   }
@@ -254,6 +284,14 @@ export function extractBusinessEvidenceFromHtml(input: {
     "integrations",
     "certifications",
     "locations",
+    "faq",
+    "careers",
+    "leadership",
+    "resources",
+    "financing",
+    "warranty",
+    "support",
+    "help",
   ]
 
   if (listFactTypes.includes(input.pageType)) {

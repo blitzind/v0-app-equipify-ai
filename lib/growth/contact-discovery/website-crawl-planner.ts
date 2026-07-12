@@ -40,7 +40,7 @@ const SEED_PATHS = [
 ]
 
 const RELEVANT_LINK_KEYWORDS =
-  /\b(team|staff|leadership|about|contact|location|locations|branch|office|careers|service|dispatch|support|sales|privacy|terms|author)\b/i
+  /\b(team|staff|leadership|about|contact|location|locations|branch|office|careers|jobs|service|services|dispatch|support|sales|privacy|terms|author|faq|help|resources|blog|news|press|case-stud|testimonial|review|pricing|product|industr|solution|partner|financing|warranty|capabilities|markets|success)\b/i
 
 const PERSON_PAGE_LINK_KEYWORDS =
   /\b(team|teams|staff|leadership|management|our-people|our-team|meet-the-team|meet-our-team|about|about-us|who-we-are|people|executives|directors|board|founders?|employees?|bios?)\b/i
@@ -137,6 +137,141 @@ export function parseRobotsTxtSitemapUrls(robotsTxt: string): string[] {
     if (loc) urls.push(loc)
   }
   return urls
+}
+
+/** GE-AIOS-25C-1 — strip query/hash before diagnostics logging. */
+export function sanitizeUrlForCrawlDiagnostics(url: string): string {
+  try {
+    const parsed = new URL(url)
+    parsed.search = ""
+    parsed.hash = ""
+    return parsed.toString().replace(/\/$/, "") || parsed.origin
+  } catch {
+    return url.split("?")[0]?.split("#")[0] ?? url
+  }
+}
+
+export type RobotsTxtFetchStatus = "ok" | "missing" | "error" | "malformed" | "skipped"
+
+export type RobotsTxtPolicy = {
+  fetchStatus: RobotsTxtFetchStatus
+  sitemapUrls: string[]
+  disallowPaths: string[]
+  rulesApplied: boolean
+}
+
+/**
+ * Parse User-agent / Disallow rules for matching agent (default *).
+ * Fail-safe: malformed input yields empty disallow list with malformed status.
+ */
+export function parseRobotsTxtPolicy(
+  robotsTxt: string | null | undefined,
+  userAgent = "*",
+): RobotsTxtPolicy {
+  const sitemapUrls = robotsTxt ? parseRobotsTxtSitemapUrls(robotsTxt) : []
+  if (robotsTxt == null || !String(robotsTxt).trim()) {
+    return {
+      fetchStatus: "missing",
+      sitemapUrls: [],
+      disallowPaths: [],
+      rulesApplied: false,
+    }
+  }
+
+  try {
+    const lines = String(robotsTxt).split(/\r?\n/)
+    const uaTarget = userAgent.trim().toLowerCase() || "*"
+    type Group = { agents: string[]; disallows: string[] }
+    const groups: Group[] = []
+    let current: Group | null = null
+
+    for (const raw of lines) {
+      const line = raw.replace(/#.*$/, "").trim()
+      if (!line) continue
+
+      const uaMatch = line.match(/^user-agent:\s*(.+)$/i)
+      if (uaMatch) {
+        const agent = (uaMatch[1] ?? "*").trim().toLowerCase()
+        if (!current || current.disallows.length > 0) {
+          current = { agents: [agent], disallows: [] }
+          groups.push(current)
+        } else {
+          current.agents.push(agent)
+        }
+        continue
+      }
+
+      const disallowMatch = line.match(/^disallow:\s*(.*)$/i)
+      if (disallowMatch && current) {
+        const path = (disallowMatch[1] ?? "").trim()
+        if (path) current.disallows.push(path)
+        continue
+      }
+    }
+
+    const exact = groups.find((g) => g.agents.includes(uaTarget))
+    const star = groups.find((g) => g.agents.includes("*"))
+    const chosen = exact ?? star
+    const merged = [...new Set(chosen?.disallows ?? [])]
+
+    return {
+      fetchStatus: "ok",
+      sitemapUrls,
+      disallowPaths: merged,
+      rulesApplied: merged.length > 0,
+    }
+  } catch {
+    return {
+      fetchStatus: "malformed",
+      sitemapUrls,
+      disallowPaths: [],
+      rulesApplied: false,
+    }
+  }
+}
+
+/** Path-prefix Disallow matching (robots.txt common case). */
+export function isUrlDisallowedByRobots(url: string, disallowPaths: string[]): boolean {
+  if (!disallowPaths.length) return false
+  let pathname = "/"
+  try {
+    pathname = new URL(url).pathname || "/"
+  } catch {
+    pathname = url.startsWith("/") ? url : `/${url}`
+  }
+
+  for (const rule of disallowPaths) {
+    if (!rule) continue
+    if (rule === "/") return true
+    if (rule.includes("*")) {
+      const escaped = rule.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")
+      if (new RegExp(`^${escaped}`).test(pathname)) return true
+      continue
+    }
+    if (pathname === rule) return true
+    if (pathname.startsWith(rule.endsWith("/") ? rule : `${rule}/`)) return true
+    if (!rule.endsWith("/") && pathname.startsWith(rule)) {
+      const next = pathname.charAt(rule.length)
+      if (!next || next === "/" || next === "?" || next === "#") return true
+    }
+  }
+  return false
+}
+
+export function filterCrawlPlanByRobotsPolicy(
+  plan: WebsiteCrawlPlanEntry[],
+  policy: RobotsTxtPolicy,
+): { allowed: WebsiteCrawlPlanEntry[]; blocked: WebsiteCrawlPlanEntry[] } {
+  if (!policy.rulesApplied || policy.disallowPaths.length === 0) {
+    return { allowed: plan, blocked: [] }
+  }
+  const allowed: WebsiteCrawlPlanEntry[] = []
+  const blocked: WebsiteCrawlPlanEntry[] = []
+  for (const entry of plan) {
+    if (isUrlDisallowedByRobots(entry.url, policy.disallowPaths)) blocked.push(entry)
+    else allowed.push(entry)
+  }
+  return { allowed, blocked }
 }
 
 export function parseSitemapIndexUrls(xml: string, origin: string, max = 6): string[] {

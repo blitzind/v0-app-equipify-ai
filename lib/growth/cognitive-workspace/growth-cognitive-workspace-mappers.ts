@@ -13,13 +13,17 @@ import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research
 import type { NativeRevenueDecisionDisplaySummary } from "@/lib/growth/contact-verification/native-revenue-decision-adapter"
 import type { CommunicationStrategyDisplaySummary } from "@/lib/growth/contact-verification/communication-strategy-types"
 import type { GrowthLead } from "@/lib/growth/types"
+import { buildProspectKnowledgePack } from "@/lib/growth/research/company-evidence/prospect-knowledge-pack"
 import type {
   GrowthAvaAccountStatusLabel,
   GrowthAvaBelief,
   GrowthAvaCurrentAssessment,
   GrowthAvaEvidenceFact,
   GrowthAvaOperationalItem,
+  GrowthAvaProgressStep,
   GrowthAvaResearchJournalEntry,
+  GrowthAvaVisitSnapshot,
+  GrowthAvaWhatsChanged,
 } from "@/lib/growth/cognitive-workspace/growth-cognitive-workspace-types"
 
 export type BuildAvaCognitiveProjectionInput = {
@@ -240,6 +244,54 @@ function buildBriefingParagraphs(input: BuildAvaCognitiveProjectionInput): strin
   return paragraphs
 }
 
+/** GE-AIOS-25B — compact executive bullets (same facts, less height). */
+export function buildAvaAssessmentSummaryBullets(input: BuildAvaCognitiveProjectionInput): string[] {
+  const { lead, prospectRun, nativeDecision, pendingApprovalCount = 0 } = input
+  const bullets: string[] = []
+  const researched = hasUsableLeadResearch(lead) || prospectRun?.status === "completed"
+  const dmReady =
+    lead.decisionMakerStatus === "confirmed" || lead.decisionMakerStatus === "verified_contactable"
+  const researching =
+    prospectRun?.status === "queued" || prospectRun?.status === "running" || lead.status === "researching"
+
+  if (prospectRun?.status === "failed") {
+    bullets.push("Research run failed")
+  } else if (researched) {
+    bullets.push("Researched company")
+  } else if (researching) {
+    bullets.push("Research in progress")
+  } else {
+    bullets.push("Research incomplete")
+  }
+
+  if (dmReady) {
+    bullets.push("Decision maker verified")
+  } else if (researched || researching) {
+    bullets.push("Decision maker not verified")
+  }
+
+  if (researched && !dmReady) {
+    bullets.push("Outreach paused")
+  } else if (lead.status === "in_outreach" || lead.status === "replied" || lead.status === "call_ready") {
+    bullets.push("Outreach active")
+  } else if (lead.status === "converted") {
+    bullets.push("Converted to customer")
+  }
+
+  if (pendingApprovalCount > 0) {
+    bullets.push(
+      pendingApprovalCount === 1 ? "1 approval waiting" : `${pendingApprovalCount} approvals waiting`,
+    )
+  }
+
+  const blocker = resolveBlocker(lead, nativeDecision)
+  if (blocker && !bullets.some((b) => b.toLowerCase().includes("decision maker"))) {
+    bullets.push(blocker.length > 48 ? `${blocker.slice(0, 45)}…` : blocker)
+  }
+
+  return bullets.slice(0, 5)
+}
+
 export function buildAvaCurrentAssessment(
   input: BuildAvaCognitiveProjectionInput,
 ): GrowthAvaCurrentAssessment {
@@ -288,6 +340,7 @@ export function buildAvaCurrentAssessment(
 
   return {
     accountStatus: mapLeadToAvaAccountStatus(lead, { pendingApprovalCount }),
+    summaryBullets: buildAvaAssessmentSummaryBullets(input),
     briefingParagraphs: buildBriefingParagraphs(input),
     conclusion: resolveConclusion(lead, nativeDecision, prospectRun),
     recommendation: resolveRecommendation(lead, nativeDecision, prospectRun),
@@ -308,6 +361,212 @@ export function buildAvaCurrentAssessment(
       : "I'm continuing. I'll ask if I need approval or direction.",
     lastUpdatedLabel: formatRelative(lastUpdatedAt),
     lastUpdatedAt,
+  }
+}
+
+function isDecisionMakerReady(lead: GrowthLead): boolean {
+  return (
+    lead.decisionMakerStatus === "confirmed" || lead.decisionMakerStatus === "verified_contactable"
+  )
+}
+
+function hasEmailContact(lead: GrowthLead): boolean {
+  return Boolean(lead.contactEmail?.includes("@"))
+}
+
+function hasPersonalizationSignal(lead: GrowthLead): boolean {
+  const action = lead.nextBestAction ?? ""
+  return (
+    action === "start_recommended_sequence" ||
+    action === "switch_sequence_pattern" ||
+    action === "use_executive_sequence" ||
+    Boolean(lead.prospectRecommendedNextAction?.toLowerCase().includes("personal"))
+  )
+}
+
+function hasOutreachSignal(lead: GrowthLead): boolean {
+  return (
+    lead.status === "in_outreach" ||
+    lead.status === "replied" ||
+    lead.status === "call_ready" ||
+    lead.callAttemptCount > 0 ||
+    Boolean(lead.lastHumanTouchAt)
+  )
+}
+
+function hasMeetingSignal(lead: GrowthLead): boolean {
+  const action = lead.nextBestAction ?? ""
+  return (
+    lead.status === "converted" ||
+    action === "accelerate_close_motion" ||
+    action === "owner_close_motion" ||
+    action === "executive_close_motion" ||
+    Boolean(lead.promotedAt)
+  )
+}
+
+/** GE-AIOS-25B — execution progress checklist (deterministic). */
+export function buildAvaExecutionProgressTimeline(
+  input: BuildAvaCognitiveProjectionInput,
+): GrowthAvaProgressStep[] {
+  const { lead, prospectRun } = input
+  const researched = hasUsableLeadResearch(lead) || prospectRun?.status === "completed"
+  const websiteOk = Boolean(lead.website?.trim() || prospectRun?.websiteUrl?.trim()) && researched
+  const scored =
+    lead.score != null ||
+    lead.opportunityReadinessTier != null ||
+    lead.opportunityReadinessScore != null
+  const dmReady = isDecisionMakerReady(lead)
+  const emailOk =
+    lead.decisionMakerStatus === "verified_contactable" || (dmReady && hasEmailContact(lead))
+  const personalized = hasPersonalizationSignal(lead) || hasOutreachSignal(lead)
+  const outreach = hasOutreachSignal(lead)
+  const meeting = hasMeetingSignal(lead)
+
+  const flags = [
+    { id: "researched", label: "Company researched", done: researched },
+    { id: "website", label: "Website verified", done: websiteOk },
+    { id: "scored", label: "Opportunity scored", done: scored },
+    { id: "decision_maker", label: "Decision maker", done: dmReady },
+    { id: "email", label: "Email verified", done: emailOk },
+    { id: "personalization", label: "Personalization", done: personalized },
+    { id: "outreach", label: "Outreach", done: outreach },
+    { id: "meeting", label: "Meeting booked", done: meeting },
+  ]
+
+  let currentAssigned = false
+  return flags.map((step) => {
+    if (step.done) return { id: step.id, label: step.label, status: "done" as const }
+    if (!currentAssigned) {
+      currentAssigned = true
+      return { id: step.id, label: step.label, status: "current" as const }
+    }
+    return { id: step.id, label: step.label, status: "upcoming" as const }
+  })
+}
+
+export function captureAvaVisitSnapshot(input: BuildAvaCognitiveProjectionInput): GrowthAvaVisitSnapshot {
+  const assessment = buildAvaCurrentAssessment(input)
+  const evidence = buildAvaEvidenceFacts(input)
+  const { lead, prospectRun } = input
+  return {
+    confidencePercent: assessment.confidence?.valuePercent ?? null,
+    decisionMakerStatus: lead.decisionMakerStatus,
+    employeeSizeGuess: prospectRun?.employeeSizeGuess ?? lead.estimatedEmployeeCount,
+    researched: hasUsableLeadResearch(lead) || prospectRun?.status === "completed",
+    recommendation: assessment.recommendation,
+    blocker: assessment.blocker,
+    evidenceCount: evidence.length,
+    website: lead.website ?? prospectRun?.websiteUrl ?? null,
+    accountStatus: assessment.accountStatus,
+    visitedAt: new Date().toISOString(),
+  }
+}
+
+export function buildAvaWhatsChanged(options: {
+  current: GrowthAvaVisitSnapshot
+  previous: GrowthAvaVisitSnapshot | null
+  followUpAt?: string | null
+  lastProspectResearchedAt?: string | null
+}): GrowthAvaWhatsChanged {
+  const { current, previous, followUpAt, lastProspectResearchedAt } = options
+  const bullets: string[] = []
+
+  if (!previous) {
+    bullets.push(
+      current.researched ? "Opening briefing for this account" : "No prior visit snapshot — establishing baseline",
+    )
+    if (current.blocker) bullets.push(current.blocker)
+    if (current.recommendation) bullets.push(`Current focus: ${current.recommendation}`)
+  } else {
+    if (
+      current.employeeSizeGuess &&
+      previous.employeeSizeGuess &&
+      current.employeeSizeGuess !== previous.employeeSizeGuess &&
+      !/unknown/i.test(current.employeeSizeGuess)
+    ) {
+      bullets.push(`Employee size updated ${previous.employeeSizeGuess} → ${current.employeeSizeGuess}`)
+    } else if (
+      current.employeeSizeGuess &&
+      !previous.employeeSizeGuess &&
+      !/unknown/i.test(current.employeeSizeGuess)
+    ) {
+      bullets.push(`Found employee size signal: ${current.employeeSizeGuess}`)
+    }
+
+    if (
+      current.confidencePercent != null &&
+      previous.confidencePercent != null &&
+      current.confidencePercent !== previous.confidencePercent
+    ) {
+      bullets.push(`Confidence ${previous.confidencePercent} → ${current.confidencePercent}`)
+    } else if (current.confidencePercent != null && previous.confidencePercent == null) {
+      bullets.push(`Confidence established at ${current.confidencePercent}`)
+    }
+
+    const dmPrev = previous.decisionMakerStatus ?? "none"
+    const dmNow = current.decisionMakerStatus ?? "none"
+    if (dmPrev !== dmNow) {
+      bullets.push(`Decision maker status ${dmPrev.replace(/_/g, " ")} → ${dmNow.replace(/_/g, " ")}`)
+    } else if (dmNow === "none" || dmNow === "suspected" || !current.decisionMakerStatus) {
+      if (current.researched) bullets.push("Decision maker still missing")
+    }
+
+    if (current.evidenceCount > previous.evidenceCount) {
+      const delta = current.evidenceCount - previous.evidenceCount
+      bullets.push(
+        delta === 1 ? "New evidence collected" : `${delta} new evidence facts collected`,
+      )
+    } else if (current.website && current.website !== previous.website) {
+      bullets.push("New evidence collected from website")
+    } else if (current.researched && !previous.researched) {
+      bullets.push("Company research completed since last visit")
+    }
+
+    if (
+      current.recommendation &&
+      previous.recommendation &&
+      current.recommendation !== previous.recommendation
+    ) {
+      bullets.push(`Recommendation updated: ${current.recommendation}`)
+    }
+
+    if (current.blocker && current.blocker !== previous.blocker) {
+      bullets.push(`Blocked by: ${current.blocker}`)
+    }
+
+    if (current.accountStatus !== previous.accountStatus) {
+      bullets.push(`Account status ${previous.accountStatus} → ${current.accountStatus}`)
+    }
+  }
+
+  let nextResearchLabel: string | null = null
+  const scheduleIso = followUpAt?.trim() || null
+  if (scheduleIso) {
+    const ms = Date.parse(scheduleIso)
+    if (!Number.isNaN(ms)) {
+      const minutes = Math.round((ms - Date.now()) / 60000)
+      if (minutes > 0 && minutes < 60 * 48) {
+        nextResearchLabel =
+          minutes < 60
+            ? `Next follow-up in ${minutes} minute${minutes === 1 ? "" : "s"}`
+            : `Next follow-up in ${Math.round(minutes / 60)} hour${Math.round(minutes / 60) === 1 ? "" : "s"}`
+        bullets.push(nextResearchLabel)
+      }
+    }
+  } else if (lastProspectResearchedAt && isProspectResearchStale(lastProspectResearchedAt)) {
+    nextResearchLabel = "Research is stale — refresh recommended"
+    bullets.push(nextResearchLabel)
+  }
+
+  if (bullets.length === 0) {
+    bullets.push("No material changes since last visit")
+  }
+
+  return {
+    bullets: bullets.slice(0, 6),
+    isFirstVisit: !previous,
+    nextResearchLabel,
   }
 }
 
@@ -383,6 +642,24 @@ export function buildAvaBeliefs(input: BuildAvaCognitiveProjectionInput): Growth
     push(`reason:${reason.slice(0, 40)}`, `I concluded: ${reason.trim()}`, "nativeDecision.reasons")
   }
 
+  const pack =
+    prospectRun?.signals?.prospectKnowledgePack_v25c ??
+    (prospectRun?.signals?.companyEvidence_v22
+      ? buildProspectKnowledgePack({
+          bundle: prospectRun.signals.companyEvidence_v22,
+          signals: prospectRun.signals,
+        })
+      : null)
+  for (const inference of pack?.derived_inferences.slice(0, 4) ?? []) {
+    if (typeof inference.value === "boolean" && inference.value) {
+      push(
+        `kp-inf:${inference.field}`,
+        `I believe ${inference.evidenceExcerpt ?? inference.field.replace(/_/g, " ")}.`,
+        `prospectKnowledgePack.${inference.field}`,
+      )
+    }
+  }
+
   if (lead.opportunityAccelerators?.length) {
     for (const item of lead.opportunityAccelerators.slice(0, 3)) {
       if (!item.label?.trim()) continue
@@ -424,6 +701,54 @@ export function buildAvaEvidenceFacts(input: BuildAvaCognitiveProjectionInput): 
         ? normalizeGrowthResearchConfidence(prospectRun.researchConfidence)
         : null,
   })
+
+  const evidenceBundle = prospectRun?.signals?.companyEvidence_v22
+  const knowledgePack =
+    prospectRun?.signals?.prospectKnowledgePack_v25c ??
+    (evidenceBundle
+      ? buildProspectKnowledgePack({ bundle: evidenceBundle, signals: prospectRun?.signals })
+      : null)
+
+  if (evidenceBundle?.profile.primaryServices?.values.length) {
+    add(
+      "v22_services",
+      "Services (evidence)",
+      evidenceBundle.profile.primaryServices.values.slice(0, 6).join(", "),
+      {
+        source: evidenceBundle.profile.primaryServices.sourceUrls[0] ?? null,
+        confidencePercent: Math.round(evidenceBundle.profile.primaryServices.confidence * 100),
+      },
+    )
+  }
+  if (evidenceBundle?.profile.industriesServed?.values.length) {
+    add(
+      "v22_industries",
+      "Industries (evidence)",
+      evidenceBundle.profile.industriesServed.values.slice(0, 6).join(", "),
+      {
+        source: evidenceBundle.profile.industriesServed.sourceUrls[0] ?? null,
+        confidencePercent: Math.round(evidenceBundle.profile.industriesServed.confidence * 100),
+      },
+    )
+  }
+  if (knowledgePack) {
+    for (const fact of knowledgePack.observed_facts.slice(0, 8)) {
+      if (facts.some((f) => f.id === `kp:${fact.field}`)) continue
+      const value =
+        typeof fact.value === "boolean"
+          ? fact.value
+            ? "Yes"
+            : "No"
+          : Array.isArray(fact.value)
+            ? fact.value.slice(0, 4).join(", ")
+            : fact.value
+      add(`kp:${fact.field}`, fact.field.replace(/_/g, " "), value, {
+        source: fact.sourceUrls[0] ?? null,
+        confidencePercent: fact.confidence != null ? Math.round(fact.confidence * 100) : null,
+      })
+    }
+  }
+
   add("employees", "Employee size (research)", prospectRun?.employeeSizeGuess ?? lead.estimatedEmployeeCount)
   add("revenue", "Revenue size (research)", prospectRun?.revenueSizeGuess ?? lead.estimatedAnnualRevenue)
   add("crm", "Detected CRM", lead.crmDetected)
