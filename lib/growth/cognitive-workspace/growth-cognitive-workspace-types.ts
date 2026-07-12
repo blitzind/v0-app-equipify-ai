@@ -1,7 +1,10 @@
-/** GE-AIOS-25A-1 — Ava Cognitive Workspace (client-safe types). */
+/** GE-AIOS-25A — Ava Cognitive Workspace (client-safe types). */
 
 export const GROWTH_AVA_COGNITIVE_WORKSPACE_QA_MARKER =
   "ge-aios-25a-1-ava-cognitive-workspace-v1" as const
+
+export const GROWTH_AVA_COGNITIVE_WORKSPACE_COMPRESSION_QA_MARKER =
+  "ge-aios-25a-2-ava-cognitive-workspace-compression-v1" as const
 
 export const GROWTH_AVA_COGNITIVE_WORKSPACE_RULE =
   "presentation-only: compose existing drawer data; no LLM; no new APIs; no schema" as const
@@ -40,8 +43,47 @@ export const GROWTH_AVA_COGNITIVE_SECTION_TITLES: Record<GrowthAvaCognitiveSecti
   research_journal: "Research Journal",
   operational_state: "Operational State",
   activity_timeline: "Activity Timeline",
-  human_workspace: "Human Workspace",
-  raw_intelligence: "Raw Intelligence",
+  human_workspace: "What Ava Needs",
+  raw_intelligence: "Show Me Everything",
+}
+
+/** GE-AIOS-25A-2 — Raw Intelligence domains (presentation grouping only). */
+export const GROWTH_AVA_RAW_DOMAIN_ORDER = [
+  "research",
+  "revenue",
+  "communication",
+  "relationship",
+  "operations",
+  "advanced",
+] as const
+
+export type GrowthAvaRawDomainId = (typeof GROWTH_AVA_RAW_DOMAIN_ORDER)[number]
+
+export const GROWTH_AVA_RAW_DOMAIN_IDS: Record<GrowthAvaRawDomainId, string> = {
+  research: "ava-raw-domain-research",
+  revenue: "ava-raw-domain-revenue",
+  communication: "ava-raw-domain-communication",
+  relationship: "ava-raw-domain-relationship",
+  operations: "ava-raw-domain-operations",
+  advanced: "ava-raw-domain-advanced",
+}
+
+export const GROWTH_AVA_RAW_DOMAIN_TITLES: Record<GrowthAvaRawDomainId, string> = {
+  research: "Research",
+  revenue: "Revenue",
+  communication: "Communication",
+  relationship: "Relationship",
+  operations: "Operations",
+  advanced: "Advanced",
+}
+
+export const GROWTH_AVA_RAW_DOMAIN_PERSIST_KEYS: Record<GrowthAvaRawDomainId, string> = {
+  research: "ava-raw-domain-research",
+  revenue: "ava-raw-domain-revenue",
+  communication: "ava-raw-domain-communication",
+  relationship: "ava-raw-domain-relationship",
+  operations: "ava-raw-domain-operations",
+  advanced: "ava-raw-domain-advanced",
 }
 
 /** Focus keys that should expand Raw Intelligence when deep-linking. */
@@ -58,7 +100,25 @@ export const GROWTH_AVA_RAW_INTELLIGENCE_FOCUS_TARGETS = [
   "research",
   "meetings",
   "execution",
+  "decision-makers",
 ] as const
+
+/** Map drawerFocus → Raw Intelligence domain to open. */
+export const GROWTH_AVA_FOCUS_TO_RAW_DOMAIN: Partial<Record<string, GrowthAvaRawDomainId>> = {
+  research: "research",
+  "decision-makers": "research",
+  revenue: "revenue",
+  execution: "revenue",
+  conversation: "relationship",
+  relationship: "relationship",
+  sequence: "communication",
+  meetings: "communication",
+  "call-copilot": "communication",
+  "realtime-call": "communication",
+  capacity: "operations",
+  executive: "operations",
+  "ai-copilot": "advanced",
+}
 
 export type GrowthAvaAccountStatusLabel =
   | "Active Pursuit"

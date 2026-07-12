@@ -190,51 +190,51 @@ function buildBriefingParagraphs(input: BuildAvaCognitiveProjectionInput): strin
   const paragraphs: string[] = []
   const researched = hasUsableLeadResearch(lead) || prospectRun?.status === "completed"
   const company = lead.companyName
+  const dmReady =
+    lead.decisionMakerStatus === "confirmed" || lead.decisionMakerStatus === "verified_contactable"
+  const dmMissing = !dmReady
 
   if (prospectRun?.status === "failed") {
     paragraphs.push(
-      `I attempted research on ${company}, but the research run failed${
+      `I tried to research ${company}, but that run failed${
         prospectRun.failedReason ? `: ${prospectRun.failedReason}` : "."
       }`,
     )
-  } else if (researched) {
-    paragraphs.push(`I've completed initial research on ${company}.`)
+  } else if (researched && dmMissing) {
+    paragraphs.push(
+      `I researched ${company} and still haven't verified a decision maker.`,
+    )
+  } else if (researched && dmReady) {
+    paragraphs.push(`I researched ${company} and have a decision-maker contact on file.`)
   } else if (prospectRun?.status === "queued" || prospectRun?.status === "running" || lead.status === "researching") {
-    paragraphs.push(`I am still researching ${company}. My assessment is incomplete until that finishes.`)
+    paragraphs.push(`I'm still researching ${company}. I'll update this once that finishes.`)
   } else {
-    paragraphs.push(`I have not completed usable research on ${company} yet.`)
+    paragraphs.push(`I haven't finished usable research on ${company} yet.`)
   }
 
   if (prospectRun?.industryGuess && prospectRun.industryGuess !== "Unknown") {
-    paragraphs.push(
-      `Based on public website signals, I currently classify this account as ${prospectRun.industryGuess}.`,
-    )
-  } else if (researched) {
-    paragraphs.push("I do not yet have a confident industry classification from the public website.")
+    paragraphs.push(`Public website signals point to ${prospectRun.industryGuess}.`)
   }
 
-  const dm = lead.decisionMakerStatus
-  if (dm === "confirmed" || dm === "verified_contactable") {
-    paragraphs.push("I have identified a decision-maker contact on this account.")
-  } else if (researched || lead.status !== "new") {
-    paragraphs.push(
-      "I have not identified a verified decision maker, so I am holding personalized outreach until that contact is found.",
-    )
+  if (researched && dmMissing) {
+    paragraphs.push("I'm holding personalized outreach until that contact is found.")
   }
 
   const recommendation = resolveRecommendation(lead, nativeDecision, prospectRun)
   if (recommendation) {
-    paragraphs.push(`My current recommendation is: ${recommendation}.`)
+    paragraphs.push(`Next up: ${recommendation}.`)
   }
 
   if (pendingApprovalCount > 0) {
     paragraphs.push(
       pendingApprovalCount === 1
-        ? "I have 1 item waiting on your approval."
+        ? "I have one item waiting on your approval."
         : `I have ${pendingApprovalCount} items waiting on your approval.`,
     )
-  } else if (researched) {
-    paragraphs.push("I do not need anything from you right now unless you want to redirect my plan.")
+  } else if (researched || prospectRun?.status === "queued" || prospectRun?.status === "running") {
+    paragraphs.push(
+      "I'm continuing on this account. I'll let you know if I need approval or additional direction.",
+    )
   }
 
   return paragraphs
@@ -305,7 +305,7 @@ export function buildAvaCurrentAssessment(
       ? pendingApprovalCount > 0
         ? `${pendingApprovalCount} approval${pendingApprovalCount === 1 ? "" : "s"} pending`
         : "Operator review requested"
-      : "Ava does not need anything from you right now",
+      : "I'm continuing. I'll ask if I need approval or direction.",
     lastUpdatedLabel: formatRelative(lastUpdatedAt),
     lastUpdatedAt,
   }
