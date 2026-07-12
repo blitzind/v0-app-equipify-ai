@@ -29,9 +29,11 @@ assert.ok(
 )
 
 const accessSource = fs.readFileSync(path.join(ROOT, "lib/growth/access.ts"), "utf8")
+const sessionSource = fs.readFileSync(path.join(ROOT, "lib/growth/growth-engine-session.ts"), "utf8")
 assert.match(accessSource, /resolveGrowthEnginePlatformUserResolution/)
-assert.match(accessSource, /createSupabaseClientWithAccessToken/)
-console.log("  ✓ shared bearer/cookie resolution exported from access.ts")
+assert.match(sessionSource, /createSupabaseClientWithAccessToken/)
+assert.doesNotMatch(sessionSource, /inflightCookieSessionAuth/)
+console.log("  ✓ shared bearer/cookie resolution exported from access.ts / growth-engine-session.ts")
 
 const tokenMeta = getGrowthEngineBearerTokenMetadata("eyJheader.payload.signature")
 assert.equal(tokenMeta.bearer_token_length, 27)

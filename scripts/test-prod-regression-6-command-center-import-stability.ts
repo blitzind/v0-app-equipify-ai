@@ -113,12 +113,17 @@ console.log("  ✓ command-center API uses request-scoped auth and org guard")
 
 const growthEngineSession = readSource("lib/growth/growth-engine-session.ts")
 const growthLayout = readSource("app/(growth)/layout.tsx")
-assert.ok(growthEngineSession.includes("inflightCookieSessionAuth"))
+assert.equal(
+  growthEngineSession.includes("inflightCookieSessionAuth"),
+  false,
+  "module-scoped cookie auth inflight must remain removed (GE-AIOS-HOTFIX-LIVE-1C-5D)",
+)
+assert.ok(growthEngineSession.includes("resolveCookieSessionAuthSnapshot"))
 assert.doesNotMatch(
   growthLayout,
   /createServerSupabaseClient[\s\S]*?auth\.getUser[\s\S]*?resolveGrowthWorkspacePageAccess/,
 )
-console.log("  ✓ Growth auth dedupe preserved; layout avoids duplicate getUser")
+console.log("  ✓ Growth cookie auth is request-local; layout avoids duplicate getUser")
 
 // ── 8. Route files exist for AI Operations surfaces ──────────────────────────
 

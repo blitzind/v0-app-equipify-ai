@@ -2,6 +2,7 @@ import "server-only"
 
 import { z } from "zod"
 import { logGrowthEngine as logGrowthEngineEvent } from "@/lib/growth/growth-engine-log"
+import { resolveCookieSessionAuthSnapshot } from "@/lib/growth/growth-engine-cookie-session-auth"
 import {
   classifyGrowthEngineBearerAuthError,
   getGrowthEngineBearerTokenMetadata,
@@ -39,6 +40,9 @@ export type GrowthEnginePlatformUserResolution = {
   bearer_token_segment_count: number
   bearer_user_resolved: boolean
   cookie_user_resolved: boolean
+  cookie_auth_timeout: boolean
+  cookie_auth_error_code: string | null
+  cookie_auth_error_message_safe: string | null
   resolved_user: { userId: string; userEmail: string } | null
 }
 
@@ -52,30 +56,29 @@ function mapSupabaseUser(user: { id: string; email?: string | null } | null | un
   return { userId: user.id, userEmail: email }
 }
 
-type CookieSessionAuthSnapshot = {
-  cookieSessionResult: Awaited<ReturnType<Awaited<ReturnType<typeof createServerSupabaseClient>>["auth"]["getUser"]>> | null
-  cookieUser: { userId: string; userEmail: string } | null
-}
-
-/** Coalesce concurrent cookie-session getUser calls (layout + API handlers share Supabase auth lock). */
-let inflightCookieSessionAuth: Promise<CookieSessionAuthSnapshot> | null = null
-
+/**
+ * Authenticate with the current request's cookie client only.
+ * Never reuse auth promises across HTTP requests (module-scoped inflight is forbidden).
+ */
 async function resolveCookieSessionUser(
   cookieClient: Awaited<ReturnType<typeof createServerSupabaseClient>>,
-): Promise<CookieSessionAuthSnapshot> {
-  if (!inflightCookieSessionAuth) {
-    inflightCookieSessionAuth = (async () => {
-      const cookieSessionResult = await raceMiddlewareAuthOperation(cookieClient.auth.getUser())
+) {
+  return resolveCookieSessionAuthSnapshot({
+    getUser: async () => {
+      const result = await cookieClient.auth.getUser()
       return {
-        cookieSessionResult,
-        cookieUser: mapSupabaseUser(cookieSessionResult?.data.user),
+        data: { user: result.data.user ? { id: result.data.user.id, email: result.data.user.email } : null },
+        error: result.error
+          ? {
+              code: result.error.code,
+              message: result.error.message,
+              name: result.error.name,
+            }
+          : null,
       }
-    })().finally(() => {
-      inflightCookieSessionAuth = null
-    })
-  }
-
-  return inflightCookieSessionAuth
+    },
+    raceAuthOperation: raceMiddlewareAuthOperation,
+  })
 }
 
 async function resolveGrowthEngineBearerUser(
@@ -144,7 +147,12 @@ export async function resolveGrowthEnginePlatformUserResolution(
   const bearer = request ? getBearerAccessToken(request) : null
   const tokenMeta = getGrowthEngineBearerTokenMetadata(bearer)
 
-  const { cookieSessionResult, cookieUser } = await resolveCookieSessionUser(cookieClient)
+  const {
+    cookieUser,
+    cookie_auth_timeout,
+    cookie_auth_error_code,
+    cookie_auth_error_message_safe,
+  } = await resolveCookieSessionUser(cookieClient)
   const cookie_user_resolved = Boolean(cookieUser)
 
   let bearer_user_resolved = false
@@ -171,6 +179,9 @@ export async function resolveGrowthEnginePlatformUserResolution(
     bearer_token_segment_count: tokenMeta.bearer_token_segment_count,
     bearer_user_resolved,
     cookie_user_resolved,
+    cookie_auth_timeout,
+    cookie_auth_error_code,
+    cookie_auth_error_message_safe,
     resolved_user: cookieUser ?? bearerUser,
   }
 }

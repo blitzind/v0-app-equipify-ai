@@ -858,6 +858,7 @@
     "test:ge-aios-hotfix-live-1a-home-pipeline-performance": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-hotfix-live-1a-home-pipeline-performance.ts",
     "test:ge-aios-hotfix-live-1c-2-admission-evidence-persistence": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-hotfix-live-1c-2-admission-evidence-persistence.ts",
     "test:ge-aios-hotfix-live-1c-4-canonical-research-read": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-hotfix-live-1c-4-canonical-research-read.ts",
+    "test:ge-aios-hotfix-live-1c-5d-cookie-auth-isolation": "tsx scripts/test-ge-aios-hotfix-live-1c-5d-cookie-auth-isolation.ts",
     "test:ge-aios-hotfix-growth-route-access": "tsx scripts/test-ge-aios-hotfix-growth-route-access.ts",
     "test:ge-aios-hotfix-16x-home-runtime-undefined-arrays": "tsx scripts/test-ge-aios-hotfix-16x-home-runtime-undefined-arrays.ts",
     "test:ge-aios-7c-ava-led-lead-discovery": "tsx scripts/test-ge-aios-7c-ava-led-lead-discovery.ts",

@@ -222,7 +222,37 @@ export async function requireGrowthAccess(
   const resolution = await resolveGrowthEnginePlatformUserResolution(request)
   const resolvedUser = resolution.resolved_user
   if (!resolvedUser) {
-    logGrowthEngine("access_denied", { reason: "unauthenticated", rbac: GROWTH_RBAC_ACCESS_QA_MARKER })
+    let hostname: string | null = null
+    let pathname: string | null = null
+    try {
+      if (request) {
+        const url = new URL(request.url)
+        hostname = url.hostname
+        pathname = url.pathname
+      }
+    } catch {
+      /* ignore malformed request URL */
+    }
+    if (!pathname) {
+      pathname = await resolveRequestPathname(request, options)
+    }
+    logGrowthEngine("access_denied", {
+      reason: "unauthenticated",
+      rbac: GROWTH_RBAC_ACCESS_QA_MARKER,
+      auth_attempted: true,
+      user_resolved: false,
+      cookie_user_resolved: resolution.cookie_user_resolved,
+      cookie_auth_timeout: resolution.cookie_auth_timeout,
+      cookie_auth_error_code: resolution.cookie_auth_error_code,
+      cookie_auth_error_message_safe: resolution.cookie_auth_error_message_safe,
+      bearer_resolution_attempted: resolution.bearer_resolution_attempted,
+      bearer_user_resolved: resolution.bearer_user_resolved,
+      bearer_resolution_error_code: resolution.bearer_resolution_error_code,
+      bearer_resolution_error_message_safe: resolution.bearer_resolution_error_message_safe,
+      hostname,
+      pathname,
+      deployment_id: process.env.VERCEL_DEPLOYMENT_ID ?? null,
+    })
     return {
       ok: false,
       response: NextResponse.json(

@@ -90,13 +90,18 @@ function runAudit(): void {
   assert.match(growthEngineSession, /raceMiddlewareAuthOperation/, "Growth API auth must use bounded timeout guards")
   assert.match(
     growthEngineSession,
-    /raceMiddlewareAuthOperation\(cookieClient\.auth\.getUser\(\)\)/,
-    "Growth cookie session auth must time out",
+    /resolveCookieSessionAuthSnapshot/,
+    "Growth cookie session auth must use request-local snapshot helper",
   )
   assert.match(
     growthEngineSession,
+    /cookieClient\.auth\.getUser\(\)/,
+    "Growth cookie session auth must call getUser on the current request client",
+  )
+  assert.doesNotMatch(
+    growthEngineSession,
     /inflightCookieSessionAuth/,
-    "Growth cookie session auth must dedupe concurrent getUser calls",
+    "Growth cookie session auth must not reuse module-scoped inflight promises across requests",
   )
   assert.match(workspaceSettingsApi, /requireGrowthWorkspaceSettingsAccess/, "workspace settings APIs retain access gate")
   assert.match(platformGrowthApi, /requireGrowthEnginePlatformAccess/, "platform growth APIs retain access gate")
