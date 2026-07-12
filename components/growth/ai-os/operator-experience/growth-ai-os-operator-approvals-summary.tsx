@@ -9,9 +9,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { GrowthAiOsHumanApprovalCenterSection } from "@/components/growth/ai-os/command-center/growth-ai-os-human-approval-center-section"
 import type { GrowthAiOsOperatorApprovalSummary } from "@/lib/growth/aios/operator-experience/growth-ai-os-operator-experience-types"
-import { AI_OS_APPROVALS_SECTION_SUBTITLE, AI_OS_APPROVALS_SECTION_TITLE } from "@/lib/workspace/ai-os-outcome-first-terminology"
+import {
+  aiOsApprovalsSectionSubtitle,
+  aiOsApprovalsSectionTitle,
+} from "@/lib/workspace/ai-os-outcome-first-terminology"
 
 import type { GrowthHumanApprovalCenterReadModel } from "@/lib/growth/aios/approvals/growth-human-approval-center-types"
 
@@ -22,14 +26,15 @@ type Props = {
 
 export function GrowthAiOsOperatorApprovalsSummary({ summary, humanApprovalCenter }: Props) {
   const [expanded, setExpanded] = useState(false)
+  const { teammate } = useAiTeammateIdentity()
 
   if (!summary || summary.totalPending === 0) return null
 
   return (
     <section data-qa-section="operator-exceptions-approvals" className="space-y-4">
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight">{AI_OS_APPROVALS_SECTION_TITLE}</h2>
-        <p className="mt-1 text-muted-foreground">{AI_OS_APPROVALS_SECTION_SUBTITLE}</p>
+        <h2 className="text-2xl font-semibold tracking-tight">{aiOsApprovalsSectionTitle(teammate)}</h2>
+        <p className="mt-1 text-muted-foreground">{aiOsApprovalsSectionSubtitle(teammate)}</p>
       </div>
 
       <article className="rounded-2xl border border-border/70 bg-card p-6">

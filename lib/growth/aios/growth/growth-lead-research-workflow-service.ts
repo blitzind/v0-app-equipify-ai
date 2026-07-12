@@ -292,6 +292,11 @@ export async function publishGrowthLeadResearchWorkflowStatus(
     detail?: string | null
   },
 ) {
+  const { ensureGrowthAiEventBusInProcessSubscribers } = await import(
+    "@/lib/growth/aios/event-bus/growth-ai-event-bus-subscriber-registry"
+  )
+  ensureGrowthAiEventBusInProcessSubscribers()
+
   return publishAiOsEvent(admin, {
     organizationId: input.organizationId,
     eventType: GROWTH_LEAD_RESEARCH_WORKFLOW_STATUS_EVENT,

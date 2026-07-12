@@ -2,20 +2,23 @@
 
 import Link from "next/link"
 import { ArrowRight } from "lucide-react"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import {
-  AI_OS_EXCEPTIONS_SECTION_SUBTITLE,
   AI_OS_EXCEPTIONS_SECTION_TITLE,
+  aiOsExceptionsSectionSubtitle,
 } from "@/lib/workspace/ai-os-outcome-first-terminology"
 import type { GrowthHomeExceptionItem } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 
 export function GrowthHomeExceptionsSection({ items }: { items: GrowthHomeExceptionItem[] }) {
+  const { teammate } = useAiTeammateIdentity()
+
   if (items.length === 0) return null
 
   return (
     <section data-qa-section="home-exceptions" className="space-y-4">
       <div>
         <h2 className="text-xl font-semibold tracking-tight">{AI_OS_EXCEPTIONS_SECTION_TITLE}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{AI_OS_EXCEPTIONS_SECTION_SUBTITLE}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{aiOsExceptionsSectionSubtitle(teammate)}</p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {items.map((item) => (

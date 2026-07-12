@@ -87,7 +87,7 @@ export const GROWTH_WORKSPACE_SHELL_NAV_MANIFEST: GrowthWorkspaceShellNavManifes
       { id: "operations", label: "Operations", registryRouteId: "workspace-sales-operations-center", icon: Bot, workspaceRoute: true },
       { id: "training", label: "Training", registryRouteId: "workspace-training", icon: GraduationCap, workspaceRoute: true },
       { id: "about-ai", label: "About Your AI", registryRouteId: "workspace-ava-about", icon: Bot, workspaceRoute: true },
-      { id: "approvals", label: "Approvals", registryRouteId: "workspace-human-approval-center", icon: ShieldCheck, workspaceRoute: true },
+      { id: "approvals", label: "Completed Work", registryRouteId: "workspace-human-approval-center", icon: ShieldCheck, workspaceRoute: true },
       { id: "leads", label: "Leads", registryRouteId: "workspace-leads", icon: Target, workspaceRoute: true },
       { id: "audiences", label: "Audiences", registryRouteId: "workspace-audiences", icon: Users, workspaceRoute: true },
       { id: "personalized-videos", label: "Personalized Videos", registryRouteId: "workspace-personalized-videos", icon: Sparkles, workspaceRoute: true },

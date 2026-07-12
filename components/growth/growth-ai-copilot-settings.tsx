@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { BookOpen, ListChecks, Loader2, PhoneCall, Save, Shield, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -32,6 +33,7 @@ export function GrowthAiCopilotSettingsPanel({
 }: {
   variant?: "default" | "operator"
 }) {
+  const { teammate } = useAiTeammateIdentity()
   const isOperator = variant === "operator"
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -252,7 +254,7 @@ export function GrowthAiCopilotSettingsPanel({
             <p className="rounded-md border border-amber-200 bg-amber-50/60 px-2.5 py-1.5 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
               {isOperator
                 ? "Turn on AI assist above before using call assistance."
-                : "Enable Ava above before using call assistance."}
+                : `Enable ${teammate.name} above before using call assistance.`}
             </p>
           ) : null}
           <div className="space-y-2">

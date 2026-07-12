@@ -54,7 +54,20 @@ export {
   reconstructDraftFactoryStateFromCanonicalData,
   normalizeDraftFactoryWake,
   buildDraftFactoryWakeFingerprint,
+  getDeferredDraftFactoryStates,
 } from "@/lib/growth/draft-factory/draft-factory-durable-service"
+
+export {
+  GROWTH_AIOS_AUTONOMY_1B_PHASE,
+  GROWTH_DRAFT_FACTORY_WAKE_BUS_QA_MARKER,
+  GROWTH_DRAFT_FACTORY_WAKE_BUS_SUBSCRIBER_ID,
+  GROWTH_DRAFT_FACTORY_WAKE_EVENT_TYPES,
+  GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_QA_MARKER,
+} from "@/lib/growth/draft-factory/draft-factory-wake-event-types"
+
+export { mapAiOsEventToDraftFactoryWakePlans } from "@/lib/growth/draft-factory/draft-factory-wake-event-mapper"
+
+export { tickDraftFactoryDueStatesForScheduler } from "@/lib/growth/draft-factory/draft-factory-due-scheduler-tick"
 
 export {
   resolveDraftFactoryDurableRepositoryKind,

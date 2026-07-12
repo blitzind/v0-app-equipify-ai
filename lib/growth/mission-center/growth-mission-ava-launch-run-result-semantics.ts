@@ -4,6 +4,8 @@ import type {
   GrowthMissionAvaLaunchRunLeadResearchStatus,
   GrowthMissionAvaLaunchRunHumanApprovalSummary,
 } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-api-contract"
+import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
+import { completedWorkTitle } from "@/lib/workspace/ai-teammate-voice"
 
 export const GROWTH_AVA_LAUNCH_RESULT_SEMANTICS_1_QA_MARKER =
   "ge-ava-launch-result-semantics-1-v1" as const
@@ -108,7 +110,9 @@ export function buildAvaLaunchRunSuccessMessage(
     | "researchPendingCount"
     | "stoppedAt"
   >,
+  teammateName?: string | null,
 ): string {
+  const teammate = resolveAiTeammatePresentation(teammateName)
   const lines: string[] = []
 
   if (semantics.importedLeadCount === 0) {
@@ -121,18 +125,18 @@ export function buildAvaLaunchRunSuccessMessage(
 
   if (semantics.stoppedAt === "research_pending") {
     lines.push("Research is running asynchronously.")
-    lines.push("Approval items will appear after research and outreach preparation.")
+    lines.push("Completed work will appear after research and outreach preparation.")
   } else if (semantics.stoppedAt === "human_approval") {
     lines.push(
-      `${semantics.runCreatedApprovalCount} approval item${semantics.runCreatedApprovalCount === 1 ? "" : "s"} from this run ${semantics.runCreatedApprovalCount === 1 ? "is" : "are"} ready in Human Approval Center.`,
+      `${semantics.runCreatedApprovalCount} completed task${semantics.runCreatedApprovalCount === 1 ? "" : "s"} from this run ${semantics.runCreatedApprovalCount === 1 ? "is" : "are"} ready in ${completedWorkTitle(teammate).toLowerCase()}.`,
     )
   } else if (semantics.importedLeadCount === 0) {
-    lines.push("Approval items will appear after research and outreach preparation when leads are imported.")
+    lines.push("Completed work will appear after research and outreach preparation when leads are imported.")
   }
 
   if (semantics.orgHumanApprovalPendingTotal > 0) {
     lines.push(
-      `Your organization has ${semantics.orgHumanApprovalPendingTotal} existing pending approval${semantics.orgHumanApprovalPendingTotal === 1 ? "" : "s"} in Human Approval Center (not created by this run).`,
+      `Your organization has ${semantics.orgHumanApprovalPendingTotal} existing completed task${semantics.orgHumanApprovalPendingTotal === 1 ? "" : "s"} waiting for authorization (not created by this run).`,
     )
   }
 

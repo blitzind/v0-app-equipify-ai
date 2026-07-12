@@ -4,16 +4,17 @@ import { useCallback, useEffect, useState } from "react"
 import { Handshake, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import type { GrowthRelationshipTrendWindow } from "@/lib/growth/relationship-types"
 import {
-  GROWTH_ACTION_FIRST_AVA_RECOMMENDS,
   GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE,
-  GROWTH_ACTION_FIRST_AVA_IDLE,
   GROWTH_ACTION_FIRST_RELATIONSHIPS_AT_RISK,
   GROWTH_ACTION_FIRST_RELATIONSHIPS_COMMITTEE,
   GROWTH_ACTION_FIRST_RELATIONSHIPS_ENGAGEMENT,
   GROWTH_ACTION_FIRST_SUPPORTING_METRICS,
   GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER,
+  growthActionFirstIdle,
+  growthActionFirstRecommends,
 } from "@/lib/growth/workspace/growth-workspace-action-first-1f"
 
 type DashboardPayload = {
@@ -87,6 +88,7 @@ function LeadBucket({
 }
 
 export function GrowthRelationshipDashboard() {
+  const { teammate } = useAiTeammateIdentity()
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null)
   const [trendWindow, setTrendWindow] = useState<GrowthRelationshipTrendWindow>("7d")
   const [loading, setLoading] = useState(true)
@@ -140,12 +142,12 @@ export function GrowthRelationshipDashboard() {
       data-growth-action-first-order="actions-before-metrics"
       data-qa-marker-action-first={GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER}
     >
-      <GrowthEngineCard title={GROWTH_ACTION_FIRST_AVA_RECOMMENDS} data-section="relationships-action-first">
+      <GrowthEngineCard title={growthActionFirstRecommends(teammate)} data-section="relationships-action-first">
         {dashboard.executiveAttentionRequired.length === 0 &&
         dashboard.relationshipCooling.length === 0 ? (
           <>
             <p className="text-sm font-medium">{GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{GROWTH_ACTION_FIRST_AVA_IDLE}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{growthActionFirstIdle(teammate)}</p>
           </>
         ) : (
           <ul className="space-y-2 text-sm">

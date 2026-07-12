@@ -4,12 +4,13 @@ import { useCallback, useState } from "react"
 import { Bot, Check, Copy, Loader2, Sparkles, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import type {
   VoiceAiCopilotSuggestionPublicView,
   VoiceAiCopilotWorkspaceSnapshot,
 } from "@/lib/voice/ai-copilot/types"
 import { VOICE_AI_COPILOT_QA_MARKER, VOICE_DEEP_COPILOT_QA_MARKER } from "@/lib/voice/ai-copilot/types"
-import { GROWTH_AVA_PANEL_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { growthAvaPanelTitle } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { cn } from "@/lib/utils"
 
 function formatSuggestionType(type: string): string {
@@ -27,6 +28,8 @@ function CopilotSuggestionCard({
   acting: string | null
   onLifecycle: (suggestionId: string, action: "acknowledge" | "dismiss" | "copied") => Promise<void>
 }) {
+  const { teammate } = useAiTeammateIdentity()
+  const { teammate } = useAiTeammateIdentity()
   const [copied, setCopied] = useState(false)
 
   const handleCopy = useCallback(async () => {
@@ -212,9 +215,9 @@ export function GrowthCallWorkspaceAiCopilotSection({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Bot className="size-4 text-violet-700 dark:text-violet-300" />
-          <p className="text-sm font-semibold">{GROWTH_AVA_PANEL_TITLE}</p>
+          <p className="text-sm font-semibold">{growthAvaPanelTitle(teammate)}</p>
           <GrowthBadge label="Suggestion-only" tone="neutral" />
-          <GrowthBadge label="Ava does not act automatically" tone="attention" />
+          <GrowthBadge label={`${teammate.name} does not act automatically`} tone="attention" />
         </div>
         <Button
           type="button"
@@ -338,7 +341,7 @@ export function GrowthCallWorkspaceAiCopilotSection({
       {suggestions.length === 0 ? (
         <div className="rounded-lg border border-dashed border-violet-200/70 px-4 py-6 text-center dark:border-violet-900/40">
           <Bot className="mx-auto mb-2 size-6 text-muted-foreground" />
-          <p className="text-sm font-medium">No suggestions from Ava yet</p>
+          <p className="text-sm font-medium">No suggestions from {teammate.name} yet</p>
           <p className="mt-1 text-xs text-muted-foreground">
             Generate evidence-backed drafts from operator assist, intelligence, and transcript context.
           </p>
@@ -365,7 +368,7 @@ export function GrowthCallWorkspaceAiCopilotSection({
 
       <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
         {aiCopilot?.message ??
-          "Ava's drafts are operator-reviewed only. Nothing is sent, booked, transferred, or saved automatically."}
+          `${teammate.name}'s drafts are operator-reviewed only. Nothing is sent, booked, transferred, or saved automatically.`}
       </p>
     </section>
   )

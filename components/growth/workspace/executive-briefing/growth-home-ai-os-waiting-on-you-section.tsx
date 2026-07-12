@@ -17,6 +17,8 @@ import {
   GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-experience-2b"
 import { Button } from "@/components/ui/button"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
+import { reviewCompletedWork } from "@/lib/workspace/ai-teammate-voice"
 
 export const AVA_HOME_WAITING_ON_YOU_TITLE = "What I need from you" as const
 
@@ -31,6 +33,7 @@ export function GrowthHomeAiOsWaitingOnYouSection({
   relationshipSnapshotsById,
   waitingCompanyByLeadId,
 }: Props) {
+  const { teammate } = useAiTeammateIdentity()
   const waitingOnYou = enrichGrowthHomeWaitingOnYouItems(
     aiOsUx.waitingOnYou,
     relationshipSnapshotsById,
@@ -63,7 +66,7 @@ export function GrowthHomeAiOsWaitingOnYouSection({
         {approveItemsHref && approveItemsCount > 0 ? (
           <Button asChild size="sm">
             <Link href={approveItemsHref}>
-              Open Approvals
+              {reviewCompletedWork(teammate)}
               <ArrowRight className="ml-2 size-4" />
             </Link>
           </Button>

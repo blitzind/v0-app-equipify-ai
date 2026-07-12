@@ -1,7 +1,7 @@
 /**
  * SV1-4 — DataMoon decision-maker enrichment service (server-only).
  * Composes provider config, SV1-1/SV1-2 authorization signals, audience filters,
- * canonical DM attach. Does not send/enroll. Does not call Apollo.
+ * canonical DM attach. Does not send/enroll. DataMoon-only enrichment path.
  */
 
 import "server-only"
@@ -46,13 +46,38 @@ export type DatamoonDmDiscoveryAdapter = (input: {
   companyDomain: string | null
   titleFamilies: string[]
   filters: Array<{ field: string; operator: string; value: string | string[] }>
-}) => Promise<{ records: unknown[]; providerCalled: boolean; message: string }>
+  idempotencyKey?: string
+  companyId?: string | null
+}) => Promise<{
+  records: unknown[]
+  providerCalled: boolean
+  message: string
+  status?:
+    | "completed"
+    | "pending"
+    | "failed_retryable"
+    | "failed_terminal"
+    | "reused"
+    | "skipped"
+  runId?: string | null
+  audienceId?: string | null
+  nextPollAt?: string | null
+  failureCode?: string | null
+  creditsAvoided?: boolean
+  adapterKind?: "live" | "stub" | "injected"
+}>
 
-/** Default adapter is a no-network stub — production injects live audience build/fetch. */
+/**
+ * @deprecated CONTACT-1B — production must use resolveDatamoonDmDiscoveryAdapter({ runtime: "production" }).
+ * Kept only so accidental omission is loud in logs; evaluateAndEnrich never selects this in production.
+ */
 export const defaultDatamoonDmDiscoveryAdapter: DatamoonDmDiscoveryAdapter = async () => ({
   records: [],
   providerCalled: false,
-  message: "No discovery adapter records — inject live DataMoon audience adapter in runtime.",
+  message: "CONTACT-1B stub — production must resolve live DataMoon discovery adapter.",
+  status: "failed_terminal",
+  failureCode: "stub_adapter_forbidden_in_production",
+  adapterKind: "stub",
 })
 
 function nowIso(): string {
@@ -114,10 +139,13 @@ export async function evaluateAndEnrichDecisionMakerForLead(
     budgetAvailable?: boolean
     killSwitchActive?: boolean
     discoveryAdapter?: DatamoonDmDiscoveryAdapter
+    /** When true (default in production callers), resolve live DataMoon adapter if none injected. */
+    useLiveDiscoveryAdapter?: boolean
     /** Injected candidate records for tests / dry paths without HTTP. */
     injectedRecords?: unknown[]
     forceProviderCall?: boolean
     generatedAt?: string
+    env?: NodeJS.ProcessEnv
   },
 ): Promise<AiOsDatamoonDmDecision> {
   const generatedAt = input.generatedAt ?? nowIso()
@@ -268,9 +296,39 @@ export async function evaluateAndEnrichDecisionMakerForLead(
 
   let records: unknown[] = input.injectedRecords ?? []
   let providerCalled = Boolean(input.injectedRecords?.length || input.forceProviderCall)
+  let discoveryStatus:
+    | "completed"
+    | "pending"
+    | "failed_retryable"
+    | "failed_terminal"
+    | "reused"
+    | "skipped"
+    | null = input.injectedRecords ? "completed" : null
+  let discoveryRunId: string | null = null
+  let discoveryAudienceId: string | null = null
+  let discoveryNextPollAt: string | null = null
 
   if (!input.injectedRecords) {
-    const adapter = input.discoveryAdapter ?? defaultDatamoonDmDiscoveryAdapter
+    let adapter = input.discoveryAdapter
+    if (!adapter && input.useLiveDiscoveryAdapter !== false) {
+      const { resolveDatamoonDmDiscoveryAdapter } = await import(
+        "@/lib/growth/datamoon-decision-maker/datamoon-dm-discovery-factory"
+      )
+      const resolved = resolveDatamoonDmDiscoveryAdapter({
+        runtime: "production",
+        admin,
+        env: input.env,
+      })
+      adapter = resolved.legacy
+    }
+    if (!adapter) {
+      adapter = defaultDatamoonDmDiscoveryAdapter
+      logGrowthEngine("datamoon_dm_discovery_stub_selected", {
+        organization_id: input.organizationId,
+        lead_id: lead.id,
+        message: "Stub adapter selected — unexpected outside explicit cert injection.",
+      })
+    }
     const discovery = await adapter({
       organizationId: input.organizationId,
       leadId: lead.id,
@@ -278,9 +336,22 @@ export async function evaluateAndEnrichDecisionMakerForLead(
       companyDomain,
       titleFamilies: requirement.titleFamilies,
       filters,
+      idempotencyKey,
     })
     records = discovery.records
     providerCalled = discovery.providerCalled || providerCalled
+    discoveryStatus = discovery.status ?? (records.length > 0 ? "completed" : "pending")
+    discoveryRunId = discovery.runId ?? null
+    discoveryAudienceId = discovery.audienceId ?? null
+    discoveryNextPollAt = discovery.nextPollAt ?? null
+
+    if (discovery.adapterKind === "stub") {
+      logGrowthEngine("datamoon_dm_discovery_stub_forbidden", {
+        organization_id: input.organizationId,
+        lead_id: lead.id,
+        message: discovery.message,
+      })
+    }
   } else {
     providerCalled = true
   }
@@ -301,9 +372,18 @@ export async function evaluateAndEnrichDecisionMakerForLead(
     duplicateRequestPrevented: false,
     idempotencyKey,
     now: generatedAt,
+    discoveryStatus,
   })
 
-  if (providerCalled) {
+  // Attach discovery provenance onto explainability without changing the decision type.
+  decision.explainability.providerProvenance = [
+    ...decision.explainability.providerProvenance,
+    ...(discoveryRunId ? [`datamoon:run:${discoveryRunId}`] : []),
+    ...(discoveryAudienceId ? [`datamoon:audience:${discoveryAudienceId}`] : []),
+    ...(discoveryNextPollAt ? [`next_poll_at:${discoveryNextPollAt}`] : []),
+  ]
+
+  if (providerCalled && discoveryStatus !== "pending" && discoveryStatus !== "reused") {
     recordDatamoonDmRequestAttempt({
       idempotencyKey,
       organizationId: input.organizationId,
@@ -313,65 +393,145 @@ export async function evaluateAndEnrichDecisionMakerForLead(
       noSuitablePerson:
         decision.outcome === "no_suitable_person" ||
         decision.outcome === "company_match_uncertain" ||
-        decision.selectedCandidate == null,
+        (decision.selectedCandidate == null &&
+          discoveryStatus !== "pending" &&
+          discoveryStatus !== "failed_retryable"),
     })
   }
 
-  // Attach via existing DM upsert — source public_web + datamoon provenance (no schema change).
-  if (decision.selectedCandidate && decision.resumeDraftFactoryTo === "personalization") {
+  // GE-AIOS-CONTACT-1A — persist all DataMoon contact channels into canonical person model
+  // whenever a candidate is selected (do not wait until after ranking to retrieve channels).
+  if (decision.selectedCandidate) {
     const selected = decision.selectedCandidate
-    await upsertGrowthLeadDecisionMakerCandidates(admin, {
-      leadId: lead.id,
-      candidates: [
-        {
-          fullName: selected.fullName,
-          title: selected.title,
-          email: selected.email,
-          phone: selected.phone,
-          linkedinUrl: selected.linkedinUrl,
-          source: "public_web",
-          sourceDetail: `datamoon:person_enrichment:${selected.providerRecordId ?? "audience"}`,
-          confidence: Math.max(0, Math.min(1, selected.compositeScore / 100)),
-          evidenceExcerpt: selected.evidence.join(" | "),
-        },
-      ],
-      createdBy: null,
-    }).catch(() => undefined)
+    try {
+      const { persistDatamoonDecisionMakerCanonicalContacts } = await import(
+        "@/lib/growth/datamoon-decision-maker/datamoon-dm-canonical-contact-persist"
+      )
+      const persisted = await persistDatamoonDecisionMakerCanonicalContacts(admin, {
+        organizationId: input.organizationId,
+        leadId: lead.id,
+        candidate: selected,
+        emails: selected.emails.map((email) => ({
+          value: email.value,
+          normalized: email.normalized,
+          emailType: email.emailType,
+          rawProviderValue: email.rawProviderValue,
+          fieldKey: email.fieldKey,
+          providerConfidence: null,
+        })),
+        phones: selected.phones.map((phone) => ({
+          value: phone.value,
+          normalized: phone.normalized,
+          e164: phone.e164,
+          extension: phone.extension,
+          phoneType: phone.phoneType,
+          isCompanySwitchboard: phone.isCompanySwitchboard,
+          rawProviderValue: phone.rawProviderValue,
+          fieldKey: phone.fieldKey,
+          providerConfidence: null,
+        })),
+        observedAt: generatedAt,
+      })
+
+      const { publishDraftFactoryContactAvailable, publishDraftFactoryContactVerified } = await import(
+        "@/lib/growth/draft-factory/draft-factory-wake-emitters"
+      )
+      if (persisted.readiness.emailVerified || persisted.readiness.phoneVerified) {
+        void publishDraftFactoryContactVerified(admin, {
+          organizationId: input.organizationId,
+          leadId: lead.id,
+          contactId: persisted.decisionMakerId ?? persisted.personId ?? selected.providerRecordId ?? "dm",
+          canonicalPersonId: persisted.personId,
+          channel: persisted.readiness.emailVerified ? "email" : "phone",
+          verificationStatus: "verified",
+          sourceRunId: decision.idempotencyKey,
+        })
+      } else if (persisted.readiness.emailAvailable || persisted.readiness.phoneAvailable) {
+        void publishDraftFactoryContactAvailable(admin, {
+          organizationId: input.organizationId,
+          leadId: lead.id,
+          canonicalPersonId: persisted.personId,
+          channel: persisted.readiness.emailAvailable ? "email" : "phone",
+          verificationStatus: "unverified",
+          sourceRunId: decision.idempotencyKey,
+        })
+      }
+    } catch (error) {
+      logGrowthEngine("datamoon_canonical_contact_persist_failed", {
+        lead_id: lead.id,
+        message: error instanceof Error ? error.message.slice(0, 240) : String(error).slice(0, 240),
+      })
+      // Fall back to legacy DM upsert so pipeline does not lose the selected person
+      await upsertGrowthLeadDecisionMakerCandidates(admin, {
+        leadId: lead.id,
+        candidates: [
+          {
+            fullName: selected.fullName,
+            title: selected.title,
+            email: selected.email,
+            phone: selected.phone,
+            linkedinUrl: selected.linkedinUrl,
+            source: "public_web",
+            sourceDetail: `datamoon:person_enrichment:${selected.providerRecordId ?? "audience"}`,
+            confidence: Math.max(0, Math.min(1, selected.compositeScore / 100)),
+            evidenceExcerpt: selected.evidence.join(" | "),
+          },
+        ],
+        createdBy: null,
+      }).catch(() => undefined)
+    }
   }
 
   await persistDecisionLedger(admin, decision)
 
-  // SV1-5A — durable wake on DataMoon DM completion / failure (idempotent by provider run id).
+  // GE-AIOS-CONTACT-1B / AUTONOMY-1B — lifecycle events → Draft Factory observer
   {
-    const { wakeDraftFactoryFromCompletionEvent } = await import(
-      "@/lib/growth/draft-factory/draft-factory-durable-live"
-    )
-    if (decision.resumeDraftFactoryTo === "personalization" && decision.selectedCandidate) {
-      void wakeDraftFactoryFromCompletionEvent(admin, {
+    const {
+      publishDraftFactoryDatamoonPersonCompleted,
+      publishDraftFactoryDatamoonPersonRequested,
+      publishDraftFactoryDatamoonPersonPending,
+    } = await import("@/lib/growth/draft-factory/draft-factory-wake-emitters")
+    const eventKey = decision.idempotencyKey || `dm:${lead.id}:${generatedAt}`
+    if (decision.outcome === "provider_pending") {
+      void publishDraftFactoryDatamoonPersonRequested(admin, {
         organizationId: input.organizationId,
         leadId: lead.id,
-        wake: {
-          type: "datamoon_person_completed",
-          sourceId: decision.idempotencyKey || `dm:${lead.id}:${generatedAt}`,
-        },
-        portfolioSelected: input.portfolioSelected === true,
-        allowGeneration: false,
+        idempotencyKey: eventKey,
+        runId: discoveryRunId,
+        audienceId: discoveryAudienceId,
+        nextPollAt: discoveryNextPollAt,
+      })
+      void publishDraftFactoryDatamoonPersonPending(admin, {
+        organizationId: input.organizationId,
+        leadId: lead.id,
+        idempotencyKey: eventKey,
+        runId: discoveryRunId,
+        audienceId: discoveryAudienceId,
+        nextPollAt: discoveryNextPollAt,
+      })
+    } else if (decision.resumeDraftFactoryTo === "personalization" && decision.selectedCandidate) {
+      void publishDraftFactoryDatamoonPersonCompleted(admin, {
+        organizationId: input.organizationId,
+        leadId: lead.id,
+        idempotencyKey: eventKey,
+        runId: discoveryRunId,
+        audienceId: discoveryAudienceId,
       })
     } else if (
       decision.outcome === "no_suitable_person" ||
       decision.outcome === "provider_exhausted" ||
       decision.outcome === "company_match_uncertain" ||
+      decision.outcome === "provider_failed_terminal" ||
+      decision.outcome === "provider_failed_retryable" ||
       decision.outcome === "retry_later"
     ) {
-      void wakeDraftFactoryFromCompletionEvent(admin, {
+      void publishDraftFactoryDatamoonPersonCompleted(admin, {
         organizationId: input.organizationId,
         leadId: lead.id,
-        wake: {
-          type: "datamoon_person_failed",
-          sourceId: decision.idempotencyKey || `dm-fail:${lead.id}:${generatedAt}`,
-        },
-        portfolioSelected: input.portfolioSelected === true,
-        allowGeneration: false,
+        idempotencyKey: eventKey,
+        runId: discoveryRunId,
+        audienceId: discoveryAudienceId,
+        failed: true,
       })
     }
   }

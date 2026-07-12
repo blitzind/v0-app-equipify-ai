@@ -53,6 +53,7 @@ export const GROWTH_AI_EVENT_BUS_SUBSCRIBER_IDS = [
   "decision_engine_observer",
   "memory_registry_observer",
   "agent_events_observer",
+  "draft_factory_wake_observer",
 ] as const
 
 export type GrowthAiEventBusSubscriberId = (typeof GROWTH_AI_EVENT_BUS_SUBSCRIBER_IDS)[number]
@@ -166,6 +167,20 @@ export const GROWTH_AI_WORKFLOW_LIFECYCLE_ALIASES: Record<string, string> = {
   "decision.gate_blocked": "ApprovalRejected",
   "mission.completed": "MissionCompleted",
   "mission.signal.objective_advanced": "ObjectiveAdvanced",
+  "growth.company_intelligence.completed": "CompanyIntelligenceCompleted",
+  "growth.datamoon.person_requested": "DataMoonPersonRequested",
+  "growth.datamoon.person_pending": "DataMoonPersonPending",
+  "growth.datamoon.person_completed": "DataMoonPersonCompleted",
+  "growth.datamoon.person_failed": "DataMoonPersonFailed",
+  "growth.contact.verified": "ContactVerified",
+  "growth.contact.available": "ContactAvailable",
+  "growth.contact.verification_failed": "ContactVerificationFailed",
+  "growth.personalization.completed": "PersonalizationCompleted",
+  "growth.mission.changed": "MissionChanged",
+  "growth.company.profile_changed": "CompanyProfileChanged",
+  "growth.capacity.available": "CapacityAvailable",
+  "growth.research.became_stale": "ResearchBecameStale",
+  "growth.budget.window_reset": "BudgetWindowReset",
 }
 
 export function mapAiEventCategoryToGrowthCategory(category: AiEventCategory): GrowthAiEventCategory {

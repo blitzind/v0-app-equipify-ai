@@ -8,10 +8,12 @@ import { isAutonomousExecutionGuardrailsEnabledClient } from "@/lib/growth/auton
 import type { LeadDailyWorkQueueStatus } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-integration"
 import type { AutonomousExecutionGuardrailDisplay } from "@/lib/growth/autonomous-execution-guardrails/autonomous-execution-guardrail-view"
 import { GrowthAutonomousExecutionGuardrailSummary } from "@/components/growth/growth-autonomous-execution-guardrail-summary"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type { GrowthLead } from "@/lib/growth/types"
 
 export function GrowthLeadDailyWorkQueuePanel({ lead }: { lead: GrowthLead }) {
+  const { teammate } = useAiTeammateIdentity()
   const [status, setStatus] = useState<LeadDailyWorkQueueStatus | null>(null)
   const [guardrailDisplay, setGuardrailDisplay] = useState<AutonomousExecutionGuardrailDisplay | null>(null)
   const [loading, setLoading] = useState(false)
@@ -124,7 +126,7 @@ export function GrowthLeadDailyWorkQueuePanel({ lead }: { lead: GrowthLead }) {
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">
-          This lead is not scheduled in Ava&apos;s daily work queue today.
+          This lead is not scheduled in {teammate.name}&apos;s daily work queue today.
         </p>
       )}
     </GrowthCollapsibleEngineCard>

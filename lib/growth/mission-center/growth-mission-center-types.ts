@@ -5,19 +5,32 @@ import type { GrowthRevenueDirectorCommandCenterSnapshot } from "@/lib/growth/ai
 import type { BusinessProfileRecord } from "@/lib/growth/business-profile/business-profile-types"
 import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
 import type { GrowthHomeMissionTimelineItem } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
+import {
+  AI_TEAMMATE_DEFAULT_NAME,
+  resolveAiTeammatePresentation,
+  type AiTeammatePresentation,
+} from "@/lib/workspace/ai-teammate-identity"
 
 export const GROWTH_AVA_MISSION_CENTER_1A_QA_MARKER = "ge-ava-mission-center-1a-v1" as const
 
 export const GROWTH_MISSION_CENTER_RULE =
   "Mission Center aggregates existing GrowthObjective, Revenue Director, Human Approval, Business Profile, and Home read models — presentation only, no new runtime or planning engines." as const
 
-export const GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_TITLE = "Ava's Active Missions" as const
+export function growthMissionCenterActiveMissionsTitle(teammate: AiTeammatePresentation): string {
+  return `${teammate.name}'s Active Missions`
+}
 
-export const GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_SUBTITLE =
-  "Track the revenue missions Ava is running for you." as const
+export function growthMissionCenterActiveMissionsSubtitle(teammate: AiTeammatePresentation): string {
+  return `Track the revenue missions ${teammate.name} is running for you.`
+}
 
-export const GROWTH_MISSION_CENTER_EMPTY_STATE_COPY =
-  "When Ava has an active revenue mission — research, leads, or outreach — it will appear here." as const
+export function growthMissionCenterEmptyStateCopy(teammate: AiTeammatePresentation): string {
+  return `When ${teammate.name} has an active revenue mission — research, leads, or outreach — it will appear here.`
+}
+const defaultTeammate = resolveAiTeammatePresentation(AI_TEAMMATE_DEFAULT_NAME)
+export const GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_TITLE = growthMissionCenterActiveMissionsTitle(defaultTeammate)
+export const GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_SUBTITLE = growthMissionCenterActiveMissionsSubtitle(defaultTeammate)
+export const GROWTH_MISSION_CENTER_EMPTY_STATE_COPY = growthMissionCenterEmptyStateCopy(defaultTeammate)
 
 export const GROWTH_MISSION_CENTER_PRESENTATION_STAGES = [
   "business_profile",
@@ -71,7 +84,7 @@ export type GrowthMissionCenterCard = {
   statusLabel: string
   progressPercent: number
   priority: "low" | "medium" | "high" | "critical"
-  ownerLabel: "Ava"
+  ownerLabel: string
   presentationStage: GrowthMissionCenterPresentationStage
   currentActivity: string
   waitingOn: string | null

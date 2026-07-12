@@ -11,7 +11,7 @@ import { GrowthHomeConfidenceBadge } from "@/components/growth/workspace/executi
 import {
   GROWTH_BUSINESS_INTELLIGENCE_APPLY_TO_PROFILE_LABEL,
   GROWTH_BUSINESS_INTELLIGENCE_RECENTLY_RESEARCHED_LABEL,
-  GROWTH_BUSINESS_INTELLIGENCE_REVIEW_PROMPT,
+  businessIntelligenceReviewPrompt,
   type BusinessIntelligenceEvidenceSummary,
   type BusinessIntelligenceReviewDecisionSummary,
   type BusinessIntelligenceReviewDecisionType,
@@ -27,6 +27,7 @@ import type {
 import { isUnknownField } from "@/lib/growth/business-intelligence"
 import { GrowthHomeBusinessIntelligenceReviewField } from "@/components/growth/workspace/executive-briefing/growth-home-business-intelligence-review-field"
 import { Button } from "@/components/ui/button"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 
 function confidencePercent(value: number): number {
   return Math.round(value <= 1 ? value * 100 : value)
@@ -54,6 +55,7 @@ function EvidenceList({
   evidenceIds: string[]
   evidenceById: Record<string, BusinessIntelligenceEvidenceSummary>
 }) {
+  const { teammate } = useAiTeammateIdentity()
   if (evidenceIds.length === 0) {
     return <p className="text-xs text-muted-foreground">No linked evidence items.</p>
   }
@@ -334,7 +336,7 @@ export function GrowthHomeBusinessIntelligencePanel({
     <div className="space-y-4" data-qa-panel="business-intelligence">
       {showReviewPrompt ? (
         <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
-          {GROWTH_BUSINESS_INTELLIGENCE_REVIEW_PROMPT}
+          {businessIntelligenceReviewPrompt(teammate.name)}
         </div>
       ) : null}
 

@@ -76,14 +76,25 @@ assert.equal(route.includes("POST"), false)
 assert.equal(route.includes("PUT"), false)
 
 const panel = readSource("components/growth/ai-os/approvals/growth-human-approval-center-panel.tsx")
+assert.ok(panel.includes("GrowthAvaCompletedWorkPanel"))
 assert.equal(panel.includes('method: "POST"'), false)
-assert.ok(panel.includes("action.approveLabel"))
-assert.ok(panel.includes("action.rejectLabel"))
-assert.ok(panel.includes("Text drafts"))
+
+const completedWorkPanel = readSource(
+  "components/growth/ai-os/approvals/growth-ava-completed-work-panel.tsx",
+)
+assert.ok(completedWorkPanel.includes("/api/platform/growth/ai-os/approvals"))
+assert.ok(completedWorkPanel.includes("GROWTH_HUMAN_APPROVAL_CENTER_QA_MARKER"))
+
+const packageCard = readSource(
+  "components/growth/ai-os/approvals/growth-ava-completed-outreach-package-card.tsx",
+)
+assert.ok(packageCard.includes("buildAvaOperatorPackageActionApiPath"))
+assert.ok(packageCard.includes("Authorize"))
 
 const section = readSource("components/growth/ai-os/command-center/growth-ai-os-human-approval-center-section.tsx")
-assert.equal(section.includes("Approve"), false)
-assert.ok(section.includes("SMS"))
+assert.equal(section.includes('method: "POST"'), false)
+assert.ok(section.includes("GROWTH_AVA_COMPLETED_WORK_TITLE") || section.includes("Ava completed work"))
+assert.ok(section.includes("completed"))
 
 const generatedAt = "2026-06-25T16:00:00.000Z"
 

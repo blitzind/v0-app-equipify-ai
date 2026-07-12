@@ -14,16 +14,18 @@ import { GROWTH_COMMUNICATION_ENGINE_QA_MARKER } from "@/lib/growth/aios/communi
 import { GROWTH_REVENUE_DIRECTOR_QA_MARKER } from "@/lib/growth/aios/revenue-director/growth-revenue-director-types"
 import {
   AI_OS_APPROVAL_OUTCOME_BUCKETS,
-  AI_OS_HOME_PRIMARY_CTA,
+  aiOsHomePrimaryCta,
 } from "@/lib/workspace/ai-os-outcome-first-terminology"
 import {
-  defaultTeammatePresentation,
   teammateAttributeOutcomes,
   teammateHomeIntro,
   teammatePreparedSummary,
   teammatePresenceLabel,
 } from "@/lib/workspace/ai-teammate-voice"
-import type { AiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
+import {
+  resolveAiTeammatePresentation,
+  type AiTeammatePresentation,
+} from "@/lib/workspace/ai-teammate-identity"
 import type {
   GrowthAiOsOperatorAiImprovement,
   GrowthAiOsOperatorAttentionCard,
@@ -59,6 +61,7 @@ export type GrowthAiOsOperatorExperienceInput = {
   adaptiveCalibration?: GrowthAdaptiveCalibrationReadModel
   closedLoopLearning?: GrowthClosedLoopLearningReadModel
   teammate?: AiTeammatePresentation
+  teammateName?: string | null
   nativeRevenueDecisionRecommendation?: GrowthAiOsOperatorRevenueRecommendation | null
 }
 
@@ -126,7 +129,7 @@ function buildExecutiveBrief(
     aiHealthLabel: overview.aiHealthLabel,
     todayHighlights,
     criticalIssueCount: criticalIssues,
-    primaryCtaLabel: AI_OS_HOME_PRIMARY_CTA,
+    primaryCtaLabel: aiOsHomePrimaryCta(teammate),
     primaryCtaHref: primaryAction?.href ?? "/growth/os/approvals",
   }
 }
@@ -464,7 +467,7 @@ export function synthesizeGrowthAiOsOperatorExperience(
   input: GrowthAiOsOperatorExperienceInput,
 ): GrowthAiOsOperatorExperienceViewModel {
   const { dashboard, dailyBriefing } = input
-  const teammate = input.teammate ?? defaultTeammatePresentation()
+  const teammate = resolveAiTeammatePresentation(input.teammateName ?? input.teammate?.name)
   const timelineSource = [
     ...dashboard.activityTimeline.map((row) => ({
       id: row.id,

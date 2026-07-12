@@ -8,12 +8,13 @@ import { execSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 import { AI_TEAMMATE_DEFAULT_NAME } from "../lib/workspace/ai-teammate-identity"
+import { defaultTeammatePresentation } from "../lib/workspace/ai-teammate-voice"
 import {
   GROWTH_AVA_DISPLAY_NAME,
   GROWTH_AVA_FORBIDDEN_OPERATOR_LABELS,
   GROWTH_AVA_IDENTITY_OPERATOR_SURFACES,
-  GROWTH_AVA_PANEL_TITLE,
-  GROWTH_AVA_RECOMMENDED_ACTIONS_TITLE,
+  growthAvaPanelTitle,
+  growthAvaRecommendedActionsTitle,
   GROWTH_WORKSPACE_AVA_IDENTITY_1D_QA_MARKER,
 } from "../lib/growth/workspace/growth-workspace-ava-identity"
 
@@ -54,8 +55,8 @@ function main(): void {
   assert.equal(GROWTH_WORKSPACE_AVA_IDENTITY_1D_QA_MARKER, "growth-workspace-ava-identity-1d-v1")
   assert.equal(AI_TEAMMATE_DEFAULT_NAME, "Ava")
   assert.equal(GROWTH_AVA_DISPLAY_NAME, "Ava")
-  assert.equal(GROWTH_AVA_PANEL_TITLE, "Ava")
-  assert.equal(GROWTH_AVA_RECOMMENDED_ACTIONS_TITLE, "Ava recommends")
+  assert.equal(growthAvaPanelTitle(defaultTeammatePresentation()), "Ava")
+  assert.equal(growthAvaRecommendedActionsTitle(defaultTeammatePresentation()), "Ava recommends")
   console.log("  ✓ Ava identity marker and canonical display name")
 
   for (const file of GROWTH_AVA_IDENTITY_OPERATOR_SURFACES) {
@@ -79,15 +80,15 @@ function main(): void {
   console.log("  ✓ Key operator surfaces anchor on Ava-first language")
 
   const copilotTitle = read("components/growth/growth-ai-copilot.tsx")
-  assert.match(copilotTitle, /GROWTH_AVA_PANEL_TITLE|"Ava"/)
+  assert.match(copilotTitle, /growthAvaPanelTitle/)
   assert.doesNotMatch(stripComments(copilotTitle), /\bAI Copilot\b/)
 
   const inboxSidebar = read("components/growth/inbox/growth-inbox-intelligence-sidebar.tsx")
   assert.doesNotMatch(stripComments(inboxSidebar), /AI Assistant/)
-  assert.match(inboxSidebar, /GROWTH_AVA_PANEL_TITLE|"Ava"/)
+  assert.match(inboxSidebar, /growthAvaPanelTitle/)
 
   const insightPanel = read("components/growth/prospect-search/company-signal-ai-insight-panel.tsx")
-  assert.match(insightPanel, /GROWTH_AVA_INSIGHT_TITLE|What Ava noticed/)
+  assert.match(insightPanel, /growthAvaInsightTitle|whatTeammateNoticed/)
 
   console.log("  ✓ Core Ava panels use standardized titles")
 

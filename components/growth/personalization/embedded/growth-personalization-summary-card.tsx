@@ -8,7 +8,8 @@ import { GROWTH_PERSONALIZATION_EMBEDDED_QA_MARKER } from "@/lib/growth/personal
 import { GrowthPersonalizationActions } from "@/components/growth/personalization/embedded/growth-personalization-actions"
 import { GrowthPersonalizationPreviewCard } from "@/components/growth/personalization/embedded/growth-personalization-preview-card"
 import { GrowthPersonalizationStageCard } from "@/components/growth/personalization/embedded/growth-personalization-stage-card"
-import { GROWTH_AVA_PERSONALIZATION_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
+import { growthAvaPersonalizationTitle } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { personalizationStatusLabel } from "@/lib/growth/personalization/personalization-types"
 
 function SummarySkeleton() {
@@ -54,8 +55,10 @@ export function GrowthPersonalizationSummaryCard({
   showApprove = false,
   showEdit = false,
   compact = false,
-  title = GROWTH_AVA_PERSONALIZATION_TITLE,
+  title,
 }: Props) {
+  const { teammate } = useAiTeammateIdentity()
+  const resolvedTitle = title ?? growthAvaPersonalizationTitle(teammate)
   if (loading && !summary) {
     return <SummarySkeleton />
   }
@@ -69,7 +72,7 @@ export function GrowthPersonalizationSummaryCard({
       <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           <Sparkles className="size-4 text-violet-600" />
-          <h3 className={`font-semibold ${compact ? "text-xs" : "text-sm"}`}>{title}</h3>
+          <h3 className={`font-semibold ${compact ? "text-xs" : "text-sm"}`}>{resolvedTitle}</h3>
         </div>
         {summary?.status ? (
           <GrowthBadge label={personalizationStatusLabel(summary.status)} tone="attention" />

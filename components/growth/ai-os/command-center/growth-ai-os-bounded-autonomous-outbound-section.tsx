@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge"
 import { evaluateAutonomousOutboundActivationEligibility } from "@/lib/growth/aios/outbound/growth-autonomous-outbound-scope-engine"
 import type { GrowthBoundedAutonomousOutboundReadModel } from "@/lib/growth/aios/outbound/growth-autonomous-outbound-scope-types"
 import { GROWTH_AUTONOMOUS_OUTBOUND_SCOPE_QA_MARKER } from "@/lib/growth/aios/outbound/growth-autonomous-outbound-scope-types"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
+import { openCompletedWork } from "@/lib/workspace/ai-teammate-voice"
 
 type Props = {
   boundedAutonomousOutbound: GrowthBoundedAutonomousOutboundReadModel
@@ -15,6 +17,7 @@ export function GrowthAiOsBoundedAutonomousOutboundSection({
   boundedAutonomousOutbound,
   compact = false,
 }: Props) {
+  const { teammate } = useAiTeammateIdentity()
   if (boundedAutonomousOutbound.qaMarker !== GROWTH_AUTONOMOUS_OUTBOUND_SCOPE_QA_MARKER) return null
 
   const summary = boundedAutonomousOutbound.summary
@@ -113,7 +116,7 @@ export function GrowthAiOsBoundedAutonomousOutboundSection({
 
       <div className="flex flex-wrap gap-2 text-xs">
         <Link href="/growth/os/approvals" className="text-primary underline-offset-4 hover:underline">
-          Open Approval Center
+          {openCompletedWork(teammate)}
         </Link>
         {boundedAutonomousOutbound.lastEventType ? (
           <span className="text-muted-foreground">

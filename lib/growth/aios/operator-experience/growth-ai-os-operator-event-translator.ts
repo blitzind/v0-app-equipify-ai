@@ -1,11 +1,13 @@
 /** GE-AI-UX-1A — Human-readable event translations (client-safe). */
+import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
+import { completedWorkUpdated } from "@/lib/workspace/ai-teammate-voice"
 
 const EXACT_TRANSLATIONS: Record<string, string> = {
   "Growth Communication Plan Generated": "AI prepared a communication strategy.",
   "Growth Revenue Director Snapshot Generated": "Revenue Director reviewed the current pipeline.",
   "Growth Meta Recommender Snapshot Generated": "AI ranked the next best actions.",
   "Growth Priority Binding Snapshot Generated": "AI reprioritized active objectives.",
-  "Growth Human Approval Center Snapshot Generated": "Approval queue updated.",
+  "Growth Human Approval Center Snapshot Generated": "Completed work updated.",
   "Growth Bounded Autonomous Outbound Snapshot Generated": "Autonomous outbound scopes reviewed.",
   "Growth Closed Loop Learning Snapshot Generated": "AI analyzed recent outcomes.",
   "Growth Adaptive Calibration Snapshot Generated": "Learning insights reviewed for calibration.",
@@ -83,11 +85,15 @@ export function translateOperatorActivityHeadline(input: {
   title: string
   summary?: string | null
   eventType?: string | null
+  teammateName?: string | null
 }): { headline: string; rawTitle: string } {
   const title = input.title.trim()
   const summary = input.summary?.trim() ?? ""
   const eventType = input.eventType?.trim() ?? ""
 
+  if (title === "Growth Human Approval Center Snapshot Generated") {
+    return { headline: completedWorkUpdated(resolveAiTeammatePresentation(input.teammateName)), rawTitle: title }
+  }
   if (EXACT_TRANSLATIONS[title]) {
     return { headline: EXACT_TRANSLATIONS[title], rawTitle: title }
   }

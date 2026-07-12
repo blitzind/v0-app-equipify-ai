@@ -10,6 +10,7 @@ import { buildGrowthBuyingStageOperatorPreview } from "@/lib/growth/buyer-journe
 import { formatGrowthReasoningOperatorPreview } from "@/lib/growth/reasoning/growth-reasoning-diagnostics"
 import { formatGrowthSequenceOperatorPreview } from "@/lib/growth/sequence-intelligence/growth-sequence-diagnostics"
 import { GrowthOutboundSenderContextBadge } from "@/components/growth/signatures/growth-outbound-sender-context-badge"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 
 type Props = {
   audit: OutreachPersonalizationAudit
@@ -34,6 +35,7 @@ function warningTone(severity: OutreachPersonalizationAudit["warnings"][number][
 }
 
 export function GrowthOutreachPersonalizationPreview({ audit, generatedSubject, generatedContent, outboundIdentity }: Props) {
+  const { teammate } = useAiTeammateIdentity()
   const qualityPreview = audit.qualityDiagnostics
     ? buildPersonalizationQualityOperatorPreview(audit.qualityDiagnostics)
     : null
@@ -77,7 +79,7 @@ export function GrowthOutreachPersonalizationPreview({ audit, generatedSubject, 
           <GrowthBadge label="Sequence guidance applied" tone="healthy" />
         ) : null}
         {audit.refinedByAi ? (
-          <GrowthBadge label="Refined by Ava" tone="healthy" />
+          <GrowthBadge label={`Refined by ${teammate.name}`} tone="healthy" />
         ) : (
           <GrowthBadge label="Draft preview" tone="neutral" />
         )}

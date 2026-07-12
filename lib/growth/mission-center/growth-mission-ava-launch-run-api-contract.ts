@@ -6,6 +6,8 @@ import type { AvaLaunchSerializedException } from "@/lib/growth/mission-center/g
 import type { GrowthMissionAvaLaunchRunStoppedAt } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-result-semantics"
 import type { GrowthMissionAvaLaunchZeroPreviewDebug } from "@/lib/growth/mission-center/growth-mission-ava-launch-zero-preview-debug"
 import { GROWTH_AVA_LAUNCH_RESULT_SEMANTICS_1_QA_MARKER } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-result-semantics"
+import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
+import { launchTeammate, runTeammate } from "@/lib/workspace/ai-teammate-voice"
 
 export const GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER = "ge-ava-autonomy-launch-run-1-v1" as const
 
@@ -15,7 +17,11 @@ export const GROWTH_AVA_SEARCH_VALIDATION_2_QA_MARKER = "ge-ava-search-validatio
 
 export const GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR = "Validation failed" as const
 
-export const GROWTH_AVA_LAUNCH_CANT_START_HEADING = "Ava can't start yet." as const
+export function growthTeammateLaunchCantStartHeading(teammateName?: string | null): string {
+  return `${resolveAiTeammatePresentation(teammateName).name} can't start yet.`
+}
+/** @deprecated Use growthTeammateLaunchCantStartHeading with the resolved teammate. */
+export const GROWTH_AVA_LAUNCH_CANT_START_HEADING = "Your AI teammate can't start yet." as const
 
 export type GrowthAvaLaunchValidationError = {
   code: string
@@ -28,40 +34,47 @@ export type GrowthAvaLaunchValidationError = {
   rawIssue?: unknown
 }
 
-const AVA_LAUNCH_VALIDATION_ERROR_MESSAGES: Record<string, string> = {
-  approved_by_user_required: "Confirm human review before running Ava.",
-  growth_profile_schema_not_ready: "Growth Profile is not ready in this environment.",
-  growth_profile_not_approved: "Approve your Growth Profile before running Ava.",
-  mission_id_required: "Select a mission before running Ava.",
-  mission_not_found: "Selected mission was not found.",
-  mission_org_mismatch: "Selected mission does not belong to this organization.",
-  mission_not_active: "Mission is not active.",
-  mission_blocked: "Mission is blocked.",
-  no_approved_lead_search: "No approved search attached to this mission.",
-  datamoon_provider_disabled: "Datamoon provider is disabled.",
-  growth_autonomy_disabled: "Growth autonomy is disabled.",
-  topic_ids_required: "B2B/B2C audiences require at least one topic.",
-  run_name_required: "Run name is required.",
-  invalid_audience_type: "Audience type is invalid.",
-  invalid_limit: "Record limit is out of range.",
-  invalid_provider_mode: "Provider mode is invalid.",
+function launchValidationMessages(teammateName?: string | null): Record<string, string> {
+  const name = resolveAiTeammatePresentation(teammateName).name
+  return {
+    approved_by_user_required: `Confirm human review before running ${name}.`,
+    growth_profile_schema_not_ready: "Growth Profile is not ready in this environment.",
+    growth_profile_not_approved: `Approve your Growth Profile before running ${name}.`,
+    mission_id_required: `Select a mission before running ${name}.`,
+    mission_not_found: "Selected mission was not found.",
+    mission_org_mismatch: "Selected mission does not belong to this organization.",
+    mission_not_active: "Mission is not active.",
+    mission_blocked: "Mission is blocked.",
+    no_approved_lead_search: "No approved search attached to this mission.",
+    datamoon_provider_disabled: "Datamoon provider is disabled.",
+    growth_autonomy_disabled: "Growth autonomy is disabled.",
+    topic_ids_required: "B2B/B2C audiences require at least one topic.",
+    run_name_required: "Run name is required.",
+    invalid_audience_type: "Audience type is invalid.",
+    invalid_limit: "Record limit is out of range.",
+    invalid_provider_mode: "Provider mode is invalid.",
+  }
 }
 
-export function resolveGrowthAvaLaunchValidationMessage(error: GrowthAvaLaunchValidationError): string {
+export function resolveGrowthAvaLaunchValidationMessage(
+  error: GrowthAvaLaunchValidationError,
+  teammateName?: string | null,
+): string {
   if (error.validator || error.rawIssue) return error.message
   if (error.code === "validation_failed") return error.message
-  return AVA_LAUNCH_VALIDATION_ERROR_MESSAGES[error.code] ?? error.message
+  return launchValidationMessages(teammateName)[error.code] ?? error.message
 }
 
 export function formatGrowthAvaLaunchValidationErrorsForUi(
   validationErrors: GrowthAvaLaunchValidationError[],
+  teammateName?: string | null,
 ): string {
   if (validationErrors.length === 0) return GROWTH_AVA_LAUNCH_VALIDATION_FAILED_ERROR
   const bullets = validationErrors
-    .map((entry) => resolveGrowthAvaLaunchValidationMessage(entry))
+    .map((entry) => resolveGrowthAvaLaunchValidationMessage(entry, teammateName))
     .filter((message, index, all) => all.indexOf(message) === index)
     .map((message) => `• ${message}`)
-  return [GROWTH_AVA_LAUNCH_CANT_START_HEADING, "", ...bullets].join("\n")
+  return [growthTeammateLaunchCantStartHeading(teammateName), "", ...bullets].join("\n")
 }
 
 export function ensureGrowthAvaLaunchValidationErrors(
@@ -178,10 +191,16 @@ export function buildGrowthMissionAvaLaunchExceptionFailureBody(input: {
   return body
 }
 
-export const GROWTH_AVA_LAUNCH_RUN_TITLE = "Run Ava" as const
+export const growthTeammateLaunchRunTitle = (teammateName?: string | null) =>
+  runTeammate(resolveAiTeammatePresentation(teammateName))
+export const growthTeammateLaunchRunSuccessCopy = (teammateName?: string | null) =>
+  `${launchTeammate(resolveAiTeammatePresentation(teammateName))} run complete.`
+/** @deprecated Use growthTeammateLaunchRunTitle with the resolved teammate. */
+export const GROWTH_AVA_LAUNCH_RUN_TITLE = "Run AI teammate" as const
 export const GROWTH_AVA_LAUNCH_RUN_DESCRIPTION =
   "Find leads from your approved search, import them, start research, and surface items for human approval — no outbound send." as const
-export const GROWTH_AVA_LAUNCH_RUN_SUCCESS_COPY = "Ava launch run complete." as const
+/** @deprecated Use growthTeammateLaunchRunSuccessCopy with the resolved teammate. */
+export const GROWTH_AVA_LAUNCH_RUN_SUCCESS_COPY = "AI teammate launch run complete." as const
 
 export type { GrowthMissionAvaLaunchRunStoppedAt } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-result-semantics"
 

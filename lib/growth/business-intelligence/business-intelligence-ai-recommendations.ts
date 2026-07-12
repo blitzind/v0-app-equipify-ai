@@ -114,7 +114,7 @@ export function buildDeterministicGapRecommendations(
       reasoning: [
         `Deterministic recommendation from identified gap: ${gap.gap_code}.`,
         gap.requires_user_confirmation
-          ? "Operator confirmation is required before Ava acts on this area."
+          ? "Operator confirmation is required before your AI teammate acts on this area."
           : "Additional evidence would improve confidence.",
       ],
       supporting_evidence_ids: [],

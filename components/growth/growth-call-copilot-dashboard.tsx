@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Loader2, Phone, RefreshCw, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import type { GrowthCallCopilotDashboard } from "@/lib/growth/call-copilot-dashboard-repository"
 import {
   GROWTH_CALL_COPILOT_BUYING_SIGNAL_LABELS,
@@ -12,15 +13,15 @@ import {
 } from "@/lib/growth/call-copilot-types"
 import { commandLeadFocusHref } from "@/lib/growth/command/command-action-catalog"
 import {
-  GROWTH_ACTION_FIRST_AVA_RECOMMENDS,
   GROWTH_ACTION_FIRST_CALLS_OUTCOME,
   GROWTH_ACTION_FIRST_CALLS_READINESS,
   GROWTH_ACTION_FIRST_CALLS_WHO,
   GROWTH_ACTION_FIRST_CALLS_WHY,
   GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE,
-  GROWTH_ACTION_FIRST_AVA_IDLE,
   GROWTH_ACTION_FIRST_SUPPORTING_METRICS,
   GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER,
+  growthActionFirstIdle,
+  growthActionFirstRecommends,
 } from "@/lib/growth/workspace/growth-workspace-action-first-1f"
 
 function normalizeDashboard(raw: GrowthCallCopilotDashboard | null | undefined): GrowthCallCopilotDashboard | null {
@@ -44,6 +45,7 @@ function normalizeDashboard(raw: GrowthCallCopilotDashboard | null | undefined):
 }
 
 export function GrowthCallCopilotDashboard({ embedded = false }: { embedded?: boolean }) {
+  const { teammate } = useAiTeammateIdentity()
   const [dashboard, setDashboard] = useState<GrowthCallCopilotDashboard | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -106,11 +108,11 @@ export function GrowthCallCopilotDashboard({ embedded = false }: { embedded?: bo
       data-growth-action-first-order="actions-before-metrics"
       data-qa-marker-action-first={GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER}
     >
-      <GrowthEngineCard title={GROWTH_ACTION_FIRST_AVA_RECOMMENDS} data-section="calls-action-first">
+      <GrowthEngineCard title={growthActionFirstRecommends(teammate)} data-section="calls-action-first">
         {dashboard.followUpNeeded.length === 0 && dashboard.stats.highRiskActive === 0 ? (
           <>
             <p className="text-sm font-medium">{GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{GROWTH_ACTION_FIRST_AVA_IDLE}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{growthActionFirstIdle(teammate)}</p>
           </>
         ) : (
           <ul className="space-y-2 text-sm">

@@ -590,11 +590,20 @@ async function main(): Promise<void> {
   assert.ok(pilot.includes("advanceDraftFactoryForLeadLive"))
 
   const research = readSource("lib/growth/research/growth-lead-research-execution-service.ts")
-  assert.ok(research.includes("wakeDraftFactoryFromCompletionEvent"))
-  assert.ok(research.includes("research_completed"))
+  assert.ok(
+    research.includes("publishProspectResearchWorkflowBridge") ||
+      research.includes("publishGrowthLeadResearchWorkflowStatus") ||
+      research.includes("draft_factory_wake_observer") ||
+      research.includes("GE-AIOS-AUTONOMY-1B"),
+  )
+  assert.ok(!research.includes("wakeDraftFactoryFromCompletionEvent"))
 
   const dm = readSource("lib/growth/datamoon-decision-maker/datamoon-dm-service.ts")
-  assert.ok(dm.includes("datamoon_person_completed"))
+  assert.ok(dm.includes("publishDraftFactoryDatamoonPersonCompleted"))
+  assert.ok(!dm.includes("wakeDraftFactoryFromCompletionEvent"))
+  const dmEmitter = readSource("lib/growth/draft-factory/draft-factory-wake-emitters.ts")
+  assert.ok(dmEmitter.includes("growth.datamoon.person_completed"))
+  assert.ok(dmEmitter.includes("growth.datamoon.person_failed"))
 
   const migration = readSource(
     "supabase/migrations/20271112120000_growth_draft_factory_durable_sv1_5.sql",
@@ -605,7 +614,34 @@ async function main(): Promise<void> {
   const factory = readSource("lib/growth/draft-factory/draft-factory-durable-repository-factory.ts")
   assert.ok(factory.includes("no memory fallback"))
 
-  // Optional live Postgres probe
+  // Production server boundary remains intact; plain tsx cert must not load it.
+  const productionRepoEntry = readSource(
+    "lib/growth/draft-factory/draft-factory-durable-repository.ts",
+  )
+  assert.ok(
+    /import\s+["']server-only["']/.test(productionRepoEntry),
+    "production repository entry must retain import \"server-only\"",
+  )
+  const repoCore = readSource("lib/growth/draft-factory/draft-factory-durable-repository-core.ts")
+  assert.equal(
+    /import\s+["']server-only["']/.test(repoCore),
+    false,
+    "repository core must remain Node/tsx-safe without server-only",
+  )
+  const thisCertSource = readSource("scripts/test-sv1-5a-production-durable-draft-factory.ts")
+  assert.equal(
+    thisCertSource.includes("draft-factory-durable-repository\""),
+    false,
+    "tsx cert must not import the guarded production repository entrypoint",
+  )
+  assert.ok(
+    thisCertSource.includes("draft-factory-durable-repository-core") ||
+      !thisCertSource.includes("createPostgresDraftFactoryRepository"),
+    "optional live probe may import core only",
+  )
+  console.log("  ✓ tsx cert avoids guarded server-only entry; production entry still guarded")
+
+  // Optional live Postgres probe (imports Node-safe core only — never the server-only entry).
   if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL) {
     const { createClient } = await import("@supabase/supabase-js")
     const admin = createClient(
@@ -614,7 +650,7 @@ async function main(): Promise<void> {
       { auth: { persistSession: false, autoRefreshToken: false } },
     )
     const { createPostgresDraftFactoryRepository } = await import(
-      "../lib/growth/draft-factory/draft-factory-durable-repository"
+      "../lib/growth/draft-factory/draft-factory-durable-repository-core"
     )
     const pg = createPostgresDraftFactoryRepository(admin)
     const avail = await pg.assertAvailable?.()

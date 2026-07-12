@@ -1,16 +1,35 @@
-/** GROWTH-WORKSPACE-HOME-EXPERIENCE-2B — executive briefing presentation copy (client-safe). */
+/** GROWTH-WORKSPACE-HOME-EXPERIENCE-2B / GE-AIOS-IDENTITY-1B — executive briefing presentation copy (client-safe). */
+
+import type { AiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
+import {
+  completedTodaysWork,
+  confidenceLabel,
+  isWorking,
+  needsApproval,
+  nothingNeededFromYou,
+  recommends,
+} from "@/lib/workspace/ai-teammate-voice"
 
 export const GROWTH_WORKSPACE_HOME_EXPERIENCE_2B_QA_MARKER =
   "growth-workspace-home-experience-2b-v1" as const
 
 export const GROWTH_HOME_TODAY_AT_A_GLANCE = "Today at a glance" as const
-export const GROWTH_HOME_AVA_RECOMMENDS = "Ava recommends" as const
+
+export function growthHomeRecommends(teammate: AiTeammatePresentation): string {
+  return recommends(teammate)
+}
+
 export const GROWTH_HOME_NEEDS_YOUR_ATTENTION = "Needs Your Decision" as const
 export const GROWTH_HOME_CAUGHT_UP_TITLE = "You're all caught up." as const
-export const GROWTH_HOME_AVA_IDLE =
-  "Ava doesn't need anything from you right now." as const
 
-export const GROWTH_HOME_KPI_AVA_CONFIDENCE = "Ava's confidence" as const
+export function growthHomeIdle(teammate: AiTeammatePresentation): string {
+  return nothingNeededFromYou(teammate)
+}
+
+export function growthHomeKpiConfidence(teammate: AiTeammatePresentation): string {
+  return confidenceLabel(teammate)
+}
+
 export const GROWTH_HOME_KPI_COMPLETED_FOR_YOU = "Completed for you" as const
 export const GROWTH_HOME_KPI_NEEDS_APPROVAL = "Needs approval" as const
 export const GROWTH_HOME_KPI_PIPELINE_IMPACT = "Pipeline impact" as const
@@ -53,16 +72,17 @@ export function extractFirstNameFromGreeting(greeting: string): string | null {
 }
 
 /** Teammate-voice status line from existing status labels. */
-export function resolveAvaTeammateStatusLine(statusLabel: string, activityLabel?: string | null): string {
+export function resolveAvaTeammateStatusLine(
+  teammate: AiTeammatePresentation,
+  statusLabel: string,
+  activityLabel?: string | null,
+): string {
   const lower = statusLabel.toLowerCase()
   if (lower.includes("waiting") || lower.includes("approval")) {
-    return "Ava is waiting for your approval."
+    return needsApproval(teammate)
   }
   if (lower.includes("idle") || lower.includes("caught")) {
-    return "Ava completed today's work."
+    return completedTodaysWork(teammate)
   }
-  if (activityLabel?.trim()) {
-    return `Ava is ${activityLabel.trim().replace(/^Ava\s+/i, "").replace(/\.$/, "")}.`
-  }
-  return "Ava is actively monitoring your pipeline."
+  return isWorking(teammate, activityLabel)
 }

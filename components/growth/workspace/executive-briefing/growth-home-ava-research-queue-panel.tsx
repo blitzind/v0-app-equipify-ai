@@ -4,10 +4,11 @@ import { useCallback, useState } from "react"
 import Link from "next/link"
 import { Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import {
   GROWTH_AVA_RESEARCH_QUEUE_API_PATH,
   GROWTH_AVA_RESEARCH_QUEUE_OPERATOR_LABEL,
-  GROWTH_AVA_RESEARCH_QUEUE_SAFETY_DISCLAIMER,
+  growthResearchQueueSafetyDisclaimer,
   type GrowthAvaResearchQueueApiResponse,
 } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-api-contract"
 import type { GrowthAvaResearchLoopSummary } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-types"
@@ -20,6 +21,7 @@ type Props = {
 }
 
 export function GrowthHomeAvaResearchQueuePanel({ researchLoopSummary, onCompleted }: Props) {
+  const { teammate } = useAiTeammateIdentity()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [latestSummary, setLatestSummary] = useState<GrowthAvaResearchLoopSummary | null>(researchLoopSummary)
@@ -61,7 +63,7 @@ export function GrowthHomeAvaResearchQueuePanel({ researchLoopSummary, onComplet
         <Sparkles className="mt-0.5 size-5 text-indigo-600" aria-hidden />
         <div className="min-w-0 flex-1 space-y-1">
           <h2 className="text-lg font-semibold tracking-tight">Research loop</h2>
-          <p className="text-sm text-muted-foreground">{GROWTH_AVA_RESEARCH_QUEUE_SAFETY_DISCLAIMER}</p>
+          <p className="text-sm text-muted-foreground">{growthResearchQueueSafetyDisclaimer(teammate)}</p>
         </div>
       </div>
 

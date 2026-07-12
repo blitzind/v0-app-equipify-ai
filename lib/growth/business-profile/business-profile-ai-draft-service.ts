@@ -25,9 +25,11 @@ import {
 
 export type BusinessProfileAiDraftDeps = {
   organizationId?: string | null
+  teammateName?: string | null
   fetchWebsiteContext?: (website: string) => Promise<BusinessProfileWebsiteContextResult>
   runAiDraft?: (input: {
     organizationId: string
+    teammateName?: string | null
     companyInput: BusinessProfileInput
     websiteContextSummary: string | null
   }) => Promise<BusinessProfileAiDraftModel | null>
@@ -58,6 +60,7 @@ export function normalizeBusinessProfileInput(input: BusinessProfileInput): Busi
 
 async function defaultRunAiDraft(input: {
   organizationId: string
+  teammateName?: string | null
   companyInput: BusinessProfileInput
   websiteContextSummary: string | null
 }): Promise<BusinessProfileAiDraftModel | null> {
@@ -66,10 +69,11 @@ async function defaultRunAiDraft(input: {
       task: "growth_business_profile_draft",
       organizationId: input.organizationId,
       input: {
-        system: buildBusinessProfileAiDraftSystemPrompt(),
+        system: buildBusinessProfileAiDraftSystemPrompt(input.teammateName),
         user: buildBusinessProfileAiDraftUserPrompt({
           companyInput: input.companyInput,
           websiteContextSummary: input.websiteContextSummary,
+          teammateName: input.teammateName,
         }),
       },
       schema: businessProfileAiDraftModelSchema,
@@ -121,6 +125,7 @@ export async function draftBusinessProfileWithAiAssistance(
     const runAiDraft = deps.runAiDraft ?? defaultRunAiDraft
     const aiModel = await runAiDraft({
       organizationId,
+      teammateName: deps.teammateName,
       companyInput,
       websiteContextSummary: websiteContext.summary,
     })

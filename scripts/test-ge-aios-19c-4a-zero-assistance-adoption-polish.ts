@@ -48,25 +48,23 @@ function main(): void {
   assert.equal(crossLink?.label, GROWTH_CUSTOMER_CROSS_LINK_APPROVALS_LABEL)
   console.log("  ✓ Home cross-link uses Approvals label")
 
-  const approvalsPanel = readSource("components/growth/ai-os/approvals/growth-human-approval-center-panel.tsx")
-  assert.match(approvalsPanel, /GROWTH_CUSTOMER_APPROVALS_TITLE/)
-  assert.match(approvalsPanel, /action\.approveLabel/)
-  assert.match(approvalsPanel, /action\.rejectLabel/)
-  assert.match(approvalsPanel, /GROWTH_CUSTOMER_APPROVALS_TRUST_BODY/)
+  const approvalsPanel = readSource("components/growth/ai-os/approvals/growth-ava-completed-work-panel.tsx")
+  assert.match(approvalsPanel, /GROWTH_AVA_COMPLETED_WORK_TITLE/)
+  assert.match(approvalsPanel, /Authorize|Review Ava/)
+  assert.match(approvalsPanel, /GROWTH_AVA_COMPLETED_WORK_HERO_WAITING|Ava is waiting/)
   assert.doesNotMatch(approvalsPanel, /Human Approval Center/)
   assert.doesNotMatch(approvalsPanel, /Enforcement:/)
-  assert.match(approvalsPanel, /Technical details/)
-  console.log("  ✓ Approvals page uses customer copy; engineering terms in details only")
+  console.log("  ✓ Approvals page uses Ava Completed Work copy; engineering terms not primary")
 
   const action = resolveGrowthCustomerApprovalPrimaryAction({
     route: "/growth/os/pilot/lead-research/abc",
     status: "pending",
     actionType: "approve_outreach_package",
   })
-  assert.equal(action.approveLabel, "Approve")
+  assert.equal(action.approveLabel, "Authorize")
   assert.equal(action.rejectLabel, "Reject")
-  assert.match(action.helperText, /Nothing sends until you approve/)
-  console.log("  ✓ approval primary action helper explains approve/reject workflow")
+  assert.match(action.helperText, /Nothing sends until you authorize/)
+  console.log("  ✓ approval primary action helper explains authorize/reject workflow")
 
   const dashboard = readSource(
     "components/growth/workspace/executive-briefing/growth-home-executive-briefing-dashboard.tsx",
@@ -79,7 +77,7 @@ function main(): void {
     "components/growth/workspace/executive-briefing/growth-home-launch-complete-banner.tsx",
   )
   assert.match(launchBanner, /GROWTH_CUSTOMER_LAUNCH_COMPLETE_HEADLINE/)
-  assert.match(launchBanner, /Open Approvals/)
+  assert.match(launchBanner, /Review Ava/)
   console.log("  ✓ launch moment explains next steps")
 
   const onboarding = readSource("components/growth/ai-teammate/growth-ai-teammate-onboarding-dialog.tsx")
@@ -93,7 +91,7 @@ function main(): void {
     "components/growth/workspace/executive-briefing/growth-home-ai-os-waiting-on-you-section.tsx",
   )
   assert.match(waiting, /What I need from you/)
-  assert.match(waiting, /Open Approvals/)
+  assert.match(waiting, /Review Ava/)
   console.log("  ✓ waiting section aligned with narrative labels")
 
   const workSection = readSource("components/growth/workspace/executive-briefing/growth-home-ava-work-section.tsx")
@@ -134,7 +132,7 @@ function main(): void {
   assert.doesNotMatch(dashboardBody, /GROWTH_HOME_WORKSPACE_SUMMARY_API_PATH/)
   console.log("  ✓ single workspace-summary fetch preserved")
 
-  assert.equal(GROWTH_CUSTOMER_APPROVALS_TITLE, "Approvals")
+  assert.equal(GROWTH_CUSTOMER_APPROVALS_TITLE, "Ava completed work")
   assert.equal(GROWTH_WORKSPACE_SIDEBAR_IA_QA_MARKER, "growth-workspace-sidebar-ia-v7")
   console.log("  ✓ terminology constants centralized")
 

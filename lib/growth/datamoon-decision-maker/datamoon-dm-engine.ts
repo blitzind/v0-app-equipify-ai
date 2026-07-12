@@ -60,51 +60,75 @@ export function evaluateDecisionMakerContactReadiness(input: {
   email?: string | null
   phone?: string | null
   linkedinUrl?: string | null
+  emails?: Array<{ normalized: string; emailType?: string }>
+  phones?: Array<{ normalized: string; isCompanySwitchboard?: boolean }>
 }): AiOsDatamoonDmContactReadiness {
-  const hasVerifiedEmail = emailLooksUsable(input.email)
-  const hasVerifiedPhone = phoneLooksUsable(input.phone)
+  const emailAvailable =
+    (input.emails?.some((email) => emailLooksUsable(email.normalized)) ?? false) ||
+    emailLooksUsable(input.email)
+  const personPhones =
+    input.phones?.filter((phone) => !phone.isCompanySwitchboard) ??
+    (phoneLooksUsable(input.phone) ? [{ normalized: input.phone!.trim() }] : [])
+  const phoneAvailable = personPhones.length > 0 || phoneLooksUsable(input.phone)
   const hasProfileUrl = Boolean(input.linkedinUrl?.trim())
-  if (hasVerifiedEmail) {
+
+  // Provider-returned contacts are available, not independently verified.
+  const hasVerifiedEmail = false
+  const hasVerifiedPhone = false
+
+  if (emailAvailable) {
     return {
       hasVerifiedEmail,
       hasVerifiedPhone,
+      emailAvailable: true,
+      phoneAvailable,
       hasProfileUrl,
       usableChannel: "email",
       unblocksEmailDrafting: true,
-      unblocksCallPackage: hasVerifiedPhone,
-      reason: "Verified email available for drafting channel.",
+      unblocksCallPackage: phoneAvailable,
+      readinessState: "email_available_unverified",
+      reason: "Provider email available but not independently verified — drafting may proceed; send still gated.",
     }
   }
-  if (hasVerifiedPhone) {
+  if (phoneAvailable) {
     return {
       hasVerifiedEmail,
       hasVerifiedPhone,
+      emailAvailable: false,
+      phoneAvailable: true,
       hasProfileUrl,
       usableChannel: "phone",
       unblocksEmailDrafting: false,
       unblocksCallPackage: true,
-      reason: "Phone only — call-oriented package may proceed; email drafting remains blocked.",
+      readinessState: "phone_available_unverified",
+      reason: "Provider phone only — call-oriented package may proceed; email drafting remains blocked.",
     }
   }
   if (hasProfileUrl) {
     return {
-      hasVerifiedEmail,
-      hasVerifiedPhone,
-      hasProfileUrl,
+      hasVerifiedEmail: false,
+      hasVerifiedPhone: false,
+      emailAvailable: false,
+      phoneAvailable: false,
+      hasProfileUrl: true,
       usableChannel: "profile",
       unblocksEmailDrafting: false,
       unblocksCallPackage: false,
+      readinessState: "profile_only",
       reason: "Profile URL only — insufficient for email drafting.",
     }
   }
   return {
     hasVerifiedEmail: false,
     hasVerifiedPhone: false,
+    emailAvailable: false,
+    phoneAvailable: false,
     hasProfileUrl: false,
     usableChannel: "none",
     unblocksEmailDrafting: false,
     unblocksCallPackage: false,
-    reason: "No verified usable channel.",
+    readinessState: "no_usable_channel",
+    reason: "No usable contact channel.",
   }
 }
 
@@ -277,6 +301,8 @@ export function rankDatamoonDecisionMakerCandidates(
     companyDomain?: string | null
     providerRecordId?: string | null
     companyMatchConfidence?: number
+    emails?: AiOsDatamoonDmCandidate["emails"]
+    phones?: AiOsDatamoonDmCandidate["phones"]
   }>,
   input?: { expectedCompanyDomain?: string | null; expectedCompanyName?: string | null },
 ): AiOsDatamoonDmCandidate[] {
@@ -287,7 +313,13 @@ export function rankDatamoonDecisionMakerCandidates(
     .filter((c) => c.fullName?.trim())
     .map((c) => {
       const titleScore = scoreDecisionMakerTitle({ title: c.title }).decision_maker_score
-      const readiness = evaluateDecisionMakerContactReadiness(c)
+      const readiness = evaluateDecisionMakerContactReadiness({
+        email: c.email,
+        phone: c.phone,
+        linkedinUrl: c.linkedinUrl,
+        emails: c.emails,
+        phones: c.phones,
+      })
       let companyMatch = typeof c.companyMatchConfidence === "number" ? c.companyMatchConfidence : 0.5
       const domain = c.companyDomain?.trim().toLowerCase() ?? null
       const companyName = c.companyName?.trim().toLowerCase() ?? null
@@ -320,10 +352,12 @@ export function rankDatamoonDecisionMakerCandidates(
         companyName: c.companyName?.trim() || null,
         companyDomain: domain,
         providerRecordId: c.providerRecordId ?? null,
+        emails: c.emails ?? [],
+        phones: c.phones ?? [],
         titleScore,
         seniorityBoost,
-        hasVerifiedEmail: readiness.hasVerifiedEmail,
-        hasCallablePhone: readiness.hasVerifiedPhone,
+        hasVerifiedEmail: readiness.emailAvailable,
+        hasCallablePhone: readiness.phoneAvailable,
         companyMatchConfidence: companyMatch,
         compositeScore,
         outcomeClass,
@@ -423,6 +457,15 @@ export function decideDatamoonDecisionMakerEnrichment(input: {
   duplicateRequestPrevented?: boolean
   idempotencyKey?: string | null
   now: string
+  /** GE-AIOS-CONTACT-1B — live adapter lifecycle status. */
+  discoveryStatus?:
+    | "completed"
+    | "pending"
+    | "failed_retryable"
+    | "failed_terminal"
+    | "reused"
+    | "skipped"
+    | null
 }): AiOsDatamoonDmDecision {
   const ranked = input.rankedCandidates ?? []
   const selected = input.authorization.authorized ? selectBestDatamoonDecisionMaker(ranked) : null
@@ -444,18 +487,40 @@ export function decideDatamoonDecisionMakerEnrichment(input: {
         : input.authorization.denyReason === "recent_equivalent_no_result" ||
             input.authorization.denyReason === "retry_limit_reached"
           ? "retry_later"
-          : "denied_authorization"
+          : input.authorization.denyReason === "stop_investment"
+            ? "stopped"
+            : input.authorization.denyReason === "not_portfolio_selected"
+              ? "deferred"
+              : "denied_authorization"
     resume =
       input.authorization.denyReason === "stop_investment" ||
       input.authorization.denyReason === "disqualified_lead"
         ? "paused"
         : "waiting_for_dm"
+  } else if (input.discoveryStatus === "pending") {
+    outcome = "provider_pending"
+    resume = "waiting_for_dm"
+  } else if (input.discoveryStatus === "failed_retryable") {
+    outcome = "provider_failed_retryable"
+    resume = "waiting_for_dm"
+  } else if (input.discoveryStatus === "failed_terminal") {
+    outcome = "provider_failed_terminal"
+    resume = "waiting_for_dm"
+  } else if (input.duplicateRequestPrevented && ranked.length === 0) {
+    outcome = "duplicate_noop"
+    resume = "waiting_for_dm"
   } else if (selected && contactReadiness?.unblocksEmailDrafting) {
-    outcome = selected.outcomeClass === "verified_decision_maker" ? "verified_decision_maker" : "probable_decision_maker"
+    outcome =
+      selected.outcomeClass === "verified_decision_maker"
+        ? "verified_decision_maker"
+        : "probable_decision_maker"
     resume = "personalization"
   } else if (selected && contactReadiness?.unblocksCallPackage) {
     outcome = "probable_decision_maker"
     resume = "personalization"
+  } else if (selected && !contactReadiness?.unblocksEmailDrafting && !contactReadiness?.unblocksCallPackage) {
+    outcome = "no_usable_channel"
+    resume = "waiting_for_dm"
   } else if (selected) {
     outcome = "insufficient_contact_data"
     resume = "waiting_for_dm"
@@ -479,7 +544,7 @@ export function decideDatamoonDecisionMakerEnrichment(input: {
 
   const explainability: AiOsDatamoonDmExplainability = {
     whyDecisionMakerNeeded: input.requirement.reason,
-    whyDatamoonSelected: "DataMoon is the active enrichment provider — no Apollo path.",
+    whyDatamoonSelected: "DataMoon is the active enrichment provider for person search.",
     whyAccountEarnedSpend: input.authorization.reason,
     searchCriteria: input.requirement.titleFamilies.map((t) => `title:${t}`),
     candidateCount: ranked.length,

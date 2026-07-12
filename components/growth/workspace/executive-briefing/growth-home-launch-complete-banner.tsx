@@ -10,10 +10,11 @@ import {
   dismissGrowthLaunchCompleteBanner,
   GROWTH_CUSTOMER_LAUNCH_COMPLETE_BODY,
   GROWTH_CUSTOMER_LAUNCH_COMPLETE_HEADLINE,
-  GROWTH_CUSTOMER_LAUNCH_COMPLETE_NEXT_STEPS,
+  growthCustomerLaunchCompleteNextSteps,
   GROWTH_ZERO_ASSISTANCE_ADOPTION_19C_4A_QA_MARKER,
   readGrowthLaunchCompleteBannerDismissed,
 } from "@/lib/growth/customer-experience/growth-zero-assistance-adoption-19c-4a"
+import { reviewCompletedWork } from "@/lib/workspace/ai-teammate-voice"
 import { GROWTH_SALES_OPERATIONS_CENTER_ROUTE } from "@/lib/growth/operations-center/growth-sales-operations-center-types"
 import { GROWTH_TRAINING_WORKSPACE_ROUTE } from "@/lib/growth/training/growth-training-workspace-types"
 
@@ -57,7 +58,7 @@ export function GrowthHomeLaunchCompleteBanner({ setupIncomplete }: Props) {
               {teammate.name} {GROWTH_CUSTOMER_LAUNCH_COMPLETE_BODY}
             </p>
             <ul className="space-y-1 text-sm text-muted-foreground">
-              {GROWTH_CUSTOMER_LAUNCH_COMPLETE_NEXT_STEPS.map((step) => (
+              {growthCustomerLaunchCompleteNextSteps(teammate).map((step) => (
                 <li key={step} className="flex gap-2">
                   <span aria-hidden>•</span>
                   <span>{step}</span>
@@ -66,7 +67,7 @@ export function GrowthHomeLaunchCompleteBanner({ setupIncomplete }: Props) {
             </ul>
             <div className="flex flex-wrap gap-2 pt-1">
               <Button asChild size="sm">
-                <Link href={GROWTH_HOME_STARTUP_STEP_PATHS.approvals}>Open Approvals</Link>
+                <Link href={GROWTH_HOME_STARTUP_STEP_PATHS.approvals}>{reviewCompletedWork(teammate)}</Link>
               </Button>
               <Button asChild size="sm" variant="outline">
                 <Link href={GROWTH_SALES_OPERATIONS_CENTER_ROUTE}>Operations</Link>

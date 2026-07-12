@@ -157,12 +157,20 @@ export async function submitAvaOutreachPackageApprovalAction(
 
   const now = new Date().toISOString()
 
+  const { ensureGrowthAiEventBusInProcessSubscribers } = await import(
+    "@/lib/growth/aios/event-bus/growth-ai-event-bus-subscriber-registry"
+  )
+  ensureGrowthAiEventBusInProcessSubscribers()
+
   await publishAiOsEvent(admin, {
     organizationId: input.organizationId,
     eventType: GROWTH_AVA_OUTREACH_PACKAGE_APPROVAL_EVENT,
+    category: "approval",
+    producer: "growth_ava_outreach_execution_request",
+    source: "growth_ava_outreach_execution_request_service",
     correlationId: input.packageId,
-    subjectType: "lead",
-    subjectId: leadId,
+    entityType: "lead",
+    entityId: leadId,
     payload: {
       qa_marker: GROWTH_AVA_OUTREACH_EXECUTION_REQUEST_1_QA_MARKER,
       package_id: input.packageId,

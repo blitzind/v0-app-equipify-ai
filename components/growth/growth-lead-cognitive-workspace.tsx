@@ -1,6 +1,8 @@
 "use client"
 
 import { useMemo, useState, type ReactNode } from "react"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
 import { GrowthCognitiveSection } from "@/components/growth/cognitive-workspace/growth-cognitive-section"
 import { GrowthAvaCurrentAssessmentPanel } from "@/components/growth/cognitive-workspace/growth-ava-current-assessment-panel"
 import { GrowthAvaWhatsChangedPanel } from "@/components/growth/cognitive-workspace/growth-ava-whats-changed-panel"
@@ -42,6 +44,8 @@ import type { CommunicationStrategyDisplaySummary } from "@/lib/growth/contact-v
 import type { NativeRevenueDecisionDisplaySummary } from "@/lib/growth/contact-verification/native-revenue-decision-adapter"
 import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
 import type { GrowthLead } from "@/lib/growth/types"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
+import { completedWorkTitle, reviewCompletedWork } from "@/lib/workspace/ai-teammate-voice"
 
 export type GrowthLeadCognitiveRawDomains = Partial<Record<GrowthAvaRawDomainId, ReactNode>>
 
@@ -76,6 +80,7 @@ export function GrowthLeadCognitiveWorkspace({
   rawDomains = null,
   researchNotesSlot,
 }: GrowthLeadCognitiveWorkspaceProps) {
+  const { teammate } = useAiTeammateIdentity()
   const [pendingApprovalCount] = useState(0)
 
   const projectionInput = useMemo(
@@ -181,7 +186,7 @@ export function GrowthLeadCognitiveWorkspace({
           >
             {!assessment.operatorInvolvementRequired ? (
               <p className="rounded-lg border border-emerald-200/70 bg-emerald-50/80 px-3 py-2 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">
-                I&apos;m continuing research and planning. I&apos;ll let you know if I need approval or
+                I&apos;m continuing research and planning. I&apos;ll let you know if I need authorization or
                 additional direction.
               </p>
             ) : (
@@ -199,10 +204,18 @@ export function GrowthLeadCognitiveWorkspace({
           </GrowthAvaOperatorTaskGroup>
 
           <GrowthAvaOperatorTaskGroup
-            title="Approvals"
-            description="Prepared work waiting for your decision."
+            title={completedWorkTitle(teammate)}
+            description="Prepared work waiting for your authorization."
           >
-            <GeV15AutomationRuntimeApprovalPanel leadId={lead.id} />
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {teammate.name} finished work on this account and may be waiting for your authorization.
+              </p>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/growth/os/approvals">{reviewCompletedWork(teammate)}</Link>
+              </Button>
+              <GeV15AutomationRuntimeApprovalPanel leadId={lead.id} />
+            </div>
           </GrowthAvaOperatorTaskGroup>
 
           <GrowthAvaOperatorTaskGroup

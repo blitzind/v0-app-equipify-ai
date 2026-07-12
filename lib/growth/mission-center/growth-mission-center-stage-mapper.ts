@@ -2,6 +2,7 @@
 
 import type { GrowthObjectiveStageId } from "@/lib/growth/objectives/growth-objective-types"
 import type { GrowthMissionCenterPresentationStage } from "@/lib/growth/mission-center/growth-mission-center-types"
+import type { AiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 
 const RUNTIME_TO_PRESENTATION: Record<GrowthObjectiveStageId, GrowthMissionCenterPresentationStage> = {
   discover: "lead_discovery",
@@ -28,17 +29,17 @@ const PRESENTATION_LABELS: Record<GrowthMissionCenterPresentationStage, string> 
   learning: "Learning",
 }
 
-const AVA_ACTIVITY_BY_STAGE: Record<GrowthMissionCenterPresentationStage, string> = {
-  business_profile: "Ava needs to understand your business first.",
-  lead_discovery: "Ava is finding companies that match your ideal customer.",
-  research: "Ava is researching companies.",
-  qualification: "Ava is qualifying the best-fit accounts.",
-  opportunity: "Ava is identifying high-confidence opportunities.",
-  outreach_preparation: "Ava is preparing outreach.",
-  approval: "Ava is waiting for your approval.",
-  execution: "Ava is executing approved outreach.",
-  learning: "Ava is learning from outcomes and adapting.",
-}
+const activityByStage = (teammate: AiTeammatePresentation): Record<GrowthMissionCenterPresentationStage, string> => ({
+  business_profile: `${teammate.name} needs to understand your business first.`,
+  lead_discovery: `${teammate.name} is finding companies that match your ideal customer.`,
+  research: `${teammate.name} is researching companies.`,
+  qualification: `${teammate.name} is qualifying the best-fit accounts.`,
+  opportunity: `${teammate.name} is identifying high-confidence opportunities.`,
+  outreach_preparation: `${teammate.name} is preparing outreach.`,
+  approval: `${teammate.name} is waiting for your approval.`,
+  execution: `${teammate.name} is executing approved outreach.`,
+  learning: `${teammate.name} is learning from outcomes and adapting.`,
+})
 
 export function mapRuntimeStageToPresentationStage(
   stageId: GrowthObjectiveStageId | null | undefined,
@@ -51,20 +52,21 @@ export function presentationStageLabel(stage: GrowthMissionCenterPresentationSta
   return PRESENTATION_LABELS[stage]
 }
 
-export function avaActivityForPresentationStage(
+export function teammateActivityForPresentationStage(
+  teammate: AiTeammatePresentation,
   stage: GrowthMissionCenterPresentationStage,
   context?: { companyCount?: number; opportunityCount?: number; importCount?: number },
 ): string {
   if (stage === "research" && context?.companyCount) {
-    return `Ava is researching ${context.companyCount} ${context.companyCount === 1 ? "company" : "companies"}.`
+    return `${teammate.name} is researching ${context.companyCount} ${context.companyCount === 1 ? "company" : "companies"}.`
   }
   if (stage === "opportunity" && context?.opportunityCount) {
-    return `Ava has identified ${context.opportunityCount} high-confidence ${context.opportunityCount === 1 ? "opportunity" : "opportunities"}.`
+    return `${teammate.name} has identified ${context.opportunityCount} high-confidence ${context.opportunityCount === 1 ? "opportunity" : "opportunities"}.`
   }
   if (stage === "lead_discovery" && context?.importCount) {
-    return `Ava recommends importing ${context.importCount} ${context.importCount === 1 ? "company" : "companies"}.`
+    return `${teammate.name} recommends importing ${context.importCount} ${context.importCount === 1 ? "company" : "companies"}.`
   }
-  return AVA_ACTIVITY_BY_STAGE[stage]
+  return activityByStage(teammate)[stage]
 }
 
 export function presentationStageStatusLabel(stage: GrowthMissionCenterPresentationStage): string {

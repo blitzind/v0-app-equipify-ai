@@ -2,8 +2,8 @@
 
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-workspace-base-path"
 import {
-  AI_OS_HOME_PRIMARY_CTA,
-  AI_OS_HOME_SECONDARY_CTA,
+  aiOsHomePrimaryCta,
+  aiOsHomeSecondaryCta,
 } from "@/lib/workspace/ai-os-outcome-first-terminology"
 import {
   AI_EMPLOYEE_CHECK_IN_FOCUS_INTRO,
@@ -31,7 +31,6 @@ import {
 } from "@/lib/growth/workspace/executive-briefing/growth-home-ownership-synthesizer"
 import { AI_PROACTIVE_FOUND_INTRO, proactiveCalmLine } from "@/lib/workspace/ai-proactive-initiative"
 import {
-  defaultTeammatePresentation,
   teammateAttributeOutcomes,
   teammateExceptionSummary,
   teammateHandledRest,
@@ -39,7 +38,10 @@ import {
   teammateHomeIntro,
   teammatePresenceLabel,
 } from "@/lib/workspace/ai-teammate-voice"
-import type { AiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
+import {
+  resolveAiTeammatePresentation,
+  type AiTeammatePresentation,
+} from "@/lib/workspace/ai-teammate-identity"
 import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
 import {
   buildCustomerHealth,
@@ -142,6 +144,7 @@ export type GrowthHomeExecutiveBriefingInput = {
   continueItems?: GrowthWorkspaceContinueItem[]
   revenueDirectorSnapshot?: GrowthRevenueDirectorCommandCenterSnapshot
   teammate?: AiTeammatePresentation
+  teammateName?: string | null
   operatorDisplayName?: string | null
 }
 
@@ -358,9 +361,9 @@ function buildExecutiveBrief(
     revenueImpactSummary:
       pipelineEstimate > 0 ? `Estimated pipeline impact: ${formatHomeCurrency(pipelineEstimate)}` : null,
     estimatedBusinessImpact: pipelineEstimate > 0 ? formatHomeCurrency(pipelineEstimate) : null,
-    primaryCta: { label: AI_OS_HOME_PRIMARY_CTA, href: exceptionsHref },
+    primaryCta: { label: aiOsHomePrimaryCta(teammate), href: exceptionsHref },
     secondaryCta: {
-      label: AI_OS_HOME_SECONDARY_CTA,
+      label: aiOsHomeSecondaryCta(teammate),
       href: `${GROWTH_WORKSPACE_BASE_PATH}#ai-work-summary`,
     },
     progressSinceLastVisit: completedOutcomes,
@@ -1078,7 +1081,7 @@ export function synthesizeGrowthHomeExecutiveBriefing(
   input: GrowthHomeExecutiveBriefingInput,
 ): GrowthHomeExecutiveBriefingViewModel {
   const { dashboard, recentViews = [], continueItems = [], revenueDirectorSnapshot } = input
-  const teammate = input.teammate ?? defaultTeammatePresentation()
+  const teammate = resolveAiTeammatePresentation(input.teammateName ?? input.teammate?.name)
   const { primary, additional } = buildRecommendations(dashboard)
 
   const revenueMissionInput: GrowthHomeRevenueMissionInput = {

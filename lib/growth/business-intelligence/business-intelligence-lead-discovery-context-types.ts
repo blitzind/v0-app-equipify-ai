@@ -9,7 +9,7 @@ export const GROWTH_BUSINESS_INTELLIGENCE_LEAD_DISCOVERY_API_PATH =
   "/api/platform/growth/business-intelligence/lead-discovery-context" as const
 
 export const GROWTH_BUSINESS_INTELLIGENCE_REVIEW_BUSINESS_UNDERSTANDING_ADVISORY =
-  "Ava suggests reviewing your business understanding first before relying on new targeting defaults." as const
+  "Review your business understanding first before relying on new targeting defaults." as const
 
 export const GROWTH_BUSINESS_INTELLIGENCE_DRAFT_PENDING_ADVISORY =
   "Business Profile draft pending approval — draft values are not used for live lead discovery targeting." as const

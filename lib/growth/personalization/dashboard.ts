@@ -451,6 +451,21 @@ export async function generatePersonalizationDraft(
     metadata: { generation_id: generationId, risk_level: riskLevel },
   })
 
+  if (!validation.blocked) {
+    const { getGrowthEngineAiOrgId } = await import("@/lib/growth/access")
+    const organizationId = getGrowthEngineAiOrgId()
+    if (organizationId) {
+      const { publishDraftFactoryPersonalizationCompleted } = await import(
+        "@/lib/growth/draft-factory/draft-factory-wake-emitters"
+      )
+      void publishDraftFactoryPersonalizationCompleted(admin, {
+        organizationId,
+        leadId: input.leadId,
+        generationId,
+      })
+    }
+  }
+
   const view = await loadGenerationView(admin, generationId)
   if (!view) throw new Error("generation_create_failed")
   return view

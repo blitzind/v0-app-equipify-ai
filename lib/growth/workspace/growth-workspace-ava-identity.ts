@@ -1,59 +1,150 @@
 /**
- * GROWTH-WORKSPACE-AVA-IDENTITY-1D — Ava-first operator UX copy (client-safe).
- * Customer-visible strings only — internal identifiers unchanged elsewhere.
+ * GROWTH-WORKSPACE-AVA-IDENTITY-1D / GE-AIOS-IDENTITY-1B —
+ * Operator UX copy builders (client-safe). Display strings take the configured teammate.
+ * Internal engineering codename remains Ava; customer UI must never hardcode it.
  */
 
+import type { AiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 import { AI_TEAMMATE_DEFAULT_NAME } from "@/lib/workspace/ai-teammate-identity"
+import {
+  assistUnavailable,
+  callAssistTitle,
+  callAssistanceTitle,
+  draftPreparedByTeammate,
+  emptyRecommendations,
+  emptyReplyDrafts,
+  emptySummary,
+  emptyThreadGuidance,
+  followUpFromTeammate,
+  meetingPrepFromTeammate,
+  personalizationFromTeammate,
+  preferencesTitle,
+  recommends,
+  recommendsDoingNext,
+  recommendsNext,
+  recommendsOutcome,
+  replyWithTeammate,
+  statusLearning,
+  statusOperating,
+  statusReady,
+  statusUnavailable,
+  whatTeammateNoticed,
+} from "@/lib/workspace/ai-teammate-voice"
 
 export const GROWTH_WORKSPACE_AVA_IDENTITY_1D_QA_MARKER =
   "growth-workspace-ava-identity-1d-v1" as const
 
+/** Default engineering identity — not for direct customer UI interpolation. */
 export const GROWTH_AVA_DISPLAY_NAME = AI_TEAMMATE_DEFAULT_NAME
 
-/** Primary panel / drawer titles */
-export const GROWTH_AVA_PANEL_TITLE = "Ava" as const
-export const GROWTH_AVA_REPLY_ASSIST_TITLE = "Reply with Ava" as const
-export const GROWTH_AVA_CALL_ASSIST_TITLE = "Ava · Call assist" as const
-export const GROWTH_AVA_MEETING_PREP_TITLE = "Meeting prep from Ava" as const
-export const GROWTH_AVA_INSIGHT_TITLE = "What Ava noticed" as const
-export const GROWTH_AVA_DRAFT_PREVIEW_TITLE = "Draft prepared by Ava" as const
-export const GROWTH_AVA_PERSONALIZATION_TITLE = "Personalization from Ava" as const
-export const GROWTH_AVA_FOLLOW_UP_TITLE = "Follow-up from Ava" as const
+export function growthAvaPanelTitle(teammate: AiTeammatePresentation): string {
+  return teammate.name
+}
+
+export function growthAvaReplyAssistTitle(teammate: AiTeammatePresentation): string {
+  return replyWithTeammate(teammate)
+}
+
+export function growthAvaCallAssistTitle(teammate: AiTeammatePresentation): string {
+  return callAssistTitle(teammate)
+}
+
+export function growthAvaMeetingPrepTitle(teammate: AiTeammatePresentation): string {
+  return meetingPrepFromTeammate(teammate)
+}
+
+export function growthAvaInsightTitle(teammate: AiTeammatePresentation): string {
+  return whatTeammateNoticed(teammate)
+}
+
+export function growthAvaDraftPreviewTitle(teammate: AiTeammatePresentation): string {
+  return draftPreparedByTeammate(teammate)
+}
+
+export function growthAvaPersonalizationTitle(teammate: AiTeammatePresentation): string {
+  return personalizationFromTeammate(teammate)
+}
+
+export function growthAvaFollowUpTitle(teammate: AiTeammatePresentation): string {
+  return followUpFromTeammate(teammate)
+}
+
 export const GROWTH_AVA_RESPONSE_STYLE_TITLE = "Response style" as const
 
-/** Recommendation card language */
-export const GROWTH_AVA_RECOMMENDS_NEXT_COPY =
-  "The highest-impact move Ava recommends next." as const
-export const GROWTH_AVA_RECOMMENDS_OUTCOME_COPY =
-  "The highest-impact outcome Ava recommends next." as const
-export const GROWTH_AVA_RECOMMENDS_DOING_NEXT_HINT = "What Ava recommends doing next" as const
-export const GROWTH_AVA_RECOMMENDED_ACTIONS_TITLE = "Ava recommends" as const
+export function growthAvaRecommendsNextCopy(teammate: AiTeammatePresentation): string {
+  return recommendsNext(teammate)
+}
 
-/** Empty states */
-export const GROWTH_AVA_EMPTY_RECOMMENDATIONS = "Ava doesn't have any recommendations yet." as const
-export const GROWTH_AVA_EMPTY_SUMMARY = "Ava will summarize activity as it comes in." as const
-export const GROWTH_AVA_EMPTY_THREAD_GUIDANCE = "Select a thread to see guidance from Ava." as const
-export const GROWTH_AVA_EMPTY_REPLY_DRAFTS = "Select a thread for Ava to prepare reply drafts." as const
-export const GROWTH_AVA_EMPTY_ASSIST_UNAVAILABLE = "Ava is unavailable for this thread right now." as const
+export function growthAvaRecommendsOutcomeCopy(teammate: AiTeammatePresentation): string {
+  return recommendsOutcome(teammate)
+}
 
-/** Status language */
-export const GROWTH_AVA_STATUS_READY = "Ava is ready" as const
-export const GROWTH_AVA_STATUS_UNAVAILABLE = "Ava is unavailable" as const
-export const GROWTH_AVA_STATUS_LEARNING = "Ava is learning from your workspace" as const
-export const GROWTH_AVA_STATUS_OPERATING = "Ava is operating normally" as const
+export function growthAvaRecommendsDoingNextHint(teammate: AiTeammatePresentation): string {
+  return recommendsDoingNext(teammate)
+}
+
+export function growthAvaRecommendedActionsTitle(teammate: AiTeammatePresentation): string {
+  return recommends(teammate)
+}
+
+export function growthAvaEmptyRecommendations(teammate: AiTeammatePresentation): string {
+  return emptyRecommendations(teammate)
+}
+
+export function growthAvaEmptySummary(teammate: AiTeammatePresentation): string {
+  return emptySummary(teammate)
+}
+
+export function growthAvaEmptyThreadGuidance(teammate: AiTeammatePresentation): string {
+  return emptyThreadGuidance(teammate)
+}
+
+export function growthAvaEmptyReplyDrafts(teammate: AiTeammatePresentation): string {
+  return emptyReplyDrafts(teammate)
+}
+
+export function growthAvaEmptyAssistUnavailable(teammate: AiTeammatePresentation): string {
+  return assistUnavailable(teammate)
+}
+
+export function growthAvaStatusReady(teammate: AiTeammatePresentation): string {
+  return statusReady(teammate)
+}
+
+export function growthAvaStatusUnavailable(teammate: AiTeammatePresentation): string {
+  return statusUnavailable(teammate)
+}
+
+export function growthAvaStatusLearning(teammate: AiTeammatePresentation): string {
+  return statusLearning(teammate)
+}
+
+export function growthAvaStatusOperating(teammate: AiTeammatePresentation): string {
+  return statusOperating(teammate)
+}
+
 export const GROWTH_AVA_STATUS_INACTIVE = "Inactive" as const
 export const GROWTH_AVA_STATUS_ENABLED = "Enabled" as const
 
-/** Settings operator labels */
-export const GROWTH_AVA_SETTINGS_TITLE = "Ava" as const
-export const GROWTH_AVA_PREFERENCES_TITLE = "Ava preferences" as const
-export const GROWTH_AVA_CALL_ASSISTANCE_TITLE = "Call assistance from Ava" as const
+export function growthAvaSettingsTitle(teammate: AiTeammatePresentation): string {
+  return teammate.name
+}
+
+export function growthAvaPreferencesTitle(teammate: AiTeammatePresentation): string {
+  return preferencesTitle(teammate)
+}
+
+export function growthAvaCallAssistanceTitle(teammate: AiTeammatePresentation): string {
+  return callAssistanceTitle(teammate)
+}
+
 export const GROWTH_AVA_TEAMMATE_LABEL = "Your AI teammate" as const
 
-/** Source labels */
-export const GROWTH_AVA_REPLY_SOURCE_LABEL = "Reply with Ava" as const
+export function growthAvaReplySourceLabel(teammate: AiTeammatePresentation): string {
+  return replyWithTeammate(teammate)
+}
 
-/** Operator surfaces audited in certification 1D */
+/** Operator surfaces audited in certification 1D / IDENTITY-1B */
 export const GROWTH_AVA_IDENTITY_OPERATOR_SURFACES = [
   "lib/growth/workspace/growth-workspace-ava-identity.ts",
   "lib/workspace/ai-os-outcome-first-terminology.ts",

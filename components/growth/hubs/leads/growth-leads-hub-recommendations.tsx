@@ -17,7 +17,8 @@ import {
   recordGrowthLeadsActivity,
 } from "@/lib/growth/hubs/growth-leads-recent-work-memory"
 import { useGrowthLeadsHubMetrics } from "@/components/growth/hubs/leads/use-growth-leads-hub-metrics"
-import { GROWTH_AVA_RECOMMENDED_ACTIONS_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
+import { growthAvaRecommendedActionsTitle } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { cn } from "@/lib/utils"
 
 const SEVERITY_STYLES = {
@@ -27,6 +28,7 @@ const SEVERITY_STYLES = {
 } as const
 
 export function GrowthLeadsHubRecommendations() {
+  const { teammate } = useAiTeammateIdentity()
   const { metrics } = useGrowthLeadsHubMetrics()
   const [savedSearches, setSavedSearches] = useState<GrowthProspectSearchSavedSearchWithWorkflow[]>([])
   const [snoozedIds, setSnoozedIds] = useState<Set<string>>(() => readSnoozedGrowthLeadsRecommendationIds())
@@ -55,7 +57,7 @@ export function GrowthLeadsHubRecommendations() {
 
   return (
     <section aria-labelledby="leads-hub-recommendations-heading" data-section="recommendations">
-      <GrowthEngineCard title={GROWTH_AVA_RECOMMENDED_ACTIONS_TITLE} data-section="work-inbox">
+      <GrowthEngineCard title={growthAvaRecommendedActionsTitle(teammate)} data-section="work-inbox">
         <h2 id="leads-hub-recommendations-heading" className="sr-only">
           Recommended next actions work inbox
         </h2>

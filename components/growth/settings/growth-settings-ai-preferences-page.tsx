@@ -4,13 +4,15 @@ import type { ReactNode } from "react"
 import Link from "next/link"
 import { Bot, ExternalLink } from "lucide-react"
 import { GrowthAiCopilotSettingsPanel } from "@/components/growth/growth-ai-copilot-settings"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { GrowthAiSettingsReadinessSummary } from "@/components/growth/settings/growth-ai-settings-readiness-summary"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
+import { Button } from "@/components/ui/button"
 import {
   GROWTH_SETTINGS_AI_REFINEMENT_2F_QA_MARKER,
   GROWTH_SETTINGS_SECTION_GAP,
 } from "@/components/growth/growth-settings-ui"
-import { GROWTH_AVA_PREFERENCES_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { growthAvaPreferencesTitle } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 
 export const GROWTH_SETTINGS_AI_PREFERENCES_PAGE_QA_MARKER = "growth-settings-ai-preferences-wiring-1a-v1" as const
 
@@ -40,6 +42,7 @@ function AiPreferencesSection({
 }
 
 export function GrowthSettingsAiPreferencesPage() {
+  const { teammate } = useAiTeammateIdentity()
   return (
     <div
       className={GROWTH_SETTINGS_SECTION_GAP}
@@ -47,8 +50,8 @@ export function GrowthSettingsAiPreferencesPage() {
       data-growth-settings-ai-refinement={GROWTH_SETTINGS_AI_REFINEMENT_2F_QA_MARKER}
     >
       <GrowthWorkspacePageHeader
-        title={GROWTH_AVA_PREFERENCES_TITLE}
-        description="Response style, draft preferences, memory, and learning for Ava."
+        title={growthAvaPreferencesTitle(teammate)}
+        description={`Response style, draft preferences, memory, and learning for ${teammate.name}.`}
         icon={Bot}
         actions={
           <Button type="button" variant="outline" size="sm" asChild>
@@ -64,7 +67,7 @@ export function GrowthSettingsAiPreferencesPage() {
 
       <AiPreferencesSection
         title="Assist preferences"
-        description="How Ava drafts, remembers, and learns from your playbook."
+        description={`How ${teammate.name} drafts, remembers, and learns from your playbook.`}
       >
         <GrowthAiCopilotSettingsPanel variant="operator" />
       </AiPreferencesSection>

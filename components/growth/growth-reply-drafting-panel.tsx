@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import {
   GROWTH_AI_REPLY_DRAFTING_PRIVACY_NOTE,
   GROWTH_AI_REPLY_DRAFTING_QA_MARKER,
@@ -14,7 +15,7 @@ import {
   type GrowthReplyDraftView,
   replyDraftStatusLabel,
 } from "@/lib/growth/replies/reply-draft-types"
-import { GROWTH_AVA_EMPTY_REPLY_DRAFTS } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { growthAvaEmptyReplyDrafts } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 
 const RISK_TONE: Record<string, "healthy" | "attention" | "critical" | "blocked" | "neutral"> = {
   low: "healthy",
@@ -59,6 +60,7 @@ type Props = {
 }
 
 export function GrowthReplyDraftingPanel({ threadId, disabled, embedded = false }: Props) {
+  const { teammate } = useAiTeammateIdentity()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [draft, setDraft] = useState<GrowthReplyDraftView | null>(null)
@@ -354,7 +356,7 @@ export function GrowthReplyDraftingPanel({ threadId, disabled, embedded = false 
     }
     return (
       <GrowthEngineCard title="Reply Drafting">
-        <p className="text-sm text-muted-foreground">{GROWTH_AVA_EMPTY_REPLY_DRAFTS}</p>
+        <p className="text-sm text-muted-foreground">{growthAvaEmptyReplyDrafts(teammate)}</p>
       </GrowthEngineCard>
     )
   }

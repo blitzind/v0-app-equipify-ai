@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useState } from "react"
 import { Bot, Loader2 } from "lucide-react"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { GROWTH_SETTINGS_SECTION_GAP } from "@/components/growth/growth-settings-ui"
 import type { VoiceAiCopilotReadinessSnapshot } from "@/lib/voice/ai-copilot/types"
 import { VOICE_AI_COPILOT_QA_MARKER, VOICE_DEEP_COPILOT_QA_MARKER } from "@/lib/voice/ai-copilot/types"
 
 export function GrowthAiCopilotReadinessSection() {
+  const { teammate } = useAiTeammateIdentity()
   const [readiness, setReadiness] = useState<VoiceAiCopilotReadinessSnapshot | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -44,7 +46,7 @@ export function GrowthAiCopilotReadinessSection() {
     >
       <p className="flex items-center gap-2 text-sm font-medium">
         <Bot className="size-4" />
-        Ava readiness
+        {teammate.name} readiness
       </p>
       <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm">
         <div className="flex flex-wrap gap-2">

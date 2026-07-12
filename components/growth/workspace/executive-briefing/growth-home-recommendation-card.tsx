@@ -4,13 +4,14 @@ import { useState } from "react"
 import Link from "next/link"
 import { ChevronDown, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { AI_OS_TOP_BUSINESS_MOVE_TITLE } from "@/lib/workspace/ai-os-outcome-first-terminology"
-import { GROWTH_AVA_RECOMMENDS_NEXT_COPY } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { growthAvaRecommendsNextCopy } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import type { GrowthHomeRecommendation } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 
 type Props = {
@@ -67,6 +68,7 @@ function RecommendationArticle({ recommendation, featured }: { recommendation: G
 }
 
 export function GrowthHomeRecommendationCard({ recommendation, additionalRecommendations }: Props) {
+  const { teammate } = useAiTeammateIdentity()
   const [expanded, setExpanded] = useState(false)
 
   if (!recommendation && additionalRecommendations.length === 0) return null
@@ -77,7 +79,7 @@ export function GrowthHomeRecommendationCard({ recommendation, additionalRecomme
         <>
           <div>
             <h2 className="text-xl font-semibold tracking-tight">{AI_OS_TOP_BUSINESS_MOVE_TITLE}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{GROWTH_AVA_RECOMMENDS_NEXT_COPY}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{growthAvaRecommendsNextCopy(teammate)}</p>
           </div>
           <RecommendationArticle recommendation={recommendation} featured />
         </>

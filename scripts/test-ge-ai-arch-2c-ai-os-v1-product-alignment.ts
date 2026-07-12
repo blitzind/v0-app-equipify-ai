@@ -18,11 +18,11 @@ import {
 import { AI_REVENUE_ACTIVE_MISSIONS_TITLE } from "../lib/workspace/ai-autonomous-revenue-operator"
 import {
   GE_AI_ARCH_2C_QA_MARKER,
-  AI_OS_V1_PRODUCT_STORY,
+  aiOsV1ProductStory,
   GROWTH_HOME_SERVICE_OPERATOR_VISIBLE,
   isGrowthHomeServiceOperatorVisible,
 } from "../lib/workspace/ai-os-v1-product-alignment"
-import { AI_TEAMMATE_DEFAULT_ROLE } from "../lib/workspace/ai-teammate-identity"
+import { AI_TEAMMATE_DEFAULT_ROLE, resolveAiTeammatePresentation } from "../lib/workspace/ai-teammate-identity"
 
 const ROOT = process.cwd()
 
@@ -37,7 +37,7 @@ assert.equal(GROWTH_HOME_EXECUTIVE_BRIEFING_QA_MARKER, "growth-ge-ai-arch-2c-ai-
 assert.equal(GROWTH_HOME_SERVICE_OPERATOR_VISIBLE, false)
 assert.equal(isGrowthHomeServiceOperatorVisible(), false)
 assert.equal(AI_TEAMMATE_DEFAULT_ROLE, "Equipify's AI Growth Operator")
-assert.ok(AI_OS_V1_PRODUCT_STORY.includes("sell Equipify"))
+assert.ok(aiOsV1ProductStory(resolveAiTeammatePresentation()).includes("sell Equipify"))
 console.log("  ✓ v1 product alignment constants locked")
 
 assert.equal(AI_GROWTH_INITIATIVES_TITLE, "Growth Initiatives")

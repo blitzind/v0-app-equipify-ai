@@ -4,6 +4,9 @@ export {
   GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_TITLE,
   GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_SUBTITLE,
   GROWTH_MISSION_CENTER_EMPTY_STATE_COPY,
+  growthMissionCenterActiveMissionsTitle,
+  growthMissionCenterActiveMissionsSubtitle,
+  growthMissionCenterEmptyStateCopy,
   GROWTH_MISSION_CENTER_PRESENTATION_STAGES,
 } from "@/lib/growth/mission-center/growth-mission-center-types"
 export type {
@@ -24,7 +27,7 @@ export {
 export {
   mapRuntimeStageToPresentationStage,
   presentationStageLabel,
-  avaActivityForPresentationStage,
+  teammateActivityForPresentationStage,
 } from "@/lib/growth/mission-center/growth-mission-center-stage-mapper"
 export {
   GROWTH_AVA_MISSION_RUNTIME_1A_QA_MARKER,

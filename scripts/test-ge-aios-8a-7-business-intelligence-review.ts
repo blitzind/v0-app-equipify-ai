@@ -8,7 +8,7 @@ import path from "node:path"
 
 import {
   BUSINESS_INTELLIGENCE_REVIEW_FIELD_KEYS,
-  GROWTH_BUSINESS_INTELLIGENCE_REVIEW_PROMPT,
+  businessIntelligenceReviewPrompt,
   GROWTH_BUSINESS_INTELLIGENCE_REVIEW_QA_MARKER,
   GROWTH_BUSINESS_INTELLIGENCE_REVIEW_SCHEMA_MIGRATION,
 } from "../lib/growth/business-intelligence/business-intelligence-review-types"
@@ -130,7 +130,7 @@ async function main(): Promise<void> {
 
   assert.equal(GROWTH_BUSINESS_INTELLIGENCE_REVIEW_QA_MARKER, "ge-aios-8a-7-business-intelligence-review-v1")
   assert.equal(BUSINESS_INTELLIGENCE_REVIEW_FIELD_KEYS.length, 10)
-  assert.match(GROWTH_BUSINESS_INTELLIGENCE_REVIEW_PROMPT, /Please review/)
+  assert.match(businessIntelligenceReviewPrompt("Teammate"), /Please review/)
 
   const migration = readSource(`supabase/migrations/${GROWTH_BUSINESS_INTELLIGENCE_REVIEW_SCHEMA_MIGRATION}`)
   assert.ok(migration.includes("growth.business_intelligence_review_decisions"))
@@ -157,7 +157,7 @@ async function main(): Promise<void> {
   assert.match(panelSource, /Review progress/)
   assert.match(panelSource, /GrowthHomeBusinessIntelligenceReviewField/)
   assert.match(panelSource, /apply-to-business-profile/)
-  assert.match(panelSource, /GROWTH_BUSINESS_INTELLIGENCE_REVIEW_PROMPT/)
+  assert.match(panelSource, /businessIntelligenceReviewPrompt/)
 
   const reviewFieldSource = readSource(
     "components/growth/workspace/executive-briefing/growth-home-business-intelligence-review-field.tsx",

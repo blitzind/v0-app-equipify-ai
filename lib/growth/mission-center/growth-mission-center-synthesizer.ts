@@ -10,7 +10,7 @@ import {
 } from "@/lib/growth/workspace/executive-briefing/growth-home-revenue-mission-synthesizer"
 import { initiativeConfidenceLabel, deriveInitiativeConfidence } from "@/lib/workspace/ai-proactive-initiative"
 import {
-  avaActivityForPresentationStage,
+  teammateActivityForPresentationStage,
   mapRuntimeStageToPresentationStage,
   presentationStageStatusLabel,
 } from "@/lib/growth/mission-center/growth-mission-center-stage-mapper"
@@ -38,6 +38,7 @@ import {
   missionLifecycleStatusLabel,
 } from "@/lib/growth/mission-center/growth-mission-runtime-types"
 import { formatMissionFindLeadsMonitoringStatus } from "@/lib/growth/mission-center/growth-mission-find-leads-binding-display"
+import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 
 const ACTIVE_MISSION_LIMIT = 3
 const APPROVALS_HREF = `${GROWTH_AI_OS_PUBLIC_BASE_PATH}/approvals`
@@ -88,7 +89,9 @@ function mapObjectiveToCard(
   objective: GrowthObjective,
   businessProfileApproved: boolean,
   pendingApprovalCount: number,
+  teammateName?: string | null,
 ): GrowthMissionCenterCard {
+  const teammate = resolveAiTeammatePresentation(teammateName)
   const presentationStage = businessProfileApproved
     ? mapRuntimeStageToPresentationStage(objective.runtime?.currentStageId)
     : "business_profile"
@@ -138,12 +141,12 @@ function mapObjectiveToCard(
       : "Blocked",
     progressPercent: objectiveProgressPercent(objective),
     priority: objective.priority,
-    ownerLabel: "Ava",
+    ownerLabel: teammate.name,
     presentationStage,
     currentActivity:
       bindingActivity ??
       missionRuntime?.activityLabel ??
-      avaActivityForPresentationStage(presentationStage, {
+      teammateActivityForPresentationStage(teammate, presentationStage, {
         companyCount: researchArtifactCount > 0 ? researchArtifactCount : undefined,
       }),
     waitingOn,
@@ -161,7 +164,7 @@ function mapObjectiveToCard(
       pendingApprovalCount,
     }),
     blockedReason: !businessProfileApproved
-      ? "Ava needs to understand your business first."
+      ? `${teammate.name} needs to understand your business first.`
       : objective.emergencyStopActive
         ? "Mission paused for safety."
         : null,
@@ -173,7 +176,9 @@ function mapObjectiveToCard(
 function mapRevenueMissionToCard(
   mission: ReturnType<typeof buildActiveRevenueMissions>[number],
   pendingApprovalCount: number,
+  teammateName?: string | null,
 ): GrowthMissionCenterCard {
+  const teammate = resolveAiTeammatePresentation(teammateName)
   const stageMap: Record<string, GrowthMissionCenterCard["presentationStage"]> = {
     Research: "research",
     Qualification: "qualification",
@@ -194,9 +199,9 @@ function mapRevenueMissionToCard(
     statusLabel: mission.currentStage,
     progressPercent: mission.progressPercent,
     priority: "high",
-    ownerLabel: "Ava",
+    ownerLabel: teammate.name,
     presentationStage,
-    currentActivity: avaActivityForPresentationStage(presentationStage),
+    currentActivity: teammateActivityForPresentationStage(teammate, presentationStage),
     waitingOn:
       mission.health === "needs_review"
         ? "Approve outreach drafts"

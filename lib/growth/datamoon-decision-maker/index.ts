@@ -31,3 +31,15 @@ export {
 } from "@/lib/growth/datamoon-decision-maker/datamoon-dm-engine"
 
 export { normalizeDatamoonRecordsToDecisionMakerCandidates } from "@/lib/growth/datamoon-decision-maker/datamoon-dm-normalize"
+
+export {
+  GROWTH_AIOS_CONTACT_1A_QA_MARKER,
+  extractDatamoonContactChannels,
+  projectContactChannelReadiness,
+} from "@/lib/growth/datamoon-decision-maker/datamoon-dm-contact-channels"
+
+export {
+  GROWTH_AIOS_CONTACT_1B_QA_MARKER,
+  DATAMOON_DM_DISCOVERY_POLL_POLICY,
+  DATAMOON_DM_DISCOVERY_PURPOSE,
+} from "@/lib/growth/datamoon-decision-maker/datamoon-dm-discovery-types"

@@ -6,11 +6,12 @@ import { Check, Clock3, Loader2, Target } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthHomeProgressBar } from "@/components/growth/workspace/executive-briefing/growth-home-progress-bar"
 import { GrowthMissionCenterDetailDrawer } from "@/components/growth/mission-center/growth-mission-center-detail-drawer"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
 import {
-  GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_TITLE,
-  GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_SUBTITLE,
-  GROWTH_MISSION_CENTER_EMPTY_STATE_COPY,
+  growthMissionCenterActiveMissionsTitle,
+  growthMissionCenterActiveMissionsSubtitle,
+  growthMissionCenterEmptyStateCopy,
   GROWTH_MISSION_CENTER_API_PATH,
   GROWTH_MISSION_CENTER_HEALTH_LABELS,
   GROWTH_AVA_MISSION_CENTER_1A_QA_MARKER,
@@ -27,6 +28,7 @@ type Props = {
 }
 
 export function GrowthHomeMissionCenterSection({ dashboard }: Props) {
+  const { teammate } = useAiTeammateIdentity()
   const [sources, setSources] = useState<GrowthMissionCenterSourcesPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
@@ -117,8 +119,8 @@ export function GrowthHomeMissionCenterSection({ dashboard }: Props) {
         className="rounded-2xl border border-border/70 bg-card p-5 space-y-4 sm:p-6"
       >
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">{GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_TITLE}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{GROWTH_MISSION_CENTER_ACTIVE_MISSIONS_SUBTITLE}</p>
+          <h2 className="text-lg font-semibold tracking-tight">{growthMissionCenterActiveMissionsTitle(teammate)}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{growthMissionCenterActiveMissionsSubtitle(teammate)}</p>
         </div>
 
         <div className="space-y-4">
@@ -128,7 +130,7 @@ export function GrowthHomeMissionCenterSection({ dashboard }: Props) {
               className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-5 text-sm"
             >
               <p className="font-medium text-foreground">No active missions yet</p>
-              <p className="mt-1 text-muted-foreground">{GROWTH_MISSION_CENTER_EMPTY_STATE_COPY}</p>
+              <p className="mt-1 text-muted-foreground">{growthMissionCenterEmptyStateCopy(teammate)}</p>
               {loadFailed ? (
                 <Button type="button" size="sm" variant="outline" className="mt-3" onClick={() => void loadSources()}>
                   Retry loading missions

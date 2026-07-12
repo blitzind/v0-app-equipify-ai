@@ -4,9 +4,9 @@ import { CalendarClock, CheckCircle2, Sparkles } from "lucide-react"
 import type { GrowthHomeTimelinePeriod } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 import {
   GROWTH_HOME_AVA_ACCOMPLISHED_SUBTITLE,
-  GROWTH_HOME_AVA_ACCOMPLISHED_TITLE,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-premium-ux-1a"
 import { buildActivityFeedItems } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-2a"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 
 function feedIcon(periodLabel: string) {
   const lower = periodLabel.toLowerCase()
@@ -16,6 +16,7 @@ function feedIcon(periodLabel: string) {
 }
 
 export function GrowthHomeTimelineSection({ periods }: { periods: GrowthHomeTimelinePeriod[] }) {
+  const { teammate } = useAiTeammateIdentity()
   const feedItems = buildActivityFeedItems(periods)
   if (feedItems.length === 0) return null
 
@@ -25,7 +26,7 @@ export function GrowthHomeTimelineSection({ periods }: { periods: GrowthHomeTime
       className="rounded-2xl border border-border/70 bg-card p-5 space-y-4 sm:p-6"
     >
       <div>
-        <h2 className="text-lg font-semibold tracking-tight">{GROWTH_HOME_AVA_ACCOMPLISHED_TITLE}</h2>
+        <h2 className="text-lg font-semibold tracking-tight">What {teammate.name} Accomplished</h2>
         <p className="mt-1 text-sm text-muted-foreground">{GROWTH_HOME_AVA_ACCOMPLISHED_SUBTITLE}</p>
       </div>
 

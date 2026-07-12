@@ -2,8 +2,9 @@
 
 import type { GrowthProspectSearchCompanyResult } from "@/lib/growth/prospect-search/prospect-search-types"
 import { SignalExplanationCard } from "@/components/growth/signals/signal-explanation-card"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER, SIGNAL_COPILOT_CLIENT_DISCLAIMER } from "@/lib/growth/signals/ai/signal-copilot-client-types"
-import { GROWTH_AVA_INSIGHT_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { growthAvaInsightTitle } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { cn } from "@/lib/utils"
 
 export function CompanySignalAiInsightPanel({
@@ -13,6 +14,7 @@ export function CompanySignalAiInsightPanel({
   row: GrowthProspectSearchCompanyResult
   className?: string
 }) {
+  const { teammate } = useAiTeammateIdentity()
   const hasInsight =
     row.signal_ai_short_summary ||
     (row.signal_why_now_bullets?.length ?? 0) > 0 ||
@@ -53,7 +55,7 @@ export function CompanySignalAiInsightPanel({
 
   return (
     <details className={cn("mt-2", className)} data-qa-marker={GROWTH_SIGNAL_AI_INSIGHTS_QA_MARKER}>
-      <summary className="cursor-pointer text-[11px] font-medium text-violet-800">{GROWTH_AVA_INSIGHT_TITLE}</summary>
+      <summary className="cursor-pointer text-[11px] font-medium text-violet-800">{growthAvaInsightTitle(teammate)}</summary>
       <SignalExplanationCard
         className="mt-2"
         companyName={row.company_name}

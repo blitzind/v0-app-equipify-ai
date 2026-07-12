@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { getGrowthEngineAiOrgId, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { loadAiTeammateIdentity } from "@/lib/growth/settings/growth-ai-teammate-identity-service"
 import {
   GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER,
   GROWTH_AVA_LAUNCH_VALIDATION_DEBUG_1_QA_MARKER,
   buildGrowthMissionAvaLaunchValidationFailureBody,
   buildGrowthMissionAvaLaunchExceptionFailureBody,
+  resolveGrowthAvaLaunchValidationMessage,
 } from "@/lib/growth/mission-center/growth-mission-ava-launch-run-api-contract"
 import {
   buildSearchValidationTraceFromDraft,
@@ -133,6 +135,21 @@ export async function POST(request: Request, context: RouteContext) {
     )
   }
 
+  const teammateIdentity = await loadAiTeammateIdentity(access.admin, {
+    organizationId,
+    userId: access.userId,
+  }).catch(() => null)
+  const teammateName = teammateIdentity?.name ?? null
+
+  function withTeammateValidationMessages<T extends { code: string; message: string }>(
+    errors: T[],
+  ): T[] {
+    return errors.map((entry) => ({
+      ...entry,
+      message: resolveGrowthAvaLaunchValidationMessage(entry, teammateName),
+    }))
+  }
+
   if (!missionId?.trim()) {
     return avaLaunchRouteResponse(
       { ok: false, qa_marker: GROWTH_AVA_AUTONOMY_LAUNCH_RUN_1_QA_MARKER, error: "mission_id_required" },
@@ -202,7 +219,7 @@ export async function POST(request: Request, context: RouteContext) {
       },
       outcome: "blocked",
     })
-    return avaLaunchRouteResponse(buildGrowthMissionAvaLaunchValidationFailureBody({ validationErrors }), {
+    return avaLaunchRouteResponse(buildGrowthMissionAvaLaunchValidationFailureBody({ validationErrors: withTeammateValidationMessages(validationErrors) }), {
       status: 400,
     })
   }
@@ -224,7 +241,7 @@ export async function POST(request: Request, context: RouteContext) {
     })
     return avaLaunchRouteResponse(
       buildGrowthMissionAvaLaunchValidationFailureBody({
-        validationErrors: validation.validationErrors,
+        validationErrors: withTeammateValidationMessages(validation.validationErrors),
       }),
       { status: resolveBlockingValidationStatus(validation.validationErrors) },
     )

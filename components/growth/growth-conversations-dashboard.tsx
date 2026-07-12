@@ -6,6 +6,7 @@ import { Loader2, MessageSquare, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthConversationsActionCrossLinks } from "@/components/growth/inbox/growth-inbox-conversation-intelligence-context-strip"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import {
   fetchGrowthConversationsDashboard,
   type GrowthConversationsDashboardPayload,
@@ -19,15 +20,15 @@ import {
 } from "@/lib/growth/navigation/growth-conversations-deep-link"
 import type { GrowthLead } from "@/lib/growth/types"
 import {
-  GROWTH_ACTION_FIRST_AVA_NOTICED,
-  GROWTH_ACTION_FIRST_AVA_RECOMMENDS,
   GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE,
-  GROWTH_ACTION_FIRST_AVA_IDLE,
   GROWTH_ACTION_FIRST_CONVERSATIONS_HEALTH,
   GROWTH_ACTION_FIRST_CONVERSATIONS_NEEDS_RESPONSE,
   GROWTH_ACTION_FIRST_CONVERSATIONS_NEEDS_REVIEW,
   GROWTH_ACTION_FIRST_SUPPORTING_METRICS,
   GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER,
+  growthActionFirstIdle,
+  growthActionFirstNoticed,
+  growthActionFirstRecommends,
 } from "@/lib/growth/workspace/growth-workspace-action-first-1f"
 
 export const GROWTH_CONVERSATIONS_DASHBOARD_QA_MARKER = "growth-conversations-dashboard-v2" as const
@@ -95,6 +96,7 @@ function LeadBucket({
 }
 
 export function GrowthConversationsDashboard() {
+  const { teammate } = useAiTeammateIdentity()
   const searchParams = useSearchParams()
   const deepLinkParams = useMemo(
     () => parseGrowthConversationsDeepLinkParams(searchParams),
@@ -205,13 +207,13 @@ export function GrowthConversationsDashboard() {
         </div>
       ) : null}
 
-      <GrowthEngineCard title={GROWTH_ACTION_FIRST_AVA_RECOMMENDS} data-section="conversations-action-first">
+      <GrowthEngineCard title={growthActionFirstRecommends(teammate)} data-section="conversations-action-first">
         {dashboard.conversationRisk.length === 0 &&
         dashboard.urgencyTrends.length === 0 &&
         dashboard.buyingIntent.length === 0 ? (
           <>
             <p className="text-sm font-medium">{GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{GROWTH_ACTION_FIRST_AVA_IDLE}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{growthActionFirstIdle(teammate)}</p>
           </>
         ) : (
           <ul className="space-y-2 text-sm">
@@ -221,7 +223,7 @@ export function GrowthConversationsDashboard() {
                   {GROWTH_ACTION_FIRST_CONVERSATIONS_NEEDS_RESPONSE} · {dashboard.conversationRisk.length}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {GROWTH_ACTION_FIRST_AVA_NOTICED} momentum slowing — respond before deals stall.
+                  {growthActionFirstNoticed(teammate)} momentum slowing — respond before deals stall.
                 </p>
               </li>
             ) : null}
@@ -237,7 +239,7 @@ export function GrowthConversationsDashboard() {
               <li className="rounded-lg border border-border px-3 py-2">
                 <p className="font-medium">Strong buying intent · {dashboard.buyingIntent.length}</p>
                 <p className="text-xs text-muted-foreground">
-                  {GROWTH_ACTION_FIRST_AVA_RECOMMENDS} advancing these conversations while intent is high.
+                  {growthActionFirstRecommends(teammate)} advancing these conversations while intent is high.
                 </p>
               </li>
             ) : null}

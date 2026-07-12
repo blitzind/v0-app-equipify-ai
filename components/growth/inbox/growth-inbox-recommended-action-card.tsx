@@ -4,25 +4,15 @@ import { useMemo } from "react"
 import { Loader2, Sparkles } from "lucide-react"
 import { GrowthInboxContextEmptyHint } from "@/components/growth/inbox/growth-inbox-context-empty-hint"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
 import { orchestrateGrowthInboxRecommendations } from "@/lib/growth/inbox/inbox-recommendation-orchestrator"
 import { shouldDeferGrowthInboxTier3Hydration } from "@/lib/growth/inbox/growth-inbox-minimal-runtime-contract"
 import { GROWTH_ON_DEMAND_DEFERRED_COPY } from "@/lib/growth/inbox/growth-inbox-fetch-audit"
-import { GROWTH_AVA_REPLY_SOURCE_LABEL } from "@/lib/growth/workspace/growth-workspace-ava-identity"
-
-const SOURCE_LABELS = {
-  workflow_action: "Workflow Action",
-  revenue_execution: "Revenue Execution",
-  execution_plan: "Execution Plan",
-  playbook: "Playbook",
-  booking_recommendation: "Booking",
-  opportunity_recommendation: "Opportunity",
-  revenue_readiness: "Revenue Readiness",
-  reply_copilot: GROWTH_AVA_REPLY_SOURCE_LABEL,
-  next_best_action: "Next Best Action",
-} as const
+import { growthAvaReplySourceLabel } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 
 export function GrowthInboxRecommendedActionCard() {
+  const { teammate } = useAiTeammateIdentity()
   const {
     loading,
     workflowActions,
@@ -37,6 +27,17 @@ export function GrowthInboxRecommendedActionCard() {
     commandCenterLead,
   } = useGrowthInboxLeadContext()
   const deferTier3 = shouldDeferGrowthInboxTier3Hydration()
+  const sourceLabels = {
+    workflow_action: "Workflow Action",
+    revenue_execution: "Revenue Execution",
+    execution_plan: "Execution Plan",
+    playbook: "Playbook",
+    booking_recommendation: "Booking",
+    opportunity_recommendation: "Opportunity",
+    revenue_readiness: "Revenue Readiness",
+    reply_copilot: growthAvaReplySourceLabel(teammate),
+    next_best_action: "Next Best Action",
+  } as const
   const tier3Loaded =
     Boolean(forecastEvidence) ||
     opportunityRecommendations.length > 0 ||
@@ -93,7 +94,7 @@ export function GrowthInboxRecommendedActionCard() {
           <Sparkles className="mt-0.5 size-4 shrink-0 text-indigo-700 dark:text-indigo-300" />
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <GrowthBadge label={SOURCE_LABELS[recommendation.source]} tone="attention" />
+              <GrowthBadge label={sourceLabels[recommendation.source]} tone="attention" />
               <GrowthBadge label={recommendation.confidence} tone="medium" />
             </div>
             <p className="text-sm font-semibold leading-snug text-foreground">{recommendation.recommendation}</p>

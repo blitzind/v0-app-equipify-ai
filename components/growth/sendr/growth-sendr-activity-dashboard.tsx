@@ -13,7 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { GROWTH_AVA_EMPTY_RECOMMENDATIONS } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
+import { growthAvaEmptyRecommendations } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
 import {
   GROWTH_PERSONALIZED_VIDEOS_PRODUCT_LABEL,
@@ -69,6 +70,7 @@ function formatWhen(iso: string | null): string {
 }
 
 export function GrowthSendrActivityDashboard() {
+  const { teammate } = useAiTeammateIdentity()
   const [dateRange, setDateRange] = useState<GrowthSendrAnalyticsDateRangePreset>(
     GROWTH_SENDR_ANALYTICS_DEFAULT_PRESET,
   )
@@ -288,7 +290,7 @@ export function GrowthSendrActivityDashboard() {
 
       <GrowthEngineCard title="Follow-up recommendations" icon={<Activity className="size-4" />}>
         {prospects.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{GROWTH_AVA_EMPTY_RECOMMENDATIONS}</p>
+          <p className="text-sm text-muted-foreground">{growthAvaEmptyRecommendations(teammate)}</p>
         ) : (
           <div className="space-y-2 text-sm">
             {prospects.flatMap((prospect) =>

@@ -3,18 +3,21 @@
 import Link from "next/link"
 import { AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import {
-  AI_OS_EXCEPTIONS_SECTION_SUBTITLE,
   AI_OS_EXCEPTIONS_SECTION_TITLE,
+  aiOsExceptionsSectionSubtitle,
 } from "@/lib/workspace/ai-os-outcome-first-terminology"
 import type { GrowthAiOsOperatorAttentionCard } from "@/lib/growth/aios/operator-experience/growth-ai-os-operator-experience-types"
 
 export function GrowthAiOsNeedsAttentionSection({ items }: { items: GrowthAiOsOperatorAttentionCard[] }) {
+  const { teammate } = useAiTeammateIdentity()
+
   return (
     <section data-qa-section="operator-exceptions" className="space-y-4">
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">{AI_OS_EXCEPTIONS_SECTION_TITLE}</h2>
-        <p className="mt-1 text-muted-foreground">{AI_OS_EXCEPTIONS_SECTION_SUBTITLE}</p>
+        <p className="mt-1 text-muted-foreground">{aiOsExceptionsSectionSubtitle(teammate)}</p>
       </div>
 
       {items.length === 0 ? (

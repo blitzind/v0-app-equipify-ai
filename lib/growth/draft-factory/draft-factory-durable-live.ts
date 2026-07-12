@@ -74,6 +74,13 @@ export async function buildCanonicalEvidenceForLead(
     lead.decisionMakerStatus === "verified_contactable" ||
     lead.decisionMakerStatus === "suspected"
 
+  // GE-AIOS-CONTACT-1A — usable provider email on lead or confirmed DM unblocks contact stage for drafting.
+  // Independently verified status is preferred; available-unverified still allows prep (send remains gated).
+  const contactVerifiedForEmail =
+    lead.decisionMakerStatus === "verified_contactable" ||
+    lead.decisionMakerStatus === "confirmed" ||
+    (Boolean(lead.contactEmail?.includes("@")) && decisionMakerAvailable)
+
   return {
     admitted: true,
     researchCurrent,
@@ -84,10 +91,8 @@ export async function buildCanonicalEvidenceForLead(
     portfolioSelected: input.portfolioSelected === true,
     decisionMakerAvailable,
     decisionMakerId: lead.primaryDecisionMakerId,
-    contactVerifiedForEmail:
-      lead.decisionMakerStatus === "verified_contactable" ||
-      lead.decisionMakerStatus === "confirmed",
-    personalizationReady: researchCurrent && decisionMakerAvailable,
+    contactVerifiedForEmail,
+    personalizationReady: researchCurrent && decisionMakerAvailable && contactVerifiedForEmail,
     draftValid: false,
     approved: false,
     rejected: false,
@@ -199,6 +204,82 @@ export async function advanceDraftFactoryForLeadLive(
   })
 
   const allowGeneration = input.allowGeneration !== false
+  let completionHints = { ...(input.completionHints ?? {}) }
+
+  // GE-AIOS-CONTACT-1B — waiting_for_dm actively submits live DataMoon discovery (durable path).
+  const wakeType =
+    typeof input.wake === "string"
+      ? input.wake
+      : typeof input.wake === "object" && input.wake && "type" in input.wake
+        ? String((input.wake as { type: string }).type)
+        : "scheduled_resume"
+
+  const shouldDiscoverDecisionMaker =
+    !evidence.decisionMakerAvailable ||
+    wakeType === "decision_maker_required" ||
+    wakeType === "datamoon_person_requested" ||
+    wakeType === "datamoon_person_completed" ||
+    wakeType === "datamoon_person_failed" ||
+    wakeType === "provider_capacity_available"
+
+  if (shouldDiscoverDecisionMaker && !evidence.stopInvestment) {
+    try {
+      const { evaluateAndEnrichDecisionMakerForLead } = await import(
+        "@/lib/growth/datamoon-decision-maker/datamoon-dm-service"
+      )
+      const dmDecision = await evaluateAndEnrichDecisionMakerForLead(admin, {
+        organizationId: input.organizationId,
+        leadId: input.leadId,
+        portfolioSelected: input.portfolioSelected === true,
+        budgetAvailable: true,
+        useLiveDiscoveryAdapter: true,
+        generatedAt: now,
+      })
+
+      if (dmDecision.outcome === "provider_pending") {
+        completionHints = {
+          ...completionHints,
+          inFlightDatamoon: true,
+        }
+        const nextPoll =
+          dmDecision.explainability.providerProvenance
+            .find((entry) => entry.startsWith("next_poll_at:"))
+            ?.replace("next_poll_at:", "") ?? null
+        if (nextPoll) {
+          // Persist next eligible wake via repository after advance — pass through hints.
+          completionHints = {
+            ...completionHints,
+            portfolioDeferred: false,
+          }
+          logGrowthEngine("datamoon_dm_discovery_pending_in_durable_df", {
+            organization_id: input.organizationId,
+            lead_id: input.leadId,
+            next_poll_at: nextPoll,
+            outcome: dmDecision.outcome,
+          })
+        }
+      } else if (dmDecision.resumeDraftFactoryTo === "personalization" && dmDecision.selectedCandidate) {
+        // Rebuild evidence so contact/DM flags reflect CONTACT-1A persistence.
+        const refreshed = await buildCanonicalEvidenceForLead(admin, {
+          organizationId: input.organizationId,
+          leadId: input.leadId,
+          portfolioSelected: input.portfolioSelected,
+        })
+        Object.assign(evidence, refreshed)
+        completionHints = {
+          ...completionHints,
+          inFlightDatamoon: false,
+          completeCurrentStage: wakeType === "datamoon_person_completed" ? true : completionHints.completeCurrentStage,
+        }
+      }
+    } catch (error) {
+      logGrowthEngine("datamoon_dm_discovery_durable_df_failed", {
+        organization_id: input.organizationId,
+        lead_id: input.leadId,
+        message: error instanceof Error ? error.message.slice(0, 240) : String(error).slice(0, 240),
+      })
+    }
+  }
 
   return advanceDraftFactoryForLead({
     organizationId: input.organizationId,
@@ -208,7 +289,7 @@ export async function advanceDraftFactoryForLeadLive(
     evidence,
     workerId,
     repository,
-    completionHints: input.completionHints,
+    completionHints,
     generateViaGrowth5F: allowGeneration
       ? async ({ organizationId, leadId, now: generatedAt }) => {
           const lead = await fetchGrowthLeadById(admin, leadId)

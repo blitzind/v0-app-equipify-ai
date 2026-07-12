@@ -10,10 +10,11 @@ import {
 } from "@/lib/growth/workspace/executive-briefing/growth-home-revenue-mission-synthesizer"
 import type { GrowthHomeRevenueMission } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 import {
-  avaActivityForPresentationStage,
+  teammateActivityForPresentationStage,
   mapRuntimeStageToPresentationStage,
   presentationStageLabel,
 } from "@/lib/growth/mission-center/growth-mission-center-stage-mapper"
+import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 
 function isToday(iso: string): boolean {
   const date = new Date(iso)
@@ -25,13 +26,17 @@ function isToday(iso: string): boolean {
   )
 }
 
-function objectiveHistoryToTimeline(objective: GrowthObjective): GrowthHomeMissionTimelineItem[] {
+function objectiveHistoryToTimeline(
+  objective: GrowthObjective,
+  teammateName?: string | null,
+): GrowthHomeMissionTimelineItem[] {
+  const teammate = resolveAiTeammatePresentation(teammateName)
   const items: GrowthHomeMissionTimelineItem[] = []
   for (const entry of objective.executionHistory.slice(-6).reverse()) {
     const stage = mapRuntimeStageToPresentationStage(entry.stageId)
     items.push({
       id: `obj-history-${objective.id}-${entry.id}`,
-      summary: `Ava ${entry.outcome === "success" ? "completed" : entry.outcome === "blocked" ? "paused on" : "worked on"} ${presentationStageLabel(stage).toLowerCase()}.`,
+      summary: `${teammate.name} ${entry.outcome === "success" ? "completed" : entry.outcome === "blocked" ? "paused on" : "worked on"} ${presentationStageLabel(stage).toLowerCase()}.`,
       occurredAt: entry.ts,
       missionId: objective.id,
     })
@@ -39,7 +44,7 @@ function objectiveHistoryToTimeline(objective: GrowthObjective): GrowthHomeMissi
   for (const signal of objective.recentSignals.slice(-3).reverse()) {
     items.push({
       id: `obj-signal-${objective.id}-${signal.id}`,
-      summary: `Ava recorded ${signal.type.replaceAll("_", " ")} activity.`,
+      summary: `${teammate.name} recorded ${signal.type.replaceAll("_", " ")} activity.`,
       occurredAt: signal.receivedAt,
       missionId: objective.id,
     })
@@ -52,15 +57,17 @@ export function buildMissionCenterTimeline(input: {
   objectives: GrowthObjective[]
   revenueDirectorSnapshot?: GrowthRevenueDirectorCommandCenterSnapshot | null
   revenueMissions?: GrowthHomeRevenueMission[]
+  teammateName?: string | null
 }): GrowthHomeMissionTimelineItem[] {
   const merged: GrowthHomeMissionTimelineItem[] = []
 
   for (const objective of input.objectives) {
-    merged.push(...objectiveHistoryToTimeline(objective))
+    const teammate = resolveAiTeammatePresentation(input.teammateName)
+    merged.push(...objectiveHistoryToTimeline(objective, input.teammateName))
     const stage = mapRuntimeStageToPresentationStage(objective.runtime?.currentStageId)
     merged.push({
       id: `obj-current-${objective.id}`,
-      summary: avaActivityForPresentationStage(stage),
+      summary: teammateActivityForPresentationStage(teammate, stage),
       occurredAt: objective.runtime?.lastTickAt ?? objective.updatedAt,
       missionId: objective.id,
     })

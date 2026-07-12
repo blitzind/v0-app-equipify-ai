@@ -3,6 +3,7 @@
 import { Loader2 } from "lucide-react"
 import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import type { GrowthAiOsOperatorWorkingItem } from "@/lib/growth/aios/operator-experience/growth-ai-os-operator-experience-types"
+import { aiOsWorkInProgressTitle } from "@/lib/workspace/ai-os-outcome-first-terminology"
 import { teammateWorkInProgressSubtitle } from "@/lib/workspace/ai-teammate-voice"
 
 export function GrowthAiOsAiWorkingSection({ items }: { items: GrowthAiOsOperatorWorkingItem[] }) {
@@ -11,7 +12,7 @@ export function GrowthAiOsAiWorkingSection({ items }: { items: GrowthAiOsOperato
   return (
     <section data-qa-section="operator-ai-work-in-progress" className="space-y-4">
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight">{teammate.name} is handling</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">{aiOsWorkInProgressTitle(teammate)}</h2>
         <p className="mt-1 text-muted-foreground">{teammateWorkInProgressSubtitle(teammate)}</p>
       </div>
 

@@ -36,10 +36,12 @@ import type { VoiceMissedCallRecoveryWorkspaceSnapshot } from "@/lib/voice/misse
 import type { VoiceAiCopilotWorkspaceSnapshot } from "@/lib/voice/ai-copilot/types"
 import type { VoiceAiReceptionistWorkspaceSnapshot } from "@/lib/voice/ai-receptionist/types"
 import { GrowthCallWorkspaceCollapsiblePanel } from "@/components/growth/growth-call-workspace-collapsible-panel"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { SayThisNextCard } from "@/components/growth/live-coaching/say-this-next-card"
 import { resolveSayThisNext } from "@/lib/growth/operator-assist/resolve-say-this-next"
 import type { ConversationCoachTurn } from "@/lib/growth/live-coaching/types"
 import { cn } from "@/lib/utils"
+import { assistFromTeammate } from "@/lib/workspace/ai-teammate-voice"
 import { isNativeSessionIdServerReady } from "@/lib/voice/browser-calling/call-lifecycle-reconciliation"
 import {
   logCallWorkspaceCoachingUiTelemetry,
@@ -95,6 +97,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
   answerReconciliationPending?: boolean
   browserSyncMode?: "fast" | "enrichment" | null
 }) {
+  const { teammate } = useAiTeammateIdentity()
   const [acting, setActing] = useState<string | null>(null)
   const [startingCoaching, setStartingCoaching] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -450,7 +453,7 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
 
         {showAiHandoffSections || aiCopilot || aiReceptionist || missedCallRecovery ? (
           <GrowthCallWorkspaceCollapsiblePanel
-            title="Assist from Ava"
+            title={assistFromTeammate(teammate)}
             summary="Call assist, receptionist, recovery"
             defaultOpen={false}
             qaAction="live-coaching-ai-tools-toggle"

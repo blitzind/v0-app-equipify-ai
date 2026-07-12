@@ -124,6 +124,15 @@ export async function approveBusinessProfileForOrganization(
   if (!approved) {
     throw new Error("Could not approve Business Profile.")
   }
+
+  const { publishDraftFactoryCompanyProfileChanged } = await import(
+    "@/lib/growth/draft-factory/draft-factory-wake-emitters"
+  )
+  void publishDraftFactoryCompanyProfileChanged(admin, {
+    organizationId: input.organizationId,
+    profileId: input.profileId,
+  })
+
   return approved
 }
 

@@ -10,6 +10,7 @@ import { GrowthMeetingCalendarIntelligenceInline } from "@/components/growth/gro
 import { GrowthMeetingOperatorHandoffPanel } from "@/components/growth/growth-meeting-operator-handoff-panel"
 import { GrowthMeetingPrepPanel } from "@/components/growth/growth-meeting-prep-panel"
 import { GrowthOpportunityDraftPanel } from "@/components/growth/growth-opportunity-draft-panel"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import {
   GROWTH_MEETING_INBOX_VIEWS,
   GROWTH_MEETING_PROVIDER_LABELS,
@@ -24,15 +25,14 @@ import {
 } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
 import type { GrowthCalendarEventIntelligence } from "@/lib/growth/meeting-intelligence/calendar-event-intelligence-types"
 import {
-  GROWTH_ACTION_FIRST_AVA_RECOMMENDS,
   GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE,
-  GROWTH_ACTION_FIRST_AVA_IDLE,
   GROWTH_ACTION_FIRST_MEETINGS_FOLLOW_UP,
   GROWTH_ACTION_FIRST_MEETINGS_PREP,
   GROWTH_ACTION_FIRST_MEETINGS_TODAY,
   GROWTH_ACTION_FIRST_SUPPORTING_METRICS,
   GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER,
 } from "@/lib/growth/workspace/growth-workspace-action-first-1f"
+import { nothingNeededFromYou, recommends } from "@/lib/workspace/ai-teammate-voice"
 import { cn } from "@/lib/utils"
 import { buildGrowthLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import {
@@ -62,6 +62,7 @@ function leadDrawerHref(meeting: GrowthMeeting): string {
 }
 
 export function GrowthMeetingIntelligenceDashboard() {
+  const { teammate } = useAiTeammateIdentity()
   const router = useRouter()
   const searchParams = useSearchParams()
   const deepLinkMeetingId = resolveGrowthMeetingIdFromSearchParams(searchParams)
@@ -314,14 +315,14 @@ export function GrowthMeetingIntelligenceDashboard() {
               ) : null}
             </div>
           ) : null}
-          <GrowthEngineCard title={GROWTH_ACTION_FIRST_AVA_RECOMMENDS} data-section="meetings-action-first">
+          <GrowthEngineCard title={recommends(teammate)} data-section="meetings-action-first">
             {dashboard.upcomingCount === 0 &&
             dashboard.startingSoonCount === 0 &&
             dashboard.followUpsDueCount === 0 &&
             dashboard.outcomesMissingCount === 0 ? (
               <>
                 <p className="text-sm font-medium">{GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{GROWTH_ACTION_FIRST_AVA_IDLE}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{nothingNeededFromYou(teammate)}</p>
               </>
             ) : (
               <ul className="space-y-2 text-sm">
@@ -348,7 +349,7 @@ export function GrowthMeetingIntelligenceDashboard() {
                       {dashboard.followUpsDueCount + dashboard.outcomesMissingCount}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Log outcomes and send follow-ups so Ava can keep deals moving.
+                      Log outcomes and send follow-ups so {teammate.name} can keep deals moving.
                     </p>
                   </li>
                 ) : null}

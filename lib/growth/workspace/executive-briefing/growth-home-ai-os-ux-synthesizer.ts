@@ -25,11 +25,12 @@ import type {
 } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 import { GROWTH_HOME_AI_OS_UX_QA_MARKER } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
 import {
-  GROWTH_HOME_KPI_AVA_CONFIDENCE,
+  growthHomeKpiConfidence,
   GROWTH_HOME_KPI_COMPLETED_FOR_YOU,
   GROWTH_HOME_KPI_NEEDS_APPROVAL,
   GROWTH_HOME_KPI_PIPELINE_IMPACT,
 } from "@/lib/growth/workspace/executive-briefing/growth-home-experience-2b"
+import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 import {
   formatHomeCurrency,
   pluralize,
@@ -237,7 +238,7 @@ export function buildExecutiveBriefingHero(
     confidence.confidencePercent != null
       ? {
           id: "confidence",
-          title: GROWTH_HOME_KPI_AVA_CONFIDENCE,
+          title: growthHomeKpiConfidence(resolveAiTeammatePresentation()),
           value: `${confidence.confidencePercent}%`,
           status: confidence.confidenceLabel ?? "High confidence",
         }
@@ -583,9 +584,11 @@ export function buildAiOsUxViewModel(input: {
     waitingOnYou: waitingOnYouResult.items,
     waitingOnYouOverflow: waitingOnYouResult.overflowCount,
     approveItemsHref:
-      waitingOnYouResult.items[0]?.href ??
-      input.needsReview.reviewHref ??
-      `${GROWTH_WORKSPACE_BASE_PATH}/campaigns/sequences`,
+      approveItemsCount > 0
+        ? `${GROWTH_WORKSPACE_BASE_PATH}/os/approvals`
+        : waitingOnYouResult.items[0]?.href ??
+          input.needsReview.reviewHref ??
+          `${GROWTH_WORKSPACE_BASE_PATH}/campaigns/sequences`,
     approveItemsCount,
     liveStatus: buildAvaLiveStatus(input.dashboard),
     dailyWorkQueueBuckets: canonicalQueueBuckets(input.dashboard),

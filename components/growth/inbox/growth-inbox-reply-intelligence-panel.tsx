@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation"
 import { Bot, History, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard, StatTile } from "@/components/growth/growth-ui-utils"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import type { GrowthOutboundReply } from "@/lib/growth/outbound/types"
 import { growthFeaturePath } from "@/lib/growth/navigation/growth-workspace-base-path"
 import {
@@ -20,8 +21,8 @@ import {
 } from "@/lib/growth/reply-intelligence/reply-intent-types"
 import { isCommunicationStrategyEnabledClient } from "@/lib/growth/contact-verification/communication-strategy-feature"
 import {
-  GROWTH_AVA_EMPTY_ASSIST_UNAVAILABLE,
-  GROWTH_AVA_REPLY_ASSIST_TITLE,
+  growthAvaEmptyAssistUnavailable,
+  growthAvaReplyAssistTitle,
 } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import type { CommunicationStrategyDisplaySummary } from "@/lib/growth/contact-verification/communication-strategy-view"
 
@@ -35,6 +36,7 @@ type GrowthInboxReplyIntelligencePanelProps = {
 }
 
 export function GrowthInboxReplyIntelligencePanel({ leadId, compact = false }: GrowthInboxReplyIntelligencePanelProps) {
+  const { teammate } = useAiTeammateIdentity()
   const pathname = usePathname()
   const { dashboard, loading, error, reload: loadDashboard } = useGrowthReplyIntelligenceDashboard()
   const [leadReply, setLeadReply] = useState<InboxReplyItem | null>(null)
@@ -217,7 +219,7 @@ export function GrowthInboxReplyIntelligencePanel({ leadId, compact = false }: G
             </GrowthEngineCard>
           ) : null}
 
-          <GrowthEngineCard title={GROWTH_AVA_REPLY_ASSIST_TITLE} icon={<Bot className="size-4" />}>
+          <GrowthEngineCard title={growthAvaReplyAssistTitle(teammate)} icon={<Bot className="size-4" />}>
             {detailLoading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" />
@@ -233,7 +235,7 @@ export function GrowthInboxReplyIntelligencePanel({ leadId, compact = false }: G
                 <p className="rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">{copilot.suggestedReplyDraft}</p>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">{GROWTH_AVA_EMPTY_ASSIST_UNAVAILABLE}</p>
+              <p className="text-sm text-muted-foreground">{growthAvaEmptyAssistUnavailable(teammate)}</p>
             )}
           </GrowthEngineCard>
 

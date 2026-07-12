@@ -68,8 +68,9 @@ export type BusinessIntelligenceReviewProgress = {
   can_apply_to_profile: boolean
 }
 
-export const GROWTH_BUSINESS_INTELLIGENCE_REVIEW_PROMPT =
-  "Ava researched your business. Please review what she learned." as const
+export function businessIntelligenceReviewPrompt(teammateName?: string | null): string {
+  return `${teammateName?.trim() || "Your AI teammate"} researched your business. Please review what they learned.`
+}
 
 export const GROWTH_BUSINESS_INTELLIGENCE_APPLY_TO_PROFILE_LABEL =
   "Update Business Profile with approved answers" as const

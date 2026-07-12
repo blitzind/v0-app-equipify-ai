@@ -191,6 +191,42 @@ export async function processCompanyIntelligenceJobQueue(
         promoted_count: result.promoted_count,
       })
 
+      // GE-AIOS-AUTONOMY-1B — CI completion → AI OS Event Bus → Draft Factory
+      try {
+        const { data: contactRows } = await admin
+          .schema("growth")
+          .from("company_contacts")
+          .select("growth_lead_id")
+          .eq("company_id", company_id)
+          .not("growth_lead_id", "is", null)
+          .limit(10)
+        const leadIds = [
+          ...new Set(
+            (contactRows ?? [])
+              .map((row) => asString((row as Record<string, unknown>).growth_lead_id))
+              .filter(Boolean),
+          ),
+        ]
+        if (leadIds.length > 0) {
+          const { getGrowthEngineAiOrgId } = await import("@/lib/growth/access")
+          const organizationId = getGrowthEngineAiOrgId()
+          if (organizationId) {
+            const { publishDraftFactoryCompanyIntelligenceCompleted } = await import(
+              "@/lib/growth/draft-factory/draft-factory-wake-emitters"
+            )
+            void publishDraftFactoryCompanyIntelligenceCompleted(admin, {
+              organizationId,
+              companyId: company_id,
+              runId: result.run_id,
+              leadIds,
+              jobId: job_id,
+            })
+          }
+        }
+      } catch {
+        // Completion wake must not block CI job completion.
+      }
+
       await triggerBuyingCommitteeIntelligenceAfterCompanyIntelligence(admin, { company_id })
 
       processed += 1

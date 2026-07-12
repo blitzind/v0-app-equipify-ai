@@ -18,6 +18,7 @@ import {
 import { runGrowthMissionRuntimeOrchestration } from "@/lib/growth/mission-center/growth-mission-runtime-orchestrator"
 import { isMissionRuntimeOrchestrationReady } from "@/lib/growth/mission-center/growth-mission-runtime-orchestration-readiness"
 import { tickAutonomousSalesLoopForScheduler } from "@/lib/growth/specialists/execution/run-autonomous-sales-loop"
+import { tickDraftFactoryDueStatesForScheduler } from "@/lib/growth/draft-factory/draft-factory-due-scheduler-tick"
 import { buildObjectiveSignalSnapshot } from "@/lib/growth/objectives/growth-objective-signal-handler"
 import {
   GROWTH_OBJECTIVE_RUNTIME_SCHEDULER_QA_MARKER,
@@ -115,6 +116,8 @@ export type GrowthObjectiveRuntimeSchedulerResult = {
   skippedReason: string | null
   /** GE-AIOS-18A — Canonical autonomous sales loop tick (no duplicate scheduler). */
   autonomousSalesLoop: import("@/lib/growth/specialists/execution/autonomous-sales-loop-types").AutonomousSalesSchedulerTickResult | null
+  /** GE-AIOS-AUTONOMY-1B — Draft Factory due/capacity sub-tick (no duplicate cron). */
+  draftFactoryDue: import("@/lib/growth/draft-factory/draft-factory-due-scheduler-tick").DraftFactoryDueSchedulerTickResult | null
 }
 
 export async function runGrowthObjectiveRuntimeScheduler(
@@ -135,6 +138,15 @@ export async function runGrowthObjectiveRuntimeScheduler(
       })
     : null
 
+  const draftFactoryDue = killSwitches.autonomy_enabled
+    ? await tickDraftFactoryDueStatesForScheduler(admin, {
+        organizationIds: schedulerOrganizationIds,
+        startedAt,
+        maxRuntimeMs: 15_000,
+        maxOrganizations: MAX_ORGS_PER_TICK,
+      })
+    : null
+
   if (!killSwitches.autonomy_enabled || !killSwitches.autonomy_objective_mode_enabled) {
     return {
       qa_marker: GROWTH_OBJECTIVE_RUNTIME_SCHEDULER_QA_MARKER,
@@ -148,6 +160,7 @@ export async function runGrowthObjectiveRuntimeScheduler(
       failures: 0,
       skippedReason: "Objective runtime scheduler disabled by kill switch.",
       autonomousSalesLoop,
+      draftFactoryDue,
     }
   }
   const objectives = selectSchedulerObjectives(allObjectives)
@@ -228,6 +241,16 @@ export async function runGrowthObjectiveRuntimeScheduler(
           skipped_reason: autonomousSalesLoop.skipped_reason,
         }
       : null,
+    draft_factory_due: draftFactoryDue
+      ? {
+          organizations_attempted: draftFactoryDue.organizations_attempted,
+          due_states_found: draftFactoryDue.due_states_found,
+          due_advanced: draftFactoryDue.due_advanced,
+          capacity_selected: draftFactoryDue.capacity_selected,
+          failures: draftFactoryDue.failures,
+          skipped_reason: draftFactoryDue.skipped_reason,
+        }
+      : null,
   })
 
   return {
@@ -242,6 +265,7 @@ export async function runGrowthObjectiveRuntimeScheduler(
     failures,
     skippedReason: null,
     autonomousSalesLoop,
+    draftFactoryDue,
   }
 }
 

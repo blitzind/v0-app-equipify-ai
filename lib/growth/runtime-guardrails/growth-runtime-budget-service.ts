@@ -208,4 +208,13 @@ export async function resetBudgetWindow(
     .eq("window_start", windowStart)
 
   if (error) throw new Error(error.message)
+
+  const { publishDraftFactoryBudgetWindowReset } = await import(
+    "@/lib/growth/draft-factory/draft-factory-wake-emitters"
+  )
+  void publishDraftFactoryBudgetWindowReset(admin, {
+    organizationId: input.organizationId,
+    resourceType: input.resourceType,
+    windowKind: input.windowKind,
+  })
 }

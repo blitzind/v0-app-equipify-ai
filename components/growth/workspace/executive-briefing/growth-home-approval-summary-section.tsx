@@ -2,9 +2,10 @@
 
 import Link from "next/link"
 import type { GrowthHomeApprovalSummary } from "@/lib/growth/workspace/executive-briefing/growth-home-executive-briefing-types"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import {
-  AI_OS_APPROVALS_SECTION_SUBTITLE,
-  AI_OS_APPROVALS_SECTION_TITLE,
+  aiOsApprovalsSectionSubtitle,
+  aiOsApprovalsSectionTitle,
 } from "@/lib/workspace/ai-os-outcome-first-terminology"
 import { Button } from "@/components/ui/button"
 
@@ -13,13 +14,15 @@ type Props = {
 }
 
 export function GrowthHomeApprovalSummarySection({ summary }: Props) {
+  const { teammate } = useAiTeammateIdentity()
+
   if (!summary || summary.totalPending === 0) return null
 
   return (
     <section data-qa-section="home-exceptions-approvals" className="space-y-4">
       <div>
-        <h2 className="text-xl font-semibold tracking-tight">{AI_OS_APPROVALS_SECTION_TITLE}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{AI_OS_APPROVALS_SECTION_SUBTITLE}</p>
+        <h2 className="text-xl font-semibold tracking-tight">{aiOsApprovalsSectionTitle(teammate)}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{aiOsApprovalsSectionSubtitle(teammate)}</p>
       </div>
 
       <article className="rounded-xl border border-border/70 bg-card p-5">

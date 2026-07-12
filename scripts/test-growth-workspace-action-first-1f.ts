@@ -8,12 +8,13 @@ import { execSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 import {
-  GROWTH_ACTION_FIRST_AVA_IDLE,
   GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE,
   GROWTH_ACTION_FIRST_SUPPORTING_METRICS,
   GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER,
   GROWTH_ACTION_FIRST_1F_SURFACES,
+  growthActionFirstIdle,
 } from "../lib/growth/workspace/growth-workspace-action-first-1f"
+import { defaultTeammatePresentation } from "../lib/workspace/ai-teammate-voice"
 
 export { GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER }
 
@@ -49,7 +50,10 @@ function main(): void {
 
   assert.equal(GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER, "growth-workspace-action-first-1f-v1")
   assert.equal(GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE, "You're all caught up.")
-  assert.equal(GROWTH_ACTION_FIRST_AVA_IDLE, "Ava doesn't need anything from you right now.")
+  assert.equal(
+    growthActionFirstIdle(defaultTeammatePresentation()),
+    "Ava doesn't need anything from you right now.",
+  )
   assert.equal(GROWTH_ACTION_FIRST_SUPPORTING_METRICS, "Supporting metrics")
   console.log("  ✓ Action-first marker and empty-state copy")
 

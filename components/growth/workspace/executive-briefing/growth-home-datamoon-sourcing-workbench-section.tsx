@@ -52,14 +52,14 @@ import {
   GROWTH_HOME_DISCOVERY_SOURCE_DATAMOON_LABEL,
   GROWTH_HOME_FIND_LEADS_APPROVAL_COPY,
   GROWTH_HOME_FIND_LEADS_ASSUMPTIONS_TITLE,
-  GROWTH_HOME_FIND_LEADS_CARD_APPROVED_COPY,
+  growthHomeFindLeadsCardApprovedCopy,
   GROWTH_HOME_FIND_LEADS_CARD_CONTINUE_MANUAL_LABEL,
-  GROWTH_HOME_FIND_LEADS_CARD_MISSING_COPY,
+  growthHomeFindLeadsCardMissingCopy,
   GROWTH_HOME_FIND_LEADS_CTA,
-  GROWTH_HOME_FIND_LEADS_DRAWER_DESCRIPTION,
+  growthHomeFindLeadsDrawerDescription,
   GROWTH_HOME_FIND_LEADS_EDIT_SEARCH_LABEL,
   GROWTH_HOME_FIND_LEADS_HERO_PLACEHOLDER,
-  GROWTH_HOME_FIND_LEADS_HERO_SUBTITLE,
+  growthHomeFindLeadsHeroSubtitle,
   GROWTH_HOME_FIND_LEADS_HERO_TITLE,
   GROWTH_HOME_FIND_LEADS_LOOKS_GOOD_LABEL,
   GROWTH_HOME_FIND_LEADS_MISSION_BINDING_ATTACHED_COPY,
@@ -67,13 +67,13 @@ import {
   GROWTH_HOME_FIND_LEADS_PLAN_TITLE,
   GROWTH_HOME_FIND_LEADS_PLAN_USING_LABEL,
   GROWTH_HOME_FIND_LEADS_RESULTS_AVA_RECOMMENDS_COPY,
-  GROWTH_HOME_FIND_LEADS_RESULTS_AVA_RECOMMENDS_TITLE,
+  growthHomeFindLeadsResultsRecommendsTitle,
   GROWTH_HOME_FIND_LEADS_REVIEW_ALL_LABEL,
   GROWTH_HOME_FIND_LEADS_UNSURE_TITLE,
   GROWTH_HOME_FIND_LEADS_TITLE,
-  GROWTH_HOME_FIND_LEADS_SUBTITLE,
-  GROWTH_HOME_ASK_AVA_TAB_LABEL,
-  GROWTH_HOME_IMPORT_RECOMMENDED_LABEL,
+  growthHomeFindLeadsSubtitle,
+  growthHomeAskTeammateTabLabel,
+  growthHomeImportRecommendedLabel,
   GROWTH_HOME_IMPORT_SELECTED_LABEL,
   GROWTH_HOME_POWERED_BY_DATAMOON_LABEL,
   GROWTH_HOME_PROVIDER_MODE_LABEL,
@@ -118,6 +118,7 @@ import type {
   DatamoonAudienceImportRun,
 } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-types"
 import type { DatamoonProviderDiagnostics } from "@/lib/growth/providers/datamoon"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { cn } from "@/lib/utils"
 
 type GuidedWorkflowStep = "prompt" | "plan" | "ready" | "configure"
@@ -173,6 +174,7 @@ function splitAssumptions(assumptions: string[], overrides: string[]) {
 }
 
 export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }: { embedded?: boolean }) {
+  const { teammate } = useAiTeammateIdentity()
   const [open, setOpen] = useState(false)
   const [providerDetailsOpen, setProviderDetailsOpen] = useState(false)
   const [mode, setMode] = useState<AvaDatamoonSourcingWorkbenchMode>("ava_draft")
@@ -693,15 +695,15 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
           </span>
           <div className="space-y-3">
             <h2 className="text-lg font-semibold tracking-tight">{GROWTH_HOME_FIND_LEADS_TITLE}</h2>
-            <p className="text-sm text-muted-foreground">{GROWTH_HOME_FIND_LEADS_SUBTITLE}</p>
+            <p className="text-sm text-muted-foreground">{growthHomeFindLeadsSubtitle(teammate)}</p>
             {hasApprovedBusinessProfile ? (
               <>
-                <p className="text-sm text-muted-foreground">{GROWTH_HOME_FIND_LEADS_CARD_APPROVED_COPY}</p>
+                <p className="text-sm text-muted-foreground">{growthHomeFindLeadsCardApprovedCopy(teammate)}</p>
                 <GrowthBadge tone="healthy">{GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL}</GrowthBadge>
               </>
             ) : (
               <>
-                <p className="text-sm text-muted-foreground">{GROWTH_HOME_FIND_LEADS_CARD_MISSING_COPY}</p>
+                <p className="text-sm text-muted-foreground">{growthHomeFindLeadsCardMissingCopy(teammate)}</p>
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Button type="button" size="sm" onClick={handleCreateBusinessProfile}>
                     {GROWTH_HOME_DATAMOON_CREATE_BUSINESS_PROFILE_LABEL}
@@ -716,11 +718,11 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
         </div>
         ) : (
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">{GROWTH_HOME_FIND_LEADS_SUBTITLE}</p>
+            <p className="text-sm text-muted-foreground">{growthHomeFindLeadsSubtitle(teammate)}</p>
             {hasApprovedBusinessProfile ? (
               <GrowthBadge tone="healthy">{GROWTH_HOME_DATAMOON_USING_BUSINESS_PROFILE_LABEL}</GrowthBadge>
             ) : (
-              <p className="text-sm text-muted-foreground">{GROWTH_HOME_FIND_LEADS_CARD_MISSING_COPY}</p>
+              <p className="text-sm text-muted-foreground">{growthHomeFindLeadsCardMissingCopy(teammate)}</p>
             )}
           </div>
         )}
@@ -735,7 +737,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
           <SheetHeader className="space-y-2">
             <SheetTitle>{GROWTH_HOME_FIND_LEADS_TITLE}</SheetTitle>
-            <SheetDescription>{GROWTH_HOME_FIND_LEADS_DRAWER_DESCRIPTION}</SheetDescription>
+            <SheetDescription>{growthHomeFindLeadsDrawerDescription(teammate)}</SheetDescription>
           </SheetHeader>
 
           <div className="space-y-6">
@@ -746,7 +748,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
                 variant={mode === "ava_draft" ? "default" : "outline"}
                 onClick={() => handleModeChange("ava_draft")}
               >
-                {GROWTH_HOME_ASK_AVA_TAB_LABEL}
+                {growthHomeAskTeammateTabLabel(teammate)}
               </Button>
               <Button
                 type="button"
@@ -763,10 +765,10 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
                 <CardHeader className="space-y-2 px-6">
                   <div className="flex items-center gap-2 text-primary">
                     <Sparkles className="size-5" aria-hidden />
-                    <span className="text-sm font-medium">{GROWTH_HOME_ASK_AVA_TAB_LABEL}</span>
+                    <span className="text-sm font-medium">{growthHomeAskTeammateTabLabel(teammate)}</span>
                   </div>
                   <CardTitle className="text-xl">{GROWTH_HOME_FIND_LEADS_HERO_TITLE}</CardTitle>
-                  <p className="text-sm text-muted-foreground">{GROWTH_HOME_FIND_LEADS_HERO_SUBTITLE}</p>
+                  <p className="text-sm text-muted-foreground">{growthHomeFindLeadsHeroSubtitle(teammate)}</p>
                 </CardHeader>
                 <CardContent className="space-y-4 px-6">
                   {!hasApprovedBusinessProfile ? (
@@ -1128,7 +1130,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
                 {previewRecords.length > 0 ? (
                   <div className="space-y-4 rounded-xl border border-border/70 p-5">
                     <div>
-                      <h3 className="text-base font-semibold">{GROWTH_HOME_FIND_LEADS_RESULTS_AVA_RECOMMENDS_TITLE}</h3>
+                      <h3 className="text-base font-semibold">{growthHomeFindLeadsResultsRecommendsTitle(teammate)}</h3>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {GROWTH_HOME_FIND_LEADS_RESULTS_AVA_RECOMMENDS_COPY}
                       </p>
@@ -1140,7 +1142,7 @@ export function GrowthHomeDatamoonSourcingWorkbenchSection({ embedded = false }:
                         onClick={() => void handleImportRecommended()}
                       >
                         {busy === "import-all" ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-                        {GROWTH_HOME_IMPORT_RECOMMENDED_LABEL}
+                        {growthHomeImportRecommendedLabel(teammate)}
                       </Button>
                       <Button type="button" variant="outline" onClick={handleReviewAllLeads}>
                         {GROWTH_HOME_FIND_LEADS_REVIEW_ALL_LABEL}

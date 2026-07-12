@@ -2,6 +2,11 @@
 
 import type { OpportunityIntelligenceViewModel } from "@/lib/growth/opportunity-intelligence/opportunity-intelligence-view-model-types"
 import type { GrowthHomeOpportunityIntelligenceResearchStatus } from "@/lib/growth/opportunity-intelligence/growth-home-opportunity-intelligence-api-contract"
+import {
+  AI_TEAMMATE_DEFAULT_NAME,
+  resolveAiTeammatePresentation,
+  type AiTeammatePresentation,
+} from "@/lib/workspace/ai-teammate-identity"
 
 export const GROWTH_AVA_HOME_EXECUTION_1A_QA_MARKER = "ge-ava-home-execution-1a-v1" as const
 
@@ -27,8 +32,11 @@ export const GROWTH_HOME_AVA_RUN_INTAKE_LABEL = "Run intake workflow" as const
 export const GROWTH_HOME_AVA_START_RESEARCH_LABEL = "Start AI research" as const
 export const GROWTH_HOME_AVA_REFRESH_INTELLIGENCE_LABEL = "Refresh intelligence" as const
 
+export function growthHomeSafeExecutionDisclaimer(teammate: AiTeammatePresentation): string {
+  return `${teammate.name} can research and prepare recommendations, but ${teammate.subjectPronoun.toLowerCase()} will not send outreach without approval.`
+}
 export const GROWTH_HOME_AVA_SAFE_EXECUTION_DISCLAIMER =
-  "Ava can research and prepare recommendations, but she will not send outreach without approval." as const
+  growthHomeSafeExecutionDisclaimer(resolveAiTeammatePresentation(AI_TEAMMATE_DEFAULT_NAME))
 
 export const GROWTH_HOME_AVA_EXECUTE_API_PATH = "/api/platform/growth/leads" as const
 

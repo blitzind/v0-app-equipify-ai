@@ -98,6 +98,25 @@ export const GROWTH_AI_EVENT_BUS_SUBSCRIBER_DEFINITIONS: readonly GrowthAiEventB
     categories: ["memory"],
     eventTypePrefixes: ["memory", "context"],
   },
+  {
+    subscriberId: "draft_factory_wake_observer",
+    categories: ["system", "approval", "decision", "mission", "agent", "budget"],
+    eventTypePrefixes: [
+      "growth.workflow",
+      "growth.company_intelligence",
+      "growth.datamoon",
+      "growth.execution_plan",
+      "growth.ava.outreach_package_approval",
+      "decision.gate",
+      "growth.contact",
+      "growth.personalization",
+      "growth.mission",
+      "growth.company.profile",
+      "growth.capacity",
+      "growth.research",
+      "growth.budget",
+    ],
+  },
 ] as const
 
 type SubscriberObservationStore = Map<

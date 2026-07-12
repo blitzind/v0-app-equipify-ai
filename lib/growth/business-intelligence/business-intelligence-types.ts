@@ -157,6 +157,7 @@ export type BusinessIntelligenceReportRecord = {
 
 export type RunBusinessIntelligenceInput = {
   organizationId: string
+  teammateName?: string | null
   forceRefresh?: boolean
   runEvidenceEngine?: boolean
   websiteUrl?: string | null

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useGrowthCallWorkflow } from "@/components/growth/growth-call-workflow-context"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import type { GrowthCallCopilotBriefing, GrowthCallCopilotSession } from "@/lib/growth/call-copilot-types"
 import {
   GROWTH_CALL_COPILOT_BUYING_SIGNAL_KEYS,
@@ -21,7 +22,7 @@ import {
   resolveGrowthCallCopilotEnabled,
 } from "@/lib/growth/call-copilot-settings"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
-import { GROWTH_AVA_CALL_ASSIST_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { growthAvaCallAssistTitle } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import type { GrowthLead } from "@/lib/growth/types"
 
 type GrowthCallCopilotProps = {
@@ -40,6 +41,7 @@ function getBriefing(session: GrowthCallCopilotSession | null): GrowthCallCopilo
 }
 
 export function GrowthCallCopilot({ lead }: GrowthCallCopilotProps) {
+  const { teammate } = useAiTeammateIdentity()
   const { state: callWorkflow, expandToken, refreshToken, registerHandles } = useGrowthCallWorkflow()
   const [sessions, setSessions] = useState<GrowthCallCopilotSession[]>([])
   const [activeSession, setActiveSession] = useState<GrowthCallCopilotSession | null>(null)
@@ -323,7 +325,7 @@ export function GrowthCallCopilot({ lead }: GrowthCallCopilotProps) {
   return (
     <GrowthCollapsibleEngineCard
       id="growth-call-copilot"
-      title={GROWTH_AVA_CALL_ASSIST_TITLE}
+      title={growthAvaCallAssistTitle(teammate)}
       icon={<Phone className="size-4" />}
       headerAside={collapsedSummary}
       defaultOpen={callWorkflow.callWorkflowActive}

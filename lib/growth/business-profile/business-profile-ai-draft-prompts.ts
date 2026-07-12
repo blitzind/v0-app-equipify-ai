@@ -1,10 +1,12 @@
 import "server-only"
 
 import type { BusinessProfileInput } from "@/lib/growth/business-profile/business-profile-types"
+import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 
-export function buildBusinessProfileAiDraftSystemPrompt(): string {
+export function buildBusinessProfileAiDraftSystemPrompt(teammateName?: string | null): string {
+  const teammate = resolveAiTeammatePresentation(teammateName)
   return [
-    "You are Ava, an AI growth strategist for Equipify AI OS.",
+    `You are ${teammate.name}, an AI growth strategist for Equipify AI OS.`,
     "Draft a Business Profile JSON object for lead discovery and revenue recommendations.",
     "Use operator inputs and any website context provided.",
     "Be specific but conservative — list assumptions and missing information the operator should confirm.",
@@ -16,8 +18,10 @@ export function buildBusinessProfileAiDraftSystemPrompt(): string {
 export function buildBusinessProfileAiDraftUserPrompt(input: {
   companyInput: BusinessProfileInput
   websiteContextSummary: string | null
+  teammateName?: string | null
 }): string {
   const { companyInput, websiteContextSummary } = input
+  const teammate = resolveAiTeammatePresentation(input.teammateName)
   const lines = [
     "Create a Business Profile draft with these sections:",
     "- company: shortDescription, productsServices[], businessModel, primaryValueProposition",
@@ -47,7 +51,7 @@ export function buildBusinessProfileAiDraftUserPrompt(input: {
     "",
     "Requirements:",
     "- confidence.assumptions must explain what you inferred vs. what was explicit.",
-    "- confidence.missingInformation should list gaps Ava wants the operator to confirm.",
+    `- confidence.missingInformation should list gaps ${teammate.name} wants the operator to confirm.`,
     "- Do not invent precise financial metrics unless provided.",
   )
 

@@ -15,15 +15,16 @@ import {
   GROWTH_OPERATOR_SIMPLIFICATION_1E_SURFACES,
   GROWTH_OPERATOR_SIMPLIFICATION_FORBIDDEN_AUTOMATION_LABELS,
   GROWTH_OPERATOR_SIMPLIFICATION_FORBIDDEN_INFRA_LABELS,
-  GROWTH_OPPORTUNITIES_AVA_RECOMMENDS_TITLE,
   GROWTH_OPPORTUNITIES_IMPORT_PROSPECTS_CTA,
   GROWTH_OPPORTUNITIES_PIPELINE_HEALTH_TITLE,
   GROWTH_OPPORTUNITIES_QUALIFY_LEADS_CTA,
   GROWTH_SHARE_PAGES_NO_PROSPECT_MESSAGE,
   GROWTH_VIDEOS_FIRST_RUN_TITLE,
   GROWTH_WORKSPACE_OPERATOR_SIMPLIFICATION_1E_QA_MARKER,
+  growthOpportunitiesRecommendsTitle,
 } from "../lib/growth/workspace/growth-workspace-operator-simplification-1e"
-import { GROWTH_AVA_RECOMMENDED_ACTIONS_TITLE } from "../lib/growth/workspace/growth-workspace-ava-identity"
+import { defaultTeammatePresentation } from "../lib/workspace/ai-teammate-voice"
+import { growthAvaRecommendedActionsTitle } from "../lib/growth/workspace/growth-workspace-ava-identity"
 
 export { GROWTH_WORKSPACE_OPERATOR_SIMPLIFICATION_1E_QA_MARKER }
 
@@ -102,19 +103,19 @@ function main(): void {
 
   const pipeline = read("components/growth/growth-opportunity-pipeline-dashboard.tsx")
   assert.match(pipeline, /GROWTH_OPPORTUNITIES_PIPELINE_HEALTH_TITLE/)
-  assert.match(pipeline, /GROWTH_OPPORTUNITIES_AVA_RECOMMENDS_TITLE/)
+  assert.match(pipeline, /growthOpportunitiesRecommendsTitle/)
   assert.match(pipeline, /GROWTH_OPPORTUNITIES_IMPORT_PROSPECTS_CTA/)
   assert.match(pipeline, /GROWTH_OPPORTUNITIES_QUALIFY_LEADS_CTA/)
   assert.equal(GROWTH_OPPORTUNITIES_PIPELINE_HEALTH_TITLE, "Pipeline health")
-  assert.equal(GROWTH_OPPORTUNITIES_AVA_RECOMMENDS_TITLE, "Ava recommends")
+  assert.equal(growthOpportunitiesRecommendsTitle(defaultTeammatePresentation()), "Ava recommends")
   console.log("  ✓ Opportunities pipeline leads with actionable workflow")
 
   const opportunities = read("components/growth/growth-opportunity-pipeline-dashboard.tsx")
   assert.doesNotMatch(stripImportsAndComments(opportunities), /Execution Readiness/)
 
   const avaIdentity = read("lib/growth/workspace/growth-workspace-ava-identity.ts")
-  assert.match(avaIdentity, /Ava recommends/)
-  assert.equal(GROWTH_AVA_RECOMMENDED_ACTIONS_TITLE, "Ava recommends")
+  assert.match(avaIdentity, /growthAvaRecommendedActionsTitle/)
+  assert.equal(growthAvaRecommendedActionsTitle(defaultTeammatePresentation()), "Ava recommends")
   console.log("  ✓ Ava terminology preserved")
 
   assert.ok(!fs.existsSync(path.join(ROOT, ".env.local")), ".env.local must not be present")

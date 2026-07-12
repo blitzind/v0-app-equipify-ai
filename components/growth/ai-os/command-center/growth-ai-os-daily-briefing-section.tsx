@@ -4,13 +4,14 @@ import Link from "next/link"
 import { AlertTriangle, CheckCircle2, Clock3, Compass, Sparkles, Target } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import type {
   AiOsDailyBriefing,
   AiOsDailyBriefingActionItem,
   AiOsDailyBriefingUrgencyLevel,
 } from "@/lib/growth/aios/ai-os-daily-briefing-types"
 import { GROWTH_AI_OS_DAILY_BRIEFING_QA_MARKER } from "@/lib/growth/aios/ai-os-daily-briefing-types"
-import { GROWTH_AVA_EMPTY_RECOMMENDATIONS } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { growthAvaEmptyRecommendations } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { cn } from "@/lib/utils"
 
 function urgencyBadgeVariant(urgency: AiOsDailyBriefingUrgencyLevel) {
@@ -89,6 +90,7 @@ function BriefingListCard({
 }
 
 export function GrowthAiOsDailyBriefingSection({ briefing }: { briefing: AiOsDailyBriefing }) {
+  const { teammate } = useAiTeammateIdentity()
   return (
     <section
       className="space-y-6"
@@ -212,7 +214,7 @@ export function GrowthAiOsDailyBriefingSection({ briefing }: { briefing: AiOsDai
         </CardHeader>
         <CardContent className="space-y-3">
           {briefing.recommendedNextActions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{GROWTH_AVA_EMPTY_RECOMMENDATIONS}</p>
+            <p className="text-sm text-muted-foreground">{growthAvaEmptyRecommendations(teammate)}</p>
           ) : (
             briefing.recommendedNextActions.map((item) => <BriefingActionCard key={item.id} item={item} />)
           )}

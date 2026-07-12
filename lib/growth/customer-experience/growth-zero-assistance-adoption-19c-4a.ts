@@ -1,4 +1,4 @@
-/** GE-AIOS-19C-4A — Zero-assistance adoption polish (client-safe customer copy). */
+/** GE-AIOS-19C-4A / GE-AIOS-IDENTITY-1B — Zero-assistance adoption polish (client-safe customer copy). */
 
 import { GROWTH_HOME_STARTUP_STEP_PATHS } from "@/lib/growth/home/growth-home-canonical-startup-experience-18d"
 import { GROWTH_TRAINING_COMPANY_PROFILE_ROUTE } from "@/lib/growth/training/growth-training-workspace-types"
@@ -6,6 +6,16 @@ import type {
   GrowthHumanApprovalActionType,
   GrowthHumanApprovalItem,
 } from "@/lib/growth/aios/approvals/growth-human-approval-center-types"
+import type { AiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
+import {
+  completedWorkDescription,
+  completedWorkHeroEmpty,
+  completedWorkNavLabel,
+  completedWorkTitle,
+  reviewCompletedWorkFull,
+  whyTeammateStops,
+  teammatePossessive,
+} from "@/lib/workspace/ai-teammate-voice"
 
 export const GROWTH_ZERO_ASSISTANCE_ADOPTION_19C_4A_QA_MARKER =
   "ge-aios-19c-4a-zero-assistance-adoption-polish-v1" as const
@@ -13,30 +23,38 @@ export const GROWTH_ZERO_ASSISTANCE_ADOPTION_19C_4A_QA_MARKER =
 export const GROWTH_LAUNCH_COMPLETE_BANNER_STORAGE_KEY =
   "equipify:growth:launch-complete-banner/v1" as const
 
-/** Customer-facing nav + page title (internal route ids unchanged). */
-export const GROWTH_CUSTOMER_APPROVALS_NAV_LABEL = "Approvals" as const
+export function growthCustomerApprovalsNavLabel(teammate: AiTeammatePresentation): string {
+  return completedWorkNavLabel(teammate)
+}
 
-export const GROWTH_CUSTOMER_APPROVALS_TITLE = "Approvals" as const
+export function growthCustomerApprovalsTitle(teammate: AiTeammatePresentation): string {
+  return completedWorkTitle(teammate)
+}
 
-export const GROWTH_CUSTOMER_APPROVALS_PAGE_DESCRIPTION =
-  "Review outreach and actions your AI teammate prepared. Nothing sends until you approve here or on the linked review page." as const
+export function growthCustomerApprovalsPageDescription(teammate: AiTeammatePresentation): string {
+  return completedWorkDescription(teammate)
+}
 
-export const GROWTH_CUSTOMER_APPROVALS_TRUST_HEADLINE =
-  "Why approval exists" as const
+export function growthCustomerApprovalsTrustHeadline(teammate: AiTeammatePresentation): string {
+  return whyTeammateStops(teammate)
+}
 
 export const GROWTH_CUSTOMER_APPROVALS_TRUST_BODY =
-  "I prepare research, drafts, and outreach plans first. You stay in control — approve to send, or reject so I can revise. Check Home daily; I'll surface urgent items there too." as const
+  "I prepare research, drafts, and outreach plans first. You authorize my completed work — or ask me to revise. Check Home daily; I'll surface urgent items there too." as const
 
-export const GROWTH_CUSTOMER_APPROVALS_WHEN_TO_VISIT =
-  "Visit when Home shows drafts waiting, or once a day during your first week." as const
+export function growthCustomerApprovalsWhenToVisit(teammate: AiTeammatePresentation): string {
+  return `Visit when Home shows ${teammate.name} completed work waiting, or once a day during your first week.`
+}
 
 export const GROWTH_CUSTOMER_APPROVALS_AFTER_APPROVE =
-  "After you approve, I can send or continue the next step. After you reject, I revise and bring it back for review." as const
+  "After you authorize a package, sequence and transport gates still protect sending. After you reject or request revision, I revise and bring it back." as const
 
-export const GROWTH_CUSTOMER_APPROVALS_EMPTY_HEADLINE = "No drafts waiting right now" as const
+export function growthCustomerApprovalsEmptyHeadline(teammate: AiTeammatePresentation): string {
+  return completedWorkHeroEmpty(teammate)
+}
 
 export const GROWTH_CUSTOMER_APPROVALS_EMPTY_BODY =
-  "That's normal while I'm still learning your business or between outreach cycles. Complete Training if setup isn't finished — then check Home; I'll add items here when drafts are ready." as const
+  "That's normal while I'm still learning your business or between outreach cycles. Complete Training if setup isn't finished — then check Home; I'll add completed work here when drafts are ready." as const
 
 export const GROWTH_CUSTOMER_APPROVALS_EMPTY_ACTION_LABEL = "Continue in Training" as const
 
@@ -50,11 +68,15 @@ export const GROWTH_CUSTOMER_LAUNCH_COMPLETE_HEADLINE = "You're all set" as cons
 export const GROWTH_CUSTOMER_LAUNCH_COMPLETE_BODY =
   "is working in the background now — researching companies, preparing outreach drafts, and learning from your business profile." as const
 
-export const GROWTH_CUSTOMER_LAUNCH_COMPLETE_NEXT_STEPS = [
-  "Check Approvals when I prepare outreach drafts.",
-  "Watch why I chose today's plan in Operations.",
-  "Teach me more anytime in Training.",
-] as const
+export function growthCustomerLaunchCompleteNextSteps(
+  teammate: AiTeammatePresentation,
+): readonly [string, string, string] {
+  return [
+    `Review ${teammatePossessive(teammate)} completed work when I prepare outreach drafts.`,
+    "Watch why I chose today's plan in Operations.",
+    "Teach me more anytime in Training.",
+  ] as const
+}
 
 export const GROWTH_CUSTOMER_HOME_PAGE_DESCRIPTION_SUFFIX =
   "Your AI sales teammate's daily briefing." as const
@@ -82,10 +104,15 @@ export const GROWTH_CUSTOMER_EMPTY_OPERATIONS_COMPLETED =
 export const GROWTH_CUSTOMER_EMPTY_OPERATIONS_TIMELINE =
   "Recent activity appears here as I work through your queue." as const
 
-export const GROWTH_CUSTOMER_CROSS_LINK_APPROVALS_LABEL = "Approvals" as const
+export function growthCustomerCrossLinkApprovalsLabel(teammate: AiTeammatePresentation): string {
+  return completedWorkNavLabel(teammate)
+}
 
-export const GROWTH_CUSTOMER_CROSS_LINK_APPROVALS_DESCRIPTION =
-  "Review drafts your AI prepared before anything sends" as const
+export function growthCustomerCrossLinkApprovalsDescription(
+  teammate: AiTeammatePresentation,
+): string {
+  return `Review work ${teammate.name} completed before anything sends`
+}
 
 export type GrowthCustomerApprovalPrimaryAction = {
   approveLabel: string
@@ -126,6 +153,7 @@ export function formatGrowthCustomerApprovalStatusLabel(status: GrowthHumanAppro
 
 export function resolveGrowthCustomerApprovalPrimaryAction(
   item: Pick<GrowthHumanApprovalItem, "route" | "status" | "actionType">,
+  teammate?: AiTeammatePresentation,
 ): GrowthCustomerApprovalPrimaryAction {
   const href = item.route?.trim() || null
   if (!href) {
@@ -138,12 +166,13 @@ export function resolveGrowthCustomerApprovalPrimaryAction(
     }
   }
   return {
-    approveLabel: "Approve",
+    approveLabel: "Authorize",
     rejectLabel: "Reject",
     approveHref: href,
     rejectHref: href,
-    helperText:
-      "Open the review page to approve or reject. Nothing sends until you approve.",
+    helperText: teammate
+      ? `${reviewCompletedWorkFull(teammate)} to authorize or reject. Nothing sends until you authorize — and package authorization is not permission to send.`
+      : "Review completed work to authorize or reject. Nothing sends until you authorize — and package authorization is not permission to send.",
   }
 }
 
@@ -164,3 +193,9 @@ export function dismissGrowthLaunchCompleteBanner(): void {
     // ignore
   }
 }
+
+/** @deprecated Prefer growthCustomerCrossLinkApprovalsLabel(teammate) */
+export const GROWTH_CUSTOMER_CROSS_LINK_APPROVALS_LABEL = "Completed Work" as const
+/** @deprecated Prefer growthCustomerCrossLinkApprovalsDescription(teammate) */
+export const GROWTH_CUSTOMER_CROSS_LINK_APPROVALS_DESCRIPTION =
+  "Review work your AI teammate completed before anything sends" as const

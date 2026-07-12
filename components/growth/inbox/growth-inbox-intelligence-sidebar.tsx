@@ -10,6 +10,7 @@ import { GrowthInboxQuickActions } from "@/components/growth/inbox/growth-inbox-
 import { GrowthInboxRecommendedReplyCard } from "@/components/growth/inbox/growth-inbox-recommended-reply-card"
 import { GrowthPersonalizationEmbeddedPanel } from "@/components/growth/personalization/embedded/growth-personalization-embedded-panel"
 import { GrowthOnDemandFeature } from "@/components/growth/runtime/growth-on-demand-feature"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
 import { useGrowthInboxSharedData } from "@/components/growth/inbox/growth-inbox-shared-data-provider"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
@@ -19,7 +20,7 @@ import {
 } from "@/lib/growth/hubs/growth-inbox-conversation-workspace-config"
 import { shouldDeferGrowthInboxTier3Hydration } from "@/lib/growth/inbox/growth-inbox-minimal-runtime-contract"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { GROWTH_AVA_PANEL_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { growthAvaPanelTitle } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { cn } from "@/lib/utils"
 
 export const GROWTH_INBOX_INTELLIGENCE_SIDEBAR_QA_MARKER = "growth-inbox-intelligence-sidebar-v2" as const
@@ -55,6 +56,7 @@ function SidebarCard({
 }
 
 export function GrowthInboxIntelligenceSidebar() {
+  const { teammate } = useAiTeammateIdentity()
   const { selectedThread } = useGrowthInboxWorkspace()
   const {
     leadId,
@@ -115,7 +117,7 @@ export function GrowthInboxIntelligenceSidebar() {
           ) : null}
         </SidebarCard>
 
-        <SidebarCard title={GROWTH_AVA_PANEL_TITLE} sectionId="inbox-sidebar-ai-assistant">
+        <SidebarCard title={growthAvaPanelTitle(teammate)} sectionId="inbox-sidebar-ai-assistant">
           {deferTier3 ? (
             <GrowthOnDemandFeature
               feature="opportunityRecommendations"

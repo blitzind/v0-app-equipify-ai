@@ -52,9 +52,25 @@ export function normalizeDatamoonAudienceRecord(
   const lastName = pickString(raw, "last_name")
   const businessEmail = normalizeEmail(pickString(raw, "business_email"))
   const personalEmailsRaw = pickString(raw, "personal_emails")
-  const personalEmail = normalizeEmail(personalEmailsRaw)
-  const email = businessEmail ?? personalEmail
-  const personalPhone = normalizePhone(pickString(raw, "personal_phone"))
+  // Support comma-separated personal_emails by normalizing the first valid address.
+  const personalEmailCandidates = (personalEmailsRaw ?? "")
+    .split(/[,;|]/)
+    .map((part) => normalizeEmail(part))
+    .filter((value): value is string => Boolean(value))
+  const personalEmail = personalEmailCandidates[0] ?? normalizeEmail(personalEmailsRaw)
+  const email =
+    businessEmail ??
+    normalizeEmail(pickString(raw, "work_email")) ??
+    normalizeEmail(pickString(raw, "email")) ??
+    personalEmail
+  const personalPhoneRaw =
+    pickString(raw, "personal_phone") ??
+    pickString(raw, "mobile_phone") ??
+    pickString(raw, "direct_phone") ??
+    pickString(raw, "work_phone") ??
+    pickString(raw, "business_phone") ??
+    pickString(raw, "phone")
+  const personalPhone = normalizePhone(personalPhoneRaw)
   const phone = personalPhone
   const linkedinRaw = pickString(raw, "linkedin_url")
   const linkedinSlug = normalizeLinkedIn(linkedinRaw)
@@ -94,7 +110,7 @@ export function normalizeDatamoonAudienceRecord(
     business_email: businessEmail,
     personal_emails: personalEmailsRaw,
     email,
-    personal_phone: pickString(raw, "personal_phone"),
+    personal_phone: personalPhoneRaw,
     phone,
     linkedin_url: linkedinUrl,
     address_line1: addressLine1,

@@ -200,6 +200,11 @@ export async function submitGrowthLeadResearchExecutionPlanReviewAction(
   const approvalStatus = mapExecutionPlanReviewActionToStatus(input.action)
   const reviewedAt = new Date().toISOString()
 
+  const { ensureGrowthAiEventBusInProcessSubscribers } = await import(
+    "@/lib/growth/aios/event-bus/growth-ai-event-bus-subscriber-registry"
+  )
+  ensureGrowthAiEventBusInProcessSubscribers()
+
   await publishAiOsEvent(admin, {
     organizationId: input.organizationId,
     eventType: GROWTH_LEAD_RESEARCH_EXECUTION_PLAN_REVIEW_EVENT,

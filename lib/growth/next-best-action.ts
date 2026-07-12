@@ -544,7 +544,7 @@ export function computeGrowthLeadNextBestAction(input: NextBestActionInput): Gro
   if (!usable && !input.latestProspectResearchRunId && !input.latestResearchRunId) {
     return buildResult(
       "run_research",
-      "Ava is queuing company research automatically.",
+      "Company research will be queued automatically.",
       ["Research not completed"],
       "high",
     )

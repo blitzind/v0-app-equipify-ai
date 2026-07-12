@@ -20,6 +20,8 @@ import {
   GROWTH_CLOSED_LOOP_LEARNING_SUBSCRIBER_ID,
 } from "@/lib/growth/aios/learning/growth-closed-loop-learning-types"
 import { observeClosedLoopLearningEventForBus } from "@/lib/growth/aios/learning/growth-closed-loop-learning-service"
+import { observeDraftFactoryWakeEventForBus } from "@/lib/growth/draft-factory/draft-factory-wake-bus-observer"
+import { GROWTH_DRAFT_FACTORY_WAKE_BUS_SUBSCRIBER_ID } from "@/lib/growth/draft-factory/draft-factory-wake-event-types"
 import {
   aiOsEventToGrowthAiEvent,
   type GrowthAiEventBusSubscriberId,
@@ -40,6 +42,10 @@ async function runSubscriberObservation(
 
   if (subscriberId === GROWTH_CLOSED_LOOP_LEARNING_SUBSCRIBER_ID) {
     await observeClosedLoopLearningEventForBus(event)
+  }
+
+  if (subscriberId === GROWTH_DRAFT_FACTORY_WAKE_BUS_SUBSCRIBER_ID) {
+    await observeDraftFactoryWakeEventForBus(event)
   }
 
   const growthEvent = aiOsEventToGrowthAiEvent(event)

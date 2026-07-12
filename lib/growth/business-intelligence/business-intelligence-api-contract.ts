@@ -15,7 +15,7 @@ import type {
 } from "@/lib/growth/business-intelligence/business-intelligence-review-types"
 import {
   GROWTH_BUSINESS_INTELLIGENCE_REVIEW_QA_MARKER,
-  GROWTH_BUSINESS_INTELLIGENCE_REVIEW_PROMPT,
+  businessIntelligenceReviewPrompt,
   GROWTH_BUSINESS_INTELLIGENCE_APPLY_TO_PROFILE_LABEL,
   reviewDecisionLabel,
   BUSINESS_INTELLIGENCE_REVIEW_FIELD_KEYS,
@@ -30,6 +30,11 @@ import type {
   BusinessIntelligenceReportStatus,
 } from "@/lib/growth/business-intelligence/business-intelligence-types"
 import { GROWTH_BUSINESS_INTELLIGENCE_QA_MARKER } from "@/lib/growth/business-intelligence/business-intelligence-types"
+import {
+  AI_TEAMMATE_DEFAULT_NAME,
+  resolveAiTeammatePresentation,
+  type AiTeammatePresentation,
+} from "@/lib/workspace/ai-teammate-identity"
 
 export const GROWTH_BUSINESS_INTELLIGENCE_UI_QA_MARKER = "ge-aios-8a-5-business-intelligence-ui-v1" as const
 
@@ -48,23 +53,33 @@ export const GROWTH_BUSINESS_INTELLIGENCE_API_PATH =
 export const GROWTH_BUSINESS_INTELLIGENCE_RESEARCH_API_PATH =
   "/api/platform/growth/business-intelligence/research" as const
 
-export const GROWTH_BUSINESS_INTELLIGENCE_RESEARCH_STEPS = [
+export function growthBusinessIntelligenceResearchSteps(teammate: AiTeammatePresentation): string[] {
+  return [
   "Reading website",
   "Finding business facts",
   "Comparing approved profile",
-  "Building Ava's understanding",
+  `Building ${teammate.name}'s understanding`,
   "Preparing recommendations",
-] as const
+  ]
+}
+export const GROWTH_BUSINESS_INTELLIGENCE_RESEARCH_STEPS =
+  growthBusinessIntelligenceResearchSteps(resolveAiTeammatePresentation(AI_TEAMMATE_DEFAULT_NAME))
 
 export const GROWTH_BUSINESS_INTELLIGENCE_RECENTLY_RESEARCHED_LABEL = "Recently researched" as const
 
 export const GROWTH_BUSINESS_INTELLIGENCE_SECTION_TITLE = "Business Intelligence" as const
 
+export function growthBusinessIntelligenceSectionSubtitle(teammate: AiTeammatePresentation): string {
+  return `Here's what ${teammate.name} currently understands about your business.`
+}
 export const GROWTH_BUSINESS_INTELLIGENCE_SECTION_SUBTITLE =
-  "Here's what Ava currently understands about your business." as const
+  growthBusinessIntelligenceSectionSubtitle(resolveAiTeammatePresentation(AI_TEAMMATE_DEFAULT_NAME))
 
+export function growthBusinessIntelligenceEmptyMessage(teammate: AiTeammatePresentation): string {
+  return `${teammate.name} hasn't researched your business yet.`
+}
 export const GROWTH_BUSINESS_INTELLIGENCE_EMPTY_MESSAGE =
-  "Ava hasn't researched your business yet." as const
+  growthBusinessIntelligenceEmptyMessage(resolveAiTeammatePresentation(AI_TEAMMATE_DEFAULT_NAME))
 
 export const GROWTH_BUSINESS_INTELLIGENCE_RESEARCH_CTA_LABEL = "Research my company" as const
 
@@ -169,7 +184,7 @@ export type GrowthBusinessIntelligenceLeadDiscoveryContextApiResponse = {
 
 export {
   GROWTH_BUSINESS_INTELLIGENCE_REVIEW_QA_MARKER,
-  GROWTH_BUSINESS_INTELLIGENCE_REVIEW_PROMPT,
+  businessIntelligenceReviewPrompt,
   GROWTH_BUSINESS_INTELLIGENCE_APPLY_TO_PROFILE_LABEL,
   reviewDecisionLabel,
   BUSINESS_INTELLIGENCE_REVIEW_FIELD_KEYS,

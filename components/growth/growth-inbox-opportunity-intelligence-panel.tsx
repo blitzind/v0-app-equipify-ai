@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge, GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { GrowthOpportunityRecommendationScoringDetails } from "@/components/growth/growth-opportunity-recommendation-scoring-details"
 import {
   recommendationTypeLabel,
@@ -12,7 +13,7 @@ import {
   type GrowthOpportunitySignal,
   type GrowthSequencePauseCandidate,
 } from "@/lib/growth/opportunity-intelligence/opportunity-types"
-import { GROWTH_AVA_EMPTY_RECOMMENDATIONS } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { growthAvaEmptyRecommendations } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 
 type GrowthInboxOpportunityIntelligencePanelProps = {
   leadId: string | null
@@ -28,6 +29,7 @@ export function GrowthInboxOpportunityIntelligencePanel({
   threadId,
   disabled,
 }: GrowthInboxOpportunityIntelligencePanelProps) {
+  const { teammate } = useAiTeammateIdentity()
   const [loading, setLoading] = useState(false)
   const [signals, setSignals] = useState<GrowthOpportunitySignal[]>([])
   const [recommendations, setRecommendations] = useState<GrowthOpportunityRecommendation[]>([])
@@ -103,7 +105,7 @@ export function GrowthInboxOpportunityIntelligencePanel({
             Loading recommendations…
           </div>
         ) : recommendations.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{GROWTH_AVA_EMPTY_RECOMMENDATIONS}</p>
+          <p className="text-sm text-muted-foreground">{growthAvaEmptyRecommendations(teammate)}</p>
         ) : (
           <div className="space-y-3">
             {recommendations.map((recommendation) => (

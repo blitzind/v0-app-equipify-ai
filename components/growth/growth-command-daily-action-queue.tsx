@@ -3,12 +3,14 @@
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import type { AidenDailyBriefing } from "@/lib/growth/aiden/aiden-daily-briefing"
 import { GROWTH_COMMAND_CENTER_DAILY_ACTION_QUEUE_QA_MARKER } from "@/lib/growth/command/command-center-daily-action-queue"
 import type { GrowthCadenceCommandSummary } from "@/lib/growth/cadence/cadence-types"
 import { isDailyRevenueWorkQueueEnabledClient } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-feature"
 import { isAutonomousExecutionGuardrailsEnabledClient } from "@/lib/growth/autonomous-execution-guardrails/autonomous-execution-guardrail-feature"
 import type { DailyRevenueWorkQueueDisplaySummary } from "@/lib/growth/daily-work-queue/daily-revenue-work-queue-view"
+import { teammatePossessive } from "@/lib/workspace/ai-teammate-voice"
 import { cn } from "@/lib/utils"
 
 type ActionQueueCard = {
@@ -38,6 +40,7 @@ type GrowthCommandDailyActionQueueProps = {
 }
 
 export function GrowthCommandDailyActionQueue({ briefing = null, loading = false }: GrowthCommandDailyActionQueueProps) {
+  const { teammate } = useAiTeammateIdentity()
   const [callsDue, setCallsDue] = useState(0)
   const [cadenceLoading, setCadenceLoading] = useState(true)
   const [workQueue, setWorkQueue] = useState<DailyRevenueWorkQueueDisplaySummary | null>(null)
@@ -129,7 +132,7 @@ export function GrowthCommandDailyActionQueue({ briefing = null, loading = false
   return (
     <section data-qa-marker={GROWTH_COMMAND_CENTER_DAILY_ACTION_QUEUE_QA_MARKER}>
       <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {workQueue ? "Ava daily work queue" : "Today\u2019s action queue"}
+        {workQueue ? `${teammatePossessive(teammate)} daily work queue` : "Today\u2019s action queue"}
       </p>
       {workQueue?.channel_summary ? (
         <p className="mb-3 text-sm text-muted-foreground">{workQueue.channel_summary}</p>

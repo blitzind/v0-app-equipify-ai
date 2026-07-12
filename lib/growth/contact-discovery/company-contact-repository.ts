@@ -319,6 +319,18 @@ export async function refreshCompanyContactVerification(
         leadId: refreshed.growth_lead_id,
         event: "email_verified",
       })
+      const { getGrowthEngineAiOrgId } = await import("@/lib/growth/access")
+      const organizationId = getGrowthEngineAiOrgId()
+      if (organizationId) {
+        const { publishDraftFactoryContactVerified } = await import(
+          "@/lib/growth/draft-factory/draft-factory-wake-emitters"
+        )
+        void publishDraftFactoryContactVerified(admin, {
+          organizationId,
+          leadId: refreshed.growth_lead_id,
+          contactId: refreshed.id,
+        })
+      }
     }
     if (phoneVerified) {
       void scheduleUnifiedRevenueWorkflowLifecycleReEvaluation({

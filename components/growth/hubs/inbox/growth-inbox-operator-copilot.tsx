@@ -5,6 +5,7 @@ import { useMemo } from "react"
 import { Loader2, Phone, Reply, CalendarClock, UserRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthBadge } from "@/components/growth/growth-ui-utils"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
 import { orchestrateGrowthInboxRecommendations } from "@/lib/growth/inbox/inbox-recommendation-orchestrator"
 import {
@@ -12,7 +13,10 @@ import {
 } from "@/lib/growth/hubs/growth-workspace-hub-paths"
 import { growthWorkspaceInboxWorkflowHref, growthWorkspaceLeadHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import { useGrowthFeaturePath } from "@/lib/growth/navigation/use-growth-feature-path"
-import { GROWTH_AVA_EMPTY_THREAD_GUIDANCE, GROWTH_AVA_REPLY_ASSIST_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import {
+  growthAvaEmptyThreadGuidance,
+  growthAvaReplyAssistTitle,
+} from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { cn } from "@/lib/utils"
 
 const SEVERITY_STYLES = {
@@ -28,6 +32,7 @@ function resolveSeverity(rankScore: number): keyof typeof SEVERITY_STYLES {
 }
 
 export function GrowthInboxOperatorCopilot() {
+  const { teammate } = useAiTeammateIdentity()
   const callsHref = useGrowthFeaturePath("calls")
   const {
     loading,
@@ -84,7 +89,7 @@ export function GrowthInboxOperatorCopilot() {
   if (!recommendation) {
     return (
       <div className="flex h-full items-center p-4 text-sm text-muted-foreground">
-        {GROWTH_AVA_EMPTY_THREAD_GUIDANCE}
+        {growthAvaEmptyThreadGuidance(teammate)}
       </div>
     )
   }
@@ -96,7 +101,7 @@ export function GrowthInboxOperatorCopilot() {
   return (
     <section aria-labelledby="inbox-operator-copilot-heading" className="flex h-full flex-col p-3" data-section="operator-copilot">
       <h2 id="inbox-operator-copilot-heading" className="mb-3 text-sm font-semibold text-foreground">
-        {GROWTH_AVA_REPLY_ASSIST_TITLE}
+        {growthAvaReplyAssistTitle(teammate)}
       </h2>
       <div
         className={cn(

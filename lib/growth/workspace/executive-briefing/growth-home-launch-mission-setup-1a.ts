@@ -10,6 +10,12 @@ import {
   HOME_LIVING_GET_AVA_READY_DESCRIPTION,
   HOME_LIVING_GET_AVA_READY_TITLE,
 } from "@/lib/growth/home/growth-home-living-experience-18e"
+import {
+  AI_TEAMMATE_DEFAULT_NAME,
+  resolveAiTeammatePresentation,
+  type AiTeammatePresentation,
+} from "@/lib/workspace/ai-teammate-identity"
+import { launchTeammate, meetTeammate } from "@/lib/workspace/ai-teammate-voice"
 
 export const GROWTH_AVA_LAUNCH_MISSION_SETUP_1A_QA_MARKER = "ge-ava-launch-mission-setup-1a-v1" as const
 
@@ -30,15 +36,20 @@ export const GROWTH_AVA_LAUNCH_MISSION_DEFAULT_OBJECTIVE_TYPE = "customers_acqui
 
 export const GROWTH_AVA_LAUNCH_MISSION_DEFAULT_TARGET = 10 as const
 
-export const GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS = {
-  meet_ava: "Meet Ava",
+export function growthLaunchMissionSetupStepLabels(teammate: AiTeammatePresentation) {
+  return {
+  meet_ava: meetTeammate(teammate),
   growth_profile: "Growth Profile & ICP",
   lead_source: "Lead Source & Mission",
   mailbox_readiness: "Mailbox Readiness",
   approval_guardrails: "Approval & Autonomy",
   calendar_booking: "Calendar & Booking",
-  launch_ava: "Launch Ava",
-} as const
+  launch_ava: launchTeammate(teammate),
+  } as const
+}
+
+export const GROWTH_AVA_LAUNCH_MISSION_SETUP_STEP_LABELS =
+  growthLaunchMissionSetupStepLabels(resolveAiTeammatePresentation(AI_TEAMMATE_DEFAULT_NAME))
 
 export const GROWTH_HOME_FIND_LEADS_SECTION_SELECTOR = '[data-workflow-step="find"]' as const
 

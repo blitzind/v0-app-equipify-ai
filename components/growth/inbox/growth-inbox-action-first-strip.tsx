@@ -4,21 +4,22 @@ import Link from "next/link"
 import { useMemo } from "react"
 import { ArrowRight } from "lucide-react"
 import { GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
 import { useGrowthReplyIntelligenceDashboard } from "@/components/growth/inbox/use-growth-reply-intelligence-dashboard"
 import { deriveGrowthInboxOverviewMetrics } from "@/lib/growth/inbox/growth-inbox-overview-metrics"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
 import {
-  GROWTH_ACTION_FIRST_AVA_RECOMMENDS,
-  GROWTH_ACTION_FIRST_AVA_IDLE,
   GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE,
   GROWTH_ACTION_FIRST_INBOX_HIGH_PRIORITY,
   GROWTH_ACTION_FIRST_INBOX_NEEDS_REVIEW,
   GROWTH_ACTION_FIRST_INBOX_REPLIES_WAITING,
   GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER,
 } from "@/lib/growth/workspace/growth-workspace-action-first-1f"
+import { recommends, nothingNeededFromYou } from "@/lib/workspace/ai-teammate-voice"
 
 export function GrowthInboxActionFirstStrip() {
+  const { teammate } = useAiTeammateIdentity()
   const { threads } = useGrowthInboxWorkspace()
   const { dashboard } = useGrowthReplyIntelligenceDashboard({ deferLoad: true })
 
@@ -32,12 +33,12 @@ export function GrowthInboxActionFirstStrip() {
   if (actionTotal === 0) {
     return (
       <GrowthEngineCard
-        title={GROWTH_ACTION_FIRST_AVA_RECOMMENDS}
+        title={recommends(teammate)}
         data-section="inbox-action-first"
         data-qa-marker={GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER}
       >
         <p className="text-sm font-medium">{GROWTH_ACTION_FIRST_CAUGHT_UP_TITLE}</p>
-        <p className="mt-1 text-sm text-muted-foreground">{GROWTH_ACTION_FIRST_AVA_IDLE}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{nothingNeededFromYou(teammate)}</p>
       </GrowthEngineCard>
     )
   }
@@ -53,7 +54,7 @@ export function GrowthInboxActionFirstStrip() {
       id: "needs-review",
       label: GROWTH_ACTION_FIRST_INBOX_NEEDS_REVIEW,
       count: metrics.needsReview,
-      hint: "Drafts and approvals Ava prepared for your review.",
+      hint: `Drafts and approvals ${teammate.name} prepared for your review.`,
     },
     {
       id: "high-priority",
@@ -65,7 +66,7 @@ export function GrowthInboxActionFirstStrip() {
 
   return (
     <GrowthEngineCard
-      title={GROWTH_ACTION_FIRST_AVA_RECOMMENDS}
+      title={recommends(teammate)}
       data-section="inbox-action-first"
       data-qa-marker={GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER}
     >

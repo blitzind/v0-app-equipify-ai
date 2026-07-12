@@ -7,7 +7,8 @@ import { GrowthBadge } from "@/components/growth/growth-ui-utils"
 import { GrowthKnowledgeContextSection } from "@/components/growth/growth-knowledge-context-section"
 import { GrowthKnowledgeRecommendationsSection } from "@/components/growth/growth-knowledge-recommendations-section"
 import { GrowthCampaignReadinessPanel } from "@/components/growth/growth-campaign-readiness-panel"
-import { GROWTH_AVA_MEETING_PREP_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
+import { growthAvaMeetingPrepTitle } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { GrowthConversationalPlaybooksPanel } from "@/components/growth/growth-conversational-playbooks-panel"
 import { GrowthHumanInterventionsPanel } from "@/components/growth/growth-human-interventions-panel"
 import { GrowthSmartFollowUpPoliciesPanel } from "@/components/growth/growth-smart-follow-up-policies-panel"
@@ -36,6 +37,7 @@ function PrepSection({
   children: React.ReactNode
   defaultOpen?: boolean
 }) {
+  const { teammate } = useAiTeammateIdentity()
   const [open, setOpen] = useState(defaultOpen)
   return (
     <section className="rounded-lg border border-border/70 bg-background/80">
@@ -332,7 +334,7 @@ export function GrowthMeetingPrepPanel({
             compact
           />
 
-          <PrepSection title={GROWTH_AVA_MEETING_PREP_TITLE}>
+          <PrepSection title={growthAvaMeetingPrepTitle(teammate)}>
             <div className="space-y-3" data-qa-marker="growth-ai-meeting-prep-m1c-v1">
               <div className="flex flex-wrap items-center gap-2">
                 {aiMeetingPrep ? (
@@ -366,7 +368,7 @@ export function GrowthMeetingPrepPanel({
                   disabled={generatingAiPrep || queueActionLoading}
                   onClick={() => void runAiPrepAction("generate")}
                 >
-                  {generatingAiPrep ? "Generating…" : aiMeetingPrep ? "Regenerate prep" : "Ask Ava to prepare"}
+                  {generatingAiPrep ? "Generating…" : aiMeetingPrep ? "Regenerate prep" : `Ask ${teammate.name} to prepare`}
                 </Button>
                 {aiMeetingPrep?.status === "draft" ? (
                   <>

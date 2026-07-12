@@ -232,12 +232,12 @@ function buildBriefingParagraphs(input: BuildAvaCognitiveProjectionInput): strin
   if (pendingApprovalCount > 0) {
     paragraphs.push(
       pendingApprovalCount === 1
-        ? "I have one item waiting on your approval."
-        : `I have ${pendingApprovalCount} items waiting on your approval.`,
+        ? "I completed one task and am waiting for your authorization."
+        : `I completed ${pendingApprovalCount} tasks and am waiting for your authorization.`,
     )
   } else if (researched || prospectRun?.status === "queued" || prospectRun?.status === "running") {
     paragraphs.push(
-      "I'm continuing on this account. I'll let you know if I need approval or additional direction.",
+      "I'm continuing on this account. I'll let you know if I need authorization or additional direction.",
     )
   }
 
@@ -280,7 +280,9 @@ export function buildAvaAssessmentSummaryBullets(input: BuildAvaCognitiveProject
 
   if (pendingApprovalCount > 0) {
     bullets.push(
-      pendingApprovalCount === 1 ? "1 approval waiting" : `${pendingApprovalCount} approvals waiting`,
+      pendingApprovalCount === 1
+        ? "1 completed task waiting"
+        : `${pendingApprovalCount} completed tasks waiting`,
     )
   }
 
@@ -356,9 +358,9 @@ export function buildAvaCurrentAssessment(
     operatorInvolvementRequired,
     operatorInvolvementSummary: operatorInvolvementRequired
       ? pendingApprovalCount > 0
-        ? `${pendingApprovalCount} approval${pendingApprovalCount === 1 ? "" : "s"} pending`
+        ? `${pendingApprovalCount} completed task${pendingApprovalCount === 1 ? "" : "s"} waiting`
         : "Operator review requested"
-      : "I'm continuing. I'll ask if I need approval or direction.",
+      : "I'm continuing. I'll ask if I need authorization or direction.",
     lastUpdatedLabel: formatRelative(lastUpdatedAt),
     lastUpdatedAt,
   }

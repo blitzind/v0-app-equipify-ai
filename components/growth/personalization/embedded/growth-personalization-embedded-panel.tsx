@@ -9,26 +9,16 @@ import type { GrowthPersonalizationEmbeddedSurface } from "@/lib/growth/personal
 import { GROWTH_PERSONALIZATION_EMBEDDED_QA_MARKER } from "@/lib/growth/personalization/embedded/growth-personalization-embedded-types"
 import { useGrowthLeadPersonalization } from "@/lib/growth/personalization/embedded/use-growth-lead-personalization"
 import { GrowthPersonalizationSummaryCard } from "@/components/growth/personalization/embedded/growth-personalization-summary-card"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { buildGrowthSharePageWorkspaceHref, growthWorkspaceInboxHref, growthWorkspaceInboxWorkflowHref } from "@/lib/growth/navigation/growth-workspace-operator-links"
 import {
-  GROWTH_AVA_FOLLOW_UP_TITLE,
-  GROWTH_AVA_PERSONALIZATION_TITLE,
+  growthAvaFollowUpTitle,
+  growthAvaPersonalizationTitle,
 } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { Button } from "@/components/ui/button"
 import type { GrowthLead } from "@/lib/growth/types"
 import { hasUsableLeadResearch } from "@/lib/growth/research/growth-lead-research-readiness"
 import { enqueueGrowthLeadResearchFromDrawer } from "@/lib/growth/research/growth-lead-research-drawer-client"
-
-const SURFACE_TITLES: Record<GrowthPersonalizationEmbeddedSurface, string> = {
-  lead: GROWTH_AVA_PERSONALIZATION_TITLE,
-  inbox: "Suggested follow-up from Ava",
-  call: "Follow-up package from Ava",
-  opportunity: "Personalized follow-up from Ava",
-  meeting: "Meeting personalization from Ava",
-  conversation: GROWTH_AVA_FOLLOW_UP_TITLE,
-  sendr: "Prospect personalization from Ava",
-  share: "Share page personalization from Ava",
-}
 
 type Props = {
   lead?: GrowthLead | null
@@ -45,6 +35,7 @@ export function GrowthPersonalizationEmbeddedPanel({
   compact = false,
   className,
 }: Props) {
+  const { teammate } = useAiTeammateIdentity()
   const { summary, loading, generating, error, generate, regenerate, refresh } =
     useGrowthLeadPersonalization(leadId)
   const [approving, setApproving] = useState(false)
@@ -54,6 +45,16 @@ export function GrowthPersonalizationEmbeddedPanel({
   const [packageShare, setPackageShare] = useState(false)
 
   const researched = lead ? hasUsableLeadResearch(lead) : true
+  const surfaceTitles: Record<GrowthPersonalizationEmbeddedSurface, string> = {
+    lead: growthAvaPersonalizationTitle(teammate),
+    inbox: `Suggested follow-up from ${teammate.name}`,
+    call: `Follow-up package from ${teammate.name}`,
+    opportunity: `Personalized follow-up from ${teammate.name}`,
+    meeting: `Meeting personalization from ${teammate.name}`,
+    conversation: growthAvaFollowUpTitle(teammate),
+    sendr: `Prospect personalization from ${teammate.name}`,
+    share: `Share page personalization from ${teammate.name}`,
+  }
 
   async function handleGenerate() {
     if (!leadId) return
@@ -135,7 +136,7 @@ export function GrowthPersonalizationEmbeddedPanel({
         loading={loading}
         generating={generating || approving}
         error={error}
-        title={SURFACE_TITLES[surface]}
+        title={surfaceTitles[surface]}
         compact={compact}
         showStage={showStage}
         showPreview={showPreview}

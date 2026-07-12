@@ -9,6 +9,14 @@ import { resolveLeadAdmissionStateFromMetadata } from "@/lib/growth/revenue-work
 import type { GrowthLeadResearchWorkflowStatus } from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
 import type { GrowthLead } from "@/lib/growth/types"
 import type { GrowthResearchRunStatus } from "@/lib/growth/research/research-types"
+import {
+  needsWebsiteForResearch,
+  researchingCompany,
+  researchCanRetry,
+  researchWillRefresh,
+  willResearchAutomatically,
+} from "@/lib/workspace/ai-teammate-voice"
+import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 
 export const GROWTH_LEAD_RESEARCH_READINESS_21A_QA_MARKER =
   "ge-aios-21a-deep-autonomous-company-research-v1" as const
@@ -162,18 +170,22 @@ export function resolveCustomerResearchStateLabel(state: GrowthLeadCustomerResea
   }
 }
 
-export function resolveCustomerResearchProgressMessage(state: GrowthLeadCustomerResearchState): string | null {
+export function resolveCustomerResearchProgressMessage(
+  state: GrowthLeadCustomerResearchState,
+  teammateName?: string | null,
+): string | null {
+  const teammate = resolveAiTeammatePresentation(teammateName)
   switch (state) {
     case "researching":
-      return "Ava is researching this company…"
+      return researchingCompany(teammate)
     case "not_started":
-      return "Ava will research this company automatically."
+      return willResearchAutomatically(teammate)
     case "insufficient_evidence":
-      return "Add a company website so Ava can gather public intelligence."
+      return needsWebsiteForResearch(teammate)
     case "failed":
-      return "Research did not complete — Ava can retry automatically."
+      return researchCanRetry(teammate)
     case "stale":
-      return "Research is aging — Ava will refresh when queued."
+      return researchWillRefresh(teammate)
     default:
       return null
   }

@@ -1,6 +1,11 @@
 /**
  * GROWTH-WORKSPACE-OPERATOR-SIMPLIFICATION-1E — operator UX simplification copy (client-safe).
  */
+import {
+  AI_TEAMMATE_DEFAULT_NAME,
+  resolveAiTeammatePresentation,
+  type AiTeammatePresentation,
+} from "@/lib/workspace/ai-teammate-identity"
 
 export const GROWTH_WORKSPACE_OPERATOR_SIMPLIFICATION_1E_QA_MARKER =
   "growth-workspace-operator-simplification-1e-v1" as const
@@ -33,7 +38,11 @@ export const GROWTH_CALLS_EXECUTION_READINESS_LABEL = "Call readiness" as const
 /** Opportunities — actionable pipeline */
 export const GROWTH_OPPORTUNITIES_PIPELINE_HEALTH_TITLE = "Pipeline health" as const
 export const GROWTH_OPPORTUNITIES_DEALS_NEEDING_ATTENTION_TITLE = "Deals needing attention" as const
-export const GROWTH_OPPORTUNITIES_AVA_RECOMMENDS_TITLE = "Ava recommends" as const
+export function growthOpportunitiesRecommendsTitle(teammate: AiTeammatePresentation): string {
+  return `${teammate.name} recommends`
+}
+export const GROWTH_OPPORTUNITIES_AVA_RECOMMENDS_TITLE =
+  growthOpportunitiesRecommendsTitle(resolveAiTeammatePresentation(AI_TEAMMATE_DEFAULT_NAME))
 export const GROWTH_OPPORTUNITIES_RECENTLY_CHANGED_TITLE = "Recently changed" as const
 export const GROWTH_OPPORTUNITIES_PIPELINE_VALUE_TITLE = "Pipeline value" as const
 export const GROWTH_OPPORTUNITIES_PIPELINE_EMPTY_TITLE = "Start building your pipeline" as const

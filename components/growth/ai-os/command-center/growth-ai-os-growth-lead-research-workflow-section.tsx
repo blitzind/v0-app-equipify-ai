@@ -5,10 +5,11 @@ import { GitBranch, ShieldAlert, Sparkles, Target, TrendingUp } from "lucide-rea
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { GrowthAiOsKpiCard } from "@/components/growth/ai-os/executive-planning-review/growth-ai-os-executive-planning-ux-utils"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import type { AiOsCommandCenterGrowthLeadResearchWorkflow } from "@/lib/growth/aios/ai-os-command-center-types"
 import { GROWTH_LEAD_RESEARCH_WORKFLOW_QA_MARKER } from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
 import { GROWTH_LEAD_RESEARCH_OPPORTUNITY_ASSESSMENT_QA_MARKER } from "@/lib/growth/aios/growth/growth-lead-research-opportunity-assessment"
-import { GROWTH_AVA_EMPTY_RECOMMENDATIONS } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { growthAvaEmptyRecommendations } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { cn } from "@/lib/utils"
 
 function statusBadgeVariant(status: string) {
@@ -118,6 +119,7 @@ export function GrowthAiOsGrowthLeadResearchWorkflowSection({
 }: {
   workflow: AiOsCommandCenterGrowthLeadResearchWorkflow
 }) {
+  const { teammate } = useAiTeammateIdentity()
   return (
     <section
       className="space-y-4"
@@ -231,7 +233,7 @@ export function GrowthAiOsGrowthLeadResearchWorkflowSection({
           </CardHeader>
           <CardContent className="space-y-3">
             {workflow.recommendedNextActions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{GROWTH_AVA_EMPTY_RECOMMENDATIONS}</p>
+              <p className="text-sm text-muted-foreground">{growthAvaEmptyRecommendations(teammate)}</p>
             ) : (
               workflow.recommendedNextActions.map((item) => (
                 <div key={item.leadId} className="rounded-lg border border-border/70 p-3">

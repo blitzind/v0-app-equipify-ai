@@ -175,6 +175,7 @@ export async function updateGrowthLeadDecisionMaker(
     linkedinUrl?: string | null
     status?: GrowthDecisionMakerStatus
     isPrimary?: boolean
+    canonicalPersonId?: string | null
   },
 ): Promise<GrowthLeadDecisionMaker | null> {
   const patch: Record<string, unknown> = {}
@@ -189,6 +190,9 @@ export async function updateGrowthLeadDecisionMaker(
   if (input.phone !== undefined) patch.phone = trimOrNull(input.phone)
   if (input.linkedinUrl !== undefined) patch.linkedin_url = trimOrNull(input.linkedinUrl)
   if (input.status !== undefined) patch.status = input.status
+  if (input.canonicalPersonId !== undefined) {
+    patch.canonical_person_id = trimOrNull(input.canonicalPersonId)
+  }
 
   if (input.isPrimary === true) {
     await decisionMakersTable(admin)

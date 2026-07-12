@@ -1,11 +1,24 @@
+import {
+  AI_TEAMMATE_DEFAULT_NAME,
+  resolveAiTeammatePresentation,
+  type AiTeammatePresentation,
+} from "@/lib/workspace/ai-teammate-identity"
 /** GROWTH-WORKSPACE-DASHBOARD-REFINEMENT-2A — executive hero UX copy (client-safe). */
 
 export const GROWTH_WORKSPACE_DASHBOARD_REFINEMENT_2A_QA_MARKER =
   "growth-workspace-dashboard-refinement-2a-v1" as const
 
-export const GROWTH_HOME_HERO_AVA_RECOMMENDS = "Ava recommends" as const
+export function growthHomeHeroRecommends(teammate: AiTeammatePresentation): string {
+  return `${teammate.name} recommends`
+}
+export const GROWTH_HOME_HERO_AVA_RECOMMENDS =
+  growthHomeHeroRecommends(resolveAiTeammatePresentation(AI_TEAMMATE_DEFAULT_NAME))
 export const GROWTH_HOME_HERO_KPI_CONFIDENCE = "Confidence" as const
-export const GROWTH_HOME_HERO_KPI_TASKS_COMPLETED = "Tasks Ava completed" as const
+export function growthHomeHeroTasksCompleted(teammate: AiTeammatePresentation): string {
+  return `Tasks ${teammate.name} completed`
+}
+export const GROWTH_HOME_HERO_KPI_TASKS_COMPLETED =
+  growthHomeHeroTasksCompleted(resolveAiTeammatePresentation(AI_TEAMMATE_DEFAULT_NAME))
 export const GROWTH_HOME_HERO_KPI_NEEDS_APPROVAL = "Needs approval" as const
 export const GROWTH_HOME_HERO_KPI_REVENUE_INFLUENCED = "Revenue influenced" as const
 export const GROWTH_HOME_HERO_OPPORTUNITY_LABEL = "Biggest opportunity" as const

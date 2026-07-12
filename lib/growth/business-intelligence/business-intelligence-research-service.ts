@@ -9,6 +9,8 @@ import { fetchBusinessIntelligenceReportReadModel } from "@/lib/growth/business-
 import { runBusinessIntelligence } from "@/lib/growth/business-intelligence/run-business-intelligence"
 import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/business-profile-repository"
 import { runEvidenceEngine } from "@/lib/growth/evidence-engine/run-evidence-engine"
+import { getOrganizationAiTeammateIdentity } from "@/lib/growth/settings/growth-ai-teammate-identity-repository"
+import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 
 export type RunBusinessIntelligenceResearchDeps = {
   runEvidenceEngine?: typeof runEvidenceEngine
@@ -41,6 +43,7 @@ export async function runBusinessIntelligenceOperatorResearch(
   admin: SupabaseClient,
   input: {
     organizationId: string
+    teammateName?: string | null
     forceRefresh?: boolean
     websiteUrl?: string | null
     deps?: RunBusinessIntelligenceResearchDeps
@@ -52,6 +55,10 @@ export async function runBusinessIntelligenceOperatorResearch(
   const runEvidenceEngineImpl = deps.runEvidenceEngine ?? runEvidenceEngine
   const runBusinessIntelligenceImpl = deps.runBusinessIntelligence ?? runBusinessIntelligence
   const fetchReadModel = deps.fetchBusinessIntelligenceReportReadModel ?? fetchBusinessIntelligenceReportReadModel
+  const identity = input.teammateName
+    ? null
+    : await getOrganizationAiTeammateIdentity(admin, input.organizationId).catch(() => null)
+  const teammate = resolveAiTeammatePresentation(input.teammateName ?? identity?.teammateName)
 
   const approvedProfile = await loadApprovedProfile(admin, input.organizationId)
   const websiteUrl = resolveWebsiteUrl({
@@ -68,6 +75,7 @@ export async function runBusinessIntelligenceOperatorResearch(
       trigger: "operator_request",
       providers: ["website", "approved_profile"],
       websiteUrl,
+      teammateName: teammate.name,
       persist: true,
       forceRefresh,
     })
@@ -93,13 +101,13 @@ export async function runBusinessIntelligenceOperatorResearch(
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Business Intelligence build failed."
-    return { ok: false, message: `Could not build Ava's understanding: ${message}` }
+    return { ok: false, message: `Could not build ${teammate.name}'s understanding: ${message}` }
   }
 
   if (!biResult.ok || biResult.empty_state || !biResult.report) {
     return {
       ok: false,
-      message: biResult.message ?? "Research completed but Ava could not build a Business Intelligence report.",
+      message: biResult.message ?? `Research completed but ${teammate.name} could not build a Business Intelligence report.`,
     }
   }
 

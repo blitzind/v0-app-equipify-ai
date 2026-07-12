@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { StatTile } from "@/components/growth/growth-ui-utils"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import {
   GROWTH_SETTINGS_VOICE_CALLING_REFINEMENT_2D_QA_MARKER,
   GrowthSettingsCard,
@@ -13,7 +14,7 @@ import {
 } from "@/lib/growth/native-dialer/native-dialer-types"
 import type { GrowthLiveCoachingSettings } from "@/lib/growth/realtime/providers/provider-types"
 import type { OperatorAssistPreferencesPublicView } from "@/lib/growth/operator-assist/types"
-import { GROWTH_AVA_CALL_ASSISTANCE_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { growthAvaCallAssistanceTitle } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import type { VoiceBrowserCallingReadinessSnapshot } from "@/lib/voice/browser-calling/types"
 
 type ReadinessSnapshot = {
@@ -44,6 +45,7 @@ function providerDisplayLabel(providerId: NativeDialerProviderId | null | undefi
 }
 
 export function GrowthCallingPreferencesReadinessSummary() {
+  const { teammate } = useAiTeammateIdentity()
   const [loading, setLoading] = useState(true)
   const [snapshot, setSnapshot] = useState<ReadinessSnapshot | null>(null)
 
@@ -109,7 +111,7 @@ export function GrowthCallingPreferencesReadinessSummary() {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <StatTile label="Calling ready" value={snapshot.callingReady ? "Ready" : "Not ready"} />
           <StatTile label="Provider" value={snapshot.providerLabel} />
-          <StatTile label={GROWTH_AVA_CALL_ASSISTANCE_TITLE} value={snapshot.aiAssistLabel} />
+          <StatTile label={growthAvaCallAssistanceTitle(teammate)} value={snapshot.aiAssistLabel} />
           <StatTile label="Live coaching" value={snapshot.liveCoachingLabel} />
         </div>
       ) : null}

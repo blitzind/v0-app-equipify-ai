@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { Loader2, Sparkles } from "lucide-react"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import {
   GROWTH_SETTINGS_FORM_GAP,
   GROWTH_SETTINGS_INNER_GAP,
   GrowthSettingsCard,
   GrowthSettingsToggleRow,
 } from "@/components/growth/growth-settings-ui"
-import { GROWTH_AVA_CALL_ASSISTANCE_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { growthAvaCallAssistanceTitle } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { callAssistanceTitle } from "@/lib/workspace/ai-teammate-voice"
 import {
   DEFAULT_OPERATOR_ASSIST_PREFERENCES,
   VOICE_UNIFIED_OPERATOR_ASSIST_QA_MARKER,
@@ -27,6 +29,7 @@ const CATEGORY_LABELS: Record<UnifiedOperatorAssistCategory, string> = {
 }
 
 export function GrowthOperatorAssistPreferencesPanel() {
+  const { teammate } = useAiTeammateIdentity()
   const [preferences, setPreferences] = useState<OperatorAssistPreferencesPublicView>(
     DEFAULT_OPERATOR_ASSIST_PREFERENCES,
   )
@@ -45,7 +48,7 @@ export function GrowthOperatorAssistPreferencesPanel() {
         message?: string
       }
       if (!res.ok || !data.ok || !data.preferences) {
-        throw new Error(data.message ?? "Could not load call assistance settings from Ava.")
+        throw new Error(data.message ?? `Could not load ${callAssistanceTitle(teammate).toLowerCase()}.`)
       }
       setPreferences(data.preferences)
     } catch (e) {
@@ -53,7 +56,7 @@ export function GrowthOperatorAssistPreferencesPanel() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [teammate])
 
   useEffect(() => {
     void load()
@@ -88,14 +91,14 @@ export function GrowthOperatorAssistPreferencesPanel() {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" />
-        Loading call assistance from Ava…
+        Loading {callAssistanceTitle(teammate).toLowerCase()}…
       </div>
     )
   }
 
   return (
     <div data-voice-unified-operator-assist-qa-marker={VOICE_UNIFIED_OPERATOR_ASSIST_QA_MARKER}>
-      <GrowthSettingsCard title={GROWTH_AVA_CALL_ASSISTANCE_TITLE} icon={<Sparkles className="size-4" />}>
+      <GrowthSettingsCard title={growthAvaCallAssistanceTitle(teammate)} icon={<Sparkles className="size-4" />}>
         <p className="mb-4 text-sm text-muted-foreground">
           Control real-time suggestions, objections, and buying signals during live calls.
         </p>

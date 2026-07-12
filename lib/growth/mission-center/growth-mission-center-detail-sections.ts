@@ -10,6 +10,7 @@ import {
 import { GROWTH_AVA_MISSION_RUNTIME_1A_QA_MARKER } from "@/lib/growth/mission-center/growth-mission-runtime-types"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-workspace-base-path"
 import { buildAiOsMissionPlanningHref, GROWTH_AI_OS_PUBLIC_BASE_PATH } from "@/lib/growth/aios/ai-os-public-routes"
+import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 
 function artifactItems(objective: GrowthObjective, resourceTypes: string[]): string[] {
   const items: string[] = []
@@ -34,7 +35,9 @@ export function buildMissionDetailSections(input: {
   businessProfileApproved: boolean
   pendingApprovalCount: number
   highConfidenceOpportunityCount?: number
+  teammateName?: string | null
 }): GrowthMissionCenterDetailSection[] {
+  const teammate = resolveAiTeammatePresentation(input.teammateName)
   const planningHref = buildAiOsMissionPlanningHref(input.objective.id) ?? `${GROWTH_WORKSPACE_BASE_PATH}/objectives`
   const approvalsHref = `${GROWTH_AI_OS_PUBLIC_BASE_PATH}/approvals`
   const findLeadsBinding = resolveFindLeadsBinding(input.objective)
@@ -50,8 +53,8 @@ export function buildMissionDetailSections(input: {
       title: "Business Profile",
       status: input.businessProfileApproved ? "ready" : "blocked",
       summary: input.businessProfileApproved
-        ? "Ava is using your approved business profile."
-        : "Ava needs to understand your business first.",
+        ? `${teammate.name} is using your approved business profile.`
+        : `${teammate.name} needs to understand your business first.`,
       items: input.businessProfileApproved ? ["Approved profile active"] : [],
       href: GROWTH_WORKSPACE_BASE_PATH,
     },
@@ -62,8 +65,8 @@ export function buildMissionDetailSections(input: {
       summary: findLeadsBinding
         ? formatMissionFindLeadsMonitoringStatus(findLeadsBinding)
         : artifactItems(input.objective, ["saved_search", "audience"]).length > 0
-          ? "Ava has active audiences and saved searches."
-          : "Ava recommends starting a lead search.",
+          ? `${teammate.name} has active audiences and saved searches.`
+          : `${teammate.name} recommends starting a lead search.`,
       items: leadDiscoveryItems.length > 0 ? leadDiscoveryItems : [],
       advancedItems: leadDiscoveryAdvanced.length > 0 ? leadDiscoveryAdvanced : undefined,
       href: GROWTH_WORKSPACE_BASE_PATH,
@@ -73,7 +76,7 @@ export function buildMissionDetailSections(input: {
       title: "Research",
       status: artifactItems(input.objective, ["research_run"]).length > 0 ? "in_progress" : "not_started",
       summary: artifactItems(input.objective, ["research_run"]).length > 0
-        ? "Ava is researching companies."
+        ? `${teammate.name} is researching companies.`
         : "Research will begin after leads are discovered.",
       items: artifactItems(input.objective, ["research_run", "enrichment_run"]),
       href: planningHref,
@@ -92,7 +95,7 @@ export function buildMissionDetailSections(input: {
       status: (input.highConfidenceOpportunityCount ?? 0) > 0 ? "ready" : "not_started",
       summary:
         (input.highConfidenceOpportunityCount ?? 0) > 0
-          ? `Ava has identified ${input.highConfidenceOpportunityCount} high-confidence opportunities.`
+          ? `${teammate.name} has identified ${input.highConfidenceOpportunityCount} high-confidence opportunities.`
           : "Opportunities appear after research and qualification.",
       items:
         (input.highConfidenceOpportunityCount ?? 0) > 0
@@ -105,7 +108,7 @@ export function buildMissionDetailSections(input: {
       title: "Outreach Preparation",
       status: artifactItems(input.objective, ["sequence"]).length > 0 ? "in_progress" : "not_started",
       summary: artifactItems(input.objective, ["sequence", "landing_page", "video_page"]).length > 0
-        ? "Ava is preparing outreach."
+        ? `${teammate.name} is preparing outreach.`
         : "Outreach drafts appear after qualification.",
       items: artifactItems(input.objective, ["sequence", "landing_page", "video_page"]),
       href: planningHref,
@@ -116,7 +119,7 @@ export function buildMissionDetailSections(input: {
       status: input.pendingApprovalCount > 0 ? "waiting" : "not_started",
       summary:
         input.pendingApprovalCount > 0
-          ? "Ava is waiting for your approval."
+          ? `${teammate.name} is waiting for your approval.`
           : "No approvals pending right now.",
       items: input.pendingApprovalCount > 0 ? [`${input.pendingApprovalCount} items waiting for review`] : [],
       href: approvalsHref,
@@ -134,7 +137,7 @@ export function buildMissionDetailSections(input: {
       title: "Learning",
       status: input.objective.recommendations.length > 0 ? "in_progress" : "not_started",
       summary: input.objective.recommendations.length > 0
-        ? "Ava has adaptive recommendations to review."
+        ? `${teammate.name} has adaptive recommendations to review.`
         : "Learning insights accumulate as the mission progresses.",
       items: input.objective.recommendations.slice(0, 4).map((rec) => rec.recommendation),
       href: planningHref,

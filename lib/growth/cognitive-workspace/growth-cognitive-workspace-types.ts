@@ -62,7 +62,7 @@ export const GROWTH_AVA_COGNITIVE_SECTION_TITLES: Record<
   research_journal: "Research Journal",
   operational_state: "Operational State",
   activity_timeline: "Activity Timeline",
-  human_workspace: "What Ava Needs",
+  human_workspace: "What I Need",
   raw_intelligence: "Show Me Everything",
 }
 

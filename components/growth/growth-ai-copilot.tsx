@@ -13,13 +13,14 @@ import {
 import { GrowthOutreachPersonalizationPreview } from "@/components/growth/growth-outreach-personalization-preview"
 import { GrowthOutboundSenderContextBadge } from "@/components/growth/signatures/growth-outbound-sender-context-badge"
 import { GrowthBadge, GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { GROWTH_DRAWER_CARD_KEYS } from "@/lib/growth/growth-lead-drawer-stream-filters"
 import type {
   GrowthAiCopilotGeneration,
   GrowthAiCopilotGenerationType,
 } from "@/lib/growth/ai-copilot-types"
 import type { GrowthOutreachQueueItem } from "@/lib/growth/outreach/outreach-queue-types"
-import { GROWTH_AVA_PANEL_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { growthAvaPanelTitle } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import type { GrowthLead } from "@/lib/growth/types"
 import type { GrowthSenderProfilesDashboardPayload } from "@/lib/growth/signatures/signature-types"
 
@@ -64,6 +65,7 @@ function formatGenerationTypeLabel(type: GrowthAiCopilotGenerationType): string 
 }
 
 export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
+  const { teammate } = useAiTeammateIdentity()
   const [generations, setGenerations] = useState<GrowthAiCopilotGeneration[]>([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState<string | null>(null)
@@ -242,7 +244,7 @@ export function GrowthAiCopilot({ lead }: GrowthAiCopilotProps) {
   return (
     <GrowthCollapsibleEngineCard
       id="growth-ai-copilot"
-      title={GROWTH_AVA_PANEL_TITLE}
+      title={growthAvaPanelTitle(teammate)}
       icon={<Bot className="size-4" />}
       headerAside={<span className="text-xs text-muted-foreground">{collapsedSummary}</span>}
       defaultOpen={false}

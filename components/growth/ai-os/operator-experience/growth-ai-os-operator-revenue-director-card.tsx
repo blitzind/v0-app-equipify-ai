@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { ChevronDown, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import {
   Collapsible,
   CollapsibleContent,
@@ -12,7 +13,7 @@ import {
 import { GrowthAiOsRevenueDirectorSection } from "@/components/growth/ai-os/command-center/growth-ai-os-revenue-director-section"
 import { AI_OS_TOP_BUSINESS_MOVE_TITLE } from "@/lib/workspace/ai-os-outcome-first-terminology"
 import type { GrowthRevenueDirectorReadModel } from "@/lib/growth/aios/revenue-director/growth-revenue-director-types"
-import { GROWTH_AVA_RECOMMENDS_OUTCOME_COPY } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { growthAvaRecommendsOutcomeCopy } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import type { GrowthAiOsOperatorRevenueRecommendation } from "@/lib/growth/aios/operator-experience/growth-ai-os-operator-experience-types"
 
 type Props = {
@@ -21,6 +22,7 @@ type Props = {
 }
 
 export function GrowthAiOsOperatorRevenueDirectorCard({ recommendation, revenueDirector }: Props) {
+  const { teammate } = useAiTeammateIdentity()
   const [expanded, setExpanded] = useState(false)
 
   if (!recommendation) return null
@@ -29,7 +31,7 @@ export function GrowthAiOsOperatorRevenueDirectorCard({ recommendation, revenueD
     <section id="top-business-move" data-qa-section="operator-top-business-move" className="space-y-4">
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">{AI_OS_TOP_BUSINESS_MOVE_TITLE}</h2>
-        <p className="mt-1 text-muted-foreground">{GROWTH_AVA_RECOMMENDS_OUTCOME_COPY}</p>
+        <p className="mt-1 text-muted-foreground">{growthAvaRecommendsOutcomeCopy(teammate)}</p>
       </div>
 
       <article className="rounded-2xl border border-indigo-100 bg-indigo-50/30 p-6">

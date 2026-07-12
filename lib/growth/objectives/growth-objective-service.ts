@@ -174,7 +174,16 @@ export async function pauseGrowthObjective(
   organizationId: string,
   objectiveId: string,
 ): Promise<GrowthObjective> {
-  return pauseGrowthObjectiveRuntime(admin, organizationId, objectiveId)
+  const paused = await pauseGrowthObjectiveRuntime(admin, organizationId, objectiveId)
+  const { publishDraftFactoryMissionChanged } = await import(
+    "@/lib/growth/draft-factory/draft-factory-wake-emitters"
+  )
+  void publishDraftFactoryMissionChanged(admin, {
+    organizationId,
+    objectiveId,
+    changeKind: "paused",
+  })
+  return paused
 }
 
 export async function resumeGrowthObjective(
@@ -183,7 +192,16 @@ export async function resumeGrowthObjective(
   objectiveId: string,
   options?: { certificationMode?: boolean },
 ): Promise<GrowthObjective> {
-  return resumeGrowthObjectiveRuntime(admin, organizationId, objectiveId, options)
+  const resumed = await resumeGrowthObjectiveRuntime(admin, organizationId, objectiveId, options)
+  const { publishDraftFactoryMissionChanged } = await import(
+    "@/lib/growth/draft-factory/draft-factory-wake-emitters"
+  )
+  void publishDraftFactoryMissionChanged(admin, {
+    organizationId,
+    objectiveId,
+    changeKind: "resumed",
+  })
+  return resumed
 }
 
 export async function archiveGrowthObjective(

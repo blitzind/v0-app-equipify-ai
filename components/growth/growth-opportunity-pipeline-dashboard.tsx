@@ -10,6 +10,7 @@ import { GrowthCallIntelligenceScorecardCard } from "@/components/growth/growth-
 import { GrowthNativeDialerLaunchButton } from "@/components/growth/growth-native-dialer-launch-button"
 import { GrowthOpportunityNextBestActionCard } from "@/components/growth/growth-opportunity-next-best-action-card"
 import { GrowthPredictiveDealIntelligenceCard } from "@/components/growth/growth-predictive-deal-intelligence-card"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { nativeCallWorkspaceHref } from "@/lib/growth/native-dialer/native-dialer-navigation"
 import {
   buildGrowthLeadHref,
@@ -31,7 +32,6 @@ import type {
   GrowthOpportunityPipelineView,
 } from "@/lib/growth/opportunity-pipeline/pipeline-types"
 import {
-  GROWTH_OPPORTUNITIES_AVA_RECOMMENDS_TITLE,
   GROWTH_OPPORTUNITIES_DEALS_NEEDING_ATTENTION_TITLE,
   GROWTH_OPPORTUNITIES_IMPORT_PROSPECTS_CTA,
   GROWTH_OPPORTUNITIES_PIPELINE_EMPTY_MESSAGE,
@@ -41,6 +41,7 @@ import {
   GROWTH_OPPORTUNITIES_QUALIFY_LEADS_CTA,
   GROWTH_OPPORTUNITIES_RECENTLY_CHANGED_TITLE,
   GROWTH_WORKSPACE_OPERATOR_SIMPLIFICATION_1E_QA_MARKER,
+  growthOpportunitiesRecommendsTitle,
 } from "@/lib/growth/workspace/growth-workspace-operator-simplification-1e"
 import { GROWTH_WORKSPACE_ACTION_FIRST_1F_QA_MARKER } from "@/lib/growth/workspace/growth-workspace-action-first-1f"
 import { GROWTH_WORKSPACE_BASE_PATH } from "@/lib/growth/navigation/growth-route-metadata-types"
@@ -237,6 +238,7 @@ function OpportunityDetailPanel({
 }
 
 export function GrowthOpportunityPipelineDashboard() {
+  const { teammate } = useAiTeammateIdentity()
   const router = useRouter()
   const searchParams = useSearchParams()
   const syncingFromUrlRef = useRef(false)
@@ -410,9 +412,9 @@ export function GrowthOpportunityPipelineDashboard() {
 
         {(dashboard?.dealsNeedingAction ?? 0) > 0 ? (
           <div className="mt-4 rounded-lg border border-indigo-200/60 bg-indigo-50/40 p-3 dark:border-indigo-900/40 dark:bg-indigo-950/20">
-            <p className="text-sm font-medium">{GROWTH_OPPORTUNITIES_AVA_RECOMMENDS_TITLE}</p>
+            <p className="text-sm font-medium">{growthOpportunitiesRecommendsTitle(teammate)}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Review deals needing action in the pipeline list below — Ava surfaces risk and stale follow-ups for you to decide.
+              Review deals needing action in the pipeline list below — {teammate.name} surfaces risk and stale follow-ups for you to decide.
             </p>
           </div>
         ) : null}

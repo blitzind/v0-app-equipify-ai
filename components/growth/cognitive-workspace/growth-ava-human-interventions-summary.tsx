@@ -10,6 +10,8 @@ import {
   type HumanInterventionType,
   type HumanInterventionsResponse,
 } from "@/lib/growth/human-interventions/human-intervention-types"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
+import { completedWorkTitle } from "@/lib/workspace/ai-teammate-voice"
 
 const SUMMARY_GROUPS: Array<{
   key: string
@@ -17,7 +19,7 @@ const SUMMARY_GROUPS: Array<{
   types: HumanInterventionType[]
 }> = [
   { key: "campaign", label: "Campaign blockers", types: ["campaign_blocked", "channel_issue"] },
-  { key: "approval", label: "Approvals", types: ["approval_required", "manual_review"] },
+  { key: "approval", label: "completed_work", types: ["approval_required", "manual_review"] },
   { key: "replies", label: "Replies", types: ["reply_required", "high_intent"] },
   { key: "followups", label: "Follow-ups", types: ["opportunity", "risk_detected"] },
 ]
@@ -27,6 +29,7 @@ type Props = {
 }
 
 export function GrowthAvaHumanInterventionsSummary({ leadId }: Props) {
+  const { teammate } = useAiTeammateIdentity()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [queue, setQueue] = useState<HumanInterventionsResponse | null>(null)
@@ -68,7 +71,9 @@ export function GrowthAvaHumanInterventionsSummary({ leadId }: Props) {
       ? []
       : SUMMARY_GROUPS.map((group) => {
           const count = group.types.reduce((sum, type) => sum + (queue.type_counts?.[type] ?? 0), 0)
-          return count > 0 ? { key: group.key, label: group.label, count } : null
+          return count > 0
+            ? { key: group.key, label: group.label === "completed_work" ? completedWorkTitle(teammate) : group.label, count }
+            : null
         }).filter(Boolean) as Array<{ key: string; label: string; count: number }>
 
   const leftoverTypes = (Object.keys(queue?.type_counts ?? {}) as HumanInterventionType[]).filter(

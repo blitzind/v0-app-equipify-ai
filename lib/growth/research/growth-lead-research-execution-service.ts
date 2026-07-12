@@ -170,6 +170,17 @@ export async function executeGrowthLeadProspectResearch(
   const rebuild = Boolean(input.rebuild) || input.trigger === "stale_refresh"
   const force = Boolean(input.force)
 
+  if (input.trigger === "stale_refresh" && lead.lastProspectResearchedAt) {
+    const { publishDraftFactoryResearchBecameStale } = await import(
+      "@/lib/growth/draft-factory/draft-factory-wake-emitters"
+    )
+    void publishDraftFactoryResearchBecameStale(input.admin, {
+      organizationId,
+      leadId: lead.id,
+      lastResearchedAt: lead.lastProspectResearchedAt,
+    })
+  }
+
   if (!force && !shouldAutoQueueLeadResearch(lead) && !rebuild) {
     return {
       ok: false,
@@ -296,22 +307,8 @@ export async function executeGrowthLeadProspectResearch(
     qualificationRan,
   })
 
-  // SV1-5A — durable wake on research completion (no research rerun from this callback).
-  if (research.run.status === "completed" && research.run.id) {
-    const { wakeDraftFactoryFromCompletionEvent } = await import(
-      "@/lib/growth/draft-factory/draft-factory-durable-live"
-    )
-    void wakeDraftFactoryFromCompletionEvent(input.admin, {
-      organizationId,
-      leadId: lead.id,
-      wake: {
-        type: research.cached ? "research_completed" : "research_completed",
-        sourceId: String(research.run.id),
-      },
-      portfolioSelected: true,
-      allowGeneration: false,
-    })
-  }
+  // GE-AIOS-AUTONOMY-1B — research completion wakes Draft Factory via AI OS Event Bus
+  // (growth.workflow.status_changed → draft_factory_wake_observer). No parallel direct wake.
 
   return {
     ok: true,

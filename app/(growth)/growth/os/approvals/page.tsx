@@ -1,5 +1,5 @@
-import { GrowthHumanApprovalCenterPanel } from "@/components/growth/ai-os/approvals/growth-human-approval-center-panel"
+import { GrowthAvaCompletedWorkPanel } from "@/components/growth/ai-os/approvals/growth-ava-completed-work-panel"
 
-export default function GrowthHumanApprovalCenterPage() {
-  return <GrowthHumanApprovalCenterPanel />
+export default function GrowthAvaCompletedWorkPage() {
+  return <GrowthAvaCompletedWorkPanel />
 }

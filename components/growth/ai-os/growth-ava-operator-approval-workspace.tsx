@@ -387,7 +387,7 @@ export function GrowthAvaOperatorApprovalWorkspace({
             Refresh workspace
           </Button>
           <Button type="button" variant="ghost" size="sm" asChild>
-            <Link href="/growth/os/approvals">Human Approval Center</Link>
+            <Link href="/growth/os/approvals">Ava&apos;s completed work</Link>
           </Button>
         </div>
       </CardContent>

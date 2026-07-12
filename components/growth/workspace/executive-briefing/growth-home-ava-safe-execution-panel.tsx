@@ -3,10 +3,11 @@
 import { useCallback, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import {
   GROWTH_HOME_AVA_REFRESH_INTELLIGENCE_LABEL,
   GROWTH_HOME_AVA_RUN_INTAKE_LABEL,
-  GROWTH_HOME_AVA_SAFE_EXECUTION_DISCLAIMER,
+  growthHomeSafeExecutionDisclaimer,
   GROWTH_HOME_AVA_START_RESEARCH_LABEL,
   type GrowthHomeAvaExecuteAction,
   type GrowthHomeAvaExecuteApiResponse,
@@ -38,6 +39,7 @@ type Props = {
 }
 
 export function GrowthHomeAvaSafeExecutionPanel({ leadId, onIntelligenceRefreshed }: Props) {
+  const { teammate } = useAiTeammateIdentity()
   const [loadingAction, setLoadingAction] = useState<GrowthHomeAvaExecuteAction | null>(null)
   const [lastResult, setLastResult] = useState<GrowthHomeAvaExecuteApiResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -83,7 +85,7 @@ export function GrowthHomeAvaSafeExecutionPanel({ leadId, onIntelligenceRefreshe
     >
       <div>
         <p className="text-sm font-semibold">Safe execution</p>
-        <p className="mt-1 text-xs text-muted-foreground">{GROWTH_HOME_AVA_SAFE_EXECUTION_DISCLAIMER}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{growthHomeSafeExecutionDisclaimer(teammate)}</p>
       </div>
 
       <div className="flex flex-wrap gap-2">

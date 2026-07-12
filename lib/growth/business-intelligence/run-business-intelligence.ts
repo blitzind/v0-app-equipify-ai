@@ -262,6 +262,7 @@ export async function runBusinessIntelligence(
 
   const report = buildBusinessIntelligenceReport({
     organization_id: input.organizationId,
+    teammateName: input.teammateName,
     evidence_snapshot_id: snapshot.snapshot_id,
     evidence_run_id: snapshot.run_id,
     snapshot: snapshot.snapshot,

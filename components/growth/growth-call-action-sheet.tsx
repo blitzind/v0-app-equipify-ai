@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { useGrowthCallWorkflowOptional } from "@/components/growth/growth-call-workflow-context"
 import { buildGrowthCallDialOptions } from "@/lib/growth/communication/call-dial"
 import type { ResolvedGrowthDialPreferences } from "@/lib/growth/communication/types"
@@ -21,6 +22,7 @@ import { resolveCallSheetMicCaptureHint } from "@/lib/growth/realtime/browser-au
 import { GROWTH_BROWSER_AUDIO_CAPTURE_SAFETY_COPY } from "@/lib/growth/realtime/browser-audio/browser-audio-capture-invariants"
 import { GROWTH_LEAD_CALL_DISPOSITIONS, type GrowthLeadCallDisposition } from "@/lib/growth/call-types"
 import type { GrowthLead } from "@/lib/growth/types"
+import { callAssistanceTitle } from "@/lib/workspace/ai-teammate-voice"
 import { cn } from "@/lib/utils"
 
 const QUICK_DISPOSITIONS: GrowthLeadCallDisposition[] = [
@@ -57,6 +59,7 @@ export function GrowthCallActionSheet({
   onLeadUpdated,
 }: GrowthCallActionSheetProps) {
   const workflow = useGrowthCallWorkflowOptional()
+  const { teammate } = useAiTeammateIdentity()
   const [loadingPrefs, setLoadingPrefs] = useState(false)
   const [resolved, setResolved] = useState<ResolvedGrowthDialPreferences | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -245,7 +248,7 @@ export function GrowthCallActionSheet({
 
   async function startCallCopilot() {
     if (!workflow) {
-      setError("Open the lead drawer to start call assistance from Ava.")
+      setError(`Open the lead drawer to start ${callAssistanceTitle(teammate).toLowerCase()}.`)
       return
     }
     setBusy(true)
@@ -254,7 +257,7 @@ export function GrowthCallActionSheet({
       await workflow.runStartCallCopilot()
       onOpenChange(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not start call assistance from Ava.")
+      setError(e instanceof Error ? e.message : `Could not start ${callAssistanceTitle(teammate).toLowerCase()}.`)
     } finally {
       setBusy(false)
     }

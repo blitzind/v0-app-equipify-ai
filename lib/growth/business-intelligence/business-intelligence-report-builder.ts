@@ -15,6 +15,7 @@ import type {
   BusinessIntelligenceReport,
   BusinessIntelligenceReportSections,
 } from "@/lib/growth/business-intelligence/business-intelligence-types"
+import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 
 function field(map: Record<string, import("@/lib/growth/business-intelligence/business-intelligence-types").BusinessIntelligenceReportField>, key: string) {
   return map[key]!
@@ -123,9 +124,11 @@ export function detectBusinessIntelligenceGaps(input: {
   sections: BusinessIntelligenceReportSections
   snapshot: EvidenceEngineSnapshotPayload
   confidence_summary: BusinessIntelligenceConfidenceSummary
+  teammateName?: string | null
 }): BusinessIntelligenceGap[] {
   const gaps: BusinessIntelligenceGap[] = []
   const { sections, snapshot, confidence_summary } = input
+  const teammate = resolveAiTeammatePresentation(input.teammateName)
 
   if (isUnknownField(sections.company.plans_pricing)) {
     gaps.push(
@@ -133,7 +136,7 @@ export function detectBusinessIntelligenceGaps(input: {
         gap_code: "missing_pricing_evidence",
         severity: "medium",
         title: "Pricing evidence missing",
-        message: "No pricing or plan evidence was found. Ava should ask the operator to confirm pricing positioning.",
+        message: `No pricing or plan evidence was found. ${teammate.name} should ask the operator to confirm pricing positioning.`,
         related_fields: ["company.plans_pricing"],
         requires_user_confirmation: true,
       }),
@@ -159,7 +162,7 @@ export function detectBusinessIntelligenceGaps(input: {
         gap_code: "missing_testimonials_or_case_studies",
         severity: "medium",
         title: "No testimonials or case studies found",
-        message: "Ava found no testimonial or case study evidence on the website or approved profile.",
+        message: `${teammate.name} found no testimonial or case study evidence on the website or approved profile.`,
         related_fields: ["proof.testimonials", "proof.case_studies"],
         requires_user_confirmation: true,
       }),
@@ -236,7 +239,7 @@ export function detectBusinessIntelligenceGaps(input: {
         severity: "high",
         title: "Company description conflicts with approved profile",
         message:
-          "Website company description evidence conflicts with approved profile evidence. Ava should ask the operator to resolve this.",
+          `Website company description evidence conflicts with approved profile evidence. ${teammate.name} should ask the operator to resolve this.`,
         related_fields: ["company.company_description"],
         requires_user_confirmation: true,
       }),
@@ -262,7 +265,7 @@ export function detectBusinessIntelligenceGaps(input: {
         gap_code: "low_overall_confidence",
         severity: "medium",
         title: "Overall understanding confidence is low",
-        message: "Ava's current understanding has low overall confidence and needs operator confirmation.",
+        message: `${teammate.name}'s current understanding has low overall confidence and needs operator confirmation.`,
         related_fields: [],
         requires_user_confirmation: true,
       }),
@@ -275,7 +278,7 @@ export function detectBusinessIntelligenceGaps(input: {
         gap_code: "needs_review_items_present",
         severity: "high",
         title: "Evidence needs review",
-        message: "One or more facts or contradictions require human review before Ava acts on this understanding.",
+        message: `One or more facts or contradictions require human review before ${teammate.name} acts on this understanding.`,
         related_fields: snapshot.contradictions.map((item) => item.fact_key),
         requires_user_confirmation: true,
       }),
@@ -292,6 +295,7 @@ export function buildBusinessIntelligenceReport(input: {
   snapshot: EvidenceEngineSnapshotPayload
   generated_at?: string
   metadata?: Record<string, unknown>
+  teammateName?: string | null
 }): BusinessIntelligenceReport {
   const fieldMap = mapSnapshotToBusinessIntelligenceFields(input.snapshot)
   const sections = buildSections(fieldMap)
@@ -304,6 +308,7 @@ export function buildBusinessIntelligenceReport(input: {
     sections,
     snapshot: input.snapshot,
     confidence_summary,
+    teammateName: input.teammateName,
   })
 
   const contradictions: BusinessIntelligenceContradictionSummary[] = input.snapshot.contradictions.map(

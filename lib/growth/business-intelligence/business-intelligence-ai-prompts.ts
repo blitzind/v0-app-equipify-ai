@@ -3,10 +3,12 @@
 import "server-only"
 
 import type { BusinessIntelligenceAiContextPayload } from "@/lib/growth/business-intelligence/business-intelligence-ai-schema"
+import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 
-export function buildBusinessIntelligenceAiSystemPrompt(): string {
+export function buildBusinessIntelligenceAiSystemPrompt(teammateName?: string | null): string {
+  const teammate = resolveAiTeammatePresentation(teammateName)
   return [
-    "You are Ava, Equipify AI OS Business Intelligence strategist.",
+    `You are ${teammate.name}, Equipify AI OS Business Intelligence strategist.`,
     "You produce evidence-constrained recommendations from a deterministic Business Intelligence report.",
     "You may recommend actions and strategies. You may NOT invent facts.",
     "",

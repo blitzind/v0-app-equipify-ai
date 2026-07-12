@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { StatTile } from "@/components/growth/growth-ui-utils"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import {
   GROWTH_SETTINGS_AI_REFINEMENT_2F_QA_MARKER,
   GrowthSettingsCard,
@@ -15,23 +16,17 @@ import { GROWTH_WORKSPACE_SETTINGS_LANDING_PAGE_OPTIONS } from "@/lib/growth/set
 import type { GrowthWorkspaceSettingsSidebarPreferences } from "@/lib/growth/settings/growth-workspace-settings-types"
 import { AI_TEAMMATE_DEFAULT_NAME } from "@/lib/workspace/ai-teammate-identity"
 import {
-  GROWTH_AVA_PREFERENCES_TITLE,
   GROWTH_AVA_STATUS_ENABLED,
   GROWTH_AVA_STATUS_INACTIVE,
-  GROWTH_AVA_STATUS_LEARNING,
-  GROWTH_AVA_STATUS_READY,
-  GROWTH_AVA_STATUS_UNAVAILABLE,
   GROWTH_AVA_TEAMMATE_LABEL,
+  growthAvaPreferencesTitle,
+  growthAvaStatusLearning,
+  growthAvaStatusReady,
+  growthAvaStatusUnavailable,
 } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { assistFromTeammate } from "@/lib/workspace/ai-teammate-voice"
 
 export type GrowthAiReadinessScope = "teammate" | "preferences" | "autonomy" | "command-center"
-
-const READINESS_CARD_TITLES: Record<GrowthAiReadinessScope, string> = {
-  teammate: "How Ava works for you",
-  preferences: GROWTH_AVA_PREFERENCES_TITLE,
-  autonomy: "Autonomy at a glance",
-  "command-center": "Command Center at a glance",
-}
 
 const REASONING_LABELS: Record<string, string> = {
   default: "Balanced",
@@ -53,6 +48,7 @@ function resolveApprovalLabel(masterMode: string, autonomyPaused: boolean): stri
 }
 
 export function GrowthAiSettingsReadinessSummary({ scope }: { scope: GrowthAiReadinessScope }) {
+  const { teammate } = useAiTeammateIdentity()
   const [loading, setLoading] = useState(true)
   const [copilot, setCopilot] = useState<GrowthCopilotSettings | null>(null)
   const [autonomy, setAutonomy] = useState<GrowthAutonomySettingsViewModel | null>(null)
@@ -116,7 +112,7 @@ export function GrowthAiSettingsReadinessSummary({ scope }: { scope: GrowthAiRea
           <>
             <StatTile label={GROWTH_AVA_TEAMMATE_LABEL} value={teammateName} />
             <StatTile
-              label="Assist from Ava"
+              label={assistFromTeammate(teammate)}
               value={copilot?.aiCopilotEnabled ? GROWTH_AVA_STATUS_ENABLED : GROWTH_AVA_STATUS_INACTIVE}
             />
             <StatTile label="Autonomy" value={autonomyMode} />
@@ -130,8 +126,8 @@ export function GrowthAiSettingsReadinessSummary({ scope }: { scope: GrowthAiRea
         return (
           <>
             <StatTile
-              label={GROWTH_AVA_STATUS_READY}
-              value={copilot?.aiCopilotEnabled ? GROWTH_AVA_STATUS_ENABLED : GROWTH_AVA_STATUS_UNAVAILABLE}
+              label={growthAvaStatusReady(teammate)}
+              value={copilot?.aiCopilotEnabled ? GROWTH_AVA_STATUS_ENABLED : growthAvaStatusUnavailable(teammate)}
             />
             <StatTile label="Response style" value={reasoningLabel} />
             <StatTile
@@ -140,7 +136,7 @@ export function GrowthAiSettingsReadinessSummary({ scope }: { scope: GrowthAiRea
             />
             <StatTile
               label="Learning"
-              value={copilot?.aiCopilotPlaybookEnabled ? GROWTH_AVA_STATUS_LEARNING : GROWTH_AVA_STATUS_INACTIVE}
+              value={copilot?.aiCopilotPlaybookEnabled ? growthAvaStatusLearning(teammate) : GROWTH_AVA_STATUS_INACTIVE}
             />
           </>
         )
@@ -183,7 +179,16 @@ export function GrowthAiSettingsReadinessSummary({ scope }: { scope: GrowthAiRea
 
   return (
     <div data-growth-settings-ai-refinement={GROWTH_SETTINGS_AI_REFINEMENT_2F_QA_MARKER}>
-      <GrowthSettingsCard title={READINESS_CARD_TITLES[scope]}>
+      <GrowthSettingsCard
+        title={
+          {
+            teammate: `How ${teammate.name} works for you`,
+            preferences: growthAvaPreferencesTitle(teammate),
+            autonomy: "Autonomy at a glance",
+            "command-center": "Command Center at a glance",
+          }[scope]
+        }
+      >
         {loading ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" aria-hidden />

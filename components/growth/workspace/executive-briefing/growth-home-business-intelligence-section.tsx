@@ -1,20 +1,21 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Brain, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { GrowthHomeBusinessIntelligencePanel } from "@/components/growth/workspace/executive-briefing/growth-home-business-intelligence-panel"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import {
   GROWTH_BUSINESS_INTELLIGENCE_APPLY_TO_PROFILE_API_PATH,
-  GROWTH_BUSINESS_INTELLIGENCE_EMPTY_MESSAGE,
   GROWTH_BUSINESS_INTELLIGENCE_READ_ONLY_BANNER,
   GROWTH_BUSINESS_INTELLIGENCE_RESEARCH_API_PATH,
   GROWTH_BUSINESS_INTELLIGENCE_RESEARCH_CTA_LABEL,
-  GROWTH_BUSINESS_INTELLIGENCE_RESEARCH_STEPS,
   GROWTH_BUSINESS_INTELLIGENCE_REVIEW_DECISION_API_PATH,
-  GROWTH_BUSINESS_INTELLIGENCE_SECTION_SUBTITLE,
   GROWTH_BUSINESS_INTELLIGENCE_SECTION_TITLE,
   GROWTH_BUSINESS_INTELLIGENCE_UI_QA_MARKER,
+  growthBusinessIntelligenceEmptyMessage,
+  growthBusinessIntelligenceResearchSteps,
+  growthBusinessIntelligenceSectionSubtitle,
   growthBusinessIntelligenceReportHref,
   type BusinessIntelligenceReviewDecisionType,
   type BusinessIntelligenceReviewFieldKey,
@@ -28,6 +29,8 @@ import { cn } from "@/lib/utils"
 type ViewState = "loading" | "empty" | "researching" | "ready" | "error"
 
 export function GrowthHomeBusinessIntelligenceSection({ embedded = false }: { embedded?: boolean }) {
+  const { teammate } = useAiTeammateIdentity()
+  const researchSteps = useMemo(() => growthBusinessIntelligenceResearchSteps(teammate), [teammate])
   const [view, setView] = useState<ViewState>("loading")
   const [response, setResponse] = useState<GrowthBusinessIntelligenceReportApiResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -49,9 +52,9 @@ export function GrowthHomeBusinessIntelligenceSection({ embedded = false }: { em
     stopResearchStepTimer()
     setResearchStepIndex(0)
     researchStepTimerRef.current = setInterval(() => {
-      setResearchStepIndex((current) => (current + 1) % GROWTH_BUSINESS_INTELLIGENCE_RESEARCH_STEPS.length)
+      setResearchStepIndex((current) => (current + 1) % researchSteps.length)
     }, 1400)
-  }, [stopResearchStepTimer])
+  }, [researchSteps.length, stopResearchStepTimer])
 
   useEffect(() => () => stopResearchStepTimer(), [stopResearchStepTimer])
 
@@ -188,7 +191,7 @@ export function GrowthHomeBusinessIntelligenceSection({ embedded = false }: { em
     }
   }, [])
 
-  const researchStepLabel = GROWTH_BUSINESS_INTELLIGENCE_RESEARCH_STEPS[researchStepIndex]
+  const researchStepLabel = researchSteps[researchStepIndex]
 
   const content = (
     <div
@@ -203,13 +206,13 @@ export function GrowthHomeBusinessIntelligenceSection({ embedded = false }: { em
           </span>
           <div>
             <h3 className="text-base font-semibold tracking-tight">{GROWTH_BUSINESS_INTELLIGENCE_SECTION_TITLE}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{GROWTH_BUSINESS_INTELLIGENCE_SECTION_SUBTITLE}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{growthBusinessIntelligenceSectionSubtitle(teammate)}</p>
           </div>
         </div>
       ) : (
         <div>
           <p className="text-sm font-medium">{GROWTH_BUSINESS_INTELLIGENCE_SECTION_TITLE}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{GROWTH_BUSINESS_INTELLIGENCE_SECTION_SUBTITLE}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{growthBusinessIntelligenceSectionSubtitle(teammate)}</p>
         </div>
       )}
 
@@ -231,7 +234,7 @@ export function GrowthHomeBusinessIntelligenceSection({ embedded = false }: { em
           </div>
           <p className="text-sm text-muted-foreground">{researchStepLabel}</p>
           <ul className="space-y-1 text-xs text-muted-foreground">
-            {GROWTH_BUSINESS_INTELLIGENCE_RESEARCH_STEPS.map((step, index) => (
+            {researchSteps.map((step, index) => (
               <li
                 key={step}
                 className={cn(index === researchStepIndex ? "font-medium text-foreground" : undefined)}
@@ -254,7 +257,7 @@ export function GrowthHomeBusinessIntelligenceSection({ embedded = false }: { em
 
       {view === "empty" ? (
         <div className="space-y-3 rounded-xl border border-dashed border-border/70 bg-muted/15 px-4 py-4">
-          <p className="text-sm">{GROWTH_BUSINESS_INTELLIGENCE_EMPTY_MESSAGE}</p>
+          <p className="text-sm">{growthBusinessIntelligenceEmptyMessage(teammate)}</p>
           <p className="text-xs text-muted-foreground">{GROWTH_BUSINESS_INTELLIGENCE_READ_ONLY_BANNER}</p>
           {error ? (
             <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">

@@ -12,6 +12,8 @@ import {
 import type { GrowthLeadResearchRun } from "@/lib/growth/research-types"
 import type { GrowthResearchRunPublicView } from "@/lib/growth/research/research-types"
 import type { GrowthLead } from "@/lib/growth/types"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
+import { researchingCompany, willResearchAutomatically } from "@/lib/workspace/ai-teammate-voice"
 
 type GrowthCompanyIntelligenceSnapshotProps = {
   lead: GrowthLead
@@ -59,6 +61,7 @@ export function GrowthCompanyIntelligenceSnapshot({
   prospectRun,
   researchEnqueueing = false,
 }: GrowthCompanyIntelligenceSnapshotProps) {
+  const { teammate } = useAiTeammateIdentity()
   const result = latestRun?.result
   const serviceTerritory = result?.serviceAreaClues?.slice(0, 2).join(" · ") || null
   const equipment = result?.equipmentServiceIndicators?.slice(0, 3).join(" · ") || null
@@ -81,6 +84,7 @@ export function GrowthCompanyIntelligenceSnapshot({
   })
   const progressMessage = resolveCustomerResearchProgressMessage(
     researchEnqueueing ? "researching" : researchState,
+    teammate.name,
   )
 
   const hasLeadIntel =
@@ -104,7 +108,7 @@ export function GrowthCompanyIntelligenceSnapshot({
       >
         <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-muted/15 px-4 py-6 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
-          {progressMessage ?? "Ava is researching this company…"}
+          {progressMessage ?? researchingCompany(teammate)}
         </div>
       </GrowthCollapsibleEngineCard>
     )
@@ -119,8 +123,7 @@ export function GrowthCompanyIntelligenceSnapshot({
         persistKey={GROWTH_DRAWER_CARD_KEYS.companyIntelligence}
       >
         <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
-          {progressMessage ??
-            "Ava will gather company intelligence automatically once a website is available."}
+          {progressMessage ?? willResearchAutomatically(teammate)}
         </div>
       </GrowthCollapsibleEngineCard>
     )

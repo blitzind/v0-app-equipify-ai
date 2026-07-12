@@ -7,11 +7,12 @@ import { GrowthInboxWidgetErrorBoundary } from "@/components/growth/growth-inbox
 import { GrowthReplyWorkflowActionsPanel } from "@/components/growth/growth-reply-workflow-actions-panel"
 import { GrowthInboxActionCenterBookingEmbed } from "@/components/growth/inbox/growth-inbox-action-center-booking-embed"
 import { GrowthInboxActionCenterCopilotEmbed } from "@/components/growth/inbox/growth-inbox-action-center-copilot-embed"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { GrowthInboxActionCenterOpportunityEmbed } from "@/components/growth/inbox/growth-inbox-action-center-opportunity-embed"
 import { useGrowthInboxLeadContext } from "@/components/growth/inbox/growth-inbox-lead-context-provider"
 import { useGrowthInboxSharedData } from "@/components/growth/inbox/growth-inbox-shared-data-provider"
 import { useGrowthInboxWorkspace } from "@/components/growth/inbox/growth-inbox-workspace-provider"
-import { GROWTH_AVA_REPLY_ASSIST_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { growthAvaReplyAssistTitle } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import {
   Collapsible,
   CollapsibleContent,
@@ -47,6 +48,7 @@ function WorkflowGroup({
 }
 
 export function GrowthInboxActionCenterWorkflowEmbeds() {
+  const { teammate } = useAiTeammateIdentity()
   const {
     leadId,
     workflowActions,
@@ -165,7 +167,7 @@ export function GrowthInboxActionCenterWorkflowEmbeds() {
         )}
       </WorkflowGroup>
 
-      <WorkflowGroup title={GROWTH_AVA_REPLY_ASSIST_TITLE} count={copilot ? 1 : 0}>
+      <WorkflowGroup title={growthAvaReplyAssistTitle(teammate)} count={copilot ? 1 : 0}>
         <GrowthInboxActionCenterCopilotEmbed />
       </WorkflowGroup>
 

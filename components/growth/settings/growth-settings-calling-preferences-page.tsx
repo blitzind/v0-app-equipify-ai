@@ -9,11 +9,12 @@ import { GrowthOperatorAssistPreferencesPanel } from "@/components/growth/growth
 import { GrowthCallingConnectionStatusPanel } from "@/components/growth/settings/growth-calling-connection-status-panel"
 import { GrowthCallingPreferencesReadinessSummary } from "@/components/growth/settings/growth-calling-preferences-readiness-summary"
 import { GrowthWorkspacePageHeader } from "@/components/growth/shell/growth-workspace-page-header"
+import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import {
   GROWTH_SETTINGS_SECTION_GAP,
   GROWTH_SETTINGS_VOICE_CALLING_REFINEMENT_2D_QA_MARKER,
 } from "@/components/growth/growth-settings-ui"
-import { GROWTH_AVA_CALL_ASSISTANCE_TITLE } from "@/lib/growth/workspace/growth-workspace-ava-identity"
+import { growthAvaCallAssistanceTitle } from "@/lib/growth/workspace/growth-workspace-ava-identity"
 import { Button } from "@/components/ui/button"
 
 export const GROWTH_SETTINGS_CALLING_PREFERENCES_PAGE_QA_MARKER =
@@ -47,6 +48,7 @@ function CallingPreferencesSection({
 }
 
 export function GrowthSettingsCallingPreferencesPage() {
+  const { teammate } = useAiTeammateIdentity()
   return (
     <div
       className={GROWTH_SETTINGS_SECTION_GAP}
@@ -55,7 +57,7 @@ export function GrowthSettingsCallingPreferencesPage() {
     >
       <GrowthWorkspacePageHeader
         title="Calling Preferences"
-        description="Dialer defaults, call assistance from Ava, and live coaching for outbound and inbound calls."
+        description={`Dialer defaults, call assistance from ${teammate.name}, and live coaching for outbound and inbound calls.`}
         icon={Phone}
         actions={
           <Button type="button" variant="outline" size="sm" asChild>
@@ -84,7 +86,7 @@ export function GrowthSettingsCallingPreferencesPage() {
       </CallingPreferencesSection>
 
       <CallingPreferencesSection
-        title={GROWTH_AVA_CALL_ASSISTANCE_TITLE}
+        title={growthAvaCallAssistanceTitle(teammate)}
         description="Real-time guidance and coaching during live calls."
       >
         <div className={GROWTH_SETTINGS_SECTION_GAP}>

@@ -3,6 +3,11 @@
  */
 
 import type { GrowthWorkspaceDashboardViewModel } from "@/lib/growth/workspace/growth-workspace-dashboard-types"
+import {
+  AI_TEAMMATE_DEFAULT_NAME,
+  resolveAiTeammatePresentation,
+  type AiTeammatePresentation,
+} from "@/lib/workspace/ai-teammate-identity"
 
 export const GROWTH_HOME_FRESH_SLATE_RUNTIME_ACTIVITY_QA_MARKER =
   "growth-home-fresh-slate-runtime-activity-1h-v1" as const
@@ -13,7 +18,11 @@ export const GROWTH_HOME_DEMO_CUSTOMER_ACCOUNT_NAMES = [
   "King of Boat Care",
 ] as const
 
-export const GROWTH_HOME_FRESH_AVA_HEADLINE = "Ava is standing by" as const
+export function growthHomeFreshTeammateHeadline(teammate: AiTeammatePresentation): string {
+  return `${teammate.name} is standing by`
+}
+export const GROWTH_HOME_FRESH_AVA_HEADLINE =
+  growthHomeFreshTeammateHeadline(resolveAiTeammatePresentation(AI_TEAMMATE_DEFAULT_NAME))
 export const GROWTH_HOME_FRESH_AVA_SUBLINE =
   "Import prospects or start a mission to begin." as const
 

@@ -4,7 +4,7 @@ import Link from "next/link"
 import { Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
-import { AI_OS_AI_IMPROVEMENTS_TITLE } from "@/lib/workspace/ai-os-outcome-first-terminology"
+import { aiOsImprovementsTitle } from "@/lib/workspace/ai-os-outcome-first-terminology"
 import { teammateImprovementsSubtitle } from "@/lib/workspace/ai-teammate-voice"
 import type { GrowthAiOsOperatorAiImprovement } from "@/lib/growth/aios/operator-experience/growth-ai-os-operator-experience-types"
 
@@ -16,7 +16,7 @@ export function GrowthAiOsOperatorAiImprovementsSection({ items }: { items: Grow
   return (
     <section data-qa-section="operator-ai-improvements" className="space-y-4">
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight">{AI_OS_AI_IMPROVEMENTS_TITLE}</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">{aiOsImprovementsTitle(teammate)}</h2>
         <p className="mt-1 text-muted-foreground">{teammateImprovementsSubtitle(teammate)}</p>
       </div>
       <div className="space-y-3">

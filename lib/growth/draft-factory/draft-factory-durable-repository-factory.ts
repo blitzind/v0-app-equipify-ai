@@ -13,7 +13,7 @@ import type {
 } from "@/lib/growth/draft-factory/draft-factory-durable-repository-contract"
 import { resolveDraftFactoryDurableRepositoryKind } from "@/lib/growth/draft-factory/draft-factory-durable-repository-contract"
 import { createMemoryDraftFactoryRepository } from "@/lib/growth/draft-factory/draft-factory-durable-memory-repository"
-import { createPostgresDraftFactoryRepository } from "@/lib/growth/draft-factory/draft-factory-durable-repository"
+import { createPostgresDraftFactoryRepository } from "@/lib/growth/draft-factory/draft-factory-durable-repository-core"
 
 export type { DraftFactoryDurableRepository, AiOsDraftFactoryRuntimeMode }
 export { resolveDraftFactoryDurableRepositoryKind }

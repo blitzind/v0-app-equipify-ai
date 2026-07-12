@@ -40,7 +40,7 @@ export const GROWTH_HOME_AVA_ALL_NORMAL_LINE = AVA_NARRATIVE_ALL_NORMAL_LINE
 /** @deprecated GE-AIOS-14B — narrative engine replaces activity pills */
 export const GROWTH_HOME_AVA_ONE_THING_TITLE = "I only need one thing from you" as const
 /** @deprecated GE-AIOS-14B — narrative engine replaces activity pills */
-export const GROWTH_HOME_AVA_CURRENTLY_TITLE = "Ava is currently" as const
+export const GROWTH_HOME_AVA_CURRENTLY_TITLE = "Currently" as const
 /** @deprecated GE-AIOS-14B — narrative engine replaces since-last-visit list */
 export const GROWTH_HOME_AVA_SINCE_LAST_VISIT_TITLE = "Since your last visit" as const
 
