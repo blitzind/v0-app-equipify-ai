@@ -1,9 +1,10 @@
 /**
- * GE-AIOS-AUTONOMY-1B/1C — Draft Factory due/capacity sub-tick for Objective Runtime Scheduler.
+ * GE-AIOS-AUTONOMY-1B/1C/1E — Draft Factory due/capacity sub-tick for Objective Runtime Scheduler.
  * Extends existing cron tick — does not register a new Vercel cron.
  *
- * AUTONOMY-1C: due advances are selected via SV1-1 + SV1-2 capacity-class buckets.
- * FIFO (`updated_at ASC`) is only the final tie-break — not the sole authority.
+ * AUTONOMY-1C: due advances via SV1-1 + SV1-2 capacity-class buckets.
+ * AUTONOMY-1E: classify full due pool + sample per class before SV1-1 so FIFO
+ * cannot starve capacity-class discovery under the due-tick runtime budget.
  */
 
 import "server-only"
@@ -12,9 +13,12 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { ensureGrowthAiEventBusInProcessSubscribers } from "@/lib/growth/aios/event-bus/growth-ai-event-bus-subscriber-registry"
 import {
-  mapDurableStateToPortfolioCapacityClass,
   mapPortfolioCapacityClassToResourceClass,
 } from "@/lib/growth/draft-factory/draft-factory-due-capacity-class"
+import {
+  GROWTH_AIOS_AUTONOMY_1E_QA_MARKER,
+  planFairDueCapacityClassAdmission,
+} from "@/lib/growth/draft-factory/draft-factory-due-fair-admission"
 import { selectPortfolioAwareDueDraftFactoryStates } from "@/lib/growth/draft-factory/draft-factory-due-portfolio-selection"
 import {
   advanceDraftFactoryCapacityWake,
@@ -39,6 +43,7 @@ import { planWakeEvaluationBatch } from "@/lib/growth/runtime-guardrails/growth-
 import { getRuntimeKillSwitchStates } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
 import type { AiOsInvestmentState } from "@/lib/growth/resource-allocation/resource-allocation-types"
 import type { AiOsPortfolioCapacityClass } from "@/lib/growth/portfolio-allocation/portfolio-allocation-types"
+import type { DuePortfolioSelectionCandidate } from "@/lib/growth/draft-factory/draft-factory-due-portfolio-selection"
 
 export type DraftFactoryDueSchedulerTickResult = {
   qa_marker: typeof GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_QA_MARKER
@@ -51,7 +56,17 @@ export type DraftFactoryDueSchedulerTickResult = {
   skipped_reason: string | null
   portfolio_aware_selected?: number
   portfolio_aware_classes?: number
+  due_tick_started_at?: string
+  due_tick_runtime_ms?: number
+  budget_exhausted_phase?: string | null
 }
+
+type BudgetPhase =
+  | null
+  | "classification"
+  | "enrichment"
+  | "advancement"
+  | "capacity_wake"
 
 async function projectInvestmentForDueLead(
   admin: SupabaseClient,
@@ -64,41 +79,60 @@ async function projectInvestmentForDueLead(
   companyName: string | null
   researchFresh: boolean | null
   researchStale: boolean | null
+  enrichmentFailed: boolean
+  enrichmentFailureReason: string | null
 }> {
-  const lead = await fetchGrowthLeadById(admin, leadId)
-  if (!lead) {
+  try {
+    const lead = await fetchGrowthLeadById(admin, leadId)
+    if (!lead) {
+      return {
+        investmentState: "stop_investment",
+        spendAuthorized: false,
+        companyName: null,
+        researchFresh: null,
+        researchStale: null,
+        enrichmentFailed: true,
+        enrichmentFailureReason: "lead_not_found",
+      }
+    }
+
+    const hasUsableResearch = Boolean(lead.latestProspectResearchRunId && lead.lastProspectResearchedAt)
+    const researchStale = lead.lastProspectResearchedAt
+      ? isProspectResearchStale(lead.lastProspectResearchedAt)
+      : true
+    const researchFresh = hasUsableResearch && !researchStale
+
+    const signals = buildResourceAllocationSignalsFromLead(lead, {
+      budgetAvailable: true,
+      killSwitchActive: false,
+    })
+    const resource = evaluateResourceAllocationFacade({
+      organizationId,
+      accountId: leadId,
+      resourceClass: mapPortfolioCapacityClassToResourceClass(capacityClass),
+      signals,
+    })
+
+    return {
+      investmentState: resource.investment_state,
+      spendAuthorized: resource.spend_authorized,
+      companyName: lead.companyName,
+      researchFresh,
+      researchStale,
+      enrichmentFailed: false,
+      enrichmentFailureReason: null,
+    }
+  } catch (error) {
     return {
       investmentState: "stop_investment",
       spendAuthorized: false,
       companyName: null,
       researchFresh: null,
       researchStale: null,
+      enrichmentFailed: true,
+      enrichmentFailureReason:
+        error instanceof Error ? error.message.slice(0, 160) : "enrichment_exception",
     }
-  }
-
-  const hasUsableResearch = Boolean(lead.latestProspectResearchRunId && lead.lastProspectResearchedAt)
-  const researchStale = lead.lastProspectResearchedAt
-    ? isProspectResearchStale(lead.lastProspectResearchedAt)
-    : true
-  const researchFresh = hasUsableResearch && !researchStale
-
-  const signals = buildResourceAllocationSignalsFromLead(lead, {
-    budgetAvailable: true,
-    killSwitchActive: false,
-  })
-  const resource = evaluateResourceAllocationFacade({
-    organizationId,
-    accountId: leadId,
-    resourceClass: mapPortfolioCapacityClassToResourceClass(capacityClass),
-    signals,
-  })
-
-  return {
-    investmentState: resource.investment_state,
-    spendAuthorized: resource.spend_authorized,
-    companyName: lead.companyName,
-    researchFresh,
-    researchStale,
   }
 }
 
@@ -106,6 +140,7 @@ export async function tickDraftFactoryDueStatesForScheduler(
   admin: SupabaseClient,
   input: {
     organizationIds: string[]
+    /** AUTONOMY-1E — due-tick local clock. Prefer omitting so the tick starts fresh. */
     startedAt?: number
     maxRuntimeMs?: number
     maxOrganizations?: number
@@ -127,7 +162,9 @@ export async function tickDraftFactoryDueStatesForScheduler(
     }
   }
 
+  // AUTONOMY-1E — due-tick clock starts here (not shared with sales-loop start).
   const startedAt = input.startedAt ?? Date.now()
+  const dueTickStartedAtIso = new Date(startedAt).toISOString()
   const maxRuntimeMs = input.maxRuntimeMs ?? 15_000
   const maxOrgs = input.maxOrganizations ?? GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_MAX_ORGS
   const organizationIds = [...new Set(input.organizationIds)].slice(0, maxOrgs)
@@ -139,9 +176,13 @@ export async function tickDraftFactoryDueStatesForScheduler(
   let failures = 0
   let portfolioAwareSelected = 0
   let portfolioAwareClasses = 0
+  let budgetExhaustedPhase: BudgetPhase = null
 
   for (const organizationId of organizationIds) {
-    if (Date.now() - startedAt >= maxRuntimeMs) break
+    if (Date.now() - startedAt >= maxRuntimeMs) {
+      budgetExhaustedPhase = budgetExhaustedPhase ?? "advancement"
+      break
+    }
 
     try {
       const resolved = await resolveDraftFactoryDurableRepository({
@@ -155,7 +196,6 @@ export async function tickDraftFactoryDueStatesForScheduler(
       const repository = resolved.repository
       const now = new Date().toISOString()
 
-      // AUTONOMY-1C — pull a larger due pool; portfolio-aware selection chooses the advance set.
       const dueStates = await listDueDraftFactoryStates({
         organizationId,
         now,
@@ -179,29 +219,63 @@ export async function tickDraftFactoryDueStatesForScheduler(
         // Poll tick must not abort DF due advances.
       }
 
-      const enriched = []
-      for (const state of dueStates) {
-        if (Date.now() - startedAt >= maxRuntimeMs) break
-        const capacityClass = mapDurableStateToPortfolioCapacityClass(state.state)
-        if (!capacityClass) continue
-        const investment = await projectInvestmentForDueLead(
-          admin,
-          organizationId,
-          state.leadId,
-          capacityClass,
-        )
-        enriched.push({
+      // AUTONOMY-1E — eager class discovery from the full due pool (pure, no SV1-1).
+      const admission = planFairDueCapacityClassAdmission({
+        dueStates: dueStates.map((state) => ({
           leadId: state.leadId,
           state: state.state,
           updatedAt: state.updatedAt,
+        })),
+        totalAdvanceBudget: GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_MAX_ADVANCES_PER_ORG,
+        perClassCandidateCap: GROWTH_DRAFT_FACTORY_DUE_CLASS_CANDIDATE_CAP,
+      })
+
+      const enriched: DuePortfolioSelectionCandidate[] = []
+      const enrichedCountByClass: Record<string, number> = {}
+      let enrichmentFailureCount = 0
+      let enrichmentBudgetExhausted = false
+
+      for (const candidate of admission.sampledCandidates) {
+        if (Date.now() - startedAt >= maxRuntimeMs) {
+          enrichmentBudgetExhausted = true
+          budgetExhaustedPhase = "enrichment"
+          break
+        }
+
+        const investment = await projectInvestmentForDueLead(
+          admin,
+          organizationId,
+          candidate.leadId,
+          candidate.capacityClass,
+        )
+
+        if (investment.enrichmentFailed) {
+          enrichmentFailureCount += 1
+          logGrowthEngine("draft_factory_due_enrichment_failed", {
+            qa_marker: GROWTH_AIOS_AUTONOMY_1E_QA_MARKER,
+            organization_id: organizationId,
+            lead_id: candidate.leadId,
+            capacity_class: candidate.capacityClass,
+            reason: investment.enrichmentFailureReason,
+          })
+          // Fail closed for this lead — still include stop so SV1-2 can skip consistently.
+        }
+
+        enriched.push({
+          leadId: candidate.leadId,
+          state: candidate.state,
+          updatedAt: candidate.updatedAt,
           investmentState: investment.investmentState,
           spendAuthorized: investment.spendAuthorized,
           companyName: investment.companyName,
           researchFresh: investment.researchFresh,
           researchStale: investment.researchStale,
         })
+        enrichedCountByClass[candidate.capacityClass] =
+          (enrichedCountByClass[candidate.capacityClass] ?? 0) + 1
       }
 
+      // Portfolio selection runs on whatever was enriched; discovered classes already logged.
       const selection = selectPortfolioAwareDueDraftFactoryStates({
         organizationId,
         dueStates: enriched,
@@ -212,11 +286,31 @@ export async function tickDraftFactoryDueStatesForScheduler(
       portfolioAwareSelected += selection.selectedLeadIds.length
       portfolioAwareClasses += selection.classSelections.length
 
+      const selectedCountByClass: Record<string, number> = {}
+      for (const row of selection.classSelections) {
+        selectedCountByClass[row.capacityClass] = row.selectedLeadIds.length
+      }
+
       logGrowthEngine("draft_factory_due_portfolio_selection", {
         qa_marker: selection.qa_marker,
+        autonomy_1e_qa_marker: GROWTH_AIOS_AUTONOMY_1E_QA_MARKER,
         organization_id: organizationId,
         due_pool: dueStates.length,
+        due_pool_count: admission.duePoolCount,
         selected: selection.selectedLeadIds.length,
+        active_capacity_classes: admission.activeCapacityClasses,
+        raw_count_by_class: admission.rawCountByClass,
+        candidate_cap_by_class: admission.candidateCapByClass,
+        sampled_count_by_class: admission.sampledCountByClass,
+        enriched_count_by_class: enrichedCountByClass,
+        selected_count_by_class: selectedCountByClass,
+        skipped_stop_count: selection.classSelections.reduce(
+          (sum, row) => sum + row.skippedStopInvestment,
+          0,
+        ),
+        enrichment_failure_count: enrichmentFailureCount,
+        budget_exhausted_phase: enrichmentBudgetExhausted ? "enrichment" : null,
+        due_tick_started_at: dueTickStartedAtIso,
         classes: selection.classSelections.map((row) => ({
           capacity_class: row.capacityClass,
           slots: row.slotsAllocated,
@@ -226,6 +320,22 @@ export async function tickDraftFactoryDueStatesForScheduler(
         })),
       })
 
+      for (const leadId of selection.selectedLeadIds) {
+        const capacityClass = selection.selectedByClass[leadId]
+        const candidate = enriched.find((row) => row.leadId === leadId)
+        logGrowthEngine("draft_factory_due_lead_selection_explain", {
+          qa_marker: GROWTH_AIOS_AUTONOMY_1E_QA_MARKER,
+          organization_id: organizationId,
+          lead_id: leadId,
+          capacity_class: capacityClass ?? null,
+          sampled: true,
+          investment: candidate?.investmentState ?? null,
+          portfolio: "selected",
+          advanced: false,
+          reason: "portfolio_selected_pending_advance",
+        })
+      }
+
       const dueBatch = planWakeEvaluationBatch({
         totalWaits: selection.selectedLeadIds.length,
         perRunCap: GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_MAX_ADVANCES_PER_ORG,
@@ -233,8 +343,12 @@ export async function tickDraftFactoryDueStatesForScheduler(
 
       if (dueBatch.wakeExecutionEnabled && dueBatch.effectiveLimit > 0) {
         for (const leadId of selection.selectedLeadIds.slice(0, dueBatch.effectiveLimit)) {
-          if (Date.now() - startedAt >= maxRuntimeMs) break
+          if (Date.now() - startedAt >= maxRuntimeMs) {
+            budgetExhaustedPhase = "advancement"
+            break
+          }
           const capacityClass = selection.selectedByClass[leadId]
+          const candidate = enriched.find((row) => row.leadId === leadId)
           const result = await advanceDraftFactoryForLeadLive(admin, {
             organizationId,
             leadId,
@@ -246,7 +360,20 @@ export async function tickDraftFactoryDueStatesForScheduler(
             allowGeneration: false,
             workerId: `df-due-scheduler:${organizationId}`,
           })
-          if (result.outcome !== "duplicate_noop") dueAdvanced += 1
+          const advanced = result.outcome !== "duplicate_noop"
+          if (advanced) dueAdvanced += 1
+          logGrowthEngine("draft_factory_due_lead_selection_explain", {
+            qa_marker: GROWTH_AIOS_AUTONOMY_1E_QA_MARKER,
+            organization_id: organizationId,
+            lead_id: leadId,
+            capacity_class: capacityClass ?? null,
+            sampled: true,
+            investment: candidate?.investmentState ?? null,
+            portfolio: "selected",
+            advanced,
+            reason: advanced ? "advanced" : "duplicate_noop",
+            outcome: result.outcome,
+          })
         }
       }
 
@@ -260,7 +387,10 @@ export async function tickDraftFactoryDueStatesForScheduler(
       if (capacityBatch.wakeExecutionEnabled && capacityBatch.effectiveLimit > 0 && capacityCandidates.length > 0) {
         const capacityEnriched = []
         for (const [index, row] of capacityCandidates.entries()) {
-          if (Date.now() - startedAt >= maxRuntimeMs) break
+          if (Date.now() - startedAt >= maxRuntimeMs) {
+            budgetExhaustedPhase = budgetExhaustedPhase ?? "capacity_wake"
+            break
+          }
           const investment = await projectInvestmentForDueLead(
             admin,
             organizationId,
@@ -278,17 +408,19 @@ export async function tickDraftFactoryDueStatesForScheduler(
           })
         }
 
-        const capacity = await advanceDraftFactoryCapacityWake({
-          organizationId,
-          capacityClass: "llm_drafting",
-          capacitySlotsAvailable: capacityBatch.effectiveLimit,
-          now,
-          workerId: `df-capacity-scheduler:${organizationId}`,
-          repository,
-          candidates: capacityEnriched,
-        })
-        capacitySelected += capacity.selectedLeadIds.length
-        capacityDeferred += capacity.deferredLeadIds.length
+        if (capacityEnriched.length > 0) {
+          const capacity = await advanceDraftFactoryCapacityWake({
+            organizationId,
+            capacityClass: "llm_drafting",
+            capacitySlotsAvailable: capacityBatch.effectiveLimit,
+            now,
+            workerId: `df-capacity-scheduler:${organizationId}`,
+            repository,
+            candidates: capacityEnriched,
+          })
+          capacitySelected += capacity.selectedLeadIds.length
+          capacityDeferred += capacity.deferredLeadIds.length
+        }
       }
     } catch (error) {
       failures += 1
@@ -300,8 +432,10 @@ export async function tickDraftFactoryDueStatesForScheduler(
     }
   }
 
+  const dueTickRuntimeMs = Date.now() - startedAt
   logGrowthEngine("draft_factory_due_scheduler_tick", {
     qa_marker: GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_QA_MARKER,
+    autonomy_1e_qa_marker: GROWTH_AIOS_AUTONOMY_1E_QA_MARKER,
     organizations_attempted: organizationIds.length,
     due_states_found: dueStatesFound,
     due_advanced: dueAdvanced,
@@ -310,7 +444,10 @@ export async function tickDraftFactoryDueStatesForScheduler(
     portfolio_aware_selected: portfolioAwareSelected,
     portfolio_aware_classes: portfolioAwareClasses,
     failures,
-    runtime_ms: Date.now() - startedAt,
+    due_tick_started_at: dueTickStartedAtIso,
+    due_tick_runtime_ms: dueTickRuntimeMs,
+    budget_exhausted_phase: budgetExhaustedPhase,
+    runtime_ms: dueTickRuntimeMs,
   })
 
   return {
@@ -324,5 +461,8 @@ export async function tickDraftFactoryDueStatesForScheduler(
     skipped_reason: null,
     portfolio_aware_selected: portfolioAwareSelected,
     portfolio_aware_classes: portfolioAwareClasses,
+    due_tick_started_at: dueTickStartedAtIso,
+    due_tick_runtime_ms: dueTickRuntimeMs,
+    budget_exhausted_phase: budgetExhaustedPhase,
   }
 }

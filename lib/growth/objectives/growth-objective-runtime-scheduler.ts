@@ -138,10 +138,13 @@ export async function runGrowthObjectiveRuntimeScheduler(
       })
     : null
 
+  // AUTONOMY-1E — Draft Factory due tick gets its own clock so the sales loop
+  // cannot silently consume the due-tick's 15s enrichment/advancement budget.
+  // Outer scheduler remains bounded by MAX_SCHEDULER_RUNTIME_MS below.
   const draftFactoryDue = killSwitches.autonomy_enabled
     ? await tickDraftFactoryDueStatesForScheduler(admin, {
         organizationIds: schedulerOrganizationIds,
-        startedAt,
+        // Omit startedAt → due tick uses Date.now() at sub-tick begin.
         maxRuntimeMs: 15_000,
         maxOrganizations: MAX_ORGS_PER_TICK,
       })

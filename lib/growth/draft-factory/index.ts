@@ -78,6 +78,16 @@ export {
 } from "@/lib/growth/draft-factory/draft-factory-due-capacity-class"
 
 export {
+  GROWTH_AIOS_AUTONOMY_1E_QA_MARKER,
+  GROWTH_DRAFT_FACTORY_DUE_CLASS_MIN_SAMPLE,
+  GROWTH_DRAFT_FACTORY_DUE_CLASS_SAMPLE_COMPARISON_MULTIPLIER,
+  computeDueClassEnrichmentSampleSize,
+  planFairDueCapacityClassAdmission,
+  type DueClassAdmissionPlan,
+  type DueStateClassifiedCandidate,
+} from "@/lib/growth/draft-factory/draft-factory-due-fair-admission"
+
+export {
   selectPortfolioAwareDueDraftFactoryStates,
   type DuePortfolioSelectionCandidate,
   type DuePortfolioSelectionInput,
