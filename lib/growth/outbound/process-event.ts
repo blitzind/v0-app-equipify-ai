@@ -161,6 +161,35 @@ export async function processOutboundEvent(
     },
   })
 
+  if ((event.eventType === "opened" || event.eventType === "clicked") && lead.organizationId) {
+    void (async () => {
+      const { ingestOutboundEngagementRelationshipEvent } = await import(
+        "@/lib/growth/aios/growth/growth-adaptive-loop-1b-live-ingestion"
+      )
+      const metadata =
+        messageId != null
+          ? ((await admin
+              .schema("growth")
+              .from("outbound_messages")
+              .select("metadata")
+              .eq("id", messageId)
+              .maybeSingle()
+              .then((row) => (row.data as { metadata?: Record<string, unknown> } | null)?.metadata)) ??
+            {})
+          : {}
+      await ingestOutboundEngagementRelationshipEvent(admin, {
+        organizationId: lead.organizationId!,
+        leadId: resolved.leadId,
+        engagementType: event.eventType === "opened" ? "email_opened" : "link_clicked",
+        occurredAt: event.occurredAt,
+        subject: event.subject,
+        priorEngagementOpens: Number(metadata.open_count ?? 0),
+        priorLinkClicks: Number(metadata.click_count ?? 0),
+        sourceEventId: messageEvent.id,
+      }).catch(() => undefined)
+    })()
+  }
+
   let replyId: string | null = null
   let insertedReply = null as Awaited<ReturnType<typeof insertGrowthOutboundReply>> | null
   if (event.eventType === "replied") {

@@ -34,6 +34,11 @@ import {
   type GrowthOutreachOperatorReasoning,
 } from "@/lib/growth/aios/growth/growth-outreach-conversation-intelligence"
 import type { ProspectKnowledgePack } from "@/lib/growth/research/company-evidence/prospect-knowledge-pack"
+import type { GrowthLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-types"
+import {
+  GROWTH_AIOS_RELATIONSHIP_STRATEGY_2A_QA_MARKER,
+  type GrowthOutreachRelationshipAssessment,
+} from "@/lib/growth/aios/growth/growth-relationship-strategy-2a-types"
 
 export type { GrowthOutreachEvidenceCitation }
 export {
@@ -41,6 +46,7 @@ export {
   GROWTH_AIOS_CONVERSATION_INTELLIGENCE_2A_QA_MARKER,
   GROWTH_AIOS_CONVERSATION_INTELLIGENCE_3A_QA_MARKER,
   GROWTH_AIOS_REVENUE_STRATEGY_1A_QA_MARKER,
+  GROWTH_AIOS_RELATIONSHIP_STRATEGY_2A_QA_MARKER,
 }
 
 export const GROWTH_AIOS_OUTREACH_QUALITY_1A_QA_MARKER =
@@ -91,6 +97,10 @@ export type GrowthOutreachSalesStrategyBrief = {
   consultantDiscoveryIntelligence?: GrowthOutreachConsultantDiscoveryIntelligence | null
   /** REVENUE-STRATEGY-1A — VP-of-Sales pre-outreach strategy (internal). */
   revenueStrategyIntelligence?: GrowthOutreachRevenueStrategyIntelligence | null
+  /** RELATIONSHIP-STRATEGY-2A — canonical relationship assessment (computed, not persisted). */
+  relationshipAssessment?: GrowthOutreachRelationshipAssessment | null
+  /** ADAPTIVE-LOOP-1A — relationship evolution from prospect events (computed, not persisted). */
+  adaptiveLoopEvolution?: import("@/lib/growth/aios/growth/growth-adaptive-loop-1a-types").AdaptiveLoopEvolutionSummary | null
 }
 
 export type BuildSalesStrategyBriefInput = {
@@ -140,6 +150,11 @@ export type BuildSalesStrategyBriefInput = {
   decisionMakers?: RevenueStrategyDecisionMakerCandidate[]
   buyingCommitteeSnapshot?: RevenueStrategyBuyingCommitteeSnapshot | null
   communicationChannelHint?: string | null
+  /** RELATIONSHIP-STRATEGY-2A — computed at prep time from lead memory + context packet. */
+  relationshipAssessment?: GrowthOutreachRelationshipAssessment | null
+  leadMemory?: GrowthLeadMemoryInfluenceContext | null
+  /** ADAPTIVE-LOOP-1A — prospect events since last package (in-memory evolution only). */
+  adaptiveEvents?: import("@/lib/growth/aios/growth/growth-adaptive-loop-1a-types").AdaptiveProspectEvent[]
 }
 
 function cleanLine(value: string | null | undefined): string | null {
@@ -530,6 +545,8 @@ export function buildOutreachSalesStrategyBrief(
     decisionMakers: input.decisionMakers,
     buyingCommitteeSnapshot: input.buyingCommitteeSnapshot,
     communicationChannelHint: input.communicationChannelHint,
+    relationshipAssessment: input.relationshipAssessment,
+    leadMemory: input.leadMemory,
   })
 
   const finalSellerKnowledgeQuality = scoreOutreachSellerKnowledgeQuality({
@@ -571,6 +588,7 @@ export function buildOutreachSalesStrategyBrief(
     operatorReasoning: enriched.operatorReasoning,
     consultantDiscoveryIntelligence: enriched.consultantDiscoveryIntelligence,
     revenueStrategyIntelligence: enriched.revenueStrategyIntelligence,
+    relationshipAssessment: enriched.relationshipAssessment ?? input.relationshipAssessment ?? null,
     sellerKnowledgeQuality: finalSellerKnowledgeQuality,
   }
 }

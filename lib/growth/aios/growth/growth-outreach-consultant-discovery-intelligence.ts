@@ -638,6 +638,15 @@ export function isGenericDiscoveryQuestion(question: string): boolean {
   return GENERIC_DISCOVERY_PATTERNS.some((pattern) => pattern.test(question.trim()))
 }
 
+export function isAnsweredDiscoveryTheme(question: string, answeredThemes: string[] | null | undefined): boolean {
+  if (!answeredThemes?.length) return false
+  const normalized = question.toLowerCase()
+  return answeredThemes.some((theme) => {
+    const words = theme.split(/\s+/).filter((word) => word.length > 4)
+    return words.some((word) => normalized.includes(word))
+  })
+}
+
 export function passesConsultantDiscoveryTest(input: {
   recommendedFirstQuestion: string
   consultantHypothesis: string
@@ -685,6 +694,8 @@ export function buildConsultantDiscoveryIntelligence(input: {
   industry?: GrowthOutreachIndustryInference | null
   learningWeights?: GrowthOutreachLearningThemeWeight[] | null
   posture?: "curious" | "balanced" | "confident"
+  answeredThemes?: string[] | null
+  relationshipConfidence?: string | null
 }): GrowthOutreachConsultantDiscoveryIntelligence | null {
   if (!input.selectedObservation) return null
 
@@ -749,6 +760,11 @@ export function buildConsultantDiscoveryIntelligence(input: {
           (row.themeKey === profile.discoveryQuestions[0]?.themeKey ? 0.02 : 0),
       ),
     }))
+    .filter(
+      (row) =>
+        !isGenericDiscoveryQuestion(row.question) &&
+        !isAnsweredDiscoveryTheme(row.question, input.answeredThemes),
+    )
     .sort((a, b) => b.score - a.score)
 
   const seed = `${input.leadId}:${themeKey}:dq`

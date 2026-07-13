@@ -99,11 +99,13 @@ assert.ok(!/sendr|growth 5f|draft factory/i.test(drafts.personalizedVideo))
 console.log("  ✓ Channel drafts derive from one brief with quality gates")
 
 const assets = summarizeStrategyDerivedAssetsForPackage(drafts)
-assert.equal(assets.length, 6)
+assert.equal(assets.length, 8)
 assert.ok(assets.every((row) => row.draftOnly))
 const video = assets.find((row) => row.channel === "sendr")
 assert.equal(video?.label, "Personalized Video")
 assert.ok(!/sendr/i.test(video?.label ?? ""))
+const voicemail = assets.find((row) => row.channel === "voicemail")
+assert.equal(voicemail?.label, "Voicemail")
 console.log("  ✓ Asset summaries label Personalized Video (not SENDR)")
 
 const pkg: GrowthAutonomousOutreachApprovalPackage = {

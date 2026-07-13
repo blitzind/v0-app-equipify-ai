@@ -88,7 +88,21 @@ export async function runBuyingCommitteeIntelligenceForCanonicalCompany(
         })
         promotion_status = promo.promotion_status
         promotion_reason = promo.reason
-        if (promo.promoted) promoted_count++
+        if (promo.promoted) {
+          promoted_count++
+          void (async () => {
+            const { ingestBuyingCommitteePromotionForCompany } = await import(
+              "@/lib/growth/aios/growth/growth-adaptive-loop-1b-live-ingestion"
+            )
+            await ingestBuyingCommitteePromotionForCompany(admin, {
+              companyId: input.company_id,
+              committeeRole: draft.committee_role,
+              personLabel: draft.full_name,
+              occurredAt: new Date().toISOString(),
+              sourceEventId: promo.member_id ?? draft.person_id,
+            }).catch(() => undefined)
+          })()
+        }
       }
 
       summaries.push({

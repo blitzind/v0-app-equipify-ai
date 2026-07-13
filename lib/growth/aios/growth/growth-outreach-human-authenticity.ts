@@ -92,6 +92,26 @@ export function passesRealSalespersonTest(text: string): boolean {
   return !combined.some((pattern) => pattern.test(text))
 }
 
+/** GE-AIOS-RELATIONSHIP-STRATEGY-2A — permanent human communication constitution. */
+export const GROWTH_HUMAN_COMMUNICATION_CONSTITUTION_PATTERNS = [
+  /\bconfidence score\b/i,
+  /\bconfidence calculation\b/i,
+  /\binternal prompt\b/i,
+  /\bcrawler\b/i,
+  /\bautomation language\b/i,
+  /\bworkflow name\b/i,
+  /\bdraft factory\b/i,
+  /\bgrowth 5f\b/i,
+  /\bpilot run\b/i,
+  /\bsendr\b/i,
+  /\baios\b/i,
+  /\bge-aios\b/i,
+  /\bour (system|model|agent)\b/i,
+  /\bllm\b/i,
+  /\bprocessed data\b/i,
+  /\binferred from\b/i,
+]
+
 export function detectHumanAuthenticityFailures(text: string): string[] {
   const failures: string[] = []
   for (const pattern of HUMAN_AUTHENTICITY_RESEARCH_REVEAL_PATTERNS) {
@@ -99,6 +119,9 @@ export function detectHumanAuthenticityFailures(text: string): string[] {
   }
   for (const pattern of HUMAN_AUTHENTICITY_SDR_TEMPLATE_PATTERNS) {
     if (pattern.test(text)) failures.push(`human_authenticity:sdr_template:${pattern.source}`)
+  }
+  for (const pattern of GROWTH_HUMAN_COMMUNICATION_CONSTITUTION_PATTERNS) {
+    if (pattern.test(text)) failures.push(`human_authenticity:constitution:${pattern.source}`)
   }
   if (
     /\b(we help|i help companies|our platform|product tour|book a demo|schedule a call)\b/i.test(text)

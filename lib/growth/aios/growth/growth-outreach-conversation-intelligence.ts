@@ -35,6 +35,12 @@ import {
   type RevenueStrategyDecisionMakerCandidate,
 } from "@/lib/growth/aios/growth/growth-outreach-revenue-strategy-intelligence"
 import type { ProspectKnowledgePack } from "@/lib/growth/research/company-evidence/prospect-knowledge-pack"
+import type { GrowthLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-types"
+import {
+  finalizeRelationshipAssessmentStrategyEvolution,
+  mergeRelationshipMemoryObjections,
+  type GrowthOutreachRelationshipAssessment,
+} from "@/lib/growth/aios/growth/growth-relationship-strategy-2a"
 
 export const GROWTH_AIOS_CONVERSATION_INTELLIGENCE_1A_QA_MARKER =
   "ge-aios-conversation-intelligence-1a-v1" as const
@@ -923,6 +929,8 @@ export function enrichOutreachSalesStrategyBrief(input: {
   decisionMakers?: RevenueStrategyDecisionMakerCandidate[]
   buyingCommitteeSnapshot?: RevenueStrategyBuyingCommitteeSnapshot | null
   communicationChannelHint?: string | null
+  relationshipAssessment?: GrowthOutreachRelationshipAssessment | null
+  leadMemory?: GrowthLeadMemoryInfluenceContext | null
 }): {
   businessProblems: string[]
   primaryHook: string
@@ -942,6 +950,7 @@ export function enrichOutreachSalesStrategyBrief(input: {
   operatorReasoning: GrowthOutreachOperatorReasoning
   consultantDiscoveryIntelligence: GrowthOutreachConsultantDiscoveryIntelligence | null
   revenueStrategyIntelligence: GrowthOutreachRevenueStrategyIntelligence | null
+  relationshipAssessment: GrowthOutreachRelationshipAssessment | null
 } {
   const seller = input.brief.sellerTruth!
   const prospect = input.brief.prospectTruth!
@@ -1002,13 +1011,16 @@ export function enrichOutreachSalesStrategyBrief(input: {
     hasStrongEvidence: evidenceIntelligence.strongestThemes.length > 0,
   })
 
-  const objections = buildDynamicObjections({
-    persona,
-    industry,
-    seller,
-    businessOutcome: outcome.primaryOutcome,
-    posture: conversationRisk.posture,
-  })
+  const objections = mergeRelationshipMemoryObjections(
+    buildDynamicObjections({
+      persona,
+      industry,
+      seller,
+      businessOutcome: outcome.primaryOutcome,
+      posture: conversationRisk.posture,
+    }),
+    input.leadMemory,
+  )
 
   const businessProblems = unique(
     [
@@ -1114,6 +1126,8 @@ export function enrichOutreachSalesStrategyBrief(input: {
     industry,
     learningWeights: input.learningWeights,
     posture: conversationRisk.posture,
+    answeredThemes: input.relationshipAssessment?.answeredThemes ?? input.leadMemory?.avoidRepeating,
+    relationshipConfidence: input.relationshipAssessment?.relationshipConfidence.level,
   })
 
   const revenueStrategyIntelligence = buildRevenueStrategyIntelligence({
@@ -1134,7 +1148,17 @@ export function enrichOutreachSalesStrategyBrief(input: {
     persona,
     buyingCommitteeSnapshot: input.buyingCommitteeSnapshot ?? null,
     communicationChannelHint: input.communicationChannelHint ?? null,
+    relationshipAssessment: input.relationshipAssessment ?? null,
   })
+
+  const relationshipAssessment = input.relationshipAssessment
+    ? finalizeRelationshipAssessmentStrategyEvolution(input.relationshipAssessment, {
+        currentRecommendation: revenueStrategyIntelligence.recommendation,
+        currentConfidence: revenueStrategyIntelligence.confidenceScore,
+        previousRecommendation: input.relationshipAssessment.strategyEvolution.previousRecommendation,
+        previousConfidence: input.relationshipAssessment.previousStrategyConfidence,
+      })
+    : null
 
   return {
     businessProblems,
@@ -1174,5 +1198,6 @@ export function enrichOutreachSalesStrategyBrief(input: {
     operatorReasoning,
     consultantDiscoveryIntelligence,
     revenueStrategyIntelligence,
+    relationshipAssessment,
   }
 }

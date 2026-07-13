@@ -96,6 +96,20 @@ export async function generateAndPersistAutonomousOutreachApprovalPackageForDraf
   const lead = await fetchGrowthLeadById(admin, input.leadId)
   if (!lead) return null
 
+  const { listOutreachPreparationRunsForLead } = await import(
+    "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-store"
+  )
+  const priorRuns = await listOutreachPreparationRunsForLead(
+    admin,
+    input.organizationId,
+    input.leadId,
+  ).catch(() => [])
+  const previousPackage =
+    priorRuns
+      .filter((run) => run.outcome === "completed" && run.approvalPackage)
+      .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt))[0]?.approvalPackage ??
+    null
+
   const snapshot = await fetchLatestGrowthLeadResearchWorkflowSnapshot(admin, {
     organizationId: input.organizationId,
     leadId: input.leadId,
@@ -108,6 +122,12 @@ export async function generateAndPersistAutonomousOutreachApprovalPackageForDraf
     companyName: input.companyName ?? lead.companyName,
     snapshot,
     generatedAt: input.generatedAt,
+    previousPackage,
+    wakeCondition,
+    refreshReasons:
+      wakeCondition === "relationship_material_change"
+        ? ["relationship_material_change"]
+        : undefined,
   })
 
   if (approvalPackage.pendingHumanApproval !== true || approvalPackage.transportBlocked !== true) {
@@ -159,6 +179,7 @@ export async function generateAndPersistAutonomousOutreachApprovalPackageForDraf
     transportBlocked: true,
     approvalPackage,
     reusedExisting: false,
+    previousPackage,
   }
 }
 
@@ -224,6 +245,9 @@ export async function rebuildAutonomousOutreachApprovalPackagePayload(
     companyName: lead.companyName,
     snapshot,
     generatedAt: parsed.generatedAt,
+    previousPackage,
+    refreshReasons: input.rebuildReason ? [input.rebuildReason] : [],
+    wakeCondition: input.wakeCondition ?? "execution_completed",
   })
 
   if (approvalPackage.pendingHumanApproval !== true || approvalPackage.transportBlocked !== true) {

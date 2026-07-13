@@ -32,8 +32,27 @@ import {
   mapRevenueStrategyChannelToPackage,
   mapRevenueStrategySequenceToPackage,
 } from "@/lib/growth/aios/growth/growth-outreach-revenue-strategy-intelligence"
+import { mergeOperatorAssetStateFromPreviousPackage } from "@/lib/growth/aios/growth/growth-send-plane-1b-operator-approval-persistence"
 import { loadBuyingCommitteeIntelligenceLeadRollup } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-lead-rollup"
 import { loadBuyingCommitteeIntelligenceOperatorStatus } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-operator-status"
+import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
+import { buildOutreachContextPacket } from "@/lib/growth/outreach/personalization/context-packet-builder"
+import {
+  applyAdaptiveLoopToOutreachPreparation,
+  detectAdaptiveStrategyChanges,
+  GROWTH_AIOS_ADAPTIVE_LOOP_1A_QA_MARKER,
+} from "@/lib/growth/aios/growth/growth-adaptive-loop-1a"
+import type { AdaptiveProspectEvent } from "@/lib/growth/aios/growth/growth-adaptive-loop-1a-types"
+import {
+  loadPendingAdaptiveEventsForLead,
+  markAdaptiveEventsProcessedForLead,
+} from "@/lib/growth/aios/growth/growth-adaptive-loop-1b-relationship-event-record"
+import {
+  buildRelationshipAssessment,
+  buildRelationshipAssessmentContextFromPacket,
+  loadInstitutionalAdviceSnippets,
+} from "@/lib/growth/aios/growth/growth-relationship-strategy-2a"
+import type { GrowthAutonomousOutreachPreparationWakeCondition } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
 
 export async function buildAutonomousOutreachApprovalPackage(
   admin: SupabaseClient,
@@ -44,6 +63,10 @@ export async function buildAutonomousOutreachApprovalPackage(
     snapshot: GrowthLeadResearchWorkflowSnapshot
     generatedAt: string
     teammateName?: string | null
+    previousPackage?: GrowthAutonomousOutreachApprovalPackage | null
+    refreshReasons?: string[]
+    wakeCondition?: GrowthAutonomousOutreachPreparationWakeCondition
+    adaptiveEvents?: AdaptiveProspectEvent[]
   },
 ): Promise<GrowthAutonomousOutreachApprovalPackage> {
   const lead = await fetchGrowthLeadById(admin, input.leadId)
@@ -165,8 +188,103 @@ export async function buildAutonomousOutreachApprovalPackage(
   })
   const communicationChannelHint = resolveCommunicationPlanRecommendedChannel(communicationPlan)
 
+  const [leadMemory, contextPacket] = await Promise.all([
+    buildLeadMemoryInfluenceContext(admin, input.leadId).catch(() => null),
+    buildOutreachContextPacket(admin, lead).catch(() => null),
+  ])
+
+  const relationshipContext = contextPacket
+    ? buildRelationshipAssessmentContextFromPacket({
+        priorTouchCount: contextPacket.priorTouchCount,
+        priorReplySummaries: contextPacket.priorReplySummaries,
+        priorOutboundSubjects: contextPacket.priorOutboundSubjects,
+        objectionSummaries: contextPacket.objectionSummaries,
+        sequenceHistorySummaries: contextPacket.sequenceHistorySummaries,
+        memoryOpenLoopSummaries: contextPacket.memoryOpenLoopSummaries,
+        buyingIntent: contextPacket.buyingIntent,
+        competitorPressure: contextPacket.competitorPressure,
+      })
+    : {
+        priorTouchCount: 0,
+        priorReplyCount: 0,
+        priorOutboundSubjects: [],
+        objectionSummaries: [],
+        priorReplySummaries: [],
+        sequenceHistorySummaries: [],
+        memoryOpenLoopSummaries: [],
+        buyingIntent: null,
+        competitorPressure: null,
+      }
+
+  const previousRevenue = input.previousPackage?.salesStrategyBrief?.revenueStrategyIntelligence
+
+  const adaptiveEvents =
+    input.adaptiveEvents ??
+    (await loadPendingAdaptiveEventsForLead(admin, input.leadId).catch(() => []))
+
+  const leadSignals = {
+    relationshipStrengthScore: lead.relationshipStrengthScore,
+    relationshipStrengthTier: lead.relationshipStrengthTier,
+    relationshipTrend: lead.relationshipTrend,
+    sequenceFatigueRisk: lead.sequenceFatigueRisk,
+    leadStatus: lead.status,
+    hasMeetingScheduled: Boolean(lead.followUpAt && /meeting/i.test(lead.nextBestActionReason ?? "")),
+    isCustomer: /customer|won|converted/i.test(lead.status),
+    isSuppressed: /suppress|dnc|do not contact/i.test(lead.status ?? ""),
+    committeeMemberCount: buyingCommitteeSnapshot?.verifiedMemberCount,
+    singleThreadRisk: buyingCommitteeSnapshot?.singleThreadRisk,
+  }
+
+  let effectiveMemory = leadMemory
+  let effectiveCommittee = buyingCommitteeSnapshot
+  let relationshipAssessment
+
+  if (adaptiveEvents.length) {
+    const adaptive = applyAdaptiveLoopToOutreachPreparation({
+      events: adaptiveEvents,
+      memory: leadMemory,
+      context: relationshipContext,
+      lead: leadSignals,
+      committee: buyingCommitteeSnapshot,
+      assessmentInput: {
+        leadId: input.leadId,
+        companyName,
+        preparedAt: input.generatedAt,
+        previousRecommendation: previousRevenue?.recommendation ?? null,
+        previousConfidence: previousRevenue?.confidenceScore ?? null,
+        institutionalAdvice: loadInstitutionalAdviceSnippets({
+          industry: sellerTruth.industries[0] ?? null,
+        }),
+        committeeMemberCount: buyingCommitteeSnapshot?.verifiedMemberCount,
+        singleThreadRisk: buyingCommitteeSnapshot?.singleThreadRisk,
+      },
+      learningWeights,
+      previousAssessment: input.previousPackage?.salesStrategyBrief?.relationshipAssessment,
+      previousRevenue,
+      extraRefreshReasons: input.refreshReasons ?? (input.wakeCondition ? [input.wakeCondition] : []),
+    })
+    effectiveMemory = adaptive.memory
+    effectiveCommittee = adaptive.committee
+    relationshipAssessment = adaptive.relationshipAssessment
+  } else {
+    relationshipAssessment = buildRelationshipAssessment({
+      leadId: input.leadId,
+      companyName,
+      preparedAt: input.generatedAt,
+      memory: leadMemory,
+      context: relationshipContext,
+      lead: leadSignals,
+      refreshReasons: input.refreshReasons ?? (input.wakeCondition ? [input.wakeCondition] : []),
+      previousRecommendation: previousRevenue?.recommendation ?? null,
+      previousConfidence: previousRevenue?.confidenceScore ?? null,
+      institutionalAdvice: loadInstitutionalAdviceSnippets({
+        industry: sellerTruth.industries[0] ?? null,
+      }),
+    })
+  }
+
   // Think first — Prospect Truth + Seller Truth → Conversation Strategy → drafts.
-  const salesStrategyBrief = buildOutreachSalesStrategyBrief({
+  let salesStrategyBrief = buildOutreachSalesStrategyBrief({
     leadId: input.leadId,
     companyName,
     preparedAt: input.generatedAt,
@@ -205,16 +323,45 @@ export async function buildAutonomousOutreachApprovalPackage(
       title: row.title,
       isPrimary: row.id === lead.primaryDecisionMakerId || row.id === primaryDm?.id,
     })),
-    buyingCommitteeSnapshot,
+    buyingCommitteeSnapshot: effectiveCommittee,
     communicationChannelHint,
+    relationshipAssessment,
+    leadMemory: effectiveMemory,
+    adaptiveEvents,
   })
+
+  if (adaptiveEvents.length && salesStrategyBrief.relationshipAssessment) {
+    salesStrategyBrief = {
+      ...salesStrategyBrief,
+      adaptiveLoopEvolution: {
+        qaMarker: GROWTH_AIOS_ADAPTIVE_LOOP_1A_QA_MARKER,
+        eventCount: adaptiveEvents.length,
+        recentEvents: adaptiveEvents,
+        strategyChange: detectAdaptiveStrategyChanges({
+          previousAssessment: input.previousPackage?.salesStrategyBrief?.relationshipAssessment,
+          currentAssessment: salesStrategyBrief.relationshipAssessment,
+          previousRevenue: input.previousPackage?.salesStrategyBrief?.revenueStrategyIntelligence,
+          currentRevenue: salesStrategyBrief.revenueStrategyIntelligence,
+          events: adaptiveEvents,
+        }),
+        relationshipAssessment: salesStrategyBrief.relationshipAssessment,
+        learningAdvisoryApplied: Boolean(learningWeights?.length),
+      },
+    }
+    await markAdaptiveEventsProcessedForLead(admin, input.leadId, input.generatedAt).catch(
+      () => undefined,
+    )
+  }
 
   const drafts = generateOutreachDraftsFromSalesStrategyBrief({
     brief: salesStrategyBrief,
     senderName: teammate.name,
   })
 
-  const generatedAssets = summarizeStrategyDerivedAssetsForPackage(drafts)
+  const generatedAssets = mergeOperatorAssetStateFromPreviousPackage({
+    generatedAssets: summarizeStrategyDerivedAssetsForPackage(drafts),
+    previousPackage: input.previousPackage,
+  })
 
   const packageId = `outreach-prep:${input.leadId}:${input.generatedAt}`
 

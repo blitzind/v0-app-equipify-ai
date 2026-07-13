@@ -13,6 +13,12 @@ import {
   applySequenceVideoAttachmentToSmsBody,
   wireApprovedSequenceVideoAttachment,
 } from "@/lib/growth/sequences/growth-sequence-video-send-builder-service"
+import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import { resolveCanonicalOutreachPackageForLead } from "@/lib/growth/aios/growth/growth-send-plane-1a-canonical-loader"
+import {
+  materializeCanonicalOutreachChannelContent,
+  resolveOperatorAssetOverride,
+} from "@/lib/growth/aios/growth/growth-send-plane-1a-materialization"
 
 export async function buildSequenceExecutionSmsPayload(
   admin: SupabaseClient,
@@ -35,6 +41,28 @@ export async function buildSequenceExecutionSmsPayload(
   if (!toE164) return { error: "missing_recipient_phone" }
 
   let body = step.instructions?.trim() ?? ""
+  if (!body) {
+    const organizationId = getGrowthEngineAiOrgId()
+    const canonicalPkg =
+      organizationId != null
+        ? await resolveCanonicalOutreachPackageForLead(admin, {
+            organizationId,
+            leadId: lead.id,
+          })
+        : null
+    const brief = canonicalPkg?.salesStrategyBrief
+    if (brief) {
+      const materialized = materializeCanonicalOutreachChannelContent({
+        brief,
+        channel: "sms",
+        package: canonicalPkg,
+        operatorAssetOverride: resolveOperatorAssetOverride(canonicalPkg, "sms"),
+      })
+      if (materialized.transportReady) {
+        body = materialized.body
+      }
+    }
+  }
   if (!body) {
     const packet = await buildOutreachContextPacket(admin, lead)
     const context = projectSmsPersonalizationContext({ packet })

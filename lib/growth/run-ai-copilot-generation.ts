@@ -64,6 +64,7 @@ import { prepareOutboundEmailContent } from "@/lib/growth/signatures/outbound-si
 import { resolveGrowthOutboundIdentityContext } from "@/lib/growth/signatures/outbound-identity-context"
 import type { GrowthOutboundIdentityContext } from "@/lib/growth/signatures/outbound-identity-types"
 import { applyOutboundEmailTracking } from "@/lib/growth/tracking/tracking-links"
+import { tryMaterializeCanonicalCopilotGeneration } from "@/lib/growth/aios/growth/growth-send-plane-1a-copilot-bridge"
 
 export type RunGrowthAiCopilotGenerationInput = {
   admin: SupabaseClient
@@ -164,6 +165,18 @@ export async function runGrowthAiCopilotGeneration(
     rules: playbookResolution.rules,
     conflicts: playbookResolution.conflicts,
   })
+
+  const canonicalGeneration = await tryMaterializeCanonicalCopilotGeneration({
+    admin: input.admin,
+    request: input,
+    actingUserId,
+    storeGenerations: settings.aiCopilotStoreGenerations,
+    promptVariant,
+    snapshot,
+  })
+  if (canonicalGeneration) {
+    return canonicalGeneration
+  }
 
   const useOutreachPersonalization =
     settings.outreachPersonalizationEnabled && isOutreachPersonalizationEmailType(input.generationType)

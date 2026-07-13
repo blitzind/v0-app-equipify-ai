@@ -133,6 +133,29 @@ export async function finalizeIngestedReplyIntelligence(
     ingestionEventId: input.ingestionEventId,
   })
 
+  if (refreshedLead.organizationId) {
+    const { mapReplyIntentToAdaptiveProspectEvent } = await import(
+      "@/lib/growth/aios/growth/growth-adaptive-loop-1b-event-mappers"
+    )
+    const { ingestLiveRelationshipEvent } = await import(
+      "@/lib/growth/aios/growth/growth-adaptive-loop-1b-live-ingestion"
+    )
+    const adaptiveEvent = mapReplyIntentToAdaptiveProspectEvent({
+      intent: intelligence.intent,
+      occurredAt: input.outboundReply.receivedAt,
+      bodyPreview: input.bodyPreview,
+    })
+    if (adaptiveEvent) {
+      void ingestLiveRelationshipEvent(admin, {
+        organizationId: refreshedLead.organizationId,
+        leadId: input.leadId,
+        source: "reply_intelligence",
+        event: adaptiveEvent,
+        sourceEventId: input.outboundReply.id,
+      }).catch(() => undefined)
+    }
+  }
+
   if (input.senderEmail) {
     shadowLogReplyIntelligence({
       email: input.senderEmail,

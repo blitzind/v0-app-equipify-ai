@@ -24,6 +24,11 @@ import {
   reviewHumanAuthenticity,
 } from "@/lib/growth/aios/growth/growth-outreach-elite-human-communication"
 import { reviewOutreachDraftCopy } from "@/lib/growth/aios/growth/growth-outreach-conversation-intelligence"
+import {
+  finalizeProductionCustomerFacingCopy,
+  reviewProductionHumanCommunicationConstitution,
+} from "@/lib/growth/aios/growth/growth-send-plane-1a-constitution"
+import { seedGeneratedAssetVersionMetadata } from "@/lib/growth/aios/growth/growth-send-plane-1b-operator-approval-persistence"
 
 export type GrowthOutreachStrategyDerivedDrafts = {
   email: {
@@ -32,13 +37,14 @@ export type GrowthOutreachStrategyDerivedDrafts = {
     opening: string
     body: string
     cta: string
-    signature: string
     full: string
     wordCount: number
   }
   linkedIn: string
   sms: string
   callGuide: string
+  voicemail: string
+  meetingRequest: string
   personalizedVideo: string
   followUpSequence: string
   qualityFailures: string[]
@@ -47,6 +53,39 @@ export type GrowthOutreachStrategyDerivedDrafts = {
 function firstName(name: string | null): string | null {
   if (!name?.trim()) return null
   return name.trim().split(/\s+/)[0] ?? null
+}
+
+function buildRelationshipAwareFollowUpSequence(input: {
+  company: string
+  dmFirst: string | null
+  observation: string
+  question: string
+  safeRecall: Array<{ naturalPhrase: string; topic: string }>
+  relationshipGoal: string | null
+}): string {
+  const greeting = input.dmFirst ? `Hi ${input.dmFirst}` : "Hi"
+  const recallLine = input.safeRecall[1]?.naturalPhrase ?? input.safeRecall[0]?.naturalPhrase ?? null
+  const goalLine = input.relationshipGoal ? `Goal: ${input.relationshipGoal}` : null
+
+  return [
+    `Day 3: Continue the thread:`,
+    recallLine
+      ? `${greeting}. ${recallLine}. Still the right focus?`
+      : `${greeting}. Different angle on ${input.company}: ${input.observation} Still relevant?`,
+    ``,
+    `Day 7: One question only:`,
+    input.question,
+    ``,
+    `Day 14: Soft bump:`,
+    recallLine
+      ? `${greeting}. Wanted to close the loop on ${input.safeRecall[0]?.topic ?? input.company}.`
+      : `Still curious about ${input.company}'s service ops, or bad timing?`,
+    ``,
+    `Day 21: Close the loop:`,
+    goalLine
+      ? `Closing my loop on this unless ${input.relationshipGoal?.toLowerCase()} is still on your radar.`
+      : `Closing my loop on this unless you want the conversation.`,
+  ].join("\n")
 }
 
 export function generateOutreachDraftsFromSalesStrategyBrief(input: {
@@ -77,12 +116,12 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
   })
 
   const greeting = ctx.greeting
-  const sender = ctx.sender
-  const signature = `— ${sender}`
   const emailBody = human.emailBody
   const opening = emailBody.split("\n\n")[0] ?? greeting
-  const ctaLine = emailBody.includes("?") && !/happy to compare/i.test(emailBody) ? "" : "Happy to compare notes if useful — no pitch."
-  const emailFull = `Subject: ${human.subject}\nPreview: ${human.preview}\n\n${emailBody}`
+  const ctaLine = emailBody.includes("?") && !/happy to compare/i.test(emailBody) ? "" : "Happy to compare notes if useful. No pitch."
+  const transportBody = finalizeProductionCustomerFacingCopy(emailBody)
+  const transportSubject = finalizeProductionCustomerFacingCopy(human.subject)
+  const emailFull = `Subject: ${transportSubject}\nPreview: ${human.preview}\n\n${transportBody}`
 
   const discoveryFromConsultant =
     brief.consultantDiscoveryIntelligence?.rankedDiscoveryQuestions
@@ -99,7 +138,7 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
         ]
 
   const callGuide = [
-    `Opening: "${greeting.replace(",", "")} — ${observation}"`,
+    `Opening: "${greeting.replace(",", "")}. ${observation}"`,
     `Earn curiosity: "${question}"`,
     `Conversation objective: ${brief.conversationObjective}`,
     `Operator note (internal): ${brief.conversationJustification ?? brief.primaryHook}`,
@@ -119,7 +158,7 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
       ? "• Follow approved profile never-say / words-to-avoid list (see Seller Truth)."
       : null,
     `Desired outcome: One thoughtful reply or a redirect to the right owner.`,
-    `Follow-up: Summarize what you heard — don't chase.`,
+    `Follow-up: Summarize what you heard. Don't chase.`,
   ]
     .filter(Boolean)
     .join("\n")
@@ -130,45 +169,77 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
   const personalizedVideo = videoMissing
     ? "Video draft requires additional personalization before recording."
     : [
-        `Opening: "${greeting.replace(",", "")} — short note on ${company}."`,
+        `Opening: "${greeting.replace(",", "")}. Short note on ${company}."`,
         `Talking points (operator):`,
         `• Observation: ${observation}`,
         `• Question: ${question}`,
         ctx.outcome ? `• Outcome focus: ${ctx.outcome}` : null,
-        `• Do not lead with product — earn the conversation first.`,
-        `Closing: "If useful, grab a time — if not, no chase."`,
+        `• Do not lead with product. Earn the conversation first.`,
+        `Closing: "If useful, grab a time. If not, no chase."`,
       ]
         .filter(Boolean)
         .join("\n")
 
-  const followUpSequence = [
-    `Day 3 — New angle:`,
-    `${dmFirst ? `Hi ${dmFirst}` : "Hi"} — different angle on ${company}: ${observation} Still relevant?`,
-    ``,
-    `Day 7 — One question only:`,
-    question,
-    ``,
-    `Day 14 — Soft bump:`,
-    `Still curious about ${company}'s service ops — or bad timing?`,
-    ``,
-    `Day 21 — Close the loop:`,
-    `Closing my loop on this unless you want the conversation.`,
-  ].join("\n")
+  const voicemail = finalizeProductionCustomerFacingCopy(
+    [
+      greeting.replace(",", ""),
+      observation.split(/[.!?]/)[0]?.trim() ? `${observation.split(/[.!?]/)[0]?.trim()}.` : observation,
+      question,
+    ]
+      .filter(Boolean)
+      .join(" "),
+  )
 
-  const prospectFacing = [emailFull, human.linkedIn, human.sms]
+  const meetingRequest = finalizeProductionCustomerFacingCopy(
+    [
+      greeting,
+      brief.recommendedCta || question,
+    ].join(" "),
+  )
+
+  const followUpSequence = finalizeProductionCustomerFacingCopy(
+    buildRelationshipAwareFollowUpSequence({
+      company,
+      dmFirst,
+      observation,
+      question,
+      safeRecall: brief.relationshipAssessment?.safeRecall ?? [],
+      relationshipGoal: brief.relationshipAssessment?.relationshipGoal.label ?? null,
+    }),
+  )
+
+  const finalizedLinkedIn = finalizeProductionCustomerFacingCopy(human.linkedIn)
+  const finalizedSms = finalizeProductionCustomerFacingCopy(human.sms)
+
+  const prospectFacing = [
+    emailFull,
+    finalizedLinkedIn,
+    finalizedSms,
+    voicemail,
+    meetingRequest,
+    followUpSequence,
+  ]
   const qualityFailures = [
     ...assertOutreachCopyQuality(emailFull),
-    ...assertOutreachCopyQuality(human.linkedIn),
-    ...assertOutreachCopyQuality(human.sms),
+    ...assertOutreachCopyQuality(finalizedLinkedIn),
+    ...assertOutreachCopyQuality(finalizedSms),
     ...assertOutreachCopyQuality(callGuide),
     ...assertOutreachCopyQuality(personalizedVideo),
     ...assertOutreachCopyQuality(followUpSequence),
+    ...assertOutreachCopyQuality(voicemail),
+    ...assertOutreachCopyQuality(meetingRequest),
     ...reviewOutreachDraftCopy(emailFull),
-    ...reviewOutreachDraftCopy(human.linkedIn),
-    ...reviewOutreachDraftCopy(human.sms),
+    ...reviewOutreachDraftCopy(finalizedLinkedIn),
+    ...reviewOutreachDraftCopy(finalizedSms),
     ...reviewHumanAuthenticity(emailFull, company),
-    ...reviewHumanAuthenticity(human.linkedIn, company),
-    ...reviewHumanAuthenticity(human.sms, company),
+    ...reviewHumanAuthenticity(finalizedLinkedIn, company),
+    ...reviewHumanAuthenticity(finalizedSms, company),
+    ...reviewProductionHumanCommunicationConstitution(transportBody, company),
+    ...reviewProductionHumanCommunicationConstitution(transportSubject, company),
+    ...reviewProductionHumanCommunicationConstitution(finalizedLinkedIn, company),
+    ...reviewProductionHumanCommunicationConstitution(finalizedSms, company),
+    ...reviewProductionHumanCommunicationConstitution(voicemail, company),
+    ...reviewProductionHumanCommunicationConstitution(meetingRequest, company),
     ...(brief.consultantDiscoveryIntelligence
       ? reviewConsultantDiscoveryQuality({
           discovery: brief.consultantDiscoveryIntelligence,
@@ -191,18 +262,19 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
 
   return {
     email: {
-      subject: human.subject,
+      subject: transportSubject,
       preview: human.preview,
       opening,
-      body: emailBody,
+      body: transportBody,
       cta: ctaLine,
-      signature,
       full: emailFull,
-      wordCount: countWords(emailBody),
+      wordCount: countWords(transportBody),
     },
-    linkedIn: human.linkedIn,
-    sms: human.sms,
+    linkedIn: finalizedLinkedIn,
+    sms: finalizedSms,
     callGuide,
+    voicemail,
+    meetingRequest,
     personalizedVideo,
     followUpSequence,
     qualityFailures,
@@ -213,41 +285,53 @@ export function summarizeStrategyDerivedAssetsForPackage(
   drafts: GrowthOutreachStrategyDerivedDrafts,
 ): GrowthAutonomousOutreachPreparedAssetSummary[] {
   return [
-    {
+    seedGeneratedAssetVersionMetadata({
       channel: "email",
       label: "Email",
       preview: drafts.email.full.slice(0, 1600),
       draftOnly: true,
-    },
-    {
+    }),
+    seedGeneratedAssetVersionMetadata({
       channel: "linkedin",
       label: "LinkedIn",
       preview: drafts.linkedIn.slice(0, 800),
       draftOnly: true,
-    },
-    {
+    }),
+    seedGeneratedAssetVersionMetadata({
       channel: "call",
       label: "Call guide",
       preview: drafts.callGuide.slice(0, 1600),
       draftOnly: true,
-    },
-    {
+    }),
+    seedGeneratedAssetVersionMetadata({
       channel: "sms",
       label: "SMS",
       preview: drafts.sms.slice(0, 400),
       draftOnly: true,
-    },
-    {
+    }),
+    seedGeneratedAssetVersionMetadata({
       channel: "sendr",
       label: "Personalized Video",
       preview: drafts.personalizedVideo.slice(0, 800),
       draftOnly: true,
-    },
-    {
+    }),
+    seedGeneratedAssetVersionMetadata({
       channel: "follow_up",
       label: "Follow-up sequence",
       preview: drafts.followUpSequence.slice(0, 1600),
       draftOnly: true,
-    },
+    }),
+    seedGeneratedAssetVersionMetadata({
+      channel: "voicemail",
+      label: "Voicemail",
+      preview: drafts.voicemail.slice(0, 800),
+      draftOnly: true,
+    }),
+    seedGeneratedAssetVersionMetadata({
+      channel: "meeting_request",
+      label: "Meeting request",
+      preview: drafts.meetingRequest.slice(0, 800),
+      draftOnly: true,
+    }),
   ]
 }

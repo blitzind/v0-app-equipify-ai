@@ -290,6 +290,30 @@ export async function updateGrowthMeeting(
       event: "meeting_booked",
       actor: { userId: input.actor?.userId ?? null, email: input.actor?.email ?? null },
     })
+    void (async () => {
+      const organizationId = lead.organizationId
+      if (!organizationId) return
+      const { mapMeetingStatusToAdaptiveProspectEvent } = await import(
+        "@/lib/growth/aios/growth/growth-adaptive-loop-1b-event-mappers"
+      )
+      const { ingestLiveRelationshipEvent } = await import(
+        "@/lib/growth/aios/growth/growth-adaptive-loop-1b-live-ingestion"
+      )
+      const event = mapMeetingStatusToAdaptiveProspectEvent({
+        status: "scheduled",
+        occurredAt: now,
+        companyName: lead.companyName,
+      })
+      if (event) {
+        await ingestLiveRelationshipEvent(admin, {
+          organizationId,
+          leadId: meeting.leadId,
+          source: "meeting_pipeline",
+          event,
+          sourceEventId: meeting.id,
+        }).catch(() => undefined)
+      }
+    })()
   }
 
   if (input.status === "completed" && existing.status !== "completed") {
@@ -327,6 +351,31 @@ export async function updateGrowthMeeting(
       event: "meeting_completed",
       actor: { userId: input.actor?.userId ?? null, email: input.actor?.email ?? null },
     })
+    void (async () => {
+      const organizationId = lead.organizationId
+      if (!organizationId) return
+      const { mapMeetingStatusToAdaptiveProspectEvent } = await import(
+        "@/lib/growth/aios/growth/growth-adaptive-loop-1b-event-mappers"
+      )
+      const { ingestLiveRelationshipEvent } = await import(
+        "@/lib/growth/aios/growth/growth-adaptive-loop-1b-live-ingestion"
+      )
+      const event = mapMeetingStatusToAdaptiveProspectEvent({
+        status: "completed",
+        occurredAt: now,
+        companyName: lead.companyName,
+        outcome: meeting.outcome,
+      })
+      if (event) {
+        await ingestLiveRelationshipEvent(admin, {
+          organizationId,
+          leadId: meeting.leadId,
+          source: "meeting_pipeline",
+          event,
+          sourceEventId: meeting.id,
+        }).catch(() => undefined)
+      }
+    })()
   }
 
   if (input.status === "no_show" && existing.status !== "no_show") {
@@ -365,6 +414,30 @@ export async function updateGrowthMeeting(
       outcome: "no_show",
       occurredAt: now,
     })
+    void (async () => {
+      const organizationId = lead.organizationId
+      if (!organizationId) return
+      const { mapMeetingStatusToAdaptiveProspectEvent } = await import(
+        "@/lib/growth/aios/growth/growth-adaptive-loop-1b-event-mappers"
+      )
+      const { ingestLiveRelationshipEvent } = await import(
+        "@/lib/growth/aios/growth/growth-adaptive-loop-1b-live-ingestion"
+      )
+      const event = mapMeetingStatusToAdaptiveProspectEvent({
+        status: "no_show",
+        occurredAt: now,
+        companyName: lead.companyName,
+      })
+      if (event) {
+        await ingestLiveRelationshipEvent(admin, {
+          organizationId,
+          leadId: meeting.leadId,
+          source: "meeting_pipeline",
+          event,
+          sourceEventId: meeting.id,
+        }).catch(() => undefined)
+      }
+    })()
   }
 
   if (input.status === "canceled" && existing.status !== "canceled") {
@@ -384,6 +457,30 @@ export async function updateGrowthMeeting(
       event: "meeting_cancelled",
       actor: { userId: input.actor?.userId ?? null, email: input.actor?.email ?? null },
     })
+    void (async () => {
+      const organizationId = lead.organizationId
+      if (!organizationId) return
+      const { mapMeetingStatusToAdaptiveProspectEvent } = await import(
+        "@/lib/growth/aios/growth/growth-adaptive-loop-1b-event-mappers"
+      )
+      const { ingestLiveRelationshipEvent } = await import(
+        "@/lib/growth/aios/growth/growth-adaptive-loop-1b-live-ingestion"
+      )
+      const event = mapMeetingStatusToAdaptiveProspectEvent({
+        status: "canceled",
+        occurredAt: now,
+        companyName: lead.companyName,
+      })
+      if (event) {
+        await ingestLiveRelationshipEvent(admin, {
+          organizationId,
+          leadId: meeting.leadId,
+          source: "meeting_pipeline",
+          event,
+          sourceEventId: meeting.id,
+        }).catch(() => undefined)
+      }
+    })()
   }
 
   if (input.outcome && input.outcome.trim()) {

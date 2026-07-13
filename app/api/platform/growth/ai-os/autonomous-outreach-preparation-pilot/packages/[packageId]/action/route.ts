@@ -16,6 +16,21 @@ const actionBodySchema = z.object({
   decision: z.enum(["approve", "reject"]),
   leadId: z.string().min(1),
   note: z.string().max(500).optional(),
+  draftEdits: z
+    .record(
+      z.enum([
+        "email",
+        "linkedin",
+        "sms",
+        "voicemail",
+        "call",
+        "sendr",
+        "follow_up",
+        "meeting_request",
+      ]),
+      z.string().max(8000),
+    )
+    .optional(),
 })
 
 function actionErrorStatus(error: string): number {
@@ -100,6 +115,7 @@ export async function POST(request: Request, context: RouteContext) {
       operatorUserId: access.userId,
       operatorEmail: access.userEmail,
       note: body.note ?? null,
+      draftEdits: body.draftEdits,
     })
 
     return NextResponse.json({

@@ -13,6 +13,8 @@ import {
   GROWTH_REPLY_INTELLIGENCE_V2_QA_MARKER,
   GROWTH_REPLY_SALES_EXECUTION_VIEWS,
 } from "../lib/growth/reply-intelligence/reply-intent-types"
+import { mapReplyIntentToAdaptiveProspectEvent } from "../lib/growth/aios/growth/growth-adaptive-loop-1b-event-mappers"
+import { isRelationshipMaterialChange } from "../lib/growth/aios/growth/growth-adaptive-loop-1b-material-change"
 
 assert.equal(GROWTH_REPLY_INTELLIGENCE_V2_QA_MARKER, "growth-reply-intelligence-v1")
 assert.ok(GROWTH_REPLY_SALES_EXECUTION_VIEWS.includes("demo_requests"))
@@ -109,13 +111,132 @@ const processSource = fs.readFileSync(
 )
 assert.match(processSource, /classifyReplyIntentV2/)
 assert.match(processSource, /routeReplyWorkflows/)
+assert.match(processSource, /insertConversationTimelineEvent/)
+
+const outboundProcessSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/outbound/process-event.ts"),
+  "utf8",
+)
+assert.match(outboundProcessSource, /finalizeIngestedReplyIntelligence/)
+assert.match(outboundProcessSource, /recomputeGrowthLeadWorkflowSignals/)
+const finalizeCallIdx = outboundProcessSource.indexOf("await finalizeIngestedReplyIntelligence")
+const recomputeCallIdx = outboundProcessSource.lastIndexOf("await recomputeGrowthLeadWorkflowSignals")
+assert.ok(
+  finalizeCallIdx >= 0 && recomputeCallIdx > finalizeCallIdx,
+  "webhook path recomputes workflow after finalize",
+)
 
 const bridgeSource = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/replies/finalize-ingested-reply-intelligence.ts"),
   "utf8",
 )
 assert.match(bridgeSource, /processReplyIntelligence/)
-assert.match(bridgeSource, /recomputeGrowthLeadWorkflowSignals/)
+assert.match(bridgeSource, /routeLeadSignalEvents/)
+assert.match(bridgeSource, /scheduleUnifiedRevenueWorkflowLifecycleReEvaluation/)
+assert.match(bridgeSource, /mapReplyIntentToAdaptiveProspectEvent/)
+assert.match(bridgeSource, /ingestLiveRelationshipEvent/)
+assert.match(bridgeSource, /\.catch\(\(\) => undefined\)/)
+assert.doesNotMatch(
+  bridgeSource,
+  /recomputeGrowthLeadWorkflowSignals/,
+  "workflow recompute is delegated to webhook caller, not finalize",
+)
+
+const adaptiveRecordSource = fs.readFileSync(
+  path.join(process.cwd(), "lib/growth/aios/growth/growth-adaptive-loop-1b-relationship-event-record.ts"),
+  "utf8",
+)
+assert.match(adaptiveRecordSource, /fingerprint/)
+assert.match(adaptiveRecordSource, /existing\?\.id/)
+
+const occurredAt = "2026-07-14T10:00:00.000Z"
+
+function expectMappedIntent(
+  intent: ReturnType<typeof classifyReplyIntentV2>["intent"],
+  body: string,
+  expectedEventType: string,
+  material = true,
+) {
+  const event = mapReplyIntentToAdaptiveProspectEvent({
+    intent,
+    occurredAt,
+    bodyPreview: body,
+  })
+  assert.ok(event, `expected adaptive event for ${intent}`)
+  assert.equal(event!.type, expectedEventType)
+  assert.equal(isRelationshipMaterialChange({ eventType: event!.type }), material)
+}
+
+function expectAdaptiveIntent(
+  body: string,
+  expectedIntent: ReturnType<typeof classifyReplyIntentV2>["intent"],
+  expectedEventType: string,
+  material = true,
+) {
+  const classified = classifyReplyIntentV2(body)
+  assert.equal(classified.intent, expectedIntent)
+  expectMappedIntent(classified.intent, body, expectedEventType, material)
+}
+
+expectAdaptiveIntent(
+  "Thanks for reaching out. We are interested in learning more.",
+  "positive_interest",
+  "reply_received",
+)
+
+const incumbentBody = "We already have software for dispatch."
+const incumbentMapped = mapReplyIntentToAdaptiveProspectEvent({
+  intent: "objection",
+  occurredAt,
+  bodyPreview: incumbentBody,
+})
+assert.ok(incumbentMapped)
+assert.equal(incumbentMapped!.type, "already_have_software")
+assert.equal(isRelationshipMaterialChange({ eventType: incumbentMapped!.type }), true)
+
+expectAdaptiveIntent("What does pricing look like for 40 technicians?", "pricing_question", "pricing_discussion")
+expectAdaptiveIntent("Not now. Circle back next quarter.", "timing_delay", "timing_objection")
+expectAdaptiveIntent("We are already using ServiceMax for this.", "competitor_mention", "competitor_mentioned")
+expectMappedIntent("referral", "Please loop in our ops lead Sarah on this thread.", "referral")
+const wrongContactEvent = mapReplyIntentToAdaptiveProspectEvent({
+  intent: "wrong_contact",
+  occurredAt,
+  bodyPreview: "You have the wrong person on this account.",
+})
+assert.ok(wrongContactEvent)
+assert.equal(wrongContactEvent!.type, "contact_changed")
+assert.equal(isRelationshipMaterialChange({ eventType: wrongContactEvent!.type }), false)
+assert.equal(
+  isRelationshipMaterialChange({
+    eventType: wrongContactEvent!.type,
+    context: { organizationalImpactScore: 0.5 },
+  }),
+  true,
+)
+expectAdaptiveIntent("Please unsubscribe me.", "unsubscribe", "unsubscribe")
+
+const ooo = classifyReplyIntentV2("I am out of office until Monday.")
+assert.equal(ooo.intent, "out_of_office")
+assert.equal(
+  mapReplyIntentToAdaptiveProspectEvent({ intent: ooo.intent, occurredAt, bodyPreview: "OOO" }),
+  null,
+)
+
+const unknown = classifyReplyIntentV2("👍")
+assert.equal(unknown.intent, "unknown")
+assert.equal(
+  mapReplyIntentToAdaptiveProspectEvent({ intent: unknown.intent, occurredAt, bodyPreview: "👍" }),
+  null,
+)
+
+const positiveEvent = mapReplyIntentToAdaptiveProspectEvent({
+  intent: "positive_interest",
+  occurredAt,
+  bodyPreview: "Interested",
+})!
+const duplicateFingerprint = `ge-aios-adaptive-loop-1b:reply_received:${occurredAt}`
+assert.match(adaptiveRecordSource, /fingerprint/)
+assert.ok(duplicateFingerprint.includes(positiveEvent.type))
 
 const inboxRunnerSource = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/inbox-sync/inbox-sync-runner.ts"),
@@ -131,7 +252,7 @@ const uiSource = fs.readFileSync(
 assert.match(uiSource, /GROWTH_REPLY_INTELLIGENCE_V2_QA_MARKER/)
 assert.match(uiSource, /data-qa-marker=\{GROWTH_REPLY_INTELLIGENCE_V2_QA_MARKER\}/)
 assert.match(uiSource, /Conversation timeline/)
-assert.match(uiSource, /AI reply copilot/)
+assert.match(uiSource, /AI-assisted reply copilot/)
 
 const inboxRunner = fs.readFileSync(
   path.join(process.cwd(), "lib/growth/inbox-sync/inbox-sync-runner.ts"),

@@ -16,8 +16,10 @@ import {
 import type { GrowthAvaOutreachExecutionRequest } from "@/lib/growth/mission-center/growth-ava-outreach-execution-request-types"
 import {
   buildAvaOperatorPackageActionApiPath,
+  buildAvaOperatorPackageDraftsApiPath,
   GROWTH_AVA_OPERATOR_SUCCESS_PIPELINE_STEPS,
 } from "@/lib/growth/mission-center/growth-ava-operator-workspace-contract"
+import { GROWTH_AIOS_SEND_PLANE_1B_QA_MARKER } from "@/lib/growth/aios/growth/growth-send-plane-1b-operator-approval-persistence"
 import {
   GROWTH_AVA_COMPLETED_WORK_QA_MARKER,
   GROWTH_AVA_COMPLETED_WORK_SEQUENCE_GATE_HREF,
@@ -106,7 +108,7 @@ export function GrowthAvaCompletedOutreachPackageCard({
 }: Props) {
   const { teammate } = useAiTeammateIdentity()
   const [packet, setPacket] = useState<Approvals2AOperatorReviewPacket | null>(null)
-  const [busy, setBusy] = useState<"approve" | "reject" | "needs_revision" | "lifecycle" | null>(
+  const [busy, setBusy] = useState<"approve" | "reject" | "needs_revision" | "lifecycle" | "save" | null>(
     null,
   )
   const [error, setError] = useState<string | null>(null)
@@ -172,6 +174,39 @@ export function GrowthAvaCompletedOutreachPackageCard({
     }
   }, [card.leadId, card.packageId])
 
+  const saveDrafts = useCallback(async () => {
+    if (!card.leadId || !card.packageId) {
+      setError("Package identity is incomplete.")
+      return
+    }
+    setBusy("save")
+    setError(null)
+    try {
+      const response = await fetch(buildAvaOperatorPackageDraftsApiPath(card.packageId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadId: card.leadId,
+          draftEdits,
+        }),
+      })
+      const payload = (await response.json()) as {
+        ok?: boolean
+        error?: string
+        message?: string
+        packet?: Approvals2AOperatorReviewPacket
+      }
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error ?? payload.message ?? "Failed to save draft edits.")
+      }
+      if (payload.packet) setPacket(payload.packet)
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to save draft edits.")
+    } finally {
+      setBusy(null)
+    }
+  }, [card.leadId, card.packageId, draftEdits])
+
   const submit = useCallback(
     async (decision: "approve" | "reject" | "needs_revision") => {
       if (!card.leadId || !card.packageId) {
@@ -182,12 +217,20 @@ export function GrowthAvaCompletedOutreachPackageCard({
       setError(null)
       try {
         const apiDecision = decision === "needs_revision" ? "reject" : decision
-        const body: { decision: "approve" | "reject"; leadId: string; note?: string } = {
+        const body: {
+          decision: "approve" | "reject"
+          leadId: string
+          note?: string
+          draftEdits?: Record<string, string>
+        } = {
           decision: apiDecision,
           leadId: card.leadId,
         }
         if (decision === "needs_revision") {
           body.note = buildNeedsRevisionNote("revise package before resubmit")
+        }
+        if (decision === "approve" && Object.keys(draftEdits).length > 0) {
+          body.draftEdits = draftEdits
         }
         const response = await fetch(buildAvaOperatorPackageActionApiPath(card.packageId), {
           method: "POST",
@@ -225,7 +268,7 @@ export function GrowthAvaCompletedOutreachPackageCard({
         setBusy(null)
       }
     },
-    [card.leadId, card.packageId, onDecided, onDismiss],
+    [card.leadId, card.packageId, draftEdits, onDecided, onDismiss],
   )
 
   const runLifecycle = useCallback(
@@ -425,6 +468,12 @@ export function GrowthAvaCompletedOutreachPackageCard({
             <BulletList lines={view.whySelected} />
           </Section>
 
+          {view.operatorReviewLayout.relationshipStrategyEssentials.length ? (
+            <Section title="Relationship strategy">
+              <BulletList lines={view.operatorReviewLayout.relationshipStrategyEssentials} />
+            </Section>
+          ) : null}
+
           {view.operatorReviewLayout.revenueStrategyEssentials.length ? (
             <Section title="Sales recommendation">
               <BulletList lines={view.operatorReviewLayout.revenueStrategyEssentials} />
@@ -450,12 +499,37 @@ export function GrowthAvaCompletedOutreachPackageCard({
           </Section>
 
           <Section title="Drafts">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={busy !== null || !card.leadId}
+                onClick={() => void saveDrafts()}
+              >
+                {busy === "save" ? <Loader2 className="mr-2 size-3.5 animate-spin" /> : null}
+                Save draft edits
+              </Button>
+              <span className="text-xs text-muted-foreground" data-qa={GROWTH_AIOS_SEND_PLANE_1B_QA_MARKER}>
+                Persist edits before authorize — transport sends the saved version.
+              </span>
+            </div>
             <div className="grid gap-3">
               {view.drafts.map((draft) => (
                 <div key={draft.channel} className="rounded-md border bg-background/80 p-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium">{draft.label}</span>
                     {!draft.prepared ? <Badge variant="outline">Not prepared</Badge> : null}
+                    {draft.versionStatus === "approved" ? (
+                      <Badge variant="default">Approved</Badge>
+                    ) : draft.versionStatus === "edited" ? (
+                      <Badge variant="secondary">Edited</Badge>
+                    ) : draft.prepared ? (
+                      <Badge variant="outline">Generated</Badge>
+                    ) : null}
+                    {draft.editedByOperator ? (
+                      <Badge variant="outline">Edited by operator</Badge>
+                    ) : null}
                     {draft.wordCount != null ? (
                       <Badge variant="outline">{draft.wordCount} words</Badge>
                     ) : null}
@@ -476,6 +550,16 @@ export function GrowthAvaCompletedOutreachPackageCard({
                         }
                         rows={draft.channel === "sms" || draft.channel === "linkedin" ? 3 : 6}
                       />
+                      {draft.constitutionWarnings?.length ? (
+                        <div className="mt-2 rounded-md border border-amber-300/70 bg-amber-50/50 p-2 text-xs text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100">
+                          <p className="font-medium">Constitution warnings (you decide)</p>
+                          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                            {draft.constitutionWarnings.slice(0, 4).map((warning) => (
+                              <li key={warning}>{warning}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
                     </div>
                   ) : (
                     <p className="mt-2 text-sm text-muted-foreground">Not prepared</p>
@@ -562,6 +646,15 @@ export function GrowthAvaCompletedOutreachPackageCard({
                 <BulletList lines={view.operatorReviewLayout.expandable.prospectTruthDetail} />
               </div>
             ) : null}
+          </GrowthCollapsibleEngineCard>
+
+          <GrowthCollapsibleEngineCard
+            title="Relationship strategy detail"
+            defaultOpen={false}
+            compact
+            persistKey={`ava-outreach-relationship-strategy-${card.packageId}`}
+          >
+            <BulletList lines={view.operatorReviewLayout.expandable.relationshipStrategyDetail} />
           </GrowthCollapsibleEngineCard>
 
           <GrowthCollapsibleEngineCard

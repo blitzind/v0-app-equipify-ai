@@ -11,6 +11,10 @@ export function buildAvaOperatorPackageActionApiPath(packageId: string): string 
   return `${GROWTH_AVA_OPERATOR_PACKAGE_ACTION_API_PREFIX}/${encodeURIComponent(packageId)}/action`
 }
 
+export function buildAvaOperatorPackageDraftsApiPath(packageId: string): string {
+  return `${GROWTH_AVA_OPERATOR_PACKAGE_ACTION_API_PREFIX}/${encodeURIComponent(packageId)}/drafts`
+}
+
 export const GROWTH_AVA_OPERATOR_SUCCESS_PIPELINE_STEPS = [
   "Package Approved",
   "Execution Request Created",

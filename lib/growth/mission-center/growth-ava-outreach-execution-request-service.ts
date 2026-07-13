@@ -25,6 +25,10 @@ import {
   type GrowthAvaOutreachPackageApprovalDecision,
   type GrowthAvaOutreachPackageApprovalResult,
 } from "@/lib/growth/mission-center/growth-ava-outreach-execution-request-types"
+import {
+  freezeOperatorApprovedPackageAssets,
+} from "@/lib/growth/aios/growth/growth-send-plane-1b-operator-approval-persistence-service"
+import type { SendPlane1BEditablePackageChannel } from "@/lib/growth/aios/growth/growth-send-plane-1b-operator-approval-persistence"
 
 export function isAvaOutreachExecutionRequestEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return env[GROWTH_AVA_OUTREACH_EXECUTION_REQUEST_FEATURE_FLAG]?.trim() === "true"
@@ -127,6 +131,7 @@ export async function submitAvaOutreachPackageApprovalAction(
     operatorUserId: string
     operatorEmail: string
     note?: string | null
+    draftEdits?: Partial<Record<SendPlane1BEditablePackageChannel, string>>
   },
 ): Promise<GrowthAvaOutreachPackageApprovalResult> {
   if (!isAvaOutreachExecutionRequestEnabled()) {
@@ -207,6 +212,15 @@ export async function submitAvaOutreachPackageApprovalAction(
   }
 
   const requestId = randomUUID()
+
+  await freezeOperatorApprovedPackageAssets(admin, {
+    organizationId: input.organizationId,
+    packageId: input.packageId,
+    approvedAt: now,
+    draftEdits: input.draftEdits,
+    operatorUserId: input.operatorUserId,
+  })
+
   let executionRequest: GrowthAvaOutreachExecutionRequest = {
     qa_marker: GROWTH_AVA_OUTREACH_EXECUTION_REQUEST_1_QA_MARKER,
     requestId,

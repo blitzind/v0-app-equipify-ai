@@ -31,6 +31,9 @@ export const GROWTH_AIOS_CONVERSATION_INTELLIGENCE_3A_OPERATOR_LAYOUT_QA_MARKER 
 export const GROWTH_AIOS_REVENUE_STRATEGY_1A_OPERATOR_LAYOUT_QA_MARKER =
   "ge-aios-revenue-strategy-1a-sales-strategy-layout-v1" as const
 
+export { GROWTH_AIOS_RELATIONSHIP_STRATEGY_2A_OPERATOR_LAYOUT_QA_MARKER } from "@/lib/growth/aios/growth/growth-relationship-strategy-2a-types"
+export { GROWTH_AIOS_ADAPTIVE_LOOP_1A_OPERATOR_LAYOUT_QA_MARKER } from "@/lib/growth/aios/growth/growth-adaptive-loop-1a-types"
+
 export const APPROVALS_2A_DRAFT_CHANNELS = [
   "email",
   "linkedin",
@@ -39,6 +42,7 @@ export const APPROVALS_2A_DRAFT_CHANNELS = [
   "sms",
   "sendr",
   "follow_up",
+  "meeting_request",
 ] as const
 
 export type Approvals2ADraftChannel = (typeof APPROVALS_2A_DRAFT_CHANNELS)[number]
@@ -58,6 +62,9 @@ export type Approvals2ADraftSlot = {
   wordCount: number | null
   readTimeSeconds: number | null
   characterCount: number | null
+  versionStatus?: "generated" | "edited" | "approved"
+  editedByOperator?: boolean
+  constitutionWarnings?: string[]
 }
 
 export type Approvals2AOperatorReviewPacket = {
@@ -137,12 +144,15 @@ export type Approvals2AOperatorReviewPacket = {
   teammateName: string
   /** CONVERSATION-INTELLIGENCE-2B — prioritized scan path + collapsed detail buckets. */
   operatorReviewLayout: {
+    relationshipStrategyEssentials: string[]
+    adaptiveLoopEssentials: string[]
     conversationStrategyEssentials: string[]
     consultantDiscoveryEssentials: string[]
     revenueStrategyEssentials: string[]
     researchSummary: string[]
     sellerTruthEssentials: string[]
     expandable: {
+      relationshipStrategyDetail: string[]
       sellerTruthDetail: string[]
       prospectTruthDetail: string[]
       observationIntelligence: string[]
@@ -212,6 +222,8 @@ function draftLabel(channel: Approvals2ADraftChannel): string {
       return "Personalized Video"
     case "follow_up":
       return "Follow-up sequence"
+    case "meeting_request":
+      return "Meeting request"
   }
 }
 
@@ -403,17 +415,22 @@ export function projectApprovals2AOperatorReviewPacket(input: {
     ? researchSummary.slice(0, 4)
     : ["Personalization rationale attached on the prepared package."]
 
-  const assetsByChannel = new Map<string, string>()
+  const assetsByChannel = new Map<string, GrowthAutonomousOutreachApprovalPackage["generatedAssets"][number]>()
   for (const asset of pkg.generatedAssets) {
-    if (!assetsByChannel.has(asset.channel) && asset.preview?.trim()) {
-      assetsByChannel.set(asset.channel, asset.preview)
+    if (!assetsByChannel.has(asset.channel)) {
+      assetsByChannel.set(asset.channel, asset)
     }
   }
 
   const drafts: Approvals2ADraftSlot[] = APPROVALS_2A_DRAFT_CHANNELS.map((channel) => {
     const mapped = mapPackageChannelToDraft(channel)
-    const preview = mapped ? assetsByChannel.get(mapped) ?? null : null
-    // Voicemail is a required review slot; dedicated asset may not yet be prepared.
+    const asset = mapped ? assetsByChannel.get(mapped) ?? null : null
+    const preview =
+      asset?.approvedPreview?.trim() ||
+      asset?.operatorPreview?.trim() ||
+      asset?.preview?.trim() ||
+      asset?.generatedPreview?.trim() ||
+      null
     const preparedPreview = preview?.trim() ? preview : null
     const metrics = draftMetrics(preparedPreview, channel)
     return {
@@ -433,6 +450,9 @@ export function projectApprovals2AOperatorReviewPacket(input: {
         channel === "sms" && pkg.draftQuality?.smsCharacterCount != null
           ? pkg.draftQuality.smsCharacterCount
           : metrics.characterCount,
+      versionStatus: asset?.versionStatus ?? (preparedPreview ? "generated" : undefined),
+      editedByOperator: asset?.versionStatus === "edited" || asset?.versionStatus === "approved",
+      constitutionWarnings: asset?.constitutionWarnings ?? [],
     }
   })
 
@@ -508,6 +528,39 @@ export function projectApprovals2AOperatorReviewPacket(input: {
   ].filter((line): line is string => Boolean(line))
 
   const revenueStrategy = strategy?.revenueStrategyIntelligence ?? null
+  const relationship = strategy?.relationshipAssessment ?? null
+  const adaptiveEvolution = strategy?.adaptiveLoopEvolution ?? null
+
+  const relationshipStrategyEssentials = [
+    adaptiveEvolution?.strategyChange.relationshipChangedBecause.length
+      ? `Relationship changed because: ${adaptiveEvolution.strategyChange.relationshipChangedBecause.join(", ")}`
+      : null,
+    adaptiveEvolution?.strategyChange.previousStrategy.recommendation &&
+    adaptiveEvolution?.strategyChange.currentStrategy.recommendation &&
+    adaptiveEvolution.strategyChange.previousStrategy.recommendation !==
+      adaptiveEvolution.strategyChange.currentStrategy.recommendation
+      ? `Previous strategy: ${adaptiveEvolution.strategyChange.previousStrategy.recommendation} → Current: ${adaptiveEvolution.strategyChange.currentStrategy.recommendation}`
+      : null,
+    ...(adaptiveEvolution?.strategyChange.meaningfulChanges.slice(0, 3).map((line) => `Change: ${line}`) ?? []),
+    relationship?.relationshipStory.summary ? `Story: ${relationship.relationshipStory.summary}` : null,
+    relationship?.relationshipGoal.label ? `Goal: ${relationship.relationshipGoal.label}` : null,
+    relationship?.relationshipDirection ? `Direction: ${relationship.relationshipDirection}` : null,
+    relationship?.relationshipMomentum
+      ? `Momentum: ${relationship.relationshipMomentum.trend} (${relationship.relationshipMomentum.score}/100)`
+      : null,
+    relationship?.trustBudget ? `Trust budget: ${relationship.trustBudget.level}` : null,
+    relationship?.relationshipConfidence
+      ? `Relationship confidence: ${relationship.relationshipConfidence.level.replace(/_/g, " ")}`
+      : null,
+    relationship?.strategyEvolution.evolutionSummary[0] ?? null,
+    relationship?.strategyEvolution.whyChanged[0] ?? null,
+    revenueStrategy ? `Current recommendation: ${revenueStrategy.recommendation}` : null,
+    relationship?.strategyEvolution.confidenceDelta != null
+      ? `Confidence delta: ${relationship.strategyEvolution.confidenceDelta > 0 ? "+" : ""}${Math.round(relationship.strategyEvolution.confidenceDelta * 100)} pts`
+      : revenueStrategy
+        ? `Confidence: ${revenueStrategy.confidenceLevel}`
+        : null,
+  ].filter((line): line is string => Boolean(line))
 
   const revenueStrategyEssentials = [
     revenueStrategy ? `Sales recommendation: ${revenueStrategy.recommendation}` : null,
@@ -561,6 +614,26 @@ export function projectApprovals2AOperatorReviewPacket(input: {
       : strategy?.operatorReasoning?.smallestCommitment
         ? `Smallest commitment: ${strategy.operatorReasoning.smallestCommitment}`
         : null,
+  ].filter((line): line is string => Boolean(line))
+
+  const relationshipStrategyDetail = [
+    ...(relationship?.relationshipStory.essentials.map((line) => `Story: ${line}`) ?? []),
+    relationship?.relationshipGoal.rationale ? `Goal rationale: ${relationship.relationshipGoal.rationale}` : null,
+    relationship?.relationshipGoal.successCriteria
+      ? `Success criteria: ${relationship.relationshipGoal.successCriteria}`
+      : null,
+    relationship?.relationshipGoal.nextGoal
+      ? `Next goal: ${relationship.relationshipGoal.nextGoal.replace(/_/g, " ")}`
+      : null,
+    ...(relationship?.safeRecall.map((row) => `Safe recall: ${row.naturalPhrase}`) ?? []),
+    ...(relationship?.relationshipProtection.active
+      ? relationship.relationshipProtection.rationale.map((line) => `Protection: ${line}`)
+      : []),
+    ...(relationship?.relationshipImprovementLikelihood.rationale.map(
+      (line) => `Improvement outlook: ${line}`,
+    ) ?? []),
+    ...(relationship?.strategyEvolution.whyChanged.map((line) => `Why changed: ${line}`) ?? []),
+    ...(relationship?.institutionalAdvice.map((row) => `Institutional advice: ${row.pattern}`) ?? []),
   ].filter((line): line is string => Boolean(line))
 
   const revenueStrategyDetail = [
@@ -686,16 +759,17 @@ export function projectApprovals2AOperatorReviewPacket(input: {
   const priorityLineCount =
     countReviewLines([
       ...whySelected,
-      ...revenueStrategyEssentials,
-      ...consultantDiscoveryEssentials,
-      ...conversationStrategyEssentials,
-      ...researchSummary.slice(0, 3),
-      ...sellerTruthEssentials.slice(0, 3),
+      ...relationshipStrategyEssentials,
+      ...revenueStrategyEssentials.slice(0, 2),
+      ...consultantDiscoveryEssentials.slice(0, 2),
+      ...conversationStrategyEssentials.slice(0, 2),
+      ...researchSummary.slice(0, 2),
     ]) +
     drafts.filter((draft) => draft.prepared).length * 2 +
     8
 
   const expandableLineCount = countReviewLines([
+    ...relationshipStrategyDetail,
     ...sellerTruthDetail,
     ...prospectTruthDetail,
     ...observationIntelligence,
@@ -709,12 +783,15 @@ export function projectApprovals2AOperatorReviewPacket(input: {
   ])
 
   const operatorReviewLayout = {
+    relationshipStrategyEssentials,
+    adaptiveLoopEssentials: adaptiveEvolution?.strategyChange.relationshipChangedBecause ?? [],
     conversationStrategyEssentials,
     consultantDiscoveryEssentials,
     revenueStrategyEssentials,
     researchSummary,
     sellerTruthEssentials,
     expandable: {
+      relationshipStrategyDetail,
       sellerTruthDetail,
       prospectTruthDetail,
       observationIntelligence,

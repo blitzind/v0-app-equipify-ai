@@ -27,6 +27,7 @@ export const GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_WAKE_CONDITIONS = [
   "execution_completed",
   "stale_outreach_package",
   "manual_outreach_preparation_request",
+  "relationship_material_change",
 ] as const
 
 export type GrowthAutonomousOutreachPreparationWakeCondition =
@@ -51,10 +52,28 @@ export const GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_BUDGET = {
 export type GrowthAutonomousOutreachPreparationRunOutcome = "completed" | "failed" | "skipped"
 
 export type GrowthAutonomousOutreachPreparedAssetSummary = {
-  channel: "email" | "sms" | "linkedin" | "call" | "sendr" | "follow_up"
+  channel:
+    | "email"
+    | "sms"
+    | "linkedin"
+    | "call"
+    | "sendr"
+    | "follow_up"
+    | "voicemail"
+    | "meeting_request"
   label: string
+  /** Canonical current preview — mirrors generated, edited, or approved version. */
   preview: string
   draftOnly: true
+  /** SEND-PLANE-1B — immutable generated snapshot at package build. */
+  generatedPreview?: string
+  operatorPreview?: string | null
+  approvedPreview?: string | null
+  versionStatus?: "generated" | "edited" | "approved"
+  editedAt?: string | null
+  editedBy?: string | null
+  approvedAt?: string | null
+  constitutionWarnings?: string[]
 }
 
 export type GrowthAutonomousOutreachDraftQuality = {

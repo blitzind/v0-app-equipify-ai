@@ -38,6 +38,7 @@ export type EliteHumanDraftContext = {
   curiousPosture: boolean
   selectedObservation: GrowthOutreachObservationCandidate | null
   recommendedFirstQuestion: string | null
+  safeRecallOpener: string | null
 }
 
 /** Never expose internal reasoning or AI/automation language to prospects. */
@@ -195,7 +196,7 @@ export function buildCuriousQuestion(input: {
   }
   if (outcome) {
     return hashPickLocal(input.seed, [
-      `${outcome.charAt(0).toUpperCase()}${outcome.slice(1)} — on your plate right now?`,
+      `${outcome.charAt(0).toUpperCase()}${outcome.slice(1)} on your plate right now?`,
       `${outcome.charAt(0).toUpperCase()}${outcome.slice(1)} harder than it should be?`,
       `${outcome.charAt(0).toUpperCase()}${outcome.slice(1)} becoming more of a focus this quarter?`,
     ])
@@ -207,28 +208,30 @@ export function buildCuriousQuestion(input: {
       "Something you're actively working on?",
     ])
   }
-  return "Is service coordination still mostly smooth — or starting to fray at the edges?"
+  return "Is service coordination still mostly smooth, or starting to fray at the edges?"
 }
 
 function buildHumanSubject(ctx: EliteHumanDraftContext): string {
   const company = ctx.brief.companyName
-  if (ctx.equipment.some((e) => /mri|ct|imaging/i.test(e))) return `${company} — imaging service ops`
-  if (ctx.equipment[0]) return `${company} — ${ctx.equipment[0]} service`
-  if (ctx.industry) return `${company} — ${ctx.industry.split(" ")[0]} ops`
+  if (ctx.equipment.some((e) => /mri|ct|imaging/i.test(e))) return `${company} imaging service ops`
+  if (ctx.equipment[0]) return `${company} ${ctx.equipment[0]} service`
+  if (ctx.industry) return `${company} ${ctx.industry.split(" ")[0]} ops`
   return `${company}`
 }
 
 function buildHumanEmailBody(ctx: EliteHumanDraftContext, variationSeed?: string): string {
   const seed = variationSeed ?? ctx.brief.leadId
   const variation = pickHumanEmailVariation(seed)
-  const observation = humanizeObservation({
-    insight: ctx.insight,
-    equipment: ctx.equipment,
-    companyName: ctx.brief.companyName,
-    industry: ctx.industry,
-    selectedObservation: ctx.selectedObservation,
-    seed,
-  })
+  const observation = ctx.safeRecallOpener
+    ? ctx.safeRecallOpener.charAt(0).toUpperCase() + ctx.safeRecallOpener.slice(1)
+    : humanizeObservation({
+        insight: ctx.insight,
+        equipment: ctx.equipment,
+        companyName: ctx.brief.companyName,
+        industry: ctx.industry,
+        selectedObservation: ctx.selectedObservation,
+        seed,
+      })
   const question = buildCuriousQuestion({
     outcome: ctx.outcome,
     equipment: ctx.equipment,
@@ -257,13 +260,13 @@ function formatHumanEmailVariant(input: {
 
   switch (variation) {
     case "one_line":
-      return [ctx.greeting, `${observation} ${question}`, `— ${ctx.sender}`].join("\n")
+      return [ctx.greeting, `${observation} ${question}`].join("\n")
     case "fragment":
-      return [ctx.greeting, "", fragment + ".", "", question, "", `— ${ctx.sender}`].join("\n")
+      return [ctx.greeting, "", fragment + ".", "", question].join("\n")
     case "observation_only":
-      return [ctx.greeting, "", observation, "", `— ${ctx.sender}`].join("\n")
+      return [ctx.greeting, "", observation].join("\n")
     case "indirect":
-      return [ctx.greeting, "", observation, "", question, "", `— ${ctx.sender}`].join("\n")
+      return [ctx.greeting, "", observation, "", question].join("\n")
     case "soft_close":
       return [
         ctx.greeting,
@@ -273,19 +276,9 @@ function formatHumanEmailVariant(input: {
         question,
         "",
         "Happy to compare notes if useful.",
-        "",
-        `— ${ctx.sender}`,
       ].join("\n")
     default:
-      return [
-        ctx.greeting,
-        "",
-        observation,
-        "",
-        question,
-        "",
-        `— ${ctx.sender}`,
-      ].join("\n")
+      return [ctx.greeting, "", observation, "", question].join("\n")
   }
 }
 
@@ -306,7 +299,7 @@ function buildHumanLinkedIn(ctx: EliteHumanDraftContext): string {
     selectedObservation: ctx.selectedObservation,
     recommendedFirstQuestion: ctx.recommendedFirstQuestion,
   })
-  const opener = ctx.dmFirst ? `${ctx.dmFirst} —` : "Hi —"
+  const opener = ctx.dmFirst ? `${ctx.dmFirst},` : "Hi,"
   return `${opener} ${observation} ${question}`
 }
 
@@ -478,5 +471,6 @@ export function extractEliteHumanDraftContext(input: {
     selectedObservation,
     recommendedFirstQuestion:
       brief.consultantDiscoveryIntelligence?.recommendedFirstQuestion ?? null,
+    safeRecallOpener: brief.relationshipAssessment?.safeRecall[0]?.naturalPhrase ?? null,
   }
 }

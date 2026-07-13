@@ -15,6 +15,10 @@ import type {
   GrowthOutreachSellerTruth,
 } from "@/lib/growth/aios/growth/growth-outreach-seller-truth"
 import type { GrowthOutreachSellerKnowledgeQuality } from "@/lib/growth/business-profile/equipify-master-knowledge-quality"
+import {
+  relationshipAssessmentSuggestsDelay,
+  type GrowthOutreachRelationshipAssessment,
+} from "@/lib/growth/aios/growth/growth-relationship-strategy-2a"
 
 export const GROWTH_AIOS_REVENUE_STRATEGY_1A_QA_MARKER =
   "ge-aios-revenue-strategy-1a-autonomous-sales-strategy-intelligence-v1" as const
@@ -599,6 +603,7 @@ function resolveRecommendation(input: {
   missingEvidenceCount: number
   committeeSnapshot: RevenueStrategyBuyingCommitteeSnapshot | null
   consultantDiscovery: GrowthOutreachConsultantDiscoveryIntelligence | null
+  relationshipAssessment?: GrowthOutreachRelationshipAssessment | null
 }): {
   recommendation: RevenueStrategyRecommendation
   timingDecision: RevenueStrategyTimingDecision
@@ -623,6 +628,53 @@ function resolveRecommendation(input: {
   }
   if (input.sellerKnowledgeQuality?.readyForDraftGeneration === false) {
     researchGaps.push("Seller knowledge incomplete for confident positioning")
+  }
+
+  const assessment = input.relationshipAssessment
+  if (assessment?.available) {
+    if (assessment.relationshipGoal.current === "walk_away") {
+      return {
+        recommendation: "disqualify",
+        timingDecision: "wait",
+        delayReasons: assessment.relationshipProtection.rationale,
+        researchGaps,
+        summary: "Walk away — protect the brand and close the loop respectfully.",
+      }
+    }
+    if (relationshipAssessmentSuggestsDelay(assessment)) {
+      const delayReasons = [
+        ...assessment.relationshipProtection.rationale,
+        ...assessment.relationshipImprovementLikelihood.rationale.filter((line) =>
+          /wait|pause|patience|weaken/i.test(line),
+        ),
+      ]
+      if (assessment.trustBudget.level === "depleted" || assessment.trustBudget.level === "damaging") {
+        delayReasons.push(`Trust budget is ${assessment.trustBudget.level} — protect credibility before another touch.`)
+      }
+      if (assessment.relationshipMomentum.trend === "reversing" || assessment.relationshipMomentum.trend === "stalling") {
+        delayReasons.push(`Relationship momentum is ${assessment.relationshipMomentum.trend}.`)
+      }
+      return {
+        recommendation: "delay",
+        timingDecision:
+          assessment.relationshipProtection.action === "wait" ? "wait" : "wait_for_signal",
+        delayReasons: delayReasons.length ? delayReasons : ["Relationship protection active — wait before proceeding."],
+        researchGaps,
+        summary: `Given everything known about this relationship, wait — ${assessment.relationshipGoal.label.toLowerCase()} comes first.`,
+      }
+    }
+    if (
+      assessment.relationshipGoal.current === "recover_trust" ||
+      assessment.relationshipGoal.current === "protect_relationship"
+    ) {
+      return {
+        recommendation: "delay",
+        timingDecision: "wait_for_signal",
+        delayReasons: [assessment.relationshipGoal.rationale],
+        researchGaps,
+        summary: `Protect the relationship — focus on ${assessment.relationshipGoal.label.toLowerCase()} before advancing.`,
+      }
+    }
   }
 
   if (!input.hasPrimaryDm && input.readiness.evidenceQuality < 0.45) {
@@ -732,6 +784,7 @@ export function buildRevenueStrategyIntelligence(input: {
   persona?: GrowthOutreachPersonaInference | null
   buyingCommitteeSnapshot?: RevenueStrategyBuyingCommitteeSnapshot | null
   communicationChannelHint?: string | null
+  relationshipAssessment?: GrowthOutreachRelationshipAssessment | null
 }): GrowthOutreachRevenueStrategyIntelligence {
   const candidates: RevenueStrategyDecisionMakerCandidate[] =
     input.decisionMakers && input.decisionMakers.length > 0
@@ -767,6 +820,7 @@ export function buildRevenueStrategyIntelligence(input: {
     missingEvidenceCount: input.missingEvidence?.length ?? 0,
     committeeSnapshot: input.buyingCommitteeSnapshot ?? null,
     consultantDiscovery: input.consultantDiscoveryIntelligence ?? null,
+    relationshipAssessment: input.relationshipAssessment ?? null,
   })
 
   const scoredEntries = scoreEntryCandidates({
@@ -869,7 +923,15 @@ export function buildRevenueStrategyIntelligence(input: {
   ]
 
   const vpSalesJudgment =
-    resolved.recommendation === "proceed"
+    input.relationshipAssessment?.available
+      ? resolved.recommendation === "proceed"
+        ? `Given everything I know about this relationship, ${input.companyName} is worth the next touch — ${input.relationshipAssessment.relationshipGoal.label.toLowerCase()} aligns with timing.`
+        : resolved.recommendation === "delay"
+          ? `Given everything I know about this relationship, ${input.companyName} should wait — ${resolved.delayReasons[0] ?? input.relationshipAssessment.relationshipGoal.rationale}`
+          : resolved.recommendation === "research"
+            ? `Given everything I know about this relationship, ${input.companyName} needs more context before another touch.`
+            : `Given everything I know about this relationship, ${input.companyName} is off the list until trust recovers.`
+      : resolved.recommendation === "proceed"
       ? `If I had only ten calls this week, ${input.companyName} makes the list — ${input.consultantDiscoveryIntelligence?.primaryBusinessPressure?.label ?? "operational pressure"} and timing align.`
       : resolved.recommendation === "delay"
         ? `If I had only ten calls this week, ${input.companyName} waits — ${resolved.delayReasons[0] ?? "success confidence is below the bar"}.`

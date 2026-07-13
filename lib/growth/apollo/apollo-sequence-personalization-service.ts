@@ -11,6 +11,11 @@ import { projectSmsPersonalizationContext } from "@/lib/growth/sms/personalizati
 import { normalizeToE164 } from "@/lib/growth/sms/phone-normalization"
 import { runGrowthAiCopilotGeneration } from "@/lib/growth/run-ai-copilot-generation"
 import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import { resolveCanonicalOutreachPackageForLead } from "@/lib/growth/aios/growth/growth-send-plane-1a-canonical-loader"
+import {
+  materializeCanonicalOutreachChannelContent,
+  resolveOperatorAssetOverride,
+} from "@/lib/growth/aios/growth/growth-send-plane-1a-materialization"
 import {
   fetchGrowthSequenceEnrollmentById,
   fetchGrowthSequenceEnrollmentStepById,
@@ -240,14 +245,36 @@ async function personalizeSmsDraft(
     phoneE164?: string | null
   },
 ): Promise<{ draft: ApolloSequenceExecutionDraftRecord; smsBody: string | null }> {
-  const context = projectSmsPersonalizationContext({ packet: input.unified_context.outreach_packet })
-  const { draft: smsDraft } = buildPersonalizedSmsDraft({
-    leadId: input.leadId,
-    context,
-    draftType: "outbound",
-  })
+  let body = ""
+  const organizationId = getGrowthEngineAiOrgId()
+  if (organizationId) {
+    const canonicalPkg = await resolveCanonicalOutreachPackageForLead(admin, {
+      organizationId,
+      leadId: input.leadId,
+    })
+    const brief = canonicalPkg?.salesStrategyBrief
+    if (brief) {
+      const materialized = materializeCanonicalOutreachChannelContent({
+        brief,
+        channel: "sms",
+        package: canonicalPkg,
+        operatorAssetOverride: resolveOperatorAssetOverride(canonicalPkg, "sms"),
+      })
+      if (materialized.transportReady) {
+        body = materialized.body
+      }
+    }
+  }
 
-  let body = asString(smsDraft.body)
+  if (!body) {
+    const context = projectSmsPersonalizationContext({ packet: input.unified_context.outreach_packet })
+    const { draft: smsDraft } = buildPersonalizedSmsDraft({
+      leadId: input.leadId,
+      context,
+      draftType: "outbound",
+    })
+    body = asString(smsDraft.body)
+  }
   if (!body || isApolloSmsPlaceholderBody(body)) {
     const name = input.unified_context.contact_full_name.split(/\s+/)[0] || "there"
     const company = input.unified_context.contact_company_name
@@ -272,10 +299,40 @@ async function personalizeSmsDraft(
   }
 }
 
-function personalizeVoiceDropDraft(input: {
-  draft: ApolloSequenceExecutionDraftRecord
-  unified_context: ApolloUnifiedPersonalizationContext
-}): ApolloSequenceExecutionDraftRecord {
+async function personalizeVoiceDropDraft(
+  admin: SupabaseClient,
+  input: {
+    draft: ApolloSequenceExecutionDraftRecord
+    unified_context: ApolloUnifiedPersonalizationContext
+    leadId: string
+  },
+): Promise<ApolloSequenceExecutionDraftRecord> {
+  const organizationId = getGrowthEngineAiOrgId()
+  if (organizationId) {
+    const canonicalPkg = await resolveCanonicalOutreachPackageForLead(admin, {
+      organizationId,
+      leadId: input.leadId,
+    })
+    const brief = canonicalPkg?.salesStrategyBrief
+    if (brief) {
+      const materialized = materializeCanonicalOutreachChannelContent({
+        brief,
+        channel: "voicemail",
+        package: canonicalPkg,
+        operatorAssetOverride: resolveOperatorAssetOverride(canonicalPkg, "voicemail"),
+      })
+      if (materialized.transportReady) {
+        return {
+          ...input.draft,
+          body_placeholder: materialized.body,
+          voice_drop_script_reference: materialized.body,
+          content_summary: "Canonical voicemail draft from Sales Strategy Brief.",
+          personalization_packet_marker: input.unified_context.qa_marker,
+        }
+      }
+    }
+  }
+
   const intelligence = buildApolloVoiceDropIntelligenceFromUnifiedContext({
     unified_context: input.unified_context,
     fit_score: input.unified_context.qualification_score,
@@ -411,7 +468,13 @@ export async function personalizeApolloSequenceCandidateContent(
     }
 
     if (draft.draft_type === "voice_drop") {
-      updatedDrafts.push(personalizeVoiceDropDraft({ draft, unified_context: unifiedContext }))
+      updatedDrafts.push(
+        await personalizeVoiceDropDraft(admin, {
+          draft,
+          unified_context: unifiedContext,
+          leadId,
+        }),
+      )
       continue
     }
 
