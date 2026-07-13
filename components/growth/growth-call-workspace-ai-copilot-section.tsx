@@ -29,7 +29,6 @@ function CopilotSuggestionCard({
   onLifecycle: (suggestionId: string, action: "acknowledge" | "dismiss" | "copied") => Promise<void>
 }) {
   const { teammate } = useAiTeammateIdentity()
-  const { teammate } = useAiTeammateIdentity()
   const [copied, setCopied] = useState(false)
 
   const handleCopy = useCallback(async () => {
