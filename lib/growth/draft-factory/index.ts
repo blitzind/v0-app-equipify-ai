@@ -69,6 +69,26 @@ export { mapAiOsEventToDraftFactoryWakePlans } from "@/lib/growth/draft-factory/
 
 export { tickDraftFactoryDueStatesForScheduler } from "@/lib/growth/draft-factory/draft-factory-due-scheduler-tick"
 
+/** GE-AIOS-AUTONOMY-1C — Portfolio-aware due selection (selection only; no new scheduler). */
+export {
+  GROWTH_AIOS_AUTONOMY_1C_QA_MARKER,
+  allocateDueSlotsByCapacityClass,
+  mapDurableStateToPortfolioCapacityClass,
+  mapPortfolioCapacityClassToResourceClass,
+} from "@/lib/growth/draft-factory/draft-factory-due-capacity-class"
+
+export {
+  selectPortfolioAwareDueDraftFactoryStates,
+  type DuePortfolioSelectionCandidate,
+  type DuePortfolioSelectionInput,
+  type DuePortfolioSelectionResult,
+} from "@/lib/growth/draft-factory/draft-factory-due-portfolio-selection"
+
+export {
+  GROWTH_DRAFT_FACTORY_DUE_POOL_LIMIT,
+  GROWTH_DRAFT_FACTORY_DUE_CLASS_CANDIDATE_CAP,
+} from "@/lib/growth/draft-factory/draft-factory-wake-event-types"
+
 export {
   resolveDraftFactoryDurableRepositoryKind,
 } from "@/lib/growth/draft-factory/draft-factory-durable-repository-contract"

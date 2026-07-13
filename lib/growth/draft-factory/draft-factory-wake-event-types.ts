@@ -41,3 +41,7 @@ export const GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_QA_MARKER =
 export const GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_MAX_ORGS = 20
 export const GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_MAX_ADVANCES_PER_ORG = 10
 export const GROWTH_DRAFT_FACTORY_CAPACITY_SLOTS_PER_ORG = 5
+/** Candidate pool size before portfolio-aware selection (AUTONOMY-1C). */
+export const GROWTH_DRAFT_FACTORY_DUE_POOL_LIMIT = 100
+/** FIFO candidates evaluated per capacity class before SV1-2 ranks. */
+export const GROWTH_DRAFT_FACTORY_DUE_CLASS_CANDIDATE_CAP = 20
