@@ -7,6 +7,7 @@ export type DatamoonClientStatus = "success" | "failed" | "skipped" | "dry_run"
 
 export type DatamoonApiErrorCategory =
   | "bad_request"
+  | "unauthorized"
   | "forbidden"
   | "not_found"
   | "validation"
@@ -101,6 +102,10 @@ export type DatamoonProviderDiagnostics = {
   enrichment_key_present: boolean
   audience_ext_key_present: boolean
   audience_module_key_present: boolean
+  /** CONTACT-1E — mode vs key presence without revealing secrets. */
+  active_audience_key_present: boolean
+  alternate_audience_key_present: boolean
+  mode_key_mismatch_risk: boolean
 }
 
 export const GROWTH_DATAMOON_PROVIDER_DIAGNOSTICS_QA_MARKER =

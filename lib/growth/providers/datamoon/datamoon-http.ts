@@ -70,6 +70,8 @@ export function classifyDatamoonHttpStatus(status: number): DatamoonApiErrorCate
   switch (status) {
     case 400:
       return "bad_request"
+    case 401:
+      return "unauthorized"
     case 403:
       return "forbidden"
     case 404:

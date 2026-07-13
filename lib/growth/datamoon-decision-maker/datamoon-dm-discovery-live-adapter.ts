@@ -24,12 +24,19 @@ import {
   type DatamoonDmDiscoveryResults,
   type DatamoonDmDiscoveryStatusResult,
 } from "@/lib/growth/datamoon-decision-maker/datamoon-dm-discovery-types"
+import {
+  classifyDatamoonDmFailureDiagnostic,
+  GROWTH_AIOS_CONTACT_1E_QA_MARKER,
+  isDatamoonDmDiscoveryFailureTerminal,
+  resolveDatamoonDmPollExhaustionFailureCode,
+} from "@/lib/growth/datamoon-decision-maker/datamoon-dm-failure-classification"
 import { resolveDatamoonBuildAudienceId } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-build-id"
 import { resolveDatamoonFetchPayload } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-import-fetch-payload"
 import { resolveDatamoonProviderFiltersForImport } from "@/lib/growth/lead-sources/datamoon/datamoon-audience-filter-mapping"
 import {
   buildAudience,
   fetchAudience,
+  diagnoseDatamoonProvider,
 } from "@/lib/growth/providers/datamoon/datamoon-client"
 import {
   isDatamoonDryRunOnly,
@@ -136,6 +143,26 @@ export function createLiveDatamoonDecisionMakerDiscoveryAdapter(
           failureCode: null,
         }
       }
+      // CONTACT-1E — do not recreate after terminal auth failure unless retry_eligible.
+      if (
+        existing?.status === "failed_terminal" &&
+        isDatamoonDmDiscoveryFailureTerminal(existing.firstFailureCode ?? existing.failureCode) &&
+        !existing.retryEligible
+      ) {
+        return {
+          qaMarker: GROWTH_AIOS_CONTACT_1B_QA_MARKER,
+          status: "failed_terminal",
+          runId: existing.runId,
+          audienceId: existing.audienceId,
+          providerCalled: false,
+          reusedExisting: true,
+          nextPollAt: null,
+          message:
+            existing.failureCode ??
+            "Terminal DataMoon failure — set retry_eligible after configuration correction.",
+          failureCode: existing.firstFailureCode ?? existing.failureCode,
+        }
+      }
 
       const criteriaFingerprint = buildDatamoonDmDiscoveryCriteriaFingerprint({
         organizationId: input.organizationId,
@@ -195,14 +222,44 @@ export function createLiveDatamoonDecisionMakerDiscoveryAdapter(
       )
 
       if (build.status === "skipped" || build.status === "failed") {
-        const terminal =
-          build.error_category === "disabled" || build.error_category === "missing_key"
+        const failureCode = build.error_category ?? "build_failed"
+        const terminal = isDatamoonDmDiscoveryFailureTerminal(failureCode)
+        const diagnostics = diagnoseDatamoonProvider(env)
+        const classified = classifyDatamoonDmFailureDiagnostic({
+          failureCode,
+          httpStatus: build.http_status,
+          audienceMode: providerMode,
+          audienceExtKeyPresent: diagnostics.audience_ext_key_present,
+          audienceModuleKeyPresent: diagnostics.audience_module_key_present,
+          providerEnabled: diagnostics.enabled,
+        })
         await patchDatamoonDmDiscoveryRun(options.admin, durable.runId, {
           status: "failed",
           lifecycleStatus: terminal ? "failed_terminal" : "failed_retryable",
-          failureCode: build.error_category ?? "build_failed",
+          failureCode,
           failureClass: terminal ? "terminal" : "retryable",
+          firstFailureCode: failureCode,
           nextPollAt: terminal ? null : addMs(now, computeBackoffMs(1)),
+          retryEligible: false,
+          extraMetadata: {
+            contact_1e_qa_marker: GROWTH_AIOS_CONTACT_1E_QA_MARKER,
+            failure_diagnostic: classified.diagnostic,
+            failure_diagnostic_message: classified.message,
+            http_status: build.http_status,
+            operation: "audience_build",
+            audience_mode: providerMode,
+          },
+        })
+        logGrowthEngine("datamoon_dm_discovery_build_failed", {
+          qa_marker: GROWTH_AIOS_CONTACT_1E_QA_MARKER,
+          organization_id: input.organizationId,
+          lead_id: input.leadId,
+          run_id: durable.runId,
+          failure_code: failureCode,
+          terminal,
+          diagnostic: classified.diagnostic,
+          audience_mode: providerMode,
+          http_status: build.http_status,
         })
         return {
           qaMarker: GROWTH_AIOS_CONTACT_1B_QA_MARKER,
@@ -212,8 +269,8 @@ export function createLiveDatamoonDecisionMakerDiscoveryAdapter(
           providerCalled: true,
           reusedExisting: false,
           nextPollAt: terminal ? null : addMs(now, computeBackoffMs(1)),
-          message: build.message,
-          failureCode: build.error_category ?? "build_failed",
+          message: classified.message || build.message,
+          failureCode,
         }
       }
 
@@ -326,6 +383,51 @@ export function createLiveDatamoonDecisionMakerDiscoveryAdapter(
         }
       }
 
+      // CONTACT-1E — auth/config failed_retryable must upgrade to terminal; never poll.
+      if (
+        durable.status === "failed_retryable" &&
+        isDatamoonDmDiscoveryFailureTerminal(durable.failureCode ?? durable.firstFailureCode)
+      ) {
+        const primary = durable.firstFailureCode ?? durable.failureCode ?? "forbidden"
+        const diagnostics = diagnoseDatamoonProvider(env)
+        const classified = classifyDatamoonDmFailureDiagnostic({
+          failureCode: primary,
+          firstFailureCode: durable.firstFailureCode,
+          audienceId: durable.audienceId,
+          audienceMode: durable.providerMode,
+          audienceExtKeyPresent: diagnostics.audience_ext_key_present,
+          audienceModuleKeyPresent: diagnostics.audience_module_key_present,
+          providerEnabled: diagnostics.enabled,
+        })
+        await patchDatamoonDmDiscoveryRun(options.admin, durable.runId, {
+          status: "failed",
+          lifecycleStatus: "failed_terminal",
+          failureCode: classified.primaryFailureCode,
+          failureClass: "terminal",
+          firstFailureCode: durable.firstFailureCode ?? primary,
+          nextPollAt: null,
+          retryEligible: false,
+          extraMetadata: {
+            contact_1e_qa_marker: GROWTH_AIOS_CONTACT_1E_QA_MARKER,
+            failure_diagnostic: classified.diagnostic,
+            failure_diagnostic_message: classified.message,
+            promoted_from: "failed_retryable",
+          },
+        })
+        return {
+          qaMarker: GROWTH_AIOS_CONTACT_1B_QA_MARKER,
+          status: "failed_terminal",
+          runId: durable.runId,
+          audienceId: durable.audienceId,
+          pollAttemptCount: durable.pollAttemptCount,
+          nextPollAt: null,
+          resultCount: durable.resultCount,
+          message: classified.message,
+          failureCode: classified.primaryFailureCode,
+          readyForFetch: false,
+        }
+      }
+
       const requestedAge = Date.parse(now) - Date.parse(durable.requestedAt)
       if (requestedAge > DATAMOON_DM_DISCOVERY_POLL_POLICY.maxProviderAgeMs) {
         await patchDatamoonDmDiscoveryRun(options.admin, durable.runId, {
@@ -349,13 +451,95 @@ export function createLiveDatamoonDecisionMakerDiscoveryAdapter(
         }
       }
 
-      if (durable.pollAttemptCount >= DATAMOON_DM_DISCOVERY_POLL_POLICY.maxPollsPerRun) {
+      // CONTACT-1E — never burn poll budget without a valid audience/build ID.
+      // Allow a short in-flight grace while requestDiscovery is still building.
+      if (!durable.audienceId) {
+        const ageMs = Date.parse(now) - Date.parse(durable.requestedAt)
+        const priorTerminal = isDatamoonDmDiscoveryFailureTerminal(
+          durable.firstFailureCode ?? durable.failureCode,
+        )
+        const buildStillInFlight =
+          !priorTerminal &&
+          !durable.failureCode &&
+          ageMs < 120_000 &&
+          (durable.status === "requested" || durable.status === "polling")
+
+        if (buildStillInFlight) {
+          const nextPollAt = addMs(now, DATAMOON_DM_DISCOVERY_POLL_POLICY.minPollIntervalMs)
+          await patchDatamoonDmDiscoveryRun(options.admin, durable.runId, {
+            lastPollAt: now,
+            nextPollAt,
+            // Do not increment pollAttemptCount — no provider poll occurred.
+            lifecycleStatus: "requested",
+          })
+          return {
+            qaMarker: GROWTH_AIOS_CONTACT_1B_QA_MARKER,
+            status: "requested",
+            runId: durable.runId,
+            audienceId: null,
+            pollAttemptCount: durable.pollAttemptCount,
+            nextPollAt,
+            resultCount: null,
+            message: "Build in flight — waiting for provider audience ID (no poll count).",
+            failureCode: null,
+            readyForFetch: false,
+          }
+        }
+
+        const failureCode =
+          priorTerminal && durable.firstFailureCode
+            ? durable.firstFailureCode
+            : durable.failureCode && isDatamoonDmDiscoveryFailureTerminal(durable.failureCode)
+              ? durable.failureCode
+              : "missing_provider_audience_id"
         await patchDatamoonDmDiscoveryRun(options.admin, durable.runId, {
           status: "failed",
           lifecycleStatus: "failed_terminal",
-          failureCode: "max_polls_exceeded",
+          failureCode,
+          failureClass: "terminal",
+          firstFailureCode: durable.firstFailureCode ?? failureCode,
+          lastPollAt: now,
+          nextPollAt: null,
+          retryEligible: false,
+          extraMetadata: {
+            contact_1e_qa_marker: GROWTH_AIOS_CONTACT_1E_QA_MARKER,
+            failure_diagnostic: "missing_provider_audience_id",
+            failure_diagnostic_message:
+              "No provider audience ID after build window — polling must not continue (CONTACT-1E).",
+            operation: "poll_without_audience_id",
+          },
+        })
+        return {
+          qaMarker: GROWTH_AIOS_CONTACT_1B_QA_MARKER,
+          status: "failed_terminal",
+          runId: durable.runId,
+          audienceId: null,
+          pollAttemptCount: durable.pollAttemptCount,
+          nextPollAt: null,
+          resultCount: null,
+          message: "No provider audience ID — polling forbidden.",
+          failureCode,
+          readyForFetch: false,
+        }
+      }
+
+      if (durable.pollAttemptCount >= DATAMOON_DM_DISCOVERY_POLL_POLICY.maxPollsPerRun) {
+        const preserved = resolveDatamoonDmPollExhaustionFailureCode({
+          firstFailureCode: durable.firstFailureCode,
+          priorFailureCode: durable.failureCode,
+        })
+        await patchDatamoonDmDiscoveryRun(options.admin, durable.runId, {
+          status: "failed",
+          lifecycleStatus: "failed_terminal",
+          failureCode: preserved,
           failureClass: "terminal",
           nextPollAt: null,
+          extraMetadata: {
+            contact_1e_qa_marker: GROWTH_AIOS_CONTACT_1E_QA_MARKER,
+            poll_budget_exhausted: true,
+            reported_max_polls: preserved === "max_polls_exceeded",
+            preserved_primary_failure: preserved !== "max_polls_exceeded" ? preserved : null,
+          },
         })
         return {
           qaMarker: GROWTH_AIOS_CONTACT_1B_QA_MARKER,
@@ -365,30 +549,11 @@ export function createLiveDatamoonDecisionMakerDiscoveryAdapter(
           pollAttemptCount: durable.pollAttemptCount,
           nextPollAt: null,
           resultCount: null,
-          message: "Maximum polls exceeded — terminal.",
-          failureCode: "max_polls_exceeded",
-          readyForFetch: false,
-        }
-      }
-
-      if (!durable.audienceId) {
-        const nextPollAt = addMs(now, computeBackoffMs(durable.pollAttemptCount + 1))
-        await patchDatamoonDmDiscoveryRun(options.admin, durable.runId, {
-          lastPollAt: now,
-          nextPollAt,
-          pollAttemptCount: durable.pollAttemptCount + 1,
-          lifecycleStatus: "polling",
-        })
-        return {
-          qaMarker: GROWTH_AIOS_CONTACT_1B_QA_MARKER,
-          status: "polling",
-          runId: durable.runId,
-          audienceId: null,
-          pollAttemptCount: durable.pollAttemptCount + 1,
-          nextPollAt,
-          resultCount: null,
-          message: "Waiting for audience id.",
-          failureCode: null,
+          message:
+            preserved === "max_polls_exceeded"
+              ? "Maximum polls exceeded — terminal."
+              : `Poll budget exhausted; primary failure preserved: ${preserved}.`,
+          failureCode: preserved,
           readyForFetch: false,
         }
       }
@@ -402,17 +567,43 @@ export function createLiveDatamoonDecisionMakerDiscoveryAdapter(
       const pollAttemptCount = durable.pollAttemptCount + 1
 
       if (fetchResult.status === "skipped" || fetchResult.status === "failed") {
-        const terminal =
-          fetchResult.error_category === "disabled" || fetchResult.error_category === "missing_key"
+        const rawCode = fetchResult.error_category ?? "poll_failed"
+        const failureCode =
+          rawCode === "forbidden" || rawCode === "unauthorized" ? "fetch_forbidden" : rawCode
+        const terminal = isDatamoonDmDiscoveryFailureTerminal(failureCode) ||
+          isDatamoonDmDiscoveryFailureTerminal(rawCode)
+        const persistCode = terminal && (rawCode === "forbidden" || rawCode === "unauthorized")
+          ? "fetch_forbidden"
+          : rawCode
+        const diagnostics = diagnoseDatamoonProvider(env)
+        const classified = classifyDatamoonDmFailureDiagnostic({
+          failureCode: persistCode,
+          firstFailureCode: durable.firstFailureCode,
+          httpStatus: fetchResult.http_status,
+          audienceId: durable.audienceId,
+          audienceMode: durable.providerMode,
+          audienceExtKeyPresent: diagnostics.audience_ext_key_present,
+          audienceModuleKeyPresent: diagnostics.audience_module_key_present,
+          providerEnabled: diagnostics.enabled,
+        })
         const nextPollAt = terminal ? null : addMs(now, computeBackoffMs(pollAttemptCount))
         await patchDatamoonDmDiscoveryRun(options.admin, durable.runId, {
           status: terminal ? "failed" : "building",
           lifecycleStatus: terminal ? "failed_terminal" : "failed_retryable",
-          failureCode: fetchResult.error_category ?? "poll_failed",
+          failureCode: persistCode,
           failureClass: terminal ? "terminal" : "retryable",
+          firstFailureCode: durable.firstFailureCode ?? persistCode,
           lastPollAt: now,
           nextPollAt,
           pollAttemptCount,
+          retryEligible: false,
+          extraMetadata: {
+            contact_1e_qa_marker: GROWTH_AIOS_CONTACT_1E_QA_MARKER,
+            failure_diagnostic: classified.diagnostic,
+            failure_diagnostic_message: classified.message,
+            http_status: fetchResult.http_status,
+            operation: "audience_fetch",
+          },
         })
         return {
           qaMarker: GROWTH_AIOS_CONTACT_1B_QA_MARKER,
@@ -422,8 +613,8 @@ export function createLiveDatamoonDecisionMakerDiscoveryAdapter(
           pollAttemptCount,
           nextPollAt,
           resultCount: null,
-          message: fetchResult.message,
-          failureCode: fetchResult.error_category ?? "poll_failed",
+          message: classified.message || fetchResult.message,
+          failureCode: persistCode,
           readyForFetch: false,
         }
       }
@@ -600,8 +791,46 @@ export function createLegacyDatamoonDmDiscoveryAdapterBridge(
       }
     }
 
+    // CONTACT-1E — terminal auth/config failures do not auto-recreate unless retry_eligible.
+    if (existing?.status === "failed_terminal") {
+      const authTerminal = isDatamoonDmDiscoveryFailureTerminal(
+        existing.firstFailureCode ?? existing.failureCode,
+      )
+      if (authTerminal && !existing.retryEligible) {
+        return {
+          records: [],
+          providerCalled: false,
+          message:
+            existing.failureCode ??
+            "DataMoon DM discovery terminally failed — await configuration correction + retry_eligible.",
+          status: "failed_terminal",
+          runId: existing.runId,
+          audienceId: existing.audienceId,
+          nextPollAt: null,
+          failureCode: existing.firstFailureCode ?? existing.failureCode,
+          creditsAvoided: true,
+          adapterKind: options.adapterKind ?? "live",
+        }
+      }
+      // retry_eligible or non-auth terminal: fall through to create a superseding run.
+    }
+
     if (existing && (existing.status === "polling" || existing.status === "requested" || existing.status === "failed_retryable")) {
       const status = await adapter.getDiscoveryStatus({ runId: existing.runId })
+      if (status.status === "failed_terminal") {
+        return {
+          records: [],
+          providerCalled: true,
+          message: status.message,
+          status: "failed_terminal",
+          runId: existing.runId,
+          audienceId: existing.audienceId,
+          nextPollAt: null,
+          failureCode: status.failureCode,
+          creditsAvoided: true,
+          adapterKind: options.adapterKind ?? "live",
+        }
+      }
       if (status.readyForFetch || status.status === "completed" || status.status === "no_result") {
         const fetched = await adapter.fetchDiscoveryResults({ runId: existing.runId })
         return {

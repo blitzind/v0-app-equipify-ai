@@ -36,6 +36,10 @@ export type DatamoonDmDiscoveryDurableRecord = {
   pollAttemptCount: number
   noResultAt: string | null
   failureCode: string | null
+  /** CONTACT-1E — earliest terminal/provider failure; never overwritten by max_polls. */
+  firstFailureCode: string | null
+  /** CONTACT-1E — explicit eligible retry after configuration correction. */
+  retryEligible: boolean
   resultCount: number | null
   providerMode: DatamoonAudienceMode
   dryRun: boolean
@@ -119,6 +123,8 @@ export function mapAudienceRunToDmDiscoveryRecord(
       typeof meta.poll_attempt_count === "number" ? meta.poll_attempt_count : 0,
     noResultAt: typeof meta.no_result_at === "string" ? meta.no_result_at : null,
     failureCode: typeof meta.failure_code === "string" ? meta.failure_code : run.errorMessage,
+    firstFailureCode: typeof meta.first_failure_code === "string" ? meta.first_failure_code : null,
+    retryEligible: meta.retry_eligible === true,
     resultCount: typeof meta.result_count === "number" ? meta.result_count : run.previewCount,
     providerMode: run.providerMode,
     dryRun: run.dryRun,
@@ -231,14 +237,18 @@ export async function patchDatamoonDmDiscoveryRun(
     noResultAt?: string | null
     failureCode?: string | null
     failureClass?: "retryable" | "terminal" | null
+    /** CONTACT-1E — set once; subsequent patches must not clear unless explicit. */
+    firstFailureCode?: string | null
+    retryEligible?: boolean
     resultCount?: number | null
     extraMetadata?: Record<string, unknown>
   },
 ): Promise<DatamoonDmDiscoveryDurableRecord | null> {
   const existing = await fetchDatamoonAudienceImportRunById(admin, runId)
   if (!existing) return null
+  const priorMeta = readMeta(existing)
   const meta = {
-    ...readMeta(existing),
+    ...priorMeta,
     ...(patch.extraMetadata ?? {}),
   }
   if (patch.lifecycleStatus !== undefined) meta.lifecycle_status = patch.lifecycleStatus
@@ -248,6 +258,17 @@ export async function patchDatamoonDmDiscoveryRun(
   if (patch.failureCode !== undefined) meta.failure_code = patch.failureCode
   if (patch.failureClass !== undefined) meta.failure_class = patch.failureClass
   if (patch.resultCount !== undefined) meta.result_count = patch.resultCount
+  if (patch.retryEligible !== undefined) meta.retry_eligible = patch.retryEligible
+
+  // Preserve earliest failure; never let max_polls overwrite first_failure_code.
+  const incomingFailure = patch.firstFailureCode ?? patch.failureCode
+  if (incomingFailure && typeof incomingFailure === "string") {
+    if (typeof priorMeta.first_failure_code !== "string" || !priorMeta.first_failure_code) {
+      meta.first_failure_code = incomingFailure
+    } else if (patch.firstFailureCode !== undefined) {
+      meta.first_failure_code = patch.firstFailureCode
+    }
+  }
 
   const updated = await updateDatamoonAudienceImportRun(admin, runId, {
     datamoonAudienceId: patch.audienceId !== undefined ? patch.audienceId : undefined,
