@@ -12,8 +12,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { buildAutonomousOutreachApprovalPackage } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-draft-service"
-import { fetchLatestGrowthLeadResearchWorkflowSnapshot } from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
+import { generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-package-persistence"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { ensureGrowthAiEventBusInProcessSubscribers } from "@/lib/growth/aios/event-bus/growth-ai-event-bus-subscriber-registry"
 import {
@@ -503,25 +502,17 @@ export async function tickDraftFactoryDueStatesForScheduler(
             repository,
             candidates: capacityEnriched,
             generateViaGrowth5F: async ({ organizationId: orgId, leadId, now: generatedAt }) => {
-              const lead = await fetchGrowthLeadById(admin, leadId)
-              if (!lead) return null
-              const snapshot = await fetchLatestGrowthLeadResearchWorkflowSnapshot(admin, {
-                organizationId: orgId,
-                leadId,
-              })
-              if (!snapshot) return null
-              const growth5f = await buildAutonomousOutreachApprovalPackage(admin, {
-                organizationId: orgId,
-                leadId,
-                companyName: lead.companyName,
-                snapshot,
-                generatedAt,
-              })
-              if (growth5f.pendingHumanApproval !== true || growth5f.transportBlocked !== true) {
-                return null
-              }
+              const persisted = await generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory(
+                admin,
+                {
+                  organizationId: orgId,
+                  leadId,
+                  generatedAt,
+                },
+              )
+              if (!persisted) return null
               return {
-                packageId: growth5f.packageId,
+                packageId: persisted.packageId,
                 pendingHumanApproval: true as const,
                 transportBlocked: true as const,
               }

@@ -6,8 +6,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { buildAutonomousOutreachApprovalPackage } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-draft-service"
-import { fetchLatestGrowthLeadResearchWorkflowSnapshot } from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
+import { generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-package-persistence"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { recordRuntimeGuardrailAudit } from "@/lib/growth/runtime-guardrails/growth-runtime-audit-repository"
 import {
@@ -292,25 +291,17 @@ export async function advanceDraftFactoryForLeadLive(
     completionHints,
     generateViaGrowth5F: allowGeneration
       ? async ({ organizationId, leadId, now: generatedAt }) => {
-          const lead = await fetchGrowthLeadById(admin, leadId)
-          if (!lead) return null
-          const snapshot = await fetchLatestGrowthLeadResearchWorkflowSnapshot(admin, {
-            organizationId,
-            leadId,
-          })
-          if (!snapshot) return null
-          const growth5f = await buildAutonomousOutreachApprovalPackage(admin, {
-            organizationId,
-            leadId,
-            companyName: lead.companyName,
-            snapshot,
-            generatedAt,
-          })
-          if (growth5f.pendingHumanApproval !== true || growth5f.transportBlocked !== true) {
-            return null
-          }
+          const persisted = await generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory(
+            admin,
+            {
+              organizationId,
+              leadId,
+              generatedAt,
+            },
+          )
+          if (!persisted) return null
           return {
-            packageId: growth5f.packageId,
+            packageId: persisted.packageId,
             pendingHumanApproval: true as const,
             transportBlocked: true as const,
           }

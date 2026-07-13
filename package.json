@@ -901,6 +901,7 @@
     "test:ge-aios-autonomy-1c-portfolio-aware-due-scheduler": "tsx scripts/test-ge-aios-autonomy-1c-portfolio-aware-due-scheduler.ts",
     "test:ge-aios-autonomy-1e-fair-capacity-class-admission": "tsx scripts/test-ge-aios-autonomy-1e-fair-capacity-class-admission.ts",
     "test:ge-aios-autonomy-1f-draft-generation-capacity-path": "tsx scripts/test-ge-aios-autonomy-1f-draft-generation-capacity-path.ts",
+    "test:ge-aios-autonomy-1h-durable-approval-package-payload": "tsx scripts/test-ge-aios-autonomy-1h-durable-approval-package-payload.ts",
     "test:ge-aios-contact-1a-datamoon-email-phone-completion": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-contact-1a-datamoon-email-phone-completion.ts",
     "test:ge-aios-contact-1b-live-datamoon-dm-discovery": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-contact-1b-live-datamoon-dm-discovery.ts",
     "test:ge-aios-contact-1e-datamoon-forbidden-poll-repair": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-anon-key node -r ./scripts/server-only-shim.cjs --import tsx scripts/test-ge-aios-contact-1e-datamoon-forbidden-poll-repair.ts",

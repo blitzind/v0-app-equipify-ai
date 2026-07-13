@@ -7,7 +7,7 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { buildAutonomousOutreachApprovalPackage } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-draft-service"
+import { generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-package-persistence"
 import { fetchLatestGrowthLeadResearchWorkflowSnapshot } from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { evaluateAndEnrichDecisionMakerForLead } from "@/lib/growth/datamoon-decision-maker/datamoon-dm-service"
@@ -267,15 +267,22 @@ export async function advanceDraftFactoryForLead(
         leadId: input.leadId,
       })
       if (snapshot) {
-        const growth5f = await buildAutonomousOutreachApprovalPackage(admin, {
-          organizationId: input.organizationId,
-          leadId: input.leadId,
-          companyName: lead.companyName,
-          snapshot,
-          generatedAt,
-        })
+        // AUTONOMY-1H — Growth 5F build + durable package body (idempotent by package_id/run_id).
+        const persisted = await generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory(
+          admin,
+          {
+            organizationId: input.organizationId,
+            leadId: input.leadId,
+            companyName: lead.companyName,
+            generatedAt,
+          },
+        )
         // Hard invariant: never clear transport block.
-        if (growth5f.transportBlocked !== true || growth5f.pendingHumanApproval !== true) {
+        if (
+          !persisted ||
+          persisted.transportBlocked !== true ||
+          persisted.pendingHumanApproval !== true
+        ) {
           advance = {
             ...advance,
             nextState: "failed",
@@ -288,7 +295,7 @@ export async function advanceDraftFactoryForLead(
             signals: { ...signals, hasRecentApprovalPackage: true, personalizationReady: true },
             wakeSource: input.wakeSource,
             budgetAvailable: true,
-            growth5fApprovalPackage: growth5f,
+            growth5fApprovalPackage: persisted.approvalPackage,
             now: generatedAt,
             workerId,
           })

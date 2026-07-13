@@ -31,10 +31,8 @@ import {
 } from "@/lib/growth/draft-factory/draft-factory-wake-event-types"
 import { planWakeEvaluationBatch } from "@/lib/growth/runtime-guardrails/growth-wake-guardrails"
 import { getRuntimeKillSwitchStates } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
+import { generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-package-persistence"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
-import { buildAutonomousOutreachApprovalPackage } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-draft-service"
-import { fetchLatestGrowthLeadResearchWorkflowSnapshot } from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
-import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 
 export type DraftFactoryWakeObservationResult = {
   qaMarker: typeof GROWTH_DRAFT_FACTORY_WAKE_BUS_QA_MARKER
@@ -119,25 +117,17 @@ async function applyOrgCapacityWake(
     repository,
     candidates: capacityCandidates,
     generateViaGrowth5F: async ({ organizationId, leadId, now: generatedAt }) => {
-      const lead = await fetchGrowthLeadById(admin, leadId)
-      if (!lead) return null
-      const snapshot = await fetchLatestGrowthLeadResearchWorkflowSnapshot(admin, {
-        organizationId,
-        leadId,
-      })
-      if (!snapshot) return null
-      const growth5f = await buildAutonomousOutreachApprovalPackage(admin, {
-        organizationId,
-        leadId,
-        companyName: lead.companyName,
-        snapshot,
-        generatedAt,
-      })
-      if (growth5f.pendingHumanApproval !== true || growth5f.transportBlocked !== true) {
-        return null
-      }
+      const persisted = await generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory(
+        admin,
+        {
+          organizationId,
+          leadId,
+          generatedAt,
+        },
+      )
+      if (!persisted) return null
       return {
-        packageId: growth5f.packageId,
+        packageId: persisted.packageId,
         pendingHumanApproval: true as const,
         transportBlocked: true as const,
       }
