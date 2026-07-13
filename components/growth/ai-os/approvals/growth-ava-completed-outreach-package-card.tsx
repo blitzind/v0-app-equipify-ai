@@ -537,6 +537,51 @@ export function GrowthAvaCompletedOutreachPackageCard({
                         ]}
                   </ul>
                 </div>
+                {view.operatorReasoning ? (
+                  <div className="space-y-2 rounded-md border border-primary/20 bg-primary/5 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Ava reasoning
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field
+                        label="Conversation goal"
+                        value={view.operatorReasoning.conversationGoal}
+                      />
+                      <Field
+                        label="Business outcome"
+                        value={view.operatorReasoning.businessOutcome}
+                      />
+                      <Field
+                        label="Primary insight"
+                        value={view.operatorReasoning.primaryInsight ?? "Not enough evidence yet"}
+                      />
+                      <Field
+                        label="Reason for CTA"
+                        value={view.operatorReasoning.reasonForCta}
+                      />
+                    </div>
+                    <Field
+                      label="Evidence summary"
+                      value={view.operatorReasoning.evidenceSummary ?? "Evidence still thin"}
+                    />
+                    <Field
+                      label="Conversation risks"
+                      value={
+                        view.operatorReasoning.conversationRisks.length
+                          ? view.operatorReasoning.conversationRisks.join("\n")
+                          : "No elevated risks flagged"
+                      }
+                    />
+                    <Field
+                      label="Intentionally avoided"
+                      value={
+                        view.operatorReasoning.intentionallyAvoided.length
+                          ? view.operatorReasoning.intentionallyAvoided.join("\n")
+                          : "None listed"
+                      }
+                    />
+                  </div>
+                ) : null}
                 <Field
                   label="Business problems (evidence-backed)"
                   value={

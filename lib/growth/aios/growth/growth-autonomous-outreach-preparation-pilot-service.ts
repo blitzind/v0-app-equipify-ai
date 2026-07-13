@@ -104,6 +104,7 @@ async function publishOutreachPreparedEvent(
     generatedAt: string
     assetCount: number
     confidence: number
+    observationThemeKey?: string | null
   },
 ) {
   return publishAiOsEvent(admin, {
@@ -120,6 +121,7 @@ async function publishOutreachPreparedEvent(
       package_id: input.packageId,
       asset_count: input.assetCount,
       confidence: input.confidence,
+      observation_theme_key: input.observationThemeKey ?? null,
       pending_human_approval: true,
       transport_blocked: true,
       occurred_at: input.generatedAt,
@@ -189,6 +191,8 @@ async function executeAutonomousOutreachPreparation(
               generatedAt: input.generatedAt,
               assetCount: approvalPackage.generatedAssets.length,
               confidence: approvalPackage.confidence,
+              observationThemeKey:
+                approvalPackage.salesStrategyBrief?.evidenceIntelligence?.themeKey ?? null,
             })
           }
           return {

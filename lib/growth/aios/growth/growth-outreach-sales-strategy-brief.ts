@@ -18,14 +18,28 @@ import type { GrowthIndustryPlaybook } from "@/lib/growth/playbooks/industry-pla
 import type { OrganizationalKnowledgeItem } from "@/lib/growth/memory/knowledge/organization-knowledge-types"
 import type { GrowthOutreachSellerKnowledgeQuality } from "@/lib/growth/business-profile/equipify-master-knowledge-quality"
 import { scoreOutreachSellerKnowledgeQuality } from "@/lib/growth/business-profile/equipify-master-knowledge-quality"
+import {
+  GROWTH_AIOS_CONVERSATION_INTELLIGENCE_1A_QA_MARKER,
+  GROWTH_AIOS_CONVERSATION_INTELLIGENCE_2A_QA_MARKER,
+  enrichOutreachSalesStrategyBrief,
+  type GrowthOutreachConversationRisk,
+  type GrowthOutreachEvidenceIntelligence,
+  type GrowthOutreachLearningThemeWeight,
+  type GrowthOutreachOperatorReasoning,
+} from "@/lib/growth/aios/growth/growth-outreach-conversation-intelligence"
+import type { ProspectKnowledgePack } from "@/lib/growth/research/company-evidence/prospect-knowledge-pack"
 
 export type { GrowthOutreachEvidenceCitation }
+export {
+  GROWTH_AIOS_CONVERSATION_INTELLIGENCE_1A_QA_MARKER,
+  GROWTH_AIOS_CONVERSATION_INTELLIGENCE_2A_QA_MARKER,
+}
 
 export const GROWTH_AIOS_OUTREACH_QUALITY_1A_QA_MARKER =
   "ge-aios-outreach-quality-1a-human-sales-communication-engine-v1" as const
 
 export const GROWTH_OUTREACH_SALES_STRATEGY_BRIEF_VERSION =
-  "outreach-sales-strategy-brief-v3" as const
+  "outreach-sales-strategy-brief-v4" as const
 
 export type GrowthOutreachSalesStrategyBrief = {
   version: typeof GROWTH_OUTREACH_SALES_STRATEGY_BRIEF_VERSION
@@ -61,6 +75,10 @@ export type GrowthOutreachSalesStrategyBrief = {
   conversationStrategy?: GrowthOutreachConversationStrategy
   /** MASTER-KNOWLEDGE-1A — pre-draft seller knowledge quality (identifies gaps, never fabricates). */
   sellerKnowledgeQuality?: GrowthOutreachSellerKnowledgeQuality
+  /** CONVERSATION-INTELLIGENCE-1A — sanitized evidence + operator reasoning. */
+  evidenceIntelligence?: GrowthOutreachEvidenceIntelligence
+  conversationRisk?: GrowthOutreachConversationRisk
+  operatorReasoning?: GrowthOutreachOperatorReasoning
 }
 
 export type BuildSalesStrategyBriefInput = {
@@ -100,6 +118,10 @@ export type BuildSalesStrategyBriefInput = {
   organizationalKnowledge?: OrganizationalKnowledgeItem[]
   knowledgeCenterLines?: string[]
   industryPlaybook?: GrowthIndustryPlaybook | null
+  /** CONVERSATION-INTELLIGENCE-2A — structured research observations (existing research run). */
+  prospectKnowledgePack?: ProspectKnowledgePack | null
+  /** CONVERSATION-INTELLIGENCE-2A — advisory opener theme weights from sequence optimization. */
+  learningWeights?: GrowthOutreachLearningThemeWeight[] | null
 }
 
 function cleanLine(value: string | null | undefined): string | null {
@@ -446,7 +468,7 @@ export function buildOutreachSalesStrategyBrief(
     confidence,
   })
 
-  return {
+  const baseBrief = {
     version: GROWTH_OUTREACH_SALES_STRATEGY_BRIEF_VERSION,
     leadId: input.leadId,
     companyName,
@@ -474,6 +496,55 @@ export function buildOutreachSalesStrategyBrief(
     prospectTruth,
     conversationStrategy,
     sellerKnowledgeQuality,
+  }
+
+  const enriched = enrichOutreachSalesStrategyBrief({
+    brief: baseBrief,
+    approvedProfile: input.approvedProfile,
+    website: input.website,
+    contactTitle: input.contactTitle,
+    equipmentServiced: equipment,
+    industryHint: input.industry,
+    prospectKnowledgePack: input.prospectKnowledgePack,
+    learningWeights: input.learningWeights,
+  })
+
+  const finalSellerKnowledgeQuality = scoreOutreachSellerKnowledgeQuality({
+    profile: input.approvedProfile,
+    sellerTruth: enriched.sellerTruth ?? sellerTruth,
+    evidence,
+    missingEvidence: uniqueLines(input.missingEvidence ?? [], 8),
+    contactTitle: input.contactTitle,
+    conversationJustification: enriched.conversationJustification,
+    primaryHook: enriched.primaryHook,
+    confidence: enriched.confidence,
+    personaConfidence: enriched.conversationRisk.personaConfidence,
+    industryConfidence: enriched.conversationRisk.industryConfidence,
+    evidenceSanitized: true,
+    conversationIntelligenceApplied: true,
+    eliteSdrIntelligenceApplied: Boolean(enriched.evidenceIntelligence.selectedObservation),
+  })
+
+  return {
+    ...baseBrief,
+    businessProblems: enriched.businessProblems,
+    primaryHook: enriched.primaryHook,
+    businessValue: enriched.businessValue,
+    trustBuilders: enriched.trustBuilders,
+    objections: enriched.objections,
+    recommendedCta: enriched.recommendedCta,
+    recommendedConversation: enriched.conversationObjective,
+    conversationObjective: enriched.conversationObjective,
+    businessObjective: enriched.businessObjective,
+    conversationJustification: enriched.conversationJustification,
+    confidence: enriched.confidence,
+    decisionMakerAnalysis: enriched.decisionMakerAnalysis,
+    sellerTruth: enriched.sellerTruth,
+    conversationStrategy: enriched.conversationStrategy,
+    evidenceIntelligence: enriched.evidenceIntelligence,
+    conversationRisk: enriched.conversationRisk,
+    operatorReasoning: enriched.operatorReasoning,
+    sellerKnowledgeQuality: finalSellerKnowledgeQuality,
   }
 }
 

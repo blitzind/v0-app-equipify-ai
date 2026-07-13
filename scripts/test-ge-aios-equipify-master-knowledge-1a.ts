@@ -132,13 +132,15 @@ const brief = buildOutreachSalesStrategyBrief({
   approvedProfile: liveProfile,
 })
 
-assert.equal(GROWTH_OUTREACH_SALES_STRATEGY_BRIEF_VERSION, "outreach-sales-strategy-brief-v3")
+assert.equal(GROWTH_OUTREACH_SALES_STRATEGY_BRIEF_VERSION, "outreach-sales-strategy-brief-v4")
 assert.ok(brief.sellerKnowledgeQuality)
 assert.ok(brief.sellerKnowledgeQuality.overallScore >= 0.55)
 assert.ok(brief.sellerKnowledgeQuality.readyForDraftGeneration)
 assert.ok(brief.conversationStrategy?.postponeTopics?.length)
 assert.ok(brief.conversationStrategy?.gratefulReplyOutcome)
-assert.match(brief.businessValue, /equipment|service|operations/i)
+assert.match(brief.businessValue, /technician|field and depot|brief comparison|worth a short exchange/i)
+assert.ok(brief.evidenceIntelligence)
+assert.ok(brief.operatorReasoning)
 console.log("  ✓ Sales Strategy Brief includes quality scoring and conversation intelligence")
 
 const drafts = generateOutreachDraftsFromSalesStrategyBrief({ brief, senderName: "Ava" })

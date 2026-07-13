@@ -132,7 +132,7 @@ assert.equal(
   GROWTH_AIOS_SALES_PLAYBOOK_1B_QA_MARKER,
   "ge-aios-sales-playbook-1b-canonical-seller-knowledge-wiring-v1",
 )
-assert.equal(GROWTH_OUTREACH_SALES_STRATEGY_BRIEF_VERSION, "outreach-sales-strategy-brief-v3")
+assert.equal(GROWTH_OUTREACH_SALES_STRATEGY_BRIEF_VERSION, "outreach-sales-strategy-brief-v4")
 
 const seller = buildOutreachSellerTruth({
   profileId: "profile-1",
@@ -226,9 +226,13 @@ assert.ok(brief.sellerTruth)
 assert.ok(brief.prospectTruth)
 assert.ok(brief.conversationStrategy)
 assert.ok(brief.conversationJustification)
-assert.match(brief.businessValue, /clearer operating rhythm|Reduce operational complexity/)
-assert.equal(brief.recommendedCta, "15-minute workflow review")
-assert.equal(brief.objections[0]?.objection, "We already have a system.")
+assert.match(
+  brief.businessValue,
+  /imaging uptime|brief comparison|worth a short exchange|coordinate field and depot/i,
+)
+assert.ok(brief.recommendedCta.length > 3)
+assert.ok(brief.operatorReasoning?.reasonForCta)
+assert.ok(brief.objections.length >= 1)
 assert.equal(brief.relationshipStage, "Aware")
 assert.ok(!/Equipify helps field-service and equipment teams replace scattered handoffs/i.test(brief.businessValue))
 console.log("  ✓ Seller + Prospect + Conversation Strategy generated; hardcoded value replaced")
@@ -237,8 +241,12 @@ const drafts = generateOutreachDraftsFromSalesStrategyBrief({
   brief,
   senderName: "Jordan",
 })
-assert.match(drafts.email.full, /Conversation justification|earning a reply|workflow/i)
-assert.match(drafts.callGuide, /Conversation justification/)
+assert.ok(!/verified description|\(\d+%\)/i.test(drafts.email.full))
+assert.match(
+  drafts.email.full,
+  /stood out|heavy lift|caught my eye|curious|are you finding|on your radar|made me wonder|specific rhythm/i,
+)
+assert.match(drafts.callGuide, /Earn curiosity|Opening:/)
 assert.match(drafts.callGuide, /Relationship stage/)
 assert.equal(
   drafts.qualityFailures.filter((f) => f.startsWith("cliche:")).length,

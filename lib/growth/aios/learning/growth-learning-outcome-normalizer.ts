@@ -228,11 +228,24 @@ export function normalizeLearningOutcomeFromEvent(event: AiOsEvent): GrowthLearn
   }
 
   if (event.eventType === GROWTH_AUTONOMOUS_OUTREACH_PREPARED_EVENT) {
+    const observationThemeKey =
+      typeof payload.observation_theme_key === "string" ? payload.observation_theme_key : undefined
     return baseOutcome(event, {
       source: "workflow_agent",
       outcomeType: "completed",
       signalStrength: 0.72,
       confidence: 0.8,
+      dimensions: observationThemeKey ? { messageTheme: observationThemeKey } : {},
+      evidence: observationThemeKey
+        ? [
+            {
+              source: "outreach_preparation",
+              label: "observation_theme_key",
+              value: observationThemeKey,
+              confidence: 0.85,
+            },
+          ]
+        : undefined,
     })
   }
 

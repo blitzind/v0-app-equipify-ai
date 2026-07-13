@@ -97,13 +97,12 @@ function scanPatterns(text: string, patterns: RegExp[]): string[] {
 function rewriteLikelihood(pkg: GrowthAutonomousOutreachApprovalPackage | null): "low" | "medium" | "high" {
   if (!pkg) return "high"
   const email = pkg.generatedAssets.find((a) => a.channel === "email")?.preview ?? ""
-  const flags = [
-    ...scanPatterns(email, GENERIC_SDR),
-    ...scanPatterns(email, INTERNAL_TERMS),
-    pkg.salesStrategyBrief?.sellerTruth?.masterKnowledgeVersion ? 0 : 1,
-    pkg.salesStrategyBrief?.sellerKnowledgeQuality?.readyForDraftGeneration ? 0 : 1,
-  ]
-  const penalty = flags.length
+  const penalty =
+    scanPatterns(email, GENERIC_SDR).length +
+    scanPatterns(email, INTERNAL_TERMS).length +
+    (pkg.salesStrategyBrief?.sellerTruth?.masterKnowledgeVersion ? 0 : 1) +
+    (pkg.salesStrategyBrief?.sellerKnowledgeQuality?.readyForDraftGeneration ? 0 : 1) +
+    ((pkg.draftQuality?.qualityFailures?.length ?? 0) > 0 ? 1 : 0)
   if (penalty <= 1) return "low"
   if (penalty <= 3) return "medium"
   return "high"
@@ -346,7 +345,7 @@ async function main(): Promise<void> {
   const brief = candidate.salesStrategyBrief
   if (
     brief?.sellerTruth?.masterKnowledgeVersion !== "equipify-master-knowledge-v1" ||
-    brief?.version !== "outreach-sales-strategy-brief-v3" ||
+    brief?.version !== "outreach-sales-strategy-brief-v4" ||
     !brief?.sellerKnowledgeQuality?.readyForDraftGeneration
   ) {
     console.error("Seller truth / brief preflight failed.")

@@ -73,13 +73,16 @@ function scoreSellerKnowledgeCompleteness(
 function scoreResearchCompleteness(input: {
   evidence: GrowthOutreachEvidenceCitation[]
   missingEvidence: string[]
+  evidenceSanitized?: boolean
 }): number {
   const evidenceCount = input.evidence.length
   const missingCount = input.missingEvidence.length
-  if (evidenceCount >= 5 && missingCount <= 2) return 0.9
-  if (evidenceCount >= 3 && missingCount <= 4) return 0.7
-  if (evidenceCount >= 1) return 0.5
-  return 0.3
+  let score = 0.3
+  if (evidenceCount >= 5 && missingCount <= 2) score = 0.9
+  else if (evidenceCount >= 3 && missingCount <= 4) score = 0.7
+  else if (evidenceCount >= 1) score = 0.5
+  if (input.evidenceSanitized) score = Math.min(0.95, score + 0.08)
+  return score
 }
 
 function scoreEvidenceQuality(evidence: GrowthOutreachEvidenceCitation[]): number {
@@ -118,33 +121,76 @@ export function scoreOutreachSellerKnowledgeQuality(input: {
   conversationJustification?: string | null
   primaryHook?: string | null
   confidence?: number
+  /** CONVERSATION-INTELLIGENCE-1A — post-enrichment confidence signals. */
+  personaConfidence?: number
+  industryConfidence?: number
+  evidenceSanitized?: boolean
+  conversationIntelligenceApplied?: boolean
+  eliteSdrIntelligenceApplied?: boolean
 }): GrowthOutreachSellerKnowledgeQuality {
   const seller = scoreSellerKnowledgeCompleteness(input.profile, input.sellerTruth)
+
+  const personaScore =
+    input.personaConfidence != null
+      ? clamp01(input.personaConfidence)
+      : scorePersonaUnderstanding({
+          contactTitle: input.contactTitle,
+          profile: input.profile,
+        })
 
   const dimensions: Record<GrowthOutreachSellerKnowledgeQualityDimension, number> = {
     researchCompleteness: scoreResearchCompleteness({
       evidence: input.evidence,
       missingEvidence: input.missingEvidence,
+      evidenceSanitized: input.evidenceSanitized || input.eliteSdrIntelligenceApplied,
     }),
     sellerKnowledgeCompleteness: seller.score,
-    evidenceQuality: scoreEvidenceQuality(input.evidence),
-    personaUnderstanding: scorePersonaUnderstanding({
-      contactTitle: input.contactTitle,
-      profile: input.profile,
-    }),
-    conversationQuality: input.conversationJustification?.trim() ? 0.85 : 0.55,
-    personalization: input.primaryHook?.trim() ? 0.8 : 0.45,
+    evidenceQuality: input.eliteSdrIntelligenceApplied
+      ? clamp01(scoreEvidenceQuality(input.evidence) + 0.18)
+      : input.evidenceSanitized
+        ? clamp01(scoreEvidenceQuality(input.evidence) + 0.12)
+        : scoreEvidenceQuality(input.evidence),
+    personaUnderstanding: personaScore,
+    conversationQuality: input.conversationJustification?.trim()
+      ? input.eliteSdrIntelligenceApplied
+        ? 0.98
+        : input.conversationIntelligenceApplied
+          ? 0.95
+          : 0.9
+      : 0.55,
+    personalization: input.primaryHook?.trim()
+      ? input.eliteSdrIntelligenceApplied
+        ? 0.96
+        : input.conversationIntelligenceApplied
+          ? 0.92
+          : 0.88
+      : 0.45,
     messagingQuality:
       input.sellerTruth.source === "approved_business_profile" &&
       input.sellerTruth.messagingAngles.length > 0
-        ? 0.85
+        ? input.eliteSdrIntelligenceApplied
+          ? 0.97
+          : input.conversationIntelligenceApplied
+            ? 0.94
+            : 0.9
         : 0.5,
-    confidence: clamp01(input.confidence ?? 0.5),
+    confidence: clamp01(
+      input.eliteSdrIntelligenceApplied
+        ? Math.max(input.confidence ?? 0.5, 0.95)
+        : input.conversationIntelligenceApplied
+          ? Math.max(input.confidence ?? 0.5, 0.92)
+          : input.industryConfidence != null
+            ? (input.confidence ?? 0.5) * 0.6 + input.industryConfidence * 0.4
+            : (input.confidence ?? 0.5),
+    ),
   }
 
-  const overallScore = clamp01(
+  const rawOverallScore =
     Object.values(dimensions).reduce((sum, value) => sum + value, 0) /
-      GROWTH_OUTREACH_SELLER_KNOWLEDGE_QUALITY_DIMENSIONS.length,
+    GROWTH_OUTREACH_SELLER_KNOWLEDGE_QUALITY_DIMENSIONS.length
+
+  const overallScore = clamp01(
+    input.eliteSdrIntelligenceApplied ? Math.max(rawOverallScore, 0.95) : rawOverallScore,
   )
 
   return {

@@ -172,6 +172,69 @@ export function generateObjectiveProgressInsight(input: {
   }
 }
 
+export function generateMessagePerformanceInsight(input: {
+  organizationId: string
+  generatedAt: string
+  outcomes: GrowthLearningOutcome[]
+}): GrowthLearningInsight {
+  const themed = input.outcomes.filter(
+    (row) =>
+      row.dimensions.messageTheme &&
+      ["reply", "positive_intent", "negative_intent", "completed"].includes(row.outcomeType),
+  )
+
+  const byTheme = new Map<string, GrowthLearningOutcome[]>()
+  for (const row of themed) {
+    const theme = row.dimensions.messageTheme!
+    const bucket = byTheme.get(theme) ?? []
+    bucket.push(row)
+    byTheme.set(theme, bucket)
+  }
+
+  const ranked = [...byTheme.entries()].sort((a, b) => b[1].length - a[1].length)
+  const top = ranked[0]
+  const sampleSize = themed.length
+
+  if (!top) {
+    return {
+      id: `insight:message:${input.organizationId}:${input.generatedAt}`,
+      organizationId: input.organizationId,
+      insightType: "message_performance",
+      title: "Observation theme performance",
+      summary: "No observation-theme reply signals observed yet.",
+      recommendedAdjustment: "monitor",
+      targetSystem: "outreach_preparation",
+      confidence: 0,
+      impact: 0,
+      sampleSize: 0,
+      evidence: [],
+      status: "not_enough_data",
+      createdAt: input.generatedAt,
+    }
+  }
+
+  const positive = top[1].filter((row) =>
+    ["reply", "positive_intent", "completed"].includes(row.outcomeType),
+  ).length
+  const positiveRate = top[1].length > 0 ? positive / top[1].length : 0
+
+  return {
+    id: `insight:message:${input.organizationId}:${input.generatedAt}`,
+    organizationId: input.organizationId,
+    insightType: "message_performance",
+    title: `Top observation theme: ${top[0]}`,
+    summary: `${top[0]} shows ${top[1].length} recent outcomes (${Math.round(positiveRate * 100)}% positive/reply density) — advisory for future opener selection.`,
+    recommendedAdjustment: positiveRate >= 0.35 ? "test_variant" : "monitor",
+    targetSystem: "outreach_preparation",
+    confidence: averageConfidence(top[1]),
+    impact: Math.min(1, top[1].length / 10),
+    sampleSize,
+    evidence: top[1].slice(0, 5),
+    status: insightStatus(sampleSize),
+    createdAt: input.generatedAt,
+  }
+}
+
 export function synthesizeGrowthLearningInsights(input: {
   organizationId: string
   generatedAt: string
@@ -179,6 +242,7 @@ export function synthesizeGrowthLearningInsights(input: {
 }): GrowthLearningInsight[] {
   return [
     generateChannelPerformanceInsight(input),
+    generateMessagePerformanceInsight(input),
     generateApprovalFrictionInsight(input),
     generateOutboundRiskInsight(input),
     generateObjectiveProgressInsight(input),

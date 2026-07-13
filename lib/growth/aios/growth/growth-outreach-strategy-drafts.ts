@@ -1,6 +1,6 @@
 /**
- * GE-AIOS-OUTREACH-QUALITY-1A — Channel drafts derived from Sales Strategy Brief (client-safe).
- * One brief → one consistent story across email, LinkedIn, SMS, call, video, follow-ups.
+ * GE-AIOS-OUTREACH-QUALITY-1A / CONVERSATION-INTELLIGENCE-1B — Channel drafts from Sales Strategy Brief.
+ * One brief → one consistent story. Customer-facing copy = elite human SDR voice.
  */
 
 import type { GrowthAutonomousOutreachPreparedAssetSummary } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
@@ -9,6 +9,14 @@ import {
   countWords,
   type GrowthOutreachSalesStrategyBrief,
 } from "@/lib/growth/aios/growth/growth-outreach-sales-strategy-brief"
+import { reviewOutreachDraftCopy } from "@/lib/growth/aios/growth/growth-outreach-conversation-intelligence"
+import {
+  buildCuriousQuestion,
+  buildEliteHumanProspectDrafts,
+  extractEliteHumanDraftContext,
+  humanizeObservation,
+  reviewEliteHumanCommunication,
+} from "@/lib/growth/aios/growth/growth-outreach-elite-human-communication"
 
 export type GrowthOutreachStrategyDerivedDrafts = {
   email: {
@@ -34,17 +42,6 @@ function firstName(name: string | null): string | null {
   return name.trim().split(/\s+/)[0] ?? null
 }
 
-function evidencePhrase(brief: GrowthOutreachSalesStrategyBrief): string | null {
-  const detail = brief.evidence[0]?.detail?.trim()
-  if (!detail) return null
-  if (detail.length > 110) return `${detail.slice(0, 107).trim()}…`
-  return detail
-}
-
-function problemPhrase(brief: GrowthOutreachSalesStrategyBrief): string | null {
-  return brief.businessProblems[0]?.replace(/\.$/, "") ?? null
-}
-
 export function generateOutreachDraftsFromSalesStrategyBrief(input: {
   brief: GrowthOutreachSalesStrategyBrief
   senderName?: string | null
@@ -52,68 +49,46 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
   const brief = input.brief
   const company = brief.companyName
   const dmFirst = firstName(brief.decisionMakerAnalysis.name)
-  const greeting = dmFirst ? `Hi ${dmFirst},` : "Hi,"
-  const problem = problemPhrase(brief)
-  const evidence = evidencePhrase(brief)
-  const cta = brief.recommendedCta
-  const sender = input.senderName?.trim() || "Ava"
-  const justification = brief.conversationJustification || brief.primaryHook
+  const ctx = extractEliteHumanDraftContext(input)
+  const human = buildEliteHumanProspectDrafts(ctx)
+
+  const observation = humanizeObservation({
+    insight: ctx.insight,
+    equipment: ctx.equipment,
+    companyName: company,
+    industry: ctx.industry,
+    selectedObservation: ctx.selectedObservation,
+    seed: brief.leadId,
+  })
+  const question = buildCuriousQuestion({
+    outcome: ctx.outcome,
+    equipment: ctx.equipment,
+    curiousPosture: ctx.curiousPosture,
+    seed: brief.leadId,
+    selectedObservation: ctx.selectedObservation,
+  })
+
+  const greeting = ctx.greeting
+  const sender = ctx.sender
+  const signature = `— ${sender}`
+  const emailBody = human.emailBody
+  const opening = emailBody.split("\n\n")[0] ?? greeting
+  const ctaLine = emailBody.includes("?") && !/happy to compare/i.test(emailBody) ? "" : "Happy to compare notes if useful — no pitch."
+  const emailFull = `Subject: ${human.subject}\nPreview: ${human.preview}\n\n${emailBody}`
+
   const discovery =
     brief.sellerTruth?.discoveryQuestions?.slice(0, 3) ??
     [
-      `How do you currently handle ${problem?.toLowerCase() ?? "day-to-day service coordination"}?`,
+      question.replace(/\?$/, "") + "?",
       "Where does work still fall through the cracks?",
       "What would a cleaner week look like for your team?",
     ]
 
-  const subject = problem
-    ? `${company} — ${problem.split(" ").slice(0, 6).join(" ")}`
-    : `${company} service operations`
-
-  const preview = (brief.primaryHook || justification).slice(0, 90)
-
-  const opening = evidence
-    ? `${greeting}\n\nWhile reviewing ${company}, ${evidence.charAt(0).toLowerCase()}${evidence.slice(1)} stood out.`
-    : `${greeting}\n\nI've been looking at how ${company} runs service work.`
-
-  const middle = [
-    justification,
-    brief.businessValue,
-    `If useful, the next step is a ${cta.toLowerCase()} — specifically about ${brief.recommendedConversation.charAt(0).toLowerCase()}${brief.recommendedConversation.slice(1)}`,
-  ]
-    .filter(Boolean)
-    .join(" ")
-
-  const ctaLine = `Open to a ${cta.toLowerCase()} this week or next?`
-  const signature = `— ${sender}`
-
-  let emailBody = `${opening}\n\n${middle}\n\n${ctaLine}\n\n${signature}`
-  const words = emailBody.split(/\s+/).filter(Boolean)
-  if (words.length > 148) {
-    emailBody = `${words.slice(0, 145).join(" ")}\n\n${ctaLine}\n\n${signature}`
-  }
-
-  const emailFull = `Subject: ${subject}\nPreview: ${preview}\n\n${emailBody}`
-
-  const linkedIn = [
-    dmFirst ? `Hi ${dmFirst} —` : "Hi —",
-    evidence
-      ? `your ${company} footprint around ${evidence.toLowerCase()} caught my attention.`
-      : `${company}'s service footprint caught my attention.`,
-    problem
-      ? `Curious how you're handling ${problem.toLowerCase()} these days?`
-      : `Curious what service operations looks like for you this quarter?`,
-  ].join(" ")
-
-  let sms = dmFirst
-    ? `Hi ${dmFirst}, it's ${sender}. Quick question on ${company}'s service ops${problem ? ` — ${problem.toLowerCase()}` : ""}. Open to a short ${cta.toLowerCase()}?`
-    : `Hi, it's ${sender}. Quick question on ${company} service ops. Open to a short ${cta.toLowerCase()}?`
-  if (sms.length > 300) sms = `${sms.slice(0, 297).trim()}…`
-
   const callGuide = [
-    `Opening: "${greeting.replace(",", "")}, thanks for taking a minute — I was looking at ${company}${evidence ? ` and ${evidence.toLowerCase()}` : ""}."`,
+    `Opening: "${greeting.replace(",", "")} — ${observation}"`,
+    `Earn curiosity: "${question}"`,
     `Conversation objective: ${brief.conversationObjective}`,
-    `Conversation justification: ${justification}`,
+    `Operator note (internal): ${brief.conversationJustification ?? brief.primaryHook}`,
     `Relationship stage: ${brief.relationshipStage ?? "Cold"}`,
     `Discovery questions:`,
     ...discovery.map((q, index) => `${index + 1}. ${q}`),
@@ -129,8 +104,8 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
     brief.sellerTruth?.neverSay?.length || brief.sellerTruth?.wordsToAvoid?.length
       ? "• Follow approved profile never-say / words-to-avoid list (see Seller Truth)."
       : null,
-    `Desired outcome: Agreement on whether a ${cta.toLowerCase()} is worth scheduling.`,
-    `Follow-up: Send a short note summarizing what you heard; do not push a product tour.`,
+    `Desired outcome: One thoughtful reply or a redirect to the right owner.`,
+    `Follow-up: Summarize what you heard — don't chase.`,
   ]
     .filter(Boolean)
     .join("\n")
@@ -141,57 +116,62 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
   const personalizedVideo = videoMissing
     ? "Video draft requires additional personalization before recording."
     : [
-        `Opening: "${greeting.replace(",", "")} — I put together a short note on ${company}."`,
-        `Talking points:`,
-        `• Justification: ${justification}`,
-        `• Hook: ${brief.primaryHook}`,
-        problem ? `• Problem focus: ${problem}` : null,
-        `• Value: ${brief.businessValue}`,
-        `• Ask: a ${cta.toLowerCase()}`,
-        `Closing: "If this is useful, grab a time — if not, no chase."`,
+        `Opening: "${greeting.replace(",", "")} — short note on ${company}."`,
+        `Talking points (operator):`,
+        `• Observation: ${observation}`,
+        `• Question: ${question}`,
+        ctx.outcome ? `• Outcome focus: ${ctx.outcome}` : null,
+        `• Do not lead with product — earn the conversation first.`,
+        `Closing: "If useful, grab a time — if not, no chase."`,
       ]
         .filter(Boolean)
         .join("\n")
 
   const followUpSequence = [
-    `Day 3 — New angle: ${brief.trustBuilders[0] ?? brief.businessValue}`,
-    `Hi${dmFirst ? ` ${dmFirst}` : ""} — following my note on ${company}. One thing I keep hearing from similar teams: ${problem?.toLowerCase() ?? "service handoffs create quiet delay"}. Worth a ${cta.toLowerCase()}?`,
+    `Day 3 — New angle:`,
+    `${dmFirst ? `Hi ${dmFirst}` : "Hi"} — different angle on ${company}: ${observation} Still relevant?`,
     ``,
-    `Day 7 — Proof / clarity:`,
-    `Sharing a sharper question rather than a pitch: ${brief.recommendedConversation} If there's a better owner for that, point me there.`,
+    `Day 7 — One question only:`,
+    question,
     ``,
     `Day 14 — Soft bump:`,
-    `Still curious whether ${company} is actively tightening service workflows this quarter. Happy to keep this to ${cta.toLowerCase()} and leave a clean no if timing is wrong.`,
+    `Still curious about ${company}'s service ops — or bad timing?`,
     ``,
     `Day 21 — Close the loop:`,
-    `I'll close the loop on my side unless you want the conversation. Either way, appreciate your time.`,
+    `Closing my loop on this unless you want the conversation.`,
   ].join("\n")
 
+  const prospectFacing = [emailFull, human.linkedIn, human.sms]
   const qualityFailures = [
     ...assertOutreachCopyQuality(emailFull),
-    ...assertOutreachCopyQuality(linkedIn),
-    ...assertOutreachCopyQuality(sms),
+    ...assertOutreachCopyQuality(human.linkedIn),
+    ...assertOutreachCopyQuality(human.sms),
     ...assertOutreachCopyQuality(callGuide),
     ...assertOutreachCopyQuality(personalizedVideo),
     ...assertOutreachCopyQuality(followUpSequence),
+    ...reviewOutreachDraftCopy(emailFull),
+    ...reviewOutreachDraftCopy(human.linkedIn),
+    ...reviewOutreachDraftCopy(human.sms),
+    ...reviewEliteHumanCommunication(emailFull, company),
+    ...reviewEliteHumanCommunication(human.linkedIn, company),
+    ...reviewEliteHumanCommunication(human.sms, company),
   ]
 
-  // Also block seller wordsToAvoid / neverSay when present.
   const banned = [
     ...(brief.sellerTruth?.wordsToAvoid ?? []),
     ...(brief.sellerTruth?.neverSay ?? []),
   ]
   for (const phrase of banned) {
     const pattern = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i")
-    for (const text of [emailFull, linkedIn, sms, callGuide, personalizedVideo, followUpSequence]) {
+    for (const text of prospectFacing) {
       if (pattern.test(text)) qualityFailures.push(`seller_never_say:${phrase}`)
     }
   }
 
   return {
     email: {
-      subject,
-      preview,
+      subject: human.subject,
+      preview: human.preview,
       opening,
       body: emailBody,
       cta: ctaLine,
@@ -199,8 +179,8 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
       full: emailFull,
       wordCount: countWords(emailBody),
     },
-    linkedIn,
-    sms,
+    linkedIn: human.linkedIn,
+    sms: human.sms,
     callGuide,
     personalizedVideo,
     followUpSequence,

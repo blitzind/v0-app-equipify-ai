@@ -10,6 +10,7 @@ import {
   countWords,
   estimateReadTimeSeconds,
 } from "@/lib/growth/aios/growth/growth-outreach-sales-strategy-brief"
+import type { GrowthOutreachOperatorReasoning } from "@/lib/growth/aios/growth/growth-outreach-conversation-intelligence"
 import type { AiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 
@@ -80,6 +81,8 @@ export type Approvals2AOperatorReviewPacket = {
     prospectTruth: string[]
     conversationStrategy: string[]
   }
+  /** CONVERSATION-INTELLIGENCE-1A — operator-facing Ava reasoning. */
+  operatorReasoning: GrowthOutreachOperatorReasoning | null
   drafts: Approvals2ADraftSlot[]
   explainability: {
     whyPursue: string
@@ -439,6 +442,41 @@ export function projectApprovals2AOperatorReviewPacket(input: {
         : null,
     ].filter((line): line is string => Boolean(line)),
     conversationStrategy: [
+      strategy?.operatorReasoning?.conversationGoal
+        ? `Conversation goal: ${strategy.operatorReasoning.conversationGoal}`
+        : strategy?.conversationStrategy?.conversationGoal
+          ? `Conversation goal: ${strategy.conversationStrategy.conversationGoal}`
+          : null,
+      strategy?.operatorReasoning?.businessOutcome
+        ? `Business outcome: ${strategy.operatorReasoning.businessOutcome}`
+        : strategy?.conversationStrategy?.businessOutcomeThatMatters
+          ? `Business outcome: ${strategy.conversationStrategy.businessOutcomeThatMatters}`
+          : null,
+      strategy?.operatorReasoning?.primaryInsight
+        ? `Primary insight: ${strategy.operatorReasoning.primaryInsight}`
+        : strategy?.conversationStrategy?.primaryInsight
+          ? `Primary insight: ${strategy.conversationStrategy.primaryInsight}`
+          : null,
+      strategy?.operatorReasoning?.evidenceSummary
+        ? `Evidence summary: ${strategy.operatorReasoning.evidenceSummary}`
+        : strategy?.conversationStrategy?.evidenceSummary
+          ? `Evidence summary: ${strategy.conversationStrategy.evidenceSummary}`
+          : null,
+      strategy?.operatorReasoning?.reasonForCta
+        ? `Reason for CTA: ${strategy.operatorReasoning.reasonForCta}`
+        : strategy?.conversationStrategy?.reasonForCta
+          ? `Reason for CTA: ${strategy.conversationStrategy.reasonForCta}`
+          : null,
+      ...(strategy?.operatorReasoning?.conversationRisks ??
+        strategy?.conversationStrategy?.conversationRisks ??
+        []
+      ).map((line) => `Conversation risk: ${line}`),
+      ...(strategy?.operatorReasoning?.intentionallyAvoided ??
+        strategy?.conversationStrategy?.intentionallyAvoided ??
+        []
+      )
+        .slice(0, 4)
+        .map((line) => `Intentionally avoided: ${line}`),
       strategy?.conversationJustification
         ? `Justification: ${strategy.conversationJustification}`
         : null,
@@ -459,12 +497,32 @@ export function projectApprovals2AOperatorReviewPacket(input: {
         : strategy?.recommendedConversation
           ? `Why this conversation: ${strategy.recommendedConversation}`
           : null,
-      strategy?.conversationStrategy?.businessOutcomeThatMatters
-        ? `Outcome that matters: ${strategy.conversationStrategy.businessOutcomeThatMatters}`
-        : null,
+      strategy?.conversationStrategy?.smallestCommitment
+        ? `Smallest commitment: ${strategy.conversationStrategy.smallestCommitment}`
+        : strategy?.operatorReasoning?.smallestCommitment
+          ? `Smallest commitment: ${strategy.operatorReasoning.smallestCommitment}`
+          : null,
       ...(strategy?.conversationStrategy?.doNotDiscuss.slice(0, 3).map(
         (line) => `Do not discuss: ${line}`,
       ) ?? []),
+      strategy?.evidenceIntelligence?.themeKey
+        ? `Selected observation theme: ${strategy.evidenceIntelligence.themeKey}`
+        : null,
+      strategy?.evidenceIntelligence?.selectionRationale
+        ? `Selection rationale: ${strategy.evidenceIntelligence.selectionRationale}`
+        : null,
+      strategy?.evidenceIntelligence?.selectedObservation?.consultantObservation
+        ? `Consultant observation: ${strategy.evidenceIntelligence.selectedObservation.consultantObservation}`
+        : null,
+      ...(strategy?.evidenceIntelligence?.rankedObservations ?? [])
+        .slice(0, 3)
+        .map(
+          (row) =>
+            `Ranked observation (${row.scores.total.toFixed(2)}): ${row.themeKey} — ${row.consultantObservation}`,
+        ),
+      strategy?.evidenceIntelligence?.observationSelection?.runnerUp?.themeKey
+        ? `Runner-up theme: ${strategy.evidenceIntelligence.observationSelection.runnerUp.themeKey}`
+        : null,
     ].filter((line): line is string => Boolean(line)),
   }
 
@@ -506,6 +564,7 @@ export function projectApprovals2AOperatorReviewPacket(input: {
     }),
     salesStrategy: strategy,
     knowledgeLayers,
+    operatorReasoning: strategy?.operatorReasoning ?? null,
     drafts,
     explainability: {
       whyPursue:

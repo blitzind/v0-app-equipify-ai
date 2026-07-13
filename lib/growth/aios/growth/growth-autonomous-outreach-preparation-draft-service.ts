@@ -24,7 +24,10 @@ import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/
 import { enrichBusinessProfileFromMasterContextDocument } from "@/lib/growth/business-profile/equipify-master-context-ingestion"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
+import { loadSequenceOptimizationOutreachSignals } from "@/lib/growth/sequence-optimization/sequence-optimization-queries"
 import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
+import type { GrowthOutreachLearningThemeWeight } from "@/lib/growth/aios/growth/growth-outreach-conversation-intelligence"
 
 export async function buildAutonomousOutreachApprovalPackage(
   admin: SupabaseClient,
@@ -79,6 +82,32 @@ export async function buildAutonomousOutreachApprovalPackage(
     leadId: input.leadId,
   })
 
+  const researchRun = await fetchLatestCompletedProspectResearchRun(admin, input.leadId).catch(
+    () => null,
+  )
+  const prospectKnowledgePack = researchRun?.signals?.prospectKnowledgePack_v25c ?? null
+
+  let learningWeights: GrowthOutreachLearningThemeWeight[] | null = null
+  try {
+    const generatedMs = Date.parse(input.generatedAt)
+    const dateFrom = new Date(generatedMs - 90 * 86400000).toISOString()
+    const outreachSignals = await loadSequenceOptimizationOutreachSignals(admin, {
+      dateFrom,
+      dateTo: input.generatedAt,
+      channel: null,
+      repUserId: null,
+      sequenceId: null,
+      attributionModel: "last_touch",
+    })
+    learningWeights = outreachSignals.openerSignals.map((row) => ({
+      themeKey: row.key,
+      replyRatePct: row.replyRatePct,
+      sends: row.sends,
+    }))
+  } catch {
+    learningWeights = null
+  }
+
   // Think first — Prospect Truth + Seller Truth → Conversation Strategy → drafts.
   const salesStrategyBrief = buildOutreachSalesStrategyBrief({
     leadId: input.leadId,
@@ -110,6 +139,8 @@ export async function buildAutonomousOutreachApprovalPackage(
     sellerTruth,
     approvedProfile: enrichedProfile,
     approvedProfileId: profileRecord?.id ?? null,
+    prospectKnowledgePack,
+    learningWeights,
   })
 
   const drafts = generateOutreachDraftsFromSalesStrategyBrief({
@@ -162,9 +193,15 @@ export async function buildAutonomousOutreachApprovalPackage(
       `Primary hook: ${salesStrategyBrief.primaryHook}`,
       `Conversation justification: ${salesStrategyBrief.conversationJustification}`,
       `CTA: ${salesStrategyBrief.recommendedCta}`,
+      salesStrategyBrief.operatorReasoning?.conversationGoal
+        ? `Conversation goal: ${salesStrategyBrief.operatorReasoning.conversationGoal}`
+        : null,
+      salesStrategyBrief.operatorReasoning?.businessOutcome
+        ? `Business outcome: ${salesStrategyBrief.operatorReasoning.businessOutcome}`
+        : null,
       `Seller source: ${sellerTruth.source}`,
       ...salesStrategyBrief.trustBuilders.slice(0, 3),
-    ],
+    ].filter((line): line is string => Boolean(line)),
     supportingResearch: verifiedEvidence.slice(0, 6),
     confidence: Math.max(confidence, salesStrategyBrief.confidence),
     approvalRequirements: [
@@ -177,12 +214,16 @@ export async function buildAutonomousOutreachApprovalPackage(
       "LinkedIn and SMS remain manual send from the operator workspace.",
       "Personalized video stays draft-only until you explicitly approve recording.",
       "All channels share one sales strategy brief (Prospect Truth + Seller Truth → Conversation Strategy).",
+      salesStrategyBrief.evidenceIntelligence
+        ? "Evidence sanitized through Conversation Intelligence before drafts."
+        : null,
+      "Customer-facing drafts reviewed for elite human SDR voice (CONVERSATION-INTELLIGENCE-1B).",
       sellerTruth.source === "approved_business_profile"
         ? enrichedProfile?.masterKnowledgeIngestion?.isRuntimeSourceOfTruth === false
           ? "Seller messaging derived from enriched Approved Business Profile (Master Context ingested, not runtime SoT)."
           : "Seller messaging derived from Approved Business Profile."
         : "Seller messaging used safe defaults — Approved Business Profile not available.",
-    ],
+    ].filter((line): line is string => Boolean(line)),
     recommendedChannel: resolveCommunicationPlanRecommendedChannel(communicationPlan),
     recommendedSequence: "email_first_multichannel",
     expectedOutcome:

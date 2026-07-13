@@ -117,6 +117,17 @@ export type GrowthOutreachConversationStrategy = {
   /** MASTER-KNOWLEDGE-1A — internal conversation intelligence. */
   postponeTopics?: string[]
   gratefulReplyOutcome?: string
+  /** CONVERSATION-INTELLIGENCE-1A — operator-facing reasoning (not chain-of-thought). */
+  conversationGoal?: string
+  primaryInsight?: string | null
+  evidenceSummary?: string | null
+  reasonForCta?: string
+  conversationRisks?: string[]
+  intentionallyAvoided?: string[]
+  strongestEvidence?: string[]
+  weakestEvidence?: string[]
+  safestRecommendation?: string
+  smallestCommitment?: string
 }
 
 function clean(value: string | null | undefined): string | null {
@@ -186,6 +197,13 @@ function matchBuyerPersona(
 ): EquipifyBuyerPersonaKnowledge | null {
   const normalized = (title ?? "").toLowerCase()
   if (!normalized) return null
+  if (/\b(president|ceo|chief executive|founder|owner|principal|managing partner|managing director)\b/i.test(normalized)) {
+    return (
+      personas.find((row) => /^owner$/i.test(row.persona)) ??
+      personas.find((row) => /coo/i.test(row.persona)) ??
+      null
+    )
+  }
   return (
     personas.find((row) => normalized.includes(row.persona.toLowerCase().split("/")[0].trim())) ??
     personas.find((row) =>
@@ -587,7 +605,15 @@ export function buildOutreachConversationStrategy(input: {
     doNotDiscuss,
     supportingEvidence: unique(
       [
-        ...prospect.evidence.map((row) => `${row.source}: ${row.detail}`),
+        ...prospect.evidence
+          .filter((row) => !/verified description|unverified|\(\d+%\)/i.test(row.detail))
+          .map((row) =>
+            row.detail
+              .replace(/^(verified|unverified)\s+(description|product|service|signal|indicator|finding)\s*(\(\d+%\))?\s*:?\s*/i, "")
+              .replace(/\(\d+%\)/g, "")
+              .trim(),
+          )
+          .filter((line) => line.length > 12),
         seller.primaryValueProposition,
         ...seller.enrichments.fromKnowledgeCenter.slice(0, 2),
       ],
