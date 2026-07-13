@@ -327,7 +327,7 @@ console.log("  ✓ no Apollo path; no send/enroll; transport_blocked intact")
 // --- 5F still canonical; DF wiring present ---
 const dfService = readSource("lib/growth/draft-factory/draft-factory-service.ts")
 assert.ok(dfService.includes("evaluateAndEnrichDecisionMakerForLead"))
-assert.ok(dfService.includes("buildAutonomousOutreachApprovalPackage"))
+assert.ok(dfService.includes("generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory") || dfService.includes("buildAutonomousOutreachApprovalPackage"))
 const draft5f = readSource(
   "lib/growth/aios/growth/growth-autonomous-outreach-preparation-draft-service.ts",
 )

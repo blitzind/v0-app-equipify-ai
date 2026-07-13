@@ -168,6 +168,25 @@ export async function listOutreachPreparationPilotRuns(
   return rows.reverse().map(mapRunRowToRecord)
 }
 
+/** GE-AIOS-OPERATOR-UX-1A — lead-scoped runs for cancel/archive propagation. */
+export async function listOutreachPreparationPilotRunsForLead(
+  admin: SupabaseClient,
+  input: { organizationId: string; leadId: string; limit?: number },
+): Promise<GrowthAutonomousOutreachPreparationRunRecord[]> {
+  const { data, error } = await pilotRunsTable(admin)
+    .select("*")
+    .eq("organization_id", input.organizationId)
+    .eq("lead_id", input.leadId)
+    .order("completed_at", { ascending: false })
+    .limit(input.limit ?? 25)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return ((data ?? []) as PilotRunRow[]).map(mapRunRowToRecord)
+}
+
 export async function insertOutreachPreparationPilotRun(
   admin: SupabaseClient,
   input: {

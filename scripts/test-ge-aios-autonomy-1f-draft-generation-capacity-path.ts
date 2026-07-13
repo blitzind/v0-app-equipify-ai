@@ -109,7 +109,7 @@ console.log("  ✓ candidate sampling prefers generation-ready FIFO, then deferr
 const tickSrc = readSource("lib/growth/draft-factory/draft-factory-due-scheduler-tick.ts")
 assert.ok(tickSrc.includes("collectGenerationCapacityCandidates"))
 assert.ok(tickSrc.includes("generateViaGrowth5F"))
-assert.ok(tickSrc.includes("buildAutonomousOutreachApprovalPackage"))
+assert.ok(tickSrc.includes("generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory"))
 assert.ok(tickSrc.includes("routed_to_generation_capacity_wake"))
 assert.ok(tickSrc.includes("allowGeneration: false"))
 assert.ok(tickSrc.includes("GROWTH_AIOS_AUTONOMY_1F_QA_MARKER"))
@@ -125,7 +125,7 @@ console.log("  ✓ due tick: allowGeneration stays false; capacity wake injects 
 const wakeSrc = readSource("lib/growth/draft-factory/draft-factory-wake-bus-observer.ts")
 assert.ok(wakeSrc.includes("collectGenerationCapacityCandidates"))
 assert.ok(wakeSrc.includes("generateViaGrowth5F"))
-assert.ok(wakeSrc.includes("buildAutonomousOutreachApprovalPackage"))
+assert.ok(wakeSrc.includes("generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory"))
 console.log("  ✓ wake bus capacity path also discovers waiting_for_generation + Growth 5F")
 
 const growth5f = readSource(

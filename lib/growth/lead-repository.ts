@@ -954,6 +954,55 @@ export async function archiveGrowthLeads(
   return leads
 }
 
+/** GE-AIOS-OPERATOR-UX-1A — restore archived leads (clears archive fields; status → qualified). */
+export async function restoreGrowthLeads(
+  admin: SupabaseClient,
+  input: {
+    leadIds: string[]
+    restoredBy?: string | null
+  },
+): Promise<GrowthLead[]> {
+  if (input.leadIds.length === 0) return []
+
+  const archiveReady = await isGrowthLeadArchiveSchemaReady(admin)
+  if (!archiveReady) {
+    throw new GrowthLeadArchiveSchemaIncompleteError()
+  }
+
+  const now = new Date().toISOString()
+  const { data, error } = await growthLeadsTable(admin)
+    .update({
+      archived_at: null,
+      archived_by: null,
+      archive_reason: null,
+      status: "qualified",
+      updated_at: now,
+    })
+    .in("id", input.leadIds)
+    .not("archived_at", "is", null)
+    .select(LEAD_SELECT)
+
+  if (error) {
+    logGrowthEngine("lead_restore_failed", {
+      table: "growth.leads",
+      action: "update",
+      leadIds: input.leadIds,
+      code: error.code ?? null,
+      message: error.message,
+    })
+    throw new Error(error.message)
+  }
+
+  const leads = ((data ?? []) as GrowthLeadDbRow[]).map(mapGrowthLeadRow)
+  for (const lead of leads) {
+    logGrowthEngine("lead_restored", {
+      leadId: lead.id,
+      restoredBy: input.restoredBy ?? null,
+    })
+  }
+  return leads
+}
+
 /** @deprecated Use archiveGrowthLeads — hard delete is disabled for Growth leads. */
 export async function deleteGrowthLead(admin: SupabaseClient, leadId: string): Promise<boolean> {
   const archived = await archiveGrowthLeads(admin, { leadIds: [leadId] })

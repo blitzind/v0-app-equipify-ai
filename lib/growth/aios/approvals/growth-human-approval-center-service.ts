@@ -1,4 +1,4 @@
-/** GE-AI-2H — Human Approval Center service (server-only). */
+/** GE-AI-2H / GE-AIOS-OPERATOR-UX-1A — Human Approval Center service (server-only). */
 
 import "server-only"
 
@@ -6,11 +6,17 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { AiOsCommandCenterReadModel } from "@/lib/growth/aios/ai-os-command-center-types"
 import {
   synthesizeGrowthHumanApprovalCenterReadModel,
+  buildHumanApprovalCenterSummary,
   type AiVoiceApprovalSnapshotItem,
   type GeV15ApprovalInboxSnapshotItem,
   type GrowthHumanApprovalCenterInput,
 } from "@/lib/growth/aios/approvals/growth-human-approval-center-engine"
 import type { GrowthHumanApprovalCenterReadModel } from "@/lib/growth/aios/approvals/growth-human-approval-center-types"
+import {
+  collectSubjectLeadIdsFromApprovalItems,
+  fetchCompletedWorkLeadLifecycleMap,
+} from "@/lib/growth/aios/approvals/completed-work-lead-lifecycle"
+import { filterActiveCompletedWorkItems } from "@/lib/growth/aios/approvals/completed-work-operator-ux"
 import { fetchBoundedAutonomousOutboundReadModel } from "@/lib/growth/aios/outbound/growth-autonomous-outbound-scope-service"
 import { listGeV15OrganizationApprovalInbox } from "@/lib/growth/automation-runtime/ge-v1-5-automation-runtime-approval-inbox"
 import { listPendingAutomationApprovals } from "@/lib/growth/automation/growth-automation-approval-service"
@@ -141,6 +147,29 @@ export async function fetchGrowthHumanApprovalCenterReadModel(
     totalLimit: input.totalLimit,
   })
 
+  // OPERATOR-UX-1A — exclude archived/disqualified leads from active Completed Work.
+  let filteredModel = readModel
+  try {
+    const leadIds = collectSubjectLeadIdsFromApprovalItems(readModel.items)
+    const lifecycleById = await fetchCompletedWorkLeadLifecycleMap(admin, leadIds)
+    const activeItems = filterActiveCompletedWorkItems({
+      items: readModel.items,
+      leadLifecycleById: lifecycleById,
+    })
+    if (activeItems.length !== readModel.items.length) {
+      const topLimit = input.topLimit ?? 10
+      filteredModel = {
+        ...readModel,
+        items: activeItems,
+        topItems: activeItems.slice(0, topLimit),
+        summary: buildHumanApprovalCenterSummary(activeItems),
+      }
+    }
+  } catch {
+    // Fail open on lifecycle lookup so approvals remain visible if lead query fails.
+    filteredModel = readModel
+  }
+
   const externalFailures: Array<{ source: string; message: string }> = []
   if (geV15Result.status === "rejected") {
     externalFailures.push({ source: "ge_v15_automation_runtime.inbox.fetch", message: String(geV15Result.reason) })
@@ -158,10 +187,10 @@ export async function fetchGrowthHumanApprovalCenterReadModel(
     externalFailures.push({ source: "human_execution.fetch", message: String(humanExecResult.reason) })
   }
 
-  if (externalFailures.length === 0) return readModel
+  if (externalFailures.length === 0) return filteredModel
 
   return {
-    ...readModel,
-    sourcesFailed: [...readModel.sourcesFailed, ...externalFailures],
+    ...filteredModel,
+    sourcesFailed: [...filteredModel.sourcesFailed, ...externalFailures],
   }
 }

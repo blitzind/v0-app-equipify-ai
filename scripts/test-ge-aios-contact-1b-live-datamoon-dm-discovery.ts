@@ -369,7 +369,7 @@ assert.equal(GROWTH_AIOS_CONTACT_1B_QA_MARKER, "ge-aios-contact-1b-live-datamoon
     .map(readSource)
     .join("\n")
   assert.equal(/from \"@\/lib\/growth\/providers\/apollo|apollo_people_search/i.test(corpus), false)
-  assert.ok(readSource("lib/growth/draft-factory/draft-factory-durable-live.ts").includes("buildAutonomousOutreachApprovalPackage"))
+  assert.ok(readSource("lib/growth/draft-factory/draft-factory-durable-live.ts").includes("generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory"))
   assert.ok(readSource("lib/growth/draft-factory/draft-factory-durable-live.ts").includes("transportBlocked"))
   console.log("  ✓ Growth 5F remains draft generator; transport blocked; no Apollo")
 }

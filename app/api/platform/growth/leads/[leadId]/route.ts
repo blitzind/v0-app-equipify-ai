@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
+import { getGrowthEngineAiOrgId, logGrowthEngine, requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
 import { fetchGrowthLeadById, updateGrowthLead, archiveGrowthLeads } from "@/lib/growth/lead-repository"
 import { mapGrowthLeadArchiveApiError } from "@/lib/growth/lead-archive-api-errors"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
@@ -19,6 +19,7 @@ import {
   validateLeadContactEmail,
 } from "@/lib/growth/lead-contact-validation"
 import { GROWTH_LEAD_SOURCE_KINDS, GROWTH_LEAD_STATUSES, GROWTH_LEAD_RESEARCH_PRIORITIES } from "@/lib/growth/types"
+import { stopAutonomousWorkForLead } from "@/lib/growth/aios/approvals/completed-work-lifecycle-propagation"
 
 export const runtime = "nodejs"
 
@@ -154,6 +155,16 @@ export async function PATCH(
         to: body.status,
         actor: { userId: access.userId, email: access.userEmail },
       })
+      if (body.status === "disqualified" || body.status === "archived") {
+        const organizationId = getGrowthEngineAiOrgId()
+        if (organizationId) {
+          void stopAutonomousWorkForLead(access.admin, {
+            organizationId,
+            leadId,
+            reason: body.status === "archived" ? "lead_archived" : "lead_disqualified",
+          }).catch(() => undefined)
+        }
+      }
     }
     if (body.website !== undefined) {
       await emitGrowthLeadWebsiteChangedTimeline(access.admin, {
@@ -264,6 +275,15 @@ export async function DELETE(
         to: "archived",
         actor: { userId: access.userId, email: access.userEmail },
       })
+    }
+
+    const organizationId = getGrowthEngineAiOrgId()
+    if (organizationId) {
+      void stopAutonomousWorkForLead(access.admin, {
+        organizationId,
+        leadId,
+        reason: "lead_archived",
+      }).catch(() => undefined)
     }
 
     logGrowthEngine("lead_archive_success", {

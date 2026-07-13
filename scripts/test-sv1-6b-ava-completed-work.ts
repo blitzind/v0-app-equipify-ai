@@ -7,10 +7,10 @@ import fs from "node:fs"
 import path from "node:path"
 import {
   GROWTH_AVA_COMPLETED_WORK_HREF,
-  GROWTH_AVA_COMPLETED_WORK_NAV_LABEL,
   GROWTH_AVA_COMPLETED_WORK_PHASE,
   GROWTH_AVA_COMPLETED_WORK_QA_MARKER,
-  GROWTH_AVA_COMPLETED_WORK_TITLE,
+  resolveCompletedWorkNavLabel,
+  resolveCompletedWorkTitle,
 } from "../lib/growth/aios/approvals/ava-completed-work-contract"
 import {
   buildNeedsRevisionNote,
@@ -22,8 +22,9 @@ import {
 } from "../lib/growth/aios/approvals/ava-completed-work-projection"
 import type { GrowthHumanApprovalItem } from "../lib/growth/aios/approvals/growth-human-approval-center-types"
 import type { GrowthAutonomousOutreachApprovalPackage } from "../lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
-import { GROWTH_CUSTOMER_APPROVALS_TITLE } from "../lib/growth/customer-experience/growth-zero-assistance-adoption-19c-4a"
+import { growthCustomerApprovalsTitle } from "../lib/growth/customer-experience/growth-zero-assistance-adoption-19c-4a"
 import { buildAvaOperatorPackageActionApiPath } from "../lib/growth/mission-center/growth-ava-operator-workspace-contract"
+import { resolveAiTeammatePresentation } from "../lib/workspace/ai-teammate-identity"
 
 function readSource(relativePath: string): string {
   return fs.readFileSync(path.join(process.cwd(), relativePath), "utf8")
@@ -85,11 +86,12 @@ function samplePackage(): GrowthAutonomousOutreachApprovalPackage {
 function main(): void {
   console.log(`[${GROWTH_AVA_COMPLETED_WORK_PHASE}] Ava Completed Work certification`)
 
+  const teammate = resolveAiTeammatePresentation("Ava")
   assert.equal(GROWTH_AVA_COMPLETED_WORK_QA_MARKER, "ge-aios-sv1-6b-ava-completed-work-v1")
-  assert.equal(GROWTH_AVA_COMPLETED_WORK_TITLE, "Ava completed work")
-  assert.equal(GROWTH_AVA_COMPLETED_WORK_NAV_LABEL, "Ava's Work")
+  assert.equal(resolveCompletedWorkTitle(teammate), "Ava completed work")
+  assert.equal(resolveCompletedWorkNavLabel(teammate), "Ava's Work")
   assert.equal(GROWTH_AVA_COMPLETED_WORK_HREF, "/growth/os/approvals")
-  assert.equal(GROWTH_CUSTOMER_APPROVALS_TITLE, GROWTH_AVA_COMPLETED_WORK_TITLE)
+  assert.equal(growthCustomerApprovalsTitle(teammate), resolveCompletedWorkTitle(teammate))
   console.log("  ✓ Ava Completed Work contract + customer title aligned")
 
   const packageId = parsePackageIdFromApprovalRoute(
@@ -160,10 +162,12 @@ function main(): void {
   console.log("  ✓ package mutation path reuses existing action API")
 
   const panel = readSource("components/growth/ai-os/approvals/growth-ava-completed-work-panel.tsx")
-  assert.match(panel, /GROWTH_AVA_COMPLETED_WORK_TITLE/)
-  assert.match(panel, /Ava completed \$\{projection\.totalCompleted\}/)
+  assert.match(panel, /resolveCompletedWorkTitle/)
+  assert.match(panel, /Ready for your review/)
   assert.match(panel, /\/api\/platform\/growth\/ai-os\/approvals/)
   assert.match(panel, /\/api\/platform\/growth\/ai-os\/command-center/)
+  assert.match(panel, /recentRuns/)
+  assert.match(panel, /approvalPackage/)
   assert.doesNotMatch(panel, /Human Approval Center/)
   assert.doesNotMatch(panel, /Operator Queue|Approval Dashboard|CRM workflow|Sales rep/)
   console.log("  ✓ completed-work panel uses AI OS language over HAC GET")
@@ -184,15 +188,15 @@ function main(): void {
   console.log("  ✓ /growth/os/approvals serves Ava Completed Work projection")
 
   const nav = readSource("lib/growth/navigation/growth-workspace-shell-navigation.ts")
-  assert.match(nav, /Ava's Work/)
+  assert.match(nav, /Completed Work/)
   const routeCatalog = readSource("lib/growth/navigation/growth-route-catalog-data.ts")
-  assert.match(routeCatalog, /Ava's Work/)
-  console.log("  ✓ nav + route catalog point to Ava's Work")
+  assert.match(routeCatalog, /Completed Work/)
+  console.log("  ✓ nav + route catalog point to Completed Work")
 
   const homeWaiting = readSource(
     "components/growth/workspace/executive-briefing/growth-home-ai-os-waiting-on-you-section.tsx",
   )
-  assert.match(homeWaiting, /Review Ava/)
+  assert.match(homeWaiting, /Review/)
   assert.doesNotMatch(homeWaiting, /Open Approvals/)
   const homeSynth = readSource(
     "lib/growth/workspace/executive-briefing/growth-home-ai-os-ux-synthesizer.ts",
@@ -201,14 +205,14 @@ function main(): void {
   console.log("  ✓ Home routes into Ava Completed Work")
 
   const cognitive = readSource("components/growth/growth-lead-cognitive-workspace.tsx")
-  assert.match(cognitive, /Ava's completed work/)
+  assert.match(cognitive, /reviewCompletedWork/)
   assert.match(cognitive, /\/growth\/os\/approvals/)
   console.log("  ✓ Cognitive Workspace points into Ava Completed Work")
 
   const cc = readSource(
     "components/growth/ai-os/command-center/growth-ai-os-human-approval-center-section.tsx",
   )
-  assert.match(cc, /GROWTH_AVA_COMPLETED_WORK_TITLE/)
+  assert.match(cc, /resolveCompletedWorkTitle/)
   assert.doesNotMatch(cc, /Human Approval Center/)
   console.log("  ✓ Command Center section uses Ava Completed Work language")
 

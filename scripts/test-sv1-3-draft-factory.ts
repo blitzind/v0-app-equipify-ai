@@ -92,7 +92,10 @@ const moduleCorpus = fs
   .map((name) => readSource(`lib/growth/draft-factory/${name}`))
   .join("\n")
 
-assert.ok(moduleCorpus.includes("buildAutonomousOutreachApprovalPackage") || readSource("lib/growth/draft-factory/draft-factory-service.ts").includes("buildAutonomousOutreachApprovalPackage"))
+assert.ok(
+  moduleCorpus.includes("generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory") ||
+    moduleCorpus.includes("buildAutonomousOutreachApprovalPackage"),
+)
 assert.equal(/transportBlocked:\s*false|transport_blocked:\s*false/.test(moduleCorpus), false)
 assert.ok(moduleCorpus.includes("transportBlocked: true"))
 assert.equal(/sendEmail|enrollInCampaign|removeTransportBlock/.test(moduleCorpus), false)
@@ -304,7 +307,7 @@ console.log("  ✓ parallel workers don't duplicate work")
 
 // 5F remains canonical — source checks
 const factoryService = readSource("lib/growth/draft-factory/draft-factory-service.ts")
-assert.ok(factoryService.includes("buildAutonomousOutreachApprovalPackage"))
+assert.ok(factoryService.includes("generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory"))
 assert.ok(factoryService.includes("Growth 5F") || factoryService.includes("5F"))
 
 const outreachService = readSource(

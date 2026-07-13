@@ -8,6 +8,7 @@ import {
   findOutreachPreparationRunByPackageId,
   insertOutreachPreparationPilotRun,
   listOutreachPreparationPilotRuns,
+  listOutreachPreparationPilotRunsForLead,
   markOutreachPreparationPackageApprovalDecision,
   resetOutreachPreparationPilotOrgState,
   upsertOutreachPreparationPilotControlState,
@@ -91,6 +92,14 @@ export async function findAutonomousOutreachPreparationRunByPackageId(
     organizationId,
     packageId,
   })
+}
+
+export async function listOutreachPreparationRunsForLead(
+  admin: SupabaseClient,
+  organizationId: string,
+  leadId: string,
+): Promise<GrowthAutonomousOutreachPreparationRunRecord[]> {
+  return listOutreachPreparationPilotRunsForLead(admin, { organizationId, leadId })
 }
 
 export async function markAutonomousOutreachPackageApprovalDecision(input: {
