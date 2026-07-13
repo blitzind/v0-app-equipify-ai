@@ -136,13 +136,12 @@ assert.match(
   /manual_outreach_preparation_request[\s\S]*?const decision = await executeAutonomousOutreachPreparation[\s\S]*?approvalPackage: decision\.approvalPackage/,
 )
 console.log("  ✓ Manual outreach preparation request persists approvalPackage on completed runs")
-assert.match(draftSource, /runOutreachPersonalizationGeneration/)
-assert.match(draftSource, /runSmsPersonalizationForLead/)
-assert.match(draftSource, /buildCadenceLinkedInDraft/)
-assert.match(draftSource, /previewSendrPersonalization/)
+assert.match(draftSource, /buildOutreachSalesStrategyBrief/)
+assert.match(draftSource, /generateOutreachDraftsFromSalesStrategyBrief/)
+assert.match(draftSource, /salesStrategyBrief/)
 assert.equal(draftSource.includes("sendEmail"), false)
 assert.equal(draftSource.includes("executeTransportSend"), false)
-console.log("  ✓ Reuses existing SENDR/personalization draft systems without transport")
+console.log("  ✓ Strategy-first draft generation inside Growth 5F pipeline without transport")
 
 const actionRoute = readSource("app/api/platform/growth/ai-os/autonomous-outreach-preparation-pilot/action/route.ts")
 assert.match(actionRoute, /403/)

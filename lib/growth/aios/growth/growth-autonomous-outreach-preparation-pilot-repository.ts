@@ -259,6 +259,33 @@ export async function findOutreachPreparationRunByPackageId(
   return byApprovalPackage ? mapRunRowToRecord(byApprovalPackage as PilotRunRow) : null
 }
 
+/** GE-AIOS-MASTER-KNOWLEDGE-1C — replace approval_package body on an existing run row. */
+export async function updateOutreachPreparationPilotRunApprovalPackage(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string
+    runId: string
+    approvalPackage: GrowthAutonomousOutreachApprovalPackage
+    confidence?: number | null
+    now?: string
+  },
+): Promise<void> {
+  const { error } = await pilotRunsTable(admin)
+    .update({
+      approval_package: input.approvalPackage,
+      package_id: input.approvalPackage.packageId,
+      confidence: input.confidence ?? input.approvalPackage.confidence,
+      qa_marker: GROWTH_AVA_PERSISTENCE_1_QA_MARKER,
+      completed_at: input.now ?? input.approvalPackage.preparedAt,
+    })
+    .eq("organization_id", input.organizationId)
+    .eq("run_id", input.runId)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+}
+
 export async function markOutreachPreparationPackageApprovalDecision(
   admin: SupabaseClient,
   input: {

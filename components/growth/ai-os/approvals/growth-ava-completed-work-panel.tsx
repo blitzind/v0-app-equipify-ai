@@ -49,6 +49,7 @@ import {
   sortCompletedWorkForOperatorPriority,
   summarizeActionableCompletedWork,
 } from "@/lib/growth/aios/approvals/completed-work-operator-ux"
+import { humanizeCompletedWorkSupportingSummary } from "@/lib/growth/aios/approvals/approvals-operator-review-packet"
 import {
   formatGrowthCustomerApprovalActionLabel,
   formatGrowthCustomerApprovalChannelLabel,
@@ -108,17 +109,20 @@ function GenericCompletedWorkCard({
   onActivated,
   onDismiss,
   organizationId,
+  teammateName,
 }: {
   item: GrowthHumanApprovalCenterReadModel["items"][number]
   boundedAutonomousOutbound: GrowthBoundedAutonomousOutboundReadModel | null
   onActivated: () => void
   onDismiss: (itemId: string) => void
   organizationId: string
+  teammateName: string
 }) {
   const channelLabel = formatGrowthCustomerApprovalChannelLabel(item.channel)
   const typeLabel = formatGrowthCustomerApprovalActionLabel(item.actionType)
   const cta = resolveCompletedWorkContextualCta(item)
   const overflow = resolveCompletedWorkOverflowActions({ item })
+  const humanSummary = humanizeCompletedWorkSupportingSummary(item, teammateName)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -180,7 +184,7 @@ function GenericCompletedWorkCard({
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
           <p className="font-medium text-foreground">{item.title}</p>
-          <p className="text-sm text-muted-foreground">{item.summary}</p>
+          <p className="text-sm text-muted-foreground">{humanSummary}</p>
           <div className="flex flex-wrap gap-2 pt-1">
             <Badge variant="secondary">{typeLabel}</Badge>
             {channelLabel ? <Badge variant="outline">{channelLabel}</Badge> : null}
@@ -284,6 +288,7 @@ function SupportingGroup({
   onActivated,
   onDismiss,
   organizationId,
+  teammateName,
 }: {
   label: string
   count: number
@@ -292,6 +297,7 @@ function SupportingGroup({
   onActivated: () => void
   onDismiss: (itemId: string) => void
   organizationId: string
+  teammateName: string
 }) {
   const [open, setOpen] = useState(false)
   return (
@@ -314,6 +320,7 @@ function SupportingGroup({
               onActivated={onActivated}
               onDismiss={onDismiss}
               organizationId={organizationId}
+              teammateName={teammateName}
             />
           ))}
         </ul>
@@ -506,6 +513,14 @@ export function GrowthAvaCompletedWorkPanel() {
                         card={row.outreachCard}
                         packageBody={packagesById.get(row.outreachCard.packageId) ?? null}
                         onDecided={() => void load()}
+                        onDismiss={() => {
+                          persistDismissedCompletedWorkItemId(organizationId, row.item.id)
+                          setDismissedIds((prev) => {
+                            const next = new Set(prev)
+                            next.add(row.item.id)
+                            return next
+                          })
+                        }}
                       />
                     ) : (
                       <GenericCompletedWorkCard
@@ -521,6 +536,7 @@ export function GrowthAvaCompletedWorkPanel() {
                           })
                         }
                         organizationId={organizationId}
+                        teammateName={teammate.name}
                       />
                     ),
                   )}
@@ -561,6 +577,7 @@ export function GrowthAvaCompletedWorkPanel() {
                           })
                         }
                         organizationId={organizationId}
+                        teammateName={teammate.name}
                       />
                     ))}
                   </ul>

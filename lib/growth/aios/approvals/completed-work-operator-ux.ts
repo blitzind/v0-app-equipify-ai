@@ -27,6 +27,7 @@ export type CompletedWorkLeadLifecycleSnapshot = {
 export type CompletedWorkOperatorBucket =
   | "ready_outreach"
   | "ready_needs_revision"
+  | "ready_meeting"
   | "ready_follow_up"
   | "ready_other"
   | "supporting_calibration"
@@ -93,6 +94,7 @@ export function resolveCompletedWorkOperatorBucket(
 ): CompletedWorkOperatorBucket {
   const category = categorizeAvaCompletedWorkItem(item)
   if (category === "outreach_packages") return "ready_outreach"
+  if (category === "meeting_preparations") return "ready_meeting"
   if (item.actionType === "review_blocker" || item.riskLevel === "high") {
     if (item.source === "adaptive_calibration" || item.source === "meta_recommender") {
       return "supporting_calibration"
@@ -105,7 +107,7 @@ export function resolveCompletedWorkOperatorBucket(
   if (item.source === "priority_binding" || item.source === "revenue_operator") {
     return "supporting_objective"
   }
-  if (category === "follow_up_recommendations" || category === "meeting_preparations") {
+  if (category === "follow_up_recommendations") {
     return "ready_follow_up"
   }
   if (category === "accounts_need_review") return "ready_other"
@@ -138,8 +140,13 @@ export function summarizeActionableCompletedWork(
   for (const item of items) {
     const bucket = resolveCompletedWorkOperatorBucket(item)
     if (bucket === "ready_outreach") outreachPackages += 1
-    else if (bucket === "ready_follow_up" || bucket === "ready_needs_revision") followUpDecisions += 1
-    else supportingRecommendations += 1
+    else if (
+      bucket === "ready_follow_up" ||
+      bucket === "ready_needs_revision" ||
+      bucket === "ready_meeting"
+    ) {
+      followUpDecisions += 1
+    } else supportingRecommendations += 1
   }
 
   return {
@@ -157,12 +164,13 @@ export function sortCompletedWorkForOperatorPriority<T extends { item: GrowthHum
   const rank: Record<CompletedWorkOperatorBucket, number> = {
     ready_outreach: 0,
     ready_needs_revision: 1,
-    ready_follow_up: 2,
-    ready_other: 3,
-    supporting_risk: 4,
-    supporting_objective: 5,
-    supporting_calibration: 6,
-    history: 7,
+    ready_meeting: 2,
+    ready_follow_up: 3,
+    ready_other: 4,
+    supporting_risk: 5,
+    supporting_objective: 6,
+    supporting_calibration: 7,
+    history: 8,
   }
   return [...rows].sort((a, b) => {
     const ba = resolveCompletedWorkOperatorBucket(a.item)
@@ -176,6 +184,7 @@ export function sortCompletedWorkForOperatorPriority<T extends { item: GrowthHum
 export function resolveCompletedWorkContextualCta(item: GrowthHumanApprovalItem): string {
   const bucket = resolveCompletedWorkOperatorBucket(item)
   if (bucket === "ready_outreach") return "Review Outreach"
+  if (bucket === "ready_meeting") return "Review Meeting Prep"
   if (bucket === "ready_follow_up") return "Review Follow-Up"
   if (bucket === "supporting_risk") return "View Risk Details"
   if (bucket === "supporting_calibration" || bucket === "supporting_objective") {

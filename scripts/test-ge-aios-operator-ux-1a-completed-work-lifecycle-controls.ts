@@ -191,10 +191,10 @@ console.log("  ✓ configurable teammate identity respected; no hardcoded Ava CT
 const card = readSource(
   "components/growth/ai-os/approvals/growth-ava-completed-outreach-package-card.tsx",
 )
-assert.ok(card.includes("Prepared drafts"))
+assert.ok(card.includes("Drafts") || card.includes("Prepared drafts"))
 assert.ok(card.includes("Not prepared"))
-assert.ok(card.includes("Cancel work"))
-assert.ok(card.includes("Archive account"))
+assert.ok(card.includes("Cancel work") || card.includes("Pause autonomy"))
+assert.ok(card.includes("Archive lead") || card.includes("Archive account"))
 assert.ok(card.includes("Authorize"))
 assert.equal(/sendEmail|enrollSequence|twilio|placeCall/i.test(card), false)
 console.log("  ✓ Block Imaging-style package card renders drafts inline with lifecycle actions")

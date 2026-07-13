@@ -553,20 +553,25 @@ export function summarizePreparedAssetsForPackage(input: {
   return [
     {
       channel: "email",
-      label: "Email draft",
+      label: "Email",
       preview: input.emailSubject
-        ? `${input.emailSubject} — ${input.emailBody.slice(0, 120)}`
-        : input.emailBody.slice(0, 160),
+        ? `Subject: ${input.emailSubject}\n\n${input.emailBody.slice(0, 1200)}`
+        : input.emailBody.slice(0, 1200),
       draftOnly: true,
     },
-    { channel: "sms", label: "SMS draft", preview: input.smsBody.slice(0, 160), draftOnly: true },
-    { channel: "linkedin", label: "LinkedIn draft", preview: input.linkedInDraft.slice(0, 160), draftOnly: true },
-    { channel: "call", label: "Call talking points", preview: input.callTalkingPoints.slice(0, 160), draftOnly: true },
-    { channel: "sendr", label: "SENDR recommendation", preview: input.sendrRecommendation.slice(0, 160), draftOnly: true },
+    { channel: "sms", label: "SMS", preview: input.smsBody.slice(0, 400), draftOnly: true },
+    { channel: "linkedin", label: "LinkedIn", preview: input.linkedInDraft.slice(0, 600), draftOnly: true },
+    { channel: "call", label: "Call guide", preview: input.callTalkingPoints.slice(0, 800), draftOnly: true },
+    {
+      channel: "sendr",
+      label: "Personalized Video",
+      preview: input.sendrRecommendation.slice(0, 400),
+      draftOnly: true,
+    },
     {
       channel: "follow_up",
-      label: "Follow-up recommendation",
-      preview: input.followUpRecommendation.slice(0, 160),
+      label: "Follow-up sequence",
+      preview: input.followUpRecommendation.slice(0, 400),
       draftOnly: true,
     },
   ]

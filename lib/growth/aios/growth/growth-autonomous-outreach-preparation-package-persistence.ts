@@ -26,6 +26,7 @@ import {
   appendAutonomousOutreachPreparationRun,
   findAutonomousOutreachPreparationRunByPackageId,
 } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-store"
+import { updateOutreachPreparationPilotRunApprovalPackage } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-repository"
 import type {
   GrowthAutonomousOutreachApprovalPackage,
   GrowthAutonomousOutreachPreparationWakeCondition,
@@ -45,6 +46,7 @@ export type DraftFactoryGrowth5FPackageResult = {
   transportBlocked: true
   approvalPackage: GrowthAutonomousOutreachApprovalPackage
   reusedExisting: boolean
+  previousPackage?: GrowthAutonomousOutreachApprovalPackage | null
 }
 
 /**
@@ -181,4 +183,110 @@ export async function recoverAutonomousOutreachApprovalPackagePayload(
     generatedAt: parsed.generatedAt,
     wakeCondition: input.wakeCondition ?? "execution_completed",
   })
+}
+
+/**
+ * GE-AIOS-EQUIPIFY-MASTER-KNOWLEDGE-1C — Force rebuild of an existing package body using
+ * the canonical Growth 5F strategy-first path. Preserves packageId / runId; does not mutate Draft Factory.
+ */
+export async function rebuildAutonomousOutreachApprovalPackagePayload(
+  admin: SupabaseClient,
+  input: {
+    organizationId: string
+    packageId: string
+    wakeCondition?: GrowthAutonomousOutreachPreparationWakeCondition
+    rebuildReason?: string
+  },
+): Promise<DraftFactoryGrowth5FPackageResult | null> {
+  const parsed = parseOutreachPrepPackageId(input.packageId)
+  if (!parsed) return null
+
+  const existing = await findAutonomousOutreachPreparationRunByPackageId(
+    admin,
+    input.organizationId,
+    input.packageId,
+  ).catch(() => null)
+
+  const previousPackage = existing?.approvalPackage ?? null
+
+  const lead = await fetchGrowthLeadById(admin, parsed.leadId)
+  if (!lead) return null
+
+  const snapshot = await fetchLatestGrowthLeadResearchWorkflowSnapshot(admin, {
+    organizationId: input.organizationId,
+    leadId: parsed.leadId,
+  })
+  if (!snapshot) return null
+
+  const approvalPackage = await buildAutonomousOutreachApprovalPackage(admin, {
+    organizationId: input.organizationId,
+    leadId: parsed.leadId,
+    companyName: lead.companyName,
+    snapshot,
+    generatedAt: parsed.generatedAt,
+  })
+
+  if (approvalPackage.pendingHumanApproval !== true || approvalPackage.transportBlocked !== true) {
+    return null
+  }
+  if (approvalPackage.packageId !== input.packageId) {
+    return null
+  }
+
+  const run =
+    existing ??
+    buildAutonomousOutreachPreparationRunRecord({
+      leadId: parsed.leadId,
+      companyName: approvalPackage.companyName,
+      wakeCondition: input.wakeCondition ?? "execution_completed",
+      generatedAt: parsed.generatedAt,
+      outcome: "completed",
+      packageId: approvalPackage.packageId,
+      confidence: approvalPackage.confidence,
+      revenueOperatorHandoff: "human_review_required",
+      approvalPackage,
+    })
+
+  const updatedRun = {
+    ...run,
+    approvalPackage,
+    packageId: approvalPackage.packageId,
+    confidence: approvalPackage.confidence,
+    completedAt: parsed.generatedAt,
+  }
+
+  if (existing) {
+    await updateOutreachPreparationPilotRunApprovalPackage(admin, {
+      organizationId: input.organizationId,
+      runId: existing.runId,
+      approvalPackage,
+      confidence: approvalPackage.confidence,
+      now: parsed.generatedAt,
+    })
+  } else {
+    await appendAutonomousOutreachPreparationRun({
+      admin,
+      organizationId: input.organizationId,
+      now: parsed.generatedAt,
+      run: updatedRun,
+    })
+  }
+
+  logGrowthEngine("growth_5f_approval_package_rebuilt", {
+    qa_marker: GROWTH_AIOS_AUTONOMY_1H_QA_MARKER,
+    organization_id: input.organizationId,
+    lead_id: parsed.leadId,
+    package_id: input.packageId,
+    rebuild_reason: input.rebuildReason ?? "master_knowledge_refresh",
+    had_previous_body: Boolean(previousPackage),
+  })
+
+  return {
+    packageId: input.packageId,
+    pendingHumanApproval: true,
+    transportBlocked: true,
+    approvalPackage,
+    reusedExisting: false,
+    previousPackage,
+  }
 }

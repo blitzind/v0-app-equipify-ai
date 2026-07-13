@@ -1,30 +1,30 @@
-/** GE-AIOS-GROWTH-5F — Draft-only outreach preparation orchestrator (server-only). */
+/** GE-AIOS-GROWTH-5F / OUTREACH-QUALITY-1A / SALES-PLAYBOOK-1B — Strategy-first outreach prep (server-only). */
 
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import {
-  buildCadenceLinkedInDraft,
-  buildCadenceSuggestedSmsText,
-  buildCadenceTaskInstructions,
-} from "@/lib/growth/cadence/cadence-channel-engine"
 import type { GrowthLeadResearchWorkflowSnapshot } from "@/lib/growth/aios/growth/growth-lead-research-workflow-types"
-import {
-  resolveOutreachPreparationConfidence,
-  summarizePreparedAssetsForPackage,
-} from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-engine"
+import { resolveOutreachPreparationConfidence } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-engine"
 import type { GrowthAutonomousOutreachApprovalPackage } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
 import { GROWTH_AUTONOMOUS_OUTREACH_PREPARATION_PILOT_ALLOWED_WORKFLOW } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
 import {
   requestGrowthCommunicationPlan,
   resolveCommunicationPlanRecommendedChannel,
 } from "@/lib/growth/aios/communication/growth-communication-engine-service"
+import {
+  buildOutreachSalesStrategyBrief,
+  estimateReadTimeSeconds,
+} from "@/lib/growth/aios/growth/growth-outreach-sales-strategy-brief"
+import {
+  generateOutreachDraftsFromSalesStrategyBrief,
+  summarizeStrategyDerivedAssetsForPackage,
+} from "@/lib/growth/aios/growth/growth-outreach-strategy-drafts"
+import { loadOutreachSellerTruthForOrganization } from "@/lib/growth/aios/growth/growth-outreach-seller-truth-loader"
+import { getActiveApprovedBusinessProfile } from "@/lib/growth/business-profile/business-profile-repository"
+import { enrichBusinessProfileFromMasterContextDocument } from "@/lib/growth/business-profile/equipify-master-context-ingestion"
+import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
-import { runOutreachPersonalizationGeneration } from "@/lib/growth/outreach/personalization/run-outreach-personalization"
-import { runSmsPersonalizationForLead } from "@/lib/growth/sms/personalization/run-sms-personalization"
-import { previewSendrPersonalization } from "@/lib/growth/sendr/growth-sendr-personalization-preview-service"
-
-const SYSTEM_OPERATOR_USER_ID = "growth-autonomous-outreach-preparation-pilot"
+import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 
 export async function buildAutonomousOutreachApprovalPackage(
   admin: SupabaseClient,
@@ -34,6 +34,7 @@ export async function buildAutonomousOutreachApprovalPackage(
     companyName: string | null
     snapshot: GrowthLeadResearchWorkflowSnapshot
     generatedAt: string
+    teammateName?: string | null
   },
 ): Promise<GrowthAutonomousOutreachApprovalPackage> {
   const lead = await fetchGrowthLeadById(admin, input.leadId)
@@ -41,64 +42,82 @@ export async function buildAutonomousOutreachApprovalPackage(
     throw new Error("Lead not found for outreach preparation.")
   }
 
-  const emailDraft = await runOutreachPersonalizationGeneration(admin, {
-    lead,
-    generationType: "cold_email",
-    actingUserId: SYSTEM_OPERATOR_USER_ID,
-    aiRefinementEnabled: false,
-  })
+  const decisionMakers = await listGrowthLeadDecisionMakers(admin, input.leadId).catch(() => [])
+  const primaryDm =
+    decisionMakers.find((row) => row.id === lead.primaryDecisionMakerId) ?? decisionMakers[0] ?? null
 
-  const smsDraft = await runSmsPersonalizationForLead(admin, lead, {
-    messageType: "follow_up",
-    draftType: "outbound",
-  })
-
-  const linkedInDraft = buildCadenceLinkedInDraft({
-    companyName: lead.companyName ?? input.companyName ?? "the account",
-    contactName: lead.contactName,
-  })
-
-  const callTalkingPoints = buildCadenceTaskInstructions({
-    channel: "manual_call",
-    companyName: lead.companyName ?? input.companyName ?? "the account",
-    contactName: lead.contactName,
-  })
-
-  const sendrPreview = await previewSendrPersonalization(admin, {
-    leadId: input.leadId,
-    sampleTemplates: {
-      hero: "Hi {{first_name}} — tailored for {{company_name}}",
-      cta: "See how {{company_name}} can streamline operations",
-    },
-  })
-
-  const sendrRecommendation =
-    sendrPreview.missing.length > 0
-      ? `SENDR personalization preview ready with ${sendrPreview.missing.length} missing variable(s) — review before publish.`
-      : `SENDR personalization preview resolved ${Object.keys(sendrPreview.resolved).length} variables — draft-only recommendation.`
-
-  const followUpRecommendation =
-    input.snapshot.nextBestAction?.action ??
-    input.snapshot.executionPlan?.nextBestAction ??
-    "Schedule human-reviewed follow-up after approval package review."
+  const companyName = lead.companyName ?? input.companyName ?? "this company"
+  const verifiedEvidence = input.snapshot.evidenceSummary?.verifiedEvidence ?? []
+  const missingEvidence = input.snapshot.evidenceSummary?.missingEvidence ?? []
+  const assumptions = input.snapshot.evidenceSummary?.assumptions ?? []
+  const equipmentFromLead = lead.fieldServiceStackDetected
+    ? [lead.fieldServiceStackDetected]
+    : []
+  const equipmentFromEvidence = verifiedEvidence
+    .filter((line) => /service indicator|equipment|mri|ct|imaging|fleet/i.test(line))
+    .map((line) => line.replace(/^Service indicator:\s*/i, "").trim())
+    .filter(Boolean)
 
   const confidence = resolveOutreachPreparationConfidence(input.snapshot)
-  const evidence = input.snapshot.evidenceSummary?.verifiedEvidence ?? []
-  const personalizationEvidence = [
-    ...emailDraft.audit.warnings.slice(0, 3).map((warning) => warning.message ?? String(warning)),
-    ...smsDraft.audit.warnings.slice(0, 2).map((warning) => warning.message ?? String(warning)),
-    `Email strategy: ${emailDraft.audit.strategyVersion ?? "deterministic"}`,
-  ]
+  const teammate = resolveAiTeammatePresentation(input.teammateName)
 
-  const generatedAssets = summarizePreparedAssetsForPackage({
-    emailSubject: emailDraft.subject,
-    emailBody: emailDraft.content,
-    smsBody: smsDraft.draft.body,
-    linkedInDraft,
-    callTalkingPoints,
-    sendrRecommendation,
-    followUpRecommendation,
+  // SALES-PLAYBOOK-1B / MASTER-KNOWLEDGE-1A — Seller Truth from enriched Approved Business Profile.
+  const profileRecord = await getActiveApprovedBusinessProfile(admin, input.organizationId).catch(
+    () => null,
+  )
+  const enrichedProfile = profileRecord?.profile
+    ? enrichBusinessProfileFromMasterContextDocument(profileRecord.profile, {
+        ingestedAt: input.generatedAt,
+      })
+    : null
+
+  const sellerTruth = await loadOutreachSellerTruthForOrganization(admin, {
+    organizationId: input.organizationId,
+    preparedAt: input.generatedAt,
+    prospectIndustry: null,
+    prospectCompanyName: companyName,
+    leadId: input.leadId,
   })
+
+  // Think first — Prospect Truth + Seller Truth → Conversation Strategy → drafts.
+  const salesStrategyBrief = buildOutreachSalesStrategyBrief({
+    leadId: input.leadId,
+    companyName,
+    preparedAt: input.generatedAt,
+    website: lead.website,
+    contactName: primaryDm?.fullName ?? lead.contactName,
+    contactTitle: primaryDm?.title ?? null,
+    contactEmail: primaryDm?.email ?? lead.contactEmail,
+    contactPhone: primaryDm?.phone ?? lead.contactPhone,
+    location: [lead.city, lead.state, lead.country].filter(Boolean).join(", ") || null,
+    employees: lead.estimatedEmployeeCount,
+    revenueEstimate: lead.estimatedAnnualRevenue,
+    equipmentServiced: [...equipmentFromLead, ...equipmentFromEvidence].slice(0, 4),
+    verifiedEvidence,
+    missingEvidence,
+    assumptions,
+    opportunitySummary: input.snapshot.opportunityAssessment?.summary ?? null,
+    fitReason: input.snapshot.qualification?.reason ?? null,
+    qualificationConfidence: input.snapshot.qualification?.confidence ?? null,
+    researchConfidence: confidence,
+    personalizationSignals: [],
+    industry: sellerTruth.industries[0] ?? null,
+    relationshipStrengthTier: lead.relationshipStrengthTier,
+    contactTemperature: lead.contactTemperature,
+    leadStatus: lead.status,
+    hasMeetingScheduled: Boolean(lead.followUpAt && /meeting/i.test(lead.nextBestActionReason ?? "")),
+    isCustomer: /customer|won|converted/i.test(lead.status),
+    sellerTruth,
+    approvedProfile: enrichedProfile,
+    approvedProfileId: profileRecord?.id ?? null,
+  })
+
+  const drafts = generateOutreachDraftsFromSalesStrategyBrief({
+    brief: salesStrategyBrief,
+    senderName: teammate.name,
+  })
+
+  const generatedAssets = summarizeStrategyDerivedAssetsForPackage(drafts)
 
   const packageId = `outreach-prep:${input.leadId}:${input.generatedAt}`
 
@@ -112,7 +131,10 @@ export async function buildAutonomousOutreachApprovalPackage(
       senderReady: true,
       engagementScore: confidence,
       metaRecommendationType:
-        input.snapshot.nextBestAction?.action?.includes("sms") ? "sms" : "email",
+        input.snapshot.nextBestAction?.kind === "generate_outreach_draft" &&
+        /sms/i.test(input.snapshot.nextBestAction.label)
+          ? "sms"
+          : "email",
     },
     generatedAt: input.generatedAt,
   })
@@ -123,25 +145,49 @@ export async function buildAutonomousOutreachApprovalPackage(
     companyName: lead.companyName ?? input.companyName,
     preparedAt: input.generatedAt,
     generatedAssets,
-    personalizationEvidence,
-    supportingResearch: evidence.slice(0, 6),
-    confidence,
+    salesStrategyBrief,
+    draftQuality: {
+      emailWordCount: drafts.email.wordCount,
+      emailReadTimeSeconds: estimateReadTimeSeconds(drafts.email.body),
+      smsCharacterCount: drafts.sms.length,
+      qualityFailures: [
+        ...drafts.qualityFailures,
+        ...(salesStrategyBrief.sellerKnowledgeQuality?.readyForDraftGeneration === false
+          ? ["seller_knowledge_incomplete"]
+          : []),
+      ],
+      sellerKnowledgeQuality: salesStrategyBrief.sellerKnowledgeQuality,
+    },
+    personalizationEvidence: [
+      `Primary hook: ${salesStrategyBrief.primaryHook}`,
+      `Conversation justification: ${salesStrategyBrief.conversationJustification}`,
+      `CTA: ${salesStrategyBrief.recommendedCta}`,
+      `Seller source: ${sellerTruth.source}`,
+      ...salesStrategyBrief.trustBuilders.slice(0, 3),
+    ],
+    supportingResearch: verifiedEvidence.slice(0, 6),
+    confidence: Math.max(confidence, salesStrategyBrief.confidence),
     approvalRequirements: [
       "operator_outbound_approval",
       "human_send_gate",
       "channel_prepare_review",
     ],
     complianceNotes: [
-      "Draft-only — no transport execution in GE-AIOS-GROWTH-5F.",
-      "LinkedIn and SMS require manual send from operator workspace.",
-      "SENDR enrollment blocked until explicit human approval.",
-      `Communication plan ${communicationPlan.id} — read-only channel strategy.`,
+      "Draft-only — nothing sends until you authorize and clear sequence transport gates.",
+      "LinkedIn and SMS remain manual send from the operator workspace.",
+      "Personalized video stays draft-only until you explicitly approve recording.",
+      "All channels share one sales strategy brief (Prospect Truth + Seller Truth → Conversation Strategy).",
+      sellerTruth.source === "approved_business_profile"
+        ? enrichedProfile?.masterKnowledgeIngestion?.isRuntimeSourceOfTruth === false
+          ? "Seller messaging derived from enriched Approved Business Profile (Master Context ingested, not runtime SoT)."
+          : "Seller messaging derived from Approved Business Profile."
+        : "Seller messaging used safe defaults — Approved Business Profile not available.",
     ],
     recommendedChannel: resolveCommunicationPlanRecommendedChannel(communicationPlan),
-    recommendedSequence: input.snapshot.executionPlan?.estimatedSteps?.[0]?.label ?? "email_first_multichannel",
+    recommendedSequence: "email_first_multichannel",
     expectedOutcome:
       input.snapshot.executionPlan?.expectedOutcome ??
-      "Human-approved outreach after draft review.",
+      salesStrategyBrief.businessObjective,
     pendingHumanApproval: true,
     transportBlocked: true,
   }

@@ -1,6 +1,7 @@
 /** GE-AIOS-LIVE-1B — Operator-approved Equipify production Company Profile content (client-safe). */
 
 import type { BusinessProfileDraftContent, BusinessProfileInput } from "@/lib/growth/business-profile/business-profile-types"
+import { enrichBusinessProfileWithEquipifyMasterKnowledge } from "@/lib/growth/business-profile/equipify-master-knowledge-merge"
 
 export const GE_AIOS_LIVE_1B_QA_MARKER = "ge-aios-live-1b-equipify-equipment-service-icp-v1" as const
 
@@ -34,7 +35,7 @@ export const LIVE_1B_EQUIPIFY_COMPANY_INPUT: BusinessProfileInput = {
 }
 
 export function buildLive1bEquipifyCompanyProfileContent(): BusinessProfileDraftContent {
-  return {
+  const base: BusinessProfileDraftContent = {
     company: {
       companyName: "Equipify",
       website: "https://equipify.ai",
@@ -185,4 +186,6 @@ export function buildLive1bEquipifyCompanyProfileContent(): BusinessProfileDraft
     draftSource: "deterministic",
     websiteContextSummary: GE_AIOS_LIVE_1B_QA_MARKER,
   }
+
+  return enrichBusinessProfileWithEquipifyMasterKnowledge(base)
 }

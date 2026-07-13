@@ -2,6 +2,7 @@
 
 import type { GrowthAgentKind } from "@/lib/growth/aios/growth/growth-agent-framework-types"
 import type { GrowthSchedulerMode } from "@/lib/growth/aios/growth/growth-scheduler-readiness-types"
+import type { GrowthOutreachSalesStrategyBrief } from "@/lib/growth/aios/growth/growth-outreach-sales-strategy-brief"
 
 export const GROWTH_AIOS_GROWTH_5F_PHASE = "GE-AIOS-GROWTH-5F" as const
 
@@ -56,12 +57,24 @@ export type GrowthAutonomousOutreachPreparedAssetSummary = {
   draftOnly: true
 }
 
+export type GrowthAutonomousOutreachDraftQuality = {
+  emailWordCount: number
+  emailReadTimeSeconds: number
+  smsCharacterCount: number
+  qualityFailures: string[]
+  /** MASTER-KNOWLEDGE-1A — seller knowledge completeness before draft generation. */
+  sellerKnowledgeQuality?: import("@/lib/growth/business-profile/equipify-master-knowledge-quality").GrowthOutreachSellerKnowledgeQuality
+}
+
 export type GrowthAutonomousOutreachApprovalPackage = {
   packageId: string
   leadId: string
   companyName: string | null
   preparedAt: string
   generatedAssets: GrowthAutonomousOutreachPreparedAssetSummary[]
+  /** OUTREACH-QUALITY-1A — think-first brief; all channel drafts derive from this. */
+  salesStrategyBrief?: GrowthOutreachSalesStrategyBrief
+  draftQuality?: GrowthAutonomousOutreachDraftQuality
   personalizationEvidence: string[]
   supportingResearch: string[]
   confidence: number

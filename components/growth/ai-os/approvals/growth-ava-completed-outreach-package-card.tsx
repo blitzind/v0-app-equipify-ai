@@ -1,10 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useState, type ReactNode } from "react"
 import Link from "next/link"
-import { Check, ChevronDown, Loader2, MoreHorizontal } from "lucide-react"
+import { Check, Loader2, MoreHorizontal } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,17 +27,21 @@ import {
   type GrowthAvaCompletedOutreachPackageCard,
 } from "@/lib/growth/aios/approvals/ava-completed-work-projection"
 import type { GrowthAutonomousOutreachApprovalPackage } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
+import {
+  GROWTH_AIOS_APPROVALS_2A_QA_MARKER,
+  projectApprovals2AOperatorReviewPacket,
+  type Approvals2AOperatorReviewPacket,
+} from "@/lib/growth/aios/approvals/approvals-operator-review-packet"
+import { GROWTH_AIOS_OUTREACH_QUALITY_1A_QA_MARKER } from "@/lib/growth/aios/growth/growth-outreach-sales-strategy-brief"
 import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { needsApproval, recommends } from "@/lib/workspace/ai-teammate-voice"
-import { GROWTH_AIOS_OPERATOR_UX_1A_QA_MARKER } from "@/lib/growth/aios/approvals/completed-work-operator-ux"
 
 type Props = {
   card: GrowthAvaCompletedOutreachPackageCard
   packageBody?: GrowthAutonomousOutreachApprovalPackage | null
   onDecided: () => void
+  onDismiss?: () => void
 }
-
-const CHANNEL_ORDER = ["email", "follow_up", "linkedin", "call", "sms", "sendr"] as const
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -47,42 +52,35 @@ function Field({ label, value }: { label: string; value: string }) {
   )
 }
 
-function channelLabel(channel: string): string {
-  switch (channel) {
-    case "email":
-      return "Initial email"
-    case "follow_up":
-      return "Follow-up"
-    case "linkedin":
-      return "LinkedIn message"
-    case "call":
-      return "Call opener"
-    case "sms":
-      return "SMS draft"
-    case "sendr":
-      return "SENDR / video"
-    default:
-      return channel
-  }
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="space-y-3 rounded-lg border border-border/60 bg-muted/10 p-4">
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      {children}
+    </section>
+  )
 }
 
-function DraftChannelBlock({
-  channel,
-  preview,
+function EditableBlock({
+  label,
+  value,
+  onChange,
+  rows = 4,
 }: {
-  channel: string
-  preview: string | null
+  label: string
+  value: string
+  onChange: (next: string) => void
+  rows?: number
 }) {
   return (
-    <div className="rounded-md border bg-background/80 p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="secondary">{channel}</Badge>
-        <span className="text-sm font-medium">{channelLabel(channel)}</span>
-        {!preview ? <Badge variant="outline">Not prepared</Badge> : null}
-      </div>
-      <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
-        {preview?.trim() ? preview : "Not prepared"}
-      </p>
+    <div className="space-y-1.5">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <Textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        rows={rows}
+        className="min-h-[88px] resize-y text-sm"
+      />
     </div>
   )
 }
@@ -91,9 +89,10 @@ export function GrowthAvaCompletedOutreachPackageCard({
   card,
   packageBody,
   onDecided,
+  onDismiss,
 }: Props) {
   const { teammate } = useAiTeammateIdentity()
-  const [expanded, setExpanded] = useState(true)
+  const [packet, setPacket] = useState<Approvals2AOperatorReviewPacket | null>(null)
   const [busy, setBusy] = useState<"approve" | "reject" | "needs_revision" | "lifecycle" | null>(
     null,
   )
@@ -101,52 +100,69 @@ export function GrowthAvaCompletedOutreachPackageCard({
   const [executionRequest, setExecutionRequest] = useState<GrowthAvaOutreachExecutionRequest | null>(
     null,
   )
-  const [decisionMakerLabel, setDecisionMakerLabel] = useState(card.decisionMaker)
-  const [contactEmail, setContactEmail] = useState<string | null>(null)
-  const [contactPhone, setContactPhone] = useState<string | null>(null)
+  const [strategyEdit, setStrategyEdit] = useState("")
+  const [draftEdits, setDraftEdits] = useState<Record<string, string>>({})
 
-  const loadDecisionMaker = useCallback(async () => {
-    if (!card.leadId) return
-    try {
-      const [dmResponse, leadResponse] = await Promise.all([
-        fetch(`/api/platform/growth/leads/${encodeURIComponent(card.leadId)}/decision-makers`, {
-          cache: "no-store",
-        }),
-        fetch(`/api/platform/growth/leads/${encodeURIComponent(card.leadId)}`, {
-          cache: "no-store",
-        }),
-      ])
-      if (dmResponse.ok) {
-        const body = (await dmResponse.json()) as {
-          decisionMakers?: Array<{ fullName: string; title?: string | null }>
-        }
-        const first = body.decisionMakers?.[0]
-        if (first?.fullName) {
-          setDecisionMakerLabel(
-            first.title ? `${first.fullName} · ${first.title}` : first.fullName,
-          )
-        }
-      }
-      if (leadResponse.ok) {
-        const body = (await leadResponse.json()) as {
-          lead?: { contactEmail?: string | null; contactPhone?: string | null }
-        }
-        setContactEmail(body.lead?.contactEmail ?? null)
-        setContactPhone(body.lead?.contactPhone ?? null)
-      }
-    } catch {
-      // keep projected label
-    }
-  }, [card.leadId])
+  const fallbackPacket = packageBody
+    ? projectApprovals2AOperatorReviewPacket({
+        pkg: packageBody,
+        teammateName: teammate.name,
+      })
+    : null
+
+  const view = packet ?? fallbackPacket
 
   useEffect(() => {
-    void loadDecisionMaker()
-  }, [loadDecisionMaker])
+    if (!view) return
+    setStrategyEdit(
+      view.salesStrategy
+        ? [
+            view.salesStrategy.executiveSummary,
+            "",
+            `Primary hook: ${view.salesStrategy.primaryHook}`,
+            `Conversation justification: ${view.salesStrategy.conversationJustification ?? view.salesStrategy.primaryHook}`,
+            `Business objective: ${view.salesStrategy.businessObjective}`,
+            `Conversation objective: ${view.salesStrategy.conversationObjective}`,
+            `Recommended CTA: ${view.salesStrategy.recommendedCta}`,
+            `Relationship stage: ${view.salesStrategy.relationshipStage ?? "Cold"}`,
+          ].join("\n")
+        : "",
+    )
+    const next: Record<string, string> = {}
+    for (const draft of view.drafts) {
+      next[draft.channel] = draft.preview ?? ""
+    }
+    setDraftEdits(next)
+  }, [packet, fallbackPacket?.packageId, Boolean(view?.salesStrategy)])
+
+  useEffect(() => {
+    if (!card.leadId || !card.packageId) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/platform/growth/ai-os/completed-work/packages/${encodeURIComponent(card.packageId)}?leadId=${encodeURIComponent(card.leadId)}`,
+          { cache: "no-store" },
+        )
+        if (!response.ok) return
+        const body = (await response.json()) as {
+          ok?: boolean
+          packet?: Approvals2AOperatorReviewPacket
+        }
+        if (!cancelled && body.ok && body.packet) setPacket(body.packet)
+      } catch {
+        // keep fallback packet
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [card.leadId, card.packageId])
 
   const submit = useCallback(
     async (decision: "approve" | "reject" | "needs_revision") => {
       if (!card.leadId || !card.packageId) {
-        setError("Package identity is incomplete — open the linked review surface.")
+        setError("Package identity is incomplete.")
         return
       }
       setBusy(decision)
@@ -169,7 +185,6 @@ export function GrowthAvaCompletedOutreachPackageCard({
           ok?: boolean
           error?: string
           message?: string
-          transportBlocked?: boolean
           result?: { executionRequest?: GrowthAvaOutreachExecutionRequest | null }
         }
         if (!response.ok || !payload.ok) {
@@ -178,6 +193,18 @@ export function GrowthAvaCompletedOutreachPackageCard({
         if (decision === "approve") {
           setExecutionRequest(payload.result?.executionRequest ?? null)
         }
+        if (decision === "reject" || decision === "needs_revision") {
+          // APPROVALS-2A — reject/needs-revision also pauses autonomous progression.
+          await fetch("/api/platform/growth/ai-os/completed-work/lifecycle", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "cancel_work",
+              leadId: card.leadId,
+              packageId: card.packageId,
+            }),
+          }).catch(() => undefined)
+        }
         onDecided()
       } catch (submitError) {
         setError(submitError instanceof Error ? submitError.message : "Package action failed.")
@@ -185,15 +212,24 @@ export function GrowthAvaCompletedOutreachPackageCard({
         setBusy(null)
       }
     },
-    [card.leadId, card.packageId, onDecided],
+    [card.leadId, card.packageId, onDecided, onDismiss],
   )
 
   const runLifecycle = useCallback(
-    async (action: "cancel_work" | "archive_account" | "delete_permanently") => {
+    async (
+      action: "cancel_work" | "archive_account" | "pause_autonomy" | "delete_permanently" | "dismiss",
+    ) => {
       if (!card.leadId) return
-      if (action === "cancel_work") {
+      if (action === "dismiss") {
+        onDismiss?.()
+        onDecided()
+        return
+      }
+      if (action === "cancel_work" || action === "pause_autonomy") {
         const ok = window.confirm(
-          "Cancel this work?\n\nActive package/workflow will stop. Nothing will send. History remains. The account stays active unless you archive it separately.",
+          action === "pause_autonomy"
+            ? "Pause autonomy for this account?\n\nPending package work will stop. Nothing will send. History remains."
+            : "Cancel this work?\n\nActive package/workflow will stop. Nothing will send. History remains. The account stays active unless you archive it separately.",
         )
         if (!ok) return
       }
@@ -204,12 +240,12 @@ export function GrowthAvaCompletedOutreachPackageCard({
         if (!ok) return
       }
       if (action === "delete_permanently") {
+        const company = view?.company.name ?? card.company
         const typed = window.prompt(
-          `Delete permanently (archives + stops AI work; hard delete disabled).\nType: DELETE ${card.company}`,
+          `Delete permanently (archives + stops AI work; hard delete disabled).\nType: DELETE ${company}`,
         )
         if (!typed) return
         setBusy("lifecycle")
-        setError(null)
         try {
           const response = await fetch("/api/platform/growth/ai-os/completed-work/lifecycle", {
             method: "POST",
@@ -241,7 +277,7 @@ export function GrowthAvaCompletedOutreachPackageCard({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            action,
+            action: action === "pause_autonomy" ? "cancel_work" : action,
             leadId: card.leadId,
             packageId: card.packageId,
           }),
@@ -257,32 +293,37 @@ export function GrowthAvaCompletedOutreachPackageCard({
         setBusy(null)
       }
     },
-    [card.company, card.leadId, card.packageId, onDecided],
+    [card.company, card.leadId, card.packageId, onDecided, view?.company.name],
   )
 
   const approved = Boolean(executionRequest)
-  const assetsByChannel = new Map(
-    (packageBody?.generatedAssets ?? card.draftAssets).map((asset) => [asset.channel, asset.preview]),
-  )
 
   return (
     <li
       className="rounded-xl border-2 border-emerald-200/80 bg-card p-5 shadow-sm dark:border-emerald-900/50"
       data-qa-marker={GROWTH_AVA_COMPLETED_WORK_QA_MARKER}
-      data-qa-marker-operator-ux={GROWTH_AIOS_OPERATOR_UX_1A_QA_MARKER}
+      data-qa-marker-approvals-2a={GROWTH_AIOS_APPROVALS_2A_QA_MARKER}
+      data-qa-marker-outreach-quality-1a={GROWTH_AIOS_OUTREACH_QUALITY_1A_QA_MARKER}
       data-package-id={card.packageId}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
-          <p className="text-lg font-semibold text-foreground">{card.company}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+            Outreach package
+          </p>
+          <p className="text-xl font-semibold text-foreground">
+            {view?.company.name ?? card.company}
+          </p>
           <p className="text-sm text-muted-foreground">
-            {recommends(teammate)} authorizing this outreach package.
+            {recommends(teammate)} authorizing this complete sales packet.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">{Math.round(card.confidence * 100)}% confidence</Badge>
+          <Badge variant="secondary">
+            {Math.round((view?.risk.overallConfidence ?? card.confidence) * 100)}% confidence
+          </Badge>
           <Badge variant="outline">Risk {card.risk}</Badge>
-          <Badge variant="outline">{card.currentStage}</Badge>
+          <Badge variant="outline">Transport blocked</Badge>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button type="button" size="icon" variant="ghost" className="size-8" disabled={busy !== null}>
@@ -291,20 +332,35 @@ export function GrowthAvaCompletedOutreachPackageCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {card.leadId ? (
-                <DropdownMenuItem asChild>
-                  <Link href={`/growth/leads/${card.leadId}`}>Open account</Link>
-                </DropdownMenuItem>
+              {view ? (
+                <>
+                  <DropdownMenuItem asChild>
+                    <Link href={view.links.leadHref}>View lead</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href={view.links.researchHref}>Open research</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href={view.links.companyHref}>Open company</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href={view.links.contactHref}>Open contact</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
               ) : null}
               <DropdownMenuItem onClick={() => void submit("needs_revision")}>
                 Needs revision
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => void submit("reject")}>Reject</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => void runLifecycle("cancel_work")}>
-                Cancel work
+              <DropdownMenuItem onClick={() => void runLifecycle("pause_autonomy")}>
+                Pause autonomy
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => void runLifecycle("archive_account")}>
-                Archive account
+                Archive lead
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => void runLifecycle("dismiss")}>
+                Dismiss from Completed Work
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -318,34 +374,367 @@ export function GrowthAvaCompletedOutreachPackageCard({
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <Field label="Decision maker" value={decisionMakerLabel} />
-        <Field label="Email" value={contactEmail ?? "Not on lead record"} />
-        <Field label="Phone" value={contactPhone ?? "Not on lead record"} />
-        <Field label={`Why ${teammate.name} selected it`} value={card.whySelected} />
-        <Field label="Why now" value={card.explainability.whyNow} />
-        <Field label="Expected outcome" value={card.expectedOutcome} />
-        <Field label="Personalization" value={card.personalizationSummary} />
-        <Field label="Recommended channel" value={card.recommendedChannel} />
-        <Field label="Sequence" value={card.recommendedSequence} />
-      </div>
+      {view ? (
+        <div className="mt-5 space-y-4">
+          <Section title="Company summary">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <Field label="Logo" value={view.company.logoUrl ?? "Not prepared"} />
+              <Field label="Company" value={view.company.name} />
+              <Field label="Website" value={view.company.website ?? "Not on record"} />
+              <Field label="Industry" value={view.company.industry ?? "Not prepared"} />
+              <Field label="Location" value={view.company.location ?? "Not on record"} />
+              <Field label="Employees" value={view.company.employees ?? "Not on record"} />
+              <Field
+                label="Revenue estimate"
+                value={view.company.revenueEstimate ?? "Not on record"}
+              />
+              <Field
+                label="Equipment serviced"
+                value={
+                  view.company.equipmentServiced.length
+                    ? view.company.equipmentServiced.join(" · ")
+                    : "Not prepared"
+                }
+              />
+              <Field
+                label="Research confidence"
+                value={
+                  view.company.researchConfidence != null
+                    ? `${Math.round(view.company.researchConfidence * 100)}%`
+                    : "Not prepared"
+                }
+              />
+            </div>
+          </Section>
 
-      <div className="mt-4 space-y-2">
-        <p className="text-sm font-semibold text-foreground">Prepared drafts</p>
-        <div className="grid gap-2">
-          {CHANNEL_ORDER.map((channel) => (
-            <DraftChannelBlock
-              key={channel}
-              channel={channel}
-              preview={assetsByChannel.get(channel) ?? null}
-            />
-          ))}
+          <Section title="Decision maker">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <Field label="Name" value={view.decisionMaker.name ?? "Not prepared"} />
+              <Field label="Title" value={view.decisionMaker.title ?? "Not prepared"} />
+              <Field label="Email" value={view.decisionMaker.email ?? "Not prepared"} />
+              <Field label="Phone" value={view.decisionMaker.phone ?? "Not prepared"} />
+              <Field label="LinkedIn" value={view.decisionMaker.linkedIn ?? "Not prepared"} />
+              <Field
+                label="Contact confidence"
+                value={
+                  view.decisionMaker.contactConfidence != null
+                    ? `${Math.round(view.decisionMaker.contactConfidence * 100)}%`
+                    : "Not prepared"
+                }
+              />
+              <Field
+                label="Verification status"
+                value={view.decisionMaker.verificationStatus ?? "Not prepared"}
+              />
+            </div>
+          </Section>
+
+          <Section title={`Why ${teammate.name} selected this company`}>
+            <ul className="list-disc space-y-1 pl-5 text-sm text-foreground">
+              {view.whySelected.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </Section>
+
+          <Section title="Personalization">
+            <ul className="list-disc space-y-1 pl-5 text-sm text-foreground">
+              {view.personalization.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </Section>
+
+          <Section title="Research evidence">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {view.evidenceCards.map((evidence) => (
+                <div
+                  key={evidence.id}
+                  className="rounded-md border bg-background/80 px-3 py-2 text-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <span aria-hidden>{evidence.present ? "✓" : "○"}</span>
+                    <span className="font-medium">{evidence.label}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {evidence.present
+                      ? evidence.detail ?? "Evidence present"
+                      : "Not prepared"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </Section>
+
+          <Section title="Sales strategy brief">
+            {view.salesStrategy ? (
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="secondary">
+                    {Math.round(view.salesStrategy.confidence * 100)}% strategy confidence
+                  </Badge>
+                  <Badge variant="outline">{view.salesStrategy.recommendedCta}</Badge>
+                  <Badge variant="outline">
+                    {view.salesStrategy.relationshipStage ?? "Cold"}
+                  </Badge>
+                  <Badge variant="outline">{view.salesStrategy.tone || "Consultative"}</Badge>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Business objective" value={view.salesStrategy.businessObjective} />
+                  <Field
+                    label="Conversation objective"
+                    value={view.salesStrategy.conversationObjective}
+                  />
+                  <Field label="Primary hook" value={view.salesStrategy.primaryHook} />
+                  <Field label="Business value" value={view.salesStrategy.businessValue} />
+                </div>
+                <Field
+                  label="Conversation justification"
+                  value={
+                    view.salesStrategy.conversationJustification ??
+                    view.salesStrategy.primaryHook
+                  }
+                />
+                <div className="space-y-2 rounded-md border bg-background/80 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Seller truth
+                  </p>
+                  <ul className="list-disc space-y-1 pl-5 text-sm text-foreground">
+                    {view.knowledgeLayers.sellerTruth.length
+                      ? view.knowledgeLayers.sellerTruth.map((line) => (
+                          <li key={line}>{line}</li>
+                        ))
+                      : [
+                          <li key="empty">Seller truth not attached on this package</li>,
+                        ]}
+                  </ul>
+                </div>
+                <div className="space-y-2 rounded-md border bg-background/80 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Prospect truth
+                  </p>
+                  <ul className="list-disc space-y-1 pl-5 text-sm text-foreground">
+                    {view.knowledgeLayers.prospectTruth.length
+                      ? view.knowledgeLayers.prospectTruth.map((line) => (
+                          <li key={line}>{line}</li>
+                        ))
+                      : [
+                          <li key="empty">Prospect truth not attached on this package</li>,
+                        ]}
+                  </ul>
+                </div>
+                <div className="space-y-2 rounded-md border bg-background/80 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Conversation strategy
+                  </p>
+                  <ul className="list-disc space-y-1 pl-5 text-sm text-foreground">
+                    {view.knowledgeLayers.conversationStrategy.length
+                      ? view.knowledgeLayers.conversationStrategy.map((line) => (
+                          <li key={line}>{line}</li>
+                        ))
+                      : [
+                          <li key="empty">Conversation strategy not attached on this package</li>,
+                        ]}
+                  </ul>
+                </div>
+                <Field
+                  label="Business problems (evidence-backed)"
+                  value={
+                    view.salesStrategy.businessProblems.length
+                      ? view.salesStrategy.businessProblems.join("\n")
+                      : "None listed — evidence still thin"
+                  }
+                />
+                <Field
+                  label="Evidence sources"
+                  value={
+                    view.salesStrategy.evidence.length
+                      ? view.salesStrategy.evidence
+                          .map((row) => `${row.source}: ${row.detail}`)
+                          .join("\n")
+                      : "No citations prepared"
+                  }
+                />
+                <Field
+                  label="Decision maker analysis"
+                  value={[
+                    view.salesStrategy.decisionMakerAnalysis.whyThisPerson,
+                    view.salesStrategy.decisionMakerAnalysis.whyTheyCare,
+                    view.salesStrategy.decisionMakerAnalysis.likelyResponsibilities.length
+                      ? `Responsibilities: ${view.salesStrategy.decisionMakerAnalysis.likelyResponsibilities.join("; ")}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join("\n")}
+                />
+                <Field
+                  label="Trust builders"
+                  value={
+                    view.salesStrategy.trustBuilders.length
+                      ? view.salesStrategy.trustBuilders.join("\n")
+                      : "None listed"
+                  }
+                />
+                <Field
+                  label="Objections"
+                  value={view.salesStrategy.objections
+                    .map((row) => `${row.objection} → ${row.response}`)
+                    .join("\n")}
+                />
+                <Field
+                  label="Missing personalization opportunities"
+                  value={
+                    view.salesStrategy.missingPersonalizationOpportunities.length
+                      ? view.salesStrategy.missingPersonalizationOpportunities.join(" · ")
+                      : "None listed"
+                  }
+                />
+                <EditableBlock
+                  label="Strategy (editable)"
+                  value={strategyEdit}
+                  onChange={setStrategyEdit}
+                  rows={8}
+                />
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Strategy brief was not attached to this package. Review drafts carefully before
+                authorizing.
+              </p>
+            )}
+          </Section>
+
+          <Section title="Drafts">
+            <div className="grid gap-3">
+              {view.drafts.map((draft) => (
+                <div key={draft.channel} className="rounded-md border bg-background/80 p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium">{draft.label}</span>
+                    {!draft.prepared ? <Badge variant="outline">Not prepared</Badge> : null}
+                    {draft.wordCount != null ? (
+                      <Badge variant="outline">{draft.wordCount} words</Badge>
+                    ) : null}
+                    {draft.readTimeSeconds != null ? (
+                      <Badge variant="outline">~{draft.readTimeSeconds}s read</Badge>
+                    ) : null}
+                    {draft.characterCount != null ? (
+                      <Badge variant="outline">{draft.characterCount} chars</Badge>
+                    ) : null}
+                  </div>
+                  {draft.prepared ? (
+                    <div className="mt-2">
+                      <EditableBlock
+                        label={`${draft.label} (editable)`}
+                        value={draftEdits[draft.channel] ?? draft.preview ?? ""}
+                        onChange={(next) =>
+                          setDraftEdits((prev) => ({ ...prev, [draft.channel]: next }))
+                        }
+                        rows={draft.channel === "sms" || draft.channel === "linkedin" ? 3 : 6}
+                      />
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-muted-foreground">Not prepared</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Section>
+
+          <Section title="Explainability">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field
+                label={`Why ${teammate.name} believes this account is worth pursuing`}
+                value={view.explainability.whyPursue}
+              />
+              <Field label="Why this contact was selected" value={view.explainability.whyContact} />
+              <Field label="Why this messaging was chosen" value={view.explainability.whyMessaging} />
+              <Field label="Why this timing was selected" value={view.explainability.whyTiming} />
+              <Field
+                label="Confidence"
+                value={`${Math.round(view.explainability.confidence * 100)}%`}
+              />
+              <Field
+                label="Unknown assumptions"
+                value={
+                  view.explainability.unknownAssumptions.length
+                    ? view.explainability.unknownAssumptions.join(" · ")
+                    : "None listed"
+                }
+              />
+            </div>
+            {view.explainability.supportingEvidence.length > 0 ? (
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                {view.explainability.supportingEvidence.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            ) : null}
+          </Section>
+
+          <Section title="Risk panel">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <Field
+                label="Overall confidence"
+                value={`${Math.round(view.risk.overallConfidence * 100)}%`}
+              />
+              <Field label="Spam risk" value={view.risk.spamRisk} />
+              <Field label="Bounce risk" value={view.risk.bounceRisk} />
+              <Field
+                label="Relationship strength"
+                value={view.risk.relationshipStrength ?? "Not prepared"}
+              />
+              <Field label="Research completeness" value={view.risk.researchCompleteness} />
+              <Field label="Contact verification" value={view.risk.contactVerification} />
+              <Field
+                label="Unknown fields"
+                value={
+                  view.risk.unknownFields.length
+                    ? view.risk.unknownFields.join(", ")
+                    : "None listed"
+                }
+              />
+              <Field
+                label="Blocking autonomous send"
+                value={view.risk.autonomousSendBlockedReasons.join(" · ")}
+              />
+            </div>
+          </Section>
+
+          <Section title="Transparency">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <Field
+                label="Generated"
+                value={new Date(view.transparency.generatedAt).toLocaleString()}
+              />
+              <Field
+                label="Last updated"
+                value={
+                  view.transparency.lastUpdatedAt
+                    ? new Date(view.transparency.lastUpdatedAt).toLocaleString()
+                    : "Not prepared"
+                }
+              />
+              <Field label="Research age" value={view.transparency.researchAge ?? "Not prepared"} />
+              <Field
+                label="Decision maker age"
+                value={view.transparency.decisionMakerAge ?? "Not prepared"}
+              />
+              <Field
+                label="Contact source"
+                value={view.transparency.contactSource ?? "Not prepared"}
+              />
+              <Field label="Package version" value={view.transparency.packageVersion} />
+              <Field label="Preparation" value={view.transparency.preparationLabel} />
+            </div>
+          </Section>
         </div>
-      </div>
+      ) : (
+        <p className="mt-4 text-sm text-muted-foreground">Loading complete review packet…</p>
+      )}
 
-      <p className="mt-3 text-xs text-muted-foreground">
-        {needsApproval(teammate)} Approving this package does not send — sequence and
-        transport gates remain.
+      <p className="mt-4 text-xs text-muted-foreground">
+        {needsApproval(teammate)} Approving this package does not send — sequence and transport gates
+        remain.
       </p>
 
       {approved ? (
@@ -355,8 +744,8 @@ export function GrowthAvaCompletedOutreachPackageCard({
             <p className="text-sm font-semibold">Package authorized</p>
           </div>
           <p className="text-sm text-muted-foreground">
-            {teammate.name} created the execution request. Sequence transport still needs your approval before
-            anything sends.
+            Execution request created. Sequence transport still needs your approval before anything
+            sends.
           </p>
           <Button asChild size="sm">
             <Link href={GROWTH_AVA_COMPLETED_WORK_SEQUENCE_GATE_HREF}>Review sequence gate</Link>
@@ -386,19 +775,8 @@ export function GrowthAvaCompletedOutreachPackageCard({
             size="sm"
             variant="outline"
             disabled={busy !== null || !card.leadId}
-            onClick={() => void submit("reject")}
-          >
-            {busy === "reject" ? <Loader2 className="mr-2 size-3.5 animate-spin" /> : null}
-            Reject
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={busy !== null || !card.leadId}
             onClick={() => void submit("needs_revision")}
           >
-            {busy === "needs_revision" ? <Loader2 className="mr-2 size-3.5 animate-spin" /> : null}
             Needs revision
           </Button>
           <Button
@@ -406,67 +784,37 @@ export function GrowthAvaCompletedOutreachPackageCard({
             size="sm"
             variant="outline"
             disabled={busy !== null || !card.leadId}
-            onClick={() => void runLifecycle("cancel_work")}
+            onClick={() => void submit("reject")}
           >
-            Cancel work
+            Reject
           </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy !== null || !card.leadId}
+            onClick={() => void runLifecycle("archive_account")}
+          >
+            Archive lead
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy !== null || !card.leadId}
+            onClick={() => void runLifecycle("pause_autonomy")}
+          >
+            Pause autonomy
+          </Button>
+          {view ? (
+            <Button asChild size="sm" variant="ghost">
+              <Link href={view.links.leadHref}>View lead</Link>
+            </Button>
+          ) : null}
         </div>
       )}
 
       {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
-
-      <div className="mt-3">
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="h-8 gap-1.5 px-2"
-          onClick={() => {
-            const next = !expanded
-            setExpanded(next)
-            if (next) void loadDecisionMaker()
-          }}
-        >
-          <ChevronDown className={`size-3.5 transition-transform ${expanded ? "rotate-180" : ""}`} />
-          {expanded ? "Hide evidence" : "Show evidence & rationale"}
-        </Button>
-      </div>
-
-      {expanded ? (
-        <div className="mt-3 space-y-3 rounded-lg border border-border/60 bg-muted/10 p-3 text-sm">
-          <Field label="Why I chose this company" value={card.explainability.whyCompany} />
-          <Field label="Why this decision maker" value={card.explainability.whyDecisionMaker} />
-          <Field label="Why this sequence" value={card.explainability.whySequence} />
-          <Field label="Investment decision" value={card.explainability.investmentDecision} />
-          <Field label="Portfolio decision" value={card.explainability.portfolioDecision} />
-          <Field label="Knowledge summary" value={card.explainability.knowledgeSummary} />
-          {(packageBody?.supportingResearch ?? card.explainability.supportingEvidence).length > 0 ? (
-            <div>
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                Supporting evidence
-              </p>
-              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                {(packageBody?.supportingResearch ?? card.explainability.supportingEvidence).map(
-                  (line) => (
-                    <li key={line}>{line}</li>
-                  ),
-                )}
-              </ul>
-            </div>
-          ) : null}
-          {packageBody?.approvalRequirements?.length ? (
-            <Field
-              label="Approval requirements"
-              value={packageBody.approvalRequirements.join(" · ")}
-            />
-          ) : null}
-          {card.leadId ? (
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/growth/leads/${card.leadId}`}>Open account</Link>
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
     </li>
   )
 }
