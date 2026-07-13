@@ -27,8 +27,10 @@ import {
   type GrowthAvaCompletedOutreachPackageCard,
 } from "@/lib/growth/aios/approvals/ava-completed-work-projection"
 import type { GrowthAutonomousOutreachApprovalPackage } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
+import { GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
 import {
   GROWTH_AIOS_APPROVALS_2A_QA_MARKER,
+  GROWTH_AIOS_CONVERSATION_INTELLIGENCE_2B_OPERATOR_LAYOUT_QA_MARKER,
   projectApprovals2AOperatorReviewPacket,
   type Approvals2AOperatorReviewPacket,
 } from "@/lib/growth/aios/approvals/approvals-operator-review-packet"
@@ -58,6 +60,17 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       {children}
     </section>
+  )
+}
+
+function BulletList({ lines }: { lines: string[] }) {
+  if (!lines.length) return <p className="text-sm text-muted-foreground">Not prepared</p>
+  return (
+    <ul className="list-disc space-y-1 pl-5 text-sm text-foreground">
+      {lines.map((line) => (
+        <li key={line}>{line}</li>
+      ))}
+    </ul>
   )
 }
 
@@ -303,6 +316,7 @@ export function GrowthAvaCompletedOutreachPackageCard({
       className="rounded-xl border-2 border-emerald-200/80 bg-card p-5 shadow-sm dark:border-emerald-900/50"
       data-qa-marker={GROWTH_AVA_COMPLETED_WORK_QA_MARKER}
       data-qa-marker-approvals-2a={GROWTH_AIOS_APPROVALS_2A_QA_MARKER}
+      data-qa-marker-conversation-intelligence-2b={GROWTH_AIOS_CONVERSATION_INTELLIGENCE_2B_OPERATOR_LAYOUT_QA_MARKER}
       data-qa-marker-outreach-quality-1a={GROWTH_AIOS_OUTREACH_QUALITY_1A_QA_MARKER}
       data-package-id={card.packageId}
     >
@@ -378,29 +392,15 @@ export function GrowthAvaCompletedOutreachPackageCard({
         <div className="mt-5 space-y-4">
           <Section title="Company summary">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <Field label="Logo" value={view.company.logoUrl ?? "Not prepared"} />
               <Field label="Company" value={view.company.name} />
               <Field label="Website" value={view.company.website ?? "Not on record"} />
               <Field label="Industry" value={view.company.industry ?? "Not prepared"} />
               <Field label="Location" value={view.company.location ?? "Not on record"} />
-              <Field label="Employees" value={view.company.employees ?? "Not on record"} />
-              <Field
-                label="Revenue estimate"
-                value={view.company.revenueEstimate ?? "Not on record"}
-              />
               <Field
                 label="Equipment serviced"
                 value={
                   view.company.equipmentServiced.length
                     ? view.company.equipmentServiced.join(" · ")
-                    : "Not prepared"
-                }
-              />
-              <Field
-                label="Research confidence"
-                value={
-                  view.company.researchConfidence != null
-                    ? `${Math.round(view.company.researchConfidence * 100)}%`
                     : "Not prepared"
                 }
               />
@@ -415,238 +415,38 @@ export function GrowthAvaCompletedOutreachPackageCard({
               <Field label="Phone" value={view.decisionMaker.phone ?? "Not prepared"} />
               <Field label="LinkedIn" value={view.decisionMaker.linkedIn ?? "Not prepared"} />
               <Field
-                label="Contact confidence"
-                value={
-                  view.decisionMaker.contactConfidence != null
-                    ? `${Math.round(view.decisionMaker.contactConfidence * 100)}%`
-                    : "Not prepared"
-                }
-              />
-              <Field
                 label="Verification status"
                 value={view.decisionMaker.verificationStatus ?? "Not prepared"}
               />
             </div>
           </Section>
 
-          <Section title={`Why ${teammate.name} selected this company`}>
-            <ul className="list-disc space-y-1 pl-5 text-sm text-foreground">
-              {view.whySelected.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
+          <Section title={`Why ${teammate.name} chose this account`}>
+            <BulletList lines={view.whySelected} />
           </Section>
 
-          <Section title="Personalization">
-            <ul className="list-disc space-y-1 pl-5 text-sm text-foreground">
-              {view.personalization.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          </Section>
+          {view.operatorReviewLayout.revenueStrategyEssentials.length ? (
+            <Section title="Sales recommendation">
+              <BulletList lines={view.operatorReviewLayout.revenueStrategyEssentials} />
+            </Section>
+          ) : null}
 
-          <Section title="Research evidence">
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {view.evidenceCards.map((evidence) => (
-                <div
-                  key={evidence.id}
-                  className="rounded-md border bg-background/80 px-3 py-2 text-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <span aria-hidden>{evidence.present ? "✓" : "○"}</span>
-                    <span className="font-medium">{evidence.label}</span>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {evidence.present
-                      ? evidence.detail ?? "Evidence present"
-                      : "Not prepared"}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </Section>
+          {view.operatorReviewLayout.consultantDiscoveryEssentials.length ? (
+            <Section title="Consultant discovery">
+              <BulletList lines={view.operatorReviewLayout.consultantDiscoveryEssentials} />
+            </Section>
+          ) : null}
 
-          <Section title="Sales strategy brief">
-            {view.salesStrategy ? (
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">
-                    {Math.round(view.salesStrategy.confidence * 100)}% strategy confidence
-                  </Badge>
-                  <Badge variant="outline">{view.salesStrategy.recommendedCta}</Badge>
-                  <Badge variant="outline">
-                    {view.salesStrategy.relationshipStage ?? "Cold"}
-                  </Badge>
-                  <Badge variant="outline">{view.salesStrategy.tone || "Consultative"}</Badge>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Business objective" value={view.salesStrategy.businessObjective} />
-                  <Field
-                    label="Conversation objective"
-                    value={view.salesStrategy.conversationObjective}
-                  />
-                  <Field label="Primary hook" value={view.salesStrategy.primaryHook} />
-                  <Field label="Business value" value={view.salesStrategy.businessValue} />
-                </div>
-                <Field
-                  label="Conversation justification"
-                  value={
-                    view.salesStrategy.conversationJustification ??
-                    view.salesStrategy.primaryHook
-                  }
-                />
-                <div className="space-y-2 rounded-md border bg-background/80 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Seller truth
-                  </p>
-                  <ul className="list-disc space-y-1 pl-5 text-sm text-foreground">
-                    {view.knowledgeLayers.sellerTruth.length
-                      ? view.knowledgeLayers.sellerTruth.map((line) => (
-                          <li key={line}>{line}</li>
-                        ))
-                      : [
-                          <li key="empty">Seller truth not attached on this package</li>,
-                        ]}
-                  </ul>
-                </div>
-                <div className="space-y-2 rounded-md border bg-background/80 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Prospect truth
-                  </p>
-                  <ul className="list-disc space-y-1 pl-5 text-sm text-foreground">
-                    {view.knowledgeLayers.prospectTruth.length
-                      ? view.knowledgeLayers.prospectTruth.map((line) => (
-                          <li key={line}>{line}</li>
-                        ))
-                      : [
-                          <li key="empty">Prospect truth not attached on this package</li>,
-                        ]}
-                  </ul>
-                </div>
-                <div className="space-y-2 rounded-md border bg-background/80 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Conversation strategy
-                  </p>
-                  <ul className="list-disc space-y-1 pl-5 text-sm text-foreground">
-                    {view.knowledgeLayers.conversationStrategy.length
-                      ? view.knowledgeLayers.conversationStrategy.map((line) => (
-                          <li key={line}>{line}</li>
-                        ))
-                      : [
-                          <li key="empty">Conversation strategy not attached on this package</li>,
-                        ]}
-                  </ul>
-                </div>
-                {view.operatorReasoning ? (
-                  <div className="space-y-2 rounded-md border border-primary/20 bg-primary/5 p-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Ava reasoning
-                    </p>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <Field
-                        label="Conversation goal"
-                        value={view.operatorReasoning.conversationGoal}
-                      />
-                      <Field
-                        label="Business outcome"
-                        value={view.operatorReasoning.businessOutcome}
-                      />
-                      <Field
-                        label="Primary insight"
-                        value={view.operatorReasoning.primaryInsight ?? "Not enough evidence yet"}
-                      />
-                      <Field
-                        label="Reason for CTA"
-                        value={view.operatorReasoning.reasonForCta}
-                      />
-                    </div>
-                    <Field
-                      label="Evidence summary"
-                      value={view.operatorReasoning.evidenceSummary ?? "Evidence still thin"}
-                    />
-                    <Field
-                      label="Conversation risks"
-                      value={
-                        view.operatorReasoning.conversationRisks.length
-                          ? view.operatorReasoning.conversationRisks.join("\n")
-                          : "No elevated risks flagged"
-                      }
-                    />
-                    <Field
-                      label="Intentionally avoided"
-                      value={
-                        view.operatorReasoning.intentionallyAvoided.length
-                          ? view.operatorReasoning.intentionallyAvoided.join("\n")
-                          : "None listed"
-                      }
-                    />
-                  </div>
-                ) : null}
-                <Field
-                  label="Business problems (evidence-backed)"
-                  value={
-                    view.salesStrategy.businessProblems.length
-                      ? view.salesStrategy.businessProblems.join("\n")
-                      : "None listed — evidence still thin"
-                  }
-                />
-                <Field
-                  label="Evidence sources"
-                  value={
-                    view.salesStrategy.evidence.length
-                      ? view.salesStrategy.evidence
-                          .map((row) => `${row.source}: ${row.detail}`)
-                          .join("\n")
-                      : "No citations prepared"
-                  }
-                />
-                <Field
-                  label="Decision maker analysis"
-                  value={[
-                    view.salesStrategy.decisionMakerAnalysis.whyThisPerson,
-                    view.salesStrategy.decisionMakerAnalysis.whyTheyCare,
-                    view.salesStrategy.decisionMakerAnalysis.likelyResponsibilities.length
-                      ? `Responsibilities: ${view.salesStrategy.decisionMakerAnalysis.likelyResponsibilities.join("; ")}`
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join("\n")}
-                />
-                <Field
-                  label="Trust builders"
-                  value={
-                    view.salesStrategy.trustBuilders.length
-                      ? view.salesStrategy.trustBuilders.join("\n")
-                      : "None listed"
-                  }
-                />
-                <Field
-                  label="Objections"
-                  value={view.salesStrategy.objections
-                    .map((row) => `${row.objection} → ${row.response}`)
-                    .join("\n")}
-                />
-                <Field
-                  label="Missing personalization opportunities"
-                  value={
-                    view.salesStrategy.missingPersonalizationOpportunities.length
-                      ? view.salesStrategy.missingPersonalizationOpportunities.join(" · ")
-                      : "None listed"
-                  }
-                />
-                <EditableBlock
-                  label="Strategy (editable)"
-                  value={strategyEdit}
-                  onChange={setStrategyEdit}
-                  rows={8}
-                />
+          <Section title="Conversation strategy">
+            <BulletList lines={view.operatorReviewLayout.conversationStrategyEssentials} />
+            {view.operatorReviewLayout.sellerTruthEssentials.length ? (
+              <div className="mt-3 space-y-1">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Seller guidance
+                </p>
+                <BulletList lines={view.operatorReviewLayout.sellerTruthEssentials.slice(0, 5)} />
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Strategy brief was not attached to this package. Review drafts carefully before
-                authorizing.
-              </p>
-            )}
+            ) : null}
           </Section>
 
           <Section title="Drafts">
@@ -685,37 +485,6 @@ export function GrowthAvaCompletedOutreachPackageCard({
             </div>
           </Section>
 
-          <Section title="Explainability">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field
-                label={`Why ${teammate.name} believes this account is worth pursuing`}
-                value={view.explainability.whyPursue}
-              />
-              <Field label="Why this contact was selected" value={view.explainability.whyContact} />
-              <Field label="Why this messaging was chosen" value={view.explainability.whyMessaging} />
-              <Field label="Why this timing was selected" value={view.explainability.whyTiming} />
-              <Field
-                label="Confidence"
-                value={`${Math.round(view.explainability.confidence * 100)}%`}
-              />
-              <Field
-                label="Unknown assumptions"
-                value={
-                  view.explainability.unknownAssumptions.length
-                    ? view.explainability.unknownAssumptions.join(" · ")
-                    : "None listed"
-                }
-              />
-            </div>
-            {view.explainability.supportingEvidence.length > 0 ? (
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                {view.explainability.supportingEvidence.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-            ) : null}
-          </Section>
-
           <Section title="Risk panel">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <Field
@@ -745,33 +514,154 @@ export function GrowthAvaCompletedOutreachPackageCard({
             </div>
           </Section>
 
-          <Section title="Transparency">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <GrowthCollapsibleEngineCard
+            title="Research summary"
+            defaultOpen={false}
+            compact
+            persistKey={`ava-outreach-research-${card.packageId}`}
+          >
+            <BulletList lines={view.operatorReviewLayout.researchSummary} />
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {view.evidenceCards.map((evidence) => (
+                <div
+                  key={evidence.id}
+                  className="rounded-md border bg-background/80 px-3 py-2 text-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <span aria-hidden>{evidence.present ? "✓" : "○"}</span>
+                    <span className="font-medium">{evidence.label}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {evidence.present
+                      ? evidence.detail ?? "Evidence present"
+                      : "Not prepared"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </GrowthCollapsibleEngineCard>
+
+          <GrowthCollapsibleEngineCard
+            title="Seller truth detail"
+            defaultOpen={false}
+            compact
+            persistKey={`ava-outreach-seller-${card.packageId}`}
+          >
+            <BulletList lines={view.operatorReviewLayout.expandable.sellerTruthDetail} />
+          </GrowthCollapsibleEngineCard>
+
+          <GrowthCollapsibleEngineCard
+            title="Prospect truth detail"
+            defaultOpen={false}
+            compact
+            persistKey={`ava-outreach-prospect-${card.packageId}`}
+          >
+            <BulletList lines={view.knowledgeLayers.prospectTruth} />
+            {view.operatorReviewLayout.expandable.prospectTruthDetail.length ? (
+              <div className="mt-3">
+                <BulletList lines={view.operatorReviewLayout.expandable.prospectTruthDetail} />
+              </div>
+            ) : null}
+          </GrowthCollapsibleEngineCard>
+
+          <GrowthCollapsibleEngineCard
+            title="Sales strategy detail"
+            defaultOpen={false}
+            compact
+            persistKey={`ava-outreach-revenue-strategy-${card.packageId}`}
+          >
+            <BulletList lines={view.operatorReviewLayout.expandable.revenueStrategyDetail} />
+          </GrowthCollapsibleEngineCard>
+
+          <GrowthCollapsibleEngineCard
+            title="Consultant reasoning detail"
+            defaultOpen={false}
+            compact
+            persistKey={`ava-outreach-consultant-${card.packageId}`}
+          >
+            <BulletList lines={view.operatorReviewLayout.expandable.consultantDiscoveryDetail} />
+          </GrowthCollapsibleEngineCard>
+
+          <GrowthCollapsibleEngineCard
+            title="Observation intelligence"
+            defaultOpen={false}
+            compact
+            persistKey={`ava-outreach-observations-${card.packageId}`}
+          >
+            <BulletList lines={view.operatorReviewLayout.expandable.observationIntelligence} />
+          </GrowthCollapsibleEngineCard>
+
+          <GrowthCollapsibleEngineCard
+            title="Explainability"
+            defaultOpen={false}
+            compact
+            persistKey={`ava-outreach-explain-${card.packageId}`}
+          >
+            <BulletList lines={view.operatorReviewLayout.expandable.explainabilityDetail} />
+          </GrowthCollapsibleEngineCard>
+
+          <GrowthCollapsibleEngineCard
+            title="Strategy detail"
+            defaultOpen={false}
+            compact
+            persistKey={`ava-outreach-strategy-${card.packageId}`}
+          >
+            {view.salesStrategy ? (
+              <div className="space-y-3">
+                <BulletList lines={view.operatorReviewLayout.expandable.strategyDetail} />
+                <EditableBlock
+                  label="Strategy (editable)"
+                  value={strategyEdit}
+                  onChange={setStrategyEdit}
+                  rows={8}
+                />
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Strategy brief was not attached to this package.
+              </p>
+            )}
+          </GrowthCollapsibleEngineCard>
+
+          <GrowthCollapsibleEngineCard
+            title="Transparency & metadata"
+            defaultOpen={false}
+            compact
+            persistKey={`ava-outreach-transparency-${card.packageId}`}
+          >
+            <BulletList lines={view.operatorReviewLayout.expandable.transparencyDetail} />
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Field label="Employees" value={view.company.employees ?? "Not on record"} />
               <Field
-                label="Generated"
-                value={new Date(view.transparency.generatedAt).toLocaleString()}
+                label="Revenue estimate"
+                value={view.company.revenueEstimate ?? "Not on record"}
               />
               <Field
-                label="Last updated"
+                label="Research confidence"
                 value={
-                  view.transparency.lastUpdatedAt
-                    ? new Date(view.transparency.lastUpdatedAt).toLocaleString()
+                  view.company.researchConfidence != null
+                    ? `${Math.round(view.company.researchConfidence * 100)}%`
                     : "Not prepared"
                 }
               />
-              <Field label="Research age" value={view.transparency.researchAge ?? "Not prepared"} />
               <Field
-                label="Decision maker age"
-                value={view.transparency.decisionMakerAge ?? "Not prepared"}
+                label="Contact confidence"
+                value={
+                  view.decisionMaker.contactConfidence != null
+                    ? `${Math.round(view.decisionMaker.contactConfidence * 100)}%`
+                    : "Not prepared"
+                }
               />
-              <Field
-                label="Contact source"
-                value={view.transparency.contactSource ?? "Not prepared"}
-              />
-              <Field label="Package version" value={view.transparency.packageVersion} />
-              <Field label="Preparation" value={view.transparency.preparationLabel} />
             </div>
-          </Section>
+            {view.operatorReviewLayout.expandable.personalizationDetail.length ? (
+              <div className="mt-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Personalization signals
+                </p>
+                <BulletList lines={view.operatorReviewLayout.expandable.personalizationDetail} />
+              </div>
+            ) : null}
+          </GrowthCollapsibleEngineCard>
         </div>
       ) : (
         <p className="mt-4 text-sm text-muted-foreground">Loading complete review packet…</p>

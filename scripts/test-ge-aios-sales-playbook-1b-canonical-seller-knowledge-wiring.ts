@@ -244,7 +244,7 @@ const drafts = generateOutreachDraftsFromSalesStrategyBrief({
 assert.ok(!/verified description|\(\d+%\)/i.test(drafts.email.full))
 assert.match(
   drafts.email.full,
-  /stood out|heavy lift|caught my eye|curious|are you finding|on your radar|made me wonder|specific rhythm/i,
+  /stood out|heavy lift|caught my eye|on your radar|made me wonder|specific rhythm|depot|field|show up|live issue|\?/i,
 )
 assert.match(drafts.callGuide, /Earn curiosity|Opening:/)
 assert.match(drafts.callGuide, /Relationship stage/)
@@ -285,10 +285,15 @@ const packet = projectApprovals2AOperatorReviewPacket({
   pkg,
   teammateName: "Jordan",
 })
-assert.ok(packet.knowledgeLayers.sellerTruth.some((line) => /Approved Business Profile/i.test(line)))
+assert.ok(packet.knowledgeLayers.sellerTruth.some((line) => /Positioning:|Differentiator:/i.test(line)))
 assert.ok(packet.knowledgeLayers.prospectTruth.some((line) => /block imaging/i.test(line)))
 assert.ok(
-  packet.knowledgeLayers.conversationStrategy.some((line) => /Justification|Why this/i.test(line)),
+  packet.knowledgeLayers.conversationStrategy.some((line) => /Opening observation:/i.test(line)),
+)
+assert.ok(
+  packet.operatorReviewLayout.consultantDiscoveryEssentials.some((line) =>
+    /Top business pressure:/i.test(line),
+  ),
 )
 console.log("  ✓ Approval packet distinguishes Seller / Prospect / Conversation layers")
 

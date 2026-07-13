@@ -105,6 +105,12 @@ async function publishOutreachPreparedEvent(
     assetCount: number
     confidence: number
     observationThemeKey?: string | null
+    businessPressureKey?: string | null
+    discoveryQuestionTheme?: string | null
+    revenueStrategyRecommendation?: string | null
+    entryPointRole?: string | null
+    channelStrategy?: string | null
+    committeeStrategy?: string | null
   },
 ) {
   return publishAiOsEvent(admin, {
@@ -122,6 +128,12 @@ async function publishOutreachPreparedEvent(
       asset_count: input.assetCount,
       confidence: input.confidence,
       observation_theme_key: input.observationThemeKey ?? null,
+      business_pressure_key: input.businessPressureKey ?? null,
+      discovery_question_theme: input.discoveryQuestionTheme ?? null,
+      revenue_strategy_recommendation: input.revenueStrategyRecommendation ?? null,
+      entry_point_role: input.entryPointRole ?? null,
+      channel_strategy: input.channelStrategy ?? null,
+      committee_strategy: input.committeeStrategy ?? null,
       pending_human_approval: true,
       transport_blocked: true,
       occurred_at: input.generatedAt,
@@ -193,6 +205,24 @@ async function executeAutonomousOutreachPreparation(
               confidence: approvalPackage.confidence,
               observationThemeKey:
                 approvalPackage.salesStrategyBrief?.evidenceIntelligence?.themeKey ?? null,
+              businessPressureKey:
+                approvalPackage.salesStrategyBrief?.consultantDiscoveryIntelligence
+                  ?.primaryBusinessPressure?.key ?? null,
+              discoveryQuestionTheme:
+                approvalPackage.salesStrategyBrief?.consultantDiscoveryIntelligence
+                  ?.rankedDiscoveryQuestions[0]?.themeKey ?? null,
+              revenueStrategyRecommendation:
+                approvalPackage.salesStrategyBrief?.revenueStrategyIntelligence?.recommendation ??
+                null,
+              entryPointRole:
+                approvalPackage.salesStrategyBrief?.revenueStrategyIntelligence?.primaryEntryPoint
+                  .role ?? null,
+              channelStrategy:
+                approvalPackage.salesStrategyBrief?.revenueStrategyIntelligence?.channelPlan
+                  .primaryChannel ?? null,
+              committeeStrategy:
+                approvalPackage.salesStrategyBrief?.revenueStrategyIntelligence?.committeeStrategy ??
+                null,
             })
           }
           return {

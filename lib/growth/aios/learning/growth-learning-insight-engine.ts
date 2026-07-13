@@ -235,6 +235,133 @@ export function generateMessagePerformanceInsight(input: {
   }
 }
 
+export function generateConsultantDiscoveryInsight(input: {
+  organizationId: string
+  generatedAt: string
+  outcomes: GrowthLearningOutcome[]
+}): GrowthLearningInsight {
+  const pressureOutcomes = input.outcomes.filter(
+    (row) =>
+      row.dimensions.businessPressureKey &&
+      ["reply", "positive_intent", "completed"].includes(row.outcomeType),
+  )
+  const questionOutcomes = input.outcomes.filter(
+    (row) =>
+      row.dimensions.discoveryQuestionTheme &&
+      ["reply", "positive_intent", "completed"].includes(row.outcomeType),
+  )
+
+  const byPressure = new Map<string, GrowthLearningOutcome[]>()
+  for (const row of pressureOutcomes) {
+    const key = row.dimensions.businessPressureKey!
+    const bucket = byPressure.get(key) ?? []
+    bucket.push(row)
+    byPressure.set(key, bucket)
+  }
+
+  const topPressure = [...byPressure.entries()].sort((a, b) => b[1].length - a[1].length)[0]
+  const sampleSize = pressureOutcomes.length + questionOutcomes.length
+
+  if (!topPressure) {
+    return {
+      id: `insight:consultant-discovery:${input.organizationId}:${input.generatedAt}`,
+      organizationId: input.organizationId,
+      insightType: "message_performance",
+      title: "Consultant discovery performance",
+      summary: "No business-pressure or discovery-question reply signals observed yet.",
+      recommendedAdjustment: "monitor",
+      targetSystem: "outreach_preparation",
+      confidence: 0,
+      impact: 0,
+      sampleSize: 0,
+      evidence: [],
+      status: "not_enough_data",
+      createdAt: input.generatedAt,
+    }
+  }
+
+  const positive = topPressure[1].filter((row) =>
+    ["reply", "positive_intent", "completed"].includes(row.outcomeType),
+  ).length
+  const positiveRate = topPressure[1].length > 0 ? positive / topPressure[1].length : 0
+
+  return {
+    id: `insight:consultant-discovery:${input.organizationId}:${input.generatedAt}`,
+    organizationId: input.organizationId,
+    insightType: "message_performance",
+    title: `Top business pressure: ${topPressure[0]}`,
+    summary: `${topPressure[0]} pressure shows ${topPressure[1].length} recent outcomes (${Math.round(positiveRate * 100)}% positive/reply density) — advisory for consultant hypothesis ranking.`,
+    recommendedAdjustment: positiveRate >= 0.35 ? "test_variant" : "monitor",
+    targetSystem: "outreach_preparation",
+    confidence: averageConfidence(topPressure[1]),
+    impact: Math.min(1, topPressure[1].length / 10),
+    sampleSize,
+    evidence: topPressure[1].slice(0, 5),
+    status: insightStatus(sampleSize),
+    createdAt: input.generatedAt,
+  }
+}
+
+export function generateRevenueStrategyInsight(input: {
+  organizationId: string
+  generatedAt: string
+  outcomes: GrowthLearningOutcome[]
+}): GrowthLearningInsight {
+  const strategic = input.outcomes.filter(
+    (row) =>
+      row.dimensions.revenueStrategyRecommendation &&
+      ["reply", "positive_intent", "completed"].includes(row.outcomeType),
+  )
+  const byRecommendation = new Map<string, GrowthLearningOutcome[]>()
+  for (const row of strategic) {
+    const key = row.dimensions.revenueStrategyRecommendation!
+    const bucket = byRecommendation.get(key) ?? []
+    bucket.push(row)
+    byRecommendation.set(key, bucket)
+  }
+  const top = [...byRecommendation.entries()].sort((a, b) => b[1].length - a[1].length)[0]
+  const sampleSize = strategic.length
+
+  if (!top) {
+    return {
+      id: `insight:revenue-strategy:${input.organizationId}:${input.generatedAt}`,
+      organizationId: input.organizationId,
+      insightType: "message_performance",
+      title: "Revenue strategy performance",
+      summary: "No revenue-strategy reply signals observed yet.",
+      recommendedAdjustment: "monitor",
+      targetSystem: "outreach_preparation",
+      confidence: 0,
+      impact: 0,
+      sampleSize: 0,
+      evidence: [],
+      status: "not_enough_data",
+      createdAt: input.generatedAt,
+    }
+  }
+
+  const positive = top[1].filter((row) =>
+    ["reply", "positive_intent", "completed"].includes(row.outcomeType),
+  ).length
+  const positiveRate = top[1].length > 0 ? positive / top[1].length : 0
+
+  return {
+    id: `insight:revenue-strategy:${input.organizationId}:${input.generatedAt}`,
+    organizationId: input.organizationId,
+    insightType: "message_performance",
+    title: `Top revenue strategy: ${top[0]}`,
+    summary: `${top[0]} recommendations show ${top[1].length} recent outcomes (${Math.round(positiveRate * 100)}% positive/reply density).`,
+    recommendedAdjustment: positiveRate >= 0.35 ? "test_variant" : "monitor",
+    targetSystem: "outreach_preparation",
+    confidence: averageConfidence(top[1]),
+    impact: Math.min(1, top[1].length / 10),
+    sampleSize,
+    evidence: top[1].slice(0, 5),
+    status: insightStatus(sampleSize),
+    createdAt: input.generatedAt,
+  }
+}
+
 export function synthesizeGrowthLearningInsights(input: {
   organizationId: string
   generatedAt: string
@@ -243,6 +370,8 @@ export function synthesizeGrowthLearningInsights(input: {
   return [
     generateChannelPerformanceInsight(input),
     generateMessagePerformanceInsight(input),
+    generateConsultantDiscoveryInsight(input),
+    generateRevenueStrategyInsight(input),
     generateApprovalFrictionInsight(input),
     generateOutboundRiskInsight(input),
     generateObjectiveProgressInsight(input),

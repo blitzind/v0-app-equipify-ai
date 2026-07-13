@@ -1,6 +1,6 @@
 /**
- * GE-AIOS-CONVERSATION-INTELLIGENCE-1B — Elite human SDR communication (client-safe).
- * Extends 1A reasoning — customer-facing drafts only. No new persistence.
+ * GE-AIOS-CONVERSATION-INTELLIGENCE-1B / 2B — Elite human SDR communication (client-safe).
+ * Extends 1A/2A reasoning — customer-facing drafts only. No new persistence.
  */
 
 import type { GrowthOutreachSalesStrategyBrief } from "@/lib/growth/aios/growth/growth-outreach-sales-strategy-brief"
@@ -10,9 +10,20 @@ import {
   passesConsultantTest,
   type GrowthOutreachObservationCandidate,
 } from "@/lib/growth/aios/growth/growth-outreach-elite-sdr-intelligence"
+import {
+  detectHumanAuthenticityFailures,
+  GROWTH_AIOS_CONVERSATION_INTELLIGENCE_2B_QA_MARKER,
+  hashPick,
+  HUMAN_AUTHENTICITY_RESEARCH_REVEAL_PATTERNS,
+  HUMAN_AUTHENTICITY_SDR_TEMPLATE_PATTERNS,
+  pickHumanEmailVariation,
+  type HumanEmailVariation,
+} from "@/lib/growth/aios/growth/growth-outreach-human-authenticity"
 
 export const GROWTH_AIOS_CONVERSATION_INTELLIGENCE_1B_QA_MARKER =
   "ge-aios-conversation-intelligence-1b-elite-human-sales-communication-v1" as const
+
+export { GROWTH_AIOS_CONVERSATION_INTELLIGENCE_2B_QA_MARKER }
 
 export type EliteHumanDraftContext = {
   brief: GrowthOutreachSalesStrategyBrief
@@ -26,6 +37,7 @@ export type EliteHumanDraftContext = {
   cta: string
   curiousPosture: boolean
   selectedObservation: GrowthOutreachObservationCandidate | null
+  recommendedFirstQuestion: string | null
 }
 
 /** Never expose internal reasoning or AI/automation language to prospects. */
@@ -93,12 +105,12 @@ export const ELITE_HUMAN_MARKETING_FINGERPRINTS = [
   /service footprint stood out/i,
   /smallest next step/i,
   /worth a brief comparison/i,
+  ...HUMAN_AUTHENTICITY_RESEARCH_REVEAL_PATTERNS,
+  ...HUMAN_AUTHENTICITY_SDR_TEMPLATE_PATTERNS,
 ]
 
-function hashPick(seed: string, options: string[]): string {
-  let hash = 0
-  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
-  return options[hash % options.length] ?? options[0]
+function hashPickLocal(seed: string, options: string[]): string {
+  return hashPick(seed, options)
 }
 
 function clean(value: string | null | undefined): string | null {
@@ -131,28 +143,28 @@ export function humanizeObservation(input: {
   }
   const lower = (input.insight ?? "").toLowerCase()
   if (/imaging|mri|ct|diagnostic/.test(lower) || /mri|ct|imaging/i.test(input.equipment.join(" "))) {
-    return hashPick(input.companyName, [
-      "MRI/CT depot and field work at your scale isn't common — stood out.",
-      "National imaging service with depot turnaround is a specific rhythm.",
-      "Refurb + field imaging ops across provider sites — that's a heavy lift.",
+    return hashPickLocal(input.seed ?? input.companyName, [
+      "Running depot repairs alongside field imaging work isn't a workflow every shop has to coordinate.",
+      "National imaging service with depot turnaround is a specific operating rhythm.",
+      "Refurb plus field imaging ops across provider sites is a heavier coordination lift than OEM-only shops.",
     ])
   }
   if (/depot|lifecycle|refurbish/.test(lower)) {
-    return "Depot + field lifecycle work is a specific rhythm — not every shop runs it that way."
+    return "Keeping field work synchronized with shop work usually gets harder before anyone notices."
   }
   if (/multi.?site|nationwide|scale/.test(lower)) {
-    return "Multi-site service coordination at your scale is usually where handoffs get noisy."
+    return "Multi-site service coordination at scale is usually where handoffs get noisy."
   }
   if (/hiring|technician/.test(lower)) {
-    return "Hiring field capacity while volume shifts — that combo usually exposes workflow strain."
+    return "Hiring field capacity while volume shifts often exposes dispatch strain before teams catch up."
   }
   if (input.equipment[0]) {
-    return `${input.equipment.slice(0, 2).join("/")} service work at your scale caught my eye.`
+    return `${input.equipment.slice(0, 2).join("/")} service work at this scale is an uncommon operating mix.`
   }
   if (input.insight && !/you support|your team|your model/i.test(input.insight)) {
-    return input.insight.replace(/^You /, "Looks like you ").replace(/\.$/, " — stood out.")
+    return input.insight.replace(/^You /, "").replace(/\.$/, ".")
   }
-  return `Something specific about how ${input.companyName} runs service work caught my eye.`
+  return `Service operations at ${input.companyName} look more complex than the average shop.`
 }
 
 export function buildCuriousQuestion(input: {
@@ -161,7 +173,12 @@ export function buildCuriousQuestion(input: {
   curiousPosture: boolean
   seed: string
   selectedObservation?: GrowthOutreachObservationCandidate | null
+  recommendedFirstQuestion?: string | null
 }): string {
+  if (input.recommendedFirstQuestion?.trim()) {
+    const q = input.recommendedFirstQuestion.trim()
+    return q.endsWith("?") ? q : `${q}?`
+  }
   if (input.selectedObservation) {
     return buildConsultantQuestion({
       observation: input.selectedObservation,
@@ -170,24 +187,24 @@ export function buildCuriousQuestion(input: {
   }
   const outcome = input.outcome ? conversationalOutcome(input.outcome) : null
   if (/imaging|uptime|depot/.test(outcome ?? "") || /mri|ct/i.test(input.equipment.join(" "))) {
-    return hashPick(input.seed, [
-      "Curious if installed-base growth is making uptime planning harder this year — or if you've got that locked down?",
-      "Are you finding depot turnaround stays predictable as volume shifts?",
-      "Has coordinating field + depot work gotten harder as the fleet grows?",
+    return hashPickLocal(input.seed, [
+      "Installed-base growth making uptime planning harder this year?",
+      "Depot turnaround still predictable as volume shifts?",
+      "Coordinating field and depot work getting harder as the fleet grows?",
     ])
   }
   if (outcome) {
-    return hashPick(input.seed, [
-      `Curious if ${outcome.toLowerCase()} is actually on your plate right now?`,
-      `Are you finding ${outcome.toLowerCase()} harder than it should be?`,
-      `Has ${outcome.toLowerCase()} become more of a focus this quarter?`,
+    return hashPickLocal(input.seed, [
+      `${outcome.charAt(0).toUpperCase()}${outcome.slice(1)} — on your plate right now?`,
+      `${outcome.charAt(0).toUpperCase()}${outcome.slice(1)} harder than it should be?`,
+      `${outcome.charAt(0).toUpperCase()}${outcome.slice(1)} becoming more of a focus this quarter?`,
     ])
   }
   if (input.curiousPosture) {
-    return hashPick(input.seed, [
-      "Worth asking — or am I off base?",
-      "Curious if that's even a live issue for you.",
-      "Is that something you're actively working on?",
+    return hashPickLocal(input.seed, [
+      "Off base?",
+      "Live issue for you?",
+      "Something you're actively working on?",
     ])
   }
   return "Is service coordination still mostly smooth — or starting to fray at the edges?"
@@ -201,39 +218,75 @@ function buildHumanSubject(ctx: EliteHumanDraftContext): string {
   return `${company}`
 }
 
-function buildHumanEmailBody(ctx: EliteHumanDraftContext): string {
+function buildHumanEmailBody(ctx: EliteHumanDraftContext, variationSeed?: string): string {
+  const seed = variationSeed ?? ctx.brief.leadId
+  const variation = pickHumanEmailVariation(seed)
   const observation = humanizeObservation({
     insight: ctx.insight,
     equipment: ctx.equipment,
     companyName: ctx.brief.companyName,
     industry: ctx.industry,
     selectedObservation: ctx.selectedObservation,
-    seed: ctx.brief.leadId,
+    seed,
   })
   const question = buildCuriousQuestion({
     outcome: ctx.outcome,
     equipment: ctx.equipment,
     curiousPosture: ctx.curiousPosture,
-    seed: ctx.brief.leadId,
+    seed,
     selectedObservation: ctx.selectedObservation,
+    recommendedFirstQuestion: ctx.recommendedFirstQuestion,
   })
 
-  const variant = hashPick(ctx.brief.leadId, ["obs_q", "obs_q_close", "obs_only"])
-  const lines = [ctx.greeting, "", observation]
+  return formatHumanEmailVariant({
+    ctx,
+    variation,
+    observation,
+    question,
+  })
+}
 
-  if (variant === "obs_only" && ctx.curiousPosture) {
-    lines.push("", question, "", `— ${ctx.sender}`)
-    return lines.join("\n")
+function formatHumanEmailVariant(input: {
+  ctx: EliteHumanDraftContext
+  variation: HumanEmailVariation
+  observation: string
+  question: string
+}): string {
+  const { ctx, variation, observation, question } = input
+  const fragment = observation.split(/[.!?]/)[0]?.trim() ?? observation
+
+  switch (variation) {
+    case "one_line":
+      return [ctx.greeting, `${observation} ${question}`, `— ${ctx.sender}`].join("\n")
+    case "fragment":
+      return [ctx.greeting, "", fragment + ".", "", question, "", `— ${ctx.sender}`].join("\n")
+    case "observation_only":
+      return [ctx.greeting, "", observation, "", `— ${ctx.sender}`].join("\n")
+    case "indirect":
+      return [ctx.greeting, "", observation, "", question, "", `— ${ctx.sender}`].join("\n")
+    case "soft_close":
+      return [
+        ctx.greeting,
+        "",
+        observation,
+        "",
+        question,
+        "",
+        "Happy to compare notes if useful.",
+        "",
+        `— ${ctx.sender}`,
+      ].join("\n")
+    default:
+      return [
+        ctx.greeting,
+        "",
+        observation,
+        "",
+        question,
+        "",
+        `— ${ctx.sender}`,
+      ].join("\n")
   }
-
-  lines.push("", question)
-
-  if (!ctx.curiousPosture && variant === "obs_q_close") {
-    lines.push("", "Happy to compare notes if useful — no pitch.")
-  }
-
-  lines.push("", `— ${ctx.sender}`)
-  return lines.join("\n")
 }
 
 function buildHumanLinkedIn(ctx: EliteHumanDraftContext): string {
@@ -251,9 +304,23 @@ function buildHumanLinkedIn(ctx: EliteHumanDraftContext): string {
     curiousPosture: true,
     seed: `${ctx.brief.leadId}:linkedin`,
     selectedObservation: ctx.selectedObservation,
+    recommendedFirstQuestion: ctx.recommendedFirstQuestion,
   })
   const opener = ctx.dmFirst ? `${ctx.dmFirst} —` : "Hi —"
   return `${opener} ${observation} ${question}`
+}
+
+function compactSmsObservation(observation: string, maxLen: number): string {
+  const firstClause =
+    observation
+      .split(/[.!?]|\s+—\s+/)
+      .map((part) => part.trim())
+      .find((part) => part.length > 12) ?? observation.trim()
+  if (firstClause.length <= maxLen) return firstClause
+  const truncated = firstClause.slice(0, maxLen)
+  const lastSpace = truncated.lastIndexOf(" ")
+  const cut = lastSpace > maxLen * 0.45 ? truncated.slice(0, lastSpace) : truncated
+  return cut.replace(/[—\-,;:]+$/, "").trim()
 }
 
 function buildHumanSms(ctx: EliteHumanDraftContext): string {
@@ -265,9 +332,9 @@ function buildHumanSms(ctx: EliteHumanDraftContext): string {
     selectedObservation: ctx.selectedObservation,
     seed: `${ctx.brief.leadId}:sms`,
   })
-  const shortObs = observation.split(/[.!?]/)[0]?.trim() ?? observation
+  const shortObs = compactSmsObservation(observation, 72)
   const name = ctx.dmFirst ? `${ctx.dmFirst}, ` : ""
-  let sms = `${name}quick q on ${ctx.brief.companyName}: ${shortObs.slice(0, 72)}. Reply if off base?`
+  let sms = `${name}quick q on ${ctx.brief.companyName}: ${shortObs}. Reply if off base?`
   if (sms.length > 300) sms = `${sms.slice(0, 297).trim()}…`
   return sms
 }
@@ -320,9 +387,14 @@ export function failsSwapTest(text: string, companyName: string): boolean {
 export function reviewEliteHumanCommunication(text: string, companyName: string): string[] {
   return [
     ...detectAiFingerprint(text),
+    ...detectHumanAuthenticityFailures(text),
     ...(failsSwapTest(text, companyName) ? ["ai_fingerprint:swap_test_failed"] : []),
     ...(passesConsultantTest(text) ? [] : ["ai_fingerprint:consultant_test_failed"]),
   ]
+}
+
+export function reviewHumanAuthenticity(text: string, companyName: string): string[] {
+  return reviewEliteHumanCommunication(text, companyName)
 }
 
 export function buildEliteHumanProspectDrafts(ctx: EliteHumanDraftContext): {
@@ -338,12 +410,21 @@ export function buildEliteHumanProspectDrafts(ctx: EliteHumanDraftContext): {
   const subject = buildHumanSubject(ctx)
   const preview = emailBody.split("\n").find((line) => line.length > 24 && !line.startsWith("Hi"))?.slice(0, 90) ?? subject
 
-  const revise = (text: string, channel: "email" | "linkedin" | "sms") => {
-    const failures = reviewEliteHumanCommunication(text, ctx.brief.companyName)
+  const revise = (text: string, channel: "email" | "linkedin" | "sms", attempt = 0): string => {
+    const failures = reviewHumanAuthenticity(text, ctx.brief.companyName)
     if (failures.length === 0) return text
-    if (channel === "email") return buildHumanEmailBody({ ...ctx, curiousPosture: true })
-    if (channel === "linkedin") return buildHumanLinkedIn({ ...ctx, curiousPosture: true })
-    return buildHumanSms(ctx)
+    if (attempt >= 4) return text
+    if (channel === "email") {
+      return revise(
+        buildHumanEmailBody(ctx, `${ctx.brief.leadId}:rev:${attempt + 1}`),
+        channel,
+        attempt + 1,
+      )
+    }
+    if (channel === "linkedin") {
+      return revise(buildHumanLinkedIn(ctx), channel, attempt + 1)
+    }
+    return revise(buildHumanSms(ctx), channel, attempt + 1)
   }
 
   emailBody = revise(emailBody, "email")
@@ -395,5 +476,7 @@ export function extractEliteHumanDraftContext(input: {
     cta: brief.recommendedCta,
     curiousPosture: brief.conversationRisk?.posture === "curious",
     selectedObservation,
+    recommendedFirstQuestion:
+      brief.consultantDiscoveryIntelligence?.recommendedFirstQuestion ?? null,
   }
 }

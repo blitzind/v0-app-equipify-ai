@@ -174,7 +174,7 @@ console.log("  ✓ Growth outreach prep builds strategy first; no parallel draft
 const card = readSource(
   "components/growth/ai-os/approvals/growth-ava-completed-outreach-package-card.tsx",
 )
-assert.match(card, /Sales strategy brief/)
+assert.match(card, /Conversation strategy/)
 assert.match(card, /Personalized Video|draft\.label/)
 assert.match(card, /GROWTH_AIOS_OUTREACH_QUALITY_1A_QA_MARKER/)
 assert.match(card, /EditableBlock/)

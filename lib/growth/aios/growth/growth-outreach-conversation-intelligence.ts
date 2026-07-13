@@ -22,16 +22,32 @@ import {
   type GrowthOutreachObservationCandidate,
   type GrowthOutreachObservationSelection,
 } from "@/lib/growth/aios/growth/growth-outreach-elite-sdr-intelligence"
+import {
+  GROWTH_AIOS_CONVERSATION_INTELLIGENCE_3A_QA_MARKER,
+  buildConsultantDiscoveryIntelligence,
+  type GrowthOutreachConsultantDiscoveryIntelligence,
+} from "@/lib/growth/aios/growth/growth-outreach-consultant-discovery-intelligence"
+import {
+  GROWTH_AIOS_REVENUE_STRATEGY_1A_QA_MARKER,
+  buildRevenueStrategyIntelligence,
+  type GrowthOutreachRevenueStrategyIntelligence,
+  type RevenueStrategyBuyingCommitteeSnapshot,
+  type RevenueStrategyDecisionMakerCandidate,
+} from "@/lib/growth/aios/growth/growth-outreach-revenue-strategy-intelligence"
 import type { ProspectKnowledgePack } from "@/lib/growth/research/company-evidence/prospect-knowledge-pack"
 
 export const GROWTH_AIOS_CONVERSATION_INTELLIGENCE_1A_QA_MARKER =
   "ge-aios-conversation-intelligence-1a-v1" as const
 
-export { GROWTH_AIOS_CONVERSATION_INTELLIGENCE_2A_QA_MARKER }
+export { GROWTH_AIOS_CONVERSATION_INTELLIGENCE_2A_QA_MARKER, GROWTH_AIOS_CONVERSATION_INTELLIGENCE_3A_QA_MARKER, GROWTH_AIOS_REVENUE_STRATEGY_1A_QA_MARKER }
 export type {
   GrowthOutreachLearningThemeWeight,
   GrowthOutreachObservationCandidate,
   GrowthOutreachObservationSelection,
+  GrowthOutreachConsultantDiscoveryIntelligence,
+  GrowthOutreachRevenueStrategyIntelligence,
+  RevenueStrategyBuyingCommitteeSnapshot,
+  RevenueStrategyDecisionMakerCandidate,
 }
 
 export type GrowthOutreachEvidenceInsight = {
@@ -149,6 +165,51 @@ export function sanitizeRawEvidenceForProspect(raw: string): string {
     text = sentence.length > 40 ? sentence : `${text.slice(0, 157).trim()}…`
   }
   return text
+}
+
+export function normalizeOperatorResearchLine(raw: string): string | null {
+  const sanitized = sanitizeRawEvidenceForProspect(raw)
+  if (!sanitized || sanitized.length < 10) return null
+  const lower = sanitized.toLowerCase()
+  if (/mri|ct|imaging|diagnostic/.test(lower)) {
+    return "Public website confirms diagnostic imaging equipment service."
+  }
+  if (/refurb|oem/.test(lower)) {
+    return "Service mix includes refurbished and OEM equipment support."
+  }
+  if (/hiring|technician|career|biomedical/.test(lower)) {
+    return "Careers page signals active hiring for field and depot capacity."
+  }
+  if (/nationwide|multi.?site|global|healthcare provider/.test(lower)) {
+    return "Operates across multiple customer sites at scale."
+  }
+  if (/depot|field service|lifecycle/.test(lower)) {
+    return "Combines depot and field service operations."
+  }
+  if (/customer portal|online booking/.test(lower)) {
+    return "Customer-facing service portal is part of the operating model."
+  }
+  const sentence = sanitized.charAt(0).toUpperCase() + sanitized.slice(1)
+  return sentence.length > 120 ? `${sentence.slice(0, 117).trim()}…` : sentence
+}
+
+export function buildOperatorResearchSummaries(
+  lines: Array<string | null | undefined>,
+  limit = 6,
+): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const line of lines) {
+    if (!line?.trim()) continue
+    const normalized = normalizeOperatorResearchLine(line)
+    if (!normalized) continue
+    const key = normalized.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(normalized)
+    if (out.length >= limit) break
+  }
+  return out
 }
 
 function inferThemeFromEvidence(detail: string): {
@@ -786,6 +847,11 @@ const FORBIDDEN_DRAFT_PATTERNS = [
   /\bi'd appreciate\b/i,
   /quick 15 minutes/i,
   /following up/i,
+  /\bsomething i kept coming back to\b/i,
+  /\bone thing that stood out\b/i,
+  /\bit looks like\b/i,
+  /\bfrom what i found\b/i,
+  /\bwhile researching\b/i,
 ]
 
 export function reviewOutreachDraftCopy(text: string): string[] {
@@ -852,6 +918,11 @@ export function enrichOutreachSalesStrategyBrief(input: {
   industryHint?: string | null
   prospectKnowledgePack?: ProspectKnowledgePack | null
   learningWeights?: GrowthOutreachLearningThemeWeight[] | null
+  relationshipStrengthTier?: string | null
+  opportunityReadinessScore?: number | null
+  decisionMakers?: RevenueStrategyDecisionMakerCandidate[]
+  buyingCommitteeSnapshot?: RevenueStrategyBuyingCommitteeSnapshot | null
+  communicationChannelHint?: string | null
 }): {
   businessProblems: string[]
   primaryHook: string
@@ -869,6 +940,8 @@ export function enrichOutreachSalesStrategyBrief(input: {
   evidenceIntelligence: GrowthOutreachEvidenceIntelligence
   conversationRisk: GrowthOutreachConversationRisk
   operatorReasoning: GrowthOutreachOperatorReasoning
+  consultantDiscoveryIntelligence: GrowthOutreachConsultantDiscoveryIntelligence | null
+  revenueStrategyIntelligence: GrowthOutreachRevenueStrategyIntelligence | null
 } {
   const seller = input.brief.sellerTruth!
   const prospect = input.brief.prospectTruth!
@@ -1030,6 +1103,39 @@ export function enrichOutreachSalesStrategyBrief(input: {
     ? `${persona.normalizedRole ?? "This role"} typically cares about ${persona.matchedPersona.desiredBusinessOutcomes[0].toLowerCase()}.`
     : input.brief.decisionMakerAnalysis.whyTheyCare
 
+  const consultantDiscoveryIntelligence = buildConsultantDiscoveryIntelligence({
+    selectedObservation: evidenceIntelligence.selectedObservation ?? null,
+    evidence: input.brief.evidence,
+    equipment,
+    companyName: company,
+    leadId: input.brief.leadId,
+    sellerTruth: updatedSellerTruth,
+    persona,
+    industry,
+    learningWeights: input.learningWeights,
+    posture: conversationRisk.posture,
+  })
+
+  const revenueStrategyIntelligence = buildRevenueStrategyIntelligence({
+    leadId: input.brief.leadId,
+    companyName: company,
+    primaryDmName: dmName,
+    primaryDmTitle: input.brief.decisionMakerAnalysis.title,
+    decisionMakers: input.decisionMakers,
+    relationshipStage,
+    relationshipStrengthTier: input.relationshipStrengthTier,
+    opportunityReadinessScore: input.opportunityReadinessScore,
+    missingEvidence: input.brief.missingPersonalizationOpportunities,
+    evidenceIntelligence,
+    consultantDiscoveryIntelligence,
+    conversationRisk,
+    sellerTruth: updatedSellerTruth,
+    sellerKnowledgeQuality: input.brief.sellerKnowledgeQuality,
+    persona,
+    buyingCommitteeSnapshot: input.buyingCommitteeSnapshot ?? null,
+    communicationChannelHint: input.communicationChannelHint ?? null,
+  })
+
   return {
     businessProblems,
     primaryHook,
@@ -1066,5 +1172,7 @@ export function enrichOutreachSalesStrategyBrief(input: {
     evidenceIntelligence,
     conversationRisk,
     operatorReasoning,
+    consultantDiscoveryIntelligence,
+    revenueStrategyIntelligence,
   }
 }

@@ -14,8 +14,22 @@ import type { GrowthOutreachOperatorReasoning } from "@/lib/growth/aios/growth/g
 import type { AiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 
+import {
+  buildOperatorResearchSummaries,
+  normalizeOperatorResearchLine,
+} from "@/lib/growth/aios/growth/growth-outreach-conversation-intelligence"
+
 export const GROWTH_AIOS_APPROVALS_2A_QA_MARKER =
   "ge-aios-approvals-2a-operator-review-experience-v1" as const
+
+export const GROWTH_AIOS_CONVERSATION_INTELLIGENCE_2B_OPERATOR_LAYOUT_QA_MARKER =
+  "ge-aios-conversation-intelligence-2b-operator-review-layout-v1" as const
+
+export const GROWTH_AIOS_CONVERSATION_INTELLIGENCE_3A_OPERATOR_LAYOUT_QA_MARKER =
+  "ge-aios-conversation-intelligence-3a-consultant-discovery-layout-v1" as const
+
+export const GROWTH_AIOS_REVENUE_STRATEGY_1A_OPERATOR_LAYOUT_QA_MARKER =
+  "ge-aios-revenue-strategy-1a-sales-strategy-layout-v1" as const
 
 export const APPROVALS_2A_DRAFT_CHANNELS = [
   "email",
@@ -121,6 +135,28 @@ export type Approvals2AOperatorReviewPacket = {
   pendingHumanApproval: true
   transportBlocked: true
   teammateName: string
+  /** CONVERSATION-INTELLIGENCE-2B — prioritized scan path + collapsed detail buckets. */
+  operatorReviewLayout: {
+    conversationStrategyEssentials: string[]
+    consultantDiscoveryEssentials: string[]
+    revenueStrategyEssentials: string[]
+    researchSummary: string[]
+    sellerTruthEssentials: string[]
+    expandable: {
+      sellerTruthDetail: string[]
+      prospectTruthDetail: string[]
+      observationIntelligence: string[]
+      consultantDiscoveryDetail: string[]
+      revenueStrategyDetail: string[]
+      explainabilityDetail: string[]
+      evidenceDetail: string[]
+      transparencyDetail: string[]
+      strategyDetail: string[]
+      personalizationDetail: string[]
+    }
+    priorityLineCount: number
+    expandableLineCount: number
+  }
 }
 
 function firstNonEmpty(...values: Array<string | null | undefined>): string | null {
@@ -204,12 +240,18 @@ function draftMetrics(preview: string | null, channel: Approvals2ADraftChannel):
 function buildEvidenceCards(input: {
   website: string | null
   supportingResearch: string[]
+  researchSummary?: string[]
   hasDecisionMaker: boolean
   hasEmail: boolean
   hasPhone: boolean
   contactSource: string | null
 }): Approvals2AEvidenceCard[] {
-  const researchJoined = input.supportingResearch.join(" ").toLowerCase()
+  const researchJoined = [
+    ...input.supportingResearch,
+    ...(input.researchSummary ?? []),
+  ]
+    .join(" ")
+    .toLowerCase()
   const has = (needle: RegExp) => needle.test(researchJoined)
 
   return [
@@ -264,10 +306,18 @@ function buildEvidenceCards(input: {
     {
       id: "internal_research",
       label: "Internal research",
-      present: input.supportingResearch.length > 0,
-      detail: `${input.supportingResearch.length} evidence line${input.supportingResearch.length === 1 ? "" : "s"}`,
+      present: input.supportingResearch.length > 0 || (input.researchSummary?.length ?? 0) > 0,
+      detail: input.researchSummary?.length
+        ? input.researchSummary.slice(0, 2).join(" · ")
+        : input.supportingResearch.length
+          ? `${input.supportingResearch.length} evidence signal${input.supportingResearch.length === 1 ? "" : "s"}`
+          : null,
     },
   ]
+}
+
+function countReviewLines(lines: Array<string | null | undefined>): number {
+  return lines.filter((line) => Boolean(line?.trim())).length
 }
 
 export function projectApprovals2AOperatorReviewPacket(input: {
@@ -322,6 +372,7 @@ export function projectApprovals2AOperatorReviewPacket(input: {
   const dm = input.decisionMaker ?? null
   const research = input.research ?? null
   const pkg = input.pkg
+  const strategy = pkg.salesStrategyBrief ?? null
 
   const email = firstNonEmpty(dm?.email, lead?.contactEmail)
   const phone = firstNonEmpty(dm?.phone, lead?.contactPhone)
@@ -333,19 +384,24 @@ export function projectApprovals2AOperatorReviewPacket(input: {
         ? [lead.fieldServiceStackDetected.trim()]
         : []
 
+  const researchSummary = buildOperatorResearchSummaries([
+    ...pkg.supportingResearch,
+    ...(strategy?.evidence.map((row) => row.detail) ?? []),
+    ...(strategy?.prospectTruth?.evidence.map((row) => row.detail) ?? []),
+  ])
+
   const whySelected = [
-    ...pkg.supportingResearch.slice(0, 4),
-    equipment[0] ? `Services ${equipment[0]}` : null,
-    name ? "Decision maker verified" : null,
-    "Fits approved ICP",
+    ...researchSummary.slice(0, 3),
+    equipment[0] ? `Equipment focus: ${equipment.join(" · ")}` : null,
+    name ? `Decision maker: ${name}${dm?.title ? ` (${dm.title})` : ""}` : null,
+    strategy?.prospectTruth?.fitReason ? `ICP fit: ${strategy.prospectTruth.fitReason}` : "Fits approved ICP",
   ]
     .filter((line): line is string => Boolean(line?.trim()))
     .slice(0, 5)
 
-  const personalization =
-    pkg.personalizationEvidence.length > 0
-      ? pkg.personalizationEvidence.slice(0, 6)
-      : ["Personalization rationale attached on the prepared package."]
+  const personalization = researchSummary.length
+    ? researchSummary.slice(0, 4)
+    : ["Personalization rationale attached on the prepared package."]
 
   const assetsByChannel = new Map<string, string>()
   for (const asset of pkg.generatedAssets) {
@@ -393,137 +449,285 @@ export function projectApprovals2AOperatorReviewPacket(input: {
     firstNonEmpty(dm?.source, lead?.sourceVendor, lead?.sourceChannel, "Canonical lead contacts") ??
     null
 
-  const strategy = pkg.salesStrategyBrief ?? null
+  const sellerTruthEssentials = [
+    strategy?.sellerTruth?.primaryValueProposition
+      ? `Positioning: ${strategy.sellerTruth.primaryValueProposition}`
+      : null,
+    ...(strategy?.sellerTruth?.differentiators.slice(0, 2).map((line) => `Differentiator: ${line}`) ?? []),
+    strategy?.sellerTruth?.wordsToAvoid?.length
+      ? `Words to avoid: ${strategy.sellerTruth.wordsToAvoid.slice(0, 4).join(", ")}`
+      : null,
+    strategy?.sellerTruth?.neverSay?.length
+      ? `Never say: ${strategy.sellerTruth.neverSay.slice(0, 3).join(", ")}`
+      : null,
+  ].filter((line): line is string => Boolean(line))
+
+  const sellerTruthDetail = [
+    strategy?.sellerTruth?.source === "approved_business_profile"
+      ? "Approved Business Profile loaded"
+      : "Approved Business Profile unavailable — safe seller defaults",
+    strategy?.sellerTruth?.elevatorPitch
+      ? `Elevator pitch: ${strategy.sellerTruth.elevatorPitch}`
+      : null,
+    strategy?.sellerTruth?.mission ? `Mission: ${strategy.sellerTruth.mission}` : null,
+    ...(strategy?.sellerTruth?.ctaPreferences.map((line) => `Preferred CTA: ${line}`) ?? []),
+    ...(strategy?.sellerTruth?.discoveryQuestions?.slice(0, 4).map((line) => `Discovery: ${line}`) ?? []),
+    strategy?.sellerTruth?.industryPlaybookUsedAsFallback
+      ? "Industry playbook used only as fallback for missing seller guidance"
+      : null,
+    strategy?.sellerTruth?.biUsedAsEnrichmentOnly
+      ? "Business Intelligence used as enrichment only (profile remains SoT)"
+      : null,
+    ...(strategy?.sellerTruth?.enrichments.fromOrganizationalKnowledge.slice(0, 3).map(
+      (line) => `Org knowledge: ${line}`,
+    ) ?? []),
+    ...(strategy?.sellerTruth?.enrichments.fromKnowledgeCenter.slice(0, 3).map(
+      (line) => `Knowledge Center: ${line}`,
+    ) ?? []),
+  ].filter((line): line is string => Boolean(line))
+
+  const prospectTruthEssentials = [
+    strategy?.prospectTruth?.companyName
+      ? `Company: ${strategy.prospectTruth.companyName}`
+      : `Company: ${firstNonEmpty(pkg.companyName, lead?.companyName) ?? "Account"}`,
+    strategy?.prospectTruth?.fitReason ? `Fit: ${strategy.prospectTruth.fitReason}` : null,
+    strategy?.prospectTruth?.opportunitySummary
+      ? `Opportunity: ${strategy.prospectTruth.opportunitySummary}`
+      : null,
+    strategy?.relationshipStage || strategy?.prospectTruth?.relationshipStage
+      ? `Relationship stage: ${strategy?.relationshipStage ?? strategy?.prospectTruth?.relationshipStage}`
+      : null,
+  ].filter((line): line is string => Boolean(line))
+
+  const prospectTruthDetail = [
+    ...(strategy?.prospectTruth?.businessProblems.map((line) => `Problem: ${line}`) ?? []),
+    ...(strategy?.prospectTruth?.evidence.slice(0, 6).map((row) => {
+      const normalized = normalizeOperatorResearchLine(row.detail)
+      return normalized ? `Evidence: ${normalized}` : null
+    }) ?? []),
+  ].filter((line): line is string => Boolean(line))
+
+  const revenueStrategy = strategy?.revenueStrategyIntelligence ?? null
+
+  const revenueStrategyEssentials = [
+    revenueStrategy ? `Sales recommendation: ${revenueStrategy.recommendation}` : null,
+    revenueStrategy?.recommendationSummary ? `Why: ${revenueStrategy.recommendationSummary}` : null,
+    revenueStrategy?.primaryEntryPoint
+      ? `Recommended entry: ${revenueStrategy.primaryEntryPoint.label}`
+      : null,
+    revenueStrategy?.backupEntryPoint
+      ? `Backup entry: ${revenueStrategy.backupEntryPoint.label}`
+      : null,
+    revenueStrategy?.conversationApproach
+      ? `Strategy: ${revenueStrategy.conversationApproach}`
+      : null,
+    revenueStrategy
+      ? `Confidence: ${revenueStrategy.confidenceLevel} (${Math.round(revenueStrategy.confidenceScore * 100)}%)`
+      : null,
+  ].filter((line): line is string => Boolean(line))
+
+  const consultantDiscovery = strategy?.consultantDiscoveryIntelligence ?? null
+
+  const consultantDiscoveryEssentials = [
+    consultantDiscovery?.primaryBusinessPressure
+      ? `Top business pressure: ${consultantDiscovery.primaryBusinessPressure.label}`
+      : null,
+    consultantDiscovery?.operationalBottleneck
+      ? `Operational bottleneck: ${consultantDiscovery.operationalBottleneck}`
+      : null,
+    consultantDiscovery?.primaryBuyingTrigger
+      ? `Primary buying trigger (${consultantDiscovery.primaryBuyingTrigger.impact}): ${consultantDiscovery.primaryBuyingTrigger.label}`
+      : null,
+    consultantDiscovery?.conversationAngle
+      ? `Conversation angle: ${consultantDiscovery.conversationAngle}`
+      : null,
+    consultantDiscovery?.recommendedFirstQuestion
+      ? `Recommended first question: ${consultantDiscovery.recommendedFirstQuestion}`
+      : null,
+    consultantDiscovery
+      ? `Reason confidence: ${Math.round(consultantDiscovery.reasonConfidence * 100)}%`
+      : null,
+  ].filter((line): line is string => Boolean(line))
+
+  const conversationStrategyEssentials = [
+    strategy?.evidenceIntelligence?.selectedObservation?.consultantObservation
+      ? `Opening observation: ${strategy.evidenceIntelligence.selectedObservation.consultantObservation}`
+      : strategy?.operatorReasoning?.primaryInsight
+        ? `Opening observation: ${strategy.operatorReasoning.primaryInsight}`
+        : null,
+    strategy?.recommendedCta ? `Recommended CTA: ${strategy.recommendedCta}` : null,
+    strategy?.conversationStrategy?.smallestCommitment
+      ? `Smallest commitment: ${strategy.conversationStrategy.smallestCommitment}`
+      : strategy?.operatorReasoning?.smallestCommitment
+        ? `Smallest commitment: ${strategy.operatorReasoning.smallestCommitment}`
+        : null,
+  ].filter((line): line is string => Boolean(line))
+
+  const revenueStrategyDetail = [
+    revenueStrategy?.vpSalesJudgment ? `VP judgment: ${revenueStrategy.vpSalesJudgment}` : null,
+    revenueStrategy?.timingRationale ? `Timing: ${revenueStrategy.timingRationale}` : null,
+    ...(revenueStrategy?.timingSignals.map((line) => `Timing signal: ${line}`) ?? []),
+    revenueStrategy?.channelPlan
+      ? `Channel: ${revenueStrategy.channelPlan.primaryChannel} — ${revenueStrategy.channelPlan.rationale}`
+      : null,
+    revenueStrategy?.sequencePlan
+      ? `Sequence: ${revenueStrategy.sequencePlan.approach.replace(/_/g, " ")} — ${revenueStrategy.sequencePlan.rationale}`
+      : null,
+    revenueStrategy?.committeeStrategy
+      ? `Committee: ${revenueStrategy.committeeStrategy.replace(/_/g, " ")}`
+      : null,
+    ...(revenueStrategy?.committeeStakeholders
+      .filter((row) => row.present)
+      .map((row) => `Stakeholder: ${row.label}`) ?? []),
+    ...(revenueStrategy?.threadPlan.map(
+      (row, index) =>
+        `Thread ${index + 1}: ${row.contactTitle ?? "Contact"} — ${row.conversationAngle}`,
+    ) ?? []),
+    ...(revenueStrategy?.risks.map((row) => `Risk (${row.severity}): ${row.label}`) ?? []),
+    ...(revenueStrategy?.delayReasons.map((line) => `Delay: ${line}`) ?? []),
+    ...(revenueStrategy?.researchGaps.map((line) => `Research gap: ${line}`) ?? []),
+    revenueStrategy?.competitivePosture.competitiveWedge
+      ? `Competitive wedge: ${revenueStrategy.competitivePosture.competitiveWedge}`
+      : null,
+  ].filter((line): line is string => Boolean(line))
+
+  const consultantDiscoveryDetail = [
+    consultantDiscovery?.consultantHypothesis
+      ? `Hypothesis: ${consultantDiscovery.consultantHypothesis}`
+      : null,
+    consultantDiscovery?.reasoningChain.operationalImplication
+      ? `Operational implication: ${consultantDiscovery.reasoningChain.operationalImplication}`
+      : null,
+    consultantDiscovery?.reasoningChain.businessImplication
+      ? `Business implication: ${consultantDiscovery.reasoningChain.businessImplication}`
+      : null,
+    consultantDiscovery?.reasoningChain.conversationOpportunity
+      ? `Conversation opportunity: ${consultantDiscovery.reasoningChain.conversationOpportunity}`
+      : null,
+    consultantDiscovery?.conversationTiming.reason
+      ? `Why now: ${consultantDiscovery.conversationTiming.reason}`
+      : consultantDiscovery?.conversationTiming.internalNote ?? null,
+    ...(consultantDiscovery?.rankedBuyingTriggers.slice(1, 4).map(
+      (row) => `Buying trigger (${row.impact}): ${row.label}`,
+    ) ?? []),
+    ...(consultantDiscovery?.rankedDiscoveryQuestions.slice(1, 4).map(
+      (row) => `Discovery (${row.themeKey}): ${row.question}`,
+    ) ?? []),
+    strategy?.operatorReasoning?.conversationGoal
+      ? `Goal: ${strategy.operatorReasoning.conversationGoal}`
+      : null,
+    strategy?.operatorReasoning?.businessOutcome
+      ? `Outcome: ${strategy.operatorReasoning.businessOutcome}`
+      : null,
+    strategy?.operatorReasoning?.reasonForCta
+      ? `CTA rationale: ${strategy.operatorReasoning.reasonForCta}`
+      : null,
+  ].filter((line): line is string => Boolean(line))
+
+  const observationIntelligence = [
+    strategy?.evidenceIntelligence?.themeKey
+      ? `Selected theme: ${strategy.evidenceIntelligence.themeKey}`
+      : null,
+    strategy?.evidenceIntelligence?.selectionRationale ?? null,
+    ...(strategy?.evidenceIntelligence?.rankedObservations ?? [])
+      .slice(0, 3)
+      .map(
+        (row) =>
+          `Ranked (${row.scores.total.toFixed(2)}): ${row.themeKey} — ${row.consultantObservation}`,
+      ),
+    strategy?.evidenceIntelligence?.observationSelection?.runnerUp?.themeKey
+      ? `Runner-up: ${strategy.evidenceIntelligence.observationSelection.runnerUp.themeKey}`
+      : null,
+  ].filter((line): line is string => Boolean(line))
 
   const knowledgeLayers = {
-    sellerTruth: [
-      strategy?.sellerTruth?.source === "approved_business_profile"
-        ? "Approved Business Profile loaded"
-        : "Approved Business Profile unavailable — safe seller defaults",
-      strategy?.sellerTruth?.primaryValueProposition
-        ? `Value proposition: ${strategy.sellerTruth.primaryValueProposition}`
-        : null,
-      strategy?.sellerTruth?.elevatorPitch
-        ? `Elevator pitch: ${strategy.sellerTruth.elevatorPitch}`
-        : null,
-      strategy?.sellerTruth?.mission ? `Mission: ${strategy.sellerTruth.mission}` : null,
-      ...(strategy?.sellerTruth?.differentiators.map((line) => `Differentiator: ${line}`) ?? []),
-      ...(strategy?.sellerTruth?.ctaPreferences.map((line) => `Preferred CTA: ${line}`) ?? []),
-      strategy?.sellerTruth?.industryPlaybookUsedAsFallback
-        ? "Industry playbook used only as fallback for missing seller guidance"
-        : "Industry playbook not used as primary seller guidance",
-      strategy?.sellerTruth?.biUsedAsEnrichmentOnly
-        ? "Business Intelligence used as enrichment only (profile remains SoT)"
-        : null,
-      ...(strategy?.sellerTruth?.enrichments.fromOrganizationalKnowledge.slice(0, 2).map(
-        (line) => `Org knowledge: ${line}`,
-      ) ?? []),
-      ...(strategy?.sellerTruth?.enrichments.fromKnowledgeCenter.slice(0, 2).map(
-        (line) => `Knowledge Center: ${line}`,
-      ) ?? []),
-    ].filter((line): line is string => Boolean(line)),
-    prospectTruth: [
-      strategy?.prospectTruth?.companyName
-        ? `Company: ${strategy.prospectTruth.companyName}`
-        : `Company: ${firstNonEmpty(pkg.companyName, lead?.companyName) ?? "Account"}`,
-      strategy?.prospectTruth?.fitReason
-        ? `Fit: ${strategy.prospectTruth.fitReason}`
-        : null,
-      strategy?.prospectTruth?.opportunitySummary
-        ? `Opportunity: ${strategy.prospectTruth.opportunitySummary}`
-        : null,
-      ...(strategy?.prospectTruth?.businessProblems.map((line) => `Problem: ${line}`) ??
-        pkg.supportingResearch.slice(0, 3).map((line) => `Evidence: ${line}`)),
-      ...(strategy?.prospectTruth?.evidence.slice(0, 4).map(
-        (row) => `${row.source}: ${row.detail}`,
-      ) ?? []),
-      strategy?.relationshipStage || strategy?.prospectTruth?.relationshipStage
-        ? `Relationship stage: ${strategy?.relationshipStage ?? strategy?.prospectTruth?.relationshipStage}`
-        : null,
-    ].filter((line): line is string => Boolean(line)),
-    conversationStrategy: [
-      strategy?.operatorReasoning?.conversationGoal
-        ? `Conversation goal: ${strategy.operatorReasoning.conversationGoal}`
-        : strategy?.conversationStrategy?.conversationGoal
-          ? `Conversation goal: ${strategy.conversationStrategy.conversationGoal}`
-          : null,
-      strategy?.operatorReasoning?.businessOutcome
-        ? `Business outcome: ${strategy.operatorReasoning.businessOutcome}`
-        : strategy?.conversationStrategy?.businessOutcomeThatMatters
-          ? `Business outcome: ${strategy.conversationStrategy.businessOutcomeThatMatters}`
-          : null,
-      strategy?.operatorReasoning?.primaryInsight
-        ? `Primary insight: ${strategy.operatorReasoning.primaryInsight}`
-        : strategy?.conversationStrategy?.primaryInsight
-          ? `Primary insight: ${strategy.conversationStrategy.primaryInsight}`
-          : null,
-      strategy?.operatorReasoning?.evidenceSummary
-        ? `Evidence summary: ${strategy.operatorReasoning.evidenceSummary}`
-        : strategy?.conversationStrategy?.evidenceSummary
-          ? `Evidence summary: ${strategy.conversationStrategy.evidenceSummary}`
-          : null,
-      strategy?.operatorReasoning?.reasonForCta
-        ? `Reason for CTA: ${strategy.operatorReasoning.reasonForCta}`
-        : strategy?.conversationStrategy?.reasonForCta
-          ? `Reason for CTA: ${strategy.conversationStrategy.reasonForCta}`
-          : null,
-      ...(strategy?.operatorReasoning?.conversationRisks ??
-        strategy?.conversationStrategy?.conversationRisks ??
-        []
-      ).map((line) => `Conversation risk: ${line}`),
-      ...(strategy?.operatorReasoning?.intentionallyAvoided ??
-        strategy?.conversationStrategy?.intentionallyAvoided ??
-        []
-      )
-        .slice(0, 4)
-        .map((line) => `Intentionally avoided: ${line}`),
-      strategy?.conversationJustification
-        ? `Justification: ${strategy.conversationJustification}`
-        : null,
-      strategy?.conversationStrategy?.whyThisCompany
-        ? `Why this company: ${strategy.conversationStrategy.whyThisCompany}`
-        : null,
-      strategy?.conversationStrategy?.whyThisPerson
-        ? `Why this person: ${strategy.conversationStrategy.whyThisPerson}`
-        : null,
-      strategy?.conversationStrategy?.whyNow
-        ? `Why now: ${strategy.conversationStrategy.whyNow}`
-        : null,
-      strategy?.conversationStrategy?.whySeller
-        ? `Why seller: ${strategy.conversationStrategy.whySeller}`
-        : null,
-      strategy?.conversationStrategy?.whyThisConversation
-        ? `Why this conversation: ${strategy.conversationStrategy.whyThisConversation}`
-        : strategy?.recommendedConversation
-          ? `Why this conversation: ${strategy.recommendedConversation}`
-          : null,
-      strategy?.conversationStrategy?.smallestCommitment
-        ? `Smallest commitment: ${strategy.conversationStrategy.smallestCommitment}`
-        : strategy?.operatorReasoning?.smallestCommitment
-          ? `Smallest commitment: ${strategy.operatorReasoning.smallestCommitment}`
-          : null,
-      ...(strategy?.conversationStrategy?.doNotDiscuss.slice(0, 3).map(
-        (line) => `Do not discuss: ${line}`,
-      ) ?? []),
-      strategy?.evidenceIntelligence?.themeKey
-        ? `Selected observation theme: ${strategy.evidenceIntelligence.themeKey}`
-        : null,
-      strategy?.evidenceIntelligence?.selectionRationale
-        ? `Selection rationale: ${strategy.evidenceIntelligence.selectionRationale}`
-        : null,
-      strategy?.evidenceIntelligence?.selectedObservation?.consultantObservation
-        ? `Consultant observation: ${strategy.evidenceIntelligence.selectedObservation.consultantObservation}`
-        : null,
-      ...(strategy?.evidenceIntelligence?.rankedObservations ?? [])
-        .slice(0, 3)
-        .map(
-          (row) =>
-            `Ranked observation (${row.scores.total.toFixed(2)}): ${row.themeKey} — ${row.consultantObservation}`,
-        ),
-      strategy?.evidenceIntelligence?.observationSelection?.runnerUp?.themeKey
-        ? `Runner-up theme: ${strategy.evidenceIntelligence.observationSelection.runnerUp.themeKey}`
-        : null,
-    ].filter((line): line is string => Boolean(line)),
+    sellerTruth: sellerTruthEssentials,
+    prospectTruth: prospectTruthEssentials,
+    conversationStrategy: conversationStrategyEssentials,
+  }
+
+  const explainabilityDetail = [
+    `Why pursue: ${firstNonEmpty(strategy?.executiveSummary, research?.opportunitySummary, pkg.expectedOutcome, whySelected[0]) ?? `${teammate.name} prepared this account after research completed.`}`,
+    `Why contact: ${firstNonEmpty(revenueStrategy?.primaryEntryPoint.label, strategy?.decisionMakerAnalysis.whyThisPerson, name ? `${name}${dm?.title ? ` (${dm.title})` : ""} is the selected decision maker.` : null) ?? `${teammate.name} used the best available decision-maker context.`}`,
+    `Why messaging: ${firstNonEmpty(strategy?.primaryHook, strategy?.evidenceIntelligence?.selectedObservation?.consultantObservation) ?? `${teammate.name} tailored messaging from research and personalization signals.`}`,
+    `Why timing: ${firstNonEmpty(revenueStrategy?.timingRationale, revenueStrategy?.recommendationSummary) ?? `${teammate.name} finished preparation at ${pkg.preparedAt} and stopped for your authorization before any send.`}`,
+    ...(strategy?.operatorReasoning?.conversationRisks ?? []).map((line) => `Risk: ${line}`),
+    ...(strategy?.operatorReasoning?.intentionallyAvoided ?? []).map((line) => `Avoid: ${line}`),
+  ]
+
+  const evidenceDetail = researchSummary.map((line) => `Research: ${line}`)
+
+  const strategyDetail = [
+    strategy?.conversationJustification ? `Justification: ${strategy.conversationJustification}` : null,
+    strategy?.primaryHook ? `Primary hook: ${strategy.primaryHook}` : null,
+    strategy?.businessValue ? `Business value: ${strategy.businessValue}` : null,
+    ...(strategy?.businessProblems.map((line) => `Problem: ${line}`) ?? []),
+    ...(strategy?.trustBuilders.map((line) => `Trust builder: ${line}`) ?? []),
+    ...(strategy?.objections.map((row) => `Objection: ${row.objection} → ${row.response}`) ?? []),
+    ...(strategy?.missingPersonalizationOpportunities.map((gap) => `Missing: ${gap}`) ?? []),
+  ].filter((line): line is string => Boolean(line))
+
+  const transparencyDetail = [
+    `Generated: ${pkg.preparedAt}`,
+    research?.updatedAt ? `Last updated: ${research.updatedAt}` : null,
+    formatAge(research?.updatedAt ?? lead?.lastResearchedAt, nowMs)
+      ? `Research age: ${formatAge(research?.updatedAt ?? lead?.lastResearchedAt, nowMs)}`
+      : null,
+    formatAge(dm?.discoveredAt, nowMs)
+      ? `Decision maker age: ${formatAge(dm?.discoveredAt, nowMs)}`
+      : null,
+    contactSource ? `Contact source: ${contactSource}` : null,
+    `Package: ${pkg.packageId}`,
+  ].filter((line): line is string => Boolean(line))
+
+  const personalizationDetail =
+    pkg.personalizationEvidence.length > 0 ? pkg.personalizationEvidence.slice(0, 8) : []
+
+  const priorityLineCount =
+    countReviewLines([
+      ...whySelected,
+      ...revenueStrategyEssentials,
+      ...consultantDiscoveryEssentials,
+      ...conversationStrategyEssentials,
+      ...researchSummary.slice(0, 3),
+      ...sellerTruthEssentials.slice(0, 3),
+    ]) +
+    drafts.filter((draft) => draft.prepared).length * 2 +
+    8
+
+  const expandableLineCount = countReviewLines([
+    ...sellerTruthDetail,
+    ...prospectTruthDetail,
+    ...observationIntelligence,
+    ...consultantDiscoveryDetail,
+    ...revenueStrategyDetail,
+    ...explainabilityDetail,
+    ...evidenceDetail,
+    ...transparencyDetail,
+    ...strategyDetail,
+    ...personalizationDetail,
+  ])
+
+  const operatorReviewLayout = {
+    conversationStrategyEssentials,
+    consultantDiscoveryEssentials,
+    revenueStrategyEssentials,
+    researchSummary,
+    sellerTruthEssentials,
+    expandable: {
+      sellerTruthDetail,
+      prospectTruthDetail,
+      observationIntelligence,
+      consultantDiscoveryDetail,
+      revenueStrategyDetail,
+      explainabilityDetail,
+      evidenceDetail,
+      transparencyDetail,
+      strategyDetail,
+      personalizationDetail,
+    },
+    priorityLineCount,
+    expandableLineCount,
   }
 
   return {
@@ -557,6 +761,7 @@ export function projectApprovals2AOperatorReviewPacket(input: {
     evidenceCards: buildEvidenceCards({
       website: lead?.website ?? null,
       supportingResearch: pkg.supportingResearch,
+      researchSummary,
       hasDecisionMaker: Boolean(name),
       hasEmail: Boolean(email),
       hasPhone: Boolean(phone),
@@ -587,11 +792,7 @@ export function projectApprovals2AOperatorReviewPacket(input: {
           personalization[0],
         ) ?? `${teammate.name} tailored messaging from research and personalization signals.`,
       whyTiming: `${teammate.name} finished preparation at ${pkg.preparedAt} and stopped for your authorization before any send.`,
-      supportingEvidence: [
-        ...(strategy?.evidence.map((row) => `${row.source}: ${row.detail}`) ?? []),
-        ...pkg.supportingResearch.slice(0, 6),
-        ...personalization.slice(0, 3),
-      ].slice(0, 10),
+      supportingEvidence: researchSummary.slice(0, 6),
       confidence: strategy?.confidence ?? pkg.confidence,
       unknownAssumptions: [
         ...(research?.assumptions ?? []),
@@ -640,6 +841,7 @@ export function projectApprovals2AOperatorReviewPacket(input: {
     pendingHumanApproval: true,
     transportBlocked: true,
     teammateName: teammate.name,
+    operatorReviewLayout,
   }
 }
 

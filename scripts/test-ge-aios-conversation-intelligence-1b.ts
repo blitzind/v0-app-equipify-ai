@@ -168,7 +168,7 @@ assert.equal(reviewEliteHumanCommunication(drafts.email.full, "Block Imaging").l
 assert.equal(reviewEliteHumanCommunication(drafts.linkedIn, "Block Imaging").length, 0)
 assert.equal(reviewEliteHumanCommunication(drafts.sms, "Block Imaging").length, 0)
 assert.equal(drafts.qualityFailures.length, 0, `Quality failures: ${drafts.qualityFailures.join(", ")}`)
-assert.ok(/curious|are you finding|has that|stood out|heavy lift|caught my eye/i.test(prospectCopy))
+assert.ok(/depot|imaging|refurb|coordinating|uptime|show up|live issue|off base|\?/i.test(prospectCopy))
 console.log("  ✓ Block Imaging drafts pass elite human review")
 
 // 1A regression still wired

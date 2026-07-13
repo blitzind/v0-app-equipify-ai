@@ -9,14 +9,21 @@ import {
   countWords,
   type GrowthOutreachSalesStrategyBrief,
 } from "@/lib/growth/aios/growth/growth-outreach-sales-strategy-brief"
-import { reviewOutreachDraftCopy } from "@/lib/growth/aios/growth/growth-outreach-conversation-intelligence"
+import {
+  reviewConsultantDiscoveryQuality,
+} from "@/lib/growth/aios/growth/growth-outreach-consultant-discovery-intelligence"
+import {
+  reviewRevenueStrategyQuality,
+} from "@/lib/growth/aios/growth/growth-outreach-revenue-strategy-intelligence"
 import {
   buildCuriousQuestion,
   buildEliteHumanProspectDrafts,
   extractEliteHumanDraftContext,
   humanizeObservation,
   reviewEliteHumanCommunication,
+  reviewHumanAuthenticity,
 } from "@/lib/growth/aios/growth/growth-outreach-elite-human-communication"
+import { reviewOutreachDraftCopy } from "@/lib/growth/aios/growth/growth-outreach-conversation-intelligence"
 
 export type GrowthOutreachStrategyDerivedDrafts = {
   email: {
@@ -66,6 +73,7 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
     curiousPosture: ctx.curiousPosture,
     seed: brief.leadId,
     selectedObservation: ctx.selectedObservation,
+    recommendedFirstQuestion: ctx.recommendedFirstQuestion,
   })
 
   const greeting = ctx.greeting
@@ -76,13 +84,19 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
   const ctaLine = emailBody.includes("?") && !/happy to compare/i.test(emailBody) ? "" : "Happy to compare notes if useful — no pitch."
   const emailFull = `Subject: ${human.subject}\nPreview: ${human.preview}\n\n${emailBody}`
 
+  const discoveryFromConsultant =
+    brief.consultantDiscoveryIntelligence?.rankedDiscoveryQuestions
+      .slice(0, 3)
+      .map((row) => row.question) ?? []
   const discovery =
-    brief.sellerTruth?.discoveryQuestions?.slice(0, 3) ??
-    [
-      question.replace(/\?$/, "") + "?",
-      "Where does work still fall through the cracks?",
-      "What would a cleaner week look like for your team?",
-    ]
+    discoveryFromConsultant.length >= 2
+      ? discoveryFromConsultant
+      : brief.sellerTruth?.discoveryQuestions?.slice(0, 3) ??
+        [
+          question.replace(/\?$/, "") + "?",
+          "Where does work still fall through the cracks?",
+          "What would a cleaner week look like for your team?",
+        ]
 
   const callGuide = [
     `Opening: "${greeting.replace(",", "")} — ${observation}"`,
@@ -152,9 +166,16 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
     ...reviewOutreachDraftCopy(emailFull),
     ...reviewOutreachDraftCopy(human.linkedIn),
     ...reviewOutreachDraftCopy(human.sms),
-    ...reviewEliteHumanCommunication(emailFull, company),
-    ...reviewEliteHumanCommunication(human.linkedIn, company),
-    ...reviewEliteHumanCommunication(human.sms, company),
+    ...reviewHumanAuthenticity(emailFull, company),
+    ...reviewHumanAuthenticity(human.linkedIn, company),
+    ...reviewHumanAuthenticity(human.sms, company),
+    ...(brief.consultantDiscoveryIntelligence
+      ? reviewConsultantDiscoveryQuality({
+          discovery: brief.consultantDiscoveryIntelligence,
+          prospectFacingQuestion: question,
+        })
+      : ["consultant_discovery:not_applied"]),
+    ...reviewRevenueStrategyQuality(brief.revenueStrategyIntelligence ?? null),
   ]
 
   const banned = [

@@ -126,6 +126,12 @@ export type GrowthLearningOutcome = {
     companySize?: string
     persona?: string
     messageTheme?: string
+    businessPressureKey?: string
+    discoveryQuestionTheme?: string
+    revenueStrategyRecommendation?: string
+    entryPointRole?: string
+    channelStrategy?: string
+    committeeStrategy?: string
     timingBucket?: string
   }
   evidence: GrowthLearningOutcomeEvidence[]

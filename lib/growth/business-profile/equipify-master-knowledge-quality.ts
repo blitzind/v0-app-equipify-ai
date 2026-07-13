@@ -127,6 +127,8 @@ export function scoreOutreachSellerKnowledgeQuality(input: {
   evidenceSanitized?: boolean
   conversationIntelligenceApplied?: boolean
   eliteSdrIntelligenceApplied?: boolean
+  consultantDiscoveryApplied?: boolean
+  revenueStrategyApplied?: boolean
 }): GrowthOutreachSellerKnowledgeQuality {
   const seller = scoreSellerKnowledgeCompleteness(input.profile, input.sellerTruth)
 
@@ -142,7 +144,7 @@ export function scoreOutreachSellerKnowledgeQuality(input: {
     researchCompleteness: scoreResearchCompleteness({
       evidence: input.evidence,
       missingEvidence: input.missingEvidence,
-      evidenceSanitized: input.evidenceSanitized || input.eliteSdrIntelligenceApplied,
+      evidenceSanitized: input.evidenceSanitized || input.eliteSdrIntelligenceApplied || input.consultantDiscoveryApplied,
     }),
     sellerKnowledgeCompleteness: seller.score,
     evidenceQuality: input.eliteSdrIntelligenceApplied
@@ -152,11 +154,15 @@ export function scoreOutreachSellerKnowledgeQuality(input: {
         : scoreEvidenceQuality(input.evidence),
     personaUnderstanding: personaScore,
     conversationQuality: input.conversationJustification?.trim()
-      ? input.eliteSdrIntelligenceApplied
-        ? 0.98
-        : input.conversationIntelligenceApplied
-          ? 0.95
-          : 0.9
+      ? input.revenueStrategyApplied
+        ? 1
+        : input.consultantDiscoveryApplied
+          ? 0.99
+          : input.eliteSdrIntelligenceApplied
+            ? 0.98
+            : input.conversationIntelligenceApplied
+              ? 0.95
+              : 0.9
       : 0.55,
     personalization: input.primaryHook?.trim()
       ? input.eliteSdrIntelligenceApplied
@@ -190,7 +196,9 @@ export function scoreOutreachSellerKnowledgeQuality(input: {
     GROWTH_OUTREACH_SELLER_KNOWLEDGE_QUALITY_DIMENSIONS.length
 
   const overallScore = clamp01(
-    input.eliteSdrIntelligenceApplied ? Math.max(rawOverallScore, 0.95) : rawOverallScore,
+    input.revenueStrategyApplied || input.consultantDiscoveryApplied || input.eliteSdrIntelligenceApplied
+      ? Math.max(rawOverallScore, 0.95)
+      : rawOverallScore,
   )
 
   return {

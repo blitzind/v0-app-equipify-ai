@@ -496,12 +496,10 @@ export function consultantOpeningLine(input: {
   observation: GrowthOutreachObservationCandidate
   seed: string
 }): string {
-  const options = [
-    `One thing that stood out: ${input.observation.consultantObservation.charAt(0).toLowerCase()}${input.observation.consultantObservation.slice(1)}`,
-    `Something I kept coming back to — ${input.observation.consultantObservation.charAt(0).toLowerCase()}${input.observation.consultantObservation.slice(1)}`,
-    input.observation.consultantObservation,
-  ]
-  return options[hashStable(input.seed) % options.length] ?? input.observation.consultantObservation
+  const observation = input.observation.consultantObservation.trim()
+  const firstSentence = observation.split(/(?<=[.!?])\s+/)[0]?.trim() ?? observation
+  const options = [observation, firstSentence]
+  return options[hashStable(input.seed) % options.length] ?? observation
 }
 
 export function buildConsultantQuestion(input: {
@@ -509,12 +507,24 @@ export function buildConsultantQuestion(input: {
   seed: string
 }): string {
   const angle = input.observation.curiousAngle.replace(/^whether\s+/i, "").replace(/\.$/, "")
+  const cap = `${angle.charAt(0).toUpperCase()}${angle.slice(1)}`
   const options = [
-    `Made me wonder whether ${angle} — or if that's already handled.`,
-    `Curious if ${angle}?`,
-    `Are you finding ${angle}?`,
-    `${angle.charAt(0).toUpperCase()}${angle.slice(1)} — is that on your radar?`,
+    `${cap}?`,
+    `${cap} — still a live issue?`,
+    `Worth comparing notes on ${angle}?`,
   ]
+
+  if (/\bhas (become|gotten)\b/i.test(angle)) {
+    const hasForm = angle.replace(/\bhas (become|gotten)\b/i, "$1")
+    options.splice(1, 0, `Has ${hasForm}?`)
+  } else if (/^(at what point|where)\b/i.test(angle)) {
+    options.splice(1, 0, `${cap} — showing up day to day?`)
+  } else if (/^[a-z]+ing\b/i.test(angle)) {
+    options.splice(1, 0, `Is ${angle} showing up day to day?`)
+  } else {
+    options.splice(1, 0, `Does ${angle} show up day to day?`)
+  }
+
   return options[hashStable(`${input.seed}:q`) % options.length] ?? options[0]
 }
 
@@ -523,6 +533,9 @@ export function passesConsultantTest(text: string): boolean {
     return false
   }
   if (/\b(streamline|leverage|comprehensive solution|game.?changer)\b/i.test(text)) {
+    return false
+  }
+  if (/\b(something i kept coming back to|one thing that stood out|i noticed|made me wonder|stood out|caught my eye)\b/i.test(text)) {
     return false
   }
   return true

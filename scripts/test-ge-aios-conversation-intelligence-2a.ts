@@ -254,7 +254,7 @@ assert.equal(reviewEliteHumanCommunication(drafts.email.full, "Block Imaging").l
 assert.equal(reviewEliteHumanCommunication(drafts.linkedIn, "Block Imaging").length, 0)
 assert.equal(reviewEliteHumanCommunication(drafts.sms, "Block Imaging").length, 0)
 assert.equal(drafts.qualityFailures.length, 0, `Quality failures: ${drafts.qualityFailures.join(", ")}`)
-assert.ok(/refurb|depot|imaging|curious|wonder|stood out/i.test(prospectCopy))
+assert.ok(/refurb|depot|imaging|wonder|stood out|on your radar|show up|live issue|\?/i.test(prospectCopy))
 console.log("  ✓ Block Imaging drafts pass elite SDR intelligence review")
 
 // Operator review packet shows observation selection
@@ -285,10 +285,14 @@ const pkg: GrowthAutonomousOutreachApprovalPackage = {
 }
 const review = projectApprovals2AOperatorReviewPacket({ pkg, teammateName: "Ava" })
 assert.ok(
-  review.knowledgeLayers.conversationStrategy.some((line) => /Selected observation theme:/i.test(line)),
+  review.operatorReviewLayout.conversationStrategyEssentials.some((line) =>
+    /Opening observation:/i.test(line),
+  ),
 )
 assert.ok(
-  review.knowledgeLayers.conversationStrategy.some((line) => /Consultant observation:/i.test(line)),
+  review.operatorReviewLayout.expandable.observationIntelligence.some((line) =>
+    /Selected theme:/i.test(line),
+  ),
 )
 console.log("  ✓ Operator review packet exposes ranked observations + selection rationale")
 

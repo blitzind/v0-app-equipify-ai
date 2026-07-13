@@ -249,11 +249,23 @@ const pkg: GrowthAutonomousOutreachApprovalPackage = {
 
 const packet = projectApprovals2AOperatorReviewPacket({ pkg, teammateName: "Ava" })
 assert.ok(packet.operatorReasoning)
-assert.ok(packet.knowledgeLayers.conversationStrategy.some((line) => /Conversation goal:/i.test(line)))
-assert.ok(packet.knowledgeLayers.conversationStrategy.some((line) => /Business outcome:/i.test(line)))
-assert.ok(packet.knowledgeLayers.conversationStrategy.some((line) => /Primary insight:/i.test(line)))
-assert.ok(packet.knowledgeLayers.conversationStrategy.some((line) => /Reason for CTA:/i.test(line)))
-console.log("  ✓ Approval packet exposes operator-facing reasoning")
+assert.ok(packet.knowledgeLayers.conversationStrategy.some((line) => /Opening observation:/i.test(line)))
+assert.ok(
+  packet.operatorReviewLayout.consultantDiscoveryEssentials.some((line) =>
+    /Top business pressure:/i.test(line),
+  ),
+)
+assert.ok(
+  packet.operatorReviewLayout.consultantDiscoveryEssentials.some((line) =>
+    /Recommended first question:/i.test(line),
+  ),
+)
+assert.ok(
+  packet.operatorReviewLayout.expandable.consultantDiscoveryDetail.some((line) =>
+    /Goal:|Outcome:/i.test(line),
+  ),
+)
+console.log("  ✓ Approval packet exposes operator-facing conclusions")
 
 // Source wiring
 const briefSource = readSource("lib/growth/aios/growth/growth-outreach-sales-strategy-brief.ts")
@@ -262,6 +274,7 @@ const draftsSource = readSource("lib/growth/aios/growth/growth-outreach-strategy
 assert.match(briefSource, /enrichOutreachSalesStrategyBrief/)
 assert.match(briefSource, /outreach-sales-strategy-brief-v4/)
 assert.match(intelSource, /buildEvidenceIntelligence/)
+assert.match(intelSource, /buildConsultantDiscoveryIntelligence/)
 assert.match(intelSource, /buildDynamicObjections/)
 assert.match(intelSource, /pickDynamicCta/)
 assert.match(draftsSource, /buildEliteHumanProspectDrafts/)

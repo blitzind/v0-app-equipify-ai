@@ -230,22 +230,90 @@ export function normalizeLearningOutcomeFromEvent(event: AiOsEvent): GrowthLearn
   if (event.eventType === GROWTH_AUTONOMOUS_OUTREACH_PREPARED_EVENT) {
     const observationThemeKey =
       typeof payload.observation_theme_key === "string" ? payload.observation_theme_key : undefined
+    const businessPressureKey =
+      typeof payload.business_pressure_key === "string" ? payload.business_pressure_key : undefined
+    const discoveryQuestionTheme =
+      typeof payload.discovery_question_theme === "string"
+        ? payload.discovery_question_theme
+        : undefined
+    const revenueStrategyRecommendation =
+      typeof payload.revenue_strategy_recommendation === "string"
+        ? payload.revenue_strategy_recommendation
+        : undefined
+    const entryPointRole =
+      typeof payload.entry_point_role === "string" ? payload.entry_point_role : undefined
+    const channelStrategy =
+      typeof payload.channel_strategy === "string" ? payload.channel_strategy : undefined
+    const committeeStrategy =
+      typeof payload.committee_strategy === "string" ? payload.committee_strategy : undefined
+    const dimensions: GrowthLearningOutcome["dimensions"] = {}
+    if (observationThemeKey) dimensions.messageTheme = observationThemeKey
+    if (businessPressureKey) dimensions.businessPressureKey = businessPressureKey
+    if (discoveryQuestionTheme) dimensions.discoveryQuestionTheme = discoveryQuestionTheme
+    if (revenueStrategyRecommendation) {
+      dimensions.revenueStrategyRecommendation = revenueStrategyRecommendation
+    }
+    if (entryPointRole) dimensions.entryPointRole = entryPointRole
+    if (channelStrategy) dimensions.channelStrategy = channelStrategy
+    if (committeeStrategy) dimensions.committeeStrategy = committeeStrategy
     return baseOutcome(event, {
       source: "workflow_agent",
       outcomeType: "completed",
       signalStrength: 0.72,
       confidence: 0.8,
-      dimensions: observationThemeKey ? { messageTheme: observationThemeKey } : {},
-      evidence: observationThemeKey
-        ? [
-            {
-              source: "outreach_preparation",
-              label: "observation_theme_key",
-              value: observationThemeKey,
-              confidence: 0.85,
-            },
-          ]
-        : undefined,
+      dimensions,
+      evidence: [
+        ...(observationThemeKey
+          ? [
+              {
+                source: "outreach_preparation",
+                label: "observation_theme_key",
+                value: observationThemeKey,
+                confidence: 0.85,
+              },
+            ]
+          : []),
+        ...(businessPressureKey
+          ? [
+              {
+                source: "outreach_preparation",
+                label: "business_pressure_key",
+                value: businessPressureKey,
+                confidence: 0.82,
+              },
+            ]
+          : []),
+        ...(discoveryQuestionTheme
+          ? [
+              {
+                source: "outreach_preparation",
+                label: "discovery_question_theme",
+                value: discoveryQuestionTheme,
+                confidence: 0.8,
+              },
+            ]
+          : []),
+        ...(revenueStrategyRecommendation
+          ? [
+              {
+                source: "outreach_preparation",
+                label: "revenue_strategy_recommendation",
+                value: revenueStrategyRecommendation,
+                confidence: 0.84,
+              },
+            ]
+          : []),
+        ...(entryPointRole
+          ? [
+              {
+                source: "outreach_preparation",
+                label: "entry_point_role",
+                value: entryPointRole,
+                confidence: 0.82,
+              },
+            ]
+          : []),
+      ],
     })
   }
 

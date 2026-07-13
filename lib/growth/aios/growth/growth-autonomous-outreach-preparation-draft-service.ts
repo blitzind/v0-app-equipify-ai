@@ -28,6 +28,12 @@ import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/r
 import { loadSequenceOptimizationOutreachSignals } from "@/lib/growth/sequence-optimization/sequence-optimization-queries"
 import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
 import type { GrowthOutreachLearningThemeWeight } from "@/lib/growth/aios/growth/growth-outreach-conversation-intelligence"
+import {
+  mapRevenueStrategyChannelToPackage,
+  mapRevenueStrategySequenceToPackage,
+} from "@/lib/growth/aios/growth/growth-outreach-revenue-strategy-intelligence"
+import { loadBuyingCommitteeIntelligenceLeadRollup } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-lead-rollup"
+import { loadBuyingCommitteeIntelligenceOperatorStatus } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-operator-status"
 
 export async function buildAutonomousOutreachApprovalPackage(
   admin: SupabaseClient,
@@ -108,6 +114,57 @@ export async function buildAutonomousOutreachApprovalPackage(
     learningWeights = null
   }
 
+  const bcRollup = await loadBuyingCommitteeIntelligenceLeadRollup(admin, input.leadId).catch(() => null)
+  const bcStatus =
+    bcRollup?.company_id != null
+      ? await loadBuyingCommitteeIntelligenceOperatorStatus(admin, {
+          company_id: bcRollup.company_id,
+        }).catch(() => null)
+      : null
+  const buyingCommitteeSnapshot =
+    bcRollup && bcStatus
+      ? {
+          hasVerifiedCommittee: bcStatus.has_verified_committee,
+          discoveryPending: bcRollup.discovery_pending,
+          discoveryFailed: bcRollup.discovery_failed,
+          singleThreadRisk: bcStatus.single_thread_risk,
+          coverageScore: bcStatus.coverage_score,
+          rolesPresent: bcStatus.roles_present,
+          rolesMissing: bcStatus.roles_missing,
+          verifiedMemberCount: bcStatus.verified_member_count,
+        }
+      : bcRollup
+        ? {
+            hasVerifiedCommittee: bcRollup.has_verified_committee,
+            discoveryPending: bcRollup.discovery_pending,
+            discoveryFailed: bcRollup.discovery_failed,
+            singleThreadRisk: true,
+            coverageScore: 0,
+            rolesPresent: [],
+            rolesMissing: [],
+            verifiedMemberCount: 0,
+          }
+        : null
+
+  const communicationPlan = requestGrowthCommunicationPlan({
+    organizationId: input.organizationId,
+    subject: { type: "lead", id: input.leadId },
+    goal: "qualify",
+    context: {
+      emailReady: true,
+      smsReady: true,
+      senderReady: true,
+      engagementScore: confidence,
+      metaRecommendationType:
+        input.snapshot.nextBestAction?.kind === "generate_outreach_draft" &&
+        /sms/i.test(input.snapshot.nextBestAction.label)
+          ? "sms"
+          : "email",
+    },
+    generatedAt: input.generatedAt,
+  })
+  const communicationChannelHint = resolveCommunicationPlanRecommendedChannel(communicationPlan)
+
   // Think first — Prospect Truth + Seller Truth → Conversation Strategy → drafts.
   const salesStrategyBrief = buildOutreachSalesStrategyBrief({
     leadId: input.leadId,
@@ -141,6 +198,15 @@ export async function buildAutonomousOutreachApprovalPackage(
     approvedProfileId: profileRecord?.id ?? null,
     prospectKnowledgePack,
     learningWeights,
+    relationshipStrengthTier: lead.relationshipStrengthTier,
+    opportunityReadinessScore: lead.opportunityReadinessScore,
+    decisionMakers: decisionMakers.map((row) => ({
+      name: row.fullName,
+      title: row.title,
+      isPrimary: row.id === lead.primaryDecisionMakerId || row.id === primaryDm?.id,
+    })),
+    buyingCommitteeSnapshot,
+    communicationChannelHint,
   })
 
   const drafts = generateOutreachDraftsFromSalesStrategyBrief({
@@ -152,23 +218,12 @@ export async function buildAutonomousOutreachApprovalPackage(
 
   const packageId = `outreach-prep:${input.leadId}:${input.generatedAt}`
 
-  const communicationPlan = requestGrowthCommunicationPlan({
-    organizationId: input.organizationId,
-    subject: { type: "lead", id: input.leadId },
-    goal: "qualify",
-    context: {
-      emailReady: true,
-      smsReady: true,
-      senderReady: true,
-      engagementScore: confidence,
-      metaRecommendationType:
-        input.snapshot.nextBestAction?.kind === "generate_outreach_draft" &&
-        /sms/i.test(input.snapshot.nextBestAction.label)
-          ? "sms"
-          : "email",
-    },
-    generatedAt: input.generatedAt,
-  })
+  const revenueChannel = salesStrategyBrief.revenueStrategyIntelligence
+    ? mapRevenueStrategyChannelToPackage(salesStrategyBrief.revenueStrategyIntelligence.channelPlan)
+    : communicationChannelHint
+  const revenueSequence = salesStrategyBrief.revenueStrategyIntelligence
+    ? mapRevenueStrategySequenceToPackage(salesStrategyBrief.revenueStrategyIntelligence.sequencePlan)
+    : "email_first_multichannel"
 
   return {
     packageId,
@@ -224,8 +279,8 @@ export async function buildAutonomousOutreachApprovalPackage(
           : "Seller messaging derived from Approved Business Profile."
         : "Seller messaging used safe defaults — Approved Business Profile not available.",
     ].filter((line): line is string => Boolean(line)),
-    recommendedChannel: resolveCommunicationPlanRecommendedChannel(communicationPlan),
-    recommendedSequence: "email_first_multichannel",
+    recommendedChannel: revenueChannel,
+    recommendedSequence: revenueSequence,
     expectedOutcome:
       input.snapshot.executionPlan?.expectedOutcome ??
       salesStrategyBrief.businessObjective,

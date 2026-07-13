@@ -21,7 +21,13 @@ import { scoreOutreachSellerKnowledgeQuality } from "@/lib/growth/business-profi
 import {
   GROWTH_AIOS_CONVERSATION_INTELLIGENCE_1A_QA_MARKER,
   GROWTH_AIOS_CONVERSATION_INTELLIGENCE_2A_QA_MARKER,
+  GROWTH_AIOS_CONVERSATION_INTELLIGENCE_3A_QA_MARKER,
+  GROWTH_AIOS_REVENUE_STRATEGY_1A_QA_MARKER,
   enrichOutreachSalesStrategyBrief,
+  type GrowthOutreachConsultantDiscoveryIntelligence,
+  type GrowthOutreachRevenueStrategyIntelligence,
+  type RevenueStrategyBuyingCommitteeSnapshot,
+  type RevenueStrategyDecisionMakerCandidate,
   type GrowthOutreachConversationRisk,
   type GrowthOutreachEvidenceIntelligence,
   type GrowthOutreachLearningThemeWeight,
@@ -33,6 +39,8 @@ export type { GrowthOutreachEvidenceCitation }
 export {
   GROWTH_AIOS_CONVERSATION_INTELLIGENCE_1A_QA_MARKER,
   GROWTH_AIOS_CONVERSATION_INTELLIGENCE_2A_QA_MARKER,
+  GROWTH_AIOS_CONVERSATION_INTELLIGENCE_3A_QA_MARKER,
+  GROWTH_AIOS_REVENUE_STRATEGY_1A_QA_MARKER,
 }
 
 export const GROWTH_AIOS_OUTREACH_QUALITY_1A_QA_MARKER =
@@ -79,6 +87,10 @@ export type GrowthOutreachSalesStrategyBrief = {
   evidenceIntelligence?: GrowthOutreachEvidenceIntelligence
   conversationRisk?: GrowthOutreachConversationRisk
   operatorReasoning?: GrowthOutreachOperatorReasoning
+  /** CONVERSATION-INTELLIGENCE-3A — consultant discovery conclusions (internal). */
+  consultantDiscoveryIntelligence?: GrowthOutreachConsultantDiscoveryIntelligence | null
+  /** REVENUE-STRATEGY-1A — VP-of-Sales pre-outreach strategy (internal). */
+  revenueStrategyIntelligence?: GrowthOutreachRevenueStrategyIntelligence | null
 }
 
 export type BuildSalesStrategyBriefInput = {
@@ -122,6 +134,12 @@ export type BuildSalesStrategyBriefInput = {
   prospectKnowledgePack?: ProspectKnowledgePack | null
   /** CONVERSATION-INTELLIGENCE-2A — advisory opener theme weights from sequence optimization. */
   learningWeights?: GrowthOutreachLearningThemeWeight[] | null
+  /** REVENUE-STRATEGY-1A — optional pre-outreach strategy inputs. */
+  relationshipStrengthTier?: string | null
+  opportunityReadinessScore?: number | null
+  decisionMakers?: RevenueStrategyDecisionMakerCandidate[]
+  buyingCommitteeSnapshot?: RevenueStrategyBuyingCommitteeSnapshot | null
+  communicationChannelHint?: string | null
 }
 
 function cleanLine(value: string | null | undefined): string | null {
@@ -507,6 +525,11 @@ export function buildOutreachSalesStrategyBrief(
     industryHint: input.industry,
     prospectKnowledgePack: input.prospectKnowledgePack,
     learningWeights: input.learningWeights,
+    relationshipStrengthTier: input.relationshipStrengthTier,
+    opportunityReadinessScore: input.opportunityReadinessScore,
+    decisionMakers: input.decisionMakers,
+    buyingCommitteeSnapshot: input.buyingCommitteeSnapshot,
+    communicationChannelHint: input.communicationChannelHint,
   })
 
   const finalSellerKnowledgeQuality = scoreOutreachSellerKnowledgeQuality({
@@ -523,6 +546,8 @@ export function buildOutreachSalesStrategyBrief(
     evidenceSanitized: true,
     conversationIntelligenceApplied: true,
     eliteSdrIntelligenceApplied: Boolean(enriched.evidenceIntelligence.selectedObservation),
+    consultantDiscoveryApplied: Boolean(enriched.consultantDiscoveryIntelligence),
+    revenueStrategyApplied: Boolean(enriched.revenueStrategyIntelligence),
   })
 
   return {
@@ -544,6 +569,8 @@ export function buildOutreachSalesStrategyBrief(
     evidenceIntelligence: enriched.evidenceIntelligence,
     conversationRisk: enriched.conversationRisk,
     operatorReasoning: enriched.operatorReasoning,
+    consultantDiscoveryIntelligence: enriched.consultantDiscoveryIntelligence,
+    revenueStrategyIntelligence: enriched.revenueStrategyIntelligence,
     sellerKnowledgeQuality: finalSellerKnowledgeQuality,
   }
 }
