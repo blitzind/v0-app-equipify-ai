@@ -13,8 +13,12 @@ import {
   getDeferredDraftFactoryStates,
   listDueDraftFactoryStates,
 } from "@/lib/growth/draft-factory/draft-factory-durable-service"
-import { wakeDraftFactoryFromCompletionEvent } from "@/lib/growth/draft-factory/draft-factory-durable-live"
+import {
+  buildCanonicalEvidenceForLead,
+  wakeDraftFactoryFromCompletionEvent,
+} from "@/lib/growth/draft-factory/draft-factory-durable-live"
 import { resolveDraftFactoryDurableRepository } from "@/lib/growth/draft-factory/draft-factory-durable-repository-factory"
+import { collectGenerationCapacityCandidates } from "@/lib/growth/draft-factory/draft-factory-generation-capacity"
 import {
   mapAiOsEventToDraftFactoryWakePlans,
   type DraftFactoryWakePlan,
@@ -28,6 +32,9 @@ import {
 import { planWakeEvaluationBatch } from "@/lib/growth/runtime-guardrails/growth-wake-guardrails"
 import { getRuntimeKillSwitchStates } from "@/lib/growth/runtime-guardrails/growth-runtime-kill-switch-service"
 import { createServiceRoleClient } from "@/lib/supabase/admin"
+import { buildAutonomousOutreachApprovalPackage } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-draft-service"
+import { fetchLatestGrowthLeadResearchWorkflowSnapshot } from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
+import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 
 export type DraftFactoryWakeObservationResult = {
   qaMarker: typeof GROWTH_DRAFT_FACTORY_WAKE_BUS_QA_MARKER
@@ -63,18 +70,45 @@ async function applyOrgCapacityWake(
     repository,
   })
 
-  const byLead = new Map<string, (typeof deferred)[number]>()
-  for (const row of [...deferred, ...due]) {
-    byLead.set(row.leadId, row)
-  }
-  const candidates = [...byLead.values()].slice(0, GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_MAX_ADVANCES_PER_ORG)
-  if (candidates.length === 0) return 0
+  // AUTONOMY-1F — include waiting_for_generation, not only portfolio_deferred.
+  const pool = collectGenerationCapacityCandidates({
+    deferredStates: deferred.map((row) => ({
+      leadId: row.leadId,
+      state: row.state,
+      updatedAt: row.updatedAt,
+    })),
+    dueStates: due.map((row) => ({
+      leadId: row.leadId,
+      state: row.state,
+      updatedAt: row.updatedAt,
+    })),
+    limit: GROWTH_DRAFT_FACTORY_DUE_SCHEDULER_MAX_ADVANCES_PER_ORG,
+  })
+  if (pool.candidates.length === 0) return 0
 
   const batch = planWakeEvaluationBatch({
-    totalWaits: candidates.length,
+    totalWaits: pool.candidates.length,
     perRunCap: GROWTH_DRAFT_FACTORY_CAPACITY_SLOTS_PER_ORG,
   })
   if (!batch.wakeExecutionEnabled || batch.effectiveLimit <= 0) return 0
+
+  const capacityCandidates = []
+  for (const [index, row] of pool.candidates.entries()) {
+    const evidence = await buildCanonicalEvidenceForLead(admin, {
+      organizationId: input.organizationId,
+      leadId: row.leadId,
+      portfolioSelected: true,
+    })
+    if (evidence.stopInvestment) continue
+    capacityCandidates.push({
+      leadId: row.leadId,
+      investmentState: "increase_investment" as const,
+      spendAuthorized: true,
+      evidence,
+      signals: { missionPriorityOverall: 100 - index },
+    })
+  }
+  if (capacityCandidates.length === 0) return 0
 
   const result = await advanceDraftFactoryCapacityWake({
     organizationId: input.organizationId,
@@ -83,12 +117,31 @@ async function applyOrgCapacityWake(
     now: input.now,
     workerId: `df-wake-bus:${input.sourceId}`,
     repository,
-    candidates: candidates.map((row, index) => ({
-      leadId: row.leadId,
-      investmentState: "maintain_investment",
-      spendAuthorized: true,
-      signals: { missionPriorityOverall: 100 - index },
-    })),
+    candidates: capacityCandidates,
+    generateViaGrowth5F: async ({ organizationId, leadId, now: generatedAt }) => {
+      const lead = await fetchGrowthLeadById(admin, leadId)
+      if (!lead) return null
+      const snapshot = await fetchLatestGrowthLeadResearchWorkflowSnapshot(admin, {
+        organizationId,
+        leadId,
+      })
+      if (!snapshot) return null
+      const growth5f = await buildAutonomousOutreachApprovalPackage(admin, {
+        organizationId,
+        leadId,
+        companyName: lead.companyName,
+        snapshot,
+        generatedAt,
+      })
+      if (growth5f.pendingHumanApproval !== true || growth5f.transportBlocked !== true) {
+        return null
+      }
+      return {
+        packageId: growth5f.packageId,
+        pendingHumanApproval: true as const,
+        transportBlocked: true as const,
+      }
+    },
   })
 
   return result.results.filter((row) => row.outcome !== "duplicate_noop").length

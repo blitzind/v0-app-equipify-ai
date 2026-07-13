@@ -308,7 +308,17 @@ export async function advanceDraftFactoryForLead(
         mappedStage ??
         plan.stageEvaluated ??
         resolveEarliestIncompleteDurableStage(nextEvidence)
-      if (stage && stage !== "complete" && stage !== "approval" && stage !== "qualification" && stage !== "investment") {
+      // AUTONOMY-1F — when Growth 5F is injected, do not stub-complete generation
+      // before the generator runs (would skip generateViaGrowth5F entirely).
+      const deferGenerationToGrowth5F = stage === "generation" && Boolean(input.generateViaGrowth5F)
+      if (
+        stage &&
+        !deferGenerationToGrowth5F &&
+        stage !== "complete" &&
+        stage !== "approval" &&
+        stage !== "qualification" &&
+        stage !== "investment"
+      ) {
         nextEvidence = applyStageCompletionFact(nextEvidence, stage, {
           packageId: hints.packageId,
           researchRunId: wakeType === "research_completed" ? String(sourceId) : nextEvidence.researchRunId,

@@ -88,6 +88,13 @@ export {
 } from "@/lib/growth/draft-factory/draft-factory-due-fair-admission"
 
 export {
+  GROWTH_AIOS_AUTONOMY_1F_QA_MARKER,
+  collectGenerationCapacityCandidates,
+  isWaitingForGenerationDurableState,
+  type GenerationCapacityCandidate,
+} from "@/lib/growth/draft-factory/draft-factory-generation-capacity"
+
+export {
   selectPortfolioAwareDueDraftFactoryStates,
   type DuePortfolioSelectionCandidate,
   type DuePortfolioSelectionInput,
