@@ -30,11 +30,15 @@ import { listGrowthMeetingsForLead } from "@/lib/growth/meeting-intelligence/mee
 import { fetchGrowthLeadEmailEventSummary } from "@/lib/growth/outbound/email-event-summary"
 import { listGrowthOutboundRepliesForLead } from "@/lib/growth/outbound/reply-repository"
 import { isReplyMaterialForCanonicalDecision } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1a-reply"
+import { extractBuyingStageFromMetadata } from "@/lib/growth/prospect-search/prospect-search-qualification-overlays"
 import { fetchGrowthSequenceEnrollmentById } from "@/lib/growth/sequence-enrollment/sequence-enrollment-repository"
 import {
   loadLatestStoredCallWorkspacePostCallClosureForLead,
 } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-stored-closure"
 import { mapStoredClosureToDecisionPostCall } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-stored-closure-map"
+import {
+  buildMeetingIntelligenceInputForDecisionEngine,
+} from "@/lib/growth/meeting-intelligence/growth-canonical-meeting-brief-builder"
 
 function mapPackageState(
   pkg: GrowthAutonomousOutreachApprovalPackage | null,
@@ -356,6 +360,25 @@ export async function resolveGrowthCanonicalDecisionForLead(
       ),
       discoveryGaps: brief?.missingEvidence?.slice(0, 4) ?? [],
     },
+    meetingIntelligence: buildMeetingIntelligenceInputForDecisionEngine({
+      hasUpcomingMeeting: Boolean(upcomingMeeting),
+      buyingStage:
+        extractBuyingStageFromMetadata(
+          lead.metadata && typeof lead.metadata === "object" ? lead.metadata : {},
+        )?.buying_stage ?? null,
+      recommendedNextAction: lead.nextBestActionReason,
+      readinessScore: brief?.revenueStrategyIntelligence?.opportunityReadiness?.overall
+        ? Math.round((brief.revenueStrategyIntelligence.opportunityReadiness.overall ?? 0) * 100)
+        : 55,
+      readinessMissing: brief?.missingEvidence?.slice(0, 4) ?? [],
+      committeeCoverage: committeeStatus?.roles_missing?.length
+        ? committeeStatus.roles_missing.length >= 2
+          ? "Weak"
+          : "Partial"
+        : "Strong",
+      canonicalDecision: null,
+      postCallClosure: storedClosure?.closure ?? null,
+    }),
     sourceVersions: {
       memoryVersion: memoryBundle?.generatedAt ?? null,
       relationshipVersion: relationshipAssessment?.relationshipGoal?.current ?? null,

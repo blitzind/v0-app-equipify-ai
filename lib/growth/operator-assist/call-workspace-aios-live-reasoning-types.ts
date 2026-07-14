@@ -3,6 +3,7 @@
 import type { GrowthOutreachConsultantDiscoveryIntelligence } from "@/lib/growth/aios/growth/growth-outreach-consultant-discovery-intelligence"
 import type { GrowthOutreachRevenueStrategyIntelligence } from "@/lib/growth/aios/growth/growth-outreach-revenue-strategy-intelligence"
 import type { GrowthOutreachRelationshipAssessment } from "@/lib/growth/aios/growth/growth-relationship-strategy-2a-types"
+import type { GrowthCanonicalMeetingBrief } from "@/lib/growth/meeting-intelligence/growth-canonical-meeting-brief-types"
 
 export const GROWTH_CALL_WORKSPACE_AIOS_LIVE_REASONING_QA_MARKER =
   "ge-aios-call-workspace-intelligence-2a-v1" as const
@@ -51,4 +52,5 @@ export type CallWorkspaceAiosLiveReasoningSnapshot = {
   consultantDiscoveryIntelligence: GrowthOutreachConsultantDiscoveryIntelligence | null
   revenueStrategyIntelligence: GrowthOutreachRevenueStrategyIntelligence | null
   relationshipAssessment: GrowthOutreachRelationshipAssessment | null
+  meetingBrief?: GrowthCanonicalMeetingBrief | null
 }

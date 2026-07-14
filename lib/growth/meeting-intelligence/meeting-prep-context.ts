@@ -3,7 +3,9 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { fetchGrowthMeetingById } from "@/lib/growth/meeting-intelligence/meeting-repository"
 import { assembleMeetingPrepBundle } from "@/lib/growth/meeting-intelligence/meeting-prep-bundle"
+import { resolveGrowthCanonicalMeetingBriefForMeeting } from "@/lib/growth/meeting-intelligence/growth-canonical-meeting-brief-service"
 import { loadMeetingPrepAccountPlaybookContext } from "@/lib/growth/meeting-intelligence/meeting-prep-account-playbook-loader"
 import type {
   GrowthMeetingPrepBundle,
@@ -21,6 +23,7 @@ import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/r
 import { resolveCanonicalHumanMemoryForLead } from "@/lib/growth/lead-memory/resolve-canonical-human-memory-for-lead"
 import { resolveGrowthCanonicalDecisionForLead } from "@/lib/growth/aios/growth/resolve-growth-canonical-decision-for-lead"
 import { projectGrowthCanonicalOperatorDecision } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-operator-projection"
+import { readGrowthVideoMeetingPrepFromLeadMetadata } from "@/lib/growth/sequences/growth-sequence-video-intelligence-mappings"
 
 function metaRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {}
@@ -144,9 +147,23 @@ export async function gatherMeetingPrepBundleForMeeting(
       })
     : null
 
-  return {
+  const enrichedBundle = {
     ...bundle,
     canonicalDecision,
     canonicalRecommendedNextAction: canonicalProjection?.whatToDo ?? bundle.researchSummary.recommendedNextAction,
+  }
+
+  const canonicalMeetingBrief =
+    lead.organizationId != null
+      ? await resolveGrowthCanonicalMeetingBriefForMeeting(admin, {
+          organizationId: lead.organizationId,
+          meeting,
+          prepBundle: enrichedBundle,
+        }).catch(() => null)
+      : null
+
+  return {
+    ...enrichedBundle,
+    canonicalMeetingBrief,
   }
 }

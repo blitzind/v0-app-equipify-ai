@@ -8,6 +8,7 @@ import type { GrowthInstitutionalSalesIntelligence } from "@/lib/growth/aios/gro
 import type { GrowthOutreachRelationshipAssessment } from "@/lib/growth/aios/growth/growth-relationship-strategy-2a-types"
 import type { RevenueStrategyRecommendation } from "@/lib/growth/aios/growth/growth-outreach-revenue-strategy-intelligence"
 import type { CanonicalHumanMemoryBundle } from "@/lib/growth/lead-memory/canonical-human-memory-types"
+import type { GrowthCanonicalMeetingIntelligenceInput } from "@/lib/growth/meeting-intelligence/growth-canonical-meeting-brief-types"
 
 export type GrowthCanonicalDecisionOperatorConstraints = {
   archived?: boolean
@@ -108,6 +109,7 @@ export type GrowthCanonicalDecisionInput = {
   transportState: GrowthCanonicalDecisionTransportState | null
   operatorConstraints: GrowthCanonicalDecisionOperatorConstraints | null
   commercialReadiness: GrowthCanonicalDecisionCommercialReadiness | null
+  meetingIntelligence?: GrowthCanonicalMeetingIntelligenceInput | null
 
   /** Stable versions for fingerprinting — supplied by callers, not invented here. */
   sourceVersions?: {

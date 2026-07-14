@@ -918,6 +918,8 @@
     "test:ge-aios-decision-engine-1b": "tsx scripts/test-ge-aios-decision-engine-1b.ts",
     "test:ge-aios-decision-engine-1c": "tsx scripts/test-ge-aios-decision-engine-1c.ts",
     "test:ge-aios-decision-engine-1d": "tsx scripts/test-ge-aios-decision-engine-1d.ts",
+    "test:ge-aios-meeting-intelligence-1a": "tsx scripts/test-ge-aios-meeting-intelligence-1a.ts",
+    "test:ge-aios-first-meeting-workflow-1a": "tsx scripts/test-ge-aios-first-meeting-workflow-1a.ts",
     "test:ge-aios-revenue-strategy-1a": "tsx scripts/test-ge-aios-revenue-strategy-1a.ts",
     "test:ge-aios-relationship-strategy-2a": "tsx scripts/test-ge-aios-relationship-strategy-2a.ts",
     "test:ge-aios-send-plane-1a": "tsx scripts/test-ge-aios-send-plane-1a.ts",

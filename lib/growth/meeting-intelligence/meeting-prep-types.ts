@@ -149,4 +149,6 @@ export type GrowthMeetingPrepBundle = {
   /** GE-AIOS-DECISION-ENGINE-1B — canonical decision alignment for meeting workspace */
   canonicalDecision?: import("@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-types").GrowthCanonicalDecisionResolution | null
   canonicalRecommendedNextAction?: string | null
+  /** GE-AIOS-MEETING-INTELLIGENCE-1A — computed battle plan (never persisted separately) */
+  canonicalMeetingBrief?: import("@/lib/growth/meeting-intelligence/growth-canonical-meeting-brief-types").GrowthCanonicalMeetingBrief | null
 }

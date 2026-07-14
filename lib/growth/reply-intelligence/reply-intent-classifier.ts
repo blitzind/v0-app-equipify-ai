@@ -19,7 +19,17 @@ export type ReplyIntentClassificationResult = {
 const OOO = [/out of office/i, /\booo\b/i, /automatic reply/i, /auto.?reply/i, /away from (the )?office/i]
 const UNSUB = [/unsubscribe/i, /remove me/i, /stop emailing/i, /do not contact/i, /opt out/i]
 const NOT_INTERESTED = [/not interested/i, /no thank/i, /please remove/i, /not a fit/i]
-const WRONG_CONTACT = [/wrong (person|contact|email)/i, /not the right person/i, /no longer (here|with)/i]
+const WRONG_CONTACT = [
+  /wrong (person|contact|email)/i,
+  /not the right person/i,
+  /not sure i(?:'m| am) the right person/i,
+  /no longer (here|with)/i,
+]
+const REFERRAL_TO_ROLE = [
+  /would probably be better/i,
+  /(?:our|the) service director/i,
+  /talk to (?:our|the) (?:service director|operations|team)/i,
+]
 const MEETING = [/schedule a (call|meeting|demo)/i, /book a (call|demo|meeting)/i, /let'?s (meet|talk|chat)/i, /meeting booked/i, /calendar/i]
 const PRICING = [/pricing/i, /how much/i, /cost/i, /budget/i, /quote/i, /rate/i]
 const TIMING = [/not now/i, /maybe later/i, /check back/i, /next quarter/i, /next month/i, /circle back/i]
@@ -28,7 +38,13 @@ const REFERRAL = [/reach out to/i, /contact (my|our)/i, /try .+@/i, /speak with/
 const SUPPORT = [/support ticket/i, /customer service/i, /help desk/i, /billing issue/i]
 const POSITIVE = [/interested/i, /tell me more/i, /sounds good/i, /yes[, ]/i, /would like to learn/i]
 const OBJECTION = [/too expensive/i, /no budget/i, /internal resistance/i, /need approval/i, /hard to justify/i]
-const STAKEHOLDER = [/my (boss|manager|team|director|vp|ceo)/i, /stakeholder/i, /decision maker/i, /procurement/i]
+const STAKEHOLDER = [
+  /my (boss|manager|team|director|vp|ceo)/i,
+  /(?:our|the) service director/i,
+  /stakeholder/i,
+  /decision maker/i,
+  /procurement/i,
+]
 const IMPLEMENTATION = [/implementation/i, /rollout/i, /deploy/i, /onboarding/i]
 const INTEGRATION = [/integrate/i, /integration/i, /api/i, /connect to/i]
 const TIMELINE_URGENCY = [/asap/i, /urgent/i, /this quarter/i, /deadline/i, /timeline/i]
@@ -115,6 +131,9 @@ export function classifyReplyIntent(bodyPreview: string | null | undefined): Rep
   } else if (matchAny(body, NOT_INTERESTED)) {
     intent = "not_interested"
     confidence = 0.8
+  } else if (matchAny(body, REFERRAL_TO_ROLE)) {
+    intent = "referral"
+    confidence = 0.78
   } else if (matchAny(body, WRONG_CONTACT)) {
     intent = "wrong_contact"
     confidence = 0.75

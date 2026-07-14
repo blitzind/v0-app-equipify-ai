@@ -30,6 +30,8 @@ import {
   type CallWorkspaceAiosScenarioBranch,
 } from "@/lib/growth/operator-assist/call-workspace-aios-live-reasoning-types"
 import type { VoiceCallTranscriptSnapshot } from "@/lib/voice/media-streaming/types"
+import type { GrowthCanonicalMeetingBrief } from "@/lib/growth/meeting-intelligence/growth-canonical-meeting-brief-types"
+import { projectCanonicalMeetingBriefLiveContext } from "@/lib/growth/meeting-intelligence/growth-canonical-meeting-brief-builder"
 
 export type BuildCallWorkspaceAiosLiveReasoningInput = {
   generatedAt: string
@@ -47,6 +49,8 @@ export type BuildCallWorkspaceAiosLiveReasoningInput = {
   liveSnapshot: GrowthRealtimeLiveSnapshot | null
   voiceTranscript: VoiceCallTranscriptSnapshot | null
   transcriptText?: string
+  meetingBrief?: GrowthCanonicalMeetingBrief | null
+  agendaStepIndex?: number | null
 }
 
 function buildScenarioBranches(input: {
@@ -224,7 +228,22 @@ export function buildCallWorkspaceAiosLiveReasoningSnapshot(
 
   const discovery = enriched.consultantDiscoveryIntelligence
   const revenue = enriched.revenueStrategyIntelligence
-  const sayThisNext = buildSayThisNext({ enriched, liveSnapshot: input.liveSnapshot })
+  let sayThisNext = buildSayThisNext({ enriched, liveSnapshot: input.liveSnapshot })
+
+  if (input.meetingBrief) {
+    const live = projectCanonicalMeetingBriefLiveContext(
+      input.meetingBrief,
+      input.agendaStepIndex ?? input.liveSnapshot?.discovery.covered.length ?? 0,
+    )
+    sayThisNext = {
+      ...sayThisNext,
+      currentObjective: live.currentObjective ?? sayThisNext.currentObjective,
+      recommendedNextSentence: live.questionToAskNext ?? sayThisNext.recommendedNextSentence,
+      why: live.pursuitOutcome ?? sayThisNext.why,
+      recoveryResponse: live.offTrackRecovery ?? sayThisNext.recoveryResponse,
+      expectedOutcome: live.commitmentToObtain ?? sayThisNext.expectedOutcome,
+    }
+  }
 
   const discoveryMissing = input.liveSnapshot?.discovery.missing ?? []
   const discoveryCovered = input.liveSnapshot?.discovery.covered ?? []
@@ -270,6 +289,7 @@ export function buildCallWorkspaceAiosLiveReasoningSnapshot(
     consultantDiscoveryIntelligence: discovery,
     revenueStrategyIntelligence: revenue,
     relationshipAssessment,
+    meetingBrief: input.meetingBrief ?? null,
   }
 }
 

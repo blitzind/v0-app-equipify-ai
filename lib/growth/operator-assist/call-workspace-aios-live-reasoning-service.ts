@@ -21,6 +21,9 @@ import {
   resolveLatestProspectSequenceNumber,
 } from "@/lib/growth/operator-assist/call-workspace-aios-live-signals"
 import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
+import { listGrowthMeetingsForLead } from "@/lib/growth/meeting-intelligence/meeting-repository"
+import { gatherMeetingPrepBundleForMeeting } from "@/lib/growth/meeting-intelligence/meeting-prep-context"
+import { resolveGrowthCanonicalMeetingBriefForMeeting } from "@/lib/growth/meeting-intelligence/growth-canonical-meeting-brief-service"
 import { loadSequenceOptimizationOutreachSignals } from "@/lib/growth/sequence-optimization/sequence-optimization-queries"
 import type { GrowthRealtimeLiveSnapshot } from "@/lib/growth/realtime/realtime-call-types"
 import { logVoiceInfrastructure } from "@/lib/voice/telemetry"
@@ -82,6 +85,7 @@ export async function resolveCallWorkspaceAiosLiveReasoning(
     voiceTranscript: VoiceCallTranscriptSnapshot | null
     generatedAt?: string
     realtimeSessionId?: string | null
+    meetingId?: string | null
   },
 ): Promise<CallWorkspaceAiosLiveReasoningSnapshot | null> {
   const generatedAt = input.generatedAt ?? new Date().toISOString()
@@ -196,6 +200,37 @@ export async function resolveCallWorkspaceAiosLiveReasoning(
     singleThreadRisk: buyingCommitteeSnapshot?.singleThreadRisk,
   }
 
+  let meetingBrief = null
+  try {
+    const meetings = await listGrowthMeetingsForLead(admin, input.leadId, 6)
+    const nowMs = Date.parse(generatedAt)
+    const targetMeeting =
+      (input.meetingId
+        ? meetings.find((row) => row.id === input.meetingId)
+        : null) ??
+      meetings.find(
+        (row) =>
+          row.startAt &&
+          Date.parse(row.startAt) > nowMs - 3_600_000 &&
+          (row.status === "scheduled" || row.status === "proposed"),
+      ) ??
+      null
+    if (targetMeeting) {
+      const prepBundle = await gatherMeetingPrepBundleForMeeting(admin, targetMeeting)
+      if (prepBundle) {
+        meetingBrief = await resolveGrowthCanonicalMeetingBriefForMeeting(admin, {
+          organizationId: input.organizationId,
+          meeting: targetMeeting,
+          prepBundle,
+          generatedAt,
+          agendaStepIndex: sequenceNumber ?? 0,
+        })
+      }
+    }
+  } catch {
+    meetingBrief = null
+  }
+
   const snapshot = buildCallWorkspaceAiosLiveReasoningSnapshot({
     generatedAt,
     leadId: input.leadId,
@@ -212,6 +247,8 @@ export async function resolveCallWorkspaceAiosLiveReasoning(
     liveSnapshot: input.liveSnapshot,
     voiceTranscript: input.voiceTranscript,
     transcriptText: buildLiveTranscriptText({ voiceTranscript: input.voiceTranscript }),
+    meetingBrief,
+    agendaStepIndex: sequenceNumber ?? 0,
   })
 
   liveReasoningCache.set(cacheKey, {

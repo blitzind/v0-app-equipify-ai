@@ -202,6 +202,118 @@ export function GrowthMeetingPrepPanel({
             ) : null}
           </div>
 
+          {prep.canonicalMeetingBrief ? (
+            <PrepSection title="Meeting battle plan">
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Meeting objective</p>
+                  <p className="mt-1 font-medium">{prep.canonicalMeetingBrief.meetingObjective}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Today&apos;s strategy</p>
+                  <p className="mt-1 text-sm">{prep.canonicalMeetingBrief.operatorExperience.todaysStrategy}</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What Ava wants to learn</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-4 text-sm">
+                      {prep.canonicalMeetingBrief.operatorExperience.whatAvaWantsToLearn.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What Ava wants to leave with</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-4 text-sm">
+                      {prep.canonicalMeetingBrief.operatorExperience.whatAvaWantsToLeaveWith.map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+                {prep.canonicalMeetingBrief.stakeholders.length > 0 ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stakeholders</p>
+                    <ul className="mt-1 space-y-2 text-sm">
+                      {prep.canonicalMeetingBrief.stakeholders.slice(0, 4).map((row) => (
+                        <li key={`${row.name}-${row.role}`} className="rounded-md border border-border/60 px-2 py-1.5">
+                          <p className="font-medium">
+                            {row.name}
+                            {row.role ? <span className="text-muted-foreground"> · {row.role}</span> : null}
+                          </p>
+                          {row.likelyPriorities[0] ? (
+                            <p className="text-xs text-muted-foreground">{row.likelyPriorities[0]}</p>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {prep.canonicalMeetingBrief.questionsToAsk.length > 0 ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Questions to ask</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-4 text-sm">
+                      {prep.canonicalMeetingBrief.questionsToAsk.slice(0, 5).map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {prep.canonicalMeetingBrief.evidenceToReference.length > 0 ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Evidence to reference</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-4 text-sm">
+                      {prep.canonicalMeetingBrief.evidenceToReference.slice(0, 4).map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {prep.canonicalMeetingBrief.likelyObjections.length > 0 ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Likely objections</p>
+                    <ul className="mt-1 space-y-2 text-sm">
+                      {prep.canonicalMeetingBrief.likelyObjections.slice(0, 3).map((row) => (
+                        <li key={row.objection} className="rounded-md border border-border/60 px-2 py-1.5">
+                          <p className="font-medium">{row.objection}</p>
+                          <p className="text-xs text-muted-foreground">{row.suggestedResponse}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {prep.canonicalMeetingBrief.commitmentsToVerify.length > 0 ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Commitments to verify</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-4 text-sm">
+                      {prep.canonicalMeetingBrief.commitmentsToVerify.slice(0, 4).map((row) => (
+                        <li key={row.commitment}>{row.commitment}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {prep.canonicalMeetingBrief.operatorExperience.risks.length > 0 ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Risks</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-4 text-sm text-amber-900 dark:text-amber-100">
+                      {prep.canonicalMeetingBrief.operatorExperience.risks.slice(0, 4).map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Success criteria</p>
+                  <ul className="mt-1 list-disc space-y-1 pl-4 text-sm">
+                    {prep.canonicalMeetingBrief.goals.successCriteria.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </PrepSection>
+          ) : null}
+
           <PrepSection title="Recommended objectives">
             {prep.recommendedObjectives.length === 0 ? (
               <p className="text-muted-foreground">No objectives generated yet.</p>
