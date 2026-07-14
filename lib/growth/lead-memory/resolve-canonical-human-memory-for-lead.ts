@@ -207,6 +207,26 @@ export async function resolveCanonicalHumanMemoryForLead(
   const companyName = resolveCanonicalCompanyDisplayName(canonicalDisplayIdentity, companyNameRaw)
   const identityCompanyLabel = resolveAuthoritativeForm(companyName)
 
+  const institutionalLearningPromise = resolveInstitutionalSalesIntelligenceForOrganization(admin, {
+    organizationId: input.organizationId,
+    generatedAt,
+    accountContext: {
+      companyName: identityCompanyLabel,
+      industry: sellerTruth.industries[0] ?? null,
+      contactTitle: primaryDm?.title ?? lead.contactTitle,
+      companySize: lead.estimatedEmployeeCount,
+      employeeCount: lead.estimatedEmployeeCount,
+      relationshipStage: lead.relationshipStrengthTier,
+      accountEvidenceThemes: verifiedEvidence,
+      businessPressureKey:
+        loadedPackage?.salesStrategyBrief?.consultantDiscoveryIntelligence?.primaryBusinessPressure?.key ??
+        null,
+      messageThemeKey:
+        loadedPackage?.salesStrategyBrief?.evidenceIntelligence?.selectedObservation?.themeKey ?? null,
+    },
+    canonicalDisplayIdentity,
+  })
+
   const rawRecords = buildCanonicalRecordsFromProfileView(profileView, identityCompanyLabel)
   const { active, suppressedLowConfidence, expiredPersonal } = resolveCurrentConclusions(rawRecords)
 
@@ -235,25 +255,7 @@ export async function resolveCanonicalHumanMemoryForLead(
 
   const influence = projectLeadMemoryInfluenceContext(profileView)
 
-  const institutionalLearning = await resolveInstitutionalSalesIntelligenceForOrganization(admin, {
-    organizationId: input.organizationId,
-    generatedAt,
-    accountContext: {
-      companyName: identityCompanyLabel,
-      industry: sellerTruth.industries[0] ?? null,
-      contactTitle: primaryDm?.title ?? lead.contactTitle,
-      companySize: lead.estimatedEmployeeCount,
-      employeeCount: lead.estimatedEmployeeCount,
-      relationshipStage: lead.relationshipStrengthTier,
-      accountEvidenceThemes: verifiedEvidence,
-      businessPressureKey:
-        loadedPackage?.salesStrategyBrief?.consultantDiscoveryIntelligence?.primaryBusinessPressure?.key ??
-        null,
-      messageThemeKey:
-        loadedPackage?.salesStrategyBrief?.evidenceIntelligence?.selectedObservation?.themeKey ?? null,
-    },
-    canonicalDisplayIdentity,
-  })
+  const institutionalLearning = await institutionalLearningPromise
 
   const accountFacts = [
     ...business.currentSoftware,

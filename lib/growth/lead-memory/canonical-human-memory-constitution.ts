@@ -68,10 +68,10 @@ export function isProfessionallyUsefulPersonalContext(text: string): boolean {
 }
 
 export function institutionalAdviceMustNotOverrideAccountFact(
-  institutionalLine: string,
+  institutionalLine: unknown,
   accountFacts: string[],
 ): boolean {
-  const normalizedInstitutional = institutionalLine.trim().toLowerCase()
+  const normalizedInstitutional = String(institutionalLine ?? "").trim().toLowerCase()
   if (!normalizedInstitutional) return true
   return !accountFacts.some((fact) => {
     const normalizedFact = fact.trim().toLowerCase()

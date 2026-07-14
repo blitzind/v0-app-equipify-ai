@@ -21,9 +21,9 @@ import {
 } from "@/lib/growth/prospect-search/prospect-search-qualification-overlays"
 import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
 import { resolveCanonicalHumanMemoryForLead } from "@/lib/growth/lead-memory/resolve-canonical-human-memory-for-lead"
-import { resolveGrowthCanonicalDecisionForLead } from "@/lib/growth/aios/growth/resolve-growth-canonical-decision-for-lead"
+import { resolveGrowthCanonicalDecisionForLeadCached } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
 import { projectGrowthCanonicalOperatorDecision } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-operator-projection"
-import { readGrowthVideoMeetingPrepFromLeadMetadata } from "@/lib/growth/sequences/growth-sequence-video-intelligence-mappings"
+import { resolveGrowthEngineWorkspaceOrganizationId } from "@/lib/growth/growth-engine-workspace-organization"
 
 function metaRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {}
@@ -82,6 +82,8 @@ export async function gatherMeetingPrepBundleForMeeting(
   if (!lead) return null
 
   const metadata = metaRecord(lead.metadata)
+  const workspaceOrg = resolveGrowthEngineWorkspaceOrganizationId()
+  const organizationId = workspaceOrg?.organizationId ?? null
 
   const [decisionMakers, research, contactIntelMap, memoryBundle] = await Promise.all([
     listGrowthLeadDecisionMakers(admin, lead.id),
@@ -94,9 +96,9 @@ export async function gatherMeetingPrepBundleForMeeting(
         company_name: lead.companyName,
       },
     ]),
-    lead.organizationId
+    organizationId
       ? resolveCanonicalHumanMemoryForLead(admin, {
-          organizationId: lead.organizationId,
+          organizationId,
           leadId: lead.id,
           companyName: lead.companyName,
         }).catch(() => null)
@@ -108,13 +110,13 @@ export async function gatherMeetingPrepBundleForMeeting(
   const contactIntelligence = contactIntelMap.get(`growth_lead:${lead.id}`) ?? null
   const accountPlaybookContext = await loadMeetingPrepAccountPlaybookContext(admin, meeting)
 
-  const canonicalDecision =
-    lead.organizationId != null
-      ? await resolveGrowthCanonicalDecisionForLead(admin, {
-          organizationId: lead.organizationId,
-          leadId: lead.id,
-        }).catch(() => null)
-      : null
+  const canonicalDecision = organizationId
+    ? await resolveGrowthCanonicalDecisionForLeadCached(admin, {
+        organizationId,
+        leadId: lead.id,
+        cacheScope: "operator-surface",
+      }).catch(() => null)
+    : null
 
   const bundle = assembleMeetingPrepBundle({
     meeting,
@@ -153,14 +155,13 @@ export async function gatherMeetingPrepBundleForMeeting(
     canonicalRecommendedNextAction: canonicalProjection?.whatToDo ?? bundle.researchSummary.recommendedNextAction,
   }
 
-  const canonicalMeetingBrief =
-    lead.organizationId != null
-      ? await resolveGrowthCanonicalMeetingBriefForMeeting(admin, {
-          organizationId: lead.organizationId,
-          meeting,
-          prepBundle: enrichedBundle,
-        }).catch(() => null)
-      : null
+  const canonicalMeetingBrief = organizationId
+    ? await resolveGrowthCanonicalMeetingBriefForMeeting(admin, {
+        organizationId,
+        meeting,
+        prepBundle: enrichedBundle,
+      }).catch(() => null)
+    : null
 
   return {
     ...enrichedBundle,

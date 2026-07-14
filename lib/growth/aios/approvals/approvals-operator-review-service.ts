@@ -15,7 +15,8 @@ import { fetchLatestGrowthLeadResearchWorkflowSnapshot } from "@/lib/growth/aios
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { resolveCanonicalHumanMemoryForLead } from "@/lib/growth/lead-memory/resolve-canonical-human-memory-for-lead"
-import { resolveGrowthCanonicalDecisionForLead } from "@/lib/growth/aios/growth/resolve-growth-canonical-decision-for-lead"
+import { resolveGrowthCanonicalDecisionForLeadCached } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
+import { resolveGrowthEngineWorkspaceOrganizationId } from "@/lib/growth/growth-engine-workspace-organization"
 import { loadLatestCanonicalDecisionOperatorOverrideForLead } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-override-loader"
 
 export async function loadApprovals2AOperatorReviewPacket(
@@ -68,11 +69,12 @@ export async function loadApprovals2AOperatorReviewPacket(
     canonicalHumanMemory: freshCanonicalHumanMemory ?? pkg.canonicalHumanMemory ?? null,
   }
 
-  const canonicalDecision = await resolveGrowthCanonicalDecisionForLead(admin, {
+  const canonicalDecision = await resolveGrowthCanonicalDecisionForLeadCached(admin, {
     organizationId: input.organizationId,
     leadId: input.leadId,
-    generatedAt: input.now,
     packageSnapshot: pkgForProjection,
+    preloadedMemoryBundle: freshCanonicalHumanMemory,
+    cacheScope: "operator-surface",
   }).catch(() => null)
 
   const canonicalDecisionOverride = await loadLatestCanonicalDecisionOperatorOverrideForLead(admin, {

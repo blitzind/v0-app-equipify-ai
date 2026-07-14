@@ -41,7 +41,8 @@ import {
   readLeadMetadataSummary,
 } from "@/lib/growth/revenue-queue/revenue-queue-inbox-display-map"
 import type { GrowthLead } from "@/lib/growth/types"
-import { resolveGrowthCanonicalDecisionForLead } from "@/lib/growth/aios/growth/resolve-growth-canonical-decision-for-lead"
+import { resolveGrowthCanonicalDecisionForLeadCached } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
+import { resolveGrowthEngineWorkspaceOrganizationId } from "@/lib/growth/growth-engine-workspace-organization"
 
 function isPipelineRun(value: unknown): value is GrowthLeadEnginePipelineRun {
   if (!value || typeof value !== "object") return false
@@ -380,8 +381,11 @@ function buildBuyingStageFromLead(
 export async function buildLeadOperatorWorkspacePayloadFromGrowthLead(
   admin: SupabaseClient,
   lead: GrowthLead,
+  options?: { organizationId?: string | null },
 ): Promise<GrowthLeadOperatorWorkspacePayload> {
-  const { history: intentActivity, identified } = await loadIntentActivityFromLead(admin, lead)
+  const workspaceOrg = resolveGrowthEngineWorkspaceOrganizationId(options?.organizationId)
+  const organizationId = workspaceOrg?.organizationId ?? null
+
   const handoffPkg = loadOperatorHandoffFromGrowthLead(lead)
   const handoff = handoffPkg?.handoff ?? null
   const hints = computeOperatorHandoffPriorityHints(buildOperatorHandoffInputFromGrowthLead(lead))
@@ -409,11 +413,27 @@ export async function buildLeadOperatorWorkspacePayloadFromGrowthLead(
     ...(handoff?.operator_attribution ?? []),
   ]
 
-  const [searchSignals, buyingStageRows, companyMatches] = await Promise.all([
+  const [
+    intentResult,
+    searchSignals,
+    buyingStageRows,
+    companyMatches,
+    canonical_decision,
+  ] = await Promise.all([
+    loadIntentActivityFromLead(admin, lead),
     loadSearchIntentSignalsForRevenueQueue(admin, lead.id, 12),
     loadBuyingStageAssessmentsForRevenueQueue(admin, lead.id, 3),
     loadCompanyIdentificationMatchesForRevenueQueue(admin, lead.id, 5),
+    organizationId
+      ? resolveGrowthCanonicalDecisionForLeadCached(admin, {
+          organizationId,
+          leadId: lead.id,
+          cacheScope: "operator-surface",
+        }).catch(() => null)
+      : Promise.resolve(null),
   ])
+
+  const { history: intentActivity, identified } = intentResult
 
   const search_intent_signals: GrowthLeadOperatorSearchIntentSummary[] = searchSignals.map((s) => ({
     id: s.id,
@@ -425,14 +445,6 @@ export async function buildLeadOperatorWorkspacePayloadFromGrowthLead(
     source_type: s.source_type,
     evidence: s.evidence,
   }))
-
-  const canonical_decision =
-    lead.organizationId != null
-      ? await resolveGrowthCanonicalDecisionForLead(admin, {
-          organizationId: lead.organizationId,
-          leadId: lead.id,
-        }).catch(() => null)
-      : null
 
   return {
     qa_marker: GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER,

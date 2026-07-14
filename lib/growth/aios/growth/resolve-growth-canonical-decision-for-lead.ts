@@ -39,6 +39,12 @@ import { mapStoredClosureToDecisionPostCall } from "@/lib/growth/aios/growth/gro
 import {
   buildMeetingIntelligenceInputForDecisionEngine,
 } from "@/lib/growth/meeting-intelligence/growth-canonical-meeting-brief-builder"
+import {
+  buildStableCanonicalMemoryVersionKey,
+  resolveCanonicalDecisionEvaluationInstantMs,
+  resolveCanonicalDecisionGeneratedAtBoundary,
+} from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-resolution-boundary"
+import type { CanonicalHumanMemoryBundle } from "@/lib/growth/lead-memory/canonical-human-memory-types"
 
 function mapPackageState(
   pkg: GrowthAutonomousOutreachApprovalPackage | null,
@@ -101,43 +107,64 @@ export async function resolveGrowthCanonicalDecisionForLead(
     materialEvent?: { id?: string | null; at?: string | null; kind?: string | null } | null
     packageSnapshot?: GrowthAutonomousOutreachApprovalPackage | null
     skipMemoryLoad?: boolean
+    preloadedMemoryBundle?: CanonicalHumanMemoryBundle | null
   },
 ): Promise<GrowthCanonicalDecisionResolution | null> {
-  const generatedAt = input.generatedAt ?? new Date().toISOString()
-  const inputDegraded: string[] = []
-
   const lead = await fetchGrowthLeadById(admin, input.leadId).catch(() => null)
   if (!lead) return null
 
-  const organizationId = input.organizationId || lead.organizationId || ""
+  const organizationId = input.organizationId || ""
   if (!organizationId) {
-    inputDegraded.push("organization_missing")
+    return null
   }
+
+  const inputDegraded: string[] = []
+
+  const preliminaryGeneratedAt =
+    input.generatedAt ??
+    resolveCanonicalDecisionGeneratedAtBoundary({
+      packagePreparedAt:
+        input.packageSnapshot?.preparedAt ?? input.packageSnapshot?.salesStrategyBrief?.preparedAt ?? null,
+      latestReplyAt: null,
+      latestMeetingAt: null,
+      storedClosureAt: null,
+      leadUpdatedAt: lead.nextBestActionComputedAt ?? lead.lastResearchedAt ?? null,
+      materialEventAt: input.materialEvent?.at ?? null,
+    })
+
+  const packagePromise: Promise<GrowthAutonomousOutreachApprovalPackage | null> =
+    input.packageSnapshot != null
+      ? Promise.resolve(input.packageSnapshot)
+      : resolveCanonicalOutreachPackageForLead(admin, {
+          organizationId,
+          leadId: input.leadId,
+        }).catch(() => {
+          inputDegraded.push("outreach_package")
+          return null
+        })
 
   const [memoryBundle, outreachPackage, emailSummary, meetings, latestReplies, committeeRollup] =
     await Promise.all([
       input.skipMemoryLoad
-        ? Promise.resolve(null)
-        : resolveCanonicalHumanMemoryForLead(admin, {
-            organizationId,
-            leadId: input.leadId,
-            generatedAt,
-            companyName: lead.companyName,
-            packageSnapshot: input.packageSnapshot ?? undefined,
-            skipPackageLoad: input.packageSnapshot != null,
-          }).catch(() => {
-            inputDegraded.push("memory_bundle")
-            return null
-          }),
-      input.packageSnapshot != null
-        ? Promise.resolve(input.packageSnapshot)
-        : resolveCanonicalOutreachPackageForLead(admin, {
-            organizationId,
-            leadId: input.leadId,
-          }).catch(() => {
-            inputDegraded.push("outreach_package")
-            return null
-          }),
+        ? Promise.resolve(input.preloadedMemoryBundle ?? null)
+        : input.preloadedMemoryBundle != null
+          ? Promise.resolve(input.preloadedMemoryBundle)
+          : packagePromise
+              .then((pkg) =>
+                resolveCanonicalHumanMemoryForLead(admin, {
+                  organizationId,
+                  leadId: input.leadId,
+                  generatedAt: preliminaryGeneratedAt,
+                  companyName: lead.companyName,
+                  packageSnapshot: pkg ?? undefined,
+                  skipPackageLoad: true,
+                }),
+              )
+              .catch(() => {
+                inputDegraded.push("memory_bundle")
+                return null
+              }),
+      packagePromise,
       fetchGrowthLeadEmailEventSummary(admin, input.leadId, lead.contactEmail).catch(() => {
         inputDegraded.push("email_summary")
         return null
@@ -157,6 +184,29 @@ export async function resolveGrowthCanonicalDecisionForLead(
     ])
 
   const pkg = outreachPackage ?? input.packageSnapshot ?? null
+  const latestReply = latestReplies[0] ?? null
+  const storedClosure = await loadLatestStoredCallWorkspacePostCallClosureForLead(admin, {
+    leadId: input.leadId,
+  }).catch(() => null)
+
+  const generatedAt =
+    input.generatedAt ??
+    resolveCanonicalDecisionGeneratedAtBoundary({
+      packagePreparedAt: pkg?.preparedAt ?? pkg?.salesStrategyBrief?.preparedAt ?? null,
+      latestReplyAt: latestReply?.receivedAt ?? null,
+      latestMeetingAt:
+        meetings.find((row) => row.startAt && row.status !== "cancelled")?.startAt ?? null,
+      storedClosureAt: storedClosure?.recordedAt ?? null,
+      leadUpdatedAt: lead.nextBestActionComputedAt ?? lead.lastResearchedAt ?? null,
+      materialEventAt: input.materialEvent?.at ?? latestReply?.receivedAt ?? null,
+    })
+
+  const evaluationInstantMs = resolveCanonicalDecisionEvaluationInstantMs(generatedAt, [
+    pkg?.preparedAt ?? pkg?.salesStrategyBrief?.preparedAt ?? null,
+    latestReply?.receivedAt ?? null,
+    storedClosure?.recordedAt ?? null,
+    lead.nextBestActionComputedAt ?? null,
+  ])
   const brief = pkg?.salesStrategyBrief ?? memoryBundle?.packageSnapshot ?? null
 
   const relationshipAssessment =
@@ -218,12 +268,11 @@ export async function resolveGrowthCanonicalDecisionForLead(
   const objections = memoryBundle?.influence?.topObjections ?? []
   const buyingSignals = memoryBundle?.influence?.priorInteractionSummaries?.slice(0, 3) ?? []
 
-  const nowMs = Date.parse(generatedAt)
   const upcomingMeeting =
     meetings.find(
       (row) =>
         row.startAt &&
-        Date.parse(row.startAt) > nowMs &&
+        Date.parse(row.startAt) > evaluationInstantMs &&
         row.status !== "cancelled" &&
         row.status !== "completed",
     ) ?? null
@@ -240,7 +289,6 @@ export async function resolveGrowthCanonicalDecisionForLead(
     committeeStatus?.roles_missing?.[0] ??
     null
 
-  const latestReply = latestReplies[0] ?? null
   const replyIntent = latestReply?.intent ?? latestReply?.classification ?? null
   const replyMaterial =
     replyIntent != null ? isReplyMaterialForCanonicalDecision(String(replyIntent)) : false
@@ -260,10 +308,6 @@ export async function resolveGrowthCanonicalDecisionForLead(
 
   const packageState = mapPackageState(pkg)
   const approvalPending = pkg?.pendingHumanApproval === true
-
-  const storedClosure = await loadLatestStoredCallWorkspacePostCallClosureForLead(admin, {
-    leadId: input.leadId,
-  }).catch(() => null)
 
   const postCall = storedClosure
     ? mapStoredClosureToDecisionPostCall(storedClosure.closure)
@@ -380,7 +424,7 @@ export async function resolveGrowthCanonicalDecisionForLead(
       postCallClosure: storedClosure?.closure ?? null,
     }),
     sourceVersions: {
-      memoryVersion: memoryBundle?.generatedAt ?? null,
+      memoryVersion: buildStableCanonicalMemoryVersionKey(memoryBundle),
       relationshipVersion: relationshipAssessment?.relationshipGoal?.current ?? null,
       revenueVersion: revenueStrategy,
       packageVersion: pkg?.packageId ?? null,

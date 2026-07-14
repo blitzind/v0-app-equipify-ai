@@ -61,7 +61,7 @@ import { GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER } from "@/lib/growth/home/growt
 import { fetchLatestAvaResearchLoopSummary } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-service"
 import { enrichRelationshipLeadSnapshotsBatch } from "@/lib/growth/relationship/enrich-relationship-lead-snapshots-batch"
 import { loadGrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-loader"
-import { resolveGrowthCanonicalDecisionForLead } from "@/lib/growth/aios/growth/resolve-growth-canonical-decision-for-lead"
+import { resolveGrowthCanonicalDecisionForLeadCached } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
 
 import { GROWTH_HOME_LEAD_POOL_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 
@@ -576,10 +576,10 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
           label: "canonical_hero_decision",
           budgetMs: loaderBudgetMs,
           fn: () =>
-            resolveGrowthCanonicalDecisionForLead(input.admin, {
+            resolveGrowthCanonicalDecisionForLeadCached(input.admin, {
               organizationId,
               leadId: heroLeadId,
-              generatedAt,
+              cacheScope: "operator-surface",
             }),
           fallback: null,
         }).then((step) => {

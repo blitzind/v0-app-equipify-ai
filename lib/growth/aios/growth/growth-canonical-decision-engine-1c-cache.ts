@@ -120,6 +120,7 @@ export async function resolveGrowthCanonicalDecisionForLeadCached(
     bypassCache?: boolean
     lifecycleVersion?: string | null
     postCallClosureFingerprint?: string | null
+    preloadedMemoryBundle?: import("@/lib/growth/lead-memory/canonical-human-memory-types").CanonicalHumanMemoryBundle | null
   },
 ): Promise<GrowthCanonicalDecisionResolution> {
   const materialEventVersion =
@@ -148,6 +149,7 @@ export async function resolveGrowthCanonicalDecisionForLeadCached(
     generatedAt: input.generatedAt,
     materialEvent: input.materialEvent ?? undefined,
     packageSnapshot: input.packageSnapshot ?? undefined,
+    preloadedMemoryBundle: input.preloadedMemoryBundle ?? undefined,
   })
 
   if (!resolution) {
@@ -165,10 +167,15 @@ export async function resolveGrowthCanonicalDecisionForLeadCached(
     scope: input.cacheScope,
   })
 
-  decisionResolutionCache.set(resolvedCacheKey, {
+  const entry: CacheEntry = {
     resolution,
     expiresAt: Date.now() + CACHE_TTL_MS,
-  })
+  }
+
+  decisionResolutionCache.set(resolvedCacheKey, entry)
+  if (resolvedCacheKey !== cacheKey) {
+    decisionResolutionCache.set(cacheKey, entry)
+  }
   pruneCache()
 
   return resolution

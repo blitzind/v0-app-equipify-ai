@@ -2,14 +2,18 @@
 
 import type { UnifiedOperatorAssistEvent } from "@/lib/growth/operator-assist/types"
 
-function normalizeEvidence(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 160)
+function normalizeEvidence(value: unknown): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .slice(0, 160)
 }
 
 export function buildAssistDedupeKey(input: {
   category: string
   eventType: string
-  evidenceText: string
+  evidenceText: unknown
 }): string {
   return `${input.category}:${input.eventType}:${normalizeEvidence(input.evidenceText)}`
 }
