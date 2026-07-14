@@ -3,9 +3,43 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import type { GrowthAutonomousOutreachApprovalPackage } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
-import { listAutonomousOutreachPreparationRunsForLead } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-store"
+import type {
+  GrowthAutonomousOutreachApprovalPackage,
+  GrowthAutonomousOutreachPreparationRunRecord,
+} from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
+import { listOutreachPreparationRunsForLead } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-store"
 import { hasCanonicalSalesStrategyBriefPackage } from "@/lib/growth/aios/growth/growth-send-plane-1a-materialization"
+
+function isEligibleCompletedRun(
+  run: GrowthAutonomousOutreachPreparationRunRecord,
+): run is GrowthAutonomousOutreachPreparationRunRecord & {
+  approvalPackage: GrowthAutonomousOutreachApprovalPackage
+} {
+  return (
+    run.outcome === "completed" &&
+    run.leadId.length > 0 &&
+    hasCanonicalSalesStrategyBriefPackage(run.approvalPackage)
+  )
+}
+
+function compareCanonicalPreparationRuns(
+  left: GrowthAutonomousOutreachPreparationRunRecord,
+  right: GrowthAutonomousOutreachPreparationRunRecord,
+): number {
+  const leftApproved = left.approvalPackage?.packageApprovalDecision === "approved" ? 1 : 0
+  const rightApproved = right.approvalPackage?.packageApprovalDecision === "approved" ? 1 : 0
+  if (leftApproved !== rightApproved) return rightApproved - leftApproved
+
+  const completedDelta = Date.parse(right.completedAt) - Date.parse(left.completedAt)
+  if (completedDelta !== 0) return completedDelta
+
+  const preparedDelta =
+    Date.parse(right.approvalPackage?.preparedAt ?? right.completedAt) -
+    Date.parse(left.approvalPackage?.preparedAt ?? left.completedAt)
+  if (preparedDelta !== 0) return preparedDelta
+
+  return (right.packageId ?? right.runId).localeCompare(left.packageId ?? left.runId)
+}
 
 export async function resolveCanonicalOutreachPackageForLead(
   admin: SupabaseClient,
@@ -14,20 +48,12 @@ export async function resolveCanonicalOutreachPackageForLead(
     leadId: string
   },
 ): Promise<GrowthAutonomousOutreachApprovalPackage | null> {
-  const runs = await listAutonomousOutreachPreparationRunsForLead(admin, {
-    organizationId: input.organizationId,
-    leadId: input.leadId,
-    limit: 12,
-  })
-
-  const completed = runs.filter(
-    (run) => run.outcome === "completed" && hasCanonicalSalesStrategyBriefPackage(run.approvalPackage),
+  const runs = await listOutreachPreparationRunsForLead(
+    admin,
+    input.organizationId,
+    input.leadId,
   )
 
-  const approved = completed.find(
-    (run) => run.approvalPackage?.packageApprovalDecision === "approved",
-  )
-  if (approved?.approvalPackage) return approved.approvalPackage
-
-  return completed[0]?.approvalPackage ?? null
+  const eligible = runs.filter(isEligibleCompletedRun).sort(compareCanonicalPreparationRuns)
+  return eligible[0]?.approvalPackage ?? null
 }
