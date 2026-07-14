@@ -18,6 +18,7 @@ import type { GrowthReplyBuyingSignalEvidence } from "@/lib/growth/reply-intelli
 import type { ReplyIntentClassificationV2Result } from "@/lib/growth/reply-intelligence/reply-intent-classifier-v2"
 import type { GrowthReplyObjectionEvidence } from "@/lib/growth/reply-intelligence/reply-intent-types"
 import { appendGrowthLeadTimelineEvent } from "@/lib/growth/timeline-repository"
+import { invalidateCanonicalDecisionCacheForLead } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
 import { processMultichannelRevenueIntelligence } from "@/lib/growth/revenue-intelligence/process-multichannel-revenue-intelligence"
 import {
   isLegacyBuyingCommitteeWriteQuarantined,
@@ -249,6 +250,8 @@ export async function processRevenueIntelligence(
     bodyPreview: input.bodyPreview,
     signals,
   })
+
+  invalidateCanonicalDecisionCacheForLead(input.leadId, "buying_committee_material_update")
 
   const { data: priorMomentum } = await admin
     .schema("growth")

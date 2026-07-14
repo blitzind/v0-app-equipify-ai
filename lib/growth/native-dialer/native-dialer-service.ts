@@ -1,6 +1,8 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import { resolveCanonicalChannelContentForLead } from "@/lib/growth/aios/growth/growth-channels-1a-canonical-resolver"
 import { fetchNativeCallWorkspaceDashboard } from "@/lib/growth/native-dialer/native-dialer-dashboard-repository"
 import type { CoachingLinkPipelineTelemetryContext } from "@/lib/growth/native-dialer/call-workspace-coaching-link-pipeline-telemetry"
 import {
@@ -124,6 +126,55 @@ export async function submitGrowthNativeCallWrapup(
     wrapup,
     companyName: input.companyName ?? "Lead",
   })
+
+  if (wrapup.leadId) {
+    const orgId = await getGrowthEngineAiOrgId(admin)
+    const { data: sessionRow } = await admin
+      .schema("growth")
+      .from("native_call_workspace_sessions")
+      .select("realtime_session_id, company_name")
+      .eq("id", input.sessionId)
+      .maybeSingle()
+
+    const realtimeSessionId = (sessionRow?.realtime_session_id as string | null) ?? null
+    const { executeCallWorkspacePostCallClosure } = await import(
+      "@/lib/growth/operator-assist/call-workspace-post-call-closure"
+    )
+    const { resolveCallWorkspaceAiosLiveReasoning } = await import(
+      "@/lib/growth/operator-assist/call-workspace-aios-live-reasoning-service"
+    )
+    const { fetchGrowthRealtimeCallSession } = await import(
+      "@/lib/growth/realtime/realtime-call-repository"
+    )
+
+    const realtimeSession = realtimeSessionId
+      ? await fetchGrowthRealtimeCallSession(admin, realtimeSessionId).catch(() => null)
+      : null
+
+    const liveReasoning = await resolveCallWorkspaceAiosLiveReasoning(admin, {
+      organizationId: orgId,
+      leadId: wrapup.leadId,
+      liveSnapshot: realtimeSession?.liveSnapshot ?? null,
+      voiceTranscript: null,
+      generatedAt: new Date().toISOString(),
+      realtimeSessionId,
+    }).catch(() => null)
+
+    await executeCallWorkspacePostCallClosure(admin, {
+      organizationId: orgId,
+      leadId: wrapup.leadId,
+      companyName: input.companyName ?? (sessionRow?.company_name as string | null) ?? null,
+      sessionId: input.sessionId,
+      realtimeSessionId,
+      generatedAt: new Date().toISOString(),
+      liveReasoning,
+      scorecard: null,
+      operatorWrapup: input.wrapup,
+      operatorDisposition: input.wrapup.outcome,
+      operatorNotes: input.wrapup.notes ?? null,
+    }).catch(() => undefined)
+  }
+
   return wrapup
 }
 
@@ -171,12 +222,32 @@ export async function fetchGrowthNativeDialerLeadContext(
   ])
 
   if (!leadRes.data) return null
+
+  let canonicalCallGuide: string | null = null
+  let canonicalCallGuideSource: string | null = null
+  const organizationId = getGrowthEngineAiOrgId()
+  if (organizationId) {
+    const materialized = await resolveCanonicalChannelContentForLead(admin, {
+      organizationId,
+      leadId,
+      channel: "call",
+    })
+    if (materialized?.transportReady && materialized.body.trim()) {
+      canonicalCallGuide = materialized.body
+      canonicalCallGuideSource = materialized.sourcePackageId
+        ? `package:${materialized.sourcePackageId}`
+        : "canonical_brief"
+    }
+  }
+
   return {
     leadId,
     companyName: leadRes.data.company_name as string,
     contactName: (leadRes.data.contact_name as string | null) ?? null,
     contactPhone: (leadRes.data.contact_phone as string | null) ?? null,
-    researchSummary: null,
+    researchSummary: canonicalCallGuide,
+    canonicalCallGuide,
+    canonicalCallGuideSource,
     dealCloseProbability: (dealRes.data?.close_probability as number | null) ?? null,
     executionReadinessScore: (executionRes.data?.readiness_score as number | null) ?? null,
     meetingOutcomeScore: (outcomeRes.data?.meeting_outcome_score as number | null) ?? null,

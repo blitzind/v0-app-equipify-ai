@@ -195,6 +195,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
           salesOutcomes: workspaceSummary?.salesOutcomes ?? null,
           organizationalKnowledge: workspaceSummary?.organizationalKnowledge?.store.items ?? null,
           operatorDisplayName,
+          canonicalHeroDecision: workspaceSummary?.canonicalHeroDecision ?? null,
         }),
       ),
     [
@@ -210,6 +211,7 @@ export function GrowthHomeExecutiveBriefingDashboard({
       persistedMemoryStore,
       workspaceSummary?.generatedAt,
       workspaceSummary?.organizationalKnowledge,
+      workspaceSummary?.canonicalHeroDecision,
       operatorDisplayName,
     ],
   )

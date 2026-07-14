@@ -11,6 +11,7 @@ import type { CanonicalOutreachTransportChannel } from "@/lib/growth/aios/growth
 import {
   reviewProductionHumanCommunicationConstitution,
   stripAiGeneratedSignatureContent,
+  type GrowthCanonicalDisplayIdentity,
 } from "@/lib/growth/aios/growth/growth-send-plane-1a-constitution"
 
 export const GROWTH_AIOS_SEND_PLANE_1B_QA_MARKER =
@@ -137,8 +138,17 @@ export function parseEmailTransportFromAssetPreview(preview: string): {
 export function reviewOperatorEditConstitutionWarnings(
   text: string,
   companyName: string,
+  canonicalIdentity?: GrowthCanonicalDisplayIdentity | null,
 ): string[] {
-  return reviewProductionHumanCommunicationConstitution(text, companyName)
+  return reviewProductionHumanCommunicationConstitution(text, companyName, canonicalIdentity)
+}
+
+export function resolvePackageCanonicalDisplayIdentity(
+  pkg: GrowthAutonomousOutreachApprovalPackage | null | undefined,
+): GrowthCanonicalDisplayIdentity | null {
+  return (
+    pkg?.canonicalDisplayIdentity ?? pkg?.salesStrategyBrief?.canonicalDisplayIdentity ?? null
+  )
 }
 
 export function prepareOperatorApprovedTransportBody(text: string): string {
@@ -190,6 +200,7 @@ export function resolveTransportAssetFromPackage(
   pkg: GrowthAutonomousOutreachApprovalPackage | null | undefined,
   channel: CanonicalOutreachTransportChannel,
   companyName: string,
+  canonicalIdentity?: GrowthCanonicalDisplayIdentity | null,
 ): SendPlane1BResolvedTransportAsset | null {
   const packageChannel = mapTransportChannelToPackageChannel(channel)
   const asset = findPackageAssetByChannel(pkg, packageChannel)
@@ -204,10 +215,12 @@ export function resolveTransportAssetFromPackage(
     body = parsed.body || resolved.preview
   }
 
+  const identity = canonicalIdentity ?? resolvePackageCanonicalDisplayIdentity(pkg)
+
   const constitutionWarnings =
     resolved.versionStatus === "approved"
       ? asset?.constitutionWarnings ?? []
-      : reviewOperatorEditConstitutionWarnings(body, companyName)
+      : reviewOperatorEditConstitutionWarnings(body, companyName, identity)
 
   return {
     channel,
@@ -265,7 +278,11 @@ export function applyOperatorDraftEditsToPackage(input: {
     const generatedPreview =
       existing.generatedPreview?.trim() || existing.preview?.trim() || trimmed
     const changed = trimmed !== generatedPreview
-    const warnings = reviewOperatorEditConstitutionWarnings(trimmed, input.companyName)
+    const warnings = reviewOperatorEditConstitutionWarnings(
+      trimmed,
+      input.companyName,
+      resolvePackageCanonicalDisplayIdentity(input.pkg),
+    )
 
     const updated = seedGeneratedAssetVersionMetadata({
       ...existing,

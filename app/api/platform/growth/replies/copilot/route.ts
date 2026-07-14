@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { requireGrowthEnginePlatformAccess } from "@/lib/growth/access"
-import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
+import { resolveCanonicalHumanMemoryForLead } from "@/lib/growth/lead-memory/resolve-canonical-human-memory-for-lead"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { listGrowthOutboundRepliesForLead } from "@/lib/growth/outbound/reply-repository"
 import {
@@ -21,7 +21,16 @@ async function buildCopilotAssistForLead(
     contactLabel?: string | null
   },
 ) {
-  const memory = await buildLeadMemoryInfluenceContext(admin, input.leadId).catch(() => null)
+  const lead = await fetchGrowthLeadById(admin, input.leadId)
+  const memoryBundle =
+    lead?.organizationId != null
+      ? await resolveCanonicalHumanMemoryForLead(admin, {
+          organizationId: lead.organizationId,
+          leadId: input.leadId,
+          companyName: input.companyName ?? lead.companyName,
+        }).catch(() => null)
+      : null
+  const memory = memoryBundle?.influence ?? null
   return buildReplyCopilotAssist({
     bodyPreview: input.bodyPreview,
     companyName: input.companyName,

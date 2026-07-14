@@ -8,6 +8,7 @@ import type {
   GrowthMeetingSource,
   GrowthMeetingStatus,
 } from "@/lib/growth/meeting-intelligence/meeting-intelligence-types"
+import { invalidateCanonicalDecisionCacheForLead } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
 
 const MEETING_SELECT =
   "id, lead_id, owner_user_id, opportunity_id, outbound_reply_id, realtime_call_session_id, title, status, start_at, end_at, source, provider, calendar_event_id, calendar_sync_status, calendar_sync_error, calendar_synced_at, calendar_last_sync_at, meeting_url, manual_meeting_url, meeting_location_type, meeting_location_label, auto_create_meeting_link, provider_connection_required, notes, attendee_emails, timezone, outcome, next_action, follow_up_due_at, no_show_reason, scheduled_at, completed_at, canceled_at, no_show_at, outcome_recorded_at, booking_page_id, meeting_candidate_id, account_playbook_id, source_attribution, created_by, created_at, updated_at"
@@ -165,7 +166,11 @@ export async function updateGrowthMeetingRow(
     .select(MEETING_SELECT)
     .single()
   if (error) throw new Error(error.message)
-  return mapGrowthMeetingRow(data as MeetingDbRow)
+  const meeting = mapGrowthMeetingRow(data as MeetingDbRow)
+  if (patch.status && meeting.leadId) {
+    invalidateCanonicalDecisionCacheForLead(meeting.leadId, `meeting_${String(patch.status)}`)
+  }
+  return meeting
 }
 
 export async function listGrowthMeetingsForLead(

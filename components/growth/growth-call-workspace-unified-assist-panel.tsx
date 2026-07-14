@@ -38,6 +38,7 @@ import type { VoiceAiReceptionistWorkspaceSnapshot } from "@/lib/voice/ai-recept
 import { GrowthCallWorkspaceCollapsiblePanel } from "@/components/growth/growth-call-workspace-collapsible-panel"
 import { useAiTeammateIdentity } from "@/components/growth/ai-teammate/ai-teammate-identity-provider"
 import { SayThisNextCard } from "@/components/growth/live-coaching/say-this-next-card"
+import { GrowthCallWorkspaceAiosLiveAssistPanel } from "@/components/growth/growth-call-workspace-aios-live-assist-panel"
 import { resolveSayThisNext } from "@/lib/growth/operator-assist/resolve-say-this-next"
 import type { ConversationCoachTurn } from "@/lib/growth/live-coaching/types"
 import { cn } from "@/lib/utils"
@@ -400,6 +401,13 @@ export function GrowthCallWorkspaceUnifiedAssistPanel({
       ) : null}
 
       <SayThisNextCard sayThisNext={sayThisNext} coachingActive={coachingActive} className="mb-3" />
+
+      {operatorAssist?.aiosLiveReasoning ? (
+        <GrowthCallWorkspaceAiosLiveAssistPanel
+          reasoning={operatorAssist.aiosLiveReasoning}
+          className="mb-3"
+        />
+      ) : null}
 
       {coachingStatusLine ? (
         <p className="mb-3 text-xs text-muted-foreground">{coachingStatusLine}</p>

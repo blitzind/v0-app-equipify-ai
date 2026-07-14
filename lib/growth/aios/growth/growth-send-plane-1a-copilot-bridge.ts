@@ -20,6 +20,9 @@ import {
 } from "@/lib/growth/aios/growth/growth-send-plane-1a-materialization"
 import { GROWTH_AIOS_SEND_PLANE_1A_QA_MARKER } from "@/lib/growth/aios/growth/growth-send-plane-1a-constitution"
 import type { RunGrowthAiCopilotGenerationInput } from "@/lib/growth/run-ai-copilot-generation"
+import { resolveGrowthCanonicalDecisionForLeadCached } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
+import { evaluateCanonicalCopilotMaterializationConsistency } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-enforcement"
+import { GROWTH_AIOS_CANONICAL_DECISION_ENGINE_1D_QA_MARKER } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-types"
 
 export async function tryMaterializeCanonicalCopilotGeneration(input: {
   admin: SupabaseClient
@@ -34,7 +37,7 @@ export async function tryMaterializeCanonicalCopilotGeneration(input: {
   | null
 > {
   const channel = resolveCanonicalTransportChannelFromGenerationType(input.request.generationType)
-  if (!channel || channel === "call" || channel === "sendr") {
+  if (!channel) {
     return null
   }
 
@@ -47,6 +50,24 @@ export async function tryMaterializeCanonicalCopilotGeneration(input: {
   })
   const brief = pkg?.salesStrategyBrief
   if (!brief) return null
+
+  const resolution = await resolveGrowthCanonicalDecisionForLeadCached(input.admin, {
+    organizationId,
+    leadId: input.request.leadId,
+    packageSnapshot: pkg,
+    cacheScope: `copilot-materialization:${input.request.generationType}`,
+  }).catch(() => null)
+  const consistency = evaluateCanonicalCopilotMaterializationConsistency(resolution, {
+    channel,
+    generationType: input.request.generationType,
+  })
+  if (consistency.blocked) {
+    return {
+      ok: false,
+      code: "canonical_decision_materialization_blocked",
+      message: consistency.reason,
+    }
+  }
 
   const materialized = materializeCanonicalOutreachChannelContent({
     brief,
@@ -91,6 +112,9 @@ export async function tryMaterializeCanonicalCopilotGeneration(input: {
           sendPlane: GROWTH_AIOS_SEND_PLANE_1A_QA_MARKER,
           packageId: pkg.packageId,
           channel,
+          canonicalDecisionEnforcement: GROWTH_AIOS_CANONICAL_DECISION_ENGINE_1D_QA_MARKER,
+          materializationOutcome: consistency.outcome,
+          refreshRequired: consistency.refreshRequired,
         },
         approvedAt: null,
         approvedBy: null,
@@ -117,6 +141,9 @@ export async function tryMaterializeCanonicalCopilotGeneration(input: {
       sendPlane: GROWTH_AIOS_SEND_PLANE_1A_QA_MARKER,
       packageId: pkg.packageId,
       channel,
+      canonicalDecisionEnforcement: GROWTH_AIOS_CANONICAL_DECISION_ENGINE_1D_QA_MARKER,
+      materializationOutcome: consistency.outcome,
+      refreshRequired: consistency.refreshRequired,
     },
     createdBy: input.actingUserId,
   })

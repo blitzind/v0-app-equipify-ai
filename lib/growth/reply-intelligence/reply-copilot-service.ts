@@ -12,6 +12,7 @@ import {
   buildMemoryAwareSuggestedReplyDraft,
   type ReplyCopilotRelationshipMemory,
 } from "@/lib/growth/reply-intelligence/reply-copilot-memory"
+import { applyChannelParityConstitution } from "@/lib/growth/aios/growth/growth-channels-1a-parity"
 
 export type { ReplyCopilotRelationshipMemory } from "@/lib/growth/reply-intelligence/reply-copilot-memory"
 export { mapMemoryInfluenceToReplyCopilotRelationship } from "@/lib/growth/reply-intelligence/reply-copilot-memory"
@@ -68,12 +69,16 @@ export function buildReplyCopilotAssist(input: {
     ...(input.relationshipMemory?.commitmentSummaries ?? []),
   ].filter((entry): entry is string => Boolean(entry?.trim()))
 
-  const suggestedReplyDraft = buildMemoryAwareSuggestedReplyDraft({
+  const rawSuggestedReplyDraft = buildMemoryAwareSuggestedReplyDraft({
     contactLabel: input.contactLabel,
     intent: classified.intent,
     bodyObjectionDraft: objections[0]?.suggestedReplyDraft,
     relationshipMemory: input.relationshipMemory,
   })
+  const suggestedReplyDraft = applyChannelParityConstitution(
+    rawSuggestedReplyDraft,
+    input.companyName?.trim() || "Prospect",
+  ).body
 
   const mergedObjectionLabels = [
     ...objections.map((o) => o.category),

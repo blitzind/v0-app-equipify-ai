@@ -149,6 +149,40 @@ export function ingestMemoryCandidatesFromSource(input: MemoryIngestionInput): I
     }
   }
 
+  if (/\b(call me after|prefers|communication style|afternoon calls)\b/i.test(text)) {
+    candidates.push({
+      memoryCategory: "communication_preference",
+      confidence: "medium",
+      title: /call me after/i.test(text) ? "Prefers afternoon calls" : "Communication style preference",
+      evidenceSnippet: evidence,
+      sourceSystem: input.sourceSystem,
+    })
+  }
+
+  if (/\b(send|checklist|due|friday|follow-up|commitment)\b/i.test(text)) {
+    candidates.push({
+      memoryCategory: "meeting_signal",
+      confidence: "medium",
+      title: /checklist/i.test(text) ? "Action commitment: checklist requested" : "Action commitment detected",
+      evidenceSnippet: evidence,
+      sourceSystem: input.sourceSystem,
+    })
+  }
+
+  if (/\b(opening|expansion|location|software|servicetitan|incumbent)\b/i.test(text)) {
+    candidates.push({
+      memoryCategory: "industry_interest",
+      confidence: "medium",
+      title: /expansion|location/i.test(text)
+        ? "Expansion initiative noted"
+        : /software|servicetitan/i.test(text)
+          ? "Current software context noted"
+          : "Business fact detected",
+      evidenceSnippet: evidence,
+      sourceSystem: input.sourceSystem,
+    })
+  }
+
   if (/\b(email|call|text|linkedin|morning|afternoon)\b/i.test(text)) {
     candidates.push({
       memoryCategory: "communication_preference",

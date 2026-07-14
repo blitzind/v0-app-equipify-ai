@@ -399,6 +399,14 @@ export function GrowthCallCopilot({ lead }: GrowthCallCopilotProps) {
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Opening line</p>
                   <p>{briefing.openingLine}</p>
                 </div>
+                {briefing.canonicalCallGuide ? (
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Call guide</p>
+                    <pre className="mt-1 whitespace-pre-wrap rounded-md border bg-muted/30 p-2 text-xs">
+                      {briefing.canonicalCallGuide}
+                    </pre>
+                  </div>
+                ) : null}
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Recommended CTA</p>
                   <p>{briefing.recommendedCta}</p>

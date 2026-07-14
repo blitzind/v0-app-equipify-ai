@@ -17,6 +17,7 @@ import {
 import { recomputeGrowthLeadWorkflowSignals } from "@/lib/growth/recompute-lead-next-best-action"
 import { loadRevenueQueueOperatorWorkspace } from "@/lib/growth/revenue-queue/revenue-queue-detail-bridge"
 import type { GrowthLead, GrowthLeadStatus } from "@/lib/growth/types"
+import { invalidateCanonicalDecisionCacheForLead } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
 
 export const GROWTH_REVENUE_QUEUE_ACTION_BRIDGE_QA_MARKER =
   "growth-revenue-queue-action-bridge-v1" as const
@@ -133,12 +134,14 @@ async function applyCanonicalLeadAction(
   }
 
   if (action === "mark_duplicate") {
-    return updateGrowthLead(admin, leadId, {
+    const updated = await updateGrowthLead(admin, leadId, {
       status: "disqualified",
       metadata: appendRevenueQueueActionMetadata(existing, action, input.actorUserId, {
         duplicate_reason: input.reason ?? "",
       }),
     })
+    if (updated) invalidateCanonicalDecisionCacheForLead(leadId, "lead_disqualified")
+    return updated
   }
 
   if (action === "run_lead_engine") {

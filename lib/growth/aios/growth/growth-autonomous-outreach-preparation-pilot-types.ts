@@ -91,6 +91,10 @@ export type GrowthAutonomousOutreachApprovalPackage = {
   companyName: string | null
   preparedAt: string
   generatedAssets: GrowthAutonomousOutreachPreparedAssetSummary[]
+  /** INSTITUTIONAL-LEARNING-1B — canonical display identity computed once at package generation. */
+  canonicalDisplayIdentity?: import("@/lib/growth/aios/growth/growth-canonical-display-identity-1b-types").GrowthCanonicalDisplayIdentity | null
+  /** MEMORY-RESOLVER-1A — canonical human memory bundle computed once at package generation. */
+  canonicalHumanMemory?: import("@/lib/growth/lead-memory/canonical-human-memory-types").CanonicalHumanMemoryBundle
   /** OUTREACH-QUALITY-1A — think-first brief; all channel drafts derive from this. */
   salesStrategyBrief?: GrowthOutreachSalesStrategyBrief
   draftQuality?: GrowthAutonomousOutreachDraftQuality

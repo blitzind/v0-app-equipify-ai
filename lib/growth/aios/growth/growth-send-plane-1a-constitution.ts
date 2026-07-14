@@ -1,7 +1,16 @@
 /**
  * GE-AIOS-SEND-PLANE-1A — Production Human Communication Constitution (client-safe).
  * Mandatory final gate before transport. No signatures — mailbox system owns those.
+ * INSTITUTIONAL-LEARNING-1B — canonical identity capitalization/branding gate.
  */
+
+import {
+  applyCanonicalIdentityToCopy,
+  reviewCanonicalIdentityConstitution,
+  type GrowthCanonicalDisplayIdentity,
+} from "@/lib/growth/aios/growth/growth-canonical-display-identity-1b"
+
+export type { GrowthCanonicalDisplayIdentity } from "@/lib/growth/aios/growth/growth-canonical-display-identity-1b"
 
 export const GROWTH_AIOS_SEND_PLANE_1A_QA_MARKER =
   "ge-aios-send-plane-1a-canonical-draft-materialization-v1" as const
@@ -88,9 +97,28 @@ export function stripAiGeneratedSignatureContent(text: string): string {
     .trim()
 }
 
+export function reviewOperatorExecutionGuideConstitution(
+  text: string,
+  canonicalIdentity?: GrowthCanonicalDisplayIdentity | null,
+): string[] {
+  const failures: string[] = []
+  const normalized = text.trim()
+  if (!normalized) {
+    failures.push("send_plane:empty_copy")
+    return failures
+  }
+  if (/—/.test(normalized)) failures.push("send_plane:em_dash_forbidden")
+  for (const pattern of SEND_PLANE_SIGNATURE_PATTERNS) {
+    if (pattern.test(normalized)) failures.push(`send_plane:signature_leak:${pattern.source}`)
+  }
+  failures.push(...reviewCanonicalIdentityConstitution(normalized, canonicalIdentity))
+  return failures
+}
+
 export function reviewProductionHumanCommunicationConstitution(
   text: string,
   companyName: string,
+  canonicalIdentity?: GrowthCanonicalDisplayIdentity | null,
 ): string[] {
   const failures: string[] = []
   const normalized = text.trim()
@@ -120,9 +148,16 @@ export function reviewProductionHumanCommunicationConstitution(
     failures.push("send_plane:internal_evidence_leak")
   }
 
+  failures.push(...reviewCanonicalIdentityConstitution(normalized, canonicalIdentity))
+
   return failures
 }
 
-export function finalizeProductionCustomerFacingCopy(text: string): string {
-  return normalizeProductionPunctuation(stripAiGeneratedSignatureContent(text))
+export function finalizeProductionCustomerFacingCopy(
+  text: string,
+  canonicalIdentity?: GrowthCanonicalDisplayIdentity | null,
+): string {
+  const stripped = stripAiGeneratedSignatureContent(text)
+  const identityApplied = applyCanonicalIdentityToCopy(stripped, canonicalIdentity)
+  return normalizeProductionPunctuation(identityApplied)
 }

@@ -29,7 +29,7 @@ import {
   type GrowthAvaCompletedOutreachPackageCard,
 } from "@/lib/growth/aios/approvals/ava-completed-work-projection"
 import type { GrowthAutonomousOutreachApprovalPackage } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
-import { GrowthCollapsibleEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthAvaMemoryReviewSection } from "@/components/growth/ai-os/approvals/growth-ava-memory-review-section"
 import {
   GROWTH_AIOS_APPROVALS_2A_QA_MARKER,
   GROWTH_AIOS_CONVERSATION_INTELLIGENCE_2B_OPERATOR_LAYOUT_QA_MARKER,
@@ -467,6 +467,29 @@ export function GrowthAvaCompletedOutreachPackageCard({
           <Section title={`Why ${teammate.name} chose this account`}>
             <BulletList lines={view.whySelected} />
           </Section>
+
+          {view.memoryReview.length ? (
+            <GrowthAvaMemoryReviewSection
+              leadId={card.leadId}
+              packageId={card.packageId}
+              rows={view.memoryReview}
+              onUpdated={(rows) =>
+                setPacket((current) => (current ? { ...current, memoryReview: rows } : current))
+              }
+            />
+          ) : null}
+
+          {view.operatorReviewLayout.canonicalDecisionEssentials.length ? (
+            <Section title="Why this package exists">
+              <BulletList lines={view.operatorReviewLayout.canonicalDecisionEssentials} />
+            </Section>
+          ) : null}
+
+          {view.operatorReviewLayout.canonicalDecisionEnforcementEssentials.length ? (
+            <Section title="Enforcement status">
+              <BulletList lines={view.operatorReviewLayout.canonicalDecisionEnforcementEssentials} />
+            </Section>
+          ) : null}
 
           {view.operatorReviewLayout.relationshipStrategyEssentials.length ? (
             <Section title="Relationship strategy">

@@ -1,5 +1,6 @@
 /** Client-safe projection of lead memory profile views into decision context (Sprint 3). */
 
+import { resolveAuthoritativeHumanMemoryKind } from "@/lib/growth/lead-memory/canonical-human-memory-metadata"
 import {
   filterUsableOutreachMemorySnippet,
   isUnusableOutreachMemoryEvidence,
@@ -11,17 +12,31 @@ import {
 } from "@/lib/growth/lead-memory/memory-types"
 
 const COMMITMENT_CATEGORIES = new Set([
-  "meeting_signal",
   "timeline_signal",
   "budget_signal",
   "buying_signal",
 ])
 
+function eventHumanKind(event: GrowthLeadMemoryProfileView["events"][number]): string | null {
+  const kind = resolveAuthoritativeHumanMemoryKind({
+    memoryCategory: event.memoryCategory,
+    title: event.title,
+    metadata: event.metadata ?? null,
+  })
+  return kind
+}
+
+export function isCommitmentEvent(event: GrowthLeadMemoryProfileView["events"][number]): boolean {
+  const kind = eventHumanKind(event)
+  if (kind === "action_commitment") return true
+  if (kind != null) return false
+  return COMMITMENT_CATEGORIES.has(event.memoryCategory)
+}
+
 const AVOID_REPEAT_CATEGORIES = new Set([
   "communication_preference",
   "timeline_signal",
   "budget_signal",
-  "meeting_signal",
 ])
 
 function snippet(value: string | null | undefined, max = 200): string {
@@ -79,7 +94,7 @@ export function projectLeadMemoryInfluenceContext(
     .filter(Boolean)
 
   const commitmentSummaries = (view?.events ?? [])
-    .filter((event) => COMMITMENT_CATEGORIES.has(event.memoryCategory))
+    .filter((event) => isCommitmentEvent(event))
     .slice(0, 5)
     .map((event) => eventSnippet(event.title, event.evidenceSnippet, 140))
     .filter(Boolean)
@@ -87,7 +102,11 @@ export function projectLeadMemoryInfluenceContext(
   const avoidRepeating = [
     ...topPreferences,
     ...(view?.events ?? [])
-      .filter((event) => AVOID_REPEAT_CATEGORIES.has(event.memoryCategory))
+      .filter((event) => {
+        const kind = eventHumanKind(event)
+        if (kind === "communication_style" || kind === "personal_context") return true
+        return AVOID_REPEAT_CATEGORIES.has(event.memoryCategory)
+      })
       .slice(0, 5)
       .map((event) => snippet(event.evidenceSnippet, 120)),
   ].filter(Boolean)

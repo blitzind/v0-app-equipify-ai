@@ -19,8 +19,101 @@ import {
   normalizeOperatorResearchLine,
 } from "@/lib/growth/aios/growth/growth-outreach-conversation-intelligence"
 
+export const GROWTH_AIOS_MEMORY_RESOLVER_1A_OPERATOR_LAYOUT_QA_MARKER =
+  "ge-aios-memory-resolver-1a-operator-review-layout-v1" as const
+
+export type Approvals2AMemoryReviewRow = {
+  id: string
+  category: string
+  humanMemoryKind: string | null
+  conclusion: string
+  confidence: string
+  sourceSystem: string
+  recordedAt: string
+  operatorStatus: string
+  whyItMatters: string | null
+  freshnessExpiresAt: string | null
+  pinned: boolean
+  protected: boolean
+  mergeStatus: string | null
+}
+
+export const GROWTH_AIOS_MEMORY_RESOLVER_1B_OPERATOR_LAYOUT_QA_MARKER =
+  "ge-aios-memory-resolver-1b-operator-review-layout-v1" as const
+
+export function projectCanonicalMemoryReviewRows(input: {
+  canonicalHumanMemory?: import("@/lib/growth/lead-memory/canonical-human-memory-types").CanonicalHumanMemoryBundle | null
+}): Approvals2AMemoryReviewRow[] {
+  const bundle = input.canonicalHumanMemory
+  if (!bundle) return []
+
+  const records = [
+    ...bundle.business.records,
+    ...bundle.personal.records,
+    ...bundle.relationship.records,
+    ...bundle.sales.records,
+    ...bundle.actions.records,
+  ]
+
+  const seen = new Set<string>()
+  const rows: Approvals2AMemoryReviewRow[] = []
+  for (const record of records) {
+    if (record.superseded || record.operatorStatus === "deleted") continue
+    const key = `${record.id}:${record.conclusion}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    rows.push({
+      id: record.id,
+      category: record.humanMemoryKind ?? record.memoryCategory,
+      humanMemoryKind: record.humanMemoryKind,
+      conclusion: record.conclusion,
+      confidence: record.confidence,
+      sourceSystem: record.sourceSystem,
+      recordedAt: record.recordedAt,
+      operatorStatus: record.operatorStatus,
+      whyItMatters: record.whyItMatters,
+      freshnessExpiresAt: record.freshnessExpiresAt,
+      pinned: record.pinned,
+      protected: record.protected,
+      mergeStatus: record.superseded ? "superseded" : null,
+    })
+  }
+
+  return rows.slice(0, 12)
+}
+
+import type { GrowthCanonicalDecisionResolution } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-types"
+import { projectCanonicalDecisionHacEnforcement } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-enforcement"
+import { projectCanonicalDecisionOverrideEssentials } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-enforcement"
+import type { CanonicalDecisionOperatorOverrideRecord } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-types"
+import { projectCanonicalDecisionEssentials } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-operator-projection"
+
 export const GROWTH_AIOS_APPROVALS_2A_QA_MARKER =
   "ge-aios-approvals-2a-operator-review-experience-v1" as const
+
+export const GROWTH_AIOS_CALL_WORKSPACE_POST_CALL_CLOSURE_2B_OPERATOR_LAYOUT_QA_MARKER =
+  "ge-aios-call-workspace-intelligence-2b-operator-review-layout-v1" as const
+
+export function projectPostCallClosureEssentials(input: {
+  closure?: import("@/lib/growth/operator-assist/call-workspace-post-call-closure-types").GrowthCallWorkspacePostCallClosure | null
+  packageApprovalRequirements?: string[]
+}): string[] {
+  const fromPackage = (input.packageApprovalRequirements ?? []).filter((line) =>
+    /post-call|call outcome|call workspace closure/i.test(line),
+  )
+  if (fromPackage.length) return fromPackage.slice(0, 6)
+
+  const closure = input.closure
+  if (!closure) return []
+
+  return [
+    closure.meetingSummary,
+    ...closure.businessConclusions.slice(0, 2),
+    closure.recommendedNextAction.label,
+    ...(closure.strategyChange?.meaningfulChanges.slice(0, 2) ?? []),
+  ].filter(Boolean)
+}
+
 
 export const GROWTH_AIOS_CONVERSATION_INTELLIGENCE_2B_OPERATOR_LAYOUT_QA_MARKER =
   "ge-aios-conversation-intelligence-2b-operator-review-layout-v1" as const
@@ -33,6 +126,7 @@ export const GROWTH_AIOS_REVENUE_STRATEGY_1A_OPERATOR_LAYOUT_QA_MARKER =
 
 export { GROWTH_AIOS_RELATIONSHIP_STRATEGY_2A_OPERATOR_LAYOUT_QA_MARKER } from "@/lib/growth/aios/growth/growth-relationship-strategy-2a-types"
 export { GROWTH_AIOS_ADAPTIVE_LOOP_1A_OPERATOR_LAYOUT_QA_MARKER } from "@/lib/growth/aios/growth/growth-adaptive-loop-1a-types"
+export { GROWTH_AIOS_INSTITUTIONAL_LEARNING_1A_OPERATOR_LAYOUT_QA_MARKER } from "@/lib/growth/aios/growth/growth-institutional-learning-1a-types"
 
 export const APPROVALS_2A_DRAFT_CHANNELS = [
   "email",
@@ -142,6 +236,8 @@ export type Approvals2AOperatorReviewPacket = {
   pendingHumanApproval: true
   transportBlocked: true
   teammateName: string
+  /** MEMORY-RESOLVER-1A — operator memory review surface (approve/correct/delete/pin/protect/merge). */
+  memoryReview: Approvals2AMemoryReviewRow[]
   /** CONVERSATION-INTELLIGENCE-2B — prioritized scan path + collapsed detail buckets. */
   operatorReviewLayout: {
     relationshipStrategyEssentials: string[]
@@ -149,6 +245,10 @@ export type Approvals2AOperatorReviewPacket = {
     conversationStrategyEssentials: string[]
     consultantDiscoveryEssentials: string[]
     revenueStrategyEssentials: string[]
+    institutionalLearningEssentials: string[]
+    postCallClosureEssentials: string[]
+    canonicalDecisionEssentials: string[]
+    canonicalDecisionEnforcementEssentials: string[]
     researchSummary: string[]
     sellerTruthEssentials: string[]
     expandable: {
@@ -158,6 +258,7 @@ export type Approvals2AOperatorReviewPacket = {
       observationIntelligence: string[]
       consultantDiscoveryDetail: string[]
       revenueStrategyDetail: string[]
+      institutionalLearningDetail: string[]
       explainabilityDetail: string[]
       evidenceDetail: string[]
       transparencyDetail: string[]
@@ -376,6 +477,8 @@ export function projectApprovals2AOperatorReviewPacket(input: {
     assumptions?: string[]
     opportunitySummary?: string | null
   } | null
+  canonicalDecision?: GrowthCanonicalDecisionResolution | null
+  canonicalDecisionOverride?: CanonicalDecisionOperatorOverrideRecord | null
 }): Approvals2AOperatorReviewPacket {
   const teammate = resolveAiTeammatePresentation(input.teammateName)
   const nowIso = input.now ?? new Date().toISOString()
@@ -530,6 +633,22 @@ export function projectApprovals2AOperatorReviewPacket(input: {
   const revenueStrategy = strategy?.revenueStrategyIntelligence ?? null
   const relationship = strategy?.relationshipAssessment ?? null
   const adaptiveEvolution = strategy?.adaptiveLoopEvolution ?? null
+  const institutionalLearning = strategy?.institutionalLearning ?? null
+
+  const institutionalLearningEssentials = [
+    ...(institutionalLearning?.operatorInsights.slice(0, 3).map((row) => `${row.headline} ${row.detail}`) ?? []),
+    institutionalLearning?.confidenceBoost
+      ? `Organizational learning supports current strategy confidence (+${Math.round(institutionalLearning.confidenceBoost * 100)} pts advisory).`
+      : null,
+  ].filter((line): line is string => Boolean(line))
+
+  const institutionalLearningDetail = [
+    ...(institutionalLearning?.applicablePatterns.map(
+      (row) =>
+        `Pattern (${row.dimension}): ${row.advisory} · confidence ${Math.round(row.confidence * 100)}% · n=${row.sampleSize}`,
+    ) ?? []),
+    ...(institutionalLearning?.rejectedPatterns.map((row) => `Rejected: ${row}`) ?? []),
+  ]
 
   const relationshipStrategyEssentials = [
     adaptiveEvolution?.strategyChange.relationshipChangedBecause.length
@@ -788,6 +907,26 @@ export function projectApprovals2AOperatorReviewPacket(input: {
     conversationStrategyEssentials,
     consultantDiscoveryEssentials,
     revenueStrategyEssentials,
+    institutionalLearningEssentials,
+    postCallClosureEssentials: projectPostCallClosureEssentials({
+      packageApprovalRequirements: pkg.approvalRequirements,
+    }),
+    canonicalDecisionEssentials: input.canonicalDecision
+      ? projectCanonicalDecisionEssentials({
+          decision: input.canonicalDecision.decision,
+          freshness: input.canonicalDecision.freshness,
+          packagePurpose: pkg.expectedOutcome,
+          isSupportingPackage:
+            input.canonicalDecision.decision.primaryAction !== "send_promised_information" &&
+            input.canonicalDecision.decision.primaryAction !== "contact",
+        })
+      : [],
+    canonicalDecisionEnforcementEssentials: input.canonicalDecision
+      ? [
+          ...projectCanonicalDecisionHacEnforcement(input.canonicalDecision, null).essentials,
+          ...projectCanonicalDecisionOverrideEssentials(input.canonicalDecisionOverride),
+        ]
+      : [],
     researchSummary,
     sellerTruthEssentials,
     expandable: {
@@ -797,6 +936,7 @@ export function projectApprovals2AOperatorReviewPacket(input: {
       observationIntelligence,
       consultantDiscoveryDetail,
       revenueStrategyDetail,
+      institutionalLearningDetail,
       explainabilityDetail,
       evidenceDetail,
       transparencyDetail,
@@ -812,7 +952,13 @@ export function projectApprovals2AOperatorReviewPacket(input: {
     packageId: pkg.packageId,
     leadId: pkg.leadId,
     company: {
-      name: firstNonEmpty(pkg.companyName, lead?.companyName) ?? "Account",
+      name:
+        firstNonEmpty(
+          pkg.canonicalDisplayIdentity?.company.canonical,
+          pkg.salesStrategyBrief?.canonicalDisplayIdentity?.company.canonical,
+          pkg.companyName,
+          lead?.companyName,
+        ) ?? "Account",
       website: lead?.website ?? null,
       industry: research?.industry ?? null,
       location: locationFromLead(lead ?? {}),
@@ -918,6 +1064,7 @@ export function projectApprovals2AOperatorReviewPacket(input: {
     pendingHumanApproval: true,
     transportBlocked: true,
     teammateName: teammate.name,
+    memoryReview: projectCanonicalMemoryReviewRows({ canonicalHumanMemory: pkg.canonicalHumanMemory }),
     operatorReviewLayout,
   }
 }

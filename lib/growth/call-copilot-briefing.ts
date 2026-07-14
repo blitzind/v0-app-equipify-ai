@@ -15,6 +15,9 @@ import type { GrowthCallCopilotBriefing } from "@/lib/growth/call-copilot-types"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
 import type { GrowthLead } from "@/lib/growth/types"
+import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import { resolveCanonicalChannelContentForLead } from "@/lib/growth/aios/growth/growth-channels-1a-canonical-resolver"
+import { GROWTH_AIOS_CHANNELS_1A_QA_MARKER } from "@/lib/growth/aios/growth/growth-channels-1a-types"
 
 export {
   computeBriefEffectivenessScore,
@@ -103,6 +106,29 @@ export async function buildGrowthCallCopilotBriefing(
     ? `Hi ${lead.contactName.split(" ")[0]} — calling from Equipify about ${lead.companyName}.`
     : `Hi — calling about ${lead.companyName}.`
 
+  let canonicalCallGuide: string | null = null
+  let canonicalCallGuideSource: string | null = null
+  const organizationId = getGrowthEngineAiOrgId()
+  if (organizationId) {
+    const materialized = await resolveCanonicalChannelContentForLead(admin, {
+      organizationId,
+      leadId: lead.id,
+      channel: "call",
+    })
+    if (materialized?.transportReady && materialized.body.trim()) {
+      canonicalCallGuide = materialized.body
+      canonicalCallGuideSource = materialized.sourcePackageId
+        ? `package:${materialized.sourcePackageId}`
+        : "canonical_brief"
+    }
+  }
+
+  const resolvedOpeningLine = canonicalCallGuide
+    ? (canonicalCallGuide.match(/Opening:\s*"([^"]+)"/)?.[1]?.trim() ??
+      canonicalCallGuide.split("\n")[0]?.replace(/^Opening:\s*/i, "").replace(/^"|"$/g, "").trim() ??
+      openingLine)
+    : openingLine
+
   const recommendedCta =
     lead.nextBestAction === "call_now" || lead.nextBestAction === "call_immediately"
       ? "Confirm a short follow-up or demo slot before ending the call."
@@ -124,7 +150,10 @@ export async function buildGrowthCallCopilotBriefing(
     },
     whyNow,
     likelyObjections,
-    openingLine,
+    openingLine: resolvedOpeningLine,
+    canonicalCallGuide,
+    canonicalCallGuideSource,
+    channelsParityMarker: GROWTH_AIOS_CHANNELS_1A_QA_MARKER,
     recommendedCta,
     doNotSay,
     riskWarnings,

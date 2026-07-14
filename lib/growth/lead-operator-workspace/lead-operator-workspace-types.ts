@@ -200,6 +200,8 @@ export type GrowthLeadOperatorWorkspacePayload = {
   search_intent_signals: GrowthLeadOperatorSearchIntentSummary[]
   company_match: GrowthLeadOperatorCompanyMatchSummary | null
   buying_stage: GrowthLeadOperatorBuyingStageSummary | null
+  /** GE-AIOS-DECISION-ENGINE-1B — canonical next-best decision for this lead */
+  canonical_decision?: import("@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-types").GrowthCanonicalDecisionResolution | null
 }
 
 export const GROWTH_LEAD_ENGINE_RUN_METADATA_KEY = "lead_engine_run" as const

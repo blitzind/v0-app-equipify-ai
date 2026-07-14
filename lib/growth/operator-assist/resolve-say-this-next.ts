@@ -9,6 +9,8 @@ import {
   CONVERSATION_STAGE_LABELS,
   GROWTH_LIVE_COACHING_V2_QA_MARKER,
 } from "@/lib/growth/live-coaching/types"
+import { buildAiosSayThisNextSnapshot } from "@/lib/growth/operator-assist/aios-live-assist-mapper"
+import type { CallWorkspaceAiosScenarioBranch } from "@/lib/growth/operator-assist/call-workspace-aios-live-reasoning-types"
 
 export const GROWTH_SAY_THIS_NEXT_QA_MARKER = "growth-say-this-next-v2" as const
 
@@ -41,6 +43,12 @@ export type SayThisNextSnapshot = {
   updatedAt: string
   eventId: string | null
   qaMarker: typeof GROWTH_LIVE_COACHING_V2_QA_MARKER
+  aiosQaMarker?: string | null
+  businessPressure?: string | null
+  expectedOutcome?: string | null
+  alternativeResponse?: string | null
+  recoveryResponse?: string | null
+  scenarioBranches?: CallWorkspaceAiosScenarioBranch[]
 }
 
 function pickPrimaryCoachTurn(input: {
@@ -91,6 +99,9 @@ export function resolveSayThisNext(
   optimisticCoach?: ConversationCoachTurn | null,
 ): SayThisNextSnapshot | null {
   if (!operatorAssist && !optimisticCoach) return null
+
+  const aiosSayThisNext = buildAiosSayThisNextSnapshot(operatorAssist?.aiosLiveReasoning ?? null)
+  if (aiosSayThisNext) return aiosSayThisNext
 
   const generatedAt = operatorAssist?.generatedAt ?? new Date().toISOString()
   const coachingState = operatorAssist?.coachingState ?? null

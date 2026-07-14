@@ -1,6 +1,9 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import { resolveCanonicalChannelContentForLead } from "@/lib/growth/aios/growth/growth-channels-1a-canonical-resolver"
+import { GROWTH_AIOS_CHANNELS_1A_QA_MARKER } from "@/lib/growth/aios/growth/growth-channels-1a-types"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { buildPersonalizedSmsDraft } from "@/lib/growth/sms/personalization/assemble-sms-draft"
 import {
@@ -24,6 +27,36 @@ export async function buildSmsInboxDraftSuggestion(
 ): Promise<GrowthSmsInboxDraftSuggestion | null> {
   const lead = await fetchGrowthLeadById(admin, input.leadId)
   if (!lead) return null
+
+  const organizationId = getGrowthEngineAiOrgId()
+  if (organizationId && (input.draftType ?? "reply") === "outbound") {
+    const materialized = await resolveCanonicalChannelContentForLead(admin, {
+      organizationId,
+      leadId: lead.id,
+      channel: "sms",
+    })
+    if (materialized?.transportReady && materialized.body.trim()) {
+      return {
+        qa_marker: GROWTH_AIOS_CHANNELS_1A_QA_MARKER,
+        channel: "sms",
+        draftType: input.draftType ?? "reply",
+        suggestedBody: materialized.body,
+        charCount: materialized.body.length,
+        segmentCount: Math.max(1, Math.ceil(materialized.body.length / 160)),
+        humanApprovalRequired: true,
+        audit: {
+          openingHook: "canonical_package_asset",
+          cta: null,
+          qualityScore: 100,
+          contextQuality: "canonical",
+          memoryQuality: "canonical",
+          confidenceLabel: "canonical_send_plane",
+        },
+        contextUsed: ["canonical_outreach_package", `package:${materialized.sourcePackageId ?? "brief"}`],
+        memoryUsed: [],
+      }
+    }
+  }
 
   const context = await buildSmsPersonalizationContext(admin, lead)
   const { audit, draft } = buildPersonalizedSmsDraft({

@@ -21,6 +21,7 @@ import {
   stageDistribution,
 } from "@/lib/growth/lead-memory/relationship-context"
 import { buildRelationshipSummary, buildSummaryHighlights } from "@/lib/growth/lead-memory/relationship-summary"
+import { isOperatorControlledMemoryMetadata } from "@/lib/growth/lead-memory/canonical-human-memory-metadata"
 import {
   GROWTH_LEAD_MEMORY_ENGINE_QA_MARKER,
   maskLeadMemoryLabel,
@@ -75,6 +76,7 @@ function snapshotsTable(admin: SupabaseClient) {
 }
 
 function mapEvent(row: Record<string, unknown>): GrowthLeadMemoryEvent {
+  const metadata = row.metadata && typeof row.metadata === "object" ? (row.metadata as Record<string, unknown>) : undefined
   return {
     id: asString(row.id),
     leadLabel: asString(row.lead_label),
@@ -84,6 +86,7 @@ function mapEvent(row: Record<string, unknown>): GrowthLeadMemoryEvent {
     evidenceSnippet: asString(row.evidence_snippet),
     sourceSystem: asString(row.source_system),
     recordedAt: asString(row.recorded_at),
+    metadata,
   }
 }
 
@@ -354,13 +357,27 @@ async function upsertMemoryEvent(
 ): Promise<void> {
   const fingerprint = `${candidate.memoryCategory}:${candidate.title}:${candidate.evidenceSnippet.slice(0, 80)}`
   const { data: existing } = await eventsTable(admin)
-    .select("id")
+    .select("id, metadata")
     .eq("lead_id", leadId)
     .eq("title", candidate.title)
     .eq("memory_category", candidate.memoryCategory)
     .limit(1)
     .maybeSingle()
-  if (existing) return
+  if (existing) {
+    const metadata = (existing as { metadata?: Record<string, unknown> }).metadata
+    if (isOperatorControlledMemoryMetadata(metadata)) return
+    return
+  }
+
+  const { data: protectedDuplicate } = await eventsTable(admin)
+    .select("id, metadata")
+    .eq("lead_id", leadId)
+    .contains("metadata", { fingerprint })
+    .limit(1)
+    .maybeSingle()
+  if (protectedDuplicate && isOperatorControlledMemoryMetadata((protectedDuplicate as { metadata?: Record<string, unknown> }).metadata)) {
+    return
+  }
 
   await eventsTable(admin).insert({
     lead_id: leadId,

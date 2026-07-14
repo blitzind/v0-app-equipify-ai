@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { GrowthEngineCard } from "@/components/growth/growth-ui-utils"
+import { GrowthCanonicalDecisionCard } from "@/components/growth/growth-canonical-decision-card"
 import { CompanyIntelligenceCard } from "@/components/growth/company-signals/company-intelligence-card"
 import { VerificationEnrichmentCard } from "@/components/growth/lead-operator/verification-enrichment-card"
 import { HighIntentActivityCard } from "@/components/growth/revenue-intelligence/high-intent-activity-card"
@@ -312,6 +313,8 @@ export function GrowthLeadOperatorWorkspace({ leadId }: { leadId: string }) {
               />
             </>
           ) : null}
+          <GrowthCanonicalDecisionCard decision={workspace.canonical_decision?.decision ?? null} />
+          {!workspace.canonical_decision ? (
           <GrowthEngineCard title="Next action">
             <p className="text-sm font-medium text-foreground">
               {handoff?.recommended_next_action ?? hints?.recommended_next_action}
@@ -320,6 +323,7 @@ export function GrowthLeadOperatorWorkspace({ leadId }: { leadId: string }) {
               Recommended timing: {handoff?.recommended_followup_window ?? hints?.recommended_followup_window}
             </p>
           </GrowthEngineCard>
+          ) : null}
           <GrowthEngineCard title="Missing information">
             <EvidenceList items={handoff?.missing_information ?? []} />
           </GrowthEngineCard>

@@ -72,7 +72,16 @@ export function GrowthAiOsClosedLoopLearningSection({ closedLoopLearning }: Prop
 
       {topInsights.length > 0 ? (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Top insights</p>
+          <p className="text-xs font-medium text-muted-foreground">What Ava has learned</p>
+          {topInsights
+            .filter((insight) => insight.status === "advisory")
+            .slice(0, 3)
+            .map((insight) => (
+              <p key={`learned-${insight.id}`} className="text-sm text-muted-foreground">
+                {insight.summary}
+              </p>
+            ))}
+          <p className="text-xs font-medium text-muted-foreground pt-1">Top insights</p>
           {topInsights.map((insight) => (
             <div key={insight.id} className="rounded-md border p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">

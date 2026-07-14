@@ -1,10 +1,14 @@
 import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { getGrowthEngineAiOrgId } from "@/lib/growth/access"
+import { resolveCanonicalChannelContentForLead } from "@/lib/growth/aios/growth/growth-channels-1a-canonical-resolver"
+import { applyChannelParityConstitution } from "@/lib/growth/aios/growth/growth-channels-1a-parity"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
 import { getInboxThread } from "@/lib/growth/inbox/thread-repository"
 import { mapMemoryInfluenceToReplyCopilotRelationship } from "@/lib/growth/reply-intelligence/reply-copilot-memory"
+import { buildReplyCopilotAssist } from "@/lib/growth/reply-intelligence/reply-copilot-service"
 import { buildSmsPersonalizationContext } from "@/lib/growth/sms/personalization/sms-context-builder"
 import { buildInboundSmsResponseSuggestions } from "@/lib/growth/sms/inbound-sms-response-suggestions"
 import type { GrowthInboundSmsResponseSuggestions } from "@/lib/growth/sms/inbound-sms-response-suggestion-types"
@@ -45,6 +49,31 @@ export async function fetchInboundSmsResponseSuggestions(
 
   const relationshipMemory = mapMemoryInfluenceToReplyCopilotRelationship(memoryInfluence)
 
+  const replyAssist = buildReplyCopilotAssist({
+    bodyPreview: inboundBody,
+    companyName: lead.companyName,
+    contactLabel: lead.contactName,
+    relationshipMemory,
+  })
+
+  let canonicalSmsReplySeed: string | undefined
+  const organizationId = getGrowthEngineAiOrgId()
+  if (organizationId) {
+    const materialized = await resolveCanonicalChannelContentForLead(admin, {
+      organizationId,
+      leadId: lead.id,
+      channel: "sms",
+    })
+    if (materialized?.transportReady) {
+      canonicalSmsReplySeed = materialized.body
+    }
+  }
+
+  const constitutionBoundedReply = applyChannelParityConstitution(
+    replyAssist.suggestedReplyDraft.replace(/\n+/g, " ").slice(0, 320),
+    lead.companyName,
+  ).body
+
   return buildInboundSmsResponseSuggestions({
     leadId: lead.id,
     inboundBody,
@@ -57,5 +86,7 @@ export async function fetchInboundSmsResponseSuggestions(
     nextBestAction: lead.nextBestAction,
     nextBestActionReason: lead.nextBestActionReason,
     relationshipMemory,
+    constitutionBoundedReplySeed: constitutionBoundedReply,
+    canonicalPackagePresent: Boolean(canonicalSmsReplySeed),
   })
 }

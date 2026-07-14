@@ -21,6 +21,7 @@ export type LiveRelationshipEventSource =
   | "outbound_tracking"
   | "company_research"
   | "operator_action"
+  | "call_workspace"
 
 export type LiveRelationshipIngestionResult = {
   qaMarker: typeof GROWTH_AIOS_ADAPTIVE_LOOP_1B_QA_MARKER

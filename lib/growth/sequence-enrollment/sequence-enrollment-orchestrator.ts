@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { logGrowthEngine, getGrowthEngineAiOrgId } from "@/lib/growth/access"
 import type { GrowthAiCopilotGenerationType } from "@/lib/growth/ai-copilot-types"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { invalidateCanonicalDecisionCacheForLead } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
 import { listGrowthSequencePatterns } from "@/lib/growth/sequence-pattern-repository"
 import {
   computeOutreachExecutionConfidence,
@@ -647,6 +648,8 @@ export async function pauseGrowthSequenceEnrollment(
     pauseReason: input.pauseReason,
   })
 
+  invalidateCanonicalDecisionCacheForLead(input.leadId, "sequence_enrollment_paused")
+
   void (async () => {
     try {
       const patterns = await listGrowthSequencePatterns(admin)
@@ -696,6 +699,8 @@ export async function resumeGrowthSequenceEnrollment(
     actingUserEmail: input.actingUserEmail,
   })
 
+  invalidateCanonicalDecisionCacheForLead(input.leadId, "sequence_enrollment_resumed")
+
   return updated
 }
 
@@ -721,6 +726,8 @@ export async function cancelGrowthSequenceEnrollment(
     enrollmentStalled: false,
   })
   await setLeadActiveSequenceEnrollment(admin, input.leadId, null)
+
+  invalidateCanonicalDecisionCacheForLead(input.leadId, "sequence_enrollment_cancelled")
 
   await emitGrowthLeadSequenceEnrollmentCancelledTimeline(admin, {
     leadId: input.leadId,

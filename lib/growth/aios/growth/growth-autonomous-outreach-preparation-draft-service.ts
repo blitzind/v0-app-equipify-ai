@@ -25,18 +25,13 @@ import { enrichBusinessProfileFromMasterContextDocument } from "@/lib/growth/bus
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
-import { loadSequenceOptimizationOutreachSignals } from "@/lib/growth/sequence-optimization/sequence-optimization-queries"
 import { resolveAiTeammatePresentation } from "@/lib/workspace/ai-teammate-identity"
-import type { GrowthOutreachLearningThemeWeight } from "@/lib/growth/aios/growth/growth-outreach-conversation-intelligence"
 import {
   mapRevenueStrategyChannelToPackage,
   mapRevenueStrategySequenceToPackage,
 } from "@/lib/growth/aios/growth/growth-outreach-revenue-strategy-intelligence"
 import { mergeOperatorAssetStateFromPreviousPackage } from "@/lib/growth/aios/growth/growth-send-plane-1b-operator-approval-persistence"
-import { loadBuyingCommitteeIntelligenceLeadRollup } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-lead-rollup"
-import { loadBuyingCommitteeIntelligenceOperatorStatus } from "@/lib/growth/buying-committee-intelligence/buying-committee-intelligence-operator-status"
-import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
-import { buildOutreachContextPacket } from "@/lib/growth/outreach/personalization/context-packet-builder"
+import { resolveCanonicalHumanMemoryForLead } from "@/lib/growth/lead-memory/resolve-canonical-human-memory-for-lead"
 import {
   applyAdaptiveLoopToOutreachPreparation,
   detectAdaptiveStrategyChanges,
@@ -49,10 +44,11 @@ import {
 } from "@/lib/growth/aios/growth/growth-adaptive-loop-1b-relationship-event-record"
 import {
   buildRelationshipAssessment,
-  buildRelationshipAssessmentContextFromPacket,
-  loadInstitutionalAdviceSnippets,
 } from "@/lib/growth/aios/growth/growth-relationship-strategy-2a"
+import { resolveCanonicalCompanyDisplayName } from "@/lib/growth/aios/growth/growth-canonical-display-identity-1b"
 import type { GrowthAutonomousOutreachPreparationWakeCondition } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
+import type { Growth5fPackageBuildMode } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-types"
+import { assertGrowth5fPackagePreparationAllowed } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-growth5f-gate"
 
 export async function buildAutonomousOutreachApprovalPackage(
   admin: SupabaseClient,
@@ -67,8 +63,23 @@ export async function buildAutonomousOutreachApprovalPackage(
     refreshReasons?: string[]
     wakeCondition?: GrowthAutonomousOutreachPreparationWakeCondition
     adaptiveEvents?: AdaptiveProspectEvent[]
+    buildMode?: Growth5fPackageBuildMode
   },
 ): Promise<GrowthAutonomousOutreachApprovalPackage> {
+  if (input.buildMode !== "preview_only") {
+    await assertGrowth5fPackagePreparationAllowed(admin, {
+      organizationId: input.organizationId,
+      leadId: input.leadId,
+      generatedAt: input.generatedAt,
+      proposedPurpose: input.previousPackage?.expectedOutcome ?? null,
+      wakeCondition: input.wakeCondition,
+      previousPackage: input.previousPackage ?? null,
+      isOperatorRebuild: Boolean(input.refreshReasons?.length),
+      isMaterialRefresh: input.wakeCondition === "relationship_material_change",
+      cacheScope: "growth5f:build-package",
+    })
+  }
+
   const lead = await fetchGrowthLeadById(admin, input.leadId)
   if (!lead) {
     throw new Error("Lead not found for outreach preparation.")
@@ -78,7 +89,22 @@ export async function buildAutonomousOutreachApprovalPackage(
   const primaryDm =
     decisionMakers.find((row) => row.id === lead.primaryDecisionMakerId) ?? decisionMakers[0] ?? null
 
-  const companyName = lead.companyName ?? input.companyName ?? "this company"
+  const adaptiveEvents =
+    input.adaptiveEvents ??
+    (await loadPendingAdaptiveEventsForLead(admin, input.leadId).catch(() => []))
+
+  const memoryBundle = await resolveCanonicalHumanMemoryForLead(admin, {
+    organizationId: input.organizationId,
+    leadId: input.leadId,
+    generatedAt: input.generatedAt,
+    researchSnapshot: input.snapshot,
+    packageSnapshot: input.previousPackage ?? null,
+    skipPackageLoad: !input.previousPackage,
+    liveDeltas: adaptiveEvents,
+    companyName: input.companyName,
+  })
+
+  const companyNameRaw = lead.companyName ?? input.companyName ?? "this company"
   const verifiedEvidence = input.snapshot.evidenceSummary?.verifiedEvidence ?? []
   const missingEvidence = input.snapshot.evidenceSummary?.missingEvidence ?? []
   const assumptions = input.snapshot.evidenceSummary?.assumptions ?? []
@@ -107,7 +133,7 @@ export async function buildAutonomousOutreachApprovalPackage(
     organizationId: input.organizationId,
     preparedAt: input.generatedAt,
     prospectIndustry: null,
-    prospectCompanyName: companyName,
+    prospectCompanyName: companyNameRaw,
     leadId: input.leadId,
   })
 
@@ -116,58 +142,14 @@ export async function buildAutonomousOutreachApprovalPackage(
   )
   const prospectKnowledgePack = researchRun?.signals?.prospectKnowledgePack_v25c ?? null
 
-  let learningWeights: GrowthOutreachLearningThemeWeight[] | null = null
-  try {
-    const generatedMs = Date.parse(input.generatedAt)
-    const dateFrom = new Date(generatedMs - 90 * 86400000).toISOString()
-    const outreachSignals = await loadSequenceOptimizationOutreachSignals(admin, {
-      dateFrom,
-      dateTo: input.generatedAt,
-      channel: null,
-      repUserId: null,
-      sequenceId: null,
-      attributionModel: "last_touch",
-    })
-    learningWeights = outreachSignals.openerSignals.map((row) => ({
-      themeKey: row.key,
-      replyRatePct: row.replyRatePct,
-      sends: row.sends,
-    }))
-  } catch {
-    learningWeights = null
-  }
-
-  const bcRollup = await loadBuyingCommitteeIntelligenceLeadRollup(admin, input.leadId).catch(() => null)
-  const bcStatus =
-    bcRollup?.company_id != null
-      ? await loadBuyingCommitteeIntelligenceOperatorStatus(admin, {
-          company_id: bcRollup.company_id,
-        }).catch(() => null)
-      : null
-  const buyingCommitteeSnapshot =
-    bcRollup && bcStatus
-      ? {
-          hasVerifiedCommittee: bcStatus.has_verified_committee,
-          discoveryPending: bcRollup.discovery_pending,
-          discoveryFailed: bcRollup.discovery_failed,
-          singleThreadRisk: bcStatus.single_thread_risk,
-          coverageScore: bcStatus.coverage_score,
-          rolesPresent: bcStatus.roles_present,
-          rolesMissing: bcStatus.roles_missing,
-          verifiedMemberCount: bcStatus.verified_member_count,
-        }
-      : bcRollup
-        ? {
-            hasVerifiedCommittee: bcRollup.has_verified_committee,
-            discoveryPending: bcRollup.discovery_pending,
-            discoveryFailed: bcRollup.discovery_failed,
-            singleThreadRisk: true,
-            coverageScore: 0,
-            rolesPresent: [],
-            rolesMissing: [],
-            verifiedMemberCount: 0,
-          }
-        : null
+  const canonicalDisplayIdentity = memoryBundle.identity
+  const companyName = resolveCanonicalCompanyDisplayName(canonicalDisplayIdentity, companyNameRaw)
+  const learningWeights = memoryBundle.learningWeights
+  const buyingCommitteeSnapshot = memoryBundle.committee
+  const leadMemory = memoryBundle.influence
+  const relationshipContext = memoryBundle.relationshipContext
+  const institutionalLearning = memoryBundle.institutionalAdvisory
+  const institutionalAdvice = memoryBundle.institutionalAdvice
 
   const communicationPlan = requestGrowthCommunicationPlan({
     organizationId: input.organizationId,
@@ -188,39 +170,7 @@ export async function buildAutonomousOutreachApprovalPackage(
   })
   const communicationChannelHint = resolveCommunicationPlanRecommendedChannel(communicationPlan)
 
-  const [leadMemory, contextPacket] = await Promise.all([
-    buildLeadMemoryInfluenceContext(admin, input.leadId).catch(() => null),
-    buildOutreachContextPacket(admin, lead).catch(() => null),
-  ])
-
-  const relationshipContext = contextPacket
-    ? buildRelationshipAssessmentContextFromPacket({
-        priorTouchCount: contextPacket.priorTouchCount,
-        priorReplySummaries: contextPacket.priorReplySummaries,
-        priorOutboundSubjects: contextPacket.priorOutboundSubjects,
-        objectionSummaries: contextPacket.objectionSummaries,
-        sequenceHistorySummaries: contextPacket.sequenceHistorySummaries,
-        memoryOpenLoopSummaries: contextPacket.memoryOpenLoopSummaries,
-        buyingIntent: contextPacket.buyingIntent,
-        competitorPressure: contextPacket.competitorPressure,
-      })
-    : {
-        priorTouchCount: 0,
-        priorReplyCount: 0,
-        priorOutboundSubjects: [],
-        objectionSummaries: [],
-        priorReplySummaries: [],
-        sequenceHistorySummaries: [],
-        memoryOpenLoopSummaries: [],
-        buyingIntent: null,
-        competitorPressure: null,
-      }
-
   const previousRevenue = input.previousPackage?.salesStrategyBrief?.revenueStrategyIntelligence
-
-  const adaptiveEvents =
-    input.adaptiveEvents ??
-    (await loadPendingAdaptiveEventsForLead(admin, input.leadId).catch(() => []))
 
   const leadSignals = {
     relationshipStrengthScore: lead.relationshipStrengthScore,
@@ -252,9 +202,7 @@ export async function buildAutonomousOutreachApprovalPackage(
         preparedAt: input.generatedAt,
         previousRecommendation: previousRevenue?.recommendation ?? null,
         previousConfidence: previousRevenue?.confidenceScore ?? null,
-        institutionalAdvice: loadInstitutionalAdviceSnippets({
-          industry: sellerTruth.industries[0] ?? null,
-        }),
+        institutionalAdvice,
         committeeMemberCount: buyingCommitteeSnapshot?.verifiedMemberCount,
         singleThreadRisk: buyingCommitteeSnapshot?.singleThreadRisk,
       },
@@ -277,9 +225,7 @@ export async function buildAutonomousOutreachApprovalPackage(
       refreshReasons: input.refreshReasons ?? (input.wakeCondition ? [input.wakeCondition] : []),
       previousRecommendation: previousRevenue?.recommendation ?? null,
       previousConfidence: previousRevenue?.confidenceScore ?? null,
-      institutionalAdvice: loadInstitutionalAdviceSnippets({
-        industry: sellerTruth.industries[0] ?? null,
-      }),
+      institutionalAdvice,
     })
   }
 
@@ -328,11 +274,14 @@ export async function buildAutonomousOutreachApprovalPackage(
     relationshipAssessment,
     leadMemory: effectiveMemory,
     adaptiveEvents,
+    institutionalLearning,
+    canonicalDisplayIdentity,
   })
 
   if (adaptiveEvents.length && salesStrategyBrief.relationshipAssessment) {
     salesStrategyBrief = {
       ...salesStrategyBrief,
+      canonicalDisplayIdentity,
       adaptiveLoopEvolution: {
         qaMarker: GROWTH_AIOS_ADAPTIVE_LOOP_1A_QA_MARKER,
         eventCount: adaptiveEvents.length,
@@ -345,7 +294,9 @@ export async function buildAutonomousOutreachApprovalPackage(
           events: adaptiveEvents,
         }),
         relationshipAssessment: salesStrategyBrief.relationshipAssessment,
-        learningAdvisoryApplied: Boolean(learningWeights?.length),
+        learningAdvisoryApplied:
+          Boolean(learningWeights?.length) ||
+          Boolean(institutionalLearning?.applicablePatterns.length),
       },
     }
     await markAdaptiveEventsProcessedForLead(admin, input.leadId, input.generatedAt).catch(
@@ -375,9 +326,11 @@ export async function buildAutonomousOutreachApprovalPackage(
   return {
     packageId,
     leadId: input.leadId,
-    companyName: lead.companyName ?? input.companyName,
+    companyName,
     preparedAt: input.generatedAt,
     generatedAssets,
+    canonicalDisplayIdentity,
+    canonicalHumanMemory: memoryBundle,
     salesStrategyBrief,
     draftQuality: {
       emailWordCount: drafts.email.wordCount,

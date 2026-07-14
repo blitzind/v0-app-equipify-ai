@@ -18,8 +18,9 @@ import {
   resolveProspectSearchQualificationFields,
 } from "@/lib/growth/prospect-search/prospect-search-qualification-overlays"
 import { fetchLatestCompletedProspectResearchRun } from "@/lib/growth/research/research-repository"
-import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
-import { readGrowthVideoMeetingPrepFromLeadMetadata } from "@/lib/growth/sequences/growth-sequence-video-intelligence-mappings"
+import { resolveCanonicalHumanMemoryForLead } from "@/lib/growth/lead-memory/resolve-canonical-human-memory-for-lead"
+import { resolveGrowthCanonicalDecisionForLead } from "@/lib/growth/aios/growth/resolve-growth-canonical-decision-for-lead"
+import { projectGrowthCanonicalOperatorDecision } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-operator-projection"
 
 function metaRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {}
@@ -79,7 +80,7 @@ export async function gatherMeetingPrepBundleForMeeting(
 
   const metadata = metaRecord(lead.metadata)
 
-  const [decisionMakers, research, contactIntelMap, memory] = await Promise.all([
+  const [decisionMakers, research, contactIntelMap, memoryBundle] = await Promise.all([
     listGrowthLeadDecisionMakers(admin, lead.id),
     fetchLatestCompletedProspectResearchRun(admin, lead.id),
     loadProspectSearchContactIntelligenceBatch(admin, [
@@ -90,13 +91,29 @@ export async function gatherMeetingPrepBundleForMeeting(
         company_name: lead.companyName,
       },
     ]),
-    buildLeadMemoryInfluenceContext(admin, lead.id),
+    lead.organizationId
+      ? resolveCanonicalHumanMemoryForLead(admin, {
+          organizationId: lead.organizationId,
+          leadId: lead.id,
+          companyName: lead.companyName,
+        }).catch(() => null)
+      : Promise.resolve(null),
   ])
+
+  const memory = memoryBundle?.influence ?? null
 
   const contactIntelligence = contactIntelMap.get(`growth_lead:${lead.id}`) ?? null
   const accountPlaybookContext = await loadMeetingPrepAccountPlaybookContext(admin, meeting)
 
-  return assembleMeetingPrepBundle({
+  const canonicalDecision =
+    lead.organizationId != null
+      ? await resolveGrowthCanonicalDecisionForLead(admin, {
+          organizationId: lead.organizationId,
+          leadId: lead.id,
+        }).catch(() => null)
+      : null
+
+  const bundle = assembleMeetingPrepBundle({
     meeting,
     lead,
     leadScore: resolveLeadScore(lead.score, metadata),
@@ -106,7 +123,7 @@ export async function gatherMeetingPrepBundleForMeeting(
     research,
     accountPlaybookContext,
     videoEngagementContext: readGrowthVideoMeetingPrepFromLeadMetadata(metadata),
-    relationshipMemory: memory.available
+    relationshipMemory: memory?.available
       ? {
           summary: memory.relationshipSummary,
           topObjections: memory.topObjections,
@@ -117,4 +134,19 @@ export async function gatherMeetingPrepBundleForMeeting(
         }
       : undefined,
   })
+
+  if (!bundle) return null
+
+  const canonicalProjection = canonicalDecision
+    ? projectGrowthCanonicalOperatorDecision({
+        decision: canonicalDecision.decision,
+        freshness: canonicalDecision.freshness,
+      })
+    : null
+
+  return {
+    ...bundle,
+    canonicalDecision,
+    canonicalRecommendedNextAction: canonicalProjection?.whatToDo ?? bundle.researchSummary.recommendedNextAction,
+  }
 }

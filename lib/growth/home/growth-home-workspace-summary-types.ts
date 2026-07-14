@@ -14,6 +14,7 @@ import type { GrowthAvaResearchLoopSummary } from "@/lib/growth/ava-home/growth-
 import type { RelationshipLeadSnapshotMap } from "@/lib/growth/relationship/relationship-lead-snapshot-types"
 import type { GrowthHomeLeadPoolSummary } from "@/lib/growth/home/growth-home-lead-pool-pagination"
 import type { GrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-snapshot"
+import type { GrowthCanonicalDecisionResolution } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-types"
 
 export const GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER = "ge-simplify-1b-home-workspace-summary-v1" as const
 
@@ -126,4 +127,6 @@ export type GrowthHomeWorkspaceSummaryPayload = {
   leadPool: GrowthHomeLeadPoolSummary
   /** GE-AIOS-18G — Active mission discovery runtime for Home narrative + decisions */
   missionDiscovery: GrowthHomeMissionDiscoverySnapshot | null
+  /** GE-AIOS-DECISION-ENGINE-1B — canonical hero decision for top-priority lead */
+  canonicalHeroDecision: GrowthCanonicalDecisionResolution | null
 }

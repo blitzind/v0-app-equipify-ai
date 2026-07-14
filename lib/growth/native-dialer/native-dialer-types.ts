@@ -173,6 +173,9 @@ export type NativeDialerLeadContext = {
   contactName: string | null
   contactPhone: string | null
   researchSummary: string | null
+  /** Approved canonical call guide from Growth 5F package when available. */
+  canonicalCallGuide?: string | null
+  canonicalCallGuideSource?: string | null
   dealCloseProbability: number | null
   executionReadinessScore: number | null
   meetingOutcomeScore: number | null

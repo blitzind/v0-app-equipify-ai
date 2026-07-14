@@ -20,6 +20,7 @@ import { projectSmsPersonalizationContext } from "@/lib/growth/sms/personalizati
 import { estimateSmsSegments } from "@/lib/growth/sms/personalization/sms-quality-scoring"
 import { SMS_PERSONALIZATION_DEFAULT_MAX_CHARS } from "@/lib/growth/sms/personalization/sms-personalization-types"
 import type { GrowthSmsInboxDraftSuggestion } from "@/lib/growth/sms/personalization/sms-personalization-types"
+import { GROWTH_AIOS_CHANNELS_1A_QA_MARKER } from "@/lib/growth/aios/growth/growth-channels-1a-types"
 import {
   GROWTH_SMS_INBOUND_RESPONSE_SUGGESTIONS_QA_MARKER,
   type GrowthInboundSmsResponseSuggestions,
@@ -238,10 +239,29 @@ function buildCallPromptSuggestion(input: {
   }
 }
 
+function buildCanonicalReplySmsAudit(): ReturnType<typeof buildPersonalizedSmsDraft>["audit"] {
+  return {
+    openingHook: { strategy: "reply_copilot", evidenceSource: "canonical_package" },
+    cta: { category: "reply_continuation", selectionReason: "constitution_bounded_reply_seed" },
+    qualityScore: {
+      overall: 90,
+      specificity: 85,
+      memoryAlignment: 85,
+      contextAlignment: 85,
+    },
+    contextQuality: "high",
+    memoryQuality: "high",
+    confidenceLabel: "canonical_reply",
+    messageType: "reply_sms",
+  }
+}
+
 function wrapSmsDraftSuggestion(input: {
   body: string
   draftType: "reply"
   audit: ReturnType<typeof buildPersonalizedSmsDraft>["audit"]
+  contextUsedOverride?: string[]
+  memoryUsedOverride?: string[]
 }): GrowthSmsInboxDraftSuggestion {
   const body = sanitizeSmsSuggestionBody(input.body)
   return {
@@ -260,8 +280,8 @@ function wrapSmsDraftSuggestion(input: {
       memoryQuality: input.audit.memoryQuality,
       confidenceLabel: input.audit.confidenceLabel,
     },
-    contextUsed: summarizeSmsContextUsed(input.audit),
-    memoryUsed: summarizeSmsMemoryUsed(input.audit),
+    contextUsed: input.contextUsedOverride ?? summarizeSmsContextUsed(input.audit),
+    memoryUsed: input.memoryUsedOverride ?? summarizeSmsMemoryUsed(input.audit),
   }
 }
 
@@ -277,6 +297,8 @@ export function buildInboundSmsResponseSuggestions(input: {
   nextBestAction?: GrowthNextBestAction | null
   nextBestActionReason?: string | null
   relationshipMemory?: ReplyCopilotRelationshipMemory
+  constitutionBoundedReplySeed?: string
+  canonicalPackagePresent?: boolean
 }): GrowthInboundSmsResponseSuggestions {
   const inboundBody = input.inboundBody.trim()
   const classified = classifyReplyIntentV2(inboundBody)
@@ -294,24 +316,42 @@ export function buildInboundSmsResponseSuggestions(input: {
     packet: input.packet,
     priorSmsPreviews: input.priorSmsPreviews,
   })
-  const { audit } = buildPersonalizedSmsDraft({
-    leadId: input.leadId,
-    context,
+  const usingCanonicalReply = Boolean(input.constitutionBoundedReplySeed?.trim())
+  const { audit } = usingCanonicalReply
+    ? { audit: buildCanonicalReplySmsAudit() }
+    : buildPersonalizedSmsDraft({
+        leadId: input.leadId,
+        context,
+        draftType: "reply",
+        maxChars: SMS_PERSONALIZATION_DEFAULT_MAX_CHARS,
+      })
+
+  const smsBody = input.constitutionBoundedReplySeed?.trim()
+    ? sanitizeSmsSuggestionBody(
+        normalizeCustomerFacingCopy(input.constitutionBoundedReplySeed),
+      )
+    : buildIntentAwareSmsBody({
+        inboundBody,
+        intent: classified.intent,
+        contactFirstName,
+        companyName: input.companyName,
+        customerBenefitPhrase,
+        relationshipMemory: input.relationshipMemory,
+        priorSmsPreviews: input.priorSmsPreviews,
+      })
+
+  const smsReply = wrapSmsDraftSuggestion({
+    body: smsBody,
     draftType: "reply",
-    maxChars: SMS_PERSONALIZATION_DEFAULT_MAX_CHARS,
+    audit,
+    contextUsedOverride: usingCanonicalReply
+      ? ["reply_copilot_constitution", ...(input.canonicalPackagePresent ? ["canonical_outreach_package"] : [])]
+      : undefined,
+    memoryUsedOverride: usingCanonicalReply ? ["relationship_memory"] : undefined,
   })
-
-  const smsBody = buildIntentAwareSmsBody({
-    inboundBody,
-    intent: classified.intent,
-    contactFirstName,
-    companyName: input.companyName,
-    customerBenefitPhrase,
-    relationshipMemory: input.relationshipMemory,
-    priorSmsPreviews: input.priorSmsPreviews,
-  })
-
-  const smsReply = wrapSmsDraftSuggestion({ body: smsBody, draftType: "reply", audit })
+  if (usingCanonicalReply) {
+    smsReply.qa_marker = GROWTH_AIOS_CHANNELS_1A_QA_MARKER
+  }
   const safetyWarnings = auditSmsSuggestionSafety({ body: smsReply.suggestedBody, intent: classified.intent })
 
   const emailFollowUp = buildEmailFollowUpSuggestion({
@@ -340,6 +380,8 @@ export function buildInboundSmsResponseSuggestions(input: {
   ]
   if (researchSnippets.length > 0) contextUsed.push("verified_research")
   if (input.nextBestAction) contextUsed.push(`next_best_action:${input.nextBestAction}`)
+  if (input.canonicalPackagePresent) contextUsed.push("canonical_outreach_package")
+  if (input.constitutionBoundedReplySeed) contextUsed.push("reply_copilot_constitution")
 
   const memoryUsed = [...smsReply.memoryUsed]
   if (input.relationshipMemory?.relationshipSummary) memoryUsed.push("relationship_summary")

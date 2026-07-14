@@ -169,6 +169,23 @@ export async function reviewVoiceMemoryDraft(
   })
 
   await recomputeProfileRollup(admin, input.organizationId, profile.id)
+
+  const resolvedLeadId = input.leadId ?? (profile.metadataJson as { leadId?: string } | null)?.leadId ?? null
+  if (resolvedLeadId) {
+    const { bridgeApprovedVoiceMemoryToLeadMemory } = await import(
+      "@/lib/growth/lead-memory/voice-memory-lead-bridge"
+    )
+    await bridgeApprovedVoiceMemoryToLeadMemory(admin, {
+      organizationId: input.organizationId,
+      leadId: resolvedLeadId,
+      draftLabel: draft.draftLabel,
+      evidenceText: draft.evidenceText,
+      memoryType,
+      confidenceScore: draft.confidenceScore,
+      voiceMemoryEventId: memoryEvent.id,
+    }).catch(() => null)
+  }
+
   return { draftStatus: "accepted", memoryEventId: memoryEvent.id, profileId: profile.id }
 }
 

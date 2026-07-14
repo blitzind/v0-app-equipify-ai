@@ -11,6 +11,7 @@ import type { GrowthAutonomousOutreachApprovalPackage } from "@/lib/growth/aios/
 import {
   finalizeProductionCustomerFacingCopy,
   GROWTH_AIOS_SEND_PLANE_1A_QA_MARKER,
+  reviewOperatorExecutionGuideConstitution,
   reviewProductionHumanCommunicationConstitution,
 } from "@/lib/growth/aios/growth/growth-send-plane-1a-constitution"
 import {
@@ -43,13 +44,27 @@ export function resolveCanonicalTransportChannelFromGenerationType(
 ): CanonicalOutreachTransportChannel | null {
   const type = (generationType ?? "").toLowerCase()
   if (type === "sms" || type.includes("sms")) return "sms"
-  if (type === "voice_drop" || type.includes("voicemail") || type.includes("voice")) return "voicemail"
+  if (type === "voice_drop" || type.includes("voicemail") || type.includes("voice_drop")) return "voicemail"
   if (type.includes("linkedin")) return "linkedin"
   if (type.includes("meeting")) return "meeting_request"
+  if (
+    type === "call_opening" ||
+    type === "call_objection_response" ||
+    type === "call_summary" ||
+    type === "call_risk_brief" ||
+    type.includes("call_")
+  ) {
+    return "call"
+  }
+  if (type.includes("sendr") || type.includes("personalized_video") || type.includes("personalized video")) {
+    return "sendr"
+  }
+  if (type === "follow_up" || type.includes("follow_up")) return "follow_up"
   if (
     type === "cold_email" ||
     type === "follow_up_email" ||
     type === "reply_email" ||
+    type === "response_draft" ||
     type === "reengagement_email" ||
     type === "executive_email" ||
     type === "breakup_email" ||
@@ -72,17 +87,35 @@ export function materializeCanonicalOutreachDrafts(input: {
   })
 }
 
-function extractEmailBodyForTransport(drafts: GrowthOutreachStrategyDerivedDrafts): {
+function resolveMaterializationCanonicalIdentity(input: {
+  brief: GrowthOutreachSalesStrategyBrief
+  package?: GrowthAutonomousOutreachApprovalPackage | null
+}) {
+  return (
+    input.brief.canonicalDisplayIdentity ??
+    input.package?.canonicalDisplayIdentity ??
+    input.package?.salesStrategyBrief?.canonicalDisplayIdentity ??
+    null
+  )
+}
+
+function extractEmailBodyForTransport(
+  drafts: GrowthOutreachStrategyDerivedDrafts,
+  canonicalIdentity: ReturnType<typeof resolveMaterializationCanonicalIdentity>,
+): {
   subject: string
   body: string
 } {
-  const subject = finalizeProductionCustomerFacingCopy(drafts.email.subject)
-  const body = finalizeProductionCustomerFacingCopy(drafts.email.body)
+  const subject = finalizeProductionCustomerFacingCopy(drafts.email.subject, canonicalIdentity)
+  const body = finalizeProductionCustomerFacingCopy(drafts.email.body, canonicalIdentity)
   return { subject, body }
 }
 
-function extractFollowUpBodyForTransport(drafts: GrowthOutreachStrategyDerivedDrafts): string {
-  return finalizeProductionCustomerFacingCopy(drafts.followUpSequence)
+function extractFollowUpBodyForTransport(
+  drafts: GrowthOutreachStrategyDerivedDrafts,
+  canonicalIdentity: ReturnType<typeof resolveMaterializationCanonicalIdentity>,
+): string {
+  return finalizeProductionCustomerFacingCopy(drafts.followUpSequence, canonicalIdentity)
 }
 
 export function materializeCanonicalOutreachChannelContent(input: {
@@ -93,7 +126,13 @@ export function materializeCanonicalOutreachChannelContent(input: {
   operatorAssetOverride?: string | null
 }): CanonicalOutreachMaterializedContent {
   const companyName = input.brief.companyName
-  const packageAsset = resolveTransportAssetFromPackage(input.package, input.channel, companyName)
+  const canonicalIdentity = resolveMaterializationCanonicalIdentity(input)
+  const packageAsset = resolveTransportAssetFromPackage(
+    input.package,
+    input.channel,
+    companyName,
+    canonicalIdentity,
+  )
 
   if (packageAsset) {
     const isApproved = packageAsset.source === "approved_operator"
@@ -102,18 +141,24 @@ export function materializeCanonicalOutreachChannelContent(input: {
 
     const body = isApproved
       ? prepareOperatorApprovedTransportBody(rawBody)
-      : finalizeProductionCustomerFacingCopy(rawBody)
+      : finalizeProductionCustomerFacingCopy(rawBody, canonicalIdentity)
     const subject = rawSubject
       ? isApproved
         ? prepareOperatorApprovedTransportBody(rawSubject)
-        : finalizeProductionCustomerFacingCopy(rawSubject)
+        : finalizeProductionCustomerFacingCopy(rawSubject, canonicalIdentity)
       : null
 
     const constitutionFailures = isApproved
       ? []
       : [
-          ...reviewProductionHumanCommunicationConstitution(body, companyName),
-          ...(subject ? reviewProductionHumanCommunicationConstitution(subject, companyName) : []),
+          ...(input.channel === "call"
+            ? reviewOperatorExecutionGuideConstitution(body, canonicalIdentity)
+            : reviewProductionHumanCommunicationConstitution(body, companyName, canonicalIdentity)),
+          ...(subject
+            ? input.channel === "call"
+              ? reviewOperatorExecutionGuideConstitution(subject, canonicalIdentity)
+              : reviewProductionHumanCommunicationConstitution(subject, companyName, canonicalIdentity)
+            : []),
         ]
 
     return {
@@ -138,7 +183,7 @@ export function materializeCanonicalOutreachChannelContent(input: {
 
   switch (input.channel) {
     case "email": {
-      const email = extractEmailBodyForTransport(drafts)
+      const email = extractEmailBodyForTransport(drafts, canonicalIdentity)
       subject = email.subject
       rawBody = email.body
       break
@@ -159,7 +204,7 @@ export function materializeCanonicalOutreachChannelContent(input: {
       rawBody = drafts.personalizedVideo
       break
     case "follow_up":
-      rawBody = extractFollowUpBodyForTransport(drafts)
+      rawBody = extractFollowUpBodyForTransport(drafts, canonicalIdentity)
       break
     case "meeting_request":
       rawBody = drafts.meetingRequest
@@ -170,14 +215,20 @@ export function materializeCanonicalOutreachChannelContent(input: {
     rawBody = input.operatorAssetOverride.trim()
   }
 
-  const body = finalizeProductionCustomerFacingCopy(rawBody)
+  const body = finalizeProductionCustomerFacingCopy(rawBody, canonicalIdentity)
   if (subject) {
-    subject = finalizeProductionCustomerFacingCopy(subject)
+    subject = finalizeProductionCustomerFacingCopy(subject, canonicalIdentity)
   }
 
   const constitutionFailures = [
-    ...reviewProductionHumanCommunicationConstitution(body, companyName),
-    ...(subject ? reviewProductionHumanCommunicationConstitution(subject, companyName) : []),
+    ...(input.channel === "call"
+      ? reviewOperatorExecutionGuideConstitution(body, canonicalIdentity)
+      : reviewProductionHumanCommunicationConstitution(body, companyName, canonicalIdentity)),
+    ...(subject
+      ? input.channel === "call"
+        ? reviewOperatorExecutionGuideConstitution(subject, canonicalIdentity)
+        : reviewProductionHumanCommunicationConstitution(subject, companyName, canonicalIdentity)
+      : []),
   ]
 
   return {

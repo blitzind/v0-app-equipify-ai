@@ -71,7 +71,7 @@ const copilotRouteSource = fs.readFileSync(
   path.join(process.cwd(), "app/api/platform/growth/replies/copilot/route.ts"),
   "utf8",
 )
-assert.match(copilotRouteSource, /buildLeadMemoryInfluenceContext/)
+assert.match(copilotRouteSource, /resolveCanonicalHumanMemoryForLead/)
 assert.match(copilotRouteSource, /mapMemoryInfluenceToReplyCopilotRelationship/)
 
 const replyPromptSource = fs.readFileSync(

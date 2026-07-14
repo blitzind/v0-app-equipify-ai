@@ -10,6 +10,7 @@ import {
 } from "@/lib/growth/compliance/compliance-events"
 import { recordExperimentMetricFromDeliveryAttempt } from "@/lib/growth/experiments/experiment-metrics"
 import { shadowLogComplianceUnsubscribe } from "@/lib/growth/contact-verification/email-learning-shadow"
+import { invalidateCanonicalDecisionCacheForLead } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
 
 function suppressionsTable(admin: SupabaseClient) {
   return admin.schema("growth").from("delivery_suppressions")
@@ -86,6 +87,10 @@ export async function registerUnsubscribe(
     source: input.source ?? "manual",
     occurredAt,
   })
+
+  if (input.leadId) {
+    invalidateCanonicalDecisionCacheForLead(input.leadId, "unsubscribe")
+  }
 
   if (input.deliveryAttemptId) {
     await recordExperimentMetricFromDeliveryAttempt(admin, {

@@ -131,6 +131,10 @@ export type GrowthOutreachRelationshipProtection = {
 export type GrowthOutreachInstitutionalAdviceSnippet = {
   pattern: string
   source: string
+  confidence?: number
+  sampleSize?: number
+  freshnessDays?: number
+  applicability?: string
 }
 
 export type GrowthOutreachRelationshipAssessment = {

@@ -14,6 +14,7 @@ import type {
   GrowthAutonomousOutreachPreparationPilotControlState,
   GrowthAutonomousOutreachPreparationRunRecord,
 } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
+import { invalidateCanonicalDecisionCacheForLead } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
 
 type PilotStateRow = {
   organization_id: string
@@ -326,6 +327,13 @@ export async function markOutreachPreparationPackageApprovalDecision(
 
   if (error) {
     throw new Error(error.message)
+  }
+
+  if (existing.approvalPackage.leadId) {
+    invalidateCanonicalDecisionCacheForLead(
+      existing.approvalPackage.leadId,
+      `package_${input.decision}`,
+    )
   }
 
   return updatedRun

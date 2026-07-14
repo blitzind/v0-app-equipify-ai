@@ -35,6 +35,8 @@ import {
   rankUnifiedAssistEvents,
   scoreUnifiedAssistEvent,
 } from "@/lib/growth/operator-assist/unified-priority"
+import { mapAiosLiveReasoningToAssistEvents } from "@/lib/growth/operator-assist/aios-live-assist-mapper"
+import type { CallWorkspaceAiosLiveReasoningSnapshot } from "@/lib/growth/operator-assist/call-workspace-aios-live-reasoning-types"
 
 function voiceCategoryFromEvent(event: VoiceIntelligenceEventPublicView): UnifiedOperatorAssistCategory {
   if (event.eventType.includes("objection") || event.eventType.includes("competitor")) return "objection"
@@ -155,6 +157,7 @@ export function buildUnifiedOperatorAssistSnapshot(input: {
   participants?: VoiceConferenceParticipantPublicView[]
   preferences?: OperatorAssistPreferencesPublicView
   generatedAt?: string
+  aiosLiveReasoning?: CallWorkspaceAiosLiveReasoningSnapshot | null
 }): UnifiedOperatorAssistSnapshot {
   const generatedAt = input.generatedAt ?? new Date().toISOString()
   const preferences = input.preferences ?? DEFAULT_OPERATOR_ASSIST_PREFERENCES
@@ -163,17 +166,23 @@ export function buildUnifiedOperatorAssistSnapshot(input: {
     growthEventCount: input.growthTranscriptEvents?.length ?? 0,
   })
 
-  const voiceEvents = input.conversationIntelligence
-    ? [
-        ...input.conversationIntelligence.objections,
-        ...input.conversationIntelligence.buyingSignals,
-        ...input.conversationIntelligence.riskEvents,
-        ...input.conversationIntelligence.operatorGuidance,
-        ...input.conversationIntelligence.liveSignals,
-      ].map((event) => mapVoiceEvent(event, input.voiceCallId ?? input.conversationIntelligence!.voiceCallId))
-    : []
+  const voiceEvents = input.aiosLiveReasoning
+    ? []
+    : input.conversationIntelligence
+      ? [
+          ...input.conversationIntelligence.objections,
+          ...input.conversationIntelligence.buyingSignals,
+          ...input.conversationIntelligence.riskEvents,
+          ...input.conversationIntelligence.operatorGuidance,
+          ...input.conversationIntelligence.liveSignals,
+        ].map((event) => mapVoiceEvent(event, input.voiceCallId ?? input.conversationIntelligence!.voiceCallId))
+      : []
 
-  const growthEvents = (input.coachingState?.activeGuidance ?? []).map(mapGrowthGuidanceEvent)
+  const growthEvents = input.aiosLiveReasoning
+    ? []
+    : (input.coachingState?.activeGuidance ?? []).map(mapGrowthGuidanceEvent)
+
+  const aiosEvents = mapAiosLiveReasoningToAssistEvents(input.aiosLiveReasoning ?? null)
 
   const interruptionSummary = detectConversationalInterruptions({
     voiceTranscript: canonicalTranscriptSource === "voice_segments" ? input.voiceTranscript : null,
@@ -216,7 +225,7 @@ export function buildUnifiedOperatorAssistSnapshot(input: {
   })
 
   const merged = preferGrowthGuidanceOnConflict(
-    dedupeUnifiedAssistEvents([...growthEvents, ...voiceEvents, ...interruptionAssistEvents]),
+    dedupeUnifiedAssistEvents([...aiosEvents, ...growthEvents, ...voiceEvents, ...interruptionAssistEvents]),
   )
 
   const activeFeed = merged.filter((event) => {
@@ -246,6 +255,7 @@ export function buildUnifiedOperatorAssistSnapshot(input: {
     realtimeSessionId: input.realtimeSessionId,
     voiceCallId: input.voiceCallId,
     conversationIntelligence: input.conversationIntelligence,
+    aiosLiveReasoning: input.aiosLiveReasoning ?? null,
     feed: ranked,
     topPriority,
     additional,
@@ -255,6 +265,7 @@ export function buildUnifiedOperatorAssistSnapshot(input: {
       conversationIntelligence: input.conversationIntelligence,
       leadContext: input.leadContext,
       rankedAssistEvents: ranked,
+      aiosLiveReasoning: input.aiosLiveReasoning ?? null,
     }),
     interruptionSummary,
     supervisorVisibility: {

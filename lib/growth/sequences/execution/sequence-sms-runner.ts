@@ -18,6 +18,8 @@ import {
   isApolloSmsPlaceholderBody,
 } from "@/lib/growth/apollo/apollo-sequence-placeholder-guard"
 import type { GrowthSequenceExecutionJob } from "@/lib/growth/sequences/execution/sequence-execution-types"
+import { enforceCanonicalDecisionForSequenceChannelJob } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-sequence-enforcement"
+import type { CanonicalSequenceEnforcementTrustedGate } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-types"
 
 export async function runSequenceSmsExecutionJob(
   admin: SupabaseClient,
@@ -26,11 +28,22 @@ export async function runSequenceSmsExecutionJob(
     actingUserId: string
     actingUserEmail: string
     auditActorUserId: string
+    trustedGate?: CanonicalSequenceEnforcementTrustedGate | null
   },
 ): Promise<GrowthSequenceExecutionRunResult> {
   const { job } = input
   if (!job.sequenceStepId) {
     return { ok: false, jobId: job.id, status: "blocked", message: "missing_step", blocked: true }
+  }
+
+  const canonicalGate = await enforceCanonicalDecisionForSequenceChannelJob(admin, {
+    job,
+    channelLabel: "sms",
+    cacheScope: `sequence-sms:${job.id}`,
+    trustedGate: input.trustedGate,
+  })
+  if (!canonicalGate.allowed) {
+    return canonicalGate.result
   }
 
   const useStoredDraft =

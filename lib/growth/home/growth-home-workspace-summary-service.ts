@@ -61,6 +61,7 @@ import { GROWTH_HOME_WORKSPACE_SUMMARY_QA_MARKER } from "@/lib/growth/home/growt
 import { fetchLatestAvaResearchLoopSummary } from "@/lib/growth/ava-home/growth-ava-research-orchestrator-service"
 import { enrichRelationshipLeadSnapshotsBatch } from "@/lib/growth/relationship/enrich-relationship-lead-snapshots-batch"
 import { loadGrowthHomeMissionDiscoverySnapshot } from "@/lib/growth/mission-center/growth-home-mission-discovery-loader"
+import { resolveGrowthCanonicalDecisionForLead } from "@/lib/growth/aios/growth/resolve-growth-canonical-decision-for-lead"
 
 import { GROWTH_HOME_LEAD_POOL_BATCH_LIMIT } from "@/lib/growth/relationship/relationship-scale-limits"
 
@@ -564,6 +565,29 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
   const durationMs = Date.now() - startedAt
   logGrowthHomePipelineTimings({ totalMs: durationMs, timings: stageTimings })
 
+  const heroLeadId =
+    dailyWorkQueueBundle.display?.top_items?.[0]?.lead_id ??
+    leads.find((row) => row.id)?.id ??
+    null
+
+  const canonicalHeroDecision =
+    organizationId && heroLeadId
+      ? await withGrowthHomeLoaderBudget({
+          label: "canonical_hero_decision",
+          budgetMs: loaderBudgetMs,
+          fn: () =>
+            resolveGrowthCanonicalDecisionForLead(input.admin, {
+              organizationId,
+              leadId: heroLeadId,
+              generatedAt,
+            }),
+          fallback: null,
+        }).then((step) => {
+          stageTimings.push(step.timing)
+          return step.value
+        })
+      : null
+
   const optimization: GrowthHomeWorkspaceSummaryOptimization = {
     listGrowthLeadsCalls: 1,
     duplicateLeadListEliminated: 1,
@@ -594,6 +618,7 @@ export async function buildGrowthHomeWorkspaceSummary(input: {
     relationshipSnapshots,
     leadPool,
     missionDiscovery,
+    canonicalHeroDecision,
   }
 }
 

@@ -7,6 +7,8 @@ import "server-only"
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { generateAndPersistAutonomousOutreachApprovalPackageForDraftFactory } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-package-persistence"
+import { resolveGrowthCanonicalDecisionForLeadCached } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
+import { evaluateDraftFactoryDecisionGate } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-enforcement"
 import { logGrowthEngine } from "@/lib/growth/access"
 import { recordRuntimeGuardrailAudit } from "@/lib/growth/runtime-guardrails/growth-runtime-audit-repository"
 import {
@@ -202,16 +204,36 @@ export async function advanceDraftFactoryForLeadLive(
     portfolioSelected: input.portfolioSelected,
   })
 
-  const allowGeneration = input.allowGeneration !== false
+  let allowGeneration = input.allowGeneration !== false
   let completionHints = { ...(input.completionHints ?? {}) }
 
-  // GE-AIOS-CONTACT-1B — waiting_for_dm actively submits live DataMoon discovery (durable path).
   const wakeType =
     typeof input.wake === "string"
       ? input.wake
       : typeof input.wake === "object" && input.wake && "type" in input.wake
         ? String((input.wake as { type: string }).type)
         : "scheduled_resume"
+
+  const canonicalDecision = await resolveGrowthCanonicalDecisionForLeadCached(admin, {
+    organizationId: input.organizationId,
+    leadId: input.leadId,
+    generatedAt: now,
+    cacheScope: "draft-factory:advance",
+  }).catch(() => null)
+  const draftFactoryGate = evaluateDraftFactoryDecisionGate(canonicalDecision, {
+    wakeCondition: wakeType,
+  })
+  if (!draftFactoryGate.allowGeneration) {
+    completionHints = {
+      ...completionHints,
+      decisionEnforcementBlocked: true,
+      canonicalDecisionEnforcementOutcome: draftFactoryGate.outcome,
+      canonicalEnforcementFingerprint: draftFactoryGate.enforcementFingerprint,
+      decisionNextEligibleWakeAt: draftFactoryGate.nextEligibleWakeAt,
+      generationCapacityAvailable: false,
+    }
+    allowGeneration = false
+  }
 
   const shouldDiscoverDecisionMaker =
     !evidence.decisionMakerAvailable ||

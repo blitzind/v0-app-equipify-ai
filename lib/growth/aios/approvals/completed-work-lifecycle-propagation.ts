@@ -16,6 +16,7 @@ import {
   markAutonomousOutreachPackageApprovalDecision,
 } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-store"
 import { createPostgresDraftFactoryRepository } from "@/lib/growth/draft-factory/draft-factory-durable-repository-core"
+import { invalidateCanonicalDecisionCacheForLead } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
 import type { AiOsDraftFactoryDurableLeadState } from "@/lib/growth/draft-factory/draft-factory-durable-types"
 
 export type StopAutonomousWorkReason =
@@ -170,6 +171,8 @@ export async function stopAutonomousWorkForLead(
     packages_rejected: packagesRejected,
     package_ids: [...packageIds],
   })
+
+  invalidateCanonicalDecisionCacheForLead(input.leadId, `autonomy_stopped:${input.reason}`)
 
   return {
     qaMarker: GROWTH_AIOS_OPERATOR_UX_1A_QA_MARKER,

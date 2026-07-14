@@ -7,7 +7,7 @@ import { recordCampaignReplyLearning } from "@/lib/growth/reply-intelligence/cam
 import { processRevenueIntelligence } from "@/lib/growth/revenue-intelligence/process-revenue-intelligence"
 import { applyReplyComplianceHardening } from "@/lib/growth/reply-intelligence/reply-compliance-hardening"
 import { buildReplyCopilotAssist, mapMemoryInfluenceToReplyCopilotRelationship } from "@/lib/growth/reply-intelligence/reply-copilot-service"
-import { buildLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-influence-context"
+import { resolveCanonicalHumanMemoryForLead } from "@/lib/growth/lead-memory/resolve-canonical-human-memory-for-lead"
 import { classifyReplyIntentV2 } from "@/lib/growth/reply-intelligence/reply-intent-classifier-v2"
 import { insertConversationTimelineEvent } from "@/lib/growth/reply-intelligence/reply-ingestion-repository"
 import { detectReplyObjections } from "@/lib/growth/reply-intelligence/objection-detection"
@@ -41,6 +41,8 @@ import {
 } from "@/lib/growth/outbound/reply-repository"
 import type { GrowthOutboundReply } from "@/lib/growth/outbound/types"
 import { appendGrowthLeadTimelineEvent } from "@/lib/growth/timeline-repository"
+import { invalidateCanonicalDecisionCacheForLead } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
+import { resolveGrowthCanonicalDecisionForLead } from "@/lib/growth/aios/growth/resolve-growth-canonical-decision-for-lead"
 
 function trimPhone(value: string | null | undefined): boolean {
   return Boolean(value?.trim())
@@ -168,7 +170,14 @@ export async function processReplyIntelligence(
     }).catch(() => undefined)
   }
 
-  const copilotMemory = await buildLeadMemoryInfluenceContext(admin, input.lead.id).catch(() => null)
+  const memoryBundle = input.lead.organizationId
+    ? await resolveCanonicalHumanMemoryForLead(admin, {
+        organizationId: input.lead.organizationId,
+        leadId: input.lead.id,
+        companyName: input.lead.companyName,
+      }).catch(() => null)
+    : null
+  const copilotMemory = memoryBundle?.influence ?? null
 
   const copilot = buildReplyCopilotAssist({
     bodyPreview: input.bodyPreview,
@@ -246,6 +255,38 @@ export async function processReplyIntelligence(
     priority,
     nextAction,
   })
+
+  if (input.lead.organizationId) {
+    const canonicalResolution = await resolveGrowthCanonicalDecisionForLead(admin, {
+      organizationId: input.lead.organizationId,
+      leadId: input.lead.id,
+      generatedAt: input.reply.receivedAt,
+      materialEvent: {
+        id: input.reply.id,
+        at: input.reply.receivedAt,
+        kind: classified.intent,
+      },
+    }).catch(() => null)
+
+    if (canonicalResolution) {
+      invalidateCanonicalDecisionCacheForLead(input.lead.id, "material_reply_finalized")
+      await appendGrowthLeadTimelineEvent(admin, {
+        leadId: input.lead.id,
+        eventType: "canonical_decision_refreshed",
+        title: "Canonical decision refreshed",
+        summary: canonicalResolution.decision.title,
+        outboundReplyId: input.reply.id,
+        payload: {
+          primary_action: canonicalResolution.decision.primaryAction,
+          decision_fingerprint: canonicalResolution.decision.decisionFingerprint,
+          freshness: canonicalResolution.freshness.state,
+          suppressed_count: canonicalResolution.decision.suppressedActions.length,
+          suppress_sequence: canonicalResolution.suppressionHints.suppressSequenceSends,
+        },
+      }).catch(() => undefined)
+    }
+  }
+
   await emitReplyAssignedTimeline(admin, {
     leadId: input.lead.id,
     replyId: input.reply.id,

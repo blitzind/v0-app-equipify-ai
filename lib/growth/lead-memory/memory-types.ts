@@ -5,6 +5,15 @@ export const GROWTH_LEAD_MEMORY_ENGINE_QA_MARKER = "growth-lead-memory-engine-v1
 export const GROWTH_LEAD_MEMORY_PRIVACY_NOTE =
   "Lead memory is evidence-backed relationship context only. No autonomous CRM mutation, no autonomous outreach, no hidden memory from unrelated data, no provider payloads or secrets."
 
+export const GROWTH_LEAD_MEMORY_HUMAN_KINDS = [
+  "business_fact",
+  "personal_context",
+  "communication_style",
+  "sales_conclusion",
+  "action_commitment",
+] as const
+export type GrowthLeadMemoryHumanKind = (typeof GROWTH_LEAD_MEMORY_HUMAN_KINDS)[number]
+
 export const GROWTH_LEAD_MEMORY_CATEGORIES = [
   "communication_preference",
   "buying_signal",
@@ -68,6 +77,7 @@ export type GrowthLeadMemoryEvent = {
   evidenceSnippet: string
   sourceSystem: string
   recordedAt: string
+  metadata?: Record<string, unknown>
 }
 
 export type GrowthLeadObjectionMemory = {

@@ -19,6 +19,8 @@ import {
   relationshipAssessmentSuggestsDelay,
   type GrowthOutreachRelationshipAssessment,
 } from "@/lib/growth/aios/growth/growth-relationship-strategy-2a"
+import { applyInstitutionalConfidenceBoost } from "@/lib/growth/aios/growth/growth-institutional-learning-1a"
+import type { GrowthInstitutionalSalesIntelligence } from "@/lib/growth/aios/growth/growth-institutional-learning-1a-types"
 
 export const GROWTH_AIOS_REVENUE_STRATEGY_1A_QA_MARKER =
   "ge-aios-revenue-strategy-1a-autonomous-sales-strategy-intelligence-v1" as const
@@ -785,6 +787,7 @@ export function buildRevenueStrategyIntelligence(input: {
   buyingCommitteeSnapshot?: RevenueStrategyBuyingCommitteeSnapshot | null
   communicationChannelHint?: string | null
   relationshipAssessment?: GrowthOutreachRelationshipAssessment | null
+  institutionalLearning?: GrowthInstitutionalSalesIntelligence | null
 }): GrowthOutreachRevenueStrategyIntelligence {
   const candidates: RevenueStrategyDecisionMakerCandidate[] =
     input.decisionMakers && input.decisionMakers.length > 0
@@ -912,7 +915,10 @@ export function buildRevenueStrategyIntelligence(input: {
 
   const competitivePosture = buildCompetitivePosture(input.sellerTruth)
 
-  const confidenceScore = opportunityReadiness.overall
+  const confidenceScore = applyInstitutionalConfidenceBoost(
+    opportunityReadiness.overall,
+    input.institutionalLearning,
+  )
   const confidenceLevel: GrowthOutreachRevenueStrategyIntelligence["confidenceLevel"] =
     confidenceScore >= 0.75 ? "high" : confidenceScore >= 0.55 ? "medium" : "low"
 
@@ -920,7 +926,17 @@ export function buildRevenueStrategyIntelligence(input: {
     ...(input.consultantDiscoveryIntelligence?.conversationTiming.signals ?? []),
     ...(input.buyingCommitteeSnapshot?.discoveryPending ? ["Committee discovery in flight"] : []),
     ...(opportunityReadiness.operationalUrgency >= 0.7 ? ["Operational pressure elevated"] : []),
+    ...(input.institutionalLearning?.conversationAngleHint
+      ? [`Organizational pattern (advisory): ${input.institutionalLearning.conversationAngleHint}`]
+      : []),
   ]
+
+  const channelPlanWithInstitutional = {
+    ...channelPlan,
+    rationale: input.institutionalLearning?.channelHint
+      ? `${channelPlan.rationale} Advisory from organizational learning: ${input.institutionalLearning.channelHint}`
+      : channelPlan.rationale,
+  }
 
   const vpSalesJudgment =
     input.relationshipAssessment?.available
@@ -956,7 +972,7 @@ export function buildRevenueStrategyIntelligence(input: {
     committeeStrategy,
     committeeStakeholders,
     threadPlan,
-    channelPlan,
+    channelPlan: channelPlanWithInstitutional,
     sequencePlan,
     risks: risks.filter((r) => r.present),
     competitivePosture,

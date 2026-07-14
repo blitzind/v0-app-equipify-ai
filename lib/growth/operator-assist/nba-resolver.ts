@@ -10,6 +10,7 @@ import type {
   UnifiedNextBestActionSnapshot,
   UnifiedOperatorAssistEvent,
 } from "@/lib/growth/operator-assist/types"
+import type { CallWorkspaceAiosLiveReasoningSnapshot } from "@/lib/growth/operator-assist/call-workspace-aios-live-reasoning-types"
 
 function toNbaItem(input: {
   title: string
@@ -35,10 +36,25 @@ export function resolveUnifiedNextBestAction(input: {
   conversationIntelligence: VoiceCallConversationIntelligenceSnapshot | null
   leadContext: Pick<NativeDialerLeadContext, "recommendedNextAction"> | null
   rankedAssistEvents: UnifiedOperatorAssistEvent[]
+  aiosLiveReasoning?: CallWorkspaceAiosLiveReasoningSnapshot | null
 }): UnifiedNextBestActionSnapshot {
   const candidates: UnifiedNextBestActionItem[] = []
 
-  if (input.coachingState?.primaryCoach?.primaryPhrase) {
+  if (input.aiosLiveReasoning?.sayThisNext.recommendedNextSentence) {
+    const say = input.aiosLiveReasoning.sayThisNext
+    candidates.push(
+      toNbaItem({
+        title: "Exactly what to say next",
+        prompt: say.recommendedNextSentence,
+        evidenceText: say.why,
+        confidenceScore: say.confidence,
+        source: "aios_live_reasoning",
+        dedupeKey: `aios-say-this-next:${input.aiosLiveReasoning.triggeredBySequenceNumber ?? "bootstrap"}`,
+      }),
+    )
+  }
+
+  if (!input.aiosLiveReasoning && input.coachingState?.primaryCoach?.primaryPhrase) {
     const coach = input.coachingState.primaryCoach
     candidates.push(
       toNbaItem({
@@ -52,7 +68,7 @@ export function resolveUnifiedNextBestAction(input: {
     )
   }
 
-  const voiceNba = input.conversationIntelligence?.suggestedNextBestAction
+  const voiceNba = !input.aiosLiveReasoning ? input.conversationIntelligence?.suggestedNextBestAction : null
   if (voiceNba) {
     candidates.push(
       toNbaItem({
@@ -66,7 +82,7 @@ export function resolveUnifiedNextBestAction(input: {
     )
   }
 
-  if (input.coachingState?.suggestedNextQuestion && !input.coachingState.primaryCoach) {
+  if (!input.aiosLiveReasoning && input.coachingState?.suggestedNextQuestion && !input.coachingState.primaryCoach) {
     candidates.push(
       toNbaItem({
         title: "Suggested discovery question",
@@ -79,7 +95,7 @@ export function resolveUnifiedNextBestAction(input: {
     )
   }
 
-  if (input.liveSnapshot) {
+  if (!input.aiosLiveReasoning && input.liveSnapshot) {
     const picked = pickSuggestedNextQuestion({
       snapshot: input.liveSnapshot,
       candidates: [],

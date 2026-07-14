@@ -26,8 +26,11 @@ import {
 import { reviewOutreachDraftCopy } from "@/lib/growth/aios/growth/growth-outreach-conversation-intelligence"
 import {
   finalizeProductionCustomerFacingCopy,
+  normalizeProductionPunctuation,
+  reviewOperatorExecutionGuideConstitution,
   reviewProductionHumanCommunicationConstitution,
 } from "@/lib/growth/aios/growth/growth-send-plane-1a-constitution"
+import { applyCanonicalIdentityToCopy } from "@/lib/growth/aios/growth/growth-canonical-display-identity-1b"
 import { seedGeneratedAssetVersionMetadata } from "@/lib/growth/aios/growth/growth-send-plane-1b-operator-approval-persistence"
 
 export type GrowthOutreachStrategyDerivedDrafts = {
@@ -76,15 +79,15 @@ function buildRelationshipAwareFollowUpSequence(input: {
     `Day 7: One question only:`,
     input.question,
     ``,
-    `Day 14: Soft bump:`,
+    `Day 14: New angle:`,
     recallLine
-      ? `${greeting}. Wanted to close the loop on ${input.safeRecall[0]?.topic ?? input.company}.`
+      ? `${greeting}. One more thought on ${input.safeRecall[0]?.topic ?? input.company}. Worth a reply?`
       : `Still curious about ${input.company}'s service ops, or bad timing?`,
     ``,
-    `Day 21: Close the loop:`,
+    `Day 21: Respectful close:`,
     goalLine
-      ? `Closing my loop on this unless ${input.relationshipGoal?.toLowerCase()} is still on your radar.`
-      : `Closing my loop on this unless you want the conversation.`,
+      ? `Unless ${input.relationshipGoal?.toLowerCase()} is still on your radar, I'll step back for now.`
+      : `Unless you want the conversation, I'll step back for now.`,
   ].join("\n")
 }
 
@@ -94,6 +97,7 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
 }): GrowthOutreachStrategyDerivedDrafts {
   const brief = input.brief
   const company = brief.companyName
+  const canonicalIdentity = brief.canonicalDisplayIdentity ?? null
   const dmFirst = firstName(brief.decisionMakerAnalysis.name)
   const ctx = extractEliteHumanDraftContext(input)
   const human = buildEliteHumanProspectDrafts(ctx)
@@ -119,9 +123,10 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
   const emailBody = human.emailBody
   const opening = emailBody.split("\n\n")[0] ?? greeting
   const ctaLine = emailBody.includes("?") && !/happy to compare/i.test(emailBody) ? "" : "Happy to compare notes if useful. No pitch."
-  const transportBody = finalizeProductionCustomerFacingCopy(emailBody)
-  const transportSubject = finalizeProductionCustomerFacingCopy(human.subject)
-  const emailFull = `Subject: ${transportSubject}\nPreview: ${human.preview}\n\n${transportBody}`
+  const transportBody = finalizeProductionCustomerFacingCopy(emailBody, canonicalIdentity)
+  const transportSubject = finalizeProductionCustomerFacingCopy(human.subject, canonicalIdentity)
+  const transportPreview = finalizeProductionCustomerFacingCopy(human.preview, canonicalIdentity)
+  const emailFull = `Subject: ${transportSubject}\nPreview: ${transportPreview}\n\n${transportBody}`
 
   const discoveryFromConsultant =
     brief.consultantDiscoveryIntelligence?.rankedDiscoveryQuestions
@@ -137,48 +142,58 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
           "What would a cleaner week look like for your team?",
         ]
 
-  const callGuide = [
-    `Opening: "${greeting.replace(",", "")}. ${observation}"`,
-    `Earn curiosity: "${question}"`,
-    `Conversation objective: ${brief.conversationObjective}`,
-    `Operator note (internal): ${brief.conversationJustification ?? brief.primaryHook}`,
-    `Relationship stage: ${brief.relationshipStage ?? "Cold"}`,
-    `Discovery questions:`,
-    ...discovery.map((q, index) => `${index + 1}. ${q}`),
-    `Likely objections:`,
-    ...brief.objections.map((row) => `• ${row.objection} → ${row.response}`),
-    `Do not discuss:`,
-    ...(brief.conversationStrategy?.doNotDiscuss
-      .filter((row) => !/^Never say:|^Avoid wording:/i.test(row))
-      .slice(0, 4)
-      .map((row) => `• ${row}`) ?? [
-      "• Do not pitch a product tour before confirming the workflow problem.",
-    ]),
-    brief.sellerTruth?.neverSay?.length || brief.sellerTruth?.wordsToAvoid?.length
-      ? "• Follow approved profile never-say / words-to-avoid list (see Seller Truth)."
-      : null,
-    `Desired outcome: One thoughtful reply or a redirect to the right owner.`,
-    `Follow-up: Summarize what you heard. Don't chase.`,
-  ]
-    .filter(Boolean)
-    .join("\n")
+  const callGuide = normalizeProductionPunctuation(
+    applyCanonicalIdentityToCopy(
+      [
+        `Opening: "${greeting.replace(",", "")}. ${observation}"`,
+        `Earn curiosity: "${question}"`,
+        `Conversation objective: ${brief.conversationObjective}`,
+        `Operator note (internal): ${brief.conversationJustification ?? brief.primaryHook}`,
+        `Relationship stage: ${brief.relationshipStage ?? "Cold"}`,
+        `Discovery questions:`,
+        ...discovery.map((q, index) => `${index + 1}. ${q}`),
+        `Likely objections:`,
+        ...brief.objections.map((row) => `• ${row.objection} → ${row.response}`),
+        `Do not discuss:`,
+        ...(brief.conversationStrategy?.doNotDiscuss
+          .filter((row) => !/^Never say:|^Avoid wording:/i.test(row))
+          .slice(0, 4)
+          .map((row) => `• ${row}`) ?? [
+          "• Do not pitch a product tour before confirming the workflow problem.",
+        ]),
+        brief.sellerTruth?.neverSay?.length || brief.sellerTruth?.wordsToAvoid?.length
+          ? "• Follow approved profile never-say / words-to-avoid list (see Seller Truth)."
+          : null,
+        `Desired outcome: One thoughtful reply or a redirect to the right owner.`,
+        `Follow-up: Summarize what you heard. Don't chase.`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      canonicalIdentity,
+    ),
+  )
 
   const videoMissing = brief.missingPersonalizationOpportunities.some((row) =>
     /email|phone|decision maker|contact/i.test(row),
   )
   const personalizedVideo = videoMissing
     ? "Video draft requires additional personalization before recording."
-    : [
-        `Opening: "${greeting.replace(",", "")}. Short note on ${company}."`,
-        `Talking points (operator):`,
-        `• Observation: ${observation}`,
-        `• Question: ${question}`,
-        ctx.outcome ? `• Outcome focus: ${ctx.outcome}` : null,
-        `• Do not lead with product. Earn the conversation first.`,
-        `Closing: "If useful, grab a time. If not, no chase."`,
-      ]
-        .filter(Boolean)
-        .join("\n")
+    : normalizeProductionPunctuation(
+        applyCanonicalIdentityToCopy(
+          [
+            `Opening: "${greeting.replace(",", "")}. Short note on ${company}."`,
+            `Talking points (operator):`,
+            `• Observation: ${observation}`,
+            `• Question: ${question}`,
+            ctx.outcome ? `• Outcome focus: ${ctx.outcome}` : null,
+            `• Do not lead with product. Earn the conversation first.`,
+            `Closing: "If useful, grab a time. If not, no chase."`,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+          canonicalIdentity,
+        ),
+      )
 
   const voicemail = finalizeProductionCustomerFacingCopy(
     [
@@ -188,6 +203,7 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
     ]
       .filter(Boolean)
       .join(" "),
+    canonicalIdentity,
   )
 
   const meetingRequest = finalizeProductionCustomerFacingCopy(
@@ -195,6 +211,7 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
       greeting,
       brief.recommendedCta || question,
     ].join(" "),
+    canonicalIdentity,
   )
 
   const followUpSequence = finalizeProductionCustomerFacingCopy(
@@ -206,10 +223,11 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
       safeRecall: brief.relationshipAssessment?.safeRecall ?? [],
       relationshipGoal: brief.relationshipAssessment?.relationshipGoal.label ?? null,
     }),
+    canonicalIdentity,
   )
 
-  const finalizedLinkedIn = finalizeProductionCustomerFacingCopy(human.linkedIn)
-  const finalizedSms = finalizeProductionCustomerFacingCopy(human.sms)
+  const finalizedLinkedIn = finalizeProductionCustomerFacingCopy(human.linkedIn, canonicalIdentity)
+  const finalizedSms = finalizeProductionCustomerFacingCopy(human.sms, canonicalIdentity)
 
   const prospectFacing = [
     emailFull,
@@ -234,12 +252,14 @@ export function generateOutreachDraftsFromSalesStrategyBrief(input: {
     ...reviewHumanAuthenticity(emailFull, company),
     ...reviewHumanAuthenticity(finalizedLinkedIn, company),
     ...reviewHumanAuthenticity(finalizedSms, company),
-    ...reviewProductionHumanCommunicationConstitution(transportBody, company),
-    ...reviewProductionHumanCommunicationConstitution(transportSubject, company),
-    ...reviewProductionHumanCommunicationConstitution(finalizedLinkedIn, company),
-    ...reviewProductionHumanCommunicationConstitution(finalizedSms, company),
-    ...reviewProductionHumanCommunicationConstitution(voicemail, company),
-    ...reviewProductionHumanCommunicationConstitution(meetingRequest, company),
+    ...reviewProductionHumanCommunicationConstitution(transportBody, company, canonicalIdentity),
+    ...reviewProductionHumanCommunicationConstitution(transportSubject, company, canonicalIdentity),
+    ...reviewProductionHumanCommunicationConstitution(finalizedLinkedIn, company, canonicalIdentity),
+    ...reviewProductionHumanCommunicationConstitution(finalizedSms, company, canonicalIdentity),
+    ...reviewProductionHumanCommunicationConstitution(voicemail, company, canonicalIdentity),
+    ...reviewProductionHumanCommunicationConstitution(meetingRequest, company, canonicalIdentity),
+    ...reviewOperatorExecutionGuideConstitution(callGuide, canonicalIdentity),
+    ...reviewOperatorExecutionGuideConstitution(personalizedVideo, canonicalIdentity),
     ...(brief.consultantDiscoveryIntelligence
       ? reviewConsultantDiscoveryQuality({
           discovery: brief.consultantDiscoveryIntelligence,

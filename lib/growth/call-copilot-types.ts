@@ -75,6 +75,10 @@ export type GrowthCallCopilotBriefing = {
   whyNow: string
   likelyObjections: string[]
   openingLine: string
+  /** Approved Growth 5F call guide when present — operator/execution authority. */
+  canonicalCallGuide?: string | null
+  canonicalCallGuideSource?: string | null
+  channelsParityMarker?: string | null
   recommendedCta: string
   doNotSay: string[]
   riskWarnings: string[]

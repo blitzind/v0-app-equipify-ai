@@ -8,6 +8,7 @@ import type {
 import type { GrowthLiveGuidancePriorityLabel } from "@/lib/growth/live-guidance/live-guidance-priority"
 import type { GrowthRealtimeLiveSnapshot } from "@/lib/growth/realtime/realtime-call-types"
 import type { VoiceCallConversationIntelligenceSnapshot } from "@/lib/voice/intelligence/types"
+import type { CallWorkspaceAiosLiveReasoningSnapshot } from "@/lib/growth/operator-assist/call-workspace-aios-live-reasoning-types"
 
 export const VOICE_UNIFIED_OPERATOR_ASSIST_QA_MARKER = "voice-unified-operator-assist-v1" as const
 
@@ -26,6 +27,7 @@ export const UNIFIED_OPERATOR_ASSIST_EVENT_SOURCES = [
   "growth_guidance",
   "voice_intelligence",
   "interruption",
+  "aios_reasoning",
 ] as const
 
 export type UnifiedOperatorAssistEventSource = (typeof UNIFIED_OPERATOR_ASSIST_EVENT_SOURCES)[number]
@@ -45,7 +47,7 @@ export type UnifiedOperatorAssistCategory = (typeof UNIFIED_OPERATOR_ASSIST_CATE
 export type UnifiedOperatorAssistEvent = {
   id: string
   source: UnifiedOperatorAssistEventSource
-  sourceKind: "growth_guidance" | "voice_objection" | "voice_buying_signal" | "voice_risk" | "voice_guidance" | "voice_conversation" | "interruption"
+  sourceKind: "growth_guidance" | "voice_objection" | "voice_buying_signal" | "voice_risk" | "voice_guidance" | "voice_conversation" | "interruption" | "aios_reasoning"
   lifecycleStatus: UnifiedOperatorAssistLifecycleStatus
   category: UnifiedOperatorAssistCategory
   eventType: string
@@ -139,6 +141,7 @@ export type UnifiedOperatorAssistSnapshot = {
   realtimeSessionId: string | null
   voiceCallId: string | null
   conversationIntelligence: VoiceCallConversationIntelligenceSnapshot | null
+  aiosLiveReasoning: CallWorkspaceAiosLiveReasoningSnapshot | null
   feed: UnifiedOperatorAssistEvent[]
   topPriority: UnifiedOperatorAssistEvent[]
   additional: UnifiedOperatorAssistEvent[]

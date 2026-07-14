@@ -351,10 +351,39 @@ async function personalizeVoiceDropDraft(
   }
 }
 
-function personalizeCallDraft(input: {
-  draft: ApolloSequenceExecutionDraftRecord
-  unified_context: ApolloUnifiedPersonalizationContext
-}): ApolloSequenceExecutionDraftRecord {
+async function personalizeCallDraft(
+  admin: SupabaseClient,
+  input: {
+    draft: ApolloSequenceExecutionDraftRecord
+    unified_context: ApolloUnifiedPersonalizationContext
+    leadId: string
+  },
+): Promise<ApolloSequenceExecutionDraftRecord> {
+  const organizationId = getGrowthEngineAiOrgId()
+  if (organizationId) {
+    const canonicalPkg = await resolveCanonicalOutreachPackageForLead(admin, {
+      organizationId,
+      leadId: input.leadId,
+    })
+    const brief = canonicalPkg?.salesStrategyBrief
+    if (brief) {
+      const materialized = materializeCanonicalOutreachChannelContent({
+        brief,
+        channel: "call",
+        package: canonicalPkg,
+        operatorAssetOverride: resolveOperatorAssetOverride(canonicalPkg, "call"),
+      })
+      if (materialized.transportReady) {
+        return {
+          ...input.draft,
+          body_placeholder: materialized.body,
+          content_summary: "Canonical call guide from Growth 5F package.",
+          personalization_packet_marker: input.unified_context.qa_marker,
+        }
+      }
+    }
+  }
+
   const intelligence = buildApolloCallIntelligence(input.unified_context)
   const body = formatApolloCallIntelligenceBody(intelligence)
 
@@ -479,7 +508,13 @@ export async function personalizeApolloSequenceCandidateContent(
     }
 
     if (draft.draft_type === "call") {
-      updatedDrafts.push(personalizeCallDraft({ draft, unified_context: unifiedContext }))
+      updatedDrafts.push(
+        await personalizeCallDraft(admin, {
+          draft,
+          unified_context: unifiedContext,
+          leadId,
+        }),
+      )
       continue
     }
 

@@ -35,6 +35,7 @@ import {
   GROWTH_NATIVE_DIALER_QA_MARKER,
   GROWTH_GOOGLE_VOICE_BRIDGE_QA_MARKER,
 } from "@/lib/growth/native-dialer/native-dialer-types"
+import { GROWTH_GOOGLE_VOICE_BRIDGE_COACHING_QA_MARKER } from "@/lib/growth/native-dialer/call-workspace-coaching-types"
 import { GROWTH_CALLS_SETUP_OPERATOR_MESSAGE } from "@/lib/growth/workspace/growth-workspace-operator-simplification-1e"
 import {
   beginGoogleVoiceBridgeDialFlow,

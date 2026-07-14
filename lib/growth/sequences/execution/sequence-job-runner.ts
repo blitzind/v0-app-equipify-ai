@@ -38,6 +38,8 @@ import { evaluateGrowthQaDeliverabilityBypassForJobSend,
 } from "@/lib/growth/sequence-enrollment/qa-deliverability-bypass"
 import { recordSequenceEnrollmentChannelEvent } from "@/lib/growth/sequence-orchestration/sequence-multi-channel-state-repository"
 import { assertSequenceExecutionPauseGate } from "@/lib/growth/sequences/execution/sequence-pause-gate"
+import { enforceCanonicalDecisionForSequenceChannelJob } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-sequence-enforcement"
+import { buildCanonicalSequenceEnforcementTrustedGate } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-trusted-gate"
 
 export type SequenceExecutionRunInput = {
   jobId: string
@@ -48,6 +50,7 @@ export type SequenceExecutionRunInput = {
   approvedBy?: string | null
   lockedBy?: string
   cronMode?: boolean
+  canonicalDecisionOverrideReason?: string | null
 }
 
 function isUuid(value: string | null | undefined): value is string {
@@ -392,6 +395,26 @@ export async function runSequenceExecutionJob(
     return { ok: false, jobId: job.id, status: job.status, message: "job_locked" }
   }
 
+  const canonicalGate = await enforceCanonicalDecisionForSequenceChannelJob(admin, {
+    job: locked,
+    channelLabel: locked.channel ?? null,
+    operatorOverrideReason: input.canonicalDecisionOverrideReason,
+    operatorId: input.actingUserId,
+    operatorEmail: input.actingUserEmail,
+    cacheScope: `sequence-job:${locked.id}`,
+  })
+  if (!canonicalGate.allowed) {
+    return canonicalGate.result
+  }
+
+  const trustedGate = buildCanonicalSequenceEnforcementTrustedGate({
+    jobId: locked.id,
+    leadId: locked.leadId,
+    decisionFingerprint: canonicalGate.decisionFingerprint ?? "",
+    enforcementFingerprint: canonicalGate.enforcement.enforcementFingerprint,
+    channelLabel: locked.channel ?? null,
+  })
+
   if (!locked.sequenceStepId) {
     await finalizeBlockedJob(admin, locked, "missing_step")
     return { ok: false, jobId: locked.id, status: "blocked", message: "missing_step", blocked: true }
@@ -403,6 +426,7 @@ export async function runSequenceExecutionJob(
       actingUserId: input.actingUserId,
       actingUserEmail: input.actingUserEmail,
       auditActorUserId: resolveSequenceExecutionAuditActorUserId(locked, input) ?? input.actingUserId,
+      trustedGate,
     })
     return smsResult
   }
@@ -413,6 +437,7 @@ export async function runSequenceExecutionJob(
       actingUserId: input.actingUserId,
       actingUserEmail: input.actingUserEmail,
       auditActorUserId: resolveSequenceExecutionAuditActorUserId(locked, input) ?? input.actingUserId,
+      trustedGate,
     })
     return voiceDropResult
   }
@@ -542,6 +567,7 @@ export async function runSequenceExecutionJob(
     actorUserId: auditActorUserId,
     actorEmail: input.actingUserEmail,
     qa_deliverability_bypass: sendBypass.active ? sendBypass : null,
+    canonical_decision_override_reason: input.canonicalDecisionOverrideReason,
     metadata: {
       ...(payload.experimentId && payload.experimentVariantId
         ? {

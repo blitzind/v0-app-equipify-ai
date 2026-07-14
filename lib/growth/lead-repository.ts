@@ -3,6 +3,7 @@ import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { normalizeGrowthActorUserIdForDb } from "@/lib/growth/actor-user-id"
 import { getGrowthEngineAiOrgId, logGrowthEngine } from "@/lib/growth/access"
+import { invalidateCanonicalDecisionCacheForLead } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
 import { dispatchSequenceWakeForLeadEvent } from "@/lib/growth/sequences/conditions/sequence-event-wake-engine"
 import { GrowthLeadArchiveSchemaIncompleteError } from "@/lib/growth/lead-archive-api-errors"
 import { probeGrowthLeadArchiveSchema } from "@/lib/growth/lead-archive-schema-health"
@@ -949,6 +950,7 @@ export async function archiveGrowthLeads(
 
   const leads = ((data ?? []) as GrowthLeadDbRow[]).map(mapGrowthLeadRow)
   for (const lead of leads) {
+    invalidateCanonicalDecisionCacheForLead(lead.id, "lead_archived")
     logGrowthEngine("lead_archived", { leadId: lead.id, archivedBy: input.archivedBy ?? null })
   }
   return leads
@@ -995,6 +997,7 @@ export async function restoreGrowthLeads(
 
   const leads = ((data ?? []) as GrowthLeadDbRow[]).map(mapGrowthLeadRow)
   for (const lead of leads) {
+    invalidateCanonicalDecisionCacheForLead(lead.id, "lead_restored")
     logGrowthEngine("lead_restored", {
       leadId: lead.id,
       restoredBy: input.restoredBy ?? null,

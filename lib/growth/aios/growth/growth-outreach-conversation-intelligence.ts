@@ -41,6 +41,10 @@ import {
   mergeRelationshipMemoryObjections,
   type GrowthOutreachRelationshipAssessment,
 } from "@/lib/growth/aios/growth/growth-relationship-strategy-2a"
+import {
+  applyInstitutionalConfidenceBoost,
+} from "@/lib/growth/aios/growth/growth-institutional-learning-1a"
+import type { GrowthInstitutionalSalesIntelligence } from "@/lib/growth/aios/growth/growth-institutional-learning-1a-types"
 
 export const GROWTH_AIOS_CONVERSATION_INTELLIGENCE_1A_QA_MARKER =
   "ge-aios-conversation-intelligence-1a-v1" as const
@@ -931,6 +935,7 @@ export function enrichOutreachSalesStrategyBrief(input: {
   communicationChannelHint?: string | null
   relationshipAssessment?: GrowthOutreachRelationshipAssessment | null
   leadMemory?: GrowthLeadMemoryInfluenceContext | null
+  institutionalLearning?: GrowthInstitutionalSalesIntelligence | null
 }): {
   businessProblems: string[]
   primaryHook: string
@@ -1149,6 +1154,7 @@ export function enrichOutreachSalesStrategyBrief(input: {
     buyingCommitteeSnapshot: input.buyingCommitteeSnapshot ?? null,
     communicationChannelHint: input.communicationChannelHint ?? null,
     relationshipAssessment: input.relationshipAssessment ?? null,
+    institutionalLearning: input.institutionalLearning ?? null,
   })
 
   const relationshipAssessment = input.relationshipAssessment
@@ -1170,7 +1176,10 @@ export function enrichOutreachSalesStrategyBrief(input: {
     conversationObjective: recommendedConversation,
     businessObjective: outcome.primaryOutcome,
     conversationJustification: conversationStrategy.conversationJustification,
-    confidence: conversationRisk.overall,
+    confidence: applyInstitutionalConfidenceBoost(
+      conversationRisk.overall,
+      input.institutionalLearning,
+    ),
     decisionMakerAnalysis: {
       ...input.brief.decisionMakerAnalysis,
       whyThisPerson: persona.normalizedRole

@@ -41,6 +41,7 @@ import {
   readLeadMetadataSummary,
 } from "@/lib/growth/revenue-queue/revenue-queue-inbox-display-map"
 import type { GrowthLead } from "@/lib/growth/types"
+import { resolveGrowthCanonicalDecisionForLead } from "@/lib/growth/aios/growth/resolve-growth-canonical-decision-for-lead"
 
 function isPipelineRun(value: unknown): value is GrowthLeadEnginePipelineRun {
   if (!value || typeof value !== "object") return false
@@ -425,6 +426,14 @@ export async function buildLeadOperatorWorkspacePayloadFromGrowthLead(
     evidence: s.evidence,
   }))
 
+  const canonical_decision =
+    lead.organizationId != null
+      ? await resolveGrowthCanonicalDecisionForLead(admin, {
+          organizationId: lead.organizationId,
+          leadId: lead.id,
+        }).catch(() => null)
+      : null
+
   return {
     qa_marker: GROWTH_LEAD_OPERATOR_WORKSPACE_QA_MARKER,
     row: buildRevenueQueueRowPublicFromGrowthLead(lead, identified),
@@ -442,5 +451,6 @@ export async function buildLeadOperatorWorkspacePayloadFromGrowthLead(
     search_intent_signals,
     company_match: buildCompanyMatchFromLead(lead, companyMatches[0] ?? null),
     buying_stage: buildBuyingStageFromLead(lead, buyingStageRows[0] ?? null),
+    canonical_decision,
   }
 }

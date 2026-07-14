@@ -60,6 +60,10 @@ export type AdvanceDraftFactoryForLeadInput = {
     providerTimeout?: boolean
     terminalNoResult?: boolean
     packageId?: string
+    decisionEnforcementBlocked?: boolean
+    canonicalDecisionEnforcementOutcome?: string
+    canonicalEnforcementFingerprint?: string
+    decisionNextEligibleWakeAt?: string | null
   }
 }
 
@@ -359,6 +363,15 @@ export async function advanceDraftFactoryForLead(
       !nextEvidence.stopInvestment &&
       nextEvidence.portfolioSelected
     ) {
+      if (hints.decisionEnforcementBlocked) {
+        plan = {
+          stageEvaluated: "generation",
+          outcome: "deferred",
+          reason: `Canonical decision enforcement: ${hints.canonicalDecisionEnforcementOutcome ?? "blocked"}.`,
+          nextEvidence,
+          nextEligibleWakeAt: hints.decisionNextEligibleWakeAt ?? null,
+        }
+      } else {
       const packagesToday = await repo.getPackagesProducedToday(input.organizationId, now)
       if (packagesToday >= AI_OS_DRAFT_FACTORY_CAPACITY.maxPackagesPerDay) {
         plan = {
@@ -413,6 +426,7 @@ export async function advanceDraftFactoryForLead(
           nextEligibleWakeAt: null,
           incrementAttempt: "generation",
         }
+      }
       }
     }
 

@@ -21,6 +21,8 @@ import type { AvaMemorySummary, AvaOrganizationalMemoryStore } from "@/lib/growt
 import type { AvaOperatingRhythm, AvaOperatingRhythmMemory } from "@/lib/growth/operating-rhythm/types"
 import type { AvaSpecialistOrchestratorResult } from "@/lib/growth/specialists/types"
 import { buildPrimaryDecisionFromWorkManager } from "@/lib/growth/work-manager/home/build-primary-decision-work"
+import { projectCanonicalDecisionToHomePrimary } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-operator-projection"
+import type { GrowthCanonicalOperatorDecisionProjection } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-operator-projection"
 import type { AvaWorkManagerResult } from "@/lib/growth/work-manager/types"
 import type {
   GrowthHomeAccomplishmentGroup,
@@ -51,6 +53,7 @@ export type GrowthHomeAvaHeroDecision = {
   label: string
   detail: string | null
   href: string | null
+  canonicalProjection?: GrowthCanonicalOperatorDecisionProjection | null
 }
 
 export type GrowthHomeAvaHeroViewModel = {
@@ -101,6 +104,8 @@ export type BuildAvaHomeHeroInput = {
   salesOutcomes?: import("@/lib/growth/specialists/execution/sales-outcome-types").GrowthHomeSalesOutcomesPayload | null
   organizationalKnowledge?: import("@/lib/growth/memory/knowledge/organization-knowledge-types").OrganizationalKnowledgeItem[] | null
   operatorDisplayName?: string | null
+  /** GE-AIOS-DECISION-ENGINE-1B — server-resolved canonical hero decision */
+  canonicalHeroDecision?: import("@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-types").GrowthCanonicalDecisionResolution | null
 }
 
 function pluralize(count: number, singular: string, plural: string): string {
@@ -290,9 +295,29 @@ export function buildAvaHomeHero(input: BuildAvaHomeHeroInput): GrowthHomeAvaHer
   assertDailyBriefing(dailyBriefing)
 
   const workManager = dailyBriefing.work_manager_result
-  const decision = workManager
-    ? mapPrimaryDecision(buildPrimaryDecisionFromWorkManager(workManager, input.aiOsUx))
-    : buildAvaPrimaryDecision(input.aiOsUx)
+  const canonicalHero = input.canonicalHeroDecision
+  const decision = canonicalHero
+    ? (() => {
+        const homePrimary = projectCanonicalDecisionToHomePrimary({
+          decision: canonicalHero.decision,
+          freshness: canonicalHero.freshness,
+          href: `/admin/growth/leads/${canonicalHero.leadId}`,
+        })
+        return {
+          primaryDecision: {
+            id: homePrimary.id,
+            label: homePrimary.label,
+            detail: homePrimary.detail,
+            href: homePrimary.href,
+            canonicalProjection: homePrimary.projection,
+          },
+          additionalDecisionCount: Math.max(0, canonicalHero.decision.supportingActions.length),
+          reviewAllHref: input.aiOsUx.approveItemsHref,
+        }
+      })()
+    : workManager
+      ? mapPrimaryDecision(buildPrimaryDecisionFromWorkManager(workManager, input.aiOsUx))
+      : buildAvaPrimaryDecision(input.aiOsUx)
 
   const storyBlocks = dailyBriefing.story_blocks ?? []
   const dailyActivityNarrative = dailyBriefing.daily_activity_narrative ?? null

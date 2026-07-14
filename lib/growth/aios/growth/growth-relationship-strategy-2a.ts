@@ -7,6 +7,10 @@ import { mergeMemoryObjectionSummaries } from "@/lib/growth/lead-memory/memory-i
 import type { GrowthLeadMemoryInfluenceContext } from "@/lib/growth/lead-memory/memory-types"
 import type { RevenueStrategyRecommendation } from "@/lib/growth/aios/growth/growth-outreach-revenue-strategy-intelligence"
 import {
+  buildInstitutionalAdviceSnippets,
+  type GrowthInstitutionalSalesIntelligence,
+} from "@/lib/growth/aios/growth/growth-institutional-learning-1a"
+import {
   GROWTH_AIOS_RELATIONSHIP_STRATEGY_2A_QA_MARKER,
   RELATIONSHIP_GOAL_LABELS,
   type BuildRelationshipAssessmentInput,
@@ -903,7 +907,11 @@ export function buildRelationshipAssessmentContextFromPacket(input: {
 export function loadInstitutionalAdviceSnippets(input: {
   industry?: string | null
   insights?: Array<{ summary: string; title?: string }>
+  institutionalIntelligence?: GrowthInstitutionalSalesIntelligence | null
 }): GrowthOutreachInstitutionalAdviceSnippet[] {
+  const fromLearning = buildInstitutionalAdviceSnippets(input.institutionalIntelligence)
+  if (fromLearning.length) return fromLearning
+
   const snippets: GrowthOutreachInstitutionalAdviceSnippet[] = []
   for (const insight of input.insights ?? []) {
     const pattern = insight.summary?.trim()

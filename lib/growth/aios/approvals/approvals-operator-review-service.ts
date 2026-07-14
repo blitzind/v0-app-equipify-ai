@@ -14,6 +14,9 @@ import { findAutonomousOutreachPreparationRunByPackageId } from "@/lib/growth/ai
 import { fetchLatestGrowthLeadResearchWorkflowSnapshot } from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
 import { listGrowthLeadDecisionMakers } from "@/lib/growth/decision-maker-repository"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
+import { resolveCanonicalHumanMemoryForLead } from "@/lib/growth/lead-memory/resolve-canonical-human-memory-for-lead"
+import { resolveGrowthCanonicalDecisionForLead } from "@/lib/growth/aios/growth/resolve-growth-canonical-decision-for-lead"
+import { loadLatestCanonicalDecisionOperatorOverrideForLead } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-override-loader"
 
 export async function loadApprovals2AOperatorReviewPacket(
   admin: SupabaseClient,
@@ -52,8 +55,37 @@ export async function loadApprovals2AOperatorReviewPacket(
     .filter(Boolean)
     .slice(0, 4)
 
+  const freshCanonicalHumanMemory = await resolveCanonicalHumanMemoryForLead(admin, {
+    organizationId: input.organizationId,
+    leadId: input.leadId,
+    packageSnapshot: { ...pkg, canonicalHumanMemory: pkg.canonicalHumanMemory },
+    skipPackageLoad: true,
+    companyName: lead?.companyName ?? pkg.companyName,
+  }).catch(() => pkg.canonicalHumanMemory ?? null)
+
+  const pkgForProjection = {
+    ...pkg,
+    canonicalHumanMemory: freshCanonicalHumanMemory ?? pkg.canonicalHumanMemory ?? null,
+  }
+
+  const canonicalDecision = await resolveGrowthCanonicalDecisionForLead(admin, {
+    organizationId: input.organizationId,
+    leadId: input.leadId,
+    generatedAt: input.now,
+    packageSnapshot: pkgForProjection,
+  }).catch(() => null)
+
+  const canonicalDecisionOverride = await loadLatestCanonicalDecisionOperatorOverrideForLead(admin, {
+    organizationId: input.organizationId,
+    leadId: input.leadId,
+    packageId: input.packageId,
+    decisionFingerprint: canonicalDecision?.decision.decisionFingerprint ?? null,
+  }).catch(() => null)
+
   return projectApprovals2AOperatorReviewPacket({
-    pkg,
+    pkg: pkgForProjection,
+    canonicalDecision,
+    canonicalDecisionOverride,
     teammateName: input.teammateName,
     now: input.now,
     lead: lead

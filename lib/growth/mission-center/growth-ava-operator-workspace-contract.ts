@@ -15,6 +15,10 @@ export function buildAvaOperatorPackageDraftsApiPath(packageId: string): string 
   return `${GROWTH_AVA_OPERATOR_PACKAGE_ACTION_API_PREFIX}/${encodeURIComponent(packageId)}/drafts`
 }
 
+export function buildAvaOperatorPackageMemoryActionsApiPath(packageId: string): string {
+  return `/api/platform/growth/ai-os/completed-work/packages/${encodeURIComponent(packageId)}/memory-actions`
+}
+
 export const GROWTH_AVA_OPERATOR_SUCCESS_PIPELINE_STEPS = [
   "Package Approved",
   "Execution Request Created",

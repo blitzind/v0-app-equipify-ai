@@ -146,4 +146,7 @@ export type GrowthMeetingPrepBundle = {
   readiness: MeetingPrepReadiness
   accountPlaybookContext: MeetingPrepAccountPlaybookContext | null
   videoEngagementContext: GrowthVideoMeetingPrepContext | null
+  /** GE-AIOS-DECISION-ENGINE-1B — canonical decision alignment for meeting workspace */
+  canonicalDecision?: import("@/lib/growth/aios/growth/growth-canonical-decision-engine-1b-types").GrowthCanonicalDecisionResolution | null
+  canonicalRecommendedNextAction?: string | null
 }

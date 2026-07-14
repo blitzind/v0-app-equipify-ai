@@ -200,6 +200,8 @@ export const GROWTH_LEAD_TIMELINE_EVENT_TYPES = [
   "cta_clicked",
   "booking_started",
   "booking_completed",
+  "canonical_decision_refreshed",
+  "canonical_decision_operator_override",
 ] as const
 
 export type GrowthLeadTimelineEventType = (typeof GROWTH_LEAD_TIMELINE_EVENT_TYPES)[number]

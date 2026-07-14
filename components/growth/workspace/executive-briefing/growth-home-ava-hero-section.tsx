@@ -232,6 +232,16 @@ export function GrowthHomeAvaHeroSection({
                 {hero.primaryDecision.detail ? (
                   <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{hero.primaryDecision.detail}</p>
                 ) : null}
+                {hero.primaryDecision.canonicalProjection?.thenActions[0] ? (
+                  <p className="mt-1 text-xs text-muted-foreground line-clamp-1">
+                    Then: {hero.primaryDecision.canonicalProjection.thenActions[0]}
+                  </p>
+                ) : null}
+                {hero.primaryDecision.canonicalProjection?.doNotActions[0] ? (
+                  <p className="mt-1 text-xs text-muted-foreground line-clamp-1">
+                    Do not: {hero.primaryDecision.canonicalProjection.doNotActions[0]}
+                  </p>
+                ) : null}
               </div>
               {hero.primaryDecision.href ? (
                 <Button asChild size="sm">

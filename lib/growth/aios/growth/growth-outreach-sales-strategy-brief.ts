@@ -39,6 +39,9 @@ import {
   GROWTH_AIOS_RELATIONSHIP_STRATEGY_2A_QA_MARKER,
   type GrowthOutreachRelationshipAssessment,
 } from "@/lib/growth/aios/growth/growth-relationship-strategy-2a-types"
+import type { GrowthInstitutionalSalesIntelligence } from "@/lib/growth/aios/growth/growth-institutional-learning-1a-types"
+import type { GrowthCanonicalDisplayIdentity } from "@/lib/growth/aios/growth/growth-canonical-display-identity-1b-types"
+import { resolveCanonicalCompanyDisplayName } from "@/lib/growth/aios/growth/growth-canonical-display-identity-1b"
 
 export type { GrowthOutreachEvidenceCitation }
 export {
@@ -101,6 +104,10 @@ export type GrowthOutreachSalesStrategyBrief = {
   relationshipAssessment?: GrowthOutreachRelationshipAssessment | null
   /** ADAPTIVE-LOOP-1A — relationship evolution from prospect events (computed, not persisted). */
   adaptiveLoopEvolution?: import("@/lib/growth/aios/growth/growth-adaptive-loop-1a-types").AdaptiveLoopEvolutionSummary | null
+  /** INSTITUTIONAL-LEARNING-1A — organizational advisory from Learning Engine (computed, not persisted). */
+  institutionalLearning?: GrowthInstitutionalSalesIntelligence | null
+  /** INSTITUTIONAL-LEARNING-1B — canonical display identity computed at package generation. */
+  canonicalDisplayIdentity?: GrowthCanonicalDisplayIdentity | null
 }
 
 export type BuildSalesStrategyBriefInput = {
@@ -155,6 +162,10 @@ export type BuildSalesStrategyBriefInput = {
   leadMemory?: GrowthLeadMemoryInfluenceContext | null
   /** ADAPTIVE-LOOP-1A — prospect events since last package (in-memory evolution only). */
   adaptiveEvents?: import("@/lib/growth/aios/growth/growth-adaptive-loop-1a-types").AdaptiveProspectEvent[]
+  /** INSTITUTIONAL-LEARNING-1A — organizational advisory from Learning Engine. */
+  institutionalLearning?: GrowthInstitutionalSalesIntelligence | null
+  /** INSTITUTIONAL-LEARNING-1B — pre-resolved canonical identity for this package. */
+  canonicalDisplayIdentity?: GrowthCanonicalDisplayIdentity | null
 }
 
 function cleanLine(value: string | null | undefined): string | null {
@@ -296,7 +307,10 @@ function fallbackObjections(cta: string, problem: string | null): Array<{ object
 export function buildOutreachSalesStrategyBrief(
   input: BuildSalesStrategyBriefInput,
 ): GrowthOutreachSalesStrategyBrief {
-  const companyName = cleanLine(input.companyName) || "this company"
+  const companyName = resolveCanonicalCompanyDisplayName(
+    input.canonicalDisplayIdentity ?? null,
+    cleanLine(input.companyName) || "this company",
+  )
   const evidence = evidenceFromSignals(input)
   const equipment = uniqueLines(input.equipmentServiced ?? [], 4)
   const dmName = cleanLine(input.contactName)
@@ -547,6 +561,7 @@ export function buildOutreachSalesStrategyBrief(
     communicationChannelHint: input.communicationChannelHint,
     relationshipAssessment: input.relationshipAssessment,
     leadMemory: input.leadMemory,
+    institutionalLearning: input.institutionalLearning,
   })
 
   const finalSellerKnowledgeQuality = scoreOutreachSellerKnowledgeQuality({
@@ -589,6 +604,8 @@ export function buildOutreachSalesStrategyBrief(
     consultantDiscoveryIntelligence: enriched.consultantDiscoveryIntelligence,
     revenueStrategyIntelligence: enriched.revenueStrategyIntelligence,
     relationshipAssessment: enriched.relationshipAssessment ?? input.relationshipAssessment ?? null,
+    institutionalLearning: input.institutionalLearning ?? null,
+    canonicalDisplayIdentity: input.canonicalDisplayIdentity ?? null,
     sellerKnowledgeQuality: finalSellerKnowledgeQuality,
   }
 }

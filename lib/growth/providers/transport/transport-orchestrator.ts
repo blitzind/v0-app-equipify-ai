@@ -33,6 +33,14 @@ import type { GrowthSenderRotationFallbackCandidate } from "@/lib/growth/sender-
 import { recordNativeWarmupSend } from "@/lib/growth/warmup/warmup-execution"
 import { shadowLogOutboundSend } from "@/lib/growth/contact-verification/email-learning-shadow"
 import { resolveGrowthActorForDb } from "@/lib/growth/actor-user-id"
+import { resolveGrowthCanonicalDecisionForLeadCached } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
+import { evaluateCanonicalTransportBoundary } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-enforcement"
+import {
+  buildCanonicalDecisionOperatorOverrideRecord,
+  validateCanonicalDecisionOperatorOverride,
+} from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-enforcement"
+import { recordCanonicalDecisionOperatorOverride } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-operator-override"
+import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 
 export class TransportHumanApprovalRequiredError extends Error {
   constructor() {
@@ -61,6 +69,7 @@ export type TransportSendInput = {
   is_test?: boolean
   metadata?: Record<string, unknown>
   qa_deliverability_bypass?: GrowthQaDeliverabilityBypassSnapshot | null
+  canonical_decision_override_reason?: string | null
 }
 
 export type TransportSendResult = {
@@ -419,6 +428,81 @@ export async function executeTransportSend(
     recordAudit: !resolvedInput.metadata?.governance_audit_recorded,
     approvalReason: resolvedInput.is_test ? "Human confirmed provider test send." : "Human confirmed provider send.",
   })
+
+  if (resolvedInput.lead_id) {
+    const lead = await fetchGrowthLeadById(admin, resolvedInput.lead_id).catch(() => null)
+    const organizationId = lead?.promotedOrganizationId ?? null
+    if (organizationId) {
+      const canonicalDecision = await resolveGrowthCanonicalDecisionForLeadCached(admin, {
+        organizationId,
+        leadId: resolvedInput.lead_id,
+        cacheScope: `transport:${resolvedInput.sequence_execution_job_id ?? "direct"}`,
+      }).catch(() => null)
+      const transportEnforcement = evaluateCanonicalTransportBoundary(canonicalDecision, {
+        humanApproved: resolvedInput.human_approved === true,
+        channel: "email",
+        packageFingerprintAtApproval:
+          typeof resolvedInput.metadata?.package_id === "string"
+            ? resolvedInput.metadata.package_id
+            : null,
+      })
+      let transportAllowed = transportEnforcement.allowed
+      if (!transportAllowed && resolvedInput.canonical_decision_override_reason?.trim()) {
+        const validation = validateCanonicalDecisionOperatorOverride({
+          resolution: canonicalDecision,
+          scope: "transport",
+          reason: resolvedInput.canonical_decision_override_reason,
+          suppressionCode: transportEnforcement.outcome,
+        })
+        if (validation.allowed && canonicalDecision) {
+          const override = buildCanonicalDecisionOperatorOverrideRecord({
+            operatorId: resolvedInput.actorUserId ?? "operator",
+            operatorEmail: resolvedInput.actorEmail ?? null,
+            reason: resolvedInput.canonical_decision_override_reason,
+            resolution: canonicalDecision,
+            suppressionCode: transportEnforcement.outcome,
+            enforcementFingerprint: transportEnforcement.enforcementFingerprint,
+            scope: "transport",
+          })
+          await recordCanonicalDecisionOperatorOverride(admin, {
+            leadId: resolvedInput.lead_id,
+            jobId: resolvedInput.sequence_execution_job_id ?? null,
+            packageId:
+              typeof resolvedInput.metadata?.package_id === "string"
+                ? resolvedInput.metadata.package_id
+                : null,
+            channel: "email",
+            action: "transport_send",
+            override,
+          })
+          transportAllowed = true
+        }
+      }
+      if (!transportAllowed) {
+        await recordTransportAuditEvent(admin, {
+          provider_id: String(resolvedInput.metadata?.provider_id ?? "growth_engine"),
+          event_type: "delivery_failed",
+          title: "Delivery blocked by canonical decision",
+          description: transportEnforcement.reason,
+          severity: "high",
+          metadata: {
+            lead_id: resolvedInput.lead_id,
+            outcome: transportEnforcement.outcome,
+            enforcement_fingerprint: transportEnforcement.enforcementFingerprint,
+            requires_package_refresh: transportEnforcement.requiresPackageRefresh,
+          },
+          actorUserId: resolvedInput.actorUserId,
+          actorEmail: resolvedInput.actorEmail,
+        }).catch(() => undefined)
+        return {
+          ok: false,
+          attempt: null,
+          error: transportEnforcement.outcome,
+          requires_human_review: transportEnforcement.requiresPackageRefresh,
+        }
+      }
+    }
+  }
 
   let senderAccountId = resolvedInput.sender_account_id
   let rotationMeta: TransportSendResult["sender_rotation"]

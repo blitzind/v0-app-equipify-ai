@@ -32,6 +32,8 @@ import type {
   GrowthAutonomousOutreachPreparationWakeCondition,
 } from "@/lib/growth/aios/growth/growth-autonomous-outreach-preparation-pilot-types"
 import { fetchLatestGrowthLeadResearchWorkflowSnapshot } from "@/lib/growth/aios/growth/growth-lead-research-workflow-service"
+import { resolveGrowthCanonicalDecisionForLeadCached, invalidateCanonicalDecisionCacheForLead } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-cache"
+import { evaluateGrowth5fPackagePreparation } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1c-enforcement"
 import { fetchGrowthLeadById } from "@/lib/growth/lead-repository"
 
 export {
@@ -116,6 +118,31 @@ export async function generateAndPersistAutonomousOutreachApprovalPackageForDraf
   })
   if (!snapshot) return null
 
+  const canonicalDecision = await resolveGrowthCanonicalDecisionForLeadCached(admin, {
+    organizationId: input.organizationId,
+    leadId: input.leadId,
+    generatedAt: input.generatedAt,
+    packageSnapshot: previousPackage,
+    cacheScope: "growth5f:package-preparation",
+  }).catch(() => null)
+  const packageEnforcement = evaluateGrowth5fPackagePreparation(canonicalDecision, {
+    proposedPurpose: previousPackage?.expectedOutcome ?? null,
+    wakeCondition,
+    isMaterialRefresh: wakeCondition === "relationship_material_change",
+  })
+  if (!packageEnforcement.allowed) {
+    logGrowthEngine("growth_5f_package_preparation_blocked_by_canonical_decision", {
+      qa_marker: GROWTH_AIOS_AUTONOMY_1H_QA_MARKER,
+      organization_id: input.organizationId,
+      lead_id: input.leadId,
+      outcome: packageEnforcement.outcome,
+      reason: packageEnforcement.reason,
+      enforcement_fingerprint: packageEnforcement.enforcementFingerprint,
+      wait_until: packageEnforcement.waitUntil,
+    })
+    return null
+  }
+
   const approvalPackage = await buildAutonomousOutreachApprovalPackage(admin, {
     organizationId: input.organizationId,
     leadId: input.leadId,
@@ -172,6 +199,8 @@ export async function generateAndPersistAutonomousOutreachApprovalPackageForDraf
     pending_human_approval: true,
     transport_blocked: true,
   })
+
+  invalidateCanonicalDecisionCacheForLead(input.leadId, "package_created")
 
   return {
     packageId,
@@ -239,6 +268,32 @@ export async function rebuildAutonomousOutreachApprovalPackagePayload(
   })
   if (!snapshot) return null
 
+  const canonicalDecision = await resolveGrowthCanonicalDecisionForLeadCached(admin, {
+    organizationId: input.organizationId,
+    leadId: parsed.leadId,
+    generatedAt: parsed.generatedAt,
+    packageSnapshot: previousPackage,
+    cacheScope: "growth5f:operator-rebuild",
+  }).catch(() => null)
+  const packageEnforcement = evaluateGrowth5fPackagePreparation(canonicalDecision, {
+    proposedPurpose: previousPackage?.expectedOutcome ?? null,
+    wakeCondition: input.wakeCondition ?? "execution_completed",
+    isOperatorRebuild: true,
+    isMaterialRefresh: Boolean(input.rebuildReason),
+  })
+  if (!packageEnforcement.allowed) {
+    logGrowthEngine("growth_5f_operator_rebuild_blocked_by_canonical_decision", {
+      qa_marker: GROWTH_AIOS_AUTONOMY_1H_QA_MARKER,
+      organization_id: input.organizationId,
+      lead_id: parsed.leadId,
+      package_id: input.packageId,
+      outcome: packageEnforcement.outcome,
+      reason: packageEnforcement.reason,
+      enforcement_fingerprint: packageEnforcement.enforcementFingerprint,
+    })
+    return null
+  }
+
   const approvalPackage = await buildAutonomousOutreachApprovalPackage(admin, {
     organizationId: input.organizationId,
     leadId: parsed.leadId,
@@ -304,6 +359,8 @@ export async function rebuildAutonomousOutreachApprovalPackagePayload(
     rebuild_reason: input.rebuildReason ?? "master_knowledge_refresh",
     had_previous_body: Boolean(previousPackage),
   })
+
+  invalidateCanonicalDecisionCacheForLead(parsed.leadId, "package_rebuilt")
 
   return {
     packageId: input.packageId,

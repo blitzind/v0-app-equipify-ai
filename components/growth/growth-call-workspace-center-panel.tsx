@@ -20,6 +20,7 @@ import { GrowthIncomingCallPanel } from "@/components/growth/growth-incoming-cal
 import { GrowthCallWorkspaceGoogleVoiceBridgePanel } from "@/components/growth/growth-call-workspace-google-voice-bridge-panel"
 import { GrowthCallWorkspaceUnifiedAssistPanel } from "@/components/growth/growth-call-workspace-unified-assist-panel"
 import { GrowthPostCallWrapup } from "@/components/growth/growth-post-call-wrapup"
+import { GrowthCallWorkspacePostCallClosurePanel } from "@/components/growth/growth-call-workspace-post-call-closure-panel"
 import { GrowthCallWorkspaceFollowUpPanel } from "@/components/growth/growth-call-workspace-follow-up-panel"
 import { GrowthCallWorkspaceQueuePreviewPanel } from "@/components/growth/growth-call-workspace-queue-preview-panel"
 import { GrowthNativeDialer } from "@/components/growth/growth-native-dialer"
@@ -48,6 +49,7 @@ import type {
 } from "@/lib/voice/transfer-control/types"
 import type { VoiceCallTranscriptSnapshot } from "@/lib/voice/media-streaming/types"
 import type { UnifiedOperatorAssistSnapshot } from "@/lib/growth/operator-assist/types"
+import type { GrowthCallWorkspacePostCallClosure } from "@/lib/growth/operator-assist/call-workspace-post-call-closure-types"
 import type { VoiceAiCopilotWorkspaceSnapshot } from "@/lib/voice/ai-copilot/types"
 import type { VoiceAiReceptionistWorkspaceSnapshot } from "@/lib/voice/ai-receptionist/types"
 import type { VoiceMissedCallRecoveryWorkspaceSnapshot } from "@/lib/voice/missed-call-recovery/types"
@@ -345,6 +347,8 @@ export function GrowthCallWorkspaceCenterPanel({
   onFollowUpComplete?: () => void
 }) {
   const [savedWrapup, setSavedWrapup] = useState<NativeCallWrapupPublicView | null>(null)
+  const [postCallClosure, setPostCallClosure] = useState<GrowthCallWorkspacePostCallClosure | null>(null)
+  const [postCallClosureLoading, setPostCallClosureLoading] = useState(false)
   const [elapsed, setElapsed] = useState(activeSession?.durationSeconds ?? 0)
   const externalBridge = isExternalBridgeSession(activeSession)
   const liveCoachingFocusMode = phase === "active" || phase === "bridge_pending"
@@ -352,8 +356,36 @@ export function GrowthCallWorkspaceCenterPanel({
   const assistCompactMode = workspaceContext?.deferredAnalytics ?? false
 
   useEffect(() => {
-    if (phase !== "wrapup") setSavedWrapup(null)
-  }, [phase, activeSession?.id])
+    if (phase !== "wrapup") {
+      setSavedWrapup(null)
+      setPostCallClosure(null)
+      return
+    }
+
+    if (!activeSession?.leadId) return
+
+    const params = new URLSearchParams({
+      sessionId: activeSession.id,
+      leadId: activeSession.leadId,
+      finalize: "false",
+    })
+    if (activeSession.realtimeSessionId) {
+      params.set("realtimeSessionId", activeSession.realtimeSessionId)
+    }
+    if (activeSession.companyName) {
+      params.set("companyName", activeSession.companyName)
+    }
+
+    setPostCallClosureLoading(true)
+    void fetch(`/api/platform/growth/calls/post-call-closure?${params.toString()}`)
+      .then(async (res) => {
+        const data = (await res.json().catch(() => ({}))) as {
+          closure?: GrowthCallWorkspacePostCallClosure
+        }
+        if (res.ok && data.closure) setPostCallClosure(data.closure)
+      })
+      .finally(() => setPostCallClosureLoading(false))
+  }, [phase, activeSession?.id, activeSession?.leadId, activeSession?.realtimeSessionId, activeSession?.companyName])
 
   useEffect(() => {
     if (!activeSession || !["active", "on_hold"].includes(activeSession.status) || !activeSession.connectedAt) {
@@ -596,6 +628,10 @@ export function GrowthCallWorkspaceCenterPanel({
               />
             ) : (
               <>
+                <GrowthCallWorkspacePostCallClosurePanel
+                  closure={postCallClosure}
+                  loading={postCallClosureLoading}
+                />
                 <GrowthCallWorkspaceUnifiedAssistPanel
                   phase="wrapup"
                   nativeSessionId={activeSession.id}

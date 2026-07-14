@@ -31,6 +31,8 @@ import {
 } from "@/lib/voice/repository/voice-drop-repository"
 import { getVoiceDropCampaign } from "@/lib/voice/repository/voice-drop-repository"
 import { VOICE_DROP_FREQUENCY_CAP_DAYS } from "@/lib/voice/voice-drops/types"
+import { enforceCanonicalDecisionForSequenceChannelJob } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-sequence-enforcement"
+import type { CanonicalSequenceEnforcementTrustedGate } from "@/lib/growth/aios/growth/growth-canonical-decision-engine-1d-types"
 
 export async function runSequenceVoiceDropExecutionJob(
   admin: SupabaseClient,
@@ -39,11 +41,22 @@ export async function runSequenceVoiceDropExecutionJob(
     actingUserId: string
     actingUserEmail: string
     auditActorUserId: string
+    trustedGate?: CanonicalSequenceEnforcementTrustedGate | null
   },
 ): Promise<GrowthSequenceExecutionRunResult> {
   const { job } = input
   if (!job.sequenceStepId) {
     return { ok: false, jobId: job.id, status: "blocked", message: "missing_step", blocked: true }
+  }
+
+  const canonicalGate = await enforceCanonicalDecisionForSequenceChannelJob(admin, {
+    job,
+    channelLabel: "voice_drop",
+    cacheScope: `sequence-voice-drop:${job.id}`,
+    trustedGate: input.trustedGate,
+  })
+  if (!canonicalGate.allowed) {
+    return canonicalGate.result
   }
 
   const preflight = await evaluateSequenceVoiceDropExecutionPreflight(admin, {
